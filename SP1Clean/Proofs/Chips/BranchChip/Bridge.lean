@@ -113,7 +113,9 @@ theorem correct_branch_native
 
 /-- End-to-end: from the BRANCH chip's verified `Spec` (on a real row) plus the PC/rs1/rs2 reads, the
 committed rs1/rs2 ↔ Sail reassembly, the immediate decode, and the committed-pc reassembly, the RISC-V
-`BTYPE` execution agrees with the SP1 chip emulation — flag-dispatched over the six opcodes. -/
+`BTYPE` execution agrees with the SP1 chip emulation — flag-dispatched over the six opcodes. The
+branch-target 4-byte alignment is **derived** from the `Spec`'s divisibility conjunct (the in-circuit
+`÷4` range check), not assumed. -/
 theorem branch_chip_reaches_sail
     (inp : BranchChip.Inputs (ZMod p)) (cols : Extracted.BranchColumns (ZMod p))
     (data : ProverData (ZMod p))
@@ -127,8 +129,7 @@ theorem branch_chip_reaches_sail
     (h_rs1v : Word.toBitVec64 (BranchChip.rs1Word cols) = rs1_val)
     (h_rs2v : Word.toBitVec64 (BranchChip.rs2Word cols) = rs2_val)
     (h_dec : Word.toBitVec64 cols.adapter.op_c_imm = sign_extend (m := 64) imm)
-    (h_pcw : Word.toBitVec64 (BranchChip.pcWord cols) = pc)
-    (h_align : (Word.toBitVec64 (BranchChip.nextPcWord cols)).toNat % 4 = 0) :
+    (h_pcw : Word.toBitVec64 (BranchChip.pcWord cols) = pc) :
     (cols.is_beq = 1 →
         (spec_btype imm (.Regidx rs2) (.Regidx rs1) bop.BEQ).run s
           = (sp1_branch (BranchChip.nextPcWord cols)).run s) ∧
@@ -147,7 +148,13 @@ theorem branch_chip_reaches_sail
     (cols.is_bgeu = 1 →
         (spec_btype imm (.Regidx rs2) (.Regidx rs1) bop.BGEU).run s
           = (sp1_branch (BranchChip.nextPcWord cols)).run s) := by
-  obtain ⟨_, _, h_flags, h_taken_gated, h_fall_gated, h_decision⟩ := h_chip
+  obtain ⟨_, _, h_flags, h_taken_gated, h_fall_gated, h_decision, h_div⟩ := h_chip
+  -- 4-byte alignment is now a verified `Spec` conjunct (the in-circuit `÷4` range check), not an assumed
+  -- precondition: lift the low-limb divisibility to the committed `next_pc` word.
+  have h_align : (Word.toBitVec64 (BranchChip.nextPcWord cols)).toNat % 4 = 0 := by
+    rw [Word.toBitVec64_toNat_mod_four]
+    simpa only [BranchChip.nextPcWord, Vector.getElem_mk, List.getElem_toArray,
+      List.getElem_cons_zero] using h_div h_real
   have h_brbin : cols.is_branching = 0 ∨ cols.is_branching = 1 := h_flags.2.2.2.2.2.2
   have key : ∀ op : bop, (cols.is_branching = 1 ↔ branchCond op rs1_val rs2_val) →
       (spec_btype imm (.Regidx rs2) (.Regidx rs1) op).run s
@@ -183,8 +190,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- BRANCH's `ChipKind` registration. `view` threads `next_pc = cols.next_pc`, I-type adapter, opcode
-`Σ is_b*·k`; no destination write. `sailEquiv` is the six-way flag-dispatched conjunction; `reaches_sail`
-is `branch_chip_reaches_sail`. -/
+`Σ is_b*·k`; no destination write. `sailEquiv` is the six-way flag-dispatched conjunction; the
+branch-target 4-byte alignment is no longer a precondition — `reaches_sail` derives it from the chip
+`Spec`. `reaches_sail` is `branch_chip_reaches_sail`. -/
 def kind : Soundness.ChipKind p where
   name := "Branch"
   Inputs := BranchChip.Inputs
@@ -203,7 +211,6 @@ def kind : Soundness.ChipKind p where
       Word.toBitVec64 (BranchChip.rs2Word cols) = rs2_val →
       Word.toBitVec64 cols.adapter.op_c_imm = sign_extend (m := 64) imm →
       Word.toBitVec64 (BranchChip.pcWord cols) = pc →
-      (Word.toBitVec64 (BranchChip.nextPcWord cols)).toNat % 4 = 0 →
       (cols.is_beq = 1 →
           (spec_btype imm (.Regidx rs2) (.Regidx rs1) bop.BEQ).run s
             = (sp1_branch (BranchChip.nextPcWord cols)).run s) ∧
@@ -223,8 +230,8 @@ def kind : Soundness.ChipKind p where
           (spec_btype imm (.Regidx rs2) (.Regidx rs1) bop.BGEU).run s
             = (sp1_branch (BranchChip.nextPcWord cols)).run s)
   reaches_sail := fun inp cols data s h_real h_chip rs1 rs2 imm pc rs1_val rs2_val
-      hs h_pc h_rs1 h_rs2 h_rs1v h_rs2v h_dec h_pcw h_align =>
+      hs h_pc h_rs1 h_rs2 h_rs1v h_rs2v h_dec h_pcw =>
     branch_chip_reaches_sail inp cols data rs1 rs2 imm pc rs1_val rs2_val s hs h_real h_chip
-      h_pc h_rs1 h_rs2 h_rs1v h_rs2v h_dec h_pcw h_align
+      h_pc h_rs1 h_rs2 h_rs1v h_rs2v h_dec h_pcw
 
 end SP1Clean.BranchChip

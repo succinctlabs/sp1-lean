@@ -76,6 +76,55 @@ theorem addw_chip_reaches_sail
     ((h_chip.2.2 h_real).trans
       (AddwChip.rv64_addw_eq (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)))
 
+/-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `ADDIW` (I-type add-word-immediate). -/
+noncomputable def spec_addiw (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_ADDIW imm rs1 rd
+  pure ()
+
+set_option linter.unusedSimpArgs false in
+omit [Fact (2 ^ 17 < p)] in
+/-- Native Sail equivalence for ADDIW: the chip's semantic fact (`h_addw`, with the immediate operand
+`op_c_val` bound to `sign_extend imm` via `h_dec`) plus the rs1/PC reads drive `spec_addiw ≡ sp1_addw`. The
+Sail `ADDIW` writes `sign_extend (extractLsb (rX rs1 + immext) 31 0)`, which `addw_pure_eq` ties to the
+chip's `signExtend 64 (setWidth 32 (op_b + op_c))`. -/
+theorem correct_addiw_native
+    (op_b_val op_c_val a_val : Word (ZMod p))
+    (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
+    (h_pc : s.regs.get? Register.PC = some pc)
+    (h_rs1 : s.get_reg? rs1_idx = some (Word.toBitVec64 op_b_val))
+    (h_dec : Word.toBitVec64 op_c_val = sign_extend (m := 64) imm)
+    (h_addw : Word.toBitVec64 a_val =
+      (BitVec.setWidth 32 (Word.toBitVec64 op_b_val + Word.toBitVec64 op_c_val)).signExtend 64) :
+    (spec_addiw imm (.Regidx rs1_idx) (.Regidx rd_idx)).run s
+      = (sp1_addw (.Regidx rd_idx) pc a_val).run s := by
+  have harm : Word.toBitVec64 a_val
+      = sign_extend (m := 64) (Sail.BitVec.extractLsb
+          (Word.toBitVec64 op_b_val + sign_extend (m := 64) imm) 31 0) := by
+    rw [h_addw, ← h_dec]
+    simp only [sign_extend, Sail.BitVec.signExtend]
+    congr 1
+  simp [spec_addiw, sp1_addw, execute_ADDIW, PreSail.readReg, PreSail.writeReg,
+    Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- End-to-end (ADDIW): from the ADDW chip's verified `Spec` plus the rs1/PC reads and the immediate decode
+(`op_c_val = sign_extend imm`), Sail's `ADDIW` agrees with the SP1 chip emulation. -/
+theorem addiw_chip_reaches_sail
+    (input : AddwChip.Inputs (ZMod p)) (cols : Extracted.AddwCols (ZMod p)) (data : ProverData (ZMod p))
+    (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
+    (h_real : input.is_real = 1)
+    (h_chip : AddwChip.Spec input cols data)
+    (h_pc : s.regs.get? Register.PC = some pc)
+    (h_rs1 : s.get_reg? rs1_idx = some (Word.toBitVec64 input.op_b_val))
+    (h_dec : Word.toBitVec64 input.op_c_val = sign_extend (m := 64) imm) :
+    (spec_addiw imm (.Regidx rs1_idx) (.Regidx rd_idx)).run s
+      = (sp1_addw (.Regidx rd_idx) pc (AddwChip.resultWord cols)).run s :=
+  correct_addiw_native input.op_b_val input.op_c_val (AddwChip.resultWord cols)
+    rs1_idx rd_idx imm pc s h_pc h_rs1 h_dec
+    ((h_chip.2.2 h_real).trans
+      (AddwChip.rv64_addw_eq (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)))
+
 end SP1Clean.AddwSail
 
 namespace SP1Clean.AddwChip
@@ -95,13 +144,23 @@ def kind : Soundness.ChipKind p where
     #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, AddwChip.resultWord cols, 19⟩
   chipSpec := fun inp cols data => Spec inp cols data
-  sailEquiv := fun inp cols s => ∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
-    s.regs.get? Register.PC = some pc →
-    s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) →
-    s.get_reg? rs2 = some (Word.toBitVec64 inp.op_c_val) →
-    (spec_addw (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-      = (sp1_addw (.Regidx rd) pc (AddwChip.resultWord cols)).run s
-  reaches_sail := fun inp cols data s h_real h_chip rs1 rs2 rd pc h_pc h_rs1 h_rs2 =>
-    addw_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2
+  sailEquiv := fun inp cols s =>
+    (∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
+      s.regs.get? Register.PC = some pc →
+      s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) →
+      s.get_reg? rs2 = some (Word.toBitVec64 inp.op_c_val) →
+      (spec_addw (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
+        = (sp1_addw (.Regidx rd) pc (AddwChip.resultWord cols)).run s) ∧
+    (∀ (rs1 rd : BitVec 5) (imm : BitVec 12) (pc : BitVec 64),
+      s.regs.get? Register.PC = some pc →
+      s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) →
+      Word.toBitVec64 inp.op_c_val = sign_extend (m := 64) imm →
+      (spec_addiw imm (.Regidx rs1) (.Regidx rd)).run s
+        = (sp1_addw (.Regidx rd) pc (AddwChip.resultWord cols)).run s)
+  reaches_sail := fun inp cols data s h_real h_chip =>
+    ⟨fun rs1 rs2 rd pc h_pc h_rs1 h_rs2 =>
+       addw_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2,
+     fun rs1 rd imm pc h_pc h_rs1 h_dec =>
+       addiw_chip_reaches_sail inp cols data rs1 rd imm pc s h_real h_chip h_pc h_rs1 h_dec⟩
 
 end SP1Clean.AddwChip

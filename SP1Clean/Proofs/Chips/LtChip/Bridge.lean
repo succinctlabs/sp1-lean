@@ -94,6 +94,63 @@ theorem correct_slt_native
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_slt]
 
+/-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SLTI` (I-type signed
+less-than-immediate). -/
+noncomputable def spec_slti (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_ITYPE imm rs1 rd iop.SLTI
+  pure ()
+
+/-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SLTIU` (unsigned). -/
+noncomputable def spec_sltiu (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_ITYPE imm rs1 rd iop.SLTIU
+  pure ()
+
+set_option linter.unusedSimpArgs false in
+omit [Fact (2 ^ 17 < p)] in
+/-- Native Sail equivalence (signed immediate `SLTI`): the chip's RV64 `slt` fact (`h_slt`, with the
+immediate operand `op_c_val` bound to `sign_extend imm` via `h_dec`) plus the rs1/PC reads drive
+`spec_slti ≡ sp1_lt`. The Sail `SLTI` arm `zero_extend (bool_to_bit (zopz0zI_s (rX rs1) immext))` is the
+same body as the `execute_RTYPE_pure .SLT`, so `execute_RTYPE_pure_slt` retires it. -/
+theorem correct_slti_native
+    (op_b_val op_c_val a_val : Word (ZMod p))
+    (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
+    (h_pc : s.regs.get? Register.PC = some pc)
+    (h_rs1 : s.get_reg? rs1_idx = some (Word.toBitVec64 op_b_val))
+    (h_dec : Word.toBitVec64 op_c_val = sign_extend (m := 64) imm)
+    (h_slt : Word.toBitVec64 a_val
+        = RV64.slt (Word.toBitVec64 op_c_val) (Word.toBitVec64 op_b_val)) :
+    (spec_slti imm (.Regidx rs1_idx) (.Regidx rd_idx)).run s
+      = (sp1_lt (.Regidx rd_idx) pc a_val).run s := by
+  have harm : Word.toBitVec64 a_val
+      = zero_extend (m := 64) (bool_to_bit (zopz0zI_s (Word.toBitVec64 op_b_val)
+          (sign_extend (m := 64) imm))) := by
+    rw [h_slt, ← h_dec, ← execute_RTYPE_pure_slt]; simp [execute_RTYPE_pure]
+  simp [spec_slti, sp1_lt, execute_ITYPE, PreSail.readReg, PreSail.writeReg,
+    Sail.run_rX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
+
+set_option linter.unusedSimpArgs false in
+omit [Fact (2 ^ 17 < p)] in
+/-- Native Sail equivalence (unsigned immediate `SLTIU`): `h_sltu` + rs1/PC reads drive
+`spec_sltiu ≡ sp1_lt`, via the `execute_RTYPE_pure_sltu` Sail-side identity. -/
+theorem correct_sltiu_native
+    (op_b_val op_c_val a_val : Word (ZMod p))
+    (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
+    (h_pc : s.regs.get? Register.PC = some pc)
+    (h_rs1 : s.get_reg? rs1_idx = some (Word.toBitVec64 op_b_val))
+    (h_dec : Word.toBitVec64 op_c_val = sign_extend (m := 64) imm)
+    (h_sltu : Word.toBitVec64 a_val
+        = RV64.sltu (Word.toBitVec64 op_c_val) (Word.toBitVec64 op_b_val)) :
+    (spec_sltiu imm (.Regidx rs1_idx) (.Regidx rd_idx)).run s
+      = (sp1_lt (.Regidx rd_idx) pc a_val).run s := by
+  have harm : Word.toBitVec64 a_val
+      = zero_extend (m := 64) (bool_to_bit (zopz0zI_u (Word.toBitVec64 op_b_val)
+          (sign_extend (m := 64) imm))) := by
+    rw [h_sltu, ← h_dec, ← execute_RTYPE_pure_sltu]; simp [execute_RTYPE_pure]
+  simp [spec_sltiu, sp1_lt, execute_ITYPE, PreSail.readReg, PreSail.writeReg,
+    Sail.run_rX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
+
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end: a real `Lt` chip row reaches the RISC-V Sail set-less-than, flag-dispatched.
 Both SLT and SLTU conjuncts are proven and axiom-clean. -/
@@ -118,6 +175,32 @@ theorem lt_chip_reaches_sail
   · exact correct_sltu_native input.op_b_val input.op_c_val (LtChip.resultWord cols)
       rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 ((h_gated h_real).2 hsltu)
 
+omit [Fact (2 ^ 17 < p)] in
+/-- End-to-end (immediate forms SLTI/SLTIU): a real `Lt` chip row whose `op_c` operand is the
+sign-extended 12-bit immediate (`h_dec`, supplied at the bridge from the program bus) reaches the RISC-V
+Sail I-type set-less-than, flag-dispatched. The chip's `Spec` proves the same RV64 `slt`/`sltu` equation for
+immediate (`imm_c = 1`) rows as for register rows, so both conjuncts are proven and axiom-clean. -/
+theorem lt_chip_reaches_sail_imm
+    (input : LtChip.Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) (data : ProverData (ZMod p))
+    (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
+    (h_real : input.is_real = 1)
+    (h_chip : LtChip.Spec input cols data)
+    (h_pc : s.regs.get? Register.PC = some pc)
+    (h_rs1 : s.get_reg? rs1_idx = some (Word.toBitVec64 input.op_b_val))
+    (h_dec : Word.toBitVec64 input.op_c_val = sign_extend (m := 64) imm) :
+    (cols.is_slt = 1 →
+        (spec_slti imm (.Regidx rs1_idx) (.Regidx rd_idx)).run s
+          = (sp1_lt (.Regidx rd_idx) pc (LtChip.resultWord cols)).run s) ∧
+    (cols.is_sltu = 1 →
+        (spec_sltiu imm (.Regidx rs1_idx) (.Regidx rd_idx)).run s
+          = (sp1_lt (.Regidx rd_idx) pc (LtChip.resultWord cols)).run s) := by
+  obtain ⟨-, -, h_gated⟩ := h_chip
+  refine ⟨fun hslt => ?_, fun hsltu => ?_⟩
+  · exact correct_slti_native input.op_b_val input.op_c_val (LtChip.resultWord cols)
+      rs1_idx rd_idx imm pc s h_pc h_rs1 h_dec ((h_gated h_real).1 hslt)
+  · exact correct_sltiu_native input.op_b_val input.op_c_val (LtChip.resultWord cols)
+      rs1_idx rd_idx imm pc s h_pc h_rs1 h_dec ((h_gated h_real).2 hsltu)
+
 end SP1Clean.LtSail
 
 namespace SP1Clean.LtChip
@@ -128,7 +211,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- **Lt's `ChipKind` registration.** Program-bus opcode `is_slt·9 + is_sltu·10`; `sailEquiv` is the
-flag-dispatched SLT/SLTU conjunction; `reaches_sail` is `lt_chip_reaches_sail`. -/
+conjunction of the **register** SLT/SLTU guarantee (gated on the rs2 read) and the **immediate** SLTI/SLTIU
+guarantee (gated on the program-bus immediate decode `op_c_val = sign_extend imm`), each flag-dispatched.
+A row is register (`imm_c = 0`) or immediate (`imm_c = 1`); the consumer picks the matching conjunct. -/
 def kind : Soundness.ChipKind p where
   name := "Lt"
   Inputs := LtChip.Inputs
@@ -138,17 +223,31 @@ def kind : Soundness.ChipKind p where
     cols.adapter.toAdapterView, inp.is_real, resultWord cols,
     cols.is_slt * 9 + cols.is_sltu * 10⟩
   chipSpec := fun inp cols data => Spec inp cols data
-  sailEquiv := fun inp cols s => ∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
-    s.regs.get? Register.PC = some pc →
-    s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) →
-    s.get_reg? rs2 = some (Word.toBitVec64 inp.op_c_val) →
-    (cols.is_slt = 1 →
-        (spec_slt (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_lt (.Regidx rd) pc (resultWord cols)).run s) ∧
-    (cols.is_sltu = 1 →
-        (spec_sltu (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_lt (.Regidx rd) pc (resultWord cols)).run s)
-  reaches_sail := fun inp cols data s h_real h_chip rs1 rs2 rd pc h_pc h_rs1 h_rs2 =>
-    lt_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2
+  sailEquiv := fun inp cols s =>
+    (∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
+      s.regs.get? Register.PC = some pc →
+      s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) →
+      s.get_reg? rs2 = some (Word.toBitVec64 inp.op_c_val) →
+      (cols.is_slt = 1 →
+          (spec_slt (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
+            = (sp1_lt (.Regidx rd) pc (resultWord cols)).run s) ∧
+      (cols.is_sltu = 1 →
+          (spec_sltu (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
+            = (sp1_lt (.Regidx rd) pc (resultWord cols)).run s)) ∧
+    (∀ (rs1 rd : BitVec 5) (imm : BitVec 12) (pc : BitVec 64),
+      s.regs.get? Register.PC = some pc →
+      s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) →
+      Word.toBitVec64 inp.op_c_val = sign_extend (m := 64) imm →
+      (cols.is_slt = 1 →
+          (spec_slti imm (.Regidx rs1) (.Regidx rd)).run s
+            = (sp1_lt (.Regidx rd) pc (resultWord cols)).run s) ∧
+      (cols.is_sltu = 1 →
+          (spec_sltiu imm (.Regidx rs1) (.Regidx rd)).run s
+            = (sp1_lt (.Regidx rd) pc (resultWord cols)).run s))
+  reaches_sail := fun inp cols data s h_real h_chip =>
+    ⟨fun rs1 rs2 rd pc h_pc h_rs1 h_rs2 =>
+       lt_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2,
+     fun rs1 rd imm pc h_pc h_rs1 h_dec =>
+       lt_chip_reaches_sail_imm inp cols data rs1 rd imm pc s h_real h_chip h_pc h_rs1 h_dec⟩
 
 end SP1Clean.LtChip
