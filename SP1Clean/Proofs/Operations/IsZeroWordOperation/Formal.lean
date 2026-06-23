@@ -42,14 +42,12 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   circuit_proof_start
   obtain ⟨hs0, hs1, hs2, hs3, _hbreal, hbres, hf, hsec, hg⟩ := h_holds
   obtain ⟨hia, -⟩ := h_input
-  have ea0 : Expression.eval env input_var_a[0] = input_a[0] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea1 : Expression.eval env input_var_a[1] = input_a[1] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea2 : Expression.eval env input_var_a[2] = input_a[2] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea3 : Expression.eval env input_var_a[3] = input_a[3] := by rw [← hia]; simp [Vector.getElem_map]
-  have S0 := hs0 h_assumptions; rw [ea0] at S0
-  have S1 := hs1 h_assumptions; rw [ea1] at S1
-  have S2 := hs2 h_assumptions; rw [ea2] at S2
-  have S3 := hs3 h_assumptions; rw [ea3] at S3
+  have ea : ∀ i (hi : i < 4), Expression.eval env input_var_a[i] = input_a[i] := by
+    intro i hi; rw [← hia]; simp [Vector.getElem_map]
+  have S0 := hs0 h_assumptions; rw [ea 0 (by norm_num)] at S0
+  have S1 := hs1 h_assumptions; rw [ea 1 (by norm_num)] at S1
+  have S2 := hs2 h_assumptions; rw [ea 2 (by norm_num)] at S2
+  have S3 := hs3 h_assumptions; rw [ea 3 (by norm_num)] at S3
   rw [← sub_eq_add_neg] at hf hsec
   refine ⟨⟨bool_of_mul_pred hbres, eq_of_sub_eq_zero hf, eq_of_sub_eq_zero hsec,
       S0, S1, S2, S3, ?_⟩, Or.inl rfl, Or.inl rfl, Or.inl rfl, Or.inl rfl⟩
@@ -63,15 +61,13 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   circuit_proof_start
   obtain ⟨hbres, hf, hsec, hS0, hS1, hS2, hS3, hg⟩ := h_spec
   obtain ⟨hia, -⟩ := h_input
-  have ea0 : Expression.eval env.toEnvironment input_var_a[0] = input_a[0] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea1 : Expression.eval env.toEnvironment input_var_a[1] = input_a[1] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea2 : Expression.eval env.toEnvironment input_var_a[2] = input_a[2] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea3 : Expression.eval env.toEnvironment input_var_a[3] = input_a[3] := by rw [← hia]; simp [Vector.getElem_map]
+  have ea : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_a[i] = input_a[i] := by
+    intro i hi; rw [← hia]; simp [Vector.getElem_map]
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · exact ⟨h_assumptions, by rw [ea0]; exact hS0⟩
-  · exact ⟨h_assumptions, by rw [ea1]; exact hS1⟩
-  · exact ⟨h_assumptions, by rw [ea2]; exact hS2⟩
-  · exact ⟨h_assumptions, by rw [ea3]; exact hS3⟩
+  · exact ⟨h_assumptions, by rw [ea 0 (by norm_num)]; exact hS0⟩
+  · exact ⟨h_assumptions, by rw [ea 1 (by norm_num)]; exact hS1⟩
+  · exact ⟨h_assumptions, by rw [ea 2 (by norm_num)]; exact hS2⟩
+  · exact ⟨h_assumptions, by rw [ea 3 (by norm_num)]; exact hS3⟩
   · rcases h_assumptions with h | h <;> simp [h]
   · rcases hbres with h | h <;> simp [h]
   · simp [hf]
@@ -81,17 +77,23 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     · rw [h, one_mul, hg h]; simp
 
 omit [Fact (2 ^ 17 < p)] in
+/-- The populated `result` is boolean for **any** source word (a product of per-limb `0/1`
+indicators) — the ungated structural fact `spec_populate_offGate` needs. -/
+theorem populate_result_bool (w : Word (ZMod p)) :
+    (populate w).result = 0 ∨ (populate w).result = 1 := by
+  simp only [populate, IsZeroOperation.populate]
+  by_cases h0 : w[0] = 0 <;> by_cases h1 : w[1] = 0 <;> by_cases h2 : w[2] = 0 <;>
+    by_cases h3 : w[3] = 0 <;> simp [h0, h1, h2, h3]
+
+omit [Fact (2 ^ 17 < p)] in
 /-- The witnessed columns `populate a` satisfy the gadget `Spec` for any `is_real`. The composing op
 (`IsEqualWord`) / top-level chip uses this to discharge the `assertion IsZeroWordOperation.circuit`
 prover obligation. -/
 theorem spec_populate (a : Word (ZMod p)) (is_real : ZMod p) :
-    Spec (⟨a, populate a, is_real⟩ : Inputs (ZMod p)) := by
-  refine ⟨?_, rfl, rfl, IsZeroOperation.spec_populate a[0] is_real,
+    Spec (⟨a, populate a, is_real⟩ : Inputs (ZMod p)) :=
+  ⟨populate_result_bool a, rfl, rfl, IsZeroOperation.spec_populate a[0] is_real,
     IsZeroOperation.spec_populate a[1] is_real, IsZeroOperation.spec_populate a[2] is_real,
     IsZeroOperation.spec_populate a[3] is_real, fun _ => rfl⟩
-  simp only [populate, IsZeroOperation.populate]
-  by_cases h0 : a[0] = 0 <;> by_cases h1 : a[1] = 0 <;> by_cases h2 : a[2] = 0 <;>
-    by_cases h3 : a[3] = 0 <;> simp [h0, h1, h2, h3]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Semantic exposure: on a real row the `Spec` forces `result` to be the word zero-indicator. -/
@@ -100,15 +102,6 @@ theorem result_semantic {input : Inputs (ZMod p)} (h : Spec input) (hr : input.i
       if (input.a[0] = 0 ∧ input.a[1] = 0 ∧ input.a[2] = 0 ∧ input.a[3] = 0) then 1 else 0 := by
   obtain ⟨_, hf, hs, hS0, hS1, hS2, hS3, hg⟩ := h
   exact result_collapse (hS0 hr).1 (hS1 hr).1 (hS2 hr).1 (hS3 hr).1 hf hs (hg hr)
-
-omit [Fact (2 ^ 17 < p)] in
-/-- The populated `result` is boolean for **any** source word (a product of per-limb `0/1`
-indicators) — the ungated structural fact `spec_populate_offGate` needs. -/
-theorem populate_result_bool (w : Word (ZMod p)) :
-    (populate w).result = 0 ∨ (populate w).result = 1 := by
-  simp only [populate, IsZeroOperation.populate]
-  by_cases h0 : w[0] = 0 <;> by_cases h1 : w[1] = 0 <;> by_cases h2 : w[2] = 0 <;>
-    by_cases h3 : w[3] = 0 <;> simp [h0, h1, h2, h3]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- `Spec` with the gate off (`is_real = 0`) holds at the populate of **any** word `w` — not just

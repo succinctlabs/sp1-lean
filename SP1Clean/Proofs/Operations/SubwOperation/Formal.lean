@@ -46,13 +46,14 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   obtain ⟨hia, hib, ⟨hiv, _⟩, _⟩ := h_input
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   have h65536 : (2 : ℕ) ^ 16 = 65536 := by norm_num
-  have ea0 : Expression.eval env input_var_a[0] = input_a[0] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea1 : Expression.eval env input_var_a[1] = input_a[1] := by rw [← hia]; simp only [Vector.getElem_map]
-  have eb0 : Expression.eval env input_var_b[0] = input_b[0] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb1 : Expression.eval env input_var_b[1] = input_b[1] := by rw [← hib]; simp only [Vector.getElem_map]
-  have ev0 : Expression.eval env input_var_cols_value[0] = input_cols_value[0] := by rw [← hiv]; simp only [Vector.getElem_map]
-  have ev1 : Expression.eval env input_var_cols_value[1] = input_cols_value[1] := by rw [← hiv]; simp only [Vector.getElem_map]
-  simp only [circuit_norm, byteChannel, ea0, ea1, eb0, eb1, ev0, ev1] at h_holds ⊢
+  have ea : ∀ i (hi : i < 4), Expression.eval env input_var_a[i] = input_a[i] := by
+    intro i hi; rw [← hia]; simp only [Vector.getElem_map]
+  have eb : ∀ i (hi : i < 4), Expression.eval env input_var_b[i] = input_b[i] := by
+    intro i hi; rw [← hib]; simp only [Vector.getElem_map]
+  have ev : ∀ i (hi : i < 2),
+      Expression.eval env input_var_cols_value[i] = input_cols_value[i] := by
+    intro i hi; rw [← hiv]; simp only [Vector.getElem_map]
+  simp only [circuit_norm, byteChannel, ea, eb, ev] at h_holds ⊢
   obtain ⟨h_msb, hr0, hr1, _hgate, hgc0, hgc1⟩ := h_holds
   have h_msb_as : U16MSBOperation.circuit.Assumptions
       (⟨input_cols_value[1], ⟨input_cols_msb_msb⟩, input_is_real⟩ : U16MSBOperation.Inputs (ZMod p)) := by
@@ -91,12 +92,13 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   obtain ⟨ha, hb, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, ⟨hiv, _⟩, _⟩ := h_input
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
-  have ev0 : Expression.eval env.toEnvironment input_var_cols_value[0] = input_cols_value[0] := by rw [← hiv]; simp only [Vector.getElem_map]
-  have ev1 : Expression.eval env.toEnvironment input_var_cols_value[1] = input_cols_value[1] := by rw [← hiv]; simp only [Vector.getElem_map]
-  have ea0 : Expression.eval env.toEnvironment input_var_a[0] = input_a[0] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea1 : Expression.eval env.toEnvironment input_var_a[1] = input_a[1] := by rw [← hia]; simp only [Vector.getElem_map]
-  have eb0 : Expression.eval env.toEnvironment input_var_b[0] = input_b[0] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb1 : Expression.eval env.toEnvironment input_var_b[1] = input_b[1] := by rw [← hib]; simp only [Vector.getElem_map]
+  have ev : ∀ i (hi : i < 2),
+      Expression.eval env.toEnvironment input_var_cols_value[i] = input_cols_value[i] := by
+    intro i hi; rw [← hiv]; simp only [Vector.getElem_map]
+  have ea : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_a[i] = input_a[i] := by
+    intro i hi; rw [← hia]; simp only [Vector.getElem_map]
+  have eb : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_b[i] = input_b[i] := by
+    intro i hi; rw [← hib]; simp only [Vector.getElem_map]
   have key : input_is_real = 1 →
       (input_cols_value[0].val < 2 ^ 16 ∧ input_cols_value[1].val < 2 ^ 16) ∧
       RawSpec input_a input_b ⟨input_cols_value, ⟨input_cols_msb_msb⟩⟩ ∧
@@ -108,7 +110,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       List.getElem_cons_zero, List.getElem_cons_succ] at hUv0 hUv1
     obtain ⟨h_raw, h_msbval⟩ := carries_of_subwSemantics ha hb hU hbveq
     exact ⟨⟨hUv0, hUv1⟩, h_raw, h_msbval⟩
-  simp only [circuit_norm, byteChannel, ea0, ea1, eb0, eb1, ev0, ev1]
+  simp only [circuit_norm, byteChannel, ea, eb, ev]
   refine ⟨⟨⟨fun hr1 => (key hr1).1.2, hbin⟩, ⟨h_spec.1, fun hr1 => (key hr1).2.2⟩⟩, ?_, ?_, ?_, ?_, ?_⟩
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
