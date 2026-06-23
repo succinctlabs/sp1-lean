@@ -44,7 +44,7 @@ theorem cpustate_constraints_faithful
     Interaction.toProp_send_state, ByteOpcode.ofNat_six, ByteOpcode.ofNat_three,
     ByteOpcode.constrain_Range, ByteOpcode.constrain_U8Range, val_13, ZMod.val_zero,
     one_ne_zero, ne_eq, not_false_eq_true, true_implies, sub_self, mul_zero,
-    Nat.ofNat_pos, true_and, and_true, show (2 : ℕ) ^ 8 = 256 from by norm_num]
+    Nat.ofNat_pos, true_and, and_true, show (2 : ℕ) ^ 8 = 256 by norm_num]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- **CPUState fragment — assertion half.** `CPUState` emits only the (vacuous at `is_real = 1`)
@@ -67,7 +67,7 @@ theorem cpustate_interactions_faithful
     Interaction.toProp_send_state, ByteOpcode.ofNat_six, ByteOpcode.ofNat_three,
     ByteOpcode.constrain_Range, ByteOpcode.constrain_U8Range, val_13, ZMod.val_zero,
     one_ne_zero, ne_eq, not_false_eq_true, true_implies,
-    Nat.ofNat_pos, true_and, and_true, show (2 : ℕ) ^ 8 = 256 from by norm_num]
+    Nat.ofNat_pos, true_and, and_true, show (2 : ℕ) ^ 8 = 256 by norm_num]
 
 open SP1Clean.Channels (stateChannel byteChannel StateMsg)
 
