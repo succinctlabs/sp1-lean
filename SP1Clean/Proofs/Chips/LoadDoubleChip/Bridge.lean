@@ -163,34 +163,34 @@ theorem correct_load_double_native
         h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
   -- Register read of `rs1` survives the `nextPC` write.
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
-    rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs1
+    rwa [hsp, SailState.get_reg?_insert_nextPC]
   -- The eight memory bytes on `sp` (same memory as `s`), in the `reg_val.toNat + offset.toNat` form.
   have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
       = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
   have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]?
-      = some (BitVec.ofNat 8 loaded[0].val) := by rw [hmem_eq, ← hadd]; exact hmem₀
+      = some (BitVec.ofNat 8 loaded[0].val) := by rwa [hmem_eq, ← hadd]
   have hm₁ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]?
-      = some (BitVec.ofNat 8 (loaded[0].val >>> 8)) := by rw [hmem_eq, ← hadd]; exact hmem₁
+      = some (BitVec.ofNat 8 (loaded[0].val >>> 8)) := by rwa [hmem_eq, ← hadd]
   have hm₂ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2]?
-      = some (BitVec.ofNat 8 loaded[1].val) := by rw [hmem_eq, ← hadd]; exact hmem₂
+      = some (BitVec.ofNat 8 loaded[1].val) := by rwa [hmem_eq, ← hadd]
   have hm₃ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 3]?
-      = some (BitVec.ofNat 8 (loaded[1].val >>> 8)) := by rw [hmem_eq, ← hadd]; exact hmem₃
+      = some (BitVec.ofNat 8 (loaded[1].val >>> 8)) := by rwa [hmem_eq, ← hadd]
   have hm₄ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4]?
-      = some (BitVec.ofNat 8 loaded[2].val) := by rw [hmem_eq, ← hadd]; exact hmem₄
+      = some (BitVec.ofNat 8 loaded[2].val) := by rwa [hmem_eq, ← hadd]
   have hm₅ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 5]?
-      = some (BitVec.ofNat 8 (loaded[2].val >>> 8)) := by rw [hmem_eq, ← hadd]; exact hmem₅
+      = some (BitVec.ofNat 8 (loaded[2].val >>> 8)) := by rwa [hmem_eq, ← hadd]
   have hm₆ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 6]?
-      = some (BitVec.ofNat 8 loaded[3].val) := by rw [hmem_eq, ← hadd]; exact hmem₆
+      = some (BitVec.ofNat 8 loaded[3].val) := by rwa [hmem_eq, ← hadd]
   have hm₇ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 7]?
-      = some (BitVec.ofNat 8 (loaded[3].val >>> 8)) := by rw [hmem_eq, ← hadd]; exact hmem₇
+      = some (BitVec.ofNat 8 (loaded[3].val >>> 8)) := by rwa [hmem_eq, ← hadd]
   -- The alignment fact in Sail form, and the range-subset PMA fact.
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 8 = true := by
-    rw [is_aligned_vaddr_iff_mod, hadd]; exact h_aligned
+    rwa [is_aligned_vaddr_iff_mod, hadd]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 8 (by omega) h_lo (by rw [hadd]; exact h_hi)
+    range_subset_sp1_pma _ 8 (by omega) h_lo (by rwa [hadd])
   -- The read result on `sp`.
   have hread := run_vmem_read_of_width_8' rs1_idx reg_val (BitVec.signExtend 64 imm)
     (BitVec.ofNat 8 loaded[0].val) (BitVec.ofNat 8 (loaded[0].val >>> 8))
@@ -281,11 +281,11 @@ theorem ld_chip_reaches_sail
     cols.memory_access.prev_value pc s hs hconfig h_pc h_rs1 ?_ ?_ ?_ ?_ hloaded
     hmem₀ hmem₁ hmem₂ hmem₃ hmem₄ hmem₅ hmem₆ hmem₇
   · -- alignment: `sum % 8 = 0` from the chip's `sum % 2^48 % 8 = 0`
-    rw [hreg, hoff, ← Nat.mod_mod_of_dvd _ (by norm_num : (8 : ℕ) ∣ 2 ^ 48)]; exact h_align48
+    rwa [hreg, hoff, ← Nat.mod_mod_of_dvd _ (by norm_num : (8 : ℕ) ∣ 2 ^ 48)]
   · -- fits in 64 bits (from the read-fits bound)
     rw [hreg, hoff]; omega
   · -- read fits in the 48-bit physical window
-    rw [hreg, hoff]; exact h_hi
+    rwa [hreg, hoff]
   · -- non-reserved: `2^16 ≤ (reg_val + offset).toNat`, no wrap since `sum < 2^48`
     rw [BitVec.toNat_add, hreg, hoff, Nat.mod_eq_of_lt (by omega)]; omega
 
