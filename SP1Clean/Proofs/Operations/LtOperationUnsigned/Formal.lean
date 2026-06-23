@@ -150,21 +150,17 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   obtain ⟨hbcc_imp, hbin⟩ := h_assumptions
   obtain ⟨hib, hicc, hicols, hir⟩ := h_input
   obtain ⟨_hibit, hiflags, _hineinv, hicl⟩ := hicols
-  have eb0 : Expression.eval env input_var_b[0] = input_b[0] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb1 : Expression.eval env input_var_b[1] = input_b[1] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb2 : Expression.eval env input_var_b[2] = input_b[2] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb3 : Expression.eval env input_var_b[3] = input_b[3] := by rw [← hib]; simp only [Vector.getElem_map]
-  have ec0 : Expression.eval env input_var_cc[0] = input_cc[0] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec1 : Expression.eval env input_var_cc[1] = input_cc[1] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec2 : Expression.eval env input_var_cc[2] = input_cc[2] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec3 : Expression.eval env input_var_cc[3] = input_cc[3] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ef0 : Expression.eval env input_var_cols_u16_flags[0] = input_cols_u16_flags[0] := by rw [← hiflags]; simp only [Vector.getElem_map]
-  have ef1 : Expression.eval env input_var_cols_u16_flags[1] = input_cols_u16_flags[1] := by rw [← hiflags]; simp only [Vector.getElem_map]
-  have ef2 : Expression.eval env input_var_cols_u16_flags[2] = input_cols_u16_flags[2] := by rw [← hiflags]; simp only [Vector.getElem_map]
-  have ef3 : Expression.eval env input_var_cols_u16_flags[3] = input_cols_u16_flags[3] := by rw [← hiflags]; simp only [Vector.getElem_map]
-  have ecl0 : Expression.eval env input_var_cols_comparison_limbs[0] = input_cols_comparison_limbs[0] := by rw [← hicl]; simp only [Vector.getElem_map]
-  have ecl1 : Expression.eval env input_var_cols_comparison_limbs[1] = input_cols_comparison_limbs[1] := by rw [← hicl]; simp only [Vector.getElem_map]
-  simp only [id_eq, eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3, ef0, ef1, ef2, ef3, ecl0, ecl1] at h_holds ⊢
+  have eb : ∀ i (hi : i < 4), Expression.eval env input_var_b[i] = input_b[i] := by
+    intro i hi; rw [← hib]; simp only [Vector.getElem_map]
+  have ec : ∀ i (hi : i < 4), Expression.eval env input_var_cc[i] = input_cc[i] := by
+    intro i hi; rw [← hicc]; simp only [Vector.getElem_map]
+  have ef : ∀ i (hi : i < 4),
+      Expression.eval env input_var_cols_u16_flags[i] = input_cols_u16_flags[i] := by
+    intro i hi; rw [← hiflags]; simp only [Vector.getElem_map]
+  have ecl : ∀ i (hi : i < 2),
+      Expression.eval env input_var_cols_comparison_limbs[i] = input_cols_comparison_limbs[i] := by
+    intro i hi; rw [← hicl]; simp only [Vector.getElem_map]
+  simp only [id_eq, eb, ec, ef, ecl] at h_holds ⊢
   obtain ⟨h_cmp, hE1, hE6, hE8, hE10, hE12, hE14, hE19, hE27, hE35, hE43, hE48, hE49, hE54⟩ := h_holds
   -- the composed `U16Compare` assertion's `Assumptions` (cl ranges on a real row, via the cores).
   have hCmpAs : U16CompareOperation.circuit.Assumptions
@@ -199,20 +195,17 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   obtain ⟨hbcc_imp, hbin⟩ := h_assumptions
   obtain ⟨hib, hicc, hicols, hir⟩ := h_input
   obtain ⟨_hibit, hiflags, _hineinv, hicl⟩ := hicols
-  have eb0 : Expression.eval env.toEnvironment input_var_b[0] = input_b[0] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb1 : Expression.eval env.toEnvironment input_var_b[1] = input_b[1] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb2 : Expression.eval env.toEnvironment input_var_b[2] = input_b[2] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb3 : Expression.eval env.toEnvironment input_var_b[3] = input_b[3] := by rw [← hib]; simp only [Vector.getElem_map]
-  have ec0 : Expression.eval env.toEnvironment input_var_cc[0] = input_cc[0] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec1 : Expression.eval env.toEnvironment input_var_cc[1] = input_cc[1] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec2 : Expression.eval env.toEnvironment input_var_cc[2] = input_cc[2] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec3 : Expression.eval env.toEnvironment input_var_cc[3] = input_cc[3] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ef0 : Expression.eval env.toEnvironment input_var_cols_u16_flags[0] = input_cols_u16_flags[0] := by rw [← hiflags]; simp only [Vector.getElem_map]
-  have ef1 : Expression.eval env.toEnvironment input_var_cols_u16_flags[1] = input_cols_u16_flags[1] := by rw [← hiflags]; simp only [Vector.getElem_map]
-  have ef2 : Expression.eval env.toEnvironment input_var_cols_u16_flags[2] = input_cols_u16_flags[2] := by rw [← hiflags]; simp only [Vector.getElem_map]
-  have ef3 : Expression.eval env.toEnvironment input_var_cols_u16_flags[3] = input_cols_u16_flags[3] := by rw [← hiflags]; simp only [Vector.getElem_map]
-  have ecl0 : Expression.eval env.toEnvironment input_var_cols_comparison_limbs[0] = input_cols_comparison_limbs[0] := by rw [← hicl]; simp only [Vector.getElem_map]
-  have ecl1 : Expression.eval env.toEnvironment input_var_cols_comparison_limbs[1] = input_cols_comparison_limbs[1] := by rw [← hicl]; simp only [Vector.getElem_map]
+  have eb : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_b[i] = input_b[i] := by
+    intro i hi; rw [← hib]; simp only [Vector.getElem_map]
+  have ec : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_cc[i] = input_cc[i] := by
+    intro i hi; rw [← hicc]; simp only [Vector.getElem_map]
+  have ef : ∀ i (hi : i < 4),
+      Expression.eval env.toEnvironment input_var_cols_u16_flags[i] = input_cols_u16_flags[i] := by
+    intro i hi; rw [← hiflags]; simp only [Vector.getElem_map]
+  have ecl : ∀ i (hi : i < 2),
+      Expression.eval env.toEnvironment input_var_cols_comparison_limbs[i]
+        = input_cols_comparison_limbs[i] := by
+    intro i hi; rw [← hicl]; simp only [Vector.getElem_map]
   obtain ⟨hf0, hf1, hf2, hf3, hsum, hs3, hs2, hs1, hs0, hcl0eq, hcl1eq, hinv, hbitbool, hbitord⟩ := h_spec
   -- the composed `U16Compare` assertion's `Assumptions` ∧ `Spec` (cl ranges via the cores on a real row).
   have h_sel_real : input_is_real = 1 → Selectors input_b input_cc
@@ -231,7 +224,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   have hCmpSpec : U16CompareOperation.circuit.Spec
       ⟨input_cols_comparison_limbs[0], input_cols_comparison_limbs[1],
         ⟨input_cols_u16_compare_operation_bit⟩, input_is_real⟩ := ⟨hbitbool, hbitord⟩
-  simp only [id_eq, eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3, ef0, ef1, ef2, ef3, ecl0, ecl1]
+  simp only [id_eq, eb, ec, ef, ecl]
   refine ⟨⟨hCmpAs, hCmpSpec⟩, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · rcases hbin with h | h <;> rw [h] <;> ring
   · rcases hf0 with h | h <;> rw [h] <;> ring
