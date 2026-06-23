@@ -218,14 +218,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       · right; rw [h1, hb0]; simp
       · left; rw [h1, hb1]; simp
 
-set_option linter.unusedSectionVars false in
-/-- A length-4 `#v` of pointwise evaluations folds to the `Vector.map` of the evaluator. -/
-private lemma vec4_eval (e : Environment (ZMod p)) (v : Vector (Expression (ZMod p)) 4) :
-    (#v[Expression.eval e v[0], Expression.eval e v[1], Expression.eval e v[2],
-        Expression.eval e v[3]] : Vector (ZMod p) 4) = Vector.map (Expression.eval e) v := by
-  ext k hk
-  interval_cases k <;> simp [Vector.getElem_map]
-
 set_option maxHeartbeats 4000000 in
 /-- Completeness via honest `ProverHint` flag witnesses (`hintFlags`/`hintBranching`). The six-way
 decision constraint is discharged by mirroring soundness's case analysis in reverse via `Decision`. -/
