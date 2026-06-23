@@ -68,6 +68,47 @@ theorem correct_jal_native
     hsp_pc, hjump, RETIRE_SUCCESS, h_jump, h_link]
   simp [hsp]
 
+omit [Fact (2 ^ 17 < p)] in
+/-- Native Sail equivalence for `jal x0` (the `j` pseudo-instruction). When `rd = x0` the link write is a
+no-op on both sides (`wX_bits 0` is dropped in RV64), so only the jump must match — `h_link` is not needed,
+which is exactly why the chip leaves `op_a_operation.value` unconstrained on `op_a_0 = 1` rows. -/
+theorem correct_jal_native_x0
+    (_op_b_imm next_pc_word op_a_word : Word (ZMod p))
+    (imm : BitVec 21) (pc : BitVec 64) (s : SailState)
+    (hs : SailState.isInitialized s)
+    (h_pc : s.regs.get? Register.PC = some pc)
+    (h_jump : Word.toBitVec64 next_pc_word = pc + sign_extend (m := 64) imm)
+    (h_align : (Word.toBitVec64 next_pc_word).toNat % 4 = 0) :
+    (spec_jal imm (.Regidx 0#5)).run s
+      = (sp1_jal (.Regidx 0#5) pc next_pc_word op_a_word).run s := by
+  have hpc_get : s.regs.get Register.PC (hs _) = pc := by
+    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+  set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
+  have hsp_init : SailState.isInitialized sp :=
+    SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
+  have key : ∀ (reg : Register) (h : reg ∈ s.regs) (h' : reg ∈ sp.regs),
+      reg ≠ Register.nextPC → sp.regs.get reg h' = s.regs.get reg h := by
+    intro reg h h' hne
+    show (s.regs.insert Register.nextPC (pc + 4#64)).get reg _ = _
+    rw [Std.ExtDHashMap.get_insert]; simp [Ne.symm hne]
+  have hsp_pc : sp.regs.get Register.PC (hsp_init _) = pc := by
+    rw [key Register.PC (hs _) (hsp_init _) (by decide)]; exact hpc_get
+  have hsp_npc : sp.regs.get Register.nextPC (hsp_init _) = pc + 4#64 := by
+    show (s.regs.insert Register.nextPC (pc + 4#64)).get Register.nextPC _ = _
+    rw [Std.ExtDHashMap.get_insert]; simp
+  have htgt4 : Word.toBitVec64 next_pc_word % 4#64 = 0 := by
+    apply BitVec.eq_of_toNat_eq; rw [BitVec.toNat_umod]; simpa using h_align
+  have hjump : EStateM.run (jump_to (pc + sign_extend (m := 64) imm)) sp
+      = .ok RETIRE_SUCCESS { sp with regs := sp.regs.insert Register.nextPC (Word.toBitVec64 next_pc_word) } := by
+    rw [← h_jump]; exact jump_to_of_mod4_eq_zero _ sp hsp_init htgt4
+  simp [spec_jal, sp1_jal, execute_JAL, hsp.symm,
+    Sail.run_readReg_bind_of_isInitialized _ _ hs, hpc_get,
+    Sail.run_readReg_bind_of_isInitialized _ _ hsp_init,
+    hsp_pc, hjump, RETIRE_SUCCESS, h_jump]
+  simp [hsp]
+  intro x' hx'
+  simp [Std.ExtDHashMap.get?_insert, beq_iff_eq, hx']
+
 /-- `Word.toBitVec64 #v[4,0,0,0] = 4#64`. -/
 theorem toBitVec64_four : Word.toBitVec64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) = 4#64 := by
   have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
@@ -84,8 +125,9 @@ theorem toBitVec64_four : Word.toBitVec64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMo
   decide
 
 /-- End-to-end: from the JAL chip's verified `Spec` (on a real row) plus the PC read, the committed-pc ↔
-Sail-PC reassembly, the immediate decode, `op_a_0 = 0` (rd ≠ x0), and the jump-target alignment, the
-RISC-V `JAL` execution agrees with the SP1 chip emulation. -/
+Sail-PC reassembly, the immediate decode, and the jump-target alignment, the RISC-V `JAL` execution agrees
+with the SP1 chip emulation. Covers **both** `rd ≠ x0` (`op_a_0 = 0`, link write proven) and `jal x0`
+(`op_a_0 = 1 ∧ rd = x0`, link write a no-op on both sides) — closing the `j` pseudo-instruction. -/
 theorem jal_chip_reaches_sail
     (inp : JalChip.Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) (data : ProverData (ZMod p))
     (rd : BitVec 5) (imm : BitVec 21) (pc : BitVec 64) (s : SailState)
@@ -95,16 +137,20 @@ theorem jal_chip_reaches_sail
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_pcw : Word.toBitVec64 (JalChip.pcWord cols) = pc)
     (h_dec : Word.toBitVec64 cols.adapter.op_b_imm = sign_extend (m := 64) imm)
-    (h_op_a_0 : cols.adapter.op_a_0 = 0)
+    (h_op_a : cols.adapter.op_a_0 = 0 ∨ (cols.adapter.op_a_0 = 1 ∧ rd = 0#5))
     (h_align : (Word.toBitVec64 cols.add_operation.value).toNat % 4 = 0) :
     (spec_jal imm (.Regidx rd)).run s
       = (sp1_jal (.Regidx rd) pc cols.add_operation.value cols.op_a_operation.value).run s := by
   have h_jump : Word.toBitVec64 cols.add_operation.value = pc + sign_extend (m := 64) imm := by
     rw [h_chip.2.2.1 h_real, h_pcw, h_dec]
-  have h_link : Word.toBitVec64 cols.op_a_operation.value = pc + 4#64 := by
-    rw [h_chip.2.2.2 h_real h_op_a_0, h_pcw, toBitVec64_four]
-  exact correct_jal_native cols.adapter.op_b_imm cols.add_operation.value cols.op_a_operation.value
-    rd imm pc s hs h_pc h_jump h_link h_align
+  rcases h_op_a with h_op_a_0 | ⟨_, hrd0⟩
+  · have h_link : Word.toBitVec64 cols.op_a_operation.value = pc + 4#64 := by
+      rw [h_chip.2.2.2 h_real h_op_a_0, h_pcw, toBitVec64_four]
+    exact correct_jal_native cols.adapter.op_b_imm cols.add_operation.value cols.op_a_operation.value
+      rd imm pc s hs h_pc h_jump h_link h_align
+  · subst hrd0
+    exact correct_jal_native_x0 cols.adapter.op_b_imm cols.add_operation.value cols.op_a_operation.value
+      imm pc s hs h_pc h_jump h_align
 
 end SP1Clean.JalSail
 
@@ -131,11 +177,11 @@ def kind : Soundness.ChipKind p where
     s.regs.get? Register.PC = some pc →
     Word.toBitVec64 (JalChip.pcWord cols) = pc →
     Word.toBitVec64 cols.adapter.op_b_imm = sign_extend (m := 64) imm →
-    cols.adapter.op_a_0 = 0 →
+    (cols.adapter.op_a_0 = 0 ∨ (cols.adapter.op_a_0 = 1 ∧ rd = 0#5)) →
     (Word.toBitVec64 cols.add_operation.value).toNat % 4 = 0 →
     (spec_jal imm (.Regidx rd)).run s
       = (sp1_jal (.Regidx rd) pc cols.add_operation.value cols.op_a_operation.value).run s
-  reaches_sail := fun inp cols data s h_real h_chip rd imm pc hs h_pc h_pcw h_dec h_op_a_0 h_align =>
-    jal_chip_reaches_sail inp cols data rd imm pc s hs h_real h_chip h_pc h_pcw h_dec h_op_a_0 h_align
+  reaches_sail := fun inp cols data s h_real h_chip rd imm pc hs h_pc h_pcw h_dec h_op_a h_align =>
+    jal_chip_reaches_sail inp cols data rd imm pc s hs h_real h_chip h_pc h_pcw h_dec h_op_a h_align
 
 end SP1Clean.JalChip

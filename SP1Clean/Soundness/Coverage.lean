@@ -19,7 +19,16 @@ the registry by `rfl` (`coverage.map (·.kind) = allChipKinds`).
 
 **Opcode → Sail.** `Opcode.toNat` is the Program-bus opcode each chip commits (`Trace.RowView.opcode`);
 `routeOf_reaches_sail` surfaces each routed chip's `ChipKind.reaches_sail`, i.e. on a real row its
-in-circuit `Spec` drives the RISC-V Sail spec (`spec_<op>`) — the formal bridge from this enum to Sail. -/
+in-circuit `Spec` drives the RISC-V Sail spec (`spec_<op>`) — the formal bridge from this enum to Sail.
+
+**Register vs immediate ALU forms.** Routing is keyed on `(opcode, rd == x0)` *only*, exactly as SP1's
+`tracing.rs`: the immediate ALU instructions (SLTI/SLTIU, XORI/ORI/ANDI, ADDIW) are **not** separate
+`Opcode`s — they share their register opcode (`SLT = 9`, `XOR = 3`, `ADDW = 19`, …) and are distinguished by
+the in-row `adapter.imm_c` *column*, not by routing. So `imm_c` is deliberately absent from this table. The
+ALU chips each reach Sail for **both** forms: `LtChip`/`BitwiseChip`/`AddwChip`'s `sailEquiv` is the
+conjunction of a register guarantee (gated on the rs2 read) and an immediate guarantee (gated on the
+program-bus decode `op_c_val = sign_extend imm`), so `routeOf_reaches_sail` covers SLTI/…/ADDIW as well as
+their register forms. (`ShiftLeft`/`ShiftRight` model `imm_c` in-circuit; `ADDI` has its own `AddiChip`.) -/
 
 namespace SP1Clean.Soundness
 
