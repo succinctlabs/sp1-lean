@@ -3,6 +3,7 @@ import Mathlib.Data.ZMod.Basic
 import SP1Clean.Proofs.Chips.BranchChip.Formal
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Extracted.BranchChip
+import SP1Clean.Faithful.ChipTactics
 
 /-! # Chip-level faithfulness anchor for BRANCH
 
@@ -29,11 +30,6 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 private lemma val_14 [NeZero p] : (14 : ZMod p).val = 14 := by
   have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   exact ZMod.val_natCast_of_lt (show (14 : ℕ) < p by omega)
-
-/-- `(16 : ZMod p).val = 16` under `Fact (2^17 < p)` (for the `next_pc[1]`/`next_pc[2]` u16 sends). -/
-private lemma val_16 [NeZero p] : (16 : ZMod p).val = 16 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
 
 /-- The chip-local structural meaning of BRANCH's `asserts` inline tail (everything past the composed
 `CPUState`/`ITypeReaderImmutable`/`LtOperationSigned` sub-lists): the six opcode-flag booleans, the flag

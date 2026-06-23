@@ -5,6 +5,7 @@ import SP1Clean.Extracted.LoadWordChip
 import SP1Clean.Faithful.AddressOperation
 import SP1Clean.Faithful.CPUState
 import SP1Clean.Faithful.ITypeReader
+import SP1Clean.Faithful.ChipTactics
 
 /-! # Chip-level faithfulness anchor — SP1's whole `LoadWord` chip constraint list ↔ combined spec -/
 
@@ -15,10 +16,6 @@ open SP1Clean.Extracted
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-private lemma val_16 [NeZero p] : (16 : ZMod p).val = 16 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
 
 set_option maxHeartbeats 4000000 in
 theorem loadwordcols_constraints_faithful (cols : Extracted.LoadWordColumns (ZMod p))
