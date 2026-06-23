@@ -102,8 +102,7 @@ theorem correct_addiw_native
       = sign_extend (m := 64) (Sail.BitVec.extractLsb
           (Word.toBitVec64 op_b_val + sign_extend (m := 64) imm) 31 0) := by
     rw [h_addw, ← h_dec]
-    simp only [sign_extend, Sail.BitVec.signExtend]
-    congr 1
+    rfl
   simp [spec_addiw, sp1_addw, execute_ADDIW, PreSail.readReg, PreSail.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
 
