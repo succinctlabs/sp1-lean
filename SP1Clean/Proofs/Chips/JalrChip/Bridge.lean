@@ -79,10 +79,10 @@ theorem correct_jalr_native
   simp [hsp]
 
 /-- End-to-end: from the JALR chip's verified `Spec` (on a real row) plus the PC read, the rs1 register
-read, the committed rs1 ↔ Sail reassembly, the immediate decode, `op_a_0 = 0` (rd ≠ x0), the committed-pc
-reassembly, and the LSB-clearing relation, the RISC-V `JALR` execution agrees with the SP1 chip emulation.
-The cleared-target 4-byte alignment is **derived** from the `Spec`'s divisibility conjunct (the in-circuit
-`÷4` range check), not assumed. -/
+read, the committed rs1 ↔ Sail reassembly, the immediate decode, `op_a_0 = 0` (rd ≠ x0), and the
+committed-pc reassembly, the RISC-V `JALR` execution agrees with the SP1 chip emulation. Both the
+LSB-clearing relation and the cleared-target 4-byte alignment are **derived** from the chip `Spec` (the
+in-circuit binary `lsb` gate + `÷4` range check), not assumed. -/
 theorem jalr_chip_reaches_sail
     (inp : JalrChip.Inputs (ZMod p)) (cols : Extracted.JalrColumns (ZMod p)) (data : ProverData (ZMod p))
     (rd rs1 : BitVec 5) (imm : BitVec 12) (pc rs1_val : BitVec 64) (s : SailState)
@@ -94,22 +94,24 @@ theorem jalr_chip_reaches_sail
     (h_rs1v : Word.toBitVec64 (JalrChip.rs1Word cols) = rs1_val)
     (h_dec : Word.toBitVec64 cols.adapter.op_c_imm = sign_extend (m := 64) imm)
     (h_op_a_0 : cols.adapter.op_a_0 = 0)
-    (h_pcw : Word.toBitVec64 (JalrChip.pcWord cols) = pc)
-    (h_lsbclear : Word.toBitVec64 (JalrChip.nextPcWord cols)
-        = BitVec.update (Word.toBitVec64 cols.add_operation.value) 0 0#1) :
+    (h_pcw : Word.toBitVec64 (JalrChip.pcWord cols) = pc) :
     (spec_jalr imm (.Regidx rs1) (.Regidx rd)).run s
       = (sp1_jalr (.Regidx rd) (JalrChip.nextPcWord cols) cols.op_a_operation.value).run s := by
   have h_jump : Word.toBitVec64 cols.add_operation.value = rs1_val + sign_extend (m := 64) imm := by
     rw [h_chip.2.2.2.1 h_real, h_rs1v, h_dec]
   have h_link : Word.toBitVec64 cols.op_a_operation.value = pc + 4#64 := by
     rw [h_chip.2.2.2.2.1 h_real h_op_a_0, h_pcw, JalSail.toBitVec64_four]
+  -- The LSB-clearing relation is now a verified `Spec` conjunct (the in-circuit binary `lsb` gate + the
+  -- `÷4` byte-range), not an assumed precondition; unfold the Sail `BitVec.update` to its `~~~1#64 &&&` form.
   have h_lsbclear' : Word.toBitVec64 (JalrChip.nextPcWord cols)
-      = BitVec.update (rs1_val + sign_extend (m := 64) imm) 0 0#1 := by rw [h_lsbclear, h_jump]
+      = BitVec.update (rs1_val + sign_extend (m := 64) imm) 0 0#1 := by
+    rw [h_chip.2.2.2.2.2.2 h_real, h_jump]
+    simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
   -- 4-byte alignment is now a verified `Spec` conjunct (the in-circuit `÷4` range check), not an
   -- assumed precondition: lift the cleared low-limb divisibility to the committed `next_pc` word.
   have h_align : (Word.toBitVec64 (JalrChip.nextPcWord cols)).toNat % 4 = 0 := by
     rw [Word.toBitVec64_toNat_mod_four]
-    exact h_chip.2.2.2.2.2 h_real
+    exact h_chip.2.2.2.2.2.1 h_real
   exact correct_jalr_native cols.adapter.op_c_imm (JalrChip.nextPcWord cols) cols.op_a_operation.value
     rd rs1 imm pc rs1_val s hs hconfig h_pc h_rs1 h_lsbclear' h_link h_align
 
@@ -124,9 +126,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- JALR's `ChipKind` registration. `view` threads the LSB-cleared `next_pc`, I-type adapter, opcode 47.
-`sailEquiv` quantifies PC/rs1 read, decode, and LSB-clearing preconditions internally (the cleared-target
-4-byte alignment is no longer a precondition — `reaches_sail` derives it from the chip `Spec`);
-`reaches_sail` is `jalr_chip_reaches_sail`. -/
+`sailEquiv` quantifies the PC/rs1 read and decode preconditions internally; neither the LSB-clearing
+relation nor the cleared-target 4-byte alignment is a precondition — `reaches_sail` derives both from the
+chip `Spec`. `reaches_sail` is `jalr_chip_reaches_sail`. -/
 def kind : Soundness.ChipKind p where
   name := "Jalr"
   Inputs := JalrChip.Inputs
@@ -143,13 +145,11 @@ def kind : Soundness.ChipKind p where
     Word.toBitVec64 cols.adapter.op_c_imm = sign_extend (m := 64) imm →
     cols.adapter.op_a_0 = 0 →
     Word.toBitVec64 (JalrChip.pcWord cols) = pc →
-    Word.toBitVec64 (JalrChip.nextPcWord cols)
-      = BitVec.update (Word.toBitVec64 cols.add_operation.value) 0 0#1 →
     (spec_jalr imm (.Regidx rs1) (.Regidx rd)).run s
       = (sp1_jalr (.Regidx rd) (JalrChip.nextPcWord cols) cols.op_a_operation.value).run s
   reaches_sail := fun inp cols data s h_real h_chip rd rs1 imm pc rs1_val hs hconfig h_pc h_rs1 h_rs1v h_dec
-      h_op_a_0 h_pcw h_lsbclear =>
+      h_op_a_0 h_pcw =>
     jalr_chip_reaches_sail inp cols data rd rs1 imm pc rs1_val s hs hconfig h_real h_chip h_pc h_rs1 h_rs1v h_dec
-      h_op_a_0 h_pcw h_lsbclear
+      h_op_a_0 h_pcw
 
 end SP1Clean.JalrChip

@@ -85,6 +85,23 @@ lemma toBitVec128_toNat [NeZero p] {w : Word (ZMod p)} (hw : w.isU64) :
 
 end Word
 
+/-- Clearing bit 0 (the Sail `BitVec.update _ 0 0#1`, which unfolds to `~~~(1#64) &&& ·`) of
+`BitVec.ofNat 64 (M + b)` — with `b ≤ 1` and `M` even — yields `BitVec.ofNat 64 M`. Stated in the
+Sail-free `~~~(1#64) &&&` form so `Math/` stays Sail-independent; the JALR bridge bridges this to
+`BitVec.update` (a one-line `simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']`). Used by the JALR
+LSB-clearing `Spec` conjunct (`toNat add_value = toNat next_pc_word + lsb`, `lsb ∈ {0,1}`). -/
+lemma ofNat64_clear_lsb_and {M b : ℕ} (hb : b ≤ 1) (hM : M % 2 = 0) :
+    BitVec.ofNat 64 M = ~~~(1#64) &&& BitVec.ofNat 64 (M + b) := by
+  apply BitVec.eq_of_getLsbD_eq
+  intro i hi
+  simp only [BitVec.getLsbD_and, BitVec.getLsbD_not, BitVec.getLsbD_ofNat, hi, decide_true,
+    Bool.true_and]
+  rcases Nat.eq_zero_or_pos i with h0 | hpos
+  · subst h0; simp [Nat.testBit_zero, hM]
+  · obtain ⟨j, rfl⟩ := Nat.exists_eq_succ_of_ne_zero (by omega : i ≠ 0)
+    have hdiv : (M + b) / 2 = M / 2 := by omega
+    simp [Nat.testBit_succ, hdiv]
+
 /-! ## Field constants (`ZMod p`, `Fact (2 ^ 17 < p)`) -/
 
 @[simp] lemma val_65536_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
@@ -110,19 +127,32 @@ lemma val_4_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (4 : ZMod p) ≠ 0 := by
   have h : (4 : ZMod p).val = 4 := val_4_zmod_p
   intro hz; rw [hz] at h; simp at h
 
-/-- The reverse of `U16toU8OperationSafe.high_byte_lt` for the `÷4` alignment check: if `x · 4⁻¹` is a
-14-bit value (the in-circuit `Range` byte-lookup), then `x` is divisible by 4. Since `x · 4⁻¹ < 2^14`
-gives `x = (x · 4⁻¹) · 4` with `(x · 4⁻¹).val · 4 < 2^16 < p` (no wrap), `x.val = (x · 4⁻¹).val · 4`. -/
-lemma val_mod_four_of_mul_inv_four_lt [Fact p.Prime] [Fact (2 ^ 17 < p)] {x : ZMod p}
-    (h : (x * (4 : ZMod p)⁻¹).val < 2 ^ 14) : x.val % 4 = 0 := by
+/-- The `÷4` alignment check `(x · 4⁻¹).val < 2^14` pins `x = (x · 4⁻¹) · 4` exactly in `ℕ`: since
+`(x · 4⁻¹).val · 4 < 2^16 < p` there is no wrap, so `x.val = (x · 4⁻¹).val · 4`. The shared core of the
+two corollaries below (divisibility + the `< 2^16` bound). -/
+lemma val_eq_mul_inv_four_mul_four [Fact p.Prime] [Fact (2 ^ 17 < p)] {x : ZMod p}
+    (h : (x * (4 : ZMod p)⁻¹).val < 2 ^ 14) : x.val = (x * (4 : ZMod p)⁻¹).val * 4 := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   rw [show (2 : ℕ) ^ 14 = 16384 from by norm_num] at h
   have h41 : (4 : ZMod p)⁻¹ * 4 = 1 := inv_mul_cancel₀ val_4_ne_zero
-  have hxval : x.val = (x * (4 : ZMod p)⁻¹).val * 4 := by
-    conv_lhs => rw [show x = (x * (4 : ZMod p)⁻¹) * 4 by rw [mul_assoc, h41, mul_one]]
-    rw [ZMod.val_mul, val_4_zmod_p, Nat.mod_eq_of_lt (by omega)]
-  rw [hxval]; omega
+  conv_lhs => rw [show x = (x * (4 : ZMod p)⁻¹) * 4 by rw [mul_assoc, h41, mul_one]]
+  rw [ZMod.val_mul, val_4_zmod_p, Nat.mod_eq_of_lt (by omega)]
+
+/-- The reverse of `U16toU8OperationSafe.high_byte_lt` for the `÷4` alignment check: if `x · 4⁻¹` is a
+14-bit value (the in-circuit `Range` byte-lookup), then `x` is divisible by 4. -/
+lemma val_mod_four_of_mul_inv_four_lt [Fact p.Prime] [Fact (2 ^ 17 < p)] {x : ZMod p}
+    (h : (x * (4 : ZMod p)⁻¹).val < 2 ^ 14) : x.val % 4 = 0 := by
+  rw [val_eq_mul_inv_four_mul_four h]; omega
+
+/-- Companion bound to `val_mod_four_of_mul_inv_four_lt`: the same `÷4` range check also gives
+`x.val < 2^16` (`x.val = (x · 4⁻¹).val · 4 < 2^14 · 4`). Used by the JALR LSB-clearing soundness to lift
+the field subtraction `value[0] - lsb` to `ℕ`. -/
+lemma val_lt_65536_of_mul_inv_four_lt [Fact p.Prime] [Fact (2 ^ 17 < p)] {x : ZMod p}
+    (h : (x * (4 : ZMod p)⁻¹).val < 2 ^ 14) : x.val < 2 ^ 16 := by
+  have he := val_eq_mul_inv_four_mul_four h
+  rw [show (2 : ℕ) ^ 14 = 16384 from by norm_num] at h
+  rw [he, show (2 : ℕ) ^ 16 = 65536 from by norm_num]; omega
 
 @[simp] lemma val_65535_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
     (65535 : ZMod p).val = 65535 := by
