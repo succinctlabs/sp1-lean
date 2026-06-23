@@ -82,7 +82,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
-  refine ⟨⟨h_jt, h_bin, ?_, ?_⟩, ?_, ?_, ?_, ?_⟩
+  refine ⟨⟨h_jt, h_bin, ?_, ?_, ?_⟩, ?_, ?_, ?_, ?_⟩
   · intro hr1
     have := (h_add1 ⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩ hr1).2
     rw [ha1eq] at this
@@ -92,6 +92,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have := (h_add2 ⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩ hg1).2
     rw [ha1eq] at this
     simpa only [pcWord] using this
+  · -- 4-byte alignment of the jump target, from the in-circuit `÷4` byte-range pull `h_align`
+    -- (`(value[0] · 4⁻¹).val < 2^14 ⇒ value[0].val % 4 = 0`). The Sail bridge lifts it to the whole word.
+    intro hr1
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
+    have hguar := h_align (by rw [hr1])
+    simp only [byteChannel] at hguar
+    rw [← c14] at hguar
+    exact val_mod_four_of_mul_inv_four_lt ((byteRowSpec_range _ h14p).mp hguar)
   · exact Or.inr h_bin
   · exact Or.inr ⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩
   · exact Or.inr ⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩

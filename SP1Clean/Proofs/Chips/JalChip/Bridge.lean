@@ -125,9 +125,10 @@ theorem toBitVec64_four : Word.toBitVec64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMo
   decide
 
 /-- End-to-end: from the JAL chip's verified `Spec` (on a real row) plus the PC read, the committed-pc ↔
-Sail-PC reassembly, the immediate decode, and the jump-target alignment, the RISC-V `JAL` execution agrees
-with the SP1 chip emulation. Covers **both** `rd ≠ x0` (`op_a_0 = 0`, link write proven) and `jal x0`
-(`op_a_0 = 1 ∧ rd = x0`, link write a no-op on both sides) — closing the `j` pseudo-instruction. -/
+Sail-PC reassembly, and the immediate decode, the RISC-V `JAL` execution agrees with the SP1 chip
+emulation. The jump-target 4-byte alignment is **derived** from the `Spec`'s divisibility conjunct (the
+in-circuit `÷4` range check), not assumed. Covers **both** `rd ≠ x0` (`op_a_0 = 0`, link write proven) and
+`jal x0` (`op_a_0 = 1 ∧ rd = x0`, link write a no-op on both sides) — closing the `j` pseudo-instruction. -/
 theorem jal_chip_reaches_sail
     (inp : JalChip.Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) (data : ProverData (ZMod p))
     (rd : BitVec 5) (imm : BitVec 21) (pc : BitVec 64) (s : SailState)
@@ -137,15 +138,19 @@ theorem jal_chip_reaches_sail
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_pcw : Word.toBitVec64 (JalChip.pcWord cols) = pc)
     (h_dec : Word.toBitVec64 cols.adapter.op_b_imm = sign_extend (m := 64) imm)
-    (h_op_a : cols.adapter.op_a_0 = 0 ∨ (cols.adapter.op_a_0 = 1 ∧ rd = 0#5))
-    (h_align : (Word.toBitVec64 cols.add_operation.value).toNat % 4 = 0) :
+    (h_op_a : cols.adapter.op_a_0 = 0 ∨ (cols.adapter.op_a_0 = 1 ∧ rd = 0#5)) :
     (spec_jal imm (.Regidx rd)).run s
       = (sp1_jal (.Regidx rd) pc cols.add_operation.value cols.op_a_operation.value).run s := by
   have h_jump : Word.toBitVec64 cols.add_operation.value = pc + sign_extend (m := 64) imm := by
     rw [h_chip.2.2.1 h_real, h_pcw, h_dec]
+  -- 4-byte alignment is now a verified `Spec` conjunct (the in-circuit `÷4` range check), not an assumed
+  -- precondition: lift the jump-target low-limb divisibility to the committed word.
+  have h_align : (Word.toBitVec64 cols.add_operation.value).toNat % 4 = 0 := by
+    rw [Word.toBitVec64_toNat_mod_four]
+    exact h_chip.2.2.2.2 h_real
   rcases h_op_a with h_op_a_0 | ⟨_, hrd0⟩
   · have h_link : Word.toBitVec64 cols.op_a_operation.value = pc + 4#64 := by
-      rw [h_chip.2.2.2 h_real h_op_a_0, h_pcw, toBitVec64_four]
+      rw [h_chip.2.2.2.1 h_real h_op_a_0, h_pcw, toBitVec64_four]
     exact correct_jal_native cols.adapter.op_b_imm cols.add_operation.value cols.op_a_operation.value
       rd imm pc s hs h_pc h_jump h_link h_align
   · subst hrd0
@@ -162,8 +167,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- JAL's `ChipKind` registration. `view` threads `next_pc = add_operation.value` (the data-dependent
-jump target), J-type adapter, opcode 46. `sailEquiv` quantifies the PC/decode/alignment preconditions
-internally (JAL reads no source registers); `reaches_sail` is `jal_chip_reaches_sail`. -/
+jump target), J-type adapter, opcode 46. `sailEquiv` quantifies the PC/decode preconditions internally
+(JAL reads no source registers); the jump-target alignment is no longer a precondition — `reaches_sail`
+derives it from the chip `Spec`. `reaches_sail` is `jal_chip_reaches_sail`. -/
 def kind : Soundness.ChipKind p where
   name := "Jal"
   Inputs := JalChip.Inputs
@@ -178,10 +184,9 @@ def kind : Soundness.ChipKind p where
     Word.toBitVec64 (JalChip.pcWord cols) = pc →
     Word.toBitVec64 cols.adapter.op_b_imm = sign_extend (m := 64) imm →
     (cols.adapter.op_a_0 = 0 ∨ (cols.adapter.op_a_0 = 1 ∧ rd = 0#5)) →
-    (Word.toBitVec64 cols.add_operation.value).toNat % 4 = 0 →
     (spec_jal imm (.Regidx rd)).run s
       = (sp1_jal (.Regidx rd) pc cols.add_operation.value cols.op_a_operation.value).run s
-  reaches_sail := fun inp cols data s h_real h_chip rd imm pc hs h_pc h_pcw h_dec h_op_a h_align =>
-    jal_chip_reaches_sail inp cols data rd imm pc s hs h_real h_chip h_pc h_pcw h_dec h_op_a h_align
+  reaches_sail := fun inp cols data s h_real h_chip rd imm pc hs h_pc h_pcw h_dec h_op_a =>
+    jal_chip_reaches_sail inp cols data rd imm pc s hs h_real h_chip h_pc h_pcw h_dec h_op_a
 
 end SP1Clean.JalChip
