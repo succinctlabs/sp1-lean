@@ -24,12 +24,8 @@ lemma byteRowSpec_ltu_29 {op : ZMod p} (h : op.val < 29) :
     rw [show (29 : ZMod p) = ((29 : ℕ) : ZMod p) from by norm_cast, ZMod.val_natCast_of_lt h29p]
   haveI : Fact (1 < p) := ⟨hp2⟩
   refine ⟨ByteOpcode.LTU, by norm_cast, ?_⟩
-  simp only [ByteOpcode.constrain_LTU]
-  refine ⟨⟨?_, ?_, ?_⟩, Or.inr trivial, ?_⟩
-  · rw [ZMod.val_one]; norm_num
-  · omega
-  · rw [h29]; norm_num
-  · rw [h29]; exact ⟨fun _ => h, fun _ => trivial⟩
+  simp only [ByteOpcode.constrain_LTU, ZMod.val_one, h29]
+  exact ⟨⟨by norm_num, by omega, by norm_num⟩, Or.inr trivial, fun _ => h, fun _ => trivial⟩
 
 /-- Verifier-side `Assumptions` — trivial. `AluX0` discards its result, so there are no operand
 well-formedness obligations; `is_real` binary and the reader contract are derived in soundness from the
@@ -44,8 +40,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   simp only [← sub_eq_add_neg] at h_oa1 h_oa2
   simp only [isReal, clkLow, opcodeVal]
   -- the per-emitter channel-requirement tail: CPUState / reader (the gated byte pull owes no requirement).
-  exact ⟨⟨h_reader h_bin, h_bin, h_oa1, h_oa2⟩,
-    Or.inr h_bin, Or.inr h_bin⟩
+  exact ⟨⟨h_reader h_bin, h_bin, h_oa1, h_oa2⟩, Or.inr h_bin, Or.inr h_bin⟩
 
 /-- Honest prover-side row well-formedness: `is_real` binary, the two `op_a_0` forcing gates, the
 CPUState clock bounds + the immutable-ALU-reader contract, and the dynamic opcode in ALU range
@@ -69,16 +64,13 @@ theorem completeness :
   simp only [isReal, clkLow, opcodeVal] at h_assumptions
   obtain ⟨h_bin, h_oa1, h_oa2, h_cpu, h_reader, h_op_lt⟩ := h_assumptions
   simp only [sub_eq_add_neg] at h_oa1 h_oa2
-  refine ⟨⟨h_bin, h_cpu⟩, ?_, ⟨h_bin, h_reader⟩, ?_, ?_, ?_⟩
+  refine ⟨⟨h_bin, h_cpu⟩, ?_, ⟨h_bin, h_reader⟩, ?_, h_oa1, h_oa2⟩
   · -- the LTU `opcode < 29` byte pull (fires on real rows).
     intro hneg
-    have hr1 : input_is_real = 1 := neg_inj.mp hneg
     simp only [byteChannel]
-    exact byteRowSpec_ltu_29 (h_op_lt hr1)
+    exact byteRowSpec_ltu_29 (h_op_lt (neg_inj.mp hneg))
   · -- `is_real` binary gate.
     rcases h_bin with h | h <;> rw [h] <;> simp
-  · exact h_oa1
-  · exact h_oa2
 
 /-- The `AluX0` chip row as a `GeneralFormalCircuit`: validates the ALU-into-`x0` program/register accesses
 and advances state (the result discarded); output is the extracted `AluX0Cols`. -/

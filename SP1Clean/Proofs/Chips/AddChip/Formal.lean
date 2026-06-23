@@ -33,18 +33,13 @@ theorem completeness :
   obtain ⟨ha, hb, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c⟩ := h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
-  have hbeq : (#v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
-      Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
-      Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
-      Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]] : Word (ZMod p))
-      = input_adapter_op_b_memory_prev_value := by
-    rw [← hob]; apply Vector.ext; intro i hi; simp only [Vector.getElem_map]; interval_cases i <;> rfl
-  have hceq : (#v[Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[0],
-      Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[1],
-      Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[2],
-      Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[3]] : Word (ZMod p))
-      = input_adapter_op_c_memory_prev_value := by
-    rw [← hoc]; apply Vector.ext; intro i hi; simp only [Vector.getElem_map]; interval_cases i <;> rfl
+  have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
+      Vector.map (Expression.eval env.toEnvironment) vv = v →
+      (#v[Expression.eval env.toEnvironment vv[0], Expression.eval env.toEnvironment vv[1],
+        Expression.eval env.toEnvironment vv[2], Expression.eval env.toEnvironment vv[3]] : Word (ZMod p)) = v :=
+    fun vv v h => by rw [← h]; apply Vector.ext; intro i hi; simp only [Vector.getElem_map]; interval_cases i <;> rfl
+  have hbeq := mapEq input_var_adapter_op_b_memory_prev_value _ hob
+  have hceq := mapEq input_var_adapter_op_c_memory_prev_value _ hoc
   -- The witnessed `value` is `populate op_b op_c` (`h_env` per-limb).
   have hval : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + i}) : Word (ZMod p))
