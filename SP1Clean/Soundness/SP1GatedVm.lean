@@ -253,9 +253,7 @@ theorem sp1_state_balance_of_balancedInteractions
     exact stateLookups_mult_binary hp v (hbin v hv) a hav
   · -- the two constant-`±1` boundary entries
     simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
-    rcases ha with rfl | rfl
-    · right; right; rfl
-    · left; rfl
+    rcases ha with rfl | rfl <;> simp [multOf]
 
 /-- **The witness → gated-capstone bridge (assembled; `sorry`-free given the decode seam).** From the
 ensemble `Statement`'s per-table constraints and balanced channels, the heterogeneous trace decoded
@@ -277,8 +275,8 @@ theorem sp1_gatedExecution_prereqs (witness : EnsembleWitness (sp1GatedVm (p := 
   -- instantiate the balanced channels at the State channel (the ensemble channel-list head)
   have h_balanced : BalancedInteractions
       (witness.interactionsWith Channels.stateChannel.toRaw) := by
-    have h := (hB Channels.stateChannel.toRaw (List.mem_cons_self ..)).1
-    rwa [EnsembleWitness.interactionsWith_allTablesWitness] at h
+    rw [← EnsembleWitness.interactionsWith_allTablesWitness]
+    exact (hB Channels.stateChannel.toRaw (List.mem_cons_self ..)).1
   exact ⟨rows, data, h_spec, hbin,
     sp1_state_balance_of_balancedInteractions witness.publicInput rows hbin _
       (fun i hi => EnsembleWitness.channel_eq_of_mem_interactionsWith hi) h_balanced h_corr⟩

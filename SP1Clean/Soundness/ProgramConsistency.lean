@@ -140,9 +140,8 @@ theorem programConsistent_of_balance [NeZero p]
         (programAccess r).op_c[2].val, (programAccess r).op_c[3].val,
         (programAccess r).op_a_0.val, (programAccess r).imm_b.val, (programAccess r).imm_c.val],
       ((programAccess r).is_real.val : ℤ)) with hsend
-  have h_eq : programLookups r = [send] := by rw [hsend]; rfl
   have h_send_mem : send ∈ aggregateChipRows rows programLookups :=
-    List.mem_flatMap.mpr ⟨r, hr, by rw [h_eq]; exact List.mem_singleton.mpr rfl⟩
+    List.mem_flatMap.mpr ⟨r, hr, List.mem_singleton.mpr rfl⟩
   have hvne : (programAccess r).is_real.val ≠ 0 := fun hv =>
     h_real (ZMod.val_injective p (by rw [ZMod.val_zero]; exact hv))
   have h_pos : 0 < multOf send := by rw [hsend]; simp only [multOf]; omega
@@ -197,10 +196,7 @@ theorem programLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) programChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
-  have hp2 : 2 < p := by
-    have h := Fact.out (p := 2 ^ 17 < p)
-    have h2 : (2 : ℕ) < 2 ^ 17 := by norm_num
-    omega
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   -- reduce `interactionsWith` to the single program emit (RAC subs + Equality gates + memory emits drop;
   -- the memory emits' `if memoryChannel = programChannel` collapse via the channel distinctness + `if_false`)
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,

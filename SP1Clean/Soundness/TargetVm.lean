@@ -255,7 +255,6 @@ private theorem chain_to_refines
       congr 1
       exact sndPc_eq_rcvPc (isWalk_chain hw.1 i hi)
     · intro idx
-      have hi' : i < path.length := by omega
       by_cases hcond : (idx.toNat : ZMod p) = (path[i]'hi').adapter.op_a
       · rw [heff.regs.1 idx hcond, replayVal, dif_pos hi', if_pos hcond]
       · rw [heff.regs.2 idx hcond, href.frame idx, replayVal, dif_pos hi', if_neg hcond]
