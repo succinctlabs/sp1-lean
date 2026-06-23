@@ -108,7 +108,6 @@ theorem completeness :
   have hpc := h_input.2.1.2.2.2
   have hbpv := h_input.2.2.2.2.2.2.1.1
   have hcpv := h_input.2.2.2.2.2.2.2.2.1.1
-  -- fold the closures' eval'd operands to the value-level inputs
   have ec0 : Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[0]
       = input_adapter_op_c_memory_prev_value[0] := by
     rw [← hcpv, Vector.getElem_map]
@@ -129,7 +128,6 @@ theorem completeness :
   set B := input_adapter_op_b_memory_prev_value with hB
   set c0 := input_adapter_op_c_memory_prev_value[0] with hc0
   set F := hintFlags env.hint with hF
-  -- pin every witnessed cell to its populate projection
   have hA0 : env.get i₀ = (populateA B c0 F)[0] := by simpa using h_env_a 0
   have hA1 : env.get (i₀ + 1) = (populateA B c0 F)[1] := by simpa using h_env_a 1
   have hA2 : env.get (i₀ + 2) = (populateA B c0 F)[2] := by simpa using h_env_a 2
@@ -202,7 +200,6 @@ theorem completeness :
   simp only [hA0, hA1, hA2, hA3, hbm, hsw, hcb0, hcb1, hcb2, hcb3, hcb4, hcb5, hsram, hv0, hv1,
     hv2, hlo0, hlo1, hlo2, hlo3, hhi0, hhi1, hhi2, hhi3, hlr0, hlr1, hlr2, hlr3, hs0, hs1, hs2,
     hs3, hfl0, hfl1, hfl2, hfl3, hfl4, heb0, heb1, heb2, heb3, ec0, epc0, epc1, epc2]
-  -- derived flag facts
   have hbUw : Word.isU64 B := hbU
   obtain ⟨hbU0, hbU1, hbU2, hbU3⟩ := Word.lt_cases_of_isU64 hbUw
   obtain ⟨ho0, ho1, ho2, ho3⟩ := one_hot_resolve F hf0 hf1 hf2 hf3 hsum01
@@ -221,7 +218,6 @@ theorem completeness :
     · obtain ⟨-, -, h3z⟩ := ho2 h2
       right; rw [h2, h3z, add_zero]
   have hbmB := bMsb_bool B F hbUw hf1 hf3 (fun h => (ho1 h).2.2)
-  -- the constraint bundles at the populate values
   obtain ⟨hcba0, hcba1, hcba2, hcba3, hcba4, hcba5⟩ := ShiftLeftChip.cBits_asserts c0
   obtain ⟨hsel0, hsb0, hsel1, hsb1, hsel2, hsb2, hsel3, hsb3, hone⟩ :=
     shiftU16_asserts c0 F he14 hsum01
@@ -272,7 +268,7 @@ theorem completeness :
     rw [bMsb_eq_sraw B F h3 (ho3 h3).2.1]
     exact (U16MSBOperation.spec_populate hbU1 1).2 rfl
   · -- the word-variant sign witness is the high bit of the placed `a[1]`
-    rw [show srwMsb B c0 F = U16MSBOperation.populate_msb (populateA B c0 F)[1] from by
+    rw [show srwMsb B c0 F = U16MSBOperation.populate_msb (populateA B c0 F)[1] by
       rw [srwMsb, if_pos h13]]
     exact (U16MSBOperation.spec_populate
       (populateA_val_lt B c0 F hbUw hf0 hf1 hf2 hf3 hsum01 1 (by norm_num)) 1).2 rfl

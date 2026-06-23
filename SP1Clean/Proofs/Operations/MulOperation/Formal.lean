@@ -217,7 +217,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     have hmsb_bool : input_cols_product_msb_msb = 0 ∨ input_cols_product_msb_msb = 1 := hpmspec.1
     have hmsb : input_is_mulw = 1 → input_cols_product_msb_msb =
         if (input_cols_product[2] + input_cols_product[3] * 256).val ≥ 32768 then 1 else 0 := by
-      intro h; have := hpmspec.2 h; rw [ep2, ep3] at this; exact this
+      intro h; have := hpmspec.2 h; rwa [ep2, ep3] at this
     have hb_msb : input_cols_b_msb = if input_b[3].val ≥ 32768 then 1 else 0 := by
       obtain ⟨hlo3, hhi3, hreass3⟩ := hb_low 3
       dsimp only at hlo3 hhi3 hreass3
