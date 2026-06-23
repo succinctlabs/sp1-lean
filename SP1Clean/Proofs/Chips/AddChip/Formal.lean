@@ -1,7 +1,11 @@
 import SP1Clean.Native.Chips.AddChip.Defs
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
 
-/-! # `SP1Clean.AddChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
+/-! # `SP1Clean.AddChip` — contract: `Assumptions` / soundness / completeness / `circuit`
+
+This is the canonical "template" chip for the porting recipe (`docs/agents/porting-recipe.md`). When
+golfing / cleaning proofs here or in any sibling chip, follow `docs/agents/proof-patterns.md` §
+"Golf & cleanup discipline" (and the backlog in `docs/agents/cleanup-backlog.md`). -/
 
 namespace SP1Clean.AddChip
 

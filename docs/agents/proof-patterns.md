@@ -582,6 +582,62 @@ always means a *local* regression against one of these.
   raw binders and the `SpecObligation` indirection exists. The ShiftRight/ShiftLeft conjuncts share an
   analogous `cpuA/msb*/aluA` block that is a candidate for the same treatment.
 
+## Golf & cleanup discipline
+
+How to golf/clean a proof without breaking the repo's invariants (axiom-clean, 0-warning, no `info:`).
+Distilled from the 2026-06-22/23 cleanup campaign (109 files, −591 lines, axiom-cleanliness preserved). The
+prioritized follow-up backlog + the golfing/cleanup skills (`/cleanup`, `/cleanup-all`, `/decompose-proof`,
+`/split-file`, `Skill(simplify)`) live in `docs/agents/cleanup-backlog.md`.
+
+**Instant, always-safe wins** (the bulk of the line savings):
+- `:= by rfl` → `:= rfl`; `show T from by tac` → `show T by tac`; `rw […] at h; exact h` → `rwa […] at h`;
+  `refine F ?_; exact e` → `exact F e`; `simp only […] at h ⊢; exact h` → `simpa only […] using h`.
+- Merge adjacent identical `simp only`/`rw`; inline a single-use `have x := e` that has **no** `by` body.
+- Reach for mathlib instead of a hand proof: `zero_ne_one`, `Int.eq_zero_of_abs_lt_dvd`, etc.
+
+**The dominant structural win — eval-map factoring.** Chip/op `Formal.lean` proofs repeat a per-limb
+`have eX : Expression.eval env input_var_X[i] = input_X[i] := by rw [← hX]; simp [Vector.getElem_map]`, one per
+limb. Collapse the copies into ONE quantified helper
+`have eX : ∀ i (hi : i < n), … := by intro i hi; rw [← hX]; simp [Vector.getElem_map]`, then call `eX i (by omega)`
+at each site (~12–25%/file on Load/Store/op `Formal.lean`). A *global* lemma for this was investigated and is
+**not** worth it — see backlog R2.
+
+**Kernel-safe dedup on the bit-shift / DivRem cores** (the `2^64` landmine zone — read the "Bit-shift chip
+soundness" § first). A heavy file may repeat a byte-identical `have` block across N sibling lemmas. You can
+factor it into a single helper **iff the block is pure `ZMod.val` / `Nat` arithmetic with no `2^64`/`BitVec`
+reduction** — extract it as a lemma **over loose variables** and apply it symbolically. This is kernel-safe
+because a lemma application instantiates an *already-checked* body, so the kernel does no *extra* reduction
+(no `skipKernelTC`; elaboration time does not regress). **Hard constraint:** the helper's conclusion must match
+the original `have`'s type **character-for-character** — it's a downstream `rw`-target, and `(16 : ZMod p) - …`
+is **not** interchangeable with `(16 - … : ZMod p)`. The heavy `2^64`-scale work itself is already isolated in
+abstract-`BitVec` helpers (`srl_toNat`/`sra_toNat`) — leave those alone. Worked example: `inner_val`/`inner_hi_val`
+in `Proofs/Chips/ShiftLeftChip/Core.lean`.
+
+**Traps — `have`s that look dead but are load-bearing** (verify with `lean_goal` / a build before removing):
+- `have hp : 2 ^ 17 < p := Fact.out` (and `have : 131072 < p`) — feeds a downstream `omega` that needs the
+  magnitude; grep shows one occurrence (its own line) yet `omega` consumes it implicitly.
+- `haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩` — supplies an instance to later
+  `ZMod.val`/`omega` steps. There is **no** global `NeZero p` instance, *on purpose* (it would break the
+  pervasive `omit [Fact (2^17 < p)] in` clauses — `Model/ByteTable.lean:84`; see backlog R1).
+
+**Don't golf:**
+- **`Faithful/*` anchors** — conservative only (drop `by exact` / dead `let` / `from by`); never restructure
+  proof terms or statement forms; they are *syntactic* faithfulness anchors.
+- **`Spec`/`Assumptions`/statement forms**, `set_option`/`maxHeartbeats`, `ElaboratedCircuit` field structure.
+- **Auto-gen** — `Extracted/`, `*Vectors.lean`, `Native/Operations/*/RawSpec`, etc.; banner-check the header.
+- **Narrative comments on kernel-sensitive Shift/DivRem files** — they document the `2^64` / `id (ZMod p)`
+  landmines + proof roadmaps; they are the institutional memory of *why* the proof is shaped that way. (A
+  blanket comment-strip on `ShiftLeftChip/Soundness/Sll` was reverted for exactly this.)
+
+**Verify every batch:** `lake build SP1Clean` clean (0 warn, no `info:`), `bash scripts/check_no_skipkerneltc.sh`,
+`sorry` grep = only `SP1GatedVm.lean`, then `scripts/run_audit.sh` periodically (the axiom census must stay
+identical). On heavy files watch the per-file elaboration time in the build log and **revert on regression**.
+
+**Merge gotcha (post-`git merge`):** an auto-merge can *silently duplicate* a lemma that both branches added
+near each other — no conflict marker, but `lake build` fails with "`<name>` has already been declared". Always
+run the full `lake build` after a merge even when `git status` shows no conflicts (`Proofs/Chips/BitwiseChip/
+Bridge.lean` hit this when upstream #101's immediate-type bridges met a golfed copy).
+
 ## "emitted = projection": `<b>Lookups_eq_emitted` (proving a trace projection IS the emission)
 
 Goal: prove a hand-written trace-level projection (`Soundness/*Consistency.lean`'s `stateLookups`,
