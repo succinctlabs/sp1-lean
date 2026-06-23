@@ -32,7 +32,6 @@ theorem mul_asserts_faithful (cols : Extracted.MulCols (ZMod p)) :
   intro h
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   simp only [Extracted.MulCols.asserts, Extracted.forall_append_single, List.Forall] at h
-  dsimp only [SP1Clean.MulChip.AssertSpec]
   exact h.2
 
 omit [Fact (2 ^ 24 < p)] in
