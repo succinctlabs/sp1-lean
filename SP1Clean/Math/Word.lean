@@ -93,8 +93,7 @@ end Word
   exact ZMod.val_natCast_of_lt (show (65536 : ℕ) < p by omega)
 
 lemma val_65536_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (65536 : ZMod p) ≠ 0 := by
-  have h : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
-  intro hz; rw [hz] at h; simp at h
+  simp [← ZMod.val_eq_zero, val_65536_zmod_p]
 
 @[simp] lemma val_2_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
     (2 : ZMod p).val = 2 := by
@@ -107,8 +106,7 @@ lemma val_65536_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (65536 : ZMod p) ≠ 0 
   exact ZMod.val_natCast_of_lt (show (4 : ℕ) < p by omega)
 
 lemma val_4_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (4 : ZMod p) ≠ 0 := by
-  have h : (4 : ZMod p).val = 4 := val_4_zmod_p
-  intro hz; rw [hz] at h; simp at h
+  simp [← ZMod.val_eq_zero, val_4_zmod_p]
 
 /-- The reverse of `U16toU8OperationSafe.high_byte_lt` for the `÷4` alignment check: if `x · 4⁻¹` is a
 14-bit value (the in-circuit `Range` byte-lookup), then `x` is divisible by 4. Since `x · 4⁻¹ < 2^14`
