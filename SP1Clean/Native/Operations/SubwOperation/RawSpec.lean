@@ -85,7 +85,6 @@ theorem carries_of_subwSemantics {a b : Word (ZMod p)} {cols : Extracted.SubwOpe
       = (BitVec.setWidth 32 (Word.toBitVec64 a - Word.toBitVec64 b)).signExtend 64) :
     RawSpec a b cols ∧ cols.msb.msb = if cols.value[1].val ≥ 32768 then 1 else 0 := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
   obtain ⟨hv0, hv1, hm2, _⟩ := Word.lt_cases_of_isU64 hU
