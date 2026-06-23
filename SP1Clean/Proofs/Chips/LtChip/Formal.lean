@@ -115,10 +115,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         exact h2 (by exact_mod_cast h20)
     have h01 : (0 : ZMod p) ≠ 1 := by
       haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-      intro h
-      have := congrArg ZMod.val h
-      rw [ZMod.val_zero, ZMod.val_one] at this
-      exact absurd this (by norm_num)
+      exact zero_ne_one
     rw [h_slt0] at h_lt_spec
     simp only [if_neg h01] at h_lt_spec
     simp only [resultWord, rv64_sltu_eq, Word.toBitVec64_toNat ha,
