@@ -57,15 +57,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_op_a_0 : input_adapter_op_a_0 = 0 ∨ input_adapter_op_a_0 = 1 := h_jt.2.1
   -- eval-of-pc rewrites: circuit's `a` operand `#v[eval pc[i], 0]` equals the concrete `pcWord`.
   have hpc : Vector.map (Expression.eval env) input_var_state_pc = input_state_pc := h_input.2.1.2.2.2
-  have ep0 : Expression.eval env input_var_state_pc[0] = input_state_pc[0] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep1 : Expression.eval env input_var_state_pc[1] = input_state_pc[1] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep2 : Expression.eval env input_var_state_pc[2] = input_state_pc[2] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
+  have epc : ∀ i (hi : i < 3), Expression.eval env input_var_state_pc[i] = input_state_pc[i] :=
+    fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have ha1eq : (#v[Expression.eval env input_var_state_pc[0], Expression.eval env input_var_state_pc[1],
       Expression.eval env input_var_state_pc[2], 0] : Word (ZMod p))
-      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by rw [ep0, ep1, ep2]
+      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by
+    rw [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]
   have ha1U : Word.isU64 (#v[Expression.eval env input_var_state_pc[0],
       Expression.eval env input_var_state_pc[1], Expression.eval env input_var_state_pc[2], 0]
         : Word (ZMod p)) := ha1eq ▸ h_pcU
@@ -108,16 +105,14 @@ theorem completeness :
     h_input.2.1.2.2.2
   have hob : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_imm
       = input_adapter_op_b_imm := h_input.2.2.2.2.2.1
-  have ep0 : Expression.eval env.toEnvironment input_var_state_pc[0] = input_state_pc[0] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep1 : Expression.eval env.toEnvironment input_var_state_pc[1] = input_state_pc[1] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep2 : Expression.eval env.toEnvironment input_var_state_pc[2] = input_state_pc[2] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
+  have epc : ∀ i (hi : i < 3),
+      Expression.eval env.toEnvironment input_var_state_pc[i] = input_state_pc[i] :=
+    fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have ha1eq : (#v[Expression.eval env.toEnvironment input_var_state_pc[0],
       Expression.eval env.toEnvironment input_var_state_pc[1],
       Expression.eval env.toEnvironment input_var_state_pc[2], 0] : Word (ZMod p))
-      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by rw [ep0, ep1, ep2]
+      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by
+    rw [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]
   have ha1U : Word.isU64 (#v[Expression.eval env.toEnvironment input_var_state_pc[0],
       Expression.eval env.toEnvironment input_var_state_pc[1],
       Expression.eval env.toEnvironment input_var_state_pc[2], 0] : Word (ZMod p)) := ha1eq ▸ h_pcU

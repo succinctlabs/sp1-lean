@@ -56,21 +56,17 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- `h_input` flattened: `op_a/op_b_memory` are 3-leaf sub-groups `prev_value ∧ ts_prev_low ∧ ts_diff`.
   obtain ⟨_h_ir, ⟨_h_clkh, _h_clk1, _h_clk0, hpc⟩, _h_a, ⟨_h_amem_pv, _h_amem_pl, _h_amem_dl⟩,
     _h_a0, _h_b, ⟨h_bmem_pv, _h_bmem_pl, _h_bmem_dl⟩, _hcimm⟩ := h_input
-  have rb0 : Expression.eval env input_var_adapter_op_b_memory_prev_value[0]
-      = input_adapter_op_b_memory_prev_value[0] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb1 : Expression.eval env input_var_adapter_op_b_memory_prev_value[1]
-      = input_adapter_op_b_memory_prev_value[1] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb2 : Expression.eval env input_var_adapter_op_b_memory_prev_value[2]
-      = input_adapter_op_b_memory_prev_value[2] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb3 : Expression.eval env input_var_adapter_op_b_memory_prev_value[3]
-      = input_adapter_op_b_memory_prev_value[3] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
+  have rb : ∀ i (hi : i < 4),
+      Expression.eval env input_var_adapter_op_b_memory_prev_value[i]
+        = input_adapter_op_b_memory_prev_value[i] :=
+    fun i hi => by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
   have hrs1eq : (#v[Expression.eval env input_var_adapter_op_b_memory_prev_value[0],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[1],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[2],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[3]] : Word (ZMod p))
       = #v[input_adapter_op_b_memory_prev_value[0], input_adapter_op_b_memory_prev_value[1],
         input_adapter_op_b_memory_prev_value[2], input_adapter_op_b_memory_prev_value[3]] := by
-    rw [rb0, rb1, rb2, rb3]
+    rw [rb 0 (by omega), rb 1 (by omega), rb 2 (by omega), rb 3 (by omega)]
   have hrs1U : Word.isU64 (#v[Expression.eval env input_var_adapter_op_b_memory_prev_value[0],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[1],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[2],
@@ -82,15 +78,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
         ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
-  have ep0 : Expression.eval env input_var_state_pc[0] = input_state_pc[0] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep1 : Expression.eval env input_var_state_pc[1] = input_state_pc[1] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep2 : Expression.eval env input_var_state_pc[2] = input_state_pc[2] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
+  have epc : ∀ i (hi : i < 3), Expression.eval env input_var_state_pc[i] = input_state_pc[i] :=
+    fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have hpceq : (#v[Expression.eval env input_var_state_pc[0], Expression.eval env input_var_state_pc[1],
       Expression.eval env input_var_state_pc[2], 0] : Word (ZMod p))
-      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by rw [ep0, ep1, ep2]
+      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by
+    rw [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]
   have hpcU : Word.isU64 (#v[Expression.eval env input_var_state_pc[0],
       Expression.eval env input_var_state_pc[1], Expression.eval env input_var_state_pc[2], 0]
         : Word (ZMod p)) := hpceq ▸ h_pcU
@@ -130,50 +123,36 @@ theorem completeness :
   obtain ⟨he_av, he_oav, he_lsb⟩ := h_env
   obtain ⟨_h_ir, ⟨_h_clkh, _h_clk1, _h_clk0, hpc⟩, _h_a, ⟨_h_amem_pv, _h_amem_pl, _h_amem_dl⟩,
     _h_a0, _h_b, ⟨h_bmem_pv, _h_bmem_pl, _h_bmem_dl⟩, hcimm⟩ := h_input
-  have rb0 : Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0]
-      = input_adapter_op_b_memory_prev_value[0] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb1 : Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1]
-      = input_adapter_op_b_memory_prev_value[1] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb2 : Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2]
-      = input_adapter_op_b_memory_prev_value[2] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb3 : Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]
-      = input_adapter_op_b_memory_prev_value[3] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
+  have rb : ∀ i (hi : i < 4),
+      Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[i]
+        = input_adapter_op_b_memory_prev_value[i] :=
+    fun i hi => by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
   have hrs1eq : (#v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]] : Word (ZMod p))
       = #v[input_adapter_op_b_memory_prev_value[0], input_adapter_op_b_memory_prev_value[1],
         input_adapter_op_b_memory_prev_value[2], input_adapter_op_b_memory_prev_value[3]] := by
-    rw [rb0, rb1, rb2, rb3]
+    rw [rb 0 (by omega), rb 1 (by omega), rb 2 (by omega), rb 3 (by omega)]
   have hrs1U : Word.isU64 (#v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]] : Word (ZMod p)) :=
     hrs1eq ▸ h_rs1U
-  have ci0 : Expression.eval env.toEnvironment input_var_adapter_op_c_imm[0]
-      = input_adapter_op_c_imm[0] := by rw [← hcimm]; simp only [Vector.getElem_map]
-  have ci1 : Expression.eval env.toEnvironment input_var_adapter_op_c_imm[1]
-      = input_adapter_op_c_imm[1] := by rw [← hcimm]; simp only [Vector.getElem_map]
-  have ci2 : Expression.eval env.toEnvironment input_var_adapter_op_c_imm[2]
-      = input_adapter_op_c_imm[2] := by rw [← hcimm]; simp only [Vector.getElem_map]
-  have ci3 : Expression.eval env.toEnvironment input_var_adapter_op_c_imm[3]
-      = input_adapter_op_c_imm[3] := by rw [← hcimm]; simp only [Vector.getElem_map]
   have hcimm_eq : (#v[Expression.eval env.toEnvironment input_var_adapter_op_c_imm[0],
       Expression.eval env.toEnvironment input_var_adapter_op_c_imm[1],
       Expression.eval env.toEnvironment input_var_adapter_op_c_imm[2],
       Expression.eval env.toEnvironment input_var_adapter_op_c_imm[3]] : Word (ZMod p))
       = input_adapter_op_c_imm := by
     rw [← hcimm]; apply Vector.ext; intro i hi; simp only [Vector.getElem_map]; interval_cases i <;> rfl
-  have ep0 : Expression.eval env.toEnvironment input_var_state_pc[0] = input_state_pc[0] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep1 : Expression.eval env.toEnvironment input_var_state_pc[1] = input_state_pc[1] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep2 : Expression.eval env.toEnvironment input_var_state_pc[2] = input_state_pc[2] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
+  have epc : ∀ i (hi : i < 3),
+      Expression.eval env.toEnvironment input_var_state_pc[i] = input_state_pc[i] :=
+    fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have hpceq : (#v[Expression.eval env.toEnvironment input_var_state_pc[0],
       Expression.eval env.toEnvironment input_var_state_pc[1],
       Expression.eval env.toEnvironment input_var_state_pc[2], 0] : Word (ZMod p))
-      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by rw [ep0, ep1, ep2]
+      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by
+    rw [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]
   have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
     have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
