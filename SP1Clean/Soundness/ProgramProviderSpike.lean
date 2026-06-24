@@ -100,15 +100,13 @@ omit [NeZero p] in
 theorem demoRomRow_valid [Fact (2 ^ 17 < p)] : ProgramRowSpec (demoRomRow (p := p)) := by
   have h32 : (32 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, Or.inl rfl⟩ <;>
-    simp only [demoRomRow, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] <;>
-    first
-      | (rw [show (1 : ZMod p) = ((1 : ℕ) : ZMod p) from by norm_cast,
-            ZMod.val_natCast_of_lt (by omega)]; norm_num)
-      | (rw [show (2 : ZMod p) = ((2 : ℕ) : ZMod p) from by norm_cast,
-            ZMod.val_natCast_of_lt (by omega)]; norm_num)
-      | (rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) from by norm_cast,
-            ZMod.val_natCast_of_lt (by omega)]; norm_num)
-      | (rw [ZMod.val_zero]; norm_num)
+    simp only [demoRomRow, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      show (1 : ZMod p) = ((1 : ℕ) : ZMod p) from by norm_cast,
+      show (2 : ZMod p) = ((2 : ℕ) : ZMod p) from by norm_cast,
+      show (3 : ZMod p) = ((3 : ℕ) : ZMod p) from by norm_cast,
+      ZMod.val_natCast_of_lt (show (3 : ℕ) < p by omega),
+      ZMod.val_natCast_of_lt (show (2 : ℕ) < p by omega),
+      ZMod.val_natCast_of_lt (show (1 : ℕ) < p by omega), ZMod.val_zero] <;> omega
 
 omit [NeZero p] in
 /-- The constructed provider for the one-row demo ROM is a genuine `ProgramProvider` (no assumption) —
@@ -116,6 +114,6 @@ the `programProvider_of_validRom` construction is inhabited, not vacuous. -/
 theorem demoRom_programProvider [Fact (2 ^ 17 < p)] (mult : ProgramRow (ZMod p) → ℤ) :
     ProgramProvider (p := p) ProgramRowSpec (romContributions [demoRomRow (p := p)] mult) :=
   programProvider_of_validRom [demoRomRow] mult
-    (by intro row hrow; simp only [List.mem_singleton] at hrow; subst hrow; exact demoRomRow_valid)
+    fun _ hrow => List.mem_singleton.1 hrow ▸ demoRomRow_valid
 
 end SP1Clean.Soundness

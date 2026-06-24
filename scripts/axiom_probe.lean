@@ -58,6 +58,8 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.AddiSail.addi_chip_reaches_sail
 #print axioms SP1Clean.AddwSail.correct_addw_native
 #print axioms SP1Clean.AddwSail.addw_chip_reaches_sail
+#print axioms SP1Clean.AddwSail.correct_addiw_native
+#print axioms SP1Clean.AddwSail.addiw_chip_reaches_sail
 #print axioms SP1Clean.AluX0Sail.correct_aluX0_rtype
 #print axioms SP1Clean.AluX0Sail.correct_aluX0_rtypew
 #print axioms SP1Clean.AluX0Sail.correct_aluX0_addi
@@ -68,9 +70,15 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.AluX0Sail.correct_aluX0_divw
 #print axioms SP1Clean.AluX0Sail.correct_aluX0_remw
 #print axioms SP1Clean.BitwiseSail.correct_bitwise_native
+#print axioms SP1Clean.BitwiseSail.correct_andi_native
+#print axioms SP1Clean.BitwiseSail.correct_ori_native
+#print axioms SP1Clean.BitwiseSail.correct_xori_native
 #print axioms SP1Clean.BitwiseSail.bitwise_chip_reaches_sail_and
 #print axioms SP1Clean.BitwiseSail.bitwise_chip_reaches_sail_or
 #print axioms SP1Clean.BitwiseSail.bitwise_chip_reaches_sail_xor
+#print axioms SP1Clean.BitwiseSail.bitwise_chip_reaches_sail_andi
+#print axioms SP1Clean.BitwiseSail.bitwise_chip_reaches_sail_ori
+#print axioms SP1Clean.BitwiseSail.bitwise_chip_reaches_sail_xori
 #print axioms SP1Clean.BranchSail.correct_branch_native
 #print axioms SP1Clean.BranchSail.branch_chip_reaches_sail
 #print axioms SP1Clean.DivRemSail.correct_div_native
@@ -83,6 +91,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.DivRemSail.correct_remuw_native
 #print axioms SP1Clean.DivRemSail.divrem_chip_reaches_sail
 #print axioms SP1Clean.JalSail.correct_jal_native
+#print axioms SP1Clean.JalSail.correct_jal_native_x0
 #print axioms SP1Clean.JalSail.jal_chip_reaches_sail
 #print axioms SP1Clean.JalrSail.correct_jalr_native
 #print axioms SP1Clean.JalrSail.jalr_chip_reaches_sail
@@ -104,7 +113,10 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.LoadX0Sail.loadX0_chip_reaches_sail
 #print axioms SP1Clean.LtSail.correct_sltu_native
 #print axioms SP1Clean.LtSail.correct_slt_native
+#print axioms SP1Clean.LtSail.correct_slti_native
+#print axioms SP1Clean.LtSail.correct_sltiu_native
 #print axioms SP1Clean.LtSail.lt_chip_reaches_sail
+#print axioms SP1Clean.LtSail.lt_chip_reaches_sail_imm
 #print axioms SP1Clean.MulSail.correct_mul_native
 #print axioms SP1Clean.MulSail.correct_mulh_native
 #print axioms SP1Clean.MulSail.correct_mulhu_native
@@ -133,6 +145,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.SubwSail.subw_chip_reaches_sail
 #print axioms SP1Clean.UTypeSail.correct_utype_lui_native
 #print axioms SP1Clean.UTypeSail.correct_utype_auipc_native
+#print axioms SP1Clean.UTypeSail.correct_utype_native_x0
 #print axioms SP1Clean.UTypeSail.utype_chip_reaches_sail_lui
 #print axioms SP1Clean.UTypeSail.utype_chip_reaches_sail_auipc
 #print axioms SP1Clean.AddChip.kind

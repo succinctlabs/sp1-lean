@@ -71,9 +71,9 @@ theorem correct_store_word_native
         h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
         h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
-    rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs1
+    rwa [hsp, SailState.get_reg?_insert_nextPC]
   have hsp_rs2 : sp.get_reg? rs2_idx = some stored := by
-    rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs2
+    rwa [hsp, SailState.get_reg?_insert_nextPC]
   have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
       = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
@@ -86,10 +86,6 @@ theorem correct_store_word_native
   have hwrite := run_vmem_write_of_width_4 rs1_idx reg_val (BitVec.signExtend 64 imm)
     (Sail.BitVec.extractLsb stored 31 0) sp hsp_init hsp_rs1 h_align' hsp_config h_does_fit h_in_range
   simp only [hmem_eq] at hwrite
-  have hrx2 : rX_bits (regidx.Regidx rs2_idx) sp = .ok stored sp := by
-    have h := @run_rX_bits rs2_idx sp
-    simp only [EStateM.run] at h
-    rw [h, hsp_rs2]
   have hsp1 : (sp1_sw pc (reg_val + BitVec.signExtend 64 imm)
         (Sail.BitVec.extractLsb stored 31 0)).run s
       = .ok RETIRE_SUCCESS { sp with mem :=
@@ -128,7 +124,7 @@ theorem sw_chip_reaches_sail
       = (sp1_sw pc (Word.toBitVec64 input.op_b_val + BitVec.signExtend 64 imm)
           (Sail.BitVec.extractLsb (Word.toBitVec64 input.adapter.op_a_memory.prev_value) 31 0)).run s := by
   haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
-  obtain ⟨h_b, h_c, _h_fits48, h_nonres, h_align4, _h_off⟩ := h_assum
+  obtain ⟨h_b, h_c, _h_fits48, _h_nonres, h_align4, _h_off⟩ := h_assum
   have hreg : (Word.toBitVec64 input.op_b_val).toNat = Word.toNat input.op_b_val :=
     Word.toBitVec64_toNat h_b
   have hoff : (BitVec.signExtend 64 imm).toNat = Word.toNat input.op_c_imm := by

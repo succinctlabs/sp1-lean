@@ -71,8 +71,7 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
 lemma reassemble (w low : ZMod p) :
     w = low + (w - low) * (256 : ZMod p)⁻¹ * 256 := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h256 : (256 : ZMod p)⁻¹ * 256 = 1 := inv_mul_cancel₀ val_256_ne_zero
-  rw [mul_assoc, h256, mul_one]; ring
+  rw [mul_assoc, inv_mul_cancel₀ val_256_ne_zero, mul_one]; ring
 
 /-- A limb's value splits as its low byte plus 256× its high byte, given both are bytes. -/
 lemma limb_split {w low : ZMod p} (hlo : low.val < 256)
@@ -261,8 +260,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   obtain ⟨_h_gate, h_bw⟩ := h_holds
   have h_spec := h_bw ⟨hop, hbin⟩
   refine ⟨?_, Or.inr ⟨hop, hbin⟩⟩
-  simp only [decompBytes, eb, ec, elb, elc, ← sub_eq_add_neg] at h_spec ⊢
-  exact h_spec
+  simpa only [decompBytes, eb, ec, elb, elc, ← sub_eq_add_neg] using h_spec
 
 set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
@@ -283,8 +281,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     fun k _ => by rw [← hilc]; simp only [Vector.getElem_map]
   refine ⟨?_, ⟨hop, hbin⟩, ?_⟩
   · rcases hbin with h | h <;> rw [h] <;> simp
-  · simp only [decompBytes, eb, ec, elb, elc, ← sub_eq_add_neg] at h_spec ⊢
-    exact h_spec
+  · simpa only [decompBytes, eb, ec, elb, elc, ← sub_eq_add_neg] using h_spec
 
 /-- SP1's `BitwiseU16Operation::eval` as a Clean-native `FormalAssertion`: the `is_real` binary gate
 plus the composed `BitwiseOperation` on the two `U16toU8` byte decompositions, witnessing nothing. -/

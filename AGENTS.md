@@ -49,7 +49,8 @@ The SP1 Rust source (the extraction/spec oracle, read-only reference) lives in a
   A `run_in_background` build can outlive its shell — check with `ps -ef | grep -E "lake|lean" | grep -v lsp`
   before spawning another. The lean LSP server (`uvx lean-lsp-mcp`) also keeps several GB warm.
 - **Toolchain (pinned, do not bump):** `lean-toolchain` = `leanprover/lean4:v4.28.0`; mathlib `v4.28.0`;
-  Clean from `github.com/Verified-zkEVM/clean @ main`. Sail comes from two `github.com/succinctlabs/*` deps
+  Clean pinned to a specific commit on `github.com/Verified-zkEVM/clean` (the PR #398 head — re-pin to
+  `@ main` once it merges; see `lakefile.toml` + roadmap W9). Sail comes from two `github.com/succinctlabs/*` deps
   pinned to the `dtumad/clean-native` branch — `LeanRV64D` (`sail-riscv-lean`, the generated RV64 model) and
   `RISCV` (`riscv-lean`, the lightweight ISA fns) — which transitively pull the `rems-project/lean-sail @ v4`
   runtime; each carries a 4.28 `lean-toolchain`. All deps are fetched by `lake build`; nothing is a local
@@ -135,11 +136,17 @@ builds just that layer. Isolation is **by convention** — Lake does not forbid 
 imports within one package; the auto-gen guard is the `Extracted/` "do not hand-edit" headers + the sole
 writer `update_extracted.py`.
 
-**Restructure status (2026-06-16).** Landed & green: the `Math`/`Model` split, `Extracted/` auto-gen
+**Restructure status (updated 2026-06-23).** Landed & green: the `Math`/`Model` split, `Extracted/` auto-gen
 consolidation (`Circuit/` + `WitnessVectors/`), the `FormalModel/Contracts/` audit surface (all `Spec`s +
 the ALU chips' `Assumptions`/`ProverAssumptions`), the `Native/`+`Proofs/` five-pillar re-bucket of
 `Chips`/`Operations`/`Readers`/`WitnessTests`, and all six per-pillar layer libraries — build green
-(3633 jobs), audit clean (314 probes, `sorryAx` confined to the known 4-sorry debt). Planned (approved
+(3676 jobs), audit clean (366 probes, `sorryAx` confined to the known debt). **DivRem/ShiftLeft/ShiftRight/Mul
+completeness are all closed** (2026-06-12 / 06-18), leaving **one** remaining `sorry` — `sp1_witness_decode`
+(the capstone W1b/W1c decode seam). A large proof-cleanup campaign (2026-06-22 / 06-23) golfed ~109
+hand-written files (−591 lines) while preserving axiom-cleanliness, plus substrate-hoist refactors
+(`Word.isU64_four`, Faithful `val_16`/`bool_iff` dedup → `ChipTactics`). Upstream `main` was merged in
+2026-06-23 (#100 hard-gates `skipKernelTC` and removes overrides; #101 fleshes out the immediate-type Sail
+bridges; #102 makes the jalr/jal/branch specs explicit about divisibility / LSB-clearing). Planned (approved
 plan, not yet done): lifting the remaining chips' `Assumptions` onto the audit surface (helper-dependent
 chips Jal/Jalr/Branch/DivRem/ShiftLeft/ShiftRight + split-`Spec` Lt/Bitwise keep theirs in their proof
 files). The guest-program execution model was surfaced in `FormalModel/Trace/GuestProgram.lean` (Phase 5);
@@ -178,10 +185,39 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
 
 - `circuit_proof_start` (from `Clean.Utils.Tactics`) is the **first** tactic in soundness/completeness proofs;
   any `haveI`/`set_option` must come after it, or it errors "can only be used on Soundness/Completeness".
-- Imports MUST precede the module doc-comment (the package `-D linter.flexible` flag is rejected on a
-  zero-imports header).
+- Imports MUST precede the module doc-comment (a `-D linter.*` flag can't be validated against a header that
+  opens with a doc-comment before its imports — the linter's registration module isn't in scope yet; same
+  "Step 0" reason the package `[leanOptions]` carries no Mathlib linter flags, see `lakefile.toml`).
+- **Linters — two kinds.** *Syntactic* linters run during `lake build` (option-gated); *environment*
+  linters run as a separate `lake lint` pass over the built environment.
+  - **Syntactic.** The `SP1Proofs` lake library enables `-D linter.style.lambdaSyntax`/`dollarSyntax` (via its
+    `moreLeanArgs`); these apply during the normal `lake build SP1Clean` (224 hand-written `Proofs/`/`Faithful/`/
+    `Soundness/` modules) with **zero** violations. Package-level Mathlib linter flags do **not** work (the
+    Clean-only `Math/`/`Model/` files lack the registration) — scope any new linter to a lake lib, not the
+    package. The auto-gen `Extracted/`+`*Vectors` files carry per-file `set_option linter.all false`.
+  - **Environment (`lake lint`).** Run `lake lint` (after a build — it imports the oleans) for the Batteries
+    `#lint` checks. The driver is `scripts/sp1Lint.lean` (package `lintDriver = "sp1Lint"`), a thin wrapper over
+    `getChecks`/`lintCore`. We use a **custom driver, not the stock `runLinter` exe**, because `runLinter`
+    scopes by namespace *root* (`getDeclsInPackage module.getRoot`) — it would lint all `SP1Clean.*` incl.
+    `SP1Clean.Extracted.*`, and the per-file `set_option linter.all false` headers do **nothing** against
+    environment linters (those run post-import; only `nolints.json`/`@[nolint]` suppress them). `sp1Lint`
+    instead filters decls by full module path (drops `Extracted/`+`*Vectors`) and runs a **curated** set of 11
+    low-noise linters. Residue lives in `scripts/nolints.json` (21 stable entries — 3 `defLemma`
+    obligation-bundle defs + 18 `simpComm`/`simpNF` Math/Model/Sail simp lemmas); `lake exe sp1Lint --update`
+    regenerates it; CI runs `lake lint` in the build job. Deliberately **dropped**: `docBlame`/`tacticDocs`
+    (doc-coverage noise) and `unusedArguments` (flags only the uniform field-generic / `ProverData` signature
+    args — all structural, and a fresh false-positive per new chip).
+  - Next candidates + the non-negotiable suppressions (`unusedSectionVars`/`unusedSimpArgs`, the auto-gen
+    `linter.all false`) are catalogued in `docs/agents/cleanup-backlog.md`.
 - Heavy `toBitVec64` rw chains are whnf-expensive — `set_option maxHeartbeats 2000000 in` (carry lemmas need up
   to `16000000`).
+- **Never `set_option (debug.)skipKernelTC`.** It bypasses the kernel's type-check re-run — the trust anchor
+  for an axiom-clean proof — so it is **CI-gated** (`scripts/check_no_skipkerneltc.sh`, run by the audit and a
+  standalone CI `guards` job; any hit in `SP1Clean/**/*.lean` fails the build). If a goal blocks on a kernel
+  deep-recursion / `2^64`-unfold error, the fix is to factor the expensive compute into an **abstract-`BitVec`
+  helper** proved once over variables (the `srl_toNat`/`sra_toNat` pattern), then apply it symbolically — never
+  silence the kernel. See `docs/agents/proof-patterns.md` §"Bit-shift chip soundness" (the `2^64` bullet) for
+  the worked fix.
 - `mul_eq_zero` won't fire on `ZMod p` (a `Nat.rec` Mul-instance quirk) — derive booleanness via
   `inv_mul_cancel₀` / a `bool_of_mul_pred`-style lemma instead.
 - `Word` is an `abbrev` for `Vector` — `w.toBitVec64` dot-notation fails; write `Word.toBitVec64 w`.
@@ -213,11 +249,21 @@ after installing or toggling.
 
 ## docs/
 
+- `docs/README.md` — index + "what to read first".
 - `docs/architecture.md` — the four-artifact chain, layout, design verdict, what's deferred.
+- `docs/roadmap.md` — the W-graph dependency chart, open work, debt status.
+- `docs/bus-model.md` — the cross-chip interaction-bus model (channels, consistency).
+- `docs/release-audit.md` — the honest-claim / trust-boundary report (axiom census + sorry inventory;
+  regenerate with `scripts/run_audit.sh`).
 - `docs/agents/lean-sail-notes.md` — the 4.28 environment: toolchain pins, why public Clean `main`, the local Sail
   setup + `lake update` trap, the Clean-main ↔ Batteries import collision and its fix.
-- `docs/agents/proof-patterns.md` — the witnessed-`FormalCircuit` soundness/completeness recipe + concrete landmines.
+- `docs/agents/proof-patterns.md` — the witnessed-`FormalCircuit` soundness/completeness recipe + concrete
+  landmines + the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
 - `docs/agents/porting-recipe.md` — step-by-step checklist to port a new chip from the Add/Bitwise template.
+- `docs/agents/extraction.md` — the constraint-extraction pipeline (compiler → Python → Lean DSL).
+- `docs/agents/mul-operation-learnings.md` — Mul-specific soundness/completeness pitfalls.
+- `docs/agents/cleanup-backlog.md` — the prioritized follow-up cleanup/refactor backlog + the golfing/cleanup
+  skills catalog.
 - `docs/snapshots/compile-profile.md` — per-module wall-clock compile profile + worst offenders + common threads
   (point-in-time snapshot); re-run with `scripts/profile_compile.sh`.
 - `docs/snapshots/axiom-ledger.md` — machine-checked `#print axioms` inventory per theorem (point-in-time

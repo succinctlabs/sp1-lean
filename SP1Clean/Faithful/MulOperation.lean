@@ -26,10 +26,6 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-private lemma val_16' [NeZero p] : (16 : ZMod p).val = 16 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
-
 /-- The high decomposition byte of `b` (`E7 = U16toU8OperationSafe.value b ...[7]`), the value the
 `MSB` send pins `b_msb` against. -/
 private def hiByteB (b : Word (ZMod p)) (cols : Extracted.MulOperation (ZMod p)) (is_real : ZMod p) :
@@ -92,7 +88,7 @@ theorem mulOp_interactions_faithful (a b c : Word (ZMod p))
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.MulOperation.interactions, List.forall_append, List.Forall,
     Interaction.toProp_send_byte, ByteOpcode.ofNat_three, ByteOpcode.ofNat_five, ByteOpcode.ofNat_six,
-    ByteOpcode.constrain_U8Range, ByteOpcode.constrain_MSB, ByteOpcode.constrain_Range, val_16',
+    ByteOpcode.constrain_U8Range, ByteOpcode.constrain_MSB, ByteOpcode.constrain_Range, val_16_zmod_p,
     one_ne_zero, ne_eq, not_false_eq_true, true_implies, MulOpInteractSpec, hiByteB, hiByteC,
     and_assoc]
 

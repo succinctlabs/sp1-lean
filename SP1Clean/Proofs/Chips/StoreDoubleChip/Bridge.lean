@@ -83,29 +83,24 @@ theorem correct_store_double_native
         h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
   -- Register reads of `rs1` (base) and `rs2` (stored value) survive the `nextPC` write.
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
-    rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs1
+    rwa [hsp, SailState.get_reg?_insert_nextPC]
   have hsp_rs2 : sp.get_reg? rs2_idx = some (Word.toBitVec64 stored) := by
-    rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs2
+    rwa [hsp, SailState.get_reg?_insert_nextPC]
   -- The alignment fact in Sail form, and the range-subset PMA fact.
   have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
       = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 8 = true := by
     rw [is_aligned_vaddr_iff_mod, hadd]; exact h_aligned
-  have h_does_fit' : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 < 2 ^ 64 := _h_does_fit
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
     range_subset_sp1_pma _ 8 (by omega) h_lo (by rw [hadd]; exact h_hi)
   -- The write result on `sp` (same memory as `s`).
   have hwrite := run_vmem_write_of_width_8 rs1_idx reg_val (BitVec.signExtend 64 imm)
-    (Word.toBitVec64 stored) sp hsp_init hsp_rs1 h_align' hsp_config h_does_fit' h_in_range
+    (Word.toBitVec64 stored) sp hsp_init hsp_rs1 h_align' hsp_config _h_does_fit h_in_range
   simp only [hmem_eq] at hwrite
-  -- Resolve `rX_bits rs2` (the stored-value register) on `sp`, and collapse the `extractLsb`.
-  have hrx2 : rX_bits (regidx.Regidx rs2_idx) sp = .ok (Word.toBitVec64 stored) sp := by
-    have h := @run_rX_bits rs2_idx sp
-    simp only [EStateM.run] at h
-    rw [h, hsp_rs2]
+  -- Collapse the `extractLsb` on the stored value.
   have hext : Sail.BitVec.extractLsb (Word.toBitVec64 stored) 63 0 = Word.toBitVec64 stored := by
     simp [Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb']
   -- Reduce the SP1 side: thread the `nextPC` write, then run the `modify` of memory.
@@ -128,9 +123,7 @@ theorem correct_store_double_native
               (BitVec.ofNat 8 ((Word.toBitVec64 stored).toNat >>> 48))).insert
             ((reg_val + BitVec.signExtend 64 imm).toNat + 7)
               (BitVec.ofNat 8 ((Word.toBitVec64 stored).toNat >>> 56))) } := by
-    rw [sp1_sd]
-    rw [EStateM.run_bind, run_writeReg]
-    rfl
+    rw [sp1_sd, EStateM.run_bind, run_writeReg]; rfl
   rw [hsp1]
   simp only [spec_sd]
   rw [EStateM.run_bind, run_readReg_of_isInitialized _ _ hs, hpc_get]
@@ -158,7 +151,7 @@ theorem sd_chip_reaches_sail
       = (sp1_sd pc (Word.toBitVec64 input.op_b_val + BitVec.signExtend 64 imm)
           input.adapter.op_a_memory.prev_value).run s := by
   haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
-  obtain ⟨h_b, h_c, _h_fits48, h_nonres, h_align48⟩ := h_assum
+  obtain ⟨h_b, h_c, _h_fits48, _h_nonres, h_align48⟩ := h_assum
   have hreg : (Word.toBitVec64 input.op_b_val).toNat = Word.toNat input.op_b_val :=
     Word.toBitVec64_toNat h_b
   have hoff : (BitVec.signExtend 64 imm).toNat = Word.toNat input.op_c_imm := by

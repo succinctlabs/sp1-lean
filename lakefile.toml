@@ -3,6 +3,13 @@ defaultTargets = ["SP1Clean"]
 
 moreLeanArgs = ["--tstack=400000"]
 
+# `lake lint` driver — the project-local environment-linter pass (`scripts/sp1Lint.lean`). It runs a
+# curated subset of the Batteries `#lint` linters over the hand-written `SP1Clean.*` declarations only,
+# excluding the auto-generated `Extracted/`+`*Vectors` code. We use a thin custom driver (not the stock
+# `runLinter` exe) because `runLinter` scopes by namespace *root*, which cannot exclude `SP1Clean.Extracted`
+# while keeping `SP1Clean.Proofs`. Needs a built project first (env linters read oleans); run after `lake build`.
+lintDriver = "sp1Lint"
+
 # Built-in options only (no Mathlib linter options here — those require a Mathlib
 # linter module to be imported before the package -D flags are validated, which a
 # Clean-only file does not pull in; see the sp1-lean Step 0 finding).
@@ -32,6 +39,14 @@ rev = "dtumad/clean-native"
 name = "RISCV"
 git = "https://github.com/succinctlabs/riscv-lean"
 rev = "dtumad/clean-native"
+
+# The `lake lint` driver executable (see `lintDriver` above). A thin wrapper around the Batteries
+# `#lint` framework; `supportInterpreter` is required because the linters' `test` functions are run
+# through the interpreter. Built by `lake build` along with the libraries; invoked by `lake lint`.
+[[lean_exe]]
+name = "sp1Lint"
+srcDir = "scripts"
+supportInterpreter = true
 
 # Umbrella library — root module `SP1Clean.lean` imports every module; `lake build` (the default
 # target) builds everything through it. Package-level `moreLeanArgs`/`[leanOptions]` above apply to
@@ -65,6 +80,11 @@ globs = ["SP1Clean.Native.+"]
 
 # The proof pillar: the sound/complete proofs (Proofs/), the faithfulness anchors (Faithful/),
 # and the whole-machine/trace layer (Soundness/).
+# Lib-scoped Mathlib style linters: these hand-written modules all transitively import the linter
+# registration (unlike the Clean-only Math/Model files — see the package `[leanOptions]` note above),
+# so the `-D linter.style.*` flags are safe here. Start minimal (lambda/dollar are at zero violations);
+# see `docs/agents/cleanup-backlog.md` for the next candidates (oldObtain / longLine / cdot).
 [[lean_lib]]
 name = "SP1Proofs"
 globs = ["SP1Clean.Proofs.+", "SP1Clean.Faithful.+", "SP1Clean.Soundness.+"]
+moreLeanArgs = ["-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true"]

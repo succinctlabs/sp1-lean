@@ -1,0 +1,75 @@
+import Mathlib.Data.ZMod.Basic
+import Mathlib.Tactic
+
+/-! # Binary-field gates and BitVec comparisons
+
+Field-generic helper lemmas for **binary (boolean) field elements** (`x = 0 ∨ x = 1`) and the two
+`BitVec` order comparisons (`slt`/`ult`). These recur in the chip decision/selector proofs (Branch's
+signed/unsigned branch decision, Lt's flag selectors); collected here so any chip can reuse them rather
+than re-proving a private copy. Pure `ZMod p` / `BitVec` facts — no SP1-specific or circuit dependency. -/
+
+namespace SP1Clean
+
+variable {p : ℕ}
+
+/-- A boolean field element has `val ≤ 1`. -/
+lemma bool_val_le [Fact p.Prime] {x : ZMod p} (h : x = 0 ∨ x = 1) : x.val ≤ 1 := by
+  haveI : Fact (1 < p) := ⟨(Fact.out : p.Prime).one_lt⟩
+  rcases h with h | h <;> simp [h, ZMod.val_one]
+
+/-- Distinct field elements have distinct `val`s. -/
+lemma val_ne [NeZero p] {x y : ZMod p} (h : x ≠ y) : x.val ≠ y.val := fun hv =>
+  h (by rw [← ZMod.natCast_zmod_val x, ← ZMod.natCast_zmod_val y, hv])
+
+/-- A field element equal to `if P then 1 else 0` is `1` iff `P` holds. -/
+lemma eq_one_iff_of_ite [Fact p.Prime] {x : ZMod p} {P : Prop} [Decidable P]
+    (h : x = if P then 1 else 0) : x = 1 ↔ P := by
+  by_cases hP : P
+  · simp [h, hP]
+  · simp only [h, if_neg hP]
+    exact ⟨fun he => absurd he zero_ne_one, fun hp => absurd hp hP⟩
+
+/-- A field element equal to `1 - (if P then 1 else 0)` is `1` iff `P` fails. -/
+lemma eq_one_iff_of_one_sub_ite [Fact p.Prime] {x : ZMod p} {P : Prop} [Decidable P]
+    (h : x = 1 - (if P then 1 else 0)) : x = 1 ↔ ¬ P := by
+  by_cases hP : P
+  · simp only [h, if_pos hP, sub_self]
+    exact ⟨fun he => absurd he zero_ne_one, fun hp => absurd hP hp⟩
+  · simp [h, hP]
+
+/-- A binary `x` with `x = 1 ↔ P` is `if P then 1 else 0` (completeness direction of
+`eq_one_iff_of_ite`). -/
+lemma bool_eq_ite_of_iff {x : ZMod p} (hx : x = 0 ∨ x = 1) {P : Prop} [Decidable P]
+    (h : x = 1 ↔ P) : x = if P then 1 else 0 := by
+  by_cases hP : P
+  · rw [if_pos hP]; exact h.mpr hP
+  · rw [if_neg hP]; rcases hx with h0 | h1
+    · exact h0
+    · exact absurd (h.mp h1) hP
+
+/-- A binary `x` with `x = 1 ↔ y = 0` (for binary `y`) is `1 - y`. -/
+lemma bool_eq_one_sub [Fact p.Prime] {x y : ZMod p} (hx : x = 0 ∨ x = 1) (hy : y = 0 ∨ y = 1)
+    (h : x = 1 ↔ y = 0) : x = 1 - y := by
+  rcases hy with hy | hy
+  · rw [hy, sub_zero]; exact h.mpr hy
+  · rw [hy]; rcases hx with hx | hx
+    · rw [hx]; simp
+    · have := h.mp hx; rw [hy] at this; exact absurd this one_ne_zero
+
+/-- `BitVec.slt` as a signed-`toInt` comparison. -/
+lemma slt_true_iff {w : ℕ} (x y : BitVec w) : x.slt y = true ↔ x.toInt < y.toInt := by
+  simp [BitVec.slt]
+
+/-- `BitVec.slt` false as the negated signed comparison. -/
+lemma slt_false_iff {w : ℕ} (x y : BitVec w) : x.slt y = false ↔ ¬ x.toInt < y.toInt := by
+  simp [BitVec.slt]
+
+/-- `BitVec.ult` as an unsigned-`toNat` comparison. -/
+lemma ult_true_iff {w : ℕ} (x y : BitVec w) : x.ult y = true ↔ x.toNat < y.toNat := by
+  simp [BitVec.ult]
+
+/-- `BitVec.ult` false as the negated unsigned comparison. -/
+lemma ult_false_iff {w : ℕ} (x y : BitVec w) : x.ult y = false ↔ ¬ x.toNat < y.toNat := by
+  simp [BitVec.ult]
+
+end SP1Clean

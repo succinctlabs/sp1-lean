@@ -53,7 +53,6 @@ theorem isConsistentBalanced_of_intCast_zero {p : ℕ} [NeZero p]
   intro k
   have hdvd : (p : ℤ) ∣ multiplicitySum accesses k :=
     (ZMod.intCast_zmod_eq_zero_iff_dvd _ p).mp (hmod k)
-  -- |multiplicitySum| ≤ (filtered count) ≤ length < p
   have hbound : |multiplicitySum accesses k| ≤ ((filterKey accesses k).map multOf).length := by
     apply abs_sum_le_length_of_binary
     intro x hx
@@ -61,13 +60,8 @@ theorem isConsistentBalanced_of_intCast_zero {p : ℕ} [NeZero p]
     exact hbin a (List.mem_of_mem_filter ha)
   have hlen2 : ((filterKey accesses k).map multOf).length ≤ accesses.length := by
     rw [List.length_map, filterKey]; exact List.length_filter_le _ _
-  have habs : |multiplicitySum accesses k| < (p : ℤ) := by
-    have : ((filterKey accesses k).map multOf).length < p := by omega
-    have hc : (((filterKey accesses k).map multOf).length : ℤ) < (p : ℤ) := by exact_mod_cast this
-    omega
-  -- p ∣ x and |x| < p ⇒ x = 0
-  by_contra h
-  exact absurd (Int.le_of_dvd (abs_pos.mpr h) ((dvd_abs _ _).mpr hdvd)) (by omega)
+  have habs : |multiplicitySum accesses k| < (p : ℤ) := by omega
+  exact Int.eq_zero_of_abs_lt_dvd hdvd habs
 
 /-! ## The Clean → native translation (the `toAccess` adapter, roadmap W1a)
 
@@ -103,7 +97,6 @@ theorem intCast_multiplicitySum_map_toAccess
   haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).ne_zero⟩
   by_cases h_ex : ∃ i ∈ interactions, keyOf (Interaction.toAccess i) = k
   · obtain ⟨i₀, hi₀, hk₀⟩ := h_ex
-    -- same-channel keys separate exactly on the message
     have h_pred : ∀ i ∈ interactions,
         decide (keyOf (Interaction.toAccess i) = k) = decide (i.msg = i₀.msg) := by
       intro i hi
@@ -115,7 +108,6 @@ theorem intCast_multiplicitySum_map_toAccess
         exact Array.toList_inj.mp (List.map_injective_iff.mpr (ZMod.val_injective p) h3)
       · intro h
         simp only [Interaction.toAccess, keyOf, h_channel i hi, h_channel i₀ hi₀, h]
-    -- the access-key filter is the `toAccess`-image of the message filter
     have h_filter : (interactions.map Interaction.toAccess).filter (fun a => keyOf a = k)
         = (interactions.filter (fun i => i.msg = i₀.msg)).map Interaction.toAccess := by
       rw [List.filter_map]
@@ -154,8 +146,7 @@ theorem isConsistentBalanced_of_balancedInteractions
     isConsistentBalanced accesses := by
   haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).ne_zero⟩
   refine isConsistentBalanced_of_intCast_zero (p := p) accesses ?_ h_bin ?_
-  · -- |accesses| = |interactions| < ringChar (ZMod p) = p
-    rcases h_bal.1 with hlt | hchar
+  · rcases h_bal.1 with hlt | hchar
     · rw [h_perm.length_eq, List.length_map]
       rwa [ZMod.ringChar_zmod_n] at hlt
     · rw [ZMod.ringChar_zmod_n] at hchar

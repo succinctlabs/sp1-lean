@@ -535,18 +535,14 @@ lemma lower_toNat (w : Word (ZMod p)) (lower : Extracted.U16toU8Operation (ZMod 
   have h1 : w[1].val = (lower.low_bytes[1]).val + ((w[1] - lower.low_bytes[1]) * 256⁻¹).val * 256 := hw 1
   have h2 : w[2].val = (lower.low_bytes[2]).val + ((w[2] - lower.low_bytes[2]) * 256⁻¹).val * 256 := hw 2
   have h3 : w[3].val = (lower.low_bytes[3]).val + ((w[3] - lower.low_bytes[3]) * 256⁻¹).val * 256 := hw 3
-  have e0 : byteAt (extendedBytes w lower s) 0 = lower.low_bytes[0] := by rfl
-  have e1 : byteAt (extendedBytes w lower s) 1 = (w[0] - lower.low_bytes[0]) * 256⁻¹ := by
-    rfl
-  have e2 : byteAt (extendedBytes w lower s) 2 = lower.low_bytes[1] := by rfl
-  have e3 : byteAt (extendedBytes w lower s) 3 = (w[1] - lower.low_bytes[1]) * 256⁻¹ := by
-    rfl
-  have e4 : byteAt (extendedBytes w lower s) 4 = lower.low_bytes[2] := by rfl
-  have e5 : byteAt (extendedBytes w lower s) 5 = (w[2] - lower.low_bytes[2]) * 256⁻¹ := by
-    rfl
-  have e6 : byteAt (extendedBytes w lower s) 6 = lower.low_bytes[3] := by rfl
-  have e7 : byteAt (extendedBytes w lower s) 7 = (w[3] - lower.low_bytes[3]) * 256⁻¹ := by
-    rfl
+  have e0 : byteAt (extendedBytes w lower s) 0 = lower.low_bytes[0] := rfl
+  have e1 : byteAt (extendedBytes w lower s) 1 = (w[0] - lower.low_bytes[0]) * 256⁻¹ := rfl
+  have e2 : byteAt (extendedBytes w lower s) 2 = lower.low_bytes[1] := rfl
+  have e3 : byteAt (extendedBytes w lower s) 3 = (w[1] - lower.low_bytes[1]) * 256⁻¹ := rfl
+  have e4 : byteAt (extendedBytes w lower s) 4 = lower.low_bytes[2] := rfl
+  have e5 : byteAt (extendedBytes w lower s) 5 = (w[2] - lower.low_bytes[2]) * 256⁻¹ := rfl
+  have e6 : byteAt (extendedBytes w lower s) 6 = lower.low_bytes[3] := rfl
+  have e7 : byteAt (extendedBytes w lower s) 7 = (w[3] - lower.low_bytes[3]) * 256⁻¹ := rfl
   rw [e0, e1, e2, e3, e4, e5, e6, e7, Word.toNat_def, h0, h1, h2, h3]
   ring
 
@@ -742,14 +738,14 @@ lemma extendedBytes_toNat (w : Word (ZMod p)) (lower : Extracted.U16toU8Operatio
     (byteAt (extendedBytes w lower s) 0).val + (byteAt (extendedBytes w lower s) 1).val*256^1 + (byteAt (extendedBytes w lower s) 2).val*256^2 + (byteAt (extendedBytes w lower s) 3).val*256^3 + (byteAt (extendedBytes w lower s) 4).val*256^4 + (byteAt (extendedBytes w lower s) 5).val*256^5 + (byteAt (extendedBytes w lower s) 6).val*256^6 + (byteAt (extendedBytes w lower s) 7).val*256^7 + (byteAt (extendedBytes w lower s) 8).val*256^8 + (byteAt (extendedBytes w lower s) 9).val*256^9 + (byteAt (extendedBytes w lower s) 10).val*256^10 + (byteAt (extendedBytes w lower s) 11).val*256^11 + (byteAt (extendedBytes w lower s) 12).val*256^12 + (byteAt (extendedBytes w lower s) 13).val*256^13 + (byteAt (extendedBytes w lower s) 14).val*256^14 + (byteAt (extendedBytes w lower s) 15).val*256^15
       = w.toNat + (s * 255).val * (256^8 + 256^9 + 256^10 + 256^11 + 256^12 + 256^13 + 256^14 + 256^15) := by
   have hlow := lower_toNat w lower s hspec
-  have e8 : byteAt (extendedBytes w lower s) 8 = s * 255 := by rfl
-  have e9 : byteAt (extendedBytes w lower s) 9 = s * 255 := by rfl
-  have e10 : byteAt (extendedBytes w lower s) 10 = s * 255 := by rfl
-  have e11 : byteAt (extendedBytes w lower s) 11 = s * 255 := by rfl
-  have e12 : byteAt (extendedBytes w lower s) 12 = s * 255 := by rfl
-  have e13 : byteAt (extendedBytes w lower s) 13 = s * 255 := by rfl
-  have e14 : byteAt (extendedBytes w lower s) 14 = s * 255 := by rfl
-  have e15 : byteAt (extendedBytes w lower s) 15 = s * 255 := by rfl
+  have e8 : byteAt (extendedBytes w lower s) 8 = s * 255 := rfl
+  have e9 : byteAt (extendedBytes w lower s) 9 = s * 255 := rfl
+  have e10 : byteAt (extendedBytes w lower s) 10 = s * 255 := rfl
+  have e11 : byteAt (extendedBytes w lower s) 11 = s * 255 := rfl
+  have e12 : byteAt (extendedBytes w lower s) 12 = s * 255 := rfl
+  have e13 : byteAt (extendedBytes w lower s) 13 = s * 255 := rfl
+  have e14 : byteAt (extendedBytes w lower s) 14 = s * 255 := rfl
+  have e15 : byteAt (extendedBytes w lower s) 15 = s * 255 := rfl
   rw [e8, e9, e10, e11, e12, e13, e14, e15]
   omega
 

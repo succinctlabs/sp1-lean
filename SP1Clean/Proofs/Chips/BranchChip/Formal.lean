@@ -120,12 +120,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have hpcU : Word.isU64 (#v[Expression.eval env input_var_state_pc[0],
       Expression.eval env input_var_state_pc[1], Expression.eval env input_var_state_pc[2], 0]
         : Word (ZMod p)) := hpceq ▸ h_pcU
-  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
-    have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
-      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
-        ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
+  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
   have h_onehot := one_hot6 hbeq hbne hblt hbge hbltu hbgeu h_sumbin
   have h_sig_bin : env.get (i₀ + 2) + env.get (i₀ + 3) = 0 ∨ env.get (i₀ + 2) + env.get (i₀ + 3) = 1 := by
     rcases hblt with hl | hl <;> rcases hbge with hg | hg
@@ -138,7 +133,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
       rw [hl, hg, ZMod.val_one] at h_onehot
       omega
-  refine ⟨⟨?_, h_bin, ⟨hbeq, hbne, hblt, hbge, hbltu, hbgeu, hisbr⟩, ?_, ?_, ?_⟩, ?_⟩
+  refine ⟨⟨?_, h_bin, ⟨hbeq, hbne, hblt, hbge, hbltu, hbgeu, hisbr⟩, ?_, ?_, ?_, ?_⟩, ?_⟩
   · exact h_itype h_bin
   · intro hr1 hbr1
     have hav := (h_add1 ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩ hbr1).2
@@ -205,6 +200,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     simp only [rs1Word, rs2Word]
     exact branch_conditions_of_decision_eq h_rs1U h_rs2U hbeq hbne hblt hbge hbltu hbgeu hisbr hone
       h_bit h_eqf (by simp only [branchDecision]; linear_combination h_isbr)
+  · -- 4-byte alignment of the branch target's low limb, from the in-circuit `÷4` byte-range pull
+    -- `h_byte1` (`(next_pc[0] · 4⁻¹).val < 2^14 ⇒ next_pc[0].val % 4 = 0`). Lifted to the whole word
+    -- at the Sail bridge. Mirrors `JalChip.soundness`.
+    intro hr1
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
+    have hguar := h_byte1 (by rw [hr1])
+    simp only [byteChannel] at hguar
+    rw [← c14] at hguar
+    exact val_mod_four_of_mul_inv_four_lt ((byteRowSpec_range _ h14p).mp hguar)
   · refine ⟨Or.inr ⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, Or.inr h_bin, Or.inr ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩,
       Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, ?_⟩, Or.inr h_bin⟩
     -- AddOp2 gate `is_real - is_branching` is binary: on padding `is_branching = 0` from `h_pad`.
@@ -217,14 +221,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     · rcases hisbr with hb0 | hb1
       · right; rw [h1, hb0]; simp
       · left; rw [h1, hb1]; simp
-
-set_option linter.unusedSectionVars false in
-/-- A length-4 `#v` of pointwise evaluations folds to the `Vector.map` of the evaluator. -/
-private lemma vec4_eval (e : Environment (ZMod p)) (v : Vector (Expression (ZMod p)) 4) :
-    (#v[Expression.eval e v[0], Expression.eval e v[1], Expression.eval e v[2],
-        Expression.eval e v[3]] : Vector (ZMod p) 4) = Vector.map (Expression.eval e) v := by
-  ext k hk
-  interval_cases k <;> simp [Vector.getElem_map]
 
 set_option maxHeartbeats 4000000 in
 /-- Completeness via honest `ProverHint` flag witnesses (`hintFlags`/`hintBranching`). The six-way
@@ -267,12 +263,7 @@ theorem completeness :
   have ha1U : Word.isU64 (#v[Expression.eval env.toEnvironment input_var_state_pc[0],
       Expression.eval env.toEnvironment input_var_state_pc[1],
       Expression.eval env.toEnvironment input_var_state_pc[2], 0] : Word (ZMod p)) := ha1eq ▸ h_pcU
-  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
-    have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
-      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
-        ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
+  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
   have hcimm : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_imm
       = input_adapter_op_c_imm := h_input.2.2.2.2.2.2.2
   have hcimmeq : (#v[Expression.eval env.toEnvironment input_var_adapter_op_c_imm[0],

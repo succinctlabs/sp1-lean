@@ -364,5 +364,4 @@ theorem subcols_interactions_faithful_syntactic
   rw [hS, hM, hP]
   exact ((hB.append_left _).append_right _).append_right _
 
-
 end SP1Clean.Faithful

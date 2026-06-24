@@ -43,35 +43,28 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     h_input.2.2.2.2.2.1
   have hmap_pv : Vector.map (Expression.eval env) input_var_memory_access_prev_value
       = input_memory_access_prev_value := h_input.2.2.2.2.1.1
-  have eob0 : Expression.eval env input_var_offset_bit[0] = input_offset_bit[0] := by
-    rw [← hmap_ob]; simp only [Vector.getElem_map]
-  have eob1 : Expression.eval env input_var_offset_bit[1] = input_offset_bit[1] := by
-    rw [← hmap_ob]; simp only [Vector.getElem_map]
-  have epv0 : Expression.eval env input_var_memory_access_prev_value[0]
-      = input_memory_access_prev_value[0] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have epv1 : Expression.eval env input_var_memory_access_prev_value[1]
-      = input_memory_access_prev_value[1] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have epv2 : Expression.eval env input_var_memory_access_prev_value[2]
-      = input_memory_access_prev_value[2] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have epv3 : Expression.eval env input_var_memory_access_prev_value[3]
-      = input_memory_access_prev_value[3] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  simp only [eob0, eob1, epv0, epv1, epv2, epv3, ← sub_eq_add_neg] at hsel0 hsel1 hsel2 hsel3
+  have eob : ∀ i (hi : i < 2), Expression.eval env input_var_offset_bit[i] = input_offset_bit[i] :=
+    fun i hi => by rw [← hmap_ob]; simp only [Vector.getElem_map]
+  have epv : ∀ i (hi : i < 4), Expression.eval env input_var_memory_access_prev_value[i]
+      = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
+  simp only [eob 0 (by omega), eob 1 (by omega), epv 0 (by omega), epv 1 (by omega),
+    epv 2 (by omega), epv 3 (by omega), ← sub_eq_add_neg] at hsel0 hsel1 hsel2 hsel3
   have h_it := h_itype h_bin
   -- the `AddressOperation` Assumptions (eval form, matching the subcircuit input).
   have hob0' : Expression.eval env input_var_offset_bit[0] = 0
-      ∨ Expression.eval env input_var_offset_bit[0] = 1 := by rw [eob0]; exact hob0
+      ∨ Expression.eval env input_var_offset_bit[0] = 1 := by rw [eob 0 (by omega)]; exact hob0
   have hob1' : Expression.eval env input_var_offset_bit[1] = 0
-      ∨ Expression.eval env input_var_offset_bit[1] = 1 := by rw [eob1]; exact hob1
+      ∨ Expression.eval env input_var_offset_bit[1] = 1 := by rw [eob 1 (by omega)]; exact hob1
   have h_off' : (0 : ZMod p).val + 2 * (Expression.eval env input_var_offset_bit[0]).val
         + 4 * (Expression.eval env input_var_offset_bit[1]).val
       = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
-    rw [eob0, eob1]; simp only [ZMod.val_zero]; omega
+    rw [eob 0 (by omega), eob 1 (by omega)]; simp only [ZMod.val_zero]; omega
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, Expression.eval env input_var_offset_bit[0],
           Expression.eval env input_var_offset_bit[1]⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, hob0', hob1', h_ge, h_off'⟩
   have h_addr_spec := h_addr h_addr_as
-  simp only [eob0, eob1] at h_addr_spec
+  simp only [eob 0 (by omega), eob 1 (by omega)] at h_addr_spec
   -- `selected_half < 2^16` on a real row: it equals one of the four 16-bit limbs by the offset corner.
   have h_sel_lt : input_selected_half.val < 2 ^ 16 := by
     rcases hob0 with hb0 | hb0
@@ -158,32 +151,20 @@ theorem completeness :
       = input_offset_bit := h_input.2.2.2.2.2.1
   have hmap_pv : Vector.map (Expression.eval env.toEnvironment) input_var_memory_access_prev_value
       = input_memory_access_prev_value := h_input.2.2.2.2.1.1
-  have epc0 : Expression.eval env.toEnvironment input_var_state_pc[0]
-      = input_state_pc[0] := by rw [← hmap_pc]; simp only [Vector.getElem_map]
-  have epc1 : Expression.eval env.toEnvironment input_var_state_pc[1]
-      = input_state_pc[1] := by rw [← hmap_pc]; simp only [Vector.getElem_map]
-  have epc2 : Expression.eval env.toEnvironment input_var_state_pc[2]
-      = input_state_pc[2] := by rw [← hmap_pc]; simp only [Vector.getElem_map]
-  have eob0 : Expression.eval env.toEnvironment input_var_offset_bit[0]
-      = input_offset_bit[0] := by rw [← hmap_ob]; simp only [Vector.getElem_map]
-  have eob1 : Expression.eval env.toEnvironment input_var_offset_bit[1]
-      = input_offset_bit[1] := by rw [← hmap_ob]; simp only [Vector.getElem_map]
-  have epv0 : Expression.eval env.toEnvironment input_var_memory_access_prev_value[0]
-      = input_memory_access_prev_value[0] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have epv1 : Expression.eval env.toEnvironment input_var_memory_access_prev_value[1]
-      = input_memory_access_prev_value[1] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have epv2 : Expression.eval env.toEnvironment input_var_memory_access_prev_value[2]
-      = input_memory_access_prev_value[2] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have epv3 : Expression.eval env.toEnvironment input_var_memory_access_prev_value[3]
-      = input_memory_access_prev_value[3] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
+  have epc : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_state_pc[i]
+      = input_state_pc[i] := fun i hi => by rw [← hmap_pc]; simp only [Vector.getElem_map]
+  have eob : ∀ i (hi : i < 2), Expression.eval env.toEnvironment input_var_offset_bit[i]
+      = input_offset_bit[i] := fun i hi => by rw [← hmap_ob]; simp only [Vector.getElem_map]
+  have epv : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_memory_access_prev_value[i]
+      = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
   have hob0' : Expression.eval env.toEnvironment input_var_offset_bit[0] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[0] = 1 := by rw [eob0]; exact hob0
+      ∨ Expression.eval env.toEnvironment input_var_offset_bit[0] = 1 := by rw [eob 0 (by omega)]; exact hob0
   have hob1' : Expression.eval env.toEnvironment input_var_offset_bit[1] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[1] = 1 := by rw [eob1]; exact hob1
+      ∨ Expression.eval env.toEnvironment input_var_offset_bit[1] = 1 := by rw [eob 1 (by omega)]; exact hob1
   have h_off' : (0 : ZMod p).val + 2 * (Expression.eval env.toEnvironment input_var_offset_bit[0]).val
         + 4 * (Expression.eval env.toEnvironment input_var_offset_bit[1]).val
       = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
-    rw [eob0, eob1]; simp only [ZMod.val_zero]; omega
+    rw [eob 0 (by omega), eob 1 (by omega)]; simp only [ZMod.val_zero]; omega
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, Expression.eval env.toEnvironment input_var_offset_bit[0],
           Expression.eval env.toEnvironment input_var_offset_bit[1]⟩ : AddressOperation.Inputs (ZMod p)) :=
@@ -211,16 +192,16 @@ theorem completeness :
   refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨⟨fun _ => h_sel_lt, h_lh_bin⟩, ?_⟩, ⟨?_, ?_⟩,
     ?_, ?_, ?_, ?_, h_op_a_0, ?_, ?_, ?_, ?_⟩
   · exact hbin
-  · simp only [epc0, epc1, epc2]; exact h_cpu
+  · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · exact hbin
   · exact h_mem
   · exact h_msb_spec
   · exact hbin
   · exact h_it
-  · simp only [eob0, eob1, epv0, ← sub_eq_add_neg]; exact hsel0
-  · simp only [eob0, eob1, epv1, ← sub_eq_add_neg]; exact hsel1
-  · simp only [eob0, eob1, epv2, ← sub_eq_add_neg]; exact hsel2
-  · simp only [eob0, eob1, epv3, ← sub_eq_add_neg]; exact hsel3
+  · simp only [eob 0 (by omega), eob 1 (by omega), epv 0 (by omega), ← sub_eq_add_neg]; exact hsel0
+  · simp only [eob 0 (by omega), eob 1 (by omega), epv 1 (by omega), ← sub_eq_add_neg]; exact hsel1
+  · simp only [eob 0 (by omega), eob 1 (by omega), epv 2 (by omega), ← sub_eq_add_neg]; exact hsel2
+  · simp only [eob 0 (by omega), eob 1 (by omega), epv 3 (by omega), ← sub_eq_add_neg]; exact hsel3
   · exact h_msbgate
   · rcases h_lh_bin with h | h <;> rw [h] <;> simp
   · rcases h_lhu_bin with h | h <;> rw [h] <;> simp

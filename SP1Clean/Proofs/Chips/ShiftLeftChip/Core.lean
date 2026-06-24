@@ -21,10 +21,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-! ## Field constants for the shift-amount modulus -/
 
-@[simp] lemma val_64_zmod_p [NeZero p] : (64 : ZMod p).val = 64 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (64 : ℕ) < p by omega)
-
+-- `val_64_zmod_p` now lives in `Math/Word.lean`; `val_64_ne_zero` is local.
 lemma val_64_ne_zero [NeZero p] : (64 : ZMod p) ≠ 0 := by
   have h : (64 : ZMod p).val = 64 := val_64_zmod_p
   intro hz; rw [hz] at h; simp at h
@@ -259,6 +256,29 @@ lemma sll_within_byte_shift_1
 
 /-! ## Byte-shift placement wrappers (one per `(cb4, cb5)` combination) -/
 
+/-- The bit-decomposition exponent `(cb0 + 2cb1 + 4cb2 + 8cb3).val = S` (the within-byte shift count),
+shared by every close-case/sub-case wrapper. -/
+lemma inner_val {S : ℕ} (hS_le : S ≤ 15) {cb0 cb1 cb2 cb3 : ZMod p}
+    (h_inner_eq : cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8
+                  = ((S : ℕ) : ZMod p)) :
+    (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8 : ZMod p).val = S := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
+
+/-- The complementary high exponent `(16 - (cb0 + 2cb1 + 4cb2 + 8cb3)).val = 16 - S`. -/
+lemma inner_hi_val {S : ℕ} (hS_le : S ≤ 15) {cb0 cb1 cb2 cb3 : ZMod p}
+    (h_inner_eq : cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8
+                  = ((S : ℕ) : ZMod p)) :
+    (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8) : ZMod p).val
+      = 16 - S := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+            + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
+    rw [h_inner_eq, Nat.cast_sub (by omega : S ≤ 16)]; push_cast; ring]
+  exact ZMod.val_natCast_of_lt (by omega)
+
 set_option maxHeartbeats 4000000 in
 /-- `cb4=cb5=0` (byte_shift=0): `limb_result` placed at limb 0. -/
 lemma sll_close_cb4cb5_zero_case
@@ -300,15 +320,8 @@ lemma sll_close_cb4cb5_zero_case
   rw [BitVec.toNat_shiftLeft]
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
-  have h_inner_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                      + cb3 * 8 : ZMod p).val = S := by
-    rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
-  have h_inner_hi_val : (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                                + cb3 * 8) : ZMod p).val = 16 - S := by
-    rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-              + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
-      rw [h_inner_eq, Nat.cast_sub (by omega : S ≤ 16)]; push_cast; ring]
-    exact ZMod.val_natCast_of_lt (by omega)
+  have h_inner_val := inner_val h_S_le h_inner_eq
+  have h_inner_hi_val := inner_hi_val h_S_le h_inner_eq
   rw [h_inner_val] at lt_lh0 lt_lh1 lt_lh2 lt_lh3
   rw [h_inner_hi_val] at lt_ll0 lt_ll1 lt_ll2 lt_ll3
   have h_total_val : (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32).val
@@ -380,15 +393,8 @@ lemma sll_close_cb4cb5_one_one_case
   rw [BitVec.toNat_shiftLeft]
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
-  have h_inner_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                      + cb3 * 8 : ZMod p).val = S := by
-    rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
-  have h_inner_hi_val : (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                                + cb3 * 8) : ZMod p).val = 16 - S := by
-    rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-              + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
-      rw [h_inner_eq, Nat.cast_sub (by omega : S ≤ 16)]; push_cast; ring]
-    exact ZMod.val_natCast_of_lt (by omega)
+  have h_inner_val := inner_val h_S_le h_inner_eq
+  have h_inner_hi_val := inner_hi_val h_S_le h_inner_eq
   rw [h_inner_val] at lt_lh0 lt_lh1 lt_lh2 lt_lh3
   rw [h_inner_hi_val] at lt_ll0 lt_ll1 lt_ll2 lt_ll3
   have h_total_val : (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32).val
@@ -460,15 +466,8 @@ lemma sll_close_cb4cb5_zero_one_case
   rw [BitVec.toNat_shiftLeft]
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
-  have h_inner_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                      + cb3 * 8 : ZMod p).val = S := by
-    rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
-  have h_inner_hi_val : (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                                + cb3 * 8) : ZMod p).val = 16 - S := by
-    rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-              + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
-      rw [h_inner_eq, Nat.cast_sub (by omega : S ≤ 16)]; push_cast; ring]
-    exact ZMod.val_natCast_of_lt (by omega)
+  have h_inner_val := inner_val h_S_le h_inner_eq
+  have h_inner_hi_val := inner_hi_val h_S_le h_inner_eq
   rw [h_inner_val] at lt_lh0 lt_lh1 lt_lh2 lt_lh3
   rw [h_inner_hi_val] at lt_ll0 lt_ll1 lt_ll2 lt_ll3
   have h_total_val : (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32).val
@@ -540,15 +539,8 @@ lemma sll_close_cb4cb5_one_zero_case
   rw [BitVec.toNat_shiftLeft]
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
-  have h_inner_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                      + cb3 * 8 : ZMod p).val = S := by
-    rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
-  have h_inner_hi_val : (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                                + cb3 * 8) : ZMod p).val = 16 - S := by
-    rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-              + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
-      rw [h_inner_eq, Nat.cast_sub (by omega : S ≤ 16)]; push_cast; ring]
-    exact ZMod.val_natCast_of_lt (by omega)
+  have h_inner_val := inner_val h_S_le h_inner_eq
+  have h_inner_hi_val := inner_hi_val h_S_le h_inner_eq
   rw [h_inner_val] at lt_lh0 lt_lh1 lt_lh2 lt_lh3
   rw [h_inner_hi_val] at lt_ll0 lt_ll1 lt_ll2 lt_ll3
   have h_total_val : (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32).val
@@ -979,15 +971,8 @@ lemma sllw_close_cb4_zero_case
       % 2 ^ 32 := by
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
-  have h_inner_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                      + cb3 * 8 : ZMod p).val = S := by
-    rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
-  have h_inner_hi_val : (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                                + cb3 * 8) : ZMod p).val = 16 - S := by
-    rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-              + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
-      rw [h_inner_eq, Nat.cast_sub (by omega : S ≤ 16)]; push_cast; ring]
-    exact ZMod.val_natCast_of_lt (by omega)
+  have h_inner_val := inner_val h_S_le h_inner_eq
+  have h_inner_hi_val := inner_hi_val h_S_le h_inner_eq
   rw [h_inner_val] at lt_lh0 lt_lh1
   rw [h_inner_hi_val] at lt_ll0 lt_ll1
   have h_total_val : (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16).val = S := by
@@ -1039,15 +1024,8 @@ lemma sllw_close_cb4_one_case
       % 2 ^ 32 := by
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
-  have h_inner_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                      + cb3 * 8 : ZMod p).val = S := by
-    rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
-  have h_inner_hi_val : (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                                + cb3 * 8) : ZMod p).val = 16 - S := by
-    rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-              + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
-      rw [h_inner_eq, Nat.cast_sub (by omega : S ≤ 16)]; push_cast; ring]
-    exact ZMod.val_natCast_of_lt (by omega)
+  have h_inner_val := inner_val h_S_le h_inner_eq
+  have h_inner_hi_val := inner_hi_val h_S_le h_inner_eq
   rw [h_inner_val] at lt_lh0 lt_lh1
   rw [h_inner_hi_val] at lt_ll0 lt_ll1
   have h_total_val : (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16).val = S + 16 := by
@@ -1105,15 +1083,8 @@ lemma sllw_subcase_cb4_zero
                               BitVec.setWidth 5 (HWord.toBitVec32 #v[c0, c1])) := by
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
-  have h_inner_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                      + cb3 * 8 : ZMod p).val = S := by
-    rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
-  have h_inner_hi_val : (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                                + cb3 * 8) : ZMod p).val = 16 - S := by
-    rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-              + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
-      rw [h_inner_eq, Nat.cast_sub (by omega : S ≤ 16)]; push_cast; ring]
-    exact ZMod.val_natCast_of_lt (by omega)
+  have h_inner_val := inner_val h_S_le h_inner_eq
+  have h_inner_hi_val := inner_hi_val h_S_le h_inner_eq
   have h_lt_ll0_N : ll0.val < N := by rw [h_N_eq]; rw [h_inner_hi_val] at lt_ll0; exact lt_ll0
   have h_lt_ll1_N : ll1.val < N := by rw [h_N_eq]; rw [h_inner_hi_val] at lt_ll1; exact lt_ll1
   have h_lt_lh0_M : hl0.val < M := by rw [h_M_eq]; rw [h_inner_val] at lt_lh0; exact lt_lh0
@@ -1191,15 +1162,8 @@ lemma sllw_subcase_cb4_one
                               BitVec.setWidth 5 (HWord.toBitVec32 #v[c0, c1])) := by
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
-  have h_inner_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                      + cb3 * 8 : ZMod p).val = S := by
-    rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
-  have h_inner_hi_val : (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-                                + cb3 * 8) : ZMod p).val = 16 - S := by
-    rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
-              + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
-      rw [h_inner_eq, Nat.cast_sub (by omega : S ≤ 16)]; push_cast; ring]
-    exact ZMod.val_natCast_of_lt (by omega)
+  have h_inner_val := inner_val h_S_le h_inner_eq
+  have h_inner_hi_val := inner_hi_val h_S_le h_inner_eq
   have h_lt_ll0_N : ll0.val < N := by rw [h_N_eq]; rw [h_inner_hi_val] at lt_ll0; exact lt_ll0
   have h_ll0v_val : (ll0 * v0123).val = ll0.val * M := by
     rw [ZMod.val_mul_of_lt, h_v_val]; rw [h_v_val]; nlinarith [h_lt_ll0_N, h_MN]

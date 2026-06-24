@@ -31,14 +31,12 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel] at h_holds ⊢
   obtain ⟨hr, _hbool, hgc⟩ := h_holds
-  -- post-#398 the byte receive owes no padding requirement, so the goal is exactly `Spec`.
   refine ⟨bool_of_mul_pred hgc, ?_⟩
   intro hr1eq
-  have hav := ha hr1eq
   have hneg : -input_is_real = -1 := by rw [hr1eq]
   have R := hr hneg
   rw [← c16] at R
-  refine msb_of_raw hav ?_
+  refine msb_of_raw (ha hr1eq) ?_
   simp only [RawSpec, sub_eq_add_neg]
   exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ h16p).mp R⟩
 

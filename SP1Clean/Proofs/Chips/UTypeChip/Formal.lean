@@ -63,18 +63,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_jt := h_jt0 h_bin
   have h_op_a_0 : input_adapter_op_a_0 = 0 ∨ input_adapter_op_a_0 = 1 := h_jt.2.1
   have hpc : Vector.map (Expression.eval env) input_var_state_pc = input_state_pc := h_input.2.1.2.2.2
-  have ep0 : Expression.eval env input_var_state_pc[0] = input_state_pc[0] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep1 : Expression.eval env input_var_state_pc[1] = input_state_pc[1] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep2 : Expression.eval env input_var_state_pc[2] = input_state_pc[2] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
+  have epc : ∀ i (hi : i < 3), Expression.eval env input_var_state_pc[i] = input_state_pc[i] :=
+    fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have ha0 : env.get i₀ = input_is_auipc * input_state_pc[0] := by
-    rw [ep0] at h_ad0; exact add_neg_eq_zero.mp h_ad0
+    rw [epc 0 (by omega)] at h_ad0; exact add_neg_eq_zero.mp h_ad0
   have ha1 : env.get (i₀ + 1) = input_is_auipc * input_state_pc[1] := by
-    rw [ep1] at h_ad1; exact add_neg_eq_zero.mp h_ad1
+    rw [epc 1 (by omega)] at h_ad1; exact add_neg_eq_zero.mp h_ad1
   have ha2 : env.get (i₀ + 2) = input_is_auipc * input_state_pc[2] := by
-    rw [ep2] at h_ad2; exact add_neg_eq_zero.mp h_ad2
+    rw [epc 2 (by omega)] at h_ad2; exact add_neg_eq_zero.mp h_ad2
   have haddend0 : input_is_auipc = 0 →
       (#v[env.get i₀, env.get (i₀ + 1), env.get (i₀ + 2), 0] : Word (ZMod p)) = #v[0, 0, 0, 0] := by
     intro h; rw [ha0, ha1, ha2, h]; simp
@@ -112,12 +108,9 @@ theorem completeness :
   obtain ⟨h_imm, h_pcU, h_bin, h_iaui, h_op0, h_cpu, h_rac, _h_dec⟩ := h_assumptions
   obtain ⟨_, ⟨_, _, _, hpc⟩, ⟨_, _, _, hob, _⟩, _⟩ := h_input
   obtain ⟨he_addend, he_addval⟩ := h_env
-  have ep0 : Expression.eval env.toEnvironment input_var_state_pc[0] = input_state_pc[0] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep1 : Expression.eval env.toEnvironment input_var_state_pc[1] = input_state_pc[1] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep2 : Expression.eval env.toEnvironment input_var_state_pc[2] = input_state_pc[2] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
+  have epc : ∀ i (hi : i < 3),
+      Expression.eval env.toEnvironment input_var_state_pc[i] = input_state_pc[i] :=
+    fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have hg0 : env.get i₀ = input_is_auipc * Expression.eval env.toEnvironment input_var_state_pc[0] := by
     simpa using he_addend 0
   have hg1 : env.get (i₀ + 1) = input_is_auipc * Expression.eval env.toEnvironment input_var_state_pc[1] := by
@@ -149,7 +142,7 @@ theorem completeness :
       rw [e]; refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;> simp
     · have e : (#v[env.get i₀, env.get (i₀ + 1), env.get (i₀ + 2), 0] : Word (ZMod p))
           = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by
-        rw [hg0, hg1, hg2, h, ep0, ep1, ep2]; simp
+        rw [hg0, hg1, hg2, h, epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; simp
       rw [e]; exact h_pcU
   have h_gate2 : input_is_real + -input_adapter_op_a_0 = 0 ∨ input_is_real + -input_adapter_op_a_0 = 1 := by
     rw [h_op0]; simpa using h_bin

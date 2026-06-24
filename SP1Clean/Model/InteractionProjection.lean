@@ -39,9 +39,8 @@ omit [NeZero p] in
 lemma val_of_binary (hp : 2 < p) {is_real : ZMod p} (h : is_real = 0 ∨ is_real = 1) :
     is_real.val = 0 ∨ is_real.val = 1 := by
   haveI : NeZero p := ⟨by omega⟩
-  rcases h with h | h <;> subst h
-  · exact Or.inl ZMod.val_zero
-  · exact Or.inr (by rw [ZMod.val_one_eq_one_mod, Nat.mod_eq_of_lt (show 1 < p by omega)])
+  rcases h with h | h <;> subst h <;>
+    simp [ZMod.val_one_eq_one_mod, Nat.mod_eq_of_lt (show 1 < p by omega)]
 
 omit [NeZero p] in
 /-- For a binary `is_real`, `signedVal is_real = is_real.val` (the positive/`send` multiplicity; both

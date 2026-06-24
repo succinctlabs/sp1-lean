@@ -122,15 +122,12 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   -- bridge op_a_memory.prev_value eval → value for the four read-zeroing gates (nested vector field).
   have hmap_a : Vector.map (Expression.eval env) input_var_cols_op_a_memory_prev_value
       = input_cols_op_a_memory_prev_value := h_input.1.2.1.1
-  have ea0 : Expression.eval env input_var_cols_op_a_memory_prev_value[0]
-      = input_cols_op_a_memory_prev_value[0] := by rw [← hmap_a]; simp only [Vector.getElem_map]
-  have ea1 : Expression.eval env input_var_cols_op_a_memory_prev_value[1]
-      = input_cols_op_a_memory_prev_value[1] := by rw [← hmap_a]; simp only [Vector.getElem_map]
-  have ea2 : Expression.eval env input_var_cols_op_a_memory_prev_value[2]
-      = input_cols_op_a_memory_prev_value[2] := by rw [← hmap_a]; simp only [Vector.getElem_map]
-  have ea3 : Expression.eval env input_var_cols_op_a_memory_prev_value[3]
-      = input_cols_op_a_memory_prev_value[3] := by rw [← hmap_a]; simp only [Vector.getElem_map]
-  rw [ea0] at z0; rw [ea1] at z1; rw [ea2] at z2; rw [ea3] at z3
+  have ea : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env (input_var_cols_op_a_memory_prev_value[i]'hi)
+        = input_cols_op_a_memory_prev_value[i]'hi := by
+    intro i hi; rw [← hmap_a, Vector.getElem_map]
+  rw [ea 0 (by norm_num)] at z0; rw [ea 1 (by norm_num)] at z1
+  rw [ea 2 (by norm_num)] at z2; rw [ea 3 (by norm_num)] at z3
   -- the immediate gates bridge (op_c + op_c_memory.prev_value), as in `ALUTypeReader.soundness`.
   have hoc := h_input.1.2.2.2.2.2.1
   have hpv := h_input.1.2.2.2.2.2.2.1.1
@@ -146,15 +143,12 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   -- bridges: op_a_memory.prev_value (zeroing gates) and op_c / op_c_memory.prev_value (immediate gates).
   have hmap_a : Vector.map (Expression.eval env.toEnvironment) input_var_cols_op_a_memory_prev_value
       = input_cols_op_a_memory_prev_value := h_input.1.2.1.1
-  have ea0 : Expression.eval env.toEnvironment input_var_cols_op_a_memory_prev_value[0]
-      = input_cols_op_a_memory_prev_value[0] := by rw [← hmap_a]; simp only [Vector.getElem_map]
-  have ea1 : Expression.eval env.toEnvironment input_var_cols_op_a_memory_prev_value[1]
-      = input_cols_op_a_memory_prev_value[1] := by rw [← hmap_a]; simp only [Vector.getElem_map]
-  have ea2 : Expression.eval env.toEnvironment input_var_cols_op_a_memory_prev_value[2]
-      = input_cols_op_a_memory_prev_value[2] := by rw [← hmap_a]; simp only [Vector.getElem_map]
-  have ea3 : Expression.eval env.toEnvironment input_var_cols_op_a_memory_prev_value[3]
-      = input_cols_op_a_memory_prev_value[3] := by rw [← hmap_a]; simp only [Vector.getElem_map]
-  rw [← ea0] at z0; rw [← ea1] at z1; rw [← ea2] at z2; rw [← ea3] at z3
+  have ea : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env.toEnvironment (input_var_cols_op_a_memory_prev_value[i]'hi)
+        = input_cols_op_a_memory_prev_value[i]'hi := by
+    intro i hi; rw [← hmap_a, Vector.getElem_map]
+  rw [← ea 0 (by norm_num)] at z0; rw [← ea 1 (by norm_num)] at z1
+  rw [← ea 2 (by norm_num)] at z2; rw [← ea 3 (by norm_num)] at z3
   have hoc := h_input.1.2.2.2.2.2.1
   have hpv := h_input.1.2.2.2.2.2.2.1.1
   have eoc : ∀ (i : ℕ) (hi : i < 4),

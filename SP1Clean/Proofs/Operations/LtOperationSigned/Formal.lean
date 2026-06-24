@@ -187,25 +187,21 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   circuit_proof_start
   obtain ⟨hb_u64, hcc_u64, hir_bin, his_bin⟩ := h_assumptions
   obtain ⟨hib, hicc, ⟨⟨_, hflags, _, hcl⟩, _, _⟩, _, _⟩ := h_input
-  have eb0 : Expression.eval env input_var_b[0] = input_b[0] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb1 : Expression.eval env input_var_b[1] = input_b[1] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb2 : Expression.eval env input_var_b[2] = input_b[2] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb3 : Expression.eval env input_var_b[3] = input_b[3] := by rw [← hib]; simp only [Vector.getElem_map]
-  have ec0 : Expression.eval env input_var_cc[0] = input_cc[0] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec1 : Expression.eval env input_var_cc[1] = input_cc[1] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec2 : Expression.eval env input_var_cc[2] = input_cc[2] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec3 : Expression.eval env input_var_cc[3] = input_cc[3] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ef0 : Expression.eval env input_var_cols_result_u16_flags[0] = input_cols_result_u16_flags[0] := by rw [← hflags]; simp only [Vector.getElem_map]
-  have ef1 : Expression.eval env input_var_cols_result_u16_flags[1] = input_cols_result_u16_flags[1] := by rw [← hflags]; simp only [Vector.getElem_map]
-  have ef2 : Expression.eval env input_var_cols_result_u16_flags[2] = input_cols_result_u16_flags[2] := by rw [← hflags]; simp only [Vector.getElem_map]
-  have ef3 : Expression.eval env input_var_cols_result_u16_flags[3] = input_cols_result_u16_flags[3] := by rw [← hflags]; simp only [Vector.getElem_map]
-  have ecl0 : Expression.eval env input_var_cols_result_comparison_limbs[0] = input_cols_result_comparison_limbs[0] := by rw [← hcl]; simp only [Vector.getElem_map]
-  have ecl1 : Expression.eval env input_var_cols_result_comparison_limbs[1] = input_cols_result_comparison_limbs[1] := by rw [← hcl]; simp only [Vector.getElem_map]
+  have eb : ∀ i (hi : i < 4), Expression.eval env input_var_b[i] = input_b[i] := by
+    intro i hi; rw [← hib]; simp only [Vector.getElem_map]
+  have ec : ∀ i (hi : i < 4), Expression.eval env input_var_cc[i] = input_cc[i] := by
+    intro i hi; rw [← hicc]; simp only [Vector.getElem_map]
+  have ef : ∀ i (hi : i < 4),
+      Expression.eval env input_var_cols_result_u16_flags[i] = input_cols_result_u16_flags[i] := by
+    intro i hi; rw [← hflags]; simp only [Vector.getElem_map]
+  have ecl : ∀ i (hi : i < 2), Expression.eval env input_var_cols_result_comparison_limbs[i]
+      = input_cols_result_comparison_limbs[i] := by
+    intro i hi; rw [← hcl]; simp only [Vector.getElem_map]
   obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb_u64
   obtain ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64 hcc_u64
   obtain ⟨h_msb_b, h_msb_c, h_lt, _, _, hE5, hE7, hE9⟩ := h_holds
-  simp only [id_eq, eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3, ef0, ef1, ef2, ef3, ecl0, ecl1,
-    vec4_eta, vec2_eta, ← sub_eq_add_neg] at h_msb_b h_msb_c h_lt hE5 hE7 hE9 ⊢
+  simp only [id_eq, eb, ec, ef, ecl, vec4_eta, vec2_eta, ← sub_eq_add_neg]
+    at h_msb_b h_msb_c h_lt hE5 hE7 hE9 ⊢
   -- the two `U16MSBOperation` sub-assertion `Assumptions` (16-bit operands, `is_signed` binary).
   have hAb : U16MSBOperation.circuit.Assumptions
       ⟨input_b[3], ⟨input_cols_b_msb_msb⟩, input_is_signed⟩ := ⟨fun _ => hb3, his_bin⟩
@@ -249,20 +245,17 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   obtain ⟨hb_u64, hcc_u64, hir_bin, his_bin⟩ := h_assumptions
   obtain ⟨_, _, hbm_bool, hcm_bool, hg5, hg7, hg9, hbm_eq, hcm_eq, h_uns_spec⟩ := h_spec
   obtain ⟨hib, hicc, ⟨⟨_, hflags, _, hcl⟩, _, _⟩, _, _⟩ := h_input
-  have eb0 : Expression.eval env.toEnvironment input_var_b[0] = input_b[0] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb1 : Expression.eval env.toEnvironment input_var_b[1] = input_b[1] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb2 : Expression.eval env.toEnvironment input_var_b[2] = input_b[2] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb3 : Expression.eval env.toEnvironment input_var_b[3] = input_b[3] := by rw [← hib]; simp only [Vector.getElem_map]
-  have ec0 : Expression.eval env.toEnvironment input_var_cc[0] = input_cc[0] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec1 : Expression.eval env.toEnvironment input_var_cc[1] = input_cc[1] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec2 : Expression.eval env.toEnvironment input_var_cc[2] = input_cc[2] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ec3 : Expression.eval env.toEnvironment input_var_cc[3] = input_cc[3] := by rw [← hicc]; simp only [Vector.getElem_map]
-  have ef0 : Expression.eval env.toEnvironment input_var_cols_result_u16_flags[0] = input_cols_result_u16_flags[0] := by rw [← hflags]; simp only [Vector.getElem_map]
-  have ef1 : Expression.eval env.toEnvironment input_var_cols_result_u16_flags[1] = input_cols_result_u16_flags[1] := by rw [← hflags]; simp only [Vector.getElem_map]
-  have ef2 : Expression.eval env.toEnvironment input_var_cols_result_u16_flags[2] = input_cols_result_u16_flags[2] := by rw [← hflags]; simp only [Vector.getElem_map]
-  have ef3 : Expression.eval env.toEnvironment input_var_cols_result_u16_flags[3] = input_cols_result_u16_flags[3] := by rw [← hflags]; simp only [Vector.getElem_map]
-  have ecl0 : Expression.eval env.toEnvironment input_var_cols_result_comparison_limbs[0] = input_cols_result_comparison_limbs[0] := by rw [← hcl]; simp only [Vector.getElem_map]
-  have ecl1 : Expression.eval env.toEnvironment input_var_cols_result_comparison_limbs[1] = input_cols_result_comparison_limbs[1] := by rw [← hcl]; simp only [Vector.getElem_map]
+  have eb : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_b[i] = input_b[i] := by
+    intro i hi; rw [← hib]; simp only [Vector.getElem_map]
+  have ec : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_cc[i] = input_cc[i] := by
+    intro i hi; rw [← hicc]; simp only [Vector.getElem_map]
+  have ef : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_cols_result_u16_flags[i]
+      = input_cols_result_u16_flags[i] := by
+    intro i hi; rw [← hflags]; simp only [Vector.getElem_map]
+  have ecl : ∀ i (hi : i < 2),
+      Expression.eval env.toEnvironment input_var_cols_result_comparison_limbs[i]
+        = input_cols_result_comparison_limbs[i] := by
+    intro i hi; rw [← hcl]; simp only [Vector.getElem_map]
   obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb_u64
   obtain ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64 hcc_u64
   have hbtop : (input_b[3] + input_is_signed * 32768 - 65536 * input_cols_b_msb_msb).val < 2 ^ 16 := by
@@ -277,8 +270,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       have hcm0 : input_cols_c_msb_msb = 0 := by simpa using h9
       rw [h, hcm0]; simpa using hc3
     · rw [h, one_mul, hcm_eq h]; simpa using (adj_limb hc3).2
-  simp only [id_eq, eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3, ef0, ef1, ef2, ef3, ecl0, ecl1,
-    vec4_eta, vec2_eta, ← sub_eq_add_neg] at ⊢
+  simp only [id_eq, eb, ec, ef, ecl, vec4_eta, vec2_eta, ← sub_eq_add_neg]
   refine ⟨⟨⟨fun _ => hb3, his_bin⟩, hbm_bool, hbm_eq⟩,
     ⟨⟨fun _ => hc3, his_bin⟩, hcm_bool, hcm_eq⟩,
     ⟨⟨fun _ => ⟨Word.isU64_of_cases (by simpa using hb0) (by simpa using hb1) (by simpa using hb2)

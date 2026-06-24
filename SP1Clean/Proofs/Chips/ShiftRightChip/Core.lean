@@ -28,22 +28,7 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
--- Local field-constant helpers not yet in `Foundations/Word.lean` (which has `val_2/65535/65536`).
-@[simp] lemma val_4_zmod_p : (4 : ZMod p).val = 4 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (4 : ℕ) < p by omega)
-@[simp] lemma val_8_zmod_p : (8 : ZMod p).val = 8 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (8 : ℕ) < p by omega)
-@[simp] lemma val_16_zmod_p : (16 : ZMod p).val = 16 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
-@[simp] lemma val_32_zmod_p : (32 : ZMod p).val = 32 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (32 : ℕ) < p by omega)
-@[simp] lemma val_64_zmod_p : (64 : ZMod p).val = 64 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (64 : ℕ) < p by omega)
+-- Field constants `val_4/8/16/32/64_zmod_p` now live in `Math/Word.lean`; `val_64_ne_zero` is local.
 lemma val_64_ne_zero : (64 : ZMod p) ≠ 0 := by
   have h : (64 : ZMod p).val = 64 := val_64_zmod_p
   intro hz; rw [hz] at h; simp at h

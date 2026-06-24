@@ -70,11 +70,6 @@ theorem subwSemantics_of_carries {a b : Word (ZMod p)} {cols : Extracted.SubwOpe
     (BitVec.setWidth 32 (Word.toBitVec64 a - Word.toBitVec64 b)) cols.msb.msb
     hv0 hv1 h_msb rfl rfl hX
 
-/-- `(65535 : ZMod p) ≠ 0` (its `val` is `65535`). -/
-private lemma c65535_ne_zero : (65535 : ZMod p) ≠ 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  intro h; have := congrArg ZMod.val h; rw [val_65535_zmod_p, ZMod.val_zero] at this; omega
-
 set_option maxHeartbeats 16000000 in
 /-- Backward (completeness) core — the converse of `subwSemantics_of_carries`. Borrow-form analog of
 `AddwOperation.carries_of_addwSemantics`. -/
@@ -85,7 +80,6 @@ theorem carries_of_subwSemantics {a b : Word (ZMod p)} {cols : Extracted.SubwOpe
       = (BitVec.setWidth 32 (Word.toBitVec64 a - Word.toBitVec64 b)).signExtend 64) :
     RawSpec a b cols ∧ cols.msb.msb = if cols.value[1].val ≥ 32768 then 1 else 0 := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
   obtain ⟨hv0, hv1, hm2, _⟩ := Word.lt_cases_of_isU64 hU
@@ -167,7 +161,7 @@ theorem carries_of_subwSemantics {a b : Word (ZMod p)} {cols : Extracted.SubwOpe
     have hvaleq : (m * 65535 : ZMod p).val = (65535 : ZMod p).val := by
       rw [hMdef, hMval, val_65535_zmod_p]
     have hmul : m * 65535 = (1 : ZMod p) * 65535 := by rw [one_mul]; exact (ZMod.val_injective _) hvaleq
-    exact mul_right_cancel₀ c65535_ne_zero hmul
+    exact mul_right_cancel₀ val_65535_ne_zero hmul
   · rw [if_neg hcond] at hbvN
     have hmsblt : ((a[0].val + 65535 - b[0].val + 1) + (a[1].val + 65535 - b[1].val) * 2 ^ 16) % 2 ^ 32 < 2 ^ 31 := by
       have h := hcond
@@ -182,6 +176,6 @@ theorem carries_of_subwSemantics {a b : Word (ZMod p)} {cols : Extracted.SubwOpe
     have hvaleq : (m * 65535 : ZMod p).val = (0 : ZMod p).val := by
       rw [hMdef, hMval, ZMod.val_zero]
     have hmul : m * 65535 = (0 : ZMod p) * 65535 := by rw [zero_mul]; exact (ZMod.val_injective _) hvaleq
-    exact mul_right_cancel₀ c65535_ne_zero hmul
+    exact mul_right_cancel₀ val_65535_ne_zero hmul
 
 end SP1Clean.SubwOperation

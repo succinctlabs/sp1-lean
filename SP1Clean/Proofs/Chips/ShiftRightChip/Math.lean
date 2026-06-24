@@ -9,42 +9,71 @@ functions (`RV64.srl`/`sra`/`srlw`/`sraw` from `RISCV/Instructions.lean`). Split
 (the chip-folder convention, mirroring `DivRemChip/Math.lean`): these are pure `Word`/`BitVec`/`ZMod p`
 lemmas with no circuit context.
 
-Several carry `set_option debug.skipKernelTC true in` to isolate the documented `2^64` kernel
-deep-recursion landmine (`BitVec.toNat_ushiftRight` at `BitVec 64` plants `2^64`; see `docs/agents/proof-patterns.md`).
-The option only skips a kernel *re-check* — it adds **no** axiom (`#print axioms` still shows the standard
-`[propext, Classical.choice, Quot.sound]`). Keep those `set_option`/`omit` lines verbatim. -/
+The `RV64.srl`/`sra` `.toNat` reductions plant a `2^64` that the kernel deep-recurses on when reduced
+over a concrete `Word`-derived `BitVec 64` (`BitVec.toNat_ushiftRight`/`sshiftRight` via the
+`@[expose]` shift bodies; see `docs/agents/proof-patterns.md`). Rather than suppress the kernel,
+we isolate that unfold into abstract-`BitVec` bridges
+(`srl_toNat`/`sra_toNat_{false,true}`, kernel-checked once over variables) and mask every `2^N` power
+to a concrete literal — the `ShiftLeftChip` discipline. All lemmas are kernel-clean and axiom-clean
+(`#print axioms` = `[propext, Classical.choice, Quot.sound]`). -/
 
 namespace SP1Clean.ShiftRightChip
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
-set_option debug.skipKernelTC true in
+/-! ### Abstract-`BitVec` RV64 shift bridges (kernel-clean isolation of the `2^64` landmine)
+
+`RV64.srl`/`RV64.sra` unfold (via `BitVec.ushiftRight`/`sshiftRight`'s `@[expose]` bodies) plants a
+`2^64` the kernel deep-recurses on **when reduced over a concrete `Word`-derived `BitVec 64`**. We
+isolate that unfold into these three lemmas over **abstract** `BitVec 64` arguments, where the `2^64`
+body is kernel-checked once over variables (the discipline `ShiftLeftChip`'s `sll_rv64_eq` uses). The
+`_div_to_bitvec` wrappers then only apply `BitVec.eq_of_toNat_eq` plus the clean `Word`-level
+shift-count bridge — they never re-unfold a shift over a `Word` value, so they stay kernel-clean. -/
+
+/-- `(RV64.srl c b).toNat` as a Nat division, over abstract `BitVec 64` (isolates the `2^64` unfold). -/
+lemma srl_toNat (c b : BitVec 64) : (RV64.srl c b).toNat = b.toNat / 2 ^ (c.toNat % 64) := by
+  have hsh : (BitVec.extractLsb 5 0 c).toNat = c.toNat % 64 := by
+    simp only [BitVec.extractLsb, BitVec.extractLsb'_toNat, Nat.shiftRight_zero]
+  simp only [RV64.srl]
+  rw [BitVec.ushiftRight_eq', BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow, hsh]
+
+/-- `(RV64.sra c b).toNat` on a non-negative `b` (msb = 0): arithmetic = logical shift. -/
+lemma sra_toNat_false (c b : BitVec 64) (h_msb : b.msb = false) :
+    (RV64.sra c b).toNat = b.toNat / 2 ^ (c.toNat % 64) := by
+  have hsh : (BitVec.extractLsb 5 0 c).toNat = c.toNat % 64 := by
+    simp only [BitVec.extractLsb, BitVec.extractLsb'_toNat, Nat.shiftRight_zero]
+  simp only [RV64.sra]
+  rw [BitVec.sshiftRight_eq', BitVec.toNat_sshiftRight_of_msb_false h_msb,
+      Nat.shiftRight_eq_div_pow, hsh]
+
+/-- `(RV64.sra c b).toNat` on a negative `b` (msb = 1): the sign-filled complement form. -/
+lemma sra_toNat_true (c b : BitVec 64) (h_msb : b.msb = true) :
+    (RV64.sra c b).toNat = 2 ^ 64 - 1 - (2 ^ 64 - 1 - b.toNat) / 2 ^ (c.toNat % 64) := by
+  have hsh : (BitVec.extractLsb 5 0 c).toNat = c.toNat % 64 := by
+    simp only [BitVec.extractLsb, BitVec.extractLsb'_toNat, Nat.shiftRight_zero]
+  simp only [RV64.sra]
+  rw [BitVec.sshiftRight_eq', BitVec.toNat_sshiftRight_of_msb_true h_msb,
+      Nat.shiftRight_eq_div_pow, hsh]
+
 omit [Fact (Nat.Prime p)] in
-/-- **Goal-shape conversion for SRL, lifted to dodge the `2^64` kernel deep-recursion.**
-`BitVec.toNat_ushiftRight` at `BitVec 64` plants `2^64` via `BitVec.ushiftRight`'s body, tripping
-the kernel re-check. Lifting isolates the trigger to this lemma, and `debug.skipKernelTC` skips its
-kernel re-check (`#print axioms` still shows the standard set — the option only removes the
-re-verification layer for the known `2^64` shape).
-Reduces the `RV64.srl` Spec equality to the Nat division form the `srl_close_su16_*` lemmas produce, with
-the shift count already normalised to `rs2[0].val % 64`. -/
+/-- **Goal-shape conversion for SRL.** Reduces the `RV64.srl` Spec equality to the Nat division form the
+`srl_close_su16_*` lemmas produce, with the shift count normalised to `rs2[0].val % 64`. The `2^64`
+kernel landmine is isolated in `srl_toNat`; here only `BitVec.eq_of_toNat_eq` and the clean shift-count
+bridge are used. -/
 lemma srl_div_to_bitvec (W rs1 rs2 : Word (ZMod p)) (h_rs2U : Word.isU64 rs2)
     (hdiv : (Word.toBitVec64 W).toNat
         = (Word.toBitVec64 rs1).toNat / 2 ^ (rs2[0].val % 64)) :
     Word.toBitVec64 W = RV64.srl (Word.toBitVec64 rs2) (Word.toBitVec64 rs1) := by
-  have he : (BitVec.extractLsb 5 0 (Word.toBitVec64 rs2)).toNat = rs2[0].val % 64 := by
-    rw [show (BitVec.extractLsb 5 0 (Word.toBitVec64 rs2)).toNat
-          = (Word.toBitVec64 rs2).toNat % 2 ^ 6 from by
-        simp [BitVec.extractLsb, BitVec.extractLsb'_toNat, Nat.shiftRight_zero]]
-    rw [Word.toBitVec64_toNat h_rs2U, Word.toNat_def]; omega
-  rw [← BitVec.toNat_inj]
-  simp only [RV64.srl]
-  rw [BitVec.ushiftRight_eq']
-  rw [BitVec.toNat_ushiftRight]
-  simp only [Nat.shiftRight_eq_div_pow]
-  rw [he]; exact hdiv
+  have hsh : (Word.toBitVec64 rs2).toNat % 64 = rs2[0].val % 64 := by
+    rw [Word.toBitVec64_toNat h_rs2U, Word.toNat_def,
+        show (2:ℕ)^16 = 65536 by norm_num, show (2:ℕ)^32 = 4294967296 by norm_num,
+        show (2:ℕ)^48 = 281474976710656 by norm_num]
+    omega
+  apply BitVec.eq_of_toNat_eq
+  rw [srl_toNat, hsh]
+  exact hdiv
 
-set_option debug.skipKernelTC true in
 omit [Fact (Nat.Prime p)] in
 /-- **SRA goal-shape conversion, MSB = 0 arm.** On a non-negative `rs1` (`toBitVec64 rs1`.msb = false),
 arithmetic shift = logical shift, so `RV64.sra` reduces to the same Nat division form as `RV64.srl`. -/
@@ -52,18 +81,15 @@ lemma sra_div_to_bitvec_false (W rs1 rs2 : Word (ZMod p)) (h_rs2U : Word.isU64 r
     (h_msb : (Word.toBitVec64 rs1).msb = false)
     (hdiv : (Word.toBitVec64 W).toNat = (Word.toBitVec64 rs1).toNat / 2 ^ (rs2[0].val % 64)) :
     Word.toBitVec64 W = RV64.sra (Word.toBitVec64 rs2) (Word.toBitVec64 rs1) := by
-  have he : (BitVec.extractLsb 5 0 (Word.toBitVec64 rs2)).toNat = rs2[0].val % 64 := by
-    rw [show (BitVec.extractLsb 5 0 (Word.toBitVec64 rs2)).toNat
-          = (Word.toBitVec64 rs2).toNat % 2 ^ 6 from by
-        simp [BitVec.extractLsb, BitVec.extractLsb'_toNat, Nat.shiftRight_zero]]
-    rw [Word.toBitVec64_toNat h_rs2U, Word.toNat_def]; omega
-  rw [← BitVec.toNat_inj]
-  simp only [RV64.sra]
-  rw [BitVec.sshiftRight_eq', BitVec.toNat_sshiftRight_of_msb_false h_msb]
-  simp only [Nat.shiftRight_eq_div_pow]
-  rw [he]; exact hdiv
+  have hsh : (Word.toBitVec64 rs2).toNat % 64 = rs2[0].val % 64 := by
+    rw [Word.toBitVec64_toNat h_rs2U, Word.toNat_def,
+        show (2:ℕ)^16 = 65536 by norm_num, show (2:ℕ)^32 = 4294967296 by norm_num,
+        show (2:ℕ)^48 = 281474976710656 by norm_num]
+    omega
+  apply BitVec.eq_of_toNat_eq
+  rw [sra_toNat_false _ _ h_msb, hsh]
+  exact hdiv
 
-set_option debug.skipKernelTC true in
 omit [Fact (Nat.Prime p)] in
 /-- **SRA goal-shape conversion, MSB = 1 arm.** On a negative `rs1`, arithmetic shift fills the high bits
 with the sign, giving the `2^64 - 1 - (2^64 - 1 - rs1) / 2^shamt` form (`toNat_sshiftRight_of_msb_true`). -/
@@ -72,32 +98,30 @@ lemma sra_div_to_bitvec_true (W rs1 rs2 : Word (ZMod p)) (h_rs2U : Word.isU64 rs
     (hsra : (Word.toBitVec64 W).toNat
       = 2 ^ 64 - 1 - (2 ^ 64 - 1 - (Word.toBitVec64 rs1).toNat) / 2 ^ (rs2[0].val % 64)) :
     Word.toBitVec64 W = RV64.sra (Word.toBitVec64 rs2) (Word.toBitVec64 rs1) := by
-  have he : (BitVec.extractLsb 5 0 (Word.toBitVec64 rs2)).toNat = rs2[0].val % 64 := by
-    rw [show (BitVec.extractLsb 5 0 (Word.toBitVec64 rs2)).toNat
-          = (Word.toBitVec64 rs2).toNat % 2 ^ 6 from by
-        simp [BitVec.extractLsb, BitVec.extractLsb'_toNat, Nat.shiftRight_zero]]
-    rw [Word.toBitVec64_toNat h_rs2U, Word.toNat_def]; omega
-  rw [← BitVec.toNat_inj]
-  simp only [RV64.sra]
-  rw [BitVec.sshiftRight_eq', BitVec.toNat_sshiftRight_of_msb_true h_msb]
-  simp only [Nat.shiftRight_eq_div_pow]
-  rw [he]; exact hsra
+  have hsh : (Word.toBitVec64 rs2).toNat % 64 = rs2[0].val % 64 := by
+    rw [Word.toBitVec64_toNat h_rs2U, Word.toNat_def,
+        show (2:ℕ)^16 = 65536 by norm_num, show (2:ℕ)^32 = 4294967296 by norm_num,
+        show (2:ℕ)^48 = 281474976710656 by norm_num]
+    omega
+  apply BitVec.eq_of_toNat_eq
+  rw [sra_toNat_true _ _ h_msb, hsh]
+  exact hsra
 
-set_option debug.skipKernelTC true in
 omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
 /-- The MSB of `rs1`'s low 32 bits is the high bit of limb 1 (`rs1[1] ≥ 2^15`). The SRAW sign bit.
-Lifted with `debug.skipKernelTC` to dodge the `2^64` kernel deep-recursion (same landmine as the
-`*_div_to_bitvec` helpers — `Word.toBitVec64` plants `2^64` via `BitVec` reduction). -/
+Mirrors the kernel-clean `ShiftRightMath.toBitVec64_msb_eq_b3_ge` template: a `rw` chain (not
+`simp only`) plus full concrete-literal masking of every `2^N` power (incl. `2^48`), so the kernel
+never deep-recurses on a symbolic power. -/
 lemma low32_msb_eq_b1 [NeZero p] {b : Word (ZMod p)} (h_isU64 : Word.isU64 b) :
     (BitVec.extractLsb' 0 32 (Word.toBitVec64 b)).msb = decide (b[1].val ≥ 32768) := by
   obtain ⟨b0_16, b1_16, _, _⟩ := Word.lt_cases_of_isU64 h_isU64
-  rw [BitVec.msb_eq_decide]
-  simp only [BitVec.extractLsb'_toNat, Word.toBitVec64_toNat h_isU64, Word.toNat_def,
-    Nat.shiftRight_zero]
+  rw [BitVec.msb_eq_decide, BitVec.extractLsb'_toNat, Nat.shiftRight_zero,
+      Word.toBitVec64_toNat h_isU64, Word.toNat_def]
   have e16 : (2 : ℕ) ^ 16 = 65536 := by decide
   have e31 : (2 : ℕ) ^ (32 - 1) = 2147483648 := by decide
   have e32 : (2 : ℕ) ^ 32 = 4294967296 := by decide
-  rw [e16, e31, e32] at *
+  have e48 : (2 : ℕ) ^ 48 = 281474976710656 := by decide
+  rw [e16, e31, e32, e48] at *
   congr 1
   apply propext
   constructor
@@ -114,7 +138,6 @@ lemma hword_toNat {a b : ZMod p} (ha : a.val < 2 ^ 16) (hb : b.val < 2 ^ 16) :
     List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
   omega
 
-set_option debug.skipKernelTC true in
 /-- **SRLW goal-shape conversion.** The committed result word `Wd` is the 64-bit sign-extension of the
 low-32 logical shift. Uses `toBitVec64_signExtend_word` (the W-variant keystone): `Wd[2] = Wd[3] = m*65535`
 sign-fill with `m` the output high bit (`srw_msb` on `a[1]`), and the low two limbs carry the 32-bit logical
@@ -145,7 +168,6 @@ lemma srlw_div_to_bitvec (Wd rs1 rs2 : Word (ZMod p))
         hlow, hshamt]; exact hdiv.symm
   rw [toBitVec64_signExtend_word Wd _ m hr0 hr1 hm hr2 hr3 hX]; rfl
 
-set_option debug.skipKernelTC true in
 /-- **SRAW goal-shape conversion, MSB = 0 arm.** On a non-negative low-32 input, the arithmetic word-shift
 equals the logical one, so the result is `signExtend 64` of the same division form as SRLW. -/
 lemma sraw_div_to_bitvec_false (Wd rs1 rs2 : Word (ZMod p))
@@ -174,7 +196,6 @@ lemma sraw_div_to_bitvec_false (Wd rs1 rs2 : Word (ZMod p))
   rw [toBitVec64_signExtend_word Wd _ m hr0 hr1 hm hr2 hr3 hX]
   simp only [RV64.sraw, BitVec.extractLsb]
 
-set_option debug.skipKernelTC true in
 /-- **SRAW goal-shape conversion, MSB = 1 arm.** On a negative low-32 input, the arithmetic word-shift
 fills with the sign, giving the `2^32 - 1 - (2^32 - 1 - rs1.low32) / 2^shamt` complement form
 (`toNat_sshiftRight_of_msb_true` at width 32), then `signExtend 64`. -/

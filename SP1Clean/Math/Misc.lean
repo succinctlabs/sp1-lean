@@ -60,8 +60,8 @@ end Int
   · split_ifs <;> simp [h]
 
 instance Fin.noZeroDivisors_of_prime (p : ℕ)
-    [hp : Fact (Nat.Prime (p + 1))] : NoZeroDivisors (Fin (p + 1)) := by
-  refine IsDomain.to_noZeroDivisors (ZMod (p + 1))
+    [hp : Fact (Nat.Prime (p + 1))] : NoZeroDivisors (Fin (p + 1)) :=
+  IsDomain.to_noZeroDivisors (ZMod (p + 1))
 
 @[simp] theorem Std.ExtDHashMap.insert_insert [BEq α] [Hashable α] [LawfulBEq α]
     {m : Std.ExtDHashMap α β} (a : α) (b b' : β a) :

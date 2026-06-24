@@ -115,7 +115,7 @@ lemma run_within_mmio_readable_mmio (reg_val : BitVec 64) (offset : BitVec 64)
     (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none) :
     (within_mmio_readable (physaddr.Physaddr
       (zero_extend (BitVec.addInt (reg_val + offset) 0))) width).run s = .ok false s := by
-  have h_base : BitVec.toNat plat_clint_base = 33554432 := by native_decide
+  have h_base : BitVec.toNat plat_clint_base = 33554432 := by rfl
   have h_bv : (reg_val + offset).toNat = (reg_val.toNat + offset.toNat) % 18446744073709551616 :=
     BitVec.toNat_add reg_val offset
   simp [within_mmio_readable, get_config_rvfi, within_clint]
@@ -130,7 +130,7 @@ lemma run_within_mmio_writable_mmio (reg_val : BitVec 64) (offset : BitVec 64)
     (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none) :
     (within_mmio_writable (physaddr.Physaddr
       (zero_extend (BitVec.addInt (reg_val + offset) 0))) width).run s = .ok false s := by
-  have h_base : BitVec.toNat plat_clint_base = 33554432 := by native_decide
+  have h_base : BitVec.toNat plat_clint_base = 33554432 := by rfl
   have h_bv : (reg_val + offset).toNat = (reg_val.toNat + offset.toNat) % 18446744073709551616 :=
     BitVec.toNat_add reg_val offset
   simp [within_mmio_writable, get_config_rvfi, within_clint]

@@ -137,7 +137,7 @@ theorem correct_load_byte_native
         h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
         h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
-    rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs1
+    rwa [hsp, SailState.get_reg?_insert_nextPC]
   have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
       = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega

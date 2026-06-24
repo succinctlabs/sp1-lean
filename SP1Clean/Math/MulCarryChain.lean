@@ -86,9 +86,9 @@ variable {p : ℕ}
 theorem gate_zero (cp : ℕ → ℕ) :
     ((product cp 0 : ℕ) : ZMod p)
       = ((cp 0 : ℕ) : ZMod p) - ((carry cp 0 : ℕ) : ZMod p) * 256 := by
-  have h := recurrence_zero cp
   have hc : (((product cp 0 : ℕ) : ZMod p) + 256 * ((carry cp 0 : ℕ) : ZMod p))
-      = ((cp 0 : ℕ) : ZMod p) := by exact_mod_cast congrArg (Nat.cast : ℕ → ZMod p) h
+      = ((cp 0 : ℕ) : ZMod p) := by
+    exact_mod_cast congrArg (Nat.cast : ℕ → ZMod p) (recurrence_zero cp)
   linear_combination hc
 
 /-- Step carry-chain gate over `ZMod p`. -/
@@ -96,10 +96,9 @@ theorem gate_succ (cp : ℕ → ℕ) (i : ℕ) :
     ((product cp (i + 1) : ℕ) : ZMod p)
       = ((cp (i + 1) : ℕ) : ZMod p) + ((carry cp i : ℕ) : ZMod p)
         - ((carry cp (i + 1) : ℕ) : ZMod p) * 256 := by
-  have h := recurrence_succ cp i
   have hc : (((product cp (i + 1) : ℕ) : ZMod p) + 256 * ((carry cp (i + 1) : ℕ) : ZMod p))
       = ((cp (i + 1) : ℕ) : ZMod p) + ((carry cp i : ℕ) : ZMod p) := by
-    exact_mod_cast congrArg (Nat.cast : ℕ → ZMod p) h
+    exact_mod_cast congrArg (Nat.cast : ℕ → ZMod p) (recurrence_succ cp i)
   linear_combination hc
 
 /-- The carry cast into `ZMod p` round-trips through `.val` (no wrap), giving the `< 65536` range

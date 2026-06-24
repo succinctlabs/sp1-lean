@@ -141,9 +141,7 @@ theorem stateLookups_mult_binary (hp : 2 < p) (r : Trace.RowView (ZMod p))
   intro a ha
   have hv := val_of_binary hp h_real
   simp only [stateLookups, List.mem_cons, List.not_mem_nil, or_false] at ha
-  rcases ha with rfl | rfl <;>
-    · simp only [multOf, stateAccess]
-      omega
+  rcases ha with rfl | rfl <;> simp only [multOf, stateAccess] <;> omega
 
 /-- **Successor exists (from State balance).** On a balanced State bus, every real row `a`'s `send` key
 `(clk_high, clk_low+clk_inc, next_pc)` is cancelled by the `receive` of some real row `b` — so `b`'s
@@ -253,8 +251,7 @@ theorem pcChainProp_iff_isChain (l : List (StateAccess (ZMod p))) :
     cases t with
     | nil => exact ⟨fun _ => List.isChain_singleton a, fun _ => trivial⟩
     | cons b t' =>
-      rw [List.isChain_cons_cons, ← IH]
-      rfl
+      simp only [List.isChain_cons_cons, ← IH, pcChainProp, pcStep]
 
 /-- **Clock injectivity, getElem form.** `clkInjective` rephrased over row indices: two rows with equal
 encoded clocks are the same index. The bridge `state_adjacent_pc_handoff` consumes. -/
@@ -383,10 +380,7 @@ theorem stateLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
     h_np0, h_np1, h_np2, h_clk]
   -- only the multiplicities differ: `signedVal (∓eval is_real)` vs `∓is_real.val`. `h_ir` ties the eval to
   -- `r.is_real`; the `signedVal` lemmas evaluate the centered representative on the gate.
-  have hp2 : 2 < p := by
-    have h := Fact.out (p := 2 ^ 17 < p)
-    have h2 : (2 : ℕ) < 2 ^ 17 := by norm_num
-    omega
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   rw [h_ir, signedVal_neg_is_real hp2 h_real, signedVal_is_real hp2 h_real]
 
 end SP1Clean.Soundness

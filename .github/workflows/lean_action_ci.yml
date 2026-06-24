@@ -8,6 +8,15 @@ on:
   workflow_dispatch:
 
 jobs:
+  guards:
+    # Lightweight source-policy gates — run on a standard runner in parallel with the
+    # heavy build so a forbidden pattern blocks the PR in seconds without a Lean build.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No skipKernelTC in source
+        run: scripts/check_no_skipkerneltc.sh
+
   build:
     runs-on:
       [
@@ -28,4 +37,10 @@ jobs:
           test: "false"
           lint: "false"
           use-github-cache: "true"
+      # Environment linters: the `lake lint` pass (our `sp1Lint` lintDriver — a curated subset of the
+      # Batteries `#lint` linters over the hand-written `SP1Clean.*` declarations; see AGENTS.md § Linters).
+      # Runs in the build job, after the build, so the oleans it imports are present. Explicit `lake lint`
+      # (rather than lean-action's `lint:` flag) keeps the driver invocation unambiguous.
+      - name: Environment linters (lake lint)
+        run: lake lint
 

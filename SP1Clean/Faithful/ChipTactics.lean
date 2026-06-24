@@ -22,10 +22,9 @@ namespace SP1Clean.Faithful
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- `(16 : ZMod p).val = 16` under `Fact (2^17 < p)`. -/
-lemma val_16 [NeZero p] : (16 : ZMod p).val = 16 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
+/-- `(16 : ZMod p).val = 16` — the Faithful-local spelling of `SP1Clean.val_16_zmod_p`
+(kept as the established name used across the per-chip anchors' `simp only` lists). -/
+lemma val_16 [NeZero p] : (16 : ZMod p).val = 16 := val_16_zmod_p
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Carry-bool bridge: `x*(x-1)=0 ↔ x∈{0,1}` (field; `→` via the `mul_eq_zero`-free

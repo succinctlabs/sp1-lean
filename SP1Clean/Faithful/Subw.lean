@@ -8,6 +8,7 @@ import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.SubwOperation
 import SP1Clean.Faithful.U16MSBOperation
+import SP1Clean.Faithful.ChipTactics
 
 /-! # Faithfulness anchor — `SubwOperation` constraints ↔ native combined raw spec
 
@@ -25,18 +26,6 @@ open SP1Clean.Extracted
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- `(16 : ZMod p).val = 16` under `Fact (2^17 < p)`. -/
-private lemma val_16 [NeZero p] : (16 : ZMod p).val = 16 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
-
-omit [Fact (2 ^ 17 < p)] in
-/-- Carry-bool bridge: `x*(x-1)=0 ↔ x∈{0,1}` (field; `→` via `bool_of_mul_pred`). -/
-private lemma bool_iff {x : ZMod p} : x * (x - 1) = 0 ↔ (x = 0 ∨ x = 1) := by
-  rw [sub_eq_add_neg]
-  exact ⟨SP1Clean.bool_of_mul_pred,
-    fun h => by rcases h with h | h <;> rw [h] <;> ring⟩
 
 set_option linter.unusedSimpArgs false in
 /-- **Faithfulness anchor.** SP1's composed `SubwOperation` constraint list holds iff the native

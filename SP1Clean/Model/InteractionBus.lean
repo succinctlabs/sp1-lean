@@ -64,9 +64,7 @@ theorem multiplicitySum_cons (head : LookupAccess) (tail : LookupAccessList) (k 
     multiplicitySum (head :: tail) k =
       (if keyOf head = k then multOf head else 0) + multiplicitySum tail k := by
   simp only [multiplicitySum, filterKey, List.filter_cons]
-  by_cases h : keyOf head = k
-  · simp [h]
-  · simp [h]
+  by_cases h : keyOf head = k <;> simp [h]
 
 theorem multiplicitySum_append (l1 l2 : LookupAccessList) (k : LookupKey) :
     multiplicitySum (l1 ++ l2) k = multiplicitySum l1 k + multiplicitySum l2 k := by
@@ -181,7 +179,7 @@ theorem provider_touches_pos_send
   -- so the provider's sum at this key is non-zero, hence its filtered list is non-empty
   have hprov_ne : multiplicitySum prov (keyOf a) ≠ 0 := by omega
   by_contra h
-  push_neg at h
+  push Not at h
   refine hprov_ne ?_
   simp only [multiplicitySum, filterKey]
   rw [List.filter_eq_nil_iff.mpr ?_]; · rfl
@@ -207,7 +205,7 @@ theorem balanced_pos_has_neg
     (a : LookupAccess) (ha : a ∈ accesses) (hak : keyOf a = k) (h_pos : 0 < multOf a) :
     ∃ b ∈ accesses, keyOf b = k ∧ multOf b < 0 := by
   by_contra h
-  push_neg at h
+  push Not at h
   -- if no contribution at key `k` is strictly negative, every summand of `multiplicitySum … k` is `≥ 0`
   have h_nonneg : ∀ x ∈ (filterKey accesses k).map multOf, 0 ≤ x := by
     intro x hx

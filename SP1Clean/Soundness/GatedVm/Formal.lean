@@ -33,9 +33,7 @@ def GatedVm.toFormalEnsemble (vm : GatedVm F PublicIO)
   Assumptions := Assumptions
   Spec := Spec
   soundness := by
-    intro publicInput hA hStmt
-    obtain ⟨witness, hpub, hC, hB⟩ := hStmt
-    subst hpub
+    rintro publicInput hA ⟨witness, rfl, hC, hB⟩
     exact soundness witness hA hC hB
 
 @[simp] lemma GatedVm.toFormalEnsemble_ensemble (vm : GatedVm F PublicIO)

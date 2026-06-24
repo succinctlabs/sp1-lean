@@ -70,7 +70,7 @@ private lemma persist_nextPC (rs1_idx : BitVec 5) (reg_val pc : BitVec 64)
         h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsec
         h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
         h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
-  · rw [SailState.get_reg?_insert_nextPC]; exact h_rs1
+  · rwa [SailState.get_reg?_insert_nextPC]
 
 /-! ## The four width-core lemmas
 
@@ -100,13 +100,13 @@ theorem loadX0_w1 (is_unsigned : Bool)
       = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
   have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rw [hmem_eq, ← hadd]; exact hmem₀
+    rwa [hmem_eq, ← hadd]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 1 = true := by
-    rw [is_aligned_vaddr_iff_mod, hadd]; exact h_aligned
+    rwa [is_aligned_vaddr_iff_mod, hadd]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 1 (by omega) h_lo (by rw [hadd]; exact h_hi)
+    range_subset_sp1_pma _ 1 (by omega) h_lo (by rwa [hadd])
   have hread := run_vmem_read_of_width_1' rs1_idx reg_val (BitVec.signExtend 64 imm) data₀
     sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range hm₀
   simp only at hread
@@ -139,15 +139,15 @@ theorem loadX0_w2 (is_unsigned : Bool)
       = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
   have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rw [hmem_eq, ← hadd]; exact hmem₀
+    rwa [hmem_eq, ← hadd]
   have hm₁ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
-    rw [hmem_eq, ← hadd]; exact hmem₁
+    rwa [hmem_eq, ← hadd]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 2 = true := by
-    rw [is_aligned_vaddr_iff_mod, hadd]; exact h_aligned
+    rwa [is_aligned_vaddr_iff_mod, hadd]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 2 (by omega) h_lo (by rw [hadd]; exact h_hi)
+    range_subset_sp1_pma _ 2 (by omega) h_lo (by rwa [hadd])
   have hread := run_vmem_read_of_width_2' rs1_idx reg_val (BitVec.signExtend 64 imm) data₀ data₁
     sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range hm₀ hm₁
   simp only at hread
@@ -183,19 +183,19 @@ theorem loadX0_w4 (is_unsigned : Bool)
       = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
   have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rw [hmem_eq, ← hadd]; exact hmem₀
+    rwa [hmem_eq, ← hadd]
   have hm₁ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
-    rw [hmem_eq, ← hadd]; exact hmem₁
+    rwa [hmem_eq, ← hadd]
   have hm₂ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2]? = some data₂ := by
-    rw [hmem_eq, ← hadd]; exact hmem₂
+    rwa [hmem_eq, ← hadd]
   have hm₃ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 3]? = some data₃ := by
-    rw [hmem_eq, ← hadd]; exact hmem₃
+    rwa [hmem_eq, ← hadd]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 4 = true := by
-    rw [is_aligned_vaddr_iff_mod, hadd]; exact h_aligned
+    rwa [is_aligned_vaddr_iff_mod, hadd]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 4 (by omega) h_lo (by rw [hadd]; exact h_hi)
+    range_subset_sp1_pma _ 4 (by omega) h_lo (by rwa [hadd])
   have hread := run_vmem_read_of_width_4' rs1_idx reg_val (BitVec.signExtend 64 imm)
     data₀ data₁ data₂ data₃
     sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range hm₀ hm₁ hm₂ hm₃
@@ -236,27 +236,27 @@ theorem loadX0_w8 (is_unsigned : Bool)
       = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
   have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rw [hmem_eq, ← hadd]; exact hmem₀
+    rwa [hmem_eq, ← hadd]
   have hm₁ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
-    rw [hmem_eq, ← hadd]; exact hmem₁
+    rwa [hmem_eq, ← hadd]
   have hm₂ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2]? = some data₂ := by
-    rw [hmem_eq, ← hadd]; exact hmem₂
+    rwa [hmem_eq, ← hadd]
   have hm₃ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 3]? = some data₃ := by
-    rw [hmem_eq, ← hadd]; exact hmem₃
+    rwa [hmem_eq, ← hadd]
   have hm₄ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4]? = some data₄ := by
-    rw [hmem_eq, ← hadd]; exact hmem₄
+    rwa [hmem_eq, ← hadd]
   have hm₅ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 5]? = some data₅ := by
-    rw [hmem_eq, ← hadd]; exact hmem₅
+    rwa [hmem_eq, ← hadd]
   have hm₆ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 6]? = some data₆ := by
-    rw [hmem_eq, ← hadd]; exact hmem₆
+    rwa [hmem_eq, ← hadd]
   have hm₇ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 7]? = some data₇ := by
-    rw [hmem_eq, ← hadd]; exact hmem₇
+    rwa [hmem_eq, ← hadd]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 8 = true := by
-    rw [is_aligned_vaddr_iff_mod, hadd]; exact h_aligned
+    rwa [is_aligned_vaddr_iff_mod, hadd]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 8 (by omega) h_lo (by rw [hadd]; exact h_hi)
+    range_subset_sp1_pma _ 8 (by omega) h_lo (by rwa [hadd])
   have hread := run_vmem_read_of_width_8' rs1_idx reg_val (BitVec.signExtend 64 imm)
     data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇
     sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range hm₀ hm₁ hm₂ hm₃ hm₄ hm₅ hm₆ hm₇

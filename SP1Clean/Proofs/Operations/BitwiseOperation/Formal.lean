@@ -27,33 +27,14 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   circuit_proof_start
   obtain ⟨hopcode, _hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hir, _, _⟩ := h_input
-  have ea0 : Expression.eval env input_var_a[0] = input_a[0] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea1 : Expression.eval env input_var_a[1] = input_a[1] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea2 : Expression.eval env input_var_a[2] = input_a[2] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea3 : Expression.eval env input_var_a[3] = input_a[3] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea4 : Expression.eval env input_var_a[4] = input_a[4] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea5 : Expression.eval env input_var_a[5] = input_a[5] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea6 : Expression.eval env input_var_a[6] = input_a[6] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea7 : Expression.eval env input_var_a[7] = input_a[7] := by rw [← hia]; simp only [Vector.getElem_map]
-  have eb0 : Expression.eval env input_var_b[0] = input_b[0] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb1 : Expression.eval env input_var_b[1] = input_b[1] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb2 : Expression.eval env input_var_b[2] = input_b[2] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb3 : Expression.eval env input_var_b[3] = input_b[3] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb4 : Expression.eval env input_var_b[4] = input_b[4] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb5 : Expression.eval env input_var_b[5] = input_b[5] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb6 : Expression.eval env input_var_b[6] = input_b[6] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb7 : Expression.eval env input_var_b[7] = input_b[7] := by rw [← hib]; simp only [Vector.getElem_map]
-  have er0 : Expression.eval env input_var_cols_result[0] = input_cols_result[0] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er1 : Expression.eval env input_var_cols_result[1] = input_cols_result[1] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er2 : Expression.eval env input_var_cols_result[2] = input_cols_result[2] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er3 : Expression.eval env input_var_cols_result[3] = input_cols_result[3] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er4 : Expression.eval env input_var_cols_result[4] = input_cols_result[4] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er5 : Expression.eval env input_var_cols_result[5] = input_cols_result[5] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er6 : Expression.eval env input_var_cols_result[6] = input_cols_result[6] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er7 : Expression.eval env input_var_cols_result[7] = input_cols_result[7] := by rw [← hir]; simp only [Vector.getElem_map]
-  simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, ea4, ea5, ea6, ea7,
-    eb0, eb1, eb2, eb3, eb4, eb5, eb6, eb7,
-    er0, er1, er2, er3, er4, er5, er6, er7] at h_holds ⊢
+  have ea : ∀ i (hi : i < 8), Expression.eval env input_var_a[i] = input_a[i] := by
+    intro i hi; rw [← hia]; simp only [Vector.getElem_map]
+  have eb : ∀ i (hi : i < 8), Expression.eval env input_var_b[i] = input_b[i] := by
+    intro i hi; rw [← hib]; simp only [Vector.getElem_map]
+  have er : ∀ i (hi : i < 8),
+      Expression.eval env input_var_cols_result[i] = input_cols_result[i] := by
+    intro i hi; rw [← hir]; simp only [Vector.getElem_map]
+  simp only [circuit_norm, byteChannel, ea, eb, er] at h_holds ⊢
   obtain ⟨hg0, hg1, hg2, hg3, hg4, hg5, hg6, hg7⟩ := h_holds
   -- post-#398 the byte receives owe no padding requirement, so the goal is exactly `Spec`.
   intro h1
@@ -85,30 +66,13 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   obtain ⟨hia, hib, hir, _, _⟩ := h_input
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
-  have ea0 : Expression.eval env.toEnvironment input_var_a[0] = input_a[0] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea1 : Expression.eval env.toEnvironment input_var_a[1] = input_a[1] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea2 : Expression.eval env.toEnvironment input_var_a[2] = input_a[2] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea3 : Expression.eval env.toEnvironment input_var_a[3] = input_a[3] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea4 : Expression.eval env.toEnvironment input_var_a[4] = input_a[4] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea5 : Expression.eval env.toEnvironment input_var_a[5] = input_a[5] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea6 : Expression.eval env.toEnvironment input_var_a[6] = input_a[6] := by rw [← hia]; simp only [Vector.getElem_map]
-  have ea7 : Expression.eval env.toEnvironment input_var_a[7] = input_a[7] := by rw [← hia]; simp only [Vector.getElem_map]
-  have eb0 : Expression.eval env.toEnvironment input_var_b[0] = input_b[0] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb1 : Expression.eval env.toEnvironment input_var_b[1] = input_b[1] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb2 : Expression.eval env.toEnvironment input_var_b[2] = input_b[2] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb3 : Expression.eval env.toEnvironment input_var_b[3] = input_b[3] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb4 : Expression.eval env.toEnvironment input_var_b[4] = input_b[4] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb5 : Expression.eval env.toEnvironment input_var_b[5] = input_b[5] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb6 : Expression.eval env.toEnvironment input_var_b[6] = input_b[6] := by rw [← hib]; simp only [Vector.getElem_map]
-  have eb7 : Expression.eval env.toEnvironment input_var_b[7] = input_b[7] := by rw [← hib]; simp only [Vector.getElem_map]
-  have er0 : Expression.eval env.toEnvironment input_var_cols_result[0] = input_cols_result[0] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er1 : Expression.eval env.toEnvironment input_var_cols_result[1] = input_cols_result[1] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er2 : Expression.eval env.toEnvironment input_var_cols_result[2] = input_cols_result[2] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er3 : Expression.eval env.toEnvironment input_var_cols_result[3] = input_cols_result[3] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er4 : Expression.eval env.toEnvironment input_var_cols_result[4] = input_cols_result[4] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er5 : Expression.eval env.toEnvironment input_var_cols_result[5] = input_cols_result[5] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er6 : Expression.eval env.toEnvironment input_var_cols_result[6] = input_cols_result[6] := by rw [← hir]; simp only [Vector.getElem_map]
-  have er7 : Expression.eval env.toEnvironment input_var_cols_result[7] = input_cols_result[7] := by rw [← hir]; simp only [Vector.getElem_map]
+  have ea : ∀ i (hi : i < 8), Expression.eval env.toEnvironment input_var_a[i] = input_a[i] := by
+    intro i hi; rw [← hia]; simp only [Vector.getElem_map]
+  have eb : ∀ i (hi : i < 8), Expression.eval env.toEnvironment input_var_b[i] = input_b[i] := by
+    intro i hi; rw [← hib]; simp only [Vector.getElem_map]
+  have er : ∀ i (hi : i < 8),
+      Expression.eval env.toEnvironment input_var_cols_result[i] = input_cols_result[i] := by
+    intro i hi; rw [← hir]; simp only [Vector.getElem_map]
   have key : input_is_real = 1 → ∀ i : Fin 8,
       ByteRowSpec (⟨input_opcode, input_cols_result[↑i], input_a[↑i], input_b[↑i]⟩ : ByteRow (ZMod p)) := by
     intro hr1 i
@@ -123,9 +87,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       · rw [h, byteOp_two]; exact hxor (by rw [← hcast, h]; norm_num) i
     exact (byteRowSpec_byteOp _ _ _ hopcode).mpr
       ⟨⟨by rw [hres]; exact byteOp_lt256 _ _ _ hb.1 hb.2, hb.1, hb.2⟩, hres⟩
-  simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, ea4, ea5, ea6, ea7,
-    eb0, eb1, eb2, eb3, eb4, eb5, eb6, eb7,
-    er0, er1, er2, er3, er4, er5, er6, er7]
+  simp only [circuit_norm, byteChannel, ea, eb, er]
   refine ⟨fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, fun hneg => ?_,
     fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, fun hneg => ?_⟩
   · exact key (neg_inj.mp hneg) 0

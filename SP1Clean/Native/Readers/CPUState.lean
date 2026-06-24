@@ -94,11 +94,9 @@ theorem soundness [Fact (2 ^ 17 < p)] : FormalAssertion.Soundness (ZMod p) main 
   -- (`Guarantees := True`), so the Spec implication is the only goal.
   intro hr1
   have hneg : -input_is_real = -1 := by rw [hr1]
-  have hb1 := h_holds.1 hneg
-  have hb2 := h_holds.2 hneg
-  refine ⟨(byteRowSpec_range _ h13p).mp ?_, ((byteRowSpec_u8range_pair _ _).mp hb2).1⟩
+  refine ⟨(byteRowSpec_range _ h13p).mp ?_, ((byteRowSpec_u8range_pair _ _).mp (h_holds.2 hneg)).1⟩
   rw [sub_eq_add_neg, Nat.cast_ofNat]
-  exact hb1
+  exact h_holds.1 hneg
 
 theorem completeness [Fact (2 ^ 17 < p)] : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -109,15 +107,13 @@ theorem completeness [Fact (2 ^ 17 < p)] : FormalAssertion.Completeness (ZMod p)
   simp only [circuit_norm, byteChannel]
   refine ⟨?_, ?_⟩
   · intro hneg
-    have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    obtain ⟨hb1, _⟩ := h_spec hr1
+    obtain ⟨hb1, _⟩ := h_spec (neg_inj.mp hneg)
     rw [sub_eq_add_neg] at hb1
     have key := (byteRowSpec_range _ h13p).mpr hb1
     rw [Nat.cast_ofNat] at key
     exact key
   · intro hneg
-    have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    obtain ⟨_, hb2⟩ := h_spec hr1
+    obtain ⟨_, hb2⟩ := h_spec (neg_inj.mp hneg)
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hb2, by rw [ZMod.val_zero]; norm_num⟩
 
 /-- The native CPUState reader as a Clean `FormalAssertion`: takes the chip-owned `cols` block plus

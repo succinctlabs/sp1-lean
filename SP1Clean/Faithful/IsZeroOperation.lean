@@ -7,6 +7,7 @@ import SP1Clean.Model.InteractionProjection
 import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.IsZeroOperation
+import SP1Clean.Faithful.ChipTactics
 
 /-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (IsZero)
 
@@ -23,13 +24,6 @@ open SP1Clean.Extracted
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-omit [Fact (2 ^ 17 < p)] in
-/-- Carry-bool bridge: `x*(x-1)=0 ↔ x∈{0,1}` (field; `→` via `bool_of_mul_pred`). -/
-private lemma bool_iff {x : ZMod p} : x * (x - 1) = 0 ↔ (x = 0 ∨ x = 1) := by
-  rw [sub_eq_add_neg]
-  exact ⟨SP1Clean.bool_of_mul_pred,
-    fun h => by rcases h with h | h <;> rw [h] <;> ring⟩
 
 omit [Fact (2 ^ 17 < p)] in
 /-- **Faithfulness anchor — assertion half.** SP1's `IsZeroOperation` `asserts` list holds iff the

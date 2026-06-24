@@ -57,7 +57,6 @@ section sailboats
 
 namespace Option
 
-
 /-- Version of `Option.getM` using `throw` instead of `failure`. -/
 def toSailM {α} (x : Option α) : SailM α :=
   Option.elim x (throw Sail.Error.Unreachable) pure

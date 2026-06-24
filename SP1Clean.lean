@@ -218,6 +218,7 @@ import SP1Clean.Faithful.U16toU8OperationSafe
 import SP1Clean.Faithful.U16toU8OperationUnsafe
 import SP1Clean.Faithful.UTypeChip
 import SP1Clean.Math.Bitwise
+import SP1Clean.Math.Gate
 import SP1Clean.Model.ByteTable
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ChipAir

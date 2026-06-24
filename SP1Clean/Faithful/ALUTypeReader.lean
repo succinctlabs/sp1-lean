@@ -32,11 +32,6 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- `(16 : ZMod p).val = 16` under `Fact (2^17 < p)`. -/
-private lemma val_16' [NeZero p] : (16 : ZMod p).val = 16 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
-
 set_option maxHeartbeats 4000000 in
 /-- **Faithfulness anchor (ALUTypeReader fragment).** Under `is_real = is_trusted = 1`, SP1's generated
 `ALUTypeReader` constraint list holds iff the combined spec holds. -/
@@ -69,9 +64,9 @@ theorem alutypereader_constraints_faithful
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_memory, Interaction.toProp_send_program,
     ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.constrain_Range,
-    ByteOpcode.constrain_U8Range, val_16', ZMod.val_zero, one_ne_zero, ne_eq, not_false_eq_true,
+    ByteOpcode.constrain_U8Range, val_16_zmod_p, ZMod.val_zero, one_ne_zero, ne_eq, not_false_eq_true,
     true_implies, sub_self, mul_zero, sub_zero, zero_mul, Nat.ofNat_pos, true_and, and_true,
-    show (2 : ℕ) ^ 8 = 256 from by norm_num, show (2 : ℕ) ^ 16 = 65536 from by norm_num]
+    show (2 : ℕ) ^ 8 = 256 by norm_num, show (2 : ℕ) ^ 16 = 65536 by norm_num]
   tauto
 
 open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel ProgramMsg)
