@@ -37,10 +37,44 @@ jobs:
           test: "false"
           lint: "false"
           use-github-cache: "true"
-      # Environment linters: the `lake lint` pass (our `sp1Lint` lintDriver — a curated subset of the
-      # Batteries `#lint` linters over the hand-written `SP1Clean.*` declarations; see AGENTS.md § Linters).
-      # Runs in the build job, after the build, so the oleans it imports are present. Explicit `lake lint`
-      # (rather than lean-action's `lint:` flag) keeps the driver invocation unambiguous.
+      # Hand the freshly-built project oleans to the `lint` job via a commit-keyed cache.
+      # lean-action's own `use-github-cache` covers dependencies only (keyed on the manifest), not the
+      # per-commit project build — so without this the lint job would rebuild the whole project.
+      - name: Cache build outputs for the lint job
+        uses: actions/cache/save@v4
+        with:
+          path: .lake/build
+          key: lake-build-${{ github.sha }}
+
+  lint:
+    # Environment linters (`lake lint` → the `sp1Lint` lintDriver; a curated subset of the Batteries
+    # `#lint` linters over the hand-written `SP1Clean.*` declarations; see AGENTS.md § Linters). Split
+    # into its own job so it is clearly independent in the checks list. `needs: build` so it runs after
+    # the build has published the commit-keyed olean cache; restoring it lets `lake lint` read the
+    # already-built project (the lean-action step then just replays). The restore is best-effort — if it
+    # misses, lean-action rebuilds the project, so the job stays correct either way.
+    needs: build
+    runs-on:
+      [
+        runs-on,
+        runner=64cpu-linux-x64,
+        spot=false,
+        disk=large,
+        "run-id=${{ github.run_id }}",
+      ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore build outputs from the build job
+        uses: actions/cache/restore@v4
+        with:
+          path: .lake/build
+          key: lake-build-${{ github.sha }}
+      - uses: leanprover/lean-action@v1
+        with:
+          build: "true"
+          test: "false"
+          lint: "false"
+          use-github-cache: "true"
       - name: Environment linters (lake lint)
         run: lake lint
-
