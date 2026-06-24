@@ -185,8 +185,15 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
 
 - `circuit_proof_start` (from `Clean.Utils.Tactics`) is the **first** tactic in soundness/completeness proofs;
   any `haveI`/`set_option` must come after it, or it errors "can only be used on Soundness/Completeness".
-- Imports MUST precede the module doc-comment (the package `-D linter.flexible` flag is rejected on a
-  zero-imports header).
+- Imports MUST precede the module doc-comment (a `-D linter.*` flag can't be validated against a header that
+  opens with a doc-comment before its imports — the linter's registration module isn't in scope yet; same
+  "Step 0" reason the package `[leanOptions]` carries no Mathlib linter flags, see `lakefile.toml`).
+- **Linters.** The `SP1Proofs` lake library enables `-D linter.style.lambdaSyntax`/`dollarSyntax` (via its
+  `moreLeanArgs`); these apply during the normal `lake build SP1Clean` (224 hand-written `Proofs/`/`Faithful/`/
+  `Soundness/` modules) with **zero** violations. Package-level Mathlib linter flags do **not** work (the
+  Clean-only `Math/`/`Model/` files lack the registration) — scope any new linter to a lake lib, not the
+  package. Next candidates + the non-negotiable suppressions (`unusedSectionVars`/`unusedSimpArgs`, the
+  auto-gen `linter.all false`) are catalogued in `docs/agents/cleanup-backlog.md`.
 - Heavy `toBitVec64` rw chains are whnf-expensive — `set_option maxHeartbeats 2000000 in` (carry lemmas need up
   to `16000000`).
 - **Never `set_option (debug.)skipKernelTC`.** It bypasses the kernel's type-check re-run — the trust anchor

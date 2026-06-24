@@ -65,6 +65,11 @@ globs = ["SP1Clean.Native.+"]
 
 # The proof pillar: the sound/complete proofs (Proofs/), the faithfulness anchors (Faithful/),
 # and the whole-machine/trace layer (Soundness/).
+# Lib-scoped Mathlib style linters: these hand-written modules all transitively import the linter
+# registration (unlike the Clean-only Math/Model files — see the package `[leanOptions]` note above),
+# so the `-D linter.style.*` flags are safe here. Start minimal (lambda/dollar are at zero violations);
+# see `docs/agents/cleanup-backlog.md` for the next candidates (oldObtain / longLine / cdot).
 [[lean_lib]]
 name = "SP1Proofs"
 globs = ["SP1Clean.Proofs.+", "SP1Clean.Faithful.+", "SP1Clean.Soundness.+"]
+moreLeanArgs = ["-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true"]
