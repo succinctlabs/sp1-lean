@@ -45,12 +45,6 @@ def limbReadEq (e e' : MemEvent (ZMod p)) : Prop :=
   (e.prevValue[0]).val = (e'.value[0]).val ∧ (e.prevValue[1]).val = (e'.value[1]).val ∧
     (e.prevValue[2]).val = (e'.value[2]).val ∧ (e.prevValue[3]).val = (e'.value[3]).val
 
-/-- A per-address access is one of the trace's bus-backed events. -/
-private theorem mem_memEventsFiltered_of_mem_eventsAt {rows : List (Trace.RowView (ZMod p))}
-    {addr : ℕ} {e : MemEvent (ZMod p)} (he : e ∈ eventsAt rows addr) :
-    e ∈ memEventsFiltered rows := by
-  rw [eventsAt] at he; exact List.mem_of_mem_filter he
-
 /-- **Limb-level key extraction.** A canceller match `recvKey e' = sendKey e` equates the four value
 limbs *individually* — the keys carry them as separate `List ℕ` entries. The limb-level refinement of
 `recvKey_eq_sendKey` the `isU64` recovery rides. -/
@@ -107,8 +101,6 @@ theorem eventsAt_genesis_reads_zero [NeZero p] (rows : List (Trace.RowView (ZMod
     (h_bal : isConsistentBalanced (aggregateChipRows rows memoryLookups ++ memProv))
     (hne : eventsAt rows addr ≠ []) :
     wordToNat ((eventsAt rows addr).getLast hne).prevValue = 0 := by
-  have haddr : ∀ {e}, e ∈ eventsAt rows addr → e.addr.val = addr := by
-    intro e he; rw [eventsAt] at he; have := (List.mem_filter.mp he).2; simpa using this
   have h_sorted : MemoryAccessList.isTimestampSorted ((eventsAt rows addr).map MemEvent.toAccess) := by
     rw [← filterAddress_memAccessListFiltered]
     exact MemoryAccessList.filterAddress_sorted _ (memAccessListFiltered_isTimestampSorted rows h_clk) addr
@@ -120,7 +112,7 @@ theorem eventsAt_genesis_reads_zero [NeZero p] (rows : List (Trace.RowView (ZMod
     have he''_at : e'' ∈ eventsAt rows addr := by
       rw [eventsAt]
       exact List.mem_filter.mpr ⟨he''_mem,
-        decide_eq_true_eq.mpr (haddr'.trans (haddr (List.getLast_mem hne)))⟩
+        decide_eq_true_eq.mpr (haddr'.trans (addr_of_mem_eventsAt (List.getLast_mem hne)))⟩
     have hle := getLast_clk_le h_sorted hne he''_at
     have hlt := h_prevlt _ he_mem
     omega

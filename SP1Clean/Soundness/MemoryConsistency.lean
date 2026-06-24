@@ -472,6 +472,19 @@ address). The per-address single-address chain ranges over `(eventsAt rows addr)
 def eventsAt (rows : List (Trace.RowView (ZMod p))) (addr : ℕ) : List (MemEvent (ZMod p)) :=
   (memEventsFiltered rows).filter (fun e => decide (e.addr.val = addr))
 
+/-- A per-address access (`∈ eventsAt`) is one of the trace's bus-backed events
+(`∈ memEventsFiltered`). Shared by the single-address chain proof and the `isU64` recovery. -/
+theorem mem_memEventsFiltered_of_mem_eventsAt {rows : List (Trace.RowView (ZMod p))}
+    {addr : ℕ} {e : MemEvent (ZMod p)} (he : e ∈ eventsAt rows addr) :
+    e ∈ memEventsFiltered rows := by
+  rw [eventsAt] at he; exact List.mem_of_mem_filter he
+
+/-- Membership in `eventsAt rows addr` pins the event's address (`.val`). -/
+theorem addr_of_mem_eventsAt {rows : List (Trace.RowView (ZMod p))}
+    {addr : ℕ} {e : MemEvent (ZMod p)} (he : e ∈ eventsAt rows addr) :
+    e.addr.val = addr := by
+  rw [eventsAt] at he; have := (List.mem_filter.mp he).2; simpa using this
+
 /-- The vendored `filterAddress` of the filtered access list is `eventsAt` mapped through `toAccess` —
 the bridge that lets the per-address single-address proof work at the event level (where `prevTs` lives).
 -/
@@ -773,9 +786,9 @@ theorem isConsistentSingleAddress_of_balance [NeZero p] (rows : List (Trace.RowV
     (h_sorted : MemoryAccessList.isTimestampSorted ((eventsAt rows addr).map MemEvent.toAccess)) :
     MemoryAccessList.isConsistentSingleAddress ((eventsAt rows addr).map MemEvent.toAccess) h_sorted := by
   have hsub : ∀ {e}, e ∈ eventsAt rows addr → e ∈ memEventsFiltered rows := by
-    intro e he; rw [eventsAt] at he; exact List.mem_of_mem_filter he
+    intro e he; exact mem_memEventsFiltered_of_mem_eventsAt he
   have haddr : ∀ {e}, e ∈ eventsAt rows addr → e.addr.val = addr := by
-    intro e he; rw [eventsAt] at he; have := (List.mem_filter.mp he).2; simpa using this
+    intro e he; exact addr_of_mem_eventsAt he
   refine isConsistentSingleAddress_of_chain (eventsAt rows addr) h_sorted ?_ ?_
   · -- adjacency: each read equals the next (earlier) write
     rw [List.isChain_iff_getElem]
