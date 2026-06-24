@@ -11,6 +11,9 @@ For *how* to golf safely, see `proof-patterns.md` § "Golf & cleanup discipline"
 - The Soundness Memory-layer helper consolidation (`two_lt_p_aux` / `valCast_pos_aux` /
   `mem_memEventsFiltered_of_mem_eventsAt`).
 - Linters: `style.lambdaSyntax` / `style.dollarSyntax` enabled on the `SP1Proofs` lake library (zero fallout).
+- `lake lint` (environment linters) stood up — the `sp1Lint` lintDriver (`scripts/sp1Lint.lean`) runs 11 curated
+  Batteries `#lint` linters over the hand-written `SP1Clean.*` decls (auto-gen excluded by module-path filter),
+  with a 21-entry `scripts/nolints.json` baseline; CI runs it in the build job.
 
 ## Cross-file refactors — deferred with caveats
 
@@ -61,6 +64,8 @@ Left untouched in the campaign; revisit only with a specific goal:
 
 ## Linters — next candidates (deferred; real fallout)
 
+### Syntactic (build-time, lib `moreLeanArgs`)
+
 After `style.lambdaSyntax` / `style.dollarSyntax` (zero-fallout, enabled): `linter.oldObtain`,
 `linter.style.longLine` (Model/Sail* already suppress it), `linter.style.cdot`. Each has real hits to triage
 (fix or per-file suppress) across the heavy cores — enable one at a time, return to 0-warning, then the next.
@@ -68,6 +73,30 @@ Do **not** enable `linter.unusedSectionVars` / `linter.unusedSimpArgs` (structur
 proofs — ~275 deliberate suppressions). Leave the auto-gen `linter.all false` (`Extracted/`, `TraceGenTests/`).
 The scoping unit is the `SP1Proofs` lake library's `moreLeanArgs` (see `lakefile.toml` + the AGENTS.md "Linters"
 note for the registration caveat).
+
+### Environment (`lake lint` / `sp1Lint`)
+
+The curated set runs 11 of the Batteries `#lint` linters. Deferred / dropped, with rationale:
+
+- **`docBlame` / `docBlameThm` / `tacticDocs` / `deprecatedNoSince`** — doc-coverage linters; thousands of hits
+  on undocumented private proof lemmas. Enable only after a deliberate documentation pass (not planned).
+- **`unusedArguments`** — *dropped, not deferred.* It flags **only** the project's uniform signature args
+  (`{p} [Fact p.Prime] [Fact (2^17<p)]` / `NeZero p`, and the `ProverData`/`ProverHint` args every chip
+  `Spec`/`Assumptions` carries) — all structurally required, none a defect — and it grows a fresh false-positive
+  per new chip, so even nolinting it is a permanent tax. Re-run ad hoc if hunting genuinely-dead args.
+- **`structureInType`** — not in the curated set; revisit if structure-universe hygiene becomes a concern.
+- **Fixable `simpNF` residue (2 entries):** `ShiftRightMath.val_4_zmod_p` / `val_64_zmod_p` are "simp can prove
+  this" *duplicate* `@[simp]` re-declarations (provable by the canonical `val_4_zmod_p` / `ShiftLeftCore.
+  val_64_zmod_p`). Droppable, but in a heavy `ShiftRightChip/Core` file — fold into a future Shift-core pass and
+  re-`--update` the nolints. The other 19 `nolints.json` entries are stable Math/Model/Sail simp infra (leave).
+
+**Hardening option — namespace-isolate the auto-gen (Option B, deferred).** The `sp1Lint` exclusion is a *soft*
+module-path filter (`getHandwrittenDecls` drops `SP1Clean.Extracted.*` + `*Vectors`). A *hard* boundary would
+relocate all auto-gen to a separate root namespace `SP1Extracted.*`, so the stock `runLinter SP1Clean` excludes
+it by construction (no custom filter). Cost: ~87 module renames + hundreds of import-line edits + `update_
+extracted.py` writer paths + the root aggregator + lakefile globs, and it touches the deliberate "vectors live
+in `Proofs/TraceGenTests/`" layering. Not worth it for linting alone; reconsider if a hard auto-gen/hand-written
+namespace split is wanted for other reasons.
 
 ## Golfing / cleanup skills available
 

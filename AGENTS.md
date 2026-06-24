@@ -188,12 +188,27 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
 - Imports MUST precede the module doc-comment (a `-D linter.*` flag can't be validated against a header that
   opens with a doc-comment before its imports — the linter's registration module isn't in scope yet; same
   "Step 0" reason the package `[leanOptions]` carries no Mathlib linter flags, see `lakefile.toml`).
-- **Linters.** The `SP1Proofs` lake library enables `-D linter.style.lambdaSyntax`/`dollarSyntax` (via its
-  `moreLeanArgs`); these apply during the normal `lake build SP1Clean` (224 hand-written `Proofs/`/`Faithful/`/
-  `Soundness/` modules) with **zero** violations. Package-level Mathlib linter flags do **not** work (the
-  Clean-only `Math/`/`Model/` files lack the registration) — scope any new linter to a lake lib, not the
-  package. Next candidates + the non-negotiable suppressions (`unusedSectionVars`/`unusedSimpArgs`, the
-  auto-gen `linter.all false`) are catalogued in `docs/agents/cleanup-backlog.md`.
+- **Linters — two kinds.** *Syntactic* linters run during `lake build` (option-gated); *environment*
+  linters run as a separate `lake lint` pass over the built environment.
+  - **Syntactic.** The `SP1Proofs` lake library enables `-D linter.style.lambdaSyntax`/`dollarSyntax` (via its
+    `moreLeanArgs`); these apply during the normal `lake build SP1Clean` (224 hand-written `Proofs/`/`Faithful/`/
+    `Soundness/` modules) with **zero** violations. Package-level Mathlib linter flags do **not** work (the
+    Clean-only `Math/`/`Model/` files lack the registration) — scope any new linter to a lake lib, not the
+    package. The auto-gen `Extracted/`+`*Vectors` files carry per-file `set_option linter.all false`.
+  - **Environment (`lake lint`).** Run `lake lint` (after a build — it imports the oleans) for the Batteries
+    `#lint` checks. The driver is `scripts/sp1Lint.lean` (package `lintDriver = "sp1Lint"`), a thin wrapper over
+    `getChecks`/`lintCore`. We use a **custom driver, not the stock `runLinter` exe**, because `runLinter`
+    scopes by namespace *root* (`getDeclsInPackage module.getRoot`) — it would lint all `SP1Clean.*` incl.
+    `SP1Clean.Extracted.*`, and the per-file `set_option linter.all false` headers do **nothing** against
+    environment linters (those run post-import; only `nolints.json`/`@[nolint]` suppress them). `sp1Lint`
+    instead filters decls by full module path (drops `Extracted/`+`*Vectors`) and runs a **curated** set of 11
+    low-noise linters. Residue lives in `scripts/nolints.json` (21 stable entries — 3 `defLemma`
+    obligation-bundle defs + 18 `simpComm`/`simpNF` Math/Model/Sail simp lemmas); `lake exe sp1Lint --update`
+    regenerates it; CI runs `lake lint` in the build job. Deliberately **dropped**: `docBlame`/`tacticDocs`
+    (doc-coverage noise) and `unusedArguments` (flags only the uniform field-generic / `ProverData` signature
+    args — all structural, and a fresh false-positive per new chip).
+  - Next candidates + the non-negotiable suppressions (`unusedSectionVars`/`unusedSimpArgs`, the auto-gen
+    `linter.all false`) are catalogued in `docs/agents/cleanup-backlog.md`.
 - Heavy `toBitVec64` rw chains are whnf-expensive — `set_option maxHeartbeats 2000000 in` (carry lemmas need up
   to `16000000`).
 - **Never `set_option (debug.)skipKernelTC`.** It bypasses the kernel's type-check re-run — the trust anchor
