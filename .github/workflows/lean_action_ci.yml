@@ -37,4 +37,10 @@ jobs:
           test: "false"
           lint: "false"
           use-github-cache: "true"
+      # Environment linters: the `lake lint` pass (our `sp1Lint` lintDriver — a curated subset of the
+      # Batteries `#lint` linters over the hand-written `SP1Clean.*` declarations; see AGENTS.md § Linters).
+      # Runs in the build job, after the build, so the oleans it imports are present. Explicit `lake lint`
+      # (rather than lean-action's `lint:` flag) keeps the driver invocation unambiguous.
+      - name: Environment linters (lake lint)
+        run: lake lint
 
