@@ -95,10 +95,10 @@ For an operation `<Op>` (e.g. `Add`, `BitwiseU16`):
 
 Each new module's import goes into the root `SP1Clean.lean`.
 
-## Trace Generation (`Proofs/TraceGenTests/`)
+## Trace Generation (`SP1CleanTest/TraceGenTests/`)
 
 Partially deriving SP1's `generate_trace` from the circuit definition.
-`Proofs/TraceGenTests/TraceGenerator.lean` (axiom-clean,
+`SP1CleanTest/TraceGenTests/TraceGenerator.lean` (axiom-clean,
 generic): `circuitTraceRow` seeds Clean's `FlatOperation.dynamicWitnesses` env-threading fold with
 one row's input column values, runs `main`'s own witness closures in emission order, then evaluates
 `main`'s **output struct** under the final environment — the output layout *is* the row layout, so
@@ -113,12 +113,16 @@ matrix equals, cell-for-cell, whole traces dumped from SP1's **real** `MachineAi
 column layout, and padding at once; the per-`populate` vector anchors check only the witness
 formulas pointwise.
 
-`Proofs/TraceGenTests/` is kept **whole** in the `Proofs/` pillar: its auto-gen
-`<Chip>ChipTraceVectors.lean` batteries import the hand-written scaffold types (`EventPopulate` /
-`Conformance`), so — unlike `Extracted/WitnessVectors/` — they are *not* split into the `Extracted/`
-auto-gen pillar (that would invert the pillar layering). Its `Conformance.lean` carries the
-concrete-prime scaffold; the layer is independent of `Proofs/WitnessTests/` — the older
-per-operation `populate` conformance layer, kept as a temporary operation-level bridge.
+This trace-gen layer and the older per-operation `populate`-conformance layer (`WitnessTests/`) both
+live in the **top-level `SP1CleanTest` test library** (the `lake test` target), *not* the main
+`SP1Clean/` tree. The reason is `native_decide`: the `<Chip>TraceWitness.lean` / `<Op>Witness.lean`
+anchors are the project's only uses of it (it trusts the whole compiler, adding
+`Lean.ofReduceBool`/`Lean.trustCompiler`), so the entire layer — anchors, the `Conformance.lean` /
+`EventPopulate.lean` concrete-prime scaffold, and the auto-gen `<Chip>ChipTraceVectors.lean` /
+`WitnessTests/Vectors/<Op>.lean` batteries — is quarantined in a library that imports `SP1Clean` but
+is never imported by it. `scripts/check_no_native_decide.sh` keeps the main build clean. (Because the
+vectors travel with the anchors, the old "can't split the vectors into `Extracted/` without inverting
+the pillar layering" tension is moot — the whole test layer is one self-contained library.)
 
 Status (10 chips, 44 events + 20 padding rows each, **all unmasked** — every column of every
 covered chip is compared cell-for-cell):

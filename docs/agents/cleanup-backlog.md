@@ -91,25 +91,31 @@ actionable**:
 
 ### Syntactic (build-time, lib `moreLeanArgs`)
 
-After `style.lambdaSyntax` / `style.dollarSyntax` (zero-fallout, enabled): `linter.oldObtain`,
-`linter.style.longLine` (Model/Sail* already suppress it), `linter.style.cdot`. Each has real hits to triage
-(fix or per-file suppress) across the heavy cores — enable one at a time, return to 0-warning, then the next.
-Do **not** enable `linter.unusedSectionVars` / `linter.unusedSimpArgs` (structurally necessary in circuit
-proofs — ~275 deliberate suppressions). Leave the auto-gen `linter.all false` (`Extracted/`, `TraceGenTests/`).
-The scoping unit is the `SP1Proofs` lake library's `moreLeanArgs` (see `lakefile.toml` + the AGENTS.md "Linters"
-note for the registration caveat).
+**Enabled, all at zero violations** (across every hand-written core pillar — `SP1Math`/`SP1Model`/
+`SP1FormalModel`/`SP1Native`/`SP1Proofs`): `style.lambdaSyntax`, `style.dollarSyntax`, the four
+deprecated-tactic guards `style.refine` / `style.cases` / `style.induction` / `style.admit`, and `oldObtain` /
+`style.cdot`.
+
+**Remaining candidate:** `linter.style.longLine` (Model/Sail* already suppress it). It has real hits to triage
+(reflow or per-file suppress) across the heavy cores — fallout concentrates in `Native/` (~817 lines >100) and
+`FormalModel/` (~263); enable it alone, then return to 0-warning. Do **not** enable
+`linter.unusedSectionVars` / `linter.unusedSimpArgs` (structurally necessary in circuit proofs — ~275
+deliberate suppressions). Leave the auto-gen `linter.all false` (`Extracted/`, `TraceGenTests/`). The scoping
+unit is each core pillar's lake-library `moreLeanArgs` (five identical copies — keep in sync; the auto-gen
+`SP1Extracted` library is deliberately excluded). See `lakefile.toml` + the AGENTS.md "Linters" note.
 
 ### Environment (`lake lint` / `sp1Lint`)
 
-The curated set runs 11 of the Batteries `#lint` linters. Deferred / dropped, with rationale:
+The curated set runs 13 of the Batteries/Mathlib `#lint` linters (the original 11 plus the Mathlib
+`structureInType` / `deprecatedNoSince` hygiene checks, both at zero violations). Deferred / dropped,
+with rationale:
 
-- **`docBlame` / `docBlameThm` / `tacticDocs` / `deprecatedNoSince`** — doc-coverage linters; thousands of hits
+- **`docBlame` / `docBlameThm` / `tacticDocs`** — doc-coverage linters; thousands of hits
   on undocumented private proof lemmas. Enable only after a deliberate documentation pass (not planned).
 - **`unusedArguments`** — *dropped, not deferred.* It flags **only** the project's uniform signature args
   (`{p} [Fact p.Prime] [Fact (2^17<p)]` / `NeZero p`, and the `ProverData`/`ProverHint` args every chip
   `Spec`/`Assumptions` carries) — all structurally required, none a defect — and it grows a fresh false-positive
   per new chip, so even nolinting it is a permanent tax. Re-run ad hoc if hunting genuinely-dead args.
-- **`structureInType`** — not in the curated set; revisit if structure-universe hygiene becomes a concern.
 - **Fixable `simpNF` residue (2 entries):** `ShiftRightMath.val_4_zmod_p` / `val_64_zmod_p` are "simp can prove
   this" *duplicate* `@[simp]` re-declarations (provable by the canonical `val_4_zmod_p` / `ShiftLeftCore.
   val_64_zmod_p`). Droppable, but in a heavy `ShiftRightChip/Core` file — fold into a future Shift-core pass and
@@ -119,9 +125,11 @@ The curated set runs 11 of the Batteries `#lint` linters. Deferred / dropped, wi
 module-path filter (`getHandwrittenDecls` drops `SP1Clean.Extracted.*` + `*Vectors`). A *hard* boundary would
 relocate all auto-gen to a separate root namespace `SP1Extracted.*`, so the stock `runLinter SP1Clean` excludes
 it by construction (no custom filter). Cost: ~87 module renames + hundreds of import-line edits + `update_
-extracted.py` writer paths + the root aggregator + lakefile globs, and it touches the deliberate "vectors live
-in `Proofs/TraceGenTests/`" layering. Not worth it for linting alone; reconsider if a hard auto-gen/hand-written
-namespace split is wanted for other reasons.
+extracted.py` writer paths + the root aggregator + lakefile globs. (Since the 2026-06-25 test-library split, the
+witness/trace conformance vectors already live in the separate top-level `SP1CleanTest` library — excluded from
+`lake lint` by the `SP1Clean`-prefix filter — so only the main-lib `SP1Clean.Extracted.*` auto-gen would remain
+to relocate.) Not worth it for linting alone; reconsider if a hard auto-gen/hand-written namespace split is
+wanted for other reasons.
 
 ## Golfing / cleanup skills available
 

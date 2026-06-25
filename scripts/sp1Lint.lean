@@ -14,14 +14,16 @@ project in the two ways the stock `runLinter` exe cannot do:
   elaboration; they do nothing against these *environment* linters, which run post-import over the built
   environment. `nolints.json` / `@[nolint]` are the only env-linter suppressions.
 
-  INVARIANT: keep `getHandwrittenDecls` in sync with `update_extracted.py`'s three output dirs —
-  `Extracted/`, `Extracted/WitnessVectors/` (both under the `SP1Clean.Extracted` prefix), and
-  `Proofs/TraceGenTests/*Vectors.lean` (caught by the `endsWith "Vectors"` clause; no hand-written
-  module ends in "Vectors").
+  INVARIANT: `getHandwrittenDecls` keeps only `SP1Clean.*` declarations, minus the auto-gen ones —
+  the `SP1Clean.Extracted` prefix (the constraint structs + the main-lib `Circuit/` forms) and any
+  module ending in "Vectors". The whole top-level **test** library `SP1CleanTest.*` (the witness/trace
+  conformance anchors + their `update_extracted.py`-written `…Vectors`/`Vectors.*` modules) is excluded
+  automatically, since `SP1Clean` is not a prefix of `SP1CleanTest` — so `lake lint` covers the main
+  library only (matching mathlib/batteries, which don't env-lint their test libs).
 
 * **Curated linter set.** We run a low-noise subset via `runOnly`, omitting the doc-coverage linters
-  (`docBlame`/`docBlameThm`/`tacticDocs`/`deprecatedNoSince`) that would swamp a proofs project. See
-  `curatedLinters` below; grow it deliberately (and see AGENTS.md § Linters).
+  (`docBlame`/`docBlameThm`/`tacticDocs`) that would swamp a proofs project. See `curatedLinters`
+  below; grow it deliberately (and see AGENTS.md § Linters).
 
 Wired as the package `lintDriver`, so `lake lint` runs it (after `lake build`, which the env linters need
 for oleans). Residue is recorded in `scripts/nolints.json`; `lake exe sp1Lint --update` snapshots the
@@ -32,8 +34,10 @@ open Lean Core Elab Batteries.Tactic.Lint
 open System (FilePath)
 
 /-- The curated environment-linter set (short names, as registered by `@[env_linter]`). The
-doc-coverage linters (`docBlame`, `docBlameThm`, `tacticDocs`, `deprecatedNoSince`) and `structureInType`
-are intentionally omitted — see AGENTS.md § Linters.
+doc-coverage linters (`docBlame`, `docBlameThm`, `tacticDocs`) are intentionally omitted — they would
+swamp a proofs project — see AGENTS.md § Linters. `structureInType` and `deprecatedNoSince` (both
+Mathlib `@[env_linter]`s, reached via the transitive Mathlib import) ARE included: low-noise hygiene
+checks for structures that should be `Prop` and `@[deprecated]` attributes missing a `since` date.
 
 `unusedArguments` is also intentionally omitted: it flags only the project's *uniform* signature args
 (`{p} [Fact p.Prime] [Fact (2^17 < p)]` / `NeZero p` instance binders, and the `ProverData`/`ProverHint`
@@ -44,7 +48,8 @@ genuinely-dead args. -/
 def curatedLinters : List Name :=
   [`dupNamespace, `defLemma, `unusedHavesSuffices,
    `checkUnivs, `checkType, `synTaut, `impossibleInstance, `nonClassInstance,
-   `simpNF, `simpVarHead, `simpComm]
+   `simpNF, `simpVarHead, `simpComm,
+   `structureInType, `deprecatedNoSince]
 
 /-- The list of `nolints` pulled from the `nolints.json` file (linter short-name × declaration). -/
 abbrev NoLints := Array (Name × Name)

@@ -13,8 +13,8 @@ variant flags are **not** computable from the row inputs — the prover supplies
 `"shift_left_flags"` `ProverHint` key (one-hot on real rows, absent/all-zero on padding); the
 committed `is_sllw_imm` is derived as `is_sllw · imm_c`.
 
-Everything is computable (ℕ arithmetic on `.val`, cast back): `TraceGenTests` derives whole trace
-rows from these closures and `native_decide`-checks them against SP1's real `generate_trace`. On
+Everything is computable (ℕ arithmetic on `.val`, cast back): the `SP1CleanTest` trace-gen anchors
+derive whole trace rows from these closures and check them against SP1's real `generate_trace`. On
 all-zero inputs + empty hint they reproduce SP1's `padded_row_template`
 (`v_01 = v_012 = v_0123 = 1`, everything else zero) — the `v_*` encodings are computed ungated
 because their constraints are ungated. -/

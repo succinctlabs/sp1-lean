@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: No skipKernelTC in source
         run: scripts/check_no_skipkerneltc.sh
+      - name: No native_decide in the main SP1Clean library
+        run: scripts/check_no_native_decide.sh
 
   build:
     runs-on:
@@ -78,3 +80,38 @@ jobs:
           use-github-cache: "true"
       - name: Environment linters (lake lint)
         run: lake lint
+
+  test:
+    # Conformance tests (`lake test` → the `SP1CleanTest` testDriver: the witness-generation and
+    # whole-trace `native_decide` anchors checked against batteries dumped from SP1's real Rust prover).
+    # These live in their own library — the ONLY place `native_decide` is allowed — so they are gated
+    # here, separately from the `native_decide`-free main build. Split into its own job (in parallel with
+    # `lint`) so the trusted-compiler checks are clearly independent in the checks list. `needs: build`
+    # so it runs after the build has published the commit-keyed olean cache; restoring it lets `lake test`
+    # reuse the already-built main library and only elaborate the test modules. The restore is
+    # best-effort — if it misses, lean-action rebuilds the main library, so the job stays correct either way.
+    needs: build
+    runs-on:
+      [
+        runs-on,
+        runner=64cpu-linux-x64,
+        spot=false,
+        disk=large,
+        "run-id=${{ github.run_id }}",
+      ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore build outputs from the build job
+        uses: actions/cache/restore@v4
+        with:
+          path: .lake/build
+          key: lake-build-${{ github.sha }}
+      - uses: leanprover/lean-action@v1
+        with:
+          build: "true"
+          test: "false"
+          lint: "false"
+          use-github-cache: "true"
+      - name: Conformance tests (lake test)
+        run: lake test
