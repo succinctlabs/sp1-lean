@@ -33,28 +33,26 @@ jobs:
       - uses: actions/checkout@v4
       # Test that the project builds without failure
       # Note: defaults to ignore warnings and deprecations, maybe change eventually
+      # lean-action's `use-github-cache` caches the WHOLE `.lake` (project build + deps) under a
+      # commit-keyed key (`lake-<os>-<arch>-<toolchain>-<manifest>-<sha>`) with a manifest-prefix
+      # `restore-keys` fallback. So this build is incremental from the most recent prior commit, and the
+      # exact-`<sha>` cache it saves is what the `lint`/`test` jobs restore (an exact hit → `lake build`
+      # there just replays, no recompilation). No separate per-commit project cache is needed.
       - uses: leanprover/lean-action@v1
         with:
           build: "true"
           test: "false"
           lint: "false"
           use-github-cache: "true"
-      # Hand the freshly-built project oleans to the `lint` job via a commit-keyed cache.
-      # lean-action's own `use-github-cache` covers dependencies only (keyed on the manifest), not the
-      # per-commit project build — so without this the lint job would rebuild the whole project.
-      - name: Cache build outputs for the lint job
-        uses: actions/cache/save@v4
-        with:
-          path: .lake/build
-          key: lake-build-${{ github.sha }}
 
   lint:
     # Environment linters (`lake lint` → the `sp1Lint` lintDriver; a curated subset of the Batteries
     # `#lint` linters over the hand-written `SP1Clean.*` declarations; see AGENTS.md § Linters). Split
     # into its own job so it is clearly independent in the checks list. `needs: build` so it runs after
-    # the build has published the commit-keyed olean cache; restoring it lets `lake lint` read the
-    # already-built project (the lean-action step then just replays). The restore is best-effort — if it
-    # misses, lean-action rebuilds the project, so the job stays correct either way.
+    # the build job has saved its exact-`<sha>` `.lake` cache; lean-action below restores that on an exact
+    # hit, so `lake build` just replays the already-built project (no recompilation) before `lake lint`.
+    # If that cache were ever absent, lean-action's manifest-prefix `restore-keys` fallback does a correct
+    # incremental build instead, so the job stays correct either way.
     needs: build
     runs-on:
       [
@@ -67,11 +65,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Restore build outputs from the build job
-        uses: actions/cache/restore@v4
-        with:
-          path: .lake/build
-          key: lake-build-${{ github.sha }}
       - uses: leanprover/lean-action@v1
         with:
           build: "true"
@@ -87,9 +80,10 @@ jobs:
     # These live in their own library — the ONLY place `native_decide` is allowed — so they are gated
     # here, separately from the `native_decide`-free main build. Split into its own job (in parallel with
     # `lint`) so the trusted-compiler checks are clearly independent in the checks list. `needs: build`
-    # so it runs after the build has published the commit-keyed olean cache; restoring it lets `lake test`
-    # reuse the already-built main library and only elaborate the test modules. The restore is
-    # best-effort — if it misses, lean-action rebuilds the main library, so the job stays correct either way.
+    # so it runs after the build job has saved its exact-`<sha>` `.lake` cache; lean-action below restores
+    # that on an exact hit, so `lake build` replays the already-built main library (no recompilation) and
+    # `lake test` only elaborates the test modules. If that cache were ever absent, lean-action's
+    # manifest-prefix `restore-keys` fallback does a correct incremental build instead.
     needs: build
     runs-on:
       [
@@ -102,11 +96,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Restore build outputs from the build job
-        uses: actions/cache/restore@v4
-        with:
-          path: .lake/build
-          key: lake-build-${{ github.sha }}
       - uses: leanprover/lean-action@v1
         with:
           build: "true"
