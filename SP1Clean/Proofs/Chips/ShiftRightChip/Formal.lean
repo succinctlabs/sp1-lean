@@ -3,6 +3,7 @@ import SP1Clean.Proofs.Chips.ShiftRightChip.Soundness.Srl
 import SP1Clean.Proofs.Chips.ShiftRightChip.Soundness.Sra
 import SP1Clean.Proofs.Chips.ShiftRightChip.Soundness.Srlw
 import SP1Clean.Proofs.Chips.ShiftRightChip.Soundness.Sraw
+import SP1Clean.Math.EvalVec
 
 /-! # `SP1Clean.ShiftRightChip` — contract: soundness / completeness / `circuit`
 
@@ -84,15 +85,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · exact (SoundSrlw.soundness i₀ env input_var input h_input h_assumptions h_holds).1 hr
   · exact (SoundSraw.soundness i₀ env input_var input h_input h_assumptions h_holds).1 hr
   · exact (SoundSrl.soundness  i₀ env input_var input h_input h_assumptions h_holds).2
-
-set_option linter.unusedSectionVars false in
-/-- A length-4 `#v` of pointwise evaluations is the `Vector.map` of the evaluator (folds the witness
-closures' operands back to `Vector.map`; mirrors `ShiftLeftChip.vec4_eval`). -/
-private lemma vec4_eval (e : Environment (ZMod p)) (v : Vector (Expression (ZMod p)) 4) :
-    (#v[Expression.eval e v[0], Expression.eval e v[1], Expression.eval e v[2],
-        Expression.eval e v[3]] : Vector (ZMod p) 4) = Vector.map (Expression.eval e) v := by
-  ext k hk
-  interval_cases k <;> simp [Vector.getElem_map]
 
 set_option maxHeartbeats 16000000 in
 /-- Completeness: `main`'s honest `Populate` witness closures (flags from the `"shift_right_flags"`

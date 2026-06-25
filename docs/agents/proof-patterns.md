@@ -568,6 +568,13 @@ always means a *local* regression against one of these.
   ~76 auto-gen modules carry it in their headers; keep it when regenerating (the linter passes over the
   monolithic generated terms were a measurable chunk of their cost).
 
+- **`maxHeartbeats` tightening is the *wrong* lever — don't chase the ceilings.** The heavy Shift/DivRem
+  proofs are kernel / type-checking-bound, not heartbeat-bound: `ShiftLeftChip/Soundness/Sll.soundness`
+  measures at **72** elaboration heartbeats against its 4M ceiling. The high ceilings are non-binding safety
+  margins; lowering them has no wall-clock effect and only risks a future spike. Real cost is term-intrinsic
+  (the `2^64` reductions, the product-glue `simpa`s) — chase *that* (the abstract-`BitVec` helpers + shared-tail
+  dedup below), not the `set_option` numbers.
+
 - **Shared-tail dedup for many-conjunct soundness proofs (the DivRem pattern).** When N conjunct files
   each prove `GeneralFormalCircuit.Soundness` over the *same* `main`, they each re-elaborate the
   byte-identical post-instruction "requirements tail" (readers + `is_real` + channel obligations) at a
@@ -586,8 +593,8 @@ always means a *local* regression against one of these.
 
 How to golf/clean a proof without breaking the repo's invariants (axiom-clean, 0-warning, no `info:`).
 Distilled from the 2026-06-22/23 cleanup campaign (109 files, −591 lines, axiom-cleanliness preserved). The
-prioritized follow-up backlog + the golfing/cleanup skills (`/cleanup`, `/cleanup-all`, `/decompose-proof`,
-`/split-file`, `Skill(simplify)`) live in `docs/agents/cleanup-backlog.md`.
+remaining deferred cleanup TODOs live under `docs/roadmap.md` § "Cleanup / polish backlog"; the available
+cleanup skills are catalogued at the end of this section.
 
 **Instant, always-safe wins** (the bulk of the line savings):
 - `:= by rfl` → `:= rfl`; `show T from by tac` → `show T by tac`; `rw […] at h; exact h` → `rwa […] at h`;
@@ -599,8 +606,11 @@ prioritized follow-up backlog + the golfing/cleanup skills (`/cleanup`, `/cleanu
 `have eX : Expression.eval env input_var_X[i] = input_X[i] := by rw [← hX]; simp [Vector.getElem_map]`, one per
 limb. Collapse the copies into ONE quantified helper
 `have eX : ∀ i (hi : i < n), … := by intro i hi; rw [← hX]; simp [Vector.getElem_map]`, then call `eX i (by omega)`
-at each site (~12–25%/file on Load/Store/op `Formal.lean`). A *global* lemma for this was investigated and is
-**not** worth it — see backlog R2.
+at each site (~12–25%/file on Load/Store/op `Formal.lean`). A *global* lemma for the per-limb `eX` helper was
+investigated and is **not** worth it: it saves only ~1 line/helper while re-churning ~36 already-clean
+`Formal.lean` files plus a foundational rebuild, at form-variation risk. (The narrower length-4 `#v` → `Vector.map`
+fold *was* worth hoisting — it's the shared `SP1Clean.vec4_eval` in `Math/EvalVec.lean`, used across the
+Mul/Lt/Bitwise/Shift `Formal` proofs + the DivRem completeness `Driver`.)
 
 **Kernel-safe dedup on the bit-shift / DivRem cores** (the `2^64` landmine zone — read the "Bit-shift chip
 soundness" § first). A heavy file may repeat a byte-identical `have` block across N sibling lemmas. You can
@@ -617,8 +627,11 @@ in `Proofs/Chips/ShiftLeftChip/Core.lean`.
 - `have hp : 2 ^ 17 < p := Fact.out` (and `have : 131072 < p`) — feeds a downstream `omega` that needs the
   magnitude; grep shows one occurrence (its own line) yet `omega` consumes it implicitly.
 - `haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩` — supplies an instance to later
-  `ZMod.val`/`omega` steps. There is **no** global `NeZero p` instance, *on purpose* (it would break the
-  pervasive `omit [Fact (2^17 < p)] in` clauses — `Model/ByteTable.lean:84`; see backlog R1).
+  `ZMod.val`/`omega` steps. There is **no** global `NeZero p` instance, *on purpose*: a `Fact (2^17 < p)`-derived
+  one would make the pervasive `omit [Fact (2^17 < p)] in` clauses illegal (`Model/ByteTable.lean:84`). A
+  `Fact p.Prime`-derived global instance *might* survive the `omit` pattern (it depends on primality, not the
+  magnitude) and eliminate most of the ~185 `haveI` copies — but it cuts against the documented local-instance
+  discipline and risks instance-resolution surprises, so it's an owner decision, not a drive-by change.
 
 **Don't golf:**
 - **`Faithful/*` anchors** — conservative only (drop `by exact` / dead `let` / `from by`); never restructure
@@ -637,6 +650,15 @@ identical). On heavy files watch the per-file elaboration time in the build log 
 near each other — no conflict marker, but `lake build` fails with "`<name>` has already been declared". Always
 run the full `lake build` after a merge even when `git status` shows no conflicts (`Proofs/Chips/BitwiseChip/
 Bridge.lean` hit this when upstream #101's immediate-type bridges met a golfed copy).
+
+**Available cleanup skills:**
+- **`/cleanup`** — the per-file 7-phase workflow (style audit → per-decl golf → simplify → verify). Best for a
+  handful of named files.
+- **`/cleanup-all`** — the orchestrator marathon (dispatches per-batch workers across the whole tree). Best for a
+  project-wide sweep; honor the repo guardrails (auto-gen exclusion, axiom-clean, heavy-core caution).
+- **`/decompose-proof`** — break one long proof into named sub-lemmas.
+- **`/split-file`** — split an over-long file along namespace/section seams.
+- **`Skill(simplify)`** — a holistic reuse/altitude review pass on a file (invoked inside `/cleanup` Phase 6.5).
 
 ## "emitted = projection": `<b>Lookups_eq_emitted` (proving a trace projection IS the emission)
 

@@ -1,4 +1,5 @@
 import SP1Clean.Native.Chips.BitwiseChip.Defs
+import SP1Clean.Math.EvalVec
 
 /-! # `SP1Clean.BitwiseChip` — contract: `Assumptions` / soundness / completeness / `circuit`
 
@@ -130,16 +131,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       rw [hxor, ho0]; ring
     exact (BitwiseU16Operation.result_semantic _ hr
       (h_bw ⟨ha, hb, by rw [hopc]; exact val_lt_three (Or.inr (Or.inr rfl)), h_bin⟩)).2.2 hopc
-
-set_option linter.unusedSectionVars false in
-/-- A length-4 `#v` of pointwise evaluations is the `Vector.map` of the evaluator — lets the witness
-hint's `populate` operands (written `#v[env op_b_val[k]]` by the generator) be rewritten to the
-`Vector.map eval …` form that `h_input` provides. -/
-private lemma vec4_eval (e : Environment (ZMod p)) (v : Vector (Expression (ZMod p)) 4) :
-    (#v[Expression.eval e v[0], Expression.eval e v[1], Expression.eval e v[2],
-        Expression.eval e v[3]] : Vector (ZMod p) 4) = Vector.map (Expression.eval e) v := by
-  ext k hk
-  interval_cases k <;> simp [Vector.getElem_map]
 
 set_option maxHeartbeats 8000000 in
 theorem completeness :

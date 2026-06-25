@@ -207,7 +207,7 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
     deprecated-tactic guards `style.refine`/`style.cases`/`style.induction`/`style.admit`, and
     `oldObtain`/`style.cdot` — all at **zero** violations. They apply during the normal `lake build SP1Clean`.
     `linter.style.longLine` is the remaining candidate (real fallout, concentrated in Native/FormalModel; see
-    `docs/agents/cleanup-backlog.md`). The flags are scoped **per-lib** rather than at package level so the
+    `docs/roadmap.md` § "Cleanup / polish backlog"). The flags are scoped **per-lib** rather than at package level so the
     auto-gen `SP1Extracted` library stays out of the set (it carries per-file `set_option linter.all false`);
     keep the five identical `moreLeanArgs` copies in `lakefile.toml` in sync. (Every hand-written pillar
     transitively imports Mathlib — Native via Clean — so the `-D linter.*` options register fine; the older
@@ -226,8 +226,9 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
     regenerates it; CI runs `lake lint` in the build job. Deliberately **dropped**: `docBlame`/`tacticDocs`
     (doc-coverage noise) and `unusedArguments` (flags only the uniform field-generic / `ProverData` signature
     args — all structural, and a fresh false-positive per new chip).
-  - Next candidates + the non-negotiable suppressions (`unusedSectionVars`/`unusedSimpArgs`, the auto-gen
-    `linter.all false`) are catalogued in `docs/agents/cleanup-backlog.md`.
+  - The next-candidate linter (`longLine`) is tracked in `docs/roadmap.md` § "Cleanup / polish backlog"; the
+    non-negotiable suppressions — `unusedSectionVars`/`unusedSimpArgs` (structurally necessary in circuit
+    proofs) and the auto-gen `linter.all false` — must stay.
 - Heavy `toBitVec64` rw chains are whnf-expensive — `set_option maxHeartbeats 2000000 in` (carry lemmas need up
   to `16000000`).
 - **Never `set_option (debug.)skipKernelTC`.** It bypasses the kernel's type-check re-run — the trust anchor
@@ -287,8 +288,6 @@ after installing or toggling.
 - `docs/agents/porting-recipe.md` — step-by-step checklist to port a new chip from the Add/Bitwise template.
 - `docs/agents/extraction.md` — the constraint-extraction pipeline (compiler → Python → Lean DSL).
 - `docs/agents/mul-operation-learnings.md` — Mul-specific soundness/completeness pitfalls.
-- `docs/agents/cleanup-backlog.md` — the prioritized follow-up cleanup/refactor backlog + the golfing/cleanup
-  skills catalog.
 - `docs/snapshots/compile-profile.md` — per-module wall-clock compile profile + worst offenders + common threads
   (point-in-time snapshot); re-run with `scripts/profile_compile.sh`.
 - `docs/snapshots/axiom-ledger.md` — machine-checked `#print axioms` inventory per theorem (point-in-time

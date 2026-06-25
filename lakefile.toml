@@ -72,7 +72,7 @@ name = "SP1Clean"
 # below; they all transitively import Mathlib (Native via Clean), so the `-D linter.*` options are
 # registered and these flags apply during `lake build SP1Clean` / `lake test`. All eight are at zero
 # violations. `linter.style.longLine` is the remaining candidate (real fallout, concentrated in
-# Native/FormalModel) — see `docs/agents/cleanup-backlog.md`. The auto-gen `SP1Extracted` library is
+# Native/FormalModel) — see `docs/roadmap.md` § "Cleanup / polish backlog". The auto-gen `SP1Extracted` library is
 # deliberately left OUT (it carries per-file `set_option linter.all false` instead), as are the
 # auto-gen `*Vectors` modules inside `SP1CleanTest` (same per-file suppression). KEEP THE SIX COPIES IN SYNC.
 [[lean_lib]]

@@ -5,7 +5,7 @@ import SP1Clean.FormalModel.Contracts.ChipAssumptions
 
 This is the canonical "template" chip for the porting recipe (`docs/agents/porting-recipe.md`). When
 golfing / cleaning proofs here or in any sibling chip, follow `docs/agents/proof-patterns.md` §
-"Golf & cleanup discipline" (and the backlog in `docs/agents/cleanup-backlog.md`). -/
+"Golf & cleanup discipline". -/
 
 namespace SP1Clean.AddChip
 

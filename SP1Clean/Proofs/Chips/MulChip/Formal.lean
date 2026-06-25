@@ -1,4 +1,5 @@
 import SP1Clean.Native.Chips.MulChip.Defs
+import SP1Clean.Math.EvalVec
 
 /-! # `SP1Clean.MulChip` — `Assumptions` / soundness / completeness / `circuit` -/
 
@@ -116,16 +117,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
       first | exact ha0 | exact ha1 | exact ha2 | exact ha3
-
-set_option linter.unusedSectionVars false in
-/-- A length-4 `#v` of pointwise evaluations is the `Vector.map` of the evaluator (folds the witness
-hint's `populate` operands, written `#v[env op_*_val[k]]` by the generator, back to `Vector.map`;
-mirrors `LtChip.vec4_eval`). -/
-private lemma vec4_eval (e : Environment (ZMod p)) (v : Vector (Expression (ZMod p)) 4) :
-    (#v[Expression.eval e v[0], Expression.eval e v[1], Expression.eval e v[2],
-        Expression.eval e v[3]] : Vector (ZMod p) 4) = Vector.map (Expression.eval e) v := by
-  ext k hk
-  interval_cases k <;> simp [Vector.getElem_map]
 
 set_option maxHeartbeats 40000000 in
 theorem completeness :
