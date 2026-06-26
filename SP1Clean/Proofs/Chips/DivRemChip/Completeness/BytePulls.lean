@@ -7,7 +7,7 @@ The chip's tail emits 26 single-cell `byteChannel` range lookups (`pabsc`/`pabsr
 `pe2r1`/`pe2q1`): each is a gated lookup `opcode = 6` (Range) on one witnessed cell. `completeness`
 discharges each by rewriting the cell to its populate value and `convert byteRow_range16 … using 2`.
 That `convert` is a deep defeq; factoring it into one parametric lemma collapses 26 of them into a
-single proof (and moves it off the heavy `completeness_driver` budget). -/
+single proof (and moves it off the heavy `completeness` budget). -/
 
 namespace SP1Clean.DivRemChip.BytePulls
 

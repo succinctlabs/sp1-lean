@@ -44,7 +44,7 @@ ShiftLeft/ShiftRight/DivRem completeness work.
 2. `ShiftRightChip.completeness` — `Proofs/Chips/ShiftRightChip/Formal.lean` — **CLOSED 2026-06-12**
    (axiom-clean), same hint-`populate` recipe as ShiftLeft.
 3. `DivRemChip.completeness` — `Proofs/Chips/DivRemChip/Formal.lean` — **CLOSED 2026-06-18** (axiom-clean),
-   via `completeness_driver` in `Proofs/Chips/DivRemChip/Completeness/Driver.lean`. The 13 nested
+   via `completeness` in `Proofs/Chips/DivRemChip/Completeness/Driver.lean`. The 13 nested
    `IsEqualWord`/`IsZero` cols pins were unblocked by *selective non-decomposition* —
    `attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements` keeps those sub-op cols folded
    so `circuit_proof_start` never explodes them into the intractable nested record (see

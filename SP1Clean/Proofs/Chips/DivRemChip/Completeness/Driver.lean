@@ -14,7 +14,7 @@ import SP1Clean.Proofs.Chips.DivRemChip.Completeness.SubSpecs
 
 The `completeness` proof: `main`'s honest `Populate` witness closures (flags from the
 `"div_rem_flags"` hint) satisfy every constraint under `ProverAssumptions`. Relocated here (as
-`completeness_driver`, reused by `Formal.circuit`) so `Formal.lean` stays a thin contract file; the
+`completeness`, reused by `Formal.circuit`) so `Formal.lean` stays a thin contract file; the
 preamble runs after `circuit_proof_start` (where the witness-agreement `h_env` is cheap), then the
 62-case `refine` discharges each constraint. Mul/glue/ctq/Add/Lt/U16MSB/`own`/byte-pull cases are all
 real (the sub-circuit `Spec` cases delegate to the `SubSpecs.subSpec_*` helpers).
@@ -53,7 +53,7 @@ attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements
 set_option maxHeartbeats 64000000 in
 /-- Completeness: `main`'s honest `Populate` witness closures (flags from the `"div_rem_flags"`
 hint) satisfy every constraint under `ProverAssumptions`. -/
-theorem completeness_driver :
+theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨hbU, hcU, hbin, hf0, hf1, hf2, hf3, hf4, hf5, hf6, hf7, hsum, hpad, hop_a_0, h_cpu,

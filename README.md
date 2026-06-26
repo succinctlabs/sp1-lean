@@ -27,7 +27,7 @@ things: SP1's Rust constraints, the Clean circuit, and the RISC-V ISA.
   specifies for that instruction (proved against the Sail model). Every soundness theorem is
   *axiom-clean* — `#print axioms` shows only Lean's standard axioms, no `sorry`.
 - **Completeness** — because the circuits carry explicit witnesses, we also prove that every correct
-  input is accepted (no spurious constraint rejects a valid row).
+  input is accepted (no spurious constraint rejects a valid row) — `sorry`-free for all 25 chips.
 - **Faithfulness** — the constraints the Lean proof reasons about are *exactly* the constraints SP1's Rust
   code emits, so the proof can't be vacuously about a different circuit.
 
@@ -35,11 +35,12 @@ things: SP1's Rust constraints, the Clean circuit, and the RISC-V ISA.
 
 - The Sail model is taken as the ground-truth definition of RISC-V.
 - The Clean DSL and the Lean toolchain are trusted.
-- **Soundness is `sorry`-free.** A handful of *completeness* proofs are still deferred skeletons
-  (currently five: Mul, ShiftLeft, ShiftRight and DivRem chips, plus one prerequisite premise in the
-  gated-VM capstone). These are liveness gaps — they say "this valid row is accepted", not "this row is
-  correct" — so they never weaken a soundness claim. See [`docs/release-audit.md`](docs/release-audit.md)
-  for the exact inventory and [`docs/roadmap.md`](docs/roadmap.md) for the plan to close them.
+- **Soundness and per-chip completeness are both `sorry`-free, across all 25 chips.** The single
+  remaining `sorry` in the project is one premise of the whole-machine *capstone* — the decode seam
+  (`sp1_witness_decode`), which binds the 25 witness tables to their decoded rows. It is a structural
+  packaging premise, not a per-chip soundness or completeness gap, so it never weakens a chip-level
+  claim. See [`docs/release-audit.md`](docs/release-audit.md) for the axiom inventory and
+  [`docs/roadmap.md`](docs/roadmap.md) for the plan to close it.
 - This is a per-chip, per-row result plus a trace-level composition layer; it is not yet an end-to-end
   proof of the whole zkVM.
 

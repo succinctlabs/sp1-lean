@@ -26,7 +26,7 @@ the soundness/completeness proofs, and the bundled `circuit`.
 **Status.** The semantic `Spec` (the flag-gated RV64 `div`/`rem`/… identities on `cols.a`,
 `Specs/Chip.lean`) is real and **soundness is proved** — assembled here from the eight per-conjunct
 `Soundness/<Op>.lean` files (each its own `GeneralFormalCircuit.Soundness`, split out so the heavy
-per-variant proofs compile in parallel). Completeness lives in `Completeness/Driver.lean` (`completeness_driver`). -/
+per-variant proofs compile in parallel). Completeness lives in `Completeness/Driver.lean` (`completeness`). -/
 
 namespace SP1Clean.DivRemChip
 
@@ -69,11 +69,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 set_option maxHeartbeats 16000000 in
 /-- The `DivRem` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `div`/`divu`/`rem`/`remu`/`divw`/
 `remw`/`divuw`/`remuw` semantic contract on the extracted `DivRemCols` column struct. Soundness and
-completeness are both proved (completeness via `completeness_driver`). -/
+completeness are both proved (completeness via `completeness`). -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
-    soundness := soundness, completeness := completeness_driver }
+    soundness := soundness, completeness := completeness }
 
 end SP1Clean.DivRemChip

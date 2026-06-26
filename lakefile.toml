@@ -32,7 +32,11 @@ git = "https://github.com/leanprover-community/mathlib4"
 rev = "v4.28.0"
 
 # Clean PR #398 head (fix-zero-multiplicity-channels): native gated channels.
-# Re-pin to main once the PR merges (roadmap W9).
+# Re-pin to main once the PR merges (roadmap W9). NOTE (2026-06-26): merged-main (2c20f7f0) re-pin
+# attempted and reverted — it is a large structural migration (channelsWithRequirements moved off
+# ElaboratedCircuit, new FormalAssertion.requirementsChannelsLawful, pushIf/pullIf → Channel. methods,
+# 3-field ChannelInteraction; breaks ~20 chips + readers + 7 auto-gen Extracted/Circuit). Plan:
+# docs/agents/clean-main-migration.md. Do on better hardware.
 [[require]]
 name = "Clean"
 git = "https://github.com/Verified-zkEVM/clean"

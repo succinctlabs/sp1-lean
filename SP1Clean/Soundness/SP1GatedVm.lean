@@ -127,11 +127,10 @@ def sp1Verifier : GeneralFormalCircuit (ZMod p) SP1PublicIO unit where
 /-! ## The SP1 machine as a gated VM -/
 
 /-- The 25 capstone-wired chips, each a `GeneralFormalCircuit` wrapped as a Clean AIR `Component`
-(`⟨chip.circuit⟩`). Order mirrors `ChipRegistry.allChipKinds`. The `Mul`/`ShiftLeft`/`ShiftRight`/
-`DivRem` `circuit`s carry completeness `sorry`s; the ensemble *soundness proof* consumes only each
-`Component`'s constraints/channels, never its `completeness` field — but note that `#print axioms`
-is structural, so the embedded fields still surface `sorryAx` on this `def` (and everything built
-from it) until the four completeness holes close. -/
+(`⟨chip.circuit⟩`). Order mirrors `ChipRegistry.allChipKinds`. Every chip's `circuit` is `sorry`-free
+in **both** soundness and completeness, so `#print axioms` on this `def` shows **no** `sorryAx` (only
+`bv_decide`'s `ofReduceBool`/`trustCompiler` ride along, via `Mul`/`Bitwise` soundness). The capstone's
+lone `sorryAx` enters separately, through the decode-seam premise `sp1_witness_decode`. -/
 def sp1Tables : List (Component (ZMod p)) :=
   [⟨AddChip.circuit⟩, ⟨AddiChip.circuit⟩, ⟨AddwChip.circuit⟩, ⟨SubChip.circuit⟩, ⟨SubwChip.circuit⟩,
    ⟨BitwiseChip.circuit⟩, ⟨LtChip.circuit⟩, ⟨ShiftLeftChip.circuit⟩, ⟨ShiftRightChip.circuit⟩,
