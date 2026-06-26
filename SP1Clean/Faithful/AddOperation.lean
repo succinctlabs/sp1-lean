@@ -83,7 +83,7 @@ theorem add_interactions_faithful_syntactic
     exact ZMod.val_natCast_of_lt h
   -- the byte kernel maps each recovered `pullIf` pull to its `LookupAccess`
   have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
+      AbstractInteraction.toAccess env ((pulledIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",
           [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],

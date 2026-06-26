@@ -80,7 +80,7 @@ theorem bitwise_interactions_faithful_syntactic
   have er : ∀ (i : ℕ) (hi : i < 8), Expression.eval env input.cols.result[i] = cols.result[i] :=
     fun i hi => by rw [← h_r, Vector.getElem_map]
   have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
+      AbstractInteraction.toAccess env ((pulledIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",
           [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],

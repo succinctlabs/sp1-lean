@@ -68,7 +68,5 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalColumns main where
   -- 2 × 4-limb add-result witnesses; all readers/operations are `assertion`s (localLength 0).
   localLength _ := 8
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements :=
-    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.JalChip

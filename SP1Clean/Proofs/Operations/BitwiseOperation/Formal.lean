@@ -25,7 +25,7 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
 set_option maxHeartbeats 2000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨hopcode, _hbin⟩ := h_assumptions
+  obtain ⟨hopcode, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hir, _, _⟩ := h_input
   have ea : ∀ i (hi : i < 8), Expression.eval env input_var_a[i] = input_a[i] := by
     intro i hi; rw [← hia]; simp only [Vector.getElem_map]
@@ -36,8 +36,12 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     intro i hi; rw [← hir]; simp only [Vector.getElem_map]
   simp only [circuit_norm, byteChannel, ea, eb, er] at h_holds ⊢
   obtain ⟨hg0, hg1, hg2, hg3, hg4, hg5, hg6, hg7⟩ := h_holds
-  -- post-#398 the byte receives owe no padding requirement, so the goal is exactly `Spec`.
-  intro h1
+  -- The eight trailing conjuncts are the byte pulls' own `Requirements` — vacuous off-gate.
+  refine ⟨fun h1 => ?_, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   have hneg : -input_is_real = -1 := by rw [h1]
   have R0 := hg0 hneg; have R1 := hg1 hneg; have R2 := hg2 hneg; have R3 := hg3 hneg
   have R4 := hg4 hneg; have R5 := hg5 hneg; have R6 := hg6 hneg; have R7 := hg7 hneg
@@ -106,7 +110,8 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Assumptions := Assumptions,
     Spec := Spec,
     soundness := soundness,
-    completeness := completeness }
+    completeness := completeness,
+    channelsWithRequirements := [byteChannel.toRaw] }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

@@ -326,25 +326,38 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       rw [hsdc]; rcases hmh_b with h | h <;> rw [h]
       · left; ring
       · rw [one_mul, hc_msb]; split <;> simp
-  · -- channel-requirement tail: 2 U16toU8 + 1 U16MSB(product) Assumptions (post-#398 the op5 + 24
-    -- gated byte pulls owe no padding requirement).
-    refine ⟨?_, ?_, ?_⟩
-    · exact Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).1, hir_bin⟩
-    · exact Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).2, hir_bin⟩
-    · -- the `product_msb` U16MSB is gated on `is_mulw`; under `is_mulw = 1` we get `is_real = 1`
-      -- (`hmw_real`), so the `is_real`-gated byte pull (`hpG1`) ranges `product[2]`/`product[3]`.
-      refine Or.inr ⟨fun h => ?_, hmw_b⟩
-      have hr1 : input_is_real = 1 := hmw_real h
-      obtain ⟨_, hprod_eq, _, _, _, _, _, _, _⟩ := _hicols
-      have ep2 : Expression.eval env input_var_cols_product[2] = input_cols_product[2] := by
-        rw [← hprod_eq, Vector.getElem_map]
-      have ep3 : Expression.eval env input_var_cols_product[3] = input_cols_product[3] := by
-        rw [← hprod_eq, Vector.getElem_map]
-      have pb2 : input_cols_product[2].val < 2 ^ 8 := by
-        rw [← ep2]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 (by rw [hr1]))).1
-      have pb3 : input_cols_product[3].val < 2 ^ 8 := by
-        rw [← ep3]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 (by rw [hr1]))).2
-      rw [ep2, ep3, byte_compose_val pb2 pb3 rfl]; omega
+  · -- channel-requirement tail: the 3 composed sub-assertion `Assumptions` (2 U16toU8 + 1 U16MSB on
+    -- `product`) followed by the 26 direct byte pulls' off-gate `Requirements` (2 op5 MSB + 16 carry
+    -- range + 8 product range) — all vacuous under the binary `is_real` gate.
+    refine ⟨Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).1, hir_bin⟩,
+        Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).2, hir_bin⟩,
+        Or.inr ⟨fun h => ?_, hmw_b⟩,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0⟩
+    -- the `product_msb` U16MSB is gated on `is_mulw`; under `is_mulw = 1` we get `is_real = 1`
+    -- (`hmw_real`), so the `is_real`-gated byte pull (`hpG1`) ranges `product[2]`/`product[3]`.
+    have hr1 : input_is_real = 1 := hmw_real h
+    obtain ⟨_, hprod_eq, _, _, _, _, _, _, _⟩ := _hicols
+    have ep2 : Expression.eval env input_var_cols_product[2] = input_cols_product[2] := by
+      rw [← hprod_eq, Vector.getElem_map]
+    have ep3 : Expression.eval env input_var_cols_product[3] = input_cols_product[3] := by
+      rw [← hprod_eq, Vector.getElem_map]
+    have pb2 : input_cols_product[2].val < 2 ^ 8 := by
+      rw [← ep2]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 (by rw [hr1]))).1
+    have pb3 : input_cols_product[3].val < 2 ^ 8 := by
+      rw [← ep3]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 (by rw [hr1]))).2
+    rw [ep2, ep3, byte_compose_val pb2 pb3 rfl]; omega
 
 /-- Byte-value bridge: the `k`-th byte of the `ZMod`-level sign/zero-extended operand equals the `ℕ`
 byte stream `extStream` at `k` (used by the witnessed `schoolProduct`/`schoolCarry`). Bytes `0..7` are
@@ -905,7 +918,8 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Assumptions := Assumptions,
     Spec := Spec,
     soundness := soundness,
-    completeness := completeness }
+    completeness := completeness,
+    channelsWithRequirements := [byteChannel.toRaw] }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

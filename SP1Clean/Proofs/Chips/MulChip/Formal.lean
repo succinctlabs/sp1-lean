@@ -60,7 +60,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inr (Or.inr hmw))))
   -- `MulOperation.Assumptions` (operands `isU64` when active; flag binaries; `is_mulw → is_real`; sum-bound).
   have h_spec := h_mulop ⟨fun _ => ⟨hbU, hcU⟩, bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩
-  refine ⟨⟨hadapter h_bin, h_bin, fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩⟩, Or.inr h_bin,
+  refine ⟨⟨hadapter h_bin, h_bin, fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩⟩, h_bin,
     Or.inr ⟨fun _ => ⟨hbU, hcU⟩, bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩, Or.inr h_bin⟩
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inl h1)
@@ -184,6 +184,7 @@ semantic contract; output is the extracted `MulCols` column struct. Soundness/co
 and axiom-clean (completeness via `MulOperation.spec_populate` on the witnessed columns). -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs MulCols :=
   { main, elaborated,
+    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

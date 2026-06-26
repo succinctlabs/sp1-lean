@@ -28,8 +28,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- `AddOperation` is a `FormalAssertion`; `h_add` is `Assumptions → Spec`. Feed `⟨ha, hb, h_bin⟩`
   -- inline (drives unification on the witnessed `value` field) and apply the gated add identity.
   refine ⟨⟨h_adapter h_bin, h_bin, fun hr => (h_add ⟨fun _ => ⟨ha, hb⟩, h_bin⟩ hr).2⟩, ?_⟩
+  -- The sub-circuit `Assumptions` tail (post-Clean-`main`: each is a bare `Assumptions` or a
+  -- `channelsWithRequirements = [] ∨ Assumptions` disjunct). All discharged by the binary gate + `ha`/`hb`.
   and_intros <;>
-    first | exact Or.inl rfl | exact Or.inr h_bin | exact Or.inr ⟨fun _ => ⟨ha, hb⟩, h_bin⟩
+    first | exact h_bin | exact Or.inl rfl | exact Or.inr h_bin | exact Or.inr ⟨fun _ => ⟨ha, hb⟩, h_bin⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
@@ -69,5 +71,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddCols where
   ProverSpec := fun _ _ _ => True
   soundness := soundness
   completeness := completeness
+  channelsWithRequirements :=
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.AddChip

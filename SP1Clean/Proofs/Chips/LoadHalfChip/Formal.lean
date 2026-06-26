@@ -96,7 +96,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_msb_spec := h_msb h_msb_as
   refine ⟨⟨h_addr_spec, h_mem h_bin, h_msb_spec, h_it, ⟨hsel0, hsel1, hsel2, hsel3⟩, h_op_a_0,
     h_msbgate, h_lh_bin, bool_of_mul_pred h_lhu_gate, h_bin⟩, ?_⟩
-  refine ⟨Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin,
+  refine ⟨h_bin, Or.inr h_addr_as, Or.inr h_bin,
     Or.inr ⟨fun _ => h_sel_lt, h_lh_bin⟩, Or.inr h_bin⟩
 
 /-- Prover-side row well-formedness: the address facts + the reader/gadget `Spec`s + the selector
@@ -212,6 +212,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadHalfColumns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
+    channelsWithRequirements :=
+      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     soundness := soundness, completeness := completeness }
 
 end SP1Clean.LoadHalfChip

@@ -89,15 +89,10 @@ instance sp1VerifierElaborated : ElaboratedCircuit (ZMod p) SP1PublicIO unit sp1
   localLength _ := 0
   output _ _ := ()
   channelsWithGuarantees := []
-  channelsWithRequirements := [Channels.stateChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma sp1Verifier_channelsWithGuarantees_eq :
     ((sp1VerifierElaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p))) = [] := rfl
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma sp1Verifier_channelsWithRequirements_eq :
-    ((sp1VerifierElaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [Channels.stateChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma sp1Verifier_localLength_eq (x : Var SP1PublicIO (ZMod p)) :
     (sp1VerifierElaborated (p := p)).localLength x = 0 := rfl
@@ -110,6 +105,7 @@ theorem sp1Verifier_soundness :
   circuit_proof_start
   simp only [circuit_norm, Channels.stateChannel, Channels.StateMsg.Spec]
 
+set_option linter.unusedSectionVars false in
 theorem sp1Verifier_completeness :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) sp1VerifierMain
       (fun _ _ _ => True) (fun _ _ _ => True) := by
@@ -123,6 +119,7 @@ def sp1Verifier : GeneralFormalCircuit (ZMod p) SP1PublicIO unit where
   Spec := fun _ _ _ => True
   soundness := sp1Verifier_soundness
   completeness := sp1Verifier_completeness
+  channelsWithRequirements := [Channels.stateChannel.toRaw]
 
 /-! ## The SP1 machine as a gated VM -/
 
@@ -275,7 +272,7 @@ theorem sp1_gatedExecution_prereqs (witness : EnsembleWitness (sp1GatedVm (p := 
   have h_balanced : BalancedInteractions
       (witness.interactionsWith Channels.stateChannel.toRaw) := by
     rw [← EnsembleWitness.interactionsWith_allTablesWitness]
-    exact (hB Channels.stateChannel.toRaw (List.mem_cons_self ..)).1
+    exact hB Channels.stateChannel.toRaw (List.mem_cons_self ..)
   exact ⟨rows, data, h_spec, hbin,
     sp1_state_balance_of_balancedInteractions witness.publicInput rows hbin _
       (fun i hi => EnsembleWitness.channel_eq_of_mem_interactionsWith hi) h_balanced h_corr⟩

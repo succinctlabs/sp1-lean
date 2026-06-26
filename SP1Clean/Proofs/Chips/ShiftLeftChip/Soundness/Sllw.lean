@@ -221,10 +221,20 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       hll0 hhl0 hll1 hhl1 hw00 hw01 hw10 hw11 h_msb_a1
       (by linear_combination -hwmsb2) (by linear_combination -hwmsb3)
   · -- Channel-requirement tail: the three sub-assertion `Assumptions` (each the gate/flag binary fact,
-    -- except the U16MSB `a1 < 2^16` operand range which is part of the deferred SLLW argument);
-    -- post-#398 the nine `byteChannel` gated receives owe no padding requirement.
+    -- except the U16MSB `a1 < 2^16` operand range which is part of the deferred SLLW argument), then the
+    -- nine `gate`-gated `byteChannel` pulls' off-gate `Requirements` — vacuous under the binary gate
+    -- `is_sll + is_sllw ∈ {0,1}` (`off_gate_vacuous`).
     simp only [id_eq] at *
-    exact ⟨Or.inr (bool_of_mul_pred _hrealbin), Or.inr ⟨a1_bound_cond, bool_of_mul_pred _hE6⟩,
-      Or.inr (bool_of_mul_pred _hE2)⟩
+    exact ⟨bool_of_mul_pred _hrealbin, Or.inr ⟨a1_bound_cond, bool_of_mul_pred _hE6⟩,
+      Or.inr (bool_of_mul_pred _hE2),
+      fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
+      fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
+      fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
+      fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
+      fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
+      fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
+      fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
+      fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
+      fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0⟩
 
 end SP1Clean.ShiftLeftChip.SoundSllw

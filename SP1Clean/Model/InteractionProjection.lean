@@ -106,13 +106,13 @@ multiplicity. This is the per-interaction computation the `stateLookups_eq_emitt
 over the recovered `interactionsWith` list. -/
 lemma toAccess_pushIf_state (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : StateMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (pushIf (channel := stateChannel) mult msg).toRaw =
+    AbstractInteraction.toAccess env (pushedIf (channel :=stateChannel) mult msg).toRaw =
       (InteractionKind.State, "SP1State",
         [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
          (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val],
         signedVal (Expression.eval env mult)) := by
-  simp [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushIf,
+  simp [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
     Channel.toRaw, kindOf, stateChannel, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
 
@@ -127,7 +127,7 @@ val-projected, and the signed multiplicity. The `toElements` unfold is done with
 the trailing `simp` only normalizes the resulting `Vector.cast`/`++`/`map`/`toList` chain. -/
 lemma toAccess_pushIf_memory (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : MemoryMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (pushIf (channel := memoryChannel) mult msg).toRaw =
+    AbstractInteraction.toAccess env (pushedIf (channel :=memoryChannel) mult msg).toRaw =
       (InteractionKind.Memory, "SP1Memory",
         [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
          (Expression.eval env msg.addr0).val, (Expression.eval env msg.addr1).val,
@@ -135,7 +135,7 @@ lemma toAccess_pushIf_memory (env : Environment (ZMod p)) (mult : Expression (ZM
          (Expression.eval env msg.v1).val, (Expression.eval env msg.v2).val,
          (Expression.eval env msg.v3).val],
         signedVal (Expression.eval env mult)) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushIf,
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
     Channel.toRaw, kindOf, memoryChannel, if_true, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
   simp
@@ -147,7 +147,7 @@ message (a plain `Channel.emit`, default `toRaw`; post-#398 `circuit_norm` norma
 val-projected, and the signed multiplicity. -/
 lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : ProgramMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (pushIf (channel := programChannel) mult msg).toRaw =
+    AbstractInteraction.toAccess env (pushedIf (channel :=programChannel) mult msg).toRaw =
       (InteractionKind.Program, "SP1Program",
         [(Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val, (Expression.eval env msg.opcode).val,
@@ -158,7 +158,7 @@ lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (Z
          (Expression.eval env msg.op_c3).val, (Expression.eval env msg.op_a_0).val,
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env mult)) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushIf,
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
     Channel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
   simp
@@ -173,12 +173,12 @@ four `ByteRow` fields val-projected, and the signed multiplicity `signedVal (eva
 `pullIf`/`byteChannel`/`ByteRow` analog of `toAccess_pushIf_state`. -/
 lemma toAccess_pullIf_byte (env : Environment (ZMod p)) (gate : Expression (ZMod p))
     (msg : ByteRow (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (pullIf (channel := byteChannel) gate msg).toRaw =
+    AbstractInteraction.toAccess env (pulledIf (channel :=byteChannel) gate msg).toRaw =
       (InteractionKind.Byte, "SP1Byte",
         [(Expression.eval env msg.opcode).val, (Expression.eval env msg.a).val,
          (Expression.eval env msg.b).val, (Expression.eval env msg.c).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pullIf, Channel.toRaw, kindOf,
+  simp [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf, Channel.toRaw, kindOf,
     byteChannel, toElements, toComponents, components, ProvableStruct.componentsToElements]
 
 end SP1Clean

@@ -34,9 +34,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
-  -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`).
+  -- the per-subcircuit channel-requirement tail. `CPUState`'s requirement is now a bare
+  -- `Assumptions` (`is_real` binary); the rest stay `channels = [] ∨ <sub>.Assumptions` disjuncts.
   exact ⟨⟨h_addr h_addr_as, h_mem h_bin, h_itype h_bin, h_bin⟩,
-    Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
+    h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
 
 /-- Prover-side row well-formedness (3-arg form): operand `isU64`s + address-fits bound + the reader
 clock/timestamp `Spec`s + `is_real` binary. -/
@@ -76,6 +77,7 @@ theorem completeness :
 /-- The `StoreDouble` chip row as a `GeneralFormalCircuit`; output is the extracted `StoreDoubleColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreDoubleColumns :=
   { main, elaborated,
+    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

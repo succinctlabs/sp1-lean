@@ -70,8 +70,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AluX0Cols main where
   output input _ := ⟨input.state, input.adapter, input.opcode, input.is_real⟩
   output_eq := by intro input n; simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements :=
-    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
 
 /-- Semantic contract, composed from the sub-circuit `Spec`s. The `ALUTypeReaderImmutable` adapter facts

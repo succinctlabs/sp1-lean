@@ -70,7 +70,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   simp only [eob 0 (by omega), eob 1 (by omega)] at h_addr_spec
   refine ⟨⟨h_addr_spec, h_mem h_bin, h_it,
     ⟨sub_eq_zero.mp hr0, sub_eq_zero.mp hr1, sub_eq_zero.mp hr2, sub_eq_zero.mp hr3⟩, h_bin⟩, ?_⟩
-  exact ⟨Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
+  exact ⟨h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
 
 /-- Prover-side row well-formedness: operand `isU64`s + address-fits/alignment + the `offset_bit`
 decomposition + offset binaries + `is_real` binary + the reader `Spec`s + the read-modify-write equations. -/
@@ -171,6 +171,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreHalfColumns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
+    channelsWithRequirements :=
+      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     soundness := soundness, completeness := completeness }
 
 end SP1Clean.StoreHalfChip

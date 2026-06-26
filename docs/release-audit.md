@@ -13,7 +13,7 @@ machine-derived** — by `scripts/run_audit.sh`, whose raw census output is comm
 | sp1-lean | `e076768` + this audit's changes | `git rev-parse HEAD` |
 | toolchain | `leanprover/lean4:v4.28.0` | `cat lean-toolchain` |
 | SP1 (the oracle) | `9d249b8d4` = **`v6.2.2-20-g9d249b8d4`**, branch `dtumad/clean-native` | `git -C ../sp1 describe --tags` |
-| Clean | `292b9cc3` (= PR [#398](https://github.com/Verified-zkEVM/clean/pull/398) head; re-pin to `main` on merge) | `git -C .lake/packages/Clean rev-parse HEAD` |
+| Clean | `2c20f7f0` (= merged `main`, the PR [#398](https://github.com/Verified-zkEVM/clean/pull/398) merge commit; native gated channels — re-pinned off the `292b9cc3` PR-head 2026-06-26, roadmap W9) | `git -C .lake/packages/Clean rev-parse HEAD` |
 | LeanRV64D | `b8186950` | `git -C .lake/packages/LeanRV64D rev-parse HEAD` |
 
 Do **not** cite the SP1 pin as "v6.2.2" unqualified — the checkout is 20 commits past the tag, on the

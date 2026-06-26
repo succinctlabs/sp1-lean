@@ -99,8 +99,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
-  refine ⟨⟨h_it, h_bin, h_lsb, ?_, ?_, ?_, ?_⟩, Or.inr h_bin, Or.inr ⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩,
-    Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩, Or.inr h_bin⟩
+  refine ⟨⟨h_it, h_bin, h_lsb, ?_, ?_, ?_, ?_⟩, h_bin, Or.inr ⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩,
+    Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩, Or.inr h_bin, fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
   · intro hr1
     have := (h_add1 ⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩ hr1).2
     rw [hrs1eq] at this
@@ -281,6 +281,7 @@ theorem completeness :
 two witnessed `AddOperation` gadgets and the I-type reader; output is the extracted `JalrColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs JalrColumns :=
   { main, elaborated,
+    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

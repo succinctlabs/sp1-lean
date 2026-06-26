@@ -86,7 +86,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       fun h1 => ⟨(h_bytes h1).1, (h_bytes h1).2.1, (h_bytes h1).2.2.1, (h_bytes h1).2.2.2⟩,
       ⟨hsel0, hsel1, hsel2, hsel3⟩, sub_eq_zero.mp hincr,
       ⟨sub_eq_zero.mp hr0, sub_eq_zero.mp hr1, sub_eq_zero.mp hr2, sub_eq_zero.mp hr3⟩, h_bin⟩,
-    Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
+    h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin,
+    fun h1 h0 => off_gate_vacuous h_bin h1 h0,
+    fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
 
 /-- Prover-side row well-formedness. -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
@@ -203,6 +205,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreByteColumns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
+    channelsWithRequirements :=
+      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     soundness := soundness, completeness := completeness }
 
 end SP1Clean.StoreByteChip

@@ -40,19 +40,28 @@ Both `LeanRV64D` and `RISCV` (`riscv-lean`) are now required and wired in `lakef
 `dtumad/clean-native` branch of `riscv-lean` carries the 4.28 fixes (3 trivial errors — redundant
 `rfl`/`congr` after `simp`) so it builds clean alongside the rest.
 
-## The Clean-main ↔ Batteries import collision (and the fix)
+## The Clean-main ↔ Batteries import collision (RESOLVED upstream 2026-06-26)
 
-**Symptom.** Public Clean `main`'s `Clean.Utils.Misc` and Batteries both declare
-`Fin.foldl_eq_foldl_finRange`. The wider Clean surface (pulled via `Clean.Gadgets.Bits`) clashes with the Sail
-side's full `import Mathlib` (which reaches `Batteries.Data.Fin.Fold` through the `Topology/Subpath` corner) —
-a genuine upstream Clean-main bug (absent on the succinctlabs/4.29 combo, which instead has the broken
-`Table.Inductive`).
+**Status: no longer a forcing constraint.** The merged-`main` re-pin (`2c20f7f0`, roadmap W9) includes Clean
+commit `d25bba8d` "Avoid Fin fold lemma clash with Batteries", which **deletes** Clean's own
+`Fin.foldl_eq_foldl_finRange` from `Clean.Utils.Misc` (Clean now `import`s Batteries' `Fin.Fold` directly in
+`Gadgets/Keccak/Permutation.lean`). So the duplicate-declaration clash below can no longer occur, and the
+import narrowing is **no longer required for correctness**.
 
-**Fix.** Narrow the Sail-side files (`Math/Misc.lean`, `Register.lean`, `SailWrap.lean`, and the
+We nonetheless **keep** the narrow imports: they are also the project's deliberate narrow-import compile
+strategy (a full `import Mathlib` in foundational `Math/Misc.lean` would propagate the whole of Mathlib
+transitively to every downstream module). Re-widening to full `import Mathlib` is therefore a compile
+regression, not a cleanup — left as a non-goal. (If a specific narrowed file needs an extra instance such as
+`LT (ZMod p)`, widen *that* file's import minimally rather than restoring full Mathlib project-wide.)
+
+**Historical symptom (pre-`d25bba8d`).** Public Clean `main`'s `Clean.Utils.Misc` and Batteries both declared
+`Fin.foldl_eq_foldl_finRange`. The wider Clean surface (pulled via `Clean.Gadgets.Bits`) clashed with the Sail
+side's full `import Mathlib` (which reaches `Batteries.Data.Fin.Fold` through the `Topology/Subpath` corner).
+The fix was to narrow the Sail-side files (`Math/Misc.lean`, `Register.lean`, `SailWrap.lean`, and the
 `Faithful/*` anchors) to **only** `import Mathlib.Tactic` + `Mathlib.Data.ZMod.Basic` + `Std.Data.ExtDHashMap`
 — none of which reach `Batteries.Data.Fin.Fold`. `Clean.Circuit.Basic` + full Mathlib never clash; only the
-wider Clean gadget surface does. With the narrowing, the unified `lake build SP1Clean` is 0/0 with both
-the gadget half and the Sail half co-imported.
+wider Clean gadget surface did. With the narrowing, the unified `lake build SP1Clean` is 0/0 with both the
+gadget half and the Sail half co-imported.
 
 A practical consequence: the narrowed files don't have `LT (ZMod p)` and similar in scope — e.g. a faithfulness
 anchor that only sends `Range` should trim `ByteOpcode.constrain`'s `< 256` cases to `_ => True` rather than

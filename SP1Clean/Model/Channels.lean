@@ -1,5 +1,6 @@
 import SP1Clean.Model.ByteTable
 import SP1Clean.Math.Word
+import SP1Clean.Math.Gate
 import Clean.Circuit.Basic
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving

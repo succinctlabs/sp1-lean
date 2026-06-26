@@ -25,7 +25,7 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
 set_option maxHeartbeats 1000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨hab_imp, _hbin⟩ := h_assumptions
+  obtain ⟨hab_imp, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hiv, _⟩ := h_input
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   have h65536 : (2 : ℕ) ^ 16 = 65536 := by norm_num
@@ -33,7 +33,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       ∀ i (_ : i < 4), Expression.eval env w[i] = v[i] := fun i _ => by rw [← h, Vector.getElem_map]
   simp only [circuit_norm, byteChannel, ev hia, ev hib, ev hiv] at h_holds ⊢
   obtain ⟨hr0, hr1, hr2, hr3, _hbool, hgc0, hgc1, hgc2, hgc3⟩ := h_holds
-  intro hr1eq
+  -- The four trailing conjuncts are the limb byte pulls' own `Requirements` — vacuous off-gate (`cedc171b`).
+  refine ⟨fun hr1eq => ?_, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   obtain ⟨ha, hb⟩ := hab_imp hr1eq
   have hneg : -input_is_real = -1 := by rw [hr1eq]
   have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg; have R3 := hr3 hneg
@@ -89,6 +92,7 @@ def circuit : FormalAssertion (ZMod p) Inputs where
   Spec := Spec
   soundness := soundness
   completeness := completeness
+  channelsWithRequirements := [byteChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

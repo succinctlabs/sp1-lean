@@ -93,7 +93,5 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalrColumns main where
   -- 2 × 4-limb add results + 1 lsb scalar.
   localLength _ := 9
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements :=
-    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.JalrChip

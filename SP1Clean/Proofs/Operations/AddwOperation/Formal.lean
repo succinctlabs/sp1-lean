@@ -59,8 +59,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     rw [← c16] at R1
     show input_cols_value[1].val < 2 ^ 16
     exact (byteRowSpec_range _ h16p).mp R1
-  -- post-#398 the two byte receives owe no padding requirement.
-  refine ⟨⟨(h_msb h_msb_as).1, ?_⟩, Or.inr h_msb_as⟩
+  -- Trailing requirements: the composed `U16MSBOperation`'s `Assumptions`, then the two direct byte
+  -- pulls' own `Requirements` — both vacuous off-gate.
+  refine ⟨⟨(h_msb h_msb_as).1, ?_⟩, Or.inr h_msb_as,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   intro hr1eq
   have hneg : -input_is_real = -1 := by rw [hr1eq]
   have R0 := hr0 hneg; have R1 := hr1 hneg
@@ -201,7 +203,8 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Assumptions := Assumptions,
     Spec := Spec,
     soundness := soundness,
-    completeness := completeness }
+    completeness := completeness,
+    channelsWithRequirements := [byteChannel.toRaw] }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

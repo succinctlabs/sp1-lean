@@ -125,7 +125,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Extracted.AddressOperati
   output _ i0 := ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩
   -- byte-bus channels propagated from the AddrAddOperation assertion.
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements := [byteChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
@@ -139,10 +138,6 @@ set_option linter.unusedSectionVars false in
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees
-      : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma channelsWithRequirements_eq :
-    ((elaborated (p := p)).channelsWithRequirements
       : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
 
 set_option maxHeartbeats 4000000 in
@@ -252,7 +247,8 @@ def circuit : FormalCircuit (ZMod p) Inputs Extracted.AddressOperation :=
     Assumptions := Assumptions,
     Spec := Spec,
     soundness := soundness,
-    completeness := completeness }
+    completeness := completeness,
+    channelsWithRequirements := [byteChannel.toRaw] }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

@@ -69,17 +69,13 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   -- the composed timestamp sub-assertion's two checks are gated receives (mult `-is_real`):
   -- `byteChannel` is in BOTH the guarantee and the requirement list.
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements := [byteChannel.toRaw]
 
--- Expose the declared channel lists + `localLength` as `@[circuit_norm]` rfl-lemmas so the composing
+-- Expose the declared channel list + `localLength` as `@[circuit_norm]` rfl-lemmas so the composing
 -- `RTypeReader`'s `channelsLawful` / `circuit_proof_start` is discharged automatically.
+-- (`channelsWithRequirements` now lives on `circuit` below; Clean's generic def-lemma reduces it.)
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees
-      : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma channelsWithRequirements_eq :
-    ((elaborated (p := p)).channelsWithRequirements
       : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
@@ -106,7 +102,8 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    channelsWithRequirements := [byteChannel.toRaw] }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

@@ -88,7 +88,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
   have h_addspec := h_add ⟨fun _ => ⟨h_addendU, h_imm⟩, h_gate2⟩
-  refine ⟨⟨h_jt, h_bin, h_iaui, ?_, ?_⟩, Or.inr h_bin, Or.inr ⟨fun _ => ⟨h_addendU, h_imm⟩, h_gate2⟩, Or.inr h_bin⟩
+  refine ⟨⟨h_jt, h_bin, h_iaui, ?_, ?_⟩, h_bin, Or.inr ⟨fun _ => ⟨h_addendU, h_imm⟩, h_gate2⟩, Or.inr h_bin⟩
   · intro hr1 hop0 hiaui0
     have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, hop0]; simp
     have hsem := (h_addspec hg1).2
@@ -163,6 +163,7 @@ theorem completeness :
 composing the witnessed `AddOperation` gadget and the J-type reader; output is the extracted `UTypeColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
   { main, elaborated,
+    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

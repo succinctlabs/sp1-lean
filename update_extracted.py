@@ -510,6 +510,16 @@ def _normalize_circuit_api(operation: str, body: str) -> str:
     # A bare numeral seeding an accumulator chain (`let E16 := 0 + cols…`) fails to elaborate (the
     # `0`'s type can't be synthesized bottom-up inside the un-ascribed `let`); pin it explicitly.
     body = body.replace(":= 0 + ", ":= (0 : Expression (ZMod p)) + ")
+    # Clean `main` (the merged #398) moved `channelsWithRequirements` OFF `ElaboratedCircuit` — it now
+    # lives only on the formal-circuit structures (`GeneralFormalCircuit`/`FormalCircuit`/`FormalAssertion`).
+    # These bare extracted forms are plain `ElaboratedCircuit`s, so drop the field and its rfl-lemma; the
+    # requirement metadata lives on the hand-written `<Op>.circuit` (in `Native/`/`Proofs/`) instead.
+    body = re.sub(r"^  channelsWithRequirements := .*\n", "", body, count=1, flags=re.M)
+    body = re.sub(
+        r"set_option linter\.unusedSectionVars false in\n"
+        r"@\[circuit_norm\] lemma channelsWithRequirements_eq :\n"
+        r"    \(\(elaborated \(p := p\)\)\.channelsWithRequirements : List \(RawChannel \(ZMod p\)\)\)\n"
+        r"      = .*? := rfl\n", "", body, count=1, flags=re.M)
     return body
 
 

@@ -89,8 +89,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_bin := bool_of_mul_pred h_gate
   have h_slt_bool := bool_of_mul_pred h_slt_bin
   have h_sltu_bool := bool_of_mul_pred h_sltu_bin
-  refine ⟨⟨h_adapter h_bin, h_bin, fun hr => ⟨fun hslt => ?_, fun hsltu => ?_⟩⟩,
-    Or.inr h_bin, Or.inr ⟨ha, hb, h_bin, h_slt_bool⟩, Or.inr h_bin⟩
+  refine ⟨⟨h_adapter h_bin, h_bin, fun hr => ⟨fun hslt => ?_, fun hsltu => ?_⟩⟩, ?_⟩
   · -- `is_slt = 1` ⇒ `is_signed = 1`, so the gadget bit is the signed compare. The structural
     -- `Spec` exposes the semantic bit via `result_semantic`.
     have h_lt_spec := (LtOperationSigned.result_semantic ha hb hr (h_lt ⟨ha, hb, h_bin, h_slt_bool⟩)).1
@@ -121,6 +120,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     simp only [if_neg h01] at h_lt_spec
     simp only [resultWord, rv64_sltu_eq, Word.toBitVec64_toNat ha,
       Word.toBitVec64_toNat hb, toBitVec64_bitWord _ _ h_lt_spec]
+  -- The per-emitter channel-requirement tail: the bare `CPUState` `Assumptions` (the binary gate), the
+  -- composed `LtOperationSigned`/`ALUTypeReader` requirements (bare or `[] ∨ Assumptions` disjuncts).
+  · and_intros <;>
+      first | exact h_bin | exact ⟨ha, hb, h_bin, h_slt_bool⟩ | exact Or.inl rfl
+            | exact Or.inr h_bin | exact Or.inr ⟨ha, hb, h_bin, h_slt_bool⟩
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
@@ -177,6 +181,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    channelsWithRequirements :=
+      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
 
 end SP1Clean.LtChip

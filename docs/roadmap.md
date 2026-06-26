@@ -98,11 +98,17 @@ and its `RowEffect` target shape (strict write) is now fixed by the W2+W7 keysto
 the axiom-clean end-to-end claim but not of the named-hypothesis target theorem** — it merges at the very
 end (`sp1_target_soundness` inherits its closure automatically).
 
-**Clean PR #398 exposure: resolved (2026-06-10).** W9 landed by pinning Clean to the open PR's head
-SHA (`292b9cc3`, 13 commits ahead / 0 behind the old pin) rather than waiting for the merge — the
-custom gating is gone and W1a now works directly against the upstream primitives (and gains
-`InteractionsWellFormed` + the new `Air/Balance` gated lemmas for free). Residual: a small re-pin to
-the merge commit when the PR lands on `main`.
+**Clean PR #398 exposure: resolved (2026-06-10); merged-`main` re-pin landed (2026-06-26).** W9 first
+landed by pinning Clean to the open PR's head SHA (`292b9cc3`, 13 commits ahead / 0 behind the old pin)
+rather than waiting for the merge — the custom gating is gone and W1a now works directly against the
+upstream primitives. The residual re-pin to the **merge commit** (`2c20f7f0`) is now done: it migrated
+`channelsWithRequirements` off `ElaboratedCircuit` onto the formal-circuit structures (the default
+`requirementsChannelsLawful` tactic closes once the list is set), renamed the `pushIf`/`pullIf` value
+forms to `pushedIf`/`pulledIf`, and dropped the `BalancedChannel` `∧ InteractionsWellFormed` `.1`. Build
+green (3628), `lake test` green (3324), axiom-clean. The `cedc171b` "assume constraints for channels with
+reqs" obligation (an off-gate pull `Requirements`) is discharged by listing every touched channel in
+`channelsWithRequirements`; the soundness off-gate conjuncts are vacuous under the binary gate
+(`SP1Clean.off_gate_vacuous`, `Math/Gate.lean`). Padding (`mult = 0`) stays vacuous throughout.
 
 ---
 
@@ -279,9 +285,12 @@ the SP1 pin emits a `name`/`main`-**field** `ElaboratedCircuit` from a transient
 (`60665ed0`, later reworked), which no pinned Clean accepts. `update_extracted.py` now normalizes the
 emitter output (`_normalize_circuit_api`: parameterized instance + `pullIf`/`toRaw` names); a full
 regen at the pin reproduces `Extracted/` + `WitnessTests/` byte-identical and the 14 circuit-form
-files up to the (accepted, re-committed) emitter formatting of the two `Lt` files. **Residual:**
-re-pin to the merge commit when the PR lands on `main`; upstream `d25bba8d` (post-pin, not in the PR
-branch) likely retires the Batteries import-narrowing workaround (`docs/agents/lean-sail-notes.md`).
+files up to the (accepted, re-committed) emitter formatting of the two `Lt` files. **Residual: CLOSED
+(2026-06-26)** — re-pinned to the merge commit `2c20f7f0` (see the "merged-`main` re-pin" note above;
+`_normalize_circuit_api` extended to strip the now-`ElaboratedCircuit`-less `channelsWithRequirements`
+field + rfl-lemma). Upstream `d25bba8d` (now in the pin) deletes Clean's clashing
+`Fin.foldl_eq_foldl_finRange`, so the Batteries import-narrowing is no longer forced — kept as the
+project's narrow-import compile strategy, documented in `docs/agents/lean-sail-notes.md`.
 
 ### W11 — re-base `GatedVm` on upstream `VmTables` (M–L; new, post-W9)
 

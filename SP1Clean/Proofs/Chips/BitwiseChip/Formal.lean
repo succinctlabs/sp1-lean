@@ -114,8 +114,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       · obtain ⟨ho, _⟩ := hoh.1 hx
         exact Or.inr (Or.inr (by rw [hx, ho]; ring))
   -- once the active flag forces the others to 0, the byte opcode reduces to a literal
-  refine ⟨⟨h_bin, fun hr => ⟨fun hand => ?_, fun hor => ?_, fun hxor => ?_⟩⟩,
-    Or.inr h_bin, Or.inr ⟨ha, hb, hop3, h_bin⟩, Or.inr h_bin⟩
+  refine ⟨⟨h_bin, fun hr => ⟨fun hand => ?_, fun hor => ?_, fun hxor => ?_⟩⟩, ?_⟩
   · obtain ⟨hx0, ho0⟩ := hoh.2.2 hand
     have hopc : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0 := by
       rw [hx0, ho0]; ring
@@ -131,6 +130,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       rw [hxor, ho0]; ring
     exact (BitwiseU16Operation.result_semantic _ hr
       (h_bw ⟨ha, hb, by rw [hopc]; exact val_lt_three (Or.inr (Or.inr rfl)), h_bin⟩)).2.2 hopc
+  -- The per-emitter channel-requirement tail: the bare `CPUState` `Assumptions` (the binary gate), the
+  -- composed `BitwiseU16Operation`/`ALUTypeReader` requirements (bare or `[] ∨ Assumptions` disjuncts).
+  · and_intros <;>
+      first | exact h_bin | exact ⟨ha, hb, hop3, h_bin⟩ | exact Or.inl rfl
+            | exact Or.inr h_bin | exact Or.inr ⟨ha, hb, hop3, h_bin⟩
 
 set_option maxHeartbeats 8000000 in
 theorem completeness :
@@ -204,6 +208,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    channelsWithRequirements :=
+      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
 
 end SP1Clean.BitwiseChip

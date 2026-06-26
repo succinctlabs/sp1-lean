@@ -53,8 +53,9 @@ The SP1 Rust source (the extraction/spec oracle, read-only reference) lives in a
   A `run_in_background` build can outlive its shell — check with `ps -ef | grep -E "lake|lean" | grep -v lsp`
   before spawning another. The lean LSP server (`uvx lean-lsp-mcp`) also keeps several GB warm.
 - **Toolchain (pinned, do not bump):** `lean-toolchain` = `leanprover/lean4:v4.28.0`; mathlib `v4.28.0`;
-  Clean pinned to a specific commit on `github.com/Verified-zkEVM/clean` (the PR #398 head — re-pin to
-  `@ main` once it merges; see `lakefile.toml` + roadmap W9). Sail comes from two `github.com/succinctlabs/*` deps
+  Clean pinned to merged `main` (`2c20f7f0`, the #398 merge commit — the native gated-channel API; see
+  `lakefile.toml`, roadmap W9, and `docs/agents/clean-main-migration.md`). Bump with the **scoped**
+  `lake update Clean` (NEVER bare `lake update` — it jumps to the max dep toolchain → 4.29). Sail comes from two `github.com/succinctlabs/*` deps
   pinned to the `dtumad/clean-native` branch — `LeanRV64D` (`sail-riscv-lean`, the generated RV64 model) and
   `RISCV` (`riscv-lean`, the lightweight ISA fns) — which transitively pull the `rems-project/lean-sail @ v4`
   runtime; each carries a 4.28 `lean-toolchain`. All deps are fetched by `lake build`; nothing is a local

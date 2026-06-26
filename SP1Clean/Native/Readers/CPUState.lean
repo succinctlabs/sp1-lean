@@ -67,16 +67,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     (elaborated (p := p)).channelsWithGuarantees
       = ([byteChannel.toRaw] : List (RawChannel (ZMod p))) := rfl
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma channelsWithRequirements_eq :
-    (elaborated (p := p)).channelsWithRequirements
-      = ([byteChannel.toRaw, stateChannel.toRaw] : List (RawChannel (ZMod p))) := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
@@ -90,9 +85,10 @@ theorem soundness [Fact (2 ^ 17 < p)] : FormalAssertion.Soundness (ZMod p) main 
   have h13p : (13 : ℕ) < p := lt_trans (Nat.lt_two_pow_self) hn13
   simp only [circuit_norm, byteChannel, stateChannel, StateMsg.Spec] at h_holds ⊢
   -- `Spec`: `is_real = 1 → clk bounds`, derived from the byte-pull guarantees (fire at `mult = -1`).
-  -- Post-#398 the receives owe no padding requirement and the State emit requirements are trivial
-  -- (`Guarantees := True`), so the Spec implication is the only goal.
-  intro hr1
+  -- The two trailing conjuncts are the byte pulls' own `Requirements` (post-`cedc171b`): each fires only
+  -- at an off-gate multiplicity (`-is_real ∉ {0,-1}`), impossible under the binary `Assumptions` — vacuous.
+  refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
+    fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
   have hneg : -input_is_real = -1 := by rw [hr1]
   refine ⟨(byteRowSpec_range _ h13p).mp ?_, ((byteRowSpec_u8range_pair _ _).mp (h_holds.2 hneg)).1⟩
   rw [sub_eq_add_neg, Nat.cast_ofNat]
@@ -126,9 +122,14 @@ def circuit [Fact (2 ^ 17 < p)] : FormalAssertion (ZMod p) Inputs where
   Spec := Spec
   soundness := soundness
   completeness := completeness
+  channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength [Fact (2 ^ 17 < p)] (x : Var Inputs (ZMod p)) :
     (circuit (p := p)).localLength x = 0 := rfl
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma channelsWithRequirements_eq [Fact (2 ^ 17 < p)] :
+    (circuit (p := p)).channelsWithRequirements
+      = ([byteChannel.toRaw, stateChannel.toRaw] : List (RawChannel (ZMod p))) := rfl
 
 end SP1Clean.Readers.CPUState

@@ -14,7 +14,7 @@ import SP1Clean.Proofs.Chips.BranchChip.Bridge
 import SP1Clean.Proofs.Chips.BranchChip.Decision
 import SP1Clean.Native.Chips.BranchChip.Defs
 import SP1Clean.Proofs.Chips.BranchChip.Formal
-import SP1Clean.Proofs.Chips.ByteChip
+import SP1Clean.Proofs.Chips.ByteChip.Provider
 import SP1Clean.Proofs.Chips.DivRemChip.Assembly
 import SP1Clean.Proofs.Chips.DivRemChip.Bridge
 import SP1Clean.Proofs.Chips.DivRemChip.Defs
@@ -337,3 +337,5 @@ import SP1Clean.FormalModel.Trace.Witness
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.FormalModel.Contracts.Readers
 import SP1Clean.Soundness.RowView
+import SP1Clean.Proofs.Chips.ByteChip.RangeChip
+import SP1Clean.Proofs.Chips.ByteChip.ByteChip

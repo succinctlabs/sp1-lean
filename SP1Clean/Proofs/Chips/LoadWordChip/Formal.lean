@@ -92,7 +92,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     h_msbgate, h_lw_bin, bool_of_mul_pred h_lwu_gate, h_bin⟩, ?_⟩
   -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`; the
   -- `U16MSBOperation` byte-bus subcircuit contributes its own `Assumptions` in eval form).
-  refine ⟨Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin,
+  refine ⟨h_bin, Or.inr h_addr_as, Or.inr h_bin,
     Or.inr ⟨fun _ => h_sel1_lt_eval, h_lw_bin⟩, Or.inr h_bin⟩
 
 /-- Prover-side row well-formedness (3-arg form): operand `isU64`s + address-fits/alignment + the
@@ -191,6 +191,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadWordColumns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
+    channelsWithRequirements :=
+      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     soundness := soundness, completeness := completeness }
 
 end SP1Clean.LoadWordChip

@@ -23,7 +23,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_bin := bool_of_mul_pred h_gate
   refine ⟨⟨h_adapter h_bin, h_bin, fun hr => (h_sub ⟨ha, hb, h_bin⟩ hr).2⟩, ?_⟩
   and_intros <;>
-    first | exact Or.inl rfl | exact Or.inr h_bin | exact Or.inr ⟨ha, hb, h_bin⟩
+    first | exact h_bin | exact Or.inl rfl | exact Or.inr h_bin | exact Or.inr ⟨ha, hb, h_bin⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
@@ -57,6 +57,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubCols :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    channelsWithRequirements :=
+      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
 
 end SP1Clean.SubChip

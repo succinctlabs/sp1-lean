@@ -1,9 +1,40 @@
 # Clean merged-`main` migration (roadmap W9 residual)
 
-**Status:** attempted 2026-06-26, **reverted** (build red, migration larger than expected). All machinery
-the final `sorry` (`sp1_witness_decode`) needs is already present at the current pin, so this migration is
-**independent** of the decode work and can be done on its own. **Heavy** — full rebuilds of Clean + SP1Clean
-(~20–40 min each); do on better hardware.
+**Status: DONE (2026-06-26).** Re-pinned to `2c20f7f0`; build green (3628), `lake test` green (3324),
+`lake lint` clean, headline theorems axiom-clean (`[propext, Classical.choice, Quot.sound]`). The
+historical "attempted then reverted" note is superseded — the migration below is the record of what was
+actually applied. The one remaining `sorry` (`sp1_witness_decode`) is the pre-existing decode seam,
+independent of this work.
+
+## What actually differed from the first attempt's notes (read this first)
+
+The real surface was a bit larger and the proof story a bit different than the plan below predicted:
+
+- **The off-gate `Requirements` obligation (`cedc171b`).** A gated `byteChannel.pull`/`pullIf` now owes
+  `¬-gate = -1 → ¬gate = 0 → channel.Guarantees …` (`ChannelInteraction.Requirements`). This is
+  discharged two ways: (a) *lawfulness* — list every touched channel in `channelsWithRequirements`, so
+  `InChannelsOrRequirements`'s `i.channel ∈ channels` disjunct fires (no `Guarantees` proof needed); and
+  (b) *soundness* — each DIRECT shallow byte pull adds one vacuous trailing conjunct, closed by the shared
+  `SP1Clean.off_gate_vacuous` (`Math/Gate.lean`, imported via `Model/Channels.lean`) under the binary
+  gate. Padding (`mult = 0`) is vacuous in both `Guarantees` and `Requirements`. (The plan's claim that a
+  receive "owes no Requirements" was true at the `292b9cc3` head but NOT at the merge.)
+- **`pushIf`/`pullIf` are circuit *operations* now; the value constructors are `pushedIf`/`pulledIf`.**
+  The `Model/InteractionProjection.lean` kernels + the `Soundness/StateConsistency.lean` `hk` lemma +
+  17 `Faithful/*` `hk`/`hsk` lemma statements rename `pushIf (channel := X)`→`pushedIf (channel := X)`
+  (and `pullIf`→`pulledIf`). `circuit_norm`'s `emitted_eq_pushedIf` normalizes `emit` to `pushedIf`.
+- **`requirementsChannelsLawful` is omitted everywhere** — its default tactic closes once
+  `channelsWithRequirements` is set on the formal-circuit. We do NOT re-add per-circuit rfl-lemmas
+  (Clean's generic `channelsWithRequirements_def` reduces it); `CPUState` keeps a re-pointed one, a
+  harmless asymmetry the robust `and_intros <;> first | …` chip tails absorb.
+- **Chip soundness tails** gained the bare-`Assumptions`/`Or`-wrapped split; fix is to add an
+  `exact <hbin>` arm to the `first | …` chain (+ an `off_gate_vacuous` conjunct per direct pull).
+- **Auto-gen `Extracted/Circuit/*`**: `_normalize_circuit_api` strips the field + rfl-lemma; the 14
+  committed files were stripped in place to match.
+
+## Original migration plan (retained for reference)
+
+All machinery the final `sorry` (`sp1_witness_decode`) needs is already present, so this migration is
+**independent** of the decode work. **Heavy** — full rebuilds of Clean + SP1Clean (~20–40 min each).
 
 ## The move
 

@@ -120,7 +120,5 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs BitwiseCols main where
   -- are `assertion`s (`localLength 0`). 3 + 16 = 19.
   localLength _ := 19
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements :=
-    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.BitwiseChip

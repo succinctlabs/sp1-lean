@@ -103,17 +103,12 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength_eq := by intros; simp +arith [circuit_norm, main, RegisterAccessCols.circuit]
   output _ _ := ()
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, RegisterAccessCols.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
       = [byteChannel.toRaw] := rfl
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma channelsWithRequirements_eq :
-    ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
@@ -166,6 +161,7 @@ composes a `RegisterAccessCols` per operand (op_c gated by `is_real - imm_c`), i
 immediate gates, and emits the Program/Memory buses, with a semantic spec. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
+    channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     soundness := soundness, completeness := completeness }
 

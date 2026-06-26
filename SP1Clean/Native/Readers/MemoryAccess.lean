@@ -103,16 +103,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
       = [byteChannel.toRaw] := rfl
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma channelsWithRequirements_eq :
-    ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw, memoryChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
@@ -125,9 +120,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel, memoryChannel] at h_holds ⊢
   obtain ⟨a1, a2, a3, b4, b5⟩ := h_holds
-  -- the `Spec` body, on a real row (`is_real = 1`); post-#398 the byte receives owe no padding
-  -- requirement, so the Spec implication is the only goal.
-  intro hr1
+  -- The two trailing conjuncts are the byte pulls' own `Requirements` (diff_low/diff_high range
+  -- checks) — vacuous off-gate; the two Memory emits add no soundness obligation.
+  refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
+    fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
   rw [hr1, one_mul] at a1 a2 a3
   have hb4 := b4 (by rw [hr1]); rw [← c16] at hb4
   have hb5 := b5 (by rw [hr1])
@@ -167,7 +163,8 @@ the two Memory-bus interactions at a real 48-bit address, parameterised by the w
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw] }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

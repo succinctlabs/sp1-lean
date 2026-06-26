@@ -91,10 +91,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     simp only [byteChannel] at hguar
     rw [← c14] at hguar
     exact val_mod_four_of_mul_inv_four_lt ((byteRowSpec_range _ h14p).mp hguar)
-  · exact Or.inr h_bin
+  · exact h_bin
   · exact Or.inr ⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩
   · exact Or.inr ⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩
-  · exact Or.inr h_bin
+  · exact ⟨Or.inr h_bin, fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
@@ -178,6 +178,7 @@ theorem completeness :
 two witnessed `AddOperation` gadgets and the J-type reader; output is the extracted `JalColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
   { main, elaborated,
+    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

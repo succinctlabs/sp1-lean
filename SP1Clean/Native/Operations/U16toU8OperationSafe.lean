@@ -104,16 +104,10 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements := [byteChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw] := rfl
-
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma channelsWithRequirements_eq :
-    ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
       = [byteChannel.toRaw] := rfl
 
 set_option linter.unusedSectionVars false in
@@ -145,7 +139,7 @@ theorem spec_populate {u16_values : Word (ZMod p)}
 set_option maxHeartbeats 1000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨_himp, _hbin⟩ := h_assumptions
+  obtain ⟨_himp, hbin⟩ := h_assumptions
   obtain ⟨hiu, hicols, _⟩ := h_input
   have e8 : (2 : ℕ) ^ 8 = 256 := by norm_num
   have ea0 : Expression.eval env input_var_u16_values[0] = input_u16_values[0] := by rw [← hiu]; simp only [Vector.getElem_map]
@@ -158,8 +152,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have el3 : Expression.eval env input_var_cols_low_bytes[3] = input_cols_low_bytes[3] := by rw [← hicols]; simp only [Vector.getElem_map]
   simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, el0, el1, el2, el3] at h_holds ⊢
   obtain ⟨hr0, hr1, hr2, hr3⟩ := h_holds
-  -- post-#398 the byte receives owe no padding requirement, so the goal is exactly `Spec`.
-  intro hr1eq
+  -- The four trailing conjuncts are the byte pulls' own `Requirements` — vacuous off-gate.
+  refine ⟨fun hr1eq => ?_, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   have hneg : -input_is_real = -1 := by rw [hr1eq]
   have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg; have R3 := hr3 hneg
   rw [byteRowSpec_u8range_pair, e8, ← sub_eq_add_neg] at R0 R1 R2 R3
@@ -203,6 +199,7 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Assumptions := Assumptions,
     Spec := Spec,
     soundness := soundness,
-    completeness := completeness }
+    completeness := completeness,
+    channelsWithRequirements := [byteChannel.toRaw] }
 
 end SP1Clean.U16toU8OperationSafe

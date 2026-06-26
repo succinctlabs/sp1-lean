@@ -76,17 +76,14 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   -- the two timestamp byte checks are gated receives (mult `-is_real`): they give the `ByteRowSpec`
   -- guarantee on real rows AND impose a padding requirement, so `byteChannel` is in BOTH lists.
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements := [byteChannel.toRaw]
 
--- Expose the declared channel lists + `localLength` as `@[circuit_norm]` rfl-lemmas so the composing
+-- Expose the declared channel list + `localLength` as `@[circuit_norm]` rfl-lemmas so the composing
 -- `RegisterAccessCols` reader's `channelsLawful` / `circuit_proof_start` is discharged automatically.
+-- (`channelsWithRequirements` now lives on `circuit` below; Clean's generic `channelsWithRequirements_def`
+-- reduces it, so no per-reader rfl-lemma is needed.)
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees
-      : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma channelsWithRequirements_eq :
-    ((elaborated (p := p)).channelsWithRequirements
       : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
@@ -103,7 +100,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   circuit_proof_start
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel] at h_holds ⊢
-  intro hr1
+  -- The two trailing conjuncts are the byte pulls' own `Requirements` (post-`cedc171b`): each fires only
+  -- at an off-gate multiplicity (`-is_real ∉ {0,-1}`), impossible under the binary `Assumptions` — vacuous.
+  refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
+    fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
   have hneg : -input_is_real = -1 := by rw [hr1]
   have hb1 := h_holds.1 hneg
   have hb2 := h_holds.2 hneg
@@ -135,7 +135,8 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    channelsWithRequirements := [byteChannel.toRaw] }
 
 -- This leaf reader emits only on `byteChannel`, so its interactions are empty on the Memory/Program
 -- channels — the bottom-up base case that lets `RegisterAccessCols`/`RTypeReader` drop this sub-reader's

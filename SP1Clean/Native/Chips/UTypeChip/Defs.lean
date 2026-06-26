@@ -63,7 +63,5 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs UTypeColumns main where
   -- 3 addend limbs + 4 add-result limbs; readers/operation are assertions (localLength 0).
   localLength _ := 7
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements :=
-    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.UTypeChip

@@ -367,7 +367,7 @@ theorem stateLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
     Channels.byteChannel_eq_stateChannel_false, if_false]
   -- `hk` is the gated kernel `toAccess_pushIf_state`; it `rw`s against the recovered interactions.
   have hk : ∀ (m : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pushIf (channel := stateChannel) m s).toRaw) =
+      AbstractInteraction.toAccess env ((pushedIf (channel := stateChannel) m s).toRaw) =
         (InteractionKind.State, "SP1State",
           [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,

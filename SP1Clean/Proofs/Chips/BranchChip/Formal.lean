@@ -209,8 +209,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     simp only [byteChannel] at hguar
     rw [← c14] at hguar
     exact val_mod_four_of_mul_inv_four_lt ((byteRowSpec_range _ h14p).mp hguar)
-  · refine ⟨Or.inr ⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, Or.inr h_bin, Or.inr ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩,
-      Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, ?_⟩, Or.inr h_bin⟩
+  · refine ⟨Or.inr ⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, h_bin, Or.inr ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩,
+      Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, ?_⟩, Or.inr h_bin,
+      fun h1 h0 => off_gate_vacuous h_bin h1 h0, fun h1 h0 => off_gate_vacuous h_bin h1 h0,
+      fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
     -- AddOp2 gate `is_real - is_branching` is binary: on padding `is_branching = 0` from `h_pad`.
     rcases h_bin with h0 | h1
     · have hbr0 : env.get (i₀ + 6) = 0 := by
@@ -510,6 +512,7 @@ theorem completeness :
 two `AddOperation` gadgets + `ITypeReaderImmutable`. Soundness and completeness are axiom-clean. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs BranchColumns :=
   { main, elaborated,
+    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

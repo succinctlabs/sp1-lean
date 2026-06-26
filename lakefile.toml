@@ -31,16 +31,15 @@ name = "mathlib"
 git = "https://github.com/leanprover-community/mathlib4"
 rev = "v4.28.0"
 
-# Clean PR #398 head (fix-zero-multiplicity-channels): native gated channels.
-# Re-pin to main once the PR merges (roadmap W9). NOTE (2026-06-26): merged-main (2c20f7f0) re-pin
-# attempted and reverted — it is a large structural migration (channelsWithRequirements moved off
-# ElaboratedCircuit, new FormalAssertion.requirementsChannelsLawful, pushIf/pullIf → Channel. methods,
-# 3-field ChannelInteraction; breaks ~20 chips + readers + 7 auto-gen Extracted/Circuit). Plan:
-# docs/agents/clean-main-migration.md. Do on better hardware.
+# Clean `main` (the merged PR #398 = native gated channels). Migrated 2026-06-26 off the PR-head pin
+# `292b9cc3`: channelsWithRequirements moved off ElaboratedCircuit onto the formal-circuit structures
+# (+ new requirementsChannelsLawful), pushIf/pullIf became Channel. methods, 3-field ChannelInteraction.
+# See docs/agents/clean-main-migration.md. Bump with the scoped `lake update Clean` (NEVER bare
+# `lake update` — it bumps to the max dep toolchain → 4.29).
 [[require]]
 name = "Clean"
 git = "https://github.com/Verified-zkEVM/clean"
-rev = "292b9cc369be11baf816926a4bd5a697c01b1dcc"
+rev = "2c20f7f0fb30ed336dd42bbf023254b5a650faaf"
 
 [[require]]
 name = "LeanRV64D"

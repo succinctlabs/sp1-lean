@@ -44,7 +44,16 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     h_opa0,
     h_byte0, h_byte1, h_byte2, h_byte3, h_byte4, h_byte5, h_byte6, h_byte7, h_byte8⟩ := h_holds
   -- post-#398 the nine byte receives owe no padding requirement.
-  refine ⟨?spec, ?cpuA, ?msb1A, ?msb2A, ?msb3A, ?aluA⟩
+  refine ⟨?spec, ?cpuA, ?msb1A, ?msb2A, ?msb3A, ?aluA,
+    fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
+    fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
+    fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
+    fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
+    fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
+    fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
+    fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
+    fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
+    fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0⟩
   case spec =>
       intro hreal hsrlw
       -- `is_srlw = 1` forces the other three variant flags to 0 (single-op selection).
@@ -301,7 +310,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           exact ShiftRightMath.srlw_dispatch_1 b_cb0 b_cb1 b_cb2 b_cb3 hcb4 eq_v01 eq_v012 eq_v0123
             lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
   -- CPUState / ALUTypeReader only assume `is_real` binary (from the in-circuit gate).
-  case cpuA => exact Or.inr (bool_of_mul_pred h_realgate)
+  case cpuA => exact bool_of_mul_pred h_realgate
   case aluA => exact Or.inr (bool_of_mul_pred h_realgate)
   -- The three `U16MSBOperation` assumptions need `a.val < 2^16` on real sub-rows. For `msb1`/`msb2`
   -- (the `op_b[3]`/`op_b[1]` sign reads) this is `isU64 op_b`; for `msb3` (the result limb `a[1]`) it is

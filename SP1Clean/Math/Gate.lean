@@ -17,6 +17,17 @@ lemma bool_val_le [Fact p.Prime] {x : ZMod p} (h : x = 0 ∨ x = 1) : x.val ≤ 
   haveI : Fact (1 < p) := ⟨(Fact.out : p.Prime).one_lt⟩
   rcases h with h | h <;> simp [h, ZMod.val_one]
 
+/-- A gated byte pull/push leaves an off-gate `Requirements` conjunct on a reader/operation/chip
+soundness goal under Clean `main` (post-`cedc171b`): `¬-x = -1 → ¬x = 0 → channel.Guarantees …`, where
+`x` is the `is_real` gate. It is **vacuous** under the binary gate `x = 0 ∨ x = 1` — the two
+hypotheses are jointly contradictory (`x = 1` forces `-x = -1`; `x = 0` is excluded) — so any `P`
+follows. Lets each such conjunct close as `fun h1 h0 => off_gate_vacuous hbin h1 h0`. -/
+lemma off_gate_vacuous {x : ZMod p} (h : x = 0 ∨ x = 1) {P : Prop}
+    (h1 : ¬-x = -1) (h0 : ¬x = 0) : P := by
+  rcases h with h | h
+  · exact absurd h h0
+  · exact absurd (by rw [h]) h1
+
 /-- Distinct field elements have distinct `val`s. -/
 lemma val_ne [NeZero p] {x y : ZMod p} (h : x ≠ y) : x.val ≠ y.val := fun hv =>
   h (by rw [← ZMod.natCast_zmod_val x, ← ZMod.natCast_zmod_val y, hv])

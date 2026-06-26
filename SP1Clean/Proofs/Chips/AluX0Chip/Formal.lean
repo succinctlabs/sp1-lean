@@ -39,8 +39,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_gate
   simp only [← sub_eq_add_neg] at h_oa1 h_oa2
   simp only [isReal, clkLow, opcodeVal]
-  -- the per-emitter channel-requirement tail: CPUState / reader (the gated byte pull owes no requirement).
-  exact ⟨⟨h_reader h_bin, h_bin, h_oa1, h_oa2⟩, Or.inr h_bin, Or.inr h_bin⟩
+  -- The per-emitter channel-requirement tail: the bare `CPUState` `Assumptions` (the `is_real` binary
+  -- gate, `h_bin`), the off-gate-vacuous byte pull (`is_real ∈ {0,1}` rules out the `¬is_real = 0` ∧
+  -- `¬-is_real = -1` antecedents), and the `ALUTypeReaderImmutable` requirement (`Or.inr h_bin`).
+  exact ⟨⟨h_reader h_bin, h_bin, h_oa1, h_oa2⟩, h_bin,
+    fun h1 h0 => off_gate_vacuous h_bin h1 h0, Or.inr h_bin⟩
 
 /-- Honest prover-side row well-formedness: `is_real` binary, the two `op_a_0` forcing gates, the
 CPUState clock bounds + the immutable-ALU-reader contract, and the dynamic opcode in ALU range
@@ -78,6 +81,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    channelsWithRequirements :=
+      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
 
 end SP1Clean.AluX0Chip

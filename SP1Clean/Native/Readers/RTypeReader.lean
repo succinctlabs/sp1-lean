@@ -119,7 +119,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   -- requirement, so it is in BOTH lists. The Memory + Program buses are plain gated `emit`s (requirements-only,
   -- `Guarantees := True` for memory ⇒ trivial; `ProgramMsg.Spec` for program).
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, RegisterAccessCols.circuit]
 
 -- Expose this reader's own declared channel lists + `localLength` as `@[circuit_norm]` rfl-lemmas so the
@@ -128,10 +127,6 @@ set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
       = [byteChannel.toRaw] := rfl
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma channelsWithRequirements_eq :
-    ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
@@ -168,7 +163,8 @@ composes a `RegisterAccessCols` sub-assertion per operand for the timestamp byte
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
