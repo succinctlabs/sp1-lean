@@ -1,4 +1,5 @@
 import SP1Clean.Native.Chips.LtChip.Defs
+import SP1Clean.Math.EvalVec
 
 /-! # `SP1Clean.LtChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
 
@@ -115,23 +116,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         exact h2 (by exact_mod_cast h20)
     have h01 : (0 : ZMod p) ≠ 1 := by
       haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-      intro h
-      have := congrArg ZMod.val h
-      rw [ZMod.val_zero, ZMod.val_one] at this
-      exact absurd this (by norm_num)
+      exact zero_ne_one
     rw [h_slt0] at h_lt_spec
     simp only [if_neg h01] at h_lt_spec
     simp only [resultWord, rv64_sltu_eq, Word.toBitVec64_toNat ha,
       Word.toBitVec64_toNat hb, toBitVec64_bitWord _ _ h_lt_spec]
-
-set_option linter.unusedSectionVars false in
-/-- A length-4 `#v` of pointwise evaluations is the `Vector.map` of the evaluator (lets the witness
-hint's `populate` operands, written `#v[env op_*_val[k]]` by the generator, be folded to `Vector.map`). -/
-private lemma vec4_eval (e : Environment (ZMod p)) (v : Vector (Expression (ZMod p)) 4) :
-    (#v[Expression.eval e v[0], Expression.eval e v[1], Expression.eval e v[2],
-        Expression.eval e v[3]] : Vector (ZMod p) 4) = Vector.map (Expression.eval e) v := by
-  ext k hk
-  interval_cases k <;> simp [Vector.getElem_map]
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :

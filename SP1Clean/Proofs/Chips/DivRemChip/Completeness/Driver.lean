@@ -6,6 +6,7 @@ import SP1Clean.Proofs.Chips.DivRemChip.Populate.Euclid
 import SP1Clean.Proofs.Chips.DivRemChip.Soundness
 import SP1Clean.Proofs.Chips.DivRemChip.Assembly
 import SP1Clean.Proofs.Chips.DivRemChip.Completeness.OwnComplete
+import SP1Clean.Math.EvalVec
 import SP1Clean.Proofs.Chips.DivRemChip.Completeness.BytePulls
 import SP1Clean.Proofs.Chips.DivRemChip.Completeness.SubSpecs
 
@@ -47,16 +48,6 @@ local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); 
 -- the intractable nested record. Selective: Mul uses a `witness` result, Add/Lt/U16MSB use struct literals,
 -- so none of them match `fromElements`. Lets the 13 `eqb/eqc/eqb2/eqc2/isc0` cols pins close fast.
 attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements
-
-
-set_option linter.unusedSectionVars false in
-/-- A length-4 `#v` of pointwise evaluations is the `Vector.map` of the evaluator (folds the witness
-closures' operands back to `Vector.map`; mirrors `ShiftRightChip.vec4_eval`). -/
-private lemma vec4_eval (e : Environment (ZMod p)) (v : Vector (Expression (ZMod p)) 4) :
-    (#v[Expression.eval e v[0], Expression.eval e v[1], Expression.eval e v[2],
-        Expression.eval e v[3]] : Vector (ZMod p) 4) = Vector.map (Expression.eval e) v := by
-  ext k hk
-  interval_cases k <;> simp [Vector.getElem_map]
 
 
 set_option maxHeartbeats 64000000 in

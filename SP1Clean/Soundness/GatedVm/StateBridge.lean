@@ -143,18 +143,8 @@ theorem balanced_state_bus
     split_ifs <;> ring
   rw [hbd] at hb
   rw [outdeg_realRowEdges rows k, indeg_realRowEdges rows k]
-  have ei : (if (InteractionKind.State, "SP1State", initEntry) = k then (1 : ℤ) else 0)
-          = (if k = (InteractionKind.State, "SP1State", initEntry) then 1 else 0) := by
-    by_cases h : (InteractionKind.State, "SP1State", initEntry) = k
-    · rw [if_pos h, if_pos h.symm]
-    · rw [if_neg h, if_neg (fun hh => h hh.symm)]
-  have ef : (if (InteractionKind.State, "SP1State", finalEntry) = k then (1 : ℤ) else 0)
-          = (if k = (InteractionKind.State, "SP1State", finalEntry) then 1 else 0) := by
-    by_cases h : (InteractionKind.State, "SP1State", finalEntry) = k
-    · rw [if_pos h, if_pos h.symm]
-    · rw [if_neg h, if_neg (fun hh => h hh.symm)]
-  rw [ei, ef] at hb
-  linarith [hb]
+  simp only [eq_comm] at hb
+  linarith
 
 /-- **Balance ⇒ a real-row execution trail.** Combining `balanced_state_bus` with the abstract
 `GatedVm.exists_trail`: from the balanced state bus (+ genesis/finalization boundary) there is a walk of

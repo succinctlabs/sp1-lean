@@ -86,8 +86,7 @@ SP1's RISC-V `Opcode` enum, emitted by the constraint compiler as `Opcode.ofNat 
 `.program` bus interactions (the chip adapters' instruction reads). The *semantics* of program
 interactions are deferred (their `toProp` is `True`, see `Extracted/ExtractionDSL.lean`), so —
 unlike the fully-modelled `ByteOpcode` — `Opcode` only needs to carry the numeric tag and elaborate.
-It is
-a thin `ℕ` wrapper with an `ofNat` that, like `ByteOpcode.ofNat`, composes with the
+It is a thin `ℕ` wrapper with an `ofNat` that, like `ByteOpcode.ofNat`, composes with the
 `[CoeHead F ℕ]` hypothesis so `Opcode.ofNat (opcode : F)` typechecks. -/
 abbrev Opcode := ℕ
 

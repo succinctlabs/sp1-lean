@@ -1,4 +1,5 @@
 import SP1Clean.Native.Chips.MulChip.Defs
+import SP1Clean.Math.EvalVec
 
 /-! # `SP1Clean.MulChip` — `Assumptions` / soundness / completeness / `circuit` -/
 
@@ -117,16 +118,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
       first | exact ha0 | exact ha1 | exact ha2 | exact ha3
 
-set_option linter.unusedSectionVars false in
-/-- A length-4 `#v` of pointwise evaluations is the `Vector.map` of the evaluator (folds the witness
-hint's `populate` operands, written `#v[env op_*_val[k]]` by the generator, back to `Vector.map`;
-mirrors `LtChip.vec4_eval`). -/
-private lemma vec4_eval (e : Environment (ZMod p)) (v : Vector (Expression (ZMod p)) 4) :
-    (#v[Expression.eval e v[0], Expression.eval e v[1], Expression.eval e v[2],
-        Expression.eval e v[3]] : Vector (ZMod p) 4) = Vector.map (Expression.eval e) v := by
-  ext k hk
-  interval_cases k <;> simp [Vector.getElem_map]
-
 set_option maxHeartbeats 40000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
@@ -157,18 +148,16 @@ theorem completeness :
   have hmw' : env.get (i₀ + 4) = 1 → env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2)
       + env.get (i₀ + 3) + env.get (i₀ + 4) = 1 := fun h => by
     rw [hsumc]; exact hmulw_real (by rw [← hflag4]; exact h)
-  have epc0 : Expression.eval env.toEnvironment input_var_state_pc[0] = input_state_pc[0] := by
-    rw [← hpc, Vector.getElem_map]
-  have epc1 : Expression.eval env.toEnvironment input_var_state_pc[1] = input_state_pc[1] := by
-    rw [← hpc, Vector.getElem_map]
-  have epc2 : Expression.eval env.toEnvironment input_var_state_pc[2] = input_state_pc[2] := by
-    rw [← hpc, Vector.getElem_map]
+  have epc : ∀ (i : ℕ) (hi : i < 3),
+      Expression.eval env.toEnvironment input_var_state_pc[i] = input_state_pc[i] :=
+    fun i hi => by rw [← hpc, Vector.getElem_map]
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have hbool : ∀ x : ZMod p, x = 0 ∨ x = 1 → x * (x + -1) = 0 := by
     rintro x (h | h) <;> rw [h] <;> simp
   -- fold the witness hint's `populate` operands to the evaluated input words
   simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval, hob, hoc] at h_env_cols
-  refine ⟨⟨hbin, by rw [← epc0, ← epc1, ← epc2] at h_cpu; exact h_cpu⟩,
+  rw [← epc 0 (by norm_num), ← epc 1 (by norm_num), ← epc 2 (by norm_num)] at h_cpu
+  refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨fun _ => ⟨hbU, hcU⟩, hsum01', hmw', hf0', hf1', hf2', hf3', hf4', hsum01'⟩, ?_⟩,
     by simpa using h_env_a 0, by simpa using h_env_a 1,
     by simpa using h_env_a 2, by simpa using h_env_a 3,

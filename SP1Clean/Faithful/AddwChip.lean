@@ -236,7 +236,6 @@ theorem addwcols_memory_interactions_faithful_syntactic
     h_pl_b, h_pv_b0, h_pv_b1, h_pv_b2, h_pv_b3,
     h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3, sub_eq_add_neg]
 
-
 set_option maxHeartbeats 4000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Byte-bus interactions, SYNTACTIC (multi-fragment `Perm` + WITNESSED).**
@@ -306,7 +305,6 @@ theorem addwcols_byte_interactions_faithful_syntactic
   -- circuit `[CPUState 2] ++ [Add 4] ++ [ALUTypeReader 6]` vs oracle `[Add 4] ++ [CPUState 2] ++ [RT 6]`:
   -- swap the first two blocks (the `ALUTypeReader 6` tail is shared).
   exact (List.perm_append_comm (l₁ := [_, _]) (l₂ := [_, _, _])).append_right [_, _, _, _, _, _]
-
 
 set_option maxHeartbeats 4000000 in
 /-- **Chip-level faithfulness anchor — COMBINED, SYNTACTIC.** The full faithfulness statement for `AddwChip`:

@@ -64,7 +64,7 @@ def reg_idx_to_Register (idx : BitVec 5) : Register :=
 /-- All of the registers corresponding to a `BitVec 5` contain 64-bit values. -/
 lemma reg_idx_must_64 (idx : BitVec 5) :
     RegisterType (reg_idx_to_Register idx) = BitVec 64 := by
-  simp [reg_idx_to_Register]
+  simp only [reg_idx_to_Register]
   split <;> rfl
 
 /-- Interpret a bitvec into a register type for some vector index. -/
@@ -269,10 +269,6 @@ reg_idx_to_Register idx = .x31 ↔ idx = 31#5 ∨ idx = 0#5 := by fin_cases idx 
 lemma regidxToRegister_inj (idx idx' : BitVec 5) :
     reg_idx_to_Register idx = reg_idx_to_Register idx' ↔
       idx = idx' ∨ (idx = 0#5 ∧ idx' = 31#5) ∨ (idx = 31#5 ∧ idx' = 0#5) := by
-  fin_cases idx
-  all_goals {
-    simp [eq_comm (a := idx')]
-    try {aesop}
-  }
+  fin_cases idx <;> (simp [eq_comm (a := idx')]; try aesop)
 
 end regidx

@@ -134,9 +134,8 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     Or.inr h_assumptions, Or.inr h_assumptions, Or.inr (bool_of_mul_pred h_immbin), fun _ _ => bool_of_mul_pred hbin⟩
   -- the four immediate gates: bridge `input_cols_op_c[i]` / `…prev_value[i]` (value-level) to the
   -- `Expression.eval env …[i]` form `h_holds` carries, via the `h_input` Word equalities + `getElem_map`.
-  have hoc := h_input.1.2.2.2.2.2.1
-  have hpv := h_input.1.2.2.2.2.2.2.1.1
-  rw [← hoc, ← hpv]; simp only [Vector.getElem_map]; exact ⟨i0, i1, i2, i3⟩
+  rw [← h_input.1.2.2.2.2.2.1, ← h_input.1.2.2.2.2.2.2.1.1]
+  simp only [Vector.getElem_map]; exact ⟨i0, i1, i2, i3⟩
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start

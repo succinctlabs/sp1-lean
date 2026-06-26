@@ -1,4 +1,5 @@
 import SP1Clean.Math.Word
+import SP1Clean.Math.Gate
 import SP1Clean.Extracted.LtOperationUnsigned
 import SP1Clean.Native.Operations.U16CompareOperation.RawSpec
 import SP1Clean.Proofs.Operations.U16CompareOperation.Formal
@@ -22,12 +23,6 @@ open Circuit
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 instance : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
-
-omit [Fact (2 ^ 17 < p)] in
-/-- A boolean field element has `val ≤ 1`. -/
-private lemma bool_val_le {x : ZMod p} (h : x = 0 ∨ x = 1) : x.val ≤ 1 := by
-  haveI : Fact (1 < p) := ⟨(Fact.out : p.Prime).one_lt⟩
-  rcases h with h | h <;> simp [h, ZMod.val_one]
 
 set_option maxHeartbeats 1000000 in
 /-- Four boolean flags whose field sum is `0` or `1` have **at most one** set: the assignment is
@@ -92,11 +87,6 @@ def Selectors (b cc : Word (ZMod p)) (cols : Extracted.LtOperationUnsigned (ZMod
   ((b[3] * f3 + b[2] * f2 + b[1] * f1 + b[0] * f0) - cl0 = 0) ∧
   ((cc[3] * f3 + cc[2] * f2 + cc[1] * f1 + cc[0] * f0) - cl1 = 0) ∧
   (((1 - sumf) - 1) * (cols.not_eq_inv * (cl0 - cl1) - 1) = 0)
-
-omit [Fact (2 ^ 17 < p)] in
-/-- Distinct field elements have distinct `val`s. -/
-private lemma val_ne {x y : ZMod p} (h : x ≠ y) : x.val ≠ y.val := fun hv =>
-  h (by rw [← ZMod.natCast_zmod_val x, ← ZMod.natCast_zmod_val y, hv])
 
 set_option maxHeartbeats 1000000 in
 /-- Soundness core: the boolean flags select the most-significant differing limb (all higher limbs

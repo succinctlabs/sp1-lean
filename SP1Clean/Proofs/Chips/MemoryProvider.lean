@@ -70,7 +70,7 @@ theorem memRow_eq_of_key {r1 r2 : MemInitRow (ZMod p)} (h : memRowKey r1 = memRo
   · exact ZMod.val_injective p hv1
   · exact ZMod.val_injective p hv2
   · exact ZMod.val_injective p hv3
-  · exact absurd hi (by omega)
+  · omega
 
 /-- The **`MemoryProvider`**: any Memory-bus contribution list whose every entry sits at the key of some
 `initSpec`-valid boundary record. The native, predicate-characterized content of SP1's preprocessed Memory
@@ -86,7 +86,7 @@ cross-bus-disjointness input `memoryBalance_of_machine` consumes (mirrors `progr
 theorem memProvider_kind {initSpec : MemInitRow (ZMod p) → Prop} {prov : LookupAccessList}
     (h : MemoryProvider initSpec prov) : ∀ b ∈ prov, (keyOf b).1 = InteractionKind.Memory := by
   intro b hb
-  obtain ⟨row, _, hk⟩ := h b hb
+  obtain ⟨_, _, hk⟩ := h b hb
   rw [hk, memRowKey]
 
 /-- A boundary contribution whose key a `MemoryProvider` carries is an `initSpec`-valid record. (The
@@ -97,7 +97,6 @@ theorem initRow_of_provider {initSpec : MemInitRow (ZMod p) → Prop} {row : Mem
     (hk : keyOf b = memRowKey row) : initSpec row := by
   obtain ⟨row', h_spec, h_key⟩ := h_prov b hb
   rw [hk] at h_key
-  rw [memRow_eq_of_key h_key]
-  exact h_spec
+  rwa [memRow_eq_of_key h_key]
 
 end SP1Clean.MemoryGlobalChip

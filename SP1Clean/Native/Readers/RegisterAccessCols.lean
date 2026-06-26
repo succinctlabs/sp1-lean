@@ -85,11 +85,9 @@ set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
 
-
 /-- `is_real` is binary — the precondition for the genuinely `is_real`-gated byte receives (and threaded
 down to the composed `RegisterAccessTimestamp`). Discharged by the chip's gate. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop := input.is_real = 0 ∨ input.is_real = 1
-
 
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   -- `Spec` = the composed timestamp sub-assertion's `Spec` (the two byte bounds); the sub gives it from

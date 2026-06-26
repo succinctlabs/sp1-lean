@@ -31,9 +31,7 @@ theorem isEqualWord_of_raw {a b : Word (ZMod p)} {cols : Extracted.IsEqualWordOp
     (h_raw : RawSpec a b cols) :
     cols.is_diff_zero.result =
       if (a[0] = b[0] ∧ a[1] = b[1] ∧ a[2] = b[2] ∧ a[3] = b[3]) then 1 else 0 := by
-  have h := IsZeroWordOperation.isZeroWord_of_raw h_raw
-  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-    List.getElem_cons_succ, sub_eq_zero] at h
-  exact h
+  simpa only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, sub_eq_zero] using IsZeroWordOperation.isZeroWord_of_raw h_raw
 
 end SP1Clean.IsEqualWordOperation

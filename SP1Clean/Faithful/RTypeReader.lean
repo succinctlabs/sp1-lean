@@ -6,6 +6,7 @@ import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Extracted.RTypeReader
+import SP1Clean.Faithful.ChipTactics
 
 /-! # Faithfulness anchor — SP1's `RTypeReader` constraint fragment ↔ the native reader spec
 
@@ -32,11 +33,6 @@ open SP1Clean.Extracted
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- `(16 : ZMod p).val = 16` under `Fact (2^17 < p)`. -/
-private lemma val_16 [NeZero p] : (16 : ZMod p).val = 16 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
 
 set_option maxHeartbeats 2000000 in
 /-- **Faithfulness anchor (RTypeReader fragment).** Under `is_real = is_trusted = 1`, SP1's generated
@@ -68,7 +64,7 @@ theorem rtypereader_constraints_faithful
     ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.constrain_Range,
     ByteOpcode.constrain_U8Range, val_16, ZMod.val_zero, one_ne_zero, ne_eq, not_false_eq_true,
     true_implies, sub_self, mul_zero, sub_zero, Nat.ofNat_pos, true_and, and_true,
-    show (2 : ℕ) ^ 8 = 256 from by norm_num, show (2 : ℕ) ^ 16 = 65536 from by norm_num]
+    show (2 : ℕ) ^ 8 = 256 by norm_num, show (2 : ℕ) ^ 16 = 65536 by norm_num]
   -- The simp leaves a right-associated flat conjunction; the RHS groups the byte facts per operand.
   -- Only associativity differs.
   tauto
@@ -113,7 +109,7 @@ theorem rtypereader_interactions_faithful
     ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.constrain_Range,
     ByteOpcode.constrain_U8Range, val_16, ZMod.val_zero, one_ne_zero, ne_eq, not_false_eq_true,
     true_implies, Nat.ofNat_pos, true_and, and_true,
-    show (2 : ℕ) ^ 8 = 256 from by norm_num, show (2 : ℕ) ^ 16 = 65536 from by norm_num]
+    show (2 : ℕ) ^ 8 = 256 by norm_num, show (2 : ℕ) ^ 16 = 65536 by norm_num]
   tauto
 
 open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel ProgramMsg)

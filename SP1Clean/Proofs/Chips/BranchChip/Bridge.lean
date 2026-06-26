@@ -85,9 +85,9 @@ theorem correct_branch_native
   have hsp_pc : sp.regs.get Register.PC (hsp_init _) = pc := by
     rw [key Register.PC (hs _) (hsp_init _) (by decide)]; exact hpc_get
   have hsp_rs1 : SailState.get_reg? sp rs1 = some rs1_val := by
-    rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs1
+    rwa [hsp, SailState.get_reg?_insert_nextPC]
   have hsp_rs2 : SailState.get_reg? sp rs2 = some rs2_val := by
-    rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs2
+    rwa [hsp, SailState.get_reg?_insert_nextPC]
   have hexec : EStateM.run (execute_BTYPE imm (.Regidx rs2) (.Regidx rs1) op) sp
       = .ok RETIRE_SUCCESS { s with regs := s.regs.insert Register.nextPC (Word.toBitVec64 next_pc_word) } := by
     rcases em (branchCond op rs1_val rs2_val) with hc | hc
@@ -173,12 +173,12 @@ theorem branch_chip_reaches_sail
   obtain ⟨d_beq, d_bne, d_blt, d_bge, d_bltu, d_bgeu⟩ := h_decision h_real
   refine ⟨fun hf => key bop.BEQ ?_, fun hf => key bop.BNE ?_, fun hf => key bop.BLT ?_,
     fun hf => key bop.BGE ?_, fun hf => key bop.BLTU ?_, fun hf => key bop.BGEU ?_⟩
-  · have := d_beq hf; rw [h_rs1v, h_rs2v] at this; exact this
-  · have := d_bne hf; rw [h_rs1v, h_rs2v] at this; exact this
-  · have := d_blt hf; rw [h_rs1v, h_rs2v] at this; exact this
-  · have := d_bge hf; rw [h_rs1v, h_rs2v] at this; exact this
-  · have := d_bltu hf; rw [h_rs1v, h_rs2v] at this; exact this
-  · have := d_bgeu hf; rw [h_rs1v, h_rs2v] at this; exact this
+  · have := d_beq hf; rwa [h_rs1v, h_rs2v] at this
+  · have := d_bne hf; rwa [h_rs1v, h_rs2v] at this
+  · have := d_blt hf; rwa [h_rs1v, h_rs2v] at this
+  · have := d_bge hf; rwa [h_rs1v, h_rs2v] at this
+  · have := d_bltu hf; rwa [h_rs1v, h_rs2v] at this
+  · have := d_bgeu hf; rwa [h_rs1v, h_rs2v] at this
 
 end SP1Clean.BranchSail
 

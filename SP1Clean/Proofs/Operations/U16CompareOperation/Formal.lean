@@ -30,7 +30,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel] at h_holds ⊢
   obtain ⟨hr, _hbool, hgc⟩ := h_holds
-  -- post-#398 the byte receive owes no padding requirement, so the goal is exactly `Spec`.
   refine ⟨bool_of_mul_pred hgc, ?_⟩
   intro hr1eq
   obtain ⟨ha, hb⟩ := hab hr1eq

@@ -67,8 +67,8 @@ lemma srl_div_to_bitvec (W rs1 rs2 : Word (ZMod p)) (h_rs2U : Word.isU64 rs2)
     Word.toBitVec64 W = RV64.srl (Word.toBitVec64 rs2) (Word.toBitVec64 rs1) := by
   have hsh : (Word.toBitVec64 rs2).toNat % 64 = rs2[0].val % 64 := by
     rw [Word.toBitVec64_toNat h_rs2U, Word.toNat_def,
-        show (2:ℕ)^16 = 65536 from by norm_num, show (2:ℕ)^32 = 4294967296 from by norm_num,
-        show (2:ℕ)^48 = 281474976710656 from by norm_num]
+        show (2:ℕ)^16 = 65536 by norm_num, show (2:ℕ)^32 = 4294967296 by norm_num,
+        show (2:ℕ)^48 = 281474976710656 by norm_num]
     omega
   apply BitVec.eq_of_toNat_eq
   rw [srl_toNat, hsh]
@@ -83,8 +83,8 @@ lemma sra_div_to_bitvec_false (W rs1 rs2 : Word (ZMod p)) (h_rs2U : Word.isU64 r
     Word.toBitVec64 W = RV64.sra (Word.toBitVec64 rs2) (Word.toBitVec64 rs1) := by
   have hsh : (Word.toBitVec64 rs2).toNat % 64 = rs2[0].val % 64 := by
     rw [Word.toBitVec64_toNat h_rs2U, Word.toNat_def,
-        show (2:ℕ)^16 = 65536 from by norm_num, show (2:ℕ)^32 = 4294967296 from by norm_num,
-        show (2:ℕ)^48 = 281474976710656 from by norm_num]
+        show (2:ℕ)^16 = 65536 by norm_num, show (2:ℕ)^32 = 4294967296 by norm_num,
+        show (2:ℕ)^48 = 281474976710656 by norm_num]
     omega
   apply BitVec.eq_of_toNat_eq
   rw [sra_toNat_false _ _ h_msb, hsh]
@@ -100,8 +100,8 @@ lemma sra_div_to_bitvec_true (W rs1 rs2 : Word (ZMod p)) (h_rs2U : Word.isU64 rs
     Word.toBitVec64 W = RV64.sra (Word.toBitVec64 rs2) (Word.toBitVec64 rs1) := by
   have hsh : (Word.toBitVec64 rs2).toNat % 64 = rs2[0].val % 64 := by
     rw [Word.toBitVec64_toNat h_rs2U, Word.toNat_def,
-        show (2:ℕ)^16 = 65536 from by norm_num, show (2:ℕ)^32 = 4294967296 from by norm_num,
-        show (2:ℕ)^48 = 281474976710656 from by norm_num]
+        show (2:ℕ)^16 = 65536 by norm_num, show (2:ℕ)^32 = 4294967296 by norm_num,
+        show (2:ℕ)^48 = 281474976710656 by norm_num]
     omega
   apply BitVec.eq_of_toNat_eq
   rw [sra_toNat_true _ _ h_msb, hsh]

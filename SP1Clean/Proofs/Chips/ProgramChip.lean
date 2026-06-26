@@ -72,14 +72,14 @@ theorem programRow_eq_of_key {r1 r2 : ProgramRow (ZMod p)} (h : programRowKey r1
     · exact ZMod.val_injective p hb1
     · exact ZMod.val_injective p hb2
     · exact ZMod.val_injective p hb3
-    · exact absurd hi (by omega)
+    · omega
   · apply Vector.ext; intro i hi
     rcases i with _|_|_|_|i
     · exact ZMod.val_injective p hc0
     · exact ZMod.val_injective p hc1
     · exact ZMod.val_injective p hc2
     · exact ZMod.val_injective p hc3
-    · exact absurd hi (by omega)
+    · omega
 
 /-- The **rich ROM-membership predicate** SP1's program/decode chip establishes for every received row —
 the *received* facts `Foundations/Channels.lean`'s `ProgramMsg.Spec` defers: the register indices are
@@ -105,7 +105,6 @@ theorem inROM_of_provider {inROM : ProgramRow (ZMod p) → Prop} {row : ProgramR
     (hk : keyOf b = programRowKey row) : inROM row := by
   obtain ⟨row', h_spec, h_key⟩ := h_prov b hb
   rw [hk] at h_key
-  rw [programRow_eq_of_key h_key]
-  exact h_spec
+  rwa [programRow_eq_of_key h_key]
 
 end SP1Clean.ProgramChip

@@ -6,7 +6,7 @@ whole-machine claim. Unlike its predecessor, **every quantitative claim in this 
 machine-derived** — by `scripts/run_audit.sh`, whose raw census output is committed at
 `snapshots/axiom-census.txt`. Re-run the harness before citing any number.
 
-**Pins (audit of 2026-06-10).**
+**Pins (snapshot of 2026-06-10; census regenerated 2026-06-23 — re-run `scripts/run_audit.sh` for current numbers).**
 
 | What | Value | Command |
 |---|---|---|
@@ -23,8 +23,9 @@ project's own branch (it carries the `sp1-constraint-compiler` and witness-dump 
 > **Read this first if you read nothing else.** *Soundness is `sorry`-free across every wired chip* —
 > each chip `soundness` theorem and each Sail bridge is axiom-clean (the three Lean axioms, plus
 > `bv_decide`/`native_decide`'s two trusted axioms where used, plus Sail-model platform axioms where the
-> bridge reaches the Sail spec). The only `sorry`s are **three completeness/liveness holes and one
-> capstone-packaging premise** (§III.2). The machine-level *target theorem* is now **stated in Lean and
+> bridge reaches the Sail spec). The only `sorry` is **one capstone-packaging premise** — `sp1_witness_decode`,
+> the W1b/W1c decode seam (§III.2); the DivRem/ShiftLeft/ShiftRight/Mul completeness holes that this report's
+> 2026-06-10 snapshot listed were **closed** (2026-06-12 / 06-18). The machine-level *target theorem* is now **stated in Lean and
 > its simulation induction proved** (`Soundness/TargetVm.lean`): what separates today's capstone from
 > "the real Sail interpreter executes the guest program to the committed exit code" is exactly the
 > **named obligations** of `TargetObligations` (Part I) plus the one capstone premise — each mapped to

@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: No skipKernelTC in source
         run: scripts/check_no_skipkerneltc.sh
+      - name: No native_decide in the main SP1Clean library
+        run: scripts/check_no_native_decide.sh
 
   build:
     runs-on:
@@ -31,6 +33,11 @@ jobs:
       - uses: actions/checkout@v4
       # Test that the project builds without failure
       # Note: defaults to ignore warnings and deprecations, maybe change eventually
+      # lean-action's `use-github-cache` caches the WHOLE `.lake` (project build + deps) under a
+      # commit-keyed key (`lake-<os>-<arch>-<toolchain>-<manifest>-<sha>`) with a manifest-prefix
+      # `restore-keys` fallback. So this build is incremental from the most recent prior commit, and the
+      # exact-`<sha>` cache it saves is what the `lint`/`test` jobs restore (an exact hit → `lake build`
+      # there just replays, no recompilation). No separate per-commit project cache is needed.
       - uses: leanprover/lean-action@v1
         with:
           build: "true"
@@ -38,3 +45,62 @@ jobs:
           lint: "false"
           use-github-cache: "true"
 
+  lint:
+    # Environment linters (`lake lint` → the `sp1Lint` lintDriver; a curated subset of the Batteries
+    # `#lint` linters over the hand-written `SP1Clean.*` declarations; see AGENTS.md § Linters). Split
+    # into its own job so it is clearly independent in the checks list. `needs: build` so it runs after
+    # the build job has saved its exact-`<sha>` `.lake` cache; lean-action below restores that on an exact
+    # hit, so `lake build` just replays the already-built project (no recompilation) before `lake lint`.
+    # If that cache were ever absent, lean-action's manifest-prefix `restore-keys` fallback does a correct
+    # incremental build instead, so the job stays correct either way.
+    needs: build
+    runs-on:
+      [
+        runs-on,
+        runner=64cpu-linux-x64,
+        spot=false,
+        disk=large,
+        "run-id=${{ github.run_id }}",
+      ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          build: "true"
+          test: "false"
+          lint: "false"
+          use-github-cache: "true"
+      - name: Environment linters (lake lint)
+        run: lake lint
+
+  test:
+    # Conformance tests (`lake test` → the `SP1CleanTest` testDriver: the witness-generation and
+    # whole-trace `native_decide` anchors checked against batteries dumped from SP1's real Rust prover).
+    # These live in their own library — the ONLY place `native_decide` is allowed — so they are gated
+    # here, separately from the `native_decide`-free main build. Split into its own job (in parallel with
+    # `lint`) so the trusted-compiler checks are clearly independent in the checks list. `needs: build`
+    # so it runs after the build job has saved its exact-`<sha>` `.lake` cache; lean-action below restores
+    # that on an exact hit, so `lake build` replays the already-built main library (no recompilation) and
+    # `lake test` only elaborates the test modules. If that cache were ever absent, lean-action's
+    # manifest-prefix `restore-keys` fallback does a correct incremental build instead.
+    needs: build
+    runs-on:
+      [
+        runs-on,
+        runner=64cpu-linux-x64,
+        spot=false,
+        disk=large,
+        "run-id=${{ github.run_id }}",
+      ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          build: "true"
+          test: "false"
+          lint: "false"
+          use-github-cache: "true"
+      - name: Conformance tests (lake test)
+        run: lake test

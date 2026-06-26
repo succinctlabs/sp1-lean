@@ -1,4 +1,5 @@
 import SP1Clean.Native.Chips.BitwiseChip.Defs
+import SP1Clean.Math.EvalVec
 
 /-! # `SP1Clean.BitwiseChip` — contract: `Assumptions` / soundness / completeness / `circuit`
 
@@ -69,16 +70,11 @@ private lemma one_hot3 {x o a : ZMod p}
     (x = 1 → o = 0 ∧ a = 0) ∧ (o = 1 → x = 0 ∧ a = 0) ∧ (a = 1 → x = 0 ∧ o = 0) := by
   have hp : 2 ^ 17 < p := Fact.out
   haveI : Fact (1 < p) := ⟨by omega⟩
-  have h2 : (2 : ZMod p) ≠ 0 := by
-    have h : ((2 : ℕ) : ZMod p) ≠ 0 := by
-      rw [Ne, CharP.cast_eq_zero_iff (ZMod p) p]; intro hd
-      have := Nat.le_of_dvd (by norm_num) hd; omega
-    simpa using h
-  have h6 : (6 : ZMod p) ≠ 0 := by
-    have h : ((6 : ℕ) : ZMod p) ≠ 0 := by
-      rw [Ne, CharP.cast_eq_zero_iff (ZMod p) p]; intro hd
-      have := Nat.le_of_dvd (by norm_num) hd; omega
-    simpa using h
+  have hne : ∀ k : ℕ, 0 < k → k < p → ((k : ℕ) : ZMod p) ≠ 0 := fun k hk hkp => by
+    rw [Ne, CharP.cast_eq_zero_iff (ZMod p) p]; intro hd
+    exact absurd (Nat.le_of_dvd hk hd) (by omega)
+  have h2 : (2 : ZMod p) ≠ 0 := by simpa using hne 2 (by norm_num) (by omega)
+  have h6 : (6 : ZMod p) ≠ 0 := by simpa using hne 6 (by norm_num) (by omega)
   rcases hx with rfl | rfl <;> rcases ho with rfl | rfl <;> rcases ha with rfl | rfl <;>
     refine ⟨fun h => ?_, fun h => ?_, fun h => ?_⟩ <;>
     first
@@ -86,6 +82,16 @@ private lemma one_hot3 {x o a : ZMod p}
       | exact absurd h.symm one_ne_zero
       | (exfalso; apply h2; linear_combination hsum)
       | (exfalso; apply h6; linear_combination hsum)
+
+/-- The byte opcode `is_xor·2 + is_or·1 + is_and·0` lands in `{0,1,2}` (one-hot), so its `val < 3` —
+the operand-range part of the composed `BitwiseU16Operation.circuit`'s `Assumptions`. -/
+private lemma val_lt_three {x : ZMod p} (h : x = 0 ∨ x = 1 ∨ x = 2) : x.val < 3 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  rcases h with rfl | rfl | rfl
+  · simp
+  · rw [ZMod.val_one]; omega
+  · rw [show (2 : ZMod p) = ((2 : ℕ) : ZMod p) by norm_cast, ZMod.val_natCast_of_lt hp]; omega
 
 set_option maxHeartbeats 2000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
@@ -99,23 +105,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_and_bool := bool_of_mul_pred h_and_bin
   have hoh := one_hot3 h_xor_bool h_or_bool h_and_bool h_sum
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  -- the byte opcode `is_xor·2 + is_or·1` lands in `{0,1,2}` (one-hot), so it is `< 3` — the operand
-  -- range part of the composed `BitwiseU16Operation.circuit`'s `Assumptions`.
-  have hop3 : (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0).val < 3 := by
-    have key : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0
-        ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 1
-        ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 2 := by
+  have hop3 : (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0).val < 3 :=
+    val_lt_three <| by
       rcases h_xor_bool with hx | hx
       · rcases h_or_bool with ho | ho
         · exact Or.inl (by rw [hx, ho]; ring)
         · exact Or.inr (Or.inl (by rw [hx, ho]; ring))
       · obtain ⟨ho, _⟩ := hoh.1 hx
         exact Or.inr (Or.inr (by rw [hx, ho]; ring))
-    rcases key with h | h | h <;> rw [h]
-    · rw [ZMod.val_zero]; omega
-    · rw [ZMod.val_one]; omega
-    · rw [show (2 : ZMod p) = ((2 : ℕ) : ZMod p) by norm_cast,
-        ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega : 2 < p)]; omega
   -- once the active flag forces the others to 0, the byte opcode reduces to a literal
   refine ⟨⟨h_bin, fun hr => ⟨fun hand => ?_, fun hor => ?_, fun hxor => ?_⟩⟩,
     Or.inr h_bin, Or.inr ⟨ha, hb, hop3, h_bin⟩, Or.inr h_bin⟩
@@ -132,22 +129,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · obtain ⟨ho0, _ha0⟩ := hoh.1 hxor
     have hopc : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 2 := by
       rw [hxor, ho0]; ring
-    have h2 : (2 : ZMod p).val < 3 := by
-      rw [show (2 : ZMod p) = ((2 : ℕ) : ZMod p) by norm_cast,
-        ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega : 2 < p)]
-      omega
     exact (BitwiseU16Operation.result_semantic _ hr
-      (h_bw ⟨ha, hb, by rw [hopc]; exact h2, h_bin⟩)).2.2 hopc
-
-set_option linter.unusedSectionVars false in
-/-- A length-4 `#v` of pointwise evaluations is the `Vector.map` of the evaluator — lets the witness
-hint's `populate` operands (written `#v[env op_b_val[k]]` by the generator) be rewritten to the
-`Vector.map eval …` form that `h_input` provides. -/
-private lemma vec4_eval (e : Environment (ZMod p)) (v : Vector (Expression (ZMod p)) 4) :
-    (#v[Expression.eval e v[0], Expression.eval e v[1], Expression.eval e v[2],
-        Expression.eval e v[3]] : Vector (ZMod p) 4) = Vector.map (Expression.eval e) v := by
-  ext k hk
-  interval_cases k <;> simp [Vector.getElem_map]
+      (h_bw ⟨ha, hb, by rw [hopc]; exact val_lt_three (Or.inr (Or.inr rfl)), h_bin⟩)).2.2 hopc
 
 set_option maxHeartbeats 8000000 in
 theorem completeness :
@@ -178,10 +161,8 @@ theorem completeness :
   have hpvc : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value
       = input_adapter_op_c_memory_prev_value := h_input.2.2.2.2.2.2.2.2.1.1
   simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval, hpvb, hpvc] at h_env_cols
-  have hop3 : (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0).val < 3 := by
-    have key : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0
-        ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 1
-        ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 2 := by
+  have hop3 : (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0).val < 3 :=
+    val_lt_three <| by
       rw [hflag0, hflag1, hflag2]
       rcases hf0 with hx | hx
       · rcases hf1 with ho | ho
@@ -189,11 +170,6 @@ theorem completeness :
         · exact Or.inr (Or.inl (by rw [hx, ho]; ring))
       · obtain ⟨ho, -⟩ := hone0 hx
         exact Or.inr (Or.inr (by rw [hx, ho]; ring))
-    rcases key with h | h | h <;> rw [h]
-    · rw [ZMod.val_zero]; omega
-    · rw [ZMod.val_one]; omega
-    · rw [show (2 : ZMod p) = ((2 : ℕ) : ZMod p) by norm_cast,
-        ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega : 2 < p)]; omega
   refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨ha, hb, hop3, hbin⟩,
       ?_⟩,

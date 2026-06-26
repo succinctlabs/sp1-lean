@@ -42,9 +42,7 @@ lemma interactionsWith_formalSubcircuit_eq_nil {Input Output : TypeMap}
     rw [FlatOperation.channels]; exact List.mem_map.mpr ⟨i, hi, rfl⟩
   have hcontra := hsub hmem
   rw [hci'] at hcontra
-  rcases List.mem_append.mp hcontra with h | h
-  · exact h_g h
-  · exact h_r h
+  exact (List.mem_append.mp hcontra).elim h_g h_r
 
 /-- **`.main`-form companion** (matches what `circuit_norm` leaves after reducing a formal subcircuit):
 a circuit's `main` emits nothing on a channel outside its declared `channels` (= guarantees ++
@@ -88,9 +86,7 @@ lemma filter_interactions_formalAssertion_eq_nil {Input : TypeMap} [ProvableType
     rw [FlatOperation.channels]; exact List.mem_map.mpr ⟨i, hi, rfl⟩
   have hcontra := hsub hmem
   rw [hci'] at hcontra
-  rcases List.mem_append.mp hcontra with h | h
-  · exact h_g h
-  · exact h_r h
+  exact (List.mem_append.mp hcontra).elim h_g h_r
 
 /-- `.2`-projection form of `interactionsWith_main_eq_nil` — `circuit_norm` unfolds `Circuit.operations`
 to `(circuit.main input offset).2`, so this is the shape that actually appears after reducing

@@ -534,6 +534,132 @@ first
 ```
 See `Proofs/Chips/AddChip.lean` and `Native/Readers/RegisterAccessCols.lean` for the worked examples.
 
+## Compile-time / performance landmines
+
+The compile-time profile lives in `docs/snapshots/compile-profile.md` (regenerate with
+`scripts/profile_compile.sh`). These are the durable, still-true lessons behind it — apply them when
+adding a chip or chasing a slow file. The broad attribute/macro wins have already been harvested
+(below); remaining cost is term-intrinsic in the DivRem/Shift/Mul heavies, so new slowness almost
+always means a *local* regression against one of these.
+
+- **The `v[i]` index-bound tax — already fixed by the `decide` fast path.** Every `v[i]` elaborates
+  an `i < n` bound side-goal; in Lean 4.28's Std the slice-support `get_elem_tactic_extensible` rule
+  does ~11 full-context traversals (`rw … at *`, `dsimp … at *`, a slice `simp`) per index — ~0.34s
+  for `1 < 4` inside a hypothesis-heavy soundness proof, paid in every `have` type. `Math/GetElemFastPath.lean`
+  registers one `macro_rules | get_elem_tactic_extensible => decide` line *above* Std's (so it's tried
+  first among the extensible rules, still after `done`/`assumption`): literal bounds close by kernel
+  `Nat.decLt` in ~26 heartbeats, non-literals fall through. This single line halved the swept set when
+  it landed; **don't regress it** (e.g. by importing a module that re-shadows the rule below Std's). If
+  a `have`-dense proof suddenly slows, suspect the fast path isn't in scope.
+
+- **`circuit_proof_start` / bind-chain normalization is NOT the bottleneck — don't chase it.**
+  Measured at 6k–32k heartbeats on medium chips, ~320k (~90s) even on DivRem's `main` (the repo's
+  biggest). The once-per-chip `main_ops_eq` lemma would save ~4% — not worth it. Slow soundness files
+  are slow in their *proof body* (the arithmetic / product-glue `simpa`s), not in the start tactic.
+
+- **`ElaboratedCircuit` `localLength_eq`'s `rfl` default whnf-unfolds `main` — seconds on a big main.**
+  On a 17-op `main` the default `rfl` costs ~15s; `channelsLawful`'s default fails outright on
+  channel-heavy mains. Hand-write the simp-route `localLength_eq` (and the `channelsWith*_eq` /
+  `circuit_localLength` rfl-lemmas) on every chip with a non-trivial `main` so the defaults stay cheap
+  — see the "ElaboratedCircuit field obligations" section above for the full recipe. Chips with small
+  mains (2–5 ops) can keep the `rfl` default; it's cheap there.
+
+- **`set_option linter.all false` on the generated `Extracted/` modules removes the linter tax.** The
+  ~76 auto-gen modules carry it in their headers; keep it when regenerating (the linter passes over the
+  monolithic generated terms were a measurable chunk of their cost).
+
+- **`maxHeartbeats` tightening is the *wrong* lever — don't chase the ceilings.** The heavy Shift/DivRem
+  proofs are kernel / type-checking-bound, not heartbeat-bound: `ShiftLeftChip/Soundness/Sll.soundness`
+  measures at **72** elaboration heartbeats against its 4M ceiling. The high ceilings are non-binding safety
+  margins; lowering them has no wall-clock effect and only risks a future spike. Real cost is term-intrinsic
+  (the `2^64` reductions, the product-glue `simpa`s) — chase *that* (the abstract-`BitVec` helpers + shared-tail
+  dedup below), not the `set_option` numbers.
+
+- **Shared-tail dedup for many-conjunct soundness proofs (the DivRem pattern).** When N conjunct files
+  each prove `GeneralFormalCircuit.Soundness` over the *same* `main`, they each re-elaborate the
+  byte-identical post-instruction "requirements tail" (readers + `is_real` + channel obligations) at a
+  high `maxHeartbeats` — N× the same work. Extract it once: a `requirements_holds` lemma proving the
+  tail with **raw** (un-`circuit_proof_start`'d) binders, a `SpecObligation Spec` wrapper, and a
+  `soundness_of_specObligation` that reassembles a full `Soundness` from a per-conjunct `SpecObligation`
+  plus the shared tail. Each conjunct then proves only its chip-specific `Spec` via a `spec_proof_start`
+  elab tactic (mirrors `circuit_proof_start`'s setup but unfolds `SpecObligation`, so it does *less*
+  work). See `Proofs/Chips/DivRemChip/Soundness/Tail.lean`. **Landmine:** `requirements_holds` must be
+  applied *by-term* on raw binders — after `circuit_proof_start` the decomposed context (destroyed
+  `input_var` binders, consumed `h_holds`) no longer matches, which is exactly why the tail lemma takes
+  raw binders and the `SpecObligation` indirection exists. The ShiftRight/ShiftLeft conjuncts share an
+  analogous `cpuA/msb*/aluA` block that is a candidate for the same treatment.
+
+## Golf & cleanup discipline
+
+How to golf/clean a proof without breaking the repo's invariants (axiom-clean, 0-warning, no `info:`).
+Distilled from the 2026-06-22/23 cleanup campaign (109 files, −591 lines, axiom-cleanliness preserved). The
+remaining deferred cleanup TODOs live under `docs/roadmap.md` § "Cleanup / polish backlog"; the available
+cleanup skills are catalogued at the end of this section.
+
+**Instant, always-safe wins** (the bulk of the line savings):
+- `:= by rfl` → `:= rfl`; `show T from by tac` → `show T by tac`; `rw […] at h; exact h` → `rwa […] at h`;
+  `refine F ?_; exact e` → `exact F e`; `simp only […] at h ⊢; exact h` → `simpa only […] using h`.
+- Merge adjacent identical `simp only`/`rw`; inline a single-use `have x := e` that has **no** `by` body.
+- Reach for mathlib instead of a hand proof: `zero_ne_one`, `Int.eq_zero_of_abs_lt_dvd`, etc.
+
+**The dominant structural win — eval-map factoring.** Chip/op `Formal.lean` proofs repeat a per-limb
+`have eX : Expression.eval env input_var_X[i] = input_X[i] := by rw [← hX]; simp [Vector.getElem_map]`, one per
+limb. Collapse the copies into ONE quantified helper
+`have eX : ∀ i (hi : i < n), … := by intro i hi; rw [← hX]; simp [Vector.getElem_map]`, then call `eX i (by omega)`
+at each site (~12–25%/file on Load/Store/op `Formal.lean`). A *global* lemma for the per-limb `eX` helper was
+investigated and is **not** worth it: it saves only ~1 line/helper while re-churning ~36 already-clean
+`Formal.lean` files plus a foundational rebuild, at form-variation risk. (The narrower length-4 `#v` → `Vector.map`
+fold *was* worth hoisting — it's the shared `SP1Clean.vec4_eval` in `Math/EvalVec.lean`, used across the
+Mul/Lt/Bitwise/Shift `Formal` proofs + the DivRem completeness `Driver`.)
+
+**Kernel-safe dedup on the bit-shift / DivRem cores** (the `2^64` landmine zone — read the "Bit-shift chip
+soundness" § first). A heavy file may repeat a byte-identical `have` block across N sibling lemmas. You can
+factor it into a single helper **iff the block is pure `ZMod.val` / `Nat` arithmetic with no `2^64`/`BitVec`
+reduction** — extract it as a lemma **over loose variables** and apply it symbolically. This is kernel-safe
+because a lemma application instantiates an *already-checked* body, so the kernel does no *extra* reduction
+(no `skipKernelTC`; elaboration time does not regress). **Hard constraint:** the helper's conclusion must match
+the original `have`'s type **character-for-character** — it's a downstream `rw`-target, and `(16 : ZMod p) - …`
+is **not** interchangeable with `(16 - … : ZMod p)`. The heavy `2^64`-scale work itself is already isolated in
+abstract-`BitVec` helpers (`srl_toNat`/`sra_toNat`) — leave those alone. Worked example: `inner_val`/`inner_hi_val`
+in `Proofs/Chips/ShiftLeftChip/Core.lean`.
+
+**Traps — `have`s that look dead but are load-bearing** (verify with `lean_goal` / a build before removing):
+- `have hp : 2 ^ 17 < p := Fact.out` (and `have : 131072 < p`) — feeds a downstream `omega` that needs the
+  magnitude; grep shows one occurrence (its own line) yet `omega` consumes it implicitly.
+- `haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩` — supplies an instance to later
+  `ZMod.val`/`omega` steps. There is **no** global `NeZero p` instance, *on purpose*: a `Fact (2^17 < p)`-derived
+  one would make the pervasive `omit [Fact (2^17 < p)] in` clauses illegal (`Model/ByteTable.lean:84`). A
+  `Fact p.Prime`-derived global instance *might* survive the `omit` pattern (it depends on primality, not the
+  magnitude) and eliminate most of the ~185 `haveI` copies — but it cuts against the documented local-instance
+  discipline and risks instance-resolution surprises, so it's an owner decision, not a drive-by change.
+
+**Don't golf:**
+- **`Faithful/*` anchors** — conservative only (drop `by exact` / dead `let` / `from by`); never restructure
+  proof terms or statement forms; they are *syntactic* faithfulness anchors.
+- **`Spec`/`Assumptions`/statement forms**, `set_option`/`maxHeartbeats`, `ElaboratedCircuit` field structure.
+- **Auto-gen** — `Extracted/`, `*Vectors.lean`, `Native/Operations/*/RawSpec`, etc.; banner-check the header.
+- **Narrative comments on kernel-sensitive Shift/DivRem files** — they document the `2^64` / `id (ZMod p)`
+  landmines + proof roadmaps; they are the institutional memory of *why* the proof is shaped that way. (A
+  blanket comment-strip on `ShiftLeftChip/Soundness/Sll` was reverted for exactly this.)
+
+**Verify every batch:** `lake build SP1Clean` clean (0 warn, no `info:`), `bash scripts/check_no_skipkerneltc.sh`,
+`sorry` grep = only `SP1GatedVm.lean`, then `scripts/run_audit.sh` periodically (the axiom census must stay
+identical). On heavy files watch the per-file elaboration time in the build log and **revert on regression**.
+
+**Merge gotcha (post-`git merge`):** an auto-merge can *silently duplicate* a lemma that both branches added
+near each other — no conflict marker, but `lake build` fails with "`<name>` has already been declared". Always
+run the full `lake build` after a merge even when `git status` shows no conflicts (`Proofs/Chips/BitwiseChip/
+Bridge.lean` hit this when upstream #101's immediate-type bridges met a golfed copy).
+
+**Available cleanup skills:**
+- **`/cleanup`** — the per-file 7-phase workflow (style audit → per-decl golf → simplify → verify). Best for a
+  handful of named files.
+- **`/cleanup-all`** — the orchestrator marathon (dispatches per-batch workers across the whole tree). Best for a
+  project-wide sweep; honor the repo guardrails (auto-gen exclusion, axiom-clean, heavy-core caution).
+- **`/decompose-proof`** — break one long proof into named sub-lemmas.
+- **`/split-file`** — split an over-long file along namespace/section seams.
+- **`Skill(simplify)`** — a holistic reuse/altitude review pass on a file (invoked inside `/cleanup` Phase 6.5).
+
 ## "emitted = projection": `<b>Lookups_eq_emitted` (proving a trace projection IS the emission)
 
 Goal: prove a hand-written trace-level projection (`Soundness/*Consistency.lean`'s `stateLookups`,

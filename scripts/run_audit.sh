@@ -49,8 +49,17 @@ if scripts/check_no_skipkerneltc.sh; then
 else
   echo "FAIL: skipKernelTC reintroduced (see above)"; fail=1
 fi
-echo "native_decide occurrences (disclosed, witness battery + Sail memory bridges):"
-grep -rn 'native_decide' SP1Clean --include='*.lean' | wc -l
+
+echo
+echo "== A2 native_decide guard (gate: none in SP1Clean/) =="
+if scripts/check_no_native_decide.sh; then
+  echo "PASS: no native_decide in the main library"
+else
+  echo "FAIL: native_decide in SP1Clean/ (see above)"; fail=1
+fi
+echo "native_decide occurrences in SP1CleanTest/ (disclosed — the witness/trace conformance battery,"
+echo "the sole sanctioned native_decide; adds Lean.ofReduceBool/trustCompiler, confined off the main library):"
+grep -rn 'native_decide' SP1CleanTest --include='*.lean' | wc -l
 
 echo
 echo "== A3 axiom census (the authoritative oracle) =="

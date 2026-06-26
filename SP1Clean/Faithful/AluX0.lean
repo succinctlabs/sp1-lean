@@ -22,10 +22,6 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-private lemma val_16'' [NeZero p] : (16 : ZMod p).val = 16 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
-
 private lemma val_29'' [NeZero p] : (29 : ZMod p).val = 29 := by
   have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   exact ZMod.val_natCast_of_lt (show (29 : ℕ) < p by omega)
@@ -76,7 +72,7 @@ theorem alux0cols_constraints_faithful (cols : Extracted.AluX0Cols (ZMod p))
     Interaction.toProp_send_memory, Interaction.toProp_send_program,
     ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.ofNat_four,
     ByteOpcode.constrain_Range, ByteOpcode.constrain_U8Range, ByteOpcode.constrain_LTU,
-    val_16'', val_29'', ZMod.val_zero, ZMod.val_one, one_ne_zero, ne_eq, not_false_eq_true,
+    val_16_zmod_p, val_29'', ZMod.val_zero, ZMod.val_one, one_ne_zero, ne_eq, not_false_eq_true,
     true_implies, sub_self, mul_zero, sub_zero, zero_mul, one_mul, Nat.ofNat_pos, true_and, and_true,
     false_or, true_iff, show (1 : ℕ) < 256 from by norm_num, show (29 : ℕ) < 256 from by norm_num,
     show (2 : ℕ) ^ 8 = 256 from by norm_num, show (2 : ℕ) ^ 16 = 65536 from by norm_num]

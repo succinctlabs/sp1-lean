@@ -83,6 +83,15 @@ lemma toBitVec128_toNat [NeZero p] {w : Word (ZMod p)} (hw : w.isU64) :
   have := lt_cases_of_isU64 hw
   rw [Nat.mod_eq_of_lt (by omega)]
 
+/-- The constant word `#v[4,0,0,0]` (the "+4" PC increment used by Jal/Jalr/Branch) is a valid u64. -/
+lemma isU64_four [NeZero p] [Fact (2 ^ 17 < p)] :
+    isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
+  have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  refine isU64_of_cases ?_ ?_ ?_ ?_ <;>
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
+      ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
+
 end Word
 
 /-- Clearing bit 0 (the Sail `BitVec.update _ 0 0#1`, which unfolds to `~~~(1#64) &&& ·`) of
@@ -110,8 +119,7 @@ lemma ofNat64_clear_lsb_and {M b : ℕ} (hb : b ≤ 1) (hM : M % 2 = 0) :
   exact ZMod.val_natCast_of_lt (show (65536 : ℕ) < p by omega)
 
 lemma val_65536_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (65536 : ZMod p) ≠ 0 := by
-  have h : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
-  intro hz; rw [hz] at h; simp at h
+  simp [← ZMod.val_eq_zero, val_65536_zmod_p]
 
 @[simp] lemma val_2_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
     (2 : ZMod p).val = 2 := by
@@ -124,8 +132,42 @@ lemma val_65536_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (65536 : ZMod p) ≠ 0 
   exact ZMod.val_natCast_of_lt (show (4 : ℕ) < p by omega)
 
 lemma val_4_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (4 : ZMod p) ≠ 0 := by
-  have h : (4 : ZMod p).val = 4 := val_4_zmod_p
-  intro hz; rw [hz] at h; simp at h
+  simp [← ZMod.val_eq_zero, val_4_zmod_p]
+
+@[simp] lemma val_8_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
+    (8 : ZMod p).val = 8 := by
+  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  exact ZMod.val_natCast_of_lt (show (8 : ℕ) < p by omega)
+
+@[simp] lemma val_13_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
+    (13 : ZMod p).val = 13 := by
+  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  exact ZMod.val_natCast_of_lt (show (13 : ℕ) < p by omega)
+
+@[simp] lemma val_14_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
+    (14 : ZMod p).val = 14 := by
+  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  exact ZMod.val_natCast_of_lt (show (14 : ℕ) < p by omega)
+
+@[simp] lemma val_16_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
+    (16 : ZMod p).val = 16 := by
+  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
+
+@[simp] lemma val_32_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
+    (32 : ZMod p).val = 32 := by
+  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  exact ZMod.val_natCast_of_lt (show (32 : ℕ) < p by omega)
+
+@[simp] lemma val_64_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
+    (64 : ZMod p).val = 64 := by
+  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  exact ZMod.val_natCast_of_lt (show (64 : ℕ) < p by omega)
+
+@[simp] lemma val_32768_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
+    (32768 : ZMod p).val = 32768 := by
+  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  exact ZMod.val_natCast_of_lt (show (32768 : ℕ) < p by omega)
 
 /-- The `÷4` alignment check `(x · 4⁻¹).val < 2^14` pins `x = (x · 4⁻¹) · 4` exactly in `ℕ`: since
 `(x · 4⁻¹).val · 4 < 2^16 < p` there is no wrap, so `x.val = (x · 4⁻¹).val · 4`. The shared core of the
@@ -158,6 +200,9 @@ lemma val_lt_65536_of_mul_inv_four_lt [Fact p.Prime] [Fact (2 ^ 17 < p)] {x : ZM
     (65535 : ZMod p).val = 65535 := by
   have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   exact ZMod.val_natCast_of_lt (show (65535 : ℕ) < p by omega)
+
+lemma val_65535_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (65535 : ZMod p) ≠ 0 := by
+  simp [← ZMod.val_eq_zero, val_65535_zmod_p]
 
 /-- The 16-bit complement `65535 - x` has a clean `.val` (= `65535 - x.val` in `ℕ`).
 Used by the Sub borrow-chain limb lift: feeding `bbar := 65535 - b[i]` (a genuine

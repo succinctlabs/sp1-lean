@@ -35,11 +35,6 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- `(14 : ZMod p).val = 14` under `Fact (2^17 < p)`. -/
-private lemma val_14 [NeZero p] : (14 : ZMod p).val = 14 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (14 : ℕ) < p by omega)
-
 set_option maxHeartbeats 2000000 in
 /-- **Chip-level faithfulness anchor — assertion half.** Under `is_real = 1 ∧ op_a_0 = 0`, SP1's generated
 JALR `asserts` list holds iff: the two `AddOperation` assertion specs (carry-bools) for the jump target
@@ -107,7 +102,7 @@ theorem jalrcols_interactions_faithful (cols : Extracted.JalrColumns (ZMod p))
   simp only [Extracted.ITypeReader.interactions, List.Forall, Interaction.toProp_send_byte,
     Interaction.toProp_receive, Interaction.toProp_send_memory, Interaction.toProp_send_program,
     ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.constrain_Range,
-    ByteOpcode.constrain_U8Range, val_14, val_16, ZMod.val_zero, one_ne_zero, ne_eq,
+    ByteOpcode.constrain_U8Range, val_14_zmod_p, val_16, ZMod.val_zero, one_ne_zero, ne_eq,
     not_false_eq_true, true_implies, Nat.ofNat_pos, true_and, and_true,
     show (2 : ℕ) ^ 8 = 256 from by norm_num]
   tauto

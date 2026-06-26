@@ -39,7 +39,6 @@ lemma single_flag {a b c d : ZMod p} (ha : a = 1)
     (hb : b = 0 ∨ b = 1) (hc : c = 0 ∨ c = 1) (hd : d = 0 ∨ d = 1)
     (hsum : a + b + c + d = 0 ∨ a + b + c + d = 1) : b = 0 ∧ c = 0 ∧ d = 0 := by
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   have hva : a.val = 1 := by rw [ha]; exact ZMod.val_one p
   have vb : b.val ≤ 1 := by rcases hb with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
   have vc : c.val ≤ 1 := by rcases hc with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
@@ -64,7 +63,6 @@ lemma srlw_sraw_gate {a b c d : ZMod p}
     (hsum : a + b + c + d = 0 ∨ a + b + c + d = 1) (hcd : c + d = 1) :
     a = 0 ∧ b = 0 ∧ a + b + c + d = 1 := by
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   have va : a.val ≤ 1 := by rcases ha with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
   have vb : b.val ≤ 1 := by rcases hb with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
   have vc : c.val ≤ 1 := by rcases hc with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
@@ -90,7 +88,6 @@ lemma pair_flag {a b c d : ZMod p}
     (ha : a = 0 ∨ a = 1) (hb : b = 0 ∨ b = 1) (hc : c = 0 ∨ c = 1) (hd : d = 0 ∨ d = 1)
     (hsum : a + b + c + d = 0 ∨ a + b + c + d = 1) : c + d = 0 ∨ c + d = 1 := by
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   have va : a.val ≤ 1 := by rcases ha with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
   have vb : b.val ≤ 1 := by rcases hb with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
   have vc : c.val ≤ 1 := by rcases hc with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]

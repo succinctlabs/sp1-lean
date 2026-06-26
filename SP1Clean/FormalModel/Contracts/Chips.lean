@@ -374,9 +374,7 @@ private lemma high64_mul (b' c' : BitVec 129) (b'' c'' : BitVec 128)
 
 /-- `RV64.mul rs2 rs1 = rs1 * rs2` (commuted into the gadget's `b * c` form). -/
 lemma rv64_mul_eq (x y : BitVec 64) : RV64.mul x y = y * x := by
-  simp only [RV64.mul]
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_mul, BitVec.toNat_mul, Nat.mul_comm]
+  rw [RV64.mul, BitVec.mul_comm]
 
 /-- `RV64.mulh`'s high-64-bit signed×signed product equals the gadget's `>>>64 |>.setWidth 64` form. -/
 lemma rv64_mulh_eq (x y : BitVec 64) :

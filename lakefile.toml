@@ -3,9 +3,24 @@ defaultTargets = ["SP1Clean"]
 
 moreLeanArgs = ["--tstack=400000"]
 
-# Built-in options only (no Mathlib linter options here — those require a Mathlib
-# linter module to be imported before the package -D flags are validated, which a
-# Clean-only file does not pull in; see the sp1-lean Step 0 finding).
+# `lake lint` driver — the project-local environment-linter pass (`scripts/sp1Lint.lean`). It runs a
+# curated subset of the Batteries `#lint` linters over the hand-written `SP1Clean.*` declarations only,
+# excluding the auto-generated `Extracted/`+`*Vectors` code. We use a thin custom driver (not the stock
+# `runLinter` exe) because `runLinter` scopes by namespace *root*, which cannot exclude `SP1Clean.Extracted`
+# while keeping `SP1Clean.Proofs`. Needs a built project first (env linters read oleans); run after `lake build`.
+lintDriver = "sp1Lint"
+
+# `lake test` driver — builds/elaborates the top-level `SP1CleanTest` library (the witness- and
+# whole-trace conformance anchors). Those anchors are the project's ONLY `native_decide` (which trusts
+# the whole Lean compiler via `Lean.ofReduceBool`/`Lean.trustCompiler`), so they are quarantined in
+# this test library, OUT of the main `SP1Clean` library — kept `native_decide`-free by the
+# `scripts/check_no_native_decide.sh` source gate (the CI `guards` job + the audit). Run with `lake test`.
+testDriver = "SP1CleanTest"
+
+# Built-in options only — the Mathlib style linters are applied per-lib via `moreLeanArgs`
+# (see the pillar libraries below), NOT here at package scope: that keeps the auto-gen
+# `SP1Extracted` library cleanly out of the linter set. (Every hand-written pillar transitively
+# imports Mathlib, so the `-D linter.*` options register fine when applied per-lib.)
 [leanOptions]
 pp.unicode.fun = true
 synthInstance.maxHeartbeats = 1000000
@@ -33,6 +48,14 @@ name = "RISCV"
 git = "https://github.com/succinctlabs/riscv-lean"
 rev = "dtumad/clean-native"
 
+# The `lake lint` driver executable (see `lintDriver` above). A thin wrapper around the Batteries
+# `#lint` framework; `supportInterpreter` is required because the linters' `test` functions are run
+# through the interpreter. Built by `lake build` along with the libraries; invoked by `lake lint`.
+[[lean_exe]]
+name = "sp1Lint"
+srcDir = "scripts"
+supportInterpreter = true
+
 # Umbrella library — root module `SP1Clean.lean` imports every module; `lake build` (the default
 # target) builds everything through it. Package-level `moreLeanArgs`/`[leanOptions]` above apply to
 # all libraries, so the layer libraries below inherit `--tstack`/heartbeats with no duplication.
@@ -42,15 +65,37 @@ name = "SP1Clean"
 # Layer build-targets (select modules by submodule glob; module names stay `SP1Clean.*`, so these add
 # no import churn). They make each pillar independently buildable — `lake build SP1Extracted`, etc.
 # NOTE: isolation is by convention, not enforced — Lake does not forbid cross-layer imports within one
-# package. The `Native`/`Proofs` pillar libraries are added once those directories land.
+# package.
+#
+# Lib-scoped Mathlib style linters. Every hand-written core pillar (Math/Model/FormalModel/Native +
+# Proofs/Faithful/Soundness) plus the `SP1CleanTest` test lib carries the SAME `moreLeanArgs` linter set
+# below; they all transitively import Mathlib (Native via Clean), so the `-D linter.*` options are
+# registered and these flags apply during `lake build SP1Clean` / `lake test`. All eight are at zero
+# violations. `linter.style.longLine` is the remaining candidate (real fallout, concentrated in
+# Native/FormalModel) — see `docs/roadmap.md` § "Cleanup / polish backlog". The auto-gen `SP1Extracted` library is
+# deliberately left OUT (it carries per-file `set_option linter.all false` instead), as are the
+# auto-gen `*Vectors` modules inside `SP1CleanTest` (same per-file suppression). KEEP THE SIX COPIES IN SYNC.
 [[lean_lib]]
 name = "SP1Math"
 globs = ["SP1Clean.Math.+"]
+moreLeanArgs = [
+  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
+  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
+  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
+  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
+]
 
 [[lean_lib]]
 name = "SP1Model"
 globs = ["SP1Clean.Model.+"]
+moreLeanArgs = [
+  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
+  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
+  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
+  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
+]
 
+# Auto-gen pillar — NO linter args (the generated modules carry `set_option linter.all false`).
 [[lean_lib]]
 name = "SP1Extracted"
 globs = ["SP1Clean.Extracted.+"]
@@ -58,13 +103,49 @@ globs = ["SP1Clean.Extracted.+"]
 [[lean_lib]]
 name = "SP1FormalModel"
 globs = ["SP1Clean.FormalModel.+"]
+moreLeanArgs = [
+  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
+  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
+  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
+  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
+]
 
 [[lean_lib]]
 name = "SP1Native"
 globs = ["SP1Clean.Native.+"]
+moreLeanArgs = [
+  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
+  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
+  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
+  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
+]
 
 # The proof pillar: the sound/complete proofs (Proofs/), the faithfulness anchors (Faithful/),
-# and the whole-machine/trace layer (Soundness/).
+# and the whole-machine/trace layer (Soundness/). Same linter set as the other core pillars above.
 [[lean_lib]]
 name = "SP1Proofs"
 globs = ["SP1Clean.Proofs.+", "SP1Clean.Faithful.+", "SP1Clean.Soundness.+"]
+moreLeanArgs = [
+  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
+  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
+  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
+  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
+]
+
+# The test pillar (the `lake test` driver, see `testDriver` above) — the witness-generation and
+# whole-trace conformance anchors (`SP1CleanTest.{WitnessTests,TraceGenTests}.*`), which import the
+# main `SP1Clean` library and check it against batteries dumped from SP1's real Rust prover. This is
+# the ONLY library that may use `native_decide`; it is NOT imported by the umbrella `SP1Clean`, so the
+# default `lake build` stays `native_decide`-free. Same syntactic linter set as the core pillars; the
+# auto-gen `SP1CleanTest.WitnessTests.Vectors.*` / `*TraceVectors` modules self-suppress with their own
+# `set_option linter.all false`. (The `lake lint` env-linter pass skips this lib too — `sp1Lint` keeps
+# only `SP1Clean`-prefixed declarations, and `SP1CleanTest` is not such a prefix.)
+[[lean_lib]]
+name = "SP1CleanTest"
+globs = ["SP1CleanTest.+"]
+moreLeanArgs = [
+  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
+  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
+  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
+  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
+]

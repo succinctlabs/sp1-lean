@@ -96,13 +96,13 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have hmap : Vector.map (Expression.eval env) input_var_cols_op_a_memory_prev_value
       = input_cols_op_a_memory_prev_value := h_input.1.2.1.1
   have ev0 : Expression.eval env input_var_cols_op_a_memory_prev_value[0]
-      = input_cols_op_a_memory_prev_value[0] := by rw [← hmap]; simp only [Vector.getElem_map]
+      = input_cols_op_a_memory_prev_value[0] := by simp [← hmap]
   have ev1 : Expression.eval env input_var_cols_op_a_memory_prev_value[1]
-      = input_cols_op_a_memory_prev_value[1] := by rw [← hmap]; simp only [Vector.getElem_map]
+      = input_cols_op_a_memory_prev_value[1] := by simp [← hmap]
   have ev2 : Expression.eval env input_var_cols_op_a_memory_prev_value[2]
-      = input_cols_op_a_memory_prev_value[2] := by rw [← hmap]; simp only [Vector.getElem_map]
+      = input_cols_op_a_memory_prev_value[2] := by simp [← hmap]
   have ev3 : Expression.eval env input_var_cols_op_a_memory_prev_value[3]
-      = input_cols_op_a_memory_prev_value[3] := by rw [← hmap]; simp only [Vector.getElem_map]
+      = input_cols_op_a_memory_prev_value[3] := by simp [← hmap]
   rw [ev0] at z0; rw [ev1] at z1; rw [ev2] at z2; rw [ev3] at z3
   exact ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin,
       h_rac_a h_assumptions, h_rac_b h_assumptions⟩,
@@ -115,13 +115,13 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   have hmap : Vector.map (Expression.eval env.toEnvironment) input_var_cols_op_a_memory_prev_value
       = input_cols_op_a_memory_prev_value := h_input.1.2.1.1
   have ev0 : Expression.eval env.toEnvironment input_var_cols_op_a_memory_prev_value[0]
-      = input_cols_op_a_memory_prev_value[0] := by rw [← hmap]; simp only [Vector.getElem_map]
+      = input_cols_op_a_memory_prev_value[0] := by simp [← hmap]
   have ev1 : Expression.eval env.toEnvironment input_var_cols_op_a_memory_prev_value[1]
-      = input_cols_op_a_memory_prev_value[1] := by rw [← hmap]; simp only [Vector.getElem_map]
+      = input_cols_op_a_memory_prev_value[1] := by simp [← hmap]
   have ev2 : Expression.eval env.toEnvironment input_var_cols_op_a_memory_prev_value[2]
-      = input_cols_op_a_memory_prev_value[2] := by rw [← hmap]; simp only [Vector.getElem_map]
+      = input_cols_op_a_memory_prev_value[2] := by simp [← hmap]
   have ev3 : Expression.eval env.toEnvironment input_var_cols_op_a_memory_prev_value[3]
-      = input_cols_op_a_memory_prev_value[3] := by rw [← hmap]; simp only [Vector.getElem_map]
+      = input_cols_op_a_memory_prev_value[3] := by simp [← hmap]
   rw [← ev0] at z0; rw [← ev1] at z1; rw [← ev2] at z2; rw [← ev3] at z3
   refine ⟨⟨h_assumptions, hrac_a⟩, ⟨h_assumptions, hrac_b⟩, ?_, z0, z1, z2, z3⟩
   rcases hbin with h | h <;> rw [h] <;> simp

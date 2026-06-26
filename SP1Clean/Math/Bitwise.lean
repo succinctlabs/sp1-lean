@@ -26,8 +26,7 @@ variable {p : ℕ}
   exact ZMod.val_natCast_of_lt (show (256 : ℕ) < p by omega)
 
 lemma val_256_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (256 : ZMod p) ≠ 0 := by
-  have h : (256 : ZMod p).val = 256 := val_256_zmod_p
-  intro hz; rw [hz] at h; simp at h
+  simp [← ZMod.val_eq_zero, val_256_zmod_p]
 
 /-! ## The byte operation (AND=0, OR=1, XOR=2) -/
 

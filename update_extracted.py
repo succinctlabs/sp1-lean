@@ -103,8 +103,8 @@ WITNESS_SCHEMA: Dict[str, List[str]] = {
 }
 
 # Chips with a **whole-trace** dumper in the `witness_vectors` binary (`--chip <name>`) → an extra
-# `Proofs/TraceGenTests/<name>ChipTraceVectors.lean` (the event battery + the full padded matrix from
-# SP1's real `generate_trace`) plus a hand-written `Proofs/TraceGenTests/<name>ChipTraceWitness.lean`
+# `SP1CleanTest/TraceGenTests/<name>ChipTraceVectors.lean` (the event battery + the full padded matrix from
+# SP1's real `generate_trace`) plus a hand-written `SP1CleanTest/TraceGenTests/<name>ChipTraceWitness.lean`
 # anchor that re-derives every row from the chip's own circuit (`TraceGenerator.lean` +
 # `EventPopulate.lean`) and checks the matrices match. Value = (expected row width — a layout-drift
 # tripwire; the dumper also asserts it, reader kind — picks the dumped record type and the Lean
@@ -126,7 +126,7 @@ TRACE_CHIPS: Dict[str, Tuple[int, str]] = {
 
 # Ordered JSON keys of one dumped event, per reader kind = the field order of Lean's
 # `AluEventRec` / `AluTypeEventRec` / `AluEventOpRec` / `AluTypeOpEventRec`
-# (`Proofs/TraceGenTests/EventPopulate.lean`).
+# (`SP1CleanTest/TraceGenTests/EventPopulate.lean`).
 TRACE_EVENT_KEYS: Dict[str, List[str]] = {
     "RType": [
         "clk", "pc", "a", "b", "c", "opA", "opB", "opC",
@@ -225,8 +225,11 @@ DEFAULT_SP1_DIR = "../sp1"
 # regenerated files so the extraction provenance is always recorded in-repo.
 SP1_PINNED_COMMIT = "9d249b8d4fb7d00156bf77f5d295d1dbcaaf4136"
 EXTRACTED_DIR = os.path.join("SP1Clean", "Extracted")
-WITNESS_DIR = os.path.join("SP1Clean", "Extracted", "WitnessVectors")
-TRACEGEN_DIR = os.path.join("SP1Clean", "Proofs", "TraceGenTests")
+# The witness/trace conformance vectors are test-only data: they live in the top-level
+# `SP1CleanTest` test library (built by `lake test`), not the main `SP1Clean` library — which is
+# gated `native_decide`-free (the anchors that consume these vectors are the only `native_decide`).
+WITNESS_DIR = os.path.join("SP1CleanTest", "WitnessTests", "Vectors")
+TRACEGEN_DIR = os.path.join("SP1CleanTest", "TraceGenTests")
 
 COMMON_IMPORTS = """import SP1Clean.Math.Word
 import SP1Clean.Extracted.ExtractionDSL
@@ -657,7 +660,7 @@ def render_witness_vectors(operation: str, data: dict) -> str:
         f"imperative code and cannot be symbolically extracted; these vectors instead tie the Lean\n"
         f"witness function to the Rust source by **conformance** (agreement on the sampled inputs —\n"
         f"edge cases + a seeded LCG — not an all-inputs proof). Each entry is `{tuple_desc}`. The\n"
-        f"check lives in `SP1Clean/WitnessTests/{operation}Witness.lean`. Regenerate with\n"
+        f"check lives in `SP1CleanTest/WitnessTests/{operation}Witness.lean`. Regenerate with\n"
         f"`SP1_DIR=… python3 update_extracted.py`. -/"
     )
     return (
@@ -708,12 +711,12 @@ def render_trace_vectors(chip: str, width: int, kind: str, data: dict) -> str:
         f"`MachineAir::generate_trace` by `update_extracted.py` (the `witness_vectors` binary,\n"
         f"`--chip {chip}`): the deterministic event battery and the full padded {width}-column\n"
         f"row-major matrix (including SP1's zero padding rows). The anchor\n"
-        f"`SP1Clean/Proofs/TraceGenTests/{chip}ChipTraceWitness.lean` re-derives every row from the\n"
+        f"`SP1CleanTest/TraceGenTests/{chip}ChipTraceWitness.lean` re-derives every row from the\n"
         f"chip's own circuit (`TraceGenerator.lean`) and checks the matrices match. Regenerate\n"
         f"with `SP1_DIR=… python3 update_extracted.py`. -/"
     )
     return (
-        "import SP1Clean.Proofs.TraceGenTests.EventPopulate\n\n"
+        "import SP1CleanTest.TraceGenTests.EventPopulate\n\n"
         + doc + "\n\n"
         + "namespace SP1Clean.TraceGenTests\nopen SP1Clean\n\n"
         + LINTERS_OFF + "\n\n"

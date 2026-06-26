@@ -24,11 +24,6 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- `(13 : ZMod p).val = 13` under `Fact (2^17 < p)`. -/
-private lemma val_13 [NeZero p] : (13 : ZMod p).val = 13 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (13 : ℕ) < p by omega)
-
 /-- **Faithfulness anchor (CPUState fragment).** Under `is_real = 1`, SP1's generated `CPUState`
 constraint list holds iff the two clock-range bounds hold — i.e. iff `Readers.CPUState.Spec` holds.
 The `.state` `receive`/`send` interactions contribute `True` (their meaning is the trace-level bus);
@@ -42,9 +37,9 @@ theorem cpustate_constraints_faithful
   simp only [Extracted.CPUState.asserts, Extracted.CPUState.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_state, ByteOpcode.ofNat_six, ByteOpcode.ofNat_three,
-    ByteOpcode.constrain_Range, ByteOpcode.constrain_U8Range, val_13, ZMod.val_zero,
+    ByteOpcode.constrain_Range, ByteOpcode.constrain_U8Range, val_13_zmod_p, ZMod.val_zero,
     one_ne_zero, ne_eq, not_false_eq_true, true_implies, sub_self, mul_zero,
-    Nat.ofNat_pos, true_and, and_true, show (2 : ℕ) ^ 8 = 256 from by norm_num]
+    Nat.ofNat_pos, true_and, and_true, show (2 : ℕ) ^ 8 = 256 by norm_num]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- **CPUState fragment — assertion half.** `CPUState` emits only the (vacuous at `is_real = 1`)
@@ -65,9 +60,9 @@ theorem cpustate_interactions_faithful
   simp only [Extracted.CPUState.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_state, ByteOpcode.ofNat_six, ByteOpcode.ofNat_three,
-    ByteOpcode.constrain_Range, ByteOpcode.constrain_U8Range, val_13, ZMod.val_zero,
+    ByteOpcode.constrain_Range, ByteOpcode.constrain_U8Range, val_13_zmod_p, ZMod.val_zero,
     one_ne_zero, ne_eq, not_false_eq_true, true_implies,
-    Nat.ofNat_pos, true_and, and_true, show (2 : ℕ) ^ 8 = 256 from by norm_num]
+    Nat.ofNat_pos, true_and, and_true, show (2 : ℕ) ^ 8 = 256 by norm_num]
 
 open SP1Clean.Channels (stateChannel byteChannel StateMsg)
 

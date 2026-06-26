@@ -37,24 +37,18 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- nested `memory_access.prev_value` (which `ITypeReader.Spec`'s zeroing gates reference).
   have hmap : Vector.map (Expression.eval env) input_var_memory_access_prev_value
       = input_memory_access_prev_value := h_input.2.2.2.1
-  have ev0 : Expression.eval env input_var_memory_access_prev_value[0]
-      = input_memory_access_prev_value[0] := by rw [← hmap]; simp only [Vector.getElem_map]
-  have ev1 : Expression.eval env input_var_memory_access_prev_value[1]
-      = input_memory_access_prev_value[1] := by rw [← hmap]; simp only [Vector.getElem_map]
-  have ev2 : Expression.eval env input_var_memory_access_prev_value[2]
-      = input_memory_access_prev_value[2] := by rw [← hmap]; simp only [Vector.getElem_map]
-  have ev3 : Expression.eval env input_var_memory_access_prev_value[3]
-      = input_memory_access_prev_value[3] := by rw [← hmap]; simp only [Vector.getElem_map]
+  have ev : ∀ i (hi : i < 4), Expression.eval env input_var_memory_access_prev_value[i]
+      = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap]; simp only [Vector.getElem_map]
   have h_it := h_itype h_bin
-  rw [ev0, ev1, ev2, ev3] at h_it
+  rw [ev 0 (by omega), ev 1 (by omega), ev 2 (by omega), ev 3 (by omega)] at h_it
   -- the `AddressOperation` Assumptions: operand `isU64`s + fits, the offset bits boolean (literal `0`),
   -- and the address-validity (non-reserved + 8-aligned, so the inverse gate / offset range check hold).
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
-  refine ⟨⟨h_addr h_addr_as, h_mem h_bin, h_it, h_op_a_0, h_bin⟩, ?_⟩
   -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`).
-  exact ⟨Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
+  exact ⟨⟨h_addr h_addr_as, h_mem h_bin, h_it, h_op_a_0, h_bin⟩,
+    Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
 
 /-- Prover-side row well-formedness: operand `isU64`s + address-fits bound plus the `is_real` binary selector. -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
@@ -86,30 +80,16 @@ theorem completeness :
       = input_memory_access_prev_value := h_input.2.2.2.1
   have hmap_pc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc
       = input_state_pc := h_input.2.1.2.2.2
-  have epv0 : Expression.eval env.toEnvironment input_var_memory_access_prev_value[0]
-      = input_memory_access_prev_value[0] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have epv1 : Expression.eval env.toEnvironment input_var_memory_access_prev_value[1]
-      = input_memory_access_prev_value[1] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have epv2 : Expression.eval env.toEnvironment input_var_memory_access_prev_value[2]
-      = input_memory_access_prev_value[2] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have epv3 : Expression.eval env.toEnvironment input_var_memory_access_prev_value[3]
-      = input_memory_access_prev_value[3] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have epc0 : Expression.eval env.toEnvironment input_var_state_pc[0]
-      = input_state_pc[0] := by rw [← hmap_pc]; simp only [Vector.getElem_map]
-  have epc1 : Expression.eval env.toEnvironment input_var_state_pc[1]
-      = input_state_pc[1] := by rw [← hmap_pc]; simp only [Vector.getElem_map]
-  have epc2 : Expression.eval env.toEnvironment input_var_state_pc[2]
-      = input_state_pc[2] := by rw [← hmap_pc]; simp only [Vector.getElem_map]
+  have epv : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_memory_access_prev_value[i]
+      = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
+  have epc : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_state_pc[i]
+      = input_state_pc[i] := fun i hi => by rw [← hmap_pc]; simp only [Vector.getElem_map]
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
-  refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩, h_op_a_0, ?_⟩
-  · exact hbin
-  · simp only [epc0, epc1, epc2]; exact h_cpu
-  · exact hbin
-  · exact h_mem
-  · exact hbin
-  · simp only [epv0, epv1, epv2, epv3]; exact h_it
+  refine ⟨⟨hbin, ?_⟩, h_addr_as, ⟨hbin, h_mem⟩, ⟨hbin, ?_⟩, h_op_a_0, ?_⟩
+  · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
+  · simp only [epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega)]; exact h_it
   · rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- The `LoadDouble` chip row as a `GeneralFormalCircuit`; output is the extracted `LoadDoubleColumns`. -/

@@ -93,9 +93,7 @@ lemma walk_clk_monotone {pi : SP1PublicIO (ZMod p)} {rows : List (ChipRow p)}
     {path : List (Trace.RowView (ZMod p))} (hw : WalkOf pi rows path)
     (i : ℕ) (hi : i + 1 < path.length) :
     sndClkOf (stateAccess (path[i]'(by omega))) = rcvClkOf (stateAccess (path[i + 1]'hi)) := by
-  have h := isWalk_chain hw.1 i hi
-  simp only [stateEdge] at h
-  exact sndClk_eq_rcvClk h
+  exact sndClk_eq_rcvClk (by simpa only [stateEdge] using isWalk_chain hw.1 i hi)
 
 /-! ## The concrete decode∧value `OperandsBound` -/
 

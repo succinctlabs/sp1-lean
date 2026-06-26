@@ -318,3 +318,34 @@ and retires the K6 sampled-conformance reliance for those chips.
 - The witness-vector battery and `Extracted/` currency are re-checked by `scripts/run_audit.sh` §A4 +
   CI `lake build`; the `SP1_PINNED_COMMIT` assertion in `update_extracted.py` keeps extraction
   provenance explicit. Remaining: a CI job that re-extracts and diffs per-PR.
+
+---
+
+## Cleanup / polish backlog (non-blocking)
+
+Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistically. The *how-to-golf-safely*
+lessons (heavy-core caution, kernel-safe dedup, the `maxHeartbeats`-is-the-wrong-lever finding, the available
+`/cleanup` skills) live in `docs/agents/proof-patterns.md` § "Compile-time / performance landmines" + "Golf &
+cleanup discipline".
+
+- **`linter.style.longLine`** — the one remaining syntactic linter not yet enabled (it's the last candidate
+  noted in AGENTS.md § Linters). ~1080 lines exceed 100 chars (`Native/` ~817, `FormalModel/` ~263). Enable it
+  alone on the core pillar lake libraries, then reflow or per-file-suppress back to 0 warnings. Heavy, mechanical.
+- **Shift soundness tail-dedup** — the real build-time prize. Extract the byte-identical `cpuA/msb*/aluA`
+  requirements tail shared across the 6 Shift soundness conjuncts into a `requirements_holds`/`SpecObligation`
+  helper, mirroring `Proofs/Chips/DivRemChip/Soundness/Tail.lean` (recipe: proof-patterns § "Shared-tail
+  dedup"). Structural, multi-hour, overlaps the recently-golfed Shift soundness files — do it as a dedicated
+  pass, not a drive-by.
+- **`/decompose-proof` candidates** — long proof bodies worth splitting into named sub-lemmas:
+  `ShiftLeftChip`/`ShiftRightChip` `Formal.lean` `completeness` (~123/~180 lines), `LoadHalfChip`'s 4-way
+  `h_sel_lt` offset-selection case-bash (near-verbatim across soundness + completeness), `BranchChip`
+  `soundness`/`completeness` (~156/~290 lines of per-column `env.get` plumbing). Several are perf-tuned —
+  decompose with care and watch elaboration time.
+- **SailState-staging bridge preamble** — the `hpc_get`/`key`/`hsp_config` preamble recurs across ~10
+  store/jal/load `Bridge.lean` files → a shared lemma. **Re-examine the shape first** — upstream #101/#102
+  rewrote several bridges in the 2026-06-23 merge, so the pre-merge duplication may have shifted.
+- **Namespace-isolate the auto-gen (linter hardening, Option B)** — the `sp1Lint` exclusion is a *soft*
+  module-path filter. A *hard* boundary would relocate all auto-gen to a separate root namespace
+  `SP1Extracted.*` so the stock `runLinter` excludes it by construction (no custom filter). Cost: ~87 module
+  renames + import-line edits + `update_extracted.py` writer paths + lakefile globs. Not worth it for linting
+  alone; reconsider only if a hard auto-gen/hand-written namespace split is wanted for other reasons.

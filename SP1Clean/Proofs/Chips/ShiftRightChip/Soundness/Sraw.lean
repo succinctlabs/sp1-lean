@@ -143,7 +143,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         intro h; have := val_2_zmod_p (p := p); rw [h, ZMod.val_zero] at this; exact absurd this (by norm_num)
       have hne3 : (3 : ZMod p) ≠ 0 := by
         intro h; have h3 : (3 : ZMod p).val = 3 := by
-          rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) from by push_cast; rfl]
+          rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) by push_cast; rfl]
           exact ZMod.val_natCast_of_lt (by omega)
         rw [h, ZMod.val_zero] at h3; exact absurd h3 (by norm_num)
       obtain ⟨-, h_ll2_0⟩ := ShiftRightMath.higher_lower_zero b_cb0 b_cb1 b_cb2 b_cb3
@@ -154,9 +154,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         have he := hbyte_fact h_byte0
         rw [hc0e] at he
         have h10v : ((10 : ZMod p)).val = 10 := by
-          rw [show (10 : ZMod p) = ((10 : ℕ) : ZMod p) from by push_cast; rfl]
+          rw [show (10 : ZMod p) = ((10 : ℕ) : ZMod p) by push_cast; rfl]
           exact ZMod.val_natCast_of_lt (by omega)
-        rw [h10v, show (2 : ℕ) ^ 10 = 1024 from by norm_num] at he
+        rw [h10v, show (2 : ℕ) ^ 10 = 1024 by norm_num] at he
         rw [c0mod_inv_bridge]; exact he
       set su0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4) with hsu0_def
       set su1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 1) with hsu1_def
@@ -433,7 +433,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     obtain ⟨-, -, -, -, -, -, ⟨h_obmap, -, -⟩, -, -, -⟩ := h_input
     exact Or.inr ⟨fun _ => by
         rw [show Expression.eval env input_var_adapter_op_b_memory_prev_value[3]
-              = input_adapter_op_b_memory_prev_value[3] from by rw [← h_obmap]; simp only [Vector.getElem_map]]
+              = input_adapter_op_b_memory_prev_value[3] by rw [← h_obmap]; simp only [Vector.getElem_map]]
         exact h_rs1U 3,
       bool_of_mul_pred h_sra_b⟩
   case msb2A =>
@@ -441,7 +441,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     obtain ⟨-, -, -, -, -, -, ⟨h_obmap, -, -⟩, -, -, -⟩ := h_input
     exact Or.inr ⟨fun _ => by
         rw [show Expression.eval env input_var_adapter_op_b_memory_prev_value[1]
-              = input_adapter_op_b_memory_prev_value[1] from by rw [← h_obmap]; simp only [Vector.getElem_map]]
+              = input_adapter_op_b_memory_prev_value[1] by rw [← h_obmap]; simp only [Vector.getElem_map]]
         exact h_rs1U 1,
       bool_of_mul_pred h_sraw_b⟩
   case msb3A =>
@@ -521,7 +521,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       intro h; have := val_2_zmod_p (p := p); rw [h, ZMod.val_zero] at this; exact absurd this (by norm_num)
     have hne3 : (3 : ZMod p) ≠ 0 := by
       intro h; have h3 : (3 : ZMod p).val = 3 := by
-        rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) from by push_cast; rfl]
+        rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) by push_cast; rfl]
         exact ZMod.val_natCast_of_lt (by omega)
       rw [h, ZMod.val_zero] at h3; exact absurd h3 (by norm_num)
     obtain ⟨-, h_ll2_0⟩ := ShiftRightMath.higher_lower_zero b_cb0 b_cb1 b_cb2 b_cb3
