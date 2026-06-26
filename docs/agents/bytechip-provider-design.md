@@ -152,6 +152,35 @@ favorably:
   reasons about `mapFinRange` symbolically (one `forAllNoOffset`/`∀ i` argument, not an N-fold unroll),
   so the provider soundness is generic over the domain — SP1's 65536-row byte table does **not** blow up.
 
+## Phase 0c — the `channelsWithRequirements` reconciliation: VALIDATED + faithful (2026-06-26)
+
+To finish `byteChannel`, every reader/chip/op must drop it from `channelsWithRequirements` (Clean's
+`addVm`/`addTable` need `byteChannel ∉ table.channelsWithRequirements`). The `cedc171b` off-gate
+pull-`Requirements` is instead discharged by a **local binary gate**, faithful to SP1:
+- **Faithfulness (definitive):** SP1 constrains the byte-send selector boolean *locally, at the send
+  site*, EVERYWHERE — adapter (`adapter/state.rs:81` `assert_bool(is_real)`), operations
+  (`operations/add.rs:52` `assert_bool(is_real)`, doc "Constrains that is_real is boolean";
+  `operations/field/range.rs:92`), memory (`air/memory.rs:32/83/134/184`). Adding the gate is more
+  faithful, not an invention.
+- **Validated template (CPUState, builds standalone green + axiom-clean):**
+  1. `main`: add the gate as the **inline** `assertZero (input.is_real * (input.is_real - 1))` — NOT
+     `… === 0`, which composes the Equality *subcircuit* that `ConstraintsHold.Shallow` cannot see
+     (Clean's fib8 has the same caveat in-source). For CPUState this gate is exactly `Extracted.CPUState`
+     assert `E3`, so the reader gains a constraint it was previously (unfaithfully) missing.
+  2. `circuit`: drop `byteChannel` from `channelsWithRequirements`; update the `…_eq` rfl-lemma RHS.
+  3. supply `requirementsChannelsLawful input_var i₀ := by simp only [circuit_norm, main, byteChannel,
+     stateChannel]; grind` (the gate, now shallow, gives `is_real ∈ {0,1}`; `grind` kills the off-gate
+     byte `Requirements`). `main` must be in the simp set (it's a named `def`, unlike fib8's inline one).
+  4. soundness: the gate becomes `h_holds.1`, shift byte indices (`h_holds.1→.2.1`, `.2→.2.2`); the
+     `off_gate_vacuous h_assumptions` tail is unchanged. completeness: add a leading gate bullet
+     `rcases h_assumptions with h | h <;> simp [h]`.
+- **Sweep classification:** leaf readers (CPUState/RegisterAccessTimestamp/MemoryAccess) need the gate
+  ADDED; operations (Add/Sub/…/U16…) ALREADY have it (just drop the channel + supply
+  `requirementsChannelsLawful`); composed circuits (RegisterAccessCols/RTypeReader/type-readers/chips/
+  whole chips) just drop `byteChannel` (their subs handle the byte `Requirements`). ~50 files, one
+  coordinated red-period sweep (mirror the migration sweep). Faithfulness anchors (`Faithful/*`) may need
+  the new `E3`-style gate reflected.
+
 ### Build units (each lands green + axiom-clean independently)
 1. **op 3 (U8Range) provider** — `main` witnesses `a`, proves `a.val < 2^8`, pushes `(3, a, 0, 0)`;
    soundness = `byteRowSpec_u8range`. Simplest; mirror an existing range gadget (`U16toU8`/`ShiftBounds`).
