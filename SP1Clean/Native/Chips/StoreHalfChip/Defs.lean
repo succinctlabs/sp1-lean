@@ -99,7 +99,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreHalfColumns main wh
       ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
       input.memory_access, input.offset_bit, input.store_value, input.is_real⟩
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `ITypeReaderImmutable`'s program **pull** (W11 flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s plus the four read-modify-write
 `store_value` equations and the `is_real`-binary fact. -/

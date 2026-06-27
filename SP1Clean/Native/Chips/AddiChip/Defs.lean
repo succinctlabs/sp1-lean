@@ -58,6 +58,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AddiCols (ZMod p)
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddiCols main where
   channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit]
   localLength _ := 4
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.AddiChip

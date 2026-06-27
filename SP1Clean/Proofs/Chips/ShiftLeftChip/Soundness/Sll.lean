@@ -264,7 +264,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     -- `is_sll + is_sllw ∈ {0,1}` (`off_gate_vacuous`).
     simp only [id_eq] at *
     exact ⟨bool_of_mul_pred _hrealbin, Or.inr ⟨a1_bound_cond, bool_of_mul_pred _hE6⟩,
-      Or.inr (bool_of_mul_pred _hE2),
+      Or.inr ⟨bool_of_mul_pred _hE2, bool_of_mul_pred _hE2⟩,
       fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
       fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
       fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,

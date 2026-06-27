@@ -44,7 +44,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     ⟨input.adapter.op_b_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3⟩ ∧
   Readers.RegisterAccessCols.Spec
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
-      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩
+      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
+  (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 /-- Proven `is_real`-binary + `is_real`/flag-gated RV64 identity on the result word. Vacuous on
 padding. Cross-row bus guarantees live at the trace level and are not re-exposed here. -/
@@ -133,8 +135,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- The per-emitter channel-requirement tail: the bare `CPUState` `Assumptions` (the binary gate), the
   -- composed `BitwiseU16Operation`/`ALUTypeReader` requirements (bare or `[] ∨ Assumptions` disjuncts).
   · and_intros <;>
-      first | exact h_bin | exact ⟨ha, hb, hop3, h_bin⟩ | exact Or.inl rfl
-            | exact Or.inr h_bin
+      first | exact h_bin | exact ⟨h_bin, h_bin⟩ | exact ⟨ha, hb, hop3, h_bin⟩ | exact Or.inl rfl
+            | exact Or.inr h_bin | exact Or.inr ⟨h_bin, h_bin⟩
 
 set_option maxHeartbeats 8000000 in
 theorem completeness :
@@ -142,7 +144,7 @@ theorem completeness :
   circuit_proof_start
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨ha, hb, hbin, hf0, hf1, hf2, hsum, hone0, hone1, hone2, hop_a_0, himm, h_cpu,
-    hrac_a, hrac_b, hrac_c⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨h_env_flags, h_env_cols⟩ := h_env
   have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
   have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using h_env_flags 1
@@ -177,10 +179,10 @@ theorem completeness :
   refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨ha, hb, hop3, hbin⟩,
       ?_⟩,
-    ⟨hbin, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
+    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
-      hrac_a, hrac_b, hrac_c⟩,
+      hrac_a, hrac_b, hrac_c, hdec⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     hbool _ hf0',
     hbool _ hf1',
@@ -210,6 +212,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
+      [stateChannel.toRaw, memoryChannel.toRaw] }
 
 end SP1Clean.BitwiseChip

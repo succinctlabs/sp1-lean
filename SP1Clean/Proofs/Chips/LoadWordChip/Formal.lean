@@ -50,7 +50,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     epv 2 (by omega), epv 3 (by omega), ← sub_eq_add_neg] at hsel0 hsel1 hsel2 hsel3
   simp only [← sub_eq_add_neg] at h_msbgate
   rw [esw 1 (by omega)] at h_msb
-  have h_it := h_itype h_bin
+  have h_it := h_itype ⟨h_bin, h_bin⟩
   simp only [esw 0 (by omega), esw 1 (by omega)] at h_it
   -- the `AddressOperation` Assumptions: operand `isU64`s + fits, offset bits boolean (0, 0, the witnessed
   -- `offset_bit`), non-reserved, and the offset decomposition `4·offset_bit = addr % 8`.
@@ -93,7 +93,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`; the
   -- `U16MSBOperation` byte-bus subcircuit contributes its own `Assumptions` in eval form).
   refine ⟨h_bin, Or.inr h_addr_as, Or.inr h_bin,
-    Or.inr ⟨fun _ => h_sel1_lt_eval, h_lw_bin⟩, Or.inr h_bin⟩
+    Or.inr ⟨fun _ => h_sel1_lt_eval, h_lw_bin⟩, Or.inr ⟨h_bin, h_bin⟩⟩
 
 /-- Prover-side row well-formedness (3-arg form): operand `isU64`s + address-fits/alignment + the
 `offset_bit` decomposition + the selected-limb 16-bit bounds + the reader/gadget `Spec`s + the selector
@@ -175,7 +175,7 @@ theorem completeness :
   · exact hbin
   · exact h_mem
   · simp only [esw 1 (by omega)]; exact h_msb_spec
-  · exact hbin
+  · exact ⟨hbin, hbin⟩
   · simp only [esw 0 (by omega), esw 1 (by omega)]; exact h_it
   · simp only [esw 0 (by omega), epv 0 (by omega), ← sub_eq_add_neg]; exact hsel0
   · simp only [esw 1 (by omega), epv 1 (by omega), ← sub_eq_add_neg]; exact hsel1
@@ -192,7 +192,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadWordColumns :=
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+      [stateChannel.toRaw, memoryChannel.toRaw],
     soundness := soundness, completeness := completeness }
 
 end SP1Clean.LoadWordChip

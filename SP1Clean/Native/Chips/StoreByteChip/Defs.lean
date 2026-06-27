@@ -123,7 +123,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreByteColumns main wh
       input.memory_access, input.offset_bit, input.mem_limb, input.mem_limb_low_byte,
       input.register_low_byte, input.increment, input.store_value, input.is_real⟩
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `ITypeReaderImmutable`'s program **pull** (W11 flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
 
 /-- Semantic contract. The spine sub-`Spec`s, the (real-row-gated) byte bounds, the mem-limb selection,
 the increment identity, the read-modify-write equations, and the `is_real` binary. -/

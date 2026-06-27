@@ -42,8 +42,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- The per-emitter channel-requirement tail: the bare `CPUState` `Assumptions` (the `is_real` binary
   -- gate, `h_bin`), the off-gate-vacuous byte pull (`is_real ∈ {0,1}` rules out the `¬is_real = 0` ∧
   -- `¬-is_real = -1` antecedents), and the `ALUTypeReaderImmutable` requirement (`Or.inr h_bin`).
-  exact ⟨⟨h_reader h_bin, h_bin, h_oa1, h_oa2⟩, h_bin,
-    fun h1 h0 => off_gate_vacuous h_bin h1 h0, Or.inr h_bin⟩
+  exact ⟨⟨h_reader ⟨h_bin, h_bin⟩, h_bin, h_oa1, h_oa2⟩, h_bin,
+    fun h1 h0 => off_gate_vacuous h_bin h1 h0, Or.inr ⟨h_bin, h_bin⟩⟩
 
 /-- Honest prover-side row well-formedness: `is_real` binary, the two `op_a_0` forcing gates, the
 CPUState clock bounds + the immutable-ALU-reader contract, and the dynamic opcode in ALU range
@@ -67,7 +67,7 @@ theorem completeness :
   simp only [isReal, clkLow, opcodeVal] at h_assumptions
   obtain ⟨h_bin, h_oa1, h_oa2, h_cpu, h_reader, h_op_lt⟩ := h_assumptions
   simp only [sub_eq_add_neg] at h_oa1 h_oa2
-  refine ⟨⟨h_bin, h_cpu⟩, ?_, ⟨h_bin, h_reader⟩, ?_, h_oa1, h_oa2⟩
+  refine ⟨⟨h_bin, h_cpu⟩, ?_, ⟨⟨h_bin, h_bin⟩, h_reader⟩, ?_, h_oa1, h_oa2⟩
   · -- the LTU `opcode < 29` byte pull (fires on real rows).
     intro hneg
     simp only [byteChannel]
@@ -85,7 +85,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+      [stateChannel.toRaw, memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
         Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]; grind }

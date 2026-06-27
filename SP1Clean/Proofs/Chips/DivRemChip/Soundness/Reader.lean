@@ -71,7 +71,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     obtain ⟨h_oir, -⟩ := h_input
     have h_bin : input_is_real = 0 ∨ input_is_real = 1 := by
       have h := e355; simp only [circuit_norm] at h; rw [h_oir] at h; exact bool_of_mul_pred h
-    have hr := h_rtype h_bin
+    have hr := h_rtype ⟨h_bin, h_bin⟩
     simp only [Readers.RTypeReader.circuit] at hr
     exact ⟨hr, h_bin⟩
 

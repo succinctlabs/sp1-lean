@@ -36,8 +36,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
   -- the per-subcircuit channel-requirement tail. `CPUState`'s requirement is now a bare
   -- `Assumptions` (`is_real` binary); the rest stay `channels = [] ∨ <sub>.Assumptions` disjuncts.
-  exact ⟨⟨h_addr h_addr_as, h_mem h_bin, h_itype h_bin, h_bin⟩,
-    h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
+  exact ⟨⟨h_addr h_addr_as, h_mem h_bin, h_itype ⟨h_bin, h_bin⟩, h_bin⟩,
+    h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr ⟨h_bin, h_bin⟩⟩
 
 /-- Prover-side row well-formedness (3-arg form): operand `isU64`s + address-fits bound + the reader
 clock/timestamp `Spec`s + `is_real` binary. -/
@@ -54,14 +54,16 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : P
         input.adapter.op_a_memory.prev_value, input.is_real⟩ ∧
     Readers.ITypeReaderImmutable.Spec
       ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high, clkLow input.state,
-        input.state.pc, 39⟩
+        input.state.pc, 39⟩ ∧
+    (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16
+      ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_align, hbin, h_cpu, h_mem, h_it⟩ := h_assumptions
+  obtain ⟨ha, hb, hfit, h_ge, h_align, hbin, h_cpu, h_mem, h_it, hdec⟩ := h_assumptions
   -- eval→value bridge for the nested `pc` vector the CPUState `Spec` references.
   have hmap_pc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc
       = input_state_pc := h_input.2.1.2.2.2
@@ -70,14 +72,14 @@ theorem completeness :
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
-  refine ⟨⟨hbin, ?_⟩, h_addr_as, ⟨hbin, h_mem⟩, ⟨hbin, h_it⟩, ?_⟩
+  refine ⟨⟨hbin, ?_⟩, h_addr_as, ⟨hbin, h_mem⟩, ⟨⟨hbin, hbin⟩, h_it⟩, ?_⟩
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- The `StoreDouble` chip row as a `GeneralFormalCircuit`; output is the extracted `StoreDoubleColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreDoubleColumns :=
   { main, elaborated,
-    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

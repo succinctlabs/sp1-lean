@@ -96,9 +96,11 @@ theorem alutypereader_program_interactions_faithful_syntactic
     (h_imm : Expression.eval env input.cols.imm_c = cols.imm_c) :
     (((Readers.ALUTypeReader.main input).operations offset).interactionsWith
         programChannel.toRaw).map (AbstractInteraction.toAccess env)
-      = ((Extracted.ALUTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
-          is_trusted).map Extracted.Interaction.toAccess).filter (fun a => a.1 = InteractionKind.Program) := by
+      = (((Extracted.ALUTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
+          is_trusted).map Extracted.Interaction.toAccess).filter
+            (fun a => a.1 = InteractionKind.Program)).map LookupAccessList.negMult := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have hrac := fun (n : ℕ) (inp : Var Readers.RegisterAccessCols.Inputs (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit programChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
@@ -108,10 +110,11 @@ theorem alutypereader_program_interactions_faithful_syntactic
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [Readers.ALUTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
-  simp only [toAccess_pushIf_program]
+  simp only [toAccess_pullIf_program]
   simp only [Extracted.ALUTypeReader.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign, List.filter_cons]
-  simp [circuit_norm, Opcode.ofNat, ConstraintCoe.coe_eq_val,
+  simp [circuit_norm, Opcode.ofNat, ConstraintCoe.coe_eq_val, LookupAccessList.negMult,
+    signedVal_neg hp2,
     h_it, h_p0, h_p1, h_p2, h_oc, h_oa, h_ob, h_oc0, h_oc1, h_oc2, h_oc3, h_oa0, h_imm]
 
 set_option maxHeartbeats 1000000 in

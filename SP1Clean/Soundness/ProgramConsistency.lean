@@ -59,10 +59,11 @@ def ProgramAccess.toRow (pa : ProgramAccess (ZMod p)) : ProgramRow (ZMod p) :=
     op_a := pa.op_a, op_b := pa.op_b, imm_b := pa.imm_b, op_c := pa.op_c,
     op_a_0 := pa.op_a_0, imm_c := pa.imm_c }
 
-/-- The single signed Program-bus contribution an Add row emits: a `send` of the 16-tuple instruction
-fetch at `+is_real` (matching the `.send (.program …) is_trusted` args at `Extracted/RTypeReader.lean:82`
-with `opcode = 0`, `is_trusted = is_real`). On padding rows (`is_real = 0`) the multiplicity vanishes
-(`programLookups_padding`). -/
+/-- The single signed Program-bus contribution an Add row emits: a `pull` of the 16-tuple instruction
+fetch at `−is_real` (W11 polarity flip — the CPU readers switched their `programChannel.emit is_trusted`
+*send* to a `Channel.pullIf is_trusted` *receive*; the off-chip ROM provider now pushes and proves
+`ProgramMsg.RowSpec`, the chips pull and derive). `opcode = 0`, `is_trusted = is_real`. On padding rows
+(`is_real = 0`) the multiplicity vanishes (`programLookups_padding`). -/
 def programLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
   let pa := programAccess r
   [ (.Program, "SP1Program",
@@ -70,7 +71,7 @@ def programLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
         pa.op_b[0].val, pa.op_b[1].val, pa.op_b[2].val, pa.op_b[3].val,
         pa.op_c[0].val, pa.op_c[1].val, pa.op_c[2].val, pa.op_c[3].val,
         pa.op_a_0.val, pa.imm_b.val, pa.imm_c.val],
-      (pa.is_real.val : ℤ)) ]
+      (-(pa.is_real.val : ℤ))) ]
 
 /-- Aggregate the trace into its per-row program-access list, in chronological order. -/
 def aggregateProgramAccesses (rows : List (Trace.RowView (ZMod p))) : List (ProgramAccess (ZMod p)) :=
@@ -109,7 +110,7 @@ theorem programLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is
     simp only [programAccess, h, ZMod.val_zero, Nat.cast_zero]
   intro k
   simp only [programLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, hz,
-    ite_self, add_zero]
+    neg_zero, ite_self, add_zero]
 
 /-- **`TraceProgramLink` discharged down to bus balance.** Given a native `ProgramProvider` (SP1's
 preprocessed program/decode chip — it carries only validly-decoded ROM rows, `Chips/ProgramChip.lean`)
@@ -139,19 +140,21 @@ theorem programConsistent_of_balance [NeZero p]
         (programAccess r).op_c[0].val, (programAccess r).op_c[1].val,
         (programAccess r).op_c[2].val, (programAccess r).op_c[3].val,
         (programAccess r).op_a_0.val, (programAccess r).imm_b.val, (programAccess r).imm_c.val],
-      ((programAccess r).is_real.val : ℤ)) with hsend
+      (-(programAccess r).is_real.val : ℤ)) with hsend
   have h_send_mem : send ∈ aggregateChipRows rows programLookups :=
     List.mem_flatMap.mpr ⟨r, hr, List.mem_singleton.mpr rfl⟩
   have hvne : (programAccess r).is_real.val ≠ 0 := fun hv =>
     h_real (ZMod.val_injective p (by rw [ZMod.val_zero]; exact hv))
-  have h_pos : 0 < multOf send := by rw [hsend]; simp only [multOf]; omega
-  have h_nonneg : ∀ b ∈ aggregateChipRows rows programLookups, 0 ≤ multOf b := by
+  have h_neg : multOf send < 0 := by rw [hsend]; simp only [multOf]; omega
+  -- W11 flip: the chip's Program contribution is now a `pull` (`−is_real ≤ 0`); the off-chip ROM
+  -- provider pushes positively to cancel it (`provider_touches_neg_send`, the sign dual).
+  have h_nonpos : ∀ b ∈ aggregateChipRows rows programLookups, multOf b ≤ 0 := by
     intro b hb
     obtain ⟨r', _, hb'⟩ := List.mem_flatMap.mp hb
     simp only [programLookups, List.mem_singleton] at hb'
     subst hb'
-    simp only [multOf]; positivity
-  obtain ⟨b, hb, hkey⟩ := provider_touches_pos_send _ prov h_nonneg h_bal send h_send_mem h_pos
+    simp only [multOf, neg_nonpos]; positivity
+  obtain ⟨b, hb, hkey⟩ := provider_touches_neg_send _ prov h_nonpos h_bal send h_send_mem h_neg
   have hak : keyOf send = programRowKey (programAccess r).toRow := by
     rw [hsend]; simp only [keyOf, programRowKey, ProgramAccess.toRow]
   exact inROM_of_provider h_prov hb (hkey.trans hak)
@@ -203,8 +206,10 @@ theorem programLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
   -- `toAccess` the lone emit (the kernel matches the `_root_.emitted` form `circuit_norm` leaves),
   -- then bind to `programLookups` via the realisation hypotheses
-  simp only [toAccess_pushIf_program]
-  simp [circuit_norm, signedVal_is_real hp2 h_real, programLookups, programAccess,
+  simp only [toAccess_pullIf_program]
+  -- W11 flip: the lone emit is now a `pull`, so its multiplicity is `signedVal (-is_trusted) = -is_real.val`
+  -- (`signedVal_neg_is_real`), matching `programLookups`'s now-negated `−is_real` contribution.
+  simp [circuit_norm, signedVal_neg_is_real hp2 h_real, programLookups, programAccess,
     h_it, h_p0, h_p1, h_p2, h_oc, h_oa, h_ob, h_ob1, h_ob2, h_ob3, h_immb,
     h_oct, h_oc1, h_oc2, h_oc3, h_immc, h_oa0, ZMod.val_zero]
 

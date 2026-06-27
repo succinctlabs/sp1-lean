@@ -67,6 +67,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalColumns main where
   channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit, Readers.JTypeReader.circuit]
   -- 2 × 4-limb add-result witnesses; all readers/operations are `assertion`s (localLength 0).
   localLength _ := 8
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `JTypeReader`'s program **pull** (W11 flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.JalChip

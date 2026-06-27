@@ -94,14 +94,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
   have h_addr_spec := h_addr h_addr_as
   simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
-  have h_it := h_itype h_bin
+  have h_it := h_itype ⟨h_bin, h_bin⟩
   refine ⟨⟨h_addr_spec, h_mem h_bin, h_it,
       fun h1 => ⟨(h_u8 h1).1, (h_u8 h1).2, h_byte_lt h1⟩, h_msb_fact,
       ⟨hsel0, hsel1, hsel2, hsel3⟩, hmux_eq, h_op_a_0, h_msbgate, h_lb_bin, h_lbu_bin, h_bin⟩,
     h_bin, Or.inr h_addr_as, Or.inr h_bin,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0,
     fun h1 h0 => off_gate_vacuous h_lb_bin h1 h0,
-    Or.inr h_bin⟩
+    Or.inr ⟨h_bin, h_bin⟩⟩
 
 /-- Prover-side row well-formedness: the address facts + selector binaries + `op_a_0 = 0` + the byte
 value bounds + the sign-bit fact + the limb-selection / byte-mux equations + the reader `Spec`s. -/
@@ -190,7 +190,7 @@ theorem completeness :
     intro _
     simp only [byteChannel]
     exact (byteRowSpec_msb _ _).mpr ⟨⟨h_msb_lt, hbyte_pa⟩, h_msb_bin, h_msb_iff⟩
-  · exact hbin
+  · exact ⟨hbin, hbin⟩
   · exact h_it
   · simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega), ← sub_eq_add_neg]; exact hsel0
   · simp only [eob 1 (by omega), eob 2 (by omega), epv 1 (by omega), ← sub_eq_add_neg]; exact hsel1
@@ -212,7 +212,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadByteColumns :=
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+      [stateChannel.toRaw, memoryChannel.toRaw],
     soundness := soundness, completeness := completeness,
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,

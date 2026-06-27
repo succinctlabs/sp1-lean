@@ -46,7 +46,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   simp only [esv 0 (by omega), esv 1 (by omega), esv 2 (by omega), esv 3 (by omega),
     epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega),
     eoap 0 (by omega), eoap 1 (by omega), ← sub_eq_add_neg] at hr0 hr1 hr2 hr3
-  have h_it := h_itype h_bin
+  have h_it := h_itype ⟨h_bin, h_bin⟩
   have h_off' : (0 : ZMod p).val + 2 * (0 : ZMod p).val + 4 * input_offset_bit.val
       = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
     simp only [ZMod.val_zero]; omega
@@ -62,7 +62,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, h_off_bin, h_ge, h_off'⟩
   refine ⟨⟨h_addr h_addr_as, h_mem h_bin, h_it,
     ⟨sub_eq_zero.mp hr0, sub_eq_zero.mp hr1, sub_eq_zero.mp hr2, sub_eq_zero.mp hr3⟩, h_bin⟩, ?_⟩
-  exact ⟨h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
+  exact ⟨h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr ⟨h_bin, h_bin⟩⟩
 
 /-- Prover-side row well-formedness (3-arg form): operand `isU64`s + address-fits/alignment + the
 `offset_bit` decomposition + `is_real` binary + the reader `Spec`s + the read-modify-write equations. -/
@@ -88,7 +88,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : P
         input.store_value, input.is_real⟩ ∧
     Readers.ITypeReaderImmutable.Spec
       ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high, clkLow input.state,
-        input.state.pc, 38⟩
+        input.state.pc, 38⟩ ∧
+    (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16
+      ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
@@ -96,7 +98,7 @@ theorem completeness :
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
-  obtain ⟨ha, hb, hfit, h_ge, h_align, h_off, hbin, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it⟩ :=
+  obtain ⟨ha, hb, hfit, h_ge, h_align, h_off, hbin, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it, hdec⟩ :=
     h_assumptions
   have hmap_pc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc
       = input_state_pc := h_input.2.1.2.2.2
@@ -132,7 +134,7 @@ theorem completeness :
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · exact hbin
   · exact h_mem
-  · exact hbin
+  · exact ⟨hbin, hbin⟩
   · exact h_it
   · simp only [esv 0 (by omega), epv 0 (by omega), eoap 0 (by omega), ← sub_eq_add_neg]
     exact sub_eq_zero_of_eq hr0
@@ -147,7 +149,7 @@ theorem completeness :
 /-- The `StoreWord` chip row as a `GeneralFormalCircuit`; output is the extracted `StoreWordColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreWordColumns :=
   { main, elaborated,
-    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

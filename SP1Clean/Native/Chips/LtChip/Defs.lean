@@ -105,6 +105,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LtCols main where
   -- witnesses the two flags (2) + the `LtOperationSigned` block (1 + 1 + 8 = 10); the two readers are
   -- `assertion`s (`localLength 0`) over the threaded `state`/`adapter` inputs. 2 + 10 = 12.
   localLength _ := 12
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.LtChip

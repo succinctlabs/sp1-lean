@@ -152,9 +152,10 @@ theorem subwcols_program_interactions_faithful_syntactic
     (h_oa0 : Expression.eval env input.adapter.op_a_0 = cols.adapter.op_a_0) :
     (((SubwChip.main input).operations offset).interactionsWith programChannel.toRaw).map
         (AbstractInteraction.toAccess env)
-      = ((Extracted.SubwCols.interactions cols).map Extracted.Interaction.toAccess).filter
-          (fun a => a.1 = InteractionKind.Program) := by
+      = (((Extracted.SubwCols.interactions cols).map Extracted.Interaction.toAccess).filter
+          (fun a => a.1 = InteractionKind.Program)).map LookupAccessList.negMult := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) programChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
@@ -164,10 +165,12 @@ theorem subwcols_program_interactions_faithful_syntactic
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.SubwOperation.circuit, SP1Clean.SubwOperation.main,
     SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, toAccess_pushIf_program, heq]
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, toAccess_pullIf_program, heq]
   -- only RTypeReader's Program emit survives the `Program` filter; close via the kernel + bindings + the
-  -- opcode coercion (`Opcode.ofNat 0 = 0`), then drop the byte/state/memory residual by channel name.
-  simp [circuit_norm, toAccess_pushIf_program, Gadgets.Equality.main,
+  -- opcode coercion (`Opcode.ofNat 0 = 0`), then drop the byte/state/memory residual by channel name. The
+  -- emit is now a `pull` (W11 flip), so its multiplicity is `-is_real` — matched by `negMult` on the oracle.
+  simp [circuit_norm, toAccess_pullIf_program, Gadgets.Equality.main, LookupAccessList.negMult,
+    signedVal_neg hp2,
     Extracted.SubwCols.interactions, Extracted.SubwOperation.interactions, Extracted.U16MSBOperation.interactions,
     Extracted.CPUState.interactions, Extracted.RTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign, Opcode.ofNat, ConstraintCoe.coe_eq_val,
@@ -362,19 +365,25 @@ theorem subwcols_interactions_faithful_syntactic
           (AbstractInteraction.toAccess env)) ++
         ((((SubwChip.main input).operations offset).interactionsWith memoryChannel.toRaw).map
           (AbstractInteraction.toAccess env)) ++
-        ((((SubwChip.main input).operations offset).interactionsWith programChannel.toRaw).map
-          (AbstractInteraction.toAccess env)))
+        (((((SubwChip.main input).operations offset).interactionsWith programChannel.toRaw).map
+          (AbstractInteraction.toAccess env)).map LookupAccessList.negMult))
       ((Extracted.SubwCols.interactions cols).map Extracted.Interaction.toAccess) := by
   have hS := subwcols_state_interactions_faithful_syntactic env input offset cols h_ir h_ch h_c0 h_c1 h_p0 h_p1 h_p2
   have hP := subwcols_program_interactions_faithful_syntactic env input offset cols h_ir h_p0 h_p1 h_p2
     h_oa h_ob h_oc h_oa0
+  -- The Program block carries one `negMult` (W11 flip: our pull is `-is_real`); re-negating `hP`'s already-
+  -- negated oracle block recovers the pristine Program filter, so the whole equation stays vs. SP1's oracle.
+  have hP' : ((((SubwChip.main input).operations offset).interactionsWith programChannel.toRaw).map
+      (AbstractInteraction.toAccess env)).map LookupAccessList.negMult
+      = ((Extracted.SubwCols.interactions cols).map Extracted.Interaction.toAccess).filter
+          (fun a => a.1 = InteractionKind.Program) := by rw [hP, LookupAccessList.map_negMult_negMult]
   have hM := subwcols_memory_interactions_faithful_syntactic env input offset cols h_ir h_ch h_c0 h_c1
     h_oa h_ob h_oc h_wv0 h_wv1 h_msb h_pl_a h_pv_a0 h_pv_a1 h_pv_a2 h_pv_a3
     h_pl_b h_pv_b0 h_pv_b1 h_pv_b2 h_pv_b3 h_pl_c h_pv_c0 h_pv_c1 h_pv_c2 h_pv_c3
   have hB := subwcols_byte_interactions_faithful_syntactic env input offset cols h_ir h_c0 h_c1
     h_wv0 h_wv1 h_msb h_pl_a h_dl_a h_pl_b h_dl_b h_pl_c h_dl_c
   refine List.Perm.trans ?_ (LookupAccessList.perm_filter_by_kind _).symm
-  rw [hS, hM, hP]
+  rw [hS, hM, hP']
   exact ((hB.append_left _).append_right _).append_right _
 
 end SP1Clean.Faithful

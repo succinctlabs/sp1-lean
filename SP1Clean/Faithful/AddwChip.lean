@@ -100,9 +100,10 @@ theorem addwcols_program_interactions_faithful_syntactic
     (h_imm : Expression.eval env input.adapter.imm_c = cols.adapter.imm_c) :
     (((AddwChip.main input).operations offset).interactionsWith programChannel.toRaw).map
         (AbstractInteraction.toAccess env)
-      = ((Extracted.AddwCols.interactions cols).map Extracted.Interaction.toAccess).filter
-          (fun a => a.1 = InteractionKind.Program) := by
+      = (((Extracted.AddwCols.interactions cols).map Extracted.Interaction.toAccess).filter
+          (fun a => a.1 = InteractionKind.Program)).map LookupAccessList.negMult := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) programChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
@@ -112,8 +113,9 @@ theorem addwcols_program_interactions_faithful_syntactic
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
     SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, toAccess_pushIf_program, heq]
-  simp [circuit_norm, toAccess_pushIf_program, Gadgets.Equality.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, toAccess_pullIf_program, heq]
+  simp [circuit_norm, toAccess_pullIf_program, Gadgets.Equality.main, LookupAccessList.negMult,
+    signedVal_neg hp2,
     Extracted.AddwCols.interactions, Extracted.AddwOperation.interactions,
     Extracted.U16MSBOperation.interactions,
     Extracted.CPUState.interactions, Extracted.ALUTypeReader.interactions,
@@ -373,19 +375,25 @@ theorem addwcols_interactions_faithful_syntactic
           (AbstractInteraction.toAccess env)) ++
         ((((AddwChip.main input).operations offset).interactionsWith memoryChannel.toRaw).map
           (AbstractInteraction.toAccess env)) ++
-        ((((AddwChip.main input).operations offset).interactionsWith programChannel.toRaw).map
-          (AbstractInteraction.toAccess env)))
+        (((((AddwChip.main input).operations offset).interactionsWith programChannel.toRaw).map
+          (AbstractInteraction.toAccess env)).map LookupAccessList.negMult))
       ((Extracted.AddwCols.interactions cols).map Extracted.Interaction.toAccess) := by
   have hS := addwcols_state_interactions_faithful_syntactic env input offset cols h_ir h_ch h_c0 h_c1 h_p0 h_p1 h_p2
   have hP := addwcols_program_interactions_faithful_syntactic env input offset cols h_ir h_p0 h_p1 h_p2
     h_oa h_ob h_oc0 h_oc1 h_oc2 h_oc3 h_oa0 h_imm
+  -- The Program block carries one `negMult` (W11 flip: our pull is `-is_real`); re-negating `hP`'s already-
+  -- negated oracle block recovers the pristine Program filter, so the whole equation stays vs. SP1's oracle.
+  have hP' : ((((AddwChip.main input).operations offset).interactionsWith programChannel.toRaw).map
+      (AbstractInteraction.toAccess env)).map LookupAccessList.negMult
+      = ((Extracted.AddwCols.interactions cols).map Extracted.Interaction.toAccess).filter
+          (fun a => a.1 = InteractionKind.Program) := by rw [hP, LookupAccessList.map_negMult_negMult]
   have hM := addwcols_memory_interactions_faithful_syntactic env input offset cols h_ir h_ch h_c0 h_c1
     h_oa h_ob h_oc0 h_imm h_wv0 h_wv1 h_msb h_pl_a h_pv_a0 h_pv_a1 h_pv_a2 h_pv_a3
     h_pl_b h_pv_b0 h_pv_b1 h_pv_b2 h_pv_b3 h_pl_c h_pv_c0 h_pv_c1 h_pv_c2 h_pv_c3
   have hB := addwcols_byte_interactions_faithful_syntactic env input offset cols h_ir h_c0 h_c1 h_imm
     h_wv0 h_wv1 h_msb h_pl_a h_dl_a h_pl_b h_dl_b h_pl_c h_dl_c
   refine List.Perm.trans ?_ (LookupAccessList.perm_filter_by_kind _).symm
-  rw [hS, hM, hP]
+  rw [hS, hM, hP']
   exact ((hB.append_left _).append_right _).append_right _
 
 end SP1Clean.Faithful

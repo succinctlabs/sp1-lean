@@ -80,8 +80,11 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
     -- sum `e2 = is_divw + is_remw + is_divuw + is_remuw`) are discharged locally via `off_gate_vacuous`, so
     -- `byteChannel` can later be *finished* in a Clean `SoundEnsemble`. The gate is already shallow (emitted
     -- via `assertZeros (ownAsserts cols)`), so `main` is unchanged.
+    -- (W11 flip) `programChannel` also dropped: `RTypeReader` now **pulls** the program fetch (a
+    -- guarantee, not a requirement) with its off-gate `Requirements` discharged inside the reader, so the
+    -- chip owes no program requirement and `programChannel` moves to `channelsWithGuarantees` (`Defs`).
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+      [stateChannel.toRaw, memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
         AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit,

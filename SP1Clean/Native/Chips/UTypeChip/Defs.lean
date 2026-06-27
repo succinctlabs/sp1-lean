@@ -62,6 +62,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs UTypeColumns main where
   channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit, Readers.JTypeReader.circuit]
   -- 3 addend limbs + 4 add-result limbs; readers/operation are assertions (localLength 0).
   localLength _ := 7
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `JTypeReader`'s program **pull** (W11 flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.UTypeChip

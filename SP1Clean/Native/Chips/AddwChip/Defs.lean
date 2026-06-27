@@ -57,6 +57,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddwCols main where
   channelsLawful := by simp [circuit_norm, main, AddwOperation.circuit, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit]
   -- 2 result limbs + 1 sign bit; readers are `assertion`s (`localLength 0`).
   localLength _ := 3
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.AddwChip

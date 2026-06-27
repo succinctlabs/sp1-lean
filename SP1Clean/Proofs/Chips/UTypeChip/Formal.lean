@@ -40,7 +40,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
   Readers.RegisterAccessCols.Spec
     ⟨input.adapter.op_a_memory, input.is_real,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4⟩ ∧
-  Word.toBitVec64 input.adapter.op_b_imm = RV64.lui (immOf input.adapter)
+  Word.toBitVec64 input.adapter.op_b_imm = RV64.lui (immOf input.adapter) ∧
+  (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
+    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 omit [Fact p.Prime] in
 /-- `Word.toBitVec64 #v[0,0,0,0] = 0`. -/
@@ -60,7 +62,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   unfold id at *
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_real_gate
   have h_iaui : input_is_auipc = 0 ∨ input_is_auipc = 1 := bool_of_mul_pred h_iaui_gate
-  have h_jt := h_jt0 h_bin
+  have h_jt := h_jt0 ⟨h_bin, h_bin⟩
   have h_op_a_0 : input_adapter_op_a_0 = 0 ∨ input_adapter_op_a_0 = 1 := h_jt.2.1
   have hpc : Vector.map (Expression.eval env) input_var_state_pc = input_state_pc := h_input.2.1.2.2.2
   have epc : ∀ i (hi : i < 3), Expression.eval env input_var_state_pc[i] = input_state_pc[i] :=
@@ -88,7 +90,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
   have h_addspec := h_add ⟨fun _ => ⟨h_addendU, h_imm⟩, h_gate2⟩
-  refine ⟨⟨h_jt, h_bin, h_iaui, ?_, ?_⟩, h_bin, Or.inr ⟨fun _ => ⟨h_addendU, h_imm⟩, h_gate2⟩, Or.inr h_bin⟩
+  refine ⟨⟨h_jt, h_bin, h_iaui, ?_, ?_⟩, h_bin, Or.inr ⟨fun _ => ⟨h_addendU, h_imm⟩, h_gate2⟩, Or.inr ⟨h_bin, h_bin⟩⟩
   · intro hr1 hop0 hiaui0
     have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, hop0]; simp
     have hsem := (h_addspec hg1).2
@@ -105,7 +107,7 @@ set_option maxHeartbeats 2000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨h_imm, h_pcU, h_bin, h_iaui, h_op0, h_cpu, h_rac, _h_dec⟩ := h_assumptions
+  obtain ⟨h_imm, h_pcU, h_bin, h_iaui, h_op0, h_cpu, h_rac, _h_dec, hdec⟩ := h_assumptions
   obtain ⟨_, ⟨_, _, _, hpc⟩, ⟨_, _, _, hob, _⟩, _⟩ := h_input
   obtain ⟨he_addend, he_addval⟩ := h_env
   have epc : ∀ i (hi : i < 3),
@@ -147,7 +149,7 @@ theorem completeness :
   have h_gate2 : input_is_real + -input_adapter_op_a_0 = 0 ∨ input_is_real + -input_adapter_op_a_0 = 1 := by
     rw [h_op0]; simpa using h_bin
   refine ⟨⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨hA_U, h_imm⟩, h_gate2⟩, ?_⟩,
-    ⟨h_bin, ⟨?_, ?_, ?_, ?_⟩, Or.inl h_op0, h_rac⟩, ?_, ?_, ?_, ?_, ?_⟩
+    ⟨⟨h_bin, h_bin⟩, ⟨?_, ?_, ?_, ?_⟩, Or.inl h_op0, h_rac, hdec⟩, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hval]; exact AddOperation.spec_populate hA_U h_imm (input_is_real + -input_adapter_op_a_0)
   · rw [h_op0, zero_mul]
   · rw [h_op0, zero_mul]
@@ -163,7 +165,7 @@ theorem completeness :
 composing the witnessed `AddOperation` gadget and the J-type reader; output is the extracted `UTypeColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
   { main, elaborated,
-    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

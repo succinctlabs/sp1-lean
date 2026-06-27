@@ -38,7 +38,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     ⟨input.adapter.op_b_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3⟩ ∧
   Readers.RegisterAccessCols.Spec
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
-      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩
+      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
+  (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 /-- Semantic contract, stated against the clean RV64 ISA functions (mirrors the R-type chip contract, here spelled
 inline for the **two-variant** ALU adapter): the `ALUTypeReader` sub-`Spec` on the `state`/`adapter`
@@ -89,7 +91,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_bin := bool_of_mul_pred h_gate
   have h_slt_bool := bool_of_mul_pred h_slt_bin
   have h_sltu_bool := bool_of_mul_pred h_sltu_bin
-  refine ⟨⟨h_adapter h_bin, h_bin, fun hr => ⟨fun hslt => ?_, fun hsltu => ?_⟩⟩, ?_⟩
+  refine ⟨⟨h_adapter ⟨h_bin, h_bin⟩, h_bin, fun hr => ⟨fun hslt => ?_, fun hsltu => ?_⟩⟩, ?_⟩
   · -- `is_slt = 1` ⇒ `is_signed = 1`, so the gadget bit is the signed compare. The structural
     -- `Spec` exposes the semantic bit via `result_semantic`.
     have h_lt_spec := (LtOperationSigned.result_semantic ha hb hr (h_lt ⟨ha, hb, h_bin, h_slt_bool⟩)).1
@@ -123,15 +125,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- The per-emitter channel-requirement tail: the bare `CPUState` `Assumptions` (the binary gate), the
   -- composed `LtOperationSigned`/`ALUTypeReader` requirements (bare or `[] ∨ Assumptions` disjuncts).
   · and_intros <;>
-      first | exact h_bin | exact ⟨ha, hb, h_bin, h_slt_bool⟩ | exact Or.inl rfl
-            | exact Or.inr h_bin
+      first | exact h_bin | exact ⟨ha, hb, h_bin, h_slt_bool⟩ | exact ⟨h_bin, h_bin⟩
+            | exact Or.inl rfl | exact Or.inr ⟨h_bin, h_bin⟩
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨ha, hb, hbin, hf0, hf1, hsum, hslt_real, hop_a_0, himm, h_cpu,
-    hrac_a, hrac_b, hrac_c⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨h_env_flags, h_env_cols⟩ := h_env
   have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
   have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using h_env_flags 1
@@ -144,10 +146,10 @@ theorem completeness :
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨ha, hb, hbin, hf0'⟩, ?_⟩,
-    ⟨hbin, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
+    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
-      hrac_a, hrac_b, hrac_c⟩,
+      hrac_a, hrac_b, hrac_c, hdec⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     hbool _ hf0',
     hbool _ hf1',
@@ -183,6 +185,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
+      [stateChannel.toRaw, memoryChannel.toRaw] }
 
 end SP1Clean.LtChip

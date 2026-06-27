@@ -125,14 +125,31 @@ guarantee; nothing downstream consumes the dropped facts. ROM-membership stays t
 def ProgramMsg.Spec (msg : ProgramMsg (ZMod p)) : Prop :=
   msg.op_a_0 = 0 ∨ msg.op_a_0 = 1
 
-/-- The Program channel (SP1 `InteractionKind.Program`). `Guarantees := ProgramMsg.Spec` (R-type shape +
-`op_a_0` boolean). Emitted via `Channel.emit` (default `toRaw`, gated by `is_trusted` = `is_real` on Add):
-the shape slots are literal `0` and `op_a_0` boolean comes from the reader's unconditional gate, so the send
-proves the guarantee on every row. The index bounds + opcode decode are *received* from the decode/ProgramChip
-(not a local send). The `name` matches the `"SP1Program"` key in `programLookups`. -/
+/-- **The Program message's per-row well-formedness** — the decode facts that hold for a validly-decoded
+ROM row of *any* instruction type: the destination register index `op_a < 32`, the pc limbs `< 2^16`, and
+`op_a_0` boolean. (The *source* index bounds `op_b0`/`op_c0 < 32` are **not** here — they are register
+indices only when `imm_b`/`imm_c = 0`; for an immediate they carry the immediate word, which can exceed 32.
+A conditional `imm = 0 → op < 32` form is a later refinement.) This is the per-message `Guarantees` the
+**ROM provider proves on push** and the chips **pull-and-derive** (W11 polarity flip) — program-INDEPENDENT,
+exactly analogous to `byteChannel.Guarantees = ByteRowSpec`. The *program-specific* membership (`inROM` — the
+fetch is in *this* committed program) is the finished-channel **balance** fact (pulls ⊆ the provider's
+program rows), not a per-message guarantee (see `Soundness/ProgramConsistency.lean`). -/
+def ProgramMsg.RowSpec (msg : ProgramMsg (ZMod p)) : Prop :=
+  msg.op_a.val < 32 ∧
+  msg.pc0.val < 2 ^ 16 ∧ msg.pc1.val < 2 ^ 16 ∧ msg.pc2.val < 2 ^ 16 ∧
+  (msg.op_a_0 = 0 ∨ msg.op_a_0 = 1)
+
+/-- The Program channel (SP1 `InteractionKind.Program`). `Guarantees := ProgramMsg.RowSpec` — the rich
+decode well-formedness (indices `< 32`, pc `< 2^16`, `op_a_0` boolean). **W11 polarity flip:** the ROM
+provider now `pushIf`-pushes valid program rows (proving `ProgramMsg.RowSpec`) and the CPU readers
+`pullIf`-pull (deriving it), so the decode bounds are *derived* by consumers — the byte-bus model. SP1's
+Rust genuinely *sends* program (`+1`); our pull emits `−1`, so our Program interactions match SP1's
+extracted oracle **up to per-channel multiplicity negation** (a sound LogUp sign symmetry — the balance is
+invariant under negating one channel's multiplicities; the divergence is bridged, FV-checked, in the
+`Faithful/*` Program anchors). The `name` matches the `"SP1Program"` key in `programLookups`. -/
 def programChannel : Channel (ZMod p) ProgramMsg where
   name := "SP1Program"
-  Guarantees msg _ := ProgramMsg.Spec msg
+  Guarantees msg _ := ProgramMsg.RowSpec msg
 
 /-- The Byte channel (SP1 `InteractionKind.Byte`), lookups into the preprocessed `ByteChip`/`RangeChip`.
 Its `Guarantees` is `ByteRowSpec`, the byte-table membership predicate — and **Byte is the root of

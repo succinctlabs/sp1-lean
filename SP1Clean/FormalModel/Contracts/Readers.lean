@@ -96,7 +96,11 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     (input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1) ∧
     RegisterAccessCols.Spec ⟨input.cols.op_a_memory, input.is_real, input.clk_low + 4⟩ ∧
     RegisterAccessCols.Spec ⟨input.cols.op_b_memory, input.is_real, input.clk_low + 3⟩ ∧
-    RegisterAccessCols.Spec ⟨input.cols.op_c_memory, input.is_real, input.clk_low + 2⟩
+    RegisterAccessCols.Spec ⟨input.cols.op_c_memory, input.is_real, input.clk_low + 2⟩ ∧
+    -- (W11 flip) the decode bounds **derived** from the program bus's `ProgramMsg.RowSpec` pull guarantee
+    -- (destination index `< 32`, pc limbs `< 2^16`, on real `is_trusted` rows) — no longer trace-level.
+    (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
 
 end SP1Clean.Readers.RTypeReader
 
@@ -139,7 +143,10 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
       input.cols.imm_c * (input.cols.op_c_memory.prev_value[3] - input.cols.op_c[3]) = 0) ∧
     RegisterAccessCols.Spec ⟨input.cols.op_a_memory, input.is_real, input.clk_low + 4⟩ ∧
     RegisterAccessCols.Spec ⟨input.cols.op_b_memory, input.is_real, input.clk_low + 3⟩ ∧
-    RegisterAccessCols.Spec ⟨input.cols.op_c_memory, input.is_real - input.cols.imm_c, input.clk_low + 2⟩
+    RegisterAccessCols.Spec ⟨input.cols.op_c_memory, input.is_real - input.cols.imm_c, input.clk_low + 2⟩ ∧
+    -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
+    (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
 
 end SP1Clean.Readers.ALUTypeReader
 
@@ -181,7 +188,10 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
       input.cols.imm_c * (input.cols.op_c_memory.prev_value[3] - input.cols.op_c[3]) = 0) ∧
     RegisterAccessCols.Spec ⟨input.cols.op_a_memory, input.is_real, input.clk_low + 4⟩ ∧
     RegisterAccessCols.Spec ⟨input.cols.op_b_memory, input.is_real, input.clk_low + 3⟩ ∧
-    RegisterAccessCols.Spec ⟨input.cols.op_c_memory, input.is_real - input.cols.imm_c, input.clk_low + 2⟩
+    RegisterAccessCols.Spec ⟨input.cols.op_c_memory, input.is_real - input.cols.imm_c, input.clk_low + 2⟩ ∧
+    -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
+    (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
 
 end SP1Clean.Readers.ALUTypeReaderImmutable
 
@@ -217,7 +227,10 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
       input.cols.op_a_0 * input.wv2 = 0 ∧ input.cols.op_a_0 * input.wv3 = 0) ∧
     (input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1) ∧
     RegisterAccessCols.Spec ⟨input.cols.op_a_memory, input.is_real, input.clk_low + 4⟩ ∧
-    RegisterAccessCols.Spec ⟨input.cols.op_b_memory, input.is_real, input.clk_low + 3⟩
+    RegisterAccessCols.Spec ⟨input.cols.op_b_memory, input.is_real, input.clk_low + 3⟩ ∧
+    -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
+    (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
 
 end SP1Clean.Readers.ITypeReader
 
@@ -248,7 +261,10 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
       input.cols.op_a_0 * input.cols.op_a_memory.prev_value[3] = 0) ∧
     (input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1) ∧
     RegisterAccessCols.Spec ⟨input.cols.op_a_memory, input.is_real, input.clk_low + 4⟩ ∧
-    RegisterAccessCols.Spec ⟨input.cols.op_b_memory, input.is_real, input.clk_low + 3⟩
+    RegisterAccessCols.Spec ⟨input.cols.op_b_memory, input.is_real, input.clk_low + 3⟩ ∧
+    -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
+    (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
 
 end SP1Clean.Readers.ITypeReaderImmutable
 
@@ -282,7 +298,10 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
   (input.cols.op_a_0 * input.wv0 = 0 ∧ input.cols.op_a_0 * input.wv1 = 0 ∧
       input.cols.op_a_0 * input.wv2 = 0 ∧ input.cols.op_a_0 * input.wv3 = 0) ∧
     (input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1) ∧
-    RegisterAccessCols.Spec ⟨input.cols.op_a_memory, input.is_real, input.clk_low + 4⟩
+    RegisterAccessCols.Spec ⟨input.cols.op_a_memory, input.is_real, input.clk_low + 4⟩ ∧
+    -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
+    (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
 
 end SP1Clean.Readers.JTypeReader
 

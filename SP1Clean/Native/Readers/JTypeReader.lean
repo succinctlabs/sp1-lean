@@ -41,9 +41,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let cols := input.cols
   assertion RegisterAccessCols.circuit ⟨cols.op_a_memory, input.is_real, input.clk_low + 4⟩
   cols.op_a_0 * (cols.op_a_0 - 1) === 0
-  -- The Program-bus instruction fetch (SP1's `send (.program …) is_trusted`); both operand-`b`/`c` slots
-  -- carry immediate words (`op_b_imm`/`op_c_imm`) with `imm_b = imm_c = 1`. `op_a` is the rd register index.
-  programChannel.emit input.is_trusted
+  -- W11 polarity flip: the Program-bus instruction fetch is now a **`pullIf`** (the ROM provider pushes &
+  -- proves `ProgramMsg.RowSpec`; this reader pulls & *derives* it — the decode bounds flow into the `Spec`).
+  -- Local shallow `is_trusted` boolean gate so the pull's off-gate `Requirements` are vacuous, letting
+  -- `programChannel` drop from `channelsWithRequirements`. Both operand-`b`/`c` slots carry immediate words
+  -- (`op_b_imm`/`op_c_imm`) with `imm_b = imm_c = 1`. `op_a` is the rd register index.
+  assertZero (input.is_trusted * (input.is_trusted - 1))
+  programChannel.pullIf input.is_trusted
     (⟨input.pc[0], input.pc[1], input.pc[2], input.opcode,
       cols.op_a,
       cols.op_b_imm[0], cols.op_b_imm[1], cols.op_b_imm[2], cols.op_b_imm[3],
@@ -65,43 +69,73 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- `byteChannel` (composed `RegisterAccessCols` checks) + `programChannel` (W11 flip — now **pulled**,
+  -- so its `ProgramMsg.RowSpec` guarantee is assumed here; it joins `channelsWithGuarantees` and its
+  -- requirement drops from `channelsWithRequirements`, discharged by the inline `is_trusted` gate).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, RegisterAccessCols.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw] := rfl
+      = [byteChannel.toRaw, programChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
 
-/-- `is_real` is binary — the precondition for the `is_real`-gated byte receives (threaded into the
-composed `RegisterAccessCols`). Discharged by the chip's `is_real` binary gate. -/
-def Assumptions (input : Inputs (ZMod p)) : Prop := input.is_real = 0 ∨ input.is_real = 1
+/-- `is_real`/`is_trusted` binary — the precondition for the `is_real`-gated byte receives (threaded into
+the composed `RegisterAccessCols`) + the program-pull `is_trusted` gate. Discharged by the chip's binary
+gates. The decode bounds are NOT assumed — they are **derived** into the `Spec` (W11 flip). -/
+def Assumptions (input : Inputs (ZMod p)) : Prop :=
+  (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_trusted = 0 ∨ input.is_trusted = 1)
 
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  simp only [circuit_norm, memoryChannel, programChannel, ProgramMsg.Spec] at h_holds ⊢
-  obtain ⟨h_rac_a, hbin, z0, z1, z2, z3⟩ := h_holds
-  exact ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin, h_rac_a h_assumptions⟩,
-    Or.inr h_assumptions, fun _ _ => bool_of_mul_pred hbin⟩
+  -- `h_holds`: the `RegisterAccessCols` sub, the `op_a_0` gate `hbin`, the inline `is_trusted` gate
+  -- `h_trust`, the **program pull's guarantee** `h_prog` (`ProgramMsg.RowSpec`), then the zeroing gates.
+  simp only [circuit_norm, memoryChannel, programChannel, ProgramMsg.RowSpec] at h_holds ⊢
+  obtain ⟨h_rac_a, hbin, h_trust, h_prog, z0, z1, z2, z3⟩ := h_holds
+  have htbin := bool_of_mul_pred h_trust
+  have e : ∀ i (hi : i < 3), Expression.eval env input_var_pc[i] = input_pc[i] := by
+    intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
+  -- The decode-bounds `Spec` conjunct is **derived** from the program pull `h_prog`; the pull's own
+  -- `Requirements` are off-gate (vacuous via the binary `is_trusted` gate).
+  refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin,
+      h_rac_a h_assumptions.1, fun ht => ?_⟩,
+    Or.inr h_assumptions.1,
+    fun h1 h0 => off_gate_vacuous htbin h1 h0⟩
+  obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [ht])
+  rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
+  exact ⟨ha, hp0, hp1, hp2⟩
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨⟨z0, z1, z2, z3⟩, hbin, hrac_a⟩ := h_spec
-  refine ⟨⟨h_assumptions, hrac_a⟩, ?_, z0, z1, z2, z3⟩
-  rcases hbin with h | h <;> rw [h] <;> simp
+  obtain ⟨hreal, htrust⟩ := h_assumptions
+  -- `h_spec` supplies the zeroing gates `z*`, the `op_a_0` binary `hbin`, the `RegisterAccessCols`
+  -- sub-`Spec`, and (W11) the gated decode bounds `hdec` — discharging the program **pull**'s guarantee.
+  obtain ⟨⟨z0, z1, z2, z3⟩, hbin, hrac_a, hdec⟩ := h_spec
+  have e : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_pc[i] = input_pc[i] := by
+    intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
+  refine ⟨⟨hreal, hrac_a⟩, ?_, ?_, ?_, z0, z1, z2, z3⟩
+  · rcases hbin with h | h <;> rw [h] <;> simp     -- `op_a_0` gate
+  · rcases htrust with h | h <;> rw [h] <;> simp   -- `is_trusted` gate
+  · intro ht
+    obtain ⟨ha, hp0, hp1, hp2⟩ := hdec (neg_inj.mp ht)
+    simp only [programChannel, ProgramMsg.RowSpec]
+    rw [e 0 (by norm_num), e 1 (by norm_num), e 2 (by norm_num)]
+    exact ⟨ha, hp0, hp1, hp2, hbin⟩
 
 /-- The native J-type reader as a Clean `FormalAssertion`: composes a single `RegisterAccessCols` for op_a
 (write), imposes the `op_a_0` binary + zeroing gates, and emits the Program/Memory buses. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
-  -- `byteChannel` dropped (W11 Phase 0c): the composed `RegisterAccessCols` sub-assertion discharges its
-  -- own byte-pull `Requirements`, so only the Memory + Program buses' requirements remain here.
+  -- `byteChannel` dropped (W11 Phase 0c); `programChannel` dropped (W11 flip — now pulled, its off-gate
+  -- requirement vacuous via the inline `is_trusted` gate). Only the Memory bus's requirements remain.
   { main, elaborated,
-    channelsWithRequirements := [memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [memoryChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, RegisterAccessCols.circuit, memoryChannel, programChannel]; grind }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

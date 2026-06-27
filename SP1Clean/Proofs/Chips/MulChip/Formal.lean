@@ -40,7 +40,11 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
   Readers.RegisterAccessCols.Spec
     ⟨input.adapter.op_b_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3⟩ ∧
   Readers.RegisterAccessCols.Spec
-    ⟨input.adapter.op_c_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩
+    ⟨input.adapter.op_c_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
+  -- (W11 flip) the decode bounds the `RTypeReader` program **pull** now *derives* into its `Spec`
+  -- (destination index `< 32`, pc limbs `< 2^16`, on real rows) — completeness must provide them.
+  (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -60,8 +64,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inr (Or.inr hmw))))
   -- `MulOperation.Assumptions` (operands `isU64` when active; flag binaries; `is_mulw → is_real`; sum-bound).
   have h_spec := h_mulop ⟨fun _ => ⟨hbU, hcU⟩, bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩
-  refine ⟨⟨hadapter h_bin, h_bin, fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩⟩, h_bin,
-    Or.inr ⟨fun _ => ⟨hbU, hcU⟩, bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩, Or.inr h_bin⟩
+  refine ⟨⟨hadapter ⟨h_bin, h_bin⟩, h_bin, fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩⟩, h_bin,
+    Or.inr ⟨fun _ => ⟨hbU, hcU⟩, bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩, Or.inr ⟨h_bin, h_bin⟩⟩
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inl h1)
     obtain ⟨_hisU64, hmul, _hmulhu, _hmulh, _hmulhsu, _hmulw⟩ :=
@@ -123,7 +127,7 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨hbU, hcU, hbin, hf0, hf1, hf2, hf3, hf4, hsum, hmulw_real, hop_a_0, h_cpu,
-    hrac_a, hrac_b, hrac_c⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨h_env_flags, h_env_cols, h_env_a⟩ := h_env
   obtain ⟨-, ⟨-, -, -, hpc⟩, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   -- the five variant flags are witnessed from the `"mul_flags"` hint
@@ -163,7 +167,7 @@ theorem completeness :
     by simpa using h_env_a 2, by simpa using h_env_a 3,
     hbool _ hf0', hbool _ hf1', hbool _ hf2', hbool _ hf3', hbool _ hf4', hbool _ hsum01',
     hop_a_0,
-    ⟨hbin, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c⟩, ?_⟩
+    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec⟩, ?_⟩
   · -- the composed `MulOperation` `FormalAssertion`'s `Spec` at the witnessed `populate`d columns:
     -- `spec_populate` once the witnessed column struct equals `populate …` (each cell is
     -- `env.get (i₀+5+k)`, pinned by the normalised witness hint to `(toElements (populate …))[k]`).
@@ -184,7 +188,8 @@ semantic contract; output is the extracted `MulCols` column struct. Soundness/co
 and axiom-clean (completeness via `MulOperation.spec_populate` on the witnessed columns). -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs MulCols :=
   { main, elaborated,
-    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    -- `programChannel` dropped (W11 flip — now pulled via `RTypeReader`, a guarantee not a requirement).
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

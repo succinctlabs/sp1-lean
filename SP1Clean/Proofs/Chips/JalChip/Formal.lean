@@ -46,14 +46,16 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4⟩ ∧
   (jumpTargetWord input)[3] = 0 ∧
   (linkTargetWord input)[3] = 0 ∧
-  (input.is_real = 1 → ((jumpTargetWord input)[0] * (4 : ZMod p)⁻¹).val < 2 ^ 14)
+  (input.is_real = 1 → ((jumpTargetWord input)[0] * (4 : ZMod p)⁻¹).val < 2 ^ 14) ∧
+  (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
+    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨h_imm, h_pcU, h_pad⟩ := h_assumptions
   obtain ⟨h_cpu, h_add1, h_av3, h_add2, h_oav3, h_jt0, h_align, h_gate⟩ := h_holds
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_gate
-  have h_jt : Readers.JTypeReader.Spec _ := h_jt0 h_bin
+  have h_jt : Readers.JTypeReader.Spec _ := h_jt0 ⟨h_bin, h_bin⟩
   have h_op_a_0 : input_adapter_op_a_0 = 0 ∨ input_adapter_op_a_0 = 1 := h_jt.2.1
   -- eval-of-pc rewrites: circuit's `a` operand `#v[eval pc[i], 0]` equals the concrete `pcWord`.
   have hpc : Vector.map (Expression.eval env) input_var_state_pc = input_state_pc := h_input.2.1.2.2.2
@@ -94,12 +96,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · exact h_bin
   · exact Or.inr ⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩
   · exact Or.inr ⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩
-  · exact ⟨Or.inr h_bin, fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
+  · exact ⟨Or.inr ⟨h_bin, h_bin⟩, fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨h_imm, h_pcU, h_bin, h_op_a_0, h_cpu, h_rac, h_jt3, h_lt3, h_align_pa⟩ := h_assumptions
+  obtain ⟨h_imm, h_pcU, h_bin, h_op_a_0, h_cpu, h_rac, h_jt3, h_lt3, h_align_pa, hdec⟩ := h_assumptions
   simp only [jumpTargetWord, linkTargetWord] at h_jt3 h_lt3 h_align_pa
   obtain ⟨he_av, he_oav⟩ := h_env
   -- eval-of-input rewrites.
@@ -161,7 +163,7 @@ theorem completeness :
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
   refine ⟨⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
-    ⟨h_bin, ⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac⟩, ?_, ?_⟩
+    ⟨⟨h_bin, h_bin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac, hdec⟩, ?_, ?_⟩
   · rw [hval1]; exact AddOperation.spec_populate ha1U h_imm input_is_real
   · rw [hav3]; exact h_jt3
   · rw [hval2]; exact AddOperation.spec_populate ha1U h4U (input_is_real + -input_adapter_op_a_0)
@@ -180,12 +182,12 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
   -- `byteChannel` dropped (W11 Phase 0c): the off-gate alignment byte-pull `Requirements` is discharged by
   -- the inline `is_real` boolean gate in `main`; the residual buses are the readers'/add-ops'.
   { main, elaborated,
-    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     requirementsChannelsLawful := fun input_var i₀ => by
-      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
+      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel,
         AddOperation.circuit, Readers.CPUState.circuit, Readers.JTypeReader.circuit]; grind }
 
 end SP1Clean.JalChip

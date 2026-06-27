@@ -49,6 +49,30 @@ abbrev LookupKey := InteractionKind × String × List ℕ
 @[reducible] def keyOf (a : LookupAccess) : LookupKey := (a.1, a.2.1, a.2.2.1)
 @[reducible] def multOf (a : LookupAccess) : ℤ := a.2.2.2
 
+/-- Negate a `LookupAccess`'s multiplicity, fixing its key. The faithfulness bridge for the W11
+program-bus polarity flip: our circuit now emits the Program fetch as a `pull` (`−is_real`), so it
+equals SP1's extracted oracle Program block **up to per-entry multiplicity negation** (a sound LogUp
+sign symmetry — negating one channel's multiplicities preserves the balance). -/
+@[reducible] def negMult (a : LookupAccess) : LookupAccess := (a.1, a.2.1, a.2.2.1, -a.2.2.2)
+
+@[simp] lemma negMult_mk (k : InteractionKind) (s : String) (l : List ℕ) (m : ℤ) :
+    negMult (k, s, l, m) = (k, s, l, -m) := rfl
+
+@[simp] lemma keyOf_negMult (a : LookupAccess) : keyOf (negMult a) = keyOf a := rfl
+
+@[simp] lemma multOf_negMult (a : LookupAccess) : multOf (negMult a) = -multOf a := rfl
+
+lemma negMult_negMult (a : LookupAccess) : negMult (negMult a) = a := by
+  simp only [negMult, neg_neg]
+
+/-- `negMult` is a list-map involution: re-negating an already-negated block recovers it. Used (via `rw`) by
+the combined faithfulness anchors, whose Program block carries one `negMult` (the W11 sign-flip) so the rest
+of the equation stays the pristine SP1 oracle. Not `@[simp]` (the bare LHS is not in simp-normal form —
+`List.map_map` rewrites it first). -/
+lemma map_negMult_negMult (l : LookupAccessList) :
+    (l.map negMult).map negMult = l := by
+  simp only [List.map_map, Function.comp_def, negMult_negMult, List.map_id']
+
 /-- Restrict to the contributions matching one `(kind, table_id, entry)` key. -/
 def filterKey (accesses : LookupAccessList) (k : LookupKey) : LookupAccessList :=
   accesses.filter (fun a => keyOf a = k)
@@ -185,6 +209,48 @@ theorem provider_touches_pos_send
   rw [List.filter_eq_nil_iff.mpr ?_]; · rfl
   intro b hb hkb
   exact absurd (by simpa using hkb) (h b hb)
+
+/-! ## Sign symmetry — the flipped-polarity dual provider lemma
+
+The W11 program-bus polarity flip makes the consumers *pull* (non-positive multiplicity) rather than
+*send*; the provider then *pushes* (positive). Negating every multiplicity preserves the balance
+(`multiplicitySum` is linear), so the flipped-polarity "balance ⟹ membership" reduces to
+`provider_touches_pos_send` on the negated bus. -/
+
+/-- `multiplicitySum` is negated by `negMult`-mapping the bus (`negMult` fixes keys, flips multiplicities). -/
+theorem multiplicitySum_map_negMult (l : LookupAccessList) (k : LookupKey) :
+    multiplicitySum (l.map negMult) k = -multiplicitySum l k := by
+  induction l with
+  | nil => simp [multiplicitySum_nil]
+  | cons hd tl ih =>
+    rw [List.map_cons, multiplicitySum_cons, multiplicitySum_cons, ih, keyOf_negMult, multOf_negMult]
+    by_cases h : keyOf hd = k <;> simp only [h, if_true, if_false] <;> omega
+
+/-- Balance is invariant under negating every multiplicity. -/
+theorem isConsistentBalanced_map_negMult (l : LookupAccessList) :
+    isConsistentBalanced (l.map negMult) ↔ isConsistentBalanced l := by
+  simp only [isConsistentBalanced, multiplicitySum_map_negMult, neg_eq_zero]
+
+/-- **Flipped-polarity provider touch.** The dual of `provider_touches_pos_send`: a key with a strictly-
+*negative* consumer pull on a balanced bus is touched by the provider (consumers pull non-positively; the
+provider must cancel with a positive push). Proved by negating the whole bus and applying the positive
+lemma. -/
+theorem provider_touches_neg_send
+    (consumers prov : LookupAccessList)
+    (h_nonpos : ∀ b ∈ consumers, multOf b ≤ 0)
+    (h_bal : isConsistentBalanced (consumers ++ prov))
+    (a : LookupAccess) (ha : a ∈ consumers) (h_neg : multOf a < 0) :
+    ∃ b ∈ prov, keyOf b = keyOf a := by
+  have h_bal' : isConsistentBalanced (consumers.map negMult ++ prov.map negMult) := by
+    rw [← List.map_append]; exact (isConsistentBalanced_map_negMult _).mpr h_bal
+  have h_nonneg' : ∀ b ∈ consumers.map negMult, 0 ≤ multOf b := by
+    intro b hb; obtain ⟨c, hc, rfl⟩ := List.mem_map.mp hb
+    have := h_nonpos c hc; rw [multOf_negMult]; omega
+  have ha' : negMult a ∈ consumers.map negMult := List.mem_map.mpr ⟨a, ha, rfl⟩
+  have h_pos' : 0 < multOf (negMult a) := by rw [multOf_negMult]; omega
+  obtain ⟨b', hb', hkey'⟩ := provider_touches_pos_send _ _ h_nonneg' h_bal' (negMult a) ha' h_pos'
+  obtain ⟨b, hb, rfl⟩ := List.mem_map.mp hb'
+  exact ⟨b, hb, by simpa using hkey'⟩
 
 /-! ## The closed-bus matching lemma (the kernel of "balance ⟹ a canceling receive exists")
 

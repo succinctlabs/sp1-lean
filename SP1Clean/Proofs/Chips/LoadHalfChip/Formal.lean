@@ -49,7 +49,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
   simp only [eob 0 (by omega), eob 1 (by omega), epv 0 (by omega), epv 1 (by omega),
     epv 2 (by omega), epv 3 (by omega), ← sub_eq_add_neg] at hsel0 hsel1 hsel2 hsel3
-  have h_it := h_itype h_bin
+  have h_it := h_itype ⟨h_bin, h_bin⟩
   -- the `AddressOperation` Assumptions (eval form, matching the subcircuit input).
   have hob0' : Expression.eval env input_var_offset_bit[0] = 0
       ∨ Expression.eval env input_var_offset_bit[0] = 1 := by rw [eob 0 (by omega)]; exact hob0
@@ -97,7 +97,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   refine ⟨⟨h_addr_spec, h_mem h_bin, h_msb_spec, h_it, ⟨hsel0, hsel1, hsel2, hsel3⟩, h_op_a_0,
     h_msbgate, h_lh_bin, bool_of_mul_pred h_lhu_gate, h_bin⟩, ?_⟩
   refine ⟨h_bin, Or.inr h_addr_as, Or.inr h_bin,
-    Or.inr ⟨fun _ => h_sel_lt, h_lh_bin⟩, Or.inr h_bin⟩
+    Or.inr ⟨fun _ => h_sel_lt, h_lh_bin⟩, Or.inr ⟨h_bin, h_bin⟩⟩
 
 /-- Prover-side row well-formedness: the address facts + the reader/gadget `Spec`s + the selector
 binaries + `op_a_0 = 0` + the offset-selection equations + the `is_lhu·msb` zero-extension gate. -/
@@ -196,7 +196,7 @@ theorem completeness :
   · exact hbin
   · exact h_mem
   · exact h_msb_spec
-  · exact hbin
+  · exact ⟨hbin, hbin⟩
   · exact h_it
   · simp only [eob 0 (by omega), eob 1 (by omega), epv 0 (by omega), ← sub_eq_add_neg]; exact hsel0
   · simp only [eob 0 (by omega), eob 1 (by omega), epv 1 (by omega), ← sub_eq_add_neg]; exact hsel1
@@ -213,7 +213,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadHalfColumns :=
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+      [stateChannel.toRaw, memoryChannel.toRaw],
     soundness := soundness, completeness := completeness }
 
 end SP1Clean.LoadHalfChip

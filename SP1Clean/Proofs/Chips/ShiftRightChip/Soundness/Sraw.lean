@@ -433,7 +433,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- subcircuit `Assumptions` tail (CPUState, three U16MSB, ALUTypeReader) + nine byte-pull requirements.
   -- CPUState / ALUTypeReader only assume `is_real` binary (from the in-circuit gate).
   case cpuA => exact bool_of_mul_pred h_realgate
-  case aluA => exact Or.inr (bool_of_mul_pred h_realgate)
+  case aluA => exact Or.inr ⟨bool_of_mul_pred h_realgate, bool_of_mul_pred h_realgate⟩
   -- The three `U16MSBOperation` assumptions need `a.val < 2^16` on real sub-rows. For `msb1`/`msb2`
   -- (the `op_b[3]`/`op_b[1]` sign reads) this is `isU64 op_b`; for `msb3` (the result limb `a[1]`) it is
   -- the output bound, re-derived in `case msb3A` from the gate-active byte pulls (see that block).

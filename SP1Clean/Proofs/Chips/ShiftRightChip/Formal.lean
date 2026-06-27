@@ -68,7 +68,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3⟩ ∧
   Readers.RegisterAccessCols.Spec
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
-      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩
+      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
+  (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 set_option maxHeartbeats 4000000 in
 /-- **Soundness.** The flag-gated RV64 `srl`/`sra`/`srlw`/`sraw` identities on the result column `cols.a`.
@@ -93,7 +95,7 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨hbU, hcU, hbin, hf0, hf1, hf2, hf3, hsum, hop_a_0, himmc, himmbin, hpins, h_cpu,
-    hrac_a, hrac_b, hrac_c⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨h_env_a, h_env_bmsb, h_env_srwmsb, h_env_cb, h_env_sram, h_env_v, h_env_lo, h_env_hi,
     h_env_lr, h_env_s, h_env_fl⟩ := h_env
   -- project (not destructure — rcases on `h_input` disturbs the bound `h_env_*` hypotheses)
@@ -226,8 +228,8 @@ theorem completeness :
       hbmB, fun h3 => ?_⟩,
     ⟨⟨fun _ => populateA_val_lt B c0 F hbUw hf0 hf1 hf2 hf3 hsum01 1 (by norm_num), he13⟩,
       srwMsb_bool B c0 F hbUw hf0 hf1 hf2 hf3 hsum01, fun h13 => ?_⟩,
-    ⟨hbin, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, himmc, himmbin, hpins,
-      hrac_a, hrac_b, hrac_c⟩,
+    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, himmc, himmbin, hpins,
+      hrac_a, hrac_b, hrac_c, hdec⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     by rcases hf0 with h | h <;> rw [h] <;> simp,
     by rcases hf1 with h | h <;> rw [h] <;> simp,
@@ -278,7 +280,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftRightCols :=
     -- off-gate `Requirements` are discharged locally via the shallow `sum` boolean gate
     -- (`off_gate_vacuous`), so `byteChannel` can later be *finished* in a Clean `SoundEnsemble`.
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+      [stateChannel.toRaw, memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
         Readers.CPUState.circuit, U16MSBOperation.circuit, Readers.ALUTypeReader.circuit]

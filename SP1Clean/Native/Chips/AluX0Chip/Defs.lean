@@ -69,7 +69,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AluX0Cols main where
   localLength_eq := by intro input n; simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
   output input _ := ⟨input.state, input.adapter, input.opcode, input.is_real⟩
   output_eq := by intro input n; simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReaderImmutable`'s program
+  -- **pull** (W11 flip): the reader pulls the instruction fetch as a guarantee, which propagates here.
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
 
 /-- Semantic contract, composed from the sub-circuit `Spec`s. The `ALUTypeReaderImmutable` adapter facts

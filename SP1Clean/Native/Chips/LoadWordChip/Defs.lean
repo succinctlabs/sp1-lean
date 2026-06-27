@@ -118,7 +118,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadWordColumns main whe
       input.memory_access, input.offset_bit, input.selected_word, ⟨input.msb⟩,
       input.is_lw, input.is_lwu⟩
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity +
 offset booleans, the `MemoryAccess` timestamp monotonicity, the `U16MSBOperation` high-bit fact, the

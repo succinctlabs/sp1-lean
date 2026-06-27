@@ -255,7 +255,7 @@ lemma requirements_holds :
     case eqc2 => exact Or.inl rfl
     case isc0 => exact Or.inl rfl
     case cpu => exact hbin
-    case rtype => exact Or.inr hbin
+    case rtype => exact Or.inr ⟨hbin, hbin⟩
     case mulLo =>
       exact Or.inr ⟨fun hr => ⟨hqcU hr, hcU_op⟩, hbin, fun h => (zero_ne_one h).elim, hbin,
         Or.inl rfl, Or.inl rfl, Or.inl rfl, Or.inl rfl, by rcases hbin with h | h <;> simp [h]⟩

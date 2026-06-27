@@ -81,12 +81,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
   have h_addr_spec := h_addr h_addr_as
   simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
-  have h_it := h_itype h_bin
+  have h_it := h_itype ⟨h_bin, h_bin⟩
   refine ⟨⟨h_addr_spec, h_mem h_bin, h_it,
       fun h1 => ⟨(h_bytes h1).1, (h_bytes h1).2.1, (h_bytes h1).2.2.1, (h_bytes h1).2.2.2⟩,
       ⟨hsel0, hsel1, hsel2, hsel3⟩, sub_eq_zero.mp hincr,
       ⟨sub_eq_zero.mp hr0, sub_eq_zero.mp hr1, sub_eq_zero.mp hr2, sub_eq_zero.mp hr3⟩, h_bin⟩,
-    h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin,
+    h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr ⟨h_bin, h_bin⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
 
@@ -129,7 +129,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : P
         input.store_value, input.is_real⟩ ∧
     Readers.ITypeReaderImmutable.Spec
       ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high, clkLow input.state,
-        input.state.pc, 36⟩
+        input.state.pc, 36⟩ ∧
+    (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16
+      ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 set_option maxHeartbeats 16000000 in
 theorem completeness :
@@ -138,7 +140,8 @@ theorem completeness :
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
   obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, hbin, hreg_pa, hreghi_pa, hmem_pa, hmemhi_pa,
-    ⟨hsel0, hsel1, hsel2, hsel3⟩, hincr_pa, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it⟩ := h_assumptions
+    ⟨hsel0, hsel1, hsel2, hsel3⟩, hincr_pa, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it, hdec⟩ :=
+    h_assumptions
   obtain ⟨_, ⟨_, _, _, hmap_pc⟩, ⟨_, ⟨hmap_oap, _, _⟩, _, _, _, _⟩,
     ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _, hmap_sv⟩ := h_input
   have eoap0 : Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[0]
@@ -173,7 +176,7 @@ theorem completeness :
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · exact hbin
   · exact h_mem
-  · exact hbin
+  · exact ⟨hbin, hbin⟩
   · exact h_it
   · intro _
     simp only [byteChannel]; rw [← sub_eq_add_neg, eoap0]
@@ -208,7 +211,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreByteColumns :=
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+      [stateChannel.toRaw, memoryChannel.toRaw],
     soundness := soundness, completeness := completeness,
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,

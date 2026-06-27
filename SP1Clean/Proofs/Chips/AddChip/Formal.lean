@@ -27,16 +27,22 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_bin := bool_of_mul_pred h_gate
   -- `AddOperation` is a `FormalAssertion`; `h_add` is `Assumptions → Spec`. Feed `⟨ha, hb, h_bin⟩`
   -- inline (drives unification on the witnessed `value` field) and apply the gated add identity.
-  refine ⟨⟨h_adapter h_bin, h_bin, fun hr => (h_add ⟨fun _ => ⟨ha, hb⟩, h_bin⟩ hr).2⟩, ?_⟩
+  -- `RTypeReader.Assumptions` is now `⟨is_real binary, is_trusted binary⟩` (W11 flip; `is_trusted = is_real`
+  -- here, so both are `h_bin`); its `Spec` now also carries the **derived** decode bounds.
+  refine ⟨⟨h_adapter ⟨h_bin, h_bin⟩, h_bin, fun hr => (h_add ⟨fun _ => ⟨ha, hb⟩, h_bin⟩ hr).2⟩, ?_⟩
   -- The sub-circuit `Assumptions` tail (post-Clean-`main`: each is a bare `Assumptions` or a
   -- `channelsWithRequirements = [] ∨ Assumptions` disjunct). All discharged by the binary gate + `ha`/`hb`.
   and_intros <;>
-    first | exact h_bin | exact Or.inl rfl | exact Or.inr h_bin
+    first
+      | exact h_bin
+      | exact ⟨h_bin, h_bin⟩
+      | exact Or.inl rfl
+      | exact Or.inr ⟨h_bin, h_bin⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c⟩ := h_assumptions
+  obtain ⟨ha, hb, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
@@ -56,7 +62,7 @@ theorem completeness :
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
-    ⟨hbin, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c⟩, ?_⟩
+    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec⟩, ?_⟩
   · rw [hval]; exact AddOperation.spec_populate ha hb input_is_real
   rcases hbin with h | h <;> rw [h] <;> simp
 
@@ -71,8 +77,9 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddCols where
   ProverSpec := fun _ _ _ => True
   soundness := soundness
   completeness := completeness
+  -- `programChannel` dropped (W11 flip — now pulled via `RTypeReader`, a guarantee not a requirement).
   channelsWithRequirements :=
-    [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
+    [stateChannel.toRaw, memoryChannel.toRaw]
   -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (the gated VM channel
   -- interactions, descended from the composed `CPUState` subcircuit) so the chip can be a `VmTables` table.
   exposedChannels := fun input _ =>

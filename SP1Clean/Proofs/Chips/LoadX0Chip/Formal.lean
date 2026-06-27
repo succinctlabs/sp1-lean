@@ -57,7 +57,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
   have h_addr_spec := h_addr h_addr_as
   simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
-  have h_it := h_itype h_bin
+  have h_it := h_itype ⟨h_bin, h_bin⟩
   -- the alignment gates, in value form.
   simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_al0 h_al1 h_al2
   simp only [← sub_eq_add_neg] at h_oa1 h_oa2
@@ -67,7 +67,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       bool_of_mul_pred h_b4, bool_of_mul_pred h_b5, bool_of_mul_pred h_b6,
       h_bin, h_al2, h_al1, h_al0, h_oa1, h_oa2⟩, ?_⟩
   -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`).
-  exact ⟨h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
+  exact ⟨h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr ⟨h_bin, h_bin⟩⟩
 
 /-- Prover-side row well-formedness: operand `isU64`s + address facts + selector binaries + alignment
 equations + the `op_a_0` forcing facts + the reader/CPUState/MemoryAccess `Spec`s. -/
@@ -135,7 +135,7 @@ theorem completeness :
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · exact hbin
   · exact h_mem
-  · exact hbin
+  · exact ⟨hbin, hbin⟩
   · exact h_it
   · rcases h_b0 with h | h <;> rw [h] <;> simp
   · rcases h_b1 with h | h <;> rw [h] <;> simp
@@ -157,7 +157,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadX0Columns :=
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+      [stateChannel.toRaw, memoryChannel.toRaw],
     soundness := soundness, completeness := completeness }
 
 end SP1Clean.LoadX0Chip

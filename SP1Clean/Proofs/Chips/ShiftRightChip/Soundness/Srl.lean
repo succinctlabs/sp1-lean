@@ -348,7 +348,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- `CPUState` requirement surfaces as a bare `Assumptions` (its `channelsWithRequirements` reduces to a
   -- non-empty literal, collapsing the `= [] ∨` disjunct); the `ALUTypeReader` one keeps the disjunct.
   case cpuA => exact bool_of_mul_pred h_realgate
-  case aluA => exact Or.inr (bool_of_mul_pred h_realgate)
+  case aluA => exact Or.inr ⟨bool_of_mul_pred h_realgate, bool_of_mul_pred h_realgate⟩
   -- The three `U16MSBOperation` assumptions need `a.val < 2^16` on real sub-rows. For `msb1`/`msb2`
   -- (the `op_b[3]`/`op_b[1]` sign reads) this is `isU64 op_b`; for `msb3` (the result limb `a[1]`) it is
   -- the output bound, re-derived in `case msb3A` from the gate-active byte pulls (see that block).

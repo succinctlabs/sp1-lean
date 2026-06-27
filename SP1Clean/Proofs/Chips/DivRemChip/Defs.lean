@@ -77,7 +77,11 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3⟩ ∧
   Readers.RegisterAccessCols.Spec
     ⟨input.adapter.op_c_memory, input.is_real,
-      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩
+      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
+  -- (W11 flip) the `RTypeReader` program **pull** now *derives* the decode bounds into its `Spec`
+  -- (destination index `< 32`, pc limbs `< 2^16`, on real rows) — completeness must provide them.
+  (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 /-- All-zero `fromElements` placeholder for any column block. -/
 @[irreducible] def zc {α : TypeMap} [ProvableType α] : Var α (ZMod p) :=
@@ -425,7 +429,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs DivRemCols main where
   localLength _ := 217
   localLength_eq := by simp +arith [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]
   subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]; try omega
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- (W11 flip) `programChannel` joins the guarantees: `RTypeReader` now **pulls** the program fetch
+  -- (a guarantee = `ProgramMsg.RowSpec`), so its guarantee propagates up here alongside `byteChannel`.
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
   -- the ~30 upstream `pullIf` unfold/refolds put this past simp's default step budget post-#398
   channelsLawful := by simp (maxSteps := 1000000) [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]
 

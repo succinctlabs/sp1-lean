@@ -34,16 +34,17 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         cols := ⟨Vector.map (Expression.eval env) (Vector.mapRange 2 fun i => var { index := i₀ + i }),
           ⟨env.get (i₀ + 2)⟩⟩, is_real := input_is_real } := ⟨ha, hb, h_bin⟩
   refine ⟨⟨?_, h_bin, fun hr => ?_⟩, ?_⟩
-  · simpa only [resultWord, Vector.getElem_map] using h_adapter h_bin
+  · simpa only [resultWord, Vector.getElem_map] using h_adapter ⟨h_bin, h_bin⟩
   · refine trans ?_ (rv64_addw_eq _ _).symm
     simpa only [resultWord, AddwOperation.resultWord, Vector.getElem_map] using
       ((h_addw h_as).2 hr).2
-  · and_intros <;> first | exact h_bin | exact Or.inl rfl | exact Or.inr h_bin
+  · and_intros <;>
+      first | exact h_bin | exact ⟨h_bin, h_bin⟩ | exact Or.inl rfl | exact Or.inr ⟨h_bin, h_bin⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c⟩ := h_assumptions
+  obtain ⟨ha, hb, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   -- `op_c_memory` is grouped since `imm_c` is the final field of the ALU adapter block.
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, ⟨hoc, -, -⟩, -⟩ := h_input
   obtain ⟨h_env_val, h_env_msb⟩ := h_env
@@ -70,10 +71,10 @@ theorem completeness :
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨ha, hb, hbin⟩, ?_⟩,
-    ⟨hbin, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
+    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
-      hrac_a, hrac_b, hrac_c⟩, ?_⟩
+      hrac_a, hrac_b, hrac_c, hdec⟩, ?_⟩
   · rw [hval, hmsbeq]; exact AddwOperation.spec_populate ha hb input_is_real
   rcases hbin with h | h <;> rw [h] <;> simp
 
@@ -85,6 +86,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddwCols :=
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
+      [stateChannel.toRaw, memoryChannel.toRaw] }
 
 end SP1Clean.AddwChip

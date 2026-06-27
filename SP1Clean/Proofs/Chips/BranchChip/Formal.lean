@@ -136,7 +136,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       rw [hl, hg, ZMod.val_one] at h_onehot
       omega
   refine ⟨⟨?_, h_bin, ⟨hbeq, hbne, hblt, hbge, hbltu, hbgeu, hisbr⟩, ?_, ?_, ?_, ?_⟩, ?_⟩
-  · exact h_itype h_bin
+  · exact h_itype ⟨h_bin, h_bin⟩
   · intro hr1 hbr1
     have hav := (h_add1 ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩ hbr1).2
     rw [hpceq] at hav
@@ -212,7 +212,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rw [← c14] at hguar
     exact val_mod_four_of_mul_inv_four_lt ((byteRowSpec_range _ h14p).mp hguar)
   · refine ⟨Or.inr ⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, h_bin, Or.inr ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩,
-      Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, ?_⟩, Or.inr h_bin,
+      Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, ?_⟩, Or.inr ⟨h_bin, h_bin⟩,
       fun h1 h0 => off_gate_vacuous h_bin h1 h0, fun h1 h0 => off_gate_vacuous h_bin h1 h0,
       fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
     -- AddOp2 gate `is_real - is_branching` is binary: on padding `is_branching = 0` from `h_pad`.
@@ -455,7 +455,7 @@ theorem completeness :
   refine ⟨⟨⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, h_lt_spec⟩, ?_, ?_, ?_, ?_, ?_, ?_,
     (by linear_combination -hsumreal), hsumbin, ?_, ?_, ?_,
     ⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, brb⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
-    ?_, ?_, ?_, ⟨h_bin, h_it⟩, ?_, ?_, ?_⟩
+    ?_, ?_, ?_, ⟨⟨h_bin, h_bin⟩, h_it⟩, ?_, ?_, ?_⟩
   · rcases fb0 with h | h <;> rw [h] <;> simp
   · rcases fb1 with h | h <;> rw [h] <;> simp
   · rcases fb2 with h | h <;> rw [h] <;> simp
@@ -517,12 +517,12 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BranchColumns :=
   -- `byteChannel` dropped (W11 Phase 0c): the three off-gate next_pc byte-range pulls are discharged by the
   -- inline `is_real = Σ flags` / `Σ flags ∈ {0,1}` shallow gates in `main`; residual buses are the readers'.
   { main, elaborated,
-    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     requirementsChannelsLawful := fun input_var i₀ => by
-      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
+      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel,
         AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit,
         Readers.ITypeReaderImmutable.circuit]; grind }
 

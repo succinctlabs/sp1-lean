@@ -66,6 +66,32 @@ lemma signedVal_neg_is_real (hp : 2 < p) {is_real : ZMod p} (h : is_real = 0 ∨
     rw [if_neg (by omega), Nat.cast_sub (show 1 ≤ p by omega)]
     push_cast; ring
 
+omit [NeZero p] in
+/-- **`signedVal` is odd** for an odd prime `p`: `signedVal (-x) = -signedVal x` for *every* `x`
+(no binarity needed). The centered representative of `-x` is the negation of that of `x`, because
+`2 * x.val = p` is impossible for odd `p`. This is the general sign-symmetry behind the W11 program-bus
+LogUp polarity flip (the faithfulness anchors carry `is_real`/`is_trusted` as free field elements, so the
+binary `signedVal_neg_is_real` does not apply). -/
+lemma signedVal_neg [Fact p.Prime] (hp : 2 < p) (x : ZMod p) :
+    signedVal (-x) = -signedVal x := by
+  haveI : NeZero p := ⟨by omega⟩
+  have hpp : p.Prime := Fact.out
+  have hodd : ¬ (2 ∣ p) := fun h2 => by
+    rcases hpp.eq_one_or_self_of_dvd 2 h2 with h | h <;> omega
+  rcases eq_or_ne x 0 with hx | hx
+  · subst hx; simp [signedVal, ZMod.val_zero]
+  · have hxlt : x.val < p := ZMod.val_lt x
+    have hxpos : 0 < x.val := by rw [ZMod.val_pos]; exact hx
+    haveI : NeZero x := ⟨hx⟩
+    have hvneg : (-x).val = p - x.val := ZMod.val_neg_of_ne_zero x
+    have hne : 2 * x.val ≠ p := fun he => hodd ⟨x.val, he.symm⟩
+    unfold signedVal
+    rw [hvneg]
+    by_cases h : 2 * x.val ≤ p
+    · have h' : 2 * x.val < p := lt_of_le_of_ne h hne
+      rw [if_pos h, if_neg (by omega), Nat.cast_sub (by omega)]; ring
+    · rw [if_neg h, if_pos (by omega), Nat.cast_sub (by omega)]; ring
+
 /-- `signedVal` is a **section** of the canonical projection `ℤ → ZMod p`: casting the centered
 representative back recovers the element. This is what lets Clean's *field* channel balance be read as
 a `mod p` statement about the native ℤ multiplicities (`GatedVm/BalanceMod.lean`). -/
@@ -177,6 +203,31 @@ lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (Z
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env mult)) := by
   simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
+    Channel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
+    ProvableStruct.componentsToElements]
+  simp
+
+omit [NeZero p] in
+/-- **Kernel of the Program "received = projection" (gated VM pull).** The `pullIf`/`programChannel`/
+`ProgramMsg` analog of `toAccess_pushIf_program` — the W11 polarity-flip form, after the CPU readers switched
+their `programChannel.emit +is_trusted` (send) to `Channel.pullIf is_trusted` (the ROM provider now pushes and
+proves `ProgramMsg.RowSpec`; chips pull and derive). Its signed multiplicity is `signedVal (eval env (-gate))`;
+`toAccess` ignores the channel `Guarantees`, so the projected `LookupAccess` is identical to the old
+`pushIf is_trusted` form modulo the sign. -/
+lemma toAccess_pullIf_program (env : Environment (ZMod p)) (gate : Expression (ZMod p))
+    (msg : ProgramMsg (Expression (ZMod p))) :
+    AbstractInteraction.toAccess env (pulledIf (channel := programChannel) gate msg).toRaw =
+      (InteractionKind.Program, "SP1Program",
+        [(Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
+         (Expression.eval env msg.pc2).val, (Expression.eval env msg.opcode).val,
+         (Expression.eval env msg.op_a).val, (Expression.eval env msg.op_b0).val,
+         (Expression.eval env msg.op_b1).val, (Expression.eval env msg.op_b2).val,
+         (Expression.eval env msg.op_b3).val, (Expression.eval env msg.op_c0).val,
+         (Expression.eval env msg.op_c1).val, (Expression.eval env msg.op_c2).val,
+         (Expression.eval env msg.op_c3).val, (Expression.eval env msg.op_a_0).val,
+         (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
+        signedVal (Expression.eval env (-gate))) := by
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
     Channel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
   simp
