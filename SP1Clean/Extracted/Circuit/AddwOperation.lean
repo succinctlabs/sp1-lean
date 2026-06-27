@@ -60,7 +60,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   assertion U16MSBOperation.circuit ⟨cols.value[1], { msb := cols.msb.msb }, is_real⟩
   byteChannel.pullIf is_real (⟨6, cols.value[0], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.pullIf is_real (⟨6, cols.value[1], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  E1 === 0
+  assertZero E1
   E8 === 0
   E15 === 0
 

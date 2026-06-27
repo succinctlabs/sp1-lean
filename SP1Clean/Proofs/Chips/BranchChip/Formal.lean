@@ -80,6 +80,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     h_byte1, h_byte2, h_byte3⟩ := h_holds
   obtain ⟨_h_ir, ⟨_h_ckh, _h_ck1, _h_ck0, hpc⟩, _h_a, ⟨h_amem_pv, _, _⟩, _h_a0, _h_b,
     ⟨h_bmem_pv, _, _⟩, hcimm⟩ := h_input
+  -- the `is_real = Σ flags` gate is now the shallow `assertZero (is_real - sum)`; recover the eq form.
+  replace h_realsum := add_neg_eq_zero.mp h_realsum
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := by
     rw [h_realsum]; exact bool_of_mul_pred h_sumbin
   have hbeq := bool_of_mul_pred h_beq
@@ -450,7 +452,8 @@ theorem completeness :
       ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 6 + 1 + 4 + 4 + 3) i hi).trans
         (he_lt ⟨i, hi⟩))
     simp [circuit_norm]
-  refine ⟨⟨⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, h_lt_spec⟩, ?_, ?_, ?_, ?_, ?_, ?_, hsumreal.symm, hsumbin, ?_, ?_, ?_,
+  refine ⟨⟨⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, h_lt_spec⟩, ?_, ?_, ?_, ?_, ?_, ?_,
+    (by linear_combination -hsumreal), hsumbin, ?_, ?_, ?_,
     ⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, brb⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
     ?_, ?_, ?_, ⟨h_bin, h_it⟩, ?_, ?_, ?_⟩
   · rcases fb0 with h | h <;> rw [h] <;> simp
@@ -511,10 +514,16 @@ theorem completeness :
 /-- The BRANCH chip's `GeneralFormalCircuit`: conditional control flow via `LtOperationSigned` +
 two `AddOperation` gadgets + `ITypeReaderImmutable`. Soundness and completeness are axiom-clean. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs BranchColumns :=
+  -- `byteChannel` dropped (W11 Phase 0c): the three off-gate next_pc byte-range pulls are discharged by the
+  -- inline `is_real = Σ flags` / `Σ flags ∈ {0,1}` shallow gates in `main`; residual buses are the readers'.
   { main, elaborated,
-    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
+        AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit,
+        Readers.ITypeReaderImmutable.circuit]; grind }
 
 end SP1Clean.BranchChip

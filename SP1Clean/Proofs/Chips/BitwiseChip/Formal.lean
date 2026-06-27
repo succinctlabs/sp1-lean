@@ -134,7 +134,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- composed `BitwiseU16Operation`/`ALUTypeReader` requirements (bare or `[] ∨ Assumptions` disjuncts).
   · and_intros <;>
       first | exact h_bin | exact ⟨ha, hb, hop3, h_bin⟩ | exact Or.inl rfl
-            | exact Or.inr h_bin | exact Or.inr ⟨ha, hb, hop3, h_bin⟩
+            | exact Or.inr h_bin
 
 set_option maxHeartbeats 8000000 in
 theorem completeness :
@@ -210,6 +210,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     channelsWithRequirements :=
-      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
+      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
 
 end SP1Clean.BitwiseChip

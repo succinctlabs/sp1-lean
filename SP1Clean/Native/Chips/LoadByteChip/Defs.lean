@@ -93,9 +93,11 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadByteColumns (
     + ((1 : Expression (ZMod p)) - input.offset_bit[0]) * input.selected_limb_low_byte) === 0
   input.adapter.op_a_0 === 0
   input.is_lbu * input.msb === 0
-  input.is_lb * (input.is_lb - 1) === 0
+  -- shallow (`assertZero`, W11 Phase 0c): the second byte pull is gated by `is_lb`, so its off-gate
+  -- `Requirements` needs `is_lb ∈ {0,1}` visible to `ConstraintsHold.Shallow`.
+  assertZero (input.is_lb * (input.is_lb - 1))
   input.is_lbu * (input.is_lbu - 1) === 0
-  is_real * (is_real - 1) === 0
+  assertZero (is_real * (is_real - 1))
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.offset_bit,
     input.selected_limb, input.selected_limb_low_byte, input.selected_byte, input.msb,
     input.is_lb, input.is_lbu⟩

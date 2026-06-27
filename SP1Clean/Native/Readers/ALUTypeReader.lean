@@ -160,8 +160,10 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 composes a `RegisterAccessCols` per operand (op_c gated by `is_real - imm_c`), imposes the `op_a_0` +
 immediate gates, and emits the Program/Memory buses, with a semantic spec. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
+  -- `byteChannel` dropped (W11 Phase 0c): the composed `RegisterAccessCols` sub-assertions discharge their
+  -- own byte-pull `Requirements`, so only the Memory + Program buses' requirements remain here.
   { main, elaborated,
-    channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     soundness := soundness, completeness := completeness }
 

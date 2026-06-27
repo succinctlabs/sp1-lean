@@ -226,7 +226,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftRightCols (Z
   is_sra * (is_sra - 1) === 0
   is_srlw * (is_srlw - 1) === 0
   is_sraw * (is_sraw - 1) === 0
-  sum * (sum - 1) === 0
+  -- The combined selector `sum` (= the byte-pull gate) is boolean-gated **inline** (`assertZero`, not
+  -- `=== 0`) so it is visible to `ConstraintsHold.Shallow`, discharging the off-gate byte-pull
+  -- `Requirements` without keeping `byteChannel` in `channelsWithRequirements`.
+  assertZero (sum * (sum - 1))
   is_w_imm - e13 * input.adapter.imm_c === 0
   -- c_bits booleans
   b0 * (b0 - 1) === 0

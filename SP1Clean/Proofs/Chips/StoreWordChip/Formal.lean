@@ -147,7 +147,7 @@ theorem completeness :
 /-- The `StoreWord` chip row as a `GeneralFormalCircuit`; output is the extracted `StoreWordColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreWordColumns :=
   { main, elaborated,
-    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

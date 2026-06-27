@@ -112,8 +112,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
   is_bltu * (is_bltu - 1) === 0
   is_bgeu * (is_bgeu - 1) === 0
   let sum := is_beq + is_bne + is_blt + is_bge + is_bltu + is_bgeu
-  input.is_real === sum
-  sum * (sum - 1) === 0
+  -- shallow (`assertZero`, W11 Phase 0c): the three next_pc byte pulls are gated by `input.is_real`, whose
+  -- binarity is `is_real = Σ flags` ∧ `Σ flags ∈ {0,1}`; both must be visible to `ConstraintsHold.Shallow`.
+  assertZero (input.is_real - sum)
+  assertZero (sum * (sum - 1))
   let is_eq := (1 : Expression (ZMod p)) - (cmp.result.u16_flags[0] + cmp.result.u16_flags[1]
     + cmp.result.u16_flags[2] + cmp.result.u16_flags[3])
   let bit := cmp.result.u16_compare_operation.bit

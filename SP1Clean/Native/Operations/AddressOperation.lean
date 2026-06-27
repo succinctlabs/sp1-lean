@@ -248,7 +248,10 @@ def circuit : FormalCircuit (ZMod p) Inputs Extracted.AddressOperation :=
     Spec := Spec,
     soundness := soundness,
     completeness := completeness,
-    channelsWithRequirements := [byteChannel.toRaw] }
+    channelsWithRequirements := [],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel]
+      exact List.nil_subset _ }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

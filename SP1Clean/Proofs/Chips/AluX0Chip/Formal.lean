@@ -78,11 +78,16 @@ theorem completeness :
 /-- The `AluX0` chip row as a `GeneralFormalCircuit`: validates the ALU-into-`x0` program/register accesses
 and advances state (the result discarded); output is the extracted `AluX0Cols`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
+  -- `byteChannel` dropped (W11 Phase 0c): the off-gate LTU byte-pull `Requirements` is discharged by the
+  -- inline `is_real` boolean gate in `main`; the residual buses (state/memory/program) are the readers'.
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     channelsWithRequirements :=
-      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
+      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
+        Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]; grind }
 
 end SP1Clean.AluX0Chip

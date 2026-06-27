@@ -192,7 +192,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadWordColumns :=
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     channelsWithRequirements :=
-      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     soundness := soundness, completeness := completeness }
 
 end SP1Clean.LoadWordChip

@@ -202,8 +202,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftLeftCols (ZM
   let shamt := bitShift + b4 * 16 + b5 * 32
   let e32 := (input.adapter.op_c_memory.prev_value[0] - shamt) * Expression.const ((64 : ZMod p)⁻¹)
   -- ## The inline shift assertZero constraints (in `Extracted/ShiftLeftChip.lean` `asserts` order)
-  -- variant flags
-  (is_sll + is_sllw) * ((is_sll + is_sllw) - 1) === 0
+  -- variant flags. The combined selector `is_sll + is_sllw` (= the byte-pull gate) is boolean-gated
+  -- **inline** (`assertZero`, not `=== 0`) so it is visible to `ConstraintsHold.Shallow`, discharging the
+  -- off-gate byte-pull `Requirements` without keeping `byteChannel` in `channelsWithRequirements`.
+  assertZero ((is_sll + is_sllw) * ((is_sll + is_sllw) - 1))
   is_sll * (is_sll - 1) === 0
   is_sllw * (is_sllw - 1) === 0
   -- c_bits booleans

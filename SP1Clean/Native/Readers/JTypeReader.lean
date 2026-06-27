@@ -96,8 +96,10 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 /-- The native J-type reader as a Clean `FormalAssertion`: composes a single `RegisterAccessCols` for op_a
 (write), imposes the `op_a_0` binary + zeroing gates, and emits the Program/Memory buses. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
+  -- `byteChannel` dropped (W11 Phase 0c): the composed `RegisterAccessCols` sub-assertion discharges its
+  -- own byte-pull `Requirements`, so only the Memory + Program buses' requirements remain here.
   { main, elaborated,
-    channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     soundness := soundness, completeness := completeness }
 

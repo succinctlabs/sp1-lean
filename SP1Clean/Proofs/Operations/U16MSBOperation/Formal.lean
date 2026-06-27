@@ -76,7 +76,9 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Spec := Spec,
     soundness := soundness,
     completeness := completeness,
-    channelsWithRequirements := [byteChannel.toRaw] }
+    channelsWithRequirements := [],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel]; grind }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

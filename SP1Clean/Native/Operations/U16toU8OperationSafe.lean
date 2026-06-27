@@ -99,6 +99,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
     (⟨3, 0, cols.low_bytes[2], (u16_values[2] - cols.low_bytes[2]) * (256 : ZMod p)⁻¹⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.pullIf is_real
     (⟨3, 0, cols.low_bytes[3], (u16_values[3] - cols.low_bytes[3]) * (256 : ZMod p)⁻¹⟩ : ByteRow (Expression (ZMod p)))
+  assertZero (is_real * (is_real - 1))
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
@@ -151,7 +152,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have el2 : Expression.eval env input_var_cols_low_bytes[2] = input_cols_low_bytes[2] := by rw [← hicols]; simp only [Vector.getElem_map]
   have el3 : Expression.eval env input_var_cols_low_bytes[3] = input_cols_low_bytes[3] := by rw [← hicols]; simp only [Vector.getElem_map]
   simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, el0, el1, el2, el3] at h_holds ⊢
-  obtain ⟨hr0, hr1, hr2, hr3⟩ := h_holds
+  obtain ⟨hr0, hr1, hr2, hr3, _hbool⟩ := h_holds
   -- The four trailing conjuncts are the byte pulls' own `Requirements` — vacuous off-gate.
   refine ⟨fun hr1eq => ?_, fun h1 h0 => off_gate_vacuous hbin h1 h0,
     fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
@@ -181,7 +182,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   have el2 : Expression.eval env.toEnvironment input_var_cols_low_bytes[2] = input_cols_low_bytes[2] := by rw [← hicols]; simp only [Vector.getElem_map]
   have el3 : Expression.eval env.toEnvironment input_var_cols_low_bytes[3] = input_cols_low_bytes[3] := by rw [← hicols]; simp only [Vector.getElem_map]
   simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, el0, el1, el2, el3]
-  refine ⟨?_, ?_, ?_, ?_⟩ <;>
+  refine ⟨?_, ?_, ?_, ?_, by rcases hbin with h | h <;> rw [h] <;> simp⟩ <;>
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have hsp := h_spec hr1
@@ -200,6 +201,8 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Spec := Spec,
     soundness := soundness,
     completeness := completeness,
-    channelsWithRequirements := [byteChannel.toRaw] }
+    channelsWithRequirements := [],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel]; grind }
 
 end SP1Clean.U16toU8OperationSafe

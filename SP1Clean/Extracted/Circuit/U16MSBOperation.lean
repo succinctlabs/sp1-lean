@@ -46,7 +46,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let E5 := cols.msb * 65536
   let E6 := E4 - E5
   byteChannel.pullIf is_real (⟨6, E6, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  E1 === 0
+  assertZero E1
   E3 === 0
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where

@@ -108,7 +108,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var StoreByteColumns 
     + input.increment * ((1 : Expression (ZMod p)) - input.offset_bit[1]) * input.offset_bit[2]) === 0
   input.store_value[3] - (input.memory_access.prev_value[3]
     + input.increment * input.offset_bit[1] * input.offset_bit[2]) === 0
-  input.is_real * (input.is_real - 1) === 0
+  assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.offset_bit,
     input.mem_limb, input.mem_limb_low_byte, input.register_low_byte, input.increment,
     input.store_value, input.is_real⟩

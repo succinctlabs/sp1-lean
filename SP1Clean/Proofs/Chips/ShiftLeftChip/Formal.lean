@@ -217,7 +217,16 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftLeftCols :=
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
+    -- `byteChannel` dropped from `channelsWithRequirements` (W11): the nine `gate`-gated byte pulls'
+    -- off-gate `Requirements` are discharged locally via the shallow `(is_sll + is_sllw)` boolean gate
+    -- (`off_gate_vacuous`), so `byteChannel` can later be *finished* in a Clean `SoundEnsemble`.
     channelsWithRequirements :=
-      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
+      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
+        Readers.CPUState.circuit, U16MSBOperation.circuit, Readers.ALUTypeReader.circuit]
+      intro env hgate
+      have hbool := bool_of_mul_pred hgate
+      and_intros <;> exact fun h1 h0 => off_gate_vacuous hbool h1 h0 }
 
 end SP1Clean.ShiftLeftChip

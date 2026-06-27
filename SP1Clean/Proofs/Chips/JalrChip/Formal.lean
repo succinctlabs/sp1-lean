@@ -280,10 +280,15 @@ theorem completeness :
 /-- The JALR chip row as a `GeneralFormalCircuit`: register-indirect jump with LSB clearing, composing the
 two witnessed `AddOperation` gadgets and the I-type reader; output is the extracted `JalrColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs JalrColumns :=
+  -- `byteChannel` dropped (W11 Phase 0c): the off-gate alignment byte-pull `Requirements` is discharged by
+  -- the inline `is_real` boolean gate in `main`; the residual buses are the readers'/add-ops'.
   { main, elaborated,
-    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
+        AddOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit]; grind }
 
 end SP1Clean.JalrChip

@@ -98,7 +98,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   circuit_proof_start
   obtain ⟨habc_imp, hir_bin, hmw_real, hmul_b, hmh_b, hmhu_b, hmhsu_b, hmw_b, hsum⟩ := h_assumptions
   obtain ⟨hib, hic, _hicols, hir, _him_mul, _him_mulh, _him_mulhu, _him_mulhsu, _him_mulw⟩ := h_input
-  obtain ⟨hA, hB, hpm, hb_bool, hc_bool, hb5, hc5, hcF0, hcF1, hcF2, hcF3, hcF4, hcF5, hcF6, hcF7, hcF8, hcF9, hcF10,
+  obtain ⟨_gate, hA, hB, hpm, hb_bool, hc_bool, hb5, hc5, hcF0, hcF1, hcF2, hcF3, hcF4, hcF5, hcF6, hcF7, hcF8, hcF9, hcF10,
     hcF11, hcF12, hcF13, hcF14, hcF15, hpG0, hpG1, hpG2, hpG3, hpG4, hpG5, hpG6, hpG7,
     hsdb, hsdc, himpb, himpc, hch0, hch1, hch2, hch3, hch4, hch5, hch6, hch7, hch8, hch9, hch10,
     hch11, hch12, hch13, hch14, hch15⟩ := h_holds
@@ -713,7 +713,9 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     ecl3] at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
-    ?_, ?_, ?_, ?_⟩
+    ?_, ?_, ?_, ?_, ?_⟩
+  -- leading `is_real` binary gate (W11 cwr: byte sends are locally `is_real`-gated, shallow `assertZero`)
+  · rcases hir_bin with h | h <;> simp [h]
   -- 3 subcircuit `⟨Assumptions, Spec⟩`: U16toU8(b), U16toU8(c), U16MSB(product)
   · exact ⟨⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).1, hir_bin⟩, fun h => (h_gated h).2.1⟩
   · exact ⟨⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).2, hir_bin⟩, fun h => (h_gated h).2.2.1⟩
@@ -919,7 +921,12 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Spec := Spec,
     soundness := soundness,
     completeness := completeness,
-    channelsWithRequirements := [byteChannel.toRaw] }
+    channelsWithRequirements := [],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel]
+      refine ⟨List.nil_subset _, fun env hgate => ?_⟩
+      have hbool := bool_of_mul_pred hgate
+      and_intros <;> exact fun h1 h0 => off_gate_vacuous hbool h1 h0 }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

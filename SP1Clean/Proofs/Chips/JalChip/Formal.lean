@@ -177,10 +177,15 @@ theorem completeness :
 /-- The JAL chip row as a `GeneralFormalCircuit`: the data-dependent jump/link semantics, composing the
 two witnessed `AddOperation` gadgets and the J-type reader; output is the extracted `JalColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
+  -- `byteChannel` dropped (W11 Phase 0c): the off-gate alignment byte-pull `Requirements` is discharged by
+  -- the inline `is_real` boolean gate in `main`; the residual buses are the readers'/add-ops'.
   { main, elaborated,
-    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
+        AddOperation.circuit, Readers.CPUState.circuit, Readers.JTypeReader.circuit]; grind }
 
 end SP1Clean.JalChip

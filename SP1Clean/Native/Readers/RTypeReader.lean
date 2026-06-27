@@ -115,8 +115,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  -- `byteChannel` (from the composed `RegisterAccessCols` timestamp checks) gives guarantees + a (padding)
-  -- requirement, so it is in BOTH lists. The Memory + Program buses are plain gated `emit`s (requirements-only,
+  -- `byteChannel` (from the composed `RegisterAccessCols` timestamp checks) propagates its *guarantee* up
+  -- here; its *requirement* is discharged inside the sub (W11 Phase 0c), so it is dropped from
+  -- `channelsWithRequirements` below. The Memory + Program buses are plain gated `emit`s (requirements-only,
   -- `Guarantees := True` for memory ⇒ trivial; `ProgramMsg.Spec` for program).
   channelsWithGuarantees := [byteChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, RegisterAccessCols.circuit]
@@ -161,10 +162,12 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 composes a `RegisterAccessCols` sub-assertion per operand for the timestamp byte checks, imposes the
 `op_a_0` binary + zeroing gates, and emits the Program/Memory buses, with a semantic spec. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
+  -- `byteChannel` dropped (W11 Phase 0c): the composed `RegisterAccessCols` sub-assertions discharge their
+  -- own byte-pull `Requirements`, so only the Memory + Program buses' requirements remain here.
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     soundness := soundness, completeness := completeness,
-    channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
+    channelsWithRequirements := [memoryChannel.toRaw, programChannel.toRaw] }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

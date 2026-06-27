@@ -35,7 +35,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       Expression.eval env input_var_cols_result[i] = input_cols_result[i] := by
     intro i hi; rw [← hir]; simp only [Vector.getElem_map]
   simp only [circuit_norm, byteChannel, ea, eb, er] at h_holds ⊢
-  obtain ⟨hg0, hg1, hg2, hg3, hg4, hg5, hg6, hg7⟩ := h_holds
+  obtain ⟨hg0, hg1, hg2, hg3, hg4, hg5, hg6, hg7, _hbool⟩ := h_holds
   -- The eight trailing conjuncts are the byte pulls' own `Requirements` — vacuous off-gate.
   refine ⟨fun h1 => ?_, fun h1 h0 => off_gate_vacuous hbin h1 h0,
     fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
@@ -93,7 +93,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       ⟨⟨by rw [hres]; exact byteOp_lt256 _ _ _ hb.1 hb.2, hb.1, hb.2⟩, hres⟩
   simp only [circuit_norm, byteChannel, ea, eb, er]
   refine ⟨fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, fun hneg => ?_,
-    fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, fun hneg => ?_⟩
+    fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, ?_⟩
   · exact key (neg_inj.mp hneg) 0
   · exact key (neg_inj.mp hneg) 1
   · exact key (neg_inj.mp hneg) 2
@@ -102,6 +102,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   · exact key (neg_inj.mp hneg) 5
   · exact key (neg_inj.mp hneg) 6
   · exact key (neg_inj.mp hneg) 7
+  · rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- The `BitwiseOperation` gadget as a Clean-native `FormalAssertion`: `is_real`- and opcode-gated
 semantic spec, byte-bus AND/OR/XOR pulls, witnessing nothing. -/
@@ -111,7 +112,9 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Spec := Spec,
     soundness := soundness,
     completeness := completeness,
-    channelsWithRequirements := [byteChannel.toRaw] }
+    channelsWithRequirements := [],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel]; grind }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

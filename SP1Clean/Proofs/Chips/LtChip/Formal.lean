@@ -124,7 +124,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- composed `LtOperationSigned`/`ALUTypeReader` requirements (bare or `[] ∨ Assumptions` disjuncts).
   · and_intros <;>
       first | exact h_bin | exact ⟨ha, hb, h_bin, h_slt_bool⟩ | exact Or.inl rfl
-            | exact Or.inr h_bin | exact Or.inr ⟨ha, hb, h_bin, h_slt_bool⟩
+            | exact Or.inr h_bin
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
@@ -183,6 +183,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     channelsWithRequirements :=
-      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
+      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
 
 end SP1Clean.LtChip

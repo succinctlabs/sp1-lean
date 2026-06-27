@@ -50,6 +50,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   byteChannel.pullIf is_real (⟨opcode, cols.result[5], a[5], b[5]⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.pullIf is_real (⟨opcode, cols.result[6], a[6], b[6]⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.pullIf is_real (⟨opcode, cols.result[7], a[7], b[7]⟩ : ByteRow (Expression (ZMod p)))
+  assertZero (is_real * (is_real - 1))
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0

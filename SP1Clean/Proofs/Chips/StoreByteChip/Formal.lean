@@ -202,11 +202,17 @@ theorem completeness :
 
 /-- The `StoreByte` chip row as a `GeneralFormalCircuit`; output is the extracted `StoreByteColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreByteColumns :=
+  -- `byteChannel` dropped (W11 Phase 0c): the two off-gate byte-pull `Requirements` (register/mem U8 pairs)
+  -- are discharged by the inline `is_real` boolean gate in `main`; the residual buses are the readers'.
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     channelsWithRequirements :=
-      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
-    soundness := soundness, completeness := completeness }
+      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    soundness := soundness, completeness := completeness,
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
+        AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit,
+        Readers.MemoryAccess.circuit]; grind }
 
 end SP1Clean.StoreByteChip

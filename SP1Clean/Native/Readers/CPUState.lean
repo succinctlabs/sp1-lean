@@ -53,6 +53,10 @@ value — `toRaw` (gated post-#398), padding owes nothing) plus the two State-bu
 current `(clk, cols.pc)` with `-is_real`, `send` the next `(clk + clk_inc, next_pc)` with `+is_real`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let cols := input.cols
+  -- Local, shallow `is_real` boolean gate (faithful — SP1's adapter `assert_bool(is_real)`); kept inline
+  -- (`assertZero`, not `=== 0`) so it is visible to `ConstraintsHold.Shallow`, discharging the off-gate
+  -- byte-pull `Requirements` without keeping `byteChannel` in `channelsWithRequirements`.
+  assertZero (input.is_real * (input.is_real - 1))
   byteChannel.pullIf input.is_real
     (⟨6, (cols.clk_0_16 - 1) * (8 : ZMod p)⁻¹, Expression.const ((13 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
@@ -90,9 +94,9 @@ theorem soundness [Fact (2 ^ 17 < p)] : FormalAssertion.Soundness (ZMod p) main 
   refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
   have hneg : -input_is_real = -1 := by rw [hr1]
-  refine ⟨(byteRowSpec_range _ h13p).mp ?_, ((byteRowSpec_u8range_pair _ _).mp (h_holds.2 hneg)).1⟩
+  refine ⟨(byteRowSpec_range _ h13p).mp ?_, ((byteRowSpec_u8range_pair _ _).mp (h_holds.2.2 hneg)).1⟩
   rw [sub_eq_add_neg, Nat.cast_ofNat]
-  exact h_holds.1 hneg
+  exact h_holds.2.1 hneg
 
 theorem completeness [Fact (2 ^ 17 < p)] : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -101,7 +105,8 @@ theorem completeness [Fact (2 ^ 17 < p)] : FormalAssertion.Completeness (ZMod p)
   -- (`-is_real = -1`, i.e. `is_real = 1`); there the `Spec` clock bounds supply it. The State emits add no
   -- completeness obligation (`Guarantees := True`).
   simp only [circuit_norm, byteChannel]
-  refine ⟨?_, ?_⟩
+  refine ⟨?_, ?_, ?_⟩
+  · rcases h_assumptions with h | h <;> simp [h]
   · intro hneg
     obtain ⟨hb1, _⟩ := h_spec (neg_inj.mp hneg)
     rw [sub_eq_add_neg] at hb1
@@ -122,7 +127,12 @@ def circuit [Fact (2 ^ 17 < p)] : FormalAssertion (ZMod p) Inputs where
   Spec := Spec
   soundness := soundness
   completeness := completeness
-  channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw]
+  -- `byteChannel` dropped (W11 Phase 0c): the off-gate byte-pull `Requirements` are now discharged by the
+  -- inline `is_real` boolean gate in `main`, so `byteChannel` need not stay in `channelsWithRequirements`
+  -- (it can later be *finished* in a Clean `SoundEnsemble`). The State bus stays — it carries real emits.
+  channelsWithRequirements := [stateChannel.toRaw]
+  requirementsChannelsLawful input_var i₀ := by
+    simp only [circuit_norm, main, byteChannel, stateChannel]; grind
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength [Fact (2 ^ 17 < p)] (x : Var Inputs (ZMod p)) :
@@ -130,6 +140,6 @@ set_option linter.unusedSectionVars false in
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq [Fact (2 ^ 17 < p)] :
     (circuit (p := p)).channelsWithRequirements
-      = ([byteChannel.toRaw, stateChannel.toRaw] : List (RawChannel (ZMod p))) := rfl
+      = ([stateChannel.toRaw] : List (RawChannel (ZMod p))) := rfl
 
 end SP1Clean.Readers.CPUState

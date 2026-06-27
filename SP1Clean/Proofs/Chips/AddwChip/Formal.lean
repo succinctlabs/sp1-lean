@@ -38,7 +38,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · refine trans ?_ (rv64_addw_eq _ _).symm
     simpa only [resultWord, AddwOperation.resultWord, Vector.getElem_map] using
       ((h_addw h_as).2 hr).2
-  · and_intros <;> first | exact h_bin | exact Or.inl rfl | exact Or.inr h_bin | exact Or.inr h_as
+  · and_intros <;> first | exact h_bin | exact Or.inl rfl | exact Or.inr h_bin
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
@@ -85,6 +85,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddwCols :=
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     channelsWithRequirements :=
-      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
+      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
 
 end SP1Clean.AddwChip

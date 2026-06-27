@@ -66,8 +66,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  -- the composed timestamp sub-assertion's two checks are gated receives (mult `-is_real`):
-  -- `byteChannel` is in BOTH the guarantee and the requirement list.
+  -- the composed timestamp sub-assertion's two checks are gated receives (mult `-is_real`): their
+  -- `byteChannel` *guarantee* propagates up here (the *requirement* is discharged inside the sub — W11
+  -- Phase 0c — so `byteChannel` is dropped from `channelsWithRequirements` below).
   channelsWithGuarantees := [byteChannel.toRaw]
 
 -- Expose the declared channel list + `localLength` as `@[circuit_norm]` rfl-lemmas so the composing
@@ -100,10 +101,13 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 /-- The outer register-access reader as a Clean `FormalAssertion`: takes the chip-owned `cols` block plus
 `is_real`/`clk_target`, composes the timestamp sub-assertion, with `Spec` the propagated byte bounds. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
+  -- `byteChannel` dropped (W11 Phase 0c): the composed `RegisterAccessTimestamp` sub-assertion now
+  -- discharges its own off-gate byte-pull `Requirements` (inline `is_real` gate), so it contributes no
+  -- `byteChannel` requirement here; only its `byteChannel` *guarantee* still propagates up.
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     soundness := soundness, completeness := completeness,
-    channelsWithRequirements := [byteChannel.toRaw] }
+    channelsWithRequirements := [] }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

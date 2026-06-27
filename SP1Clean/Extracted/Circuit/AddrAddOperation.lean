@@ -73,7 +73,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   byteChannel.pullIf is_real (⟨6, cols.value[0], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.pullIf is_real (⟨6, cols.value[1], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.pullIf is_real (⟨6, cols.value[2], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  E1 === 0
+  assertZero E1
   E8 === 0
   E15 === 0
   E22 === 0

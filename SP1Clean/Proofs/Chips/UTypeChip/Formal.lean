@@ -163,7 +163,7 @@ theorem completeness :
 composing the witnessed `AddOperation` gadget and the J-type reader; output is the extracted `UTypeColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
   { main, elaborated,
-    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

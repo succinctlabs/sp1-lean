@@ -80,6 +80,10 @@ and emit the two Memory interactions (send prior value at prev timestamp `+is_re
 `(clk_high, clk_low + 1)` `−is_real`). -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let ts := input.mem.access_timestamp
+  -- Local, shallow `is_real` boolean gate (faithful — SP1's memory-access `assert_bool`); kept inline
+  -- (`assertZero`, not `=== 0`) so it is visible to `ConstraintsHold.Shallow`, discharging the off-gate
+  -- byte-pull `Requirements` without keeping `byteChannel` in `channelsWithRequirements`.
+  assertZero (input.is_real * (input.is_real - 1))
   input.is_real * (ts.compare_low * (ts.compare_low - 1)) === 0
   input.is_real * (ts.compare_low * (input.clk_high - ts.prev_high)) === 0
   input.is_real * ((ts.compare_low * (input.clk_low + 1) + (1 - ts.compare_low) * input.clk_high
@@ -119,7 +123,9 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   circuit_proof_start
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel, memoryChannel] at h_holds ⊢
-  obtain ⟨a1, a2, a3, b4, b5⟩ := h_holds
+  -- the leading `_` is the new inline `is_real` boolean gate (unused in soundness — `Assumptions` already
+  -- gives `is_real ∈ {0,1}`); `a1 a2 a3` the three timestamp asserts, `b4 b5` the two byte-pull requirements.
+  obtain ⟨_, a1, a2, a3, b4, b5⟩ := h_holds
   -- The two trailing conjuncts are the byte pulls' own `Requirements` (diff_low/diff_high range
   -- checks) — vacuous off-gate; the two Memory emits add no soundness obligation.
   refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
@@ -140,8 +146,10 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel]
   rcases h_assumptions with h0 | h1
-  · -- padding row (`is_real = 0`): every gated assert is `0 · _`, the byte pulls fire only off-padding.
-    refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · -- padding row (`is_real = 0`): the leading gate + every gated assert is `0 · _`, the byte pulls fire
+    -- only off-padding.
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+    · simp only [h0, zero_mul]
     · simp only [h0, zero_mul]
     · simp only [h0, zero_mul]
     · simp only [h0, zero_mul]
@@ -151,7 +159,8 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     obtain ⟨hcl, ha2, ha3, hd_low, hd_high⟩ := h_spec h1
     simp only [id] at *
     simp only [selCur, selPrev] at ha3
-    refine ⟨?_, ?_, ?_, ?_, ?_⟩
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+    · simp [h1]
     · rw [h1, one_mul]; rcases hcl with h | h <;> rw [h] <;> ring
     · rw [h1, one_mul]; linear_combination ha2
     · rw [h1, one_mul]; linear_combination ha3
@@ -161,10 +170,15 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 /-- The native memory-access primitive as a Clean `FormalAssertion`: timestamp monotonicity columns +
 the two Memory-bus interactions at a real 48-bit address, parameterised by the written `new_value`. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
+  -- `byteChannel` dropped (W11 Phase 0c): the off-gate byte-pull `Requirements` are now discharged by the
+  -- inline `is_real` boolean gate in `main`, so only the Memory bus stays in `channelsWithRequirements`
+  -- (it carries the real send/receive emits); `byteChannel` moves to a Clean `SoundEnsemble` provider later.
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     soundness := soundness, completeness := completeness,
-    channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw] }
+    channelsWithRequirements := [memoryChannel.toRaw],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel, memoryChannel]; grind }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

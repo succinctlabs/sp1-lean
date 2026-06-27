@@ -63,6 +63,10 @@ diff) * 65536⁻¹`. Each is a `byteChannel.pullIf` (mult `-is_real`, **raw** va
 handing soundness the `ByteRowSpec` guarantee on real rows; on padding (`mult = 0`) it owes nothing. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let cols := input.cols
+  -- Local, shallow `is_real` boolean gate (faithful — SP1's `eval_register_access_*` `assert_bool`);
+  -- kept inline (`assertZero`, not `=== 0`) so it is visible to `ConstraintsHold.Shallow`, discharging the
+  -- off-gate byte-pull `Requirements` without keeping `byteChannel` in `channelsWithRequirements`.
+  assertZero (input.is_real * (input.is_real - 1))
   byteChannel.pullIf input.is_real
     (⟨6, cols.diff_low_limb, Expression.const ((16 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
@@ -105,8 +109,8 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
   have hneg : -input_is_real = -1 := by rw [hr1]
-  have hb1 := h_holds.1 hneg
-  have hb2 := h_holds.2 hneg
+  have hb1 := h_holds.2.1 hneg
+  have hb2 := h_holds.2.2 hneg
   rw [← c16] at hb1
   refine ⟨(byteRowSpec_range _ h16p).mp hb1, ?_⟩
   simp only [sub_eq_add_neg]
@@ -118,7 +122,8 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   circuit_proof_start
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel]
-  refine ⟨?_, ?_⟩
+  refine ⟨?_, ?_, ?_⟩
+  · rcases h_assumptions with h | h <;> simp [h]
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     obtain ⟨hb1, _⟩ := h_spec hr1
@@ -133,10 +138,15 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 /-- The inner timestamp reader as a Clean `FormalAssertion`: takes the chip-owned `cols` block plus
 `is_real`/`clk_target`, imposes the two `is_real`-gated byte checks, with `Spec` the two byte bounds. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
+  -- `byteChannel` dropped (W11 Phase 0c): the off-gate byte-pull `Requirements` are now discharged by the
+  -- inline `is_real` boolean gate in `main`, so `channelsWithRequirements` is empty (this leaf reader emits
+  -- only on `byteChannel`, which moves to a Clean `SoundEnsemble` byte provider later).
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     soundness := soundness, completeness := completeness,
-    channelsWithRequirements := [byteChannel.toRaw] }
+    channelsWithRequirements := [],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel]; grind }
 
 -- This leaf reader emits only on `byteChannel`, so its interactions are empty on the Memory/Program
 -- channels — the bottom-up base case that lets `RegisterAccessCols`/`RTypeReader` drop this sub-reader's

@@ -184,7 +184,7 @@ semantic contract; output is the extracted `MulCols` column struct. Soundness/co
 and axiom-clean (completeness via `MulOperation.spec_populate` on the witnessed columns). -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs MulCols :=
   { main, elaborated,
-    channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness }

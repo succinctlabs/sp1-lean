@@ -56,7 +56,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AluX0Cols (ZMod p
   assertion Readers.ALUTypeReaderImmutable.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, input.opcode⟩
-  input.is_real * (input.is_real - 1) === 0
+  assertZero (input.is_real * (input.is_real - 1))
   input.is_real * (input.adapter.op_a_0 - 1) === 0
   (input.is_real - 1) * input.adapter.op_a_0 === 0
   return ⟨input.state, input.adapter, input.opcode, input.is_real⟩

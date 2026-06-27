@@ -20,6 +20,7 @@ word is reconstructed (`resultWord`) and placed at the chip level. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let cols := input.cols
   let is_real := input.is_real
+  assertZero (is_real * (is_real - 1))
   assertion U16toU8OperationSafe.circuit ⟨input.b, cols.b_lower_byte, is_real⟩
   assertion U16toU8OperationSafe.circuit ⟨input.c, cols.c_lower_byte, is_real⟩
   assertion U16MSBOperation.circuit ⟨cols.product[2] + cols.product[3] * 256, cols.product_msb, input.is_mulw⟩

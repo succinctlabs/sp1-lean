@@ -60,7 +60,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalColumns (ZMod 
   byteChannel.pullIf input.is_real
     (⟨6, (add_value[0] * (4 : ZMod p)⁻¹), Expression.const ((14 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
-  input.is_real * (input.is_real - 1) === 0
+  assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, ⟨add_value⟩, ⟨op_a_value⟩, input.is_real⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalColumns main where

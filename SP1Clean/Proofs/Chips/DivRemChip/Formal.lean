@@ -75,7 +75,39 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
+    -- `byteChannel` dropped from `channelsWithRequirements` (W11): the 34 byte pulls' off-gate
+    -- `Requirements` (32 gated by the shallow `is_real` gate `E355`, the last two by the shallow word-flag
+    -- sum `e2 = is_divw + is_remw + is_divuw + is_remuw`) are discharged locally via `off_gate_vacuous`, so
+    -- `byteChannel` can later be *finished* in a Clean `SoundEnsemble`. The gate is already shallow (emitted
+    -- via `assertZeros (ownAsserts cols)`), so `main` is unchanged.
     channelsWithRequirements :=
-      [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] }
+      [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
+        AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit,
+        LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit,
+        Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]
+      intro env hshallow
+      simp only [ownAsserts, List.forall_mem_cons] at hshallow
+      obtain ⟨e13, e15, e17, e19, e20, e21, e22, e23, e29, e35, e41, e47, e48, e49, e51, e54, e57, e59,
+        e61, e64, e67, e69, e70, e71, e73, e76, e79, e81, e83, e86, e89, e91, e96, e99, e103, e105, e107,
+        e109, e111, e113, e115, e117, e119, e154, e157, e160, e163, e167, e171, e175, e179, e184, e189,
+        e194, e199, e204, e209, e214, e219, e225, e228, e230, e232, e234, e236, e238, e240, e242, e244,
+        e247, e250, e253, e256, e259, e262, e265, e268, e270, e272, e274, e276, e278, e280, e282, e284,
+        e286, e288, e299, e300, e301, e302, e305, e307, e309, e311, e313, e315, e317, e319, e321, e323,
+        e325, e327, e329, e331, e333, e335, e337, e339, e341, e343, e345, e347, e349, e351, e353, e355,
+        e357, e359, e367, eopa0⟩ := hshallow
+      simp only [circuit_norm] at e325 e327 e329 e331 e333 e335 e337 e339 e355 e367
+      have hbin := bool_of_mul_pred e355
+      have bd := bool_of_mul_pred e325; have bdu := bool_of_mul_pred e327
+      have br := bool_of_mul_pred e329; have bru := bool_of_mul_pred e331
+      have bdw := bool_of_mul_pred e333; have brw := bool_of_mul_pred e335
+      have bduw := bool_of_mul_pred e337; have bruw := bool_of_mul_pred e339
+      have hvs := flags_val_sum bd bdu br bru bdw brw bduw bruw (by linear_combination -e367)
+      have he2 := group_binary4 bdw brw bduw bruw (by omega)
+      and_intros <;>
+        first
+          | exact fun h1 h0 => off_gate_vacuous hbin h1 h0
+          | exact fun h1 h0 => off_gate_vacuous he2 h1 h0 }
 
 end SP1Clean.DivRemChip
