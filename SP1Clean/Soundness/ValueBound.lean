@@ -20,6 +20,8 @@ equals the memory clk order the value chain ranges over. That discharge is the r
 namespace SP1Clean.Soundness.Target
 
 open SP1Clean
+open SP1Clean.ProgramChip (ProgramRow)
+open SP1Clean.LookupAccessList (isConsistentBalanced aggregateChipRows)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
@@ -138,6 +140,64 @@ def targetObligations_full (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p
         SP1Halted prog (exitOf pi.exit_code) s) :
     TargetObligations prog pi rows (OperandsBound_full prog) where
   bound := operandsBound_full_targetBound prog pi rows h_decode_link h_value_link
+  lift := h_lift
+  halt_nonempty := h_halt_nonempty
+  halt := h_halt
+
+/-! ## P4 — the Program-bus link **retired**: decode half from the finished-channel balance
+
+The `TraceProgramValid` Program-bus link `targetObligations_full` threads is now replaced by the
+balance-level decode discharge (`decode_targetBound_of_balance` = constructed provider
+`programProvider_of_valid` + `programConsistent_of_balance`). The committed program ROM (`rom`, each row
+the decode of the guest ROM) and the balanced Program bus suffice — no standalone Program link. The bus
+balance (`isConsistentBalanced`) is the lone LogUp/GKR residual, the same shape every other bus carries
+until the full `VmTables` capstone; with `programChannel` finished against `programProviderEnsemble`
+(`ProgramProviderChip`), that residual becomes an upstream-Clean obligation. The cross-bus **value** link
+(`h_value_link`) is a *different* bus and stays threaded — retiring it is the value-half (W2) task. -/
+
+/-- **The full `bound` field with the Program-bus link retired.** Decode half from
+`decode_targetBound_of_balance` (decoded ROM + balance), value half from the threaded cross-bus value
+link. The Program-bus `TraceProgramValid` link is gone. -/
+theorem operandsBound_full_targetBound_of_balance (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p))
+    (rows : List (ChipRow p))
+    (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)
+    (h_decoded : ∀ row ∈ rom, decodedInROM prog row)
+    (h_bal : isConsistentBalanced
+      (aggregateChipRows (rows.map ChipRow.view) programLookups ++ romContributions rom mult))
+    (h_value_link : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+        TraceValueBinding s0 path) :
+    ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+      ∀ i (hi : i < path.length) s, RefinesAt prog s0 path i s →
+        OperandsBound_full prog (path[i]'hi) s := by
+  intro s0 path h0 hw i hi s href
+  exact ⟨decode_bound_of_balance prog rom mult h_decoded h_bal hw hi s,
+         value_targetBound (h_value_link s0 path h0 hw) hi href⟩
+
+/-- **The full `TargetObligations` with the Program-bus link retired** (decode half discharged from
+Program-bus balance). The only Program-bus residual is the `isConsistentBalanced` fact — which the
+finished `programChannel` (`programProviderEnsemble`) turns into an upstream-Clean obligation. The
+cross-bus value link and the W7/W5 lift/halt seams remain. -/
+def targetObligations_full_of_balance (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p))
+    (rows : List (ChipRow p))
+    (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)
+    (h_decoded : ∀ row ∈ rom, decodedInROM prog row)
+    (h_bal : isConsistentBalanced
+      (aggregateChipRows (rows.map ChipRow.view) programLookups ++ romContributions rom mult))
+    (h_value_link : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+        TraceValueBinding s0 path)
+    (h_lift : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+      ∀ i (hi : i + 1 < path.length) s,
+        RefinesAt prog s0 path i s → OperandsBound_full prog (path[i]'(by omega)) s →
+        ∃ s', SailStep s s' ∧ RowEffect prog (path[i]'(by omega)) s s')
+    (h_halt_nonempty : ∀ path, WalkOf pi.toLegacy rows path → path ≠ [])
+    (h_halt : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+      ∀ (hne : path ≠ []) s,
+        RefinesAt prog s0 path (path.length - 1) s →
+        OperandsBound_full prog (path[path.length - 1]'(by
+          have := List.length_pos_of_ne_nil hne; omega)) s →
+        SP1Halted prog (exitOf pi.exit_code) s) :
+    TargetObligations prog pi rows (OperandsBound_full prog) where
+  bound := operandsBound_full_targetBound_of_balance prog pi rows rom mult h_decoded h_bal h_value_link
   lift := h_lift
   halt_nonempty := h_halt_nonempty
   halt := h_halt
