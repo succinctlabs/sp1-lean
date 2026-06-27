@@ -340,3 +340,5 @@ import SP1Clean.Soundness.RowView
 import SP1Clean.Proofs.Chips.ByteChip.RangeChip
 import SP1Clean.Proofs.Chips.ByteChip.ByteChip
 import SP1Clean.Proofs.Chips.ByteChip.Ensemble
+import SP1Clean.Proofs.Chips.ProgramProviderChip
+import SP1Clean.Proofs.Chips.ProgramProviderEnsemble
