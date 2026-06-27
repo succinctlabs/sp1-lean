@@ -339,3 +339,4 @@ import SP1Clean.FormalModel.Contracts.Readers
 import SP1Clean.Soundness.RowView
 import SP1Clean.Proofs.Chips.ByteChip.RangeChip
 import SP1Clean.Proofs.Chips.ByteChip.ByteChip
+import SP1Clean.Proofs.Chips.ByteChip.Ensemble
