@@ -365,7 +365,8 @@ theorem stateLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
   -- `byteChannel.toRaw ≠ stateChannel.toRaw` distinctness lemma filters out the byte pulls).
   simp only [Readers.CPUState.main, circuit_norm,
     Channels.byteChannel_eq_stateChannel_false, if_false]
-  -- `hk` is the gated kernel `toAccess_pushIf_state`; it `rw`s against the recovered interactions.
+  -- `hk`/`hk_pull` are the gated kernels `toAccess_{push,pull}If_state`; they `rw` against the recovered
+  -- interactions. Post-W11 the receive is a `pullIf` (mult `-is_real`), the send a `pushIf` (mult `is_real`).
   have hk : ∀ (m : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
       AbstractInteraction.toAccess env ((pushedIf (channel := stateChannel) m s).toRaw) =
         (InteractionKind.State, "SP1State",
@@ -373,7 +374,14 @@ theorem stateLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env m)) :=
     fun m s => toAccess_pushIf_state env m s
-  simp only [hk]
+  have hk_pull : ∀ (g : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
+      AbstractInteraction.toAccess env ((pulledIf (channel := stateChannel) g s).toRaw) =
+        (InteractionKind.State, "SP1State",
+          [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
+           (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
+           (Expression.eval env s.pc2).val], signedVal (Expression.eval env (-g))) :=
+    fun g s => toAccess_pullIf_state env g s
+  simp only [hk, hk_pull]
   -- `cols`/`next_pc`/`clk_inc` are reader *inputs*; their evals are pinned by the binding hypotheses
   -- (`h_*`/`h_np*`/`h_clk`); `circuit_norm` distributes `eval` over the `clk_low` sum (+ `clk_inc`).
   simp only [circuit_norm, stateLookups, stateAccess, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2,

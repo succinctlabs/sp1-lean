@@ -73,5 +73,28 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddCols where
   completeness := completeness
   channelsWithRequirements :=
     [stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
+  -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (the gated VM channel
+  -- interactions, descended from the composed `CPUState` subcircuit) so the chip can be a `VmTables` table.
+  exposedChannels := fun input _ =>
+    expose stateChannel
+      [ pulledIf input.is_real
+          ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+           input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+        pushedIf input.is_real
+          ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+           input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ]
+  exposedChannels_eq := by
+    intro input offset
+    -- descend the chip into its composed sub-readers (`circuit_norm` +
+    -- `FormalAssertion.toSubcircuit_interactions`); `interactionsWith stateChannel` is itself a channel
+    -- `List.filter`, so the closing `simp` drops the byte/mem/program pulls (channel distinctness) and the
+    -- `Gadgets.Equality` constraint-only sub-ops (no interactions), leaving CPUState's State pull + push.
+    simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+      Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+      Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+      Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+      SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
+      circuit_norm, FormalAssertion.toSubcircuit_interactions]
+    simp [circuit_norm, Gadgets.Equality.main]
 
 end SP1Clean.AddChip

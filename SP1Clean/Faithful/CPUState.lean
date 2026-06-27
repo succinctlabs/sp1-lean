@@ -111,7 +111,14 @@ theorem cpustate_interactions_faithful_syntactic
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env m)) :=
     fun m s => toAccess_pushIf_state env m s
-  simp only [Readers.CPUState.main, circuit_norm, hbk, hsk,
+  have hsk_pull : ∀ (g : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
+      AbstractInteraction.toAccess env ((pulledIf (channel := stateChannel) g s).toRaw) =
+        (InteractionKind.State, "SP1State",
+          [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
+           (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
+           (Expression.eval env s.pc2).val], signedVal (Expression.eval env (-g))) :=
+    fun g s => toAccess_pullIf_state env g s
+  simp only [Readers.CPUState.main, circuit_norm, hbk, hsk, hsk_pull,
     Extracted.CPUState.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx,

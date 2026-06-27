@@ -63,8 +63,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   byteChannel.pullIf input.is_real
     (⟨3, 0, cols.clk_16_24, 0⟩ : ByteRow (Expression (ZMod p)))
   let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
-  stateChannel.emit (-input.is_real) ⟨cols.clk_high, clk_low, cols.pc[0], cols.pc[1], cols.pc[2]⟩
-  stateChannel.emit input.is_real
+  -- State bus as a gated VM channel (W11): `receive_state` is a `pullIf` (mult `-is_real`,
+  -- `assumeGuarantees := true`), `send_state` a `pushIf` (mult `+is_real`). Switching the receive from
+  -- `emit (-is_real)` to `pullIf is_real` is harmless (`StateMsg.Spec = True`, so the assumed guarantee is
+  -- vacuous) but is required so each chip can `expose` the `[pulledIf, pushedIf]` pair Clean's `VmTables`
+  -- consumes (`tables_channel`). `toAccess` ignores `assumeGuarantees`, so the trace projection is unchanged.
+  stateChannel.pullIf input.is_real ⟨cols.clk_high, clk_low, cols.pc[0], cols.pc[1], cols.pc[2]⟩
+  stateChannel.pushIf input.is_real
     ⟨cols.clk_high, clk_low + input.clk_inc, input.next_pc[0], input.next_pc[1], input.next_pc[2]⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
@@ -102,9 +107,9 @@ theorem completeness [Fact (2 ^ 17 < p)] : FormalAssertion.Completeness (ZMod p)
   circuit_proof_start
   have h13p : (13 : ℕ) < p := lt_trans (Nat.lt_two_pow_self) hn13
   -- The two byte pulls' completeness obligation (their `ByteRowSpec` guarantee) only fires on real rows
-  -- (`-is_real = -1`, i.e. `is_real = 1`); there the `Spec` clock bounds supply it. The State emits add no
-  -- completeness obligation (`Guarantees := True`).
-  simp only [circuit_norm, byteChannel]
+  -- (`-is_real = -1`, i.e. `is_real = 1`); there the `Spec` clock bounds supply it. The State `pullIf`'s
+  -- completeness obligation is `StateMsg.Spec = True` (dropped by `stateChannel, StateMsg.Spec`).
+  simp only [circuit_norm, byteChannel, stateChannel, StateMsg.Spec]
   refine ⟨?_, ?_, ?_⟩
   · rcases h_assumptions with h | h <;> simp [h]
   · intro hneg

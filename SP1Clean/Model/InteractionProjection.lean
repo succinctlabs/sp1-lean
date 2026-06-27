@@ -116,6 +116,24 @@ lemma toAccess_pushIf_state (env : Environment (ZMod p)) (mult : Expression (ZMo
     Channel.toRaw, kindOf, stateChannel, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
 
+omit [NeZero p] in
+/-- **Kernel of the State "received = projection" (gated VM pull).** The `pullIf`/`stateChannel`/`StateMsg`
+analog of `toAccess_pushIf_state` — the W11 form, after `CPUState` switched its `receive_state` from
+`emit (-is_real)` to `Channel.pullIf is_real` (so each chip can `expose` the `[pulledIf, pushedIf]` pair for
+Clean's `VmTables`). Its signed multiplicity is `signedVal (eval env (-gate))`; `toAccess` ignores
+`assumeGuarantees`, so the projected `LookupAccess` is identical to the old `pushIf (-is_real)` form. -/
+lemma toAccess_pullIf_state (env : Environment (ZMod p)) (gate : Expression (ZMod p))
+    (msg : StateMsg (Expression (ZMod p))) :
+    AbstractInteraction.toAccess env (pulledIf (channel := stateChannel) gate msg).toRaw =
+      (InteractionKind.State, "SP1State",
+        [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
+         (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
+         (Expression.eval env msg.pc2).val],
+        signedVal (Expression.eval env (-gate))) := by
+  simp [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
+    Channel.toRaw, kindOf, stateChannel, toElements, toComponents, components,
+    ProvableStruct.componentsToElements]
+
 open SP1Clean.Channels (memoryChannel MemoryMsg programChannel ProgramMsg)
 
 omit [NeZero p] in

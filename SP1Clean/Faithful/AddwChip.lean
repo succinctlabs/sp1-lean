@@ -150,6 +150,13 @@ theorem addwcols_state_interactions_faithful_syntactic
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env m)) :=
     fun m s => toAccess_pushIf_state env m s
+  have hsk_pull : ∀ (g : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
+      AbstractInteraction.toAccess env ((pulledIf (channel := stateChannel) g s).toRaw) =
+        (InteractionKind.State, "SP1State",
+          [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
+           (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
+           (Expression.eval env s.pc2).val], signedVal (Expression.eval env (-g))) :=
+    fun g s => toAccess_pullIf_state env g s
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) stateChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
@@ -161,11 +168,11 @@ theorem addwcols_state_interactions_faithful_syntactic
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
     SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, hsk, heq]
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, hsk, hsk_pull, heq]
   -- the residual: CPUState's 2 State interactions (via `hsk`), everything else dropped by the `State`
   -- filter (byte/mem/program channel distinctness) or emitting nothing (`Gadgets.Equality.main`); the
   -- oracle `.filter .State` likewise keeps only the CPUState fragment's 2 State entries.
-  simp [circuit_norm, hsk, Gadgets.Equality.main,
+  simp [circuit_norm, hsk, hsk_pull, Gadgets.Equality.main,
     Extracted.AddwCols.interactions, Extracted.AddwOperation.interactions, Extracted.U16MSBOperation.interactions,
     Extracted.CPUState.interactions, Extracted.ALUTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
