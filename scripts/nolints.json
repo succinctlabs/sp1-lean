@@ -1,5 +1,6 @@
 [["defLemma", "SP1Clean.Soundness.memBalanceHyps_of_genesis"],
  ["defLemma", "SP1Clean.Soundness.Target.targetObligations_full"],
+ ["defLemma", "SP1Clean.Soundness.Target.targetObligations_full_of_balance"],
  ["defLemma", "SP1Clean.Soundness.Target.targetObligations_of_decode"],
  ["simpComm", "Sail.writeReg_writeReg_comm"],
  ["simpComm", "Sail.write_reg'_write_reg'_comm"],
