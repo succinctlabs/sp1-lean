@@ -93,7 +93,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) 
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_slt * 9 + is_sltu * 10,
      lt_cols.result.u16_compare_operation.bit, 0, 0, 0⟩
-  input.is_real * (input.is_real - 1) === 0
+  -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
+  -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
+  assertZero (input.is_real * (input.is_real - 1))
   is_slt * (is_slt - 1) === 0
   is_sltu * (is_sltu - 1) === 0
   (is_slt + is_sltu) * ((is_slt + is_sltu) - 1) === 0

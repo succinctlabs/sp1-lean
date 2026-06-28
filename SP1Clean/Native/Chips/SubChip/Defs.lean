@@ -39,7 +39,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (SubCols) (ZMod p
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 2,
      value[0], value[1], value[2], value[3]⟩
-  input.is_real * (input.is_real - 1) === 0
+  -- Inline `assertZero` (not `=== 0`, the deep Equality subcircuit) so the `is_real` booleanity is visible
+  -- to `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
+  assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, ⟨value⟩, input.is_real⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs SubCols main where

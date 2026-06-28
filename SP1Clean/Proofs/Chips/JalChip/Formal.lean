@@ -188,6 +188,26 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
     soundness := soundness, completeness := completeness,
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel,
-        AddOperation.circuit, Readers.CPUState.circuit, Readers.JTypeReader.circuit]; grind }
+        AddOperation.circuit, Readers.CPUState.circuit, Readers.JTypeReader.circuit]; grind,
+    -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair so the chip is a
+    -- `VmTables` table. Unlike straight-line ALU chips, `next_pc` is the **witnessed** jump target
+    -- `add_value[0..2]` (cells `offset+0..2`) the chip feeds the composed `CPUState`.
+    exposedChannels := fun input offset =>
+      expose stateChannel
+        [ pulledIf input.is_real
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+          pushedIf input.is_real
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+             var ⟨offset⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩⟩ ],
+    exposedChannels_eq := by
+      intro input offset
+      simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+        Readers.JTypeReader.circuit, Readers.JTypeReader.main,
+        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+        SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
+        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+      simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.JalChip

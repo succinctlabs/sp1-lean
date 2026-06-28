@@ -74,7 +74,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var StoreDoubleColumn
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
       input.state.pc, 39⟩
-  input.is_real * (input.is_real - 1) === 0
+  assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.is_real⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreDoubleColumns main where

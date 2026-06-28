@@ -55,7 +55,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var UTypeColumns (ZMo
   addend[1] - input.is_auipc * input.state.pc[1] === 0
   addend[2] - input.is_auipc * input.state.pc[2] === 0
   input.is_auipc * (input.is_auipc - 1) === 0
-  input.is_real * (input.is_real - 1) === 0
+  -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
+  -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
+  assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, addend, ⟨add_value⟩, input.is_auipc, input.is_real⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs UTypeColumns main where

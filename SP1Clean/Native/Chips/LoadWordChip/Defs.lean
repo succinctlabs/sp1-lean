@@ -103,7 +103,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadWordColumns (
   input.msb * (input.is_lw - 1) === 0
   input.is_lw * (input.is_lw - 1) === 0
   input.is_lwu * (input.is_lwu - 1) === 0
-  is_real * (is_real - 1) === 0
+  assertZero (is_real * (is_real - 1))
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.offset_bit,
     input.selected_word, ⟨input.msb⟩, input.is_lw, input.is_lwu⟩
 

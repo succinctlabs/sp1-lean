@@ -104,7 +104,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadX0Columns (ZM
   input.is_lw * (input.is_lw - 1) === 0
   input.is_lwu * (input.is_lwu - 1) === 0
   input.is_ld * (input.is_ld - 1) === 0
-  is_real * (is_real - 1) === 0
+  assertZero (is_real * (is_real - 1))
   input.is_ld * input.offset_bit[2] === 0
   (input.is_lw + input.is_lwu + input.is_ld) * input.offset_bit[1] === 0
   (input.is_lh + input.is_lhu + input.is_lw + input.is_lwu + input.is_ld) * input.offset_bit[0] === 0

@@ -158,6 +158,29 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadX0Columns :=
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     channelsWithRequirements :=
       [stateChannel.toRaw, memoryChannel.toRaw],
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8); the
+    -- enabled flag is the **derived** umbrella selector sum (SP1's `is_real`, all seven load opcodes).
+    exposedChannels := fun input _ =>
+      expose stateChannel
+        [ pulledIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+              + input.is_lw + input.is_lwu + input.is_ld)
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+          pushedIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+              + input.is_lw + input.is_lwu + input.is_ld)
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
+    exposedChannels_eq := by
+      intro input offset
+      simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+        AddressOperation.circuit, AddressOperation.main,
+        AddrAddOperation.circuit, AddrAddOperation.main,
+        Readers.MemoryAccess.circuit, Readers.MemoryAccess.main,
+        Readers.ITypeReaderImmutable.circuit, Readers.ITypeReaderImmutable.main,
+        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+      simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.LoadX0Chip

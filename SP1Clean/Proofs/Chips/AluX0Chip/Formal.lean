@@ -88,6 +88,26 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
       [stateChannel.toRaw, memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
-        Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]; grind }
+        Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]; grind,
+    -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
+    -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
+    -- The chip's own LTU byte-pull and the reader's pulls are on byteChannel/programChannel/memoryChannel,
+    -- filtered out by `interactionsWith stateChannel`.
+    exposedChannels := fun input _ =>
+      expose stateChannel
+        [ pulledIf input.is_real
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+          pushedIf input.is_real
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
+    exposedChannels_eq := by
+      intro input offset
+      simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+        Readers.ALUTypeReaderImmutable.circuit, Readers.ALUTypeReaderImmutable.main,
+        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+      simp [circuit_norm, byteChannel, Gadgets.Equality.main] }
 
 end SP1Clean.AluX0Chip

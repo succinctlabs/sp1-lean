@@ -62,6 +62,25 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubCols :=
     soundness := soundness, completeness := completeness,
     -- `programChannel` dropped (W11 flip — now pulled via `RTypeReader`, a guarantee not a requirement).
     channelsWithRequirements :=
-      [stateChannel.toRaw, memoryChannel.toRaw] }
+      [stateChannel.toRaw, memoryChannel.toRaw],
+    -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8) so the
+    -- chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone State pull+push.
+    exposedChannels := fun input _ =>
+      expose stateChannel
+        [ pulledIf input.is_real
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+          pushedIf input.is_real
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
+    exposedChannels_eq := by
+      intro input offset
+      simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+        Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+        SP1Clean.SubOperation.circuit, SP1Clean.SubOperation.main,
+        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+      simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.SubChip

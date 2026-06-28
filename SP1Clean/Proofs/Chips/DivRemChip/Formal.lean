@@ -111,6 +111,39 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
       and_intros <;>
         first
           | exact fun h1 h0 => off_gate_vacuous hbin h1 h0
-          | exact fun h1 h0 => off_gate_vacuous he2 h1 h0 }
+          | exact fun h1 h0 => off_gate_vacuous he2 h1 h0,
+    -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
+    -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
+    -- The `is_real` gate (`E355`) is already shallow (emitted via `assertZeros (ownAsserts cols)`).
+    exposedChannels := fun input _ =>
+      expose stateChannel
+        [ pulledIf input.is_real
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+          pushedIf input.is_real
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
+    exposedChannels_eq := by
+      intro input offset
+      simp (maxSteps := 1000000) only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+        Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+        MulOperation.circuit, MulOperation.main,
+        IsEqualWordOperation.circuit, IsEqualWordOperation.main,
+        IsZeroWordOperation.circuit, IsZeroWordOperation.main,
+        AddOperation.circuit, AddOperation.main,
+        LtOperationUnsigned.circuit, LtOperationUnsigned.main,
+        U16MSBOperation.circuit, U16MSBOperation.main,
+        -- the nested gadgets the above ops compose (byte-decomp / zero-test / u16-compare cores)
+        U16toU8OperationSafe.circuit, U16toU8OperationSafe.main,
+        IsZeroOperation.circuit, IsZeroOperation.main,
+        U16CompareOperation.circuit, U16CompareOperation.main, assertZeros,
+        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+      -- the leftover (past the `CPUState` state pull/push) is `assertZeros (ownAsserts cols)` ++ the 34
+      -- direct `byteChannel` pulls; `interactionsWith_append` splits the `++`, the map-assert lemma
+      -- empties the asserts, and `byteChannel ≠ stateChannel` drops the pulls.
+      simp (maxSteps := 1000000) [circuit_norm, Gadgets.Equality.main,
+        Operations.interactionsWith_append, byteChannel, stateChannel] }
 
 end SP1Clean.DivRemChip

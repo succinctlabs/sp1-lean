@@ -217,6 +217,27 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadByteColumns :=
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
         AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit,
-        Readers.MemoryAccess.circuit]; grind }
+        Readers.MemoryAccess.circuit]; grind,
+    -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8); the
+    -- enabled flag is the **derived** selector sum `is_lb + is_lbu` (SP1's `is_real`).
+    exposedChannels := fun input _ =>
+      expose stateChannel
+        [ pulledIf (input.is_lb + input.is_lbu)
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+          pushedIf (input.is_lb + input.is_lbu)
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
+    exposedChannels_eq := by
+      intro input offset
+      simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+        AddressOperation.circuit, AddressOperation.main,
+        AddrAddOperation.circuit, AddrAddOperation.main,
+        Readers.MemoryAccess.circuit, Readers.MemoryAccess.main,
+        Readers.ITypeReader.circuit, Readers.ITypeReader.main,
+        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+      simp [circuit_norm, Gadgets.Equality.main, byteChannel] }
 
 end SP1Clean.LoadByteChip

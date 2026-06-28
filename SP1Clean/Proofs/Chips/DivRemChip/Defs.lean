@@ -155,6 +155,16 @@ set_option linter.unusedSectionVars false in
   | nil => rfl
   | cons e es ih => simp [Operations.shallowInteractions, List.map_cons, ih]
 
+-- `interactionsWith` (per-channel filter) of a list of pure `.assert` ops is empty — lets the
+-- `exposedChannels_eq` State-bus descent close over `assertZeros (ownAsserts cols)` without unfolding.
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma interactionsWith_map_assert (channel : RawChannel (ZMod p))
+    (es : List (Expression (ZMod p))) :
+    Operations.interactionsWith channel (es.map fun e => (Operation.assert e)) = [] := by
+  induction es with
+  | nil => rfl
+  | cons e es ih => rw [List.map_cons, Operations.interactionsWith_assert, ih]
+
 set_option maxHeartbeats 16000000 in
 /-- `main` — composes all sub-gadgets in `Extracted/DivRemChip.lean` `asserts`/`interactions` order:
 the two `c_times_quotient` `MulOperation`s (`lower`: low-64, gated `is_mul = is_real`; `upper`:

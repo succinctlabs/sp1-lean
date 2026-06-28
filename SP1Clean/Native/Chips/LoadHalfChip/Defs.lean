@@ -96,7 +96,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadHalfColumns (
   input.is_lhu * input.msb === 0
   input.is_lh * (input.is_lh - 1) === 0
   input.is_lhu * (input.is_lhu - 1) === 0
-  is_real * (is_real - 1) === 0
+  assertZero (is_real * (is_real - 1))
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.offset_bit,
     input.selected_half, ⟨input.msb⟩, input.is_lh, input.is_lhu⟩
 

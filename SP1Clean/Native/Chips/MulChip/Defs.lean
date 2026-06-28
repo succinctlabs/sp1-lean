@@ -111,7 +111,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p))
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_mul * 11 + is_mulh * 12 + is_mulhu * 13 + is_mulhsu * 14 + is_mulw * 24,
      a[0], a[1], a[2], a[3]⟩
-  input.is_real * (input.is_real - 1) === 0
+  -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
+  -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
+  assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, a, cols, is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw⟩
 
 set_option maxHeartbeats 4000000 in

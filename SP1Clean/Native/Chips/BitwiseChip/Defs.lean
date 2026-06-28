@@ -102,7 +102,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_xor * 3 + is_or * 4 + is_and * 5,
      r[0] + r[1] * 256, r[2] + r[3] * 256, r[4] + r[5] * 256, r[6] + r[7] * 256⟩
-  input.is_real * (input.is_real - 1) === 0
+  -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
+  -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
+  assertZero (input.is_real * (input.is_real - 1))
   is_xor * (is_xor - 1) === 0
   is_or * (is_or - 1) === 0
   is_and * (is_and - 1) === 0

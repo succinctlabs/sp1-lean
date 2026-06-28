@@ -524,6 +524,31 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BranchColumns :=
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel,
         AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit,
-        Readers.ITypeReaderImmutable.circuit]; grind }
+        Readers.ITypeReaderImmutable.circuit]; grind,
+    -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair so the chip is a
+    -- `VmTables` table. `next_pc` is the **witnessed** muxed branch target the chip feeds `CPUState`:
+    -- the three selected limbs `next_pc[0..2]` (cells `offset+15..17`).
+    exposedChannels := fun input offset =>
+      expose stateChannel
+        [ pulledIf input.is_real
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+          pushedIf input.is_real
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+             var ⟨offset + 6 + 1 + 4 + 4⟩, var ⟨offset + 6 + 1 + 4 + 4 + 1⟩,
+             var ⟨offset + 6 + 1 + 4 + 4 + 2⟩⟩ ],
+    exposedChannels_eq := by
+      intro input offset
+      simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+        Readers.ITypeReaderImmutable.circuit, Readers.ITypeReaderImmutable.main,
+        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+        SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
+        LtOperationSigned.circuit, LtOperationSigned.main,
+        U16MSBOperation.circuit, U16MSBOperation.main,
+        LtOperationUnsigned.circuit, LtOperationUnsigned.main,
+        U16CompareOperation.circuit, U16CompareOperation.main,
+        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+      simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.BranchChip

@@ -190,7 +190,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftLeftCols (ZM
     ⟨input.adapter, gate, gate, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_sll * 6 + is_sllw * 21, a[0], a[1], a[2], a[3]⟩
-  input.is_real * (input.is_real - 1) === 0
+  -- `is_real` boolean gate emitted **inline** (`assertZero`, not `=== 0`) so the `enabled = is_real`
+  -- selector is visible to `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table.
+  assertZero (input.is_real * (input.is_real - 1))
   input.is_real - (is_sll + is_sllw) === 0
   -- shorthands for the committed column expressions (pure lets — no operations emitted)
   let b0 := c_bits[0]; let b1 := c_bits[1]; let b2 := c_bits[2]

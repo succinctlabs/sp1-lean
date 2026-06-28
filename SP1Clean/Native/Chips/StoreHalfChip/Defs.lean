@@ -86,7 +86,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var StoreHalfColumns 
   (input.store_value[3] - (input.memory_access.prev_value[3]
     + (input.adapter.op_a_memory.prev_value[0] - input.memory_access.prev_value[3])
       * input.offset_bit[0] * input.offset_bit[1])) === 0
-  input.is_real * (input.is_real - 1) === 0
+  assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.offset_bit,
     input.store_value, input.is_real⟩
 
