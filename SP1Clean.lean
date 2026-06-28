@@ -329,6 +329,7 @@ import SP1Clean.Soundness.ProgramConsistency
 import SP1Clean.Soundness.ProgramProviderSpike
 import SP1Clean.Soundness.SP1GatedVm
 import SP1Clean.Soundness.StateConsistency
+import SP1Clean.Soundness.StateVm
 import SP1Clean.Soundness.TargetVm
 import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
