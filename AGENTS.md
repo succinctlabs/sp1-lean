@@ -119,7 +119,9 @@ Mirror-rust layout under `SP1Clean/`:
 - **`Soundness/`** — the whole-machine layer: per-bus `{State,Byte,Program,Memory}Consistency.lean`;
   `ChipRow.lean` (the `ChipKind` structure-of-functions — each chip registers one `kind`, carrying a
   `name` = its SP1 `MachineAir::name`) + `ChipRegistry.lean` (`allChipKinds`); the gated execution capstone
-  `GatedVm/` + `SP1GatedVm.lean` (`sp1_machine_soundness`, the final Clean `FormalEnsemble`); and the
+  `GatedVm/` (the Eulerian-trail machinery) + `SP1Ensemble.lean` (`sp1Ensemble` — a plain Clean
+  `Ensemble`, 25 chips + 11 boundary/provider tables — and `sp1_machine_soundness`, the final Clean
+  `FormalEnsemble`; W11 Phase 5 re-base, the bespoke `GatedVm` data layer retired); and the
   auditable instruction-coverage layer — `Opcode.lean` + `Coverage.lean` (the `Opcode → chip → Sail`
   routing table mirroring SP1's `tracing.rs`/`RiscvAir`), `InstructionTrace.lean` (instruction-sequence →
   `ChipRow`-sequence map, mirroring `ExecutionRecord`/`generate_trace`), and `Completeness.lean`

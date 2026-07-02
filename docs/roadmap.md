@@ -49,13 +49,13 @@ ShiftLeft/ShiftRight/DivRem completeness work.
    `attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements` keeps those sub-op cols folded
    so `circuit_proof_start` never explodes them into the intractable nested record (see
    `docs/agents/proof-patterns.md`). Heartbeats 256M → 64M.
-4. `sp1_witness_decode` — `Soundness/SP1GatedVm.lean` — the single isolated capstone premise: the
+4. `sp1_witness_decode` — `Soundness/SP1Ensemble.lean` — the single isolated capstone premise: the
    witness → `ChipRow` decode seam (`SP1WitnessDecode`, = **W1b/W1c** below); a packaging premise, not
    a chip debt. (`sp1_gatedExecution_prereqs` itself is now a *proven* assembly of this seam with the
    W1a balance translation `sp1_state_balance_of_balancedInteractions`.)
 
 Note (census fact): because each chip `circuit` *embeds* its completeness proof as a structure field,
-items 1–3 also surface as `sorryAx` on `sp1Tables`/`sp1GatedVm`/`sp1_machine_soundness` under
+items 1–3 also surface as `sorryAx` on `sp1Tables`/`sp1Ensemble`/`sp1_machine_soundness` under
 `#print axioms`, even though the soundness proofs never consume those fields. Closing items 1–3 is
 therefore also what makes the *capstone chain's* census clean (together with item 4).
 
@@ -212,7 +212,7 @@ for all 25 current chips), `stateLookups`/`sndKey` (`Soundness/GatedVm/StateBrid
 `state_successor_of_balance`/`balanced_state_bus`) is per-access, so a mixed-increment trace
 type-checks. The chip itself remains open. Deliverables: `TargetObligations.halt`/`halt_nonempty`,
 `exit_code` bound into the public values (replace `SP1PublicIO` with `SP1TargetPublicIO` in
-`SP1GatedVm.lean`), ECALL routing in `Coverage.lean` (today ECALL/EBREAK/UNIMP are the 3 uncovered
+`SP1Ensemble.lean`), ECALL routing in `Coverage.lean` (today ECALL/EBREAK/UNIMP are the 3 uncovered
 opcodes of 53), and pointing `stateAccess`'s `clk_inc` projection at a `RowView`-level increment.
 
 ### W7 — the `try_step` step-lift (XL; parallel track) `[~]` decode stage + RowEffect shape landed
@@ -232,13 +232,13 @@ kind. Risk: the address-translation reduction; if heavy, this becomes the critic
 
 `sp1_gatedExecution_prereqs` is no longer a monolithic `sorry` (2026-06-10): it is a **proven**
 assembly of the W1b decode seam `sp1_witness_decode : … → SP1WitnessDecode witness` (the sole
-remaining `sorry` in `Soundness/SP1GatedVm.lean`) with the proven W1a balance translation.
+remaining `sorry` in `Soundness/SP1Ensemble.lean`) with the proven W1a balance translation.
 
 - [x] **W1a (2026-06-10):** Clean `Statement.BalancedChannels` → native `isConsistentBalanced`
   State-bus translation, **proven and clean-3** at ensemble scale:
-  `sp1_state_balance_of_balancedInteractions` (`Soundness/SP1GatedVm.lean`), riding the generic
+  `sp1_state_balance_of_balancedInteractions` (`Soundness/SP1Ensemble.lean`), riding the generic
   adapter `isConsistentBalanced_of_balancedInteractions` + the per-key cast-sum kernel
-  `intCast_multiplicitySum_map_toAccess` (`GatedVm/BalanceMod.lean`; same-channel `toAccess` keys
+  `intCast_multiplicitySum_map_toAccess` (`Model/BalanceBridge.lean`; same-channel `toAccess` keys
   separate exactly on the message by `ZMod.val`/`Array.toList` injectivity, so each `LookupKey` ℤ-sum
   casts to one Clean `balanceOf`), `Interaction.toAccess`/`intCast_signedVal`
   (`Model/InteractionProjection.lean`), the native `{-1, 0, 1}` bound
@@ -292,17 +292,30 @@ field + rfl-lemma). Upstream `d25bba8d` (now in the pin) deletes Clean's clashin
 `Fin.foldl_eq_foldl_finRange`, so the Batteries import-narrowing is no longer forced — kept as the
 project's narrow-import compile strategy, documented in `docs/agents/lean-sail-notes.md`.
 
-### W11 — re-base `GatedVm` on upstream `VmTables` (M–L; new, post-W9)
+### W11 — re-base `GatedVm` on upstream Clean ensembles (**Phases 0–5 DONE 2026-07-02**; path A tracked)
 
-`GatedVm/` exists only because pre-#398 upstream `VmTables` hardwired `±1` multiplicities. Post-#398
-it natively supports gated VMs (`VmStep`, `tables_channel` over `pullIf`/`pushIf` with enabledness
-derived from constraints, `stepOfAllTables`, the gated
-`verifier_guarantees_of_requirements_of_requirements_of_guarantees`,
-`addVm_soundVmChannel_of_soundChannels`). Re-basing would inherit the upstream VM-channel soundness
-engine for the State bus. Cost: every chip exposes `[pullIf is_real cur, pushIf is_real next]` on the
-State channel (the state *receive* switches from `emit (-is_real)` to a true `pullIf` — harmless,
-`StateMsg.Spec = True`) plus enabledness booleanity from the existing `is_real` gate. Adjacent to
-W1a; not coupled to it.
+**Landed.** The bespoke `GatedVm` data layer is retired: the capstone is `Soundness/SP1Ensemble.lean` —
+`sp1Ensemble`, a **plain** Clean `Air.Flat.Ensemble` (25 chips + 11 in-circuit boundary/provider tables
+[8 byte + program ROM + memory init/finalize] over the four buses, `sp1StateVerifier` pull-final/
+push-init boundary), with `sp1_machine_soundness` over its `Statement` and the decode seam
+`sp1_witness_decode` re-anchored to `EnsembleWitness sp1Ensemble`. `GatedVm/{Defs,Formal}.lean` deleted;
+`BalanceMod.lean` relocated verbatim to `Model/BalanceBridge.lean` (Clean's `Air/Balance` is field-level
+only — the field→ℤ bridge exists nowhere upstream); the Eulerian-trail machinery
+(`GatedVm/{Chain,StateBridge,Capstone,SailDispatch,Bridge}.lean`) is unchanged. All 25 chips carry State
+`exposedChannels` + `sp1StateVmSpike : VmTables` (`Soundness/StateVm.lean`); byte/program are finished
+against in-circuit providers; the memory boundary is closed (init-push + finalize-pull, boolean mults,
+`memBalanceHyps_of_boundary`).
+
+**Open (path A, tracked).** The final object is a *plain* `Ensemble` because Clean's composition
+machinery can't hold it: post-memory-flip every chip's `channelsWithGuarantees` contains
+`memoryChannel`, which can never be a *finished* channel (chips pull-then-push it — the circular
+VM-channel shape) and `addVm` is single-VM-channel with exactly one `[pulledIf, pushedIf]` pair per
+table (chips make 3–4 memory pairs; the memory boundary is a multiset, not one pull+push). Un-parking
+`sp1StateVmEnsemble` (`Soundness/StateVm.lean`) and expressing memory as a true second VM channel needs
+the **multi-VM / multi-step / multi-boundary `VmTables` generalization** — upstreamable to Clean
+(`FemtoCairo.lean:26` acknowledges the read-write-memory gap; `Utils/OfflineMemory.lean` is the spec
+foundation). Also open: `sp1_finishedChannel_guarantees` (P5.4) — the proven byte/program pull-guarantee
+grounding over `sp1Ensemble` (separable; feeds the seam's per-chip `FullGuarantees`).
 
 ### B1 — the three completeness `sorry`s (M each, independent)
 

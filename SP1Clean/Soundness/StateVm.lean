@@ -1,4 +1,4 @@
-import SP1Clean.Soundness.SP1GatedVm
+import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.Proofs.Chips.ByteChip.Ensemble
 import SP1Clean.Proofs.Chips.ProgramProviderEnsemble
 import Clean.Air.Vm
@@ -7,21 +7,20 @@ import Clean.Air.Vm
 
 Validates that Clean's native State-bus VM soundness engine (`VmTables` + `SoundEnsemble.addVm`)
 integrates with SP1's chips and the byte/program provider ensembles — **without** replacing the live
-GatedVm capstone (`sp1_machine_soundness`), which is untouched.
+capstone (`sp1_machine_soundness`, `Soundness/SP1Ensemble.lean`), which is untouched.
 
-The spike stands up `sp1StateVmSpike : VmTables` with a single table (`AddChip`), a fresh boundary
-verifier `sp1StateVerifier` (pull final, push init — the VmTables loop closure, distinct from the
-GatedVm `sp1Verifier`'s `emit ±1`), chains the byte + program finished channels into a `SoundEnsemble`,
-and applies `addVm` to produce a `SoundVmEnsemble`. Phase A3 flips `tables := sp1Tables` once all 25
-chips expose the State pair. We deliberately stop at `SoundVmEnsemble` (no `.toFormal`, which re-introduces
-the per-table `Assumptions`/memory-isU64 seam). -/
+The spike stands up `sp1StateVmSpike : VmTables` over the full 25-chip `sp1Tables`, with the shared
+boundary verifier `sp1StateVerifier` (pull final, push init — the VmTables loop closure, now defined
+in `Soundness/SP1Ensemble.lean`, where it is also the capstone ensemble's verifier), and chains the
+byte + program finished channels into a `SoundEnsemble`. We deliberately stop at `SoundVmEnsemble` (no
+`.toFormal`, which re-introduces the per-table `Assumptions`/memory-isU64 seam). -/
 
 namespace SP1Clean.Soundness
 
 open Circuit Air.Flat
 open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel StateMsg)
 
--- Stated under the capstone bound `Fact (2 ^ 24 < p)` (the same `sp1Tables`/`sp1GatedVm` use, needed by
+-- Stated under the capstone bound `Fact (2 ^ 24 < p)` (the same `sp1Tables`/`sp1Ensemble` use, needed by
 -- `Mul`/`DivRem`), with the project-standard `Fact (2 ^ 17 < p)` derived locally. The 1-table spike only
 -- needed `2 ^ 17`; the full 25-table flip pulls in `Mul`/`DivRem`, which carry the stronger bound.
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
@@ -50,61 +49,6 @@ omit [Fact (2 ^ 24 < p)] in
   intro he
   have : (programChannel (p := p)).toRaw.name = (stateChannel (p := p)).toRaw.name := by rw [he]
   simp [Channel.toRaw_name, Channels.stateChannel, Channels.programChannel] at this
-
-/-! ## The VmTables boundary verifier -/
-
-/-- The VmTables boundary verifier `main`: a true `pull` of the public **final** state followed by a
-true `push` of the public **init** state — the loop-closing boundary `VmTables.verifier_channel` wants
-(`[pulled final, pushed init]`). (Contrast `sp1VerifierMain`, which `emit`s `±1` for the GatedVm balance;
-that has `assumeGuarantees = false` and no `exposedChannels`, so it does not satisfy the VmTables shape.) -/
-@[circuit_norm]
-def sp1StateVerifierMain (pi : Var SP1PublicIO (ZMod p)) : Circuit (ZMod p) Unit := do
-  stateChannel.pull ⟨pi.final_clk_high, pi.final_clk_low, pi.final_pc0, pi.final_pc1, pi.final_pc2⟩
-  stateChannel.push ⟨pi.init_clk_high, pi.init_clk_low, pi.init_pc0, pi.init_pc1, pi.init_pc2⟩
-
-instance sp1StateVerifierElaborated :
-    ElaboratedCircuit (ZMod p) SP1PublicIO unit sp1StateVerifierMain where
-  localLength _ := 0
-  output _ _ := ()
-  channelsWithGuarantees := []
-
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma sp1StateVerifier_channelsWithGuarantees_eq :
-    ((sp1StateVerifierElaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p))) = [] := rfl
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma sp1StateVerifier_localLength_eq (x : Var SP1PublicIO (ZMod p)) :
-    (sp1StateVerifierElaborated (p := p)).localLength x = 0 := rfl
-
-theorem sp1StateVerifier_soundness :
-    GeneralFormalCircuit.Soundness (Output := unit) (ZMod p) sp1StateVerifierMain
-      (fun _ _ => True) (fun _ _ _ => True) := by
-  circuit_proof_start
-  simp [circuit_norm, Channels.stateChannel, Channels.StateMsg.Spec]
-
-set_option linter.unusedSectionVars false in
-theorem sp1StateVerifier_completeness :
-    GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) sp1StateVerifierMain
-      (fun _ _ _ => True) (fun _ _ _ => True) := by
-  circuit_proof_start
-  simp [circuit_norm, Channels.stateChannel, Channels.StateMsg.Spec]
-
-/-- The VmTables boundary verifier as a `GeneralFormalCircuit`, exposing `[pulled final, pushed init]`
-on the State channel. -/
-def sp1StateVerifier : GeneralFormalCircuit (ZMod p) SP1PublicIO unit where
-  main := sp1StateVerifierMain
-  elaborated := sp1StateVerifierElaborated
-  Assumptions := fun _ _ => True
-  Spec := fun _ _ _ => True
-  soundness := sp1StateVerifier_soundness
-  completeness := sp1StateVerifier_completeness
-  channelsWithRequirements := [stateChannel.toRaw]
-  exposedChannels := fun pi _ =>
-    expose stateChannel
-      [ pulled ⟨pi.final_clk_high, pi.final_clk_low, pi.final_pc0, pi.final_pc1, pi.final_pc2⟩,
-        pushed ⟨pi.init_clk_high, pi.init_clk_low, pi.init_pc0, pi.init_pc1, pi.init_pc2⟩ ]
-  exposedChannels_eq := by
-    intro pi offset
-    simp [circuit_norm, sp1StateVerifierMain]
 
 /-! ## Per-chip `enabled`-booleanity helpers
 

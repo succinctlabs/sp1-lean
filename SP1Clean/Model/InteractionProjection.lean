@@ -94,7 +94,7 @@ lemma signedVal_neg [Fact p.Prime] (hp : 2 < p) (x : ZMod p) :
 
 /-- `signedVal` is a **section** of the canonical projection `ℤ → ZMod p`: casting the centered
 representative back recovers the element. This is what lets Clean's *field* channel balance be read as
-a `mod p` statement about the native ℤ multiplicities (`GatedVm/BalanceMod.lean`). -/
+a `mod p` statement about the native ℤ multiplicities (`Model/BalanceBridge.lean`). -/
 lemma intCast_signedVal (x : ZMod p) : ((signedVal x : ℤ) : ZMod p) = x := by
   have hval : ((x.val : ℤ) : ZMod p) = x := by
     rw [Int.cast_natCast, ZMod.natCast_val, ZMod.cast_id]

@@ -24,7 +24,7 @@ echo "LeanRV64D: $(git -C .lake/packages/LeanRV64D rev-parse HEAD 2>/dev/null ||
 echo
 echo "== A2 sorry inventory (gate: exactly the known-debt set) =="
 # The known direct `sorry` proof-holes. Update this list (and the docs) when one is closed.
-expected_sorries="SP1Clean/Soundness/SP1GatedVm.lean"
+expected_sorries="SP1Clean/Soundness/SP1Ensemble.lean"
 sorry_re='(^[[:space:]]*sorry[[:space:]]*$)|(:=[[:space:]]*sorry)|(=>[[:space:]]*sorry)'
 actual=$(grep -rlE "$sorry_re" SP1Clean --include='*.lean' | sort)
 grep -rnE "$sorry_re" SP1Clean --include='*.lean'
@@ -90,7 +90,8 @@ allowed = {
     "SP1Clean.Soundness.sp1_witness_decode",
     "SP1Clean.Soundness.sp1_gatedExecution_prereqs",
     "SP1Clean.Soundness.sp1Tables", "SP1Clean.Soundness.sp1Tables_length",
-    "SP1Clean.Soundness.sp1GatedVm",
+    "SP1Clean.Soundness.sp1Ensemble", "SP1Clean.Soundness.sp1ProviderTables",
+    "SP1Clean.Soundness.sp1ProviderTables_length",
     "SP1Clean.Soundness.sp1FormalEnsemble", "SP1Clean.Soundness.sp1_machine_soundness",
     "SP1Clean.Soundness.Target.sp1_target_soundness",
 }

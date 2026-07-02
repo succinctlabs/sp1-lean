@@ -1,4 +1,7 @@
-import SP1Clean.Soundness.GatedVm.Defs
+import Mathlib.Data.Multiset.Basic
+import Mathlib.Data.Multiset.Filter
+import Mathlib.Data.Multiset.AddSub
+import Mathlib.Tactic.Linarith
 
 /-! # Balance ⇒ trail: the Eulerian core of the gated VM
 
@@ -89,7 +92,7 @@ theorem exists_trail (edge : α → V × V) (E : Multiset α) :
   | _ E IH =>
     intro src snk h
     by_cases hss : src = snk
-    · exact ⟨[], hss, by simp⟩
+    · exact ⟨[], hss, by simp [Multiset.zero_le]⟩
     · have hsrc := h src
       rw [if_pos rfl, if_neg hss] at hsrc
       have hpos : 0 < outdeg E edge src := by omega

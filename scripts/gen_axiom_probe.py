@@ -29,10 +29,12 @@ TARGETS = [
     ("SP1CleanTest/TraceGenTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
     ("SP1Clean/Soundness/GatedVm/*.lean",
      r"theorem\s+(exists_trail|chipRows_step_sound|state_trail_of_balance|"
-     r"gatedExecution_of_specs_and_balance|gatedExecution_allChips|"
-     r"isConsistentBalanced_of_intCast_zero|intCast_multiplicitySum_map_toAccess|"
+     r"gatedExecution_of_specs_and_balance|gatedExecution_allChips)\b"),
+    # The field⇒ℤ balance bridge (formerly GatedVm/BalanceMod.lean, relocated in W11 Phase 5).
+    ("SP1Clean/Model/BalanceBridge.lean",
+     r"theorem\s+(isConsistentBalanced_of_intCast_zero|intCast_multiplicitySum_map_toAccess|"
      r"isConsistentBalanced_of_balancedInteractions)\b"),
-    ("SP1Clean/Soundness/SP1GatedVm.lean", r"(?:theorem|def)\s+(sp1\w*)\b"),
+    ("SP1Clean/Soundness/SP1Ensemble.lean", r"(?:theorem|def)\s+(sp1\w*)\b"),
     ("SP1Clean/Soundness/ChipRegistry.lean", r"(?:theorem|def)\s+(allChipKinds\w*)\b"),
     ("SP1Clean/Soundness/Coverage.lean",
      r"theorem\s+(coverage_kinds_eq_registry|coverage_length|covered_iff_routed|"
@@ -46,9 +48,11 @@ TARGETS = [
     ("SP1Clean/FormalModel/Trace/Witness.lean",
      r"(?:theorem|lemma)\s+(isInitialState_nonvacuous|cfgState_\w+|mem_fullRegs)\b"),
     ("SP1Clean/Soundness/MemoryGlobal.lean",
-     r"theorem\s+(memProviderGenesis_of_contributions|traceMemoryValid_of_genesis_and_balance)\b"),
+     r"theorem\s+(memProviderGenesis_of_contributions|memProviderGenesis_of_boundary|"
+     r"traceMemoryValid_of_genesis_and_balance|traceMemoryValid_of_boundary_and_balance)\b"),
     ("SP1Clean/Soundness/MemoryIsU64.lean",
-     r"(?:theorem|def)\s+(memBalanceHyps_of_genesis|operand_\w+_isU64_of_memBalance)\b"),
+     r"(?:theorem|def)\s+(memBalanceHyps_of_genesis|memBalanceHyps_of_boundary|"
+     r"operand_\w+_isU64_of_memBalance)\b"),
     ("SP1Clean/Soundness/ValueBound.lean",
      r"(?:theorem|def|lemma)\s+(value_targetBound|operandsBound_full_targetBound|targetObligations_full|"
      r"ValueOperandsBound|walk_clk_monotone|sndClk_eq_rcvClk)\b"),

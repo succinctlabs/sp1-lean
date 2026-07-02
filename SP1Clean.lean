@@ -220,6 +220,7 @@ import SP1Clean.Faithful.UTypeChip
 import SP1Clean.Math.Bitwise
 import SP1Clean.Math.EvalVec
 import SP1Clean.Math.Gate
+import SP1Clean.Model.BalanceBridge
 import SP1Clean.Model.ByteTable
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ChipAir
@@ -314,12 +315,10 @@ import SP1Clean.Soundness.Completeness
 import SP1Clean.Soundness.Coverage
 import SP1Clean.Soundness.Decode
 import SP1Clean.Soundness.ValueBound
-import SP1Clean.Soundness.GatedVm.BalanceMod
+
 import SP1Clean.Soundness.GatedVm.Bridge
 import SP1Clean.Soundness.GatedVm.Capstone
 import SP1Clean.Soundness.GatedVm.Chain
-import SP1Clean.Soundness.GatedVm.Defs
-import SP1Clean.Soundness.GatedVm.Formal
 import SP1Clean.Soundness.GatedVm.SailDispatch
 import SP1Clean.Soundness.GatedVm.StateBridge
 import SP1Clean.Soundness.InstructionTrace
@@ -329,7 +328,7 @@ import SP1Clean.Soundness.MemoryIsU64
 import SP1Clean.Soundness.Opcode
 import SP1Clean.Soundness.ProgramConsistency
 import SP1Clean.Soundness.ProgramProviderSpike
-import SP1Clean.Soundness.SP1GatedVm
+import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.Soundness.StateConsistency
 import SP1Clean.Soundness.StateVm
 import SP1Clean.Soundness.TargetVm

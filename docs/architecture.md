@@ -223,8 +223,8 @@ SP1Clean/
 │                   Operations/<Op>/Formal, WitnessTests/ anchors, Sail bridges; the 3 complex chips
 │                   TraceGenTests/ (full-trace conformance)        DivRem/ShiftLeft/ShiftRight whole here)
 ├── Soundness/      {State,Byte,Program,Memory}Consistency,       (PILLAR 5 "trace + guest programs":
-│                   ChipRow (`ChipKind`+`name`), ChipRegistry,      GatedVm/ + SP1GatedVm = the gated
-│                   GatedVm/, SP1GatedVm, TargetVm,                 whole-machine capstone;
+│                   ChipRow (`ChipKind`+`name`), ChipRegistry,      GatedVm/ (trail) + SP1Ensemble = the
+│                   GatedVm/, SP1Ensemble, TargetVm,                whole-machine capstone;
 │                   Opcode, Coverage, InstructionTrace,            Coverage = Opcode→chip→Sail table;
 │                   Completeness, RowView                          RowView = reader-agnostic row view)
 ├── Comparison.lean the worked-example findings doc — full rationale, no new proofs

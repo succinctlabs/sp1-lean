@@ -1,4 +1,4 @@
-import SP1Clean.Soundness.SP1GatedVm
+import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.FormalModel.Trace.GuestProgram
 
 /-! # The target machine-level theorem — a real Sail execution chain from a loaded guest program
@@ -56,7 +56,7 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 SP1 commits ~30 `PublicValues` fields; the legacy `SP1PublicIO` models the ten state-boundary fields,
 and the target adds `exit_code` (`../sp1 crates/hypercube/src/air/public_values.rs`). Kept flat with a
-`toLegacy` projection so `sp1GatedVm`/`sp1Verifier` need not fork yet; the eventual W5 landing replaces
+`toLegacy` projection so `sp1Ensemble`/`sp1StateVerifier` need not fork yet; the eventual W5 landing replaces
 `SP1PublicIO` outright. -/
 structure SP1TargetPublicIO (F : Type) where
   init_clk_high : F
@@ -290,7 +290,7 @@ theorem sp1_target_soundness
     (OperandsBound : Trace.RowView (ZMod p) → SailState → Prop)
     (ob : ∀ rows : List (ChipRow p), TargetObligations prog pi rows OperandsBound)
     (h_entry : pcBitsOfVals pi.init_pc0.val pi.init_pc1.val pi.init_pc2.val = prog.pc_start)
-    (h_stmt : (sp1GatedVm (p := p)).toEnsemble.Statement pi.toLegacy) :
+    (h_stmt : (sp1Ensemble (p := p)).Statement pi.toLegacy) :
     ∀ s0, IsInitialState prog s0 →
       ∃ (n : ℕ) (s_f : SailState),
         SailChain n s0 s_f ∧ SP1Halted prog (exitOf pi.exit_code) s_f := by

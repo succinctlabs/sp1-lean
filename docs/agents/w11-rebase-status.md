@@ -1,11 +1,30 @@
-# W11 ensemble re-base — status & what's left (hand-off 2026-06-26)
+# W11 ensemble re-base — status & what's left (hand-off 2026-06-26; **Phases 4–5 landed 2026-07-02**)
 
 Re-basing the whole-machine capstone onto canonical Clean `SoundEnsemble`/`VmTables` with
 `StaticLookupChannel` providers, replacing the bespoke `GatedVm`. Full plan:
 `~/.claude/plans/make-a-plan-to-valiant-wozniak.md`. Design + faithful-provider details + the validated
 Phase-0 techniques: `docs/agents/bytechip-provider-design.md`. Branch `dtumad/clean-upgrade`; everything
-below is committed and **green** (`lake build SP1Clean` 3633 jobs 0/0, `lake test` 3324, guards pass, one
-known `sp1_witness_decode` sorry).
+below is committed and **green** (guards pass, one known `sp1_witness_decode` sorry).
+
+**2026-07-02 update — items 6–7 below are DONE.** The capstone is now `Soundness/SP1Ensemble.lean`:
+`sp1Ensemble` (a **plain** Clean `Ensemble` — 25 chips + 11 boundary/provider tables, four buses,
+`sp1StateVerifier` pull-final/push-init boundary), with `sp1_machine_soundness` restated over its
+`Statement` and the decode seam re-anchored to `EnsembleWitness sp1Ensemble`.
+`GatedVm/{Defs,Formal}.lean` deleted; `GatedVm/BalanceMod.lean` **relocated verbatim** to
+`Model/BalanceBridge.lean` (⚠ the item-7 claim "Clean `Air/Balance` ⊇ `BalanceMod`" was wrong on
+inspection — Clean's balance layer is field-level only; the field→ℤ bridge exists nowhere upstream, so
+it moved rather than dissolved). `GatedVm/{Chain,StateBridge,Capstone,SailDispatch,Bridge}.lean` (the
+Eulerian-trail machinery, the `GatedVm` *namespace*) are unchanged. Why a plain `Ensemble`, not
+`SoundEnsemble`/`addVm`: post-memory-flip every chip's `channelsWithGuarantees` contains
+`memoryChannel`, which can never be finished (pull-then-push) and `addVm` is single-VM-channel — see
+the module doc of `SP1Clean/Soundness/SP1Ensemble.lean` and the parked `sp1StateVmEnsemble` note in
+`Soundness/StateVm.lean` (un-parking = roadmap W11 path A, the multi-VM `VmTables` generalization).
+Memory boundary (Phase 4): `MemoryProviderChip` (init-push, boolean mult) + `MemoryFinalizeChip`
+(finalize-pull, new) + the native finalize twin in `Soundness/MemoryGlobal.lean`
+(`memFinalizeContributions`, `memProviderGenesis_of_boundary`) + `memBalanceHyps_of_boundary`
+(`Soundness/MemoryIsU64.lean`). Remaining in-flight: the byte/program finished-channel grounding lemma
+`sp1_finishedChannel_guarantees` (P5.4, separable — the capstone is green without it; it feeds the
+seam's per-chip `FullGuarantees`).
 
 ## Commits so far
 - `07597ba` — Clean→main migration baseline + the in-circuit byte/range providers (superseded, see below).

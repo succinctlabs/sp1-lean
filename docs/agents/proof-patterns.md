@@ -643,7 +643,7 @@ in `Proofs/Chips/ShiftLeftChip/Core.lean`.
   blanket comment-strip on `ShiftLeftChip/Soundness/Sll` was reverted for exactly this.)
 
 **Verify every batch:** `lake build SP1Clean` clean (0 warn, no `info:`), `bash scripts/check_no_skipkerneltc.sh`,
-`sorry` grep = only `SP1GatedVm.lean`, then `scripts/run_audit.sh` periodically (the axiom census must stay
+`sorry` grep = only `SP1Ensemble.lean`, then `scripts/run_audit.sh` periodically (the axiom census must stay
 identical). On heavy files watch the per-file elaboration time in the build log and **revert on regression**.
 
 **Merge gotcha (post-`git merge`):** an auto-merge can *silently duplicate* a lemma that both branches added

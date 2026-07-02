@@ -134,7 +134,7 @@ theorem stateLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_r
 
 /-- **Gated multiplicities are `{-1, 0, 1}`.** For a binary `is_real` row, both `stateLookups`
 contributions carry multiplicity `±is_real.val ∈ {-1, 0, 1}` — the multiplicity bound the field → ℤ
-balance translation (`isConsistentBalanced_of_intCast_zero`, `GatedVm/BalanceMod.lean`) consumes. -/
+balance translation (`isConsistentBalanced_of_intCast_zero`, `Model/BalanceBridge.lean`) consumes. -/
 theorem stateLookups_mult_binary (hp : 2 < p) (r : Trace.RowView (ZMod p))
     (h_real : r.is_real = 0 ∨ r.is_real = 1) :
     ∀ a ∈ stateLookups r, multOf a = -1 ∨ multOf a = 0 ∨ multOf a = 1 := by

@@ -2,7 +2,7 @@ import SP1Clean.Soundness.InstructionTrace
 
 /-! # `Completeness` — partial VM completeness scaffold (Sail execution → circuit accepts)
 
-The capstone (`SP1GatedVm.lean`) proves **soundness** (circuit accepts ⟹ a valid RISC-V-Sail trail
+The capstone (`SP1Ensemble.lean`) proves **soundness** (circuit accepts ⟹ a valid RISC-V-Sail trail
 exists). This file scaffolds the dual **completeness** direction (a valid instruction ⟹ the circuit can
 accept it) to the extent the per-chip proofs already support it, with an eye on eventually closing it.
 
@@ -18,7 +18,7 @@ chip (`ProgramComplete`), every instruction's chip can produce an accepting row 
 **The open obligation (documented, not `sorry`'d).** Going from "each row is individually acceptable" to
 "the whole circuit accepts the program" requires assembling the per-row witnesses into one
 `EnsembleWitness` whose four channels balance — the *completeness dual* of the residual
-`sp1_gatedExecution_prereqs` (`SP1GatedVm.lean`). That global step is future work; this file deliberately
+`sp1_gatedExecution_prereqs` (`SP1Ensemble.lean`). That global step is future work; this file deliberately
 stops at the per-row reduction rather than claim it. -/
 
 namespace SP1Clean.Soundness

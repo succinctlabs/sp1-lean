@@ -50,7 +50,7 @@ under `Fact (2^24 < p)`, satisfied by KoalaBear):
    RISC-V Sail spec** for that instruction (`correct_<op>_native`), *conditional* on register/decode
    reads;
 4. **(whole-machine capstone)** the chips compose over one shared gated bus layer into
-   `sp1_machine_soundness` (`Soundness/SP1GatedVm.lean`): from the Clean ensemble `Statement`
+   `sp1_machine_soundness` (`Soundness/SP1Ensemble.lean`): from the Clean ensemble `Statement`
    (per-table constraints + balanced channels) over the committed public boundary, every real row's
    RISC-V step matches its proven SP1 chip and the committed `pc_start`/`next_pc` are the endpoints of
    a valid transition trail (an Eulerian-trail argument from the state-bus balance alone);
@@ -184,7 +184,7 @@ the HALT chip (W5) supplies 256 via a `RowView`-level increment when it lands.
 | + Sail axioms (stores) | 12 | store bridges/`kind`s: + `match_reservation` instead of `load_reservation` |
 | + Sail axioms (control flow) | 9 | Jal/Jalr/Branch bridges + `kind`s: + `sys_enable_experimental_extensions` |
 | + Sail axioms (aggregates) | 6 | `allChipKinds(_length)`, `gatedExecution_allChips`, `coverage_kinds_eq_registry`, `coverage_length`, `routeOf_reaches_sail` — union of the per-chip footprints |
-| + `sorryAx` (capstone chain) | 7 | `sp1_witness_decode` (the seam) and its consumer `sp1_gatedExecution_prereqs` (now a proven assembly, sorried only via the seam), and, via the embedded-completeness fields (TB-10), `sp1Tables(_length)`, `sp1GatedVm`, `sp1FormalEnsemble`, `sp1_machine_soundness` |
+| + `sorryAx` (capstone chain) | 4 | `sp1_witness_decode` (the seam) and its consumers `sp1_gatedExecution_prereqs` (a proven assembly, sorried only via the seam), `sp1FormalEnsemble`, `sp1_machine_soundness` — `sp1Tables(_length)`/`sp1Ensemble`/`sp1ProviderTables(_length)` themselves are `sorryAx`-free (W11 Phase 5 census, 2026-07-02) |
 | clean-3 + `sorryAx` | 3 | the three completeness holes (ShiftLeft, ShiftRight, DivRem) |
 | `propext` only / none | 4 | the `by decide` coverage guards; `sp1Assumptions` |
 | clean-3 + **full Sail platform surface** (~76 axioms) | 1 | **`Target.sp1_target_execution`** — no `sorryAx`, no `bv_decide`; the surface enters through the `try_step` statement (trust base D) |
