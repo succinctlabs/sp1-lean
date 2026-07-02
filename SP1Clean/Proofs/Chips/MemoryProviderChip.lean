@@ -37,10 +37,15 @@ open SP1Clean.Channels (memoryChannel MemoryMsg)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Range-checks the whole 4-limb `value` word (16-bit limbs, one `WordRangeCheck` assertion), witnesses a
-multiplicity `m`, and pushes the memory-boundary record `input` onto `memoryChannel` with multiplicity `m`. -/
+**boolean** multiplicity `m` (inline shallow `assertZero (m*(m-1))` — the Phase-0c gate idiom, so the
+capstone seam can extract mult-binarity from `ConstraintsHold.Shallow`; the field→ℤ balance translation
+`isConsistentBalanced_of_balancedInteractions` needs every memory-bus multiplicity in `{-1, 0, 1}`, and
+SP1's memory-global chips are one boolean-gated row per address), and pushes the memory-boundary record
+`input` onto `memoryChannel` with multiplicity `m`. -/
 def main (input : Var MemoryMsg (ZMod p)) : Circuit (ZMod p) Unit := do
   assertion WordRangeCheck.circuit input.value
   let m ← witnessField (fun _ => 1)
+  assertZero (m * (m - 1))
   memoryChannel.pushIf m input
 
 /-- The Memory-boundary provider: pushes a boundary record whose value word it range-checks in-circuit.
@@ -54,10 +59,10 @@ def circuit : GeneralFormalCircuit (ZMod p) MemoryMsg unit where
   soundness := by
     circuit_proof_start [WordRangeCheck.circuit, WordRangeCheck.Assumptions, WordRangeCheck.Spec,
       MemoryMsg.isU64]
-    exact ⟨h_holds, fun _ _ => h_holds⟩
+    exact ⟨h_holds.1, fun _ _ => h_holds.1⟩
   completeness := by
     circuit_proof_start [WordRangeCheck.circuit, WordRangeCheck.Assumptions, WordRangeCheck.Spec,
       MemoryMsg.isU64]
-    exact h_assumptions
+    exact ⟨h_assumptions, by simp [h_env]⟩
 
 end SP1Clean.MemoryProviderChip

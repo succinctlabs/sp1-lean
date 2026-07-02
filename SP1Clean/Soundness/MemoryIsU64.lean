@@ -202,6 +202,31 @@ structure MemBalanceHyps [NeZero p] (rows : List (Trace.RowView (ZMod p)))
   balanced : isConsistentBalanced (aggregateChipRows rows memoryLookups ++ memProv)
   writeU64 : ∀ r ∈ rows, r.is_real ≠ 0 → Word.isU64 r.rdWrite
 
+/-- **The W1c hypothesis bundle over the full init ++ finalize boundary (Phase 4).** Assembles
+`MemBalanceHyps` for the combined constructed boundary (`memGenesisContributions ++
+memFinalizeContributions`, `Soundness/MemoryGlobal.lean`) — the shape the capstone's memory-`isU64`
+grounding consumes, with the balance hypothesis now *closable* for real traces (the finalize pulls
+cancel the chains' otherwise-unmatched last receives). The finalize side enters `MemProviderGenesis`
+vacuously under `h_fin` (nothing reads from the last write), a named hypothesis like `h_t0`. -/
+theorem memBalanceHyps_of_boundary [NeZero p] (rows : List (Trace.RowView (ZMod p)))
+    (clkHigh t0 : ℕ) (addrs : List ℕ) (mult : ℕ → ℤ)
+    (finals : List (ℕ × ℕ × ℕ × Vector ℕ 4 × ℤ))
+    (hwf : ∀ r ∈ rows, MemRowWellFormed r)
+    (h_clk : TraceMemClkValid rows)
+    (h_prev : memPrevLink rows)
+    (h_prevlt : ∀ e ∈ memEventsFiltered rows, e.prevTs < e.clk.val)
+    (h_t0 : ∀ e ∈ memEventsFiltered rows, t0 ≠ e.clk.val)
+    (h_fin : ∀ b ∈ memFinalizeContributions finals, ∀ e ∈ memEventsFiltered rows,
+      keyOf b ≠ memEvent_sendKey e)
+    (h_bal : isConsistentBalanced (aggregateChipRows rows memoryLookups
+      ++ (memGenesisContributions clkHigh t0 addrs mult ++ memFinalizeContributions finals)))
+    (h_wu64 : ∀ r ∈ rows, r.is_real ≠ 0 → Word.isU64 r.rdWrite) :
+    MemBalanceHyps rows
+      (memGenesisContributions clkHigh t0 addrs mult ++ memFinalizeContributions finals) :=
+  { wellFormed := hwf, clk := h_clk, prevLink := h_prev, prevLt := h_prevlt
+    genesis := memProviderGenesis_of_boundary rows clkHigh t0 addrs mult finals h_t0 h_fin
+    balanced := h_bal, writeU64 := h_wu64 }
+
 /-- **Every bus-backed access is `isU64` (read and written words).** The per-address assembly: the
 limb-level chain (`memEvent_prevValue_eq_writer`) + the genesis zero (`eventsAt_genesis_reads_zero`) +
 the write case split (`memEventsFiltered_value_cases`) feed the chain induction `isU64_of_limbChain`.

@@ -1,4 +1,5 @@
 import SP1Clean.Proofs.Chips.MemoryProviderChip
+import SP1Clean.Proofs.Chips.MemoryFinalizeChip
 import Clean.Air.Vm
 
 /-! # Finishing the Memory bus (boundary half) — the memory-provider segment of the `SoundEnsemble`
@@ -44,5 +45,18 @@ guarantee is now an upstream-Clean (bus-balance) obligation against the boundary
 @[simp] theorem memoryProviderEnsemble_finished (PublicIO : TypeMap) [ProvableType PublicIO] :
     (memoryChannel (p := p)).toRaw ∈ (memoryProviderEnsemble (p := p) PublicIO).finished := by
   simp [memoryProviderEnsemble, circuit_norm]
+
+/-- The **full boundary** segment (Phase 4 demonstrator): the finalize *pull* table
+(`MemoryFinalizeChip`) chains legally onto the finished channel — its `channelsWithGuarantees =
+[memoryChannel]` ⊆ finished and its `channelsWithRequirements = []` (a pull owes nothing), so
+`addTable`'s obligations close by the default recipes. Documents that the init-push/finalize-pull
+boundary pair is self-consistent among providers; not load-bearing for the capstone (which composes the
+tables into the plain `Ensemble` directly). -/
+def memoryBoundaryEnsemble (PublicIO : TypeMap) [ProvableType PublicIO] :
+    SoundEnsemble (ZMod p) PublicIO :=
+  memoryProviderEnsemble (p := p) PublicIO
+    |>.addTable ⟨MemoryFinalizeChip.circuit⟩
+        (by simp [circuit_norm, MemoryFinalizeChip.circuit, memoryProviderEnsemble])
+        (by simp [circuit_norm, MemoryFinalizeChip.circuit, memoryProviderEnsemble])
 
 end SP1Clean.MemoryProviderChip

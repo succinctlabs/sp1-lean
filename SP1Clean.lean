@@ -347,3 +347,4 @@ import SP1Clean.Proofs.Chips.ProgramProviderChip
 import SP1Clean.Proofs.Chips.ProgramProviderEnsemble
 import SP1Clean.Proofs.Chips.MemoryProviderChip
 import SP1Clean.Proofs.Chips.MemoryProviderEnsemble
+import SP1Clean.Proofs.Chips.MemoryFinalizeChip

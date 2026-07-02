@@ -75,4 +75,63 @@ theorem traceMemoryValid_of_genesis_and_balance [NeZero p] (rows : List (Trace.R
       hwf h_clk h_prev h_prevlt
       (memProviderGenesis_of_contributions rows clkHigh t0 addrs mult h_t0) h_bal }
 
+/-! ## The finalize twin (Phase 4) — the boundary's pull side, natively
+
+SP1's MemoryGlobalFinalize chip pulls each address chain's **final** `(clk, value)` record — the one
+receive the trace leaves unmatched (nothing reads after the last write). Its in-circuit artifact is
+`Proofs/Chips/MemoryFinalizeChip.lean`; here are its **native** contributions and their entry into the
+`MemProviderGenesis` bundle. `MemProviderGenesis` only constrains a boundary entry sitting at an event's
+*send* key (a genesis prior); a finalize entry sits at the last access's *receive* key, which no event
+sends at (an event's send key carries its `prevTs`/`prevValue` — nothing reads from the last write), so
+the finalize side enters **vacuously** under `h_fin`, a named hypothesis exactly like `h_t0` (deriving it
+natively is per-address last-access reasoning — tracked, never `sorry`). -/
+
+/-- One MemoryGlobalFinalize contribution: the claimed final value word `v` of `addr`'s access chain at
+the chain's last timestamp `(clkHigh, clkLow)` (the bus key `[clkHigh, clkLow, addr, 0, 0, v0..v3]`). -/
+def memFinalizeAccess (clkHigh clkLow addr : ℕ) (v : Vector ℕ 4) (mult : ℤ) : LookupAccess :=
+  (.Memory, "SP1Memory", [clkHigh, clkLow, addr, 0, 0, v[0], v[1], v[2], v[3]], mult)
+
+/-- The MemoryGlobalFinalize chip's native contributions: one finalize entry per record
+`(clkHigh, clkLow, addr, value, mult)` — the per-address final `(clk, value)` keys. -/
+def memFinalizeContributions (records : List (ℕ × ℕ × ℕ × Vector ℕ 4 × ℤ)) : LookupAccessList :=
+  records.map fun (ch, cl, addr, v, m) => memFinalizeAccess ch cl addr v m
+
+/-- **The combined init ++ finalize boundary is a genesis provider.** Init entries by
+`memProviderGenesis_of_contributions`; finalize entries vacuously — their keys avoid every event's send
+key (`h_fin`: nothing reads from the last write). -/
+theorem memProviderGenesis_of_boundary (rows : List (Trace.RowView (ZMod p)))
+    (clkHigh t0 : ℕ) (addrs : List ℕ) (mult : ℕ → ℤ)
+    (finals : List (ℕ × ℕ × ℕ × Vector ℕ 4 × ℤ))
+    (h_t0 : ∀ e ∈ memEventsFiltered rows, t0 ≠ e.clk.val)
+    (h_fin : ∀ b ∈ memFinalizeContributions finals, ∀ e ∈ memEventsFiltered rows,
+      keyOf b ≠ memEvent_sendKey e) :
+    MemProviderGenesis
+      (memGenesisContributions clkHigh t0 addrs mult ++ memFinalizeContributions finals) rows := by
+  intro b hb e he hkey
+  rcases List.mem_append.mp hb with hb' | hb'
+  · exact memProviderGenesis_of_contributions rows clkHigh t0 addrs mult h_t0 b hb' e he hkey
+  · exact absurd hkey (h_fin b hb' e he)
+
+/-- **`TraceMemoryValid` from the full init ++ finalize boundary + balance** — the
+`traceMemoryValid_of_genesis_and_balance` upgrade whose balance hypothesis is satisfiable for real
+traces (the genesis-only variant's bus can never balance once a chain has a final unmatched receive). -/
+theorem traceMemoryValid_of_boundary_and_balance [NeZero p] (rows : List (Trace.RowView (ZMod p)))
+    (clkHigh t0 : ℕ) (addrs : List ℕ) (mult : ℕ → ℤ)
+    (finals : List (ℕ × ℕ × ℕ × Vector ℕ 4 × ℤ))
+    (hwf : ∀ r ∈ rows, MemRowWellFormed r)
+    (h_clk : TraceMemClkValid rows)
+    (h_prev : memPrevLink rows)
+    (h_prevlt : ∀ e ∈ memEventsFiltered rows, e.prevTs < e.clk.val)
+    (h_t0 : ∀ e ∈ memEventsFiltered rows, t0 ≠ e.clk.val)
+    (h_fin : ∀ b ∈ memFinalizeContributions finals, ∀ e ∈ memEventsFiltered rows,
+      keyOf b ≠ memEvent_sendKey e)
+    (h_bal : isConsistentBalanced (aggregateChipRows rows memoryLookups
+      ++ (memGenesisContributions clkHigh t0 addrs mult ++ memFinalizeContributions finals))) :
+    TraceMemoryValid rows :=
+  { clk := h_clk
+    online := isConsistentOnline_of_memBalance rows
+      (memGenesisContributions clkHigh t0 addrs mult ++ memFinalizeContributions finals)
+      hwf h_clk h_prev h_prevlt
+      (memProviderGenesis_of_boundary rows clkHigh t0 addrs mult finals h_t0 h_fin) h_bal }
+
 end SP1Clean.Soundness
