@@ -288,7 +288,7 @@ claim that real-address read/write events plug into the existing offline memory.
 /-- The two signed Memory-bus contributions the `MemoryAccess` block emits at a **real 3-limb address**
 (W11 polarity flip): a `pull` of the prior word at the previous timestamp (`−is_real` — the chip *derives*
 `MemoryMsg.isU64 prev_value`) and a `push` of `new_value` at the current timestamp `(clk_high, clk_low + 1)`
-(`+is_real` — the chip *proves* `isU64 new_value`). Matches `Readers/MemoryAccess.lean:99-110`. On padding
+(`+is_real` — the chip *proves* `isU64 new_value`). Matches `Readers/MemoryAccess.lean:99-108`. On padding
 rows both vanish (`memAccessLookups_padding`). -/
 def memAccessLookups (mem : Extracted.MemoryAccessCols (ZMod p))
     (clk_high clk_low addr0 addr1 addr2 : ZMod p) (new_value : Word (ZMod p)) (is_real : ZMod p) :

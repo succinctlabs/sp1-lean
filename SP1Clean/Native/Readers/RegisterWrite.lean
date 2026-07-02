@@ -45,8 +45,7 @@ deriving ProvableStruct
 write timestamp (`+is_real`, the W11-flipped polarity). -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   memoryChannel.pushIf input.is_real
-    (⟨input.clk_high, input.clk_low, input.op_a, 0, 0,
-      input.value[0], input.value[1], input.value[2], input.value[3]⟩ : MemoryMsg (Expression (ZMod p)))
+    (⟨input.clk_high, input.clk_low, input.op_a, 0, 0, input.value⟩ : MemoryMsg (Expression (ZMod p)))
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
@@ -74,14 +73,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   circuit_proof_start
   simp only [circuit_norm, memoryChannel, MemoryMsg.isU64] at h_holds ⊢
   -- The only obligation is the write `pushIf`'s requirement, `¬is_real=-1 → ¬is_real=0 → isU64 value`.
-  refine fun _ h0 => ?_
-  have hr1 : input_is_real = 1 := (h_assumptions.1).resolve_left h0
-  obtain ⟨hv0, hv1, hv2, hv3⟩ := Word.lt_cases_of_isU64 (h_assumptions.2 hr1)
-  obtain ⟨-, -, -, hvm, -⟩ := h_input
-  have ev : ∀ i (hi : i < 4), Expression.eval env input_var_value[i] = input_value[i] := by
-    intro i hi; have := congrArg (fun v => v[i]'hi) hvm; simpa using this
-  rw [ev 0 (by norm_num), ev 1 (by norm_num), ev 2 (by norm_num), ev 3 (by norm_num)]
-  exact ⟨hv0, hv1, hv2, hv3⟩
+  exact fun _ h0 => h_assumptions.2 ((h_assumptions.1).resolve_left h0)
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start

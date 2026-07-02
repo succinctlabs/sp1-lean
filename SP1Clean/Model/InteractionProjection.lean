@@ -162,6 +162,16 @@ lemma toAccess_pullIf_state (env : Environment (ZMod p)) (gate : Expression (ZMo
 
 open SP1Clean.Channels (memoryChannel MemoryMsg programChannel ProgramMsg)
 
+/-- Expand a 4-vector's `toList` into its four elements — the `Word`-field analog of the flat scalar
+components in the `toElements` unfolds below (the `MemoryMsg.value` word flattens through `toElements`
+as a `Vector`, not four scalars). -/
+private lemma toList_word {α : Type} (w : Vector α 4) :
+    w.toList = [w[0], w[1], w[2], w[3]] := by
+  apply List.ext_getElem (by simp)
+  intro i h1 h2
+  simp only [List.length_cons, List.length_nil] at h2
+  interval_cases i <;> simp
+
 omit [NeZero p] in
 /-- **Kernel of the Memory "emitted = projection".** The `toAccess`-image of a pushed `memoryChannel`
 message (a plain `Channel.emit`, default `toRaw`; post-#398 `circuit_norm` normal form: `pushIf`) is the
@@ -175,14 +185,14 @@ lemma toAccess_pushIf_memory (env : Environment (ZMod p)) (mult : Expression (ZM
       (InteractionKind.Memory, "SP1Memory",
         [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
          (Expression.eval env msg.addr0).val, (Expression.eval env msg.addr1).val,
-         (Expression.eval env msg.addr2).val, (Expression.eval env msg.v0).val,
-         (Expression.eval env msg.v1).val, (Expression.eval env msg.v2).val,
-         (Expression.eval env msg.v3).val],
+         (Expression.eval env msg.addr2).val, (Expression.eval env msg.value[0]).val,
+         (Expression.eval env msg.value[1]).val, (Expression.eval env msg.value[2]).val,
+         (Expression.eval env msg.value[3]).val],
         signedVal (Expression.eval env mult)) := by
   simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
     Channel.toRaw, kindOf, memoryChannel, if_true, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
-  simp
+  simp [Vector.toList_append, toList_word]
 
 omit [NeZero p] in
 /-- **Kernel of the Memory "received = projection" (gated VM pull).** The `pullIf`/`memoryChannel`/`MemoryMsg`
@@ -197,14 +207,14 @@ lemma toAccess_pullIf_memory (env : Environment (ZMod p)) (gate : Expression (ZM
       (InteractionKind.Memory, "SP1Memory",
         [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
          (Expression.eval env msg.addr0).val, (Expression.eval env msg.addr1).val,
-         (Expression.eval env msg.addr2).val, (Expression.eval env msg.v0).val,
-         (Expression.eval env msg.v1).val, (Expression.eval env msg.v2).val,
-         (Expression.eval env msg.v3).val],
+         (Expression.eval env msg.addr2).val, (Expression.eval env msg.value[0]).val,
+         (Expression.eval env msg.value[1]).val, (Expression.eval env msg.value[2]).val,
+         (Expression.eval env msg.value[3]).val],
         signedVal (Expression.eval env (-gate))) := by
   simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
     Channel.toRaw, kindOf, memoryChannel, if_true, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
-  simp
+  simp [Vector.toList_append, toList_word]
 
 omit [NeZero p] in
 /-- **Kernel of the Program "emitted = projection".** The `toAccess`-image of a pushed `programChannel`

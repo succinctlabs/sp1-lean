@@ -102,12 +102,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   -- `new = prev_value` (from the pull), a write supplies the store value's range-check).
   memoryChannel.pullIf input.is_real
     (⟨ts.prev_high, ts.prev_low, input.addr0, input.addr1, input.addr2,
-      input.mem.prev_value[0], input.mem.prev_value[1], input.mem.prev_value[2],
-      input.mem.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
+      input.mem.prev_value⟩ : MemoryMsg (Expression (ZMod p)))
   memoryChannel.pushIf input.is_real
     (⟨input.clk_high, input.clk_low + 1, input.addr0, input.addr1, input.addr2,
-      input.new_value[0], input.new_value[1], input.new_value[2], input.new_value[3]⟩ :
-      MemoryMsg (Expression (ZMod p)))
+      input.new_value⟩ : MemoryMsg (Expression (ZMod p)))
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
@@ -138,50 +136,29 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   simp only [circuit_norm, byteChannel, memoryChannel, MemoryMsg.isU64] at h_holds ⊢
   -- the leading `_` is the inline `is_real` boolean gate (unused in soundness — `Assumptions` already gives
   -- `is_real ∈ {0,1}`); `a1 a2 a3` the three timestamp asserts, `b4 b5` the two byte-pull guarantees, and
-  -- `h_mem` the memory read-prior pull's guarantee (`MemoryMsg.isU64` of `prev_value`).
+  -- `h_mem` the memory read-prior pull's guarantee (`Word.isU64` of the whole `prev_value` word).
   obtain ⟨_, a1, a2, a3, b4, b5, h_mem⟩ := h_holds
-  -- bridge `prev_value`/`new_value` Word limbs from `eval` form to value (nested vector fields).
-  have eprev : ∀ i (hi : i < 4),
-      Expression.eval env input_var_mem_prev_value[i] = input_mem_prev_value[i] := by
-    intro i hi; have := congrArg (fun v => v[i]'hi) h_input.1.1; simpa using this
-  have enew : ∀ i (hi : i < 4),
-      Expression.eval env input_var_new_value[i] = input_new_value[i] := by
-    intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.2.1; simpa using this
   -- The byte-pull off-gate `Requirements` + the memory pull off-gate are vacuous; the memory **push** owes
-  -- `MemoryMsg.isU64` of `new_value` (from the `isU64 new_value` `Assumption`).
+  -- `Word.isU64` of `new_value`, exactly the `isU64 new_value` `Assumption` (real row via ¬is_real = 0).
   refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
-    fun _ h0 => ?_⟩
-  · -- Spec consequent (real row); the new `isU64 prev_value` conjunct comes from the memory pull `h_mem`.
-    rw [hr1, one_mul] at a1 a2 a3
-    have hb4 := b4 (by rw [hr1]); rw [← c16] at hb4
-    have hb5 := b5 (by rw [hr1])
-    obtain ⟨hp0, hp1, hp2, hp3⟩ := h_mem (by rw [hr1])
-    rw [eprev 0 (by norm_num)] at hp0; rw [eprev 1 (by norm_num)] at hp1
-    rw [eprev 2 (by norm_num)] at hp2; rw [eprev 3 (by norm_num)] at hp3
-    -- strip the `id (ZMod p)` `ProvableType` carrier off the `Spec` body so `ring`/`sub_eq_add_neg`
-    -- resolve (the `id` carrier, à la `LtOperationUnsigned`; `docs/agents/mul-operation-learnings.md` §1).
-    simp only [id] at *
-    refine ⟨bool_of_mul_pred a1, ?_, ?_, (byteRowSpec_range _ h16p).mp hb4, ?_,
-      Word.isU64_of_cases hp0 hp1 hp2 hp3⟩
-    · rw [sub_eq_add_neg]; exact a2
-    · simp only [selCur, selPrev]; linear_combination a3
-    · exact ((byteRowSpec_u8range_pair _ _).mp hb5).1
-  · -- memory push (new_value): `isU64` from the `Assumption` (real row via ¬is_real = 0).
-    have ht : input_is_real = 1 := by
-      rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
-    obtain ⟨hn0, hn1, hn2, hn3⟩ := Word.lt_cases_of_isU64 (h_assumptions.2 ht)
-    rw [enew 0 (by norm_num), enew 1 (by norm_num), enew 2 (by norm_num), enew 3 (by norm_num)]
-    exact ⟨hn0, hn1, hn2, hn3⟩
+    fun _ h0 => h_assumptions.2 (h_assumptions.1.resolve_left h0)⟩
+  -- Spec consequent (real row); the `isU64 prev_value` conjunct is the memory pull `h_mem` verbatim.
+  rw [hr1, one_mul] at a1 a2 a3
+  have hb4 := b4 (by rw [hr1]); rw [← c16] at hb4
+  have hb5 := b5 (by rw [hr1])
+  -- strip the `id (ZMod p)` `ProvableType` carrier off the `Spec` body so `ring`/`sub_eq_add_neg`
+  -- resolve (the `id` carrier, à la `LtOperationUnsigned`; `docs/agents/mul-operation-learnings.md` §1).
+  simp only [id] at *
+  refine ⟨bool_of_mul_pred a1, ?_, ?_, (byteRowSpec_range _ h16p).mp hb4,
+    ((byteRowSpec_u8range_pair _ _).mp hb5).1, h_mem (by rw [hr1])⟩
+  · rw [sub_eq_add_neg]; exact a2
+  · simp only [selCur, selPrev]; linear_combination a3
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
-  -- bridge `prev_value` Word limbs from `eval` form to value, for the memory pull completeness goal.
-  have eprev : ∀ i (hi : i < 4),
-      Expression.eval env.toEnvironment input_var_mem_prev_value[i] = input_mem_prev_value[i] := by
-    intro i hi; have := congrArg (fun v => v[i]'hi) h_input.1.1; simpa using this
   simp only [circuit_norm, byteChannel, memoryChannel, MemoryMsg.isU64]
   obtain ⟨hbin, hnew⟩ := h_assumptions
   rcases hbin with h0 | h1
@@ -207,10 +184,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     · rw [h1, one_mul]; linear_combination ha3
     · intro _; rw [← c16]; exact (byteRowSpec_range _ h16p).mpr hd_low
     · intro _; exact (byteRowSpec_u8range_pair _ _).mpr ⟨hd_high, by rw [ZMod.val_zero]; norm_num⟩
-    · intro _
-      obtain ⟨hp0, hp1, hp2, hp3⟩ := Word.lt_cases_of_isU64 hisu
-      rw [eprev 0 (by norm_num), eprev 1 (by norm_num), eprev 2 (by norm_num), eprev 3 (by norm_num)]
-      exact ⟨hp0, hp1, hp2, hp3⟩
+    · intro _; exact hisu
 
 /-- The native memory-access primitive as a Clean `FormalAssertion`: timestamp monotonicity columns +
 the two Memory-bus interactions at a real 48-bit address, parameterised by the written `new_value`. -/

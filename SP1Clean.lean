@@ -294,6 +294,7 @@ import SP1Clean.Native.Operations.U16MSBOperation.Populate
 import SP1Clean.Native.Operations.U16MSBOperation.RawSpec
 import SP1Clean.Native.Operations.U16toU8OperationSafe
 import SP1Clean.Native.Operations.U16toU8OperationUnsafe
+import SP1Clean.Native.Operations.WordRangeCheck
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Native.Readers.ALUTypeReaderImmutable
 import SP1Clean.Native.Readers.CPUState

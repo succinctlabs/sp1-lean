@@ -53,21 +53,19 @@ def stateChannel : Channel (ZMod p) StateMsg where
   name := "SP1State"
   Guarantees msg _ := StateMsg.Spec msg
 
-/-- The Memory-bus message — `(clk_high, clk_low, addr0, addr1, addr2, v0, v1, v2, v3)`, arity 9,
-matching SP1's `AirInteraction.memory` (`crates/hypercube/src/lookup/interaction.rs`) and the `.memory`
-interaction in `Extracted/RTypeReader.lean`. Registers use `addr0` = register index, `addr1 = addr2 = 0`;
-`(v0, v1, v2, v3)` is the 4-limb little-endian word. Each register access sends the prior value at the
-previous timestamp and receives the new value at the current timestamp. -/
+/-- The Memory-bus message — `(clk_high, clk_low, addr0, addr1, addr2, value)`, where `value : Word` is
+the 4-limb little-endian word; `ProvableStruct` flattens it to the same arity-9 element tuple, matching
+SP1's `AirInteraction.memory` (`crates/hypercube/src/lookup/interaction.rs`) and the `.memory`
+interaction in `Extracted/RTypeReader.lean`. Registers use `addr0` = register index, `addr1 = addr2 = 0`.
+Each register access sends the prior value at the previous timestamp and receives the new value at the
+current timestamp. -/
 structure MemoryMsg (F : Type) where
   clk_high : F
   clk_low : F
   addr0 : F
   addr1 : F
   addr2 : F
-  v0 : F
-  v1 : F
-  v2 : F
-  v3 : F
+  value : Word F
 deriving ProvableStruct
 
 /-- Per-row register-access address shape (`addr1 = addr2 = 0`). Kept as a small structural predicate (e.g.
@@ -75,13 +73,13 @@ for trace use); it is **not** the memory channel's `Guarantees` — see `memoryC
 def MemoryMsg.Spec (msg : MemoryMsg (ZMod p)) : Prop :=
   msg.addr1 = 0 ∧ msg.addr2 = 0
 
-/-- **The Memory message's value well-formedness** — the 4-limb word `(v0, v1, v2, v3)` is a `U64` (each limb
-`< 2^16`). This is the per-message `Guarantees` the memory **provider proves on push** (a writer's range-check)
-and the chips **pull-and-derive** (W11 polarity flip), exactly analogous to `ProgramMsg.RowSpec` / the byte
-bus. Kept as a flat 4-conjunct (not routed through `Word.isU64`/`Fin 4` indexing) so the `simp only` in
-soundness/completeness stays linear, like `ProgramMsg.RowSpec`. -/
+/-- **The Memory message's value well-formedness** — the 4-limb `value` word is a `U64` (each limb
+`< 2^16`), literally `Word.isU64`. This is the per-message `Guarantees` the memory **provider proves on
+push** (a writer's range-check) and the chips **pull-and-derive** (W11 polarity flip), exactly analogous
+to `ProgramMsg.RowSpec` / the byte bus. Because the message carries the whole `Word`, the pull guarantee
+and the chips' operand facts are the *same* proposition — no per-limb bridging. -/
 def MemoryMsg.isU64 (msg : MemoryMsg (ZMod p)) : Prop :=
-  msg.v0.val < 2 ^ 16 ∧ msg.v1.val < 2 ^ 16 ∧ msg.v2.val < 2 ^ 16 ∧ msg.v3.val < 2 ^ 16
+  Word.isU64 msg.value
 
 /-- The Memory channel (SP1 `InteractionKind.Memory`). `Guarantees := MemoryMsg.isU64` — the value's
 well-formedness (each limb `< 2^16`). **W11 polarity flip:** the memory access's *read-back/write* now

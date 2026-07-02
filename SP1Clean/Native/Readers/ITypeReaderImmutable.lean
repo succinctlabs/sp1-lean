@@ -57,21 +57,17 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   -- op_a (rs2 read): pull prior value at prev timestamp, push the unchanged prior value at `clk_low + 4`.
   memoryChannel.pullIf input.is_real
     (⟨input.clk_high, cols.op_a_memory.access_timestamp.prev_low, cols.op_a, 0, 0,
-      cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1],
-      cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
+      cols.op_a_memory.prev_value⟩ : MemoryMsg (Expression (ZMod p)))
   memoryChannel.pushIf input.is_real
     (⟨input.clk_high, input.clk_low + 4, cols.op_a, 0, 0,
-      cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1],
-      cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
+      cols.op_a_memory.prev_value⟩ : MemoryMsg (Expression (ZMod p)))
   -- op_b (rs1 read): pull prior value, push the unchanged prior value at `clk_low + 3`.
   memoryChannel.pullIf input.is_real
     (⟨input.clk_high, cols.op_b_memory.access_timestamp.prev_low, cols.op_b, 0, 0,
-      cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1],
-      cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
+      cols.op_b_memory.prev_value⟩ : MemoryMsg (Expression (ZMod p)))
   memoryChannel.pushIf input.is_real
     (⟨input.clk_high, input.clk_low + 3, cols.op_b, 0, 0,
-      cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1],
-      cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
+      cols.op_b_memory.prev_value⟩ : MemoryMsg (Expression (ZMod p)))
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
@@ -107,22 +103,20 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have htbin := bool_of_mul_pred h_trust
   have e : ∀ i (hi : i < 3), Expression.eval env input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
-  -- bridge each operand `prev_value` limb from `eval` form to its value (nested vector fields).
+  -- bridge the four `op_a_0 * prev_value_i` read-zeroing gates from `eval` form to value form
+  -- (the gates index into the nested `prev_value` vector limb-wise).
   have eva : ∀ i (hi : i < 4),
       Expression.eval env input_var_cols_op_a_memory_prev_value[i] =
         input_cols_op_a_memory_prev_value[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.1.2.1.1; simpa using this
-  have evb : ∀ i (hi : i < 4),
-      Expression.eval env input_var_cols_op_b_memory_prev_value[i] =
-        input_cols_op_b_memory_prev_value[i] := by
-    intro i hi; have := congrArg (fun v => v[i]'hi) h_input.1.2.2.2.2.1.1; simpa using this
-  -- bridge the four `op_a_0 * prev_value_i` read-zeroing gates from `eval` form to value form.
   rw [eva 0 (by norm_num)] at z0; rw [eva 1 (by norm_num)] at z1
   rw [eva 2 (by norm_num)] at z2; rw [eva 3 (by norm_num)] at z3
-  -- Spec: decode bounds (program pull) + op_a/op_b `isU64` (memory pulls). Requirements: 2 rac, program
-  -- off-gate, then per operand a pull off-gate (vacuous) + a push (op_a/op_b both reads → read-back = pull).
+  -- Spec: decode bounds (program pull) + op_a/op_b `isU64` (memory pulls — the whole-`Word` messages make
+  -- the pull guarantees the Spec conjuncts verbatim). Requirements: 2 rac, program off-gate, then per
+  -- operand a pull off-gate (vacuous) + a push (op_a/op_b both reads → read-back = pull).
   refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin,
-      h_rac_a h_assumptions.1, h_rac_b h_assumptions.1, fun ht => ?_, fun ht2 => ?_⟩,
+      h_rac_a h_assumptions.1, h_rac_b h_assumptions.1, fun ht => ?_,
+      fun ht2 => ⟨h_mem_a (by rw [ht2]), h_mem_b (by rw [ht2])⟩⟩,
     Or.inr h_assumptions.1, Or.inr h_assumptions.1,
     fun h1 h0 => off_gate_vacuous htbin h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
@@ -133,15 +127,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [ht])
     rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
     exact ⟨ha, hp0, hp1, hp2⟩
-  · -- op_a/op_b `isU64` from the two memory pull guarantees
-    have hneg : -input_is_real = -1 := by rw [ht2]
-    obtain ⟨hma0, hma1, hma2, hma3⟩ := h_mem_a hneg
-    obtain ⟨hmb0, hmb1, hmb2, hmb3⟩ := h_mem_b hneg
-    rw [eva 0 (by norm_num)] at hma0; rw [eva 1 (by norm_num)] at hma1
-    rw [eva 2 (by norm_num)] at hma2; rw [eva 3 (by norm_num)] at hma3
-    rw [evb 0 (by norm_num)] at hmb0; rw [evb 1 (by norm_num)] at hmb1
-    rw [evb 2 (by norm_num)] at hmb2; rw [evb 3 (by norm_num)] at hmb3
-    exact ⟨Word.isU64_of_cases hma0 hma1 hma2 hma3, Word.isU64_of_cases hmb0 hmb1 hmb2 hmb3⟩
   · -- push_a: read-back value = op_a prev, from the paired pull
     have ht : input_is_real = 1 := by
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
@@ -164,10 +149,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       Expression.eval env.toEnvironment input_var_cols_op_a_memory_prev_value[i] =
         input_cols_op_a_memory_prev_value[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.1.2.1.1; simpa using this
-  have evb : ∀ i (hi : i < 4),
-      Expression.eval env.toEnvironment input_var_cols_op_b_memory_prev_value[i] =
-        input_cols_op_b_memory_prev_value[i] := by
-    intro i hi; have := congrArg (fun v => v[i]'hi) h_input.1.2.2.2.2.1.1; simpa using this
   -- bridge the read-zeroing gates from value form (in `Spec`) to `eval` form (the goal asserts).
   rw [← eva 0 (by norm_num)] at z0; rw [← eva 1 (by norm_num)] at z1
   rw [← eva 2 (by norm_num)] at z2; rw [← eva 3 (by norm_num)] at z3
@@ -179,18 +160,12 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     simp only [programChannel, ProgramMsg.RowSpec]
     rw [e 0 (by norm_num), e 1 (by norm_num), e 2 (by norm_num)]
     exact ⟨ha, hp0, hp1, hp2, hbin⟩
-  · -- mem pull a: derive `MemoryMsg.isU64 {eval'd prev_a}` from hisu.1 + eval bridge
+  · -- mem pull a: the whole-`Word` guarantee is the Spec's op_a `isU64` verbatim
     simp only [memoryChannel, MemoryMsg.isU64]
-    intro hneg
-    obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 (hisu (neg_inj.mp hneg)).1
-    rw [eva 0 (by norm_num), eva 1 (by norm_num), eva 2 (by norm_num), eva 3 (by norm_num)]
-    exact ⟨ha0, ha1, ha2, ha3⟩
+    exact fun hneg => (hisu (neg_inj.mp hneg)).1
   · -- mem pull b
     simp only [memoryChannel, MemoryMsg.isU64]
-    intro hneg
-    obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 (hisu (neg_inj.mp hneg)).2
-    rw [evb 0 (by norm_num), evb 1 (by norm_num), evb 2 (by norm_num), evb 3 (by norm_num)]
-    exact ⟨hb0, hb1, hb2, hb3⟩
+    exact fun hneg => (hisu (neg_inj.mp hneg)).2
 
 /-- The native immutable I-type reader as a Clean `FormalAssertion`: composes a `RegisterAccessCols` per
 operand (both reads), imposes the `op_a_0` binary + read-zeroing gates, and emits the Program/Memory buses. -/
