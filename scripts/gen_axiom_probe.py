@@ -35,6 +35,7 @@ TARGETS = [
      r"theorem\s+(isConsistentBalanced_of_intCast_zero|intCast_multiplicitySum_map_toAccess|"
      r"isConsistentBalanced_of_balancedInteractions)\b"),
     ("SP1Clean/Soundness/SP1Ensemble.lean", r"(?:theorem|def)\s+(sp1\w*)\b"),
+    ("SP1Clean/Soundness/FinishedChannels.lean", r"theorem\s+(sp1_finishedChannel_guarantees)\b"),
     ("SP1Clean/Soundness/ChipRegistry.lean", r"(?:theorem|def)\s+(allChipKinds\w*)\b"),
     ("SP1Clean/Soundness/Coverage.lean",
      r"theorem\s+(coverage_kinds_eq_registry|coverage_length|covered_iff_routed|"

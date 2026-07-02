@@ -329,6 +329,7 @@ import SP1Clean.Soundness.Opcode
 import SP1Clean.Soundness.ProgramConsistency
 import SP1Clean.Soundness.ProgramProviderSpike
 import SP1Clean.Soundness.SP1Ensemble
+import SP1Clean.Soundness.FinishedChannels
 import SP1Clean.Soundness.StateConsistency
 import SP1Clean.Soundness.StateVm
 import SP1Clean.Soundness.TargetVm

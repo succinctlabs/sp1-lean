@@ -354,6 +354,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.sp1_gatedExecution_prereqs
 #print axioms SP1Clean.Soundness.sp1FormalEnsemble
 #print axioms SP1Clean.Soundness.sp1_machine_soundness
+#print axioms SP1Clean.Soundness.sp1_finishedChannel_guarantees
 #print axioms SP1Clean.Soundness.allChipKinds
 #print axioms SP1Clean.Soundness.allChipKinds_length
 #print axioms SP1Clean.Soundness.covered_iff_routed

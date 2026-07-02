@@ -314,8 +314,10 @@ table (chips make 3–4 memory pairs; the memory boundary is a multiset, not one
 `sp1StateVmEnsemble` (`Soundness/StateVm.lean`) and expressing memory as a true second VM channel needs
 the **multi-VM / multi-step / multi-boundary `VmTables` generalization** — upstreamable to Clean
 (`FemtoCairo.lean:26` acknowledges the read-write-memory gap; `Utils/OfflineMemory.lean` is the spec
-foundation). Also open: `sp1_finishedChannel_guarantees` (P5.4) — the proven byte/program pull-guarantee
-grounding over `sp1Ensemble` (separable; feeds the seam's per-chip `FullGuarantees`).
+foundation). P5.4 is **done**: `sp1_finishedChannel_guarantees` (`Soundness/FinishedChannels.lean`) —
+the proven byte/program pull-guarantee grounding over `sp1Ensemble` (every table's byte/program
+`ChannelGuarantees` from `Statement`, via `guarantees_of_requirements_append` on the consumer/provider
+partition; feeds the seam's per-chip `FullGuarantees`).
 
 ### B1 — the three completeness `sorry`s (M each, independent)
 

@@ -22,9 +22,10 @@ the module doc of `SP1Clean/Soundness/SP1Ensemble.lean` and the parked `sp1State
 Memory boundary (Phase 4): `MemoryProviderChip` (init-push, boolean mult) + `MemoryFinalizeChip`
 (finalize-pull, new) + the native finalize twin in `Soundness/MemoryGlobal.lean`
 (`memFinalizeContributions`, `memProviderGenesis_of_boundary`) + `memBalanceHyps_of_boundary`
-(`Soundness/MemoryIsU64.lean`). Remaining in-flight: the byte/program finished-channel grounding lemma
-`sp1_finishedChannel_guarantees` (P5.4, separable — the capstone is green without it; it feeds the
-seam's per-chip `FullGuarantees`).
+(`Soundness/MemoryIsU64.lean`). P5.4 also DONE: `sp1_finishedChannel_guarantees`
+(`Soundness/FinishedChannels.lean`, sorry-free) — every table's byte/program `ChannelGuarantees` from
+the `Statement`, via `guarantees_of_requirements_append` on the consumer (verifier + 25 chips) /
+provider (11 boundary tables) partition; it feeds the seam's per-chip `FullGuarantees`.
 
 ## Commits so far
 - `07597ba` — Clean→main migration baseline + the in-circuit byte/range providers (superseded, see below).
