@@ -15,7 +15,9 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Operands are 64-bit values; the load targets a non-reserved, in-range address. The offset bits are
 bits 0–2 of the address and boolean (alignment per width is enforced in-circuit by the alignment gates,
-not assumed). -/
+not assumed). The final conjunct is the **W11 memory-flip** obligation: the value read from RAM
+(`memory_access.prev_value`, which for a load is the loaded word) is a valid 64-bit word — honest at the
+single-row level (the memory bus range-checks every value it holds; the read pins `new_value = prev_value`). -/
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
@@ -24,13 +26,14 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
       = (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 ∧
     (input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1) ∧
     (input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1) ∧
-    (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1)
+    (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1) ∧
+    Word.isU64 input.memory_access.prev_value
 
 set_option maxHeartbeats 16000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2⟩ := h_assumptions
+  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_pv_isu64⟩ := h_assumptions
   obtain ⟨_h_cpu, h_addr, h_mem, h_itype, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5, h_b6, h_gate,
     h_al2, h_al1, h_al0, h_oa1, h_oa2⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
@@ -62,12 +65,13 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_al0 h_al1 h_al2
   simp only [← sub_eq_add_neg] at h_oa1 h_oa2
   simp only [isReal, opcodeVal]
-  refine ⟨⟨h_addr_spec, h_mem h_bin, h_it,
+  refine ⟨⟨h_addr_spec, h_mem ⟨h_bin, fun _ => h_pv_isu64⟩, h_it,
       bool_of_mul_pred h_b0, bool_of_mul_pred h_b1, bool_of_mul_pred h_b2, bool_of_mul_pred h_b3,
       bool_of_mul_pred h_b4, bool_of_mul_pred h_b5, bool_of_mul_pred h_b6,
       h_bin, h_al2, h_al1, h_al0, h_oa1, h_oa2⟩, ?_⟩
-  -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`).
-  exact ⟨h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr ⟨h_bin, h_bin⟩⟩
+  -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`); `MemoryAccess`'s
+  -- read push owes `isU64 prev_value` (chip assumption; a read pins `new_value = prev_value`).
+  exact ⟨h_bin, Or.inr h_addr_as, Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩, Or.inr ⟨h_bin, h_bin⟩⟩
 
 /-- Prover-side row well-formedness: operand `isU64`s + address facts + selector binaries + alignment
 equations + the `op_a_0` forcing facts + the reader/CPUState/MemoryAccess `Spec`s. -/
@@ -80,6 +84,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : P
     (input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1) ∧
     (input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1) ∧
     (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1) ∧
+    Word.isU64 input.memory_access.prev_value ∧
     (input.is_lb = 0 ∨ input.is_lb = 1) ∧ (input.is_lbu = 0 ∨ input.is_lbu = 1) ∧
     (input.is_lh = 0 ∨ input.is_lh = 1) ∧ (input.is_lhu = 0 ∨ input.is_lhu = 1) ∧
     (input.is_lw = 0 ∨ input.is_lw = 1) ∧ (input.is_lwu = 0 ∨ input.is_lwu = 1) ∧
@@ -105,8 +110,8 @@ theorem completeness :
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   simp only [isReal, opcodeVal] at h_assumptions
-  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5, h_b6, hbin,
-    h_al2, h_al1, h_al0, h_oa1, h_oa2, h_cpu, h_mem, h_it⟩ := h_assumptions
+  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_pv_isu64, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5,
+    h_b6, hbin, h_al2, h_al1, h_al0, h_oa1, h_oa2, h_cpu, h_mem, h_it⟩ := h_assumptions
   simp only [sub_eq_add_neg] at h_oa1 h_oa2
   obtain ⟨_, _, _, _, _, _, _, ⟨_, _, _, hmap_pc⟩, _, _, hmap_ob⟩ := h_input
   have epc : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_state_pc[i]
@@ -133,7 +138,7 @@ theorem completeness :
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
-  · exact hbin
+  · exact ⟨hbin, fun _ => h_pv_isu64⟩
   · exact h_mem
   · exact ⟨hbin, hbin⟩
   · exact h_it

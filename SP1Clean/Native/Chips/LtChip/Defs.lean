@@ -3,6 +3,7 @@ import SP1Clean.Proofs.Operations.LtOperationSigned.Formal
 import SP1Clean.Native.Operations.LtOperationSigned.Populate
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Extracted.LtChip
 import Clean.Circuit.Basic
@@ -93,6 +94,12 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) 
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_slt * 9 + is_sltu * 10,
      lt_cols.result.u16_compare_operation.bit, 0, 0, 0⟩
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- `LtOperationSigned`, so `isU64 (resultWord)` discharges its requirement. The Lt result is the single
+  -- compare bit in the low limb (zeros above): `#v[bit, 0, 0, 0]`; the write access clock is `recombined + 4`.
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a, #v[lt_cols.result.u16_compare_operation.bit, 0, 0, 0], input.is_real⟩
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
   -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
   assertZero (input.is_real * (input.is_real - 1))
@@ -103,11 +110,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) 
 
 set_option maxHeartbeats 1000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs LtCols main where
-  channelsLawful := by simp [circuit_norm, main, LtOperationSigned.circuit, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit]
-  -- witnesses the two flags (2) + the `LtOperationSigned` block (1 + 1 + 8 = 10); the two readers are
+  channelsLawful := by simp [circuit_norm, main, LtOperationSigned.circuit, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, Readers.RegisterWrite.circuit]
+  -- witnesses the two flags (2) + the `LtOperationSigned` block (1 + 1 + 8 = 10); the readers/write are
   -- `assertion`s (`localLength 0`) over the threaded `state`/`adapter` inputs. 2 + 10 = 12.
   localLength _ := 12
-  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
+  -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
+  -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 end SP1Clean.LtChip

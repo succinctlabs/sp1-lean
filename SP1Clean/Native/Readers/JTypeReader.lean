@@ -57,66 +57,88 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   cols.op_a_0 * input.wv1 === 0
   cols.op_a_0 * input.wv2 === 0
   cols.op_a_0 * input.wv3 === 0
-  -- op_a (rd write): send prior value at prev timestamp, receive the written value `wv*` at `clk_low + 4`.
-  memoryChannel.emit input.is_real
+  -- op_a (rd). **W11 polarity flip + Option B (pure read):** the *read-prior* is now a `pullIf` (the chip
+  -- *derives* `MemoryMsg.isU64` of op_a's `prev_value`). op_a's write **push** is factored OUT into
+  -- `Readers/RegisterWrite.circuit`, composed by the chip *after* its operation (so the reader owes no
+  -- `isU64 wv`; the op_a write's `isU64` flows value→push at the chip level, breaking the old circularity).
+  memoryChannel.pullIf input.is_real
     (⟨input.clk_high, cols.op_a_memory.access_timestamp.prev_low, cols.op_a, 0, 0,
       cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1],
       cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
-  memoryChannel.emit (-input.is_real)
-    (⟨input.clk_high, input.clk_low + 4, cols.op_a, 0, 0,
-      input.wv0, input.wv1, input.wv2, input.wv3⟩ : MemoryMsg (Expression (ZMod p)))
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  -- `byteChannel` (composed `RegisterAccessCols` checks) + `programChannel` (W11 flip — now **pulled**,
-  -- so its `ProgramMsg.RowSpec` guarantee is assumed here; it joins `channelsWithGuarantees` and its
-  -- requirement drops from `channelsWithRequirements`, discharged by the inline `is_trusted` gate).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  -- `byteChannel` (composed `RegisterAccessCols` checks) + `programChannel` (W11 program flip — now
+  -- **pulled**) + `memoryChannel` (W11 memory flip — the op_a read-prior `pullIf` derives `MemoryMsg.isU64`,
+  -- so it joins `channelsWithGuarantees`; its write `pushIf` keeps it in `channelsWithRequirements`).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, RegisterAccessCols.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw, programChannel.toRaw] := rfl
+      = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
 
 /-- `is_real`/`is_trusted` binary — the precondition for the `is_real`-gated byte receives (threaded into
 the composed `RegisterAccessCols`) + the program-pull `is_trusted` gate. Discharged by the chip's binary
-gates. The decode bounds are NOT assumed — they are **derived** into the `Spec` (W11 flip). -/
+gates. The decode bounds are NOT assumed — they are **derived** into the `Spec` (W11 flip). No `isU64 wv`
+conjunct: this reader is a **pure read** (Option B) — the op_a write **push** is factored out into
+`Readers/RegisterWrite.circuit`, which the composing chip discharges with `isU64 value` from its
+operation; so the lone memory interaction here is the op_a read-prior pull (no write to range-check). -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_trusted = 0 ∨ input.is_trusted = 1)
 
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   -- `h_holds`: the `RegisterAccessCols` sub, the `op_a_0` gate `hbin`, the inline `is_trusted` gate
-  -- `h_trust`, the **program pull's guarantee** `h_prog` (`ProgramMsg.RowSpec`), then the zeroing gates.
-  simp only [circuit_norm, memoryChannel, programChannel, ProgramMsg.RowSpec] at h_holds ⊢
-  obtain ⟨h_rac_a, hbin, h_trust, h_prog, z0, z1, z2, z3⟩ := h_holds
+  -- `h_trust`, the **program pull's guarantee** `h_prog` (`ProgramMsg.RowSpec`), the zeroing gates, then the
+  -- **memory pull's guarantee** `h_mem_a` (`MemoryMsg.isU64` of op_a's `prev_value`).
+  simp only [circuit_norm, memoryChannel, MemoryMsg.isU64, programChannel, ProgramMsg.RowSpec]
+    at h_holds ⊢
+  obtain ⟨h_rac_a, hbin, h_trust, h_prog, z0, z1, z2, z3, h_mem_a⟩ := h_holds
   have htbin := bool_of_mul_pred h_trust
   have e : ∀ i (hi : i < 3), Expression.eval env input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
-  -- The decode-bounds `Spec` conjunct is **derived** from the program pull `h_prog`; the pull's own
-  -- `Requirements` are off-gate (vacuous via the binary `is_trusted` gate).
+  have eva : ∀ i (hi : i < 4),
+      Expression.eval env input_var_cols_op_a_memory_prev_value[i] =
+        input_cols_op_a_memory_prev_value[i] := by
+    intro i hi; have := congrArg (fun v => v[i]'hi) h_input.1.2.1.1; simpa using this
+  -- Spec: decode bounds (from program pull) + op_a `isU64` (from memory pull). Requirements: rac (Or.inr),
+  -- program off-gate (vacuous), mem pull off-gate (vacuous), mem push (wv from the `isU64 wv` Assumption).
   refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin,
-      h_rac_a h_assumptions.1, fun ht => ?_⟩,
+      h_rac_a h_assumptions.1, fun ht => ?_, fun ht2 => ?_⟩,
     Or.inr h_assumptions.1,
-    fun h1 h0 => off_gate_vacuous htbin h1 h0⟩
-  obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [ht])
-  rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
-  exact ⟨ha, hp0, hp1, hp2⟩
+    fun h1 h0 => off_gate_vacuous htbin h1 h0,
+    fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0⟩
+  · -- decode bounds from the program pull guarantee
+    obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [ht])
+    rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
+    exact ⟨ha, hp0, hp1, hp2⟩
+  · -- op_a `isU64` from the memory pull guarantee (pure read: no write push to range-check)
+    have hneg : -input_is_real = -1 := by rw [ht2]
+    obtain ⟨hma0, hma1, hma2, hma3⟩ := h_mem_a hneg
+    rw [eva 0 (by norm_num)] at hma0; rw [eva 1 (by norm_num)] at hma1
+    rw [eva 2 (by norm_num)] at hma2; rw [eva 3 (by norm_num)] at hma3
+    exact Word.isU64_of_cases hma0 hma1 hma2 hma3
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hreal, htrust⟩ := h_assumptions
   -- `h_spec` supplies the zeroing gates `z*`, the `op_a_0` binary `hbin`, the `RegisterAccessCols`
-  -- sub-`Spec`, and (W11) the gated decode bounds `hdec` — discharging the program **pull**'s guarantee.
-  obtain ⟨⟨z0, z1, z2, z3⟩, hbin, hrac_a, hdec⟩ := h_spec
+  -- sub-`Spec`, the gated decode bounds `hdec`, and (W11 memory) the op_a `isU64` `hisu` — discharging the
+  -- program **pull** and the memory **pull** (the push does NOT appear in completeness goals).
+  obtain ⟨⟨z0, z1, z2, z3⟩, hbin, hrac_a, hdec, hisu⟩ := h_spec
   have e : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
-  refine ⟨⟨hreal, hrac_a⟩, ?_, ?_, ?_, z0, z1, z2, z3⟩
+  have eva : ∀ i (hi : i < 4),
+      Expression.eval env.toEnvironment input_var_cols_op_a_memory_prev_value[i] =
+        input_cols_op_a_memory_prev_value[i] := by
+    intro i hi; have := congrArg (fun v => v[i]'hi) h_input.1.2.1.1; simpa using this
+  refine ⟨⟨hreal, hrac_a⟩, ?_, ?_, ?_, z0, z1, z2, z3, ?_⟩
   · rcases hbin with h | h <;> rw [h] <;> simp     -- `op_a_0` gate
   · rcases htrust with h | h <;> rw [h] <;> simp   -- `is_trusted` gate
   · intro ht
@@ -124,6 +146,12 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     simp only [programChannel, ProgramMsg.RowSpec]
     rw [e 0 (by norm_num), e 1 (by norm_num), e 2 (by norm_num)]
     exact ⟨ha, hp0, hp1, hp2, hbin⟩
+  · -- mem pull: derive `MemoryMsg.isU64 {eval'd prev_a}` from hisu + eval bridge
+    simp only [memoryChannel, MemoryMsg.isU64]
+    intro hneg
+    obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 (hisu (neg_inj.mp hneg))
+    rw [eva 0 (by norm_num), eva 1 (by norm_num), eva 2 (by norm_num), eva 3 (by norm_num)]
+    exact ⟨ha0, ha1, ha2, ha3⟩
 
 /-- The native J-type reader as a Clean `FormalAssertion`: composes a single `RegisterAccessCols` for op_a
 (write), imposes the `op_a_0` binary + zeroing gates, and emits the Program/Memory buses. -/

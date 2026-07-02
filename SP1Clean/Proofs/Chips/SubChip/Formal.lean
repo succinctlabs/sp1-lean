@@ -18,19 +18,33 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- `circuit_proof_start` unfolds the inlined R-type Spec, re-normalizes
   -- `wv*` result-word fields, and drops the leading CPUState `True` fragment.
   circuit_proof_start
-  obtain ⟨ha, hb⟩ := h_assumptions
-  obtain ⟨_, h_sub, h_adapter, h_gate⟩ := h_holds
+  obtain ⟨_, h_sub, h_adapter, _h_regwrite, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
-  -- `RTypeReader.Assumptions` is now `⟨is_real binary, is_trusted binary⟩` (W11 flip; `is_trusted = is_real`
-  -- here, so both are `h_bin`); its `Spec` now also carries the **derived** decode bounds.
-  refine ⟨⟨h_adapter ⟨h_bin, h_bin⟩, h_bin, fun hr => (h_sub ⟨ha, hb, h_bin⟩ hr).2⟩, ?_⟩
+  -- **Option B cycle-break.** No operand `isU64` is assumed (chip `Assumptions = True`). Apply the
+  -- `RTypeReader` sub-soundness `h_adapter` (its `Assumptions` is `⟨is_real binary, is_trusted binary⟩`,
+  -- both `h_bin` since `is_trusted = is_real`) to get its `Spec`; its 7th conjunct is the **memory-pull-
+  -- derived** operand `isU64` trio `(is_real = 1 → isU64 op_a/op_b/op_c prev)`. Operand `isU64` thus flows
+  -- reader → here, not from a chip assumption — no cycle.
+  have h_rspec := h_adapter ⟨h_bin, h_bin⟩
+  have h_trio := h_rspec.2.2.2.2.2.2
+  -- Feed operand `isU64` (gated on `is_real`) into `SubOperation`'s sub-soundness → `isU64 value` (.1) + the
+  -- gated sub identity (.2). The witnessed result `value`'s `isU64` then discharges the new `RegisterWrite`
+  -- op_a write push's `Assumptions`.
+  have h_subspec := h_sub ⟨fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2⟩, h_bin⟩
+  refine ⟨⟨h_rspec, h_bin, fun hr => (h_subspec hr).2⟩, ?_⟩
   and_intros <;>
-    first | exact h_bin | exact ⟨h_bin, h_bin⟩ | exact Or.inl rfl | exact Or.inr ⟨h_bin, h_bin⟩
+    first
+      | exact h_bin
+      | exact ⟨h_bin, h_bin⟩
+      | exact Or.inl rfl
+      | exact Or.inr ⟨h_bin, h_bin⟩
+      | exact ⟨fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2⟩, h_bin⟩
+      | exact Or.inr ⟨h_bin, fun hr => (h_subspec hr).1⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
@@ -48,9 +62,14 @@ theorem completeness :
     rw [h_env ⟨i, hi⟩]
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
-  refine ⟨⟨hbin, h_cpu⟩, ⟨⟨ha, hb, hbin⟩, ?_⟩,
-    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec⟩, ?_⟩
+  refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
+    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
+      fun hr => ⟨ha_prev hr, ha, hb⟩⟩,
+    ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
   · rw [hval]; exact SubOperation.spec_populate ha hb input_is_real
+  · -- RegisterWrite's `isU64 value` (op_a write push): the witnessed result `value = populate op_b op_c`,
+    -- whose `isU64` is `spec_populate.1`.
+    intro hr; rw [hval]; exact (SubOperation.spec_populate ha hb input_is_real hr).1
   rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- The Sub chip row as a `GeneralFormalCircuit`: semantic contract, composing the witnessed
@@ -77,6 +96,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubCols :=
       intro input offset
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.SubOperation.circuit, SP1Clean.SubOperation.main,

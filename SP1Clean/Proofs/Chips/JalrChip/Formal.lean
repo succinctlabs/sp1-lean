@@ -29,6 +29,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
   Word.isU64 (#v[input.adapter.op_b_memory.prev_value[0], input.adapter.op_b_memory.prev_value[1],
     input.adapter.op_b_memory.prev_value[2], input.adapter.op_b_memory.prev_value[3]] : Word (ZMod p)) ∧
   Word.isU64 (#v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0] : Word (ZMod p)) ∧
+  -- (Option B pure-read ITypeReader) the op_a read-prior `isU64`, for the reader's op_a memory pull
+  -- completeness (its `Spec` now derives + owes the read-prior `isU64` pair).
+  (input.is_real = 1 → Word.isU64 input.adapter.op_a_memory.prev_value) ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   input.adapter.op_a_0 = 0 ∧
   Readers.CPUState.Spec
@@ -50,7 +53,7 @@ set_option maxHeartbeats 2000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨h_imm, h_rs1U, h_pcU, h_pad⟩ := h_assumptions
-  obtain ⟨h_lsbgate, h_cpu, h_add1, h_av3, h_add2, h_oav3, h_it0, h_align, h_gate⟩ := h_holds
+  obtain ⟨h_lsbgate, h_cpu, h_add1, h_av3, h_add2, h_oav3, h_it0, _h_regwrite, h_align, h_gate⟩ := h_holds
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_gate
   have h_lsb := bool_of_mul_pred h_lsbgate
   have h_it : Readers.ITypeReader.Spec _ := h_it0 ⟨h_bin, h_bin⟩
@@ -102,7 +105,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
   refine ⟨⟨h_it, h_bin, h_lsb, ?_, ?_, ?_, ?_⟩, h_bin, Or.inr ⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩,
-    Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩, Or.inr ⟨h_bin, h_bin⟩, fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
+    Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩, Or.inr ⟨h_bin, h_bin⟩, Or.inr ⟨h_bin, ?_⟩,
+    fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
   · intro hr1
     have := (h_add1 ⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩ hr1).2
     rw [hrs1eq] at this
@@ -162,13 +166,33 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       rw [hav0, hav3]; ring
     rw [sub_eq_add_neg, hrel]
     exact ofNat64_clear_lsb_and hlsble hMeven
+  · -- RegisterWrite op_a write push: `isU64` of the written link value `op_a_value`. On `rd ≠ x0`
+    -- (`op_a_0 = 0`) it is the link add result `pc + 4` (`spec_populate.1`); on `rd = x0` (`op_a_0 = 1`)
+    -- the `op_a_0` zeroing gates pin every limb to `0`.
+    intro hr1
+    replace hr1 : input_is_real = 1 := hr1
+    rcases h_op_a_0 with h0 | h0
+    · have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
+      exact (h_add2 ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩ hg1).1
+    · obtain ⟨z0, z1, z2, z3⟩ := h_it.1
+      rw [h0, one_mul] at z0 z1 z2 z3
+      refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
+        simp only [Vector.getElem_mapRange, circuit_norm] <;> simp_all
 
 set_option maxHeartbeats 2000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨h_imm, h_rs1U, h_pcU, h_bin, h_op_a_0, h_cpu, h_rac_a, h_rac_b, h_jt3, h_lt3,
+  obtain ⟨h_imm, h_rs1U, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac_a, h_rac_b, h_jt3, h_lt3,
     h_align_pa, hdec⟩ := h_assumptions
+  -- op_b (rs1) read-prior `isU64` in the reader's **raw** `prev_value` form (from the reconstructed
+  -- `h_rs1U`), for the pure-read `ITypeReader.Spec`'s memory-pull `isU64` pair.
+  have hpb_raw : Word.isU64 input_adapter_op_b_memory_prev_value := by
+    have he : (#v[input_adapter_op_b_memory_prev_value[0], input_adapter_op_b_memory_prev_value[1],
+        input_adapter_op_b_memory_prev_value[2], input_adapter_op_b_memory_prev_value[3]]
+          : Word (ZMod p)) = input_adapter_op_b_memory_prev_value := by
+      apply Vector.ext; intro i hi; interval_cases i <;> rfl
+    rwa [he] at h_rs1U
   simp only [jumpTargetWord, linkTargetWord, lsbBit, rs1WordI] at h_jt3 h_lt3 h_align_pa
   obtain ⟨he_av, he_oav, he_lsb⟩ := h_env
   obtain ⟨_h_ir, ⟨_h_clkh, _h_clk1, _h_clk0, hpc⟩, _h_a, ⟨_h_amem_pv, _h_amem_pl, _h_amem_dl⟩,
@@ -265,12 +289,19 @@ theorem completeness :
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
   refine ⟨?_, ⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨hpceq ▸ h_pcU, h4U⟩, h_gate2⟩, ?_⟩,
-    ?_, ⟨⟨h_bin, h_bin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac_a, h_rac_b, hdec⟩, ?_, ?_⟩
+    ?_, ⟨⟨h_bin, h_bin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac_a, h_rac_b, hdec,
+      fun hr => ⟨h_oap hr, hpb_raw⟩⟩,
+    ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_⟩
   · rcases hlsb_bin with h | h <;> rw [h] <;> simp
   · rw [hval1]; exact AddOperation.spec_populate hrs1U h_imm input_is_real
   · rw [hav3]; exact h_jt3
   · rw [hval2]; exact AddOperation.spec_populate (hpceq ▸ h_pcU) h4U (input_is_real + -input_adapter_op_a_0)
   · rw [hoav3]; exact h_lt3
+  · -- RegisterWrite op_a write push: `isU64` of the link value `pc + 4` (completeness covers `op_a_0 = 0`).
+    intro hr
+    rw [hval2]
+    exact (AddOperation.spec_populate (hpceq ▸ h_pcU) h4U (input_is_real + -input_adapter_op_a_0)
+      (by rw [h_op_a_0]; simpa using hr)).1
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
@@ -291,7 +322,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalrColumns :=
     soundness := soundness, completeness := completeness,
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
-        AddOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit]; grind,
+        AddOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit,
+        Readers.RegisterWrite.circuit]; grind,
     -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair so the chip is a
     -- `VmTables` table. `next_pc` is the **witnessed** LSB-cleared jump target the chip feeds `CPUState`:
     -- low limb `add_value[0] - lsb` (cells `offset+0` minus `offset+8`), high limbs `add_value[1..2]`.
@@ -307,6 +339,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalrColumns :=
       intro input offset
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ITypeReader.circuit, Readers.ITypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,

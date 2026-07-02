@@ -89,7 +89,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
         AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit,
         LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit,
-        Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]
+        Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit,
+        assertZeros]
       intro env hshallow
       simp only [ownAsserts, List.forall_mem_cons] at hshallow
       obtain ⟨e13, e15, e17, e19, e20, e21, e22, e23, e29, e35, e41, e47, e48, e49, e51, e54, e57, e59,
@@ -144,6 +145,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
       -- direct `byteChannel` pulls; `interactionsWith_append` splits the `++`, the map-assert lemma
       -- empties the asserts, and `byteChannel ≠ stateChannel` drops the pulls.
       simp (maxSteps := 1000000) [circuit_norm, Gadgets.Equality.main,
-        Operations.interactionsWith_append, byteChannel, stateChannel] }
+        Operations.interactionsWith_append, byteChannel, stateChannel, memoryChannel,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+        FormalAssertion.toSubcircuit_interactions] }
 
 end SP1Clean.DivRemChip

@@ -3,6 +3,7 @@ import SP1Clean.Native.Operations.AddressOperation
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ITypeReader
 import SP1Clean.Native.Readers.MemoryAccess
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
 import SP1Clean.Extracted.LoadByteChip
@@ -81,6 +82,14 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadByteColumns (
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
       input.state.pc, input.is_lb * 29 + input.is_lbu * 32,
       input.selected_byte + 65280 * input.msb, 65535 * input.msb, 65535 * input.msb, 65535 * input.msb⟩
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- the memory read + byte selection, so `isU64 <loaded word>` discharges its requirement. The loaded word is
+  -- the sign/zero-extended byte (the same tuple threaded to `ITypeReader` as `wv0..wv3`).
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a,
+     #v[input.selected_byte + 65280 * input.msb, 65535 * input.msb, 65535 * input.msb,
+        65535 * input.msb], is_real⟩
   (input.selected_limb - input.memory_access.prev_value[0])
     * (input.offset_bit[1] - 1 : Expression (ZMod p)) * (input.offset_bit[2] - 1) === 0
   (input.selected_limb - input.memory_access.prev_value[1])
@@ -103,17 +112,18 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadByteColumns (
     input.is_lb, input.is_lbu⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadByteColumns main where
-  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit]
+  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit]
   localLength _ := 3 + 1
-  localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit]
+  localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit]
   output input i0 :=
     ⟨input.state, input.adapter,
       ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
       input.memory_access, input.offset_bit, input.selected_limb, input.selected_limb_low_byte,
       input.selected_byte, input.msb, input.is_lb, input.is_lbu⟩
-  output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit]
-  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit]
+  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip);
+  -- `memoryChannel` joins from `MemoryAccess`'s read pulls + `RegisterWrite`'s op_a write push (W11 memory flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- Semantic contract. The spine sub-`Spec`s, the (real-row-gated) byte bounds, the (LB-gated) sign-bit
 fact, the four limb-selection equations, the byte-mux equation, the `op_a != x0` flag, the `is_lbu·msb`

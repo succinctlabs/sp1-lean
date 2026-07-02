@@ -3,6 +3,7 @@ import SP1Clean.Native.Operations.AddressOperation
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ITypeReader
 import SP1Clean.Native.Readers.MemoryAccess
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Extracted.LoadDoubleChip
 import Clean.Circuit.Basic
@@ -73,23 +74,30 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadDoubleColumns
       input.state.pc, 35,
       input.memory_access.prev_value[0], input.memory_access.prev_value[1],
       input.memory_access.prev_value[2], input.memory_access.prev_value[3]⟩
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- the memory read, so `isU64 prev_value` discharges its requirement. The loaded word (no extension for LD)
+  -- is the full read value `memory_access.prev_value`.
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a, input.memory_access.prev_value, input.is_real⟩
   input.adapter.op_a_0 === 0
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.is_real⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadDoubleColumns main where
-  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit]
+  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit]
   -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks are threaded
   -- inputs and the gates witness nothing.
   localLength _ := 3 + 1
-  localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit]
+  localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit]
   output input i0 :=
     ⟨input.state, input.adapter,
       ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
       input.memory_access, input.is_real⟩
-  output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit]
-  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit]
+  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip);
+  -- `memoryChannel` joins from `MemoryAccess`'s read pulls + `RegisterWrite`'s op_a write push (W11 memory flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity,
 the `MemoryAccess` timestamp monotonicity, the `ITypeReader` adapter facts (which carry the load meaning —

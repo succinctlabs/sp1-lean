@@ -160,7 +160,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs BranchColumns main where
   subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit]; try omega
   -- W11 flip: the Program-bus fetch propagated up from `ITypeReaderImmutable`'s program **pull**
   -- (now a guarantee) joins the byte guarantee in `channelsWithGuarantees`.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- The taken target word the chip witnesses for `branch_value` (`pc + op_c_imm`, base-2^16). -/
 def branchTargetWord (input : Inputs (ZMod p)) : Word (ZMod p) :=

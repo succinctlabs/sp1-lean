@@ -23,13 +23,14 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
     2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
-    (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 = 0
+    (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 = 0 ∧
+    Word.isU64 input.memory_access.prev_value
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_align⟩ := h_assumptions
-  obtain ⟨_h_cpu, h_addr, h_mem, h_itype, h_op_a_0, h_gate⟩ := h_holds
+  obtain ⟨ha, hb, hfit, h_ge, h_align, h_pv_isu64⟩ := h_assumptions
+  obtain ⟨_h_cpu, h_addr, h_mem, h_itype, _h_regwrite, h_op_a_0, h_gate⟩ := h_holds
   -- the proven `is_real`-binary gate discharges the readers'/`MemoryAccess`'s `Assumptions`; the
   -- `AddressOperation` gadget takes the operand `isU64`s + the address-fits bound.
   have h_bin := bool_of_mul_pred h_gate
@@ -46,9 +47,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
-  -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`).
-  exact ⟨⟨h_addr h_addr_as, h_mem h_bin, h_it, h_op_a_0, h_bin⟩,
-    h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr ⟨h_bin, h_bin⟩⟩
+  -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`): `MemoryAccess`'s
+  -- read push + `RegisterWrite`'s op_a write push both owe `isU64 prev_value` (the loaded word = the full
+  -- read value; a chip assumption).
+  exact ⟨⟨h_addr h_addr_as, h_mem ⟨h_bin, fun _ => h_pv_isu64⟩, h_it, h_op_a_0, h_bin⟩,
+    h_bin, Or.inr h_addr_as, Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩, Or.inr ⟨h_bin, h_bin⟩,
+    Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩⟩
 
 /-- Prover-side row well-formedness: operand `isU64`s + address-fits bound plus the `is_real` binary selector. -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
@@ -56,6 +60,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : P
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
     2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 = 0 ∧
+    Word.isU64 input.memory_access.prev_value ∧
     (input.is_real = 0 ∨ input.is_real = 1) ∧
     input.adapter.op_a_0 = 0 ∧
     Readers.CPUState.Spec
@@ -74,7 +79,7 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_align, hbin, h_op_a_0, h_cpu, h_mem, h_it⟩ := h_assumptions
+  obtain ⟨ha, hb, hfit, h_ge, h_align, h_pv_isu64, hbin, h_op_a_0, h_cpu, h_mem, h_it⟩ := h_assumptions
   -- eval→value bridges for the nested vector fields the reader `Spec`s reference (`pc`, the loaded word).
   have hmap_pv : Vector.map (Expression.eval env.toEnvironment) input_var_memory_access_prev_value
       = input_memory_access_prev_value := h_input.2.2.2.1
@@ -87,7 +92,8 @@ theorem completeness :
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
-  refine ⟨⟨hbin, ?_⟩, h_addr_as, ⟨hbin, h_mem⟩, ⟨⟨hbin, hbin⟩, ?_⟩, h_op_a_0, ?_⟩
+  refine ⟨⟨hbin, ?_⟩, h_addr_as, ⟨⟨hbin, fun _ => h_pv_isu64⟩, h_mem⟩, ⟨⟨hbin, hbin⟩, ?_⟩,
+    ⟨⟨hbin, fun _ => h_pv_isu64⟩, trivial⟩, h_op_a_0, ?_⟩
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · simp only [epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega)]; exact h_it
   · rcases hbin with h | h <;> rw [h] <;> simp
@@ -115,9 +121,10 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadDoubleColumns :=
         AddrAddOperation.circuit, AddrAddOperation.main,
         Readers.MemoryAccess.circuit, Readers.MemoryAccess.main,
         Readers.ITypeReader.circuit, Readers.ITypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main] }
+      simp [circuit_norm, Gadgets.Equality.main, memoryChannel] }
 
 end SP1Clean.LoadDoubleChip

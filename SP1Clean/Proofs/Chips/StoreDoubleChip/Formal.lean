@@ -34,10 +34,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
+  have h_it := h_itype ⟨h_bin, h_bin⟩
+  -- (W11 memory flip) the pushed `new_value` for SD is the rs2 read (`op_a_memory.prev_value`), whose
+  -- `isU64` is exposed by the immutable I-type adapter's `Spec` on a real row — no new assumption needed.
+  have h_new : input_is_real = 1 → Word.isU64 input_adapter_op_a_memory_prev_value :=
+    fun hr => (h_it.2.2.2.2.2 hr).1
   -- the per-subcircuit channel-requirement tail. `CPUState`'s requirement is now a bare
   -- `Assumptions` (`is_real` binary); the rest stay `channels = [] ∨ <sub>.Assumptions` disjuncts.
-  exact ⟨⟨h_addr h_addr_as, h_mem h_bin, h_itype ⟨h_bin, h_bin⟩, h_bin⟩,
-    h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr ⟨h_bin, h_bin⟩⟩
+  exact ⟨⟨h_addr h_addr_as, h_mem ⟨h_bin, h_new⟩, h_it, h_bin⟩,
+    h_bin, Or.inr h_addr_as, Or.inr ⟨h_bin, h_new⟩, Or.inr ⟨h_bin, h_bin⟩⟩
 
 /-- Prover-side row well-formedness (3-arg form): operand `isU64`s + address-fits bound + the reader
 clock/timestamp `Spec`s + `is_real` binary. -/
@@ -72,7 +77,8 @@ theorem completeness :
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
-  refine ⟨⟨hbin, ?_⟩, h_addr_as, ⟨hbin, h_mem⟩, ⟨⟨hbin, hbin⟩, h_it⟩, ?_⟩
+  refine ⟨⟨hbin, ?_⟩, h_addr_as, ⟨⟨hbin, fun hr => (h_it.2.2.2.2.2 hr).1⟩, h_mem⟩,
+    ⟨⟨hbin, hbin⟩, h_it⟩, ?_⟩
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · rcases hbin with h | h <;> rw [h] <;> simp
 

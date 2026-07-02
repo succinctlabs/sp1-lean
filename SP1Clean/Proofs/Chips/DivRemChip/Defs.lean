@@ -9,6 +9,7 @@ import SP1Clean.Proofs.Chips.DivRemChip.OwnAsserts
 import SP1Clean.Proofs.Chips.DivRemChip.Populate
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.RTypeReader
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Extracted.DivRemChip
 import Clean.Circuit.Basic
@@ -57,6 +58,10 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
+  -- (W11 memory flip) the op_a (`rd`) read-prior pull's `prev_value` is `isU64` on real rows — the
+  -- `RTypeReader`'s completeness needs the memory trio (op_a/op_b/op_c reads `isU64`) to emit its pulls;
+  -- op_b/op_c come from the two operand `isU64`s above, op_a from this (mirrors `MulChip.ProverAssumptions`).
+  (input.is_real = 1 → Word.isU64 input.adapter.op_a_memory.prev_value) ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   (f[0] = 0 ∨ f[0] = 1) ∧ (f[1] = 0 ∨ f[1] = 1) ∧ (f[2] = 0 ∨ f[2] = 1) ∧ (f[3] = 0 ∨ f[3] = 1) ∧
   (f[4] = 0 ∨ f[4] = 1) ∧ (f[5] = 0 ∨ f[5] = 1) ∧ (f[6] = 0 ∨ f[6] = 1) ∧ (f[7] = 0 ∨ f[7] = 1) ∧
@@ -431,18 +436,26 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   -- `is_real`-gated checks are off. SP1's `eval_msb` relies on the operand's own gated range check instead.
   byteChannel.pullIf e2 (⟨6, remainder[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.pullIf e2 (⟨6, quotient[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- the arithmetic so `isU64 a` (the flag-selected quotient/remainder output, byte-range-checked) discharges
+  -- its requirement — breaking the old reader-circularity. Write access clock is the recombined low clock `+ 4`.
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a, a, input.is_real⟩
   return cols
 
 set_option maxHeartbeats 16000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs DivRemCols main where
   -- MulOperation FormalAssertions witness 45 cols each; + the `b`/`c` operand columns (4 each); total: 217.
   localLength _ := 217
-  localLength_eq := by simp +arith [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]
-  subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]; try omega
+  localLength_eq := by simp +arith [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit, assertZeros]
+  subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit, assertZeros]; try omega
   -- (W11 flip) `programChannel` joins the guarantees: `RTypeReader` now **pulls** the program fetch
-  -- (a guarantee = `ProgramMsg.RowSpec`), so its guarantee propagates up here alongside `byteChannel`.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  -- (a guarantee = `ProgramMsg.RowSpec`), so its guarantee propagates up here alongside `byteChannel`;
+  -- `memoryChannel` likewise joins from `RTypeReader`'s memory read **pulls** (W11 memory flip). The
+  -- `RegisterWrite` op_a write push owes a memory requirement (in `circuit.channelsWithRequirements`).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
   -- the ~30 upstream `pullIf` unfold/refolds put this past simp's default step budget post-#398
-  channelsLawful := by simp (maxSteps := 1000000) [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]
+  channelsLawful := by simp (maxSteps := 1000000) [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit, assertZeros]
 
 end SP1Clean.DivRemChip

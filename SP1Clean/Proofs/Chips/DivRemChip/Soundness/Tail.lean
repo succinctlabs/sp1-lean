@@ -43,7 +43,7 @@ lemma requirements_holds :
     hb_absc0, hb_absc1, hb_absc2, hb_absc3, hb_absr0, hb_absr1, hb_absr2, hb_absr3,
     hb_q0, hb_q1, hb_q2, hb_q3, hb_r0, hb_r1, hb_r2, hb_r3,
     hb_ctq0, hb_ctq1, hb_ctq2, hb_ctq3, hb_ctq4, hb_ctq5, hb_ctq6, hb_ctq7,
-    hb_e2r1, hb_e2q1⟩ := h_holds
+    hb_e2r1, hb_e2q1, _h_regwrite⟩ := h_holds
   simp only [ownAsserts] at h_own
   obtain ⟨e13, e15, e17, e19, e20, e21, e22, e23, e29, e35, e41, e47, e48, e49, e51, e54, e57, e59,
     e61, e64, e67, e69, e70, e71, e73, e76, e79, e81, e83, e86, e89, e91, e96, e99, e103, e105, e107,
@@ -247,7 +247,7 @@ lemma requirements_holds :
       fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
       fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
       fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
-      fun h1 h0 => off_gate_vacuous he2 h1 h0, fun h1 h0 => off_gate_vacuous he2 h1 h0⟩
+      fun h1 h0 => off_gate_vacuous he2 h1 h0, fun h1 h0 => off_gate_vacuous he2 h1 h0, ?regwrite⟩
     case own => simp only [circuit_norm, assertZeros, forAllNoOffset_map_assert]
     case eqb => exact Or.inl rfl
     case eqc => exact Or.inl rfl
@@ -337,6 +337,48 @@ lemma requirements_holds :
       exact Or.inr ⟨fun he2g => isU16_of_byteRowSpec (hb_e2r1 (by linear_combination -he2g)), he2⟩
     case msb6 =>
       exact Or.inr ⟨fun he2g => isU16_of_byteRowSpec (hb_e2q1 (by linear_combination -he2g)), he2⟩
+    case regwrite =>
+      -- RegisterWrite's op_a write push owes `isU64 a`: on a real row the writeback `a` (i₀+8+4) is the
+      -- flag-selected quotient (div family, E184/E194/E204/E214) or remainder (rem family, E189/E199/E209/
+      -- E219), both byte-range-checked (`hb_q*`/`hb_r*`) hence `isU64`. The div/rem group selector is binary
+      -- with sum 1 (one-hot), so exactly one family ties `a` to its byte-checked column.
+      refine Or.inr ⟨hbin, fun hr => ?_⟩
+      replace hr : input_is_real = 1 := hr
+      have hrneg' : -input_is_real = -1 := by rw [hr]
+      simp only [circuit_norm] at e184 e194 e204 e214 e189 e199 e209 e219
+      rcases group_binary4 bdu bd bdw bduw (by omega) with hgd | hgd
+      · -- div-group = 0 ⟹ rem-group = 1 (one-hot): `a` = remainder.
+        have hgr : env.get (i₀ + 3) + env.get (i₀ + 2) + env.get (i₀ + 5) + env.get (i₀ + 7) = 1 := by
+          rcases group_binary4 bru br brw bruw (by omega) with hgr0 | hgr0
+          · exact absurd (show (1 : ZMod p) = 0 by linear_combination -hsum567 + hgd + hgr0) one_ne_zero
+          · exact hgr0
+        apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+        · rw [show env.get (i₀ + 8 + 4) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1)
+              from by have h := e189; rw [hgr, one_mul] at h; linear_combination -h]
+          exact isU16_of_byteRowSpec (hb_r0 hrneg')
+        · rw [show env.get (i₀ + 8 + 4 + 1) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1 + 1)
+              from by have h := e199; rw [hgr, one_mul] at h; linear_combination -h]
+          exact isU16_of_byteRowSpec (hb_r1 hrneg')
+        · rw [show env.get (i₀ + 8 + 4 + 2) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1 + 2)
+              from by have h := e209; rw [hgr, one_mul] at h; linear_combination -h]
+          exact isU16_of_byteRowSpec (hb_r2 hrneg')
+        · rw [show env.get (i₀ + 8 + 4 + 3) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1 + 3)
+              from by have h := e219; rw [hgr, one_mul] at h; linear_combination -h]
+          exact isU16_of_byteRowSpec (hb_r3 hrneg')
+      · -- div-group = 1: `a` = quotient.
+        apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+        · rw [show env.get (i₀ + 8 + 4) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1+4)
+              from by have h := e184; rw [hgd, one_mul] at h; linear_combination -h]
+          exact isU16_of_byteRowSpec (hb_q0 hrneg')
+        · rw [show env.get (i₀ + 8 + 4 + 1) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1+4 + 1)
+              from by have h := e194; rw [hgd, one_mul] at h; linear_combination -h]
+          exact isU16_of_byteRowSpec (hb_q1 hrneg')
+        · rw [show env.get (i₀ + 8 + 4 + 2) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1+4 + 2)
+              from by have h := e204; rw [hgd, one_mul] at h; linear_combination -h]
+          exact isU16_of_byteRowSpec (hb_q2 hrneg')
+        · rw [show env.get (i₀ + 8 + 4 + 3) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1+4 + 3)
+              from by have h := e214; rw [hgd, one_mul] at h; linear_combination -h]
+          exact isU16_of_byteRowSpec (hb_q3 hrneg')
 
 /-- The `Spec`-only obligation: the soundness goal *minus* the shared `Operations.Requirements` tail.
 Each conjunct proves this (its own `Spec`); the tail is supplied once by `requirements_holds`. -/

@@ -118,7 +118,7 @@ theorem sh_chip_reaches_sail
       = (sp1_sh pc (Word.toBitVec64 input.op_b_val + BitVec.signExtend 64 imm)
           (Sail.BitVec.extractLsb (Word.toBitVec64 input.adapter.op_a_memory.prev_value) 15 0)).run s := by
   haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
-  obtain ⟨h_b, h_c, _h_fits48, h_nonres, h_align2, _hob0, _hob1, _h_off⟩ := h_assum
+  obtain ⟨h_b, h_c, _h_fits48, h_nonres, h_align2, _hob0, _hob1, _h_off, _h_sv⟩ := h_assum
   have hreg : (Word.toBitVec64 input.op_b_val).toNat = Word.toNat input.op_b_val :=
     Word.toBitVec64_toNat h_b
   have hoff : (BitVec.signExtend 64 imm).toNat = Word.toNat input.op_c_imm := by

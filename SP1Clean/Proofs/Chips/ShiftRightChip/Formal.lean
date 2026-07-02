@@ -45,6 +45,8 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
   let f := hintFlags hint
   Word.isU64 input.adapter.op_b_memory.prev_value ∧
   Word.isU64 input.adapter.op_c_memory.prev_value ∧
+  -- (W11 memory flip) the op_a read-prior `isU64`, surfaced by the now-pure-read `ALUTypeReader` `Spec`.
+  (input.is_real = 1 → Word.isU64 input.adapter.op_a_memory.prev_value) ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   (f[0] = 0 ∨ f[0] = 1) ∧ (f[1] = 0 ∨ f[1] = 1) ∧
   (f[2] = 0 ∨ f[2] = 1) ∧ (f[3] = 0 ∨ f[3] = 1) ∧
@@ -94,7 +96,7 @@ hint) satisfy every constraint under `ProverAssumptions`. -/
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨hbU, hcU, hbin, hf0, hf1, hf2, hf3, hsum, hop_a_0, himmc, himmbin, hpins, h_cpu,
+  obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hsum, hop_a_0, himmc, himmbin, hpins, h_cpu,
     hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨h_env_a, h_env_bmsb, h_env_srwmsb, h_env_cb, h_env_sram, h_env_v, h_env_lo, h_env_hi,
     h_env_lr, h_env_s, h_env_fl⟩ := h_env
@@ -229,7 +231,10 @@ theorem completeness :
     ⟨⟨fun _ => populateA_val_lt B c0 F hbUw hf0 hf1 hf2 hf3 hsum01 1 (by norm_num), he13⟩,
       srwMsb_bool B c0 F hbUw hf0 hf1 hf2 hf3 hsum01, fun h13 => ?_⟩,
     ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, himmc, himmbin, hpins,
-      hrac_a, hrac_b, hrac_c, hdec⟩,
+      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, hbU⟩, fun _ => hcU⟩,
+    -- (W11 Option B) the op_a write `RegisterWrite` block: gate `sum` binary + the witnessed result `a`
+    -- (`populateA`) is `U64` (`populateA_val_lt`, unconditional under the prover assumptions).
+    ⟨⟨?_, fun _ => ?_⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     by rcases hf0 with h | h <;> rw [h] <;> simp,
     by rcases hf1 with h | h <;> rw [h] <;> simp,
@@ -266,6 +271,16 @@ theorem completeness :
       rw [srwMsb, if_pos h13]]
     exact (U16MSBOperation.spec_populate
       (populateA_val_lt B c0 F hbUw hf0 hf1 hf2 hf3 hsum01 1 (by norm_num)) 1).2 rfl
+  · -- `RegisterWrite` gate (`sum`) binary: the four-flag sum is `is_real` (`hsum01`); line 196's `simp`
+    -- has already rewritten the four flag columns to `F`, so the goal is `hsum01` up to the projection.
+    exact hsum01
+  · -- `RegisterWrite` write value `a = populateA` is `U64` (each limb `< 2^16`, `populateA_val_lt`).
+    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
+      simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm, hA0, hA1, hA2, hA3]
+    · exact populateA_val_lt B c0 F hbUw hf0 hf1 hf2 hf3 hsum01 0 (by norm_num)
+    · exact populateA_val_lt B c0 F hbUw hf0 hf1 hf2 hf3 hsum01 1 (by norm_num)
+    · exact populateA_val_lt B c0 F hbUw hf0 hf1 hf2 hf3 hsum01 2 (by norm_num)
+    · exact populateA_val_lt B c0 F hbUw hf0 hf1 hf2 hf3 hsum01 3 (by norm_num)
 
 /-- The `ShiftRight` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `srl`/`sra`/`srlw`/`sraw`
 semantic contract; output is the extracted `ShiftRightCols` column struct. Soundness is proved (assembled
@@ -283,7 +298,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftRightCols :=
       [stateChannel.toRaw, memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
-        Readers.CPUState.circuit, U16MSBOperation.circuit, Readers.ALUTypeReader.circuit]
+        Readers.CPUState.circuit, U16MSBOperation.circuit, Readers.ALUTypeReader.circuit,
+        Readers.RegisterWrite.circuit]
       -- the `is_real` boolean gate is now also shallow (`assertZero`, VmTables-ready), so the shallow
       -- hypothesis is the pair `⟨is_real gate, sum gate⟩`; the byte pulls are gated by the `sum`, so
       -- discharge off-gate via `hgate.2`.
@@ -304,6 +320,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftRightCols :=
       intro input offset
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,

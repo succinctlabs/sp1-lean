@@ -2,6 +2,7 @@ import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Proofs.Operations.AddOperation.Formal
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.JTypeReader
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
 import SP1Clean.Extracted.JalChip
@@ -57,6 +58,12 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalColumns (ZMod 
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 46,
      op_a_value[0], op_a_value[1], op_a_value[2], op_a_value[3]⟩
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- the link `AddOperation`, so `isU64 op_a_value` (the link result `pc + 4` / zeroing-gate range-check)
+  -- discharges its requirement. The write access clock is the recombined low clock `+ 4` (matching the reader).
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a, op_a_value, input.is_real⟩
   byteChannel.pullIf input.is_real
     (⟨6, (add_value[0] * (4 : ZMod p)⁻¹), Expression.const ((14 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
@@ -64,10 +71,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalColumns (ZMod 
   return ⟨input.state, input.adapter, ⟨add_value⟩, ⟨op_a_value⟩, input.is_real⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalColumns main where
-  channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit, Readers.JTypeReader.circuit]
+  channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit,
+    Readers.JTypeReader.circuit, Readers.RegisterWrite.circuit]
   -- 2 × 4-limb add-result witnesses; all readers/operations are `assertion`s (localLength 0).
   localLength _ := 8
-  -- `programChannel` joins the byte guarantee propagated up from `JTypeReader`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `JTypeReader`'s program **pull** (W11 flip);
+  -- `memoryChannel` joins from `JTypeReader`'s op_a memory read **pull** (W11 memory flip). The `RegisterWrite`
+  -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 end SP1Clean.JalChip

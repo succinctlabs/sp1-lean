@@ -15,15 +15,17 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Operand words fit in 64 bits, and `is_real` is binary (the latter discharged by the composing
-chip's `is_real * (is_real - 1) = 0` gate). -/
+/-- On a real row (`is_real = 1`) the operand words fit in 64 bits, and `is_real` is binary (the latter
+discharged by the composing chip's `is_real * (is_real - 1) = 0` gate). The `isU64` precondition is **gated
+on `is_real`** (mirroring `AddOperation`): a padding row owes nothing, so a chip feeding operands whose
+range check is itself `is_real`-gated (the Option-B reader-derived operand `isU64`) can discharge it. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
-  Word.isU64 input.a ∧ Word.isU64 input.b ∧ (input.is_real = 0 ∨ input.is_real = 1)
+  (input.is_real = 1 → Word.isU64 input.a ∧ Word.isU64 input.b) ∧ (input.is_real = 0 ∨ input.is_real = 1)
 
 set_option maxHeartbeats 1000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin⟩ := h_assumptions
+  obtain ⟨hab_imp, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hiv, _⟩ := h_input
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   have h65536 : (2 : ℕ) ^ 16 = 65536 := by norm_num
@@ -35,6 +37,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   refine ⟨fun hr1eq => ?_, fun h1 h0 => off_gate_vacuous hbin h1 h0,
     fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
     fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
+  obtain ⟨ha, hb⟩ := hab_imp hr1eq
   have hneg : -input_is_real = -1 := by rw [hr1eq]
   have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg; have R3 := hr3 hneg
   rw [← c16] at R0 R1 R2 R3
@@ -53,7 +56,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
 set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin⟩ := h_assumptions
+  obtain ⟨hab_imp, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hiv, _⟩ := h_input
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   have ev {w : Word (Expression (ZMod p))} {v : Word (ZMod p)}
@@ -73,6 +76,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   · rcases hbin with h0 | h1
     · simp [h0]
     · obtain ⟨hv, hbv⟩ := h_spec h1
+      obtain ⟨ha, hb⟩ := hab_imp h1
       obtain ⟨hc0, hc1, hc2, hc3, _, _, _, _⟩ := carries_of_subSemantics ha hb hv hbv
       simp only [Nat.cast_ofNat, sub_eq_add_neg] at hc0 hc1 hc2 hc3
       rw [h1]

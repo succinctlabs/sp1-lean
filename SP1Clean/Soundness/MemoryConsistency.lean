@@ -163,6 +163,51 @@ theorem memoryLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_
 open Circuit SP1Clean.InteractionRecovery
 open SP1Clean.Channels (memoryChannel MemoryMsg)
 
+/-- The **five** Memory-bus contributions `Readers/RTypeReader.main` actually emits after the W11 polarity
+flip: per operand the read-prior *pull* (`−is_real` — the chip *derives* `MemoryMsg.isU64` of the operand's
+prior value) and the op_b/op_c read-back *pushes* (`+is_real`). The op_a (`rd`) **write** push is factored
+out into `Readers/RegisterWrite` (composed by the chip after its operation), so it is absent here. These are
+`memoryLookups`'s five *read* entries (all but the op_a write, `memoryLookups` entry 1) with flipped signs —
+the pull/push polarity; on a register row (`imm_b = imm_c = 0`, where `memoryLookups` gates op_b/op_c by
+plain `±is_real`) they carry identical keys. Both feed the same `multiplicitySum` bus, so the offline-memory
+model (`isConsistentOnline_of_memBalance`) — stated over `memoryLookups`, balance being `negMult`-invariant
+— is unaffected. -/
+def memoryReadLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
+  let chk := r.state.clk_high
+  let cl := rowClkLow r
+  let ir := (r.is_real.val : ℤ)
+  let a := r.adapter
+  [ -- op_a: read-prior pull
+    (.Memory, "SP1Memory",
+      [chk.val, a.op_a_memory.access_timestamp.prev_low.val, a.op_a.val, 0, 0,
+        a.op_a_memory.prev_value[0].val, a.op_a_memory.prev_value[1].val,
+        a.op_a_memory.prev_value[2].val, a.op_a_memory.prev_value[3].val], -ir),
+    -- op_b: read-prior pull, read-back push
+    (.Memory, "SP1Memory",
+      [chk.val, a.op_b_memory.access_timestamp.prev_low.val, a.op_b[0].val, 0, 0,
+        a.op_b_memory.prev_value[0].val, a.op_b_memory.prev_value[1].val,
+        a.op_b_memory.prev_value[2].val, a.op_b_memory.prev_value[3].val], -ir),
+    (.Memory, "SP1Memory",
+      [chk.val, (cl + 3).val, a.op_b[0].val, 0, 0,
+        a.op_b_memory.prev_value[0].val, a.op_b_memory.prev_value[1].val,
+        a.op_b_memory.prev_value[2].val, a.op_b_memory.prev_value[3].val], ir),
+    -- op_c: read-prior pull, read-back push
+    (.Memory, "SP1Memory",
+      [chk.val, a.op_c_memory.access_timestamp.prev_low.val, a.op_c[0].val, 0, 0,
+        a.op_c_memory.prev_value[0].val, a.op_c_memory.prev_value[1].val,
+        a.op_c_memory.prev_value[2].val, a.op_c_memory.prev_value[3].val], -ir),
+    (.Memory, "SP1Memory",
+      [chk.val, (cl + 2).val, a.op_c[0].val, 0, 0,
+        a.op_c_memory.prev_value[0].val, a.op_c_memory.prev_value[1].val,
+        a.op_c_memory.prev_value[2].val, a.op_c_memory.prev_value[3].val], ir) ]
+
+/-- **Projection = emission (register reads).** The reader's read-only projection `memoryReadLookups` equals
+the `Memory`-filtered, `toAccess`-imaged interactions the native `Readers/RTypeReader` block emits — the
+register analogue of `memAccessLookups_eq_emitted`. The three `RegisterAccessCols` sub-assertions emit only
+`byteChannel`, the program pull is a different channel, and the `op_a_0` gates emit nothing, leaving exactly
+the five read pulls/pushes: op_a/b/c read-prior *pulls* (`−is_real`, `toAccess_pullIf_memory`) and op_b/c
+read-back *pushes* (`+is_real`, `toAccess_pushIf_memory`). The op_a *write* push lives in
+`Readers/RegisterWrite`, so it is not among the reader's emissions. -/
 theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment (ZMod p)) (offset : ℕ)
     [Fact p.Prime] [Fact (2 ^ 17 < p)]
     (input : Var Readers.RTypeReader.Inputs (ZMod p))
@@ -172,13 +217,7 @@ theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment
     (h_cl : Expression.eval env input.clk_low = rowClkLow r)
     (h_oa : Expression.eval env input.cols.op_a = r.adapter.op_a)
     (h_ob : Expression.eval env input.cols.op_b = r.adapter.op_b[0])
-    (h_immb : r.adapter.imm_b = 0)
     (h_oc : Expression.eval env input.cols.op_c = r.adapter.op_c[0])
-    (h_imm : r.adapter.imm_c = 0)
-    (h_wv0 : Expression.eval env input.wv0 = r.rdWrite[0])
-    (h_wv1 : Expression.eval env input.wv1 = r.rdWrite[1])
-    (h_wv2 : Expression.eval env input.wv2 = r.rdWrite[2])
-    (h_wv3 : Expression.eval env input.wv3 = r.rdWrite[3])
     (h_pl_a : Expression.eval env input.cols.op_a_memory.access_timestamp.prev_low =
       r.adapter.op_a_memory.access_timestamp.prev_low)
     (h_pv_a0 : Expression.eval env input.cols.op_a_memory.prev_value[0] =
@@ -209,7 +248,7 @@ theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment
       r.adapter.op_c_memory.prev_value[2])
     (h_pv_c3 : Expression.eval env input.cols.op_c_memory.prev_value[3] =
       r.adapter.op_c_memory.prev_value[3]) :
-    memoryLookups r =
+    memoryReadLookups r =
       (((Readers.RTypeReader.main input).operations offset).interactionsWith
           memoryChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   have hp2 : 2 < p := two_lt_p_aux
@@ -224,10 +263,11 @@ theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.programChannel_eq_memoryChannel_false, if_false]
-  simp only [toAccess_pushIf_memory]
+  -- W11 flip: the read-priors are now `pull`s (`toAccess_pullIf_memory`, mult `signedVal (-is_real)`), the
+  -- read-backs `push`es (`toAccess_pushIf_memory`, mult `signedVal is_real`) — matching `memoryReadLookups`.
+  simp only [toAccess_pushIf_memory, toAccess_pullIf_memory]
   simp [circuit_norm, signedVal_is_real hp2 h_real, signedVal_neg_is_real hp2 h_real,
-    memoryLookups, rowClkLow, h_ir, h_ch, h_cl, h_oa, h_ob, h_immb, h_oc, h_imm, sub_zero, mul_one,
-    h_wv0, h_wv1, h_wv2, h_wv3,
+    memoryReadLookups, rowClkLow, h_ir, h_ch, h_cl, h_oa, h_ob, h_oc,
     h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3, h_pl_b, h_pv_b0, h_pv_b1, h_pv_b2, h_pv_b3,
     h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3]
 
@@ -245,10 +285,11 @@ which carries no memory-access columns); they compose with the per-row register 
 load/store row's full Memory-bus contribution. The model itself needs no change — exactly the Phase-F
 claim that real-address read/write events plug into the existing offline memory. -/
 
-/-- The two signed Memory-bus contributions the `MemoryAccess` block emits at a **real 3-limb address**:
-a `send` of the prior word at the previous timestamp (`+is_real`) and a `receive` of `new_value` at the
-current timestamp `(clk_high, clk_low + 1)` (`−is_real`). Matches `Readers/MemoryAccess.lean:93-100`. On
-padding rows both vanish (`memAccessLookups_padding`). -/
+/-- The two signed Memory-bus contributions the `MemoryAccess` block emits at a **real 3-limb address**
+(W11 polarity flip): a `pull` of the prior word at the previous timestamp (`−is_real` — the chip *derives*
+`MemoryMsg.isU64 prev_value`) and a `push` of `new_value` at the current timestamp `(clk_high, clk_low + 1)`
+(`+is_real` — the chip *proves* `isU64 new_value`). Matches `Readers/MemoryAccess.lean:99-110`. On padding
+rows both vanish (`memAccessLookups_padding`). -/
 def memAccessLookups (mem : Extracted.MemoryAccessCols (ZMod p))
     (clk_high clk_low addr0 addr1 addr2 : ZMod p) (new_value : Word (ZMod p)) (is_real : ZMod p) :
     LookupAccessList :=
@@ -257,10 +298,10 @@ def memAccessLookups (mem : Extracted.MemoryAccessCols (ZMod p))
   [ (.Memory, "SP1Memory",
       [ts.prev_high.val, ts.prev_low.val, addr0.val, addr1.val, addr2.val,
         mem.prev_value[0].val, mem.prev_value[1].val, mem.prev_value[2].val,
-        mem.prev_value[3].val], ir),
+        mem.prev_value[3].val], -ir),
     (.Memory, "SP1Memory",
       [clk_high.val, (clk_low + 1).val, addr0.val, addr1.val, addr2.val,
-        new_value[0].val, new_value[1].val, new_value[2].val, new_value[3].val], -ir) ]
+        new_value[0].val, new_value[1].val, new_value[2].val, new_value[3].val], ir) ]
 
 /-- The single offline-memory event a memory access contributes at the **real** recombined 48-bit
 address (`addr0 + addr1·2^16 + addr2·2^32`), at the current timestamp `clk_low + 1`: value `new_value`
@@ -328,7 +369,7 @@ theorem memAccessLookups_eq_emitted (env : Environment (ZMod p)) (offset : ℕ)
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [Readers.MemoryAccess.main, circuit_norm, heq,
     SP1Clean.Channels.byteChannel_eq_memoryChannel_false, if_false]
-  simp only [toAccess_pushIf_memory]
+  simp only [toAccess_pushIf_memory, toAccess_pullIf_memory]
   simp [circuit_norm, signedVal_is_real hp2 h_real, signedVal_neg_is_real hp2 h_real,
     memAccessLookups, h_ir, h_ch, h_cl, h_a0, h_a1, h_a2, h_ph, h_pl,
     h_pv0, h_pv1, h_pv2, h_pv3, h_nv0, h_nv1, h_nv2, h_nv3]

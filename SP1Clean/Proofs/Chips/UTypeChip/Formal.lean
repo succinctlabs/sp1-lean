@@ -30,6 +30,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.adapter.op_b_imm ∧
   Word.isU64 (#v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0] : Word (ZMod p)) ∧
+  -- (Option B pure-read JTypeReader) the op_a read-prior `isU64`, for the reader's op_a memory pull
+  -- completeness (its `Spec` now derives + owes the read-prior `isU64`).
+  (input.is_real = 1 → Word.isU64 input.adapter.op_a_memory.prev_value) ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   (input.is_auipc = 0 ∨ input.is_auipc = 1) ∧
   input.adapter.op_a_0 = 0 ∧
@@ -58,7 +61,7 @@ set_option maxHeartbeats 2000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨h_imm, h_pcU, h_pad, h_dec⟩ := h_assumptions
-  obtain ⟨_h_cpu, h_add, h_jt0, h_ad0, h_ad1, h_ad2, h_iaui_gate, h_real_gate⟩ := h_holds
+  obtain ⟨_h_cpu, h_add, h_jt0, _h_regwrite, h_ad0, h_ad1, h_ad2, h_iaui_gate, h_real_gate⟩ := h_holds
   unfold id at *
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_real_gate
   have h_iaui : input_is_auipc = 0 ∨ input_is_auipc = 1 := bool_of_mul_pred h_iaui_gate
@@ -90,7 +93,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
   have h_addspec := h_add ⟨fun _ => ⟨h_addendU, h_imm⟩, h_gate2⟩
-  refine ⟨⟨h_jt, h_bin, h_iaui, ?_, ?_⟩, h_bin, Or.inr ⟨fun _ => ⟨h_addendU, h_imm⟩, h_gate2⟩, Or.inr ⟨h_bin, h_bin⟩⟩
+  refine ⟨⟨h_jt, h_bin, h_iaui, ?_, ?_⟩, h_bin, Or.inr ⟨fun _ => ⟨h_addendU, h_imm⟩, h_gate2⟩,
+    Or.inr ⟨h_bin, h_bin⟩, Or.inr ⟨h_bin, ?_⟩⟩
   · intro hr1 hop0 hiaui0
     have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, hop0]; simp
     have hsem := (h_addspec hg1).2
@@ -102,12 +106,23 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     simp only [haddendpc hiaui1] at hsem
     rw [hsem, auipc_eq_add_lui, ← h_dec]
     simp only [pcWord]
+  · -- RegisterWrite op_a write push: `isU64` of the written result `add_value`. On `rd ≠ x0` (`op_a_0 = 0`)
+    -- it is the LUI/AUIPC add result; on `rd = x0` (`op_a_0 = 1`) the `op_a_0` zeroing gates pin it to `0`.
+    intro hr1
+    replace hr1 : input_is_real = 1 := hr1
+    rcases h_op_a_0 with h0 | h0
+    · have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
+      exact (h_addspec hg1).1
+    · obtain ⟨z0, z1, z2, z3⟩ := h_jt.1
+      rw [h0, one_mul] at z0 z1 z2 z3
+      refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
+        simp only [Vector.getElem_mapRange, circuit_norm] <;> simp_all
 
 set_option maxHeartbeats 2000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨h_imm, h_pcU, h_bin, h_iaui, h_op0, h_cpu, h_rac, _h_dec, hdec⟩ := h_assumptions
+  obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_iaui, h_op0, h_cpu, h_rac, _h_dec, hdec⟩ := h_assumptions
   obtain ⟨_, ⟨_, _, _, hpc⟩, ⟨_, _, _, hob, _⟩, _⟩ := h_input
   obtain ⟨he_addend, he_addval⟩ := h_env
   have epc : ∀ i (hi : i < 3),
@@ -149,12 +164,18 @@ theorem completeness :
   have h_gate2 : input_is_real + -input_adapter_op_a_0 = 0 ∨ input_is_real + -input_adapter_op_a_0 = 1 := by
     rw [h_op0]; simpa using h_bin
   refine ⟨⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨hA_U, h_imm⟩, h_gate2⟩, ?_⟩,
-    ⟨⟨h_bin, h_bin⟩, ⟨?_, ?_, ?_, ?_⟩, Or.inl h_op0, h_rac, hdec⟩, ?_, ?_, ?_, ?_, ?_⟩
+    ⟨⟨h_bin, h_bin⟩, ⟨?_, ?_, ?_, ?_⟩, Or.inl h_op0, h_rac, hdec, h_oap⟩,
+    ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hval]; exact AddOperation.spec_populate hA_U h_imm (input_is_real + -input_adapter_op_a_0)
   · rw [h_op0, zero_mul]
   · rw [h_op0, zero_mul]
   · rw [h_op0, zero_mul]
   · rw [h_op0, zero_mul]
+  · -- RegisterWrite op_a write push: `isU64` of the result `add_value` (completeness covers `op_a_0 = 0`).
+    intro hr
+    rw [hval]
+    exact (AddOperation.spec_populate hA_U h_imm (input_is_real + -input_adapter_op_a_0)
+      (by rw [h_op0]; simpa using hr)).1
   · rw [hg0]; ring_nf
   · rw [hg1]; ring_nf
   · rw [hg2]; ring_nf
@@ -183,6 +204,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
       intro input offset
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.JTypeReader.circuit, Readers.JTypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,

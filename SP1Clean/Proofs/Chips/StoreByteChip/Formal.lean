@@ -13,7 +13,10 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Operands are 64-bit values; the store targets a non-reserved, in-range address (no alignment). -/
+/-- Operands are 64-bit values; the store targets a non-reserved, in-range address (no alignment). The
+final conjunct is the **W11 memory-flip** obligation: the merged `store_value` written to the memory bus is
+a valid 64-bit word — honest at the single-row level (the memory bus range-checks every value it receives;
+the store is the pusher). -/
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
@@ -22,13 +25,14 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
       = (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 ∧
     (input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1) ∧
     (input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1) ∧
-    (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1)
+    (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1) ∧
+    (input.is_real = 1 → Word.isU64 input.store_value)
 
 set_option maxHeartbeats 16000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2⟩ := h_assumptions
+  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_sv⟩ := h_assumptions
   obtain ⟨_h_cpu, h_addr, h_mem, h_itype, hreg_rcv, hmem_rcv, hsel0, hsel1, hsel2, hsel3,
     hincr, hr0, hr1, hr2, hr3, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
@@ -82,11 +86,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_addr_spec := h_addr h_addr_as
   simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
   have h_it := h_itype ⟨h_bin, h_bin⟩
-  refine ⟨⟨h_addr_spec, h_mem h_bin, h_it,
+  refine ⟨⟨h_addr_spec, h_mem ⟨h_bin, h_sv⟩, h_it,
       fun h1 => ⟨(h_bytes h1).1, (h_bytes h1).2.1, (h_bytes h1).2.2.1, (h_bytes h1).2.2.2⟩,
       ⟨hsel0, hsel1, hsel2, hsel3⟩, sub_eq_zero.mp hincr,
       ⟨sub_eq_zero.mp hr0, sub_eq_zero.mp hr1, sub_eq_zero.mp hr2, sub_eq_zero.mp hr3⟩, h_bin⟩,
-    h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr ⟨h_bin, h_bin⟩,
+    h_bin, Or.inr h_addr_as, Or.inr ⟨h_bin, h_sv⟩, Or.inr ⟨h_bin, h_bin⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
 
@@ -131,7 +135,8 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : P
       ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high, clkLow input.state,
         input.state.pc, 36⟩ ∧
     (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16
-      ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+      ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+    (input.is_real = 1 → Word.isU64 input.store_value)
 
 set_option maxHeartbeats 16000000 in
 theorem completeness :
@@ -140,7 +145,7 @@ theorem completeness :
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
   obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, hbin, hreg_pa, hreghi_pa, hmem_pa, hmemhi_pa,
-    ⟨hsel0, hsel1, hsel2, hsel3⟩, hincr_pa, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it, hdec⟩ :=
+    ⟨hsel0, hsel1, hsel2, hsel3⟩, hincr_pa, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it, hdec, h_sv⟩ :=
     h_assumptions
   obtain ⟨_, ⟨_, _, _, hmap_pc⟩, ⟨_, ⟨hmap_oap, _, _⟩, _, _, _, _⟩,
     ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _, hmap_sv⟩ := h_input
@@ -174,7 +179,7 @@ theorem completeness :
   refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
-  · exact hbin
+  · exact ⟨hbin, h_sv⟩
   · exact h_mem
   · exact ⟨hbin, hbin⟩
   · exact h_it

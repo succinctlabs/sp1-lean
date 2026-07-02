@@ -63,30 +63,33 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   cols.op_a_0 * cols.op_a_memory.prev_value[1] === 0
   cols.op_a_0 * cols.op_a_memory.prev_value[2] === 0
   cols.op_a_0 * cols.op_a_memory.prev_value[3] === 0
-  -- op_a (read): send prior value at prev timestamp, receive the unchanged prior value at `clk_low + 4`.
-  memoryChannel.emit input.is_real
+  -- **W11 polarity flip:** the *read-prior* is now a `pullIf` (deriving `MemoryMsg.isU64` of the operand
+  -- `prev_value`) and the *read-back* a `pushIf` (op_a/op_b/op_c are all **reads**, so every push is a
+  -- read-back of the same `prev_value` — its `isU64` is discharged from the matching read-prior pull).
+  -- op_a (read): pull prior value at prev timestamp, push the unchanged prior value at `clk_low + 4`.
+  memoryChannel.pullIf input.is_real
     (⟨input.clk_high, cols.op_a_memory.access_timestamp.prev_low, cols.op_a, 0, 0,
       cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1],
       cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
-  memoryChannel.emit (-input.is_real)
+  memoryChannel.pushIf input.is_real
     (⟨input.clk_high, input.clk_low + 4, cols.op_a, 0, 0,
       cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1],
       cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
-  -- op_b (rs1 read): send prior value, receive the unchanged prior value at `clk_low + 3`.
-  memoryChannel.emit input.is_real
+  -- op_b (rs1 read): pull prior value, push the unchanged prior value at `clk_low + 3`.
+  memoryChannel.pullIf input.is_real
     (⟨input.clk_high, cols.op_b_memory.access_timestamp.prev_low, cols.op_b, 0, 0,
       cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1],
       cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
-  memoryChannel.emit (-input.is_real)
+  memoryChannel.pushIf input.is_real
     (⟨input.clk_high, input.clk_low + 3, cols.op_b, 0, 0,
       cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1],
       cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
   -- op_c (rs2 read), gated by `is_real - imm_c` (an immediate does no register read); index its low limb.
-  memoryChannel.emit (input.is_real - cols.imm_c)
+  memoryChannel.pullIf (input.is_real - cols.imm_c)
     (⟨input.clk_high, cols.op_c_memory.access_timestamp.prev_low, cols.op_c[0], 0, 0,
       cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1],
       cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
-  memoryChannel.emit (-(input.is_real - cols.imm_c))
+  memoryChannel.pushIf (input.is_real - cols.imm_c)
     (⟨input.clk_high, input.clk_low + 2, cols.op_c[0], 0, 0,
       cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1],
       cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
@@ -98,15 +101,16 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength_eq := by intros; simp +arith [circuit_norm, main, RegisterAccessCols.circuit]
   output _ _ := ()
   -- `byteChannel` (from the composed `RegisterAccessCols`) propagates its guarantee. `programChannel` is now
-  -- **pulled** (W11 flip), so its guarantee (`ProgramMsg.RowSpec`) is assumed here too — it joins
-  -- `channelsWithGuarantees` and drops from `channelsWithRequirements` (discharged by the `is_trusted` gate).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  -- **pulled** (W11 program flip), and `memoryChannel` too (W11 memory flip — the read-prior `pullIf`s derive
+  -- `MemoryMsg.isU64`), so both join `channelsWithGuarantees`; memory's read-back `pushIf`s keep it in
+  -- `channelsWithRequirements`.
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, RegisterAccessCols.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw, programChannel.toRaw] := rfl
+      = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
@@ -120,50 +124,94 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
 set_option maxHeartbeats 4000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  simp only [circuit_norm, memoryChannel, programChannel, ProgramMsg.RowSpec, sub_eq_add_neg]
-    at h_holds ⊢
+  simp only [circuit_norm, memoryChannel, MemoryMsg.isU64, programChannel, ProgramMsg.RowSpec,
+    sub_eq_add_neg] at h_holds ⊢
   obtain ⟨h_rac_a, h_rac_b, h_rac_c, hbin, h_immc, h_immbin, i0, i1, i2, i3, h_trust, h_prog,
-    z0, z1, z2, z3⟩ := h_holds
+    z0, z1, z2, z3, h_mem_a, h_mem_b, h_mem_c⟩ := h_holds
   have htbin := bool_of_mul_pred h_trust
+  have hcbin := bool_of_mul_pred h_immbin
   have e : ∀ i (hi : i < 3), Expression.eval env input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
-  -- bridge op_a_memory.prev_value eval → value for the four read-zeroing gates (nested vector field).
-  have hmap_a : Vector.map (Expression.eval env) input_var_cols_op_a_memory_prev_value
-      = input_cols_op_a_memory_prev_value := h_input.1.2.1.1
-  have ea : ∀ (i : ℕ) (hi : i < 4),
+  -- bridge each operand `prev_value` limb from `eval` form to value (read-zeroing gates + isU64 outputs).
+  have eva : ∀ (i : ℕ) (hi : i < 4),
       Expression.eval env (input_var_cols_op_a_memory_prev_value[i]'hi)
         = input_cols_op_a_memory_prev_value[i]'hi := by
-    intro i hi; rw [← hmap_a, Vector.getElem_map]
-  rw [ea 0 (by norm_num)] at z0; rw [ea 1 (by norm_num)] at z1
-  rw [ea 2 (by norm_num)] at z2; rw [ea 3 (by norm_num)] at z3
+    intro i hi; rw [← h_input.1.2.1.1, Vector.getElem_map]
+  have evb : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env (input_var_cols_op_b_memory_prev_value[i]'hi)
+        = input_cols_op_b_memory_prev_value[i]'hi := by
+    intro i hi; rw [← h_input.1.2.2.2.2.1.1, Vector.getElem_map]
+  have evc : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env (input_var_cols_op_c_memory_prev_value[i]'hi)
+        = input_cols_op_c_memory_prev_value[i]'hi := by
+    intro i hi; rw [← h_input.1.2.2.2.2.2.2.1.1, Vector.getElem_map]
+  -- bridge the four op_a read-zeroing gates from `eval` form to value form.
+  rw [eva 0 (by norm_num)] at z0; rw [eva 1 (by norm_num)] at z1
+  rw [eva 2 (by norm_num)] at z2; rw [eva 3 (by norm_num)] at z3
   -- the immediate gates bridge (op_c + op_c_memory.prev_value), as in `ALUTypeReader.soundness`.
   have hoc := h_input.1.2.2.2.2.2.1
   have hpv := h_input.1.2.2.2.2.2.2.1.1
-  refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin, h_immc, bool_of_mul_pred h_immbin, ?_,
-      h_rac_a h_assumptions.1, h_rac_b h_assumptions.1, h_rac_c (bool_of_mul_pred h_immbin), fun ht => ?_⟩,
-    Or.inr h_assumptions.1, Or.inr h_assumptions.1, Or.inr (bool_of_mul_pred h_immbin),
-    fun h1 h0 => off_gate_vacuous htbin h1 h0⟩
+  refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin, h_immc, hcbin, ?_,
+      h_rac_a h_assumptions.1, h_rac_b h_assumptions.1, h_rac_c hcbin,
+      fun ht => ?_, fun ht2 => ?_, fun ht3 => ?_⟩,
+    Or.inr h_assumptions.1, Or.inr h_assumptions.1, Or.inr hcbin,
+    fun h1 h0 => off_gate_vacuous htbin h1 h0,
+    fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
+    fun _ h0 => ?_,
+    fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
+    fun _ h0 => ?_,
+    fun h1 h0 => off_gate_vacuous hcbin h1 h0,
+    fun _ h0 => ?_⟩
   · rw [← hoc, ← hpv]; simp only [Vector.getElem_map]; exact ⟨i0, i1, i2, i3⟩
   · -- the decode-bounds `Spec` conjunct is **derived** from the program pull `h_prog`.
     obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [ht])
     rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
     exact ⟨ha, hp0, hp1, hp2⟩
+  · -- op_a/op_b `isU64` from the two `is_real`-gated memory pulls.
+    have hneg : -input_is_real = -1 := by rw [ht2]
+    obtain ⟨hma0, hma1, hma2, hma3⟩ := h_mem_a hneg
+    obtain ⟨hmb0, hmb1, hmb2, hmb3⟩ := h_mem_b hneg
+    rw [eva 0 (by norm_num)] at hma0; rw [eva 1 (by norm_num)] at hma1
+    rw [eva 2 (by norm_num)] at hma2; rw [eva 3 (by norm_num)] at hma3
+    rw [evb 0 (by norm_num)] at hmb0; rw [evb 1 (by norm_num)] at hmb1
+    rw [evb 2 (by norm_num)] at hmb2; rw [evb 3 (by norm_num)] at hmb3
+    exact ⟨Word.isU64_of_cases hma0 hma1 hma2 hma3, Word.isU64_of_cases hmb0 hmb1 hmb2 hmb3⟩
+  · -- op_c `isU64` from the `is_real - imm_c`-gated memory pull.
+    have hnegc : -(input_is_real + -input_cols_imm_c) = -1 := by rw [ht3]
+    obtain ⟨hmc0, hmc1, hmc2, hmc3⟩ := h_mem_c hnegc
+    rw [evc 0 (by norm_num)] at hmc0; rw [evc 1 (by norm_num)] at hmc1
+    rw [evc 2 (by norm_num)] at hmc2; rw [evc 3 (by norm_num)] at hmc3
+    exact Word.isU64_of_cases hmc0 hmc1 hmc2 hmc3
+  · -- push_a: read-back value = op_a prev, from the paired pull.
+    have ht : input_is_real = 1 := by
+      rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
+    exact h_mem_a (by rw [ht])
+  · -- push_b: read-back value = op_b prev, from the paired pull.
+    have ht : input_is_real = 1 := by
+      rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
+    exact h_mem_b (by rw [ht])
+  · -- push_c: read-back value = op_c prev, from the paired (is_real - imm_c)-gated pull.
+    have htc : input_is_real + -input_cols_imm_c = 1 := by
+      rcases hcbin with h | h; exact absurd h h0; exact h
+    exact h_mem_c (by rw [htc])
 
 set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hreal, htrust⟩ := h_assumptions
   obtain ⟨⟨z0, z1, z2, z3⟩, hbin, h_immc, h_immbin_or, ⟨i0, i1, i2, i3⟩, hrac_a, hrac_b, hrac_c,
-    hdec⟩ := h_spec
-  -- bridges: op_a_memory.prev_value (zeroing gates) and op_c / op_c_memory.prev_value (immediate gates).
-  have hmap_a : Vector.map (Expression.eval env.toEnvironment) input_var_cols_op_a_memory_prev_value
-      = input_cols_op_a_memory_prev_value := h_input.1.2.1.1
-  have ea : ∀ (i : ℕ) (hi : i < 4),
+    hdec, hisu_ab, hisu_c⟩ := h_spec
+  -- bridges: op_a/op_b/op_c `prev_value` (zeroing gates + memory pulls) and op_c (immediate gates).
+  have eva : ∀ (i : ℕ) (hi : i < 4),
       Expression.eval env.toEnvironment (input_var_cols_op_a_memory_prev_value[i]'hi)
         = input_cols_op_a_memory_prev_value[i]'hi := by
-    intro i hi; rw [← hmap_a, Vector.getElem_map]
-  rw [← ea 0 (by norm_num)] at z0; rw [← ea 1 (by norm_num)] at z1
-  rw [← ea 2 (by norm_num)] at z2; rw [← ea 3 (by norm_num)] at z3
+    intro i hi; rw [← h_input.1.2.1.1, Vector.getElem_map]
+  have evb : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env.toEnvironment (input_var_cols_op_b_memory_prev_value[i]'hi)
+        = input_cols_op_b_memory_prev_value[i]'hi := by
+    intro i hi; rw [← h_input.1.2.2.2.2.1.1, Vector.getElem_map]
+  rw [← eva 0 (by norm_num)] at z0; rw [← eva 1 (by norm_num)] at z1
+  rw [← eva 2 (by norm_num)] at z2; rw [← eva 3 (by norm_num)] at z3
   have hoc := h_input.1.2.2.2.2.2.1
   have hpv := h_input.1.2.2.2.2.2.2.1.1
   have eoc : ∀ (i : ℕ) (hi : i < 4),
@@ -175,9 +223,9 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     intro i hi; rw [← hpv, Vector.getElem_map]
   have e : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
-  simp only [sub_eq_add_neg] at h_immc h_immbin_or hrac_c i0 i1 i2 i3
+  simp only [sub_eq_add_neg] at h_immc h_immbin_or hrac_c i0 i1 i2 i3 hisu_c
   refine ⟨⟨hreal, hrac_a⟩, ⟨hreal, hrac_b⟩, ⟨h_immbin_or, hrac_c⟩,
-    ?_, h_immc, ?_, ?_, ?_, ?_, ?_, ?_, ?_, z0, z1, z2, z3⟩
+    ?_, h_immc, ?_, ?_, ?_, ?_, ?_, ?_, ?_, z0, z1, z2, z3, ?_, ?_, ?_⟩
   · rcases hbin with h | h <;> rw [h] <;> simp
   · rcases h_immbin_or with h | h <;> rw [h] <;> simp
   · simp only [eoc, epv]; exact i0
@@ -190,6 +238,24 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     simp only [programChannel, ProgramMsg.RowSpec]
     rw [e 0 (by norm_num), e 1 (by norm_num), e 2 (by norm_num)]
     exact ⟨ha, hp0, hp1, hp2, hbin⟩
+  · -- mem pull a: derive `MemoryMsg.isU64 {eval'd prev_a}` from hisu_ab.1 + eval bridge.
+    simp only [memoryChannel, MemoryMsg.isU64]
+    intro hneg
+    obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 (hisu_ab (neg_inj.mp hneg)).1
+    rw [eva 0 (by norm_num), eva 1 (by norm_num), eva 2 (by norm_num), eva 3 (by norm_num)]
+    exact ⟨ha0, ha1, ha2, ha3⟩
+  · -- mem pull b
+    simp only [memoryChannel, MemoryMsg.isU64]
+    intro hneg
+    obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 (hisu_ab (neg_inj.mp hneg)).2
+    rw [evb 0 (by norm_num), evb 1 (by norm_num), evb 2 (by norm_num), evb 3 (by norm_num)]
+    exact ⟨hb0, hb1, hb2, hb3⟩
+  · -- mem pull c (gated `is_real - imm_c`): derive from hisu_c + the op_c prev bridge `epv`.
+    simp only [memoryChannel, MemoryMsg.isU64]
+    intro hneg
+    obtain ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64 (hisu_c (neg_inj.mp hneg))
+    rw [epv 0 (by norm_num), epv 1 (by norm_num), epv 2 (by norm_num), epv 3 (by norm_num)]
+    exact ⟨hc0, hc1, hc2, hc3⟩
 
 /-- The native immutable ALU-type reader as a Clean `FormalAssertion`: composes a `RegisterAccessCols` per
 operand (op_c gated `is_real - imm_c`), imposes the `op_a_0` binary + immediate + read-zeroing gates, and

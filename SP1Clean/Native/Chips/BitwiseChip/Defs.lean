@@ -2,6 +2,7 @@ import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Native.Operations.BitwiseU16Operation
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Extracted.BitwiseChip
 import Clean.Circuit.Basic
@@ -102,6 +103,14 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_xor * 3 + is_or * 4 + is_and * 5,
      r[0] + r[1] * 256, r[2] + r[3] * 256, r[4] + r[5] * 256, r[6] + r[7] * 256⟩
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- `BitwiseU16Operation`, so `isU64 (resultWord)` (the reassembled result word, each byte range-checked by
+  -- the bitwise byte-bus pulls) discharges its requirement. The written value is the four-limb result word
+  -- `#v[r[0]+r[1]*256, …]`; the write access clock is the recombined low clock `+ 4`.
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a, #v[r[0] + r[1] * 256, r[2] + r[3] * 256, r[4] + r[5] * 256, r[6] + r[7] * 256],
+     input.is_real⟩
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
   -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
   assertZero (input.is_real * (input.is_real - 1))
@@ -116,12 +125,14 @@ set_option maxHeartbeats 1000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs BitwiseCols main where
   channelsLawful := by
     simp [circuit_norm, main, BitwiseU16Operation.circuit, Readers.ALUTypeReader.circuit,
-      Readers.CPUState.circuit]
+      Readers.CPUState.circuit, Readers.RegisterWrite.circuit]
   -- witnesses the three flags (3) + the `BitwiseU16Operation` column struct (`b_low_bytes` 4 +
-  -- `c_low_bytes` 4 + `bitwise_operation.result` 8 = 16); `BitwiseU16Operation` and the two readers
-  -- are `assertion`s (`localLength 0`). 3 + 16 = 19.
+  -- `c_low_bytes` 4 + `bitwise_operation.result` 8 = 16); `BitwiseU16Operation`, the two readers and
+  -- `RegisterWrite` are `assertion`s (`localLength 0`). 3 + 16 = 19.
   localLength _ := 19
-  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
+  -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
+  -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 end SP1Clean.BitwiseChip

@@ -272,7 +272,7 @@ theorem ld_chip_reaches_sail
     (spec_ld imm rs1_idx rd_idx).run s
       = (sp1_ld rd_idx pc cols.memory_access.prev_value).run s := by
   haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
-  obtain ⟨h_b, h_c, _h_fits48, h_nonres, h_align48⟩ := h_assum
+  obtain ⟨h_b, h_c, _h_fits48, h_nonres, h_align48, _h_pv_isu64⟩ := h_assum
   have hreg : (Word.toBitVec64 input.op_b_val).toNat = Word.toNat input.op_b_val :=
     Word.toBitVec64_toNat h_b
   have hoff : (BitVec.signExtend 64 imm).toNat = Word.toNat input.op_c_imm := by

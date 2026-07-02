@@ -25,9 +25,11 @@ omit [Fact (2 ^ 17 < p)] in
 private lemma carry_zero {x c : ZMod p} (h : c = 0 ∨ c = 1) (hxc : x = c) : x * (x + -1) = 0 := by
   rw [hxc]; rcases h with h | h <;> rw [h] <;> ring
 
-/-- Operand words fit in 64 bits, and `is_real` is binary. -/
+/-- On a real row (`is_real = 1`) the operand words fit in 64 bits, and `is_real` is binary. The `isU64`
+precondition is **gated on `is_real`** (mirroring `AddOperation`/`SubOperation`): a padding row owes
+nothing, so a chip feeding reader-derived (Option-B, `is_real`-gated) operand `isU64` can discharge it. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
-  Word.isU64 input.a ∧ Word.isU64 input.b ∧ (input.is_real = 0 ∨ input.is_real = 1)
+  (input.is_real = 1 → Word.isU64 input.a ∧ Word.isU64 input.b) ∧ (input.is_real = 0 ∨ input.is_real = 1)
 
 /-- Semantic contract: the sign bit `msb`'s booleanness holds **unconditionally** (the composed
 `U16MSBOperation` asserts it ungated), and on a real row (`is_real`-gated) the reconstructed result is
@@ -42,7 +44,7 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
 set_option maxHeartbeats 4000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin⟩ := h_assumptions
+  obtain ⟨hab_imp, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, ⟨hiv, _⟩, _⟩ := h_input
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   have h65536 : (2 : ℕ) ^ 16 = 65536 := by norm_num
@@ -69,6 +71,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   refine ⟨⟨(h_msb h_msb_as).1, ?_⟩, Or.inr h_msb_as,
     fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   intro hr1eq
+  obtain ⟨ha, hb⟩ := hab_imp hr1eq
   have hneg : -input_is_real = -1 := by rw [hr1eq]
   have R0 := hr0 hneg; have R1 := hr1 hneg
   rw [← c16] at R0 R1
@@ -91,7 +94,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
 set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin⟩ := h_assumptions
+  obtain ⟨hab_imp, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, ⟨hiv, _⟩, _⟩ := h_input
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   have ev : ∀ i (hi : i < 2),
@@ -106,6 +109,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       RawSpec input_a input_b ⟨input_cols_value, ⟨input_cols_msb_msb⟩⟩ ∧
       input_cols_msb_msb = if input_cols_value[1].val ≥ 32768 then 1 else 0 := by
     intro hr1
+    obtain ⟨ha, hb⟩ := hab_imp hr1
     obtain ⟨hU, hbveq⟩ := h_spec.2 hr1
     obtain ⟨hUv0, hUv1, _, _⟩ := Word.lt_cases_of_isU64 hU
     simp only [resultWord, Vector.getElem_mk, List.getElem_toArray,

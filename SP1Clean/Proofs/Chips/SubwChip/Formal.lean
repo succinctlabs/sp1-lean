@@ -24,25 +24,42 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   circuit_proof_start
   have h_subw := h_holds.2.1
   have h_adapter := h_holds.2.2.1
-  have h_bin := bool_of_mul_pred h_holds.2.2.2
-  have ha := h_assumptions.1
-  have hb := h_assumptions.2
+  -- `RegisterWrite` is now `h_holds.2.2.2.1`; the inline gate shifted to `.2.2.2.2`.
+  have h_bin := bool_of_mul_pred h_holds.2.2.2.2
+  -- **Option B cycle-break.** No operand `isU64` is assumed (chip `Assumptions = True`). Derive it from the
+  -- `RTypeReader` sub-`Spec`'s memory-pull `isU64` trio (its 7th conjunct, gated on `is_real`).
+  have h_rspec := h_adapter ⟨h_bin, h_bin⟩
+  have h_trio := h_rspec.2.2.2.2.2.2
   have h_as : SubwOperation.circuit.Assumptions
       { a := input_adapter_op_b_memory_prev_value, b := input_adapter_op_c_memory_prev_value,
         cols := ⟨Vector.map (Expression.eval env) (Vector.mapRange 2 fun i => var { index := i₀ + i }),
-          ⟨env.get (i₀ + 2)⟩⟩, is_real := input_is_real } := ⟨ha, hb, h_bin⟩
+          ⟨env.get (i₀ + 2)⟩⟩, is_real := input_is_real } :=
+    ⟨fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2⟩, h_bin⟩
+  -- The `RegisterWrite` op_a write push owes `isU64` of the sign-extended write word `[v0, v1, msb·65535,
+  -- msb·65535]` (= `SubwOperation.resultWord cols`); align its `Vector.map`/`env.get` slots.
+  have h_rw_isU64 : input_is_real = 1 →
+      Word.isU64 (#v[env.get i₀, env.get (i₀ + 1), env.get (i₀ + 2) * 65535, env.get (i₀ + 2) * 65535]
+        : Word (ZMod p)) := fun hr => by
+    simpa only [SubwOperation.resultWord, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+      using ((h_subw h_as).2 hr).1
   refine ⟨⟨?_, h_bin, fun hr => ?_⟩, ?_⟩
-  · simpa only [Vector.getElem_map] using h_adapter ⟨h_bin, h_bin⟩
+  · simpa only [Vector.getElem_map] using h_rspec
   · refine trans ?_ (rv64_subw_eq _ _).symm
     simpa only [SubwOperation.resultWord, Vector.getElem_map] using
       ((h_subw h_as).2 hr).2
   · and_intros <;>
-      first | exact h_bin | exact ⟨h_bin, h_bin⟩ | exact Or.inl rfl | exact Or.inr ⟨h_bin, h_bin⟩
+      first
+        | exact h_bin
+        | exact ⟨h_bin, h_bin⟩
+        | exact Or.inl rfl
+        | exact Or.inr ⟨h_bin, h_bin⟩
+        | exact ⟨fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2⟩, h_bin⟩
+        | exact Or.inr ⟨h_bin, h_rw_isU64⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   obtain ⟨h_env_val, h_env_msb⟩ := h_env
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
@@ -73,9 +90,30 @@ theorem completeness :
     rw [h_env_msb]
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
-  refine ⟨⟨hbin, h_cpu⟩, ⟨⟨ha, hb, hbin⟩, ?_⟩,
-    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec⟩, ?_⟩
+  refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
+    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
+      fun hr => ⟨ha_prev hr, ha, hb⟩⟩,
+    ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
   · rw [hval, hmsbeq]; exact SubwOperation.spec_populate ha hb input_is_real
+  · -- RegisterWrite's `isU64 value` (op_a write push): the witnessed op_a write word is the sign-extended
+    -- `resultWord (populate op_b op_c)`, whose `isU64` is `spec_populate.2 _ |>.1`. The write value appears
+    -- as individual `env.get` slots, so bridge them to the operation's witnessed limbs via `hval`/`hmsbeq`.
+    intro hr
+    have h0 : env.get i₀ = (SubwOperation.subwValueWitness input_adapter_op_b_memory_prev_value
+        input_adapter_op_c_memory_prev_value)[0] := by
+      simpa only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+        using congrArg (fun v => v[0]) hval
+    have h1 : env.get (i₀ + 1) = (SubwOperation.subwValueWitness input_adapter_op_b_memory_prev_value
+        input_adapter_op_c_memory_prev_value)[1] := by
+      simpa only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+        using congrArg (fun v => v[1]) hval
+    have hword : (#v[env.get i₀, env.get (i₀ + 1), env.get (i₀ + 2) * 65535, env.get (i₀ + 2) * 65535]
+          : Word (ZMod p))
+        = SubwOperation.resultWord (SubwOperation.populate input_adapter_op_b_memory_prev_value
+            input_adapter_op_c_memory_prev_value) := by
+      rw [h0, h1, hmsbeq]; simp only [SubwOperation.resultWord, SubwOperation.populate]
+    rw [hword]
+    exact ((SubwOperation.spec_populate ha hb input_is_real).2 hr).1
   rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- The SUBW chip row as a `GeneralFormalCircuit`: semantic contract, composing the witnessed gadget +
@@ -101,6 +139,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubwCols :=
       intro input offset
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.SubwOperation.circuit, SP1Clean.SubwOperation.main,

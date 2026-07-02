@@ -2,6 +2,7 @@ import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Proofs.Operations.AddOperation.Formal
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.RTypeReader
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Extracted.AddChip
 import Clean.Circuit.Basic
@@ -50,6 +51,12 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (AddCols) (ZMod p
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 0,
      value[0], value[1], value[2], value[3]⟩
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- `AddOperation`, so `isU64 value` (the ALU result range-check) discharges its requirement — breaking the
+  -- old reader-circularity. The write access clock is the recombined low clock `+ 4` (matching the old reader).
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a, value, input.is_real⟩
   -- The `is_real` boolean gate is kept **inline** (`assertZero`, not `=== 0` which composes the deep
   -- Equality subcircuit) so it is visible to `ConstraintsHold.Shallow` — required for the chip to be a
   -- `VmTables` table (`tables_channel`'s `enabled` booleanity reads the shallow constraints). W11.
@@ -57,9 +64,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (AddCols) (ZMod p
   return ⟨input.state, input.adapter, ⟨value⟩, input.is_real⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddCols main where
-  channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit]
+  channelsLawful := by
+    simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit,
+      Readers.RegisterWrite.circuit]
   localLength _ := 4
-  -- `programChannel` joins the byte guarantee propagated up from `RTypeReader`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `RTypeReader`'s program **pull** (W11 flip);
+  -- `memoryChannel` joins from `RTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
+  -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 end SP1Clean.AddChip

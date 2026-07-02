@@ -88,8 +88,10 @@ deriving ProvableStruct
 (`op_a_0 * wv_i = 0`, the `rd = x0 ⇒ write 0` rule) and the `op_a_0` binary fact — genuine local
 `assertZero` constraints, derived in soundness from the imposed gates — plus, per operand, the composed
 `RegisterAccessCols` byte bounds (`is_real`-gated, access clocks `clk_low + 4/3/2`), derived from the byte
-bus. The register **index** bounds + value `isU64` stay non-local: received facts whose validity is the
-trace level (`Soundness/{Byte,Memory,Program}Consistency.lean`). -/
+bus. The register **index** bounds stay non-local (received facts; trace level). The **operand `isU64`**
+(W11 memory flip) is now *derived* here, on real rows, from the three memory **read-prior pulls**' guarantees
+(`MemoryMsg.isU64`): the consuming chip reads `op_b`/`op_c`'s `isU64` straight out of this `Spec` instead of
+assuming it; the `op_a` (old `rd`) one round-trips the pull/push discharge in completeness. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   (input.cols.op_a_0 * input.wv0 = 0 ∧ input.cols.op_a_0 * input.wv1 = 0 ∧
       input.cols.op_a_0 * input.wv2 = 0 ∧ input.cols.op_a_0 * input.wv3 = 0) ∧
@@ -100,7 +102,10 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     -- (W11 flip) the decode bounds **derived** from the program bus's `ProgramMsg.RowSpec` pull guarantee
     -- (destination index `< 32`, pc limbs `< 2^16`, on real `is_trusted` rows) — no longer trace-level.
     (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
-      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
+    -- (W11 memory flip) operand `isU64` derived from the three memory read-prior pulls (real rows).
+    (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
+      Word.isU64 input.cols.op_b_memory.prev_value ∧ Word.isU64 input.cols.op_c_memory.prev_value)
 
 end SP1Clean.Readers.RTypeReader
 
@@ -146,7 +151,12 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     RegisterAccessCols.Spec ⟨input.cols.op_c_memory, input.is_real - input.cols.imm_c, input.clk_low + 2⟩ ∧
     -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
     (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
-      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
+    -- (W11 memory flip) op_a/op_b operand `isU64` derived from the two `is_real`-gated memory read-prior
+    -- pulls, and op_c's from the `is_real - imm_c`-gated read-prior pull (no register read for an immediate).
+    (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
+      Word.isU64 input.cols.op_b_memory.prev_value) ∧
+    (input.is_real - input.cols.imm_c = 1 → Word.isU64 input.cols.op_c_memory.prev_value)
 
 end SP1Clean.Readers.ALUTypeReader
 
@@ -191,7 +201,12 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     RegisterAccessCols.Spec ⟨input.cols.op_c_memory, input.is_real - input.cols.imm_c, input.clk_low + 2⟩ ∧
     -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
     (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
-      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
+    -- (W11 memory flip) op_a/op_b operand `isU64` derived from the two `is_real`-gated memory read-prior
+    -- pulls, and op_c's from the `is_real - imm_c`-gated read-prior pull (no register read for an immediate).
+    (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
+      Word.isU64 input.cols.op_b_memory.prev_value) ∧
+    (input.is_real - input.cols.imm_c = 1 → Word.isU64 input.cols.op_c_memory.prev_value)
 
 end SP1Clean.Readers.ALUTypeReaderImmutable
 
@@ -230,7 +245,10 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     RegisterAccessCols.Spec ⟨input.cols.op_b_memory, input.is_real, input.clk_low + 3⟩ ∧
     -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
     (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
-      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
+    -- (W11 memory flip) op_a/op_b operand `isU64` derived from the two memory read-prior pulls (real rows).
+    (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
+      Word.isU64 input.cols.op_b_memory.prev_value)
 
 end SP1Clean.Readers.ITypeReader
 
@@ -264,7 +282,10 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     RegisterAccessCols.Spec ⟨input.cols.op_b_memory, input.is_real, input.clk_low + 3⟩ ∧
     -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
     (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
-      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
+    -- (W11 memory flip) op_a/op_b operand `isU64` derived from the two memory read-prior pulls (real rows).
+    (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
+      Word.isU64 input.cols.op_b_memory.prev_value)
 
 end SP1Clean.Readers.ITypeReaderImmutable
 
@@ -301,7 +322,9 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     RegisterAccessCols.Spec ⟨input.cols.op_a_memory, input.is_real, input.clk_low + 4⟩ ∧
     -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
     (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
-      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16)
+      input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
+    -- (W11 memory flip) op_a operand `isU64` derived from the memory read-prior pull (real rows).
+    (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value)
 
 end SP1Clean.Readers.JTypeReader
 

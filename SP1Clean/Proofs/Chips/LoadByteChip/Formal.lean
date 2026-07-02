@@ -23,14 +23,15 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
       = (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 ∧
     (input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1) ∧
     (input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1) ∧
-    (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1)
+    (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1) ∧
+    Word.isU64 input.memory_access.prev_value
 
 set_option maxHeartbeats 16000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2⟩ := h_assumptions
-  obtain ⟨_h_cpu, h_addr, h_mem, hu8, hmsb_rcv, h_itype, hsel0, hsel1, hsel2, hsel3, hmux,
+  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_pv_isu64⟩ := h_assumptions
+  obtain ⟨_h_cpu, h_addr, h_mem, hu8, hmsb_rcv, h_itype, _h_regwrite, hsel0, hsel1, hsel2, hsel3, hmux,
     h_op_a_0, h_msbgate, h_lb_gate, h_lbu_gate, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   have h_lb_bin := bool_of_mul_pred h_lb_gate
@@ -95,13 +96,47 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_addr_spec := h_addr h_addr_as
   simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
   have h_it := h_itype ⟨h_bin, h_bin⟩
-  refine ⟨⟨h_addr_spec, h_mem h_bin, h_it,
+  -- `msb` is binary on any real row: LB rows get it from the inline MSB byte-pull; LBU rows have `msb = 0`
+  -- (the `is_lbu·msb = 0` gate with `is_lbu = 1`).
+  have h_msb_bin_real : input_is_lb + input_is_lbu = 1 → (input_msb = 0 ∨ input_msb = 1) := by
+    intro h1
+    rcases h_lb_bin with hlb | hlb
+    · have hlbu : input_is_lbu = 1 := by rw [hlb, zero_add] at h1; exact h1
+      left; rw [hlbu, one_mul] at h_msbgate; exact h_msbgate
+    · exact (h_msb_fact hlb).1
+  have hp65536 : (65536 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  -- the loaded word `#v[selected_byte + 65280·msb, 65535·msb, 65535·msb, 65535·msb]` (op_a write value) is
+  -- `isU64` on real rows: limb 0 = the byte-sign-extended low limb (`selected_byte < 256` + `65280·msb`), the
+  -- high limbs the sign fill `65535·msb` — all `< 2^16` since `selected_byte < 256` and `msb ∈ {0,1}`.
+  have h_msb_val : input_is_lb + input_is_lbu = 1 → (65535 * input_msb : ZMod p).val < 2 ^ 16 := by
+    intro h1
+    rcases h_msb_bin_real h1 with h | h
+    · rw [h, mul_zero, ZMod.val_zero]; norm_num
+    · rw [h, mul_one, show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) by norm_cast,
+        ZMod.val_natCast_of_lt (by omega)]; norm_num
+  have h_limb0_lt : input_is_lb + input_is_lbu = 1 →
+      (input_selected_byte + 65280 * input_msb : ZMod p).val < 2 ^ 16 := by
+    intro h1
+    have hbyte := h_byte_lt h1
+    rcases h_msb_bin_real h1 with h | h
+    · rw [h, mul_zero, add_zero]; omega
+    · rw [h, mul_one]
+      have h65280 : (65280 : ZMod p).val = 65280 := by
+        rw [show (65280 : ZMod p) = ((65280 : ℕ) : ZMod p) by norm_cast, ZMod.val_natCast_of_lt (by omega)]
+      have hval : (input_selected_byte + 65280 : ZMod p).val = input_selected_byte.val + 65280 := by
+        rw [ZMod.val_add, h65280, Nat.mod_eq_of_lt (by omega)]
+      rw [hval]; omega
+  have h_load_isu64 : input_is_lb + input_is_lbu = 1 → Word.isU64
+      (#v[input_selected_byte + 65280 * input_msb, 65535 * input_msb, 65535 * input_msb,
+          65535 * input_msb] : Word (ZMod p)) :=
+    fun h1 => Word.isU64_of_cases (h_limb0_lt h1) (h_msb_val h1) (h_msb_val h1) (h_msb_val h1)
+  refine ⟨⟨h_addr_spec, h_mem ⟨h_bin, fun _ => h_pv_isu64⟩, h_it,
       fun h1 => ⟨(h_u8 h1).1, (h_u8 h1).2, h_byte_lt h1⟩, h_msb_fact,
       ⟨hsel0, hsel1, hsel2, hsel3⟩, hmux_eq, h_op_a_0, h_msbgate, h_lb_bin, h_lbu_bin, h_bin⟩,
-    h_bin, Or.inr h_addr_as, Or.inr h_bin,
+    h_bin, Or.inr h_addr_as, Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0,
     fun h1 h0 => off_gate_vacuous h_lb_bin h1 h0,
-    Or.inr ⟨h_bin, h_bin⟩⟩
+    Or.inr ⟨h_bin, h_bin⟩, Or.inr ⟨h_bin, h_load_isu64⟩⟩
 
 /-- Prover-side row well-formedness: the address facts + selector binaries + `op_a_0 = 0` + the byte
 value bounds + the sign-bit fact + the limb-selection / byte-mux equations + the reader `Spec`s. -/
@@ -114,6 +149,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : P
     (input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1) ∧
     (input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1) ∧
     (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1) ∧
+    Word.isU64 input.memory_access.prev_value ∧
     (input.is_lb = 0 ∨ input.is_lb = 1) ∧ (input.is_lbu = 0 ∨ input.is_lbu = 1) ∧
     (isReal input = 0 ∨ isReal input = 1) ∧
     input.adapter.op_a_0 = 0 ∧
@@ -147,7 +183,7 @@ theorem completeness :
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
-  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_lb_bin, h_lbu_bin, hbin, h_op_a_0,
+  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_pv_isu64, h_lb_bin, h_lbu_bin, hbin, h_op_a_0,
     hlo_pa, hhi_pa, hbyte_pa, h_msb_bin, h_msb_iff, h_msbgate, ⟨hsel0, hsel1, hsel2, hsel3⟩,
     hmux_pa, h_cpu, h_mem, h_it⟩ := h_assumptions
   obtain ⟨_, _, ⟨_, _, _, hmap_pc⟩, _, ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _⟩ := h_input
@@ -177,10 +213,32 @@ theorem completeness :
           Expression.eval env.toEnvironment input_var_offset_bit[1],
           Expression.eval env.toEnvironment input_var_offset_bit[2]⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
-  refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ?_, ?_, ⟨?_, ?_⟩, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  -- the loaded word `#v[selected_byte + 65280·msb, 65535·msb, 65535·msb, 65535·msb]` (op_a write value) is
+  -- `isU64`: `selected_byte < 256` (prover) + `msb ∈ {0,1}` (prover) bound every limb `< 2^16`.
+  have hp65536 : (65536 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have h_msb_val : (65535 * input_msb : ZMod p).val < 2 ^ 16 := by
+    rcases h_msb_bin with h | h
+    · rw [h, mul_zero, ZMod.val_zero]; norm_num
+    · rw [h, mul_one, show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) by norm_cast,
+        ZMod.val_natCast_of_lt (by omega)]; norm_num
+  have h_limb0_lt : (input_selected_byte + 65280 * input_msb : ZMod p).val < 2 ^ 16 := by
+    rcases h_msb_bin with h | h
+    · rw [h, mul_zero, add_zero]; omega
+    · rw [h, mul_one]
+      have h65280 : (65280 : ZMod p).val = 65280 := by
+        rw [show (65280 : ZMod p) = ((65280 : ℕ) : ZMod p) by norm_cast, ZMod.val_natCast_of_lt (by omega)]
+      have hval : (input_selected_byte + 65280 : ZMod p).val = input_selected_byte.val + 65280 := by
+        rw [ZMod.val_add, h65280, Nat.mod_eq_of_lt (by omega)]
+      rw [hval]; omega
+  have h_load_isu64 : Word.isU64
+      (#v[input_selected_byte + 65280 * input_msb, 65535 * input_msb, 65535 * input_msb,
+          65535 * input_msb] : Word (ZMod p)) :=
+    Word.isU64_of_cases h_limb0_lt h_msb_val h_msb_val h_msb_val
+  refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ?_, ?_, ⟨?_, ?_⟩, ⟨?_, ?_⟩,
+    ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
-  · exact hbin
+  · exact ⟨hbin, fun _ => h_pv_isu64⟩
   · exact h_mem
   · -- U8Range-pair receive obligation (real row); value is raw (`toRaw` (gated post-#398)).
     intro _
@@ -192,6 +250,8 @@ theorem completeness :
     exact (byteRowSpec_msb _ _).mpr ⟨⟨h_msb_lt, hbyte_pa⟩, h_msb_bin, h_msb_iff⟩
   · exact ⟨hbin, hbin⟩
   · exact h_it
+  · exact ⟨hbin, fun _ => h_load_isu64⟩
+  · trivial
   · simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega), ← sub_eq_add_neg]; exact hsel0
   · simp only [eob 1 (by omega), eob 2 (by omega), epv 1 (by omega), ← sub_eq_add_neg]; exact hsel1
   · simp only [eob 1 (by omega), eob 2 (by omega), epv 2 (by omega), ← sub_eq_add_neg]; exact hsel2
@@ -217,7 +277,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadByteColumns :=
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
         AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit,
-        Readers.MemoryAccess.circuit]; grind,
+        Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit]; grind,
     -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8); the
     -- enabled flag is the **derived** selector sum `is_lb + is_lbu` (SP1's `is_real`).
     exposedChannels := fun input _ =>
@@ -235,9 +295,10 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadByteColumns :=
         AddrAddOperation.circuit, AddrAddOperation.main,
         Readers.MemoryAccess.circuit, Readers.MemoryAccess.main,
         Readers.ITypeReader.circuit, Readers.ITypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, byteChannel] }
+      simp [circuit_norm, Gadgets.Equality.main, byteChannel, memoryChannel] }
 
 end SP1Clean.LoadByteChip

@@ -125,6 +125,7 @@ theorem addcols_state_interactions_faithful_syntactic
   -- the `State` filter (channel distinctness), leaving CPUState's State pull (receive) + push (send).
   simp only [AddChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
     Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+    Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
     Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
@@ -166,6 +167,7 @@ theorem addcols_program_interactions_faithful_syntactic
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [AddChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
     Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+    Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
     Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
@@ -182,13 +184,16 @@ theorem addcols_program_interactions_faithful_syntactic
 
 set_option maxHeartbeats 4000000 in
 set_option linter.unusedSimpArgs false in
-/-- **Chip-level faithfulness anchor — Memory-bus interactions, SYNTACTIC (composition + WITNESSED).** The
-six Memory interactions the whole `AddChip` row emits (only the `RTypeReader` fragment emits Memory)
-project to the same `LookupAccess` list as the Memory entries of SP1's extracted `AddCols.interactions`
-oracle. The first chip-level anchor combining both techniques: it descends the chip to the `RTypeReader`
-memory emits, and the `op_a` write value is the chip-**witnessed** ALU result `cols.add_operation.value`,
-bound via `env.get (offset + k)` (the witnessed columns at the chip offset). The `clk_low` E4
-(`clk_0_16 + clk_16_24 * 2^16`) is reconstructed from `h_c0`/`h_c1`. -/
+/-- **Chip-level faithfulness anchor — Memory-bus interactions, SYNTACTIC (composition + WITNESSED + `Perm`
++ `negMult`).** The six Memory interactions the whole `AddChip` row emits — `RTypeReader`'s five reads
+(op_a read, op_b read+write-back, op_c read+write-back) **plus** `RegisterWrite`'s op_a write (Option B:
+the write factored out, composed by the chip after `AddOperation`) — project, after the W11-flip `negMult`
+sign-bridge, to a `List.Perm` of the Memory entries of SP1's extracted `AddCols.interactions` oracle. Two
+shifts from the old clean `=`: (1) the reads/writes are `pullIf`/`pushIf` (the negation of SP1's
+send/receive), so the whole emitted block is `negMult`-bridged; (2) the op_a write now trails the block (it
+comes from the separate `RegisterWrite` sub-assertion) whereas the oracle lists it second — so it is a
+`List.Perm`, not `=`. The `op_a` write value is the chip-**witnessed** ALU result `cols.add_operation.value`,
+bound via `env.get (offset + k)`. The `clk_low` E4 (`clk_0_16 + clk_16_24 * 2^16`) is from `h_c0`/`h_c1`. -/
 theorem addcols_memory_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddChip.Inputs (ZMod p)) (offset : ℕ)
     (cols : Extracted.AddCols (ZMod p))
@@ -221,21 +226,26 @@ theorem addcols_memory_interactions_faithful_syntactic
     (h_pv_c1 : Expression.eval env input.adapter.op_c_memory.prev_value[1] = cols.adapter.op_c_memory.prev_value[1])
     (h_pv_c2 : Expression.eval env input.adapter.op_c_memory.prev_value[2] = cols.adapter.op_c_memory.prev_value[2])
     (h_pv_c3 : Expression.eval env input.adapter.op_c_memory.prev_value[3] = cols.adapter.op_c_memory.prev_value[3]) :
-    (((AddChip.main input).operations offset).interactionsWith memoryChannel.toRaw).map
-        (AbstractInteraction.toAccess env)
-      = ((Extracted.AddCols.interactions cols).map Extracted.Interaction.toAccess).filter
-          (fun a => a.1 = InteractionKind.Memory) := by
+    List.Perm
+      (((((AddChip.main input).operations offset).interactionsWith memoryChannel.toRaw).map
+          (AbstractInteraction.toAccess env)).map LookupAccessList.negMult)
+      (((Extracted.AddCols.interactions cols).map Extracted.Interaction.toAccess).filter
+          (fun a => a.1 = InteractionKind.Memory)) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) memoryChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [AddChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
     Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+    Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
     Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, toAccess_pushIf_memory, heq]
-  simp [circuit_norm, toAccess_pushIf_memory, Gadgets.Equality.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions,
+    toAccess_pushIf_memory, toAccess_pullIf_memory, heq]
+  simp [circuit_norm, toAccess_pushIf_memory, toAccess_pullIf_memory, Gadgets.Equality.main,
+    LookupAccessList.negMult, signedVal_neg hp2,
     Extracted.AddCols.interactions, Extracted.AddOperation.interactions,
     Extracted.CPUState.interactions, Extracted.RTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
@@ -243,6 +253,11 @@ theorem addcols_memory_interactions_faithful_syntactic
     h_wv0, h_wv1, h_wv2, h_wv3, h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3,
     h_pl_b, h_pv_b0, h_pv_b1, h_pv_b2, h_pv_b3,
     h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3]
+  -- `simp` reduced both sides + stripped the common `op_a read` head. Residual: the circuit's
+  -- `[op_b read, op_b write, op_c read, op_c write, op_a write]` vs the oracle's
+  -- `[op_a write, op_b read, op_b write, op_c read, op_c write]` — the relocated op_a write (`RegisterWrite`)
+  -- trails the circuit block but leads the oracle's, so rotate it to the front (`perm_append_comm`).
+  exact List.perm_append_comm (l₁ := [_, _, _, _]) (l₂ := [_])
 
 set_option maxHeartbeats 4000000 in
 set_option linter.unusedSimpArgs false in
@@ -298,6 +313,7 @@ theorem addcols_byte_interactions_faithful_syntactic
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [AddChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
     Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+    Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
     Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
@@ -318,8 +334,9 @@ set_option maxHeartbeats 4000000 in
 the interactions the row emits on its four buses — `State`, `Byte`, `Memory`, `Program` — taken together
 are a `List.Perm` of SP1's *entire* extracted `AddCols.interactions` oracle (projected to `LookupAccess`).
 Assembled from the four per-channel anchors via `perm_filter_by_kind` (which decomposes the oracle image
-into its four `InteractionKind` blocks) + `List.Perm.append` (Byte is the only `Perm`; State/Memory/Program
-are `=`). No semantics, no channel filter — the complete emitted-interaction list vs the complete oracle.
+into its four `InteractionKind` blocks) + `List.Perm.append` (Byte and Memory are `Perm`s — the Memory block
+is `negMult`-bridged + reordered post-W11-flip, with `RegisterWrite`'s op_a write trailing; State/Program are
+`=`). No semantics, no channel filter — the complete emitted-interaction list vs the complete oracle.
 This closes out `AddChip`'s four-artifact chain at the syntactic-interaction level. -/
 theorem addcols_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddChip.Inputs (ZMod p)) (offset : ℕ)
@@ -368,8 +385,8 @@ theorem addcols_interactions_faithful_syntactic
           (AbstractInteraction.toAccess env)) ++
         ((((AddChip.main input).operations offset).interactionsWith byteChannel.toRaw).map
           (AbstractInteraction.toAccess env)) ++
-        ((((AddChip.main input).operations offset).interactionsWith memoryChannel.toRaw).map
-          (AbstractInteraction.toAccess env)) ++
+        (((((AddChip.main input).operations offset).interactionsWith memoryChannel.toRaw).map
+          (AbstractInteraction.toAccess env)).map LookupAccessList.negMult) ++
         (((((AddChip.main input).operations offset).interactionsWith programChannel.toRaw).map
           (AbstractInteraction.toAccess env)).map LookupAccessList.negMult))
       ((Extracted.AddCols.interactions cols).map Extracted.Interaction.toAccess) := by
@@ -388,7 +405,9 @@ theorem addcols_interactions_faithful_syntactic
   have hB := addcols_byte_interactions_faithful_syntactic env input offset cols h_ir h_c0 h_c1
     h_wv0 h_wv1 h_wv2 h_wv3 h_pl_a h_dl_a h_pl_b h_dl_b h_pl_c h_dl_c
   refine List.Perm.trans ?_ (LookupAccessList.perm_filter_by_kind _).symm
-  rw [hS, hM, hP']
-  exact ((hB.append_left _).append_right _).append_right _
+  -- State + Program blocks are clean `=` (`rw`); Byte + Memory are `Perm`s (`hB`/`hM`) threaded through the
+  -- append structure. (W11 memory flip: the Memory block is now `negMult`-bridged + reordered, like Program.)
+  rw [hS, hP']
+  exact ((hB.append_left _).append hM).append_right _
 
 end SP1Clean.Faithful

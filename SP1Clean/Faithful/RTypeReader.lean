@@ -116,13 +116,15 @@ open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel Progr
 open SP1Clean.InteractionRecovery
 
 set_option maxHeartbeats 1000000 in
-/-- **Faithfulness anchor (RTypeReader fragment) — Memory-bus interactions, SYNTACTIC.** The six Memory
-interactions the reader actually emits (`interactionsWith memoryChannel`) project to the same
-`LookupAccess` list as the Memory entries of SP1's extracted `RTypeReader.interactions` oracle (the
-`.filter`-to-`.Memory` of its `toAccess`-image). Per-channel the circuit and oracle emit in the same
-`op_a, op_b, op_c` (send-prev, receive-new) order, so this is a clean `=` — no `Perm`. Exercises the
-`.memory` arm of `Extracted.Interaction.toAccess` and its `.send`/`.receive` `Dir.sign` (the reader emits
-the receive with `mult -is_real`, the oracle as `.receive … is_real`; both project to `signedVal (-is_real)`). -/
+/-- **Faithfulness anchor (RTypeReader fragment) — Memory-bus interactions, SYNTACTIC.** Option B: the
+reader is now a **pure read** — its op_a (`rd`) **write** is factored out into `RegisterWrite` (composed by
+the chip). So the **five** Memory interactions the reader actually emits (`interactionsWith memoryChannel`:
+op_a read, op_b read+write, op_c read+write) project to the same `LookupAccess` list as the Memory entries
+of SP1's extracted `RTypeReader.interactions` oracle **with the op_a write dropped** (`.eraseIdx 1` — the
+op_a write is Memory-index 1). The relocated op_a write is recovered at the chip level by `RegisterWrite`'s
+own emit, so the *combined* chip Memory block still equals the full oracle (`Faithful/AddChip.lean`). Same
+`op_a(read), op_b, op_c` order, so a clean `=` after the erase. Exercises the `.memory` arm of
+`Extracted.Interaction.toAccess` and its `.send`/`.receive` `Dir.sign`. -/
 theorem rtypereader_memory_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var Readers.RTypeReader.Inputs (ZMod p)) (offset : ℕ)
     (clk_high clk_low : ZMod p) (pc : Vector (ZMod p) 3) (opcode : ZMod p)
@@ -133,10 +135,7 @@ theorem rtypereader_memory_interactions_faithful_syntactic
     (h_oa : Expression.eval env input.cols.op_a = cols.op_a)
     (h_ob : Expression.eval env input.cols.op_b = cols.op_b)
     (h_oc : Expression.eval env input.cols.op_c = cols.op_c)
-    (h_wv0 : Expression.eval env input.wv0 = op_a_write_value[0])
-    (h_wv1 : Expression.eval env input.wv1 = op_a_write_value[1])
-    (h_wv2 : Expression.eval env input.wv2 = op_a_write_value[2])
-    (h_wv3 : Expression.eval env input.wv3 = op_a_write_value[3])
+    -- (Option B) the op_a write left the reader, so the `op_a_write_value` eval-bridges `h_wv*` are gone.
     (h_pl_a : Expression.eval env input.cols.op_a_memory.access_timestamp.prev_low =
       cols.op_a_memory.access_timestamp.prev_low)
     (h_pv_a0 : Expression.eval env input.cols.op_a_memory.prev_value[0] = cols.op_a_memory.prev_value[0])
@@ -157,9 +156,11 @@ theorem rtypereader_memory_interactions_faithful_syntactic
     (h_pv_c3 : Expression.eval env input.cols.op_c_memory.prev_value[3] = cols.op_c_memory.prev_value[3]) :
     (((Readers.RTypeReader.main input).operations offset).interactionsWith
         memoryChannel.toRaw).map (AbstractInteraction.toAccess env)
-      = ((Extracted.RTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
-          is_trusted).map Extracted.Interaction.toAccess).filter (fun a => a.1 = InteractionKind.Memory) := by
+      = ((((Extracted.RTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
+          is_trusted).map Extracted.Interaction.toAccess).filter
+            (fun a => a.1 = InteractionKind.Memory)).eraseIdx 1).map LookupAccessList.negMult := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have hrac := fun (n : ℕ) (inp : Var Readers.RegisterAccessCols.Inputs (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit memoryChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
@@ -169,13 +170,18 @@ theorem rtypereader_memory_interactions_faithful_syntactic
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.programChannel_eq_memoryChannel_false, if_false]
-  simp only [toAccess_pushIf_memory]
+  -- W11 memory flip: reads are `pullIf` (mult `-is_real`), the op_b/op_c read-backs `pushIf` (mult `is_real`);
+  -- the op_a write `pushIf` is GONE (factored to `RegisterWrite`), so the oracle's op_a write (Memory-index 1)
+  -- is `eraseIdx 1`'d off the RHS, and the whole list is `negMult`-bridged (our pull/push polarity is the
+  -- negation of SP1's send/receive — same up-to-sign bridge as the Program bus).
+  simp only [toAccess_pushIf_memory, toAccess_pullIf_memory]
   -- RHS: unfold the oracle + projection, drop the byte/program entries (`.1 ≠ .Memory`) from the filter.
   simp only [Extracted.RTypeReader.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign, List.filter_cons]
-  -- both sides are now the same six `.Memory` accesses; bind the evals and reduce the constants.
-  simp [circuit_norm, h_ir, h_ch, h_cl, h_oa, h_ob, h_oc,
-    h_wv0, h_wv1, h_wv2, h_wv3, h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3,
+  -- both sides are now the same five `.Memory` accesses (modulo `negMult`); bind the evals + sign bridge.
+  simp [circuit_norm, LookupAccessList.negMult, signedVal_neg hp2,
+    h_ir, h_ch, h_cl, h_oa, h_ob, h_oc,
+    h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3,
     h_pl_b, h_pv_b0, h_pv_b1, h_pv_b2, h_pv_b3,
     h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3]
 

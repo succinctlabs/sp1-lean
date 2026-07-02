@@ -93,7 +93,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreWordColumns main wh
       input.memory_access, input.offset_bit, input.store_value, input.is_real⟩
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
   -- `programChannel` joins the byte guarantee propagated up from `ITypeReaderImmutable`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity +
 offset booleans, the `MemoryAccess` timestamp monotonicity (whose `new_value` is `store_value`), the

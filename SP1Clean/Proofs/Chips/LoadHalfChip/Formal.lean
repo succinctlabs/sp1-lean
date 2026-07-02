@@ -34,10 +34,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_align, hob0, hob1, h_off, hpv0, hpv1, hpv2, hpv3⟩ := h_assumptions
-  obtain ⟨_h_cpu, h_addr, h_mem, h_msb, h_itype, hsel0, hsel1, hsel2, hsel3, h_op_a_0,
+  obtain ⟨_h_cpu, h_addr, h_mem, h_msb, h_itype, _h_regwrite, hsel0, hsel1, hsel2, hsel3, h_op_a_0,
     h_msbgate, h_lh_gate, h_lhu_gate, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   have h_lh_bin := bool_of_mul_pred h_lh_gate
+  -- all four memory limbs are 16-bit (chip assumption) → `isU64 prev_value`, for `MemoryAccess`'s read push.
+  have h_pv_isu64 : Word.isU64 input_memory_access_prev_value := Word.isU64_of_cases hpv0 hpv1 hpv2 hpv3
   -- eval→value bridges for the nested vector fields the sub-`Spec`s / selection gates reference.
   have hmap_ob : Vector.map (Expression.eval env) input_var_offset_bit = input_offset_bit :=
     h_input.2.2.2.2.2.1
@@ -94,10 +96,25 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       (⟨input_selected_half, ⟨input_msb⟩, input_is_lh⟩ : U16MSBOperation.Inputs (ZMod p)) :=
     ⟨fun _ => h_sel_lt, h_lh_bin⟩
   have h_msb_spec := h_msb h_msb_as
-  refine ⟨⟨h_addr_spec, h_mem h_bin, h_msb_spec, h_it, ⟨hsel0, hsel1, hsel2, hsel3⟩, h_op_a_0,
+  -- `msb` binary (from `U16MSBOperation.Spec`) → sign-fill limb `65535·msb ∈ {0, 65535} < 2^16`.
+  have h_msb_val : (65535 * input_msb : ZMod p).val < 2 ^ 16 := by
+    have hp65535 : (65535 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+    have h_msb_bin : input_msb = 0 ∨ input_msb = 1 := h_msb_spec.1
+    rcases h_msb_bin with h | h
+    · rw [h, mul_zero, ZMod.val_zero]; norm_num
+    · rw [h, mul_one, show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) by norm_cast,
+        ZMod.val_natCast_of_lt hp65535]; norm_num
+  -- the loaded word `#v[selected_half, 65535·msb, 65535·msb, 65535·msb]` (op_a write value) is `isU64` —
+  -- from the selected memory limb (`h_sel_lt`) + the binary `msb` sign fill (`h_msb_val`).
+  have h_load_isu64 : Word.isU64
+      (#v[input_selected_half, 65535 * input_msb, 65535 * input_msb, 65535 * input_msb] : Word (ZMod p)) :=
+    Word.isU64_of_cases h_sel_lt h_msb_val h_msb_val h_msb_val
+  refine ⟨⟨h_addr_spec, h_mem ⟨h_bin, fun _ => h_pv_isu64⟩, h_msb_spec, h_it,
+    ⟨hsel0, hsel1, hsel2, hsel3⟩, h_op_a_0,
     h_msbgate, h_lh_bin, bool_of_mul_pred h_lhu_gate, h_bin⟩, ?_⟩
-  refine ⟨h_bin, Or.inr h_addr_as, Or.inr h_bin,
-    Or.inr ⟨fun _ => h_sel_lt, h_lh_bin⟩, Or.inr ⟨h_bin, h_bin⟩⟩
+  refine ⟨h_bin, Or.inr h_addr_as, Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩,
+    Or.inr ⟨fun _ => h_sel_lt, h_lh_bin⟩, Or.inr ⟨h_bin, h_bin⟩,
+    Or.inr ⟨h_bin, fun _ => h_load_isu64⟩⟩
 
 /-- Prover-side row well-formedness: the address facts + the reader/gadget `Spec`s + the selector
 binaries + `op_a_0 = 0` + the offset-selection equations + the `is_lhu·msb` zero-extension gate. -/
@@ -189,15 +206,30 @@ theorem completeness :
         have hi : input_offset_bit[0] ≠ 0 := by rw [hb0]; exact one_ne_zero
         rw [sub_eq_zero.mp ((mul_eq_zero.mp ((mul_eq_zero.mp hsel3).resolve_right ho)).resolve_right hi)]
         exact hpv3
-  refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨⟨fun _ => h_sel_lt, h_lh_bin⟩, ?_⟩, ⟨?_, ?_⟩,
+  -- `isU64 prev_value` (from the four 16-bit limbs) for `MemoryAccess`'s read push; the loaded-word `isU64`
+  -- (`h_load_isu64`) for `RegisterWrite`'s op_a write push.
+  have h_pv_isu64 : Word.isU64 input_memory_access_prev_value := Word.isU64_of_cases hpv0 hpv1 hpv2 hpv3
+  have h_msb_val : (65535 * input_msb : ZMod p).val < 2 ^ 16 := by
+    have hp65535 : (65535 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+    have h_msb_bin : input_msb = 0 ∨ input_msb = 1 := h_msb_spec.1
+    rcases h_msb_bin with h | h
+    · rw [h, mul_zero, ZMod.val_zero]; norm_num
+    · rw [h, mul_one, show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) by norm_cast,
+        ZMod.val_natCast_of_lt hp65535]; norm_num
+  have h_load_isu64 : Word.isU64
+      (#v[input_selected_half, 65535 * input_msb, 65535 * input_msb, 65535 * input_msb] : Word (ZMod p)) :=
+    Word.isU64_of_cases h_sel_lt h_msb_val h_msb_val h_msb_val
+  refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨⟨fun _ => h_sel_lt, h_lh_bin⟩, ?_⟩, ⟨?_, ?_⟩, ⟨?_, ?_⟩,
     ?_, ?_, ?_, ?_, h_op_a_0, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
-  · exact hbin
+  · exact ⟨hbin, fun _ => h_pv_isu64⟩
   · exact h_mem
   · exact h_msb_spec
   · exact ⟨hbin, hbin⟩
   · exact h_it
+  · exact ⟨hbin, fun _ => h_load_isu64⟩
+  · trivial
   · simp only [eob 0 (by omega), eob 1 (by omega), epv 0 (by omega), ← sub_eq_add_neg]; exact hsel0
   · simp only [eob 0 (by omega), eob 1 (by omega), epv 1 (by omega), ← sub_eq_add_neg]; exact hsel1
   · simp only [eob 0 (by omega), eob 1 (by omega), epv 2 (by omega), ← sub_eq_add_neg]; exact hsel2
@@ -233,9 +265,10 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadHalfColumns :=
         Readers.MemoryAccess.circuit, Readers.MemoryAccess.main,
         U16MSBOperation.circuit, U16MSBOperation.main,
         Readers.ITypeReader.circuit, Readers.ITypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, byteChannel] }
+      simp [circuit_norm, Gadgets.Equality.main, byteChannel, memoryChannel] }
 
 end SP1Clean.LoadHalfChip

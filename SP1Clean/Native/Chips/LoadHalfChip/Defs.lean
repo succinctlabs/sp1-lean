@@ -4,6 +4,7 @@ import SP1Clean.Proofs.Operations.U16MSBOperation.Formal
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ITypeReader
 import SP1Clean.Native.Readers.MemoryAccess
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Extracted.LoadHalfChip
 import Clean.Circuit.Basic
@@ -83,6 +84,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadHalfColumns (
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
       input.state.pc, input.is_lh * 30 + input.is_lhu * 33,
       input.selected_half, 65535 * input.msb, 65535 * input.msb, 65535 * input.msb⟩
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- the memory read + selection, so `isU64 <loaded word>` discharges its requirement. The loaded word is the
+  -- sign/zero-extended `selected_half` (the same tuple threaded to `ITypeReader` as `wv0..wv3`).
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a,
+     #v[input.selected_half, 65535 * input.msb, 65535 * input.msb, 65535 * input.msb], is_real⟩
   -- offset selection: `selected_half` = the 2-bit-selected limb of `prev_value`.
   (input.selected_half - input.memory_access.prev_value[0])
     * (input.offset_bit[0] - 1 : Expression (ZMod p)) * (input.offset_bit[1] - 1) === 0
@@ -101,18 +109,19 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadHalfColumns (
     input.selected_half, ⟨input.msb⟩, input.is_lh, input.is_lhu⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadHalfColumns main where
-  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
+  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
   -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks/gates witness nothing.
   localLength _ := 3 + 1
-  localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
+  localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
   output input i0 :=
     ⟨input.state, input.adapter,
       ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
       input.memory_access, input.offset_bit, input.selected_half, ⟨input.msb⟩,
       input.is_lh, input.is_lhu⟩
-  output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
-  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
+  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip);
+  -- `memoryChannel` joins from `MemoryAccess`'s read pulls + `RegisterWrite`'s op_a write push (W11 memory flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s plus the four offset-selection equations,
 the `op_a != x0` flag, the `is_lhu·msb` zero-extension gate, and the `is_lh`/`is_lhu`/`is_real` binaries. -/

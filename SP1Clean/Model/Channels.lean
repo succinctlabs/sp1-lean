@@ -75,16 +75,27 @@ for trace use); it is **not** the memory channel's `Guarantees` — see `memoryC
 def MemoryMsg.Spec (msg : MemoryMsg (ZMod p)) : Prop :=
   msg.addr1 = 0 ∧ msg.addr2 = 0
 
-/-- The Memory channel (SP1 `InteractionKind.Memory`). `Guarantees := True`: the memory bus is **just the
-balance** — the chip *emits* the per-row register interactions (`±is_real`) and the value's well-formedness
-(`isU64`) is **not** a per-row channel fact. Operand `isU64` for a consuming ALU chip is a chip-level
-**`Assumptions`** precondition (discharged at the machine/trace level from the offline-memory balance + the
-writer), not forced into the channel — the idiomatic split (see `docs/bus-model.md` §7). The cross-row
-offline-memory meaning stays trace-level (`Soundness/MemoryConsistency.lean`'s `TraceMemoryLink`). The `name`
-matches the `"SP1Memory"` key in `memoryLookups`. -/
+/-- **The Memory message's value well-formedness** — the 4-limb word `(v0, v1, v2, v3)` is a `U64` (each limb
+`< 2^16`). This is the per-message `Guarantees` the memory **provider proves on push** (a writer's range-check)
+and the chips **pull-and-derive** (W11 polarity flip), exactly analogous to `ProgramMsg.RowSpec` / the byte
+bus. Kept as a flat 4-conjunct (not routed through `Word.isU64`/`Fin 4` indexing) so the `simp only` in
+soundness/completeness stays linear, like `ProgramMsg.RowSpec`. -/
+def MemoryMsg.isU64 (msg : MemoryMsg (ZMod p)) : Prop :=
+  msg.v0.val < 2 ^ 16 ∧ msg.v1.val < 2 ^ 16 ∧ msg.v2.val < 2 ^ 16 ∧ msg.v3.val < 2 ^ 16
+
+/-- The Memory channel (SP1 `InteractionKind.Memory`). `Guarantees := MemoryMsg.isU64` — the value's
+well-formedness (each limb `< 2^16`). **W11 polarity flip:** the memory access's *read-back/write* now
+`pushIf`-pushes (proving `isU64` — a writer's ALU-result range-check for `op_a`; the just-pulled read-prior
+guarantee for an `op_b`/`op_c` read-back), and the *read-prior* `pullIf`-pulls (deriving `isU64`), so the
+operand `isU64` is *derived* by the consuming chip rather than carried as a chip-level `Assumptions`
+precondition — the byte/program-bus model. SP1's Rust *sends* the read-prior (`+is_real`); our pull emits
+`−is_real`, so our Memory interactions match SP1's extracted oracle **up to per-channel multiplicity
+negation** (a sound LogUp sign symmetry, bridged in the `Faithful/*` Memory anchors). The cross-row
+offline-memory *value-correctness* (read = last write) stays trace-level (`Soundness/MemoryConsistency.lean`);
+this channel carries only the value's `isU64`. The `name` matches the `"SP1Memory"` key in `memoryLookups`. -/
 def memoryChannel : Channel (ZMod p) MemoryMsg where
   name := "SP1Memory"
-  Guarantees _ _ := True
+  Guarantees msg _ := MemoryMsg.isU64 msg
 
 /-- The Program-bus message — the arity-16 instruction-fetch tuple `(pc0, pc1, pc2, opcode, op_a,
 op_b0..3, op_c0..3, op_a_0, imm_b, imm_c)`, matching SP1's `AirInteraction.program`

@@ -4,6 +4,7 @@ import SP1Clean.Proofs.Operations.U16MSBOperation.Formal
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ITypeReader
 import SP1Clean.Native.Readers.MemoryAccess
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Extracted.LoadWordChip
 import Clean.Circuit.Basic
@@ -94,6 +95,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadWordColumns (
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
       input.state.pc, input.is_lw * 31 + input.is_lwu * 34,
       input.selected_word[0], input.selected_word[1], 65535 * input.msb, 65535 * input.msb⟩
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- the memory read + selection, so `isU64 <loaded word>` discharges its requirement. The loaded word is the
+  -- sign/zero-extended `selected_word` (the same tuple threaded to `ITypeReader` as `wv0..wv3`).
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a,
+     #v[input.selected_word[0], input.selected_word[1], 65535 * input.msb, 65535 * input.msb], is_real⟩
   -- offset selection: `selected_word` = low half (offset 0) or high half (offset 1) of `prev_value`.
   (input.selected_word[0] - input.memory_access.prev_value[0]) * (input.offset_bit - 1) === 0
   (input.selected_word[1] - input.memory_access.prev_value[1]) * (input.offset_bit - 1) === 0
@@ -108,18 +116,19 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadWordColumns (
     input.selected_word, ⟨input.msb⟩, input.is_lw, input.is_lwu⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadWordColumns main where
-  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
+  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
   -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks/gates witness nothing.
   localLength _ := 3 + 1
-  localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
+  localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
   output input i0 :=
     ⟨input.state, input.adapter,
       ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
       input.memory_access, input.offset_bit, input.selected_word, ⟨input.msb⟩,
       input.is_lw, input.is_lwu⟩
-  output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
-  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
+  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip);
+  -- `memoryChannel` joins from `MemoryAccess`'s read pulls + `RegisterWrite`'s op_a write push (W11 memory flip).
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity +
 offset booleans, the `MemoryAccess` timestamp monotonicity, the `U16MSBOperation` high-bit fact, the

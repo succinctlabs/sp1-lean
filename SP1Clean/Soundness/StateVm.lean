@@ -314,55 +314,55 @@ private lemma aluX0_enabled_bool (input : Var AluX0Chip.Inputs (ZMod p)) (offset
 
 /-! ## Per-chip channel rfl-lemmas (cheap lazy projection; avoid unfolding the huge circuits) -/
 
-private lemma add_cwg : (AddChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma add_cwg : (AddChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma add_cwr : (AddChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma addi_cwg : (AddiChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma addi_cwg : (AddiChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma addi_cwr : (AddiChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma addw_cwg : (AddwChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma addw_cwg : (AddwChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma addw_cwr : (AddwChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma sub_cwg : (SubChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma sub_cwg : (SubChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma sub_cwr : (SubChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma subw_cwg : (SubwChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma subw_cwg : (SubwChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma subw_cwr : (SubwChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma bitwise_cwg : (BitwiseChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma bitwise_cwg : (BitwiseChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma bitwise_cwr : (BitwiseChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma lt_cwg : (LtChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma lt_cwg : (LtChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma lt_cwr : (LtChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma shiftLeft_cwg : (ShiftLeftChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma shiftLeft_cwg : (ShiftLeftChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma shiftLeft_cwr : (ShiftLeftChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma shiftRight_cwg : (ShiftRightChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma shiftRight_cwg : (ShiftRightChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma shiftRight_cwr : (ShiftRightChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma jal_cwg : (JalChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma jal_cwg : (JalChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma jal_cwr : (JalChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma jalr_cwg : (JalrChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma jalr_cwg : (JalrChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma jalr_cwr : (JalrChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma branch_cwg : (BranchChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma branch_cwg : (BranchChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma branch_cwr : (BranchChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma uType_cwg : (UTypeChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma uType_cwg : (UTypeChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma uType_cwr : (UTypeChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma loadByte_cwg : (LoadByteChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma loadByte_cwg : (LoadByteChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma loadByte_cwr : (LoadByteChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma loadHalf_cwg : (LoadHalfChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma loadHalf_cwg : (LoadHalfChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma loadHalf_cwr : (LoadHalfChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma loadWord_cwg : (LoadWordChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma loadWord_cwg : (LoadWordChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma loadWord_cwr : (LoadWordChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma loadDouble_cwg : (LoadDoubleChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma loadDouble_cwg : (LoadDoubleChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma loadDouble_cwr : (LoadDoubleChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma loadX0_cwg : (LoadX0Chip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma loadX0_cwg : (LoadX0Chip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma loadX0_cwr : (LoadX0Chip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma storeByte_cwg : (StoreByteChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma storeByte_cwg : (StoreByteChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma storeByte_cwr : (StoreByteChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma storeHalf_cwg : (StoreHalfChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma storeHalf_cwg : (StoreHalfChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma storeHalf_cwr : (StoreHalfChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma storeWord_cwg : (StoreWordChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma storeWord_cwg : (StoreWordChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma storeWord_cwr : (StoreWordChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma storeDouble_cwg : (StoreDoubleChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma storeDouble_cwg : (StoreDoubleChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma storeDouble_cwr : (StoreDoubleChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma mul_cwg : (MulChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma mul_cwg : (MulChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma mul_cwr : (MulChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma divRem_cwg : (DivRemChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma divRem_cwg : (DivRemChip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma divRem_cwr : (DivRemChip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
-private lemma aluX0_cwg : (AluX0Chip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw] := rfl
+private lemma aluX0_cwg : (AluX0Chip.circuit (p := p)).channelsWithGuarantees = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 private lemma aluX0_cwr : (AluX0Chip.circuit (p := p)).channelsWithRequirements = [stateChannel.toRaw, memoryChannel.toRaw] := rfl
 
 /-- Per-table `tables_channel` recipe: postpone the three exposed-pair witnesses, close membership
@@ -436,10 +436,18 @@ def byteProgramEnsemble : SoundEnsemble (ZMod p) SP1PublicIO :=
         (by simp [circuit_norm, ProgramProviderChip.circuit, ByteChip.byteProviderEnsemble])
     |>.addFinishedChannel programChannel.toRaw
 
+/- **W11 MEMORY-FLIP — PARKED (M5 seam).** The Option-B memory flip makes every chip **pull** the memory
+bus (to derive operand `isU64`), so `memoryChannel` now sits in each chip's `channelsWithGuarantees` (see the
+updated `*_cwg` lemmas above). Clean's `addVm` obligation `grts_subset_finished` requires each VM table's
+guarantees ⊆ `stateChannel :: finished`, but `memoryChannel` is neither the State VM channel nor a *finished*
+channel — and it **cannot** be finished, because memory is itself a pull-then-push VM channel, not a
+`SoundChannel` (`Air/Vm.lean` top doc). So `sp1StateVmEnsemble`/`sp1StateVm_sound` are genuinely unprovable
+as-is; restoring them needs Clean's `VmTables` generalized to multi-step / multi-VM-channel so memory becomes
+a *second* VM channel added alongside State (roadmap W11 "path A"). The 25-table `sp1StateVmSpike` (the
+`VmTables` def itself, over the untouched State `exposedChannels`) and `byteProgramEnsemble` are KEPT above
+and still build — this parks only the final `addVm` composition and its soundness corollary.
+
 set_option maxHeartbeats 4000000 in
-/-- **The full State-bus VM.** `addVm` applies the 25-table State VM to the byte+program-finished base,
-producing a `SoundVmEnsemble` over all SP1 chips and the real byte/program providers (memory stays an
-open requirement). -/
 def sp1StateVmEnsemble : SoundVmEnsemble (ZMod p) SP1PublicIO :=
   byteProgramEnsemble.addVm sp1StateVmSpike
     (by
@@ -447,7 +455,6 @@ def sp1StateVmEnsemble : SoundVmEnsemble (ZMod p) SP1PublicIO :=
         ProgramProviderChip.circuit, ByteChip.U8Range.circuit, ByteChip.MSB.circuit,
         ByteChip.AndByte.circuit, ByteChip.OrByte.circuit, ByteChip.XorByte.circuit,
         RangeChip.circuit8, RangeChip.circuit13, RangeChip.circuit16, RangeChip.circuit]
-      -- the residual `"SP1State" = <other> → …` implications are vacuous (distinct channel names).
       refine ⟨?_, ?_⟩
       · intro hn; exact absurd hn (by decide : ¬ ("SP1State" = "SP1Program"))
       · intro hn; exact absurd hn (by decide : ¬ ("SP1State" = "SP1Byte")))
@@ -461,13 +468,12 @@ def sp1StateVmEnsemble : SoundVmEnsemble (ZMod p) SP1PublicIO :=
         List.forall_mem_cons, add_cwr, addi_cwr, addw_cwr, sub_cwr, subw_cwr, bitwise_cwr, lt_cwr, shiftLeft_cwr, shiftRight_cwr, jal_cwr, jalr_cwr, branch_cwr, uType_cwr, loadByte_cwr, loadHalf_cwr, loadWord_cwr, loadDouble_cwr, loadX0_cwr, storeByte_cwr, storeHalf_cwr, storeWord_cwr, storeDouble_cwr, mul_cwr, divRem_cwr, aluX0_cwr]
       simp [circuit_norm, byteProgramEnsemble, ByteChip.byteProviderEnsemble, ProgramProviderChip.circuit])
 
-/-- The State VM channel is sound: from a constraint-satisfying, channel-balanced witness over the
-byte+program-finished ensemble plus the full 25-table State VM, the verifier's guarantees hold. -/
 theorem sp1StateVm_sound : (sp1StateVmEnsemble (p := p)).ensemble.SoundVmChannel :=
   (sp1StateVmEnsemble (p := p)).soundVmChannel
 
 @[deprecated sp1StateVm_sound (since := "2026-06-28")]
 theorem sp1StateVm_spike_sound : (sp1StateVmEnsemble (p := p)).ensemble.SoundVmChannel :=
   sp1StateVm_sound
+-/
 
 end SP1Clean.Soundness

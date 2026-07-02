@@ -2,6 +2,7 @@ import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Proofs.Operations.AddwOperation.Formal
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Extracted.AddwChip
 import Clean.Circuit.Basic
@@ -50,16 +51,27 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (AddwCols) (ZMod 
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 19,
      value[0], value[1], msb[0] * 65535, msb[0] * 65535⟩
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- `AddwOperation`, so `isU64 (resultWord)` (the sign-extended W result, range-checked by the operation)
+  -- discharges its requirement. The written value is the sign-extended W word
+  -- `#v[value[0], value[1], msb·65535, msb·65535]`; the write access clock is the recombined low clock `+ 4`.
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a, #v[value[0], value[1], msb[0] * 65535, msb[0] * 65535], input.is_real⟩
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
   -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, ⟨value, ⟨msb[0]⟩⟩, input.is_real⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddwCols main where
-  channelsLawful := by simp [circuit_norm, main, AddwOperation.circuit, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit]
+  channelsLawful := by
+    simp [circuit_norm, main, AddwOperation.circuit, Readers.ALUTypeReader.circuit,
+      Readers.CPUState.circuit, Readers.RegisterWrite.circuit]
   -- 2 result limbs + 1 sign bit; readers are `assertion`s (`localLength 0`).
   localLength _ := 3
-  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
+  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
+  -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
+  -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 end SP1Clean.AddwChip

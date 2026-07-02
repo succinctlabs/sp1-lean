@@ -2,6 +2,7 @@ import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Native.Operations.MulOperation
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.RTypeReader
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Extracted.MulChip
 import Clean.Circuit.Basic
@@ -111,6 +112,16 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p))
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_mul * 11 + is_mulh * 12 + is_mulhu * 13 + is_mulhsu * 14 + is_mulw * 24,
      a[0], a[1], a[2], a[3]⟩
+  -- Pin `is_real` to the one-hot flag-sum (SP1 has no separate `is_real`: it gates the whole row by this
+  -- sum `E3`, used uniformly for `CPUState`/`RTypeReader`/`MulOperation`). Making it explicit lets soundness
+  -- bridge the reader (gated `is_real`) and the operation (gated by the sum) — the Option-B operand `isU64`
+  -- the reader derives on real rows now also discharges `MulOperation`'s `sum = 1 → isU64` precondition.
+  assertZero (input.is_real - (is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw))
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- `MulOperation`, so `isU64 a` (the result word range) discharges its requirement. Clock `+ 4`.
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a, a, input.is_real⟩
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
   -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
   assertZero (input.is_real * (input.is_real - 1))
@@ -118,18 +129,23 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p))
 
 set_option maxHeartbeats 4000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs MulCols main where
-  -- flags(5) + MulOperation cols(45) + a(4) = 54; MulOperation is a FormalAssertion (0 witnesses).
+  -- flags(5) + MulOperation cols(45) + a(4) = 54; MulOperation/RegisterWrite are FormalAssertions (0 witnesses).
   localLength _ := 54
-  localLength_eq := by simp +arith [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit]
-  subcircuitsConsistent := by simp only [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit]; try omega
-  -- `programChannel` joins the byte guarantee propagated up from `RTypeReader`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
-  channelsLawful := by simp [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit]
+  localLength_eq := by simp +arith [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit,
+    Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit]
+  subcircuitsConsistent := by simp only [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit,
+    Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit]; try omega
+  -- `programChannel` joins the byte guarantee propagated up from `RTypeReader`'s program **pull** (W11 flip);
+  -- `memoryChannel` joins from `RTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
+  -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsLawful := by simp [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit,
+    Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw, programChannel.toRaw] := rfl
+      = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 54 := rfl

@@ -44,6 +44,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
   let f := hintFlags hint
   Word.isU64 input.op_b_val ∧
   Word.isU64 input.adapter.op_c_memory.prev_value ∧
+  -- (W11 Option-B memory flip) the op_a register read-prior is `u64` on real rows — feeds the
+  -- `ALUTypeReader` op_a/op_b `isU64` reader-`Spec` conjunct (op_a's half).
+  (input.is_real = 1 → Word.isU64 input.adapter.op_a_memory.prev_value) ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   (f[0] = 0 ∨ f[0] = 1) ∧ (f[1] = 0 ∨ f[1] = 1) ∧
   input.is_real = f[0] + f[1] ∧
@@ -90,7 +93,7 @@ hint) satisfy every constraint under `ProverAssumptions`. -/
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨hbU, hcU, hbin, hf0, hf1, hsum, hop_a_0, himmc, himmbin, hpins, h_cpu,
+  obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hsum, hop_a_0, himmc, himmbin, hpins, h_cpu,
     hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨h_env_a, h_env_cb, h_env_v, h_env_s, h_env_lo, h_env_hi, h_env_lr, h_env_tail⟩ := h_env
   obtain ⟨h_env_msb, h_env_fl⟩ := h_env_tail
@@ -182,7 +185,13 @@ theorem completeness :
     ⟨⟨hsum01, hsum01⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [← hsum]; exact himmc, by rw [← hsum]; exact himmbin, hpins,
       by rw [← hsum]; exact hrac_a, by rw [← hsum]; exact hrac_b, by rw [← hsum]; exact hrac_c,
-      by rw [← hsum]; exact hdec⟩,
+      by rw [← hsum]; exact hdec,
+      -- (W11 memory flip) the two operand-`isU64` reader-`Spec` conjuncts (op_a/op_b on real rows; op_c on
+      -- the `is_real - imm_c` register-read gate). The reader's `is_real` arg is `gate`, so `rw [← hsum]`.
+      by rw [← hsum]; exact fun hr => ⟨ha_prev hr, hbU⟩, by rw [← hsum]; exact fun _ => hcU⟩,
+    -- (W11 Option-B) the composed `RegisterWrite` op_a write push: `gate` binary + the placed result word
+    -- `a`'s `isU64` (populate per-limb range); `Spec = True` (`trivial`).
+    ⟨⟨hsum01, ?_⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     by rw [hsum]; exact add_neg_cancel (F[0] + F[1]),
     by rcases hsum01 with h | h <;> rw [h] <;> simp,
@@ -200,6 +209,15 @@ theorem completeness :
   · rw [show sllwMsb B c0 F = U16MSBOperation.populate_msb (populateA B c0 F)[1] by
       rw [sllwMsb, if_pos h1]]
     exact (U16MSBOperation.spec_populate (populateA_val_lt B c0 F hbUw 1 (by norm_num)) 1).2 rfl
+  · -- RegisterWrite op_a write push: the placed result word `a` is a `u64` (the populate per-limb range).
+    intro _
+    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
+      simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm, hA0, hA1, hA2, hA3] <;>
+      first
+        | exact populateA_val_lt B c0 F hbUw 0 (by norm_num)
+        | exact populateA_val_lt B c0 F hbUw 1 (by norm_num)
+        | exact populateA_val_lt B c0 F hbUw 2 (by norm_num)
+        | exact populateA_val_lt B c0 F hbUw 3 (by norm_num)
   -- the nine `gate`-gated byte-range pulls: the populate bounds hold unconditionally
   -- (`convert … using 2` bridges the circuit's ℕ-cast numerals to the lemmas' field numerals)
   · exact fun _ => by convert byteRow_e32 c0 hc0v using 2
@@ -227,7 +245,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftLeftCols :=
       [stateChannel.toRaw, memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
-        Readers.CPUState.circuit, U16MSBOperation.circuit, Readers.ALUTypeReader.circuit]
+        Readers.CPUState.circuit, U16MSBOperation.circuit, Readers.ALUTypeReader.circuit,
+        Readers.RegisterWrite.circuit]
       -- the `is_real` boolean gate is now also shallow (`assertZero`, VmTables-ready), so the shallow
       -- hypothesis is the pair `⟨is_real gate, (is_sll + is_sllw) gate⟩`; the byte pulls are gated by the
       -- sum, so discharge off-gate via `hgate.2`.
@@ -248,6 +267,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftLeftCols :=
       intro input offset
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,

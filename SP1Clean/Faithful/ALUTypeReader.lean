@@ -118,11 +118,16 @@ theorem alutypereader_program_interactions_faithful_syntactic
     h_it, h_p0, h_p1, h_p2, h_oc, h_oa, h_ob, h_oc0, h_oc1, h_oc2, h_oc3, h_oa0, h_imm]
 
 set_option maxHeartbeats 1000000 in
-/-- **Faithfulness anchor (ALUTypeReader fragment) — Memory-bus interactions, SYNTACTIC.** Sibling of
-`rtypereader_memory_…`: the six Memory interactions project to the oracle's Memory entries. ALU-type
-differences: the `op_c` register read uses the low limb `op_c[0]` as its address, and its two Memory emits
-are gated by `is_real - imm_c` (an immediate does no register read) — handled by binding `imm_c` (`h_imm`),
-the mult reduces to `is_real - cols.imm_c` matching the oracle's `E29`. -/
+/-- **Faithfulness anchor (ALUTypeReader fragment) — Memory-bus interactions, SYNTACTIC.** Option B: the
+reader is now a **pure read** — its op_a (`rd`) **write** is factored out into `RegisterWrite` (composed by
+the chip). So the **five** Memory interactions the reader actually emits (op_a read, op_b read+write-back,
+op_c read+write-back) project to the same `LookupAccess` list as the Memory entries of SP1's extracted
+`ALUTypeReader.interactions` oracle **with the op_a write dropped** (`.eraseIdx 1` — the op_a write is
+Memory-index 1), after the W11-flip `negMult` sign-bridge (our pull/push polarity is the negation of SP1's
+send/receive). ALU-type differences vs R-type: the `op_c` register read uses the low limb `op_c[0]` as its
+address, and its emits are gated by `is_real - imm_c` (`h_imm` binds it). The relocated op_a write is
+recovered at the chip level by `RegisterWrite`'s own emit. Same `op_a(read), op_b, op_c` order, so a clean
+`=` after the erase. -/
 theorem alutypereader_memory_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var Readers.ALUTypeReader.Inputs (ZMod p)) (offset : ℕ)
     (clk_high clk_low : ZMod p) (pc : Vector (ZMod p) 3) (opcode : ZMod p)
@@ -134,10 +139,6 @@ theorem alutypereader_memory_interactions_faithful_syntactic
     (h_ob : Expression.eval env input.cols.op_b = cols.op_b)
     (h_oc0 : Expression.eval env input.cols.op_c[0] = cols.op_c[0])
     (h_imm : Expression.eval env input.cols.imm_c = cols.imm_c)
-    (h_wv0 : Expression.eval env input.wv0 = op_a_write_value[0])
-    (h_wv1 : Expression.eval env input.wv1 = op_a_write_value[1])
-    (h_wv2 : Expression.eval env input.wv2 = op_a_write_value[2])
-    (h_wv3 : Expression.eval env input.wv3 = op_a_write_value[3])
     (h_pl_a : Expression.eval env input.cols.op_a_memory.access_timestamp.prev_low =
       cols.op_a_memory.access_timestamp.prev_low)
     (h_pv_a0 : Expression.eval env input.cols.op_a_memory.prev_value[0] = cols.op_a_memory.prev_value[0])
@@ -158,9 +159,11 @@ theorem alutypereader_memory_interactions_faithful_syntactic
     (h_pv_c3 : Expression.eval env input.cols.op_c_memory.prev_value[3] = cols.op_c_memory.prev_value[3]) :
     (((Readers.ALUTypeReader.main input).operations offset).interactionsWith
         memoryChannel.toRaw).map (AbstractInteraction.toAccess env)
-      = ((Extracted.ALUTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
-          is_trusted).map Extracted.Interaction.toAccess).filter (fun a => a.1 = InteractionKind.Memory) := by
+      = ((((Extracted.ALUTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
+          is_trusted).map Extracted.Interaction.toAccess).filter
+            (fun a => a.1 = InteractionKind.Memory)).eraseIdx 1).map LookupAccessList.negMult := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have hrac := fun (n : ℕ) (inp : Var Readers.RegisterAccessCols.Inputs (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit memoryChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
@@ -170,13 +173,20 @@ theorem alutypereader_memory_interactions_faithful_syntactic
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [Readers.ALUTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.programChannel_eq_memoryChannel_false, if_false]
-  simp only [toAccess_pushIf_memory]
+  simp only [toAccess_pushIf_memory, toAccess_pullIf_memory]
   simp only [Extracted.ALUTypeReader.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign, List.filter_cons]
-  simp [circuit_norm, h_ir, h_ch, h_cl, h_oa, h_ob, h_oc0, h_imm,
-    h_wv0, h_wv1, h_wv2, h_wv3, h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3,
+  simp [circuit_norm, LookupAccessList.negMult, signedVal_neg hp2,
+    h_ir, h_ch, h_cl, h_oa, h_ob, h_oc0, h_imm,
+    h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3,
     h_pl_b, h_pv_b0, h_pv_b1, h_pv_b2, h_pv_b3,
     h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3, sub_eq_add_neg]
+  -- residual op_c sign bridge: the `is_real - imm_c` gate's two `signedVal` orientations. Unlike R-type's
+  -- single-variable `is_real`, the compound `cols.imm_c + -is_real = -(is_real + -cols.imm_c)` needs a `ring`
+  -- nudge before `signedVal_neg` fires.
+  refine ⟨?_, ?_⟩
+  · rw [(by ring : cols.imm_c + -is_real = -(is_real + -cols.imm_c)), signedVal_neg hp2]
+  · rw [(by ring : cols.imm_c + -is_real = -(is_real + -cols.imm_c)), signedVal_neg hp2, neg_neg]
 
 set_option maxHeartbeats 1000000 in
 /-- **Faithfulness anchor (ALUTypeReader fragment) — Byte-bus interactions, SYNTACTIC.** Sibling of

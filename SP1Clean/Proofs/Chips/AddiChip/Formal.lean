@@ -16,19 +16,30 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start [Spec]
-  obtain ⟨ha, hb⟩ := h_assumptions
-  obtain ⟨_, h_add, h_adapter, h_gate⟩ := h_holds
+  obtain ⟨_, h_add, h_adapter, _h_regwrite, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
-  refine ⟨⟨h_adapter ⟨h_bin, h_bin⟩, h_bin, fun hr => (h_add ⟨fun _ => ⟨ha, hb⟩, h_bin⟩ hr).2⟩, ?_⟩
+  -- **Option B cycle-break.** The immediate `op_c`'s `isU64` is assumed (`h_assumptions`); the register
+  -- `op_b`'s `isU64` is *derived* from the `ITypeReader` reader sub-`Spec` (its 6th conjunct is the memory-
+  -- pull-derived pair `is_real=1 → isU64 op_a/op_b prev`). Feeding both into `AddOperation` gives `isU64 value`
+  -- (.1) + the gated add identity (.2); the result `isU64` discharges the new `RegisterWrite` op_a write push.
+  have h_rspec := h_adapter ⟨h_bin, h_bin⟩
+  have h_pair := h_rspec.2.2.2.2.2
+  have h_addspec := h_add ⟨fun hr => ⟨(h_pair hr).2, h_assumptions⟩, h_bin⟩
+  refine ⟨⟨h_rspec, h_bin, fun hr => (h_addspec hr).2⟩, ?_⟩
   and_intros <;>
     first
-      | exact h_bin | exact ⟨h_bin, h_bin⟩ | exact ⟨fun _ => ⟨ha, hb⟩, h_bin⟩
-      | exact Or.inl rfl | exact Or.inr ⟨h_bin, h_bin⟩
+      | exact h_bin
+      | exact ⟨h_bin, h_bin⟩
+      | exact Or.inl rfl
+      | exact Or.inr ⟨h_bin, h_bin⟩
+      | exact ⟨fun hr => ⟨(h_pair hr).2, h_assumptions⟩, h_bin⟩
+      | exact Or.inr ⟨fun hr => ⟨(h_pair hr).2, h_assumptions⟩, h_bin⟩
+      | exact Or.inr ⟨h_bin, fun hr => (h_addspec hr).1⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hdec⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hdec⟩ := h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, hoc⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
@@ -47,8 +58,13 @@ theorem completeness :
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
-    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hdec⟩, ?_⟩
+    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hdec,
+      fun hr => ⟨ha_prev hr, ha⟩⟩,
+    ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
   · rw [hval]; exact AddOperation.spec_populate ha hb input_is_real
+  · -- RegisterWrite's `isU64 value` (op_a write push): the witnessed result `value = populate op_b op_c_imm`,
+    -- whose `isU64` is `spec_populate.1`.
+    intro hr; rw [hval]; exact (AddOperation.spec_populate ha hb input_is_real hr).1
   rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- The `Addi` chip row as a `GeneralFormalCircuit`: single-variant `is_real`-gated RV64 `add`
@@ -75,6 +91,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddiCols :=
       intro input offset
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ITypeReader.circuit, Readers.ITypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,

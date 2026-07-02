@@ -39,7 +39,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- (dropped by `simp`), leaving the three real conjuncts.
   simp only [Inputs.op_b_val, Inputs.op_c_val] at h_assumptions ⊢
   obtain ⟨hb_u64, hc_u64, hc_eq⟩ := h_assumptions
-  obtain ⟨_hcpu, hmsb, _halu, _hrealbin, hrealeq,
+  obtain ⟨_hcpu, hmsb, _halu, _hregwrite, _hrealbin, hrealeq,
     _hE2, _hE4, _hE6,
     hcb0b, hcb1b, hcb2b, hcb3b, hcb4b, hcb5b,
     hsu0sel, hsu0b, hsu1sel, hsu1b, hsu2sel, hsu2b, hsu3sel, hsu3b, hsusum,
@@ -113,6 +113,109 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     exact ShiftLeftCore.sllw_a1_bound (2^S) (2^(16-S))
       (by rw [← pow_add, Nat.add_sub_cancel' (show S ≤ 16 by omega)]; norm_num)
       hv0123val (bool_of_mul_pred hcb4b) hs0sel hs1sel hs2sel hs3sel hssum hlr0 hlr1 hll0 hhl0 hll1 hw01 hw11
+  -- The placed result word `a` is a `u64` on every real (gate = 1) row — the `RegisterWrite` op_a write
+  -- push's `isU64` requirement (W11 Option-B memory flip). Self-contained from the byte ranges (the
+  -- `lower/higher_limb` pulls bound the `limb_result` entries) + the placement asserts (each `a_i` is `0`,
+  -- a `limb_result` entry, or `msb·65535`); reused in the channel-requirement tail.
+  have a_isU64 : (input_is_sll + input_is_sllw : ZMod p) = 1 →
+      (env.get i₀).val < 2 ^ 16 ∧ (env.get (i₀+1)).val < 2 ^ 16 ∧
+      (env.get (i₀+2)).val < 2 ^ 16 ∧ (env.get (i₀+3)).val < 2 ^ 16 := by
+    intro hgate1
+    simp only [id_eq] at *
+    have hp17 : 131072 < p := by have := Fact.out (p := (2:ℕ)^17 < p); omega
+    have hv01 : env.get (i₀+4+6) = (env.get (i₀+4) + 1) * (env.get (i₀+4+1) * 3 + 1) := by
+      linear_combination hv01e
+    have hv012 : env.get (i₀+4+6+1) = env.get (i₀+4+6) * (env.get (i₀+4+2) * 15 + 1) := by
+      linear_combination hv012e
+    have hv0123 : env.get (i₀+4+6+2) = env.get (i₀+4+6+1) * (env.get (i₀+4+3) * 255 + 1) := by
+      linear_combination hv0123e
+    obtain ⟨S, hSle, hv0123val, h_inner⟩ := ShiftLeftCore.v0123_pow
+      (bool_of_mul_pred hcb0b) (bool_of_mul_pred hcb1b) (bool_of_mul_pred hcb2b) (bool_of_mul_pred hcb3b)
+      hv01 hv012 hv0123
+    have hwidth_hl : (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8 : ZMod p)
+        = ((S : ℕ) : ZMod p) := by
+      have hi := h_inner; push_cast at hi ⊢; linear_combination hi
+    have hwidth_ll : (16 + -(env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8) : ZMod p)
+        = (((16 - S) : ℕ) : ZMod p) := by
+      push_cast [Nat.cast_sub (show S ≤ 16 by omega)]; linear_combination -hwidth_hl
+    have hneg : -(input_is_sll + input_is_sllw) = -1 := by rw [hgate1]
+    have hll0 : (env.get (i₀+4+6+3+4)).val < 2 ^ (16 - S) := by
+      have hb := hbyte2 hneg; rw [hwidth_ll] at hb
+      exact (byteRowSpec_range _ (show 16 - S < p by omega)).mp hb
+    have hhl0 : (env.get (i₀+4+6+3+4+4)).val < 2 ^ S := by
+      have hb := hbyte3 hneg; rw [hwidth_hl] at hb
+      exact (byteRowSpec_range _ (show S < p by omega)).mp hb
+    have hll1 : (env.get (i₀+4+6+3+4+1)).val < 2 ^ (16 - S) := by
+      have hb := hbyte4 hneg; rw [hwidth_ll] at hb
+      exact (byteRowSpec_range _ (show 16 - S < p by omega)).mp hb
+    have hhl1 : (env.get (i₀+4+6+3+4+4+1)).val < 2 ^ S := by
+      have hb := hbyte5 hneg; rw [hwidth_hl] at hb
+      exact (byteRowSpec_range _ (show S < p by omega)).mp hb
+    have hll2 : (env.get (i₀+4+6+3+4+2)).val < 2 ^ (16 - S) := by
+      have hb := hbyte6 hneg; rw [hwidth_ll] at hb
+      exact (byteRowSpec_range _ (show 16 - S < p by omega)).mp hb
+    have hhl2 : (env.get (i₀+4+6+3+4+4+2)).val < 2 ^ S := by
+      have hb := hbyte7 hneg; rw [hwidth_hl] at hb
+      exact (byteRowSpec_range _ (show S < p by omega)).mp hb
+    have hll3 : (env.get (i₀+4+6+3+4+3)).val < 2 ^ (16 - S) := by
+      have hb := hbyte8 hneg; rw [hwidth_ll] at hb
+      exact (byteRowSpec_range _ (show 16 - S < p by omega)).mp hb
+    have hhl3 : (env.get (i₀+4+6+3+4+4+3)).val < 2 ^ S := by
+      have hb := hbyte9 hneg; rw [hwidth_hl] at hb
+      exact (byteRowSpec_range _ (show S < p by omega)).mp hb
+    have hlr0 : env.get (i₀+4+6+3+4+4+4) = env.get (i₀+4+6+3+4) * env.get (i₀+4+6+2) := by
+      linear_combination hreass0
+    have hlr1 : env.get (i₀+4+6+3+4+4+4+1) = env.get (i₀+4+6+3+4+1) * env.get (i₀+4+6+2) + env.get (i₀+4+6+3+4+4) := by
+      linear_combination hreass1
+    have hlr2 : env.get (i₀+4+6+3+4+4+4+2) = env.get (i₀+4+6+3+4+2) * env.get (i₀+4+6+2) + env.get (i₀+4+6+3+4+4+1) := by
+      linear_combination hreass2
+    have hlr3 : env.get (i₀+4+6+3+4+4+4+3) = env.get (i₀+4+6+3+4+3) * env.get (i₀+4+6+2) + env.get (i₀+4+6+3+4+4+2) := by
+      linear_combination hreass3
+    have hMN : 2 ^ S * 2 ^ (16 - S) = 65536 := by
+      rw [← pow_add, Nat.add_sub_cancel' (show S ≤ 16 by omega)]; norm_num
+    have hMpos : 0 < 2 ^ S := pow_pos (by norm_num) _
+    have hb0 : (env.get (i₀+4+6+3+4+4+4)).val < 2 ^ 16 := by
+      rw [hlr0]; exact lr0_val_lt hMN hMpos hv0123val hll0
+    have hb1 : (env.get (i₀+4+6+3+4+4+4+1)).val < 2 ^ 16 := by
+      rw [hlr1]; exact lr_val_lt hMN hv0123val hll1 hhl0
+    have hb2 : (env.get (i₀+4+6+3+4+4+4+2)).val < 2 ^ 16 := by
+      rw [hlr2]; exact lr_val_lt hMN hv0123val hll2 hhl1
+    have hb3 : (env.get (i₀+4+6+3+4+4+4+3)).val < 2 ^ 16 := by
+      rw [hlr3]; exact lr_val_lt hMN hv0123val hll3 hhl2
+    have hssum : env.get (i₀+4+6+3) + env.get (i₀+4+6+3+1) + env.get (i₀+4+6+3+2)
+        + env.get (i₀+4+6+3+3) = 1 := by
+      rw [hgate1, one_mul] at hsusum; linear_combination hsusum
+    rcases bool_of_mul_pred _hE4 with hsll0 | hsll1
+    · -- is_sll = 0 ⇒ is_sllw = 1 (SLLW): low two limbs placed, high two `= msb·65535`.
+      have hsllw1 : input_is_sllw = 1 := by rw [hsll0, zero_add] at hgate1; exact hgate1
+      have hs0sel : env.get (i₀+4+6+3) * (env.get (i₀+4+4) - 0) = 0 := by
+        rw [hsll0] at hsu0sel; linear_combination hsu0sel
+      have hs1sel : env.get (i₀+4+6+3+1) * (env.get (i₀+4+4) - 1) = 0 := by
+        rw [hsll0] at hsu1sel; linear_combination hsu1sel
+      have hs2sel : env.get (i₀+4+6+3+2) * (env.get (i₀+4+4) - 2) = 0 := by
+        rw [hsll0] at hsu2sel; linear_combination hsu2sel
+      have hs3sel : env.get (i₀+4+6+3+3) * (env.get (i₀+4+4) - 3) = 0 := by
+        rw [hsll0] at hsu3sel; linear_combination hsu3sel
+      have a1_bound := a1_bound_cond hsllw1
+      have h_msb_a1 := (hmsb ⟨fun _ => a1_bound, Or.inr hsllw1⟩).2 hsllw1
+      have hmsbb : env.get (i₀+4+6+3+4+4+4+4) = 0 ∨ env.get (i₀+4+6+3+4+4+4+4) = 1 := by
+        rw [show env.get (i₀+4+6+3+4+4+4+4)
+            = if (env.get (i₀+1)).val ≥ 32768 then 1 else 0 from h_msb_a1]
+        split
+        · exact Or.inr rfl
+        · exact Or.inl rfl
+      rw [hsllw1, one_mul] at hw00 hw01 hw10 hw11 hwmsb2 hwmsb3
+      rw [← sub_eq_add_neg] at hw00 hw01 hw11
+      have ha2 : env.get (i₀+2) = env.get (i₀+4+6+3+4+4+4+4) * 65535 := by linear_combination -hwmsb2
+      have ha3 : env.get (i₀+3) = env.get (i₀+4+6+3+4+4+4+4) * 65535 := by linear_combination -hwmsb3
+      exact sllw_a_isU64 (bool_of_mul_pred hcb4b) hs0sel hs1sel hs2sel hs3sel hssum hb0 hb1 hmsbb
+        hw00 hw01 hw10 hw11 ha2 ha3
+    · -- is_sll = 1 (SLL): a permutation/placement of the four `limb_result` entries.
+      rw [hsll1, one_mul] at hp00 hp01 hp02 hp03 hp10 hp11 hp12 hp13 hp20 hp21 hp22 hp23 hp30 hp31 hp32 hp33
+      rw [← sub_eq_add_neg] at hp00 hp01 hp02 hp03 hp11 hp12 hp13 hp22 hp23 hp33
+      exact sll_a_isU64 (bool_of_mul_pred hsu0b) (bool_of_mul_pred hsu1b) (bool_of_mul_pred hsu2b)
+        hssum hb0 hb1 hb2 hb3 hp00 hp01 hp02 hp03 hp10 hp11 hp12 hp13 hp20 hp21 hp22 hp23
+        hp30 hp31 hp32 hp33
   refine ⟨fun hreal => ?_, ?_⟩
   · intro hsll
     -- Witnessed columns evaluate into `id (ZMod p)`; normalize to `ZMod p` so the native ring tactics
@@ -265,6 +368,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     simp only [id_eq] at *
     exact ⟨bool_of_mul_pred _hrealbin, Or.inr ⟨a1_bound_cond, bool_of_mul_pred _hE6⟩,
       Or.inr ⟨bool_of_mul_pred _hE2, bool_of_mul_pred _hE2⟩,
+      Or.inr ⟨bool_of_mul_pred _hE2, fun hr => by
+        obtain ⟨hq0, hq1, hq2, hq3⟩ := a_isU64 hr
+        refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
+          simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+        exacts [hq0, hq1, hq2, hq3]⟩,
       fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
       fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
       fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,

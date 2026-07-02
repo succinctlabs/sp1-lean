@@ -19,32 +19,47 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 set_option maxRecDepth 4000 in
 set_option maxHeartbeats 2000000 in
-/-- W-instruction soundness. Landmines: use `.2.1`/`.2.2.1`/`.2.2.2` projections on `h_holds` (never
-`obtain`/`rcases`), keep `Spec` opaque so `RV64.addw` stays out of `circuit_norm`; arith goes via
-`rv64_addw_eq` by hand. -/
+/-- W-instruction soundness (Option B memory flip). Landmines: use `.2.1`/`.2.2.1`/… projections on
+`h_holds` (never `obtain`/`rcases`), keep `Spec` opaque so `RV64.addw` stays out of `circuit_norm`; arith
+goes via `rv64_addw_eq` by hand. `op_b`'s `isU64` is **derived** from the `ALUTypeReader` reader `Spec`'s
+`is_real`-gated memory read-prior pull (usable inside the `is_real = 1` branch where the W result is needed);
+`op_c`'s `isU64` is the chip `Assumptions` (`AddwOperation` has an *ungated* operand `isU64` precondition, and
+`op_c`'s reader guarantee is gated by `is_real - imm_c`, with `imm_c = 0` a decode-only fact). The witnessed
+result's `isU64` discharges the new `RegisterWrite` op_a write push. -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   have h_addw := h_holds.2.1
   have h_adapter := h_holds.2.2.1
-  have h_bin := bool_of_mul_pred h_holds.2.2.2
-  have ha := h_assumptions.1
-  have hb := h_assumptions.2
-  have h_as : AddwOperation.circuit.Assumptions
-      { a := input_adapter_op_b_memory_prev_value, b := input_adapter_op_c_memory_prev_value,
-        cols := ⟨Vector.map (Expression.eval env) (Vector.mapRange 2 fun i => var { index := i₀ + i }),
-          ⟨env.get (i₀ + 2)⟩⟩, is_real := input_is_real } := ⟨ha, hb, h_bin⟩
+  have h_bin := bool_of_mul_pred h_holds.2.2.2.2
+  have hb := h_assumptions
+  -- The `ALUTypeReader` sub-`Spec` (its `Assumptions` = ⟨is_real binary, is_trusted binary⟩, both `h_bin`
+  -- since `is_trusted = is_real`); its op_a/op_b `isU64` conjunct (`is_real = 1 → isU64 op_a ∧ isU64 op_b`).
+  have h_rspec := h_adapter ⟨h_bin, h_bin⟩
+  have h_ob := h_rspec.2.2.2.2.2.2.2.2.2.1
+  -- Build the (ungated) `AddwOperation` Assumptions on the `is_real = 1` branch: op_b from the reader pull,
+  -- op_c from the chip Assumption. `h_addspec hr` is the operation's `Spec` on a real row.
+  have h_addspec := fun (hr : input_is_real = 1) => h_addw ⟨(h_ob hr).2, hb, h_bin⟩
   refine ⟨⟨?_, h_bin, fun hr => ?_⟩, ?_⟩
-  · simpa only [resultWord, Vector.getElem_map] using h_adapter ⟨h_bin, h_bin⟩
+  · simpa only [resultWord, Vector.getElem_map] using h_rspec
   · refine trans ?_ (rv64_addw_eq _ _).symm
     simpa only [resultWord, AddwOperation.resultWord, Vector.getElem_map] using
-      ((h_addw h_as).2 hr).2
+      ((h_addspec hr).2 hr).2
   · and_intros <;>
-      first | exact h_bin | exact ⟨h_bin, h_bin⟩ | exact Or.inl rfl | exact Or.inr ⟨h_bin, h_bin⟩
+      first
+        | exact h_bin
+        | exact ⟨h_bin, h_bin⟩
+        | exact Or.inl rfl
+        | exact Or.inr ⟨h_bin, h_bin⟩
+        | exact Or.inr ⟨h_bin, fun hr => by
+            have hisu := ((h_addspec hr).2 hr).1
+            simp only [AddwOperation.resultWord, Vector.getElem_map, Vector.getElem_mapRange,
+              circuit_norm] at hisu ⊢
+            exact hisu⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   -- `op_c_memory` is grouped since `imm_c` is the final field of the ALU adapter block.
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, ⟨hoc, -, -⟩, -⟩ := h_input
   obtain ⟨h_env_val, h_env_msb⟩ := h_env
@@ -74,8 +89,20 @@ theorem completeness :
     ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
-      hrac_a, hrac_b, hrac_c, hdec⟩, ?_⟩
+      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, ha⟩, fun _ => hb⟩,
+    ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
   · rw [hval, hmsbeq]; exact AddwOperation.spec_populate ha hb input_is_real
+  · -- RegisterWrite's `isU64 value` (the op_a write push): the witnessed result word's `isU64` from
+    -- `spec_populate.2 hr).1`, bridged from the operation's `populate resultWord` to the chip's explicit
+    -- `#v[value[0], value[1], msb·65535, msb·65535]` (in `env.get` form) via `hval`/`hmsbeq`.
+    intro hr
+    have hisu := ((AddwOperation.spec_populate ha hb input_is_real).2 hr).1
+    have e0 := congrArg (fun v => v[0]) hval
+    have e1 := congrArg (fun v => v[1]) hval
+    simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm] at e0 e1
+    simp only [AddwOperation.resultWord, AddwOperation.populate] at hisu
+    simp only [e0, e1, hmsbeq]
+    exact hisu
   rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- The ADDW chip row as a `GeneralFormalCircuit`: semantic contract, composing the witnessed gadget +
@@ -101,6 +128,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddwCols :=
       intro input offset
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,

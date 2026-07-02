@@ -56,7 +56,7 @@ hint) satisfy every constraint under `ProverAssumptions`. -/
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨hbU, hcU, hbin, hf0, hf1, hf2, hf3, hf4, hf5, hf6, hf7, hsum, hpad, hop_a_0, h_cpu,
+  obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hf4, hf5, hf6, hf7, hsum, hpad, hop_a_0, h_cpu,
     hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨h_env_flags, h_env_qc, h_env_a, h_env_b, h_env_c, h_env_mullo, h_env_mulhi, h_env_scal,
     h_env_ctq, h_env_carry, h_env_ovb, h_env_ovc, h_env_isc0, h_env_absc, h_env_absr, h_env_rc,
@@ -900,12 +900,17 @@ theorem completeness :
     ?pabsc0, ?pabsc1, ?pabsc2, ?pabsc3, ?pabsr0, ?pabsr1, ?pabsr2, ?pabsr3,
     ?pq0, ?pq1, ?pq2, ?pq3, ?pr0, ?pr1, ?pr2, ?pr3,
     ?pctq0, ?pctq1, ?pctq2, ?pctq3, ?pctq4, ?pctq5, ?pctq6, ?pctq7,
-    ?pe2r1, ?pe2q1⟩
+    ?pe2r1, ?pe2q1, ?regwrite⟩
   case cpu => exact ⟨hbin, by rw [← epc0, ← epc1, ← epc2] at h_cpu; exact h_cpu⟩
+  case regwrite =>
+    -- RegisterWrite's op_a write push: `is_real` binary + the witnessed result `a = populateA B C F`
+    -- (`hAvec`), whose `isU64` is unconditional (`populateA_isU64`).
+    exact ⟨⟨hbin, fun _ => by rw [hAvec]; exact populateA_isU64 B C F⟩, trivial⟩
   case rtype =>
     -- (W11 flip) the reader's `Assumptions` is now the pair `⟨is_real binary, is_trusted binary⟩` (both
     -- `is_real` here), and its `Spec` gained the trailing decode conjunct `hdec` (provided by completeness).
-    exact ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec⟩
+    exact ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
+      fun hr => ⟨ha_prev hr, hbU, hcU⟩⟩
   case mulLo =>
     rw [hQCvec, hCvec]
     have hsumArgLo : input_is_real + 0 + 0 + 0 + 0 = 0

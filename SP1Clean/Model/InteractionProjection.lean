@@ -185,6 +185,28 @@ lemma toAccess_pushIf_memory (env : Environment (ZMod p)) (mult : Expression (ZM
   simp
 
 omit [NeZero p] in
+/-- **Kernel of the Memory "received = projection" (gated VM pull).** The `pullIf`/`memoryChannel`/`MemoryMsg`
+analog of `toAccess_pushIf_memory` — the W11 polarity-flip form, after the readers switched a memory
+*read-prior* `emit +is_real` (send) to `Channel.pullIf is_real` (the writer/provider now pushes & proves
+`MemoryMsg.isU64`; chips pull & derive it). Its signed multiplicity is `signedVal (eval env (-gate))`;
+`toAccess` ignores the channel `Guarantees`, so the projected `LookupAccess` is identical to the old
+`pushIf is_real` form modulo the sign. -/
+lemma toAccess_pullIf_memory (env : Environment (ZMod p)) (gate : Expression (ZMod p))
+    (msg : MemoryMsg (Expression (ZMod p))) :
+    AbstractInteraction.toAccess env (pulledIf (channel := memoryChannel) gate msg).toRaw =
+      (InteractionKind.Memory, "SP1Memory",
+        [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
+         (Expression.eval env msg.addr0).val, (Expression.eval env msg.addr1).val,
+         (Expression.eval env msg.addr2).val, (Expression.eval env msg.v0).val,
+         (Expression.eval env msg.v1).val, (Expression.eval env msg.v2).val,
+         (Expression.eval env msg.v3).val],
+        signedVal (Expression.eval env (-gate))) := by
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
+    Channel.toRaw, kindOf, memoryChannel, if_true, toElements, toComponents, components,
+    ProvableStruct.componentsToElements]
+  simp
+
+omit [NeZero p] in
 /-- **Kernel of the Program "emitted = projection".** The `toAccess`-image of a pushed `programChannel`
 message (a plain `Channel.emit`, default `toRaw`; post-#398 `circuit_norm` normal form: `pushIf`) is the
 16-field `programLookups`-style `LookupAccess`: bus `.Program`, table `"SP1Program"`, the sixteen fields

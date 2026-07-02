@@ -304,6 +304,7 @@ import SP1Clean.Native.Readers.MemoryAccess
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Native.Readers.RegisterAccessCols
 import SP1Clean.Native.Readers.RegisterAccessTimestamp
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Soundness.AllChips
 import SP1Clean.Soundness.ByteConsistency
 import SP1Clean.Soundness.ChipRegistry
@@ -343,3 +344,5 @@ import SP1Clean.Proofs.Chips.ByteChip.ByteChip
 import SP1Clean.Proofs.Chips.ByteChip.Ensemble
 import SP1Clean.Proofs.Chips.ProgramProviderChip
 import SP1Clean.Proofs.Chips.ProgramProviderEnsemble
+import SP1Clean.Proofs.Chips.MemoryProviderChip
+import SP1Clean.Proofs.Chips.MemoryProviderEnsemble

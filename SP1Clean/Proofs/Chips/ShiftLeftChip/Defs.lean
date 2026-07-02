@@ -4,6 +4,7 @@ import SP1Clean.Proofs.Chips.ShiftLeftChip.Populate
 import SP1Clean.Proofs.Operations.U16MSBOperation.Formal
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Extracted.ShiftLeftChip
 import Clean.Circuit.Basic
@@ -190,6 +191,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftLeftCols (ZM
     ⟨input.adapter, gate, gate, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_sll * 6 + is_sllw * 21, a[0], a[1], a[2], a[3]⟩
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- the shift placement, so `isU64 a` (the placed result word's per-limb range, derived from the
+  -- `lower/higher_limb` byte pulls) discharges its requirement — breaking the old reader-circularity. The
+  -- write access clock is the recombined low clock `+ 4`; `gate = is_sll + is_sllw` matches the reader.
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a, a, gate⟩
   -- `is_real` boolean gate emitted **inline** (`assertZero`, not `=== 0`) so the `enabled = is_real`
   -- selector is visible to `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table.
   assertZero (input.is_real * (input.is_real - 1))
@@ -296,18 +304,139 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs ShiftLeftCols main where
   -- + limb_result(4) + sllw_msb(1) + flags(3) = 33; the variant flags are committed columns (witnessed
   -- last, `i₀+30..32`), and the three sub-assertions add no witnesses.
   localLength _ := 33
-  localLength_eq := by simp +arith [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit]
-  subcircuitsConsistent := by simp only [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit]; try omega
-  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw]
-  channelsLawful := by simp [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit]
+  localLength_eq := by simp +arith [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
+  subcircuitsConsistent := by simp only [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]; try omega
+  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
+  -- `memoryChannel` joins from the reader's memory read **pulls** (W11 memory flip). The new `RegisterWrite`
+  -- op_a write push owes a memory **requirement** (declared in `circuit.channelsWithRequirements`), not a guarantee.
+  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsLawful := by simp [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw, programChannel.toRaw] := rfl
+      = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 33 := rfl
+
+/-! ## Result-word range (`isU64 a`) for the `RegisterWrite` op_a write push
+
+The W11 Option-B memory flip composes `RegisterWrite` *after* the shift placement; its push owes
+`isU64` of the placed result word `a`. These pure-field lemmas range-check the placed limbs from the
+`lower/higher_limb` byte ranges (`lr` = a `limb_result` entry, `< 2^16`) and the placement asserts (each
+`a_i` is `0`, a `limb_result` entry, or `msb·65535`). Shared by both `Soundness/{Sll,Sllw}.lean` tails. -/
+
+set_option linter.unusedSectionVars false in
+/-- A reassembled `limb_result` entry `lr = ll·v + hl` is a `u16` (`ll < N`, `hl < M`, `v.val = M`,
+`M·N = 65536`). -/
+lemma lr_val_lt {M N : ℕ} (hMN : M * N = 65536) {ll hl v : ZMod p}
+    (hv : v.val = M) (hll : ll.val < N) (hhl : hl.val < M) :
+    (ll * v + hl).val < 2 ^ 16 := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  have h_llv : (ll * v).val = ll.val * M := by
+    rw [ZMod.val_mul_of_lt, hv]; rw [hv]; nlinarith [hll, hMN]
+  have h_sum : (ll * v + hl).val = ll.val * M + hl.val := by
+    rw [ZMod.val_add_of_lt, h_llv]; rw [h_llv]; nlinarith [hll, hhl, hMN]
+  rw [show (2 : ℕ) ^ 16 = 65536 from by norm_num, h_sum]; nlinarith [hll, hhl, hMN]
+
+/-- The low `limb_result` entry `lr0 = ll·v` is a `u16`. -/
+lemma lr0_val_lt {M N : ℕ} (hMN : M * N = 65536) (hMpos : 0 < M) {ll v : ZMod p}
+    (hv : v.val = M) (hll : ll.val < N) : (ll * v).val < 2 ^ 16 := by
+  have := lr_val_lt hMN hv hll (show (0 : ZMod p).val < M by rw [ZMod.val_zero]; exact hMpos)
+  rwa [add_zero] at this
+
+set_option linter.unusedSectionVars false in
+/-- **SLL result range.** From the one-hot byte-shift selectors (`s_k` boolean, `Σ s_k = 1`), the 16
+`is_sll`-collapsed placement asserts, and the four `limb_result` `u16` bounds, every result limb is a
+`u16` (each `a_i` is `0` or one `lr_j`). -/
+lemma sll_a_isU64 {a0 a1 a2 a3 s0 s1 s2 s3 lr0 lr1 lr2 lr3 : ZMod p}
+    (hs0b : s0 = 0 ∨ s0 = 1) (hs1b : s1 = 0 ∨ s1 = 1)
+    (hs2b : s2 = 0 ∨ s2 = 1)
+    (hssum : s0 + s1 + s2 + s3 = 1)
+    (hb0 : lr0.val < 2 ^ 16) (hb1 : lr1.val < 2 ^ 16)
+    (hb2 : lr2.val < 2 ^ 16) (hb3 : lr3.val < 2 ^ 16)
+    (h00 : s0 * (a0 - lr0) = 0) (h01 : s0 * (a1 - lr1) = 0)
+    (h02 : s0 * (a2 - lr2) = 0) (h03 : s0 * (a3 - lr3) = 0)
+    (h10 : s1 * a0 = 0) (h11 : s1 * (a1 - lr0) = 0)
+    (h12 : s1 * (a2 - lr1) = 0) (h13 : s1 * (a3 - lr2) = 0)
+    (h20 : s2 * a0 = 0) (h21 : s2 * a1 = 0)
+    (h22 : s2 * (a2 - lr0) = 0) (h23 : s2 * (a3 - lr1) = 0)
+    (h30 : s3 * a0 = 0) (h31 : s3 * a1 = 0)
+    (h32 : s3 * a2 = 0) (h33 : s3 * (a3 - lr0) = 0) :
+    a0.val < 2 ^ 16 ∧ a1.val < 2 ^ 16 ∧ a2.val < 2 ^ 16 ∧ a3.val < 2 ^ 16 := by
+  have hz : (0 : ZMod p).val < 2 ^ 16 := by rw [ZMod.val_zero]; norm_num
+  rcases hs0b with e0 | e0
+  · rcases hs1b with e1 | e1
+    · rcases hs2b with e2 | e2
+      · -- s0 = s1 = s2 = 0 ⇒ s3 = 1
+        have e3 : s3 = 1 := by rw [e0, e1, e2] at hssum; linear_combination hssum
+        rw [e3, one_mul] at h30 h31 h32 h33
+        exact ⟨by rw [h30]; exact hz, by rw [h31]; exact hz, by rw [h32]; exact hz,
+          by rw [sub_eq_zero.mp h33]; exact hb0⟩
+      · rw [e2, one_mul] at h20 h21 h22 h23
+        exact ⟨by rw [h20]; exact hz, by rw [h21]; exact hz,
+          by rw [sub_eq_zero.mp h22]; exact hb0, by rw [sub_eq_zero.mp h23]; exact hb1⟩
+    · rw [e1, one_mul] at h10 h11 h12 h13
+      exact ⟨by rw [h10]; exact hz, by rw [sub_eq_zero.mp h11]; exact hb0,
+        by rw [sub_eq_zero.mp h12]; exact hb1, by rw [sub_eq_zero.mp h13]; exact hb2⟩
+  · rw [e0, one_mul] at h00 h01 h02 h03
+    exact ⟨by rw [sub_eq_zero.mp h00]; exact hb0, by rw [sub_eq_zero.mp h01]; exact hb1,
+      by rw [sub_eq_zero.mp h02]; exact hb2, by rw [sub_eq_zero.mp h03]; exact hb3⟩
+
+set_option linter.unusedSectionVars false in
+/-- **SLLW result range.** From the byte-shift selectors (`cb4 ∈ {0,1}`, so only `s0`/`s1` are hot), the
+low-two placement asserts, the `lr0`/`lr1` `u16` bounds, and `msb` boolean (the sign fill `a2 = a3 =
+msb·65535`), every result limb is a `u16`. -/
+lemma sllw_a_isU64 {a0 a1 a2 a3 s0 s1 s2 s3 cb4 lr0 lr1 msb : ZMod p}
+    (hcb4 : cb4 = 0 ∨ cb4 = 1)
+    (hs0sel : s0 * (cb4 - 0) = 0) (hs1sel : s1 * (cb4 - 1) = 0)
+    (hs2sel : s2 * (cb4 - 2) = 0) (hs3sel : s3 * (cb4 - 3) = 0)
+    (hssum : s0 + s1 + s2 + s3 = 1)
+    (hb0 : lr0.val < 2 ^ 16) (hb1 : lr1.val < 2 ^ 16)
+    (hmsbb : msb = 0 ∨ msb = 1)
+    (h00 : s0 * (a0 - lr0) = 0) (h01 : s0 * (a1 - lr1) = 0)
+    (h10 : s1 * a0 = 0) (h11 : s1 * (a1 - lr0) = 0)
+    (ha2 : a2 = msb * 65535) (ha3 : a3 = msb * 65535) :
+    a0.val < 2 ^ 16 ∧ a1.val < 2 ^ 16 ∧ a2.val < 2 ^ 16 ∧ a3.val < 2 ^ 16 := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  have hz : (0 : ZMod p).val < 2 ^ 16 := by rw [ZMod.val_zero]; norm_num
+  have hmsb_bound : (msb * 65535).val < 2 ^ 16 := by
+    rcases hmsbb with h | h <;> rw [h]
+    · rw [zero_mul, ZMod.val_zero]; norm_num
+    · rw [one_mul, show ((65535 : ZMod p)) = ((65535 : ℕ) : ZMod p) by push_cast; rfl,
+        ZMod.val_natCast_of_lt (by omega)]; norm_num
+  have hv2 : (2 : ZMod p).val = 2 := val_2_zmod_p
+  have hv3 : (3 : ZMod p).val = 3 := by
+    rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) from by push_cast; rfl]
+    exact ZMod.val_natCast_of_lt (by omega)
+  have n1 : (1 : ZMod p) ≠ 0 := one_ne_zero
+  have n2 : (2 : ZMod p) ≠ 0 := fun h => by rw [h, ZMod.val_zero] at hv2; omega
+  have n3 : (3 : ZMod p) ≠ 0 := fun h => by rw [h, ZMod.val_zero] at hv3; omega
+  rcases hcb4 with h4 | h4
+  · rw [h4] at hs1sel hs2sel hs3sel
+    have hs1 : s1 = 0 := ShiftLeftCore.eq_zero_of_mul_const (h := hs1sel)
+      (hk := by rw [show ((0 : ZMod p) - 1) = -1 from by ring]; exact neg_ne_zero.mpr n1)
+    have hs2 : s2 = 0 := ShiftLeftCore.eq_zero_of_mul_const (h := hs2sel)
+      (hk := by rw [show ((0 : ZMod p) - 2) = -2 from by ring]; exact neg_ne_zero.mpr n2)
+    have hs3 : s3 = 0 := ShiftLeftCore.eq_zero_of_mul_const (h := hs3sel)
+      (hk := by rw [show ((0 : ZMod p) - 3) = -3 from by ring]; exact neg_ne_zero.mpr n3)
+    have hs0 : s0 = 1 := by rw [hs1, hs2, hs3] at hssum; linear_combination hssum
+    rw [hs0, one_mul] at h00 h01
+    exact ⟨by rw [sub_eq_zero.mp h00]; exact hb0, by rw [sub_eq_zero.mp h01]; exact hb1,
+      by rw [ha2]; exact hmsb_bound, by rw [ha3]; exact hmsb_bound⟩
+  · rw [h4] at hs0sel hs2sel hs3sel
+    have hs0 : s0 = 0 := ShiftLeftCore.eq_zero_of_mul_const (h := hs0sel)
+      (hk := by rw [show ((1 : ZMod p) - 0) = 1 from by ring]; exact n1)
+    have hs2 : s2 = 0 := ShiftLeftCore.eq_zero_of_mul_const (h := hs2sel)
+      (hk := by rw [show ((1 : ZMod p) - 2) = -1 from by ring]; exact neg_ne_zero.mpr n1)
+    have hs3 : s3 = 0 := ShiftLeftCore.eq_zero_of_mul_const (h := hs3sel)
+      (hk := by rw [show ((1 : ZMod p) - 3) = -2 from by ring]; exact neg_ne_zero.mpr n2)
+    have hs1 : s1 = 1 := by rw [hs0, hs2, hs3] at hssum; linear_combination hssum
+    rw [hs1, one_mul] at h10 h11
+    exact ⟨by rw [h10]; exact hz, by rw [sub_eq_zero.mp h11]; exact hb0,
+      by rw [ha2]; exact hmsb_bound, by rw [ha3]; exact hmsb_bound⟩
 
 end SP1Clean.ShiftLeftChip

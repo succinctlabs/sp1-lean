@@ -30,7 +30,7 @@ set_option maxHeartbeats 16000000 in
 /-- Soundness of the `sra` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨h_cpu, h_msb1, h_msb2, h_msb3, h_alu, h_realgate,
+  obtain ⟨h_cpu, h_msb1, h_msb2, h_msb3, h_alu, h_regwrite, h_realgate,
     h_srl_b, h_sra_b, h_srlw_b, h_sraw_b, h_sum_b, h_wimm,
     h_b0, h_b1, h_b2, h_b3, h_b4, h_b5,
     h_s0w, h_s0b, h_s1w, h_s1b, h_s2w, h_s2b, h_s3w, h_s3b, h_onehot,
@@ -43,8 +43,19 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     h_w0, h_w1, h_w2, h_w3, h_w4, h_w5,
     h_opa0,
     h_byte0, h_byte1, h_byte2, h_byte3, h_byte4, h_byte5, h_byte6, h_byte7, h_byte8⟩ := h_holds
+  -- W11 Option B: the op_a write `RegisterWrite` push's `isU64 a` requirement, via the shared result
+  -- range-check `resultA_isU64` applied to this row's destructured constraints.
+  have h_obmap : Vector.map (Expression.eval env) input_var_adapter_op_b_memory_prev_value =
+      input_adapter_op_b_memory_prev_value := by
+    obtain ⟨-, -, -, -, -, -, ⟨h, -, -⟩, -, -, -⟩ := h_input; exact h
+  have hregW := resultA_isU64 i₀ env h_obmap h_assumptions.1 h_msb1 h_msb3 h_srl_b h_sra_b h_srlw_b
+    h_sraw_b h_sum_b h_b0 h_b1 h_b2 h_b3 h_b4 h_s0w h_s0b h_s1w h_s1b h_s2w h_s2b h_s3w h_onehot
+    h_v01 h_v012 h_v0123 h_split2 h_lr0 h_lr1 h_lr2 h_lr3 h_smv h_o0 h_o1 h_o2 h_o3 h_o4 h_o5 h_o6
+    h_o7 h_o8 h_o9 h_o10 h_o11 h_o12 h_o13 h_o14 h_o15 h_w0 h_w1 h_w2 h_w3 h_w4 h_w5 h_byte1 h_byte2
+    h_byte3 h_byte4 h_byte5 h_byte6 h_byte7 h_byte8
   -- post-#398 the nine byte receives owe no padding requirement.
   refine ⟨?spec, ?cpuA, ?msb1A, ?msb2A, ?msb3A, ?aluA,
+    Or.inr ⟨bool_of_mul_pred h_sum_b, hregW⟩,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,

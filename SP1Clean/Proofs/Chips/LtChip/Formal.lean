@@ -16,14 +16,18 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
 
-/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, the honest `"lt_flags"`
-hint (each flag binary, the sum = `is_real`, `is_slt` only on real rows), `op_a_0 = 0`,
+/-- Prover-side row well-formedness: operand `isU64`s (`op_b_val`/`op_c_val`), the op_a read-prior
+`isU64` (op_a memory pull) and the op_c read-prior `isU64` (the `is_real - imm_c`-gated op_c memory pull —
+distinct from `op_c_val = adapter.op_c` since `Lt`'s adapter is immediate-capable), `is_real` binary, the
+honest `"lt_flags"` hint (each flag binary, the sum = `is_real`, `is_slt` only on real rows), `op_a_0 = 0`,
 `imm_c = 0` (register-register rows), CPUState clock bounds, three timestamp `Spec`s
 (op_c gated by `is_real - imm_c`). -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
+  (input.is_real = 1 → Word.isU64 input.adapter.op_a_memory.prev_value) ∧
+  (input.is_real - input.adapter.imm_c = 1 → Word.isU64 input.adapter.op_c_memory.prev_value) ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   (f[0] = 0 ∨ f[0] = 1) ∧ (f[1] = 0 ∨ f[1] = 1) ∧
   input.is_real = f[0] + f[1] ∧
@@ -84,10 +88,69 @@ private lemma toBitVec64_bitWord (bit : ZMod p) (P : Prop) [Decidable P]
   subst h
   by_cases hP : P <;> simp [hP, Word.toBitVec64, Word.toNat, ZMod.val_one, ZMod.val_zero]
 
+/-- A binary field element's `val` is a valid 16-bit limb. -/
+private lemma val_lt_of_bool {b : ZMod p} (h : b = 0 ∨ b = 1) : b.val < 2 ^ 16 := by
+  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rcases h with h | h <;> rw [h]
+  · rw [ZMod.val_zero]; norm_num
+  · rw [ZMod.val_one]; norm_num
+
+/-- The Lt result word `#v[bit, 0, 0, 0]` is a valid u64 whenever the compare `bit` is binary (the
+op_a write push's `isU64 value` obligation). -/
+private lemma isU64_bitWord {b : ZMod p} (h : b = 0 ∨ b = 1) :
+    Word.isU64 (#v[b, 0, 0, 0] : Word (ZMod p)) :=
+  Word.isU64_of_cases (val_lt_of_bool h) (val_lt_of_bool (Or.inl rfl))
+    (val_lt_of_bool (Or.inl rfl)) (val_lt_of_bool (Or.inl rfl))
+
+set_option linter.unusedSectionVars false in
+/-- A field element pinned to `if Q then 1 else 0` is binary (used in soundness to read the compare
+`bit`'s binary-ness off `LtOperationSigned.result_semantic`). -/
+private lemma bool_of_eq_ite {b : ZMod p} {Q : Prop} [Decidable Q]
+    (h : b = if Q then 1 else 0) : b = 0 ∨ b = 1 := by
+  split at h
+  · exact Or.inr h
+  · exact Or.inl h
+
+set_option linter.unusedSectionVars false in
+/-- Column 0 of a flattened `LtOperationSigned` column struct is its compare `bit` (peeling the
+`ProvableStruct` `toComponents`/`cast`/`append` tower). Used by completeness to read the witnessed bit
+out of the `populate`-pinned witness cell `env.get (i₀ + 2)`. -/
+private lemma toElements_col0 {x : Extracted.LtOperationSigned (ZMod p)}
+    (hi : (0:ℕ) < size Extracted.LtOperationSigned) :
+    (toElements x)[0]'hi = x.result.u16_compare_operation.bit := by
+  simp only [ProvableType.toElements, ProvableStruct.toComponents,
+    ProvableStruct.componentsToElements, circuit_norm]
+  rw [Vector.getElem_append_left (by decide), Vector.getElem_cast,
+    Vector.getElem_append_left (by decide), Vector.getElem_cast]
+  rfl
+
+/-- The witnessed compare `bit` of `LtOperationSigned.populate` (the `U16CompareOperation` strict-less-than
+indicator on a real row) is binary. -/
+private lemma populate_bit_bool {b cc : Word (ZMod p)} {s r : ZMod p} (hr : r = 1) :
+    (LtOperationSigned.populate b cc s r).result.u16_compare_operation.bit = 0 ∨
+    (LtOperationSigned.populate b cc s r).result.u16_compare_operation.bit = 1 := by
+  rw [show (LtOperationSigned.populate b cc s r).result.u16_compare_operation.bit
+        = (if r = 1 then LtOperationUnsigned.populate
+              #v[b[0], b[1], b[2], b[3] + s * 32768 - 65536 * (s * U16MSBOperation.populate_msb b[3])]
+              #v[cc[0], cc[1], cc[2], cc[3] + s * 32768 - 65536 * (s * U16MSBOperation.populate_msb cc[3])]
+            else ⟨⟨0⟩, #v[0, 0, 0, 0], 0, #v[0, 0]⟩).u16_compare_operation.bit from rfl, if_pos hr,
+      show (LtOperationUnsigned.populate _ _).u16_compare_operation.bit
+        = U16CompareOperation.populate_bit _ _ from rfl]
+  exact U16CompareOperation.populate_bit_bool _ _
+
+/-- The witnessed `LtOperationSigned` block's flattened cell 0 (the compare `bit`) is binary on a real
+row — the form completeness uses after pinning the witness cell `env.get (i₀ + 2)` to `populate`. -/
+private lemma witness_bit_bool {b cc : Word (ZMod p)} {s r : ZMod p} (hr : r = 1)
+    (hi : (0:ℕ) < size Extracted.LtOperationSigned) :
+    (toElements (LtOperationSigned.populate b cc s r))[0]'hi = 0 ∨
+    (toElements (LtOperationSigned.populate b cc s r))[0]'hi = 1 := by
+  rw [toElements_col0]; exact populate_bit_bool hr
+
+set_option maxHeartbeats 800000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start [Spec]
   obtain ⟨ha, hb⟩ := h_assumptions
-  obtain ⟨_cpu, h_lt, h_adapter, h_gate, h_slt_bin, h_sltu_bin, h_sum⟩ := h_holds
+  obtain ⟨_cpu, h_lt, h_adapter, _h_rw, h_gate, h_slt_bin, h_sltu_bin, h_sum⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   have h_slt_bool := bool_of_mul_pred h_slt_bin
   have h_sltu_bool := bool_of_mul_pred h_sltu_bin
@@ -127,12 +190,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · and_intros <;>
       first | exact h_bin | exact ⟨ha, hb, h_bin, h_slt_bool⟩ | exact ⟨h_bin, h_bin⟩
             | exact Or.inl rfl | exact Or.inr ⟨h_bin, h_bin⟩
+            | exact Or.inr ⟨h_bin, fun hr => isU64_bitWord
+                (bool_of_eq_ite (LtOperationSigned.result_semantic ha hb hr
+                  (h_lt ⟨ha, hb, h_bin, h_slt_bool⟩)).1)⟩
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin, hf0, hf1, hsum, hslt_real, hop_a_0, himm, h_cpu,
+  obtain ⟨ha, hb, ha_prev, hc_prev, hbin, hf0, hf1, hsum, hslt_real, hop_a_0, himm, h_cpu,
     hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨h_env_flags, h_env_cols⟩ := h_env
   have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
@@ -149,7 +215,8 @@ theorem completeness :
     ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
-      hrac_a, hrac_b, hrac_c, hdec⟩,
+      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, ha⟩, hc_prev⟩,
+    ⟨⟨hbin, ?_⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     hbool _ hf0',
     hbool _ hf1',
@@ -175,6 +242,15 @@ theorem completeness :
   refine Eq.trans ?_
     ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 2) i hi).trans (h_env_cols ⟨i, hi⟩))
   simp [circuit_norm]
+  -- RegisterWrite's `isU64 #v[bit, 0, 0, 0]` (the op_a write push): the upper three limbs are literal
+  -- `0`; the witnessed compare `bit` `env`-evaluates (via `h_env_cols`) to the `populate`d column 0,
+  -- i.e. `U16CompareOperation.populate_bit …`, which is binary by `populate_bit_bool`.
+  intro hr
+  have h0 := h_env_cols 0
+  simp only [Fin.val_zero, Nat.add_zero] at h0
+  refine isU64_bitWord ?_
+  rw [h0]
+  exact witness_bit_bool hr _
 
 /-- The unified `Lt` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `slt`/`sltu` semantic contract,
 composing the witnessed signed-compare gadget and the immediate-capable register reader; output is the
@@ -200,6 +276,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
       intro input offset
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.LtOperationSigned.circuit, SP1Clean.LtOperationSigned.main,
