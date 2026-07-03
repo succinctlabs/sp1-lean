@@ -1,0 +1,110 @@
+import SP1Clean.FormalModel.Trace.GuestProgram
+import Clean.Circuit.Expression
+
+/-! # The program commitment — `ProverData` as the committed guest program
+
+The semantic-channels design keys every channel guarantee to **the deterministic execution of the
+committed program**: the prover writes the guest program into `ProverData` (Clean's committed
+prover-data store, `String → (n : ℕ) → Array (Vector F n)`, shared across all tables of an ensemble
+witness via `same_data`), and `progOf` decodes it back to a `GuestProgram`. Binding the committed data
+to *the* program of interest is the `StatementFor` conjunct `progOf witness.data = prog` — the Lean
+shadow of SP1's verifying-key program commitment.
+
+Reserved keys (arities pinned by the decoders below):
+- `"sp1.rom"`, arity 5 — one instruction per row: `[pc0, pc1, pc2, w_lo, w_hi]` (pc as three 16-bit
+  limbs, the 32-bit encoding as two 16-bit halves);
+- `"sp1.pc_start"`, arity 3 — the entry point's three 16-bit limbs;
+- `"sp1.image"`, arity 4 — one byte per row: `[a0, a1, a2, byte]` (48-bit address limbs, one byte);
+- `"sp1.init_clk"`, arity 2 — the genesis clock `[clk_high, clk_low]`.
+
+`progOf` is **total** via sanitization — duplicate ROM addresses are dropped (keep-first) and
+misaligned addresses removed, so `GuestProgram.rom_nodup`/`rom_aligned` hold by construction and a
+malicious `data` still decodes to *some* well-formed program (the guarantees are then statements about
+that program; the vkey binding is what pins it to the real one). For the honest prover the encoding is
+faithful and `progOf data = prog` holds by computation. -/
+
+namespace SP1Clean.Commit
+
+open SP1Clean.Soundness.Target
+
+variable {p : ℕ}
+
+/-! ## ROM sanitization -/
+
+/-- Keep-first dedup by address + drop misaligned entries, so the decoded ROM is a well-formed
+`GuestProgram.rom` regardless of what the prover committed. -/
+def sanitizeRom : List (BitVec 64 × BitVec 32) → List (BitVec 64 × BitVec 32)
+  | [] => []
+  | e :: rest =>
+    if e.1.toNat % 4 = 0 then
+      e :: (sanitizeRom rest).filter (fun e' => e'.1 ≠ e.1)
+    else
+      sanitizeRom rest
+
+theorem sanitizeRom_nodup (l : List (BitVec 64 × BitVec 32)) :
+    ((sanitizeRom l).map Prod.fst).Nodup := by
+  induction l with
+  | nil => simp [sanitizeRom]
+  | cons e rest ih =>
+    rw [sanitizeRom]
+    split
+    · simp only [List.map_cons, List.nodup_cons]
+      refine ⟨fun hmem => ?_, ih.sublist (List.filter_sublist.map Prod.fst)⟩
+      obtain ⟨e', he', heq⟩ := List.mem_map.mp hmem
+      have hne := List.of_mem_filter he'
+      simp only [ne_eq, decide_not, Bool.not_eq_eq_eq_not, Bool.not_true,
+        decide_eq_false_iff_not] at hne
+      exact hne heq
+    · exact ih
+
+theorem sanitizeRom_aligned (l : List (BitVec 64 × BitVec 32)) :
+    ∀ a ∈ (sanitizeRom l).map Prod.fst, a.toNat % 4 = 0 := by
+  induction l with
+  | nil => simp [sanitizeRom]
+  | cons e rest ih =>
+    rw [sanitizeRom]
+    split
+    · intro a ha
+      rcases List.mem_map.mp ha with ⟨e', he', rfl⟩
+      rcases List.mem_cons.mp he' with rfl | he'
+      · assumption
+      · exact ih _ (List.mem_map_of_mem (List.mem_of_mem_filter he'))
+    · exact ih
+
+/-! ## The per-row decoders -/
+
+/-- One committed ROM row `[pc0, pc1, pc2, w_lo, w_hi]` → `(pc, instruction word)`. The pc limbs are
+`val`-recombined base-2^16 (matching the Program-bus pc limb convention); the word halves likewise. -/
+def romEntryOf (v : Vector (ZMod p) 5) : BitVec 64 × BitVec 32 :=
+  (BitVec.ofNat 64 (v[0].val + v[1].val * 2 ^ 16 + v[2].val * 2 ^ 32),
+   BitVec.ofNat 32 (v[3].val % 2 ^ 16 + (v[4].val % 2 ^ 16) * 2 ^ 16))
+
+/-- One committed image row `[a0, a1, a2, byte]` → `(address, byte)`. -/
+def imageEntryOf (v : Vector (ZMod p) 4) : BitVec 64 × BitVec 8 :=
+  (BitVec.ofNat 64 (v[0].val + v[1].val * 2 ^ 16 + v[2].val * 2 ^ 32),
+   BitVec.ofNat 8 (v[3].val % 2 ^ 8))
+
+/-- The committed entry point (`0` if the key is absent/malformed — the vkey binding pins the honest
+value). -/
+def pcStartOf (data : ProverData (ZMod p)) : BitVec 64 :=
+  match (data "sp1.pc_start" 3).toList with
+  | [v] => BitVec.ofNat 64 (v[0].val + v[1].val * 2 ^ 16 + v[2].val * 2 ^ 32)
+  | _ => 0
+
+/-- The committed genesis clock, ℕ-decoded (`1` if absent/malformed, keeping `1 ≤ initClkNat` the
+honest default the boundary vkey assumption also carries). -/
+def initClkNat (data : ProverData (ZMod p)) : ℕ :=
+  match (data "sp1.init_clk" 2).toList with
+  | [v] => v[0].val * 2 ^ 24 + v[1].val
+  | _ => 1
+
+/-- **The committed guest program.** Total: sanitization makes `rom_nodup`/`rom_aligned` hold by
+construction, so every `ProverData` decodes to a well-formed program. -/
+def progOf (data : ProverData (ZMod p)) : GuestProgram where
+  rom := sanitizeRom (((data "sp1.rom" 5).toList).map romEntryOf)
+  pc_start := pcStartOf data
+  memImage := ((data "sp1.image" 4).toList).map imageEntryOf
+  rom_nodup := sanitizeRom_nodup _
+  rom_aligned := sanitizeRom_aligned _
+
+end SP1Clean.Commit
