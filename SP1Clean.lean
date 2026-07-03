@@ -352,3 +352,7 @@ import SP1Clean.Proofs.Chips.ProgramProviderEnsemble
 import SP1Clean.Proofs.Chips.MemoryProviderChip
 import SP1Clean.Proofs.Chips.MemoryProviderEnsemble
 import SP1Clean.Proofs.Chips.MemoryFinalizeChip
+import SP1Clean.Spike.Channels
+import SP1Clean.Spike.Engine
+import SP1Clean.Spike.AddRow
+import SP1Clean.Spike.Concrete
