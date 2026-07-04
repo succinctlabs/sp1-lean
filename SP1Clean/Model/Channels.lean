@@ -1,3 +1,4 @@
+import SP1Clean.Model.BusMessages
 import SP1Clean.Model.ByteTable
 import SP1Clean.Math.Word
 import SP1Clean.Math.Gate
@@ -23,27 +24,6 @@ open Circuit
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The State-bus message — `(clk_high, clk_low, pc0, pc1, pc2)`, arity 5, matching SP1's
-`AirInteraction.state` (`crates/hypercube/src/lookup/interaction.rs`) and the `.state` interaction in
-`Extracted/CPUState.lean`. Each CPU/ALU row receives the current `(clk, pc)` and sends the next. -/
-structure StateMsg (F : Type) where
-  clk_high : F
-  clk_low : F
-  pc0 : F
-  pc1 : F
-  pc2 : F
-deriving ProvableStruct
-
-/-- Per-row well-formedness of a State message: **`True`**. SP1's `CPUState::eval`
-(`crates/core/machine/src/adapter/state.rs:90-98`) range-checks *only* the clock (`clk_0_16` 13-bit Range
-+ `clk_16_24` U8Range) — **it does not range-check `pc`** (the `receive_state`/`send_state` pass `cols.pc`/
-`next_pc` un-bounded). So the State *send* proves no local guarantee; the pc-limb bounds are *received*
-facts (the previous row's send / the verifier-committed initial pc via the PC chain, and the program ROM),
-exactly like the register-index bounds. The earlier `pc < 2^16` conjuncts here were discharged by divergent
-`pc` byte checks in `Readers/CPUState.lean` that SP1 has no analog of; removed in the byte faithfulness
-cleanup. The cross-row PC chain stays the trace level (`Soundness/StateConsistency.lean`). -/
-def StateMsg.Spec (_ : StateMsg (ZMod p)) : Prop := True
-
 /-- The State channel (SP1 `InteractionKind.State`). `Guarantees := StateMsg.Spec = True`: SP1's State
 send proves no local well-formedness (it range-checks no pc; the clk checks are separate byte sends).
 Emitted via `Channel.emit` so the `is_real` multiplicity (`+is_real` send / `-is_real`
@@ -52,34 +32,6 @@ chain stays the trace level (`Soundness/StateConsistency.lean`). -/
 def stateChannel : Channel (ZMod p) StateMsg where
   name := "SP1State"
   Guarantees msg _ := StateMsg.Spec msg
-
-/-- The Memory-bus message — `(clk_high, clk_low, addr0, addr1, addr2, value)`, where `value : Word` is
-the 4-limb little-endian word; `ProvableStruct` flattens it to the same arity-9 element tuple, matching
-SP1's `AirInteraction.memory` (`crates/hypercube/src/lookup/interaction.rs`) and the `.memory`
-interaction in `Extracted/RTypeReader.lean`. Registers use `addr0` = register index, `addr1 = addr2 = 0`.
-Each register access sends the prior value at the previous timestamp and receives the new value at the
-current timestamp. -/
-structure MemoryMsg (F : Type) where
-  clk_high : F
-  clk_low : F
-  addr0 : F
-  addr1 : F
-  addr2 : F
-  value : Word F
-deriving ProvableStruct
-
-/-- Per-row register-access address shape (`addr1 = addr2 = 0`). Kept as a small structural predicate (e.g.
-for trace use); it is **not** the memory channel's `Guarantees` — see `memoryChannel`. -/
-def MemoryMsg.Spec (msg : MemoryMsg (ZMod p)) : Prop :=
-  msg.addr1 = 0 ∧ msg.addr2 = 0
-
-/-- **The Memory message's value well-formedness** — the 4-limb `value` word is a `U64` (each limb
-`< 2^16`), literally `Word.isU64`. This is the per-message `Guarantees` the memory **provider proves on
-push** (a writer's range-check) and the chips **pull-and-derive** (W11 polarity flip), exactly analogous
-to `ProgramMsg.RowSpec` / the byte bus. Because the message carries the whole `Word`, the pull guarantee
-and the chips' operand facts are the *same* proposition — no per-limb bridging. -/
-def MemoryMsg.isU64 (msg : MemoryMsg (ZMod p)) : Prop :=
-  Word.isU64 msg.value
 
 /-- The Memory channel (SP1 `InteractionKind.Memory`). `Guarantees := MemoryMsg.isU64` — the value's
 well-formedness (each limb `< 2^16`). **W11 polarity flip:** the memory access's *read-back/write* now
@@ -94,59 +46,6 @@ this channel carries only the value's `isU64`. The `name` matches the `"SP1Memor
 def memoryChannel : Channel (ZMod p) MemoryMsg where
   name := "SP1Memory"
   Guarantees msg _ := MemoryMsg.isU64 msg
-
-/-- The Program-bus message — the arity-16 instruction-fetch tuple `(pc0, pc1, pc2, opcode, op_a,
-op_b0..3, op_c0..3, op_a_0, imm_b, imm_c)`, matching SP1's `AirInteraction.program`
-(`crates/hypercube/src/lookup/interaction.rs`, `InteractionKind::Program => 16`) and the `.send
-(.program …)` in `Extracted/RTypeReader.lean`. `op_b`/`op_c` are the two operands as 4-limb words; for an
-R-type row only the register-index limb is non-zero (`op_b1..3 = op_c1..3 = imm_b = imm_c = 0`). -/
-structure ProgramMsg (F : Type) where
-  pc0 : F
-  pc1 : F
-  pc2 : F
-  opcode : F
-  op_a : F
-  op_b0 : F
-  op_b1 : F
-  op_b2 : F
-  op_b3 : F
-  op_c0 : F
-  op_c1 : F
-  op_c2 : F
-  op_c3 : F
-  op_a_0 : F
-  imm_b : F
-  imm_c : F
-deriving ProvableStruct
-
-/-- Per-row well-formedness of a Program message — the part a CPU row can **send-prove locally** for *any*
-adapter type. The only genuinely send-local fact is that `op_a_0` is boolean (from the reader's
-unconditional `op_a_0 * (op_a_0 - 1) = 0` gate). Everything else is a **decode** fact that belongs on the
-**receive** side (`ProgramChip.ProgramRowSpec`), not the send-side channel `Guarantees`:
-the register-index **bounds** (`op_a < 32`, `op_b0`/`op_c0 < 2^16`), the opcode `trusted_instr` decode, the
-`op_a_0 = 1 ↔ op_a = 0` decode, pc bounds/alignment, **and the R-type/I-type operand shape** (`op_b1..3 = 0`,
-and for register-`c` ops `op_c1..3 = imm_c = 0`). The last point is why this is *not* `op_c1..3 = imm_c = 0`:
-an immediate-`c` op (the `ALUTypeReader` adapter — `Addw`, `Lt`, `Bitwise`, shifts) legitimately sends a
-non-zero `op_c` word with `imm_c = 1`, so the R/I-type shape cannot be a send guarantee; it is decoded on
-receive. (`RTypeReader` still emits literal `0`s in those slots, so it proves the same — strictly weaker —
-guarantee; nothing downstream consumes the dropped facts. ROM-membership stays trace-level,
-`Soundness/ProgramConsistency.lean`.) -/
-def ProgramMsg.Spec (msg : ProgramMsg (ZMod p)) : Prop :=
-  msg.op_a_0 = 0 ∨ msg.op_a_0 = 1
-
-/-- **The Program message's per-row well-formedness** — the decode facts that hold for a validly-decoded
-ROM row of *any* instruction type: the destination register index `op_a < 32`, the pc limbs `< 2^16`, and
-`op_a_0` boolean. (The *source* index bounds `op_b0`/`op_c0 < 32` are **not** here — they are register
-indices only when `imm_b`/`imm_c = 0`; for an immediate they carry the immediate word, which can exceed 32.
-A conditional `imm = 0 → op < 32` form is a later refinement.) This is the per-message `Guarantees` the
-**ROM provider proves on push** and the chips **pull-and-derive** (W11 polarity flip) — program-INDEPENDENT,
-exactly analogous to `byteChannel.Guarantees = ByteRowSpec`. The *program-specific* membership (`inROM` — the
-fetch is in *this* committed program) is the finished-channel **balance** fact (pulls ⊆ the provider's
-program rows), not a per-message guarantee (see `Soundness/ProgramConsistency.lean`). -/
-def ProgramMsg.RowSpec (msg : ProgramMsg (ZMod p)) : Prop :=
-  msg.op_a.val < 32 ∧
-  msg.pc0.val < 2 ^ 16 ∧ msg.pc1.val < 2 ^ 16 ∧ msg.pc2.val < 2 ^ 16 ∧
-  (msg.op_a_0 = 0 ∨ msg.op_a_0 = 1)
 
 /-- The Program channel (SP1 `InteractionKind.Program`). `Guarantees := ProgramMsg.RowSpec` — the rich
 decode well-formedness (indices `< 32`, pc `< 2^16`, `op_a_0` boolean). **W11 polarity flip:** the ROM

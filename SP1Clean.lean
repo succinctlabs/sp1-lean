@@ -221,6 +221,7 @@ import SP1Clean.Math.Bitwise
 import SP1Clean.Math.EvalVec
 import SP1Clean.Math.Gate
 import SP1Clean.Model.BalanceBridge
+import SP1Clean.Model.BusMessages
 import SP1Clean.Model.ByteTable
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ChipAir
