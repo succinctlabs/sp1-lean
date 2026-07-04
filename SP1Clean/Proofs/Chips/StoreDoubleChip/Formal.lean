@@ -106,7 +106,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreDoubleColumns :=
         Readers.ITypeReaderImmutable.circuit, Readers.ITypeReaderImmutable.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.StoreDoubleChip

@@ -54,7 +54,9 @@ theorem completeness :
       = AddOperation.populate input_adapter_op_b_memory_prev_value input_adapter_op_c_imm := by
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    rw [h_env ⟨i, hi⟩]
+    -- `h_env` now bundles the chip's `value` witness-gen equations with the GFC `ITypeReader`
+    -- subcircuit's completeness obligation (SC Phase 2pre) — the witness equations are `h_env.1`.
+    rw [h_env.1 ⟨i, hi⟩]
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
@@ -95,7 +97,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddiCols :=
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.AddiChip

@@ -107,7 +107,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
         Readers.ALUTypeReaderImmutable.circuit, Readers.ALUTypeReaderImmutable.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, byteChannel, Gadgets.Equality.main] }
 
 end SP1Clean.AluX0Chip

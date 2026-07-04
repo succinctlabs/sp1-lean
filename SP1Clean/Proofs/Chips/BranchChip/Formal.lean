@@ -234,7 +234,9 @@ theorem completeness :
   circuit_proof_start
   obtain ⟨h_imm, h_rs1U, h_rs2U, h_pcU, h_bin, h_cpu, h_it, h_bt3, h_ft3,
     hf0, hf1, hf2, hf3, hf4, hf5, h_realsum, h_brbin, h_brpad, h_dec, h_ranges⟩ := h_assumptions
-  obtain ⟨he_flags, he_br, he_bv, he_fv, he_np, he_lt⟩ := h_env
+  -- `h_env` now bundles the six witness-gen equation groups with the GFC `ITypeReaderImmutable`
+  -- subcircuit's completeness obligation (trailing conjunct, discarded — the reader slot is discharged below).
+  obtain ⟨he_flags, he_br, he_bv, he_fv, he_np, he_lt, _⟩ := h_env
   simp only [branchTargetWord, fallThroughWord] at h_bt3 h_ft3 h_ranges
   have hg0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using he_flags 0
   have hg1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using he_flags 1
@@ -548,7 +550,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BranchColumns :=
         U16MSBOperation.circuit, U16MSBOperation.main,
         LtOperationUnsigned.circuit, LtOperationUnsigned.main,
         U16CompareOperation.circuit, U16CompareOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.BranchChip

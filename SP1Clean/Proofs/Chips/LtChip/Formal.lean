@@ -200,7 +200,9 @@ theorem completeness :
   circuit_proof_start
   obtain ⟨ha, hb, ha_prev, hc_prev, hbin, hf0, hf1, hsum, hslt_real, hop_a_0, himm, h_cpu,
     hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
-  obtain ⟨h_env_flags, h_env_cols⟩ := h_env
+  -- `h_env` now bundles the chip's flag/`lt_cols` witness-gen equations with the GFC `ALUTypeReader`
+  -- subcircuit's completeness obligation (SC Phase 2pre) — discard the trailing reader obligation.
+  obtain ⟨h_env_flags, h_env_cols, -⟩ := h_env
   have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
   have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using h_env_flags 1
   have hf0' : env.get i₀ = 0 ∨ env.get i₀ = 1 := by rw [hflag0]; exact hf0
@@ -283,7 +285,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
         SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
         SP1Clean.LtOperationUnsigned.circuit, SP1Clean.LtOperationUnsigned.main,
         SP1Clean.U16CompareOperation.circuit, SP1Clean.U16CompareOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.LtChip

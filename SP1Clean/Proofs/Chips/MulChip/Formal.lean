@@ -161,7 +161,9 @@ theorem completeness :
   circuit_proof_start
   obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hf4, hsum, hmulw_real, hop_a_0, h_cpu,
     hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
-  obtain ⟨h_env_flags, h_env_cols, h_env_a⟩ := h_env
+  -- `h_env` now bundles the `flags`/`cols`/`a` witness-gen equations with the GFC `RTypeReader`
+  -- subcircuit's completeness obligation (its fourth component); the witness equations are the first three.
+  obtain ⟨h_env_flags, h_env_cols, h_env_a, -⟩ := h_env
   obtain ⟨-, ⟨-, -, -, hpc⟩, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   -- the five variant flags are witnessed from the `"mul_flags"` hint
   have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
@@ -313,7 +315,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs MulCols :=
         SP1Clean.MulOperation.circuit, SP1Clean.MulOperation.main,
         SP1Clean.U16toU8OperationSafe.circuit, SP1Clean.U16toU8OperationSafe.main,
         SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.MulChip

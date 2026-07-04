@@ -61,7 +61,9 @@ theorem completeness :
   circuit_proof_start
   obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
-  obtain ⟨h_env_val, h_env_msb⟩ := h_env
+  -- `h_env` now bundles the `value`/`msb` witness-gen equations with the GFC `RTypeReader` subcircuit's
+  -- completeness obligation (its third component); the witness equations are the first two.
+  obtain ⟨h_env_val, h_env_msb, -⟩ := h_env
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have hbeq : (#v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
@@ -144,7 +146,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubwCols :=
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.SubwOperation.circuit, SP1Clean.SubwOperation.main,
         SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.SubwChip

@@ -140,7 +140,10 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
         U16toU8OperationSafe.circuit, U16toU8OperationSafe.main,
         IsZeroOperation.circuit, IsZeroOperation.main,
         U16CompareOperation.circuit, U16CompareOperation.main, assertZeros,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        -- `RTypeReader` is now a GFC (SC Phase 2pre); its interactions unfold through the GFC lemma,
+        -- while the FA lemma still covers CPUState/RegisterWrite/operations.
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       -- the leftover (past the `CPUState` state pull/push) is `assertZeros (ownAsserts cols)` ++ the 34
       -- direct `byteChannel` pulls; `interactionsWith_append` splits the `++`, the map-assert lemma
       -- empties the asserts, and `byteChannel ≠ stateChannel` drops the pulls.

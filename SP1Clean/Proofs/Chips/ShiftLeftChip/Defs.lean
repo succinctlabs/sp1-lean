@@ -187,7 +187,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftLeftCols (ZM
   let is_sll := flags[0]; let is_sllw := flags[1]; let is_sllw_imm := flags[2]
   let gate := is_sll + is_sllw
   assertion U16MSBOperation.circuit ⟨a[1], ⟨sllw_msb[0]⟩, is_sllw⟩
-  assertion Readers.ALUTypeReader.circuit
+  -- `ALUTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
+  -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.ALUTypeReader.circuit
     ⟨input.adapter, gate, gate, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_sll * 6 + is_sllw * 21, a[0], a[1], a[2], a[3]⟩

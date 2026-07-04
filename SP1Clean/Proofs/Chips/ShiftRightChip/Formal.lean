@@ -98,8 +98,10 @@ theorem completeness :
   circuit_proof_start
   obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hsum, hop_a_0, himmc, himmbin, hpins, h_cpu,
     hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+  -- SC Phase 2pre: the GFC `ALUTypeReader` (composed via `let _ ←`, after the 11 `witnessVector`s)
+  -- appends its honest-witness/completeness conjunct to `h_env` as the trailing `h_env_alu`.
   obtain ⟨h_env_a, h_env_bmsb, h_env_srwmsb, h_env_cb, h_env_sram, h_env_v, h_env_lo, h_env_hi,
-    h_env_lr, h_env_s, h_env_fl⟩ := h_env
+    h_env_lr, h_env_s, h_env_fl, h_env_alu⟩ := h_env
   -- project (not destructure — rcases on `h_input` disturbs the bound `h_env_*` hypotheses)
   have hpc := h_input.2.1.2.2.2
   have hbpv := h_input.2.2.2.2.2.2.1.1
@@ -324,7 +326,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftRightCols :=
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main, byteChannel] }
 
 end SP1Clean.ShiftRightChip

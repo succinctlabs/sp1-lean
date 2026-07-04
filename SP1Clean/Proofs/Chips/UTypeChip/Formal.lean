@@ -124,7 +124,9 @@ theorem completeness :
   circuit_proof_start
   obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_iaui, h_op0, h_cpu, h_rac, _h_dec, hdec⟩ := h_assumptions
   obtain ⟨_, ⟨_, _, _, hpc⟩, ⟨_, _, _, hob, _⟩, _⟩ := h_input
-  obtain ⟨he_addend, he_addval⟩ := h_env
+  -- `h_env` now bundles the addend/add-result witness equations with the GFC `JTypeReader` subcircuit's
+  -- completeness obligation (SC Phase 2pre); the witness equations are `he_addend`/`he_addval`.
+  obtain ⟨he_addend, he_addval, _⟩ := h_env
   have epc : ∀ i (hi : i < 3),
       Expression.eval env.toEnvironment input_var_state_pc[i] = input_state_pc[i] :=
     fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
@@ -208,7 +210,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.UTypeChip

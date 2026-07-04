@@ -72,12 +72,14 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var StoreByteColumns 
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, is_real⟩
   let addr_op ← subcircuit AddressOperation.circuit
     ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1], input.offset_bit[2]⟩
-  assertion Readers.MemoryAccess.circuit
+  -- `MemoryAccess` and `ITypeReaderImmutable` are now `GeneralFormalCircuit`s (SC Phase 2pre) — composed
+  -- via the GFC `CoeFun` (`let _ ←` discards the `unit` output). Their `Spec`s (Contracts) are unchanged.
+  let _ ← Readers.MemoryAccess.circuit
     ⟨input.memory_access, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
       addr_op.addr_operation.value[0], addr_op.addr_operation.value[1], addr_op.addr_operation.value[2],
       input.store_value, is_real⟩
-  assertion Readers.ITypeReaderImmutable.circuit
+  let _ ← Readers.ITypeReaderImmutable.circuit
     ⟨input.adapter, is_real, is_real, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 36⟩
   byteChannel.pullIf is_real

@@ -98,7 +98,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod
   assertion BitwiseU16Operation.circuit
     ⟨input.op_b_val, input.op_c_val, bw_cols, byteOpcode, input.is_real⟩
   let r := bw_cols.bitwise_operation.result
-  assertion Readers.ALUTypeReader.circuit
+  -- `ALUTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
+  -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.ALUTypeReader.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_xor * 3 + is_or * 4 + is_and * 5,

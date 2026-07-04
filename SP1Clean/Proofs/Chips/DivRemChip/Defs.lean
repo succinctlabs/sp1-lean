@@ -367,7 +367,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   -- Readers (after the arithmetic gadgets, extracted order — `E382` opcode + result-word write):
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  assertion Readers.RTypeReader.circuit
+  -- `RTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
+  -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.RTypeReader.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * (65536 : Expression (ZMod p)), input.state.pc,
      is_divu * 16 + is_remu * 18 + is_div * 15 + is_rem * 17 + is_divw * 25 + is_remw * 27

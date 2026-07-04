@@ -53,7 +53,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AluX0Cols (ZMod p
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   byteChannel.pullIf input.is_real (⟨4, 1, input.opcode, 29⟩ : ByteRow (Expression (ZMod p)))
-  assertion Readers.ALUTypeReaderImmutable.circuit
+  -- `ALUTypeReaderImmutable` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC
+  -- `CoeFun` (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.ALUTypeReaderImmutable.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, input.opcode⟩
   assertZero (input.is_real * (input.is_real - 1))

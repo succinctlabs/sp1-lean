@@ -79,7 +79,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalrColumns (ZMod
   assertion AddOperation.circuit
     ⟨pcWordV, #v[4, 0, 0, 0], { value := op_a_value }, input.is_real - input.adapter.op_a_0⟩
   op_a_value[3] === 0
-  assertion Readers.ITypeReader.circuit
+  -- `ITypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
+  -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.ITypeReader.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 47,
      op_a_value[0], op_a_value[1], op_a_value[2], op_a_value[3]⟩

@@ -47,7 +47,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var UTypeColumns (ZMo
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   assertion AddOperation.circuit
     ⟨addendV, input.adapter.op_b_imm, { value := add_value }, input.is_real - input.adapter.op_a_0⟩
-  assertion Readers.JTypeReader.circuit
+  -- `JTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
+  -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.JTypeReader.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      input.is_auipc * 48 + (1 - input.is_auipc) * 49,

@@ -9,7 +9,7 @@ import Clean.Circuit.Channel
 import Clean.Gadgets.Equality
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # Native `ITypeReader` reader — the I-type register-adapter per-row checks as a Clean `FormalAssertion`
+/-! # Native `ITypeReader` reader — the I-type register-adapter per-row checks as a Clean `GeneralFormalCircuit`
 
 The register adapter for **I-type** instructions (loads and reg-reg-imm ops): a destination write `op_a`
 (= rd), a source read `op_b` (= rs1), and an **immediate** `op_c_imm` (no op_c register read). SP1's
@@ -101,13 +101,30 @@ operation/load; so both memory interactions here are read pulls/read-backs (no w
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_trusted = 0 ∨ input.is_trusted = 1)
 
-theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
+/-! ### `ProverData`-lifted forms (SC Phase 2pre)
+
+The reader upgrades `FormalAssertion → GeneralFormalCircuit` (Output = `unit`) so its `Spec` can, in a
+later phase, re-export the data-relative pull guarantees (`ProgTruth`/`MemTruth`). Content UNCHANGED:
+`AssumptionsD`/`SpecD` ignore the extra `ProverData`/`output`, so the soundness/completeness bodies are
+the old ones (modulo the `dsimp`/`show` reductions the nested-`cols` reassembly needs). -/
+
+/-- The soundness assumption, lifted to ignore `ProverData`. -/
+def AssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Assumptions input
+
+/-- The soundness spec, lifted to ignore the `unit` output and `ProverData`. -/
+def SpecD (input : Inputs (ZMod p)) (_ : unit (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Spec input
+
+/-- The completeness assumption (an assertion assumes both `Assumptions` and `Spec`). -/
+def ProverAssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+    (_ : ProverHint (ZMod p)) : Prop := Assumptions input ∧ Spec input
+
+theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
   -- `h_holds`: the 2 `RegisterAccessCols` subs, the `op_a_0` gate `hbin`, the inline `is_trusted` gate
   -- `h_trust`, the **program pull's guarantee** `h_prog`, the zeroing gates, then the two **memory pull
   -- guarantees** `h_mem_a`/`h_mem_b` (`MemoryMsg.isU64` of op_a/op_b's `prev_value`).
-  simp only [circuit_norm, memoryChannel, MemoryMsg.isU64, programChannel, ProgramMsg.RowSpec]
-    at h_holds ⊢
+  simp only [circuit_norm, AssumptionsD, SpecD, memoryChannel, MemoryMsg.isU64, programChannel,
+    ProgramMsg.RowSpec] at h_holds h_assumptions ⊢
   obtain ⟨h_rac_a, h_rac_b, hbin, h_trust, h_prog, z0, z1, z2, z3, h_mem_a, h_mem_b⟩ := h_holds
   have htbin := bool_of_mul_pred h_trust
   have e : ∀ i (hi : i < 3), Expression.eval env input_var_pc[i] = input_pc[i] := by
@@ -117,14 +134,15 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   -- operand a pull off-gate (vacuous); op_a is read-only (no push), op_b has one push.
   refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin,
       h_rac_a h_assumptions.1, h_rac_b h_assumptions.1, fun ht => ?_,
-      fun ht2 => ⟨h_mem_a (by rw [ht2]), h_mem_b (by rw [ht2])⟩⟩,
+      fun ht2 => ⟨h_mem_a (by rw [show input_is_real = 1 from ht2]),
+        h_mem_b (by rw [show input_is_real = 1 from ht2])⟩⟩,
     Or.inr h_assumptions.1, Or.inr h_assumptions.1,
     fun h1 h0 => off_gate_vacuous htbin h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
     fun _ h0 => ?_⟩
   · -- decode bounds from the program pull guarantee
-    obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [ht])
+    obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [show input_is_trusted = 1 from ht])
     rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
     exact ⟨ha, hp0, hp1, hp2⟩
   · -- push_b requirement — same `prev_value` word as the paired pull (h_mem_b)
@@ -132,13 +150,20 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
     exact h_mem_b (by rw [ht])
 
-theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
+theorem completeness :
+    GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD
+      (fun _ _ _ => True) := by
   circuit_proof_start
+  simp only [ProverAssumptionsD] at h_assumptions
+  obtain ⟨h_assumptions, h_spec⟩ := h_assumptions
   obtain ⟨hreal, htrust⟩ := h_assumptions
   -- `h_spec` supplies the zeroing gates `z*`, the `op_a_0` binary `hbin`, the two `RegisterAccessCols`
   -- sub-`Spec`s, the gated decode bounds `hdec`, and (W11 memory) the op_a/op_b `isU64` `hisu` — discharging
   -- the program **pull** and the two memory **pulls** (the pushes do NOT appear in completeness goals).
   obtain ⟨⟨z0, z1, z2, z3⟩, hbin, hrac_a, hrac_b, hdec, hisu⟩ := h_spec
+  -- `hbin`/`htrust` carry `{record}.field` projections (the `ProverAssumptionsD`/Contracts `Spec`
+  -- reassembly); `dsimp` iota-reduces them to the destructured atoms so the `rw`-gates below match.
+  dsimp only at hbin htrust
   have e : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
   refine ⟨⟨hreal, hrac_a⟩, ⟨hreal, hrac_b⟩, ?_, ?_, ?_, z0, z1, z2, z3, ?_, ?_⟩
@@ -156,15 +181,16 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     simp only [memoryChannel, MemoryMsg.isU64]
     exact fun hneg => (hisu (neg_inj.mp hneg)).2
 
-/-- The native I-type reader as a Clean `FormalAssertion`: composes a `RegisterAccessCols` per operand
+/-- The native I-type reader as a Clean `GeneralFormalCircuit`: composes a `RegisterAccessCols` per operand
 (op_a write, op_b read), imposes the `op_a_0` binary + zeroing gates, and emits the Program/Memory buses. -/
-def circuit : FormalAssertion (ZMod p) Inputs :=
+def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
   -- `byteChannel` dropped (W11 Phase 0c); `programChannel` dropped (W11 flip — now pulled, its off-gate
   -- requirement vacuous via the inline `is_trusted` gate). Only the Memory bus's requirements remain.
   { main, elaborated,
-    channelsWithRequirements := [memoryChannel.toRaw],
-    Assumptions := Assumptions, Spec := Spec,
+    Assumptions := AssumptionsD, Spec := SpecD,
+    ProverAssumptions := ProverAssumptionsD, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
+    channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, RegisterAccessCols.circuit, memoryChannel, programChannel]; grind }
 

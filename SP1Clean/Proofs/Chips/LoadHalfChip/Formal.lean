@@ -268,7 +268,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadHalfColumns :=
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main, byteChannel, memoryChannel] }
 
 end SP1Clean.LoadHalfChip

@@ -115,11 +115,28 @@ decode bounds are **derived** into the `Spec` from the program pull (W11 flip), 
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_trusted = 0 ∨ input.is_trusted = 1)
 
+/-! ### `ProverData`-lifted forms (SC Phase 2pre)
+
+The reader upgrades `FormalAssertion → GeneralFormalCircuit` (Output = `unit`) so its `Spec` can, in a
+later phase, re-export the data-relative pull guarantees (`ProgTruth`/`MemTruth`). Content UNCHANGED:
+`AssumptionsD`/`SpecD` ignore the extra `ProverData`/`output`, so the soundness/completeness bodies are
+the old ones (modulo the record-projection `show`/`dsimp` bridges the reassembled `input` needs). -/
+
+/-- The soundness assumption, lifted to ignore `ProverData`. -/
+def AssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Assumptions input
+
+/-- The soundness spec, lifted to ignore the `unit` output and `ProverData`. -/
+def SpecD (input : Inputs (ZMod p)) (_ : unit (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Spec input
+
+/-- The completeness assumption (an assertion assumes both `Assumptions` and `Spec`). -/
+def ProverAssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+    (_ : ProverHint (ZMod p)) : Prop := Assumptions input ∧ Spec input
+
 set_option maxHeartbeats 4000000 in
-theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
+theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
-  simp only [circuit_norm, memoryChannel, MemoryMsg.isU64, programChannel, ProgramMsg.RowSpec,
-    sub_eq_add_neg] at h_holds ⊢
+  simp only [circuit_norm, AssumptionsD, SpecD, Spec, memoryChannel, MemoryMsg.isU64, programChannel,
+    ProgramMsg.RowSpec, sub_eq_add_neg] at h_holds h_assumptions ⊢
   obtain ⟨h_rac_a, h_rac_b, h_rac_c, hbin, h_immc, h_immbin, i0, i1, i2, i3, h_trust, h_prog,
     z0, z1, z2, z3, h_mem_a, h_mem_b, h_mem_c⟩ := h_holds
   have htbin := bool_of_mul_pred h_trust
@@ -140,8 +157,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have hpv := h_input.1.2.2.2.2.2.2.1.1
   refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin, h_immc, hcbin, ?_,
       h_rac_a h_assumptions.1, h_rac_b h_assumptions.1, h_rac_c hcbin,
-      fun ht => ?_, fun ht2 => ⟨h_mem_a (by rw [ht2]), h_mem_b (by rw [ht2])⟩,
-      fun ht3 => h_mem_c (by rw [ht3])⟩,
+      fun ht => ?_,
+      fun ht2 => ⟨h_mem_a (by rw [show input_is_real = 1 from ht2]),
+        h_mem_b (by rw [show input_is_real = 1 from ht2])⟩,
+      fun ht3 => h_mem_c (by rw [show input_is_real + -input_cols_imm_c = 1 from ht3])⟩,
     Or.inr h_assumptions.1, Or.inr h_assumptions.1, Or.inr hcbin,
     fun h1 h0 => off_gate_vacuous htbin h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
@@ -152,7 +171,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     fun _ h0 => ?_⟩
   · rw [← hoc, ← hpv]; simp only [Vector.getElem_map]; exact ⟨i0, i1, i2, i3⟩
   · -- the decode-bounds `Spec` conjunct is **derived** from the program pull `h_prog`.
-    obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [ht])
+    obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [show input_is_trusted = 1 from ht])
     rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
     exact ⟨ha, hp0, hp1, hp2⟩
   · -- push_a: read-back value = op_a prev, from the paired pull.
@@ -169,11 +188,18 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     exact h_mem_c (by rw [htc])
 
 set_option maxHeartbeats 4000000 in
-theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
+theorem completeness :
+    GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD
+      (fun _ _ _ => True) := by
   circuit_proof_start
+  simp only [ProverAssumptionsD] at h_assumptions
+  obtain ⟨h_assumptions, h_spec⟩ := h_assumptions
   obtain ⟨hreal, htrust⟩ := h_assumptions
   obtain ⟨⟨z0, z1, z2, z3⟩, hbin, h_immc, h_immbin_or, ⟨i0, i1, i2, i3⟩, hrac_a, hrac_b, hrac_c,
     hdec, hisu_ab, hisu_c⟩ := h_spec
+  -- `hbin`/`h_immbin_or`/`htrust` carry `{record}.field` projections (the `ProverAssumptionsD`/Contracts
+  -- `Spec` reassembly); `dsimp` iota-reduces them to the destructured atoms so the `rw`-gates below match.
+  dsimp only at hbin h_immbin_or htrust
   -- bridges: op_a `prev_value` limbs (the read-zeroing gates) and op_c (immediate gates); the memory
   -- pulls need none (their `isU64` obligations are whole-`Word`, eval already substituted away).
   have eva : ∀ (i : ℕ) (hi : i < 4),
@@ -218,14 +244,15 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     simp only [memoryChannel, MemoryMsg.isU64]
     exact fun hneg => hisu_c (neg_inj.mp hneg)
 
-/-- The native immutable ALU-type reader as a Clean `FormalAssertion`: composes a `RegisterAccessCols` per
+/-- The native immutable ALU-type reader as a Clean `GeneralFormalCircuit`: composes a `RegisterAccessCols` per
 operand (op_c gated `is_real - imm_c`), imposes the `op_a_0` binary + immediate + read-zeroing gates, and
 emits the Program/Memory buses. -/
-def circuit : FormalAssertion (ZMod p) Inputs :=
+def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
   -- `byteChannel` dropped (W11 Phase 0c); `programChannel` dropped (W11 flip — now pulled, its off-gate
   -- requirement vacuous via the inline `is_trusted` gate). Only the Memory bus's requirements remain.
   { main, elaborated,
-    Assumptions := Assumptions, Spec := Spec,
+    Assumptions := AssumptionsD, Spec := SpecD,
+    ProverAssumptions := ProverAssumptionsD, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by

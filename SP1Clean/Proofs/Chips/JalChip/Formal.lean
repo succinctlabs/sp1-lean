@@ -118,7 +118,9 @@ theorem completeness :
   obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac, h_jt3, h_lt3, h_align_pa, hdec⟩ :=
     h_assumptions
   simp only [jumpTargetWord, linkTargetWord] at h_jt3 h_lt3 h_align_pa
-  obtain ⟨he_av, he_oav⟩ := h_env
+  -- `h_env` now bundles the two witness-vector equations with the GFC `JTypeReader` subcircuit's
+  -- completeness obligation (SC Phase 2pre); the witness equations are `he_av`/`he_oav`.
+  obtain ⟨he_av, he_oav, _⟩ := h_env
   -- eval-of-input rewrites.
   have hpc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc = input_state_pc :=
     h_input.2.1.2.2.2
@@ -230,7 +232,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.JalChip

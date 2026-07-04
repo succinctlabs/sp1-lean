@@ -62,7 +62,9 @@ theorem completeness :
   obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   -- `op_c_memory` is grouped since `imm_c` is the final field of the ALU adapter block.
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, ⟨hoc, -, -⟩, -⟩ := h_input
-  obtain ⟨h_env_val, h_env_msb⟩ := h_env
+  -- `h_env` now bundles the chip's `value`/`msb` witness-gen equations with the GFC `ALUTypeReader`
+  -- subcircuit's completeness obligation (SC Phase 2pre) — discard the trailing reader obligation.
+  obtain ⟨h_env_val, h_env_msb, -⟩ := h_env
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
       Vector.map (Expression.eval env.toEnvironment) vv = v →
@@ -133,7 +135,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddwCols :=
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
         SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.AddwChip

@@ -89,7 +89,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) 
       #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]
       (env is_slt) (env input.is_real))
   assertion LtOperationSigned.circuit ⟨input.op_b_val, input.op_c_val, lt_cols, is_slt, input.is_real⟩
-  assertion Readers.ALUTypeReader.circuit
+  -- `ALUTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
+  -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.ALUTypeReader.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_slt * 9 + is_sltu * 10,

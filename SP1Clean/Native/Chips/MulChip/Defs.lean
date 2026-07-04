@@ -107,7 +107,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p))
   (is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw)
     * ((is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw) - 1) === 0
   input.adapter.op_a_0 === 0
-  assertion Readers.RTypeReader.circuit
+  -- `RTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
+  -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.RTypeReader.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_mul * 11 + is_mulh * 12 + is_mulhu * 13 + is_mulhsu * 14 + is_mulw * 24,

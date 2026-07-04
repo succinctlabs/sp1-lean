@@ -194,7 +194,9 @@ theorem completeness :
       apply Vector.ext; intro i hi; interval_cases i <;> rfl
     rwa [he] at h_rs1U
   simp only [jumpTargetWord, linkTargetWord, lsbBit, rs1WordI] at h_jt3 h_lt3 h_align_pa
-  obtain ⟨he_av, he_oav, he_lsb⟩ := h_env
+  -- `h_env` now bundles the two add-result + `lsb` witness-gen equations with the GFC `ITypeReader`
+  -- subcircuit's completeness obligation (4th conjunct, discarded — the reader slot is discharged below).
+  obtain ⟨he_av, he_oav, he_lsb, _⟩ := h_env
   obtain ⟨_h_ir, ⟨_h_clkh, _h_clk1, _h_clk0, hpc⟩, _h_a, ⟨_h_amem_pv, _h_amem_pl, _h_amem_dl⟩,
     _h_a0, _h_b, ⟨h_bmem_pv, _h_bmem_pl, _h_bmem_dl⟩, hcimm⟩ := h_input
   have rb0 : Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0]
@@ -343,7 +345,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalrColumns :=
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions]
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
       simp [circuit_norm, Gadgets.Equality.main] }
 
 end SP1Clean.JalrChip

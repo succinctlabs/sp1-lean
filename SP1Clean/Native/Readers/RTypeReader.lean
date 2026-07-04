@@ -140,12 +140,31 @@ operation; so all five memory interactions here are read pulls/read-backs (no wr
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_trusted = 0 ∨ input.is_trusted = 1)
 
-theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
+/-! ### `ProverData`-lifted forms (SC Phase 2pre)
+
+The reader upgrades `FormalAssertion → GeneralFormalCircuit` (Output = `unit`) so its `Spec` can, in a
+later phase, re-export the data-relative pull guarantees (`ProgTruth`/`MemTruth`). Content UNCHANGED:
+`AssumptionsD`/`SpecD` ignore the extra `ProverData`/`output`, so the soundness/completeness bodies are
+the old ones (modulo the `dsimp`/`show` reductions the nested-`cols` reassembly needs). -/
+
+/-- The soundness assumption, lifted to ignore `ProverData`. -/
+def AssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Assumptions input
+
+/-- The soundness spec, lifted to ignore the `unit` output and `ProverData`. -/
+def SpecD (input : Inputs (ZMod p)) (_ : unit (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Spec input
+
+/-- The completeness assumption (an assertion assumes both `Assumptions` and `Spec`). -/
+def ProverAssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+    (_ : ProverHint (ZMod p)) : Prop := Assumptions input ∧ Spec input
+
+theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
   -- After simp: `h_holds` = 3 rac subs + hbin + h_trust + h_prog (program pull) + z0..z3 (zeroing) +
   -- h_mem_a/b/c (memory pull guarantees: `-is_real = -1 → Word.isU64 {prev_value}` — the message
   -- carries the whole `Word`, so the guarantee is the Spec's `isU64` proposition verbatim).
-  simp only [circuit_norm, memoryChannel, MemoryMsg.isU64, programChannel, ProgramMsg.RowSpec] at h_holds ⊢
+  -- `AssumptionsD`/`SpecD` unfold to the data-free content in the same `circuit_norm` pass.
+  simp only [circuit_norm, AssumptionsD, SpecD, memoryChannel, MemoryMsg.isU64, programChannel,
+    ProgramMsg.RowSpec] at h_holds h_assumptions ⊢
   obtain ⟨h_rac_a, h_rac_b, h_rac_c, hbin, h_trust, h_prog, z0, z1, z2, z3, h_mem_a, h_mem_b, h_mem_c⟩ :=
     h_holds
   have htbin := bool_of_mul_pred h_trust
@@ -163,12 +182,13 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     fun _ h0 => ?_,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
     fun _ h0 => ?_⟩
-  · -- Goal 1: is_trusted = 1 → decode bounds (from program pull guarantee)
-    obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [ht])
+  · -- Goal 1: is_trusted = 1 → decode bounds (from program pull guarantee). `ht` carries the reassembled
+    -- `input.is_trusted` record projection (the `SpecD` wrapper) — defeq to the atom, bridged by `show`.
+    obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [show input_is_trusted = 1 from ht])
     rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
     exact ⟨ha, hp0, hp1, hp2⟩
   · -- Goal 2: is_real = 1 → isU64 trio — the three memory pull guarantees, verbatim
-    have hneg : -input_is_real = -1 := by rw [ht2]
+    have hneg : -input_is_real = -1 := by rw [show input_is_real = 1 from ht2]
     exact ⟨h_mem_a hneg, h_mem_b hneg, h_mem_c hneg⟩
   · -- Goal 3: push_b requirement — same prev_value Word as the paired pull (h_mem_b)
     have ht : input_is_real = 1 := by
@@ -179,12 +199,19 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
     exact h_mem_c (by rw [ht])
 
-theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
+theorem completeness :
+    GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD
+      (fun _ _ _ => True) := by
   circuit_proof_start
+  simp only [ProverAssumptionsD] at h_assumptions
+  obtain ⟨h_assumptions, h_spec⟩ := h_assumptions
   obtain ⟨hreal, htrust⟩ := h_assumptions
   -- `h_spec` supplies the zeroing gates `z*`, the `op_a_0` binary `hbin`, the three `RegisterAccessCols`
   -- sub-`Spec`s, and `hdec` — now a PAIR: `(decode if trusted) ∧ (isU64 trio if real)`.
   obtain ⟨⟨z0, z1, z2, z3⟩, hbin, hrac_a, hrac_b, hrac_c, hdec⟩ := h_spec
+  -- `hbin`/`htrust` carry `{record}.field` projections (the `ProverAssumptionsD`/Contracts `Spec`
+  -- reassembly); `dsimp` iota-reduces them to the destructured atoms so the `rw`-gates below match.
+  dsimp only at hbin htrust
   have e : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
   refine ⟨⟨hreal, hrac_a⟩, ⟨hreal, hrac_b⟩, ⟨hreal, hrac_c⟩, ?_, ?_, ?_, z0, z1, z2, z3, ?_, ?_, ?_⟩
@@ -201,14 +228,15 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   · exact fun hneg => (hdec.2 (neg_inj.mp hneg)).2.1
   · exact fun hneg => (hdec.2 (neg_inj.mp hneg)).2.2
 
-/-- The native RTypeReader reader as a Clean `FormalAssertion`: takes the chip-owned `cols` adapter block,
+/-- The native RTypeReader reader as a Clean `GeneralFormalCircuit`: takes the chip-owned `cols` adapter block,
 composes a `RegisterAccessCols` sub-assertion per operand for the timestamp byte checks, imposes the
 `op_a_0` binary + zeroing gates, and emits the Program/Memory buses, with a semantic spec. -/
-def circuit : FormalAssertion (ZMod p) Inputs :=
+def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
   -- `byteChannel` dropped (W11 Phase 0c); `programChannel` dropped (W11 flip — now pulled, its off-gate
   -- requirement vacuous via the inline `is_trusted` gate). Only the Memory bus's requirements remain.
   { main, elaborated,
-    Assumptions := Assumptions, Spec := Spec,
+    Assumptions := AssumptionsD, Spec := SpecD,
+    ProverAssumptions := ProverAssumptionsD, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by

@@ -136,7 +136,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
   next_pc[1] === is_branching * branch_value[1] + (input.is_real - is_branching) * fall_value[1]
   next_pc[2] === is_branching * branch_value[2] + (input.is_real - is_branching) * fall_value[2]
   let opcode := is_beq * 40 + is_bne * 41 + is_blt * 42 + is_bge * 43 + is_bltu * 44 + is_bgeu * 45
-  assertion Readers.ITypeReaderImmutable.circuit
+  -- `ITypeReaderImmutable` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
+  -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.ITypeReaderImmutable.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, opcode⟩
   byteChannel.pullIf input.is_real

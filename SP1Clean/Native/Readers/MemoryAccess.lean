@@ -8,7 +8,7 @@ import Clean.Circuit.Channel
 import Clean.Gadgets.Equality
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # Native `MemoryAccess` primitive — one true-address memory read/write as a Clean `FormalAssertion`
+/-! # Native `MemoryAccess` primitive — one true-address memory read/write as a Clean `GeneralFormalCircuit`
 
 SP1's `eval_memory_access_read` / `eval_memory_access_write` + `eval_memory_access_timestamp`
 (`crates/core/machine/src/air/memory.rs`), mirrored in the `memory_access` fragment of every
@@ -130,10 +130,28 @@ the just-pulled `prev_value`; a write supplies its store value's range-check) �
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_real = 1 → Word.isU64 input.new_value)
 
-theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
+/-! ### `ProverData`-lifted forms (SC Phase 2pre)
+
+The reader upgrades `FormalAssertion → GeneralFormalCircuit` (Output = `unit`) so its `Spec` can, in a
+later phase, re-export the data-relative pull guarantees. Content UNCHANGED: `AssumptionsD`/`SpecD` ignore
+the extra `ProverData`/`output`, so the soundness/completeness bodies are the old ones (modulo the
+`AssumptionsD`/`SpecD` folds and any `dsimp`/`show` reductions the record reassembly needs). -/
+
+/-- The soundness assumption, lifted to ignore `ProverData`. -/
+def AssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Assumptions input
+
+/-- The soundness spec, lifted to ignore the `unit` output and `ProverData`. -/
+def SpecD (input : Inputs (ZMod p)) (_ : unit (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Spec input
+
+/-- The completeness assumption (an assertion assumes both `Assumptions` and `Spec`). -/
+def ProverAssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+    (_ : ProverHint (ZMod p)) : Prop := Assumptions input ∧ Spec input
+
+theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
-  simp only [circuit_norm, byteChannel, memoryChannel, MemoryMsg.isU64] at h_holds ⊢
+  simp only [circuit_norm, AssumptionsD, SpecD, byteChannel, memoryChannel, MemoryMsg.isU64]
+    at h_holds h_assumptions ⊢
   -- the leading `_` is the inline `is_real` boolean gate (unused in soundness — `Assumptions` already gives
   -- `is_real ∈ {0,1}`); `a1 a2 a3` the three timestamp asserts, `b4 b5` the two byte-pull guarantees, and
   -- `h_mem` the memory read-prior pull's guarantee (`Word.isU64` of the whole `prev_value` word).
@@ -145,6 +163,9 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
     fun _ h0 => h_assumptions.2 (h_assumptions.1.resolve_left h0)⟩
   -- Spec consequent (real row); the `isU64 prev_value` conjunct is the memory pull `h_mem` verbatim.
+  -- `hr1`/the goal carry the reassembled `{record}.field` projections (the `SpecD` wrapper); `dsimp only`
+  -- iota-reduces them to the destructured atoms (`selCur`/`selPrev` stay folded) so the `rw`s below match.
+  dsimp only at hr1 ⊢
   rw [hr1, one_mul] at a1 a2 a3
   have hb4 := b4 (by rw [hr1]); rw [← c16] at hb4
   have hb5 := b5 (by rw [hr1])
@@ -156,11 +177,18 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   · rw [sub_eq_add_neg]; exact a2
   · simp only [selCur, selPrev]; linear_combination a3
 
-theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
+theorem completeness :
+    GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD
+      (fun _ _ _ => True) := by
   circuit_proof_start
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
+  simp only [ProverAssumptionsD] at h_assumptions
+  obtain ⟨h_assumptions, h_spec⟩ := h_assumptions
   simp only [circuit_norm, byteChannel, memoryChannel, MemoryMsg.isU64]
   obtain ⟨hbin, hnew⟩ := h_assumptions
+  -- `hbin` carries the reassembled `{record}.is_real` projection (the `ProverAssumptionsD` reassembly);
+  -- `dsimp only` iota-reduces it to the destructured atom so the `simp`/`rw`-gates below match.
+  dsimp only at hbin
   rcases hbin with h0 | h1
   · -- padding row (`is_real = 0`): the leading gate + every gated assert is `0 · _`, the byte/memory pulls
     -- fire only off-padding.
@@ -175,6 +203,9 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   · -- real row (`is_real = 1`): the asserts come from the `Spec` facts, the byte pulls from its ranges, the
     -- memory pull from its new `isU64 prev_value` conjunct.
     obtain ⟨hcl, ha2, ha3, hd_low, hd_high, hisu⟩ := h_spec h1
+    -- the `Spec`-derived facts carry the reassembled `{record}.field` projections; `dsimp only` reduces
+    -- them to atoms (`selCur`/`selPrev` stay folded) so the `rw`/`linear_combination`s below match.
+    dsimp only at hcl ha2 ha3 hd_low hd_high hisu
     simp only [id] at *
     simp only [selCur, selPrev] at ha3
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -186,14 +217,15 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     · intro _; exact (byteRowSpec_u8range_pair _ _).mpr ⟨hd_high, by rw [ZMod.val_zero]; norm_num⟩
     · intro _; exact hisu
 
-/-- The native memory-access primitive as a Clean `FormalAssertion`: timestamp monotonicity columns +
+/-- The native memory-access primitive as a Clean `GeneralFormalCircuit`: timestamp monotonicity columns +
 the two Memory-bus interactions at a real 48-bit address, parameterised by the written `new_value`. -/
-def circuit : FormalAssertion (ZMod p) Inputs :=
+def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
   -- `byteChannel` dropped (W11 Phase 0c): the off-gate byte-pull `Requirements` are now discharged by the
   -- inline `is_real` boolean gate in `main`, so only the Memory bus stays in `channelsWithRequirements`
   -- (it carries the real send/receive emits); `byteChannel` moves to a Clean `SoundEnsemble` provider later.
   { main, elaborated,
-    Assumptions := Assumptions, Spec := Spec,
+    Assumptions := AssumptionsD, Spec := SpecD,
+    ProverAssumptions := ProverAssumptionsD, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by

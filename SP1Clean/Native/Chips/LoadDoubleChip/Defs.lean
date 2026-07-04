@@ -63,12 +63,15 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadDoubleColumns
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let addr_op ← subcircuit AddressOperation.circuit ⟨input.op_b_val, input.op_c_imm, 0, 0, 0⟩
-  assertion Readers.MemoryAccess.circuit
+  -- SC Phase 2pre: `MemoryAccess` is now a `GeneralFormalCircuit`, composed via the GFC `CoeFun`
+  -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.MemoryAccess.circuit
     ⟨input.memory_access, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
       addr_op.addr_operation.value[0], addr_op.addr_operation.value[1], addr_op.addr_operation.value[2],
       input.memory_access.prev_value, input.is_real⟩
-  assertion Readers.ITypeReader.circuit
+  -- SC Phase 2pre: `ITypeReader` is now a `GeneralFormalCircuit`, composed via the GFC `CoeFun`.
+  let _ ← Readers.ITypeReader.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
       input.state.pc, 35,

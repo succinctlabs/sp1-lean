@@ -114,7 +114,7 @@ theorem addwcols_program_interactions_faithful_syntactic
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
     SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, toAccess_pullIf_program, heq]
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, toAccess_pullIf_program, heq]
   simp [circuit_norm, toAccess_pullIf_program, Gadgets.Equality.main, LookupAccessList.negMult,
     signedVal_neg hp2,
     Extracted.AddwCols.interactions, Extracted.AddwOperation.interactions,
@@ -172,7 +172,7 @@ theorem addwcols_state_interactions_faithful_syntactic
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
     SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, hsk, hsk_pull, heq]
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, hsk, hsk_pull, heq]
   -- the residual: CPUState's 2 State interactions (via `hsk`), everything else dropped by the `State`
   -- filter (byte/mem/program channel distinctness) or emitting nothing (`Gadgets.Equality.main`); the
   -- oracle `.filter .State` likewise keeps only the CPUState fragment's 2 State entries.
@@ -243,7 +243,7 @@ theorem addwcols_memory_interactions_faithful_syntactic
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
     SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions,
     toAccess_pushIf_memory, toAccess_pullIf_memory, heq]
   simp [circuit_norm, toAccess_pushIf_memory, toAccess_pullIf_memory, Gadgets.Equality.main,
     LookupAccessList.negMult, signedVal_neg hp2,
@@ -326,7 +326,7 @@ theorem addwcols_byte_interactions_faithful_syntactic
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
     SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, hk, heq]
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, hk, heq]
   simp [circuit_norm, hk, Gadgets.Equality.main,
     Extracted.AddwCols.interactions, Extracted.AddwOperation.interactions, Extracted.U16MSBOperation.interactions,
     Extracted.CPUState.interactions, Extracted.ALUTypeReader.interactions,

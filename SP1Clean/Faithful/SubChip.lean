@@ -118,7 +118,7 @@ theorem subcols_state_interactions_faithful_syntactic
     Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.SubOperation.circuit, SP1Clean.SubOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, hsk, hsk_pull, heq]
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, hsk, hsk_pull, heq]
   -- the residual: CPUState's 2 State interactions (via `hsk`), everything else dropped by the `State`
   -- filter (byte/mem/program channel distinctness) or emitting nothing (`Gadgets.Equality.main`); the
   -- oracle `.filter .State` likewise keeps only the CPUState fragment's 2 State entries.
@@ -160,7 +160,7 @@ theorem subcols_program_interactions_faithful_syntactic
     Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.SubOperation.circuit, SP1Clean.SubOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, toAccess_pullIf_program, heq]
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, toAccess_pullIf_program, heq]
   -- only RTypeReader's Program emit survives the `Program` filter; close via the kernel + bindings + the
   -- opcode coercion (`Opcode.ofNat 0 = 0`), then drop the byte/state/memory residual by channel name. The
   -- emit is now a `pull` (W11 flip), so its multiplicity is `-is_real` — matched by `negMult` on the oracle.
@@ -231,7 +231,7 @@ theorem subcols_memory_interactions_faithful_syntactic
     Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.SubOperation.circuit, SP1Clean.SubOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions,
     toAccess_pushIf_memory, toAccess_pullIf_memory, heq]
   simp [circuit_norm, toAccess_pushIf_memory, toAccess_pullIf_memory, Gadgets.Equality.main,
     LookupAccessList.negMult, signedVal_neg hp2,
@@ -306,7 +306,7 @@ theorem subcols_byte_interactions_faithful_syntactic
     Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.SubOperation.circuit, SP1Clean.SubOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, hk, heq]
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, hk, heq]
   simp [circuit_norm, hk, Gadgets.Equality.main,
     Extracted.SubCols.interactions, Extracted.SubOperation.interactions,
     Extracted.CPUState.interactions, Extracted.RTypeReader.interactions,
