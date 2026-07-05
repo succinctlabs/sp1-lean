@@ -1,7 +1,7 @@
 import SP1Clean.Soundness.TargetVm
 import SP1Clean.Soundness.ProgramConsistency
 import SP1Clean.Soundness.ProgramProviderSpike
-import SP1Clean.Soundness.Opcode
+import SP1Clean.Model.Opcode
 import SP1Clean.Model.SailDecode
 
 /-! # W3 — the decode half of `OperandsBound` (trusted Program path)

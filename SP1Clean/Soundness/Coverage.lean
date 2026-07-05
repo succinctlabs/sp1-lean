@@ -1,5 +1,5 @@
 import SP1Clean.Soundness.ChipRegistry
-import SP1Clean.Soundness.Opcode
+import SP1Clean.Model.Opcode
 
 /-! # `Coverage` — the one auditable instruction → chip → Sail table
 

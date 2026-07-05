@@ -75,7 +75,7 @@ import SP1Clean.Proofs.Chips.MulChip.Formal
 import SP1Clean.Proofs.Chips.AluX0Chip.Bridge
 import SP1Clean.Native.Chips.AluX0Chip.Defs
 import SP1Clean.Proofs.Chips.AluX0Chip.Formal
-import SP1Clean.Proofs.Chips.ProgramChip
+import SP1Clean.Model.ProgramChip
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Bridge
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Core
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Populate
@@ -331,7 +331,7 @@ import SP1Clean.Soundness.InstructionTrace
 import SP1Clean.Soundness.MemoryConsistency
 import SP1Clean.Soundness.MemoryGlobal
 import SP1Clean.Soundness.MemoryIsU64
-import SP1Clean.Soundness.Opcode
+import SP1Clean.Model.Opcode
 import SP1Clean.Soundness.ProgramConsistency
 import SP1Clean.Soundness.ProgramProviderSpike
 import SP1Clean.Soundness.SP1Ensemble
