@@ -49,10 +49,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   assertZero (input.is_trusted * (input.is_trusted - 1))
   programChannel.pullIf input.is_trusted
     (⟨input.pc[0], input.pc[1], input.pc[2], input.opcode,
-      cols.op_a,
-      cols.op_b_imm[0], cols.op_b_imm[1], cols.op_b_imm[2], cols.op_b_imm[3],
-      cols.op_c_imm[0], cols.op_c_imm[1], cols.op_c_imm[2], cols.op_c_imm[3],
-      cols.op_a_0, 1, 1⟩ : ProgramMsg (Expression (ZMod p)))
+      cols.op_a, cols.op_b_imm, cols.op_c_imm, cols.op_a_0, 1, 1⟩ :
+      ProgramMsg (Expression (ZMod p)))
   cols.op_a_0 * input.wv0 === 0
   cols.op_a_0 * input.wv1 === 0
   cols.op_a_0 * input.wv2 === 0

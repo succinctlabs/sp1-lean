@@ -233,7 +233,7 @@ pre-write), and the three pushes. -/
 def rowFactsOf (input : Inputs (ZMod p)) : RowFacts p where
   statePull := statePullMsg input
   statePush := statePushMsg input
-  fetch := ⟨0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0⟩
+  fetch := ⟨0, 0, 0, 0, 0, #v[0, 0, 0, 0], #v[0, 0, 0, 0], 0, 0, 0⟩
   memPulls := [(bPullMsg input, StateMsg.timeNat (statePullMsg input) + 2),
                (cPullMsg input, StateMsg.timeNat (statePullMsg input) + 3),
                (aPullMsg input, StateMsg.timeNat (statePullMsg input) + 3)]

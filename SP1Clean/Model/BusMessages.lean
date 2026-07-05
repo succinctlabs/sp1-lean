@@ -70,22 +70,20 @@ def MemoryMsg.isU64 (msg : MemoryMsg (ZMod p)) : Prop :=
 /-- The Program-bus message — the arity-16 instruction-fetch tuple `(pc0, pc1, pc2, opcode, op_a,
 op_b0..3, op_c0..3, op_a_0, imm_b, imm_c)`, matching SP1's `AirInteraction.program`
 (`crates/hypercube/src/lookup/interaction.rs`, `InteractionKind::Program => 16`) and the `.send
-(.program …)` in `Extracted/RTypeReader.lean`. `op_b`/`op_c` are the two operands as 4-limb words; for an
-R-type row only the register-index limb is non-zero (`op_b1..3 = op_c1..3 = imm_b = imm_c = 0`). -/
+(.program …)` in `Extracted/RTypeReader.lean`. `op_b`/`op_c` are the two operands as 4-limb **`Word`s**;
+`ProvableStruct` flattens each to the same 4 elements, so the emitted arity-16 row is byte-identical to
+the older 8-scalar-limb form (the `MemoryMsg.value : Word` precedent). **Field order preserves the row**:
+`op_b`/`op_c` are adjacent, `imm_b`/`imm_c` stay last — do NOT interleave `imm_b` between them (that would
+reorder the bus tuple). For an R-type row only the register-index limb of each operand is non-zero
+(`op_b[1..3] = op_c[1..3] = imm_b = imm_c = 0`). -/
 structure ProgramMsg (F : Type) where
   pc0 : F
   pc1 : F
   pc2 : F
   opcode : F
   op_a : F
-  op_b0 : F
-  op_b1 : F
-  op_b2 : F
-  op_b3 : F
-  op_c0 : F
-  op_c1 : F
-  op_c2 : F
-  op_c3 : F
+  op_b : Word F
+  op_c : Word F
   op_a_0 : F
   imm_b : F
   imm_c : F

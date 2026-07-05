@@ -146,7 +146,7 @@ theorem sp1StateVerifier_completeness :
       sp1StateVerifierProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [circuit_norm, Channels.stateChannel, sp1StateVerifierProverAssumptions] at h_assumptions ⊢
-  convert h_assumptions using 3 <;> simp_all [circuit_norm]
+  exact h_assumptions
 
 /-- The SP1 boundary verifier as a `GeneralFormalCircuit`: pulls the public final state (receiving its
 `StateTruth`), pushes the public initial state, exposing the loop-closing `[pulled final, pushed init]`

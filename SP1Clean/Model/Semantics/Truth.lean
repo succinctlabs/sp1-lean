@@ -88,17 +88,17 @@ def StepFact (data : ProverData (ZMod p)) (r : RowFacts p) : Prop :=
 
 /-! ## The Program channel's semantic guarantee -/
 
-/-- A Program-bus message projected to the committed program-row column shape — the operands' four limbs
-reassembled as `Word`s — so `decodedInROM` can be applied to a `ProgramMsg`. -/
+/-- A Program-bus message projected to the committed program-row column shape — a trivial field-rename now
+that `ProgramMsg.op_b`/`op_c` are already `Word`s — so `decodedInROM` can be applied to a `ProgramMsg`. -/
 def rowOfMsg (m : ProgramMsg (ZMod p)) : SP1Clean.ProgramChip.ProgramRow (ZMod p) where
   pc0 := m.pc0
   pc1 := m.pc1
   pc2 := m.pc2
   opcode := m.opcode
   op_a := m.op_a
-  op_b := #v[m.op_b0, m.op_b1, m.op_b2, m.op_b3]
+  op_b := m.op_b
   imm_b := m.imm_b
-  op_c := #v[m.op_c0, m.op_c1, m.op_c2, m.op_c3]
+  op_c := m.op_c
   op_a_0 := m.op_a_0
   imm_c := m.imm_c
 

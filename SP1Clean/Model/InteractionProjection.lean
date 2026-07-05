@@ -227,17 +227,20 @@ lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (Z
       (InteractionKind.Program, "SP1Program",
         [(Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val, (Expression.eval env msg.opcode).val,
-         (Expression.eval env msg.op_a).val, (Expression.eval env msg.op_b0).val,
-         (Expression.eval env msg.op_b1).val, (Expression.eval env msg.op_b2).val,
-         (Expression.eval env msg.op_b3).val, (Expression.eval env msg.op_c0).val,
-         (Expression.eval env msg.op_c1).val, (Expression.eval env msg.op_c2).val,
-         (Expression.eval env msg.op_c3).val, (Expression.eval env msg.op_a_0).val,
+         (Expression.eval env msg.op_a).val, (Expression.eval env msg.op_b[0]).val,
+         (Expression.eval env msg.op_b[1]).val, (Expression.eval env msg.op_b[2]).val,
+         (Expression.eval env msg.op_b[3]).val, (Expression.eval env msg.op_c[0]).val,
+         (Expression.eval env msg.op_c[1]).val, (Expression.eval env msg.op_c[2]).val,
+         (Expression.eval env msg.op_c[3]).val, (Expression.eval env msg.op_a_0).val,
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env mult)) := by
   simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
     Channel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
-  simp
+  -- Two `Word` fields (`op_b`/`op_c`) followed by trailing scalars: the op_c append doesn't split under
+  -- plain `simp` (a `toList` normal-form loop), so force the split with an explicit `rw` (op_b reduces on
+  -- its own). Cf. the memory kernels, where `value` is the last field and `toList_word` alone suffices.
+  simp [Vector.toList_append, toList_word]; rw [Vector.toList_append]; simp [toList_word]
 
 omit [NeZero p] in
 /-- **Kernel of the Program "received = projection" (gated VM pull).** The `pullIf`/`programChannel`/
@@ -252,17 +255,19 @@ lemma toAccess_pullIf_program (env : Environment (ZMod p)) (gate : Expression (Z
       (InteractionKind.Program, "SP1Program",
         [(Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val, (Expression.eval env msg.opcode).val,
-         (Expression.eval env msg.op_a).val, (Expression.eval env msg.op_b0).val,
-         (Expression.eval env msg.op_b1).val, (Expression.eval env msg.op_b2).val,
-         (Expression.eval env msg.op_b3).val, (Expression.eval env msg.op_c0).val,
-         (Expression.eval env msg.op_c1).val, (Expression.eval env msg.op_c2).val,
-         (Expression.eval env msg.op_c3).val, (Expression.eval env msg.op_a_0).val,
+         (Expression.eval env msg.op_a).val, (Expression.eval env msg.op_b[0]).val,
+         (Expression.eval env msg.op_b[1]).val, (Expression.eval env msg.op_b[2]).val,
+         (Expression.eval env msg.op_b[3]).val, (Expression.eval env msg.op_c[0]).val,
+         (Expression.eval env msg.op_c[1]).val, (Expression.eval env msg.op_c[2]).val,
+         (Expression.eval env msg.op_c[3]).val, (Expression.eval env msg.op_a_0).val,
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env (-gate))) := by
   simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
     Channel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
-  simp
+  -- See the push kernel: force the op_c append split with an explicit `rw` (the `Word`-plus-trailing-scalars
+  -- shape that plain `simp`'s `toList` normalization won't split).
+  simp [Vector.toList_append, toList_word]; rw [Vector.toList_append]; simp [toList_word]
 
 open SP1Clean.Channels (byteChannel)
 
