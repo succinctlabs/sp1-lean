@@ -34,6 +34,7 @@ namespace SP1Clean.Readers.CPUState
 
 open Circuit
 open SP1Clean.Channels (stateChannel byteChannel StateMsg)
+open SP1Clean.Semantics (StateTruth)
 
 variable {p : ℕ} [Fact p.Prime]
 
@@ -75,12 +76,17 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRaw]
+  -- The State bus is now a semantic `VmChannel`: its `pullIf` (`assumeGuarantees := true`) receives
+  -- `StateTruth`, which is *not* trivially true, so `stateChannel` must join `channelsWithGuarantees`
+  -- (else `InChannelsOrGuarantees` can't discharge the pull). Byte stays (its pulls receive `ByteRowSpec`).
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw]
+  channelsLawful := by
+    simp [circuit_norm, main, byteChannel, stateChannel]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     (elaborated (p := p)).channelsWithGuarantees
-      = ([byteChannel.toRaw] : List (RawChannel (ZMod p))) := rfl
+      = ([byteChannel.toRaw, stateChannel.toRaw] : List (RawChannel (ZMod p))) := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
@@ -89,29 +95,59 @@ set_option linter.unusedSectionVars false in
 Discharged by the composing chip's `is_real * (is_real - 1) = 0` gate. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop := input.is_real = 0 ∨ input.is_real = 1
 
-theorem soundness [Fact (2 ^ 17 < p)] : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
+/-! ### `ProverData`-lifted forms (SC Phase 2c — the State semantic flip)
+
+`CPUState` upgrades `FormalAssertion → GeneralFormalCircuit` because its State `pullIf` now receives the
+data-relative `StateTruth` guarantee (the State channel is a semantic `VmChannel`). Soundness *ignores*
+the received `StateTruth` (no consumer yet — the `Spec` is the unchanged clock bounds); completeness must
+*supply* it — a state push cannot prove reachability row-locally, so the honest prover (the trace
+generator, which has the real Sail execution) provides it via `ProverAssumptions`. -/
+
+/-- Soundness assumption, lifted to ignore `ProverData`. -/
+def AssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Assumptions input
+
+/-- Soundness spec: the two clock bounds (Contract `Spec`, unchanged), data-ignored. -/
+def SpecD (input : Inputs (ZMod p)) (_ : unit (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Spec input
+
+/-- Completeness assumption: the clock bounds plus the state pull's `StateTruth` (supplied by the honest
+prover — the row is a real execution step of the committed program). -/
+def ProverAssumptionsD (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
+    (_ : ProverHint (ZMod p)) : Prop :=
+  Assumptions input ∧ Spec input ∧ (input.is_real = 1 → StateTruth (stateMsgOf input.cols) data)
+
+theorem soundness [Fact (2 ^ 17 < p)] :
+    GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
   have h13p : (13 : ℕ) < p := lt_trans (Nat.lt_two_pow_self) hn13
-  simp only [circuit_norm, byteChannel, stateChannel, StateMsg.Spec] at h_holds ⊢
-  -- `Spec`: `is_real = 1 → clk bounds`, derived from the byte-pull guarantees (fire at `mult = -1`).
-  -- The two trailing conjuncts are the byte pulls' own `Requirements` (post-`cedc171b`): each fires only
-  -- at an off-gate multiplicity (`-is_real ∉ {0,-1}`), impossible under the binary `Assumptions` — vacuous.
+  simp only [circuit_norm, AssumptionsD, SpecD, Spec, Assumptions, byteChannel, stateChannel]
+    at h_holds h_assumptions ⊢
+  -- `h_holds`: gate, byte1, byte2, and the **state pull's `StateTruth`** (`h_spull`, ignored — no
+  -- consumer yet). Goal: the clock bounds (from the byte pulls) + the two byte off-gate requirements.
+  obtain ⟨h_gate, h_b1, h_b2, _h_spull⟩ := h_holds
   refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
-  have hneg : -input_is_real = -1 := by rw [hr1]
-  refine ⟨(byteRowSpec_range _ h13p).mp ?_, ((byteRowSpec_u8range_pair _ _).mp (h_holds.2.2 hneg)).1⟩
+  have hneg : -(input_is_real) = -1 := by rw [hr1]
+  refine ⟨(byteRowSpec_range _ h13p).mp ?_, ((byteRowSpec_u8range_pair _ _).mp (h_b2 hneg)).1⟩
   rw [sub_eq_add_neg, Nat.cast_ofNat]
-  exact h_holds.2.1 hneg
+  exact h_b1 hneg
 
-theorem completeness [Fact (2 ^ 17 < p)] : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
+theorem completeness [Fact (2 ^ 17 < p)] :
+    GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD
+      (fun _ _ _ => True) := by
   circuit_proof_start
   have h13p : (13 : ℕ) < p := lt_trans (Nat.lt_two_pow_self) hn13
-  -- The two byte pulls' completeness obligation (their `ByteRowSpec` guarantee) only fires on real rows
-  -- (`-is_real = -1`, i.e. `is_real = 1`); there the `Spec` clock bounds supply it. The State `pullIf`'s
-  -- completeness obligation is `StateMsg.Spec = True` (dropped by `stateChannel, StateMsg.Spec`).
-  simp only [circuit_norm, byteChannel, stateChannel, StateMsg.Spec]
-  refine ⟨?_, ?_, ?_⟩
-  · rcases h_assumptions with h | h <;> simp [h]
+  simp only [ProverAssumptionsD, Assumptions, Spec] at h_assumptions
+  obtain ⟨h_bin, h_spec, h_state⟩ := h_assumptions
+  -- pc limbs: the in-circuit message evaluates `var_cols_pc[i]`; the `statePullMsg` carries the value
+  -- `input_cols_pc[i]` — equal by `h_input`'s vector-map (the `RTypeReader` eval-bridge idiom).
+  have e : ∀ i (hi : i < 3),
+      Expression.eval env.toEnvironment input_var_cols_pc[i] = input_cols_pc[i] := by
+    intro i hi; have := congrArg (fun v => v[i]'hi) h_input.1.2.2.2; simpa using this
+  -- The two byte pulls' completeness obligation fires only on real rows (`-is_real = -1`); the `Spec`
+  -- clock bounds supply it. The State `pullIf`'s obligation is its `StateTruth` — supplied by `h_state`.
+  simp only [circuit_norm, byteChannel, stateChannel]
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · rcases h_bin with h | h <;> simp [h]
   · intro hneg
     obtain ⟨hb1, _⟩ := h_spec (neg_inj.mp hneg)
     rw [sub_eq_add_neg] at hb1
@@ -121,20 +157,26 @@ theorem completeness [Fact (2 ^ 17 < p)] : FormalAssertion.Completeness (ZMod p)
   · intro hneg
     obtain ⟨_, hb2⟩ := h_spec (neg_inj.mp hneg)
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hb2, by rw [ZMod.val_zero]; norm_num⟩
+  · intro hneg
+    simp only [stateMsgOf] at h_state
+    rw [e 0 (by norm_num), e 1 (by norm_num), e 2 (by norm_num)]
+    exact h_state (neg_inj.mp hneg)
 
-/-- The native CPUState reader as a Clean `FormalAssertion`: takes the chip-owned `cols` block plus
-`next_pc`/`clk_inc`/`is_real`, imposes the two `is_real`-gated clock byte checks and emits the State bus,
-with `Spec` the two clock bounds (derived from the byte bus). -/
-def circuit [Fact (2 ^ 17 < p)] : FormalAssertion (ZMod p) Inputs where
+/-- The native CPUState reader as a Clean `GeneralFormalCircuit`: takes the chip-owned `cols` block plus
+`next_pc`/`clk_inc`/`is_real`, imposes the two `is_real`-gated clock byte checks and emits the (now
+semantic) State bus, with `Spec` the two clock bounds and `ProverAssumptions` supplying the state pull's
+`StateTruth`. -/
+def circuit [Fact (2 ^ 17 < p)] : GeneralFormalCircuit (ZMod p) Inputs unit where
   main
   elaborated
-  Assumptions := Assumptions
-  Spec := Spec
+  Assumptions := AssumptionsD
+  Spec := SpecD
+  ProverAssumptions := ProverAssumptionsD
+  ProverSpec := fun _ _ _ => True
   soundness := soundness
   completeness := completeness
-  -- `byteChannel` dropped (W11 Phase 0c): the off-gate byte-pull `Requirements` are now discharged by the
-  -- inline `is_real` boolean gate in `main`, so `byteChannel` need not stay in `channelsWithRequirements`
-  -- (it can later be *finished* in a Clean `SoundEnsemble`). The State bus stays — it carries real emits.
+  -- The State bus stays — its `pushIf` owes `Owed = True` (and the `pullIf`'s off-gate requirement is
+  -- vacuous via the inline `is_real` gate), so `channelsWithRequirements` is just the State channel.
   channelsWithRequirements := [stateChannel.toRaw]
   requirementsChannelsLawful input_var i₀ := by
     simp only [circuit_norm, main, byteChannel, stateChannel]; grind

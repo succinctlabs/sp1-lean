@@ -50,7 +50,7 @@ deriving ProvableStruct
 `is_real` binary gate and the two `op_a_0` forcing gates (`op_a = x0` on real rows). The opcode fed to the
 reader is the committed `opcode` column. Assembles the extracted `AluX0Cols`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AluX0Cols (ZMod p)) := do
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   byteChannel.pullIf input.is_real (⟨4, 1, input.opcode, 29⟩ : ByteRow (Expression (ZMod p)))
   -- `ALUTypeReaderImmutable` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC
@@ -73,7 +73,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AluX0Cols main where
   output_eq := by intro input n; simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
   -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReaderImmutable`'s program
   -- **pull** (W11 flip): the reader pulls the instruction fetch as a guarantee, which propagates here.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
 
 /-- Semantic contract, composed from the sub-circuit `Spec`s. The `ALUTypeReaderImmutable` adapter facts

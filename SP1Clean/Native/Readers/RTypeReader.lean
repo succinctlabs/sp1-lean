@@ -188,7 +188,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
     exact ⟨ha, hp0, hp1, hp2⟩
   · -- Goal 2: is_real = 1 → isU64 trio — the three memory pull guarantees, verbatim
-    have hneg : -input_is_real = -1 := by rw [show input_is_real = 1 from ht2]
+    have hneg : - input_is_real = -1 := by rw [show input_is_real = 1 from ht2]
     exact ⟨h_mem_a hneg, h_mem_b hneg, h_mem_c hneg⟩
   · -- Goal 3: push_b requirement — same prev_value Word as the paired pull (h_mem_b)
     have ht : input_is_real = 1 := by

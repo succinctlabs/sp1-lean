@@ -185,8 +185,8 @@ theorem alutypereader_memory_interactions_faithful_syntactic
   -- single-variable `is_real`, the compound `cols.imm_c + -is_real = -(is_real + -cols.imm_c)` needs a `ring`
   -- nudge before `signedVal_neg` fires.
   refine ⟨?_, ?_⟩
-  · rw [(by ring : cols.imm_c + -is_real = -(is_real + -cols.imm_c)), signedVal_neg hp2]
-  · rw [(by ring : cols.imm_c + -is_real = -(is_real + -cols.imm_c)), signedVal_neg hp2, neg_neg]
+  · rw [(by ring : cols.imm_c + - is_real = -(is_real + -cols.imm_c)), signedVal_neg hp2]
+  · rw [(by ring : cols.imm_c + - is_real = -(is_real + -cols.imm_c)), signedVal_neg hp2, neg_neg]
 
 set_option maxHeartbeats 1000000 in
 /-- **Faithfulness anchor (ALUTypeReader fragment) — Byte-bus interactions, SYNTACTIC.** Sibling of

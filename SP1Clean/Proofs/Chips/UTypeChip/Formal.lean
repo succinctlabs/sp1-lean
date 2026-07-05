@@ -26,7 +26,7 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 /-- Honest prover-side row well-formedness. The immediate + program-counter words `isU64`, `is_real`/
 `is_auipc` binary, `op_a_0 = 0` (the `rd ≠ x0` rows completeness covers), the CPUState clock bounds + op_a
 register-access timestamp bounds, and the decode fact. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.adapter.op_b_imm ∧
   Word.isU64 (#v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0] : Word (ZMod p)) ∧
@@ -45,7 +45,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4⟩ ∧
   Word.toBitVec64 input.adapter.op_b_imm = RV64.lui (immOf input.adapter) ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
-    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
 
 omit [Fact p.Prime] in
 /-- `Word.toBitVec64 #v[0,0,0,0] = 0`. -/
@@ -88,7 +90,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     · rw [haddend0 h]; refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;> simp
     · rw [haddendpc h]; exact h_pcU
   -- `is_real - op_a_0` is binary: on real rows from `op_a_0 ∈ {0,1}`, on padding from `h_pad`.
-  have h_gate2 : input_is_real + -input_adapter_op_a_0 = 0 ∨ input_is_real + -input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
@@ -96,12 +98,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   refine ⟨⟨h_jt, h_bin, h_iaui, ?_, ?_⟩, h_bin, Or.inr ⟨fun _ => ⟨h_addendU, h_imm⟩, h_gate2⟩,
     Or.inr ⟨h_bin, h_bin⟩, Or.inr ⟨h_bin, ?_⟩⟩
   · intro hr1 hop0 hiaui0
-    have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, hop0]; simp
+    have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, hop0]; simp
     have hsem := (h_addspec hg1).2
     simp only [haddend0 hiaui0, toBitVec64_zero_word] at hsem
     rw [hsem]; simpa using h_dec
   · intro hr1 hop0 hiaui1
-    have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, hop0]; simp
+    have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, hop0]; simp
     have hsem := (h_addspec hg1).2
     simp only [haddendpc hiaui1] at hsem
     rw [hsem, auipc_eq_add_lui, ← h_dec]
@@ -111,7 +113,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     intro hr1
     replace hr1 : input_is_real = 1 := hr1
     rcases h_op_a_0 with h0 | h0
-    · have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
+    · have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
       exact (h_addspec hg1).1
     · obtain ⟨z0, z1, z2, z3⟩ := h_jt.1
       rw [h0, one_mul] at z0 z1 z2 z3
@@ -122,11 +124,11 @@ set_option maxHeartbeats 2000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_iaui, h_op0, h_cpu, h_rac, _h_dec, hdec⟩ := h_assumptions
+  obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_iaui, h_op0, h_cpu, h_rac, _h_dec, hdec, h_st⟩ := h_assumptions
   obtain ⟨_, ⟨_, _, _, hpc⟩, ⟨_, _, _, hob, _⟩, _⟩ := h_input
   -- `h_env` now bundles the addend/add-result witness equations with the GFC `JTypeReader` subcircuit's
   -- completeness obligation (SC Phase 2pre); the witness equations are `he_addend`/`he_addval`.
-  obtain ⟨he_addend, he_addval, _⟩ := h_env
+  obtain ⟨he_addend, he_addval, -, _⟩ := h_env
   have epc : ∀ i (hi : i < 3),
       Expression.eval env.toEnvironment input_var_state_pc[i] = input_state_pc[i] :=
     fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
@@ -163,12 +165,12 @@ theorem completeness :
           = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by
         rw [hg0, hg1, hg2, h, epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; simp
       rw [e]; exact h_pcU
-  have h_gate2 : input_is_real + -input_adapter_op_a_0 = 0 ∨ input_is_real + -input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
     rw [h_op0]; simpa using h_bin
-  refine ⟨⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨hA_U, h_imm⟩, h_gate2⟩, ?_⟩,
+  refine ⟨⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨hA_U, h_imm⟩, h_gate2⟩, ?_⟩,
     ⟨⟨h_bin, h_bin⟩, ⟨?_, ?_, ?_, ?_⟩, Or.inl h_op0, h_rac, hdec, h_oap⟩,
     ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [hval]; exact AddOperation.spec_populate hA_U h_imm (input_is_real + -input_adapter_op_a_0)
+  · rw [hval]; exact AddOperation.spec_populate hA_U h_imm (input_is_real + - input_adapter_op_a_0)
   · rw [h_op0, zero_mul]
   · rw [h_op0, zero_mul]
   · rw [h_op0, zero_mul]
@@ -176,7 +178,7 @@ theorem completeness :
   · -- RegisterWrite op_a write push: `isU64` of the result `add_value` (completeness covers `op_a_0 = 0`).
     intro hr
     rw [hval]
-    exact (AddOperation.spec_populate hA_U h_imm (input_is_real + -input_adapter_op_a_0)
+    exact (AddOperation.spec_populate hA_U h_imm (input_is_real + - input_adapter_op_a_0)
       (by rw [h_op0]; simpa using hr)).1
   · rw [hg0]; ring_nf
   · rw [hg1]; ring_nf
@@ -195,15 +197,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input _ =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.JTypeReader.circuit, Readers.JTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -212,6 +216,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
         SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.UTypeChip

@@ -76,7 +76,7 @@ the `rd` write value is `[bit, 0, 0, 0]` from the gadget's compare bit), gate `i
 booleans + their sum-bound (`AssertSpec`, needed by soundness to force `is_slt = 0` in the `SLTU` branch),
 and assemble the extracted `LtCols` struct. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) := do
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let flags ← witnessVector 2 (fun env => hintFlags env.hint)
   let is_slt := flags[0]; let is_sltu := flags[1]
@@ -119,6 +119,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LtCols main where
   -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 end SP1Clean.LtChip

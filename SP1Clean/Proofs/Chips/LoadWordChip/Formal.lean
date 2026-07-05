@@ -126,7 +126,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 /-- Prover-side row well-formedness (3-arg form): operand `isU64`s + address-fits/alignment + the
 `offset_bit` decomposition + the selected-limb 16-bit bounds + the reader/gadget `Spec`s + the selector
 binaries + `op_a_0 = 0` + the offset-selection equations + the `(is_lw-1)·msb` zero-extension gate. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
+def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
     2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
@@ -150,7 +150,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : P
     Readers.ITypeReader.Spec
       ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
         input.state.pc, input.is_lw * 31 + input.is_lwu * 34,
-        input.selected_word[0], input.selected_word[1], 65535 * input.msb, 65535 * input.msb⟩
+        input.selected_word[0], input.selected_word[1], 65535 * input.msb, 65535 * input.msb⟩ ∧
+    -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
+    (isReal input = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
@@ -158,7 +160,7 @@ theorem completeness :
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_align, h_off, h_pv_isu64, h_lw_bin, h_lwu_bin, hbin, h_op_a_0,
-    ⟨hsel0, hsel1, hsel2, hsel3⟩, h_msbgate, h_msb_spec, h_cpu, h_mem, h_it⟩ := h_assumptions
+    ⟨hsel0, hsel1, hsel2, hsel3⟩, h_msbgate, h_msb_spec, h_cpu, h_mem, h_it, h_st⟩ := h_assumptions
   obtain ⟨hpv0, hpv1, hpv2, hpv3⟩ := Word.lt_cases_of_isU64 h_pv_isu64
   simp only [isReal] at hbin
   -- eval→value bridges for the nested vectors the reader/gadget `Spec`s reference.
@@ -219,7 +221,7 @@ theorem completeness :
           Expression.eval env.toEnvironment input_var_selected_word[1],
           65535 * input_msb, 65535 * input_msb] : Word (ZMod p)) :=
     Word.isU64_of_cases h_sel0_lt_eval h_sel1_lt_eval h_msb_val h_msb_val
-  refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨⟨fun _ => h_sel1_lt_eval, h_lw_bin⟩, ?_⟩, ⟨?_, ?_⟩, ⟨?_, ?_⟩,
+  refine ⟨⟨?_, ?_, h_st⟩, h_addr_as, ⟨?_, ?_⟩, ⟨⟨fun _ => h_sel1_lt_eval, h_lw_bin⟩, ?_⟩, ⟨?_, ?_⟩, ⟨?_, ?_⟩,
     ?_, ?_, ?_, ?_, h_op_a_0, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
@@ -250,15 +252,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadWordColumns :=
     -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8); the
     -- enabled flag is the **derived** selector sum `is_lw + is_lwu` (SP1's `is_real`).
     exposedChannels := fun input _ =>
-      expose stateChannel
-        [ pulledIf (input.is_lw + input.is_lwu)
+      stateChannel.expose
+        [ stateChannel.pulledIf (input.is_lw + input.is_lwu)
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf (input.is_lw + input.is_lwu)
+          stateChannel.pushedIf (input.is_lw + input.is_lwu)
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         AddressOperation.circuit, AddressOperation.main,
         AddrAddOperation.circuit, AddrAddOperation.main,
@@ -270,6 +274,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadWordColumns :=
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, byteChannel, memoryChannel] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.LoadWordChip

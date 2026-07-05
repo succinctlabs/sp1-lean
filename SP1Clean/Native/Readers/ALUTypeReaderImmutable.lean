@@ -160,7 +160,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
       fun ht => ?_,
       fun ht2 => ⟨h_mem_a (by rw [show input_is_real = 1 from ht2]),
         h_mem_b (by rw [show input_is_real = 1 from ht2])⟩,
-      fun ht3 => h_mem_c (by rw [show input_is_real + -input_cols_imm_c = 1 from ht3])⟩,
+      fun ht3 => h_mem_c (by rw [show input_is_real + - input_cols_imm_c = 1 from ht3])⟩,
     Or.inr h_assumptions.1, Or.inr h_assumptions.1, Or.inr hcbin,
     fun h1 h0 => off_gate_vacuous htbin h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
@@ -183,7 +183,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
     exact h_mem_b (by rw [ht])
   · -- push_c: read-back value = op_c prev, from the paired (is_real - imm_c)-gated pull.
-    have htc : input_is_real + -input_cols_imm_c = 1 := by
+    have htc : input_is_real + - input_cols_imm_c = 1 := by
       rcases hcbin with h | h; exact absurd h h0; exact h
     exact h_mem_c (by rw [htc])
 

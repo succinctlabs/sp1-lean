@@ -57,7 +57,7 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hf4, hf5, hf6, hf7, hsum, hpad, hop_a_0, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
   obtain ⟨h_env_flags, h_env_qc, h_env_a, h_env_b, h_env_c, h_env_mullo, h_env_mulhi, h_env_scal,
     h_env_ctq, h_env_carry, h_env_ovb, h_env_ovc, h_env_isc0, h_env_absc, h_env_absr, h_env_rc,
     h_env_max, h_env_wcneg, h_env_wrneg, h_env_misc, h_env_cl, h_env_f, h_env_nei, h_env_bit,
@@ -901,7 +901,7 @@ theorem completeness :
     ?pq0, ?pq1, ?pq2, ?pq3, ?pr0, ?pr1, ?pr2, ?pr3,
     ?pctq0, ?pctq1, ?pctq2, ?pctq3, ?pctq4, ?pctq5, ?pctq6, ?pctq7,
     ?pe2r1, ?pe2q1, ?regwrite⟩
-  case cpu => exact ⟨hbin, by rw [← epc0, ← epc1, ← epc2] at h_cpu; exact h_cpu⟩
+  case cpu => exact ⟨hbin, by rw [← epc0, ← epc1, ← epc2] at h_cpu; exact h_cpu, h_st⟩
   case regwrite =>
     -- RegisterWrite's op_a write push: `is_real` binary + the witnessed result `a = populateA B C F`
     -- (`hAvec`), whose `isU64` is unconditional (`populateA_isU64`).

@@ -36,7 +36,7 @@ gadget as a Clean `assertion`. The `ALUTypeReader`'s four `op_a_write_value` lim
 `ALUTypeReader.asserts … 19 #v[…value[0], …value[1], msb·65535, msb·65535] …`); the Program-bus opcode is
 `19`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (AddwCols) (ZMod p)) := do
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let value ← witnessVector 2 (fun env =>
     AddwOperation.addwValueWitness
@@ -74,6 +74,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddwCols main where
   -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 end SP1Clean.AddwChip

@@ -188,7 +188,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
     exact h_mem_b (by rw [ht])
   · -- push_c requirement — same whole-`Word` prev_value as the paired (is_real - imm_c)-gated pull (h_mem_c).
-    have htc : input_is_real + -input_cols_imm_c = 1 := by
+    have htc : input_is_real + - input_cols_imm_c = 1 := by
       rcases hcbin with h | h; exact absurd h h0; exact h
     exact h_mem_c (by rw [htc])
 

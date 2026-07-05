@@ -84,7 +84,7 @@ lemma requirements_holds :
     have hqcU : input_is_real = 1 → Word.isU64 (Vector.map (Expression.eval env)
         (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }) : Word (ZMod p)) := by
       intro hr
-      have hrneg' : -input_is_real = -1 := by rw [hr]
+      have hrneg' : - input_is_real = -1 := by rw [hr]
       simp only [circuit_norm] at e48 e49 e51 e54 e59 e61 e64 e69
       apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
       · rw [show env.get (i₀ + 8) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1+4)
@@ -100,7 +100,7 @@ lemma requirements_holds :
     have hrcU : input_is_real = 1 → Word.isU64 (Vector.map (Expression.eval env)
         (Vector.mapRange 4 fun i => var { index := B + 7+8+8+11+11+11+4+4 + i }) : Word (ZMod p)) := by
       intro hr
-      have hrneg' : -input_is_real = -1 := by rw [hr]
+      have hrneg' : - input_is_real = -1 := by rw [hr]
       simp only [circuit_norm] at e70 e71 e73 e76 e81 e83 e86 e91
       apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
       · rw [show env.get (B + 7+8+8+11+11+11+4+4)
@@ -116,14 +116,14 @@ lemma requirements_holds :
     have habscU : input_is_real = 1 → Word.isU64 (Vector.map (Expression.eval env)
         (Vector.mapRange 4 fun i => var { index := B + 7+8+8+11+11+11 + i }) : Word (ZMod p)) := by
       intro hr
-      have hrneg' : -input_is_real = -1 := by rw [hr]
+      have hrneg' : - input_is_real = -1 := by rw [hr]
       apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
       exacts [isU16_of_byteRowSpec (hb_absc0 hrneg'), isU16_of_byteRowSpec (hb_absc1 hrneg'),
         isU16_of_byteRowSpec (hb_absc2 hrneg'), isU16_of_byteRowSpec (hb_absc3 hrneg')]
     have habsrU : input_is_real = 1 → Word.isU64 (Vector.map (Expression.eval env)
         (Vector.mapRange 4 fun i => var { index := B + 7+8+8+11+11+11+4 + i }) : Word (ZMod p)) := by
       intro hr
-      have hrneg' : -input_is_real = -1 := by rw [hr]
+      have hrneg' : - input_is_real = -1 := by rw [hr]
       apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
       exacts [isU16_of_byteRowSpec (hb_absr0 hrneg'), isU16_of_byteRowSpec (hb_absr1 hrneg'),
         isU16_of_byteRowSpec (hb_absr2 hrneg'), isU16_of_byteRowSpec (hb_absr3 hrneg')]
@@ -156,7 +156,7 @@ lemma requirements_holds :
     have hmaxU : input_is_real = 1 → Word.isU64 (Vector.map (Expression.eval env)
         (Vector.mapRange 4 fun i => var { index := B + 7+8+8+11+11+11+4+4+4 + i }) : Word (ZMod p)) := by
       intro hr
-      have hrneg' : -input_is_real = -1 := by rw [hr]
+      have hrneg' : - input_is_real = -1 := by rw [hr]
       have hsem := IsZeroWordOperation.result_semantic (h_isc0 (Or.inr hr)) hr
       have h299 := e299; have h300 := e300; have h301 := e301; have h302 := e302
       simp only [circuit_norm] at h299 h300 h301 h302
@@ -325,7 +325,7 @@ lemma requirements_holds :
     case msb2 =>
       refine Or.inr ⟨fun hirnwg => ?_, hirnw⟩
       obtain ⟨hr, -⟩ := hirnw_imp hirnwg
-      have hrneg' : -input_is_real = -1 := by rw [hr]
+      have hrneg' : - input_is_real = -1 := by rw [hr]
       exact isU16_of_byteRowSpec (hb_r3 hrneg')
     case msb3 =>
       refine Or.inr ⟨fun _ => ?_, he2⟩
@@ -344,7 +344,7 @@ lemma requirements_holds :
       -- with sum 1 (one-hot), so exactly one family ties `a` to its byte-checked column.
       refine Or.inr ⟨hbin, fun hr => ?_⟩
       replace hr : input_is_real = 1 := hr
-      have hrneg' : -input_is_real = -1 := by rw [hr]
+      have hrneg' : - input_is_real = -1 := by rw [hr]
       simp only [circuit_norm] at e184 e194 e204 e214 e189 e199 e209 e219
       rcases group_binary4 bdu bd bdw bduw (by omega) with hgd | hgd
       · -- div-group = 0 ⟹ rem-group = 1 (one-hot): `a` = remainder.

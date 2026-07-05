@@ -60,7 +60,7 @@ def InteractSpec (_cols : MulCols (ZMod p)) : Prop := True
 Witnesses result word `a` and the five variant flags; gates `is_real`; assembles `MulCols`.
 `RTypeReader` carries the flag-weighted opcode (`E16–E23`). -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p)) := do
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let flags ← witnessVector 5 (fun env => hintFlags env.hint)
   let is_mul := flags[0]; let is_mulh := flags[1]; let is_mulhu := flags[2]
@@ -140,14 +140,14 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs MulCols main where
   -- `programChannel` joins the byte guarantee propagated up from `RTypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `RTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit,
     Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
+      = [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 54 := rfl

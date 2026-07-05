@@ -220,6 +220,16 @@ def expose (channel : VmChannel F Message)
     (interactions : List (VmChannelInteraction channel)) : List (ExposedChannel F) :=
   [{ channel := channel.toRaw, interactions := interactions.map (·.toRaw) }]
 
+/-- The `ExposedChannelsLawful`-reducer for `VmChannel.expose` — the analog of Clean's
+`Channel.exposedChannelsLawful_expose` (`@[circuit_norm ↓]`), so a chip's `exposedChannels_eq` over a
+`VmChannel.expose` reduces to a single `interactionsWith channel.toRaw = interactions.map toRaw` goal. -/
+@[circuit_norm ↓]
+lemma exposedChannelsLawful_expose (ops : Operations F) (channel : VmChannel F Message)
+    (interactions : List (VmChannelInteraction channel)) :
+    ops.ExposedChannelsLawful (channel.expose interactions) ↔
+      ops.interactionsWith channel.toRaw = interactions.map (·.toRaw) := by
+  simp only [Operations.ExposedChannelsLawful, expose, List.mem_singleton, forall_eq]
+
 @[circuit_norm]
 lemma mem_expose_pullIf_pushIf (enabled enabled' : Expression F)
     (pull pull' push push' : Message (Expression F)) :

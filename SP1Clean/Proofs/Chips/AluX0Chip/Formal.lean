@@ -48,7 +48,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 /-- Honest prover-side row well-formedness: `is_real` binary, the two `op_a_0` forcing gates, the
 CPUState clock bounds + the immutable-ALU-reader contract, and the dynamic opcode in ALU range
 (`opcode < 29`, the LTU byte pull's witness — the honest prover only emits real ALU opcodes). -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   (isReal input = 0 ∨ isReal input = 1) ∧
   isReal input * (input.adapter.op_a_0 - 1) = 0 ∧
@@ -58,16 +58,18 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
   Readers.ALUTypeReaderImmutable.Spec
     ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
       input.state.pc, opcodeVal input⟩ ∧
-  (isReal input = 1 → input.opcode.val < 29)
+  (isReal input = 1 → input.opcode.val < 29) ∧
+  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
+  (isReal input = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [isReal, clkLow, opcodeVal] at h_assumptions
-  obtain ⟨h_bin, h_oa1, h_oa2, h_cpu, h_reader, h_op_lt⟩ := h_assumptions
+  obtain ⟨h_bin, h_oa1, h_oa2, h_cpu, h_reader, h_op_lt, h_st⟩ := h_assumptions
   simp only [sub_eq_add_neg] at h_oa1 h_oa2
-  refine ⟨⟨h_bin, h_cpu⟩, ?_, ⟨⟨h_bin, h_bin⟩, h_reader⟩, ?_, h_oa1, h_oa2⟩
+  refine ⟨⟨h_bin, h_cpu, h_st⟩, ?_, ⟨⟨h_bin, h_bin⟩, h_reader⟩, ?_, h_oa1, h_oa2⟩
   · -- the LTU `opcode < 29` byte pull (fires on real rows).
     intro hneg
     simp only [byteChannel]
@@ -94,21 +96,23 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
     -- The chip's own LTU byte-pull and the reader's pulls are on byteChannel/programChannel/memoryChannel,
     -- filtered out by `interactionsWith stateChannel`.
     exposedChannels := fun input _ =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ALUTypeReaderImmutable.circuit, Readers.ALUTypeReaderImmutable.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, byteChannel, Gadgets.Equality.main] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.AluX0Chip

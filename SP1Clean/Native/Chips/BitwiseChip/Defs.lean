@@ -82,7 +82,7 @@ SP1's `builder.assert_zero(op_a_0)`), and assemble the extracted `BitwiseCols` s
 `c_low_bytes` column blocks are witnessed (the gadget enforces the decomposition on its own internal
 copies; these struct fields are not read by the `Spec`). -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod p)) := do
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let flags ← witnessVector 3 (fun env => hintFlags env.hint)
   let is_xor := flags[0]; let is_or := flags[1]; let is_and := flags[2]
@@ -135,6 +135,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs BitwiseCols main where
   -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 end SP1Clean.BitwiseChip

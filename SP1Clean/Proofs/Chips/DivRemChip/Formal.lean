@@ -111,21 +111,23 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
       have he2 := group_binary4 bdw brw bduw bruw (by omega)
       and_intros <;>
         first
-          | exact fun h1 h0 => off_gate_vacuous hbin h1 h0
-          | exact fun h1 h0 => off_gate_vacuous he2 h1 h0,
+          | exact Or.inr fun h1 h0 => off_gate_vacuous hbin h1 h0
+          | exact Or.inr fun h1 h0 => off_gate_vacuous he2 h1 h0,
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     -- The `is_real` gate (`E355`) is already shallow (emitted via `assertZeros (ownAsserts cols)`).
     exposedChannels := fun input _ =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp (maxSteps := 1000000) only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.RTypeReader.circuit, Readers.RTypeReader.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
@@ -148,7 +150,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
       -- direct `byteChannel` pulls; `interactionsWith_append` splits the `++`, the map-assert lemma
       -- empties the asserts, and `byteChannel ≠ stateChannel` drops the pulls.
       simp (maxSteps := 1000000) [circuit_norm, Gadgets.Equality.main,
-        Operations.interactionsWith_append, byteChannel, stateChannel, memoryChannel,
+        Operations.interactionsWith_append, VmChannel.pulledIf, VmChannel.pushedIf,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         FormalAssertion.toSubcircuit_interactions] }
 

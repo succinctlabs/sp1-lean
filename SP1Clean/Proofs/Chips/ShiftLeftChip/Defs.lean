@@ -146,7 +146,7 @@ assertZero constraints (`AssertSpec`) and the nine `gate`-gated byte-range pulls
 assemble the extracted `ShiftLeftCols` struct. (Soundness ranges over every satisfying assignment
 regardless of the generators; the generators carry completeness and the `TraceGenTests` conformance.) -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftLeftCols (ZMod p)) := do
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   -- The shift column block + the variant flags are **witnessed columns** (honest `Populate` closures
   -- over the adapter operand columns + the flag hint). The three variant flags
@@ -311,13 +311,13 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs ShiftLeftCols main where
   -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from the reader's memory read **pulls** (W11 memory flip). The new `RegisterWrite`
   -- op_a write push owes a memory **requirement** (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
+      = [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 33 := rfl

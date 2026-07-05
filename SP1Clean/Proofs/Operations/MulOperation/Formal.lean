@@ -125,7 +125,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     obtain ⟨hbU, hcU⟩ := habc_imp hr
     obtain ⟨hbU0, hbU1, hbU2, hbU3⟩ := Word.lt_cases_of_isU64 hbU
     obtain ⟨hcU0, hcU1, hcU2, hcU3⟩ := Word.lt_cases_of_isU64 hcU
-    have hneg : -input_is_real = -1 := by rw [hr]
+    have hneg : - input_is_real = -1 := by rw [hr]
     have h16p : (16 : ℕ) < p := by
       have h := Fact.out (p := 2 ^ 24 < p); have e : (2 : ℕ) ^ 24 = 16777216 := by norm_num
       omega

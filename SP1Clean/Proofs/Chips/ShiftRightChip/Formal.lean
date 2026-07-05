@@ -40,7 +40,7 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 honest `"shift_right_flags"` hint (each flag binary, the sum = `is_real`), `op_a_0 = 0`, the
 immediate-`c` machinery (verbatim `ALUTypeReader.Spec` conjuncts), the CPUState clock bounds, and the
 three register-access timestamp `Spec`s (op_c gated `is_real - imm_c`). -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
   Word.isU64 input.adapter.op_b_memory.prev_value ∧
@@ -72,7 +72,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
 
 set_option maxHeartbeats 4000000 in
 /-- **Soundness.** The flag-gated RV64 `srl`/`sra`/`srlw`/`sraw` identities on the result column `cols.a`.
@@ -97,10 +99,12 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hsum, hop_a_0, himmc, himmbin, hpins, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
   -- SC Phase 2pre: the GFC `ALUTypeReader` (composed via `let _ ←`, after the 11 `witnessVector`s)
   -- appends its honest-witness/completeness conjunct to `h_env` as the trailing `h_env_alu`.
-  obtain ⟨h_env_a, h_env_bmsb, h_env_srwmsb, h_env_cb, h_env_sram, h_env_v, h_env_lo, h_env_hi,
+  -- (SC Phase 2c) the composed `CPUState` GFC now pushes its `StateTruth` guarantee, so its
+  -- completeness-provided facts are the (discarded) prepended component of `h_env`.
+  obtain ⟨-, h_env_a, h_env_bmsb, h_env_srwmsb, h_env_cb, h_env_sram, h_env_v, h_env_lo, h_env_hi,
     h_env_lr, h_env_s, h_env_fl, h_env_alu⟩ := h_env
   -- project (not destructure — rcases on `h_input` disturbs the bound `h_env_*` hypotheses)
   have hpc := h_input.2.1.2.2.2
@@ -225,7 +229,7 @@ theorem completeness :
   obtain ⟨hmsb1, hmsb2, hmsb3⟩ := msb_asserts B c0 F hf0 hf1 hf2 hf3 hsum01
   obtain ⟨hp1, hp2, hp3, hp4, hp5, hp6, hp7, hp8, hp9, hp10, hp11, hp12, hp13, hp14, hp15,
     hp16, hp17, hp18, hp19, hp20, hp21, hp22⟩ := place_asserts B c0 F hf0 hf1 hf2 hf3 hsum01
-  refine ⟨⟨hbin, h_cpu⟩,
+  refine ⟨⟨hbin, h_cpu, h_st⟩,
     ⟨⟨fun _ => hbU3, hf1⟩,
       hbmB, fun h1 => ?_⟩,
     ⟨⟨fun _ => hbU1, hf3⟩,
@@ -307,19 +311,24 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftRightCols :=
       -- discharge off-gate via `hgate.2`.
       intro env hgate
       have hbool := bool_of_mul_pred hgate.2
-      and_intros <;> exact fun h1 h0 => off_gate_vacuous hbool h1 h0,
+      -- (SC Phase 2c) the semantic `stateChannel.toRaw` no longer auto-decides unequal to `byteChannel`
+      -- in the simp set, so each byte-pull goal is now `byteChannel = stateChannel ∨ off-gate`; take
+      -- `Or.inr` (the channels differ; the off-gate byte requirement is discharged as before).
+      and_intros <;> exact Or.inr fun h1 h0 => off_gate_vacuous hbool h1 h0,
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input _ =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -328,6 +337,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftRightCols :=
         SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, byteChannel] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.ShiftRightChip

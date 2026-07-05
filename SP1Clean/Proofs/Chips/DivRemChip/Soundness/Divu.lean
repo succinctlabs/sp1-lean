@@ -185,7 +185,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     --     pin a[i]=quotient[i] ⇒ goal `toBitVec64 aW = toBitVec64 quotient = RV64.divu c b` (the `.1`).
     -- === STAGE 2: the unsigned Euclidean identity `b = c·quotient_comp + remainder_comp` ===
     obtain ⟨h_oir, -, -, -, -, -, ⟨h_ob, -, -⟩, -, ⟨h_oc, -, -⟩⟩ := h_input
-    have hrneg' : -input_is_real = -1 := by rw [hr]
+    have hrneg' : - input_is_real = -1 := by rw [hr]
     have hbb0 : Expression.eval env input_var_op_b_val[0] = input_op_b_val[0] := by
       simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange]
     have hbb1 : Expression.eval env input_var_op_b_val[1] = input_op_b_val[1] := by

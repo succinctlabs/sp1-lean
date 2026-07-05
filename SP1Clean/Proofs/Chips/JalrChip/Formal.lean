@@ -23,7 +23,7 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 /-- Honest prover-side row well-formedness: operand `isU64`s, `is_real`/`lsb` binary, CPUState + op_a/op_b
 timestamp bounds, `value[3] = 0` for both add results, and the `is_real`-gated cleared-target 4-byte
 alignment (`(jump_target[0] - lsb) / 4 < 2^14`). Covers `rd ≠ x0` rows (`op_a_0 = 0`). -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.adapter.op_c_imm ∧
   Word.isU64 (#v[input.adapter.op_b_memory.prev_value[0], input.adapter.op_b_memory.prev_value[1],
@@ -47,7 +47,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
   (input.is_real = 1 →
     (((jumpTargetWord input)[0] - lsbBit input) * (4 : ZMod p)⁻¹).val < 2 ^ 14) ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
-    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
 
 set_option maxHeartbeats 2000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
@@ -100,7 +102,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       Expression.eval env input_var_state_pc[1], Expression.eval env input_var_state_pc[2], 0]
         : Word (ZMod p)) := hpceq ▸ h_pcU
   -- `is_real - op_a_0` is binary: on real rows from `op_a_0 ∈ {0,1}`, on padding from `h_pad`.
-  have h_gate2 : input_is_real + -input_adapter_op_a_0 = 0 ∨ input_is_real + -input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
@@ -112,7 +114,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rw [hrs1eq] at this
     simpa only [rs1Word] using this
   · intro hr1 hop_a_0
-    have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, hop_a_0]; simp
+    have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, hop_a_0]; simp
     have := (h_add2 ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩ hg1).2
     rw [hpceq] at this
     simpa only [pcWord] using this
@@ -172,7 +174,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     intro hr1
     replace hr1 : input_is_real = 1 := hr1
     rcases h_op_a_0 with h0 | h0
-    · have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
+    · have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
       exact (h_add2 ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩ hg1).1
     · obtain ⟨z0, z1, z2, z3⟩ := h_it.1
       rw [h0, one_mul] at z0 z1 z2 z3
@@ -184,7 +186,7 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨h_imm, h_rs1U, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac_a, h_rac_b, h_jt3, h_lt3,
-    h_align_pa, hdec⟩ := h_assumptions
+    h_align_pa, hdec, h_st⟩ := h_assumptions
   -- op_b (rs1) read-prior `isU64` in the reader's **raw** `prev_value` form (from the reconstructed
   -- `h_rs1U`), for the pure-read `ITypeReader.Spec`'s memory-pull `isU64` pair.
   have hpb_raw : Word.isU64 input_adapter_op_b_memory_prev_value := by
@@ -196,7 +198,7 @@ theorem completeness :
   simp only [jumpTargetWord, linkTargetWord, lsbBit, rs1WordI] at h_jt3 h_lt3 h_align_pa
   -- `h_env` now bundles the two add-result + `lsb` witness-gen equations with the GFC `ITypeReader`
   -- subcircuit's completeness obligation (4th conjunct, discarded — the reader slot is discharged below).
-  obtain ⟨he_av, he_oav, he_lsb, _⟩ := h_env
+  obtain ⟨he_av, he_oav, he_lsb, -, _⟩ := h_env
   obtain ⟨_h_ir, ⟨_h_clkh, _h_clk1, _h_clk0, hpc⟩, _h_a, ⟨_h_amem_pv, _h_amem_pl, _h_amem_dl⟩,
     _h_a0, _h_b, ⟨h_bmem_pv, _h_bmem_pl, _h_bmem_dl⟩, hcimm⟩ := h_input
   have rb0 : Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0]
@@ -287,22 +289,22 @@ theorem completeness :
   have hlsb_bin : env.get (i₀ + 4 + 4) = 0 ∨ env.get (i₀ + 4 + 4) = 1 := by
     rw [he_lsb]
     rcases Nat.mod_two_eq_zero_or_one (env.get i₀).val with h | h <;> rw [h] <;> simp
-  have h_gate2 : input_is_real + -input_adapter_op_a_0 = 0 ∨ input_is_real + -input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
-  refine ⟨?_, ⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨hpceq ▸ h_pcU, h4U⟩, h_gate2⟩, ?_⟩,
+  refine ⟨?_, ⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨hpceq ▸ h_pcU, h4U⟩, h_gate2⟩, ?_⟩,
     ?_, ⟨⟨h_bin, h_bin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac_a, h_rac_b, hdec,
       fun hr => ⟨h_oap hr, hpb_raw⟩⟩,
     ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_⟩
   · rcases hlsb_bin with h | h <;> rw [h] <;> simp
   · rw [hval1]; exact AddOperation.spec_populate hrs1U h_imm input_is_real
   · rw [hav3]; exact h_jt3
-  · rw [hval2]; exact AddOperation.spec_populate (hpceq ▸ h_pcU) h4U (input_is_real + -input_adapter_op_a_0)
+  · rw [hval2]; exact AddOperation.spec_populate (hpceq ▸ h_pcU) h4U (input_is_real + - input_adapter_op_a_0)
   · rw [hoav3]; exact h_lt3
   · -- RegisterWrite op_a write push: `isU64` of the link value `pc + 4` (completeness covers `op_a_0 = 0`).
     intro hr
     rw [hval2]
-    exact (AddOperation.spec_populate (hpceq ▸ h_pcU) h4U (input_is_real + -input_adapter_op_a_0)
+    exact (AddOperation.spec_populate (hpceq ▸ h_pcU) h4U (input_is_real + - input_adapter_op_a_0)
       (by rw [h_op_a_0]; simpa using hr)).1
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
@@ -330,15 +332,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalrColumns :=
     -- `VmTables` table. `next_pc` is the **witnessed** LSB-cleared jump target the chip feeds `CPUState`:
     -- low limb `add_value[0] - lsb` (cells `offset+0` minus `offset+8`), high limbs `add_value[1..2]`.
     exposedChannels := fun input offset =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              var ⟨offset⟩ - var ⟨offset + 8⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ITypeReader.circuit, Readers.ITypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -347,6 +351,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalrColumns :=
         SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.JalrChip

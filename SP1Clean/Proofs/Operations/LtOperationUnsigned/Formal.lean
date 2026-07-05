@@ -105,28 +105,28 @@ theorem sel_populate {b cc : Word (ZMod p)} :
               true_or, or_true, if_true, if_false, Vector.getElem_mk, List.getElem_toArray,
               List.getElem_cons_zero, List.getElem_cons_succ, sub_self, sub_zero, zero_sub, mul_zero,
               zero_mul, mul_one, one_mul, add_zero, zero_add, neg_zero] <;>
-            first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h0) | linear_combination -inv_mul_cancel₀ (sub_ne_zero.mpr h0) | ring
+            first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h0) | linear_combination - inv_mul_cancel₀ (sub_ne_zero.mpr h0) | ring
       · -- limb 1 differs
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
           simp only [ne_eq, h3, h2, h1, eq_self_iff_true, not_true_eq_false, not_false_eq_true,
             true_or, or_true, if_true, if_false, Vector.getElem_mk, List.getElem_toArray,
             List.getElem_cons_zero, List.getElem_cons_succ, sub_self, sub_zero, zero_sub, mul_zero,
             zero_mul, mul_one, one_mul, add_zero, zero_add, neg_zero] <;>
-          first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h1) | linear_combination -inv_mul_cancel₀ (sub_ne_zero.mpr h1) | ring
+          first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h1) | linear_combination - inv_mul_cancel₀ (sub_ne_zero.mpr h1) | ring
     · -- limb 2 differs
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         simp only [ne_eq, h3, h2, eq_self_iff_true, not_true_eq_false, not_false_eq_true,
           true_or, or_true, if_true, if_false, Vector.getElem_mk, List.getElem_toArray,
           List.getElem_cons_zero, List.getElem_cons_succ, sub_self, sub_zero, zero_sub, mul_zero,
           zero_mul, mul_one, one_mul, add_zero, zero_add, neg_zero] <;>
-        first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h2) | linear_combination -inv_mul_cancel₀ (sub_ne_zero.mpr h2) | ring
+        first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h2) | linear_combination - inv_mul_cancel₀ (sub_ne_zero.mpr h2) | ring
   · -- limb 3 differs (most significant)
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [ne_eq, h3, eq_self_iff_true, not_true_eq_false, not_false_eq_true,
         true_or, or_true, if_true, if_false, Vector.getElem_mk, List.getElem_toArray,
         List.getElem_cons_zero, List.getElem_cons_succ, sub_self, sub_zero, zero_sub, mul_zero,
         zero_mul, mul_one, one_mul, add_zero, zero_add, neg_zero] <;>
-      first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h3) | linear_combination -inv_mul_cancel₀ (sub_ne_zero.mpr h3) | ring
+      first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h3) | linear_combination - inv_mul_cancel₀ (sub_ne_zero.mpr h3) | ring
 
 set_option maxHeartbeats 2000000 in
 set_option linter.unusedSectionVars false in

@@ -29,7 +29,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 `SubOperation.populate`, gate `is_real`, and assemble the extracted `SubCols` struct. `RTypeReader`
 carries opcode `2` and the four `op_a_write_value` limbs. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (SubCols) (ZMod p)) := do
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let value ← witnessVector 4 (fun env =>
     SubOperation.populate
@@ -61,6 +61,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs SubCols main where
   -- `programChannel` joins the byte guarantee propagated up from `RTypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `RTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 end SP1Clean.SubChip

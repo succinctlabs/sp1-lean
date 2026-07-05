@@ -23,7 +23,7 @@ def Assumptions (_ : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := True
 `op_a_0 = 0` flag, and the `is_real`-gated CPUState clock bounds + per-operand register-access
 timestamp bounds (the verifier commits a well-formed clock/timestamp row). Soundness never assumes
 these. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
@@ -46,7 +46,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
   -- (W11 flip) the decode bounds the `RTypeReader` program **pull** now *derives* into its `Spec`
   -- (destination index `< 32`, pc limbs `< 2^16`, on real rows) — completeness must provide them.
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -160,10 +162,10 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hf4, hsum, hmulw_real, hop_a_0, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
-  -- `h_env` now bundles the `flags`/`cols`/`a` witness-gen equations with the GFC `RTypeReader`
-  -- subcircuit's completeness obligation (its fourth component); the witness equations are the first three.
-  obtain ⟨h_env_flags, h_env_cols, h_env_a, -⟩ := h_env
+    hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
+  -- `h_env` now bundles the CPUState GFC obligation (SC Phase 2c, prepended) + the `flags`/`cols`/`a`
+  -- witness-gen equations + the GFC `RTypeReader` subcircuit's completeness obligation (trailing).
+  obtain ⟨-, h_env_flags, h_env_cols, h_env_a, -⟩ := h_env
   obtain ⟨-, ⟨-, -, -, hpc⟩, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   -- the five variant flags are witnessed from the `"mul_flags"` hint
   have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
@@ -196,7 +198,7 @@ theorem completeness :
   -- fold the witness hint's `populate` operands to the evaluated input words
   simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval, hob, hoc] at h_env_cols
   rw [← epc 0 (by norm_num), ← epc 1 (by norm_num), ← epc 2 (by norm_num)] at h_cpu
-  refine ⟨⟨hbin, h_cpu⟩,
+  refine ⟨⟨hbin, h_cpu, h_st⟩,
     ⟨⟨fun _ => ⟨hbU, hcU⟩, hsum01', hmw', hf0', hf1', hf2', hf3', hf4', hsum01'⟩, ?_⟩,
     by simpa using h_env_a 0, by simpa using h_env_a 1,
     by simpa using h_env_a 2, by simpa using h_env_a 3,
@@ -298,15 +300,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs MulCols :=
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input _ =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.RTypeReader.circuit, Readers.RTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -317,6 +321,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs MulCols :=
         SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.MulChip

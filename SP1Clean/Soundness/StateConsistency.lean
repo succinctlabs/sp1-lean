@@ -368,19 +368,22 @@ theorem stateLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
   -- `hk`/`hk_pull` are the gated kernels `toAccess_{push,pull}If_state`; they `rw` against the recovered
   -- interactions. Post-W11 the receive is a `pullIf` (mult `-is_real`), the send a `pushIf` (mult `is_real`).
   have hk : ∀ (m : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pushedIf (channel := stateChannel) m s).toRaw) =
+      AbstractInteraction.toAccess env ((stateChannel.pushedIf m s).toRaw) =
         (InteractionKind.State, "SP1State",
           [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env m)) :=
     fun m s => toAccess_pushIf_state env m s
   have hk_pull : ∀ (g : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pulledIf (channel := stateChannel) g s).toRaw) =
+      AbstractInteraction.toAccess env ((stateChannel.pulledIf g s).toRaw) =
         (InteractionKind.State, "SP1State",
           [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env (-g))) :=
     fun g s => toAccess_pullIf_state env g s
+  -- `circuit_norm` recovered the State interactions in the raw `VmChannelInteraction` form; unfold the
+  -- `pushedIf`/`pulledIf` in the kernels so they match that form.
+  simp only [VmChannel.pushedIf, VmChannel.pulledIf] at hk hk_pull
   simp only [hk, hk_pull]
   -- `cols`/`next_pc`/`clk_inc` are reader *inputs*; their evals are pinned by the binding hypotheses
   -- (`h_*`/`h_np*`/`h_clk`); `circuit_norm` distributes `eval` over the `clk_low` sum (+ `clk_inc`).

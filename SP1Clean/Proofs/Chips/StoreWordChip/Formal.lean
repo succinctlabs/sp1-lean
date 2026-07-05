@@ -69,7 +69,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 
 /-- Prover-side row well-formedness (3-arg form): operand `isU64`s + address-fits/alignment + the
 `offset_bit` decomposition + `is_real` binary + the reader `Spec`s + the read-modify-write equations. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
+def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
     2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
@@ -94,7 +94,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : P
         input.state.pc, 38⟩ ∧
     (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16
       ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
-    (input.is_real = 1 → Word.isU64 input.store_value)
+    (input.is_real = 1 → Word.isU64 input.store_value) ∧
+    -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
+    (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
@@ -103,7 +105,7 @@ theorem completeness :
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
   obtain ⟨ha, hb, hfit, h_ge, h_align, h_off, hbin, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it, hdec,
-      h_sv⟩ := h_assumptions
+      h_sv, h_st⟩ := h_assumptions
   have hmap_pc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc
       = input_state_pc := h_input.2.1.2.2.2
   have hmap_sv : Vector.map (Expression.eval env.toEnvironment) input_var_store_value
@@ -133,9 +135,10 @@ theorem completeness :
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, input_offset_bit⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, h_off_bin, h_ge, h_off'⟩
-  refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨⟨?_, ?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
+  · simp only [Readers.CPUState.stateMsgOf]; exact h_st
   · exact ⟨hbin, h_sv⟩
   · exact h_mem
   · exact ⟨hbin, hbin⟩
@@ -158,15 +161,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreWordColumns :=
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     exposedChannels := fun input _ =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         AddressOperation.circuit, AddressOperation.main,
         AddrAddOperation.circuit, AddrAddOperation.main,
@@ -176,6 +181,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreWordColumns :=
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.StoreWordChip

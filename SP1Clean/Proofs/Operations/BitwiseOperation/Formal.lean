@@ -42,7 +42,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
     fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
     fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
-  have hneg : -input_is_real = -1 := by rw [h1]
+  have hneg : - input_is_real = -1 := by rw [h1]
   have R0 := hg0 hneg; have R1 := hg1 hneg; have R2 := hg2 hneg; have R3 := hg3 hneg
   have R4 := hg4 hneg; have R5 := hg5 hneg; have R6 := hg6 hneg; have R7 := hg7 hneg
   -- The byte table guarantees each fired send's operands are bytes and `result = byteOp`.

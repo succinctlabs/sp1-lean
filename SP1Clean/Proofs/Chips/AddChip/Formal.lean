@@ -51,7 +51,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
@@ -67,12 +67,12 @@ theorem completeness :
       = AddOperation.populate input_adapter_op_b_memory_prev_value input_adapter_op_c_memory_prev_value := by
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    -- `h_env` now bundles the chip's `value` witness-gen equations with the GFC `RTypeReader`
-    -- subcircuit's completeness obligation — the witness equations are `h_env.1`.
-    rw [h_env.1 ⟨i, hi⟩]
+    -- `h_env` now bundles the GFC `CPUState` obligation (`.1`, since it too is a GFC subcircuit now),
+    -- the chip's `value` witness-gen equations (`.2.1`), and the `RTypeReader` obligation (`.2.2`).
+    rw [h_env.2.1 ⟨i, hi⟩]
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
-  refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
+  refine ⟨⟨hbin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
       fun hr => ⟨ha_prev hr, ha, hb⟩⟩,
     ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
@@ -99,15 +99,20 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddCols where
   -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (the gated VM channel
   -- interactions, descended from the composed `CPUState` subcircuit) so the chip can be a `VmTables` table.
   exposedChannels := fun input _ =>
-    expose stateChannel
-      [ pulledIf input.is_real
+    stateChannel.expose
+      [ stateChannel.pulledIf input.is_real
           ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
            input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-        pushedIf input.is_real
+        stateChannel.pushedIf input.is_real
           ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
            input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ]
   exposedChannels_eq := by
     intro input offset
+    -- reduce `ExposedChannelsLawful (stateChannel.expose [pull, push])` to a single
+    -- `interactionsWith stateChannel.toRaw = [pull.toRaw, push.toRaw]` goal (the `VmChannel` analog of
+    -- Clean's `Channel.exposedChannelsLawful_expose`), then descend as before.
+    simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+      List.map_cons, List.map_nil]
     -- descend the chip into its composed sub-readers (`circuit_norm` +
     -- `FormalAssertion.toSubcircuit_interactions`); `interactionsWith stateChannel` is itself a channel
     -- `List.filter`, so the closing `simp` drops the byte/mem/program pulls (channel distinctness) and the
@@ -120,6 +125,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddCols where
       SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
       circuit_norm, FormalAssertion.toSubcircuit_interactions,
       GeneralFormalCircuit.toSubcircuit_interactions]
-    simp [circuit_norm, Gadgets.Equality.main]
+    simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf]
 
 end SP1Clean.AddChip

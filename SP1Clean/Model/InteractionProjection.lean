@@ -53,7 +53,7 @@ omit [NeZero p] in
 /-- For a binary `is_real`, `signedVal (-is_real) = -is_real.val` (the negative/`receive` multiplicity):
 `-is_real` evaluates to `p - is_real.val`, whose centered representative is `-(is_real.val)`. -/
 lemma signedVal_neg_is_real (hp : 2 < p) {is_real : ZMod p} (h : is_real = 0 ∨ is_real = 1) :
-    signedVal (-is_real) = -(is_real.val : ℤ) := by
+    signedVal (- is_real) = -(is_real.val : ℤ) := by
   haveI : NeZero p := ⟨by omega⟩
   rcases h with h | h <;> subst h
   · simp [signedVal, ZMod.val_zero]
@@ -132,14 +132,14 @@ multiplicity. This is the per-interaction computation the `stateLookups_eq_emitt
 over the recovered `interactionsWith` list. -/
 lemma toAccess_pushIf_state (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : StateMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (pushedIf (channel :=stateChannel) mult msg).toRaw =
+    AbstractInteraction.toAccess env (stateChannel.pushedIf mult msg).toRaw =
       (InteractionKind.State, "SP1State",
         [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
          (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val],
         signedVal (Expression.eval env mult)) := by
-  simp [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
-    Channel.toRaw, kindOf, stateChannel, toElements, toComponents, components,
+  simp [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pushedIf,
+    VmChannel.toRaw, kindOf, stateChannel, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
 
 omit [NeZero p] in
@@ -150,14 +150,14 @@ Clean's `VmTables`). Its signed multiplicity is `signedVal (eval env (-gate))`; 
 `assumeGuarantees`, so the projected `LookupAccess` is identical to the old `pushIf (-is_real)` form. -/
 lemma toAccess_pullIf_state (env : Environment (ZMod p)) (gate : Expression (ZMod p))
     (msg : StateMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (pulledIf (channel := stateChannel) gate msg).toRaw =
+    AbstractInteraction.toAccess env (stateChannel.pulledIf gate msg).toRaw =
       (InteractionKind.State, "SP1State",
         [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
          (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
-    Channel.toRaw, kindOf, stateChannel, toElements, toComponents, components,
+  simp [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pulledIf,
+    VmChannel.toRaw, kindOf, stateChannel, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
 
 open SP1Clean.Channels (memoryChannel MemoryMsg programChannel ProgramMsg)

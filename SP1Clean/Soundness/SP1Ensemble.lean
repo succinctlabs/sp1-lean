@@ -110,11 +110,16 @@ instance sp1StateVerifierElaborated :
     ElaboratedCircuit (ZMod p) SP1PublicIO unit sp1StateVerifierMain where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := []
+  -- SC Phase 2c: the boundary pull of the **final** state receives `StateTruth` (the semantic capstone
+  -- conclusion — grounded by the engine, honestly supplied on the completeness side); so `stateChannel`
+  -- joins `channelsWithGuarantees`.
+  channelsWithGuarantees := [Channels.stateChannel.toRaw]
+  channelsLawful := by simp [circuit_norm, sp1StateVerifierMain, Channels.stateChannel]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma sp1StateVerifier_channelsWithGuarantees_eq :
-    ((sp1StateVerifierElaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p))) = [] :=
+    ((sp1StateVerifierElaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
+      = [Channels.stateChannel.toRaw] :=
   rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma sp1StateVerifier_localLength_eq (x : Var SP1PublicIO (ZMod p)) :
@@ -124,32 +129,46 @@ theorem sp1StateVerifier_soundness :
     GeneralFormalCircuit.Soundness (Output := unit) (ZMod p) sp1StateVerifierMain
       (fun _ _ => True) (fun _ _ _ => True) := by
   circuit_proof_start
-  simp [circuit_norm, Channels.stateChannel, Channels.StateMsg.Spec]
+  simp [circuit_norm, Channels.stateChannel]
+
+/-- SC Phase 2c: the honest prover supplies the final-state pull's `StateTruth` — the real terminal state
+of the committed program's execution (engine-grounded on the soundness side; the semantic capstone
+conclusion). -/
+def sp1StateVerifierProverAssumptions (pi : SP1PublicIO (ZMod p)) (data : ProverData (ZMod p))
+    (_ : ProverHint (ZMod p)) : Prop :=
+  SP1Clean.Semantics.StateTruth
+    (⟨pi.final_clk_high, pi.final_clk_low, pi.final_pc0, pi.final_pc1, pi.final_pc2⟩ :
+      Channels.StateMsg (ZMod p)) data
 
 set_option linter.unusedSectionVars false in
 theorem sp1StateVerifier_completeness :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) sp1StateVerifierMain
-      (fun _ _ _ => True) (fun _ _ _ => True) := by
+      sp1StateVerifierProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  simp [circuit_norm, Channels.stateChannel, Channels.StateMsg.Spec]
+  simp only [circuit_norm, Channels.stateChannel, sp1StateVerifierProverAssumptions] at h_assumptions ⊢
+  convert h_assumptions using 3 <;> simp_all [circuit_norm]
 
-/-- The SP1 boundary verifier as a `GeneralFormalCircuit`: pulls the public final state, pushes the
-public initial state, exposing the loop-closing `[pulled final, pushed init]` State pair. -/
+/-- The SP1 boundary verifier as a `GeneralFormalCircuit`: pulls the public final state (receiving its
+`StateTruth`), pushes the public initial state, exposing the loop-closing `[pulled final, pushed init]`
+State pair. -/
 def sp1StateVerifier : GeneralFormalCircuit (ZMod p) SP1PublicIO unit where
   main := sp1StateVerifierMain
   elaborated := sp1StateVerifierElaborated
   Assumptions := fun _ _ => True
   Spec := fun _ _ _ => True
+  ProverAssumptions := sp1StateVerifierProverAssumptions
   soundness := sp1StateVerifier_soundness
   completeness := sp1StateVerifier_completeness
   channelsWithRequirements := [Channels.stateChannel.toRaw]
   exposedChannels := fun pi _ =>
-    expose Channels.stateChannel
-      [ pulled ⟨pi.final_clk_high, pi.final_clk_low, pi.final_pc0, pi.final_pc1, pi.final_pc2⟩,
-        pushed ⟨pi.init_clk_high, pi.init_clk_low, pi.init_pc0, pi.init_pc1, pi.init_pc2⟩ ]
+    Channels.stateChannel.expose
+      [ Channels.stateChannel.pulled ⟨pi.final_clk_high, pi.final_clk_low, pi.final_pc0, pi.final_pc1, pi.final_pc2⟩,
+        Channels.stateChannel.pushed ⟨pi.init_clk_high, pi.init_clk_low, pi.init_pc0, pi.init_pc1, pi.init_pc2⟩ ]
   exposedChannels_eq := by
     intro pi offset
-    simp [circuit_norm, sp1StateVerifierMain]
+    simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+      List.map_cons, List.map_nil]
+    simp [circuit_norm, sp1StateVerifierMain, VmChannel.pulled, VmChannel.pushed]
 
 /-! ## The SP1 machine as a plain Clean `Ensemble` -/
 

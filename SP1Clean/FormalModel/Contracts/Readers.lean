@@ -1,4 +1,5 @@
 import SP1Clean.Math.Word
+import SP1Clean.Model.BusMessages
 import SP1Clean.Extracted.CPUState
 import SP1Clean.Extracted.RTypeReader
 import SP1Clean.Extracted.ALUTypeReader
@@ -354,5 +355,12 @@ rows. The cross-row PC chain stays at the trace level (`Soundness/StateConsisten
 def Spec (input : Inputs (ZMod p)) : Prop :=
   input.is_real = 1 →
     ((input.cols.clk_0_16 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13 ∧ input.cols.clk_16_24.val < 2 ^ 8
+
+/-- The State-bus **pull** message a CPUState block emits: the current `(clk, pc)` (clk recombined from
+the two byte limbs). Shared by the reader (its `pullIf` receives this message's `StateTruth`) and every
+composing chip (whose `ProverAssumptions` must supply that same `StateTruth`) — defined on the contract
+surface so both reference the identical message. -/
+def stateMsgOf (cols : Extracted.CPUState (ZMod p)) : SP1Clean.Channels.StateMsg (ZMod p) :=
+  ⟨cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536, cols.pc[0], cols.pc[1], cols.pc[2]⟩
 
 end SP1Clean.Readers.CPUState

@@ -68,7 +68,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var StoreByteColumns 
   let regHigh := (input.adapter.op_a_memory.prev_value[0] - input.register_low_byte)
     * Expression.const ((256 : ZMod p)⁻¹)
   let memHigh := (input.mem_limb - input.mem_limb_low_byte) * Expression.const ((256 : ZMod p)⁻¹)
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, is_real⟩
   let addr_op ← subcircuit AddressOperation.circuit
     ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1], input.offset_bit[2]⟩
@@ -126,7 +126,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreByteColumns main wh
       input.register_low_byte, input.increment, input.store_value, input.is_real⟩
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
   -- `programChannel` joins the byte guarantee propagated up from `ITypeReaderImmutable`'s program **pull** (W11 flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- Semantic contract. The spine sub-`Spec`s, the (real-row-gated) byte bounds, the mem-limb selection,
 the increment identity, the read-modify-write equations, and the `is_real` binary. -/

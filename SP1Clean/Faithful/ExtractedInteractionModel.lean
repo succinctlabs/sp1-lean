@@ -42,7 +42,7 @@ sink sign `signedVal (-mult)` (Clean's pull convention); the dynamic buses use `
 def Interaction.toAccess (intr : Interaction (ZMod p)) : LookupAccess :=
   match intr.payload with
   | .byte op a b c =>
-      (InteractionKind.Byte, "SP1Byte", [op.idx, a.val, b.val, c.val], signedVal (-intr.mult))
+      (InteractionKind.Byte, "SP1Byte", [op.idx, a.val, b.val, c.val], signedVal (- intr.mult))
   | .state a b c d e =>
       (InteractionKind.State, "SP1State",
         [a.val, b.val, c.val, d.val, e.val], signedVal (intr.dir.sign intr.mult))

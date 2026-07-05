@@ -308,7 +308,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have a1_bound : (env.get (i₀+1)).val < 2 ^ 16 := a1_bound_cond hsllw
     have h_msb_a1 := (hmsb ⟨fun _ => a1_bound, Or.inr hsllw⟩).2 hsllw
     -- Reduce the goal and apply the SLLW assembly.
-    have hLHS : Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var {index := i₀+i})
+    have hLHS : Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var {index := i₀+ i})
         = (#v[env.get i₀, env.get (i₀+1), env.get (i₀+2), env.get (i₀+3)] : Word (ZMod p)) := by
       apply Vector.ext; intro i hi
       simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]

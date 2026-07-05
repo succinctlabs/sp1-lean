@@ -210,7 +210,7 @@ theorem completeness : Completeness (ZMod p) main Assumptions := by
   have hcast2 : ((input_offset_bit2.val : ℕ) : ZMod p) = input_offset_bit2 := ZMod.natCast_zmod_val _
   -- range-check argument decomposes as `8 · (v0 / 8)` (offset bits = low 3 bits of `v0`).
   have hmod8 : A % 8 = A % 2 ^ 16 % 8 := (Nat.mod_mod_of_dvd A (by norm_num)).symm
-  have hdecomp : v0 + -(4 * input_offset_bit2) + -(2 * input_offset_bit1) + -input_offset_bit0
+  have hdecomp : v0 + -(4 * input_offset_bit2) + -(2 * input_offset_bit1) + - input_offset_bit0
       = ((8 * (A % 2 ^ 16 / 8) : ℕ) : ZMod p) := by
     have h1 : v0 = ((A % 2 ^ 16 : ℕ) : ZMod p) := by rw [← hv0_eq, ZMod.natCast_zmod_val]
     have h2 : 4 * input_offset_bit2 + 2 * input_offset_bit1 + input_offset_bit0
@@ -218,7 +218,7 @@ theorem completeness : Completeness (ZMod p) main Assumptions := by
       rw [← hmod8, ← hoff]; push_cast [hcast0, hcast1, hcast2]; ring
     have h3 : A % 2 ^ 16 - A % 2 ^ 16 % 8 = 8 * (A % 2 ^ 16 / 8) := by omega
     rw [h1, show ((A % 2 ^ 16 : ℕ) : ZMod p) + -(4 * input_offset_bit2) + -(2 * input_offset_bit1)
-        + -input_offset_bit0 = ((A % 2 ^ 16 : ℕ) : ZMod p) - ((A % 2 ^ 16 % 8 : ℕ) : ZMod p) from by
+        + - input_offset_bit0 = ((A % 2 ^ 16 : ℕ) : ZMod p) - ((A % 2 ^ 16 % 8 : ℕ) : ZMod p) from by
       linear_combination -h2, ← Nat.cast_sub (Nat.mod_le _ _), h3]
   refine ⟨⟨⟨hb, hcc, hfit, Or.inr rfl⟩, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hval]; exact AddrAddOperation.spec_populate hb hcc (1 : ZMod p)
@@ -232,7 +232,7 @@ theorem completeness : Completeness (ZMod p) main Assumptions := by
     simp only [circuit_norm, byteChannel]
     rw [← c13]
     refine (byteRowSpec_range _ h13p).mpr ?_
-    show ((v0 + -(4 * input_offset_bit2) + -(2 * input_offset_bit1) + -input_offset_bit0)
+    show ((v0 + -(4 * input_offset_bit2) + -(2 * input_offset_bit1) + - input_offset_bit0)
         * (8 : ZMod p)⁻¹).val < 2 ^ 13
     rw [hdecomp, show ((8 * (A % 2 ^ 16 / 8) : ℕ) : ZMod p)
         = (8 : ZMod p) * ((A % 2 ^ 16 / 8 : ℕ) : ZMod p) from by push_cast; ring,

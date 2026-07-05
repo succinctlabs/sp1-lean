@@ -149,7 +149,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hc6 := bool_of_mul_pred e321
     have hc7 := bool_of_mul_pred e323
     obtain ⟨h_oir, -, -, -, -, -, ⟨h_ob, -, -⟩, -, ⟨h_oc, -, -⟩⟩ := h_input
-    have hrneg' : -input_is_real = -1 := by rw [hr]
+    have hrneg' : - input_is_real = -1 := by rw [hr]
     have hbb0 : Expression.eval env input_var_op_b_val[0] = input_op_b_val[0] := by
       simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange]
     have hbb1 : Expression.eval env input_var_op_b_val[1] = input_op_b_val[1] := by

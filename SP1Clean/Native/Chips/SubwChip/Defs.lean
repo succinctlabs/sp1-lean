@@ -35,7 +35,7 @@ struct. The `RTypeReader`'s four `op_a_write_value` limbs are the **sign-extende
 20 #v[…value[0], …value[1], msb·65535, msb·65535] …`); the Program-bus opcode is `20`. Only the
 `SubwOperation` gadget witnesses; the two readers are `assertion`s over the threaded `state`/`adapter`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (SubwCols) (ZMod p)) := do
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   -- The chip witnesses the result low limbs + sign bit via the operation's `populate`, then composes the
   -- demoted `SubwOperation` gadget as a Clean `assertion`.
@@ -74,6 +74,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs SubwCols main where
   -- `programChannel` joins the byte guarantee propagated up from `RTypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `RTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 end SP1Clean.SubwChip

@@ -61,7 +61,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       (⟨input_cols_value[1], ⟨input_cols_msb_msb⟩, input_is_real⟩ : U16MSBOperation.Inputs (ZMod p)) := by
     refine ⟨fun hr1eq => ?_, hbin⟩
     have hr1' : input_is_real = 1 := hr1eq
-    have hneg : -input_is_real = -1 := by rw [hr1']
+    have hneg : - input_is_real = -1 := by rw [hr1']
     have R1 := hr1 hneg
     rw [← c16] at R1
     show input_cols_value[1].val < 2 ^ 16
@@ -72,7 +72,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   intro hr1eq
   obtain ⟨ha, hb⟩ := hab_imp hr1eq
-  have hneg : -input_is_real = -1 := by rw [hr1eq]
+  have hneg : - input_is_real = -1 := by rw [hr1eq]
   have R0 := hr0 hneg; have R1 := hr1 hneg
   rw [← c16] at R0 R1
   rw [hr1eq, one_mul] at hgc0 hgc1

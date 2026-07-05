@@ -44,7 +44,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
@@ -61,10 +61,10 @@ theorem completeness :
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     -- `h_env` now bundles the chip's `value` witness-gen equations with the GFC `RTypeReader`
     -- subcircuit's completeness obligation — the witness equations are `h_env.1`.
-    rw [h_env.1 ⟨i, hi⟩]
+    rw [h_env.2.1 ⟨i, hi⟩]
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
-  refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
+  refine ⟨⟨hbin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
       fun hr => ⟨ha_prev hr, ha, hb⟩⟩,
     ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
@@ -87,15 +87,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubCols :=
     -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8) so the
     -- chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone State pull+push.
     exposedChannels := fun input _ =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.RTypeReader.circuit, Readers.RTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -104,6 +106,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubCols :=
         SP1Clean.SubOperation.circuit, SP1Clean.SubOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.SubChip

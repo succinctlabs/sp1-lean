@@ -24,7 +24,7 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 /-- Honest prover-side row well-formedness. The immediate + rs1/rs2 + pc words `isU64`, `is_real` binary,
 the CPUState clock bounds + op_a/op_b register-access timestamp bounds, the two targets fitting in 48 bits
 (`value[3] = 0`), and the `is_real`-gated next_pc 4-byte alignment + u16 limb ranges. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
   let br := hintBranching hint
@@ -64,7 +64,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
   (input.is_real = 1 →
     ((committedNextPc input br)[0] * (4 : ZMod p)⁻¹).val < 2 ^ 14 ∧
     (committedNextPc input br)[1].val < 2 ^ 16 ∧
-    (committedNextPc input br)[2].val < 2 ^ 16)
+    (committedNextPc input br)[2].val < 2 ^ 16) ∧
+  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
 
 -- The binary-element algebra (`zero_ne_one'`, `val_of_bool`, `one_hot6`) and the six-way decision
 -- dispatch (`branch_conditions_of_decision_eq` / `branch_decision_eq_of_conditions`) live in the
@@ -233,10 +235,10 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨h_imm, h_rs1U, h_rs2U, h_pcU, h_bin, h_cpu, h_it, h_bt3, h_ft3,
-    hf0, hf1, hf2, hf3, hf4, hf5, h_realsum, h_brbin, h_brpad, h_dec, h_ranges⟩ := h_assumptions
+    hf0, hf1, hf2, hf3, hf4, hf5, h_realsum, h_brbin, h_brpad, h_dec, h_ranges, h_st⟩ := h_assumptions
   -- `h_env` now bundles the six witness-gen equation groups with the GFC `ITypeReaderImmutable`
   -- subcircuit's completeness obligation (trailing conjunct, discarded — the reader slot is discharged below).
-  obtain ⟨he_flags, he_br, he_bv, he_fv, he_np, he_lt, _⟩ := h_env
+  obtain ⟨he_flags, he_br, he_bv, he_fv, he_np, he_lt, -, _⟩ := h_env
   simp only [branchTargetWord, fallThroughWord] at h_bt3 h_ft3 h_ranges
   have hg0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using he_flags 0
   have hg1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using he_flags 1
@@ -456,7 +458,7 @@ theorem completeness :
     simp [circuit_norm]
   refine ⟨⟨⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, h_lt_spec⟩, ?_, ?_, ?_, ?_, ?_, ?_,
     (by linear_combination -hsumreal), hsumbin, ?_, ?_, ?_,
-    ⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, brb⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
+    ⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, brb⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
     ?_, ?_, ?_, ⟨⟨h_bin, h_bin⟩, h_it⟩, ?_, ?_, ?_⟩
   · rcases fb0 with h | h <;> rw [h] <;> simp
   · rcases fb1 with h | h <;> rw [h] <;> simp
@@ -531,16 +533,18 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BranchColumns :=
     -- `VmTables` table. `next_pc` is the **witnessed** muxed branch target the chip feeds `CPUState`:
     -- the three selected limbs `next_pc[0..2]` (cells `offset+15..17`).
     exposedChannels := fun input offset =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              var ⟨offset + 6 + 1 + 4 + 4⟩, var ⟨offset + 6 + 1 + 4 + 4 + 1⟩,
              var ⟨offset + 6 + 1 + 4 + 4 + 2⟩⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ITypeReaderImmutable.circuit, Readers.ITypeReaderImmutable.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
@@ -552,6 +556,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BranchColumns :=
         U16CompareOperation.circuit, U16CompareOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.BranchChip

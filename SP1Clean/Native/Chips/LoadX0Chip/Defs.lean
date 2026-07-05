@@ -84,7 +84,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadX0Columns (ZM
     + input.is_lw + input.is_lwu + input.is_ld
   let opcode := 29 * input.is_lb + 32 * input.is_lbu + 30 * input.is_lh + 33 * input.is_lhu
     + 31 * input.is_lw + 34 * input.is_lwu + 35 * input.is_ld
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, is_real⟩
   let addr_op ← subcircuit AddressOperation.circuit
     ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1], input.offset_bit[2]⟩
@@ -131,7 +131,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadX0Columns main where
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
   -- `programChannel` joins the byte guarantee propagated up from `ITypeReaderImmutable`'s program **pull**;
   -- `memoryChannel` from `MemoryAccess`'s read-prior **pull** (W11 memory flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity,
 the `MemoryAccess` timestamp monotonicity (a read), the `ITypeReaderImmutable` adapter facts (op_a/op_b

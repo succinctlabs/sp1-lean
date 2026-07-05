@@ -81,7 +81,7 @@ bit of `selected_word[1]` (gated by `is_lw`); `ITypeReader` writes the extended 
 zero-extension gate, and the `is_lw`/`is_lwu`/`is_real` binary gates are imposed directly. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadWordColumns (ZMod p)) := do
   let is_real := input.is_lw + input.is_lwu
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, is_real⟩
   let addr_op ← subcircuit AddressOperation.circuit ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit⟩
   -- SC Phase 2pre: `MemoryAccess` is now a `GeneralFormalCircuit`, composed via the GFC `CoeFun`
@@ -131,7 +131,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadWordColumns main whe
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
   -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `MemoryAccess`'s read pulls + `RegisterWrite`'s op_a write push (W11 memory flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity +
 offset booleans, the `MemoryAccess` timestamp monotonicity, the `U16MSBOperation` high-bit fact, the

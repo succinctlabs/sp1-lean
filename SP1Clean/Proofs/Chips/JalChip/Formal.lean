@@ -33,7 +33,7 @@ def linkTargetWord (input : Inputs (ZMod p)) : Word (ZMod p) :=
 op_a register-access timestamp bounds, `value[3] = 0` for both add results, and the `is_real`-gated
 4-byte alignment check (`jump_target[0] / 4 < 2^14`). Covers `rd ≠ x0` rows (`op_a_0 = 0`); soundness
 handles both the `op_a_0 = 0` and `op_a_0 = 1` (jal x0) cases. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.adapter.op_b_imm ∧
   Word.isU64 (#v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0] : Word (ZMod p)) ∧
@@ -51,7 +51,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
   (linkTargetWord input)[3] = 0 ∧
   (input.is_real = 1 → ((jumpTargetWord input)[0] * (4 : ZMod p)⁻¹).val < 2 ^ 14) ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
-    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -74,7 +76,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
   -- the link gate `is_real - op_a_0` is binary on every row (real: `op_a_0` binary; padding: `op_a_0 = 0`).
   -- `is_real - op_a_0` is binary: on real rows from `op_a_0 ∈ {0,1}`, on padding from `h_pad`.
-  have h_gate2 : input_is_real + -input_adapter_op_a_0 = 0 ∨ input_is_real + -input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
@@ -84,7 +86,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rw [ha1eq] at this
     simpa only [pcWord] using this
   · intro hr1 hop_a_0
-    have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, hop_a_0]; simp
+    have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, hop_a_0]; simp
     have := (h_add2 ⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩ hg1).2
     rw [ha1eq] at this
     simpa only [pcWord] using this
@@ -105,7 +107,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     intro hr1
     replace hr1 : input_is_real = 1 := hr1
     rcases h_op_a_0 with h0 | h0
-    · have hg1 : input_is_real + -input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
+    · have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
       exact (h_add2 ⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩ hg1).1
     · obtain ⟨z0, z1, z2, z3⟩ := h_jt.1
       rw [h0, one_mul] at z0 z1 z2 z3
@@ -115,12 +117,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac, h_jt3, h_lt3, h_align_pa, hdec⟩ :=
+  obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac, h_jt3, h_lt3, h_align_pa, hdec, h_st⟩ :=
     h_assumptions
   simp only [jumpTargetWord, linkTargetWord] at h_jt3 h_lt3 h_align_pa
   -- `h_env` now bundles the two witness-vector equations with the GFC `JTypeReader` subcircuit's
   -- completeness obligation (SC Phase 2pre); the witness equations are `he_av`/`he_oav`.
-  obtain ⟨he_av, he_oav, _⟩ := h_env
+  obtain ⟨he_av, he_oav, -, _⟩ := h_env
   -- eval-of-input rewrites.
   have hpc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc = input_state_pc :=
     h_input.2.1.2.2.2
@@ -176,20 +178,20 @@ theorem completeness :
     have := congrArg (·[3]) hval2
     simpa only [Vector.getElem_map, Vector.getElem_mapRange, ha1eq, circuit_norm] using this
   -- link gate `is_real - op_a_0` reduces to `is_real` when `op_a_0 = 0`.
-  have h_gate2 : input_is_real + -input_adapter_op_a_0 = 0 ∨ input_is_real + -input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
-  refine ⟨⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
+  refine ⟨⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
     ⟨⟨h_bin, h_bin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac, hdec, h_oap⟩,
     ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_⟩
   · rw [hval1]; exact AddOperation.spec_populate ha1U h_imm input_is_real
   · rw [hav3]; exact h_jt3
-  · rw [hval2]; exact AddOperation.spec_populate ha1U h4U (input_is_real + -input_adapter_op_a_0)
+  · rw [hval2]; exact AddOperation.spec_populate ha1U h4U (input_is_real + - input_adapter_op_a_0)
   · rw [hoav3]; exact h_lt3
   · -- RegisterWrite op_a write push: `isU64` of the link value `pc + 4` (completeness covers `op_a_0 = 0`).
     intro hr
     rw [hval2]
-    exact (AddOperation.spec_populate ha1U h4U (input_is_real + -input_adapter_op_a_0)
+    exact (AddOperation.spec_populate ha1U h4U (input_is_real + - input_adapter_op_a_0)
       (by rw [h_op_a_0]; simpa using hr)).1
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
@@ -217,15 +219,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
     -- `VmTables` table. Unlike straight-line ALU chips, `next_pc` is the **witnessed** jump target
     -- `add_value[0..2]` (cells `offset+0..2`) the chip feeds the composed `CPUState`.
     exposedChannels := fun input offset =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              var ⟨offset⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.JTypeReader.circuit, Readers.JTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -234,6 +238,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
         SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.JalChip

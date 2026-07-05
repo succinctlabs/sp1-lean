@@ -24,7 +24,7 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 `"bitwise_flags"` hint (each flag binary, one-hot, the sum = `is_real`), `op_a_0 = 0`,
 `imm_c = 0` (register-register ops), CPUState clock bounds, three timestamp `Spec`s
 (op_c gated by `is_real - imm_c`). -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
@@ -47,7 +47,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
 
 /-- Proven `is_real`-binary + `is_real`/flag-gated RV64 identity on the result word. Vacuous on
 padding. Cross-row bus guarantees live at the trace level and are not re-exposed here. -/
@@ -200,10 +202,10 @@ theorem completeness :
   circuit_proof_start
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨ha, hb, ha_prev, hbin, hf0, hf1, hf2, hsum, hone0, hone1, hone2, hop_a_0, himm, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
   -- `h_env` now bundles the chip's flag/`bw_cols` witness-gen equations with the GFC `ALUTypeReader`
   -- subcircuit's completeness obligation (SC Phase 2pre) — discard the trailing reader obligation.
-  obtain ⟨h_env_flags, h_env_cols, -⟩ := h_env
+  obtain ⟨-, h_env_flags, h_env_cols, -⟩ := h_env
   have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
   have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using h_env_flags 1
   have hflag2 : env.get (i₀ + 2) = (hintFlags env.hint)[2] := by simpa using h_env_flags 2
@@ -237,7 +239,7 @@ theorem completeness :
       exact Or.inr (Or.inr (by rw [hx, ho]; ring))
   have hop3 : (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0).val < 3 :=
     val_lt_three hop_cases
-  refine ⟨⟨hbin, h_cpu⟩,
+  refine ⟨⟨hbin, h_cpu, h_st⟩,
     ⟨⟨ha, hb, hop3, hbin⟩,
       ?_⟩,
     ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
@@ -305,15 +307,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input _ =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -323,6 +327,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
         SP1Clean.BitwiseOperation.circuit, SP1Clean.BitwiseOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.BitwiseChip

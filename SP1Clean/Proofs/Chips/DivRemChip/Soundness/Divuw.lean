@@ -80,7 +80,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hz_remuw : env.get (i₀ + 7) = 0 := (ZMod.val_eq_zero _).mp (by omega)
     set B := i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 with hBdef
     obtain ⟨h_oir, -, -, -, -, -, ⟨h_ob, -, -⟩, -, ⟨h_oc, -, -⟩⟩ := h_input
-    have hrneg' : -input_is_real = -1 := by rw [hr]
+    have hrneg' : - input_is_real = -1 := by rw [hr]
     have he2g : env.get (i₀ + 4) + env.get (i₀ + 5) + env.get (i₀ + 6) + env.get (i₀ + 7) = 1 := by
       rw [hflag, hz_divw, hz_remw, hz_remuw]; ring
     -- operand bridges (`eval(operand_var[i]) = operand[i]`) — the witnessed columns.

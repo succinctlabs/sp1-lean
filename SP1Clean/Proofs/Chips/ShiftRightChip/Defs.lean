@@ -153,7 +153,7 @@ gadgets (`b_msb` on `op_b` limb 3 gated `is_sra` and limb 1 gated `is_sraw`; `sr
 assertions (`AssertSpec`) and the nine byte-range pulls (`InteractSpec`), and assemble the extracted
 `ShiftRightCols` struct. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftRightCols (ZMod p)) := do
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let a ← witnessVector 4 (fun env =>
     populateA
@@ -349,13 +349,13 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs ShiftRightCols main wher
   -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit, Readers.RegisterWrite.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
+      = [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 37 := rfl

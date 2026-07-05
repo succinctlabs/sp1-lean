@@ -59,12 +59,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
   -- `op_c_memory` is grouped since `imm_c` is the final field of the ALU adapter block.
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, ⟨hoc, -, -⟩, -⟩ := h_input
   -- `h_env` now bundles the chip's `value`/`msb` witness-gen equations with the GFC `ALUTypeReader`
   -- subcircuit's completeness obligation (SC Phase 2pre) — discard the trailing reader obligation.
-  obtain ⟨h_env_val, h_env_msb, -⟩ := h_env
+  obtain ⟨-, h_env_val, h_env_msb, -⟩ := h_env
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
       Vector.map (Expression.eval env.toEnvironment) vv = v →
@@ -87,7 +87,7 @@ theorem completeness :
     rw [h_env_msb]
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
-  refine ⟨⟨hbin, h_cpu⟩, ⟨⟨ha, hb, hbin⟩, ?_⟩,
+  refine ⟨⟨hbin, h_cpu, h_st⟩, ⟨⟨ha, hb, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
@@ -119,15 +119,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddwCols :=
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input _ =>
-      expose stateChannel
-        [ pulledIf input.is_real
+      stateChannel.expose
+        [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          pushedIf input.is_real
+          stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
+      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
+        List.map_cons, List.map_nil]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -137,6 +139,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddwCols :=
         SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main] }
+      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
 
 end SP1Clean.AddwChip

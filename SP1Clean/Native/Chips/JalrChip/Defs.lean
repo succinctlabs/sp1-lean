@@ -72,7 +72,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalrColumns (ZMod
   let pcWordV : Word (Expression (ZMod p)) :=
     #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
   lsb * (lsb - 1) === 0
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[add_value[0] - lsb, add_value[1], add_value[2]], 8, input.is_real⟩
   assertion AddOperation.circuit ⟨rs1WordV, input.adapter.op_c_imm, { value := add_value }, input.is_real⟩
   add_value[3] === 0
@@ -105,6 +105,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalrColumns main where
   -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `ITypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 end SP1Clean.JalrChip

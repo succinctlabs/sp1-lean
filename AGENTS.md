@@ -271,6 +271,13 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
 - `mul_eq_zero` won't fire on `ZMod p` (a `Nat.rec` Mul-instance quirk) — derive booleanness via
   `inv_mul_cancel₀` / a `bool_of_mul_pred`-style lemma instead.
 - `Word` is an `abbrev` for `Vector` — `w.toBitVec64` dot-notation fails; write `Word.toBitVec64 w`.
+- **The Sail `-i` token — space your negations.** Sail declares GLOBAL `infixl:65 " +i "/" -i "/" *i "/" ^i "`
+  (`Sail/Sail.lean`, integer ops, used 1300+× in the generated LeanRV64D model so they can't be scoped). Now
+  that `Model/Channels.lean` imports Sail-carrying `Truth` (the semantic-channels flip), the ` -i ` token is
+  active in **every** circuit-proof file, and the lexer greedily tokenizes `-i` inside `-input_is_real` as the
+  operator → `unexpected token '-i'; expected term`. So write a negation of any `i`-starting identifier with a
+  space or parens: **`- input_is_real`** or **`-(input_is_real)`**, never `-input_is_real`. (The space *before*
+  the minus is untouched and still distinguishes binary-sub from unary-neg, so this is semantically null.)
 - Prefer targeted `simp [...] at h` over `simp_all` (it leaks into unrelated hypotheses).
 - **Don't leave `ring`'s `info:` note in the build.** On some goals `ring` runs its `ring1` pass, which
   *fails* and emits `Try this: ring_nf` / "ring works primarily in commutative rings …", then closes via

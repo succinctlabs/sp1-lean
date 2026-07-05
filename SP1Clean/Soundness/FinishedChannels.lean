@@ -42,7 +42,7 @@ private lemma programChannel_eq_stateChannel_false :
   simp only [eq_iff_iff, iff_false]
   intro he
   have : (programChannel (p := p)).toRaw.name = (stateChannel (p := p)).toRaw.name := by rw [he]
-  simp [Channel.toRaw_name, Channels.stateChannel, Channels.programChannel] at this
+  simp [Channel.toRaw_name, VmChannel.toRaw_name, Channels.stateChannel, Channels.programChannel] at this
 
 /-- The boundary verifier's requirement channels — State only. -/
 private lemma verifierTable_cwr (witness : EnsembleWitness (sp1Ensemble (p := p))) :

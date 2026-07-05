@@ -125,7 +125,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
   input.is_real * (is_branching - decision) === 0
   -- padding: `is_real = 0 → is_branching = 0` keeps `is_real - is_branching` binary.
   (input.is_real - 1) * is_branching === 0
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[next_pc[0], next_pc[1], next_pc[2]], 8, input.is_real⟩
   assertion AddOperation.circuit ⟨pcWordV, input.adapter.op_c_imm, { value := branch_value }, is_branching⟩
   branch_value[3] === 0
@@ -162,7 +162,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs BranchColumns main where
   subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit]; try omega
   -- W11 flip: the Program-bus fetch propagated up from `ITypeReaderImmutable`'s program **pull**
   -- (now a guarantee) joins the byte guarantee in `channelsWithGuarantees`.
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- The taken target word the chip witnesses for `branch_value` (`pc + op_c_imm`, base-2^16). -/
 def branchTargetWord (input : Inputs (ZMod p)) : Word (ZMod p) :=

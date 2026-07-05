@@ -33,7 +33,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   obtain ⟨hr, _hbool, hgc⟩ := h_holds
   refine ⟨⟨bool_of_mul_pred hgc, ?_⟩, fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   intro hr1eq
-  have hneg : -input_is_real = -1 := by rw [hr1eq]
+  have hneg : - input_is_real = -1 := by rw [hr1eq]
   have R := hr hneg
   rw [← c16] at R
   refine msb_of_raw (ha hr1eq) ?_

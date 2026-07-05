@@ -108,7 +108,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   -- at an off-gate multiplicity (`-is_real ∉ {0,-1}`), impossible under the binary `Assumptions` — vacuous.
   refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
-  have hneg : -input_is_real = -1 := by rw [hr1]
+  have hneg : - input_is_real = -1 := by rw [hr1]
   have hb1 := h_holds.2.1 hneg
   have hb2 := h_holds.2.2 hneg
   rw [← c16] at hb1

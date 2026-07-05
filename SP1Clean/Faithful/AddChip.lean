@@ -105,19 +105,20 @@ theorem addcols_state_interactions_faithful_syntactic
           (fun a => a.1 = InteractionKind.State) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hsk : ∀ (m : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pushedIf (channel := stateChannel) m s).toRaw) =
+      AbstractInteraction.toAccess env ((stateChannel.pushedIf m s).toRaw) =
         (InteractionKind.State, "SP1State",
           [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env m)) :=
     fun m s => toAccess_pushIf_state env m s
   have hsk_pull : ∀ (g : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pulledIf (channel := stateChannel) g s).toRaw) =
+      AbstractInteraction.toAccess env ((stateChannel.pulledIf g s).toRaw) =
         (InteractionKind.State, "SP1State",
           [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env (-g))) :=
     fun g s => toAccess_pullIf_state env g s
+  simp only [VmChannel.pushedIf, VmChannel.pulledIf] at hsk hsk_pull
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) stateChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil

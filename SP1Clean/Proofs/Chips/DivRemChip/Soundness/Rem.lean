@@ -118,7 +118,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p))
         = RV64.rem (Word.toBitVec64 input_op_c_val) (Word.toBitVec64 input_op_b_val) := by
       obtain ⟨h_oir, -, -, -, -, -, ⟨h_ob, -, -⟩, -, ⟨h_oc, -, -⟩⟩ := h_input
-      have hrneg' : -input_is_real = -1 := by rw [hr]
+      have hrneg' : - input_is_real = -1 := by rw [hr]
       have hbb0 : Expression.eval env input_var_op_b_val[0] = input_op_b_val[0] := by
         simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange]
       have hbb1 : Expression.eval env input_var_op_b_val[1] = input_op_b_val[1] := by

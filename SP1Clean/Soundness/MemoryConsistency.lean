@@ -68,7 +68,7 @@ def memoryLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
     (.Memory, "SP1Memory",
       [chk.val, (cl + 4).val, a.op_a.val, 0, 0,
         r.rdWrite[0].val, r.rdWrite[1].val,
-        r.rdWrite[2].val, r.rdWrite[3].val], -ir),
+        r.rdWrite[2].val, r.rdWrite[3].val], - ir),
     -- op_b: read prior (send), read-back prior (receive); gated by `is_real * (1 - imm_b)`, address its low limb
     (.Memory, "SP1Memory",
       [chk.val, a.op_b_memory.access_timestamp.prev_low.val, a.op_b[0].val, 0, 0,
@@ -77,7 +77,7 @@ def memoryLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
     (.Memory, "SP1Memory",
       [chk.val, (cl + 3).val, a.op_b[0].val, 0, 0,
         a.op_b_memory.prev_value[0].val, a.op_b_memory.prev_value[1].val,
-        a.op_b_memory.prev_value[2].val, a.op_b_memory.prev_value[3].val], -ibr),
+        a.op_b_memory.prev_value[2].val, a.op_b_memory.prev_value[3].val], - ibr),
     -- op_c: read prior (send), read-back prior (receive); gated by `is_real * (1 - imm_c)`, address its low limb
     (.Memory, "SP1Memory",
       [chk.val, a.op_c_memory.access_timestamp.prev_low.val, a.op_c[0].val, 0, 0,
@@ -86,7 +86,7 @@ def memoryLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
     (.Memory, "SP1Memory",
       [chk.val, (cl + 2).val, a.op_c[0].val, 0, 0,
         a.op_c_memory.prev_value[0].val, a.op_c_memory.prev_value[1].val,
-        a.op_c_memory.prev_value[2].val, a.op_c_memory.prev_value[3].val], -icr) ]
+        a.op_c_memory.prev_value[2].val, a.op_c_memory.prev_value[3].val], - icr) ]
 
 /-- A single register-access event. Mirrors the vendored `MemoryAccess` tuple `(timestamp, addr,
 readValue, writeValue)`: `addr`, timestamp `clk` (compared via `.val`, since `ZMod p` has no canonical
@@ -181,12 +181,12 @@ def memoryReadLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
     (.Memory, "SP1Memory",
       [chk.val, a.op_a_memory.access_timestamp.prev_low.val, a.op_a.val, 0, 0,
         a.op_a_memory.prev_value[0].val, a.op_a_memory.prev_value[1].val,
-        a.op_a_memory.prev_value[2].val, a.op_a_memory.prev_value[3].val], -ir),
+        a.op_a_memory.prev_value[2].val, a.op_a_memory.prev_value[3].val], - ir),
     -- op_b: read-prior pull, read-back push
     (.Memory, "SP1Memory",
       [chk.val, a.op_b_memory.access_timestamp.prev_low.val, a.op_b[0].val, 0, 0,
         a.op_b_memory.prev_value[0].val, a.op_b_memory.prev_value[1].val,
-        a.op_b_memory.prev_value[2].val, a.op_b_memory.prev_value[3].val], -ir),
+        a.op_b_memory.prev_value[2].val, a.op_b_memory.prev_value[3].val], - ir),
     (.Memory, "SP1Memory",
       [chk.val, (cl + 3).val, a.op_b[0].val, 0, 0,
         a.op_b_memory.prev_value[0].val, a.op_b_memory.prev_value[1].val,
@@ -195,7 +195,7 @@ def memoryReadLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
     (.Memory, "SP1Memory",
       [chk.val, a.op_c_memory.access_timestamp.prev_low.val, a.op_c[0].val, 0, 0,
         a.op_c_memory.prev_value[0].val, a.op_c_memory.prev_value[1].val,
-        a.op_c_memory.prev_value[2].val, a.op_c_memory.prev_value[3].val], -ir),
+        a.op_c_memory.prev_value[2].val, a.op_c_memory.prev_value[3].val], - ir),
     (.Memory, "SP1Memory",
       [chk.val, (cl + 2).val, a.op_c[0].val, 0, 0,
         a.op_c_memory.prev_value[0].val, a.op_c_memory.prev_value[1].val,
@@ -298,7 +298,7 @@ def memAccessLookups (mem : Extracted.MemoryAccessCols (ZMod p))
   [ (.Memory, "SP1Memory",
       [ts.prev_high.val, ts.prev_low.val, addr0.val, addr1.val, addr2.val,
         mem.prev_value[0].val, mem.prev_value[1].val, mem.prev_value[2].val,
-        mem.prev_value[3].val], -ir),
+        mem.prev_value[3].val], - ir),
     (.Memory, "SP1Memory",
       [clk_high.val, (clk_low + 1).val, addr0.val, addr1.val, addr2.val,
         new_value[0].val, new_value[1].val, new_value[2].val, new_value[3].val], ir) ]

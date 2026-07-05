@@ -54,7 +54,7 @@ what makes the ungated lower glue and the flag-gated shape asserts dischargeable
 `op_a_0 = 0`, the CPUState clock bounds, and the three register-access timestamp `Spec`s (mirrors
 `MulChip.ProverAssumptions` — R-type, no immediate machinery). Lives in `Defs` (not `Formal`) so the
 `Completeness/` split files can import it without a cycle. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
@@ -86,7 +86,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
   -- (W11 flip) the `RTypeReader` program **pull** now *derives* the decode bounds into its `Spec`
   -- (destination index `< 32`, pc limbs `< 2^16`, on real rows) — completeness must provide them.
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
 
 /-- All-zero `fromElements` placeholder for any column block. -/
 @[irreducible] def zc {α : TypeMap} [ProvableType α] : Var α (ZMod p) :=
@@ -365,7 +367,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   assertion U16MSBOperation.circuit ⟨remainder[1], ⟨w_remmsb[0]⟩, e2⟩
   assertion U16MSBOperation.circuit ⟨quotient[1], ⟨w_quotmsb[0]⟩, e2⟩
   -- Readers (after the arithmetic gadgets, extracted order — `E382` opcode + result-word write):
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   -- `RTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
   -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
@@ -456,7 +458,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs DivRemCols main where
   -- (a guarantee = `ProgramMsg.RowSpec`), so its guarantee propagates up here alongside `byteChannel`;
   -- `memoryChannel` likewise joins from `RTypeReader`'s memory read **pulls** (W11 memory flip). The
   -- `RegisterWrite` op_a write push owes a memory requirement (in `circuit.channelsWithRequirements`).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
   -- the ~30 upstream `pullIf` unfold/refolds put this past simp's default step budget post-#398
   channelsLawful := by simp (maxSteps := 1000000) [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit, assertZeros]
 

@@ -344,7 +344,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have h_c0_lt : input_adapter_op_c[0].val < 65536 := by
       have h := hc_u64 0; norm_num at h ⊢; exact h
     -- Reduce the goal and apply the native assembly.
-    have hLHS : Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var {index := i₀+i})
+    have hLHS : Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var {index := i₀+ i})
         = (#v[env.get i₀, env.get (i₀+1), env.get (i₀+2), env.get (i₀+3)] : Word (ZMod p)) := by
       apply Vector.ext; intro i hi
       simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]

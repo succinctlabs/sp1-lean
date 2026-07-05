@@ -69,7 +69,7 @@ writes the extended word to `op_a` (opcode `30·is_lh + 33·is_lhu`). The four 2
 the `op_a != x0` gate, the `is_lhu·msb` zero-extension gate, and the binary gates are imposed directly. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadHalfColumns (ZMod p)) := do
   let is_real := input.is_lh + input.is_lhu
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, is_real⟩
   let addr_op ← subcircuit AddressOperation.circuit
     ⟨input.op_b_val, input.op_c_imm, 0, input.offset_bit[0], input.offset_bit[1]⟩
@@ -124,7 +124,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadHalfColumns main whe
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
   -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `MemoryAccess`'s read pulls + `RegisterWrite`'s op_a write push (W11 memory flip).
-  channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s plus the four offset-selection equations,
 the `op_a != x0` flag, the `is_lhu·msb` zero-extension gate, and the `is_lh`/`is_lhu`/`is_real` binaries. -/
