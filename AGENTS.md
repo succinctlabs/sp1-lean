@@ -188,9 +188,15 @@ Program channel's becomes `ProgTruth` (fetch-decode correspondence), and **memor
 `isU64`** (pure coherence bookkeeping — never carries execution truth, never in the final theorem). Landed:
 the `VmChannel` veneer (decoupled `Guarantees`/`Owed`), the semantic foundation (`progOf`/`MicroTime`/
 `Truth`), the Phase-1 end-to-end spike (`Spike/`, axiom-clean), the full reader/chip `FormalAssertion →
-GeneralFormalCircuit` sweep, and the **relocation of the execution substrate down to `Model/Semantics/`**
-(so `Channels.lean` can wire the semantic guarantees). Next: flip `stateChannel`/`programChannel` to carry
-the semantic `Guarantees`, then the per-chip `advance` lemmas + the timed-channel grounding engine.
+GeneralFormalCircuit` sweep, the **relocation of the execution substrate down to `Model/Semantics/`**, and
+the **State-channel flip (Phase 2c, 2026-07-05)**: `stateChannel` is now a `VmChannel` carrying
+`Guarantees := StateTruth` (Owed `True`) — CPUState → GFC supplying the pull's `StateTruth`, all 25 chips
+threading it, the boundary verifier carrying the final-state truth, the parked `StateVm` VmTables spike
+retired. **Consequence (disclosed): `sp1_machine_soundness` now inherits the Sail platform trust base**
+(`riscv_f*`/`plat_*`/`*_reservation`/…) — the capstone is tied to the Sail execution model via the state
+channel; `StateTruth` is not yet grounded in the soundness *conclusion* (that is the engine phase). Next:
+the program flip (`ProgTruth` — needs the decode maps relocated to `Model`), then the per-chip `advance`
+lemmas + the timed-channel grounding engine.
 
 Everything is **field-generic** over a prime field — the standard variable block is:
 ```lean
@@ -273,11 +279,13 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
 - `Word` is an `abbrev` for `Vector` — `w.toBitVec64` dot-notation fails; write `Word.toBitVec64 w`.
 - **The Sail `-i` token — space your negations.** Sail declares GLOBAL `infixl:65 " +i "/" -i "/" *i "/" ^i "`
   (`Sail/Sail.lean`, integer ops, used 1300+× in the generated LeanRV64D model so they can't be scoped). Now
-  that `Model/Channels.lean` imports Sail-carrying `Truth` (the semantic-channels flip), the ` -i ` token is
-  active in **every** circuit-proof file, and the lexer greedily tokenizes `-i` inside `-input_is_real` as the
-  operator → `unexpected token '-i'; expected term`. So write a negation of any `i`-starting identifier with a
-  space or parens: **`- input_is_real`** or **`-(input_is_real)`**, never `-input_is_real`. (The space *before*
-  the minus is untouched and still distinguishes binary-sub from unary-neg, so this is semantically null.)
+  that `Model/Channels.lean` imports Sail-carrying `Truth` (the semantic-channels flip), all four tokens are
+  active in **every** circuit-proof file, and the lexer greedily tokenizes `<op>i` inside `-input_is_real` /
+  `i₀+i` as the operator → `unexpected token '-i'; expected term`. So keep a space (or parens) whenever an
+  operator is immediately followed by an `i`: **`- input_is_real`** / `-(input_is_real)` (never `-input_is_real`),
+  **`i₀ + i`** (never `i₀+i`), `2 ^ i`, `x * input`. (The space *before* the operator is untouched and still
+  distinguishes binary-op from unary/application, so this is semantically null. The spaced Sail operator
+  ` +i ` — the `i` followed by a space — is the one form you must NOT break.)
 - Prefer targeted `simp [...] at h` over `simp_all` (it leaks into unrelated hypotheses).
 - **Don't leave `ring`'s `info:` note in the build.** On some goals `ring` runs its `ring1` pass, which
   *fails* and emits `Try this: ring_nf` / "ring works primarily in commutative rings …", then closes via
