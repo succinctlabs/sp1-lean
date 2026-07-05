@@ -1,5 +1,6 @@
 import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.Model.Semantics.GuestProgram
+import SP1Clean.Model.Semantics.Decode
 
 /-! # The target machine-level theorem — a real Sail execution chain from a loaded guest program
 
@@ -79,10 +80,7 @@ def SP1TargetPublicIO.toLegacy {F : Type} (pi : SP1TargetPublicIO F) : SP1Public
     final_clk_high := pi.final_clk_high, final_clk_low := pi.final_clk_low,
     final_pc0 := pi.final_pc0, final_pc1 := pi.final_pc1, final_pc2 := pi.final_pc2 }
 
-/-! ## PC limbs ↔ the Sail 64-bit PC -/
-
-/-- Reassemble three 16-bit PC limb values into the Sail 64-bit PC. -/
-def pcBitsOfVals (a b c : ℕ) : BitVec 64 := BitVec.ofNat 64 (a + b * 2 ^ 16 + c * 2 ^ 32)
+/-! ## PC limbs ↔ the Sail 64-bit PC (`pcBitsOfVals` relocated to `Model/Semantics/Decode.lean`) -/
 
 /-- The 64-bit PC a row's state-bus **receive** key carries (its current pc). -/
 def rcvPcOf (sa : StateAccess (ZMod p)) : BitVec 64 :=
