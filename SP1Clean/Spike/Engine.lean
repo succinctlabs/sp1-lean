@@ -1,4 +1,4 @@
-import SP1Clean.FormalModel.Semantics.Truth
+import SP1Clean.Model.Semantics.Truth
 
 /-! # Spike engine — the minimal timed grounding theorem
 

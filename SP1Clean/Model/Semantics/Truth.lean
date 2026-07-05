@@ -1,5 +1,5 @@
-import SP1Clean.FormalModel.Trace.ProgramCommitment
-import SP1Clean.FormalModel.Semantics.MicroTime
+import SP1Clean.Model.Semantics.ProgramCommitment
+import SP1Clean.Model.Semantics.MicroTime
 
 /-! # Execution truth — the semantic channel payloads
 

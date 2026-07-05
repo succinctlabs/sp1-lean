@@ -73,8 +73,17 @@ Mirror-rust layout under `SP1Clean/`:
   `limb_lift`), `Bitwise.lean` (`byteOp`, `reassemble_byteOp`, …), `Misc.lean`, `MulCarryChain.lean`,
   `HWord.lean`, `GetElemFastPath.lean` (the upstreaming candidate).
 - **`Model/`** — the SP1 substrate (Sail + buses): `Register.lean`, `SailWrap.lean`, `SailMemory.lean`,
-  `Channels.lean`, `InteractionBus/Projection/Recovery.lean`, `ChipAir.lean`, `SP1Constraint.lean`,
-  `ByteTable.lean`. (`Math` + `Model` are the former `Foundations/`, split by SP1-dependence.)
+  `BusMessages.lean` (the State/Memory/Program message structs + their structural per-row predicates),
+  `Channels.lean` (the channel definitions — `VmChannel`s carrying the semantic guarantees),
+  `VmChannel.lean` (the decoupled-`Guarantees`/`Owed` veneer over Clean's `RawChannel`),
+  `InteractionBus/Projection/Recovery.lean`, `ChipAir.lean`, `SP1Constraint.lean`, `ByteTable.lean`, and
+  the **semantic-execution substrate** `Semantics/` — `GuestProgram.lean` (the `GuestProgram` +
+  `IsInitialState`/`SailStep`/`SailChain`/`SP1Halted` Sail execution model), `ProgramCommitment.lean`
+  (`progOf : ProverData → GuestProgram`, the committed program), `MicroTime.lean` (bus-clock ↔ step
+  correspondence, `MemLoc`, `chainState`, `microValue`), and `Truth.lean` (`StateTruth`/`MemTruth`/
+  `ProgTruth`, the semantic channel payloads). `Semantics/` sits **below** `Channels.lean` so the channel
+  `Guarantees` can be `StateTruth`/`ProgTruth` directly. (`Math` + `Model` are the former `Foundations/`,
+  split by SP1-dependence.)
 - **`Extracted/`** — the "extracted from Rust" pillar, **auto-generated, do not hand-edit**: the column
   structs + `asserts`/`interactions` lists (`<Op>.lean`/`<Chip>Chip.lean`), the operation circuit forms
   `Circuit/<Op>.lean` (SP1's `eval` as a Clean circuit), and the witness-conformance vectors
@@ -83,11 +92,12 @@ Mirror-rust layout under `SP1Clean/`:
   `Contracts/` holds the per-reader/operation/chip `Inputs` + semantic `Spec`s (`Readers.lean`,
   `Operations.lean`, `Chips.lean` — the former `Specs/`) and the lifted chip `Assumptions`/`ProverAssumptions`
   (`ChipAssumptions.lean`, currently the ALU chips Add/Addi/Addw/Sub/Subw). `ProverSpec` is uniformly
-  `fun _ _ _ => True` (inline in each `circuit` bundle). `Trace/GuestProgram.lean` holds the guest-program
-  execution model (`GuestProgram`, `IsInitialState`, `SailStep`/`SailChain`, `SP1Halted`, `exitOf`) — the
-  SailState-level "guest programs" statements (they depend only on `Model/`). The trace *arguments* that
-  consume them (`TargetObligations`, the `sp1_target_execution` theorem, the `Opcode→chip` routing, `Emits`)
-  reference `ChipRow` (a Soundness-layer type), so they cannot move below `Soundness/` and stay there.
+  `fun _ _ _ => True` (inline in each `circuit` bundle). `Trace/Witness.lean` holds the witness-table
+  scaffolding; the guest-program execution model (`GuestProgram`, `IsInitialState`, `SailStep`/`SailChain`,
+  `SP1Halted`, `exitOf`) was relocated **down to `Model/Semantics/GuestProgram.lean`** (so the semantic
+  channel guarantees can reference it). The trace *arguments* that consume it (`TargetObligations`, the
+  `sp1_target_execution` theorem, the `Opcode→chip` routing, `Emits`) reference `ChipRow` (a Soundness-layer
+  type), so they cannot move below `Soundness/` and stay there.
 - **`Native/`** — the "implemented native in Lean" pillar (circuit construction): `Native/Chips/<Op>Chip/Defs.lean`
   (each chip's `main` + `ElaboratedCircuit`), `Native/Operations/<Op>/{Populate,RawSpec}.lean` (witness +
   native arithmetic core) + flat ops (`BitwiseU16Operation.lean`, `AddressOperation.lean`, …), and
@@ -163,13 +173,24 @@ hand-written files (−591 lines) while preserving axiom-cleanliness, plus subst
 bridges; #102 makes the jalr/jal/branch specs explicit about divisibility / LSB-clearing). Planned (approved
 plan, not yet done): lifting the remaining chips' `Assumptions` onto the audit surface (helper-dependent
 chips Jal/Jalr/Branch/DivRem/ShiftLeft/ShiftRight + split-`Spec` Lt/Bitwise keep theirs in their proof
-files). The guest-program execution model was surfaced in `FormalModel/Trace/GuestProgram.lean` (Phase 5);
-the trace *arguments* (TargetObligations / target theorem / routing / Emits) are `ChipRow`-dependent and so
-remain in `Soundness/` — their natural layer — rather than being forced below it.
+files). The trace *arguments* (TargetObligations / target theorem / routing / Emits) are `ChipRow`-dependent
+and so remain in `Soundness/` — their natural layer — rather than being forced below it.
 The bespoke `Soundness/GatedVm/` → Clean `VmTables` migration (roadmap W11) was investigated and **deferred**
 — Clean's VM engine yields verifier-guarantees with no explicit execution walk, while SP1's spec is a
 balance-derived `GatedExecution` with an Eulerian trail, so re-basing adds obligations without removing the
 SP1-specific trail machinery (see roadmap W11).
+
+**Semantic-channels program (in progress, 2026-07).** The approved direction (`docs/` roadmap + the
+`semantic_channels_program` memory) inverts the architecture so the **channels carry the execution
+semantics**: the prover commits the guest program in `ProverData`, the State channel's guarantee becomes
+`StateTruth` ("the deterministic Sail execution of the committed program is at this pc at this clk"), the
+Program channel's becomes `ProgTruth` (fetch-decode correspondence), and **memory stays structural
+`isU64`** (pure coherence bookkeeping — never carries execution truth, never in the final theorem). Landed:
+the `VmChannel` veneer (decoupled `Guarantees`/`Owed`), the semantic foundation (`progOf`/`MicroTime`/
+`Truth`), the Phase-1 end-to-end spike (`Spike/`, axiom-clean), the full reader/chip `FormalAssertion →
+GeneralFormalCircuit` sweep, and the **relocation of the execution substrate down to `Model/Semantics/`**
+(so `Channels.lean` can wire the semantic guarantees). Next: flip `stateChannel`/`programChannel` to carry
+the semantic `Guarantees`, then the per-chip `advance` lemmas + the timed-channel grounding engine.
 
 Everything is **field-generic** over a prime field — the standard variable block is:
 ```lean

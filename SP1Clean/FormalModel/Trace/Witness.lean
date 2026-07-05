@@ -1,4 +1,4 @@
-import SP1Clean.FormalModel.Trace.GuestProgram
+import SP1Clean.Model.Semantics.GuestProgram
 
 /-! # W6b — the non-vacuity witness: `IsInitialState` is satisfiable
 

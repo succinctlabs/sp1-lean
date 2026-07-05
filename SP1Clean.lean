@@ -238,6 +238,10 @@ import SP1Clean.Model.SailDecode
 import SP1Clean.Model.SailMemory
 import SP1Clean.Model.SailWrap
 import SP1Clean.Model.VmChannel
+import SP1Clean.Model.Semantics.GuestProgram
+import SP1Clean.Model.Semantics.ProgramCommitment
+import SP1Clean.Model.Semantics.MicroTime
+import SP1Clean.Model.Semantics.Truth
 import SP1Clean.Math.Word
 import SP1Clean.Extracted.Circuit.AddOperation
 import SP1Clean.Proofs.Operations.AddOperation.Formal
@@ -337,11 +341,7 @@ import SP1Clean.Soundness.StateVm
 import SP1Clean.Soundness.TargetVm
 import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
-import SP1Clean.FormalModel.Trace.GuestProgram
-import SP1Clean.FormalModel.Trace.ProgramCommitment
 import SP1Clean.FormalModel.Trace.Witness
-import SP1Clean.FormalModel.Semantics.MicroTime
-import SP1Clean.FormalModel.Semantics.Truth
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.FormalModel.Contracts.Readers
 import SP1Clean.Soundness.RowView

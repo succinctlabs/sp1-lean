@@ -1,5 +1,5 @@
 import SP1Clean.Soundness.SP1Ensemble
-import SP1Clean.FormalModel.Trace.GuestProgram
+import SP1Clean.Model.Semantics.GuestProgram
 
 /-! # The target machine-level theorem — a real Sail execution chain from a loaded guest program
 

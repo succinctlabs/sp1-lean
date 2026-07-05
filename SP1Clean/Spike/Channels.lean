@@ -1,12 +1,12 @@
 import SP1Clean.Model.VmChannel
-import SP1Clean.FormalModel.Semantics.Truth
+import SP1Clean.Model.Semantics.Truth
 import SP1Clean.Model.Channels
 
 /-! # Spike channels — semantic `VmChannel`s over the real truth predicates
 
 **Phase-1 de-risk spike** (`SP1Clean/Spike/`, to be deleted after the real sweep). The two semantic
 channels the spike threads end-to-end, built on the Phase-0 `VmChannel` veneer
-(`Model/VmChannel.lean`) and the real execution-truth predicates (`FormalModel/Semantics/Truth.lean`):
+(`Model/VmChannel.lean`) and the real execution-truth predicates (`Model/Semantics/Truth.lean`):
 
 - `spikeState` — pull-side `Guarantees := Semantics.StateTruth` (the committed program's execution is
   at this `(clk, pc)`), push-side `Owed := True` (today's State-bus strength: a state push proves

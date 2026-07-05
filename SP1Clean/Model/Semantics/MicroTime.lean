@@ -1,4 +1,4 @@
-import SP1Clean.FormalModel.Trace.GuestProgram
+import SP1Clean.Model.Semantics.GuestProgram
 import SP1Clean.Model.BusMessages
 
 /-! # Micro-time — the bus-clock ↔ execution-step correspondence

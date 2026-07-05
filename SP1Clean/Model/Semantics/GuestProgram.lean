@@ -3,14 +3,15 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Model.Register
 import LeanRV64D
 
-/-! # Guest programs + the Sail execution model — the 5th-pillar audit surface
+/-! # Guest programs + the Sail execution model — the semantic-execution substrate (`Model/Semantics/`)
 
 The "general trace arguments and guest programs" the auditor reads to know *what is being executed*: a
 `GuestProgram` (encoded instruction ROM + entry point + initial memory image), what it means for a Sail
 state to *load* it (`IsInitialState`), the real multi-step chain over the **official** LeanRV64D
 interpreter (`SailStep`/`SailChain` on `try_step`), and the halting condition (`SP1Halted`). These
-statements depend only on the Sail `SailState` model (`Model/`), so they sit on the audit surface
-*below* the proofs (between `Model` and `Soundness`).
+statements depend only on the Sail `SailState` model (`Model/`), so they live in the `Model/Semantics/`
+substrate — **below** `Model/Channels.lean`, so the semantic channel guarantees (`StateTruth`/`ProgTruth`,
+built atop these in `Model/Semantics/Truth.lean`) can be wired directly into the channels.
 
 The trace **arguments** that consume them — `TargetObligations`, `WalkOf`, `RefinesAt`, `RowEffect`, and
 the target theorem `sp1_target_execution` — reference `ChipRow`/`StateAccess` (the Soundness-layer trace

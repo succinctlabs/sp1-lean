@@ -7,7 +7,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 The `ProvableStruct` message tuples of SP1's dynamic buses — State, Memory, Program — plus the
 **structural** (program-independent, execution-independent) per-row predicates over them
 (`Spec`/`isU64`/`RowSpec`). Extracted from `Model/Channels.lean` so this layer sits *below* the
-semantic-execution predicates (`FormalModel/Semantics/Truth.lean` — `StateTruth`/`MemTruth`/`ProgTruth`),
+semantic-execution predicates (`Model/Semantics/Truth.lean` — `StateTruth`/`MemTruth`/`ProgTruth`),
 which need these message types: with the messages here, `Truth` imports this file (not `Channels`), and
 `Channels` can then wire the semantic predicates into the channel `Guarantees` without an import cycle.
 

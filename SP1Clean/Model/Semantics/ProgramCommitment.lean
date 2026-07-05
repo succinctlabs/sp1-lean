@@ -1,4 +1,4 @@
-import SP1Clean.FormalModel.Trace.GuestProgram
+import SP1Clean.Model.Semantics.GuestProgram
 import Clean.Circuit.Expression
 
 /-! # The program commitment — `ProverData` as the committed guest program
