@@ -1,5 +1,6 @@
 import SP1Clean.Model.Semantics.ProgramCommitment
 import SP1Clean.Model.Semantics.MicroTime
+import SP1Clean.Model.Semantics.Decode
 
 /-! # Execution truth — the semantic channel payloads
 
@@ -84,5 +85,32 @@ def StepFact (data : ProverData (ZMod p)) (r : RowFacts p) : Prop :=
     SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
     ValueAt data (MemoryMsg.locOf mp.1) mp.2 mp.1.value) →
   StateTruth r.statePush data ∧ ∀ m ∈ r.memPushes, MemTruth m data
+
+/-! ## The Program channel's semantic guarantee -/
+
+/-- A Program-bus message projected to the committed program-row column shape — the operands' four limbs
+reassembled as `Word`s — so `decodedInROM` can be applied to a `ProgramMsg`. -/
+def rowOfMsg (m : ProgramMsg (ZMod p)) : SP1Clean.ProgramChip.ProgramRow (ZMod p) where
+  pc0 := m.pc0
+  pc1 := m.pc1
+  pc2 := m.pc2
+  opcode := m.opcode
+  op_a := m.op_a
+  op_b := #v[m.op_b0, m.op_b1, m.op_b2, m.op_b3]
+  imm_b := m.imm_b
+  op_c := #v[m.op_c0, m.op_c1, m.op_c2, m.op_c3]
+  op_a_0 := m.op_a_0
+  imm_c := m.imm_c
+
+/-- **The Program channel's semantic guarantee** — the fetch-decode correspondence: the message's decode
+bounds (`RowSpec`) **plus** that the fetched row is the decode of the committed program's ROM at its pc
+(`decodedInROM`, over `Commit.progOf data`). So the `is_real`-gated opcode a chip pins in its fetch is a
+real decode of the committed guest program — the foundation of opcode-based Sail dispatch. Structural
+`RowSpec` is what a push proves row-locally (the `Owed`); the `decodedInROM` half is the finished-channel
+balance/vkey fact a pull receives (grounded by the ROM provider), so `programChannel` becomes a semantic
+`VmChannel` (`Owed := RowSpec`, `Guarantees := ProgTruth`) exactly like the State channel. -/
+def ProgTruth (m : ProgramMsg (ZMod p)) (data : ProverData (ZMod p)) : Prop :=
+  SP1Clean.Channels.ProgramMsg.RowSpec m ∧
+    SP1Clean.Soundness.Target.decodedInROM (Commit.progOf data) (rowOfMsg m)
 
 end SP1Clean.Semantics

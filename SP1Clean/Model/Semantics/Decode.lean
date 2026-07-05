@@ -19,10 +19,9 @@ namespace SP1Clean.Soundness.Target
 open Sail LeanRV64D LeanRV64D.Functions
 open SP1Clean.ProgramChip (ProgramRow)
 
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 /-! ## The decode projection: LeanRV64D `instruction` → committed Program-bus columns -/
 
@@ -272,7 +271,7 @@ def instrToProgramRow (pc : Vector (ZMod p) 3) : instruction → Option (Program
              imm_c := 0 }
   | _ => none
 
-omit [Fact (2 ^ 24 < p)] in
+omit [Fact (2 ^ 17 < p)] in
 /-- The R-type projection, unfolded — the committed Program-bus column shape an `RTYPE` decode produces
 (`op_a = rd`, `op_b[0] = rs1`, `op_c[0] = rs2`, high limbs and immediate flags `0`, opcode the SP1
 discriminant). The definitional spec of `instrToProgramRow` on R-type, the anchor a W7 `try_step` decode
@@ -288,7 +287,7 @@ theorem instrToProgramRow_rtype (pc : Vector (ZMod p) 3) (rs2 rs1 rd : regidx) (
              op_a_0 := if regidxVal (p := p) rd = 0 then 1 else 0,
              imm_c := 0 } := rfl
 
-omit [Fact (2 ^ 24 < p)] in
+omit [Fact (2 ^ 17 < p)] in
 /-- The I-type projection, unfolded — `op_a = rd`, `op_b[0] = rs1`, `op_c = sign-extended immediate`
 (as little-endian limbs), `imm_c = 1`, opcode the SP1 discriminant (`ADDI` its own; the rest the R-type
 opcode, per `iopToOpcode`). -/
