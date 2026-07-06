@@ -302,6 +302,62 @@ theorem instrToProgramRow_itype (pc : Vector (ZMod p) 3) (imm : BitVec 12) (rs1 
              op_a_0 := if regidxVal (p := p) rd = 0 then 1 else 0,
              imm_c := 1 } := rfl
 
+/-! ## Decode inversion — the committed row's `(opcode, imm_c)` pins the R-type instruction (W7) -/
+
+/-- Every SP1 opcode discriminant is `< 53` — so it casts injectively into `ZMod p` (`2^17 < p`). -/
+theorem opcode_toNat_lt (o : Opcode) : o.toNat < 53 := by cases o <;> decide
+
+/-- **Opcode cast reflection at `ADD`.** In `ZMod p` (`2^17 < p`), if an opcode's discriminant equals
+`ADD`'s (`= 0`), then it *is* `0` in `ℕ` — the injectivity of `Nat.cast` on the opcode range that the
+decode inversion rides. -/
+theorem opcodeCast_eq_add_zero (o : Opcode)
+    (ho : (o.toNat : ZMod p) = ((ropToOpcode rop.ADD).toNat : ZMod p)) : o.toNat = 0 := by
+  have hp : (2:ℕ) ^ 17 < p := Fact.out
+  have h1 := opcode_toNat_lt o
+  have h2 := congrArg ZMod.val ho
+  rw [ZMod.val_natCast_of_lt (by omega),
+    ZMod.val_natCast_of_lt (by simp only [ropToOpcode, Opcode.toNat]; omega)] at h2
+  simpa only [ropToOpcode, Opcode.toNat] using h2
+
+/-- **The Add decode inversion (W7).** If a decoded instruction `i` projects (`instrToProgramRow`) to a
+committed row whose opcode is `ADD`'s and whose `imm_c = 0`, then `i` *is* `RTYPE (rs2, rs1, rd, ADD)`, with
+the row's operand columns exactly the `regidxVal` of those registers. The `imm_c = 0` rules out every
+immediate-typed arm (`imm_c = 1`), and the `opcode = ADD` rules out the other R-shaped arms (RTYPEW / MUL /
+MULW / DIV* / REM*, whose discriminants are `≠ 0`) and pins `op = ADD` within the RTYPE arm. Keyed on the
+committed columns via `split` over the projection's 19 match arms — no full case over `instruction`'s ~300
+constructors. Serves the whole R-type family (a sibling for each `ropToOpcode`/`ropwToOpcode` target). -/
+theorem instrToProgramRow_inv_add {pc : Vector (ZMod p) 3} {i : instruction} {row : ProgramRow (ZMod p)}
+    (h : instrToProgramRow pc i = some row)
+    (hop : row.opcode = ((ropToOpcode rop.ADD).toNat : ZMod p))
+    (himm : row.imm_c = (0 : ZMod p)) :
+    ∃ rs2 rs1 rd : regidx, i = .RTYPE (rs2, rs1, rd, rop.ADD) ∧
+      row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
+      ∧ row.op_c = #v[regidxVal rs2, 0, 0, 0] := by
+  simp only [instrToProgramRow] at h
+  split at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst h)
+  all_goals (try (exact absurd himm one_ne_zero))
+  · rename_i rs2 rs1 rd op
+    have hz := opcodeCast_eq_add_zero _ hop
+    have : op = rop.ADD := by
+      cases op <;> first | rfl | (simp only [ropToOpcode, Opcode.toNat] at hz; omega)
+    subst this; exact ⟨rs2, rs1, rd, rfl, rfl, rfl, rfl⟩
+  · rename_i rs2 rs1 rd op
+    exact absurd (opcodeCast_eq_add_zero _ hop) (by cases op <;> decide)
+  · rename_i rs2 rs1 rd m
+    exact absurd (opcodeCast_eq_add_zero _ hop)
+      (by rcases m with ⟨a, b, c⟩; cases a <;> cases b <;> cases c <;> decide)
+  · rename_i rs2 rs1 rd
+    exact absurd (opcodeCast_eq_add_zero _ hop) (by decide)
+  · rename_i rs2 rs1 rd isU
+    exact absurd (opcodeCast_eq_add_zero _ hop) (by cases isU <;> decide)
+  · rename_i rs2 rs1 rd isU
+    exact absurd (opcodeCast_eq_add_zero _ hop) (by cases isU <;> decide)
+  · rename_i rs2 rs1 rd isU
+    exact absurd (opcodeCast_eq_add_zero _ hop) (by cases isU <;> decide)
+  · rename_i rs2 rs1 rd isU
+    exact absurd (opcodeCast_eq_add_zero _ hop) (by cases isU <;> decide)
+
 /-- The pc-limb vector of a program row. -/
 def rowPcVec (row : ProgramRow (ZMod p)) : Vector (ZMod p) 3 := #v[row.pc0, row.pc1, row.pc2]
 
