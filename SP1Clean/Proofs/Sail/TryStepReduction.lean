@@ -1,4 +1,5 @@
 import SP1Clean.Model.SailWrap
+import SP1Clean.Model.SailMemory
 import SP1Clean.Model.Semantics.GuestProgram
 
 /-! # Phase 3 — the `try_step` reduction (the W7 `lift` seam)
@@ -315,5 +316,71 @@ theorem run_dispatchInterrupt_machine_none (s : SailState) (hinit : s.isInitiali
   unfold dispatchInterrupt
   rw [run_bind_of_run s _ none (run_getPendingSet_machine_none s hinit hmie hmideleg)]
   rfl
+
+/-! ## Stage 4 preamble — the `minstret_increment`-write frame
+
+`try_step`'s first effect is `writeReg minstret_increment (← should_inc_minstret …)`, changing `s → s'`
+BEFORE `run_hart_active` runs. Since `minstret_increment` is disjoint from every register the deep-field
+reductions read (`mstatus`/`mideleg`/`PC`/`cur_privilege`/`hart_state`/`elp`/…) and the write leaves `s.mem`
+untouched, every frame-stable precondition transfers to `s'` by `get`-on-disjoint-key — so the deep fields
+re-derive on `s'` directly (the frame the earlier plan flagged as the crux, now dissolved by Stage 2'/3'
+being precondition-parameterized). -/
+
+/-- A CSR read is invariant under a write to the disjoint `minstret_increment` register. -/
+theorem get_writeMinstret_ne {reg : Register} (h : Register.minstret_increment ≠ reg)
+    (s : SailState) (v : RegisterType Register.minstret_increment) (hmem : reg ∈ s.regs)
+    (hmem' : reg ∈ s.regs.insert Register.minstret_increment v) :
+    (s.regs.insert Register.minstret_increment v).get reg hmem' = s.regs.get reg hmem := by
+  rw [Std.ExtDHashMap.get_insert, dif_neg]
+  simpa [beq_iff_eq] using h
+
+/-- **`dispatchInterrupt Machine = none` survives the `minstret_increment` write** — the `no_interrupt`
+field re-derives on the post-write state (Stage 2' is precondition-parameterized, all frame-stable). -/
+theorem run_dispatchInterrupt_machine_none_writeMinstret (s : SailState) (hinit : s.isInitialized)
+    (v : RegisterType Register.minstret_increment)
+    (hmie : _get_Mstatus_MIE (s.regs.get Register.mstatus (hinit _)) = 0#1)
+    (hmideleg : s.regs.get Register.mideleg (hinit _) = zeros) :
+    (dispatchInterrupt Privilege.Machine).run {s with regs := s.regs.insert Register.minstret_increment v}
+      = .ok none {s with regs := s.regs.insert Register.minstret_increment v} := by
+  have hinit' : SailState.isInitialized {s with regs := s.regs.insert Register.minstret_increment v} :=
+    SailState.isInitialized_insert s hinit _ _
+  refine run_dispatchInterrupt_machine_none _ hinit' ?_ ?_
+  · rw [get_writeMinstret_ne (by decide) s v (hinit _)]; exact hmie
+  · rw [get_writeMinstret_ne (by decide) s v (hinit _)]; exact hmideleg
+
+/-- `isValidMemConfig` survives the `minstret_increment` write (all five config registers are disjoint). -/
+theorem isValidMemConfig_writeMinstret (s : SailState) (hinit : s.isInitialized)
+    (hconfig : SailMem.SailState.isValidMemConfig s hinit) (v : RegisterType Register.minstret_increment) :
+    SailMem.SailState.isValidMemConfig {s with regs := s.regs.insert Register.minstret_increment v}
+      (SailState.isInitialized_insert s hinit _ _) := by
+  obtain ⟨h_cur, h_mprv, h_mseccfg, h_htif, h_pma⟩ := hconfig
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩ <;>
+    rw [get_writeMinstret_ne (by decide) s v (hinit _)]
+  exacts [h_cur, h_mprv, h_mseccfg, h_htif, h_pma]
+
+/-- **`fetch () = F_Base w` survives the `minstret_increment` write** — the `fetched` field re-derives on
+the post-write state (Stage 3' is precondition-parameterized: `mem`/`PC`/config all frame-stable, the
+align/`isRVC` preconditions are about `pc`/the word, untouched). -/
+theorem run_fetch_eq_F_Base_writeMinstret
+    (pc : BitVec 64) (data₀ data₁ data₂ data₃ : BitVec 8)
+    (s : SailState) (hinit : s.isInitialized) (v : RegisterType Register.minstret_increment)
+    (hconfig : SailMem.SailState.isValidMemConfig s hinit)
+    (h_pc : s.regs.get Register.PC (hinit _) = pc)
+    (h_access0 : BitVec.ofBool pc[0] = 0#1) (h_access1 : BitVec.ofBool pc[1] = 0#1)
+    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr pc) 4 = true)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (pc + 0) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
+    (h_align : Int.tmod (↑(zero_extend (BitVec.addInt (pc + 0) 0) : BitVec 64).toNat) 4 = 0)
+    (h_not_rvc : isRVC (Sail.BitVec.extractLsb (data₃ ++ data₂ ++ data₁ ++ data₀) 15 0) = false)
+    (hmem₀ : s.mem[(pc + 0).toNat]? = some data₀) (hmem₁ : s.mem[(pc + 0).toNat + 1]? = some data₁)
+    (hmem₂ : s.mem[(pc + 0).toNat + 2]? = some data₂) (hmem₃ : s.mem[(pc + 0).toNat + 3]? = some data₃) :
+    (fetch ()).run {s with regs := s.regs.insert Register.minstret_increment v}
+      = .ok (FetchResult.F_Base (data₃ ++ data₂ ++ data₁ ++ data₀))
+          {s with regs := s.regs.insert Register.minstret_increment v} :=
+  SailMem.run_fetch_eq_F_Base_of_isInitialized pc data₀ data₁ data₂ data₃ _
+    (SailState.isInitialized_insert s hinit _ _)
+    (isValidMemConfig_writeMinstret s hinit hconfig v)
+    (by rw [get_writeMinstret_ne (by decide) s v (hinit _)]; exact h_pc)
+    h_access0 h_access1 h_aligned h_in_range h_align h_not_rvc hmem₀ hmem₁ hmem₂ hmem₃
 
 end SP1Clean.TryStepReduction
