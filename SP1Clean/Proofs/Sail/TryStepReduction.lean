@@ -401,7 +401,7 @@ state `s''`, given a successful active-hart step (`h_ha`: `run_hart_active` yiel
 outer frame peels: `ext_pre_step_hook` (no-op) → `should_inc_minstret` (`b`) → `writeReg minstret_increment`
 (`s'`) → `hart_state` dispatch → `run_hart_active` (`h_ha`) → the `Retire_Success` `assert` (true) → the
 `HART_ACTIVE` tail (`tick_pc`, the retired-gated minstret bump, dead rvfi/hooks). -/
-theorem tryStep_eq_of_hart_active (s : SailState) (step_no : Nat) (hinit : s.isInitialized)
+theorem tryStep_eq_of_hart_active (s : SailState) (step_no : Nat)
     (b : Bool) (ib : BitVec 32) (s'' : SailState)
     (hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
       = some (HartState.HART_ACTIVE ()))
