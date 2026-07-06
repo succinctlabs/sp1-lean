@@ -202,7 +202,7 @@ theorem decodedInROM_addRow : decodedInROM addProgram (addRow (p := p)) := by
   · simp only [pcBitsOfRow, addRow, pcBitsOfVals, ZMod.val_zero]; rfl
   · intro s hcfg
     refine ⟨.RTYPE (regidx.Regidx 3#5, regidx.Regidx 2#5, regidx.Regidx 1#5, rop.ADD), s,
-      SP1Clean.SailDecode.decode_ADD_example s hcfg.1 hcfg.2, ?_⟩
+      SP1Clean.SailDecode.decode_ADD_example s hcfg.init hcfg.priv, ?_⟩
     rw [instrToProgramRow_rtype]; rfl
 
 end SP1Clean.Soundness.Target

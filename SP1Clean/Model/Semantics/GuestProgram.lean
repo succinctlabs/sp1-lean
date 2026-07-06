@@ -49,16 +49,37 @@ def RomLoaded (prog : GuestProgram) (s : SailState) : Prop :=
   ∀ a w, prog.fetchWord a = some w →
     ∀ i : Fin 4, s.mem.get? (a.toNat + i) = some (w.extractLsb' (8 * i) 8)
 
-/-- **[W7 seam]** The state residue a runnable initial state needs for the `try_step` reduction —
-every register initialized + machine mode (no enabled interrupts, bare address translation, hart active,
-RVC off, … added incrementally as W7 discovers them). The two current pins are exactly what the decode
-reduction (`Model/SailDecode.lean`) consumes: `isInitialized` (the Zicfilp/forward-CFI decode branch
-reads privilege-dependent CSRs, which must be present) and `cur_privilege = Machine` (so the
-`match cur_privilege` in that branch resolves). `isInitialized` here is redundant with
-`IsInitialState.initialized`/`RefinesAt.init`; it is folded in so `SailConfigured s` alone suffices to
-decode `s` (used by `DecodeOperandsBound`/`decodedInROM`, which only carry `SailConfigured`). -/
-def SailConfigured (s : SailState) : Prop :=
-  s.isInitialized ∧ s.regs.get? Register.cur_privilege = some Privilege.Machine
+/-- **[W7]** The **persist-able, PC-independent** platform-configuration residue of a runnable SP1
+execution state — the *global* half of the `try_step` reduction's precondition (its PC-dependent *local*
+half — fetch alignment + the ROM word in memory — is derived at use-site from `RomLoaded` + the guest
+program's alignment, and is **not** stored here since it is about *this* pc, not a state invariant).
+
+The first two fields (`init`/`priv`) are exactly what the decode reduction (`Model/SailDecode.lean`)
+consumes — `isInitialized` (the Zicfilp/forward-CFI decode branch reads privilege-dependent CSRs, which
+must be present) and `cur_privilege = Machine` (so the `match cur_privilege` in that branch resolves); the
+decode consumers (`DecodeOperandsBound`/`decodedInROM`) only touch these two, so this strengthening keeps
+them monotone (`.1`/`.2` = `init`/`priv` still project positionally). The remaining fields are the
+quiescent machine-mode facts the interrupt/fetch reductions need (`run_dispatchInterrupt_machine_none` /
+`run_fetch_eq_F_Base_of_isInitialized`), bundled here so `RefinesAt.cfg` carries them and
+`SailConfigured.toStraightLineReady` can assemble `StraightLineReady` (see `Proofs/Sail/Advance.lean`).
+Producers must establish all of it: the `IsInitialState` loader (initial state) and `RowEffect.cfg`
+(persistence across each chip's step). -/
+structure SailConfigured (s : SailState) : Prop where
+  /-- Every register is initialized (present in the register map). -/
+  init : s.isInitialized
+  /-- Machine privilege. -/
+  priv : s.regs.get? Register.cur_privilege = some Privilege.Machine
+  /-- The hart is active (not waiting/halted). -/
+  active : s.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ())
+  /-- Machine interrupts disabled (`mstatus.MIE = 0`) — the interrupt-dispatch short-circuit. -/
+  mie : _get_Mstatus_MIE (s.regs.get Register.mstatus (init _)) = 0#1
+  /-- No machine-interrupt delegation (`mideleg = 0`) — clears the delegation assert. -/
+  mideleg : s.regs.get Register.mideleg (init _) = zeros
+  /-- No landing pad expected (`elp ≠ LP_EXPECTED`) — the forward-CFI trap arm is dead. -/
+  no_landing_pad :
+    s.regs.get? Register.elp ≠ some (landing_pad_bits_backwards landing_pad_expectation.LP_EXPECTED)
+  /-- The SP1 memory configuration (bare translation, no HTIF, the fixed PMA region) — the fetch/load path. -/
+  memcfg : SailMem.SailState.isValidMemConfig s init
 
 /-- A Sail state that "loads" the guest program: a *relation*, not a constructed state, so everything
 the execution doesn't touch stays quantified. ELF ingestion (W6b) produces a `GuestProgram` and a
