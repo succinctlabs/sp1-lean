@@ -101,13 +101,17 @@ structure StraightLineReady (s : SailState) (w : BitVec 32) : Prop where
 /-- **The lift-bind law** (the master peel): a `liftM m`-prefixed `SailME.run` do-block runs `m` first
 (threading its state change), then continues with `SailME.run ∘ k` on the value — for ANY `SailM` action
 `m`, state-preserving or not (so it peels the state-changing `writeReg`/`execute` tail too). -/
-theorem run_SailME_liftM_bind {β : Type} (s : SailState) (m : SailM β) (k : β → SailME Step Step) :
-    EStateM.run (SailME.run (liftM m >>= k)) s
-      = EStateM.run (m >>= fun a => SailME.run (k a)) s := by
+theorem run_SailME_liftM_bind {β : Type} (m : SailM β) (k : β → SailME Step Step) :
+    SailME.run (liftM m >>= k) = (m >>= fun a => SailME.run (k a) : SailM Step) := by
+  funext s
   simp only [SailME.run, PreSail.PreSailME.run, ExceptT.run, ExceptT.mk, ExceptT.bindCont,
     ExceptT.bind, ExceptT.lift, ExceptT.map, Functor.map, Except.map, MonadLift.monadLift,
     liftM, monadLift, bind, EStateM.bind, EStateM.run, EStateM.map]
   cases m s <;> rfl
+
+/-- Peel a trailing `SailME.run (pure a)` to the `SailM` `pure a` (no throw, no state change). -/
+theorem run_SailME_pure {β : Type} (a : β) :
+    SailME.run (pure a : SailME β β) = (pure a : SailM β) := rfl
 
 /-- Peel a `liftM (readReg reg)` from the front of a `SailME.run` do-block: under `isInitialized`, it
 resolves to the state's register value with no state change. The `SailME`/`ExceptT`/`EStateM` monad-stack
@@ -134,58 +138,79 @@ theorem run_SailME_liftM_bind_of_run {β : Type} (s : SailState) (m : SailM β) 
     liftM, monadLift, bind, EStateM.bind, EStateM.run, EStateM.map]
   rw [show m s = EStateM.Result.ok a s from hm]
 
-/-! ## Stage 3 — `run_hart_active` reduces to the execute stage (the composition target)
+/-! ## Stage 3 — `run_hart_active` reduces to the execute stage -/
 
-The next lemma to land (probed 2026-07-05 — exact structure confirmed):
-```
-theorem run_hart_active_eq_of_ready (s w I step_no)
+set_option linter.unusedVariables false in
+theorem run_hart_active_eq_of_ready (s : SailState) (w : BitVec 32) (I : instruction) (step_no : Nat)
     (h : StraightLineReady s w) (hdec : (ext_decode w).run s = .ok I s) :
     (run_hart_active step_no).run s
-      = (do Sail.writeReg Register.nextPC (BitVec.addInt (← Sail.readReg Register.PC) 4)
-            let result ← (match (← execute I) with | .ExecuteAs o => execute o | r => pure r)
-            pure (Step.Step_Execute (result, zero_extend (m := 32) w))).run s
-```
-`unfold run_hart_active` exposes `EStateM.run (SailME.run do let cp ← liftM (readReg cur_privilege); let
-di ← liftM (dispatchInterrupt cp); (have __do_jp := <fetch→F_Base→decode→landing-pad-if→writeReg nextPC
-→ execute → Step_Execute>); match di with | some => throw | none => __do_jp ()) s`. The reduction is a
-**monad-transformer (`SailME`/`ExceptT`/`EStateM`) peeling** that threads all five `StraightLineReady`
-fields: peel `liftM (readReg cur_privilege)` with `h.priv` (→ Machine); peel `liftM (dispatchInterrupt
-Machine)` with `h.no_interrupt` (→ `none`) so the `match` takes `__do_jp ()`; peel `liftM (fetch ())` with
-`h.fetched` (→ `F_Base w`) so the fetch `match` takes the `F_Base` arm; `ext_fetch_hook = id`,
-`get_config_print_instr = false` (dead print), `is_landing_pad_expected = false` (from `h.no_landing_pad`
-via `run_is_landing_pad_expected`, so the trap arm is dead); leaving `readReg PC; writeReg nextPC (PC+4);
-execute I` (thread `hdec` for the `ext_decode w = I`). The peeling recipe is the big monad-unfold `simp
-only` set from `Model/SailWrap.lean`'s `SailME_run_readReg_map_writeReg` (`SailME.run`, `PreSailME.run`,
-`ExceptT.{run,bind,lift,map}`, `liftM`, `monadLift`, `EStateM.{run,bind,pure,map,modifyGet,get}`, …) plus
-the `StraightLineReady` hypotheses; substantial (the goal term is large) but mechanical once the peeling
-lemmas are in place. Then Stage 4 (the `try_step` wrapper: pre-hook + minstret-write frame + hart_state
-dispatch + result-dispatch `Retire_Success` assert + `tick_pc`) composes it, and the two deep facts
-(`dispatchInterrupt`/`fetch`) are discharged from the Sail model (Stages 2'/3').
+      = (do
+          Sail.writeReg Register.nextPC (BitVec.addInt (← Sail.readReg Register.PC) 4)
+          let result ← (match (← execute I) with
+            | .ExecuteAs other_inst => execute other_inst
+            | result => pure result)
+          pure (Step.Step_Execute (result, zero_extend (m := 32) w))).run s := by
+  have hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
+    rw [Sail.run_readReg, h.priv]
+  unfold run_hart_active
+  rw [run_SailME_liftM_bind_of_run _ _ _ hcp]
+  rw [run_SailME_liftM_bind_of_run _ _ _ h.no_interrupt]
+  simp only [pure_bind]
+  rw [run_SailME_liftM_bind_of_run _ _ _ h.fetched]
+  simp only [ext_fetch_hook_eq]
+  rw [run_SailME_liftM_bind_of_run _ _ _ hdec]
+  simp only [get_config_print_instr_eq, Bool.false_eq_true, if_false, pure_bind]
+  -- the landing-pad guard is false (`elp ≠ LP_EXPECTED`), so the CFI trap arm is dead.
+  have hlp : (is_landing_pad_expected ()).run s = .ok false s := by
+    rw [run_is_landing_pad_expected s h.init]
+    congr 1
+    rw [beq_eq_false_iff_ne]
+    exact fun heq =>
+      h.no_landing_pad (by rw [Std.ExtDHashMap.get?_eq_some_get (h.init _), heq])
+  rw [run_SailME_liftM_bind_of_run _ _ _ hlp]
+  simp only [Bool.false_and, Bool.false_eq_true, if_false]
+  -- the state-changing execute tail: peel `readReg PC`, `writeReg nextPC`, `execute I` with the general
+  -- lift-bind law (threading the state), then strip `EStateM.run` and the three binders with `bind_congr`
+  -- so the `ExecuteAs` redirect match's scrutinee `a` becomes free — `cases a` collapses both arms (of the
+  -- compiled matcher, without needing to name it), each closing under the lift-bind/pure laws.
+  simp only [run_SailME_liftM_bind, run_SailME_pure, bind_assoc, pure_bind]
+  refine congrArg (EStateM.run · s) (bind_congr fun _ => bind_congr fun _ => bind_congr fun a => ?_)
+  cases a <;> simp only [run_SailME_liftM_bind, run_SailME_pure, pure_bind, bind_assoc]
 
-## Remaining ladder (the composition + the two substantive stages)
+/-! ## Remaining ladder (the composition + the two substantive stages)
 
-Stages 0-1 above are the trivial/`readReg`-then-`pure` pieces. The rest of `tryStep_eq_of_ready`
-(the ADD-family `try_step 0 false → spec_add`-shaped reduction) still needs:
+Stage 3 (`run_hart_active_eq_of_ready`, above) is **landed** — the reduction of `run_hart_active` to the
+execute stage `writeReg nextPC (PC+4); execute I; Step_Execute (…)`, threading all five
+`StraightLineReady` fields (`priv`/`no_interrupt`/`fetched`/`no_landing_pad`/`init`) + `hdec` for
+`ext_decode w = I`, is axiom-clean (only the accepted Sail platform trust base). The rest of
+`tryStep_eq_of_ready` (the ADD-family `try_step 0 false → spec_add`-shaped reduction) still needs:
 
-- **Stage 2 — `dispatchInterrupt_none`** (`SysControl.lean:593`): deeper than a bare `mip &&& mie` check
-  — it calls `getPendingSet` (an `assert (currentlyEnabled Ext_S || mideleg = 0)` + `read_mip
-  IncludePlatformInterrupts` + `pending_{m,s} := mip_bits &&& mie &&& (~)mideleg` + the `mstatus`
-  MIE/SIE bits), then `findPendingInterrupt`. `= none` needs the state fact that `read_mip` (register mip
-  PLUS platform interrupt sources MTIP/MSIP/MEIP) masked by `mie` is `0` — i.e. a genuine
-  no-pending-interrupt precondition, discharged by reducing `read_mip`/`getPendingSet` under an initial
-  quiescent-interrupt state. Bounded but a real sub-lemma (readReg toolkit + the `read_mip` reduction).
-- **Stage 3 — `fetch_eq_F_Base`** (`Fetch.lean:227`, THE wall): with `get_config_rvfi = false` (done),
-  `ext_fetch_check_pc = none`, PC 4-aligned (bit0 = bit1 = 0), `Ext_Ziccif`/`Ext_Zca` enabled, `fetch`
-  reduces to `fetch_bytes PC PC 4` → `translateAddr` (identity under Bare/machine-mode) + `mem_read
-  (InstructionFetch …)` → `F_Base w` where `w` is the `RomLoaded` word. Reuse `Model/SailMemory.lean`'s
-  `run_mem_read_*`/`run_vmem_read_of_width_4'` (built for the Load path — adapt to `InstructionFetch`).
-- **Stage 4 — decode-thread**: `ext_decode w = instruction` supplied by `decodedInROM.decodes` (NOT
-  computed) — the `run_bind` congruence, not the SailDecode concrete walk.
-- **Stage 5 — execute wrapper + result-dispatch + `tick_pc`**: `writeReg nextPC (PC+4); execute I`
-  (`execute_RTYPE_eq_execute_RTYPE'` + `run_wX_bits`/`run_rX_bits`) → `Step_Execute (Retire_Success (),
-  instbits)` → the `try_step` result-dispatch (the `Retire_Success` case is an `assert (hart_is_active
-  …)`, true here) → `tick_pc` (`tick_pc_eq`) commits `PC ← nextPC`; the minstret/rvfi bookkeeping is
-  dead (`get_config_rvfi = false`) or unobservable (`minstret_increment`).
+- **Stage 4 — the `try_step` wrapper** (`Step.lean:400`): compose Stage 3 with the outer frame —
+  `ext_pre_step_hook` (no-op, `@[simp]` above); the `minstret_increment := should_inc_minstret (←
+  readReg cur_privilege)` write (an unobservable-frame `writeReg`, mirror the spike's `FrameFact`); the
+  `hart_state = HART_ACTIVE ()` dispatch (`h.active`); the result-dispatch (the `Step_Execute
+  (Retire_Success (), _)` case is `assert (hart_is_active …)`, true by `hart_is_active_active`); and
+  `tick_pc ()` (`tick_pc_eq`) committing `PC ← nextPC`, with the minstret/rvfi bookkeeping dead
+  (`get_config_rvfi = false`) or unobservable. Composes Stage 3 — no new deep Sail reduction.
+- **Stages 2'/3' — discharge the two deep `StraightLineReady` fields** (currently assumptions, so the
+  named-hypothesis fallback holds with no sorry):
+  - **`no_interrupt`** (`dispatchInterrupt Machine = none`, `SysControl.lean:593`): deeper than a bare
+    `mip &&& mie` check — it calls `getPendingSet` (an `assert (currentlyEnabled Ext_S || mideleg = 0)` +
+    `read_mip IncludePlatformInterrupts` + `pending_{m,s} := mip_bits &&& mie &&& (~)mideleg` + the
+    `mstatus` MIE/SIE bits), then `findPendingInterrupt`. `= none` needs the state fact that `read_mip`
+    (register mip PLUS platform interrupt sources MTIP/MSIP/MEIP) masked by `mie` is `0` — a genuine
+    no-pending-interrupt precondition, discharged by reducing `read_mip`/`getPendingSet` under a
+    quiescent-interrupt state. Bounded but a real sub-lemma (readReg toolkit + the `read_mip` reduction).
+  - **`fetched`** (`fetch () = F_Base w`, `Fetch.lean:227`, THE wall): with `get_config_rvfi = false`
+    (done), `ext_fetch_check_pc = none`, PC 4-aligned (bit0 = bit1 = 0), `Ext_Ziccif`/`Ext_Zca` enabled,
+    `fetch` reduces to `fetch_bytes PC PC 4` → `translateAddr` (identity under Bare/machine-mode) +
+    `mem_read (InstructionFetch …)` → `F_Base w` where `w` is the `RomLoaded` word. Reuse
+    `Model/SailMemory.lean`'s `run_mem_read_*`/`run_vmem_read_of_width_4'` (built for the Load path —
+    adapt to `InstructionFetch`).
+
+The `hdec : ext_decode w = I` argument is caller-supplied by `decodedInROM.decodes` (NOT computed) — the
+per-family (3b) application threads it from `ProgTruth`; the execute stage then composes with the already-
+proven `execute_<FAM>` bridges (`correct_<op>_native`).
 
 `StraightLineReady s` bundles the state facts: `hart_state = HART_ACTIVE ()`, `mip &&& mie = 0`,
 `elp ≠ LP_EXPECTED`, `ext_fetch_check_pc = none`, PC 4-aligned, `Ext_Ziccif`/`Ext_Zca` — threaded from
