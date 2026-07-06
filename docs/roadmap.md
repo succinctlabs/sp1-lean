@@ -315,9 +315,43 @@ table (chips make 3–4 memory pairs; the memory boundary is a multiset, not one
 the **multi-VM / multi-step / multi-boundary `VmTables` generalization** — upstreamable to Clean
 (`FemtoCairo.lean:26` acknowledges the read-write-memory gap; `Utils/OfflineMemory.lean` is the spec
 foundation). P5.4 is **done**: `sp1_finishedChannel_guarantees` (`Soundness/FinishedChannels.lean`) —
-the proven byte/program pull-guarantee grounding over `sp1Ensemble` (every table's byte/program
-`ChannelGuarantees` from `Statement`, via `guarantees_of_requirements_append` on the consumer/provider
-partition; feeds the seam's per-chip `FullGuarantees`).
+the proven **byte** pull-guarantee grounding over `sp1Ensemble` (every table's byte `ChannelGuarantees`
+from `Statement`, via `guarantees_of_requirements_append` on the consumer/provider partition; feeds the
+seam's per-chip `FullGuarantees`). *(SC Phase 2a, W12, narrowed this from byte+program to byte-only:
+`programChannel` became a semantic `VmChannel` and is no longer a finished channel; its `decodedInROM`
+half is engine-grounded. `programProviderEnsemble` retired accordingly.)*
+
+### W12 — semantic channels: the buses carry the RISC-V execution contract (in progress, 2026-07)
+
+The architecture inversion (`docs/architecture.md`, the master plan, the `semantic_channels_program`
+memory): instead of deriving a `GatedExecution` trail from balance and lifting it through a routing table,
+the **channels carry the semantics**. The prover commits the guest program in `ProverData`; the State
+channel's guarantee becomes `StateTruth` ("the deterministic Sail execution of the committed program is at
+this pc at this clk"), the Program channel's becomes `ProgTruth` ("the fetched row is the RV64 decode of
+the committed ROM at its pc"), Memory becomes `MemTruth` (execution-truth of the value — bookkeeping, never
+in the final theorem), and per-opcode Sail semantics dispatch through the opcode each chip pins in its
+fetch. Guarantees are **decoupled** from push-`Owed` (the `VmChannel` veneer) and grounded by a timed
+grounding engine, not by finished-channel balance.
+
+**Landed.** Phase 0a `VmChannel` veneer (`Model/VmChannel.lean`, decoupled `Guarantees`/`Owed`); Phase 0b
+semantic foundation (`progOf`/`MicroTime`/`Truth`, relocated to `Model/Semantics/`); Phase 1 end-to-end
+spike (`Spike/`, axiom-clean, passed the hard gate); Phase 2pre reader→GFC sweep; **Phase 2c State flip**
+(`stateChannel : VmChannel(StateTruth, True)`, 2026-07-05); **Phase 2a Program flip** (`1e9e142`/`fb24e6c`,
+2026-07-05): Word-native `ProgramMsg` + `programChannel : VmChannel(ProgTruth, RowSpec)`, `ProgTruth`
+threaded opaquely through 6 readers + 24 chips, RV64 accessors `decodedInROM.decodes`/`ProgTruth.decodes`,
+program exited the finished-channel machinery (byte-only), `programProviderEnsemble` retired.
+
+**Consequence (disclosed).** `sp1_machine_soundness` now inherits the Sail platform trust base via the
+State channel (`StateTruth`→`SailChain`) and the Sail RV64 decode base via the Program channel
+(`ProgTruth`→`ext_decode`); neither `StateTruth` nor `ProgTruth` is yet grounded in the soundness
+*conclusion* — that is the engine phase.
+
+**Open.** Phase 2b Memory flip (`memoryChannel : VmChannel(MemTruth, isU64)`; the push/pull-both bus, ~65
+files); Phase 3 the `try_step` reduction (the W7 `lift`, IN scope); Phase 4 the per-chip `advance` lemmas
+(`= tryStepReduction ∘ opcode-inversion ∘ correct_<op>_native`); Phase 5 the timed-channel grounding engine
+(`Soundness/TimedChannel.lean` + `TimedGrounding.lean` — grounds every pull guarantee, yielding
+`StateTruth(final)`); Phase 6 the `sp1_semantic_soundness` capstone + `sp1_witness_decode` →
+`sp1_row_facts_decode` seam swap + `GatedVm`/`TargetVm` retirement.
 
 ### B1 — the three completeness `sorry`s (M each, independent)
 
