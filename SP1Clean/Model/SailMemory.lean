@@ -494,6 +494,71 @@ lemma run_translateAddr_fetch_of_isInitialized
     privLevel_bits_backwards, privLevel_bits_forwards,
     hmprv', h_cur_privilege, hmachine, hsatp_bare, is_shadow_stack_access]
 
+/-- **`fetch_bytes pc pc 4 = FetchBytes_Success w`** — the four-byte instruction fetch composes the identity
+`translateAddr` with the `InstructionFetch` `mem_read`, under `ext_fetch_check_pc = none` (unconditional). -/
+lemma run_fetch_bytes_four_of_isInitialized
+    (pc : BitVec 64) (data₀ data₁ data₂ data₃ : BitVec 8)
+    (s : SailState) (hs : SailState.isInitialized s)
+    (hconfig : SailState.isValidMemConfig s hs)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (pc + 0) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
+    (h_align : Int.tmod (↑(zero_extend (BitVec.addInt (pc + 0) 0) : BitVec 64).toNat) 4 = 0)
+    (hmem₀ : s.mem[(pc + 0).toNat]? = some data₀)
+    (hmem₁ : s.mem[(pc + 0).toNat + 1]? = some data₁)
+    (hmem₂ : s.mem[(pc + 0).toNat + 2]? = some data₂)
+    (hmem₃ : s.mem[(pc + 0).toNat + 3]? = some data₃) :
+    (fetch_bytes pc pc 4).run s
+      = .ok (FetchBytes_Result.FetchBytes_Success (data₃ ++ data₂ ++ data₁ ++ data₀)) s := by
+  have htrans := run_translateAddr_fetch_of_isInitialized pc s hs hconfig
+  have hmem := run_mem_read_four_bytes_fetch_of_isInitialized pc 0 data₀ data₁ data₂ data₃ s hs
+    h_in_range h_align hconfig hmem₀ hmem₁ hmem₂ hmem₃
+  rw [show (BitVec.addInt (pc + 0) 0 : BitVec 64) = pc by simp [BitVec.addInt]] at hmem
+  simp only [EStateM.run] at htrans hmem
+  unfold fetch_bytes
+  simp [SailME.run, PreSail.PreSailME.run, ExceptT.run, ExceptT.bind, ExceptT.mk,
+    ExceptT.bindCont, ExceptT.lift, ExceptT.map, ExceptT.pure,
+    MonadLift.monadLift, liftM, monadLift, Functor.map, Except.map,
+    Bind.bind, Pure.pure, SailME.throw, PreSail.PreSailME.throw,
+    bind, pure, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
+    ext_fetch_check_pc, htrans, hmem]
+
+/-- **`fetch () = F_Base w`** (the `StraightLineReady.fetched` field) — the full RV64 base-instruction fetch
+under the SP1 machine-mode config: `get_config_rvfi = false` (dead), `ext_fetch_check_pc = none`, PC
+4-aligned (`access 0/1 = 0` + `is_aligned_vaddr`), `Ext_Ziccif` enabled, `fetch_bytes` yields the ROM word,
+and the word is a full 32-bit instruction (`isRVC = false`). -/
+lemma run_fetch_eq_F_Base_of_isInitialized
+    (pc : BitVec 64) (data₀ data₁ data₂ data₃ : BitVec 8)
+    (s : SailState) (hs : SailState.isInitialized s)
+    (hconfig : SailState.isValidMemConfig s hs)
+    (h_pc : s.regs.get Register.PC (hs _) = pc)
+    (h_access0 : BitVec.ofBool pc[0] = 0#1)
+    (h_access1 : BitVec.ofBool pc[1] = 0#1)
+    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr pc) 4 = true)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (pc + 0) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
+    (h_align : Int.tmod (↑(zero_extend (BitVec.addInt (pc + 0) 0) : BitVec 64).toNat) 4 = 0)
+    (h_not_rvc : isRVC (Sail.BitVec.extractLsb (data₃ ++ data₂ ++ data₁ ++ data₀) 15 0) = false)
+    (hmem₀ : s.mem[(pc + 0).toNat]? = some data₀)
+    (hmem₁ : s.mem[(pc + 0).toNat + 1]? = some data₁)
+    (hmem₂ : s.mem[(pc + 0).toNat + 2]? = some data₂)
+    (hmem₃ : s.mem[(pc + 0).toNat + 3]? = some data₃) :
+    (fetch ()).run s
+      = .ok (FetchResult.F_Base (data₃ ++ data₂ ++ data₁ ++ data₀)) s := by
+  have hfb := run_fetch_bytes_four_of_isInitialized pc data₀ data₁ data₂ data₃ s hs hconfig
+    h_in_range h_align hmem₀ hmem₁ hmem₂ hmem₃
+  simp only [EStateM.run] at hfb
+  unfold fetch
+  simp [SailME.run, PreSail.PreSailME.run, ExceptT.run, ExceptT.bind, ExceptT.mk,
+    ExceptT.bindCont, ExceptT.lift, ExceptT.map, ExceptT.pure,
+    MonadLift.monadLift, liftM, monadLift, Functor.map, Except.map,
+    Bind.bind, Pure.pure, SailME.throw, PreSail.PreSailME.throw,
+    bind, pure, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
+    Sail.readReg, PreSail.readReg, run_readReg_of_isInitialized s _ hs,
+    Std.ExtDHashMap.get?_eq_some_get (hs _),
+    getThe, MonadStateOf.get, MonadState.get, get, EStateM.get,
+    get_config_rvfi, ext_fetch_check_pc, currentlyEnabled, hartSupports,
+    h_pc, h_access0, h_access1, h_aligned, h_not_rvc, hfb]
+
 /-- Four-byte `mem_read` under kernel config. -/
 lemma run_mem_read_four_bytes_of_isInitialized
     (reg_val offset : BitVec 64)
