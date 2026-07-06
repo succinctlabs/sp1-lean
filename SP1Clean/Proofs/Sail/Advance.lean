@@ -41,6 +41,27 @@ def sp1Effect (v : Trace.RowView (ZMod p)) : SailM Unit := do
 /-- The control-flow effect (branches): commit the next-pc only, no register write. -/
 def sp1Effect_ctrl (v : Trace.RowView (ZMod p)) : SailM Unit := set_next_pc (sndPcBV v)
 
+/-! ## The execute-stage bridge (per family) -/
+
+/-- **The RTYPE execute stage reaches `Retire_Success`.** `execute (.RTYPE …)` on a state whose `rs1`/`rs2`
+register reads are known runs to `Retire_Success` and writes only `rd` (via `wX_bits`, x0-uniform). This is
+the `hexec` the ladder needs, for the whole R-type family (Add/Sub/Bitwise/Lt/Shift/… — one `op`). The
+committed write value is `execute_RTYPE_pure op_b op_c op`; a chip's semantic `Spec` ties that to `rdWrite`. -/
+theorem rtype_execute_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (op : rop)
+    (op_b op_c : BitVec 64) (s_a : SailState)
+    (h_rs1 : s_a.get_reg? rs1_idx = some op_b)
+    (h_rs2 : s_a.get_reg? rs2_idx = some op_c) :
+    (execute (.RTYPE (.Regidx rs2_idx, .Regidx rs1_idx, .Regidx rd_idx, op))).run s_a
+      = .ok (ExecutionResult.Retire_Success ())
+          (if rd_idx = 0#5 then s_a
+           else {s_a with regs := (s_a.regs.insert (reg_idx_to_Register rd_idx)
+             (bitVecToRegidxVal rd_idx (execute_RTYPE_pure op_b op_c op)))}) := by
+  simp only [execute, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE']
+  rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1]),
+    run_bind_of_run s_a _ op_c (by rw [run_rX_bits, h_rs2]),
+    run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  rfl
+
 /-! ## The generic composition -/
 
 /-- **`run_hart_active` reaches the `Retire_Success` step**, given the execute stage lands there: from the
