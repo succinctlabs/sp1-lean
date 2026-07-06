@@ -44,6 +44,9 @@ branch and the step's `rvfi_pc_data` write is dead. -/
 /-- The pre-step hook is a no-op (`StepExt.lean:210`). -/
 @[simp] theorem ext_pre_step_hook_eq : ext_pre_step_hook () = () := rfl
 
+/-- The post-step hook is a no-op (`StepExt.lean`). -/
+@[simp] theorem ext_post_step_hook_eq : ext_post_step_hook () = () := rfl
+
 /-- `hart_is_active` on the active hart is `true` (`StepCommon.lean:207`). -/
 @[simp] theorem hart_is_active_active : hart_is_active (HartState.HART_ACTIVE ()) = true := rfl
 
@@ -239,6 +242,13 @@ theorem run_bind_of_run {α β : Type} (s : SailState) (m : SailM α) (x : α)
   simp only [bind, EStateM.bind, EStateM.run]
   rw [show m s = EStateM.Result.ok x s from hm]
 
+/-- **State-threading bind-peel**: for an `m` that runs `s → s'` (`.ok x s'`), `(m >>= k) .run s` resolves
+to `(k x) .run s'`. Peels a *state-changing* action (`writeReg`, `run_hart_active`, …). -/
+theorem run_bind_of_run' {α β : Type} (s s' : SailState) (m : SailM α) (x : α)
+    (hm : m.run s = .ok x s') (k : α → SailM β) : (m >>= k).run s = (k x).run s' := by
+  simp only [bind, EStateM.bind, EStateM.run]
+  rw [show m s = EStateM.Result.ok x s' from hm]
+
 /-- **`RunPres m s`**: `m` runs to `.ok _ s` — a read-only, state-preserving `SailM` action at `s`. -/
 def RunPres {α : Type} (m : SailM α) (s : SailState) : Prop := ∃ v, m.run s = .ok v s
 
@@ -382,5 +392,48 @@ theorem run_fetch_eq_F_Base_writeMinstret
     (isValidMemConfig_writeMinstret s hinit hconfig v)
     (by rw [get_writeMinstret_ne (by decide) s v (hinit _)]; exact h_pc)
     h_access0 h_access1 h_aligned h_in_range h_align h_not_rvc hmem₀ hmem₁ hmem₂ hmem₃
+
+/-! ## Stage 4 — the `try_step` outer-frame reduction -/
+
+set_option linter.unusedVariables false in
+/-- **`try_step step_no false` reduces to the `tick_pc` + minstret-bump tail** on the post-`run_hart_active`
+state `s''`, given a successful active-hart step (`h_ha`: `run_hart_active` yields `Retire_Success`). The
+outer frame peels: `ext_pre_step_hook` (no-op) → `should_inc_minstret` (`b`) → `writeReg minstret_increment`
+(`s'`) → `hart_state` dispatch → `run_hart_active` (`h_ha`) → the `Retire_Success` `assert` (true) → the
+`HART_ACTIVE` tail (`tick_pc`, the retired-gated minstret bump, dead rvfi/hooks). -/
+theorem tryStep_eq_of_hart_active (s : SailState) (step_no : Nat) (hinit : s.isInitialized)
+    (b : Bool) (ib : BitVec 32) (s'' : SailState)
+    (hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
+      = some (HartState.HART_ACTIVE ()))
+    (hb : (should_inc_minstret Privilege.Machine).run s = .ok b s)
+    (hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s)
+    (h_ha : (run_hart_active step_no).run {s with regs := s.regs.insert Register.minstret_increment b}
+      = .ok (Step.Step_Execute (ExecutionResult.Retire_Success (), ib)) s'')
+    (h_active'' : s''.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ())) :
+    (try_step step_no false).run s
+      = (do
+          tick_pc ()
+          let mi ← Sail.readReg Register.minstret_increment
+          if (true && mi) = true then do
+              let m ← Sail.readReg Register.minstret
+              Sail.writeReg Register.minstret (BitVec.addInt m 1)
+              (pure false : SailM Bool)
+            else (pure false : SailM Bool)).run s'' := by
+  unfold try_step
+  simp only [ext_pre_step_hook_eq]
+  rw [run_bind_of_run s _ Privilege.Machine hcp, run_bind_of_run s _ b hb, run_writeReg_bind]
+  have hhs' : (Sail.readReg Register.hart_state).run
+      {s with regs := s.regs.insert Register.minstret_increment b}
+      = .ok (HartState.HART_ACTIVE ()) {s with regs := s.regs.insert Register.minstret_increment b} := by
+    rw [Sail.run_readReg]; rw [show ({s with regs := s.regs.insert Register.minstret_increment b} :
+      SailState).regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()) from hactive]
+  rw [bind_assoc, run_bind_of_run _ _ (HartState.HART_ACTIVE ()) hhs']
+  rw [run_bind_of_run' _ s'' (run_hart_active step_no) _ h_ha]
+  have hhs'' : (Sail.readReg Register.hart_state).run s'' = .ok (HartState.HART_ACTIVE ()) s'' := by
+    rw [Sail.run_readReg, show s''.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()) from h_active'']
+  simp only [run_bind_of_run s'' _ (HartState.HART_ACTIVE ()) hhs'', hart_is_active_active,
+    run_bind_of_run s'' _ () (run_assert_true s'' _)]
+  simp only [get_config_rvfi_eq, Bool.false_eq_true, if_false, ext_post_step_hook_eq, pure_bind,
+    bind_assoc]
 
 end SP1Clean.TryStepReduction
