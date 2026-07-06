@@ -62,6 +62,45 @@ theorem rtype_execute_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (op : rop)
     run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
+/-! ## The `StraightLineReady` producer (the `toStraightLineReady` body) -/
+
+/-- **`StraightLineReady` on the post-`minstret_increment`-write state.** From the quiescent machine-mode
+config facts on `s` — initialized, machine privilege, active hart, `mstatus.MIE = 0`, `mideleg = 0`, no
+landing-pad expectation, valid memory config, PC 4-aligned, and the ROM word present in memory — the
+`try_step` post-write state `{s with regs.insert minstret_increment b}` is `StraightLineReady` for the
+fetched word `data₃ ++ … ++ data₀`. Pure assembly: the two deep fields come from the `_writeMinstret`
+frame lemmas (`run_dispatchInterrupt_machine_none_writeMinstret` / `run_fetch_eq_F_Base_writeMinstret`);
+the three register-read fields frame through the disjoint `minstret_increment` insert. This is the body of
+the eventual `SailConfigured.toStraightLineReady` (its hypotheses are the strengthened config's fields). -/
+theorem straightLineReady_writeMinstret
+    (s : SailState) (b : Bool) (pc : BitVec 64) (data₀ data₁ data₂ data₃ : BitVec 8)
+    (hinit : s.isInitialized)
+    (hconfig : SailMem.SailState.isValidMemConfig s hinit)
+    (hmie : _get_Mstatus_MIE (s.regs.get Register.mstatus (hinit _)) = 0#1)
+    (hmideleg : s.regs.get Register.mideleg (hinit _) = zeros)
+    (h_priv : s.regs.get? Register.cur_privilege = some Privilege.Machine)
+    (h_active : s.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()))
+    (h_elp : s.regs.get? Register.elp
+      ≠ some (landing_pad_bits_backwards landing_pad_expectation.LP_EXPECTED))
+    (h_pc : s.regs.get Register.PC (hinit _) = pc)
+    (h_access0 : BitVec.ofBool pc[0] = 0#1) (h_access1 : BitVec.ofBool pc[1] = 0#1)
+    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr pc) 4 = true)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (pc + 0) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
+    (h_align : Int.tmod (↑(zero_extend (BitVec.addInt (pc + 0) 0) : BitVec 64).toNat) 4 = 0)
+    (h_not_rvc : isRVC (Sail.BitVec.extractLsb (data₃ ++ data₂ ++ data₁ ++ data₀) 15 0) = false)
+    (hmem₀ : s.mem[(pc + 0).toNat]? = some data₀) (hmem₁ : s.mem[(pc + 0).toNat + 1]? = some data₁)
+    (hmem₂ : s.mem[(pc + 0).toNat + 2]? = some data₂) (hmem₃ : s.mem[(pc + 0).toNat + 3]? = some data₃) :
+    StraightLineReady ({s with regs := s.regs.insert Register.minstret_increment b})
+      (data₃ ++ data₂ ++ data₁ ++ data₀) where
+  init := SailState.isInitialized_insert s hinit _ _
+  priv := by rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact h_priv
+  active := by rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact h_active
+  no_interrupt := run_dispatchInterrupt_machine_none_writeMinstret s hinit b hmie hmideleg
+  fetched := run_fetch_eq_F_Base_writeMinstret pc data₀ data₁ data₂ data₃ s hinit b hconfig h_pc
+    h_access0 h_access1 h_aligned h_in_range h_align h_not_rvc hmem₀ hmem₁ hmem₂ hmem₃
+  no_landing_pad := by rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact h_elp
+
 /-! ## The generic composition -/
 
 /-- **`run_hart_active` reaches the `Retire_Success` step**, given the execute stage lands there: from the
