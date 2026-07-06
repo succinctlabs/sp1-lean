@@ -23,6 +23,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 open SP1Clean
 
 set_option maxHeartbeats 4000000
+-- The `SailME`/`ExceptT`/`EStateM` monad-stack unfold `simp only` sets use situational subsets per peel
+-- (cf. `Model/SailWrap.lean`), so different lemmas leave different args unused.
+set_option linter.unusedSimpArgs false
 
 /-! ## Stage 0 — the pure config / hook flags (constants in the Sail model) -/
 
@@ -92,6 +95,44 @@ structure StraightLineReady (s : SailState) (w : BitVec 32) : Prop where
   /-- No landing pad is expected (`elp ≠ LP_EXPECTED`), so the CFI trap branch is dead. -/
   no_landing_pad :
     s.regs.get? Register.elp ≠ some (landing_pad_bits_backwards landing_pad_expectation.LP_EXPECTED)
+
+/-! ## Stage 2b — the `SailME`-peeling machinery (reduce `liftM`-prefixed `SailME.run` do-blocks) -/
+
+/-- **The lift-bind law** (the master peel): a `liftM m`-prefixed `SailME.run` do-block runs `m` first
+(threading its state change), then continues with `SailME.run ∘ k` on the value — for ANY `SailM` action
+`m`, state-preserving or not (so it peels the state-changing `writeReg`/`execute` tail too). -/
+theorem run_SailME_liftM_bind {β : Type} (s : SailState) (m : SailM β) (k : β → SailME Step Step) :
+    EStateM.run (SailME.run (liftM m >>= k)) s
+      = EStateM.run (m >>= fun a => SailME.run (k a)) s := by
+  simp only [SailME.run, PreSail.PreSailME.run, ExceptT.run, ExceptT.mk, ExceptT.bindCont,
+    ExceptT.bind, ExceptT.lift, ExceptT.map, Functor.map, Except.map, MonadLift.monadLift,
+    liftM, monadLift, bind, EStateM.bind, EStateM.run, EStateM.map]
+  cases m s <;> rfl
+
+/-- Peel a `liftM (readReg reg)` from the front of a `SailME.run` do-block: under `isInitialized`, it
+resolves to the state's register value with no state change. The `SailME`/`ExceptT`/`EStateM` monad-stack
+unfold (the `SailWrap.SailME_run_readReg_map_writeReg` recipe). -/
+theorem run_SailME_liftM_readReg_bind (s : SailState) (reg : Register)
+    (hs : SailState.isInitialized s) (k : RegisterType reg → SailME Step Step) :
+    EStateM.run (SailME.run (liftM (Sail.readReg reg) >>= k)) s
+      = EStateM.run (SailME.run (k (s.regs.get reg (hs reg)))) s := by
+  simp only [SailME.run, PreSail.PreSailME.run, Sail.readReg, PreSail.readReg,
+    ExceptT.run, ExceptT.mk, ExceptT.bindCont, ExceptT.bind, ExceptT.lift, ExceptT.map,
+    Functor.map, Except.map, MonadLift.monadLift, liftM, monadLift, pure, bind,
+    EStateM.run, EStateM.bind, EStateM.pure, EStateM.map, EStateM.get,
+    getThe, MonadStateOf.get, MonadState.get, get,
+    Std.ExtDHashMap.get?_eq_some_get (hs _)]
+
+/-- Peel a `liftM m` from the front of a `SailME.run` do-block for any **state-preserving** `SailM` action
+`m` (given `m.run s = .ok a s`): it resolves to its value `a` with no state change. The generic peel that
+threads the `StraightLineReady` `dispatchInterrupt`/`fetch` facts. -/
+theorem run_SailME_liftM_bind_of_run {β : Type} (s : SailState) (m : SailM β) (a : β)
+    (hm : EStateM.run m s = .ok a s) (k : β → SailME Step Step) :
+    EStateM.run (SailME.run (liftM m >>= k)) s = EStateM.run (SailME.run (k a)) s := by
+  simp only [SailME.run, PreSail.PreSailME.run, ExceptT.run, ExceptT.mk, ExceptT.bindCont,
+    ExceptT.bind, ExceptT.lift, ExceptT.map, Functor.map, Except.map, MonadLift.monadLift,
+    liftM, monadLift, bind, EStateM.bind, EStateM.run, EStateM.map]
+  rw [show m s = EStateM.Result.ok a s from hm]
 
 /-! ## Stage 3 — `run_hart_active` reduces to the execute stage (the composition target)
 
