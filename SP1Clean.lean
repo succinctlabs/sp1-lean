@@ -238,6 +238,7 @@ import SP1Clean.Model.SailDecode
 import SP1Clean.Model.SailMemory
 import SP1Clean.Model.SailWrap
 import SP1Clean.Proofs.Sail.TryStepReduction
+import SP1Clean.Proofs.Sail.Advance
 import SP1Clean.Model.VmChannel
 import SP1Clean.Model.Semantics.GuestProgram
 import SP1Clean.Model.Semantics.ProgramCommitment
