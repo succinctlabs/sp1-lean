@@ -101,6 +101,42 @@ theorem straightLineReady_writeMinstret
     h_access0 h_access1 h_aligned h_in_range h_align h_not_rvc hmem₀ hmem₁ hmem₂ hmem₃
   no_landing_pad := by rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact h_elp
 
+/-- **The PC-dependent local fetch predicate** — the *local* half of the `try_step` precondition (the
+persist-able global half is `SailConfigured`). At `s`'s current pc, the pc is 4-aligned and the 4 ROM
+bytes are present in memory, so the base-instruction fetch yields the little-endian word
+`data₃ ++ … ++ data₀`. Kept separate from `SailConfigured` (not persist-able) because it is about *this*
+pc — in the walk it is derived at each row from `RomLoaded` + the guest program's `rom_aligned` + the row's
+pc-match, not carried as a state invariant. -/
+structure FetchReady (s : SailState) (pc : BitVec 64) (data₀ data₁ data₂ data₃ : BitVec 8) : Prop where
+  /-- The current pc. -/
+  pc_eq : s.regs.get? Register.PC = some pc
+  access0 : BitVec.ofBool pc[0] = 0#1
+  access1 : BitVec.ofBool pc[1] = 0#1
+  aligned : is_aligned_vaddr (virtaddr.Virtaddr pc) 4 = true
+  in_range : range_subset (zero_extend (BitVec.addInt (pc + 0) 0))
+    (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true
+  align : Int.tmod (↑(zero_extend (BitVec.addInt (pc + 0) 0) : BitVec 64).toNat) 4 = 0
+  not_rvc : isRVC (Sail.BitVec.extractLsb (data₃ ++ data₂ ++ data₁ ++ data₀) 15 0) = false
+  mem0 : s.mem[(pc + 0).toNat]? = some data₀
+  mem1 : s.mem[(pc + 0).toNat + 1]? = some data₁
+  mem2 : s.mem[(pc + 0).toNat + 2]? = some data₂
+  mem3 : s.mem[(pc + 0).toNat + 3]? = some data₃
+
+/-- **`SailConfigured` + the local fetch facts assemble `StraightLineReady`** — the uniform bridge from the
+audit-surface config (`RefinesAt.cfg`) to the ladder's readiness predicate on the post-`minstret`-write
+state. The global `SailConfigured` supplies the seven persist-able fields; `FetchReady` supplies the
+PC-dependent fetch facts. This is the packaged form of `straightLineReady_writeMinstret`. -/
+theorem SailConfigured.toStraightLineReady {s : SailState} (cfg : SailConfigured s) (b : Bool)
+    (pc : BitVec 64) (data₀ data₁ data₂ data₃ : BitVec 8)
+    (hfetch : FetchReady s pc data₀ data₁ data₂ data₃) :
+    StraightLineReady ({s with regs := s.regs.insert Register.minstret_increment b})
+      (data₃ ++ data₂ ++ data₁ ++ data₀) :=
+  straightLineReady_writeMinstret s b pc data₀ data₁ data₂ data₃
+    cfg.init cfg.memcfg cfg.mie cfg.mideleg cfg.priv cfg.active cfg.no_landing_pad
+    (by have h := hfetch.pc_eq; rwa [Std.ExtDHashMap.get?_eq_some_get (cfg.init _), Option.some_inj] at h)
+    hfetch.access0 hfetch.access1 hfetch.aligned hfetch.in_range hfetch.align hfetch.not_rvc
+    hfetch.mem0 hfetch.mem1 hfetch.mem2 hfetch.mem3
+
 /-! ## The generic composition -/
 
 /-- **`run_hart_active` reaches the `Retire_Success` step**, given the execute stage lands there: from the
