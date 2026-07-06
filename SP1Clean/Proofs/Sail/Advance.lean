@@ -132,7 +132,7 @@ theorem SailConfigured.toStraightLineReady {s : SailState} (cfg : SailConfigured
     StraightLineReady ({s with regs := s.regs.insert Register.minstret_increment b})
       (data₃ ++ data₂ ++ data₁ ++ data₀) :=
   straightLineReady_writeMinstret s b pc data₀ data₁ data₂ data₃
-    cfg.init cfg.memcfg cfg.mie cfg.mideleg cfg.priv cfg.active cfg.no_landing_pad
+    cfg.init cfg.toValidMemConfig cfg.mie cfg.mideleg cfg.priv cfg.active cfg.no_landing_pad
     (by have h := hfetch.pc_eq; rwa [Std.ExtDHashMap.get?_eq_some_get (cfg.init _), Option.some_inj] at h)
     hfetch.access0 hfetch.access1 hfetch.aligned hfetch.in_range hfetch.align hfetch.not_rvc
     hfetch.mem0 hfetch.mem1 hfetch.mem2 hfetch.mem3

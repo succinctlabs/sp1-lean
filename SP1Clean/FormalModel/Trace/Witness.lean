@@ -114,11 +114,6 @@ lemma cfgState_pma (pc : BitVec 64) (hmem : Register.pma_regions ∈ (configured
     simp only [configuredState, Std.ExtDHashMap.get?_insert_self]
   rwa [Std.ExtDHashMap.get?_eq_some_get hmem, Option.some_inj] at h
 
-lemma cfgState_curpriv_get (pc : BitVec 64) (hmem : Register.cur_privilege ∈ (configuredState pc).regs) :
-    (configuredState pc).regs.get Register.cur_privilege hmem = Privilege.Machine := by
-  have h := cfgState_priv pc
-  rwa [Std.ExtDHashMap.get?_eq_some_get hmem, Option.some_inj] at h
-
 /-- A minimal guest program (empty ROM/data, entry pc 0). Enough to exhibit that `IsInitialState` is
 satisfiable; a richer program (real ROM bytes) reuses `configuredState` + adds `mem` content. -/
 def emptyProgram : GuestProgram := ⟨[], 0, [], by simp, by simp⟩
@@ -149,19 +144,17 @@ theorem isInitialState_nonvacuous : ∃ s0, IsInitialState emptyProgram s0 :=
            rw [cfgState_get?_other 0 Register.elp (by decide) (by decide) (by decide)]
            exact (by decide : ¬ (some (default : RegisterType Register.elp)
              = some (landing_pad_bits_backwards landing_pad_expectation.LP_EXPECTED)))
-         memcfg :=
-           { h_cur_privilege := cfgState_curpriv_get 0 _
-             h_mprv_disabled := by
-               rw [cfgState_get_other 0 Register.mstatus (by decide) (by decide) (by decide)]
-               exact (by decide :
-                 BitVec.ofNat 1 ((default : RegisterType Register.mstatus).toNat >>> 17) = 0#1)
-             h_mseccfg_disabled := by
-               rw [cfgState_get_other 0 Register.mseccfg (by decide) (by decide) (by decide)]
-               exact (by decide :
-                 BitVec.ofNat 1 ((default : RegisterType Register.mseccfg).toNat >>> 10) = 0#1)
-             h_htif_disabled := by
-               rw [cfgState_get_other 0 Register.htif_tohost_base (by decide) (by decide) (by decide)]
-               exact (by decide : (default : RegisterType Register.htif_tohost_base) = none)
-             h_pma_regions := cfgState_pma 0 _ } } }⟩
+         mprv_disabled := by
+           rw [cfgState_get_other 0 Register.mstatus (by decide) (by decide) (by decide)]
+           exact (by decide :
+             BitVec.ofNat 1 ((default : RegisterType Register.mstatus).toNat >>> 17) = 0#1)
+         mseccfg_disabled := by
+           rw [cfgState_get_other 0 Register.mseccfg (by decide) (by decide) (by decide)]
+           exact (by decide :
+             BitVec.ofNat 1 ((default : RegisterType Register.mseccfg).toNat >>> 10) = 0#1)
+         htif_disabled := by
+           rw [cfgState_get_other 0 Register.htif_tohost_base (by decide) (by decide) (by decide)]
+           exact (by decide : (default : RegisterType Register.htif_tohost_base) = none)
+         pma_regions := cfgState_pma 0 _ } }⟩
 
 end SP1Clean.Soundness.Target
