@@ -219,4 +219,69 @@ proven `execute_<FAM>` bridges (`correct_<op>_native`).
 (try_step 0 false).run s = (writeReg nextPC (PC+4) >>= fun _ => execute I >>= fun _ => tick_pc ()).run s`
 is the Phase-3a deliverable that Phase-4 `advance` composes with `correct_<op>_native`. -/
 
+/-! ## Stage 2' — discharging `no_interrupt` (`dispatchInterrupt Machine = none`)
+
+The `dispatchInterrupt Machine` reduction (`SysControl.lean:593`) spirals through `getPendingSet`
+(`assert (Ext_S ∨ mideleg = 0)` + `read_mip` + the `mip &&& mie &&& ~mideleg` masks + the `mstatus`
+MIE/SIE bits) and `findPendingInterrupt`. The **key structural simplification**: at `priv = Machine`
+the whole result collapses to `none` as soon as `mIE = false` (i.e. `mstatus.MIE = 0`) — the
+`read_mip`/`currentlyEnabled`/pending-mask values are all *discarded* — so we only need those
+sub-computations to be **state-preserving**, plus `mstatus` (for `mIE`) and `mideleg` (for the assert)
+by value. Hence the small `RunPres` (run-state-preserving) toolkit below: it certifies a read-only
+`SailM` action returns `.ok _ s` with the SAME state, and is closed under `pure`/`readReg`/`bind`/`ite`,
+so the discarded reads thread through `run_bind_of_run` without ever computing their values. -/
+
+/-- **Generic `SailM` bind-peel**: a `SailM` action `m` that runs to `.ok x s` (state-preserving) resolves
+`(m >>= k) .run s` to `(k x) .run s`. The plain-`SailM` analog of `run_SailME_liftM_bind_of_run`. -/
+theorem run_bind_of_run {α β : Type} (s : SailState) (m : SailM α) (x : α)
+    (hm : m.run s = .ok x s) (k : α → SailM β) : (m >>= k).run s = (k x).run s := by
+  simp only [bind, EStateM.bind, EStateM.run]
+  rw [show m s = EStateM.Result.ok x s from hm]
+
+/-- **`RunPres m s`**: `m` runs to `.ok _ s` — a read-only, state-preserving `SailM` action at `s`. -/
+def RunPres {α : Type} (m : SailM α) (s : SailState) : Prop := ∃ v, m.run s = .ok v s
+
+theorem RunPres.pure {α : Type} (x : α) (s : SailState) : RunPres (Pure.pure x) s := ⟨x, rfl⟩
+
+theorem RunPres.readReg (s : SailState) (reg : Register) (hs : s.isInitialized) :
+    RunPres (Sail.readReg reg) s := ⟨_, Sail.run_readReg_of_isInitialized s reg hs⟩
+
+theorem RunPres.bind {α β : Type} {m : SailM α} {k : α → SailM β} {s : SailState}
+    (hm : RunPres m s) (hk : ∀ v, RunPres (k v) s) : RunPres (m >>= k) s := by
+  obtain ⟨v, hv⟩ := hm
+  obtain ⟨w, hw⟩ := hk v
+  exact ⟨w, by rw [run_bind_of_run s m v hv]; exact hw⟩
+
+theorem RunPres.ite {α : Type} {c : Prop} [Decidable c] {a b : SailM α} {s : SailState}
+    (ha : RunPres a s) (hb : RunPres b s) : RunPres (if c then a else b) s := by
+  by_cases h : c <;> simp only [h, if_true, if_false, reduceIte] <;> [exact ha; exact hb]
+
+/-- `currentlyEnabled Ext_Zicsr` is state-preserving (a `pure`, no register read). -/
+theorem RunPres.currentlyEnabled_Zicsr (s : SailState) :
+    RunPres (currentlyEnabled extension.Ext_Zicsr) s := by
+  unfold currentlyEnabled; exact ⟨_, rfl⟩
+
+/-- `currentlyEnabled Ext_S` is state-preserving (reads `misa`, recurses to the `pure` `Zicsr`). -/
+theorem RunPres.currentlyEnabled_S (s : SailState) (hs : s.isInitialized) :
+    RunPres (currentlyEnabled extension.Ext_S) s := by
+  unfold currentlyEnabled
+  exact RunPres.bind (RunPres.readReg s Register.misa hs)
+    (fun _ => RunPres.bind (RunPres.currentlyEnabled_Zicsr s) (fun _ => RunPres.pure _ s))
+
+/-- `external_interrupts_pending` is state-preserving (reads `sig_meip`; conditionally `sig_seip`). -/
+theorem RunPres.eip (s : SailState) (hs : s.isInitialized) :
+    RunPres (external_interrupts_pending ()) s := by
+  unfold external_interrupts_pending
+  exact RunPres.bind (RunPres.readReg s Register.sig_meip hs) (fun _ =>
+    RunPres.bind (RunPres.bind (RunPres.currentlyEnabled_S s hs)
+      (fun _ => RunPres.ite (RunPres.readReg s Register.sig_seip hs) (RunPres.pure _ s)))
+      (fun _ => RunPres.pure _ s))
+
+/-- `read_mip IncludePlatformInterrupts` is state-preserving (reads `mip`, ORs the platform sources). -/
+theorem RunPres.readMipIncl (s : SailState) (hs : s.isInitialized) :
+    RunPres (read_mip XipReadType.IncludePlatformInterrupts) s := by
+  unfold read_mip
+  exact RunPres.bind (RunPres.readReg s Register.mip hs) (fun _ =>
+    RunPres.bind (RunPres.eip s hs) (fun _ => RunPres.pure _ s))
+
 end SP1Clean.TryStepReduction
