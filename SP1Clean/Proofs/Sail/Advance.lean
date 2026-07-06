@@ -193,6 +193,53 @@ theorem SailConfigured.toStraightLineReady {s : SailState} (cfg : SailConfigured
     hfetch.access0 hfetch.access1 hfetch.aligned hfetch.in_range hfetch.align hfetch.not_rvc
     hfetch.mem0 hfetch.mem1 hfetch.mem2 hfetch.mem3
 
+/-- **L7 — the `FetchReady` producer.** At a state whose PC is a ROM address `pc` (`fetchWord pc = some w`)
+with the ROM bytes present (`RomLoaded`), the PC-dependent local fetch facts hold: alignment (from the
+program's `rom_aligned`), `in_range` (from `rom_in_window` via `range_subset_sp1_pma`), `not_rvc` (from
+`rom_full_width` + the byte reassembly `word_reassemble`), and the four ROM bytes (from `RomLoaded`). This
+is the derivation the split promised — `FetchReady` reconstructed at each row from the committed program +
+the pc match, so it need not be a persist-able state invariant. -/
+theorem fetchReady_of_romLoaded
+    (prog : GuestProgram) (s : SailState) (pc : BitVec 64) (w : BitVec 32)
+    (hrom : RomLoaded prog s) (hfetch : prog.fetchWord pc = some w)
+    (hpc : s.regs.get? Register.PC = some pc) :
+    FetchReady s pc (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8)
+      (w.extractLsb' 24 8) := by
+  have hfacts : pc.toNat % 4 = 0 ∧ (2 ^ 16 ≤ pc.toNat ∧ pc.toNat + 4 ≤ 2 ^ 48)
+      ∧ w.extractLsb' 0 2 = 0b11#2 := by
+    have hf := hfetch
+    rw [GuestProgram.fetchWord, Option.map_eq_some_iff] at hf
+    obtain ⟨e, hfind, hew⟩ := hf
+    have hmem := List.mem_of_find?_eq_some hfind
+    have hpc' : e.1 = pc := by have := List.find?_some hfind; simpa using this
+    refine ⟨?_, ?_, ?_⟩
+    · rw [← hpc']; exact prog.rom_aligned e.1 (List.mem_map_of_mem hmem)
+    · rw [← hpc']; exact prog.rom_in_window e hmem
+    · rw [← hew]; exact prog.rom_full_width e hmem
+  obtain ⟨hmod4, ⟨hlo, hhi⟩, h_fw⟩ := hfacts
+  have hz : (zero_extend (BitVec.addInt (pc + 0) 0) : BitVec 64) = pc := by
+    simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend, BitVec.ofInt]
+  exact
+    { pc_eq := hpc
+      access0 := (pc_align_bits pc hmod4).1
+      access1 := (pc_align_bits pc hmod4).2
+      aligned := (SailMem.is_aligned_vaddr_iff_mod pc 4).mpr hmod4
+      in_range := by
+        rw [show (pc + 0 : BitVec 64) = pc from by bv_decide]
+        exact SailMem.range_subset_sp1_pma pc 4 (by norm_num) hlo hhi
+      align := by rw [hz, show (4:ℤ) = ((4:ℕ):ℤ) from rfl, ← Int.ofNat_tmod, hmod4]; rfl
+      not_rvc := by
+        rw [word_reassemble w]
+        simp only [isRVC, Sail.BitVec.extractLsb, BitVec.extractLsb]
+        rw [show BitVec.extractLsb' 0 (1 - 0 + 1) (BitVec.extractLsb' 0 (15 - 0 + 1) w)
+              = w.extractLsb' 0 2 from by
+          apply BitVec.eq_of_getLsbD_eq; intro i; simp [BitVec.getLsbD_extractLsb']]
+        rw [h_fw]; decide
+      mem0 := by have h := hrom pc w hfetch 0; simpa using h
+      mem1 := by have h := hrom pc w hfetch 1; simpa using h
+      mem2 := by have h := hrom pc w hfetch 2; simpa using h
+      mem3 := by have h := hrom pc w hfetch 3; simpa using h }
+
 /-! ## The generic composition -/
 
 /-- **`run_hart_active` reaches the `Retire_Success` step**, given the execute stage lands there: from the
