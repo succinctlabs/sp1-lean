@@ -68,7 +68,60 @@ theorem run_should_inc_minstret (s : SailState) (hs : SailState.isInitialized s)
     Sail.run_readReg_bind_of_isInitialized s Register.minstretcfg hs]
   simp only [EStateM.run_pure]
 
-/-! ## Remaining ladder (the composition + the two substantive stages)
+/-! ## Stage 2 — the straight-line readiness predicate
+
+The state facts a real ROM-loaded, quiescent, machine-mode SP1 execution state carries, bundling the two
+*deep* Sail-side facts (interrupt-quiescence and ROM-fetch) as fields so the `run_hart_active`/`try_step`
+composition can thread them; each is discharged separately from the Sail model (Stages 2'/3' — the
+`dispatchInterrupt`/`fetch` reductions, which spiral through `getPendingSet`/`read_mip`/`currentlyEnabled`
+and `fetch_bytes`/`translateAddr`/`mem_read`). `w` is the fetched instruction word. -/
+structure StraightLineReady (s : SailState) (w : BitVec 32) : Prop where
+  /-- CSRs present (the Sail-model reduction residue). -/
+  init : s.isInitialized
+  /-- Machine mode. -/
+  priv : s.regs.get? Register.cur_privilege = some Privilege.Machine
+  /-- The hart is active (not waiting). -/
+  active : s.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ())
+  /-- No interrupt is dispatched — the interior of `run_hart_active`'s first stage runs to `none` (Stage
+  2'; holds when machine interrupts are disabled, `mstatus.MIE = 0`, since `getPendingSet` short-circuits
+  on `mIE`). -/
+  no_interrupt : (dispatchInterrupt Privilege.Machine).run s = .ok none s
+  /-- The fetch yields the base (32-bit) ROM word `w` (Stage 3'; from `RomLoaded` + PC-aligned + no
+  translation fault). -/
+  fetched : (fetch ()).run s = .ok (FetchResult.F_Base w) s
+  /-- No landing pad is expected (`elp ≠ LP_EXPECTED`), so the CFI trap branch is dead. -/
+  no_landing_pad :
+    s.regs.get? Register.elp ≠ some (landing_pad_bits_backwards landing_pad_expectation.LP_EXPECTED)
+
+/-! ## Stage 3 — `run_hart_active` reduces to the execute stage (the composition target)
+
+The next lemma to land (probed 2026-07-05 — exact structure confirmed):
+```
+theorem run_hart_active_eq_of_ready (s w I step_no)
+    (h : StraightLineReady s w) (hdec : (ext_decode w).run s = .ok I s) :
+    (run_hart_active step_no).run s
+      = (do Sail.writeReg Register.nextPC (BitVec.addInt (← Sail.readReg Register.PC) 4)
+            let result ← (match (← execute I) with | .ExecuteAs o => execute o | r => pure r)
+            pure (Step.Step_Execute (result, zero_extend (m := 32) w))).run s
+```
+`unfold run_hart_active` exposes `EStateM.run (SailME.run do let cp ← liftM (readReg cur_privilege); let
+di ← liftM (dispatchInterrupt cp); (have __do_jp := <fetch→F_Base→decode→landing-pad-if→writeReg nextPC
+→ execute → Step_Execute>); match di with | some => throw | none => __do_jp ()) s`. The reduction is a
+**monad-transformer (`SailME`/`ExceptT`/`EStateM`) peeling** that threads all five `StraightLineReady`
+fields: peel `liftM (readReg cur_privilege)` with `h.priv` (→ Machine); peel `liftM (dispatchInterrupt
+Machine)` with `h.no_interrupt` (→ `none`) so the `match` takes `__do_jp ()`; peel `liftM (fetch ())` with
+`h.fetched` (→ `F_Base w`) so the fetch `match` takes the `F_Base` arm; `ext_fetch_hook = id`,
+`get_config_print_instr = false` (dead print), `is_landing_pad_expected = false` (from `h.no_landing_pad`
+via `run_is_landing_pad_expected`, so the trap arm is dead); leaving `readReg PC; writeReg nextPC (PC+4);
+execute I` (thread `hdec` for the `ext_decode w = I`). The peeling recipe is the big monad-unfold `simp
+only` set from `Model/SailWrap.lean`'s `SailME_run_readReg_map_writeReg` (`SailME.run`, `PreSailME.run`,
+`ExceptT.{run,bind,lift,map}`, `liftM`, `monadLift`, `EStateM.{run,bind,pure,map,modifyGet,get}`, …) plus
+the `StraightLineReady` hypotheses; substantial (the goal term is large) but mechanical once the peeling
+lemmas are in place. Then Stage 4 (the `try_step` wrapper: pre-hook + minstret-write frame + hart_state
+dispatch + result-dispatch `Retire_Success` assert + `tick_pc`) composes it, and the two deep facts
+(`dispatchInterrupt`/`fetch`) are discharged from the Sail model (Stages 2'/3').
+
+## Remaining ladder (the composition + the two substantive stages)
 
 Stages 0-1 above are the trivial/`readReg`-then-`pure` pieces. The rest of `tryStep_eq_of_ready`
 (the ADD-family `try_step 0 false → spec_add`-shaped reduction) still needs:
