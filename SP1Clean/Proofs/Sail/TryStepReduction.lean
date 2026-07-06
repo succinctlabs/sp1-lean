@@ -284,4 +284,36 @@ theorem RunPres.readMipIncl (s : SailState) (hs : s.isInitialized) :
   exact RunPres.bind (RunPres.readReg s Register.mip hs) (fun _ =>
     RunPres.bind (RunPres.eip s hs) (fun _ => RunPres.pure _ s))
 
+/-- A satisfied `assert true` is a state-preserving no-op (`= pure ()`). -/
+theorem run_assert_true (s : SailState) (msg : String) :
+    ((PreSail.assert true msg : SailM Unit)).run s = .ok () s := rfl
+
+/-- **`getPendingSet Machine = none`** from a quiescent-interrupt state: at Machine priv the SIE branch is
+dead and, with `mstatus.MIE = 0`, the MIE branch is too — so the result is `none` regardless of the (run
+but discarded) `read_mip`/`currentlyEnabled`/pending-mask values. `mideleg = 0` clears the delegation assert. -/
+theorem run_getPendingSet_machine_none (s : SailState) (hinit : s.isInitialized)
+    (hmie : _get_Mstatus_MIE (s.regs.get Register.mstatus (hinit _)) = 0#1)
+    (hmideleg : s.regs.get Register.mideleg (hinit _) = zeros) :
+    (getPendingSet Privilege.Machine).run s = .ok none s := by
+  unfold getPendingSet
+  obtain ⟨ce, hce⟩ := RunPres.currentlyEnabled_S s hinit
+  obtain ⟨mb, hmb⟩ := RunPres.readMipIncl s hinit
+  rw [run_bind_of_run s _ ce hce, run_readReg_bind_of_isInitialized s Register.mideleg hinit,
+    hmideleg]
+  simp only [beq_self_eq_true, Bool.or_true]
+  rw [run_bind_of_run s _ () (run_assert_true s _), run_bind_of_run s _ mb hmb]
+  simp only [run_readReg_bind_of_isInitialized s Register.mie hinit,
+    run_readReg_bind_of_isInitialized s Register.mideleg hinit,
+    run_readReg_bind_of_isInitialized s Register.mstatus hinit, pure_bind, hmie]
+  rfl
+
+/-- **`dispatchInterrupt Machine = none`** (the `no_interrupt` field) from a quiescent-interrupt state. -/
+theorem run_dispatchInterrupt_machine_none (s : SailState) (hinit : s.isInitialized)
+    (hmie : _get_Mstatus_MIE (s.regs.get Register.mstatus (hinit _)) = 0#1)
+    (hmideleg : s.regs.get Register.mideleg (hinit _) = zeros) :
+    (dispatchInterrupt Privilege.Machine).run s = .ok none s := by
+  unfold dispatchInterrupt
+  rw [run_bind_of_run s _ none (run_getPendingSet_machine_none s hinit hmie hmideleg)]
+  rfl
+
 end SP1Clean.TryStepReduction
