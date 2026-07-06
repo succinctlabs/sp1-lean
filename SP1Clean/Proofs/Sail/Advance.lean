@@ -77,6 +77,26 @@ theorem ofNat_val_eq_of_cast {rd : BitVec 5} {op_a : ZMod p} (hrd : (rd.toNat : 
   rw [ZMod.val_natCast_of_lt (by have := rd.isLt; omega)]
   simp [BitVec.ofNat_toNat]
 
+/-- **L3 — the straight-line pc bridge.** For a row whose committed `next_pc` is the low-limb `+4`
+(`#v[pc[0]+4, pc[1], pc[2]]`), the row's committed send pc is the receive pc plus four: `sndPcOf = rcvPcOf +
+4`. Needs the low pc limb `< 2^16` (from the reader `Spec`, via `DecodeBounds`) so `pc[0]+4` does not wrap
+the field, and `BitVec.ofNat`'s additivity carries the `+4` out. This is the `RowEffect.pc` content for the
+whole straight-line (`pc+4`) family. -/
+theorem sndPc_straightline (r : Trace.RowView (ZMod p))
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (h0 : (r.state.pc[0]).val < 2 ^ 16) :
+    sndPcOf (stateAccess r) = rcvPcOf (stateAccess r) + 4#64 := by
+  have hp : (2:ℕ) ^ 24 < p := Fact.out
+  have hv4 : (4 : ZMod p).val = 4 := by
+    simp only [ZMod.val_ofNat, Nat.mod_eq_of_lt (show 4 < p by omega)]
+  have e0 : (r.state.pc[0] + 4 : ZMod p).val = (r.state.pc[0]).val + 4 := by
+    rw [ZMod.val_add, hv4, Nat.mod_eq_of_lt (by omega)]
+  simp only [sndPcOf, rcvPcOf, stateAccess, pcBitsOfVals, hstraight,
+    Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ, e0]
+  rw [show (r.state.pc[0]).val + 4 + (r.state.pc[1]).val * 2 ^ 16 + (r.state.pc[2]).val * 2 ^ 32
+        = ((r.state.pc[0]).val + (r.state.pc[1]).val * 2 ^ 16 + (r.state.pc[2]).val * 2 ^ 32) + 4 from by ring,
+     BitVec.ofNat_add]
+
 /-! ## The execute-stage bridge (per family) -/
 
 /-- **The RTYPE execute stage reaches `Retire_Success`.** `execute (.RTYPE …)` on a state whose `rs1`/`rs2`
