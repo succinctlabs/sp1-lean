@@ -116,7 +116,7 @@ lemma cfgState_pma (pc : BitVec 64) (hmem : Register.pma_regions ∈ (configured
 
 /-- A minimal guest program (empty ROM/data, entry pc 0). Enough to exhibit that `IsInitialState` is
 satisfiable; a richer program (real ROM bytes) reuses `configuredState` + adds `mem` content. -/
-def emptyProgram : GuestProgram := ⟨[], 0, [], by simp, by simp⟩
+def emptyProgram : GuestProgram := ⟨[], 0, [], by simp, by simp, by simp, by simp⟩
 
 /-- **The W6b non-vacuity witness.** `IsInitialState` is satisfiable: the configured initial state loads
 the (minimal) guest program. So the target theorem's universally-quantified hypothesis is not vacuous. The

@@ -175,15 +175,27 @@ the `isInitialized` + machine-mode residue the decode reduction consumes. This i
 shape `decode_bound_of_balance` consumes (`∀ row ∈ rom, decodedInROM prog row`) — for a fixed program
 each row is discharged this way. -/
 
-/-- A one-instruction guest program: `ADD x1, x2, x3` (`0x003100B3`) at pc 0. -/
-def addProgram : GuestProgram :=
-  ⟨[(0#64, 0x003100B3#32)], 0, [], by simp,
-   by simp⟩
+/-- A one-instruction guest program: `ADD x1, x2, x3` (`0x003100B3`) at pc `0x10000` — the base of the SP1
+code window `[2^16, 2^48)`, so it satisfies `rom_in_window`; the word's low two bits are `0b11`
+(non-compressed), so it satisfies `rom_full_width`. Doubles as the pilot's end-to-end `advance` witness. -/
+def addProgram : GuestProgram where
+  rom := [(0x10000#64, 0x003100B3#32)]
+  pc_start := 0x10000#64
+  memImage := []
+  rom_nodup := by simp
+  rom_aligned := by
+    intro a ha; simp only [List.map_cons, List.map_nil, List.mem_singleton] at ha; subst ha
+    norm_num [BitVec.toNat_ofNat]
+  rom_in_window := by
+    intro aw ha; simp only [List.mem_singleton] at ha; subst ha
+    refine ⟨?_, ?_⟩ <;> norm_num [BitVec.toNat_ofNat]
+  rom_full_width := by
+    intro aw ha; simp only [List.mem_singleton] at ha; subst ha; bv_decide
 
-/-- The committed Program-bus row the ADD decodes to — the `instrToProgramRow` projection at pc 0
-(`op_a = rd = x1`, `op_b[0] = rs1 = x2`, `op_c[0] = rs2 = x3`, opcode `ADD`). -/
+/-- The committed Program-bus row the ADD decodes to — the `instrToProgramRow` projection at pc `0x10000`
+(`op_a = rd = x1`, `op_b[0] = rs1 = x2`, `op_c[0] = rs2 = x3`, opcode `ADD`; `pc1 = 1` for `0x10000`). -/
 def addRow : ProgramRow (ZMod p) :=
-  { pc0 := 0, pc1 := 0, pc2 := 0,
+  { pc0 := 0, pc1 := 1, pc2 := 0,
     opcode := ((ropToOpcode rop.ADD).toNat : ZMod p),
     op_a := regidxVal (regidx.Regidx 1#5),
     op_b := #v[regidxVal (regidx.Regidx 2#5), 0, 0, 0],
@@ -199,7 +211,10 @@ ROM word at its pc, against the official Sail `ext_decode` — `decodedInROM` ho
 Sail model's decoder axioms. -/
 theorem decodedInROM_addRow : decodedInROM addProgram (addRow (p := p)) := by
   refine ⟨0x003100B3#32, ?_, ?_⟩
-  · simp only [pcBitsOfRow, addRow, pcBitsOfVals, ZMod.val_zero]; rfl
+  · haveI : Fact (1 < p) := ⟨(Fact.out : p.Prime).one_lt⟩
+    simp only [pcBitsOfRow, addRow, pcBitsOfVals, ZMod.val_zero, ZMod.val_one, addProgram,
+      GuestProgram.fetchWord, List.find?_cons, List.find?_nil]
+    norm_num
   · intro s hcfg
     refine ⟨.RTYPE (regidx.Regidx 3#5, regidx.Regidx 2#5, regidx.Regidx 1#5, rop.ADD), s,
       SP1Clean.SailDecode.decode_ADD_example s hcfg.init hcfg.priv, ?_⟩

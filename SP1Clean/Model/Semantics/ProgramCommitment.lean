@@ -36,7 +36,8 @@ variable {p : ℕ}
 def sanitizeRom : List (BitVec 64 × BitVec 32) → List (BitVec 64 × BitVec 32)
   | [] => []
   | e :: rest =>
-    if e.1.toNat % 4 = 0 then
+    if e.1.toNat % 4 = 0 ∧ 2 ^ 16 ≤ e.1.toNat ∧ e.1.toNat + 4 ≤ 2 ^ 48
+        ∧ e.2.extractLsb' 0 2 = 0b11#2 then
       e :: (sanitizeRom rest).filter (fun e' => e'.1 ≠ e.1)
     else
       sanitizeRom rest
@@ -64,11 +65,44 @@ theorem sanitizeRom_aligned (l : List (BitVec 64 × BitVec 32)) :
   | cons e rest ih =>
     rw [sanitizeRom]
     split
-    · intro a ha
+    · rename_i hguard
+      intro a ha
       rcases List.mem_map.mp ha with ⟨e', he', rfl⟩
       rcases List.mem_cons.mp he' with rfl | he'
-      · assumption
+      · exact hguard.1
       · exact ih _ (List.mem_map_of_mem (List.mem_of_mem_filter he'))
+    · exact ih
+
+/-- Every sanitized ROM entry sits in the SP1 code window `[2^16, 2^48)` — the sanitizer drops entries
+outside it, so `rom_in_window` holds by construction. -/
+theorem sanitizeRom_in_window (l : List (BitVec 64 × BitVec 32)) :
+    ∀ aw ∈ sanitizeRom l, 2 ^ 16 ≤ aw.1.toNat ∧ aw.1.toNat + 4 ≤ 2 ^ 48 := by
+  induction l with
+  | nil => simp [sanitizeRom]
+  | cons e rest ih =>
+    rw [sanitizeRom]
+    split
+    · rename_i hguard
+      intro aw haw
+      rcases List.mem_cons.mp haw with rfl | haw
+      · exact ⟨hguard.2.1, hguard.2.2.1⟩
+      · exact ih _ (List.mem_of_mem_filter haw)
+    · exact ih
+
+/-- Every sanitized ROM word is a full 32-bit (non-compressed) instruction (low two bits `0b11`) — the
+sanitizer drops compressed entries, so `rom_full_width` holds by construction. -/
+theorem sanitizeRom_full_width (l : List (BitVec 64 × BitVec 32)) :
+    ∀ aw ∈ sanitizeRom l, aw.2.extractLsb' 0 2 = 0b11#2 := by
+  induction l with
+  | nil => simp [sanitizeRom]
+  | cons e rest ih =>
+    rw [sanitizeRom]
+    split
+    · rename_i hguard
+      intro aw haw
+      rcases List.mem_cons.mp haw with rfl | haw
+      · exact hguard.2.2.2
+      · exact ih _ (List.mem_of_mem_filter haw)
     · exact ih
 
 /-! ## The per-row decoders -/
@@ -106,5 +140,7 @@ def progOf (data : ProverData (ZMod p)) : GuestProgram where
   memImage := ((data "sp1.image" 4).toList).map imageEntryOf
   rom_nodup := sanitizeRom_nodup _
   rom_aligned := sanitizeRom_aligned _
+  rom_in_window := sanitizeRom_in_window _
+  rom_full_width := sanitizeRom_full_width _
 
 end SP1Clean.Commit

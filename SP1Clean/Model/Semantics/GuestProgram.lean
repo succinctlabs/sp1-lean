@@ -39,6 +39,14 @@ structure GuestProgram where
   memImage : List (BitVec 64 × BitVec 8)
   rom_nodup : (rom.map Prod.fst).Nodup
   rom_aligned : ∀ a ∈ rom.map Prod.fst, a.toNat % 4 = 0
+  /-- Every ROM word sits in the SP1 code window `[2^16, 2^48)` — the fetch's `range_subset` precondition
+  (`range_subset_sp1_pma`, `Model/SailMemory.lean`). SP1 reserves the low 64 KiB, so code never lives there;
+  a real ELF loads into this window. Feeds `FetchReady.in_range` at each fetched row. -/
+  rom_in_window : ∀ aw ∈ rom, 2 ^ 16 ≤ aw.1.toNat ∧ aw.1.toNat + 4 ≤ 2 ^ 48
+  /-- Every ROM word is a **full 32-bit (non-compressed) instruction** — its low two bits are `0b11`. SP1
+  emits no RVC, and `isRVC` (upstream of decode) tests exactly this, so `FetchReady.not_rvc` needs it as a
+  program invariant (it is not recoverable from a successful decode). -/
+  rom_full_width : ∀ aw ∈ rom, aw.2.extractLsb' 0 2 = 0b11#2
 
 /-- The instruction word at `a`, if `a` is a ROM address. -/
 def GuestProgram.fetchWord (prog : GuestProgram) (a : BitVec 64) : Option (BitVec 32) :=
