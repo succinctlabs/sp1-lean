@@ -90,4 +90,80 @@ theorem tryStep_reaches (s s_a s'' : SailState) (w : BitVec 32) (I : instruction
   tryStep_eq_of_hart_active s 0 b (zero_extend (m := 32) w) s'' hactive hb hcp
     (run_hart_active_reaches _ s_a s'' w I 0 hslr hdec hsa hexec) h_active''
 
+/-- **The minstret-bump tail is a register-file frame**: run on any initialized state `t`, the
+`minstret_increment`-gated `minstret ← minstret+1` bump yields `.ok false t'` with `t'` agreeing with `t`
+on `PC` and on the whole `BitVec 5` register file — the bump touches only the `minstret` CSR. -/
+theorem minstret_tail_frame (t : SailState) (hinit : t.isInitialized) :
+    ∃ t' : SailState,
+      (do
+        let mi ← Sail.readReg Register.minstret_increment
+        if (true && mi) = true then do
+            let m ← Sail.readReg Register.minstret
+            Sail.writeReg Register.minstret (BitVec.addInt m 1)
+            (pure false : SailM Bool)
+          else (pure false : SailM Bool)).run t = .ok false t'
+      ∧ t'.regs.get? Register.PC = t.regs.get? Register.PC
+      ∧ (∀ idx : BitVec 5, t'.get_reg? idx = t.get_reg? idx) := by
+  rw [run_bind_of_run t _ _ (Sail.run_readReg_of_isInitialized t Register.minstret_increment hinit)]
+  split
+  · rw [run_bind_of_run t _ _ (Sail.run_readReg_of_isInitialized t Register.minstret hinit),
+      run_writeReg_bind]
+    refine ⟨_, rfl, ?_, fun idx => ?_⟩
+    · rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]
+    · exact SailState.get_reg?_insert_of_ne (by unfold reg_idx_to_Register; split <;> decide)
+  · exact ⟨_, rfl, rfl, fun _ => rfl⟩
+
+/-- **The `tick_pc` + minstret tail's effect** on the observables: it commits `PC ← nextPC` and leaves every
+`BitVec 5` register file entry fixed (the minstret bump touches only the `minstret` CSR, `tick_pc` only
+`PC` — both outside the register file). -/
+theorem tail_effect (s'' : SailState) (hinit'' : s''.isInitialized) :
+    ∃ s_final : SailState,
+      (do
+        tick_pc ()
+        let mi ← Sail.readReg Register.minstret_increment
+        if (true && mi) = true then do
+            let m ← Sail.readReg Register.minstret
+            Sail.writeReg Register.minstret (BitVec.addInt m 1)
+            (pure false : SailM Bool)
+          else (pure false : SailM Bool)).run s'' = .ok false s_final
+      ∧ s_final.regs.get? Register.PC = s''.regs.get? Register.nextPC
+      ∧ (∀ idx : BitVec 5, s_final.get_reg? idx = s''.get_reg? idx) := by
+  simp only [tick_pc_eq, bind_assoc]
+  rw [run_bind_of_run s'' _ _ (Sail.run_readReg_of_isInitialized s'' Register.nextPC hinit''),
+    run_writeReg_bind]
+  obtain ⟨t', hrun, hPC', hxreg'⟩ := minstret_tail_frame
+    {s'' with regs := s''.regs.insert Register.PC (s''.regs.get Register.nextPC (hinit'' _))}
+    (SailState.isInitialized_insert s'' hinit'' _ _)
+  refine ⟨t', hrun, ?_, fun idx => ?_⟩
+  · rw [hPC', Std.ExtDHashMap.get?_insert_self, Std.ExtDHashMap.get?_eq_some_get (hinit'' _)]
+  · rw [hxreg' idx]; exact SailState.get_reg?_insert_PC
+
+/-- **The core `SailStep` composition** — joins the landed ladder (`tryStep_reaches`) with the tail's
+observable effect (`tail_effect`). Given the ladder inputs on the post-minstret-write state, `try_step`
+takes one real step to some `s_final` whose `PC` is the post-execute `nextPC` and whose `BitVec 5`
+register file agrees with the post-execute state `s''`. This is the whole `try_step`-side content of a
+register-writing chip's `advance`; per-chip work is only characterizing `s''` (via the execute bridge)
+and building the ladder inputs from `RefinesAt`/`OperandsBound`. -/
+theorem sailStep_of_ladder (s s_a s'' : SailState) (w : BitVec 32) (I : instruction) (b : Bool)
+    (hb : (should_inc_minstret Privilege.Machine).run s = .ok b s)
+    (hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s)
+    (hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
+      = some (HartState.HART_ACTIVE ()))
+    (hslr : StraightLineReady ({s with regs := s.regs.insert Register.minstret_increment b}) w)
+    (hdec : (ext_decode w).run ({s with regs := s.regs.insert Register.minstret_increment b})
+      = .ok I ({s with regs := s.regs.insert Register.minstret_increment b}))
+    (hsa : (Sail.writeReg Register.nextPC (BitVec.addInt
+        ((s.regs.insert Register.minstret_increment b).get Register.PC (hslr.init Register.PC)) 4)).run
+        ({s with regs := s.regs.insert Register.minstret_increment b}) = .ok () s_a)
+    (hexec : (execute I).run s_a = .ok (ExecutionResult.Retire_Success ()) s'')
+    (h_active'' : s''.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()))
+    (hinit'' : s''.isInitialized) :
+    ∃ s_final : SailState, (try_step 0 false).run s = .ok false s_final
+      ∧ s_final.regs.get? Register.PC = s''.regs.get? Register.nextPC
+      ∧ (∀ idx : BitVec 5, s_final.get_reg? idx = s''.get_reg? idx) := by
+  obtain ⟨s_final, hrun, hPC, hxreg⟩ := tail_effect s'' hinit''
+  refine ⟨s_final, ?_, hPC, hxreg⟩
+  rw [tryStep_reaches s s_a s'' w I b hb hcp hactive hslr hdec hsa hexec h_active'']
+  exact hrun
+
 end SP1Clean.Advance
