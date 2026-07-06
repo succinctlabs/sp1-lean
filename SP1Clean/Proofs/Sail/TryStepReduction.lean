@@ -73,9 +73,13 @@ theorem run_should_inc_minstret (s : SailState) (hs : SailState.isInitialized s)
 Stages 0-1 above are the trivial/`readReg`-then-`pure` pieces. The rest of `tryStep_eq_of_ready`
 (the ADD-family `try_step 0 false → spec_add`-shaped reduction) still needs:
 
-- **Stage 2 — `dispatchInterrupt_none`** (`SysControl.lean:593`): under the no-pending-interrupt state
-  fact (`mip &&& mie = 0`), the interrupt-check reduces to `pure none` — a `readReg mip`/`mie` +
-  boolean reduction (readReg-toolkit; substantive but bounded).
+- **Stage 2 — `dispatchInterrupt_none`** (`SysControl.lean:593`): deeper than a bare `mip &&& mie` check
+  — it calls `getPendingSet` (an `assert (currentlyEnabled Ext_S || mideleg = 0)` + `read_mip
+  IncludePlatformInterrupts` + `pending_{m,s} := mip_bits &&& mie &&& (~)mideleg` + the `mstatus`
+  MIE/SIE bits), then `findPendingInterrupt`. `= none` needs the state fact that `read_mip` (register mip
+  PLUS platform interrupt sources MTIP/MSIP/MEIP) masked by `mie` is `0` — i.e. a genuine
+  no-pending-interrupt precondition, discharged by reducing `read_mip`/`getPendingSet` under an initial
+  quiescent-interrupt state. Bounded but a real sub-lemma (readReg toolkit + the `read_mip` reduction).
 - **Stage 3 — `fetch_eq_F_Base`** (`Fetch.lean:227`, THE wall): with `get_config_rvfi = false` (done),
   `ext_fetch_check_pc = none`, PC 4-aligned (bit0 = bit1 = 0), `Ext_Ziccif`/`Ext_Zca` enabled, `fetch`
   reduces to `fetch_bytes PC PC 4` → `translateAddr` (identity under Bare/machine-mode) + `mem_read
