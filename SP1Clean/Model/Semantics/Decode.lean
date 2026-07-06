@@ -323,4 +323,18 @@ def decodedInROM (prog : GuestProgram) (row : ProgramRow (ZMod p)) : Prop :=
     ∀ s, SailConfigured s → ∃ i s', (ext_decode w).run s = .ok i s' ∧
       instrToProgramRow (rowPcVec row) i = some row
 
+set_option linter.unusedSectionVars false in
+/-- **RV64 decode accessor.** Unpacks `decodedInROM` to the official LeanRV64D `ext_decode` result (the
+generated RV64 `encdec_backwards` decoder): the fetched ROM word `w` and, for any configured Sail state,
+the decoded `instruction` `i` with its `ext_decode` run and the `instrToProgramRow` projection back to the
+row. This is the callable RV64 surface the Phase-4 `advance`/`try_step` reduction consumes from a fetch's
+`ProgTruth` — making the LeanRV64D decoder an explicit, reusable lemma rather than a buried existential. -/
+theorem decodedInROM.decodes {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row) (s : SailState) (hs : SailConfigured s) :
+    ∃ w i s', prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (ext_decode w).run s = .ok i s' ∧ instrToProgramRow (rowPcVec row) i = some row := by
+  obtain ⟨w, hfetch, hbody⟩ := h
+  obtain ⟨i, s', hrun, hrow⟩ := hbody s hs
+  exact ⟨w, i, s', hfetch, hrun, hrow⟩
+
 end SP1Clean.Soundness.Target

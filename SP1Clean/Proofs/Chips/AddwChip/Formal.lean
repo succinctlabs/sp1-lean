@@ -59,7 +59,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c, hdec, h_st, h_prog⟩ :=
+    h_assumptions
   -- `op_c_memory` is grouped since `imm_c` is the final field of the ALU adapter block.
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, ⟨hoc, -, -⟩, -⟩ := h_input
   -- `h_env` now bundles the chip's `value`/`msb` witness-gen equations with the GFC `ALUTypeReader`
@@ -88,10 +89,10 @@ theorem completeness :
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu, h_st⟩, ⟨⟨ha, hb, hbin⟩, ?_⟩,
-    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
+    ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
-      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, ha⟩, fun _ => hb⟩,
+      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, ha⟩, fun _ => hb⟩, h_prog⟩,
     ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
   · rw [hval, hmsbeq]; exact AddwOperation.spec_populate ha hb input_is_real
   · -- RegisterWrite's `isU64 value` (the op_a write push): the witnessed result word's `isU64` from

@@ -49,7 +49,12 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
     input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (JALR opcode `47`, I-type reader).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.ITypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 47, 0, 0, 0, 0⟩) data)
 
 set_option maxHeartbeats 2000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
@@ -186,7 +191,7 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨h_imm, h_rs1U, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac_a, h_rac_b, h_jt3, h_lt3,
-    h_align_pa, hdec, h_st⟩ := h_assumptions
+    h_align_pa, hdec, h_st, h_prog⟩ := h_assumptions
   -- op_b (rs1) read-prior `isU64` in the reader's **raw** `prev_value` form (from the reconstructed
   -- `h_rs1U`), for the pure-read `ITypeReader.Spec`'s memory-pull `isU64` pair.
   have hpb_raw : Word.isU64 input_adapter_op_b_memory_prev_value := by
@@ -293,8 +298,8 @@ theorem completeness :
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
   refine ⟨?_, ⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨hpceq ▸ h_pcU, h4U⟩, h_gate2⟩, ?_⟩,
-    ?_, ⟨⟨h_bin, h_bin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac_a, h_rac_b, hdec,
-      fun hr => ⟨h_oap hr, hpb_raw⟩⟩,
+    ?_, ⟨⟨h_bin, h_bin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac_a, h_rac_b, hdec,
+      fun hr => ⟨h_oap hr, hpb_raw⟩⟩, h_prog⟩,
     ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_⟩
   · rcases hlsb_bin with h | h <;> rw [h] <;> simp
   · rw [hval1]; exact AddOperation.spec_populate hrs1U h_imm input_is_real

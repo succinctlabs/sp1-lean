@@ -177,7 +177,12 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) (_ 
         input.selected_byte + 65280 * input.msb, 65535 * input.msb, 65535 * input.msb,
         65535 * input.msb⟩ ∧
     -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-    (isReal input = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+    (isReal input = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+    -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (LB/LBU opcode, I-type reader).
+    (isReal input = 1 → SP1Clean.Semantics.ProgTruth
+      (Readers.ITypeReader.progMsgOf
+        ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
+          input.state.pc, input.is_lb * 29 + input.is_lbu * 32, 0, 0, 0, 0⟩) data)
 
 set_option maxHeartbeats 16000000 in
 theorem completeness :
@@ -187,7 +192,7 @@ theorem completeness :
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
   obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_pv_isu64, h_lb_bin, h_lbu_bin, hbin, h_op_a_0,
     hlo_pa, hhi_pa, hbyte_pa, h_msb_bin, h_msb_iff, h_msbgate, ⟨hsel0, hsel1, hsel2, hsel3⟩,
-    hmux_pa, h_cpu, h_mem, h_it, h_st⟩ := h_assumptions
+    hmux_pa, h_cpu, h_mem, h_it, h_st, h_prog⟩ := h_assumptions
   obtain ⟨_, _, ⟨_, _, _, hmap_pc⟩, _, ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _⟩ := h_input
   simp only [isReal] at hbin
   haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -236,7 +241,7 @@ theorem completeness :
       (#v[input_selected_byte + 65280 * input_msb, 65535 * input_msb, 65535 * input_msb,
           65535 * input_msb] : Word (ZMod p)) :=
     Word.isU64_of_cases h_limb0_lt h_msb_val h_msb_val h_msb_val
-  refine ⟨⟨?_, ?_, h_st⟩, h_addr_as, ⟨?_, ?_⟩, ?_, ?_, ⟨?_, ?_⟩, ⟨?_, ?_⟩,
+  refine ⟨⟨?_, ?_, h_st⟩, h_addr_as, ⟨?_, ?_⟩, ?_, ?_, ⟨?_, ?_, h_prog⟩, ⟨?_, ?_⟩,
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu

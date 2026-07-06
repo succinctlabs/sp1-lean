@@ -151,9 +151,11 @@ balance-level decode discharge (`decode_targetBound_of_balance` = constructed pr
 `programProvider_of_valid` + `programConsistent_of_balance`). The committed program ROM (`rom`, each row
 the decode of the guest ROM) and the balanced Program bus suffice — no standalone Program link. The bus
 balance (`isConsistentBalanced`) is the lone LogUp/GKR residual, the same shape every other bus carries
-until the full `VmTables` capstone; with `programChannel` finished against `programProviderEnsemble`
-(`ProgramProviderChip`), that residual becomes an upstream-Clean obligation. The cross-bus **value** link
-(`h_value_link`) is a *different* bus and stays threaded — retiring it is the value-half (W2) task. -/
+until the full `VmTables` capstone; that residual is discharged by the timed-channel grounding engine
+(Phase 5) — SC Phase 2a flipped `programChannel` to a semantic `VmChannel` (`Guarantees := ProgTruth`), so
+it is no longer *finished* against a provider (`ProgramProviderChip` still pushes each `RowSpec`-valid row,
+owing `RowSpec`). The cross-bus **value** link (`h_value_link`) is a *different* bus and stays threaded —
+retiring it is the value-half (W2) task. -/
 
 /-- **The full `bound` field with the Program-bus link retired.** Decode half from
 `decode_targetBound_of_balance` (decoded ROM + balance), value half from the threaded cross-bus value
@@ -174,9 +176,9 @@ theorem operandsBound_full_targetBound_of_balance (prog : GuestProgram) (pi : SP
          value_targetBound (h_value_link s0 path h0 hw) hi href⟩
 
 /-- **The full `TargetObligations` with the Program-bus link retired** (decode half discharged from
-Program-bus balance). The only Program-bus residual is the `isConsistentBalanced` fact — which the
-finished `programChannel` (`programProviderEnsemble`) turns into an upstream-Clean obligation. The
-cross-bus value link and the W7/W5 lift/halt seams remain. -/
+Program-bus balance). The only Program-bus residual is the `isConsistentBalanced` fact — grounded by the
+timed-channel engine (Phase 5) now that SC Phase 2a flipped `programChannel` to a semantic `VmChannel`
+(no longer *finished* against a provider). The cross-bus value link and the W7/W5 lift/halt seams remain. -/
 def targetObligations_full_of_balance (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p))
     (rows : List (ChipRow p))
     (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)

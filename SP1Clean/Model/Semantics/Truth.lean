@@ -113,4 +113,16 @@ def ProgTruth (m : ProgramMsg (ZMod p)) (data : ProverData (ZMod p)) : Prop :=
   SP1Clean.Channels.ProgramMsg.RowSpec m ∧
     SP1Clean.Soundness.Target.decodedInROM (Commit.progOf data) (rowOfMsg m)
 
+set_option linter.unusedSectionVars false in
+/-- **`ProgTruth` → the RV64-decoded instruction.** From a fetch message's `ProgTruth`, the genuine
+LeanRV64D `ext_decode` instruction whose `instrToProgramRow` is the message's row — the callable RV64
+surface the Phase-4 per-chip `advance` consumes (its opcode-based Sail dispatch). A thin re-export of the
+`decodedInROM.decodes` accessor through the `ProgTruth` conjunction. -/
+theorem ProgTruth.decodes {m : ProgramMsg (ZMod p)} {data : ProverData (ZMod p)}
+    (h : ProgTruth m data) (s : SailState) (hs : SailConfigured s) :
+    ∃ w i s', (Commit.progOf data).fetchWord (pcBitsOfRow (rowOfMsg m)) = some w ∧
+      (ext_decode w).run s = .ok i s' ∧
+      instrToProgramRow (rowPcVec (rowOfMsg m)) i = some (rowOfMsg m) :=
+  h.2.decodes s hs
+
 end SP1Clean.Semantics

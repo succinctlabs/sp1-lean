@@ -108,6 +108,15 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
       Word.isU64 input.cols.op_b_memory.prev_value ∧ Word.isU64 input.cols.op_c_memory.prev_value)
 
+/-- The Program-bus fetch message this reader pulls (SC Phase 2a), as a `ProgramMsg` value — the R-type
+form: both operands are register indices (`#v[reg, 0, 0, 0]`), `imm_b = imm_c = 0`. Defeq to the `eval` of
+the reader `main`'s pull message, so the reader's `ProverAssumptionsD` `ProgTruth (progMsgOf input)` and
+every composing chip's supplied `ProgTruth` reference the identical term (the `stateMsgOf` pattern). -/
+def progMsgOf (input : Inputs (ZMod p)) : SP1Clean.Channels.ProgramMsg (ZMod p) :=
+  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode,
+   input.cols.op_a, #v[input.cols.op_b, 0, 0, 0], #v[input.cols.op_c, 0, 0, 0],
+   input.cols.op_a_0, 0, 0⟩
+
 end SP1Clean.Readers.RTypeReader
 
 namespace SP1Clean.Readers.ALUTypeReader
@@ -159,6 +168,14 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
       Word.isU64 input.cols.op_b_memory.prev_value) ∧
     (input.is_real - input.cols.imm_c = 1 → Word.isU64 input.cols.op_c_memory.prev_value)
 
+/-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the ALU form: op_b a register index
+(`#v[reg, 0, 0, 0]`), op_c a full `Word` (register or immediate), `imm_c` a decoded flag. Defeq to the
+`eval` of the reader `main`'s pull message. -/
+def progMsgOf (input : Inputs (ZMod p)) : SP1Clean.Channels.ProgramMsg (ZMod p) :=
+  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode,
+   input.cols.op_a, #v[input.cols.op_b, 0, 0, 0], input.cols.op_c,
+   input.cols.op_a_0, 0, input.cols.imm_c⟩
+
 end SP1Clean.Readers.ALUTypeReader
 
 namespace SP1Clean.Readers.ALUTypeReaderImmutable
@@ -209,6 +226,13 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
       Word.isU64 input.cols.op_b_memory.prev_value) ∧
     (input.is_real - input.cols.imm_c = 1 → Word.isU64 input.cols.op_c_memory.prev_value)
 
+/-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the immutable-ALU form (same fetch as
+`ALUTypeReader`; op_a is a discarded source read). Defeq to the `eval` of the reader `main`'s pull. -/
+def progMsgOf (input : Inputs (ZMod p)) : SP1Clean.Channels.ProgramMsg (ZMod p) :=
+  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode,
+   input.cols.op_a, #v[input.cols.op_b, 0, 0, 0], input.cols.op_c,
+   input.cols.op_a_0, 0, input.cols.imm_c⟩
+
 end SP1Clean.Readers.ALUTypeReaderImmutable
 
 namespace SP1Clean.Readers.ITypeReader
@@ -251,6 +275,14 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
       Word.isU64 input.cols.op_b_memory.prev_value)
 
+/-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the I-type form: op_b a register index
+(`#v[reg, 0, 0, 0]`), op_c the immediate `op_c_imm` (a `Word`), `imm_c = 1`. Defeq to the `eval` of the
+reader `main`'s pull message. -/
+def progMsgOf (input : Inputs (ZMod p)) : SP1Clean.Channels.ProgramMsg (ZMod p) :=
+  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode,
+   input.cols.op_a, #v[input.cols.op_b, 0, 0, 0], input.cols.op_c_imm,
+   input.cols.op_a_0, 0, 1⟩
+
 end SP1Clean.Readers.ITypeReader
 
 namespace SP1Clean.Readers.ITypeReaderImmutable
@@ -287,6 +319,14 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     -- (W11 memory flip) op_a/op_b operand `isU64` derived from the two memory read-prior pulls (real rows).
     (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
       Word.isU64 input.cols.op_b_memory.prev_value)
+
+/-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the immutable-I-type form (same fetch
+as `ITypeReader`; op_a is a source read, e.g. a Store's rs2). Defeq to the `eval` of the reader `main`'s
+pull message. -/
+def progMsgOf (input : Inputs (ZMod p)) : SP1Clean.Channels.ProgramMsg (ZMod p) :=
+  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode,
+   input.cols.op_a, #v[input.cols.op_b, 0, 0, 0], input.cols.op_c_imm,
+   input.cols.op_a_0, 0, 1⟩
 
 end SP1Clean.Readers.ITypeReaderImmutable
 
@@ -326,6 +366,14 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
       input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
     -- (W11 memory flip) op_a operand `isU64` derived from the memory read-prior pull (real rows).
     (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value)
+
+/-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the J/U form: both operands are
+immediates (`op_b_imm`/`op_c_imm`, `Word`s), `imm_b = imm_c = 1`. Defeq to the `eval` of the reader
+`main`'s pull message. -/
+def progMsgOf (input : Inputs (ZMod p)) : SP1Clean.Channels.ProgramMsg (ZMod p) :=
+  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode,
+   input.cols.op_a, input.cols.op_b_imm, input.cols.op_c_imm,
+   input.cols.op_a_0, 1, 1⟩
 
 end SP1Clean.Readers.JTypeReader
 

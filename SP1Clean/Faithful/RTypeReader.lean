@@ -220,7 +220,13 @@ theorem rtypereader_program_interactions_faithful_syntactic
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
-  simp only [toAccess_pullIf_program]
+  -- SC Phase 2a: `programChannel` is a `VmChannel` — `circuit_norm` recovers the program pull in the raw
+  -- `VmChannelInteraction.toRaw` form, so unfold the kernel's `pulledIf`/`toRaw` to match it (cf. the
+  -- `StateConsistency` state-kernel pattern), then rewrite.
+  have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
+    toAccess_pullIf_program env g m
+  simp only [VmChannel.pulledIf] at hk
+  simp only [hk]
   simp only [Extracted.RTypeReader.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign, List.filter_cons]
   simp [circuit_norm, Opcode.ofNat, ConstraintCoe.coe_eq_val, LookupAccessList.negMult,

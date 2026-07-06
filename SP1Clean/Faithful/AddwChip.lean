@@ -107,6 +107,10 @@ theorem addwcols_program_interactions_faithful_syntactic
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) programChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
+  -- SC Phase 2a: unfold the `VmChannel` kernel's `pulledIf` to match `circuit_norm`'s raw recovery.
+  have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
+    toAccess_pullIf_program env g m
+  simp only [VmChannel.pulledIf] at hk
   simp only [AddwChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
     Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
     Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -114,8 +118,8 @@ theorem addwcols_program_interactions_faithful_syntactic
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
     SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, toAccess_pullIf_program, heq]
-  simp [circuit_norm, toAccess_pullIf_program, Gadgets.Equality.main, LookupAccessList.negMult,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, hk, heq]
+  simp [circuit_norm, hk, Gadgets.Equality.main, LookupAccessList.negMult,
     signedVal_neg hp2,
     Extracted.AddwCols.interactions, Extracted.AddwOperation.interactions,
     Extracted.U16MSBOperation.interactions,

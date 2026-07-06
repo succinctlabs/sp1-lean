@@ -223,7 +223,7 @@ message (a plain `Channel.emit`, default `toRaw`; post-#398 `circuit_norm` norma
 val-projected, and the signed multiplicity. -/
 lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : ProgramMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (pushedIf (channel :=programChannel) mult msg).toRaw =
+    AbstractInteraction.toAccess env (programChannel.pushedIf mult msg).toRaw =
       (InteractionKind.Program, "SP1Program",
         [(Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val, (Expression.eval env msg.opcode).val,
@@ -234,8 +234,8 @@ lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (Z
          (Expression.eval env msg.op_c[3]).val, (Expression.eval env msg.op_a_0).val,
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env mult)) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
-    Channel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
+  simp only [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pushedIf,
+    VmChannel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
   -- Two `Word` fields (`op_b`/`op_c`) followed by trailing scalars: the op_c append doesn't split under
   -- plain `simp` (a `toList` normal-form loop), so force the split with an explicit `rw` (op_b reduces on
@@ -251,7 +251,7 @@ proves `ProgramMsg.RowSpec`; chips pull and derive). Its signed multiplicity is 
 `pushIf is_trusted` form modulo the sign. -/
 lemma toAccess_pullIf_program (env : Environment (ZMod p)) (gate : Expression (ZMod p))
     (msg : ProgramMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (pulledIf (channel := programChannel) gate msg).toRaw =
+    AbstractInteraction.toAccess env (programChannel.pulledIf gate msg).toRaw =
       (InteractionKind.Program, "SP1Program",
         [(Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val, (Expression.eval env msg.opcode).val,
@@ -262,8 +262,8 @@ lemma toAccess_pullIf_program (env : Environment (ZMod p)) (gate : Expression (Z
          (Expression.eval env msg.op_c[3]).val, (Expression.eval env msg.op_a_0).val,
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
-    Channel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
+  simp only [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pulledIf,
+    VmChannel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
   -- See the push kernel: force the op_c append split with an explicit `rw` (the `Word`-plus-trailing-scalars
   -- shape that plain `simp`'s `toList` normalization won't split).

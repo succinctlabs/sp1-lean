@@ -1,5 +1,6 @@
 import Clean.Circuit.Basic
 import Clean.Circuit.Channel
+import Clean.Circuit.Explicit
 
 /-! # `VmChannel` — a typed channel with decoupled `Guarantees`/`Owed`
 
@@ -212,6 +213,39 @@ def pushIf (channel : VmChannel F Message) (enabled : Expression F)
     (msg : Message (Expression F)) : Circuit F Unit := fun _ =>
   let interaction : VmChannelInteraction channel := ⟨ enabled, msg, false ⟩
   ((), [.interact interaction.toRaw])
+
+/-! ## `ExplicitCircuits` instances for the emitters
+
+The `VmChannel` analogs of Clean's plain-`Channel` emitter instances (`Clean/Circuit/Explicit.lean`), so a
+`main` that binds an emitter continuation (e.g. `let m ← witnessField …; channel.pushIf m msg` — the
+witnessed-multiplicity provider push) derives its `ElaboratedCircuit` by default. A pull declares the
+channel in `channelsWithGuarantees` (it receives the guarantee); a push declares none (it owes `Owed`). -/
+
+instance {channel : VmChannel F Message} : ExplicitCircuits (F := F) channel.pull where
+  output _ _ := ()
+  localLength _ _ := 0
+  operations msg _ := [.interact (channel.pulled msg).toRaw]
+  channelsWithGuarantees _ _ := [channel.toRaw]
+
+instance {channel : VmChannel F Message} {enabled : Expression F} :
+    ExplicitCircuits (F := F) (channel.pullIf enabled) where
+  output _ _ := ()
+  localLength _ _ := 0
+  operations msg _ := [.interact (channel.pulledIf enabled msg).toRaw]
+  channelsWithGuarantees _ _ := [channel.toRaw]
+
+instance {channel : VmChannel F Message} : ExplicitCircuits (F := F) channel.push where
+  output _ _ := ()
+  localLength _ _ := 0
+  operations msg _ := [.interact (channel.pushed msg).toRaw]
+  channelsWithGuarantees _ _ := []
+
+instance {channel : VmChannel F Message} {enabled : Expression F} :
+    ExplicitCircuits (F := F) (channel.pushIf enabled) where
+  output _ _ := ()
+  localLength _ _ := 0
+  operations msg _ := [.interact (channel.pushedIf enabled msg).toRaw]
+  channelsWithGuarantees _ _ := []
 
 /-! ## Exposure (the `exposedChannels` API) -/
 

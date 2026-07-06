@@ -166,17 +166,22 @@ theorem addcols_program_interactions_faithful_syntactic
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) programChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
+  -- SC Phase 2a: `programChannel` is a `VmChannel` — `circuit_norm` recovers the program pull in the raw
+  -- `VmChannelInteraction` form, so unfold the kernel's `pulledIf` to match it (cf. `StateConsistency`).
+  have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
+    toAccess_pullIf_program env g m
+  simp only [VmChannel.pulledIf] at hk
   simp only [AddChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
     Readers.RTypeReader.circuit, Readers.RTypeReader.main,
     Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
     Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, toAccess_pullIf_program, heq]
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, hk, heq]
   -- only RTypeReader's Program emit survives the `Program` filter; close via the kernel + bindings + the
   -- opcode coercion (`Opcode.ofNat 0 = 0`), then drop the byte/state/memory residual by channel name. The
   -- emit is now a `pull` (W11 flip), so its multiplicity is `-is_real` — matched by `negMult` on the oracle.
-  simp [circuit_norm, toAccess_pullIf_program, Gadgets.Equality.main, LookupAccessList.negMult,
+  simp [circuit_norm, hk, Gadgets.Equality.main, LookupAccessList.negMult,
     signedVal_neg hp2,
     Extracted.AddCols.interactions, Extracted.AddOperation.interactions,
     Extracted.CPUState.interactions, Extracted.RTypeReader.interactions,

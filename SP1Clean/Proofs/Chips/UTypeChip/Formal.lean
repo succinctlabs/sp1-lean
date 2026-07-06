@@ -47,7 +47,14 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
     input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (the LUI/AUIPC opcode
+  -- `is_auipc·48 + (1 - is_auipc)·49`, J-type reader; `progMsgOf` ignores the `wv` fields).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.JTypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
+       input.is_auipc * 48 + (1 - input.is_auipc) * 49, 0, 0, 0, 0⟩) data)
 
 omit [Fact p.Prime] in
 /-- `Word.toBitVec64 #v[0,0,0,0] = 0`. -/
@@ -124,7 +131,11 @@ set_option maxHeartbeats 2000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_iaui, h_op0, h_cpu, h_rac, _h_dec, hdec, h_st⟩ := h_assumptions
+  obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_iaui, h_op0, h_cpu, h_rac, _h_dec, hdec, h_st, h_prog⟩ :=
+    h_assumptions
+  -- align `h_prog`'s opcode `1 - is_auipc` (HSub) with the `1 + -is_auipc` form `circuit_norm` leaves
+  -- in the reader-obligation goal.
+  simp only [sub_eq_add_neg] at h_prog
   obtain ⟨_, ⟨_, _, _, hpc⟩, ⟨_, _, _, hob, _⟩, _⟩ := h_input
   -- `h_env` now bundles the addend/add-result witness equations with the GFC `JTypeReader` subcircuit's
   -- completeness obligation (SC Phase 2pre); the witness equations are `he_addend`/`he_addval`.
@@ -168,7 +179,7 @@ theorem completeness :
   have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
     rw [h_op0]; simpa using h_bin
   refine ⟨⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨hA_U, h_imm⟩, h_gate2⟩, ?_⟩,
-    ⟨⟨h_bin, h_bin⟩, ⟨?_, ?_, ?_, ?_⟩, Or.inl h_op0, h_rac, hdec, h_oap⟩,
+    ⟨⟨h_bin, h_bin⟩, ⟨⟨?_, ?_, ?_, ?_⟩, Or.inl h_op0, h_rac, hdec, h_oap⟩, h_prog⟩,
     ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hval]; exact AddOperation.spec_populate hA_U h_imm (input_is_real + - input_adapter_op_a_0)
   · rw [h_op0, zero_mul]

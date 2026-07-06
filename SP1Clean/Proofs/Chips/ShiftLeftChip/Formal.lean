@@ -73,7 +73,15 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (the flag-weighted SLL/SLLW
+  -- opcode `is_sll·6 + is_sllw·21`; the reader is gated by `gate = is_sll + is_sllw = f[0] + f[1]`, and
+  -- `progMsgOf` ignores the gating/`wv` fields).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.ALUTypeReader.progMsgOf
+      ⟨input.adapter, f[0] + f[1], f[0] + f[1], input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
+       f[0] * 6 + f[1] * 21, 0, 0, 0, 0⟩) data)
 
 set_option maxHeartbeats 4000000 in
 /-- **Soundness.** The flag-gated RV64 `sll`/`sllw` identities on the result column `cols.a`. **Pieced
@@ -96,7 +104,7 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hsum, hop_a_0, himmc, himmbin, hpins, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec, h_st, h_prog⟩ := h_assumptions
   -- (SC Phase 2c) the composed `CPUState` GFC now pushes its `StateTruth` guarantee, so its
   -- completeness-provided facts are the (discarded) prepended component of `h_env`.
   obtain ⟨-, h_env_a, h_env_cb, h_env_v, h_env_s, h_env_lo, h_env_hi, h_env_lr, h_env_tail⟩ := h_env
@@ -188,13 +196,16 @@ theorem completeness :
   refine ⟨⟨hbin, h_cpu, h_st⟩,
     ⟨⟨fun _ => populateA_val_lt B c0 F hbUw 1 (by norm_num), hf1⟩,
       sllwMsb_bool B c0 F hbUw, fun h1 => ?_⟩,
-    ⟨⟨hsum01, hsum01⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
+    ⟨⟨hsum01, hsum01⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [← hsum]; exact himmc, by rw [← hsum]; exact himmbin, hpins,
       by rw [← hsum]; exact hrac_a, by rw [← hsum]; exact hrac_b, by rw [← hsum]; exact hrac_c,
       by rw [← hsum]; exact hdec,
       -- (W11 memory flip) the two operand-`isU64` reader-`Spec` conjuncts (op_a/op_b on real rows; op_c on
       -- the `is_real - imm_c` register-read gate). The reader's `is_real` arg is `gate`, so `rw [← hsum]`.
       by rw [← hsum]; exact fun hr => ⟨ha_prev hr, hbU⟩, by rw [← hsum]; exact fun _ => hcU⟩,
+      -- (SC Phase 2a) the Program pull's `ProgTruth`: the reader's `is_trusted` = `gate` = `F[0] + F[1]`,
+      -- so bridge the `= 1` gate to `input.is_real = 1` via `hsum`; the opcode/adapter/pc fields match `h_prog`.
+      fun hg => h_prog (hsum.trans hg)⟩,
     -- (W11 Option-B) the composed `RegisterWrite` op_a write push: `gate` binary + the placed result word
     -- `a`'s `isU64` (populate per-limb range); `Spec = True` (`trivial`).
     ⟨⟨hsum01, ?_⟩, trivial⟩,

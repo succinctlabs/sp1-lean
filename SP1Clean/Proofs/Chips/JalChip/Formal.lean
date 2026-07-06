@@ -53,7 +53,13 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
     input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (JAL opcode `46`, J-type
+  -- reader; `progMsgOf` ignores the `wv` fields, so the `0` placeholders are defeq to the link value).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.JTypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 46, 0, 0, 0, 0⟩) data)
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -117,8 +123,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac, h_jt3, h_lt3, h_align_pa, hdec, h_st⟩ :=
-    h_assumptions
+  obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac, h_jt3, h_lt3, h_align_pa, hdec, h_st,
+    h_prog⟩ := h_assumptions
   simp only [jumpTargetWord, linkTargetWord] at h_jt3 h_lt3 h_align_pa
   -- `h_env` now bundles the two witness-vector equations with the GFC `JTypeReader` subcircuit's
   -- completeness obligation (SC Phase 2pre); the witness equations are `he_av`/`he_oav`.
@@ -182,7 +188,7 @@ theorem completeness :
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
   refine ⟨⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
-    ⟨⟨h_bin, h_bin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac, hdec, h_oap⟩,
+    ⟨⟨h_bin, h_bin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac, hdec, h_oap⟩, h_prog⟩,
     ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_⟩
   · rw [hval1]; exact AddOperation.spec_populate ha1U h_imm input_is_real
   · rw [hav3]; exact h_jt3

@@ -74,7 +74,14 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (the flag-weighted
+  -- SRL/SRA/SRLW/SRAW opcode `is_srl·7 + is_sra·8 + is_srlw·22 + is_sraw·23`; `progMsgOf` ignores `wv`).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.ALUTypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
+       f[0] * 7 + f[1] * 8 + f[2] * 22 + f[3] * 23, 0, 0, 0, 0⟩) data)
 
 set_option maxHeartbeats 4000000 in
 /-- **Soundness.** The flag-gated RV64 `srl`/`sra`/`srlw`/`sraw` identities on the result column `cols.a`.
@@ -99,7 +106,7 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hsum, hop_a_0, himmc, himmbin, hpins, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec, h_st, h_prog⟩ := h_assumptions
   -- SC Phase 2pre: the GFC `ALUTypeReader` (composed via `let _ ←`, after the 11 `witnessVector`s)
   -- appends its honest-witness/completeness conjunct to `h_env` as the trailing `h_env_alu`.
   -- (SC Phase 2c) the composed `CPUState` GFC now pushes its `StateTruth` guarantee, so its
@@ -236,8 +243,8 @@ theorem completeness :
       hbmB, fun h3 => ?_⟩,
     ⟨⟨fun _ => populateA_val_lt B c0 F hbUw hf0 hf1 hf2 hf3 hsum01 1 (by norm_num), he13⟩,
       srwMsb_bool B c0 F hbUw hf0 hf1 hf2 hf3 hsum01, fun h13 => ?_⟩,
-    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, himmc, himmbin, hpins,
-      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, hbU⟩, fun _ => hcU⟩,
+    ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, himmc, himmbin, hpins,
+      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, hbU⟩, fun _ => hcU⟩, h_prog⟩,
     -- (W11 Option B) the op_a write `RegisterWrite` block: gate `sum` binary + the witnessed result `a`
     -- (`populateA`) is `U64` (`populateA_val_lt`, unconditional under the prover assumptions).
     ⟨⟨?_, fun _ => ?_⟩, trivial⟩,

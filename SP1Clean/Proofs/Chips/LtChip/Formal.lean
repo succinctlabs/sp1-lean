@@ -46,7 +46,14 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (the flag-weighted
+  -- SLT/SLTU opcode `is_slt·9 + is_sltu·10`; `progMsgOf` ignores the `wv` fields).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.ALUTypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
+       f[0] * 9 + f[1] * 10, 0, 0, 0, 0⟩) data)
 
 /-- Semantic contract, stated against the clean RV64 ISA functions (mirrors the R-type chip contract, here spelled
 inline for the **two-variant** ALU adapter): the `ALUTypeReader` sub-`Spec` on the `state`/`adapter`
@@ -201,7 +208,7 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨ha, hb, ha_prev, hc_prev, hbin, hf0, hf1, hsum, hslt_real, hop_a_0, himm, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec, h_st, h_prog⟩ := h_assumptions
   -- `h_env` now bundles the CPUState GFC obligation (SC Phase 2c, prepended) + the chip's flag/`lt_cols`
   -- witness-gen equations + the GFC `ALUTypeReader` subcircuit's completeness obligation — discard both ends.
   obtain ⟨-, h_env_flags, h_env_cols, -⟩ := h_env
@@ -216,10 +223,11 @@ theorem completeness :
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   refine ⟨⟨hbin, h_cpu, h_st⟩,
     ⟨⟨ha, hb, hbin, hf0'⟩, ?_⟩,
-    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
+    ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
       hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, ha⟩, hc_prev⟩,
+      fun hr => by rw [hflag0, hflag1]; exact h_prog hr⟩,
     ⟨⟨hbin, ?_⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     hbool _ hf0',

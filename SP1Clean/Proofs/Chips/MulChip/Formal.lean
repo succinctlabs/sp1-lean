@@ -48,7 +48,15 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (the flag-weighted MUL*/MULW
+  -- opcode `is_mul·11 + … + is_mulw·24`; `progMsgOf` ignores the `wv` fields, so the `0` placeholders are
+  -- defeq to the actual reader input which carries the ALU-result `a` limbs).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.RTypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
+       f[0] * 11 + f[1] * 12 + f[2] * 13 + f[3] * 14 + f[4] * 24, 0, 0, 0, 0⟩) data)
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -162,7 +170,7 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hf4, hsum, hmulw_real, hop_a_0, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec, h_st, h_prog⟩ := h_assumptions
   -- `h_env` now bundles the CPUState GFC obligation (SC Phase 2c, prepended) + the `flags`/`cols`/`a`
   -- witness-gen equations + the GFC `RTypeReader` subcircuit's completeness obligation (trailing).
   obtain ⟨-, h_env_flags, h_env_cols, h_env_a, -⟩ := h_env
@@ -204,8 +212,8 @@ theorem completeness :
     by simpa using h_env_a 2, by simpa using h_env_a 3,
     hbool _ hf0', hbool _ hf1', hbool _ hf2', hbool _ hf3', hbool _ hf4', hbool _ hsum01',
     hop_a_0,
-    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
-      fun hr => ⟨ha_prev hr, hbU, hcU⟩⟩,
+    ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
+      fun hr => ⟨ha_prev hr, hbU, hcU⟩⟩, ?_⟩,
     ?_, ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
   · -- the composed `MulOperation` `FormalAssertion`'s `Spec` at the witnessed `populate`d columns:
     -- `spec_populate` once the witnessed column struct equals `populate …` (each cell is
@@ -220,6 +228,12 @@ theorem completeness :
       ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 5) i hi).trans
         (h_env_cols ⟨i, hi⟩))
     simp [circuit_norm]
+  · -- Program pull `ProgTruth`: the dummy `progMsgOf` opcode uses the hint flags `(hintFlags env.hint)[k]`;
+    -- the goal's opcode uses the witnessed flag columns `env.get (i₀+k)`. Bridge them via `hflag*` (the `wv`
+    -- fields differ but `progMsgOf` ignores them, so `exact h_prog` closes up-to-defeq), then hand off `h_prog`.
+    intro hr
+    rw [hflag0, hflag1, hflag2, hflag3, hflag4]
+    exact h_prog hr
   · -- the `is_real = sum` row gate: the prover sets `is_real = Σ flags` (`hsumc`).
     linear_combination -hsumc
   · -- RegisterWrite's `isU64 value` (op_a write push): on a real row the witnessed `a` equals the selected

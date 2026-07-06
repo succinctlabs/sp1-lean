@@ -59,7 +59,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec, h_st⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec, h_st, h_prog⟩ :=
+    h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   -- `h_env` now bundles the `value`/`msb` witness-gen equations with the GFC `RTypeReader` subcircuit's
   -- completeness obligation (its third component); the witness equations are the first two.
@@ -93,8 +94,8 @@ theorem completeness :
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
-    ⟨⟨hbin, hbin⟩, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
-      fun hr => ⟨ha_prev hr, ha, hb⟩⟩,
+    ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
+      fun hr => ⟨ha_prev hr, ha, hb⟩⟩, h_prog⟩,
     ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
   · rw [hval, hmsbeq]; exact SubwOperation.spec_populate ha hb input_is_real
   · -- RegisterWrite's `isU64 value` (op_a write push): the witnessed op_a write word is the sign-extended

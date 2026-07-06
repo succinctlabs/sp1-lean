@@ -74,14 +74,20 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) (_ 
         input.memory_access.prev_value[0], input.memory_access.prev_value[1],
         input.memory_access.prev_value[2], input.memory_access.prev_value[3]⟩ ∧
     -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-    (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+    (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+    -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (LD opcode `35`, I-type reader).
+    (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+      (Readers.ITypeReader.progMsgOf
+        ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high, clkLow input.state,
+          input.state.pc, 35, 0, 0, 0, 0⟩) data)
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_align, h_pv_isu64, hbin, h_op_a_0, h_cpu, h_mem, h_it, h_st⟩ := h_assumptions
+  obtain ⟨ha, hb, hfit, h_ge, h_align, h_pv_isu64, hbin, h_op_a_0, h_cpu, h_mem, h_it, h_st, h_prog⟩ :=
+    h_assumptions
   -- eval→value bridges for the nested vector fields the reader `Spec`s reference (`pc`, the loaded word).
   have hmap_pv : Vector.map (Expression.eval env.toEnvironment) input_var_memory_access_prev_value
       = input_memory_access_prev_value := h_input.2.2.2.1
@@ -94,7 +100,7 @@ theorem completeness :
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
-  refine ⟨⟨hbin, ?_, h_st⟩, h_addr_as, ⟨⟨hbin, fun _ => h_pv_isu64⟩, h_mem⟩, ⟨⟨hbin, hbin⟩, ?_⟩,
+  refine ⟨⟨hbin, ?_, h_st⟩, h_addr_as, ⟨⟨hbin, fun _ => h_pv_isu64⟩, h_mem⟩, ⟨⟨hbin, hbin⟩, ?_, h_prog⟩,
     ⟨⟨hbin, fun _ => h_pv_isu64⟩, trivial⟩, h_op_a_0, ?_⟩
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · simp only [epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega)]; exact h_it

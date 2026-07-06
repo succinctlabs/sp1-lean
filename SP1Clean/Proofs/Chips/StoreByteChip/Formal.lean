@@ -138,7 +138,13 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) (_ 
       ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
     (input.is_real = 1 → Word.isU64 input.store_value) ∧
     -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-    (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+    (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+    -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (SB opcode `36`, immutable
+    -- I-type reader — op_a is a source read, so `progMsgOf` copies the reader input verbatim).
+    (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+      (Readers.ITypeReaderImmutable.progMsgOf
+        ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high, clkLow input.state,
+          input.state.pc, 36⟩) data)
 
 set_option maxHeartbeats 16000000 in
 theorem completeness :
@@ -147,8 +153,8 @@ theorem completeness :
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
   obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, hbin, hreg_pa, hreghi_pa, hmem_pa, hmemhi_pa,
-    ⟨hsel0, hsel1, hsel2, hsel3⟩, hincr_pa, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it, hdec, h_sv, h_st⟩ :=
-    h_assumptions
+    ⟨hsel0, hsel1, hsel2, hsel3⟩, hincr_pa, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it, hdec, h_sv, h_st,
+    h_prog⟩ := h_assumptions
   obtain ⟨_, ⟨_, _, _, hmap_pc⟩, ⟨_, ⟨hmap_oap, _, _⟩, _, _, _, _⟩,
     ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _, hmap_sv⟩ := h_input
   have eoap0 : Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[0]
@@ -178,7 +184,7 @@ theorem completeness :
           Expression.eval env.toEnvironment input_var_offset_bit[1],
           Expression.eval env.toEnvironment input_var_offset_bit[2]⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
-  refine ⟨⟨?_, ?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨⟨?_, ?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_, ?_⟩, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · simp only [Readers.CPUState.stateMsgOf]; exact h_st
@@ -186,6 +192,7 @@ theorem completeness :
   · exact h_mem
   · exact ⟨hbin, hbin⟩
   · exact h_it
+  · exact h_prog
   · intro _
     simp only [byteChannel]; rw [← sub_eq_add_neg, eoap0]
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hreg_pa, hreghi_pa⟩

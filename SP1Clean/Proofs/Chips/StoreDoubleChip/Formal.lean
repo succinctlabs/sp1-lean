@@ -63,14 +63,20 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) (_ 
     (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16
       ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
     -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-    (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+    (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+    -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (SD opcode `39`, immutable
+    -- I-type reader — op_a is a source read, so `progMsgOf` copies the reader input verbatim).
+    (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+      (Readers.ITypeReaderImmutable.progMsgOf
+        ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high, clkLow input.state,
+          input.state.pc, 39⟩) data)
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_align, hbin, h_cpu, h_mem, h_it, hdec, h_st⟩ := h_assumptions
+  obtain ⟨ha, hb, hfit, h_ge, h_align, hbin, h_cpu, h_mem, h_it, hdec, h_st, h_prog⟩ := h_assumptions
   -- eval→value bridge for the nested `pc` vector the CPUState `Spec` references.
   have hmap_pc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc
       = input_state_pc := h_input.2.1.2.2.2
@@ -80,7 +86,7 @@ theorem completeness :
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
   refine ⟨⟨hbin, ?_, ?_⟩, h_addr_as, ⟨⟨hbin, fun hr => (h_it.2.2.2.2.2 hr).1⟩, h_mem⟩,
-    ⟨⟨hbin, hbin⟩, h_it⟩, ?_⟩
+    ⟨⟨hbin, hbin⟩, h_it, h_prog⟩, ?_⟩
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · simp only [Readers.CPUState.stateMsgOf]; exact h_st
   · rcases hbin with h | h <;> rw [h] <;> simp

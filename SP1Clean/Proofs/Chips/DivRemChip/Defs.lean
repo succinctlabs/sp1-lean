@@ -88,7 +88,17 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (the flag-weighted DIV*/REM*
+  -- opcode `is_divu·16 + is_remu·18 + … + is_remuw·28`, with `is_div = f[0]`, `is_divu = f[1]`, …,
+  -- `is_remuw = f[7]`; `progMsgOf` ignores the `wv` fields, so the `0` placeholders are defeq to the actual
+  -- reader input which carries the `a` (result) limbs).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.RTypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
+       f[1] * 16 + f[3] * 18 + f[0] * 15 + f[2] * 17 + f[4] * 25 + f[5] * 27 + f[6] * 26 + f[7] * 28,
+       0, 0, 0, 0⟩) data)
 
 /-- All-zero `fromElements` placeholder for any column block. -/
 @[irreducible] def zc {α : TypeMap} [ProvableType α] : Var α (ZMod p) :=

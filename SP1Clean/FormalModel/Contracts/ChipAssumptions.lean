@@ -49,7 +49,15 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth` (the row is a real execution
   -- step of the committed program) — discharging `CPUState`'s new `ProverAssumptions` state obligation.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (the pinned-opcode fetch is a
+  -- real decode of the committed ROM) — discharging `RTypeReader`'s new `ProverAssumptions` program
+  -- obligation. `progMsgOf` ignores the `wv`/clock fields, so the `0` placeholders are defeq to the actual
+  -- reader input (which carries the ALU-result `value` limbs).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.RTypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 0, 0, 0, 0, 0⟩) data)
 
 end SP1Clean.AddChip
 
@@ -85,7 +93,12 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth` (the row is a real execution
   -- step of the committed program) — discharging `CPUState`'s new `ProverAssumptions` state obligation.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (ADDI opcode `1`, I-type reader).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.ITypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 1, 0, 0, 0, 0⟩) data)
 
 end SP1Clean.AddiChip
 
@@ -127,7 +140,12 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth` (the row is a real execution
   -- step of the committed program) — discharging `CPUState`'s new `ProverAssumptions` state obligation.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (ADDW opcode `19`, ALU reader).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.ALUTypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 19, 0, 0, 0, 0⟩) data)
 
 end SP1Clean.AddwChip
 
@@ -163,7 +181,13 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth` (the row is a real execution
   -- step of the committed program) — discharging `CPUState`'s new `ProverAssumptions` state obligation.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (SUB opcode `2`). `progMsgOf`
+  -- ignores the `wv`/clock fields, so the `0` placeholders are defeq to the actual reader input.
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.RTypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 2, 0, 0, 0, 0⟩) data)
 
 end SP1Clean.SubChip
 
@@ -199,6 +223,11 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth` (the row is a real execution
   -- step of the committed program) — discharging `CPUState`'s new `ProverAssumptions` state obligation.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (SUBW opcode `20`).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.RTypeReader.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 20, 0, 0, 0, 0⟩) data)
 
 end SP1Clean.SubwChip

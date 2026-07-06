@@ -66,7 +66,15 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     (committedNextPc input br)[1].val < 2 ^ 16 ∧
     (committedNextPc input br)[2].val < 2 ^ 16) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth`. The immutable I-type reader
+  -- carries the branch opcode as the one-hot-weighted flag sum (`f[i] * (40+i)`, mirroring `main`'s
+  -- `opcode` let); `progMsgOf` copies the reader input verbatim (op_a is a source read).
+  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.ITypeReaderImmutable.progMsgOf
+      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+        input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
+        f[0] * 40 + f[1] * 41 + f[2] * 42 + f[3] * 43 + f[4] * 44 + f[5] * 45⟩) data)
 
 -- The binary-element algebra (`zero_ne_one'`, `val_of_bool`, `one_hot6`) and the six-way decision
 -- dispatch (`branch_conditions_of_decision_eq` / `branch_decision_eq_of_conditions`) live in the
@@ -235,7 +243,8 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨h_imm, h_rs1U, h_rs2U, h_pcU, h_bin, h_cpu, h_it, h_bt3, h_ft3,
-    hf0, hf1, hf2, hf3, hf4, hf5, h_realsum, h_brbin, h_brpad, h_dec, h_ranges, h_st⟩ := h_assumptions
+    hf0, hf1, hf2, hf3, hf4, hf5, h_realsum, h_brbin, h_brpad, h_dec, h_ranges, h_st, h_prog⟩ :=
+    h_assumptions
   -- `h_env` now bundles the six witness-gen equation groups with the GFC `ITypeReaderImmutable`
   -- subcircuit's completeness obligation (trailing conjunct, discarded — the reader slot is discharged below).
   obtain ⟨he_flags, he_br, he_bv, he_fv, he_np, he_lt, -, _⟩ := h_env
@@ -459,7 +468,8 @@ theorem completeness :
   refine ⟨⟨⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, h_lt_spec⟩, ?_, ?_, ?_, ?_, ?_, ?_,
     (by linear_combination -hsumreal), hsumbin, ?_, ?_, ?_,
     ⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, brb⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
-    ?_, ?_, ?_, ⟨⟨h_bin, h_bin⟩, h_it⟩, ?_, ?_, ?_⟩
+    ?_, ?_, ?_, ⟨⟨h_bin, h_bin⟩, h_it, by
+      rw [hg0, hg1, hg2, hg3, hg4, hg5]; exact h_prog⟩, ?_, ?_, ?_⟩
   · rcases fb0 with h | h <;> rw [h] <;> simp
   · rcases fb1 with h | h <;> rw [h] <;> simp
   · rcases fb2 with h | h <;> rw [h] <;> simp

@@ -204,9 +204,13 @@ theorem programLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
   -- the memory emits' `if memoryChannel = programChannel` collapse via the channel distinctness + `if_false`)
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
-  -- `toAccess` the lone emit (the kernel matches the `_root_.emitted` form `circuit_norm` leaves),
-  -- then bind to `programLookups` via the realisation hypotheses
-  simp only [toAccess_pullIf_program]
+  -- `toAccess` the lone emit; SC Phase 2a: `programChannel` is a `VmChannel`, so `circuit_norm` recovers
+  -- the pull in raw `VmChannelInteraction` form — unfold the kernel's `pulledIf` to match it (cf.
+  -- `StateConsistency`), then bind to `programLookups` via the realisation hypotheses.
+  have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
+    toAccess_pullIf_program env g m
+  simp only [VmChannel.pulledIf] at hk
+  simp only [hk]
   -- W11 flip: the lone emit is now a `pull`, so its multiplicity is `signedVal (-is_trusted) = -is_real.val`
   -- (`signedVal_neg_is_real`), matching `programLookups`'s now-negated `−is_real` contribution.
   simp [circuit_norm, signedVal_neg_is_real hp2 h_real, programLookups, programAccess,

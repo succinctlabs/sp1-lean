@@ -161,6 +161,10 @@ theorem subwcols_program_interactions_faithful_syntactic
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) programChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
+  -- SC Phase 2a: unfold the `VmChannel` kernel's `pulledIf` to match `circuit_norm`'s raw recovery.
+  have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
+    toAccess_pullIf_program env g m
+  simp only [VmChannel.pulledIf] at hk
   simp only [SubwChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
     Readers.RTypeReader.circuit, Readers.RTypeReader.main,
     Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -168,11 +172,11 @@ theorem subwcols_program_interactions_faithful_syntactic
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.SubwOperation.circuit, SP1Clean.SubwOperation.main,
     SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, toAccess_pullIf_program, heq]
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, hk, heq]
   -- only RTypeReader's Program emit survives the `Program` filter; close via the kernel + bindings + the
   -- opcode coercion (`Opcode.ofNat 0 = 0`), then drop the byte/state/memory residual by channel name. The
   -- emit is now a `pull` (W11 flip), so its multiplicity is `-is_real` — matched by `negMult` on the oracle.
-  simp [circuit_norm, toAccess_pullIf_program, Gadgets.Equality.main, LookupAccessList.negMult,
+  simp [circuit_norm, hk, Gadgets.Equality.main, LookupAccessList.negMult,
     signedVal_neg hp2,
     Extracted.SubwCols.interactions, Extracted.SubwOperation.interactions, Extracted.U16MSBOperation.interactions,
     Extracted.CPUState.interactions, Extracted.RTypeReader.interactions,

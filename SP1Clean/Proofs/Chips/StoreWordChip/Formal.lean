@@ -96,7 +96,13 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) (_ 
       ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
     (input.is_real = 1 → Word.isU64 input.store_value) ∧
     -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-    (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+    (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+    -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (SW opcode `38`, immutable
+    -- I-type reader — op_a is a source read, so `progMsgOf` copies the reader input verbatim).
+    (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
+      (Readers.ITypeReaderImmutable.progMsgOf
+        ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high, clkLow input.state,
+          input.state.pc, 38⟩) data)
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
@@ -105,7 +111,7 @@ theorem completeness :
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
   obtain ⟨ha, hb, hfit, h_ge, h_align, h_off, hbin, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it, hdec,
-      h_sv, h_st⟩ := h_assumptions
+      h_sv, h_st, h_prog⟩ := h_assumptions
   have hmap_pc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc
       = input_state_pc := h_input.2.1.2.2.2
   have hmap_sv : Vector.map (Expression.eval env.toEnvironment) input_var_store_value
@@ -135,7 +141,7 @@ theorem completeness :
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, input_offset_bit⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, h_off_bin, h_ge, h_off'⟩
-  refine ⟨⟨?_, ?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨⟨?_, ?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · simp only [Readers.CPUState.stateMsgOf]; exact h_st
@@ -143,6 +149,7 @@ theorem completeness :
   · exact h_mem
   · exact ⟨hbin, hbin⟩
   · exact h_it
+  · exact h_prog
   · simp only [esv 0 (by omega), epv 0 (by omega), eoap 0 (by omega), ← sub_eq_add_neg]
     exact sub_eq_zero_of_eq hr0
   · simp only [esv 1 (by omega), epv 1 (by omega), eoap 1 (by omega), ← sub_eq_add_neg]

@@ -60,16 +60,22 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
       input.state.pc, opcodeVal input⟩ ∧
   (isReal input = 1 → input.opcode.val < 29) ∧
   -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (isReal input = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data)
+  (isReal input = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
+  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (dynamic ALU `opcode`,
+  -- immutable-ALU reader; `ALUTypeReaderImmutable` has no `wv` fields, so the input is copied verbatim).
+  (isReal input = 1 → SP1Clean.Semantics.ProgTruth
+    (Readers.ALUTypeReaderImmutable.progMsgOf
+      ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
+        input.state.pc, opcodeVal input⟩) data)
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [isReal, clkLow, opcodeVal] at h_assumptions
-  obtain ⟨h_bin, h_oa1, h_oa2, h_cpu, h_reader, h_op_lt, h_st⟩ := h_assumptions
+  obtain ⟨h_bin, h_oa1, h_oa2, h_cpu, h_reader, h_op_lt, h_st, h_prog⟩ := h_assumptions
   simp only [sub_eq_add_neg] at h_oa1 h_oa2
-  refine ⟨⟨h_bin, h_cpu, h_st⟩, ?_, ⟨⟨h_bin, h_bin⟩, h_reader⟩, ?_, h_oa1, h_oa2⟩
+  refine ⟨⟨h_bin, h_cpu, h_st⟩, ?_, ⟨⟨h_bin, h_bin⟩, h_reader, h_prog⟩, ?_, h_oa1, h_oa2⟩
   · -- the LTU `opcode < 29` byte pull (fires on real rows).
     intro hneg
     simp only [byteChannel]

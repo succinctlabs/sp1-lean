@@ -34,6 +34,7 @@ namespace SP1Clean.Readers.ALUTypeReader
 
 open Circuit
 open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel ProgramMsg)
+open SP1Clean.Semantics (ProgTruth)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
@@ -142,9 +143,12 @@ def AssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := A
 /-- The soundness spec, lifted to ignore the `unit` output and `ProverData`. -/
 def SpecD (input : Inputs (ZMod p)) (_ : unit (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Spec input
 
-/-- The completeness assumption (an assertion assumes both `Assumptions` and `Spec`). -/
-def ProverAssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
-    (_ : ProverHint (ZMod p)) : Prop := Assumptions input ∧ Spec input
+/-- The completeness assumption: `Assumptions` and `Spec`, plus (SC Phase 2a — the program flip) the
+program pull's `ProgTruth` (the honest prover supplies that the pinned-opcode fetch is a real decode of
+the committed guest ROM — a `decodedInROM` fact the pull *receives*, not provable row-locally). -/
+def ProverAssumptionsD (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
+    (_ : ProverHint (ZMod p)) : Prop :=
+  Assumptions input ∧ Spec input ∧ (input.is_trusted = 1 → ProgTruth (progMsgOf input) data)
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
@@ -155,7 +159,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   -- can't reach its `is_real - imm_c` HSub subtractions to align them with the `+ -` form `circuit_norm`
   -- leaves in `h_holds` — unfold `Spec` here too so the projections reduce and `sub_eq_add_neg` fires.
   simp only [circuit_norm, AssumptionsD, SpecD, Spec, memoryChannel, MemoryMsg.isU64, programChannel,
-    ProgramMsg.RowSpec, sub_eq_add_neg] at h_holds h_assumptions ⊢
+    sub_eq_add_neg] at h_holds h_assumptions ⊢
   obtain ⟨h_rac_a, h_rac_b, h_rac_c, hbin, h_immc, h_immbin, i0, i1, i2, i3, h_trust, h_prog,
     z0, z1, z2, z3, h_mem_a, h_mem_b, h_mem_c⟩ := h_holds
   have htbin := bool_of_mul_pred h_trust
@@ -179,8 +183,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     -- `Expression.eval env …[i]` form `h_holds` carries, via the `h_input` Word equalities + `getElem_map`.
     rw [← h_input.1.2.2.2.2.2.1, ← h_input.1.2.2.2.2.2.2.1.1]
     simp only [Vector.getElem_map]; exact ⟨i0, i1, i2, i3⟩
-  · -- the decode-bounds `Spec` conjunct is **derived** from the program pull `h_prog`.
-    obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [ht])
+  · -- the decode-bounds `Spec` conjunct is **derived** from the program pull `h_prog`. Extract the
+    -- `RowSpec` half via `⟨⟨…⟩, -⟩` — the outer `∧` splits `ProgTruth = RowSpec ∧ decodedInROM` in one
+    -- delta step and discards the heavy `decodedInROM` with `-` (the opaque-threading discipline).
+    obtain ⟨⟨ha, hp0, hp1, hp2, _⟩, -⟩ := h_prog (by rw [ht])
     rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
     exact ⟨ha, hp0, hp1, hp2⟩
   · -- push_b requirement — same whole-`Word` prev_value as the paired pull (h_mem_b).
@@ -197,10 +203,10 @@ theorem completeness :
       (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [ProverAssumptionsD] at h_assumptions
-  obtain ⟨h_assumptions, h_spec⟩ := h_assumptions
+  obtain ⟨h_assumptions, h_spec, h_prog⟩ := h_assumptions
   obtain ⟨hreal, htrust⟩ := h_assumptions
   obtain ⟨⟨z0, z1, z2, z3⟩, hbin, h_immc, h_immbin_or, ⟨i0, i1, i2, i3⟩, hrac_a, hrac_b, hrac_c,
-    hdec, hisu_ab, hisu_c⟩ := h_spec
+    -, hisu_ab, hisu_c⟩ := h_spec
   -- `hbin`/`htrust` carry `{record}.field` projections (the `ProverAssumptionsD`/Contracts `Spec`
   -- reassembly); `dsimp` iota-reduces them to the destructured atoms so the `rw`-gates below match.
   dsimp only at hbin htrust
@@ -227,11 +233,11 @@ theorem completeness :
   · simp only [eoc, epv]; exact i2
   · simp only [eoc, epv]; exact i3
   · rcases htrust with h | h <;> rw [h] <;> simp     -- `is_trusted` gate
-  · intro ht                                         -- program **pull** guarantee
-    obtain ⟨ha, hp0, hp1, hp2⟩ := hdec (neg_inj.mp ht)
-    simp only [programChannel, ProgramMsg.RowSpec]
+  · -- The program pull now supplies `ProgTruth` (not `RowSpec`) — handed in via `h_prog`. After bridging
+    -- the 3 pc limbs (`e`) the goal message is `progMsgOf input`, closed opaquely by `exact h_prog`.
+    intro ht
     rw [e 0 (by norm_num), e 1 (by norm_num), e 2 (by norm_num)]
-    exact ⟨ha, hp0, hp1, hp2, hbin⟩
+    exact h_prog (neg_inj.mp ht)
   · -- mem pull a: the whole-`Word` `isU64` is literally hisu_ab.1 (the eval is already substituted away).
     simp only [memoryChannel, MemoryMsg.isU64]
     exact fun hneg => (hisu_ab (neg_inj.mp hneg)).1
