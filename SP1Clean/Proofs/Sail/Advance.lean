@@ -302,15 +302,18 @@ theorem minstret_tail_frame (t : SailState) (hinit : t.isInitialized) :
             (pure false : SailM Bool)
           else (pure false : SailM Bool)).run t = .ok false t'
       ∧ t'.regs.get? Register.PC = t.regs.get? Register.PC
-      ∧ (∀ idx : BitVec 5, t'.get_reg? idx = t.get_reg? idx) := by
+      ∧ (∀ idx : BitVec 5, t'.get_reg? idx = t.get_reg? idx)
+      ∧ t'.mem = t.mem
+      ∧ (∀ R : Register, R ≠ Register.minstret → t'.regs.get? R = t.regs.get? R) := by
   rw [run_bind_of_run t _ _ (Sail.run_readReg_of_isInitialized t Register.minstret_increment hinit)]
   split
   · rw [run_bind_of_run t _ _ (Sail.run_readReg_of_isInitialized t Register.minstret hinit),
       run_writeReg_bind]
-    refine ⟨_, rfl, ?_, fun idx => ?_⟩
+    refine ⟨_, rfl, ?_, (fun idx => ?_), rfl, fun R hR => ?_⟩
     · rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]
     · exact SailState.get_reg?_insert_of_ne (by unfold reg_idx_to_Register; split <;> decide)
-  · exact ⟨_, rfl, rfl, fun _ => rfl⟩
+    · rw [Std.ExtDHashMap.get?_insert, dif_neg (fun hc => hR (beq_iff_eq.mp hc).symm)]
+  · exact ⟨_, rfl, rfl, fun _ => rfl, rfl, fun _ _ => rfl⟩
 
 /-- **The `tick_pc` + minstret tail's effect** on the observables: it commits `PC ← nextPC` and leaves every
 `BitVec 5` register file entry fixed (the minstret bump touches only the `minstret` CSR, `tick_pc` only
@@ -326,16 +329,20 @@ theorem tail_effect (s'' : SailState) (hinit'' : s''.isInitialized) :
             (pure false : SailM Bool)
           else (pure false : SailM Bool)).run s'' = .ok false s_final
       ∧ s_final.regs.get? Register.PC = s''.regs.get? Register.nextPC
-      ∧ (∀ idx : BitVec 5, s_final.get_reg? idx = s''.get_reg? idx) := by
+      ∧ (∀ idx : BitVec 5, s_final.get_reg? idx = s''.get_reg? idx)
+      ∧ s_final.mem = s''.mem
+      ∧ (∀ R : Register, R ≠ Register.PC → R ≠ Register.minstret →
+          s_final.regs.get? R = s''.regs.get? R) := by
   simp only [tick_pc_eq, bind_assoc]
   rw [run_bind_of_run s'' _ _ (Sail.run_readReg_of_isInitialized s'' Register.nextPC hinit''),
     run_writeReg_bind]
-  obtain ⟨t', hrun, hPC', hxreg'⟩ := minstret_tail_frame
+  obtain ⟨t', hrun, hPC', hxreg', hmem', hframe'⟩ := minstret_tail_frame
     {s'' with regs := s''.regs.insert Register.PC (s''.regs.get Register.nextPC (hinit'' _))}
     (SailState.isInitialized_insert s'' hinit'' _ _)
-  refine ⟨t', hrun, ?_, fun idx => ?_⟩
+  refine ⟨t', hrun, ?_, (fun idx => ?_), hmem', fun R hRpc hRm => ?_⟩
   · rw [hPC', Std.ExtDHashMap.get?_insert_self, Std.ExtDHashMap.get?_eq_some_get (hinit'' _)]
   · rw [hxreg' idx]; exact SailState.get_reg?_insert_PC
+  · rw [hframe' R hRm, Std.ExtDHashMap.get?_insert, dif_neg (fun hc => hRpc (beq_iff_eq.mp hc).symm)]
 
 /-- **The core `SailStep` composition** — joins the landed ladder (`tryStep_reaches`) with the tail's
 observable effect (`tail_effect`). Given the ladder inputs on the post-minstret-write state, `try_step`
@@ -359,9 +366,12 @@ theorem sailStep_of_ladder (s s_a s'' : SailState) (w : BitVec 32) (I : instruct
     (hinit'' : s''.isInitialized) :
     ∃ s_final : SailState, (try_step 0 false).run s = .ok false s_final
       ∧ s_final.regs.get? Register.PC = s''.regs.get? Register.nextPC
-      ∧ (∀ idx : BitVec 5, s_final.get_reg? idx = s''.get_reg? idx) := by
-  obtain ⟨s_final, hrun, hPC, hxreg⟩ := tail_effect s'' hinit''
-  refine ⟨s_final, ?_, hPC, hxreg⟩
+      ∧ (∀ idx : BitVec 5, s_final.get_reg? idx = s''.get_reg? idx)
+      ∧ s_final.mem = s''.mem
+      ∧ (∀ R : Register, R ≠ Register.PC → R ≠ Register.minstret →
+          s_final.regs.get? R = s''.regs.get? R) := by
+  obtain ⟨s_final, hrun, hPC, hxreg, hmem, hframe⟩ := tail_effect s'' hinit''
+  refine ⟨s_final, ?_, hPC, hxreg, hmem, hframe⟩
   rw [tryStep_reaches s s_a s'' w I b hb hcp hactive hslr hdec hsa hexec h_active'']
   exact hrun
 
