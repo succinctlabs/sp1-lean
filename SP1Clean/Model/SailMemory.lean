@@ -465,6 +465,35 @@ lemma run_mem_read_four_bytes_fetch_of_isInitialized
       data₀ data₁ data₂ data₃ s hs h_in_range h_align h_htif h_pma
       hmem₀ hmem₁ hmem₂ hmem₃]
 
+/-- `translateAddr` for an **`InstructionFetch`** under the SP1 machine-mode config is the identity
+(`translationMode Machine = Bare`, so no page walk): `addr ↦ Physaddr (zero_extend addr)` with `PBMT_PMA`.
+The reduction the `fetch_bytes` step composes with. -/
+lemma run_translateAddr_fetch_of_isInitialized
+    (addr : BitVec 64) (s : SailState) (hs : SailState.isInitialized s)
+    (hconfig : SailState.isValidMemConfig s hs) :
+    (translateAddr (virtaddr.Virtaddr addr) (MemoryAccessType.InstructionFetch ())).run s
+      = .ok (.Ok (physaddr.Physaddr (zero_extend (m := 64) addr),
+          page_based_mem_type.PBMT_PMA, init_ext_ptw)) s := by
+  obtain ⟨h_cur_privilege, h_mprv_disabled, _, h_htif, h_pma⟩ := hconfig
+  have hmprv' : Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 = 0#1 := by
+    rw [show Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 =
+      BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (hs _)) >>> 17) from rfl]
+    exact h_mprv_disabled
+  have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
+  have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
+  simp [translateAddr, translationMode, effectivePrivilege,
+    SailME.run, PreSail.PreSailME.run, ExceptT.run, ExceptT.bind, ExceptT.mk,
+    ExceptT.bindCont, ExceptT.lift, ExceptT.map, ExceptT.pure,
+    MonadLift.monadLift, liftM, monadLift, Functor.map, Except.map,
+    Bind.bind, Pure.pure, SailME.throw, PreSail.PreSailME.throw,
+    bind, pure, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
+    Sail.readReg, PreSail.readReg, run_readReg_of_isInitialized s _ hs,
+    Std.ExtDHashMap.get?_eq_some_get (hs _),
+    getThe, MonadStateOf.get, MonadState.get, get, EStateM.get,
+    modifyGet, MonadStateOf.modifyGet, MonadState.modifyGet, EStateM.modifyGet,
+    privLevel_bits_backwards, privLevel_bits_forwards,
+    hmprv', h_cur_privilege, hmachine, hsatp_bare, is_shadow_stack_access]
+
 /-- Four-byte `mem_read` under kernel config. -/
 lemma run_mem_read_four_bytes_of_isInitialized
     (reg_val offset : BitVec 64)
