@@ -41,6 +41,42 @@ def sp1Effect (v : Trace.RowView (ZMod p)) : SailM Unit := do
 /-- The control-flow effect (branches): commit the next-pc only, no register write. -/
 def sp1Effect_ctrl (v : Trace.RowView (ZMod p)) : SailM Unit := set_next_pc (sndPcBV v)
 
+/-! ## Pilot algebra (fetch + operand leaves) -/
+
+/-- **L1 — little-endian byte reassembly.** The four `RomLoaded` bytes of a fetched word `w`
+(`data₀..₃ = w.extractLsb' (8·i) 8`), concatenated high-to-low, reassemble `w`. The `: BitVec 32`
+ascription normalizes the `8+8+8+8` append width to `32` so `bv_decide` sees a well-typed goal. -/
+theorem word_reassemble (w : BitVec 32) :
+    (w.extractLsb' 24 8 ++ w.extractLsb' 16 8 ++ w.extractLsb' 8 8 ++ w.extractLsb' 0 8 : BitVec 32) = w := by
+  bv_decide
+
+/-- **L2 — 4-alignment clears the low two pc bits.** A `pc` with `pc.toNat % 4 = 0` has bit 0 and bit 1
+zero — the `access0`/`access1` fields the fetch reduction needs. -/
+theorem pc_align_bits (pc : BitVec 64) (h : pc.toNat % 4 = 0) :
+    BitVec.ofBool pc[0] = 0#1 ∧ BitVec.ofBool pc[1] = 0#1 := by
+  have hb : pc[0] = false ∧ pc[1] = false := by
+    simp only [BitVec.getElem_eq_testBit_toNat, Nat.testBit_eq_decide_div_mod_eq,
+      decide_eq_false_iff_not]
+    omega
+  rw [hb.1, hb.2]; exact ⟨rfl, rfl⟩
+
+/-- **L4 — the ADD execute identity.** The RV64 `ADD` semantics (`RV64.add rs2 rs1 = rs1 + rs2`) equal the
+pure R-type execute value (`execute_RTYPE_pure op1 op2 ADD = op1 + op2`); the bridge tying a chip's `Spec`
+result to the value `rtype_execute_reaches` writes. -/
+theorem rv64add_eq_execute_RTYPE_pure (a b : BitVec 64) :
+    RV64.add b a = execute_RTYPE_pure a b rop.ADD := by
+  simp [RV64.add, execute_RTYPE_pure]
+
+/-- **L5 — `rdOf` inverts the committed `op_a`.** When the committed destination column `op_a = (rd.toNat)`
+for a genuine `rd : BitVec 5`, the `BitVec.ofNat 5 op_a.val` in `rdOf` recovers `rd` exactly (the register
+index is canonical because `rd.toNat < 32 < p`). -/
+theorem ofNat_val_eq_of_cast {rd : BitVec 5} {op_a : ZMod p} (hrd : (rd.toNat : ZMod p) = op_a) :
+    BitVec.ofNat 5 op_a.val = rd := by
+  rw [← hrd]
+  have hp : (2:ℕ) ^ 24 < p := Fact.out
+  rw [ZMod.val_natCast_of_lt (by have := rd.isLt; omega)]
+  simp [BitVec.ofNat_toNat]
+
 /-! ## The execute-stage bridge (per family) -/
 
 /-- **The RTYPE execute stage reaches `Retire_Success`.** `execute (.RTYPE …)` on a state whose `rs1`/`rs2`
