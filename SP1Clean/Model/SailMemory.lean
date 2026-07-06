@@ -384,6 +384,87 @@ lemma run_checked_mem_read_four_bytes_of_isInitialized
     EStateM.run, pure, Pure.pure, Functor.map, getThe, MonadStateOf.get, MonadState.get,
     get, EStateM.get, MemoryOpResult_add_meta]
 
+/-- Four-byte `checked_mem_read` on the **`InstructionFetch`** path under kernel config. Identical to the
+`Load` version — `SP1_PMA` grants `executable := true` alongside `readable := true`, so `phys_access_check`
+passes for a fetch exactly as for a load. The fetch reduction (`fetch () = F_Base w`) reuses this. -/
+lemma run_checked_mem_read_four_bytes_fetch_of_isInitialized
+    (reg_val offset : BitVec 64)
+    (data₀ data₁ data₂ data₃ : BitVec 8)
+    (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
+    (h_align : Int.tmod (↑(zero_extend (BitVec.addInt (reg_val + offset) 0) : BitVec 64).toNat) 4 = 0)
+    (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none)
+    (h_pma : s.regs.get Register.pma_regions (hs _) = [SP1_PMA_Region])
+    (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀)
+    (hmem₁ : s.mem[(reg_val + offset).toNat + 1]? = some data₁)
+    (hmem₂ : s.mem[(reg_val + offset).toNat + 2]? = some data₂)
+    (hmem₃ : s.mem[(reg_val + offset).toNat + 3]? = some data₃) :
+    (checked_mem_read (MemoryAccessType.InstructionFetch ())
+        page_based_mem_type.PBMT_PMA Privilege.Machine
+        (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 4
+        false false false false).run s
+      = .ok (.Ok (data₃ ++ data₂ ++ data₁ ++ data₀, ())) s := by
+  simp [checked_mem_read, phys_access_check, pmpCheck, SailME.run, PreSail.PreSailME.run]
+  simp [pmaCheck, Std.ExtDHashMap.get?_eq_some_get (hs _), h_pma]
+  simp [matching_pma_region, matching_pma_region_bits_range]
+  erw [h_in_range]
+  simp [EStateM.Result.map, accessFaultFromAccessType,
+    pma_misaligned_exception, SP1_PMA]
+  simp [is_aligned_paddr, override_PMA, h_align, - EStateM.run_bind]
+  erw [EStateM.run_bind, run_within_mmio_readable_mmio reg_val offset 4 s hs h_htif]
+  simp [read_kind_of_flags, read_ram]
+  simp [ConcurrencyInterfaceV1.sail_mem_read, PreSail.ConcurrencyInterfaceV1.sail_mem_read]
+  simp only [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
+  have hmod : (reg_val + offset).toNat = (reg_val.toNat + offset.toNat) % 18446744073709551616 :=
+    BitVec.toNat_add reg_val offset
+  have hmem₀' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616]? = some data₀ := by
+    rw [← hmod]; exact hmem₀
+  have hmem₁' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616 + 1]? = some data₁ := by
+    rw [← hmod]; exact hmem₁
+  have hmem₂' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616 + 2]? = some data₂ := by
+    rw [← hmod]; exact hmem₂
+  have hmem₃' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616 + 3]? = some data₃ := by
+    rw [← hmod]; exact hmem₃
+  simp [PreSail.readBytes, PreSail.readByte,
+    hmem₀', hmem₁', hmem₂', hmem₃',
+    bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure,
+    EStateM.run, pure, Pure.pure, Functor.map, getThe, MonadStateOf.get, MonadState.get,
+    get, EStateM.get, MemoryOpResult_add_meta]
+
+/-- Four-byte `mem_read` on the **`InstructionFetch`** path under kernel config. `effectivePrivilege` for a
+fetch ignores `MPRV` (the `bne` is false), landing directly at `cur_privilege = Machine`. -/
+lemma run_mem_read_four_bytes_fetch_of_isInitialized
+    (reg_val offset : BitVec 64)
+    (data₀ data₁ data₂ data₃ : BitVec 8)
+    (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
+    (h_align : Int.tmod (↑(zero_extend (BitVec.addInt (reg_val + offset) 0) : BitVec 64).toNat) 4 = 0)
+    (hconfig : SailState.isValidMemConfig s hs)
+    (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀)
+    (hmem₁ : s.mem[(reg_val + offset).toNat + 1]? = some data₁)
+    (hmem₂ : s.mem[(reg_val + offset).toNat + 2]? = some data₂)
+    (hmem₃ : s.mem[(reg_val + offset).toNat + 3]? = some data₃) :
+    (mem_read (MemoryAccessType.InstructionFetch ())
+        page_based_mem_type.PBMT_PMA
+        (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 4
+        false false false).run s
+      = .ok (.Ok (data₃ ++ data₂ ++ data₁ ++ data₀)) s := by
+  obtain ⟨h_cur_privilege, h_mprv_disabled, _, h_htif, h_pma⟩ := hconfig
+  -- the `effectivePrivilege` MPRV branch is dead: `mstatus.MPRV = 0` ⇒ the `∧`'s second conjunct is false,
+  -- so the fetch lands directly at `cur_privilege = Machine` (no need to evaluate the `access ≠ fetch` bne).
+  have hmprv' : Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 = 0#1 := by
+    rw [show Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 =
+      BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (hs _)) >>> 17) from rfl]
+    exact h_mprv_disabled
+  simp [mem_read, mem_read_priv, mem_read_priv_meta, MemoryOpResult_drop_meta,
+    Std.ExtDHashMap.get?_eq_some_get (hs _),
+    h_cur_privilege, effectivePrivilege, hmprv', EStateM.Result.map,
+    run_checked_mem_read_four_bytes_fetch_of_isInitialized reg_val offset
+      data₀ data₁ data₂ data₃ s hs h_in_range h_align h_htif h_pma
+      hmem₀ hmem₁ hmem₂ hmem₃]
+
 /-- Four-byte `mem_read` under kernel config. -/
 lemma run_mem_read_four_bytes_of_isInitialized
     (reg_val offset : BitVec 64)
