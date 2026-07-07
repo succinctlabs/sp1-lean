@@ -1,5 +1,7 @@
 import SP1Clean.Proofs.Sail.TryStepReduction
-import SP1Clean.Soundness.ValueBound
+import SP1Clean.Soundness.RowEffectDefs
+import SP1Clean.Soundness.ProgramConsistency
+import RISCV.Instructions
 
 /-! # Phase 4 — the uniform per-chip `advance` (Sail-step obligation)
 

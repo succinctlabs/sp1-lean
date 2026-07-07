@@ -27,15 +27,9 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
-/-- **The value half of `OperandsBound`.** For each register source operand (`imm = 0`), the live Sail
-register value equals the row's committed read-value column (`op_b`/`op_c` `prev_value`). This is what
-W7's `try_step` reduction consumes: the interpreter's `rs1`/`rs2` reads agree with the chip's columns, so
-the executed result matches the committed `rdWrite`. -/
-def ValueOperandsBound (r : Trace.RowView (ZMod p)) (s : SailState) : Prop :=
-  (∀ idx : BitVec 5, r.adapter.imm_b = 0 → (idx.toNat : ZMod p) = r.adapter.op_b[0] →
-      s.get_reg? idx = some (Word.toBitVec64 r.adapter.op_b_memory.prev_value)) ∧
-  (∀ idx : BitVec 5, r.adapter.imm_c = 0 → (idx.toNat : ZMod p) = r.adapter.op_c[0] →
-      s.get_reg? idx = some (Word.toBitVec64 r.adapter.op_c_memory.prev_value))
+-- `ValueOperandsBound` relocated to `Soundness/RowEffectDefs.lean` (below `ChipRow`, so `Proofs/Sail/Advance`
+-- and the chip `advance` proofs can drop below `ChipRegistry` for the `ChipKind.advance` field). Available
+-- here unchanged via the transitive import of `RowEffectDefs`.
 
 /-- **The cross-bus residual.** Each row's committed read-value columns are the exact-replay value
 (`replayVal`) at the operand register — i.e. the value the most-recent earlier `op_a` write left there.

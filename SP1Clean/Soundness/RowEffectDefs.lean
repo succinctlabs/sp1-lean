@@ -80,4 +80,16 @@ structure RowEffect (prog : GuestProgram) (r : Trace.RowView (ZMod p))
   init : s.isInitialized → s'.isInitialized
   cfg : SailConfigured s → SailConfigured s'
 
+/-- **The value half of `OperandsBound`.** For each register source operand (`imm = 0`), the live Sail
+register value equals the row's committed read-value column (`op_b`/`op_c` `prev_value`). This is what
+W7's `try_step` reduction consumes: the interpreter's `rs1`/`rs2` reads agree with the chip's columns, so
+the executed result matches the committed `rdWrite`. (Relocated here from `Soundness/ValueBound.lean` so the
+Phase-4 `advance` composition — and eventually a `ChipKind.advance` field — sits below `ChipRow`; namespace
+`SP1Clean.Soundness.Target` unchanged so every reference resolves as before.) -/
+def ValueOperandsBound (r : Trace.RowView (ZMod p)) (s : SailState) : Prop :=
+  (∀ idx : BitVec 5, r.adapter.imm_b = 0 → (idx.toNat : ZMod p) = r.adapter.op_b[0] →
+      s.get_reg? idx = some (Word.toBitVec64 r.adapter.op_b_memory.prev_value)) ∧
+  (∀ idx : BitVec 5, r.adapter.imm_c = 0 → (idx.toNat : ZMod p) = r.adapter.op_c[0] →
+      s.get_reg? idx = some (Word.toBitVec64 r.adapter.op_c_memory.prev_value))
+
 end SP1Clean.Soundness.Target
