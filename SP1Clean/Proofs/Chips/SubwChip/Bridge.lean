@@ -2,6 +2,7 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.SubwChip.Formal
 import SP1Clean.Soundness.ChipRow
+import SP1Clean.Proofs.Sail.Advance
 
 /-! # Native Sail bridge for SUBW (+ `ChipKind` registration)
 
@@ -83,20 +84,62 @@ namespace SP1Clean.SubwChip
 
 open SP1Clean.SubwSail
 open Sail LeanRV64D LeanRV64D.Functions
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- **SUBW's committed bus view** — the chip-agnostic `RowView` (opcode `20`, the `pc+4` straight-line
+next-pc, the sign-extended W result `[v0, v1, msb·65535, msb·65535]` as `rdWrite`). Standalone so
+`SubwChip.advance` can be supplied *as* `kind.advance` (see `AddChip.rowView`). -/
+def rowView (inp : Inputs (ZMod p)) (cols : Extracted.SubwCols (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+    cols.adapter.toAdapterView, inp.is_real,
+    #v[cols.subw_operation.value[0], cols.subw_operation.value[1],
+       cols.subw_operation.msb.msb * 65535, cols.subw_operation.msb.msb * 65535], 20⟩
+
+/-- **`SubwChip.advance`** — the per-Subw-row `try_step` lift (SC Phase 4, the **first W-op chip**): the
+`execute_RTYPEW` twin of `AddChip.advance`, a thin single-op adapter over the generic `advance_of_rtypew`
+(register-only, `RTypeReader`). The only per-chip inputs are the opcode `SUBW` (= 20) and the write-value
+identity `hval` — the chip `Spec`'s gated `RV64.subw op_c op_b` conjunct, threaded through `SubwChip.rv64_subw_eq`
++ `subw_pure_eq` into `execute_RTYPEW_pure op_b op_c SUBW` (the low-32 subtract sign-extended to 64). Stated to
+match the `ChipKind.advance` obligation exactly, so `kind.advance := some (PLift.up advance)` type-checks. -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.SubwCols (ZMod p)) (data : ProverData (ZMod p))
+    (prog : GuestProgram) (s : SailState)
+    (hreal : (rowView inp cols).is_real = 1)
+    (hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : inp.adapter = cols.adapter ∧ (rowView inp cols).adapter.op_a ≠ 0) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hlink, hnonX0⟩ := hready
+  have hreal' : inp.is_real = 1 := hreal
+  set r := rowView inp cols with hr
+  have vrd : r.rdWrite = #v[cols.subw_operation.value[0], cols.subw_operation.value[1],
+      cols.subw_operation.msb.msb * 65535, cols.subw_operation.msb.msb * 65535] := rfl
+  have vopbm : r.adapter.op_b_memory = cols.adapter.op_b_memory := rfl
+  have vopcm : r.adapter.op_c_memory = cols.adapter.op_c_memory := rfl
+  obtain ⟨-, hrspec, -, harith⟩ := hspec
+  obtain ⟨-, -, -, -, -, hbounds, -⟩ := hrspec
+  obtain ⟨-, hpc0, -, -⟩ := hbounds hreal'
+  have hop : r.opcode = ((ropwToOpcode ropw.SUBW).toNat : ZMod p) := by
+    simp [hr, rowView, ropwToOpcode, Opcode.toNat]
+  have hval : r.rdWrite.toBitVec64 = execute_RTYPEW_pure r.adapter.op_b_memory.prev_value.toBitVec64
+      r.adapter.op_c_memory.prev_value.toBitVec64 ropw.SUBW := by
+    have ha := harith hreal'
+    simp only [SubwChip.Inputs.op_b_val, SubwChip.Inputs.op_c_val, hlink] at ha
+    rw [vrd, vopbm, vopcm, ha, subw_pure_eq]; exact SubwChip.rv64_subw_eq _ _
+  exact advance_of_rtypew ropw.SUBW hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+
 /-- **SUBW's `ChipKind` registration.** Write-word is the sign-extended W result
-`[v0, v1, msb·65535, msb·65535]`; Program-bus opcode `20`; adapter is `RTypeReader`. -/
+`[v0, v1, msb·65535, msb·65535]`; Program-bus opcode `20`; adapter is `RTypeReader`.
+`advance`/`advanceReady` (SC Phase 4) route to `SubwChip.advance`. -/
 def kind : Soundness.ChipKind p where
   name := "Subw"
   Inputs := SubwChip.Inputs
   Cols := Extracted.SubwCols
-  view := fun inp cols => ⟨cols.state,
-    #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real,
-    #v[cols.subw_operation.value[0], cols.subw_operation.value[1],
-       cols.subw_operation.msb.msb * 65535, cols.subw_operation.msb.msb * 65535], 20⟩
+  view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   sailEquiv := fun inp cols s => ∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
     s.regs.get? Register.PC = some pc →
@@ -108,5 +151,7 @@ def kind : Soundness.ChipKind p where
              cols.subw_operation.msb.msb * 65535, cols.subw_operation.msb.msb * 65535]).run s
   reaches_sail := fun inp cols data s h_real h_chip rs1 rs2 rd pc h_pc h_rs1 h_rs2 =>
     subw_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2
+  advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧ (rowView inp cols).adapter.op_a ≠ 0
+  advance := some (PLift.up advance)
 
 end SP1Clean.SubwChip

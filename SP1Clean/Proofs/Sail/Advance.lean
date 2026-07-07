@@ -118,6 +118,26 @@ theorem rtype_execute_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (op : rop)
     run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
+/-- **The RTYPEW execute stage reaches `Retire_Success`**, generic over the 32-bit W-op. `execute (.RTYPEW …)`
+on a state whose `rs1`/`rs2` reads are known runs to `Retire_Success` writing only `rd` with
+`execute_RTYPEW_pure op_b op_c op` (the low-32 result sign-extended to 64). The `hexec` the shared core needs
+for the W-op family (Addw/Subw + SLLW/SRLW/SRAW); structurally the RTYPE twin (`execute_RTYPEW'` = two reads +
+one write), so the proof is identical modulo `RTYPEW`. -/
+theorem rtypew_execute_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (op : ropw)
+    (op_b op_c : BitVec 64) (s_a : SailState)
+    (h_rs1 : s_a.get_reg? rs1_idx = some op_b)
+    (h_rs2 : s_a.get_reg? rs2_idx = some op_c) :
+    (execute (.RTYPEW (.Regidx rs2_idx, .Regidx rs1_idx, .Regidx rd_idx, op))).run s_a
+      = .ok (ExecutionResult.Retire_Success ())
+          (if rd_idx = 0#5 then s_a
+           else {s_a with regs := (s_a.regs.insert (reg_idx_to_Register rd_idx)
+             (bitVecToRegidxVal rd_idx (execute_RTYPEW_pure op_b op_c op)))}) := by
+  simp only [execute, execute_RTYPEW_eq_execute_RTYPEW', execute_RTYPEW']
+  rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1]),
+    run_bind_of_run s_a _ op_c (by rw [run_rX_bits, h_rs2]),
+    run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  rfl
+
 /-- **`execute_ITYPE` pure part** — the I-type twin of `execute_RTYPE_pure` (op1 = the `rs1` read, `immext`
 = the sign-extended immediate). Covers the ALU immediate ops ADDI/SLTI/SLTIU/ANDI/ORI/XORI, so one
 `itype_execute_reaches` serves the whole immediate-ALU family (Addi + the immediate forms of Bitwise/Lt).
@@ -640,6 +660,49 @@ theorem advance_of_rtype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
     (fun t hframe _ => by
       have := rtype_execute_reaches rs2 rs1 rd op (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_neg hrd_ne] at this)
+    hrd_ne hopa'.symm hval hstraight hpc0
+
+/-- **The W-op chip `advance` — RowView-generic, one call per chip and 32-bit W-op** (`AddwChip`/`SubwChip`,
+and the `*W` variants of Shift). The `execute_RTYPEW` twin of `advance_of_rtype`: identical straight-line,
+two-read composition, only the decode (`decodesRTypew`) / execute (`rtypew_execute_reaches`) / write value
+(`execute_RTYPEW_pure`) are the W forms. The only per-chip inputs are `op` and the `Spec`-derived `hval`
+(`rdWrite = execute_RTYPEW_pure op_b op_c op` — the low-32 op sign-extended). -/
+theorem advance_of_rtypew {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (op : ropw)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s)
+    (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((ropwToOpcode op).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0)
+    (hnonX0 : r.adapter.op_a ≠ 0)
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hval : Word.toBitVec64 r.rdWrite
+      = execute_RTYPEW_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+          (Word.toBitVec64 r.adapter.op_c_memory.prev_value) op) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ :=
+    decodesRTypew op hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
+  exact advance_write_core (instruction.RTYPEW (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) rd
+    (execute_RTYPEW_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+      (Word.toBitVec64 r.adapter.op_c_memory.prev_value) op) (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ => by
+      have := rtypew_execute_reaches rs2 rs1 rd op (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
         (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
       rwa [if_neg hrd_ne] at this)
     hrd_ne hopa'.symm hval hstraight hpc0

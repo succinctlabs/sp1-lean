@@ -368,6 +368,44 @@ theorem instrToProgramRow_inv_rtype {pc : Vector (ZMod p) 3} {i : instruction} {
   · rename_i rs2 rs1 rd isU
     exact absurd (opcodeCast_inj hop) (by cases isU <;> cases op <;> decide)
 
+/-- **The RTYPEW decode inversion (W7), generic over the W-op.** The `execute_RTYPEW` twin of
+`instrToProgramRow_inv_rtype`: if a decoded `i` projects to a committed row whose opcode is `op`'s
+(`ropwToOpcode`, image `{19..23}`) and whose `imm_c = 0`, then `i` *is* `RTYPEW (rs2, rs1, rd, op)`. Same
+shape as the R-type arm (the RTYPEW projection differs only in the opcode); `imm_c = 0` kills the
+immediate-typed arms, and the opcode column — disjoint from `ropToOpcode` (`0..10`) and from MUL/MULW/DIV*/REM*
+— rules out the other R-shaped arms and pins the op within RTYPEW. **Serves Addw/Subw + the `*W` variants of
+Shift** (SLLW/SRLW/SRAW). -/
+theorem instrToProgramRow_inv_rtypew {pc : Vector (ZMod p) 3} {i : instruction} {row : ProgramRow (ZMod p)}
+    (op : ropw) (h : instrToProgramRow pc i = some row)
+    (hop : row.opcode = ((ropwToOpcode op).toNat : ZMod p))
+    (himm : row.imm_c = (0 : ZMod p)) :
+    ∃ rs2 rs1 rd : regidx, i = .RTYPEW (rs2, rs1, rd, op) ∧
+      row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
+      ∧ row.op_c = #v[regidxVal rs2, 0, 0, 0] := by
+  simp only [instrToProgramRow] at h
+  split at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst h)
+  all_goals (try (exact absurd himm one_ne_zero))
+  · rename_i rs2 rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i rs2 rs1 rd op'
+    have hz : (ropwToOpcode op').toNat = (ropwToOpcode op).toNat := opcodeCast_inj hop
+    obtain rfl : op' = op := by cases op' <;> cases op <;> first | rfl | (exact absurd hz (by decide))
+    exact ⟨rs2, rs1, rd, rfl, rfl, rfl, rfl⟩
+  · rename_i rs2 rs1 rd m
+    exact absurd (opcodeCast_inj hop)
+      (by rcases m with ⟨a, b, c⟩; cases a <;> cases b <;> cases c <;> cases op <;> decide)
+  · rename_i rs2 rs1 rd
+    exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
+  · rename_i rs2 rs1 rd isU
+    exact absurd (opcodeCast_inj hop) (by cases isU <;> cases op <;> decide)
+  · rename_i rs2 rs1 rd isU
+    exact absurd (opcodeCast_inj hop) (by cases isU <;> cases op <;> decide)
+  · rename_i rs2 rs1 rd isU
+    exact absurd (opcodeCast_inj hop) (by cases isU <;> cases op <;> decide)
+  · rename_i rs2 rs1 rd isU
+    exact absurd (opcodeCast_inj hop) (by cases isU <;> cases op <;> decide)
+
 /-- The pc-limb vector of a program row. -/
 def rowPcVec (row : ProgramRow (ZMod p)) : Vector (ZMod p) 3 := #v[row.pc0, row.pc1, row.pc2]
 
@@ -477,6 +515,44 @@ theorem decodesRType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : rop
   obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
   obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
   obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_rtype op hrow2 hop himm
+  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
+  have e2 : rs2' = rs2 := regidx_bv_inj (by
+    have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
+    exact h.symm)
+  have e1 : rs1' = rs1 := regidx_bv_inj (by
+    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
+    exact h.symm)
+  have e0 : rd' = rd := regidx_bv_inj (by
+    have h := ha.symm.trans ha'
+    simp only [regidxVal] at h
+    exact h.symm)
+  subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
+
+/-- **The ∀-configured-state RTYPEW decode producer** — the `execute_RTYPEW` twin of `decodesRType`. From the
+Program-bus `decodedInROM` + the committed `(opcode, imm_c=0)`, recover the fetched word `w` and the register
+indices `rs2/rs1/rd`, with the decode `ext_decode w = RTYPEW(rs2,rs1,rd,op)` holding in **every** configured
+state (the register indices pinned by `regidx_bv_inj`). What `advance_of_rtypew` consumes. -/
+theorem decodesRTypew {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : ropw)
+    (h : decodedInROM prog row)
+    (hop : row.opcode = ((ropwToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0)
+    {s0 : SailState} (hs0 : SailConfigured s0) :
+    ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
+      prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (∀ sc, SailConfigured sc → (ext_decode w).run sc
+        = .ok (instruction.RTYPEW (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) sc) ∧
+      row.op_a = (rd.toNat : ZMod p) ∧
+      row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
+      row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
+  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
+  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_rtypew op hrow0 hop himm
+  obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
+  refine ⟨w, rs2, rs1, rd, hfetch, ?_, ha, hb, hc⟩
+  intro sc hsc
+  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
+  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
+  obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_rtypew op hrow2 hop himm
   obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
   have e2 : rs2' = rs2 := regidx_bv_inj (by
     have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
