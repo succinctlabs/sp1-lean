@@ -5,6 +5,7 @@ import SP1Clean.Proofs.Chips.AddChip.Formal
 import SP1Clean.Native.Chips.AddiChip.Defs
 import SP1Clean.Proofs.Chips.AddiChip.Formal
 import SP1Clean.Proofs.Chips.AddiChip.Bridge
+import SP1Clean.Proofs.Chips.AddiChip.Advance
 import SP1Clean.Proofs.Chips.AddwChip.Bridge
 import SP1Clean.Native.Chips.AddwChip.Defs
 import SP1Clean.Proofs.Chips.AddwChip.Formal
