@@ -2,6 +2,7 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.LtChip.Formal
 import SP1Clean.Soundness.ChipRow
+import SP1Clean.Proofs.Sail.Advance
 
 /-! # Native Sail bridge for the unified `Lt` chip (SLT + SLTU) + `ChipKind`
 
@@ -207,21 +208,78 @@ namespace SP1Clean.LtChip
 
 open SP1Clean.LtSail
 open Sail LeanRV64D LeanRV64D.Functions
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- **Lt's committed bus view** — the chip-agnostic `RowView` (opcode `is_slt·9 + is_sltu·10`, the `pc+4`
+straight-line next-pc, the comparison `resultWord` as `rdWrite`). Standalone so `LtChip.advance` can be
+supplied *as* `kind.advance` (see `AddChip.rowView`). -/
+def rowView (inp : Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+    cols.adapter.toAdapterView, inp.is_real, resultWord cols,
+    cols.is_slt * 9 + cols.is_sltu * 10⟩
+
+/-- **`LtChip.advance`** — the per-Lt-row `try_step` lift (SC Phase 4, the second multi-op chip): a 2-way
+adapter (SLT/SLTU) over `advance_of_rtype`, register-only (`imm_c = 0`). Each flag branch reads its opcode off
+the `is_slt·9+is_sltu·10` selector (the one-hot in `advanceReady` zeros the other → the single op), and its
+write-value identity from the Spec's gated `RV64.slt`/`sltu` conjunct via `execute_RTYPE_pure_slt`/`_sltu`.
+The `advanceReady` bundle carries the dispatcher-discharged facts: the pc-limb bound, `imm_c = 0`, the flag
+one-hot (op-determination pinned by the program-bus decode), the `op_a ≠ 0` routing, and — since `Lt` commits
+its operand as `op_c_val = adapter.op_c` (a value column, unlike Add/Bitwise's `op_c_memory.prev_value`) — the
+operand binding `op_c = op_c_memory.prev_value` (the register-read tie, forced by memory-bus consistency).
+Stated to match the `ChipKind.advance` obligation exactly, so `kind.advance := some (PLift.up advance)`. -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) (data : ProverData (ZMod p))
+    (prog : GuestProgram) (s : SailState)
+    (hreal : (rowView inp cols).is_real = 1)
+    (hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : inp.adapter = cols.adapter ∧ cols.state.pc[0].val < 2 ^ 16 ∧ cols.adapter.imm_c = 0 ∧
+      cols.adapter.op_c = cols.adapter.op_c_memory.prev_value ∧
+      ((cols.is_slt = 1 ∧ cols.is_sltu = 0) ∨ (cols.is_slt = 0 ∧ cols.is_sltu = 1)) ∧
+      (rowView inp cols).adapter.op_a ≠ 0) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hlink, hpc0, himmc, hopc, hflag, hnonX0⟩ := hready
+  have hreal' : inp.is_real = 1 := hreal
+  set r := rowView inp cols with hr
+  have vrd : r.rdWrite = resultWord cols := rfl
+  have vopbm : r.adapter.op_b_memory = cols.adapter.op_b_memory := rfl
+  have vopcm : r.adapter.op_c_memory = cols.adapter.op_c_memory := rfl
+  obtain ⟨-, -, hgated⟩ := hspec
+  have hg := hgated hreal'
+  rcases hflag with ⟨h_slt, h_sltu0⟩ | ⟨h_slt0, h_sltu⟩
+  · have hop : r.opcode = ((ropToOpcode rop.SLT).toNat : ZMod p) := by
+      simp [hr, rowView, h_slt, h_sltu0, ropToOpcode, Opcode.toNat]
+    have hval : r.rdWrite.toBitVec64 = execute_RTYPE_pure r.adapter.op_b_memory.prev_value.toBitVec64
+        r.adapter.op_c_memory.prev_value.toBitVec64 rop.SLT := by
+      have hslt := hg.1 h_slt
+      simp only [LtChip.Inputs.op_c_val, LtChip.Inputs.op_b_val, hlink] at hslt
+      rw [hopc] at hslt
+      rw [vrd, vopbm, vopcm, execute_RTYPE_pure_slt]; exact hslt
+    exact advance_of_rtype rop.SLT hcfg hrom hpcread hvalb hdecrom hop rfl himmc hnonX0 hpc0 rfl hval
+  · have hop : r.opcode = ((ropToOpcode rop.SLTU).toNat : ZMod p) := by
+      simp [hr, rowView, h_slt0, h_sltu, ropToOpcode, Opcode.toNat]
+    have hval : r.rdWrite.toBitVec64 = execute_RTYPE_pure r.adapter.op_b_memory.prev_value.toBitVec64
+        r.adapter.op_c_memory.prev_value.toBitVec64 rop.SLTU := by
+      have hsltu := hg.2 h_sltu
+      simp only [LtChip.Inputs.op_c_val, LtChip.Inputs.op_b_val, hlink] at hsltu
+      rw [hopc] at hsltu
+      rw [vrd, vopbm, vopcm, execute_RTYPE_pure_sltu]; exact hsltu
+    exact advance_of_rtype rop.SLTU hcfg hrom hpcread hvalb hdecrom hop rfl himmc hnonX0 hpc0 rfl hval
 
 /-- **Lt's `ChipKind` registration.** Program-bus opcode `is_slt·9 + is_sltu·10`; `sailEquiv` is the
 conjunction of the **register** SLT/SLTU guarantee (gated on the rs2 read) and the **immediate** SLTI/SLTIU
 guarantee (gated on the program-bus immediate decode `op_c_val = sign_extend imm`), each flag-dispatched.
-A row is register (`imm_c = 0`) or immediate (`imm_c = 1`); the consumer picks the matching conjunct. -/
+A row is register (`imm_c = 0`) or immediate (`imm_c = 1`); the consumer picks the matching conjunct.
+`advance`/`advanceReady` (SC Phase 4) route to `LtChip.advance`. -/
 def kind : Soundness.ChipKind p where
   name := "Lt"
   Inputs := LtChip.Inputs
   Cols := Extracted.LtCols
-  view := fun inp cols => ⟨cols.state,
-    #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, resultWord cols,
-    cols.is_slt * 9 + cols.is_sltu * 10⟩
+  view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   sailEquiv := fun inp cols s =>
     (∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
@@ -249,5 +307,10 @@ def kind : Soundness.ChipKind p where
        lt_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2,
      fun rs1 rd imm pc h_pc h_rs1 h_dec =>
        lt_chip_reaches_sail_imm inp cols data rs1 rd imm pc s h_real h_chip h_pc h_rs1 h_dec⟩
+  advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧ cols.state.pc[0].val < 2 ^ 16 ∧
+    cols.adapter.imm_c = 0 ∧ cols.adapter.op_c = cols.adapter.op_c_memory.prev_value ∧
+    ((cols.is_slt = 1 ∧ cols.is_sltu = 0) ∨ (cols.is_slt = 0 ∧ cols.is_sltu = 1)) ∧
+    (rowView inp cols).adapter.op_a ≠ 0
+  advance := some (PLift.up advance)
 
 end SP1Clean.LtChip
