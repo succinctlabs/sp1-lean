@@ -59,8 +59,11 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
        input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
        f[0] * 3 + f[1] * 4 + f[2] * 5, 0, 0, 0, 0⟩) data)
 
-/-- Proven `is_real`-binary + `is_real`/flag-gated RV64 identity on the result word. Vacuous on
-padding. Cross-row bus guarantees live at the trace level and are not re-exposed here. -/
+/-- Proven `is_real`-binary + `is_real`/flag-gated RV64 identity on the result word + the **flag structure**
+(each of `is_and`/`is_or`/`is_xor` is boolean, and they are mutually exclusive one-hot) — the last conjunct is
+what the Phase-4 `advance` dispatch needs to route a real row to its single operation (the "at least one flag
+set" it combines with comes from the program-bus decode, since the constraints tie the flag *sum* to `{0,1}`
+but not to `is_real`). Vacuous on padding. Cross-row bus guarantees live at the trace level. -/
 def Spec (input : Inputs (ZMod p)) (cols : BitwiseCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   (input.is_real = 1 →
@@ -72,7 +75,12 @@ def Spec (input : Inputs (ZMod p)) (cols : BitwiseCols (ZMod p)) (_ : ProverData
         = RV64.or (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
     (cols.is_xor = 1 →
       Word.toBitVec64 (resultWord cols)
-        = RV64.xor (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)))
+        = RV64.xor (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))) ∧
+  ((cols.is_and = 0 ∨ cols.is_and = 1) ∧ (cols.is_or = 0 ∨ cols.is_or = 1) ∧
+    (cols.is_xor = 0 ∨ cols.is_xor = 1) ∧
+    (cols.is_and = 1 → cols.is_xor = 0 ∧ cols.is_or = 0) ∧
+    (cols.is_or = 1 → cols.is_xor = 0 ∧ cols.is_and = 0) ∧
+    (cols.is_xor = 1 → cols.is_or = 0 ∧ cols.is_and = 0))
 
 /-- One-hot lemma for the three opcode selectors: given each selector is binary and their sum is binary
 (`E1 = is_xor + is_or + is_and` with `E9 = E1·(E1-1) = 0`), whichever selector is `1` forces the other
@@ -177,7 +185,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have hop3 : (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0).val < 3 :=
     val_lt_three hop_cases
   -- once the active flag forces the others to 0, the byte opcode reduces to a literal
-  refine ⟨⟨h_bin, fun hr => ⟨fun hand => ?_, fun hor => ?_, fun hxor => ?_⟩⟩, ?_⟩
+  refine ⟨⟨h_bin, fun hr => ⟨fun hand => ?_, fun hor => ?_, fun hxor => ?_⟩,
+    ⟨h_and_bool, h_or_bool, h_xor_bool, hoh.2.2, hoh.2.1, hoh.1⟩⟩, ?_⟩
   · obtain ⟨hx0, ho0⟩ := hoh.2.2 hand
     have hopc : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0 := by
       rw [hx0, ho0]; ring

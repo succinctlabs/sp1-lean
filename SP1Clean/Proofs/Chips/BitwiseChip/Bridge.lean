@@ -125,7 +125,7 @@ theorem bitwise_chip_reaches_sail_and
       = (sp1_bitwise (.Regidx rd_idx) pc cols.bitwise_operation.bitwise_operation.result).run s := by
   refine correct_bitwise_native input.op_b_val input.op_c_val cols.bitwise_operation.bitwise_operation.result rs1_idx rs2_idx rd_idx pc s
     rop.AND h_pc h_rs1 h_rs2 ?_
-  exact (h_chip.2 h_real).1 h_and
+  exact (h_chip.2.1 h_real).1 h_and
 
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (OR): a real Bitwise chip row with `is_or = 1` reaches the Sail `OR`. -/
@@ -141,7 +141,7 @@ theorem bitwise_chip_reaches_sail_or
       = (sp1_bitwise (.Regidx rd_idx) pc cols.bitwise_operation.bitwise_operation.result).run s := by
   refine correct_bitwise_native input.op_b_val input.op_c_val cols.bitwise_operation.bitwise_operation.result rs1_idx rs2_idx rd_idx pc s
     rop.OR h_pc h_rs1 h_rs2 ?_
-  exact (h_chip.2 h_real).2.1 h_or
+  exact (h_chip.2.1 h_real).2.1 h_or
 
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (XOR): a real Bitwise chip row with `is_xor = 1` reaches the Sail `XOR`. -/
@@ -157,7 +157,7 @@ theorem bitwise_chip_reaches_sail_xor
       = (sp1_bitwise (.Regidx rd_idx) pc cols.bitwise_operation.bitwise_operation.result).run s := by
   refine correct_bitwise_native input.op_b_val input.op_c_val cols.bitwise_operation.bitwise_operation.result rs1_idx rs2_idx rd_idx pc s
     rop.XOR h_pc h_rs1 h_rs2 ?_
-  exact (h_chip.2 h_real).2.2 h_xor
+  exact (h_chip.2.1 h_real).2.2 h_xor
 
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (ANDI): a real Bitwise chip row with `is_and = 1` whose `op_c` is the sign-extended
@@ -174,7 +174,7 @@ theorem bitwise_chip_reaches_sail_andi
       = (sp1_bitwise (.Regidx rd_idx) pc cols.bitwise_operation.bitwise_operation.result).run s := by
   refine correct_andi_native input.op_b_val input.op_c_val cols.bitwise_operation.bitwise_operation.result
     rs1_idx rd_idx imm pc s h_pc h_rs1 h_dec ?_
-  exact (h_chip.2 h_real).1 h_and
+  exact (h_chip.2.1 h_real).1 h_and
 
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (ORI): a real Bitwise chip row with `is_or = 1` and immediate `op_c` reaches the Sail `ORI`. -/
@@ -190,7 +190,7 @@ theorem bitwise_chip_reaches_sail_ori
       = (sp1_bitwise (.Regidx rd_idx) pc cols.bitwise_operation.bitwise_operation.result).run s := by
   refine correct_ori_native input.op_b_val input.op_c_val cols.bitwise_operation.bitwise_operation.result
     rs1_idx rd_idx imm pc s h_pc h_rs1 h_dec ?_
-  exact (h_chip.2 h_real).2.1 h_or
+  exact (h_chip.2.1 h_real).2.1 h_or
 
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (XORI): a real Bitwise chip row with `is_xor = 1` and immediate `op_c` reaches the Sail `XORI`. -/
@@ -206,7 +206,7 @@ theorem bitwise_chip_reaches_sail_xori
       = (sp1_bitwise (.Regidx rd_idx) pc cols.bitwise_operation.bitwise_operation.result).run s := by
   refine correct_xori_native input.op_b_val input.op_c_val cols.bitwise_operation.bitwise_operation.result
     rs1_idx rd_idx imm pc s h_pc h_rs1 h_dec ?_
-  exact (h_chip.2 h_real).2.2 h_xor
+  exact (h_chip.2.1 h_real).2.2 h_xor
 
 end SP1Clean.BitwiseSail
 
