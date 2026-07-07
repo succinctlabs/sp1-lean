@@ -819,4 +819,87 @@ theorem decodesUType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : uop
   have eimm : imm' = imm := sext20shl12_word_inj imm' imm (hb'.symm.trans hb)
   subst e0 eimm; rw [hi2] at hrun2; exact hrun2
 
+/-- **The JAL decode inversion (W7).** JAL is its own opcode (`Opcode.JAL` = 46) committed with `imm_c = 1`,
+`op_a = rd`, `op_b = bitVecToWord (imm.signExtend 64)` (the 21-bit jump offset sign-extended), `op_c = 0`. So
+`(opcode = JAL, imm_c = 1)` pins the `.JAL` arm. The immediate-shaped twin of `inv_addiw` (JAL is one of the
+`imm_c = 1` bullets). -/
+theorem instrToProgramRow_inv_jal {pc : Vector (ZMod p) 3} {i : instruction} {row : ProgramRow (ZMod p)}
+    (h : instrToProgramRow pc i = some row)
+    (hop : row.opcode = ((Opcode.JAL).toNat : ZMod p))
+    (himm : row.imm_c = (1 : ZMod p)) :
+    ∃ (imm : BitVec 21) (rd : regidx), i = .JAL (imm, rd) ∧
+      row.op_a = regidxVal rd ∧ row.op_b = bitVecToWord (imm.signExtend 64)
+      ∧ row.op_c = #v[0, 0, 0, 0] := by
+  have honezero : (1 : ZMod p) ≠ 0 := by
+    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    exact one_ne_zero
+  simp only [instrToProgramRow] at h
+  split at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst h)
+  all_goals (try (exact absurd himm.symm honezero))
+  · rename_i imm rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i imm rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i imm rd
+    exact ⟨imm, rd, rfl, rfl, rfl, rfl⟩
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by decide)
+  · rename_i imm rs2 rs1 op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i imm rs1 rd isU width
+    exact absurd (opcodeCast_inj hop)
+      (by cases isU <;> (simp only [loadOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs2 rs1 width
+    exact absurd (opcodeCast_inj hop)
+      (by simp only [storeOpcode, Opcode.toNat]; split_ifs <;> decide)
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by decide)
+
+/-- **The 21-bit JAL offset sign-extension is injective** (clean, no `bv_decide`): recover `x` as the low 21
+bits of `x.signExtend 64` via `getLsbD`. The imm-uniqueness `decodesJal` rides. -/
+theorem sext21_inj {a b : BitVec 21} (h : a.signExtend 64 = b.signExtend 64) : a = b := by
+  have key : ∀ x : BitVec 21, (x.signExtend 64).setWidth 21 = x := fun x => by
+    apply BitVec.eq_of_getLsbD_eq
+    intro i hi
+    simp only [BitVec.getLsbD_setWidth, BitVec.getLsbD_signExtend, hi]
+    have h64 : i < 64 := by omega
+    simp [hi, h64]
+  rw [← key a, ← key b, h]
+
+/-- **The ∀-configured-state JAL decode producer** — the `.JAL` twin of `decodesADDIW`, keyed on the committed
+`(opcode = JAL, imm_c = 1)`. Recovers `w` + `imm/rd` with the decode holding in every configured state (`rd`
+by `regidx_bv_inj`, the 21-bit offset by `sext21_inj` on `op_b`). What `advance_of_jal` consumes. -/
+theorem decodesJal {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row)
+    (hop : row.opcode = ((Opcode.JAL).toNat : ZMod p)) (himm : row.imm_c = 1)
+    {s0 : SailState} (hs0 : SailConfigured s0) :
+    ∃ (w : BitVec 32) (imm : BitVec 21) (rd : BitVec 5),
+      prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (∀ sc, SailConfigured sc → (ext_decode w).run sc
+        = .ok (instruction.JAL (imm, .Regidx rd)) sc) ∧
+      row.op_a = (rd.toNat : ZMod p) ∧
+      row.op_b = bitVecToWord (imm.signExtend 64) ∧
+      row.op_c = #v[0, 0, 0, 0] := by
+  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
+  obtain ⟨imm, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_jal hrow0 hop himm
+  obtain ⟨rd⟩ := rdr
+  refine ⟨w, imm, rd, hfetch, ?_, ha, hb, hc⟩
+  intro sc hsc
+  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
+  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
+  obtain ⟨imm', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_jal hrow2 hop himm
+  obtain ⟨rd'⟩ := rd'
+  have e0 : rd' = rd := regidx_bv_inj (by
+    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
+  have eimm : imm' = imm := by
+    have e := congrArg (Word.toBitVec64 (p := p)) (hb.symm.trans hb')
+    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
+    exact (sext21_inj e).symm
+  subst e0 eimm; rw [hi2] at hrun2; exact hrun2
+
 end SP1Clean.Soundness.Target
