@@ -21,9 +21,7 @@ open SP1Clean.TryStepReduction
 
 set_option maxHeartbeats 4000000
 
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
-
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The row's committed next-pc as a 64-bit value — data-dependent (straight-line `pc+4` or the control-flow
 target), read uniformly off the RowView's `next_pc` limbs via `sndPcOf (stateAccess v)`. -/
@@ -75,7 +73,7 @@ index is canonical because `rd.toNat < 32 < p`). -/
 theorem ofNat_val_eq_of_cast {rd : BitVec 5} {op_a : ZMod p} (hrd : (rd.toNat : ZMod p) = op_a) :
     BitVec.ofNat 5 op_a.val = rd := by
   rw [← hrd]
-  have hp : (2:ℕ) ^ 24 < p := Fact.out
+  have hp : (2:ℕ) ^ 17 < p := Fact.out
   rw [ZMod.val_natCast_of_lt (by have := rd.isLt; omega)]
   simp [BitVec.ofNat_toNat]
 
@@ -88,7 +86,7 @@ theorem sndPc_straightline (r : Trace.RowView (ZMod p))
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (h0 : (r.state.pc[0]).val < 2 ^ 16) :
     sndPcOf (stateAccess r) = rcvPcOf (stateAccess r) + 4#64 := by
-  have hp : (2:ℕ) ^ 24 < p := Fact.out
+  have hp : (2:ℕ) ^ 17 < p := Fact.out
   have hv4 : (4 : ZMod p).val = 4 := by
     simp only [ZMod.val_ofNat, Nat.mod_eq_of_lt (show 4 < p by omega)]
   have e0 : (r.state.pc[0] + 4 : ZMod p).val = (r.state.pc[0]).val + 4 := by
