@@ -82,7 +82,8 @@ theorem decode_bound (prog : GuestProgram) {pi : SP1PublicIO (ZMod p)}
     ext j hj
     interval_cases j <;> simp
   rw [hpcvec] at hdec
-  exact hdec s hcfg
+  obtain ⟨i, hr, hrow⟩ := hdec s hcfg
+  exact ⟨i, s, hr, hrow⟩
 
 /-! ## The balance-level decode discharge (removing the threaded link) — W3 deliverable B -/
 
@@ -216,7 +217,7 @@ theorem decodedInROM_addRow : decodedInROM addProgram (addRow (p := p)) := by
       GuestProgram.fetchWord, List.find?_cons, List.find?_nil]
     norm_num
   · intro s hcfg
-    refine ⟨.RTYPE (regidx.Regidx 3#5, regidx.Regidx 2#5, regidx.Regidx 1#5, rop.ADD), s,
+    refine ⟨.RTYPE (regidx.Regidx 3#5, regidx.Regidx 2#5, regidx.Regidx 1#5, rop.ADD),
       SP1Clean.SailDecode.decode_ADD_example s hcfg.init hcfg.priv, ?_⟩
     rw [instrToProgramRow_rtype]; rfl
 

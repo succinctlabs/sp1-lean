@@ -120,8 +120,8 @@ surface the Phase-4 per-chip `advance` consumes (its opcode-based Sail dispatch)
 `decodedInROM.decodes` accessor through the `ProgTruth` conjunction. -/
 theorem ProgTruth.decodes {m : ProgramMsg (ZMod p)} {data : ProverData (ZMod p)}
     (h : ProgTruth m data) (s : SailState) (hs : SailConfigured s) :
-    ∃ w i s', (Commit.progOf data).fetchWord (pcBitsOfRow (rowOfMsg m)) = some w ∧
-      (ext_decode w).run s = .ok i s' ∧
+    ∃ w i, (Commit.progOf data).fetchWord (pcBitsOfRow (rowOfMsg m)) = some w ∧
+      (ext_decode w).run s = .ok i s ∧
       instrToProgramRow (rowPcVec (rowOfMsg m)) i = some (rowOfMsg m) :=
   h.2.decodes s hs
 

@@ -376,7 +376,7 @@ to the decoded committed columns. (Discharged from bus balance via a `ProgramPro
 — tracked separately.) -/
 def decodedInROM (prog : GuestProgram) (row : ProgramRow (ZMod p)) : Prop :=
   ∃ w, prog.fetchWord (pcBitsOfRow row) = some w ∧
-    ∀ s, SailConfigured s → ∃ i s', (ext_decode w).run s = .ok i s' ∧
+    ∀ s, SailConfigured s → ∃ i, (ext_decode w).run s = .ok i s ∧
       instrToProgramRow (rowPcVec row) i = some row
 
 set_option linter.unusedSectionVars false in
@@ -387,10 +387,10 @@ row. This is the callable RV64 surface the Phase-4 `advance`/`try_step` reductio
 `ProgTruth` — making the LeanRV64D decoder an explicit, reusable lemma rather than a buried existential. -/
 theorem decodedInROM.decodes {prog : GuestProgram} {row : ProgramRow (ZMod p)}
     (h : decodedInROM prog row) (s : SailState) (hs : SailConfigured s) :
-    ∃ w i s', prog.fetchWord (pcBitsOfRow row) = some w ∧
-      (ext_decode w).run s = .ok i s' ∧ instrToProgramRow (rowPcVec row) i = some row := by
+    ∃ w i, prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (ext_decode w).run s = .ok i s ∧ instrToProgramRow (rowPcVec row) i = some row := by
   obtain ⟨w, hfetch, hbody⟩ := h
-  obtain ⟨i, s', hrun, hrow⟩ := hbody s hs
-  exact ⟨w, i, s', hfetch, hrun, hrow⟩
+  obtain ⟨i, hrun, hrow⟩ := hbody s hs
+  exact ⟨w, i, hfetch, hrun, hrow⟩
 
 end SP1Clean.Soundness.Target
