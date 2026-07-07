@@ -1,6 +1,7 @@
 import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.Model.Semantics.GuestProgram
 import SP1Clean.Model.Semantics.Decode
+import SP1Clean.Soundness.RowEffectDefs
 
 /-! # The target machine-level theorem — a real Sail execution chain from a loaded guest program
 
@@ -80,15 +81,9 @@ def SP1TargetPublicIO.toLegacy {F : Type} (pi : SP1TargetPublicIO F) : SP1Public
     final_clk_high := pi.final_clk_high, final_clk_low := pi.final_clk_low,
     final_pc0 := pi.final_pc0, final_pc1 := pi.final_pc1, final_pc2 := pi.final_pc2 }
 
-/-! ## PC limbs ↔ the Sail 64-bit PC (`pcBitsOfVals` relocated to `Model/Semantics/Decode.lean`) -/
-
-/-- The 64-bit PC a row's state-bus **receive** key carries (its current pc). -/
-def rcvPcOf (sa : StateAccess (ZMod p)) : BitVec 64 :=
-  pcBitsOfVals sa.pc[0].val sa.pc[1].val sa.pc[2].val
-
-/-- The 64-bit PC a row's state-bus **send** key carries (its committed next pc). -/
-def sndPcOf (sa : StateAccess (ZMod p)) : BitVec 64 :=
-  pcBitsOfVals sa.next_pc[0].val sa.next_pc[1].val sa.next_pc[2].val
+/-! ## PC limbs ↔ the Sail 64-bit PC — `rcvPcOf`/`sndPcOf` relocated to `Soundness/RowEffectDefs.lean`
+(below `ChipRow`), alongside `RefinesAt`/`RowEffect`/`replayVal`, so the `ChipKind.advance` field can
+reference them. -/
 
 omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
 private lemma sndPc_eq_rcvPc {sa sb : StateAccess (ZMod p)} (h : sndKey sa = rcvKey sb) :
@@ -134,52 +129,9 @@ lemma isWalk_chain {α V : Type} {edge : α → V × V} :
       have h' : j + 1 < rest.length := by simpa using h
       simpa using ih hrest j h'
 
-/-! ## The refinement invariant and the per-row effect -/
-
-/-- **The exact-replay value (W2).** The value register `idx` holds after replaying the first `i` walk
-rows from `s0`: the committed write (`rdWrite`) of the **most-recent** earlier row whose `op_a`
-destination is `idx`, or `s0`'s value if none wrote it. The exact-value refinement of the old frame
-disjunction — `RefinesAt.frame` now pins each register to this, so a row's committed operand columns
-(read-back register values) can be tied to the live Sail registers (W2's operand binding). -/
-def replayVal (s0 : SailState) (path : List (Trace.RowView (ZMod p))) (idx : BitVec 5) :
-    ℕ → Option (BitVec 64)
-  | 0 => s0.get_reg? idx
-  | i + 1 =>
-    if hi : i < path.length then
-      if (idx.toNat : ZMod p) = (path[i]'hi).adapter.op_a then
-        some (Word.toBitVec64 (path[i]'hi).rdWrite)
-      else replayVal s0 path idx i
-    else replayVal s0 path idx i
-
-/-- The simulation invariant at walk position `i`: the state's PC is the next row's committed pc, the
-program ROM is intact, the platform configuration persists, and every register holds its **exact replay
-value** (`replayVal`: the most-recent earlier `op_a` write, or `s0`'s value). The register clause is now
-an exact replay, not a frame (W2's operand-binding strengthening). -/
-structure RefinesAt (prog : GuestProgram) (s0 : SailState)
-    (path : List (Trace.RowView (ZMod p))) (i : ℕ) (s : SailState) : Prop where
-  pc : ∀ (h : i < path.length),
-    s.regs.get? Register.PC = some (rcvPcOf (stateAccess (path[i]'h)))
-  rom : RomLoaded prog s
-  init : s.isInitialized
-  cfg : SailConfigured s
-  frame : ∀ idx : BitVec 5, s.get_reg? idx = replayVal s0 path idx i
-
-/-- The committed effect of one row, as a relation between the pre- and post-states of its interpreter
-step: the PC moves to the row's committed `next_pc`; the register file is **exactly** `s` except at the
-row's `op_a` destination, where it becomes the committed write value `rdWrite`; ROM, initialization, and
-configuration persist. The register clause is the exact-write form (W7's `wX_bits rd` produces it) the
-exact replay needs — `try_step` may also touch bookkeeping registers (`minstret`, `hart_state`, …) the
-trace doesn't commit, but those are outside the `BitVec 5` register file. -/
-structure RowEffect (prog : GuestProgram) (r : Trace.RowView (ZMod p))
-    (s s' : SailState) : Prop where
-  pc : s'.regs.get? Register.PC = some (sndPcOf (stateAccess r))
-  regs : (∀ idx : BitVec 5, (idx.toNat : ZMod p) = r.adapter.op_a →
-            s'.get_reg? idx = some (Word.toBitVec64 r.rdWrite)) ∧
-         (∀ idx : BitVec 5, ¬ (idx.toNat : ZMod p) = r.adapter.op_a →
-            s'.get_reg? idx = s.get_reg? idx)
-  rom : RomLoaded prog s → RomLoaded prog s'
-  init : s.isInitialized → s'.isInitialized
-  cfg : SailConfigured s → SailConfigured s'
+/-! ## The refinement invariant and the per-row effect — `replayVal`/`RefinesAt`/`RowEffect` relocated to
+`Soundness/RowEffectDefs.lean` (below `ChipRow`, so the `ChipKind.advance` field can reference `RowEffect`).
+The `WalkOf`/`TargetObligations`/`chain_to_refines` machinery below references `ChipRow`, so it stays here. -/
 
 /-- The walk the capstone's trail produces: an `IsWalk` between the committed boundary keys whose rows
 are (a sub-multiset of) the trace's real rows. -/
