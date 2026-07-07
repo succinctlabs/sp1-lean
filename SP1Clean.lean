@@ -341,6 +341,7 @@ import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.Soundness.FinishedChannels
 import SP1Clean.Soundness.StateConsistency
 import SP1Clean.Soundness.TargetVm
+import SP1Clean.Soundness.AdvanceDispatch
 import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
 import SP1Clean.FormalModel.Trace.Witness
