@@ -556,4 +556,44 @@ theorem advance_of_regWrite {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {
   · -- cfg
     exact SailConfigured.congr cfg hinitf hcfg_frame
 
+/-- **The R-type chip `advance` — RowView-generic, one call per chip.** For any straight-line R-type row
+`r` refined by `s` (config + ROM + the committed pc), the Memory-bus value bound (`ValueOperandsBound`),
+the Program-bus fetch truth (`decodedInROM`), the opcode/imm column shape, the routing fact `op_a ≠ 0`,
+the low-pc-limb bound, and the `Spec`-derived write value `hval`, one real `try_step` produces the row's
+committed `RowEffect`. Absorbs the whole per-chip plumbing — the ∀-state decode (`decodesRType`), the fetch
+(`fetchReady_of_romLoaded`), and the two register reads — over `advance_of_regWrite`, so each chip's adapter
+only unpacks its own `Spec` for `hval`/`hpc0` and supplies the column-shape facts by `rfl`. **The only
+per-chip-varying inputs are `op` and `hval`.** -/
+theorem advance_of_rtype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (op : rop)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s)
+    (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((ropToOpcode op).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0)
+    (hnonX0 : r.adapter.op_a ≠ 0)
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hval : Word.toBitVec64 r.rdWrite
+      = execute_RTYPE_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+          (Word.toBitVec64 r.adapter.op_c_memory.prev_value) op) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ :=
+    decodesRType op hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
+  exact advance_of_regWrite op rs2 rs1 rd _ _ (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    hrs1 hrs2 hrd_ne hopa'.symm hval hstraight hpc0
+
 end SP1Clean.Advance
