@@ -304,16 +304,17 @@ theorem minstret_tail_frame (t : SailState) (hinit : t.isInitialized) :
       ∧ t'.regs.get? Register.PC = t.regs.get? Register.PC
       ∧ (∀ idx : BitVec 5, t'.get_reg? idx = t.get_reg? idx)
       ∧ t'.mem = t.mem
-      ∧ (∀ R : Register, R ≠ Register.minstret → t'.regs.get? R = t.regs.get? R) := by
+      ∧ (∀ R : Register, R ≠ Register.minstret → t'.regs.get? R = t.regs.get? R)
+      ∧ t'.isInitialized := by
   rw [run_bind_of_run t _ _ (Sail.run_readReg_of_isInitialized t Register.minstret_increment hinit)]
   split
   · rw [run_bind_of_run t _ _ (Sail.run_readReg_of_isInitialized t Register.minstret hinit),
       run_writeReg_bind]
-    refine ⟨_, rfl, ?_, (fun idx => ?_), rfl, fun R hR => ?_⟩
+    refine ⟨_, rfl, ?_, (fun idx => ?_), rfl, (fun R hR => ?_), SailState.isInitialized_insert t hinit _ _⟩
     · rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]
     · exact SailState.get_reg?_insert_of_ne (by unfold reg_idx_to_Register; split <;> decide)
     · rw [Std.ExtDHashMap.get?_insert, dif_neg (fun hc => hR (beq_iff_eq.mp hc).symm)]
-  · exact ⟨_, rfl, rfl, fun _ => rfl, rfl, fun _ _ => rfl⟩
+  · exact ⟨_, rfl, rfl, fun _ => rfl, rfl, (fun _ _ => rfl), hinit⟩
 
 /-- **The `tick_pc` + minstret tail's effect** on the observables: it commits `PC ← nextPC` and leaves every
 `BitVec 5` register file entry fixed (the minstret bump touches only the `minstret` CSR, `tick_pc` only
@@ -332,14 +333,15 @@ theorem tail_effect (s'' : SailState) (hinit'' : s''.isInitialized) :
       ∧ (∀ idx : BitVec 5, s_final.get_reg? idx = s''.get_reg? idx)
       ∧ s_final.mem = s''.mem
       ∧ (∀ R : Register, R ≠ Register.PC → R ≠ Register.minstret →
-          s_final.regs.get? R = s''.regs.get? R) := by
+          s_final.regs.get? R = s''.regs.get? R)
+      ∧ s_final.isInitialized := by
   simp only [tick_pc_eq, bind_assoc]
   rw [run_bind_of_run s'' _ _ (Sail.run_readReg_of_isInitialized s'' Register.nextPC hinit''),
     run_writeReg_bind]
-  obtain ⟨t', hrun, hPC', hxreg', hmem', hframe'⟩ := minstret_tail_frame
+  obtain ⟨t', hrun, hPC', hxreg', hmem', hframe', hinit'⟩ := minstret_tail_frame
     {s'' with regs := s''.regs.insert Register.PC (s''.regs.get Register.nextPC (hinit'' _))}
     (SailState.isInitialized_insert s'' hinit'' _ _)
-  refine ⟨t', hrun, ?_, (fun idx => ?_), hmem', fun R hRpc hRm => ?_⟩
+  refine ⟨t', hrun, ?_, (fun idx => ?_), hmem', (fun R hRpc hRm => ?_), hinit'⟩
   · rw [hPC', Std.ExtDHashMap.get?_insert_self, Std.ExtDHashMap.get?_eq_some_get (hinit'' _)]
   · rw [hxreg' idx]; exact SailState.get_reg?_insert_PC
   · rw [hframe' R hRm, Std.ExtDHashMap.get?_insert, dif_neg (fun hc => hRpc (beq_iff_eq.mp hc).symm)]
@@ -369,10 +371,39 @@ theorem sailStep_of_ladder (s s_a s'' : SailState) (w : BitVec 32) (I : instruct
       ∧ (∀ idx : BitVec 5, s_final.get_reg? idx = s''.get_reg? idx)
       ∧ s_final.mem = s''.mem
       ∧ (∀ R : Register, R ≠ Register.PC → R ≠ Register.minstret →
-          s_final.regs.get? R = s''.regs.get? R) := by
-  obtain ⟨s_final, hrun, hPC, hxreg, hmem, hframe⟩ := tail_effect s'' hinit''
-  refine ⟨s_final, ?_, hPC, hxreg, hmem, hframe⟩
+          s_final.regs.get? R = s''.regs.get? R)
+      ∧ s_final.isInitialized := by
+  obtain ⟨s_final, hrun, hPC, hxreg, hmem, hframe, hinitf⟩ := tail_effect s'' hinit''
+  refine ⟨s_final, ?_, hPC, hxreg, hmem, hframe, hinitf⟩
   rw [tryStep_reaches s s_a s'' w I b hb hcp hactive hslr hdec hsa hexec h_active'']
   exact hrun
+
+/-! ## Per-chip `advance` composition helpers -/
+
+/-- **`SailConfigured` survives the `minstret_increment` write.** Every config field re-derives on
+`{s with regs.insert minstret_increment b}` (the register is disjoint from every config CSR) — the fact the
+ladder needs to apply the (∀-configured-state) decode and `toStraightLineReady` at the post-write state. -/
+theorem SailConfigured.writeMinstret {s : SailState} (cfg : SailConfigured s) (b : Bool) :
+    SailConfigured ({s with regs := s.regs.insert Register.minstret_increment b}) where
+  init := SailState.isInitialized_insert s cfg.init _ _
+  priv := by rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact cfg.priv
+  active := by rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact cfg.active
+  mie := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.mie
+  mideleg := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.mideleg
+  no_landing_pad := by rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact cfg.no_landing_pad
+  mprv_disabled := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.mprv_disabled
+  mseccfg_disabled := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.mseccfg_disabled
+  htif_disabled := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.htif_disabled
+  pma_regions := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.pma_regions
+
+/-- **Register read-back.** The value `wX_bits`/`execute` writes to a non-`x0` register `rd` reads back
+through `get_reg?` — the `bitVecToRegidxVal`/`reg_idx_must_64` casts cancel. This is the `RowEffect.regs`
+rd-write clause. -/
+theorem get_reg?_writeBack (s : SailState) (rd : BitVec 5) (rd_ne : rd ≠ 0#5) (v : BitVec 64) :
+    SailState.get_reg? ({s with regs := s.regs.insert (reg_idx_to_Register rd) (bitVecToRegidxVal rd v)}) rd
+      = some v := by
+  simp only [SailState.get_reg?, Std.ExtDHashMap.get?_insert_self, if_neg (show ¬(rd = 0) from rd_ne),
+    bitVecToRegidxVal]
+  grind
 
 end SP1Clean.Advance
