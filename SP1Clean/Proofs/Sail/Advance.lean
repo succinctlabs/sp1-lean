@@ -179,6 +179,29 @@ theorem itype_execute_reaches (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5) (op 
     run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
+/-- **`execute_ADDIW` pure part** — `signExtend 64 (extractLsb (op_b + immext) 31 0)` (the low-32 sum
+sign-extended). ADDIW is its own Sail AST arm (`execute_ADDIW`), not `execute_ITYPE .ADDI`, so it gets its
+own pure part / reaches (the `execute_RTYPEW_pure`-analogue for the immediate-W form). -/
+def execute_ADDIW_pure (op_b immext : BitVec 64) : BitVec 64 :=
+  sign_extend (m := 64) (Sail.BitVec.extractLsb (op_b + immext) 31 0)
+
+/-- **The ADDIW execute stage reaches `Retire_Success`.** `execute (.ADDIW …)` on a state whose `rs1` read is
+known runs to `Retire_Success` writing only `rd` with `execute_ADDIW_pure op_b (signExtend imm)`. The
+immediate-W `hexec` the shared core needs (one read + the immediate; the `let y ← pure …` intermediate folds
+via `pure_bind`). -/
+theorem execute_ADDIW_reaches (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5)
+    (op_b : BitVec 64) (s_a : SailState)
+    (h_rs1 : s_a.get_reg? rs1_idx = some op_b) :
+    (execute (.ADDIW (imm, .Regidx rs1_idx, .Regidx rd_idx))).run s_a
+      = .ok (ExecutionResult.Retire_Success ())
+          (if rd_idx = 0#5 then s_a
+           else {s_a with regs := (s_a.regs.insert (reg_idx_to_Register rd_idx)
+             (bitVecToRegidxVal rd_idx (execute_ADDIW_pure op_b (sign_extend (m := 64) imm))))}) := by
+  simp only [execute, execute_ADDIW, execute_ADDIW_pure, pure_bind]
+  rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1]),
+    run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  rfl
+
 /-! ## The `StraightLineReady` producer (the `toStraightLineReady` body) -/
 
 /-- **`StraightLineReady` on the post-`minstret_increment`-write state.** From the quiescent machine-mode
@@ -749,6 +772,51 @@ theorem advance_of_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
     (fun t hframe _ => by
       have := itype_execute_reaches imm rs1 rd op (Word.toBitVec64 r.adapter.op_b_memory.prev_value) t
+        ((hframe rs1).trans hrs1)
+      rwa [if_neg hrd_ne] at this)
+    hrd_ne hopa'.symm hval' hstraight hpc0
+
+/-- **The ADDIW chip `advance` — RowView-generic** (the immediate branch of `AddwChip`). The `.ADDIW` twin of
+`advance_of_itype`: straight-line, one register read (`rs1` → `op_b`), the `op_c` column the sign-extended
+immediate (`imm_c = 1`); feeds `advance_write_core` with `execute_ADDIW_reaches`. The per-chip inputs are the
+fixed opcode `ADDW` (= 19, ADDIW shares it) and the `Spec`-derived write identity `hval`
+(`rdWrite = execute_ADDIW_pure op_b op_c`). -/
+theorem advance_of_addiw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s)
+    (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((Opcode.ADDW).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 1)
+    (hnonX0 : r.adapter.op_a ≠ 0)
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hval : Word.toBitVec64 r.rdWrite
+      = execute_ADDIW_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+          (Word.toBitVec64 r.adapter.op_c)) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesADDIW hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
+  have himmbind : Word.toBitVec64 r.adapter.op_c = imm.signExtend 64 := by
+    rw [show r.adapter.op_c = bitVecToWord (imm.signExtend 64) from hopc]
+    exact toBitVec64_bitVecToWord _
+  have hval' : Word.toBitVec64 r.rdWrite
+      = execute_ADDIW_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value) (imm.signExtend 64) := by
+    rw [hval, himmbind]
+  exact advance_write_core (instruction.ADDIW (imm, .Regidx rs1, .Regidx rd)) rd
+    (execute_ADDIW_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value) (imm.signExtend 64))
+    (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ => by
+      have := execute_ADDIW_reaches imm rs1 rd (Word.toBitVec64 r.adapter.op_b_memory.prev_value) t
         ((hframe rs1).trans hrs1)
       rwa [if_neg hrd_ne] at this)
     hrd_ne hopa'.symm hval' hstraight hpc0

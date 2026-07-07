@@ -489,6 +489,48 @@ theorem instrToProgramRow_inv_itype {pc : Vector (ZMod p) 3} {i : instruction}
   · rename_i imm rs1 rd
     exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
 
+/-- **The ADDIW decode inversion (W7).** ADDIW has no own opcode — it commits the ADDW opcode (`19`) with
+`imm_c = 1` (I-type shape), so it is pinned by `(opcode = ADDW, imm_c = 1)`: `imm_c = 1` kills the
+`imm_c = 0` arms, and opcode `ADDW` (disjoint from every `iopToOpcode`/UTYPE/JAL/JALR/BTYPE/LOAD/STORE/SHIFT
+image) rules out the other immediate-shaped arms — leaving the `.ADDIW` arm. The I-type-W twin of
+`instrToProgramRow_inv_itype` (no `op` parameter). -/
+theorem instrToProgramRow_inv_addiw {pc : Vector (ZMod p) 3} {i : instruction} {row : ProgramRow (ZMod p)}
+    (h : instrToProgramRow pc i = some row)
+    (hop : row.opcode = ((Opcode.ADDW).toNat : ZMod p))
+    (himm : row.imm_c = (1 : ZMod p)) :
+    ∃ (imm : BitVec 12) (rs1 rd : regidx), i = .ADDIW (imm, rs1, rd) ∧
+      row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
+      ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
+  have honezero : (1 : ZMod p) ≠ 0 := by
+    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    exact one_ne_zero
+  simp only [instrToProgramRow] at h
+  split at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst h)
+  all_goals (try (exact absurd himm.symm honezero))
+  · rename_i imm rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i imm rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i imm rd
+    exact absurd (opcodeCast_inj hop) (by decide)
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by decide)
+  · rename_i imm rs2 rs1 op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i imm rs1 rd isU width
+    exact absurd (opcodeCast_inj hop)
+      (by cases isU <;> (simp only [loadOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs2 rs1 width
+    exact absurd (opcodeCast_inj hop)
+      (by simp only [storeOpcode, Opcode.toNat]; split_ifs <;> decide)
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i imm rs1 rd
+    exact ⟨imm, rs1, rd, rfl, rfl, rfl, rfl⟩
+
 /-- **The ∀-configured-state `RTYPE(op)` decode from a row's `ProgTruth` membership.** From
 `decodedInROM prog row` on a row whose committed opcode is `op`'s and whose `imm_c = 0`, the fetched ROM
 word `w` decodes — **in every configured Sail state** — to `RTYPE (rs2, rs1, rd, op)` with the register
@@ -616,6 +658,46 @@ theorem decodesIType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : iop
   obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
   obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
   obtain ⟨imm', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_itype op hrow2 hop himm
+  obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
+  have e1 : rs1' = rs1 := regidx_bv_inj (by
+    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
+    exact h.symm)
+  have e0 : rd' = rd := regidx_bv_inj (by
+    have h := ha.symm.trans ha'
+    simp only [regidxVal] at h
+    exact h.symm)
+  have eimm : imm' = imm := by
+    have e := congrArg (Word.toBitVec64 (p := p)) (hc.symm.trans hc')
+    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
+    exact (sext12_inj e).symm
+  subst e1 e0 eimm
+  rw [hi2] at hrun2
+  exact hrun2
+
+/-- **The ∀-configured-state ADDIW decode producer** — the `.ADDIW` twin of `decodesIType`, keyed on the
+committed `(opcode = ADDW, imm_c = 1)`. Recovers `w` + `imm/rs1/rd` with the decode holding in every
+configured state (register indices pinned by `regidx_bv_inj`, the immediate by `sext12_inj` on the `op_c`
+column). What `advance_of_addiw` consumes. -/
+theorem decodesADDIW {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row)
+    (hop : row.opcode = ((Opcode.ADDW).toNat : ZMod p)) (himm : row.imm_c = 1)
+    {s0 : SailState} (hs0 : SailConfigured s0) :
+    ∃ (w : BitVec 32) (imm : BitVec 12) (rs1 rd : BitVec 5),
+      prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (∀ sc, SailConfigured sc → (ext_decode w).run sc
+        = .ok (instruction.ADDIW (imm, .Regidx rs1, .Regidx rd)) sc) ∧
+      row.op_a = (rd.toNat : ZMod p) ∧
+      row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
+      row.op_c = bitVecToWord (imm.signExtend 64) := by
+  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
+  obtain ⟨imm, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_addiw hrow0 hop himm
+  obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
+  refine ⟨w, imm, rs1, rd, hfetch, ?_, ha, hb, hc⟩
+  intro sc hsc
+  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
+  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
+  obtain ⟨imm', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_addiw hrow2 hop himm
   obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
   have e1 : rs1' = rs1 := regidx_bv_inj (by
     have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
