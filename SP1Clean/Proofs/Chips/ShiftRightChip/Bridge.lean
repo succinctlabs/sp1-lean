@@ -2,6 +2,7 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.ShiftRightChip.Formal
 import SP1Clean.Soundness.ChipRow
+import SP1Clean.Proofs.Sail.Advance
 import RISCV.ForLean
 
 /-! # Native Sail bridge for the `ShiftRight` chip (SRL/SRA/SRLW/SRAW) + `ChipKind`
@@ -207,8 +208,85 @@ namespace SP1Clean.ShiftRightChip
 
 open SP1Clean.ShiftRightSail
 open Sail LeanRV64D LeanRV64D.Functions
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- The ShiftRight RowView (standalone, shared by `kind.view` and `advance`): straight-line `next_pc`,
+the ALU adapter, `cols.a` as the shift-result write, opcode `is_srl·7 + is_sra·8 + is_srlw·22 + is_sraw·23`
+(SRL = 7, SRA = 8, SRLW = 22, SRAW = 23). -/
+def rowView (inp : Inputs (ZMod p)) (cols : Extracted.ShiftRightCols (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+    cols.adapter.toAdapterView, inp.is_real, cols.a,
+    cols.is_srl * 7 + cols.is_sra * 8 + cols.is_srlw * 22 + cols.is_sraw * 23⟩
+
+/-- **`ShiftRightChip.advance`** — the per-ShiftRight-row `try_step` lift (SC Phase 4). A 4-op multi-op R-type
+chip (SRL / SRA / SRLW / SRAW), so it `rcases` the one-hot `advanceReady` flag partition and routes each branch
+to the op-generic straight-line register-write core: `advance_of_rtype rop.SRL`/`rop.SRA` for the 64-bit forms,
+`advance_of_rtypew ropw.SRLW`/`ropw.SRAW` for the low-32 W-forms. The write value is
+`execute_RTYPE_pure`/`execute_RTYPEW_pure` (proved `= RV64.srl`/`sra`/`srlw`/`sraw` by the corresponding
+`execute_RTYPE(W)_pure_*` identity), matched against the chip `Spec`'s flag-gated `RV64.*` conjunct. Unlike
+ShiftLeft, the `Spec` already states operands as the register read-backs `op_b_memory.prev_value` /
+`op_c_memory.prev_value`, so no `op_c = op_c_memory.prev_value` conjunct is needed in `advanceReady`; it carries
+the reader passthrough, the pc-limb bound, `op_a ≠ 0`, `imm_c = 0`, and the 4-way one-hot flag partition. -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.ShiftRightCols (ZMod p)) (data : ProverData (ZMod p))
+    (prog : GuestProgram) (s : SailState)
+    (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : cols.state.pc[0].val < 2 ^ 16 ∧ inp.adapter = cols.adapter ∧
+      (rowView inp cols).adapter.op_a ≠ 0 ∧ cols.adapter.imm_c = 0 ∧
+      ((cols.is_srl = 1 ∧ cols.is_sra = 0 ∧ cols.is_srlw = 0 ∧ cols.is_sraw = 0) ∨
+       (cols.is_sra = 1 ∧ cols.is_srl = 0 ∧ cols.is_srlw = 0 ∧ cols.is_sraw = 0) ∨
+       (cols.is_srlw = 1 ∧ cols.is_srl = 0 ∧ cols.is_sra = 0 ∧ cols.is_sraw = 0) ∨
+       (cols.is_sraw = 1 ∧ cols.is_srl = 0 ∧ cols.is_sra = 0 ∧ cols.is_srlw = 0))) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hpc0, hpass, hnonX0, himmc0, hflag⟩ := hready
+  have hreal' : inp.is_real = 1 := hreal
+  set r := rowView inp cols with hr
+  have vrd : r.rdWrite = cols.a := rfl
+  have himmb : r.adapter.imm_b = 0 := rfl
+  have himmc : r.adapter.imm_c = 0 := himmc0
+  have hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]] := rfl
+  rcases hflag with ⟨h1, h2, h3, h4⟩ | ⟨h1, h2, h3, h4⟩ | ⟨h1, h2, h3, h4⟩ | ⟨h1, h2, h3, h4⟩
+  · have hop : r.opcode = ((ropToOpcode rop.SRL).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, ropToOpcode, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = execute_RTYPE_pure (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_c_memory.prev_value) rop.SRL := by
+      have hsrl_spec := (hspec hreal').1 h1
+      simp only [hpass] at hsrl_spec
+      rw [execute_RTYPE_pure_srl, vrd]; exact hsrl_spec
+    exact advance_of_rtype rop.SRL hcfg hrom hpcread hvalb hdecrom hop himmb himmc hnonX0 hpc0 hstraight hval
+  · have hop : r.opcode = ((ropToOpcode rop.SRA).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, ropToOpcode, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = execute_RTYPE_pure (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_c_memory.prev_value) rop.SRA := by
+      have hsra_spec := (hspec hreal').2.1 h1
+      simp only [hpass] at hsra_spec
+      rw [execute_RTYPE_pure_sra, vrd]; exact hsra_spec
+    exact advance_of_rtype rop.SRA hcfg hrom hpcread hvalb hdecrom hop himmb himmc hnonX0 hpc0 hstraight hval
+  · have hop : r.opcode = ((ropwToOpcode ropw.SRLW).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, ropwToOpcode, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = execute_RTYPEW_pure (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_c_memory.prev_value) ropw.SRLW := by
+      have hsrlw_spec := (hspec hreal').2.2.1 h1
+      simp only [hpass] at hsrlw_spec
+      rw [execute_RTYPEW_pure_srlw, vrd]; exact hsrlw_spec
+    exact advance_of_rtypew ropw.SRLW hcfg hrom hpcread hvalb hdecrom hop himmb himmc hnonX0 hpc0 hstraight hval
+  · have hop : r.opcode = ((ropwToOpcode ropw.SRAW).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, ropwToOpcode, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = execute_RTYPEW_pure (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_c_memory.prev_value) ropw.SRAW := by
+      have hsraw_spec := (hspec hreal').2.2.2 h1
+      simp only [hpass] at hsraw_spec
+      rw [execute_RTYPEW_pure_sraw, vrd]; exact hsraw_spec
+    exact advance_of_rtypew ropw.SRAW hcfg hrom hpcread hvalb hdecrom hop himmb himmc hnonX0 hpc0 hstraight hval
 
 /-- `ChipKind` registration for ShiftRight (SRL/SRA/SRLW/SRAW). `rs1`/`rs2` are read from the
 adapter register read-backs `op_b_memory.prev_value`/`op_c_memory.prev_value`. -/
@@ -216,10 +294,7 @@ def kind : Soundness.ChipKind p where
   name := "ShiftRight"
   Inputs := ShiftRightChip.Inputs
   Cols := Extracted.ShiftRightCols
-  view := fun inp cols => ⟨cols.state,
-    #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, cols.a,
-    cols.is_srl * 7 + cols.is_sra * 8 + cols.is_srlw * 22 + cols.is_sraw * 23⟩
+  view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   sailEquiv := fun inp cols s => ∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
     s.regs.get? Register.PC = some pc →
@@ -239,5 +314,12 @@ def kind : Soundness.ChipKind p where
           = (sp1_sr (.Regidx rd) pc cols.a).run s)
   reaches_sail := fun inp cols data s h_real h_chip rs1 rs2 rd pc h_pc h_rs1 h_rs2 =>
     shiftright_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2
+  advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧ inp.adapter = cols.adapter ∧
+    (rowView inp cols).adapter.op_a ≠ 0 ∧ cols.adapter.imm_c = 0 ∧
+    ((cols.is_srl = 1 ∧ cols.is_sra = 0 ∧ cols.is_srlw = 0 ∧ cols.is_sraw = 0) ∨
+     (cols.is_sra = 1 ∧ cols.is_srl = 0 ∧ cols.is_srlw = 0 ∧ cols.is_sraw = 0) ∨
+     (cols.is_srlw = 1 ∧ cols.is_srl = 0 ∧ cols.is_sra = 0 ∧ cols.is_sraw = 0) ∨
+     (cols.is_sraw = 1 ∧ cols.is_srl = 0 ∧ cols.is_sra = 0 ∧ cols.is_srlw = 0))
+  advance := some (PLift.up advance)
 
 end SP1Clean.ShiftRightChip
