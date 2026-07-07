@@ -122,20 +122,81 @@ namespace SP1Clean.JalrChip
 open SP1Clean.JalrSail
 open SP1Clean.SailMem
 open Sail LeanRV64D LeanRV64D.Functions
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- The JALR RowView (standalone, so `kind.view` and `advance` share one definition without a cycle):
+the LSB-cleared 3-limb `next_pc` (`add_operation.value[0] - lsb`), the I-type adapter, `op_a_operation.value`
+as the `pc+4` link write, opcode 47. -/
+def rowView (inp : Inputs (ZMod p)) (cols : Extracted.JalrColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨cols.state,
+    #v[cols.add_operation.value[0] - cols.lsb, cols.add_operation.value[1], cols.add_operation.value[2]],
+    cols.adapter.toAdapterView, inp.is_real, cols.op_a_operation.value, 47⟩
+
+/-- **`JalrChip.advance`** — the per-JALR-row `try_step` lift (SC Phase 4, the **second computed-`next_pc`
+chip**): over `advance_of_jalr` (the config-threaded jump ladder core `advance_jump_core`, whose
+`execute_JALR` sets `nextPC := (rs1 + signExtend imm) &&& ~~~1` and writes the link `pc+4` to `rd`). The
+per-chip obligations are discharged from the chip `Spec`: the LSB-cleared target `hsnd` (`sndPcOf =
+BitVec.update (rs1_val + signExtend imm) 0 0#1`, from the Spec's jump conjunct + the lsb-clear conjunct + the
+decode's immediate + the `nextPcWord` reassembly — `nextPcWord[3] = 0` definitionally, so the committed 3-limb
+`next_pc` equals the Sail 64-bit target with no extra `advanceReady` limb bound), the link `hlink` (`rdWrite =
+pc+4`), and the 4-alignment `halign` (from the Spec's `÷4` range-check conjunct). `rs1` is read through
+`ValueOperandsBound`. Stated to match the field. -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.JalrColumns (ZMod p)) (data : ProverData (ZMod p))
+    (prog : GuestProgram) (s : SailState)
+    (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : cols.state.pc[0].val < 2 ^ 16 ∧ cols.adapter.op_a_0 = 0 ∧
+      (rowView inp cols).adapter.op_a ≠ 0) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hpc0, hopa0, hnonX0⟩ := hready
+  have hreal' : inp.is_real = 1 := hreal
+  have reassemble : ∀ (v : Word (ZMod p)), v[3] = 0 →
+      pcBitsOfVals v[0].val v[1].val v[2].val = Word.toBitVec64 v := by
+    intro v hv; simp only [Word.toBitVec64, pcBitsOfVals]; congr 1
+    rw [Word.toNat_def, hv]; simp only [ZMod.val_zero]; ring
+  set r := rowView inp cols with hr
+  have vrd : r.rdWrite = cols.op_a_operation.value := rfl
+  have vopc : r.adapter.op_c = cols.adapter.op_c_imm := rfl
+  have vopbm : r.adapter.op_b_memory.prev_value = cols.adapter.op_b_memory.prev_value := rfl
+  have himmb : r.adapter.imm_b = 0 := rfl
+  have himmc : r.adapter.imm_c = 1 := rfl
+  have hop : r.opcode = ((Opcode.JALR).toNat : ZMod p) := by simp [hr, rowView, Opcode.toNat]
+  have hpcw : Word.toBitVec64 (JalrChip.pcWord cols) = rcvPcOf (stateAccess r) := by
+    have hp3 : (JalrChip.pcWord cols)[3] = 0 := rfl
+    rw [← reassemble _ hp3]; rfl
+  have hsnd_eq : sndPcOf (stateAccess r) = Word.toBitVec64 (JalrChip.nextPcWord cols) := by
+    have hp3 : (JalrChip.nextPcWord cols)[3] = 0 := rfl
+    rw [← reassemble _ hp3]; rfl
+  have hr1 : Word.toBitVec64 (JalrChip.rs1Word cols)
+      = Word.toBitVec64 cols.adapter.op_b_memory.prev_value := rfl
+  refine advance_of_jalr hcfg hrom hpcread hvalb hdecrom hop himmb himmc hnonX0 ?_ ?_ ?_
+  · rw [hsnd_eq, Word.toBitVec64_toNat_mod_four]; exact hspec.2.2.2.2.2.1 hreal'
+  · intro imm hopc
+    have h_dec : Word.toBitVec64 cols.adapter.op_c_imm = sign_extend (m := 64) imm := by
+      have hh : cols.adapter.op_c_imm = bitVecToWord (imm.signExtend 64) := vopc.symm.trans hopc
+      rw [hh]; exact toBitVec64_bitVecToWord _
+    have h_jump : Word.toBitVec64 cols.add_operation.value
+        = Word.toBitVec64 cols.adapter.op_b_memory.prev_value + sign_extend (m := 64) imm := by
+      rw [hspec.2.2.2.1 hreal', hr1, h_dec]
+    rw [vopbm, hsnd_eq, hspec.2.2.2.2.2.2 hreal', h_jump]
+    simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
+  · rw [vrd, hspec.2.2.2.2.1 hreal' hopa0, hpcw, JalSail.toBitVec64_four]
 
 /-- JALR's `ChipKind` registration. `view` threads the LSB-cleared `next_pc`, I-type adapter, opcode 47.
 `sailEquiv` quantifies the PC/rs1 read and decode preconditions internally; neither the LSB-clearing
 relation nor the cleared-target 4-byte alignment is a precondition — `reaches_sail` derives both from the
-chip `Spec`. `reaches_sail` is `jalr_chip_reaches_sail`. -/
+chip `Spec`. `reaches_sail` is `jalr_chip_reaches_sail`; `advance` is `JalrChip.advance` (the SC Phase 4
+uniform `try_step` lift). -/
 def kind : Soundness.ChipKind p where
   name := "Jalr"
   Inputs := JalrChip.Inputs
   Cols := Extracted.JalrColumns
-  view := fun inp cols => ⟨cols.state,
-    #v[cols.add_operation.value[0] - cols.lsb, cols.add_operation.value[1], cols.add_operation.value[2]],
-    cols.adapter.toAdapterView, inp.is_real, cols.op_a_operation.value, 47⟩
+  view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   sailEquiv := fun inp cols s => ∀ (rd rs1 : BitVec 5) (imm : BitVec 12) (pc rs1_val : BitVec 64),
     (hs : SailState.isInitialized s) → SailState.isValidMemConfig s hs →
@@ -151,5 +212,8 @@ def kind : Soundness.ChipKind p where
       h_op_a_0 h_pcw =>
     jalr_chip_reaches_sail inp cols data rd rs1 imm pc rs1_val s hs hconfig h_real h_chip h_pc h_rs1 h_rs1v h_dec
       h_op_a_0 h_pcw
+  advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧ cols.adapter.op_a_0 = 0 ∧
+    (rowView inp cols).adapter.op_a ≠ 0
+  advance := some (PLift.up advance)
 
 end SP1Clean.JalrChip
