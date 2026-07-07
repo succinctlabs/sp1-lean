@@ -1,4 +1,5 @@
 import SP1Clean.Proofs.Chips.AddChip.Bridge
+import SP1Clean.Proofs.Chips.AddChip.Advance
 import SP1Clean.Native.Chips.AddChip.Defs
 import SP1Clean.Proofs.Chips.AddChip.Formal
 import SP1Clean.Native.Chips.AddiChip.Defs
