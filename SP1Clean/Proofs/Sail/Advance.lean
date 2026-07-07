@@ -118,20 +118,44 @@ theorem rtype_execute_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (op : rop)
     run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
-/-- **The ITYPE execute stage reaches `Retire_Success`** (ADDI arm). `execute (.ITYPE …)` on a state whose
-`rs1` read is known runs to `Retire_Success` writing only `rd` with `op_b + signExtend imm` — the I-type
-`hexec` the shared core needs (one read + the immediate, no `rs2`). -/
-theorem itype_execute_reaches (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5)
+/-- **`execute_ITYPE` pure part** — the I-type twin of `execute_RTYPE_pure` (op1 = the `rs1` read, `immext`
+= the sign-extended immediate). Covers the ALU immediate ops ADDI/SLTI/SLTIU/ANDI/ORI/XORI, so one
+`itype_execute_reaches` serves the whole immediate-ALU family (Addi + the immediate forms of Bitwise/Lt).
+(Placed here beside the execute-reaches lemmas; a natural cleanup is to hoist it into `Model/SailWrap.lean`
+next to `execute_RTYPE_pure`.) -/
+def execute_ITYPE_pure (op1 immext : BitVec 64) (op : iop) : BitVec 64 :=
+  match op with
+  | .ADDI => op1 + immext
+  | .SLTI => zero_extend (m := 64) (bool_to_bit (zopz0zI_s op1 immext))
+  | .SLTIU => zero_extend (m := 64) (bool_to_bit (zopz0zI_u op1 immext))
+  | .ANDI => op1 &&& immext
+  | .ORI => op1 ||| immext
+  | .XORI => op1 ^^^ immext
+
+/-- `execute_ITYPE` with the isolated pure part (the I-type twin of `execute_RTYPE'`). -/
+def execute_ITYPE' (imm : BitVec 12) (rs1 rd : regidx) (op : iop) : SailM ExecutionResult := do
+  let rs1_bits ← rX_bits rs1
+  wX_bits rd (execute_ITYPE_pure rs1_bits (sign_extend (m := 64) imm) op)
+  pure RETIRE_SUCCESS
+
+@[simp] theorem execute_ITYPE_eq_execute_ITYPE' (imm : BitVec 12) (rs1 rd : regidx) (op : iop) :
+    execute_ITYPE imm rs1 rd op = execute_ITYPE' imm rs1 rd op := by
+  cases op <;> simp_all [execute_ITYPE', execute_ITYPE, execute_ITYPE_pure]
+
+/-- **The ITYPE execute stage reaches `Retire_Success`**, generic over the ALU immediate op. `execute
+(.ITYPE …)` on a state whose `rs1` read is known runs to `Retire_Success` writing only `rd` with
+`execute_ITYPE_pure op_b (signExtend imm) op` — the I-type `hexec` the shared core needs (one read + the
+immediate, no `rs2`). Serves the whole immediate-ALU family via `op`. -/
+theorem itype_execute_reaches (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5) (op : iop)
     (op_b : BitVec 64) (s_a : SailState)
     (h_rs1 : s_a.get_reg? rs1_idx = some op_b) :
-    (execute (.ITYPE (imm, .Regidx rs1_idx, .Regidx rd_idx, iop.ADDI))).run s_a
+    (execute (.ITYPE (imm, .Regidx rs1_idx, .Regidx rd_idx, op))).run s_a
       = .ok (ExecutionResult.Retire_Success ())
           (if rd_idx = 0#5 then s_a
            else {s_a with regs := (s_a.regs.insert (reg_idx_to_Register rd_idx)
-             (bitVecToRegidxVal rd_idx (op_b + sign_extend (m := 64) imm)))}) := by
-  simp only [execute, execute_ITYPE]
-  rw [run_bind_of_run s_a _ (op_b + sign_extend (m := 64) imm)
-        (by rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1])]; rfl),
+             (bitVecToRegidxVal rd_idx (execute_ITYPE_pure op_b (sign_extend (m := 64) imm) op)))}) := by
+  simp only [execute, execute_ITYPE_eq_execute_ITYPE', execute_ITYPE']
+  rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1]),
     run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
@@ -620,25 +644,27 @@ theorem advance_of_rtype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
       rwa [if_neg hrd_ne] at this)
     hrd_ne hopa'.symm hval hstraight hpc0
 
-/-- **The I-type chip `advance` — RowView-generic, one call per chip** (`AddiChip`, and the immediate ALU
-forms). The I-type twin of `advance_of_rtype`: straight-line, one register read (`rs1` → `op_b`), and the
-`op_c` column is the sign-extended immediate (`imm_c = 1`), whose 64-bit value the round-trip
-`toBitVec64_bitVecToWord` recovers. Feeds the shared `advance_write_core` with `itype_execute_reaches`; the
-adapter supplies only the ADDI opcode and the `Spec`-derived write `hval` (`rdWrite = op_b + op_c`). -/
-theorem advance_of_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
+/-- **The I-type chip `advance` — RowView-generic, one call per chip and immediate ALU op** (`AddiChip`,
+and the immediate forms of Bitwise/Lt). The I-type twin of `advance_of_rtype`: straight-line, one register
+read (`rs1` → `op_b`), and the `op_c` column is the sign-extended immediate (`imm_c = 1`), whose 64-bit
+value the round-trip `toBitVec64_bitVecToWord` recovers. Feeds the shared `advance_write_core` with
+`itype_execute_reaches op`; the only per-chip inputs are `op` and the `Spec`-derived write identity `hval`
+(`rdWrite = execute_ITYPE_pure op_b op_c op`). -/
+theorem advance_of_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (op : iop)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
     (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
     (hvalb : ValueOperandsBound r s)
     (hdecrom : decodedInROM prog (programAccess r).toRow)
-    (hop : r.opcode = ((iopToOpcode iop.ADDI).toNat : ZMod p))
+    (hop : r.opcode = ((iopToOpcode op).toNat : ZMod p))
     (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 1)
     (hnonX0 : r.adapter.op_a ≠ 0)
     (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hval : Word.toBitVec64 r.rdWrite
-      = Word.toBitVec64 r.adapter.op_b_memory.prev_value + Word.toBitVec64 r.adapter.op_c) :
+      = execute_ITYPE_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+          (Word.toBitVec64 r.adapter.op_c) op) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesIType iop.ADDI hdecrom hop himmc hcfg
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesIType op hdecrom hop himmc hcfg
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -650,14 +676,16 @@ theorem advance_of_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     rw [show r.adapter.op_c = bitVecToWord (imm.signExtend 64) from hopc]
     exact toBitVec64_bitVecToWord _
   have hval' : Word.toBitVec64 r.rdWrite
-      = Word.toBitVec64 r.adapter.op_b_memory.prev_value + imm.signExtend 64 := by rw [hval, himmbind]
-  exact advance_write_core (instruction.ITYPE (imm, .Regidx rs1, .Regidx rd, iop.ADDI)) rd
-    (Word.toBitVec64 r.adapter.op_b_memory.prev_value + imm.signExtend 64) (rcvPcOf (stateAccess r))
+      = execute_ITYPE_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value) (imm.signExtend 64) op := by
+    rw [hval, himmbind]
+  exact advance_write_core (instruction.ITYPE (imm, .Regidx rs1, .Regidx rd, op)) rd
+    (execute_ITYPE_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value) (imm.signExtend 64) op)
+    (rcvPcOf (stateAccess r))
     (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
     hcfg hpcread rfl hfetchReady
     (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
     (fun t hframe _ => by
-      have := itype_execute_reaches imm rs1 rd (Word.toBitVec64 r.adapter.op_b_memory.prev_value) t
+      have := itype_execute_reaches imm rs1 rd op (Word.toBitVec64 r.adapter.op_b_memory.prev_value) t
         ((hframe rs1).trans hrs1)
       rwa [if_neg hrd_ne] at this)
     hrd_ne hopa'.symm hval' hstraight hpc0

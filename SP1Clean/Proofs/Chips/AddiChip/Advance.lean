@@ -51,6 +51,6 @@ theorem advance {prog : GuestProgram} {s : SailState}
     have hidentity := harith hreal
     simp only [AddiChip.Inputs.op_b_val, AddiChip.Inputs.op_c_val, hlink] at hidentity
     rw [vrd, vopbm, vopc, hidentity, RV64.add]
-  exact advance_of_itype hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  exact advance_of_itype iop.ADDI hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
 
 end SP1Clean.AddiChip
