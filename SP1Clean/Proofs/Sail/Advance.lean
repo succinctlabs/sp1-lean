@@ -118,6 +118,23 @@ theorem rtype_execute_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (op : rop)
     run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
+/-- **The ITYPE execute stage reaches `Retire_Success`** (ADDI arm). `execute (.ITYPE …)` on a state whose
+`rs1` read is known runs to `Retire_Success` writing only `rd` with `op_b + signExtend imm` — the I-type
+`hexec` the shared core needs (one read + the immediate, no `rs2`). -/
+theorem itype_execute_reaches (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5)
+    (op_b : BitVec 64) (s_a : SailState)
+    (h_rs1 : s_a.get_reg? rs1_idx = some op_b) :
+    (execute (.ITYPE (imm, .Regidx rs1_idx, .Regidx rd_idx, iop.ADDI))).run s_a
+      = .ok (ExecutionResult.Retire_Success ())
+          (if rd_idx = 0#5 then s_a
+           else {s_a with regs := (s_a.regs.insert (reg_idx_to_Register rd_idx)
+             (bitVecToRegidxVal rd_idx (op_b + sign_extend (m := 64) imm)))}) := by
+  simp only [execute, execute_ITYPE]
+  rw [run_bind_of_run s_a _ (op_b + sign_extend (m := 64) imm)
+        (by rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1])]; rfl),
+    run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  rfl
+
 /-! ## The `StraightLineReady` producer (the `toStraightLineReady` body) -/
 
 /-- **`StraightLineReady` on the post-`minstret_increment`-write state.** From the quiescent machine-mode
@@ -436,24 +453,28 @@ theorem SailConfigured.congr {sf s : SailState} (cfg : SailConfigured s) (hinit 
       htif_disabled := by rw [hget Register.htif_tohost_base (hinit _) (hf _ (by tauto))]; exact cfg.htif_disabled
       pma_regions := by rw [hget Register.pma_regions (hinit _) (hf _ (by tauto))]; exact cfg.pma_regions }
 
-/-- **L11 — the generic register-writing `advance` (R-type).** From the audit-surface facts on a
-straight-line R-type row (config `cfg`, ROM, the row's committed pc/next_pc, the fetched-word decode to
-`RTYPE (rs2,rs1,rd,op)`, the `rs1`/`rs2` reads, `rd ≠ x0`, the `Spec`-derived write value `hval`), one real
-`try_step` takes `s` to a state realizing the row's `RowEffect`. The whole `try_step` side is
-`sailStep_of_ladder`; this wires the ladder inputs from `cfg`/`hfetch`/the decode/reads and reads off the
-five `RowEffect` clauses. The only per-chip-varying inputs are `op` and `hval`. -/
-theorem advance_of_regWrite {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
-    (op : rop) (rs2 rs1 rd : BitVec 5) (op_b op_c : BitVec 64) (pc : BitVec 64)
+/-- **The shared straight-line register-writing core.** Instruction-agnostic: the execute stage writes
+*only* `rd` (leaving `nextPC = pc+4`), so this covers the whole straight-line register-writing family
+(R-type, I-type, U-type, AluX0, loads-into-registers). From the audit-surface facts (config `cfg`, ROM via
+`hfetch`, the committed pc, the fetched-word decode to `I`, `rd ≠ x0`, the `Spec`-derived write `value`),
+one real `try_step` realizes the row's `RowEffect`. The **execute** enters as a hypothesis `hexec` (over any
+state agreeing with `s` on the register file), so each family plugs in its own execute-reaches lemma
+(`rtype_execute_reaches`/`itype_execute_reaches`/…) — the ladder + the five-clause `RowEffect` readoff are
+shared. The only per-chip inputs to a wrapper are `I`, `value`/`hexec`, and `hval`. -/
+theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
+    (I : instruction) (rd : BitVec 5) (value : BitVec 64) (pc : BitVec 64)
     (data₀ data₁ data₂ data₃ : BitVec 8)
     (cfg : SailConfigured s)
     (hpc : s.regs.get? Register.PC = some pc) (hrcv : pc = rcvPcOf (stateAccess r))
     (hfetch : FetchReady s pc data₀ data₁ data₂ data₃)
     (hdecgen : ∀ sc : SailState, SailConfigured sc →
-      (ext_decode (data₃ ++ data₂ ++ data₁ ++ data₀)).run sc
-        = .ok (instruction.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) sc)
-    (hrs1 : SailState.get_reg? s rs1 = some op_b) (hrs2 : SailState.get_reg? s rs2 = some op_c)
+      (ext_decode (data₃ ++ data₂ ++ data₁ ++ data₀)).run sc = .ok I sc)
+    (hexec : ∀ t : SailState, (∀ idx : BitVec 5, SailState.get_reg? t idx = SailState.get_reg? s idx) →
+      t.isInitialized →
+      (execute I).run t = .ok (ExecutionResult.Retire_Success ())
+        {t with regs := t.regs.insert (reg_idx_to_Register rd) (bitVecToRegidxVal rd value)})
     (hrd_ne : rd ≠ 0#5) (hrd_a : (rd.toNat : ZMod p) = r.adapter.op_a)
-    (hval : Word.toBitVec64 r.rdWrite = execute_RTYPE_pure op_b op_c op)
+    (hval : Word.toBitVec64 r.rdWrite = value)
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hpc0 : (r.state.pc[0]).val < 2 ^ 16) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
@@ -476,22 +497,24 @@ theorem advance_of_regWrite {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {
   set npv := BitVec.addInt (s'.regs.get Register.PC (hslr.init Register.PC)) 4 with hnpv_def
   set s_a := ({s' with regs := s'.regs.insert Register.nextPC npv}) with hsa_def
   have hsa : (Sail.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
-  have hrs1' : SailState.get_reg? s_a rs1 = some op_b := by
-    rw [hsa_def, SailState.get_reg?_insert_of_ne (hxne rs1), hs'_def,
-      SailState.get_reg?_insert_of_ne (hmne rs1)]; exact hrs1
-  have hrs2' : SailState.get_reg? s_a rs2 = some op_c := by
-    rw [hsa_def, SailState.get_reg?_insert_of_ne (hxne rs2), hs'_def,
-      SailState.get_reg?_insert_of_ne (hmne rs2)]; exact hrs2
-  have hexec := rtype_execute_reaches rs2 rs1 rd op op_b op_c s_a hrs1' hrs2'
-  rw [if_neg hrd_ne] at hexec
-  set s'' := ({s_a with regs := s_a.regs.insert (reg_idx_to_Register rd) (bitVecToRegidxVal rd (execute_RTYPE_pure op_b op_c op))}) with hs''_def
+  have hinit_s' : SailState.isInitialized s' := by
+    rw [hs'_def]; exact SailState.isInitialized_insert s cfg.init _ _
+  have hinit_sa : SailState.isInitialized s_a := by
+    rw [hsa_def]; exact SailState.isInitialized_insert s' hinit_s' _ _
+  -- the ladder state `s_a` agrees with `s` on the whole register file (only nextPC/minstret were inserted),
+  -- so the family's `hexec` applies.
+  have hframe_sa : ∀ idx : BitVec 5, SailState.get_reg? s_a idx = SailState.get_reg? s idx := fun idx => by
+    rw [hsa_def, SailState.get_reg?_insert_of_ne (hxne idx), hs'_def,
+      SailState.get_reg?_insert_of_ne (hmne idx)]
+  have hexec_sa := hexec s_a hframe_sa hinit_sa
+  set s'' := ({s_a with regs := s_a.regs.insert (reg_idx_to_Register rd) (bitVecToRegidxVal rd value)})
+    with hs''_def
   have hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
     rw [Sail.run_readReg, cfg.priv]
   have hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
       = some (HartState.HART_ACTIVE ()) := by
     rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact cfg.active
-  have hdec : (ext_decode (data₃ ++ data₂ ++ data₁ ++ data₀)).run s'
-      = .ok (instruction.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) s' :=
+  have hdec : (ext_decode (data₃ ++ data₂ ++ data₁ ++ data₀)).run s' = .ok I s' :=
     hdecgen s' (SailConfigured.writeMinstret cfg b)
   -- the s'' → s register frame off the touched set
   have hframe_s : ∀ R : Register, R ≠ Register.minstret_increment → R ≠ Register.nextPC →
@@ -502,16 +525,11 @@ theorem advance_of_regWrite {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {
   have h_active'' : s''.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()) := by
     rw [hframe_s Register.hart_state (by decide) (by decide)
       (hrdreg Register.hart_state (by tauto))]; exact cfg.active
-  have hinit_s' : SailState.isInitialized s' := by
-    rw [hs'_def]; exact SailState.isInitialized_insert s cfg.init _ _
-  have hinit_sa : SailState.isInitialized s_a := by
-    rw [hsa_def]; exact SailState.isInitialized_insert s' hinit_s' _ _
   have hinit'' : SailState.isInitialized s'' := by
     rw [hs''_def]; exact SailState.isInitialized_insert s_a hinit_sa _ _
   obtain ⟨s_final, hrun, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
-    sailStep_of_ladder s s_a s'' (data₃ ++ data₂ ++ data₁ ++ data₀)
-      (instruction.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) b
-      hb hcp hactive hslr hdec hsa hexec h_active'' hinit''
+    sailStep_of_ladder s s_a s'' (data₃ ++ data₂ ++ data₁ ++ data₀) I b
+      hb hcp hactive hslr hdec hsa hexec_sa h_active'' hinit''
   -- the s_final → s config-register frame
   have hcfg_frame : ∀ R : Register,
       (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
@@ -590,10 +608,58 @@ theorem advance_of_rtype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
   have hrs2 := hvalb.2 rs2 himmc hidxc
   have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
   have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
-  exact advance_of_regWrite op rs2 rs1 rd _ _ (rcvPcOf (stateAccess r))
+  exact advance_write_core (instruction.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) rd
+    (execute_RTYPE_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+      (Word.toBitVec64 r.adapter.op_c_memory.prev_value) op) (rcvPcOf (stateAccess r))
     (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
     hcfg hpcread rfl hfetchReady
     (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
-    hrs1 hrs2 hrd_ne hopa'.symm hval hstraight hpc0
+    (fun t hframe _ => by
+      have := rtype_execute_reaches rs2 rs1 rd op (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_neg hrd_ne] at this)
+    hrd_ne hopa'.symm hval hstraight hpc0
+
+/-- **The I-type chip `advance` — RowView-generic, one call per chip** (`AddiChip`, and the immediate ALU
+forms). The I-type twin of `advance_of_rtype`: straight-line, one register read (`rs1` → `op_b`), and the
+`op_c` column is the sign-extended immediate (`imm_c = 1`), whose 64-bit value the round-trip
+`toBitVec64_bitVecToWord` recovers. Feeds the shared `advance_write_core` with `itype_execute_reaches`; the
+adapter supplies only the ADDI opcode and the `Spec`-derived write `hval` (`rdWrite = op_b + op_c`). -/
+theorem advance_of_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s)
+    (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((iopToOpcode iop.ADDI).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 1)
+    (hnonX0 : r.adapter.op_a ≠ 0)
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hval : Word.toBitVec64 r.rdWrite
+      = Word.toBitVec64 r.adapter.op_b_memory.prev_value + Word.toBitVec64 r.adapter.op_c) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesIType iop.ADDI hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
+  have himmbind : Word.toBitVec64 r.adapter.op_c = imm.signExtend 64 := by
+    rw [show r.adapter.op_c = bitVecToWord (imm.signExtend 64) from hopc]
+    exact toBitVec64_bitVecToWord _
+  have hval' : Word.toBitVec64 r.rdWrite
+      = Word.toBitVec64 r.adapter.op_b_memory.prev_value + imm.signExtend 64 := by rw [hval, himmbind]
+  exact advance_write_core (instruction.ITYPE (imm, .Regidx rs1, .Regidx rd, iop.ADDI)) rd
+    (Word.toBitVec64 r.adapter.op_b_memory.prev_value + imm.signExtend 64) (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ => by
+      have := itype_execute_reaches imm rs1 rd (Word.toBitVec64 r.adapter.op_b_memory.prev_value) t
+        ((hframe rs1).trans hrs1)
+      rwa [if_neg hrd_ne] at this)
+    hrd_ne hopa'.symm hval' hstraight hpc0
 
 end SP1Clean.Advance
