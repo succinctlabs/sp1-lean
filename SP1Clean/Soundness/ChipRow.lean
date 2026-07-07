@@ -1,6 +1,8 @@
 import SP1Clean.Soundness.RowView
 import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
+import SP1Clean.Soundness.RowEffectDefs
+import SP1Clean.Soundness.ProgramConsistency
 
 /-! # `ChipKind` / `ChipRow` — the heterogeneous trace row, dispatched by *value*
 
@@ -57,6 +59,32 @@ structure ChipKind (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
     (view inp cols).is_real = 1 →
     chipSpec inp cols data →
     sailEquiv inp cols s
+  /-- **The chip-specific "row is ready to advance" bundle** (SC Phase 4): the extra facts the trace
+  dispatcher supplies per chip beyond the uniform refinement + `Spec` — the reader-passthrough
+  well-formedness (`cols = main inp`, i.e. `inp.adapter = cols.adapter`), the routing invariant (`op_a ≠ 0`
+  for register-writing chips, or the active-operation flag for multi-op chips), and any pc-limb bounds not
+  already in the `Spec`. Defaults to `True`; each migrated chip overrides it with exactly what its `advance`
+  proof consumes. Analogue of how `sailEquiv` folds the chip's own read/decode preconditions internally. -/
+  advanceReady : Inputs (ZMod p) → Cols (ZMod p) → Target.GuestProgram → SailState → Prop :=
+    fun _ _ _ _ => True
+  /-- **The chip's uniform `advance` obligation** (SC Phase 4 — the semantic model core): in a state `s`
+  refining this row (`SailConfigured`, ROM loaded, the committed pc, and the operand-value bound) with the
+  program-bus decode (`decodedInROM`) and the chip's `advanceReady` bundle, one real Sail `try_step`
+  produces the row's committed `RowEffect` (the PC write + the `op_a` register write + ROM/config
+  preservation). This is `TargetObligations.lift` restricted to one chip's rows; the dispatcher
+  (`chipRows_advance_sound`) assembles the per-chip `advance`s into the whole-trace `lift`. `Option (PLift …)`
+  so chips migrate incrementally — `none` until a chip proves it (Add/Sub/Addi so far); `PLift` lifts the
+  obligation `Prop` into a `Type` that `Option` accepts. -/
+  advance : Option (PLift (∀ (inp : Inputs (ZMod p)) (cols : Cols (ZMod p)) (data : ProverData (ZMod p))
+      (prog : Target.GuestProgram) (s : SailState),
+    (view inp cols).is_real = 1 →
+    chipSpec inp cols data →
+    Target.SailConfigured s → Target.RomLoaded prog s →
+    s.regs.get? Register.PC = some (Target.rcvPcOf (stateAccess (view inp cols))) →
+    Target.ValueOperandsBound (view inp cols) s →
+    Target.decodedInROM prog (programAccess (view inp cols)).toRow →
+    advanceReady inp cols prog s →
+    ∃ s', Target.SailStep s s' ∧ Target.RowEffect prog (view inp cols) s s')) := none
 
 /-- A committed trace row: a chip `kind` together with that chip's inputs + committed column struct. The
 dependent `inputs`/`cols` fields take their types from `kind`, so a `List (ChipRow p)` freely interleaves
