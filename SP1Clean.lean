@@ -109,6 +109,7 @@ import SP1Clean.Proofs.Chips.StoreWordChip.Bridge
 import SP1Clean.Native.Chips.StoreWordChip.Defs
 import SP1Clean.Proofs.Chips.StoreWordChip.Formal
 import SP1Clean.Proofs.Chips.SubChip.Bridge
+import SP1Clean.Proofs.Chips.SubChip.Advance
 import SP1Clean.Native.Chips.SubChip.Defs
 import SP1Clean.Proofs.Chips.SubChip.Formal
 import SP1Clean.Proofs.Chips.SubwChip.Bridge
