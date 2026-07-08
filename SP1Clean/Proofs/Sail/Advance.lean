@@ -573,7 +573,8 @@ theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s
     (hrd_ne : rd ≠ 0#5) (hrd_a : (rd.toNat : ZMod p) = r.adapter.op_a)
     (hval : Word.toBitVec64 r.rdWrite = value)
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
-    (hpc0 : (r.state.pc[0]).val < 2 ^ 16) :
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hwrites : r.commit.writesReg = true) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   have hxne : ∀ idx : BitVec 5, Register.nextPC ≠ reg_idx_to_Register idx := fun idx => by
     unfold reg_idx_to_Register; split <;> decide
@@ -643,7 +644,7 @@ theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s
       (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide) (hrdreg R hR)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hs''_def, hsa_def, hs'_def]
   refine ⟨s_final, ⟨false, hrun⟩,
-    { pc := ?_, regs := ⟨?_, ?_⟩, rom := ?_, init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
+    { pc := ?_, regs := ?_, rom := ?_, init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
   · -- pc
     rw [hPCf]
     have hnp : s''.regs.get? Register.nextPC = some npv := by
@@ -658,19 +659,22 @@ theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s
     rw [hnp]; congr 1
     rw [hnpv_def, hgetPC, sndPc_straightline r hstraight hpc0, ← hrcv]
     simp [BitVec.addInt]
-  · -- regs.1
-    intro idx hidx
-    obtain rfl : idx = rd := (ofNat_val_eq_of_cast hidx).symm.trans (ofNat_val_eq_of_cast hrd_a)
-    rw [hxf idx, hs''_def, get_reg?_writeBack s_a idx hrd_ne _, ← hval]
-  · -- regs.2
-    intro idx hidx
-    rw [hxf idx]
-    by_cases h0 : idx = 0#5
-    · subst h0; simp [SailState.get_reg?]
-    · have hidxrd : idx ≠ rd := fun heq => hidx (by rw [heq]; exact hrd_a)
-      rw [hs''_def, SailState.get_reg?_insert_of_ne (reg_idx_to_Register_ne idx rd h0 hrd_ne hidxrd),
-        hsa_def, SailState.get_reg?_insert_of_ne (hxne idx), hs'_def,
-        SailState.get_reg?_insert_of_ne (hmne idx)]
+  · -- regs (this is a register-writing chip, `hwrites : commit.writesReg = true` → the write + frame pair)
+    rw [if_pos hwrites]
+    refine ⟨?_, ?_⟩
+    · -- the op_a write
+      intro idx hidx
+      obtain rfl : idx = rd := (ofNat_val_eq_of_cast hidx).symm.trans (ofNat_val_eq_of_cast hrd_a)
+      rw [hxf idx, hs''_def, get_reg?_writeBack s_a idx hrd_ne _, ← hval]
+    · -- the frame off op_a
+      intro idx hidx
+      rw [hxf idx]
+      by_cases h0 : idx = 0#5
+      · subst h0; simp [SailState.get_reg?]
+      · have hidxrd : idx ≠ rd := fun heq => hidx (by rw [heq]; exact hrd_a)
+        rw [hs''_def, SailState.get_reg?_insert_of_ne (reg_idx_to_Register_ne idx rd h0 hrd_ne hidxrd),
+          hsa_def, SailState.get_reg?_insert_of_ne (hxne idx), hs'_def,
+          SailState.get_reg?_insert_of_ne (hmne idx)]
   · -- rom
     intro hr a w hf i; rw [hmem_fin]; exact hr a w hf i
   · -- cfg
@@ -696,7 +700,8 @@ theorem advance_of_rtype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hval : Word.toBitVec64 r.rdWrite
       = execute_RTYPE_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
-          (Word.toBitVec64 r.adapter.op_c_memory.prev_value) op) :
+          (Word.toBitVec64 r.adapter.op_c_memory.prev_value) op)
+    (hwrites : r.commit.writesReg = true := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ :=
     decodesRType op hdecrom hop himmc hcfg
@@ -720,7 +725,7 @@ theorem advance_of_rtype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
       have := rtype_execute_reaches rs2 rs1 rd op (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
         (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
       rwa [if_neg hrd_ne] at this)
-    hrd_ne hopa'.symm hval hstraight hpc0
+    hrd_ne hopa'.symm hval hstraight hpc0 hwrites
 
 /-- **The W-op chip `advance` — RowView-generic, one call per chip and 32-bit W-op** (`AddwChip`/`SubwChip`,
 and the `*W` variants of Shift). The `execute_RTYPEW` twin of `advance_of_rtype`: identical straight-line,
@@ -739,7 +744,8 @@ theorem advance_of_rtypew {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hval : Word.toBitVec64 r.rdWrite
       = execute_RTYPEW_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
-          (Word.toBitVec64 r.adapter.op_c_memory.prev_value) op) :
+          (Word.toBitVec64 r.adapter.op_c_memory.prev_value) op)
+    (hwrites : r.commit.writesReg = true := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ :=
     decodesRTypew op hdecrom hop himmc hcfg
@@ -763,7 +769,7 @@ theorem advance_of_rtypew {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
       have := rtypew_execute_reaches rs2 rs1 rd op (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
         (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
       rwa [if_neg hrd_ne] at this)
-    hrd_ne hopa'.symm hval hstraight hpc0
+    hrd_ne hopa'.symm hval hstraight hpc0 hwrites
 
 /-- **The I-type chip `advance` — RowView-generic, one call per chip and immediate ALU op** (`AddiChip`,
 and the immediate forms of Bitwise/Lt). The I-type twin of `advance_of_rtype`: straight-line, one register
@@ -783,7 +789,8 @@ theorem advance_of_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hval : Word.toBitVec64 r.rdWrite
       = execute_ITYPE_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
-          (Word.toBitVec64 r.adapter.op_c) op) :
+          (Word.toBitVec64 r.adapter.op_c) op)
+    (hwrites : r.commit.writesReg = true := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesIType op hdecrom hop himmc hcfg
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
@@ -809,7 +816,7 @@ theorem advance_of_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
       have := itype_execute_reaches imm rs1 rd op (Word.toBitVec64 r.adapter.op_b_memory.prev_value) t
         ((hframe rs1).trans hrs1)
       rwa [if_neg hrd_ne] at this)
-    hrd_ne hopa'.symm hval' hstraight hpc0
+    hrd_ne hopa'.symm hval' hstraight hpc0 hwrites
 
 /-- **The ADDIW chip `advance` — RowView-generic** (the immediate branch of `AddwChip`). The `.ADDIW` twin of
 `advance_of_itype`: straight-line, one register read (`rs1` → `op_b`), the `op_c` column the sign-extended
@@ -828,7 +835,8 @@ theorem advance_of_addiw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hval : Word.toBitVec64 r.rdWrite
       = execute_ADDIW_pure (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
-          (Word.toBitVec64 r.adapter.op_c)) :
+          (Word.toBitVec64 r.adapter.op_c))
+    (hwrites : r.commit.writesReg = true := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesADDIW hdecrom hop himmc hcfg
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
@@ -854,7 +862,7 @@ theorem advance_of_addiw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
       have := execute_ADDIW_reaches imm rs1 rd (Word.toBitVec64 r.adapter.op_b_memory.prev_value) t
         ((hframe rs1).trans hrs1)
       rwa [if_neg hrd_ne] at this)
-    hrd_ne hopa'.symm hval' hstraight hpc0
+    hrd_ne hopa'.symm hval' hstraight hpc0 hwrites
 
 /-- **The U-type chip `advance` — RowView-generic** (`UTypeChip`, LUI/AUIPC). No register reads (`imm_b =
 imm_c = 1`); the write value is the immediate (LUI) or pc-relative (AUIPC), the latter reading the pc through
@@ -871,7 +879,8 @@ theorem advance_of_utype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hval : ∀ imm : BitVec 20, r.adapter.op_b = bitVecToWord ((imm.signExtend 64) <<< 12) →
-      Word.toBitVec64 r.rdWrite = execute_UTYPE_pure op (rcvPcOf (stateAccess r)) imm) :
+      Word.toBitVec64 r.rdWrite = execute_UTYPE_pure op (rcvPcOf (stateAccess r)) imm)
+    (hwrites : r.commit.writesReg = true := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, imm, rd, hfetch, hdecw, hopa, hopb⟩ := decodesUType op hdecrom hop himmc hcfg
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
@@ -887,7 +896,7 @@ theorem advance_of_utype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     (fun t hframe hpcf _ => by
       have := execute_UTYPE_reaches imm rd op (rcvPcOf (stateAccess r)) t (hpcf.trans hpcread)
       rwa [if_neg hrd_ne] at this)
-    hrd_ne hopa'.symm hval' hstraight hpc0
+    hrd_ne hopa'.symm hval' hstraight hpc0 hwrites
 
 /-! ## Jumps (computed `next_pc`) — the `execute` sets `nextPC` itself -/
 
@@ -939,7 +948,8 @@ theorem advance_jump_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
           (reg_idx_to_Register rd) (bitVecToRegidxVal rd link))})
     (hrd_ne : rd ≠ 0#5) (hrd_a : (rd.toNat : ZMod p) = r.adapter.op_a)
     (hval : Word.toBitVec64 r.rdWrite = link)
-    (htgt : sndPcOf (stateAccess r) = target) :
+    (htgt : sndPcOf (stateAccess r) = target)
+    (hwrites : r.commit.writesReg = true) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   have hxne : ∀ idx : BitVec 5, Register.nextPC ≠ reg_idx_to_Register idx := fun idx => by
     unfold reg_idx_to_Register; split <;> decide
@@ -1017,28 +1027,31 @@ theorem advance_jump_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
       (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide) (hrdreg R hR)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hs''_def, hsa_def, hs'_def]
   refine ⟨s_final, ⟨false, hrun⟩,
-    { pc := ?_, regs := ⟨?_, ?_⟩, rom := ?_, init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
+    { pc := ?_, regs := ?_, rom := ?_, init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
   · rw [hPCf]
     have hnp : s''.regs.get? Register.nextPC = some target := by
       rw [hs''_def, Std.ExtDHashMap.get?_insert,
         dif_neg (by unfold reg_idx_to_Register; split <;> decide),
         Std.ExtDHashMap.get?_insert_self]
     rw [hnp, htgt]
-  · intro idx hidx
-    obtain rfl : idx = rd := (ofNat_val_eq_of_cast hidx).symm.trans (ofNat_val_eq_of_cast hrd_a)
-    rw [hxf idx, hs''_def,
-      get_reg?_writeBack {s_a with regs := s_a.regs.insert Register.nextPC target} idx hrd_ne _, ← hval]
-  · intro idx hidx
-    rw [hxf idx]
-    by_cases h0 : idx = 0#5
-    · subst h0; simp [SailState.get_reg?]
-    · have hidxrd : idx ≠ rd := fun heq => hidx (by rw [heq]; exact hrd_a)
-      have hframe_idx : s''.regs.get? (reg_idx_to_Register idx)
-          = s.regs.get? (reg_idx_to_Register idx) :=
-        hframe_s (reg_idx_to_Register idx) (Ne.symm (hmne idx)) (Ne.symm (hxne idx))
-          (Ne.symm (reg_idx_to_Register_ne idx rd h0 hrd_ne hidxrd))
-      simp only [SailState.get_reg?]
-      rw [hframe_idx]
+  · -- regs (register-writing jump: `hwrites` → the link write + frame pair)
+    rw [if_pos hwrites]
+    refine ⟨?_, ?_⟩
+    · intro idx hidx
+      obtain rfl : idx = rd := (ofNat_val_eq_of_cast hidx).symm.trans (ofNat_val_eq_of_cast hrd_a)
+      rw [hxf idx, hs''_def,
+        get_reg?_writeBack {s_a with regs := s_a.regs.insert Register.nextPC target} idx hrd_ne _, ← hval]
+    · intro idx hidx
+      rw [hxf idx]
+      by_cases h0 : idx = 0#5
+      · subst h0; simp [SailState.get_reg?]
+      · have hidxrd : idx ≠ rd := fun heq => hidx (by rw [heq]; exact hrd_a)
+        have hframe_idx : s''.regs.get? (reg_idx_to_Register idx)
+            = s.regs.get? (reg_idx_to_Register idx) :=
+          hframe_s (reg_idx_to_Register idx) (Ne.symm (hmne idx)) (Ne.symm (hxne idx))
+            (Ne.symm (reg_idx_to_Register_ne idx rd h0 hrd_ne hidxrd))
+        simp only [SailState.get_reg?]
+        rw [hframe_idx]
   · intro hr a w2 hf i; rw [hmem_fin]; exact hr a w2 hf i
   · exact SailConfigured.congr cfg hinitf hcfg_frame
 
@@ -1056,7 +1069,8 @@ theorem advance_of_jal {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : S
     (halign : (sndPcOf (stateAccess r)).toNat % 4 = 0)
     (hsnd : ∀ imm : BitVec 21, r.adapter.op_b = bitVecToWord (imm.signExtend 64) →
        sndPcOf (stateAccess r) = rcvPcOf (stateAccess r) + sign_extend (m := 64) imm)
-    (hlink : Word.toBitVec64 r.rdWrite = rcvPcOf (stateAccess r) + 4#64) :
+    (hlink : Word.toBitVec64 r.rdWrite = rcvPcOf (stateAccess r) + 4#64)
+    (hwrites : r.commit.writesReg = true := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, imm, rd, hfetch, hdecw, hopa, hopb, _⟩ := decodesJal hdecrom hop himmc hcfg
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
@@ -1075,7 +1089,7 @@ theorem advance_of_jal {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : S
     (fun t _hframe hpcf hnpc hinit _hcfg =>
       execute_JAL_reaches imm rd (rcvPcOf (stateAccess r)) t hinit
         (hpcf.trans hpcread) hnpc hrd_ne halign')
-    hrd_ne hopa'.symm hlink htgt
+    hrd_ne hopa'.symm hlink htgt hwrites
 
 /-- **The JALR execute stage reaches `Retire_Success`.** Like `execute_JAL_reaches` but JALR (a) has an
 `update_elp_state rs1` prefix (a no-op under `isValidMemConfig`), (b) reads `rs1` (not the pc), and (c)
@@ -1121,7 +1135,8 @@ theorem advance_of_jalr {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
        sndPcOf (stateAccess r)
          = BitVec.update (Word.toBitVec64 r.adapter.op_b_memory.prev_value
              + sign_extend (m := 64) imm) 0 0#1)
-    (hlink : Word.toBitVec64 r.rdWrite = rcvPcOf (stateAccess r) + 4#64) :
+    (hlink : Word.toBitVec64 r.rdWrite = rcvPcOf (stateAccess r) + 4#64)
+    (hwrites : r.commit.writesReg = true := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesJalr hdecrom hop himmc hcfg
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
@@ -1147,7 +1162,7 @@ theorem advance_of_jalr {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
       execute_JALR_reaches imm rs1 rd (rcvPcOf (stateAccess r))
         (Word.toBitVec64 r.adapter.op_b_memory.prev_value) t hinit
         hcfgt.toValidMemConfig hnpc ((hframe rs1).trans hrs1) hrd_ne halign')
-    hrd_ne hopa'.symm hlink htgt
+    hrd_ne hopa'.symm hlink htgt hwrites
 
 
 /-! ## DivRem (DIV/REM/DIVW/REMW × signed/unsigned) execute-reaches + advance_of_* (SC Phase 4) -/
@@ -1231,7 +1246,8 @@ theorem advance_of_div {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : S
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hval : Word.toBitVec64 r.rdWrite
       = SailRV64.div (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
-          (Word.toBitVec64 r.adapter.op_b_memory.prev_value) isU) :
+          (Word.toBitVec64 r.adapter.op_b_memory.prev_value) isU)
+    (hwrites : r.commit.writesReg = true := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDiv isU hdecrom hop himmc hcfg
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
@@ -1254,7 +1270,7 @@ theorem advance_of_div {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : S
       have := execute_DIV_reaches rs2 rs1 rd isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
         (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
       rwa [if_neg hrd_ne] at this)
-    hrd_ne hopa'.symm hval hstraight hpc0
+    hrd_ne hopa'.symm hval hstraight hpc0 hwrites
 
 /-- The REM/REMU chip `advance` (RowView-generic; note the bool-first `SailRV64.rem isU op_c op_b`). -/
 theorem advance_of_rem {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
@@ -1267,7 +1283,8 @@ theorem advance_of_rem {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : S
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hval : Word.toBitVec64 r.rdWrite
       = SailRV64.rem isU (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
-          (Word.toBitVec64 r.adapter.op_b_memory.prev_value)) :
+          (Word.toBitVec64 r.adapter.op_b_memory.prev_value))
+    (hwrites : r.commit.writesReg = true := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRem isU hdecrom hop himmc hcfg
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
@@ -1290,7 +1307,7 @@ theorem advance_of_rem {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : S
       have := execute_REM_reaches rs2 rs1 rd isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
         (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
       rwa [if_neg hrd_ne] at this)
-    hrd_ne hopa'.symm hval hstraight hpc0
+    hrd_ne hopa'.symm hval hstraight hpc0 hwrites
 
 /-- The DIVW/DIVUW chip `advance` (RowView-generic). -/
 theorem advance_of_divw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
@@ -1303,7 +1320,8 @@ theorem advance_of_divw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hval : Word.toBitVec64 r.rdWrite
       = SailRV64.divw (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
-          (Word.toBitVec64 r.adapter.op_b_memory.prev_value) isU) :
+          (Word.toBitVec64 r.adapter.op_b_memory.prev_value) isU)
+    (hwrites : r.commit.writesReg = true := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDivw isU hdecrom hop himmc hcfg
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
@@ -1326,7 +1344,7 @@ theorem advance_of_divw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
       have := execute_DIVW_reaches rs2 rs1 rd isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
         (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
       rwa [if_neg hrd_ne] at this)
-    hrd_ne hopa'.symm hval hstraight hpc0
+    hrd_ne hopa'.symm hval hstraight hpc0 hwrites
 
 /-- The REMW/REMUW chip `advance` (RowView-generic; bool-first `SailRV64.remw isU op_c op_b`). -/
 theorem advance_of_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
@@ -1339,7 +1357,8 @@ theorem advance_of_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hval : Word.toBitVec64 r.rdWrite
       = SailRV64.remw isU (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
-          (Word.toBitVec64 r.adapter.op_b_memory.prev_value)) :
+          (Word.toBitVec64 r.adapter.op_b_memory.prev_value))
+    (hwrites : r.commit.writesReg = true := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRemw isU hdecrom hop himmc hcfg
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
@@ -1362,6 +1381,6 @@ theorem advance_of_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
       have := execute_REMW_reaches rs2 rs1 rd isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
         (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
       rwa [if_neg hrd_ne] at this)
-    hrd_ne hopa'.symm hval hstraight hpc0
+    hrd_ne hopa'.symm hval hstraight hpc0 hwrites
 
 end SP1Clean.Advance

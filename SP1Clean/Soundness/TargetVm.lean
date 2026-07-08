@@ -205,9 +205,19 @@ private theorem chain_to_refines
       congr 1
       exact sndPc_eq_rcvPc (isWalk_chain hw.1 i hi)
     · intro idx
-      by_cases hcond : (idx.toNat : ZMod p) = (path[i]'hi').adapter.op_a
-      · rw [heff.regs.1 idx hcond, replayVal, dif_pos hi', if_pos hcond]
-      · rw [heff.regs.2 idx hcond, href.frame idx, replayVal, dif_pos hi', if_neg hcond]
+      have hregs := heff.regs
+      by_cases hwr : (path[i]'hi').commit.writesReg = true
+      · -- a register-writing row: `heff.regs` is the op_a write + frame pair
+        rw [if_pos hwr] at hregs
+        by_cases hcond : (idx.toNat : ZMod p) = (path[i]'hi').adapter.op_a
+        · rw [hregs.1 idx hcond, replayVal, dif_pos hi', if_pos ⟨hwr, hcond⟩]
+        · rw [hregs.2 idx hcond, href.frame idx, replayVal, dif_pos hi', if_neg (fun h => hcond h.2)]
+      · -- a non-writing row (Branch / AluX0 / LoadX0): `heff.regs` is a pure register frame, and
+        -- `replayVal` skips it (its `writesReg` guard is false)
+        rw [Bool.not_eq_true] at hwr
+        rw [if_neg (by rw [hwr]; decide)] at hregs
+        rw [hregs idx, href.frame idx, replayVal, dif_pos hi',
+          if_neg (fun h => by rw [hwr] at h; exact absurd h.1 (by decide))]
 
 /-- **The target machine-level theorem (skeleton form).** Given the gated execution certificate over
 the committed boundary, the entry-point tie, and the named obligations, the official Sail interpreter,

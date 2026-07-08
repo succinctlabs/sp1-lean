@@ -36,16 +36,18 @@ def sndPcOf (sa : StateAccess (ZMod p)) : BitVec 64 :=
 /-! ## The refinement invariant and the per-row effect -/
 
 /-- **The exact-replay value (W2).** The value register `idx` holds after replaying the first `i` walk
-rows from `s0`: the committed write (`rdWrite`) of the **most-recent** earlier row whose `op_a`
-destination is `idx`, or `s0`'s value if none wrote it. The exact-value refinement of the old frame
-disjunction — `RefinesAt.frame` now pins each register to this, so a row's committed operand columns
-(read-back register values) can be tied to the live Sail registers (W2's operand binding). -/
+rows from `s0`: the committed write (`rdWrite`) of the **most-recent** earlier **register-writing** row
+(`commit.writesReg`) whose `op_a` destination is `idx`, or `s0`'s value if none wrote it. The
+`commit.writesReg` guard (SC Phase 4) skips non-writers — a Branch/Store row whose `op_a` is a *source*
+`rs1`/`rs2` read, not a destination — so their read register is not falsely pinned to `rdWrite`. The
+exact-value refinement of the old frame disjunction — `RefinesAt.frame` pins each register to this, so a
+row's committed operand columns (read-back register values) tie to the live Sail registers (W2's binding). -/
 def replayVal (s0 : SailState) (path : List (Trace.RowView (ZMod p))) (idx : BitVec 5) :
     ℕ → Option (BitVec 64)
   | 0 => s0.get_reg? idx
   | i + 1 =>
     if hi : i < path.length then
-      if (idx.toNat : ZMod p) = (path[i]'hi).adapter.op_a then
+      if (path[i]'hi).commit.writesReg = true ∧ (idx.toNat : ZMod p) = (path[i]'hi).adapter.op_a then
         some (Word.toBitVec64 (path[i]'hi).rdWrite)
       else replayVal s0 path idx i
     else replayVal s0 path idx i
@@ -64,18 +66,22 @@ structure RefinesAt (prog : GuestProgram) (s0 : SailState)
   frame : ∀ idx : BitVec 5, s.get_reg? idx = replayVal s0 path idx i
 
 /-- The committed effect of one row, as a relation between the pre- and post-states of its interpreter
-step: the PC moves to the row's committed `next_pc`; the register file is **exactly** `s` except at the
-row's `op_a` destination, where it becomes the committed write value `rdWrite`; ROM, initialization, and
-configuration persist. The register clause is the exact-write form (W7's `wX_bits rd` produces it) the
-exact replay needs — `try_step` may also touch bookkeeping registers (`minstret`, `hart_state`, …) the
-trace doesn't commit, but those are outside the `BitVec 5` register file. -/
+step: the PC moves to the row's committed `next_pc`; the **register** file is, **when the row writes a
+register** (`commit.writesReg`), exactly `s` except at the `op_a` destination (→ the committed `rdWrite`),
+and **when it does not** (Branch / AluX0 / LoadX0, `commit.writesReg = false`) a pure frame — the SC
+Phase 4 gate that lets a Branch/Store row, whose `op_a` is a *source read*, not corrupt that register; ROM,
+initialization, and configuration persist. `try_step` may also touch bookkeeping registers (`minstret`,
+`hart_state`, …) the trace doesn't commit, but those are outside the `BitVec 5` register file. (The memory
+axis — `RowEffect.mem` / a store's `commit.memWrite` — is added in Phase 3b.) -/
 structure RowEffect (prog : GuestProgram) (r : Trace.RowView (ZMod p))
     (s s' : SailState) : Prop where
   pc : s'.regs.get? Register.PC = some (sndPcOf (stateAccess r))
-  regs : (∀ idx : BitVec 5, (idx.toNat : ZMod p) = r.adapter.op_a →
-            s'.get_reg? idx = some (Word.toBitVec64 r.rdWrite)) ∧
-         (∀ idx : BitVec 5, ¬ (idx.toNat : ZMod p) = r.adapter.op_a →
-            s'.get_reg? idx = s.get_reg? idx)
+  regs : (if r.commit.writesReg then
+            (∀ idx : BitVec 5, (idx.toNat : ZMod p) = r.adapter.op_a →
+              s'.get_reg? idx = some (Word.toBitVec64 r.rdWrite)) ∧
+            (∀ idx : BitVec 5, ¬ (idx.toNat : ZMod p) = r.adapter.op_a →
+              s'.get_reg? idx = s.get_reg? idx)
+          else (∀ idx : BitVec 5, s'.get_reg? idx = s.get_reg? idx))
   rom : RomLoaded prog s → RomLoaded prog s'
   init : s.isInitialized → s'.isInitialized
   cfg : SailConfigured s → SailConfigured s'
