@@ -1237,4 +1237,96 @@ theorem decodesRemw {prog : GuestProgram} {row : ProgramRow (ZMod p)} (isU : Boo
     have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
   subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
 
+/-! ## BTYPE (branches) decode inversion + producer (SC Phase 4 · Phase 3a) -/
+
+/-- **The 13-bit B-immediate sign-extension is injective** (clean, no `bv_decide`): recover `x` as the low
+13 bits of `x.signExtend 64` via `getLsbD`. The imm-uniqueness `decodesBType` rides. -/
+theorem sext13_inj {a b : BitVec 13} (h : a.signExtend 64 = b.signExtend 64) : a = b := by
+  have key : ∀ x : BitVec 13, (x.signExtend 64).setWidth 13 = x := fun x => by
+    apply BitVec.eq_of_getLsbD_eq; intro i hi
+    simp only [BitVec.getLsbD_setWidth, BitVec.getLsbD_signExtend, hi]
+    have h64 : i < 64 := by omega
+    simp [hi, h64]
+  rw [← key a, ← key b, h]
+
+/-- **The BTYPE decode inversion (W7), generic over the branch op.** If a decoded `i` projects to a
+committed row whose opcode is `op`'s (`bopToOpcode`, image `{40..45}`) and whose `imm_c = 1`, then `i` *is*
+`BTYPE (imm, rs2, rs1, op)`, with `op_a = rs1` (SOURCE), `op_b = rs2` (source), `op_c = signExtended imm`.
+`imm_c = 1` kills the R-shaped arms; the opcode column rules out the other immediate-shaped arms and pins
+`op` within BTYPE. The immediate-shaped twin of `instrToProgramRow_inv_jalr`. -/
+theorem instrToProgramRow_inv_btype {pc : Vector (ZMod p) 3} {i : instruction} {row : ProgramChip.ProgramRow (ZMod p)}
+    (op : bop) (h : instrToProgramRow pc i = some row)
+    (hop : row.opcode = ((bopToOpcode op).toNat : ZMod p))
+    (himm : row.imm_c = (1 : ZMod p)) :
+    ∃ (imm : BitVec 13) (rs2 rs1 : regidx), i = .BTYPE (imm, rs2, rs1, op) ∧
+      row.op_a = regidxVal rs1 ∧ row.op_b = #v[regidxVal rs2, 0, 0, 0]
+      ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
+  have honezero : (1 : ZMod p) ≠ 0 := by
+    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    exact one_ne_zero
+  simp only [instrToProgramRow] at h
+  split at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst h)
+  all_goals (try (exact absurd himm.symm honezero))
+  · rename_i imm rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i imm rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i imm rd
+    exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
+  · rename_i imm rs2 rs1 op'
+    have hz : (bopToOpcode op').toNat = (bopToOpcode op).toNat := opcodeCast_inj hop
+    obtain rfl : op' = op := by cases op' <;> cases op <;> first | rfl | (exact absurd hz (by decide))
+    exact ⟨imm, rs2, rs1, rfl, rfl, rfl, rfl⟩
+  · rename_i imm rs1 rd isU width
+    exact absurd (opcodeCast_inj hop)
+      (by cases isU <;> cases op <;> (simp only [loadOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs2 rs1 width
+    exact absurd (opcodeCast_inj hop)
+      (by cases op <;> (simp only [storeOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
+
+/-- **The ∀-configured-state BTYPE decode producer** — the `.BTYPE` twin of `decodesJalr`, keyed on the
+committed `(opcode ∈ {BEQ..BGEU}, imm_c = 1)`. Recovers `w` + `imm/rs2/rs1` with the decode holding in every
+configured state (`rs1` from `op_a` and `rs2` from `op_b` pinned by `regidx_bv_inj`, the 13-bit offset by
+`sext13_inj` on `op_c`). What `BranchChip.advance` consumes. -/
+theorem decodesBType {prog : GuestProgram} {row : ProgramChip.ProgramRow (ZMod p)} (op : bop)
+    (h : decodedInROM prog row)
+    (hop : row.opcode = ((bopToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 1)
+    {s0 : SailState} (hs0 : SailConfigured s0) :
+    ∃ (w : BitVec 32) (imm : BitVec 13) (rs2 rs1 : BitVec 5),
+      prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (∀ sc, SailConfigured sc → (ext_decode w).run sc
+        = .ok (instruction.BTYPE (imm, .Regidx rs2, .Regidx rs1, op)) sc) ∧
+      row.op_a = (rs1.toNat : ZMod p) ∧
+      row.op_b = #v[(rs2.toNat : ZMod p), 0, 0, 0] ∧
+      row.op_c = bitVecToWord (imm.signExtend 64) := by
+  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
+  obtain ⟨imm, rs2r, rs1r, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_btype op hrow0 hop himm
+  obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r
+  refine ⟨w, imm, rs2, rs1, hfetch, ?_, ha, hb, hc⟩
+  intro sc hsc
+  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
+  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
+  obtain ⟨imm', rs2', rs1', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_btype op hrow2 hop himm
+  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'
+  have e2 : rs2' = rs2 := regidx_bv_inj (by
+    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
+    exact h.symm)
+  have e1 : rs1' = rs1 := regidx_bv_inj (by
+    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
+  have eimm : imm' = imm := by
+    have e := congrArg (Word.toBitVec64 (p := p)) (hc.symm.trans hc')
+    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
+    exact (sext13_inj e).symm
+  subst e2 e1 eimm; rw [hi2] at hrun2; exact hrun2
+
 end SP1Clean.Soundness.Target

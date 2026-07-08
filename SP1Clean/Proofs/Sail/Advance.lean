@@ -1383,4 +1383,161 @@ theorem advance_of_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
       rwa [if_neg hrd_ne] at this)
     hrd_ne hopa'.symm hval hstraight hpc0 hwrites
 
+/-! ## Control-flow (branches): computed next_pc, NO register write (SC Phase 4 · Phase 3a) -/
+
+/-- The Sail-computed branch-taken predicate for a `bop`, keyed exactly on `execute_BTYPE`'s inner
+`match op` (BEQ/BNE via `==`/`!=`, the four ordering forms via the Sail `zopz0z*` comparison fns).
+Self-contained (no `BranchSail.branchCond` dependency) so `execute_BTYPE_reaches` sits in `Advance.lean`,
+below the BranchChip bridge. The BranchChip adapter bridges `btypeTaken ↔ branchCond` via the
+`zopz0z*_eq_slt/ult` lemmas. -/
+def btypeTaken (op : bop) (x y : BitVec 64) : Bool :=
+  match op with
+  | .BEQ => x == y
+  | .BNE => x != y
+  | .BLT => zopz0zI_s x y
+  | .BGE => zopz0zKzJ_s x y
+  | .BLTU => zopz0zI_u x y
+  | .BGEU => zopz0zKzJ_u x y
+
+/-- **The BTYPE execute stage reaches `Retire_Success`.** On a state `t` whose `rs1`/`rs2` reads and
+staged `nextPC = pc + 4` are known, `execute (.BTYPE …)` runs to `Retire_Success` committing
+`nextPC := target` (only): the **taken** arm's `jump_to` overwrites `nextPC ← target = pc + signExtend imm`
+(4-aligned via `jump_to_of_mod4_eq_zero`); the **not-taken** arm leaves the staged `pc+4` untouched, so the
+result equals `{t with regs.insert nextPC target}` (target = pc+4) by the idempotent re-insert of the already
+staged `nextPC`. The `hexec` the control-flow core (`advance_of_ctrl`) needs — the branch twin of the
+straight-line `*_execute_reaches`, but the execute *changes* `nextPC` (no `rd` write). -/
+theorem execute_BTYPE_reaches (imm : BitVec 13) (rs1_idx rs2_idx : BitVec 5) (op : bop)
+    (pc target rs1_val rs2_val : BitVec 64) (t : SailState) (hs : t.isInitialized)
+    (hpc : t.regs.get? Register.PC = some pc)
+    (hnpc : t.regs.get? Register.nextPC = some (pc + 4#64))
+    (h_rs1 : SailState.get_reg? t rs1_idx = some rs1_val)
+    (h_rs2 : SailState.get_reg? t rs2_idx = some rs2_val)
+    (h_taken : btypeTaken op rs1_val rs2_val = true → target = pc + sign_extend (m := 64) imm)
+    (h_not_taken : btypeTaken op rs1_val rs2_val = false → target = pc + 4#64)
+    (h_align : target.toNat % 4 = 0) :
+    (execute (.BTYPE (imm, .Regidx rs2_idx, .Regidx rs1_idx, op))).run t
+      = .ok (ExecutionResult.Retire_Success ())
+          {t with regs := t.regs.insert Register.nextPC target} := by
+  have hpc_get : t.regs.get Register.PC (hs _) = pc := by
+    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at hpc; exact hpc
+  by_cases hc : btypeTaken op rs1_val rs2_val = true
+  · have hnpc_t := h_taken hc
+    have htgt4 : (pc + sign_extend (m := 64) imm) % 4#64 = 0 := by
+      rw [← hnpc_t]; apply BitVec.eq_of_toNat_eq; rw [BitVec.toNat_umod]; simpa using h_align
+    have hjump := jump_to_of_mod4_eq_zero (pc + sign_extend (m := 64) imm) t hs htgt4
+    cases op <;> simp only [btypeTaken, beq_iff_eq, bne_iff_ne] at hc <;>
+      simp [execute, execute_BTYPE, run_rX_bits, h_rs1, h_rs2,
+        Sail.run_readReg_bind_of_isInitialized _ _ hs, hpc_get, RETIRE_SUCCESS, hjump, hnpc_t, hc]
+  · simp only [Bool.not_eq_true] at hc
+    have hnt := h_not_taken hc
+    have hgtnpc : t.regs.get? Register.nextPC = some target := by rw [hnpc, hnt]
+    have hidem : t.regs.insert Register.nextPC target = t.regs := by
+      apply Std.ExtDHashMap.ext_get?; intro k; rw [Std.ExtDHashMap.get?_insert]
+      split
+      · rename_i hk; simp only [beq_iff_eq] at hk; subst hk; rw [hgtnpc]; rfl
+      · rfl
+    cases op <;> simp only [btypeTaken, beq_eq_false_iff_ne, bne_eq_false_iff_eq] at hc <;>
+      simp [execute, execute_BTYPE, run_rX_bits, h_rs1, h_rs2, RETIRE_SUCCESS, hc, hidem]
+
+/-- **The control-flow (branch) ladder core** — the twin of `advance_jump_core` for a **computed
+`next_pc` with NO register write**. The `execute` commits `nextPC := target` only (no `rd` insert), the row
+takes `commit.writesReg = false`, and `RowEffect.regs` discharges via the `if_neg` (frame-only) branch — a
+uniform register frame over ALL indices (no `op_a` split). Everything else — the minstret/fetch/decode/
+`try_step` ladder and the register/ROM/config frames off `{minstret, nextPC}` — mirrors the straight-line/
+jump cores. Serves the branch family (`BTYPE`); the per-chip `hexec` is `execute_BTYPE_reaches`, the target
+is the committed `next_pc` (`htgt : sndPcOf = target`). -/
+theorem advance_of_ctrl {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
+    (I : instruction) (target pc : BitVec 64)
+    (data₀ data₁ data₂ data₃ : BitVec 8)
+    (cfg : SailConfigured s)
+    (hpc : s.regs.get? Register.PC = some pc)
+    (hfetch : FetchReady s pc data₀ data₁ data₂ data₃)
+    (hdecgen : ∀ sc : SailState, SailConfigured sc →
+      (ext_decode (data₃ ++ data₂ ++ data₁ ++ data₀)).run sc = .ok I sc)
+    (hexec : ∀ t : SailState, (∀ idx : BitVec 5, SailState.get_reg? t idx = SailState.get_reg? s idx) →
+      t.regs.get? Register.PC = s.regs.get? Register.PC →
+      t.regs.get? Register.nextPC = some (pc + 4#64) →
+      t.isInitialized → SailConfigured t →
+      (execute I).run t = .ok (ExecutionResult.Retire_Success ())
+        {t with regs := t.regs.insert Register.nextPC target})
+    (htgt : sndPcOf (stateAccess r) = target)
+    (hnowrite : r.commit.writesReg = false) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  have hxne : ∀ idx : BitVec 5, Register.nextPC ≠ reg_idx_to_Register idx := fun idx => by
+    unfold reg_idx_to_Register; split <;> decide
+  have hmne : ∀ idx : BitVec 5, Register.minstret_increment ≠ reg_idx_to_Register idx := fun idx => by
+    unfold reg_idx_to_Register; split <;> decide
+  obtain ⟨b, hb⟩ : ∃ b, (should_inc_minstret Privilege.Machine).run s = .ok b s :=
+    ⟨_, run_should_inc_minstret s cfg.init _⟩
+  have hslr : StraightLineReady ({s with regs := s.regs.insert Register.minstret_increment b})
+      (data₃ ++ data₂ ++ data₁ ++ data₀) :=
+    SailConfigured.toStraightLineReady cfg b pc data₀ data₁ data₂ data₃ hfetch
+  set s' := ({s with regs := s.regs.insert Register.minstret_increment b}) with hs'_def
+  set npv := BitVec.addInt (s'.regs.get Register.PC (hslr.init Register.PC)) 4 with hnpv_def
+  set s_a := ({s' with regs := s'.regs.insert Register.nextPC npv}) with hsa_def
+  have hsa : (Sail.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
+  have hinit_s' : SailState.isInitialized s' := by
+    rw [hs'_def]; exact SailState.isInitialized_insert s cfg.init _ _
+  have hinit_sa : SailState.isInitialized s_a := by
+    rw [hsa_def]; exact SailState.isInitialized_insert s' hinit_s' _ _
+  have hframe_sa : ∀ idx : BitVec 5, SailState.get_reg? s_a idx = SailState.get_reg? s idx := fun idx => by
+    rw [hsa_def, SailState.get_reg?_insert_of_ne (hxne idx), hs'_def,
+      SailState.get_reg?_insert_of_ne (hmne idx)]
+  have hpcf_sa : s_a.regs.get? Register.PC = s.regs.get? Register.PC := by
+    rw [hsa_def, Std.ExtDHashMap.get?_insert, dif_neg (by decide),
+      hs'_def, Std.ExtDHashMap.get?_insert, dif_neg (by decide)]
+  have hgetPC : s'.regs.get Register.PC (hslr.init Register.PC) = pc := by
+    have h1 : s'.regs.get? Register.PC = some pc := by
+      rw [hs'_def, Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact hpc
+    rw [Std.ExtDHashMap.get?_eq_some_get (hslr.init Register.PC)] at h1
+    exact (Option.some.injEq _ _).mp h1
+  have hnpc_sa : s_a.regs.get? Register.nextPC = some (pc + 4#64) := by
+    rw [hsa_def, Std.ExtDHashMap.get?_insert_self, hnpv_def, hgetPC]; simp [BitVec.addInt]
+  have hcfg_sa : SailConfigured s_a :=
+    SailConfigured.congr (SailConfigured.writeMinstret cfg b) hinit_sa (fun R hR => by
+      rw [hsa_def, Std.ExtDHashMap.get?_insert,
+          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
+  have hexec_sa := hexec s_a hframe_sa hpcf_sa hnpc_sa hinit_sa hcfg_sa
+  set s'' := ({s_a with regs := s_a.regs.insert Register.nextPC target}) with hs''_def
+  have hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
+    rw [Sail.run_readReg, cfg.priv]
+  have hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
+      = some (HartState.HART_ACTIVE ()) := by
+    rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact cfg.active
+  have hdec : (ext_decode (data₃ ++ data₂ ++ data₁ ++ data₀)).run s' = .ok I s' :=
+    hdecgen s' (SailConfigured.writeMinstret cfg b)
+  have hframe_s : ∀ R : Register, R ≠ Register.minstret_increment → R ≠ Register.nextPC →
+      s''.regs.get? R = s.regs.get? R := fun R h1 h2 => by
+    rw [hs''_def, Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h2 (beq_iff_eq.mp hc).symm),
+      hsa_def, Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h2 (beq_iff_eq.mp hc).symm),
+      hs'_def, Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h1 (beq_iff_eq.mp hc).symm)]
+  have h_active'' : s''.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()) := by
+    rw [hframe_s Register.hart_state (by decide) (by decide)]; exact cfg.active
+  have hinit'' : SailState.isInitialized s'' := by
+    rw [hs''_def]; exact SailState.isInitialized_insert s_a hinit_sa _ _
+  obtain ⟨s_final, hrun, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
+    sailStep_of_ladder s s_a s'' (data₃ ++ data₂ ++ data₁ ++ data₀) I b
+      hb hcp hactive hslr hdec hsa hexec_sa h_active'' hinit''
+  have hcfg_frame : ∀ R : Register,
+      (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
+        ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base ∨ R = Register.pma_regions)
+      → s_final.regs.get? R = s.regs.get? R := fun R hR => by
+    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
+      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
+  have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hs''_def, hsa_def, hs'_def]
+  refine ⟨s_final, ⟨false, hrun⟩,
+    { pc := ?_, regs := ?_, rom := ?_, init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
+  · rw [hPCf]
+    have hnp : s''.regs.get? Register.nextPC = some target := by
+      rw [hs''_def, Std.ExtDHashMap.get?_insert_self]
+    rw [hnp, htgt]
+  · rw [if_neg (by rw [hnowrite]; decide)]
+    intro idx
+    rw [hxf idx, hs''_def, SailState.get_reg?_insert_of_ne (hxne idx)]
+    exact hframe_sa idx
+  · intro hr a w2 hf i; rw [hmem_fin]; exact hr a w2 hf i
+  · exact SailConfigured.congr cfg hinitf hcfg_frame
+
 end SP1Clean.Advance
