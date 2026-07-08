@@ -1424,4 +1424,124 @@ theorem decodesLoad {prog : GuestProgram} {row : ProgramRow (ZMod p)} (width : w
   subst e1 e0 eimm; rw [hi2] at hrun2; exact hrun2
 
 
+/-! ## STORE decode inversion + producer (SC Phase 4 · Phase 3b) -/
+
+-- impossible forward reference. Both are general `storeOpcode` facts and belong beside `storeOpcode`.
+
+/-- `(storeOpcode 1).toNat = 36` (SB). Proven via `beq_self_eq_true` (NOT `rfl`/`decide`) so the
+kernel never deep-reduces the `word_width = Int` comparison; the `SB.toNat = 36` tail is a small
+enum `rfl`. Isolates the one Int-literal reduction the store adapter needs. -/
+theorem storeOpcode_one_toNat : (storeOpcode (1 : word_width)).toNat = 36 := by
+  have hsb : storeOpcode (1 : word_width) = Opcode.SB := by
+    unfold storeOpcode; rw [if_pos (beq_self_eq_true (1 : word_width))]
+  rw [hsb]; rfl
+
+/-- **The width pin for SB.** `storeOpcode` is non-injective at `.SD` (maps everything ∉{1,2,4}
+there), but injective at SB/SH/SW: `(storeOpcode w').toNat = (storeOpcode 1).toNat → w' = 1`. Feeds
+`decodesStore`'s `hpin` for StoreByte. (For StoreDouble, the analogous pin needs the `ext_decode`
+`width ∈ {1,2,4,8}` fact, since `storeOpcode 8 = .SD` collides with any other w' ∉ {1,2,4}.) -/
+theorem storeOpcode_pin_one (w' : word_width)
+    (h : (storeOpcode w').toNat = (storeOpcode (1 : word_width)).toNat) : w' = 1 := by
+  rw [storeOpcode_one_toNat] at h; simp only [storeOpcode] at h
+  split_ifs at h with h1 h2 h3
+  · exact by simpa using h1
+  · exact absurd h (by decide)
+  · exact absurd h (by decide)
+  · exact absurd h (by decide)
+
+/-- **The STORE decode inversion (W7), keyed on byte-width.** S-type shaped: if a decoded `i` projects
+to a committed row whose opcode is `storeOpcode width`'s and whose `imm_c = 1`, then `i` *is*
+`STORE (imm, rs2, rs1, width')` with `op_a = rs2` (the value SOURCE), `op_b = rs1` (base source),
+`op_c = signExtended imm`. Because `word_width = Int` and `storeOpcode` is non-injective at `.SD`, the
+recovered `width'` is returned with only `(storeOpcode width').toNat = (storeOpcode width).toNat`; the
+caller pins it (via `storeOpcode_pin_one` for SB). `imm_c = 1` kills the R-shaped arms; the opcode
+column (image {36,37,38,39}) rules out the other immediate-shaped arms. The `.STORE` twin of
+`instrToProgramRow_inv_btype`. -/
+theorem instrToProgramRow_inv_store {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramChip.ProgramRow (ZMod p)}
+    (width : word_width) (h : instrToProgramRow pc i = some row)
+    (hop : row.opcode = ((storeOpcode width).toNat : ZMod p))
+    (himm : row.imm_c = (1 : ZMod p)) :
+    ∃ (imm : BitVec 12) (rs2 rs1 : regidx) (width' : word_width),
+      i = .STORE (imm, rs2, rs1, width') ∧
+      (storeOpcode width').toNat = (storeOpcode width).toNat ∧
+      row.op_a = regidxVal rs2 ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
+      ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
+  have honezero : (1 : ZMod p) ≠ 0 := by
+    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    exact one_ne_zero
+  simp only [instrToProgramRow] at h
+  split at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst h)
+  all_goals (try (exact absurd himm.symm honezero))
+  · rename_i imm rs1 rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [storeOpcode, iopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [storeOpcode, uopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rd
+    exact absurd (opcodeCast_inj hop) (by simp only [storeOpcode, Opcode.toNat]; split_ifs <;> decide)
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by simp only [storeOpcode, Opcode.toNat]; split_ifs <;> decide)
+  · rename_i imm rs2 rs1 op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [storeOpcode, bopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs1 rd isU width2
+    exact absurd (opcodeCast_inj hop)
+      (by cases isU <;> (simp only [storeOpcode, loadOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs2 rs1 width'
+    exact ⟨imm, rs2, rs1, width', rfl, opcodeCast_inj hop, rfl, rfl, rfl⟩
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [storeOpcode, sopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [storeOpcode, sopwToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by simp only [storeOpcode, Opcode.toNat]; split_ifs <;> decide)
+
+/-- **The ∀-configured-state STORE decode producer** — the `.STORE` twin of `decodesBType`, keyed on
+`(opcode = storeOpcode width, imm_c = 1)`. Recovers `w` + `imm/rs2/rs1` with the decode holding in
+every configured state (`rs2` from `op_a`, `rs1` from `op_b` pinned by `regidx_bv_inj`; the 12-bit
+offset by `sext12_inj` on `op_c`; the width by the caller's `hpin`). What `StoreByteChip.advance`
+consumes. -/
+theorem decodesStore {prog : GuestProgram} {row : ProgramChip.ProgramRow (ZMod p)} (width : word_width)
+    (h : decodedInROM prog row)
+    (hop : row.opcode = ((storeOpcode width).toNat : ZMod p)) (himm : row.imm_c = 1)
+    (hpin : ∀ w' : word_width, (storeOpcode w').toNat = (storeOpcode width).toNat → w' = width)
+    {s0 : SailState} (hs0 : SailConfigured s0) :
+    ∃ (w : BitVec 32) (imm : BitVec 12) (rs2 rs1 : BitVec 5),
+      prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (∀ sc, SailConfigured sc → (ext_decode w).run sc
+        = .ok (instruction.STORE (imm, .Regidx rs2, .Regidx rs1, width)) sc) ∧
+      row.op_a = (rs2.toNat : ZMod p) ∧
+      row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
+      row.op_c = bitVecToWord (imm.signExtend 64) := by
+  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
+  obtain ⟨imm, rs2r, rs1r, width', hi0, hwop, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_store width hrow0 hop himm
+  obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r
+  refine ⟨w, imm, rs2, rs1, hfetch, ?_, ha, hb, hc⟩
+  intro sc hsc
+  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
+  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
+  obtain ⟨imm', rs2', rs1', width'2, hi2, hwop2, ha', hb', hc'⟩ :=
+    instrToProgramRow_inv_store width hrow2 hop himm
+  have hpw2 : width'2 = width := hpin width'2 hwop2
+  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'
+  have e2 : rs2' = rs2 := regidx_bv_inj (by
+    have hh := ha.symm.trans ha'; simp only [regidxVal] at hh; exact hh.symm)
+  have e1 : rs1' = rs1 := regidx_bv_inj (by
+    have hh := congrArg (fun v => v[0]) (hb.symm.trans hb')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hh
+    exact hh.symm)
+  have eimm : imm' = imm := by
+    have e := congrArg (Word.toBitVec64 (p := p)) (hc.symm.trans hc')
+    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
+    exact (sext12_inj e).symm
+  rw [e2, e1, eimm, hpw2] at hi2
+  rw [hi2] at hrun2; exact hrun2
+
+
 end SP1Clean.Soundness.Target
