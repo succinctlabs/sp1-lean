@@ -184,7 +184,8 @@ private theorem chain_to_refines
   induction i with
   | zero =>
     intro hi
-    refine ⟨s0, .refl s0, ?_, h0.romLoaded, h0.initialized, h0.configured, fun idx => rfl⟩
+    refine ⟨s0, .refl s0, ?_, h0.romLoaded, h0.initialized, h0.configured, fun idx => rfl,
+      fun a => rfl⟩
     intro h
     have hhead := isWalk_head hw.1 h
     have hpc : rcvPcOf (stateAccess (path[0]'h))
@@ -199,7 +200,7 @@ private theorem chain_to_refines
     have hob := ob.bound s0 path h0 hw i hi' s href
     obtain ⟨s', hstep, heff⟩ := ob.lift s0 path h0 hw i hi s href hob
     refine ⟨s', hchain.snoc hstep, ?_, heff.rom href.rom, heff.init href.init,
-      heff.cfg href.cfg, ?_⟩
+      heff.cfg href.cfg, ?_, ?_⟩
     · intro h
       rw [heff.pc]
       congr 1
@@ -218,6 +219,18 @@ private theorem chain_to_refines
         rw [if_neg (by rw [hwr]; decide)] at hregs
         rw [hregs idx, href.frame idx, replayVal, dif_pos hi',
           if_neg (fun h => by rw [hwr] at h; exact absurd h.1 (by decide))]
+    · -- the memory arm: `RowEffect.mem` (store byte-range write / frame) matched against `memReplayVal`
+      intro a
+      rw [memReplayVal, dif_pos hi']
+      split
+      · -- a store row (`memWrite = some mw`): the covered bytes are written, the rest framed
+        rename_i mw heq
+        obtain ⟨hcov, hfr⟩ := heff.mem.2 mw heq
+        by_cases hc : mw.covers a
+        · rw [if_pos hc]; exact hcov a hc
+        · rw [if_neg hc, hfr a hc, href.mem a]
+      · -- a non-store row (`memWrite = none`): `s'.mem = s.mem`, `memReplayVal` recurses
+        rename_i heq; rw [heff.mem.1 heq a, href.mem a]
 
 /-- **The target machine-level theorem (skeleton form).** Given the gated execution certificate over
 the committed boundary, the entry-point tie, and the named obligations, the official Sail interpreter,

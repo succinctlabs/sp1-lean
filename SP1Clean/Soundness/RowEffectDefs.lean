@@ -52,6 +52,40 @@ def replayVal (s0 : SailState) (path : List (Trace.RowView (ZMod p))) (idx : Bit
       else replayVal s0 path idx i
     else replayVal s0 path idx i
 
+/-! ## The memory axis (SC Phase 4 · Phase 3b): byte-address replay + the store `MemWrite` helpers -/
+
+/-- The byte address a store's committed `MemWrite` targets — the three `AddressOperation` limbs
+recombined (`a0 + a1·2^16 + a2·2^32`). -/
+def _root_.SP1Clean.Trace.MemWrite.addrNat (mw : Trace.MemWrite (ZMod p)) : ℕ :=
+  mw.addr[0].val + mw.addr[1].val * 2 ^ 16 + mw.addr[2].val * 2 ^ 32
+
+/-- Byte `a` lies in the store's written range `[addrNat, addrNat + width)`. -/
+def _root_.SP1Clean.Trace.MemWrite.covers (mw : Trace.MemWrite (ZMod p)) (a : ℕ) : Prop :=
+  mw.addrNat ≤ a ∧ a < mw.addrNat + mw.width
+
+instance (mw : Trace.MemWrite (ZMod p)) (a : ℕ) : Decidable (mw.covers a) := by
+  unfold Trace.MemWrite.covers; infer_instance
+
+/-- The little-endian byte the store writes at a covered address — the low `width` bytes of `value`. (The
+high `8 - width` bytes of SP1's read-modify-write `store_value` never enter the invariant.) -/
+def _root_.SP1Clean.Trace.MemWrite.byteAt (mw : Trace.MemWrite (ZMod p)) (a : ℕ) : BitVec 8 :=
+  (Word.toBitVec64 mw.value).extractLsb' (8 * (a - mw.addrNat)) 8
+
+/-- **The byte-address exact-replay value** — the memory twin of `replayVal`, folding the store rows'
+committed `memWrite`s. The byte at address `a` after replaying the first `i` walk rows: the byte the
+most-recent earlier *store* covering `a` wrote (`byteAt a`), or `s0`'s initial memory byte if none.
+Parallel to `RomLoaded` but INDUCTIVE (data memory is written by stores, ROM is not). `RefinesAt.mem` pins
+each byte to this; a load sources its committed byte from it. -/
+def memReplayVal (s0 : SailState) (path : List (Trace.RowView (ZMod p))) (a : ℕ) :
+    ℕ → Option (BitVec 8)
+  | 0 => s0.mem.get? a
+  | i + 1 =>
+    if hi : i < path.length then
+      match (path[i]'hi).commit.memWrite with
+      | some mw => if mw.covers a then some (mw.byteAt a) else memReplayVal s0 path a i
+      | none => memReplayVal s0 path a i
+    else memReplayVal s0 path a i
+
 /-- The simulation invariant at walk position `i`: the state's PC is the next row's committed pc, the
 program ROM is intact, the platform configuration persists, and every register holds its **exact replay
 value** (`replayVal`: the most-recent earlier `op_a` write, or `s0`'s value). The register clause is now
@@ -64,6 +98,7 @@ structure RefinesAt (prog : GuestProgram) (s0 : SailState)
   init : s.isInitialized
   cfg : SailConfigured s
   frame : ∀ idx : BitVec 5, s.get_reg? idx = replayVal s0 path idx i
+  mem : ∀ a : ℕ, s.mem.get? a = memReplayVal s0 path a i
 
 /-- The committed effect of one row, as a relation between the pre- and post-states of its interpreter
 step: the PC moves to the row's committed `next_pc`; the **register** file is, **when the row writes a
@@ -71,8 +106,10 @@ register** (`commit.writesReg`), exactly `s` except at the `op_a` destination (�
 and **when it does not** (Branch / AluX0 / LoadX0, `commit.writesReg = false`) a pure frame — the SC
 Phase 4 gate that lets a Branch/Store row, whose `op_a` is a *source read*, not corrupt that register; ROM,
 initialization, and configuration persist. `try_step` may also touch bookkeeping registers (`minstret`,
-`hart_state`, …) the trace doesn't commit, but those are outside the `BitVec 5` register file. (The memory
-axis — `RowEffect.mem` / a store's `commit.memWrite` — is added in Phase 3b.) -/
+`hart_state`, …) the trace doesn't commit, but those are outside the `BitVec 5` register file. The **memory**
+clause is the orthogonal second axis: `commit.memWrite = none` (all chips but stores) → `s'.mem = s.mem`
+frame; `some mw` (a store) → the committed `width`-byte range at `mw.addrNat` becomes `mw.byteAt`, the rest
+framed. -/
 structure RowEffect (prog : GuestProgram) (r : Trace.RowView (ZMod p))
     (s s' : SailState) : Prop where
   pc : s'.regs.get? Register.PC = some (sndPcOf (stateAccess r))
@@ -82,6 +119,10 @@ structure RowEffect (prog : GuestProgram) (r : Trace.RowView (ZMod p))
             (∀ idx : BitVec 5, ¬ (idx.toNat : ZMod p) = r.adapter.op_a →
               s'.get_reg? idx = s.get_reg? idx)
           else (∀ idx : BitVec 5, s'.get_reg? idx = s.get_reg? idx))
+  mem : (r.commit.memWrite = none → ∀ a : ℕ, s'.mem.get? a = s.mem.get? a) ∧
+        (∀ mw : Trace.MemWrite (ZMod p), r.commit.memWrite = some mw →
+          (∀ a : ℕ, mw.covers a → s'.mem.get? a = some (mw.byteAt a)) ∧
+          (∀ a : ℕ, ¬ mw.covers a → s'.mem.get? a = s.mem.get? a))
   rom : RomLoaded prog s → RomLoaded prog s'
   init : s.isInitialized → s'.isInitialized
   cfg : SailConfigured s → SailConfigured s'
