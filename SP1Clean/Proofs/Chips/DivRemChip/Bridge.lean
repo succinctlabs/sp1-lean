@@ -5,6 +5,7 @@ import SP1Clean.Soundness.ChipRow
 import RISCV.Instructions
 import RISCV.SailToRV64
 import RISCV.SailPureToInstructions
+import SP1Clean.Proofs.Sail.Advance
 
 /-! # Native Sail bridge for the `DivRem` chip (DIV/DIVU/REM/REMU/DIVW/DIVUW/REMW/REMUW) + `ChipKind`
 
@@ -301,10 +302,176 @@ namespace SP1Clean.DivRemChip
 
 open SP1Clean.DivRemSail
 open Sail LeanRV64D LeanRV64D.Functions
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+
+/-- The DivRem RowView (shared by `kind.view` and `advance`): straight-line `pc+4` next-pc, the R-type
+adapter, `cols.a` as the divide/remainder write, opcode the flag-weighted R-type discriminant
+(DIV 15, DIVU 16, REM 17, REMU 18, DIVW 25, DIVUW 26, REMW 27, REMUW 28). -/
+def rowView (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+    cols.adapter.toAdapterView, inp.is_real, cols.a,
+    cols.is_divu * 16 + cols.is_remu * 18 + cols.is_div * 15 + cols.is_rem * 17
+      + cols.is_divw * 25 + cols.is_remw * 27 + cols.is_divuw * 26 + cols.is_remuw * 28⟩
+
+/-- **`DivRemChip.advance`** — the per-DivRem-row `try_step` lift (SC Phase 4), 8-way flag dispatch.
+Each branch pins the R-type opcode `if isU then <U-op> else <s-op>`, converts the chip `Spec`'s flag-gated
+`RV64.<op>` conjunct to the Sail-pure `SailRV64.<op>` write value (via `RV64.<op>_eq`, using the bridge's
+explicit-`hb` typed pattern — `rw [RV64.<op>_eq]` fails on the internal `decide False`/`decide True`), and
+routes to the matching `advance_of_div/rem/divw/remw isU`. `himmb`/`himmc`/`hstraight` are `rfl` (RTypeReader),
+and `hpc0` comes from the reader `Spec`'s bounds. -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) (data : ProverData (ZMod p))
+    (prog : GuestProgram) (s : SailState)
+    (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : inp.adapter = cols.adapter ∧ (rowView inp cols).adapter.op_a ≠ 0 ∧
+      ((cols.is_div = 1 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧ cols.is_remu = 0 ∧
+          cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+       (cols.is_divu = 1 ∧ cols.is_div = 0 ∧ cols.is_rem = 0 ∧ cols.is_remu = 0 ∧
+          cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+       (cols.is_rem = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_remu = 0 ∧
+          cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+       (cols.is_remu = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
+          cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+       (cols.is_divw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
+          cols.is_remu = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+       (cols.is_remw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
+          cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+       (cols.is_divuw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
+          cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_remuw = 0) ∨
+       (cols.is_remuw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
+          cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0))) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hlink, hnonX0, hflag⟩ := hready
+  have hreal' : inp.is_real = 1 := hreal
+  set r := rowView inp cols with hr
+  have vrd : r.rdWrite = cols.a := rfl
+  have vopbm : r.adapter.op_b_memory = cols.adapter.op_b_memory := rfl
+  have vopcm : r.adapter.op_c_memory = cols.adapter.op_c_memory := rfl
+  obtain ⟨-, -, -, -, -, hbounds, -⟩ := hspec.1
+  obtain ⟨-, hpc0, -, -⟩ := hbounds hreal'
+  have hbr := hspec.2.2 hreal'
+  rcases hflag with ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ | ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ | ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ |
+    ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ | ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ | ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ |
+    ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ | ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩
+  · -- is_div
+    have hop : r.opcode = (((if (false:Bool) then Opcode.DIVU else Opcode.DIV)).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.div (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) false := by
+      have hs := hbr.1 h1
+      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.div (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) false
+        = RV64.div (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.div_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_div false hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  · -- is_divu
+    have hop : r.opcode = (((if (true:Bool) then Opcode.DIVU else Opcode.DIV)).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.div (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) true := by
+      have hs := hbr.2.1 h1
+      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.div (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) true
+        = RV64.divu (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.divu_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_div true hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  · -- is_rem
+    have hop : r.opcode = (((if (false:Bool) then Opcode.REMU else Opcode.REM)).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.rem false (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) := by
+      have hs := hbr.2.2.1 h1
+      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.rem false (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+        = RV64.rem (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.rem_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_rem false hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  · -- is_remu
+    have hop : r.opcode = (((if (true:Bool) then Opcode.REMU else Opcode.REM)).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.rem true (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) := by
+      have hs := hbr.2.2.2.1 h1
+      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.rem true (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+        = RV64.remu (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.remu_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_rem true hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  · -- is_divw
+    have hop : r.opcode = (((if (false:Bool) then Opcode.DIVUW else Opcode.DIVW)).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.divw (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) false := by
+      have hs := hbr.2.2.2.2.1 h1
+      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.divw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) false
+        = RV64.divw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.divw_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_divw false hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  · -- is_remw
+    have hop : r.opcode = (((if (false:Bool) then Opcode.REMUW else Opcode.REMW)).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.remw false (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) := by
+      have hs := hbr.2.2.2.2.2.1 h1
+      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.remw false (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+        = RV64.remw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.remw_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_remw false hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  · -- is_divuw
+    have hop : r.opcode = (((if (true:Bool) then Opcode.DIVUW else Opcode.DIVW)).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.divw (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) true := by
+      have hs := hbr.2.2.2.2.2.2.1 h1
+      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.divw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) true
+        = RV64.divuw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.divuw_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_divw true hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  · -- is_remuw
+    have hop : r.opcode = (((if (true:Bool) then Opcode.REMUW else Opcode.REMW)).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.remw true (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) := by
+      have hs := hbr.2.2.2.2.2.2.2 h1
+      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.remw true (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+        = RV64.remuw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.remuw_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_remw true hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
 
 /-- `ChipKind` registration for DivRem (DIV/DIVU/REM/REMU/DIVW/DIVUW/REMW/REMUW). `rs1`/`rs2`
 are sourced from inputs `op_b_val`/`op_c_val`. Carries `Fact (2 ^ 24 < p)`. -/
@@ -312,11 +479,7 @@ def kind : Soundness.ChipKind p where
   name := "DivRem"
   Inputs := DivRemChip.Inputs
   Cols := Extracted.DivRemCols
-  view := fun inp cols => ⟨cols.state,
-    #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, cols.a,
-    cols.is_divu * 16 + cols.is_remu * 18 + cols.is_div * 15 + cols.is_rem * 17
-      + cols.is_divw * 25 + cols.is_remw * 27 + cols.is_divuw * 26 + cols.is_remuw * 28⟩
+  view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   sailEquiv := fun inp cols s => ∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
     s.regs.get? Register.PC = some pc →
@@ -348,5 +511,24 @@ def kind : Soundness.ChipKind p where
           = (sp1_divrem (.Regidx rd) pc cols.a).run s)
   reaches_sail := fun inp cols data s h_real h_chip rs1 rs2 rd pc h_pc h_rs1 h_rs2 =>
     divrem_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2
+  advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧
+    (rowView inp cols).adapter.op_a ≠ 0 ∧
+    ((cols.is_div = 1 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧ cols.is_remu = 0 ∧
+        cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+     (cols.is_divu = 1 ∧ cols.is_div = 0 ∧ cols.is_rem = 0 ∧ cols.is_remu = 0 ∧
+        cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+     (cols.is_rem = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_remu = 0 ∧
+        cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+     (cols.is_remu = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
+        cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+     (cols.is_divw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
+        cols.is_remu = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+     (cols.is_remw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
+        cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
+     (cols.is_divuw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
+        cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_remuw = 0) ∨
+     (cols.is_remuw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
+        cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0))
+  advance := some (PLift.up advance)
 
 end SP1Clean.DivRemChip

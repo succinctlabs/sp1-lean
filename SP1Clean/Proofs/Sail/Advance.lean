@@ -2,6 +2,7 @@ import SP1Clean.Proofs.Sail.TryStepReduction
 import SP1Clean.Soundness.RowEffectDefs
 import SP1Clean.Soundness.ProgramConsistency
 import RISCV.Instructions
+import RISCV.SailToRV64
 
 /-! # Phase 4 — the uniform per-chip `advance` (Sail-step obligation)
 
@@ -1147,5 +1148,220 @@ theorem advance_of_jalr {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
         (Word.toBitVec64 r.adapter.op_b_memory.prev_value) t hinit
         hcfgt.toValidMemConfig hnpc ((hframe rs1).trans hrs1) hrd_ne halign')
     hrd_ne hopa'.symm hlink htgt
+
+
+/-! ## DivRem (DIV/REM/DIVW/REMW × signed/unsigned) execute-reaches + advance_of_* (SC Phase 4) -/
+
+/-- The DIV/DIVU execute stage reaches `Retire_Success` (write value `SailRV64.div op_c op_b isU`).
+The div-by-zero/overflow special cases are fully inside `SailRV64.div`; `div_eq` reduces
+`execute_DIV` to `skeleton_binary` by `rfl`, so this mirrors `rtype_execute_reaches` exactly. -/
+theorem execute_DIV_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (isU : Bool)
+    (op_b op_c : BitVec 64) (s_a : SailState)
+    (h_rs1 : s_a.get_reg? rs1_idx = some op_b) (h_rs2 : s_a.get_reg? rs2_idx = some op_c) :
+    (execute (.DIV (.Regidx rs2_idx, .Regidx rs1_idx, .Regidx rd_idx, isU))).run s_a
+      = .ok (ExecutionResult.Retire_Success ())
+          (if rd_idx = 0#5 then s_a
+           else {s_a with regs := (s_a.regs.insert (reg_idx_to_Register rd_idx)
+             (bitVecToRegidxVal rd_idx (SailRV64.div op_c op_b isU)))}) := by
+  simp only [execute, _root_.div_eq, skeleton_binary]
+  rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1]),
+    run_bind_of_run s_a _ op_c (by rw [run_rX_bits, h_rs2]),
+    run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  rfl
+
+/-- The REM/REMU execute stage reaches `Retire_Success` (write value `SailRV64.rem isU op_c op_b`).
+`execute_REM` has only bool-specialized named lemmas, so the reduction to `skeleton_binary` is an
+inline `show … from rfl` (holds for a variable `isU` — the body threads `is_unsigned` as a value). -/
+theorem execute_REM_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (isU : Bool)
+    (op_b op_c : BitVec 64) (s_a : SailState)
+    (h_rs1 : s_a.get_reg? rs1_idx = some op_b) (h_rs2 : s_a.get_reg? rs2_idx = some op_c) :
+    (execute (.REM (.Regidx rs2_idx, .Regidx rs1_idx, .Regidx rd_idx, isU))).run s_a
+      = .ok (ExecutionResult.Retire_Success ())
+          (if rd_idx = 0#5 then s_a
+           else {s_a with regs := (s_a.regs.insert (reg_idx_to_Register rd_idx)
+             (bitVecToRegidxVal rd_idx (SailRV64.rem isU op_c op_b)))}) := by
+  simp only [execute, show execute_REM (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx) isU
+    = skeleton_binary (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)
+        (fun val1 val2 => SailRV64.rem isU val2 val1) from rfl, skeleton_binary]
+  rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1]),
+    run_bind_of_run s_a _ op_c (by rw [run_rX_bits, h_rs2]),
+    run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  rfl
+
+/-- The DIVW/DIVUW execute stage reaches `Retire_Success` (write value `SailRV64.divw op_c op_b isU`). -/
+theorem execute_DIVW_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (isU : Bool)
+    (op_b op_c : BitVec 64) (s_a : SailState)
+    (h_rs1 : s_a.get_reg? rs1_idx = some op_b) (h_rs2 : s_a.get_reg? rs2_idx = some op_c) :
+    (execute (.DIVW (.Regidx rs2_idx, .Regidx rs1_idx, .Regidx rd_idx, isU))).run s_a
+      = .ok (ExecutionResult.Retire_Success ())
+          (if rd_idx = 0#5 then s_a
+           else {s_a with regs := (s_a.regs.insert (reg_idx_to_Register rd_idx)
+             (bitVecToRegidxVal rd_idx (SailRV64.divw op_c op_b isU)))}) := by
+  simp only [execute, _root_.divw_eq, skeleton_binary]
+  rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1]),
+    run_bind_of_run s_a _ op_c (by rw [run_rX_bits, h_rs2]),
+    run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  rfl
+
+/-- The REMW/REMUW execute stage reaches `Retire_Success` (write value `SailRV64.remw isU op_c op_b`). -/
+theorem execute_REMW_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (isU : Bool)
+    (op_b op_c : BitVec 64) (s_a : SailState)
+    (h_rs1 : s_a.get_reg? rs1_idx = some op_b) (h_rs2 : s_a.get_reg? rs2_idx = some op_c) :
+    (execute (.REMW (.Regidx rs2_idx, .Regidx rs1_idx, .Regidx rd_idx, isU))).run s_a
+      = .ok (ExecutionResult.Retire_Success ())
+          (if rd_idx = 0#5 then s_a
+           else {s_a with regs := (s_a.regs.insert (reg_idx_to_Register rd_idx)
+             (bitVecToRegidxVal rd_idx (SailRV64.remw isU op_c op_b)))}) := by
+  simp only [execute, show execute_REMW (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx) isU
+    = skeleton_binary (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)
+        (fun val1 val2 => SailRV64.remw isU val2 val1) from rfl, skeleton_binary]
+  rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1]),
+    run_bind_of_run s_a _ op_c (by rw [run_rX_bits, h_rs2]),
+    run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  rfl
+
+/-- The DIV/DIVU chip `advance` (RowView-generic; mirrors `advance_of_rtype`). -/
+theorem advance_of_div {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = (((if isU then Opcode.DIVU else Opcode.DIV)).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0) (hnonX0 : r.adapter.op_a ≠ 0)
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hval : Word.toBitVec64 r.rdWrite
+      = SailRV64.div (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 r.adapter.op_b_memory.prev_value) isU) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDiv isU hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
+  exact advance_write_core (instruction.DIV (.Regidx rs2, .Regidx rs1, .Regidx rd, isU)) rd
+    (SailRV64.div (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+      (Word.toBitVec64 r.adapter.op_b_memory.prev_value) isU) (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ => by
+      have := execute_DIV_reaches rs2 rs1 rd isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_neg hrd_ne] at this)
+    hrd_ne hopa'.symm hval hstraight hpc0
+
+/-- The REM/REMU chip `advance` (RowView-generic; note the bool-first `SailRV64.rem isU op_c op_b`). -/
+theorem advance_of_rem {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = (((if isU then Opcode.REMU else Opcode.REM)).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0) (hnonX0 : r.adapter.op_a ≠ 0)
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hval : Word.toBitVec64 r.rdWrite
+      = SailRV64.rem isU (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 r.adapter.op_b_memory.prev_value)) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRem isU hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
+  exact advance_write_core (instruction.REM (.Regidx rs2, .Regidx rs1, .Regidx rd, isU)) rd
+    (SailRV64.rem isU (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+      (Word.toBitVec64 r.adapter.op_b_memory.prev_value)) (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ => by
+      have := execute_REM_reaches rs2 rs1 rd isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_neg hrd_ne] at this)
+    hrd_ne hopa'.symm hval hstraight hpc0
+
+/-- The DIVW/DIVUW chip `advance` (RowView-generic). -/
+theorem advance_of_divw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = (((if isU then Opcode.DIVUW else Opcode.DIVW)).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0) (hnonX0 : r.adapter.op_a ≠ 0)
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hval : Word.toBitVec64 r.rdWrite
+      = SailRV64.divw (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 r.adapter.op_b_memory.prev_value) isU) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDivw isU hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
+  exact advance_write_core (instruction.DIVW (.Regidx rs2, .Regidx rs1, .Regidx rd, isU)) rd
+    (SailRV64.divw (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+      (Word.toBitVec64 r.adapter.op_b_memory.prev_value) isU) (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ => by
+      have := execute_DIVW_reaches rs2 rs1 rd isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_neg hrd_ne] at this)
+    hrd_ne hopa'.symm hval hstraight hpc0
+
+/-- The REMW/REMUW chip `advance` (RowView-generic; bool-first `SailRV64.remw isU op_c op_b`). -/
+theorem advance_of_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = (((if isU then Opcode.REMUW else Opcode.REMW)).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0) (hnonX0 : r.adapter.op_a ≠ 0)
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hval : Word.toBitVec64 r.rdWrite
+      = SailRV64.remw isU (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 r.adapter.op_b_memory.prev_value)) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRemw isU hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
+  exact advance_write_core (instruction.REMW (.Regidx rs2, .Regidx rs1, .Regidx rd, isU)) rd
+    (SailRV64.remw isU (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+      (Word.toBitVec64 r.adapter.op_b_memory.prev_value)) (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ => by
+      have := execute_REMW_reaches rs2 rs1 rd isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_neg hrd_ne] at this)
+    hrd_ne hopa'.symm hval hstraight hpc0
 
 end SP1Clean.Advance
