@@ -148,7 +148,7 @@ next-pc, the sign-extended W result as `rdWrite`). Standalone so `AddwChip.advan
 `kind.advance` (see `AddChip.rowView`). -/
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.AddwCols (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, AddwChip.resultWord cols, 19⟩
+    cols.adapter.toAdapterView, inp.is_real, AddwChip.resultWord cols, 19, .regWrite⟩
 
 /-- **`AddwChip.advance`** — the per-Addw-row `try_step` lift (SC Phase 4): a 2-branch adapter over the W-op
 paths — ADDW (`imm_c = 0`) via `advance_of_rtypew`, ADDIW (`imm_c = 1`) via `advance_of_addiw` (both commit

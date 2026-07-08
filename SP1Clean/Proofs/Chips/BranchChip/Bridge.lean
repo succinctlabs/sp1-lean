@@ -199,7 +199,7 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.BranchColumns
   view := fun inp cols => ⟨cols.state,
     #v[cols.next_pc[0], cols.next_pc[1], cols.next_pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, #v[0, 0, 0, 0], branchOpcode cols⟩
+    cols.adapter.toAdapterView, inp.is_real, #v[0, 0, 0, 0], branchOpcode cols, .noWrite⟩
   chipSpec := fun inp cols data => Spec inp cols data
   sailEquiv := fun inp cols s =>
     ∀ (rs1 rs2 : BitVec 5) (imm : BitVec 13) (pc rs1_val rs2_val : BitVec 64),

@@ -310,7 +310,7 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.LoadDoubleColumns
   view := fun inp _cols => ⟨inp.state,
     #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
-    inp.adapter.toAdapterView, inp.is_real, inp.memory_access.prev_value, 35⟩
+    inp.adapter.toAdapterView, inp.is_real, inp.memory_access.prev_value, 35, .regWrite⟩
   chipSpec := fun inp cols data => LoadDoubleChip.Spec inp cols data
   sailEquiv := fun inp cols s => ∀ (data : ProverData (ZMod p)) (rs1 rd : BitVec 5) (imm : BitVec 12)
       (pc : BitVec 64),

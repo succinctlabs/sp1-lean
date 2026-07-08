@@ -132,7 +132,7 @@ as the `pc+4` link write, opcode 47. -/
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.JalrColumns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state,
     #v[cols.add_operation.value[0] - cols.lsb, cols.add_operation.value[1], cols.add_operation.value[2]],
-    cols.adapter.toAdapterView, inp.is_real, cols.op_a_operation.value, 47⟩
+    cols.adapter.toAdapterView, inp.is_real, cols.op_a_operation.value, 47, .regWrite⟩
 
 /-- **`JalrChip.advance`** — the per-JALR-row `try_step` lift (SC Phase 4, the **second computed-`next_pc`
 chip**): over `advance_of_jalr` (the config-threaded jump ladder core `advance_jump_core`, whose

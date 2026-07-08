@@ -218,7 +218,7 @@ supplied *as* `kind.advance` (see `AddChip.rowView`). -/
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, resultWord cols,
-    cols.is_slt * 9 + cols.is_sltu * 10⟩
+    cols.is_slt * 9 + cols.is_sltu * 10, .regWrite⟩
 
 /-- **`LtChip.advance`** — the per-Lt-row `try_step` lift (SC Phase 4, the second multi-op chip): a 2-way
 adapter (SLT/SLTU) over `advance_of_rtype`, register-only (`imm_c = 0`). Each flag branch reads its opcode off

@@ -227,7 +227,7 @@ def kind : Soundness.ChipKind p where
     #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.a,
     cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulhu * 13 + cols.is_mulhsu * 14
-      + cols.is_mulw * 24⟩
+      + cols.is_mulw * 24, .regWrite⟩
   chipSpec := fun inp cols data => Spec inp cols data
   sailEquiv := fun inp cols s => ∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
     s.regs.get? Register.PC = some pc →

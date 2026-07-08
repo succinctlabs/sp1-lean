@@ -501,7 +501,7 @@ def kind : Soundness.ChipKind p where
   view := fun inp _cols => ⟨inp.state,
     #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, LoadX0Chip.isReal inp,
-    #v[(0 : ZMod p), 0, 0, 0], LoadX0Chip.opcodeVal inp⟩
+    #v[(0 : ZMod p), 0, 0, 0], LoadX0Chip.opcodeVal inp, .noWrite⟩
   chipSpec := fun inp cols data => LoadX0Chip.Spec inp cols data
   sailEquiv := fun _inp _cols s => ∀ (rs1 : BitVec 5) (imm : BitVec 12) (pc reg_val : BitVec 64),
     (hs : SailState.isInitialized s) → SailState.isValidMemConfig s hs →

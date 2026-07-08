@@ -173,7 +173,7 @@ the **data-dependent** jump target, `rdWrite = op_a_operation.value` the link `p
 `JalChip.advance` can be supplied *as* `kind.advance` (see `AddChip.rowView`). -/
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.add_operation.value[0], cols.add_operation.value[1], cols.add_operation.value[2]],
-    cols.adapter.toAdapterView, inp.is_real, cols.op_a_operation.value, 46⟩
+    cols.adapter.toAdapterView, inp.is_real, cols.op_a_operation.value, 46, .regWrite⟩
 
 /-- **`JalChip.advance`** — the per-JAL-row `try_step` lift (SC Phase 4, the **first computed-`next_pc` chip**):
 over `advance_of_jal` (the jump ladder core, `advance_jump_core`), whose `execute_JAL` sets `nextPC := target`

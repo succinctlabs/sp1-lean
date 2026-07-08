@@ -76,7 +76,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 (see `AddChip.rowView`). -/
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.SubCols (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, cols.sub_operation.value, 2⟩
+    cols.adapter.toAdapterView, inp.is_real, cols.sub_operation.value, 2, .regWrite⟩
 
 /-- **The SUB execute identity.** The RV64 `SUB` semantics (`RV64.sub rs2 rs1 = rs1 - rs2`) equal the pure
 R-type execute value (`execute_RTYPE_pure op1 op2 SUB = op1 - op2`); the bridge tying `SubChip.Spec`'s

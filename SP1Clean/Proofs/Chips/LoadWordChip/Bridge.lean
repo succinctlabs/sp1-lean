@@ -283,7 +283,7 @@ def kind : Soundness.ChipKind p where
     #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, LoadWordChip.isReal inp,
     #v[inp.selected_word[0], inp.selected_word[1], 65535 * inp.msb, 65535 * inp.msb],
-    inp.is_lw * 31 + inp.is_lwu * 34⟩
+    inp.is_lw * 31 + inp.is_lwu * 34, .regWrite⟩
   chipSpec := fun inp cols data => LoadWordChip.Spec inp cols data
   sailEquiv := fun inp _cols s => ∀ (rs1 rd : BitVec 5) (imm : BitVec 12) (pc reg_val : BitVec 64)
       (is_unsigned : Bool),

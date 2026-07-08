@@ -218,7 +218,7 @@ the ALU adapter, `cols.a` as the shift-result write, opcode `is_srl·7 + is_sra�
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.ShiftRightCols (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.a,
-    cols.is_srl * 7 + cols.is_sra * 8 + cols.is_srlw * 22 + cols.is_sraw * 23⟩
+    cols.is_srl * 7 + cols.is_sra * 8 + cols.is_srlw * 22 + cols.is_sraw * 23, .regWrite⟩
 
 /-- **`ShiftRightChip.advance`** — the per-ShiftRight-row `try_step` lift (SC Phase 4). A 4-op multi-op R-type
 chip (SRL / SRA / SRLW / SRAW), so it `rcases` the one-hot `advanceReady` flag partition and routes each branch

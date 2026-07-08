@@ -130,7 +130,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 the ALU adapter, `cols.a` as the shift-result write, opcode `is_sll·6 + is_sllw·21` (SLL = 6, SLLW = 21). -/
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.ShiftLeftCols (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, cols.a, cols.is_sll * 6 + cols.is_sllw * 21⟩
+    cols.adapter.toAdapterView, inp.is_real, cols.a, cols.is_sll * 6 + cols.is_sllw * 21, .regWrite⟩
 
 /-- **`ShiftLeftChip.advance`** — the per-ShiftLeft-row `try_step` lift (SC Phase 4). A multi-op R-type chip
 (SLL / SLLW), so it `rcases` the `advanceReady` flag partition and routes each branch to the op-generic

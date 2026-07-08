@@ -315,7 +315,7 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) : Tra
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.a,
     cols.is_divu * 16 + cols.is_remu * 18 + cols.is_div * 15 + cols.is_rem * 17
-      + cols.is_divw * 25 + cols.is_remw * 27 + cols.is_divuw * 26 + cols.is_remuw * 28⟩
+      + cols.is_divw * 25 + cols.is_remw * 27 + cols.is_divuw * 26 + cols.is_remuw * 28, .regWrite⟩
 
 /-- **`DivRemChip.advance`** — the per-DivRem-row `try_step` lift (SC Phase 4), 8-way flag dispatch.
 Each branch pins the R-type opcode `if isU then <U-op> else <s-op>`, converts the chip `Spec`'s flag-gated

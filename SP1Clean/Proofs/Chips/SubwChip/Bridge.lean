@@ -95,7 +95,7 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.SubwCols (ZMod p)) : Trace
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real,
     #v[cols.subw_operation.value[0], cols.subw_operation.value[1],
-       cols.subw_operation.msb.msb * 65535, cols.subw_operation.msb.msb * 65535], 20⟩
+       cols.subw_operation.msb.msb * 65535, cols.subw_operation.msb.msb * 65535], 20, .regWrite⟩
 
 /-- **`SubwChip.advance`** — the per-Subw-row `try_step` lift (SC Phase 4, the **first W-op chip**): the
 `execute_RTYPEW` twin of `AddChip.advance`, a thin single-op adapter over the generic `advance_of_rtypew`

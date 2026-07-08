@@ -76,6 +76,35 @@ def _root_.SP1Clean.Extracted.ITypeReader.toAdapterView {F : Type} [Zero F] [One
     op_b := #v[c.op_b, 0, 0, 0], op_b_memory := c.op_b_memory, imm_b := 0,
     op_c := c.op_c_imm, op_c_memory := c.op_b_memory, imm_c := 1 }
 
+/-- **One committed contiguous memory write** (a store): `width` little-endian bytes of `value` written at
+the byte address recombined from the three `AddressOperation` limbs (`addrNat = a0 + a1·2^16 + a2·2^32`).
+The write-side projection of the Memory-bus `MemEvent`; carried on a store `RowView`. Only the low `width`
+bytes of `value` are written — the high bytes of SP1's read-modify-write `store_value` are irrelevant. -/
+structure MemWrite (F : Type) where
+  addr : Vector F 3
+  value : Word F
+  width : Nat
+
+/-- **The two orthogonal write axes** a committed row may perform (the PC transition is always committed, so
+it is not represented here): an optional **register write** — gated by `writesReg`, the existing `op_a :=
+rdWrite` — and an optional contiguous **memory write** (`some` only for stores). This mirrors the Sail
+`SequentialState`'s split `regs`/`mem`: the real RISC-V mental model is "each instruction transitions the PC,
+writes ≤ 1 register, and writes ≤ 1 contiguous memory range." `writesReg` is exactly the (currently
+hardcoded-`true`) `opAEvent.is_write`. A hypothetical reg+mem instruction (an atomic AMO) is expressible with
+both axes active — the two-axis model is the long-term-viable generalization. -/
+structure CommitEffect (F : Type) where
+  writesReg : Bool
+  memWrite : Option (MemWrite F)
+
+namespace CommitEffect
+/-- The common case — ALU / jump / normal load: write `op_a := rdWrite`, no memory write. -/
+def regWrite {F : Type} : CommitEffect F := ⟨true, none⟩
+/-- No register write, no memory write — Branch (`op_a = rs1` source), AluX0 / LoadX0 (`op_a = x0`). -/
+def noWrite {F : Type} : CommitEffect F := ⟨false, none⟩
+/-- No register write, one contiguous memory write — the stores (`op_a = rs2` is a read-back self-write). -/
+def store {F : Type} (mw : MemWrite F) : CommitEffect F := ⟨false, some mw⟩
+end CommitEffect
+
 /-- The **chip-agnostic** per-row columns the four interaction-bus projections read: the CPUState and the
 reader-agnostic `AdapterView` blocks, the `is_real` selector, the rd write-back value (the ALU result the
 Memory bus carries for the `op_a` write), and the Program-bus opcode. Every chip maps to this via
@@ -93,5 +122,10 @@ structure RowView (F : Type) where
   is_real : F
   rdWrite : Word F
   opcode : F
+  /-- **The committed architectural write effect** (SC Phase 4): the register-write gate + the optional
+  memory write. `.regWrite` for the register-writing chips (the common case), `.noWrite` for Branch /
+  AluX0 / LoadX0, `.store ⟨…⟩` for the stores. Read only by the target-execution refinement layer
+  (`Soundness/RowEffectDefs.lean` `replayVal`/`memReplayVal`/`RowEffect`); the bus projections ignore it. -/
+  commit : CommitEffect F
 
 end SP1Clean.Trace

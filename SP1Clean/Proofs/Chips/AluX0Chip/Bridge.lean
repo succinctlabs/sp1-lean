@@ -225,7 +225,7 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.AluX0Cols
   view := fun inp cols => ⟨cols.state,
     #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, #v[(0 : ZMod p), 0, 0, 0], cols.opcode⟩
+    cols.adapter.toAdapterView, inp.is_real, #v[(0 : ZMod p), 0, 0, 0], cols.opcode, .noWrite⟩
   chipSpec := fun inp cols data => Spec inp cols data
   sailEquiv := fun _inp _cols s => ∀ (rs1 rs2 : BitVec 5) (imm : BitVec 12) (pc : BitVec 64)
       (rs1_val rs2_val : BitVec 64),

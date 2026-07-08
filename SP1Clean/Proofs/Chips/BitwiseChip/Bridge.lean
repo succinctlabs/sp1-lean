@@ -226,7 +226,7 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.BitwiseCols (ZMod p)) : Tr
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real,
     BitwiseU16Operation.resultWord cols.bitwise_operation.bitwise_operation.result,
-    cols.is_xor * 3 + cols.is_or * 4 + cols.is_and * 5⟩
+    cols.is_xor * 3 + cols.is_or * 4 + cols.is_and * 5, .regWrite⟩
 
 /-- **`BitwiseChip.advance`** — the per-Bitwise-row `try_step` lift (SC Phase 4, the **first multi-op chip**):
 a 6-way adapter (`imm_c ∈ {0,1}` register/immediate × the 3 one-hot flags AND/OR/XOR) over the generic

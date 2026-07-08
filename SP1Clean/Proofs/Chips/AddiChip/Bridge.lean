@@ -77,7 +77,7 @@ next-pc, `add_operation` result as `rdWrite`). Standalone so `AddiChip.advance` 
 `kind.advance` (see `AddChip.rowView`). -/
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.AddiCols (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, cols.add_operation.value, 1⟩
+    cols.adapter.toAdapterView, inp.is_real, cols.add_operation.value, 1, .regWrite⟩
 
 /-- **`AddiChip.advance`** — the per-Addi-row `try_step` lift (SC Phase 4), the first I-type migrated chip: a
 thin adapter over `advance_of_itype` with opcode `ADDI` + the write-value identity `hval`

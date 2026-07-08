@@ -148,7 +148,7 @@ can be supplied *as* `kind.advance` (see `AddChip.rowView`). -/
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.UTypeColumns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.add_operation.value,
-    inp.is_auipc * 48 + (1 - inp.is_auipc) * 49⟩
+    inp.is_auipc * 48 + (1 - inp.is_auipc) * 49, .regWrite⟩
 
 /-- **`UTypeChip.advance`** — the per-U-type-row `try_step` lift (SC Phase 4): a 2-branch adapter over
 `advance_of_utype` (LUI `is_auipc = 0`, opcode 49; AUIPC `is_auipc = 1`, opcode 48). No register reads

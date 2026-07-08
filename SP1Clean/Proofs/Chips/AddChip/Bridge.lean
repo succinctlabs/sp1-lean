@@ -81,7 +81,7 @@ so `AddChip.advance` below — the Phase-4 `try_step` obligation, which referenc
 stated *before* `kind` and supplied *as* `kind.advance`, breaking the `advance ↔ kind.view` reference cycle. -/
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.AddCols (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, cols.add_operation.value, 0⟩
+    cols.adapter.toAdapterView, inp.is_real, cols.add_operation.value, 0, .regWrite⟩
 
 /-- **`AddChip.advance`** — the per-Add-row `try_step` lift (SC Phase 4), closing `TargetObligations.lift`
 for Add rows: from a state `s` refining the row `rowView inp cols` (`SailConfigured` + `RomLoaded` + the
