@@ -3,6 +3,7 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.LoadWordChip.Formal
 import SP1Clean.Soundness.ChipRow
+import SP1Clean.Proofs.Sail.Advance
 
 /-! # Native Sail bridge for LoadWord (LW / LWU)
 
@@ -263,27 +264,139 @@ namespace SP1Clean.LoadWordChip
 open SP1Clean.LoadWordSail
 open Sail LeanRV64D LeanRV64D.Functions
 open SP1Clean.SailMem
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **LoadWord's `ChipKind` registration** — enters LW / LWU rows into the heterogeneous trace and the
-soundness capstone. `view` is the straight-line shape (`next_pc = pc + 4`), the I-type adapter
-(`ITypeReader.toAdapterView`: `op_b` the rs1 base read, `op_c = op_c_imm` the immediate, `imm_c = 1`),
-the gating selector `is_real = is_lw + is_lwu`, the **extended loaded word**
-`#v[selected_word[0], selected_word[1], 65535·msb, 65535·msb]` as the rd write-back, and opcode
-`31·is_lw + 34·is_lwu`. `sailEquiv` quantifies the row's PC/rs1 reads, the Sail-state init/mem-config,
-the alignment/fits/range facts, the limb/`msb` decode facts, and the four selected memory bytes
-internally; `reaches_sail` is `lw_chip_reaches_sail` (the load value is committed in the columns, so the
-`is_real`/`Spec` hypotheses are unused). -/
+/-- **The LoadWord `rdWrite ≡ extend_value` identity**, 2-way over LW (sign) / LWU (zero).
+The sign bit `msb` is the high bit of the TOP limb `selected_word[1]`; the read is the 4-byte
+little-endian word. Reuses the same-file `LoadWordSail` 32-bit extend lemmas. The LWU-zero
+condition is keyed on `is_lw = 0` (SP1's gate is `msb·(is_lw−1) = 0`). -/
+lemma loadWord_hval (input : Inputs (ZMod p)) (isU : Bool)
+    (hsel0 : input.selected_word[0].val < 65536) (hsel1 : input.selected_word[1].val < 65536)
+    (h_lw_msb : input.is_lw = 1 → input.msb = if input.selected_word[1].val ≥ 32768 then 1 else 0)
+    (h_lwu_msb : input.is_lw = 0 → input.msb = 0)
+    (hcase : (input.is_lw = 1 ∧ input.is_lwu = 0 ∧ isU = false)
+        ∨ (input.is_lwu = 1 ∧ input.is_lw = 0 ∧ isU = true)) :
+    Word.toBitVec64 (#v[input.selected_word[0], input.selected_word[1],
+        65535 * input.msb, 65535 * input.msb] : Word (ZMod p))
+      = extend_value isU (BitVec.ofNat 8 (input.selected_word[1].val >>> 8)
+          ++ BitVec.ofNat 8 input.selected_word[1].val
+          ++ BitVec.ofNat 8 (input.selected_word[0].val >>> 8)
+          ++ BitVec.ofNat 8 input.selected_word[0].val) := by
+  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
+  rcases hcase with ⟨hlw, _, rfl⟩ | ⟨hlwu, hlw, rfl⟩
+  · -- LW (signed)
+    have hmsbeq := h_lw_msb hlw
+    simp only [extend_value, Bool.false_eq_true, if_false, sign_extend, Sail.BitVec.signExtend]
+    by_cases hge : input.selected_word[1].val ≥ 32768
+    · rw [hmsbeq, if_pos hge]; simp only [mul_one]
+      exact (LoadWordSail.signExtend64_ofNat32_concat_of_ge_32768 _ _ hsel0 hsel1 hge).symm
+    · rw [hmsbeq, if_neg hge]; simp only [mul_zero]
+      exact (LoadWordSail.signExtend64_ofNat32_concat_of_lt_32768 _ _ hsel0 hsel1 (by omega)).symm
+  · -- LWU (unsigned): is_lw = 0
+    rw [h_lwu_msb hlw]
+    simp only [extend_value, if_true, zero_extend, mul_zero]
+    exact (LoadWordSail.zeroExtend64_ofNat32_concat _ _ hsel0 hsel1).symm
+
+/-- **LoadWord's committed bus view** — standalone (identical to the former inline `kind.view`).
+Straight-line `next_pc = pc+4`, ITypeReader adapter,
+`rdWrite = #v[selected_word[0], selected_word[1], 65535·msb, 65535·msb]`, opcode
+`is_lw·31 + is_lwu·34`, `commit = .regWrite`. -/
+def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadWordColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
+    inp.adapter.toAdapterView, LoadWordChip.isReal inp,
+    #v[inp.selected_word[0], inp.selected_word[1], 65535 * inp.msb, 65535 * inp.msb],
+    inp.is_lw * 31 + inp.is_lwu * 34, .regWrite⟩
+
+/-- **LoadWord's `advanceReady` bundle**: routing (`op_a ≠ 0`), the low-pc-limb bound, the LW/LWU
+one-hot, the two loaded-limb bounds (`selected_word[i] < 2^16`), the **4-byte alignment**, the
+address bounds, and the **four-byte memory-read binding**. -/
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadWordColumns (ZMod p))
+    (_prog : GuestProgram) (s : SailState) : Prop :=
+  inp.adapter.op_a ≠ 0 ∧
+  (inp.state.pc[0]).val < 2 ^ 16 ∧
+  ((inp.is_lw = 1 ∧ inp.is_lwu = 0) ∨ (inp.is_lwu = 1 ∧ inp.is_lw = 0)) ∧
+  inp.selected_word[0].val < 65536 ∧ inp.selected_word[1].val < 65536 ∧
+  ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 4 = 0 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 < 2 ^ 64 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 ≤ 2 ^ 48 ∧
+  2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some (BitVec.ofNat 8 inp.selected_word[0].val) ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1]?
+      = some (BitVec.ofNat 8 (inp.selected_word[0].val >>> 8)) ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2]? = some (BitVec.ofNat 8 inp.selected_word[1].val) ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 3]?
+      = some (BitVec.ofNat 8 (inp.selected_word[1].val >>> 8))
+
+set_option maxHeartbeats 4000000 in
+/-- **`LoadWordChip.advance`** — the per-LoadWord-row `try_step` lift (SC Phase 4). 2-way LW/LWU
+flag dispatch fixing `isU`; each branch derives the opcode (31/34 = LW/LWU) and the
+`rdWrite ≡ extend_value` identity (`loadWord_hval`) from the chip `Spec`, then feeds
+`advance_of_load_width4` with the memory binding / bounds / alignment / routing carried in
+`advanceReady`. The LWU-zero fact is derived from the `Spec`'s `msb·(is_lw−1) = 0` gate at
+`is_lw = 0`. `hreal` unused. -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadWordColumns (ZMod p))
+    (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
+    (_hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : AdvanceReady inp cols prog s) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hnonX0, hpc0, hflag, hsel0, hsel1, h_aligned, h_fits, h_hi, h_lo, hmem₀, hmem₁, hmem₂, hmem₃⟩ := hready
+  obtain ⟨_h_addr, _h_mem, h_msb_spec, _h_it, _h_limbsel, _h_op_a_0,
+    h_lw_gate, _h_lw_bin, _h_lwu_bin, _h_real_bin⟩ := hspec
+  obtain ⟨_hmsbbin, hmsbeq⟩ := h_msb_spec
+  set r := rowView inp cols with hr
+  rcases hflag with ⟨hlw, hlwu⟩ | ⟨hlwu, hlw⟩
+  · -- LW : isU = false, opcode 31
+    refine advance_of_load_width4 false (BitVec.ofNat 8 inp.selected_word[0].val)
+      (BitVec.ofNat 8 (inp.selected_word[0].val >>> 8)) (BitVec.ofNat 8 inp.selected_word[1].val)
+      (BitVec.ofNat 8 (inp.selected_word[1].val >>> 8))
+      (by intro w' u' h; simp only [loadOpcode] at h
+          cases u' <;> split_ifs at h with h1 h2 h4 <;>
+            simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq])
+      hcfg hrom hpcread hvalb hdecrom
+      (by show inp.is_lw * 31 + inp.is_lwu * 34 = _
+          rw [hlw, hlwu]; simp only [one_mul, zero_mul, add_zero]
+          show (31 : ZMod p) = ((loadOpcode 4 false).toNat : ZMod p)
+          rw [show (loadOpcode 4 false).toNat = 31 from by decide]; norm_num)
+      rfl rfl hnonX0 hpc0 rfl h_aligned h_fits h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃ ?_ rfl rfl
+    exact loadWord_hval inp false hsel0 hsel1 (fun h1 => hmsbeq h1)
+      (fun h => by rw [h, zero_sub, mul_neg_one, neg_eq_zero] at h_lw_gate; exact h_lw_gate)
+      (Or.inl ⟨hlw, hlwu, rfl⟩)
+  · -- LWU : isU = true, opcode 34
+    refine advance_of_load_width4 true (BitVec.ofNat 8 inp.selected_word[0].val)
+      (BitVec.ofNat 8 (inp.selected_word[0].val >>> 8)) (BitVec.ofNat 8 inp.selected_word[1].val)
+      (BitVec.ofNat 8 (inp.selected_word[1].val >>> 8))
+      (by intro w' u' h; simp only [loadOpcode] at h
+          cases u' <;> split_ifs at h with h1 h2 h4 <;>
+            simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq])
+      hcfg hrom hpcread hvalb hdecrom
+      (by show inp.is_lw * 31 + inp.is_lwu * 34 = _
+          rw [hlw, hlwu]; simp only [one_mul, zero_mul, zero_add]
+          show (34 : ZMod p) = ((loadOpcode 4 true).toNat : ZMod p)
+          rw [show (loadOpcode 4 true).toNat = 34 from by decide]; norm_num)
+      rfl rfl hnonX0 hpc0 rfl h_aligned h_fits h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃ ?_ rfl rfl
+    exact loadWord_hval inp true hsel0 hsel1 (fun h1 => hmsbeq h1)
+      (fun h => by rw [h, zero_sub, mul_neg_one, neg_eq_zero] at h_lw_gate; exact h_lw_gate)
+      (Or.inr ⟨hlwu, hlw, rfl⟩)
+
 def kind : Soundness.ChipKind p where
   name := "LoadWord"
   Inputs := LoadWordChip.Inputs
   Cols := Extracted.LoadWordColumns
-  view := fun inp _cols => ⟨inp.state,
-    #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
-    inp.adapter.toAdapterView, LoadWordChip.isReal inp,
-    #v[inp.selected_word[0], inp.selected_word[1], 65535 * inp.msb, 65535 * inp.msb],
-    inp.is_lw * 31 + inp.is_lwu * 34, .regWrite⟩
+  view := rowView
   chipSpec := fun inp cols data => LoadWordChip.Spec inp cols data
   sailEquiv := fun inp _cols s => ∀ (rs1 rd : BitVec 5) (imm : BitVec 12) (pc reg_val : BitVec 64)
       (is_unsigned : Bool),
@@ -310,5 +423,7 @@ def kind : Soundness.ChipKind p where
       hsel0 hsel1 hmsb h_unsigned_msb h_al h_fits h_hi h_lo h_pc h_rs1 hm0 hm1 hm2 hm3 =>
     lw_chip_reaches_sail inp rs1 rd imm pc s hs hconfig is_unsigned hsel0 hsel1 hmsb h_unsigned_msb
       reg_val h_al h_fits h_hi h_lo h_pc h_rs1 hm0 hm1 hm2 hm3
+  advanceReady := AdvanceReady
+  advance := some (PLift.up advance)
 
 end SP1Clean.LoadWordChip

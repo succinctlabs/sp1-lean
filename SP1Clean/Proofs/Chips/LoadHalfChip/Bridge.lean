@@ -3,6 +3,7 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.LoadHalfChip.Formal
 import SP1Clean.Soundness.ChipRow
+import SP1Clean.Proofs.Sail.Advance
 
 /-! # Native Sail bridge for LoadHalf (LH / LHU)
 
@@ -220,20 +221,133 @@ namespace SP1Clean.LoadHalfChip
 open SP1Clean.LoadHalfSail
 open Sail LeanRV64D LeanRV64D.Functions
 open SP1Clean.SailMem
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- `ChipKind` registration for LoadHalf (LH / LHU, opcodes 30 / 33). `sailEquiv` carries the
-2-byte alignment hypothesis. -/
+/-- **The LoadHalf `rdWrite ≡ extend_value` identity**, 2-way over LH (sign) / LHU (zero).
+The `hval` `advance_of_load_width2` consumes: for a real row,
+`Word.toBitVec64 (loaded word) = extend_value isU (the selected half's little-endian bytes)`.
+Reuses the same-file `LoadHalfSail` 16-bit extend lemmas. -/
+lemma loadHalf_hval (input : Inputs (ZMod p)) (isU : Bool)
+    (hsel : input.selected_half.val < 65536)
+    (h_lh_msb : input.is_lh = 1 → input.msb = if input.selected_half.val ≥ 32768 then 1 else 0)
+    (h_lhu_msb : input.is_lhu = 1 → input.msb = 0)
+    (hcase : (input.is_lh = 1 ∧ input.is_lhu = 0 ∧ isU = false)
+        ∨ (input.is_lhu = 1 ∧ input.is_lh = 0 ∧ isU = true)) :
+    Word.toBitVec64 (#v[input.selected_half, 65535 * input.msb, 65535 * input.msb,
+        65535 * input.msb] : Word (ZMod p))
+      = extend_value isU (BitVec.ofNat 8 (input.selected_half.val >>> 8)
+          ++ BitVec.ofNat 8 input.selected_half.val) := by
+  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
+  rcases hcase with ⟨hlh, _, rfl⟩ | ⟨hlhu, _, rfl⟩
+  · -- LH (signed)
+    have hmsbeq := h_lh_msb hlh
+    simp only [extend_value, Bool.false_eq_true, if_false, sign_extend, Sail.BitVec.signExtend]
+    by_cases hge : input.selected_half.val ≥ 32768
+    · rw [hmsbeq, if_pos hge]; simp only [mul_one]
+      exact (LoadHalfSail.signExtend64_ofNat16_concat_of_ge_32768 _ hsel hge).symm
+    · rw [hmsbeq, if_neg hge]; simp only [mul_zero]
+      exact (LoadHalfSail.signExtend64_ofNat16_concat_of_lt_32768 _ hsel (by omega)).symm
+  · -- LHU (unsigned)
+    rw [h_lhu_msb hlhu]
+    simp only [extend_value, if_true, zero_extend, mul_zero]
+    exact (LoadHalfSail.zeroExtend64_ofNat16_concat _ hsel).symm
+
+/-- **LoadHalf's committed bus view** — standalone (identical to the former inline `kind.view`)
+so `LoadHalfChip.advance` can be supplied *as* `kind.advance`. Straight-line `next_pc = pc+4`,
+ITypeReader adapter, `rdWrite = #v[selected_half, 65535·msb, 65535·msb, 65535·msb]`, opcode
+`is_lh·30 + is_lhu·33`, `commit = .regWrite`. -/
+def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadHalfColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
+    inp.adapter.toAdapterView, LoadHalfChip.isReal inp,
+    #v[inp.selected_half, 65535 * inp.msb, 65535 * inp.msb, 65535 * inp.msb],
+    inp.is_lh * 30 + inp.is_lhu * 33, .regWrite⟩
+
+/-- **LoadHalf's `advanceReady` bundle**: the routing (`op_a ≠ 0`), the low-pc-limb bound, the
+LH/LHU one-hot, the loaded-limb bound (`selected_half < 2^16` — a genuine precondition to read
+the committed limb as its two little-endian bytes; NOT in the chip `Spec`, which carries
+`U16MSBOperation.Spec` instead), the **2-byte alignment**, the address bounds, and the
+**two-byte memory-read binding**. -/
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadHalfColumns (ZMod p))
+    (_prog : GuestProgram) (s : SailState) : Prop :=
+  inp.adapter.op_a ≠ 0 ∧
+  (inp.state.pc[0]).val < 2 ^ 16 ∧
+  ((inp.is_lh = 1 ∧ inp.is_lhu = 0) ∨ (inp.is_lhu = 1 ∧ inp.is_lh = 0)) ∧
+  inp.selected_half.val < 65536 ∧
+  ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 2 = 0 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 < 2 ^ 64 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 ≤ 2 ^ 48 ∧
+  2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some (BitVec.ofNat 8 inp.selected_half.val) ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1]?
+      = some (BitVec.ofNat 8 (inp.selected_half.val >>> 8))
+
+set_option maxHeartbeats 4000000 in
+/-- **`LoadHalfChip.advance`** — the per-LoadHalf-row `try_step` lift (SC Phase 4). 2-way LH/LHU
+flag dispatch fixing `isU`; each branch derives the opcode (30/33 = LH/LHU) and the
+`rdWrite ≡ extend_value` identity (`loadHalf_hval`) from the chip `Spec` (its `U16MSBOperation.Spec`
+supplies the sign-bit fact), then feeds `advance_of_load_width2` with the memory binding / bounds /
+alignment / routing carried in `advanceReady`. `hreal` is unused (the loaded-limb bound is carried
+in `advanceReady`, not derived from the `Spec`). -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadHalfColumns (ZMod p))
+    (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
+    (_hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : AdvanceReady inp cols prog s) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hnonX0, hpc0, hflag, hsel, h_aligned, h_fits, h_hi, h_lo, hmem₀, hmem₁⟩ := hready
+  obtain ⟨_h_addr, _h_mem, h_msb_spec, _h_it, _h_limbsel, _h_op_a_0,
+    h_lhu_gate, _h_lh_bin, _h_lhu_bin, _h_real_bin⟩ := hspec
+  obtain ⟨_hmsbbin, hmsbeq⟩ := h_msb_spec
+  set r := rowView inp cols with hr
+  rcases hflag with ⟨hlh, hlhu⟩ | ⟨hlhu, hlh⟩
+  · -- LH : isU = false, opcode 30
+    refine advance_of_load_width2 false (BitVec.ofNat 8 inp.selected_half.val)
+      (BitVec.ofNat 8 (inp.selected_half.val >>> 8))
+      (by intro w' u' h; simp only [loadOpcode] at h
+          cases u' <;> split_ifs at h with h1 h2 h4 <;>
+            simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq])
+      hcfg hrom hpcread hvalb hdecrom
+      (by show inp.is_lh * 30 + inp.is_lhu * 33 = _
+          rw [hlh, hlhu]; simp only [one_mul, zero_mul, add_zero]
+          show (30 : ZMod p) = ((loadOpcode 2 false).toNat : ZMod p)
+          rw [show (loadOpcode 2 false).toNat = 30 from by decide]; norm_num)
+      rfl rfl hnonX0 hpc0 rfl h_aligned h_fits h_hi h_lo hmem₀ hmem₁ ?_ rfl rfl
+    exact loadHalf_hval inp false hsel (fun h1 => hmsbeq h1)
+      (fun hu => by rw [hu, one_mul] at h_lhu_gate; exact h_lhu_gate)
+      (Or.inl ⟨hlh, hlhu, rfl⟩)
+  · -- LHU : isU = true, opcode 33
+    refine advance_of_load_width2 true (BitVec.ofNat 8 inp.selected_half.val)
+      (BitVec.ofNat 8 (inp.selected_half.val >>> 8))
+      (by intro w' u' h; simp only [loadOpcode] at h
+          cases u' <;> split_ifs at h with h1 h2 h4 <;>
+            simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq])
+      hcfg hrom hpcread hvalb hdecrom
+      (by show inp.is_lh * 30 + inp.is_lhu * 33 = _
+          rw [hlh, hlhu]; simp only [one_mul, zero_mul, zero_add]
+          show (33 : ZMod p) = ((loadOpcode 2 true).toNat : ZMod p)
+          rw [show (loadOpcode 2 true).toNat = 33 from by decide]; norm_num)
+      rfl rfl hnonX0 hpc0 rfl h_aligned h_fits h_hi h_lo hmem₀ hmem₁ ?_ rfl rfl
+    exact loadHalf_hval inp true hsel (fun h1 => hmsbeq h1)
+      (fun hu => by rw [hu, one_mul] at h_lhu_gate; exact h_lhu_gate)
+      (Or.inr ⟨hlhu, hlh, rfl⟩)
+
+
 def kind : Soundness.ChipKind p where
   name := "LoadHalf"
   Inputs := LoadHalfChip.Inputs
   Cols := Extracted.LoadHalfColumns
-  view := fun inp _cols => ⟨inp.state,
-    #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
-    inp.adapter.toAdapterView, LoadHalfChip.isReal inp,
-    #v[inp.selected_half, 65535 * inp.msb, 65535 * inp.msb, 65535 * inp.msb],
-    inp.is_lh * 30 + inp.is_lhu * 33, .regWrite⟩
+  view := rowView
   chipSpec := fun inp cols data => LoadHalfChip.Spec inp cols data
   sailEquiv := fun inp _cols s => ∀ (rs1 rd : BitVec 5) (imm : BitVec 12) (pc reg_val : BitVec 64)
       (is_unsigned : Bool),
@@ -257,5 +371,7 @@ def kind : Soundness.ChipKind p where
       hsel hmsb h_unsigned_msb h_al h_fits h_hi h_lo h_pc h_rs1 hm0 hm1 =>
     lh_chip_reaches_sail inp rs1 rd imm pc s hs hconfig is_unsigned hsel hmsb h_unsigned_msb
       reg_val h_al h_fits h_hi h_lo h_pc h_rs1 hm0 hm1
+  advanceReady := AdvanceReady
+  advance := some (PLift.up advance)
 
 end SP1Clean.LoadHalfChip
