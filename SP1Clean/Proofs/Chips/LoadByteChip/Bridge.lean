@@ -3,6 +3,7 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.LoadByteChip.Formal
 import SP1Clean.Soundness.ChipRow
+import SP1Clean.Proofs.Sail.Advance
 
 /-! # Native Sail bridge for LoadByte (LB / LBU)
 
@@ -205,20 +206,127 @@ namespace SP1Clean.LoadByteChip
 open SP1Clean.LoadByteSail
 open Sail LeanRV64D LeanRV64D.Functions
 open SP1Clean.SailMem
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- **The LoadByte `rdWrite ≡ extend_value` identity**, 2-way over LB (sign) / LBU (zero). The `hval`
+`advance_of_load_width1` consumes: for a real row, `Word.toBitVec64 (loaded word) = extend_value isU (the
+selected byte)`. Reuses the same-file `LoadByteSail` extend lemmas. -/
+lemma loadByte_hval (input : Inputs (ZMod p)) (isU : Bool)
+    (hsel : input.selected_byte.val < 256)
+    (h_lb_msb : input.is_lb = 1 → (input.msb = 0 ∨ input.msb = 1)
+        ∧ (input.msb = 1 ↔ 128 ≤ input.selected_byte.val))
+    (h_lbu_msb : input.is_lbu = 1 → input.msb = 0)
+    (hcase : (input.is_lb = 1 ∧ input.is_lbu = 0 ∧ isU = false)
+        ∨ (input.is_lbu = 1 ∧ input.is_lb = 0 ∧ isU = true)) :
+    Word.toBitVec64 (#v[input.selected_byte + 65280 * input.msb, 65535 * input.msb,
+        65535 * input.msb, 65535 * input.msb] : Word (ZMod p))
+      = extend_value isU (BitVec.ofNat 8 input.selected_byte.val) := by
+  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
+  rcases hcase with ⟨hlb, _, rfl⟩ | ⟨hlbu, _, rfl⟩
+  · -- LB (signed)
+    obtain ⟨hmsbbin, hmsbiff⟩ := h_lb_msb hlb
+    simp only [extend_value, Bool.false_eq_true, if_false, sign_extend, Sail.BitVec.signExtend]
+    by_cases hge : 128 ≤ input.selected_byte.val
+    · rw [hmsbiff.mpr hge]; simp only [mul_one]
+      exact (LoadByteSail.signExtend64_ofNat8_of_ge_128 _ hsel hge).symm
+    · have hmsb0 : input.msb = 0 := by
+        rcases hmsbbin with h | h
+        · exact h
+        · exact absurd (hmsbiff.mp h) hge
+      rw [hmsb0]; simp only [mul_zero, add_zero]
+      exact (LoadByteSail.signExtend64_ofNat8_of_lt_128 _ hsel (by omega)).symm
+  · -- LBU (unsigned)
+    rw [h_lbu_msb hlbu]
+    simp only [extend_value, if_true, zero_extend, mul_zero, add_zero]
+    exact (LoadByteSail.zeroExtend64_ofNat8 _ hsel).symm
+
+/-- **LoadByte's committed bus view** — standalone (identical to the former inline `kind.view`) so
+`LoadByteChip.advance` can be supplied *as* `kind.advance`. Straight-line `next_pc = pc+4`, ITypeReader
+adapter, `rdWrite = #v[sb+65280·msb, 65535·msb, …]`, opcode `is_lb·29 + is_lbu·32`, `commit = .regWrite`. -/
+def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadByteColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
+    inp.adapter.toAdapterView, LoadByteChip.isReal inp,
+    #v[inp.selected_byte + 65280 * inp.msb, 65535 * inp.msb, 65535 * inp.msb, 65535 * inp.msb],
+    inp.is_lb * 29 + inp.is_lbu * 32, .regWrite⟩
+
+/-- **LoadByte's `advanceReady` bundle**: the routing (`op_a ≠ 0` — x0 destinations route to LoadX0), the
+low-pc-limb bound, the LB/LBU one-hot, the address bounds, and the **memory byte-read binding** (the load's
+non-standard precondition, phrased in the ITypeReader columns `op_b_memory.prev_value`/`op_c_imm`). -/
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadByteColumns (ZMod p))
+    (_prog : GuestProgram) (s : SailState) : Prop :=
+  inp.adapter.op_a ≠ 0 ∧
+  (inp.state.pc[0]).val < 2 ^ 16 ∧
+  ((inp.is_lb = 1 ∧ inp.is_lbu = 0) ∨ (inp.is_lbu = 1 ∧ inp.is_lb = 0)) ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 < 2 ^ 64 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 ≤ 2 ^ 48 ∧
+  2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some (BitVec.ofNat 8 inp.selected_byte.val)
+
+set_option maxHeartbeats 4000000 in
+/-- **`LoadByteChip.advance`** — the per-LoadByte-row `try_step` lift (SC Phase 4, the **first chip to
+consume the memory axis**). 2-way LB/LBU flag dispatch fixing `isU`; each branch derives the opcode
+(29/32 = LB/LBU) and the `rdWrite ≡ extend_value` identity (`loadByte_hval`) from the chip `Spec`, then feeds
+`advance_of_load_width1` with the memory binding / bounds / routing carried in `advanceReady`. -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadByteColumns (ZMod p))
+    (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
+    (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : AdvanceReady inp cols prog s) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hnonX0, hpc0, hflag, h_fits, h_hi, h_lo, hmem⟩ := hready
+  obtain ⟨_h_addr, _h_mem, _h_it, h_bounds, h_msb_fact, _h_limbsel, _hmux, _h_op_a_0,
+    h_lbu_msb, _h_lb_bin, _h_lbu_bin, _h_real_bin⟩ := hspec
+  have hreal' : LoadByteChip.isReal inp = 1 := hreal
+  have hsel : inp.selected_byte.val < 256 := (h_bounds hreal').2.2
+  set r := rowView inp cols with hr
+  rcases hflag with ⟨hlb, hlbu⟩ | ⟨hlbu, hlb⟩
+  · -- LB : isU = false, opcode 29
+    refine advance_of_load_width1 false (BitVec.ofNat 8 inp.selected_byte.val)
+      (by intro w' u' h; simp only [loadOpcode] at h
+          cases u' <;> split_ifs at h with h1 h2 h4 <;>
+            simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq])
+      hcfg hrom hpcread hvalb hdecrom
+      (by show inp.is_lb * 29 + inp.is_lbu * 32 = _
+          rw [hlb, hlbu]; simp only [one_mul, zero_mul, add_zero]
+          show (29 : ZMod p) = ((loadOpcode 1 false).toNat : ZMod p)
+          rw [show (loadOpcode 1 false).toNat = 29 from by decide]; norm_num)
+      rfl rfl hnonX0 hpc0 rfl h_fits h_hi h_lo hmem ?_ rfl rfl
+    exact loadByte_hval inp false hsel h_msb_fact
+      (fun hu => by rw [hu, one_mul] at h_lbu_msb; exact h_lbu_msb)
+      (Or.inl ⟨hlb, hlbu, rfl⟩)
+  · -- LBU : isU = true, opcode 32
+    refine advance_of_load_width1 true (BitVec.ofNat 8 inp.selected_byte.val)
+      (by intro w' u' h; simp only [loadOpcode] at h
+          cases u' <;> split_ifs at h with h1 h2 h4 <;>
+            simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq])
+      hcfg hrom hpcread hvalb hdecrom
+      (by show inp.is_lb * 29 + inp.is_lbu * 32 = _
+          rw [hlb, hlbu]; simp only [one_mul, zero_mul, zero_add]
+          show (32 : ZMod p) = ((loadOpcode 1 true).toNat : ZMod p)
+          rw [show (loadOpcode 1 true).toNat = 32 from by decide]; norm_num)
+      rfl rfl hnonX0 hpc0 rfl h_fits h_hi h_lo hmem ?_ rfl rfl
+    exact loadByte_hval inp true hsel h_msb_fact
+      (fun hu => by rw [hu, one_mul] at h_lbu_msb; exact h_lbu_msb)
+      (Or.inr ⟨hlbu, hlb, rfl⟩)
+
 /-- `ChipKind` registration for LoadByte (LB / LBU, opcodes 29 / 32). Bytes are unaligned, so
-`sailEquiv` has no alignment hypothesis. -/
+`sailEquiv` has no alignment hypothesis. `view := rowView` (`commit = .regWrite` — loads write rd);
+`advance := some BranchChip-style `advance` over `advance_of_load_width1`, the memory-read binding /
+bounds / routing carried in `advanceReady`. -/
 def kind : Soundness.ChipKind p where
   name := "LoadByte"
   Inputs := LoadByteChip.Inputs
   Cols := Extracted.LoadByteColumns
-  view := fun inp _cols => ⟨inp.state,
-    #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
-    inp.adapter.toAdapterView, LoadByteChip.isReal inp,
-    #v[inp.selected_byte + 65280 * inp.msb, 65535 * inp.msb, 65535 * inp.msb, 65535 * inp.msb],
-    inp.is_lb * 29 + inp.is_lbu * 32, .regWrite⟩
+  view := rowView
   chipSpec := fun inp cols data => LoadByteChip.Spec inp cols data
   sailEquiv := fun inp _cols s => ∀ (rs1 rd : BitVec 5) (imm : BitVec 12) (pc reg_val : BitVec 64)
       (is_unsigned : Bool),
@@ -240,5 +348,7 @@ def kind : Soundness.ChipKind p where
       hsel hmsb h_unsigned_msb h_fits h_hi h_lo h_pc h_rs1 hm0 =>
     lb_chip_reaches_sail inp rs1 rd imm pc s hs hconfig is_unsigned hsel hmsb h_unsigned_msb
       reg_val h_fits h_hi h_lo h_pc h_rs1 hm0
+  advanceReady := AdvanceReady
+  advance := some (PLift.up advance)
 
 end SP1Clean.LoadByteChip

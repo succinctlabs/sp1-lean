@@ -1329,4 +1329,99 @@ theorem decodesBType {prog : GuestProgram} {row : ProgramChip.ProgramRow (ZMod p
     exact (sext13_inj e).symm
   subst e2 e1 eimm; rw [hi2] at hrun2; exact hrun2
 
+/-! ## LOAD decode inversion + producer (SC Phase 4 · Phase 3b) -/
+
+/-- **The LOAD decode inversion (W7).** LOAD is I-type-shaped (`op_a = rd`, `op_b = rs1`, `op_c =
+signExtended offset`, `imm_c = 1`), opcode `loadOpcode width isU`. Because `loadOpcode` is not globally
+injective (width 8 / `LD` is the `else` branch), the caller supplies the width-specific injectivity `hpin`
+(discharged by `decide` for a concrete width, e.g. width 1 → {LB, LBU}). The other immediate-shaped arms are
+ruled out by opcode disjointness (`split_ifs` over `loadOpcode`, then `decide`); the `imm_c = 0` arms by
+`himm`. The load twin of `instrToProgramRow_inv_jalr`. -/
+theorem instrToProgramRow_inv_load {pc : Vector (ZMod p) 3} {i : instruction} {row : ProgramRow (ZMod p)}
+    (width : word_width) (isU : Bool)
+    (hpin : ∀ (w' : word_width) (u' : Bool),
+      (loadOpcode w' u').toNat = (loadOpcode width isU).toNat → w' = width ∧ u' = isU)
+    (h : instrToProgramRow pc i = some row)
+    (hop : row.opcode = ((loadOpcode width isU).toNat : ZMod p))
+    (himm : row.imm_c = (1 : ZMod p)) :
+    ∃ (imm : BitVec 12) (rs1 rd : regidx), i = .LOAD (imm, rs1, rd, isU, width) ∧
+      row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
+      ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
+  have honezero : (1 : ZMod p) ≠ 0 := by
+    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    exact one_ne_zero
+  simp only [instrToProgramRow] at h
+  split at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst h)
+  all_goals (try (exact absurd himm.symm honezero))
+  · rename_i imm rs1 rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [iopToOpcode, loadOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [uopToOpcode, loadOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rd
+    exact absurd (opcodeCast_inj hop)
+      (by simp only [loadOpcode, Opcode.toNat]; split_ifs <;> decide)
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop)
+      (by simp only [loadOpcode, Opcode.toNat]; split_ifs <;> decide)
+  · rename_i imm rs2 rs1 op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [bopToOpcode, loadOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs1 rd isU' width'
+    obtain ⟨rfl, rfl⟩ := hpin width' isU' (opcodeCast_inj hop)
+    exact ⟨imm, rs1, rd, rfl, rfl, rfl, rfl⟩
+  · rename_i imm rs2 rs1 width'
+    exact absurd (opcodeCast_inj hop)
+      (by simp only [storeOpcode, loadOpcode, Opcode.toNat]; split_ifs <;> decide)
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [sopToOpcode, loadOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [sopwToOpcode, loadOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop)
+      (by simp only [loadOpcode, Opcode.toNat]; split_ifs <;> decide)
+
+/-- **The ∀-configured-state LOAD decode producer** — the `.LOAD` twin of `decodesJalr`, keyed on the
+committed `(opcode = loadOpcode width isU, imm_c = 1)` + the width-specific injectivity `hpin`. Recovers `w`
++ `imm/rs1/rd` with the decode holding in every configured state (`rs1`/`rd` pinned by `regidx_bv_inj`, the
+12-bit offset by `sext12_inj` on `op_c`). What `advance_of_load_width1` consumes. -/
+theorem decodesLoad {prog : GuestProgram} {row : ProgramRow (ZMod p)} (width : word_width) (isU : Bool)
+    (hpin : ∀ (w' : word_width) (u' : Bool),
+      (loadOpcode w' u').toNat = (loadOpcode width isU).toNat → w' = width ∧ u' = isU)
+    (h : decodedInROM prog row)
+    (hop : row.opcode = ((loadOpcode width isU).toNat : ZMod p)) (himm : row.imm_c = 1)
+    {s0 : SailState} (hs0 : SailConfigured s0) :
+    ∃ (w : BitVec 32) (imm : BitVec 12) (rs1 rd : BitVec 5),
+      prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (∀ sc, SailConfigured sc → (ext_decode w).run sc
+        = .ok (instruction.LOAD (imm, .Regidx rs1, .Regidx rd, isU, width)) sc) ∧
+      row.op_a = (rd.toNat : ZMod p) ∧
+      row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
+      row.op_c = bitVecToWord (imm.signExtend 64) := by
+  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
+  obtain ⟨imm, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_load width isU hpin hrow0 hop himm
+  obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
+  refine ⟨w, imm, rs1, rd, hfetch, ?_, ha, hb, hc⟩
+  intro sc hsc
+  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
+  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
+  obtain ⟨imm', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_load width isU hpin hrow2 hop himm
+  obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
+  have e1 : rs1' = rs1 := regidx_bv_inj (by
+    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
+    exact h.symm)
+  have e0 : rd' = rd := regidx_bv_inj (by
+    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
+  have eimm : imm' = imm := by
+    have e := congrArg (Word.toBitVec64 (p := p)) (hc.symm.trans hc')
+    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
+    exact (sext12_inj e).symm
+  subst e1 e0 eimm; rw [hi2] at hrun2; exact hrun2
+
+
 end SP1Clean.Soundness.Target
