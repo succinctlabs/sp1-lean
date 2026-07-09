@@ -48,11 +48,11 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have S1 := hs1 h_assumptions; rw [ea 1 (by norm_num)] at S1
   have S2 := hs2 h_assumptions; rw [ea 2 (by norm_num)] at S2
   have S3 := hs3 h_assumptions; rw [ea 3 (by norm_num)] at S3
-  rw [← sub_eq_add_neg] at hf hsec
-  refine ⟨⟨bool_of_mul_pred hbres, eq_of_sub_eq_zero hf, eq_of_sub_eq_zero hsec,
+  refine ⟨⟨bool_of_mul_pred (by simpa only [sub_eq_add_neg] using hbres),
+      eq_of_sub_eq_zero hf, eq_of_sub_eq_zero hsec,
       S0, S1, S2, S3, ?_⟩, Or.inl rfl, Or.inl rfl, Or.inl rfl, Or.inl rfl⟩
   intro hr1
-  rw [hr1, one_mul, ← sub_eq_add_neg] at hg
+  rw [hr1, one_mul] at hg
   exact eq_of_sub_eq_zero hg
 
 omit [Fact (2 ^ 17 < p)] in

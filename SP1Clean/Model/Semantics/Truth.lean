@@ -23,6 +23,7 @@ Initial-state convention: `IsInitialState` is a relation (underdetermined `s0`),
 over all loaders; `ZeroRegs` (SP1's zero-initialized register file) is conjoined rather than added to
 `IsInitialState` (zero blast radius on its existing consumers). -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.Semantics
 
 open Sail LeanRV64D LeanRV64D.Functions

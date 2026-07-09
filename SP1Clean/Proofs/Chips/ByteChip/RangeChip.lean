@@ -66,7 +66,7 @@ lookup, so the provider owes nothing to the bus it provides), witnesses a multip
 lookup count), and pushes the `Range` row `⟨6, a, (n : F), 0⟩` onto `byteChannel` with multiplicity `m`. -/
 def main (n : ℕ) (hn : 2 ^ n < p) (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   assertion (Gadgets.ToBits.rangeCheck n hn) input.a
-  let m ← witnessField (fun _ => 1)
+  let m ← witnessField 1
   byteChannel.pushIf m
     (⟨6, input.a, Expression.const ((n : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
 

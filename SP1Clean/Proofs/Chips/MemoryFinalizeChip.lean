@@ -32,7 +32,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- Witness a boolean multiplicity `m` and pull the claimed final memory record `input` with
 multiplicity `m` (the flipped bus's finalize side: the pull cancelling the chain's last push). -/
 def main (input : Var MemoryMsg (ZMod p)) : Circuit (ZMod p) Unit := do
-  let m ← witnessField (fun _ => 1)
+  let m ← witnessField 1
   assertZero (m * (m - 1))
   memoryChannel.pullIf m input
 
@@ -63,7 +63,8 @@ def circuit : GeneralFormalCircuit (ZMod p) MemoryMsg unit where
   channelsWithRequirements := []
   soundness := by
     circuit_proof_start
-    exact fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_holds.1) h1 h0
+    have hb : env.get i₀ * (env.get i₀ + -1) = 0 := by rw [← sub_eq_add_neg]; exact h_holds.1
+    exact fun h1 h0 => off_gate_vacuous (bool_of_mul_pred hb) h1 h0
   completeness := by
     circuit_proof_start
     refine ⟨by simp [h_env], fun _ => ?_⟩

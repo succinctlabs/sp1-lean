@@ -24,13 +24,13 @@ The chip `Spec` sources operands from **inputs** `op_b_val` (rs1) / `op_c_val` (
 the RV64 signature `f rs2_val rs1_val`. The `ChipKind`'s `sailEquiv` is the 5-way flag-dispatched
 conjunction. `Mul` carries `Fact (2 ^ 24 < p)`; the bridge derives `Fact (2 ^ 17 < p)` locally. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.MulSail
 
 open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-- The `MUL` `mul_op`: low 64 bits, signed × signed. -/
 def mulOp_mul : mul_op := { result_part := .Low, signed_rs1 := .Signed, signed_rs2 := .Signed }
@@ -43,38 +43,38 @@ def mulOp_mulhsu : mul_op := { result_part := .High, signed_rs1 := .Signed, sign
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `MUL` (low 64, signed×signed). -/
 noncomputable def spec_mul (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_MUL rs2 rs1 rd mulOp_mul
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `MULH` (high 64, signed×signed). -/
 noncomputable def spec_mulh (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_MUL rs2 rs1 rd mulOp_mulh
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `MULHU` (high 64, unsigned×unsigned). -/
 noncomputable def spec_mulhu (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_MUL rs2 rs1 rd mulOp_mulhu
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `MULHSU` (high 64, signed×unsigned). -/
 noncomputable def spec_mulhsu (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_MUL rs2 rs1 rd mulOp_mulhsu
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `MULW` (low-32 product, sext). -/
 noncomputable def spec_mulw (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_MULW rs2 rs1 rd
   pure ()
 
 /-- The SP1 chip emulation (opcode-agnostic for the five multiply variants): write `nextPC = pc + 4`
 and the result register `rd` (the multiply result word's 64-bit value). -/
 def sp1_mul (rd : regidx) (pc : BitVec 64) (a_val : Word (ZMod p)) : SailM Unit := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits rd (Word.toBitVec64 a_val)
 
 set_option linter.unusedSimpArgs false in
@@ -93,7 +93,7 @@ theorem correct_mul_native
     (spec_mul (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_mul (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_mul, sp1_mul, mulOp_mul, _root_.mul_eq, skeleton_binary, RV64.mul_eq,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_mul]
 
 set_option linter.unusedSimpArgs false in
@@ -110,7 +110,7 @@ theorem correct_mulh_native
     (spec_mulh (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_mul (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_mulh, sp1_mul, mulOp_mulh, _root_.mul_eq, skeleton_binary, RV64.mulh_eq,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_mulh]
 
 set_option linter.unusedSimpArgs false in
@@ -127,7 +127,7 @@ theorem correct_mulhu_native
     (spec_mulhu (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_mul (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_mulhu, sp1_mul, mulOp_mulhu, _root_.mul_eq, skeleton_binary, RV64.mulhu_eq,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_mulhu]
 
 set_option linter.unusedSimpArgs false in
@@ -144,7 +144,7 @@ theorem correct_mulhsu_native
     (spec_mulhsu (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_mul (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_mulhsu, sp1_mul, mulOp_mulhsu, _root_.mul_eq, skeleton_binary, RV64.mulhsu_eq,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_mulhsu]
 
 set_option linter.unusedSimpArgs false in
@@ -162,7 +162,7 @@ theorem correct_mulw_native
     (spec_mulw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_mul (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_mulw, sp1_mul, _root_.mulw_eq, skeleton_binary, RV64.mulw_eq,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_mulw]
 
 omit [Fact (2 ^ 24 < p)] in
@@ -215,7 +215,6 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-- `ChipKind` registration for Mul (MUL/MULH/MULHU/MULHSU/MULW). `rs1`/`rs2` are sourced from
 inputs `op_b_val`/`op_c_val`. Carries `Fact (2 ^ 24 < p)`. -/

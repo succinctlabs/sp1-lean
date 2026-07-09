@@ -162,6 +162,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     intro i hi; rw [← hicl]; simp only [Vector.getElem_map]
   simp only [id_eq, eb, ec, ef, ecl] at h_holds ⊢
   obtain ⟨h_cmp, hE1, hE6, hE8, hE10, hE12, hE14, hE19, hE27, hE35, hE43, hE48, hE49, hE54⟩ := h_holds
+  simp only [sub_eq_add_neg] at hE6 hE8 hE10 hE12 hE14
   -- the composed `U16Compare` assertion's `Assumptions` (cl ranges on a real row, via the cores).
   have hCmpAs : U16CompareOperation.circuit.Assumptions
       ⟨input_cols_comparison_limbs[0], input_cols_comparison_limbs[1],

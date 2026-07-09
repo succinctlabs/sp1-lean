@@ -593,7 +593,6 @@ private lemma lr3_lt (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
   have h16 : 16 - c0.val % 16 + c0.val % 16 = 16 := by omega
   rw [h16]; exact he3
 
-omit [Fact p.Prime] in
 /-- `limb_result[1]` is below `2^(16-s)` on word rows (`e14 = 0` zeroes its `lower` summand). -/
 private lemma lr1_lt_word (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
     (hb : Word.isU64 b) (hz : f[0] + f[1] = 0) :

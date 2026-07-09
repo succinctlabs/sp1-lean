@@ -18,6 +18,7 @@ result register `rd`); the RISC-V Sail spec differs by variant — `spec_srl` (`
 (rs2) — SP1's shift chip inlines the register-read decomposition — so `h_rs1`/`h_rs2` read those
 adapter columns. The `ChipKind`'s `sailEquiv` is the 4-way flag-dispatched conjunction. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.ShiftRightSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -26,32 +27,32 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SRL` (64-bit logical right). -/
 noncomputable def spec_srl (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPE rs2 rs1 rd rop.SRL
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SRA` (64-bit arithmetic right). -/
 noncomputable def spec_sra (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPE rs2 rs1 rd rop.SRA
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SRLW` (low-32 logical, sext). -/
 noncomputable def spec_srlw (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPEW rs2 rs1 rd ropw.SRLW
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SRAW` (low-32 arithmetic, sext). -/
 noncomputable def spec_sraw (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPEW rs2 rs1 rd ropw.SRAW
   pure ()
 
 /-- The SP1 chip emulation (opcode-agnostic for the four shift-right variants): write `nextPC = pc + 4`
 and the result register `rd` (the shift result word's 64-bit value). -/
 def sp1_sr (rd : regidx) (pc : BitVec 64) (a_val : Word (ZMod p)) : SailM Unit := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits rd (Word.toBitVec64 a_val)
 
 /-- The Sail `SRL` pure part is the clean RV64 `srl` (operand order `rs2 rs1`). -/
@@ -103,7 +104,7 @@ theorem correct_srl_native
     (spec_srl (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_sr (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_srl, sp1_sr, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    execute_RTYPE_pure_srl, PreSail.readReg, PreSail.writeReg,
+    execute_RTYPE_pure_srl, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_srl]
 
@@ -122,7 +123,7 @@ theorem correct_sra_native
     (spec_sra (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_sr (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_sra, sp1_sr, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    execute_RTYPE_pure_sra, PreSail.readReg, PreSail.writeReg,
+    execute_RTYPE_pure_sra, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_sra]
 
@@ -141,7 +142,7 @@ theorem correct_srlw_native
     (spec_srlw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_sr (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_srlw, sp1_sr, execute_RTYPEW_eq_execute_RTYPEW', execute_RTYPEW',
-    execute_RTYPEW_pure_srlw, PreSail.readReg, PreSail.writeReg,
+    execute_RTYPEW_pure_srlw, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_srlw]
 
@@ -160,7 +161,7 @@ theorem correct_sraw_native
     (spec_sraw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_sr (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_sraw, sp1_sr, execute_RTYPEW_eq_execute_RTYPEW', execute_RTYPEW',
-    execute_RTYPEW_pure_sraw, PreSail.readReg, PreSail.writeReg,
+    execute_RTYPEW_pure_sraw, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_sraw]
 

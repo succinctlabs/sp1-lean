@@ -3,6 +3,8 @@ import SP1Clean.Soundness.GatedVm.StateBridge
 
 /-! # The gated whole-program execution capstone (assembled)
 
+> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
+
 The whole-machine result, assembled from the two axiom-clean halves built in `SailDispatch.lean`
 (`chipRows_step_sound`) and `StateBridge.lean` (`state_trail_of_balance`):
 

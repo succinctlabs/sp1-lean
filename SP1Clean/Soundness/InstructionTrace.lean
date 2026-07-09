@@ -2,6 +2,8 @@ import SP1Clean.Soundness.Coverage
 
 /-! # `InstructionTrace` — the instruction sequence → circuit (ChipRow) sequence mapping
 
+> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
+
 The Lean analog of SP1's `ExecutionRecord` → `generate_trace`: a decoded instruction sequence maps,
 opcode-by-opcode, to the heterogeneous trace of `ChipRow`s the soundness capstone consumes. SP1 routes
 each executed instruction to one chip's event list (`tracing.rs`) and that chip emits one row
@@ -21,7 +23,6 @@ namespace SP1Clean.Soundness
 -- stronger bound with the project-standard `Fact (2 ^ 17 < p)` derived locally.
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨lt_of_le_of_lt (by norm_num) (Fact.out (p := 2 ^ 24 < p))⟩
 
 /-! ## The decoded instruction -/
 

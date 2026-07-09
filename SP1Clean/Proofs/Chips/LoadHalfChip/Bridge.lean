@@ -15,6 +15,7 @@ emulation (write `nextPC = pc + 4` and the extended half into `rd`), via
 `msb` extend (sign for `LH`, zero for `LHU`) to `#v[selected_half, 65535·msb, 65535·msb,
 65535·msb]`. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.LoadHalfSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -98,12 +99,12 @@ private lemma signExtend64_ofNat16_concat_of_ge_32768 [NeZero p]
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the width-2 Sail `LOAD`. -/
 noncomputable def spec_lh (imm : BitVec 12) (rs1 rd : BitVec 5) (is_unsigned : Bool) :
     SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   execute_LOAD imm (.Regidx rs1) (.Regidx rd) is_unsigned (width := 2)
 
 /-- The SP1 chip emulation: write `nextPC = pc + 4` and the extended loaded word into `rd`. -/
 def sp1_lh (rd : BitVec 5) (pc : BitVec 64) (val64 : BitVec 64) : SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits (.Regidx rd) val64
   pure RETIRE_SUCCESS
 
@@ -134,7 +135,7 @@ theorem correct_load_half_native
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
   have hmem_eq : sp.mem = s.mem := rfl
   have hsp_config : SailState.isValidMemConfig sp hsp_init := by
-    obtain ⟨hcp, hmprv, hmsec, hhtif, hpma⟩ := hconfig
+    obtain ⟨hcp, hmprv, hmsec, hmsecpmm, hhtif, hpma⟩ := hconfig
     have key : ∀ (reg : Register) (h : reg ∈ s.regs) (h' : reg ∈ sp.regs),
         reg ≠ Register.nextPC → sp.regs.get reg h' = s.regs.get reg h := by
       intro reg h h' hne
@@ -144,6 +145,7 @@ theorem correct_load_half_native
       { h_cur_privilege := by rwa [key _ (hs _) (hsp_init _) (by decide)]
         h_mprv_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
         h_mseccfg_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_pmm := by rwa [key _ (hs _) (hsp_init _) (by decide)]
         h_htif_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
         h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by

@@ -13,7 +13,7 @@ against this segment. (`Soundness/FinishedChannels.lean` correspondingly grounds
 The former `programProviderEnsemble` / `programProviderEnsemble_finished` — which added
 `ProgramProviderChip.circuit` and then `addFinishedChannel programChannel.toRaw` to finish the Program bus
 under the old "`Guarantees = RowSpec`, program-independent, finishable-like-byte" model — are retired
-accordingly (nothing consumed them: `StateVm.lean` uses only `ProgramProviderChip.circuit`, the comment
+accordingly (nothing consumed them: the comment
 references in `ValueBound`/`MemoryProviderEnsemble` are prose). The in-circuit program **push** provider
 itself lives on in `ProgramProviderChip.lean` (it still range-checks and pushes each `RowSpec`-valid row,
 owing `RowSpec` as its VmChannel `Owed`). This module is kept (doc-only) to preserve the import chain. -/

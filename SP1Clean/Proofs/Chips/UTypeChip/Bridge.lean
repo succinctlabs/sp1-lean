@@ -10,6 +10,7 @@ import SP1Clean.Proofs.Sail.Advance
 committed result is `RV64.lui imm` / `RV64.auipc imm pc`). The Sail `sign_extend (imm ++ 0#12)` is
 definitionally `RV64.lui imm`. The 20-bit immediate `imm` is the column-derived `UTypeChip.immOf`. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.UTypeSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -19,14 +20,14 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `UTYPE` (which writes `RV64.lui imm`
 for LUI, `PC + RV64.lui imm` for AUIPC, to `rd`). -/
 noncomputable def spec_utype (imm : BitVec 20) (rd : regidx) (op : uop) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_UTYPE imm rd op
   pure ()
 
 /-- The SP1 chip emulation: write `nextPC = pc + 4` and the result register `rd` (the committed result word's
 64-bit value, x0-uniform via `wX_bits`). -/
 def sp1_utype (rd : regidx) (pc : BitVec 64) (result : Word (ZMod p)) : SailM Unit := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits rd (Word.toBitVec64 result)
 
 set_option linter.unusedSimpArgs false in
@@ -39,7 +40,7 @@ theorem correct_utype_lui_native
     (h_result : Word.toBitVec64 result = RV64.lui imm) :
     (spec_utype imm (.Regidx rd) uop.LUI).run s = (sp1_utype (.Regidx rd) pc result).run s := by
   simp [spec_utype, sp1_utype, execute_UTYPE, sign_extend, Sail.BitVec.signExtend, RV64.lui,
-    PreSail.readReg, PreSail.writeReg, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_result]
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_result]
 
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 17 < p)] in
@@ -53,7 +54,7 @@ theorem correct_utype_auipc_native
     (spec_utype imm (.Regidx rd) uop.AUIPC).run s = (sp1_utype (.Regidx rd) pc result).run s := by
   rw [UTypeChip.auipc_eq_add_lui] at h_result
   simp [spec_utype, sp1_utype, execute_UTYPE, get_arch_pc, sign_extend, Sail.BitVec.signExtend, RV64.lui,
-    PreSail.readReg, PreSail.writeReg, Sail.run_wX_bits, Std.ExtDHashMap.get?_insert,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_wX_bits, Std.ExtDHashMap.get?_insert,
     SailState.get_reg?_insert_nextPC, h_pc, h_result]
 
 set_option linter.unusedSimpArgs false in
@@ -68,7 +69,7 @@ theorem correct_utype_native_x0
     (spec_utype imm (.Regidx 0#5) op).run s = (sp1_utype (.Regidx 0#5) pc result).run s := by
   cases op <;>
     simp [spec_utype, sp1_utype, execute_UTYPE, get_arch_pc, sign_extend, Sail.BitVec.signExtend, RV64.lui,
-      PreSail.readReg, PreSail.writeReg, Sail.run_wX_bits, Std.ExtDHashMap.get?_insert,
+      PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_wX_bits, Std.ExtDHashMap.get?_insert,
       SailState.get_reg?_insert_nextPC, h_pc]
 
 omit [Fact (2 ^ 17 < p)] in

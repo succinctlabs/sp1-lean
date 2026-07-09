@@ -17,6 +17,7 @@ derived here) with each register's `default` value (every `RegisterType r` is `I
 explicit override. Enriching the witness to a non-empty ROM (real instruction bytes loaded into `mem`, so
 `romLoaded` carries content) reuses `configuredState` and adds the byte-level `mem` lookups. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.Soundness.Target
 
 open Sail LeanRV64D LeanRV64D.Functions SP1Clean.SailMem
@@ -152,6 +153,10 @@ theorem isInitialState_nonvacuous : ∃ s0, IsInitialState emptyProgram s0 :=
            rw [cfgState_get_other 0 Register.mseccfg (by decide) (by decide) (by decide)]
            exact (by decide :
              BitVec.ofNat 1 ((default : RegisterType Register.mseccfg).toNat >>> 10) = 0#1)
+         mseccfg_pmm := by
+           rw [cfgState_get_other 0 Register.mseccfg (by decide) (by decide) (by decide)]
+           exact (by decide :
+             BitVec.ofNat 2 ((default : RegisterType Register.mseccfg).toNat >>> 32) = 0#2)
          htif_disabled := by
            rw [cfgState_get_other 0 Register.htif_tohost_base (by decide) (by decide) (by decide)]
            exact (by decide : (default : RegisterType Register.htif_tohost_base) = none)

@@ -35,7 +35,8 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   simp only [circuit_norm, hr1, one_mul] at h_holds
   obtain ⟨h_eq, h_bool, h_mul⟩ := h_holds
   have hA : AssertSpec input_a ⟨input_cols_inverse, input_cols_result⟩ :=
-    ⟨by simpa [sub_eq_add_neg] using h_eq, bool_of_mul_pred h_bool, h_mul⟩
+    ⟨by simpa [sub_eq_add_neg] using h_eq,
+      bool_of_mul_pred (by simpa only [sub_eq_add_neg] using h_bool), h_mul⟩
   exact ⟨isZero_of_assert hA, fun ha => inverse_of_assert hA ha⟩
 
 omit [Fact (2 ^ 17 < p)] in

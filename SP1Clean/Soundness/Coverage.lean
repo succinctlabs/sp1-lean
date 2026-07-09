@@ -38,7 +38,6 @@ open Sail LeanRV64D LeanRV64D.Functions
 -- file is stated under the stronger bound with the project-standard `Fact (2 ^ 17 < p)` derived locally.
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-! ## The `rd == x0` routing guard -/
 

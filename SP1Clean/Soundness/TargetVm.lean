@@ -5,6 +5,8 @@ import SP1Clean.Soundness.RowEffectDefs
 
 /-! # The target machine-level theorem — a real Sail execution chain from a loaded guest program
 
+> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
+
 **What this file is.** The *formal target* the whole-machine effort closes toward, stated and proved
 today as a skeleton: from a verifying Clean ensemble over the committed public boundary, the **official
 LeanRV64D Sail interpreter** (`try_step`), run from *any* state that loads the guest program, reaches
@@ -50,7 +52,6 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 

@@ -28,8 +28,6 @@ open Extracted (DivRemCols)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-private instance : Fact (2 ^ 17 < p) :=
-  ⟨lt_trans (by norm_num) (Fact.out (p := 2 ^ 24 < p))⟩
 
 /-! ## Forward-overflow lemmas (for the `case eN` Euclid gate `(is_overflow − 1)`)
 

@@ -29,6 +29,7 @@ The chip `Spec` is the composition of the sub-circuits' own `Spec`s + the proven
 `is_real`-binary fact + the three per-width alignment equations + the two `op_a_0` forcing gates (which
 pin `op_a_0 = is_real`, i.e. `op_a = x0` on real rows). Output is the extracted `LoadX0Columns`. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.LoadX0Chip
 
 open Circuit

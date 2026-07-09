@@ -18,7 +18,7 @@ namespace SP1Clean.InteractionRecovery
 
 open Circuit Operations
 
-variable {F : Type} [Field F]
+variable {F : Type} [FiniteField F]
 
 /-- **A formal subcircuit emits nothing on a channel it does not declare.** If `channel` is in neither
 `circuit.channelsWithGuarantees` nor `circuit.channelsWithRequirements`, then the subcircuit it produces

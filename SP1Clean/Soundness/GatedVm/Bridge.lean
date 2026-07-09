@@ -3,6 +3,8 @@ import SP1Clean.Soundness.AllChips
 
 /-! # The gated capstone on the 24-chip machine
 
+> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
+
 `gatedExecution_allChips` — the gated capstone (`GatedVm/Capstone.lean`) instantiated on
 `allChipsTrace`, the heterogeneous trace carrying one row of every chip in `allChipsTrace`. Demonstrates
 the gated whole-program execution result holds for the full SP1 chip set on one shared trace. -/
@@ -17,7 +19,6 @@ open Sail LeanRV64D LeanRV64D.Functions
 -- project-standard `Fact (2 ^ 17 < p)` derived locally.
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-- **The gated capstone on the full 24-chip machine.** `gatedExecution_of_specs_and_balance`
 instantiated on `allChipsTrace` (one row of every wired chip). Same hypotheses — per-row chip `Spec`s,

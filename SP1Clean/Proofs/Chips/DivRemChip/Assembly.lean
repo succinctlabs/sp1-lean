@@ -13,7 +13,6 @@ open SP1Clean
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-- **Unsigned family core (`DIVU`/`REMU`).** From the eight unsigned carry-chain limb equations (on

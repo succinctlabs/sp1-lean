@@ -26,9 +26,9 @@ shape, `Clean/Air/Vm.lean` top doc). Nor can `addVm` compose it (single-VM-chann
 Memory are both VM-shaped). A plain `Ensemble` carries no composition obligations — its `Statement`
 supplies exactly the constraints + four-bus balance the capstone consumes — and the per-channel
 soundness facts are proven separately (byte/program grounding via the finished-channel machinery;
-State via the trail; memory `isU64` via the boundary balance). The `sp1StateVmEnsemble` `addVm`
-composition stays parked in `Soundness/StateVm.lean` pending the multi-VM `VmTables` generalization
-(roadmap W11 path A).
+State via the trail; memory `isU64` via the boundary balance). The multi-VM `VmTables` composition
+(roadmap W11 path A) was evaluated and **rejected** (consolidation proposal §3.2 — a timeless engine
+cannot express memory currency); its de-risk spike `Soundness/StateVm.lean` has been deleted.
 
 **Trust boundary / residue.** The `soundness` *assembly* is sorry-free: it threads the two ensemble
 prerequisites into the gated capstone. The bridge from the Clean ensemble `Statement` to those
@@ -59,7 +59,6 @@ open Sail LeanRV64D LeanRV64D.Functions
 -- stronger bound with the project-standard `Fact (2 ^ 17 < p)` derived locally. KoalaBear satisfies it.
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-! ## The public input: the committed initial/final machine state
 
@@ -96,8 +95,7 @@ followed by a true `push` of the public **initial** state (SP1's bus-enforced bo
 record.rs eval_state` `send_state(.,pc_start,1)` + `receive_state(.,next_pc,1)`). Under `toAccess`
 these are exactly the `[+1 init, -1 final]` boundary entries `gatedExecution_of_specs_and_balance`'s
 `h_bal` assumes (the decode-seam `List.Perm` absorbs the pull-first ordering). The pull/push shape is
-Clean-idiomatic — it exposes the loop-closing `[pulled final, pushed init]` pair `VmTables` wants, so
-the same verifier serves `sp1StateVmSpike` (`Soundness/StateVm.lean`). No witness cells
+Clean-idiomatic — it exposes the loop-closing `[pulled final, pushed init]` pair. No witness cells
 (`localLength = 0`); the `Spec` is `True` (the meaning is carried by the trace-level balance). -/
 @[circuit_norm]
 def sp1StateVerifierMain (pi : Var SP1PublicIO (ZMod p)) : Circuit (ZMod p) Unit := do

@@ -28,6 +28,7 @@ So `lift` is no longer a black box: it is `advance` (per chip) ∘ these three r
 `TargetObligations` over `OperandsBound := Target.ValueOperandsBound` can set
 `lift := chipRows_advance_sound rows data h_bin h_spec h_migrated h_decode h_ready`. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.Soundness.Target
 
 open SP1Clean SP1Clean.Soundness

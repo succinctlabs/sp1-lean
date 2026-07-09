@@ -4,6 +4,7 @@ import LeanRV64D
 import SP1Clean.Math.Misc
 set_option linter.unusedSimpArgs false
 
+open LeanRV64D.Defs
 @[simp] abbrev SailState := PreSail.SequentialState RegisterType Sail.trivialChoiceSource
 
 /-- Every register has been initialized to some unspecified value. -/

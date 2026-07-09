@@ -534,7 +534,6 @@ lemma extractLsb_lo_toNat {w : Word (ZMod p)} (hw : w.isU64) :
       Word.toNat_def]
   omega
 
-omit [Fact p.Prime] in
 /-- **Zero-high projection.** A word whose top two limbs are `0` (zero-extended low-32, the shape of
 `DIVUW`/`REMUW` operands & comp columns) has `(extractLsb 31 0 w).toNat = w.toNat`. -/
 lemma extractLsb_toNat_of_hi_zero {w : Word (ZMod p)} (hw : w.isU64)

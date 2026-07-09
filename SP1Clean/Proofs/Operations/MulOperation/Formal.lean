@@ -106,8 +106,8 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   · -- structural `Spec`: 5 ungated facts (sign-extend defs + 3 MSB booleans) then the gated body.
     -- `b_msb`/`c_msb` booleanity from the ungated `b_msb*(b_msb-1)=0` asserts (SP1 `assert_bool`).
     refine ⟨hsdb, hsdc,
-      bool_of_mul_pred hb_bool,
-      bool_of_mul_pred hc_bool,
+      bool_of_mul_pred (by simpa only [sub_eq_add_neg] using hb_bool),
+      bool_of_mul_pred (by simpa only [sub_eq_add_neg] using hc_bool),
       (hpm ⟨fun hmw => by
         obtain ⟨_, eprod_eq, _, _, _, _, _, _, _⟩ := _hicols
         have hr1 : input_is_real = 1 := hmw_real hmw
@@ -308,8 +308,8 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
         first | exact cb0 | exact cb1 | exact cb2 | exact cb3 | exact cb4 | exact cb5 | exact cb6 | exact cb7 | exact cb8 | exact cb9 | exact cb10 | exact cb11 | exact cb12 | exact cb13 | exact cb14 | exact cb15
     · exact hsdb
     · exact hsdc
-    · exact bool_of_mul_pred hb_bool
-    · exact bool_of_mul_pred hc_bool
+    · exact bool_of_mul_pred (by simpa only [sub_eq_add_neg] using hb_bool)
+    · exact bool_of_mul_pred (by simpa only [sub_eq_add_neg] using hc_bool)
     · show input_cols_b_sign_extend = 0 ∨ input_cols_b_sign_extend = 1
       have hims : input_is_mulh + input_is_mulhsu = 0 ∨ input_is_mulh + input_is_mulhsu = 1 := by
         rcases hmh_b with h | h
@@ -725,15 +725,14 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     have pb3 : input_cols_product[3].val < 2 ^ 8 := (h_gated hr1).1.2.1 3 (by norm_num)
     rw [byte_compose_val pb2 pb3 rfl]; omega
   -- 2 ungated `b_msb`/`c_msb` booleanity asserts (from the Spec's ungated bool)
-  · simp only [id_eq]; rcases h_bmb with h | h <;> rw [h] <;> ring
-  · simp only [id_eq]; rcases h_cmb with h | h <;> rw [h] <;> ring
+  · rcases h_bmb with h | h <;> rw [h] <;> ring
+  · rcases h_cmb with h | h <;> rw [h] <;> ring
   -- 2 op5 `MSB` byte sends: provide the `MSB` byte-row guarantee on a real row
   · refine fun hneg => ?_
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     obtain ⟨hlo3, hhi3, hreass3⟩ := (h_gated hr1).2.1 3
     dsimp only at hlo3 hhi3 hreass3
     obtain ⟨hbool, hiff⟩ := op5_iff_of_msb_eq hlo3 hhi3 hreass3 (h_gated hr1).2.2.2.1
-    simp only [sub_eq_add_neg] at hhi3 hiff
     have hmlt : input_cols_b_msb.val < 256 := by
       rcases hbool with h | h <;> rw [h] <;> (first | rw [ZMod.val_zero] | rw [ZMod.val_one]) <;> norm_num
     exact (byteRowSpec_msb _ _).mpr ⟨⟨hmlt, hhi3⟩, hbool, hiff⟩
@@ -742,7 +741,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     obtain ⟨hlo3, hhi3, hreass3⟩ := (h_gated hr1).2.2.1 3
     dsimp only at hlo3 hhi3 hreass3
     obtain ⟨hbool, hiff⟩ := op5_iff_of_msb_eq hlo3 hhi3 hreass3 (h_gated hr1).2.2.2.2.1
-    simp only [sub_eq_add_neg] at hhi3 hiff
     have hmlt : input_cols_c_msb.val < 256 := by
       rcases hbool with h | h <;> rw [h] <;> (first | rw [ZMod.val_zero] | rw [ZMod.val_one]) <;> norm_num
     exact (byteRowSpec_msb _ _).mpr ⟨⟨hmlt, hhi3⟩, hbool, hiff⟩
@@ -925,7 +923,7 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel]
       refine ⟨List.nil_subset _, fun env hgate => ?_⟩
-      have hbool := bool_of_mul_pred hgate
+      have hbool := bool_of_mul_pred (by simpa only [sub_eq_add_neg] using hgate)
       and_intros <;> exact fun h1 h0 => off_gate_vacuous hbool h1 h0 }
 
 set_option linter.unusedSectionVars false in

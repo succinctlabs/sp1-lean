@@ -14,6 +14,7 @@ The load-bearing goal is **uniformity**: one `sp1Effect` (a function of the comm
 generic `advance_of_regWrite` proof, and thin per-chip adapters — replacing the 25 bespoke per-chip
 `ChipKind.sailEquiv` predicates so the audit surface is a single statement. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.Advance
 
 open SP1Clean Sail LeanRV64D LeanRV64D.Functions
@@ -362,7 +363,7 @@ The `ExecuteAs` redirect is dead (`execute I` returned `Retire_Success`, not `Ex
 theorem run_hart_active_reaches (s' s_a s'' : SailState) (w : BitVec 32) (I : instruction) (step_no : Nat)
     (hslr : StraightLineReady s' w)
     (hdec : (ext_decode w).run s' = .ok I s')
-    (hsa : (Sail.writeReg Register.nextPC
+    (hsa : (LeanRV64D.writeReg Register.nextPC
         (BitVec.addInt (s'.regs.get Register.PC (hslr.init Register.PC)) 4)).run s' = .ok () s_a)
     (hexec : (execute I).run s_a = .ok (ExecutionResult.Retire_Success ()) s'') :
     (run_hart_active step_no).run s'
@@ -379,13 +380,13 @@ post-minstret-write state `s' = {s with regs.insert minstret_increment b}` (with
 `run_hart_active_reaches` (into `h_ha`) + `tryStep_eq_of_hart_active`. -/
 theorem tryStep_reaches (s s_a s'' : SailState) (w : BitVec 32) (I : instruction) (b : Bool)
     (hb : (should_inc_minstret Privilege.Machine).run s = .ok b s)
-    (hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s)
+    (hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s)
     (hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
       = some (HartState.HART_ACTIVE ()))
     (hslr : StraightLineReady ({s with regs := s.regs.insert Register.minstret_increment b}) w)
     (hdec : (ext_decode w).run ({s with regs := s.regs.insert Register.minstret_increment b})
       = .ok I ({s with regs := s.regs.insert Register.minstret_increment b}))
-    (hsa : (Sail.writeReg Register.nextPC (BitVec.addInt
+    (hsa : (LeanRV64D.writeReg Register.nextPC (BitVec.addInt
         ((s.regs.insert Register.minstret_increment b).get Register.PC (hslr.init Register.PC)) 4)).run
         ({s with regs := s.regs.insert Register.minstret_increment b}) = .ok () s_a)
     (hexec : (execute I).run s_a = .ok (ExecutionResult.Retire_Success ()) s'')
@@ -393,10 +394,10 @@ theorem tryStep_reaches (s s_a s'' : SailState) (w : BitVec 32) (I : instruction
     (try_step 0 false).run s
       = (do
           tick_pc ()
-          let mi ← Sail.readReg Register.minstret_increment
+          let mi ← LeanRV64D.readReg Register.minstret_increment
           if (true && mi) = true then do
-              let m ← Sail.readReg Register.minstret
-              Sail.writeReg Register.minstret (BitVec.addInt m 1)
+              let m ← LeanRV64D.readReg Register.minstret
+              LeanRV64D.writeReg Register.minstret (BitVec.addInt m 1)
               (pure false : SailM Bool)
             else (pure false : SailM Bool)).run s'' :=
   tryStep_eq_of_hart_active s 0 b (zero_extend (m := 32) w) s'' hactive hb hcp
@@ -408,10 +409,10 @@ on `PC` and on the whole `BitVec 5` register file — the bump touches only the 
 theorem minstret_tail_frame (t : SailState) (hinit : t.isInitialized) :
     ∃ t' : SailState,
       (do
-        let mi ← Sail.readReg Register.minstret_increment
+        let mi ← LeanRV64D.readReg Register.minstret_increment
         if (true && mi) = true then do
-            let m ← Sail.readReg Register.minstret
-            Sail.writeReg Register.minstret (BitVec.addInt m 1)
+            let m ← LeanRV64D.readReg Register.minstret
+            LeanRV64D.writeReg Register.minstret (BitVec.addInt m 1)
             (pure false : SailM Bool)
           else (pure false : SailM Bool)).run t = .ok false t'
       ∧ t'.regs.get? Register.PC = t.regs.get? Register.PC
@@ -436,10 +437,10 @@ theorem tail_effect (s'' : SailState) (hinit'' : s''.isInitialized) :
     ∃ s_final : SailState,
       (do
         tick_pc ()
-        let mi ← Sail.readReg Register.minstret_increment
+        let mi ← LeanRV64D.readReg Register.minstret_increment
         if (true && mi) = true then do
-            let m ← Sail.readReg Register.minstret
-            Sail.writeReg Register.minstret (BitVec.addInt m 1)
+            let m ← LeanRV64D.readReg Register.minstret
+            LeanRV64D.writeReg Register.minstret (BitVec.addInt m 1)
             (pure false : SailM Bool)
           else (pure false : SailM Bool)).run s'' = .ok false s_final
       ∧ s_final.regs.get? Register.PC = s''.regs.get? Register.nextPC
@@ -467,13 +468,13 @@ register-writing chip's `advance`; per-chip work is only characterizing `s''` (v
 and building the ladder inputs from `RefinesAt`/`OperandsBound`. -/
 theorem sailStep_of_ladder (s s_a s'' : SailState) (w : BitVec 32) (I : instruction) (b : Bool)
     (hb : (should_inc_minstret Privilege.Machine).run s = .ok b s)
-    (hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s)
+    (hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s)
     (hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
       = some (HartState.HART_ACTIVE ()))
     (hslr : StraightLineReady ({s with regs := s.regs.insert Register.minstret_increment b}) w)
     (hdec : (ext_decode w).run ({s with regs := s.regs.insert Register.minstret_increment b})
       = .ok I ({s with regs := s.regs.insert Register.minstret_increment b}))
-    (hsa : (Sail.writeReg Register.nextPC (BitVec.addInt
+    (hsa : (LeanRV64D.writeReg Register.nextPC (BitVec.addInt
         ((s.regs.insert Register.minstret_increment b).get Register.PC (hslr.init Register.PC)) 4)).run
         ({s with regs := s.regs.insert Register.minstret_increment b}) = .ok () s_a)
     (hexec : (execute I).run s_a = .ok (ExecutionResult.Retire_Success ()) s'')
@@ -506,6 +507,7 @@ theorem SailConfigured.writeMinstret {s : SailState} (cfg : SailConfigured s) (b
   no_landing_pad := by rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact cfg.no_landing_pad
   mprv_disabled := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.mprv_disabled
   mseccfg_disabled := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.mseccfg_disabled
+  mseccfg_pmm := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.mseccfg_pmm
   htif_disabled := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.htif_disabled
   pma_regions := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.pma_regions
 
@@ -546,6 +548,7 @@ theorem SailConfigured.congr {sf s : SailState} (cfg : SailConfigured s) (hinit 
       no_landing_pad := by rw [hf _ (by tauto)]; exact cfg.no_landing_pad
       mprv_disabled := by rw [hget Register.mstatus (hinit _) (hf _ (by tauto))]; exact cfg.mprv_disabled
       mseccfg_disabled := by rw [hget Register.mseccfg (hinit _) (hf _ (by tauto))]; exact cfg.mseccfg_disabled
+      mseccfg_pmm := by rw [hget Register.mseccfg (hinit _) (hf _ (by tauto))]; exact cfg.mseccfg_pmm
       htif_disabled := by rw [hget Register.htif_tohost_base (hinit _) (hf _ (by tauto))]; exact cfg.htif_disabled
       pma_regions := by rw [hget Register.pma_regions (hinit _) (hf _ (by tauto))]; exact cfg.pma_regions }
 
@@ -595,7 +598,7 @@ theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s
   set s' := ({s with regs := s.regs.insert Register.minstret_increment b}) with hs'_def
   set npv := BitVec.addInt (s'.regs.get Register.PC (hslr.init Register.PC)) 4 with hnpv_def
   set s_a := ({s' with regs := s'.regs.insert Register.nextPC npv}) with hsa_def
-  have hsa : (Sail.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
+  have hsa : (LeanRV64D.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
   have hinit_s' : SailState.isInitialized s' := by
     rw [hs'_def]; exact SailState.isInitialized_insert s cfg.init _ _
   have hinit_sa : SailState.isInitialized s_a := by
@@ -613,7 +616,7 @@ theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hinit_sa
   set s'' := ({s_a with regs := s_a.regs.insert (reg_idx_to_Register rd) (bitVecToRegidxVal rd value)})
     with hs''_def
-  have hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
+  have hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
     rw [Sail.run_readReg, cfg.priv]
   have hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
       = some (HartState.HART_ACTIVE ()) := by
@@ -976,7 +979,7 @@ theorem advance_jump_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
   set s' := ({s with regs := s.regs.insert Register.minstret_increment b}) with hs'_def
   set npv := BitVec.addInt (s'.regs.get Register.PC (hslr.init Register.PC)) 4 with hnpv_def
   set s_a := ({s' with regs := s'.regs.insert Register.nextPC npv}) with hsa_def
-  have hsa : (Sail.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
+  have hsa : (LeanRV64D.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
   have hinit_s' : SailState.isInitialized s' := by
     rw [hs'_def]; exact SailState.isInitialized_insert s cfg.init _ _
   have hinit_sa : SailState.isInitialized s_a := by
@@ -1002,7 +1005,7 @@ theorem advance_jump_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hnpc_sa hinit_sa hcfg_sa
   set s'' := ({s_a with regs := ((s_a.regs.insert Register.nextPC target).insert
     (reg_idx_to_Register rd) (bitVecToRegidxVal rd link))}) with hs''_def
-  have hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
+  have hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
     rw [Sail.run_readReg, cfg.priv]
   have hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
       = some (HartState.HART_ACTIVE ()) := by
@@ -1522,7 +1525,7 @@ theorem advance_of_ctrl {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
   set s' := ({s with regs := s.regs.insert Register.minstret_increment b}) with hs'_def
   set npv := BitVec.addInt (s'.regs.get Register.PC (hslr.init Register.PC)) 4 with hnpv_def
   set s_a := ({s' with regs := s'.regs.insert Register.nextPC npv}) with hsa_def
-  have hsa : (Sail.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
+  have hsa : (LeanRV64D.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
   have hinit_s' : SailState.isInitialized s' := by
     rw [hs'_def]; exact SailState.isInitialized_insert s cfg.init _ _
   have hinit_sa : SailState.isInitialized s_a := by
@@ -1546,7 +1549,7 @@ theorem advance_of_ctrl {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
           dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hnpc_sa hinit_sa hcfg_sa
   set s'' := ({s_a with regs := s_a.regs.insert Register.nextPC target}) with hs''_def
-  have hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
+  have hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
     rw [Sail.run_readReg, cfg.priv]
   have hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
       = some (HartState.HART_ACTIVE ()) := by
@@ -1673,7 +1676,7 @@ theorem advance_load_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
   set s' := ({s with regs := s.regs.insert Register.minstret_increment b}) with hs'_def
   set npv := BitVec.addInt (s'.regs.get Register.PC (hslr.init Register.PC)) 4 with hnpv_def
   set s_a := ({s' with regs := s'.regs.insert Register.nextPC npv}) with hsa_def
-  have hsa : (Sail.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
+  have hsa : (LeanRV64D.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
   have hinit_s' : SailState.isInitialized s' := by
     rw [hs'_def]; exact SailState.isInitialized_insert s cfg.init _ _
   have hinit_sa : SailState.isInitialized s_a := by
@@ -1692,7 +1695,7 @@ theorem advance_load_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hmem_sa hinit_sa hcfg_sa
   set s'' := ({s_a with regs := s_a.regs.insert (reg_idx_to_Register rd) (bitVecToRegidxVal rd value)})
     with hs''_def
-  have hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
+  have hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
     rw [Sail.run_readReg, cfg.priv]
   have hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
       = some (HartState.HART_ACTIVE ()) := by
@@ -1944,7 +1947,7 @@ theorem advance_of_store {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
   set s' := ({s with regs := s.regs.insert Register.minstret_increment b}) with hs'_def
   set npv := BitVec.addInt (s'.regs.get Register.PC (hslr.init Register.PC)) 4 with hnpv_def
   set s_a := ({s' with regs := s'.regs.insert Register.nextPC npv}) with hsa_def
-  have hsa : (Sail.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
+  have hsa : (LeanRV64D.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
   have hinit_s' : SailState.isInitialized s' := by
     rw [hs'_def]; exact SailState.isInitialized_insert s cfg.init _ _
   have hinit_sa : SailState.isInitialized s_a := by
@@ -1968,7 +1971,7 @@ theorem advance_of_store {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
           dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hinit_sa hcfg_sa
   set s'' := ({s_a with mem := writeMem s_a.mem}) with hs''_def
-  have hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
+  have hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
     rw [Sail.run_readReg, cfg.priv]
   have hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
       = some (HartState.HART_ACTIVE ()) := by
@@ -2300,7 +2303,7 @@ theorem advance_alu_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {
   set s' := ({s with regs := s.regs.insert Register.minstret_increment b}) with hs'_def
   set npv := BitVec.addInt (s'.regs.get Register.PC (hslr.init Register.PC)) 4 with hnpv_def
   set s_a := ({s' with regs := s'.regs.insert Register.nextPC npv}) with hsa_def
-  have hsa : (Sail.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
+  have hsa : (LeanRV64D.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
   have hinit_s' : SailState.isInitialized s' := by
     rw [hs'_def]; exact SailState.isInitialized_insert s cfg.init _ _
   have hinit_sa : SailState.isInitialized s_a := by
@@ -2324,7 +2327,7 @@ theorem advance_alu_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {
       rw [hsa_def, Std.ExtDHashMap.get?_insert,
           dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hinit_sa hcfg_sa
-  have hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
+  have hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
     rw [Sail.run_readReg, cfg.priv]
   have hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
       = some (HartState.HART_ACTIVE ()) := by

@@ -5,6 +5,8 @@ import Mathlib.Tactic.Linarith
 
 /-! # Balance ⇒ trail: the Eulerian core of the gated VM
 
+> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
+
 The mathematical heart of the gated VM capstone, stated abstractly over a directed multigraph and
 **independent of SP1 / channels / fields**.
 

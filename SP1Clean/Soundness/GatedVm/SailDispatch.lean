@@ -2,6 +2,8 @@ import SP1Clean.Soundness.ChipRow
 
 /-! # Per-chip Sail dispatch
 
+> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
+
 The reusable "every real row reaches its RISC-V Sail spec" dispatch. Each row carries its chip's
 verified Sail step in `r.kind.reaches_sail`, so the dispatch is **generic** — no `cases`, no per-chip
 arm; adding a chip never touches this lemma.

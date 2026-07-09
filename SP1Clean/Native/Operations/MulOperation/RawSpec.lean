@@ -33,9 +33,6 @@ open SP1Clean.Channels (byteChannel)
 -- shared `Word`/`Gadgets` lemmas keep firing.
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-instance : Fact (2 ^ 17 < p) :=
-  ⟨by have h := Fact.out (p := 2 ^ 24 < p); have : (2 : ℕ) ^ 17 < 2 ^ 24 := by norm_num
-      omega⟩
 
 instance : Fact (p > 2) :=
   ⟨by have h := Fact.out (p := 2 ^ 24 < p); have : (2 : ℕ) < 2 ^ 24 := by norm_num
@@ -212,7 +209,6 @@ goals in `soundness`/`completeness` — where it is applied by `rw [colSum_k]` a
 `byteAt`/`extendedBytes` reduction — keeps the heavy `Finset` expansion out of those proofs. -/
 
 section ColSumExpand
-omit [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 lemma colSum_0 (bb cc : Fin 16 → ZMod p) :
     colSum bb cc 0 = byteAt bb 0 * byteAt cc 0 := by
@@ -341,7 +337,7 @@ lemma col_lift (prodk cc col prev : ZMod p)
   rw [hL, hR] at h
   exact h
 
-omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
+omit [Fact (2 ^ 24 < p)] in
 /-- A `byteAt` read of a function whose `Fin 16` values are bytes is itself a byte. -/
 lemma byteAt_val_lt (f : Fin 16 → ZMod p) (hf : ∀ i : Fin 16, (f i).val < 256) (i : ℕ) :
     (byteAt f i).val < 256 := by

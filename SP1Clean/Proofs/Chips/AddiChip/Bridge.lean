@@ -12,6 +12,7 @@ semantic `a_val = op_b + signExtend(imm)` and the rs1/PC reads. `execute_ITYPE`'
 is `wX_bits rd (rX_bits rs1 + signExtend imm)`, closed by `simp` with the auto
 `run_rX_bits`/`run_wX_bits` lemmas. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.AddiSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -20,14 +21,14 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `ADDI`. -/
 noncomputable def spec_addi (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_ITYPE imm rs1 rd iop.ADDI
   pure ()
 
 /-- The SP1 chip emulation: write `nextPC = pc + 4` and the result register `rd`
 (x0-uniform via `wX_bits`, exactly as `execute_ITYPE` writes its result). -/
 def sp1_addi (rd : regidx) (pc : BitVec 64) (a_val : Word (ZMod p)) : SailM Unit := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits rd (Word.toBitVec64 a_val)
 
 omit [Fact (2 ^ 17 < p)] in
@@ -42,7 +43,7 @@ theorem correct_addi_native
     (h_add : Word.toBitVec64 a_val = Word.toBitVec64 op_b_val + sign_extend (m := 64) imm) :
     (spec_addi imm (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_addi (.Regidx rd_idx) pc a_val).run s := by
-  simp [spec_addi, sp1_addi, execute_ITYPE, PreSail.readReg, PreSail.writeReg,
+  simp [spec_addi, sp1_addi, execute_ITYPE, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_add]
 

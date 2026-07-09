@@ -10,6 +10,7 @@ import SP1Clean.Proofs.Sail.Advance
 jump/link semantic facts and 4-byte alignment. `JalChip.kind.view` threads a **data-dependent**
 `next_pc = add_operation.value` — `RowView.next_pc` is computed data, not `pc + 4`. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.JalSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -19,7 +20,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The RISC-V spec: stage `nextPC ← PC + 4`, then execute the Sail `JAL` (which reads that link address,
 jumps `PC ← PC + sign_extend imm`, and writes the link to `rd`). -/
 noncomputable def spec_jal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_JAL imm rd
   pure ()
 

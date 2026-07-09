@@ -11,6 +11,7 @@ emulation given the semantic fact and register/PC reads. `SailWrap.execute_RTYPE
 maps `.AND/.OR/.XOR → &&&/|||/^^^`. Three `bitwise_chip_reaches_sail_*` end-to-end lemmas
 compose `BitwiseChip.Spec`'s opcode-gated conjuncts into the bridge. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.BitwiseSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -19,14 +20,14 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail R-type op. -/
 noncomputable def spec_bitwise (rs2 rs1 rd : regidx) (op : rop) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPE rs2 rs1 rd op
   pure ()
 
 /-- The SP1 chip emulation: write `nextPC = pc + 4` and the result register `rd` (the
 reassembled result word's 64-bit value). -/
 def sp1_bitwise (rd : regidx) (pc : BitVec 64) (a_val : Vector (ZMod p) 8) : SailM Unit := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits rd (Word.toBitVec64 (BitwiseU16Operation.resultWord a_val))
 
 set_option linter.unusedSimpArgs false in
@@ -44,12 +45,12 @@ theorem correct_bitwise_native
     (spec_bitwise (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx) op).run s
       = (sp1_bitwise (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_bitwise, sp1_bitwise, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_op]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail I-type op (ANDI/ORI/XORI). -/
 noncomputable def spec_bitwise_imm (imm : BitVec 12) (rs1 rd : regidx) (op : iop) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_ITYPE imm rs1 rd op
   pure ()
 
@@ -71,7 +72,7 @@ theorem correct_andi_native
   have harm : Word.toBitVec64 (BitwiseU16Operation.resultWord a_val)
       = (Word.toBitVec64 op_b_val) &&& (sign_extend (m := 64) imm) := by
     rw [h_op, ← h_dec]; simp [execute_RTYPE_pure]
-  simp [spec_bitwise_imm, sp1_bitwise, execute_ITYPE, PreSail.readReg, PreSail.writeReg,
+  simp [spec_bitwise_imm, sp1_bitwise, execute_ITYPE, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
 
 set_option linter.unusedSimpArgs false in
@@ -90,7 +91,7 @@ theorem correct_ori_native
   have harm : Word.toBitVec64 (BitwiseU16Operation.resultWord a_val)
       = (Word.toBitVec64 op_b_val) ||| (sign_extend (m := 64) imm) := by
     rw [h_op, ← h_dec]; simp [execute_RTYPE_pure]
-  simp [spec_bitwise_imm, sp1_bitwise, execute_ITYPE, PreSail.readReg, PreSail.writeReg,
+  simp [spec_bitwise_imm, sp1_bitwise, execute_ITYPE, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
 
 set_option linter.unusedSimpArgs false in
@@ -109,7 +110,7 @@ theorem correct_xori_native
   have harm : Word.toBitVec64 (BitwiseU16Operation.resultWord a_val)
       = (Word.toBitVec64 op_b_val) ^^^ (sign_extend (m := 64) imm) := by
     rw [h_op, ← h_dec]; simp [execute_RTYPE_pure]
-  simp [spec_bitwise_imm, sp1_bitwise, execute_ITYPE, PreSail.readReg, PreSail.writeReg,
+  simp [spec_bitwise_imm, sp1_bitwise, execute_ITYPE, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
 
 omit [Fact (2 ^ 17 < p)] in

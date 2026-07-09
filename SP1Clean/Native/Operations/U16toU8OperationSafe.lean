@@ -159,7 +159,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   have hneg : - input_is_real = -1 := by rw [hr1eq]
   have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg; have R3 := hr3 hneg
-  rw [byteRowSpec_u8range_pair, e8, ← sub_eq_add_neg] at R0 R1 R2 R3
+  rw [byteRowSpec_u8range_pair, e8] at R0 R1 R2 R3
   intro i
   fin_cases i
   · exact ⟨R0.1, R0.2, reassemble _ _⟩
@@ -186,7 +186,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have hsp := h_spec hr1
-    rw [byteRowSpec_u8range_pair, e8, ← sub_eq_add_neg]
+    rw [byteRowSpec_u8range_pair, e8]
     first
       | exact ⟨(hsp 0).1, (hsp 0).2.1⟩
       | exact ⟨(hsp 1).1, (hsp 1).2.1⟩

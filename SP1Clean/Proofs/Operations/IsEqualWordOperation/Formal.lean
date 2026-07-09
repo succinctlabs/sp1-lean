@@ -48,7 +48,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   obtain ⟨hia, hib, -⟩ := h_input
   refine ⟨⟨h_assumptions, ?_⟩, ?_⟩
   · have hs := h_spec
-    simp only [diff, sub_eq_add_neg] at hs
+    simp only [diff] at hs
     simpa only [← hia, ← hib, Vector.getElem_map] using hs
   · rcases h_assumptions with h | h <;> simp [h]
 

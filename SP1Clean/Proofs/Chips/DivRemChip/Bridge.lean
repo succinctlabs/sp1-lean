@@ -25,6 +25,7 @@ The chip `Spec` sources operands from **inputs** `op_b_val` (rs1) / `op_c_val` (
 the RV64 signature `f rs2_val rs1_val`. The `ChipKind`'s `sailEquiv` is the 8-way flag-dispatched
 conjunction. `DivRem` carries `Fact (2 ^ 24 < p)`; the bridge derives `Fact (2 ^ 17 < p)` locally. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.DivRemSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -33,56 +34,56 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `DIV` (signed 64-bit). -/
 noncomputable def spec_div (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_DIV rs2 rs1 rd false
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `DIVU` (unsigned 64-bit). -/
 noncomputable def spec_divu (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_DIV rs2 rs1 rd true
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `REM` (signed 64-bit). -/
 noncomputable def spec_rem (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_REM rs2 rs1 rd false
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `REMU` (unsigned 64-bit). -/
 noncomputable def spec_remu (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_REM rs2 rs1 rd true
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `DIVW` (signed low-32, sext). -/
 noncomputable def spec_divw (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_DIVW rs2 rs1 rd false
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `DIVUW` (unsigned low-32, sext). -/
 noncomputable def spec_divuw (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_DIVW rs2 rs1 rd true
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `REMW` (signed low-32, sext). -/
 noncomputable def spec_remw (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_REMW rs2 rs1 rd false
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `REMUW` (unsigned low-32, sext). -/
 noncomputable def spec_remuw (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_REMW rs2 rs1 rd true
   pure ()
 
 /-- The SP1 chip emulation (opcode-agnostic for the eight divide/remainder variants): write
 `nextPC = pc + 4` and the result register `rd` (the divide/remainder result word's 64-bit value). -/
 def sp1_divrem (rd : regidx) (pc : BitVec 64) (a_val : Word (ZMod p)) : SailM Unit := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits rd (Word.toBitVec64 a_val)
 
 set_option linter.unusedSimpArgs false in
@@ -102,7 +103,7 @@ theorem correct_div_native
   have hb : SailRV64.div (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) false
       = RV64.div (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) := RV64.div_eq _ _
   simp [spec_div, sp1_divrem, _root_.div_eq, skeleton_binary, hb,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_div]
 
 set_option linter.unusedSimpArgs false in
@@ -121,7 +122,7 @@ theorem correct_divu_native
   have hb : SailRV64.div (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) true
       = RV64.divu (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) := RV64.divu_eq _ _
   simp [spec_divu, sp1_divrem, _root_.div_eq, skeleton_binary, hb,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_divu]
 
 set_option linter.unusedSimpArgs false in
@@ -140,7 +141,7 @@ theorem correct_rem_native
   have hb : SailRV64.rem false (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val)
       = RV64.rem (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) := RV64.rem_eq _ _
   simp [spec_rem, sp1_divrem, _root_.rem_signed_eq, skeleton_binary, hb,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_rem]
 
 set_option linter.unusedSimpArgs false in
@@ -159,7 +160,7 @@ theorem correct_remu_native
   have hb : SailRV64.rem true (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val)
       = RV64.remu (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) := RV64.remu_eq _ _
   simp [spec_remu, sp1_divrem, _root_.rem_unsigned_eq, skeleton_binary, hb,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_remu]
 
 set_option linter.unusedSimpArgs false in
@@ -178,7 +179,7 @@ theorem correct_divw_native
   have hb : SailRV64.divw (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) false
       = RV64.divw (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) := RV64.divw_eq _ _
   simp [spec_divw, sp1_divrem, _root_.divw_eq, skeleton_binary, hb,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_divw]
 
 set_option linter.unusedSimpArgs false in
@@ -197,7 +198,7 @@ theorem correct_divuw_native
   have hb : SailRV64.divw (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) true
       = RV64.divuw (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) := RV64.divuw_eq _ _
   simp [spec_divuw, sp1_divrem, _root_.divw_eq, skeleton_binary, hb,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_divuw]
 
 set_option linter.unusedSimpArgs false in
@@ -216,7 +217,7 @@ theorem correct_remw_native
   have hb : SailRV64.remw false (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val)
       = RV64.remw (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) := RV64.remw_eq _ _
   simp [spec_remw, sp1_divrem, _root_.remw_signed_eq, skeleton_binary, hb,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_remw]
 
 set_option linter.unusedSimpArgs false in
@@ -235,7 +236,7 @@ theorem correct_remuw_native
   have hb : SailRV64.remw true (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val)
       = RV64.remuw (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val) := RV64.remuw_eq _ _
   simp [spec_remuw, sp1_divrem, _root_.remw_unsigned_eq, skeleton_binary, hb,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_remuw]
 
 omit [Fact (2 ^ 24 < p)] in
@@ -306,7 +307,6 @@ open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Cle
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-- The DivRem RowView (shared by `kind.view` and `advance`): straight-line `pc+4` next-pc, the R-type
 adapter, `cols.a` as the divide/remainder write, opcode the flag-weighted R-type discriminant

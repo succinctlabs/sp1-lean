@@ -15,6 +15,7 @@ emulation (write `nextPC = pc + 4` and the extended byte into `rd`), via
 extend to `#v[selected_byte + 65280·msb, 65535·msb, 65535·msb, 65535·msb]` — the sign fills bits
 8–63, so the low limb already carries `65280·msb`. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.LoadByteSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -92,12 +93,12 @@ private lemma signExtend64_ofNat8_of_ge_128 [NeZero p] (b : ZMod p) (hb : b.val 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the width-1 Sail `LOAD`. -/
 noncomputable def spec_lb (imm : BitVec 12) (rs1 rd : BitVec 5) (is_unsigned : Bool) :
     SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   execute_LOAD imm (.Regidx rs1) (.Regidx rd) is_unsigned (width := 1)
 
 /-- The SP1 chip emulation: write `nextPC = pc + 4` and the extended byte into `rd`. -/
 def sp1_lb (rd : BitVec 5) (pc : BitVec 64) (val64 : BitVec 64) : SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits (.Regidx rd) val64
   pure RETIRE_SUCCESS
 
@@ -125,7 +126,7 @@ theorem correct_load_byte_native
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
   have hmem_eq : sp.mem = s.mem := rfl
   have hsp_config : SailState.isValidMemConfig sp hsp_init := by
-    obtain ⟨hcp, hmprv, hmsec, hhtif, hpma⟩ := hconfig
+    obtain ⟨hcp, hmprv, hmsec, hmsecpmm, hhtif, hpma⟩ := hconfig
     have key : ∀ (reg : Register) (h : reg ∈ s.regs) (h' : reg ∈ sp.regs),
         reg ≠ Register.nextPC → sp.regs.get reg h' = s.regs.get reg h := by
       intro reg h h' hne
@@ -135,6 +136,7 @@ theorem correct_load_byte_native
       { h_cur_privilege := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hcp
         h_mprv_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmprv
         h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsec
+        h_mseccfg_pmm := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsecpmm
         h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
         h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by

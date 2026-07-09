@@ -25,7 +25,7 @@ corresponding `Channel.toRaw` — plain channels are the degenerate case. The em
 migrate by changing only the channel definition, and the mirrored `circuit_norm` lemma set keeps
 `circuit_proof_start` producing the same hypothesis shapes. -/
 
-variable {F : Type} [Field F]
+variable {F : Type} [FiniteField F]
 variable {Message : TypeMap} [ProvableType Message]
 
 /-- A typed channel whose pull-side `Guarantees` and push-side `Owed` are independent. The engine
@@ -167,13 +167,13 @@ def pushedIf (channel : VmChannel F Message) (enabled : Expression F)
   (channel.pushed msg).msg = msg := rfl
 @[circuit_norm] lemma pushed_assumeGuarantees (msg : Message (Expression F)) :
   (channel.pushed msg).assumeGuarantees = false := rfl
-omit [Field F] in
+omit [FiniteField F] in
 @[circuit_norm] lemma pushedIf_mult (enabled : Expression F) (msg : Message (Expression F)) :
   (channel.pushedIf enabled msg).mult = enabled := rfl
-omit [Field F] in
+omit [FiniteField F] in
 @[circuit_norm] lemma pushedIf_msg (enabled : Expression F) (msg : Message (Expression F)) :
   (channel.pushedIf enabled msg).msg = msg := rfl
-omit [Field F] in
+omit [FiniteField F] in
 @[circuit_norm] lemma pushedIf_assumeGuarantees (enabled : Expression F) (msg : Message (Expression F)) :
   (channel.pushedIf enabled msg).assumeGuarantees = false := rfl
 

@@ -61,7 +61,7 @@ def main (input : Var ProgramMsg (ZMod p)) : Circuit (ZMod p) Unit := do
   assertion (Gadgets.ToBits.rangeCheck 16 two_pow_sixteen_lt) input.pc1
   assertion (Gadgets.ToBits.rangeCheck 16 two_pow_sixteen_lt) input.pc2
   assertion assertBool input.op_a_0
-  let m ← witnessField (fun _ => 1)
+  let m ← witnessField 1
   programChannel.pushIf m input
 
 /-- The Program-ROM provider: pushes a committed instruction fetch whose decode fields it range-checks

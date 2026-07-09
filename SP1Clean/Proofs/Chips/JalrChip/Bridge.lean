@@ -12,6 +12,7 @@ LSB-clearing. Key non-obvious moves: `update_elp_state` is a no-op (`update_elp_
 `jump_to (BitVec.update target 0 0#1)` retires via `jump_to_of_mod4_eq_zero` (LSB-clearing guarantees
 4-byte alignment). `JalrChip.kind.view` threads `next_pc = add_operation.value[0] - lsb` (LSB-cleared). -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.JalrSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -22,7 +23,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The RISC-V spec: stage `nextPC ← PC + 4`, then execute the Sail `JALR` (which reads that link address,
 reads rs1, jumps `PC ← (rs1 + sign_extend imm) & ~1`, and writes the link to `rd`). -/
 noncomputable def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_JALR imm rs1 rd
   pure ()
 
@@ -61,6 +62,7 @@ theorem correct_jalr_native
     { h_cur_privilege := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_cur_privilege
       h_mprv_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_mprv_disabled
       h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_mseccfg_disabled
+      h_mseccfg_pmm := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_mseccfg_pmm
       h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_htif_disabled
       h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_pma_regions }
   have hupd : EStateM.run (update_elp_state (.Regidx rs1)) sp = .ok () sp :=

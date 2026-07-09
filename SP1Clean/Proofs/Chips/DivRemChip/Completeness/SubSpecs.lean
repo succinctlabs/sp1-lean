@@ -25,8 +25,6 @@ open Circuit
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-private instance : Fact (2 ^ 17 < p) :=
-  ⟨lt_trans (by norm_num) (Fact.out (p := 2 ^ 24 < p))⟩
 
 set_option linter.unusedSectionVars false in
 /-- A witnessed column struct equals a `populate` value when, cell by cell, the struct's

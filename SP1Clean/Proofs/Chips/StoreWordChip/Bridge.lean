@@ -12,6 +12,7 @@ emulation: write `nextPC = pc + 4` and the four little-endian bytes of `rs2[31:0
 `mem[addr … addr+3]`, via `SailMem.run_vmem_write_of_width_4`. The chip's 8-byte read-modify-write
 `store_value` bus representation is a separate trace-level concern. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.StoreWordSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -21,13 +22,13 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the width-4 Sail `STORE`. -/
 noncomputable def spec_sw (imm : BitVec 12) (rs1 rs2 : BitVec 5) : SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   execute_STORE imm (.Regidx rs2) (.Regidx rs1) (width := 4)
 
 /-- The SP1 chip emulation: write `nextPC = pc + 4` and the four little-endian bytes of `data`
 (`= rs2[31:0]`) into `mem[addr … addr+3]`, then retire. -/
 def sp1_sw (pc : BitVec 64) (addr : BitVec 64) (data : BitVec 32) : SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   modify fun st => { st with mem :=
     ((((st.mem.insert addr.toNat (BitVec.ofNat 8 data.toNat)).insert
       (addr.toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))).insert
@@ -59,7 +60,7 @@ theorem correct_store_word_native
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
   have hmem_eq : sp.mem = s.mem := rfl
   have hsp_config : SailState.isValidMemConfig sp hsp_init := by
-    obtain ⟨hcp, hmprv, hmsec, hhtif, hpma⟩ := hconfig
+    obtain ⟨hcp, hmprv, hmsec, hmsecpmm, hhtif, hpma⟩ := hconfig
     have key : ∀ (reg : Register) (h : reg ∈ s.regs) (h' : reg ∈ sp.regs),
         reg ≠ Register.nextPC → sp.regs.get reg h' = s.regs.get reg h := by
       intro reg h h' hne
@@ -69,6 +70,7 @@ theorem correct_store_word_native
       { h_cur_privilege := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hcp
         h_mprv_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmprv
         h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsec
+        h_mseccfg_pmm := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsecpmm
         h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
         h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by

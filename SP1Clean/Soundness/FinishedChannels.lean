@@ -32,7 +32,6 @@ open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel)
 -- `Fact (2 ^ 17 < p)` derived locally. KoalaBear satisfies it.
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-! ## Channel and channel-list facts -/
 

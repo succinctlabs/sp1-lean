@@ -31,13 +31,14 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel] at h_holds ⊢
   obtain ⟨hr, _hbool, hgc⟩ := h_holds
+  simp only [sub_eq_add_neg] at hgc
   refine ⟨⟨bool_of_mul_pred hgc, ?_⟩, fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   intro hr1eq
   have hneg : - input_is_real = -1 := by rw [hr1eq]
   have R := hr hneg
   rw [← c16] at R
   refine msb_of_raw (ha hr1eq) ?_
-  simp only [RawSpec, sub_eq_add_neg]
+  simp only [RawSpec]
   exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ h16p).mp R⟩
 
 set_option maxHeartbeats 2000000 in
@@ -62,10 +63,10 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     rw [hmsb]
     by_cases hge : input_a.val ≥ 32768
     · rw [if_pos hge, one_mul]
-      have hsub : (2 * input_a + -65536 : ZMod p) = (((2 * input_a.val - 65536 : ℕ) : ZMod p)) := by
-        rw [Nat.cast_sub (by omega)]; push_cast; rw [hin_cast]; ring
+      have hsub : (2 * input_a - 65536 : ZMod p) = (((2 * input_a.val - 65536 : ℕ) : ZMod p)) := by
+        rw [Nat.cast_sub (by omega)]; push_cast; rw [hin_cast]
       rw [hsub, ZMod.val_natCast_of_lt (by omega)]; omega
-    · rw [if_neg hge, zero_mul, neg_zero, add_zero, h2]; omega
+    · rw [if_neg hge, zero_mul, sub_zero, h2]; omega
   · rcases hbin with h | h <;> rw [h] <;> simp
   · rcases hmsbbool with h | h <;> rw [h] <;> simp
 

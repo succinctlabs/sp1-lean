@@ -22,7 +22,7 @@ lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 omit [Fact (2 ^ 17 < p)] in
 /-- Close a gated carry assert `x * (x + -1) = 0` from a carry-bool `c = 0 ∨ c = 1` and `x = c`
 (by `ring`). Bridges the auto-extracted `main`'s `65536 + -1` borrow spelling to `RawSpec`'s `65535`. -/
-private lemma carry_zero {x c : ZMod p} (h : c = 0 ∨ c = 1) (hxc : x = c) : x * (x + -1) = 0 := by
+private lemma carry_zero {x c : ZMod p} (h : c = 0 ∨ c = 1) (hxc : x = c) : x * (x - 1) = 0 := by
   rw [hxc]; rcases h with h | h <;> rw [h] <;> ring
 
 /-- On a real row (`is_real = 1`) the operand words fit in 64 bits, and `is_real` is binary. The `isU64`
@@ -78,6 +78,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   rw [hr1eq, one_mul] at hgc0 hgc1
   refine subwSemantics_of_carries ha hb ?_ ((h_msb h_msb_as).2 hr1eq)
   simp only [RawSpec, Nat.cast_ofNat, sub_eq_add_neg]
+  simp only [sub_eq_add_neg] at hgc0 hgc1
   -- The auto-extracted `main` spells the borrow constant as `65536 + -1`; `RawSpec` uses `65535`.
   -- They agree in `ZMod p` (ring numeral normalization), so bridge each carry bool with
   -- `linear_combination` rather than a syntactic `refine`/`rw`.
@@ -130,14 +131,14 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     · simp [h0]
     · obtain ⟨_, h_raw, _⟩ := key h1
       obtain ⟨hc0, _, _, _⟩ := h_raw
-      simp only [Nat.cast_ofNat, sub_eq_add_neg] at hc0
+      simp only [Nat.cast_ofNat] at hc0
       rw [h1, one_mul]
       exact carry_zero hc0 (by linear_combination)
   · rcases hbin with h0 | h1
     · simp [h0]
     · obtain ⟨_, h_raw, _⟩ := key h1
       obtain ⟨_, hc1, _, _⟩ := h_raw
-      simp only [Nat.cast_ofNat, sub_eq_add_neg] at hc1
+      simp only [Nat.cast_ofNat] at hc1
       rw [h1, one_mul]
       exact carry_zero hc1 (by linear_combination)
 

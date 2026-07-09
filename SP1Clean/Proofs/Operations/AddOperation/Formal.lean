@@ -44,6 +44,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   rw [hr1eq, one_mul] at hgc0 hgc1 hgc2 hgc3
   refine addSemantics_of_carries ha hb ?_ ?_
   · simp only [AssertSpec, sub_eq_add_neg]
+    simp only [sub_eq_add_neg] at hgc0 hgc1 hgc2 hgc3
     exact ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2, bool_of_mul_pred hgc3⟩
   · simp only [InteractSpec]
     rw [← h65536]
@@ -75,7 +76,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     · obtain ⟨hv, hbv⟩ := h_spec h1
       obtain ⟨ha, hb⟩ := hab_imp h1
       obtain ⟨⟨hc0, hc1, hc2, hc3⟩, _⟩ := carries_of_addSemantics ha hb hv hbv
-      simp only [sub_eq_add_neg] at hc0 hc1 hc2 hc3
       rw [h1]
       refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · simp

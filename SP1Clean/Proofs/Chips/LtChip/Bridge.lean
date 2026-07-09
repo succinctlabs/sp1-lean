@@ -11,6 +11,7 @@ import SP1Clean.Proofs.Sail.Advance
 semantic RV64 `sltu`/`slt` facts into the respective Sail executions. `lt_chip_reaches_sail` proves
 the flag-dispatched conjunction from the chip `Spec`. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.LtSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -19,20 +20,20 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SLTU`. -/
 noncomputable def spec_sltu (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPE rs2 rs1 rd rop.SLTU
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SLT` (signed). -/
 noncomputable def spec_slt (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPE rs2 rs1 rd rop.SLT
   pure ()
 
 /-- The SP1 chip emulation (opcode-agnostic for SLT/SLTU): write `nextPC = pc + 4` and the result
 register `rd` (the set-less-than result word's 64-bit value). -/
 def sp1_lt (rd : regidx) (pc : BitVec 64) (a_val : Word (ZMod p)) : SailM Unit := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits rd (Word.toBitVec64 a_val)
 
 set_option linter.unnecessarySeqFocus false in
@@ -72,7 +73,7 @@ theorem correct_sltu_native
     (spec_sltu (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_lt (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_sltu, sp1_lt, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    execute_RTYPE_pure_sltu, PreSail.readReg, PreSail.writeReg,
+    execute_RTYPE_pure_sltu, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_sltu]
 
@@ -91,20 +92,20 @@ theorem correct_slt_native
     (spec_slt (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_lt (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_slt, sp1_lt, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    execute_RTYPE_pure_slt, PreSail.readReg, PreSail.writeReg,
+    execute_RTYPE_pure_slt, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_slt]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SLTI` (I-type signed
 less-than-immediate). -/
 noncomputable def spec_slti (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_ITYPE imm rs1 rd iop.SLTI
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SLTIU` (unsigned). -/
 noncomputable def spec_sltiu (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_ITYPE imm rs1 rd iop.SLTIU
   pure ()
 
@@ -128,7 +129,7 @@ theorem correct_slti_native
       = zero_extend (m := 64) (bool_to_bit (zopz0zI_s (Word.toBitVec64 op_b_val)
           (sign_extend (m := 64) imm))) := by
     rw [h_slt, ← h_dec, ← execute_RTYPE_pure_slt]; simp [execute_RTYPE_pure]
-  simp [spec_slti, sp1_lt, execute_ITYPE, PreSail.readReg, PreSail.writeReg,
+  simp [spec_slti, sp1_lt, execute_ITYPE, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
 
 set_option linter.unusedSimpArgs false in
@@ -149,7 +150,7 @@ theorem correct_sltiu_native
       = zero_extend (m := 64) (bool_to_bit (zopz0zI_u (Word.toBitVec64 op_b_val)
           (sign_extend (m := 64) imm))) := by
     rw [h_sltu, ← h_dec, ← execute_RTYPE_pure_sltu]; simp [execute_RTYPE_pure]
-  simp [spec_sltiu, sp1_lt, execute_ITYPE, PreSail.readReg, PreSail.writeReg,
+  simp [spec_sltiu, sp1_lt, execute_ITYPE, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
 
 omit [Fact (2 ^ 17 < p)] in

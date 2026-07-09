@@ -43,7 +43,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   rw [← c16] at R0 R1 R2 R3
   rw [hr1eq, one_mul] at hgc0 hgc1 hgc2 hgc3
   have c65535 : ∀ x : ZMod p, x + 65536 + -1 = x + 65535 := fun x => by ring
-  simp only [c65535] at hgc0 hgc1 hgc2 hgc3
+  simp only [sub_eq_add_neg, c65535] at hgc0 hgc1 hgc2 hgc3
   refine subSemantics_of_carries ha hb ?_
   simp only [RawSpec, Nat.cast_ofNat, sub_eq_add_neg]
   refine ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2, bool_of_mul_pred hgc3,
@@ -81,7 +81,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       simp only [Nat.cast_ofNat, sub_eq_add_neg] at hc0 hc1 hc2 hc3
       rw [h1]
       have c65535 : ∀ x : ZMod p, x + 65536 + -1 = x + 65535 := fun x => by ring
-      simp only [c65535]
+      simp only [sub_eq_add_neg, c65535]
       refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · simp
       · rw [one_mul]; rcases hc0 with h | h <;> rw [h] <;> simp

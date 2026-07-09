@@ -108,7 +108,7 @@ Tagged `circuit_norm` at **high priority** so it fires before Clean's more-gener
 `Operations.interactionsWith_subcircuit` (which would expose the raw `FlatOperation` form and lose the
 fold). -/
 @[circuit_norm high]
-lemma interactionsWith_subcircuit_formal {F : Type} [Field F] {Input Output : TypeMap}
+lemma interactionsWith_subcircuit_formal {F : Type} [FiniteField F] {Input Output : TypeMap}
     [ProvableType Input] [ProvableType Output]
     (channel : RawChannel F) (circuit : FormalCircuit F Input Output)
     (input : Var Input F) (n : ℕ) (ops : Operations F) :
@@ -229,7 +229,7 @@ matches a `populate`-witnessed column struct after `circuit_norm` normalisation:
 proof, `ext_iff` reduces `<witnessed cols> = populate …` to per-cell equalities, each of which this lemma
 turns into `env.get (off + i)`, which the witness hint (`UsesLocalWitnessesCompleteness`) pins to
 `(toElements (populate …))[i]`. Used by `BitwiseChip`; reusable for `MulChip`/`DivRemChip`. -/
-lemma getElem_toElements_eval_varFromOffset {F : Type} [Field F] {α : TypeMap} [ProvableStruct α]
+lemma getElem_toElements_eval_varFromOffset {F : Type} [FiniteField F] {α : TypeMap} [ProvableStruct α]
     (e : Environment F) (off i : ℕ) (hi : i < size α) :
     (toElements (Eval.eval e (ProvableStruct.varFromOffset α off : α (Expression F))))[i]
       = e.get (off + i) := by

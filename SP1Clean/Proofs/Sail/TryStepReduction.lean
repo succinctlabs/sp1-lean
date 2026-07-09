@@ -18,6 +18,7 @@ concrete-decode walk technique in `Model/SailDecode.lean`.
 
 This file is built bottom-up, one verified stage lemma at a time. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.TryStepReduction
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -100,44 +101,44 @@ structure StraightLineReady (s : SailState) (w : BitVec 32) : Prop where
   no_landing_pad :
     s.regs.get? Register.elp ≠ some (landing_pad_bits_backwards landing_pad_expectation.LP_EXPECTED)
 
-/-! ## Stage 2b — the `SailME`-peeling machinery (reduce `liftM`-prefixed `SailME.run` do-blocks) -/
+/-! ## Stage 2b — the `SailME`-peeling machinery (reduce `liftM`-prefixed `PreSail.PreSailME.run` do-blocks) -/
 
-/-- **The lift-bind law** (the master peel): a `liftM m`-prefixed `SailME.run` do-block runs `m` first
-(threading its state change), then continues with `SailME.run ∘ k` on the value — for ANY `SailM` action
+/-- **The lift-bind law** (the master peel): a `liftM m`-prefixed `PreSail.PreSailME.run` do-block runs `m` first
+(threading its state change), then continues with `PreSail.PreSailME.run ∘ k` on the value — for ANY `SailM` action
 `m`, state-preserving or not (so it peels the state-changing `writeReg`/`execute` tail too). -/
 theorem run_SailME_liftM_bind {β : Type} (m : SailM β) (k : β → SailME Step Step) :
-    SailME.run (liftM m >>= k) = (m >>= fun a => SailME.run (k a) : SailM Step) := by
+    PreSail.PreSailME.run (liftM m >>= k) = (m >>= fun a => PreSail.PreSailME.run (k a) : SailM Step) := by
   funext s
-  simp only [SailME.run, PreSail.PreSailME.run, ExceptT.run, ExceptT.mk, ExceptT.bindCont,
+  simp only [PreSail.PreSailME.run, PreSail.PreSailME.run, ExceptT.run, ExceptT.mk, ExceptT.bindCont,
     ExceptT.bind, ExceptT.lift, ExceptT.map, Functor.map, Except.map, MonadLift.monadLift,
     liftM, monadLift, bind, EStateM.bind, EStateM.run, EStateM.map]
   cases m s <;> rfl
 
-/-- Peel a trailing `SailME.run (pure a)` to the `SailM` `pure a` (no throw, no state change). -/
+/-- Peel a trailing `PreSail.PreSailME.run (pure a)` to the `SailM` `pure a` (no throw, no state change). -/
 theorem run_SailME_pure {β : Type} (a : β) :
-    SailME.run (pure a : SailME β β) = (pure a : SailM β) := rfl
+    PreSail.PreSailME.run (pure a : SailME β β) = (pure a : SailM β) := rfl
 
-/-- Peel a `liftM (readReg reg)` from the front of a `SailME.run` do-block: under `isInitialized`, it
+/-- Peel a `liftM (readReg reg)` from the front of a `PreSail.PreSailME.run` do-block: under `isInitialized`, it
 resolves to the state's register value with no state change. The `SailME`/`ExceptT`/`EStateM` monad-stack
 unfold (the `SailWrap.SailME_run_readReg_map_writeReg` recipe). -/
 theorem run_SailME_liftM_readReg_bind (s : SailState) (reg : Register)
     (hs : SailState.isInitialized s) (k : RegisterType reg → SailME Step Step) :
-    EStateM.run (SailME.run (liftM (Sail.readReg reg) >>= k)) s
-      = EStateM.run (SailME.run (k (s.regs.get reg (hs reg)))) s := by
-  simp only [SailME.run, PreSail.PreSailME.run, Sail.readReg, PreSail.readReg,
+    EStateM.run (PreSail.PreSailME.run (liftM (LeanRV64D.readReg reg) >>= k)) s
+      = EStateM.run (PreSail.PreSailME.run (k (s.regs.get reg (hs reg)))) s := by
+  simp only [PreSail.PreSailME.run, PreSail.PreSailME.run, LeanRV64D.readReg, PreSail.readReg,
     ExceptT.run, ExceptT.mk, ExceptT.bindCont, ExceptT.bind, ExceptT.lift, ExceptT.map,
     Functor.map, Except.map, MonadLift.monadLift, liftM, monadLift, pure, bind,
     EStateM.run, EStateM.bind, EStateM.pure, EStateM.map, EStateM.get,
     getThe, MonadStateOf.get, MonadState.get, get,
     Std.ExtDHashMap.get?_eq_some_get (hs _)]
 
-/-- Peel a `liftM m` from the front of a `SailME.run` do-block for any **state-preserving** `SailM` action
+/-- Peel a `liftM m` from the front of a `PreSail.PreSailME.run` do-block for any **state-preserving** `SailM` action
 `m` (given `m.run s = .ok a s`): it resolves to its value `a` with no state change. The generic peel that
 threads the `StraightLineReady` `dispatchInterrupt`/`fetch` facts. -/
 theorem run_SailME_liftM_bind_of_run {β : Type} (s : SailState) (m : SailM β) (a : β)
     (hm : EStateM.run m s = .ok a s) (k : β → SailME Step Step) :
-    EStateM.run (SailME.run (liftM m >>= k)) s = EStateM.run (SailME.run (k a)) s := by
-  simp only [SailME.run, PreSail.PreSailME.run, ExceptT.run, ExceptT.mk, ExceptT.bindCont,
+    EStateM.run (PreSail.PreSailME.run (liftM m >>= k)) s = EStateM.run (PreSail.PreSailME.run (k a)) s := by
+  simp only [PreSail.PreSailME.run, PreSail.PreSailME.run, ExceptT.run, ExceptT.mk, ExceptT.bindCont,
     ExceptT.bind, ExceptT.lift, ExceptT.map, Functor.map, Except.map, MonadLift.monadLift,
     liftM, monadLift, bind, EStateM.bind, EStateM.run, EStateM.map]
   rw [show m s = EStateM.Result.ok a s from hm]
@@ -149,14 +150,15 @@ theorem run_hart_active_eq_of_ready (s : SailState) (w : BitVec 32) (I : instruc
     (h : StraightLineReady s w) (hdec : (ext_decode w).run s = .ok I s) :
     (run_hart_active step_no).run s
       = (do
-          Sail.writeReg Register.nextPC (BitVec.addInt (← Sail.readReg Register.PC) 4)
+          LeanRV64D.writeReg Register.nextPC (BitVec.addInt (← LeanRV64D.readReg Register.PC) 4)
           let result ← (match (← execute I) with
             | .ExecuteAs other_inst => execute other_inst
             | result => pure result)
           pure (Step.Step_Execute (result, zero_extend (m := 32) w))).run s := by
-  have hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
+  have hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
     rw [Sail.run_readReg, h.priv]
   unfold run_hart_active
+  simp only [SailME.run]
   rw [run_SailME_liftM_bind_of_run _ _ _ hcp]
   rw [run_SailME_liftM_bind_of_run _ _ _ h.no_interrupt]
   simp only [pure_bind]
@@ -255,7 +257,7 @@ def RunPres {α : Type} (m : SailM α) (s : SailState) : Prop := ∃ v, m.run s 
 theorem RunPres.pure {α : Type} (x : α) (s : SailState) : RunPres (Pure.pure x) s := ⟨x, rfl⟩
 
 theorem RunPres.readReg (s : SailState) (reg : Register) (hs : s.isInitialized) :
-    RunPres (Sail.readReg reg) s := ⟨_, Sail.run_readReg_of_isInitialized s reg hs⟩
+    RunPres (LeanRV64D.readReg reg) s := ⟨_, Sail.run_readReg_of_isInitialized s reg hs⟩
 
 theorem RunPres.bind {α β : Type} {m : SailM α} {k : α → SailM β} {s : SailState}
     (hm : RunPres m s) (hk : ∀ v, RunPres (k v) s) : RunPres (m >>= k) s := by
@@ -363,10 +365,10 @@ theorem isValidMemConfig_writeMinstret (s : SailState) (hinit : s.isInitialized)
     (hconfig : SailMem.SailState.isValidMemConfig s hinit) (v : RegisterType Register.minstret_increment) :
     SailMem.SailState.isValidMemConfig {s with regs := s.regs.insert Register.minstret_increment v}
       (SailState.isInitialized_insert s hinit _ _) := by
-  obtain ⟨h_cur, h_mprv, h_mseccfg, h_htif, h_pma⟩ := hconfig
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩ <;>
+  obtain ⟨h_cur, h_mprv, h_mseccfg, h_mseccfgpmm, h_htif, h_pma⟩ := hconfig
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     rw [get_writeMinstret_ne (by decide) s v (hinit _)]
-  exacts [h_cur, h_mprv, h_mseccfg, h_htif, h_pma]
+  exacts [h_cur, h_mprv, h_mseccfg, h_mseccfgpmm, h_htif, h_pma]
 
 /-- **`fetch () = F_Base w` survives the `minstret_increment` write** — the `fetched` field re-derives on
 the post-write state (Stage 3' is precondition-parameterized: `mem`/`PC`/config all frame-stable, the
@@ -406,30 +408,30 @@ theorem tryStep_eq_of_hart_active (s : SailState) (step_no : Nat)
     (hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
       = some (HartState.HART_ACTIVE ()))
     (hb : (should_inc_minstret Privilege.Machine).run s = .ok b s)
-    (hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s)
+    (hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s)
     (h_ha : (run_hart_active step_no).run {s with regs := s.regs.insert Register.minstret_increment b}
       = .ok (Step.Step_Execute (ExecutionResult.Retire_Success (), ib)) s'')
     (h_active'' : s''.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ())) :
     (try_step step_no false).run s
       = (do
           tick_pc ()
-          let mi ← Sail.readReg Register.minstret_increment
+          let mi ← LeanRV64D.readReg Register.minstret_increment
           if (true && mi) = true then do
-              let m ← Sail.readReg Register.minstret
-              Sail.writeReg Register.minstret (BitVec.addInt m 1)
+              let m ← LeanRV64D.readReg Register.minstret
+              LeanRV64D.writeReg Register.minstret (BitVec.addInt m 1)
               (pure false : SailM Bool)
             else (pure false : SailM Bool)).run s'' := by
   unfold try_step
   simp only [ext_pre_step_hook_eq]
   rw [run_bind_of_run s _ Privilege.Machine hcp, run_bind_of_run s _ b hb, run_writeReg_bind]
-  have hhs' : (Sail.readReg Register.hart_state).run
+  have hhs' : (LeanRV64D.readReg Register.hart_state).run
       {s with regs := s.regs.insert Register.minstret_increment b}
       = .ok (HartState.HART_ACTIVE ()) {s with regs := s.regs.insert Register.minstret_increment b} := by
     rw [Sail.run_readReg]; rw [show ({s with regs := s.regs.insert Register.minstret_increment b} :
       SailState).regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()) from hactive]
   rw [bind_assoc, run_bind_of_run _ _ (HartState.HART_ACTIVE ()) hhs']
   rw [run_bind_of_run' _ s'' (run_hart_active step_no) _ h_ha]
-  have hhs'' : (Sail.readReg Register.hart_state).run s'' = .ok (HartState.HART_ACTIVE ()) s'' := by
+  have hhs'' : (LeanRV64D.readReg Register.hart_state).run s'' = .ok (HartState.HART_ACTIVE ()) s'' := by
     rw [Sail.run_readReg, show s''.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()) from h_active'']
   simp only [run_bind_of_run s'' _ (HartState.HART_ACTIVE ()) hhs'', hart_is_active_active,
     run_bind_of_run s'' _ () (run_assert_true s'' _)]

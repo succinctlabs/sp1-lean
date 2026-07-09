@@ -1,0 +1,244 @@
+# SP1 verified: what is proven, and how to check it — TARGET STATE
+
+**STATUS: GOAL DOCUMENT (drafted 2026-07-09).** This is `docs/overview.md` as it will read when the
+consolidation (`docs/proposals/2026-07-architecture-consolidation.md`) and the remaining roadmap
+seams (W1b witness decode, W5 halt, W8 logUp packaging) are complete. Nothing here is hedged: every
+sentence is written in the completed voice, so **the diff between this file and `overview.md` is
+exactly the remaining work**, and every discrepancy maps to a numbered migration step in the
+proposal (§5) or a roadmap item. When a claim becomes true, it moves verbatim into `overview.md`.
+Do not cite this document as current status.
+
+---
+
+## 0. The claim, and how to read this document
+
+SP1 is a RISC-V zkVM: a prover claims "this program, run on these inputs, exited with this code,"
+and a succinct proof convinces a verifier. This repository proves, in Lean 4 with the kernel
+checking every step, that SP1's constraint system actually enforces that claim: **if the verifier
+accepts, then the official RISC-V specification — the Sail model, the same one hardware vendors
+test against — executing the committed program, really reaches that exit.**
+
+For the SP1/Rust reader: every Lean object names its Rust counterpart — chip names are
+`MachineAir::name()`, the routing table mirrors `tracing.rs`, the column structs are extracted from
+your constraint compiler, and the trace conformance suite runs against your real `generate_trace`.
+For the Lean/Clean reader: chips are Clean circuits, buses are Clean channels, and the top theorem
+is an `Ensemble.Statement → Spec` implication whose `Spec` is external (Sail) semantics.
+
+Vocabulary, used consistently: a **chip** is one of the 26 semantic tables (SP1's `RiscvAir`
+variants, including HALT); a **table** is any ensemble member (chips + providers); **pull/push**
+are Clean's bus operations — SP1's Rust `send`s where we `pull` on the Program and Memory buses,
+and the interaction lists match SP1's up to that per-channel sign flip (a LogUp symmetry,
+machine-checked per chip); an **SP1 opcode** is the 53-value field-encoded discriminant, distinct
+from a RISC-V **instruction** (the Sail `ast`); an **adapter** (SP1's term) is what the Lean code
+calls a reader; "**trace witness**" = the prover's matrix, "**witnessed columns**" =
+circuit-generated values, "**witness generator**" = the populate function.
+
+## 1. The theorem
+
+```lean
+theorem sp1_soundness
+    (prog : GuestProgram) (pi : SP1PublicIO (ZMod p))
+    (h_pi : ProgramBoundary prog pi)
+    (h_stmt : (sp1Ensemble prog).Statement pi) :
+    ∀ s0, SP1Boot prog s0 →
+      ∃ n s_f, SailChain n s0 s_f ∧ SP1Halted prog (exitCodeOf pi) s_f
+```
+
+Read: *the SP1 ensemble for the committed guest program verifies with public values `pi`* — all
+per-table AIR constraints hold and all four buses balance, i.e. everything downstream of the lookup
+argument — *then the LeanRV64D Sail interpreter, run from any state that boots the program, reaches
+the halting ECALL with the committed exit code.* `ProgramBoundary` is the vkey tie: the public
+values' entry point, exit code slot, and program commitment match `prog`.
+
+The trust base — six rows, and the audit harness asserts the theorem's axiom set is **exactly**
+this (`scripts/run_audit.sh` reproduces the census):
+
+| # | Trusted | Form |
+|---|---|---|
+| 1 | Lean kernel + `propext` / `Classical.choice` / `Quot.sound` | axioms |
+| 2 | `Lean.ofReduceBool` / `trustCompiler` (bv_decide on byte-extraction lemmas; the conformance battery) | axioms |
+| 3 | `logupGkrSound` — a verifying GKR+PCS transcript yields the fingerprinted balance | one named axiom |
+| 4 | `sailPlatformSurface` — the LeanRV64D platform bundle (~76 axioms: softfloat hooks, reservation set, terminal writes; the RV64IM integer paths touch 4) | named `List Name`, gate-enforced |
+| 5 | the Rust→Lean constraint extractor | outside Lean; byte-identical regeneration gate at the pinned SP1 commit |
+| 6 | `populate` conformance | tested (native_decide @ KoalaBear), quarantined test library, never imported by proofs |
+
+**The gap ledger is empty.** The audit allowlist contains no `sorry`; every obligation of
+`sp1_soundness` is a theorem of the six-row base above.
+
+## 2. The Sail side: what "really executes" means
+
+The reference semantics is **LeanRV64D** — the Lean translation of the official RISC-V Sail model,
+consumed as an external dependency and never modified beyond four disclosed platform-configuration
+constants (CLINT off, signature output off, PMP count 0 — SP1's execution environment). One machine
+step is `try_step`, the interpreter's own top level: interrupt check, fetch, decode, execute, PC
+commit. `SailChain n s0 s` is `n` such steps. Nothing is bypassed or re-implemented: the theorem's
+execution chain is the interpreter anyone else can run.
+
+`SP1Boot prog s0` says `s0` has the program image loaded at its link addresses, PC at the entry
+point, registers zeroed, and the platform configured (machine mode, interrupts off — the mode SP1
+executes in). It is satisfiable by construction — `SP1Boot.canonical prog` exhibits the loader
+state — so the theorem's ∀-form is demonstrably non-vacuous. `SP1Halted prog exit s_f` says `s_f`
+sits at the halting `ECALL` with syscall id HALT in `t0` and the exit code in `a0`; the chain stops
+one step before executing the ECALL itself.
+
+**The decode boundary is a per-program theorem, not an assumption.** A `GuestProgram` carries its
+ROM together with a **decode certificate**: for each ROM word, the fact that the real generated
+decoder (`ext_decode`), in every configured state, returns one fixed instruction whose
+column-projection is the committed program row. For any concrete guest program the certificate is
+*proven by kernel reduction*, word by word (the branch-skip reduction of the real decoder — the
+certificate generator is mechanical), so no decode fact appears in the trust base. Two structural
+theorems back this: the row projection is injective on the decoder's image (the decoder emits only
+canonical multiply-operand records and widths in {1, 2, 4, 8}; there is no LDU), and decode
+output-determinism is derivable from that injectivity — both machine-checked, neither trusted.
+
+The platform bundle (trust row 4): the Sail model declares ~76 platform hooks as axioms. The
+theorem statement ranges over the full interpreter, so it imports the bundle; the RV64IM integer
+paths this project models touch exactly 4. The full list is the named constant
+`sailPlatformSurface`, enumerated in `docs/snapshots/axiom-census.txt` and enforced by the gate.
+
+## 3. The four buses
+
+Chips communicate over four plain Clean channels; global soundness reduces to per-key balance
+(LogUp). One rule governs all four: **the channel guarantee is the posted message's *hygiene* —
+what the poster's byte checks establish, provable row-locally by both sides — and each bus's global
+meaning is a theorem of the engine (§5) about every balanced trace.**
+
+| Bus | Message (arity; SP1 kind) | Channel guarantee (row-local hygiene) | The semantic theorem (engine-proved, per balanced trace) |
+|---|---|---|---|
+| State | `(clk, pc)` (5; State) | clk decodability bound + pc-limb bounds | `StateTruth` at every key: the committed program's execution is at this (clk, pc) |
+| Program | instruction row (16; Program) | `RowSpec` (structural decode bounds) | every fetched row is the decode of ROM[pc] |
+| Memory | `(addr, time, value)` (9; Memory) | `isU64` value + timestamp bound + address shape | value currency: a read returns the most recent write at the read's timestamp |
+| Byte | `(op, a, b, c)` (4; Byte) | `ByteRowSpec` (table membership) | — (already row-local: the guarantee *is* the meaning) |
+
+**State** is SP1's execution-threading token: each row pulls "(clk, pc)" and pushes
+"(clk + Δ, next_pc)" — Δ = 8, or 256 for syscall rows — and balance forces every sent state to be
+consumed exactly once. That balance structure is how one sequential execution decomposes across
+independent tables, and the engine's time-ordered induction turns it back into one real execution;
+the per-chip obligation (§4) is exactly "my row advances it one step". **Program** rows are pushed
+only by the preprocessed ROM provider, whose rows are the decode of the committed program by
+construction (§2). **Memory** carries only hygiene on the channel; its currency theorem never
+appears in the final statement. **Byte** is the root of well-formedness: every range fact bottoms
+out in a preprocessed-table membership.
+
+Sign convention, stated once: SP1's Rust *sends* with positive multiplicity where Clean consumers
+*pull* (multiplicity −1) on Program and Memory; the emitted interaction lists equal SP1's extracted
+oracle up to that negation — checked per chip, not assumed (§6).
+
+## 4. One chip, end to end: Add
+
+Every chip passes the same five gates. For `AddChip` (SP1's `add_sub` AIR):
+
+| Gate | Artifact | What it pins |
+|---|---|---|
+| extract | `Extracted/AddChip.lean` (auto-generated) | the column struct + assert/interaction lists, rendered from SP1's own constraint compiler |
+| faithful | `Faithful/AddChip.lean` | circuit constraints ⟺ the extracted asserts (logical equivalence); emitted interactions ≐ SP1's oracle, all four buses (list permutation) |
+| sound | `Proofs/Chips/AddChip/Formal.lean` | constraints ⟹ the chip contract `Spec` |
+| decode | the Program pull + the row inversion | the row's operands are the fixed decoded instruction's operands |
+| advance | `Proofs/Chips/AddChip/Bridge.lean` | one real `try_step` from any state matching the row produces the row's committed effect |
+
+The chip's `main` composes the shared readers (CPUState, RTypeReader, RegisterWrite) and the add
+gadget as true Clean subcircuits, returning the extracted column struct — the column layout is the
+single source of truth shared with SP1's Rust. The two per-chip statements, verbatim:
+
+```lean
+-- the contract (soundness conclusion), stated against the RV64 ISA function:
+Spec : … ∧ (input.is_real = 1 →
+  Word.toBitVec64 cols.add_operation.value
+    = RV64.add (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))
+
+-- the uniform Sail-step obligation every chip registers (the same shape for all 26):
+advance : is_real = 1 → chipSpec inp cols data → Ready r prog s → OperandCurrency r s →
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s'
+```
+
+`RowEffect` is the faithful per-row effect model: the PC transition, at most one register write, at
+most one contiguous memory write, everything else framed — the three orthogonal axes of the Sail
+machine state. `Ready` is one fixed structure (adapter passthrough, routing, pc-limb bounds),
+discharged once at trace level, identically for every chip; no chip carries bespoke side
+conditions. Adding a chip means: extract its columns, compose its `main`, prove its `Spec`, give
+its `advance` over the per-format core — and never touch the capstone.
+
+## 5. The ensemble, and how the proof feeds out to chips
+
+`sp1Ensemble prog` bundles the tables — the 26 instruction chips plus the providers (byte/range,
+the program ROM for `prog`, memory init/finalize) — over the four channels, with one boundary
+verifier that pulls the final state and pushes the initial state committed in the public values.
+
+The soundness engine (`Soundness/TimedGrounding.lean`) grounds every bus's semantic theorem by one
+well-founded induction over the balanced channels, in time order:
+
+> Pop the row whose state-pull carries the minimal timestamp. Balance forces that pull to equal the
+> running head of the execution — no other row can match it, and around any would-be cycle the
+> timestamps strictly increase, so no cycle closes. Per-address balance forces its memory pulls to
+> equal the live frontier: the most recent write to each address. Its `advance` fact then fires —
+> one real `try_step` extends the execution — the frontier updates, and the row's pushes become
+> true facts for whoever consumes them next. Repeat until no rows remain; the final boundary pull
+> now carries `StateTruth` of the committed final (clk, pc), which is the theorem's conclusion.
+
+The per-chip interface to that induction is exactly the `advance` obligation of §4: one generic
+adapter (`stepFact_of_advance`) converts every chip's `advance` into the engine's per-row step
+record, so the capstone is chip-count-agnostic. Between the Clean `Statement` and the engine's
+inputs sit two proven translations: the witness decode (`sp1_row_facts_decode` — the committed
+tables decode to typed rows whose contracts hold) and the typed-multiset balance bridge (Clean's
+`BalancedInteractions` lifted to per-key message-multiset equalities). The whole path from
+"verifier accepts" to "Sail halts with the committed exit code" is theorems of the six-row base.
+
+## 6. Faithfulness: the circuit is SP1's circuit
+
+Two independent anchors tie the Lean circuits to SP1's Rust, per chip:
+
+- **Constraints.** `update_extracted.py` renders SP1's constraint-compiler output into
+  `Extracted/` (auto-generated, hand-editing forbidden, byte-identical regeneration checked at the
+  pinned SP1 commit). `Faithful/<Chip>.lean` proves the extracted assert list holds **iff** the
+  native circuit's composed contract does — logical equivalence, not resemblance.
+- **Interactions.** The circuit's *emitted* channel interactions and SP1's extracted interaction
+  list project to the same `(kind, table, values, signed multiplicity)` tuples — a list permutation
+  per chip, **all four buses, all 26 chips, full equivalence**, with no semantic interpretation in
+  the statement. The anchors are macro-derived from two bundled hypotheses per chip; the syntactic
+  form replaced an earlier semantic interpreter and, in doing so, caught a real slot-ordering bug
+  the semantic form had masked.
+
+## 7. Witness tests: the prover side, checked against the real prover
+
+Soundness lives entirely in §4–§6. Independently, the honest-prover path is conformance-tested:
+the circuits' own witness closures, run on event batteries dumped from SP1's real Rust prover,
+reproduce SP1's `generate_trace` matrices cell for cell — column order, padding, and the
+hint-driven variant flags included — **for all 26 chips**. These checks use `native_decide`
+(compiler-trusted evaluation) at SP1's production prime and are therefore quarantined in a separate
+test library (`SP1CleanTest`, built by `lake test`) that the proof library never imports;
+`lake build SP1Clean` is `native_decide`-free by CI gate.
+
+## 8. Boundary of the claim, and how to audit it
+
+Modeled: the Supervisor-mode RV64IM instruction chips including ECALL/HALT (53 of 53 SP1 opcodes
+routed), single shard, the four buses, the committed program/exit boundary. **Not modeled**:
+multi-shard composition, precompiles, page protection, traps beyond the halting ECALL, the
+User-mode duplicate AIRs, and the cryptographic lookup argument itself (trust row 3).
+
+To audit: `scripts/run_audit.sh` — re-checks the toolchain pins, the empty `sorry` allowlist, the
+`native_decide`/`skipKernelTC` gates, and regenerates the axiom census that backs §1's trust table,
+including the exact-set gate on `sp1_soundness`. The extraction currency check re-renders
+`Extracted/` at the pinned SP1 commit and diffs byte-for-byte. Every claim in this document is a
+named theorem you can `#print axioms`.
+
+---
+
+## Appendix: the instruction formats
+
+One row per RISC-V format; each cell is a checkable artifact (the ast column is a decode-projection
+equation; the advance column is one generic core lemma).
+
+| Format | Chips | Adapter (reader) | Program-bus pin | Sail ast | Advance effect | Quirks |
+|---|---|---|---|---|---|---|
+| R | Add, Sub, Bitwise, Lt, ShiftL/R, Mul, DivRem | `RTypeReader` (rs1/rs2 reads + rd write) | opcode, `imm_c = 0` | `RTYPE (rs2, rs1, rd, op)` | pc+4; rd ← op(rs1, rs2) | W variants via `RTYPEW`; Mul's canonical-operand image guard |
+| I | Addi + immediate arms of Bitwise/Lt/Shift | `ITypeReader` / `ALUTypeReader` | opcode, `imm_c = 1` | `ITYPE (imm, rs1, rd, op)` | pc+4; rd ← op(rs1, imm) | ADDIW shares ADDW's opcode, split by `imm_c` |
+| Load | LB/LH/LW/LD (+ LoadX0) | I-shape + `MemoryAccess` | opcode | `LOAD (imm, rs1, rd, u, w)` | pc+4; rd ← ext(mem[rs1+imm]) | width ∈ {1,2,4,8}, no LDU (decoder image); x0 routes to LoadX0 |
+| S | SB/SH/SW/SD | I-immutable shape + `MemoryAccess` | opcode | `STORE (imm, rs2, rs1, w)` | pc+4; mem[rs1+imm] ← rs2 bytes | alignment for wide stores; ROM/data disjointness |
+| B | Branch | I-immutable (`op_a` is a *source*) | opcode | `BTYPE (imm, rs2, rs1, op)` | pc ← taken ? pc+imm : pc+4; no write | the no-write control axis |
+| U | UType (LUI/AUIPC) | `JTypeReader` shape | own opcodes | `UTYPE (imm, rd, op)` | pc+4; rd ← imm-form | 20-bit immediate reconstruction |
+| J | Jal, Jalr | `JTypeReader` / `ITypeReader` | opcode | `JAL` / `JALR` | pc ← target; rd ← pc+4 | JALR clears the target LSB |
+| Sys | Halt (ECALL) | state-only | opcode | `ECALL` | terminal; clk + 256 | the boundary chip; exit code in `a0` |
+
+Each format's generic advance core (`advance_of_<format>`) is proved once over the `try_step`
+ladder; a chip's `advance` is a thin instantiation. The reader set mirrors SP1's Rust adapters
+one-to-one; the format distinction enters through the decode projection, not through new columns.

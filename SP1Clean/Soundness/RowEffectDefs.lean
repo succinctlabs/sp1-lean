@@ -5,6 +5,8 @@ import SP1Clean.Model.Semantics.Decode
 
 /-! # The refinement invariant and per-row effect (`RowView`-level, below `ChipRow`)
 
+> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
+
 The Sail-refinement layer of the target theorem, factored **out of `Soundness/TargetVm.lean`** so it sits
 **below `Soundness/ChipRow.lean`**: `RefinesAt`/`RowEffect`/`replayVal`/`rcvPcOf`/`sndPcOf` are all stated
 over the chip-agnostic `Trace.RowView` (never `ChipRow`), so a `ChipKind.advance` field can reference
@@ -14,6 +16,7 @@ over the chip-agnostic `Trace.RowView` (never `ChipRow`), so a `ChipKind.advance
 this file. Namespace `SP1Clean.Soundness.Target` is unchanged (decoupled from path), so every
 `RefinesAt`/`RowEffect`/`rcvPcOf`/… reference resolves as before. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.Soundness.Target
 
 open SP1Clean

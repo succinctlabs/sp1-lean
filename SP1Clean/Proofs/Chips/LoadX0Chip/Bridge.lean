@@ -17,6 +17,7 @@ the read merely has to succeed (via `run_vmem_read_of_width_N'`), after which th
 `wX_bits (.Regidx 0#5)` write collapse to nothing. Four width-core lemmas (1/2/4/8 bytes, each generic in
 `is_unsigned`) feed the seven per-opcode theorems `correct_loadX0_{lb,lbu,lh,lhu,lw,lwu,ld}`. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.LoadX0Sail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -27,14 +28,14 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The SP1 chip emulation: write `nextPC = pc + 4` and return `RETIRE_SUCCESS` — the loaded word is
 discarded because the destination is `x0`. -/
 def sp1_loadX0 (pc : BitVec 64) : SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   pure RETIRE_SUCCESS
 
 /-- The RISC-V spec for a load-into-`x0`: advance `nextPC`, then execute the Sail `LOAD` at the given
 width / sign mode. Each named opcode spec is an instance of this. -/
 noncomputable def specX0 (is_unsigned : Bool) (width : Nat)
     (imm : BitVec 12) (rs1 rd : BitVec 5) : SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   execute_LOAD imm (.Regidx rs1) (.Regidx rd) is_unsigned width
 
 /-- The seven per-opcode specs, by width and sign mode. -/
@@ -58,7 +59,7 @@ private lemma persist_nextPC (rs1_idx : BitVec 5) (reg_val pc : BitVec 64)
   have hsp_init : SailState.isInitialized sp :=
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
   refine ⟨hsp_init, ?_, ?_, rfl⟩
-  · obtain ⟨hcp, hmprv, hmsec, hhtif, hpma⟩ := hconfig
+  · obtain ⟨hcp, hmprv, hmsec, hmsecpmm, hhtif, hpma⟩ := hconfig
     have key : ∀ (reg : Register) (h : reg ∈ s.regs) (h' : reg ∈ sp.regs),
         reg ≠ Register.nextPC → sp.regs.get reg h' = s.regs.get reg h := by
       intro reg h h' hne
@@ -68,6 +69,7 @@ private lemma persist_nextPC (rs1_idx : BitVec 5) (reg_val pc : BitVec 64)
       { h_cur_privilege := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hcp
         h_mprv_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmprv
         h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsec
+        h_mseccfg_pmm := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsecpmm
         h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
         h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
   · rwa [SailState.get_reg?_insert_nextPC]

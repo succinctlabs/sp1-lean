@@ -18,6 +18,7 @@ the target theorem `sp1_target_execution` — reference `ChipRow`/`StateAccess` 
 machinery), so they cannot move below `Soundness` and stay in `Soundness/TargetVm.lean`. (Namespace is
 kept `SP1Clean.Soundness.Target` so `TargetVm` resolves these unchanged after importing this file.) -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.Soundness.Target
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -90,6 +91,8 @@ structure SailConfigured (s : SailState) : Prop where
   mprv_disabled : BitVec.ofNat 1 ((s.regs.get Register.mstatus (init _)).toNat >>> 17) = 0#1
   /-- `mseccfg` MML/MMWP off (bit 10) — no memory-security override. -/
   mseccfg_disabled : BitVec.ofNat 1 ((s.regs.get Register.mseccfg (init _)).toNat >>> 10) = 0#1
+  /-- `mseccfg` PMM off (bits 33:32 = 0) — pointer masking disabled (identity address transform). -/
+  mseccfg_pmm : BitVec.ofNat 2 ((s.regs.get Register.mseccfg (init _)).toNat >>> 32) = 0#2
   /-- No HTIF tohost device. -/
   htif_disabled : s.regs.get Register.htif_tohost_base (init _) = none
   /-- The single fixed SP1 PMA region (bare translation) — the fetch/load address decode. -/
@@ -104,6 +107,7 @@ def SailConfigured.toValidMemConfig {s : SailState} (cfg : SailConfigured s) :
     have h := cfg.priv; rwa [Std.ExtDHashMap.get?_eq_some_get (cfg.init _), Option.some_inj] at h
   h_mprv_disabled := cfg.mprv_disabled
   h_mseccfg_disabled := cfg.mseccfg_disabled
+  h_mseccfg_pmm := cfg.mseccfg_pmm
   h_htif_disabled := cfg.htif_disabled
   h_pma_regions := cfg.pma_regions
 

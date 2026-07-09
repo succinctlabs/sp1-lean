@@ -15,6 +15,7 @@ logical left shift) vs `spec_sllw` (`ropw.SLLW`, the low-32 left shift sign-exte
 `ChipKind`'s `sailEquiv` is the flag-dispatched conjunction (`is_sll = 1 → SLL` ∧ `is_sllw = 1 →
 SLLW`); `shiftleft_chip_reaches_sail` proves both from the chip `Spec`. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.ShiftLeftSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -23,20 +24,20 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SLL` (64-bit logical left). -/
 noncomputable def spec_sll (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPE rs2 rs1 rd rop.SLL
   pure ()
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SLLW` (low-32 left, sext). -/
 noncomputable def spec_sllw (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPEW rs2 rs1 rd ropw.SLLW
   pure ()
 
 /-- The SP1 chip emulation (opcode-agnostic for SLL/SLLW): write `nextPC = pc + 4` and the result
 register `rd` (the shift result word's 64-bit value). -/
 def sp1_sl (rd : regidx) (pc : BitVec 64) (a_val : Word (ZMod p)) : SailM Unit := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits rd (Word.toBitVec64 a_val)
 
 /-- The Sail `SLL` pure part is the clean RV64 `sll` (operand order `rs2 rs1`): both shift `rs1` left
@@ -70,7 +71,7 @@ theorem correct_sll_native
     (spec_sll (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_sl (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_sll, sp1_sl, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    execute_RTYPE_pure_sll, PreSail.readReg, PreSail.writeReg,
+    execute_RTYPE_pure_sll, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_sll]
 
@@ -89,7 +90,7 @@ theorem correct_sllw_native
     (spec_sllw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_sl (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_sllw, sp1_sl, execute_RTYPEW_eq_execute_RTYPEW', execute_RTYPEW',
-    execute_RTYPEW_pure_sllw, PreSail.readReg, PreSail.writeReg,
+    execute_RTYPEW_pure_sllw, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_sllw]
 

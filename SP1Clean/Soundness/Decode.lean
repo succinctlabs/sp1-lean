@@ -26,6 +26,7 @@ The full discharge of the threaded consistency from bus balance (a `ProgramProvi
 via `programConsistent_of_balance`) and the W7 `try_step` decode-stage reduction that *consumes* this
 predicate are tracked separately (roadmap W3 discharge / W7). -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.Soundness.Target
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -34,7 +35,6 @@ open SP1Clean.LookupAccessList (isConsistentBalanced aggregateChipRows)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 

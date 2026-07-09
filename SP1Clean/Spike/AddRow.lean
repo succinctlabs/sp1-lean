@@ -36,6 +36,7 @@ honest (spike license, all deviations noted):
   gap: `TryStepLift` is unprovable for `rd = x0` with a non-zero result (production handles `op_a_0`
   separately); the spike's concrete rows use `rd ∈ {x3, x4}`. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.Spike.AddRow
 
 open Circuit
@@ -172,7 +173,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (F := ZMod p) (Output := unit
   circuit_proof_start
   simp only [circuit_norm, spikeState, spikeMemory] at h_holds ⊢
   obtain ⟨h_gate, h_add, h_spull, h_bpull, h_cpull, h_apull⟩ := h_holds
-  have h_bin := bool_of_mul_pred h_gate
+  have h_bin := bool_of_mul_pred (by simpa only [sub_eq_add_neg] using h_gate)
   have h_operands : input_is_real = 1 →
       Word.isU64 input_op_b_val ∧ Word.isU64 input_op_c_val := by
     intro hr
@@ -262,7 +263,7 @@ def TryStepLift (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) : Prop :=
       s'.get_reg? (BitVec.ofNat 5 input.rd.val) = some (Word.toBitVec64 input.result) ∧
       ∀ j : BitVec 5, j ≠ BitVec.ofNat 5 input.rd.val → s'.get_reg? j = s.get_reg? j
 
-omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+omit [Fact (2 ^ 17 < p)] in
 /-- A register-shaped memory message's decoded location. -/
 lemma locOf_regMsg {hi lo a : ZMod p} {v : Word (ZMod p)} (ha : a.val < 32) :
     MemoryMsg.locOf (⟨hi, lo, a, 0, 0, v⟩ : MemoryMsg (ZMod p))

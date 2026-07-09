@@ -40,7 +40,6 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 -- `2 ^ 24` (subsuming `2 ^ 17`): the chip composes `MulOperation` — see `Defs`.
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 -- Keep the IsEqualWord/IsZeroWord sub-op cols (the only ones `main` passes as explicit `fromElements`)
 -- FOLDED through `circuit_proof_start`'s goal simp: `eval_fromElements` rewrites `eval (fromElements w)`

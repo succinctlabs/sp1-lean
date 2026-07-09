@@ -16,7 +16,6 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-- A gated single-cell byte Range lookup: the cell `env.get idx` equals a populate value `v` with
 `v.val < 2^16`, so the (`gate`-conditioned) `byteChannel` guarantee holds. The `gate` is irrelevant

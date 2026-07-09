@@ -10,6 +10,7 @@ import SP1Clean.Proofs.Sail.Advance
 given the chip's semantic fact `a_val = sext32→64 (op_b + op_c)` and the register/PC reads.
 `addw_pure_eq` relates the Sail pure part to `signExtend 64 (setWidth 32 (b + c))`. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.AddwSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -31,13 +32,13 @@ lemma addw_pure_eq (x y : BitVec 64) :
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `ADDW`. -/
 noncomputable def spec_addw (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPEW rs2 rs1 rd ropw.ADDW
   pure ()
 
 /-- The SP1 chip emulation: write `nextPC = pc + 4` and the result register `rd`. -/
 def sp1_addw (rd : regidx) (pc : BitVec 64) (a_val : Word (ZMod p)) : SailM Unit := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits rd (Word.toBitVec64 a_val)
 
 set_option linter.unusedSimpArgs false in
@@ -55,7 +56,7 @@ theorem correct_addw_native
     (spec_addw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_addw (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_addw, sp1_addw, execute_RTYPEW_eq_execute_RTYPEW', execute_RTYPEW',
-    addw_pure_eq, PreSail.readReg, PreSail.writeReg,
+    addw_pure_eq, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_addw]
 
@@ -79,7 +80,7 @@ theorem addw_chip_reaches_sail
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `ADDIW` (I-type add-word-immediate). -/
 noncomputable def spec_addiw (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_ADDIW imm rs1 rd
   pure ()
 
@@ -105,7 +106,7 @@ theorem correct_addiw_native
     rw [h_addw, ← h_dec]
     simp only [sign_extend, Sail.BitVec.signExtend]
     congr 1
-  simp [spec_addiw, sp1_addw, execute_ADDIW, PreSail.readReg, PreSail.writeReg,
+  simp [spec_addiw, sp1_addw, execute_ADDIW, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
 
 omit [Fact (2 ^ 17 < p)] in

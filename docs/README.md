@@ -27,6 +27,9 @@ recording the worked Add example's six steps end-to-end. The docs here distill i
 ## Index
 
 **Reader-facing (top-level)**
+- [overview.md](overview.md) — **SKELETON** of the north-star 5-page overview (the claim, the theorem, the buses, one chip end-to-end, the engine, faithfulness, tests, audit) — drafted against the *proposed* end-state with `[PENDING]` markers; becomes the public entry doc once the consolidation lands.
+- [goal-overview.md](goal-overview.md) — the **TARGET-STATE** version of overview.md, written in the completed voice with no pending markers (empty gap ledger, 26 chips, engine as capstone); the diff against overview.md IS the remaining work. Do not cite as current status.
+- [proposals/2026-07-architecture-consolidation.md](proposals/2026-07-architecture-consolidation.md) — **PROPOSAL**: the deep-audit findings + the one-engine/one-contract/one-theorem end-state, keep/retire/replace verdicts, migration plan, de-risk spikes.
 - [architecture.md](architecture.md) — four-artifact chain (gadget → chip → Sail bridge → faithful anchor), mirror-rust layout, design verdict, design status.
 - [release-audit.md](release-audit.md) — the honest claim, the five-kinds-of-faithfulness analysis, the machine-model divergence catalog, the axiom census, the `sorry` blocker inventory, and the modeling-fidelity / SP1-developer-reactions sections.
 - [roadmap.md](roadmap.md) — open work along two axes: coverage breadth (Axis A) and sound-model depth (Axis B), with the five remaining `sorry`s up front.

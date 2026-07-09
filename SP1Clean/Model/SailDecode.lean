@@ -36,6 +36,7 @@ branch (the `decide := true` discharger cannot rule out a branch when the regist
 which is costly and unnecessary for this scope, so it is deliberately not pursued; the general `∀ prog`
 statement instead keeps `decodedInROM` a trusted decode-chip assumption (cf. `ProgramRowSpec`). -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.SailDecode
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -75,7 +76,8 @@ theorem decode_ADD_example (s : SailState) (hs : s.isInitialized)
             simp (config := { decide := true }) [currentlyEnabled, hartSupports, simp_sail,
               bind, EStateM.bind, EStateM.run, pure, EStateM.pure,
               get, getThe, MonadStateOf.get, MonadState.get, EStateM.get,
-              get_xLPE, Sail.readReg, PreSail.readReg, bool_bit_backwards, hpriv,
+              get_xLPE, LeanRV64D.readReg, PreSail.readReg, bool_bit_backwards, hpriv,
+              encdec_cbop_zicbop_backwards_matches, encdec_reg_backwards_matches,
               Std.ExtDHashMap.get?_eq_some_get (hs _), Bool.and_false, Bool.false_and, reduceCtorEq]
           dsimp only [])
   -- parked at the ADD arm: take it (explicit instruction so the discharge has no metavariable).

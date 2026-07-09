@@ -11,6 +11,7 @@ SP1 chip emulation (`sp1_sd`: write `nextPC = pc + 4` and the eight little-endia
 `rs2` into `mem[addr … addr+7]`), via `SailMem.run_vmem_write_of_width_8`. Caller supplies
 register/PC reads and alignment / fits / non-reserved-address facts. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.StoreSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -22,7 +23,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 (full 64-bit word store). Note the LeanRV64D `execute_STORE` argument order is
 `imm`, `rs2` (stored-value register), `rs1` (base-address register), `width`. -/
 noncomputable def spec_sd (imm : BitVec 12) (rs1 rs2 : BitVec 5) : SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   execute_STORE imm (.Regidx rs2) (.Regidx rs1) (width := 8)
 
 /-- The SP1 chip emulation: write `nextPC = pc + 4` and the eight little-endian bytes of the
@@ -30,7 +31,7 @@ stored word into `mem[addr … addr+7]`, then retire. The byte shape matches
 `run_vmem_write_of_width_8`'s RHS (`BitVec.ofNat 8 (data.toNat >>> 8·k)` with
 `data = Word.toBitVec64 stored`). -/
 def sp1_sd (pc : BitVec 64) (addr : BitVec 64) (stored : Word (ZMod p)) : SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   let data := Word.toBitVec64 stored
   modify fun st => { st with mem :=
     ((((((((st.mem.insert addr.toNat (BitVec.ofNat 8 data.toNat)).insert
@@ -69,7 +70,7 @@ theorem correct_store_double_native
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
   have hmem_eq : sp.mem = s.mem := rfl
   have hsp_config : SailState.isValidMemConfig sp hsp_init := by
-    obtain ⟨hcp, hmprv, hmsec, hhtif, hpma⟩ := hconfig
+    obtain ⟨hcp, hmprv, hmsec, hmsecpmm, hhtif, hpma⟩ := hconfig
     have key : ∀ (reg : Register) (h : reg ∈ s.regs) (h' : reg ∈ sp.regs),
         reg ≠ Register.nextPC → sp.regs.get reg h' = s.regs.get reg h := by
       intro reg h h' hne
@@ -79,6 +80,7 @@ theorem correct_store_double_native
       { h_cur_privilege := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hcp
         h_mprv_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmprv
         h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsec
+        h_mseccfg_pmm := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsecpmm
         h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
         h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
   -- Register reads of `rs1` (base) and `rs2` (stored value) survive the `nextPC` write.

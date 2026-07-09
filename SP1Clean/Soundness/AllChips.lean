@@ -17,7 +17,6 @@ open SP1Clean
 -- project-standard `Fact (2 ^ 17 < p)` derived locally.
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-- A concrete **all-chips** trace — one row of every wired chip, in one `List (ChipRow p)`. The order
 mirrors `allChipKinds`: the ALU/R-type chips, the three control-flow chips, the nine memory chips, then

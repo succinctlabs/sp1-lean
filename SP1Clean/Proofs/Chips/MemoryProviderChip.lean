@@ -44,7 +44,7 @@ SP1's memory-global chips are one boolean-gated row per address), and pushes the
 `input` onto `memoryChannel` with multiplicity `m`. -/
 def main (input : Var MemoryMsg (ZMod p)) : Circuit (ZMod p) Unit := do
   assertion WordRangeCheck.circuit input.value
-  let m ← witnessField (fun _ => 1)
+  let m ← witnessField 1
   assertZero (m * (m - 1))
   memoryChannel.pushIf m input
 

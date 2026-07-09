@@ -22,6 +22,7 @@ Hence five generic family-core lemmas — RTYPE (ADD/SUB/XOR/OR/AND/SLT/SLTU/SLL
 opcodes; `aluX0_chip_reaches_sail` is their 29-way conjunction. The register reads (`h_rs1`/`h_rs2`) are
 needed only so the Sail reads *succeed* (their values are discarded). -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.AluX0Sail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -31,25 +32,25 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The SP1 chip emulation for ALU-into-`x0`: advance `nextPC = pc + 4` and write nothing (the result is
 discarded, `wX 0` being a no-op). Opcode-independent — the same for all 29 covered ALU (21 ALU + 8 DIV/REM-into-x0) opcodes. -/
 noncomputable def sp1_aluX0 (pc : BitVec 64) : SailM Unit := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
 
 /-! ## Family spec functions (the real Sail execution, `rd = x0`) -/
 
 /-- RTYPE family (ADD/SUB/XOR/OR/AND/SLT/SLTU/SLL/SRL/SRA): advance `nextPC`, run `execute_RTYPE` into `x0`. -/
 noncomputable def spec_aluX0_rtype (op : rop) (rs2 rs1 : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPE rs2 rs1 (.Regidx 0#5) op
   pure ()
 
 /-- RTYPEW family (ADDW/SUBW/SLLW/SRLW/SRAW): advance `nextPC`, run `execute_RTYPEW` into `x0`. -/
 noncomputable def spec_aluX0_rtypew (op : ropw) (rs2 rs1 : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPEW rs2 rs1 (.Regidx 0#5) op
   pure ()
 
 /-- ITYPE family (ADDI): advance `nextPC`, run `execute_ITYPE … iop.ADDI` into `x0`. -/
 noncomputable def spec_aluX0_addi (imm : BitVec 12) (rs1 : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_ITYPE imm rs1 (.Regidx 0#5) iop.ADDI
   pure ()
 
@@ -61,13 +62,13 @@ def mulOp_mulhsu : mul_op := { result_part := .High, signed_rs1 := .Signed, sign
 
 /-- MUL family (MUL/MULH/MULHU/MULHSU): advance `nextPC`, run `execute_MUL` into `x0`. -/
 noncomputable def spec_aluX0_mul (op : mul_op) (rs2 rs1 : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_MUL rs2 rs1 (.Regidx 0#5) op
   pure ()
 
 /-- MULW: advance `nextPC`, run `execute_MULW` into `x0`. -/
 noncomputable def spec_aluX0_mulw (rs2 rs1 : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_MULW rs2 rs1 (.Regidx 0#5)
   pure ()
 
@@ -83,7 +84,7 @@ theorem correct_aluX0_rtype (op : rop) (rs1 rs2 : BitVec 5) (rs1_val rs2_val : B
     (h_rs1 : s.get_reg? rs1 = some rs1_val) (h_rs2 : s.get_reg? rs2 = some rs2_val) :
     (spec_aluX0_rtype op (.Regidx rs2) (.Regidx rs1)).run s = (sp1_aluX0 pc).run s := by
   simp [spec_aluX0_rtype, sp1_aluX0, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2]
 
 set_option linter.unusedSimpArgs false in
@@ -95,7 +96,7 @@ theorem correct_aluX0_rtypew (op : ropw) (rs1 rs2 : BitVec 5) (rs1_val rs2_val :
     (h_rs1 : s.get_reg? rs1 = some rs1_val) (h_rs2 : s.get_reg? rs2 = some rs2_val) :
     (spec_aluX0_rtypew op (.Regidx rs2) (.Regidx rs1)).run s = (sp1_aluX0 pc).run s := by
   simp [spec_aluX0_rtypew, sp1_aluX0, execute_RTYPEW_eq_execute_RTYPEW', execute_RTYPEW',
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2]
 
 set_option linter.unusedSimpArgs false in
@@ -107,7 +108,7 @@ theorem correct_aluX0_addi (imm : BitVec 12) (rs1 : BitVec 5) (rs1_val : BitVec 
     (h_rs1 : s.get_reg? rs1 = some rs1_val) :
     (spec_aluX0_addi imm (.Regidx rs1)).run s = (sp1_aluX0 pc).run s := by
   simp [spec_aluX0_addi, sp1_aluX0, execute_ITYPE,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1]
 
 set_option linter.unusedSimpArgs false in
@@ -119,7 +120,7 @@ theorem correct_aluX0_mul (op : mul_op) (rs1 rs2 : BitVec 5) (rs1_val rs2_val : 
     (h_rs1 : s.get_reg? rs1 = some rs1_val) (h_rs2 : s.get_reg? rs2 = some rs2_val) :
     (spec_aluX0_mul op (.Regidx rs2) (.Regidx rs1)).run s = (sp1_aluX0 pc).run s := by
   simp [spec_aluX0_mul, sp1_aluX0, _root_.mul_eq, skeleton_binary,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2]
 
 set_option linter.unusedSimpArgs false in
@@ -131,30 +132,30 @@ theorem correct_aluX0_mulw (rs1 rs2 : BitVec 5) (rs1_val rs2_val : BitVec 64)
     (h_rs1 : s.get_reg? rs1 = some rs1_val) (h_rs2 : s.get_reg? rs2 = some rs2_val) :
     (spec_aluX0_mulw (.Regidx rs2) (.Regidx rs1)).run s = (sp1_aluX0 pc).run s := by
   simp [spec_aluX0_mulw, sp1_aluX0, _root_.mulw_eq, skeleton_binary,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2]
 
 /-- DIV family (DIV/DIVU): advance `nextPC`, run `execute_DIV` into `x0` (generic in `is_unsigned`). -/
 noncomputable def spec_aluX0_div (is_unsigned : Bool) (rs2 rs1 : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_DIV rs2 rs1 (.Regidx 0#5) is_unsigned
   pure ()
 
 /-- REM family (REM/REMU): advance `nextPC`, run `execute_REM` into `x0` (generic in `is_unsigned`). -/
 noncomputable def spec_aluX0_rem (is_unsigned : Bool) (rs2 rs1 : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_REM rs2 rs1 (.Regidx 0#5) is_unsigned
   pure ()
 
 /-- DIVW family (DIVW/DIVUW): advance `nextPC`, run `execute_DIVW` into `x0` (generic in `is_unsigned`). -/
 noncomputable def spec_aluX0_divw (is_unsigned : Bool) (rs2 rs1 : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_DIVW rs2 rs1 (.Regidx 0#5) is_unsigned
   pure ()
 
 /-- REMW family (REMW/REMUW): advance `nextPC`, run `execute_REMW` into `x0` (generic in `is_unsigned`). -/
 noncomputable def spec_aluX0_remw (is_unsigned : Bool) (rs2 rs1 : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_REMW rs2 rs1 (.Regidx 0#5) is_unsigned
   pure ()
 
@@ -167,7 +168,7 @@ theorem correct_aluX0_div (is_unsigned : Bool) (rs1 rs2 : BitVec 5) (rs1_val rs2
     (h_rs1 : s.get_reg? rs1 = some rs1_val) (h_rs2 : s.get_reg? rs2 = some rs2_val) :
     (spec_aluX0_div is_unsigned (.Regidx rs2) (.Regidx rs1)).run s = (sp1_aluX0 pc).run s := by
   simp [spec_aluX0_div, sp1_aluX0, _root_.div_eq, skeleton_binary,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2]
 
 set_option linter.unusedSimpArgs false in
@@ -180,7 +181,7 @@ theorem correct_aluX0_rem (is_unsigned : Bool) (rs1 rs2 : BitVec 5) (rs1_val rs2
     (spec_aluX0_rem is_unsigned (.Regidx rs2) (.Regidx rs1)).run s = (sp1_aluX0 pc).run s := by
   cases is_unsigned <;>
   simp [spec_aluX0_rem, sp1_aluX0, _root_.rem_signed_eq, _root_.rem_unsigned_eq, skeleton_binary,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2]
 
 set_option linter.unusedSimpArgs false in
@@ -192,7 +193,7 @@ theorem correct_aluX0_divw (is_unsigned : Bool) (rs1 rs2 : BitVec 5) (rs1_val rs
     (h_rs1 : s.get_reg? rs1 = some rs1_val) (h_rs2 : s.get_reg? rs2 = some rs2_val) :
     (spec_aluX0_divw is_unsigned (.Regidx rs2) (.Regidx rs1)).run s = (sp1_aluX0 pc).run s := by
   simp [spec_aluX0_divw, sp1_aluX0, _root_.divw_eq, skeleton_binary,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2]
 
 set_option linter.unusedSimpArgs false in
@@ -205,7 +206,7 @@ theorem correct_aluX0_remw (is_unsigned : Bool) (rs1 rs2 : BitVec 5) (rs1_val rs
     (spec_aluX0_remw is_unsigned (.Regidx rs2) (.Regidx rs1)).run s = (sp1_aluX0 pc).run s := by
   cases is_unsigned <;>
   simp [spec_aluX0_remw, sp1_aluX0, _root_.remw_signed_eq, _root_.remw_unsigned_eq, skeleton_binary,
-    PreSail.readReg, PreSail.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
+    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2]
 
 end SP1Clean.AluX0Sail

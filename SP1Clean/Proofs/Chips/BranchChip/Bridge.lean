@@ -11,6 +11,7 @@ condition resolving `next_pc`. The taken arm's `jump_to` retires via `jump_to_of
 land `nextPC ← next_pc_word`. `BranchChip.kind.sailEquiv` is the six-way BEQ/BNE/BLT/BGE/BLTU/BGEU
 conjunction. The whole chain is axiom-clean. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.BranchSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -20,7 +21,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The RISC-V spec: stage `nextPC ← PC + 4` (the fall-through), then execute the Sail `BTYPE` (which
 reads rs1/rs2, evaluates the condition, and on a taken branch overwrites `nextPC ← PC + sign_extend imm`). -/
 noncomputable def spec_btype (imm : BitVec 13) (rs2 rs1 : regidx) (op : bop) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_BTYPE imm rs2 rs1 op
   pure ()
 

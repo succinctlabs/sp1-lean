@@ -30,6 +30,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel] at h_holds ⊢
   obtain ⟨hr, _hbool, hgc⟩ := h_holds
+  simp only [sub_eq_add_neg] at hgc
   refine ⟨⟨bool_of_mul_pred hgc, ?_⟩, fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   intro hr1eq
   obtain ⟨ha, hb⟩ := hab hr1eq
@@ -37,7 +38,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have R := hr hneg
   rw [← c16] at R
   refine compare_of_raw ha hb ?_
-  simp only [RawSpec, sub_eq_add_neg]
+  simp only [RawSpec]
   exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ h16p).mp R⟩
 
 set_option maxHeartbeats 2000000 in
@@ -60,13 +61,13 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     by_cases hlt : input_a.val < input_b.val
     · rw [if_pos hlt]
       have hle : input_b.val ≤ input_a.val + 65536 := by omega
-      have key : input_a + - input_b + (1 : ZMod p) * 65536
+      have key : input_a - input_b + (1 : ZMod p) * 65536
           = ((input_a.val + 65536 - input_b.val : ℕ) : ZMod p) := by
         rw [Nat.cast_sub hle]; push_cast [ZMod.natCast_zmod_val]; ring
       rw [key, ZMod.val_natCast_of_lt (show input_a.val + 65536 - input_b.val < p by omega)]; omega
     · rw [if_neg hlt]
       have hle : input_b.val ≤ input_a.val := by omega
-      have key : input_a + - input_b + (0 : ZMod p) * 65536
+      have key : input_a - input_b + (0 : ZMod p) * 65536
           = ((input_a.val - input_b.val : ℕ) : ZMod p) := by
         rw [Nat.cast_sub hle]; push_cast [ZMod.natCast_zmod_val]; ring
       rw [key, ZMod.val_natCast_of_lt (show input_a.val - input_b.val < p by omega)]; omega

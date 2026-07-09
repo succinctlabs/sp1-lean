@@ -14,6 +14,7 @@ The `RowView`/`TargetObligations`-coupled theorems (`DecodeOperandsBound`, `deco
 `Soundness/Decode.lean`, which imports this core. Namespace `SP1Clean.Soundness.Target` is unchanged
 (decoupled from path), so every `instrToProgramRow`/`decodedInROM` reference resolves as before. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.Soundness.Target
 
 open Sail LeanRV64D LeanRV64D.Functions

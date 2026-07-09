@@ -70,6 +70,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   rw [hr1eq, one_mul] at hgc0 hgc1
   refine addwSemantics_of_carries ha hb ?_ ((h_msb h_msb_as).2 hr1eq)
   simp only [RawSpec, sub_eq_add_neg]
+  simp only [sub_eq_add_neg] at hgc0 hgc1
   refine ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, ?_, ?_⟩
   · rw [← h65536]; exact (byteRowSpec_range _ h16p).mp R0
   · rw [← h65536]; exact (byteRowSpec_range _ h16p).mp R1
@@ -113,14 +114,12 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     · simp [h0]
     · obtain ⟨_, h_raw, _⟩ := key h1
       obtain ⟨hc0, _, _, _⟩ := h_raw
-      simp only [sub_eq_add_neg] at hc0
       rw [h1, one_mul]
       rcases hc0 with h | h <;> rw [h] <;> simp
   · rcases hbin with h0 | h1
     · simp [h0]
     · obtain ⟨_, h_raw, _⟩ := key h1
       obtain ⟨_, hc1, _, _⟩ := h_raw
-      simp only [sub_eq_add_neg] at hc1
       rw [h1, one_mul]
       rcases hc1 with h | h <;> rw [h] <;> simp
 

@@ -3,6 +3,8 @@ import SP1Clean.Soundness.AdvanceDispatch
 
 /-! # W2 — the value half of `OperandsBound`, and the concrete decode∧value bundle
 
+> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
+
 The decode half of `OperandsBound` (`Soundness/Decode.lean`) ties each row's committed operand *index*
 columns to the decode of its instruction word. This file adds the **value half**: each row's committed
 operand *value* columns (`op_b`/`op_c` `prev_value` — the register reads the chip computed on) equal the
@@ -26,7 +28,6 @@ open SP1Clean.LookupAccessList (isConsistentBalanced aggregateChipRows)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 -- `ValueOperandsBound` relocated to `Soundness/RowEffectDefs.lean` (below `ChipRow`, so `Proofs/Sail/Advance`
 -- and the chip `advance` proofs can drop below `ChipRegistry` for the `ChipKind.advance` field). Available

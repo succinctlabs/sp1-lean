@@ -11,6 +11,7 @@ given the chip's semantic fact `a_val = sext32→64 (op_b - op_c)` and the regis
 `execute_RTYPEW rs2 rs1 rd .SUBW` computes `sext (rX(rs1)[31:0] - rX(rs2)[31:0])`, so
 `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val` — the non-commutative order is load-bearing. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.SubwSail
 
 open Sail LeanRV64D LeanRV64D.Functions
@@ -30,13 +31,13 @@ lemma subw_pure_eq (x y : BitVec 64) :
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SUBW`. -/
 noncomputable def spec_subw (rs2 rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   _ ← execute_RTYPEW rs2 rs1 rd ropw.SUBW
   pure ()
 
 /-- The SP1 chip emulation: write `nextPC = pc + 4` and the result register `rd`. -/
 def sp1_subw (rd : regidx) (pc : BitVec 64) (a_val : Word (ZMod p)) : SailM Unit := do
-  Sail.writeReg Register.nextPC (pc + 4#64)
+  LeanRV64D.writeReg Register.nextPC (pc + 4#64)
   wX_bits rd (Word.toBitVec64 a_val)
 
 set_option linter.unusedSimpArgs false in
@@ -54,7 +55,7 @@ theorem correct_subw_native
     (spec_subw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_subw (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_subw, sp1_subw, execute_RTYPEW_eq_execute_RTYPEW', execute_RTYPEW',
-    subw_pure_eq, PreSail.readReg, PreSail.writeReg,
+    subw_pure_eq, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_subw]
 

@@ -23,6 +23,7 @@ auto-generalizing `p` from a `variable` block breaks inference of the dependent 
 gates every bus emission by it, and it is exactly what the chip `Spec`'s gated identity and the Sail bridge
 key on — so the bus gating, the semantic clause, and the Sail step all reference one selector. -/
 
+open LeanRV64D.Defs
 namespace SP1Clean.Soundness
 
 open SP1Clean
