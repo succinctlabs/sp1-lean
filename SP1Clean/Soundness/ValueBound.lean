@@ -1,4 +1,5 @@
 import SP1Clean.Soundness.Decode
+import SP1Clean.Soundness.AdvanceDispatch
 
 /-! # W2 — the value half of `OperandsBound`, and the concrete decode∧value bundle
 
@@ -195,6 +196,87 @@ def targetObligations_full_of_balance (prog : GuestProgram) (pi : SP1TargetPubli
     TargetObligations prog pi rows (OperandsBound_full prog) where
   bound := operandsBound_full_targetBound_of_balance prog pi rows rom mult h_decoded h_bal h_value_link
   lift := h_lift
+  halt_nonempty := h_halt_nonempty
+  halt := h_halt
+
+/-! ## P5 — the W7 `lift` seam discharged per-chip: `chipRows_advance_sound` wired in
+
+SC Phase 4 collapses the 25 bespoke `sailEquiv`/`reaches_sail` predicates into ONE uniform
+`ChipKind.advance` obligation (one real Sail `try_step` produces the row's `RowEffect`), and
+`chipRows_advance_sound` (`Soundness/AdvanceDispatch.lean`) assembles the per-chip `advance`s into the
+whole-trace `lift` generically (no per-chip `cases`). These two defs replace the monolithic black-box
+`h_lift` hypothesis of `targetObligations_full`/`_of_balance` with that dispatcher — so `lift` is no
+longer a seam but `advance` (proved per chip, axiom-clean) composed with three clearly-named residuals:
+
+* `h_migrated` — **coverage**: every real row's chip populates `advance` (`isSome`). True today for all
+  chips **except** the four width-8/non-injective decoder-seam chips (Mul, LoadDouble, LoadX0,
+  StoreDouble), whose `advance` stays `none` pending the intractable `encdec_backwards` trace.
+* `h_decode` — the **Program-bus fetch truth** (`decodedInROM`), the `ProgTruth` seam.
+* `h_ready` — **trace well-formedness + routing** (`advanceReady`), from `InstructionTrace` + the opcode table.
+
+`OperandsBound_full = DecodeOperandsBound ∧ ValueOperandsBound`, so the dispatcher's `ValueOperandsBound`
+premise is met by `hob.2`. -/
+
+/-- **The full `TargetObligations` with `lift` discharged via `chipRows_advance_sound`** (Program-bus link
+still threaded). The monolithic W7 `lift` black box is the per-chip `advance` dispatcher ∘
+{`h_migrated`, `h_decode`, `h_ready`}. -/
+def targetObligations_full_via_advance (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p))
+    (rows : List (ChipRow p)) (data : ProverData (ZMod p))
+    (h_decode_link : TraceProgramValid (rows.map ChipRow.view) (decodedInROM prog))
+    (h_value_link : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+        TraceValueBinding s0 path)
+    (h_bin : ∀ r ∈ rows, r.is_real = 0 ∨ r.is_real = 1)
+    (h_spec : ∀ r ∈ rows, r.chipSpec data)
+    (h_migrated : ∀ r ∈ rows, r.is_real = 1 → (r.kind.advance).isSome = true)
+    (h_decode : ∀ r ∈ rows, r.is_real = 1 →
+      decodedInROM prog (programAccess r.view).toRow)
+    (h_ready : ∀ r ∈ rows, ∀ s : SailState, r.is_real = 1 →
+      r.kind.advanceReady r.inputs r.cols prog s)
+    (h_halt_nonempty : ∀ path, WalkOf pi.toLegacy rows path → path ≠ [])
+    (h_halt : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+      ∀ (hne : path ≠ []) s,
+        RefinesAt prog s0 path (path.length - 1) s →
+        OperandsBound_full prog (path[path.length - 1]'(by
+          have := List.length_pos_of_ne_nil hne; omega)) s →
+        SP1Halted prog (exitOf pi.exit_code) s) :
+    TargetObligations prog pi rows (OperandsBound_full prog) where
+  bound := operandsBound_full_targetBound prog pi rows h_decode_link h_value_link
+  lift := fun s0 path h0 hw i hi s href hob =>
+    chipRows_advance_sound rows data h_bin h_spec h_migrated h_decode h_ready s0 path h0 hw i hi s href hob.2
+  halt_nonempty := h_halt_nonempty
+  halt := h_halt
+
+/-- **The full `TargetObligations` with the Program-bus link retired AND `lift` discharged via
+`chipRows_advance_sound`** — the furthest capstone: `bound`'s decode half comes from the Program-bus
+balance, and `lift` is the per-chip `advance` dispatcher ∘ {`h_migrated`, `h_decode`, `h_ready`}. The
+only W7 residual left is coverage (`h_migrated`): true for every chip except the four decoder-seam chips
+(Mul/LoadDouble/LoadX0/StoreDouble). -/
+def targetObligations_full_of_balance_via_advance (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p))
+    (rows : List (ChipRow p)) (data : ProverData (ZMod p))
+    (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)
+    (h_decoded : ∀ row ∈ rom, decodedInROM prog row)
+    (h_bal : isConsistentBalanced
+      (aggregateChipRows (rows.map ChipRow.view) programLookups ++ romContributions rom mult))
+    (h_value_link : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+        TraceValueBinding s0 path)
+    (h_bin : ∀ r ∈ rows, r.is_real = 0 ∨ r.is_real = 1)
+    (h_spec : ∀ r ∈ rows, r.chipSpec data)
+    (h_migrated : ∀ r ∈ rows, r.is_real = 1 → (r.kind.advance).isSome = true)
+    (h_decode : ∀ r ∈ rows, r.is_real = 1 →
+      decodedInROM prog (programAccess r.view).toRow)
+    (h_ready : ∀ r ∈ rows, ∀ s : SailState, r.is_real = 1 →
+      r.kind.advanceReady r.inputs r.cols prog s)
+    (h_halt_nonempty : ∀ path, WalkOf pi.toLegacy rows path → path ≠ [])
+    (h_halt : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+      ∀ (hne : path ≠ []) s,
+        RefinesAt prog s0 path (path.length - 1) s →
+        OperandsBound_full prog (path[path.length - 1]'(by
+          have := List.length_pos_of_ne_nil hne; omega)) s →
+        SP1Halted prog (exitOf pi.exit_code) s) :
+    TargetObligations prog pi rows (OperandsBound_full prog) where
+  bound := operandsBound_full_targetBound_of_balance prog pi rows rom mult h_decoded h_bal h_value_link
+  lift := fun s0 path h0 hw i hi s href hob =>
+    chipRows_advance_sound rows data h_bin h_spec h_migrated h_decode h_ready s0 path h0 hw i hi s href hob.2
   halt_nonempty := h_halt_nonempty
   halt := h_halt
 
