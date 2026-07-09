@@ -310,7 +310,7 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.BranchColumns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
-  sailEquiv := fun inp cols s =>
+  sailEquiv := fun _inp cols s =>
     ∀ (rs1 rs2 : BitVec 5) (imm : BitVec 13) (pc rs1_val rs2_val : BitVec 64),
       SailState.isInitialized s →
       s.regs.get? Register.PC = some pc →
@@ -342,7 +342,7 @@ def kind : Soundness.ChipKind p where
       hs h_pc h_rs1 h_rs2 h_rs1v h_rs2v h_dec h_pcw =>
     branch_chip_reaches_sail inp cols data rs1 rs2 imm pc rs1_val rs2_val s hs h_real h_chip
       h_pc h_rs1 h_rs2 h_rs1v h_rs2v h_dec h_pcw
-  advanceReady := fun inp cols _ s =>
+  advanceReady := fun _inp cols _ s =>
     (∀ idx : BitVec 5, (idx.toNat : ZMod p) = cols.adapter.op_a →
        s.get_reg? idx = some (Word.toBitVec64 cols.adapter.op_a_memory.prev_value)) ∧
     ((cols.is_beq = 1 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧ cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨

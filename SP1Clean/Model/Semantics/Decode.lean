@@ -1449,6 +1449,41 @@ theorem storeOpcode_pin_one (w' : word_width)
   · exact absurd h (by decide)
   · exact absurd h (by decide)
 
+/-- `(storeOpcode 2).toNat = 37` (SH). Same `beq_self_eq_true` discipline as width 1 — no kernel
+deep-reduction of the `word_width = Int` comparison. -/
+theorem storeOpcode_two_toNat : (storeOpcode (2 : word_width)).toNat = 37 := by
+  have hsh : storeOpcode (2 : word_width) = Opcode.SH := by
+    unfold storeOpcode; rw [if_neg (by decide), if_pos (beq_self_eq_true (2 : word_width))]
+  rw [hsh]; rfl
+
+/-- `(storeOpcode 4).toNat = 38` (SW). -/
+theorem storeOpcode_four_toNat : (storeOpcode (4 : word_width)).toNat = 38 := by
+  have hsw : storeOpcode (4 : word_width) = Opcode.SW := by
+    unfold storeOpcode; rw [if_neg (by decide), if_neg (by decide),
+      if_pos (beq_self_eq_true (4 : word_width))]
+  rw [hsw]; rfl
+
+/-- **The width pin for SH.** `storeOpcode` is injective at SB/SH/SW:
+`(storeOpcode w').toNat = (storeOpcode 2).toNat → w' = 2`. Feeds `decodesStore`'s `hpin` for StoreHalf. -/
+theorem storeOpcode_pin_two (w' : word_width)
+    (h : (storeOpcode w').toNat = (storeOpcode (2 : word_width)).toNat) : w' = 2 := by
+  rw [storeOpcode_two_toNat] at h; simp only [storeOpcode] at h
+  split_ifs at h with h1 h2 h3
+  · exact absurd h (by decide)
+  · exact by simpa using h2
+  · exact absurd h (by decide)
+  · exact absurd h (by decide)
+
+/-- **The width pin for SW.** `(storeOpcode w').toNat = (storeOpcode 4).toNat → w' = 4`. -/
+theorem storeOpcode_pin_four (w' : word_width)
+    (h : (storeOpcode w').toNat = (storeOpcode (4 : word_width)).toNat) : w' = 4 := by
+  rw [storeOpcode_four_toNat] at h; simp only [storeOpcode] at h
+  split_ifs at h with h1 h2 h3
+  · exact absurd h (by decide)
+  · exact absurd h (by decide)
+  · exact by simpa using h3
+  · exact absurd h (by decide)
+
 /-- **The STORE decode inversion (W7), keyed on byte-width.** S-type shaped: if a decoded `i` projects
 to a committed row whose opcode is `storeOpcode width`'s and whose `imm_c = 1`, then `i` *is*
 `STORE (imm, rs2, rs1, width')` with `op_a = rs2` (the value SOURCE), `op_b = rs1` (base source),

@@ -1809,6 +1809,59 @@ theorem execute_STORE_reaches (imm : BitVec 12) (rs1_idx rs2_idx : BitVec 5)
   simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, h_rs2, hwrite,
     RETIRE_SUCCESS]
 
+set_option maxHeartbeats 10000000 in
+/-- **The width-2 `execute_STORE` reaches `Retire_Success`** (SH). The `execute_STORE_reaches` (width 1)
+twin: additionally requires 2-byte ALIGNMENT, and writes the low half `rs2[15:0]` as two little-endian
+bytes at `[addr, addr+1]`, leaving every register (incl. the staged `nextPC = pc+4`) untouched. Reduces
+via `SailMem.run_vmem_write_of_width_2` (whose 2-deep `mem.insert` fold this exposes verbatim). -/
+theorem execute_STORE_reaches_width2 (imm : BitVec 12) (rs1_idx rs2_idx : BitVec 5)
+    (rs1_val rs2_val : BitVec 64) (t : SailState)
+    (hs : t.isInitialized) (hconfig : SailState.isValidMemConfig t hs)
+    (h_rs1 : t.get_reg? rs1_idx = some rs1_val) (h_rs2 : t.get_reg? rs2_idx = some rs2_val)
+    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (rs1_val + sign_extend (m := 64) imm)) 2 = true)
+    (h_does_fit : rs1_val.toNat + (sign_extend (m := 64) imm : BitVec 64).toNat + 2 < 2 ^ 64)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (rs1_val + sign_extend (m := 64) imm) 0))
+      (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
+    (execute (.STORE (imm, .Regidx rs2_idx, .Regidx rs1_idx, 2))).run t
+      = .ok (ExecutionResult.Retire_Success ())
+          { t with mem := ((t.mem.insert (rs1_val + sign_extend (m := 64) imm).toNat
+              (BitVec.ofNat 8 (Sail.BitVec.extractLsb rs2_val 15 0).toNat)).insert
+              ((rs1_val + sign_extend (m := 64) imm).toNat + 1)
+              (BitVec.ofNat 8 ((Sail.BitVec.extractLsb rs2_val 15 0).toNat >>> 8))) } := by
+  have hwrite := run_vmem_write_of_width_2 rs1_idx rs1_val (sign_extend (m := 64) imm)
+    (Sail.BitVec.extractLsb rs2_val 15 0) t hs h_rs1 h_aligned hconfig h_does_fit h_in_range
+  simp only [execute]
+  simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, h_rs2, hwrite,
+    RETIRE_SUCCESS]
+
+set_option maxHeartbeats 10000000 in
+/-- **The width-4 `execute_STORE` reaches `Retire_Success`** (SW). The 4-byte (word) twin: requires
+4-byte ALIGNMENT, writes `rs2[31:0]` as four little-endian bytes at `[addr … addr+3]`, leaving every
+register untouched. Reduces via `SailMem.run_vmem_write_of_width_4` (4-deep `mem.insert` fold). -/
+theorem execute_STORE_reaches_width4 (imm : BitVec 12) (rs1_idx rs2_idx : BitVec 5)
+    (rs1_val rs2_val : BitVec 64) (t : SailState)
+    (hs : t.isInitialized) (hconfig : SailState.isValidMemConfig t hs)
+    (h_rs1 : t.get_reg? rs1_idx = some rs1_val) (h_rs2 : t.get_reg? rs2_idx = some rs2_val)
+    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (rs1_val + sign_extend (m := 64) imm)) 4 = true)
+    (h_does_fit : rs1_val.toNat + (sign_extend (m := 64) imm : BitVec 64).toNat + 4 < 2 ^ 64)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (rs1_val + sign_extend (m := 64) imm) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
+    (execute (.STORE (imm, .Regidx rs2_idx, .Regidx rs1_idx, 4))).run t
+      = .ok (ExecutionResult.Retire_Success ())
+          { t with mem := ((((t.mem.insert (rs1_val + sign_extend (m := 64) imm).toNat
+              (BitVec.ofNat 8 (Sail.BitVec.extractLsb rs2_val 31 0).toNat)).insert
+              ((rs1_val + sign_extend (m := 64) imm).toNat + 1)
+              (BitVec.ofNat 8 ((Sail.BitVec.extractLsb rs2_val 31 0).toNat >>> 8))).insert
+              ((rs1_val + sign_extend (m := 64) imm).toNat + 2)
+              (BitVec.ofNat 8 ((Sail.BitVec.extractLsb rs2_val 31 0).toNat >>> 16))).insert
+              ((rs1_val + sign_extend (m := 64) imm).toNat + 3)
+              (BitVec.ofNat 8 ((Sail.BitVec.extractLsb rs2_val 31 0).toNat >>> 24))) } := by
+  have hwrite := run_vmem_write_of_width_4 rs1_idx rs1_val (sign_extend (m := 64) imm)
+    (Sail.BitVec.extractLsb rs2_val 31 0) t hs h_rs1 h_aligned hconfig h_does_fit h_in_range
+  simp only [execute]
+  simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, h_rs2, hwrite,
+    RETIRE_SUCCESS]
+
 /-- **The store ladder core** — straight-line PC (`pc+4`), NO register write, ONE contiguous memory
 write (SC Phase 4 · Phase 3b.3; the FIRST chip with `commit.memWrite = some`). A hybrid of
 `advance_write_core` (straight-line pc via `sndPc_straightline`, since the store leaves the staged
@@ -2173,6 +2226,364 @@ theorem advance_of_load_width4 {prog : GuestProgram} {r : Trace.RowView (ZMod p)
         (by rw [hmemf]; exact hmem₂') (by rw [hmemf]; exact hmem₃')
       rwa [if_neg hrd_ne] at this)
     hrd_ne hopa'.symm hval hstraight hpc0 hwrites hnomem
+
+
+/-! ## AluX0 (ALU-into-x0, result discarded): the no-write straight-line core + family adapters -/
+
+set_option maxHeartbeats 4000000 in
+/-- **The no-write straight-line ALU core** (SC Phase 4).  The AluX0 (write-into-x0, result
+discarded) twin of `advance_write_core` / the no-write branch of `advance_of_ctrl`: the execute
+stage returns the state UNCHANGED (the `wX_bits 0#5` no-op leaves the register file fixed),
+`next_pc = pc+4`, `commit.writesReg = false`, `commit.memWrite = none`.  Purpose-built for ALU
+ops — the `hexec` needs NO memory frame (ALU never touches memory), just the register-file frame
++ pc frame + init + config.  Every AluX0 family adapter plugs in its own `execute_*_reaches`
+lemma at `rd = 0#5` (the `if_pos rfl` no-write branch).  The `RowEffect.regs` uses the `if_neg`
+all-index frame read-off (writesReg=false), exactly as `advance_of_ctrl`. -/
+theorem advance_alu_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
+    (I : instruction) (pc : BitVec 64) (data₀ data₁ data₂ data₃ : BitVec 8)
+    (cfg : SailConfigured s)
+    (hpc : s.regs.get? Register.PC = some pc) (hrcv : pc = rcvPcOf (stateAccess r))
+    (hfetch : FetchReady s pc data₀ data₁ data₂ data₃)
+    (hdecgen : ∀ sc : SailState, SailConfigured sc →
+      (ext_decode (data₃ ++ data₂ ++ data₁ ++ data₀)).run sc = .ok I sc)
+    (hexec : ∀ t : SailState, (∀ idx : BitVec 5, SailState.get_reg? t idx = SailState.get_reg? s idx) →
+      t.regs.get? Register.PC = s.regs.get? Register.PC →
+      t.isInitialized → SailConfigured t →
+      (execute I).run t = .ok (ExecutionResult.Retire_Success ()) t)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hnowrite : r.commit.writesReg = false)
+    (hnomem : r.commit.memWrite = none) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  have hxne : ∀ idx : BitVec 5, Register.nextPC ≠ reg_idx_to_Register idx := fun idx => by
+    unfold reg_idx_to_Register; split <;> decide
+  have hmne : ∀ idx : BitVec 5, Register.minstret_increment ≠ reg_idx_to_Register idx := fun idx => by
+    unfold reg_idx_to_Register; split <;> decide
+  obtain ⟨b, hb⟩ : ∃ b, (should_inc_minstret Privilege.Machine).run s = .ok b s :=
+    ⟨_, run_should_inc_minstret s cfg.init _⟩
+  have hslr : StraightLineReady ({s with regs := s.regs.insert Register.minstret_increment b})
+      (data₃ ++ data₂ ++ data₁ ++ data₀) :=
+    SailConfigured.toStraightLineReady cfg b pc data₀ data₁ data₂ data₃ hfetch
+  set s' := ({s with regs := s.regs.insert Register.minstret_increment b}) with hs'_def
+  set npv := BitVec.addInt (s'.regs.get Register.PC (hslr.init Register.PC)) 4 with hnpv_def
+  set s_a := ({s' with regs := s'.regs.insert Register.nextPC npv}) with hsa_def
+  have hsa : (Sail.writeReg Register.nextPC npv).run s' = .ok () s_a := by rw [Sail.run_writeReg]
+  have hinit_s' : SailState.isInitialized s' := by
+    rw [hs'_def]; exact SailState.isInitialized_insert s cfg.init _ _
+  have hinit_sa : SailState.isInitialized s_a := by
+    rw [hsa_def]; exact SailState.isInitialized_insert s' hinit_s' _ _
+  have hframe_sa : ∀ idx : BitVec 5, SailState.get_reg? s_a idx = SailState.get_reg? s idx := fun idx => by
+    rw [hsa_def, SailState.get_reg?_insert_of_ne (hxne idx), hs'_def,
+      SailState.get_reg?_insert_of_ne (hmne idx)]
+  have hpcf_sa : s_a.regs.get? Register.PC = s.regs.get? Register.PC := by
+    rw [hsa_def, Std.ExtDHashMap.get?_insert, dif_neg (by decide),
+      hs'_def, Std.ExtDHashMap.get?_insert, dif_neg (by decide)]
+  have hmem_sa : s_a.mem = s.mem := by rw [hsa_def, hs'_def]
+  have hgetPC : s'.regs.get Register.PC (hslr.init Register.PC) = pc := by
+    have h1 : s'.regs.get? Register.PC = some pc := by
+      rw [hs'_def, Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact hpc
+    rw [Std.ExtDHashMap.get?_eq_some_get (hslr.init Register.PC)] at h1
+    exact (Option.some.injEq _ _).mp h1
+  have hnpc_sa : s_a.regs.get? Register.nextPC = some (pc + 4#64) := by
+    rw [hsa_def, Std.ExtDHashMap.get?_insert_self, hnpv_def, hgetPC]; simp [BitVec.addInt]
+  have hcfg_sa : SailConfigured s_a :=
+    SailConfigured.congr (SailConfigured.writeMinstret cfg b) hinit_sa (fun R hR => by
+      rw [hsa_def, Std.ExtDHashMap.get?_insert,
+          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
+  have hexec_sa := hexec s_a hframe_sa hpcf_sa hinit_sa hcfg_sa
+  have hcp : (Sail.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
+    rw [Sail.run_readReg, cfg.priv]
+  have hactive : (s.regs.insert Register.minstret_increment b).get? Register.hart_state
+      = some (HartState.HART_ACTIVE ()) := by
+    rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide)]; exact cfg.active
+  have hdec : (ext_decode (data₃ ++ data₂ ++ data₁ ++ data₀)).run s' = .ok I s' :=
+    hdecgen s' (SailConfigured.writeMinstret cfg b)
+  have hframe_s : ∀ R : Register, R ≠ Register.minstret_increment → R ≠ Register.nextPC →
+      s_a.regs.get? R = s.regs.get? R := fun R h1 h2 => by
+    rw [hsa_def, Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h2 (beq_iff_eq.mp hc).symm),
+      hs'_def, Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h1 (beq_iff_eq.mp hc).symm)]
+  have h_active_sa : s_a.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()) := by
+    rw [hframe_s Register.hart_state (by decide) (by decide)]; exact cfg.active
+  obtain ⟨s_final, hrun, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
+    sailStep_of_ladder s s_a s_a (data₃ ++ data₂ ++ data₁ ++ data₀) I b
+      hb hcp hactive hslr hdec hsa hexec_sa h_active_sa hinit_sa
+  have hcfg_frame : ∀ R : Register,
+      (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
+        ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base ∨ R = Register.pma_regions)
+      → s_final.regs.get? R = s.regs.get? R := fun R hR => by
+    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
+      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
+  have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hmem_sa]
+  refine ⟨s_final, ⟨false, hrun⟩,
+    { pc := ?_, regs := ?_, mem := ⟨fun _ a => by rw [hmem_fin], fun mw hmw => absurd (hnomem.symm.trans hmw) (by simp)⟩, rom := ?_, init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
+  · rw [hPCf, hnpc_sa]; congr 1
+    rw [sndPc_straightline r hstraight hpc0, ← hrcv]
+  · rw [if_neg (by rw [hnowrite]; decide)]
+    intro idx
+    rw [hxf idx]; exact hframe_sa idx
+  · intro hr a w2 hf i; rw [hmem_fin]; exact hr a w2 hf i
+  · exact SailConfigured.congr cfg hinitf hcfg_frame
+
+set_option maxHeartbeats 4000000 in
+/-- **R-type into x0** (ADD/SUB/XOR/OR/AND/SLL/SRL/SRA/SLT/SLTU, `imm_c = 0`).  Generic over `op`.
+`rd` is forced to `0#5` from the committed `op_a = 0` (via `regidx_bv_inj`, the LoadX0 move), so the
+`rtype_execute_reaches` value drops out (`if_pos rfl`) and the whole row is straight-line no-write. -/
+theorem advance_of_alu_x0_rtype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (op : rop)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((ropToOpcode op).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0)
+    (hopa0 : r.adapter.op_a = 0) (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRType op hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd0 : rd = 0#5 := by
+    have hh : (rd.toNat : ZMod p) = ((0#5 : BitVec 5).toNat : ZMod p) := by rw [← hopa', hopa0]; simp
+    exact regidx_bv_inj hh
+  subst hrd0
+  exact advance_alu_x0_core (instruction.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx 0#5, op))
+    (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ _ => by
+      have := rtype_execute_reaches rs2 rs1 0#5 op (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_pos rfl] at this)
+    hstraight hpc0 hnowrite hnomem
+
+set_option maxHeartbeats 4000000 in
+/-- **RTYPEW into x0** (ADDW/SUBW/SLLW/SRLW/SRAW, `imm_c = 0`).  The `execute_RTYPEW` twin of
+`advance_of_alu_x0_rtype`. -/
+theorem advance_of_alu_x0_rtypew {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (op : ropw)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((ropwToOpcode op).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0)
+    (hopa0 : r.adapter.op_a = 0) (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRTypew op hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd0 : rd = 0#5 := by
+    have hh : (rd.toNat : ZMod p) = ((0#5 : BitVec 5).toNat : ZMod p) := by rw [← hopa', hopa0]; simp
+    exact regidx_bv_inj hh
+  subst hrd0
+  exact advance_alu_x0_core (instruction.RTYPEW (.Regidx rs2, .Regidx rs1, .Regidx 0#5, op))
+    (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ _ => by
+      have := rtypew_execute_reaches rs2 rs1 0#5 op (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_pos rfl] at this)
+    hstraight hpc0 hnowrite hnomem
+
+set_option maxHeartbeats 4000000 in
+/-- **ITYPE into x0** (ADDI, `imm_c = 1`).  One register read (`rs1` → `op_b`), the immediate in `op_c`. -/
+theorem advance_of_alu_x0_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (op : iop)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((iopToOpcode op).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 1)
+    (hopa0 : r.adapter.op_a = 0) (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesIType op hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd0 : rd = 0#5 := by
+    have hh : (rd.toNat : ZMod p) = ((0#5 : BitVec 5).toNat : ZMod p) := by rw [← hopa', hopa0]; simp
+    exact regidx_bv_inj hh
+  subst hrd0
+  exact advance_alu_x0_core (instruction.ITYPE (imm, .Regidx rs1, .Regidx 0#5, op))
+    (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ _ => by
+      have := itype_execute_reaches imm rs1 0#5 op (Word.toBitVec64 r.adapter.op_b_memory.prev_value) t
+        ((hframe rs1).trans hrs1)
+      rwa [if_pos rfl] at this)
+    hstraight hpc0 hnowrite hnomem
+
+set_option maxHeartbeats 4000000 in
+/-- **DIV/DIVU into x0** (`imm_c = 0`). -/
+theorem advance_of_alu_x0_div {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = (((if isU then Opcode.DIVU else Opcode.DIV)).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0)
+    (hopa0 : r.adapter.op_a = 0) (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDiv isU hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd0 : rd = 0#5 := by
+    have hh : (rd.toNat : ZMod p) = ((0#5 : BitVec 5).toNat : ZMod p) := by rw [← hopa', hopa0]; simp
+    exact regidx_bv_inj hh
+  subst hrd0
+  exact advance_alu_x0_core (instruction.DIV (.Regidx rs2, .Regidx rs1, .Regidx 0#5, isU))
+    (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ _ => by
+      have := execute_DIV_reaches rs2 rs1 0#5 isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_pos rfl] at this)
+    hstraight hpc0 hnowrite hnomem
+
+set_option maxHeartbeats 4000000 in
+/-- **REM/REMU into x0** (`imm_c = 0`; note the bool-first `SailRV64.rem isU`). -/
+theorem advance_of_alu_x0_rem {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = (((if isU then Opcode.REMU else Opcode.REM)).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0)
+    (hopa0 : r.adapter.op_a = 0) (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRem isU hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd0 : rd = 0#5 := by
+    have hh : (rd.toNat : ZMod p) = ((0#5 : BitVec 5).toNat : ZMod p) := by rw [← hopa', hopa0]; simp
+    exact regidx_bv_inj hh
+  subst hrd0
+  exact advance_alu_x0_core (instruction.REM (.Regidx rs2, .Regidx rs1, .Regidx 0#5, isU))
+    (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ _ => by
+      have := execute_REM_reaches rs2 rs1 0#5 isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_pos rfl] at this)
+    hstraight hpc0 hnowrite hnomem
+
+set_option maxHeartbeats 4000000 in
+/-- **DIVW/DIVUW into x0** (`imm_c = 0`). -/
+theorem advance_of_alu_x0_divw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = (((if isU then Opcode.DIVUW else Opcode.DIVW)).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0)
+    (hopa0 : r.adapter.op_a = 0) (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDivw isU hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd0 : rd = 0#5 := by
+    have hh : (rd.toNat : ZMod p) = ((0#5 : BitVec 5).toNat : ZMod p) := by rw [← hopa', hopa0]; simp
+    exact regidx_bv_inj hh
+  subst hrd0
+  exact advance_alu_x0_core (instruction.DIVW (.Regidx rs2, .Regidx rs1, .Regidx 0#5, isU))
+    (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ _ => by
+      have := execute_DIVW_reaches rs2 rs1 0#5 isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_pos rfl] at this)
+    hstraight hpc0 hnowrite hnomem
+
+set_option maxHeartbeats 4000000 in
+/-- **REMW/REMUW into x0** (`imm_c = 0`; bool-first `SailRV64.remw isU`). -/
+theorem advance_of_alu_x0_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = (((if isU then Opcode.REMUW else Opcode.REMW)).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0)
+    (hopa0 : r.adapter.op_a = 0) (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRemw isU hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd0 : rd = 0#5 := by
+    have hh : (rd.toNat : ZMod p) = ((0#5 : BitVec 5).toNat : ZMod p) := by rw [← hopa', hopa0]; simp
+    exact regidx_bv_inj hh
+  subst hrd0
+  exact advance_alu_x0_core (instruction.REMW (.Regidx rs2, .Regidx rs1, .Regidx 0#5, isU))
+    (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ _ => by
+      have := execute_REMW_reaches rs2 rs1 0#5 isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_pos rfl] at this)
+    hstraight hpc0 hnowrite hnomem
 
 
 end SP1Clean.Advance

@@ -2,6 +2,7 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.AluX0Chip.Formal
 import SP1Clean.Soundness.ChipRow
+import SP1Clean.Proofs.Sail.Advance
 import RISCV.Instructions
 import RISCV.SailToRV64
 import RISCV.SailPureToInstructions
@@ -213,19 +214,104 @@ namespace SP1Clean.AluX0Chip
 
 open SP1Clean.AluX0Sail
 open Sail LeanRV64D LeanRV64D.Functions
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- The AluX0 RowView (shared by `kind.view` and `advance`): straight-line `pc+4` next-pc, the
+ALU-type adapter, the zero word as the (discarded) `x0` write, the dynamic `opcode` column,
+`.noWrite` commit (rd = x0). -/
+def rowView (inp : Inputs (ZMod p)) (cols : Extracted.AluX0Cols (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+    cols.adapter.toAdapterView, inp.is_real, #v[(0 : ZMod p), 0, 0, 0], cols.opcode, .noWrite⟩
+
+/-- **AluX0's advance-readiness bundle** (SC Phase 4).  Depends on `cols` only (no `inp` — the value is
+discarded, so no reader-passthrough is needed).  The routing invariants the trace dispatcher supplies
+beyond refinement + `Spec`: the destination is `x0` (`op_a = 0`, the dual of every register-writing
+chip's `op_a ≠ 0`), the low-pc-limb bound, and — since AluX0's opcode is a single dynamic column (no
+per-op flags) — the committed `(opcode, imm_c)` pair identifying WHICH of the 24 straight-line ALU ops
+this row is (the decode's opcode↔imm_c correlation).  MUL/MULH/MULHU/MULHSU (11-14) and MULW (24) are
+DELIBERATELY EXCLUDED — see the decode seam note below; their rows are not yet covered by AluX0.advance. -/
+def advanceReady (cols : Extracted.AluX0Cols (ZMod p)) : Prop :=
+  cols.adapter.op_a = 0 ∧ cols.state.pc[0].val < 2 ^ 16 ∧
+  ( (cols.opcode = (Opcode.ADD.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.ADDI.toNat : ZMod p) ∧ cols.adapter.imm_c = 1) ∨
+    (cols.opcode = (Opcode.SUB.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.XOR.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.OR.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.AND.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.SLL.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.SRL.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.SRA.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.SLT.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.SLTU.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.DIV.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.DIVU.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.REM.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.REMU.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.ADDW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.SUBW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.SLLW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.SRLW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.SRAW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.DIVW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.DIVUW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.REMW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.REMUW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) )
+
+set_option maxHeartbeats 4000000 in
+/-- **`AluX0Chip.advance`** — the per-AluX0-row `try_step` lift (SC Phase 4), 24-way opcode dispatch
+into the seven no-write family adapters.  `op_a = 0` (so `rd = x0`, the value discarded) and the low-pc
+bound come from `advanceReady`; `himmb`/`hstraight` are `rfl` (the ALU-type `toAdapterView`).  Each
+branch reads its `(opcode, imm_c)` off `advanceReady` and calls the matching
+`advance_of_alu_x0_{rtype,rtypew,itype,div,rem,divw,remw}`.  This proof **is** `kind.advance` below —
+stated to match the `ChipKind.advance` obligation exactly (`view := rowView`, `advanceReady := this`). -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.AluX0Cols (ZMod p)) (data : ProverData (ZMod p))
+    (prog : GuestProgram) (s : SailState)
+    (_hreal : (rowView inp cols).is_real = 1) (_hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : advanceReady cols) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hopa0, hpc0, hdisj⟩ := hready
+  have himmb : (rowView inp cols).adapter.imm_b = 0 := rfl
+  rcases hdisj with ⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩
+  · exact advance_of_alu_x0_rtype rop.ADD hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_itype iop.ADDI hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtype rop.SUB hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtype rop.XOR hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtype rop.OR hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtype rop.AND hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtype rop.SLL hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtype rop.SRL hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtype rop.SRA hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtype rop.SLT hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtype rop.SLTU hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_div false hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_div true hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rem false hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rem true hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtypew ropw.ADDW hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtypew ropw.SUBW hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtypew ropw.SLLW hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtypew ropw.SRLW hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_rtypew ropw.SRAW hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_divw false hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_divw true hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_remw false hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_remw true hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+
 /-- `AluX0`'s `ChipKind` registration. `view.wr` is the zero word (`x0` discards the result);
 `sailEquiv` is the 29-way Sail conjunction (all covered ALU opcodes into `x0`), discharged via the
-five family-core lemmas. Register reads (`h_rs1`/`h_rs2`) are needed only to make Sail reads succeed. -/
+five family-core lemmas. Register reads (`h_rs1`/`h_rs2`) are needed only to make Sail reads succeed.
+`advance` (SC Phase 4) covers 24/29 — the 5 MUL/MULW-into-x0 opcodes are the documented decode seam. -/
 def kind : Soundness.ChipKind p where
   name := "AluX0"
   Inputs := AluX0Chip.Inputs
   Cols := Extracted.AluX0Cols
-  view := fun inp cols => ⟨cols.state,
-    #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, #v[(0 : ZMod p), 0, 0, 0], cols.opcode, .noWrite⟩
+  view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   sailEquiv := fun _inp _cols s => ∀ (rs1 rs2 : BitVec 5) (imm : BitVec 12) (pc : BitVec 64)
       (rs1_val rs2_val : BitVec 64),
@@ -292,5 +378,7 @@ def kind : Soundness.ChipKind p where
      correct_aluX0_divw true rs1 rs2 rs1_val rs2_val pc s h_pc h_rs1 h_rs2,
      correct_aluX0_remw false rs1 rs2 rs1_val rs2_val pc s h_pc h_rs1 h_rs2,
      correct_aluX0_remw true rs1 rs2 rs1_val rs2_val pc s h_pc h_rs1 h_rs2⟩
+  advanceReady := fun _ cols _ _ => advanceReady cols
+  advance := some (PLift.up advance)
 
 end SP1Clean.AluX0Chip
