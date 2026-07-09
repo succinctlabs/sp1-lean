@@ -31,6 +31,7 @@ recording the worked Add example's six steps end-to-end. The docs here distill i
 - [release-audit.md](release-audit.md) — the honest claim, the five-kinds-of-faithfulness analysis, the machine-model divergence catalog, the axiom census, the `sorry` blocker inventory, and the modeling-fidelity / SP1-developer-reactions sections.
 - [roadmap.md](roadmap.md) — open work along two axes: coverage breadth (Axis A) and sound-model depth (Axis B), with the five remaining `sorry`s up front.
 - [bus-model.md](bus-model.md) — the cross-chip interaction-bus model (channels, the static byte table, Guarantees/Requirements duality).
+- [chip-standardization.md](chip-standardization.md) — the uniform per-chip `ChipKind.advance` contract: motivation (spurred by the semantic channels), the two-axis effect model, the generic dispatcher, current progress (21/25 chips), and the decoder-seam deferral.
 
 **Contributor / agent-facing** — see [`agents/README.md`](agents/README.md) for the full index.
 - [agents/porting-recipe.md](agents/porting-recipe.md) — create the four artifacts, wire the root import, verify build + axioms; reuse Clean's native gadgets instead of an SP1 byte-bus.
