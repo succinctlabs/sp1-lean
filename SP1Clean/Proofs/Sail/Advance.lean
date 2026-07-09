@@ -1244,6 +1244,39 @@ theorem execute_REMW_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (isU : Bool)
     run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
+/-- The MUL/MULH/MULHU/MULHSU execute stage reaches `Retire_Success` (write value
+`SailRV64.mul op_c op_b op`).  Generic in `op : mul_op`; mirrors `execute_DIV_reaches`
+via `_root_.mul_eq`/`skeleton_binary`. -/
+theorem execute_MUL_reaches (rs2_idx rs1_idx rd_idx : BitVec 5) (op : mul_op)
+    (op_b op_c : BitVec 64) (s_a : SailState)
+    (h_rs1 : s_a.get_reg? rs1_idx = some op_b) (h_rs2 : s_a.get_reg? rs2_idx = some op_c) :
+    (execute (.MUL (.Regidx rs2_idx, .Regidx rs1_idx, .Regidx rd_idx, op))).run s_a
+      = .ok (ExecutionResult.Retire_Success ())
+          (if rd_idx = 0#5 then s_a
+           else {s_a with regs := (s_a.regs.insert (reg_idx_to_Register rd_idx)
+             (bitVecToRegidxVal rd_idx (SailRV64.mul op_c op_b op)))}) := by
+  simp only [execute, _root_.mul_eq, skeleton_binary]
+  rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1]),
+    run_bind_of_run s_a _ op_c (by rw [run_rX_bits, h_rs2]),
+    run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  rfl
+
+/-- The MULW execute stage reaches `Retire_Success` (write value `SailRV64.mulw op_c op_b`).
+Mirrors `execute_DIVW_reaches` via `_root_.mulw_eq`/`skeleton_binary`. -/
+theorem execute_MULW_reaches (rs2_idx rs1_idx rd_idx : BitVec 5)
+    (op_b op_c : BitVec 64) (s_a : SailState)
+    (h_rs1 : s_a.get_reg? rs1_idx = some op_b) (h_rs2 : s_a.get_reg? rs2_idx = some op_c) :
+    (execute (.MULW (.Regidx rs2_idx, .Regidx rs1_idx, .Regidx rd_idx))).run s_a
+      = .ok (ExecutionResult.Retire_Success ())
+          (if rd_idx = 0#5 then s_a
+           else {s_a with regs := (s_a.regs.insert (reg_idx_to_Register rd_idx)
+             (bitVecToRegidxVal rd_idx (SailRV64.mulw op_c op_b)))}) := by
+  simp only [execute, _root_.mulw_eq, skeleton_binary]
+  rw [run_bind_of_run s_a _ op_b (by rw [run_rX_bits, h_rs1]),
+    run_bind_of_run s_a _ op_c (by rw [run_rX_bits, h_rs2]),
+    run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  rfl
+
 /-- The DIV/DIVU chip `advance` (RowView-generic; mirrors `advance_of_rtype`). -/
 theorem advance_of_div {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -2581,6 +2614,86 @@ theorem advance_of_alu_x0_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)
     (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
     (fun t hframe _ _ _ => by
       have := execute_REMW_reaches rs2 rs1 0#5 isU (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_pos rfl] at this)
+    hstraight hpc0 hnowrite hnomem
+
+set_option maxHeartbeats 4000000 in
+/-- **MUL-family into x0** (MUL/MULH/MULHU/MULHSU, `imm_c = 0`).  Generic over `op : mul_op`
+with the opcode-pin `hpin` (so the decode fixes the instruction).  `rd` is forced to `0#5`
+from the committed `op_a = 0` (`regidx_bv_inj`), the `execute_MUL_reaches op` value drops out
+(`if_pos rfl`), the whole row is straight-line no-write.  The `.MUL` twin of `advance_of_alu_x0_div`.
+NOTE: usable only where `hpin` holds, i.e. MULH/MULHU (injective).  MUL/MULHSU are decoder seams. -/
+theorem advance_of_alu_x0_mul {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
+    (op : mul_op) (hpin : ∀ op' : mul_op, (mulOpToOpcode op').toNat = (mulOpToOpcode op).toNat → op' = op)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((mulOpToOpcode op).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0)
+    (hopa0 : r.adapter.op_a = 0) (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesMul op hpin hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd0 : rd = 0#5 := by
+    have hh : (rd.toNat : ZMod p) = ((0#5 : BitVec 5).toNat : ZMod p) := by rw [← hopa', hopa0]; simp
+    exact regidx_bv_inj hh
+  subst hrd0
+  exact advance_alu_x0_core (instruction.MUL (.Regidx rs2, .Regidx rs1, .Regidx 0#5, op))
+    (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ _ => by
+      have := execute_MUL_reaches rs2 rs1 0#5 op (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_pos rfl] at this)
+    hstraight hpc0 hnowrite hnomem
+
+set_option maxHeartbeats 4000000 in
+/-- **MULW into x0** (`imm_c = 0`).  No `mul_op`, so the instruction is fully fixed by the
+opcode — the `execute_MULW` twin of `advance_of_alu_x0_divw`. -/
+theorem advance_of_alu_x0_mulw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((Opcode.MULW).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0)
+    (hopa0 : r.adapter.op_a = 0) (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesMulw hdecrom hop himmc hcfg
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd0 : rd = 0#5 := by
+    have hh : (rd.toNat : ZMod p) = ((0#5 : BitVec 5).toNat : ZMod p) := by rw [← hopa', hopa0]; simp
+    exact regidx_bv_inj hh
+  subst hrd0
+  exact advance_alu_x0_core (instruction.MULW (.Regidx rs2, .Regidx rs1, .Regidx 0#5))
+    (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ _ => by
+      have := execute_MULW_reaches rs2 rs1 0#5 (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
         (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem

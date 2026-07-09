@@ -1237,6 +1237,147 @@ theorem decodesRemw {prog : GuestProgram} {row : ProgramRow (ZMod p)} (isU : Boo
     have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
   subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
 
+/-! ## MUL/MULW decode inversions + producers (SC Phase 4)
+
+Unlike DIV/REM (opcode ↔ signedness is injective), `mulOpToOpcode` is **not** injective at the
+MUL opcode (`.Low, _, _ => .MUL`, four preimages) nor at MULHSU (two).  So `instrToProgramRow_inv_mul`
+takes an explicit `hpin` pinning the `mul_op` from the opcode — provable (`by decide`) only for MULH
+and MULHU.  MUL and MULHSU remain decoder seams (would need `ext_decode` output-determinism). -/
+
+/-- The MUL/MULH/MULHU/MULHSU decode inversion (R-type shape, opcode `mulOpToOpcode op`, imm_c = 0),
+generic over `op : mul_op` with the opcode-pin `hpin` (the `storeOpcode_pin_one` move: the split lands
+on `.MUL(rs2,rs1,rd,op')`, `hpin` forces `op' = op`). -/
+theorem instrToProgramRow_inv_mul {pc : Vector (ZMod p) 3} {i : instruction} {row : ProgramRow (ZMod p)}
+    (op : mul_op) (hpin : ∀ op' : mul_op, (mulOpToOpcode op').toNat = (mulOpToOpcode op).toNat → op' = op)
+    (h : instrToProgramRow pc i = some row)
+    (hop : row.opcode = ((mulOpToOpcode op).toNat : ZMod p))
+    (himm : row.imm_c = (0 : ZMod p)) :
+    ∃ rs2 rs1 rd : regidx, i = .MUL (rs2, rs1, rd, op) ∧
+      row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
+      ∧ row.op_c = #v[regidxVal rs2, 0, 0, 0] := by
+  simp only [instrToProgramRow] at h
+  split at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst h)
+  all_goals (try (exact absurd himm one_ne_zero))
+  · rename_i rs2 rs1 rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (rcases op with ⟨a, b, c⟩; cases a <;> cases b <;> cases c <;> decide))
+  · rename_i rs2 rs1 rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (rcases op with ⟨a, b, c⟩; cases a <;> cases b <;> cases c <;> decide))
+  · rename_i rs2 rs1 rd m
+    obtain rfl : m = op := hpin m (opcodeCast_inj hop)
+    exact ⟨rs2, rs1, rd, rfl, rfl, rfl, rfl⟩
+  · rename_i rs2 rs1 rd
+    exact absurd (opcodeCast_inj hop)
+      (by rcases op with ⟨a, b, c⟩; cases a <;> cases b <;> cases c <;> decide)
+  · rename_i rs2 rs1 rd isU'
+    exact absurd (opcodeCast_inj hop)
+      (by cases isU' <;> (rcases op with ⟨a, b, c⟩; cases a <;> cases b <;> cases c <;> decide))
+  · rename_i rs2 rs1 rd isU'
+    exact absurd (opcodeCast_inj hop)
+      (by cases isU' <;> (rcases op with ⟨a, b, c⟩; cases a <;> cases b <;> cases c <;> decide))
+  · rename_i rs2 rs1 rd isU'
+    exact absurd (opcodeCast_inj hop)
+      (by cases isU' <;> (rcases op with ⟨a, b, c⟩; cases a <;> cases b <;> cases c <;> decide))
+  · rename_i rs2 rs1 rd isU'
+    exact absurd (opcodeCast_inj hop)
+      (by cases isU' <;> (rcases op with ⟨a, b, c⟩; cases a <;> cases b <;> cases c <;> decide))
+
+/-- The MULW decode inversion (R-type shape, opcode `MULW`, imm_c = 0).  No `mul_op`, so the
+instruction is fully fixed (no pin needed). -/
+theorem instrToProgramRow_inv_mulw {pc : Vector (ZMod p) 3} {i : instruction} {row : ProgramRow (ZMod p)}
+    (h : instrToProgramRow pc i = some row)
+    (hop : row.opcode = ((Opcode.MULW).toNat : ZMod p))
+    (himm : row.imm_c = (0 : ZMod p)) :
+    ∃ rs2 rs1 rd : regidx, i = .MULW (rs2, rs1, rd) ∧
+      row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
+      ∧ row.op_c = #v[regidxVal rs2, 0, 0, 0] := by
+  simp only [instrToProgramRow] at h
+  split at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst h)
+  all_goals (try (exact absurd himm one_ne_zero))
+  · rename_i rs2 rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i rs2 rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> decide)
+  · rename_i rs2 rs1 rd m
+    exact absurd (opcodeCast_inj hop)
+      (by rcases m with ⟨a, b, c⟩; cases a <;> cases b <;> cases c <;> decide)
+  · rename_i rs2 rs1 rd
+    exact ⟨rs2, rs1, rd, rfl, rfl, rfl, rfl⟩
+  · rename_i rs2 rs1 rd isU'
+    exact absurd (opcodeCast_inj hop) (by cases isU' <;> decide)
+  · rename_i rs2 rs1 rd isU'
+    exact absurd (opcodeCast_inj hop) (by cases isU' <;> decide)
+  · rename_i rs2 rs1 rd isU'
+    exact absurd (opcodeCast_inj hop) (by cases isU' <;> decide)
+  · rename_i rs2 rs1 rd isU'
+    exact absurd (opcodeCast_inj hop) (by cases isU' <;> decide)
+
+/-- ∀-configured-state MUL/MULH/MULHU/MULHSU decode producer (mirrors `decodesDiv`), threading `hpin`. -/
+theorem decodesMul {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : mul_op)
+    (hpin : ∀ op' : mul_op, (mulOpToOpcode op').toNat = (mulOpToOpcode op).toNat → op' = op)
+    (h : decodedInROM prog row)
+    (hop : row.opcode = ((mulOpToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0)
+    {s0 : SailState} (hs0 : SailConfigured s0) :
+    ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
+      prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (∀ sc, SailConfigured sc → (ext_decode w).run sc
+        = .ok (instruction.MUL (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) sc) ∧
+      row.op_a = (rd.toNat : ZMod p) ∧
+      row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
+      row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
+  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
+  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_mul op hpin hrow0 hop himm
+  obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
+  refine ⟨w, rs2, rs1, rd, hfetch, ?_, ha, hb, hc⟩
+  intro sc hsc
+  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
+  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
+  obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_mul op hpin hrow2 hop himm
+  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
+  have e2 : rs2' = rs2 := regidx_bv_inj (by
+    have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
+  have e1 : rs1' = rs1 := regidx_bv_inj (by
+    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
+  have e0 : rd' = rd := regidx_bv_inj (by
+    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
+  subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
+
+/-- ∀-configured-state MULW decode producer (mirrors `decodesDivw`; no `mul_op`). -/
+theorem decodesMulw {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row)
+    (hop : row.opcode = ((Opcode.MULW).toNat : ZMod p)) (himm : row.imm_c = 0)
+    {s0 : SailState} (hs0 : SailConfigured s0) :
+    ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
+      prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (∀ sc, SailConfigured sc → (ext_decode w).run sc
+        = .ok (instruction.MULW (.Regidx rs2, .Regidx rs1, .Regidx rd)) sc) ∧
+      row.op_a = (rd.toNat : ZMod p) ∧
+      row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
+      row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
+  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
+  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_mulw hrow0 hop himm
+  obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
+  refine ⟨w, rs2, rs1, rd, hfetch, ?_, ha, hb, hc⟩
+  intro sc hsc
+  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
+  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
+  obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_mulw hrow2 hop himm
+  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
+  have e2 : rs2' = rs2 := regidx_bv_inj (by
+    have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
+  have e1 : rs1' = rs1 := regidx_bv_inj (by
+    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
+  have e0 : rd' = rd := regidx_bv_inj (by
+    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
+  subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
+
 /-! ## BTYPE (branches) decode inversion + producer (SC Phase 4 · Phase 3a) -/
 
 /-- **The 13-bit B-immediate sign-extension is injective** (clean, no `bv_decide`): recover `x` as the low
