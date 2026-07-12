@@ -1981,6 +1981,45 @@ theorem execute_STORE_reaches_width4 (imm : BitVec 12) (rs1_idx rs2_idx : BitVec
   simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, PreSail.assert, h_rs2, hwrite,
     RETIRE_SUCCESS]
 
+set_option maxHeartbeats 10000000 in
+/-- **The width-8 `execute_STORE` reaches `Retire_Success`** (SD). The 8-byte (double-word) twin:
+requires 8-byte ALIGNMENT, writes the full 64-bit `rs2` as eight little-endian bytes at
+`[addr … addr+7]`, leaving every register untouched. Reduces via `SailMem.run_vmem_write_of_width_8`
+(8-deep `mem.insert` fold); the `extractLsb rs2 63 0` collapses to `rs2` (`hext`). -/
+theorem execute_STORE_reaches_width8 (imm : BitVec 12) (rs1_idx rs2_idx : BitVec 5)
+    (rs1_val rs2_val : BitVec 64) (t : SailState)
+    (hs : t.isInitialized) (hconfig : SailState.isValidMemConfig t hs)
+    (h_rs1 : t.get_reg? rs1_idx = some rs1_val) (h_rs2 : t.get_reg? rs2_idx = some rs2_val)
+    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (rs1_val + sign_extend (m := 64) imm)) 8 = true)
+    (h_does_fit : rs1_val.toNat + (sign_extend (m := 64) imm : BitVec 64).toNat + 8 < 2 ^ 64)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (rs1_val + sign_extend (m := 64) imm) 0))
+      (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
+    (execute (.STORE (imm, .Regidx rs2_idx, .Regidx rs1_idx, 8))).run t
+      = .ok (ExecutionResult.Retire_Success ())
+          { t with mem := ((((((((t.mem.insert (rs1_val + sign_extend (m := 64) imm).toNat
+              (BitVec.ofNat 8 rs2_val.toNat)).insert
+              ((rs1_val + sign_extend (m := 64) imm).toNat + 1)
+              (BitVec.ofNat 8 (rs2_val.toNat >>> 8))).insert
+              ((rs1_val + sign_extend (m := 64) imm).toNat + 2)
+              (BitVec.ofNat 8 (rs2_val.toNat >>> 16))).insert
+              ((rs1_val + sign_extend (m := 64) imm).toNat + 3)
+              (BitVec.ofNat 8 (rs2_val.toNat >>> 24))).insert
+              ((rs1_val + sign_extend (m := 64) imm).toNat + 4)
+              (BitVec.ofNat 8 (rs2_val.toNat >>> 32))).insert
+              ((rs1_val + sign_extend (m := 64) imm).toNat + 5)
+              (BitVec.ofNat 8 (rs2_val.toNat >>> 40))).insert
+              ((rs1_val + sign_extend (m := 64) imm).toNat + 6)
+              (BitVec.ofNat 8 (rs2_val.toNat >>> 48))).insert
+              ((rs1_val + sign_extend (m := 64) imm).toNat + 7)
+              (BitVec.ofNat 8 (rs2_val.toNat >>> 56))) } := by
+  have hwrite := run_vmem_write_of_width_8 rs1_idx rs1_val (sign_extend (m := 64) imm)
+    rs2_val t hs h_rs1 h_aligned hconfig h_does_fit h_in_range
+  have hext : Sail.BitVec.extractLsb rs2_val 63 0 = rs2_val := by
+    simp [Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb']
+  simp only [execute]
+  simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, PreSail.assert, h_rs2, hext, hwrite,
+    RETIRE_SUCCESS]
+
 /-- **The store ladder core** — straight-line PC (`pc+4`), NO register write, ONE contiguous memory
 write (SC Phase 4 · Phase 3b.3; the FIRST chip with `commit.memWrite = some`). A hybrid of
 `advance_write_core` (straight-line pc via `sndPc_straightline`, since the store leaves the staged

@@ -1800,5 +1800,91 @@ theorem decodesStore {prog : GuestProgram} {row : ProgramChip.ProgramRow (ZMod p
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r
   exact ⟨w, imm, rs2, rs1, hfetch, hrun, ha, hb, hc⟩
 
+omit [Fact (2 ^ 17 < p)] in
+/-- Guard extraction at the STORE arm: a primed projection of a `.STORE` forces width validity
+(the `storeWidthOK` image the guard buys). The `instrToProgramRow'_load_valid` twin for STORE. -/
+theorem instrToProgramRow'_store_valid {pc : Vector (ZMod p) 3}
+    {imm : BitVec 12} {rs2 rs1 : regidx} {width : word_width}
+    {row : ProgramRow (ZMod p)}
+    (h : instrToProgramRow' pc (.STORE (imm, rs2, rs1, width)) = some row) :
+    storeWidthOK width = true := by
+  cases hcm : storeWidthOK width with
+  | true => rfl
+  | false =>
+    rw [instrToProgramRow'] at h
+    rw [hcm] at h
+    simp at h
+
+/-- **The STORE inversion WITHOUT `hpin`** (the `instrToProgramRow_inv_load'` twin for STORE). From the
+*guarded* projection, the opcode column pins the width for the decoder's canonical image — in particular
+width 8 / `SD`, the `hpin`-unprovable case (`storeOpcode` is the non-injective `else`→SD there). The guard
+supplies `storeWidthOK width'` at the `.STORE` arm (`instrToProgramRow'_store_valid`), and
+`storeOpcode_inj_on_valid` pins `width' = width` from the opcode. `hwidth` is `by decide` at each concrete
+width. What `decodesStore'` (and `StoreDoubleChip.advance`) consume. -/
+theorem instrToProgramRow_inv_store' {pc : Vector (ZMod p) 3} {i : instruction} {row : ProgramRow (ZMod p)}
+    (width : word_width) (hwidth : storeWidthOK width = true)
+    (h : instrToProgramRow' pc i = some row)
+    (hop : row.opcode = ((storeOpcode width).toNat : ZMod p))
+    (himm : row.imm_c = (1 : ZMod p)) :
+    ∃ (imm : BitVec 12) (rs2 rs1 : regidx), i = .STORE (imm, rs2, rs1, width) ∧
+      row.op_a = regidxVal rs2 ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
+      ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
+  have honezero : (1 : ZMod p) ≠ 0 := by
+    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    exact one_ne_zero
+  have h0 : instrToProgramRow pc i = some row := instrToProgramRow'_some h
+  simp only [instrToProgramRow] at h0
+  split at h0
+  all_goals first | contradiction | (rw [Option.some.injEq] at h0; subst h0)
+  all_goals (try (exact absurd himm.symm honezero))
+  · rename_i imm rs1 rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [storeOpcode, iopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [storeOpcode, uopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rd
+    exact absurd (opcodeCast_inj hop) (by simp only [storeOpcode, Opcode.toNat]; split_ifs <;> decide)
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by simp only [storeOpcode, Opcode.toNat]; split_ifs <;> decide)
+  · rename_i imm rs2 rs1 op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [storeOpcode, bopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs1 rd isU width2
+    exact absurd (opcodeCast_inj hop)
+      (by cases isU <;> (simp only [storeOpcode, loadOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs2 rs1 width'
+    have hg : storeWidthOK width' = true := instrToProgramRow'_store_valid h
+    obtain rfl := storeOpcode_inj_on_valid width' width hg hwidth (opcodeCast_inj hop)
+    exact ⟨imm, rs2, rs1, rfl, rfl, rfl, rfl⟩
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [storeOpcode, sopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop)
+      (by cases op' <;> (simp only [storeOpcode, sopwToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by simp only [storeOpcode, Opcode.toNat]; split_ifs <;> decide)
+
+/-- **The ∀-configured-state STORE decode producer, WITHOUT `hpin`** (the `decodesLoad'` twin for STORE).
+Pinned by the width-validity guard `hwidth` via `instrToProgramRow_inv_store'`, so it covers the
+non-injective width-8 `SD` opcode too. What `StoreDoubleChip.advance` consumes. -/
+theorem decodesStore' {prog : GuestProgram} {row : ProgramChip.ProgramRow (ZMod p)} (width : word_width)
+    (hwidth : storeWidthOK width = true)
+    (h : decodedInROM prog row)
+    (hop : row.opcode = ((storeOpcode width).toNat : ZMod p)) (himm : row.imm_c = 1) :
+    ∃ (w : BitVec 32) (imm : BitVec 12) (rs2 rs1 : BitVec 5),
+      prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (∀ sc, SailConfigured sc → (ext_decode w).run sc
+        = .ok (instruction.STORE (imm, .Regidx rs2, .Regidx rs1, width)) sc) ∧
+      row.op_a = (rs2.toNat : ZMod p) ∧
+      row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
+      row.op_c = bitVecToWord (imm.signExtend 64) := by
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨imm, rs2r, rs1r, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_store' width hwidth hrow hop himm
+  obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r
+  exact ⟨w, imm, rs2, rs1, hfetch, hrun, ha, hb, hc⟩
+
 
 end SP1Clean.Soundness.Target

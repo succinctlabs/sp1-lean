@@ -3,6 +3,7 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.StoreDoubleChip.Formal
 import SP1Clean.Soundness.ChipRow
+import SP1Clean.Proofs.Sail.Advance
 
 /-! # Native Sail bridge for StoreDouble (SD)
 
@@ -176,19 +177,341 @@ namespace SP1Clean.StoreDoubleChip
 open SP1Clean.StoreSail
 open Sail LeanRV64D LeanRV64D.Functions
 open SP1Clean.SailMem
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-! ### Kernel-depth helper lemmas (SC Phase 4 · Phase 3b.4) — the width-8 twins of StoreWord.
+Each little-endian byte `k` of the full 64-bit stored value `v` is `v.extractLsb' (8·k) 8`. -/
+
+private theorem sd_byte0_64 (v : BitVec 64) :
+    BitVec.ofNat 8 v.toNat = v.extractLsb' 0 8 := by
+  simp only [BitVec.ofNat_toNat]; bv_decide
+private theorem sd_byte1_64 (v : BitVec 64) :
+    BitVec.ofNat 8 (v.toNat >>> 8) = v.extractLsb' 8 8 := by
+  simp only [← BitVec.toNat_ushiftRight, BitVec.ofNat_toNat]; bv_decide
+private theorem sd_byte2_64 (v : BitVec 64) :
+    BitVec.ofNat 8 (v.toNat >>> 16) = v.extractLsb' 16 8 := by
+  simp only [← BitVec.toNat_ushiftRight, BitVec.ofNat_toNat]; bv_decide
+private theorem sd_byte3_64 (v : BitVec 64) :
+    BitVec.ofNat 8 (v.toNat >>> 24) = v.extractLsb' 24 8 := by
+  simp only [← BitVec.toNat_ushiftRight, BitVec.ofNat_toNat]; bv_decide
+private theorem sd_byte4_64 (v : BitVec 64) :
+    BitVec.ofNat 8 (v.toNat >>> 32) = v.extractLsb' 32 8 := by
+  simp only [← BitVec.toNat_ushiftRight, BitVec.ofNat_toNat]; bv_decide
+private theorem sd_byte5_64 (v : BitVec 64) :
+    BitVec.ofNat 8 (v.toNat >>> 40) = v.extractLsb' 40 8 := by
+  simp only [← BitVec.toNat_ushiftRight, BitVec.ofNat_toNat]; bv_decide
+private theorem sd_byte6_64 (v : BitVec 64) :
+    BitVec.ofNat 8 (v.toNat >>> 48) = v.extractLsb' 48 8 := by
+  simp only [← BitVec.toNat_ushiftRight, BitVec.ofNat_toNat]; bv_decide
+private theorem sd_byte7_64 (v : BitVec 64) :
+    BitVec.ofNat 8 (v.toNat >>> 56) = v.extractLsb' 56 8 := by
+  simp only [← BitVec.toNat_ushiftRight, BitVec.ofNat_toNat]; bv_decide
+
+private theorem extHashMap_get?_insert_self_sd (m : Std.ExtHashMap Nat (BitVec 8)) (k : Nat) (v : BitVec 8) :
+    (m.insert k v).get? k = some v := by simp [Std.ExtHashMap.get?_eq_getElem?]
+private theorem extHashMap_get?_insert_ne_sd (m : Std.ExtHashMap Nat (BitVec 8)) (k a : Nat) (v : BitVec 8)
+    (h : k ≠ a) : (m.insert k v).get? a = m.get? a := by
+  rw [Std.ExtHashMap.get?_eq_getElem?, Std.ExtHashMap.get?_eq_getElem?, Std.ExtHashMap.getElem?_insert,
+    if_neg (by simpa using h)]
+
+/-- **StoreDouble's committed bus view** — opcode `39 = SD`, straight-line, `commit = .store ⟨addr, rs2, 8⟩`
+(8-byte write of the full 64-bit `rs2`). -/
+def rowView (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZMod p)) :
+    Trace.RowView (ZMod p) :=
+  ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
+    inp.adapter.toAdapterView, inp.is_real, inp.adapter.op_a_memory.prev_value, 39,
+    .store ⟨cols.address_operation.addr_operation.value, inp.adapter.op_a_memory.prev_value, 8⟩⟩
+
+def storeAddrNat (cols : Extracted.StoreDoubleColumns (ZMod p)) : ℕ :=
+  cols.address_operation.addr_operation.value[0].val
+    + cols.address_operation.addr_operation.value[1].val * 2 ^ 16
+    + cols.address_operation.addr_operation.value[2].val * 2 ^ 32
+
+/-- **StoreDouble's `advanceReady` bundle** (8-byte twin of StoreWord's): the op_a read-back, the range
+facts, the **8-byte alignment** (`sum % 8 = 0`), the low-pc bound, and the 8-byte ROM-disjointness. -/
+def AdvanceReady (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZMod p))
+    (prog : GuestProgram) (s : SailState) : Prop :=
+  (∀ idx : BitVec 5, (idx.toNat : ZMod p) = inp.adapter.op_a →
+     s.get_reg? idx = some (Word.toBitVec64 inp.adapter.op_a_memory.prev_value)) ∧
+  Word.isU64 inp.op_b_val ∧ Word.isU64 inp.op_c_imm ∧
+  (Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm + 8 ≤ 2 ^ 48) ∧
+  (2 ^ 16 ≤ (Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm) % 2 ^ 48) ∧
+  ((Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm) % 8 = 0) ∧
+  (inp.state.pc[0].val < 2 ^ 16) ∧
+  (∀ a w, prog.fetchWord a = some w → ∀ i : Fin 4,
+      a.toNat + (i : ℕ) ≠ storeAddrNat cols ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 1
+      ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 2 ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 3
+      ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 4 ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 5
+      ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 6 ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 7)
+
+set_option maxHeartbeats 2000000 in
+/-- **`StoreDoubleChip.advance`** — the per-SD-row `try_step` lift. Over `advance_of_store` +
+`execute_STORE_reaches_width8` (via `decodesStore' 8`): an 8-byte write, no register write; the eight
+bytes are `byteAt` at `addr .. addr+7` = the little-endian bytes of `op_a_memory.prev_value` (full rs2). -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZMod p))
+    (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
+    (_hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : AdvanceReady inp cols prog s) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hopa_bind, hb64, hc64, hfit, hlo, halign, hpc0, hdisj⟩ := hready
+  obtain ⟨h_addr_spec, _, _, _⟩ := hspec
+  set r := rowView inp cols with hr
+  have h39 : (storeOpcode (8 : word_width)).toNat = 39 := storeOpcode_eight_toNat
+  have hop : r.opcode = ((storeOpcode (8 : word_width)).toNat : ZMod p) := by rw [h39]; simp [hr, rowView]
+  have himmc : r.adapter.imm_c = (1 : ZMod p) := rfl
+  have himmb : r.adapter.imm_b = 0 := rfl
+  obtain ⟨w, imm, rs2, rs1, hfetch, hdecw, hopa, hopb, hopc⟩ :=
+    decodesStore' 8 (by decide) hdecrom hop himmc
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hrs1 : s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) := hvalb.1 rs1 himmb hidxb
+  have hrs2 : s.get_reg? rs2 = some (Word.toBitVec64 inp.adapter.op_a_memory.prev_value) :=
+    hopa_bind rs2 hopa.symm
+  have hse : (sign_extend (m := 64) imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
+  have h_imm : Word.toBitVec64 inp.op_c_imm = sign_extend (m := 64) imm := by
+    have hoc : (inp.op_c_imm : Word (ZMod p)) = bitVecToWord (imm.signExtend 64) := hopc
+    rw [hoc, toBitVec64_bitVecToWord, hse]
+  set obv := Word.toBitVec64 inp.op_b_val with hobv
+  set opv := Word.toBitVec64 inp.adapter.op_a_memory.prev_value with hopvdef
+  have hobn : obv.toNat = Word.toNat inp.op_b_val := Word.toBitVec64_toNat hb64
+  have hsimmn : (sign_extend (m := 64) imm : BitVec 64).toNat = Word.toNat inp.op_c_imm := by
+    rw [← h_imm]; exact Word.toBitVec64_toNat hc64
+  have haddN : (obv + sign_extend (m := 64) imm).toNat
+      = Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm := by
+    rw [BitVec.toNat_add, hobn, hsimmn, Nat.mod_eq_of_lt (by omega)]
+  have hsum : cols.address_operation.addr_operation.value[0].val
+      + 65536 * cols.address_operation.addr_operation.value[1].val
+      + 65536 ^ 2 * cols.address_operation.addr_operation.value[2].val
+      = (Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm) % 2 ^ 48 := h_addr_spec.1
+  have haddr : storeAddrNat cols = (obv + sign_extend (m := 64) imm).toNat := by
+    rw [haddN]; unfold storeAddrNat
+    rw [show cols.address_operation.addr_operation.value[0].val
+          + cols.address_operation.addr_operation.value[1].val * 2 ^ 16
+          + cols.address_operation.addr_operation.value[2].val * 2 ^ 32
+        = cols.address_operation.addr_operation.value[0].val
+          + 65536 * cols.address_operation.addr_operation.value[1].val
+          + 65536 ^ 2 * cols.address_operation.addr_operation.value[2].val from by ring,
+       hsum, Nat.mod_eq_of_lt (by omega)]
+  set mw : Trace.MemWrite (ZMod p) :=
+    ⟨cols.address_operation.addr_operation.value, inp.adapter.op_a_memory.prev_value, 8⟩ with hmwdef
+  have hmw : r.commit.memWrite = some mw := rfl
+  have hmwaddr : mw.addrNat = (obv + sign_extend (m := 64) imm).toNat := haddr
+  have hcov_iff : ∀ a : ℕ, mw.covers a ↔
+      (a = (obv + sign_extend (m := 64) imm).toNat ∨ a = (obv + sign_extend (m := 64) imm).toNat + 1
+       ∨ a = (obv + sign_extend (m := 64) imm).toNat + 2 ∨ a = (obv + sign_extend (m := 64) imm).toNat + 3
+       ∨ a = (obv + sign_extend (m := 64) imm).toNat + 4 ∨ a = (obv + sign_extend (m := 64) imm).toNat + 5
+       ∨ a = (obv + sign_extend (m := 64) imm).toNat + 6 ∨ a = (obv + sign_extend (m := 64) imm).toNat + 7)
+      := by
+    intro a; have hw8 : mw.width = 8 := rfl
+    unfold Trace.MemWrite.covers; rw [hmwaddr, hw8]; omega
+  have hbyteAt0 : mw.byteAt mw.addrNat = BitVec.ofNat 8 opv.toNat := by
+    simp only [Trace.MemWrite.byteAt, Nat.sub_self, Nat.mul_zero, hmwdef]
+    rw [hopvdef]; exact (sd_byte0_64 _).symm
+  have hbyteAt1 : mw.byteAt (mw.addrNat + 1) = BitVec.ofNat 8 (opv.toNat >>> 8) := by
+    simp only [Trace.MemWrite.byteAt, hmwdef, Nat.add_sub_cancel_left]
+    rw [hopvdef]; exact (sd_byte1_64 _).symm
+  have hbyteAt2 : mw.byteAt (mw.addrNat + 2) = BitVec.ofNat 8 (opv.toNat >>> 16) := by
+    simp only [Trace.MemWrite.byteAt, hmwdef, Nat.add_sub_cancel_left]
+    rw [hopvdef]; exact (sd_byte2_64 _).symm
+  have hbyteAt3 : mw.byteAt (mw.addrNat + 3) = BitVec.ofNat 8 (opv.toNat >>> 24) := by
+    simp only [Trace.MemWrite.byteAt, hmwdef, Nat.add_sub_cancel_left]
+    rw [hopvdef]; exact (sd_byte3_64 _).symm
+  have hbyteAt4 : mw.byteAt (mw.addrNat + 4) = BitVec.ofNat 8 (opv.toNat >>> 32) := by
+    simp only [Trace.MemWrite.byteAt, hmwdef, Nat.add_sub_cancel_left]
+    rw [hopvdef]; exact (sd_byte4_64 _).symm
+  have hbyteAt5 : mw.byteAt (mw.addrNat + 5) = BitVec.ofNat 8 (opv.toNat >>> 40) := by
+    simp only [Trace.MemWrite.byteAt, hmwdef, Nat.add_sub_cancel_left]
+    rw [hopvdef]; exact (sd_byte5_64 _).symm
+  have hbyteAt6 : mw.byteAt (mw.addrNat + 6) = BitVec.ofNat 8 (opv.toNat >>> 48) := by
+    simp only [Trace.MemWrite.byteAt, hmwdef, Nat.add_sub_cancel_left]
+    rw [hopvdef]; exact (sd_byte6_64 _).symm
+  have hbyteAt7 : mw.byteAt (mw.addrNat + 7) = BitVec.ofNat 8 (opv.toNat >>> 56) := by
+    simp only [Trace.MemWrite.byteAt, hmwdef, Nat.add_sub_cancel_left]
+    rw [hopvdef]; exact (sd_byte7_64 _).symm
+  have hbA0 : mw.byteAt ((obv + sign_extend (m := 64) imm).toNat)
+      = BitVec.ofNat 8 opv.toNat := by rw [← hmwaddr]; exact hbyteAt0
+  have hbA1 : mw.byteAt ((obv + sign_extend (m := 64) imm).toNat + 1)
+      = BitVec.ofNat 8 (opv.toNat >>> 8) := by rw [← hmwaddr]; exact hbyteAt1
+  have hbA2 : mw.byteAt ((obv + sign_extend (m := 64) imm).toNat + 2)
+      = BitVec.ofNat 8 (opv.toNat >>> 16) := by rw [← hmwaddr]; exact hbyteAt2
+  have hbA3 : mw.byteAt ((obv + sign_extend (m := 64) imm).toNat + 3)
+      = BitVec.ofNat 8 (opv.toNat >>> 24) := by rw [← hmwaddr]; exact hbyteAt3
+  have hbA4 : mw.byteAt ((obv + sign_extend (m := 64) imm).toNat + 4)
+      = BitVec.ofNat 8 (opv.toNat >>> 32) := by rw [← hmwaddr]; exact hbyteAt4
+  have hbA5 : mw.byteAt ((obv + sign_extend (m := 64) imm).toNat + 5)
+      = BitVec.ofNat 8 (opv.toNat >>> 40) := by rw [← hmwaddr]; exact hbyteAt5
+  have hbA6 : mw.byteAt ((obv + sign_extend (m := 64) imm).toNat + 6)
+      = BitVec.ofNat 8 (opv.toNat >>> 48) := by rw [← hmwaddr]; exact hbyteAt6
+  have hbA7 : mw.byteAt ((obv + sign_extend (m := 64) imm).toNat + 7)
+      = BitVec.ofNat 8 (opv.toNat >>> 56) := by rw [← hmwaddr]; exact hbyteAt7
+  have haligned8 : is_aligned_vaddr (virtaddr.Virtaddr (obv + sign_extend (m := 64) imm)) 8 = true := by
+    rw [is_aligned_vaddr_iff_mod, haddN]; exact halign
+  have hfit64 : obv.toNat + (sign_extend (m := 64) imm : BitVec 64).toNat + 8 < 2 ^ 64 := by
+    rw [hobn, hsimmn]; omega
+  have hinr : range_subset (zero_extend (BitVec.addInt (obv + sign_extend (m := 64) imm) 0))
+      (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
+    range_subset_sp1_pma (obv + sign_extend (m := 64) imm) 8 (by norm_num)
+      (by rw [haddN]; omega) (by rw [haddN]; omega)
+  have hcov : ∀ a : ℕ, mw.covers a →
+      ((fun m : Std.ExtHashMap Nat (BitVec 8) =>
+        (((((((m.insert ((obv + sign_extend (m := 64) imm).toNat)
+            (BitVec.ofNat 8 opv.toNat)).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 1)
+            (BitVec.ofNat 8 (opv.toNat >>> 8))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 2)
+            (BitVec.ofNat 8 (opv.toNat >>> 16))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 3)
+            (BitVec.ofNat 8 (opv.toNat >>> 24))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 4)
+            (BitVec.ofNat 8 (opv.toNat >>> 32))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 5)
+            (BitVec.ofNat 8 (opv.toNat >>> 40))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 6)
+            (BitVec.ofNat 8 (opv.toNat >>> 48))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 7)
+            (BitVec.ofNat 8 (opv.toNat >>> 56))) s.mem).get? a
+        = some (mw.byteAt a) := by
+    intro a hcova
+    rcases (hcov_iff a).mp hcova with he | he | he | he | he | he | he | he
+    · rw [he, hbA0]
+      rw [extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 7) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 6) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 5) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 4) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 3) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 2) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 1) _ _ (by omega),
+          extHashMap_get?_insert_self_sd]
+    · rw [he, hbA1]
+      rw [extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 7) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 6) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 5) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 4) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 3) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 2) _ _ (by omega),
+          extHashMap_get?_insert_self_sd]
+    · rw [he, hbA2]
+      rw [extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 7) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 6) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 5) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 4) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 3) _ _ (by omega),
+          extHashMap_get?_insert_self_sd]
+    · rw [he, hbA3]
+      rw [extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 7) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 6) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 5) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 4) _ _ (by omega),
+          extHashMap_get?_insert_self_sd]
+    · rw [he, hbA4]
+      rw [extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 7) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 6) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 5) _ _ (by omega),
+          extHashMap_get?_insert_self_sd]
+    · rw [he, hbA5]
+      rw [extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 7) _ _ (by omega),
+          extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 6) _ _ (by omega),
+          extHashMap_get?_insert_self_sd]
+    · rw [he, hbA6]
+      rw [extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 7) _ _ (by omega),
+          extHashMap_get?_insert_self_sd]
+    · rw [he, hbA7, extHashMap_get?_insert_self_sd]
+  have hncov : ∀ a : ℕ, ¬ mw.covers a →
+      ((fun m : Std.ExtHashMap Nat (BitVec 8) =>
+        (((((((m.insert ((obv + sign_extend (m := 64) imm).toNat)
+            (BitVec.ofNat 8 opv.toNat)).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 1)
+            (BitVec.ofNat 8 (opv.toNat >>> 8))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 2)
+            (BitVec.ofNat 8 (opv.toNat >>> 16))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 3)
+            (BitVec.ofNat 8 (opv.toNat >>> 24))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 4)
+            (BitVec.ofNat 8 (opv.toNat >>> 32))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 5)
+            (BitVec.ofNat 8 (opv.toNat >>> 40))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 6)
+            (BitVec.ofNat 8 (opv.toNat >>> 48))).insert
+          ((obv + sign_extend (m := 64) imm).toNat + 7)
+            (BitVec.ofNat 8 (opv.toNat >>> 56))) s.mem).get? a
+        = s.mem.get? a := by
+    intro a hncova
+    have h0 : a ≠ (obv + sign_extend (m := 64) imm).toNat :=
+      fun he => hncova ((hcov_iff a).mpr (Or.inl he))
+    have h1 : a ≠ (obv + sign_extend (m := 64) imm).toNat + 1 :=
+      fun he => hncova ((hcov_iff a).mpr (Or.inr (Or.inl he)))
+    have h2 : a ≠ (obv + sign_extend (m := 64) imm).toNat + 2 :=
+      fun he => hncova ((hcov_iff a).mpr (Or.inr (Or.inr (Or.inl he))))
+    have h3 : a ≠ (obv + sign_extend (m := 64) imm).toNat + 3 :=
+      fun he => hncova ((hcov_iff a).mpr (Or.inr (Or.inr (Or.inr (Or.inl he)))))
+    have h4 : a ≠ (obv + sign_extend (m := 64) imm).toNat + 4 :=
+      fun he => hncova ((hcov_iff a).mpr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl he))))))
+    have h5 : a ≠ (obv + sign_extend (m := 64) imm).toNat + 5 :=
+      fun he => hncova ((hcov_iff a).mpr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl he)))))))
+    have h6 : a ≠ (obv + sign_extend (m := 64) imm).toNat + 6 :=
+      fun he => hncova ((hcov_iff a).mpr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl he))))))))
+    have h7 : a ≠ (obv + sign_extend (m := 64) imm).toNat + 7 :=
+      fun he => hncova ((hcov_iff a).mpr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr he))))))))
+    rw [extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 7) a _ (fun hc => h7 hc.symm),
+      extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 6) a _ (fun hc => h6 hc.symm),
+      extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 5) a _ (fun hc => h5 hc.symm),
+      extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 4) a _ (fun hc => h4 hc.symm),
+      extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 3) a _ (fun hc => h3 hc.symm),
+      extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 2) a _ (fun hc => h2 hc.symm),
+      extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 1) a _ (fun hc => h1 hc.symm),
+      extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat) a _ (fun hc => h0 hc.symm)]
+  have hdisj' : ∀ a w2, prog.fetchWord a = some w2 → ∀ i : Fin 4, ¬ mw.covers (a.toNat + (i : ℕ)) := by
+    intro a w2 hf i hcov'
+    rcases (hcov_iff (a.toNat + (i : ℕ))).mp hcov' with he | he | he | he | he | he | he | he
+    · exact (hdisj a w2 hf i).1 (he.trans haddr.symm)
+    · exact (hdisj a w2 hf i).2.1 (he.trans (by rw [haddr]))
+    · exact (hdisj a w2 hf i).2.2.1 (he.trans (by rw [haddr]))
+    · exact (hdisj a w2 hf i).2.2.2.1 (he.trans (by rw [haddr]))
+    · exact (hdisj a w2 hf i).2.2.2.2.1 (he.trans (by rw [haddr]))
+    · exact (hdisj a w2 hf i).2.2.2.2.2.1 (he.trans (by rw [haddr]))
+    · exact (hdisj a w2 hf i).2.2.2.2.2.2.1 (he.trans (by rw [haddr]))
+    · exact (hdisj a w2 hf i).2.2.2.2.2.2.2 (he.trans (by rw [haddr]))
+  refine advance_of_store (.STORE (imm, .Regidx rs2, .Regidx rs1, 8)) (rcvPcOf (stateAccess r)) mw
+    (fun m => (((((((m.insert ((obv + sign_extend (m := 64) imm).toNat)
+        (BitVec.ofNat 8 opv.toNat)).insert
+      ((obv + sign_extend (m := 64) imm).toNat + 1)
+        (BitVec.ofNat 8 (opv.toNat >>> 8))).insert
+      ((obv + sign_extend (m := 64) imm).toNat + 2)
+        (BitVec.ofNat 8 (opv.toNat >>> 16))).insert
+      ((obv + sign_extend (m := 64) imm).toNat + 3)
+        (BitVec.ofNat 8 (opv.toNat >>> 24))).insert
+      ((obv + sign_extend (m := 64) imm).toNat + 4)
+        (BitVec.ofNat 8 (opv.toNat >>> 32))).insert
+      ((obv + sign_extend (m := 64) imm).toNat + 5)
+        (BitVec.ofNat 8 (opv.toNat >>> 40))).insert
+      ((obv + sign_extend (m := 64) imm).toNat + 6)
+        (BitVec.ofNat 8 (opv.toNat >>> 48))).insert
+      ((obv + sign_extend (m := 64) imm).toNat + 7)
+        (BitVec.ofNat 8 (opv.toNat >>> 56)))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ hinit hcfgt => ?_)
+    hcov hncov hdisj' rfl hpc0 rfl hmw
+  exact execute_STORE_reaches_width8 imm rs1 rs2 obv opv t hinit hcfgt.toValidMemConfig
+    ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2) haligned8 hfit64 hinr
 
 /-- `ChipKind` registration for StoreDouble (SD, opcode 39). -/
 def kind : Soundness.ChipKind p where
   name := "StoreDouble"
   Inputs := StoreDoubleChip.Inputs
   Cols := Extracted.StoreDoubleColumns
-  view := fun inp _cols => ⟨inp.state,
-    #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
-    inp.adapter.toAdapterView, inp.is_real, inp.adapter.op_a_memory.prev_value, 39, .noWrite⟩
+  view := rowView
   chipSpec := fun inp cols data => StoreDoubleChip.Spec inp cols data
-  sailEquiv := fun inp cols s => ∀ (data : ProverData (ZMod p)) (rs1 rs2 : BitVec 5) (imm : BitVec 12)
+  sailEquiv := fun inp _cols s => ∀ (data : ProverData (ZMod p)) (rs1 rs2 : BitVec 5) (imm : BitVec 12)
       (pc : BitVec 64),
     (hs : SailState.isInitialized s) → SailState.isValidMemConfig s hs →
     StoreDoubleChip.Assumptions inp data →
@@ -205,5 +528,7 @@ def kind : Soundness.ChipKind p where
       hstored h_pc h_rs1 h_rs2 =>
     sd_chip_reaches_sail inp cols data rs1 rs2 imm pc s hs hconfig h_assum h_imm h_hi hstored h_pc h_rs1
       h_rs2
+  advanceReady := AdvanceReady
+  advance := some (PLift.up advance)
 
 end SP1Clean.StoreDoubleChip
