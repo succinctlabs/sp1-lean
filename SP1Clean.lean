@@ -245,7 +245,6 @@ import SP1Clean.Model.Semantics.ProgramCommitment
 import SP1Clean.Model.Semantics.MicroTime
 import SP1Clean.Model.Semantics.Truth
 import SP1Clean.Model.Semantics.Decode
-import SP1Clean.Model.Semantics.DecodeGuards
 import SP1Clean.Math.Word
 import SP1Clean.Extracted.Circuit.AddOperation
 import SP1Clean.Proofs.Operations.AddOperation.Formal
