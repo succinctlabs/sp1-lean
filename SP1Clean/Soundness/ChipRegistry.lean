@@ -76,4 +76,13 @@ def allChipKinds : List (ChipKind p) :=
 `allChipKinds` without updating this, the `rfl` breaks — keeping the audit count honest. -/
 theorem allChipKinds_length : (allChipKinds (p := p)).length = 25 := rfl
 
+/-- **Full advance coverage (SC Phase 4, complete).** Every registered chip carries a populated
+`advance` field (`isSome`) — the 25/25 milestone: MUL/MULHSU (via the Move-2 guarded `inv_mul'`) and the
+four width-8 seam chips (Load/StoreDouble, LoadX0, Mul) are all migrated. This is the fact the dispatcher's
+`h_migrated` coverage residual reduces to: at a real trace row whose `kind ∈ allChipKinds`,
+`kind.advance.isSome` holds, so `chipRows_advance_sound` can fire that chip's `advance` generically. -/
+theorem allChipKinds_migrated : ∀ k ∈ allChipKinds (p := p), k.advance.isSome = true := by
+  intro k hk
+  fin_cases hk <;> rfl
+
 end SP1Clean.Soundness

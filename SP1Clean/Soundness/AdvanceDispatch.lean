@@ -14,9 +14,10 @@ once here by multiset membership; the chip's `advance` proof then fires.
 **What this buys.** The monolithic `lift` seam is decomposed into the per-chip `advance` (done + axiom-clean
 for Add/Sub/Addi) plus **three clearly-named residual obligations**, each a standard trace property:
 
-* `h_migrated` — *coverage*: every real row's chip has migrated to `advance` (`isSome`). Holds today for
-  traces whose real rows are all Add/Sub/Addi; the full trace needs all 24 non-halt chips migrated (the
-  Phase-1/2/3 fan-out).
+* `h_migrated` — *coverage*: every real row's chip has migrated to `advance` (`isSome`). **Complete
+  (SC Phase 4, 25/25):** `ChipRegistry.allChipKinds_migrated` proves every registered `kind.advance.isSome`,
+  so for any real row whose `kind ∈ allChipKinds` this discharges — the whole fan-out landed (the last seams,
+  MUL/MULHSU + the four width-8 Load/Store/Mul chips, closed via the Move-2 guarded decode).
 * `h_decode` — the **Program-bus fetch truth** (`decodedInROM prog (programAccess r.view).toRow`): the
   committed instruction word is the one at the row's pc in the ROM. This is the `ProgTruth` seam (the
   semantic-channels *program flip*), not yet grounded in the soundness conclusion.
