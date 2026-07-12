@@ -423,36 +423,6 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.LoadDoubleColumns
   view := rowView
   chipSpec := fun inp cols data => LoadDoubleChip.Spec inp cols data
-  sailEquiv := fun inp cols s => ∀ (data : ProverData (ZMod p)) (rs1 rd : BitVec 5) (imm : BitVec 12)
-      (pc : BitVec 64),
-    (hs : SailState.isInitialized s) → SailState.isValidMemConfig s hs →
-    LoadDoubleChip.Assumptions inp data →
-    Word.toBitVec64 inp.op_c_imm = BitVec.signExtend 64 imm →
-    Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm + 8 ≤ 2 ^ 48 →
-    Word.isU64 cols.memory_access.prev_value →
-    s.regs.get? Register.PC = some pc →
-    s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) →
-    s.mem[(Word.toBitVec64 inp.op_b_val + BitVec.signExtend 64 imm).toNat]?
-      = some (BitVec.ofNat 8 cols.memory_access.prev_value[0].val) →
-    s.mem[(Word.toBitVec64 inp.op_b_val + BitVec.signExtend 64 imm).toNat + 1]?
-      = some (BitVec.ofNat 8 (cols.memory_access.prev_value[0].val >>> 8)) →
-    s.mem[(Word.toBitVec64 inp.op_b_val + BitVec.signExtend 64 imm).toNat + 2]?
-      = some (BitVec.ofNat 8 cols.memory_access.prev_value[1].val) →
-    s.mem[(Word.toBitVec64 inp.op_b_val + BitVec.signExtend 64 imm).toNat + 3]?
-      = some (BitVec.ofNat 8 (cols.memory_access.prev_value[1].val >>> 8)) →
-    s.mem[(Word.toBitVec64 inp.op_b_val + BitVec.signExtend 64 imm).toNat + 4]?
-      = some (BitVec.ofNat 8 cols.memory_access.prev_value[2].val) →
-    s.mem[(Word.toBitVec64 inp.op_b_val + BitVec.signExtend 64 imm).toNat + 5]?
-      = some (BitVec.ofNat 8 (cols.memory_access.prev_value[2].val >>> 8)) →
-    s.mem[(Word.toBitVec64 inp.op_b_val + BitVec.signExtend 64 imm).toNat + 6]?
-      = some (BitVec.ofNat 8 cols.memory_access.prev_value[3].val) →
-    s.mem[(Word.toBitVec64 inp.op_b_val + BitVec.signExtend 64 imm).toNat + 7]?
-      = some (BitVec.ofNat 8 (cols.memory_access.prev_value[3].val >>> 8)) →
-    (spec_ld imm rs1 rd).run s = (sp1_ld rd pc cols.memory_access.prev_value).run s
-  reaches_sail := fun inp cols _data s _h_real _h_chip data rs1 rd imm pc hs hconfig h_assum h_imm h_hi
-      hloaded h_pc h_rs1 hm0 hm1 hm2 hm3 hm4 hm5 hm6 hm7 =>
-    ld_chip_reaches_sail inp cols data rs1 rd imm pc s hs hconfig h_assum h_imm h_hi hloaded h_pc h_rs1
-      hm0 hm1 hm2 hm3 hm4 hm5 hm6 hm7
   advanceReady := AdvanceReady
   advance := some (PLift.up advance)
 

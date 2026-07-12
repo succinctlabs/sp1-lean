@@ -208,19 +208,6 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.UTypeColumns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
-  sailEquiv := fun inp cols s => ∀ (rd : BitVec 5) (pc : BitVec 64),
-    s.regs.get? Register.PC = some pc →
-    Word.toBitVec64 (UTypeChip.pcWord cols) = pc →
-    (cols.adapter.op_a_0 = 0 ∨ (cols.adapter.op_a_0 = 1 ∧ rd = 0#5)) →
-    (inp.is_auipc = 0 →
-        (spec_utype (UTypeChip.immOf cols.adapter) (.Regidx rd) uop.LUI).run s
-          = (sp1_utype (.Regidx rd) pc cols.add_operation.value).run s) ∧
-    (inp.is_auipc = 1 →
-        (spec_utype (UTypeChip.immOf cols.adapter) (.Regidx rd) uop.AUIPC).run s
-          = (sp1_utype (.Regidx rd) pc cols.add_operation.value).run s)
-  reaches_sail := fun inp cols data s h_real h_chip rd pc h_pc h_pcw h_op_a =>
-    ⟨fun h0 => utype_chip_reaches_sail_lui inp cols data rd pc s h_real h0 h_op_a h_chip h_pc,
-     fun h1 => utype_chip_reaches_sail_auipc inp cols data rd pc s h_real h1 h_op_a h_chip h_pc h_pcw⟩
   advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧
     (inp.is_auipc = 0 ∨ inp.is_auipc = 1) ∧ cols.adapter.op_a_0 = 0 ∧
     (rowView inp cols).adapter.op_a ≠ 0

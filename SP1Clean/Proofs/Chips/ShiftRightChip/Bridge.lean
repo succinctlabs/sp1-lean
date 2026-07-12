@@ -305,24 +305,6 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.ShiftRightCols
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
-  sailEquiv := fun inp cols s => ∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
-    s.regs.get? Register.PC = some pc →
-    s.get_reg? rs1 = some (Word.toBitVec64 inp.adapter.op_b_memory.prev_value) →
-    s.get_reg? rs2 = some (Word.toBitVec64 inp.adapter.op_c_memory.prev_value) →
-    (cols.is_srl = 1 →
-        (spec_srl (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_sr (.Regidx rd) pc cols.a).run s) ∧
-    (cols.is_sra = 1 →
-        (spec_sra (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_sr (.Regidx rd) pc cols.a).run s) ∧
-    (cols.is_srlw = 1 →
-        (spec_srlw (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_sr (.Regidx rd) pc cols.a).run s) ∧
-    (cols.is_sraw = 1 →
-        (spec_sraw (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_sr (.Regidx rd) pc cols.a).run s)
-  reaches_sail := fun inp cols data s h_real h_chip rs1 rs2 rd pc h_pc h_rs1 h_rs2 =>
-    shiftright_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2
   advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧ inp.adapter = cols.adapter ∧
     (rowView inp cols).adapter.op_a ≠ 0 ∧ cols.adapter.imm_c = 0 ∧
     ((cols.is_srl = 1 ∧ cols.is_sra = 0 ∧ cols.is_srlw = 0 ∧ cols.is_sraw = 0) ∨

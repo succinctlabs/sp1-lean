@@ -231,16 +231,6 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.JalColumns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
-  sailEquiv := fun inp cols s => ∀ (rd : BitVec 5) (imm : BitVec 21) (pc : BitVec 64),
-    SailState.isInitialized s →
-    s.regs.get? Register.PC = some pc →
-    Word.toBitVec64 (JalChip.pcWord cols) = pc →
-    Word.toBitVec64 cols.adapter.op_b_imm = sign_extend (m := 64) imm →
-    (cols.adapter.op_a_0 = 0 ∨ (cols.adapter.op_a_0 = 1 ∧ rd = 0#5)) →
-    (spec_jal imm (.Regidx rd)).run s
-      = (sp1_jal (.Regidx rd) pc cols.add_operation.value cols.op_a_operation.value).run s
-  reaches_sail := fun inp cols data s h_real h_chip rd imm pc hs h_pc h_pcw h_dec h_op_a =>
-    jal_chip_reaches_sail inp cols data rd imm pc s hs h_real h_chip h_pc h_pcw h_dec h_op_a
   advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧ cols.adapter.op_a_0 = 0 ∧
     (rowView inp cols).adapter.op_a ≠ 0 ∧ cols.add_operation.value[3] = 0
   advance := some (PLift.up advance)

@@ -37,8 +37,9 @@ is the visible list of seams below, not prose.
   the program ROM stays intact (stores don't overwrite code); the store-replay strengthening lands with
   the load/store address work and the memory-init slice.
 
-The earlier per-row Sail statement (`GatedExecution.step_sound`) is *evidence* for discharging `lift`,
-not a hypothesis here: the skeleton consumes only the **trail** half of `GatedExecution`.
+The earlier per-row Sail statement (the retired `GatedExecution.step_sound` conjunct) is not consumed here:
+the skeleton discharges `lift` from the per-chip `ChipKind.advance` path and uses only the **trail** half
+of `GatedExecution`.
 
 `sp1_target_execution` is axiom-clean (the walk induction is pure logic); the corollary
 `sp1_target_soundness` additionally routes through `sp1_machine_soundness` and therefore inherits the

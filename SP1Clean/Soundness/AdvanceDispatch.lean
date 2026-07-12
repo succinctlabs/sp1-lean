@@ -6,8 +6,8 @@ The Phase-4 dispatcher: it discharges `TargetObligations.lift` (`Soundness/Targe
 Sail step-lift seam — **generically**, by routing each walk position to the migrated chip's
 `ChipKind.advance` field (`Soundness/ChipRow.lean`, populated per chip in `Chips/<Op>Chip/Bridge.lean`).
 
-It is the `advance`-side analogue of `GatedVm.chipRows_step_sound` (which routes `reaches_sail`): no
-`cases`, no per-chip arm — adding/​migrating a chip never touches this lemma. The path→`ChipRow` inversion
+It routes each row's `ChipKind.advance` generically: no `cases`, no per-chip arm — adding/​migrating a chip
+never touches this lemma. The path→`ChipRow` inversion
 (a walk row is one of the trace's real row-views, `path[i] ∈ realRowEdges (rows.map ChipRow.view)`) is done
 once here by multiset membership; the chip's `advance` proof then fires.
 

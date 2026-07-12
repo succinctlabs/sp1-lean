@@ -511,23 +511,6 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.StoreDoubleColumns
   view := rowView
   chipSpec := fun inp cols data => StoreDoubleChip.Spec inp cols data
-  sailEquiv := fun inp _cols s => ∀ (data : ProverData (ZMod p)) (rs1 rs2 : BitVec 5) (imm : BitVec 12)
-      (pc : BitVec 64),
-    (hs : SailState.isInitialized s) → SailState.isValidMemConfig s hs →
-    StoreDoubleChip.Assumptions inp data →
-    Word.toBitVec64 inp.op_c_imm = BitVec.signExtend 64 imm →
-    Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm + 8 ≤ 2 ^ 48 →
-    Word.isU64 inp.adapter.op_a_memory.prev_value →
-    s.regs.get? Register.PC = some pc →
-    s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) →
-    s.get_reg? rs2 = some (Word.toBitVec64 inp.adapter.op_a_memory.prev_value) →
-    (spec_sd imm rs1 rs2).run s
-      = (sp1_sd pc (Word.toBitVec64 inp.op_b_val + BitVec.signExtend 64 imm)
-          inp.adapter.op_a_memory.prev_value).run s
-  reaches_sail := fun inp cols _data s _h_real _h_chip data rs1 rs2 imm pc hs hconfig h_assum h_imm h_hi
-      hstored h_pc h_rs1 h_rs2 =>
-    sd_chip_reaches_sail inp cols data rs1 rs2 imm pc s hs hconfig h_assum h_imm h_hi hstored h_pc h_rs1
-      h_rs2
   advanceReady := AdvanceReady
   advance := some (PLift.up advance)
 

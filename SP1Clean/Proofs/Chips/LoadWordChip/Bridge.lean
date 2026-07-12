@@ -401,31 +401,6 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.LoadWordColumns
   view := rowView
   chipSpec := fun inp cols data => LoadWordChip.Spec inp cols data
-  sailEquiv := fun inp _cols s => ∀ (rs1 rd : BitVec 5) (imm : BitVec 12) (pc reg_val : BitVec 64)
-      (is_unsigned : Bool),
-    (hs : SailState.isInitialized s) → SailState.isValidMemConfig s hs →
-    inp.selected_word[0].val < 65536 → inp.selected_word[1].val < 65536 →
-    inp.msb = (if inp.selected_word[1].val ≥ 32768 then 1 else 0) →
-    (is_unsigned = true → inp.msb = 0) →
-    (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 4 = 0 →
-    reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 < 2 ^ 64 →
-    reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48 →
-    2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat →
-    s.regs.get? Register.PC = some pc →
-    s.get_reg? rs1 = some reg_val →
-    s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some (BitVec.ofNat 8 inp.selected_word[0].val) →
-    s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]?
-      = some (BitVec.ofNat 8 (inp.selected_word[0].val >>> 8)) →
-    s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 2]? = some (BitVec.ofNat 8 inp.selected_word[1].val) →
-    s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]?
-      = some (BitVec.ofNat 8 (inp.selected_word[1].val >>> 8)) →
-    (spec_lw imm rs1 rd is_unsigned).run s
-      = (sp1_lw rd pc (Word.toBitVec64
-          #v[inp.selected_word[0], inp.selected_word[1], 65535 * inp.msb, 65535 * inp.msb])).run s
-  reaches_sail := fun inp _cols _data s _h_real _h_chip rs1 rd imm pc reg_val is_unsigned hs hconfig
-      hsel0 hsel1 hmsb h_unsigned_msb h_al h_fits h_hi h_lo h_pc h_rs1 hm0 hm1 hm2 hm3 =>
-    lw_chip_reaches_sail inp rs1 rd imm pc s hs hconfig is_unsigned hsel0 hsel1 hmsb h_unsigned_msb
-      reg_val h_al h_fits h_hi h_lo h_pc h_rs1 hm0 hm1 hm2 hm3
   advanceReady := AdvanceReady
   advance := some (PLift.up advance)
 

@@ -201,20 +201,6 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.JalrColumns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
-  sailEquiv := fun inp cols s => ∀ (rd rs1 : BitVec 5) (imm : BitVec 12) (pc rs1_val : BitVec 64),
-    (hs : SailState.isInitialized s) → SailState.isValidMemConfig s hs →
-    s.regs.get? Register.PC = some pc →
-    SailState.get_reg? s rs1 = some rs1_val →
-    Word.toBitVec64 (JalrChip.rs1Word cols) = rs1_val →
-    Word.toBitVec64 cols.adapter.op_c_imm = sign_extend (m := 64) imm →
-    cols.adapter.op_a_0 = 0 →
-    Word.toBitVec64 (JalrChip.pcWord cols) = pc →
-    (spec_jalr imm (.Regidx rs1) (.Regidx rd)).run s
-      = (sp1_jalr (.Regidx rd) (JalrChip.nextPcWord cols) cols.op_a_operation.value).run s
-  reaches_sail := fun inp cols data s h_real h_chip rd rs1 imm pc rs1_val hs hconfig h_pc h_rs1 h_rs1v h_dec
-      h_op_a_0 h_pcw =>
-    jalr_chip_reaches_sail inp cols data rd rs1 imm pc rs1_val s hs hconfig h_real h_chip h_pc h_rs1 h_rs1v h_dec
-      h_op_a_0 h_pcw
   advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧ cols.adapter.op_a_0 = 0 ∧
     (rowView inp cols).adapter.op_a ≠ 0
   advance := some (PLift.up advance)

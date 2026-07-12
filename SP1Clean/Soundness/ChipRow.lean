@@ -12,9 +12,9 @@ its `RowView` via `ChipRow.view`, and one `List (ChipRow …)` yields one `List 
 PC chain / memory consistency are genuinely cross-chip.
 
 A `ChipKind` is a **structure of functions**: a chip registers one value (its `Inputs`/`Cols` type maps,
-the five projections, and its `reaches_sail` proof), a `ChipRow` names its kind by value, and the capstone
-dispatches the Sail step generically via `r.kind.reaches_sail` — no `cases`, no central edit. Adding a chip
-touches no file here; it defines its `kind` next to its Sail bridge (`Chips/<Op>Bridge.lean`).
+the projections, and its `advance` proof), a `ChipRow` names its kind by value, and the capstone
+dispatches the target-execution step generically via `r.kind.advance` — no `cases`, no central edit. Adding
+a chip touches no file here; it defines its `kind` next to its Sail bridge (`Chips/<Op>Bridge.lean`).
 
 `ChipKind`/`ChipRow` are parameterized **explicitly** by `(p : ℕ) [Fact p.Prime] [Fact (2^17 < p)]`:
 auto-generalizing `p` from a `variable` block breaks inference of the dependent `kind` field at use sites.
@@ -30,10 +30,9 @@ open SP1Clean
 open Sail LeanRV64D LeanRV64D.Functions
 
 /-- A chip's registration into the heterogeneous trace: its input/column type maps and the projections
-the soundness capstone consumes. `reaches_sail` is the chip's verified Sail step — on a real row, the chip
-`Spec` drives the RISC-V Sail execution to agree with the SP1 chip emulation (`sailEquiv`), whose own
-register/PC read (and, for J-type, immediate-decode) preconditions are quantified internally per kind. A
-chip supplies `reaches_sail` as a thin wrapper around its `<op>_chip_reaches_sail` bridge lemma. -/
+the soundness capstone consumes. `advance` is the chip's verified target-execution step — on a real row, the
+chip `Spec` drives one real Sail `try_step` to the row's committed `RowEffect`, whose own register/PC read
+(and, for J-type, immediate-decode) preconditions are quantified internally per kind via `advanceReady`. -/
 structure ChipKind (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
   /-- The chip's SP1 `MachineAir::name()` string (e.g. `"Add"`) — its stable, auditable identity in the
   coverage table (`Soundness/Coverage.lean`) and the registry. Non-dependent and placed **first** so the
@@ -47,25 +46,12 @@ structure ChipKind (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
   view : Inputs (ZMod p) → Cols (ZMod p) → Trace.RowView (ZMod p)
   /-- The per-row in-circuit contract — the chip's verified `Spec` (e.g. `AddChip.Spec`). -/
   chipSpec : Inputs (ZMod p) → Cols (ZMod p) → ProverData (ZMod p) → Prop
-  /-- The op-specific RISC-V Sail ≡ SP1-emulation statement in a Sail state. Each kind quantifies the
-  row's own register/PC read preconditions **internally** — ALU/R-type over a PC read + the two source
-  register reads `rs1`/`rs2` (keyed to `op_b_val`/`op_c_val`); J-type/JAL over a PC read + the
-  immediate-decode fact. Folding the reads inside `sailEquiv` keeps the capstone agnostic to a row's
-  register arity: it only ever asks for `sailEquiv inp cols s`, never naming `rs1`/`rs2`. -/
-  sailEquiv : Inputs (ZMod p) → Cols (ZMod p) → SailState → Prop
-  /-- **The chip's Sail step.** On a real row, the chip `Spec` drives `sailEquiv` (whose internal
-  read/decode preconditions the downstream Sail-state consumer supplies). -/
-  reaches_sail : ∀ (inp : Inputs (ZMod p)) (cols : Cols (ZMod p)) (data : ProverData (ZMod p))
-      (s : SailState),
-    (view inp cols).is_real = 1 →
-    chipSpec inp cols data →
-    sailEquiv inp cols s
   /-- **The chip-specific "row is ready to advance" bundle** (SC Phase 4): the extra facts the trace
   dispatcher supplies per chip beyond the uniform refinement + `Spec` — the reader-passthrough
   well-formedness (`cols = main inp`, i.e. `inp.adapter = cols.adapter`), the routing invariant (`op_a ≠ 0`
   for register-writing chips, or the active-operation flag for multi-op chips), and any pc-limb bounds not
   already in the `Spec`. Defaults to `True`; each migrated chip overrides it with exactly what its `advance`
-  proof consumes. Analogue of how `sailEquiv` folds the chip's own read/decode preconditions internally. -/
+  proof consumes. Folds the chip's own read/decode preconditions internally. -/
   advanceReady : Inputs (ZMod p) → Cols (ZMod p) → Target.GuestProgram → SailState → Prop :=
     fun _ _ _ _ => True
   /-- **The chip's uniform `advance` obligation** (SC Phase 4 — the semantic model core): in a state `s`
@@ -107,9 +93,5 @@ def ChipRow.is_real (r : ChipRow p) : ZMod p := r.view.is_real
 (`data`-first arg order keeps `r.chipSpec data` working by dot notation.) -/
 def ChipRow.chipSpec (data : ProverData (ZMod p)) (r : ChipRow p) : Prop :=
   r.kind.chipSpec r.inputs r.cols data
-
-/-- The op-specific RISC-V Sail ≡ SP1-emulation statement (projects through `r.kind`). -/
-def ChipRow.sailEquiv (r : ChipRow p) (s : SailState) : Prop :=
-  r.kind.sailEquiv r.inputs r.cols s
 
 end SP1Clean.Soundness

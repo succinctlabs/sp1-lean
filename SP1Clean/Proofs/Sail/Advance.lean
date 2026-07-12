@@ -12,7 +12,7 @@ into each chip's Sail-step obligation (`TargetObligations.lift`, `Soundness/Targ
 
 The load-bearing goal is **uniformity**: one `sp1Effect` (a function of the committed `RowView`), one
 generic `advance_of_regWrite` proof, and thin per-chip adapters — replacing the 25 bespoke per-chip
-`ChipKind.sailEquiv` predicates so the audit surface is a single statement. -/
+Sail-step predicates so the audit surface is a single statement. -/
 
 open LeanRV64D.Defs
 namespace SP1Clean.Advance

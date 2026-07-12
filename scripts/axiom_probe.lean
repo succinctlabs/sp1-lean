@@ -332,7 +332,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.TraceGenTests.subwchip_trace_conforms
 #print axioms SP1Clean.Soundness.gatedExecution_of_specs_and_balance
 #print axioms SP1Clean.Soundness.GatedVm.exists_trail
-#print axioms SP1Clean.Soundness.GatedVm.chipRows_step_sound
 #print axioms SP1Clean.Soundness.state_trail_of_balance
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_intCast_zero
 #print axioms SP1Clean.LookupAccessList.intCast_multiplicitySum_map_toAccess
@@ -363,7 +362,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.wired_subset_reachable
 #print axioms SP1Clean.Soundness.coverage_kinds_eq_registry
 #print axioms SP1Clean.Soundness.coverage_length
-#print axioms SP1Clean.Soundness.routeOf_reaches_sail
 #print axioms SP1Clean.Soundness.Target.sp1_target_execution
 #print axioms SP1Clean.Soundness.Target.sp1_target_soundness
 #print axioms SP1Clean.Soundness.Target.DecodeOperandsBound

@@ -10,7 +10,7 @@ instruction → chip routing (mirroring `$SP1_DIR/crates/core/executor/src/traci
 The discriminant is exactly the value each chip commits on the Program bus (`Trace.RowView.opcode`, e.g.
 Add commits `0`, Jal `46`, StoreByte `36`), so `Opcode.toNat` is the bridge from this enum to the
 in-circuit opcode column — and, transitively, to the chip's Sail op (each covered opcode's chip reaches
-its `spec_<op>` via `ChipKind.sailEquiv`). -/
+its `spec_<op>` via `ChipKind.advance`). -/
 
 namespace SP1Clean.Soundness
 

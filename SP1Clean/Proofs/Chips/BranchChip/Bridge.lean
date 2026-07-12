@@ -8,7 +8,7 @@ import SP1Clean.Soundness.ChipRow
 
 `correct_branch_native` proves `execute_BTYPE ≡ sp1_branch` given PC/rs1/rs2 reads and the chip-side
 condition resolving `next_pc`. The taken arm's `jump_to` retires via `jump_to_of_mod4_eq_zero`; both arms
-land `nextPC ← next_pc_word`. `BranchChip.kind.sailEquiv` is the six-way BEQ/BNE/BLT/BGE/BLTU/BGEU
+land `nextPC ← next_pc_word`. `branch_chip_reaches_sail` is the six-way BEQ/BNE/BLT/BGE/BLTU/BGEU
 conjunction. The whole chain is axiom-clean. -/
 
 open LeanRV64D.Defs
@@ -311,38 +311,6 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.BranchColumns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
-  sailEquiv := fun _inp cols s =>
-    ∀ (rs1 rs2 : BitVec 5) (imm : BitVec 13) (pc rs1_val rs2_val : BitVec 64),
-      SailState.isInitialized s →
-      s.regs.get? Register.PC = some pc →
-      SailState.get_reg? s rs1 = some rs1_val →
-      SailState.get_reg? s rs2 = some rs2_val →
-      Word.toBitVec64 (BranchChip.rs1Word cols) = rs1_val →
-      Word.toBitVec64 (BranchChip.rs2Word cols) = rs2_val →
-      Word.toBitVec64 cols.adapter.op_c_imm = sign_extend (m := 64) imm →
-      Word.toBitVec64 (BranchChip.pcWord cols) = pc →
-      (cols.is_beq = 1 →
-          (spec_btype imm (.Regidx rs2) (.Regidx rs1) bop.BEQ).run s
-            = (sp1_branch (BranchChip.nextPcWord cols)).run s) ∧
-      (cols.is_bne = 1 →
-          (spec_btype imm (.Regidx rs2) (.Regidx rs1) bop.BNE).run s
-            = (sp1_branch (BranchChip.nextPcWord cols)).run s) ∧
-      (cols.is_blt = 1 →
-          (spec_btype imm (.Regidx rs2) (.Regidx rs1) bop.BLT).run s
-            = (sp1_branch (BranchChip.nextPcWord cols)).run s) ∧
-      (cols.is_bge = 1 →
-          (spec_btype imm (.Regidx rs2) (.Regidx rs1) bop.BGE).run s
-            = (sp1_branch (BranchChip.nextPcWord cols)).run s) ∧
-      (cols.is_bltu = 1 →
-          (spec_btype imm (.Regidx rs2) (.Regidx rs1) bop.BLTU).run s
-            = (sp1_branch (BranchChip.nextPcWord cols)).run s) ∧
-      (cols.is_bgeu = 1 →
-          (spec_btype imm (.Regidx rs2) (.Regidx rs1) bop.BGEU).run s
-            = (sp1_branch (BranchChip.nextPcWord cols)).run s)
-  reaches_sail := fun inp cols data s h_real h_chip rs1 rs2 imm pc rs1_val rs2_val
-      hs h_pc h_rs1 h_rs2 h_rs1v h_rs2v h_dec h_pcw =>
-    branch_chip_reaches_sail inp cols data rs1 rs2 imm pc rs1_val rs2_val s hs h_real h_chip
-      h_pc h_rs1 h_rs2 h_rs1v h_rs2v h_dec h_pcw
   advanceReady := fun _inp cols _ s =>
     (∀ idx : BitVec 5, (idx.toNat : ZMod p) = cols.adapter.op_a →
        s.get_reg? idx = some (Word.toBitVec64 cols.adapter.op_a_memory.prev_value)) ∧

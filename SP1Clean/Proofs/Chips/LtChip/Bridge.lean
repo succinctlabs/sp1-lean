@@ -292,32 +292,6 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.LtCols
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
-  sailEquiv := fun inp cols s =>
-    (∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
-      s.regs.get? Register.PC = some pc →
-      s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) →
-      s.get_reg? rs2 = some (Word.toBitVec64 inp.op_c_val) →
-      (cols.is_slt = 1 →
-          (spec_slt (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-            = (sp1_lt (.Regidx rd) pc (resultWord cols)).run s) ∧
-      (cols.is_sltu = 1 →
-          (spec_sltu (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-            = (sp1_lt (.Regidx rd) pc (resultWord cols)).run s)) ∧
-    (∀ (rs1 rd : BitVec 5) (imm : BitVec 12) (pc : BitVec 64),
-      s.regs.get? Register.PC = some pc →
-      s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) →
-      Word.toBitVec64 inp.op_c_val = sign_extend (m := 64) imm →
-      (cols.is_slt = 1 →
-          (spec_slti imm (.Regidx rs1) (.Regidx rd)).run s
-            = (sp1_lt (.Regidx rd) pc (resultWord cols)).run s) ∧
-      (cols.is_sltu = 1 →
-          (spec_sltiu imm (.Regidx rs1) (.Regidx rd)).run s
-            = (sp1_lt (.Regidx rd) pc (resultWord cols)).run s))
-  reaches_sail := fun inp cols data s h_real h_chip =>
-    ⟨fun rs1 rs2 rd pc h_pc h_rs1 h_rs2 =>
-       lt_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2,
-     fun rs1 rd imm pc h_pc h_rs1 h_dec =>
-       lt_chip_reaches_sail_imm inp cols data rs1 rd imm pc s h_real h_chip h_pc h_rs1 h_dec⟩
   advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧ cols.state.pc[0].val < 2 ^ 16 ∧
     cols.adapter.imm_c = 0 ∧ cols.adapter.op_c = cols.adapter.op_c_memory.prev_value ∧
     ((cols.is_slt = 1 ∧ cols.is_sltu = 0) ∨ (cols.is_slt = 0 ∧ cols.is_sltu = 1)) ∧

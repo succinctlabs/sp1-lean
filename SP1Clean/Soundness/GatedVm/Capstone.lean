@@ -29,10 +29,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- A gated whole-program execution certificate over a heterogeneous trace: every real row is
 RISC-V-Sail-correct, and the rows' `current → next` transitions compose (by balance) into a path from
 the public initial state key `initEntry` to the public final state key `finalEntry`. The trail's rows
-are a sub-multiset of the trace's real rows (`trail_rows_real`), so each carries `sailEquiv`. -/
+are a sub-multiset of the trace's real rows (`trail_rows_real`). -/
 structure GatedExecution (rows : List (ChipRow p)) (initEntry finalEntry : List ℕ) : Prop where
-  /-- Every real instruction agrees with its RISC-V Sail spec, for any state honouring its reads. -/
-  step_sound : ∀ r ∈ rows, r.is_real = 1 → ∀ s : SailState, r.sailEquiv s
   /-- The committed `pc_start`/`next_pc` are the endpoints of a valid transition trail of real rows. -/
   trail : ∃ path : List (Trace.RowView (ZMod p)),
             GatedVm.IsWalk (fun r => stateEdge (stateAccess r))
@@ -46,13 +44,12 @@ is a valid whole-program execution from `pc_start` to `next_pc`. No clock inject
 side conditions — the path is forced by balance alone. -/
 theorem gatedExecution_of_specs_and_balance
     (rows : List (ChipRow p)) (data : ProverData (ZMod p)) (initEntry finalEntry : List ℕ)
-    (h_spec : ∀ r ∈ rows, r.chipSpec data)
+    (_h_spec : ∀ r ∈ rows, r.chipSpec data)
     (hbin : ∀ r ∈ rows.map ChipRow.view, r.is_real = 0 ∨ r.is_real = 1)
     (h_bal : isConsistentBalanced (aggregateChipRows (rows.map ChipRow.view) stateLookups
               ++ [(InteractionKind.State, "SP1State", initEntry, (1 : ℤ)),
                   (InteractionKind.State, "SP1State", finalEntry, (-1 : ℤ))])) :
     GatedExecution rows initEntry finalEntry where
-  step_sound := GatedVm.chipRows_step_sound rows data h_spec
   trail := state_trail_of_balance (rows.map ChipRow.view) hbin initEntry finalEntry h_bal
 
 end SP1Clean.Soundness

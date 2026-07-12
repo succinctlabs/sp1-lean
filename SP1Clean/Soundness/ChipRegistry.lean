@@ -33,7 +33,7 @@ per-chip heterogeneity (its `Inputs`/`Cols` `TypeMap`s) lives *inside* each valu
 type-checks and `allChipKinds` is the one grep-able enumeration of the wired set.
 
 This file is an enumeration / re-export hub, **not** a dispatch mechanism: the capstone dispatches each
-row generically via `r.kind.reaches_sail`. The registry exists for **auditability** — one entry ⇔ one
+row generically via `r.kind.advance`. The registry exists for **auditability** — one entry ⇔ one
 wired chip — and gives a single import that pulls in every `kind`.
 
 The instruction → chip → Sail **routing/identity** home is `Soundness/Coverage.lean` (the `Opcode` →

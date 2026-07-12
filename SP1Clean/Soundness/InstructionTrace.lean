@@ -77,7 +77,7 @@ def EmitsProgram (prog : List Instruction) (rows : List (ChipRow p)) : Prop :=
   List.Forall₂ Emits prog rows
 
 /-- An `Emits` row is dispatched to the chip the instruction routes to (the projection the capstone's
-Sail step `r.kind.reaches_sail` keys on). -/
+target-execution step `r.kind.advance` keys on). -/
 theorem Emits.routes {i : Instruction} {r : ChipRow p} (h : Emits i r) :
     routeOf i.opcode i.rdIsX0 = some r.kind := h.1
 

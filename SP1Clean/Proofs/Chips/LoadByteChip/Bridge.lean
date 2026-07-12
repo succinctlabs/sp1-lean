@@ -331,26 +331,6 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.LoadByteColumns
   view := rowView
   chipSpec := fun inp cols data => LoadByteChip.Spec inp cols data
-  sailEquiv := fun inp _cols s => ∀ (rs1 rd : BitVec 5) (imm : BitVec 12) (pc reg_val : BitVec 64)
-      (is_unsigned : Bool),
-    (hs : SailState.isInitialized s) → SailState.isValidMemConfig s hs →
-    inp.selected_byte.val < 256 →
-    inp.msb = (if inp.selected_byte.val ≥ 128 then 1 else 0) →
-    (is_unsigned = true → inp.msb = 0) →
-    reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 < 2 ^ 64 →
-    reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 ≤ 2 ^ 48 →
-    2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat →
-    s.regs.get? Register.PC = some pc →
-    s.get_reg? rs1 = some reg_val →
-    s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some (BitVec.ofNat 8 inp.selected_byte.val) →
-    (spec_lb imm rs1 rd is_unsigned).run s
-      = (sp1_lb rd pc (Word.toBitVec64
-          #v[inp.selected_byte + 65280 * inp.msb, 65535 * inp.msb, 65535 * inp.msb,
-            65535 * inp.msb])).run s
-  reaches_sail := fun inp _cols _data s _h_real _h_chip rs1 rd imm pc reg_val is_unsigned hs hconfig
-      hsel hmsb h_unsigned_msb h_fits h_hi h_lo h_pc h_rs1 hm0 =>
-    lb_chip_reaches_sail inp rs1 rd imm pc s hs hconfig is_unsigned hsel hmsb h_unsigned_msb
-      reg_val h_fits h_hi h_lo h_pc h_rs1 hm0
   advanceReady := AdvanceReady
   advance := some (PLift.up advance)
 

@@ -505,36 +505,6 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.DivRemCols
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
-  sailEquiv := fun inp cols s => ∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
-    s.regs.get? Register.PC = some pc →
-    s.get_reg? rs1 = some (Word.toBitVec64 inp.op_b_val) →
-    s.get_reg? rs2 = some (Word.toBitVec64 inp.op_c_val) →
-    (cols.is_div = 1 →
-        (spec_div (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_divrem (.Regidx rd) pc cols.a).run s) ∧
-    (cols.is_divu = 1 →
-        (spec_divu (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_divrem (.Regidx rd) pc cols.a).run s) ∧
-    (cols.is_rem = 1 →
-        (spec_rem (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_divrem (.Regidx rd) pc cols.a).run s) ∧
-    (cols.is_remu = 1 →
-        (spec_remu (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_divrem (.Regidx rd) pc cols.a).run s) ∧
-    (cols.is_divw = 1 →
-        (spec_divw (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_divrem (.Regidx rd) pc cols.a).run s) ∧
-    (cols.is_remw = 1 →
-        (spec_remw (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_divrem (.Regidx rd) pc cols.a).run s) ∧
-    (cols.is_divuw = 1 →
-        (spec_divuw (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_divrem (.Regidx rd) pc cols.a).run s) ∧
-    (cols.is_remuw = 1 →
-        (spec_remuw (.Regidx rs2) (.Regidx rs1) (.Regidx rd)).run s
-          = (sp1_divrem (.Regidx rd) pc cols.a).run s)
-  reaches_sail := fun inp cols data s h_real h_chip rs1 rs2 rd pc h_pc h_rs1 h_rs2 =>
-    divrem_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2
   advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧
     (rowView inp cols).adapter.op_a ≠ 0 ∧
     ((cols.is_div = 1 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧ cols.is_remu = 0 ∧
