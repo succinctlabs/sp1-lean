@@ -1280,6 +1280,89 @@ theorem execute_MULW_reaches (rs2_idx rs1_idx rd_idx : BitVec 5)
     run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
+set_option maxHeartbeats 4000000 in
+/-- The **register-writing** MUL-family chip `advance` (RowView-generic; mirrors `advance_of_div`).
+**Move-2:** the `mul_op` is pinned by the canonicity guard `hcanon` (via `decodesMul`/`inv_mul'`), so this
+covers all four canonical MUL ops — MUL/MULH/MULHU/MULHSU — writing `rd` the low/high product.  The
+register-writing twin of the discarded-write `advance_of_alu_x0_mul`. -/
+theorem advance_of_mul {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
+    (op : mul_op) (hcanon : mulOpCanonical op = true)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((mulOpToOpcode op).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0) (hnonX0 : r.adapter.op_a ≠ 0)
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hval : Word.toBitVec64 r.rdWrite
+      = SailRV64.mul (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 r.adapter.op_b_memory.prev_value) op)
+    (hwrites : r.commit.writesReg = true := by rfl)
+    (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesMul op hcanon hdecrom hop himmc
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
+  exact advance_write_core (instruction.MUL (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) rd
+    (SailRV64.mul (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+      (Word.toBitVec64 r.adapter.op_b_memory.prev_value) op) (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ => by
+      have := execute_MUL_reaches rs2 rs1 rd op (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_neg hrd_ne] at this)
+    hrd_ne hopa'.symm hval hstraight hpc0 hwrites hnomem
+
+set_option maxHeartbeats 4000000 in
+/-- The **register-writing** MULW chip `advance` (RowView-generic; mirrors `advance_of_divw`).  No
+`mul_op` — MULW is fixed by its own opcode; writes `rd` the 32→64 sign-extended low product. -/
+theorem advance_of_mulw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((Opcode.MULW).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 0) (hnonX0 : r.adapter.op_a ≠ 0)
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (hval : Word.toBitVec64 r.rdWrite
+      = SailRV64.mulw (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 r.adapter.op_b_memory.prev_value))
+    (hwrites : r.commit.writesReg = true := by rfl)
+    (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesMulw hdecrom hop himmc
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hidxc : (rs2.toNat : ZMod p) = r.adapter.op_c[0] := by
+    have h : r.adapter.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := hopc; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hrs2 := hvalb.2 rs2 himmc hidxc
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
+  exact advance_write_core (instruction.MULW (.Regidx rs2, .Regidx rs1, .Regidx rd)) rd
+    (SailRV64.mulw (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+      (Word.toBitVec64 r.adapter.op_b_memory.prev_value)) (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _ _ => by
+      have := execute_MULW_reaches rs2 rs1 rd (Word.toBitVec64 r.adapter.op_b_memory.prev_value)
+        (Word.toBitVec64 r.adapter.op_c_memory.prev_value) t ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2)
+      rwa [if_neg hrd_ne] at this)
+    hrd_ne hopa'.symm hval hstraight hpc0 hwrites hnomem
+
 /-- The DIV/DIVU chip `advance` (RowView-generic; mirrors `advance_of_rtype`). -/
 theorem advance_of_div {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
