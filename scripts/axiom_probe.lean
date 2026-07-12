@@ -357,6 +357,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.sp1_finishedChannel_guarantees
 #print axioms SP1Clean.Soundness.allChipKinds
 #print axioms SP1Clean.Soundness.allChipKinds_length
+#print axioms SP1Clean.Soundness.allChipKinds_migrated
 #print axioms SP1Clean.Soundness.covered_iff_routed
 #print axioms SP1Clean.Soundness.reachable_subset_wired
 #print axioms SP1Clean.Soundness.wired_subset_reachable

@@ -82,4 +82,35 @@ theorem chipRows_advance_sound
   have heff' : RowEffect prog (ChipRow.view r) s s' := heff
   exact ⟨s', hstep, hr_view ▸ heff'⟩
 
+/-- **The cutover: `TargetObligations` with the W7 `lift` seam discharged by the per-chip advance dispatch.**
+`lift` is no longer a black-box hypothesis — it is `chipRows_advance_sound`, routing each real walk row to its
+migrated `ChipKind.advance`. The remaining fields are the other capstone seams (`bound` = W2 operand binding,
+`halt`/`halt_nonempty` = W5), and the dispatch's own inputs are the named residuals: `h_bin`/`h_spec` (from the
+trace), `h_migrated` (coverage — complete 25/25 via `allChipKinds_migrated`, dischargeable from routing by
+`routeOf_mem_allChipKinds`), `h_decode` (the `ProgTruth` fetch seam), and `h_ready` (`advanceReady` routing).
+`OperandsBound := ValueOperandsBound`. This is the W7 seam made concrete — the retirement of the abstract
+`lift` hypothesis in favour of the per-chip fan-out. -/
+def targetObligations_via_advance
+    {prog : GuestProgram} {pi : SP1TargetPublicIO (ZMod p)} (rows : List (ChipRow p))
+    (data : ProverData (ZMod p))
+    (h_bound : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+      ∀ i (hi : i < path.length) s, RefinesAt prog s0 path i s → ValueOperandsBound (path[i]'hi) s)
+    (h_bin : ∀ r ∈ rows, r.is_real = 0 ∨ r.is_real = 1)
+    (h_spec : ∀ r ∈ rows, r.chipSpec data)
+    (h_migrated : ∀ r ∈ rows, r.is_real = 1 → (r.kind.advance).isSome = true)
+    (h_decode : ∀ r ∈ rows, r.is_real = 1 → decodedInROM prog (programAccess r.view).toRow)
+    (h_ready : ∀ r ∈ rows, ∀ s : SailState, r.is_real = 1 →
+      r.kind.advanceReady r.inputs r.cols prog s)
+    (h_halt_nonempty : ∀ path, WalkOf pi.toLegacy rows path → path ≠ [])
+    (h_halt : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+      ∀ (hne : path ≠ []) s, RefinesAt prog s0 path (path.length - 1) s →
+        ValueOperandsBound (path[path.length - 1]'(by
+          have := List.length_pos_of_ne_nil hne; omega)) s →
+        SP1Halted prog (exitOf pi.exit_code) s) :
+    TargetObligations prog pi rows ValueOperandsBound where
+  bound := h_bound
+  lift := chipRows_advance_sound rows data h_bin h_spec h_migrated h_decode h_ready
+  halt_nonempty := h_halt_nonempty
+  halt := h_halt
+
 end SP1Clean.Soundness.Target
