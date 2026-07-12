@@ -248,7 +248,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.BranchColumns (ZMod p)
                                               (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) = true) →
       ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
     intro op hop hdec_iff
-    obtain ⟨w, imm, rs2, rs1, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesBType op hdecrom hop himmc hcfg
+    obtain ⟨w, imm, rs2, rs1, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesBType op hdecrom hop himmc
     have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
     have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
     have hidxb : (rs2.toNat : ZMod p) = r.adapter.op_b[0] := by

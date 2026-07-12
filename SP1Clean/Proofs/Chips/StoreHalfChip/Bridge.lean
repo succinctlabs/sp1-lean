@@ -229,7 +229,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreHalfColumns (ZMod
   have himmc : r.adapter.imm_c = (1 : ZMod p) := rfl
   have himmb : r.adapter.imm_b = 0 := rfl
   obtain ⟨w, imm, rs2, rs1, hfetch, hdecw, hopa, hopb, hopc⟩ :=
-    decodesStore 2 hdecrom hop himmc storeOpcode_pin_two hcfg
+    decodesStore 2 hdecrom hop himmc storeOpcode_pin_two
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by

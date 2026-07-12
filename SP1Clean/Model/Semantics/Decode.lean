@@ -665,8 +665,7 @@ row's columns determine, lifting it to the uniform ∀-state form the Phase-4 `a
 over `op` via `instrToProgramRow_inv_rtype` — **the whole R-type family's decode producer**. -/
 theorem decodesRType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : rop)
     (h : decodedInROM prog row)
-    (hop : row.opcode = ((ropToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = ((ropToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0) :
     ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -674,28 +673,11 @@ theorem decodesRType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : rop
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_rtype op hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨rs2r, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_rtype op (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, rs2, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_rtype op hrow2 hop himm
-  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
-    exact h.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
-    exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'
-    simp only [regidxVal] at h
-    exact h.symm)
-  subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, rs2, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-- **The ∀-configured-state RTYPEW decode producer** — the `execute_RTYPEW` twin of `decodesRType`. From the
 Program-bus `decodedInROM` + the committed `(opcode, imm_c=0)`, recover the fetched word `w` and the register
@@ -703,8 +685,7 @@ indices `rs2/rs1/rd`, with the decode `ext_decode w = RTYPEW(rs2,rs1,rd,op)` hol
 state (the register indices pinned by `regidx_bv_inj`). What `advance_of_rtypew` consumes. -/
 theorem decodesRTypew {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : ropw)
     (h : decodedInROM prog row)
-    (hop : row.opcode = ((ropwToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = ((ropwToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0) :
     ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -712,28 +693,11 @@ theorem decodesRTypew {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : ro
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_rtypew op hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨rs2r, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_rtypew op (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, rs2, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_rtypew op hrow2 hop himm
-  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
-    exact h.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
-    exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'
-    simp only [regidxVal] at h
-    exact h.symm)
-  subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, rs2, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-- **`bitVecToWord` is a right inverse of `toBitVec64`.** Reassembling the four little-endian 16-bit
 limb-extracts of a 64-bit value recovers it. Gives both the I-type immediate binding
@@ -766,8 +730,7 @@ theorem sext12_inj {a b : BitVec 12} (h : a.signExtend 64 = b.signExtend 64) : a
 column via `toBitVec64_bitVecToWord` + `sext12_inj`. The Phase-4 I-type `advance`'s decode producer. -/
 theorem decodesIType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : iop)
     (h : decodedInROM prog row)
-    (hop : row.opcode = ((iopToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 1)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = ((iopToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 1) :
     ∃ (w : BitVec 32) (imm : BitVec 12) (rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -775,30 +738,11 @@ theorem decodesIType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : iop
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = bitVecToWord (imm.signExtend 64) := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨imm, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_itype op hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨imm, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_itype op (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, imm, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨imm', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_itype op hrow2 hop himm
-  obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
-    exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'
-    simp only [regidxVal] at h
-    exact h.symm)
-  have eimm : imm' = imm := by
-    have e := congrArg (Word.toBitVec64 (p := p)) (hc.symm.trans hc')
-    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
-    exact (sext12_inj e).symm
-  subst e1 e0 eimm
-  rw [hi2] at hrun2
-  exact hrun2
+  exact ⟨w, imm, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-- **The ∀-configured-state ADDIW decode producer** — the `.ADDIW` twin of `decodesIType`, keyed on the
 committed `(opcode = ADDW, imm_c = 1)`. Recovers `w` + `imm/rs1/rd` with the decode holding in every
@@ -806,8 +750,7 @@ configured state (register indices pinned by `regidx_bv_inj`, the immediate by `
 column). What `advance_of_addiw` consumes. -/
 theorem decodesADDIW {prog : GuestProgram} {row : ProgramRow (ZMod p)}
     (h : decodedInROM prog row)
-    (hop : row.opcode = ((Opcode.ADDW).toNat : ZMod p)) (himm : row.imm_c = 1)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = ((Opcode.ADDW).toNat : ZMod p)) (himm : row.imm_c = 1) :
     ∃ (w : BitVec 32) (imm : BitVec 12) (rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -815,30 +758,11 @@ theorem decodesADDIW {prog : GuestProgram} {row : ProgramRow (ZMod p)}
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = bitVecToWord (imm.signExtend 64) := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨imm, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_addiw hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨imm, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_addiw (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, imm, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨imm', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_addiw hrow2 hop himm
-  obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
-    exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'
-    simp only [regidxVal] at h
-    exact h.symm)
-  have eimm : imm' = imm := by
-    have e := congrArg (Word.toBitVec64 (p := p)) (hc.symm.trans hc')
-    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
-    exact (sext12_inj e).symm
-  subst e1 e0 eimm
-  rw [hi2] at hrun2
-  exact hrun2
+  exact ⟨w, imm, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-- **The 20-bit U-immediate encoding is injective.** Two U-immediates whose `op_b` limb-encodings
 (`bitVecToWord ((·.signExtend 64) <<< 12)`) agree are equal — the low-4/high-16 limb split
@@ -879,27 +803,18 @@ the `op_b` column). Returns `op_b = bitVecToWord ((imm.signExtend 64) <<< 12)` �
 inverts. What `advance_of_utype` consumes. -/
 theorem decodesUType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : uop)
     (h : decodedInROM prog row)
-    (hop : row.opcode = ((uopToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 1)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = ((uopToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 1) :
     ∃ (w : BitVec 32) (imm : BitVec 20) (rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
         = .ok (instruction.UTYPE (imm, .Regidx rd, op)) sc) ∧
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = bitVecToWord ((imm.signExtend 64) <<< 12) := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨imm, rdr, hi0, ha, hb⟩ := instrToProgramRow_inv_utype op hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨imm, rdr, rfl, ha, hb⟩ :=
+    instrToProgramRow_inv_utype op (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rd⟩ := rdr
-  refine ⟨w, imm, rd, hfetch, ?_, ha, hb⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨imm', rd', hi2, ha', hb'⟩ := instrToProgramRow_inv_utype op hrow2 hop himm
-  obtain ⟨rd'⟩ := rd'
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
-  have eimm : imm' = imm := sext20shl12_word_inj imm' imm (hb'.symm.trans hb)
-  subst e0 eimm; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, imm, rd, hfetch, hrun, ha, hb⟩
 
 /-- **The JAL decode inversion (W7).** JAL is its own opcode (`Opcode.JAL` = 46) committed with `imm_c = 1`,
 `op_a = rd`, `op_b = bitVecToWord (imm.signExtend 64)` (the 21-bit jump offset sign-extended), `op_c = 0`. So
@@ -958,8 +873,7 @@ theorem sext21_inj {a b : BitVec 21} (h : a.signExtend 64 = b.signExtend 64) : a
 by `regidx_bv_inj`, the 21-bit offset by `sext21_inj` on `op_b`). What `advance_of_jal` consumes. -/
 theorem decodesJal {prog : GuestProgram} {row : ProgramRow (ZMod p)}
     (h : decodedInROM prog row)
-    (hop : row.opcode = ((Opcode.JAL).toNat : ZMod p)) (himm : row.imm_c = 1)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = ((Opcode.JAL).toNat : ZMod p)) (himm : row.imm_c = 1) :
     ∃ (w : BitVec 32) (imm : BitVec 21) (rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -967,22 +881,11 @@ theorem decodesJal {prog : GuestProgram} {row : ProgramRow (ZMod p)}
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = bitVecToWord (imm.signExtend 64) ∧
       row.op_c = #v[0, 0, 0, 0] := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨imm, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_jal hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨imm, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_jal (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rd⟩ := rdr
-  refine ⟨w, imm, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨imm', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_jal hrow2 hop himm
-  obtain ⟨rd'⟩ := rd'
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
-  have eimm : imm' = imm := by
-    have e := congrArg (Word.toBitVec64 (p := p)) (hb.symm.trans hb')
-    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
-    exact (sext21_inj e).symm
-  subst e0 eimm; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, imm, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-- **The JALR decode inversion (W7).** JALR is I-type-shaped (its own opcode `Opcode.JALR` = 47, `imm_c = 1`,
 `op_a = rd`, `op_b = #v[regidxVal rs1, 0, 0, 0]` the rs1 register, `op_c = bitVecToWord (imm.signExtend 64)`
@@ -1030,8 +933,7 @@ theorem instrToProgramRow_inv_jalr {pc : Vector (ZMod p) 3} {i : instruction} {r
 pinned by `sext12_inj`). What `advance_of_jalr` consumes. -/
 theorem decodesJalr {prog : GuestProgram} {row : ProgramRow (ZMod p)}
     (h : decodedInROM prog row)
-    (hop : row.opcode = ((Opcode.JALR).toNat : ZMod p)) (himm : row.imm_c = 1)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = ((Opcode.JALR).toNat : ZMod p)) (himm : row.imm_c = 1) :
     ∃ (w : BitVec 32) (imm : BitVec 12) (rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -1039,26 +941,11 @@ theorem decodesJalr {prog : GuestProgram} {row : ProgramRow (ZMod p)}
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = bitVecToWord (imm.signExtend 64) := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨imm, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_jalr hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨imm, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_jalr (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, imm, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨imm', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_jalr hrow2 hop himm
-  obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
-    exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
-  have eimm : imm' = imm := by
-    have e := congrArg (Word.toBitVec64 (p := p)) (hc.symm.trans hc')
-    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
-    exact (sext12_inj e).symm
-  subst e1 e0 eimm; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, imm, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 
 /-! ## DivRem (DIV/DIVU/REM/REMU/DIVW/DIVUW/REMW/REMUW) decode inversions + producers (SC Phase 4) -/
@@ -1198,8 +1085,7 @@ theorem instrToProgramRow_inv_remw {pc : Vector (ZMod p) 3} {i : instruction} {r
 /-- ∀-configured-state DIV/DIVU decode producer (mirrors `decodesRType`). -/
 theorem decodesDiv {prog : GuestProgram} {row : ProgramRow (ZMod p)} (isU : Bool)
     (h : decodedInROM prog row)
-    (hop : row.opcode = (((if isU then Opcode.DIVU else Opcode.DIV)).toNat : ZMod p)) (himm : row.imm_c = 0)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = (((if isU then Opcode.DIVU else Opcode.DIV)).toNat : ZMod p)) (himm : row.imm_c = 0) :
     ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -1207,30 +1093,16 @@ theorem decodesDiv {prog : GuestProgram} {row : ProgramRow (ZMod p)} (isU : Bool
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_div isU hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨rs2r, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_div isU (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, rs2, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_div isU hrow2 hop himm
-  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
-  subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, rs2, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-- ∀-configured-state REM/REMU decode producer. -/
 theorem decodesRem {prog : GuestProgram} {row : ProgramRow (ZMod p)} (isU : Bool)
     (h : decodedInROM prog row)
-    (hop : row.opcode = (((if isU then Opcode.REMU else Opcode.REM)).toNat : ZMod p)) (himm : row.imm_c = 0)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = (((if isU then Opcode.REMU else Opcode.REM)).toNat : ZMod p)) (himm : row.imm_c = 0) :
     ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -1238,30 +1110,16 @@ theorem decodesRem {prog : GuestProgram} {row : ProgramRow (ZMod p)} (isU : Bool
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_rem isU hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨rs2r, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_rem isU (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, rs2, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_rem isU hrow2 hop himm
-  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
-  subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, rs2, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-- ∀-configured-state DIVW/DIVUW decode producer. -/
 theorem decodesDivw {prog : GuestProgram} {row : ProgramRow (ZMod p)} (isU : Bool)
     (h : decodedInROM prog row)
-    (hop : row.opcode = (((if isU then Opcode.DIVUW else Opcode.DIVW)).toNat : ZMod p)) (himm : row.imm_c = 0)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = (((if isU then Opcode.DIVUW else Opcode.DIVW)).toNat : ZMod p)) (himm : row.imm_c = 0) :
     ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -1269,30 +1127,16 @@ theorem decodesDivw {prog : GuestProgram} {row : ProgramRow (ZMod p)} (isU : Boo
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_divw isU hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨rs2r, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_divw isU (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, rs2, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_divw isU hrow2 hop himm
-  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
-  subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, rs2, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-- ∀-configured-state REMW/REMUW decode producer. -/
 theorem decodesRemw {prog : GuestProgram} {row : ProgramRow (ZMod p)} (isU : Bool)
     (h : decodedInROM prog row)
-    (hop : row.opcode = (((if isU then Opcode.REMUW else Opcode.REMW)).toNat : ZMod p)) (himm : row.imm_c = 0)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = (((if isU then Opcode.REMUW else Opcode.REMW)).toNat : ZMod p)) (himm : row.imm_c = 0) :
     ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -1300,24 +1144,11 @@ theorem decodesRemw {prog : GuestProgram} {row : ProgramRow (ZMod p)} (isU : Boo
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_remw isU hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨rs2r, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_remw isU (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, rs2, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_remw isU hrow2 hop himm
-  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
-  subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, rs2, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-! ## MUL/MULW decode inversions + producers (SC Phase 4)
 
@@ -1485,8 +1316,7 @@ theorem instrToProgramRow_inv_mul_low {pc : Vector (ZMod p) 3} {i : instruction}
 theorem decodesMul {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : mul_op)
     (hpin : ∀ op' : mul_op, (mulOpToOpcode op').toNat = (mulOpToOpcode op).toNat → op' = op)
     (h : decodedInROM prog row)
-    (hop : row.opcode = ((mulOpToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = ((mulOpToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0) :
     ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -1494,30 +1324,16 @@ theorem decodesMul {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : mul_o
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_mul op hpin hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨rs2r, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_mul op hpin (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, rs2, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_mul op hpin hrow2 hop himm
-  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
-  subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, rs2, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-- ∀-configured-state MULW decode producer (mirrors `decodesDivw`; no `mul_op`). -/
 theorem decodesMulw {prog : GuestProgram} {row : ProgramRow (ZMod p)}
     (h : decodedInROM prog row)
-    (hop : row.opcode = ((Opcode.MULW).toNat : ZMod p)) (himm : row.imm_c = 0)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = ((Opcode.MULW).toNat : ZMod p)) (himm : row.imm_c = 0) :
     ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -1525,24 +1341,11 @@ theorem decodesMulw {prog : GuestProgram} {row : ProgramRow (ZMod p)}
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_mulw hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨rs2r, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_mulw (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, rs2, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨rs2', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_mulw hrow2 hop himm
-  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hc.symm.trans hc')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h; exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
-  subst e2 e1 e0; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, rs2, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-! ## BTYPE (branches) decode inversion + producer (SC Phase 4 · Phase 3a) -/
 
@@ -1606,8 +1409,7 @@ configured state (`rs1` from `op_a` and `rs2` from `op_b` pinned by `regidx_bv_i
 `sext13_inj` on `op_c`). What `BranchChip.advance` consumes. -/
 theorem decodesBType {prog : GuestProgram} {row : ProgramChip.ProgramRow (ZMod p)} (op : bop)
     (h : decodedInROM prog row)
-    (hop : row.opcode = ((bopToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 1)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = ((bopToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 1) :
     ∃ (w : BitVec 32) (imm : BitVec 13) (rs2 rs1 : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -1615,26 +1417,11 @@ theorem decodesBType {prog : GuestProgram} {row : ProgramChip.ProgramRow (ZMod p
       row.op_a = (rs1.toNat : ZMod p) ∧
       row.op_b = #v[(rs2.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = bitVecToWord (imm.signExtend 64) := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨imm, rs2r, rs1r, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_btype op hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨imm, rs2r, rs1r, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_btype op (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r
-  refine ⟨w, imm, rs2, rs1, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨imm', rs2', rs1', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_btype op hrow2 hop himm
-  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
-    exact h.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
-  have eimm : imm' = imm := by
-    have e := congrArg (Word.toBitVec64 (p := p)) (hc.symm.trans hc')
-    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
-    exact (sext13_inj e).symm
-  subst e2 e1 eimm; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, imm, rs2, rs1, hfetch, hrun, ha, hb, hc⟩
 
 /-! ## LOAD decode inversion + producer (SC Phase 4 · Phase 3b) -/
 
@@ -1741,8 +1528,7 @@ theorem decodesLoad {prog : GuestProgram} {row : ProgramRow (ZMod p)} (width : w
     (hpin : ∀ (w' : word_width) (u' : Bool),
       (loadOpcode w' u').toNat = (loadOpcode width isU).toNat → w' = width ∧ u' = isU)
     (h : decodedInROM prog row)
-    (hop : row.opcode = ((loadOpcode width isU).toNat : ZMod p)) (himm : row.imm_c = 1)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hop : row.opcode = ((loadOpcode width isU).toNat : ZMod p)) (himm : row.imm_c = 1) :
     ∃ (w : BitVec 32) (imm : BitVec 12) (rs1 rd : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -1750,26 +1536,11 @@ theorem decodesLoad {prog : GuestProgram} {row : ProgramRow (ZMod p)} (width : w
       row.op_a = (rd.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = bitVecToWord (imm.signExtend 64) := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨imm, rs1r, rdr, hi0, ha, hb, hc⟩ := instrToProgramRow_inv_load width isU hpin hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨imm, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_load width isU hpin (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  refine ⟨w, imm, rs1, rd, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨imm', rs1', rd', hi2, ha', hb', hc'⟩ := instrToProgramRow_inv_load width isU hpin hrow2 hop himm
-  obtain ⟨rs1'⟩ := rs1'; obtain ⟨rd'⟩ := rd'
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have h := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at h
-    exact h.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have h := ha.symm.trans ha'; simp only [regidxVal] at h; exact h.symm)
-  have eimm : imm' = imm := by
-    have e := congrArg (Word.toBitVec64 (p := p)) (hc.symm.trans hc')
-    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
-    exact (sext12_inj e).symm
-  subst e1 e0 eimm; rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, imm, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 
 /-! ## STORE decode inversion + producer (SC Phase 4 · Phase 3b) -/
@@ -1922,8 +1693,7 @@ consumes. -/
 theorem decodesStore {prog : GuestProgram} {row : ProgramChip.ProgramRow (ZMod p)} (width : word_width)
     (h : decodedInROM prog row)
     (hop : row.opcode = ((storeOpcode width).toNat : ZMod p)) (himm : row.imm_c = 1)
-    (hpin : ∀ w' : word_width, (storeOpcode w').toNat = (storeOpcode width).toNat → w' = width)
-    {s0 : SailState} (hs0 : SailConfigured s0) :
+    (hpin : ∀ w' : word_width, (storeOpcode w').toNat = (storeOpcode width).toNat → w' = width) :
     ∃ (w : BitVec 32) (imm : BitVec 12) (rs2 rs1 : BitVec 5),
       prog.fetchWord (pcBitsOfRow row) = some w ∧
       (∀ sc, SailConfigured sc → (ext_decode w).run sc
@@ -1931,30 +1701,12 @@ theorem decodesStore {prog : GuestProgram} {row : ProgramChip.ProgramRow (ZMod p
       row.op_a = (rs2.toNat : ZMod p) ∧
       row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
       row.op_c = bitVecToWord (imm.signExtend 64) := by
-  obtain ⟨w, i0, hfetch, hrun0, hrow0⟩ := h.decodes s0 hs0
-  obtain ⟨imm, rs2r, rs1r, width', hi0, hwop, ha, hb, hc⟩ :=
-    instrToProgramRow_inv_store width hrow0 hop himm
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨imm, rs2r, rs1r, width', rfl, hwop, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_store width (instrToProgramRow'_some hrow) hop himm
+  obtain rfl : width' = width := hpin width' hwop
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r
-  refine ⟨w, imm, rs2, rs1, hfetch, ?_, ha, hb, hc⟩
-  intro sc hsc
-  obtain ⟨w2, i2, hfetch2, hrun2, hrow2⟩ := h.decodes sc hsc
-  obtain rfl : w2 = w := (Option.some.injEq _ _).mp (hfetch2 ▸ hfetch)
-  obtain ⟨imm', rs2', rs1', width'2, hi2, hwop2, ha', hb', hc'⟩ :=
-    instrToProgramRow_inv_store width hrow2 hop himm
-  have hpw2 : width'2 = width := hpin width'2 hwop2
-  obtain ⟨rs2'⟩ := rs2'; obtain ⟨rs1'⟩ := rs1'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have hh := ha.symm.trans ha'; simp only [regidxVal] at hh; exact hh.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have hh := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hh
-    exact hh.symm)
-  have eimm : imm' = imm := by
-    have e := congrArg (Word.toBitVec64 (p := p)) (hc.symm.trans hc')
-    rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at e
-    exact (sext12_inj e).symm
-  rw [e2, e1, eimm, hpw2] at hi2
-  rw [hi2] at hrun2; exact hrun2
+  exact ⟨w, imm, rs2, rs1, hfetch, hrun, ha, hb, hc⟩
 
 
 end SP1Clean.Soundness.Target

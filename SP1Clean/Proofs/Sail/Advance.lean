@@ -709,7 +709,7 @@ theorem advance_of_rtype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ :=
-    decodesRType op hdecrom hop himmc hcfg
+    decodesRType op hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -754,7 +754,7 @@ theorem advance_of_rtypew {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
   obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ :=
-    decodesRTypew op hdecrom hop himmc hcfg
+    decodesRTypew op hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -799,7 +799,7 @@ theorem advance_of_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesIType op hdecrom hop himmc hcfg
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesIType op hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -846,7 +846,7 @@ theorem advance_of_addiw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesADDIW hdecrom hop himmc hcfg
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesADDIW hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -891,7 +891,7 @@ theorem advance_of_utype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, imm, rd, hfetch, hdecw, hopa, hopb⟩ := decodesUType op hdecrom hop himmc hcfg
+  obtain ⟨w, imm, rd, hfetch, hdecw, hopa, hopb⟩ := decodesUType op hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
@@ -1083,7 +1083,7 @@ theorem advance_of_jal {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : S
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, imm, rd, hfetch, hdecw, hopa, hopb, _⟩ := decodesJal hdecrom hop himmc hcfg
+  obtain ⟨w, imm, rd, hfetch, hdecw, hopa, hopb, _⟩ := decodesJal hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
@@ -1150,7 +1150,7 @@ theorem advance_of_jalr {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesJalr hdecrom hop himmc hcfg
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesJalr hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -1295,7 +1295,7 @@ theorem advance_of_div {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : S
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDiv isU hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDiv isU hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -1333,7 +1333,7 @@ theorem advance_of_rem {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : S
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRem isU hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRem isU hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -1371,7 +1371,7 @@ theorem advance_of_divw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDivw isU hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDivw isU hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -1409,7 +1409,7 @@ theorem advance_of_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRemw isU hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRemw isU hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -1786,7 +1786,7 @@ theorem advance_of_load_width1 {prog : GuestProgram} {r : Trace.RowView (ZMod p)
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesLoad 1 isU hpin hdecrom hop himmc hcfg
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesLoad 1 isU hpin hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -2102,7 +2102,7 @@ theorem advance_of_load_width2 {prog : GuestProgram} {r : Trace.RowView (ZMod p)
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesLoad 2 isU hpin hdecrom hop himmc hcfg
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesLoad 2 isU hpin hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -2222,7 +2222,7 @@ theorem advance_of_load_width4 {prog : GuestProgram} {r : Trace.RowView (ZMod p)
     (hwrites : r.commit.writesReg = true := by rfl)
     (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesLoad 4 isU hpin hdecrom hop himmc hcfg
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesLoad 4 isU hpin hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -2376,7 +2376,7 @@ theorem advance_of_alu_x0_rtype {prog : GuestProgram} {r : Trace.RowView (ZMod p
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRType op hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRType op hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -2414,7 +2414,7 @@ theorem advance_of_alu_x0_rtypew {prog : GuestProgram} {r : Trace.RowView (ZMod 
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRTypew op hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRTypew op hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -2451,7 +2451,7 @@ theorem advance_of_alu_x0_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesIType op hdecrom hop himmc hcfg
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesIType op hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -2485,7 +2485,7 @@ theorem advance_of_alu_x0_div {prog : GuestProgram} {r : Trace.RowView (ZMod p)}
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDiv isU hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDiv isU hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -2522,7 +2522,7 @@ theorem advance_of_alu_x0_rem {prog : GuestProgram} {r : Trace.RowView (ZMod p)}
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRem isU hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRem isU hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -2559,7 +2559,7 @@ theorem advance_of_alu_x0_divw {prog : GuestProgram} {r : Trace.RowView (ZMod p)
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDivw isU hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesDivw isU hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -2596,7 +2596,7 @@ theorem advance_of_alu_x0_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRemw isU hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesRemw isU hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -2638,7 +2638,7 @@ theorem advance_of_alu_x0_mul {prog : GuestProgram} {r : Trace.RowView (ZMod p)}
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesMul op hpin hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesMul op hpin hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
@@ -2676,7 +2676,7 @@ theorem advance_of_alu_x0_mulw {prog : GuestProgram} {r : Trace.RowView (ZMod p)
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesMulw hdecrom hop himmc hcfg
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesMulw hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
