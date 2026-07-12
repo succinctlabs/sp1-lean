@@ -3,6 +3,7 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.LoadX0Chip.Formal
 import SP1Clean.Soundness.ChipRow
+import SP1Clean.Proofs.Sail.Advance
 
 /-! # Native Sail bridge for LoadX0 (loads into x0)
 
@@ -491,8 +492,183 @@ namespace SP1Clean.LoadX0Chip
 open SP1Clean.LoadX0Sail
 open Sail LeanRV64D LeanRV64D.Functions
 open SP1Clean.SailMem
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- **LoadX0's committed bus view** — standalone (identical to the former inline `kind.view`).
+Straight-line `next_pc = pc+4`, ITypeReader adapter, the umbrella `isReal` selector, `rdWrite`
+the zero word (the `x0` destination discards the read), the weighted-selector `opcodeVal`, and
+`commit = .noWrite`. -/
+def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadX0Columns (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
+    inp.adapter.toAdapterView, isReal inp, #v[(0 : ZMod p), 0, 0, 0], opcodeVal inp, .noWrite⟩
+
+/-- **LoadX0's `advanceReady` bundle** (SC Phase 4). Routing (`op_a = 0`, so `rd = x0`), the
+low-pc-limb bound, and — since LoadX0 bundles seven load opcodes behind a weighted-selector opcode
+— a seven-way `(opcode, bounds, memory-read)` disjunction identifying WHICH load this row is. Each
+disjunct carries only what its width-`N` no-write adapter consumes: the opcode value, the width-`N`
+alignment (widths ≥ 2), the address bounds (`fits`/`hi`/`lo`), and the **existence** of the `N` read
+bytes (the values are discarded, so they are existentially quantified rather than pinned to columns). -/
+def advanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadX0Columns (ZMod p))
+    (_prog : GuestProgram) (s : SailState) : Prop :=
+  inp.adapter.op_a = 0 ∧
+  (inp.state.pc[0]).val < 2 ^ 16 ∧
+  ( -- LB (width 1, signed)
+    ( opcodeVal inp = ((loadOpcode 1 false).toNat : ZMod p) ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 < 2 ^ 64 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 ≤ 2 ^ 48 ∧
+      2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
+      ∃ b₀ : BitVec 8, s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some b₀ ) ∨
+    -- LBU (width 1, unsigned)
+    ( opcodeVal inp = ((loadOpcode 1 true).toNat : ZMod p) ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 < 2 ^ 64 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 ≤ 2 ^ 48 ∧
+      2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
+      ∃ b₀ : BitVec 8, s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some b₀ ) ∨
+    -- LH (width 2, signed)
+    ( opcodeVal inp = ((loadOpcode 2 false).toNat : ZMod p) ∧
+      ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 2 = 0 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 < 2 ^ 64 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 ≤ 2 ^ 48 ∧
+      2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
+      ∃ b₀ b₁ : BitVec 8,
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some b₀ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1]? = some b₁ ) ∨
+    -- LHU (width 2, unsigned)
+    ( opcodeVal inp = ((loadOpcode 2 true).toNat : ZMod p) ∧
+      ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 2 = 0 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 < 2 ^ 64 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 ≤ 2 ^ 48 ∧
+      2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
+      ∃ b₀ b₁ : BitVec 8,
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some b₀ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1]? = some b₁ ) ∨
+    -- LW (width 4, signed)
+    ( opcodeVal inp = ((loadOpcode 4 false).toNat : ZMod p) ∧
+      ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 4 = 0 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 < 2 ^ 64 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 ≤ 2 ^ 48 ∧
+      2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
+      ∃ b₀ b₁ b₂ b₃ : BitVec 8,
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some b₀ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1]? = some b₁ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2]? = some b₂ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 3]? = some b₃ ) ∨
+    -- LWU (width 4, unsigned)
+    ( opcodeVal inp = ((loadOpcode 4 true).toNat : ZMod p) ∧
+      ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 4 = 0 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 < 2 ^ 64 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 ≤ 2 ^ 48 ∧
+      2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
+      ∃ b₀ b₁ b₂ b₃ : BitVec 8,
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some b₀ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1]? = some b₁ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2]? = some b₂ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 3]? = some b₃ ) ∨
+    -- LD (width 8, signed)
+    ( opcodeVal inp = ((loadOpcode 8 false).toNat : ZMod p) ∧
+      ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 8 = 0 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 8 < 2 ^ 64 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 8 ≤ 2 ^ 48 ∧
+      2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
+      ∃ b₀ b₁ b₂ b₃ b₄ b₅ b₆ b₇ : BitVec 8,
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some b₀ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1]? = some b₁ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2]? = some b₂ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 3]? = some b₃ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4]? = some b₄ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 5]? = some b₅ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 6]? = some b₆ ∧
+        s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+          + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 7]? = some b₇ ) )
+
+set_option maxHeartbeats 4000000 in
+/-- **`LoadX0Chip.advance`** — the per-LoadX0-row `try_step` lift (SC Phase 4), a seven-way opcode
+dispatch into the width-`N` no-write load adapters (`advance_of_load_x0_width{1,2,4,8}`). `op_a = 0`
+(so `rd = x0`, the read discarded) and the low-pc bound come from `advanceReady`; `himmb`/`himmc`/
+`hstraight` are `rfl` (the ITypeReader `toAdapterView`). Each branch reads its opcode + bounds + the
+existence of the `N` read bytes off `advanceReady`. This proof **is** `kind.advance` below. -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadX0Columns (ZMod p))
+    (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
+    (_hreal : (rowView inp cols).is_real = 1) (_hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : advanceReady inp cols prog s) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hopa0, hpc0, hdisj⟩ := hready
+  rcases hdisj with
+    ⟨ho, h_fits, h_hi, h_lo, b₀, hm₀⟩ |
+    ⟨ho, h_fits, h_hi, h_lo, b₀, hm₀⟩ |
+    ⟨ho, h_al, h_fits, h_hi, h_lo, b₀, b₁, hm₀, hm₁⟩ |
+    ⟨ho, h_al, h_fits, h_hi, h_lo, b₀, b₁, hm₀, hm₁⟩ |
+    ⟨ho, h_al, h_fits, h_hi, h_lo, b₀, b₁, b₂, b₃, hm₀, hm₁, hm₂, hm₃⟩ |
+    ⟨ho, h_al, h_fits, h_hi, h_lo, b₀, b₁, b₂, b₃, hm₀, hm₁, hm₂, hm₃⟩ |
+    ⟨ho, h_al, h_fits, h_hi, h_lo, b₀, b₁, b₂, b₃, b₄, b₅, b₆, b₇,
+      hm₀, hm₁, hm₂, hm₃, hm₄, hm₅, hm₆, hm₇⟩
+  · exact advance_of_load_x0_width1 false b₀ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0 hpc0 rfl
+      h_fits h_hi h_lo hm₀
+  · exact advance_of_load_x0_width1 true b₀ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0 hpc0 rfl
+      h_fits h_hi h_lo hm₀
+  · exact advance_of_load_x0_width2 false b₀ b₁ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0 hpc0 rfl
+      h_al h_fits h_hi h_lo hm₀ hm₁
+  · exact advance_of_load_x0_width2 true b₀ b₁ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0 hpc0 rfl
+      h_al h_fits h_hi h_lo hm₀ hm₁
+  · exact advance_of_load_x0_width4 false b₀ b₁ b₂ b₃ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0
+      hpc0 rfl h_al h_fits h_hi h_lo hm₀ hm₁ hm₂ hm₃
+  · exact advance_of_load_x0_width4 true b₀ b₁ b₂ b₃ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0
+      hpc0 rfl h_al h_fits h_hi h_lo hm₀ hm₁ hm₂ hm₃
+  · exact advance_of_load_x0_width8 b₀ b₁ b₂ b₃ b₄ b₅ b₆ b₇ hcfg hrom hpcread hvalb hdecrom ho rfl rfl
+      hopa0 hpc0 rfl h_al h_fits h_hi h_lo hm₀ hm₁ hm₂ hm₃ hm₄ hm₅ hm₆ hm₇
 
 /-- `ChipKind` registration for LoadX0 (all seven load opcodes into `x0`). The loaded word is
 discarded (rd = x0); `sailEquiv` is the 7-way per-opcode correctness conjunction. -/
@@ -500,10 +676,7 @@ def kind : Soundness.ChipKind p where
   name := "LoadX0"
   Inputs := LoadX0Chip.Inputs
   Cols := Extracted.LoadX0Columns
-  view := fun inp _cols => ⟨inp.state,
-    #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
-    inp.adapter.toAdapterView, LoadX0Chip.isReal inp,
-    #v[(0 : ZMod p), 0, 0, 0], LoadX0Chip.opcodeVal inp, .noWrite⟩
+  view := rowView
   chipSpec := fun inp cols data => LoadX0Chip.Spec inp cols data
   sailEquiv := fun _inp _cols s => ∀ (rs1 : BitVec 5) (imm : BitVec 12) (pc reg_val : BitVec 64),
     (hs : SailState.isInitialized s) → SailState.isValidMemConfig s hs →
@@ -574,5 +747,7 @@ def kind : Soundness.ChipKind p where
         (spec_loadX0_ld imm rs1 0#5).run s = (sp1_loadX0 pc).run s)
   reaches_sail := fun _inp _cols _data s _h_real _h_chip rs1 imm pc reg_val hs hconfig h_pc h_rs1 =>
     loadX0_chip_reaches_sail rs1 imm pc reg_val s hs hconfig h_pc h_rs1
+  advanceReady := advanceReady
+  advance := some (PLift.up advance)
 
 end SP1Clean.LoadX0Chip
