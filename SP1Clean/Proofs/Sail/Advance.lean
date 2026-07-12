@@ -2269,6 +2269,68 @@ theorem execute_LOAD_reaches_width4 (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5
   rw [run_bind_of_run' t _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
+set_option maxHeartbeats 10000000 in
+/-- **The width-8 `execute_LOAD` reaches `Retire_Success`.** The 8-byte (double-word) read twin:
+requires 8-byte ALIGNMENT, loads the little-endian word `data₇ ++ … ++ data₀`.
+Built from `SailMem.run_vmem_read_of_width_8'`. -/
+theorem execute_LOAD_reaches_width8 (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5) (is_unsigned : Bool)
+    (reg_val : BitVec 64) (data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ : BitVec 8) (t : SailState)
+    (hs : t.isInitialized) (hconfig : SailState.isValidMemConfig t hs)
+    (h_rs1 : t.get_reg? rs1_idx = some reg_val)
+    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 8 = 0)
+    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 < 2 ^ 64)
+    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48)
+    (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
+    (hmem₀ : t.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀)
+    (hmem₁ : t.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁)
+    (hmem₂ : t.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 2]? = some data₂)
+    (hmem₃ : t.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]? = some data₃)
+    (hmem₄ : t.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 4]? = some data₄)
+    (hmem₅ : t.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 5]? = some data₅)
+    (hmem₆ : t.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 6]? = some data₆)
+    (hmem₇ : t.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 7]? = some data₇) :
+    (execute (.LOAD (imm, .Regidx rs1_idx, .Regidx rd_idx, is_unsigned, 8))).run t
+      = .ok (ExecutionResult.Retire_Success ())
+          (if rd_idx = 0#5 then t
+           else {t with regs := (t.regs.insert (reg_idx_to_Register rd_idx)
+             (bitVecToRegidxVal rd_idx (extend_value is_unsigned
+               (data₇ ++ data₆ ++ data₅ ++ data₄ ++ data₃ ++ data₂ ++ data₁ ++ data₀))))}) := by
+  have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
+  have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
+      = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
+    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
+  have hm₀ : t.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]? = some data₀ := by
+    rw [← hadd]; exact hmem₀
+  have hm₁ : t.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
+    rw [← hadd]; exact hmem₁
+  have hm₂ : t.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2]? = some data₂ := by
+    rw [← hadd]; exact hmem₂
+  have hm₃ : t.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 3]? = some data₃ := by
+    rw [← hadd]; exact hmem₃
+  have hm₄ : t.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4]? = some data₄ := by
+    rw [← hadd]; exact hmem₄
+  have hm₅ : t.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 5]? = some data₅ := by
+    rw [← hadd]; exact hmem₅
+  have hm₆ : t.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 6]? = some data₆ := by
+    rw [← hadd]; exact hmem₆
+  have hm₇ : t.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 7]? = some data₇ := by
+    rw [← hadd]; exact hmem₇
+  have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 8 = true := by
+    rw [is_aligned_vaddr_iff_mod, hadd]; exact h_aligned
+  have h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
+      (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
+    range_subset_sp1_pma _ 8 (by omega) h_lo (by rw [hadd]; exact h_hi)
+  have hread := run_vmem_read_of_width_8' rs1_idx reg_val (BitVec.signExtend 64 imm)
+    data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ t hs h_rs1 h_align' hconfig h_fits h_in_range
+    hm₀ hm₁ hm₂ hm₃ hm₄ hm₅ hm₆ hm₇
+  simp only at hread
+  simp only [execute, execute_LOAD, hse, LeanRV64D.Functions.xlen_bytes, PreSail.assert]
+  rw [show Int.toNat 8 = 8 from rfl]
+  simp only [Nat.reduceLeDiff, decide_true, if_true, pure_bind]
+  rw [run_bind_of_run t _ _ hread]
+  rw [run_bind_of_run' t _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  rfl
+
 set_option maxHeartbeats 4000000 in
 /-- **The width-4 load chip `advance`.** The `advance_of_load_width2` twin: 4-byte alignment
 + four read bytes → the word `byte₃ ++ byte₂ ++ byte₁ ++ byte₀`. -/
@@ -2346,6 +2408,105 @@ theorem advance_of_load_width4 {prog : GuestProgram} {r : Trace.RowView (ZMod p)
       rwa [if_neg hrd_ne] at this)
     hrd_ne hopa'.symm hval hstraight hpc0 hwrites hnomem
 
+set_option maxHeartbeats 4000000 in
+/-- **The width-8 load chip `advance`** (LD). The `advance_of_load_width4` twin, but WITHOUT `hpin`:
+the width-8 `LD` opcode is the non-injective `else`→LD image of `loadOpcode`, so the decode is pinned
+by the width-validity guard via `decodesLoad' 8 false (by decide)`. Signed (`isU = false`, though for a
+full 64-bit read the extension is the identity), 8-byte alignment + eight read bytes → the word
+`byte₇ ++ … ++ byte₀`. -/
+theorem advance_of_load_width8 {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
+    (byte₀ byte₁ byte₂ byte₃ byte₄ byte₅ byte₆ byte₇ : BitVec 8)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
+    (hvalb : ValueOperandsBound r s)
+    (hdecrom : decodedInROM prog (programAccess r).toRow)
+    (hop : r.opcode = ((loadOpcode 8 false).toNat : ZMod p))
+    (himmb : r.adapter.imm_b = 0) (himmc : r.adapter.imm_c = 1)
+    (hnonX0 : r.adapter.op_a ≠ 0)
+    (hpc0 : (r.state.pc[0]).val < 2 ^ 16)
+    (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
+    (h_aligned : ((Word.toBitVec64 r.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 r.adapter.op_c).toNat) % 8 = 0)
+    (h_fits : (Word.toBitVec64 r.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 r.adapter.op_c).toNat + 8 < 2 ^ 64)
+    (h_hi : (Word.toBitVec64 r.adapter.op_b_memory.prev_value).toNat
+        + (Word.toBitVec64 r.adapter.op_c).toNat + 8 ≤ 2 ^ 48)
+    (h_lo : 2 ^ 16 ≤ (Word.toBitVec64 r.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 r.adapter.op_c).toNat)
+    (hmem₀ : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 r.adapter.op_c).toNat]? = some byte₀)
+    (hmem₁ : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 r.adapter.op_c).toNat + 1]? = some byte₁)
+    (hmem₂ : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 r.adapter.op_c).toNat + 2]? = some byte₂)
+    (hmem₃ : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 r.adapter.op_c).toNat + 3]? = some byte₃)
+    (hmem₄ : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 r.adapter.op_c).toNat + 4]? = some byte₄)
+    (hmem₅ : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 r.adapter.op_c).toNat + 5]? = some byte₅)
+    (hmem₆ : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 r.adapter.op_c).toNat + 6]? = some byte₆)
+    (hmem₇ : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 r.adapter.op_c).toNat + 7]? = some byte₇)
+    (hval : Word.toBitVec64 r.rdWrite
+      = extend_value false (byte₇ ++ byte₆ ++ byte₅ ++ byte₄ ++ byte₃ ++ byte₂ ++ byte₁ ++ byte₀))
+    (hwrites : r.commit.writesReg = true := by rfl)
+    (hnomem : r.commit.memWrite = none := by rfl) :
+    ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
+  obtain ⟨w, imm, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ :=
+    decodesLoad' 8 false (by decide) hdecrom hop himmc
+  have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
+  have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
+  have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
+    have h : r.adapter.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] := hopb; rw [h]; rfl
+  have hrs1 := hvalb.1 rs1 himmb hidxb
+  have hopa' : r.adapter.op_a = (rd.toNat : ZMod p) := hopa
+  have hrd_ne : rd ≠ 0#5 := by intro h0; apply hnonX0; rw [hopa', h0]; simp
+  have himmbind : Word.toBitVec64 r.adapter.op_c = BitVec.signExtend 64 imm := by
+    rw [show r.adapter.op_c = bitVecToWord (imm.signExtend 64) from hopc]
+    exact toBitVec64_bitVecToWord _
+  have h_aligned' : ((Word.toBitVec64 r.adapter.op_b_memory.prev_value).toNat
+      + (BitVec.signExtend 64 imm).toNat) % 8 = 0 := by rw [← himmbind]; exact h_aligned
+  have h_fits' : (Word.toBitVec64 r.adapter.op_b_memory.prev_value).toNat
+      + (BitVec.signExtend 64 imm).toNat + 8 < 2 ^ 64 := by rw [← himmbind]; exact h_fits
+  have h_hi' : (Word.toBitVec64 r.adapter.op_b_memory.prev_value).toNat
+      + (BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48 := by rw [← himmbind]; exact h_hi
+  have h_lo' : 2 ^ 16 ≤ (Word.toBitVec64 r.adapter.op_b_memory.prev_value
+      + BitVec.signExtend 64 imm).toNat := by rw [← himmbind]; exact h_lo
+  have hmem₀' : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+      + BitVec.signExtend 64 imm).toNat]? = some byte₀ := by rw [← himmbind]; exact hmem₀
+  have hmem₁' : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+      + BitVec.signExtend 64 imm).toNat + 1]? = some byte₁ := by rw [← himmbind]; exact hmem₁
+  have hmem₂' : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+      + BitVec.signExtend 64 imm).toNat + 2]? = some byte₂ := by rw [← himmbind]; exact hmem₂
+  have hmem₃' : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+      + BitVec.signExtend 64 imm).toNat + 3]? = some byte₃ := by rw [← himmbind]; exact hmem₃
+  have hmem₄' : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+      + BitVec.signExtend 64 imm).toNat + 4]? = some byte₄ := by rw [← himmbind]; exact hmem₄
+  have hmem₅' : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+      + BitVec.signExtend 64 imm).toNat + 5]? = some byte₅ := by rw [← himmbind]; exact hmem₅
+  have hmem₆' : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+      + BitVec.signExtend 64 imm).toNat + 6]? = some byte₆ := by rw [← himmbind]; exact hmem₆
+  have hmem₇' : s.mem[(Word.toBitVec64 r.adapter.op_b_memory.prev_value
+      + BitVec.signExtend 64 imm).toNat + 7]? = some byte₇ := by rw [← himmbind]; exact hmem₇
+  exact advance_load_core (instruction.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8)) rd
+    (extend_value false (byte₇ ++ byte₆ ++ byte₅ ++ byte₄ ++ byte₃ ++ byte₂ ++ byte₁ ++ byte₀))
+    (rcvPcOf (stateAccess r))
+    (w.extractLsb' 0 8) (w.extractLsb' 8 8) (w.extractLsb' 16 8) (w.extractLsb' 24 8)
+    hcfg hpcread rfl hfetchReady
+    (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
+    (fun t hframe _hpcf hmemf hinit hcfgt => by
+      have := execute_LOAD_reaches_width8 imm rs1 rd false
+        (Word.toBitVec64 r.adapter.op_b_memory.prev_value) byte₀ byte₁ byte₂ byte₃ byte₄ byte₅ byte₆ byte₇
+        t hinit hcfgt.toValidMemConfig
+        ((hframe rs1).trans hrs1) h_aligned' h_fits' h_hi' h_lo'
+        (by rw [hmemf]; exact hmem₀') (by rw [hmemf]; exact hmem₁')
+        (by rw [hmemf]; exact hmem₂') (by rw [hmemf]; exact hmem₃')
+        (by rw [hmemf]; exact hmem₄') (by rw [hmemf]; exact hmem₅')
+        (by rw [hmemf]; exact hmem₆') (by rw [hmemf]; exact hmem₇')
+      rwa [if_neg hrd_ne] at this)
+    hrd_ne hopa'.symm hval hstraight hpc0 hwrites hnomem
 
 /-! ## AluX0 (ALU-into-x0, result discarded): the no-write straight-line core + family adapters -/
 

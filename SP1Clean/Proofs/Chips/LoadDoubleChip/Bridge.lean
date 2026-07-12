@@ -3,6 +3,7 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.LoadDoubleChip.Formal
 import SP1Clean.Soundness.ChipRow
+import SP1Clean.Proofs.Sail.Advance
 
 /-! # Native Sail bridge for LoadDouble (LD)
 
@@ -299,8 +300,117 @@ namespace SP1Clean.LoadDoubleChip
 open SP1Clean.LoadSail
 open Sail LeanRV64D LeanRV64D.Functions
 open SP1Clean.SailMem
+open SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- **The LoadDouble `rdWrite ≡ extend_value` identity** (LD, signed). For a full 64-bit read the
+sign-extension is the identity, so the written word `memory_access.prev_value` equals `extend_value false`
+of the little-endian 8-byte read. Reuses the same-file `LoadSail.byteConcat8_toNat_eq_Word_toNat`. -/
+lemma loadDouble_hval (pv : Word (ZMod p)) (hpv : Word.isU64 pv) :
+    Word.toBitVec64 pv = extend_value false
+      (BitVec.ofNat 8 (pv[3].val >>> 8) ++ BitVec.ofNat 8 pv[3].val ++
+        BitVec.ofNat 8 (pv[2].val >>> 8) ++ BitVec.ofNat 8 pv[2].val ++
+        BitVec.ofNat 8 (pv[1].val >>> 8) ++ BitVec.ofNat 8 pv[1].val ++
+        BitVec.ofNat 8 (pv[0].val >>> 8) ++ BitVec.ofNat 8 pv[0].val) := by
+  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
+  obtain ⟨h0, h1, h2, h3⟩ := Word.lt_cases_of_isU64 hpv
+  have hconcat_toNat :
+      (BitVec.ofNat 8 (pv[3].val >>> 8) ++ BitVec.ofNat 8 pv[3].val ++
+        BitVec.ofNat 8 (pv[2].val >>> 8) ++ BitVec.ofNat 8 pv[2].val ++
+        BitVec.ofNat 8 (pv[1].val >>> 8) ++ BitVec.ofNat 8 pv[1].val ++
+        BitVec.ofNat 8 (pv[0].val >>> 8) ++ BitVec.ofNat 8 pv[0].val).toNat = Word.toNat pv := by
+    rw [byteConcat8_toNat_eq_Word_toNat pv[0] pv[1] pv[2] pv[3] h0 h1 h2 h3,
+      Word.toNat_def, Word.toNat_def]
+    simp
+  simp only [extend_value, Bool.false_eq_true, if_false, sign_extend, Sail.BitVec.signExtend,
+    BitVec.signExtend_eq]
+  apply BitVec.toNat_inj.mp
+  rw [Word.toBitVec64_toNat hpv, hconcat_toNat]
+
+/-- **LoadDouble's committed bus view** — standalone (identical to the former inline `kind.view`).
+Straight-line `next_pc = pc+4`, ITypeReader adapter, `rdWrite = memory_access.prev_value` (the full
+8-byte loaded word, no extension), opcode `35 = LD`, `commit = .regWrite`. -/
+def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadDoubleColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
+    inp.adapter.toAdapterView, inp.is_real, inp.memory_access.prev_value, 35, .regWrite⟩
+
+/-- **LoadDouble's `advanceReady` bundle**: routing (`op_a ≠ 0`), the low-pc-limb bound, the four
+loaded-limb bounds (`memory_access.prev_value[i] < 2^16`, i.e. `isU64`), the **8-byte alignment**, the
+address bounds, and the **eight-byte memory-read binding** at `op_b_memory.prev_value + op_c_imm`. -/
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadDoubleColumns (ZMod p))
+    (_prog : GuestProgram) (s : SailState) : Prop :=
+  inp.adapter.op_a ≠ 0 ∧
+  (inp.state.pc[0]).val < 2 ^ 16 ∧
+  inp.memory_access.prev_value[0].val < 2 ^ 16 ∧ inp.memory_access.prev_value[1].val < 2 ^ 16 ∧
+  inp.memory_access.prev_value[2].val < 2 ^ 16 ∧ inp.memory_access.prev_value[3].val < 2 ^ 16 ∧
+  ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 8 = 0 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 8 < 2 ^ 64 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
+      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 8 ≤ 2 ^ 48 ∧
+  2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat]?
+      = some (BitVec.ofNat 8 inp.memory_access.prev_value[0].val) ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1]?
+      = some (BitVec.ofNat 8 (inp.memory_access.prev_value[0].val >>> 8)) ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2]?
+      = some (BitVec.ofNat 8 inp.memory_access.prev_value[1].val) ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 3]?
+      = some (BitVec.ofNat 8 (inp.memory_access.prev_value[1].val >>> 8)) ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4]?
+      = some (BitVec.ofNat 8 inp.memory_access.prev_value[2].val) ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 5]?
+      = some (BitVec.ofNat 8 (inp.memory_access.prev_value[2].val >>> 8)) ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 6]?
+      = some (BitVec.ofNat 8 inp.memory_access.prev_value[3].val) ∧
+  s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 7]?
+      = some (BitVec.ofNat 8 (inp.memory_access.prev_value[3].val >>> 8))
+
+set_option maxHeartbeats 4000000 in
+/-- **`LoadDoubleChip.advance`** — the per-LoadDouble-row `try_step` lift (SC Phase 4). A single case
+(no LW/LWU dispatch): the opcode is `35 = LD`, and the `rdWrite ≡ extend_value false` identity
+(`loadDouble_hval`) reduces the write value to the full 8-byte read; `advance_of_load_width8` (no `hpin`,
+pinned by the width-validity guard) consumes the memory bindings / bounds / alignment / routing carried in
+`advanceReady`. `hspec`/`hreal` unused. -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadDoubleColumns (ZMod p))
+    (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
+    (_hreal : (rowView inp cols).is_real = 1) (_hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : AdvanceReady inp cols prog s) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hnonX0, hpc0, hpv0, hpv1, hpv2, hpv3, h_aligned, h_fits, h_hi, h_lo,
+    hmem₀, hmem₁, hmem₂, hmem₃, hmem₄, hmem₅, hmem₆, hmem₇⟩ := hready
+  refine advance_of_load_width8
+    (BitVec.ofNat 8 inp.memory_access.prev_value[0].val)
+    (BitVec.ofNat 8 (inp.memory_access.prev_value[0].val >>> 8))
+    (BitVec.ofNat 8 inp.memory_access.prev_value[1].val)
+    (BitVec.ofNat 8 (inp.memory_access.prev_value[1].val >>> 8))
+    (BitVec.ofNat 8 inp.memory_access.prev_value[2].val)
+    (BitVec.ofNat 8 (inp.memory_access.prev_value[2].val >>> 8))
+    (BitVec.ofNat 8 inp.memory_access.prev_value[3].val)
+    (BitVec.ofNat 8 (inp.memory_access.prev_value[3].val >>> 8))
+    hcfg hrom hpcread hvalb hdecrom
+    (by show (35 : ZMod p) = ((loadOpcode 8 false).toNat : ZMod p)
+        rw [show (loadOpcode 8 false).toNat = 35 from by decide]; norm_num)
+    rfl rfl hnonX0 hpc0 rfl h_aligned h_fits h_hi h_lo
+    hmem₀ hmem₁ hmem₂ hmem₃ hmem₄ hmem₅ hmem₆ hmem₇ ?_ rfl rfl
+  exact loadDouble_hval inp.memory_access.prev_value
+    (Word.isU64_of_cases hpv0 hpv1 hpv2 hpv3)
 
 /-- **LoadDouble's `ChipKind` registration** (LD). Straight-line `view`, I-type adapter, gating selector
 `is_real`, rd write-back the loaded 8-byte word `memory_access.prev_value`, opcode 35. `sailEquiv`
@@ -311,9 +421,7 @@ def kind : Soundness.ChipKind p where
   name := "LoadDouble"
   Inputs := LoadDoubleChip.Inputs
   Cols := Extracted.LoadDoubleColumns
-  view := fun inp _cols => ⟨inp.state,
-    #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
-    inp.adapter.toAdapterView, inp.is_real, inp.memory_access.prev_value, 35, .regWrite⟩
+  view := rowView
   chipSpec := fun inp cols data => LoadDoubleChip.Spec inp cols data
   sailEquiv := fun inp cols s => ∀ (data : ProverData (ZMod p)) (rs1 rd : BitVec 5) (imm : BitVec 12)
       (pc : BitVec 64),
@@ -345,5 +453,7 @@ def kind : Soundness.ChipKind p where
       hloaded h_pc h_rs1 hm0 hm1 hm2 hm3 hm4 hm5 hm6 hm7 =>
     ld_chip_reaches_sail inp cols data rs1 rd imm pc s hs hconfig h_assum h_imm h_hi hloaded h_pc h_rs1
       hm0 hm1 hm2 hm3 hm4 hm5 hm6 hm7
+  advanceReady := AdvanceReady
+  advance := some (PLift.up advance)
 
 end SP1Clean.LoadDoubleChip
