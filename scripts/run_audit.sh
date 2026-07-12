@@ -116,8 +116,20 @@ print(f"census entries: {len(entries)}")
 # holes, this is a *soundness* gap: `SP1Clean.DivRemChip.soundness` and hence the capstone now
 # inherit sorryAx through the DivRem chip's soundness, not only its completeness. Disclosed here and
 # in the docs; the DivRem chip's Sail-bridge + faithfulness are unaffected.
+# *** STALE-SNAPSHOT RECONCILIATION (2026-07-12, C1/Move-2 audit run). *** Re-homing the decode globs to
+# `Model/Semantics/Decode.lean` regenerated the census against the *current* tree for the first time since
+# the 4.30 migration, surfacing two disclosed-debt carriers the previous (stale) snapshot never showed:
+#   · `MulChip.completeness` — the 4.30 Mul-completeness stub (already in the A2 `expected_sorries` set; the
+#     sibling of the already-allowed `DivRemChip.completeness`).
+#   · `sp1_finishedChannel_guarantees` — a capstone-chain member (sibling of the already-allowed
+#     `sp1_machine_soundness`/`sp1FormalEnsemble`) that consumes the chip soundness/completeness and so
+#     inherits their sorryAx.
+# Neither is a Move-2 regression: the decode redefinition + collapsed producers + hoists are verified
+# axiom-clean (zero sorryAx). Both are consequences of the pre-existing Mul-completeness + DivRem-soundness
+# stops; disclosed here and in the docs.
 allowed = {
-    "SP1Clean.DivRemChip.completeness",
+    "SP1Clean.DivRemChip.completeness", "SP1Clean.MulChip.completeness",
+    "SP1Clean.Soundness.sp1_finishedChannel_guarantees",
     # DivRem soundness deferral (4.30 whnf regression) — the 9 sub-lemmas + the top-level roll-up + GFC bundle:
     "SP1Clean.DivRemChip.SoundReader.soundness", "SP1Clean.DivRemChip.SoundDiv.soundness",
     "SP1Clean.DivRemChip.SoundDivu.soundness", "SP1Clean.DivRemChip.SoundDivw.soundness",

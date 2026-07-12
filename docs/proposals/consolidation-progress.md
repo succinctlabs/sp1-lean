@@ -536,3 +536,46 @@ chip/operation layer (which may make it fall out). Also: the DivRem **`circuit` 
 were `stop`-stubbed too (audit A2 now lists `DivRemChip/Formal.lean`; A3 already allows `DivRemChip.circuit`).
 **Pivoting to the big-picture consolidation** per the user's steer — the hope being it restructures the layer
 that makes these tractable.
+
+## 2026-07-12 — C1 Decode / Move-2: hoist `decodedInROM` to ∃I∀s + collapse the 16 producers (LANDED)
+
+Move-2 landed (commits `b60366fe` step 0 · `ea5da87f` step 1 · `5ad0bfb6` step 2 · `c0d92626` step 3),
+building on Move-1's image-guarded projection. `decodedInROM` changed from the weak ∀s∃i form over the
+unguarded projection to the **hoisted ∃I∀s form over the guarded `instrToProgramRow'`**:
+
+    ∃ w I, fetchWord = some w ∧ (∀ s, cfg → (ext_decode w).run s = .ok I s)
+         ∧ instrToProgramRow' (rowPcVec row) I = some row
+
+- **Step 0 — file merge (forced by layering).** `Truth.lean` references `decodedInROM` and imports
+  `Decode.lean` (not `DecodeGuards.lean`); `DecodeGuards.lean` imports `Decode.lean`. So the guard
+  machinery `decodedInROM` now needs had to move **up into `Decode.lean`** (beside `instrToProgramRow`) —
+  `DecodeGuards.lean` was deleted (Move-1 created it; Move-2 dissolved it). Pure relocation, green.
+- **Step 1 — redefine + 4 dependents.** `decodedInROM.decodes` (signature unchanged, unguarded output via
+  `instrToProgramRow'_some`), `ProgTruth.decodes` (recompiles), `decodedInROM_addRow` (refine reordered —
+  the witness is state-independent), and `decode_bound` (the lone destructuring consumer).
+- **Step 2 — collapse (−248 LOC on `Decode.lean`).** With `I` fixed outside `∀ s`, every producer drops
+  its double-inversion + `regidx_bv_inj`/`sext*_inj` cross-state pinning: obtain the fixed `I`, apply its
+  one `instrToProgramRow_inv_<T>` lemma (fed `instrToProgramRow'_some hrow`), done. The now-vestigial
+  `{s0}/(hs0)` seed params are dropped from all 16 signatures + ~26 call sites (Advance + Branch/Store
+  bridges). **Scope note:** the `hpin`-drop for mul/load/store is deferred to the seam-chip sub-task
+  (LoadDouble/StoreDouble/Mul advances) that actually needs it — it requires guarded `inv_load'`/`inv_store'`
+  (only `inv_mul'` exists so far). Here all three keep `hpin` and route through `instrToProgramRow'_some`,
+  so the collapse stays uniform. The relocated `inv_mul'` + `loadOpcode`/`storeOpcode` injectivity sit ready.
+- **Step 3 — hoist evidence (trust-honesty).** `decodedInROMg` (weak guarded ∀s form) +
+  `sailConfigured_nonempty` + `decodedInROM_rtype_hoist`/`_mul_hoist` prove the strengthening is **derivable**
+  (∃I∀s follows from the weak guarded form via column-pinning). Placed in `Soundness/Decode.lean` (needs
+  `isInitialState_nonvacuous` from `FormalModel/Trace/Witness`, above the Model layer). So the strengthened
+  trusted Program-channel guarantee adds no new *fundamental* obligation — only a mechanical per-family lift.
+
+**Trust.** Strengthening the trusted `decodedInROM` (`ProgTruth`) guarantee is sound and derivable (the Step-3
+hoists); the only concrete producer (`decodedInROM_addRow`) is re-proved directly. All Move-2 decls verified
+**axiom-clean** (zero sorryAx; only `[propext, Classical.choice, Quot.sound]` + inherited Sail platform
+constants). Full build green (3503 jobs).
+
+**Audit tooling.** Re-homed the `decodedInROM*`/`instrToProgramRow_*`/`decodes<T>` globs in
+`gen_axiom_probe.py` to `Model/Semantics/Decode.lean` (they had drifted to `Soundness/Decode.lean`; census
+now 426 entries, up from 372). This first current-tree census run also surfaced two **stale-snapshot**
+disclosed-debt carriers — `MulChip.completeness` (the 4.30 Mul-completeness stub) and
+`sp1_finishedChannel_guarantees` (a capstone-chain member inheriting the DivRem-soundness + Mul-completeness
+debt) — added to the audit `allowed` set (they were clean in the pre-migration snapshot, are not Move-2
+regressions, and are consequences of already-disclosed stops). `run_audit.sh` → **AUDIT PASS**.

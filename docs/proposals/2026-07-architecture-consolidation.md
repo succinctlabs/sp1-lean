@@ -300,6 +300,12 @@ structure ChipKind (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
 **Decision (settled with the user): Move 1 + Move 2, with the uniqueness obligation owned by the
 decode/provider layer.**
 
+> **STATUS: Move 1 + Move 2 LANDED (2026-07-12).** Move 1 = commit `98de797d`; Move 2 = `b60366fe`
+> (fold `DecodeGuards` into `Decode.lean`) · `ea5da87f` (redefine) · `5ad0bfb6` (collapse the 16
+> producers, −248 LOC) · `c0d92626` (hoist evidence). All axiom-clean; `run_audit.sh` PASS. One
+> deviation: the `hpin`-drop for mul/load/store is deferred to the seam-chip sub-task (needs guarded
+> `inv_load'`/`inv_store'`). See `consolidation-progress.md` (2026-07-12 entry) for the full record.
+
 **Move 1 — partialize `instrToProgramRow` to the decoder image.** The real decoder's own
 sub-functions emit only canonical values (`encdec_mul_op_backwards` produces exactly 4 records;
 widths ∈ {1,2,4,8}; no unsigned width-8 load in RV64). Guard the `.MUL`/`.LOAD`/`.STORE` projection

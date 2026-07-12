@@ -42,8 +42,14 @@ TARGETS = [
      r"wired_subset_reachable|reachable_subset_wired|routeOf_reaches_sail)\b"),
     ("SP1Clean/Soundness/TargetVm.lean", r"theorem\s+(sp1_target\w*)\b"),
     ("SP1Clean/Soundness/Decode.lean",
-     r"(?:theorem|def)\s+(decode_\w+|instrToProgramRow_\w+|DecodeOperandsBound|decodedInROM\w*|"
-     r"targetObligations_of_decode)\b"),
+     r"(?:theorem|def)\s+(decode_\w+|instrToProgramRow_\w+|DecodeOperandsBound|decodedInROM[\w.]*|"
+     r"decodedInROMg|sailConfigured_nonempty|targetObligations_of_decode)\b"),
+    # C1/Move-2: the decode projection, guards, ∃I∀s `decodedInROM`, its accessor, the 16 collapsed
+    # `decodes<T>` producers, and the `instrToProgramRow(_inv)_*` inversions all live here (Model layer).
+    ("SP1Clean/Model/Semantics/Decode.lean",
+     r"(?:theorem|def)\s+(decodedInROM[\w.]*|decodes[A-Z]\w*|instrToProgramRow\w*|"
+     r"mulOpCanonical|loadWidthOK|storeWidthOK|mulOp_canonical_inj|"
+     r"loadOpcode_\w+|storeOpcode_\w+)\b"),
     ("SP1Clean/Model/SailDecode.lean",
      r"theorem\s+(run_bind_ok_\w+|decode_\w+)\b"),
     ("SP1Clean/FormalModel/Trace/Witness.lean",
