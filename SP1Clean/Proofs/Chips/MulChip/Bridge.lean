@@ -223,21 +223,132 @@ namespace SP1Clean.MulChip
 
 open SP1Clean.MulSail
 open Sail LeanRV64D LeanRV64D.Functions
+open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 
+/-- The Mul RowView (shared by `kind.view` and `advance`): straight-line `pc+4` next-pc, the R-type
+adapter, `cols.a` as the multiply write, opcode the flag-weighted R-type discriminant
+(MUL 11, MULH 12, MULHU 13, MULHSU 14, MULW 24). Standalone so `MulChip.advance` — the Phase-4
+`try_step` obligation referencing the whole view — can be stated *before* `kind` and supplied *as*
+`kind.advance`, breaking the `advance ↔ kind.view` reference cycle. -/
+def rowView (inp : Inputs (ZMod p)) (cols : Extracted.MulCols (ZMod p)) : Trace.RowView (ZMod p) :=
+  ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+    cols.adapter.toAdapterView, inp.is_real, cols.a,
+    cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulhu * 13 + cols.is_mulhsu * 14
+      + cols.is_mulw * 24, .regWrite⟩
+
+/-- **`MulChip.advance`** — the per-Mul-row `try_step` lift (SC Phase 4), 5-way flag dispatch.
+Each branch pins the R-type opcode (`mulOpToOpcode <op>` for MUL/MULH/MULHU/MULHSU, `Opcode.MULW`
+for MULW), converts the chip `Spec`'s flag-gated `RV64.<op>` conjunct to the Sail-pure `SailRV64.<op>`
+write value (via `RV64.<op>_eq`, the bridge's explicit-`hb` typed pattern), and routes to the matching
+`advance_of_mul <op> (canonical)` / `advance_of_mulw`. `himmb`/`himmc`/`hstraight` are `rfl`
+(RTypeReader), and `hpc0` comes from the reader `Spec`'s bounds. -/
+theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.MulCols (ZMod p)) (data : ProverData (ZMod p))
+    (prog : GuestProgram) (s : SailState)
+    (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
+    (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
+    (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
+    (hvalb : ValueOperandsBound (rowView inp cols) s)
+    (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
+    (hready : inp.adapter = cols.adapter ∧ (rowView inp cols).adapter.op_a ≠ 0 ∧
+      ((cols.is_mul = 1 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
+       (cols.is_mulh = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
+       (cols.is_mulhu = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
+       (cols.is_mulhsu = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulw = 0) ∨
+       (cols.is_mulw = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0))) :
+    ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
+  obtain ⟨hlink, hnonX0, hflag⟩ := hready
+  have hreal' : inp.is_real = 1 := hreal
+  set r := rowView inp cols with hr
+  have vrd : r.rdWrite = cols.a := rfl
+  have vopbm : r.adapter.op_b_memory = cols.adapter.op_b_memory := rfl
+  have vopcm : r.adapter.op_c_memory = cols.adapter.op_c_memory := rfl
+  obtain ⟨-, -, -, -, -, hbounds, -⟩ := hspec.1
+  obtain ⟨-, hpc0, -, -⟩ := hbounds hreal'
+  have hbr := hspec.2.2 hreal'
+  rcases hflag with ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩ |
+    ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩
+  · -- is_mul
+    have hop : r.opcode = ((mulOpToOpcode mulOp_mul).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, mulOp_mul, mulOpToOpcode, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.mul (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) mulOp_mul := by
+      have hs := hbr.1 h1
+      simp only [MulChip.Inputs.op_c_val, MulChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.mul (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) mulOp_mul
+        = RV64.mul (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.mul_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_mul mulOp_mul (by decide) hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  · -- is_mulh
+    have hop : r.opcode = ((mulOpToOpcode mulOp_mulh).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, mulOp_mulh, mulOpToOpcode, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.mul (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) mulOp_mulh := by
+      have hs := hbr.2.1 h1
+      simp only [MulChip.Inputs.op_c_val, MulChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.mul (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) mulOp_mulh
+        = RV64.mulh (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.mulh_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_mul mulOp_mulh (by decide) hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  · -- is_mulhu
+    have hop : r.opcode = ((mulOpToOpcode mulOp_mulhu).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, mulOp_mulhu, mulOpToOpcode, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.mul (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) mulOp_mulhu := by
+      have hs := hbr.2.2.1 h1
+      simp only [MulChip.Inputs.op_c_val, MulChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.mul (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) mulOp_mulhu
+        = RV64.mulhu (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.mulhu_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_mul mulOp_mulhu (by decide) hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  · -- is_mulhsu
+    have hop : r.opcode = ((mulOpToOpcode mulOp_mulhsu).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, mulOp_mulhsu, mulOpToOpcode, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.mul (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) mulOp_mulhsu := by
+      have hs := hbr.2.2.2.1 h1
+      simp only [MulChip.Inputs.op_c_val, MulChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.mul (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) mulOp_mulhsu
+        = RV64.mulhsu (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.mulhsu_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_mul mulOp_mulhsu (by decide) hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+  · -- is_mulw
+    have hop : r.opcode = ((Opcode.MULW).toNat : ZMod p) := by
+      simp [hr, rowView, h1, h2, h3, h4, h5, Opcode.toNat]
+    have hval : Word.toBitVec64 r.rdWrite
+        = SailRV64.mulw (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 r.adapter.op_b_memory.prev_value) := by
+      have hs := hbr.2.2.2.2 h1
+      simp only [MulChip.Inputs.op_c_val, MulChip.Inputs.op_b_val, hlink] at hs
+      have hb : SailRV64.mulw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+          (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+        = RV64.mulw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+            (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.mulw_eq _ _
+      rw [vrd, vopbm, vopcm, hb]; exact hs
+    exact advance_of_mulw hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
+
 /-- `ChipKind` registration for Mul (MUL/MULH/MULHU/MULHSU/MULW). `rs1`/`rs2` are sourced from
-inputs `op_b_val`/`op_c_val`. Carries `Fact (2 ^ 24 < p)`. -/
+inputs `op_b_val`/`op_c_val`. Carries `Fact (2 ^ 24 < p)`. `advance`/`advanceReady` (SC Phase 4)
+route to `MulChip.advance` (the uniform 5-way `try_step` lift). -/
 def kind : Soundness.ChipKind p where
   name := "Mul"
   Inputs := MulChip.Inputs
   Cols := Extracted.MulCols
-  view := fun inp cols => ⟨cols.state,
-    #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-    cols.adapter.toAdapterView, inp.is_real, cols.a,
-    cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulhu * 13 + cols.is_mulhsu * 14
-      + cols.is_mulw * 24, .regWrite⟩
+  view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   sailEquiv := fun inp cols s => ∀ (rs1 rs2 rd : BitVec 5) (pc : BitVec 64),
     s.regs.get? Register.PC = some pc →
@@ -260,5 +371,13 @@ def kind : Soundness.ChipKind p where
           = (sp1_mul (.Regidx rd) pc cols.a).run s)
   reaches_sail := fun inp cols data s h_real h_chip rs1 rs2 rd pc h_pc h_rs1 h_rs2 =>
     mul_chip_reaches_sail inp cols data rs1 rs2 rd pc s h_real h_chip h_pc h_rs1 h_rs2
+  advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧
+    (rowView inp cols).adapter.op_a ≠ 0 ∧
+    ((cols.is_mul = 1 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
+     (cols.is_mulh = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
+     (cols.is_mulhu = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
+     (cols.is_mulhsu = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulw = 0) ∨
+     (cols.is_mulw = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0))
+  advance := some (PLift.up advance)
 
 end SP1Clean.MulChip
