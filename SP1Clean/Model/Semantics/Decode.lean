@@ -1312,9 +1312,12 @@ theorem instrToProgramRow_inv_mul_low {pc : Vector (ZMod p) 3} {i : instruction}
       ∧ row.op_c = #v[regidxVal rs2, 0, 0, 0] :=
   instrToProgramRow_inv_mul' ⟨.Low, .Signed, .Signed⟩ rfl h hop himm
 
-/-- ∀-configured-state MUL/MULH/MULHU/MULHSU decode producer (mirrors `decodesDiv`), threading `hpin`. -/
+/-- ∀-configured-state MUL/MULH/MULHU/MULHSU decode producer (mirrors `decodesDiv`). **Move-2:** pinned
+by the canonicity guard `hcanon` via `instrToProgramRow_inv_mul'` — **no `hpin`**, so it covers the
+non-injective MUL/MULHSU opcodes too (the guarded projection supplies the record's canonicity, retiring
+the impossible global-injectivity side-condition). -/
 theorem decodesMul {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : mul_op)
-    (hpin : ∀ op' : mul_op, (mulOpToOpcode op').toNat = (mulOpToOpcode op).toNat → op' = op)
+    (hcanon : mulOpCanonical op = true)
     (h : decodedInROM prog row)
     (hop : row.opcode = ((mulOpToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0) :
     ∃ (w : BitVec 32) (rs2 rs1 rd : BitVec 5),
@@ -1326,7 +1329,7 @@ theorem decodesMul {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : mul_o
       row.op_c = #v[(rs2.toNat : ZMod p), 0, 0, 0] := by
   obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
   obtain ⟨rs2r, rs1r, rdr, rfl, ha, hb, hc⟩ :=
-    instrToProgramRow_inv_mul op hpin (instrToProgramRow'_some hrow) hop himm
+    instrToProgramRow_inv_mul' op hcanon hrow hop himm
   obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
   exact ⟨w, rs2, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 

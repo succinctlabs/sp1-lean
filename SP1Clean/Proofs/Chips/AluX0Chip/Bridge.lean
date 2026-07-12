@@ -257,9 +257,10 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.AluX0Cols (ZMod p)) : Trac
 discarded, so no reader-passthrough is needed).  The routing invariants the trace dispatcher supplies
 beyond refinement + `Spec`: the destination is `x0` (`op_a = 0`, the dual of every register-writing
 chip's `op_a ≠ 0`), the low-pc-limb bound, and — since AluX0's opcode is a single dynamic column (no
-per-op flags) — the committed `(opcode, imm_c)` pair identifying WHICH of the 24 straight-line ALU ops
-this row is (the decode's opcode↔imm_c correlation).  MUL/MULH/MULHU/MULHSU (11-14) and MULW (24) are
-DELIBERATELY EXCLUDED — see the decode seam note below; their rows are not yet covered by AluX0.advance. -/
+per-op flags) — the committed `(opcode, imm_c)` pair identifying WHICH of the straight-line ALU ops
+this row is (the decode's opcode↔imm_c correlation).  **Move-2:** the full MUL family (MUL/MULH/MULHU/
+MULHSU 11-14 + MULW 24) is now covered — the guarded `decodesMul`/`inv_mul'` pin the `mul_op` for the
+non-injective MUL/MULHSU opcodes too, so all 29 opcodes route. -/
 def advanceReady (cols : Extracted.AluX0Cols (ZMod p)) : Prop :=
   cols.adapter.op_a = 0 ∧ cols.state.pc[0].val < 2 ^ 16 ∧
   ( (cols.opcode = (Opcode.ADD.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
@@ -288,7 +289,9 @@ def advanceReady (cols : Extracted.AluX0Cols (ZMod p)) : Prop :=
     (cols.opcode = (Opcode.REMUW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
     (cols.opcode = (Opcode.MULH.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
     (cols.opcode = (Opcode.MULHU.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
-    (cols.opcode = (Opcode.MULW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) )
+    (cols.opcode = (Opcode.MULW.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.MUL.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) ∨
+    (cols.opcode = (Opcode.MULHSU.toNat : ZMod p) ∧ cols.adapter.imm_c = 0) )
 
 set_option maxHeartbeats 4000000 in
 /-- **`AluX0Chip.advance`** — the per-AluX0-row `try_step` lift (SC Phase 4), 24-way opcode dispatch
@@ -308,7 +311,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.AluX0Cols (ZMod p)) (d
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
   obtain ⟨hopa0, hpc0, hdisj⟩ := hready
   have himmb : (rowView inp cols).adapter.imm_b = 0 := rfl
-  rcases hdisj with ⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩
+  rcases hdisj with ⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩|⟨ho,hi⟩
   · exact advance_of_alu_x0_rtype rop.ADD hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
   · exact advance_of_alu_x0_itype iop.ADDI hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
   · exact advance_of_alu_x0_rtype rop.SUB hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
@@ -333,20 +336,22 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.AluX0Cols (ZMod p)) (d
   · exact advance_of_alu_x0_divw true hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
   · exact advance_of_alu_x0_remw false hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
   · exact advance_of_alu_x0_remw true hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
-  · exact advance_of_alu_x0_mul mulOp_mulh
-      (by rintro ⟨a, b, c⟩ hh; cases a <;> cases b <;> cases c <;> first | rfl | (exact absurd hh (by decide)))
+  · exact advance_of_alu_x0_mul mulOp_mulh (by decide)
       hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
-  · exact advance_of_alu_x0_mul mulOp_mulhu
-      (by rintro ⟨a, b, c⟩ hh; cases a <;> cases b <;> cases c <;> first | rfl | (exact absurd hh (by decide)))
+  · exact advance_of_alu_x0_mul mulOp_mulhu (by decide)
       hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
   · exact advance_of_alu_x0_mulw hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_mul mulOp_mul (by decide)
+      hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
+  · exact advance_of_alu_x0_mul mulOp_mulhsu (by decide)
+      hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
 
 /-- `AluX0`'s `ChipKind` registration. `view.wr` is the zero word (`x0` discards the result);
 `sailEquiv` is the 29-way Sail conjunction (all covered ALU opcodes into `x0`), discharged via the
 five family-core lemmas. Register reads (`h_rs1`/`h_rs2`) are needed only to make Sail reads succeed.
-`advance` (SC Phase 4) covers 27/29 — MUL(11) and MULHSU(14) remain the documented decode seam
-(`mulOpToOpcode` is non-injective there, so the opcode can't pin the `mul_op` without `ext_decode`
-output-determinism). -/
+`advance` (SC Phase 4 + Move-2) now covers **29/29** — MUL(11) and MULHSU(14), the former decode seam,
+are unblocked: the ∃I∀s `decodedInROM` fixes the decoded instruction across states and the image-guarded
+`inv_mul'` pins the non-injective `mul_op` from its canonicity, so the opcode no longer needs to. -/
 def kind : Soundness.ChipKind p where
   name := "AluX0"
   Inputs := AluX0Chip.Inputs

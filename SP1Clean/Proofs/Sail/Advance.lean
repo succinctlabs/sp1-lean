@@ -2623,12 +2623,13 @@ theorem advance_of_alu_x0_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)
 
 set_option maxHeartbeats 4000000 in
 /-- **MUL-family into x0** (MUL/MULH/MULHU/MULHSU, `imm_c = 0`).  Generic over `op : mul_op`
-with the opcode-pin `hpin` (so the decode fixes the instruction).  `rd` is forced to `0#5`
+with the canonicity guard `hcanon` (so the guarded decode fixes the instruction).  `rd` is forced to `0#5`
 from the committed `op_a = 0` (`regidx_bv_inj`), the `execute_MUL_reaches op` value drops out
 (`if_pos rfl`), the whole row is straight-line no-write.  The `.MUL` twin of `advance_of_alu_x0_div`.
-NOTE: usable only where `hpin` holds, i.e. MULH/MULHU (injective).  MUL/MULHSU are decoder seams. -/
+**Move-2:** now covers **all four** canonical MUL ops incl. the previously-seam MUL/MULHSU — `hcanon`
+replaces the impossible global-injectivity `hpin`, discharged `by decide` at every concrete op. -/
 theorem advance_of_alu_x0_mul {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
-    (op : mul_op) (hpin : ∀ op' : mul_op, (mulOpToOpcode op').toNat = (mulOpToOpcode op).toNat → op' = op)
+    (op : mul_op) (hcanon : mulOpCanonical op = true)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
     (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess r)))
     (hvalb : ValueOperandsBound r s) (hdecrom : decodedInROM prog (programAccess r).toRow)
@@ -2638,7 +2639,7 @@ theorem advance_of_alu_x0_mul {prog : GuestProgram} {r : Trace.RowView (ZMod p)}
     (hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]])
     (hnowrite : r.commit.writesReg = false := by rfl) (hnomem : r.commit.memWrite = none := by rfl) :
     ∃ s', SailStep s s' ∧ RowEffect prog r s s' := by
-  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesMul op hpin hdecrom hop himmc
+  obtain ⟨w, rs2, rs1, rd, hfetch, hdecw, hopa, hopb, hopc⟩ := decodesMul op hcanon hdecrom hop himmc
   have hfetch' : prog.fetchWord (rcvPcOf (stateAccess r)) = some w := hfetch
   have hfetchReady := fetchReady_of_romLoaded prog s (rcvPcOf (stateAccess r)) w hrom hfetch' hpcread
   have hidxb : (rs1.toNat : ZMod p) = r.adapter.op_b[0] := by
