@@ -6,8 +6,9 @@ A concrete heterogeneous `List (ChipRow p)` interleaving one row of every capsto
 `allChipsTrace`). ALU / R-type / I-type / J-type / memory rows — with different `Inputs`/`Cols` types and
 different readers — all coexist in one `List (ChipRow p)` and ride the shared bus layer.
 
-The gated whole-program capstone is instantiated on this trace in `Soundness/GatedVm/Bridge.lean`
-(`gatedExecution_allChips`), deriving the execution trail from the State-bus balance. -/
+(The demo instantiation of the gated whole-program capstone on this trace — the former
+`Soundness/GatedVm/Bridge.lean`'s `gatedExecution_allChips` — was deleted as an orphaned dead leaf during the
+consolidation; the capstone core lives in `Soundness/GatedVm/Capstone.lean`.) -/
 
 namespace SP1Clean.Soundness
 
