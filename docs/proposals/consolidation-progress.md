@@ -482,3 +482,39 @@ imports `SP1CleanTest` and the **test library's oleans are still 4.28-built** (`
 then re-run the audit to validate the A3 allowlist (the `allowed` set was updated for the DivRem
 soundness/completeness deferral but is unvalidated until the census runs). The main-library green checkpoint
 (`lake build SP1Clean` = 0/0) is unaffected.
+
+## 2026-07-12 — DivRem soundness whnf: SHARPER diagnosis (it's the GOAL, not h_holds)
+
+Focused LSP investigation (the `stop`-stubbed op files elaborate fast up to the stop, so the LSP works on the
+prefix). **Corrects the 2026-07-11 hypothesis** — the blowup is **not** `h_holds`/the destructure:
+
+- Measured at the point after `spec_proof_start` (Reader): total goal **679K chars** = hyps 68K + **target 610K**.
+  Green reference `Tail.requirements_holds`: total **140K** = hyps 68K + **target 71K**.
+- **`h_holds` is byte-identical between Reader (times out) and Tail (green)** — both 61K, same unreduced
+  `Vector.map (Expression.eval env) (Vector.mapRange N fun i ↦ var {…})` cols form (`Vector.map`×112,
+  `mapRange`×56, `fromElements`×10). So `h_holds`'s form is provably **not** the cause, and **no `simp … at
+  h_holds` line helps**: `simp only [circuit_norm] at h_holds` = "no progress" (already normal);
+  `Vector.map_mapRange` fires but doesn't shrink (60,581→60,945); `getElem_*` can't fire (whole-vector args).
+- **The discriminator is the GOAL TARGET: 610K (Reader) vs 71K (Tail).** Tail's `Spec` is `True` (collapsed by
+  `circuit_proof_start`); the op files' goal is the real `Spec` (e.g. `RTypeReader.Spec { cols :=
+  fromComponents(… Expression.eval env (main …)) }`) over the **unreduced witnessed `cols` output struct**,
+  never evaluated. The `obtain`/`simp only [ownAsserts]` then run every `whnf`/`isDefEq` while dragging that
+  610K goal → the deterministic-`whnf` timeout. (The `obtain h_holds` alone did not return within the 300s LSP
+  cap; but Tail destructures the identical `h_holds` in one bigger obtain and compiles — the goal is the load.)
+
+**Consequence / where the fix lives.** The remedy is a **goal-side `cols` reduction** after `spec_proof_start`,
+before the obtains — evaluate the witnessed output struct out of its `fromComponents(eval env (main …))` form
+so the target collapses from 610K toward Tail's ~71K (analogous to what `circuit_proof_start` does for Tail's
+`True` goal, and to the completeness `getElem_toElements_eval_varFromOffset` cols-reduction). This is a
+`... at ⊢` reduction, **not** `at h_holds`, and needs a slow build to confirm the exact tactic (each attempt is
+a ~tens-of-minutes build; a *working* DivRem-soundness proof genuinely uses ~100M heartbeats like Tail, so the
+low-cap fast-fail trick can't validate a fix, only refute a blowup). Also note: **5 of 9 op files
+(`Reader/Rem/Remu/Remw/Remuw`) lack the `attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements`
+that Tail/`Div*` carry** — add it to all 9 as part of any restore (necessary for the goal reduction, though
+insufficient alone). Candidate fix directions for the next attempt, in order: (a) an explicit goal-side
+`simp [circuit_norm, <the fromComponents/output eval lemma>]` / `dsimp [ElaboratedCircuit.output, …]` that
+collapses the target; (b) restructure so the op files prove the `Spec` after a `change`/defeq-`have` pinning
+the reduced cols (the BitwiseChip completeness pattern, applied to the goal); (c) **retire** the custom
+`soundness_of_specObligation` + `spec_proof_start` and prove each op file directly with stock
+`circuit_proof_start` (which reduces the goal for Tail) — the "hacky tactic not pulling its weight" option.
+Stays `stop`-deferred for now.
