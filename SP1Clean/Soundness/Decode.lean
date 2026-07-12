@@ -4,6 +4,7 @@ import SP1Clean.Soundness.ProgramProviderSpike
 import SP1Clean.Model.Opcode
 import SP1Clean.Model.SailDecode
 import SP1Clean.Model.Semantics.Decode
+import SP1Clean.FormalModel.Trace.Witness
 
 /-! # W3 — the decode half of `OperandsBound` (trusted Program path)
 
@@ -36,6 +37,7 @@ open SP1Clean.LookupAccessList (isConsistentBalanced aggregateChipRows)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 
 /-! ## The decode conjunct of `OperandsBound` and the program-ROM membership -/
@@ -207,6 +209,95 @@ def addRow : ProgramRow (ZMod p) :=
     op_c := #v[regidxVal (regidx.Regidx 3#5), 0, 0, 0],
     op_a_0 := if regidxVal (p := p) (regidx.Regidx 1#5) = 0 then 1 else 0,
     imm_c := 0 }
+
+/-! ## The ∀s → ∃I∀s hoist (C1/Move-2) — evidence the strengthened `decodedInROM` is derivable
+
+`decodedInROM` was strengthened (Move-2) from the weak ∀s∃i form to the ∃I∀s guarded form. These lemmas
+prove that strengthening is **sound and derivable**: from `decodedInROMg` (the weak ∀s form over the
+*guarded* projection — what a decode step naturally yields) plus the committed `(opcode, imm_c)` columns,
+the fixed-instruction ∃I∀s `decodedInROM` follows (the row's columns pin every per-state decode to one
+instruction). So strengthening the trusted Program-channel guarantee adds no new *fundamental* obligation
+on the eventual grounding engine — only a mechanical per-family lift. Representative families: RTYPE
+(unguarded) + MUL (guard-load-bearing, `inv_mul'` without `hpin`); the other 14 are the identical
+pattern, ported on demand. -/
+
+/-- The weak ∀s form over the *guarded* projection — what the Program provider certifies pre-hoist. -/
+def decodedInROMg (prog : GuestProgram) (row : ProgramRow (ZMod p)) : Prop :=
+  ∃ w, prog.fetchWord (pcBitsOfRow row) = some w ∧
+    ∀ s, SailConfigured s → ∃ i, (ext_decode w).run s = .ok i s ∧
+      instrToProgramRow' (rowPcVec row) i = some row
+
+/-- A configured Sail state exists **unconditionally** (the empty-program initial state) — the side
+condition the hoist instantiates to name the witness instruction `i₀`. -/
+theorem sailConfigured_nonempty : ∃ s, SailConfigured s := by
+  obtain ⟨s0, h⟩ := isInitialState_nonvacuous
+  exact ⟨s0, h.configured⟩
+
+/-- **The RTYPE hoist.** Name `i₀` at the unconditional witness state; for arbitrary `s` the row's columns
+pin the per-state `i` to `i₀` (both invert to `RTYPE` with `regidx_bv_inj`-equal registers). Keyed on the
+committed `(opcode, imm_c)`. -/
+theorem decodedInROM_rtype_hoist {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : rop)
+    (h : decodedInROMg prog row)
+    (hop : row.opcode = ((ropToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0) :
+    decodedInROM prog row := by
+  obtain ⟨w, hfetch, hbody⟩ := h
+  obtain ⟨s0, hs0⟩ := sailConfigured_nonempty
+  obtain ⟨i0, hrun0, hrow0⟩ := hbody s0 hs0
+  refine ⟨w, i0, hfetch, ?_, hrow0⟩
+  intro s hs
+  obtain ⟨i, hrun, hrow⟩ := hbody s hs
+  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_rtype op (instrToProgramRow'_some hrow0) hop himm
+  obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
+  obtain ⟨rs2r', rs1r', rdr', hi, ha', hb', hc'⟩ :=
+    instrToProgramRow_inv_rtype op (instrToProgramRow'_some hrow) hop himm
+  obtain ⟨rs2'⟩ := rs2r'; obtain ⟨rs1'⟩ := rs1r'; obtain ⟨rd'⟩ := rdr'
+  have e2 : rs2' = rs2 := regidx_bv_inj (by
+    have hh := congrArg (fun v => v[0]) (hc.symm.trans hc')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hh
+    exact hh.symm)
+  have e1 : rs1' = rs1 := regidx_bv_inj (by
+    have hh := congrArg (fun v => v[0]) (hb.symm.trans hb')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hh
+    exact hh.symm)
+  have e0 : rd' = rd := regidx_bv_inj (by
+    have hh := ha.symm.trans ha'; simp only [regidxVal] at hh; exact hh.symm)
+  subst e2 e1 e0
+  rw [hi, ← hi0] at hrun
+  exact hrun
+
+/-- **The MUL hoist** — the guard-load-bearing twin: Move-1's canonicity guard is what makes the per-state
+`i` pinnable at all (`inv_mul'`, no `hpin`). -/
+theorem decodedInROM_mul_hoist {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : mul_op)
+    (hcanon : mulOpCanonical op = true)
+    (h : decodedInROMg prog row)
+    (hop : row.opcode = ((mulOpToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0) :
+    decodedInROM prog row := by
+  obtain ⟨w, hfetch, hbody⟩ := h
+  obtain ⟨s0, hs0⟩ := sailConfigured_nonempty
+  obtain ⟨i0, hrun0, hrow0⟩ := hbody s0 hs0
+  refine ⟨w, i0, hfetch, ?_, hrow0⟩
+  intro s hs
+  obtain ⟨i, hrun, hrow⟩ := hbody s hs
+  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_mul' op hcanon hrow0 hop himm
+  obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
+  obtain ⟨rs2r', rs1r', rdr', hi, ha', hb', hc'⟩ :=
+    instrToProgramRow_inv_mul' op hcanon hrow hop himm
+  obtain ⟨rs2'⟩ := rs2r'; obtain ⟨rs1'⟩ := rs1r'; obtain ⟨rd'⟩ := rdr'
+  have e2 : rs2' = rs2 := regidx_bv_inj (by
+    have hh := congrArg (fun v => v[0]) (hc.symm.trans hc')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hh
+    exact hh.symm)
+  have e1 : rs1' = rs1 := regidx_bv_inj (by
+    have hh := congrArg (fun v => v[0]) (hb.symm.trans hb')
+    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hh
+    exact hh.symm)
+  have e0 : rd' = rd := regidx_bv_inj (by
+    have hh := ha.symm.trans ha'; simp only [regidxVal] at hh; exact hh.symm)
+  subst e2 e1 e0
+  rw [hi, ← hi0] at hrun
+  exact hrun
 
 set_option maxRecDepth 10000 in
 omit [Fact (2 ^ 24 < p)] in
