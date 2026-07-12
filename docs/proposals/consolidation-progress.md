@@ -518,3 +518,21 @@ the reduced cols (the BitwiseChip completeness pattern, applied to the goal); (c
 `soundness_of_specObligation` + `spec_proof_start` and prove each op file directly with stock
 `circuit_proof_start` (which reduces the goal for Tail) — the "hacky tactic not pulling its weight" option.
 Stays `stop`-deferred for now.
+
+## 2026-07-12 (cont.) — circuit_proof_start restructure attempt + Formal field-proof stubs
+
+Tested the "retire the custom tactic" fix (drop `spec_proof_start`/`soundness_of_specObligation`, prove Reader's
+soundness with stock `circuit_proof_start` + `requirements_holds.2`). Result: it **type-checks** (the sharing
+works — `refine ⟨?_, (requirements_holds …).2⟩` is accepted, and `circuit_proof_start` splits the goal as
+`Spec ∧ Requirements`), so the structure is sound. BUT a 45-min single-file build did **not finish** and was on
+track to the 128M-heartbeat blowup (~61 min) — i.e. `circuit_proof_start`'s goal-side witnessed-`cols` reduction
+is **also too heavy for DivRem's circuit** (AddChip works because it's small; the reduction is size-limited, not
+tactic-limited). So retiring the custom tactic does not by itself unblock DivRem. The Reader body is kept as a
+documented WIP under the `stop` (the intended eventual approach); the real unblock is the **`DivRemOperation`
+structural extract** (mirror `Native/Operations/MulOperation/`), which shrinks the per-proof circuit so the
+goal reduction becomes tractable — a multi-day effort, best done *after* the consolidation restructures the
+chip/operation layer (which may make it fall out). Also: the DivRem **`circuit` bundle** field proofs
+(`requirementsChannelsLawful`, `exposedChannels_eq` in `Formal.lean`) do the same `ownAsserts` destructure and
+were `stop`-stubbed too (audit A2 now lists `DivRemChip/Formal.lean`; A3 already allows `DivRemChip.circuit`).
+**Pivoting to the big-picture consolidation** per the user's steer — the hope being it restructures the layer
+that makes these tractable.

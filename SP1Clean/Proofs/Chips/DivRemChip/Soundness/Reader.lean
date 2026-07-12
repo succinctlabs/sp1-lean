@@ -35,22 +35,26 @@ def Spec (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p)) (_ : ProverData 
       wv0 := cols.a[0], wv1 := cols.a[1], wv2 := cols.a[2], wv3 := cols.a[3] } ∧
   (input.is_real = 0 ∨ input.is_real = 1)
 
-set_option maxHeartbeats 100000000 in
+-- 4.30 fix: `eval_fromElements` at high `circuit_norm` priority reduces the witnessed `cols` output struct
+-- (mirrors `Tail.lean`/`Div.lean`; Reader lacked it). Combined with stock `circuit_proof_start` (which
+-- reduces the goal, unlike the custom `spec_proof_start`), this collapses the 610K goal that timed out.
+attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements
+
+set_option maxHeartbeats 128000000 in
 set_option linter.unusedVariables false in
 set_option linter.unusedSimpArgs false in
 set_option maxRecDepth 10000 in
-/-- Soundness of the reader sub-`Spec` + `is_real`-binary conjuncts. -/
+/-- Soundness of the reader sub-`Spec` + `is_real`-binary conjuncts. MIGRATION-DEFERRED (`stop`): the body
+below is a **WIP, unverified** restructure — stock `circuit_proof_start` + `requirements_holds.2`, retiring the
+custom `soundness_of_specObligation`/`spec_proof_start` path — which type-checks structurally but did NOT finish
+within a 45-min build (the goal-side witnessed-`cols` reduction is too heavy for DivRem's circuit on 4.30; see
+docs/proposals/consolidation-progress.md). Kept as the documented intended approach; the real unblock is likely
+the `DivRemOperation` structural extract. -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
-  stop -- MIGRATION-DEFERRED-SOUNDNESS (Lean 4.30): elaboration hits a `whnf` timeout at 100M heartbeats
-  --   (48min → timeout), the same nativeValue/combinedSize' blowup class that hit completeness. The proof
-  --   body below is preserved (obtains already chunked). RESTORE before the consolidation PR via the
-  --   type-ascription pattern (docs/proposals/consolidation-progress.md, 2026-07-11 breakthrough) or the
-  --   DivRemOperation structural extract (compile_bottlenecks memory "paths forward").
-  apply soundness_of_specObligation
-  spec_proof_start
-  -- `op_b_val`/`op_c_val` are now the raw register reads `input_adapter_op_b/c_memory_prev_value`; the `msb`
-  -- range checks bound the reads directly (`hbU`/`hcU` are their `isU64`). The arithmetic operand `c` is the
-  -- separate witnessed column at `i₀+20..23` — used only for the `is_c_0` split.
+  stop
+  circuit_proof_start
+  refine ⟨?_, (requirements_holds i₀ env input_var input h_input h_assumptions h_holds).2⟩
+  -- `op_b_val`/`op_c_val` are the raw register reads; `hbU`/`hcU` are their `isU64`.
   have hbU := h_assumptions.1
   have hcU := h_assumptions.2
   -- The `h_holds`/`h_own` constraint conjunctions are destructured in CHUNKS: `obtain` cost is

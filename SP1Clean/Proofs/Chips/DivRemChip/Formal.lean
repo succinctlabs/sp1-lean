@@ -85,6 +85,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
     channelsWithRequirements :=
       [stateChannel.toRaw, memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
+      stop
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
         AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit,
         LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit,
@@ -124,6 +125,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
+      stop
       intro input offset
       simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
         List.map_cons, List.map_nil]

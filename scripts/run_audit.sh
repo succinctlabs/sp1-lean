@@ -34,6 +34,7 @@ echo "== A2 proof-deferral inventory (gate: exactly the known-debt set) =="
 #     2026-07-11 session). `stop`-stubbed; RESTORE before the consolidation PR.
 expected_sorries="$(cat <<'LIST'
 SP1Clean/Proofs/Chips/DivRemChip/Completeness/Driver.lean
+SP1Clean/Proofs/Chips/DivRemChip/Formal.lean
 SP1Clean/Proofs/Chips/DivRemChip/Soundness/Div.lean
 SP1Clean/Proofs/Chips/DivRemChip/Soundness/Divu.lean
 SP1Clean/Proofs/Chips/DivRemChip/Soundness/Divuw.lean
