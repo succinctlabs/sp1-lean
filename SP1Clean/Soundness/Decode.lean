@@ -72,7 +72,7 @@ theorem decode_bound (prog : GuestProgram) {pi : SP1PublicIO (ZMod p)}
     simp only [aggregateProgramAccesses]; exact List.mem_map_of_mem (Multiset.mem_coe.mp hr_coe)
   have h_real' : (programAccess r).is_real ≠ 0 := by
     simpa only [programAccess, stateAccess] using h_real
-  obtain ⟨w₀, hfetch₀, hdec⟩ := h_link.rom_holds (programAccess r) ha_mem h_real'
+  obtain ⟨w₀, I, hfetch₀, hrun, hrow⟩ := h_link.rom_holds (programAccess r) ha_mem h_real'
   have hpc : pcBitsOfRow (programAccess r).toRow = rcvPcOf (stateAccess r) := by
     simp only [pcBitsOfRow, rcvPcOf, programAccess, ProgramAccess.toRow, stateAccess]
   rw [hpc, hfetch] at hfetch₀
@@ -81,9 +81,12 @@ theorem decode_bound (prog : GuestProgram) {pi : SP1PublicIO (ZMod p)}
     simp only [rowPcVec, programAccess, ProgramAccess.toRow]
     ext j hj
     interval_cases j <;> simp
-  rw [hpcvec] at hdec
-  obtain ⟨i, hr, hrow⟩ := hdec s hcfg
-  exact ⟨i, s, hr, hrow⟩
+  -- ∃I∀s (Move-2): `I` is fixed, `hrun s hcfg` runs the decode at `s`, and the guarded projection
+  -- `hrow` yields the unguarded `instrToProgramRow` `DecodeOperandsBound` wants (via `_some`).
+  have hrow' : instrToProgramRow (rowPcVec (programAccess r).toRow) I = some (programAccess r).toRow :=
+    instrToProgramRow'_some hrow
+  rw [hpcvec] at hrow'
+  exact ⟨I, s, hrun s hcfg, hrow'⟩
 
 /-! ## The balance-level decode discharge (removing the threaded link) — W3 deliverable B -/
 
@@ -211,14 +214,15 @@ omit [Fact (2 ^ 24 < p)] in
 ROM word at its pc, against the official Sail `ext_decode` — `decodedInROM` holds, axiom-clean modulo the
 Sail model's decoder axioms. -/
 theorem decodedInROM_addRow : decodedInROM addProgram (addRow (p := p)) := by
-  refine ⟨0x003100B3#32, ?_, ?_⟩
+  -- ∃I∀s shape (Move-2): the witness instruction is state-independent (a literal under `intro s hcfg`),
+  -- so it hoists out of the `∀ s` verbatim; the projection is discharged on the *guarded* wrapper.
+  refine ⟨0x003100B3#32,
+    .RTYPE (regidx.Regidx 3#5, regidx.Regidx 2#5, regidx.Regidx 1#5, rop.ADD), ?_, ?_, ?_⟩
   · haveI : Fact (1 < p) := ⟨(Fact.out : p.Prime).one_lt⟩
     simp only [pcBitsOfRow, addRow, pcBitsOfVals, ZMod.val_zero, ZMod.val_one, addProgram,
       GuestProgram.fetchWord, List.find?_cons, List.find?_nil]
     norm_num
-  · intro s hcfg
-    refine ⟨.RTYPE (regidx.Regidx 3#5, regidx.Regidx 2#5, regidx.Regidx 1#5, rop.ADD),
-      SP1Clean.SailDecode.decode_ADD_example s hcfg.init hcfg.priv, ?_⟩
-    rw [instrToProgramRow_rtype]; rfl
+  · exact fun s hcfg => SP1Clean.SailDecode.decode_ADD_example s hcfg.init hcfg.priv
+  · rw [instrToProgramRow'_rtype, instrToProgramRow_rtype]; rfl
 
 end SP1Clean.Soundness.Target

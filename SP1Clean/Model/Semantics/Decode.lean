@@ -496,11 +496,19 @@ theorem instrToProgramRow'_rtype (pc : Vector (ZMod p) 3) (t : regidx × regidx 
 `GuestProgram`: a row is valid iff it is the decode of the instruction word the guest ROM holds at the
 row's pc. Instantiating `ProgramConsistency`'s `inROM` with this connects the encoded `GuestProgram.rom`
 to the decoded committed columns. (Discharged from bus balance via a `ProgramProvider (decodedInROM prog)`
-— tracked separately.) -/
+— tracked separately.)
+
+**Shape (C1/Move-2):** the decoded instruction `I` is hoisted **out** of the state quantifier (∃I∀s, not
+∀s∃i) over the **guarded** projection `instrToProgramRow'`. Fixing `I` across all configured states is what
+lets every `decodes<T>` consumer invert *once* (no cross-state `regidx_bv_inj` pinning), and the guarded
+projection is what lets the MUL/LOAD/STORE consumers drop their `hpin` side-conditions. This strengthens the
+predicate; it is a sound, derivable strengthening (see `decodedInROM_*_hoist` below — ∃I∀s follows from the
+weak guarded ∀s form for real decodes). -/
 def decodedInROM (prog : GuestProgram) (row : ProgramRow (ZMod p)) : Prop :=
-  ∃ w, prog.fetchWord (pcBitsOfRow row) = some w ∧
-    ∀ s, SailConfigured s → ∃ i, (ext_decode w).run s = .ok i s ∧
-      instrToProgramRow (rowPcVec row) i = some row
+  ∃ (w : BitVec 32) (I : instruction),
+    prog.fetchWord (pcBitsOfRow row) = some w ∧
+    (∀ s, SailConfigured s → (ext_decode w).run s = .ok I s) ∧
+    instrToProgramRow' (rowPcVec row) I = some row
 
 set_option linter.unusedSectionVars false in
 /-- **RV64 decode accessor.** Unpacks `decodedInROM` to the official LeanRV64D `ext_decode` result (the
@@ -512,9 +520,8 @@ theorem decodedInROM.decodes {prog : GuestProgram} {row : ProgramRow (ZMod p)}
     (h : decodedInROM prog row) (s : SailState) (hs : SailConfigured s) :
     ∃ w i, prog.fetchWord (pcBitsOfRow row) = some w ∧
       (ext_decode w).run s = .ok i s ∧ instrToProgramRow (rowPcVec row) i = some row := by
-  obtain ⟨w, hfetch, hbody⟩ := h
-  obtain ⟨i, hrun, hrow⟩ := hbody s hs
-  exact ⟨w, i, hfetch, hrun, hrow⟩
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  exact ⟨w, I, hfetch, hrun s hs, instrToProgramRow'_some hrow⟩
 
 /-- **The I-type decode inversion (W7), generic over the op.** The I-type twin of
 `instrToProgramRow_inv_rtype`: if a decoded `i` projects to a committed row whose opcode is `op`'s
