@@ -473,3 +473,12 @@ and **discards the following tactic block unelaborated** — ideal non-destructi
 global Lean config verbatim; the exact platform-config constants as the auditable Sail seam incl. the new
 **PMM** `mseccfg[33:32]=0` assumption; `SailStep`/`SailChain` framed as local notions over `try_step`);
 `lean-sail-notes.md` PMM disclosure added.
+
+**Follow-up surfaced (A3 axiom census blocked):** `scripts/run_audit.sh` A2 gates all PASS (the 12-file
+deferral inventory matches exactly), but **A3 (the `#print axioms` census) cannot regenerate**: the probe
+imports `SP1CleanTest` and the **test library's oleans are still 4.28-built** (`incompatible header`) — i.e.
+`SP1CleanTest` has **not been migrated to 4.30** yet (it's the separate `lake test` target, the sole
+`native_decide` home). Tracked follow-up: rebuild `SP1CleanTest` on 4.30 (may surface its own 4.30 fallout),
+then re-run the audit to validate the A3 allowlist (the `allowed` set was updated for the DivRem
+soundness/completeness deferral but is unvalidated until the census runs). The main-library green checkpoint
+(`lake build SP1Clean` = 0/0) is unaffected.
