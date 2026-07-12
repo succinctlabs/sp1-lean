@@ -30,7 +30,7 @@ sampled conformance into an all-inputs statement. -/
 
 namespace SP1Clean.TraceGenTests
 
-variable {F : Type} [Field F]
+variable {F : Type} [FiniteField F]
 
 /-- Derive one trace row from a circuit: run `main`'s own witness closures on the given input
 column values (env-threaded, via `Circuit.proverEnvironment`), then evaluate `main`'s output struct
