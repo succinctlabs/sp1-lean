@@ -330,7 +330,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.TraceGenTests.shiftrightchip_trace_conforms
 #print axioms SP1Clean.TraceGenTests.subchip_trace_conforms
 #print axioms SP1Clean.TraceGenTests.subwchip_trace_conforms
-#print axioms SP1Clean.Soundness.gatedExecution_allChips
 #print axioms SP1Clean.Soundness.gatedExecution_of_specs_and_balance
 #print axioms SP1Clean.Soundness.GatedVm.exists_trail
 #print axioms SP1Clean.Soundness.GatedVm.chipRows_step_sound
@@ -340,6 +339,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_balancedInteractions
 #print axioms SP1Clean.Soundness.sp1StateVerifierMain
 #print axioms SP1Clean.Soundness.sp1StateVerifier_soundness
+#print axioms SP1Clean.Soundness.sp1StateVerifierProverAssumptions
 #print axioms SP1Clean.Soundness.sp1StateVerifier_completeness
 #print axioms SP1Clean.Soundness.sp1StateVerifier
 #print axioms SP1Clean.Soundness.sp1Tables
@@ -365,10 +365,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.routeOf_reaches_sail
 #print axioms SP1Clean.Soundness.Target.sp1_target_execution
 #print axioms SP1Clean.Soundness.Target.sp1_target_soundness
-#print axioms SP1Clean.Soundness.Target.instrToProgramRow_rtype
-#print axioms SP1Clean.Soundness.Target.instrToProgramRow_itype
 #print axioms SP1Clean.Soundness.Target.DecodeOperandsBound
-#print axioms SP1Clean.Soundness.Target.decodedInROM
 #print axioms SP1Clean.Soundness.Target.decode_bound
 #print axioms SP1Clean.Soundness.Target.decode_bound_of_balance
 #print axioms SP1Clean.Soundness.Target.decode_targetBound_of_balance
@@ -382,6 +379,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.Target.cfgState_init
 #print axioms SP1Clean.Soundness.Target.cfgState_pc
 #print axioms SP1Clean.Soundness.Target.cfgState_priv
+#print axioms SP1Clean.Soundness.Target.cfgState_get?_other
+#print axioms SP1Clean.Soundness.Target.cfgState_get_other
+#print axioms SP1Clean.Soundness.Target.cfgState_pma
 #print axioms SP1Clean.Soundness.Target.isInitialState_nonvacuous
 #print axioms SP1Clean.Soundness.memProviderGenesis_of_contributions
 #print axioms SP1Clean.Soundness.traceMemoryValid_of_genesis_and_balance
@@ -392,9 +392,3 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.operand_b_isU64_of_memBalance
 #print axioms SP1Clean.Soundness.operand_c_isU64_of_memBalance
 #print axioms SP1Clean.Soundness.memBalanceHyps_of_genesis
-#print axioms SP1Clean.Soundness.Target.ValueOperandsBound
-#print axioms SP1Clean.Soundness.Target.value_targetBound
-#print axioms SP1Clean.Soundness.Target.sndClk_eq_rcvClk
-#print axioms SP1Clean.Soundness.Target.walk_clk_monotone
-#print axioms SP1Clean.Soundness.Target.operandsBound_full_targetBound
-#print axioms SP1Clean.Soundness.Target.targetObligations_full

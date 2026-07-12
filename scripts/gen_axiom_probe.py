@@ -47,7 +47,7 @@ TARGETS = [
     ("SP1Clean/Model/SailDecode.lean",
      r"theorem\s+(run_bind_ok_\w+|decode_\w+)\b"),
     ("SP1Clean/FormalModel/Trace/Witness.lean",
-     r"(?:theorem|lemma)\s+(isInitialState_nonvacuous|cfgState_\w+|mem_fullRegs)\b"),
+     r"(?:theorem|lemma)\s+(isInitialState_nonvacuous|cfgState_[\w?]+|mem_fullRegs)\b"),
     ("SP1Clean/Soundness/MemoryGlobal.lean",
      r"theorem\s+(memProviderGenesis_of_contributions|memProviderGenesis_of_boundary|"
      r"traceMemoryValid_of_genesis_and_balance|traceMemoryValid_of_boundary_and_balance)\b"),
