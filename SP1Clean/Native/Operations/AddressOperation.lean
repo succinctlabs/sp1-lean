@@ -98,12 +98,12 @@ the offset booleans, the top-two-limb inverse gate, and the low-3-bits offset ra
 
 def main (input : Var Inputs (ZMod p)) :
     Circuit (ZMod p) (Var Extracted.AddressOperation (ZMod p)) := do
-  let value ← witnessVector 3 (fun env =>
+  let value ← witnessVectorNative 3 (fun env =>
     AddrAddOperation.populate
       #v[env input.b[0], env input.b[1], env input.b[2], env input.b[3]]
       #v[env input.cc[0], env input.cc[1], env input.cc[2], env input.cc[3]])
   assertion AddrAddOperation.circuit ⟨input.b, input.cc, ⟨value⟩, 1⟩
-  let inv ← witnessVector 1 (fun env =>
+  let inv ← witnessVectorNative 1 (fun env =>
     #v[(env value[1] + env value[2])⁻¹])
   input.offset_bit0 * (input.offset_bit0 - 1) === 0
   input.offset_bit1 * (input.offset_bit1 - 1) === 0
@@ -177,14 +177,14 @@ theorem completeness : Completeness (ZMod p) main Assumptions := by
       = AddrAddOperation.populate input_b input_cc := by
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    rw [h_value ⟨i, hi⟩, hbeq, hceq]
+    have h := h_value ⟨i, hi⟩; simp only [hbeq, hceq] at h; exact h
   -- the witnessed limbs equal `populate`'s, so the gadget `Spec` (sum + limb ranges) talks about them.
   have he0 : env.get i₀ = (AddrAddOperation.populate input_b input_cc)[0] := by
-    have h := h_value ⟨0, by omega⟩; rw [hbeq, hceq] at h; simpa using h
+    have h := h_value ⟨0, by omega⟩; simp only [hbeq, hceq] at h; simpa using h
   have he1 : env.get (i₀ + 1) = (AddrAddOperation.populate input_b input_cc)[1] := by
-    have h := h_value ⟨1, by omega⟩; rw [hbeq, hceq] at h; simpa using h
+    have h := h_value ⟨1, by omega⟩; simp only [hbeq, hceq] at h; simpa using h
   have he2 : env.get (i₀ + 2) = (AddrAddOperation.populate input_b input_cc)[2] := by
-    have h := h_value ⟨2, by omega⟩; rw [hbeq, hceq] at h; simpa using h
+    have h := h_value ⟨2, by omega⟩; simp only [hbeq, hceq] at h; simpa using h
   -- the gadget `Spec` (sum + limb ranges) for the witnessed value, on the `is_real = 1` row.
   have h_aa := (AddrAddOperation.spec_populate hb hcc (1 : ZMod p)) rfl
   simp only [circuit_norm] at h_aa
@@ -232,6 +232,7 @@ theorem completeness : Completeness (ZMod p) main Assumptions := by
     simp only [circuit_norm, byteChannel]
     rw [← c13]
     refine (byteRowSpec_range _ h13p).mpr ?_
+    simp only [sub_eq_add_neg]
     show ((v0 + -(4 * input_offset_bit2) + -(2 * input_offset_bit1) + - input_offset_bit0)
         * (8 : ZMod p)⁻¹).val < 2 ^ 13
     rw [hdecomp, show ((8 * (A % 2 ^ 16 / 8) : ℕ) : ZMod p)

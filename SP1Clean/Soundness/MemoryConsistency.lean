@@ -258,9 +258,10 @@ theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit memoryChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
       (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) memoryChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) memoryChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.programChannel_eq_memoryChannel_false, if_false]
   -- W11 flip: the read-priors are now `pull`s (`toAccess_pullIf_memory`, mult `signedVal (-is_real)`), the
@@ -362,11 +363,12 @@ theorem memAccessLookups_eq_emitted (env : Environment (ZMod p)) (offset : ℕ)
       (((Readers.MemoryAccess.main input).operations offset).interactionsWith
           memoryChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   have hp2 : 2 < p := two_lt_p_aux
-  -- the three `=== 0` timestamp gates compile to `Gadgets.Equality.circuit id` subcircuits, which emit
+  -- the three `=== 0` timestamp gates compile to `Gadgets.Equality.circuit field` subcircuits, which emit
   -- nothing on `memoryChannel`; the two `byteChannel.pullIf`s are filtered by channel-distinctness.
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) memoryChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) memoryChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [Readers.MemoryAccess.main, circuit_norm, heq,
     SP1Clean.Channels.byteChannel_eq_memoryChannel_false, if_false]
   simp only [toAccess_pushIf_memory, toAccess_pullIf_memory]
@@ -468,7 +470,7 @@ theorem rowMemEventsGated_sublist (r : Trace.RowView (ZMod p)) :
     repeat' first
       | exact List.Sublist.refl _
       | exact List.nil_sublist _
-      | apply List.Sublist.cons₂
+      | apply List.Sublist.cons_cons
       | apply List.Sublist.cons
 
 /-- Generic: a per-element sublist of the bodies lifts to a sublist of the `flatMap`s. -/

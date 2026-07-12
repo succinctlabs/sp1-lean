@@ -169,12 +169,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   rw [hr1, one_mul] at a1 a2 a3
   have hb4 := b4 (by rw [hr1]); rw [← c16] at hb4
   have hb5 := b5 (by rw [hr1])
-  -- strip the `id (ZMod p)` `ProvableType` carrier off the `Spec` body so `ring`/`sub_eq_add_neg`
-  -- resolve (the `id` carrier, à la `LtOperationUnsigned`; `docs/agents/mul-operation-learnings.md` §1).
-  simp only [id] at *
   refine ⟨bool_of_mul_pred a1, ?_, ?_, (byteRowSpec_range _ h16p).mp hb4,
     ((byteRowSpec_u8range_pair _ _).mp hb5).1, h_mem (by rw [hr1])⟩
-  · rw [sub_eq_add_neg]; exact a2
+  · exact a2
   · simp only [selCur, selPrev]; linear_combination a3
 
 theorem completeness :
@@ -206,7 +203,7 @@ theorem completeness :
     -- the `Spec`-derived facts carry the reassembled `{record}.field` projections; `dsimp only` reduces
     -- them to atoms (`selCur`/`selPrev` stay folded) so the `rw`/`linear_combination`s below match.
     dsimp only at hcl ha2 ha3 hd_low hd_high hisu
-    simp only [id] at *
+    dsimp only at *
     simp only [selCur, selPrev] at ha3
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
     · simp [h1]

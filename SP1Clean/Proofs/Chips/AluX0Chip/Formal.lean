@@ -37,7 +37,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   circuit_proof_start
   obtain ⟨_h_cpu, _h_ltu, h_reader, h_gate, h_oa1, h_oa2⟩ := h_holds
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_gate
-  simp only [← sub_eq_add_neg] at h_oa1 h_oa2
   simp only [isReal, clkLow, opcodeVal]
   -- The per-emitter channel-requirement tail: the bare `CPUState` `Assumptions` (the `is_real` binary
   -- gate, `h_bin`), the off-gate-vacuous byte pull (`is_real ∈ {0,1}` rules out the `¬is_real = 0` ∧
@@ -74,7 +73,6 @@ theorem completeness :
   circuit_proof_start
   simp only [isReal, clkLow, opcodeVal] at h_assumptions
   obtain ⟨h_bin, h_oa1, h_oa2, h_cpu, h_reader, h_op_lt, h_st, h_prog⟩ := h_assumptions
-  simp only [sub_eq_add_neg] at h_oa1 h_oa2
   refine ⟨⟨h_bin, h_cpu, h_st⟩, ?_, ⟨⟨h_bin, h_bin⟩, h_reader, h_prog⟩, ?_, h_oa1, h_oa2⟩
   · -- the LTU `opcode < 29` byte pull (fires on real rows).
     intro hneg

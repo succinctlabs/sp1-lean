@@ -253,14 +253,14 @@ lemma limb_lift [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   rw [h1, h3] at h
   exact h
 
-/-- `x * (x + -1) = 0 → x ∈ {0,1}` in a field, via `inv_mul_cancel₀` (avoids
+/-- `x * (x - 1) = 0 → x ∈ {0,1}` in a field, via `inv_mul_cancel₀` (avoids
 `mul_eq_zero`, which hits a `ZMod p` `Mul`-instance unification quirk). -/
 lemma bool_of_mul_pred [Fact (Nat.Prime p)] {x : ZMod p}
-    (h : x * (x + -1) = 0) : x = 0 ∨ x = 1 := by
+    (h : x * (x - 1) = 0) : x = 0 ∨ x = 1 := by
   by_cases hx : x = 0
   · exact Or.inl hx
   · right
-    have hx1 : x⁻¹ * (x * (x + -1)) = x⁻¹ * 0 := by rw [h]
+    have hx1 : x⁻¹ * (x * (x - 1)) = x⁻¹ * 0 := by rw [h]
     rw [mul_zero, ← mul_assoc, inv_mul_cancel₀ hx, one_mul] at hx1
     linear_combination hx1
 

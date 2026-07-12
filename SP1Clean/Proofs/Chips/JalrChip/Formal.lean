@@ -107,7 +107,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       Expression.eval env input_var_state_pc[1], Expression.eval env input_var_state_pc[2], 0]
         : Word (ZMod p)) := hpceq ▸ h_pcU
   -- `is_real - op_a_0` is binary: on real rows from `op_a_0 ∈ {0,1}`, on padding from `h_pad`.
-  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
@@ -119,7 +119,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rw [hrs1eq] at this
     simpa only [rs1Word] using this
   · intro hr1 hop_a_0
-    have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, hop_a_0]; simp
+    have hg1 : input_is_real - input_adapter_op_a_0 = 1 := by rw [hr1, hop_a_0]; simp
     have := (h_add2 ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩ hg1).2
     rw [hpceq] at this
     simpa only [pcWord] using this
@@ -130,7 +130,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hguar := h_align (by rw [hr1])
     simp only [byteChannel] at hguar
     rw [← c14] at hguar
-    rw [sub_eq_add_neg]
     exact val_mod_four_of_mul_inv_four_lt ((byteRowSpec_range _ h14p).mp hguar)
   · -- LSB-clearing: the committed `nextPcWord` is `add_value` with bit 0 cleared (`~~~1#64 &&&`).
     -- The binary `lsb` gate + the `÷4` byte-range pin `lsb = bit0(add_value[0])`; with `add_value[3] = 0`
@@ -141,6 +140,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
     rw [← c14] at hguar
     have hlt := (byteRowSpec_range _ h14p).mp hguar
+    rw [sub_eq_add_neg] at hlt
     have hdlt : (env.get i₀ + -env.get (i₀ + 4 + 4)).val < 2 ^ 16 :=
       val_lt_65536_of_mul_inv_four_lt hlt
     have hdmod : (env.get i₀ + -env.get (i₀ + 4 + 4)).val % 4 = 0 :=
@@ -179,7 +179,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     intro hr1
     replace hr1 : input_is_real = 1 := hr1
     rcases h_op_a_0 with h0 | h0
-    · have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
+    · have hg1 : input_is_real - input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
       exact (h_add2 ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩ hg1).1
     · obtain ⟨z0, z1, z2, z3⟩ := h_it.1
       rw [h0, one_mul] at z0 z1 z2 z3
@@ -265,7 +265,7 @@ theorem completeness :
           input_adapter_op_c_imm := by
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    rw [he_av ⟨i, hi⟩, hcimm_eq]
+    simp only [he_av ⟨i, hi⟩, hcimm_eq]
   have hval2 : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + 4 + i}) : Word (ZMod p))
       = AddOperation.populate #v[Expression.eval env.toEnvironment input_var_state_pc[0],
@@ -294,7 +294,7 @@ theorem completeness :
   have hlsb_bin : env.get (i₀ + 4 + 4) = 0 ∨ env.get (i₀ + 4 + 4) = 1 := by
     rw [he_lsb]
     rcases Nat.mod_two_eq_zero_or_one (env.get i₀).val with h | h <;> rw [h] <;> simp
-  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
   refine ⟨?_, ⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨hpceq ▸ h_pcU, h4U⟩, h_gate2⟩, ?_⟩,
@@ -304,19 +304,19 @@ theorem completeness :
   · rcases hlsb_bin with h | h <;> rw [h] <;> simp
   · rw [hval1]; exact AddOperation.spec_populate hrs1U h_imm input_is_real
   · rw [hav3]; exact h_jt3
-  · rw [hval2]; exact AddOperation.spec_populate (hpceq ▸ h_pcU) h4U (input_is_real + - input_adapter_op_a_0)
+  · rw [hval2]; exact AddOperation.spec_populate (hpceq ▸ h_pcU) h4U (input_is_real - input_adapter_op_a_0)
   · rw [hoav3]; exact h_lt3
   · -- RegisterWrite op_a write push: `isU64` of the link value `pc + 4` (completeness covers `op_a_0 = 0`).
     intro hr
     rw [hval2]
-    exact (AddOperation.spec_populate (hpceq ▸ h_pcU) h4U (input_is_real + - input_adapter_op_a_0)
+    exact (AddOperation.spec_populate (hpceq ▸ h_pcU) h4U (input_is_real - input_adapter_op_a_0)
       (by rw [h_op_a_0]; simpa using hr)).1
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
     simp only [byteChannel, hav0, he_lsb]
     rw [← c14]
-    exact (byteRowSpec_range _ h14p).mpr (by rw [← sub_eq_add_neg]; exact h_align_pa hr1)
+    exact (byteRowSpec_range _ h14p).mpr (h_align_pa hr1)
   · rcases h_bin with h | h <;> rw [h] <;> simp
 
 /-- The JALR chip row as a `GeneralFormalCircuit`: register-indirect jump with LSB clearing, composing the

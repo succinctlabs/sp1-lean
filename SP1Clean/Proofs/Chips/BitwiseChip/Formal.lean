@@ -87,7 +87,7 @@ def Spec (input : Inputs (ZMod p)) (cols : BitwiseCols (ZMod p)) (_ : ProverData
 two to `0`. The sum-bound rules out two-or-three-hot via `2 ≠ 0` / `6 ≠ 0` in `ZMod p` (`p > 2^17`). -/
 private lemma one_hot3 {x o a : ZMod p}
     (hx : x = 0 ∨ x = 1) (ho : o = 0 ∨ o = 1) (ha : a = 0 ∨ a = 1)
-    (hsum : (x + o + a) * (x + o + a + -1) = 0) :
+    (hsum : (x + o + a) * (x + o + a - 1) = 0) :
     (x = 1 → o = 0 ∧ a = 0) ∧ (o = 1 → x = 0 ∧ a = 0) ∧ (a = 1 → x = 0 ∧ o = 0) := by
   have hp : 2 ^ 17 < p := Fact.out
   haveI : Fact (1 < p) := ⟨by omega⟩
@@ -157,8 +157,10 @@ private lemma toElements_result_byte (s : Extracted.BitwiseU16Operation (ZMod p)
   obtain ⟨a, b, c⟩ := s
   fin_cases k <;>
     (simp only [circuit_norm, explicit_provable_type];
-     rw [Vector.getElem_append_right (by decide) (by decide),
-         Vector.getElem_append_right (by decide) (by decide)]) <;> rfl
+     refine (Vector.getElem_append_right ?_ ?_).trans
+       ((Vector.getElem_append_right ?_ ?_).trans
+         ((Vector.getElem_append_left ?_).trans
+           ((Vector.getElem_cast ?_).trans (Vector.getElem_append_left ?_)))) <;> decide)
 
 set_option maxHeartbeats 2000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
@@ -213,7 +215,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
                   circuit_norm] at hisu ⊢
                 exact hisu⟩
 
-set_option maxHeartbeats 8000000 in
+set_option maxHeartbeats 32000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -234,7 +236,7 @@ theorem completeness :
   have hsum01' : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) = 0
       ∨ env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) = 1 := by
     rw [hsumc]; exact hbin
-  have hbool : ∀ x : ZMod p, x = 0 ∨ x = 1 → x * (x + -1) = 0 := by
+  have hbool : ∀ x : ZMod p, x = 0 ∨ x = 1 → x * (x - 1) = 0 := by
     rintro x (h | h) <;> rw [h] <;> simp
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   -- The witness hint computed `populate` at the *eval-of-var* operands; `h_input` identifies those with
@@ -243,7 +245,7 @@ theorem completeness :
       = input_adapter_op_b_memory_prev_value := h_input.2.2.2.2.2.2.1.1
   have hpvc : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value
       = input_adapter_op_c_memory_prev_value := h_input.2.2.2.2.2.2.2.2.1.1
-  simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval, hpvb, hpvc] at h_env_cols
+  simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval] at h_env_cols
   have hop_cases : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0
       ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 1
       ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 2 := by
@@ -279,11 +281,20 @@ theorem completeness :
       (opcode := env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0) ha hb hop3 input_is_real
       using 2
     refine (ProvableType.ext_iff _ _).mpr (fun i hi => ?_)
+    -- Ascribe `h_env_cols`'s IR-native RHS into the plain `toElements (populate …)` form via a *definitional*
+    -- `have` (the `.native` eval-match + beta is the CHEAP reduction; the expensive path is the eager
+    -- `Eq.trans` isDefEq against `toElements (populate op_prev …)`, whose `combinedSize'` tower + the
+    -- *propositional* `map eval ≡ op_prev` gap blow past 32M heartbeats in Clean 4.30). Then `hpvb`/`hpvc`
+    -- fold the operands so the composite RHS matches the goal RHS syntactically.
+    have hc : env.toEnvironment.get (i₀ + 3 + i)
+        = (toElements (BitwiseU16Operation.populate
+            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value)
+            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value)
+            (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0)))[i]'hi := h_env_cols ⟨i, hi⟩
+    rw [hpvb, hpvc] at hc
     refine Eq.trans ?_
-      ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 3) i hi).trans (h_env_cols ⟨i, hi⟩))
-    -- `W` and `eval (ProvableStruct.varFromOffset …)` both circuit_norm-normalise to the same per-field
-    -- struct, so the two `toElements` getElems coincide.
-    simp [circuit_norm]
+      ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 3) i hi).trans hc)
+    simp only [circuit_norm]; rfl
   · -- RegisterWrite's `isU64 value` (the op_a write push): the witnessed result word's `isU64` from
     -- `resultWord_isU64` at the `populate`d columns (`spec_populate`), bridged to the chip's explicit
     -- `#v[r[0]+r[1]*256, …]` (in `env.get` form) via the per-byte witness-hint pins.
@@ -295,7 +306,14 @@ theorem completeness :
             input_adapter_op_c_memory_prev_value
             (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0)).bitwise_operation.result[(k : ℕ)] := by
       intro k
-      have h := h_env_cols ⟨8 + (k : ℕ), by omega⟩
+      have h : env.toEnvironment.get (i₀ + 3 + (8 + (k : ℕ)))
+          = (toElements (BitwiseU16Operation.populate
+              (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value)
+              (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value)
+              (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0)))[8 + (k : ℕ)]'(by
+          have : size Extracted.BitwiseU16Operation = 16 := rfl; have := k.isLt; omega) :=
+        h_env_cols ⟨8 + (k : ℕ), by omega⟩
+      rw [hpvb, hpvc] at h
       rw [show i₀ + 3 + 4 + 4 + (k : ℕ) = i₀ + 3 + (8 + (k : ℕ)) by ring, h]
       exact toElements_result_byte _ k
     convert hisu using 2

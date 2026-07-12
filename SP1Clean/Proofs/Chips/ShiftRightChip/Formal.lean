@@ -228,14 +228,22 @@ theorem completeness :
       right; rw [h2, h3z, add_zero]
   have hbmB := bMsb_bool B F hbUw hf1 hf3 (fun h => (ho1 h).2.2)
   obtain ⟨hcba0, hcba1, hcba2, hcba3, hcba4, hcba5⟩ := ShiftLeftChip.cBits_asserts c0
+  simp only [← sub_eq_add_neg] at hcba0 hcba1 hcba2 hcba3 hcba4 hcba5
   obtain ⟨hsel0, hsb0, hsel1, hsb1, hsel2, hsb2, hsel3, hsb3, hone⟩ :=
     shiftU16_asserts c0 F he14 hsum01
+  simp only [← sub_eq_add_neg] at hsb0 hsel1 hsb1 hsel2 hsb2 hsel3 hsb3 hone
   obtain ⟨hva0, hva1, hva2⟩ := vInv_asserts c0
+  simp only [← sub_eq_add_neg] at hva0 hva1 hva2
   obtain ⟨hsp0, hsp1, hsp2, hsp3⟩ := split_asserts B c0 F
+  simp only [← sub_eq_add_neg] at hsp0 hsp1 hsp2 hsp3
   obtain ⟨hlra0, hlra1, hlra2, hlra3⟩ := limbResult_asserts B c0 F
+  simp only [← sub_eq_add_neg] at hlra0 hlra1 hlra2 hlra3
   obtain ⟨hmsb1, hmsb2, hmsb3⟩ := msb_asserts B c0 F hf0 hf1 hf2 hf3 hsum01
+  simp only [← sub_eq_add_neg] at hmsb2 hmsb3
   obtain ⟨hp1, hp2, hp3, hp4, hp5, hp6, hp7, hp8, hp9, hp10, hp11, hp12, hp13, hp14, hp15,
     hp16, hp17, hp18, hp19, hp20, hp21, hp22⟩ := place_asserts B c0 F hf0 hf1 hf2 hf3 hsum01
+  simp only [← sub_eq_add_neg] at hp1 hp2 hp3 hp4 hp5 hp6 hp7 hp8 hp9 hp10 hp11 hp12 hp13 hp14 hp15
+  simp only [← sub_eq_add_neg] at hp16 hp17 hp18 hp19 hp20 hp21 hp22
   refine ⟨⟨hbin, h_cpu, h_st⟩,
     ⟨⟨fun _ => hbU3, hf1⟩,
       hbmB, fun h1 => ?_⟩,
@@ -264,15 +272,19 @@ theorem completeness :
     hp1, hp2, hp3, hp4, hp5, hp6, hp7, hp8, hp9, hp10, hp11, hp12, hp13, hp14, hp15, hp16,
     hp17, hp18, hp19, hp20, hp21, hp22,
     hop_a_0,
-    fun _ => by convert ShiftLeftChip.byteRow_e32 c0 hc0v using 2,
+    fun _ => by convert ShiftLeftChip.byteRow_e32 c0 hc0v using 2; rw [sub_eq_add_neg]; rfl,
     fun _ => by convert byteRow_lower B c0 F 0 (by norm_num) using 2,
-    fun _ => by convert byteRow_higher B c0 F hbUw he14 0 (by norm_num) using 2,
+    fun _ => by
+      convert byteRow_higher B c0 F hbUw he14 0 (by norm_num) using 2; rw [sub_eq_add_neg]; rfl,
     fun _ => by convert byteRow_lower B c0 F 1 (by norm_num) using 2,
-    fun _ => by convert byteRow_higher B c0 F hbUw he14 1 (by norm_num) using 2,
+    fun _ => by
+      convert byteRow_higher B c0 F hbUw he14 1 (by norm_num) using 2; rw [sub_eq_add_neg]; rfl,
     fun _ => by convert byteRow_lower B c0 F 2 (by norm_num) using 2,
-    fun _ => by convert byteRow_higher B c0 F hbUw he14 2 (by norm_num) using 2,
+    fun _ => by
+      convert byteRow_higher B c0 F hbUw he14 2 (by norm_num) using 2; rw [sub_eq_add_neg]; rfl,
     fun _ => by convert byteRow_lower B c0 F 3 (by norm_num) using 2,
-    fun _ => by convert byteRow_higher B c0 F hbUw he14 3 (by norm_num) using 2⟩
+    fun _ => by
+      convert byteRow_higher B c0 F hbUw he14 3 (by norm_num) using 2; rw [sub_eq_add_neg]; rfl⟩
   · -- SRA: the sign witness is the high bit of `B[3]`
     rw [bMsb_eq_sra B F h1 (ho1 h1).2.2]
     exact (U16MSBOperation.spec_populate hbU3 1).2 rfl

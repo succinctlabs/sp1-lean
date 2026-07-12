@@ -2,6 +2,7 @@ import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.MulChip.Formal
 import SP1Clean.Soundness.ChipRow
+import SP1Clean.Proofs.Sail.Advance
 import RISCV.Instructions
 import RISCV.SailToRV64
 import RISCV.SailPureToInstructions
@@ -92,9 +93,11 @@ theorem correct_mul_native
         = RV64.mul (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val)) :
     (spec_mul (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_mul (.Regidx rd_idx) pc a_val).run s := by
-  simp [spec_mul, sp1_mul, mulOp_mul, _root_.mul_eq, skeleton_binary, RV64.mul_eq,
-    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
-    SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_mul]
+  simp only [spec_mul, sp1_mul, mulOp_mul]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun]
+  simp [_root_.mul_eq, RV64.mul_eq, skeleton_binary, Sail.run_rX_bits, Sail.run_wX_bits,
+    run_writeReg_bind, SailState.get_reg?_insert_nextPC, h_rs1, h_rs2, h_mul]
 
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 24 < p)] in
@@ -109,9 +112,11 @@ theorem correct_mulh_native
         = RV64.mulh (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val)) :
     (spec_mulh (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_mul (.Regidx rd_idx) pc a_val).run s := by
-  simp [spec_mulh, sp1_mul, mulOp_mulh, _root_.mul_eq, skeleton_binary, RV64.mulh_eq,
-    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
-    SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_mulh]
+  simp only [spec_mulh, sp1_mul, mulOp_mulh]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun]
+  simp [_root_.mul_eq, RV64.mulh_eq, skeleton_binary, Sail.run_rX_bits, Sail.run_wX_bits,
+    run_writeReg_bind, SailState.get_reg?_insert_nextPC, h_rs1, h_rs2, h_mulh]
 
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 24 < p)] in
@@ -126,9 +131,11 @@ theorem correct_mulhu_native
         = RV64.mulhu (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val)) :
     (spec_mulhu (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_mul (.Regidx rd_idx) pc a_val).run s := by
-  simp [spec_mulhu, sp1_mul, mulOp_mulhu, _root_.mul_eq, skeleton_binary, RV64.mulhu_eq,
-    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
-    SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_mulhu]
+  simp only [spec_mulhu, sp1_mul, mulOp_mulhu]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun]
+  simp [_root_.mul_eq, RV64.mulhu_eq, skeleton_binary, Sail.run_rX_bits, Sail.run_wX_bits,
+    run_writeReg_bind, SailState.get_reg?_insert_nextPC, h_rs1, h_rs2, h_mulhu]
 
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 24 < p)] in
@@ -143,9 +150,11 @@ theorem correct_mulhsu_native
         = RV64.mulhsu (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val)) :
     (spec_mulhsu (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_mul (.Regidx rd_idx) pc a_val).run s := by
-  simp [spec_mulhsu, sp1_mul, mulOp_mulhsu, _root_.mul_eq, skeleton_binary, RV64.mulhsu_eq,
-    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
-    SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_mulhsu]
+  simp only [spec_mulhsu, sp1_mul, mulOp_mulhsu]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun]
+  simp [_root_.mul_eq, RV64.mulhsu_eq, skeleton_binary, Sail.run_rX_bits, Sail.run_wX_bits,
+    run_writeReg_bind, SailState.get_reg?_insert_nextPC, h_rs1, h_rs2, h_mulhsu]
 
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 24 < p)] in
@@ -161,9 +170,11 @@ theorem correct_mulw_native
         = RV64.mulw (Word.toBitVec64 rs2_val) (Word.toBitVec64 rs1_val)) :
     (spec_mulw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_mul (.Regidx rd_idx) pc a_val).run s := by
-  simp [spec_mulw, sp1_mul, _root_.mulw_eq, skeleton_binary, RV64.mulw_eq,
-    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
-    SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_mulw]
+  simp only [spec_mulw, sp1_mul]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun]
+  simp [_root_.mulw_eq, RV64.mulw_eq, skeleton_binary, Sail.run_rX_bits, Sail.run_wX_bits,
+    run_writeReg_bind, SailState.get_reg?_insert_nextPC, h_rs1, h_rs2, h_mulw]
 
 omit [Fact (2 ^ 24 < p)] in
 /-- End-to-end: from the chip `Spec`, the 5-way MUL/MULH/MULHU/MULHSU/MULW Sail identities hold. -/

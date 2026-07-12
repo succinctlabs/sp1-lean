@@ -36,7 +36,7 @@ private lemma toNat_concat_half_bytes [NeZero p] (h : ZMod p) (hh : h.val < 6553
   rw [Nat.mod_eq_of_lt h_hi, show h.val >>> 8 <<< 8 ||| h.val % 256 = h.val by
     rw [← Nat.shiftLeft_add_eq_or_of_lt (i := 8) (by omega), Nat.shiftLeft_eq]; omega]
 
-omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+omit [Fact (2 ^ 17 < p)] in
 /-- Zero-extension (LHU) of the 16-bit concatenation is the word `#v[h, 0, 0, 0]`. -/
 private lemma zeroExtend64_ofNat16_concat [NeZero p] (h : ZMod p) (hh : h.val < 65536) :
     Sail.BitVec.zeroExtend (BitVec.ofNat 8 (h.val >>> 8) ++ BitVec.ofNat 8 h.val) 64 =
@@ -49,7 +49,7 @@ private lemma zeroExtend64_ofNat16_concat [NeZero p] (h : ZMod p) (hh : h.val < 
     List.getElem_cons_succ, ZMod.val_zero]
   omega
 
-omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+omit [Fact (2 ^ 17 < p)] in
 /-- Sign-extension (LH), low half: when `h < 2^15` the sign bit is `0`, giving `#v[h, 0, 0, 0]`. -/
 private lemma signExtend64_ofNat16_concat_of_lt_32768 [NeZero p]
     (h : ZMod p) (hh : h.val < 65536) (hmsb : h.val < 32768) :
@@ -169,7 +169,8 @@ theorem correct_load_half_native
   rw [hsp] at hread
   simp [spec_lh, sp1_lh, run_readReg_of_isInitialized _ _ hs,
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
-    LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, hread, hext]
+    LeanRV64D.Functions.xlen_bytes, PreSail.assert, hread, hext]
+  rfl
 
 /-- End-to-end: from chip + decode + register/PC reads + selected memory bytes, Sail's `LH`/`LHU`
 agrees with the SP1 chip emulation. -/

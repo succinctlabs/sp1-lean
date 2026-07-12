@@ -85,9 +85,19 @@ The memory chips (`LoadDouble`/`StoreDouble`) need the Sail RAM semantics, not j
 (namespace `SP1Clean.SailMem`), against the **shared** `LeanRV64D` model — the dense Sail-monad `simp`
 sets transfer almost verbatim. What's there:
 
-- **Config + PMA** — `SailState.isValidMemConfig` (Machine priv, MPRV off, mseccfg/htif off, the SP1 PMA
-  region), `SP1_PMA`/`SP1_PMA_Region`, `range_subset_sp1_pma`, `is_aligned_vaddr_iff_mod`, and the
+- **Config + PMA** — `SailState.isValidMemConfig` (Machine priv, MPRV off `mstatus[17]=0`, Zicfilp
+  landing-pads off `mseccfg[10]=0`, **pointer-masking off `mseccfg[33:32]=0`**, htif tohost unset, the SP1
+  PMA region), `SP1_PMA`/`SP1_PMA_Region`, `range_subset_sp1_pma`, `is_aligned_vaddr_iff_mod`, and the
   MMIO-readable/writable lemmas.
+  - **Platform trust disclosure (`h_mseccfg_pmm`, added during the 4.30 / sail@`793034f3` update).** The
+    newer Sail generation added **pointer masking (PMM)**: `transform_effective_address` now masks the addr
+    by `mseccfg[33:32]` (`0b01` *throws*), and `is_pmm_applicable` is unconditional for M-mode data — no
+    fork toggle exists. So `isValidMemConfig` gained `h_mseccfg_pmm` (PMM disabled ⇒ transform = identity ⇒
+    the existing memory-lemma proofs close). This is a **new platform assumption in the trust base**, faithful
+    (SP1 has no pointer masking), consistent with the existing CLINT-off / MPRV-off / `mseccfg[10]=0` / PMP=0
+    assumptions; it is a *bridge-level hypothesis on the assumed initial config* (a clause of the boot
+    predicate), not a Sail axiom. Threaded through the 10 memory-bridge transfer sites + the
+    `SailConfigured`/`toValidMemConfig` construction sites.
 - **Read** — `run_vmem_read_of_width_8'` (8-byte aligned read returns the eight `mem[addr+k]` bytes),
   with `run_checked/run_mem_read_eight_bytes_of_isInitialized`.
 - **Write** — `run_vmem_write_of_width_8` (8-byte write produces the post-state with eight `mem.insert`s of

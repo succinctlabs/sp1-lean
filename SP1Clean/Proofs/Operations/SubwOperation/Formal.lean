@@ -78,7 +78,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   rw [hr1eq, one_mul] at hgc0 hgc1
   refine subwSemantics_of_carries ha hb ?_ ((h_msb h_msb_as).2 hr1eq)
   simp only [RawSpec, Nat.cast_ofNat, sub_eq_add_neg]
-  simp only [sub_eq_add_neg] at hgc0 hgc1
   -- The auto-extracted `main` spells the borrow constant as `65536 + -1`; `RawSpec` uses `65535`.
   -- They agree in `ZMod p` (ring numeral normalization), so bridge each carry bool with
   -- `linear_combination` rather than a syntactic `refine`/`rw`.

@@ -56,7 +56,6 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
        input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
        input.is_auipc * 48 + (1 - input.is_auipc) * 49, 0, 0, 0, 0⟩) data)
 
-omit [Fact p.Prime] in
 /-- `Word.toBitVec64 #v[0,0,0,0] = 0`. -/
 lemma toBitVec64_zero_word : Word.toBitVec64 (#v[(0 : ZMod p), 0, 0, 0] : Word (ZMod p)) = 0 := by
   simp [Word.toBitVec64, Word.toNat_def]
@@ -80,11 +79,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have epc : ∀ i (hi : i < 3), Expression.eval env input_var_state_pc[i] = input_state_pc[i] :=
     fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have ha0 : env.get i₀ = input_is_auipc * input_state_pc[0] := by
-    rw [epc 0 (by omega)] at h_ad0; exact add_neg_eq_zero.mp h_ad0
+    rw [epc 0 (by omega)] at h_ad0; exact sub_eq_zero.mp h_ad0
   have ha1 : env.get (i₀ + 1) = input_is_auipc * input_state_pc[1] := by
-    rw [epc 1 (by omega)] at h_ad1; exact add_neg_eq_zero.mp h_ad1
+    rw [epc 1 (by omega)] at h_ad1; exact sub_eq_zero.mp h_ad1
   have ha2 : env.get (i₀ + 2) = input_is_auipc * input_state_pc[2] := by
-    rw [epc 2 (by omega)] at h_ad2; exact add_neg_eq_zero.mp h_ad2
+    rw [epc 2 (by omega)] at h_ad2; exact sub_eq_zero.mp h_ad2
   have haddend0 : input_is_auipc = 0 →
       (#v[env.get i₀, env.get (i₀ + 1), env.get (i₀ + 2), 0] : Word (ZMod p)) = #v[0, 0, 0, 0] := by
     intro h; rw [ha0, ha1, ha2, h]; simp
@@ -97,7 +96,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     · rw [haddend0 h]; refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;> simp
     · rw [haddendpc h]; exact h_pcU
   -- `is_real - op_a_0` is binary: on real rows from `op_a_0 ∈ {0,1}`, on padding from `h_pad`.
-  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
@@ -105,12 +104,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   refine ⟨⟨h_jt, h_bin, h_iaui, ?_, ?_⟩, h_bin, Or.inr ⟨fun _ => ⟨h_addendU, h_imm⟩, h_gate2⟩,
     Or.inr ⟨h_bin, h_bin⟩, Or.inr ⟨h_bin, ?_⟩⟩
   · intro hr1 hop0 hiaui0
-    have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, hop0]; simp
+    have hg1 : input_is_real - input_adapter_op_a_0 = 1 := by rw [hr1, hop0]; simp
     have hsem := (h_addspec hg1).2
     simp only [haddend0 hiaui0, toBitVec64_zero_word] at hsem
     rw [hsem]; simpa using h_dec
   · intro hr1 hop0 hiaui1
-    have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, hop0]; simp
+    have hg1 : input_is_real - input_adapter_op_a_0 = 1 := by rw [hr1, hop0]; simp
     have hsem := (h_addspec hg1).2
     simp only [haddendpc hiaui1] at hsem
     rw [hsem, auipc_eq_add_lui, ← h_dec]
@@ -120,7 +119,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     intro hr1
     replace hr1 : input_is_real = 1 := hr1
     rcases h_op_a_0 with h0 | h0
-    · have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
+    · have hg1 : input_is_real - input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
       exact (h_addspec hg1).1
     · obtain ⟨z0, z1, z2, z3⟩ := h_jt.1
       rw [h0, one_mul] at z0 z1 z2 z3
@@ -133,9 +132,6 @@ theorem completeness :
   circuit_proof_start
   obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_iaui, h_op0, h_cpu, h_rac, _h_dec, hdec, h_st, h_prog⟩ :=
     h_assumptions
-  -- align `h_prog`'s opcode `1 - is_auipc` (HSub) with the `1 + -is_auipc` form `circuit_norm` leaves
-  -- in the reader-obligation goal.
-  simp only [sub_eq_add_neg] at h_prog
   obtain ⟨_, ⟨_, _, _, hpc⟩, ⟨_, _, _, hob, _⟩, _⟩ := h_input
   -- `h_env` now bundles the addend/add-result witness equations with the GFC `JTypeReader` subcircuit's
   -- completeness obligation (SC Phase 2pre); the witness equations are `he_addend`/`he_addval`.
@@ -176,12 +172,12 @@ theorem completeness :
           = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by
         rw [hg0, hg1, hg2, h, epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; simp
       rw [e]; exact h_pcU
-  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
     rw [h_op0]; simpa using h_bin
   refine ⟨⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨hA_U, h_imm⟩, h_gate2⟩, ?_⟩,
     ⟨⟨h_bin, h_bin⟩, ⟨⟨?_, ?_, ?_, ?_⟩, Or.inl h_op0, h_rac, hdec, h_oap⟩, h_prog⟩,
     ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [hval]; exact AddOperation.spec_populate hA_U h_imm (input_is_real + - input_adapter_op_a_0)
+  · rw [hval]; exact AddOperation.spec_populate hA_U h_imm (input_is_real - input_adapter_op_a_0)
   · rw [h_op0, zero_mul]
   · rw [h_op0, zero_mul]
   · rw [h_op0, zero_mul]
@@ -189,7 +185,7 @@ theorem completeness :
   · -- RegisterWrite op_a write push: `isU64` of the result `add_value` (completeness covers `op_a_0 = 0`).
     intro hr
     rw [hval]
-    exact (AddOperation.spec_populate hA_U h_imm (input_is_real + - input_adapter_op_a_0)
+    exact (AddOperation.spec_populate hA_U h_imm (input_is_real - input_adapter_op_a_0)
       (by rw [h_op0]; simpa using hr)).1
   · rw [hg0]; ring_nf
   · rw [hg1]; ring_nf

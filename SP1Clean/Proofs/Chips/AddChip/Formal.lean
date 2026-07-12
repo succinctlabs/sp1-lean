@@ -72,7 +72,7 @@ theorem completeness :
     -- the chip's `value` witness-gen equations (`.2.1`), and the `RTypeReader` obligation (`.2.2`).
     rw [h_env.2.1 ⟨i, hi⟩]
     simp only [Inputs.op_b_val, Inputs.op_c_val]
-    rw [hbeq, hceq]
+    simp only [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,

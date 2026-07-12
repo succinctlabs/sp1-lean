@@ -158,8 +158,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   -- `RTypeReader`, the `SpecD`-folded goal keeps `Spec` opaque over a reassembled record, so `sub_eq_add_neg`
   -- can't reach its `is_real - imm_c` HSub subtractions to align them with the `+ -` form `circuit_norm`
   -- leaves in `h_holds` — unfold `Spec` here too so the projections reduce and `sub_eq_add_neg` fires.
-  simp only [circuit_norm, AssumptionsD, SpecD, Spec, memoryChannel, MemoryMsg.isU64, programChannel,
-    sub_eq_add_neg] at h_holds h_assumptions ⊢
+  simp only [circuit_norm, AssumptionsD, SpecD, Spec, memoryChannel, MemoryMsg.isU64, programChannel]
+    at h_holds h_assumptions ⊢
   obtain ⟨h_rac_a, h_rac_b, h_rac_c, hbin, h_immc, h_immbin, i0, i1, i2, i3, h_trust, h_prog,
     z0, z1, z2, z3, h_mem_a, h_mem_b, h_mem_c⟩ := h_holds
   have htbin := bool_of_mul_pred h_trust
@@ -194,7 +194,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
     exact h_mem_b (by rw [ht])
   · -- push_c requirement — same whole-`Word` prev_value as the paired (is_real - imm_c)-gated pull (h_mem_c).
-    have htc : input_is_real + - input_cols_imm_c = 1 := by
+    have htc : input_is_real - input_cols_imm_c = 1 := by
       rcases hcbin with h | h; exact absurd h h0; exact h
     exact h_mem_c (by rw [htc])
 
@@ -223,7 +223,6 @@ theorem completeness :
     intro i hi; rw [← hpv, Vector.getElem_map]
   have e : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
-  simp only [sub_eq_add_neg] at h_immc h_immbin_or hrac_c i0 i1 i2 i3 hisu_c
   refine ⟨⟨hreal, hrac_a⟩, ⟨hreal, hrac_b⟩, ⟨h_immbin_or, hrac_c⟩,
     ?_, h_immc, ?_, ?_, ?_, ?_, ?_, ?_, ?_, z0, z1, z2, z3, ?_, ?_, ?_⟩
   · rcases hbin with h | h <;> rw [h] <;> simp

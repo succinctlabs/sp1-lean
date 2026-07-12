@@ -55,7 +55,7 @@ private lemma toNat_concat_word_bytes [NeZero p]
   have := hx_decomp
   omega
 
-omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+omit [Fact (2 ^ 17 < p)] in
 /-- Zero-extension (LWU) of the 32-bit concatenation is the word `#v[x, y, 0, 0]`. -/
 private lemma zeroExtend64_ofNat32_concat [NeZero p]
     (x y : ZMod p) (hx : x.val < 65536) (hy : y.val < 65536) :
@@ -70,7 +70,7 @@ private lemma zeroExtend64_ofNat32_concat [NeZero p]
     List.getElem_cons_succ, ZMod.val_zero]
   rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]; ring
 
-omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+omit [Fact (2 ^ 17 < p)] in
 /-- Sign-extension (LW), low half: when `y < 2^15` the sign bit is `0`, giving `#v[x, y, 0, 0]`. -/
 private lemma signExtend64_ofNat32_concat_of_lt_32768 [NeZero p]
     (x y : ZMod p) (hx : x.val < 65536) (hy : y.val < 65536) (hmsb : y.val < 32768) :
@@ -203,7 +203,8 @@ theorem correct_load_word_native
   rw [hsp] at hread
   simp [spec_lw, sp1_lw, run_readReg_of_isInitialized _ _ hs,
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
-    LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, hread, hext]
+    LeanRV64D.Functions.xlen_bytes, PreSail.assert, hread, hext]
+  rfl
 
 /-- **End-to-end composition.** From the `LoadWord` chip prover assumptions + decode + register/PC reads
 + the four selected memory bytes, a width-4 Sail `LOAD` (sign-extended for `LW`, zero-extended for `LWU`)

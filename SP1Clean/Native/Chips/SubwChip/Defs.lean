@@ -39,11 +39,11 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (SubwCols) (ZMod 
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   -- The chip witnesses the result low limbs + sign bit via the operation's `populate`, then composes the
   -- demoted `SubwOperation` gadget as a Clean `assertion`.
-  let value ← witnessVector 2 (fun env =>
+  let value ← witnessVectorNative 2 (fun env =>
     SubwOperation.subwValueWitness
       #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
       #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]])
-  let msb ← witnessVector 1 (fun env =>
+  let msb ← witnessVectorNative 1 (fun env =>
     #v[SubwOperation.subwMsbWitness
       #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
       #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]])

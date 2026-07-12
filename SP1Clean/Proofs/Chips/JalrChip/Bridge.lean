@@ -79,6 +79,7 @@ theorem correct_jalr_native
     Sail.run_readReg_bind_of_isInitialized _ _ hsp_init, hjump,
     RETIRE_SUCCESS, h_link]
   simp [hsp]
+  rfl
 
 /-- End-to-end: from the JALR chip's verified `Spec` (on a real row) plus the PC read, the rs1 register
 read, the committed rs1 ↔ Sail reassembly, the immediate decode, `op_a_0 = 0` (rd ≠ x0), and the

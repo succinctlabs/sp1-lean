@@ -45,7 +45,7 @@ values is `≤ 1`. -/
 lemma one_hot6 {b0 b1 b2 b3 b4 b5 : ZMod p}
     (h0 : b0 = 0 ∨ b0 = 1) (h1 : b1 = 0 ∨ b1 = 1) (h2 : b2 = 0 ∨ b2 = 1)
     (h3 : b3 = 0 ∨ b3 = 1) (h4 : b4 = 0 ∨ b4 = 1) (h5 : b5 = 0 ∨ b5 = 1)
-    (hsum : (b0 + b1 + b2 + b3 + b4 + b5) * (b0 + b1 + b2 + b3 + b4 + b5 + -1) = 0) :
+    (hsum : (b0 + b1 + b2 + b3 + b4 + b5) * (b0 + b1 + b2 + b3 + b4 + b5 - 1) = 0) :
     b0.val + b1.val + b2.val + b3.val + b4.val + b5.val ≤ 1 := by
   haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : (7 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
@@ -115,7 +115,7 @@ lemma branch_conditions_of_decision_eq {rs1 rs2 : Word (ZMod p)}
       ∧ (b4 = 1 → (br = 1 ↔ (Word.toBitVec64 rs1).ult (Word.toBitVec64 rs2) = true))
       ∧ (b5 = 1 → (br = 1 ↔ (Word.toBitVec64 rs1).ult (Word.toBitVec64 rs2) = false)) := by
   simp only [branchDecision] at hbrdec
-  have hgate : (b0 + b1 + b2 + b3 + b4 + b5) * (b0 + b1 + b2 + b3 + b4 + b5 + -1) = 0 := by
+  have hgate : (b0 + b1 + b2 + b3 + b4 + b5) * (b0 + b1 + b2 + b3 + b4 + b5 - 1) = 0 := by
     rw [hone]; ring
   have h_onehot := one_hot6 hb0 hb1 hb2 hb3 hb4 hb5 hgate
   have b0v := val_of_bool hb0; have b1v := val_of_bool hb1; have b2v := val_of_bool hb2
@@ -214,7 +214,7 @@ lemma branch_decision_eq_of_conditions {rs1 rs2 : Word (ZMod p)}
     (hd5 : b5 = 1 → (br = 1 ↔ (Word.toBitVec64 rs1).ult (Word.toBitVec64 rs2) = false)) :
     br = branchDecision b0 b1 b2 b3 b4 b5 bit sum := by
   simp only [branchDecision]
-  have hgate : (b0 + b1 + b2 + b3 + b4 + b5) * (b0 + b1 + b2 + b3 + b4 + b5 + -1) = 0 := by
+  have hgate : (b0 + b1 + b2 + b3 + b4 + b5) * (b0 + b1 + b2 + b3 + b4 + b5 - 1) = 0 := by
     rw [hone]; ring
   have h_onehot := one_hot6 hb0 hb1 hb2 hb3 hb4 hb5 hgate
   have b0v := val_of_bool hb0; have b1v := val_of_bool hb1; have b2v := val_of_bool hb2

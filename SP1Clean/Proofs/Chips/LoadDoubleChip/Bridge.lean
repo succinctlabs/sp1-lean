@@ -235,7 +235,8 @@ theorem correct_load_double_native
   -- `wX_bits rd (Word.toBitVec64 loaded)` via `hextend`.
   simp [spec_ld, sp1_ld, run_readReg_of_isInitialized _ _ hs,
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
-    LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, hread, hextend]
+    LeanRV64D.Functions.xlen_bytes, PreSail.assert, hread, hextend]
+  rfl
 
 omit [Fact (2 ^ 17 < p)] in
 /-- **End-to-end composition.** From the `LoadDouble` chip's prover assumptions (the operand `isU64`s

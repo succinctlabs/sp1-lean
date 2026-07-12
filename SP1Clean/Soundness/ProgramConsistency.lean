@@ -196,9 +196,10 @@ theorem programLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit programChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
       (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) programChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) programChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   -- reduce `interactionsWith` to the single program emit (RAC subs + Equality gates + memory emits drop;
   -- the memory emits' `if memoryChannel = programChannel` collapse via the channel distinctness + `if_false`)

@@ -43,8 +43,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   rw [← c16] at R0 R1 R2 R3
   rw [hr1eq, one_mul] at hgc0 hgc1 hgc2 hgc3
   refine addSemantics_of_carries ha hb ?_ ?_
-  · simp only [AssertSpec, sub_eq_add_neg]
-    simp only [sub_eq_add_neg] at hgc0 hgc1 hgc2 hgc3
+  · simp only [AssertSpec]
     exact ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2, bool_of_mul_pred hgc3⟩
   · simp only [InteractSpec]
     rw [← h65536]

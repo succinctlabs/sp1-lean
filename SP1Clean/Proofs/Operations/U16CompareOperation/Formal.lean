@@ -30,7 +30,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel] at h_holds ⊢
   obtain ⟨hr, _hbool, hgc⟩ := h_holds
-  simp only [sub_eq_add_neg] at hgc
   refine ⟨⟨bool_of_mul_pred hgc, ?_⟩, fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   intro hr1eq
   obtain ⟨ha, hb⟩ := hab hr1eq

@@ -29,9 +29,8 @@ lemma val_16 [NeZero p] : (16 : ZMod p).val = 16 := val_16_zmod_p
 omit [Fact (2 ^ 17 < p)] in
 /-- Carry-bool bridge: `x*(x-1)=0 ↔ x∈{0,1}` (field; `→` via the `mul_eq_zero`-free
 `bool_of_mul_pred`). -/
-lemma bool_iff {x : ZMod p} : x * (x - 1) = 0 ↔ (x = 0 ∨ x = 1) := by
-  rw [sub_eq_add_neg]
-  exact ⟨SP1Clean.bool_of_mul_pred,
+lemma bool_iff {x : ZMod p} : x * (x - 1) = 0 ↔ (x = 0 ∨ x = 1) :=
+  ⟨SP1Clean.bool_of_mul_pred,
     fun h => by rcases h with h | h <;> rw [h] <;> ring⟩
 
 /-- **Chip-level faithfulness anchor skeleton.** Discharges a `*cols_constraints_faithful` goal whose

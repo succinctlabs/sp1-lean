@@ -58,9 +58,10 @@ theorem isEqualWord_interactions_faithful_syntactic
   have heqZW := fun (n : ℕ) (inp : Var SP1Clean.IsZeroWordOperation.Inputs (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil SP1Clean.IsZeroWordOperation.circuit byteChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
-  have heqEq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heqEq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [SP1Clean.IsEqualWordOperation.main, circuit_norm, heqZW, heqEq,
     Extracted.IsEqualWordOperation.interactions, Extracted.IsZeroWordOperation.interactions,
     Extracted.IsZeroOperation.interactions, List.map_nil, List.append_nil]

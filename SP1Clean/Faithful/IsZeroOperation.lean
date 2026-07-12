@@ -69,9 +69,10 @@ theorem isZero_interactions_faithful_syntactic
     (Extracted.IsZeroOperation.interactions a cols is_real).map Extracted.Interaction.toAccess
       = (((SP1Clean.IsZeroOperation.main input).operations offset).interactionsWith
           byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) inp =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [SP1Clean.IsZeroOperation.main, circuit_norm, heq, Extracted.IsZeroOperation.interactions,
     List.map_nil, List.append_nil]
 

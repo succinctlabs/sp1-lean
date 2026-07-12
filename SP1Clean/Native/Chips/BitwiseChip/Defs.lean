@@ -84,13 +84,13 @@ copies; these struct fields are not read by the `Spec`). -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let flags ← witnessVector 3 (fun env => hintFlags env.hint)
+  let flags ← witnessVectorNative 3 (fun env => hintFlags env.hint)
   let is_xor := flags[0]; let is_or := flags[1]; let is_and := flags[2]
   let byteOpcode : Expression (ZMod p) := is_xor * 2 + is_or * 1 + is_and * 0
   -- The chip witnesses the `BitwiseU16Operation` column struct (the two `U16toU8` low-byte blocks +
   -- the eight result bytes) via `populate`, then composes `BitwiseU16Operation.circuit` as a Clean
   -- `assertion` (it is a `FormalAssertion`, witnessing nothing of its own).
-  let bw_cols ← ProvableType.witness (fun env =>
+  let bw_cols ← witnessNative (var := Var Extracted.BitwiseU16Operation) (fun env =>
     BitwiseU16Operation.populate
       #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
       #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]

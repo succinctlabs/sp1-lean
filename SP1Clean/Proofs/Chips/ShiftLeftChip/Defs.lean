@@ -152,36 +152,36 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftLeftCols (ZM
   -- over the adapter operand columns + the flag hint). The three variant flags
   -- (`is_sll`/`is_sllw`/`is_sllw_imm`) are witnessed **last** (offsets `i₀+30..32`) so they are
   -- committed `cols` columns, not `Inputs` fields.
-  let a ← witnessVector 4 (fun env =>
+  let a ← witnessVectorNative 4 (fun env =>
     populateA
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
-  let c_bits ← witnessVector 6 (fun env => cBits (env input.adapter.op_c_memory.prev_value[0]))
-  let v ← witnessVector 3 (fun env => vPowers (env input.adapter.op_c_memory.prev_value[0]))
-  let shift_u16 ← witnessVector 4 (fun env =>
+  let c_bits ← witnessVectorNative 6 (fun env => cBits (env input.adapter.op_c_memory.prev_value[0]))
+  let v ← witnessVectorNative 3 (fun env => vPowers (env input.adapter.op_c_memory.prev_value[0]))
+  let shift_u16 ← witnessVectorNative 4 (fun env =>
     shiftU16 (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
-  let lower_limb ← witnessVector 4 (fun env =>
+  let lower_limb ← witnessVectorNative 4 (fun env =>
     lowerLimb
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (env input.adapter.op_c_memory.prev_value[0]))
-  let higher_limb ← witnessVector 4 (fun env =>
+  let higher_limb ← witnessVectorNative 4 (fun env =>
     higherLimb
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (env input.adapter.op_c_memory.prev_value[0]))
-  let limb_result ← witnessVector 4 (fun env =>
+  let limb_result ← witnessVectorNative 4 (fun env =>
     limbResult
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (env input.adapter.op_c_memory.prev_value[0]))
-  let sllw_msb ← witnessVector 1 (fun env =>
+  let sllw_msb ← witnessVectorNative 1 (fun env =>
     #v[sllwMsb
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint)])
-  let flags ← witnessVector 3 (fun env =>
+  let flags ← witnessVectorNative 3 (fun env =>
     #v[(hintFlags env.hint)[0], (hintFlags env.hint)[1],
        (hintFlags env.hint)[1] * env input.adapter.imm_c])
   let is_sll := flags[0]; let is_sllw := flags[1]; let is_sllw_imm := flags[2]

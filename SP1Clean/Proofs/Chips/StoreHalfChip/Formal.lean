@@ -56,7 +56,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       = input_adapter_op_a_memory_prev_value[0] := by rw [← hmap_oap]; simp only [Vector.getElem_map]
   simp only [esv 0 (by omega), esv 1 (by omega), esv 2 (by omega), esv 3 (by omega),
     epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega),
-    eoap0, eob 0 (by omega), eob 1 (by omega), ← sub_eq_add_neg] at hr0 hr1 hr2 hr3
+    eoap0, eob 0 (by omega), eob 1 (by omega)] at hr0 hr1 hr2 hr3
   have h_it := h_itype ⟨h_bin, h_bin⟩
   have hob0' : Expression.eval env input_var_offset_bit[0] = 0
       ∨ Expression.eval env input_var_offset_bit[0] = 1 := by rw [eob 0 (by omega)]; exact hob0
@@ -169,17 +169,13 @@ theorem completeness :
   · exact ⟨hbin, hbin⟩
   · exact h_it
   · exact h_prog
-  · simp only [esv 0 (by omega), epv 0 (by omega), eoap0, eob 0 (by omega), eob 1 (by omega),
-      ← sub_eq_add_neg]
+  · simp only [esv 0 (by omega), epv 0 (by omega), eoap0, eob 0 (by omega), eob 1 (by omega)]
     exact sub_eq_zero_of_eq hr0
-  · simp only [esv 1 (by omega), epv 1 (by omega), eoap0, eob 0 (by omega), eob 1 (by omega),
-      ← sub_eq_add_neg]
+  · simp only [esv 1 (by omega), epv 1 (by omega), eoap0, eob 0 (by omega), eob 1 (by omega)]
     exact sub_eq_zero_of_eq hr1
-  · simp only [esv 2 (by omega), epv 2 (by omega), eoap0, eob 0 (by omega), eob 1 (by omega),
-      ← sub_eq_add_neg]
+  · simp only [esv 2 (by omega), epv 2 (by omega), eoap0, eob 0 (by omega), eob 1 (by omega)]
     exact sub_eq_zero_of_eq hr2
-  · simp only [esv 3 (by omega), epv 3 (by omega), eoap0, eob 0 (by omega), eob 1 (by omega),
-      ← sub_eq_add_neg]
+  · simp only [esv 3 (by omega), epv 3 (by omega), eoap0, eob 0 (by omega), eob 1 (by omega)]
     exact sub_eq_zero_of_eq hr3
   · rcases hbin with h | h <;> rw [h] <;> simp
 

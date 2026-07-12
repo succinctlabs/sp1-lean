@@ -139,8 +139,8 @@ def ProverAssumptionsD (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
 set_option maxHeartbeats 4000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
-  simp only [circuit_norm, AssumptionsD, SpecD, Spec, memoryChannel, MemoryMsg.isU64, programChannel,
-    sub_eq_add_neg] at h_holds h_assumptions ⊢
+  simp only [circuit_norm, AssumptionsD, SpecD, Spec, memoryChannel, MemoryMsg.isU64, programChannel]
+    at h_holds h_assumptions ⊢
   obtain ⟨h_rac_a, h_rac_b, h_rac_c, hbin, h_immc, h_immbin, i0, i1, i2, i3, h_trust, h_prog,
     z0, z1, z2, z3, h_mem_a, h_mem_b, h_mem_c⟩ := h_holds
   have htbin := bool_of_mul_pred h_trust
@@ -164,7 +164,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
       fun ht => ?_,
       fun ht2 => ⟨h_mem_a (by rw [show input_is_real = 1 from ht2]),
         h_mem_b (by rw [show input_is_real = 1 from ht2])⟩,
-      fun ht3 => h_mem_c (by rw [show input_is_real + - input_cols_imm_c = 1 from ht3])⟩,
+      fun ht3 => h_mem_c (by rw [show input_is_real - input_cols_imm_c = 1 from ht3])⟩,
     Or.inr h_assumptions.1, Or.inr h_assumptions.1, Or.inr hcbin,
     fun h1 h0 => off_gate_vacuous htbin h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
@@ -188,7 +188,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
     exact h_mem_b (by rw [ht])
   · -- push_c: read-back value = op_c prev, from the paired (is_real - imm_c)-gated pull.
-    have htc : input_is_real + - input_cols_imm_c = 1 := by
+    have htc : input_is_real - input_cols_imm_c = 1 := by
       rcases hcbin with h | h; exact absurd h h0; exact h
     exact h_mem_c (by rw [htc])
 
@@ -224,7 +224,6 @@ theorem completeness :
     intro i hi; rw [← hpv, Vector.getElem_map]
   have e : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
-  simp only [sub_eq_add_neg] at h_immc h_immbin_or hrac_c i0 i1 i2 i3 hisu_c
   refine ⟨⟨hreal, hrac_a⟩, ⟨hreal, hrac_b⟩, ⟨h_immbin_or, hrac_c⟩,
     ?_, h_immc, ?_, ?_, ?_, ?_, ?_, ?_, ?_, z0, z1, z2, z3, ?_, ?_, ?_⟩
   · rcases hbin with h | h <;> rw [h] <;> simp

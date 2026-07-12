@@ -1,8 +1,13 @@
 # SP1 verified: what is proven, and how to check it — TARGET STATE
 
-**STATUS: GOAL DOCUMENT (drafted 2026-07-09).** This is `docs/overview.md` as it will read when the
-consolidation (`docs/proposals/2026-07-architecture-consolidation.md`) and the remaining roadmap
-seams (W1b witness decode, W5 halt, W8 logUp packaging) are complete. Nothing here is hedged: every
+**STATUS: GOAL DOCUMENT (drafted 2026-07-09; §0/§2 revised 2026-07-11 to the deps-aware audit
+standard — §2 now states the global Lean configuration verbatim and describes the RISC-V/Sail seam
+"up to what a dependency-expert knows," so a Sail-familiar reviewer can audit the connection from the
+config alone).** This is `docs/overview.md` as it will read when the consolidation
+(`docs/proposals/2026-07-architecture-consolidation.md`) and the remaining roadmap seams (W1b witness
+decode, W5 halt, W8 logUp packaging) are complete, and after the Lean **4.30** migration lands
+(soundness green; the honest-prover *completeness* proofs are temporarily `stop`-deferred, tracked
+for restore before the consolidation PR — see the gap ledger in §1). Nothing here is hedged: every
 sentence is written in the completed voice, so **the diff between this file and `overview.md` is
 exactly the remaining work**, and every discrepancy maps to a numbered migration step in the
 proposal (§5) or a roadmap item. When a claim becomes true, it moves verbatim into `overview.md`.
@@ -23,6 +28,14 @@ For the SP1/Rust reader: every Lean object names its Rust counterpart — chip n
 your constraint compiler, and the trace conformance suite runs against your real `generate_trace`.
 For the Lean/Clean reader: chips are Clean circuits, buses are Clean channels, and the top theorem
 is an `Ensemble.Statement → Spec` implication whose `Spec` is external (Sail) semantics.
+
+**Altitude convention.** This document describes what SP1-clean-native builds *on top of* its
+dependencies — Clean (the circuit/channel calculus) and LeanRV64D (the RISC-V Sail model) — at the
+level of the configuration we impose and the notions we define; it does not re-explain the
+dependencies themselves. §2.1 states the global Lean configuration verbatim; every dependency notion
+(a Sail step, a Clean channel, a decoded instruction) is named where a reader who already knows that
+dependency can audit the seam. Read from whichever end you know: the config block + §2 suffice to
+audit the RISC-V connection, the chip/ensemble sections + `Faithful/` the SP1 connection.
 
 Vocabulary, used consistently: a **chip** is one of the 26 semantic tables (SP1's `RiscvAir`
 variants, including HALT); a **table** is any ensemble member (chips + providers); **pull/push**
@@ -65,36 +78,84 @@ this (`scripts/run_audit.sh` reproduces the census):
 **The gap ledger is empty.** The audit allowlist contains no `sorry`; every obligation of
 `sp1_soundness` is a theorem of the six-row base above.
 
-## 2. The Sail side: what "really executes" means
+## 2. What sits under us: the configuration, and the Sail seam
+
+This section is written **up to what a reader who knows the dependencies knows**: it states the
+config we impose and the local notions we define on top, and defers to the dependency for its own
+semantics. A Sail-familiar reviewer should be able to audit the RISC-V connection from the constants
+listed here alone; a Lean reviewer should be able to audit the config block and the guarantees the
+proofs run under. Nothing below re-derives the RISC-V ISA or the Clean channel calculus.
+
+### 2.1 The global Lean configuration (the audit surface)
+
+Every theorem is generic over a prime field, under one standing variable block; the machine layer
+adds one larger bound (needed to decode field-encoded clocks/addresses into ℕ without wraparound):
+
+```lean
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]   -- the standing block
+-- the ensemble/engine additionally assumes a `Fact (2 ^ 25 < p)`-class bound
+```
+
+It is instantiated only at SP1's production prime (BabyBear / KoalaBear), which satisfies both with
+margin. Pins and gates, all machine-checked by `scripts/run_audit.sh`:
+
+- **Toolchain**: `leanprover/lean4:v4.30.0`, mathlib `v4.30.0`, Clean pinned to `main`, and the two
+  `succinctlabs` Sail forks (`sail-riscv-lean` carrying the platform delta below + `riscv-lean`),
+  which pull `LeanRV64D` and `lean-sail`.
+- **Trust gates**: the main `SP1Clean` library is `native_decide`-free and `skipKernelTC`-free (both
+  CI-scripted); `Extracted/` regenerates byte-identically at the pinned SP1 commit.
+
+### 2.2 The reference semantics and the platform configuration
 
 The reference semantics is **LeanRV64D** — the Lean translation of the official RISC-V Sail model,
-consumed as an external dependency and never modified beyond four disclosed platform-configuration
-constants (CLINT off, signature output off, PMP count 0 — SP1's execution environment). One machine
-step is `try_step`, the interpreter's own top level: interrupt check, fetch, decode, execute, PC
-commit. `SailChain n s0 s` is `n` such steps. Nothing is bypassed or re-implemented: the theorem's
-execution chain is the interpreter anyone else can run.
+consumed as an external dependency and **never modified** beyond a disclosed platform configuration.
+That configuration *is* the RISC-V seam a Sail reviewer audits; it is exactly SP1's execution
+environment, in two pieces:
 
-`SP1Boot prog s0` says `s0` has the program image loaded at its link addresses, PC at the entry
-point, registers zeroed, and the platform configured (machine mode, interrupts off — the mode SP1
-executes in). It is satisfiable by construction — `SP1Boot.canonical prog` exhibits the loader
-state — so the theorem's ∀-form is demonstrably non-vacuous. `SP1Halted prog exit s_f` says `s_f`
-sits at the halting `ECALL` with syscall id HALT in `t0` and the exit code in `a0`; the chain stops
-one step before executing the ECALL itself.
+- **Compile-time (fork constants, in `sail-riscv-lean`):** `plat_have_clint = false` (no CLINT
+  timer/software-interrupt device), `plat_have_sig = false` (no HTIF signature output),
+  `sys_pmp_count = 0` (no PMP entries).
+- **Per-state (`SailState.isValidMemConfig`, the initial platform mode — a clause of the `SP1Boot`
+  precondition, exhibited by the canonical loader in §2.3):** M-mode (`cur_privilege = Machine`),
+  MPRV off (`mstatus[17] = 0`),
+  Zicfilp landing-pads off (`mseccfg[10] = 0`), **pointer-masking off (`mseccfg[33:32] = 0`)** — the
+  one constant added during the 4.30/Sail-generation update, faithful (SP1 has no PMM) — HTIF tohost
+  unset, and a single uniform main-memory PMA region `[2^16, 2^48)` with no atomics/reservations.
+
+Beyond these constants, the model runs unaltered. The platform bundle (trust row 4) is the ~76
+platform hooks the Sail model declares as axioms; the theorem statement ranges over the full
+interpreter so it imports the bundle, and the RV64IM integer paths this project executes touch
+exactly 4. The full list is the named constant `sailPlatformSurface` (`docs/snapshots/axiom-census.txt`),
+gate-enforced.
+
+### 2.3 What "really executes" means — local notions over Sail's own driver
+
+`SailStep`/`SailChain` are **this project's** thin wrappers; we add no semantics, only iteration.
+`try_step` is LeanRV64D's own top-level driver — interrupt dispatch, fetch, decode, execute, PC
+commit — and we defer to it entirely for what a step *computes*:
+
+```lean
+def SailStep (s s' : SailState) : Prop := ∃ b, (try_step 0 false).run s = .ok b s'  -- one real step
+inductive SailChain : ℕ → SailState → SailState → Prop | refl … | step …             -- n steps
+```
+
+Nothing is bypassed or re-implemented — the theorem's execution chain is the interpreter anyone else
+can run. `SP1Boot prog s0` says `s0` has the program image loaded at its link addresses, PC at the
+entry point, registers zeroed, and the platform configured as in 2.2; it is satisfiable by
+construction (`SP1Boot.canonical prog` exhibits the loader state), so the ∀-form is demonstrably
+non-vacuous. `SP1Halted prog exit s_f` says `s_f` is about to execute the halting `ECALL` (PC at an
+`ECALL` word in ROM, syscall id HALT in `t0`/x5, exit code in `a0`/x10) — the chain stops one step
+before the ECALL, because SP1's `ECALL` is an execution-environment halt, not RISC-V's privileged
+trap, so it is *observed* against the unmodified model rather than simulated.
 
 **The decode boundary is a per-program theorem, not an assumption.** A `GuestProgram` carries its
-ROM together with a **decode certificate**: for each ROM word, the fact that the real generated
-decoder (`ext_decode`), in every configured state, returns one fixed instruction whose
-column-projection is the committed program row. For any concrete guest program the certificate is
-*proven by kernel reduction*, word by word (the branch-skip reduction of the real decoder — the
-certificate generator is mechanical), so no decode fact appears in the trust base. Two structural
-theorems back this: the row projection is injective on the decoder's image (the decoder emits only
-canonical multiply-operand records and widths in {1, 2, 4, 8}; there is no LDU), and decode
-output-determinism is derivable from that injectivity — both machine-checked, neither trusted.
-
-The platform bundle (trust row 4): the Sail model declares ~76 platform hooks as axioms. The
-theorem statement ranges over the full interpreter, so it imports the bundle; the RV64IM integer
-paths this project models touch exactly 4. The full list is the named constant
-`sailPlatformSurface`, enumerated in `docs/snapshots/axiom-census.txt` and enforced by the gate.
+ROM together with a **decode certificate**: for each ROM word, the real generated decoder
+(`ext_decode`), in every configured state, returns one fixed instruction whose column-projection is
+the committed program row. For any concrete program the certificate is *proven by kernel reduction*,
+word by word (the branch-skip reduction of the real decoder; the generator is mechanical), so no
+decode fact enters the trust base. Two structural theorems back it: the row projection is injective
+on the decoder's image (only canonical multiply-operand records and widths in {1, 2, 4, 8}; no LDU),
+and decode determinism follows from that injectivity — both machine-checked, neither trusted.
 
 ## 3. The four buses
 

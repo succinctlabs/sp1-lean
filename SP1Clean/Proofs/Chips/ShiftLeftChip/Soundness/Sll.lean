@@ -60,7 +60,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- bound in both the SLLW branch and the channel-requirement tail.
   have a1_bound_cond : input_is_sllw = 1 → (env.get (i₀+1)).val < 2 ^ 16 := by
     intro hsllw1
-    simp only [id_eq] at *
     have hp17 : 131072 < p := by have := Fact.out (p := (2:ℕ)^17 < p); omega
     have h2ne : (2 : ZMod p) ≠ 0 := by
       intro h; have hv := val_2_zmod_p (p := p); rw [h, ZMod.val_zero] at hv; omega
@@ -80,7 +79,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hwidth_hl : (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8 : ZMod p)
         = ((S : ℕ) : ZMod p) := by
       have hi := h_inner; push_cast at hi ⊢; linear_combination hi
-    have hwidth_ll : (16 + -(env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8) : ZMod p)
+    have hwidth_ll : (16 - (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8) : ZMod p)
         = (((16 - S) : ℕ) : ZMod p) := by
       push_cast [Nat.cast_sub (show S ≤ 16 by omega)]; linear_combination -hwidth_hl
     have hneg : -(input_is_sll + input_is_sllw) = -1 := by rw [hgate1]
@@ -108,7 +107,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hlr1 : env.get (i₀+4+6+3+4+4+4+1) = env.get (i₀+4+6+3+4+1) * env.get (i₀+4+6+2) + env.get (i₀+4+6+3+4+4) := by
       linear_combination hreass1
     rw [hsllw1, one_mul] at hw01 hw11
-    rw [← sub_eq_add_neg] at hw01 hw11
     rw [show (2:ℕ)^16 = 65536 from by norm_num]
     exact ShiftLeftCore.sllw_a1_bound (2^S) (2^(16-S))
       (by rw [← pow_add, Nat.add_sub_cancel' (show S ≤ 16 by omega)]; norm_num)
@@ -121,7 +119,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       (env.get i₀).val < 2 ^ 16 ∧ (env.get (i₀+1)).val < 2 ^ 16 ∧
       (env.get (i₀+2)).val < 2 ^ 16 ∧ (env.get (i₀+3)).val < 2 ^ 16 := by
     intro hgate1
-    simp only [id_eq] at *
     have hp17 : 131072 < p := by have := Fact.out (p := (2:ℕ)^17 < p); omega
     have hv01 : env.get (i₀+4+6) = (env.get (i₀+4) + 1) * (env.get (i₀+4+1) * 3 + 1) := by
       linear_combination hv01e
@@ -135,7 +132,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hwidth_hl : (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8 : ZMod p)
         = ((S : ℕ) : ZMod p) := by
       have hi := h_inner; push_cast at hi ⊢; linear_combination hi
-    have hwidth_ll : (16 + -(env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8) : ZMod p)
+    have hwidth_ll : (16 - (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8) : ZMod p)
         = (((16 - S) : ℕ) : ZMod p) := by
       push_cast [Nat.cast_sub (show S ≤ 16 by omega)]; linear_combination -hwidth_hl
     have hneg : -(input_is_sll + input_is_sllw) = -1 := by rw [hgate1]
@@ -205,14 +202,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         · exact Or.inr rfl
         · exact Or.inl rfl
       rw [hsllw1, one_mul] at hw00 hw01 hw10 hw11 hwmsb2 hwmsb3
-      rw [← sub_eq_add_neg] at hw00 hw01 hw11
       have ha2 : env.get (i₀+2) = env.get (i₀+4+6+3+4+4+4+4) * 65535 := by linear_combination -hwmsb2
       have ha3 : env.get (i₀+3) = env.get (i₀+4+6+3+4+4+4+4) * 65535 := by linear_combination -hwmsb3
       exact sllw_a_isU64 (bool_of_mul_pred hcb4b) hs0sel hs1sel hs2sel hs3sel hssum hb0 hb1 hmsbb
         hw00 hw01 hw10 hw11 ha2 ha3
     · -- is_sll = 1 (SLL): a permutation/placement of the four `limb_result` entries.
       rw [hsll1, one_mul] at hp00 hp01 hp02 hp03 hp10 hp11 hp12 hp13 hp20 hp21 hp22 hp23 hp30 hp31 hp32 hp33
-      rw [← sub_eq_add_neg] at hp00 hp01 hp02 hp03 hp11 hp12 hp13 hp22 hp23 hp33
       exact sll_a_isU64 (bool_of_mul_pred hsu0b) (bool_of_mul_pred hsu1b) (bool_of_mul_pred hsu2b)
         hssum hb0 hb1 hb2 hb3 hp00 hp01 hp02 hp03 hp10 hp11 hp12 hp13 hp20 hp21 hp22 hp23
         hp30 hp31 hp32 hp33
@@ -220,10 +215,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · intro hsll
     -- Witnessed columns evaluate into `id (ZMod p)`; normalize to `ZMod p` so the native ring tactics
     -- fire with the standard instance (AGENTS.md `id (ZMod p)` note) and the kernel term stays shallow.
-    simp only [id_eq] at *
     have hgate1 : (input_is_sll + input_is_sllw : ZMod p) = 1 := by
-      have h : (input_is_real + -(input_is_sll + input_is_sllw) : ZMod p) = 0 := hrealeq
-      rw [hreal, ← sub_eq_add_neg] at h
+      have h : (input_is_real - (input_is_sll + input_is_sllw) : ZMod p) = 0 := hrealeq
+      rw [hreal] at h
       exact (sub_eq_zero.mp h).symm
     have hsllw0 : input_is_sllw = 0 := by
       have h : input_is_sll + input_is_sllw = input_is_sll + 0 := by rw [add_zero, hgate1, hsll]
@@ -270,7 +264,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hwidth_hl : (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8 : ZMod p)
         = ((S : ℕ) : ZMod p) := by
       have hi := h_inner; push_cast at hi ⊢; linear_combination hi
-    have hwidth_ll : (16 + -(env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8) : ZMod p)
+    have hwidth_ll : (16 - (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8) : ZMod p)
         = (((16 - S) : ℕ) : ZMod p) := by
       push_cast [Nat.cast_sub (show S ≤ 16 by omega)]; linear_combination -hwidth_hl
     -- Fire and convert the nine byte-range guarantees (gate = 1 on the real `is_sll` row).
@@ -329,7 +323,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hlr3 : env.get (i₀+4+6+3+4+4+4+3) = env.get (i₀+4+6+3+4+3) * env.get (i₀+4+6+2) + env.get (i₀+4+6+3+4+4+2) := by
       linear_combination hreass3
     rw [hsll, one_mul] at hp00 hp01 hp02 hp03 hp10 hp11 hp12 hp13 hp20 hp21 hp22 hp23 hp30 hp31 hp32 hp33
-    rw [← sub_eq_add_neg] at hp00 hp01 hp02 hp03 hp11 hp12 hp13 hp22 hp23 hp33
     -- Selector facts (one-hot, `is_sll`-substituted byte-shift = `cb4 + 2·cb5`).
     have hs0sel : env.get (i₀+4+6+3) * (env.get (i₀+4+4) + env.get (i₀+4+5)*2 - 0) = 0 := by
       rw [hsll] at hsu0sel; linear_combination hsu0sel
@@ -365,7 +358,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     -- except the U16MSB `a1 < 2^16` operand range which is part of the deferred SLLW argument), then the
     -- nine `gate`-gated `byteChannel` pulls' off-gate `Requirements` — vacuous under the binary gate
     -- `is_sll + is_sllw ∈ {0,1}` (`off_gate_vacuous`).
-    simp only [id_eq] at *
     exact ⟨bool_of_mul_pred _hrealbin, Or.inr ⟨a1_bound_cond, bool_of_mul_pred _hE6⟩,
       Or.inr ⟨bool_of_mul_pred _hE2, bool_of_mul_pred _hE2⟩,
       Or.inr ⟨bool_of_mul_pred _hE2, fun hr => by

@@ -86,7 +86,7 @@ def SP1TargetPublicIO.toLegacy {F : Type} (pi : SP1TargetPublicIO F) : SP1Public
 (below `ChipRow`), alongside `RefinesAt`/`RowEffect`/`replayVal`, so the `ChipKind.advance` field can
 reference them. -/
 
-omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
+omit [Fact (2 ^ 24 < p)] in
 private lemma sndPc_eq_rcvPc {sa sb : StateAccess (ZMod p)} (h : sndKey sa = rcvKey sb) :
     sndPcOf sa = rcvPcOf sb := by
   have h3 := congrArg (fun k : LookupKey => k.2.2) h

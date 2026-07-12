@@ -44,9 +44,11 @@ theorem correct_bitwise_native
         = execute_RTYPE_pure (Word.toBitVec64 op_b_val) (Word.toBitVec64 op_c_val) op) :
     (spec_bitwise (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx) op).run s
       = (sp1_bitwise (.Regidx rd_idx) pc a_val).run s := by
-  simp [spec_bitwise, sp1_bitwise, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    PreLeanRV64D.readReg, PreLeanRV64D.writeReg, Sail.run_rX_bits, Sail.run_wX_bits,
-    SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_op]
+  simp only [spec_bitwise, sp1_bitwise]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
+    SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
+  simp [execute_RTYPE_eq_execute_RTYPE', execute_RTYPE', h_rs1, h_rs2, h_op]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail I-type op (ANDI/ORI/XORI). -/
 noncomputable def spec_bitwise_imm (imm : BitVec 12) (rs1 rd : regidx) (op : iop) : SailM Unit := do
@@ -72,8 +74,11 @@ theorem correct_andi_native
   have harm : Word.toBitVec64 (BitwiseU16Operation.resultWord a_val)
       = (Word.toBitVec64 op_b_val) &&& (sign_extend (m := 64) imm) := by
     rw [h_op, ← h_dec]; simp [execute_RTYPE_pure]
-  simp [spec_bitwise_imm, sp1_bitwise, execute_ITYPE, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
-    Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
+  simp only [spec_bitwise_imm, sp1_bitwise]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
+    SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
+  simp [SP1Clean.Advance.execute_ITYPE', SP1Clean.Advance.execute_ITYPE_pure, h_rs1, harm]
 
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 17 < p)] in
@@ -91,8 +96,11 @@ theorem correct_ori_native
   have harm : Word.toBitVec64 (BitwiseU16Operation.resultWord a_val)
       = (Word.toBitVec64 op_b_val) ||| (sign_extend (m := 64) imm) := by
     rw [h_op, ← h_dec]; simp [execute_RTYPE_pure]
-  simp [spec_bitwise_imm, sp1_bitwise, execute_ITYPE, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
-    Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
+  simp only [spec_bitwise_imm, sp1_bitwise]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
+    SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
+  simp [SP1Clean.Advance.execute_ITYPE', SP1Clean.Advance.execute_ITYPE_pure, h_rs1, harm]
 
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 17 < p)] in
@@ -110,8 +118,11 @@ theorem correct_xori_native
   have harm : Word.toBitVec64 (BitwiseU16Operation.resultWord a_val)
       = (Word.toBitVec64 op_b_val) ^^^ (sign_extend (m := 64) imm) := by
     rw [h_op, ← h_dec]; simp [execute_RTYPE_pure]
-  simp [spec_bitwise_imm, sp1_bitwise, execute_ITYPE, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
-    Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
+  simp only [spec_bitwise_imm, sp1_bitwise]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
+    SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
+  simp [SP1Clean.Advance.execute_ITYPE', SP1Clean.Advance.execute_ITYPE_pure, h_rs1, harm]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (AND): a real Bitwise chip row with `is_and = 1` reaches the Sail `AND`. -/

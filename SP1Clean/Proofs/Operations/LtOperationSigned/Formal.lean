@@ -109,6 +109,7 @@ theorem result_semantic {input : Inputs (ZMod p)}
     · rw [hbit.1]
       simp only [hs0, if_neg h01, Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
         List.getElem_cons_zero, List.getElem_cons_succ]
+      rfl
     · rw [toBitVec64_eq_iff hb hcc]
       have key := hbit.2
       simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
@@ -200,7 +201,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb_u64
   obtain ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64 hcc_u64
   obtain ⟨h_msb_b, h_msb_c, h_lt, _, _, hE5, hE7, hE9⟩ := h_holds
-  simp only [id_eq, eb, ec, ef, ecl, vec4_eta, vec2_eta, ← sub_eq_add_neg]
+  simp only [eb, ec, ef, ecl, vec4_eta, vec2_eta]
     at h_msb_b h_msb_c h_lt hE5 hE7 hE9 ⊢
   -- the two `U16MSBOperation` sub-assertion `Assumptions` (16-bit operands, `is_signed` binary).
   have hAb : U16MSBOperation.circuit.Assumptions
@@ -270,7 +271,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       have hcm0 : input_cols_c_msb_msb = 0 := by simpa using h9
       rw [h, hcm0]; simpa using hc3
     · rw [h, one_mul, hcm_eq h]; simpa using (adj_limb hc3).2
-  simp only [id_eq, eb, ec, ef, ecl, vec4_eta, vec2_eta, ← sub_eq_add_neg]
+  simp only [eb, ec, ef, ecl, vec4_eta, vec2_eta]
   refine ⟨⟨⟨fun _ => hb3, his_bin⟩, hbm_bool, hbm_eq⟩,
     ⟨⟨fun _ => hc3, his_bin⟩, hcm_bool, hcm_eq⟩,
     ⟨⟨fun _ => ⟨Word.isU64_of_cases (by simpa using hb0) (by simpa using hb1) (by simpa using hb2)

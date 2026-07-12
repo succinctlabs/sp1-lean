@@ -123,8 +123,7 @@ theorem cpustate_interactions_faithful_syntactic
     Extracted.CPUState.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx,
-    h_ir, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2, h_np0, h_np1, h_np2, h_clk, h6, h3,
-    sub_eq_add_neg]
+    h_ir, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2, h_np0, h_np1, h_np2, h_clk, h6, h3]
   -- both sides are now the same 4 `LookupAccess`es; the reader emits [byte,byte,state,state] and the
   -- oracle [state,state,byte,byte] — a two-block rotation, closed by `List.perm_append_comm`.
   exact List.perm_append_comm (l₁ := [_, _]) (l₂ := [_, _])
@@ -163,6 +162,6 @@ theorem cpustate_byte_interactions_faithful_syntactic
     Extracted.CPUState.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx,
-    h_ir, h_c0, h_c1, h6, h3, sub_eq_add_neg]
+    h_ir, h_c0, h_c1, h6, h3]
 
 end SP1Clean.Faithful

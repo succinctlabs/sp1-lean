@@ -113,7 +113,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have hb2 := h_holds.2.2 hneg
   rw [← c16] at hb1
   refine ⟨(byteRowSpec_range _ h16p).mp hb1, ?_⟩
-  simp only [sub_eq_add_neg]
   exact ((byteRowSpec_u8range_pair _ _).mp hb2).1
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
@@ -132,7 +131,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     obtain ⟨_, hb2⟩ := h_spec hr1
-    simp only [sub_eq_add_neg] at hb2
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hb2, by rw [ZMod.val_zero]; norm_num⟩
 
 /-- The inner timestamp reader as a Clean `FormalAssertion`: takes the chip-owned `cols` block plus

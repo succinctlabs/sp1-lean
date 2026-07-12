@@ -182,13 +182,20 @@ theorem completeness :
   have hbUw : Word.isU64 B := hbU
   obtain ⟨hc0v, -, -, -⟩ := Word.lt_cases_of_isU64 hcU
   obtain ⟨hcba0, hcba1, hcba2, hcba3, hcba4, hcba5⟩ := cBits_asserts c0
+  simp only [← sub_eq_add_neg] at hcba0 hcba1 hcba2 hcba3 hcba4 hcba5
   obtain ⟨hsel0, hsb0, hsel1, hsb1, hsel2, hsb2, hsel3, hsb3, hone⟩ :=
     shiftU16_asserts c0 F hf0 hsum01
+  simp only [← sub_eq_add_neg] at hsb0 hsel1 hsb1 hsel2 hsb2 hsel3 hsb3 hone
   obtain ⟨hva0, hva1, hva2⟩ := v_asserts c0
+  simp only [← sub_eq_add_neg] at hva0 hva1 hva2
   obtain ⟨hsp0, hsp1, hsp2, hsp3⟩ := split_asserts B c0
+  simp only [← sub_eq_add_neg] at hsp0 hsp1 hsp2 hsp3
   obtain ⟨hlra0, hlra1, hlra2, hlra3⟩ := limbResult_asserts B c0
+  simp only [← sub_eq_add_neg] at hlra0 hlra1 hlra2 hlra3
   obtain ⟨hp1, hp2, hp3, hp4, hp5, hp6, hp7, hp8, hp9, hp10, hp11, hp12, hp13, hp14, hp15,
     hp16, hp17, hp18, hp19, hp20, hp21, hp22⟩ := place_asserts B c0 F hf0 hf1 hsum01
+  simp only [← sub_eq_add_neg] at hp1 hp2 hp3 hp4 hp6 hp7 hp8 hp11 hp12 hp16 hp17 hp18 hp20
+  simp only [← sub_eq_add_neg] at hp21 hp22
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   simp only [hA0, hA1, hA2, hA3, hcb0, hcb1, hcb2, hcb3, hcb4, hcb5, hv0, hv1, hv2, hs0, hs1,
     hs2, hs3, hlo0, hlo1, hlo2, hlo3, hhi0, hhi1, hhi2, hhi3, hlr0, hlr1, hlr2, hlr3, hmsbc,
@@ -210,7 +217,7 @@ theorem completeness :
     -- `a`'s `isU64` (populate per-limb range); `Spec = True` (`trivial`).
     ⟨⟨hsum01, ?_⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
-    by rw [hsum]; exact add_neg_cancel (F[0] + F[1]),
+    by rw [hsum]; exact sub_self (F[0] + F[1]),
     by rcases hsum01 with h | h <;> rw [h] <;> simp,
     by rcases hf0 with h | h <;> rw [h] <;> simp,
     by rcases hf1 with h | h <;> rw [h] <;> simp,
@@ -237,14 +244,14 @@ theorem completeness :
         | exact populateA_val_lt B c0 F hbUw 3 (by norm_num)
   -- the nine `gate`-gated byte-range pulls: the populate bounds hold unconditionally
   -- (`convert … using 2` bridges the circuit's ℕ-cast numerals to the lemmas' field numerals)
-  · exact fun _ => by convert byteRow_e32 c0 hc0v using 2
-  · exact fun _ => by convert byteRow_lower B c0 0 (by norm_num) using 2
+  · exact fun _ => by convert byteRow_e32 c0 hc0v using 2; rw [sub_eq_add_neg]; rfl
+  · exact fun _ => by convert byteRow_lower B c0 0 (by norm_num) using 2; rw [sub_eq_add_neg]; rfl
   · exact fun _ => by convert byteRow_higher B c0 hbUw 0 (by norm_num) using 2
-  · exact fun _ => by convert byteRow_lower B c0 1 (by norm_num) using 2
+  · exact fun _ => by convert byteRow_lower B c0 1 (by norm_num) using 2; rw [sub_eq_add_neg]; rfl
   · exact fun _ => by convert byteRow_higher B c0 hbUw 1 (by norm_num) using 2
-  · exact fun _ => by convert byteRow_lower B c0 2 (by norm_num) using 2
+  · exact fun _ => by convert byteRow_lower B c0 2 (by norm_num) using 2; rw [sub_eq_add_neg]; rfl
   · exact fun _ => by convert byteRow_higher B c0 hbUw 2 (by norm_num) using 2
-  · exact fun _ => by convert byteRow_lower B c0 3 (by norm_num) using 2
+  · exact fun _ => by convert byteRow_lower B c0 3 (by norm_num) using 2; rw [sub_eq_add_neg]; rfl
   · exact fun _ => by convert byteRow_higher B c0 hbUw 3 (by norm_num) using 2
 
 /-- The `ShiftLeft` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `sll`/`sllw` semantic contract;

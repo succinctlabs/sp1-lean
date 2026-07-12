@@ -42,10 +42,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg; have R3 := hr3 hneg
   rw [← c16] at R0 R1 R2 R3
   rw [hr1eq, one_mul] at hgc0 hgc1 hgc2 hgc3
-  have c65535 : ∀ x : ZMod p, x + 65536 + -1 = x + 65535 := fun x => by ring
-  simp only [sub_eq_add_neg, c65535] at hgc0 hgc1 hgc2 hgc3
+  have c65535 : ∀ x : ZMod p, x + 65536 - 1 = x + 65535 := fun x => by ring
+  simp only [c65535] at hgc0 hgc1 hgc2 hgc3
   refine subSemantics_of_carries ha hb ?_
-  simp only [RawSpec, Nat.cast_ofNat, sub_eq_add_neg]
+  simp only [RawSpec, Nat.cast_ofNat]
   refine ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2, bool_of_mul_pred hgc3,
     ?_, ?_, ?_, ?_⟩
   · rw [← h65536]; exact (byteRowSpec_range _ h16p).mp R0

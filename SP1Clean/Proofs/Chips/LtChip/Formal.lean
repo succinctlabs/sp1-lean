@@ -129,9 +129,9 @@ private lemma toElements_col0 {x : Extracted.LtOperationSigned (ZMod p)}
     (toElements x)[0]'hi = x.result.u16_compare_operation.bit := by
   simp only [ProvableType.toElements, ProvableStruct.toComponents,
     ProvableStruct.componentsToElements, circuit_norm]
-  rw [Vector.getElem_append_left (by decide), Vector.getElem_cast,
-    Vector.getElem_append_left (by decide), Vector.getElem_cast]
-  rfl
+  refine ((Vector.getElem_append_left ?_).trans
+    ((Vector.getElem_cast ?_).trans
+      ((Vector.getElem_append_left ?_).trans (Vector.getElem_cast ?_)))) <;> decide
 
 /-- The witnessed compare `bit` of `LtOperationSigned.populate` (the `U16CompareOperation` strict-less-than
 indicator on a real row) is binary. -/
@@ -178,7 +178,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       · exfalso
         rw [h1, hsltu] at h_sum
         have h20 : (2 : ZMod p) = 0 := by
-          have e : (2 : ZMod p) = (1 + 1) * (1 + 1 + -1) := by ring
+          have e : (2 : ZMod p) = (1 + 1) * (1 + 1 - 1) := by ring
           rw [e]; exact h_sum
         have hp := Fact.out (p := 2 ^ 17 < p)
         have h2 : ((2 : ℕ) : ZMod p) ≠ 0 := by
@@ -203,7 +203,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
                 (bool_of_eq_ite (LtOperationSigned.result_semantic ha hb hr
                   (h_lt ⟨ha, hb, h_bin, h_slt_bool⟩)).1)⟩
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 32000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -218,9 +218,16 @@ theorem completeness :
   have hf1' : env.get (i₀ + 1) = 0 ∨ env.get (i₀ + 1) = 1 := by rw [hflag1]; exact hf1
   have hsum01' : env.get i₀ + env.get (i₀ + 1) = 0 ∨ env.get i₀ + env.get (i₀ + 1) = 1 := by
     rw [hflag0, hflag1, ← hsum]; exact hbin
-  have hbool : ∀ x : ZMod p, x = 0 ∨ x = 1 → x * (x + -1) = 0 := by
+  have hbool : ∀ x : ZMod p, x = 0 ∨ x = 1 → x * (x - 1) = 0 := by
     rintro x (h | h) <;> rw [h] <;> simp
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
+  -- Hoisted above the goal-splitting `refine` (both the `spec_populate` branch and the register-write
+  -- `isU64` branch are *siblings* of that `refine`, not sub-goals of each other, so any `have` defined
+  -- after the split is only visible in the one branch it was stated under).
+  have hpvb : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value
+      = input_adapter_op_b_memory_prev_value := h_input.2.2.2.2.2.2.1.1
+  have hpvc : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c
+      = input_adapter_op_c := h_input.2.2.2.2.2.2.2.1
   refine ⟨⟨hbin, h_cpu, h_st⟩,
     ⟨⟨ha, hb, hbin, hf0'⟩, ?_⟩,
     ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
@@ -236,11 +243,6 @@ theorem completeness :
   -- The composed `LtOperationSigned` `FormalAssertion`'s `Spec` at the witnessed `populate`d columns:
   -- `spec_populate` once the witnessed column struct equals `populate …` (each cell is `env.get (i₀+2+k)`,
   -- pinned by the normalised witness hint to `(toElements (populate …))[k]`).
-  have hpvb : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value
-      = input_adapter_op_b_memory_prev_value := h_input.2.2.2.2.2.2.1.1
-  have hpvc : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c
-      = input_adapter_op_c := h_input.2.2.2.2.2.2.2.1
-  simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval, hpvb, hpvc] at h_env_cols
   have hgate : (input_is_real - 1) * env.get i₀ = 0 := by
     rw [hflag0]
     rcases hf0 with h | h
@@ -251,17 +253,46 @@ theorem completeness :
     (cc := input_adapter_op_c) (is_signed := env.get i₀) (is_real := input_is_real)
     ha hb hf0' hbin hgate using 2
   refine (ProvableType.ext_iff _ _).mpr (fun i hi => ?_)
+  -- Ascribe `h_env_cols`'s IR-native RHS into the plain `toElements (populate …)` form via a *definitional*
+  -- `have` (the `.native` eval-match + beta is the CHEAP reduction; the expensive path is the eager
+  -- `Eq.trans` isDefEq against `toElements (populate …)` with FOLDED operands, whose `combinedSize'` tower
+  -- + the *propositional* `map eval ≡ op_prev` gap blow past 32M heartbeats in Clean 4.30). Then
+  -- `vec4_eval`/`hpvb`/`hpvc`/`h_input.1` fold the operands so the composite RHS matches the goal RHS.
+  have hc : env.get (i₀ + 2 + i)
+      = (toElements (LtOperationSigned.populate
+          #v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
+             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
+             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
+             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]]
+          #v[Expression.eval env.toEnvironment input_var_adapter_op_c[0],
+             Expression.eval env.toEnvironment input_var_adapter_op_c[1],
+             Expression.eval env.toEnvironment input_var_adapter_op_c[2],
+             Expression.eval env.toEnvironment input_var_adapter_op_c[3]]
+          (env.get i₀) (Expression.eval env.toEnvironment input_var_is_real)))[i]'hi := h_env_cols ⟨i, hi⟩
+  rw [vec4_eval, vec4_eval, hpvb, hpvc, h_input.1] at hc
   refine Eq.trans ?_
-    ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 2) i hi).trans (h_env_cols ⟨i, hi⟩))
-  simp [circuit_norm]
+    ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 2) i hi).trans hc)
+  simp only [circuit_norm]; rfl
   -- RegisterWrite's `isU64 #v[bit, 0, 0, 0]` (the op_a write push): the upper three limbs are literal
-  -- `0`; the witnessed compare `bit` `env`-evaluates (via `h_env_cols`) to the `populate`d column 0,
-  -- i.e. `U16CompareOperation.populate_bit …`, which is binary by `populate_bit_bool`.
+  -- `0`; the witnessed compare `bit` `env`-evaluates (via the same ascription trick, index `0`) to the
+  -- `populate`d column 0, i.e. `U16CompareOperation.populate_bit …`, which is binary by `populate_bit_bool`.
+  simp [circuit_norm]
   intro hr
-  have h0 := h_env_cols 0
-  simp only [Fin.val_zero, Nat.add_zero] at h0
+  have hc0 : env.get (i₀ + 2)
+      = (toElements (LtOperationSigned.populate
+          #v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
+             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
+             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
+             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]]
+          #v[Expression.eval env.toEnvironment input_var_adapter_op_c[0],
+             Expression.eval env.toEnvironment input_var_adapter_op_c[1],
+             Expression.eval env.toEnvironment input_var_adapter_op_c[2],
+             Expression.eval env.toEnvironment input_var_adapter_op_c[3]]
+          (env.get i₀) (Expression.eval env.toEnvironment input_var_is_real)))[0]'(by
+            have : size Extracted.LtOperationSigned = 10 := rfl; omega) := h_env_cols 0
+  rw [vec4_eval, vec4_eval, hpvb, hpvc, h_input.1] at hc0
   refine isU64_bitWord ?_
-  rw [h0]
+  rw [hc0]
   exact witness_bit_bool hr _
 
 /-- The unified `Lt` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `slt`/`sltu` semantic contract,

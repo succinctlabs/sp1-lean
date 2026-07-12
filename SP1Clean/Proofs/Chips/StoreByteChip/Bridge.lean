@@ -95,7 +95,7 @@ theorem correct_store_byte_native
   rw [EStateM.run_bind, run_readReg_of_isInitialized _ _ hs, hpc_get]
   simp only [EStateM.run_bind, run_writeReg]
   rw [show ({ s with regs := s.regs.insert Register.nextPC (pc + 4#64) } : SailState) = sp from rfl]
-  simp [execute_STORE, hse, LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert,
+  simp [execute_STORE, hse, LeanRV64D.Functions.xlen_bytes, PreSail.assert,
     hsp_rs2, hwrite]
 
 omit [Fact (2 ^ 17 < p)] in

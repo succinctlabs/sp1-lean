@@ -55,10 +55,12 @@ theorem correct_addw_native
       (BitVec.setWidth 32 (Word.toBitVec64 op_b_val + Word.toBitVec64 op_c_val)).signExtend 64) :
     (spec_addw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_addw (.Regidx rd_idx) pc a_val).run s := by
-  simp [spec_addw, sp1_addw, execute_RTYPEW_eq_execute_RTYPEW', execute_RTYPEW',
-    addw_pure_eq, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
-    Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
-    h_pc, h_rs1, h_rs2, h_addw]
+  simp only [spec_addw, sp1_addw]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by
+    rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
+    SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
+  simp [execute_RTYPEW_eq_execute_RTYPEW', execute_RTYPEW', addw_pure_eq, h_rs1, h_rs2, h_addw]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end: from the ADDW chip's verified `Spec` (gated-arith conjunct `.2.2`) plus the
@@ -106,8 +108,12 @@ theorem correct_addiw_native
     rw [h_addw, ← h_dec]
     simp only [sign_extend, Sail.BitVec.signExtend]
     congr 1
-  simp [spec_addiw, sp1_addw, execute_ADDIW, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
-    Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
+  simp only [spec_addiw, sp1_addw]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by
+    rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
+    SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
+  simp [execute_ADDIW, h_rs1, harm]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (ADDIW): from the ADDW chip's verified `Spec` plus the rs1/PC reads and the immediate decode

@@ -72,10 +72,12 @@ theorem correct_sltu_native
         = RV64.sltu (Word.toBitVec64 op_c_val) (Word.toBitVec64 op_b_val)) :
     (spec_sltu (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_lt (.Regidx rd_idx) pc a_val).run s := by
-  simp [spec_sltu, sp1_lt, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    execute_RTYPE_pure_sltu, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
-    Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
-    h_pc, h_rs1, h_rs2, h_sltu]
+  simp only [spec_sltu, sp1_lt]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
+    SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
+  simp [execute_RTYPE_eq_execute_RTYPE', execute_RTYPE', execute_RTYPE_pure_sltu,
+    h_rs1, h_rs2, h_sltu]
 
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 17 < p)] in
@@ -91,10 +93,12 @@ theorem correct_slt_native
         = RV64.slt (Word.toBitVec64 op_c_val) (Word.toBitVec64 op_b_val)) :
     (spec_slt (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_lt (.Regidx rd_idx) pc a_val).run s := by
-  simp [spec_slt, sp1_lt, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    execute_RTYPE_pure_slt, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
-    Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
-    h_pc, h_rs1, h_rs2, h_slt]
+  simp only [spec_slt, sp1_lt]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
+    SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
+  simp [execute_RTYPE_eq_execute_RTYPE', execute_RTYPE', execute_RTYPE_pure_slt,
+    h_rs1, h_rs2, h_slt]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `SLTI` (I-type signed
 less-than-immediate). -/
@@ -129,8 +133,11 @@ theorem correct_slti_native
       = zero_extend (m := 64) (bool_to_bit (zopz0zI_s (Word.toBitVec64 op_b_val)
           (sign_extend (m := 64) imm))) := by
     rw [h_slt, ← h_dec, ← execute_RTYPE_pure_slt]; simp [execute_RTYPE_pure]
-  simp [spec_slti, sp1_lt, execute_ITYPE, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
-    Sail.run_rX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
+  simp only [spec_slti, sp1_lt]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
+    SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
+  simp [SP1Clean.Advance.execute_ITYPE', SP1Clean.Advance.execute_ITYPE_pure, h_rs1, harm]
 
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 17 < p)] in
@@ -150,8 +157,11 @@ theorem correct_sltiu_native
       = zero_extend (m := 64) (bool_to_bit (zopz0zI_u (Word.toBitVec64 op_b_val)
           (sign_extend (m := 64) imm))) := by
     rw [h_sltu, ← h_dec, ← execute_RTYPE_pure_sltu]; simp [execute_RTYPE_pure]
-  simp [spec_sltiu, sp1_lt, execute_ITYPE, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
-    Sail.run_rX_bits, SailState.get_reg?_insert_nextPC, h_pc, h_rs1, harm]
+  simp only [spec_sltiu, sp1_lt]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
+    SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
+  simp [SP1Clean.Advance.execute_ITYPE', SP1Clean.Advance.execute_ITYPE_pure, h_rs1, harm]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end: a real `Lt` chip row reaches the RISC-V Sail set-less-than, flag-dispatched.

@@ -52,15 +52,18 @@ The SP1 Rust source (the extraction/spec oracle, read-only reference) lives in a
   finish or kill it** (`pkill -f "lake build"` / `pkill -f "lake env lean"`). Cap at **2–3 builds at once**.
   A `run_in_background` build can outlive its shell — check with `ps -ef | grep -E "lake|lean" | grep -v lsp`
   before spawning another. The lean LSP server (`uvx lean-lsp-mcp`) also keeps several GB warm.
-- **Toolchain (pinned, do not bump):** `lean-toolchain` = `leanprover/lean4:v4.28.0`; mathlib `v4.28.0`;
-  Clean pinned to merged `main` (`2c20f7f0`, the #398 merge commit — the native gated-channel API; see
-  `lakefile.toml`, roadmap W9, and `docs/agents/clean-main-migration.md`). Bump with the **scoped**
-  `lake update Clean` (NEVER bare `lake update` — it jumps to the max dep toolchain → 4.29). Sail comes from two `github.com/succinctlabs/*` deps
-  pinned to the `dtumad/clean-native` branch — `LeanRV64D` (`sail-riscv-lean`, the generated RV64 model) and
-  `RISCV` (`riscv-lean`, the lightweight ISA fns) — which transitively pull the `rems-project/lean-sail @ v4`
-  runtime; each carries a 4.28 `lean-toolchain`. All deps are fetched by `lake build`; nothing is a local
-  sibling checkout. **Do not run `lake update`** — it bumps the project to the **max** dep toolchain, which
-  is what would push it to 4.29. See `docs/agents/lean-sail-notes.md` before touching deps.
+- **Toolchain (pinned — migrated to 4.30 on 2026-07-11):** `lean-toolchain` = `leanprover/lean4:v4.30.0`;
+  mathlib `v4.30.0`; Clean pinned to `main` @ 4.30 (the #370 toolchain bump + #425 `elaborate_circuit`
+  reduction). **The SP1Clean-side 4.30 delta was small** (`[Field F]` → `[FiniteField F]` binder
+  strengthening in the 3 field-generic files; the `x + -1*y → x - y` `circuit_norm` normal-form flip; the
+  `Witgen.WitgenIR` witness-closure→VExpr rename `witnessVector`→`witnessVectorNative`; stricter `omit`
+  (can't omit a *referenced* section var); a `whnf`-timeout regression in the DivRem soundness proofs — see
+  `docs/proposals/consolidation-progress.md`). **Deps are currently LOCAL PATH deps** for the migration
+  (`../clean` 4.30, `../sail-riscv-lean` @ `793034f3` + the SP1 platform delta, `../riscv-lean` 4.30) — the
+  Sail generation advanced to `793034f3`, which added **pointer masking (PMM)**, so `isValidMemConfig` gained
+  `h_mseccfg_pmm` (PMM disabled; a new bridge-level platform assumption — see `lean-sail-notes.md`). Before
+  the PR these local path deps get restored to proper git deps at 4.30. **Do not run bare `lake update`**
+  (it bumps to the max dep toolchain). See `docs/agents/lean-sail-notes.md` before touching deps.
 - Lake options already set in `lakefile.toml`: `--tstack=400000`, `synthInstance.maxHeartbeats = 1000000`.
 - There are no unit tests; correctness lives in the soundness/completeness theorems and the
   `correct_<op>_native` bridges. "Test" = it elaborates and is axiom-clean.

@@ -44,7 +44,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (AddCols) (ZMod p
   -- GFC `CoeFun`, discarding its `unit` output. Its State pull now receives `StateTruth`.
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let value ← witnessVector 4 (fun env =>
+  let value ← witnessVectorNative 4 (fun env =>
     AddOperation.populate
       #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
       #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]])

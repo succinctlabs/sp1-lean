@@ -78,12 +78,12 @@ and assemble the extracted `LtCols` struct. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let flags ← witnessVector 2 (fun env => hintFlags env.hint)
+  let flags ← witnessVectorNative 2 (fun env => hintFlags env.hint)
   let is_slt := flags[0]; let is_sltu := flags[1]
   -- The chip witnesses the `LtOperationSigned` column struct (the unsigned compare block + the two
   -- sign-bit columns) via `populate`, then composes `LtOperationSigned.circuit` as a Clean `assertion`
   -- (it is a `FormalAssertion`, witnessing nothing of its own; `is_signed := is_slt`).
-  let lt_cols ← ProvableType.witness (fun env =>
+  let lt_cols ← witnessNative (var := Var Extracted.LtOperationSigned) (fun env =>
     LtOperationSigned.populate
       #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
       #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]

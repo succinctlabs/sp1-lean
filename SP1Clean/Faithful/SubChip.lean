@@ -108,9 +108,10 @@ theorem subcols_state_interactions_faithful_syntactic
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env (-g))) :=
     fun g s => toAccess_pullIf_state env g s
   simp only [VmChannel.pushedIf, VmChannel.pulledIf] at hsk hsk_pull
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) stateChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) stateChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   -- descend the chip into its three sub-readers; the `Add`/`RTypeReader` byte/mem/program emits drop under
   -- the `State` filter (channel distinctness), leaving CPUState's two State interactions.
   simp only [SubChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
@@ -152,9 +153,10 @@ theorem subcols_program_interactions_faithful_syntactic
           (fun a => a.1 = InteractionKind.Program)).map LookupAccessList.negMult := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) programChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) programChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   -- SC Phase 2a: `programChannel` is a `VmChannel` — `circuit_norm` recovers the program pull in the raw
   -- `VmChannelInteraction` form, so unfold the kernel's `pulledIf` to match it (cf. `StateConsistency`).
   have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
@@ -228,9 +230,10 @@ theorem subcols_memory_interactions_faithful_syntactic
           (fun a => a.1 = InteractionKind.Memory)) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) memoryChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) memoryChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [SubChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
     Readers.RTypeReader.circuit, Readers.RTypeReader.main,
     Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -303,9 +306,10 @@ theorem subcols_byte_interactions_faithful_syntactic
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
     fun g s => toAccess_pullIf_byte env g s
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [SubChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
     Readers.RTypeReader.circuit, Readers.RTypeReader.main,
     Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -319,7 +323,7 @@ theorem subcols_byte_interactions_faithful_syntactic
     Extracted.Interaction.toAccess_byte, Extracted.Interaction.toAccess, Extracted.Dir.sign,
     ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx, ZMod.val_zero,
     h_ir, h_c0, h_c1, h_wv0, h_wv1, h_wv2, h_wv3,
-    h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c, h6, h3, sub_eq_add_neg]
+    h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c, h6, h3]
   -- circuit `[CPUState 2] ++ [Add 4] ++ [RTypeReader 6]` vs oracle `[Add 4] ++ [CPUState 2] ++ [RT 6]`:
   -- swap the first two blocks (the `RTypeReader 6` tail is shared).
   exact (List.perm_append_comm (l₁ := [_, _]) (l₂ := [_, _, _, _])).append_right [_, _, _, _, _, _]

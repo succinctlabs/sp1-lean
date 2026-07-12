@@ -21,6 +21,14 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
+-- Keep the `IsZeroWord`/`IsEqualWord` sub-op cols (`eqb/eqc/eqb2/eqc2/isc0`, the only ones `main`
+-- passes as explicit `fromElements`) FOLDED through the goal simp, mirroring
+-- `Completeness/Driver.lean`'s identical attribute: `eval_fromElements` rewrites
+-- `eval (fromElements w)` → `fromElements (w.map env)` (flat) BEFORE `eval_eq_eval`
+-- (`@[circuit_norm ↓ high]`) decomposes it into the intractable nested record. Needed here too since
+-- `hsem := IsZeroWordOperation.result_semantic (h_isc0 …) …`'s LHS is the same `fromElements`-wired
+-- `input.cols.result`.
+attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements
 
 set_option maxHeartbeats 128000000 in
 set_option linter.unusedSimpArgs false in
@@ -78,13 +86,25 @@ lemma requirements_holds :
       linear_combination -e367
     have hms6 := h_msb6 ⟨fun he2g => isU16_of_byteRowSpec (hb_e2q1 (by linear_combination -he2g)), he2⟩
     have hms5 := h_msb5 ⟨fun he2g => isU16_of_byteRowSpec (hb_e2r1 (by linear_combination -he2g)), he2⟩
-    have hquotmsb := hms6.1
-    have hremmsb := hms5.1
+    -- Bridge the `U16MSBOperation.Spec`-derived `msb` booleanness from its unreduced
+    -- `Expression.eval env <Var Inputs>`-nested form into the plain `env.get` form via a
+    -- *definitional* `have` (cheap `.native` eval-match defeq, standalone — not the expensive
+    -- `combinedSize'` isDefEq that would otherwise be triggered lazily inside the
+    -- `comp_limb_isU16` application below; see the BitwiseChip precedent).
+    have hquotmsb : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1
+          + 4 + 4 + 1 + 1 + 1) = 0
+        ∨ env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1
+          + 4 + 4 + 1 + 1 + 1) = 1 := hms6.1
+    have hremmsb : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1
+          + 4 + 4 + 1 + 1) = 0
+        ∨ env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1
+          + 4 + 4 + 1 + 1) = 1 := hms5.1
     have hqcU : input_is_real = 1 → Word.isU64 (Vector.map (Expression.eval env)
         (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }) : Word (ZMod p)) := by
       intro hr
       have hrneg' : - input_is_real = -1 := by rw [hr]
       simp only [circuit_norm] at e48 e49 e51 e54 e59 e61 e64 e69
+      rw [sub_eq_add_neg] at e54 e64 e59 e69
       apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
       · rw [show env.get (i₀ + 8) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1+4)
             from by linear_combination e48]
@@ -101,6 +121,7 @@ lemma requirements_holds :
       intro hr
       have hrneg' : - input_is_real = -1 := by rw [hr]
       simp only [circuit_norm] at e70 e71 e73 e76 e81 e83 e86 e91
+      rw [sub_eq_add_neg] at e76 e86 e81 e91
       apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
       · rw [show env.get (B + 7+8+8+11+11+11+4+4)
             = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1) from by linear_combination e70]
@@ -163,7 +184,7 @@ lemma requirements_holds :
       simp only [Vector.getElem_mapRange, circuit_norm] at h299 h300 h301 h302
       by_cases hcz : cop[0] = 0 ∧ cop[1] = 0 ∧ cop[2] = 0
           ∧ cop[3] = 0
-      · rw [if_pos hcz] at hsem; dsimp only at hsem; rw [field_fromElements_one] at hsem
+      · rw [if_pos hcz] at hsem; rw [iszeroword_result_proj] at hsem
         simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
           Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
         rw [hsem] at h299 h300 h301 h302
@@ -174,7 +195,7 @@ lemma requirements_holds :
         · rw [show env.get (B + 7+8+8+11+11+11+4+4+4 + 1) = 0 from by linear_combination h300]; simp
         · rw [show env.get (B + 7+8+8+11+11+11+4+4+4 + 2) = 0 from by linear_combination h301]; simp
         · rw [show env.get (B + 7+8+8+11+11+11+4+4+4 + 3) = 0 from by linear_combination h302]; simp
-      · rw [if_neg hcz] at hsem; dsimp only at hsem; rw [field_fromElements_one] at hsem
+      · rw [if_neg hcz] at hsem; rw [iszeroword_result_proj] at hsem
         simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
           Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
         rw [hsem] at h299 h300 h301 h302
@@ -270,7 +291,7 @@ lemma requirements_holds :
       · have h286 := e286; simp only [circuit_norm] at h286
         have hr : input_is_real = 1 := by
           rcases hbin with h | h
-          · exfalso; rw [h_oir, h, mul_zero, neg_zero, add_zero] at h286
+          · exfalso; rw [h_oir, h, mul_zero, sub_zero] at h286
             exact zero_ne_one (h286.symm.trans hace)
           · exact h
         exact ⟨hcU_op, habscU hr⟩
@@ -280,7 +301,7 @@ lemma requirements_holds :
       · have h288 := e288; simp only [circuit_norm] at h288
         have hr : input_is_real = 1 := by
           rcases hbin with h | h
-          · exfalso; rw [h_oir, h, mul_zero, neg_zero, add_zero] at h288
+          · exfalso; rw [h_oir, h, mul_zero, sub_zero] at h288
             exact zero_ne_one (h288.symm.trans hrae)
           · exact h
         exact ⟨hrcU hr, habsrU hr⟩
@@ -305,12 +326,12 @@ lemma requirements_holds :
           by_cases hcz : cop[0] = 0 ∧ cop[1] = 0 ∧ cop[2] = 0
               ∧ cop[3] = 0
           · left
-            rw [if_pos hcz] at hsem; dsimp only at hsem; rw [field_fromElements_one] at hsem
+            rw [if_pos hcz] at hsem; rw [iszeroword_result_proj] at hsem
             simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
               Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
             rw [h, hsem] at h305; linear_combination -h305
           · right
-            rw [if_neg hcz] at hsem; dsimp only at hsem; rw [field_fromElements_one] at hsem
+            rw [if_neg hcz] at hsem; rw [iszeroword_result_proj] at hsem
             simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
               Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
             rw [h, hsem] at h305; linear_combination -h305

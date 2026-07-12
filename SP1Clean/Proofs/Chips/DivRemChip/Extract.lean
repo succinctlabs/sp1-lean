@@ -46,7 +46,10 @@ lemma field_fromElements_one {F : Type} (v : Vector F 1) :
 set_option maxHeartbeats 4000000 in
 lemma iszeroword_result_proj {F : Type} (W : Vector F 11) :
     (fromElements W : Extracted.IsZeroWordOperation F).result = W[10] := by
-  simp only [ProvableType.fromStruct, ProvableStruct.componentsFromElements, circuit_norm]
+  -- 4.30: `ProvableType.fromStruct` is an *instance* that `simp` no longer unfolds; unfold the
+  -- `fromElements` projection + the instance explicitly to expose the `field`-`fromElements` slice.
+  unfold ProvableType.fromElements ProvableType.fromStruct
+  simp only [ProvableStruct.componentsFromElements, circuit_norm]
   rw [field_fromElements_one]
   simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop, Nat.reduceAdd]
 

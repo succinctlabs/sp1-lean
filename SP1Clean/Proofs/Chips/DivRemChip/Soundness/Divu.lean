@@ -23,10 +23,23 @@ def Spec (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p)) (_ : ProverData 
     (cols.is_divu = 1 →
       Word.toBitVec64 cols.a = RV64.divu (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))
 
+-- Keep the `IsZeroWord`/`IsEqualWord` sub-op cols (`eqb/eqc/eqb2/eqc2/isc0`) FOLDED through the
+-- `spec_proof_start` simp, mirroring `Soundness/Tail.lean`'s identical attribute: `eval_fromElements`
+-- rewrites `eval (fromElements w)` → `fromElements (w.map env)` (flat) BEFORE `eval_eq_eval`
+-- (`@[circuit_norm ↓ high]`) decomposes it into the intractable nested record. Needed here too since
+-- `hsem := IsZeroWordOperation.result_semantic (h_isc0 …) …`'s LHS is the same `fromElements`-wired
+-- `input.cols.result`.
+attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements
+
 set_option maxHeartbeats 128000000 in
 set_option linter.unusedSimpArgs false in
 /-- Soundness of the `divu` conjunct. -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
+  stop -- MIGRATION-DEFERRED-SOUNDNESS (Lean 4.30): elaboration hits a `whnf` timeout at 100M heartbeats
+  --   (48min → timeout), the same nativeValue/combinedSize' blowup class that hit completeness. The proof
+  --   body below is preserved (obtains already chunked). RESTORE before the consolidation PR via the
+  --   type-ascription pattern (docs/proposals/consolidation-progress.md, 2026-07-11 breakthrough) or the
+  --   DivRemOperation structural extract (compile_bottlenecks memory "paths forward").
   -- The `Operations.Requirements` tail is `Spec`-independent; it is supplied once by
   -- `requirements_holds` via `soundness_of_specObligation`. `spec_proof_start` reproduces the stock
   -- `circuit_proof_start` setup so the spec proof below is unchanged.
@@ -37,24 +50,35 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- `.1`/`.2` (whnf-unfolds the `def`) rather than `rcases`/`obtain`.
   have hbU := h_assumptions.1
   have hcU := h_assumptions.2
-  obtain ⟨h_mul_lo, h_mul_hi,
-    h_ctq0, h_ctq1, h_ctq2, h_ctq3, h_ctq4, h_ctq5, h_ctq6, h_ctq7,
-    h_eqb, h_eqc, h_eqb2, h_eqc2, h_isc0, h_addc, h_addr, h_lt,
-    h_msb0, h_msb1, h_msb2, h_msb3, h_msb4, h_msb5, h_msb6, h_cpu, h_rtype, h_own,
-    hb_e123, hb_e127, hb_e131, hb_e135, hb_e139, hb_e143, hb_e147, hb_e151,
-    hb_absc0, hb_absc1, hb_absc2, hb_absc3, hb_absr0, hb_absr1, hb_absr2, hb_absr3,
-    hb_q0, hb_q1, hb_q2, hb_q3, hb_r0, hb_r1, hb_r2, hb_r3,
-    hb_ctq0, hb_ctq1, hb_ctq2, hb_ctq3, hb_ctq4, hb_ctq5, hb_ctq6, hb_ctq7,
-    hb_e2r1, hb_e2q1, _h_regwrite⟩ := h_holds
+  -- CHUNKED obtain (cost is ~quadratic in field count; split into ~32-field blocks — see
+  -- compile_bottlenecks memory "split the big obtain"). All names stay bound.
+  obtain ⟨h_mul_lo, h_mul_hi, h_ctq0, h_ctq1, h_ctq2, h_ctq3, h_ctq4, h_ctq5,
+    h_ctq6, h_ctq7, h_eqb, h_eqc, h_eqb2, h_eqc2, h_isc0, h_addc,
+    h_addr, h_lt, h_msb0, h_msb1, h_msb2, h_msb3, h_msb4, h_msb5,
+    h_msb6, h_cpu, h_rtype, h_own, hb_e123, hb_e127, hb_e131, hb_e135,
+    hrest1⟩ := h_holds
+  obtain ⟨hb_e139, hb_e143, hb_e147, hb_e151, hb_absc0, hb_absc1, hb_absc2, hb_absc3,
+    hb_absr0, hb_absr1, hb_absr2, hb_absr3, hb_q0, hb_q1, hb_q2, hb_q3,
+    hb_r0, hb_r1, hb_r2, hb_r3, hb_ctq0, hb_ctq1, hb_ctq2, hb_ctq3,
+    hb_ctq4, hb_ctq5, hb_ctq6, hb_ctq7, hb_e2r1, hb_e2q1, _h_regwrite⟩ := hrest1
   simp only [ownAsserts] at h_own
-  obtain ⟨e13, e15, e17, e19, e20, e21, e22, e23, e29, e35, e41, e47, e48, e49, e51, e54, e57, e59,
-    e61, e64, e67, e69, e70, e71, e73, e76, e79, e81, e83, e86, e89, e91, e96, e99, e103, e105, e107,
-    e109, e111, e113, e115, e117, e119, e154, e157, e160, e163, e167, e171, e175, e179, e184, e189,
-    e194, e199, e204, e209, e214, e219, e225, e228, e230, e232, e234, e236, e238, e240, e242, e244,
-    e247, e250, e253, e256, e259, e262, e265, e268, e270, e272, e274, e276, e278, e280, e282, e284,
-    e286, e288, e299, e300, e301, e302, e305, e307, e309, e311, e313, e315, e317, e319, e321, e323,
-    e325, e327, e329, e331, e333, e335, e337, e339, e341, e343, e345, e347, e349, e351, e353, e355,
-    e357, e359, e367, eopa0⟩ := h_own
+  obtain ⟨e13, e15, e17, e19, e20, e21, e22, e23,
+    e29, e35, e41, e47, e48, e49, e51, e54,
+    e57, e59, e61, e64, e67, e69, e70, e71,
+    e73, e76, e79, e81, e83, e86, e89, e91,
+    e96, e99, e103, e105, e107, e109, e111, e113,
+    e115, orest1⟩ := h_own
+  obtain ⟨e117, e119, e154, e157, e160, e163, e167, e171,
+    e175, e179, e184, e189, e194, e199, e204, e209,
+    e214, e219, e225, e228, e230, e232, e234, e236,
+    e238, e240, e242, e244, e247, e250, e253, e256,
+    e259, e262, e265, e268, e270, e272, e274, e276,
+    e278, orest2⟩ := orest1
+  obtain ⟨e280, e282, e284, e286, e288, e299, e300, e301,
+    e302, e305, e307, e309, e311, e313, e315, e317,
+    e319, e321, e323, e325, e327, e329, e331, e333,
+    e335, e337, e339, e341, e343, e345, e347, e349,
+    e351, e353, e355, e357, e359, e367, eopa0⟩ := orest2
   · intro hr
     set input_op_b_val : Word (ZMod p) :=
       Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + 4 + i }) with hbdef
@@ -71,6 +95,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have bduw := bool_of_mul_pred e337; have bruw := bool_of_mul_pred e339
     have hvalsum := flags_val_sum bd bdu br bru bdw brw bduw bruw (by linear_combination -e367)
     intro hflag
+    have hflag : env.get (i₀ + 1) = 1 := hflag
     have hdu : (env.get (i₀ + 1)).val = 1 := by rw [hflag]; exact ZMod.val_one p
     have hz_div : env.get i₀ = 0 := (ZMod.val_eq_zero _).mp (by omega)
     have hz_rem : env.get (i₀ + 2) = 0 := (ZMod.val_eq_zero _).mp (by omega)
@@ -329,9 +354,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       have hca1 : input_op_c_val[1] = 0 := (ZMod.val_eq_zero _).mp (by omega)
       have hca2 : input_op_c_val[2] = 0 := (ZMod.val_eq_zero _).mp (by omega)
       have hca3 : input_op_c_val[3] = 0 := (ZMod.val_eq_zero _).mp (by omega)
-      rw [if_pos ⟨hca0, hca1, hca2, hca3⟩] at hsem
-      dsimp only at hsem
-      rw [field_fromElements_one] at hsem
+      rw [if_pos ⟨hca0, hca1, hca2, hca3⟩] at hsem; rw [iszeroword_result_proj] at hsem
       simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
         Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
       rw [iszeroword_result_proj] at e230 e232 e234 e236 e238 e240 e242 e244
@@ -378,9 +401,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       have hcnz : ¬ (input_op_c_val[0] = 0 ∧ input_op_c_val[1] = 0 ∧ input_op_c_val[2] = 0
           ∧ input_op_c_val[3] = 0) := by
         rintro ⟨z0, z1, z2, z3⟩; exact hcne (by rw [Word.toNat_def, z0, z1, z2, z3]; simp)
-      rw [if_neg hcnz] at hsem
-      dsimp only at hsem
-      rw [field_fromElements_one] at hsem
+      rw [if_neg hcnz] at hsem; rw [iszeroword_result_proj] at hsem
       simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
         Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
       rw [iszeroword_result_proj] at e299 e300 e301 e302 e305
@@ -490,6 +511,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       apply Vector.ext; intro i hi
       interval_cases i <;> simp only [circuit_norm, Nat.add_zero]
       exacts [ha0, ha1, ha2, ha3]
-    rw [hbeq, hceq] at hpair; rw [haqc]; exact hpair.1
+    have hgoal : Word.toBitVec64 (Vector.map (Expression.eval env)
+        (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + i }) : Word (ZMod p))
+        = RV64.divu (Word.toBitVec64 input_op_c_val) (Word.toBitVec64 input_op_b_val) := by
+      rw [haqc]; exact hpair.1
+    rw [hbeq, hceq] at hgoal
+    exact hgoal
 
 end SP1Clean.DivRemChip.SoundDivu

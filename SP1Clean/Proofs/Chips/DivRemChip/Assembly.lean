@@ -63,7 +63,6 @@ lemma assemble_signed_normal {b c quotient remc : Word (ZMod p)}
     remc.toBitVec64 = RV64.rem c.toBitVec64 b.toBitVec64 :=
   div_rem_of_identity hc0 (by rw [hid]; ring) hlt hsgn_pos hsgn_neg
 
-omit [Fact p.Prime] in
 /-- **Unsigned word family core (`DIVUW`/`REMUW`).** The 64-bit Euclidean identity over the (zero-high)
 operand/comp columns is exactly the 32-bit identity (`extractLsb_toNat_of_hi_zero` on all four words),
 so it feeds `Math.divuw_remuw_of_identity`. The conclusion is on the sign-extension of the comp columns'

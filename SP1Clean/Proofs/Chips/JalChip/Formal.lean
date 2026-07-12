@@ -82,7 +82,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
   -- the link gate `is_real - op_a_0` is binary on every row (real: `op_a_0` binary; padding: `op_a_0 = 0`).
   -- `is_real - op_a_0` is binary: on real rows from `op_a_0 ∈ {0,1}`, on padding from `h_pad`.
-  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
@@ -92,7 +92,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rw [ha1eq] at this
     simpa only [pcWord] using this
   · intro hr1 hop_a_0
-    have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, hop_a_0]; simp
+    have hg1 : input_is_real - input_adapter_op_a_0 = 1 := by rw [hr1, hop_a_0]; simp
     have := (h_add2 ⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩ hg1).2
     rw [ha1eq] at this
     simpa only [pcWord] using this
@@ -113,7 +113,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     intro hr1
     replace hr1 : input_is_real = 1 := hr1
     rcases h_op_a_0 with h0 | h0
-    · have hg1 : input_is_real + - input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
+    · have hg1 : input_is_real - input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
       exact (h_add2 ⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩ hg1).1
     · obtain ⟨z0, z1, z2, z3⟩ := h_jt.1
       rw [h0, one_mul] at z0 z1 z2 z3
@@ -159,7 +159,7 @@ theorem completeness :
           Expression.eval env.toEnvironment input_var_state_pc[2], 0] input_adapter_op_b_imm := by
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    rw [he_av ⟨i, hi⟩, hb1eq]
+    simp only [he_av ⟨i, hi⟩, hb1eq]
   have hval2 : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + 4 + i}) : Word (ZMod p))
       = AddOperation.populate #v[Expression.eval env.toEnvironment input_var_state_pc[0],
@@ -184,7 +184,7 @@ theorem completeness :
     have := congrArg (·[3]) hval2
     simpa only [Vector.getElem_map, Vector.getElem_mapRange, ha1eq, circuit_norm] using this
   -- link gate `is_real - op_a_0` reduces to `is_real` when `op_a_0 = 0`.
-  have h_gate2 : input_is_real + - input_adapter_op_a_0 = 0 ∨ input_is_real + - input_adapter_op_a_0 = 1 := by
+  have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
   refine ⟨⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
@@ -192,12 +192,12 @@ theorem completeness :
     ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_⟩
   · rw [hval1]; exact AddOperation.spec_populate ha1U h_imm input_is_real
   · rw [hav3]; exact h_jt3
-  · rw [hval2]; exact AddOperation.spec_populate ha1U h4U (input_is_real + - input_adapter_op_a_0)
+  · rw [hval2]; exact AddOperation.spec_populate ha1U h4U (input_is_real - input_adapter_op_a_0)
   · rw [hoav3]; exact h_lt3
   · -- RegisterWrite op_a write push: `isU64` of the link value `pc + 4` (completeness covers `op_a_0 = 0`).
     intro hr
     rw [hval2]
-    exact (AddOperation.spec_populate ha1U h4U (input_is_real + - input_adapter_op_a_0)
+    exact (AddOperation.spec_populate ha1U h4U (input_is_real - input_adapter_op_a_0)
       (by rw [h_op_a_0]; simpa using hr)).1
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg

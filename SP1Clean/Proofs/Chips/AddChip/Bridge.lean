@@ -43,10 +43,12 @@ theorem correct_add_native
     (h_add : Word.toBitVec64 a_val = Word.toBitVec64 op_b_val + Word.toBitVec64 op_c_val) :
     (spec_add (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_add (.Regidx rd_idx) pc a_val).run s := by
-  simp [spec_add, sp1_add, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    execute_RTYPE_pure, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
-    Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
-    h_pc, h_rs1, h_rs2, h_add]
+  simp only [spec_add, sp1_add]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by
+    rw [run_readReg, h_pc]
+  rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
+    SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
+  simp [execute_RTYPE_eq_execute_RTYPE', execute_RTYPE', execute_RTYPE_pure, h_rs1, h_rs2, h_add]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end composition: from the Add chip's verified semantic contract

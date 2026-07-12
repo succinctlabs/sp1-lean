@@ -81,9 +81,10 @@ theorem sub_interactions_faithful_syntactic
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
     fun g s => toAccess_pullIf_byte env g s
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [SP1Clean.SubOperation.main, circuit_norm, hk, heq,
     Extracted.SubOperation.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess_byte, ByteOpcode.ofNat_six, ByteOpcode.idx,

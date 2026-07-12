@@ -539,6 +539,22 @@ private lemma limb_field_hi {x r cyp z cy : ℕ} {Xf Rf CYPf Zf CYf : ZMod p}
   push_cast at hc
   linear_combination -hc
 
+-- 4.30: the `hz5`/`hz6`/`hz7` extended-digit extractions run `omega` on the aggregate
+-- `Word.toNat (bComp B f) + (populateBNeg B f).val * (2^128 - 2^64)` divided by `2^80`/`2^96`/`2^112`.
+-- Against those opaque subterms `omega` hits `maxRecDepth`; over fresh `t`/`b` (with `interval_cases b`
+-- splitting the boolean) it discharges cleanly, so we factor the arithmetic into these three helpers.
+set_option maxRecDepth 10000 in
+private lemma fill_digit_80 (t b : ℕ) (ht : t < 2 ^ 64) (hb : b ≤ 1) :
+    b * 65535 = (t + b * (2 ^ 128 - 2 ^ 64)) / 2 ^ 80 % 2 ^ 16 := by interval_cases b <;> omega
+
+set_option maxRecDepth 10000 in
+private lemma fill_digit_96 (t b : ℕ) (ht : t < 2 ^ 64) (hb : b ≤ 1) :
+    b * 65535 = (t + b * (2 ^ 128 - 2 ^ 64)) / 2 ^ 96 % 2 ^ 16 := by interval_cases b <;> omega
+
+set_option maxRecDepth 10000 in
+private lemma fill_digit_112 (t b : ℕ) (ht : t < 2 ^ 64) (hb : b ≤ 1) :
+    b * 65535 = (t + b * (2 ^ 128 - 2 ^ 64)) / 2 ^ 112 % 2 ^ 16 := by interval_cases b <;> omega
+
 set_option maxHeartbeats 1000000 in
 /-- **Aggregate → limb equations.** Any class that proves the 128-bit aggregate congruence
 `ctqProd + remExtNat = bExtNat + 2^128·k` gets the eight field limb equations: digit-extract
@@ -570,19 +586,13 @@ private lemma euclid_limbs_of_agg {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
     simp only [bExtNat, Word.toNat_def]; omega
   have hz5 : (populateBNeg B f).val * 65535 = bExtNat B f / 2 ^ 80 % 2 ^ 16 := by
     have hc : Word.toNat (bComp B f) < 2 ^ 64 := toNat_lt_2_64 (bComp_isU64 hB f)
-    simp only [bExtNat]
-    rcases (by omega : (populateBNeg B f).val = 0 ∨ (populateBNeg B f).val = 1) with h | h <;>
-      rw [h] <;> omega
+    simp only [bExtNat]; exact fill_digit_80 _ _ hc hbnv
   have hz6 : (populateBNeg B f).val * 65535 = bExtNat B f / 2 ^ 96 % 2 ^ 16 := by
     have hc : Word.toNat (bComp B f) < 2 ^ 64 := toNat_lt_2_64 (bComp_isU64 hB f)
-    simp only [bExtNat]
-    rcases (by omega : (populateBNeg B f).val = 0 ∨ (populateBNeg B f).val = 1) with h | h <;>
-      rw [h] <;> omega
+    simp only [bExtNat]; exact fill_digit_96 _ _ hc hbnv
   have hz7 : (populateBNeg B f).val * 65535 = bExtNat B f / 2 ^ 112 % 2 ^ 16 := by
     have hc : Word.toNat (bComp B f) < 2 ^ 64 := toNat_lt_2_64 (bComp_isU64 hB f)
-    simp only [bExtNat]
-    rcases (by omega : (populateBNeg B f).val = 0 ∨ (populateBNeg B f).val = 1) with h | h <;>
-      rw [h] <;> omega
+    simp only [bExtNat]; exact fill_digit_112 _ _ hc hbnv
   -- the product digits
   have hx0 : ctqLimbNat B C f 0 = (ctqProd B C f).toNat % 2 ^ 16 := by
     norm_num [ctqLimbNat]

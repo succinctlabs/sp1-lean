@@ -82,7 +82,7 @@ theorem completeness :
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     rw [h_env_val ⟨i, hi⟩]
     simp only [Inputs.op_b_val, Inputs.op_c_val]
-    rw [hbeq, hceq]
+    simp only [hbeq, hceq]
   have hmsbeq : env.get (i₀ + 2) = AddwOperation.addwMsbWitness input_adapter_op_b_memory_prev_value
       input_adapter_op_c_memory_prev_value := by
     rw [h_env_msb]

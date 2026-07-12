@@ -63,7 +63,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_it := h_itype ⟨h_bin, h_bin⟩
   -- the alignment gates, in value form.
   simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_al0 h_al1 h_al2
-  simp only [← sub_eq_add_neg] at h_oa1 h_oa2
   simp only [isReal, opcodeVal]
   refine ⟨⟨h_addr_spec, h_mem ⟨h_bin, fun _ => h_pv_isu64⟩, h_it,
       bool_of_mul_pred h_b0, bool_of_mul_pred h_b1, bool_of_mul_pred h_b2, bool_of_mul_pred h_b3,
@@ -164,8 +163,8 @@ theorem completeness :
   · simp only [eob 2 (by omega)]; exact h_al2
   · simp only [eob 1 (by omega)]; exact h_al1
   · simp only [eob 0 (by omega)]; exact h_al0
-  · exact h_oa1
-  · exact h_oa2
+  · linear_combination h_oa1
+  · linear_combination h_oa2
 
 /-- The `LoadX0` chip row as a `GeneralFormalCircuit`; output is the extracted `LoadX0Columns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadX0Columns :=

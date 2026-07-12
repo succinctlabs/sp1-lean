@@ -74,7 +74,7 @@ def rcvClkOf (sa : StateAccess (ZMod p)) : ℕ := sa.clk_low.val
 /-- The clk a state-bus **send** key carries (the row's committed next clock, `clk + clk_inc`). -/
 def sndClkOf (sa : StateAccess (ZMod p)) : ℕ := (sa.clk_low + sa.clk_inc).val
 
-omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
+omit [Fact (2 ^ 24 < p)] in
 /-- A state-bus send/receive handoff (`sndKey sa = rcvKey sb`) advances the clock: `sb`'s receive clock is
 `sa`'s send clock `clk + clk_inc` — the clk twin of `sndPc_eq_rcvPc`. -/
 lemma sndClk_eq_rcvClk {sa sb : StateAccess (ZMod p)} (h : sndKey sa = rcvKey sb) :

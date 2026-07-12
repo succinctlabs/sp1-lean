@@ -519,7 +519,7 @@ theorem get_reg?_writeBack (s : SailState) (rd : BitVec 5) (rd_ne : rd ≠ 0#5) 
       = some v := by
   simp only [SailState.get_reg?, Std.ExtDHashMap.get?_insert_self, if_neg (show ¬(rd = 0) from rd_ne),
     bitVecToRegidxVal]
-  grind
+  grind [reg_idx_must_64]
 
 /-- `reg_idx_to_Register` is injective on **nonzero** indices — it collides only at `0#5`/`31#5` (both map
 to `x31`, the default arm), and `x0` is hardwired-`some 0` in `get_reg?` so that collision is inert. -/
@@ -932,8 +932,8 @@ theorem execute_JAL_reaches (imm : BitVec 21) (rd_idx : BitVec 5) (pc : BitVec 6
   rw [run_readReg_bind_of_isInitialized t Register.PC hs, hget_pc]
   rw [run_bind_of_run' t _ (jump_to (pc + sign_extend (m := 64) imm))
     (ExecutionResult.Retire_Success ()) (jump_to_of_mod4_eq_zero _ t hs halign)]
-  simp only [run_bind_of_run' _ _ _ () (run_wX_bits (regidx.Regidx rd_idx) _), if_neg hrd]
-  rfl
+  simp only [run_bind_of_run' _ _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  split <;> first | rfl | exact absurd ‹rd_idx = 0#5› hrd
 
 /-- **The jump ladder core** (analog of `advance_write_core`, for computed `next_pc`): the `execute` writes
 `rd := link` **and** `nextPC := target`, so the row's committed send-pc is the target (`htgt : sndPcOf = target`)
@@ -1126,8 +1126,8 @@ theorem execute_JALR_reaches (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5) (pc r
   simp only [pure_bind]
   rw [run_bind_of_run' t _ _ (ExecutionResult.Retire_Success ())
     (jump_to_of_mod4_eq_zero _ t hs halign)]
-  simp only [run_bind_of_run' _ _ _ () (run_wX_bits (regidx.Regidx rd_idx) _), if_neg hrd]
-  rfl
+  simp only [run_bind_of_run' _ _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
+  split <;> first | rfl | exact absurd ‹rd_idx = 0#5› hrd
 
 /-- **The JALR chip `advance` — RowView-generic.** Over `advance_jump_core` (the config-threaded jump core),
 reading `rs1` (→ `op_b`) via `ValueOperandsBound`: the target is the LSB-cleared `(rs1_val + signExtend imm)`
@@ -1625,8 +1625,8 @@ theorem execute_LOAD_reaches_width1 (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5
   have hread := run_vmem_read_of_width_1' rs1_idx reg_val (BitVec.signExtend 64 imm)
     data₀ t hs h_rs1 h_align' hconfig h_fits h_in_range hm₀
   simp only at hread
-  simp only [execute, execute_LOAD, hse, LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert]
-  simp only [Int.toNat_one, show ((1:ℕ) ≤b 8) = true from by decide, if_true, pure_bind]
+  simp only [execute, execute_LOAD, hse, LeanRV64D.Functions.xlen_bytes, PreSail.assert]
+  simp only [Int.toNat_one, Nat.reduceLeDiff, decide_true, if_true, pure_bind]
   rw [run_bind_of_run t _ _ hread]
   rw [run_bind_of_run' t _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
@@ -1842,7 +1842,7 @@ theorem execute_STORE_reaches (imm : BitVec 12) (rs1_idx rs2_idx : BitVec 5)
   have hwrite := run_vmem_write_of_width_1 rs1_idx rs1_val (sign_extend (m := 64) imm)
     (Sail.BitVec.extractLsb rs2_val 7 0) t hs h_rs1 h_aligned hconfig h_does_fit h_in_range
   simp only [execute]
-  simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, h_rs2, hwrite,
+  simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, PreSail.assert, h_rs2, hwrite,
     RETIRE_SUCCESS]
 
 set_option maxHeartbeats 10000000 in
@@ -1867,7 +1867,7 @@ theorem execute_STORE_reaches_width2 (imm : BitVec 12) (rs1_idx rs2_idx : BitVec
   have hwrite := run_vmem_write_of_width_2 rs1_idx rs1_val (sign_extend (m := 64) imm)
     (Sail.BitVec.extractLsb rs2_val 15 0) t hs h_rs1 h_aligned hconfig h_does_fit h_in_range
   simp only [execute]
-  simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, h_rs2, hwrite,
+  simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, PreSail.assert, h_rs2, hwrite,
     RETIRE_SUCCESS]
 
 set_option maxHeartbeats 10000000 in
@@ -1895,7 +1895,7 @@ theorem execute_STORE_reaches_width4 (imm : BitVec 12) (rs1_idx rs2_idx : BitVec
   have hwrite := run_vmem_write_of_width_4 rs1_idx rs1_val (sign_extend (m := 64) imm)
     (Sail.BitVec.extractLsb rs2_val 31 0) t hs h_rs1 h_aligned hconfig h_does_fit h_in_range
   simp only [execute]
-  simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, h_rs2, hwrite,
+  simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, PreSail.assert, h_rs2, hwrite,
     RETIRE_SUCCESS]
 
 /-- **The store ladder core** — straight-line PC (`pc+4`), NO register write, ONE contiguous memory
@@ -2061,9 +2061,9 @@ theorem execute_LOAD_reaches_width2 (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5
   have hread := run_vmem_read_of_width_2' rs1_idx reg_val (BitVec.signExtend 64 imm)
     data₀ data₁ t hs h_rs1 h_align' hconfig h_fits h_in_range hm₀ hm₁
   simp only at hread
-  simp only [execute, execute_LOAD, hse, LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert]
+  simp only [execute, execute_LOAD, hse, LeanRV64D.Functions.xlen_bytes, PreSail.assert]
   rw [show Int.toNat 2 = 2 from rfl]
-  simp only [show ((2:ℕ) ≤b 8) = true from by decide, if_true, pure_bind]
+  simp only [Nat.reduceLeDiff, decide_true, if_true, pure_bind]
   rw [run_bind_of_run t _ _ hread]
   rw [run_bind_of_run' t _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
@@ -2179,9 +2179,9 @@ theorem execute_LOAD_reaches_width4 (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5
   have hread := run_vmem_read_of_width_4' rs1_idx reg_val (BitVec.signExtend 64 imm)
     data₀ data₁ data₂ data₃ t hs h_rs1 h_align' hconfig h_fits h_in_range hm₀ hm₁ hm₂ hm₃
   simp only at hread
-  simp only [execute, execute_LOAD, hse, LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert]
+  simp only [execute, execute_LOAD, hse, LeanRV64D.Functions.xlen_bytes, PreSail.assert]
   rw [show Int.toNat 4 = 4 from rfl]
-  simp only [show ((4:ℕ) ≤b 8) = true from by decide, if_true, pure_bind]
+  simp only [Nat.reduceLeDiff, decide_true, if_true, pure_bind]
   rw [run_bind_of_run t _ _ hread]
   rw [run_bind_of_run' t _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl

@@ -44,7 +44,7 @@ theorem correct_sub_native
     (spec_sub (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_sub (.Regidx rd_idx) pc a_val).run s := by
   simp [spec_sub, sp1_sub, execute_RTYPE_eq_execute_RTYPE', execute_RTYPE',
-    execute_RTYPE_pure, PreLeanRV64D.readReg, PreLeanRV64D.writeReg,
+    execute_RTYPE_pure, run_readReg _ Register.PC,
     Sail.run_rX_bits, Sail.run_wX_bits, SailState.get_reg?_insert_nextPC,
     h_pc, h_rs1, h_rs2, h_sub]
 

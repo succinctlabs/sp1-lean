@@ -124,6 +124,35 @@ noncomputable def AbstractInteraction.toAccess (env : Environment (ZMod p))
 
 open SP1Clean.Channels (stateChannel StateMsg)
 
+/- **4.30 `combinedSize'` note.** In 4.30 `ProvableStruct.combinedSize'` became `List.sum ∘ List.map size`,
+so a `toElements` vector's `Vector.toList` size index no longer syntactically presents as `m + n` — hence
+`Vector.toList_append`/`map_append`/`getElem_append` never fire on `(toElements msg).toList` (the index label
+stays `combinedSize' …`, an opaque `List.sum`, blocking discrimination). The fix below is a per-message
+`toList` helper: `change` re-elaborates `toElements msg` as the explicit right-nested `#v[f₀] ++ (…)` append
+— defeq-cheap, no array reduction — which carries the *syntactic* `+`-index, so `Vector.toList_append`
+distributes structurally (O(#fields)). Each headline lemma then `rw`s this helper and finishes with plain
+`List.map_cons`/`List.map_nil`. This replaces the old super-linear element-wise `List.ext_getElem`+`rfl`
+that timed out on the 9- and 16-field memory/program kernels. -/
+
+/-- Expand a length-4 vector's `toList` into its four `getElem`s — the `Word`-field analog of the scalar
+`Vector.toList_mk` reductions in the per-message `toList` helpers below. -/
+private lemma toList_word {α : Type} (w : Vector α 4) :
+    w.toList = [w[0], w[1], w[2], w[3]] := by
+  apply List.ext_getElem (by simp)
+  intro i h1 h2
+  simp only [List.length_cons, List.length_nil] at h2
+  interval_cases i <;> simp
+
+/-- `(toElements msg).toList` of a `StateMsg` is its five fields, in field order. Proved by the
+`change`-to-explicit-append recipe (see the `combinedSize'` note). -/
+private lemma stateMsg_toList {T : Type} (msg : StateMsg T) :
+    (toElements msg).toList =
+      [msg.clk_high, msg.clk_low, msg.pc0, msg.pc1, msg.pc2] := by
+  change (#v[msg.clk_high] ++ (#v[msg.clk_low] ++ (#v[msg.pc0] ++ (#v[msg.pc1] ++
+    (#v[msg.pc2] ++ (#v[] : Vector T 0)))))).toList = _
+  simp only [Vector.toList_append, Vector.toList_mk, List.append_nil, List.cons_append,
+    List.nil_append]
+
 omit [NeZero p] in
 /-- **Kernel of the State "emitted = projection".** The `toAccess`-image of a pushed `stateChannel`
 message (post-#398 `circuit_norm` normal form: `pushIf`) is exactly the `stateLookups`-style
@@ -138,9 +167,12 @@ lemma toAccess_pushIf_state (env : Environment (ZMod p)) (mult : Expression (ZMo
          (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val],
         signedVal (Expression.eval env mult)) := by
-  simp [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pushedIf,
-    VmChannel.toRaw, kindOf, stateChannel, toElements, toComponents, components,
-    ProvableStruct.componentsToElements]
+  simp only [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pushedIf,
+    VmChannel.toRaw, kindOf, stateChannel, if_true]
+  simp only [Vector.toList_map, Prod.mk.injEq]
+  refine ⟨by trivial, trivial, ?_, trivial⟩
+  rw [stateMsg_toList]
+  simp only [List.map_cons, List.map_nil]
 
 omit [NeZero p] in
 /-- **Kernel of the State "received = projection" (gated VM pull).** The `pullIf`/`stateChannel`/`StateMsg`
@@ -156,21 +188,41 @@ lemma toAccess_pullIf_state (env : Environment (ZMod p)) (gate : Expression (ZMo
          (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pulledIf,
-    VmChannel.toRaw, kindOf, stateChannel, toElements, toComponents, components,
-    ProvableStruct.componentsToElements]
+  simp only [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pulledIf,
+    VmChannel.toRaw, kindOf, stateChannel, if_true]
+  simp only [Vector.toList_map, Prod.mk.injEq]
+  refine ⟨by trivial, trivial, ?_, trivial⟩
+  rw [stateMsg_toList]
+  simp only [List.map_cons, List.map_nil]
 
 open SP1Clean.Channels (memoryChannel MemoryMsg programChannel ProgramMsg)
 
-/-- Expand a 4-vector's `toList` into its four elements — the `Word`-field analog of the flat scalar
-components in the `toElements` unfolds below (the `MemoryMsg.value` word flattens through `toElements`
-as a `Vector`, not four scalars). -/
-private lemma toList_word {α : Type} (w : Vector α 4) :
-    w.toList = [w[0], w[1], w[2], w[3]] := by
-  apply List.ext_getElem (by simp)
-  intro i h1 h2
-  simp only [List.length_cons, List.length_nil] at h2
-  interval_cases i <;> simp
+/-- `(toElements msg).toList` of a `MemoryMsg` is its nine fields (the `value` word flattening to its four
+`getElem`s), in field order. See the `combinedSize'` note; the `value : Word` component appends as a
+`Vector`, expanded by `toList_word`. -/
+private lemma memoryMsg_toList {T : Type} (msg : MemoryMsg T) :
+    (toElements msg).toList =
+      [msg.clk_high, msg.clk_low, msg.addr0, msg.addr1, msg.addr2,
+       msg.value[0], msg.value[1], msg.value[2], msg.value[3]] := by
+  change (#v[msg.clk_high] ++ (#v[msg.clk_low] ++ (#v[msg.addr0] ++ (#v[msg.addr1] ++
+    (#v[msg.addr2] ++ (msg.value ++ (#v[] : Vector T 0))))))).toList = _
+  simp only [Vector.toList_append, Vector.toList_mk, List.append_nil,
+    List.cons_append, List.nil_append]
+  rw [toList_word]
+
+/-- `(toElements msg).toList` of a `ProgramMsg` is its sixteen fields (the `op_b`/`op_c` words flattening
+to their four `getElem`s each), in field order. See the `combinedSize'` note. -/
+private lemma programMsg_toList {T : Type} (msg : ProgramMsg T) :
+    (toElements msg).toList =
+      [msg.pc0, msg.pc1, msg.pc2, msg.opcode, msg.op_a,
+       msg.op_b[0], msg.op_b[1], msg.op_b[2], msg.op_b[3],
+       msg.op_c[0], msg.op_c[1], msg.op_c[2], msg.op_c[3],
+       msg.op_a_0, msg.imm_b, msg.imm_c] := by
+  change (#v[msg.pc0] ++ (#v[msg.pc1] ++ (#v[msg.pc2] ++ (#v[msg.opcode] ++ (#v[msg.op_a] ++
+    (msg.op_b ++ (msg.op_c ++ (#v[msg.op_a_0] ++ (#v[msg.imm_b] ++ (#v[msg.imm_c] ++
+    (#v[] : Vector T 0))))))))))).toList = _
+  simp only [Vector.toList_append, Vector.toList_mk, toList_word,
+    List.append_nil, List.cons_append, List.nil_append]
 
 omit [NeZero p] in
 /-- **Kernel of the Memory "emitted = projection".** The `toAccess`-image of a pushed `memoryChannel`
@@ -190,9 +242,11 @@ lemma toAccess_pushIf_memory (env : Environment (ZMod p)) (mult : Expression (ZM
          (Expression.eval env msg.value[3]).val],
         signedVal (Expression.eval env mult)) := by
   simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
-    Channel.toRaw, kindOf, memoryChannel, if_true, toElements, toComponents, components,
-    ProvableStruct.componentsToElements]
-  simp [Vector.toList_append, toList_word]
+    Channel.toRaw, kindOf, memoryChannel, if_true]
+  simp only [Vector.toList_map, Prod.mk.injEq]
+  refine ⟨by trivial, trivial, ?_, trivial⟩
+  rw [memoryMsg_toList]
+  simp only [List.map_cons, List.map_nil]
 
 omit [NeZero p] in
 /-- **Kernel of the Memory "received = projection" (gated VM pull).** The `pullIf`/`memoryChannel`/`MemoryMsg`
@@ -212,9 +266,11 @@ lemma toAccess_pullIf_memory (env : Environment (ZMod p)) (gate : Expression (ZM
          (Expression.eval env msg.value[3]).val],
         signedVal (Expression.eval env (-gate))) := by
   simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
-    Channel.toRaw, kindOf, memoryChannel, if_true, toElements, toComponents, components,
-    ProvableStruct.componentsToElements]
-  simp [Vector.toList_append, toList_word]
+    Channel.toRaw, kindOf, memoryChannel, if_true]
+  simp only [Vector.toList_map, Prod.mk.injEq]
+  refine ⟨by trivial, trivial, ?_, trivial⟩
+  rw [memoryMsg_toList]
+  simp only [List.map_cons, List.map_nil]
 
 omit [NeZero p] in
 /-- **Kernel of the Program "emitted = projection".** The `toAccess`-image of a pushed `programChannel`
@@ -235,12 +291,11 @@ lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (Z
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env mult)) := by
   simp only [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pushedIf,
-    VmChannel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
-    ProvableStruct.componentsToElements]
-  -- Two `Word` fields (`op_b`/`op_c`) followed by trailing scalars: the op_c append doesn't split under
-  -- plain `simp` (a `toList` normal-form loop), so force the split with an explicit `rw` (op_b reduces on
-  -- its own). Cf. the memory kernels, where `value` is the last field and `toList_word` alone suffices.
-  simp [Vector.toList_append, toList_word]; rw [Vector.toList_append]; simp [toList_word]
+    VmChannel.toRaw, kindOf, programChannel, if_true]
+  simp only [Vector.toList_map, Prod.mk.injEq]
+  refine ⟨by trivial, trivial, ?_, trivial⟩
+  rw [programMsg_toList]
+  simp only [List.map_cons, List.map_nil]
 
 omit [NeZero p] in
 /-- **Kernel of the Program "received = projection" (gated VM pull).** The `pullIf`/`programChannel`/
@@ -263,13 +318,22 @@ lemma toAccess_pullIf_program (env : Environment (ZMod p)) (gate : Expression (Z
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env (-gate))) := by
   simp only [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pulledIf,
-    VmChannel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
-    ProvableStruct.componentsToElements]
-  -- See the push kernel: force the op_c append split with an explicit `rw` (the `Word`-plus-trailing-scalars
-  -- shape that plain `simp`'s `toList` normalization won't split).
-  simp [Vector.toList_append, toList_word]; rw [Vector.toList_append]; simp [toList_word]
+    VmChannel.toRaw, kindOf, programChannel, if_true]
+  simp only [Vector.toList_map, Prod.mk.injEq]
+  refine ⟨by trivial, trivial, ?_, trivial⟩
+  rw [programMsg_toList]
+  simp only [List.map_cons, List.map_nil]
 
 open SP1Clean.Channels (byteChannel)
+
+/-- `(toElements msg).toList` of a `ByteRow` is its four fields, in field order. See the `combinedSize'`
+note. -/
+private lemma byteRow_toList {T : Type} (msg : ByteRow T) :
+    (toElements msg).toList = [msg.opcode, msg.a, msg.b, msg.c] := by
+  change (#v[msg.opcode] ++ (#v[msg.a] ++ (#v[msg.b] ++ (#v[msg.c] ++
+    (#v[] : Vector T 0))))).toList = _
+  simp only [Vector.toList_append, Vector.toList_mk, List.append_nil, List.cons_append,
+    List.nil_append]
 
 omit [NeZero p] in
 /-- **Kernel of the Byte "received = projection".** The `toAccess`-image of a pulled `byteChannel` row
@@ -284,7 +348,11 @@ lemma toAccess_pullIf_byte (env : Environment (ZMod p)) (gate : Expression (ZMod
         [(Expression.eval env msg.opcode).val, (Expression.eval env msg.a).val,
          (Expression.eval env msg.b).val, (Expression.eval env msg.c).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf, Channel.toRaw, kindOf,
-    byteChannel, toElements, toComponents, components, ProvableStruct.componentsToElements]
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf, Channel.toRaw, kindOf,
+    byteChannel]
+  simp only [Vector.toList_map, Prod.mk.injEq]
+  refine ⟨by trivial, trivial, ?_, trivial⟩
+  rw [byteRow_toList]
+  simp only [List.map_cons, List.map_nil]
 
 end SP1Clean

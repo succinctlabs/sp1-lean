@@ -115,7 +115,7 @@ theorem loadX0_w1 (is_unsigned : Bool)
   rw [hsp] at hread
   simp [specX0, sp1_loadX0, run_readReg_of_isInitialized _ _ hs,
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
-    LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, hread]
+    LeanRV64D.Functions.xlen_bytes, PreSail.assert, hread]
 
 set_option maxHeartbeats 10000000 in
 omit [Fact (2 ^ 17 < p)] in
@@ -156,7 +156,7 @@ theorem loadX0_w2 (is_unsigned : Bool)
   rw [hsp] at hread
   simp [specX0, sp1_loadX0, run_readReg_of_isInitialized _ _ hs,
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
-    LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, hread]
+    LeanRV64D.Functions.xlen_bytes, PreSail.assert, hread]
 
 set_option maxHeartbeats 10000000 in
 omit [Fact (2 ^ 17 < p)] in
@@ -205,7 +205,7 @@ theorem loadX0_w4 (is_unsigned : Bool)
   rw [hsp] at hread
   simp [specX0, sp1_loadX0, run_readReg_of_isInitialized _ _ hs,
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
-    LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, hread]
+    LeanRV64D.Functions.xlen_bytes, PreSail.assert, hread]
 
 set_option maxHeartbeats 10000000 in
 omit [Fact (2 ^ 17 < p)] in
@@ -266,7 +266,7 @@ theorem loadX0_w8 (is_unsigned : Bool)
   rw [hsp] at hread
   simp [specX0, sp1_loadX0, run_readReg_of_isInitialized _ _ hs,
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
-    LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, hread]
+    LeanRV64D.Functions.xlen_bytes, PreSail.assert, hread]
 
 /-! ## The seven per-opcode correctness theorems
 

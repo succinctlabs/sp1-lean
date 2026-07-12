@@ -157,7 +157,7 @@ theorem ltSigned_semantic {b cc : Word (ZMod p)} {cols : Extracted.LtOperationSi
         (by simpa using hc3)) h_uns
     refine ⟨?_, fun _ => ?_, fun _ => ?_⟩
     · rw [hbit.1]
-      simp only [hs, if_neg h01, Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
+      simp [hs, Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
         List.getElem_cons_zero, List.getElem_cons_succ]
     · rw [toBitVec64_eq_iff hb hcc]
       have key := hbit.2

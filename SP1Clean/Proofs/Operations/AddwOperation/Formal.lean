@@ -69,8 +69,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   rw [← c16] at R0 R1
   rw [hr1eq, one_mul] at hgc0 hgc1
   refine addwSemantics_of_carries ha hb ?_ ((h_msb h_msb_as).2 hr1eq)
-  simp only [RawSpec, sub_eq_add_neg]
-  simp only [sub_eq_add_neg] at hgc0 hgc1
+  simp only [RawSpec]
   refine ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, ?_, ?_⟩
   · rw [← h65536]; exact (byteRowSpec_range _ h16p).mp R0
   · rw [← h65536]; exact (byteRowSpec_range _ h16p).mp R1

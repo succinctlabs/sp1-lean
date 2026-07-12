@@ -25,7 +25,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-! ## 8-bit extension lemmas (single byte; the sign fills within limb 0) -/
 
-omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+omit [Fact (2 ^ 17 < p)] in
 /-- Zero-extension (LBU) of an 8-bit value is the word `#v[b, 0, 0, 0]`. -/
 private lemma zeroExtend64_ofNat8 [NeZero p] (b : ZMod p) (hb : b.val < 256) :
     Sail.BitVec.zeroExtend (BitVec.ofNat 8 b.val) 64 =
@@ -38,7 +38,7 @@ private lemma zeroExtend64_ofNat8 [NeZero p] (b : ZMod p) (hb : b.val < 256) :
     List.getElem_cons_succ, ZMod.val_zero]
   omega
 
-omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+omit [Fact (2 ^ 17 < p)] in
 /-- Sign-extension (LB), low half: when `b < 2^7` the sign bit is `0`, giving `#v[b, 0, 0, 0]`. -/
 private lemma signExtend64_ofNat8_of_lt_128 [NeZero p] (b : ZMod p) (hb : b.val < 256)
     (hmsb : b.val < 128) :
@@ -158,7 +158,8 @@ theorem correct_load_byte_native
   rw [hsp] at hread
   simp [spec_lb, sp1_lb, run_readReg_of_isInitialized _ _ hs,
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
-    LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, hread, hext]
+    LeanRV64D.Functions.xlen_bytes, PreSail.assert, hread, hext]
+  rfl
 
 /-- End-to-end: from chip + decode + register/PC reads + selected memory byte, Sail's `LB`/`LBU`
 agrees with the SP1 chip emulation. -/

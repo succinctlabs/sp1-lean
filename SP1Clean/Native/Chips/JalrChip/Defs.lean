@@ -55,17 +55,17 @@ def lsbBit (input : Inputs (ZMod p)) : ZMod p :=
 and the `lsb` scalar via `populate`, then compose as Clean `assertion`s. `CPUState` is fed the LSB-cleared
 `next_pc`; the link add's gate is `is_real - op_a_0`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalrColumns (ZMod p)) := do
-  let add_value ← witnessVector 4 (fun env =>
+  let add_value ← witnessVectorNative 4 (fun env =>
     AddOperation.populate
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       #v[env input.adapter.op_c_imm[0], env input.adapter.op_c_imm[1],
          env input.adapter.op_c_imm[2], env input.adapter.op_c_imm[3]])
-  let op_a_value ← witnessVector 4 (fun env =>
+  let op_a_value ← witnessVectorNative 4 (fun env =>
     AddOperation.populate
       #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
       #v[4, 0, 0, 0])
-  let lsb ← witnessField (fun env => (((env add_value[0]).val % 2 : ℕ) : ZMod p))
+  let lsb ← witnessNative (var := Expression) (fun env => (((env add_value[0]).val % 2 : ℕ) : ZMod p))
   let rs1WordV : Word (Expression (ZMod p)) :=
     #v[input.adapter.op_b_memory.prev_value[0], input.adapter.op_b_memory.prev_value[1],
        input.adapter.op_b_memory.prev_value[2], input.adapter.op_b_memory.prev_value[3]]

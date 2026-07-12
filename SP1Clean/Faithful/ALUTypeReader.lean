@@ -105,9 +105,10 @@ theorem alutypereader_program_interactions_faithful_syntactic
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit programChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
       (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) programChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) programChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [Readers.ALUTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
   -- SC Phase 2a: `programChannel` is a `VmChannel` — unfold the kernel's `pulledIf` to match the raw
@@ -173,9 +174,10 @@ theorem alutypereader_memory_interactions_faithful_syntactic
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit memoryChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
       (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) memoryChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) memoryChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [Readers.ALUTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.programChannel_eq_memoryChannel_false, if_false]
   simp only [toAccess_pushIf_memory, toAccess_pullIf_memory]
@@ -185,13 +187,13 @@ theorem alutypereader_memory_interactions_faithful_syntactic
     h_ir, h_ch, h_cl, h_oa, h_ob, h_oc0, h_imm,
     h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3,
     h_pl_b, h_pv_b0, h_pv_b1, h_pv_b2, h_pv_b3,
-    h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3, sub_eq_add_neg]
+    h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3]
   -- residual op_c sign bridge: the `is_real - imm_c` gate's two `signedVal` orientations. Unlike R-type's
-  -- single-variable `is_real`, the compound `cols.imm_c + -is_real = -(is_real + -cols.imm_c)` needs a `ring`
+  -- single-variable `is_real`, the compound `cols.imm_c - is_real = -(is_real - cols.imm_c)` needs a `ring`
   -- nudge before `signedVal_neg` fires.
   refine ⟨?_, ?_⟩
-  · rw [(by ring : cols.imm_c + - is_real = -(is_real + -cols.imm_c)), signedVal_neg hp2]
-  · rw [(by ring : cols.imm_c + - is_real = -(is_real + -cols.imm_c)), signedVal_neg hp2, neg_neg]
+  · rw [(by ring : cols.imm_c - is_real = -(is_real - cols.imm_c)), signedVal_neg hp2]
+  · rw [(by ring : is_real - cols.imm_c = -(cols.imm_c - is_real)), signedVal_neg hp2]
 
 set_option maxHeartbeats 1000000 in
 /-- **Faithfulness anchor (ALUTypeReader fragment) — Byte-bus interactions, SYNTACTIC.** Sibling of
@@ -236,15 +238,16 @@ theorem alutypereader_byte_interactions_faithful_syntactic
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
     fun g s => toAccess_pullIf_byte env g s
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [Readers.ALUTypeReader.main, Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     circuit_norm, FormalAssertion.toSubcircuit_interactions]
   simp [circuit_norm, hbk, Gadgets.Equality.main, Extracted.ALUTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx, h6, h3,
-    h_ir, h_cl, h_imm, h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c, sub_eq_add_neg]
+    h_ir, h_cl, h_imm, h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c]
 
 end SP1Clean.Faithful

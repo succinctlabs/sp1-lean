@@ -155,47 +155,47 @@ assertions (`AssertSpec`) and the nine byte-range pulls (`InteractSpec`), and as
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftRightCols (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let a ← witnessVector 4 (fun env =>
+  let a ← witnessVectorNative 4 (fun env =>
     populateA
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
-  let b_msb ← witnessVector 1 (fun env =>
+  let b_msb ← witnessVectorNative 1 (fun env =>
     #v[bMsb
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (hintFlags env.hint)])
-  let srw_msb ← witnessVector 1 (fun env =>
+  let srw_msb ← witnessVectorNative 1 (fun env =>
     #v[srwMsb
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint)])
-  let c_bits ← witnessVector 6 (fun env =>
+  let c_bits ← witnessVectorNative 6 (fun env =>
     ShiftLeftChip.cBits (env input.adapter.op_c_memory.prev_value[0]))
-  let sra_msb_v0123 ← witnessVector 1 (fun env =>
+  let sra_msb_v0123 ← witnessVectorNative 1 (fun env =>
     #v[sraMsbV0123
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint)])
-  let v ← witnessVector 3 (fun env => vPowersInv (env input.adapter.op_c_memory.prev_value[0]))
-  let lower_limb ← witnessVector 4 (fun env =>
+  let v ← witnessVectorNative 3 (fun env => vPowersInv (env input.adapter.op_c_memory.prev_value[0]))
+  let lower_limb ← witnessVectorNative 4 (fun env =>
     lowerLimb
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
-  let higher_limb ← witnessVector 4 (fun env =>
+  let higher_limb ← witnessVectorNative 4 (fun env =>
     higherLimb
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
-  let limb_result ← witnessVector 4 (fun env =>
+  let limb_result ← witnessVectorNative 4 (fun env =>
     limbResult
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
          env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
       (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
-  let shift_u16 ← witnessVector 4 (fun env =>
+  let shift_u16 ← witnessVectorNative 4 (fun env =>
     shiftU16 (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
-  let flags ← witnessVector 5 (fun env =>
+  let flags ← witnessVectorNative 5 (fun env =>
     #v[(hintFlags env.hint)[0], (hintFlags env.hint)[1], (hintFlags env.hint)[2],
        (hintFlags env.hint)[3],
        ((hintFlags env.hint)[2] + (hintFlags env.hint)[3]) * env input.adapter.imm_c])
@@ -565,6 +565,9 @@ lemma resultA_isU64
         (env.get i₀).val < 2 ^ 16 ∧ (env.get (i₀ + 1)).val < 2 ^ 16 ∧
           (env.get (i₀ + 2)).val < 2 ^ 16 ∧ (env.get (i₀ + 3)).val < 2 ^ 16 := by
     intro hsum1
+    -- Normalize the hand-written `x * (x + -1) = 0` boolean-gate parameters to the `- 1` form
+    -- `bool_of_mul_pred` now expects (Lean 4.30 `circuit_norm` canonicalized subtraction form).
+    simp only [← sub_eq_add_neg] at h_srl_b h_sra_b h_srlw_b h_sraw_b h_sum_b h_b0 h_b1 h_b2 h_b3 h_b4 h_s0b h_s1b h_s2b
     have hp17 : 2 ^ 17 < p := Fact.out
     -- The variant flag-sum is 1, so the nine byte-pull guarantees fire (gated by `-(flag-sum) = -1`).
     have hsumneg : -(env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4) +

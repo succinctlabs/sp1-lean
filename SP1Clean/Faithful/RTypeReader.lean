@@ -165,9 +165,10 @@ theorem rtypereader_memory_interactions_faithful_syntactic
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit memoryChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
       (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) memoryChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) memoryChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.programChannel_eq_memoryChannel_false, if_false]
   -- W11 memory flip: reads are `pullIf` (mult `-is_real`), the op_b/op_c read-backs `pushIf` (mult `is_real`);
@@ -215,9 +216,10 @@ theorem rtypereader_program_interactions_faithful_syntactic
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit programChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
       (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) programChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) programChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
   -- SC Phase 2a: `programChannel` is a `VmChannel` — `circuit_norm` recovers the program pull in the raw
@@ -275,9 +277,10 @@ theorem rtypereader_byte_interactions_faithful_syntactic
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
     fun g s => toAccess_pullIf_byte env g s
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   -- descend through the two nested `FormalAssertion` sub-readers (`RegisterAccessCols →
   -- RegisterAccessTimestamp`) to surface the byte emits (Clean's general `interactionsWith_subcircuit`
   -- only exposes the flat `.ops.toFlat`; `FormalAssertion.toSubcircuit_interactions` rewrites that back to
@@ -290,6 +293,6 @@ theorem rtypereader_byte_interactions_faithful_syntactic
   simp [circuit_norm, hbk, Gadgets.Equality.main, Extracted.RTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx, h6, h3,
-    h_ir, h_cl, h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c, sub_eq_add_neg]
+    h_ir, h_cl, h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c]
 
 end SP1Clean.Faithful

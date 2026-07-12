@@ -48,8 +48,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have epv : ∀ i (hi : i < 4), Expression.eval env input_var_memory_access_prev_value[i]
       = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
   simp only [esw 0 (by omega), esw 1 (by omega), epv 0 (by omega), epv 1 (by omega),
-    epv 2 (by omega), epv 3 (by omega), ← sub_eq_add_neg] at hsel0 hsel1 hsel2 hsel3
-  simp only [← sub_eq_add_neg] at h_msbgate
+    epv 2 (by omega), epv 3 (by omega)] at hsel0 hsel1 hsel2 hsel3
   rw [esw 1 (by omega)] at h_msb
   have h_it := h_itype ⟨h_bin, h_bin⟩
   simp only [esw 0 (by omega), esw 1 (by omega)] at h_it
@@ -239,11 +238,11 @@ theorem completeness :
   · simp only [esw 0 (by omega), esw 1 (by omega)]; exact h_it
   · exact ⟨hbin, fun _ => h_load_isu64⟩
   · trivial
-  · simp only [esw 0 (by omega), epv 0 (by omega), ← sub_eq_add_neg]; exact hsel0
-  · simp only [esw 1 (by omega), epv 1 (by omega), ← sub_eq_add_neg]; exact hsel1
-  · simp only [esw 0 (by omega), epv 2 (by omega), ← sub_eq_add_neg]; exact hsel2
-  · simp only [esw 1 (by omega), epv 3 (by omega), ← sub_eq_add_neg]; exact hsel3
-  · simp only [← sub_eq_add_neg]; exact h_msbgate
+  · simp only [esw 0 (by omega), epv 0 (by omega)]; exact hsel0
+  · simp only [esw 1 (by omega), epv 1 (by omega)]; exact hsel1
+  · simp only [esw 0 (by omega), epv 2 (by omega)]; exact hsel2
+  · simp only [esw 1 (by omega), epv 3 (by omega)]; exact hsel3
+  · exact h_msbgate
   · rcases h_lw_bin with h | h <;> rw [h] <;> simp
   · rcases h_lwu_bin with h | h <;> rw [h] <;> simp
   · rcases hbin with h | h <;> rw [h] <;> simp

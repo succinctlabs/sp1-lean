@@ -62,13 +62,13 @@ Witnesses result word `a` and the five variant flags; gates `is_real`; assembles
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let flags ← witnessVector 5 (fun env => hintFlags env.hint)
+  let flags ← witnessVectorNative 5 (fun env => hintFlags env.hint)
   let is_mul := flags[0]; let is_mulh := flags[1]; let is_mulhu := flags[2]
   let is_mulhsu := flags[3]; let is_mulw := flags[4]
   -- The chip witnesses the `MulOperation` column struct via `populate` (conformance-checked in
   -- `WitnessTests/MulOperationWitness.lean`), then composes `MulOperation.circuit` as a Clean
   -- `assertion`. `populate` takes `(b, c, is_mulh, is_mulhsu, is_mulw)`.
-  let cols ← ProvableType.witness (fun env =>
+  let cols ← witnessNative (var := Var Extracted.MulOperation) (fun env =>
     MulOperation.populate
       #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
       #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]
@@ -94,7 +94,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p))
   let s3 : Expression (ZMod p) := is_mul * (cols.product[6] + cols.product[7] * c256)
     + (is_mulh + is_mulhu + is_mulhsu) * (cols.product[14] + cols.product[15] * c256)
     + is_mulw * (cols.product_msb.msb * c65535)
-  let a ← witnessVector 4 (fun env => #v[env s0, env s1, env s2, env s3])
+  let a ← witnessVectorNative 4 (fun env => #v[env s0, env s1, env s2, env s3])
   a[0] === s0
   a[1] === s1
   a[2] === s2

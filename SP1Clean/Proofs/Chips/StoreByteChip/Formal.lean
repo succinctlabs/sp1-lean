@@ -48,11 +48,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have esv : ∀ i (hi : i < 4), Expression.eval env input_var_store_value[i] = input_store_value[i] :=
     fun i hi => by rw [← hmap_sv]; simp only [Vector.getElem_map]
   simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega), epv 1 (by omega),
-    epv 2 (by omega), epv 3 (by omega), ← sub_eq_add_neg] at hsel0 hsel1 hsel2 hsel3
-  simp only [eob 0 (by omega), ← sub_eq_add_neg] at hincr
+    epv 2 (by omega), epv 3 (by omega)] at hsel0 hsel1 hsel2 hsel3
+  simp only [eob 0 (by omega)] at hincr
   simp only [esv 0 (by omega), esv 1 (by omega), esv 2 (by omega), esv 3 (by omega),
     epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega),
-    eob 1 (by omega), eob 2 (by omega), ← sub_eq_add_neg] at hr0 hr1 hr2 hr3
+    eob 1 (by omega), eob 2 (by omega)] at hr0 hr1 hr2 hr3
   -- the real-row byte bounds, from the two inline U8Range-pair receives.
   have h_bytes : input_is_real = 1 →
       input_register_low_byte.val < 256 ∧
@@ -64,8 +64,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have Gr := hreg_rcv hneg; have Gm := hmem_rcv hneg
     have hbr := (byteRowSpec_u8range_pair _ _).mp Gr
     have hbm := (byteRowSpec_u8range_pair _ _).mp Gm
-    rw [show (2:ℕ)^8 = 256 from by norm_num, ← sub_eq_add_neg, eoap0] at hbr
-    rw [show (2:ℕ)^8 = 256 from by norm_num, ← sub_eq_add_neg] at hbm
+    rw [show (2:ℕ)^8 = 256 from by norm_num, eoap0] at hbr
+    rw [show (2:ℕ)^8 = 256 from by norm_num] at hbm
     exact ⟨hbr.1, hbr.2, hbm.1, hbm.2⟩
   have hob0' : Expression.eval env input_var_offset_bit[0] = 0
       ∨ Expression.eval env input_var_offset_bit[0] = 1 := by rw [eob 0 (by omega)]; exact hob0
@@ -194,27 +194,23 @@ theorem completeness :
   · exact h_it
   · exact h_prog
   · intro _
-    simp only [byteChannel]; rw [← sub_eq_add_neg, eoap0]
+    simp only [byteChannel]; rw [eoap0]
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hreg_pa, hreghi_pa⟩
   · intro _
-    simp only [byteChannel]; rw [← sub_eq_add_neg]
+    simp only [byteChannel]
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hmem_pa, hmemhi_pa⟩
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega), ← sub_eq_add_neg]; exact hsel0
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 1 (by omega), ← sub_eq_add_neg]; exact hsel1
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 2 (by omega), ← sub_eq_add_neg]; exact hsel2
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 3 (by omega), ← sub_eq_add_neg]; exact hsel3
-  · simp only [eob 0 (by omega), ← sub_eq_add_neg]; exact sub_eq_zero_of_eq hincr_pa
-  · simp only [esv 0 (by omega), eob 1 (by omega), eob 2 (by omega), epv 0 (by omega),
-      ← sub_eq_add_neg]
+  · simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega)]; exact hsel0
+  · simp only [eob 1 (by omega), eob 2 (by omega), epv 1 (by omega)]; exact hsel1
+  · simp only [eob 1 (by omega), eob 2 (by omega), epv 2 (by omega)]; exact hsel2
+  · simp only [eob 1 (by omega), eob 2 (by omega), epv 3 (by omega)]; exact hsel3
+  · simp only [eob 0 (by omega)]; exact sub_eq_zero_of_eq hincr_pa
+  · simp only [esv 0 (by omega), eob 1 (by omega), eob 2 (by omega), epv 0 (by omega)]
     exact sub_eq_zero_of_eq hr0
-  · simp only [esv 1 (by omega), eob 1 (by omega), eob 2 (by omega), epv 1 (by omega),
-      ← sub_eq_add_neg]
+  · simp only [esv 1 (by omega), eob 1 (by omega), eob 2 (by omega), epv 1 (by omega)]
     exact sub_eq_zero_of_eq hr1
-  · simp only [esv 2 (by omega), eob 1 (by omega), eob 2 (by omega), epv 2 (by omega),
-      ← sub_eq_add_neg]
+  · simp only [esv 2 (by omega), eob 1 (by omega), eob 2 (by omega), epv 2 (by omega)]
     exact sub_eq_zero_of_eq hr2
-  · simp only [esv 3 (by omega), eob 1 (by omega), eob 2 (by omega), epv 3 (by omega),
-      ← sub_eq_add_neg]
+  · simp only [esv 3 (by omega), eob 1 (by omega), eob 2 (by omega), epv 3 (by omega)]
     exact sub_eq_zero_of_eq hr3
   · rcases hbin with h | h <;> rw [h] <;> simp
 

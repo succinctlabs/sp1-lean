@@ -82,6 +82,6 @@ theorem u16tou8safe_interactions_faithful_syntactic
   simp only [SP1Clean.U16toU8OperationSafe.main, circuit_norm, hk,
     Extracted.U16toU8OperationSafe.interactions, Extracted.Interaction.toAccess_byte,
     ByteOpcode.ofNat_three, ByteOpcode.idx, ZMod.val_zero,
-    h_ir, h_u0, h_u1, h_u2, h_u3, h_lb0, h_lb1, h_lb2, h_lb3, h3, sub_eq_add_neg]
+    h_ir, h_u0, h_u1, h_u2, h_u3, h_lb0, h_lb1, h_lb2, h_lb3, h3]
 
 end SP1Clean.Faithful

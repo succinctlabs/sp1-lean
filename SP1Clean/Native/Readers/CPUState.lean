@@ -128,7 +128,7 @@ theorem soundness [Fact (2 ^ 17 < p)] :
     fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
   have hneg : -(input_is_real) = -1 := by rw [hr1]
   refine ⟨(byteRowSpec_range _ h13p).mp ?_, ((byteRowSpec_u8range_pair _ _).mp (h_b2 hneg)).1⟩
-  rw [sub_eq_add_neg, Nat.cast_ofNat]
+  rw [Nat.cast_ofNat]
   exact h_b1 hneg
 
 theorem completeness [Fact (2 ^ 17 < p)] :
@@ -150,7 +150,6 @@ theorem completeness [Fact (2 ^ 17 < p)] :
   · rcases h_bin with h | h <;> simp [h]
   · intro hneg
     obtain ⟨hb1, _⟩ := h_spec (neg_inj.mp hneg)
-    rw [sub_eq_add_neg] at hb1
     have key := (byteRowSpec_range _ h13p).mpr hb1
     rw [Nat.cast_ofNat] at key
     exact key

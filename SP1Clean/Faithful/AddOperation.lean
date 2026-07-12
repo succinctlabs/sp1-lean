@@ -91,9 +91,10 @@ theorem add_interactions_faithful_syntactic
     fun g s => toAccess_pullIf_byte env g s
   -- the five `=== 0` gates are `Gadgets.Equality` `FormalAssertion` subcircuits emitting no byte
   -- interaction, so their `byteChannel` filter is empty (as in `programLookups_eq_emitted`).
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   -- RHS: recover the 4 byte pulls from `main`; LHS: expand the extracted list + projection.
   simp only [SP1Clean.AddOperation.main, circuit_norm, hk, heq,
     Extracted.AddOperation.interactions, List.map_cons, List.map_nil,

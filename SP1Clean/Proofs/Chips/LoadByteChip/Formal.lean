@@ -44,8 +44,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have epv : ∀ i (hi : i < 4), Expression.eval env input_var_memory_access_prev_value[i]
       = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
   simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega), epv 1 (by omega),
-    epv 2 (by omega), epv 3 (by omega), ← sub_eq_add_neg] at hsel0 hsel1 hsel2 hsel3
-  simp only [eob 0 (by omega), ← sub_eq_add_neg] at hmux
+    epv 2 (by omega), epv 3 (by omega)] at hsel0 hsel1 hsel2 hsel3
+  simp only [eob 0 (by omega)] at hmux
   -- the byte-mux equation in value form.
   have hmux_eq : input_selected_byte = input_offset_bit[0]
       * ((input_selected_limb - input_selected_limb_low_byte) * (256 : ZMod p)⁻¹)
@@ -58,7 +58,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hneg : -(input_is_lb + input_is_lbu) = -1 := by rw [h1]
     have G := hu8 hneg
     have hb := (byteRowSpec_u8range_pair _ _).mp G
-    rw [show (2:ℕ)^8 = 256 from by norm_num, ← sub_eq_add_neg] at hb
+    rw [show (2:ℕ)^8 = 256 from by norm_num] at hb
     exact hb
   -- `selected_byte < 256`, by the byte-mux + the offset-bit-0 case split.
   have h_byte_lt : input_is_lb + input_is_lbu = 1 → input_selected_byte.val < 256 := by
@@ -249,7 +249,7 @@ theorem completeness :
   · exact h_mem
   · -- U8Range-pair receive obligation (real row); value is raw (`toRaw` (gated post-#398)).
     intro _
-    simp only [byteChannel]; rw [← sub_eq_add_neg]
+    simp only [byteChannel]
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hlo_pa, hhi_pa⟩
   · -- MSB receive obligation (real LB row); value is raw (`toRaw` (gated post-#398)).
     intro _
@@ -259,11 +259,11 @@ theorem completeness :
   · exact h_it
   · exact ⟨hbin, fun _ => h_load_isu64⟩
   · trivial
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega), ← sub_eq_add_neg]; exact hsel0
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 1 (by omega), ← sub_eq_add_neg]; exact hsel1
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 2 (by omega), ← sub_eq_add_neg]; exact hsel2
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 3 (by omega), ← sub_eq_add_neg]; exact hsel3
-  · simp only [eob 0 (by omega), ← sub_eq_add_neg]; exact sub_eq_zero_of_eq hmux_pa
+  · simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega)]; exact hsel0
+  · simp only [eob 1 (by omega), eob 2 (by omega), epv 1 (by omega)]; exact hsel1
+  · simp only [eob 1 (by omega), eob 2 (by omega), epv 2 (by omega)]; exact hsel2
+  · simp only [eob 1 (by omega), eob 2 (by omega), epv 3 (by omega)]; exact hsel3
+  · simp only [eob 0 (by omega)]; exact sub_eq_zero_of_eq hmux_pa
   · exact h_op_a_0
   · exact h_msbgate
   · rcases h_lb_bin with h | h <;> rw [h] <;> simp

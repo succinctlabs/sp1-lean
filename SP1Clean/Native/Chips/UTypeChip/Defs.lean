@@ -31,11 +31,11 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 `AddOperation` (gate `is_real - op_a_0`), and `JTypeReader`. Pin the addend per-limb with
 `addend[i] = is_auipc * pc[i]` gates. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var UTypeColumns (ZMod p)) := do
-  let addend ← witnessVector 3 (fun env =>
+  let addend ← witnessVectorNative 3 (fun env =>
     #v[env input.is_auipc * env input.state.pc[0],
        env input.is_auipc * env input.state.pc[1],
        env input.is_auipc * env input.state.pc[2]])
-  let add_value ← witnessVector 4 (fun env =>
+  let add_value ← witnessVectorNative 4 (fun env =>
     AddOperation.populate
       #v[env input.is_auipc * env input.state.pc[0],
          env input.is_auipc * env input.state.pc[1],

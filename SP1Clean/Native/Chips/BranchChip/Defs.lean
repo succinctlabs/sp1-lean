@@ -73,21 +73,21 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
     #v[input.adapter.op_b_memory.prev_value[0], input.adapter.op_b_memory.prev_value[1],
        input.adapter.op_b_memory.prev_value[2], input.adapter.op_b_memory.prev_value[3]]
   -- six opcode flags + is_branching: threaded via ProverHint (not an Inputs field).
-  let flags ← witnessVector 6 (fun env => hintFlags env.hint)
+  let flags ← witnessVectorNative 6 (fun env => hintFlags env.hint)
   let is_beq := flags[0]; let is_bne := flags[1]; let is_blt := flags[2]
   let is_bge := flags[3]; let is_bltu := flags[4]; let is_bgeu := flags[5]
-  let is_branching ← witnessField (fun env => hintBranching env.hint)
-  let branch_value ← witnessVector 4 (fun env =>
+  let is_branching ← witnessNative (var := Expression) (fun env => hintBranching env.hint)
+  let branch_value ← witnessVectorNative 4 (fun env =>
     AddOperation.populate
       #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
       #v[env input.adapter.op_c_imm[0], env input.adapter.op_c_imm[1],
          env input.adapter.op_c_imm[2], env input.adapter.op_c_imm[3]])
-  let fall_value ← witnessVector 4 (fun env =>
+  let fall_value ← witnessVectorNative 4 (fun env =>
     AddOperation.populate
       #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
       #v[4, 0, 0, 0])
   -- next_pc: `is_branching·branch + (is_real - is_branching)·fall` (matches selection asserts below).
-  let next_pc ← witnessVector 3 (fun env =>
+  let next_pc ← witnessVectorNative 3 (fun env =>
     let br := env is_branching
     let re := env input.is_real
     #v[br * env branch_value[0] + (re - br) * env fall_value[0],
@@ -96,7 +96,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
   -- The chip witnesses the `LtOperationSigned` column block (unsigned compare + two sign bits) via
   -- `populate` (`is_signed := is_blt + is_bge`), placed at the same offset the old subcircuit occupied,
   -- then composes `LtOperationSigned.circuit` as a Clean `assertion` (a `FormalAssertion`).
-  let lt_cols ← ProvableType.witness (fun env =>
+  let lt_cols ← witnessNative (var := Var Extracted.LtOperationSigned) (fun env =>
     LtOperationSigned.populate
       #v[env input.adapter.op_a_memory.prev_value[0], env input.adapter.op_a_memory.prev_value[1],
          env input.adapter.op_a_memory.prev_value[2], env input.adapter.op_a_memory.prev_value[3]]

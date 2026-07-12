@@ -210,6 +210,10 @@ goals in `soundness`/`completeness` — where it is applied by `rw [colSum_k]` a
 
 section ColSumExpand
 
+-- The `colSum_k` convolution identities are field-numeral-agnostic; the `2^24 < p` bound
+-- (auto-included from the file `variable` block) is unused here (4.30 `unusedSectionVars`).
+omit [Fact (2 ^ 24 < p)]
+
 lemma colSum_0 (bb cc : Fin 16 → ZMod p) :
     colSum bb cc 0 = byteAt bb 0 * byteAt cc 0 := by
   simp [colSum]

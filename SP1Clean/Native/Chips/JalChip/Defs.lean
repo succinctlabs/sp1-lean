@@ -36,12 +36,12 @@ lemma h14p : (14 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 address) via `AddOperation.populate`, then compose as Clean `assertion`s. The `CPUState` reader is fed
 the data-dependent `next_pc = add_operation.value`; the link add's gate is `is_real - op_a_0`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalColumns (ZMod p)) := do
-  let add_value ← witnessVector 4 (fun env =>
+  let add_value ← witnessVectorNative 4 (fun env =>
     AddOperation.populate
       #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
       #v[env input.adapter.op_b_imm[0], env input.adapter.op_b_imm[1],
          env input.adapter.op_b_imm[2], env input.adapter.op_b_imm[3]])
-  let op_a_value ← witnessVector 4 (fun env =>
+  let op_a_value ← witnessVectorNative 4 (fun env =>
     AddOperation.populate
       #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
       #v[4, 0, 0, 0])
