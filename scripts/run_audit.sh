@@ -34,8 +34,8 @@ echo "== A2 proof-deferral inventory (gate: exactly the known-debt set) =="
 # following tactic block and closes via `sorryAx`, so it is a deferral just like `sorry` and must
 # be tracked here). Update this list (and the docs) when one is closed.
 #   · SP1Ensemble        — `sp1_decoded_rows_sound` (structural typed-decode seam)
-#   · MulChip/Formal      — completeness (Clean-4.30 nativeValue/combinedSize' blowup)
-#   · Branch/Shift{Left,Right}Chip/Formal — completeness (Lean-4.30/4.31 `whnf` regression)
+#   · Branch/Shift{Left,Right}Chip/Formal — completeness (Lean-4.30/4.31 `whnf` regression;
+#     MulChip completeness was restored 2026-07-16 via the recorded normalization pattern)
 #   · DivRemChip/Completeness/Driver — completeness (same blowup; `stop`)
 #   · AIR                  — `supportedCore_orderedRows_dynamic` (the per-row dynamic grounding seam;
 #     `supported_core_witness_grounding` and `supported_core_native_sound` are its proved consumers)
@@ -49,7 +49,6 @@ SP1Clean/Proofs/Chips/ShiftRightChip/Formal.lean
 SP1Clean/Proofs/Chips/BranchChip/Formal.lean
 SP1Clean/Proofs/Chips/DivRemChip/Completeness/Driver.lean
 SP1Clean/Proofs/Chips/DivRemChip/Formal.lean
-SP1Clean/Proofs/Chips/MulChip/Formal.lean
 SP1Clean/Soundness/AIR.lean
 SP1Clean/Soundness/SP1Ensemble.lean
 LIST
@@ -59,7 +58,7 @@ actual=$(grep -rlE "$sorry_re" SP1Clean --include='*.lean' | sort)
 grep -rnE "$sorry_re" SP1Clean --include='*.lean'
 n_exp=$(echo "$expected_sorries" | grep -c .)
 if [ "$actual" = "$(echo "$expected_sorries" | sort)" ]; then
-  echo "PASS: proof-deferral files = expected $n_exp (5 completeness + 1 DivRem contract file + 2 capstone seams)"
+  echo "PASS: proof-deferral files = expected $n_exp (4 completeness + 1 DivRem contract file + 2 capstone seams)"
 else
   echo "FAIL: proof-deferral inventory drifted from the documented set"; fail=1
 fi
@@ -138,8 +137,7 @@ print(f"census entries: {len(entries)}")
 # transitive structure-field contamination, not an additional proof admission; retaining the unified
 # descriptor prevents the circuit registry and routing census from drifting apart.
 allowed = {
-    "SP1Clean.DivRemChip.completeness", "SP1Clean.MulChip.completeness",
-    "SP1Clean.MulChip.circuit",
+    "SP1Clean.DivRemChip.completeness",
     "SP1Clean.BranchChip.completeness", "SP1Clean.BranchChip.circuit",
     "SP1Clean.ShiftLeftChip.completeness", "SP1Clean.ShiftLeftChip.circuit",
     "SP1Clean.ShiftRightChip.completeness", "SP1Clean.ShiftRightChip.circuit",

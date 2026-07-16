@@ -156,13 +156,127 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
       first | exact ha0 | exact ha1 | exact ha2 | exact ha3
 
-set_option warn.sorry false in
 set_option maxHeartbeats 128000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
-  -- COMPLETENESS DEFERRED (Clean 4.30 combinedSize/nativeValue blowup — see docs/proposals/consolidation-progress.md).
-  -- The soundness half is fully proven; completeness is temporarily sorried to unblock the soundness build.
-  sorry
+  circuit_proof_start
+  obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hf4, hsum, hmw_real, hop_a_0, h_cpu,
+    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+  obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
+  -- `h_env` bundles the CPUState GFC obligation (discarded), the flags/`cols`/`a` witness-gen
+  -- equations, and the trailing `RTypeReader` GFC obligation (discarded).
+  obtain ⟨-, h_env_flags, h_env_cols, h_env_a, -⟩ := h_env
+  have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
+  have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using h_env_flags 1
+  have hflag2 : env.get (i₀ + 2) = (hintFlags env.hint)[2] := by simpa using h_env_flags 2
+  have hflag3 : env.get (i₀ + 3) = (hintFlags env.hint)[3] := by simpa using h_env_flags 3
+  have hflag4 : env.get (i₀ + 4) = (hintFlags env.hint)[4] := by simpa using h_env_flags 4
+  have hf0' : env.get i₀ = 0 ∨ env.get i₀ = 1 := by rw [hflag0]; exact hf0
+  have hf1' : env.get (i₀ + 1) = 0 ∨ env.get (i₀ + 1) = 1 := by rw [hflag1]; exact hf1
+  have hf2' : env.get (i₀ + 2) = 0 ∨ env.get (i₀ + 2) = 1 := by rw [hflag2]; exact hf2
+  have hf3' : env.get (i₀ + 3) = 0 ∨ env.get (i₀ + 3) = 1 := by rw [hflag3]; exact hf3
+  have hf4' : env.get (i₀ + 4) = 0 ∨ env.get (i₀ + 4) = 1 := by rw [hflag4]; exact hf4
+  have hsumc : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3)
+      + env.get (i₀ + 4) = input_is_real := by
+    rw [hflag0, hflag1, hflag2, hflag3, hflag4]; exact hsum.symm
+  have hsum01' : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3)
+        + env.get (i₀ + 4) = 0
+      ∨ env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3)
+        + env.get (i₀ + 4) = 1 := by
+    rw [hsumc]; exact hbin
+  have hmw' : env.get (i₀ + 4) = 1 → env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2)
+      + env.get (i₀ + 3) + env.get (i₀ + 4) = 1 := fun h => by
+    rw [hsumc]; exact hmw_real (by rw [← hflag4]; exact h)
+  have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
+  have hbool : ∀ x : ZMod p, x = 0 ∨ x = 1 → x * (x - 1) = 0 := by
+    rintro x (h | h) <;> rw [h] <;> simp
+  -- fold the witness hint's `populate` operands to the evaluated input words
+  simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval] at h_env_cols
+  -- Ascribe `h_env_cols`'s IR-native RHS into the plain `toElements (populate …)` form via a
+  -- *definitional* `have` (the CHEAP reduction), then fold the prev-value operands via `hob`/`hoc` —
+  -- the 4.31 `combinedSize'`/`nativeValue` fix (`docs/proposals/consolidation-progress.md`, "PATTERN
+  -- FULLY PROVEN"). One reusable per-index fact serves both the `Spec` conversion below and the
+  -- `RegisterWrite` `isU64` bullet's `product`/`product_msb` reads.
+  have h_env_cols' : ∀ (i : ℕ) (hi : i < 45), env.toEnvironment.get (i₀ + 5 + i)
+      = (toElements (MulOperation.populate input_adapter_op_b_memory_prev_value
+          input_adapter_op_c_memory_prev_value
+          (env.get (i₀ + 1)) (env.get (i₀ + 3)) (env.get (i₀ + 4))))[i]'hi := fun i hi => by
+    have hc : env.toEnvironment.get (i₀ + 5 + i)
+        = (toElements (MulOperation.populate
+            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value)
+            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value)
+            (env.get (i₀ + 1)) (env.get (i₀ + 3)) (env.get (i₀ + 4))))[i]'hi := h_env_cols ⟨i, hi⟩
+    rwa [hob, hoc] at hc
+  -- The full witnessed-`cols` struct equals `populate …` (per-cell, via `getElem_toElements_eval_
+  -- varFromOffset` + `h_env_cols'`) — reused both by the `Spec` conversion below and by the
+  -- `RegisterWrite` `isU64` bullet's `product`/`product_msb` field reads (sidesteps any manual
+  -- `toElements`/`Vector.getElem_append_*`/cast reasoning about `MulOperation`'s 9-field layout).
+  have hcols_eq : Eval.eval env.toEnvironment
+      (ProvableStruct.varFromOffset Extracted.MulOperation (i₀ + 5) : Var Extracted.MulOperation (ZMod p))
+      = MulOperation.populate input_adapter_op_b_memory_prev_value input_adapter_op_c_memory_prev_value
+          (env.get (i₀ + 1)) (env.get (i₀ + 3)) (env.get (i₀ + 4)) :=
+    (ProvableType.ext_iff (α := Extracted.MulOperation) _ _).mpr (fun i hi =>
+      (getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 5) i hi).trans (h_env_cols' i hi))
+  refine ⟨⟨hbin, h_cpu⟩,
+    ⟨⟨fun _ => ⟨hbU, hcU⟩, hsum01', hmw', hf0', hf1', hf2', hf3', hf4', hsum01'⟩, ?_⟩,
+    by simpa using h_env_a 0, by simpa using h_env_a 1, by simpa using h_env_a 2,
+    by simpa using h_env_a 3,
+    hbool _ hf0', hbool _ hf1', hbool _ hf2', hbool _ hf3', hbool _ hf4', hbool _ hsum01',
+    hop_a_0,
+    ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
+      fun hr => ⟨ha_prev hr, hbU, hcU⟩⟩⟩,
+    by linear_combination -hsumc,
+    ⟨⟨hbin, ?_⟩, trivial⟩,
+    by rcases hbin with h | h <;> rw [h] <;> simp⟩
+  · -- `MulOperation.circuit.Spec` at the witnessed columns: the structural `spec_populate` once the
+    -- witnessed struct equals `populate …` (each cell is `env.get (i₀+5+k)`, pinned by `h_env_cols'`).
+    convert MulOperation.spec_populate (b := input_adapter_op_b_memory_prev_value)
+      (c := input_adapter_op_c_memory_prev_value) hbU hcU
+      (env.get i₀) (env.get (i₀ + 1)) (env.get (i₀ + 2)) (env.get (i₀ + 3)) (env.get (i₀ + 4))
+      (env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3) + env.get (i₀ + 4))
+      hf0' hf1' hf2' hf3' hf4' hsum01' using 2
+    rfl
+    refine (ProvableType.ext_iff (α := Extracted.MulOperation) _ _).mpr (fun i hi => ?_)
+    refine Eq.trans ?_
+      ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 5) i hi).trans
+        (h_env_cols' i hi))
+    simp only [circuit_norm]; rfl
+  · -- RegisterWrite's `isU64 value` (the op_a write push): on a real row the witnessed `a` equals the
+    -- selected product slice `resultWord (populate …)`, whose `isU64` is `spec_populate`'s
+    -- `result_semantic`.
+    intro hr
+    have hsum1 : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3) + env.get (i₀ + 4) = 1 :=
+      hsumc.trans hr
+    have h_mulspec := MulOperation.spec_populate (b := input_adapter_op_b_memory_prev_value)
+      (c := input_adapter_op_c_memory_prev_value) hbU hcU
+      (env.get i₀) (env.get (i₀ + 1)) (env.get (i₀ + 2)) (env.get (i₀ + 3)) (env.get (i₀ + 4))
+      (env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3) + env.get (i₀ + 4))
+      hf0' hf1' hf2' hf3' hf4' hsum01'
+    obtain ⟨hisU64, _, _, _, _, _⟩ := MulOperation.result_semantic
+      ⟨fun _ => ⟨hbU, hcU⟩, hsum01', hmw', hf0', hf1', hf2', hf3', hf4', hsum01'⟩ h_mulspec hsum1
+    rw [show (Vector.map (Expression.eval env.toEnvironment)
+          (Vector.mapRange 4 fun i => var { index := i₀ + 5 + 45 + i }))
+        = MulOperation.resultWord _ _ from ?_]
+    · exact hisU64
+    · -- The `a` slices (`h_env_a`) reference the witnessed product columns `env.get (i₀+5+16+j)`, while
+      -- `aSelector (populate)` references `(populate).product[j]`; they agree because the chip witnesses
+      -- the columns to `populate` (`h_env_cols'`).
+      have hprod : ∀ (j : ℕ) (hj : j < 16),
+          (MulOperation.populate input_adapter_op_b_memory_prev_value input_adapter_op_c_memory_prev_value
+            (env.get (i₀ + 1)) (env.get (i₀ + 3)) (env.get (i₀ + 4))).product[j]'(by omega)
+            = env.get (i₀ + 5 + 16 + j) := fun j hj => by
+        rw [← hcols_eq]; simp only [circuit_norm]
+      have hpmsb : (MulOperation.populate input_adapter_op_b_memory_prev_value
+            input_adapter_op_c_memory_prev_value
+            (env.get (i₀ + 1)) (env.get (i₀ + 3)) (env.get (i₀ + 4))).product_msb.msb
+          = env.get (i₀ + 5 + 16 + 16 + 4 + 4 + 1 + 1) := by
+        rw [← hcols_eq]; simp only [circuit_norm]
+      rw [← MulOperation.aSelector_eq_resultWord _ _ hf0' hf1' hf2' hf3' hf4' hsum1]
+      apply Vector.ext; intro k hk; interval_cases k <;>
+        simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
+          Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+          List.getElem_cons_succ, Nat.reduceLT, dif_pos, hprod, hpmsb] <;>
+        first | exact h_env_a 0 | exact h_env_a 1 | exact h_env_a 2 | exact h_env_a 3
 
 set_option maxHeartbeats 2000000 in
 /-- The `Mul` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `mul`/`mulh`/`mulhu`/`mulhsu`/`mulw`
