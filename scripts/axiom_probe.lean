@@ -357,8 +357,8 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.TraceGenTests.shiftrightchip_trace_conforms
 #print axioms SP1Clean.TraceGenTests.subchip_trace_conforms
 #print axioms SP1Clean.TraceGenTests.subwchip_trace_conforms
+#print axioms SP1Clean.Soundness.Walk.exists_trail
 #print axioms SP1Clean.Soundness.gatedExecution_of_specs_and_balance
-#print axioms SP1Clean.Soundness.GatedVm.exists_trail
 #print axioms SP1Clean.Soundness.state_trail_of_balance
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_intCast_zero
 #print axioms SP1Clean.LookupAccessList.intCast_multiplicitySum_map_toAccess
@@ -382,6 +382,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.sp1_gatedExecution_prereqs
 #print axioms SP1Clean.Soundness.balancedStateTrailFormalEnsemble
 #print axioms SP1Clean.Soundness.balanced_state_trail_soundness
+#print axioms SP1Clean.Soundness.supportedCore_orderedRows_dynamic
 #print axioms SP1Clean.Soundness.supported_core_witness_grounding
 #print axioms SP1Clean.Soundness.supported_core_native_sound
 #print axioms SP1Clean.Soundness.TimedGrounding.walk

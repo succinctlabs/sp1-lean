@@ -330,8 +330,12 @@ witnessing. Defer it until an op's completeness is actually proven (Mul's now is
 
 ## Interaction buses (the CPU-operation / table-interaction representation)
 
-> See `bus-model.md` §0 for the authoritative
-> status. **All four buses emit in-circuit** as Clean `Channel`s (`Model/Channels.lean`:
+> **⚠ Partially historical (2026-07-16).** This section predates the consolidation: the `*Lookups`
+> shadow layer, the `GatedVm/` trail derivation, and the `Trace*Link` threading it describes are the
+> **frozen legacy path**, kept compiled only until `supportedCore_orderedRows_dynamic` closes. The live
+> capstone (`Soundness/AIR.lean` + `TimedGrounding`/`RankedGrounding`/`TypedInteractions`) consumes the
+> Clean channel balances directly — see `docs/overview.md` for the current bus story. `bus-model.md` is
+> likewise historical. **All four buses emit in-circuit** as Clean `Channel`s (`Model/Channels.lean`:
 > `stateChannel`/`byteChannel`/`memoryChannel`/`programChannel`), composed axiom-clean through
 > `Proofs/Chips/AddChip.lean`. **Receiver chips + cross-chip closure:** `Proofs/Chips/ByteChip.lean` +
 > `Proofs/Chips/ProgramChip.lean` are native predicate-model providers (`ByteProvider`/`ProgramProvider`); the
@@ -421,14 +425,14 @@ hypothesis** — exactly as `../sp1-lean` ships it, an honest assumption, not a 
   clears the target's low bit, the cleared limb `add_operation.value[0] - lsb` feeding `CPUState` and the
   `Range((add_operation.value[0] - lsb)/4, 14)` alignment send. Both register through the generalized
   `Soundness.ChipKind` (`view` threads the data-dependent `next_pc`, the reader projects through
-  `<Reader>.toAdapterView`), whose `sailEquiv` quantifies the row's PC read, the register/immediate decode,
+  `<Reader>.toAdapterView`), whose `advance` quantifies the row's PC read, the register/immediate decode,
   `op_a_0`, alignment (and, for JALR, the rs1 read and the LSB-clearing relation `next_pc_word =
   BitVec.update (rs1 + sign_extend imm) 0 0#1`) internally — so the capstone consumes them generically with
-  no central edit. The chip soundness/completeness + the `Faithful/Jal{,r}Chip.lean` assertion anchors are
-  axiom-clean; each `correct_<op>_native` carries **one isolated, documented `sorry`** on the deep
-  `execute_{JAL,JALR}` monad equivalence (the `jump_to` retire-under-alignment + `get_next_pc`/`set_next_pc`/
-  `wX_bits` reduction), the only deferred step in the chain. The interactions-half faithfulness anchors are
-  likewise deferred.
+  no central edit. The chip soundness/completeness, the `Faithful/Jal{,r}Chip.lean` assertion anchors, and
+  the `Bridge.lean` Sail bridges (via the shared `advance_jump_core` computed-`next_pc` core) are all
+  axiom-clean; the former isolated `execute_{JAL,JALR}` monad-equivalence `sorry` was closed during the
+  SC-Phase-4 jump migration. The interactions-half faithfulness anchors remain deferred pending the
+  whole-chip `ChipFaithful` migration.
 - **`x0`-destination chips (LoadX0 + AluX0 — fully axiom-clean).** SP1 routes any instruction writing `x0`
   (the hardwired-zero register) to a dedicated result-discarding chip — loads to `Proofs/Chips/LoadX0Chip/`, ALU ops
   to **`Proofs/Chips/AluX0Chip/`** — and `Soundness/Coverage.lean`'s `routeOf` keys on `(opcode, rd == x0)` exactly as
@@ -439,8 +443,8 @@ hypothesis** — exactly as `../sp1-lean` ships it, an honest assumption, not a 
   effect of `execute_<family> rs2 rs1 0#5 op` is `wX_bits 0#5 result`, and `run_wX_bits` makes a write to
   `x0` a **no-op regardless of the result**, *five generic family-core lemmas* (RTYPE/RTYPEW/ITYPE/MUL/MULW)
   prove `spec_aluX0_<op> ≡ sp1_aluX0` for all 21 covered ALU opcodes with **no `execute_*_pure = RV64.*`
-  result-correctness lemma and no Sail-platform axiom** — the `ChipKind.sailEquiv` is the ungated 21-way
-  conjunction. The Faithful anchor (`Faithful/AluX0.lean`) discharges the *inlined* reader constraints
+  result-correctness lemma and no Sail-platform axiom** — the chip's `ChipKind.advance` dispatches the
+  ungated 29-way opcode conjunction (incl. the Move-2-unblocked MUL/MULHSU cases). The Faithful anchor (`Faithful/AluX0.lean`) discharges the *inlined* reader constraints
   directly (SP1's `eval_op_a_immutable` is a plain method, not an `SP1Operation`, so unlike LoadX0 there is no
   `ALUTypeReaderImmutable.asserts` sub-call). Soundness, completeness, bridge, and anchor are all axiom-clean.
 - **Shift-left chip (SLL + SLLW — soundness proven, axiom-clean).** `Proofs/Chips/ShiftLeftChip.lean` is the first

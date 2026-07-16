@@ -3,12 +3,13 @@ import Mathlib.Data.Multiset.Filter
 import Mathlib.Data.Multiset.AddSub
 import Mathlib.Tactic.Linarith
 
-/-! # Balance ⇒ trail: the Eulerian core of the gated VM
+/-! # Walks and balance ⇒ trail: the abstract multigraph core
 
-> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
-
-The mathematical heart of the gated VM capstone, stated abstractly over a directed multigraph and
-**independent of SP1 / channels / fields**.
+The shared graph substrate of the whole-machine soundness layer, stated abstractly over a directed
+multigraph and **independent of SP1 / channels / fields**. (Relocated from `GatedVm/Chain.lean`: the
+content is live — `IsWalk` is the walk predicate of the production capstone (`Soundness/AIR.lean`) and
+`exists_trail` powers `RankedGrounding.exists_exhaustiveTrail` — only its original Eulerian-capstone
+consumer is the frozen legacy path.)
 
 Model the state bus as a directed multigraph: each real row is an edge `current_state → next_state`
 (`edge a = (current, next)` for `a` ranging over a multiset `E` of row labels), and the boundary
@@ -25,7 +26,7 @@ source shifted one step along, recurse. -/
 
 namespace SP1Clean.Soundness
 
-namespace GatedVm
+namespace Walk
 
 universe u v
 
@@ -112,6 +113,16 @@ theorem exists_trail (edge : α → V × V) (E : Multiset α) :
       refine ⟨e :: path', ⟨he1, hwalk'⟩, ?_⟩
       have hle : (e ::ₘ (↑path' : Multiset α)) ≤ e ::ₘ E.erase e := Multiset.cons_le_cons e hsub'
       rwa [Multiset.cons_erase he_mem] at hle
+
+end Walk
+
+/-! Legacy-name compatibility for the frozen Eulerian path (`GatedVm/{StateBridge,Capstone}.lean`,
+`TargetVm.lean`): the graph core moved to `Soundness.Walk`, and these aliases keep the frozen files
+compiling untouched until their scheduled post-seam deletion. Do not use in new code — write
+`Walk.<name>`. -/
+namespace GatedVm
+
+export Walk (outdeg indeg Balanced IsWalk card_filter_erase balanced_erase exists_trail)
 
 end GatedVm
 

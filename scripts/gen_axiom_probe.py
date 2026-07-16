@@ -40,9 +40,12 @@ TARGETS = [
     # native_decide quarantine); the census still probes them to disclose their ofReduceBool axioms.
     ("SP1CleanTest/WitnessTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
     ("SP1CleanTest/TraceGenTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
+    # The abstract walk/trail core (relocated from GatedVm/Chain.lean; live — used by AIR +
+    # RankedGrounding).
+    ("SP1Clean/Soundness/Walk.lean", r"theorem\s+(exists_trail)\b"),
     ("SP1Clean/Soundness/GatedVm/*.lean",
-     r"theorem\s+(exists_trail|chipRows_step_sound|state_trail_of_balance|"
-     r"gatedExecution_of_specs_and_balance|gatedExecution_allChips)\b"),
+     r"theorem\s+(chipRows_step_sound|state_trail_of_balance|"
+     r"gatedExecution_of_specs_and_balance)\b"),
     # The field⇒ℤ balance bridge (formerly GatedVm/BalanceMod.lean, relocated in W11 Phase 5).
     ("SP1Clean/Model/BalanceBridge.lean",
      r"theorem\s+(isConsistentBalanced_of_intCast_zero|intCast_multiplicitySum_map_toAccess|"
@@ -50,7 +53,8 @@ TARGETS = [
     ("SP1Clean/Soundness/SP1Ensemble.lean",
      r"(?:theorem|def)\s+((?:sp1|balanced)\w*)\b"),
     ("SP1Clean/Soundness/AIR.lean",
-     r"theorem\s+(supported_core_witness_grounding|supported_core_native_sound)\b"),
+     r"theorem\s+(supportedCore_orderedRows_dynamic|supported_core_witness_grounding|"
+     r"supported_core_native_sound)\b"),
     ("SP1Clean/Soundness/TimedGrounding.lean", r"theorem\s+(walk)\b"),
     ("SP1Clean/Soundness/FinishedChannels.lean", r"theorem\s+(sp1_finishedChannel_guarantees)\b"),
     ("SP1Clean/Soundness/ChipRegistry.lean", r"(?:theorem|def)\s+(allChipKinds\w*)\b"),

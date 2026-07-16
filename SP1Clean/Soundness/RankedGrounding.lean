@@ -1,4 +1,4 @@
-import SP1Clean.Soundness.GatedVm.Chain
+import SP1Clean.Soundness.Walk
 import Mathlib.Algebra.BigOperators.Group.Multiset.Basic
 import Mathlib.Algebra.Order.BigOperators.Group.Multiset
 
@@ -20,7 +20,7 @@ separate induction over that trace. -/
 
 namespace SP1Clean.Soundness.RankedGrounding
 
-open SP1Clean.Soundness.GatedVm
+open SP1Clean.Soundness.Walk
 
 universe u v
 

@@ -145,7 +145,7 @@ pull/push pair. -/
 theorem pcWalk_of_decodedStateWalk (data : ProverData (ZMod p)) :
     ∀ {initial final : Channels.StateMsg (ZMod p)}
       {rows : List (DecodedInstructionRow p)},
-      GatedVm.IsWalk (decodedStateEdge data) initial final rows →
+      Walk.IsWalk (decodedStateEdge data) initial final rows →
         PcWalk (fun decoded : DecodedInstructionRow p => decoded.toChipRow data)
           (Semantics.StateMsg.pcBits initial) (Semantics.StateMsg.pcBits final) rows := by
   intro initial final rows walk
@@ -166,7 +166,7 @@ count.  This isolates the purely telescoping part from Memory and Sail-state gro
 theorem clockCount_of_decodedStateWalk (data : ProverData (ZMod p)) :
     ∀ {initial final : Channels.StateMsg (ZMod p)}
       {rows : List (DecodedInstructionRow p)},
-      GatedVm.IsWalk (decodedStateEdge data) initial final rows →
+      Walk.IsWalk (decodedStateEdge data) initial final rows →
       (∀ decoded ∈ rows,
         Semantics.StateMsg.timeNat (decodedStateEdge data decoded).2 =
           Semantics.StateMsg.timeNat (decodedStateEdge data decoded).1 + 8) →
@@ -192,7 +192,7 @@ prefix length. This is the position equation consumed by shard-local Memory curr
 theorem statePullTime_of_decodedStateWalk (data : ProverData (ZMod p)) :
     ∀ {initial final : Channels.StateMsg (ZMod p)}
       {rows : List (DecodedInstructionRow p)},
-      GatedVm.IsWalk (decodedStateEdge data) initial final rows →
+      Walk.IsWalk (decodedStateEdge data) initial final rows →
       (∀ decoded ∈ rows,
         Semantics.StateMsg.timeNat (decodedStateEdge data decoded).2 =
           Semantics.StateMsg.timeNat (decodedStateEdge data decoded).1 + 8) →
@@ -237,7 +237,7 @@ theorem supportedCore_orderedRows_dynamic
     (orderedRows : List (DecodedInstructionRow p))
     (exhaustive : orderedRows.Perm
       (realDecodedInstructionRows witness.data witness.tables))
-    (stateWalk : GatedVm.IsWalk (decodedStateEdge witness.data)
+    (stateWalk : Walk.IsWalk (decodedStateEdge witness.data)
       (initialBoundaryStateMessage statement.publicValues)
       (finalBoundaryStateMessage statement.publicValues) orderedRows) :
     ∀ done decoded suffix, orderedRows = done ++ decoded :: suffix →

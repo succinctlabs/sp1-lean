@@ -308,7 +308,6 @@ import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Native.Readers.RegisterAccessCols
 import SP1Clean.Native.Readers.RegisterAccessTimestamp
 import SP1Clean.Native.Readers.RegisterWrite
-import SP1Clean.Soundness.AllChips
 import SP1Clean.Soundness.ByteConsistency
 import SP1Clean.Soundness.ChipRegistry
 import SP1Clean.Soundness.ChipRow
@@ -317,7 +316,7 @@ import SP1Clean.Soundness.Coverage
 import SP1Clean.Soundness.Decode
 
 import SP1Clean.Soundness.GatedVm.Capstone
-import SP1Clean.Soundness.GatedVm.Chain
+import SP1Clean.Soundness.Walk
 import SP1Clean.Soundness.GatedVm.SailDispatch
 import SP1Clean.Soundness.GatedVm.StateBridge
 import SP1Clean.Soundness.MemoryConsistency

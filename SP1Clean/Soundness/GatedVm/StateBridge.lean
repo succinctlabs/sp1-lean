@@ -1,4 +1,4 @@
-import SP1Clean.Soundness.GatedVm.Chain
+import SP1Clean.Soundness.Walk
 import SP1Clean.Soundness.StateConsistency
 
 /-! # SP1 state bus ⇒ `GatedVm.Balanced`: instantiating the Eulerian core

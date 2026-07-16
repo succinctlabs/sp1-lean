@@ -37,8 +37,8 @@ echo "== A2 proof-deferral inventory (gate: exactly the known-debt set) =="
 #   · MulChip/Formal      — completeness (Clean-4.30 nativeValue/combinedSize' blowup)
 #   · Branch/Shift{Left,Right}Chip/Formal — completeness (Lean-4.30/4.31 `whnf` regression)
 #   · DivRemChip/Completeness/Driver — completeness (same blowup; `stop`)
-#   · AIR                  — `supported_core_witness_grounding` (timed semantic grounding seam;
-#     `supported_core_native_sound` is its proved local-execution consumer)
+#   · AIR                  — `supportedCore_orderedRows_dynamic` (the per-row dynamic grounding seam;
+#     `supported_core_witness_grounding` and `supported_core_native_sound` are its proved consumers)
 #   · DivRemChip/Formal — one explicit `evidenceSoundness` seam from the generated whole-chip
 #     constraints to the isolated four-family evidence contract, plus the requirements-lawfulness
 #     record field. The unused top-level State exposure was retired, closing its former structural
@@ -154,6 +154,7 @@ allowed = {
     "SP1Clean.Soundness.sp1ProviderTables_length",
     "SP1Clean.Soundness.balancedStateTrailFormalEnsemble",
     "SP1Clean.Soundness.balanced_state_trail_soundness",
+    "SP1Clean.Soundness.supportedCore_orderedRows_dynamic",
     "SP1Clean.Soundness.supported_core_witness_grounding",
     "SP1Clean.Soundness.supported_core_native_sound",
     "SP1Clean.Soundness.Target.sp1_target_soundness",

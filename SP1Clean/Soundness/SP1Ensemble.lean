@@ -164,10 +164,12 @@ theorem sp1StateVerifierMain_stateInteractions (pi : Var SP1PublicIO (ZMod p)) (
 /-! ## The SP1 machine as a plain Clean `Ensemble` -/
 
 /-- The Clean-table projection of the 25-entry `supportedChips` descriptor. Every chip's `circuit` is
-wrapped as a Clean AIR `Component` (`⟨chip.circuit⟩`). Every chip's `circuit` is `sorry`-free
-in **both** soundness and completeness, so `#print axioms` on this `def` shows **no** `sorryAx` (only
-`bv_decide`'s `ofReduceBool`/`trustCompiler` ride along, via `Mul`/`Bitwise` soundness). The capstone's
-lone structural `sorryAx` enters separately, through `sp1_decoded_rows_sound`. -/
+wrapped as a Clean AIR `Component` (`⟨chip.circuit⟩`). Disclosed 4.31-migration deferral: `#print axioms`
+on this `def` currently shows `sorryAx`, carried by `DivRem.evidenceSoundness` (+ its two channel-law
+fields) and the five deferred completeness proofs (Branch/Mul/ShiftLeft/ShiftRight/DivRem) — the exact
+gated inventory is `docs/release-audit.md` §0. Every other chip's `circuit` is `sorry`-free in both
+directions (only `bv_decide`'s `ofReduceBool`/`trustCompiler` ride along, via `Mul`/`Bitwise`
+soundness). -/
 def sp1Tables : List (Component (ZMod p)) :=
   (supportedChips (p := p)).map (·.table)
 
