@@ -161,14 +161,14 @@ multiplicity. This is the per-interaction computation the `stateLookups_eq_emitt
 over the recovered `interactionsWith` list. -/
 lemma toAccess_pushIf_state (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : StateMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (stateChannel.pushedIf mult msg).toRaw =
+    AbstractInteraction.toAccess env (pushedIf (channel := stateChannel) mult msg).toRaw =
       (InteractionKind.State, "SP1State",
         [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
          (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val],
         signedVal (Expression.eval env mult)) := by
-  simp only [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pushedIf,
-    VmChannel.toRaw, kindOf, stateChannel, if_true]
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
+    Channel.toRaw, kindOf, stateChannel, if_true]
   simp only [Vector.toList_map, Prod.mk.injEq]
   refine ⟨by trivial, trivial, ?_, trivial⟩
   rw [stateMsg_toList]
@@ -182,14 +182,14 @@ Clean's `VmTables`). Its signed multiplicity is `signedVal (eval env (-gate))`; 
 `assumeGuarantees`, so the projected `LookupAccess` is identical to the old `pushIf (-is_real)` form. -/
 lemma toAccess_pullIf_state (env : Environment (ZMod p)) (gate : Expression (ZMod p))
     (msg : StateMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (stateChannel.pulledIf gate msg).toRaw =
+    AbstractInteraction.toAccess env (pulledIf (channel := stateChannel) gate msg).toRaw =
       (InteractionKind.State, "SP1State",
         [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
          (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp only [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pulledIf,
-    VmChannel.toRaw, kindOf, stateChannel, if_true]
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
+    Channel.toRaw, kindOf, stateChannel, if_true]
   simp only [Vector.toList_map, Prod.mk.injEq]
   refine ⟨by trivial, trivial, ?_, trivial⟩
   rw [stateMsg_toList]
@@ -279,7 +279,7 @@ message (a plain `Channel.emit`, default `toRaw`; post-#398 `circuit_norm` norma
 val-projected, and the signed multiplicity. -/
 lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : ProgramMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (programChannel.pushedIf mult msg).toRaw =
+    AbstractInteraction.toAccess env (pushedIf (channel := programChannel) mult msg).toRaw =
       (InteractionKind.Program, "SP1Program",
         [(Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val, (Expression.eval env msg.opcode).val,
@@ -290,8 +290,8 @@ lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (Z
          (Expression.eval env msg.op_c[3]).val, (Expression.eval env msg.op_a_0).val,
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env mult)) := by
-  simp only [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pushedIf,
-    VmChannel.toRaw, kindOf, programChannel, if_true]
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
+    Channel.toRaw, kindOf, programChannel, if_true]
   simp only [Vector.toList_map, Prod.mk.injEq]
   refine ⟨by trivial, trivial, ?_, trivial⟩
   rw [programMsg_toList]
@@ -306,7 +306,7 @@ proves `ProgramMsg.RowSpec`; chips pull and derive). Its signed multiplicity is 
 `pushIf is_trusted` form modulo the sign. -/
 lemma toAccess_pullIf_program (env : Environment (ZMod p)) (gate : Expression (ZMod p))
     (msg : ProgramMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (programChannel.pulledIf gate msg).toRaw =
+    AbstractInteraction.toAccess env (pulledIf (channel := programChannel) gate msg).toRaw =
       (InteractionKind.Program, "SP1Program",
         [(Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val, (Expression.eval env msg.opcode).val,
@@ -317,8 +317,8 @@ lemma toAccess_pullIf_program (env : Environment (ZMod p)) (gate : Expression (Z
          (Expression.eval env msg.op_c[3]).val, (Expression.eval env msg.op_a_0).val,
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp only [AbstractInteraction.toAccess, VmChannelInteraction.toRaw, VmChannel.pulledIf,
-    VmChannel.toRaw, kindOf, programChannel, if_true]
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
+    Channel.toRaw, kindOf, programChannel, if_true]
   simp only [Vector.toList_map, Prod.mk.injEq]
   refine ⟨by trivial, trivial, ?_, trivial⟩
   rw [programMsg_toList]

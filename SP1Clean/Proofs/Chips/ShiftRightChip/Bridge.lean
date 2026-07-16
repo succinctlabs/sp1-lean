@@ -16,7 +16,7 @@ result register `rd`); the RISC-V Sail spec differs by variant — `spec_srl` (`
 `execute_RTYPE(W)_pure_* = RV64.*` Sail-side identities. The chip `Spec` sources operands from the
 **register read-backs** `adapter.op_b_memory.prev_value` (rs1) / `adapter.op_c_memory.prev_value`
 (rs2) — SP1's shift chip inlines the register-read decomposition — so `h_rs1`/`h_rs2` read those
-adapter columns. The `ChipKind`'s `sailEquiv` is the 4-way flag-dispatched conjunction. -/
+adapter columns. `advance` is the four-way flag-dispatched transition. -/
 
 open LeanRV64D.Defs
 namespace SP1Clean.ShiftRightSail

@@ -1,46 +1,59 @@
-# docs/ — index
+# Documentation index
 
-Topical guides for `sp1-clean-native`. Skim the relevant one when you hit a matching surface.
-The top-level `../README.md` is the public entry point; the always-loaded contributor brief is `../AGENTS.md`.
+The top-level [`README.md`](../README.md) is the public entry point and [`AGENTS.md`](../AGENTS.md) is the
+contributor brief loaded by coding agents. This directory separates current claims from historical design
+records so that an old audit packet is never mistaken for the present theorem boundary.
 
-The docs split into two audiences:
+## Read these first
 
-- **Reader-facing** (understand what the project proves and how much it means) — the top-level files here:
-  `architecture.md`, `release-audit.md`, `roadmap.md`, `bus-model.md`.
-- **Contributor / agent-facing** (the fiddly proof/build techniques used while working on the proofs) — these
-  live under [`agents/`](agents/README.md): `porting-recipe.md`, `proof-patterns.md`, `lean-sail-notes.md`,
-  `extraction.md`, `mul-operation-learnings.md`. Point-in-time snapshots live under
-  [`snapshots/`](snapshots/): `axiom-ledger.md`, `compile-profile.md`.
+1. [`overview.md`](overview.md) — concise, current statement of what is implemented, what is reserved, and
+   where the proof stops.
+2. [`architecture.md`](architecture.md) — the whole-chip verification chain, structural buses, typed witness
+   decode, ranked/timed grounding, and theorem layering.
+3. [`release-audit.md`](release-audit.md) — machine-derived pins, trust boundary, direct-deferral inventory,
+   and `#print axioms` census.
+4. [`roadmap.md`](roadmap.md) — dependency-ordered work toward native AIR, full upstream AIR, execution, and
+   verifier soundness.
+5. [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) — compact current checkpoint
+   board for the architecture-consolidation work.
 
-## What to read first
+The most useful worked example in the source is `SP1Clean/Comparison.lean`; it explains the original Add
+chain and the design choices that led to the current whole-chip boundary.
 
-1. **`architecture.md`** — what this project is and the per-chip pattern. Read before adding a chip.
-2. **`release-audit.md`** — the honest claim + pre-release audit: what is proven, the trust boundary, the
-   axiom census, and the `sorry` inventory. Read before trusting or citing the result.
-3. **`agents/porting-recipe.md`** — the step-by-step checklist to port a new instruction. Your working doc.
-4. **`agents/proof-patterns.md`** — the witnessed-`FormalCircuit` proof recipe + the landmines.
-5. **`agents/lean-sail-notes.md`** — the 4.28 environment: relevant when touching deps, imports, or the Sail side.
+## Current reader-facing docs
 
-The single richest in-repo reference is `SP1Clean/Comparison.lean` — a no-new-proofs findings doc
-recording the worked Add example's six steps end-to-end. The docs here distill it; read it for the full rationale.
+- [`overview.md`](overview.md) — honest current overview; it distinguishes the proved supported-native
+  theorem from the reserved `supported_core_air_sound`, `sp1_air_sound`, `sp1_execution_sound`, and
+  `sp1_verifier_sound` layers.
+- [`architecture.md`](architecture.md) — detailed architecture and migration status.
+- [`release-audit.md`](release-audit.md) — authoritative current proof and trust audit. Regenerate its raw
+  census with `scripts/run_audit.sh` before citing numbers.
+- [`roadmap.md`](roadmap.md) — live debt and dependency graph. Its older W-item narrative is retained as
+  implementation history and explicitly marked as such.
+- [`bus-model.md`](bus-model.md) — the four plain Clean channels and their row-local guarantees.
+- [`chip-standardization.md`](chip-standardization.md) — the completed 25/25 `ChipKind.advance` interface
+  and how the machine layer consumes it.
 
-## Index
+## Design records and audit history
 
-**Reader-facing (top-level)**
-- [overview.md](overview.md) — **SKELETON** of the north-star 5-page overview (the claim, the theorem, the buses, one chip end-to-end, the engine, faithfulness, tests, audit) — drafted against the *proposed* end-state with `[PENDING]` markers; becomes the public entry doc once the consolidation lands.
-- [goal-overview.md](goal-overview.md) — the **TARGET-STATE** version of overview.md, written in the completed voice with no pending markers (empty gap ledger, 26 chips, engine as capstone); the diff against overview.md IS the remaining work. Do not cite as current status.
-- [proposals/2026-07-architecture-consolidation.md](proposals/2026-07-architecture-consolidation.md) — **PROPOSAL**: the deep-audit findings + the one-engine/one-contract/one-theorem end-state, keep/retire/replace verdicts, migration plan, de-risk spikes.
-- [architecture.md](architecture.md) — four-artifact chain (gadget → chip → Sail bridge → faithful anchor), mirror-rust layout, design verdict, design status.
-- [release-audit.md](release-audit.md) — the honest claim, the five-kinds-of-faithfulness analysis, the machine-model divergence catalog, the axiom census, the `sorry` blocker inventory, and the modeling-fidelity / SP1-developer-reactions sections.
-- [roadmap.md](roadmap.md) — open work along two axes: coverage breadth (Axis A) and sound-model depth (Axis B), with the five remaining `sorry`s up front.
-- [bus-model.md](bus-model.md) — the cross-chip interaction-bus model (channels, the static byte table, Guarantees/Requirements duality).
-- [chip-standardization.md](chip-standardization.md) — the uniform per-chip `ChipKind.advance` contract: motivation (spurred by the semantic channels), the two-axis effect model, the generic dispatcher, current progress (21/25 chips), and the decoder-seam deferral.
+- [`proposals/2026-07-architecture-consolidation.md`](proposals/2026-07-architecture-consolidation.md) — the
+  proposal that motivated the one-engine/one-contract split. It is a historical design record; use the
+  progress board and architecture doc for implemented state.
+- [`audits/2026-07-full-project/`](audits/2026-07-full-project/) — frozen repository-wide audit at
+  `6c399dbd` before the remediation work. Its findings are preserved as evidence, with a post-audit note
+  pointing to the current status; it is not a description of today's worktree.
+- [`goal-overview.md`](goal-overview.md) — aspirational completed-state document for the full AIR,
+  boot-to-halt, and ArkLib verifier layers. Do not cite it as current status.
 
-**Contributor / agent-facing** — see [`agents/README.md`](agents/README.md) for the full index.
-- [agents/porting-recipe.md](agents/porting-recipe.md) — create the four artifacts, wire the root import, verify build + axioms; reuse Clean's native gadgets instead of an SP1 byte-bus.
-- [agents/proof-patterns.md](agents/proof-patterns.md) — soundness/completeness skeleton for witnessed gadgets; `ZMod p` / `Word` / `circuit_proof_start` landmines; `maxHeartbeats` floors.
-- [agents/lean-sail-notes.md](agents/lean-sail-notes.md) — Lean 4.28 + public Clean `main` + the GitHub-fetched Sail deps; the `lake update` toolchain-bump trap; the Clean-main ↔ Batteries `Fin.foldl` collision and the import-narrowing fix.
-- [agents/extraction.md](agents/extraction.md) — the constraint-extraction pipeline (`sp1-constraint-compiler` → `update_extracted.py` → Lean) and the DSL contract.
-- [snapshots/axiom-ledger.md](snapshots/axiom-ledger.md) — the machine-checked `#print axioms` inventory per theorem (re-generate from a green build before release).
-- [snapshots/compile-profile.md](snapshots/compile-profile.md) — per-module elaboration profile + worst offenders (a point-in-time snapshot).
-- [agents/mul-operation-learnings.md](agents/mul-operation-learnings.md) — Mul-specific soundness/completeness pitfalls (the 16-limb schoolbook multiply).
+## Contributor and agent docs
+
+See [`agents/README.md`](agents/README.md) for the full index:
+
+- [`agents/porting-recipe.md`](agents/porting-recipe.md) — chip-porting checklist.
+- [`agents/proof-patterns.md`](agents/proof-patterns.md) — circuit proof recipes and Lean/Clean landmines.
+- [`agents/lean-sail-notes.md`](agents/lean-sail-notes.md) — Lean 4.31 dependency and Sail environment.
+- [`agents/extraction.md`](agents/extraction.md) — Rust extraction and generated-artifact contract.
+- [`agents/mul-operation-learnings.md`](agents/mul-operation-learnings.md) — multiplication-specific proofs.
+
+Point-in-time generated records live in [`snapshots/`](snapshots/), notably the axiom census and compile
+profile. They should be regenerated before a release rather than treated as evergreen prose.

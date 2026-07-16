@@ -145,6 +145,9 @@ lemma val_4_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (4 : ZMod p) ≠ 0 := by
   have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   exact ZMod.val_natCast_of_lt (show (8 : ℕ) < p by omega)
 
+lemma val_8_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (8 : ZMod p) ≠ 0 := by
+  simp [← ZMod.val_eq_zero, val_8_zmod_p]
+
 @[simp] lemma val_13_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
     (13 : ZMod p).val = 13 := by
   have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega

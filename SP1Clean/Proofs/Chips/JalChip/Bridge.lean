@@ -221,10 +221,8 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) (
   · rw [vrd, hspec.2.2.2.1 hreal' hopa0, hpcw, toBitVec64_four]
 
 /-- JAL's `ChipKind` registration. `view` threads `next_pc = add_operation.value` (the data-dependent
-jump target), J-type adapter, opcode 46. `sailEquiv` quantifies the PC/decode preconditions internally
-(JAL reads no source registers); the jump-target alignment is no longer a precondition — `reaches_sail`
-derives it from the chip `Spec`. `reaches_sail` is `jal_chip_reaches_sail`; `advance`/`advanceReady` (SC
-Phase 4) route to `JalChip.advance`. -/
+jump target), J-type adapter, opcode 46. `advance` derives jump-target alignment from the chip `Spec`
+and consumes the committed decode directly; JAL reads no source registers. -/
 def kind : Soundness.ChipKind p where
   name := "Jal"
   Inputs := JalChip.Inputs

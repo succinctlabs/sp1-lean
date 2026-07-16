@@ -12,8 +12,8 @@ and which Sail op does it reach?" It mirrors SP1's two-part structure:
   `rd == x0` → `LoadX0`; otherwise by width).
 
 **Decidable auditing.** Each `ChipKind` carries function fields (no `DecidableEq`), so the audit guards
-route through the chip's `name : String` (added in `ChipRow.lean`): `routeName` is a `p`-free `String`
-shadow of `routeOf`, over which the covered/uncovered ledger, the partition of the opcode alphabet, and
+route through the chip's `name : String` (added in `ChipRow.lean`): `routeName` is the `String`
+projection of `routeOf`, over which the covered/uncovered ledger, the partition of the opcode alphabet, and
 "routing reaches exactly the wired set" are all `by decide`. The `kind`-level table `coverage` is tied to
 the registry by `rfl` (`coverage.map (·.kind) = allChipKinds`).
 
@@ -34,98 +34,28 @@ open Sail LeanRV64D LeanRV64D.Functions
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 
-/-! ## The `rd == x0` routing guard -/
-
-/-- The `op_a == 0` (write-to-`x0`) condition under which a chip claims its opcodes, mirroring SP1's
-`tracing.rs`: ALU ops with `rd == x0` route to `AluX0` (not ported) — *not* the ALU chip; loads with
-`rd == x0` route to `LoadX0` — *not* the width chip; stores / branches / jumps / U-type ignore `rd`. -/
-inductive RdGuard where
-  /-- Routes here regardless of `rd` (stores, branches, JAL/JALR, U-type). -/
-  | any
-  /-- Routes here only when `rd ≠ x0` (the ALU chips and the width load chips). -/
-  | nonX0
-  /-- Routes here only when `rd == x0` (`LoadX0`). -/
-  | onlyX0
-  deriving DecidableEq, Repr
-
-/-- Whether the guard fires for a given `rd == x0` bit. -/
-def RdGuard.holds : RdGuard → Bool → Bool
-  | .any,    _ => true
-  | .nonX0,  b => !b
-  | .onlyX0, b => b
-
 /-! ## Routing (the `tracing.rs` mirror)
 
-`routeName` is the `p`-free `String` cascade (the decidable shadow); `routeOf` is the same cascade
-returning the actual `ChipKind p` (consumed by `Soundness/InstructionTrace.lean`). `routeName_eq` keeps
-them in lock-step. -/
+Both functions search the one `SupportedMachine.supportedChips` descriptor: `routeName` projects its
+human-readable name and `routeOf` its actual `ChipKind p`. -/
 
-/-- The instruction → chip-**name** routing: a `p`-free mirror of SP1's `tracing.rs` opcode dispatch,
+/-- The instruction → chip-**name** routing: the decidable projection of SP1's `tracing.rs` opcode dispatch,
 keyed on `(opcode, rd == x0)`. `none` = uncovered (DivRem family, system traps). ALU ops with `rd == x0`
 route to `AluX0` (the result-discarding fast path), exactly as SP1's `tracing.rs`. -/
 def routeName (op : Opcode) (rdIsX0 : Bool) : Option String :=
-  match op with
-  | .ADD  => if rdIsX0 then some "AluX0" else some "Add"
-  | .ADDI => if rdIsX0 then some "AluX0" else some "Addi"
-  | .ADDW => if rdIsX0 then some "AluX0" else some "Addw"
-  | .SUB  => if rdIsX0 then some "AluX0" else some "Sub"
-  | .SUBW => if rdIsX0 then some "AluX0" else some "Subw"
-  | .XOR | .OR | .AND => if rdIsX0 then some "AluX0" else some "Bitwise"
-  | .SLT | .SLTU => if rdIsX0 then some "AluX0" else some "Lt"
-  | .SLL | .SLLW => if rdIsX0 then some "AluX0" else some "ShiftLeft"
-  | .SRL | .SRA | .SRLW | .SRAW => if rdIsX0 then some "AluX0" else some "ShiftRight"
-  | .MUL | .MULH | .MULHU | .MULHSU | .MULW => if rdIsX0 then some "AluX0" else some "Mul"
-  | .DIV | .DIVU | .REM | .REMU | .DIVW | .DIVUW | .REMW | .REMUW =>
-      if rdIsX0 then some "AluX0" else some "DivRem"
-  | .LB | .LBU => if rdIsX0 then some "LoadX0" else some "LoadByte"
-  | .LH | .LHU => if rdIsX0 then some "LoadX0" else some "LoadHalf"
-  | .LW | .LWU => if rdIsX0 then some "LoadX0" else some "LoadWord"
-  | .LD => if rdIsX0 then some "LoadX0" else some "LoadDouble"
-  | .SB => some "StoreByte"
-  | .SH => some "StoreHalf"
-  | .SW => some "StoreWord"
-  | .SD => some "StoreDouble"
-  | .BEQ | .BNE | .BLT | .BGE | .BLTU | .BGEU => some "Branch"
-  | .JAL => some "Jal"
-  | .JALR => some "Jalr"
-  | .AUIPC | .LUI => some "UType"
-  | _ => none
+  (routeChip (p := p) op rdIsX0).map (·.kind.name)
 
-/-- The instruction → `ChipKind` routing — the same cascade as `routeName`, returning the wired chip's
-`kind`. This is what `Soundness/InstructionTrace.lean` turns instructions into `ChipRow`s with. -/
+/-- The instruction → `ChipKind` routing — the same descriptor search as `routeName`, returning the wired chip's
+`kind`. The witness decoder and timed grounding layer consume this routing identity. -/
 def routeOf (op : Opcode) (rdIsX0 : Bool) : Option (ChipKind p) :=
-  match op with
-  | .ADD  => if rdIsX0 then some AluX0Chip.kind else some AddChip.kind
-  | .ADDI => if rdIsX0 then some AluX0Chip.kind else some AddiChip.kind
-  | .ADDW => if rdIsX0 then some AluX0Chip.kind else some AddwChip.kind
-  | .SUB  => if rdIsX0 then some AluX0Chip.kind else some SubChip.kind
-  | .SUBW => if rdIsX0 then some AluX0Chip.kind else some SubwChip.kind
-  | .XOR | .OR | .AND => if rdIsX0 then some AluX0Chip.kind else some BitwiseChip.kind
-  | .SLT | .SLTU => if rdIsX0 then some AluX0Chip.kind else some LtChip.kind
-  | .SLL | .SLLW => if rdIsX0 then some AluX0Chip.kind else some ShiftLeftChip.kind
-  | .SRL | .SRA | .SRLW | .SRAW => if rdIsX0 then some AluX0Chip.kind else some ShiftRightChip.kind
-  | .MUL | .MULH | .MULHU | .MULHSU | .MULW => if rdIsX0 then some AluX0Chip.kind else some MulChip.kind
-  | .DIV | .DIVU | .REM | .REMU | .DIVW | .DIVUW | .REMW | .REMUW =>
-      if rdIsX0 then some AluX0Chip.kind else some DivRemChip.kind
-  | .LB | .LBU => if rdIsX0 then some LoadX0Chip.kind else some LoadByteChip.kind
-  | .LH | .LHU => if rdIsX0 then some LoadX0Chip.kind else some LoadHalfChip.kind
-  | .LW | .LWU => if rdIsX0 then some LoadX0Chip.kind else some LoadWordChip.kind
-  | .LD => if rdIsX0 then some LoadX0Chip.kind else some LoadDoubleChip.kind
-  | .SB => some StoreByteChip.kind
-  | .SH => some StoreHalfChip.kind
-  | .SW => some StoreWordChip.kind
-  | .SD => some StoreDoubleChip.kind
-  | .BEQ | .BNE | .BLT | .BGE | .BLTU | .BGEU => some BranchChip.kind
-  | .JAL => some JalChip.kind
-  | .JALR => some JalrChip.kind
-  | .AUIPC | .LUI => some UTypeChip.kind
-  | _ => none
+  (routeChip (p := p) op rdIsX0).map (·.kind)
 
 /-- `routeOf` and its `String` shadow agree: `routeName = (routeOf …).map (·.name)`. Keeps the decidable
 audits below (stated on `routeName`) honest about the real `kind`-level routing. -/
 theorem routeName_eq (op : Opcode) (rdIsX0 : Bool) :
-    routeName op rdIsX0 = ((routeOf (p := p) op rdIsX0).map (·.name)) := by
-  cases op <;> cases rdIsX0 <;> rfl
+    routeName (p := p) op rdIsX0 = ((routeOf (p := p) op rdIsX0).map (·.name)) := by
+  unfold routeName routeOf
+  cases routeChip (p := p) op rdIsX0 <;> rfl
 
 /-! ## The covered / uncovered ledger (over the full `Opcode` alphabet) -/
 
@@ -154,84 +84,101 @@ theorem opcode_class_disjoint :
 
 /-- The ledger is exactly the routing: covered ⟺ routes somewhere. -/
 theorem covered_iff_routed : ∀ op ∈ Opcode.all,
-    (op ∈ coveredOpcodes ↔ ((routeName op false).isSome ∨ (routeName op true).isSome)) := by decide
+    (op ∈ coveredOpcodes ↔
+      ((routeName (p := p) op false).isSome ∨ (routeName (p := p) op true).isSome)) := by
+  intro op _
+  cases op <;>
+    simp [coveredOpcodes, routeName, routeChip, supportedChips, SupportedChip.claims, RdGuard.holds]
 
 /-- Uncovered ⟺ routes nowhere (for either `rd`). -/
 theorem uncovered_iff_unrouted : ∀ op ∈ Opcode.all,
-    (op ∈ uncoveredOpcodes ↔ ((routeName op false).isNone ∧ (routeName op true).isNone)) := by decide
+    (op ∈ uncoveredOpcodes ↔
+      ((routeName (p := p) op false).isNone ∧ (routeName (p := p) op true).isNone)) := by
+  intro op _
+  cases op <;>
+    simp [uncoveredOpcodes, routeName, routeChip, supportedChips, SupportedChip.claims, RdGuard.holds]
 
 /-! ## Routing reaches exactly the wired chip set -/
 
 /-- The 25 wired chip names, in `allChipKinds` order. -/
 def wiredNames : List String :=
-  ["Add", "Addi", "Addw", "Sub", "Subw", "Bitwise", "Lt", "ShiftLeft", "ShiftRight",
-   "Jal", "Jalr", "Branch", "UType",
-   "LoadByte", "LoadHalf", "LoadWord", "LoadDouble", "LoadX0",
-   "StoreByte", "StoreHalf", "StoreWord", "StoreDouble", "Mul", "DivRem", "AluX0"]
+  (supportedChips (p := p)).map (·.kind.name)
 
 /-- Every chip name `routeName` can produce (with duplicates; membership is all the audits below need). -/
 def reachableNames : List String :=
-  Opcode.all.filterMap (fun op => routeName op false) ++
-  Opcode.all.filterMap (fun op => routeName op true)
+  Opcode.all.filterMap (fun op => routeName (p := p) op false) ++
+  Opcode.all.filterMap (fun op => routeName (p := p) op true)
+
+/-- A small routing witness for every wired instruction chip, in descriptor order.  Keeping this
+separate from the full opcode cross-product makes the no-dead-chip proof structural rather than a
+large kernel reduction over the circuit-bearing `supportedChips` records. -/
+def routingWitnesses : List (Opcode × Bool) :=
+  [(.ADD, false), (.ADDI, false), (.ADDW, false), (.SUB, false), (.SUBW, false),
+   (.XOR, false), (.SLT, false), (.SLL, false), (.SRL, false), (.JAL, false),
+   (.JALR, false), (.BEQ, false), (.AUIPC, false), (.LB, false), (.LH, false),
+   (.LW, false), (.LD, false), (.LB, true), (.SB, false), (.SH, false), (.SW, false),
+   (.SD, false), (.MUL, false), (.DIV, false), (.ADD, true)]
+
+theorem routingWitnesses_valid :
+    ∀ witness ∈ routingWitnesses, witness.1 ∈ Opcode.all := by decide
+
+theorem routingWitnessNames_eq_wired :
+    routingWitnesses.filterMap (fun witness =>
+      routeName (p := p) witness.1 witness.2) = wiredNames (p := p) := rfl
+
+private theorem routeName_mem_wired {op : Opcode} {rdIsX0 : Bool} {nm : String}
+    (h : routeName (p := p) op rdIsX0 = some nm) : nm ∈ wiredNames (p := p) := by
+  unfold routeName at h
+  obtain ⟨chip, hchip, rfl⟩ := Option.map_eq_some_iff.mp h
+  simp only [wiredNames, List.mem_map]
+  exact ⟨chip, List.mem_of_find?_eq_some hchip, rfl⟩
 
 /-- Routing never reaches a non-wired chip… -/
-theorem reachable_subset_wired : ∀ nm ∈ reachableNames, nm ∈ wiredNames := by decide
+theorem reachable_subset_wired :
+    ∀ nm ∈ reachableNames (p := p), nm ∈ wiredNames (p := p) := by
+  intro nm h
+  simp only [reachableNames, List.mem_append, List.mem_filterMap] at h
+  obtain ⟨op, _, hop⟩ | ⟨op, _, hop⟩ := h
+  · exact routeName_mem_wired hop
+  · exact routeName_mem_wired hop
 
 /-- …and every wired chip is reached by some instruction (no dead-wired chip). -/
-theorem wired_subset_reachable : ∀ nm ∈ wiredNames, nm ∈ reachableNames := by decide
+theorem wired_subset_reachable :
+    ∀ nm ∈ wiredNames (p := p), nm ∈ reachableNames (p := p) := by
+  intro nm h
+  rw [← routingWitnessNames_eq_wired] at h
+  obtain ⟨⟨op, rdIsX0⟩, hwitness, hroute⟩ := List.mem_filterMap.mp h
+  have hopcode : op ∈ Opcode.all := routingWitnesses_valid (op, rdIsX0) hwitness
+  simp only [reachableNames, List.mem_append, List.mem_filterMap]
+  cases rdIsX0
+  · exact Or.inl ⟨op, hopcode, hroute⟩
+  · exact Or.inr ⟨op, hopcode, hroute⟩
 
 /-- The wired names are exactly the registry's `name`s — ties the audit's `String` layer to the real
 `allChipKinds` (whose `ChipKind`s have no `DecidableEq`). -/
-theorem wiredNames_eq_registry : (allChipKinds (p := p)).map (·.name) = wiredNames := rfl
+theorem wiredNames_eq_registry :
+    (allChipKinds (p := p)).map (·.name) = wiredNames (p := p) := rfl
 
 /-! ## The `kind`-level coverage table (the human-readable census) -/
 
-/-- One row of the coverage census: a wired chip, the opcodes routed to it, and its `rd`-guard. -/
-structure CoverageEntry (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
-  kind : ChipKind p
-  opcodes : List Opcode
-  rdGuard : RdGuard
+/-- Compatibility name for one row of the now-unified supported-machine descriptor. -/
+abbrev CoverageEntry := SupportedChip
 
 /-- **The coverage table** — one entry per wired chip, in `allChipKinds` order, mirroring SP1's
 `tracing.rs` routing arms. Read top-to-bottom this *is* the instruction-coverage census. -/
 def coverage : List (CoverageEntry p) :=
-  [ ⟨AddChip.kind,        [.ADD],                       .nonX0⟩,
-    ⟨AddiChip.kind,       [.ADDI],                      .nonX0⟩,
-    ⟨AddwChip.kind,       [.ADDW],                      .nonX0⟩,
-    ⟨SubChip.kind,        [.SUB],                       .nonX0⟩,
-    ⟨SubwChip.kind,       [.SUBW],                      .nonX0⟩,
-    ⟨BitwiseChip.kind,    [.XOR, .OR, .AND],            .nonX0⟩,
-    ⟨LtChip.kind,         [.SLT, .SLTU],                .nonX0⟩,
-    ⟨ShiftLeftChip.kind,  [.SLL, .SLLW],                .nonX0⟩,
-    ⟨ShiftRightChip.kind, [.SRL, .SRA, .SRLW, .SRAW],   .nonX0⟩,
-    ⟨JalChip.kind,        [.JAL],                       .any⟩,
-    ⟨JalrChip.kind,       [.JALR],                      .any⟩,
-    ⟨BranchChip.kind,     [.BEQ, .BNE, .BLT, .BGE, .BLTU, .BGEU], .any⟩,
-    ⟨UTypeChip.kind,      [.AUIPC, .LUI],               .any⟩,
-    ⟨LoadByteChip.kind,   [.LB, .LBU],                  .nonX0⟩,
-    ⟨LoadHalfChip.kind,   [.LH, .LHU],                  .nonX0⟩,
-    ⟨LoadWordChip.kind,   [.LW, .LWU],                  .nonX0⟩,
-    ⟨LoadDoubleChip.kind, [.LD],                        .nonX0⟩,
-    ⟨LoadX0Chip.kind,     [.LB, .LBU, .LH, .LHU, .LW, .LWU, .LD], .onlyX0⟩,
-    ⟨StoreByteChip.kind,  [.SB],                        .any⟩,
-    ⟨StoreHalfChip.kind,  [.SH],                        .any⟩,
-    ⟨StoreWordChip.kind,  [.SW],                        .any⟩,
-    ⟨StoreDoubleChip.kind,[.SD],                        .any⟩,
-    ⟨MulChip.kind,        [.MUL, .MULH, .MULHU, .MULHSU, .MULW], .nonX0⟩,
-    ⟨DivRemChip.kind,     [.DIV, .DIVU, .REM, .REMU, .DIVW, .DIVUW, .REMW, .REMUW], .nonX0⟩,
-    ⟨AluX0Chip.kind,      [.ADD, .ADDI, .ADDW, .SUB, .SUBW, .XOR, .OR, .AND, .SLT, .SLTU,
-                           .SLL, .SLLW, .SRL, .SRA, .SRLW, .SRAW,
-                           .MUL, .MULH, .MULHU, .MULHSU, .MULW,
-                           .DIV, .DIVU, .REM, .REMU, .DIVW, .DIVUW, .REMW, .REMUW], .onlyX0⟩ ]
+  supportedChips (p := p)
 
 /-- The census' chips are **exactly** the registry, in order (`ChipKind` has no `DecidableEq`, but the
 two lists are the same terms, so this is `rfl`). -/
-theorem coverage_kinds_eq_registry : (coverage (p := p)).map (·.kind) = allChipKinds := rfl
+theorem coverage_kinds_eq_registry :
+    (coverage (p := p)).map (·.kind) = allChipKinds (p := p) := rfl
 
 theorem coverage_length : (coverage (p := p)).length = 25 := rfl
 
 /-- The census' names match the wired-name list. -/
-theorem coverage_names : (coverage (p := p)).map (fun e => e.kind.name) = wiredNames := rfl
+theorem coverage_names :
+    (coverage (p := p)).map (fun e => e.kind.name) = wiredNames (p := p) := rfl
 
 /-- The per-chip opcode census, read straight off the table. -/
 theorem coverage_opcodes :
@@ -251,23 +198,23 @@ theorem coverage_opcodes :
 
 /-! ## Worked routing examples (the readable mapping) -/
 
-example : routeName .ADD false = some "Add" := rfl
-example : routeName .ADD true  = some "AluX0" := rfl      -- ALU into x0 → AluX0 (result discarded)
-example : routeName .XOR false = some "Bitwise" := rfl
-example : routeName .SRAW false = some "ShiftRight" := rfl
-example : routeName .LD false = some "LoadDouble" := rfl
-example : routeName .LD true  = some "LoadX0" := rfl       -- any load into x0 → LoadX0
-example : routeName .LB true  = some "LoadX0" := rfl
-example : routeName .SB true  = some "StoreByte" := rfl    -- stores ignore rd
-example : routeName .BEQ false = some "Branch" := rfl
-example : routeName .JALR false = some "Jalr" := rfl
-example : routeName .LUI false = some "UType" := rfl
-example : routeName .MUL false = some "Mul" := rfl
-example : routeName .MUL true  = some "AluX0" := rfl       -- ALU into x0 → AluX0 (result discarded)
-example : routeName .MULHSU false = some "Mul" := rfl
-example : routeName .DIV false = some "DivRem" := rfl      -- DIV/REM family → DivRem (rd ≠ x0)
-example : routeName .DIV true  = some "AluX0" := rfl        -- DIV/REM into x0 → AluX0
-example : routeName .REMUW false = some "DivRem" := rfl
-example : routeName .ECALL false = none := rfl
+example : routeName (p := p) .ADD false = some "Add" := rfl
+example : routeName (p := p) .ADD true = some "AluX0" := rfl -- ALU into x0 → AluX0
+example : routeName (p := p) .XOR false = some "Bitwise" := rfl
+example : routeName (p := p) .SRAW false = some "ShiftRight" := rfl
+example : routeName (p := p) .LD false = some "LoadDouble" := rfl
+example : routeName (p := p) .LD true = some "LoadX0" := rfl -- any load into x0 → LoadX0
+example : routeName (p := p) .LB true = some "LoadX0" := rfl
+example : routeName (p := p) .SB true = some "StoreByte" := rfl -- stores ignore rd
+example : routeName (p := p) .BEQ false = some "Branch" := rfl
+example : routeName (p := p) .JALR false = some "Jalr" := rfl
+example : routeName (p := p) .LUI false = some "UType" := rfl
+example : routeName (p := p) .MUL false = some "Mul" := rfl
+example : routeName (p := p) .MUL true = some "AluX0" := rfl -- ALU into x0 → AluX0
+example : routeName (p := p) .MULHSU false = some "Mul" := rfl
+example : routeName (p := p) .DIV false = some "DivRem" := rfl -- DIV/REM family → DivRem
+example : routeName (p := p) .DIV true = some "AluX0" := rfl -- DIV/REM into x0 → AluX0
+example : routeName (p := p) .REMUW false = some "DivRem" := rfl
+example : routeName (p := p) .ECALL false = none := rfl
 
 end SP1Clean.Soundness

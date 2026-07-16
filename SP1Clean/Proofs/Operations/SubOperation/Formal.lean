@@ -1,12 +1,12 @@
 import SP1Clean.Native.Operations.SubOperation.RawSpec
 import SP1Clean.Native.Operations.SubOperation.Populate
+import SP1Clean.Native.Operations.SubOperation.Defs
 
 /-! # `SubOperation` — the `FormalAssertion` (soundness / completeness / contract)
 
-SP1's `SubOperation::eval` as a Clean `FormalAssertion`: the `Assumptions`, the soundness/completeness
-proofs (routing through `RawSpec`'s `subSemantics_of_carries`/`carries_of_subSemantics`), and the bundled
-`circuit`. The arithmetic core lives in `RawSpec`, the elaborated circuit in `Extracted`, the `populate`
-witness in `Populate`. -/
+The local subtraction gadget as a Clean `FormalAssertion`. Soundness/completeness route through
+`RawSpec`'s `subSemantics_of_carries`/`carries_of_subSemantics`; no Rust operation artifact is part of
+this proof. -/
 
 namespace SP1Clean.SubOperation
 
@@ -89,16 +89,23 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       · rw [one_mul]; rcases hc2 with h | h <;> rw [h] <;> simp
       · rw [one_mul]; rcases hc3 with h | h <;> rw [h] <;> simp
 
-/-- SP1's `SubOperation::eval` as a Clean-native `FormalAssertion`. -/
-def circuit : FormalAssertion (ZMod p) Inputs :=
-  { main, elaborated,
-    Assumptions := Assumptions,
-    Spec := Spec,
-    soundness := soundness,
-    completeness := completeness,
-    channelsWithRequirements := [],
-    requirementsChannelsLawful := fun input_var i₀ => by
-      simp only [circuit_norm, main, byteChannel]; grind }
+/-- The proof-oriented local subtraction gadget as a Clean-native `FormalAssertion`. -/
+def circuit : FormalAssertion (ZMod p) Inputs where
+  main
+  elaborated
+  Assumptions := Assumptions
+  Spec := Spec
+  soundness := soundness
+  completeness := completeness
+  channelsWithRequirements := []
+  requirementsChannelsLawful input_var i₀ := by
+    simp only [circuit_norm, main, byteChannel]
+    intro env h_constraints
+    have h_bool : (ProvableStruct.eval env input_var).is_real = 0 ∨
+        (ProvableStruct.eval env input_var).is_real = 1 :=
+      bool_of_mul_pred h_constraints.1
+    refine ⟨?_, ?_, ?_, ?_⟩ <;> intro h1 h0 <;>
+      exact off_gate_vacuous h_bool h1 h0
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

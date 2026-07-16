@@ -3,7 +3,8 @@
 ## The thesis
 
 `sp1-clean-native` verifies SP1's RISC-V chips by writing **semantic** Clean circuits whose arithmetic is
-**re-derived natively**, then anchoring them to both the RISC-V Sail spec and SP1's own operation constraints.
+**re-derived natively**, then anchoring each complete chip to both the RISC-V Sail spec and SP1's complete
+chip AIR.
 This is the opposite of the `sp1-lean`/`SP1Clean` approach, which writes *structural* specs (restatements of the
 constraint list) and *borrows* the arithmetic and Sail semantics from `SP1Operations`/`SP1Chips`.
 
@@ -12,86 +13,124 @@ axiom-clean, and comes out **comparable or smaller** than the borrowing structur
 self-contained. The Bitwise chip reproduces the pattern at full parity. The pattern is the product; new chips
 are scale-out.
 
-## The four-artifact chain (per operation)
+## Whole-machine theorem stack
 
-For an operation `<Op>` (e.g. `Add`, `BitwiseU16`):
+The circuit and proof-system boundaries are intentionally separate:
 
-1. **`Native/Operations/<Op>/` (`Populate`/`RawSpec`, or a flat `Native/Operations/<Op>.lean`) +
-   `Proofs/Operations/<Op>/Formal.lean` — witnessed `FormalCircuit` gadget.**
-   Inputs the operand words; **witnesses** the result word (its base-2^16 limbs / bytes); range-checks each
-   limb with Clean's native `Gadgets.ToBits.rangeCheck` (or a proven Clean table like `ByteXorTable` for
-   bitwise); asserts the operation's relation. Its `Inputs` struct and **semantic** `Spec`
-   (`Word.toBitVec64 value = <RV64 op of the inputs>`) live in `FormalModel/Contracts/Operations.lean` (the consolidated
-   spec layer — see below); the local `RawSpec` stays in *this* file, next to the proofs that consume it,
-   capturing the carry-bool/range or per-byte form, and `*_of_<raw>` / `<raw>_of_*` lemmas (native ports of
-   sp1-lean's `spec`/`spec_inv`) prove `RawSpec ↔ semantic`. **soundness + completeness** both close
-   natively — no `SP1Operations` borrow.
+1. Plain Clean channels enforce structural interaction equality. State records `(clock, pc)` edges;
+   Program records decoded fetch rows; Memory records timestamped locations and values; Byte records
+   finite lookup facts. State does not locally assume reachability and Program does not locally assume
+   ROM commitment.
+2. `Soundness/TimedGrounding.lean` interprets balanced records in time order. Its current proved scope is
+   the ordinary, register-only slice; RAM, repeated touches, state bumps, and syscalls are explicit open
+   generalizations.
+3. `Model/Machine/{Boot,Schedule,Execution}.lean` defines the native semantic machine. A fixed
+   `SP1MachineModel` chooses the loader and opcode-dependent timing policy, so neither can be selected by
+   the proof witness. PolyFun's `DynSystem.Machine` packages the official Sail `try_step` trajectory; it
+   is not used in circuit construction.
+4. `FormalModel/Relations.lean` states AIR soundness as witness-producing refinement. The currently
+   honest native target is `supported_core_native_sound`; the former headline is now
+   `balanced_state_trail_soundness`, accurately naming its Eulerian interaction conclusion. The name
+   `supported_core_air_sound` is reserved for native/extracted faithfulness, and `sp1_air_sound` for a
+   faithful relation over the complete upstream shard AIR and `SP1PublicValues`. Native shard soundness
+   first ends in a local Sail segment; `supportedCoreLocalExecution_anchors` places it in the canonical
+   boot trajectory once shard composition proves the initial state was reached. `SP1ExecutionRelation`
+   composes consecutive anchored shards into boot-to-halt execution.
+5. ArkLib owns probabilistic verifier knowledge soundness. `FormalModel/Verifier.lean` provides the
+   dependency-free extractor/refinement seam; a future ArkLib adapter will state `sp1_verifier_sound` by
+   post-processing an extracted AIR witness through `sp1_air_sound`.
 
-2. **`Native/Chips/<Op>Chip/Defs.lean` + `Proofs/Chips/<Op>Chip/Formal.lean` — `GeneralFormalCircuit` chip**
-   (`Defs.lean` = `main` + `ElaboratedCircuit`; `Formal.lean` = soundness/completeness/`circuit`; the
-   `Assumptions`/`Spec` live on the audit surface `FormalModel/Contracts/`)**.**
-   `main` composes the gadget **and the readers** as `subcircuit`s — each returning its extracted column
-   struct — assembling the chip's `Extracted.<Chip>Cols` output directly from their outputs (no
-   `witnessVector`/`fromElements`), and gates the row with the `is_real` binary selector
-   (`is_real * (is_real - 1) === 0`). The `Spec` is the **composition of the sub-circuits' own `Spec`s** (a
-   direct sub-call each, mirroring sp1-lean's `SP1Chips` `allHold_constraints_iff`) + the *proven*
-   `is_real`-binary fact (from the gate, not assumed) + the `is_real`-gated arithmetic identity, **stated
-   against the corresponding RV64 ISA function** (`RV64.add`/`sub`/`addw`/`subw`/`and`/`or`/`xor` from
-   `RISCV/Instructions.lean`, the opcode being static per chip). The chip `Inputs`/`Spec` live in
-   `FormalModel/Contracts/Chips.lean` (the consolidated spec layer — see below). Uses the
-   `Assumptions`/`Spec` (soundness) vs `ProverAssumptions`/`ProverSpec` (completeness) split — `is_real`-binary
-   lives only in the latter. See `Proofs/Chips/AddChip/` for the canonical shape, and `agents/proof-patterns.md`
-   for the composed-spec / proven-`is_real`-binary / no-heartbeat-bump patterns.
+This factorization prevents an algebraic trail, a Sail execution, and verifier acceptance from being
+presented as the same claim.
 
-3. **`Proofs/Chips/<Op>Chip/Bridge.lean` — native Sail bridge.**
-   Defines `spec_<op>` (the RISC-V Sail execution) and `sp1_<op>` (the chip's emulation), and proves
-   `correct_<op>_native : spec_<op> ≡ sp1_<op>`, **sourcing the operation identity from the chip's semantic
-   `Spec`** (not from `_root_.<Op>.*`). Then `<op>_chip_reaches_sail` composes chip → Sail in one module.
+The supported machine census is `Soundness/SupportedMachine.lean`: each entry owns its Clean table,
+semantic `ChipKind`, opcodes, and `rd` guard. `allChipKinds`, `sp1Tables`, `coverage`, and routing are
+projections of that descriptor rather than independently maintained lists. `RankedGrounding.lean` proves
+the generic structural upgrade from a balanced subtrail to an exhaustive trail when every edge strictly
+increases its clock rank, ruling out disconnected balanced cycles.
 
-4. **`Faithful/<Op>.lean` — faithfulness anchor.**
-   Against the generated `Extracted/<Op>.lean` (`update_extracted.py` writes SP1's
-   `<Op>Operation.constraints` as a `SP1Constraints F` — an `asserts` list of field elements + an
-   `interactions` list of bus sends/receives, the shared datatype in `Model/SP1Constraint.lean`),
-   proves `<op>_constraints_faithful : (<Op>Operation.constraints …).allHold ↔ <Op>Operation.RawSpec …`. So
-   SP1's operation constraint list **is** the native gadget's `RawSpec`, which soundness/completeness already
-   run through — closing the loop back to the SP1 source of truth.
+`WitnessDecode.lean` deterministically decodes each typed circuit table; no capstone theorem may
+existentially choose unrelated rows or casts between flat components. `LocalExecution.lean` proves that
+an ordered list of retained physical rows whose semantic projections are grounded in their evolving
+states constructs a genuine Sail chain by dispatching through each registered chip's `advance`. Ranked
+State balance now constructs an exhaustive order of exactly `realDecodedInstructionRows`; its PC walk,
+clock count, activity, registry membership, and committed Program decode are proved. The one remaining
+semantic bridge is `supportedCore_orderedRows_dynamic`: it must derive each row's timed Memory
+guarantees, circuit assumptions, operand currency, and readiness in the corresponding Sail state.
 
-   **Interaction half — semantic → syntactic (in-progress conversion goal).** The *asserts* half above is
-   already structural. The *interactions* half retains a **semantic** interpreter `Interaction.toProp`
-   (`Extracted/ExtractionDSL.lean`) as a compat bridge: it maps a byte send to `mult ≠ 0 → op.constrain …`
-   and **every** non-byte interaction (state/memory/program, all receives) to `True`, collapsing the
-   non-byte buses. The replacement —
-   the **syntactic interaction bridge** (`Faithful/ExtractedInteractionModel.lean`) — proves the circuit's
-   *emitted* interaction list and SP1's extracted oracle project, through `Extracted.Interaction.toAccess` /
-   `AbstractInteraction.toAccess`, to the **same `LookupAccess` list** `(kind, table, argvals, signedmult)`:
-   channel + message arg values + signed multiplicity/direction, **all four buses, no semantics**. This is a
-   strictly stronger, more faithful statement (it certifies the circuit emits *exactly* SP1's bus
-   interactions). It already caught a real, systematic bug `toProp` had masked — the readers emitted the
-   `U8Range` byte check in the wrong argument slot (`⟨3, value, 0, 0⟩` vs SP1's `⟨3, 0, value, 0⟩`), now
-   fixed in `CPUState`/`RegisterAccessTimestamp`/`MemoryAccess`. **Landed so far** (all axiom-clean):
-   - *Operation level* — `<op>_interactions_faithful_syntactic` for every leaf op (`add`, `sub`, `addrAdd`,
-     `u16msb`, `u16compare`, `bitwise`), the composed/hybrid ops (`ltUnsigned`, `addw`, `subw`), and the
-     first **witnessed** `FormalCircuit` op (`u16tou8safe`) — the latter via the *witnessed-value technique*:
-     a `witnessVector` column descends to `env.get (offset + k)`, bound to the oracle's `cols.<field>[k]`.
-   - *Reader level* — `cpustate_interactions_faithful_syntactic` (state+byte `Perm`);
-     `rtypereader_{memory,program,byte}_…` and `alutypereader_{memory,program,byte}_…` (all 3 channels each —
-     the byte ones descend two nested `FormalAssertion` sub-readers via Clean's
-     `FormalAssertion.toSubcircuit_interactions`, retiring the long-deferred byte-recovery gap; the ALU
-     variant adds the immediate-`c` gate `is_real − imm_c`).
-   - *Chip level* — **all four buses + the combined no-filter statement** for `AddChip`, `SubChip`,
-     `AddwChip`, `SubwChip`: each `<chip>cols_{state,program,memory,byte}_interactions_faithful_syntactic`
-     plus `<chip>cols_interactions_faithful_syntactic`, the latter proving the row's *entire* emitted
-     interaction list (all 4 channels concatenated) is a `List.Perm` of SP1's *entire* extracted oracle —
-     assembled from the 4 per-channel facts via `InteractionBus.perm_filter_by_kind`. The memory/byte
-     channels carry the chip-**witnessed** result (`env.get`-bound); byte is a fragment-order `Perm`. AddwChip
-     (ALUTypeReader, opcode 19) and SubwChip (RTypeReader, opcode 20) are the first two **W-variants**, whose
-     `op_a` write value is sign-extended `[v0, v1, msb·65535, msb·65535]`.
+The dynamic bridge reads the circuits' interactions through a typed adapter, not through the older
+hand-written `memoryLookups` projection. `TypedInteractions.lean` retains each exact evaluated Clean
+interaction and recovers its channel message; `TypedMemory.lean` turns the active Memory pulls into
+timed row facts and live-register bindings. A chip supplies only an exact operand-pull shape over its
+own `exposedChannels` list. Add is the first complete descriptor instance in
+`TypedMemoryContracts.lean`; extending the registry is structural scale-out, while RAM and repeated
+same-location scheduling remain grounding-engine work.
 
-   **Remaining conversion** (the longer-term goal): the rest of the chips (`Lt`/`Bitwise`/`Shift`/`AluX0`,
-   which first need their witnessed op-level anchors; `Mul`; the I/J-type and load/store families); the
-   remaining readers (`ITypeReader`, `JTypeReader`, `MemoryAccess`); a `faithful_chip`-macro variant for the
-   syntactic path — after which `Interaction.toProp` and the legacy `toProp` anchors (retained today as a
-   compat bridge) can be deleted repo-wide.
+Whole-machine completeness is the converse `WitnessRelation.Complete`, not Clean circuit soundness and
+not opcode coverage. It may remain a disclosed top-level `sorry` while the verified trace generator is
+built. Upstream Clean remains unchanged; this project continues to use its existing
+`GeneralFormalCircuit`/`Ensemble` packaging.
+
+## The chip-centered verification chain
+
+The stable Rust/Lean boundary is a **whole chip**, not a Rust operation. Rust operations and Lean gadgets
+serve complementary purposes and may use different structs, intermediate values, carry decompositions, or
+subcircuits. A local gadget remains a useful proof abstraction, but refactoring it must not require changing
+the extraction contract.
+
+For a chip `<Chip>`:
+
+1. **Native semantic implementation.** `Native/Operations/` contains proof-oriented Lean gadgets and
+   witness functions. `Native/Chips/<Chip>/Defs.lean` composes those gadgets and readers into one native
+   row type and one `main`. `Proofs/Operations/` may prove local semantic lemmas; these are implementation
+   details, not faithfulness anchors. The chip's `GeneralFormalCircuit` soundness/completeness theorem is
+   stated against the semantic contract in `FormalModel/Contracts/Chips.lean`.
+2. **ISA bridge.** `Proofs/Chips/<Chip>/Bridge.lean` derives the relevant Sail step from the chip's semantic
+   `Spec`. This proves what the native row means independently of the current Rust helper decomposition.
+3. **Whole-chip Rust AIR anchor.** Extraction produces the complete Rust chip row plus its `asserts` and
+   `interactions` lists. `Faithful/ChipOracle.lean` supplies the common boundary:
+   `ChipOracle.reconfigure` is the one explicit map from the native row to the Rust row, and
+   `ChipFaithful` proves (a) extensional equivalence of the two complete assertion systems and (b) equality
+   up to permutation of the complete four-bus interaction multisets. Helper operations emitted inside the
+   Rust expression may be unfolded locally by this proof, but no helper-level theorem is exported.
+4. **Populate/trace conformance.** `SP1CleanTest/TraceGenTests/` derives complete rows from the native chip's
+   own witness closures and output struct and compares them with traces dumped from Rust
+   `generate_trace`. These executable anchors catch layout, population, padding, and hint-routing drift;
+   they complement rather than replace the kernel-checked `ChipFaithful` theorem.
+
+`AddChip` and `SubChip` are the pilots for this boundary. Their native `Columns` no longer alias Rust
+rows, their self-contained Rust oracles live under `Extracted/ChipOracle/`, their gadgets no longer
+import generated direct-to-circuit artifacts, and `addChip_faithful` / `subChip_faithful` package the
+complete assertion and interaction comparisons. Performing the Add whole-chip comparison exposed a
+real gap: Rust asserts `op_a_0 = 0` for routing, while the native chip previously carried it only as a
+prover assumption. It is now a verifier-enforced chip constraint.
+
+### DivRem as the heavy-duty contract test ground
+
+`DivRemChip` deliberately uses a two-stage semantic boundary rather than eight giant circuit proofs:
+
+1. `FormalModel/Contracts/DivRem.lean` defines the stable public vocabulary: four arithmetic families,
+   quotient/remainder output routing, the eight committed opcode selectors, unique real-row selection,
+   `PairSpec`, `CaseSpec`, and `RowSpec`. The RV64 definitions themselves cover divide-by-zero and signed
+   overflow, so neither behavior is hidden in an assumption.
+2. `Proofs/Chips/DivRemChip/Cases.lean` is independent of the chip circuit and Clean elaboration. It gives
+   explicit Euclidean evidence for unsigned families and explicit `normal`/`divisorZero`/`overflow`
+   constructors for signed families, proves each family determines both quotient and remainder, and then
+   proves a small routing lemma for each selected opcode.
+3. `DivRemChip.evidenceSoundness` is the sole heavy whole-chip arithmetic seam: generated constraints must
+   yield reader behavior, unique selection, one of those family evidence values, and the final routing
+   equality. `contractSoundness` and public `soundness` are proved from it. The former nine per-op circuit
+   proofs and their shared tail were retired (about 5,600 lines) rather than retained as dead, misleading
+   proof debt.
+
+This split is the intended pattern for future complex chips: isolate pure semantic evidence, keep row-offset
+and subcircuit extraction in one chip-level conformance theorem, and never make the machine layer depend on
+the proof decomposition.
+
+The remaining generated operation modules, direct circuit forms, operation witness vectors, and
+`Faithful/<Operation>.lean` files are **migration debt**. They may remain temporarily where an unmigrated
+chip proof imports them, but new work must not add operation-level faithfulness APIs. Delete each artifact
+once every consuming chip has a native row reconfiguration and a whole-chip `ChipFaithful` anchor.
 
 Each new module's import goes into the root `SP1Clean.lean`.
 
@@ -113,9 +152,11 @@ matrix equals, cell-for-cell, whole traces dumped from SP1's **real** `MachineAi
 column layout, and padding at once; the per-`populate` vector anchors check only the witness
 formulas pointwise.
 
-This trace-gen layer and the older per-operation `populate`-conformance layer (`WitnessTests/`) both
-live in the **top-level `SP1CleanTest` test library** (the `lake test` target), *not* the main
-`SP1Clean/` tree. The reason is `native_decide`: the `<Chip>TraceWitness.lean` / `<Op>Witness.lean`
+This trace-gen layer and the transitional per-operation `populate`-conformance layer (`WitnessTests/`)
+both live in the **top-level `SP1CleanTest` test library** (the `lake test` target), *not* the main
+`SP1Clean/` tree. New coverage belongs in the whole-chip trace layer; remove an operation battery once
+no unmigrated chip relies on it. The reason for test-library isolation is `native_decide`: the
+`<Chip>TraceWitness.lean` / legacy `<Op>Witness.lean`
 anchors are the project's only uses of it (it trusts the whole compiler, adding
 `Lean.ofReduceBool`/`Lean.trustCompiler`), so the entire layer — anchors, the `Conformance.lean` /
 `EventPopulate.lean` concrete-prime scaffold, and the auto-gen `<Chip>ChipTraceVectors.lean` /
@@ -151,8 +192,9 @@ conformance to the chips' completeness theorems.
 
 ## The spec layer (`FormalModel/Contracts/`)
 
-The `Inputs` structs and semantic `Spec`s for **every** circuit are consolidated into a three-file
-`FormalModel/Contracts/` sequence (`Reader → Operation → Chip`, each importing the previous), so the whole spec surface
+The `Inputs` structs and semantic `Spec`s for **every** circuit are consolidated into the
+`FormalModel/Contracts/` audit surface (the base `Reader → Operation → Chip` sequence plus focused
+contract modules for unusually rich chips), so the whole spec surface
 is auditable in one place and depends only on `Math/`/`Model/` + `Extracted/` (never on the proof files):
 
 - **`FormalModel/Contracts/Readers.lean`** — the reader `Inputs`/`Spec`s (`CPUState`, `RTypeReader`, `RegisterAccessCols`,
@@ -164,6 +206,8 @@ is auditable in one place and depends only on `Math/`/`Model/` + `Extracted/` (n
   ADD/SUB and the bitwise ops are *definitional* (`RV64.add rs2 rs1 := rs1 + rs2`); ADDW/SUBW go through
   the `rv64_addw_eq`/`rv64_subw_eq` truncation lemmas (also here), used by the chip soundness proofs and
   the W-bridges.
+- **`FormalModel/Contracts/DivRem.lean`** — the focused DivRem family/selection/case vocabulary consumed
+  by `DivRemChip.Spec`; separated so arithmetic cases can be audited without importing the circuit proof.
 
 Each declaration keeps its **original namespace**, so the proof machinery (`main`, `elaborated`, the
 structural `RawSpec`, soundness/completeness, `circuit`) stays in the per-circuit file and resolves the
@@ -182,10 +226,12 @@ These keep every chip uniform and each `Spec` auditable on its own. Violations a
    `i.adapter.op_c` for the ALU adapter). This makes the chip's operand *definitionally* the value the
    Memory bus pins — no free column, no extra equality constraint. (Soundness/completeness unfold the
    projection with `simp only [Inputs.op_b_val, …]` right after `circuit_proof_start`.)
-2. **Each `Spec` is self-contained in `FormalModel/Contracts/Chips.lean`.** No shared chip-spec *builder* (the old
+2. **Each `Spec` is self-contained on the `FormalModel/Contracts/` audit surface.** No shared chip-spec *builder* (the old
    `RTypeChipSpec` was inlined per chip and deleted) — a reader audits one `Spec` without chasing a
    shared abstraction. The `Spec`, its `Inputs`, and the helper defs the `Spec` *directly* references
-   live together in `FormalModel/Contracts/Chips.lean`; helpers used only by `main`/`Defs` live in `Native/Chips/<Op>Chip/Defs.lean`.
+   live together there; a focused contract module such as `DivRem.lean` is appropriate when it exposes a
+   named semantic algebra rather than hiding constraint structure. Helpers used only by `main`/`Defs` live
+   in `Native/Chips/<Op>Chip/Defs.lean`.
 3. **Variant flags live in the `cols` column struct, read from `cols` in the `Spec`** — never duplicated
    as `Inputs` fields. (`main` witnesses them; the flag-sum gate binds `is_real = Σ flags`.)
 4. **Range checks go through the byte bus, not `Gadgets.ToBits.rangeCheck`.** A width-`n` range check is a
@@ -205,28 +251,29 @@ These keep every chip uniform and each `Spec` auditable on its own. Violations a
 SP1Clean/
 ├── Math/           Word, Bitwise, Misc, MulCarryChain, HWord,   (general math, no SP1/Sail deps —
 │                   GetElemFastPath                                the upstreaming candidate)
-├── Model/          Register, SailWrap, SailMemory, Channels,     (SP1 substrate: Sail wrappers + the
-│                   InteractionBus/Projection/Recovery, ChipAir,   buses + byte table)
-│                   SP1Constraint, ByteTable
-├── Extracted/      <Op>.lean / <Chip>Chip.lean (column structs   (PILLAR 1 "extracted from Rust" —
-│                   + asserts/interactions), Circuit/<Op> (op      auto-generated, do NOT hand-edit;
-│                   eval circuits), WitnessVectors/<Op> (vectors)  regen via update_extracted.py)
-├── FormalModel/    Contracts/{Readers,Operations,Chips} (Inputs  (THE central audit surface — the
-│                   + semantic Spec + chip Assumptions/             "middle ground" between Extracted
-│                   ProverAssumptions in ChipAssumptions);          and the proofs)
-│                   Trace/GuestProgram (the guest-program model)
+├── Model/          Register, SailWrap, SailMemory, Channels,     (SP1 substrate: Sail wrappers +
+│                   InteractionBus/Projection/Recovery, ChipAir,   structural buses + byte table;
+│                   SP1Constraint, ByteTable, Machine/{Boot,        native boot/schedule/execution)
+│                   Schedule,Execution}
+├── Extracted/      ChipOracle/<Chip>.lean (chip-namespaced Rust  (PILLAR 1 "extracted from Rust" —
+│                   row + complete asserts/interactions); legacy   auto-generated, do NOT hand-edit;
+│                   <Chip>Chip/<Op>/Circuit helper artifacts       regen via update_extracted.py)
+├── FormalModel/    Contracts/{Readers,Operations,Chips,           (THE central audit surface — the
+│                   PublicValues} (Inputs + semantic Specs),        "middle ground" between Extracted
+│                   Relations, Execution, Verifier, Trace/          and the proofs)
 ├── Native/         Chips/<Op>Chip/Defs (main+elaborated),        (PILLAR 2 "implemented native" —
 │                   Operations/<Op>/{Populate,RawSpec} + flat ops, circuit construction)
 │                   Readers/ (reader sub-circuits)
-├── Faithful/       <Op>                                          (PILLAR 3 "proven faithful" — anchors)
+├── Faithful/       ChipOracle + whole-chip anchors               (PILLAR 3 "proven faithful")
 ├── Proofs/         Chips/<Op>Chip/{Formal,Bridge,…},             (PILLAR 4 "proven sound/complete" +
-│                   Operations/<Op>/Formal, WitnessTests/ anchors, Sail bridges; the 3 complex chips
-│                   TraceGenTests/ (full-trace conformance)        DivRem/ShiftLeft/ShiftRight whole here)
-├── Soundness/      {State,Byte,Program,Memory}Consistency,       (PILLAR 5 "trace + guest programs":
-│                   ChipRow (`ChipKind`+`name`), ChipRegistry,      GatedVm/ (trail) + SP1Ensemble = the
-│                   GatedVm/, SP1Ensemble, TargetVm,                whole-machine capstone;
-│                   Opcode, Coverage, InstructionTrace,            Coverage = Opcode→chip→Sail table;
-│                   Completeness, RowView                          RowView = reader-agnostic row view)
+│                   Operations/<Op>/Formal, Sail bridges; complex-chip proof decomposition such as
+│                   DivRem/{Math,Cases,Assembly} and Shift soundness families)
+├── Soundness/      {State,Byte,Program,Memory}Consistency,       (PILLAR 5 "whole-machine reasoning":
+│                   ChipRow (`ChipKind`+`name`), ChipRegistry,      SP1Ensemble = balanced-trail
+│                   GatedVm/, SP1Ensemble, TimedGrounding, AIR,     intermediate; TimedGrounding + AIR
+│                   TargetVm,                                      own the semantic capstone;
+│                   Opcode, Coverage, AIR, RowView                 Coverage = Opcode→chip→Sail table;
+│                                                               AIR = relation-level capstone boundary)
 ├── Comparison.lean the worked-example findings doc — full rationale, no new proofs
 └── Step0Smoke.lean
 SP1Clean.lean  root index — import every module here
@@ -406,8 +453,8 @@ hypothesis** — exactly as `../sp1-lean` ships it, an honest assumption, not a 
   rather than re-deriving an `HWord` sign-extend. **Completeness**: `main` witnesses via the honest
   `ShiftLeftCore.pop*` generators (SP1's `event_to_row`; `popA` is built as the *placement of the recomputed
   `limb_result`* so placements hold by construction), and soundness verifies under that witnessing — but the
-  completeness **proof** (~62 inline-constraint discharges + the three reader sub-assertion obligations) is the
-  one remaining `sorry`. Tooling note: the LSP times out on the 680-line chip; a scratch `import` + `example :
+  completeness **proof** (~62 inline-constraint discharges + the three reader sub-assertion obligations) is one
+  of the five deferred completeness proofs. Tooling note: the LSP times out on the 680-line chip; a scratch `import` + `example :
   Completeness … := by circuit_proof_start; sorry` elaborates fast and exposes the full goal for iteration.
 - **Real-data threading (the reader column blocks are chip `Inputs`).** All readers are
   `FormalAssertion`s taking their `cols` as inputs, so the chip `Inputs` carry the committed `state`/`adapter`
@@ -453,8 +500,9 @@ hypothesis** — exactly as `../sp1-lean` ships it, an honest assumption, not a 
 
 ## Memory chips (`LoadDouble` read + `StoreDouble` write)
 
-The first two memory chips complete the full four-artifact chain at **real 48-bit addresses**, both
-directions, all axiom-clean:
+The first two memory chips complete the semantic native/Sail path at **real 48-bit addresses**, both
+directions, all axiom-clean. Their legacy fragment anchors remain to be consolidated into the
+whole-chip `ChipFaithful` boundary:
 
 - **Address gadgets** — `Native/Operations/AddrAddOperation.lean` (3-limb `rs1 + signExtend(imm)` with the top
   carry against `0`) and `Native/Operations/AddressOperation.lean` (composes `AddrAdd` + the offset-bit decode +

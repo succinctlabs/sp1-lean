@@ -10,8 +10,8 @@ The "general trace arguments and guest programs" the auditor reads to know *what
 state to *load* it (`IsInitialState`), the real multi-step chain over the **official** LeanRV64D
 interpreter (`SailStep`/`SailChain` on `try_step`), and the halting condition (`SP1Halted`). These
 statements depend only on the Sail `SailState` model (`Model/`), so they live in the `Model/Semantics/`
-substrate — **below** `Model/Channels.lean`, so the semantic channel guarantees (`StateTruth`/`ProgTruth`,
-built atop these in `Model/Semantics/Truth.lean`) can be wired directly into the channels.
+substrate. `StateTruth`/`ProgTruth` are built atop them in `Model/Semantics/Truth.lean` as conclusions of
+the global grounding engine; they are deliberately not row-local channel guarantees.
 
 The trace **arguments** that consume them — `TargetObligations`, `WalkOf`, `RefinesAt`, `RowEffect`, and
 the target theorem `sp1_target_execution` — reference `ChipRow`/`StateAccess` (the Soundness-layer trace
@@ -101,7 +101,7 @@ structure SailConfigured (s : SailState) : Prop where
 /-- The SP1 memory configuration (`isValidMemConfig`) the low-level fetch/load/store lemmas consume,
 reconstructed from the flattened `SailConfigured` fields (`h_cur_privilege` derives from `priv`; the other
 four are the inlined memory-config fields — the flatten deduped the `cur_privilege` fact). -/
-def SailConfigured.toValidMemConfig {s : SailState} (cfg : SailConfigured s) :
+theorem SailConfigured.toValidMemConfig {s : SailState} (cfg : SailConfigured s) :
     SailMem.SailState.isValidMemConfig s cfg.init where
   h_cur_privilege := by
     have h := cfg.priv; rwa [Std.ExtDHashMap.get?_eq_some_get (cfg.init _), Option.some_inj] at h

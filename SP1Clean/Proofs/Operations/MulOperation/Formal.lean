@@ -326,13 +326,11 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       rw [hsdc]; rcases hmh_b with h | h <;> rw [h]
       · left; ring
       · rw [one_mul, hc_msb]; split <;> simp
-  · -- channel-requirement tail: the 3 composed sub-assertion `Assumptions` (2 U16toU8 + 1 U16MSB on
-    -- `product`) followed by the 26 direct byte pulls' off-gate `Requirements` (2 op5 MSB + 16 carry
-    -- range + 8 product range) — all vacuous under the binary `is_real` gate.
-    refine ⟨Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).1, hir_bin⟩,
-        Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).2, hir_bin⟩,
-        Or.inr ⟨fun h => ?_, hmw_b⟩,
-        fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+  · -- The 26 direct byte pulls' off-gate requirements (2 op5 MSB + 16 carry + 8 product range)
+    -- are all vacuous under the binary `is_real` gate.  The three composed gadgets now expose their
+    -- byte channel through canonical Clean metadata, so their interactions do not reappear here.
+    exact ⟨fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
+        fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
         fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
         fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
         fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
@@ -345,19 +343,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
         fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
         fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0,
         fun h1 h0 => off_gate_vacuous hir_bin h1 h0, fun h1 h0 => off_gate_vacuous hir_bin h1 h0⟩
-    -- the `product_msb` U16MSB is gated on `is_mulw`; under `is_mulw = 1` we get `is_real = 1`
-    -- (`hmw_real`), so the `is_real`-gated byte pull (`hpG1`) ranges `product[2]`/`product[3]`.
-    have hr1 : input_is_real = 1 := hmw_real h
-    obtain ⟨_, hprod_eq, _, _, _, _, _, _, _⟩ := _hicols
-    have ep2 : Expression.eval env input_var_cols_product[2] = input_cols_product[2] := by
-      rw [← hprod_eq, Vector.getElem_map]
-    have ep3 : Expression.eval env input_var_cols_product[3] = input_cols_product[3] := by
-      rw [← hprod_eq, Vector.getElem_map]
-    have pb2 : input_cols_product[2].val < 2 ^ 8 := by
-      rw [← ep2]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 (by rw [hr1]))).1
-    have pb3 : input_cols_product[3].val < 2 ^ 8 := by
-      rw [← ep3]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 (by rw [hr1]))).2
-    rw [ep2, ep3, byte_compose_val pb2 pb3 rfl]; omega
 
 /-- Byte-value bridge: the `k`-th byte of the `ZMod`-level sign/zero-extended operand equals the `ℕ`
 byte stream `extStream` at `k` (used by the witnessed `schoolProduct`/`schoolCarry`). Bytes `0..7` are
@@ -911,8 +896,62 @@ theorem semantic_populate {b c : Word (ZMod p)} (hb : b.isU64) (hc : c.isU64)
     (spec_populate hb hc is_mul is_mulh is_mulhu is_mulhsu is_mulw 1
       hmul hmh hmhu hmhsu hmw hsum) rfl
 
-/-- SP1's `MulOperation::eval` as a Clean-native `FormalAssertion`: `is_real`-gated multiply-family
-constraints over the `populate`d product/carry columns; no fresh witnesses. -/
+private theorem main_requirementsChannelsLawful (input_var : Var Inputs (ZMod p)) (i₀ : ℕ) :
+    ((main input_var).operations i₀).RequirementsChannelsLawful
+      (elaborated (p := p)).channelsWithGuarantees [] := by
+  have h_byte : (byteChannel (p := p)).toRaw ∈
+      (elaborated (p := p)).channelsWithGuarantees := by
+    simp only [circuit_norm]
+  dsimp only [Operations.RequirementsChannelsLawful]
+  refine ⟨?_, ?_, ?_⟩
+  · simp only [main, Circuit.operations, Circuit.bind_def, assertion, assertZero, Channel.pullIf,
+      HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
+    simp only [Operations.subcircuitChannelsWithRequirements_append,
+      Operations.subcircuitChannelsWithRequirements_subcircuit,
+      Operations.subcircuitChannelsWithRequirements_assert,
+      Operations.subcircuitChannelsWithRequirements_interact,
+      Operations.subcircuitChannelsWithRequirements_nil,
+      FormalAssertion.toSubcircuit_channelsWithRequirements,
+      U16toU8OperationSafe.channelsWithRequirements_eq,
+      U16MSBOperation.channelsWithRequirements_eq,
+      Gadgets.Equality.channelsWithRequirements_eq, List.append_nil,
+      List.nil_subset]
+  · intro channel h_channel
+    simp only [main, Circuit.operations, Circuit.bind_def, assertion, assertZero, Channel.pullIf,
+      HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength] at h_channel
+    simp only [Operations.shallowChannels_append, Operations.shallowChannels_subcircuit,
+      Operations.shallowChannels_assert, Operations.shallowChannels_interact,
+      Operations.shallowChannels_nil, List.nil_append] at h_channel
+    simp only [ChannelInteraction.toRaw_channel, List.mem_append, List.mem_singleton,
+      List.not_mem_nil, or_false, or_self] at h_channel
+    subst channel
+    exact Or.inl h_byte
+  · intro env h_constraints
+    simp only [main, Circuit.operations, Circuit.bind_def, assertion, assertZero, Channel.pullIf,
+      HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength] at h_constraints ⊢
+    simp only [ConstraintsHold.Shallow, Operations.forAllNoOffset_append,
+      Operations.forAllNoOffset, and_true, eval_sub,
+      Expression.eval] at h_constraints
+    have h_bool : Expression.eval env input_var.is_real = 0 ∨
+        Expression.eval env input_var.is_real = 1 :=
+      bool_of_mul_pred (by simpa only [sub_eq_add_neg] using h_constraints)
+    have h_bool' : (ProvableStruct.eval env input_var).is_real = 0 ∨
+        (ProvableStruct.eval env input_var).is_real = 1 := by
+      simpa only [circuit_norm] using h_bool
+    have h_pull (msg : ByteRow (Expression (ZMod p))) :
+        (byteChannel.pulledIf input_var.is_real msg).toRaw.Requirements env := by
+      rw [ChannelInteraction.toRaw_requirements]
+      intro h1 h0
+      simp only [pulledIf_mult, circuit_norm] at h1 h0
+      exact off_gate_vacuous h_bool' h1 h0
+    simp only [Operations.InChannelsOrRequirements, Operations.forAllNoOffset_append,
+      Operations.forAllNoOffset, List.not_mem_nil, false_or, true_and, and_true]
+    and_intros
+    all_goals exact h_pull _
+
+/-- The internal multiply semantic gadget as a Clean `FormalAssertion`: `is_real`-gated
+multiply-family constraints over the `populate`d product/carry columns; no fresh witnesses.
+Its semantic lemmas are consumed by chip proofs; Rust faithfulness is asserted only at chip level. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
     Assumptions := Assumptions,
@@ -920,11 +959,7 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     soundness := soundness,
     completeness := completeness,
     channelsWithRequirements := [],
-    requirementsChannelsLawful := fun input_var i₀ => by
-      simp only [circuit_norm, main, byteChannel]
-      refine ⟨List.nil_subset _, fun env hgate => ?_⟩
-      have hbool := bool_of_mul_pred (by simpa only [sub_eq_add_neg] using hgate)
-      and_intros <;> exact fun h1 h0 => off_gate_vacuous hbool h1 h0 }
+    requirementsChannelsLawful := main_requirementsChannelsLawful }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

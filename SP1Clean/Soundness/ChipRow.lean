@@ -40,8 +40,13 @@ structure ChipKind (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
   name : String
   /-- The chip's input type map (e.g. `AddChip.Inputs`). -/
   Inputs : TypeMap
-  /-- The chip's committed-column type map (e.g. `Extracted.AddCols`). -/
+  /-- The chip's committed-column type map (e.g. `AddChip.Columns`). -/
   Cols : TypeMap
+  /-- Typeclass evidence retained with the heterogeneous descriptor so downstream decoders can use
+  the dependent input type without re-discovering it through an opaque chip constant. -/
+  [provableInputs : ProvableType Inputs]
+  /-- Typeclass evidence for the committed-column representation. -/
+  [provableCols : ProvableType Cols]
   /-- The chip-agnostic bus view (shared reader blocks, `is_real`, the rd write value, the opcode). -/
   view : Inputs (ZMod p) → Cols (ZMod p) → Trace.RowView (ZMod p)
   /-- The per-row in-circuit contract — the chip's verified `Spec` (e.g. `AddChip.Spec`). -/
@@ -60,8 +65,9 @@ structure ChipKind (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
   produces the row's committed `RowEffect` (the PC write + the `op_a` register write + ROM/config
   preservation). This is `TargetObligations.lift` restricted to one chip's rows; the dispatcher
   (`chipRows_advance_sound`) assembles the per-chip `advance`s into the whole-trace `lift`. `Option (PLift …)`
-  so chips migrate incrementally — `none` until a chip proves it (Add/Sub/Addi so far); `PLift` lifts the
-  obligation `Prop` into a `Type` that `Option` accepts. -/
+  retained from the incremental migration. Every member of the current 25-chip registry is `some`, proved
+  by `allChipKinds_migrated`; there is no fallback semantic path. `PLift` lifts the obligation `Prop` into
+  a `Type` that `Option` accepts. -/
   advance : Option (PLift (∀ (inp : Inputs (ZMod p)) (cols : Cols (ZMod p)) (data : ProverData (ZMod p))
       (prog : Target.GuestProgram) (s : SailState),
     (view inp cols).is_real = 1 →

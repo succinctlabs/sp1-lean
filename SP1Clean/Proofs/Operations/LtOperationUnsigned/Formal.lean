@@ -260,6 +260,10 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     channelsWithRequirements := [] }
 
 set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma channelsWithRequirements_eq :
+    (circuit (p := p)).channelsWithRequirements = [] := rfl
+
+set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
     circuit.localLength x = 0 := rfl
 

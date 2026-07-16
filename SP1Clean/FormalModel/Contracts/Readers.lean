@@ -108,10 +108,9 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
       Word.isU64 input.cols.op_b_memory.prev_value ∧ Word.isU64 input.cols.op_c_memory.prev_value)
 
-/-- The Program-bus fetch message this reader pulls (SC Phase 2a), as a `ProgramMsg` value — the R-type
-form: both operands are register indices (`#v[reg, 0, 0, 0]`), `imm_b = imm_c = 0`. Defeq to the `eval` of
-the reader `main`'s pull message, so the reader's `ProverAssumptionsD` `ProgTruth (progMsgOf input)` and
-every composing chip's supplied `ProgTruth` reference the identical term (the `stateMsgOf` pattern). -/
+/-- The Program-bus fetch message this reader pulls, as a `ProgramMsg` value — the R-type form: both
+operands are register indices (`#v[reg, 0, 0, 0]`), `imm_b = imm_c = 0`. It is definitionally the
+reader `main`'s pull message and is reused by the global program-grounding theorem. -/
 def progMsgOf (input : Inputs (ZMod p)) : SP1Clean.Channels.ProgramMsg (ZMod p) :=
   ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode,
    input.cols.op_a, #v[input.cols.op_b, 0, 0, 0], #v[input.cols.op_c, 0, 0, 0],
@@ -405,9 +404,8 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     ((input.cols.clk_0_16 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13 ∧ input.cols.clk_16_24.val < 2 ^ 8
 
 /-- The State-bus **pull** message a CPUState block emits: the current `(clk, pc)` (clk recombined from
-the two byte limbs). Shared by the reader (its `pullIf` receives this message's `StateTruth`) and every
-composing chip (whose `ProverAssumptions` must supply that same `StateTruth`) — defined on the contract
-surface so both reference the identical message. -/
+the two byte limbs). Defined on the contract surface so the row circuit and global grounding engine
+reference the identical structural key. -/
 def stateMsgOf (cols : Extracted.CPUState (ZMod p)) : SP1Clean.Channels.StateMsg (ZMod p) :=
   ⟨cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536, cols.pc[0], cols.pc[1], cols.pc[2]⟩
 

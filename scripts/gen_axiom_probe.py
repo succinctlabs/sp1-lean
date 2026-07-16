@@ -19,10 +19,23 @@ OUT = ROOT / "scripts" / "axiom_probe.lean"
 
 # (glob, declaration-name regex) → collect matching theorems/defs with their namespace.
 TARGETS = [
-    ("SP1Clean/Proofs/Chips/*/Formal.lean", r"theorem\s+(soundness|completeness)\b"),
+    ("SP1Clean/Proofs/Chips/*/Formal.lean",
+     # Probe the bundled circuit as well as its named proof fields.  In particular, a deferred
+     # channel-law field lives only inside `circuit`, and every deferred completeness proof is
+     # retained transitively by that structure even when a soundness consumer never projects it.
+     r"(?:theorem|def)\s+(soundness|completeness|contractSoundness|evidenceSoundness|circuit)\b"),
+    # DivRem keeps its heavyweight completeness driver outside `Formal.lean`; without this explicit
+    # target the textual admission gate saw the `stop`, but the axiom census silently skipped the
+    # declaration itself.
+    ("SP1Clean/Proofs/Chips/DivRemChip/Completeness/Driver.lean",
+     r"theorem\s+(completeness)\b"),
+    # DivRem's isolated, circuit-independent contract and evidence layer is a first-class audit
+    # surface: probe every named theorem rather than only the admitted whole-chip extraction seam.
+    ("SP1Clean/FormalModel/Contracts/DivRem.lean", r"(?:theorem|lemma)\s+(\w+)\b"),
+    ("SP1Clean/Proofs/Chips/DivRemChip/Cases.lean", r"(?:theorem|lemma)\s+(\w+)\b"),
     ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"theorem\s+(correct_\w+|\w*reaches_sail\w*)\b"),
     ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"def\s+(kind)\b"),
-    ("SP1Clean/Faithful/*.lean", r"theorem\s+(\w*faithful\w*)\b"),
+    ("SP1Clean/Faithful/*.lean", r"(?:theorem|def)\s+(\w*faithful\w*)\b"),
     # The witness/trace conformance anchors now live in the separate `SP1CleanTest` test library (the
     # native_decide quarantine); the census still probes them to disclose their ofReduceBool axioms.
     ("SP1CleanTest/WitnessTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
@@ -34,7 +47,11 @@ TARGETS = [
     ("SP1Clean/Model/BalanceBridge.lean",
      r"theorem\s+(isConsistentBalanced_of_intCast_zero|intCast_multiplicitySum_map_toAccess|"
      r"isConsistentBalanced_of_balancedInteractions)\b"),
-    ("SP1Clean/Soundness/SP1Ensemble.lean", r"(?:theorem|def)\s+(sp1\w*)\b"),
+    ("SP1Clean/Soundness/SP1Ensemble.lean",
+     r"(?:theorem|def)\s+((?:sp1|balanced)\w*)\b"),
+    ("SP1Clean/Soundness/AIR.lean",
+     r"theorem\s+(supported_core_witness_grounding|supported_core_native_sound)\b"),
+    ("SP1Clean/Soundness/TimedGrounding.lean", r"theorem\s+(walk)\b"),
     ("SP1Clean/Soundness/FinishedChannels.lean", r"theorem\s+(sp1_finishedChannel_guarantees)\b"),
     ("SP1Clean/Soundness/ChipRegistry.lean", r"(?:theorem|def)\s+(allChipKinds\w*)\b"),
     ("SP1Clean/Soundness/Coverage.lean",
@@ -93,7 +110,8 @@ def fqns_in(path: Path, decl_re: re.Pattern) -> list[str]:
                 if stack and (stack[-1][1] == part or (stack[-1][0] == "sec" and not part)):
                     stack.pop()
         elif m := decl_re.search(line):
-            if not line.lstrip().startswith("--"):
+            stripped = line.lstrip()
+            if not stripped.startswith("--") and not stripped.startswith("private "):
                 ns = ".".join(p for k, p in stack if k == "ns")
                 out.append(f"{ns}.{m.group(1)}" if ns else m.group(1))
     return out

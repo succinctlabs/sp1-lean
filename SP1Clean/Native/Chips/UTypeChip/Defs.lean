@@ -69,14 +69,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var UTypeColumns (ZMo
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, addend, ⟨add_value⟩, input.is_auipc, input.is_real⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs UTypeColumns main where
-  channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit,
-    Readers.JTypeReader.circuit, Readers.RegisterWrite.circuit]
-  -- 3 addend limbs + 4 add-result limbs; readers/operation are assertions (localLength 0).
-  localLength _ := 7
-  -- `programChannel` joins the byte guarantee propagated up from `JTypeReader`'s program **pull** (W11 flip);
-  -- `memoryChannel` joins from `JTypeReader`'s op_a memory read **pull** (W11 memory flip). The `RegisterWrite`
-  -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+/-- The explicit-circuit elaborator computes the seven witness cells and the four-channel interface
+from `main`, and reuses its structural certificates instead of reducing the full operation list. -/
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs UTypeColumns main := by
+  elaborate_circuit
 
 end SP1Clean.UTypeChip

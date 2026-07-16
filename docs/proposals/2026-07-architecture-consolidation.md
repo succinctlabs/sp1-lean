@@ -6,6 +6,11 @@ per-chip `advance` contract, and their substrate. Deliberately blunt — this is
 harsh, before anything is shared. Every recommendation carries a migration cost and, where the claim
 is load-bearing, a de-risk spike (§9).
 
+> **Implementation note (2026-07-16).** This file is the historical proposal, not the current status
+> board. Most of the one-engine/one-contract restructuring has landed, with some details intentionally
+> revised during implementation. See [`consolidation-progress.md`](consolidation-progress.md),
+> [`../architecture.md`](../architecture.md), and [`../release-audit.md`](../release-audit.md).
+
 **The one-sentence thesis.** The branch proved the right *model* — channels carrying execution
 semantics, one uniform per-chip Sail-step obligation — but it currently runs **two parallel
 soundness architectures** (the GatedVm Eulerian trail vs. the spiked timed-grounding engine), **two
@@ -14,6 +19,13 @@ per-chip Sail contracts** (`sailEquiv`/`reaches_sail` vs. `advance`/`advanceRead
 fork of a Clean library file. The end-state should be **one engine, one bus representation, one
 per-chip contract, one theorem** — deleting ≈4–5K LOC of scaffolding, adding ≈2–3K, and ending with
 a strictly *stronger* final theorem that fits on one screen.
+
+> **Naming/statement amendment (2026-07-14).** The proposal's single `sp1_soundness` name is
+> superseded. The deterministic upstream-AIR theorem is `sp1_air_sound`; boot-to-halt shard-ledger
+> composition is `sp1_execution_sound`; and `sp1_verifier_sound` is reserved for ArkLib knowledge
+> soundness. The current native supported-core theorem concludes a shard-local execution and is
+> anchored in the canonical boot trajectory only during shard composition. Read the older fused
+> examples below as historical design motivation, not the accepted theorem surface.
 
 ---
 

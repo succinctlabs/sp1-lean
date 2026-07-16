@@ -413,10 +413,9 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadDoubleColumns (ZMo
     (Word.isU64_of_cases hpv0 hpv1 hpv2 hpv3)
 
 /-- **LoadDouble's `ChipKind` registration** (LD). Straight-line `view`, I-type adapter, gating selector
-`is_real`, rd write-back the loaded 8-byte word `memory_access.prev_value`, opcode 35. `sailEquiv`
-quantifies the prover `data` and the chip `Assumptions inp data` internally (keeping the field `data`-free),
-together with the decode/fits/`isU64` facts, the rs1/PC reads, and the eight loaded bytes; `reaches_sail`
-is `ld_chip_reaches_sail`. -/
+`is_real`, rd write-back of `memory_access.prev_value`, opcode 35. `advanceReady` packages the structural
+decode/fits/`isU64` and loaded-byte facts consumed by `advance`; `ld_chip_reaches_sail` remains a local
+bridge helper. -/
 def kind : Soundness.ChipKind p where
   name := "LoadDouble"
   Inputs := LoadDoubleChip.Inputs

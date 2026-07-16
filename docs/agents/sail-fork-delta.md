@@ -1,9 +1,10 @@
 # The Sail fork delta — the exact `succinctlabs/sail-riscv-lean` changes, and how to drop them
 
-**Purpose (task K1).** We pin `LeanRV64D` (sail-riscv-lean) to the `succinctlabs @ dtumad/clean-native`
-fork. The fork's *semantic* delta over upstream `opencompl/sail-riscv-lean` is **three config lines in
-two files** (plus a `lean-toolchain` pin). This doc records them exactly so the delta can be
-(a) re-applied mechanically against any future base (e.g. the Lean 4.30 regen), or (b) retired entirely
+**Current status (2026-07-16).** The root uses an editable `../sail-riscv-lean` checkout under Lean 4.31.
+Its *semantic* delta over upstream `opencompl/sail-riscv-lean` is **three config lines in two files**.
+There is also one non-semantic generated-code change (remove `noncomputable section` from `Defs.lean` to
+avoid the Lean 4.31 code-generation panic) plus migration manifest/toolchain edits. This doc records the
+delta so it can be (a) re-applied mechanically against any future base, or (b) retired entirely
 once opencompl accepts build-time platform-config parameterization (task K3). See the consolidation
 proposal §7.5 for the disposition and `lean-sail-notes.md` for the surrounding dep environment.
 
@@ -19,14 +20,16 @@ whenever the model is regenerated — match on the `def` name, not the line.
 | `LeanRV64D/PlatformConfig.lean` (~L11012) | `plat_have_sig : Bool := true` | `false` | Signature output off — SP1 has no test-signature region |
 | `LeanRV64D/PmpRegs.lean` (~L219) | `sys_pmp_count : Int := 16` | `0` | No physical-memory-protection entries — SP1 runs unprotected M-mode |
 
-Plus: the fork's `lean-toolchain` is pinned to the project toolchain (`leanprover/lean4:v4.28.0`)
-rather than upstream's (currently v4.29.0 on opencompl `main`).
+The root currently compiles this local path dependency under Lean 4.31. The checkout's own standalone
+`lean-toolchain` still says 4.30 and must be brought to 4.31 and validated before the dependency is
+published. `Defs.lean` also drops the generated, unnecessary `noncomputable section`; this is a build/code
+generation fix, not a semantic model change.
 
 Downstream consumers of these constants (unmodified, listed for review): `Platform.lean` guards on
 `plat_have_clint`; `SysControl.lean`/`PmpControl.lean` guard on `sys_pmp_count`; `plat_sig_base`/
 `plat_sig_size` sit next to `plat_have_sig` in `PlatformConfig.lean`.
 
-## Re-applying against a new base (the 4.30 regen — task K4)
+## Re-applying against a new generated base
 
 opencompl regenerates the model *daily*, so any re-pin is a proof-churn event against the
 symbolically-reduced generated internals regardless of the fork. To re-apply:

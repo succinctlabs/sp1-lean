@@ -346,10 +346,9 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.AluX0Cols (ZMod p)) (d
   · exact advance_of_alu_x0_mul mulOp_mulhsu (by decide)
       hcfg hrom hpcread hvalb hdecrom ho himmb hi hopa0 hpc0 rfl rfl rfl
 
-/-- `AluX0`'s `ChipKind` registration. `view.wr` is the zero word (`x0` discards the result);
-`sailEquiv` is the 29-way Sail conjunction (all covered ALU opcodes into `x0`), discharged via the
-five family-core lemmas. Register reads (`h_rs1`/`h_rs2`) are needed only to make Sail reads succeed.
-`advance` (SC Phase 4 + Move-2) now covers **29/29** — MUL(11) and MULHSU(14), the former decode seam,
+/-- `AluX0`'s `ChipKind` registration. `view.wr` is the zero word (`x0` discards the result).
+`advance` covers all **29/29** routed opcodes through five family-core lemmas; source register facts are
+needed only to make the corresponding Sail reads succeed. MUL(11) and MULHSU(14), the former decode seam,
 are unblocked: the ∃I∀s `decodedInROM` fixes the decoded instruction across states and the image-guarded
 `inv_mul'` pins the non-injective `mul_op` from its canonicity, so the opcode no longer needs to. -/
 def kind : Soundness.ChipKind p where

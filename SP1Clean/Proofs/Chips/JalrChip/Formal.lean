@@ -1,4 +1,5 @@
 import SP1Clean.Native.Chips.JalrChip.Defs
+import SP1Clean.Model.InteractionRecovery
 
 /-! # `SP1Clean.JalrChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
 
@@ -6,7 +7,7 @@ namespace SP1Clean.JalrChip
 
 open Circuit
 open Extracted (JalrColumns)
-open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
+open SP1Clean.Channels (stateChannel byteChannel memoryChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -23,7 +24,7 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 /-- Honest prover-side row well-formedness: operand `isU64`s, `is_real`/`lsb` binary, CPUState + op_a/op_b
 timestamp bounds, `value[3] = 0` for both add results, and the `is_real`-gated cleared-target 4-byte
 alignment (`(jump_target[0] - lsb) / 4 < 2^14`). Covers `rd ≠ x0` rows (`op_a_0 = 0`). -/
-def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.adapter.op_c_imm ∧
   Word.isU64 (#v[input.adapter.op_b_memory.prev_value[0], input.adapter.op_b_memory.prev_value[1],
@@ -47,16 +48,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
   (input.is_real = 1 →
     (((jumpTargetWord input)[0] - lsbBit input) * (4 : ZMod p)⁻¹).val < 2 ^ 14) ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
-    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
-  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
-  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (JALR opcode `47`, I-type reader).
-  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
-    (Readers.ITypeReader.progMsgOf
-      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
-       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 47, 0, 0, 0, 0⟩) data)
+    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 8000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨h_imm, h_rs1U, h_pcU, h_pad⟩ := h_assumptions
@@ -111,8 +105,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
-  refine ⟨⟨h_it, h_bin, h_lsb, ?_, ?_, ?_, ?_⟩, h_bin, Or.inr ⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩,
-    Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩, Or.inr ⟨h_bin, h_bin⟩, Or.inr ⟨h_bin, ?_⟩,
+  refine ⟨⟨h_it, h_bin, h_lsb, ?_, ?_, ?_, ?_⟩,
+    Or.inr ⟨h_bin, h_bin⟩, Or.inr ⟨h_bin, ?_⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
   · intro hr1
     have := (h_add1 ⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩ hr1).2
@@ -186,12 +180,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
         simp only [Vector.getElem_mapRange, circuit_norm] <;> simp_all
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 8000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨h_imm, h_rs1U, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac_a, h_rac_b, h_jt3, h_lt3,
-    h_align_pa, hdec, h_st, h_prog⟩ := h_assumptions
+    h_align_pa, hdec⟩ := h_assumptions
   -- op_b (rs1) read-prior `isU64` in the reader's **raw** `prev_value` form (from the reconstructed
   -- `h_rs1U`), for the pure-read `ITypeReader.Spec`'s memory-pull `isU64` pair.
   have hpb_raw : Word.isU64 input_adapter_op_b_memory_prev_value := by
@@ -297,9 +291,9 @@ theorem completeness :
   have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
-  refine ⟨?_, ⟨h_bin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨hpceq ▸ h_pcU, h4U⟩, h_gate2⟩, ?_⟩,
+  refine ⟨?_, ⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨hpceq ▸ h_pcU, h4U⟩, h_gate2⟩, ?_⟩,
     ?_, ⟨⟨h_bin, h_bin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac_a, h_rac_b, hdec,
-      fun hr => ⟨h_oap hr, hpb_raw⟩⟩, h_prog⟩,
+      fun hr => ⟨h_oap hr, hpb_raw⟩⟩⟩,
     ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_⟩
   · rcases hlsb_bin with h | h <;> rw [h] <;> simp
   · rw [hval1]; exact AddOperation.spec_populate hrs1U h_imm input_is_real
@@ -330,32 +324,101 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalrColumns :=
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     requirementsChannelsLawful := fun input_var i₀ => by
-      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
-        AddOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit,
-        Readers.RegisterWrite.circuit]; grind,
+      have h_byte : (byteChannel (p := p)).toRaw ∈
+          (elaborated (p := p)).channelsWithGuarantees := by
+        simp only [circuit_norm]
+      dsimp only [Operations.RequirementsChannelsLawful]
+      refine ⟨?_, ?_, ?_⟩
+      · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+          witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+          subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
+          HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
+        simp only [Operations.subcircuitChannelsWithRequirements_append,
+          Operations.subcircuitChannelsWithRequirements_witness,
+          Operations.subcircuitChannelsWithRequirements_subcircuit,
+          Operations.subcircuitChannelsWithRequirements_assert,
+          Operations.subcircuitChannelsWithRequirements_interact,
+          Operations.subcircuitChannelsWithRequirements_nil,
+          GeneralFormalCircuit.toSubcircuit_channelsWithRequirements,
+          FormalAssertion.toSubcircuit_channelsWithRequirements,
+          Readers.CPUState.channelsWithRequirements_eq,
+          AddOperation.circuit, Readers.ITypeReader.circuit, Readers.RegisterWrite.circuit,
+          Gadgets.Equality.channelsWithRequirements_eq, List.nil_append, List.append_nil]
+        simp only [List.subset_def, List.mem_append, List.mem_cons, List.not_mem_nil, or_false]
+        tauto
+      · intro channel h_channel
+        simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+          witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+          subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
+          HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
+          Operations.shallowChannels_append, Operations.shallowChannels_witness,
+          Operations.shallowChannels_subcircuit, Operations.shallowChannels_assert,
+          Operations.shallowChannels_interact, Operations.shallowChannels_nil,
+          List.nil_append] at h_channel
+        simp only [List.mem_append, List.mem_singleton, List.not_mem_nil, or_false] at h_channel
+        subst channel
+        exact Or.inl h_byte
+      · intro env h_constraints
+        have h_gate : Expression.eval env input_var.is_real *
+            (Expression.eval env input_var.is_real - 1) = 0 := by
+          simpa only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+            witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+            subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
+            HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
+            ConstraintsHold.Shallow, Operations.forAllNoOffset_append,
+            Operations.forAllNoOffset, true_and, and_true, eval_mul, eval_sub,
+            Expression.eval] using h_constraints
+        have h_bool : Expression.eval env input_var.is_real = 0 ∨
+            Expression.eval env input_var.is_real = 1 := bool_of_mul_pred h_gate
+        have h_bool' : (ProvableStruct.eval env input_var).is_real = 0 ∨
+            (ProvableStruct.eval env input_var).is_real = 1 := by
+          simpa only [circuit_norm] using h_bool
+        rw [Operations.inChannelsOrRequirements_iff_forall_mem]
+        intro interaction h_interaction
+        simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+          witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+          subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
+          HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
+          Operations.shallowInteractions_append, Operations.shallowInteractions_witness,
+          Operations.shallowInteractions_subcircuit, Operations.shallowInteractions_assert,
+          Operations.shallowInteractions_interact, Operations.shallowInteractions_nil,
+          List.nil_append] at h_interaction
+        simp only [List.mem_append, List.mem_singleton, List.not_mem_nil, or_false] at h_interaction
+        subst interaction
+        right
+        rw [ChannelInteraction.toRaw_requirements]
+        intro h1 h0
+        simp only [circuit_norm] at h1 h0
+        exact off_gate_vacuous h_bool' h1 h0,
     -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair so the chip is a
     -- `VmTables` table. `next_pc` is the **witnessed** LSB-cleared jump target the chip feeds `CPUState`:
     -- low limb `add_value[0] - lsb` (cells `offset+0` minus `offset+8`), high limbs `add_value[1..2]`.
     exposedChannels := fun input offset =>
-      stateChannel.expose
-        [ stateChannel.pulledIf input.is_real
-            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
-             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          stateChannel.pushedIf input.is_real
-            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
-             var ⟨offset⟩ - var ⟨offset + 8⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩⟩ ],
+      Readers.CPUState.exposedState
+        ⟨input.state,
+          #v[var ⟨offset⟩ - var ⟨offset + 8⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩],
+          8, input.is_real⟩,
     exposedChannels_eq := by
       intro input offset
-      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
-        List.map_cons, List.map_nil]
-      simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
-        Readers.ITypeReader.circuit, Readers.ITypeReader.main,
-        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
-        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-        SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions,
-        GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
+      simp only [Readers.CPUState.exposedState]
+      rw [Operations.exposedChannelsLawful_expose]
+      simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+        witnessVectorNative, witnessNative, subcircuitWithAssertion, assertion, assertZero,
+        HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
+      simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+        Readers.CPUState.interactionsWith_state_subcircuit,
+        InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+        InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+        AddOperation.circuit, AddOperation.channelsWithGuarantees_eq,
+        Readers.ITypeReader.circuit, Readers.ITypeReader.channelsWithGuarantees_eq,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
+        FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
+        Channels.stateChannel_eq_byteChannel_false, Channels.stateChannel_eq_programChannel_false,
+        Channels.stateChannel_eq_memoryChannel_false, not_false_eq_true,
+        Operations.interactionsWith_assert, Operations.interactionsWith_interact,
+        Operations.interactionsWith_nil, List.nil_append]
+      simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
+        Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
+      simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil] }
 
 end SP1Clean.JalrChip

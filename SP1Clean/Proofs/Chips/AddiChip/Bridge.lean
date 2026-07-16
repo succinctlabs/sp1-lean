@@ -119,8 +119,8 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.AddiCols (ZMod p)) (da
     rw [vrd, vopbm, vopc, hidentity, RV64.add]
   exact advance_of_itype iop.ADDI hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
 
-/-- `ChipKind` registration for Addi (ADDI, opcode 1). `sailEquiv` carries the immediate-decode fact
-`op_c_val = signExtend imm`; `advance`/`advanceReady` (SC Phase 4) route to `AddiChip.advance`. -/
+/-- `ChipKind` registration for Addi (ADDI, opcode 1). `advance`/`advanceReady` route to
+`AddiChip.advance`; its committed Program decode pins `op_c_val = signExtend imm`. -/
 def kind : Soundness.ChipKind p where
   name := "Addi"
   Inputs := AddiChip.Inputs

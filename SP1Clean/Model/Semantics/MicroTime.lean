@@ -1,14 +1,15 @@
-import SP1Clean.Model.Semantics.GuestProgram
+import SP1Clean.Model.Machine.Execution
 import SP1Clean.Model.BusMessages
 
-/-! # Micro-time — the bus-clock ↔ execution-step correspondence
+/-! # Ordinary-window micro-time
 
-The semantic channel guarantees are statements about **the deterministic trajectory** of the committed
-program at **bus times**. This module pins the conventions:
+This module is the proved register/RAM interpretation used by the current ordinary-row grounding
+theorem. New whole-machine statements use `Machine.SP1MachineModel.schedule`; the fixed eight-tick
+definitions here remain an explicitly scoped compatibility layer until timed grounding is generalized.
 
 - `clkNat` — the ℕ-decoded bus clock (`clk_high · 2^24 + clk_low`, the split every State/Memory message
   carries); `timeNat` projections for both message types.
-- **The window convention**: execution step `k` occupies the clk window `[c0 + 8k, c0 + 8(k+1))`
+- **The ordinary window convention**: execution step `k` occupies `[c0 + 8k, c0 + 8(k+1))`
   (`c0` = the committed genesis clock; every chip advances by `CLK_INC = 8`). Intra-row effect times:
   a RAM write lands at offset `+1` (the `MemoryAccess` push offset), a register write at `+4` (the
   op_a write offset); reads/read-backs at `+2`/`+3` observe pre-effect content.
@@ -43,6 +44,10 @@ def MemoryMsg.timeNat (m : MemoryMsg (ZMod p)) : ℕ := clkNat m.clk_high m.clk_
 def pcBits (pc0 pc1 pc2 : ZMod p) : BitVec 64 :=
   BitVec.ofNat 64 (pc0.val + pc1.val * 2 ^ 16 + pc2.val * 2 ^ 32)
 
+/-- A State message's pc, using the same recombination as the official-Sail row bridge. -/
+def StateMsg.pcBits (m : StateMsg (ZMod p)) : BitVec 64 :=
+  _root_.SP1Clean.Semantics.pcBits m.pc0 m.pc1 m.pc2
+
 /-! ## Memory locations -/
 
 /-- A Memory-bus location: a register (index < 32, the `addr1 = addr2 = 0` shape) or a RAM address. -/
@@ -57,6 +62,23 @@ def MemoryMsg.locOf (m : MemoryMsg (ZMod p)) : MemLoc :=
     .reg (BitVec.ofNat 5 m.addr0.val)
   else
     .ram (BitVec.ofNat 64 (m.addr0.val + m.addr1.val * 2 ^ 16 + m.addr2.val * 2 ^ 32))
+
+/-- A Memory-bus record with the canonical register address shape decodes to that register.  The
+field equality is the form supplied by the Program/decode layer, while the result is the typed
+location consumed by timed grounding. -/
+theorem MemoryMsg.locOf_register [Fact p.Prime] [Fact (2 ^ 17 < p)]
+    (message : MemoryMsg (ZMod p)) (index : BitVec 5)
+    (addr0 : (index.toNat : ZMod p) = message.addr0)
+    (addr1 : message.addr1 = 0) (addr2 : message.addr2 = 0) :
+    MemoryMsg.locOf message = MemLoc.reg index := by
+  unfold MemoryMsg.locOf
+  rw [← addr0, addr1, addr2]
+  have indexLtP : index.toNat < p := by
+    have indexLt : index.toNat < 32 := index.isLt
+    have := Fact.out (p := 2 ^ 17 < p)
+    omega
+  simp only [ZMod.val_natCast, Nat.mod_eq_of_lt indexLtP, index.isLt, true_and, if_true,
+    BitVec.ofNat_toNat, BitVec.setWidth_eq]
 
 /-- The 8-byte little-endian RAM word at `a` (the Memory bus's value granularity). -/
 def ramWord64? (s : SailState) (a : BitVec 64) : Option (BitVec 64) := do
@@ -77,16 +99,11 @@ def locContent (s : SailState) : MemLoc → Option (BitVec 64)
 
 /-! ## The trajectory as a function -/
 
-/-- One deterministic interpreter step (`none` when `try_step` errors out of the model). -/
-noncomputable def stepOnce (s : SailState) : Option SailState :=
-  match (try_step 0 false).run s with
-  | .ok _ s' => some s'
-  | .error _ _ => none
+/-- Compatibility name for the canonical Lean-native machine step. -/
+noncomputable abbrev stepOnce := SP1Clean.Machine.stepOnce
 
-/-- The state after `k` interpreter steps from `s0`. -/
-noncomputable def chainState (s0 : SailState) : ℕ → Option SailState
-  | 0 => some s0
-  | k + 1 => (chainState s0 k).bind stepOnce
+/-- Compatibility name for the canonical PolyFun machine trajectory. -/
+noncomputable abbrev chainState := SP1Clean.Machine.trajectory
 
 /-- The function ↔ relation bridge: a defined `chainState` is a `SailChain`. -/
 theorem sailChain_of_chainState {s0 s : SailState} :
@@ -96,11 +113,11 @@ theorem sailChain_of_chainState {s0 s : SailState} :
   | zero => intro h; cases h; exact .refl s0
   | succ k ih =>
     intro h
-    rw [chainState] at h
-    rcases hbind : chainState s0 k with _ | s'
+    change (Machine.trajectory s0 k).bind Machine.stepOnce = some s at h
+    rcases hbind : Machine.trajectory s0 k with _ | s'
     · rw [hbind] at h; cases h
     · rw [hbind, Option.bind_some] at h
-      unfold stepOnce at h
+      unfold Machine.stepOnce at h
       rcases hrun : (try_step 0 false).run s' with b | e
       · rw [hrun] at h; cases h
         exact (ih hbind).snoc ⟨_, hrun⟩
@@ -112,9 +129,13 @@ theorem chainState_succ_front {s0 s1 : SailState} (h : stepOnce s0 = some s1) :
     ∀ k, chainState s0 (k + 1) = chainState s1 k := by
   intro k
   induction k with
-  | zero => show (chainState s0 0).bind stepOnce = _; simp [chainState, h]
+  | zero =>
+    change Machine.stepOnce s0 = some s1
+    exact h
   | succ k ih =>
-    show (chainState s0 (k + 1)).bind stepOnce = (chainState s1 k).bind stepOnce
+    change (Machine.trajectory s0 (k + 1)).bind Machine.stepOnce =
+      (Machine.trajectory s1 k).bind Machine.stepOnce
+    change Machine.trajectory s0 (k + 1) = Machine.trajectory s1 k at ih
     rw [ih]
 
 /-- Determinism, the other direction: a `SailChain` forces the `chainState` value. -/
@@ -125,7 +146,9 @@ theorem chainState_of_sailChain {s0 s : SailState} :
   | refl s => rfl
   | @step n s s' _ hstep _ ih =>
     obtain ⟨b, hrun⟩ := hstep
-    have hstep1 : stepOnce s = some s' := by simp [stepOnce, hrun]
+    have hstep1 : Machine.stepOnce s = some s' := by
+      unfold Machine.stepOnce
+      rw [hrun]
     rw [chainState_succ_front hstep1 n]
     exact ih
 

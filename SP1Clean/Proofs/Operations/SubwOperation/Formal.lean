@@ -66,9 +66,9 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     rw [← c16] at R1
     show input_cols_value[1].val < 2 ^ 16
     exact (byteRowSpec_range _ h16p).mp R1
-  -- Trailing requirements: the composed `U16MSBOperation`'s `Assumptions`, then the two direct byte
-  -- pulls' own `Requirements` — both vacuous off-gate.
-  refine ⟨⟨(h_msb h_msb_as).1, ?_⟩, Or.inr h_msb_as,
+  -- The two direct byte pulls are vacuous off-gate. The composed MSB gadget now exposes its empty
+  -- requirement list through canonical metadata, so its local assumption does not leak into this tail.
+  refine ⟨⟨(h_msb h_msb_as).1, ?_⟩,
     fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   intro hr1eq
   obtain ⟨ha, hb⟩ := hab_imp hr1eq
@@ -219,9 +219,7 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     completeness := completeness,
     channelsWithRequirements := [],
     requirementsChannelsLawful := fun input_var i₀ => by
-      simp only [circuit_norm, main, byteChannel]
-      refine ⟨List.nil_subset _, ?_⟩
-      grind }
+      simp only [circuit_norm, main, byteChannel]; grind }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

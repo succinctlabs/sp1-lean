@@ -1,7 +1,7 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Native.Operations.AddOperation.RawSpec
-import SP1Clean.Extracted.Circuit.AddOperation
+import SP1Clean.Native.Operations.AddOperation.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
 import SP1Clean.Model.InteractionRecovery
@@ -89,14 +89,8 @@ theorem add_interactions_faithful_syntactic
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
     fun g s => toAccess_pullIf_byte env g s
-  -- the five `=== 0` gates are `Gadgets.Equality` `FormalAssertion` subcircuits emitting no byte
-  -- interaction, so their `byteChannel` filter is empty (as in `programLookups_eq_emitted`).
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
-    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
-      ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp
-      List.not_mem_nil List.not_mem_nil
   -- RHS: recover the 4 byte pulls from `main`; LHS: expand the extracted list + projection.
-  simp only [SP1Clean.AddOperation.main, circuit_norm, hk, heq,
+  simp only [SP1Clean.AddOperation.main, circuit_norm, hk,
     Extracted.AddOperation.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess_byte, ByteOpcode.ofNat_six, ByteOpcode.idx,
     h_ir, h_v0, h_v1, h_v2, h_v3, h6]

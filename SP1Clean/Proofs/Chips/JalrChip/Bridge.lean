@@ -191,10 +191,8 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.JalrColumns (ZMod p)) 
   · rw [vrd, hspec.2.2.2.2.1 hreal' hopa0, hpcw, JalSail.toBitVec64_four]
 
 /-- JALR's `ChipKind` registration. `view` threads the LSB-cleared `next_pc`, I-type adapter, opcode 47.
-`sailEquiv` quantifies the PC/rs1 read and decode preconditions internally; neither the LSB-clearing
-relation nor the cleared-target 4-byte alignment is a precondition — `reaches_sail` derives both from the
-chip `Spec`. `reaches_sail` is `jalr_chip_reaches_sail`; `advance` is `JalrChip.advance` (the SC Phase 4
-uniform `try_step` lift). -/
+`advance` derives both the LSB-clearing relation and target alignment from the chip `Spec`, then discharges
+the uniform `try_step` effect; `jalr_chip_reaches_sail` remains its local bridge helper. -/
 def kind : Soundness.ChipKind p where
   name := "Jalr"
   Inputs := JalrChip.Inputs

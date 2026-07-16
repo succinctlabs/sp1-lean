@@ -1,5 +1,9 @@
 # W11 ensemble re-base — status & what's left (hand-off 2026-06-26; **Phases 4–5 landed 2026-07-02**)
 
+> **Historical handoff.** The later consolidation retained a plain Clean `Ensemble`, retired
+> `VmChannel`, and replaced this capstone direction with deterministic typed decode plus ranked/timed
+> grounding. See `../architecture.md` and `../proposals/consolidation-progress.md` for current state.
+
 Re-basing the whole-machine capstone onto canonical Clean `SoundEnsemble`/`VmTables` with
 `StaticLookupChannel` providers, replacing the bespoke `GatedVm`. Full plan:
 `~/.claude/plans/make-a-plan-to-valiant-wozniak.md`. Design + faithful-provider details + the validated

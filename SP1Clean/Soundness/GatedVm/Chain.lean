@@ -27,7 +27,9 @@ namespace SP1Clean.Soundness
 
 namespace GatedVm
 
-variable {α V : Type} [DecidableEq α] [DecidableEq V]
+universe u v
+
+variable {α : Type u} {V : Type v} [DecidableEq α] [DecidableEq V]
 
 /-- Out-degree of `v` in the edge multiset `E`: the number of edges whose **source** is `v`. -/
 def outdeg (E : Multiset α) (edge : α → V × V) (v : V) : ℕ :=

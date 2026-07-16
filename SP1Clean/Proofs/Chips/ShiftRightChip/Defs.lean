@@ -340,17 +340,24 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftRightCols (Z
     is_srl, is_sra, is_srlw, is_sraw, is_w_imm⟩
 
 set_option maxHeartbeats 4000000 in
+@[implicit_reducible] private def derivedElaborated :
+    ElaboratedCircuit (ZMod p) Inputs ShiftRightCols main := by
+  elaborate_circuit_with {
+    channelsWithGuarantees :=
+      [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  }
+
+/-- Clean owns the output layout and every structural proof.  This thin public record forwards them
+while keeping the declared channel order visible at the chip boundary. -/
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs ShiftRightCols main where
-  -- witnesses: a(4) + b_msb(1) + srw_msb(1) + c_bits(6) + sra_msb_v0123(1) + v(3) + lower(4)
-  -- + higher(4) + limb_result(4) + shift_u16(4) + flags(5) = 37.
-  localLength _ := 37
-  localLength_eq := by simp +arith [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit, Readers.RegisterWrite.circuit]
-  subcircuitsConsistent := by simp only [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit, Readers.RegisterWrite.circuit]; try omega
-  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
-  -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
-  -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
-  channelsLawful := by simp [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit, Readers.RegisterWrite.circuit]
+  output := derivedElaborated.output
+  output_eq := derivedElaborated.output_eq
+  localLength := derivedElaborated.localLength
+  localLength_eq := derivedElaborated.localLength_eq
+  subcircuitsConsistent := derivedElaborated.subcircuitsConsistent
+  channelsWithGuarantees :=
+    [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsLawful := derivedElaborated.channelsLawful
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :

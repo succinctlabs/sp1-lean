@@ -61,9 +61,6 @@ is **defeq** to the inner `IsZeroWord` `fromElements` (cast/take only — does N
 `.result` field), so a cheap `rfl` bridges to `iszeroword_result_proj`. -/
 lemma iseqword_result_proj {F : Type} (W : Vector F 11) :
     (fromElements W : Extracted.IsEqualWordOperation F).is_diff_zero.result = W[10] := by
-  -- `toComponents` of the derived single-field struct is the cheap projection `.cons _.is_diff_zero .nil`
-  -- (does NOT force the deep nested `IsZeroWord`); `toComponents_fromComponents` peels the outer
-  -- `fromElements` without normalizing the inner. Injectivity then gives the `is_diff_zero` value.
   have hd : toComponents (fromElements W : Extracted.IsEqualWordOperation F)
       = ProvableStruct.ProvableTypeList.cons
           (fromElements W : Extracted.IsEqualWordOperation F).is_diff_zero
@@ -76,20 +73,26 @@ lemma iseqword_result_proj {F : Type} (W : Vector F 11) :
               (components Extracted.IsEqualWordOperation)
               ((W).cast ProvableStruct.combinedSize_eq)) from rfl,
         ProvableStruct.toComponents_fromComponents]
-    simp only [ProvableStruct.componentsFromElements]
-    congr 1
-    congr 1
-    apply Vector.ext; intro i hi
-    simp only [show size Extracted.IsZeroWordOperation = 11 from rfl] at hi ⊢
-    simp only [Vector.getElem_cast, Vector.take_eq_extract]
-    erw [Vector.getElem_extract]
-    simp only [Nat.zero_add]
-    exact Vector.getElem_cast hi
+    -- Lean 4.31 no longer unfolds this implicit-reducible instance at `simp`'s default transparency.
+    -- Reduce it once, coherently with the dependent vector casts, before peeling the one-field list.
+    dsimp +instances only [components, Extracted.instProvableStructIsEqualWordOperation]
+    rw [← ProvableStruct.fromElements_toElements
+      [{ type := Extracted.IsZeroWordOperation, provableType := inferInstance }]
+      (ProvableStruct.ProvableTypeList.cons
+        (fromElements W : Extracted.IsZeroWordOperation F)
+        ProvableStruct.ProvableTypeList.nil)]
+    apply congrArg (ProvableStruct.componentsFromElements
+      [{ type := Extracted.IsZeroWordOperation, provableType := inferInstance }])
+    simp only [ProvableStruct.componentsToElements, ProvableType.toElements_fromElements,
+      Vector.cast_rfl]
+    apply Vector.ext
+    intro i hi
+    rfl
   have h1 : (fromElements W : Extracted.IsEqualWordOperation F).is_diff_zero
       = (fromElements W : Extracted.IsZeroWordOperation F) := by
-    have := hd.symm.trans ht
-    injection this
-  rw [h1, iszeroword_result_proj]
+    have h := hd.symm.trans ht
+    injection h
+  exact (congrArg Extracted.IsZeroWordOperation.result h1).trans (iszeroword_result_proj W)
 
 /-! ## Byte-bus range extraction -/
 

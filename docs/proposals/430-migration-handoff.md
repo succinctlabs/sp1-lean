@@ -1,5 +1,9 @@
 # Lean 4.30 migration — resume handoff (2026-07-11)
 
+> **Historical handoff.** The repository is now on Lean 4.31 and the proof architecture has changed.
+> This file is retained only as the 4.30 debugging record; use `consolidation-progress.md` and
+> `../release-audit.md` for current debt.
+
 > **OUTCOME (2026-07-11, later that day): migration is GREEN.** `lake build SP1Clean` = 0 errors / 0
 > warnings; both guard scripts pass. The "4 remaining DivRem soundness files" below were superseded — all
 > **9** DivRem soundness files hit a 4.30 `whnf`-timeout regression (not the nativeValue-rewrite error this

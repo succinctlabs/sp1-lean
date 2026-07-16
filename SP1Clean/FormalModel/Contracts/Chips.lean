@@ -1,8 +1,7 @@
 import SP1Clean.FormalModel.Contracts.Operations
-import SP1Clean.Extracted.AddChip
+import SP1Clean.FormalModel.Contracts.DivRem
 import SP1Clean.Extracted.AddiChip
 import SP1Clean.Extracted.AddwChip
-import SP1Clean.Extracted.SubChip
 import SP1Clean.Extracted.SubwChip
 import SP1Clean.Extracted.BitwiseChip
 import SP1Clean.Extracted.ShiftLeftChip
@@ -36,8 +35,17 @@ function truncates-then-sign-extends, related to the gadget's `setWidth 32`/`sig
 
 namespace SP1Clean.AddChip
 
-open Extracted (AddCols)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native Add-chip row.  Its arithmetic block follows the local Lean gadget, not Rust's
+`AddOperation` type.  `Faithful.AddChip.reconfigure` is the explicit whole-chip bridge to the
+extracted `AddCols` oracle.  The reader blocks remain layout-compatible while that migration proceeds. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.RTypeReader F
+  add_operation : AddOperation.Columns F
+  is_real : F
+deriving ProvableStruct
 
 /-- The `is_real` selector and the **threaded reader column blocks** `state`/`adapter` (the committed
 CPUState + register-adapter columns the chip reads). The `rs1`/`rs2` source operands are **not** separate
@@ -62,7 +70,7 @@ manipulate the adapter slot see through it. -/
 sub-`Spec`s on the `state`/`adapter` blocks, the *proven* `is_real`-binary fact, and the `is_real`-gated
 arithmetic meaning — on real rows the result column is the RV64 `ADD` of the operands
 (`RV64.add op_c_val op_b_val = op_b_val + op_c_val`). Vacuous on padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : AddCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   True ∧
   Readers.RTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
@@ -125,9 +133,18 @@ end SP1Clean.AddiChip
 
 namespace SP1Clean.SubChip
 
-open Extracted (SubCols)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
+
+/-- Native Sub-chip row. The reader blocks reuse the project substrate; only the arithmetic block is
+owned by the local Lean gadget. `Faithful.SubChip.subChipReconfigure` is the sole bridge to Rust's
+separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.RTypeReader F
+  sub_operation : SubOperation.Columns F
+  is_real : F
+deriving ProvableStruct
 
 /-- The `is_real` selector and the threaded reader column blocks `state`/`adapter` (as `AddChip`). The
 `rs1`/`rs2` operands are projected from the adapter register slots — see `Inputs.op_b_val` below. -/
@@ -145,7 +162,7 @@ Memory-bus values), projected rather than carried as separate committed columns 
 /-- Semantic contract, mirroring `AddChip`. The fourth conjunct: on real rows the result column is the
 RV64 `SUB` of the operands (`RV64.sub op_c_val op_b_val = op_b_val - op_c_val`, the fixed `rs1 - rs2`
 order — `SUB` is not commutative). -/
-def Spec (input : Inputs (ZMod p)) (cols : SubCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   True ∧
   Readers.RTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
@@ -467,44 +484,19 @@ flag-dependent arithmetic operand (read for 64-bit ops, sign/zero-extension for 
 /-- The `rs2` source = the register read on the `op_c` memory slot (`op_c_memory.prev_value`). -/
 @[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c_memory.prev_value
 
-/-- Semantic contract, composed from the sub-circuits' own `Spec`s (as `MulChip`). Three conjuncts: the
-`RTypeReader` reader sub-`Spec` on the `state`/`adapter` blocks (the register reads/write, gated by the
-flag-weighted R-type opcode and the result `cols.a` as the `op_a` write value), the *proven* `is_real`-binary
-fact, and the `is_real`-gated, **flag-gated** arithmetic with eight variant conjuncts: on real rows the
-result column `cols.a` is the RV64 divide/remainder selected by the committed flag (`cols.is_div →
-RV64.div`, signed 64-bit quotient; `cols.is_divu → RV64.divu`, unsigned; `cols.is_rem → RV64.rem`,
-signed remainder; `cols.is_remu → RV64.remu`, unsigned; and the four `*w` word variants `divw`/`remw`/
-`divuw`/`remuw`, 32-bit operated then sign-extended to 64). Operand order matches the RV64 signature
-`f rs2_val rs1_val` with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`. Vacuous on padding.
-
-The per-flag overflow/divide-by-zero side conditions (SP1's `DivRemCols.eval`) are not yet folded in. -/
+/-- Public chip contract: reader/bus-facing row plumbing plus the stable semantic `DivRemContract.RowSpec`.
+The latter gives names to the binary real-row gate, unique committed case, and eight independently
+verifiable RV64 results. Division by zero and signed overflow are specified by the RV64 functions
+themselves; they are not hidden side assumptions. -/
 def Spec (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.RTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,
       clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
       pc := cols.state.pc,
-      opcode := cols.is_divu * 16 + cols.is_remu * 18 + cols.is_div * 15 + cols.is_rem * 17
-        + cols.is_divw * 25 + cols.is_remw * 27 + cols.is_divuw * 26 + cols.is_remuw * 28,
+      opcode := DivRemContract.encodedOpcode cols,
       wv0 := cols.a[0], wv1 := cols.a[1], wv2 := cols.a[2], wv3 := cols.a[3] } ∧
-  (input.is_real = 0 ∨ input.is_real = 1) ∧
-  (input.is_real = 1 →
-    (cols.is_div = 1 →
-      Word.toBitVec64 cols.a = RV64.div (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
-    (cols.is_divu = 1 →
-      Word.toBitVec64 cols.a = RV64.divu (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
-    (cols.is_rem = 1 →
-      Word.toBitVec64 cols.a = RV64.rem (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
-    (cols.is_remu = 1 →
-      Word.toBitVec64 cols.a = RV64.remu (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
-    (cols.is_divw = 1 →
-      Word.toBitVec64 cols.a = RV64.divw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
-    (cols.is_remw = 1 →
-      Word.toBitVec64 cols.a = RV64.remw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
-    (cols.is_divuw = 1 →
-      Word.toBitVec64 cols.a = RV64.divuw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
-    (cols.is_remuw = 1 →
-      Word.toBitVec64 cols.a = RV64.remuw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)))
+  DivRemContract.RowSpec input.is_real input.op_b_val input.op_c_val cols.a cols
 
 end SP1Clean.DivRemChip
 

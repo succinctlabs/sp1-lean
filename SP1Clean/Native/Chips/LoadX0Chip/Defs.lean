@@ -29,7 +29,6 @@ The chip `Spec` is the composition of the sub-circuits' own `Spec`s + the proven
 `is_real`-binary fact + the three per-width alignment equations + the two `op_a_0` forcing gates (which
 pin `op_a_0 = is_real`, i.e. `op_a = x0` on real rows). Output is the extracted `LoadX0Columns`. -/
 
-open LeanRV64D.Defs
 namespace SP1Clean.LoadX0Chip
 
 open Circuit
@@ -118,21 +117,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadX0Columns (ZM
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.offset_bit,
     input.is_lb, input.is_lbu, input.is_lh, input.is_lhu, input.is_lw, input.is_lwu, input.is_ld⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadX0Columns main where
-  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
-  -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks are threaded
-  -- inputs and the gates witness nothing.
-  localLength _ := 3 + 1
-  localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
-  output input i0 :=
-    ⟨input.state, input.adapter,
-      ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
-      input.memory_access, input.offset_bit,
-      input.is_lb, input.is_lbu, input.is_lh, input.is_lhu, input.is_lw, input.is_lwu, input.is_ld⟩
-  output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
-  -- `programChannel` joins the byte guarantee propagated up from `ITypeReaderImmutable`'s program **pull**;
-  -- `memoryChannel` from `MemoryAccess`'s read-prior **pull** (W11 memory flip).
-  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+/-- Derive the four address witness cells and the complete four-channel interface from `main`. -/
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadX0Columns main := by
+  elaborate_circuit
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity,
 the `MemoryAccess` timestamp monotonicity (a read), the `ITypeReaderImmutable` adapter facts (op_a/op_b

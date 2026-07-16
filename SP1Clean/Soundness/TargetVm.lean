@@ -2,10 +2,13 @@ import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.Model.Semantics.GuestProgram
 import SP1Clean.Model.Semantics.Decode
 import SP1Clean.Soundness.RowEffectDefs
+import SP1Clean.FormalModel.Contracts.PublicValues
 
 /-! # The target machine-level theorem — a real Sail execution chain from a loaded guest program
 
-> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
+> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path retained as a proved intermediate.
+> Do not add new capstone work here; current soundness work targets typed witness decoding and the
+> ranked/timed grounding engine.
 
 **What this file is.** The *formal target* the whole-machine effort closes toward, stated and proved
 today as a skeleton: from a verifying Clean ensemble over the committed public boundary, the **official
@@ -23,8 +26,8 @@ is the visible list of seams below, not prose.
   W2/W3 work is free to shape it (decode indices from the program bus, values from the memory bus).
 * `TargetObligations.lift` (**W7 Sail step-lift**): in a refining state whose operands are bound, one
   `try_step` fires and produces the row's committed effect (`RowEffect`: the PC write, a register-file
-  frame at `op_a`, ROM/configuration preservation). This is where each chip's conditional `sailEquiv`
-  (the existing per-chip bridges) is upgraded to an actual interpreter step.
+  frame at `op_a`, ROM/configuration preservation). The current registry supplies this uniformly through
+  each chip's `advance` proof; this bundle preserves the older walk-facing interface.
 * `TargetObligations.halt` + `halt_nonempty` (**W5 ECALL/HALT chip**): the walk's final row is a HALT
   `SyscallInstrs` row, and any state refining the pre-halt prefix satisfies `SP1Halted` with the
   committed `exit_code`. (Note: SP1's syscall rows advance the clock by 256, not 8 —
@@ -41,9 +44,9 @@ The earlier per-row Sail statement (the retired `GatedExecution.step_sound` conj
 the skeleton discharges `lift` from the per-chip `ChipKind.advance` path and uses only the **trail** half
 of `GatedExecution`.
 
-`sp1_target_execution` is axiom-clean (the walk induction is pure logic); the corollary
-`sp1_target_soundness` additionally routes through `sp1_machine_soundness` and therefore inherits the
-capstone's `sorryAx` (the `sp1_witness_decode` decode-seam premise) until §B5 closes. -/
+`sp1_target_execution` is axiom-clean (the walk induction is pure logic); the legacy corollary
+`sp1_target_soundness` additionally routes through `balanced_state_trail_soundness` and therefore inherits the
+capstone's `sorryAx` (the `sp1_decoded_rows_sound` structural decode seam) until §B5 closes. -/
 
 namespace SP1Clean.Soundness.Target
 
@@ -56,32 +59,11 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 
-/-! ## The extended public IO: `exit_code`
+/-! ## The supported-core public values
 
-SP1 commits ~30 `PublicValues` fields; the legacy `SP1PublicIO` models the ten state-boundary fields,
-and the target adds `exit_code` (`../sp1 crates/hypercube/src/air/public_values.rs`). Kept flat with a
-`toLegacy` projection so `sp1Ensemble`/`sp1StateVerifier` need not fork yet; the eventual W5 landing replaces
-`SP1PublicIO` outright. -/
-structure SP1TargetPublicIO (F : Type) where
-  init_clk_high : F
-  init_clk_low : F
-  init_pc0 : F
-  init_pc1 : F
-  init_pc2 : F
-  final_clk_high : F
-  final_clk_low : F
-  final_pc0 : F
-  final_pc1 : F
-  final_pc2 : F
-  exit_code : F
-deriving ProvableStruct
-
-/-- Forget `exit_code` — the boundary the current ensemble commits. -/
-def SP1TargetPublicIO.toLegacy {F : Type} (pi : SP1TargetPublicIO F) : SP1PublicIO F :=
-  { init_clk_high := pi.init_clk_high, init_clk_low := pi.init_clk_low,
-    init_pc0 := pi.init_pc0, init_pc1 := pi.init_pc1, init_pc2 := pi.init_pc2,
-    final_clk_high := pi.final_clk_high, final_clk_low := pi.final_clk_low,
-    final_pc0 := pi.final_pc0, final_pc1 := pi.final_pc1, final_pc2 := pi.final_pc2 }
+`SP1TargetPublicIO` is now a compatibility alias for `SP1CorePublicValues`, defined on the formal-model
+audit surface.  Its deliberately narrow name records that the current ensemble does not yet bind
+upstream SP1's complete shard public-values record. -/
 
 /-! ## PC limbs ↔ the Sail 64-bit PC — `rcvPcOf`/`sndPcOf` relocated to `Soundness/RowEffectDefs.lean`
 (below `ChipRow`), alongside `RefinesAt`/`RowEffect`/`replayVal`, so the `ChipKind.advance` field can
@@ -257,9 +239,9 @@ theorem sp1_target_execution
   have hob := ob.bound s0 path h0 hw (path.length - 1) hlen s_f href
   exact ⟨path.length - 1, s_f, hchain, ob.halt s0 path h0 hw hne s_f href hob⟩
 
-/-- **The end-to-end corollary**: the same conclusion from a verifying Clean ensemble `Statement`,
-routed through `sp1_machine_soundness`. Inherits the capstone's single `sorryAx` (the decode seam
-`sp1_witness_decode`) until §B5 closes — the skeleton theorem above is axiom-clean. -/
+/-- **The legacy end-to-end corollary**: the same conclusion from a verifying Clean ensemble `Statement`,
+routed through `balanced_state_trail_soundness`. Inherits the intermediate theorem's `sorryAx` (the decode seam
+`sp1_decoded_rows_sound`) until §B5 closes — the skeleton theorem above is axiom-clean. -/
 theorem sp1_target_soundness
     (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p))
     (OperandsBound : Trace.RowView (ZMod p) → SailState → Prop)
@@ -269,7 +251,7 @@ theorem sp1_target_soundness
     ∀ s0, IsInitialState prog s0 →
       ∃ (n : ℕ) (s_f : SailState),
         SailChain n s0 s_f ∧ SP1Halted prog (exitOf pi.exit_code) s_f := by
-  obtain ⟨rows, h_exec⟩ := sp1_machine_soundness pi.toLegacy trivial h_stmt
+  obtain ⟨rows, h_exec⟩ := balanced_state_trail_soundness pi.toLegacy trivial h_stmt
   exact sp1_target_execution prog pi rows OperandsBound h_exec (ob rows) h_entry
 
 /-- The named-seam census the audit doc cites: one entry per open obligation of
@@ -281,6 +263,6 @@ def targetSeams : List String :=
     "TargetObligations.halt/halt_nonempty — the ECALL/HALT chip (W5; its clk_inc prerequisite landed 2026-06-10)",
     "SailConfigured — populate the platform residue as W7 discovers it (W7)",
     "RowEffect.rom strengthening to store-replay memory (W2b + W4a)",
-    "GatedExecution from Statement without sorry — close the sp1_witness_decode decode seam (W1b+W1c/§B5; the W1a balance translation is proven)" ]
+    "GatedExecution from Statement without sorry — close the sp1_decoded_rows_sound structural decode seam (W1b+W1c/§B5; the W1a balance translation is proven)" ]
 
 end SP1Clean.Soundness.Target

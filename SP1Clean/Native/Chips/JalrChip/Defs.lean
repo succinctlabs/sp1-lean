@@ -97,14 +97,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalrColumns (ZMod
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, input.is_real, ⟨add_value⟩, ⟨op_a_value⟩, lsb⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalrColumns main where
-  channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit,
-    Readers.ITypeReader.circuit, Readers.RegisterWrite.circuit]
-  -- 2 × 4-limb add results + 1 lsb scalar.
-  localLength _ := 9
-  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip);
-  -- `memoryChannel` joins from `ITypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
-  -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+/-- Derive the nine witness cells and the complete four-channel interface structurally from `main`. -/
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalrColumns main := by
+  elaborate_circuit
 
 end SP1Clean.JalrChip

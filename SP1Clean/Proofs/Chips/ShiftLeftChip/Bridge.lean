@@ -11,9 +11,8 @@ result register `rd`); the RISC-V Sail spec differs by variant — `spec_sll` (`
 logical left shift) vs `spec_sllw` (`ropw.SLLW`, the low-32 left shift sign-extended to 64).
 
 `correct_sll_native`/`correct_sllw_native` route the chip's RV64 `sll`/`sllw` facts into the Sail
-`SLL`/`SLLW` via `execute_RTYPE_pure_sll = RV64.sll` / `execute_RTYPEW_pure_sllw = RV64.sllw`. The
-`ChipKind`'s `sailEquiv` is the flag-dispatched conjunction (`is_sll = 1 → SLL` ∧ `is_sllw = 1 →
-SLLW`); `shiftleft_chip_reaches_sail` proves both from the chip `Spec`. -/
+`SLL`/`SLLW` via `execute_RTYPE_pure_sll = RV64.sll` / `execute_RTYPEW_pure_sllw = RV64.sllw`.
+`advance` dispatches the SLL/SLLW cases; `shiftleft_chip_reaches_sail` remains the semantic helper. -/
 
 open LeanRV64D.Defs
 namespace SP1Clean.ShiftLeftSail

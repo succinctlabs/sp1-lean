@@ -25,10 +25,10 @@ the multiply chip, then the ALU-into-`x0` chip.
 Each `⟨Chip.kind, inp, cols⟩` carries its chip's reader/`Inputs`/`Cols` by value, so the whole list is one
 homogeneous `List (ChipRow p)` despite the per-chip type heterogeneity. -/
 def allChipsTrace
-    (addI : AddChip.Inputs (ZMod p)) (addC : Extracted.AddCols (ZMod p))
+    (addI : AddChip.Inputs (ZMod p)) (addC : AddChip.Columns (ZMod p))
     (addiI : AddiChip.Inputs (ZMod p)) (addiC : Extracted.AddiCols (ZMod p))
     (addwI : AddwChip.Inputs (ZMod p)) (addwC : Extracted.AddwCols (ZMod p))
-    (subI : SubChip.Inputs (ZMod p)) (subC : Extracted.SubCols (ZMod p))
+    (subI : SubChip.Inputs (ZMod p)) (subC : SubChip.Columns (ZMod p))
     (subwI : SubwChip.Inputs (ZMod p)) (subwC : Extracted.SubwCols (ZMod p))
     (bitI : BitwiseChip.Inputs (ZMod p)) (bitC : Extracted.BitwiseCols (ZMod p))
     (ltI : LtChip.Inputs (ZMod p)) (ltC : Extracted.LtCols (ZMod p))

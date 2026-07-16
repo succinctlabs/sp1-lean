@@ -43,8 +43,8 @@ structure ProgramAccess (F : Type) where
   imm_c : F
   is_real : F
 
-/-- Program-access projection for an Add row. `opcode := 0` mirrors `Extracted/AddChip.lean`'s CS2
-call shape (`RTypeReader.constraints … 0 …`); the register operands and `op_a_0` are committed adapter
+/-- Program-access projection for an Add row. `opcode := 0` mirrors the Add Rust oracle's reader block
+call shape (`RTypeReader.asserts … 0 …`); the register operands and `op_a_0` are committed adapter
 columns. -/
 def programAccess (r : Trace.RowView (ZMod p)) : ProgramAccess (ZMod p) :=
   { pc := r.state.pc, opcode := r.opcode,
@@ -205,12 +205,9 @@ theorem programLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
   -- the memory emits' `if memoryChannel = programChannel` collapse via the channel distinctness + `if_false`)
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
-  -- `toAccess` the lone emit; SC Phase 2a: `programChannel` is a `VmChannel`, so `circuit_norm` recovers
-  -- the pull in raw `VmChannelInteraction` form — unfold the kernel's `pulledIf` to match it (cf.
-  -- `StateConsistency`), then bind to `programLookups` via the realisation hypotheses.
+  -- `toAccess` the lone pull, then bind it to `programLookups` via the realisation hypotheses.
   have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
     toAccess_pullIf_program env g m
-  simp only [VmChannel.pulledIf] at hk
   simp only [hk]
   -- W11 flip: the lone emit is now a `pull`, so its multiplicity is `signedVal (-is_trusted) = -is_real.val`
   -- (`signedVal_neg_is_real`), matching `programLookups`'s now-negated `−is_real` contribution.

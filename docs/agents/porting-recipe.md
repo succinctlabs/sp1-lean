@@ -82,11 +82,10 @@ entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` inste
   lemma applied verbatim.
 
 ### 3b. Wire the chip into the registry + coverage table
-- Add the `kind` to `Soundness/ChipRegistry.lean`'s `allChipKinds` and bump `allChipKinds_length` (N→N+1).
-- Add a `CoverageEntry` to `Soundness/Coverage.lean`'s `coverage` (the chip, its SP1 opcodes, and the
-  `RdGuard`), in `allChipKinds` order — `coverage_kinds_eq_registry`'s `rfl` enforces the orders match. Update
-  `wiredNames`/`completeChipNames` (if its `circuit.completeness` is sorry-free) and the routing cascades in
-  `routeOf`/`routeName` (mirroring SP1's `tracing.rs` arm); the `by decide` ledger guards re-check the rest.
+- Add one entry to `Soundness/SupportedMachine.lean`'s `supportedChips`: the Clean table, `ChipKind`, SP1
+  opcodes, and `RdGuard`, mirroring the corresponding `tracing.rs` arm. Bump `supportedChips_length` (N→N+1).
+  `allChipKinds`, `sp1Tables`, `coverage`, `routeOf`, and `routeName` are projections/searches of this one
+  descriptor; the decidable ledger guards re-check the resulting coverage.
 - A heterogeneous trace mixing the new op with Add/Sub then rides the gated capstone via `allChipsTrace`
   (`Soundness/AllChips.lean`) + `gatedExecution_allChips` (`Soundness/GatedVm/Bridge.lean`).
 

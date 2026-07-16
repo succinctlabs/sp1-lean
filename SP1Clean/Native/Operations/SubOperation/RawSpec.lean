@@ -10,18 +10,19 @@ The structural borrow-bool + limb-range form `RawSpec`, and the two native borro
 SP1 implements `a - b` as `a + (2^64 - b)`, using `2^16 - 1 - b[i]` as the added limb with the carry
 **initialized to 1** (`sp1/crates/core/machine/src/operations/sub.rs`). The borrow carry is
 `c_i = (a[i] + 65535 - b[i] - value[i] + c_{i-1}) * 65536⁻¹` (with `c_{-1} = 1`), matching SP1's Rust
-shape verbatim — the faithfulness anchor (`Faithful/Sub.lean`) is a trivial `simp`.
+shape used by this local gadget. Whole-chip faithfulness, not an operation theorem, relates the
+assembled circuit to Rust.
 
 The arithmetic routes the 16-bit complement `bbar := 65535 - b[i]` (a genuine 16-bit value, via
 `val_compl_65535`) through `limb_lift`; the BitVec subtraction goal is converted to addition up front with
 `BitVec.eq_sub_iff_add_eq`. The witnessed circuit (`populate` + `main`/`elaborated`) and its `FormalAssertion`
-contract live in the sibling `Elaborated`/`Formal` modules. -/
+contract live in the sibling `Defs`/`Formal` modules. -/
 
 namespace SP1Clean.SubOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The borrow-bool + limb-range form, matching SP1's Rust `SubOperation::eval` verbatim
+/-- The borrow-bool + limb-range form used by the local subtraction gadget
 (carry initialized to `1`, `a[i] + 65535 - b[i] - value[i] + c_in`), stated against the
 result word `value`. -/
 def RawSpec (a b value : Word (ZMod p)) : Prop :=

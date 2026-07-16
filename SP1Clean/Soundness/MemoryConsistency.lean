@@ -38,7 +38,7 @@ private theorem valCast_pos_aux [NeZero p] {x : ZMod p} (hx : x ≠ 0) : 0 < (x.
   have : x.val ≠ 0 := fun hv => hx (ZMod.val_injective p (by rw [ZMod.val_zero]; exact hv))
   omega
 
-/-- The recombined low clock for a row (`clk_0_16 + clk_16_24 * 2^16`), matching `Extracted/AddChip`'s
+/-- The recombined low clock for a row (`clk_0_16 + clk_16_24 * 2^16`), matching the Add Rust oracle's
 CS2 `clk_low` argument. -/
 def rowClkLow (r : Trace.RowView (ZMod p)) : ZMod p :=
   r.state.clk_0_16 + r.state.clk_16_24 * 65536

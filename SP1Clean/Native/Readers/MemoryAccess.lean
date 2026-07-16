@@ -114,6 +114,34 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   -- derives `MemoryMsg.isU64`, so it joins `channelsWithGuarantees`; its `new_value` `pushIf` keeps it in
   -- `channelsWithRequirements`).
   channelsWithGuarantees := [byteChannel.toRaw, memoryChannel.toRaw]
+  channelsLawful := by
+    dsimp only [ElaboratedCircuit.ChannelsLawful]
+    intro input offset
+    change Operations.ChannelsLawful
+      ([.assert _, .subcircuit _, .subcircuit _, .subcircuit _, .interact _, .interact _,
+        .interact _, .interact _] : Operations (ZMod p))
+        [byteChannel.toRaw, memoryChannel.toRaw]
+    refine ⟨?_, ?_, ?_⟩
+    · intro channel h_channel
+      simp only [circuit_norm] at h_channel
+    · intro env
+      rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
+      intro interaction h_interaction
+      simp only [Operations.shallowInteractions_assert,
+        Operations.shallowInteractions_subcircuit, Operations.shallowInteractions_interact,
+        Operations.shallowInteractions_nil,
+        List.mem_cons, List.not_mem_nil, or_false] at h_interaction
+      rcases h_interaction with rfl | rfl | rfl | rfl
+      · exact Or.inl List.mem_cons_self
+      · exact Or.inl List.mem_cons_self
+      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+    · rw [Operations.subcircuitChannelsLawful_iff_forall]
+      intro subcircuit h_subcircuit
+      simp only [Operations.subcircuits_assert, Operations.subcircuits_subcircuit,
+        Operations.subcircuits_interact, Operations.subcircuits_nil, List.mem_cons,
+        List.not_mem_nil, or_false] at h_subcircuit
+      rcases h_subcircuit with rfl | rfl | rfl <;> simp only [circuit_norm]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
@@ -226,7 +254,47 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
     soundness := soundness, completeness := completeness,
     channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
-      simp only [circuit_norm, main, byteChannel, memoryChannel]; grind }
+      change Operations.RequirementsChannelsLawful
+        ([.assert _, .subcircuit _, .subcircuit _, .subcircuit _, .interact _, .interact _,
+          .interact _, .interact _] : Operations (ZMod p))
+          [byteChannel.toRaw, memoryChannel.toRaw] [memoryChannel.toRaw]
+      dsimp only [Operations.RequirementsChannelsLawful]
+      refine ⟨?_, ?_, ?_⟩
+      · intro channel h_channel
+        simp only [circuit_norm] at h_channel
+      · intro channel h_channel
+        simp only [Operations.shallowChannels_assert, Operations.shallowChannels_subcircuit,
+          Operations.shallowChannels_interact,
+          Operations.shallowChannels_nil, List.mem_cons, List.not_mem_nil, or_false] at h_channel
+        rcases h_channel with rfl | rfl | rfl | rfl
+        · exact Or.inl List.mem_cons_self
+        · exact Or.inl List.mem_cons_self
+        · exact Or.inr List.mem_cons_self
+        · exact Or.inr List.mem_cons_self
+      · intro env h_constraints
+        have h_bool : (ProvableStruct.eval env input_var).is_real = 0 ∨
+            (ProvableStruct.eval env input_var).is_real = 1 := by
+          apply bool_of_mul_pred
+          simpa only [circuit_norm] using h_constraints.1
+        rw [Operations.inChannelsOrRequirements_iff_forall_mem]
+        intro interaction h_interaction
+        simp only [Operations.shallowInteractions_assert,
+          Operations.shallowInteractions_subcircuit, Operations.shallowInteractions_interact,
+          Operations.shallowInteractions_nil,
+          List.mem_cons, List.not_mem_nil, or_false] at h_interaction
+        rcases h_interaction with rfl | rfl | rfl | rfl
+        · right
+          rw [ChannelInteraction.toRaw_requirements]
+          intro h1 h0
+          simp only [circuit_norm] at h1 h0
+          exact off_gate_vacuous h_bool h1 h0
+        · right
+          rw [ChannelInteraction.toRaw_requirements]
+          intro h1 h0
+          simp only [circuit_norm] at h1 h0
+          exact off_gate_vacuous h_bool h1 h0
+        · exact Or.inl List.mem_cons_self
+        · exact Or.inl List.mem_cons_self }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

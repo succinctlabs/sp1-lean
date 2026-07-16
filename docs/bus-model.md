@@ -3,7 +3,7 @@
 > **HISTORICAL (2026-07-09).** This document describes the pre-consolidation bus model — including
 > the transitional two-mechanism world (in-circuit channels + the `*Lookups` ℤ-shadows) and the
 > `VmChannel`-decoupled `Guarantees`/`Owed` split. The **authoritative** post-consolidation bus
-> description is [`overview.md`](overview.md) §3 (the four plain coupled `Channel`s + the
+> description is [`overview.md`](overview.md) §4 (the four plain coupled `Channel`s + the
 > hygiene-guarantee rule); the migration that supersedes this file is
 > [`proposals/2026-07-architecture-consolidation.md`](proposals/2026-07-architecture-consolidation.md)
 > §3.5. Kept for the design rationale in §5 below; do not cite §0's "current status" as current.
@@ -12,10 +12,10 @@ This doc describes how `sp1-clean-native` models SP1's cross-chip **interaction 
 arithmetic**, relates it to the upstream SP1 Rust source (the `sp1` checkout at `$SP1_DIR`, default
 `../sp1`), and documents how it is built on the public Clean DSL's first-class `Channel`/`Table` machinery.
 
-## 0. Current status
+## 0. Historical status at the time of this design note
 
-This section is the authoritative current state; the design-narrative below (§5) records the rationale
-for how the model is structured.
+This section records the pre-consolidation state; the design narrative below (§5) explains the rationale.
+It is retained for archaeology and is not authoritative for the current implementation.
 
 - **Receiver chips + cross-chip closure (axiom-clean).** The three "secondary divergences" of
   §1 are addressed:

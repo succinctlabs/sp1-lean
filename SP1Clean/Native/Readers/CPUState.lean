@@ -2,6 +2,7 @@ import SP1Clean.FormalModel.Contracts.Readers
 import SP1Clean.Math.Word
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
+import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Extracted.CPUState
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
@@ -34,7 +35,6 @@ namespace SP1Clean.Readers.CPUState
 
 open Circuit
 open SP1Clean.Channels (stateChannel byteChannel StateMsg)
-open SP1Clean.Semantics (StateTruth)
 
 variable {p : ℕ} [Fact p.Prime]
 
@@ -47,6 +47,26 @@ lemma hn13 [Fact (2 ^ 17 < p)] : 2 ^ 13 < p := by
   have h := Fact.out (p := 2 ^ 17 < p)
   have : (2 : ℕ) ^ 13 < 2 ^ 17 := by norm_num
   omega
+
+/-- Current-state message emitted by the reader.  Shared by `main` and its exposed-channel interface. -/
+@[circuit_norm] def currentMsg (input : Var Inputs (ZMod p)) : StateMsg (Expression (ZMod p)) :=
+  ⟨input.cols.clk_high, input.cols.clk_0_16 + input.cols.clk_16_24 * 65536,
+    input.cols.pc[0], input.cols.pc[1], input.cols.pc[2]⟩
+
+/-- Successor-state message emitted by the reader.  Shared by `main` and its exposed-channel interface. -/
+@[circuit_norm] def nextMsg (input : Var Inputs (ZMod p)) : StateMsg (Expression (ZMod p)) :=
+  ⟨input.cols.clk_high, input.cols.clk_0_16 + input.cols.clk_16_24 * 65536 + input.clk_inc,
+    input.next_pc[0], input.next_pc[1], input.next_pc[2]⟩
+
+/-- Typed State interactions emitted by `CPUState`, reusable by every composing chip. -/
+def stateInteractions (input : Var Inputs (ZMod p)) :
+    List (ChannelInteraction (stateChannel (p := p))) :=
+  [stateChannel.pulledIf input.is_real (currentMsg input),
+    stateChannel.pushedIf input.is_real (nextMsg input)]
+
+/-- The exposed-channel form of `stateInteractions`. -/
+def exposedState (input : Var Inputs (ZMod p)) : List (ExposedChannel (ZMod p)) :=
+  expose stateChannel (stateInteractions input)
 
 /-- The `cols` block is an **input** (the composing chip witnesses it), so `main` witnesses nothing and
 imposes the two `is_real`-gated clock byte checks (`byteChannel` gated receives, mult `-is_real`, **raw**
@@ -63,25 +83,44 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
       ByteRow (Expression (ZMod p)))
   byteChannel.pullIf input.is_real
     (⟨3, 0, cols.clk_16_24, 0⟩ : ByteRow (Expression (ZMod p)))
-  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
-  -- State bus as a gated VM channel (W11): `receive_state` is a `pullIf` (mult `-is_real`,
-  -- `assumeGuarantees := true`), `send_state` a `pushIf` (mult `+is_real`). Switching the receive from
-  -- `emit (-is_real)` to `pullIf is_real` is harmless (`StateMsg.Spec = True`, so the assumed guarantee is
-  -- vacuous) but is required so each chip can `expose` the `[pulledIf, pushedIf]` pair Clean's `VmTables`
-  -- consumes (`tables_channel`). `toAccess` ignores `assumeGuarantees`, so the trace projection is unchanged.
-  stateChannel.pullIf input.is_real ⟨cols.clk_high, clk_low, cols.pc[0], cols.pc[1], cols.pc[2]⟩
-  stateChannel.pushIf input.is_real
-    ⟨cols.clk_high, clk_low + input.clk_inc, input.next_pc[0], input.next_pc[1], input.next_pc[2]⟩
+  -- The State bus is structural. `toAccess` ignores `assumeGuarantees`, so using the typed pull/push
+  -- pair preserves exactly the extracted interaction projection.
+  stateChannel.pullIf input.is_real (currentMsg input)
+  stateChannel.pushIf input.is_real (nextMsg input)
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  -- The State bus is now a semantic `VmChannel`: its `pullIf` (`assumeGuarantees := true`) receives
-  -- `StateTruth`, which is *not* trivially true, so `stateChannel` must join `channelsWithGuarantees`
-  -- (else `InChannelsOrGuarantees` can't discharge the pull). Byte stays (its pulls receive `ByteRowSpec`).
+  -- Channel metadata records which buses this reader touches, independently of how strong their
+  -- predicates are.  The State guarantee is now `True`, but the State pull is still a genuine
+  -- guarantee-bearing interaction and must remain visible to composing circuits.
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw]
   channelsLawful := by
-    simp [circuit_norm, main, byteChannel, stateChannel]
+    dsimp only [ElaboratedCircuit.ChannelsLawful]
+    intro input offset
+    change Operations.ChannelsLawful
+      ([.assert _, .interact _, .interact _, .interact _, .interact _] : Operations (ZMod p))
+        [byteChannel.toRaw, stateChannel.toRaw]
+    refine ⟨?_, ?_, ?_⟩
+    · intro channel h_channel
+      simp only [Operations.subcircuitChannelsWithGuarantees_assert,
+        Operations.subcircuitChannelsWithGuarantees_interact,
+        Operations.subcircuitChannelsWithGuarantees_nil, List.not_mem_nil] at h_channel
+    · intro env
+      rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
+      intro interaction h_interaction
+      simp only [Operations.shallowInteractions_assert,
+        Operations.shallowInteractions_interact, Operations.shallowInteractions_nil,
+        List.mem_cons, List.not_mem_nil, or_false] at h_interaction
+      rcases h_interaction with rfl | rfl | rfl | rfl
+      · exact Or.inl List.mem_cons_self
+      · exact Or.inl List.mem_cons_self
+      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+    · rw [Operations.subcircuitChannelsLawful_iff_forall]
+      intro subcircuit h_subcircuit
+      simp only [Operations.subcircuits_assert, Operations.subcircuits_interact,
+        Operations.subcircuits_nil, List.not_mem_nil] at h_subcircuit
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
@@ -95,13 +134,10 @@ set_option linter.unusedSectionVars false in
 Discharged by the composing chip's `is_real * (is_real - 1) = 0` gate. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop := input.is_real = 0 ∨ input.is_real = 1
 
-/-! ### `ProverData`-lifted forms (SC Phase 2c — the State semantic flip)
+/-! ### `ProverData`-lifted forms
 
-`CPUState` upgrades `FormalAssertion → GeneralFormalCircuit` because its State `pullIf` now receives the
-data-relative `StateTruth` guarantee (the State channel is a semantic `VmChannel`). Soundness *ignores*
-the received `StateTruth` (no consumer yet — the `Spec` is the unchanged clock bounds); completeness must
-*supply* it — a state push cannot prove reachability row-locally, so the honest prover (the trace
-generator, which has the real Sail execution) provides it via `ProverAssumptions`. -/
+The reader remains a `GeneralFormalCircuit` so composing chips keep one uniform interface, but its
+local contract is again purely structural.  Execution truth is derived globally. -/
 
 /-- Soundness assumption, lifted to ignore `ProverData`. -/
 def AssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Assumptions input
@@ -109,11 +145,9 @@ def AssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := A
 /-- Soundness spec: the two clock bounds (Contract `Spec`, unchanged), data-ignored. -/
 def SpecD (input : Inputs (ZMod p)) (_ : unit (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Spec input
 
-/-- Completeness assumption: the clock bounds plus the state pull's `StateTruth` (supplied by the honest
-prover — the row is a real execution step of the committed program). -/
-def ProverAssumptionsD (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
+def ProverAssumptionsD (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
-  Assumptions input ∧ Spec input ∧ (input.is_real = 1 → StateTruth (stateMsgOf input.cols) data)
+  Assumptions input ∧ Spec input
 
 theorem soundness [Fact (2 ^ 17 < p)] :
     GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
@@ -121,9 +155,7 @@ theorem soundness [Fact (2 ^ 17 < p)] :
   have h13p : (13 : ℕ) < p := lt_trans (Nat.lt_two_pow_self) hn13
   simp only [circuit_norm, AssumptionsD, SpecD, Spec, Assumptions, byteChannel, stateChannel]
     at h_holds h_assumptions ⊢
-  -- `h_holds`: gate, byte1, byte2, and the **state pull's `StateTruth`** (`h_spull`, ignored — no
-  -- consumer yet). Goal: the clock bounds (from the byte pulls) + the two byte off-gate requirements.
-  obtain ⟨h_gate, h_b1, h_b2, _h_spull⟩ := h_holds
+  obtain ⟨h_gate, h_b1, h_b2⟩ := h_holds
   refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
   have hneg : -(input_is_real) = -1 := by rw [hr1]
@@ -137,16 +169,9 @@ theorem completeness [Fact (2 ^ 17 < p)] :
   circuit_proof_start
   have h13p : (13 : ℕ) < p := lt_trans (Nat.lt_two_pow_self) hn13
   simp only [ProverAssumptionsD, Assumptions, Spec] at h_assumptions
-  obtain ⟨h_bin, h_spec, h_state⟩ := h_assumptions
-  -- pc limbs: the in-circuit message evaluates `var_cols_pc[i]`; the `statePullMsg` carries the value
-  -- `input_cols_pc[i]` — equal by `h_input`'s vector-map (the `RTypeReader` eval-bridge idiom).
-  have e : ∀ i (hi : i < 3),
-      Expression.eval env.toEnvironment input_var_cols_pc[i] = input_cols_pc[i] := by
-    intro i hi; have := congrArg (fun v => v[i]'hi) h_input.1.2.2.2; simpa using this
-  -- The two byte pulls' completeness obligation fires only on real rows (`-is_real = -1`); the `Spec`
-  -- clock bounds supply it. The State `pullIf`'s obligation is its `StateTruth` — supplied by `h_state`.
+  obtain ⟨h_bin, h_spec⟩ := h_assumptions
   simp only [circuit_norm, byteChannel, stateChannel]
-  refine ⟨?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_⟩
   · rcases h_bin with h | h <;> simp [h]
   · intro hneg
     obtain ⟨hb1, _⟩ := h_spec (neg_inj.mp hneg)
@@ -156,15 +181,10 @@ theorem completeness [Fact (2 ^ 17 < p)] :
   · intro hneg
     obtain ⟨_, hb2⟩ := h_spec (neg_inj.mp hneg)
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hb2, by rw [ZMod.val_zero]; norm_num⟩
-  · intro hneg
-    simp only [stateMsgOf] at h_state
-    rw [e 0 (by norm_num), e 1 (by norm_num), e 2 (by norm_num)]
-    exact h_state (neg_inj.mp hneg)
 
 /-- The native CPUState reader as a Clean `GeneralFormalCircuit`: takes the chip-owned `cols` block plus
-`next_pc`/`clk_inc`/`is_real`, imposes the two `is_real`-gated clock byte checks and emits the (now
-semantic) State bus, with `Spec` the two clock bounds and `ProverAssumptions` supplying the state pull's
-`StateTruth`. -/
+`next_pc`/`clk_inc`/`is_real`, imposes the two `is_real`-gated clock byte checks and emits the structural
+State interactions, with `Spec` the two clock bounds. -/
 def circuit [Fact (2 ^ 17 < p)] : GeneralFormalCircuit (ZMod p) Inputs unit where
   main
   elaborated
@@ -174,11 +194,64 @@ def circuit [Fact (2 ^ 17 < p)] : GeneralFormalCircuit (ZMod p) Inputs unit wher
   ProverSpec := fun _ _ _ => True
   soundness := soundness
   completeness := completeness
-  -- The State bus stays — its `pushIf` owes `Owed = True` (and the `pullIf`'s off-gate requirement is
-  -- vacuous via the inline `is_real` gate), so `channelsWithRequirements` is just the State channel.
-  channelsWithRequirements := [stateChannel.toRaw]
+  -- This is the canonical State interface for every chip that composes `CPUState`; parent circuits
+  -- recover it compositionally rather than unfolding this reader again.
+  exposedChannels := fun input _ => exposedState input
+  exposedChannels_eq input offset := by
+    simp only [exposedState, stateInteractions]
+    rw [Operations.exposedChannelsLawful_expose]
+    simp only [main, currentMsg, nextMsg, circuit_norm,
+      Channels.byteChannel_eq_stateChannel_false, if_false]
+  channelsWithRequirements := []
   requirementsChannelsLawful input_var i₀ := by
-    simp only [circuit_norm, main, byteChannel, stateChannel]; grind
+    change Operations.RequirementsChannelsLawful
+      ([.assert _, .interact _, .interact _, .interact _, .interact _] : Operations (ZMod p))
+        [byteChannel.toRaw, stateChannel.toRaw] []
+    dsimp only [Operations.RequirementsChannelsLawful]
+    refine ⟨?_, ?_, ?_⟩
+    · intro channel h_channel
+      simp only [Operations.subcircuitChannelsWithRequirements_assert,
+        Operations.subcircuitChannelsWithRequirements_interact,
+        Operations.subcircuitChannelsWithRequirements_nil, List.not_mem_nil] at h_channel
+    · intro channel h_channel
+      simp only [Operations.shallowChannels_assert, Operations.shallowChannels_interact,
+        Operations.shallowChannels_nil, List.mem_cons, List.not_mem_nil, or_false] at h_channel
+      rcases h_channel with rfl | rfl | rfl | rfl
+      · exact Or.inl List.mem_cons_self
+      · exact Or.inl List.mem_cons_self
+      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+    · intro env h_constraints
+      have h_bool : (ProvableStruct.eval env input_var).is_real = 0 ∨
+          (ProvableStruct.eval env input_var).is_real = 1 := by
+        apply bool_of_mul_pred
+        simpa only [circuit_norm] using h_constraints.1
+      rw [Operations.inChannelsOrRequirements_iff_forall_mem]
+      intro interaction h_interaction
+      simp only [Operations.shallowInteractions_assert,
+        Operations.shallowInteractions_interact, Operations.shallowInteractions_nil,
+        List.mem_cons, List.not_mem_nil, or_false] at h_interaction
+      rcases h_interaction with rfl | rfl | rfl | rfl
+      · right
+        rw [ChannelInteraction.toRaw_requirements]
+        intro h1 h0
+        simp only [circuit_norm] at h1 h0
+        exact off_gate_vacuous h_bool h1 h0
+      · right
+        rw [ChannelInteraction.toRaw_requirements]
+        intro h1 h0
+        simp only [circuit_norm] at h1 h0
+        exact off_gate_vacuous h_bool h1 h0
+      · right
+        simp only [ChannelInteraction.toRaw_requirements, ChannelInteraction.Requirements,
+          stateChannel]
+        intros
+        trivial
+      · right
+        simp only [ChannelInteraction.toRaw_requirements, ChannelInteraction.Requirements,
+          stateChannel]
+        intros
+        trivial
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength [Fact (2 ^ 17 < p)] (x : Var Inputs (ZMod p)) :
@@ -186,6 +259,18 @@ set_option linter.unusedSectionVars false in
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq [Fact (2 ^ 17 < p)] :
     (circuit (p := p)).channelsWithRequirements
-      = ([stateChannel.toRaw] : List (RawChannel (ZMod p))) := rfl
+      = ([] : List (RawChannel (ZMod p))) := rfl
+
+/-- The canonical State interaction pair contributed when `CPUState` is composed as a subcircuit. -/
+lemma interactionsWith_state_subcircuit [Fact (2 ^ 17 < p)]
+    (input : Var Inputs (ZMod p)) (offset : ℕ) (ops : Operations (ZMod p)) :
+    Operations.interactionsWith stateChannel.toRaw
+        (.subcircuit ((circuit (p := p)).toSubcircuit offset input) :: ops) =
+      (stateInteractions input).map ChannelInteraction.toRaw ++
+        Operations.interactionsWith stateChannel.toRaw ops := by
+  refine InteractionRecovery.interactionsWith_generalSubcircuit_eq_of_singleton_exposure
+    (circuit (p := p))
+    ⟨stateChannel.toRaw, (stateInteractions input).map ChannelInteraction.toRaw⟩ input ops ?_
+  rfl
 
 end SP1Clean.Readers.CPUState

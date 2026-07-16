@@ -20,6 +20,23 @@ open Circuit Operations
 
 variable {F : Type} [FiniteField F]
 
+/-- A lawful subcircuit emits nothing on a channel absent from both sides of its declared interface. -/
+lemma interactionsWith_subcircuit_eq_nil_of_channelsLawful {n : ℕ}
+    (subcircuit : Subcircuit F n) (channel : RawChannel F) (ops : Operations F)
+    (h_g : channel ∉ subcircuit.channelsWithGuarantees)
+    (h_r : channel ∉ subcircuit.channelsWithRequirements)
+    (h_lawful : subcircuit.ChannelsLawful) :
+    interactionsWith channel (.subcircuit subcircuit :: ops) = interactionsWith channel ops := by
+  rw [interactionsWith_subcircuit, List.filter_eq_nil_iff.mpr ?_, List.nil_append]
+  intro i hi hci
+  have hci' : i.channel = channel := by simpa using hci
+  have hmem : i.channel ∈ FlatOperation.channels subcircuit.ops.toFlat := by
+    rw [FlatOperation.channels]
+    exact List.mem_map.mpr ⟨i, hi, rfl⟩
+  have hcontra := h_lawful.2.2 hmem
+  rw [hci'] at hcontra
+  exact (List.mem_append.mp hcontra).elim h_g h_r
+
 /-- **A formal subcircuit emits nothing on a channel it does not declare.** If `channel` is in neither
 `circuit.channelsWithGuarantees` nor `circuit.channelsWithRequirements`, then the subcircuit it produces
 contributes no interaction on `channel`, so it drops out of `interactionsWith channel`. -/
@@ -31,18 +48,64 @@ lemma interactionsWith_formalSubcircuit_eq_nil {Input Output : TypeMap}
     (h_r : channel ∉ circuit.channelsWithRequirements) :
     interactionsWith channel (.subcircuit (circuit.toSubcircuit n input) :: ops)
       = interactionsWith channel ops := by
-  have hsub := (FormalCircuit.toSubcircuit_channelsLawful (circuit := circuit) (n := n)
-    (input_var := input)).2.2
-  rw [FormalCircuit.toSubcircuit_channelsWithGuarantees,
-    FormalCircuit.toSubcircuit_channelsWithRequirements] at hsub
-  rw [interactionsWith_subcircuit, List.filter_eq_nil_iff.mpr ?_, List.nil_append]
-  intro i hi hci
-  have hci' : i.channel = channel := by simpa using hci
-  have hmem : i.channel ∈ FlatOperation.channels (circuit.toSubcircuit n input).ops.toFlat := by
-    rw [FlatOperation.channels]; exact List.mem_map.mpr ⟨i, hi, rfl⟩
-  have hcontra := hsub hmem
-  rw [hci'] at hcontra
-  exact (List.mem_append.mp hcontra).elim h_g h_r
+  refine interactionsWith_subcircuit_eq_nil_of_channelsLawful _ _ _ ?_ ?_
+    (FormalCircuit.toSubcircuit_channelsLawful (circuit := circuit) (n := n) (input_var := input))
+  · simpa only [FormalCircuit.toSubcircuit_channelsWithGuarantees]
+  · simpa only [FormalCircuit.toSubcircuit_channelsWithRequirements]
+
+/-- General-formal-circuit companion to `interactionsWith_formalSubcircuit_eq_nil`. -/
+lemma interactionsWith_generalSubcircuit_eq_nil {Input Output : TypeMap}
+    [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit F Input Output) (channel : RawChannel F)
+    {n : ℕ} (input : Var Input F) (ops : Operations F)
+    (h_g : channel ∉ circuit.channelsWithGuarantees)
+    (h_r : channel ∉ circuit.channelsWithRequirements) :
+    interactionsWith channel (.subcircuit (circuit.toSubcircuit n input) :: ops)
+      = interactionsWith channel ops := by
+  refine interactionsWith_subcircuit_eq_nil_of_channelsLawful _ _ _ ?_ ?_
+    (GeneralFormalCircuit.toSubcircuit_channelsLawful
+      (circuit := circuit) (n := n) (input_var := input))
+  · simpa only [GeneralFormalCircuit.toSubcircuit_channelsWithGuarantees]
+  · simpa only [GeneralFormalCircuit.toSubcircuit_channelsWithRequirements]
+
+/-- Formal-assertion companion to `interactionsWith_formalSubcircuit_eq_nil`. -/
+lemma interactionsWith_assertionSubcircuit_eq_nil {Input : TypeMap} [ProvableType Input]
+    (circuit : FormalAssertion F Input) (channel : RawChannel F)
+    {n : ℕ} (input : Var Input F) (ops : Operations F)
+    (h_g : channel ∉ circuit.channelsWithGuarantees)
+    (h_r : channel ∉ circuit.channelsWithRequirements) :
+    interactionsWith channel (.subcircuit (circuit.toSubcircuit n input) :: ops)
+      = interactionsWith channel ops := by
+  refine interactionsWith_subcircuit_eq_nil_of_channelsLawful _ _ _ ?_ ?_
+    (FormalAssertion.toSubcircuit_channelsLawful
+      (circuit := circuit) (n := n) (input_var := input))
+  · simpa only [FormalAssertion.toSubcircuit_channelsWithGuarantees]
+  · simpa only [FormalAssertion.toSubcircuit_channelsWithRequirements]
+
+/-- Reuse a child general circuit's exposed interaction when it is composed as a subcircuit. -/
+lemma interactionsWith_generalSubcircuit_eq_of_mem_exposed
+    {Input Output : TypeMap} [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit F Input Output) (exposed : ExposedChannel F)
+    {n : ℕ} (input : Var Input F) (ops : Operations F)
+    (h_exposed : exposed ∈ circuit.exposedChannels input n) :
+    interactionsWith exposed.channel (.subcircuit (circuit.toSubcircuit n input) :: ops) =
+      exposed.interactions ++ interactionsWith exposed.channel ops := by
+  rw [interactionsWith_subcircuit, GeneralFormalCircuit.toSubcircuit_interactions]
+  change interactionsWith exposed.channel ((circuit.main input).operations n) ++
+    interactionsWith exposed.channel ops = _
+  rw [circuit.interactionsWith_eq_of_mem_exposedChannels input n exposed h_exposed]
+
+/-- Singleton-exposure form of `interactionsWith_generalSubcircuit_eq_of_mem_exposed`. -/
+lemma interactionsWith_generalSubcircuit_eq_of_singleton_exposure
+    {Input Output : TypeMap} [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit F Input Output) (exposed : ExposedChannel F)
+    {n : ℕ} (input : Var Input F) (ops : Operations F)
+    (h_exposed : circuit.exposedChannels input n = [exposed]) :
+    interactionsWith exposed.channel (.subcircuit (circuit.toSubcircuit n input) :: ops) =
+      exposed.interactions ++ interactionsWith exposed.channel ops := by
+  refine interactionsWith_generalSubcircuit_eq_of_mem_exposed circuit exposed input ops ?_
+  rw [h_exposed]
+  simp only [List.mem_singleton]
 
 /-- **`.main`-form companion** (matches what `circuit_norm` leaves after reducing a formal subcircuit):
 a circuit's `main` emits nothing on a channel outside its declared `channels` (= guarantees ++

@@ -1,5 +1,9 @@
 # Clean merged-`main` migration (roadmap W9 residual)
 
+> **Historical handoff.** This file records the 2026-06 Clean re-pin and its then-current proof debt.
+> The repository has since moved to the Lean/Clean 4.31 architecture. Use `lean-sail-notes.md` and
+> `../proposals/consolidation-progress.md` for current pins and gaps.
+
 **Status: DONE (2026-06-26).** Re-pinned to `2c20f7f0`; build green (3628), `lake test` green (3324),
 `lake lint` clean, headline theorems axiom-clean (`[propext, Classical.choice, Quot.sound]`). The
 historical "attempted then reverted" note is superseded — the migration below is the record of what was

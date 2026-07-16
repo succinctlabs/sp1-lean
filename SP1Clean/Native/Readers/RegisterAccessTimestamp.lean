@@ -80,6 +80,28 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   -- the two timestamp byte checks are gated receives (mult `-is_real`): they give the `ByteRowSpec`
   -- guarantee on real rows AND impose a padding requirement, so `byteChannel` is in BOTH lists.
   channelsWithGuarantees := [byteChannel.toRaw]
+  channelsLawful := by
+    dsimp only [ElaboratedCircuit.ChannelsLawful]
+    intro input offset
+    change Operations.ChannelsLawful
+      ([.assert _, .interact _, .interact _] : Operations (ZMod p)) [byteChannel.toRaw]
+    refine ⟨?_, ?_, ?_⟩
+    · intro channel h_channel
+      simp only [Operations.subcircuitChannelsWithGuarantees_assert,
+        Operations.subcircuitChannelsWithGuarantees_interact,
+        Operations.subcircuitChannelsWithGuarantees_nil, List.not_mem_nil] at h_channel
+    · intro env
+      rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
+      intro interaction h_interaction
+      simp only [Operations.shallowInteractions_assert,
+        Operations.shallowInteractions_interact, Operations.shallowInteractions_nil,
+        List.mem_cons, List.not_mem_nil, or_false] at h_interaction
+      rcases h_interaction with rfl | rfl <;>
+        exact Or.inl (List.mem_singleton_self byteChannel.toRaw)
+    · rw [Operations.subcircuitChannelsLawful_iff_forall]
+      intro subcircuit h_subcircuit
+      simp only [Operations.subcircuits_assert, Operations.subcircuits_interact,
+        Operations.subcircuits_nil, List.not_mem_nil] at h_subcircuit
 
 -- Expose the declared channel list + `localLength` as `@[circuit_norm]` rfl-lemmas so the composing
 -- `RegisterAccessCols` reader's `channelsLawful` / `circuit_proof_start` is discharged automatically.
@@ -144,7 +166,35 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     soundness := soundness, completeness := completeness,
     channelsWithRequirements := [],
     requirementsChannelsLawful := fun input_var i₀ => by
-      simp only [circuit_norm, main, byteChannel]; grind }
+      change Operations.RequirementsChannelsLawful
+        ([.assert _, .interact _, .interact _] : Operations (ZMod p)) [byteChannel.toRaw] []
+      dsimp only [Operations.RequirementsChannelsLawful]
+      refine ⟨?_, ?_, ?_⟩
+      · intro channel h_channel
+        simp only [Operations.subcircuitChannelsWithRequirements_assert,
+          Operations.subcircuitChannelsWithRequirements_interact,
+          Operations.subcircuitChannelsWithRequirements_nil, List.not_mem_nil] at h_channel
+      · intro channel h_channel
+        simp only [Operations.shallowChannels_assert, Operations.shallowChannels_interact,
+          Operations.shallowChannels_nil, List.mem_cons, List.not_mem_nil,
+          or_false] at h_channel
+        rcases h_channel with rfl | rfl <;>
+          exact Or.inl (List.mem_singleton_self byteChannel.toRaw)
+      · intro env h_constraints
+        have h_bool : (ProvableStruct.eval env input_var).is_real = 0 ∨
+            (ProvableStruct.eval env input_var).is_real = 1 := by
+          apply bool_of_mul_pred
+          simpa only [circuit_norm] using h_constraints.1
+        rw [Operations.inChannelsOrRequirements_iff_forall_mem]
+        intro interaction h_interaction
+        simp only [Operations.shallowInteractions_assert,
+          Operations.shallowInteractions_interact, Operations.shallowInteractions_nil,
+          List.mem_cons, List.not_mem_nil, or_false] at h_interaction
+        rcases h_interaction with rfl | rfl <;> right <;>
+          rw [ChannelInteraction.toRaw_requirements] <;>
+          intro h1 h0 <;>
+          simp only [circuit_norm] at h1 h0 <;>
+          exact off_gate_vacuous h_bool h1 h0 }
 
 -- This leaf reader emits only on `byteChannel`, so its interactions are empty on the Memory/Program
 -- channels — the bottom-up base case that lets `RegisterAccessCols`/`RTypeReader` drop this sub-reader's

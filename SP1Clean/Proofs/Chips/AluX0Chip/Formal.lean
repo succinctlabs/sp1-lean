@@ -38,16 +38,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   obtain ⟨_h_cpu, _h_ltu, h_reader, h_gate, h_oa1, h_oa2⟩ := h_holds
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_gate
   simp only [isReal, clkLow, opcodeVal]
-  -- The per-emitter channel-requirement tail: the bare `CPUState` `Assumptions` (the `is_real` binary
-  -- gate, `h_bin`), the off-gate-vacuous byte pull (`is_real ∈ {0,1}` rules out the `¬is_real = 0` ∧
-  -- `¬-is_real = -1` antecedents), and the `ALUTypeReaderImmutable` requirement (`Or.inr h_bin`).
-  exact ⟨⟨h_reader ⟨h_bin, h_bin⟩, h_bin, h_oa1, h_oa2⟩, h_bin,
+  -- The per-emitter channel-requirement tail: the off-gate-vacuous byte pull (`is_real ∈ {0,1}`
+  -- rules out the `¬is_real = 0` ∧ `¬-is_real = -1` antecedents), and the immutable reader.
+  exact ⟨⟨h_reader ⟨h_bin, h_bin⟩, h_bin, h_oa1, h_oa2⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0, Or.inr ⟨h_bin, h_bin⟩⟩
 
 /-- Honest prover-side row well-formedness: `is_real` binary, the two `op_a_0` forcing gates, the
 CPUState clock bounds + the immutable-ALU-reader contract, and the dynamic opcode in ALU range
 (`opcode < 29`, the LTU byte pull's witness — the honest prover only emits real ALU opcodes). -/
-def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   (isReal input = 0 ∨ isReal input = 1) ∧
   isReal input * (input.adapter.op_a_0 - 1) = 0 ∧
@@ -57,23 +56,15 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
   Readers.ALUTypeReaderImmutable.Spec
     ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
       input.state.pc, opcodeVal input⟩ ∧
-  (isReal input = 1 → input.opcode.val < 29) ∧
-  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (isReal input = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
-  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (dynamic ALU `opcode`,
-  -- immutable-ALU reader; `ALUTypeReaderImmutable` has no `wv` fields, so the input is copied verbatim).
-  (isReal input = 1 → SP1Clean.Semantics.ProgTruth
-    (Readers.ALUTypeReaderImmutable.progMsgOf
-      ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
-        input.state.pc, opcodeVal input⟩) data)
+  (isReal input = 1 → input.opcode.val < 29)
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [isReal, clkLow, opcodeVal] at h_assumptions
-  obtain ⟨h_bin, h_oa1, h_oa2, h_cpu, h_reader, h_op_lt, h_st, h_prog⟩ := h_assumptions
-  refine ⟨⟨h_bin, h_cpu, h_st⟩, ?_, ⟨⟨h_bin, h_bin⟩, h_reader, h_prog⟩, ?_, h_oa1, h_oa2⟩
+  obtain ⟨h_bin, h_oa1, h_oa2, h_cpu, h_reader, h_op_lt⟩ := h_assumptions
+  refine ⟨⟨h_bin, h_cpu⟩, ?_, ⟨⟨h_bin, h_bin⟩, h_reader⟩, ?_, h_oa1, h_oa2⟩
   · -- the LTU `opcode < 29` byte pull (fires on real rows).
     intro hneg
     simp only [byteChannel]
@@ -100,7 +91,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
     -- The chip's own LTU byte-pull and the reader's pulls are on byteChannel/programChannel/memoryChannel,
     -- filtered out by `interactionsWith stateChannel`.
     exposedChannels := fun input _ =>
-      stateChannel.expose
+      expose stateChannel
         [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
@@ -109,14 +100,18 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
-      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
-        List.map_cons, List.map_nil]
+      have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
+      have h_program := Channels.programChannel_toRaw_ne_stateChannel (p := p)
+      have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
+      rw [Operations.exposedChannelsLawful_expose]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ALUTypeReaderImmutable.circuit, Readers.ALUTypeReaderImmutable.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
+      simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+        h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+        if_true, List.nil_append] }
 
 end SP1Clean.AluX0Chip

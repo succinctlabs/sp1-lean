@@ -24,6 +24,9 @@ lemma bytePullSimple {gate : Prop} {env : ProverEnvironment (ZMod p)} {idx : ℕ
     (hpin : env.get idx = v) (hb : v.val < 2 ^ 16) :
     gate → byteChannel.Guarantees
       ({ opcode := 6, a := env.get idx, b := 16, c := 0 } : ByteRow (ZMod p)) env.data :=
-  fun _ => by rw [hpin]; convert byteRow_range16 hb using 2
+  fun _ => by
+    rw [hpin]
+    change ByteRowSpec (⟨6, v, 16, 0⟩ : ByteRow (ZMod p))
+    exact byteRow_range16 hb
 
 end SP1Clean.DivRemChip.BytePulls

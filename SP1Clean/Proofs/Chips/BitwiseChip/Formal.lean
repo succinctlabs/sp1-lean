@@ -24,7 +24,7 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 `"bitwise_flags"` hint (each flag binary, one-hot, the sum = `is_real`), `op_a_0 = 0`,
 `imm_c = 0` (register-register ops), CPUState clock bounds, three timestamp `Spec`s
 (op_c gated by `is_real - imm_c`). -/
-def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
@@ -47,17 +47,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
-  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
-  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (the flag-weighted
-  -- XOR/OR/AND opcode `is_xor·3 + is_or·4 + is_and·5`; `progMsgOf` ignores the `wv` fields, so the `0`
-  -- placeholders are defeq to the actual reader input which carries the result-word limbs).
-  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
-    (Readers.ALUTypeReader.progMsgOf
-      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
-       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
-       f[0] * 3 + f[1] * 4 + f[2] * 5, 0, 0, 0, 0⟩) data)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 /-- Proven `is_real`-binary + `is_real`/flag-gated RV64 identity on the result word + the **flag structure**
 (each of `is_and`/`is_or`/`is_xor` is boolean, and they are mutually exclusive one-hot) — the last conjunct is
@@ -221,7 +211,7 @@ theorem completeness :
   circuit_proof_start
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨ha, hb, ha_prev, hbin, hf0, hf1, hf2, hsum, hone0, hone1, hone2, hop_a_0, himm, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec, h_st, h_prog⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   -- `h_env` now bundles the chip's flag/`bw_cols` witness-gen equations with the GFC `ALUTypeReader`
   -- subcircuit's completeness obligation (SC Phase 2pre) — discard the trailing reader obligation.
   obtain ⟨-, h_env_flags, h_env_cols, -⟩ := h_env
@@ -258,14 +248,13 @@ theorem completeness :
       exact Or.inr (Or.inr (by rw [hx, ho]; ring))
   have hop3 : (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0).val < 3 :=
     val_lt_three hop_cases
-  refine ⟨⟨hbin, h_cpu, h_st⟩,
+  refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨ha, hb, hop3, hbin⟩,
       ?_⟩,
     ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
-      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, ha⟩, fun _ => hb⟩,
-      fun hr => by rw [hflag0, hflag1, hflag2]; exact h_prog hr⟩,
+      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, ha⟩, fun _ => hb⟩⟩,
     ⟨⟨hbin, ?_⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     hbool _ hf0',
@@ -280,7 +269,8 @@ theorem completeness :
       (c := input_adapter_op_c_memory_prev_value)
       (opcode := env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0) ha hb hop3 input_is_real
       using 2
-    refine (ProvableType.ext_iff _ _).mpr (fun i hi => ?_)
+    rfl
+    refine (ProvableType.ext_iff (α := Extracted.BitwiseU16Operation) _ _).mpr (fun i hi => ?_)
     -- Ascribe `h_env_cols`'s IR-native RHS into the plain `toElements (populate …)` form via a *definitional*
     -- `have` (the `.native` eval-match + beta is the CHEAP reduction; the expensive path is the eager
     -- `Eq.trans` isDefEq against `toElements (populate op_prev …)`, whose `combinedSize'` tower + the
@@ -343,7 +333,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input _ =>
-      stateChannel.expose
+      expose stateChannel
         [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
@@ -352,8 +342,10 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
-      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
-        List.map_cons, List.map_nil]
+      have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
+      have h_program := Channels.programChannel_toRaw_ne_stateChannel (p := p)
+      have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
+      rw [Operations.exposedChannelsLawful_expose]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -363,6 +355,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
         SP1Clean.BitwiseOperation.circuit, SP1Clean.BitwiseOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
+      simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+        h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+        if_true, List.nil_append] }
 
 end SP1Clean.BitwiseChip

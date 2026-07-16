@@ -253,6 +253,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     fun k _ => by rw [← hilc]; simp only [Vector.getElem_map]
   obtain ⟨_h_gate, h_bw⟩ := h_holds
   have h_spec := h_bw ⟨hop, hbin⟩
+  change BitwiseOperation.Spec _ at h_spec
   refine ⟨?_, Or.inr ⟨hop, hbin⟩⟩
   simpa only [decompBytes, eb, ec, elb, elc, ← sub_eq_add_neg] using h_spec
 
@@ -275,7 +276,8 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     fun k _ => by rw [← hilc]; simp only [Vector.getElem_map]
   refine ⟨?_, ⟨hop, hbin⟩, ?_⟩
   · rcases hbin with h | h <;> rw [h] <;> simp
-  · simpa only [decompBytes, eb, ec, elb, elc, ← sub_eq_add_neg] using h_spec
+  · change BitwiseOperation.Spec _
+    simpa only [decompBytes, eb, ec, elb, elc, ← sub_eq_add_neg] using h_spec
 
 /-- SP1's `BitwiseU16Operation::eval` as a Clean-native `FormalAssertion`: the `is_real` binary gate
 plus the composed `BitwiseOperation` on the two `U16toU8` byte decompositions, witnessing nothing. -/

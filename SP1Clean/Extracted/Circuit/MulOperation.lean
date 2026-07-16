@@ -80,26 +80,20 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   is_real * (cols.product[14] - (((cols.b_lower_byte.low_bytes[0]) * (cols.c_sign_extend * (255 : ZMod p)) + ((input.b[0] - cols.b_lower_byte.low_bytes[0]) * (256 : ZMod p)⁻¹) * (cols.c_sign_extend * (255 : ZMod p)) + (cols.b_lower_byte.low_bytes[1]) * (cols.c_sign_extend * (255 : ZMod p)) + ((input.b[1] - cols.b_lower_byte.low_bytes[1]) * (256 : ZMod p)⁻¹) * (cols.c_sign_extend * (255 : ZMod p)) + (cols.b_lower_byte.low_bytes[2]) * (cols.c_sign_extend * (255 : ZMod p)) + ((input.b[2] - cols.b_lower_byte.low_bytes[2]) * (256 : ZMod p)⁻¹) * (cols.c_sign_extend * (255 : ZMod p)) + (cols.b_lower_byte.low_bytes[3]) * (cols.c_sign_extend * (255 : ZMod p)) + ((input.b[3] - cols.b_lower_byte.low_bytes[3]) * (256 : ZMod p)⁻¹) * ((input.c[3] - cols.c_lower_byte.low_bytes[3]) * (256 : ZMod p)⁻¹) + (cols.b_sign_extend * (255 : ZMod p)) * (cols.c_lower_byte.low_bytes[3]) + (cols.b_sign_extend * (255 : ZMod p)) * ((input.c[2] - cols.c_lower_byte.low_bytes[2]) * (256 : ZMod p)⁻¹) + (cols.b_sign_extend * (255 : ZMod p)) * (cols.c_lower_byte.low_bytes[2]) + (cols.b_sign_extend * (255 : ZMod p)) * ((input.c[1] - cols.c_lower_byte.low_bytes[1]) * (256 : ZMod p)⁻¹) + (cols.b_sign_extend * (255 : ZMod p)) * (cols.c_lower_byte.low_bytes[1]) + (cols.b_sign_extend * (255 : ZMod p)) * ((input.c[0] - cols.c_lower_byte.low_bytes[0]) * (256 : ZMod p)⁻¹) + (cols.b_sign_extend * (255 : ZMod p)) * (cols.c_lower_byte.low_bytes[0])) + cols.carry[13] - cols.carry[14] * 256)) === 0
   is_real * (cols.product[15] - (((cols.b_lower_byte.low_bytes[0]) * (cols.c_sign_extend * (255 : ZMod p)) + ((input.b[0] - cols.b_lower_byte.low_bytes[0]) * (256 : ZMod p)⁻¹) * (cols.c_sign_extend * (255 : ZMod p)) + (cols.b_lower_byte.low_bytes[1]) * (cols.c_sign_extend * (255 : ZMod p)) + ((input.b[1] - cols.b_lower_byte.low_bytes[1]) * (256 : ZMod p)⁻¹) * (cols.c_sign_extend * (255 : ZMod p)) + (cols.b_lower_byte.low_bytes[2]) * (cols.c_sign_extend * (255 : ZMod p)) + ((input.b[2] - cols.b_lower_byte.low_bytes[2]) * (256 : ZMod p)⁻¹) * (cols.c_sign_extend * (255 : ZMod p)) + (cols.b_lower_byte.low_bytes[3]) * (cols.c_sign_extend * (255 : ZMod p)) + ((input.b[3] - cols.b_lower_byte.low_bytes[3]) * (256 : ZMod p)⁻¹) * (cols.c_sign_extend * (255 : ZMod p)) + (cols.b_sign_extend * (255 : ZMod p)) * ((input.c[3] - cols.c_lower_byte.low_bytes[3]) * (256 : ZMod p)⁻¹) + (cols.b_sign_extend * (255 : ZMod p)) * (cols.c_lower_byte.low_bytes[3]) + (cols.b_sign_extend * (255 : ZMod p)) * ((input.c[2] - cols.c_lower_byte.low_bytes[2]) * (256 : ZMod p)⁻¹) + (cols.b_sign_extend * (255 : ZMod p)) * (cols.c_lower_byte.low_bytes[2]) + (cols.b_sign_extend * (255 : ZMod p)) * ((input.c[1] - cols.c_lower_byte.low_bytes[1]) * (256 : ZMod p)⁻¹) + (cols.b_sign_extend * (255 : ZMod p)) * (cols.c_lower_byte.low_bytes[1]) + (cols.b_sign_extend * (255 : ZMod p)) * ((input.c[0] - cols.c_lower_byte.low_bytes[0]) * (256 : ZMod p)⁻¹) + (cols.b_sign_extend * (255 : ZMod p)) * (cols.c_lower_byte.low_bytes[0])) + cols.carry[14] - cols.carry[15] * 256)) === 0
 
-set_option maxHeartbeats 40000000 in
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
-  localLength _ := 0
-  output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRaw]
-  localLength_eq := by
-    simp +arith [circuit_norm, main, U16toU8OperationSafe.circuit, U16MSBOperation.circuit]
-  subcircuitsConsistent := by
-    simp only [circuit_norm, main, U16toU8OperationSafe.circuit, U16MSBOperation.circuit]; try omega
-  channelsLawful := by
-    simp only [circuit_norm, main, U16toU8OperationSafe.circuit, U16MSBOperation.circuit,
-      U16MSBOperation.elaborated]
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main := by
+  elaborate_circuit_with {
+    channelsWithGuarantees := [byteChannel.toRaw]
+  }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw] := rfl
+      = [byteChannel.toRaw] := by
+  rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
-    (elaborated (p := p)).localLength x = 0 := rfl
+    (elaborated (p := p)).localLength x = 0 := by
+  rfl
 
 
 end SP1Clean.MulOperation

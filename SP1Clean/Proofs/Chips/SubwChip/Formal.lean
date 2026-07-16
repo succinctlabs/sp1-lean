@@ -43,9 +43,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     simpa only [SubwOperation.resultWord, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
       using ((h_subw h_as).2 hr).1
   refine ⟨⟨?_, h_bin, fun hr => ?_⟩, ?_⟩
-  · simpa only [Vector.getElem_map] using h_rspec
-  · refine trans ?_ (rv64_subw_eq _ _).symm
-    simpa only [SubwOperation.resultWord, Vector.getElem_map] using
+  · simpa only [Readers.RTypeReader.circuit, Readers.RTypeReader.SpecD,
+      Vector.getElem_map] using h_rspec
+  · refine Eq.trans ?_ (rv64_subw_eq _ _).symm
+    simpa only [SubwOperation.resultWord, Vector.getElem_map, Vector.getElem_mapRange,
+      Inputs.op_b_val, Inputs.op_c_val, circuit_norm] using
       ((h_subw h_as).2 hr).2
   · and_intros <;>
       first
@@ -59,7 +61,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec, h_st, h_prog⟩ :=
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ :=
     h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   -- `h_env` now bundles the `value`/`msb` witness-gen equations with the GFC `RTypeReader` subcircuit's
@@ -93,9 +95,9 @@ theorem completeness :
     rw [h_env_msb]
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
-  refine ⟨⟨hbin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
+  refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
-      fun hr => ⟨ha_prev hr, ha, hb⟩⟩, h_prog⟩,
+      fun hr => ⟨ha_prev hr, ha, hb⟩⟩⟩,
     ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
   · rw [hval, hmsbeq]; exact SubwOperation.spec_populate ha hb input_is_real
   · -- RegisterWrite's `isU64 value` (op_a write push): the witnessed op_a write word is the sign-extended
@@ -131,7 +133,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubwCols :=
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input _ =>
-      stateChannel.expose
+      expose stateChannel
         [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
@@ -140,8 +142,22 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubwCols :=
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
-      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
-        List.map_cons, List.map_nil]
+      have h_byte : (byteChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
+        intro h
+        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
+        simp only [Channel.toRaw_name, byteChannel, stateChannel] at hn
+        exact (by decide : ("SP1Byte" : String) ≠ "SP1State") hn
+      have h_program : (programChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
+        intro h
+        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
+        simp only [Channel.toRaw_name, programChannel, stateChannel] at hn
+        exact (by decide : ("SP1Program" : String) ≠ "SP1State") hn
+      have h_memory : (memoryChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
+        intro h
+        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
+        simp only [Channel.toRaw_name, memoryChannel, stateChannel] at hn
+        exact (by decide : ("SP1Memory" : String) ≠ "SP1State") hn
+      rw [Operations.exposedChannelsLawful_expose]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.RTypeReader.circuit, Readers.RTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -151,6 +167,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubwCols :=
         SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
+      simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+        h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+        if_true, List.nil_append] }
 
 end SP1Clean.SubwChip

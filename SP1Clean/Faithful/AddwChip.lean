@@ -108,10 +108,9 @@ theorem addwcols_program_interactions_faithful_syntactic
     @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
       ProvablePair.instance (Gadgets.Equality.circuit field) programChannel.toRaw n inp
       List.not_mem_nil List.not_mem_nil
-  -- SC Phase 2a: unfold the `VmChannel` kernel's `pulledIf` to match `circuit_norm`'s raw recovery.
+  -- SC Phase 2a: unfold the `Channel` kernel's `pulledIf` to match `circuit_norm`'s raw recovery.
   have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
     toAccess_pullIf_program env g m
-  simp only [VmChannel.pulledIf] at hk
   simp only [AddwChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
     Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
     Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -165,7 +164,6 @@ theorem addwcols_state_interactions_faithful_syntactic
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env (-g))) :=
     fun g s => toAccess_pullIf_state env g s
-  simp only [VmChannel.pushedIf, VmChannel.pulledIf] at hsk hsk_pull
   have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
     @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
       ProvablePair.instance (Gadgets.Equality.circuit field) stateChannel.toRaw n inp
@@ -183,7 +181,8 @@ theorem addwcols_state_interactions_faithful_syntactic
   -- the residual: CPUState's 2 State interactions (via `hsk`), everything else dropped by the `State`
   -- filter (byte/mem/program channel distinctness) or emitting nothing (`Gadgets.Equality.main`); the
   -- oracle `.filter .State` likewise keeps only the CPUState fragment's 2 State entries.
-  simp [circuit_norm, hsk, hsk_pull, Gadgets.Equality.main,
+  simp [circuit_norm, hsk, hsk_pull, toAccess_pushIf_state, toAccess_pullIf_state,
+    Gadgets.Equality.main,
     Extracted.AddwCols.interactions, Extracted.AddwOperation.interactions, Extracted.U16MSBOperation.interactions,
     Extracted.CPUState.interactions, Extracted.ALUTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,

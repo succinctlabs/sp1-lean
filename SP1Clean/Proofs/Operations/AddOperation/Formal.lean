@@ -1,12 +1,13 @@
 import SP1Clean.Native.Operations.AddOperation.RawSpec
 import SP1Clean.Native.Operations.AddOperation.Populate
+import SP1Clean.Native.Operations.AddOperation.Defs
 
 /-! # `AddOperation` — the `FormalAssertion` (soundness / completeness / contract)
 
-SP1's `AddOperation::eval` as a Clean `FormalAssertion`. Soundness/completeness route through
+The local addition gadget as a Clean `FormalAssertion`. Soundness/completeness route through
 `RawSpec`'s `addSemantics_of_carries`/`carries_of_addSemantics`; `populate_spec` lets the composing
-chip discharge its `assertion`-side obligation. Arithmetic core in `RawSpec`, circuit in `Extracted`,
-witness in `Populate`. -/
+chip discharge its `assertion`-side obligation. Arithmetic core in `RawSpec`, circuit in `Defs`, and
+witness in `Populate`; no Rust operation artifact is part of this proof. -/
 
 namespace SP1Clean.AddOperation
 
@@ -83,7 +84,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       · rw [one_mul]; rcases hc2 with h | h <;> rw [h] <;> simp
       · rw [one_mul]; rcases hc3 with h | h <;> rw [h] <;> simp
 
-/-- SP1's `AddOperation::eval` as a Clean-native `FormalAssertion`. -/
+/-- The proof-oriented local addition gadget as a Clean-native `FormalAssertion`. -/
 def circuit : FormalAssertion (ZMod p) Inputs where
   main
   elaborated
@@ -93,10 +94,19 @@ def circuit : FormalAssertion (ZMod p) Inputs where
   completeness := completeness
   channelsWithRequirements := []
   requirementsChannelsLawful input_var i₀ := by
-    simp only [circuit_norm, main, byteChannel]; grind
+    simp only [circuit_norm, main, byteChannel]
+    intro env h_constraints
+    have h_bool : (ProvableStruct.eval env input_var).is_real = 0 ∨
+        (ProvableStruct.eval env input_var).is_real = 1 :=
+      bool_of_mul_pred h_constraints.1
+    refine ⟨?_, ?_, ?_, ?_⟩ <;> intro h1 h0 <;>
+      exact off_gate_vacuous h_bool h1 h0
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
     circuit.localLength x = 0 := rfl
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma channelsWithRequirements_eq :
+    circuit.channelsWithRequirements = ([] : List (RawChannel (ZMod p))) := rfl
 
 end SP1Clean.AddOperation

@@ -302,9 +302,8 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.BranchColumns (ZMod p)
       (by simp only [btypeTaken]; rw [zopz0zKzJ_u_true_iff, ← hr1w, ← hr2w]; exact (h_decision hreal').2.2.2.2.2 hb)
 
 /-- BRANCH's `ChipKind` registration. `view := rowView` threads `next_pc = cols.next_pc`, I-type adapter,
-opcode `Σ is_b*·k`; `commit = .noWrite` (no destination write). `sailEquiv` is the six-way flag-dispatched
-conjunction; `reaches_sail` is `branch_chip_reaches_sail`; `advance` is `BranchChip.advance` (the SC Phase 4
-`try_step` lift over the no-register-write `advance_of_ctrl` core). -/
+opcode `Σ is_b*·k`; `commit = .noWrite` (no destination write). `advance` is the six-way flag-dispatched
+`try_step` lift over the no-register-write `advance_of_ctrl` core. -/
 def kind : Soundness.ChipKind p where
   name := "Branch"
   Inputs := BranchChip.Inputs

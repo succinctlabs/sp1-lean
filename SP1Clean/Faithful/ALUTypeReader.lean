@@ -111,11 +111,10 @@ theorem alutypereader_program_interactions_faithful_syntactic
       List.not_mem_nil List.not_mem_nil
   simp only [Readers.ALUTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
-  -- SC Phase 2a: `programChannel` is a `VmChannel` — unfold the kernel's `pulledIf` to match the raw
-  -- `VmChannelInteraction` form `circuit_norm` recovers (cf. `StateConsistency`), then rewrite.
+  -- SC Phase 2a: `programChannel` is a `Channel` — unfold the kernel's `pulledIf` to match the raw
+  -- `ChannelInteraction` form `circuit_norm` recovers (cf. `StateConsistency`), then rewrite.
   have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
     toAccess_pullIf_program env g m
-  simp only [VmChannel.pulledIf] at hk
   simp only [hk]
   simp only [Extracted.ALUTypeReader.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign, List.filter_cons]

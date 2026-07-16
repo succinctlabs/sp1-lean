@@ -1,8 +1,4 @@
 import SP1Clean.FormalModel.Contracts.Readers
-import SP1Clean.Extracted.AddOperation
-import SP1Clean.Extracted.Circuit.AddOperation
-import SP1Clean.Extracted.SubOperation
-import SP1Clean.Extracted.Circuit.SubOperation
 import SP1Clean.Extracted.AddwOperation
 import SP1Clean.Extracted.SubwOperation
 import SP1Clean.Extracted.MulOperation
@@ -169,11 +165,24 @@ namespace SP1Clean.AddOperation
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
+/-- Proof-oriented local columns for the addition gadget. This shape is independent of SP1 Rust's
+`AddOperation` columns; the assembled chip faithfulness map is the only place that relates them. -/
+structure Columns (F : Type) where
+  value : Word F
+deriving ProvableStruct
+
+/-- Local addition-gadget inputs. Rust operation inputs are deliberately not an interface here. -/
+structure Inputs (F : Type) where
+  a : Word F
+  b : Word F
+  cols : Columns F
+  is_real : F
+deriving ProvableStruct
+
 /-- Semantic contract (`is_real`-gated, mirroring the readers): on a real row the result is a 64-bit
 value equal to the BitVec sum of the operands. On padding (`is_real = 0`) it is vacuous — the gadget's
-gated carry/byte constraints impose nothing there. `Inputs` (the `eval` params verbatim — the result
-column struct nested as `cols`) is the generated `Operations.AddOperation.Extracted`; the result word is
-`input.cols.value`, witnessed by the composing chip (via `populate`) and passed in. -/
+gated carry/byte constraints impose nothing there. The result word is `input.cols.value`, witnessed by
+the composing chip via `populate`; neither the input nor column layout is required to match Rust. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   input.is_real = 1 →
     Word.isU64 input.cols.value ∧
@@ -186,10 +195,23 @@ namespace SP1Clean.SubOperation
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
+/-- Proof-oriented local columns for the subtraction gadget. The assembled chip faithfulness map is
+the only place that relates this shape to SP1 Rust's helper-operation columns. -/
+structure Columns (F : Type) where
+  value : Word F
+deriving ProvableStruct
+
+/-- Local subtraction-gadget inputs. Rust operation inputs are deliberately not an interface here. -/
+structure Inputs (F : Type) where
+  a : Word F
+  b : Word F
+  cols : Columns F
+  is_real : F
+deriving ProvableStruct
+
 /-- Semantic contract (`is_real`-gated): on a real row the result is a 64-bit value equal to the BitVec
-difference of the operands. On padding (`is_real = 0`) it is vacuous. `Inputs` (the `eval` params
-verbatim — the result column struct nested as `cols`) is the generated `Operations.SubOperation.Extracted`;
-the result word is `input.cols.value`, witnessed by the composing chip (via `populate`) and passed in. -/
+difference of the operands. On padding (`is_real = 0`) it is vacuous. The result word is witnessed by
+the composing chip via `populate`; neither the input nor column layout is required to match Rust. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   input.is_real = 1 →
     Word.isU64 input.cols.value ∧

@@ -200,8 +200,8 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.UTypeColumns (ZMod p))
     simp [execute_UTYPE_pure, RV64.lui, sign_extend]
 
 /-- U-type's `ChipKind` registration. `view` threads straight-line `next_pc`, J-type adapter, opcode
-`is_auipc·48 + (1-is_auipc)·49`. `sailEquiv` is the `is_auipc`-dispatched LUI/AUIPC conjunction;
-`reaches_sail` dispatches to `utype_chip_reaches_sail_{lui,auipc}`. -/
+`is_auipc·48 + (1-is_auipc)·49`; `advance` dispatches the LUI/AUIPC cases through the corresponding local
+Sail bridge helpers. -/
 def kind : Soundness.ChipKind p where
   name := "UType"
   Inputs := UTypeChip.Inputs

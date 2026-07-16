@@ -1,19 +1,31 @@
 import SP1Clean.Proofs.Chips.ProgramProviderChip
 import Clean.Air.Vm
 
-/-! # (Retired) Program-bus provider segment — program is no longer a *finished* channel
+/-! # Finishing the structural Program channel
 
-**SC Phase 2a.** `programChannel` was flipped to a semantic `VmChannel` with `Owed := RowSpec` and
-`Guarantees := ProgTruth` (= `ProgramMsg.RowSpec ∧ decodedInROM (progOf data)`). Because
-`RowSpec ⇏ ProgTruth`, the channel is **not** `Consistent`/`Normal`, so it cannot be *finished* against a
-provider the way the byte bus is: a pull now receives the full fetch-decode correspondence
-(`decodedInROM`), and that half is grounded by the timed-channel engine (Phase 5), not by bus balance
-against this segment. (`Soundness/FinishedChannels.lean` correspondingly grounds only `byteChannel`.)
+The provider proves `ProgramMsg.RowSpec` for every pushed row.  Since that is exactly the plain
+channel guarantee, Clean can finish the channel and deliver the structural decode bounds to every
+consumer.  Program-specific ROM membership is intentionally stronger and is proved separately from
+provider balance plus the program commitment. -/
 
-The former `programProviderEnsemble` / `programProviderEnsemble_finished` — which added
-`ProgramProviderChip.circuit` and then `addFinishedChannel programChannel.toRaw` to finish the Program bus
-under the old "`Guarantees = RowSpec`, program-independent, finishable-like-byte" model — are retired
-accordingly (nothing consumed them: the comment
-references in `ValueBound`/`MemoryProviderEnsemble` are prose). The in-circuit program **push** provider
-itself lives on in `ProgramProviderChip.lean` (it still range-checks and pushes each `RowSpec`-valid row,
-owing `RowSpec` as its VmChannel `Owed`). This module is kept (doc-only) to preserve the import chain. -/
+namespace SP1Clean.ProgramProviderChip
+
+open Circuit
+open SP1Clean.Channels (programChannel)
+open Air.Flat
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Add the structural Program provider and finish its channel. -/
+def programProviderEnsemble (PublicIO : TypeMap) [ProvableType PublicIO] :
+    SoundEnsemble (ZMod p) PublicIO :=
+  SoundEnsemble.empty (ZMod p) PublicIO
+    |>.addTable ⟨circuit⟩
+        (by simp [circuit_norm, circuit]) (by simp [circuit_norm, circuit])
+    |>.addFinishedChannel programChannel.toRaw
+
+@[simp] theorem programProviderEnsemble_finished (PublicIO : TypeMap) [ProvableType PublicIO] :
+    (programChannel (p := p)).toRaw ∈ (programProviderEnsemble (p := p) PublicIO).finished := by
+  simp [programProviderEnsemble, circuit_norm]
+
+end SP1Clean.ProgramProviderChip

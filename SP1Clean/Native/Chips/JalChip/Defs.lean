@@ -72,14 +72,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalColumns (ZMod 
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, ⟨add_value⟩, ⟨op_a_value⟩, input.is_real⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalColumns main where
-  channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit,
-    Readers.JTypeReader.circuit, Readers.RegisterWrite.circuit]
-  -- 2 × 4-limb add-result witnesses; all readers/operations are `assertion`s (localLength 0).
-  localLength _ := 8
-  -- `programChannel` joins the byte guarantee propagated up from `JTypeReader`'s program **pull** (W11 flip);
-  -- `memoryChannel` joins from `JTypeReader`'s op_a memory read **pull** (W11 memory flip). The `RegisterWrite`
-  -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
-  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+/-- Derive the eight witness cells and the complete four-channel interface structurally from `main`. -/
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalColumns main := by
+  elaborate_circuit
 
 end SP1Clean.JalChip

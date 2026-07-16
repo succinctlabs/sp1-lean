@@ -1,5 +1,4 @@
 import SP1Clean
-import SP1CleanTest.WitnessTests.AddOperationWitness
 import SP1CleanTest.WitnessTests.AddrAddOperationWitness
 import SP1CleanTest.WitnessTests.AddwOperationWitness
 import SP1CleanTest.WitnessTests.BitwiseOperationWitness
@@ -8,7 +7,6 @@ import SP1CleanTest.WitnessTests.IsZeroOperationWitness
 import SP1CleanTest.WitnessTests.IsZeroWordOperationWitness
 import SP1CleanTest.WitnessTests.LtOperationUnsignedWitness
 import SP1CleanTest.WitnessTests.MulOperationWitness
-import SP1CleanTest.WitnessTests.SubOperationWitness
 import SP1CleanTest.WitnessTests.SubwOperationWitness
 import SP1CleanTest.WitnessTests.U16CompareOperationWitness
 import SP1CleanTest.WitnessTests.U16MSBOperationWitness
@@ -28,53 +26,93 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 
 #print axioms SP1Clean.AddChip.soundness
 #print axioms SP1Clean.AddChip.completeness
+#print axioms SP1Clean.AddChip.circuit
 #print axioms SP1Clean.AddiChip.soundness
 #print axioms SP1Clean.AddiChip.completeness
+#print axioms SP1Clean.AddiChip.circuit
 #print axioms SP1Clean.AddwChip.soundness
 #print axioms SP1Clean.AddwChip.completeness
+#print axioms SP1Clean.AddwChip.circuit
 #print axioms SP1Clean.AluX0Chip.soundness
 #print axioms SP1Clean.AluX0Chip.completeness
+#print axioms SP1Clean.AluX0Chip.circuit
 #print axioms SP1Clean.BitwiseChip.soundness
 #print axioms SP1Clean.BitwiseChip.completeness
+#print axioms SP1Clean.BitwiseChip.circuit
 #print axioms SP1Clean.BranchChip.soundness
 #print axioms SP1Clean.BranchChip.completeness
+#print axioms SP1Clean.BranchChip.circuit
+#print axioms SP1Clean.DivRemChip.evidenceSoundness
+#print axioms SP1Clean.DivRemChip.contractSoundness
 #print axioms SP1Clean.DivRemChip.soundness
+#print axioms SP1Clean.DivRemChip.circuit
 #print axioms SP1Clean.JalChip.soundness
 #print axioms SP1Clean.JalChip.completeness
+#print axioms SP1Clean.JalChip.circuit
 #print axioms SP1Clean.JalrChip.soundness
 #print axioms SP1Clean.JalrChip.completeness
+#print axioms SP1Clean.JalrChip.circuit
 #print axioms SP1Clean.LoadByteChip.soundness
 #print axioms SP1Clean.LoadByteChip.completeness
+#print axioms SP1Clean.LoadByteChip.circuit
 #print axioms SP1Clean.LoadDoubleChip.soundness
 #print axioms SP1Clean.LoadDoubleChip.completeness
+#print axioms SP1Clean.LoadDoubleChip.circuit
 #print axioms SP1Clean.LoadHalfChip.soundness
 #print axioms SP1Clean.LoadHalfChip.completeness
+#print axioms SP1Clean.LoadHalfChip.circuit
 #print axioms SP1Clean.LoadWordChip.soundness
 #print axioms SP1Clean.LoadWordChip.completeness
+#print axioms SP1Clean.LoadWordChip.circuit
 #print axioms SP1Clean.LoadX0Chip.soundness
 #print axioms SP1Clean.LoadX0Chip.completeness
+#print axioms SP1Clean.LoadX0Chip.circuit
 #print axioms SP1Clean.LtChip.soundness
 #print axioms SP1Clean.LtChip.completeness
+#print axioms SP1Clean.LtChip.circuit
 #print axioms SP1Clean.MulChip.soundness
 #print axioms SP1Clean.MulChip.completeness
+#print axioms SP1Clean.MulChip.circuit
 #print axioms SP1Clean.ShiftLeftChip.soundness
 #print axioms SP1Clean.ShiftLeftChip.completeness
+#print axioms SP1Clean.ShiftLeftChip.circuit
 #print axioms SP1Clean.ShiftRightChip.soundness
 #print axioms SP1Clean.ShiftRightChip.completeness
+#print axioms SP1Clean.ShiftRightChip.circuit
 #print axioms SP1Clean.StoreByteChip.soundness
 #print axioms SP1Clean.StoreByteChip.completeness
+#print axioms SP1Clean.StoreByteChip.circuit
 #print axioms SP1Clean.StoreDoubleChip.soundness
 #print axioms SP1Clean.StoreDoubleChip.completeness
+#print axioms SP1Clean.StoreDoubleChip.circuit
 #print axioms SP1Clean.StoreHalfChip.soundness
 #print axioms SP1Clean.StoreHalfChip.completeness
+#print axioms SP1Clean.StoreHalfChip.circuit
 #print axioms SP1Clean.StoreWordChip.soundness
 #print axioms SP1Clean.StoreWordChip.completeness
+#print axioms SP1Clean.StoreWordChip.circuit
 #print axioms SP1Clean.SubChip.soundness
 #print axioms SP1Clean.SubChip.completeness
+#print axioms SP1Clean.SubChip.circuit
 #print axioms SP1Clean.SubwChip.soundness
 #print axioms SP1Clean.SubwChip.completeness
+#print axioms SP1Clean.SubwChip.circuit
 #print axioms SP1Clean.UTypeChip.soundness
 #print axioms SP1Clean.UTypeChip.completeness
+#print axioms SP1Clean.UTypeChip.circuit
+#print axioms SP1Clean.DivRemChip.completeness
+#print axioms SP1Clean.DivRemContract.PairSpec
+#print axioms SP1Clean.DivRemContract.Selected
+#print axioms SP1Clean.DivRemContract.SelectionSpec
+#print axioms SP1Clean.DivRemChip.Cases.Unsigned64Evidence
+#print axioms SP1Clean.DivRemChip.Cases.Signed64Evidence
+#print axioms SP1Clean.DivRemChip.Cases.Unsigned32Evidence
+#print axioms SP1Clean.DivRemChip.Cases.Signed32Evidence
+#print axioms SP1Clean.DivRemChip.Cases.FamilyEvidence
+#print axioms SP1Clean.DivRemChip.Cases.RoutedEvidence
+#print axioms SP1Clean.DivRemChip.Cases.EvidenceSpec
+#print axioms SP1Clean.DivRemChip.Cases.EvidenceSpecs
+#print axioms SP1Clean.DivRemChip.Cases.RowEvidence
 #print axioms SP1Clean.AddSail.correct_add_native
 #print axioms SP1Clean.AddSail.add_chip_reaches_sail
 #print axioms SP1Clean.AddiSail.correct_addi_native
@@ -200,13 +238,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.alutypereader_program_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.alutypereader_memory_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.alutypereader_byte_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.addcols_asserts_faithful
-#print axioms SP1Clean.Faithful.addcols_interactions_faithful
-#print axioms SP1Clean.Faithful.addcols_state_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.addcols_program_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.addcols_memory_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.addcols_byte_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.addcols_interactions_faithful_syntactic
+#print axioms SP1Clean.Faithful.addChip_constraints_faithful
+#print axioms SP1Clean.Faithful.addChip_interactions_faithful
+#print axioms SP1Clean.Faithful.addChip_faithful
 #print axioms SP1Clean.Faithful.add_asserts_faithful
 #print axioms SP1Clean.Faithful.add_interactions_faithful
 #print axioms SP1Clean.Faithful.add_interactions_faithful_syntactic
@@ -280,14 +314,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.storedoublecols_constraints_faithful
 #print axioms SP1Clean.Faithful.storehalfcols_constraints_faithful
 #print axioms SP1Clean.Faithful.storewordcols_constraints_faithful
-#print axioms SP1Clean.Faithful.sub_constraints_faithful
-#print axioms SP1Clean.Faithful.sub_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.subcols_constraints_faithful
-#print axioms SP1Clean.Faithful.subcols_state_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.subcols_program_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.subcols_memory_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.subcols_byte_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.subcols_interactions_faithful_syntactic
+#print axioms SP1Clean.Faithful.subChip_constraints_faithful
+#print axioms SP1Clean.Faithful.subChip_interactions_faithful
+#print axioms SP1Clean.Faithful.subChip_faithful
 #print axioms SP1Clean.Faithful.subw_constraints_faithful
 #print axioms SP1Clean.Faithful.subw_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.subwcols_constraints_faithful
@@ -307,7 +336,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.utypecols_asserts_faithful
 #print axioms SP1Clean.Faithful.utypecols_interactions_faithful
 #print axioms SP1Clean.Faithful.utypecols_constraints_faithful
-#print axioms SP1Clean.WitnessTests.populate_conforms
 #print axioms SP1Clean.WitnessTests.addrAdd_conforms
 #print axioms SP1Clean.WitnessTests.addw_conforms
 #print axioms SP1Clean.WitnessTests.bitwise_conforms
@@ -316,7 +344,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.WitnessTests.isZeroWord_conforms
 #print axioms SP1Clean.WitnessTests.ltUnsigned_conforms
 #print axioms SP1Clean.WitnessTests.mul_populate_conforms
-#print axioms SP1Clean.WitnessTests.subWitness_conforms
 #print axioms SP1Clean.WitnessTests.subw_conforms
 #print axioms SP1Clean.WitnessTests.u16Compare_conforms
 #print axioms SP1Clean.WitnessTests.u16MSB_conforms
@@ -341,18 +368,23 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.sp1StateVerifierProverAssumptions
 #print axioms SP1Clean.Soundness.sp1StateVerifier_completeness
 #print axioms SP1Clean.Soundness.sp1StateVerifier
+#print axioms SP1Clean.Soundness.sp1StateVerifierMain_stateInteractions
 #print axioms SP1Clean.Soundness.sp1Tables
 #print axioms SP1Clean.Soundness.sp1Tables_length
 #print axioms SP1Clean.Soundness.sp1ProviderTables
 #print axioms SP1Clean.Soundness.sp1ProviderTables_length
+#print axioms SP1Clean.Soundness.sp1ProviderTables_stateChannel_not_mem
 #print axioms SP1Clean.Soundness.sp1Ensemble
 #print axioms SP1Clean.Soundness.sp1Assumptions
-#print axioms SP1Clean.Soundness.sp1Spec
-#print axioms SP1Clean.Soundness.sp1_witness_decode
+#print axioms SP1Clean.Soundness.balancedStateTrailSpec
+#print axioms SP1Clean.Soundness.sp1_decoded_rows_sound
 #print axioms SP1Clean.Soundness.sp1_state_balance_of_balancedInteractions
 #print axioms SP1Clean.Soundness.sp1_gatedExecution_prereqs
-#print axioms SP1Clean.Soundness.sp1FormalEnsemble
-#print axioms SP1Clean.Soundness.sp1_machine_soundness
+#print axioms SP1Clean.Soundness.balancedStateTrailFormalEnsemble
+#print axioms SP1Clean.Soundness.balanced_state_trail_soundness
+#print axioms SP1Clean.Soundness.supported_core_witness_grounding
+#print axioms SP1Clean.Soundness.supported_core_native_sound
+#print axioms SP1Clean.Soundness.TimedGrounding.walk
 #print axioms SP1Clean.Soundness.sp1_finishedChannel_guarantees
 #print axioms SP1Clean.Soundness.allChipKinds
 #print axioms SP1Clean.Soundness.allChipKinds_length

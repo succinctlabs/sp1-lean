@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 
-"""Regenerate `SP1Clean/Extracted/<Operation>.lean` and `…/<Chip>Chip.lean` from the
-upstream sp1-constraint-compiler — with **auto-derived** sub-struct reuse.
+"""Regenerate whole-chip Rust AIR oracles and transitional helper modules from the upstream
+`sp1-constraint-compiler`.
 
 Adapted from sp1-lean's `update_constraints.py`. The upstream compiler emits field-generic,
 clean-native-ready Lean directly — both the operation/chip **column struct** and the
 **`constraints` def** (`{F : Type} [Field F] [CoeHead F ℕ]`, `Word F`, `SP1ConstraintList F`,
 `.send (.byte (ByteOpcode.ofNat n) …) mult`). This script runs the compiler, sandwiches its
-output between a fixed clean-native header (imports + `namespace SP1Clean.Extracted` +
-`open SP1Clean`) and footer, and writes the whole file.
+output between a fixed clean-native header/footer and writes the whole file.
+
+The stable target is `Extracted/ChipOracle/<Chip>.lean`: one chip-specific namespace containing the
+complete Rust row shape, helper definitions used by the emitted expression, `asserts`, and
+`interactions`. Canonical reader structs are reused from their generated modules; chip-private
+arithmetic structs/functions remain namespaced inside that chip oracle and are not public
+operation-level faithfulness boundaries. `OPERATIONS`, `WITNESS_OPERATIONS`, and
+`CIRCUIT_OPERATIONS` remain only to support chips not yet migrated to this form.
 
 **Why auto-derive?** Each `Extracted/` file must own exactly one column struct; a module that
 composes sub-operations imports their already-generated modules (`--reuse-struct <Name>`)
@@ -21,11 +27,8 @@ instead of re-emitting them. Rather than hand-maintain a per-entry reuse list, t
      are passed as `--reuse-struct` and their owners are imported. The compiler re-runs and the
      file is written.
 
-So **adding a chip is one line** in `CHIPS` (and any new sub-ops in `OPERATIONS`); the reuse
-wiring is computed. The shared `SP1Constraint`/`ByteOpcode`/`Opcode` datatype lives in
-`SP1Clean/Foundations/SP1Constraint.lean` (already models every emitted opcode +
-interaction); the faithfulness anchors that tie each generated `constraints` to the native
-gadget's spec live in `SP1Clean/Faithful/`.
+The shared interaction vocabulary lives in `SP1Clean/Extracted/ExtractionDSL.lean`; whole-chip
+faithfulness anchors live in `SP1Clean/Faithful/`.
 
 Usage: `SP1_DIR=/path/to/sp1 python3 update_extracted.py`
 (default `SP1_DIR` is `../sp1`, a sibling checkout of the sp1 repo).
@@ -57,16 +60,11 @@ OPERATIONS: List[str] = [
     "LtOperationUnsigned", "LtOperationSigned",
 ]
 
-# Operation modules with a witness-vector dumper in the `witness_vectors` binary → an extra
-# `WitnessTests/<name>WitnessVectors.lean` (conformance vectors from SP1's real `populate`) plus a
-# `WitnessTests/<name>Witness.lean` anchor (hand-written). An op here MUST also be in `OPERATIONS`.
-# Tying `populate` is a *completeness/conformance* property: it cannot be symbolically extracted
-# like `eval` (native imperative code, data-dependent control flow), so we dump real-`populate`
-# outputs on a fixed input battery and `#guard` the Lean witness reproduces them. Grow as the
-# binary's per-op dispatch grows (Add first, then Sub/Bitwise, then Mul/Lt).
+# Transitional operation-level witness batteries. New conformance coverage belongs in `TRACE_CHIPS`,
+# which compares complete rows produced by the chip circuit with Rust `generate_trace`. Keep an entry
+# here only while an unmigrated chip still depends on the legacy operation boundary; shrink this list as
+# chips acquire `ChipFaithful` anchors and whole-trace tests. An op here MUST also be in `OPERATIONS`.
 WITNESS_OPERATIONS: List[str] = [
-    "AddOperation",
-    "SubOperation",
     "LtOperationUnsigned",
     "IsZeroOperation",
     "IsZeroWordOperation",
@@ -85,8 +83,6 @@ WITNESS_OPERATIONS: List[str] = [
 # (JSON array → `Vector ℕ <len>`) or a bare `ℕ` (JSON int — e.g. a field-inverse column). Keys like
 # `inputs`/`output`/`events` are intentionally omitted (not part of the witness conformance check).
 WITNESS_SCHEMA: Dict[str, List[str]] = {
-    "AddOperation": ["a_limbs", "b_limbs", "value"],
-    "SubOperation": ["a_limbs", "b_limbs", "value"],
     "LtOperationUnsigned": ["b_limbs", "cc_limbs", "comparison_limbs", "u16_flags", "not_eq_inv"],
     "IsZeroOperation": ["a_field", "inverse", "result"],
     "IsZeroWordOperation": ["a_limbs", "inv", "lresult", "first_half", "second_half", "result"],
@@ -154,16 +150,16 @@ TRACE_EVENT_TYPES: Dict[str, Tuple[str, str]] = {
     "ALUTypeOp": ("AluTypeOpEventRec", "ALUTypeRecord"),
 }
 
-# Operation modules emitted ALSO as the Clean-native **circuit form** (`Inputs` + `main` +
-# `ElaboratedCircuit`) → an extra `Extracted/<name>Circuit.lean`. Only pure-assertion, byte-bus
+# Legacy operation modules still emitted as a Clean **circuit form** (`Inputs` + `main` +
+# `ElaboratedCircuit`) → an extra `Extracted/Circuit/<name>.lean`.  This list is migration debt:
+# chip extraction is the stable faithfulness boundary, and native Lean gadgets need not match Rust
+# operation structs. Only pure-assertion, byte-bus
 # **leaf** operations (Rust `eval` returns `Shape::Unit`, composes no sub-ops) qualify: the emitted
 # `main` IS the extracted artifact, so the gadget's soundness/completeness are faithful **by
 # construction** (no separate `asserts`/`interactions` bridge — the bridge stays only as a helper for
-# the not-yet-migrated chip-level faithfulness). An op here MUST also be in `OPERATIONS`. Grow as
-# more byte-bus leaves migrate.
+# the not-yet-migrated chip-level faithfulness). An op here MUST also be in `OPERATIONS`. Shrink this
+# list as existing consumers migrate off the direct-circuit path. Do not add new entries.
 CIRCUIT_OPERATIONS: List[str] = [
-    "AddOperation",
-    "SubOperation",
     "U16CompareOperation",
     "U16MSBOperation",
     "BitwiseOperation",
@@ -196,6 +192,31 @@ CHIPS: List[str] = [
     "LoadByte", "LoadHalf", "LoadWord", "LoadDouble", "LoadX0",
     "StoreByte", "StoreHalf", "StoreWord", "StoreDouble",
 ]
+
+# Chips migrated to a chip-namespaced oracle under `Extracted/ChipOracle/<Chip>.lean`. Canonical
+# reader structs and their generated `asserts`/`interactions` functions are reused, while
+# chip-private arithmetic structs and functions stay in the oracle.
+# Grow this set one chip at a time, deleting the corresponding legacy `Extracted/<Chip>Chip.lean`
+# file after its native reconfiguration lands.
+CHIP_ORACLES: Set[str] = {"Add", "Sub"}
+
+# Stable generated reader substrate shared by native chip rows and whole-chip Rust oracles. Reusing
+# these types avoids creating a fresh CPU/register-reader hierarchy per oracle while keeping Rust
+# arithmetic operation structs chip-private. Extend this set when a new canonical reader lands.
+CHIP_ORACLE_SHARED_STRUCTS: Set[str] = {
+    "CPUState", "RTypeReader", "RegisterAccessCols", "RegisterAccessTimestamp",
+}
+
+# Generated helpers whose canonical operation/reader module is imported by every chip oracle that
+# calls them. Do not embed a second namespace containing byte-for-byte duplicate functions. Keep this
+# explicit: sharing a row struct alone does not imply that every Rust helper using it has a stable,
+# reusable generated definition.
+CHIP_ORACLE_IMPORTED_HELPERS: Set[str] = {"CPUState", "RTypeReader"}
+
+# Helpers needed while rendering a self-contained chip oracle but no longer emitted as standalone
+# verification artifacts. They remain in `OPERATIONS` solely so the discovery pass can embed their
+# generated definitions inside the owning chip namespace.
+CHIP_ONLY_HELPERS: Set[str] = {"SubOperation"}
 
 # Explicit struct→owning-module overrides, ONLY for cases the default rules can't infer:
 #   * struct name ≠ its owning module's name, or
@@ -474,15 +495,6 @@ def render(operation: str, import_modules: Sequence[str], body: str) -> str:
     return _header(import_modules, doc) + "\n" + body + "\n\n" + FOOTER
 
 
-# Ops whose `channelsLawful` the Clean default tactic cannot close (composed sub-assertion channel
-# lists need unfolding); the normalizer injects the override since the emitter never produces one.
-CHANNELS_LAWFUL_OVERRIDES: Dict[str, str] = {
-    "LtOperationSigned":
-        "  channelsLawful := by\n"
-        "    simp [circuit_norm, main, LtOperationUnsigned.circuit, U16MSBOperation.circuit]\n",
-}
-
-
 def _normalize_circuit_api(operation: str, body: str) -> str:
     """Post-process the compiler's circuit-form output onto the pinned Clean API (closes the
     release-audit TB-9 reproducibility gap). The `sp1-constraint-compiler` at the SP1 pin emits
@@ -499,14 +511,25 @@ def _normalize_circuit_api(operation: str, body: str) -> str:
         "instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where\n"
         f"  name := \"SP1CleanNative.{operation}\"\n"
         "  main := main\n",
-        "instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where\n"
-        + CHANNELS_LAWFUL_OVERRIDES.get(operation, ""))
+        "instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where\n")
     for which in ("channelsWithGuarantees", "channelsWithRequirements"):
         body = body.replace(
             f"    (ElaboratedCircuit.{which} Inputs unit : List (RawChannel (ZMod p)))",
             f"    ((elaborated (p := p)).{which} : List (RawChannel (ZMod p)))")
     body = body.replace("byteChannel.gatedReceive", "byteChannel.pullIf")
     body = body.replace("byteChannel.toRawGated", "byteChannel.toRaw")
+    # `pullIf`'s local guarantee is justified from a *shallow* boolean gate.  The compiler now emits
+    # the existing `is_real * (is_real - 1)` equation through `===`, which is semantically identical
+    # but hidden behind a subcircuit and therefore unavailable to Clean's channel-lawfulness checker.
+    # Keep this as a local gadget implementation detail: expose that already-emitted equation as an
+    # `assertZero`, or add the redundant gate for the byte-only Bitwise gadget whose current Rust helper
+    # omits it.  Chip-level extraction remains the sole Rust-faithfulness boundary.
+    if "byteChannel.pullIf is_real" in body:
+        bool_gate = "  assertZero (is_real * (is_real - 1))\n"
+        if "  let E0 := is_real - 1\n  let E1 := is_real * E0\n" in body:
+            body = body.replace("  E1 === 0\n", "  assertZero E1\n", 1)
+        elif bool_gate not in body:
+            body = body.replace("\n\ninstance elaborated", f"\n{bool_gate}\ninstance elaborated", 1)
     # A bare numeral seeding an accumulator chain (`let E16 := 0 + cols…`) fails to elaborate (the
     # `0`'s type can't be synthesized bottom-up inside the un-ascribed `let`); pin it explicitly.
     body = body.replace(":= 0 + ", ":= (0 : Expression (ZMod p)) + ")
@@ -520,6 +543,34 @@ def _normalize_circuit_api(operation: str, body: str) -> str:
         r"@\[circuit_norm\] lemma channelsWithRequirements_eq :\n"
         r"    \(\(elaborated \(p := p\)\)\.channelsWithRequirements : List \(RawChannel \(ZMod p\)\)\)\n"
         r"      = .*? := rfl\n", "", body, count=1, flags=re.M)
+
+    # The compiler emits hand-written `ElaboratedCircuit` metadata (`localLength`, `output`, channel
+    # lists, and occasionally a bespoke `channelsLawful` proof).  Those fields merely duplicate the
+    # structure already present in `main`; on MulOperation the generated simp proof also takes more
+    # than ten minutes to kernel-check under Lean 4.31.  Let Clean derive every structural field and
+    # pin only the public guarantee list.  This compiled the same Mul circuit in seconds and removes
+    # the last operation-specific structural override from this generator.
+    instance_re = re.compile(
+        r"(?:set_option maxHeartbeats \d+ in\n)?"
+        r"instance elaborated : ElaboratedCircuit \(ZMod p\) Inputs unit main where\n"
+        r"(?P<fields>.*?)"
+        r"(?=\nset_option linter\.unusedSectionVars false in\n)",
+        flags=re.S,
+    )
+    match = instance_re.search(body)
+    if match is None:
+        raise ValueError(f"circuit output for {operation} has no normalizable elaborated instance")
+    guarantees = re.search(
+        r"^  channelsWithGuarantees := (?P<value>.*)$", match.group("fields"), flags=re.M)
+    if guarantees is None:
+        raise ValueError(f"circuit output for {operation} has no guarantee metadata")
+    derived = (
+        "instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main := by\n"
+        "  elaborate_circuit_with {\n"
+        f"    channelsWithGuarantees := {guarantees.group('value')}\n"
+        "  }\n"
+    )
+    body = body[:match.start()] + derived + body[match.end():]
     return body
 
 
@@ -534,13 +585,13 @@ def render_circuit(operation: str, body: str) -> str:
     body = _normalize_circuit_api(operation, body.strip())
     doc = (
         f"/-! # AUTO-GENERATED circuit form — do not edit by hand.\n\n"
-        f"SP1's `{operation}::eval` as a Clean `Circuit`: the `Inputs` struct (the `eval` params\n"
-        f"verbatim — the column struct nested as `cols`), the `main` do-block, and the\n"
-        f"`ElaboratedCircuit` instance + `@[circuit_norm]` rfl-lemmas. Generated by\n"
+        f"Legacy transitional Clean circuit generated from `{operation}::eval`: the `Inputs` struct,\n"
+        f"the `main` do-block, and the\n"
+        f"Clean-derived `ElaboratedCircuit` instance + `@[circuit_norm]` rfl-lemmas. Generated by\n"
         f"`update_extracted.py` from the `sp1-constraint-compiler` (`--operation {operation} --format\n"
-        f"lean-circuit`). This *is* the faithful artifact the gadget's soundness/completeness run\n"
-        f"against — no separate `asserts`/`interactions` bridge. Regenerate with\n"
-        f"`SP1_DIR=… python3 update_extracted.py`. -/"
+        f"lean-circuit`). This is migration scaffolding for internal semantic gadgets, **not** a public\n"
+        f"operation-faithfulness boundary; Rust faithfulness is stated only for whole chips. Delete this\n"
+        f"module when its last consumer migrates. Regenerate with `SP1_DIR=… python3 update_extracted.py`. -/"
     )
     # A composed op's `main` calls `assertion <Sub>.circuit ⟨…⟩`; import each such sub-op's `Formal`
     # module (where `<Sub>.circuit : FormalAssertion` lives). Leaf ops have none.
@@ -617,6 +668,101 @@ def render_chip(chip: str, import_modules: Sequence[str], body: str) -> str:
         f"`SP1_DIR=… python3 update_extracted.py`. -/"
     )
     return _header(import_modules, doc) + "\n" + body + "\n\n" + FOOTER
+
+
+def _chip_helper_order(chip: str, chip_body: str, discovery: Dict[str, str]) -> List[str]:
+    """Dependency-first order of generated helper definitions called by one chip expression."""
+    ordered: List[str] = []
+    visiting: Set[str] = set()
+    done: Set[str] = set()
+
+    def visit(name: str) -> None:
+        if name in done:
+            return
+        if name in visiting:
+            raise ValueError(f"cyclic generated helper dependency while rendering {chip}: {name}")
+        if name not in discovery:
+            raise ValueError(
+                f"self-contained oracle for {chip} calls {name}, but its operation body was not "
+                "discovered (include it in OPERATIONS/EXTRACT_ONLY)")
+        visiting.add(name)
+        for dep in _CALL_RE.findall(discovery[name]):
+            if dep != name and dep in discovery:
+                visit(dep)
+            elif dep != name and dep[:1].isupper():
+                raise ValueError(
+                    f"self-contained oracle for {chip} needs generated helper {dep}, but its body "
+                    "was not discovered (include it in OPERATIONS/EXTRACT_ONLY)")
+        visiting.remove(name)
+        done.add(name)
+        ordered.append(name)
+
+    for helper in _CALL_RE.findall(chip_body):
+        if helper in discovery:
+            visit(helper)
+        elif helper[:1].isupper():
+            raise ValueError(
+                f"self-contained oracle for {chip} calls {helper}, but its operation body was not "
+                "discovered (include it in OPERATIONS/EXTRACT_ONLY)")
+    return ordered
+
+
+def _without_generated_structures(body: str) -> str:
+    """Drop struct declarations from a helper body; the chip's no-reuse row shape owns them."""
+    return _DERIVE_STRUCT_RE.sub("", body).strip()
+
+
+def render_chip_oracle(
+    chip: str, chip_body: str, discovery: Dict[str, str], import_modules: Sequence[str]
+) -> str:
+    """Render one chip-namespaced Rust AIR oracle.
+
+    The compiler fragment reuses canonical reader structs but deliberately calls helper definitions
+    such as `AddOperation.asserts`. Embed chip-private helpers dependency-first into the same namespace,
+    stripping their duplicate structs. Calls to canonical generated reader helpers are qualified back
+    to their imported module instead of embedding a duplicate namespace. This keeps Rust's generated
+    factoring available to Lean reduction without making operation modules part of the chip's theorem
+    surface or cloning the shared reader substrate.
+    """
+    marker = f"namespace {chip}Cols"
+    before, found, after = chip_body.partition(marker)
+    if not found:
+        raise ValueError(f"compiler output for {chip} missing `{marker}`")
+    helpers = _chip_helper_order(chip, chip_body, discovery)
+    embedded_helpers = [h for h in helpers if h not in CHIP_ORACLE_IMPORTED_HELPERS]
+    helper_defs = "\n\n".join(
+        _without_generated_structures(discovery[h]) for h in embedded_helpers
+    )
+    body = before.rstrip() + "\n\n" + helper_defs + "\n\n" + marker + after
+    for helper in sorted(CHIP_ORACLE_IMPORTED_HELPERS):
+        body = re.sub(
+            rf"(?<![A-Za-z0-9_.]){re.escape(helper)}\.(asserts|interactions)\b",
+            rf"SP1Clean.Extracted.{helper}.\1",
+            body,
+        )
+    body = _bump_constraints_heartbeats(body.strip(), 8000000)
+    body = _expand_large_derives(body)
+    _sanity_gate(f"{chip} (self-contained chip oracle)", body)
+    helper_list = ", ".join(embedded_helpers) if embedded_helpers else "no private helpers"
+    shared_helpers = [h for h in helpers if h in CHIP_ORACLE_IMPORTED_HELPERS]
+    shared_list = ", ".join(shared_helpers) if shared_helpers else "no shared helpers"
+    doc = (
+        f"/-! # AUTO-GENERATED whole-chip Rust AIR oracle — do not edit by hand.\n\n"
+        f"Generated by `update_extracted.py` from `sp1-constraint-compiler --chip {chip} --format lean`.\n"
+        f"Contains the complete Rust `{chip}` row shape, `assertZero` list, and interaction list,\n"
+        f"reusing canonical generated reader structs and functions where available ({shared_list}).\n"
+        f"The compiler's chip-private helper definitions ({helper_list}) are embedded in this namespace\n"
+        f"rather than imported as operation-level verification artifacts. Regenerate with\n"
+        f"`SP1_DIR=… python3 update_extracted.py`. -/"
+    )
+    return (
+        COMMON_IMPORTS + "\n"
+        + "".join(f"import SP1Clean.Extracted.{m}\n" for m in import_modules)
+        + "\n" + doc + "\n\n" + LINTERS_OFF + "\n\n"
+        + f"namespace SP1Clean.Extracted.{chip}Oracle\n"
+        + "open SP1Clean\n\n" + body + "\n\n"
+        + f"end SP1Clean.Extracted.{chip}Oracle\n"
+    )
 
 
 # ── Witness-vector pass ───────────────────────────────────────────────────────────────────────
@@ -794,6 +940,7 @@ def main() -> None:
     discovery: Dict[str, str] = {}   # module → no-reuse body (successful targets only)
     emitted: Dict[str, List[str]] = {}
     skipped: Dict[str, str] = {}     # module → first-line reason
+    required_failures: List[str] = []
     for op in OPERATIONS:
         print(f"  · {op}")
         try:
@@ -810,13 +957,15 @@ def main() -> None:
         except Exception as e:  # noqa: BLE001
             skipped[chip] = str(e).splitlines()[-1] if str(e).strip() else "compiler error"
             print(f"    ✗ skipped: {skipped[chip]}")
+            if chip in CHIP_ORACLES:
+                required_failures.append(f"chip oracle discovery {chip}: {skipped[chip]}")
 
     owner = resolve_ownership(emitted)
     print(f"Resolved ownership for {len(owner)} structs.")
 
     # 2. Emit pass: re-run with the derived reuse, then render + write (successful targets only).
     written = 0
-    for op in [o for o in OPERATIONS if o in emitted]:
+    for op in [o for o in OPERATIONS if o in emitted and o not in CHIP_ONLY_HELPERS]:
         print(f"Processing {op}")
         try:
             skips, imports = reuse_for(op, emitted[op], owner, discovery[op])
@@ -829,16 +978,32 @@ def main() -> None:
     for chip in [c for c in CHIPS if c in emitted]:
         print(f"Processing chip {chip}")
         try:
-            skips, imports = reuse_for(chip, emitted[chip], owner, discovery[chip])
-            body = run_constraint_compiler(sp1_dir, chip=chip, reuse=skips) if skips else discovery[chip]
-            _write(os.path.join(EXTRACTED_DIR, f"{chip}Chip.lean"), render_chip(chip, imports, body))
+            if chip in CHIP_ORACLES:
+                oracle_reuse = [
+                    struct for struct in emitted[chip]
+                    if struct in CHIP_ORACLE_SHARED_STRUCTS
+                ]
+                oracle_imports: List[str] = []
+                for struct in oracle_reuse:
+                    imported = _import_module(owner[struct])
+                    if imported not in oracle_imports:
+                        oracle_imports.append(imported)
+                oracle_body = (run_constraint_compiler(sp1_dir, chip=chip, reuse=oracle_reuse)
+                               if oracle_reuse else discovery[chip])
+                _write(os.path.join(EXTRACTED_DIR, "ChipOracle", f"{chip}.lean"),
+                       render_chip_oracle(chip, oracle_body, discovery, oracle_imports))
+            else:
+                skips, imports = reuse_for(chip, emitted[chip], owner, discovery[chip])
+                body = run_constraint_compiler(sp1_dir, chip=chip, reuse=skips) if skips else discovery[chip]
+                _write(os.path.join(EXTRACTED_DIR, f"{chip}Chip.lean"), render_chip(chip, imports, body))
             written += 1
         except Exception as e:  # noqa: BLE001 — best-effort, continue with the rest
             print(f"  ✗ Error: {e}")
+            if chip in CHIP_ORACLES:
+                required_failures.append(f"chip oracle render {chip}: {e}")
 
-    # 2b. Witness-vector pass: dump real-`populate` conformance vectors for the ops that have a
-    #     dumper in the `witness_vectors` binary. Best-effort per op (an op without a dumper just
-    #     skips), so the constraint pass above is never blocked by this companion pass.
+    # 2b. Transitional operation witness-vector pass. New conformance batteries belong in the
+    #     whole-chip pass below; this list only supports unmigrated consumers.
     for op in WITNESS_OPERATIONS:
         print(f"Processing witness vectors for {op}")
         try:
@@ -850,7 +1015,8 @@ def main() -> None:
             print(f"  ✗ Error: {e}")
 
     # 2d. Whole-trace pass: dump the real-`generate_trace` conformance battery for the chips in
-    #     `TRACE_CHIPS` (the `--chip` mode of the same binary). Best-effort per chip. Under
+    #     `TRACE_CHIPS` (the `--chip` mode of the same binary). A requested trace failure is fatal:
+    #     silently retaining stale vectors would undermine the extraction/conformance boundary. Under
     #     `EXTRACT_ONLY`, select these with `<Chip>Trace` (e.g. `AddTrace`) so they don't collide
     #     with the `CHIPS` constraint-extraction entries of the same name.
     for chip, (width, kind) in TRACE_CHIPS.items():
@@ -862,13 +1028,11 @@ def main() -> None:
             written += 1
         except Exception as e:  # noqa: BLE001 — best-effort, continue with the rest
             print(f"  ✗ Error: {e}")
+            required_failures.append(f"whole-trace extraction {chip}: {e}")
 
-    # 2c. Circuit-form pass: emit `Operations/<op>/Extracted.lean` (the `Inputs` + `main` +
-    #     `ElaboratedCircuit`) for the byte-bus, pure-assertion leaf operations — the auto-generated
-    #     member of the op's four-file directory (alongside the hand-written `Populate`/`RawSpec`/
-    #     `Formal`). The nested `cols` column struct still comes from the op's shared
-    #     `Extracted/<op>.lean` (imported), so this pass relies on the constraint pass above having
-    #     written it. Best-effort per op.
+    # 2c. Transitional direct-circuit pass. Native Lean gadgets are now independent implementations;
+    #     do not add entries. Delete each generated circuit as its consuming chips move to the
+    #     whole-chip `ChipFaithful` boundary.
     for op in CIRCUIT_OPERATIONS:
         print(f"Processing circuit form for {op}")
         try:
@@ -885,6 +1049,9 @@ def main() -> None:
         print(f"== {len(skipped)} target(s) skipped (compiler can't emit yet): ==")
         for name, reason in skipped.items():
             print(f"   - {name}: {reason}")
+    if required_failures:
+        details = "\n".join(f"   - {failure}" for failure in required_failures)
+        raise SystemExit(f"\nRequired extraction artifacts failed; no successful regeneration claim:\n{details}")
 
 
 if __name__ == "__main__":

@@ -322,8 +322,8 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadByteColumns (ZMod 
       (Or.inr ⟨hlbu, hlb, rfl⟩)
 
 /-- `ChipKind` registration for LoadByte (LB / LBU, opcodes 29 / 32). Bytes are unaligned, so
-`sailEquiv` has no alignment hypothesis. `view := rowView` (`commit = .regWrite` — loads write rd);
-`advance := some BranchChip-style `advance` over `advance_of_load_width1`, the memory-read binding /
+`advance` has no alignment hypothesis. `view := rowView` (`commit = .regWrite` — loads write rd);
+the proof uses `advance_of_load_width1`, with the memory-read binding /
 bounds / routing carried in `advanceReady`. -/
 def kind : Soundness.ChipKind p where
   name := "LoadByte"

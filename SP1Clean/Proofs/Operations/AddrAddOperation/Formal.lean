@@ -54,6 +54,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg
   rw [← c16] at R0 R1 R2
   rw [hr1eq, one_mul] at hgc0 hgc1 hgc2 hgc3
+  simp only [sub_zero] at hgc3
   have Rb0 := (byteRowSpec_range _ h16p).mp R0
   have Rb1 := (byteRowSpec_range _ h16p).mp R1
   have Rb2 := (byteRowSpec_range _ h16p).mp R2
@@ -107,7 +108,9 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       · rw [one_mul]; rcases hc0 with h | h <;> rw [h] <;> simp
       · rw [one_mul]; rcases hc1 with h | h <;> rw [h] <;> simp
       · rw [one_mul]; rcases hc2 with h | h <;> rw [h] <;> simp
-      · rw [one_mul]; rcases hc3 with h | h <;> rw [h] <;> simp
+      · simp only [sub_zero]
+        rw [one_mul]
+        rcases hc3 with h | h <;> rw [h] <;> simp
 
 /-- SP1's `AddrAddOperation::eval` as a Clean-native `FormalAssertion`. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=

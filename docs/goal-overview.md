@@ -1,17 +1,11 @@
 # SP1 verified: what is proven, and how to check it — TARGET STATE
 
-**STATUS: GOAL DOCUMENT (drafted 2026-07-09; §0/§2 revised 2026-07-11 to the deps-aware audit
-standard — §2 now states the global Lean configuration verbatim and describes the RISC-V/Sail seam
-"up to what a dependency-expert knows," so a Sail-familiar reviewer can audit the connection from the
-config alone).** This is `docs/overview.md` as it will read when the consolidation
-(`docs/proposals/2026-07-architecture-consolidation.md`) and the remaining roadmap seams (W1b witness
-decode, W5 halt, W8 logUp packaging) are complete, and after the Lean **4.30** migration lands
-(soundness green; the honest-prover *completeness* proofs are temporarily `stop`-deferred, tracked
-for restore before the consolidation PR — see the gap ledger in §1). Nothing here is hedged: every
-sentence is written in the completed voice, so **the diff between this file and `overview.md` is
-exactly the remaining work**, and every discrepancy maps to a numbered migration step in the
-proposal (§5) or a roadmap item. When a claim becomes true, it moves verbatim into `overview.md`.
-Do not cite this document as current status.
+**STATUS: ASPIRATIONAL GOAL DOCUMENT (drafted 2026-07-09; toolchain note refreshed 2026-07-16).**
+This is a completed-voice sketch of the desired full upstream AIR, boot-to-halt, and ArkLib verifier
+result. It is not a checklist and no longer tracks `overview.md` line-for-line: the consolidation changed
+the theorem layering and `overview.md` now records the implemented state directly. Use
+`release-audit.md`, `architecture.md`, and `proposals/consolidation-progress.md` for current claims. Do not
+cite this document as current status.
 
 ---
 
@@ -49,19 +43,23 @@ circuit-generated values, "**witness generator**" = the populate function.
 ## 1. The theorem
 
 ```lean
-theorem sp1_soundness
-    (prog : GuestProgram) (pi : SP1PublicIO (ZMod p))
-    (h_pi : ProgramBoundary prog pi)
-    (h_stmt : (sp1Ensemble prog).Statement pi) :
-    ∀ s0, SP1Boot prog s0 →
-      ∃ n s_f, SailChain n s0 s_f ∧ SP1Halted prog (exitCodeOf pi) s_f
+theorem sp1_air_sound :
+    WitnessRelation.Sound SP1AIRRelation
+      (Execution.SP1ShardExecutionRelation layout model programBinding)
+
+theorem sp1_execution_sound :
+    WitnessRelation.Sound SP1RecursiveAIRRelation
+      (Execution.SP1ExecutionRelation layout model programBinding shardIntegrity)
+
+theorem sp1_verifier_sound :
+    verifier.knowledgeSoundness ...
 ```
 
-Read: *the SP1 ensemble for the committed guest program verifies with public values `pi`* — all
-per-table AIR constraints hold and all four buses balance, i.e. everything downstream of the lookup
-argument — *then the LeanRV64D Sail interpreter, run from any state that boots the program, reaches
-the halting ECALL with the committed exit code.* `ProgramBoundary` is the vkey tie: the public
-values' entry point, exit code slot, and program commitment match `prog`.
+Read: the first theorem turns a valid full upstream shard AIR witness into the corresponding official
+Sail execution segment; the second authenticates and composes an ordered shard ledger from boot to the
+halting ECALL; the third is ArkLib knowledge soundness, with its extractor post-composed through
+`sp1_air_sound` without changing the knowledge error. The native Clean ensemble and its whole-chip
+faithfulness proofs implement `SP1AIRRelation`; they are not silently substituted for the verifier.
 
 The trust base — six rows, and the audit harness asserts the theorem's axiom set is **exactly**
 this (`scripts/run_audit.sh` reproduces the census):
@@ -76,7 +74,7 @@ this (`scripts/run_audit.sh` reproduces the census):
 | 6 | `populate` conformance | tested (native_decide @ KoalaBear), quarantined test library, never imported by proofs |
 
 **The gap ledger is empty.** The audit allowlist contains no `sorry`; every obligation of
-`sp1_soundness` is a theorem of the six-row base above.
+the three capstone theorems are theorems of the six-row base above.
 
 ## 2. What sits under us: the configuration, and the Sail seam
 
@@ -99,7 +97,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]   -- the standing block
 It is instantiated only at SP1's production prime (BabyBear / KoalaBear), which satisfies both with
 margin. Pins and gates, all machine-checked by `scripts/run_audit.sh`:
 
-- **Toolchain**: `leanprover/lean4:v4.30.0`, mathlib `v4.30.0`, Clean pinned to `main`, and the two
+- **Toolchain**: `leanprover/lean4:v4.31.0`, mathlib `v4.31.0`, Clean pinned to a released 4.31-compatible
+  revision, and the two
   `succinctlabs` Sail forks (`sail-riscv-lean` carrying the platform delta below + `riscv-lean`),
   which pull `LeanRV64D` and `lean-sail`.
 - **Trust gates**: the main `SP1Clean` library is `native_decide`-free and `skipKernelTC`-free (both
@@ -191,7 +190,7 @@ Every chip passes the same five gates. For `AddChip` (SP1's `add_sub` AIR):
 
 | Gate | Artifact | What it pins |
 |---|---|---|
-| extract | `Extracted/AddChip.lean` (auto-generated) | the column struct + assert/interaction lists, rendered from SP1's own constraint compiler |
+| extract | `Extracted/ChipOracle/Add.lean` (auto-generated) | chip-namespaced Rust row + complete assert/interaction lists, rendered from SP1's constraint compiler |
 | faithful | `Faithful/AddChip.lean` | circuit constraints ⟺ the extracted asserts (logical equivalence); emitted interactions ≐ SP1's oracle, all four buses (list permutation) |
 | sound | `Proofs/Chips/AddChip/Formal.lean` | constraints ⟹ the chip contract `Spec` |
 | decode | the Program pull + the row inversion | the row's operands are the fixed decoded instruction's operands |
@@ -239,8 +238,10 @@ well-founded induction over the balanced channels, in time order:
 The per-chip interface to that induction is exactly the `advance` obligation of §4: one generic
 adapter (`stepFact_of_advance`) converts every chip's `advance` into the engine's per-row step
 record, so the capstone is chip-count-agnostic. Between the Clean `Statement` and the engine's
-inputs sit two proven translations: the witness decode (`sp1_row_facts_decode` — the committed
-tables decode to typed rows whose contracts hold) and the typed-multiset balance bridge (Clean's
+inputs sit two proven translations: deterministic typed witness decoding plus its grounding theorem
+(`supported_core_witness_grounding` now proves exact ordering, PC/clock projection, and static
+grounding; its one dependency `supportedCore_orderedRows_dynamic` supplies the remaining timed row
+facts) and the typed-multiset balance bridge (Clean's
 `BalancedInteractions` lifted to per-key message-multiset equalities). The whole path from
 "verifier accepts" to "Sail halts with the committed exit code" is theorems of the six-row base.
 
@@ -278,7 +279,8 @@ User-mode duplicate AIRs, and the cryptographic lookup argument itself (trust ro
 
 To audit: `scripts/run_audit.sh` — re-checks the toolchain pins, the empty `sorry` allowlist, the
 `native_decide`/`skipKernelTC` gates, and regenerates the axiom census that backs §1's trust table,
-including the exact-set gate on `sp1_soundness`. The extraction currency check re-renders
+including exact-set gates on `sp1_air_sound`, `sp1_execution_sound`, and `sp1_verifier_sound`.
+The extraction currency check re-renders
 `Extracted/` at the pinned SP1 commit and diffs byte-for-byte. Every claim in this document is a
 named theorem you can `#print axioms`.
 

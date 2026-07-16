@@ -385,4 +385,12 @@ def ownAsserts (cols : Var DivRemCols (ZMod p)) : List (Expression (ZMod p)) :=
   let E367 : Expression (ZMod p) := (1 : Expression (ZMod p)) - E366
   [E13, E15, E17, E19, E20, E21, E22, E23, E29, E35, E41, E47, E48, E49, E51, E54, E57, E59, E61, E64, E67, E69, E70, E71, E73, E76, E79, E81, E83, E86, E89, E91, E96, E99, E103, E105, E107, E109, E111, E113, E115, E117, E119, E154, E157, E160, E163, E167, E171, E175, E179, E184, E189, E194, E199, E204, E209, E214, E219, E225, E228, E230, E232, E234, E236, E238, E240, E242, E244, E247, E250, E253, E256, E259, E262, E265, E268, E270, E272, E274, E276, E278, E280, E282, E284, E286, E288, E299, E300, E301, E302, E305, E307, E309, E311, E313, E315, E317, E319, E321, E323, E325, E327, E329, E331, E333, E335, E337, E339, E341, E343, E345, E347, E349, E351, E353, E355, E357, E359, E367, cols.adapter.op_a_0]
 
+set_option maxHeartbeats 8000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- `E355`, the chip selector's boolean gate, is part of the pure DivRem own-assertion list. -/
+theorem isReal_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+    cols.is_real * (cols.is_real - 1) ∈ ownAsserts cols := by
+  simp only [ownAsserts, List.mem_cons, List.not_mem_nil, or_false]
+  tauto
+
 end SP1Clean.DivRemChip

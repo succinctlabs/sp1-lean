@@ -1,5 +1,6 @@
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Defs
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Core
+import SP1Clean.Proofs.CircuitProofStart
 
 /-! # `ShiftLeftChip` — sllw conjunct soundness (split out for parallel compilation)
 
@@ -36,7 +37,7 @@ def Spec (input : Inputs (ZMod p)) (cols : ShiftLeftCols (ZMod p)) (_ : ProverDa
 set_option maxHeartbeats 4000000 in
 /-- Soundness of the `sllw` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
-  circuit_proof_start
+  circuit_proof_start_early_struct
   -- `op_b_val`/`op_c_val` are reducible projections (`adapter.op_b_memory.prev_value`/`adapter.op_c`),
   -- not committed columns. Unfolding them collapses the readback-equality conjunct to `rfl`
   -- (dropped by `simp`), leaving the three real conjuncts.
@@ -316,12 +317,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       h_diff hs0sel hs1sel hs2sel hs3sel hssum hb0dec hb1dec hlr0 hlr1
       hll0 hhl0 hll1 hhl1 hw00 hw01 hw10 hw11 h_msb_a1
       (by linear_combination -hwmsb2) (by linear_combination -hwmsb3)
-  · -- Channel-requirement tail: the three sub-assertion `Assumptions` (each the gate/flag binary fact,
-    -- except the U16MSB `a1 < 2^16` operand range which is part of the deferred SLLW argument), then the
-    -- nine `gate`-gated `byteChannel` pulls' off-gate `Requirements` — vacuous under the binary gate
-    -- `is_sll + is_sllw ∈ {0,1}` (`off_gate_vacuous`).
-    exact ⟨bool_of_mul_pred _hrealbin, Or.inr ⟨a1_bound_cond, bool_of_mul_pred _hE6⟩,
-      Or.inr ⟨bool_of_mul_pred _hE2, bool_of_mul_pred _hE2⟩,
+  · -- The MSB gadget exposes its empty requirement list canonically. The remaining reader/write
+    -- assumptions are followed by the nine gate-gated byte pulls, all vacuous off-gate.
+    exact ⟨Or.inr ⟨bool_of_mul_pred _hE2, bool_of_mul_pred _hE2⟩,
       Or.inr ⟨bool_of_mul_pred _hE2, fun hr => by
         obtain ⟨hq0, hq1, hq2, hq3⟩ := a_isU64 hr
         refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>

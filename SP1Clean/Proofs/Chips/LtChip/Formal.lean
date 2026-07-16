@@ -22,7 +22,7 @@ distinct from `op_c_val = adapter.op_c` since `Lt`'s adapter is immediate-capabl
 honest `"lt_flags"` hint (each flag binary, the sum = `is_real`, `is_slt` only on real rows), `op_a_0 = 0`,
 `imm_c = 0` (register-register rows), CPUState clock bounds, three timestamp `Spec`s
 (op_c gated by `is_real - imm_c`). -/
-def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
@@ -44,16 +44,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
-  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
-  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (the flag-weighted
-  -- SLT/SLTU opcode `is_slt·9 + is_sltu·10`; `progMsgOf` ignores the `wv` fields).
-  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
-    (Readers.ALUTypeReader.progMsgOf
-      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
-       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
-       f[0] * 9 + f[1] * 10, 0, 0, 0, 0⟩) data)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 /-- Semantic contract, stated against the clean RV64 ISA functions (mirrors the R-type chip contract, here spelled
 inline for the **two-variant** ALU adapter): the `ALUTypeReader` sub-`Spec` on the `state`/`adapter`
@@ -208,7 +199,7 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨ha, hb, ha_prev, hc_prev, hbin, hf0, hf1, hsum, hslt_real, hop_a_0, himm, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec, h_st, h_prog⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
   -- `h_env` now bundles the CPUState GFC obligation (SC Phase 2c, prepended) + the chip's flag/`lt_cols`
   -- witness-gen equations + the GFC `ALUTypeReader` subcircuit's completeness obligation — discard both ends.
   obtain ⟨-, h_env_flags, h_env_cols, -⟩ := h_env
@@ -228,13 +219,12 @@ theorem completeness :
       = input_adapter_op_b_memory_prev_value := h_input.2.2.2.2.2.2.1.1
   have hpvc : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c
       = input_adapter_op_c := h_input.2.2.2.2.2.2.2.1
-  refine ⟨⟨hbin, h_cpu, h_st⟩,
+  refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨ha, hb, hbin, hf0'⟩, ?_⟩,
     ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
-      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, ha⟩, hc_prev⟩,
-      fun hr => by rw [hflag0, hflag1]; exact h_prog hr⟩,
+      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, ha⟩, hc_prev⟩⟩,
     ⟨⟨hbin, ?_⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     hbool _ hf0',
@@ -252,7 +242,8 @@ theorem completeness :
   convert LtOperationSigned.spec_populate (b := input_adapter_op_b_memory_prev_value)
     (cc := input_adapter_op_c) (is_signed := env.get i₀) (is_real := input_is_real)
     ha hb hf0' hbin hgate using 2
-  refine (ProvableType.ext_iff _ _).mpr (fun i hi => ?_)
+  rfl
+  refine (ProvableType.ext_iff (α := Extracted.LtOperationSigned) _ _).mpr (fun i hi => ?_)
   -- Ascribe `h_env_cols`'s IR-native RHS into the plain `toElements (populate …)` form via a *definitional*
   -- `have` (the `.native` eval-match + beta is the CHEAP reduction; the expensive path is the eager
   -- `Eq.trans` isDefEq against `toElements (populate …)` with FOLDED operands, whose `combinedSize'` tower
@@ -308,7 +299,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input _ =>
-      stateChannel.expose
+      expose stateChannel
         [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
@@ -317,8 +308,10 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
-      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
-        List.map_cons, List.map_nil]
+      have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
+      have h_program := Channels.programChannel_toRaw_ne_stateChannel (p := p)
+      have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
+      rw [Operations.exposedChannelsLawful_expose]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -330,6 +323,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
         SP1Clean.U16CompareOperation.circuit, SP1Clean.U16CompareOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
+      simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+        h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+        if_true, List.nil_append] }
 
 end SP1Clean.LtChip

@@ -1347,7 +1347,8 @@ lemma sllw_assembly
     have ha0 : a0 = lr0 := by rw [hs0, one_mul] at h_p00; linear_combination h_p00
     have ha1 : a1 = lr1 := by rw [hs0, one_mul] at h_p01; linear_combination h_p01
     have h_total : cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16 = ((S : ℕ) : ZMod p) := by
-      rw [h4]; push_cast at h_inner_plain ⊢; linear_combination h_inner_plain
+      rw [h4]
+      linear_combination h_inner_plain
     have h_cbsum5_lt : (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16).val < 32 := by
       rw [h_total]; rw [ZMod.val_natCast_of_lt (by omega)]; omega
     have h_c_mod_32 : c0.val % 32 = (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16).val :=

@@ -25,8 +25,9 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 `main` composes the full constraint set: two `MulOperation` `c·quotient` products (low/high),
 `IsEqualWordOperation`×4 (overflow), `IsZeroWordOperation` (divide-by-zero), `AddOperation`×2 (negation),
 `LtOperationUnsigned` (remainder range), `U16MSBOperation`×7 (sign bits), `CPUState`/`RTypeReader`
-readers, and the chip's own assertZero tail (`ownAsserts`). Soundness is proved; completeness is a
-deferred `sorry`. (`Assumptions`/soundness/completeness/`circuit` in `Formal`.) -/
+readers, and the chip's own assertZero tail (`ownAsserts`). The public contract and its isolated
+family-evidence layer are in `FormalModel/Contracts/DivRem.lean` and `Cases.lean`; whole-chip evidence
+extraction and completeness are explicit deferred seams in `Formal.lean`/`Completeness/Driver.lean`. -/
 
 namespace SP1Clean.DivRemChip
 
@@ -54,7 +55,7 @@ what makes the ungated lower glue and the flag-gated shape asserts dischargeable
 `op_a_0 = 0`, the CPUState clock bounds, and the three register-access timestamp `Spec`s (mirrors
 `MulChip.ProverAssumptions` — R-type, no immediate machinery). Lives in `Defs` (not `Formal`) so the
 `Completeness/` split files can import it without a cycle. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
+def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
@@ -86,19 +87,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
   -- (W11 flip) the `RTypeReader` program **pull** now *derives* the decode bounds into its `Spec`
   -- (destination index `< 32`, pc limbs `< 2^16`, on real rows) — completeness must provide them.
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
-  -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-  (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
-  -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (the flag-weighted DIV*/REM*
-  -- opcode `is_divu·16 + is_remu·18 + … + is_remuw·28`, with `is_div = f[0]`, `is_divu = f[1]`, …,
-  -- `is_remuw = f[7]`; `progMsgOf` ignores the `wv` fields, so the `0` placeholders are defeq to the actual
-  -- reader input which carries the `a` (result) limbs).
-  (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
-    (Readers.RTypeReader.progMsgOf
-      ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
-       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
-       f[1] * 16 + f[3] * 18 + f[0] * 15 + f[2] * 17 + f[4] * 25 + f[5] * 27 + f[6] * 26 + f[7] * 28,
-       0, 0, 0, 0⟩) data)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
 /-- All-zero `fromElements` placeholder for any column block. -/
 @[irreducible] def zc {α : TypeMap} [ProvableType α] : Var α (ZMod p) :=
@@ -181,6 +170,18 @@ set_option linter.unusedSectionVars false in
   induction es with
   | nil => rfl
   | cons e es ih => rw [List.map_cons, Operations.interactionsWith_assert, ih]
+
+/-- The batched own-assert tail is structurally just a family of zero-length, channel-free
+`assertZero` circuits. Register that fact once so Clean can derive the enclosing chip metadata. -/
+instance : ExplicitCircuits (F := ZMod p) assertZeros where
+  output _ _ := ()
+  localLength _ _ := 0
+  operations es _ := es.map fun e => .assert e
+  localLength_eq es _ := by simp [assertZeros, Circuit.localLength, circuit_norm]
+  subcircuitsConsistent es _ := by
+    simp [assertZeros, Operations.SubcircuitsConsistent, circuit_norm]
+  channelsWithGuarantees _ _ := []
+  channelsLawful es _ := by simp [assertZeros, Operations.ChannelsLawful, circuit_norm]
 
 set_option maxHeartbeats 16000000 in
 /-- `main` — composes all sub-gadgets in `Extracted/DivRemChip.lean` `asserts`/`interactions` order:
@@ -281,14 +282,17 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   g64 * (c_times_quotient[7] - (mul_upper.product[14] + mul_upper.product[15] * c256)) === 0
   let irnw := is_real_not_word
   let w_ovb ← witnessVectorNative 11 (fun env =>
-    ProvableType.toElements (ovbWitness (env input.is_real)
-      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]] (hintFlags env.hint)))
+    (ProvableType.toElements (ovbWitness (env input.is_real)
+      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]] (hintFlags env.hint))).cast
+        (show size Extracted.IsEqualWordOperation = 11 from rfl))
   let w_ovc ← witnessVectorNative 11 (fun env =>
-    ProvableType.toElements (ovcWitness (env input.is_real)
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint)))
+    (ProvableType.toElements (ovcWitness (env input.is_real)
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))).cast
+        (show size Extracted.IsEqualWordOperation = 11 from rfl))
   let w_is_c_0 ← witnessVectorNative 11 (fun env =>
-    ProvableType.toElements (isC0Witness
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint)))
+    (ProvableType.toElements (isC0Witness
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))).cast
+        (show size Extracted.IsZeroWordOperation = 11 from rfl))
   assertion IsEqualWordOperation.circuit
     ⟨#v[bpv[0], bpv[1], bpv[2], bpv[3]], #v[0, 0, 0, 32768],
      fromElements (F := Expression (ZMod p)) w_ovb, irnw⟩
@@ -459,17 +463,58 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   return cols
 
 set_option maxHeartbeats 16000000 in
+@[implicit_reducible] private def derivedElaborated :
+    ElaboratedCircuit (ZMod p) Inputs DivRemCols main := by
+  elaborate_circuit_with {
+    channelsWithGuarantees :=
+      [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  }
+
+-- Seal the large derived record behind theorem constants. Downstream semantic proofs routinely
+-- unfold `elaborated`; exposing projections of `derivedElaborated` there makes reducibility unfold
+-- the whole chip again during metavariable instantiation.
+private theorem derivedLocalLengthEq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (main input).localLength offset = 217 := by
+  rw [derivedElaborated.localLength_eq]
+  rfl
+
+private theorem derivedSubcircuitsConsistent (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).SubcircuitsConsistent offset :=
+  derivedElaborated.subcircuitsConsistent input offset
+
+private theorem derivedChannelsLawful :
+    ElaboratedCircuit.ChannelsLawful main
+      ([byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] :
+        List (RawChannel (ZMod p))) :=
+  derivedElaborated.channelsLawful
+
+/-- Clean derives the output layout and structural metadata from the composed chip.  The public record
+forwards the compact output while keeping the constant local length visible at the proof boundary. -/
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs DivRemCols main where
-  -- MulOperation FormalAssertions witness 45 cols each; + the `b`/`c` operand columns (4 each); total: 217.
+  output := derivedElaborated.output
+  output_eq := derivedElaborated.output_eq
+  -- Keep the constant visible at the proof boundary: exposing the derived length makes
+  -- `circuit_proof_start` normalize the entire 246-column circuit whenever it unfolds this record.
   localLength _ := 217
-  localLength_eq := by simp +arith [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit, assertZeros]
-  subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit, assertZeros]; try omega
-  -- (W11 flip) `programChannel` joins the guarantees: `RTypeReader` now **pulls** the program fetch
-  -- (a guarantee = `ProgramMsg.RowSpec`), so its guarantee propagates up here alongside `byteChannel`;
-  -- `memoryChannel` likewise joins from `RTypeReader`'s memory read **pulls** (W11 memory flip). The
-  -- `RegisterWrite` op_a write push owes a memory requirement (in `circuit.channelsWithRequirements`).
-  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
-  -- the ~30 upstream `pullIf` unfold/refolds put this past simp's default step budget post-#398
-  channelsLawful := by simp (maxSteps := 1000000) [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit, assertZeros]
+  localLength_eq := derivedLocalLengthEq
+  subcircuitsConsistent := derivedSubcircuitsConsistent
+  channelsWithGuarantees :=
+    [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsLawful := derivedChannelsLawful (p := p)
+
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma channelsWithGuarantees_eq :
+    ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p))) =
+      [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw] := rfl
+
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
+    (elaborated (p := p)).localLength x = 217 := rfl
+
+/-- The shared CPU-state block in DivRem's output is an alias of the input block.  Exposing this
+small projection prevents whole-machine proofs from normalizing the complete 217-cell output just
+to identify the State-bus payload. -/
+@[circuit_norm] lemma output_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((elaborated (p := p)).output input offset).state = input.state := rfl
 
 end SP1Clean.DivRemChip

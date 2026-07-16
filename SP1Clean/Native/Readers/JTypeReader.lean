@@ -29,7 +29,6 @@ namespace SP1Clean.Readers.JTypeReader
 
 open Circuit
 open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel ProgramMsg)
-open SP1Clean.Semantics (ProgTruth)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
@@ -71,7 +70,24 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   -- **pulled**) + `memoryChannel` (W11 memory flip — the op_a read-prior `pullIf` derives `MemoryMsg.isU64`,
   -- so it joins `channelsWithGuarantees`; its write `pushIf` keeps it in `channelsWithRequirements`).
   channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
-  channelsLawful := by simp [circuit_norm, main, RegisterAccessCols.circuit]
+  channelsLawful := by
+    dsimp only [ElaboratedCircuit.ChannelsLawful]
+    intro input offset
+    dsimp only [Operations.ChannelsLawful]
+    refine ⟨?_, ?_, ?_⟩
+    · simp only [circuit_norm, main, RegisterAccessCols.circuit]
+    · intro env
+      rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
+      intro interaction h_interaction
+      simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
+      rcases h_interaction with rfl | rfl
+      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+      · exact Or.inl (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
+    · rw [Operations.subcircuitChannelsLawful_iff_forall]
+      intro subcircuit h_subcircuit
+      simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_subcircuit
+      rcases h_subcircuit with rfl | rfl | rfl | rfl | rfl | rfl <;>
+        simp only [circuit_norm]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
@@ -90,12 +106,10 @@ operation; so the lone memory interaction here is the op_a read-prior pull (no w
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_trusted = 0 ∨ input.is_trusted = 1)
 
-/-! ### `ProverData`-lifted forms (SC Phase 2pre)
+/-! ### `ProverData`-lifted forms
 
-The reader upgrades `FormalAssertion → GeneralFormalCircuit` (Output = `unit`) so its `Spec` can, in a
-later phase, re-export the data-relative pull guarantees. Content UNCHANGED: `AssumptionsD`/`SpecD`
-ignore the extra `ProverData`/`output`, so the soundness/completeness bodies are the old ones (modulo the
-`show`/`dsimp` reductions the reassembly needs). -/
+The reader keeps a uniform `GeneralFormalCircuit` interface, but its contract is row-local.  Committed-ROM
+membership is a global preprocessing/balance fact rather than a prover assumption of this circuit. -/
 
 /-- The soundness assumption, lifted to ignore `ProverData`. -/
 def AssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Assumptions input
@@ -103,12 +117,10 @@ def AssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := A
 /-- The soundness spec, lifted to ignore the `unit` output and `ProverData`. -/
 def SpecD (input : Inputs (ZMod p)) (_ : unit (ZMod p)) (_ : ProverData (ZMod p)) : Prop := Spec input
 
-/-- The completeness assumption: `Assumptions` and `Spec`, plus (SC Phase 2a — the program flip) the
-program pull's `ProgTruth` (the honest prover supplies that the pinned-opcode fetch is a real decode of
-the committed guest ROM — a `decodedInROM` fact the pull *receives*, not provable row-locally). -/
-def ProverAssumptionsD (input : Inputs (ZMod p)) (data : ProverData (ZMod p))
+/-- The row-local completeness assumption. -/
+def ProverAssumptionsD (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
-  Assumptions input ∧ Spec input ∧ (input.is_trusted = 1 → ProgTruth (progMsgOf input) data)
+  Assumptions input ∧ Spec input
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
@@ -130,9 +142,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     Or.inr h_assumptions.1,
     fun h1 h0 => off_gate_vacuous htbin h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0⟩
-  -- decode bounds from the program pull guarantee: extract the `RowSpec` half via `⟨⟨…⟩, -⟩`, discarding
-  -- the heavy `decodedInROM` (opaque-threading discipline).
-  obtain ⟨⟨ha, hp0, hp1, hp2, _⟩, -⟩ := h_prog (by rw [show input_is_trusted = 1 from ht])
+  -- Decode bounds are exactly the structural Program-channel guarantee.
+  obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [show input_is_trusted = 1 from ht])
   rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
   exact ⟨ha, hp0, hp1, hp2⟩
 
@@ -141,13 +152,13 @@ theorem completeness :
       (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [ProverAssumptionsD] at h_assumptions
-  obtain ⟨h_assumptions, h_spec, h_prog⟩ := h_assumptions
+  obtain ⟨h_assumptions, h_spec⟩ := h_assumptions
   obtain ⟨hreal, htrust⟩ := h_assumptions
   -- `h_spec` supplies the zeroing gates `z*`, the `op_a_0` binary `hbin`, the `RegisterAccessCols`
   -- sub-`Spec`, the gated decode bounds (now dropped — the program **pull** is supplied by `h_prog`'s
   -- `ProgTruth`, not derived from the Spec), and (W11 memory) the op_a `isU64` `hisu` — discharging the
   -- memory **pull** (the push does NOT appear in completeness goals).
-  obtain ⟨⟨z0, z1, z2, z3⟩, hbin, hrac_a, -, hisu⟩ := h_spec
+  obtain ⟨⟨z0, z1, z2, z3⟩, hbin, hrac_a, hdec, hisu⟩ := h_spec
   -- `hbin`/`htrust` carry `{record}.field` projections; `dsimp` iota-reduces them to the destructured
   -- atoms so the `rw`-gates below match.
   dsimp only at hbin htrust
@@ -156,11 +167,11 @@ theorem completeness :
   refine ⟨⟨hreal, hrac_a⟩, ?_, ?_, ?_, z0, z1, z2, z3, ?_⟩
   · rcases hbin with h | h <;> rw [h] <;> simp     -- `op_a_0` gate
   · rcases htrust with h | h <;> rw [h] <;> simp   -- `is_trusted` gate
-  · -- The program pull now supplies `ProgTruth` (not `RowSpec`) — handed in via `h_prog`. After bridging
-    -- the 3 pc limbs (`e`) the goal message is `progMsgOf input`, closed opaquely by `exact h_prog`.
+  · -- Prove the structural Program row from the semantic reader Spec.
     intro ht
     rw [e 0 (by norm_num), e 1 (by norm_num), e 2 (by norm_num)]
-    exact h_prog (neg_inj.mp ht)
+    obtain ⟨ha, hp0, hp1, hp2⟩ := hdec (neg_inj.mp ht)
+    exact ⟨ha, hp0, hp1, hp2, hbin⟩
   · -- mem pull: the whole-`Word` guarantee is the Spec's op_a `isU64` verbatim
     simp only [memoryChannel, MemoryMsg.isU64]
     exact fun hneg => hisu (neg_inj.mp hneg)
@@ -176,7 +187,34 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
     soundness := soundness, completeness := completeness,
     channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
-      simp only [circuit_norm, main, RegisterAccessCols.circuit, memoryChannel, programChannel]; grind }
+      dsimp only [Operations.RequirementsChannelsLawful]
+      refine ⟨?_, ?_, ?_⟩
+      · simp only [circuit_norm, main, RegisterAccessCols.circuit]
+      · intro channel h_channel
+        simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_channel
+        rcases h_channel with rfl | rfl
+        · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+        · exact Or.inr List.mem_cons_self
+      · intro env h_constraints
+        rw [constraintsHold_shallow_iff_forall_mem] at h_constraints
+        have h_trusted : (ProvableStruct.eval env input_var).is_trusted = 0 ∨
+            (ProvableStruct.eval env input_var).is_trusted = 1 := by
+          apply bool_of_mul_pred
+          have h_gate := h_constraints.1
+            (input_var.is_trusted * (input_var.is_trusted - 1)) (by
+              simp only [circuit_norm, main, RegisterAccessCols.circuit,
+                Operations.shallowConstraints, List.mem_cons])
+          simpa only [circuit_norm] using h_gate
+        rw [Operations.inChannelsOrRequirements_iff_forall_mem]
+        intro interaction h_interaction
+        simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
+        rcases h_interaction with rfl | rfl
+        · right
+          rw [ChannelInteraction.toRaw_requirements]
+          intro h1 h0
+          simp only [circuit_norm] at h1 h0
+          exact off_gate_vacuous h_trusted h1 h0
+        · exact Or.inl List.mem_cons_self }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

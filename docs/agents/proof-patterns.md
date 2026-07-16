@@ -575,19 +575,15 @@ always means a *local* regression against one of these.
   (the `2^64` reductions, the product-glue `simpa`s) — chase *that* (the abstract-`BitVec` helpers + shared-tail
   dedup below), not the `set_option` numbers.
 
-- **Shared-tail dedup for many-conjunct soundness proofs (the DivRem pattern).** When N conjunct files
-  each prove `GeneralFormalCircuit.Soundness` over the *same* `main`, they each re-elaborate the
-  byte-identical post-instruction "requirements tail" (readers + `is_real` + channel obligations) at a
-  high `maxHeartbeats` — N× the same work. Extract it once: a `requirements_holds` lemma proving the
-  tail with **raw** (un-`circuit_proof_start`'d) binders, a `SpecObligation Spec` wrapper, and a
-  `soundness_of_specObligation` that reassembles a full `Soundness` from a per-conjunct `SpecObligation`
-  plus the shared tail. Each conjunct then proves only its chip-specific `Spec` via a `spec_proof_start`
-  elab tactic (mirrors `circuit_proof_start`'s setup but unfolds `SpecObligation`, so it does *less*
-  work). See `Proofs/Chips/DivRemChip/Soundness/Tail.lean`. **Landmine:** `requirements_holds` must be
-  applied *by-term* on raw binders — after `circuit_proof_start` the decomposed context (destroyed
-  `input_var` binders, consumed `h_holds`) no longer matches, which is exactly why the tail lemma takes
-  raw binders and the `SpecObligation` indirection exists. The ShiftRight/ShiftLeft conjuncts share an
-  analogous `cpuA/msb*/aluA` block that is a candidate for the same treatment.
+- **For many-case chips, extract semantic evidence instead of splitting full circuit soundness.** The old
+  DivRem architecture proved nine `GeneralFormalCircuit.Soundness` theorems over the same enormous `main`
+  and shared their requirements tail through a custom `SpecObligation` tactic. Lean 4.30/4.31 made even
+  goal normalization dominate, and the whole stack was retired. The replacement has four layers:
+  (1) a stable contract (`FormalModel/Contracts/DivRem.lean`), (2) circuit-independent evidence types and
+  evidence→ISA proofs (`Proofs/Chips/DivRemChip/Cases.lean`), (3) reusable field/carry assembly lemmas, and
+  (4) one generated-row→evidence theorem. Pair quotient/remainder cases so arithmetic is proved once;
+  model exceptional branches as explicit constructors; keep final output routing separate. Use local
+  helper lemmas inside layer (4) for offset plumbing, but do not export N operation-shaped circuit proofs.
 
 ## Golf & cleanup discipline
 

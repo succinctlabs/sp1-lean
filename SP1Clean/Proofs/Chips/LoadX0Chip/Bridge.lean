@@ -670,8 +670,8 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadX0Columns (ZMod p)
   · exact advance_of_load_x0_width8 b₀ b₁ b₂ b₃ b₄ b₅ b₆ b₇ hcfg hrom hpcread hvalb hdecrom ho rfl rfl
       hopa0 hpc0 rfl h_al h_fits h_hi h_lo hm₀ hm₁ hm₂ hm₃ hm₄ hm₅ hm₆ hm₇
 
-/-- `ChipKind` registration for LoadX0 (all seven load opcodes into `x0`). The loaded word is
-discarded (rd = x0); `sailEquiv` is the 7-way per-opcode correctness conjunction. -/
+/-- `ChipKind` registration for LoadX0 (all seven load opcodes into `x0`). The loaded word is discarded;
+`advance` is the seven-way per-opcode no-register-write transition. -/
 def kind : Soundness.ChipKind p where
   name := "LoadX0"
   Inputs := LoadX0Chip.Inputs

@@ -11,19 +11,20 @@ never touches this lemma. The path→`ChipRow` inversion
 (a walk row is one of the trace's real row-views, `path[i] ∈ realRowEdges (rows.map ChipRow.view)`) is done
 once here by multiset membership; the chip's `advance` proof then fires.
 
-**What this buys.** The monolithic `lift` seam is decomposed into the per-chip `advance` (done + axiom-clean
-for Add/Sub/Addi) plus **three clearly-named residual obligations**, each a standard trace property:
+**What this buys.** The monolithic `lift` seam is decomposed into the per-chip `advance` (present for all
+25 registered chips) plus **three clearly-named residual obligations**, each a standard trace property:
 
 * `h_migrated` — *coverage*: every real row's chip has migrated to `advance` (`isSome`). **Complete
   (SC Phase 4, 25/25):** `ChipRegistry.allChipKinds_migrated` proves every registered `kind.advance.isSome`,
   so for any real row whose `kind ∈ allChipKinds` this discharges — the whole fan-out landed (the last seams,
   MUL/MULHSU + the four width-8 Load/Store/Mul chips, closed via the Move-2 guarded decode).
 * `h_decode` — the **Program-bus fetch truth** (`decodedInROM prog (programAccess r.view).toRow`): the
-  committed instruction word is the one at the row's pc in the ROM. This is the `ProgTruth` seam (the
-  semantic-channels *program flip*), not yet grounded in the soundness conclusion.
+  committed instruction word is the one at the row's pc in the ROM. The production native path now
+  derives this globally in `supportedCore_orderedRows_programDecoded`; this parameter remains because
+  `TargetVm` is the frozen older walk interface.
 * `h_ready` — **trace well-formedness + routing** (`advanceReady`): the reader passthrough `cols = main inp`
   (`inp.adapter = cols.adapter`, and for I-type `inp.state = cols.state`) plus the `op_a ≠ 0` register-write
-  routing. Both come from the trace construction (`InstructionTrace`) + the opcode routing table.
+  routing. Both come from witness decoding plus the opcode routing table.
 
 So `lift` is no longer a black box: it is `advance` (per chip) ∘ these three residuals, and a
 `TargetObligations` over `OperandsBound := Target.ValueOperandsBound` can set
@@ -90,7 +91,7 @@ trace), `h_migrated` (coverage — complete 25/25 via `allChipKinds_migrated`, d
 `routeOf_mem_allChipKinds`), `h_decode` (the `ProgTruth` fetch seam), and `h_ready` (`advanceReady` routing).
 `OperandsBound := ValueOperandsBound`. This is the W7 seam made concrete — the retirement of the abstract
 `lift` hypothesis in favour of the per-chip fan-out. -/
-def targetObligations_via_advance
+theorem targetObligations_via_advance
     {prog : GuestProgram} {pi : SP1TargetPublicIO (ZMod p)} (rows : List (ChipRow p))
     (data : ProverData (ZMod p))
     (h_bound : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →

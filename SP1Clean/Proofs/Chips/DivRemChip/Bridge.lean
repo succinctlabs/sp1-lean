@@ -22,8 +22,8 @@ This bridge uses the **RV64 provider library's** connection lemmas directly:
 algebra lives in those dep lemmas.
 
 The chip `Spec` sources operands from **inputs** `op_b_val` (rs1) / `op_c_val` (rs2), matching
-the RV64 signature `f rs2_val rs1_val`. The `ChipKind`'s `sailEquiv` is the 8-way flag-dispatched
-conjunction. `DivRem` carries `Fact (2 ^ 24 < p)`; the bridge derives `Fact (2 ^ 17 < p)` locally. -/
+the RV64 signature `f rs2_val rs1_val`. `advance` is the eight-way flag-dispatched transition.
+`DivRem` carries `Fact (2 ^ 24 < p)`; the bridge derives `Fact (2 ^ 17 < p)` locally. -/
 
 open LeanRV64D.Defs
 namespace SP1Clean.DivRemSail
@@ -299,27 +299,25 @@ theorem divrem_chip_reaches_sail
     (cols.is_remuw = 1 →
         (spec_remuw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
           = (sp1_divrem (.Regidx rd_idx) pc cols.a).run s) := by
-  -- `DivRemChip.Spec` is now `RTypeReader.Spec ∧ is_real-binary ∧ (is_real = 1 → 8 flag conjuncts)`;
-  -- the arithmetic the bridge needs is the third conjunct.
-  obtain ⟨h_div, h_divu, h_rem, h_remu, h_divw, h_remw, h_divuw, h_remuw⟩ := h_chip.2.2 h_real
+  have hcases := h_chip.2.cases
   refine ⟨fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_,
     fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_⟩
   · exact correct_div_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_div h)
+      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (hcases .div h_real h)
   · exact correct_divu_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_divu h)
+      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (hcases .divu h_real h)
   · exact correct_rem_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_rem h)
+      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (hcases .rem h_real h)
   · exact correct_remu_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_remu h)
+      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (hcases .remu h_real h)
   · exact correct_divw_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_divw h)
+      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (hcases .divw h_real h)
   · exact correct_remw_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_remw h)
+      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (hcases .remw h_real h)
   · exact correct_divuw_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_divuw h)
+      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (hcases .divuw h_real h)
   · exact correct_remuw_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_remuw h)
+      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (hcases .remuw h_real h)
 
 end SP1Clean.DivRemSail
 
@@ -338,8 +336,7 @@ adapter, `cols.a` as the divide/remainder write, opcode the flag-weighted R-type
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.a,
-    cols.is_divu * 16 + cols.is_remu * 18 + cols.is_div * 15 + cols.is_rem * 17
-      + cols.is_divw * 25 + cols.is_remw * 27 + cols.is_divuw * 26 + cols.is_remuw * 28, .regWrite⟩
+    DivRemContract.encodedOpcode cols, .regWrite⟩
 
 /-- **`DivRemChip.advance`** — the per-DivRem-row `try_step` lift (SC Phase 4), 8-way flag dispatch.
 Each branch pins the R-type opcode `if isU then <U-op> else <s-op>`, converts the chip `Spec`'s flag-gated
@@ -354,25 +351,9 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) (
     (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
     (hvalb : ValueOperandsBound (rowView inp cols) s)
     (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
-    (hready : inp.adapter = cols.adapter ∧ (rowView inp cols).adapter.op_a ≠ 0 ∧
-      ((cols.is_div = 1 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧ cols.is_remu = 0 ∧
-          cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-       (cols.is_divu = 1 ∧ cols.is_div = 0 ∧ cols.is_rem = 0 ∧ cols.is_remu = 0 ∧
-          cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-       (cols.is_rem = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_remu = 0 ∧
-          cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-       (cols.is_remu = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
-          cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-       (cols.is_divw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
-          cols.is_remu = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-       (cols.is_remw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
-          cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-       (cols.is_divuw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
-          cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_remuw = 0) ∨
-       (cols.is_remuw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
-          cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0))) :
+    (hready : inp.adapter = cols.adapter ∧ (rowView inp cols).adapter.op_a ≠ 0) :
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
-  obtain ⟨hlink, hnonX0, hflag⟩ := hready
+  obtain ⟨hlink, hnonX0⟩ := hready
   have hreal' : inp.is_real = 1 := hreal
   set r := rowView inp cols with hr
   have vrd : r.rdWrite = cols.a := rfl
@@ -380,18 +361,19 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) (
   have vopcm : r.adapter.op_c_memory = cols.adapter.op_c_memory := rfl
   obtain ⟨-, -, -, -, -, hbounds, -⟩ := hspec.1
   obtain ⟨-, hpc0, -, -⟩ := hbounds hreal'
-  have hbr := hspec.2.2 hreal'
-  rcases hflag with ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ | ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ | ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ |
-    ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ | ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ | ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ |
-    ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ | ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩
+  obtain ⟨case, hselected⟩ := hspec.2.selection hreal'
+  have hopSelected := hselected.encodedOpcode
+  have hcase := hspec.2.cases case hreal' hselected.1
+  cases case
   · -- is_div
     have hop : r.opcode = (((if (false:Bool) then Opcode.DIVU else Opcode.DIV)).toNat : ZMod p) := by
-      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+      simpa [hr, rowView, DivRemContract.Case.opcode, Opcode.toNat] using hopSelected
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.div (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) false := by
-      have hs := hbr.1 h1
-      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hs := hcase
+      simp only [DivRemContract.Case.result, DivRemChip.Inputs.op_c_val,
+        DivRemChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.div (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) false
         = RV64.div (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
@@ -400,12 +382,13 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) (
     exact advance_of_div false hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
   · -- is_divu
     have hop : r.opcode = (((if (true:Bool) then Opcode.DIVU else Opcode.DIV)).toNat : ZMod p) := by
-      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+      simpa [hr, rowView, DivRemContract.Case.opcode, Opcode.toNat] using hopSelected
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.div (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) true := by
-      have hs := hbr.2.1 h1
-      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hs := hcase
+      simp only [DivRemContract.Case.result, DivRemChip.Inputs.op_c_val,
+        DivRemChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.div (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) true
         = RV64.divu (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
@@ -414,12 +397,13 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) (
     exact advance_of_div true hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
   · -- is_rem
     have hop : r.opcode = (((if (false:Bool) then Opcode.REMU else Opcode.REM)).toNat : ZMod p) := by
-      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+      simpa [hr, rowView, DivRemContract.Case.opcode, Opcode.toNat] using hopSelected
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.rem false (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) := by
-      have hs := hbr.2.2.1 h1
-      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hs := hcase
+      simp only [DivRemContract.Case.result, DivRemChip.Inputs.op_c_val,
+        DivRemChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.rem false (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
         = RV64.rem (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
@@ -428,12 +412,13 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) (
     exact advance_of_rem false hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
   · -- is_remu
     have hop : r.opcode = (((if (true:Bool) then Opcode.REMU else Opcode.REM)).toNat : ZMod p) := by
-      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+      simpa [hr, rowView, DivRemContract.Case.opcode, Opcode.toNat] using hopSelected
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.rem true (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) := by
-      have hs := hbr.2.2.2.1 h1
-      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hs := hcase
+      simp only [DivRemContract.Case.result, DivRemChip.Inputs.op_c_val,
+        DivRemChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.rem true (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
         = RV64.remu (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
@@ -442,12 +427,13 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) (
     exact advance_of_rem true hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
   · -- is_divw
     have hop : r.opcode = (((if (false:Bool) then Opcode.DIVUW else Opcode.DIVW)).toNat : ZMod p) := by
-      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+      simpa [hr, rowView, DivRemContract.Case.opcode, Opcode.toNat] using hopSelected
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.divw (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) false := by
-      have hs := hbr.2.2.2.2.1 h1
-      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hs := hcase
+      simp only [DivRemContract.Case.result, DivRemChip.Inputs.op_c_val,
+        DivRemChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.divw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) false
         = RV64.divw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
@@ -456,12 +442,13 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) (
     exact advance_of_divw false hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
   · -- is_remw
     have hop : r.opcode = (((if (false:Bool) then Opcode.REMUW else Opcode.REMW)).toNat : ZMod p) := by
-      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+      simpa [hr, rowView, DivRemContract.Case.opcode, Opcode.toNat] using hopSelected
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.remw false (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) := by
-      have hs := hbr.2.2.2.2.2.1 h1
-      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hs := hcase
+      simp only [DivRemContract.Case.result, DivRemChip.Inputs.op_c_val,
+        DivRemChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.remw false (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
         = RV64.remw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
@@ -470,12 +457,13 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) (
     exact advance_of_remw false hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
   · -- is_divuw
     have hop : r.opcode = (((if (true:Bool) then Opcode.DIVUW else Opcode.DIVW)).toNat : ZMod p) := by
-      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+      simpa [hr, rowView, DivRemContract.Case.opcode, Opcode.toNat] using hopSelected
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.divw (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) true := by
-      have hs := hbr.2.2.2.2.2.2.1 h1
-      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hs := hcase
+      simp only [DivRemContract.Case.result, DivRemChip.Inputs.op_c_val,
+        DivRemChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.divw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) true
         = RV64.divuw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
@@ -484,12 +472,13 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) (
     exact advance_of_divw true hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
   · -- is_remuw
     have hop : r.opcode = (((if (true:Bool) then Opcode.REMUW else Opcode.REMW)).toNat : ZMod p) := by
-      simp [hr, rowView, h1, h2, h3, h4, h5, h6, h7, h8, Opcode.toNat]
+      simpa [hr, rowView, DivRemContract.Case.opcode, Opcode.toNat] using hopSelected
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.remw true (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) := by
-      have hs := hbr.2.2.2.2.2.2.2 h1
-      simp only [DivRemChip.Inputs.op_c_val, DivRemChip.Inputs.op_b_val, hlink] at hs
+      have hs := hcase
+      simp only [DivRemContract.Case.result, DivRemChip.Inputs.op_c_val,
+        DivRemChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.remw true (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
         = RV64.remuw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
@@ -506,23 +495,7 @@ def kind : Soundness.ChipKind p where
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧
-    (rowView inp cols).adapter.op_a ≠ 0 ∧
-    ((cols.is_div = 1 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧ cols.is_remu = 0 ∧
-        cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-     (cols.is_divu = 1 ∧ cols.is_div = 0 ∧ cols.is_rem = 0 ∧ cols.is_remu = 0 ∧
-        cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-     (cols.is_rem = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_remu = 0 ∧
-        cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-     (cols.is_remu = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
-        cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-     (cols.is_divw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
-        cols.is_remu = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-     (cols.is_remw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
-        cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0) ∨
-     (cols.is_divuw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
-        cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_remuw = 0) ∨
-     (cols.is_remuw = 1 ∧ cols.is_div = 0 ∧ cols.is_divu = 0 ∧ cols.is_rem = 0 ∧
-        cols.is_remu = 0 ∧ cols.is_divw = 0 ∧ cols.is_remw = 0 ∧ cols.is_divuw = 0))
+    (rowView inp cols).adapter.op_a ≠ 0
   advance := some (PLift.up advance)
 
 end SP1Clean.DivRemChip

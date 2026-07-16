@@ -2,7 +2,6 @@ import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.Math.Word
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
-import SP1Clean.Extracted.SubOperation
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -11,8 +10,8 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # `SubOperation` — `populate` (the witness generator)
 
-SP1's `SubOperation::populate` ported natively; `spec_populate` proves the result satisfies `Spec`.
-Circuit in `Extracted`, arithmetic core in `RawSpec`, `FormalAssertion` in `Formal`. -/
+The local subtraction witness generator; `spec_populate` proves the result satisfies `Spec`.
+Circuit in `Defs`, arithmetic core in `RawSpec`, `FormalAssertion` in `Formal`. -/
 
 namespace SP1Clean.SubOperation
 
@@ -27,9 +26,9 @@ omit [Fact p.Prime] in
 /-- `16 < p`, so the `Range` byte-row width column `16` round-trips through `byteRowSpec_range`. -/
 lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 
-/-- Native port of SP1's `SubOperation::populate`: the four base-2^16 limbs of `(a - b) mod 2^64`
-via two's-complement (`65535 - bᵢ` per limb, carry init `1`).
-Conformance to SP1's Rust `populate` checked by `WitnessTests/SubOperationWitness.lean`. -/
+/-- The four base-2^16 limbs of `(a - b) mod 2^64` via two's-complement (`65535 - bᵢ` per
+limb, carry init `1`). Chip-level populate/trace conformance checks the assembled row against Rust;
+there is intentionally no operation-level extraction boundary. -/
 def populate (a b : Word (ZMod p)) : Word (ZMod p) :=
   let s0 := a[0].val + (65535 - b[0].val) + 1
   let s1 := a[1].val + (65535 - b[1].val) + s0 / 65536

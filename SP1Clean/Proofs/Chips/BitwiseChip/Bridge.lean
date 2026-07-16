@@ -337,9 +337,8 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.BitwiseCols (ZMod p)) 
       exact advance_of_itype iop.XORI hcfg hrom hpcread hvalb hdecrom hop rfl h1 hnonX0 hpc0 rfl hval
 
 /-- **Bitwise's `ChipKind` registration.** Program-bus opcode `is_xor·3 + is_or·4 + is_and·5`;
-`sailEquiv` is the selector-dispatched AND/OR/XOR conjunction; `reaches_sail` dispatches to
-`bitwise_chip_reaches_sail_{and,or,xor}`; `advance`/`advanceReady` (SC Phase 4) route to `BitwiseChip.advance`
-(the 6-way multi-op lift). All bridge lemmas are axiom-clean. -/
+`advance`/`advanceReady` route to `BitwiseChip.advance`, the six-way register/immediate lift. The
+`bitwise_chip_reaches_sail_*` declarations remain local semantic helpers. -/
 def kind : Soundness.ChipKind p where
   name := "Bitwise"
   Inputs := BitwiseChip.Inputs

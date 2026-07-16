@@ -112,6 +112,12 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) 
 
 set_option maxHeartbeats 1000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs LtCols main where
+  output input offset :=
+    ⟨input.state, input.adapter, var { index := offset }, var { index := offset + 1 },
+      varFromOffset Extracted.LtOperationSigned (offset + 2)⟩
+  output_eq := by
+    intro input offset
+    simp only [main, circuit_norm]
   channelsLawful := by simp [circuit_norm, main, LtOperationSigned.circuit, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, Readers.RegisterWrite.circuit]
   -- witnesses the two flags (2) + the `LtOperationSigned` block (1 + 1 + 8 = 10); the readers/write are
   -- `assertion`s (`localLength 0`) over the threaded `state`/`adapter` inputs. 2 + 10 = 12.

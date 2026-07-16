@@ -6,7 +6,6 @@ import SP1Clean.FormalModel.Contracts.ChipAssumptions
 namespace SP1Clean.SubChip
 
 open Circuit
-open Extracted (SubCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -18,7 +17,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- `circuit_proof_start` unfolds the inlined R-type Spec, re-normalizes
   -- `wv*` result-word fields, and drops the leading CPUState `True` fragment.
   circuit_proof_start
-  obtain ⟨_, h_sub, h_adapter, _h_regwrite, h_gate⟩ := h_holds
+  obtain ⟨_, h_sub, h_adapter, _h_regwrite, _h_op_a_0, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   -- **Option B cycle-break.** No operand `isU64` is assumed (chip `Assumptions = True`). Apply the
   -- `RTypeReader` sub-soundness `h_adapter` (its `Assumptions` is `⟨is_real binary, is_trusted binary⟩`,
@@ -44,7 +43,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec, h_st, h_prog⟩ :=
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ :=
     h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
@@ -65,10 +64,10 @@ theorem completeness :
     rw [h_env.2.1 ⟨i, hi⟩]
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     simp only [hbeq, hceq]
-  refine ⟨⟨hbin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
+  refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
-      fun hr => ⟨ha_prev hr, ha, hb⟩⟩, h_prog⟩,
-    ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
+      fun hr => ⟨ha_prev hr, ha, hb⟩⟩⟩,
+    ⟨⟨hbin, ?_⟩, trivial⟩, hop_a_0, ?_⟩
   · rw [hval]; exact SubOperation.spec_populate ha hb input_is_real
   · -- RegisterWrite's `isU64 value` (op_a write push): the witnessed result `value = populate op_b op_c`,
     -- whose `isU64` is `spec_populate.1`.
@@ -76,8 +75,8 @@ theorem completeness :
   rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- The Sub chip row as a `GeneralFormalCircuit`: semantic contract, composing the witnessed
-gadget + the two readers; output is the extracted `SubCols` column struct. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs SubCols :=
+gadget + the two readers; output is the native `Columns` row. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
@@ -88,7 +87,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubCols :=
     -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8) so the
     -- chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone State pull+push.
     exposedChannels := fun input _ =>
-      stateChannel.expose
+      expose stateChannel
         [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
@@ -97,8 +96,22 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubCols :=
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
-      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
-        List.map_cons, List.map_nil]
+      have h_byte : (byteChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
+        intro h
+        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
+        simp only [Channel.toRaw_name, byteChannel, stateChannel] at hn
+        exact (by decide : ("SP1Byte" : String) ≠ "SP1State") hn
+      have h_program : (programChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
+        intro h
+        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
+        simp only [Channel.toRaw_name, programChannel, stateChannel] at hn
+        exact (by decide : ("SP1Program" : String) ≠ "SP1State") hn
+      have h_memory : (memoryChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
+        intro h
+        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
+        simp only [Channel.toRaw_name, memoryChannel, stateChannel] at hn
+        exact (by decide : ("SP1Memory" : String) ≠ "SP1State") hn
+      rw [Operations.exposedChannelsLawful_expose]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.RTypeReader.circuit, Readers.RTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -107,6 +120,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs SubCols :=
         SP1Clean.SubOperation.circuit, SP1Clean.SubOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
+      simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+        h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+        if_true, List.nil_append] }
 
 end SP1Clean.SubChip

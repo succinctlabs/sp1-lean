@@ -125,6 +125,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod
 
 set_option maxHeartbeats 1000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs BitwiseCols main where
+  output input offset :=
+    ⟨input.state, input.adapter,
+      varFromOffset Extracted.BitwiseU16Operation (offset + 3),
+      var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 }⟩
+  output_eq := by
+    intro input offset
+    simp only [main, circuit_norm]
   channelsLawful := by
     simp [circuit_norm, main, BitwiseU16Operation.circuit, Readers.ALUTypeReader.circuit,
       Readers.CPUState.circuit, Readers.RegisterWrite.circuit]

@@ -56,7 +56,7 @@ omit [Fact (2 ^ 17 < p)] in
 execution agrees with the SP1 chip emulation. The add identity flows from the chip
 `Spec` straight into `correct_add_native`. -/
 theorem add_chip_reaches_sail
-    (input : AddChip.Inputs (ZMod p)) (cols : Extracted.AddCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : AddChip.Inputs (ZMod p)) (cols : AddChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
     (h_chip : AddChip.Spec input cols data)
@@ -82,7 +82,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 next-pc, `is_real`, the `add_operation` result as `rdWrite`, opcode `0`). Standalone (not inlined in `kind`)
 so `AddChip.advance` below — the Phase-4 `try_step` obligation, which references the whole view — can be
 stated *before* `kind` and supplied *as* `kind.advance`, breaking the `advance ↔ kind.view` reference cycle. -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.AddCols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.add_operation.value, 0, .regWrite⟩
 
@@ -95,7 +95,7 @@ real `try_step` takes `s` to the row's committed `RowEffect`. Hands the generic 
 opcode fact and the write-value identity (chip `Spec`'s gated `RV64.add` conjunct +
 `rv64add_eq_execute_RTYPE_pure`, threading the passthrough link). This proof **is** `kind.advance` below —
 stated to match the `ChipKind.advance` obligation exactly (`view := rowView`, `advanceReady := this bundle`). -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.AddCols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1)
     (hspec : Spec inp cols data)
@@ -125,12 +125,12 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.AddCols (ZMod p)) (dat
   exact advance_of_rtype rop.ADD hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
 
 /-- **Add's `ChipKind` registration** — enters Add rows into the heterogeneous trace and the soundness
-capstone. `sailEquiv`/`reaches_sail` route to `add_chip_reaches_sail`; `advance`/`advanceReady` (SC Phase 4)
-route to `AddChip.advance` (the uniform `try_step` lift). -/
+capstone. `advance`/`advanceReady` route to `AddChip.advance`, which uses the local
+`add_chip_reaches_sail` helper to discharge the uniform `try_step` effect. -/
 def kind : Soundness.ChipKind p where
   name := "Add"
   Inputs := AddChip.Inputs
-  Cols := Extracted.AddCols
+  Cols := AddChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady :=fun inp cols _ _ => inp.adapter = cols.adapter ∧ (rowView inp cols).adapter.op_a ≠ 0

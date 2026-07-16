@@ -10,7 +10,6 @@ golfing / cleaning proofs here or in any sibling chip, follow `docs/agents/proof
 namespace SP1Clean.AddChip
 
 open Circuit
-open Extracted (AddCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -22,7 +21,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- The `Spec` is the inlined R-type-with-readers contract; `circuit_proof_start` unfolds it,
   -- re-normalizes `wv*` result-word fields, and drops the leading CPUState `True` fragment.
   circuit_proof_start
-  obtain ⟨_, h_add, h_adapter, _h_regwrite, h_gate⟩ := h_holds
+  obtain ⟨_, h_add, h_adapter, _h_regwrite, _h_op_a_0, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   -- **Option B cycle-break.** No operand `isU64` is assumed (chip `Assumptions = True`). Apply the
   -- `RTypeReader` sub-soundness `h_adapter` (its `Assumptions` is `⟨is_real binary, is_trusted binary⟩`,
@@ -51,7 +50,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec, h_st, h_prog⟩ :=
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ :=
     h_assumptions
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
@@ -73,20 +72,61 @@ theorem completeness :
     rw [h_env.2.1 ⟨i, hi⟩]
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     simp only [hbeq, hceq]
-  refine ⟨⟨hbin, h_cpu, h_st⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
+  refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
-        fun hr => ⟨ha_prev hr, ha, hb⟩⟩, h_prog⟩,
-    ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
+        fun hr => ⟨ha_prev hr, ha, hb⟩⟩⟩,
+    ⟨⟨hbin, ?_⟩, trivial⟩, hop_a_0, ?_⟩
   · rw [hval]; exact AddOperation.spec_populate ha hb input_is_real
   · -- RegisterWrite's `isU64 value` (op_a write push): the witnessed result `value = populate op_b op_c`,
     -- whose `isU64` is `spec_populate.1`.
     intro hr; rw [hval]; exact (AddOperation.spec_populate ha hb input_is_real hr).1
   rcases hbin with h | h <;> rw [h] <;> simp
 
+/-- Add's exact Memory-channel interaction list.  Keeping this list beside `circuit` makes Clean's
+exposure interface the single structural source consumed by both faithfulness and semantic grounding. -/
+def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (memoryChannel (p := p))) :=
+  [ memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_c_memory.access_timestamp.prev_low,
+       input.adapter.op_c, 0, 0, input.adapter.op_c_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2,
+       input.adapter.op_c, 0, 0, input.adapter.op_c_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+       input.adapter.op_a, 0, 0, Vector.mapRange 4 fun i => var { index := offset + i }⟩ ]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-B pull occupies its declared slot in Add's exposed Memory list. -/
+theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-C pull occupies its declared slot in Add's exposed Memory list. -/
+theorem opCPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_c_memory.access_timestamp.prev_low,
+       input.adapter.op_c, 0, 0, input.adapter.op_c_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
 /-- The Add chip row as a `GeneralFormalCircuit`: semantic contract, composing the
-witnessed gadget; output is the extracted `AddCols` column struct. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs AddCols where
+witnessed gadget; output is the native `Columns` row. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns where
   main
   elaborated
   Assumptions := Assumptions
@@ -100,33 +140,56 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddCols where
     [stateChannel.toRaw, memoryChannel.toRaw]
   -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (the gated VM channel
   -- interactions, descended from the composed `CPUState` subcircuit) so the chip can be a `VmTables` table.
-  exposedChannels := fun input _ =>
-    stateChannel.expose
+  exposedChannels := fun input offset =>
+    expose stateChannel
       [ stateChannel.pulledIf input.is_real
           ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
            input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
         stateChannel.pushedIf input.is_real
           ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
-           input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ]
+           input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
+    expose memoryChannel (exposedMemoryInteractions input offset)
   exposedChannels_eq := by
     intro input offset
-    -- reduce `ExposedChannelsLawful (stateChannel.expose [pull, push])` to a single
-    -- `interactionsWith stateChannel.toRaw = [pull.toRaw, push.toRaw]` goal (the `VmChannel` analog of
-    -- Clean's `Channel.exposedChannelsLawful_expose`), then descend as before.
-    simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
-      List.map_cons, List.map_nil]
-    -- descend the chip into its composed sub-readers (`circuit_norm` +
-    -- `FormalAssertion.toSubcircuit_interactions`); `interactionsWith stateChannel` is itself a channel
-    -- `List.filter`, so the closing `simp` drops the byte/mem/program pulls (channel distinctness) and the
-    -- `Gadgets.Equality` constraint-only sub-ops (no interactions), leaving CPUState's State pull + push.
-    simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
-      Readers.RTypeReader.circuit, Readers.RTypeReader.main,
-      Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
-      Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-      Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-      SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
-      circuit_norm, FormalAssertion.toSubcircuit_interactions,
-      GeneralFormalCircuit.toSubcircuit_interactions]
-    simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf]
+    have h_byte : (byteChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
+      intro h
+      have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
+      simp only [Channel.toRaw_name, byteChannel, stateChannel] at hn
+      exact (by decide : ("SP1Byte" : String) ≠ "SP1State") hn
+    have h_program : (programChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
+      intro h
+      have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
+      simp only [Channel.toRaw_name, programChannel, stateChannel] at hn
+      exact (by decide : ("SP1Program" : String) ≠ "SP1State") hn
+    have h_memory : (memoryChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
+      intro h
+      have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
+      simp only [Channel.toRaw_name, memoryChannel, stateChannel] at hn
+      exact (by decide : ("SP1Memory" : String) ≠ "SP1State") hn
+    unfold Operations.ExposedChannelsLawful
+    intro exposed exposedMem
+    simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
+    rcases exposedMem with rfl | rfl
+    all_goals
+      simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+        Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+        SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
+    · simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+        h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+        if_true, List.nil_append]
+    · simp [circuit_norm, Gadgets.Equality.main, exposedMemoryInteractions]
+
+/-- The completed Add circuit exposes exactly the Memory interaction list above. -/
+theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith memoryChannel.toRaw =
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
 
 end SP1Clean.AddChip

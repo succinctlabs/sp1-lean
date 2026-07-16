@@ -281,9 +281,9 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) (data
       rw [vrd, vopbm, vopcm, execute_RTYPE_pure_sltu]; exact hsltu
     exact advance_of_rtype rop.SLTU hcfg hrom hpcread hvalb hdecrom hop rfl himmc hnonX0 hpc0 rfl hval
 
-/-- **Lt's `ChipKind` registration.** Program-bus opcode `is_slt·9 + is_sltu·10`; `sailEquiv` is the
-conjunction of the **register** SLT/SLTU guarantee (gated on the rs2 read) and the **immediate** SLTI/SLTIU
-guarantee (gated on the program-bus immediate decode `op_c_val = sign_extend imm`), each flag-dispatched.
+/-- **Lt's `ChipKind` registration.** Program-bus opcode `is_slt·9 + is_sltu·10`; `advance` dispatches the
+**register** SLT/SLTU and **immediate** SLTI/SLTIU cases, with the latter pinned by the committed Program
+decode `op_c_val = sign_extend imm`.
 A row is register (`imm_c = 0`) or immediate (`imm_c = 1`); the consumer picks the matching conjunct.
 `advance`/`advanceReady` (SC Phase 4) route to `LtChip.advance`. -/
 def kind : Soundness.ChipKind p where

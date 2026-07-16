@@ -26,6 +26,7 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 = 0 ∧
     Word.isU64 input.memory_access.prev_value
 
+set_option maxHeartbeats 2000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
@@ -47,15 +48,18 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
+  simp only [AddressOperation.circuit] at h_addr
+  have h_addr_spec := h_addr h_addr_as
+  simp only [circuit_norm] at h_addr_spec
   -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`): `MemoryAccess`'s
   -- read push + `RegisterWrite`'s op_a write push both owe `isU64 prev_value` (the loaded word = the full
   -- read value; a chip assumption).
-  exact ⟨⟨h_addr h_addr_as, h_mem ⟨h_bin, fun _ => h_pv_isu64⟩, h_it, h_op_a_0, h_bin⟩,
-    h_bin, Or.inr h_addr_as, Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩, Or.inr ⟨h_bin, h_bin⟩,
+  exact ⟨⟨h_addr_spec, h_mem ⟨h_bin, fun _ => h_pv_isu64⟩, h_it, h_op_a_0, h_bin⟩,
+    Or.inr h_addr_as, Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩, Or.inr ⟨h_bin, h_bin⟩,
     Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩⟩
 
 /-- Prover-side row well-formedness: operand `isU64`s + address-fits bound plus the `is_real` binary selector. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
+def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
     2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
@@ -72,21 +76,14 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) (_ 
       ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high, clkLow input.state,
         input.state.pc, 35,
         input.memory_access.prev_value[0], input.memory_access.prev_value[1],
-        input.memory_access.prev_value[2], input.memory_access.prev_value[3]⟩ ∧
-    -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-    (input.is_real = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
-    -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (LD opcode `35`, I-type reader).
-    (input.is_real = 1 → SP1Clean.Semantics.ProgTruth
-      (Readers.ITypeReader.progMsgOf
-        ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high, clkLow input.state,
-          input.state.pc, 35, 0, 0, 0, 0⟩) data)
+        input.memory_access.prev_value[2], input.memory_access.prev_value[3]⟩
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_align, h_pv_isu64, hbin, h_op_a_0, h_cpu, h_mem, h_it, h_st, h_prog⟩ :=
+  obtain ⟨ha, hb, hfit, h_ge, h_align, h_pv_isu64, hbin, h_op_a_0, h_cpu, h_mem, h_it⟩ :=
     h_assumptions
   -- eval→value bridges for the nested vector fields the reader `Spec`s reference (`pc`, the loaded word).
   have hmap_pv : Vector.map (Expression.eval env.toEnvironment) input_var_memory_access_prev_value
@@ -100,7 +97,7 @@ theorem completeness :
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
-  refine ⟨⟨hbin, ?_, h_st⟩, h_addr_as, ⟨⟨hbin, fun _ => h_pv_isu64⟩, h_mem⟩, ⟨⟨hbin, hbin⟩, ?_, h_prog⟩,
+  refine ⟨⟨hbin, ?_⟩, h_addr_as, ⟨⟨hbin, fun _ => h_pv_isu64⟩, h_mem⟩, ⟨⟨hbin, hbin⟩, ?_⟩,
     ⟨⟨hbin, fun _ => h_pv_isu64⟩, trivial⟩, h_op_a_0, ?_⟩
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · simp only [epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega)]; exact h_it
@@ -115,7 +112,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadDoubleColumns :=
       [stateChannel.toRaw, memoryChannel.toRaw],
     soundness := soundness, completeness := completeness,
     exposedChannels := fun input _ =>
-      stateChannel.expose
+      expose stateChannel
         [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
@@ -124,8 +121,10 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadDoubleColumns :=
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
-      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
-        List.map_cons, List.map_nil]
+      have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
+      have h_program := Channels.programChannel_toRaw_ne_stateChannel (p := p)
+      have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
+      rw [Operations.exposedChannelsLawful_expose]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         AddressOperation.circuit, AddressOperation.main,
         AddrAddOperation.circuit, AddrAddOperation.main,
@@ -136,6 +135,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadDoubleColumns :=
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
+      simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+        h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+        if_true, List.nil_append] }
 
 end SP1Clean.LoadDoubleChip

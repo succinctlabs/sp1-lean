@@ -50,7 +50,7 @@ theorem correct_sub_native
 
 omit [Fact (2 ^ 17 < p)] in
 theorem sub_chip_reaches_sail
-    (input : SubChip.Inputs (ZMod p)) (cols : Extracted.SubCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : SubChip.Inputs (ZMod p)) (cols : SubChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
     (h_chip : SubChip.Spec input cols data)
@@ -75,7 +75,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- **Sub's committed bus view** — the chip-agnostic `RowView` (opcode `2`, the `pc+4` straight-line next-pc,
 `sub_operation` result as `rdWrite`). Standalone so `SubChip.advance` can be supplied *as* `kind.advance`
 (see `AddChip.rowView`). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.SubCols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.sub_operation.value, 2, .regWrite⟩
 
@@ -90,7 +90,7 @@ theorem rv64sub_eq_execute_RTYPE_pure (a b : BitVec 64) :
 adapter over `advance_of_rtype` with opcode `SUB` + the write-value identity `hval` (from `SubChip.Spec`'s
 gated `RV64.sub` conjunct via `rv64sub_eq_execute_RTYPE_pure`). Stated to match the `ChipKind.advance`
 obligation exactly, so `kind.advance := some (PLift.up advance)` type-checks directly. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.SubCols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1)
     (hspec : Spec inp cols data)
@@ -119,12 +119,12 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.SubCols (ZMod p)) (dat
     rw [vrd, vopbm, vopcm, hidentity, rv64sub_eq_execute_RTYPE_pure]
   exact advance_of_rtype rop.SUB hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
 
-/-- **Sub's `ChipKind` registration.** Program-bus opcode `2`; `reaches_sail` is `sub_chip_reaches_sail`,
-`advance`/`advanceReady` (SC Phase 4) route to `SubChip.advance`. -/
+/-- **Sub's `ChipKind` registration.** Program-bus opcode `2`; `advance`/`advanceReady` route to
+`SubChip.advance`, with `sub_chip_reaches_sail` retained as a local bridge helper. -/
 def kind : Soundness.ChipKind p where
   name := "Sub"
   Inputs := SubChip.Inputs
-  Cols := Extracted.SubCols
+  Cols := SubChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady :=fun inp cols _ _ => inp.adapter = cols.adapter ∧ (rowView inp cols).adapter.op_a ≠ 0

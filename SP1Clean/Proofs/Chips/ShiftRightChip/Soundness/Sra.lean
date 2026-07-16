@@ -1,6 +1,7 @@
 import SP1Clean.Proofs.Chips.ShiftRightChip.Defs
 import SP1Clean.Proofs.Chips.ShiftRightChip.Math
 import SP1Clean.Proofs.Chips.ShiftRightChip.Flags
+import SP1Clean.Proofs.CircuitProofStart
 
 /-! # `ShiftRightChip` — sra conjunct soundness (split for parallel compilation)
 
@@ -29,7 +30,7 @@ set_option linter.unreachableTactic false in
 set_option maxHeartbeats 16000000 in
 /-- Soundness of the `sra` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
-  circuit_proof_start
+  circuit_proof_start_early_struct
   obtain ⟨h_cpu, h_msb1, h_msb2, h_msb3, h_alu, h_regwrite, h_realgate,
     h_srl_b, h_sra_b, h_srlw_b, h_sraw_b, h_sum_b, h_wimm,
     h_b0, h_b1, h_b2, h_b3, h_b4, h_b5,
@@ -113,13 +114,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   simp only [sub_eq_add_neg] at h_o15_2 h_w0_2 h_w1_2 h_w2_2 h_w3_2 h_w4_2 h_w5_2
   simp only [sub_eq_add_neg] at h_byte2_2 h_byte4_2 h_byte6_2 h_byte8_2
   have hregW := resultA_isU64 i₀ env h_obmap h_assumptions.1 h_msb1 h_msb3 h_srl_b2 h_sra_b2
-    h_srlw_b2 h_sraw_b2 h_sum_b2 h_b0_2 h_b1_2 h_b2_2 h_b3_2 h_b4_2 h_s0w h_s0b2 h_s1w2 h_s1b2 h_s2w2
+    h_srlw_b2 h_sraw_b2 h_sum_b2 h_b0_2 h_b1_2 h_b2_2 h_b3_2 h_b4_2 (by simpa using h_s0w)
+    h_s0b2 h_s1w2 h_s1b2 h_s2w2
     h_s2b2 h_s3w2 h_onehot2 h_v01_2 h_v012_2 h_v0123_2 h_split2_2 h_lr0_2 h_lr1_2 h_lr2_2 h_lr3_2
     h_smv2 h_o0_2 h_o1_2 h_o2_2 h_o3_2 h_o4_2 h_o5_2 h_o6_2 h_o7_2 h_o8_2 h_o9_2 h_o10_2 h_o11_2
     h_o12_2 h_o13_2 h_o14_2 h_o15_2 h_w0_2 h_w1_2 h_w2_2 h_w3_2 h_w4_2 h_w5_2 h_byte1 h_byte2_2
     h_byte3 h_byte4_2 h_byte5 h_byte6_2 h_byte7 h_byte8_2
   -- post-#398 the nine byte receives owe no padding requirement.
-  refine ⟨?spec, ?cpuA, ?msb1A, ?msb2A, ?msb3A, ?aluA,
+  refine ⟨?spec, ?aluA,
     Or.inr ⟨bool_of_mul_pred h_sum_b, hregW⟩,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
@@ -548,242 +550,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           rw [a0lr, a1z, a2z, a3z, eq_lr3]
           exact ShiftRightMath.srl_dispatch_3 b_cb0 b_cb1 b_cb2 b_cb3 hcb4 hcb5 eq_v01 eq_v012 eq_v0123
             lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3 h_b0_dec h_b1_dec h_b2_dec h_b3_dec
-  -- CPUState / ALUTypeReader only assume `is_real` binary (from the in-circuit gate).
-  case cpuA => exact bool_of_mul_pred h_realgate
+  -- CPUState has no required channel; ALUTypeReader assumes `is_real` binary from the in-circuit gate.
   case aluA => exact Or.inr ⟨bool_of_mul_pred h_realgate, bool_of_mul_pred h_realgate⟩
-  -- The three `U16MSBOperation` assumptions need `a.val < 2^16` on real sub-rows. For `msb1`/`msb2`
-  -- (the `op_b[3]`/`op_b[1]` sign reads) this is `isU64 op_b`; for `msb3` (the result limb `a[1]`) it is
-  -- the output bound, re-derived in `case msb3A` from the gate-active byte pulls (see that block).
-  case msb1A =>
-    obtain ⟨h_rs1U, -⟩ := h_assumptions
-    obtain ⟨-, -, -, -, -, -, ⟨h_obmap, -, -⟩, -, -, -⟩ := h_input
-    exact Or.inr ⟨fun _ => by
-        rw [show Expression.eval env input_var_adapter_op_b_memory_prev_value[3]
-              = input_adapter_op_b_memory_prev_value[3] by rw [← h_obmap]; simp only [Vector.getElem_map]]
-        exact h_rs1U 3,
-      bool_of_mul_pred h_sra_b⟩
-  case msb2A =>
-    obtain ⟨h_rs1U, -⟩ := h_assumptions
-    obtain ⟨-, -, -, -, -, -, ⟨h_obmap, -, -⟩, -, -, -⟩ := h_input
-    exact Or.inr ⟨fun _ => by
-        rw [show Expression.eval env input_var_adapter_op_b_memory_prev_value[1]
-              = input_adapter_op_b_memory_prev_value[1] by rw [← h_obmap]; simp only [Vector.getElem_map]]
-        exact h_rs1U 1,
-      bool_of_mul_pred h_sraw_b⟩
-  case msb3A =>
-    -- The `srw_msb` gadget reads the result limb `a[1]` (gate `is_srlw + is_sraw`). Its `Assumptions`
-    -- need `a[1] < 2^16` on a real word-variant row — the output bound, re-derived here without the
-    -- active-flag `Spec` context: the gate forces `is_srl = is_sra = 0` (so the byte pulls fire), then
-    -- a SRLW/SRAW split reads `a[1]` off the (gate-active) output asserts and closes via the limb bounds.
-    refine Or.inr ⟨fun hgate => ?_, pair_flag (bool_of_mul_pred h_srl_b) (bool_of_mul_pred h_sra_b)
-      (bool_of_mul_pred h_srlw_b) (bool_of_mul_pred h_sraw_b) (bool_of_mul_pred h_sum_b)⟩
-    obtain ⟨h_srl0, h_sra0, hsum1⟩ := srlw_sraw_gate (bool_of_mul_pred h_srl_b)
-      (bool_of_mul_pred h_sra_b) (bool_of_mul_pred h_srlw_b) (bool_of_mul_pred h_sraw_b)
-      (bool_of_mul_pred h_sum_b) hgate
-    obtain ⟨h_rs1U, -⟩ := h_assumptions
-    -- === Stage A (variant-agnostic given `is_srl = is_sra = 0`): byte ranges + limb reassembly. ===
-    set cb0 := env.get (i₀ + 4 + 1 + 1) with hcb0_def
-    set cb1 := env.get (i₀ + 4 + 1 + 1 + 1) with hcb1_def
-    set cb2 := env.get (i₀ + 4 + 1 + 1 + 2) with hcb2_def
-    set cb3 := env.get (i₀ + 4 + 1 + 1 + 3) with hcb3_def
-    set cb4 := env.get (i₀ + 4 + 1 + 1 + 4) with hcb4_def
-    set cb5 := env.get (i₀ + 4 + 1 + 1 + 5) with hcb5_def
-    set ll0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3) with hll0_def
-    set ll1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 1) with hll1_def
-    set ll2 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 2) with hll2_def
-    set ll3 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 3) with hll3_def
-    set hl0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4) with hhl0_def
-    set hl1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 1) with hhl1_def
-    set hl2 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 2) with hhl2_def
-    set hl3 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 3) with hhl3_def
-    have hsumneg : -(env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4)
-        + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4 + 1)
-        + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4 + 2)
-        + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4 + 3)) = -1 := by rw [hsum1]
-    have hbyte_fact : ∀ {v w : ZMod p},
-        (-(env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4)
-            + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4 + 1)
-            + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4 + 2)
-            + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4 + 3)) = -1 →
-          byteChannel.Guarantees (⟨6, v, w, 0⟩ : ByteRow (ZMod p)) env.data) → v.val < 2 ^ w.val := by
-      intro v w hb
-      exact byteRowSpec_range_val (hb hsumneg)
-    have lt_ll0 := hbyte_fact h_byte1
-    have lt_lh0 := hbyte_fact h_byte2
-    have lt_ll1 := hbyte_fact h_byte3
-    have lt_lh1 := hbyte_fact h_byte4
-    have lt_ll2 := hbyte_fact h_byte5
-    have lt_lh2 := hbyte_fact h_byte6
-    have lt_ll3 := hbyte_fact h_byte7
-    have lt_lh3 := hbyte_fact h_byte8
-    have b_cb0 := bool_of_mul_pred h_b0
-    have b_cb1 := bool_of_mul_pred h_b1
-    have b_cb2 := bool_of_mul_pred h_b2
-    have b_cb3 := bool_of_mul_pred h_b3
-    have b_cb4 := bool_of_mul_pred h_b4
-    have b_cb5 := bool_of_mul_pred h_b5
-    set v0123 := env.get (i₀ + 4 + 1 + 1 + 6 + 1) with hv0123_def
-    set v012 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 1) with hv012_def
-    set v01 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 2) with hv01_def
-    clear_value cb0 cb1 cb2 cb3 cb4 cb5 ll0 ll1 ll2 ll3 hl0 hl1 hl2 hl3 v0123 v012 v01
-    obtain ⟨-, -, -, -, -, -, ⟨h_obmap, -, -⟩, -, -, -⟩ := h_input
-    have hb1e : Expression.eval env input_var_adapter_op_b_memory_prev_value[1]
-        = input_adapter_op_b_memory_prev_value[1] := by rw [← h_obmap]; simp [Vector.getElem_map]
-    have hb2e : Expression.eval env input_var_adapter_op_b_memory_prev_value[2]
-        = input_adapter_op_b_memory_prev_value[2] := by rw [← h_obmap]; simp [Vector.getElem_map]
-    have eq_v01 : v01 = (1 + -cb0 + 1) * 2 * ((1 + -cb1) * 3 + 1) := by
-      linear_combination h_v01
-    have eq_v012 : v012 = v01 * ((1 + -cb2) * 15 + 1) := by
-      linear_combination h_v012
-    have eq_v0123 : v0123 = v012 * ((1 + -cb3) * 255 + 1) := by
-      linear_combination h_v0123
-    have h_split2_dec : hl2 * 65536 + ll2 * v0123 = 0 := by
-      have h := h_split2; rw [hb2e, h_srl0, h_sra0] at h;       linear_combination -h
-    rw [cb4sum_natCast] at lt_ll0 lt_ll1 lt_ll2 lt_ll3
-    simp only [sub_eq_add_neg] at lt_lh0 lt_lh1 lt_lh2 lt_lh3
-    rw [cb4sum_sub_natCast] at lt_lh0 lt_lh1 lt_lh2 lt_lh3
-    have hp17 : 2 ^ 17 < p := Fact.out
-    have hne2 : (2 : ZMod p) ≠ 0 := by
-      intro h; have := val_2_zmod_p (p := p); rw [h, ZMod.val_zero] at this; exact absurd this (by norm_num)
-    have hne3 : (3 : ZMod p) ≠ 0 := by
-      intro h; have h3 : (3 : ZMod p).val = 3 := by
-        rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) by push_cast; rfl]
-        exact ZMod.val_natCast_of_lt (by omega)
-      rw [h, ZMod.val_zero] at h3; exact absurd h3 (by norm_num)
-    obtain ⟨-, h_ll2_0⟩ := ShiftRightMath.higher_lower_zero b_cb0 b_cb1 b_cb2 b_cb3
-      eq_v01 eq_v012 eq_v0123 lt_lh2 lt_ll2 h_split2_dec
-    set su0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4) with hsu0_def
-    set su1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 1) with hsu1_def
-    set su2 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 2) with hsu2_def
-    set su3 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 3) with hsu3_def
-    set lr1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 1) with hlr1_def
-    set smv := env.get (i₀ + 4 + 1 + 1 + 6) with hsmv_def
-    clear_value su0 su1 su2 su3 lr1 smv
-    have honehot1 : su0 + su1 + su2 + su3 = 1 := by
-      have hh := h_onehot; rw [hsum1] at hh; linear_combination hh
-    have eq_lr1 : lr1 = hl1 + ll2 * v0123 := by
-      linear_combination h_lr1
-    -- === Variant split: read `a[1]` off the (gate-active) output asserts `h_w*`. ===
-    rcases bool_of_mul_pred h_srlw_b with h_srlw0 | hsrlw
-    · -- SRAW (`is_srlw = 0 ⇒ is_sraw = 1`): arithmetic word shift; `b_msb` = the low-32 sign bit.
-      have hsraw : env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4 + 3) = 1 := by
-        rw [h_srlw0] at hgate; linear_combination hgate
-      have h_msb_eq2 : env.get (i₀ + 4)
-          = if input_adapter_op_b_memory_prev_value[1].val ≥ 32768 then 1 else 0 := by
-        have hsp := (h_msb2 ⟨fun _ => by rw [hb1e]; exact h_rs1U 1, bool_of_mul_pred h_sraw_b⟩).2 hsraw
-        rwa [hb1e] at hsp
-      have eq_smv : smv = env.get (i₀ + 4) * v0123 := by
-        have hh := h_smv; linear_combination hh
-      by_cases hb1 : input_adapter_op_b_memory_prev_value[1].val ≥ 32768
-      · -- low-32 negative: `a[1] = limb_result[1] + sraFill` (bs0) or `65535` (bs1).
-        have hbmsb1 : env.get (i₀ + 4) = 1 := by rw [h_msb_eq2, if_pos hb1]
-        have eq_smv1 : smv = v0123 := by rw [eq_smv, hbmsb1, one_mul]
-        rcases b_cb4 with hcb4 | hcb4
-        · have su1z : su1 = 0 := by
-            have hh := h_s1w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su2z : su2 = 0 := by
-            have hh := h_s2w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su3z : su3 = 0 := by
-            have hh := h_s3w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su0o : su0 = 1 := by
-            have hh := honehot1; rw [su1z, su2z, su3z] at hh; simpa using hh
-          have ha1 : env.get (i₀ + 1) = lr1 + (((65536 : ℕ) : ZMod p) - v0123) := by
-            have hh := h_w1; rw [hsraw, h_srlw0, su0o, hbmsb1, eq_smv1] at hh
-            push_cast; linear_combination hh
-          rw [ha1, eq_lr1, h_ll2_0, zero_mul, add_zero]
-          exact ShiftRightMath.sign_fill_lt b_cb0 b_cb1 b_cb2 b_cb3 eq_v01 eq_v012 eq_v0123 lt_lh1
-        · have su0z : su0 = 0 := by
-            have hh := h_s0w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su2z : su2 = 0 := by
-            have hh := h_s2w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su3z : su3 = 0 := by
-            have hh := h_s3w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su1o : su1 = 1 := by
-            have hh := honehot1; rw [su0z, su2z, su3z] at hh; simpa using hh
-          have ha1 : env.get (i₀ + 1) = ((65535 : ℕ) : ZMod p) := by
-            have hh := h_w3; rw [hsraw, h_srlw0, su1o, hbmsb1] at hh
-            push_cast; linear_combination hh
-          rw [ha1, ZMod.val_natCast_of_lt (by omega : (65535 : ℕ) < p)]; omega
-      · -- low-32 non-negative: identical to SRLW (`a[1] = limb_result[1]` (bs0) or `0` (bs1)).
-        have hbmsb0 : env.get (i₀ + 4) = 0 := by rw [h_msb_eq2, if_neg hb1]
-        have hsmv0 : smv = 0 := by rw [eq_smv, hbmsb0, zero_mul]
-        rcases b_cb4 with hcb4 | hcb4
-        · have su1z : su1 = 0 := by
-            have hh := h_s1w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su2z : su2 = 0 := by
-            have hh := h_s2w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su3z : su3 = 0 := by
-            have hh := h_s3w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su0o : su0 = 1 := by
-            have hh := honehot1; rw [su1z, su2z, su3z] at hh; simpa using hh
-          have ha1 : env.get (i₀ + 1) = lr1 := by
-            have hh := h_w1; rw [hsraw, h_srlw0, su0o, hbmsb0, hsmv0] at hh
-            linear_combination hh
-          rw [ha1, eq_lr1]
-          exact ShiftRightMath.limb_result_lt b_cb0 b_cb1 b_cb2 b_cb3 eq_v01 eq_v012 eq_v0123 lt_lh1 lt_ll2
-        · have su0z : su0 = 0 := by
-            have hh := h_s0w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su2z : su2 = 0 := by
-            have hh := h_s2w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su3z : su3 = 0 := by
-            have hh := h_s3w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-          have su1o : su1 = 1 := by
-            have hh := honehot1; rw [su0z, su2z, su3z] at hh; simpa using hh
-          have ha1 : env.get (i₀ + 1) = 0 := by
-            have hh := h_w3; rw [hsraw, h_srlw0, su1o, hbmsb0] at hh
-            linear_combination hh
-          rw [ha1, ZMod.val_zero]; omega
-    · -- SRLW (`is_srlw = 1 ⇒ is_sraw = 0`): logical word shift, `b_msb = 0` (no sign fill).
-      have h_sraw0 : env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4 + 3) = 0 := by
-        rw [hsrlw] at hgate; linear_combination hgate
-      have h_bmsb0 : env.get (i₀ + 4) = 0 := by
-        have hh := h_msbz; rw [h_srl0, hsrlw] at hh; simpa using hh
-      have eq_smv : smv = env.get (i₀ + 4) * v0123 := by
-        have hh := h_smv; linear_combination hh
-      have hsmv0 : smv = 0 := by rw [eq_smv, h_bmsb0, zero_mul]
-      rcases b_cb4 with hcb4 | hcb4
-      · have su1z : su1 = 0 := by
-          have hh := h_s1w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-          first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-        have su2z : su2 = 0 := by
-          have hh := h_s2w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-          first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-        have su3z : su3 = 0 := by
-          have hh := h_s3w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-          first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-        have su0o : su0 = 1 := by
-          have hh := honehot1; rw [su1z, su2z, su3z] at hh; simpa using hh
-        have ha1 : env.get (i₀ + 1) = lr1 := by
-          have hh := h_w1; rw [hsrlw, h_sraw0, su0o, h_bmsb0, hsmv0] at hh
-          linear_combination hh
-        rw [ha1, eq_lr1]
-        exact ShiftRightMath.limb_result_lt b_cb0 b_cb1 b_cb2 b_cb3 eq_v01 eq_v012 eq_v0123 lt_lh1 lt_ll2
-      · have su0z : su0 = 0 := by
-          have hh := h_s0w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-          first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-        have su2z : su2 = 0 := by
-          have hh := h_s2w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-          first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-        have su3z : su3 = 0 := by
-          have hh := h_s3w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-          first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
-        have su1o : su1 = 1 := by
-          have hh := honehot1; rw [su0z, su2z, su3z] at hh; simpa using hh
-        have ha1 : env.get (i₀ + 1) = 0 := by
-          have hh := h_w3; rw [hsrlw, h_sraw0, su1o, h_bmsb0] at hh
-          linear_combination hh
-        rw [ha1, ZMod.val_zero]; omega
-
+  -- The MSB gadgets expose empty requirement lists canonically; their local semantic
+  -- assumptions no longer leak into the parent chip's channel-requirement tail.
 end SP1Clean.ShiftRightChip.SoundSra

@@ -1,4 +1,9 @@
 > **Point-in-time snapshot — regenerate before relying on it.**
+>
+> **DivRem note (2026-07-14):** the nine per-op soundness modules and shared `Soundness/Tail.lean`
+> measured below were retired in favor of `FormalModel/Contracts/DivRem.lean` plus the lightweight
+> `Proofs/Chips/DivRemChip/Cases.lean` evidence layer. Their timings are historical evidence for that
+> architectural decision, not the current module graph.
 
 # Compile-time profile — SP1Clean
 

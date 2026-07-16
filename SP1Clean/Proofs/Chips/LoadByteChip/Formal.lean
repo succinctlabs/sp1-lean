@@ -93,8 +93,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           Expression.eval env input_var_offset_bit[1], Expression.eval env input_var_offset_bit[2]⟩
         : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
+  simp only [AddressOperation.circuit] at h_addr
   have h_addr_spec := h_addr h_addr_as
-  simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
+  simp only [circuit_norm, eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
   have h_it := h_itype ⟨h_bin, h_bin⟩
   -- `msb` is binary on any real row: LB rows get it from the inline MSB byte-pull; LBU rows have `msb = 0`
   -- (the `is_lbu·msb = 0` gate with `is_lbu = 1`).
@@ -133,14 +134,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   refine ⟨⟨h_addr_spec, h_mem ⟨h_bin, fun _ => h_pv_isu64⟩, h_it,
       fun h1 => ⟨(h_u8 h1).1, (h_u8 h1).2, h_byte_lt h1⟩, h_msb_fact,
       ⟨hsel0, hsel1, hsel2, hsel3⟩, hmux_eq, h_op_a_0, h_msbgate, h_lb_bin, h_lbu_bin, h_bin⟩,
-    h_bin, Or.inr h_addr_as, Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩,
+    Or.inr h_addr_as, Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0,
     fun h1 h0 => off_gate_vacuous h_lb_bin h1 h0,
     Or.inr ⟨h_bin, h_bin⟩, Or.inr ⟨h_bin, h_load_isu64⟩⟩
 
 /-- Prover-side row well-formedness: the address facts + selector binaries + `op_a_0 = 0` + the byte
 value bounds + the sign-bit fact + the limb-selection / byte-mux equations + the reader `Spec`s. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
+def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
     2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
@@ -175,14 +176,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (data : ProverData (ZMod p)) (_ 
       ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
         input.state.pc, input.is_lb * 29 + input.is_lbu * 32,
         input.selected_byte + 65280 * input.msb, 65535 * input.msb, 65535 * input.msb,
-        65535 * input.msb⟩ ∧
-    -- SC Phase 2c: the honest prover supplies the State pull's `StateTruth`.
-    (isReal input = 1 → SP1Clean.Semantics.StateTruth (Readers.CPUState.stateMsgOf input.state) data) ∧
-    -- SC Phase 2a: the honest prover supplies the Program pull's `ProgTruth` (LB/LBU opcode, I-type reader).
-    (isReal input = 1 → SP1Clean.Semantics.ProgTruth
-      (Readers.ITypeReader.progMsgOf
-        ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
-          input.state.pc, input.is_lb * 29 + input.is_lbu * 32, 0, 0, 0, 0⟩) data)
+        65535 * input.msb⟩
 
 set_option maxHeartbeats 16000000 in
 theorem completeness :
@@ -192,7 +186,7 @@ theorem completeness :
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
   obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_pv_isu64, h_lb_bin, h_lbu_bin, hbin, h_op_a_0,
     hlo_pa, hhi_pa, hbyte_pa, h_msb_bin, h_msb_iff, h_msbgate, ⟨hsel0, hsel1, hsel2, hsel3⟩,
-    hmux_pa, h_cpu, h_mem, h_it, h_st, h_prog⟩ := h_assumptions
+    hmux_pa, h_cpu, h_mem, h_it⟩ := h_assumptions
   obtain ⟨_, _, ⟨_, _, _, hmap_pc⟩, _, ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _⟩ := h_input
   simp only [isReal] at hbin
   haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -241,7 +235,7 @@ theorem completeness :
       (#v[input_selected_byte + 65280 * input_msb, 65535 * input_msb, 65535 * input_msb,
           65535 * input_msb] : Word (ZMod p)) :=
     Word.isU64_of_cases h_limb0_lt h_msb_val h_msb_val h_msb_val
-  refine ⟨⟨?_, ?_, h_st⟩, h_addr_as, ⟨?_, ?_⟩, ?_, ?_, ⟨?_, ?_, h_prog⟩, ⟨?_, ?_⟩,
+  refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ?_, ?_, ⟨?_, ?_⟩, ⟨?_, ?_⟩,
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
@@ -288,7 +282,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadByteColumns :=
     -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8); the
     -- enabled flag is the **derived** selector sum `is_lb + is_lbu` (SP1's `is_real`).
     exposedChannels := fun input _ =>
-      stateChannel.expose
+      expose stateChannel
         [ stateChannel.pulledIf (input.is_lb + input.is_lbu)
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
@@ -297,8 +291,10 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadByteColumns :=
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
     exposedChannels_eq := by
       intro input offset
-      simp only [Operations.ExposedChannelsLawful, VmChannel.expose, List.mem_singleton, forall_eq,
-        List.map_cons, List.map_nil]
+      have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
+      have h_program := Channels.programChannel_toRaw_ne_stateChannel (p := p)
+      have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
+      rw [Operations.exposedChannelsLawful_expose]
       simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         AddressOperation.circuit, AddressOperation.main,
         AddrAddOperation.circuit, AddrAddOperation.main,
@@ -309,6 +305,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadByteColumns :=
         Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-      simp [circuit_norm, Gadgets.Equality.main, VmChannel.pulledIf, VmChannel.pushedIf] }
+      simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+        h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+        if_true, List.nil_append] }
 
 end SP1Clean.LoadByteChip

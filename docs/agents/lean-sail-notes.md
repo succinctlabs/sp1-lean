@@ -1,44 +1,43 @@
-# Lean 4.28 + Sail environment notes
+# Lean 4.31 + Sail environment notes
 
-The whole reason this project exists as a separate tree is the toolchain. These are notes on the 4.28 + Sail
-environment, relevant when touching deps, imports, or the Sail side.
+These are the current migration notes for the shared Lean/Sail dependency graph.
 
-## Toolchain pins (do not bump)
+## Current local migration pins (2026-07-16)
 
-- `lean-toolchain`: `leanprover/lean4:v4.28.0`.
-- mathlib: `v4.28.0` (public).
-- Clean: `github.com/Verified-zkEVM/clean @ 292b9cc3` (public, **non-fork**) — the head of
-  [PR #398](https://github.com/Verified-zkEVM/clean/pull/398) (native gated channels), pinned by SHA
-  while the PR is in review (W9, 2026-06-10). **Re-pin to the merge commit once it lands on `main`**;
-  that re-pin also picks up `d25bba8d` ("Avoid Fin fold lemma clash with Batteries"), which likely
-  retires the import-narrowing workaround below — re-test the collision then.
-- Sail: two `github.com/succinctlabs/*` deps pinned to the **`dtumad/clean-native`** branch —
-  `sail-riscv-lean` (the generated `LeanRV64D` model) and `riscv-lean` (the `RISCV` ISA fns) — which
-  transitively pull the `rems-project/lean-sail @ v4` runtime. Each carries its own 4.28 `lean-toolchain`.
-  All are fetched by `lake build`; **none is a local sibling checkout** (an earlier setup used local
-  `../lean-sail-428` / `../sail-riscv-lean-428` copies — that is no longer the case).
+- the root builds the entire dependency graph with `leanprover/lean4:v4.31.0`; root mathlib is `v4.31.0`;
+- Clean is local `../clean` at `8e6ce748` (`origin/bump-lean-4.31`);
+- `sail-riscv-lean`, `riscv-lean`, and `lean-sail` are local path dependencies while their 4.31
+  changes are validated under the root toolchain. Their standalone `lean-toolchain` files still say 4.30
+  and are part of the unpublished local migration delta; update and validate those before publishing pins;
+- PolyFun is pinned to PR #34 head `502582b4bf51cddac166d3faed9ee2bfa5a2b7cc` and is used only for
+  the native semantic-machine/run interface.
 
-## Why public Clean `main` + 4.28
+Restore immutable git pins before merging the migration PR. Do not run bare `lake update`: it can
+rewrite all transitive pins and obscure which dependency introduced a toolchain change.
+
+### Generated Sail 4.31 code-generation panic
+
+Lean 4.31 emits a large LCNF panic cascade for the generated `LeanRV64D/Defs.lean` when that file opens
+with `noncomputable section`, even though its declarations are computable. Removing the unnecessary
+section marker makes the complete generated file compile and code-generate cleanly; this is the local
+one-line Sail delta to upstream or regenerate, not a kernel bypass. Never use `skipKernelTC` as a
+workaround.
+
+## Historical reason for the independent tree
 
 `sp1-lean` pins the **succinctlabs Clean fork v6.2.2 on Lean 4.29**, which ships **broken**
 `Clean.Table.Inductive`, `Clean.Types.U32`, and `Clean.Gadgets.Addition8.Addition8FullCarry` (the last with a
-`sorry`) — transitively breaking the `FemtoCairo` example this project models its chips on. Reverting to Lean
-4.28 lets us use Clean **main**, where the full feature set compiles: `FormalCircuit`, `GeneralFormalCircuit`
+`sorry`) — transitively breaking the `FemtoCairo` example this project models its chips on. The original
+Lean 4.28 setup let us use Clean **main**, where the full feature set compiled: `FormalCircuit`, `GeneralFormalCircuit`
 (+ `ProverData`/`ProverHint`), `FormalAssertion`, `subcircuit`/`witnessVector`, `FormalTable`,
-`InductiveTable`, `Gadgets.ToBits.rangeCheck`, and `FemtoCairo`. User directive: public (non-succinctlabs)
-Clean + mathlib; Sail pinned on the `succinctlabs/* @ dtumad/clean-native` 4.28 branches.
+`InductiveTable`, `Gadgets.ToBits.rangeCheck`, and `FemtoCairo`. That history no longer constrains the
+current 4.31 migration.
 
 ## The `lake update` toolchain-bump trap
 
-`lake update` bumps the project to the **max** toolchain declared by any dependency. A single 4.29 dep
-would silently drag the whole project to 4.29 (and back onto the broken Clean fork). The fix that keeps us on
-4.28: the `dtumad/clean-native` Sail branches carry a **4.28** `lean-toolchain`. The Sail RISC-V model +
-runtime are mathlib-free and build verbatim on 4.28 — only the toolchain file changed. With all deps
-declaring 4.28, `lake update` does not bump, and `lake build SP1Clean LeanRV64D` is 0/0.
-
-Both `LeanRV64D` and `RISCV` (`riscv-lean`) are now required and wired in `lakefile.toml`; the
-`dtumad/clean-native` branch of `riscv-lean` carries the 4.28 fixes (3 trivial errors — redundant
-`rfl`/`congr` after `simp`) so it builds clean alongside the rest.
+`lake update` follows dependency manifests and can silently replace the reviewed local/pinned graph.
+During this migration, use explicit target builds under the root toolchain and update one dependency pin
+at a time.
 
 ## The Clean-main ↔ Batteries import collision (RESOLVED upstream 2026-06-26)
 
@@ -120,7 +119,6 @@ on `plat_clint_base`); **no `sorryAx`**.
 
 ## When the toolchain is next touched
 
-If you ever add a dep or bump a version, re-check: (1) does `lake update` try to bump past 4.28? (2) does the
-Clean-main `Fin.foldl` collision resurface (did a file widen its imports)? (3) do the `dtumad/clean-native`
-Sail branches still carry a 4.28 `lean-toolchain`? Finish with a full `lake build SP1Clean` (the `lake env lean` single-file check
-lies on stack overflow — see proof-patterns.md).
+When changing a dependency, re-check the exact manifest revision, build the generated Sail model with
+code generation enabled, and confirm that all local siblings use 4.31. Finish with a full
+`lake build SP1Clean`; the single-file command can conceal stale oleans or stack-overflow exits.

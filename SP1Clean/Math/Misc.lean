@@ -34,7 +34,7 @@ lemma toNat_natCast_emod_pow_two (b k : ℕ) :
 end Int
 
 @[simp] lemma Std.ExtDHashMap.insert_inj' {α β}
-    [BEq α] [LawfulBEq α] [EquivBEq α]
+    [BEq α] [LawfulBEq α]
     [Hashable α] [LawfulHashable α]
     (m m' : Std.ExtDHashMap α β)
     (x : α) (y y' : β x) :
@@ -48,7 +48,7 @@ end Int
   · split_ifs <;> aesop
 
 @[simp] lemma Std.ExtDHashMap.insert_inj {α β}
-    [BEq α] [LawfulBEq α] [EquivBEq α]
+    [BEq α] [LawfulBEq α]
     [Hashable α] [LawfulHashable α]
     (m : Std.ExtDHashMap α β)
     (x : α) (y y' : β x) :
@@ -95,7 +95,7 @@ section toBatteries
 
 namespace LawfulMonadStateOf
 
-variable {σ : Type _} {m : Type _ → Type _} [Monad m] [LawfulMonad m]
+variable {σ : Type _} {m : Type _ → Type _} [Monad m]
   [MonadStateOf σ m] [LawfulMonadStateOf σ m]
 
 attribute [simp] get_bind_const get_bind_get_bind get_bind_set_bind set_bind_get set_bind_set
@@ -166,7 +166,7 @@ end EStateM
 
 namespace ReaderT
 
-instance {m σ ρ} [Monad m] [LawfulMonad m] [MonadStateOf σ m] [LawfulMonadStateOf σ m] :
+instance {m σ ρ} [Monad m] [MonadStateOf σ m] [LawfulMonadStateOf σ m] :
     LawfulMonadStateOf σ (ReaderT ρ m) where
   modifyGet_eq f := ReaderT.ext fun ctx => by
     simp [← liftM_modifyGet, LawfulMonadStateOf.modifyGet_eq, ← liftM_get]

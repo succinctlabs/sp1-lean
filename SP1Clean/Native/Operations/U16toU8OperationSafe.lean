@@ -205,4 +205,8 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     requirementsChannelsLawful := fun input_var i₀ => by
       simp only [circuit_norm, main, byteChannel]; grind }
 
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma channelsWithRequirements_eq :
+    (circuit (p := p)).channelsWithRequirements = [] := rfl
+
 end SP1Clean.U16toU8OperationSafe

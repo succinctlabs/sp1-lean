@@ -1,6 +1,4 @@
 [["defLemma", "SP1Clean.Soundness.memBalanceHyps_of_genesis"],
- ["defLemma", "SP1Clean.Soundness.Target.targetObligations_full"],
- ["defLemma", "SP1Clean.Soundness.Target.targetObligations_full_of_balance"],
  ["defLemma", "SP1Clean.Soundness.Target.targetObligations_of_decode"],
  ["simpComm", "Sail.writeReg_writeReg_comm"],
  ["simpComm", "Sail.write_reg'_write_reg'_comm"],
@@ -18,4 +16,5 @@
  ["simpNF", "SP1Clean.DivRemChip.val_16_zmod_p"],
  ["simpNF", "Std.ExtDHashMap.insert_inj"],
  ["simpNF", "Std.ExtDHashMap.insert_insert_comm"],
+ ["simpNF", "LeanRV64D.Functions.bool_bit_backwards.eq_1"],
  ["simpNF", "LeanRV64D.Functions.bool_bit_backwards.eq_2"]]

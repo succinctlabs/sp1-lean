@@ -1,6 +1,18 @@
 # Roadmap — the W-graph to the machine-level VM theorem
 
-The open work, organized as a dependency graph of work items (`W*`) whose **end state is the target
+The historical W-graph below was organized around `Target.sp1_target_execution`. The current theorem
+stack is stricter: `supported_core_native_sound` proves the native ensemble refines a shard-local Sail
+segment; `supportedCoreLocalExecution_anchors` lifts it to the canonical boot trajectory only when shard
+composition supplies reachability; `supported_core_air_sound` is reserved for extracted/native faithfulness;
+`sp1_air_sound` targets one full upstream shard; and `SP1ExecutionRelation` composes shards into boot-to-halt execution. The old walk
+induction remains a useful lemma, not the headline contract.
+
+**Status convention (2026-07-16).** The “project debt at a glance” section and
+[`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) are the live plan. The detailed
+W-graph and dated progress snapshots below are retained as implementation history; their old critical path
+and theorem names do not override the current stack above.
+
+The open work was originally organized as a dependency graph of work items (`W*`) whose **end state is the target
 theorem** `Target.sp1_target_execution` (`SP1Clean/Soundness/TargetVm.lean`): *from a verifying Clean
 ensemble over the committed boundary, the official LeanRV64D Sail interpreter, run from any state that
 loads the guest program, reaches the halting `ECALL` with the committed exit code.* The theorem is
@@ -29,35 +41,31 @@ residual `TraceValueBinding`, W5 HALT, W7's `try_step` reduction, glue.
 
 ---
 
-## The project debt at a glance — one `sorry`
+## The project debt at a glance
 
-The chip completeness debts (ShiftLeft/ShiftRight/DivRem) are now **all closed** (axiom-clean); the
-**sole** remaining `sorry` is the capstone-packaging premise (item 4 below). Soundness is `sorry`-free.
-(Line numbers drift; the declaration names are the stable handles — `scripts/run_audit.sh` gates on
-exactly this set.) `MulChip.completeness` was closed 2026-06-10 via `MulOperation.spec_populate` (the
-witnessed `populate` columns satisfy the structural `Spec`); items 1–3 below record the now-closed
-ShiftLeft/ShiftRight/DivRem completeness work.
+The 4.31 migration re-opened five chip-completeness proofs (`Branch`, `Mul`, `ShiftLeft`, `ShiftRight`,
+and `DivRem`). They remain lower priority than fixing the semantic boundary because completeness can be
+admitted without changing what a verifying row means. The current soundness debt is more important and
+more precisely stated:
 
-1. `ShiftLeftChip.completeness` — `Proofs/Chips/ShiftLeftChip/Formal.lean` — **CLOSED 2026-06-12**
-   (axiom-clean), honest `populate`-style witness + `ProverHint` opcode threading (the
-   `BranchChip.completeness` recipe).
-2. `ShiftRightChip.completeness` — `Proofs/Chips/ShiftRightChip/Formal.lean` — **CLOSED 2026-06-12**
-   (axiom-clean), same hint-`populate` recipe as ShiftLeft.
-3. `DivRemChip.completeness` — `Proofs/Chips/DivRemChip/Formal.lean` — **CLOSED 2026-06-18** (axiom-clean),
-   via `completeness` in `Proofs/Chips/DivRemChip/Completeness/Driver.lean`. The 13 nested
-   `IsEqualWord`/`IsZero` cols pins were unblocked by *selective non-decomposition* —
-   `attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements` keeps those sub-op cols folded
-   so `circuit_proof_start` never explodes them into the intractable nested record (see
-   `docs/agents/proof-patterns.md`). Heartbeats 256M → 64M.
-4. `sp1_witness_decode` — `Soundness/SP1Ensemble.lean` — the single isolated capstone premise: the
-   witness → `ChipRow` decode seam (`SP1WitnessDecode`, = **W1b/W1c** below); a packaging premise, not
-   a chip debt. (`sp1_gatedExecution_prereqs` itself is now a *proven* assembly of this seam with the
-   W1a balance translation `sp1_state_balance_of_balancedInteractions`.)
+1. `DivRemChip.evidenceSoundness` is the single whole-chip seam from the generated DivRem circuit to the
+   isolated four-family evidence contract in `Proofs/Chips/DivRemChip/Cases.lean`. Public
+   `contractSoundness` is proved from it. Two DivRem channel-law packaging fields
+   (`main_exposedChannelsLawful` and `requirementsChannelsLawful`) are separately deferred while Clean
+   4.31 normalization is unstable.
+2. `supportedCore_orderedRows_dynamic` is the timed semantic seam. Exact physical-row decoding,
+   exhaustive State ordering, PC chaining, clock accounting, activity, registry membership, and
+   committed Program decode are now proved by `supported_core_witness_grounding`. The remaining theorem
+   must establish each ordered row's Memory guarantees, circuit assumptions, operands, and readiness
+   against its evolving Sail state; `supported_core_native_sound` is the proved consumer.
+3. `sp1_decoded_rows_sound` is the older structural decode seam used only by the frozen Eulerian-trail
+   intermediate.
+4. A future whole-machine `WitnessRelation.Complete` theorem may remain one explicitly
+   completeness-only admission; Clean will not be redesigned merely to conceal that fact.
 
-Note (census fact): because each chip `circuit` *embeds* its completeness proof as a structure field,
-items 1–3 also surface as `sorryAx` on `sp1Tables`/`sp1Ensemble`/`sp1_machine_soundness` under
-`#print axioms`, even though the soundness proofs never consume those fields. Closing items 1–3 is
-therefore also what makes the *capstone chain's* census clean (together with item 4).
+`scripts/run_audit.sh` gates the exact current file set. The obsolete nine DivRem per-op circuit proofs
+were deleted during the contract conversion, so they no longer inflate either the source inventory or
+the apparent remediation plan.
 
 ---
 
@@ -75,7 +83,7 @@ therefore also what makes the *capstone chain's* census clean (together with ite
             W4a MemoryGlobalInit/       |               W8  logUp axiom packaging (M–L, after W1)
                 Final single-shard      |               W9  Clean PR #398 migration [x] (2026-06-10)
                 slice (L)               |               W11 re-base GatedVm on upstream VmTables (M–L)
-                     \                  |               B1  the 3 completeness sorries (M each)
+                     \                  |               B1  the 5 completeness sorries (M each)
                      \                  |
                 W2 operand binding from memory-bus
                 balance (XL) [+W2b load/store data
@@ -120,7 +128,7 @@ reqs" obligation (an off-gate pull `Requirements`) is discharged by listing ever
 `SailConfigured` residue seam), `SailStep`/`SailChain` over the official `try_step`, `SP1Halted`
 (observed one step before the halting ECALL), `SP1TargetPublicIO` (+`exit_code`, `toLegacy`),
 `RefinesAt`/`RowEffect`, the `TargetObligations` gap bundle, and the **proved** walk induction
-`sp1_target_execution` + the `sp1_machine_soundness`-routed corollary `sp1_target_soundness`.
+`sp1_target_execution` + the balanced-trail-routed corollary `sp1_target_soundness`.
 
 ### W6 — the guest program
 
@@ -231,8 +239,8 @@ kind. Risk: the address-translation reduction; if heavy, this becomes the critic
 ### W1 — close `sp1_gatedExecution_prereqs` (§B5 residue; XL, independent track)
 
 `sp1_gatedExecution_prereqs` is no longer a monolithic `sorry` (2026-06-10): it is a **proven**
-assembly of the W1b decode seam `sp1_witness_decode : … → SP1WitnessDecode witness` (the sole
-remaining `sorry` in `Soundness/SP1Ensemble.lean`) with the proven W1a balance translation.
+assembly of the W1b decode seam `sp1_decoded_rows_sound : … → DecodedRowsSound witness`
+with the proven W1a balance translation.
 
 - [x] **W1a (2026-06-10):** Clean `Statement.BalancedChannels` → native `isConsistentBalanced`
   State-bus translation, **proven and clean-3** at ensemble scale:
@@ -248,12 +256,12 @@ remaining `sorry` in `Soundness/SP1Ensemble.lean`) with the proven W1a balance t
   out unnecessary — the per-key cast argument replaces counting; `InteractionsWellFormed` is carried
   by `BalancedChannel` but unconsumed (the multiplicity bound is native, from binary `is_real`).
   Residual (deliberately moved to the seam): the witness ↔ access-list correspondence itself — the
-  `state_accesses_perm` field of `SP1WitnessDecode` (`stateLookups_eq_emitted` lifted over the
+  `state_accesses_perm` field of `DecodedRowsSound` (`stateLookups_eq_emitted` lifted over the
   25-table flatMap + the verifier boundary) — needs the row ↔ table binding and so rides W1b.*
 - [ ] **W1b (L, the biggest piece):** the 25-table `witness.tables ↔ List (ChipRow p)` decode
   (`same_circuits` + `valueFromOffset`) + per-table `Component.weakSoundness`, now with a concrete
-  target shape: produce the `SP1WitnessDecode` bundle (rows/data + `spec_holds` + `is_real_binary` +
-  `state_accesses_perm`) demanded by `sp1_witness_decode`.
+  target shape: prove the `DecodedRowsSound` facts (`spec_holds` + `is_real_binary` +
+  `state_accesses_perm`) about `decodedChipRows`.
 - [~] **W1c (M):** each chip's `isU64` operand `Assumptions` recovered from the memory-bus balance.
   Lemma family landed (`operand_{a,b,c}_isU64_of_memBalance` in `Soundness/MemoryIsU64.lean`, riding
   the limb-level bus-key extraction + per-address chain induction `eventsAt_values_isU64`, under the
@@ -292,13 +300,13 @@ field + rfl-lemma). Upstream `d25bba8d` (now in the pin) deletes Clean's clashin
 `Fin.foldl_eq_foldl_finRange`, so the Batteries import-narrowing is no longer forced — kept as the
 project's narrow-import compile strategy, documented in `docs/agents/lean-sail-notes.md`.
 
-### W11 — re-base `GatedVm` on upstream Clean ensembles (**Phases 0–5 DONE 2026-07-02**; path A tracked)
+### W11 — re-base `GatedVm` on upstream Clean ensembles (**Phases 0–5 DONE 2026-07-02**; dependency refactor closed)
 
 **Landed.** The bespoke `GatedVm` data layer is retired: the capstone is `Soundness/SP1Ensemble.lean` —
 `sp1Ensemble`, a **plain** Clean `Air.Flat.Ensemble` (25 chips + 11 in-circuit boundary/provider tables
 [8 byte + program ROM + memory init/finalize] over the four buses, `sp1StateVerifier` pull-final/
-push-init boundary), with `sp1_machine_soundness` over its `Statement` and the decode seam
-`sp1_witness_decode` re-anchored to `EnsembleWitness sp1Ensemble`. `GatedVm/{Defs,Formal}.lean` deleted;
+push-init boundary), with `balanced_state_trail_soundness` over its `Statement` and the decode seam
+`sp1_decoded_rows_sound` re-anchored to `EnsembleWitness sp1Ensemble`. `GatedVm/{Defs,Formal}.lean` deleted;
 `BalanceMod.lean` relocated verbatim to `Model/BalanceBridge.lean` (Clean's `Air/Balance` is field-level
 only — the field→ℤ bridge exists nowhere upstream); the Eulerian-trail machinery
 (`GatedVm/{Chain,StateBridge,Capstone,SailDispatch,Bridge}.lean`) is unchanged. All 25 chips carry State
@@ -306,60 +314,103 @@ only — the field→ℤ bridge exists nowhere upstream); the Eulerian-trail mac
 against in-circuit providers; the memory boundary is closed (init-push + finalize-pull, boolean mults,
 `memBalanceHyps_of_boundary`).
 
-**Open (path A, tracked).** The final object is a *plain* `Ensemble` because Clean's composition
+**Decision (2026-07-13).** The final object remains a *plain* `Ensemble` because Clean's composition
 machinery can't hold it: post-memory-flip every chip's `channelsWithGuarantees` contains
 `memoryChannel`, which can never be a *finished* channel (chips pull-then-push it — the circular
 VM-channel shape) and `addVm` is single-VM-channel with exactly one `[pulledIf, pushedIf]` pair per
 table (chips make 3–4 memory pairs; the memory boundary is a multiset, not one pull+push). Un-parking
-`sp1StateVmEnsemble` (`Soundness/StateVm.lean`) and expressing memory as a true second VM channel needs
-the **multi-VM / multi-step / multi-boundary `VmTables` generalization** — upstreamable to Clean
-(`FemtoCairo.lean:26` acknowledges the read-write-memory gap; `Utils/OfflineMemory.lean` is the spec
-foundation). P5.4 is **done**: `sp1_finishedChannel_guarantees` (`Soundness/FinishedChannels.lean`) —
+`sp1StateVmEnsemble` (`Soundness/StateVm.lean`) and expressing memory as a true second VM channel would
+need a large **multi-VM / multi-step / multi-boundary `VmTables` generalization**. We will not perform
+that Clean refactor for this capstone. The existing `GeneralFormalCircuit` packages stay intact, and any
+whole-machine completeness-only debt is isolated as an explicit top-level admission. P5.4 is **done**:
+`sp1_finishedChannel_guarantees` (`Soundness/FinishedChannels.lean`) —
 the proven **byte** pull-guarantee grounding over `sp1Ensemble` (every table's byte `ChannelGuarantees`
 from `Statement`, via `guarantees_of_requirements_append` on the consumer/provider partition; feeds the
-seam's per-chip `FullGuarantees`). *(SC Phase 2a, W12, narrowed this from byte+program to byte-only:
-`programChannel` became a semantic `VmChannel` and is no longer a finished channel; its `decodedInROM`
-half is engine-grounded. `programProviderEnsemble` retired accordingly.)*
+seam's per-chip `FullGuarantees`). Program is again a structural `Channel(RowSpec)` under W12; its
+`decodedInROM` half is proved separately from provider balance and program commitment rather than being
+installed as a pull guarantee.
 
-### W12 — semantic channels: the buses carry the RISC-V execution contract (in progress, 2026-07)
+### W12 — structural buses + semantic timed grounding (in progress, 2026-07)
 
-The architecture inversion (`docs/architecture.md`, the master plan, the `semantic_channels_program`
-memory): instead of deriving a `GatedExecution` trail from balance and lifting it through a routing table,
-the **channels carry the semantics**. The prover commits the guest program in `ProverData`; the State
-channel's guarantee becomes `StateTruth` ("the deterministic Sail execution of the committed program is at
-this pc at this clk"), the Program channel's becomes `ProgTruth` ("the fetched row is the RV64 decode of
-the committed ROM at its pc"), Memory becomes `MemTruth` (execution-truth of the value — bookkeeping, never
-in the final theorem), and per-opcode Sail semantics dispatch through the opcode each chip pins in its
-fetch. Guarantees are **decoupled** from push-`Owed` (the `VmChannel` veneer) and grounded by a timed
-grounding engine, not by finished-channel balance.
+The channels communicate field tuples and multiplicities, exactly as SP1's interaction buses do.
+Execution meaning is a theorem about the balanced, timestamped records; it is not a row-local channel
+guarantee. State therefore carries `True`, Program carries structural `RowSpec`, Memory carries `isU64`,
+and Byte carries its lookup predicate. The global engine combines balance, provider/commitment binding,
+schedule ordering, and per-chip `advance` lemmas to derive Sail execution truth.
 
-**Landed.** Phase 0a `VmChannel` veneer (`Model/VmChannel.lean`, decoupled `Guarantees`/`Owed`); Phase 0b
-semantic foundation (`progOf`/`MicroTime`/`Truth`, relocated to `Model/Semantics/`); Phase 1 end-to-end
-spike (`Spike/`, axiom-clean, passed the hard gate); Phase 2pre reader→GFC sweep; **Phase 2c State flip**
-(`stateChannel : VmChannel(StateTruth, True)`, 2026-07-05); **Phase 2a Program flip** (`1e9e142`/`fb24e6c`,
-2026-07-05): Word-native `ProgramMsg` + `programChannel : VmChannel(ProgTruth, RowSpec)`, `ProgTruth`
-threaded opaquely through 6 readers + 24 chips, RV64 accessors `decodedInROM.decodes`/`ProgTruth.decodes`,
-program exited the finished-channel machinery (byte-only), `programProviderEnsemble` retired.
+**Landed (2026-07-13 architectural cut).** `Model/VmChannel.lean` was deleted; State and Program use
+plain Clean `Channel`s. The Phase-1 walk was promoted to `Soundness/TimedGrounding.lean` and remains
+kernel-checked after the cut, demonstrating that its induction did not depend on semantic channel
+assumptions. `Model/Machine/{Boot,Schedule,Execution}.lean` now makes loader and timing policy external to
+the witness, uses PolyFun's PR-34 `DynSystem.Machine` only for the native Sail run, records ordinary
+eight-tick and syscall 264-tick schedules, and removes `/ 8` from the new execution relation.
+`FormalModel/{Relations,Execution,Verifier}.lean` and `Contracts/PublicValues.lean` separate AIR
+refinement, full upstream public values, semantic execution, and the eventual ArkLib verifier theorem.
+The old headline was renamed to `balanced_state_trail_soundness`; `supported_core_native_sound` is the
+honest proved local-refinement consumer of the disclosed `supportedCore_orderedRows_dynamic` seam,
+`supported_core_air_sound` is reserved for the extracted-faithful
+supported AIR, and `sp1_air_sound` is reserved until the full shard AIR relation exists.
 
-**Consequence (disclosed).** `sp1_machine_soundness` now inherits the Sail platform trust base via the
-State channel (`StateTruth`→`SailChain`) and the Sail RV64 decode base via the Program channel
-(`ProgTruth`→`ext_decode`); neither `StateTruth` nor `ProgTruth` is yet grounded in the soundness
-*conclusion* — that is the engine phase.
+**Landed setup continuation (2026-07-13).** `SP1ExecutionStatement`/`SP1ExecutionRelation` distinguish a
+single shard segment from a boot-to-halt composed execution, with explicit `ProgramBinding` and
+`ShardIntegrity` seams. `WitnessRelation.Complete` records the future converse without forcing a Clean
+redesign. `Soundness/SupportedMachine.lean` is now the single 25-chip descriptor used by the registry,
+ensemble, and routing surfaces. `Soundness/RankedGrounding.lean` proves that balanced transitions with a
+strict clock rank form an exhaustive trail, eliminating the old disconnected-cycle blind spot.
 
-**Open.** Phase 2b Memory flip (`memoryChannel : VmChannel(MemTruth, isU64)`; the push/pull-both bus, ~65
-files); Phase 3 the `try_step` reduction (the W7 `lift`, IN scope); Phase 4 the per-chip `advance` lemmas
-(`= tryStepReduction ∘ opcode-inversion ∘ correct_<op>_native`); Phase 5 the timed-channel grounding engine
-(`Soundness/TimedChannel.lean` + `TimedGrounding.lean` — grounds every pull guarantee, yielding
-`StateTruth(final)`); Phase 6 the `sp1_semantic_soundness` capstone + `sp1_witness_decode` →
-`sp1_row_facts_decode` seam swap + `GatedVm`/`TargetVm` retirement.
+**Landed contract cleanup (2026-07-13).** No chip `ProverAssumptions` contains `StateTruth` or
+`ProgTruth`. Circuit completeness now proves only row-local witness, reader, and bus-hygiene facts;
+semantic execution enters through `advance` and the global grounding theorems. The sweep also removed
+the obsolete CPUState requirement from every affected soundness tail. Lean 4.31 normalization/`whnf`
+debt remains in the disclosed completeness proofs and DivRem whole-chip evidence extraction, not in the
+channel interface. The old DivRem per-op bodies have since been retired.
 
-### B1 — the three completeness `sorry`s (M each, independent)
+**Landed typed Memory bridge.** `Soundness/TypedInteractions.lean` is a proof-carrying adapter over
+Clean's exact evaluated interactions, and `TypedMemory.lean` classifies the active Memory pulls/pushes
+without constructing a second lookup projection. `ordinaryRowFacts` feeds those exact records into
+`TimedGrounding`; grounded prior records recover the circuit's Memory `ChannelGuarantees` and live Sail
+register values. `CircuitRegisterOperandPullAt`/`CircuitRegisterOperandPullShape` are the small per-chip
+contract: each register operand must identify its exact emitted pull and bind its message to the common
+`RowView`. `TypedMemoryContracts.lean` proves the first complete descriptor instance for Add directly
+from Add's Clean `exposedMemoryInteractions`; no operation-level Rust/Lean bridge is involved.
 
-Debt items 1–3 above (`MulChip.completeness` closed 2026-06-10 via `MulOperation.spec_populate` +
-the `LtChip` witnessed-columns `convert`/`getElem_toElements_eval_varFromOffset` recipe); the
-`BranchChip.completeness` recipe (honest `ProverHint` flag witnesses + shared dispatch) is the
-template for the rest. Closing them also cleans the capstone chain's axiom census (see the debt note)
-and retires the K6 sampled-conformance reliance for those chips.
+**Residual dynamic work.** Instantiate that contract across the supported registry (separately for
+R-, ALU-, I-, J-, load/store, and no-write reader shapes), derive each row's remaining circuit
+assumptions and `advanceReady` facts, and combine them with the proved State position equation. The
+grounding engine still needs RAM records and same-location intra-row chaining before loads/stores and
+register aliases such as `rd = rs1` are covered. These are the concrete inputs to
+`supportedCore_orderedRows_dynamic`; they are independent of the verifier/ArkLib workstream.
+
+The Rust-faithfulness boundary is also moving from operations to chips. `AddChip` now owns an independent
+native row, a self-contained generated `Extracted/ChipOracle/Add.lean`, and an all-row
+`addChip_faithful` proof comparing complete assertions and interactions. Migrate the remaining chips one
+at a time; do not add operation anchors/direct circuits/witness batteries, and delete each legacy artifact
+when its last chip consumer disappears. The extraction script hard-fails requested chip-oracle/trace
+failures. Its current upstream blocker is concrete: the pinned SP1 `witness_vectors` binary has no
+`--chip` mode, so whole-trace vector regeneration must be restored before provenance is green.
+
+**Open.** Generalize `TimedGrounding` from ordinary register-only windows to RAM, repeated same-location
+touches, state bumps, syscalls/precompiles, and `SP1MachineModel.schedule`; derive Program commitment truth
+from the provider balance; close `supportedCore_orderedRows_dynamic` and retire the older
+`sp1_decoded_rows_sound`/Eulerian path; cover the full
+upstream table and public-value integrity relations; then instantiate ArkLib knowledge soundness as
+`sp1_verifier_sound` without changing its extraction error.
+
+**Larger-program boundary (not this workstream's critical path).** An executable Lean Core verifier over
+structured proof data, its deterministic refinement to a protocol specification, ArkLib knowledge
+soundness, and this AIR-to-execution development are separate layers that can proceed in parallel. They
+compose in that order at `sp1_verifier_sound`; none should be silently folded into `sp1_air_sound`.
+Compressed recursion and the Plonk/Groth16 wrappers are separate verifier targets. The present AIR-side
+priority is to close the typed timed-grounding path and then extend the theorem from the supported
+25-chip slice to the complete upstream Core AIR.
+
+### B1 — the five 4.31 completeness regressions (M each, independent)
+
+`BranchChip.completeness` remains the intended honest-`ProverHint`/shared-dispatch template for
+ShiftLeft and ShiftRight. Mul and DivRem should be revisited only after their chip-level contract and
+generated-row boundaries settle, since another structural refactor would invalidate large witness proofs
+again. Closing these also removes structural `sorryAx` propagation through bundled circuit values, even
+though machine soundness does not consume their completeness fields.
 
 ---
 
@@ -373,9 +424,9 @@ and retires the K6 sampled-conformance reliance for those chips.
   explicit exclusion list (decode/fetch, memory-infra, PageProt, syscalls/traps, Global, Range,
   precompiles, and the User-mode duplicates). `Supervisor/User`: decide whether single-variant coverage
   extends to the User duplicates (same AIR, different bus tags?) or stays a documented gap.
-- The witness-vector battery and `Extracted/` currency are re-checked by `scripts/run_audit.sh` §A4 +
-  CI `lake build`; the `SP1_PINNED_COMMIT` assertion in `update_extracted.py` keeps extraction
-  provenance explicit. Remaining: a CI job that re-extracts and diffs per-PR.
+- Checked-in trace anchors and `Extracted/` modules are elaborated by CI; the `SP1_PINNED_COMMIT`
+  assertion keeps the intended extraction source explicit. This is not yet a reproducibility check:
+  restore the missing Rust `--chip` trace dumper, then add CI that re-extracts and diffs per PR.
 
 ---
 
@@ -389,11 +440,9 @@ cleanup discipline".
 - **`linter.style.longLine`** — the one remaining syntactic linter not yet enabled (it's the last candidate
   noted in AGENTS.md § Linters). ~1080 lines exceed 100 chars (`Native/` ~817, `FormalModel/` ~263). Enable it
   alone on the core pillar lake libraries, then reflow or per-file-suppress back to 0 warnings. Heavy, mechanical.
-- **Shift soundness tail-dedup** — the real build-time prize. Extract the byte-identical `cpuA/msb*/aluA`
-  requirements tail shared across the 6 Shift soundness conjuncts into a `requirements_holds`/`SpecObligation`
-  helper, mirroring `Proofs/Chips/DivRemChip/Soundness/Tail.lean` (recipe: proof-patterns § "Shared-tail
-  dedup"). Structural, multi-hour, overlaps the recently-golfed Shift soundness files — do it as a dedicated
-  pass, not a drive-by.
+- **Shift proof decomposition** — if the repeated `cpuA/msb*/aluA` tail becomes a real bottleneck, extract
+  named evidence from it and prove the semantic result in a circuit-independent file, following the new
+  DivRem `Cases.lean` boundary. Do not recreate the retired DivRem `SpecObligation`/shared-tail architecture.
 - **`/decompose-proof` candidates** — long proof bodies worth splitting into named sub-lemmas:
   `ShiftLeftChip`/`ShiftRightChip` `Formal.lean` `completeness` (~123/~180 lines), `LoadHalfChip`'s 4-way
   `h_sel_lt` offset-selection case-bash (near-verbatim across soundness + completeness), `BranchChip`

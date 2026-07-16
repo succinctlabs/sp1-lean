@@ -66,6 +66,14 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (AddwCols) (ZMod 
   return ⟨input.state, input.adapter, ⟨value, ⟨msb[0]⟩⟩, input.is_real⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddwCols main where
+  output input offset :=
+    ⟨input.state, input.adapter,
+      ⟨Vector.mapRange 2 fun i => var { index := offset + i },
+        ⟨var { index := offset + 2 }⟩⟩,
+      input.is_real⟩
+  output_eq := by
+    intro input offset
+    simp only [main, circuit_norm]
   channelsLawful := by
     simp [circuit_norm, main, AddwOperation.circuit, Readers.ALUTypeReader.circuit,
       Readers.CPUState.circuit, Readers.RegisterWrite.circuit]

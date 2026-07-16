@@ -153,16 +153,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
   return ⟨input.state, input.adapter, next_pc,
     is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu, is_branching, cmp⟩
 
-set_option maxHeartbeats 4000000 in
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs BranchColumns main where
-  channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit]
-  -- 6 flags + 1 is_branching + 8 add targets + 3 next_pc + 10 (LtOperationSigned subcircuit).
-  localLength _ := 18 + 10
-  localLength_eq := by simp +arith [circuit_norm, main, AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit]
-  subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit]; try omega
-  -- W11 flip: the Program-bus fetch propagated up from `ITypeReaderImmutable`'s program **pull**
-  -- (now a guarantee) joins the byte guarantee in `channelsWithGuarantees`.
-  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+/-- Derive the 28 witness cells and the complete four-channel interface structurally from `main`. -/
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs BranchColumns main := by
+  elaborate_circuit
 
 /-- The taken target word the chip witnesses for `branch_value` (`pc + op_c_imm`, base-2^16). -/
 def branchTargetWord (input : Inputs (ZMod p)) : Word (ZMod p) :=

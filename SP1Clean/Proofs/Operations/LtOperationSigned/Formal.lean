@@ -237,8 +237,9 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
         (by simpa using hbtop),
       Word.isU64_of_cases (by simpa using hc0) (by simpa using hc1) (by simpa using hc2)
         (by simpa using hctop)⟩, hir_bin⟩
-  exact ⟨⟨his_bin, hir_bin, hbm_bool', hcm_bool', hE5, hE7, hE9, hbm_eq', hcm_eq', h_lt hAlt⟩,
-    Or.inr hAb, Or.inr hAc, Or.inr hAlt⟩
+  -- All three children expose their empty requirement lists canonically; their assumptions remain
+  -- useful local inputs to the semantic lemmas but do not leak into the parent soundness contract.
+  exact ⟨his_bin, hir_bin, hbm_bool', hcm_bool', hE5, hE7, hE9, hbm_eq', hcm_eq', h_lt hAlt⟩
 
 set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
@@ -297,5 +298,8 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
     circuit.localLength x = 0 := rfl
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma channelsWithRequirements_eq :
+    circuit.channelsWithRequirements = ([] : List (RawChannel (ZMod p))) := rfl
 
 end SP1Clean.LtOperationSigned
