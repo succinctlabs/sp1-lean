@@ -31,6 +31,11 @@ Main theorems (abstract `Msg` over arbitrary key/value types, ℕ times; no SP1 
   (invariant 1) turns `> t` into `≥ t + 8` for every remaining row.
 * `chainForcing_step_of_gap` — the design-literal wrapper consuming the `t + 8` gap that
   `stateBalance_remaining_ge_eight` supplies.
+* `chainLinks_of_balance` — the D4 resolution: the chain-link equalities `pⱼ₊₁ = qⱼ` and the
+  head-pull identification `p₁ = live` are *derived* from the balance given only per-slot
+  in-circuit facts — `pullⱼ.time < pushⱼ.time` (SP1's `prev_clk < clk`), push times `≤ t + 4`
+  and slot-strictly increasing, and the `t + 8` gap on other rows' pushes. `TouchOK`/extraction
+  never needs to certify intra-row links.
 
 ## The three new invariants, as validated
 
@@ -60,13 +65,23 @@ Main theorems (abstract `Msg` over arbitrary key/value types, ℕ times; no SP1 
   algebra** — the chain-link equalities `pⱼ₊₁ = qⱼ` cancel the tail pulls against the interior
   pushes purely algebraically (`chain_shift`). It is carried in `ChainOK` because the production
   value layer (read-back currency ordering within the window) will need it.
-* **(D4) OPEN PRODUCTION QUESTION (not validated here).** The spike takes the chain-link
-  equalities `pⱼ₊₁ = qⱼ` as given per-row facts (the task's stated model). If the circuit
-  certifies only per-slot time bounds — not literal pull-equals-previous-push equalities — the
-  engine must first *derive* the links from the balance; that derivation is exactly where the
-  `[t, t+8)` window-exclusivity consequence of invariants 1+2 becomes load-bearing (only this
-  row's own pushes have times in the window). Budget for that extra forcing pass when cutting
-  over `TimedGrounding.lean` if `TouchOK`-style constraints cannot supply the links directly.
+* **(D4) RESOLVED — the links ARE derivable from balance** (`chainLinks_of_balance`): if the
+  circuit certifies only per-slot time bounds — not literal pull-equals-previous-push
+  equalities — the engine can still *derive* `pⱼ₊₁ = qⱼ` and `p₁ = live`. Slot `j`'s pull is
+  strictly earlier than its own push, hence than every own push from slot `j` on (slot
+  monotonicity), and `≤ t + 4 < t + 8 ≤` every other row's push — so its only possible LHS
+  match is the running front (`live` for slot 1, then the previous slot's push), and the
+  balance pops one matched slot per induction step (`chainLinks_aux`). This is the one place
+  where the window-exclusivity gap of invariants 1+2 is genuinely load-bearing, exactly as
+  predicted. `TouchOK` does NOT need to certify links; extraction supplies per-slot bounds.
+* **(D5) The link derivation needs no frontier-time hypothesis at all** — neither
+  `live.time ≤ t` nor `< t`: pure membership forcing suffices, with no double-copy argument
+  (unlike the state bus, the slot discipline makes every competing LHS message strictly later
+  than the pull being forced). Unused likewise: the key facts and the `t ≤ push` lower bounds;
+  load-bearing are only `pull < push`, `push ≤ t + 4`, slot monotonicity, and the gap (any
+  `t + 5 ≤` bound works; production supplies `t + 8`). `ChainOK.head_lt` (`p₁.time < t`) is
+  then *derived* from `p₁ = live` plus the walk's frontier bound (the previous step re-founds
+  `live.time ≤ t_prev + 4 < t_prev + 8 ≤ t`; genesis: `≤ initial clock < t`), refining D2.
 -/
 
 namespace SP6
@@ -282,6 +297,129 @@ theorem stateBalance_remaining_ge_eight {t : ℕ} {head fin : Msg K V}
   have h2 := halign r' (mem_middle r₀ hr')
   omega
 
+/-! ## Deriving the chain links from balance (D4 resolution)
+
+Per-slot in-circuit facts only — no link assumptions. Each slot's pull is strictly earlier than
+its own push (`prev_clk < clk`), hence than every own push from that slot on (slot
+monotonicity) and than every other row's push (`≤ t + 4 < t + 8 ≤`); so in the balance it can
+only match the running front. Popping the matched slot re-founds the balance with that slot's
+push as the new front, and the induction walks the whole slot list. -/
+
+/-- Slot monotonicity propagates: the head's push is strictly earlier than every later push. -/
+lemma head_lt_of_mono :
+    ∀ (rest : List (Touch K V)) (pq : Touch K V),
+      List.IsChain (fun a b => (Prod.snd a).time < (Prod.snd b).time) (pq :: rest) →
+      ∀ pq' ∈ rest, (Prod.snd pq).time < (Prod.snd pq').time
+  | [], _, _ => by simp
+  | b :: rest', pq, h => by
+      obtain ⟨hab, htail⟩ := List.isChain_cons_cons.mp h
+      intro pq' hpq'
+      rcases List.mem_cons.mp hpq' with rfl | hpq'
+      · exact hab
+      · exact lt_trans hab (head_lt_of_mono rest' b htail pq' hpq')
+
+lemma pushes_cons_coe (pq : Touch K V) (c : List (Touch K V)) :
+    (↑(pushes (pq :: c)) : Multiset (Msg K V)) = pq.2 ::ₘ ↑(pushes c) := by
+  simp [pushes, Multiset.cons_coe]
+
+lemma pulls_cons_coe (pq : Touch K V) (c : List (Touch K V)) :
+    (↑(pulls (pq :: c)) : Multiset (Msg K V)) = pq.1 ::ₘ ↑(pulls c) := by
+  simp [pulls, Multiset.cons_coe]
+
+/-- **Head-pull forcing from per-slot facts alone** (no link hypotheses, no frontier-time
+hypothesis): the first slot's pull can match neither an own push (strictly later, by
+`prev_clk < clk` + slot monotonicity) nor another row's push (`≤ t + 4 < t + 8`), so it equals
+the front. -/
+lemma headPull_forced {t : ℕ} {front finM : Msg K V} {pq : Touch K V}
+    {rest : List (Touch K V)} {P Q : Multiset (Msg K V)}
+    (hslot : ∀ pq' ∈ pq :: rest, (Prod.fst pq').time < (Prod.snd pq').time)
+    (hhi : ∀ pq' ∈ pq :: rest, (Prod.snd pq').time ≤ t + 4)
+    (hmono : List.IsChain (fun a b => (Prod.snd a).time < (Prod.snd b).time) (pq :: rest))
+    (hP : ∀ m ∈ P, t + 8 ≤ m.time)
+    (hbal : front ::ₘ ((↑(pushes (pq :: rest)) : Multiset (Msg K V)) + P)
+      = finM ::ₘ ((↑(pulls (pq :: rest)) : Multiset (Msg K V)) + Q)) :
+    pq.1 = front := by
+  have hmem : pq.1 ∈ front ::ₘ ((↑(pushes (pq :: rest)) : Multiset (Msg K V)) + P) := by
+    rw [hbal]
+    refine Multiset.mem_cons_of_mem (Multiset.mem_add.mpr (Or.inl ?_))
+    exact Multiset.mem_coe.mpr (List.mem_map_of_mem List.mem_cons_self)
+  rcases Multiset.mem_cons.mp hmem with h | h
+  · exact h
+  · exfalso
+    have hs := hslot pq List.mem_cons_self
+    rcases Multiset.mem_add.mp h with h | h
+    · obtain ⟨pq', hpq', heq⟩ := List.mem_map.mp (Multiset.mem_coe.mp h)
+      rcases List.mem_cons.mp hpq' with rfl | hpq'
+      · rw [heq] at hs
+        omega
+      · have hlt := head_lt_of_mono rest pq hmono pq' hpq'
+        rw [heq] at hlt
+        omega
+    · have h8 := hP _ h
+      have h4 := hhi pq List.mem_cons_self
+      omega
+
+/-- Popping one matched slot from the balance: the forced head pull cancels against the front,
+leaving the slot's own push as the new front. -/
+lemma balance_pop {front finM : Msg K V} {pq : Touch K V} {rest : List (Touch K V)}
+    {P Q : Multiset (Msg K V)} (hhead : pq.1 = front)
+    (hbal : front ::ₘ ((↑(pushes (pq :: rest)) : Multiset (Msg K V)) + P)
+      = finM ::ₘ ((↑(pulls (pq :: rest)) : Multiset (Msg K V)) + Q)) :
+    pq.2 ::ₘ ((↑(pushes rest) : Multiset (Msg K V)) + P)
+      = finM ::ₘ ((↑(pulls rest) : Multiset (Msg K V)) + Q) := by
+  rw [pushes_cons_coe, pulls_cons_coe, Multiset.cons_add, Multiset.cons_add, hhead,
+    Multiset.cons_swap finM front] at hbal
+  exact (Multiset.cons_inj_right front).mp hbal
+
+/-- The slot-walking induction: from per-slot facts and the balance with running front `front`,
+the head pull equals `front` and all intra-row links hold. -/
+lemma chainLinks_aux {t : ℕ} {finM : Msg K V} :
+    ∀ (own : List (Touch K V)) (front : Msg K V) (P Q : Multiset (Msg K V)),
+      (∀ pq ∈ own, (Prod.fst pq).time < (Prod.snd pq).time) →
+      (∀ pq ∈ own, (Prod.snd pq).time ≤ t + 4) →
+      List.IsChain (fun a b => (Prod.snd a).time < (Prod.snd b).time) own →
+      (∀ m ∈ P, t + 8 ≤ m.time) →
+      front ::ₘ ((↑(pushes own) : Multiset (Msg K V)) + P)
+        = finM ::ₘ ((↑(pulls own) : Multiset (Msg K V)) + Q) →
+      (∀ h : own ≠ [], (own.head h).1 = front) ∧
+        List.IsChain (fun pq pq' => pq'.1 = pq.2) own
+  | [], _, _, _, _, _, _, _, _ => ⟨fun h => absurd rfl h, List.isChain_nil⟩
+  | [pq], _, P, Q, hslot, hhi, hmono, hP, hbal =>
+      ⟨fun _ => headPull_forced hslot hhi hmono hP hbal, List.isChain_singleton _⟩
+  | pq :: b :: rest', _, P, Q, hslot, hhi, hmono, hP, hbal => by
+      have hhead := headPull_forced hslot hhi hmono hP hbal
+      have hbal' := balance_pop hhead hbal
+      obtain ⟨ih_head, ih_link⟩ := chainLinks_aux (b :: rest') pq.2 P Q
+        (fun x hx => hslot x (List.mem_cons_of_mem _ hx))
+        (fun x hx => hhi x (List.mem_cons_of_mem _ hx))
+        (List.isChain_cons_cons.mp hmono).2 hP hbal'
+      exact ⟨fun _ => hhead,
+        List.isChain_cons_cons.mpr ⟨ih_head (List.cons_ne_nil _ _), ih_link⟩⟩
+
+/-- **The D4 resolution: chain links are derivable from balance.** Given only per-slot
+in-circuit facts (each slot's pull strictly before its own push, pushes in `[t, t+4]` strictly
+increasing in slot order, everything at key `k`) plus the `t + 8` gap on other rows' pushes,
+the balance forces the head pull to equal `live` and every later pull to equal the row's own
+previous push — `ChainOK.link` holds with no circuit-certified link facts. Load-bearing
+hypotheses: `hslot`, `hhi`, `hmono`, `hP`, `hbal` (see D5 — the keys, `hlo`, and any
+`live.time` bound are carried only for design fidelity). Combined with the walk's frontier
+bound (`live.time < t`, re-founded by `chainForcing_step`), `p₁ = live` also derives
+`ChainOK.head_lt`. -/
+theorem chainLinks_of_balance {k : K} {t : ℕ} {live finM : Msg K V}
+    {own : List (Touch K V)} (hne : own ≠ [])
+    (_hkey_pull : ∀ pq ∈ own, (Prod.fst pq).key = k)
+    (_hkey_push : ∀ pq ∈ own, (Prod.snd pq).key = k)
+    (hslot : ∀ pq ∈ own, (Prod.fst pq).time < (Prod.snd pq).time)
+    (_hlo : ∀ pq ∈ own, t ≤ (Prod.snd pq).time)
+    (hhi : ∀ pq ∈ own, (Prod.snd pq).time ≤ t + 4)
+    (hmono : List.IsChain (fun a b => (Prod.snd a).time < (Prod.snd b).time) own)
+    {P Q : Multiset (Msg K V)} (hP : ∀ m ∈ P, t + 8 ≤ m.time)
+    (hbal : live ::ₘ ((↑(pushes own) : Multiset (Msg K V)) + P)
+      = finM ::ₘ ((↑(pulls own) : Multiset (Msg K V)) + Q)) :
+    (own.head hne).1 = live ∧ List.IsChain (fun pq pq' => pq'.1 = pq.2) own := by
+  obtain ⟨hhead, hlink⟩ := chainLinks_aux own live P Q hslot hhi hmono hP hbal
+  exact ⟨hhead hne, hlink⟩
+
 end SP6
 
 #print axioms SP6.chain_shift
@@ -289,3 +427,4 @@ end SP6
 #print axioms SP6.chainForcing_step_of_gap
 #print axioms SP6.stateBalance_unique_minimal
 #print axioms SP6.stateBalance_remaining_ge_eight
+#print axioms SP6.chainLinks_of_balance
