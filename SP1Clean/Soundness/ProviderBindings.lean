@@ -145,6 +145,19 @@ noncomputable def MemoryInitProviderBound
           { raw := interaction
             channel_eq := (memoryInitProviderTable witness).channel_eq_of_mem_interactionsWith member })
 
+/-- At most one active Memory-init contribution per register or aligned 64-bit RAM cell.  Clean
+channel balance alone cannot force this: two genesis records at one location would let a later pull
+match a stale genesis twin instead of the live frontier record, so per-location uniqueness is part of
+the honest non-execution companion relation the timed grounding engine consumes.  Upstream this is
+SP1's global-interaction uniqueness argument over the memory-init table; it is bound here as a named
+boundary fact, to be discharged by the extracted-AIR layer rather than re-derived from the per-row
+`WordRangeCheck` constraints (which cannot see across rows). -/
+noncomputable def MemoryInitProviderUnique
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop :=
+  (typedTableInteractionsWith (memoryInitProviderTable witness) memoryChannel).Pairwise
+    fun i₁ i₂ => signedVal i₁.mult ≠ 0 → signedVal i₂.mult ≠ 0 →
+      MemoryMsg.locOf i₁.message ≠ MemoryMsg.locOf i₂.message
+
 /-- Every exact active Memory-init push is locally true at the selected shard boundary. The value
 range comes from the provider circuit's proved requirement; only state content and initial timing
 come from `MemoryInitProviderBound`. -/
@@ -198,6 +211,7 @@ structure InitialBoundaryFacts
   configured : SailConfigured initial
   programProvider : ProgramProviderBound witness
   memoryProvider : MemoryInitProviderBound witness initial (Commit.initClkNat witness.data)
+  memoryProviderUnique : MemoryInitProviderUnique witness
 
 /-- The selected public boundary is exactly the initial truth needed by shard-local timed grounding.
 No boot or zero-register premise is introduced here. -/

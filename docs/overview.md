@@ -36,7 +36,10 @@ theorem supported_core_native_sound (model : Machine.SP1MachineModel)
 
 - the algebraic relation of the 36-table Clean ensemble (`Constraints` plus balanced channels); and
 - explicit semantic binding of provider/boundary tables to the committed program and a local initial Sail
-  state.
+  state, including per-location uniqueness of the memory-init genesis records
+  (`MemoryInitProviderUnique`, 2026-07-16) — channel balance alone cannot exclude a duplicate genesis
+  record whose stale twin a later pull could match; upstream this is SP1's global-interaction
+  uniqueness argument.
 
 The conclusion is a finite official-LeanRV64D execution segment between public shard endpoints. It is
 deliberately local: reachability from canonical boot belongs to shard composition, not to a one-shard AIR
