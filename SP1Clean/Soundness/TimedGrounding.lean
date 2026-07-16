@@ -1,6 +1,6 @@
 import SP1Clean.Model.Semantics.Truth
 
-/-! # Timed grounding for the ordinary register-memory slice
+/-! # Timed grounding for the ordinary memory slice
 
 This is the productionized ordinary-window grounding induction. Given a batch of row-fact records
 (each carrying its `LocalStepFact` and a `FrameFact`), a true
@@ -15,25 +15,40 @@ only when a shard-local execution is anchored in the fixed machine model.
 Current scope, kept explicit rather than hidden behind a full-machine name:
 
 - **Balance representation**: plain `Multiset` equalities over lists of messages (no
-  `LookupAccessList`/`BalanceBridge` detour) — `{init} + pushes = {fin} + pulls` per bus/key. The
+  `LookupAccessList`/`BalanceBridge` detour) — `genesis + pushes = final + pulls` per bus/key, where
+  the per-key genesis/final records are `Option`s (`optMS` — lists of length ≤ 1). The
   field→ℤ→multiset translation from the real channel data is a separate seam
   (`Model/BalanceBridge.lean` is the existing adapter).
-- **Registers only, straight-line, single row type**: the memory keys are register indices
-  (`BitVec 5`); every row's touched locations are register-shaped and pairwise distinct
-  (`RowOK.locs_nodup` — intra-row same-register chaining is a Phase-2+ walk-invariant refinement).
+- **The full memory axis, straight-line, single row type**: the keys are `Semantics.MemLoc`
+  (registers *and* RAM word addresses). The frontier is **partial** — `live : MemLoc → Option _` —
+  because a total invariant over 2^64 RAM cells is not populatable; balance itself forces a `some`
+  genesis at every key the minimal row pulls (its pulled prior strictly predates the window, while
+  every batch push sits at/after it). Every row's touched locations are pairwise distinct
+  (`RowOK.locs_nodup` — intra-row same-location chaining is the SP-6 walk-invariant refinement,
+  still pending).
+- **Location-dependent effect offsets** (SP1's ordinary schedule, matching `microValue`'s effect
+  convention): a register write lands at `t + 4`, a RAM write at `t + 1` (`writeOffset`); register
+  reads observe pre-write content anywhere in `[t, t + 3]`, while RAM reads are pinned at `δ = 0`
+  (`readWindow` — the RAM effect lands at `+1`, so only the window start observes pre-effect
+  content).
 - **The three layers collapse into one strong induction** on the remaining rows (`walk`): at each step
   the row with **minimal state-pull time** is popped; balance + per-row time discipline force its
   state pull to equal the running head (layer A: unique live record per level), its memory pulls to
   equal the per-key `live` frontier messages (layer B: per-key push uniqueness ⇒ chain linearity),
   and its `LocalStepFact`/`FrameFact` fire to advance the head, the frontier, and the truth invariants
   (layer C: step facts fire in time order).
-- **`FrameFact` is a required per-row record beyond `Truth.LocalStepFact`**: the step fact alone cannot give
-  the engine value-persistence across a window for locations the row does not change — a key Phase-1
-  finding: the per-chip `advance` obligation must include a register-frame fact.
-- The `microValue` **register-epoch lemmas** (`regEpoch`, `microValue_reg`, `valueAt_shift`) are the
-  semantic crux of "chain linearity ⇒ currency": for registers, the trajectory content is constant on
-  each epoch `[c0+8k+4, c0+8(k+1)+4)`, so intra-window shifts are free and cross-window persistence
-  reduces to the rows' frames. -/
+- **`FrameFact` is a required per-row record beyond `Truth.LocalStepFact`**, now over **all**
+  locations: the step fact alone cannot give the engine value-persistence across a window for
+  locations the row does not change — chips owe frames for RAM words as well as registers.
+- The `microValue` **epoch lemmas** — the register trio (`regEpoch`, `microValue_reg`,
+  `localValueAt_shift`) and the RAM trio (`ramEpoch`, `microValue_ram`, `localValueAt_shift_ram`) —
+  are the semantic crux of "chain linearity ⇒ currency": the trajectory content is constant on
+  each epoch (`[c0+8k+4, c0+8(k+1)+4)` for registers, `[c0+8k+1, c0+8(k+1)+1)` for RAM), so
+  intra-window shifts are free and cross-window persistence reduces to the rows' frames.
+- **Forward-compatible SP-6 fields**: `RowOK.align8` (mod-8 window alignment of every state pull to
+  the public initial clock) and `LiveOK`'s frontier-time bound (`timeNat m ≤ t` per `some` record)
+  are carried and re-established through the walk now, ahead of the intra-row chain rewrite that
+  consumes them. -/
 
 namespace SP1Clean.Soundness.TimedGrounding
 
@@ -119,40 +134,130 @@ lemma localValueAt_shift {program : GuestProgram} {initial : SailState} {initial
   rw [he]
   exact hv
 
+/-! ## The RAM-epoch view of `microValue` -/
+
+/-- The `chainState` index whose content `microValue` reads at a **RAM** location: window
+`k = (τ - c0) / 8` pre-state at offset `0` only, post-state (`k+1`) for offsets `1..7` — the RAM
+effect lands at the `+1` `MemoryAccess` push offset. -/
+def ramEpoch (c0 τ : ℕ) : ℕ :=
+  if τ < c0 then 0 else (τ - c0) / 8 + (if 1 ≤ (τ - c0) % 8 then 1 else 0)
+
+/-- `microValue` at a RAM address is the `ramEpoch`-indexed trajectory content. -/
+lemma microValue_ram (s0 : SailState) (c0 : ℕ) (a : BitVec 64) (τ : ℕ) :
+    microValue s0 c0 (MemLoc.ram a) τ
+      = (chainState s0 (ramEpoch c0 τ)).bind (locContent · (MemLoc.ram a)) := by
+  rw [microValue, ramEpoch]
+  by_cases h : τ < c0
+  · rw [if_pos h, if_pos h]
+    rfl
+  · rw [if_neg h, if_neg h]
+    by_cases h1 : 1 ≤ (τ - c0) % 8 <;> simp [h1]
+
+lemma ramEpoch_eq_of {c0 τ n : ℕ} (h : c0 + 8 * n ≤ τ) (h' : τ < c0 + 8 * n + 1) :
+    ramEpoch c0 τ = n := by
+  simp only [ramEpoch]
+  split
+  · omega
+  · split <;> omega
+
+lemma ramEpoch_eq_succ_of {c0 τ n : ℕ} (h : c0 + 8 * n + 1 ≤ τ) (h' : τ < c0 + 8 * n + 9) :
+    ramEpoch c0 τ = n + 1 := by
+  simp only [ramEpoch]
+  split
+  · omega
+  · split <;> omega
+
+omit [Fact (2 ^ 17 < p)] in
+/-- **Intra-epoch shift, RAM.** The RAM analogue of `localValueAt_shift`: a RAM `LocalValueAt` fact
+moves freely between two times of the same RAM epoch of the same execution window. Window `Or.inl`:
+both times at the pre-effect point `[t, t+1)` (i.e. exactly `t`); `Or.inr`: both in the post-effect
+epoch `[t+1, t+9)`. -/
+lemma localValueAt_shift_ram {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
+    {m : StateMsg (ZMod p)} (h_m : LocalStateTruth program initial initialClock m)
+    {a : BitVec 64} {v : Word (ZMod p)} {τ τ' : ℕ}
+    (hwin : (StateMsg.timeNat m ≤ τ ∧ τ < StateMsg.timeNat m + 1 ∧
+             StateMsg.timeNat m ≤ τ' ∧ τ' < StateMsg.timeNat m + 1) ∨
+            (StateMsg.timeNat m + 1 ≤ τ ∧ τ < StateMsg.timeNat m + 9 ∧
+             StateMsg.timeNat m + 1 ≤ τ' ∧ τ' < StateMsg.timeNat m + 9))
+    (h : LocalValueAt initial initialClock (MemLoc.ram a) τ v) :
+    LocalValueAt initial initialClock (MemLoc.ram a) τ' v := by
+  obtain ⟨n, -, -, htime, -, -, -⟩ := h_m
+  have hv := h
+  unfold LocalValueAt at hv ⊢
+  rw [microValue_ram] at hv ⊢
+  have he : ramEpoch initialClock τ' = ramEpoch initialClock τ := by
+    rcases hwin with ⟨h1, h2, h3, h4⟩ | ⟨h1, h2, h3, h4⟩
+    · rw [ramEpoch_eq_of (n := n) (by omega) (by omega),
+        ramEpoch_eq_of (n := n) (by omega) (by omega)]
+    · rw [ramEpoch_eq_succ_of (n := n) (by omega) (by omega),
+        ramEpoch_eq_succ_of (n := n) (by omega) (by omega)]
+  rw [he]
+  exact hv
+
+/-! ## Location-dependent schedule offsets -/
+
+/-- The per-location write-effect offset of SP1's ordinary schedule: a register write lands at
+`t + 4` (the op_a write offset), a RAM write at `t + 1` (the `MemoryAccess` push offset) — matching
+`microValue`'s effect convention. -/
+def writeOffset : MemLoc → ℕ
+  | .reg _ => 4
+  | .ram _ => 1
+
+@[simp] lemma writeOffset_reg (i : BitVec 5) : writeOffset (MemLoc.reg i) = 4 := rfl
+
+@[simp] lemma writeOffset_ram (a : BitVec 64) : writeOffset (MemLoc.ram a) = 1 := rfl
+
+lemma writeOffset_le (loc : MemLoc) : writeOffset loc ≤ 4 := by
+  cases loc <;> simp
+
+/-- The per-location inclusive pre-effect read-window width: register reads observe pre-write
+content anywhere in `[t, t + 3]`; RAM reads must sit at `δ = 0` (read time `= t`), since the RAM
+effect lands at `t + 1`. -/
+def readWindow : MemLoc → ℕ
+  | .reg _ => 3
+  | .ram _ => 0
+
+@[simp] lemma readWindow_reg (i : BitVec 5) : readWindow (MemLoc.reg i) = 3 := rfl
+
+@[simp] lemma readWindow_ram (a : BitVec 64) : readWindow (MemLoc.ram a) = 0 := rfl
+
 /-! ## The per-row records -/
 
 /-- **The per-row frame obligation**: `LocalStepFact` alone is not enough for the engine — each row
-must also certify that it does not disturb registers it does not change. Under the same hypotheses as
-the step fact (pulled state truth + operand currency), for any register whose pushes
-this row all agree with `v` (untouched: vacuous; read-back: the re-pushed value; write: the written
-value when it happens to equal `v`), a `LocalValueAt v` fact advances across the row's window. -/
+must also certify that it does not disturb locations it does not change. Under the same hypotheses as
+the step fact (pulled state truth + operand currency), for any location (register **or** RAM word)
+whose pushes this row all agree with `v` (untouched: vacuous; read-back: the re-pushed value; write:
+the written value when it happens to equal `v`), a `LocalValueAt v` fact advances across the row's
+window. -/
 def FrameFact (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
     (r : RowFacts p) : Prop :=
   LocalStateTruth program initial initialClock r.statePull →
   (∀ mp ∈ r.memPulls, SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
       LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value) →
-  ∀ (i : BitVec 5) (v : Word (ZMod p)),
-    (∀ m ∈ r.memPushes, MemoryMsg.locOf m = MemLoc.reg i → m.value = v) →
-    LocalValueAt initial initialClock (MemLoc.reg i) (StateMsg.timeNat r.statePull) v →
-    LocalValueAt initial initialClock (MemLoc.reg i) (StateMsg.timeNat r.statePush) v
+  ∀ (loc : MemLoc) (v : Word (ZMod p)),
+    (∀ m ∈ r.memPushes, MemoryMsg.locOf m = loc → m.value = v) →
+    LocalValueAt initial initialClock loc (StateMsg.timeNat r.statePull) v →
+    LocalValueAt initial initialClock loc (StateMsg.timeNat r.statePush) v
 
 /-- The in-circuit-style shape/ordering facts for one paired pull/push touch of a row whose state-pull
-time is `t`: same (register) location, the pulled prior strictly predates the row, the read happens in
-the row's pre-write half-window, and the push is either a read-back (same value, pre-write time) or
-the write at `t + 4`. -/
+time is `t`: same location, the pulled prior strictly predates the row, the read happens in the
+location's pre-effect read window (`[t, t+3]` for registers, exactly `t` for RAM), and the push is
+either a read-back (same value, pre-write time) or the write at `t + writeOffset` (`t + 4` register,
+`t + 1` RAM). -/
 structure TouchOK (t : ℕ) (mp : MemoryMsg (ZMod p) × ℕ) (q : MemoryMsg (ZMod p)) : Prop where
   loc_eq : MemoryMsg.locOf q = MemoryMsg.locOf mp.1
-  is_reg : ∃ i : BitVec 5, MemoryMsg.locOf q = MemLoc.reg i
   pull_before : MemoryMsg.timeNat mp.1 < t
   read_lo : t ≤ mp.2
-  read_hi : mp.2 ≤ t + 3
+  read_hi : mp.2 ≤ t + readWindow (MemoryMsg.locOf mp.1)
   push_kind : (q.value = mp.1.value ∧ t ≤ MemoryMsg.timeNat q ∧ MemoryMsg.timeNat q ≤ t + 3) ∨
-    MemoryMsg.timeNat q = t + 4
+    MemoryMsg.timeNat q = t + writeOffset (MemoryMsg.locOf q)
 
-/-- The in-circuit-style per-row facts: `+8` clock discipline, positionally paired touches, and
+/-- The in-circuit-style per-row facts: `+8` clock discipline, mod-8 window alignment to the public
+initial clock (the SP-6 forward-compatibility field), positionally paired touches, and
 pairwise-distinct touched locations. -/
-structure RowOK (r : RowFacts p) : Prop where
+structure RowOK (initialClock : ℕ) (r : RowFacts p) : Prop where
   time8 : StateMsg.timeNat r.statePush = StateMsg.timeNat r.statePull + 8
+  align8 : StateMsg.timeNat r.statePull % 8 = initialClock % 8
   touches : List.Forall₂ (TouchOK (StateMsg.timeNat r.statePull)) r.memPulls r.memPushes
   locs_nodup : (r.memPushes.map MemoryMsg.locOf).Nodup
 
@@ -165,31 +270,48 @@ def Grounded (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
   ∀ mp ∈ r.memPulls, LocalMemTruth initial initialClock mp.1 ∧
     LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value
 
-/-- The walk invariant for the per-key memory frontier `live`: each key's frontier message sits at
-that key, its own guarantee (`LocalMemTruth`) holds, and its value is current at the head time `t`. -/
+/-- The walk invariant for the **partial** per-key memory frontier `live`: at each key that carries a
+frontier record, that record sits at the key, its own guarantee (`LocalMemTruth`) holds, its value is
+current at the head time `t`, and its time is at most `t` (the SP-6 forward-compatibility bound).
+Keys with `live loc = none` (untouched RAM, in particular) carry no invariant. -/
 def LiveOK (initial : SailState) (initialClock t : ℕ)
-    (live : BitVec 5 → MemoryMsg (ZMod p)) : Prop :=
-  ∀ i : BitVec 5, MemoryMsg.locOf (live i) = MemLoc.reg i ∧
-    LocalMemTruth initial initialClock (live i) ∧
-    LocalValueAt initial initialClock (MemLoc.reg i) t (live i).value
+    (live : MemLoc → Option (MemoryMsg (ZMod p))) : Prop :=
+  ∀ (loc : MemLoc) (m : MemoryMsg (ZMod p)), live loc = some m →
+    MemoryMsg.locOf m = loc ∧
+    LocalMemTruth initial initialClock m ∧
+    LocalValueAt initial initialClock loc t m.value ∧
+    MemoryMsg.timeNat m ≤ t
 
 /-! ## Per-key record lists -/
 
-/-- The row's pulled prior messages at register `i`. -/
-def rowPullsAt (r : RowFacts p) (i : BitVec 5) : List (MemoryMsg (ZMod p)) :=
-  (r.memPulls.map (·.1)).filter fun m => MemoryMsg.locOf m = MemLoc.reg i
+/-- An optional boundary record as a multiset (per-key genesis/final frontier entries have length
+≤ 1). -/
+def optMS {α : Type} (o : Option α) : Multiset α := ↑o.toList
 
-/-- The row's pushed messages at register `i`. -/
-def rowPushesAt (r : RowFacts p) (i : BitVec 5) : List (MemoryMsg (ZMod p)) :=
-  r.memPushes.filter fun m => MemoryMsg.locOf m = MemLoc.reg i
+@[simp] lemma optMS_none {α : Type} : optMS (none : Option α) = 0 := rfl
 
-/-- All pulled prior messages of a batch at register `i` (as a multiset — order is irrelevant). -/
-def pullsAt (rows : List (RowFacts p)) (i : BitVec 5) : Multiset (MemoryMsg (ZMod p)) :=
-  (rows.map fun r => (↑(rowPullsAt r i) : Multiset (MemoryMsg (ZMod p)))).sum
+@[simp] lemma optMS_some {α : Type} (a : α) : optMS (some a) = {a} := rfl
 
-/-- All pushed messages of a batch at register `i`. -/
-def pushesAt (rows : List (RowFacts p)) (i : BitVec 5) : Multiset (MemoryMsg (ZMod p)) :=
-  (rows.map fun r => (↑(rowPushesAt r i) : Multiset (MemoryMsg (ZMod p)))).sum
+lemma mem_optMS {α : Type} {a : α} {o : Option α} : a ∈ optMS o ↔ o = some a := by
+  cases o with
+  | none => simp
+  | some b => simp [eq_comm]
+
+/-- The row's pulled prior messages at location `loc`. -/
+def rowPullsAt (r : RowFacts p) (loc : MemLoc) : List (MemoryMsg (ZMod p)) :=
+  (r.memPulls.map (·.1)).filter fun m => MemoryMsg.locOf m = loc
+
+/-- The row's pushed messages at location `loc`. -/
+def rowPushesAt (r : RowFacts p) (loc : MemLoc) : List (MemoryMsg (ZMod p)) :=
+  r.memPushes.filter fun m => MemoryMsg.locOf m = loc
+
+/-- All pulled prior messages of a batch at location `loc` (as a multiset — order is irrelevant). -/
+def pullsAt (rows : List (RowFacts p)) (loc : MemLoc) : Multiset (MemoryMsg (ZMod p)) :=
+  (rows.map fun r => (↑(rowPullsAt r loc) : Multiset (MemoryMsg (ZMod p)))).sum
+
+/-- All pushed messages of a batch at location `loc`. -/
+def pushesAt (rows : List (RowFacts p)) (loc : MemLoc) : Multiset (MemoryMsg (ZMod p)) :=
+  (rows.map fun r => (↑(rowPushesAt r loc) : Multiset (MemoryMsg (ZMod p)))).sum
 
 /-! ## List/multiset helpers -/
 
@@ -284,7 +406,7 @@ private lemma coe_map_pop {α β : Type} (f : α → β) (l1 l2 : List α) (r : 
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- All pushes of a row happen at/after its state-pull time. -/
-lemma push_time_ge {r : RowFacts p} (hok : RowOK r) {q : MemoryMsg (ZMod p)}
+lemma push_time_ge {c0 : ℕ} {r : RowFacts p} (hok : RowOK c0 r) {q : MemoryMsg (ZMod p)}
     (hq : q ∈ r.memPushes) : StateMsg.timeNat r.statePull ≤ MemoryMsg.timeNat q := by
   obtain ⟨mp, -, hto⟩ := forall₂_exists_left hok.touches q hq
   rcases hto.push_kind with ⟨-, h, -⟩ | h <;> omega
@@ -292,43 +414,52 @@ lemma push_time_ge {r : RowFacts p} (hok : RowOK r) {q : MemoryMsg (ZMod p)}
 /-! ## The timed grounding walk -/
 
 omit [Fact (2 ^ 17 < p)] in
-/-- **The ordinary-register timed grounding theorem.** Given per-row `LocalStepFact`s and
+/-- **The ordinary timed grounding theorem.** Given per-row `LocalStepFact`s and
 `FrameFact`s, the in-circuit-style shape/ordering facts (`RowOK`), a true head state record
-(`LocalStateTruth head` — the boundary init push at the top level), a true per-key memory frontier
-(`LiveOK` — the genesis pushes at the top level), and the state/memory multiset balances, **every
-pull's guarantee holds**: each row is `Grounded` (its state pull's `LocalStateTruth`, its memory pulls'
-`LocalMemTruth`s, and its read-time currencies), the final state pull `fin` is true, and each key's
-finalize pull `finM i` is true.
+(`LocalStateTruth head` — the boundary init push at the top level), a true partial per-key memory
+frontier (`LiveOK` — the genesis pushes at the top level), and the state/memory multiset balances,
+**every pull's guarantee holds**: each row is `Grounded` (its state pull's `LocalStateTruth`, its
+memory pulls' `LocalMemTruth`s, and its read-time currencies), the final state pull `fin` is true, and
+each key's finalize pull `finM loc` (where present) is true.
 
 Strong induction on the batch size: pop the row with minimal state-pull time; balance + time
-discipline force it to pull `head` (layer A) and its memory pulls to equal the frontier (layer B);
-its `LocalStepFact` fires (layer C), and its pushes/`FrameFact` rebuild the invariant one window later. -/
+discipline force it to pull `head` (layer A) and its memory pulls to equal the frontier — in
+particular balance forces a `some` genesis at every key the row pulls (layer B); its `LocalStepFact`
+fires (layer C), and its pushes/`FrameFact` rebuild the invariant one window later. -/
 theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
     (fin : StateMsg (ZMod p))
-    (finM : BitVec 5 → MemoryMsg (ZMod p)) :
+    (finM : MemLoc → Option (MemoryMsg (ZMod p))) :
     ∀ (N : ℕ) (rows : List (RowFacts p)) (head : StateMsg (ZMod p))
-      (live : BitVec 5 → MemoryMsg (ZMod p)),
+      (live : MemLoc → Option (MemoryMsg (ZMod p))),
       rows.length = N →
       (∀ r ∈ rows, LocalStepFact program initial initialClock r) →
       (∀ r ∈ rows, FrameFact program initial initialClock r) →
-      (∀ r ∈ rows, RowOK r) →
+      (∀ r ∈ rows, RowOK initialClock r) →
       LocalStateTruth program initial initialClock head →
       LiveOK initial initialClock (StateMsg.timeNat head) live →
       (head ::ₘ (↑(rows.map (·.statePush)) : Multiset (StateMsg (ZMod p)))
         = fin ::ₘ ↑(rows.map (·.statePull))) →
-      (∀ i : BitVec 5, (live i) ::ₘ pushesAt rows i = (finM i) ::ₘ pullsAt rows i) →
+      (∀ loc : MemLoc, optMS (live loc) + pushesAt rows loc
+        = optMS (finM loc) + pullsAt rows loc) →
       (∀ r ∈ rows, Grounded program initial initialClock r) ∧
         LocalStateTruth program initial initialClock fin ∧
-        ∀ i : BitVec 5, LocalMemTruth initial initialClock (finM i) := by
+        ∀ (loc : MemLoc) (m : MemoryMsg (ZMod p)), finM loc = some m →
+          LocalMemTruth initial initialClock m := by
   intro N
   induction N with
   | zero =>
     intro rows head live hlen _ _ _ h_head h_live h_sbal h_mbal
     obtain rfl : rows = [] := List.length_eq_zero_iff.mp hlen
     have h_fin : head = fin := by simpa using h_sbal
-    refine ⟨by simp, h_fin ▸ h_head, fun i => ?_⟩
-    have h_fm : live i = finM i := by simpa [pullsAt, pushesAt] using h_mbal i
-    exact h_fm ▸ (h_live i).2.1
+    refine ⟨by simp, h_fin ▸ h_head, fun loc m hm => ?_⟩
+    have h_fm : optMS (live loc) = optMS (finM loc) := by
+      simpa [pullsAt, pushesAt] using h_mbal loc
+    rw [hm, optMS_some] at h_fm
+    cases hlv : live loc with
+    | none => rw [hlv, optMS_none] at h_fm; simp at h_fm
+    | some m' =>
+      rw [hlv, optMS_some, Multiset.singleton_inj] at h_fm
+      exact h_fm ▸ (h_live loc m' hlv).2.1
   | succ N ih =>
     intro rows head live hlen h_step h_frame h_ok h_head h_live h_sbal h_mbal
     have hne : rows ≠ [] := fun h => by simp [h] at hlen
@@ -355,22 +486,19 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
     have ht_head : StateMsg.timeNat r.statePull = StateMsg.timeNat head := by rw [hr_pull]
     -- (B) every memory pull of `r` equals the per-key frontier: its match in the per-key balance
     -- cannot be a push (all push times sit at/after their row's window ≥ the minimal window, while
-    -- the pulled prior strictly predates it).
-    have h_match : ∀ mp ∈ r.memPulls, ∃ i : BitVec 5,
-        MemoryMsg.locOf mp.1 = MemLoc.reg i ∧ mp.1 = live i := by
+    -- the pulled prior strictly predates it) — so balance forces a `some` genesis at the key.
+    have h_match : ∀ mp ∈ r.memPulls, live (MemoryMsg.locOf mp.1) = some mp.1 := by
       intro mp hmp
       obtain ⟨q, hq_mem, hto⟩ := forall₂_exists_right h_rok.touches mp hmp
-      obtain ⟨i, hqi⟩ := hto.is_reg
-      have hloc : MemoryMsg.locOf mp.1 = MemLoc.reg i := by rw [← hto.loc_eq]; exact hqi
-      refine ⟨i, hloc, ?_⟩
-      have hmem : mp.1 ∈ ((live i) ::ₘ pushesAt rows i) := by
-        rw [h_mbal i]
-        refine Multiset.mem_cons_of_mem ?_
+      have hmem : mp.1 ∈ optMS (live (MemoryMsg.locOf mp.1))
+          + pushesAt rows (MemoryMsg.locOf mp.1) := by
+        rw [h_mbal (MemoryMsg.locOf mp.1)]
+        refine Multiset.mem_add.mpr (Or.inr ?_)
         simp only [pullsAt, mem_listSum_map]
         exact ⟨r, hr_mem, Multiset.mem_coe.mpr (List.mem_filter.mpr
-          ⟨List.mem_map_of_mem hmp, by simp [hloc]⟩)⟩
-      rcases Multiset.mem_cons.mp hmem with h | h
-      · exact h
+          ⟨List.mem_map_of_mem hmp, by simp⟩)⟩
+      rcases Multiset.mem_add.mp hmem with h | h
+      · exact mem_optMS.mp h
       · exfalso
         simp only [pushesAt, mem_listSum_map] at h
         obtain ⟨r', hr'_mem, hq'⟩ := h
@@ -380,22 +508,32 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
         have h2 := hr_min r' hr'_mem
         have h3 := hto.pull_before
         omega
-    -- read-time currency for `r`'s pulls, from the frontier + intra-epoch shift
+    -- read-time currency for `r`'s pulls, from the frontier + intra-epoch shift (register reads
+    -- shift within the pre-write half-window; RAM reads are pinned at the window start)
     have h_curr : ∀ mp ∈ r.memPulls, SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
         LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value := by
       intro mp hmp
-      obtain ⟨i, hloc, hlive⟩ := h_match mp hmp
+      obtain ⟨-, hmt_live, hval_live, -⟩ := h_live _ mp.1 (h_match mp hmp)
       obtain ⟨q, hq_mem, hto⟩ := forall₂_exists_right h_rok.touches mp hmp
-      refine ⟨by rw [hlive]; exact (h_live i).2.1.1, ?_⟩
-      rw [hloc, hlive]
-      refine localValueAt_shift h_head (Or.inl ⟨le_refl _, by omega, ?_, ?_⟩) (h_live i).2.2
-      · have := hto.read_lo; omega
-      · have := hto.read_hi; omega
+      refine ⟨hmt_live.1, ?_⟩
+      have hlo := hto.read_lo
+      have hhi := hto.read_hi
+      cases hloc : MemoryMsg.locOf mp.1 with
+      | reg i =>
+        rw [hloc, readWindow_reg] at hhi
+        rw [hloc] at hval_live
+        exact localValueAt_shift h_head
+          (Or.inl ⟨le_refl _, by omega, by omega, by omega⟩) hval_live
+      | ram a =>
+        rw [hloc, readWindow_ram] at hhi
+        rw [hloc] at hval_live
+        have hread : mp.2 = StateMsg.timeNat head := by omega
+        rw [hread]
+        exact hval_live
     -- (C) fire the row's StepFact
     have h_after := h_step r hr_mem h_rtruth h_curr
-    have h_ground_r : Grounded program initial initialClock r := ⟨h_rtruth, fun mp hmp => by
-      obtain ⟨i, hloc, hlive⟩ := h_match mp hmp
-      exact ⟨by rw [hlive]; exact (h_live i).2.1, (h_curr mp hmp).2⟩⟩
+    have h_ground_r : Grounded program initial initialClock r := ⟨h_rtruth, fun mp hmp =>
+      ⟨(h_live _ mp.1 (h_match mp hmp)).2.1, (h_curr mp hmp).2⟩⟩
     -- pop `r` out of the batch
     obtain ⟨l1, l2, rfl⟩ : ∃ l1 l2, rows = l1 ++ r :: l2 := List.append_of_mem hr_mem
     have hlen' : (l1 ++ l2).length = N := by
@@ -415,20 +553,20 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
       show (r.memPulls.map (fun mp => MemoryMsg.locOf mp.1)).Nodup
       rw [← h_maps]
       exact h_rok.locs_nodup
-    have h_touch_push : ∀ (i : BitVec 5), ∀ q ∈ r.memPushes,
-        MemoryMsg.locOf q = MemLoc.reg i → rowPushesAt r i = [q] := by
-      intro i q hq hloc
+    have h_touch_push : ∀ (loc : MemLoc), ∀ q ∈ r.memPushes,
+        MemoryMsg.locOf q = loc → rowPushesAt r loc = [q] := by
+      intro loc q hq hloc
       unfold rowPushesAt
       exact filter_map_nodup_singleton _ _ h_rok.locs_nodup q hq _ hloc
-    have h_touch_pull : ∀ (i : BitVec 5), ∀ mp ∈ r.memPulls,
-        MemoryMsg.locOf mp.1 = MemLoc.reg i → rowPullsAt r i = [mp.1] := by
-      intro i mp hmp hloc
+    have h_touch_pull : ∀ (loc : MemLoc), ∀ mp ∈ r.memPulls,
+        MemoryMsg.locOf mp.1 = loc → rowPullsAt r loc = [mp.1] := by
+      intro loc mp hmp hloc
       unfold rowPullsAt
       exact filter_map_nodup_singleton _ _ h_pulls_nodup mp.1 (List.mem_map_of_mem hmp) _ hloc
-    have h_untouched : ∀ i : BitVec 5,
-        (¬ ∃ q ∈ r.memPushes, MemoryMsg.locOf q = MemLoc.reg i) →
-        rowPushesAt r i = [] ∧ rowPullsAt r i = [] := by
-      intro i hno
+    have h_untouched : ∀ loc : MemLoc,
+        (¬ ∃ q ∈ r.memPushes, MemoryMsg.locOf q = loc) →
+        rowPushesAt r loc = [] ∧ rowPullsAt r loc = [] := by
+      intro loc hno
       constructor
       · unfold rowPushesAt
         refine List.filter_eq_nil_iff.mpr fun q hq hloc => ?_
@@ -441,43 +579,59 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
         obtain ⟨q, hq, hto⟩ := forall₂_exists_right h_rok.touches mp hmp
         exact hno ⟨q, hq, hto.loc_eq.trans hloc⟩
     have h8 := h_rok.time8
-    -- the new frontier: the row's push where it touched, unchanged elsewhere
+    -- the new frontier: the row's push where it touched, unchanged (possibly absent) elsewhere
     have h_liveOK' : LiveOK initial initialClock (StateMsg.timeNat r.statePush)
-        (fun i => (rowPushesAt r i).headD (live i)) := by
-      intro i
-      dsimp only
-      by_cases htouch : ∃ q ∈ r.memPushes, MemoryMsg.locOf q = MemLoc.reg i
+        (fun loc => (rowPushesAt r loc).head?.or (live loc)) := by
+      intro loc m hm
+      dsimp only at hm
+      by_cases htouch : ∃ q ∈ r.memPushes, MemoryMsg.locOf q = loc
       · obtain ⟨q, hq_mem, hq_loc⟩ := htouch
-        rw [h_touch_push i q hq_mem hq_loc]
-        simp only [List.headD_cons]
+        rw [h_touch_push loc q hq_mem hq_loc] at hm
+        simp only [List.head?_cons, Option.some_or, Option.some.injEq] at hm
+        subst hm
         obtain ⟨mp, hmp_mem, hto⟩ := forall₂_exists_left h_rok.touches q hq_mem
-        have hmp_loc : MemoryMsg.locOf mp.1 = MemLoc.reg i := by rw [← hto.loc_eq]; exact hq_loc
-        obtain ⟨i', hloc', hlive_eq⟩ := h_match mp hmp_mem
-        rw [MemLoc.reg.inj (hloc'.symm.trans hmp_loc)] at hlive_eq
-        refine ⟨hq_loc, h_after.2 q hq_mem, ?_⟩
-        rcases hto.push_kind with ⟨hvq, hlo, hhi⟩ | hw
-        · -- read-back: the pushed value is the (still-current) pulled value — frame across the window
-          refine h_frame r hr_mem h_rtruth h_curr i q.value ?_ ?_
-          · intro m hm hml
-            have hqm : ([q] : List (MemoryMsg (ZMod p))) = [m] := by
-              rw [← h_touch_push i q hq_mem hq_loc, h_touch_push i m hm hml]
-            have hq_eq : q = m := by simpa using hqm
-            rw [← hq_eq]
-          · rw [hvq, hlive_eq, ht_head]
-            exact (h_live i).2.2
-        · -- write: the push's own MemTruth at `t+4`, shifted to the window end
-          have hmt := (h_after.2 q hq_mem).2
-          rw [hq_loc] at hmt
-          exact localValueAt_shift h_head (Or.inr ⟨by omega, by omega, by omega, by omega⟩) hmt
-      · obtain ⟨hp, -⟩ := h_untouched i htouch
-        rw [hp]
-        simp only [List.headD_nil]
-        refine ⟨(h_live i).1, (h_live i).2.1, ?_⟩
-        refine h_frame r hr_mem h_rtruth h_curr i (live i).value ?_ ?_
-        · intro m hm hml
-          exact absurd ⟨m, hm, hml⟩ htouch
+        have hmp_loc : MemoryMsg.locOf mp.1 = loc := by rw [← hto.loc_eq]; exact hq_loc
+        have hlive_eq := h_match mp hmp_mem
+        rw [hmp_loc] at hlive_eq
+        obtain ⟨-, -, hval_live, -⟩ := h_live loc mp.1 hlive_eq
+        refine ⟨hq_loc, h_after.2 q hq_mem, ?_, ?_⟩
+        · rcases hto.push_kind with ⟨hvq, hlo, hhi⟩ | hw
+          · -- read-back: the pushed value is the (still-current) pulled value — frame across
+            refine h_frame r hr_mem h_rtruth h_curr loc q.value ?_ ?_
+            · intro m' hm' hml
+              have hqm : ([q] : List (MemoryMsg (ZMod p))) = [m'] := by
+                rw [← h_touch_push loc q hq_mem hq_loc, h_touch_push loc m' hm' hml]
+              have hq_eq : q = m' := by simpa using hqm
+              rw [← hq_eq]
+            · rw [hvq, ht_head]
+              exact hval_live
+          · -- write: the push's own MemTruth at `t + writeOffset`, shifted to the window end
+            have hmt := (h_after.2 q hq_mem).2
+            rw [hq_loc] at hmt hw
+            cases loc with
+            | reg i =>
+              rw [writeOffset_reg] at hw
+              exact localValueAt_shift h_head
+                (Or.inr ⟨by omega, by omega, by omega, by omega⟩) hmt
+            | ram a =>
+              rw [writeOffset_ram] at hw
+              exact localValueAt_shift_ram h_head
+                (Or.inr ⟨by omega, by omega, by omega, by omega⟩) hmt
+        · -- frontier-time bound: read-backs sit in the pre-write window, writes at `+offset ≤ +4`
+          rcases hto.push_kind with ⟨-, -, hhi⟩ | hw
+          · omega
+          · have hle := writeOffset_le (MemoryMsg.locOf q)
+            omega
+      · obtain ⟨hp, -⟩ := h_untouched loc htouch
+        rw [hp] at hm
+        simp only [List.head?_nil, Option.none_or] at hm
+        obtain ⟨hloc_m, hmt_m, hval_m, htime_m⟩ := h_live loc m hm
+        refine ⟨hloc_m, hmt_m, ?_, by omega⟩
+        refine h_frame r hr_mem h_rtruth h_curr loc m.value ?_ ?_
+        · intro m' hm' hml
+          exact absurd ⟨m', hm', hml⟩ htouch
         · rw [ht_head]
-          exact (h_live i).2.2
+          exact hval_m
     -- state balance advances: cancel the consumed head
     have h_sbal' : r.statePush ::ₘ (↑((l1 ++ l2).map (·.statePush)) : Multiset (StateMsg (ZMod p)))
         = fin ::ₘ ↑((l1 ++ l2).map (·.statePull)) := by
@@ -485,33 +639,35 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
       rw [coe_map_pop, coe_map_pop, hr_pull, Multiset.cons_swap fin head] at h
       exact (Multiset.cons_inj_right _).mp h
     -- per-key memory balance advances: cancel the consumed frontier
-    have h_mbal' : ∀ i : BitVec 5,
-        ((rowPushesAt r i).headD (live i)) ::ₘ pushesAt (l1 ++ l2) i
-          = (finM i) ::ₘ pullsAt (l1 ++ l2) i := by
-      intro i
-      have hbal := h_mbal i
+    have h_mbal' : ∀ loc : MemLoc,
+        optMS ((rowPushesAt r loc).head?.or (live loc)) + pushesAt (l1 ++ l2) loc
+          = optMS (finM loc) + pullsAt (l1 ++ l2) loc := by
+      intro loc
+      have hbal := h_mbal loc
       simp only [pushesAt, pullsAt] at hbal ⊢
       rw [listSum_map_pop, listSum_map_pop] at hbal
-      by_cases htouch : ∃ q ∈ r.memPushes, MemoryMsg.locOf q = MemLoc.reg i
+      by_cases htouch : ∃ q ∈ r.memPushes, MemoryMsg.locOf q = loc
       · obtain ⟨q, hq_mem, hq_loc⟩ := htouch
         obtain ⟨mp, hmp_mem, hto⟩ := forall₂_exists_left h_rok.touches q hq_mem
-        have hmp_loc : MemoryMsg.locOf mp.1 = MemLoc.reg i := by rw [← hto.loc_eq]; exact hq_loc
-        obtain ⟨i', hloc', hlive_eq⟩ := h_match mp hmp_mem
-        rw [MemLoc.reg.inj (hloc'.symm.trans hmp_loc)] at hlive_eq
-        rw [h_touch_push i q hq_mem hq_loc, h_touch_pull i mp hmp_mem hmp_loc, hlive_eq] at hbal
-        rw [h_touch_push i q hq_mem hq_loc]
-        simp only [List.headD_cons]
-        simp only [Multiset.coe_singleton, Multiset.singleton_add] at hbal
-        rw [Multiset.cons_swap (finM i) (live i)] at hbal
+        have hmp_loc : MemoryMsg.locOf mp.1 = loc := by rw [← hto.loc_eq]; exact hq_loc
+        have hlive_eq := h_match mp hmp_mem
+        rw [hmp_loc] at hlive_eq
+        rw [h_touch_push loc q hq_mem hq_loc, h_touch_pull loc mp hmp_mem hmp_loc,
+          hlive_eq] at hbal
+        rw [h_touch_push loc q hq_mem hq_loc]
+        simp only [List.head?_cons, Option.some_or, optMS_some, Multiset.coe_singleton,
+          Multiset.singleton_add] at hbal ⊢
+        rw [Multiset.add_cons] at hbal
         exact (Multiset.cons_inj_right _).mp hbal
-      · obtain ⟨hp, hl⟩ := h_untouched i htouch
+      · obtain ⟨hp, hl⟩ := h_untouched loc htouch
         rw [hp, hl] at hbal
         rw [hp]
-        simp only [List.headD_nil, Multiset.coe_nil, Multiset.zero_add] at hbal ⊢
+        simp only [List.head?_nil, Option.none_or, Multiset.coe_nil, Multiset.zero_add]
+          at hbal ⊢
         exact hbal
     -- recurse on the rest
     obtain ⟨hg_rest, hfin, hfinM⟩ := ih (l1 ++ l2) r.statePush
-      (fun i => (rowPushesAt r i).headD (live i)) hlen'
+      (fun loc => (rowPushesAt r loc).head?.or (live loc)) hlen'
       (fun r' h => h_step r' (hsub r' h)) (fun r' h => h_frame r' (hsub r' h))
       (fun r' h => h_ok r' (hsub r' h)) h_after.1 h_liveOK' h_sbal' h_mbal'
     refine ⟨?_, hfin, hfinM⟩
