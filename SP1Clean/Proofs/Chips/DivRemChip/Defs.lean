@@ -5,7 +5,7 @@ import SP1Clean.Proofs.Operations.IsZeroWordOperation.Formal
 import SP1Clean.Proofs.Operations.AddOperation.Formal
 import SP1Clean.Proofs.Operations.U16MSBOperation.Formal
 import SP1Clean.Proofs.Operations.LtOperationUnsigned.Formal
-import SP1Clean.Proofs.Chips.DivRemChip.OwnAsserts
+import SP1Clean.Native.Operations.DivRemOperation.OwnAsserts
 import SP1Clean.Proofs.Chips.DivRemChip.Populate
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.RTypeReader

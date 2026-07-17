@@ -393,4 +393,78 @@ theorem isReal_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
   simp only [ownAsserts, List.mem_cons, List.not_mem_nil, or_false]
   tauto
 
+
+set_option maxHeartbeats 8000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- The `is_div` selector's boolean gate is part of the pure DivRem own-assertion list. -/
+theorem isDiv_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+    cols.is_div * (cols.is_div - 1) ∈ ownAsserts cols := by
+  simp only [ownAsserts, List.mem_cons, List.not_mem_nil, or_false]
+  tauto
+
+set_option maxHeartbeats 8000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- The `is_divu` selector's boolean gate is part of the pure DivRem own-assertion list. -/
+theorem isDivu_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+    cols.is_divu * (cols.is_divu - 1) ∈ ownAsserts cols := by
+  simp only [ownAsserts, List.mem_cons, List.not_mem_nil, or_false]
+  tauto
+
+set_option maxHeartbeats 8000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- The `is_rem` selector's boolean gate is part of the pure DivRem own-assertion list. -/
+theorem isRem_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+    cols.is_rem * (cols.is_rem - 1) ∈ ownAsserts cols := by
+  simp only [ownAsserts, List.mem_cons, List.not_mem_nil, or_false]
+  tauto
+
+set_option maxHeartbeats 8000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- The `is_remu` selector's boolean gate is part of the pure DivRem own-assertion list. -/
+theorem isRemu_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+    cols.is_remu * (cols.is_remu - 1) ∈ ownAsserts cols := by
+  simp only [ownAsserts, List.mem_cons, List.not_mem_nil, or_false]
+  tauto
+
+set_option maxHeartbeats 8000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- The `is_divw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
+theorem isDivw_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+    cols.is_divw * (cols.is_divw - 1) ∈ ownAsserts cols := by
+  simp only [ownAsserts, List.mem_cons, List.not_mem_nil, or_false]
+  tauto
+
+set_option maxHeartbeats 8000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- The `is_remw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
+theorem isRemw_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+    cols.is_remw * (cols.is_remw - 1) ∈ ownAsserts cols := by
+  simp only [ownAsserts, List.mem_cons, List.not_mem_nil, or_false]
+  tauto
+
+set_option maxHeartbeats 8000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- The `is_divuw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
+theorem isDivuw_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+    cols.is_divuw * (cols.is_divuw - 1) ∈ ownAsserts cols := by
+  simp only [ownAsserts, List.mem_cons, List.not_mem_nil, or_false]
+  tauto
+
+set_option maxHeartbeats 8000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- The `is_remuw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
+theorem isRemuw_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+    cols.is_remuw * (cols.is_remuw - 1) ∈ ownAsserts cols := by
+  simp only [ownAsserts, List.mem_cons, List.not_mem_nil, or_false]
+  tauto
+
+set_option maxHeartbeats 8000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- `E367`, the eight-flag one-hot sum, is part of the pure DivRem own-assertion list. -/
+theorem flagsSum_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+    (1 : Expression (ZMod p)) - (cols.is_divu + cols.is_remu + cols.is_div + cols.is_rem +
+      cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw) ∈ ownAsserts cols := by
+  simp only [ownAsserts, List.mem_cons, List.not_mem_nil, or_false]
+  tauto
+
 end SP1Clean.DivRemChip

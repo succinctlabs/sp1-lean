@@ -1,5 +1,5 @@
 import SP1Clean.Proofs.Chips.DivRemChip.Defs
-import SP1Clean.Proofs.Chips.DivRemChip.OwnAsserts
+import SP1Clean.Native.Operations.DivRemOperation.OwnAsserts
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Abs
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Bounds
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Euclid
