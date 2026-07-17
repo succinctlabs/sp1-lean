@@ -1421,7 +1421,7 @@ theorem MulChip.programEmissionShape :
     simp [MulChip.circuit, MulChip.rowView, Extracted.RTypeReader.toAdapterView,
       programMessageOfView, circuit_norm]
 
-set_option maxHeartbeats 32000000 in
+set_option maxHeartbeats 4000000 in
 theorem DivRemChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (DivRemChip.circuit (p := p))
       DivRemChip.rowView := by
@@ -1439,30 +1439,25 @@ theorem DivRemChip.programEmissionShape :
     ?_, ?_, ?_⟩
   · intro input offset
     change circuitInteractionsWith programChannel.toRaw (DivRemChip.main input) offset = _
+    -- The rewired `main` composes just five subcircuits after the witness stream: CPUState,
+    -- RTypeReader (the one Program pull), the two whole-row assertion gadgets (byte-only), and
+    -- RegisterWrite (memory-only).
     simp only [DivRemChip.main, circuitInteractionsWith_bind,
       witnessVectorNative_localLength, witnessNative_localLength,
-      assertion_localLength, generalAssertion_localLength, pullIf_localLength,
+      assertion_localLength, generalAssertion_localLength,
       circuitInteractionsWith_witnessVectorNative,
-      circuitInteractionsWith_witnessNative, circuitInteractionsWith_assertEq,
+      circuitInteractionsWith_witnessNative,
       circuitInteractionsWith_rTypeReader,
       circuitInteractionsWith_assertion_eq_nil,
       circuitInteractionsWith_generalAssertion_eq_nil,
-      circuitInteractionsWith_assertZeros, circuitInteractionsWith_bytePullIf,
-      circuitInteractionsWith_pure, assertZeros_localLength,
+      circuitInteractionsWith_pure,
       Readers.RTypeReader.circuit_localLength,
-      MulOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit,
-      AddOperation.circuit, LtOperationUnsigned.circuit, U16MSBOperation.circuit,
       Readers.CPUState.circuit, Readers.RegisterWrite.circuit,
-      MulOperation.channelsWithGuarantees_eq,
-      IsEqualWordOperation.channelsWithGuarantees_eq,
-      IsZeroWordOperation.channelsWithGuarantees_eq,
-      AddOperation.channelsWithGuarantees_eq,
-      LtOperationUnsigned.channelsWithGuarantees_eq,
-      U16MSBOperation.channelsWithGuarantees_eq,
       Readers.CPUState.channelsWithGuarantees_eq,
       Readers.RegisterWrite.channelsWithGuarantees_eq,
+      DivRemCompare.circuit, DivRemCompare.channelsWithGuarantees_eq,
+      DivRemCore.circuit, DivRemCore.channelsWithGuarantees_eq,
       FormalCircuitBase.channelsWithGuarantees_def,
-      assertEq_localLength,
       List.mem_cons, List.not_mem_nil, or_false,
       Channels.programChannel_eq_byteChannel_false,
       Channels.programChannel_eq_stateChannel_false,

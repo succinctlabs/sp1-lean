@@ -89,10 +89,10 @@ theorem requirementsChannelsLawful (input : Var Inputs (ZMod p)) (offset : ℕ) 
       [stateChannel.toRaw, memoryChannel.toRaw] := by
   sorry
 
--- `main` composes the giant `MulOperation` subcircuit twice, so bundling `{ main, elaborated }` whnfs
--- a large term — above the default heartbeat budget (cf. the `elaborated` instance in `Defs`).
+-- Bundling `{ main, elaborated }` whnfs a large term — above the default heartbeat budget
+-- (cf. the `elaborated` instance in `Defs`).
 set_option warn.sorry false in
-set_option maxHeartbeats 16000000 in
+set_option maxHeartbeats 8000000 in
 /-- The `DivRem` chip row as a `GeneralFormalCircuit`: the generated `DivRemCols` row checked against
 the public reader/selection/eight-case contract. The disclosed whole-chip seams are
 `evidenceSoundness`, `completeness`, and the requirements-channel law below. -/

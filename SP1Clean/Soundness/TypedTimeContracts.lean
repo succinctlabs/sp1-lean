@@ -258,7 +258,7 @@ theorem MulChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (MulChip.circuit (p := p)) MulChip.rowView := by
   firstStraightCPUTimeContract MulChip.Inputs, MulChip.circuit, MulChip.main, MulChip.rowView
 
-set_option maxHeartbeats 16000000 in
+set_option maxHeartbeats 4000000 in
 theorem DivRemChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (DivRemChip.circuit (p := p)) DivRemChip.rowView := by
   unfold CircuitCPUStateTimeContract
@@ -268,39 +268,9 @@ theorem DivRemChip.cpuStateTimeContract :
   refine ⟨offset + 217,
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
       input.is_real⟩, ?_, ?_⟩
-  · simp only [input, offset, DivRemChip.circuit, DivRemChip.main, circuit_norm]
-    -- Two Mul assertions.
-    right
-    right
-    -- Eight product-limb equalities.
-    right
-    right
-    right
-    right
-    right
-    right
-    right
-    right
-    -- Four equality-word assertions and one zero-word assertion.
-    right
-    right
-    right
-    right
-    right
-    -- Two absolute-value adds and the unsigned remainder comparison.
-    right
-    right
-    right
-    -- Seven sign-bit assertions.
-    right
-    right
-    right
-    right
-    right
-    right
-    right
-    left
-    rfl
+  · -- The CPU reader is the first composed subcircuit of the rewired `main` (the whole witness
+    -- stream precedes it, hence the `offset + 217`).
+    simp only [input, offset, DivRemChip.circuit, DivRemChip.main, circuit_norm]
   · intro env
     constructor <;>
       simp [input, DivRemChip.circuit, DivRemChip.rowView, circuit_norm]

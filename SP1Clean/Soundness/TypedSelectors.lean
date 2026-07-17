@@ -357,26 +357,89 @@ theorem MulChip.mainSelectorBinary :
     MainSelectorBinary (p := p) MulChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary MulChip.main
 
+omit [Fact (2 ^ 24 < p)] in
+/-- Any shallow (top-level) assert of an operations list is among its deep constraints. -/
+private lemma mem_constraints_of_mem_shallowConstraints {e : Expression (ZMod p)}
+    {ops : Operations (ZMod p)} (h : e ∈ ops.shallowConstraints) : e ∈ ops.constraints :=
+  ((Operations.forall_constraints_iff (motive := (· ∈ ops.constraints))).mp
+    (fun _ he => he)).1 e h
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Membership transport into a composed `FormalAssertion` subcircuit's flat constraint list. -/
+private lemma mem_flatConstraints_of_assertion {Input : TypeMap} [ProvableType Input]
+    {circuit : FormalAssertion (ZMod p) Input} {input : Var Input (ZMod p)} {n : ℕ}
+    {e : Expression (ZMod p)}
+    (h : e ∈ ((circuit.main input).operations n).constraints) :
+    e ∈ FlatOperation.constraints (circuit.toSubcircuit n input).ops.toFlat := by
+  simp only [FormalAssertion.toSubcircuit]
+  rw [Operations.toNested_toFlat, Operations.constraints_toFlat]
+  exact h
+
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 10000 in
+/-- The selector gate `is_real·(is_real−1)` (`E355`) sits in the `DivRemCore` cluster's own-assert
+tail — a shallow assert of the gadget's `main`, hence one of its deep constraints. -/
+private lemma divRemCore_isReal_gate_mem_constraints
+    (cols : Var Extracted.DivRemCols (ZMod p)) (n : ℕ) :
+    cols.is_real * (cols.is_real - 1) ∈ ((DivRemCore.main cols).operations n).constraints := by
+  apply mem_constraints_of_mem_shallowConstraints
+  change cols.is_real * (cols.is_real - 1) ∈ DivRemChip.ownAsserts cols ++ _
+  exact List.mem_append_left _ (DivRemChip.isReal_gate_mem_ownAsserts cols)
+
 set_option maxHeartbeats 8000000 in
 set_option maxRecDepth 10000 in
-theorem DivRemChip.mainSelectorBinary :
-    MainSelectorBinary (p := p) DivRemChip.main (fun input => input.is_real) := by
-  constructor
-  intro input offset env shallow
-  have allConstraints := (constraintsHold_shallow_iff_forall_mem.mp shallow).1
-  have gateMem : input.is_real * (input.is_real - 1) ∈
-      ((DivRemChip.main input).operations offset).shallowConstraints := by
-    change input.is_real * (input.is_real - 1) ∈ DivRemChip.ownAsserts _ ++ _
-    apply List.mem_append_left
-    simpa only using DivRemChip.isReal_gate_mem_ownAsserts _
-  have gate := allConstraints _ gateMem
-  have binary : Expression.eval env input.is_real = 0 ∨
-      Expression.eval env input.is_real = 1 := by
+/-- The selector gate is a deep constraint of the chip `main`: its deep constraint list is
+`CPUState ++ (RTypeReader ++ (Compare ++ (Core ++ (RegisterWrite ++ []))))`, and the gate lives in
+the `DivRemCore` segment. Stated over an abstract `input` so the definitional peel never
+instantiates the chip's concrete `varFromOffset` row. -/
+private lemma divRemChip_isReal_gate_mem_main_constraints
+    (input : Var DivRemChip.Inputs (ZMod p)) (n : ℕ) :
+    input.is_real * (input.is_real - 1) ∈
+      ((DivRemChip.main input).operations n).constraints := by
+  apply List.mem_append_right
+  apply List.mem_append_right
+  apply List.mem_append_right
+  apply List.mem_append_left
+  exact mem_flatConstraints_of_assertion (divRemCore_isReal_gate_mem_constraints _ _)
+
+set_option maxHeartbeats 4000000 in
+/-- DivRem's selector booleanity from the physical row constraints. The boolean gate is no longer
+a shallow assert of the chip `main` — it moved into the `DivRemCore` whole-row assertion cluster —
+so this bypasses the `MainSelectorBinary` shallow interface and extracts the gate from the deep
+constraint list through the `DivRemCore` subcircuit. -/
+theorem DivRemChip.circuitSelectorBinary :
+    CircuitSelectorBinary (p := p) DivRemChip.circuit DivRemChip.rowView := by
+  unfold CircuitSelectorBinary
+  intro data physical
+  dsimp only
+  intro constraints
+  have deep : ∀ e ∈ ((DivRemChip.main (varFromOffset DivRemChip.Inputs 0)).operations
+      (size DivRemChip.Inputs)).constraints,
+      Environment.fromArray physical data e = 0 :=
+    ((Component.constraintsHold_iff (Environment.fromArray physical data)).mp constraints).1
+  have gate : Environment.fromArray physical data
+      ((varFromOffset DivRemChip.Inputs 0 : Var DivRemChip.Inputs (ZMod p)).is_real *
+        ((varFromOffset DivRemChip.Inputs 0 : Var DivRemChip.Inputs (ZMod p)).is_real - 1)) = 0 :=
+    deep _ (divRemChip_isReal_gate_mem_main_constraints _ _)
+  have binary : Expression.eval (Environment.fromArray physical data)
+      (varFromOffset DivRemChip.Inputs 0 : Var DivRemChip.Inputs (ZMod p)).is_real = 0 ∨
+      Expression.eval (Environment.fromArray physical data)
+        (varFromOffset DivRemChip.Inputs 0 : Var DivRemChip.Inputs (ZMod p)).is_real = 1 := by
     apply bool_of_mul_pred
     simpa only [circuit_norm] using gate
-  have inputRealEq : (Eval.eval env input).is_real = Expression.eval env input.is_real := by
+  have selEq : ∀ (i : DivRemChip.Inputs (ZMod p)) (o : Extracted.DivRemCols (ZMod p)),
+      (DivRemChip.rowView i o).is_real = i.is_real := fun _ _ => rfl
+  have inputEq : Eval.eval (Environment.fromArray physical data)
+      (varFromOffset DivRemChip.Inputs 0 : Var DivRemChip.Inputs (ZMod p))
+      = (⟨DivRemChip.circuit⟩ : Component (ZMod p)).rowInput
+          (Environment.fromArray physical data) :=
+    eval_varFromOffset_valueFromOffset DivRemChip.Inputs 0 _
+  have evalReal : (Eval.eval (Environment.fromArray physical data)
+      (varFromOffset DivRemChip.Inputs 0 : Var DivRemChip.Inputs (ZMod p))).is_real
+      = Expression.eval (Environment.fromArray physical data)
+        (varFromOffset DivRemChip.Inputs 0 : Var DivRemChip.Inputs (ZMod p)).is_real := by
     simp only [circuit_norm]
-  rw [inputRealEq]
+  rw [selEq, ← inputEq, evalReal]
   exact binary
 
 theorem AluX0Chip.mainSelectorBinary :
@@ -447,8 +510,12 @@ theorem supportedChip_selectorConstraintShape (chip : SupportedChip p)
       (StoreDoubleChip.mainSelectorBinary (p := p))
   · selectorRegistryCase (MulChip.kind (p := p)), (fun input => input.is_real),
       (MulChip.mainSelectorBinary (p := p))
-  · selectorRegistryCase (DivRemChip.kind (p := p)), (fun input => input.is_real),
-      (DivRemChip.mainSelectorBinary (p := p))
+  · -- DivRem: the gate is inside the `DivRemCore` subcircuit, so the shallow `MainSelectorBinary`
+    -- route does not apply; use the direct deep-constraints theorem.
+    letI := (DivRemChip.kind (p := p)).provableInputs
+    letI := (DivRemChip.kind (p := p)).provableCols
+    apply selectorConstraintShape_of_circuit
+    exact DivRemChip.circuitSelectorBinary (p := p)
   · selectorRegistryCase (AluX0Chip.kind (p := p)), (fun input => input.is_real),
       (AluX0Chip.mainSelectorBinary (p := p))
 
