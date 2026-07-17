@@ -23,8 +23,11 @@ import SP1Clean.Proofs.Chips.DivRemChip.Extract
 import SP1Clean.Proofs.Chips.DivRemChip.Formal
 import SP1Clean.Proofs.Chips.DivRemChip.Math
 import SP1Clean.Native.Operations.DivRemOperation.OwnAsserts
+import SP1Clean.Native.Operations.DivRemOperation.AssertZeros
 import SP1Clean.Native.Operations.DivRemOperation.Compare
+import SP1Clean.Native.Operations.DivRemOperation.Core
 import SP1Clean.Proofs.Operations.DivRemOperation.Compare
+import SP1Clean.Proofs.Operations.DivRemOperation.Core
 import SP1Clean.Proofs.Chips.DivRemChip.Soundness
 import SP1Clean.Proofs.Chips.DivRemChip.Populate
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Abs
