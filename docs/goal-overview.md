@@ -1,11 +1,12 @@
 # SP1 verified: what is proven, and how to check it — TARGET STATE
 
-**STATUS: ASPIRATIONAL GOAL DOCUMENT (drafted 2026-07-09; toolchain note refreshed 2026-07-16).**
-This is a completed-voice sketch of the desired full upstream AIR, boot-to-halt, and ArkLib verifier
-result. It is not a checklist and no longer tracks `overview.md` line-for-line: the consolidation changed
-the theorem layering and `overview.md` now records the implemented state directly. Use
-`release-audit.md`, `architecture.md`, and `proposals/consolidation-progress.md` for current claims. Do not
-cite this document as current status.
+**STATUS: ASPIRATIONAL GOAL DOCUMENT (drafted 2026-07-09; goal restated 2026-07-17).**
+This is a completed-voice sketch of the target: **full Core AIR soundness, stated and proven as a
+layered refinement stack whose top composes with an actual verifier** — an executable Lean
+`verifyCore` agreeing with the pinned Rust verifier, made sound by ArkLib/VCVio knowledge soundness
+post-composed through the AIR refinement. It is not a checklist. Use `release-audit.md`,
+`overview.md`, and `proposals/consolidation-progress.md` for current claims. Do not cite this
+document as current status.
 
 ---
 
@@ -40,9 +41,28 @@ from a RISC-V **instruction** (the Sail `ast`); an **adapter** (SP1's term) is w
 calls a reader; "**trace witness**" = the prover's matrix, "**witnessed columns**" =
 circuit-generated values, "**witness generator**" = the populate function.
 
-## 1. The theorem
+## 1. The theorem stack
+
+Every layer is a witness-producing refinement (`WitnessRelation.Sound`, `FormalModel/Relations.lean`),
+so the layers compose by `Sound.trans` and the verifier consumes them through `Sound.extract` without
+touching the knowledge error:
 
 ```lean
+-- Layer 1 (native): a satisfied, balanced native Clean ensemble witness yields a
+-- shard-local official-Sail execution segment between the public endpoints.
+theorem supported_core_native_sound :
+    WitnessRelation.Sound SupportedCoreNativeRelation
+      (SupportedCoreLocalExecutionRelation model)
+
+-- Layer 2 (faithfulness): the extracted Rust AIR is the native ensemble — per-chip
+-- whole-row ChipFaithful anchors (assert-list iff + interaction-multiset Perm)
+-- transport Layer 1 to the AIR SP1 actually proves.
+theorem supported_core_air_sound :
+    WitnessRelation.Sound SupportedCoreAIRRelation
+      (SupportedCoreLocalExecutionRelation model)
+
+-- Layer 3 (full upstream): the complete Core shard AIR with the real SP1PublicValues
+-- record, then boot-to-halt shard composition over an authenticated ledger.
 theorem sp1_air_sound :
     WitnessRelation.Sound SP1AIRRelation
       (Execution.SP1ShardExecutionRelation layout model programBinding)
@@ -51,15 +71,24 @@ theorem sp1_execution_sound :
     WitnessRelation.Sound SP1RecursiveAIRRelation
       (Execution.SP1ExecutionRelation layout model programBinding shardIntegrity)
 
+-- Layer 4 (the verifier): ArkLib/VCVio knowledge soundness for the executable
+-- verifier, its straight-line extractor post-composed through sp1_air_sound
+-- (FormalModel/Verifier.lean's PerfectExtraction.refine is the deterministic seam).
 theorem sp1_verifier_sound :
     verifier.knowledgeSoundness ...
 ```
 
-Read: the first theorem turns a valid full upstream shard AIR witness into the corresponding official
-Sail execution segment; the second authenticates and composes an ordered shard ledger from boot to the
-halting ECALL; the third is ArkLib knowledge soundness, with its extractor post-composed through
-`sp1_air_sound` without changing the knowledge error. The native Clean ensemble and its whole-chip
-faithfulness proofs implement `SP1AIRRelation`; they are not silently substituted for the verifier.
+Read: Layer 1 is proven natively over the timed-grounding engine — balance and per-row constraints
+force a genuine Sail chain, row by row at its clock position. Layer 2 is where "the circuit is SP1's
+circuit" enters: 25 whole-chip faithfulness anchors, internals-flexible by design. Layer 3 widens the
+statement to everything the upstream verifier checks (all tables, public-value integrity, digests,
+shard continuity, the halting ECALL). Layer 4 is the actual verifier: an executable Lean `verifyCore`
+that agrees with the pinned Rust verifier on structured real proofs, whose ArkLib knowledge-soundness
+theorem — Fiat–Shamir, commitments, LogUp GKR, PCS — extracts a full AIR witness with an explicit
+error bound; post-composing the extractor through the deterministic stack yields the headline claim.
+The final statement is probabilistic/knowledge-soundness-shaped; nothing here claims the unconditional
+implication `verifyCore = true → valid execution`. The native ensemble and its faithfulness proofs
+implement the AIR relations; they are never silently substituted for the verifier.
 
 The trust base — six rows, and the audit harness asserts the theorem's axiom set is **exactly**
 this (`scripts/run_audit.sh` reproduces the census):
