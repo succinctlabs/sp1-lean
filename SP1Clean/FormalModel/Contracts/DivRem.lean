@@ -3,6 +3,8 @@ import SP1Clean.Math.Word
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.Proofs.Operations.IsEqualWordOperation.Formal
 import SP1Clean.Proofs.Operations.LtOperationUnsigned.Formal
+import SP1Clean.Proofs.Operations.MulOperation.Formal
+import SP1Clean.Native.Operations.DivRemOperation.OwnAsserts
 import RISCV.Instructions
 
 /-! # The semantic contract of SP1's combined divide/remainder chip
@@ -255,3 +257,105 @@ def CompareSpec {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)] (cols : DivRemCols 
   U16MSBOperation.Spec ⟨cols.quotient[1], cols.quot_msb, e2⟩
 
 end SP1Clean.DivRemCompare
+
+namespace SP1Clean.DivRemCore
+
+open SP1Clean.Extracted (DivRemCols)
+
+/-- The DivRem row's own assertZero tail, **as evaluated field equations**: every entry of the
+`DivRemChip.ownAsserts` chain (the `[E13…E367, adapter.op_a_0]` list, whose carrier-generic body is
+here instantiated at `R = ZMod p`) is zero on the committed row.
+
+This is the `DivRemCore` contract's one **deliberately-raw** component: it is exactly the content
+the `assertZeros (ownAsserts cols)` block of the gadget's `main` contributes to `h_holds` (each
+constraint expression evaluates to `0`), transported to the evaluated row by
+`DivRemCore.ownAsserts_map_eval` (`Proofs/Operations/DivRemOperation/Core.lean`). Per the
+semantic-not-structural principle the 121 equations are *not* restated semantically here — their
+semantic form IS the chip-level evidence layer (`Proofs/Chips/DivRemChip/{Soundness,Cases}.lean`),
+which extracts each needed equation by list membership. The selection facts a consumer most often
+needs (`is_real`/flag binariness, the one-hot sum, `SelectionSpec`) are already derived out of this
+bundle into `CoreSpec`'s explicit conjuncts. -/
+def OwnAssertsHold {p : ℕ} (cols : DivRemCols (ZMod p)) : Prop :=
+  ∀ x ∈ DivRemChip.ownAsserts cols, x = 0
+
+/-- The semantic evidence certified by the DivRem row's **product/own-assert/byte-range assertion
+cluster** (`Native/Operations/DivRemOperation/Core.lean`), `DivRemCompare.CompareSpec`'s structural
+twin:
+
+* the two composed `MulOperation` semantic `Spec`s at the committed instantiations — `lower`
+  (`is_mul = is_real`) and `upper` (`is_real_not_word` gate, `is_mulh = is_div + is_rem`,
+  `is_mulhu = is_divu + is_remu`) — exactly the `Assumptions → Spec` currency
+  `Proofs/Chips/DivRemChip/Extract.lean`'s `mul_lo_spec`/`mul_hi_spec_*` consume;
+* the product-glue limb links in the form `rwlo_product`/`rwhi_product_{unsigned,signed}` expect:
+  `c_times_quotient[i] = product[2i] + product[2i+1]·256` against `lower`'s bytes 0–7
+  unconditionally, and against `upper`'s bytes 8–15 under the 64-bit gate
+  `g64 = is_div + is_divu + is_rem + is_remu`;
+* the raw `OwnAssertsHold` bundle (see its docstring);
+* the derived selection facts: `is_real`/`is_real_not_word`/all eight variant flags binary, the
+  ungated one-hot sum `E367`, and `DivRemContract.SelectionSpec` (a real row selects a case);
+* mirroring `MulOperation.Spec`'s convention of carrying its own byte pulls' facts (its `RawSpec`
+  ranges), the cluster's 34 u16 `Range` pulls as gated `.val < 2^16` facts — the 8 carry-chain
+  composites (`E123…E151`) and the `abs_c`/`abs_remainder`/`quotient`/`remainder`/
+  `c_times_quotient` limbs on `is_real`, plus the two word-variant checks on
+  `remainder[1]`/`quotient[1]` on `e2`. -/
+def CoreSpec {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)] (cols : DivRemCols (ZMod p)) : Prop :=
+  let g64 := cols.is_div + cols.is_divu + cols.is_rem + cols.is_remu
+  let e2 := cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw
+  let rn := cols.rem_neg * 65535
+  let lo := cols.c_times_quotient_lower
+  let up := cols.c_times_quotient_upper
+  -- (1-2) the two `c_times_quotient` product structs' semantic contracts.
+  MulOperation.Spec
+    ⟨cols.quotient_comp, cols.c, lo, cols.is_real, cols.is_real, 0, 0, 0, 0⟩ ∧
+  MulOperation.Spec
+    ⟨cols.quotient_comp, cols.c, up, cols.is_real_not_word, 0,
+     cols.is_div + cols.is_rem, cols.is_divu + cols.is_remu, 0, 0⟩ ∧
+  -- (3) the low product glue: `c_times_quotient[0..3]` are `lower`'s bytes 0..7, unconditionally.
+  (cols.c_times_quotient[0] = lo.product[0] + lo.product[1] * 256) ∧
+  (cols.c_times_quotient[1] = lo.product[2] + lo.product[3] * 256) ∧
+  (cols.c_times_quotient[2] = lo.product[4] + lo.product[5] * 256) ∧
+  (cols.c_times_quotient[3] = lo.product[6] + lo.product[7] * 256) ∧
+  -- (4) the high product glue: on the 64-bit variants, `c_times_quotient[4..7]` are `upper`'s
+  -- bytes 8..15.
+  (g64 = 1 →
+    cols.c_times_quotient[4] = up.product[8] + up.product[9] * 256 ∧
+    cols.c_times_quotient[5] = up.product[10] + up.product[11] * 256 ∧
+    cols.c_times_quotient[6] = up.product[12] + up.product[13] * 256 ∧
+    cols.c_times_quotient[7] = up.product[14] + up.product[15] * 256) ∧
+  -- (5) the raw own-assert bundle (`E13…E367`, `op_a_0`).
+  OwnAssertsHold cols ∧
+  -- (6) derived selection facts: gate/flag binariness (`E355`/`E343`/`E325…E339`), the ungated
+  -- one-hot sum (`E367`), and the committed-case selection on real rows.
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
+  (cols.is_real_not_word = 0 ∨ cols.is_real_not_word = 1) ∧
+  (cols.is_div = 0 ∨ cols.is_div = 1) ∧ (cols.is_divu = 0 ∨ cols.is_divu = 1) ∧
+  (cols.is_rem = 0 ∨ cols.is_rem = 1) ∧ (cols.is_remu = 0 ∨ cols.is_remu = 1) ∧
+  (cols.is_divw = 0 ∨ cols.is_divw = 1) ∧ (cols.is_remw = 0 ∨ cols.is_remw = 1) ∧
+  (cols.is_divuw = 0 ∨ cols.is_divuw = 1) ∧ (cols.is_remuw = 0 ∨ cols.is_remuw = 1) ∧
+  (cols.is_divu + cols.is_remu + cols.is_div + cols.is_rem
+    + cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw = 1) ∧
+  DivRemContract.SelectionSpec cols.is_real cols ∧
+  -- (7) the 32 `is_real`-gated u16 byte-range facts: the carry-chain composites `E123…E151`, then
+  -- the `abs_c`/`abs_remainder`/`quotient`/`remainder`/`c_times_quotient` limbs.
+  (cols.is_real = 1 →
+    (cols.c_times_quotient[0] + cols.remainder_comp[0]
+      - cols.carry[0] * 65536).val < 2 ^ 16 ∧
+    (cols.c_times_quotient[1] + cols.remainder_comp[1]
+      - cols.carry[1] * 65536 + cols.carry[0]).val < 2 ^ 16 ∧
+    (cols.c_times_quotient[2] + cols.remainder_comp[2]
+      - cols.carry[2] * 65536 + cols.carry[1]).val < 2 ^ 16 ∧
+    (cols.c_times_quotient[3] + cols.remainder_comp[3]
+      - cols.carry[3] * 65536 + cols.carry[2]).val < 2 ^ 16 ∧
+    (cols.c_times_quotient[4] + rn - cols.carry[4] * 65536 + cols.carry[3]).val < 2 ^ 16 ∧
+    (cols.c_times_quotient[5] + rn - cols.carry[5] * 65536 + cols.carry[4]).val < 2 ^ 16 ∧
+    (cols.c_times_quotient[6] + rn - cols.carry[6] * 65536 + cols.carry[5]).val < 2 ^ 16 ∧
+    (cols.c_times_quotient[7] + rn - cols.carry[7] * 65536 + cols.carry[6]).val < 2 ^ 16 ∧
+    (∀ i (_ : i < 4), cols.abs_c[i].val < 2 ^ 16) ∧
+    (∀ i (_ : i < 4), cols.abs_remainder[i].val < 2 ^ 16) ∧
+    (∀ i (_ : i < 4), cols.quotient[i].val < 2 ^ 16) ∧
+    (∀ i (_ : i < 4), cols.remainder[i].val < 2 ^ 16) ∧
+    (∀ i (_ : i < 8), cols.c_times_quotient[i].val < 2 ^ 16)) ∧
+  -- (8) the two `e2`-gated word-variant range checks (live even on padding word rows).
+  (e2 = 1 → cols.remainder[1].val < 2 ^ 16 ∧ cols.quotient[1].val < 2 ^ 16)
+
+end SP1Clean.DivRemCore
