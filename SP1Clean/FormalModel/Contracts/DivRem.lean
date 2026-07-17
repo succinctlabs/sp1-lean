@@ -1,5 +1,8 @@
 import SP1Clean.Extracted.DivRemChip
 import SP1Clean.Math.Word
+import SP1Clean.FormalModel.Contracts.Operations
+import SP1Clean.Proofs.Operations.IsEqualWordOperation.Formal
+import SP1Clean.Proofs.Operations.LtOperationUnsigned.Formal
 import RISCV.Instructions
 
 /-! # The semantic contract of SP1's combined divide/remainder chip
@@ -194,3 +197,61 @@ theorem SelectionSpec.existsUnique {p : ℕ} [Fact p.Prime] {isReal : ZMod p}
   exact ⟨case, hcase, fun other hother => Selected.unique hother hcase⟩
 
 end SP1Clean.DivRemContract
+
+namespace SP1Clean.DivRemCompare
+
+open SP1Clean.Extracted (DivRemCols)
+
+/-- The semantic evidence certified by the DivRem row's **comparison/sign assertion cluster**
+(`Native/Operations/DivRemOperation/Compare.lean`): the conjunction of the fifteen composed
+sub-operations' semantic `Spec`s, instantiated at the committed `DivRemCols` fields and gated
+exactly as the chip gates them (`is_real_not_word` / the word-variant sum `e2` / `is_real` /
+`abs_c_alu_event` / `abs_rem_alu_event` / `remainder_check_multiplicity`).
+
+Each conjunct is the exact hypothesis shape the evidence-extraction layer consumes
+(`Proofs/Chips/DivRemChip/Extract.lean`: `overflow_of_iseqword`/`overflow_of_iseqword_word` take
+the four `IsEqualWordOperation.Spec`s, the divide-by-zero readout takes the
+`IsZeroWordOperation.Spec`, and the `Cases.lean` evidence families take the two `AddOperation`
+negation identities, the `LtOperationUnsigned` range fact, and the seven `U16MSBOperation` sign
+bits via each op's `result_semantic`), so chip-level assembly is pure plumbing. Per the
+semantic-not-structural principle, no constraint equation is restated here — the sub-operations'
+own `Spec`s are the semantic currency. -/
+def CompareSpec {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)] (cols : DivRemCols (ZMod p)) : Prop :=
+  let bpv := cols.adapter.op_b_memory.prev_value
+  let cpv := cols.adapter.op_c_memory.prev_value
+  let irnw := cols.is_real_not_word
+  let e2 := cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw
+  -- (1-4) signed-overflow detection: `b` vs `i64::MIN`, `c` vs `-1` — full-word @ `irnw`,
+  -- low-half @ `e2`.
+  IsEqualWordOperation.Spec
+    ⟨#v[bpv[0], bpv[1], bpv[2], bpv[3]], #v[0, 0, 0, 32768], cols.is_overflow_b, irnw⟩ ∧
+  IsEqualWordOperation.Spec
+    ⟨#v[cpv[0], cpv[1], cpv[2], cpv[3]], #v[65535, 65535, 65535, 65535],
+     cols.is_overflow_c, irnw⟩ ∧
+  IsEqualWordOperation.Spec
+    ⟨#v[bpv[0], bpv[1], 0, 0], #v[0, 32768, 0, 0], cols.is_overflow_b, e2⟩ ∧
+  IsEqualWordOperation.Spec
+    ⟨#v[cpv[0], cpv[1], 0, 0], #v[65535, 65535, 0, 0], cols.is_overflow_c, e2⟩ ∧
+  -- (5) divide-by-zero detection on the committed operand `c`.
+  IsZeroWordOperation.Spec ⟨cols.c, cols.is_c_0, cols.is_real⟩ ∧
+  -- (6-7) the `|c|` and `|remainder|` two's-complement negation identities.
+  AddOperation.Spec
+    ⟨cols.c, cols.abs_c, ⟨cols.c_neg_operation.value⟩, cols.abs_c_alu_event⟩ ∧
+  AddOperation.Spec
+    ⟨cols.remainder_comp, cols.abs_remainder, ⟨cols.rem_neg_operation.value⟩,
+     cols.abs_rem_alu_event⟩ ∧
+  -- (8) the Euclidean remainder range comparison `|remainder| < max(|c|, 1)`.
+  LtOperationUnsigned.Spec
+    ⟨cols.abs_remainder, cols.max_abs_c_or_1, cols.remainder_lt_operation,
+     cols.remainder_check_multiplicity⟩ ∧
+  -- (9-15) sign-bit extractions: b/c/remainder high u16 (@ `irnw`), b/c/remainder/quotient
+  -- low-half-high u16 (@ `e2`).
+  U16MSBOperation.Spec ⟨bpv[3], cols.b_msb, irnw⟩ ∧
+  U16MSBOperation.Spec ⟨cpv[3], cols.c_msb, irnw⟩ ∧
+  U16MSBOperation.Spec ⟨cols.remainder[3], cols.rem_msb, irnw⟩ ∧
+  U16MSBOperation.Spec ⟨bpv[1], cols.b_msb, e2⟩ ∧
+  U16MSBOperation.Spec ⟨cpv[1], cols.c_msb, e2⟩ ∧
+  U16MSBOperation.Spec ⟨cols.remainder[1], cols.rem_msb, e2⟩ ∧
+  U16MSBOperation.Spec ⟨cols.quotient[1], cols.quot_msb, e2⟩
+
+end SP1Clean.DivRemCompare
