@@ -74,6 +74,47 @@ theorem completeness :
     intro hr; rw [hval]; exact (SubOperation.spec_populate ha hb input_is_real hr).1
   rcases hbin with h | h <;> rw [h] <;> simp
 
+/-- Sub's exact Memory-channel interaction list.  Keeping this list beside `circuit` makes Clean's
+exposure interface the single structural source consumed by both faithfulness and semantic grounding. -/
+def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (memoryChannel (p := p))) :=
+  [ memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_c_memory.access_timestamp.prev_low,
+       input.adapter.op_c, 0, 0, input.adapter.op_c_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2,
+       input.adapter.op_c, 0, 0, input.adapter.op_c_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+       input.adapter.op_a, 0, 0, Vector.mapRange 4 fun i => var { index := offset + i }⟩ ]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-B pull occupies its declared slot in Sub's exposed Memory list. -/
+theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-C pull occupies its declared slot in Sub's exposed Memory list. -/
+theorem opCPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_c_memory.access_timestamp.prev_low,
+       input.adapter.op_c, 0, 0, input.adapter.op_c_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
 /-- The Sub chip row as a `GeneralFormalCircuit`: semantic contract, composing the witnessed
 gadget + the two readers; output is the native `Columns` row. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
@@ -86,7 +127,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       [stateChannel.toRaw, memoryChannel.toRaw],
     -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8) so the
     -- chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone State pull+push.
-    exposedChannels := fun input _ =>
+    exposedChannels := fun input offset =>
       expose stateChannel
         [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
@@ -94,6 +135,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
           stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
+      expose memoryChannel (exposedMemoryInteractions input offset) ++
       -- The Program-bus instruction fetch (descended from the composed `RTypeReader`, gate
       -- `is_trusted = is_real`, opcode `SUB = 2`), consumed by `Soundness/TypedProgram.lean`.
       expose programChannel
@@ -121,7 +163,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       unfold Operations.ExposedChannelsLawful
       intro exposed exposedMem
       simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
-      rcases exposedMem with rfl | rfl
+      rcases exposedMem with (rfl | rfl) | rfl
       · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
           Readers.RTypeReader.circuit, Readers.RTypeReader.main,
           Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -133,6 +175,15 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
           h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
           if_true, List.nil_append]
+      · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+          Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+          Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+          Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+          Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+          SP1Clean.SubOperation.circuit, SP1Clean.SubOperation.main,
+          circuit_norm, FormalAssertion.toSubcircuit_interactions,
+          GeneralFormalCircuit.toSubcircuit_interactions]
+        simp [circuit_norm, Gadgets.Equality.main, exposedMemoryInteractions]
       · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def,
@@ -156,5 +207,13 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         simp only [Operations.interactionsWith_subcircuit,
           FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
           List.filter_nil, List.nil_append] }
+
+/-- The completed Sub circuit exposes exactly the Memory interaction list above. -/
+theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith memoryChannel.toRaw =
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
 
 end SP1Clean.SubChip
