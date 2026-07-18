@@ -103,6 +103,57 @@ theorem completeness :
   · simp only [epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega)]; exact h_it
   · rcases hbin with h | h <;> rw [h] <;> simp
 
+/-- LoadDouble's exact Memory-channel interaction list — the first RAM-access family shape: the
+composed `MemoryAccess` RAM pull/push pair at the computed 48-bit address (`var ⟨offset..offset+2⟩`
+are the `AddressOperation` sub-circuit's witnessed address limbs), then the I-type register entries
+(op_a read-prior pull, op_b pull + read-back push) and `RegisterWrite`'s op_a write push.  LD writes
+the full read value `memory_access.prev_value` (no extension).  Keeping this list beside `circuit`
+makes Clean's exposure interface the single structural source consumed by both faithfulness and
+semantic grounding. -/
+def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (memoryChannel (p := p))) :=
+  [ memoryChannel.pulledIf input.is_real
+      ⟨input.memory_access.access_timestamp.prev_high,
+       input.memory_access.access_timestamp.prev_low,
+       var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 },
+       input.memory_access.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 1,
+       var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 },
+       input.memory_access.prev_value⟩,
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+       input.adapter.op_a, 0, 0, input.memory_access.prev_value⟩ ]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact RAM-access pull occupies its declared slot in LoadDouble's exposed Memory list. -/
+theorem ramPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.memory_access.access_timestamp.prev_high,
+       input.memory_access.access_timestamp.prev_low,
+       var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 },
+       input.memory_access.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-B pull occupies its declared slot in LoadDouble's exposed Memory list. -/
+theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
 /-- The `LoadDouble` chip row as a `GeneralFormalCircuit`; output is the extracted `LoadDoubleColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadDoubleColumns :=
   { main, elaborated,
@@ -111,7 +162,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadDoubleColumns :=
     channelsWithRequirements :=
       [stateChannel.toRaw, memoryChannel.toRaw],
     soundness := soundness, completeness := completeness,
-    exposedChannels := fun input _ =>
+    exposedChannels := fun input offset =>
       expose stateChannel
         [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
@@ -119,6 +170,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadDoubleColumns :=
           stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
+      expose memoryChannel (exposedMemoryInteractions input offset) ++
       -- The Program-bus instruction fetch (descended from the composed `ITypeReader`, gate
       -- `is_trusted = is_real`, opcode `LD = 35`), consumed by `Soundness/TypedProgram.lean`.
       expose programChannel
@@ -134,7 +186,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadDoubleColumns :=
       unfold Operations.ExposedChannelsLawful
       intro exposed exposedMem
       simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
-      rcases exposedMem with rfl | rfl
+      rcases exposedMem with (rfl | rfl) | rfl
       all_goals
         simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
           AddressOperation.circuit, AddressOperation.main,
@@ -149,10 +201,19 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadDoubleColumns :=
       · simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
           h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
           if_true, List.nil_append]
+      · simp [circuit_norm, Gadgets.Equality.main, exposedMemoryInteractions]
       · simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
           Channels.byteChannel_eq_programChannel_false,
           Channels.stateChannel_eq_programChannel_false,
           Channels.memoryChannel_eq_programChannel_false,
           decide_false, decide_true, Bool.false_eq_true, if_true, List.nil_append] }
+
+/-- The completed LoadDouble circuit exposes exactly the Memory interaction list above. -/
+theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith memoryChannel.toRaw =
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
 
 end SP1Clean.LoadDoubleChip
