@@ -353,4 +353,56 @@ theorem aluTypeReaderImmutable_programInteractions_subcircuit
     Readers.ALUTypeReaderImmutable.circuit programChannel.toRaw input offset ops _
     (aluTypeReaderImmutable_programInteractions input offset)
 
+/-- Immutable ALU reader raw Memory list: op_a read-prior pull + read-back push at `clk_low + 4`,
+op_b read-prior pull + read-back push at `clk_low + 3`, and the (`is_real - imm_c`)-gated op_c
+pull/push pair at `clk_low + 2`, addressed by the low limb `op_c[0]` (an immediate does no register
+read). All three operands are **reads** — no write push. -/
+def aluTypeImmutableMemoryInteractions
+    (input : Var Readers.ALUTypeReaderImmutable.Inputs (ZMod p)) :
+    List (AbstractInteraction (ZMod p)) :=
+  [(memoryChannel.pulledIf input.is_real
+      ⟨input.clk_high, input.cols.op_a_memory.access_timestamp.prev_low, input.cols.op_a, 0, 0,
+       input.cols.op_a_memory.prev_value⟩).toRaw,
+   (memoryChannel.pushedIf input.is_real
+      ⟨input.clk_high, input.clk_low + 4, input.cols.op_a, 0, 0,
+       input.cols.op_a_memory.prev_value⟩).toRaw,
+   (memoryChannel.pulledIf input.is_real
+      ⟨input.clk_high, input.cols.op_b_memory.access_timestamp.prev_low, input.cols.op_b, 0, 0,
+       input.cols.op_b_memory.prev_value⟩).toRaw,
+   (memoryChannel.pushedIf input.is_real
+      ⟨input.clk_high, input.clk_low + 3, input.cols.op_b, 0, 0,
+       input.cols.op_b_memory.prev_value⟩).toRaw,
+   (memoryChannel.pulledIf (input.is_real - input.cols.imm_c)
+      ⟨input.clk_high, input.cols.op_c_memory.access_timestamp.prev_low, input.cols.op_c[0], 0, 0,
+       input.cols.op_c_memory.prev_value⟩).toRaw,
+   (memoryChannel.pushedIf (input.is_real - input.cols.imm_c)
+      ⟨input.clk_high, input.clk_low + 2, input.cols.op_c[0], 0, 0,
+       input.cols.op_c_memory.prev_value⟩).toRaw]
+
+theorem aluTypeReaderImmutable_memoryInteractions
+    (input : Var Readers.ALUTypeReaderImmutable.Inputs (ZMod p)) (offset : ℕ) :
+    ((Readers.ALUTypeReaderImmutable.circuit (p := p).main input).operations
+        offset).interactionsWith memoryChannel.toRaw =
+      aluTypeImmutableMemoryInteractions input := by
+  simp only [Readers.ALUTypeReaderImmutable.circuit, Readers.ALUTypeReaderImmutable.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions]
+  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+    Channels.byteChannel_eq_memoryChannel_false,
+    Channels.programChannel_eq_memoryChannel_false,
+    decide_false, Bool.false_eq_true, List.nil_append, aluTypeImmutableMemoryInteractions]
+
+theorem aluTypeReaderImmutable_memoryInteractions_subcircuit
+    (input : Var Readers.ALUTypeReaderImmutable.Inputs (ZMod p)) (offset : ℕ)
+    (ops : Operations (ZMod p)) :
+    Operations.interactionsWith memoryChannel.toRaw
+        (.subcircuit
+          ((Readers.ALUTypeReaderImmutable.circuit (p := p)).toSubcircuit offset input) :: ops) =
+      aluTypeImmutableMemoryInteractions input ++
+        Operations.interactionsWith memoryChannel.toRaw ops :=
+  InteractionRecovery.interactionsWith_generalSubcircuit_of_main_exact_list
+    Readers.ALUTypeReaderImmutable.circuit memoryChannel.toRaw input offset ops _
+    (aluTypeReaderImmutable_memoryInteractions input offset)
+
 end SP1Clean.Soundness

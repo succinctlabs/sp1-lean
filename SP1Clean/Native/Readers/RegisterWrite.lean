@@ -1,5 +1,6 @@
 import SP1Clean.Math.Word
 import SP1Clean.Model.Channels
+import SP1Clean.Model.InteractionRecovery
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -93,3 +94,45 @@ set_option linter.unusedSectionVars false in
     circuit.localLength x = 0 := rfl
 
 end SP1Clean.Readers.RegisterWrite
+
+/-! ## Reader-local Memory-push interface
+
+The exact `main`-level and compositional subcircuit projections of this assertion's one Memory
+interaction (the op_a write push), mirroring the readers' Program-fetch interface.  Chip
+`exposedChannels_eq` Memory branches consume these instead of re-normalizing the composed
+subcircuits. -/
+
+namespace SP1Clean.Soundness
+
+open Circuit
+open SP1Clean.Channels
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- The `RegisterWrite` raw Memory list: the lone op_a (`rd`) write push at the supplied write
+timestamp. -/
+def registerWriteMemoryInteractions (input : Var Readers.RegisterWrite.Inputs (ZMod p)) :
+    List (AbstractInteraction (ZMod p)) :=
+  [(memoryChannel.pushedIf input.is_real
+      ⟨input.clk_high, input.clk_low, input.op_a, 0, 0, input.value⟩).toRaw]
+
+theorem registerWrite_memoryInteractions (input : Var Readers.RegisterWrite.Inputs (ZMod p))
+    (offset : ℕ) :
+    ((Readers.RegisterWrite.circuit (p := p).main input).operations offset).interactionsWith
+        memoryChannel.toRaw =
+      registerWriteMemoryInteractions input := by
+  simp only [Readers.RegisterWrite.circuit, Readers.RegisterWrite.main, circuit_norm,
+    registerWriteMemoryInteractions]
+
+theorem registerWrite_memoryInteractions_subcircuit
+    (input : Var Readers.RegisterWrite.Inputs (ZMod p)) (offset : ℕ)
+    (ops : Operations (ZMod p)) :
+    Operations.interactionsWith memoryChannel.toRaw
+        (.subcircuit ((Readers.RegisterWrite.circuit (p := p)).toSubcircuit offset input) :: ops) =
+      registerWriteMemoryInteractions input ++
+        Operations.interactionsWith memoryChannel.toRaw ops :=
+  InteractionRecovery.interactionsWith_assertionSubcircuit_of_main_exact
+    Readers.RegisterWrite.circuit memoryChannel.toRaw input offset ops _
+    (registerWrite_memoryInteractions input offset)
+
+end SP1Clean.Soundness

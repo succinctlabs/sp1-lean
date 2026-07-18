@@ -126,6 +126,38 @@ lemma interactionsWith_generalSubcircuit_of_main_exact {Input Output : TypeMap}
   rw [main_exact]
   rfl
 
+/-- List form of `interactionsWith_generalSubcircuit_of_main_exact`, for a child that emits
+**several** interactions on the channel (the per-reader Memory lists: read-prior pulls + read-back
+pushes). -/
+lemma interactionsWith_generalSubcircuit_of_main_exact_list {Input Output : TypeMap}
+    [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit F Input Output) (channel : RawChannel F)
+    (input : Var Input F) (offset : ℕ) (ops : Operations F)
+    (interactions : List (AbstractInteraction F))
+    (main_exact : ((circuit.main input).operations offset).interactionsWith channel =
+      interactions) :
+    interactionsWith channel (.subcircuit (circuit.toSubcircuit offset input) :: ops) =
+      interactions ++ interactionsWith channel ops := by
+  rw [interactionsWith_subcircuit, GeneralFormalCircuit.toSubcircuit_interactions]
+  change interactionsWith channel ((circuit.main input).operations offset) ++
+      interactionsWith channel ops = _
+  rw [main_exact]
+
+/-- Formal-assertion companion of `interactionsWith_generalSubcircuit_of_main_exact_list`
+(e.g. the `RegisterWrite` op_a write push, composed as a Clean `assertion`). -/
+lemma interactionsWith_assertionSubcircuit_of_main_exact {Input : TypeMap} [ProvableType Input]
+    (circuit : FormalAssertion F Input) (channel : RawChannel F)
+    (input : Var Input F) (offset : ℕ) (ops : Operations F)
+    (interactions : List (AbstractInteraction F))
+    (main_exact : ((circuit.main input).operations offset).interactionsWith channel =
+      interactions) :
+    interactionsWith channel (.subcircuit (circuit.toSubcircuit offset input) :: ops) =
+      interactions ++ interactionsWith channel ops := by
+  rw [interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions]
+  change interactionsWith channel ((circuit.main input).operations offset) ++
+      interactionsWith channel ops = _
+  rw [main_exact]
+
 /-- **`.main`-form companion** (matches what `circuit_norm` leaves after reducing a formal subcircuit):
 a circuit's `main` emits nothing on a channel outside its declared `channels` (= guarantees ++
 requirements). Derived from `ElaboratedCircuit.channels_subset`. This is the lemma that drops the

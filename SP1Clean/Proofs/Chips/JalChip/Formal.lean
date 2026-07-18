@@ -199,6 +199,30 @@ theorem completeness :
     exact (byteRowSpec_range _ h14p).mpr (h_align_pa hr1)
   · rcases h_bin with h | h <;> rw [h] <;> simp
 
+/-- Jal's exact Memory-channel interaction list (J-type: both operand slots carry immediates — the
+only register traffic is the rd slot).  The op_a read-prior pull descends from the composed
+`JTypeReader`; the op_a write push from the composed `RegisterWrite`, carrying the witnessed link
+address `op_a_value` (cells `offset+4..7`, the four cells after the jump target `add_value`).
+Keeping this list beside `circuit` makes Clean's exposure interface the single structural source
+consumed by both faithfulness and semantic grounding. -/
+def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (memoryChannel (p := p))) :=
+  [ memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+       input.adapter.op_a, 0, 0, Vector.mapRange 4 fun i => var { index := offset + 4 + i }⟩ ]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact rd read-prior pull occupies its declared slot in Jal's exposed Memory list. -/
+theorem opAPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
 /-- The JAL chip row as a `GeneralFormalCircuit`: the data-dependent jump/link semantics, composing the
 two witnessed `AddOperation` gadgets and the J-type reader; output is the extracted `JalColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
@@ -279,6 +303,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
       Readers.CPUState.exposedState
         ⟨input.state, #v[var ⟨offset⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩],
           8, input.is_real⟩ ++
+      expose memoryChannel (exposedMemoryInteractions input offset) ++
       -- The Program-bus instruction fetch (descended from the composed `JTypeReader`, gate
       -- `is_trusted = is_real`, opcode `JAL = 46`), consumed by `Soundness/TypedProgram.lean`.
       expose programChannel
@@ -292,7 +317,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
       intro exposed exposedMem
       simp only [Readers.CPUState.exposedState, expose, List.mem_append,
         List.mem_singleton] at exposedMem
-      rcases exposedMem with rfl | rfl
+      rcases exposedMem with (rfl | rfl) | rfl
       · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
           witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
@@ -311,6 +336,30 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
         simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
           Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
         simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil]
+      · -- Memory branch: compositional — the J-type reader keeps its op_a pull and `RegisterWrite`
+        -- its write push via the reader-local `_subcircuit` lemmas; every other child is nil.
+        simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
+        simp only [Operations.interactionsWith_witness,
+          Soundness.jTypeReader_memoryInteractions_subcircuit,
+          Soundness.registerWrite_memoryInteractions_subcircuit,
+          InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+          InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+          AddOperation.circuit, AddOperation.channelsWithGuarantees_eq,
+          Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
+          Gadgets.Equality.channelsWithGuarantees_eq,
+          Gadgets.Equality.channelsWithRequirements_eq,
+          FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
+          Channels.memoryChannel_eq_byteChannel_false,
+          Channels.memoryChannel_eq_stateChannel_false, not_false_eq_true,
+          Operations.interactionsWith_assert, Operations.interactionsWith_interact,
+          Operations.interactionsWith_nil, Soundness.jTypeMemoryInteractions,
+          Soundness.registerWriteMemoryInteractions, List.cons_append, List.nil_append]
+        simp only [circuit_norm]
+        simp only [Channels.byteChannel_eq_memoryChannel_false, if_false,
+          exposedMemoryInteractions, List.map_cons, List.map_nil]
+        rfl
       · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
@@ -334,5 +383,13 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
           FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
           List.filter_nil, List.nil_append]
         simp only [Channels.byteChannel_eq_programChannel_false, if_false] }
+
+/-- The completed Jal circuit exposes exactly the Memory interaction list above. -/
+theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith memoryChannel.toRaw =
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, Readers.CPUState.exposedState, expose])
 
 end SP1Clean.JalChip

@@ -289,4 +289,43 @@ theorem iTypeReader_programInteractions_subcircuit
     Readers.ITypeReader.circuit programChannel.toRaw input offset ops _
     (iTypeReader_programInteractions input offset)
 
+/-- I-type reader raw Memory list: the op_a (rd) read-prior pull, then the op_b (rs1) read-prior
+pull + read-back push at `clk_low + 3` (the op_a write push is factored into
+`Readers/RegisterWrite`). -/
+def iTypeMemoryInteractions (input : Var Readers.ITypeReader.Inputs (ZMod p)) :
+    List (AbstractInteraction (ZMod p)) :=
+  [(memoryChannel.pulledIf input.is_real
+      ⟨input.clk_high, input.cols.op_a_memory.access_timestamp.prev_low, input.cols.op_a, 0, 0,
+       input.cols.op_a_memory.prev_value⟩).toRaw,
+   (memoryChannel.pulledIf input.is_real
+      ⟨input.clk_high, input.cols.op_b_memory.access_timestamp.prev_low, input.cols.op_b, 0, 0,
+       input.cols.op_b_memory.prev_value⟩).toRaw,
+   (memoryChannel.pushedIf input.is_real
+      ⟨input.clk_high, input.clk_low + 3, input.cols.op_b, 0, 0,
+       input.cols.op_b_memory.prev_value⟩).toRaw]
+
+theorem iTypeReader_memoryInteractions (input : Var Readers.ITypeReader.Inputs (ZMod p))
+    (offset : ℕ) :
+    ((Readers.ITypeReader.circuit (p := p).main input).operations offset).interactionsWith
+        memoryChannel.toRaw =
+      iTypeMemoryInteractions input := by
+  simp only [Readers.ITypeReader.circuit, Readers.ITypeReader.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions]
+  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+    Channels.byteChannel_eq_memoryChannel_false,
+    Channels.programChannel_eq_memoryChannel_false,
+    decide_false, Bool.false_eq_true, List.nil_append, iTypeMemoryInteractions]
+
+theorem iTypeReader_memoryInteractions_subcircuit
+    (input : Var Readers.ITypeReader.Inputs (ZMod p)) (offset : ℕ)
+    (ops : Operations (ZMod p)) :
+    Operations.interactionsWith memoryChannel.toRaw
+        (.subcircuit ((Readers.ITypeReader.circuit (p := p)).toSubcircuit offset input) :: ops) =
+      iTypeMemoryInteractions input ++ Operations.interactionsWith memoryChannel.toRaw ops :=
+  InteractionRecovery.interactionsWith_generalSubcircuit_of_main_exact_list
+    Readers.ITypeReader.circuit memoryChannel.toRaw input offset ops _
+    (iTypeReader_memoryInteractions input offset)
+
 end SP1Clean.Soundness

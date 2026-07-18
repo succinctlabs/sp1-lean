@@ -184,6 +184,30 @@ theorem completeness :
   · rcases h_iaui with h | h <;> rw [h] <;> simp
   · rcases h_bin with h | h <;> rw [h] <;> simp
 
+/-- UType's exact Memory-channel interaction list (J-type: both operand slots carry immediates — the
+only register traffic is the rd slot).  The op_a read-prior pull descends from the composed
+`JTypeReader`; the op_a write push from the composed `RegisterWrite`, carrying the witnessed
+LUI/AUIPC result `add_value` (cells `offset+3..6`, after the three addend limbs).  Keeping this list
+beside `circuit` makes Clean's exposure interface the single structural source consumed by both
+faithfulness and semantic grounding. -/
+def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (memoryChannel (p := p))) :=
+  [ memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+       input.adapter.op_a, 0, 0, Vector.mapRange 4 fun i => var { index := offset + 3 + i }⟩ ]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact rd read-prior pull occupies its declared slot in UType's exposed Memory list. -/
+theorem opAPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
 /-- The U-type chip row as a `GeneralFormalCircuit`: the flag-gated `RV64.lui`/`RV64.auipc` semantics,
 composing the witnessed `AddOperation` gadget and the J-type reader; output is the extracted `UTypeColumns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
@@ -230,10 +254,11 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
         simp only [List.not_mem_nil] at h_interaction,
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
-    exposedChannels := fun input _ =>
+    exposedChannels := fun input offset =>
       Readers.CPUState.exposedState
         ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
           8, input.is_real⟩ ++
+      expose memoryChannel (exposedMemoryInteractions input offset) ++
       -- The Program-bus instruction fetch (descended from the composed `JTypeReader`, gate
       -- `is_trusted = is_real`, opcode `AUIPC·48 + LUI·49` off the committed `is_auipc` flag),
       -- consumed by `Soundness/TypedProgram.lean`.
@@ -249,7 +274,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
       intro exposed exposedMem
       simp only [Readers.CPUState.exposedState, expose, List.mem_append,
         List.mem_singleton] at exposedMem
-      rcases exposedMem with rfl | rfl
+      rcases exposedMem with (rfl | rfl) | rfl
       · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
           witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
@@ -266,6 +291,29 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
           Operations.interactionsWith_assert, Operations.interactionsWith_nil, List.nil_append]
         simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
           Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
+      · -- Memory branch: compositional — the J-type reader keeps its op_a pull and `RegisterWrite`
+        -- its write push via the reader-local `_subcircuit` lemmas; every other child is nil.
+        simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
+        simp only [Operations.interactionsWith_witness,
+          Soundness.jTypeReader_memoryInteractions_subcircuit,
+          Soundness.registerWrite_memoryInteractions_subcircuit,
+          InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+          InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+          AddOperation.circuit, AddOperation.channelsWithGuarantees_eq,
+          Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
+          Gadgets.Equality.channelsWithGuarantees_eq,
+          Gadgets.Equality.channelsWithRequirements_eq,
+          FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
+          Channels.memoryChannel_eq_byteChannel_false,
+          Channels.memoryChannel_eq_stateChannel_false, not_false_eq_true,
+          Operations.interactionsWith_assert, Operations.interactionsWith_nil,
+          Soundness.jTypeMemoryInteractions,
+          Soundness.registerWriteMemoryInteractions, List.cons_append, List.nil_append]
+        simp only [circuit_norm]
+        simp only [exposedMemoryInteractions, List.map_cons, List.map_nil]
+        rfl
       · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
@@ -288,5 +336,13 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
         simp only [Operations.interactionsWith_subcircuit,
           FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
           List.filter_nil, List.nil_append] }
+
+/-- The completed UType circuit exposes exactly the Memory interaction list above. -/
+theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith memoryChannel.toRaw =
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, Readers.CPUState.exposedState, expose])
 
 end SP1Clean.UTypeChip

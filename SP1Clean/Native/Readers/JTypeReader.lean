@@ -268,4 +268,36 @@ theorem jTypeReader_programInteractions_subcircuit
     Readers.JTypeReader.circuit programChannel.toRaw input offset ops _
     (jTypeReader_programInteractions input offset)
 
+/-- J-type reader raw Memory list: the lone op_a (rd) read-prior pull (both operand slots carry
+immediates; the op_a write push is factored into `Readers/RegisterWrite`). -/
+def jTypeMemoryInteractions (input : Var Readers.JTypeReader.Inputs (ZMod p)) :
+    List (AbstractInteraction (ZMod p)) :=
+  [(memoryChannel.pulledIf input.is_real
+      ⟨input.clk_high, input.cols.op_a_memory.access_timestamp.prev_low, input.cols.op_a, 0, 0,
+       input.cols.op_a_memory.prev_value⟩).toRaw]
+
+theorem jTypeReader_memoryInteractions (input : Var Readers.JTypeReader.Inputs (ZMod p))
+    (offset : ℕ) :
+    ((Readers.JTypeReader.circuit (p := p).main input).operations offset).interactionsWith
+        memoryChannel.toRaw =
+      jTypeMemoryInteractions input := by
+  simp only [Readers.JTypeReader.circuit, Readers.JTypeReader.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions]
+  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+    Channels.byteChannel_eq_memoryChannel_false,
+    Channels.programChannel_eq_memoryChannel_false,
+    decide_false, Bool.false_eq_true, List.nil_append, jTypeMemoryInteractions]
+
+theorem jTypeReader_memoryInteractions_subcircuit
+    (input : Var Readers.JTypeReader.Inputs (ZMod p)) (offset : ℕ)
+    (ops : Operations (ZMod p)) :
+    Operations.interactionsWith memoryChannel.toRaw
+        (.subcircuit ((Readers.JTypeReader.circuit (p := p)).toSubcircuit offset input) :: ops) =
+      jTypeMemoryInteractions input ++ Operations.interactionsWith memoryChannel.toRaw ops :=
+  InteractionRecovery.interactionsWith_generalSubcircuit_of_main_exact_list
+    Readers.JTypeReader.circuit memoryChannel.toRaw input offset ops _
+    (jTypeReader_memoryInteractions input offset)
+
 end SP1Clean.Soundness

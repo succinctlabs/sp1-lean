@@ -72,6 +72,63 @@ theorem completeness :
   · -- `is_real` binary gate.
     rcases h_bin with h | h <;> rw [h] <;> simp
 
+/-- AluX0's exact Memory-channel interaction list, descended verbatim from the composed
+`ALUTypeReaderImmutable`: op_a read-prior pull + read-back push at `clk + 4` (rd = x0 is a **read**
+here — the result is discarded), op_b read-prior pull + read-back push at `clk + 3`, and the
+(`is_real - imm_c`)-gated op_c pull/push pair at `clk + 2`, addressed by the low limb `op_c[0]` (an
+immediate does no register read).  No `RegisterWrite` push and no witness cells.  Keeping this list
+beside `circuit` makes Clean's exposure interface the single structural source consumed by both
+faithfulness and semantic grounding. -/
+def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (_offset : ℕ) :
+    List (ChannelInteraction (memoryChannel (p := p))) :=
+  [ memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pulledIf (input.is_real - input.adapter.imm_c)
+      ⟨input.state.clk_high, input.adapter.op_c_memory.access_timestamp.prev_low,
+       input.adapter.op_c[0], 0, 0, input.adapter.op_c_memory.prev_value⟩,
+    memoryChannel.pushedIf (input.is_real - input.adapter.imm_c)
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2,
+       input.adapter.op_c[0], 0, 0, input.adapter.op_c_memory.prev_value⟩ ]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact op_a (x0 rd read-prior) pull occupies its declared slot in AluX0's exposed Memory
+list. -/
+theorem opAPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-B (rs1) pull occupies its declared slot in AluX0's exposed Memory list. -/
+theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact (`is_real - imm_c`)-gated source-C pull occupies its declared slot in AluX0's exposed
+Memory list. -/
+theorem opCPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf (input.is_real - input.adapter.imm_c)
+      ⟨input.state.clk_high, input.adapter.op_c_memory.access_timestamp.prev_low,
+       input.adapter.op_c[0], 0, 0, input.adapter.op_c_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
 /-- The `AluX0` chip row as a `GeneralFormalCircuit`: validates the ALU-into-`x0` program/register accesses
 and advances state (the result discarded); output is the extracted `AluX0Cols`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
@@ -90,7 +147,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     -- The chip's own LTU byte-pull and the reader's pulls are on byteChannel/programChannel/memoryChannel,
     -- filtered out by `interactionsWith stateChannel`.
-    exposedChannels := fun input _ =>
+    exposedChannels := fun input offset =>
       expose stateChannel
         [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
@@ -98,6 +155,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
           stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
+      expose memoryChannel (exposedMemoryInteractions input offset) ++
       -- The Program-bus instruction fetch (descended from the composed `ALUTypeReaderImmutable`,
       -- gate `is_trusted = is_real`, opcode = the committed input opcode), consumed by
       -- `Soundness/TypedProgram.lean`.
@@ -114,7 +172,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
       unfold Operations.ExposedChannelsLawful
       intro exposed exposedMem
       simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
-      rcases exposedMem with rfl | rfl
+      rcases exposedMem with (rfl | rfl) | rfl
       all_goals
         simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
           Readers.ALUTypeReaderImmutable.circuit, Readers.ALUTypeReaderImmutable.main,
@@ -125,10 +183,19 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
       · simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
           h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
           if_true, List.nil_append]
+      · simp [circuit_norm, Gadgets.Equality.main, exposedMemoryInteractions]
       · simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
           Channels.byteChannel_eq_programChannel_false,
           Channels.stateChannel_eq_programChannel_false,
           Channels.memoryChannel_eq_programChannel_false,
           decide_false, decide_true, Bool.false_eq_true, if_true, List.nil_append] }
+
+/-- The completed AluX0 circuit exposes exactly the Memory interaction list above. -/
+theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith memoryChannel.toRaw =
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
 
 end SP1Clean.AluX0Chip

@@ -306,9 +306,49 @@ def exposedOpcode (offset : ℕ) : Expression (ZMod p) :=
   var ⟨offset⟩ * 40 + var ⟨offset + 1⟩ * 41 + var ⟨offset + 2⟩ * 42 +
     var ⟨offset + 3⟩ * 43 + var ⟨offset + 4⟩ * 44 + var ⟨offset + 5⟩ * 45
 
-/-- Branch's exposed channels: the State pair through the canonical `CPUState` child interface, plus
-the Program-bus instruction fetch (descended from the composed `ITypeReaderImmutable`, gate
-`is_trusted = is_real`, opcode = the committed one-hot flag encoding). -/
+/-- Branch's exact Memory-channel interaction list, descended verbatim from the composed
+`ITypeReaderImmutable`: op_a (rs1) read-prior pull + read-back push at `clk + 4`, then op_b (rs2)
+read-prior pull + read-back push at `clk + 3`.  Branch writes no register (`writesReg = false`), so
+there is no `RegisterWrite` push and the list is witness-free.  Keeping this list beside `circuit`
+makes Clean's exposure interface the single structural source consumed by both faithfulness and
+semantic grounding. -/
+def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (_offset : ℕ) :
+    List (ChannelInteraction (memoryChannel (p := p))) :=
+  [ memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩ ]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-A (rs1) pull occupies its declared slot in Branch's exposed Memory list. -/
+theorem opAPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-B (rs2) pull occupies its declared slot in Branch's exposed Memory list. -/
+theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+/-- Branch's exposed channels: the State pair through the canonical `CPUState` child interface, the
+Memory-channel closed form above, plus the Program-bus instruction fetch (descended from the
+composed `ITypeReaderImmutable`, gate `is_trusted = is_real`, opcode = the committed one-hot flag
+encoding). -/
 def stateExposure (input : Var Inputs (ZMod p)) (offset : ℕ) :
     List (ExposedChannel (ZMod p)) :=
   Readers.CPUState.exposedState
@@ -316,6 +356,7 @@ def stateExposure (input : Var Inputs (ZMod p)) (offset : ℕ) :
       #v[var ⟨offset + 6 + 1 + 4 + 4⟩, var ⟨offset + 6 + 1 + 4 + 4 + 1⟩,
         var ⟨offset + 6 + 1 + 4 + 4 + 2⟩],
       8, input.is_real⟩ ++
+  expose memoryChannel (exposedMemoryInteractions input offset) ++
   expose programChannel
     [ programChannel.pulledIf input.is_real
         ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], exposedOpcode offset,
@@ -329,7 +370,7 @@ private theorem main_exposedChannelsLawful (input : Var Inputs (ZMod p)) (offset
   intro exposed exposedMem
   simp only [stateExposure, Readers.CPUState.exposedState, expose, List.mem_append,
     List.mem_singleton] at exposedMem
-  rcases exposedMem with rfl | rfl
+  rcases exposedMem with (rfl | rfl) | rfl
   · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
       witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
       subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
@@ -351,6 +392,31 @@ private theorem main_exposedChannelsLawful (input : Var Inputs (ZMod p)) (offset
     simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
       Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
     simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil]
+  · -- Memory branch: compositional — the immutable I-type reader keeps its four Memory
+    -- interactions via the reader-local `_subcircuit` lemma; every other child is nil.
+    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+      witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
+      subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
+      HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
+    simp only [Operations.interactionsWith_witness,
+      Soundness.iTypeReaderImmutable_memoryInteractions_subcircuit,
+      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+      LtOperationSigned.circuit, LtOperationSigned.channelsWithGuarantees_eq,
+      AddOperation.circuit, AddOperation.channelsWithGuarantees_eq,
+      Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
+      Gadgets.Equality.channelsWithGuarantees_eq,
+      Gadgets.Equality.channelsWithRequirements_eq,
+      FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
+      Channels.memoryChannel_eq_byteChannel_false,
+      Channels.memoryChannel_eq_stateChannel_false, not_false_eq_true,
+      Operations.interactionsWith_assert, Operations.interactionsWith_interact,
+      Operations.interactionsWith_nil, Soundness.iTypeImmutableMemoryInteractions,
+      List.cons_append, List.nil_append]
+    simp only [circuit_norm]
+    simp only [Channels.byteChannel_eq_memoryChannel_false, if_false,
+      exposedMemoryInteractions, List.map_cons, List.map_nil]
+    rfl
   · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
     -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
     simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
@@ -394,5 +460,15 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BranchColumns :=
     -- the three selected limbs `next_pc[0..2]` (cells `offset+15..17`).
     exposedChannels := stateExposure,
     exposedChannels_eq := main_exposedChannelsLawful }
+
+/-- The completed Branch circuit exposes exactly the Memory interaction list above.  Stated via the
+exposure-lawfulness theorem directly (not through `circuit`) so it stays axiom-clean while the
+completeness seam is open. -/
+theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith memoryChannel.toRaw =
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
+  exact main_exposedChannelsLawful input offset
+    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [stateExposure, Readers.CPUState.exposedState, expose])
 
 end SP1Clean.BranchChip
