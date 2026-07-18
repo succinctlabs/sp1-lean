@@ -320,6 +320,12 @@ theorem completeness :
                show env.get (i₀ + 3 + 4 + 4 + 6) = R[6] from key 6,
                show env.get (i₀ + 3 + 4 + 4 + 7) = R[7] from key 7]
 
+/-- The Program-fetch opcode committed by the witnessed one-hot variant flags (cells `offset+0..2`):
+`XOR·3 + OR·4 + AND·5`.  Named so the exposed pull and `Soundness/TypedProgram.lean` share one
+statement-level expression instead of raw witness indices. -/
+def exposedOpcode (offset : ℕ) : Expression (ZMod p) :=
+  var ⟨offset⟩ * 3 + var ⟨offset + 1⟩ * 4 + var ⟨offset + 2⟩ * 5
+
 /-- The Bitwise chip row as a `GeneralFormalCircuit`: flag-gated RV64 `and`/`or`/`xor` semantic contract,
 composing the witnessed `BitwiseU16Operation` gadget and the immediate-capable register reader; output is
 the extracted `BitwiseCols` column struct. -/
@@ -332,31 +338,64 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
       [stateChannel.toRaw, memoryChannel.toRaw],
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
-    exposedChannels := fun input _ =>
+    exposedChannels := fun input offset =>
       expose stateChannel
         [ stateChannel.pulledIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
           stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
-             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
+             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
+      -- The Program-bus instruction fetch (descended from the composed `ALUTypeReader`, gate
+      -- `is_trusted = is_real`, opcode = the committed one-hot flag encoding), consumed by
+      -- `Soundness/TypedProgram.lean`.
+      expose programChannel
+        [ programChannel.pulledIf input.is_real
+            ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], exposedOpcode offset,
+             input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
+             input.adapter.op_a_0, 0, input.adapter.imm_c⟩ ],
     exposedChannels_eq := by
       intro input offset
       have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
       have h_program := Channels.programChannel_toRaw_ne_stateChannel (p := p)
       have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
-      rw [Operations.exposedChannelsLawful_expose]
-      simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
-        Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
-        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
-        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-        SP1Clean.BitwiseU16Operation.circuit, SP1Clean.BitwiseU16Operation.main,
-        SP1Clean.BitwiseOperation.circuit, SP1Clean.BitwiseOperation.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions,
-        GeneralFormalCircuit.toSubcircuit_interactions]
-      simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-        h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
-        if_true, List.nil_append] }
+      unfold Operations.ExposedChannelsLawful
+      intro exposed exposedMem
+      simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
+      rcases exposedMem with rfl | rfl
+      · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+          Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+          Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+          Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+          Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+          SP1Clean.BitwiseU16Operation.circuit, SP1Clean.BitwiseU16Operation.main,
+          SP1Clean.BitwiseOperation.circuit, SP1Clean.BitwiseOperation.main,
+          circuit_norm, FormalAssertion.toSubcircuit_interactions,
+          GeneralFormalCircuit.toSubcircuit_interactions]
+        simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+          h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+          if_true, List.nil_append]
+      · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
+        -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
+        simp only [main, Circuit.operations, Circuit.bind_def,
+          Circuit.pure_def, witnessVectorNative, witnessNative, subcircuitWithAssertion, assertion,
+          assertZero, HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
+        simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+          InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+          InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+          Soundness.aluTypeReader_programInteractions_subcircuit,
+          Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
+          Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
+          SP1Clean.BitwiseU16Operation.circuit, SP1Clean.BitwiseU16Operation.elaborated,
+          FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
+          Channels.programChannel_eq_byteChannel_false,
+          Channels.programChannel_eq_stateChannel_false,
+          Channels.programChannel_eq_memoryChannel_false,
+          not_false_eq_true, Operations.interactionsWith_assert,
+          Operations.interactionsWith_nil, List.map_cons, List.map_nil, List.nil_append,
+          List.append_nil, Soundness.aluTypeProgramMessage, exposedOpcode]
+        simp only [Operations.interactionsWith_subcircuit,
+          FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
+          List.filter_nil, List.nil_append] }
 
 end SP1Clean.BitwiseChip

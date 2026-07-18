@@ -278,28 +278,61 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
     exposedChannels := fun input offset =>
       Readers.CPUState.exposedState
         ⟨input.state, #v[var ⟨offset⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩],
-          8, input.is_real⟩,
+          8, input.is_real⟩ ++
+      -- The Program-bus instruction fetch (descended from the composed `JTypeReader`, gate
+      -- `is_trusted = is_real`, opcode `JAL = 46`), consumed by `Soundness/TypedProgram.lean`.
+      expose programChannel
+        [ programChannel.pulledIf input.is_real
+            ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 46,
+             input.adapter.op_a, input.adapter.op_b_imm, input.adapter.op_c_imm,
+             input.adapter.op_a_0, 1, 1⟩ ],
     exposedChannels_eq := by
       intro input offset
-      simp only [Readers.CPUState.exposedState]
-      rw [Operations.exposedChannelsLawful_expose]
-      simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-        witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-        HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
-      simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
-        Readers.CPUState.interactionsWith_state_subcircuit,
-        InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-        InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-        AddOperation.circuit, AddOperation.channelsWithGuarantees_eq,
-        Readers.JTypeReader.circuit, Readers.JTypeReader.channelsWithGuarantees_eq,
-        Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
-        FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
-        Channels.stateChannel_eq_byteChannel_false, Channels.stateChannel_eq_programChannel_false,
-        Channels.stateChannel_eq_memoryChannel_false, not_false_eq_true,
-        Operations.interactionsWith_assert, Operations.interactionsWith_interact,
-        Operations.interactionsWith_nil, List.nil_append]
-      simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
-        Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
-      simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil] }
+      unfold Operations.ExposedChannelsLawful
+      intro exposed exposedMem
+      simp only [Readers.CPUState.exposedState, expose, List.mem_append,
+        List.mem_singleton] at exposedMem
+      rcases exposedMem with rfl | rfl
+      · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
+        simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+          Readers.CPUState.interactionsWith_state_subcircuit,
+          InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+          InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+          AddOperation.circuit, AddOperation.channelsWithGuarantees_eq,
+          Readers.JTypeReader.circuit, Readers.JTypeReader.channelsWithGuarantees_eq,
+          Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
+          FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
+          Channels.stateChannel_eq_byteChannel_false, Channels.stateChannel_eq_programChannel_false,
+          Channels.stateChannel_eq_memoryChannel_false, not_false_eq_true,
+          Operations.interactionsWith_assert, Operations.interactionsWith_interact,
+          Operations.interactionsWith_nil, List.nil_append]
+        simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
+          Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
+        simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil]
+      · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
+        -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
+        simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
+        simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+          InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+          InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+          Soundness.jTypeReader_programInteractions_subcircuit,
+          Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
+          AddOperation.circuit, AddOperation.channelsWithGuarantees_eq,
+          Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
+          FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
+          Channels.programChannel_eq_byteChannel_false,
+          Channels.programChannel_eq_stateChannel_false,
+          Channels.programChannel_eq_memoryChannel_false,
+          not_false_eq_true, Operations.interactionsWith_assert,
+          Operations.interactionsWith_interact, Operations.interactionsWith_nil,
+          List.map_cons, List.map_nil, List.nil_append, Soundness.jTypeProgramMessage]
+        simp only [Operations.interactionsWith_subcircuit,
+          FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
+          List.filter_nil, List.nil_append]
+        simp only [Channels.byteChannel_eq_programChannel_false, if_false] }
 
 end SP1Clean.JalChip

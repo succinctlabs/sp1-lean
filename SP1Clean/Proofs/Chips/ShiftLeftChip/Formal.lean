@@ -96,6 +96,87 @@ theorem completeness :
   stop
   trivial
 
+/-- The reader's literal Program gate — the witnessed variant-flag sum `is_sll + is_sllw` (cells
+`offset+30..31`).  ShiftLeft's public `is_real` is only *derived* from this one-hot sum through the
+binding constraint `is_real - (is_sll + is_sllw) === 0`, so the exposed pull carries the reader's
+own gate expression; `isReal_eq_exposedGate` below identifies the two under the row's constraints. -/
+def exposedGate (offset : ℕ) : Expression (ZMod p) :=
+  var ⟨offset + 30⟩ + var ⟨offset + 31⟩
+
+/-- The Program-fetch opcode committed by the witnessed variant flags (cells `offset+30..31`):
+`SLL·6 + SLLW·21`.  Named so the exposed pull and `Soundness/TypedProgram.lean` share one
+statement-level expression instead of raw witness indices. -/
+def exposedOpcode (offset : ℕ) : Expression (ZMod p) :=
+  var ⟨offset + 30⟩ * 6 + var ⟨offset + 31⟩ * 21
+
+/-! ### `ConstraintsHold` selectors for the binding-constraint extraction
+
+Generic `Operations`-level facts (formerly in `Soundness/TypedProgram.lean`) that let
+`isReal_eq_exposedGate` select the one binding assertion without normalizing any unrelated
+arithmetic subcircuit. -/
+
+omit [Fact (2 ^ 17 < p)] in
+private theorem operationsConstraintsHold_append (env : Environment (ZMod p))
+    (left right : Operations (ZMod p)) :
+    (left ++ right).ConstraintsHold env ↔
+      left.ConstraintsHold env ∧ right.ConstraintsHold env := by
+  simp only [Operations.ConstraintsHold, Operations.constraints_append,
+    Operations.lookups_append, List.forall_mem_append]
+  tauto
+
+omit [Fact (2 ^ 17 < p)] in
+private theorem operationsConstraintsHold_assert_singleton (env : Environment (ZMod p))
+    (expression : Expression (ZMod p)) :
+    Operations.ConstraintsHold env [.assert expression] ↔ env expression = 0 := by
+  simp [Operations.ConstraintsHold, circuit_norm]
+
+omit [Fact (2 ^ 17 < p)] in
+private theorem operationsConstraintsHold_witness_singleton (env : Environment (ZMod p))
+    (length : ℕ) (generator : WitgenIR (ZMod p) length) :
+    Operations.ConstraintsHold env [.witness length generator] := by
+  simp [Operations.ConstraintsHold, circuit_norm]
+
+omit [Fact (2 ^ 17 < p)] in
+private theorem equality_of_operationsConstraintsHold_singleton (env : Environment (ZMod p))
+    (left right : Expression (ZMod p)) (offset : ℕ) :
+    Operations.ConstraintsHold env
+        [.subcircuit (@FormalAssertion.toSubcircuit (ZMod p) _ (ProvablePair field field)
+          ProvablePair.instance (Gadgets.Equality.circuit field) offset (left, right))] →
+      env left = env right := by
+  intro constraints
+  have difference :
+      env (toElements (M := field) left)[0] - env (toElements (M := field) right)[0] = 0 := by
+    simpa [Operations.ConstraintsHold, FormalAssertion.toSubcircuit,
+      Gadgets.Equality.main, Gadgets.allZero, Circuit.forEach.operations_eq,
+      FlatOperation.constraints, FlatOperation.lookups, eval_sub, circuit_norm] using constraints
+  have left_eq : env (toElements (M := field) left)[0] = env left := rfl
+  have right_eq : env (toElements (M := field) right)[0] = env right := rfl
+  rw [left_eq, right_eq, sub_eq_zero] at difference
+  exact difference
+
+set_option maxHeartbeats 8000000 in
+/-- Under the row's own constraints, the binding assert `is_real - (is_sll + is_sllw) === 0`
+identifies the exposed derived Program gate with the public `is_real` selector.  This is the one
+whole-`main` `ConstraintsHold` normalization ShiftLeft needs; keeping it here spares
+`Soundness/TypedProgram.lean` from re-normalizing the circuit. -/
+theorem isReal_eq_exposedGate (input : Var Inputs (ZMod p)) (offset : ℕ)
+    (env : Environment (ZMod p))
+    (rowConstraints : ((main input).operations offset).ConstraintsHold env) :
+    env input.is_real = env (exposedGate offset) := by
+  simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+    witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+    HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf,
+    Operations.localLength, operationsConstraintsHold_append,
+    operationsConstraintsHold_assert_singleton,
+    operationsConstraintsHold_witness_singleton] at rowConstraints
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, bindConstraints, _⟩ := rowConstraints
+  have bindEq := equality_of_operationsConstraintsHold_singleton env _ _ _ bindConstraints
+  have bindZero :
+      env input.is_real -
+        (env (var ⟨offset + 30⟩) + env (var ⟨offset + 31⟩)) = 0 := by
+    simpa [eval_sub, circuit_norm] using bindEq
+  simpa [exposedGate, circuit_norm] using sub_eq_zero.mp bindZero
+
 set_option maxHeartbeats 4000000 in
 /-- The `ShiftLeft` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `sll`/`sllw` semantic contract;
 output is the extracted `ShiftLeftCols` column struct. Soundness is proved (assembled from the two per-op
@@ -169,33 +250,69 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftLeftCols :=
           exact off_gate_vacuous h_bool h1 h0,
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
-    exposedChannels := fun input _ =>
+    exposedChannels := fun input offset =>
       Readers.CPUState.exposedState
         ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
-          8, input.is_real⟩,
+          8, input.is_real⟩ ++
+      -- The Program-bus instruction fetch (descended from the composed `ALUTypeReader`, gate =
+      -- the reader's literal derived selector sum, opcode = the committed flag encoding),
+      -- consumed by `Soundness/TypedProgram.lean`.
+      expose programChannel
+        [ programChannel.pulledIf (exposedGate offset)
+            ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], exposedOpcode offset,
+             input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
+             input.adapter.op_a_0, 0, input.adapter.imm_c⟩ ],
     exposedChannels_eq := by
       intro input offset
-      simp only [Readers.CPUState.exposedState]
-      rw [Operations.exposedChannelsLawful_expose]
-      simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-        witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-        HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
-      simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
-        Readers.CPUState.interactionsWith_state_subcircuit,
-        InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-        InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-        U16MSBOperation.circuit, U16MSBOperation.channelsWithGuarantees_eq,
-        Readers.ALUTypeReader.circuit, Readers.RegisterWrite.circuit,
-        FormalCircuitBase.channelsWithGuarantees_def,
-        Readers.ALUTypeReader.channelsWithGuarantees_eq,
-        Readers.RegisterWrite.channelsWithGuarantees_eq,
-        List.mem_cons, List.not_mem_nil, or_false,
-        Channels.stateChannel_eq_byteChannel_false, Channels.stateChannel_eq_programChannel_false,
-        Channels.stateChannel_eq_memoryChannel_false, not_false_eq_true,
-        Operations.interactionsWith_assert, Operations.interactionsWith_interact,
-        Operations.interactionsWith_nil, List.nil_append]
-      simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
-        Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
-      simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil] }
+      unfold Operations.ExposedChannelsLawful
+      intro exposed exposedMem
+      simp only [Readers.CPUState.exposedState, expose, List.mem_append,
+        List.mem_singleton] at exposedMem
+      rcases exposedMem with rfl | rfl
+      · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
+        simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+          Readers.CPUState.interactionsWith_state_subcircuit,
+          InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+          InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+          U16MSBOperation.circuit, U16MSBOperation.channelsWithGuarantees_eq,
+          Readers.ALUTypeReader.circuit, Readers.RegisterWrite.circuit,
+          FormalCircuitBase.channelsWithGuarantees_def,
+          Readers.ALUTypeReader.channelsWithGuarantees_eq,
+          Readers.RegisterWrite.channelsWithGuarantees_eq,
+          List.mem_cons, List.not_mem_nil, or_false,
+          Channels.stateChannel_eq_byteChannel_false, Channels.stateChannel_eq_programChannel_false,
+          Channels.stateChannel_eq_memoryChannel_false, not_false_eq_true,
+          Operations.interactionsWith_assert, Operations.interactionsWith_interact,
+          Operations.interactionsWith_nil, List.nil_append]
+        simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
+          Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
+        simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil]
+      · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
+        -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
+        simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
+        simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+          InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+          InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+          Soundness.aluTypeReader_programInteractions_subcircuit,
+          Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
+          U16MSBOperation.circuit, U16MSBOperation.channelsWithGuarantees_eq,
+          Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
+          FormalCircuitBase.channelsWithGuarantees_def,
+          List.mem_cons, List.not_mem_nil, or_false,
+          Channels.programChannel_eq_byteChannel_false,
+          Channels.programChannel_eq_stateChannel_false,
+          Channels.programChannel_eq_memoryChannel_false,
+          not_false_eq_true, Operations.interactionsWith_assert,
+          Operations.interactionsWith_interact, Operations.interactionsWith_nil,
+          List.map_cons, List.map_nil, List.nil_append,
+          Soundness.aluTypeProgramMessage, exposedGate, exposedOpcode]
+        simp only [Operations.interactionsWith_subcircuit,
+          FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
+          List.filter_nil, List.nil_append]
+        simp only [Channels.byteChannel_eq_programChannel_false, if_false, List.nil_append] }
 
 end SP1Clean.ShiftLeftChip
