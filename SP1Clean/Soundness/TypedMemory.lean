@@ -26,6 +26,34 @@ open SP1Clean.Channels
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
+set_option maxHeartbeats 1000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- Evaluate the canonical register-shaped Memory pull without unfolding a concrete chip input. -/
+theorem eval_registerMemoryMessage (env : Environment (ZMod p))
+    (clkHigh prevLow index : Expression (ZMod p)) (value : Word (Expression (ZMod p))) :
+    Eval.eval env (⟨clkHigh, prevLow, index, 0, 0, value⟩ : MemoryMsg (Expression (ZMod p))) =
+      (⟨Expression.eval env clkHigh, Expression.eval env prevLow, Expression.eval env index,
+        0, 0, Eval.eval env value⟩ : MemoryMsg (ZMod p)) := by
+  rw [ProvableStruct.eval_eq_eval]
+  simp only [ProvableStruct.structEvalLiteralProc, Expression.eval]
+
+/-- Package an active canonical register pull into the operand witness expected by the chip-level
+contract.  Keeping this dependent-record assembly generic prevents concrete completed circuits from
+being unfolded while Lean unifies the `MemoryMsg` projections. -/
+theorem registerPullWitness_of_registerMessage
+    (interactions : List (TypedInteraction (memoryChannel (p := p))))
+    (clkHigh prevLow addr0 : ZMod p) (value expected : Word (ZMod p))
+    (member : (⟨clkHigh, prevLow, addr0, 0, 0, value⟩ : MemoryMsg (ZMod p)) ∈
+      consumedMessages interactions)
+    (index : BitVec 5) (indexEq : (index.toNat : ZMod p) = addr0)
+    (valueEq : value = expected) :
+    ∃ message ∈ consumedMessages interactions,
+      Semantics.MemoryMsg.locOf message = Semantics.MemLoc.reg index ∧
+      message.value = expected := by
+  let message : MemoryMsg (ZMod p) := ⟨clkHigh, prevLow, addr0, 0, 0, value⟩
+  refine ⟨message, member, ?_, valueEq⟩
+  exact Semantics.MemoryMsg.locOf_register message index indexEq rfl rfl
+
 namespace DecodedInstructionRow
 
 /-- The active prior-memory messages consumed by this exact physical row. -/
@@ -115,6 +143,119 @@ structure CircuitRegisterOperandPullShape {Input Output : TypeMap}
     (fun adapter => adapter.imm_c) (fun adapter => adapter.op_c[0])
     (fun adapter => adapter.op_c_memory.prev_value)
 
+/-- Closed-form facts for one register source-operand pull.  Every fact is stated against the
+circuit's public syntactic surface — `main`'s retained interaction list and the elaborated
+`circuit.output` — never against the flattened `Component` projections (`rowOutput`/`operations`),
+so per-chip instances stay cheap for the kernel; the single `rowOutput → circuit.output`
+identification happens once, over abstract circuits, in the generic transport below. -/
+def CircuitRegisterOperandPullContractAt {Input Output : TypeMap}
+    [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit (ZMod p) Input Output)
+    (view : Input (ZMod p) → Output (ZMod p) → Trace.RowView (ZMod p))
+    (selector : Input (ZMod p) → ZMod p)
+    (operandIndex : Trace.AdapterView (ZMod p) → ZMod p)
+    (priorValue : Trace.AdapterView (ZMod p) → Word (ZMod p)) : Prop :=
+  let inputVar : Var Input (ZMod p) := varFromOffset Input 0
+  let offset := size Input
+  ∃ (gate clkHigh prevLow indexExpr : Var Input (ZMod p) → ℕ → Expression (ZMod p))
+    (valueExpr : Var Input (ZMod p) → ℕ → Word (Expression (ZMod p))),
+    (∀ input offset,
+      (memoryChannel.pulledIf (gate input offset)
+        (⟨clkHigh input offset, prevLow input offset, indexExpr input offset, 0, 0,
+          valueExpr input offset⟩ : MemoryMsg (Expression (ZMod p)))).toRaw ∈
+        ((circuit.main input).operations offset).interactionsWith memoryChannel.toRaw) ∧
+    (∀ env : Environment (ZMod p),
+      Expression.eval env (gate inputVar offset) = selector (Eval.eval env inputVar)) ∧
+    (∀ env : Environment (ZMod p),
+      Expression.eval env (indexExpr inputVar offset) =
+        operandIndex (view (Eval.eval env inputVar)
+          (Eval.eval env (circuit.output inputVar offset))).adapter) ∧
+    (∀ env : Environment (ZMod p),
+      Eval.eval env (valueExpr inputVar offset) =
+        priorValue (view (Eval.eval env inputVar)
+          (Eval.eval env (circuit.output inputVar offset))).adapter)
+
+/-- The per-chip bundle of closed-form source-operand pull facts (operands B and C), the sole
+obligation left to each chip's `CircuitGroundingContracts` file. -/
+structure CircuitRegisterOperandPullContract {Input Output : TypeMap}
+    [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit (ZMod p) Input Output)
+    (view : Input (ZMod p) → Output (ZMod p) → Trace.RowView (ZMod p))
+    (selector : Input (ZMod p) → ZMod p) : Prop where
+  opB : CircuitRegisterOperandPullContractAt circuit view selector
+    (fun adapter => adapter.op_b[0]) (fun adapter => adapter.op_b_memory.prev_value)
+  opC : CircuitRegisterOperandPullContractAt circuit view selector
+    (fun adapter => adapter.op_c[0]) (fun adapter => adapter.op_c_memory.prev_value)
+
+/-- Transport one closed-form operand contract to the flattened-component pull statement.  The
+`rowInput`/`rowOutput` identifications happen here over an abstract circuit, so concrete chips
+never force the kernel to re-normalize their composed `main`. -/
+theorem circuitRegisterOperandPullAt_of_exposure {Input Output : TypeMap}
+    [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit (ZMod p) Input Output)
+    (view : Input (ZMod p) → Output (ZMod p) → Trace.RowView (ZMod p))
+    (selector : Input (ZMod p) → ZMod p)
+    (ready : Input (ZMod p) → Output (ZMod p) → Target.GuestProgram → SailState → Prop)
+    (immediate operandIndex : Trace.AdapterView (ZMod p) → ZMod p)
+    (priorValue : Trace.AdapterView (ZMod p) → Word (ZMod p))
+    (contract : CircuitRegisterOperandPullContractAt circuit view selector
+      operandIndex priorValue) :
+    CircuitRegisterOperandPullAt circuit view selector ready immediate operandIndex priorValue := by
+  obtain ⟨gate, clkHigh, prevLow, indexExpr, valueExpr, member, gate_eval, index_eval,
+    value_eval⟩ := contract
+  intro data physical rowView
+  dsimp only
+  intro program state viewEq _ready real
+  let component : Component (ZMod p) := ⟨circuit⟩
+  let env := Environment.fromArray physical data
+  let inputVar : Var Input (ZMod p) := varFromOffset Input 0
+  let offset := size Input
+  have inputEq : Eval.eval env inputVar = component.rowInput env :=
+    eval_varFromOffset_valueFromOffset Input 0 env
+  have outputEq : Eval.eval env (circuit.output inputVar offset) = component.rowOutput env := by
+    simp only [component, Component.rowOutput, circuit_norm]
+    rfl
+  have viewEq' : rowView = view (Eval.eval env inputVar)
+      (Eval.eval env (circuit.output inputVar offset)) := by
+    rw [inputEq, outputEq]
+    exact viewEq
+  intro index _immediate indexEq
+  have active : Expression.eval env (gate inputVar offset) = 1 := by
+    calc
+      _ = selector (Eval.eval env inputVar) := gate_eval env
+      _ = selector (component.rowInput env) := by rw [inputEq]
+      _ = 1 := real
+  have rawMem : (memoryChannel.pulledIf (gate inputVar offset)
+      (⟨clkHigh inputVar offset, prevLow inputVar offset, indexExpr inputVar offset, 0, 0,
+        valueExpr inputVar offset⟩ : MemoryMsg (Expression (ZMod p)))).toRaw ∈
+      component.operations.interactionsWith memoryChannel.toRaw := by
+    rw [Component.interactionsWith_eq]
+    exact member inputVar offset
+  have hp : 2 < p := by
+    have := Fact.out (p := 2 ^ 24 < p)
+    omega
+  have consumed := eval_pulledIf_message_mem_consumedMessages component.operations memoryChannel
+    env (gate inputVar offset) _ rawMem hp active
+  rw [eval_registerMemoryMessage] at consumed
+  have addr0 : (index.toNat : ZMod p) = Expression.eval env (indexExpr inputVar offset) := by
+    rw [index_eval env, ← viewEq']
+    exact indexEq
+  have valueEq : Eval.eval env (valueExpr inputVar offset) = priorValue rowView.adapter := by
+    rw [value_eval env, ← viewEq']
+  exact registerPullWitness_of_registerMessage _ _ _ _ _ _ consumed index addr0 valueEq
+
+/-- Transport the per-chip closed-form contract bundle to the two-operand pull shape. -/
+theorem circuitRegisterOperandPullShape_of_exposure {Input Output : TypeMap}
+    [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit (ZMod p) Input Output)
+    (view : Input (ZMod p) → Output (ZMod p) → Trace.RowView (ZMod p))
+    (selector : Input (ZMod p) → ZMod p)
+    (ready : Input (ZMod p) → Output (ZMod p) → Target.GuestProgram → SailState → Prop)
+    (contract : CircuitRegisterOperandPullContract circuit view selector) :
+    CircuitRegisterOperandPullShape circuit view selector ready :=
+  ⟨circuitRegisterOperandPullAt_of_exposure circuit view selector ready _ _ _ contract.opB,
+   circuitRegisterOperandPullAt_of_exposure circuit view selector ready _ _ _ contract.opC⟩
+
 /-- Descriptor-level exact-pull contract for one register operand. -/
 def RegisterOperandPullAt (chip : SupportedChip p)
     (immediate operandIndex : Trace.AdapterView (ZMod p) → ZMod p)
@@ -167,6 +308,27 @@ theorem registerOperandPullShape_of_circuit (kind : ChipKind p)
     apply shape.opC data physical _ program state rfl ready
     rw [← selector_eq]
     exact real
+
+/-- One-step descriptor transport for chip-local operand-pull contracts.  All dependent typeclass
+evidence is taken from `kind` explicitly, so applying this theorem never asks typeclass search to
+reduce a concrete `ChipKind` record. -/
+theorem registerOperandPullShape_of_circuitContract (kind : ChipKind p)
+    (circuit : @GeneralFormalCircuit (ZMod p) kind.Inputs kind.Cols inferInstance
+      kind.provableInputs kind.provableCols)
+    (spec_eq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
+      kind.provableInputs kind.provableCols circuit = kind.chipSpec)
+    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (selector : kind.Inputs (ZMod p) → ZMod p)
+    (selector_eq : ∀ input output, (kind.view input output).is_real = selector input)
+    (contract : @CircuitRegisterOperandPullContract p _ kind.Inputs kind.Cols
+      kind.provableInputs kind.provableCols circuit kind.view selector) :
+    RegisterOperandPullShape ⟨kind, circuit, spec_eq, opcodes, rdGuard⟩ := by
+  letI : ProvableType kind.Inputs := kind.provableInputs
+  letI : ProvableType kind.Cols := kind.provableCols
+  apply registerOperandPullShape_of_circuit kind circuit spec_eq opcodes rdGuard selector
+    selector_eq
+  exact circuitRegisterOperandPullShape_of_exposure circuit kind.view selector
+    kind.advanceReady contract
 
 /-- The minimal chip-level interface exposing which exact Memory pulls carry the two possible
 register source operands. This is a theorem about the chip's emitted interaction list, not another
