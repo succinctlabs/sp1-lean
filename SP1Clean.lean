@@ -344,6 +344,7 @@ import SP1Clean.Soundness.TypedMemory
 import SP1Clean.Proofs.Chips.AddChip.Contracts
 import SP1Clean.Soundness.LocalExecution
 import SP1Clean.Soundness.RowSoundness
+import SP1Clean.Soundness.GroundingAdapter
 import SP1Clean.Soundness.AIR
 import SP1Clean.Soundness.FinishedChannels
 import SP1Clean.Soundness.StateConsistency
