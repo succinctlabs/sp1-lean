@@ -286,6 +286,52 @@ theorem completeness :
   rw [hc0]
   exact witness_bit_bool hr _
 
+/-- Lt's exact Memory-channel interaction list (ALU-type: the op_c register pull/read-back pair is
+gated by **`is_real - imm_c`** — an immediate does no register read — and addressed by the low limb
+`op_c[0]`).  The op_a write push carries the compare-bit word `[bit, 0, 0, 0]` (the witnessed
+`LtOperationSigned` block's cell 0, at `offset + 2` after the two variant flags).  Keeping this list
+beside `circuit` makes Clean's exposure interface the single structural source consumed by both
+faithfulness and semantic grounding. -/
+def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (memoryChannel (p := p))) :=
+  [ memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pulledIf (input.is_real - input.adapter.imm_c)
+      ⟨input.state.clk_high, input.adapter.op_c_memory.access_timestamp.prev_low,
+       input.adapter.op_c[0], 0, 0, input.adapter.op_c_memory.prev_value⟩,
+    memoryChannel.pushedIf (input.is_real - input.adapter.imm_c)
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2,
+       input.adapter.op_c[0], 0, 0, input.adapter.op_c_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+       input.adapter.op_a, 0, 0, #v[var { index := offset + 2 }, 0, 0, 0]⟩ ]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-B pull occupies its declared slot in Lt's exposed Memory list. -/
+theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact (`is_real - imm_c`)-gated source-C pull occupies its declared slot in Lt's exposed
+Memory list. -/
+theorem opCPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf (input.is_real - input.adapter.imm_c)
+      ⟨input.state.clk_high, input.adapter.op_c_memory.access_timestamp.prev_low,
+       input.adapter.op_c[0], 0, 0, input.adapter.op_c_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
 /-- The Program-fetch opcode committed by the witnessed one-hot variant flags (cells `offset+0..1`):
 `SLT·9 + SLTU·10`.  Named so the exposed pull and `Soundness/TypedProgram.lean` share one
 statement-level expression instead of raw witness indices. -/
@@ -312,6 +358,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
           stateChannel.pushedIf input.is_real
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
              input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
+      expose memoryChannel (exposedMemoryInteractions input offset) ++
       -- The Program-bus instruction fetch (descended from the composed `ALUTypeReader`, gate
       -- `is_trusted = is_real`, opcode = the committed one-hot flag encoding), consumed by
       -- `Soundness/TypedProgram.lean`.
@@ -328,7 +375,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
       unfold Operations.ExposedChannelsLawful
       intro exposed exposedMem
       simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
-      rcases exposedMem with rfl | rfl
+      rcases exposedMem with (rfl | rfl) | rfl
       · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
           Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
           Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
@@ -343,6 +390,18 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
         simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
           h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
           if_true, List.nil_append]
+      · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+          Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+          Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+          Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+          Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+          SP1Clean.LtOperationSigned.circuit, SP1Clean.LtOperationSigned.main,
+          SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
+          SP1Clean.LtOperationUnsigned.circuit, SP1Clean.LtOperationUnsigned.main,
+          SP1Clean.U16CompareOperation.circuit, SP1Clean.U16CompareOperation.main,
+          circuit_norm, FormalAssertion.toSubcircuit_interactions,
+          GeneralFormalCircuit.toSubcircuit_interactions]
+        simp [circuit_norm, Gadgets.Equality.main, exposedMemoryInteractions]
       · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def,
@@ -365,5 +424,13 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
         simp only [Operations.interactionsWith_subcircuit,
           FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
           List.filter_nil, List.nil_append] }
+
+/-- The completed Lt circuit exposes exactly the Memory interaction list above. -/
+theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith memoryChannel.toRaw =
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
 
 end SP1Clean.LtChip
