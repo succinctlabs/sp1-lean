@@ -51,216 +51,16 @@ def ProgramEmissionShape (chip : SupportedChip p) : Prop :=
       chip.table.operations.interactionValuesWith programChannel.toRaw env =
         [programChannel.pulledIfValue row.is_real (programMessageOfView row.view)]
 
-/-! ## Reader-local fetch interfaces -/
+/-! ## Reader-local fetch interfaces
 
-/-- The R-type reader's Program payload, named once for compositional chip proofs. -/
-def rTypeProgramMessage (input : Var Readers.RTypeReader.Inputs (ZMod p)) :
-    ProgramMsg (Expression (ZMod p)) :=
-  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode, input.cols.op_a,
-    #v[input.cols.op_b, 0, 0, 0], #v[input.cols.op_c, 0, 0, 0], input.cols.op_a_0, 0, 0⟩
-
-/-- Exact Program interaction of the R-type reader, before it is composed by a chip. -/
-theorem rTypeReader_programInteractions (input : Var Readers.RTypeReader.Inputs (ZMod p))
-    (offset : ℕ) :
-    ((Readers.RTypeReader.circuit (p := p).main input).operations offset).interactionsWith
-        programChannel.toRaw =
-      [(programChannel.pulledIf input.is_trusted (rTypeProgramMessage input)).toRaw] := by
-  simp only [Readers.RTypeReader.circuit, Readers.RTypeReader.main,
-    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions]
-  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-    Channels.byteChannel_eq_programChannel_false,
-    Channels.memoryChannel_eq_programChannel_false,
-    decide_false, Bool.false_eq_true, List.nil_append,
-    rTypeProgramMessage]
-
-omit [Fact (2 ^ 24 < p)] in
-/-- Turn an exact reader-main interaction into the compositional subcircuit form used by chips. -/
-theorem programInteractions_subcircuit_of_main {Input Output : TypeMap}
-    [ProvableType Input] [ProvableType Output]
-    (circuit : GeneralFormalCircuit (ZMod p) Input Output)
-    (input : Var Input (ZMod p)) (offset : ℕ) (ops : Operations (ZMod p))
-    (interaction : ChannelInteraction programChannel)
-    (exact : ((circuit.main input).operations offset).interactionsWith programChannel.toRaw =
-      [interaction.toRaw]) :
-    Operations.interactionsWith programChannel.toRaw
-        (.subcircuit (circuit.toSubcircuit offset input) :: ops) =
-      interaction.toRaw ::
-        Operations.interactionsWith programChannel.toRaw ops := by
-  rw [Operations.interactionsWith_subcircuit, GeneralFormalCircuit.toSubcircuit_interactions]
-  change Operations.interactionsWith programChannel.toRaw ((circuit.main input).operations offset) ++
-      Operations.interactionsWith programChannel.toRaw ops = _
-  rw [exact]
-  rfl
-
-/-- Compositional R-type form: retain the reader's fetch and append the surrounding operations. -/
-theorem rTypeReader_programInteractions_subcircuit
-    (input : Var Readers.RTypeReader.Inputs (ZMod p)) (offset : ℕ)
-    (ops : Operations (ZMod p)) :
-    Operations.interactionsWith programChannel.toRaw
-        (.subcircuit ((Readers.RTypeReader.circuit (p := p)).toSubcircuit offset input) :: ops) =
-      (programChannel.pulledIf input.is_trusted (rTypeProgramMessage input)).toRaw ::
-        Operations.interactionsWith programChannel.toRaw ops :=
-  programInteractions_subcircuit_of_main Readers.RTypeReader.circuit input offset ops _
-    (rTypeReader_programInteractions input offset)
-
-/-- The immediate-capable ALU reader's Program payload. -/
-def aluTypeProgramMessage (input : Var Readers.ALUTypeReader.Inputs (ZMod p)) :
-    ProgramMsg (Expression (ZMod p)) :=
-  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode, input.cols.op_a,
-    #v[input.cols.op_b, 0, 0, 0], input.cols.op_c, input.cols.op_a_0, 0, input.cols.imm_c⟩
-
-theorem aluTypeReader_programInteractions (input : Var Readers.ALUTypeReader.Inputs (ZMod p))
-    (offset : ℕ) :
-    ((Readers.ALUTypeReader.circuit (p := p).main input).operations offset).interactionsWith
-        programChannel.toRaw =
-      [(programChannel.pulledIf input.is_trusted (aluTypeProgramMessage input)).toRaw] := by
-  simp only [Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
-    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions]
-  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-    Channels.byteChannel_eq_programChannel_false,
-    Channels.memoryChannel_eq_programChannel_false,
-    decide_false, Bool.false_eq_true, List.nil_append, aluTypeProgramMessage]
-
-theorem aluTypeReader_programInteractions_subcircuit
-    (input : Var Readers.ALUTypeReader.Inputs (ZMod p)) (offset : ℕ)
-    (ops : Operations (ZMod p)) :
-    Operations.interactionsWith programChannel.toRaw
-        (.subcircuit ((Readers.ALUTypeReader.circuit (p := p)).toSubcircuit offset input) :: ops) =
-      (programChannel.pulledIf input.is_trusted (aluTypeProgramMessage input)).toRaw ::
-        Operations.interactionsWith programChannel.toRaw ops :=
-  programInteractions_subcircuit_of_main Readers.ALUTypeReader.circuit input offset ops _
-    (aluTypeReader_programInteractions input offset)
-
-/-- The immutable ALU reader emits the same fetch shape as its mutable sibling. -/
-def aluTypeImmutableProgramMessage
-    (input : Var Readers.ALUTypeReaderImmutable.Inputs (ZMod p)) :
-    ProgramMsg (Expression (ZMod p)) :=
-  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode, input.cols.op_a,
-    #v[input.cols.op_b, 0, 0, 0], input.cols.op_c, input.cols.op_a_0, 0, input.cols.imm_c⟩
-
-theorem aluTypeReaderImmutable_programInteractions
-    (input : Var Readers.ALUTypeReaderImmutable.Inputs (ZMod p)) (offset : ℕ) :
-    ((Readers.ALUTypeReaderImmutable.circuit (p := p).main input).operations offset).interactionsWith
-        programChannel.toRaw =
-      [(programChannel.pulledIf input.is_trusted
-        (aluTypeImmutableProgramMessage input)).toRaw] := by
-  simp only [Readers.ALUTypeReaderImmutable.circuit, Readers.ALUTypeReaderImmutable.main,
-    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions]
-  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-    Channels.byteChannel_eq_programChannel_false,
-    Channels.memoryChannel_eq_programChannel_false,
-    decide_false, Bool.false_eq_true, List.nil_append, aluTypeImmutableProgramMessage]
-
-theorem aluTypeReaderImmutable_programInteractions_subcircuit
-    (input : Var Readers.ALUTypeReaderImmutable.Inputs (ZMod p)) (offset : ℕ)
-    (ops : Operations (ZMod p)) :
-    Operations.interactionsWith programChannel.toRaw
-        (.subcircuit ((Readers.ALUTypeReaderImmutable.circuit (p := p)).toSubcircuit offset input) ::
-          ops) =
-      (programChannel.pulledIf input.is_trusted
-        (aluTypeImmutableProgramMessage input)).toRaw ::
-        Operations.interactionsWith programChannel.toRaw ops :=
-  programInteractions_subcircuit_of_main Readers.ALUTypeReaderImmutable.circuit input offset ops _
-    (aluTypeReaderImmutable_programInteractions input offset)
-
-/-- I-type reader payload: scalar `rs1`, immediate `op_c`, and `imm_c = 1`. -/
-def iTypeProgramMessage (input : Var Readers.ITypeReader.Inputs (ZMod p)) :
-    ProgramMsg (Expression (ZMod p)) :=
-  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode, input.cols.op_a,
-    #v[input.cols.op_b, 0, 0, 0], input.cols.op_c_imm, input.cols.op_a_0, 0, 1⟩
-
-theorem iTypeReader_programInteractions (input : Var Readers.ITypeReader.Inputs (ZMod p))
-    (offset : ℕ) :
-    ((Readers.ITypeReader.circuit (p := p).main input).operations offset).interactionsWith
-        programChannel.toRaw =
-      [(programChannel.pulledIf input.is_trusted (iTypeProgramMessage input)).toRaw] := by
-  simp only [Readers.ITypeReader.circuit, Readers.ITypeReader.main,
-    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions]
-  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-    Channels.byteChannel_eq_programChannel_false,
-    Channels.memoryChannel_eq_programChannel_false,
-    decide_false, Bool.false_eq_true, List.nil_append, iTypeProgramMessage]
-
-theorem iTypeReader_programInteractions_subcircuit
-    (input : Var Readers.ITypeReader.Inputs (ZMod p)) (offset : ℕ)
-    (ops : Operations (ZMod p)) :
-    Operations.interactionsWith programChannel.toRaw
-        (.subcircuit ((Readers.ITypeReader.circuit (p := p)).toSubcircuit offset input) :: ops) =
-      (programChannel.pulledIf input.is_trusted (iTypeProgramMessage input)).toRaw ::
-        Operations.interactionsWith programChannel.toRaw ops :=
-  programInteractions_subcircuit_of_main Readers.ITypeReader.circuit input offset ops _
-    (iTypeReader_programInteractions input offset)
-
-/-- Immutable I-type reader payload. -/
-def iTypeImmutableProgramMessage (input : Var Readers.ITypeReaderImmutable.Inputs (ZMod p)) :
-    ProgramMsg (Expression (ZMod p)) :=
-  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode, input.cols.op_a,
-    #v[input.cols.op_b, 0, 0, 0], input.cols.op_c_imm, input.cols.op_a_0, 0, 1⟩
-
-theorem iTypeReaderImmutable_programInteractions
-    (input : Var Readers.ITypeReaderImmutable.Inputs (ZMod p)) (offset : ℕ) :
-    ((Readers.ITypeReaderImmutable.circuit (p := p).main input).operations offset).interactionsWith
-        programChannel.toRaw =
-      [(programChannel.pulledIf input.is_trusted
-        (iTypeImmutableProgramMessage input)).toRaw] := by
-  simp only [Readers.ITypeReaderImmutable.circuit, Readers.ITypeReaderImmutable.main,
-    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions]
-  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-    Channels.byteChannel_eq_programChannel_false,
-    Channels.memoryChannel_eq_programChannel_false,
-    decide_false, Bool.false_eq_true, List.nil_append, iTypeImmutableProgramMessage]
-
-theorem iTypeReaderImmutable_programInteractions_subcircuit
-    (input : Var Readers.ITypeReaderImmutable.Inputs (ZMod p)) (offset : ℕ)
-    (ops : Operations (ZMod p)) :
-    Operations.interactionsWith programChannel.toRaw
-        (.subcircuit ((Readers.ITypeReaderImmutable.circuit (p := p)).toSubcircuit offset input) ::
-          ops) =
-      (programChannel.pulledIf input.is_trusted
-        (iTypeImmutableProgramMessage input)).toRaw ::
-        Operations.interactionsWith programChannel.toRaw ops :=
-  programInteractions_subcircuit_of_main Readers.ITypeReaderImmutable.circuit input offset ops _
-    (iTypeReaderImmutable_programInteractions input offset)
-
-/-- J-type reader payload: both operand words are immediates. -/
-def jTypeProgramMessage (input : Var Readers.JTypeReader.Inputs (ZMod p)) :
-    ProgramMsg (Expression (ZMod p)) :=
-  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode, input.cols.op_a,
-    input.cols.op_b_imm, input.cols.op_c_imm, input.cols.op_a_0, 1, 1⟩
-
-theorem jTypeReader_programInteractions (input : Var Readers.JTypeReader.Inputs (ZMod p))
-    (offset : ℕ) :
-    ((Readers.JTypeReader.circuit (p := p).main input).operations offset).interactionsWith
-        programChannel.toRaw =
-      [(programChannel.pulledIf input.is_trusted (jTypeProgramMessage input)).toRaw] := by
-  simp only [Readers.JTypeReader.circuit, Readers.JTypeReader.main,
-    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions]
-  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-    Channels.byteChannel_eq_programChannel_false,
-    Channels.memoryChannel_eq_programChannel_false,
-    decide_false, Bool.false_eq_true, List.nil_append, jTypeProgramMessage]
-
-theorem jTypeReader_programInteractions_subcircuit
-    (input : Var Readers.JTypeReader.Inputs (ZMod p)) (offset : ℕ)
-    (ops : Operations (ZMod p)) :
-    Operations.interactionsWith programChannel.toRaw
-        (.subcircuit ((Readers.JTypeReader.circuit (p := p)).toSubcircuit offset input) :: ops) =
-      (programChannel.pulledIf input.is_trusted (jTypeProgramMessage input)).toRaw ::
-        Operations.interactionsWith programChannel.toRaw ops :=
-  programInteractions_subcircuit_of_main Readers.JTypeReader.circuit input offset ops _
-    (jTypeReader_programInteractions input offset)
+The per-reader Program payloads (`rTypeProgramMessage`, `aluTypeProgramMessage`,
+`aluTypeImmutableProgramMessage`, `iTypeProgramMessage`, `iTypeImmutableProgramMessage`,
+`jTypeProgramMessage`) and their exact/compositional interaction lemmas
+(`<reader>_programInteractions` / `<reader>_programInteractions_subcircuit`) live next to each
+reader's `circuit` in `Native/Readers/*.lean`, still inside this `SP1Clean.Soundness` namespace.
+The channel-generic subcircuit helper is
+`InteractionRecovery.interactionsWith_generalSubcircuit_of_main_exact`
+(`Model/InteractionRecovery.lean`). -/
 
 /-! ## Compositional interaction projection
 
@@ -458,6 +258,68 @@ theorem circuitProgramEmissionShape_of_contract {Input Output : TypeMap}
     rfl
   rw [inputEq, outputEq]
 
+/-- The small circuit-local interface identifying the chip's exposed Program pull with the semantic
+row view — the Program sibling of `CircuitStateExposureContract` (`TypedState.lean`).  The single
+membership fact rides the chip's public Clean `exposedChannels` interface, so per-chip proofs never
+re-normalize the chip's subcircuit tree here; the gate evaluation may use the row's own constraints
+because some chips derive the public active selector from internal one-hot flags. -/
+def CircuitProgramExposureContract {Input Output : TypeMap}
+    [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit (ZMod p) Input Output)
+    (view : Input (ZMod p) → Output (ZMod p) → Trace.RowView (ZMod p)) : Prop :=
+  let inputVar : Var Input (ZMod p) := varFromOffset Input 0
+  let offset := size Input
+  ∃ (gate : Var Input (ZMod p) → ℕ → Expression (ZMod p))
+      (message : Var Input (ZMod p) → ℕ → ProgramMsg (Expression (ZMod p))),
+    (∀ input offset,
+      ⟨programChannel.toRaw,
+        [programChannel.pulledIf (gate input offset) (message input offset)].map
+          ChannelInteraction.toRaw⟩ ∈ circuit.exposedChannels input offset) ∧
+    (∀ env : Environment (ZMod p),
+      ((⟨circuit⟩ : Component (ZMod p)).operations.ConstraintsHold env) →
+        Eval.eval env (gate inputVar offset) =
+          (view (Eval.eval env inputVar)
+            (Eval.eval env (circuit.output inputVar offset))).is_real) ∧
+    (∀ env : Environment (ZMod p), Eval.eval env (message inputVar offset) =
+      programMessageOfView (view (Eval.eval env inputVar)
+        (Eval.eval env (circuit.output inputVar offset))))
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Reduce a chip's Program-emission contract to its public Clean exposed-channel interface and two
+evaluation facts, mirroring `circuitStateEmissionShape_of_exposure`.  Callers never unfold the
+chip's subcircuit tree, and the theorem still talks about the exact
+`Operations.interactionValuesWith` list evaluated by Clean. -/
+theorem circuitProgramEmissionShape_of_exposure {Input Output : TypeMap}
+    [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit (ZMod p) Input Output)
+    (view : Input (ZMod p) → Output (ZMod p) → Trace.RowView (ZMod p))
+    (contract : CircuitProgramExposureContract circuit view) :
+    CircuitProgramEmissionShape circuit view := by
+  obtain ⟨gate, message, exposure, gate_eval, message_eval⟩ := contract
+  intro data physical
+  dsimp only
+  let component : Component (ZMod p) := ⟨circuit⟩
+  let env := Environment.fromArray physical data
+  let inputVar : Var Input (ZMod p) := varFromOffset Input 0
+  let offset := size Input
+  let rowView := view (component.rowInput env) (component.rowOutput env)
+  intro constraints
+  change component.operations.interactionValuesWith programChannel.toRaw env =
+    [programChannel.pulledIfValue rowView.is_real (programMessageOfView rowView)]
+  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
+  change List.map (AbstractInteraction.eval env)
+      (((circuit.main inputVar).operations offset).interactionsWith programChannel.toRaw) = _
+  rw [circuit.interactionsWith_eq_of_mem_exposedChannels inputVar offset _
+    (exposure inputVar offset)]
+  simp only [List.map_cons, List.map_nil, Channel.eval_pulledIf]
+  rw [gate_eval env constraints, message_eval env]
+  have inputEq : Eval.eval env inputVar = component.rowInput env :=
+    eval_varFromOffset_valueFromOffset Input 0 env
+  have outputEq : Eval.eval env (circuit.output inputVar offset) = component.rowOutput env := by
+    simp only [component, Component.rowOutput, circuit_norm]
+    rfl
+  rw [inputEq, outputEq]
+
 /-- Transport a circuit-local Program theorem to its retained supported-chip descriptor without
 normalizing the dependent descriptor. -/
 theorem programEmissionShape_of_circuit (kind : ChipKind p)
@@ -527,115 +389,62 @@ theorem equality_of_operationsConstraintsHold_singleton (env : Environment (ZMod
   rw [left_eq, right_eq, sub_eq_zero] at difference
   exact difference
 
-set_option maxHeartbeats 4000000 in
 theorem AddChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (AddChip.circuit (p := p)) AddChip.rowView := by
-  apply circuitProgramEmissionShape_of_contract
-  unfold CircuitProgramInteractionContract
+  apply circuitProgramEmissionShape_of_exposure
+  unfold CircuitProgramExposureContract
   dsimp only
   refine ⟨fun input _ => input.is_real, fun input _ =>
-  ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 0,
+    ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 0,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0],
       #v[input.adapter.op_c, 0, 0, 0], input.adapter.op_a_0, 0, 0⟩,
     ?_, ?_, ?_⟩
   · intro input offset
-    simp only [AddChip.circuit, AddChip.main, Circuit.operations, Circuit.bind_def,
-      Circuit.pure_def, witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-      HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
-    simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
-      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-      rTypeReader_programInteractions_subcircuit,
-      Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
-      Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
-      SP1Clean.AddOperation.circuit, AddOperation.channelsWithGuarantees_eq,
-      FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
-      Channels.programChannel_eq_byteChannel_false,
-      Channels.programChannel_eq_stateChannel_false,
-      Channels.programChannel_eq_memoryChannel_false,
-      not_false_eq_true, Operations.interactionsWith_assert,
-      Operations.interactionsWith_nil, List.nil_append, rTypeProgramMessage]
-    simp only [Operations.interactionsWith_subcircuit,
-      FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
-      List.filter_nil, List.nil_append]
+    simp [AddChip.circuit, expose]
   · intro env
     simp [AddChip.circuit, AddChip.rowView, circuit_norm]
   · intro env
     simp [AddChip.circuit, AddChip.rowView, Extracted.RTypeReader.toAdapterView,
       programMessageOfView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem AddiChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (AddiChip.circuit (p := p)) AddiChip.rowView := by
-  apply circuitProgramEmissionShape_of_contract
-  unfold CircuitProgramInteractionContract
+  apply circuitProgramEmissionShape_of_exposure
+  unfold CircuitProgramExposureContract
   dsimp only
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 1,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
       input.adapter.op_a_0, 0, 1⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp only [AddiChip.circuit, AddiChip.main, Circuit.operations, Circuit.bind_def,
-      Circuit.pure_def, witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-      Operations.localLength]
-    simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
-      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-      iTypeReader_programInteractions_subcircuit,
-      Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
-      Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
-      SP1Clean.AddOperation.circuit, AddOperation.channelsWithGuarantees_eq,
-      FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
-      Channels.programChannel_eq_byteChannel_false,
-      Channels.programChannel_eq_stateChannel_false,
-      Channels.programChannel_eq_memoryChannel_false,
-      not_false_eq_true, Operations.interactionsWith_assert,
-      Operations.interactionsWith_nil, List.nil_append, List.append_nil, iTypeProgramMessage]
+    simp [AddiChip.circuit, expose]
   · intro env
     simp [AddiChip.circuit, AddiChip.rowView, circuit_norm]
   · intro env
     simp [AddiChip.circuit, AddiChip.rowView, Extracted.ITypeReader.toAdapterView,
       programMessageOfView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem AddwChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (AddwChip.circuit (p := p)) AddwChip.rowView := by
-  apply circuitProgramEmissionShape_of_contract
-  unfold CircuitProgramInteractionContract
+  apply circuitProgramEmissionShape_of_exposure
+  unfold CircuitProgramExposureContract
   dsimp only
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 19,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
       input.adapter.op_a_0, 0, input.adapter.imm_c⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp only [AddwChip.circuit, AddwChip.main, Circuit.operations, Circuit.bind_def,
-      Circuit.pure_def, witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-      Operations.localLength]
-    simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
-      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-      aluTypeReader_programInteractions_subcircuit,
-      Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
-      Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
-      AddwOperation.circuit, AddwOperation.elaborated,
-      FormalCircuitBase.channelsWithGuarantees_def,
-      List.mem_cons, List.not_mem_nil, or_false,
-      Channels.programChannel_eq_byteChannel_false,
-      Channels.programChannel_eq_stateChannel_false,
-      Channels.programChannel_eq_memoryChannel_false,
-      not_false_eq_true, Operations.interactionsWith_assert,
-      Operations.interactionsWith_nil, List.nil_append, List.append_nil, aluTypeProgramMessage]
+    simp [AddwChip.circuit, expose]
   · intro env
     simp [AddwChip.circuit, AddwChip.rowView, circuit_norm]
   · intro env
     simp [AddwChip.circuit, AddwChip.rowView, Extracted.ALUTypeReader.toAdapterView,
       programMessageOfView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem SubChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (SubChip.circuit (p := p)) SubChip.rowView := by
-  apply circuitProgramEmissionShape_of_contract
-  unfold CircuitProgramInteractionContract
+  apply circuitProgramEmissionShape_of_exposure
+  unfold CircuitProgramExposureContract
   dsimp only
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 2,
@@ -643,37 +452,17 @@ theorem SubChip.programEmissionShape :
       #v[input.adapter.op_c, 0, 0, 0], input.adapter.op_a_0, 0, 0⟩,
     ?_, ?_, ?_⟩
   · intro input offset
-    simp only [SubChip.circuit, SubChip.main, Circuit.operations, Circuit.bind_def,
-      Circuit.pure_def, witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-      HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
-    simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
-      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-      rTypeReader_programInteractions_subcircuit,
-      Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
-      Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
-      SubOperation.circuit, SubOperation.elaborated,
-      FormalCircuitBase.channelsWithGuarantees_def,
-      List.mem_cons, List.not_mem_nil, or_false,
-      Channels.programChannel_eq_byteChannel_false,
-      Channels.programChannel_eq_stateChannel_false,
-      Channels.programChannel_eq_memoryChannel_false,
-      not_false_eq_true, Operations.interactionsWith_assert,
-      Operations.interactionsWith_nil, List.nil_append, rTypeProgramMessage]
-    simp only [Operations.interactionsWith_subcircuit,
-      FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
-      List.filter_nil, List.nil_append]
+    simp [SubChip.circuit, expose]
   · intro env
     simp [SubChip.circuit, SubChip.rowView, circuit_norm]
   · intro env
     simp [SubChip.circuit, SubChip.rowView, Extracted.RTypeReader.toAdapterView,
       programMessageOfView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem SubwChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (SubwChip.circuit (p := p)) SubwChip.rowView := by
-  apply circuitProgramEmissionShape_of_contract
-  unfold CircuitProgramInteractionContract
+  apply circuitProgramEmissionShape_of_exposure
+  unfold CircuitProgramExposureContract
   dsimp only
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 20,
@@ -681,23 +470,7 @@ theorem SubwChip.programEmissionShape :
       #v[input.adapter.op_c, 0, 0, 0], input.adapter.op_a_0, 0, 0⟩,
     ?_, ?_, ?_⟩
   · intro input offset
-    simp only [SubwChip.circuit, SubwChip.main, Circuit.operations, Circuit.bind_def,
-      Circuit.pure_def, witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-      Operations.localLength]
-    simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
-      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-      rTypeReader_programInteractions_subcircuit,
-      Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
-      Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
-      SubwOperation.circuit, SubwOperation.elaborated,
-      FormalCircuitBase.channelsWithGuarantees_def,
-      List.mem_cons, List.not_mem_nil, or_false,
-      Channels.programChannel_eq_byteChannel_false,
-      Channels.programChannel_eq_stateChannel_false,
-      Channels.programChannel_eq_memoryChannel_false,
-      not_false_eq_true, Operations.interactionsWith_assert,
-      Operations.interactionsWith_nil, List.nil_append, List.append_nil, rTypeProgramMessage]
+    simp [SubwChip.circuit, expose]
   · intro env
     simp [SubwChip.circuit, SubwChip.rowView, circuit_norm]
   · intro env
@@ -813,12 +586,11 @@ theorem LoadDoubleChip.programEmissionShape :
     simp [LoadDoubleChip.rowView, Extracted.ITypeReader.toAdapterView,
       programMessageOfView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem LoadByteChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (LoadByteChip.circuit (p := p))
       LoadByteChip.rowView := by
-  apply circuitProgramEmissionShape_of_contract
-  unfold CircuitProgramInteractionContract
+  apply circuitProgramEmissionShape_of_exposure
+  unfold CircuitProgramExposureContract
   dsimp only
   refine ⟨fun input _ => input.is_lb + input.is_lbu, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
@@ -826,34 +598,18 @@ theorem LoadByteChip.programEmissionShape :
       #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
       input.adapter.op_a_0, 0, 1⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp only [LoadByteChip.circuit, LoadByteChip.main,
-      Readers.CPUState.circuit, Readers.CPUState.main,
-      AddressOperation.circuit, AddressOperation.main,
-      AddrAddOperation.circuit, AddrAddOperation.main,
-      Readers.MemoryAccess.circuit, Readers.MemoryAccess.main,
-      Readers.ITypeReader.circuit, Readers.ITypeReader.main,
-      Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
-      Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-      Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-      circuit_norm, FormalAssertion.toSubcircuit_interactions,
-      GeneralFormalCircuit.toSubcircuit_interactions]
-    simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-      Channels.byteChannel_eq_programChannel_false,
-      Channels.stateChannel_eq_programChannel_false,
-      Channels.memoryChannel_eq_programChannel_false,
-      decide_false, decide_true, Bool.false_eq_true, if_true, List.nil_append]
+    simp [LoadByteChip.circuit, expose]
   · intro env
     simp [LoadByteChip.rowView, LoadByteChip.isReal, circuit_norm]
   · intro env
     simp [LoadByteChip.rowView, Extracted.ITypeReader.toAdapterView,
       programMessageOfView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem LoadHalfChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (LoadHalfChip.circuit (p := p))
       LoadHalfChip.rowView := by
-  apply circuitProgramEmissionShape_of_contract
-  unfold CircuitProgramInteractionContract
+  apply circuitProgramEmissionShape_of_exposure
+  unfold CircuitProgramExposureContract
   dsimp only
   refine ⟨fun input _ => input.is_lh + input.is_lhu, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
@@ -861,35 +617,18 @@ theorem LoadHalfChip.programEmissionShape :
       #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
       input.adapter.op_a_0, 0, 1⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp only [LoadHalfChip.circuit, LoadHalfChip.main,
-      Readers.CPUState.circuit, Readers.CPUState.main,
-      AddressOperation.circuit, AddressOperation.main,
-      AddrAddOperation.circuit, AddrAddOperation.main,
-      Readers.MemoryAccess.circuit, Readers.MemoryAccess.main,
-      U16MSBOperation.circuit, U16MSBOperation.main,
-      Readers.ITypeReader.circuit, Readers.ITypeReader.main,
-      Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
-      Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-      Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-      circuit_norm, FormalAssertion.toSubcircuit_interactions,
-      GeneralFormalCircuit.toSubcircuit_interactions]
-    simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-      Channels.byteChannel_eq_programChannel_false,
-      Channels.stateChannel_eq_programChannel_false,
-      Channels.memoryChannel_eq_programChannel_false,
-      decide_false, decide_true, Bool.false_eq_true, if_true, List.nil_append]
+    simp [LoadHalfChip.circuit, expose]
   · intro env
     simp [LoadHalfChip.rowView, LoadHalfChip.isReal, circuit_norm]
   · intro env
     simp [LoadHalfChip.rowView, Extracted.ITypeReader.toAdapterView,
       programMessageOfView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem LoadWordChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (LoadWordChip.circuit (p := p))
       LoadWordChip.rowView := by
-  apply circuitProgramEmissionShape_of_contract
-  unfold CircuitProgramInteractionContract
+  apply circuitProgramEmissionShape_of_exposure
+  unfold CircuitProgramExposureContract
   dsimp only
   refine ⟨fun input _ => input.is_lw + input.is_lwu, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
@@ -897,23 +636,7 @@ theorem LoadWordChip.programEmissionShape :
       #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
       input.adapter.op_a_0, 0, 1⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp only [LoadWordChip.circuit, LoadWordChip.main,
-      Readers.CPUState.circuit, Readers.CPUState.main,
-      AddressOperation.circuit, AddressOperation.main,
-      AddrAddOperation.circuit, AddrAddOperation.main,
-      Readers.MemoryAccess.circuit, Readers.MemoryAccess.main,
-      U16MSBOperation.circuit, U16MSBOperation.main,
-      Readers.ITypeReader.circuit, Readers.ITypeReader.main,
-      Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
-      Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-      Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-      circuit_norm, FormalAssertion.toSubcircuit_interactions,
-      GeneralFormalCircuit.toSubcircuit_interactions]
-    simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-      Channels.byteChannel_eq_programChannel_false,
-      Channels.stateChannel_eq_programChannel_false,
-      Channels.memoryChannel_eq_programChannel_false,
-      decide_false, decide_true, Bool.false_eq_true, if_true, List.nil_append]
+    simp [LoadWordChip.circuit, expose]
   · intro env
     simp [LoadWordChip.rowView, LoadWordChip.isReal, circuit_norm]
   · intro env

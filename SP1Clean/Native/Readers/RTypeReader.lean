@@ -1,6 +1,7 @@
 import SP1Clean.FormalModel.Contracts.Readers
 import SP1Clean.Math.Word
 import SP1Clean.Model.Channels
+import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Native.Readers.RegisterAccessCols
 import SP1Clean.Extracted.RTypeReader
 import Clean.Circuit.Basic
@@ -289,3 +290,53 @@ set_option linter.unusedSectionVars false in
     circuit.localLength x = 0 := rfl
 
 end SP1Clean.Readers.RTypeReader
+
+/-! ## Reader-local Program-fetch interface
+
+The named Program payload plus the exact `main`-level and compositional subcircuit projections of
+this reader's one Program pull.  Chip `exposedChannels_eq` proofs and `Soundness/TypedProgram.lean`
+consume these instead of re-normalizing the reader; the `SP1Clean.Soundness` namespace preserves the
+established names. -/
+
+namespace SP1Clean.Soundness
+
+open Circuit
+open SP1Clean.Channels
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- The R-type reader's Program payload, named once for compositional chip proofs. -/
+def rTypeProgramMessage (input : Var Readers.RTypeReader.Inputs (ZMod p)) :
+    ProgramMsg (Expression (ZMod p)) :=
+  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode, input.cols.op_a,
+    #v[input.cols.op_b, 0, 0, 0], #v[input.cols.op_c, 0, 0, 0], input.cols.op_a_0, 0, 0⟩
+
+/-- Exact Program interaction of the R-type reader, before it is composed by a chip. -/
+theorem rTypeReader_programInteractions (input : Var Readers.RTypeReader.Inputs (ZMod p))
+    (offset : ℕ) :
+    ((Readers.RTypeReader.circuit (p := p).main input).operations offset).interactionsWith
+        programChannel.toRaw =
+      [(programChannel.pulledIf input.is_trusted (rTypeProgramMessage input)).toRaw] := by
+  simp only [Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions]
+  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+    Channels.byteChannel_eq_programChannel_false,
+    Channels.memoryChannel_eq_programChannel_false,
+    decide_false, Bool.false_eq_true, List.nil_append,
+    rTypeProgramMessage]
+
+/-- Compositional R-type form: retain the reader's fetch and append the surrounding operations. -/
+theorem rTypeReader_programInteractions_subcircuit
+    (input : Var Readers.RTypeReader.Inputs (ZMod p)) (offset : ℕ)
+    (ops : Operations (ZMod p)) :
+    Operations.interactionsWith programChannel.toRaw
+        (.subcircuit ((Readers.RTypeReader.circuit (p := p)).toSubcircuit offset input) :: ops) =
+      (programChannel.pulledIf input.is_trusted (rTypeProgramMessage input)).toRaw ::
+        Operations.interactionsWith programChannel.toRaw ops :=
+  InteractionRecovery.interactionsWith_generalSubcircuit_of_main_exact
+    Readers.RTypeReader.circuit programChannel.toRaw input offset ops _
+    (rTypeReader_programInteractions input offset)
+
+end SP1Clean.Soundness

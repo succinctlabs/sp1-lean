@@ -258,26 +258,44 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadHalfColumns :=
              input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
           stateChannel.pushedIf (input.is_lh + input.is_lhu)
             ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
-             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ],
+             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
+      -- The Program-bus instruction fetch (descended from the composed `ITypeReader`, gate
+      -- `is_trusted = is_lh + is_lhu`, opcode `LH·30 + LHU·33`), consumed by
+      -- `Soundness/TypedProgram.lean`.
+      expose programChannel
+        [ programChannel.pulledIf (input.is_lh + input.is_lhu)
+            ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
+             input.is_lh * 30 + input.is_lhu * 33, input.adapter.op_a,
+             #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
+             input.adapter.op_a_0, 0, 1⟩ ],
     exposedChannels_eq := by
       intro input offset
       have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
       have h_program := Channels.programChannel_toRaw_ne_stateChannel (p := p)
       have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
-      rw [Operations.exposedChannelsLawful_expose]
-      simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
-        AddressOperation.circuit, AddressOperation.main,
-        AddrAddOperation.circuit, AddrAddOperation.main,
-        Readers.MemoryAccess.circuit, Readers.MemoryAccess.main,
-        U16MSBOperation.circuit, U16MSBOperation.main,
-        Readers.ITypeReader.circuit, Readers.ITypeReader.main,
-        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
-        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-        circuit_norm, FormalAssertion.toSubcircuit_interactions,
-        GeneralFormalCircuit.toSubcircuit_interactions]
-      simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-        h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
-        if_true, List.nil_append] }
+      unfold Operations.ExposedChannelsLawful
+      intro exposed exposedMem
+      simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
+      rcases exposedMem with rfl | rfl
+      all_goals
+        simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+          AddressOperation.circuit, AddressOperation.main,
+          AddrAddOperation.circuit, AddrAddOperation.main,
+          Readers.MemoryAccess.circuit, Readers.MemoryAccess.main,
+          U16MSBOperation.circuit, U16MSBOperation.main,
+          Readers.ITypeReader.circuit, Readers.ITypeReader.main,
+          Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+          Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+          Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+          circuit_norm, FormalAssertion.toSubcircuit_interactions,
+          GeneralFormalCircuit.toSubcircuit_interactions]
+      · simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+          h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+          if_true, List.nil_append]
+      · simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+          Channels.byteChannel_eq_programChannel_false,
+          Channels.stateChannel_eq_programChannel_false,
+          Channels.memoryChannel_eq_programChannel_false,
+          decide_false, decide_true, Bool.false_eq_true, if_true, List.nil_append] }
 
 end SP1Clean.LoadHalfChip

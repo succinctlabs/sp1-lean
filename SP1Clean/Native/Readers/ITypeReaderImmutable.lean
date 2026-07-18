@@ -1,6 +1,7 @@
 import SP1Clean.FormalModel.Contracts.Readers
 import SP1Clean.Math.Word
 import SP1Clean.Model.Channels
+import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Native.Readers.RegisterAccessCols
 import SP1Clean.Extracted.ITypeReader
 import Clean.Circuit.Basic
@@ -255,3 +256,53 @@ set_option linter.unusedSectionVars false in
     (circuit (p := p)).channelsWithRequirements = [(memoryChannel (p := p)).toRaw] := rfl
 
 end SP1Clean.Readers.ITypeReaderImmutable
+
+/-! ## Reader-local Program-fetch interface
+
+The named Program payload plus the exact `main`-level and compositional subcircuit projections of
+this reader's one Program pull.  Chip `exposedChannels_eq` proofs and `Soundness/TypedProgram.lean`
+consume these instead of re-normalizing the reader; the `SP1Clean.Soundness` namespace preserves the
+established names. -/
+
+namespace SP1Clean.Soundness
+
+open Circuit
+open SP1Clean.Channels
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Immutable I-type reader payload. -/
+def iTypeImmutableProgramMessage (input : Var Readers.ITypeReaderImmutable.Inputs (ZMod p)) :
+    ProgramMsg (Expression (ZMod p)) :=
+  ⟨input.pc[0], input.pc[1], input.pc[2], input.opcode, input.cols.op_a,
+    #v[input.cols.op_b, 0, 0, 0], input.cols.op_c_imm, input.cols.op_a_0, 0, 1⟩
+
+theorem iTypeReaderImmutable_programInteractions
+    (input : Var Readers.ITypeReaderImmutable.Inputs (ZMod p)) (offset : ℕ) :
+    ((Readers.ITypeReaderImmutable.circuit (p := p).main input).operations offset).interactionsWith
+        programChannel.toRaw =
+      [(programChannel.pulledIf input.is_trusted
+        (iTypeImmutableProgramMessage input)).toRaw] := by
+  simp only [Readers.ITypeReaderImmutable.circuit, Readers.ITypeReaderImmutable.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions]
+  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+    Channels.byteChannel_eq_programChannel_false,
+    Channels.memoryChannel_eq_programChannel_false,
+    decide_false, Bool.false_eq_true, List.nil_append, iTypeImmutableProgramMessage]
+
+theorem iTypeReaderImmutable_programInteractions_subcircuit
+    (input : Var Readers.ITypeReaderImmutable.Inputs (ZMod p)) (offset : ℕ)
+    (ops : Operations (ZMod p)) :
+    Operations.interactionsWith programChannel.toRaw
+        (.subcircuit ((Readers.ITypeReaderImmutable.circuit (p := p)).toSubcircuit offset input) ::
+          ops) =
+      (programChannel.pulledIf input.is_trusted
+        (iTypeImmutableProgramMessage input)).toRaw ::
+        Operations.interactionsWith programChannel.toRaw ops :=
+  InteractionRecovery.interactionsWith_generalSubcircuit_of_main_exact
+    Readers.ITypeReaderImmutable.circuit programChannel.toRaw input offset ops _
+    (iTypeReaderImmutable_programInteractions input offset)
+
+end SP1Clean.Soundness

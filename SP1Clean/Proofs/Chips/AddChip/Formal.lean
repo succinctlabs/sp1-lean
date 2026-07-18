@@ -148,7 +148,14 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns where
         stateChannel.pushedIf input.is_real
           ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
            input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
-    expose memoryChannel (exposedMemoryInteractions input offset)
+    expose memoryChannel (exposedMemoryInteractions input offset) ++
+    -- The Program-bus instruction fetch (descended from the composed `RTypeReader`, gate
+    -- `is_trusted = is_real`, opcode `ADD = 0`), consumed by `Soundness/TypedProgram.lean`.
+    expose programChannel
+      [ programChannel.pulledIf input.is_real
+          ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 0,
+           input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0],
+           #v[input.adapter.op_c, 0, 0, 0], input.adapter.op_a_0, 0, 0⟩ ]
   exposedChannels_eq := by
     intro input offset
     have h_byte : (byteChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
@@ -169,9 +176,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns where
     unfold Operations.ExposedChannelsLawful
     intro exposed exposedMem
     simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
-    rcases exposedMem with rfl | rfl
-    all_goals
-      simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+    rcases exposedMem with (rfl | rfl) | rfl
+    · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
         Readers.RTypeReader.circuit, Readers.RTypeReader.main,
         Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
         Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
@@ -179,10 +185,40 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns where
         SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
         circuit_norm, FormalAssertion.toSubcircuit_interactions,
         GeneralFormalCircuit.toSubcircuit_interactions]
-    · simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+      simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
         h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
         if_true, List.nil_append]
-    · simp [circuit_norm, Gadgets.Equality.main, exposedMemoryInteractions]
+    · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+        Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+        Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+        Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+        SP1Clean.AddOperation.circuit, SP1Clean.AddOperation.main,
+        circuit_norm, FormalAssertion.toSubcircuit_interactions,
+        GeneralFormalCircuit.toSubcircuit_interactions]
+      simp [circuit_norm, Gadgets.Equality.main, exposedMemoryInteractions]
+    · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
+      -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
+      simp only [main, Circuit.operations, Circuit.bind_def,
+        Circuit.pure_def, witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+        HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
+      simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+        InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+        InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+        Soundness.rTypeReader_programInteractions_subcircuit,
+        Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
+        Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
+        SP1Clean.AddOperation.circuit, AddOperation.channelsWithGuarantees_eq,
+        FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
+        Channels.programChannel_eq_byteChannel_false,
+        Channels.programChannel_eq_stateChannel_false,
+        Channels.programChannel_eq_memoryChannel_false,
+        not_false_eq_true, Operations.interactionsWith_assert,
+        Operations.interactionsWith_nil, List.map_cons, List.map_nil, List.nil_append,
+        Soundness.rTypeProgramMessage]
+      simp only [Operations.interactionsWith_subcircuit,
+        FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
+        List.filter_nil, List.nil_append]
 
 /-- The completed Add circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
