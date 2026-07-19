@@ -82,8 +82,10 @@ theorem RowWiring.push_window {view : Trace.RowView (ZMod p)} {rf : Semantics.Ro
     ∀ m ∈ rf.memPushes, StateMsg.timeNat rf.statePull ≤ MemoryMsg.timeNat m ∧
       MemoryMsg.timeNat m ≤ StateMsg.timeNat rf.statePull + 4 := by
   intro m hm
-  rcases wiring.push_classified m hm with ⟨mp, -, -, -, hlo, hhi⟩ | ⟨-, -, -, -, ht⟩
+  rcases wiring.push_classified m hm with ⟨mp, -, -, -, hlo, hhi⟩ | ⟨-, -, -, -, ht⟩ |
+    ⟨-, mp, -, -, -, -, ht⟩
   · exact ⟨hlo, by omega⟩
+  · omega
   · omega
 
 section Contracts

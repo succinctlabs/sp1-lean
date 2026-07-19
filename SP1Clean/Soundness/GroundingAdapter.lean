@@ -104,8 +104,15 @@ structure RowWiring (view : Trace.RowView (ZMod p)) (rf : Semantics.RowFacts p) 
   write_push : view.commit.writesReg = true →
     ∀ index : BitVec 5, (index.toNat : ZMod p) = view.adapter.op_a →
     ∃ m ∈ rf.memPushes, MemoryMsg.locOf m = MemLoc.reg index ∧ m.value = view.rdWrite
-  /-- Every push is a pre-effect read-back of one of the row's own pulls, or the committed `op_a`
-  register write at the `+ 4` effect slot (with its in-circuit range check). -/
+  /-- Every push is one of three shapes: a pre-effect read-back of one of the row's own pulls; the
+  committed `op_a` register write at the `+ 4` effect slot (with its in-circuit range check); or —
+  on a **non-writing** row — an `op_a` read-back sitting at exactly the `+ 4` slot.
+
+  The third arm is not redundant.  Branch, AluX0, LoadX0 and the four stores read `op_a` as a
+  *source* and re-post it unchanged at the write slot, so their pushes land at `+ 4` with
+  `writesReg = false`: the first arm's strict `< t + 4` excludes them and the second arm's
+  `writesReg = true` does too.  Its currency comes from `RowEffect.regs`' pure-frame branch (the
+  post-state register equals the pre-state one), not from an intra-epoch shift. -/
   push_classified : ∀ m ∈ rf.memPushes,
     (∃ mp ∈ rf.memPulls, MemoryMsg.locOf m = MemoryMsg.locOf mp.1 ∧ m.value = mp.1.value ∧
       StateMsg.timeNat rf.statePull ≤ MemoryMsg.timeNat m ∧
@@ -114,7 +121,11 @@ structure RowWiring (view : Trace.RowView (ZMod p)) (rf : Semantics.RowFacts p) 
       (∃ index : BitVec 5, MemoryMsg.locOf m = MemLoc.reg index ∧
         (index.toNat : ZMod p) = view.adapter.op_a) ∧
       m.value = view.rdWrite ∧
-      MemoryMsg.timeNat m = StateMsg.timeNat rf.statePull + 4)
+      MemoryMsg.timeNat m = StateMsg.timeNat rf.statePull + 4) ∨
+    (view.commit.writesReg = false ∧
+      ∃ mp ∈ rf.memPulls, (∃ index : BitVec 5, MemoryMsg.locOf m = MemLoc.reg index) ∧
+        MemoryMsg.locOf m = MemoryMsg.locOf mp.1 ∧ m.value = mp.1.value ∧
+        MemoryMsg.timeNat m = StateMsg.timeNat rf.statePull + 4)
   /-- The row commits no RAM write (register-axis chips; stores are a later batch). -/
   no_ram_write : view.commit.memWrite = none
 
@@ -200,7 +211,8 @@ theorem stepFact_of_advance {kind : ChipKind p}
   · -- every pushed Memory record is true
     intro m hm
     rcases wiring.push_classified m hm with
-      ⟨mp, hmp, hloc, hval, hlo, hhi⟩ | ⟨hw, hu64, ⟨idx, hlocw, hidx⟩, hvalw, htw⟩
+      ⟨mp, hmp, hloc, hval, hlo, hhi⟩ | ⟨hw, hu64, ⟨idx, hlocw, hidx⟩, hvalw, htw⟩ |
+      ⟨hnw, mp, hmp, ⟨idx, hlocr⟩, hloc, hval, htr⟩
     · -- read-back: the pull's currency, shifted inside the pre-effect epoch
       have hc := (hcurr mp hmp).2
       rw [wiring.readTime mp hmp] at hc
@@ -236,6 +248,28 @@ theorem stepFact_of_advance {kind : ChipKind p}
       have hregs := heff.regs
       rw [if_pos hw] at hregs
       exact hregs.1 idx hidx
+    · -- a non-writing row's `op_a` read-back at the `+ 4` slot: the row changes no register, so the
+      -- post-state content is still the pulled prior value.
+      have hlocmp : MemoryMsg.locOf mp.1 = MemLoc.reg idx := hloc.symm.trans hlocr
+      have hc := (hcurr mp hmp).2
+      rw [wiring.readTime mp hmp, hlocmp] at hc
+      have hu : MemoryMsg.isU64 m := by
+        show Word.isU64 m.value
+        rw [hval]
+        exact (hcurr mp hmp).1
+      refine ⟨hu, ?_⟩
+      rw [hlocr, hval, htr, htime]
+      unfold LocalValueAt
+      rw [microValue_reg, regEpoch_eq_succ_of (n := n) (by omega) (by omega), hcs']
+      show locContent s' (MemLoc.reg idx) = some (Word.toBitVec64 mp.1.value)
+      have hregs := heff.regs
+      rw [if_neg (by simp [hnw])] at hregs
+      have hframe : locContent s' (MemLoc.reg idx) = locContent state (MemLoc.reg idx) :=
+        hregs idx
+      rw [hframe]
+      unfold LocalValueAt at hc
+      rw [microValue_reg, htime, regEpoch_eq_of (n := n) (by omega) (by omega), hcs] at hc
+      exact hc
 
 /-! ## The frame fact -/
 
@@ -551,8 +585,8 @@ theorem rowWiring_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFacts
         omega
       · rw [timeNat_rtypeReadBackMessage bounds _ _ val_2_zmod_p (by omega), ← statePull_eq]
         omega
-    · -- the op_a write at `+ 4`
-      right
+    · -- the op_a write at `+ 4` (the middle arm: this is a register-writing R-type row)
+      refine Or.inr (Or.inl ?_)
       have hidx : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
           view.adapter.op_a := by
         rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
