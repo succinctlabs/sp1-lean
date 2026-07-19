@@ -71,16 +71,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- channel's `MemoryMsg.ClkBound` guarantee — `RTypeReader`'s two read-back pushes (`clk_low + 3` /
   -- `+ 2`) and `RegisterWrite`'s op_a write push (`clk_low + 4`). The offset is left to unification,
   -- so this line never names the destructured state columns.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   -- **Option B cycle-break.** No operand `isU64` is assumed (chip `Assumptions = True`). Apply the
   -- `RTypeReader` sub-soundness to get its `Spec`; its 7th conjunct is the memory-pull-derived operand `isU64`
   -- trio (gated on `is_real`). The `is_real = sum` row gate (`h_eq_rs`) bridges that to the operation's
   -- flag-sum gate, so the reader's operand `isU64` discharges `MulOperation`'s `sum = 1 → isU64` precondition.
-  have h_rspec := hadapter ⟨h_bin, h_bin, fun hr =>
-    ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
+  have h_rspec := hadapter ⟨h_bin, h_bin, h_clk⟩
   have h_trio := h_rspec.2.2.2.2.2.2
   have h_rs : input_is_real
       = env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3) + env.get (i₀ + 4) :=
@@ -116,9 +112,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         first | exact ha0 | exact ha1 | exact ha2 | exact ha3
   refine ⟨⟨h_rspec, h_bin, fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩⟩,
     Or.inr ⟨fun hsum => hbc (h_rs.trans hsum), bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩,
-    Or.inr ⟨h_bin, h_bin, fun hr =>
-      ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
-    Or.inr ⟨h_bin, h_a_isU64, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩⟩
+    Or.inr ⟨h_bin, h_bin, h_clk⟩,
+    Or.inr ⟨h_bin, h_a_isU64, h_clk.at_four⟩⟩
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inl h1)
     obtain ⟨_hisU64, hmul, _hmulhu, _hmulh, _hmulhsu, _hmulw⟩ :=
@@ -182,10 +177,7 @@ theorem completeness :
   obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hf4, hsum, hmw_real, hop_a_0, h_cpu,
     hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ := h_assumptions
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu hr).1 (h_cpu hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   -- `h_env` bundles the CPUState GFC obligation (discarded), the flags/`cols`/`a` witness-gen
   -- equations, and the trailing `RTypeReader` GFC obligation (discarded).
@@ -247,12 +239,11 @@ theorem completeness :
     by simpa using h_env_a 3,
     hbool _ hf0', hbool _ hf1', hbool _ hf2', hbool _ hf3', hbool _ hf4', hbool _ hsum01',
     hop_a_0,
-    ⟨⟨hbin, hbin, fun hr =>
-        ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+    ⟨⟨hbin, hbin, h_clk⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
         fun hr => ⟨ha_prev hr, hbU, hcU, (hprevclk hr).1, (hprevclk hr).2.1, (hprevclk hr).2.2⟩⟩⟩,
     by linear_combination -hsumc,
-    ⟨⟨hbin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩,
+    ⟨⟨hbin, ?_, h_clk.at_four⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp⟩
   · -- `MulOperation.circuit.Spec` at the witnessed columns: the structural `spec_populate` once the
     -- witnessed struct equals `populate …` (each cell is `env.get (i₀+5+k)`, pinned by `h_env_cols'`).

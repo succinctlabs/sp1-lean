@@ -150,13 +150,13 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
     -- G1: the two read-back **push** access clocks (op_b at `clk_low + 3`, op_c at `clk_low + 2`) are
     -- 24-bit — the memory channel's `MemoryMsg.ClkBound` requirement. Not provable here: `clk_low` is a
     -- raw cross-block input, and the bound lives in the composing chip's `CPUState` block. The chip
-    -- discharges both with `Channels.MemoryMsg.clkBound_of_cpuState_bounds` from its `CPUState` sub-`Spec`.
-    -- Both are gated on plain `is_real = 1`, *not* on op_c's own `is_real - imm_c = 1` multiplicity: the
+    -- discharges both with one `Readers.ClkDiscipline.of_cpuState_spec` from its `CPUState` sub-`Spec`,
+    -- and soundness picks the two slots out of the named discipline below.
+    -- It is gated on plain `is_real = 1`, *not* on op_c's own `is_real - imm_c = 1` multiplicity: the
     -- composing chip can only obtain the immediate gate `(is_real - 1) * imm_c = 0` from **this reader's
     -- `Spec`**, so gating the assumption that way would make the chip's discharge circular. Soundness
     -- instead derives `is_real = 1` from `is_real - imm_c = 1` in-circuit (`hreal_of_c` below).
-    (input.is_real = 1 →
-      (input.clk_low + 3).val < 2 ^ 24 ∧ (input.clk_low + 2).val < 2 ^ 24)
+    ClkDiscipline input.clk_low input.is_real
 
 /-! ### `ProverData`-lifted forms
 
@@ -231,13 +231,13 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     -- `clk_low + 3`, whose `ClkBound` is the chip-supplied assumption.
     have ht : input_is_real = 1 := by
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
-    exact ⟨(h_mem_b (by rw [ht])).1, (h_assumptions.2.2 ht).1⟩
+    exact ⟨(h_mem_b (by rw [ht])).1, h_assumptions.2.2.at_three ht⟩
   · -- push_c requirement — same whole-`Word` prev_value as the paired (is_real - imm_c)-gated pull
     -- (h_mem_c), pushed at `clk_low + 2`; its `ClkBound` comes from the `is_real`-gated assumption via
     -- `hreal_of_c`.
     have htc : input_is_real - input_cols_imm_c = 1 := by
       rcases hcbin with h | h; exact absurd h h0; exact h
-    exact ⟨(h_mem_c (by rw [htc])).1, (h_assumptions.2.2 (hreal_of_c htc)).2⟩
+    exact ⟨(h_mem_c (by rw [htc])).1, h_assumptions.2.2.at_two (hreal_of_c htc)⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD

@@ -67,10 +67,11 @@ result range-check (an ALU result) or the loaded-word read pull. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_real = 1 → Word.isU64 input.value) ∧
     -- G1: the write access clock is 24-bit — the memory channel's `MemoryMsg.ClkBound` requirement.
-    -- `clk_low` is a raw cross-block input here (the chip passes its recombined clock `+ 4`), so the
-    -- bound comes from the chip's `CPUState` sub-`Spec` via
-    -- `Channels.MemoryMsg.clkBound_of_cpuState_bounds`.
-    (input.is_real = 1 → input.clk_low.val < 2 ^ 24)
+    -- This is the one reader whose `Inputs.clk_low` arrives **already shifted** to its effect slot (the
+    -- composing chip passes its recombined clock `+ 4`), so it names the *shifted* half of the discipline,
+    -- `Readers.ClkDisciplineAt`, rather than `Readers.ClkDiscipline`. The chip produces it from its own
+    -- `CPUState`-derived `ClkDiscipline` with `ClkDiscipline.at_four`.
+    ClkDisciplineAt input.clk_low input.is_real
 
 /-- No local semantic guarantee — `RegisterWrite` only emits the write interaction. -/
 def Spec (_ : Inputs (ZMod p)) : Prop := True

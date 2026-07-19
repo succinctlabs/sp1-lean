@@ -117,11 +117,11 @@ into `Readers/RegisterWrite.circuit`, which the composing chip discharges with `
 operation/load; so both memory interactions here are read pulls/read-backs (no write to range-check). -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_trusted = 0 ∨ input.is_trusted = 1) ∧
-    -- G1: the op_b read-back **push** access clock is 24-bit — the memory channel's `MemoryMsg.ClkBound`
-    -- requirement. Not provable here: `clk_low` is a raw cross-block input, and the bound lives in the
-    -- composing chip's `CPUState` block. The chip discharges it with
-    -- `Channels.MemoryMsg.clkBound_of_cpuState_bounds` from its `CPUState` sub-`Spec`.
-    (input.is_real = 1 → (input.clk_low + 3).val < 2 ^ 24)
+    -- G1: the op_b read-back **push** access clock (`clk_low + 3`) is 24-bit — the memory channel's
+    -- `MemoryMsg.ClkBound` requirement. Not provable here: `clk_low` is a raw cross-block input, and the
+    -- bound lives in the composing chip's `CPUState` block. Assumed as the named `Readers.ClkDiscipline`
+    -- (uniform across the readers); soundness picks the `+ 3` slot out of it below.
+    ClkDiscipline input.clk_low input.is_real
 
 /-! ### `ProverData`-lifted forms
 
@@ -173,7 +173,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     -- `clk_low + 3`, whose `ClkBound` is the chip-supplied assumption.
     have ht : input_is_real = 1 := by
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
-    exact ⟨(h_mem_b (by rw [ht])).1, h_assumptions.2.2 ht⟩
+    exact ⟨(h_mem_b (by rw [ht])).1, h_assumptions.2.2.at_three ht⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD

@@ -67,10 +67,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- channel's `MemoryMsg.ClkBound` guarantee — here only `RegisterWrite`'s op_a link write push at
   -- `clk_low + 4` (`JTypeReader` is a pure read and owes no push bound). The offset is left to
   -- unification, so this line never names the destructured state columns.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   have h_jt : Readers.JTypeReader.Spec _ := h_jt0 ⟨h_bin, h_bin⟩
   have h_op_a_0 : input_adapter_op_a_0 = 0 ∨ input_adapter_op_a_0 = 1 := h_jt.2.1
   -- eval-of-pc rewrites: circuit's `a` operand `#v[eval pc[i], 0]` equals the concrete `pcWord`.
@@ -110,7 +107,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rw [← c14] at hguar
     exact val_mod_four_of_mul_inv_four_lt ((byteRowSpec_range _ h14p).mp hguar)
   · exact Or.inr ⟨h_bin, h_bin⟩
-  · refine Or.inr ⟨h_bin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩
+  · refine Or.inr ⟨h_bin, ?_, h_clk.at_four⟩
     -- RegisterWrite op_a write push: `isU64` of the link value `op_a_value`. On `rd ≠ x0` (`op_a_0 = 0`)
     -- it is the link add result `pc + 4`; on `rd = x0` (`op_a_0 = 1`) the `op_a_0` zeroing gates pin it to `0`.
     intro hr1
@@ -130,10 +127,7 @@ theorem completeness :
   obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac, h_jt3, h_lt3, h_align_pa, hdec,
     hprevclk⟩ := h_assumptions
   -- G1: the *push* side clock bound, from the prover-supplied CPUState clock byte bounds.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu hr).1 (h_cpu hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   simp only [jumpTargetWord, linkTargetWord] at h_jt3 h_lt3 h_align_pa
   -- `h_env` now bundles the two witness-vector equations with the GFC `JTypeReader` subcircuit's
   -- completeness obligation (SC Phase 2pre); the witness equations are `he_av`/`he_oav`.
@@ -199,7 +193,7 @@ theorem completeness :
   refine ⟨⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
     ⟨⟨h_bin, h_bin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac, hdec,
       fun hr => ⟨h_oap hr, hprevclk hr⟩⟩⟩,
-    ⟨⟨h_bin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩, ?_, ?_⟩
+    ⟨⟨h_bin, ?_, h_clk.at_four⟩, trivial⟩, ?_, ?_⟩
   · rw [hval1]; exact AddOperation.spec_populate ha1U h_imm input_is_real
   · rw [hav3]; exact h_jt3
   · rw [hval2]; exact AddOperation.spec_populate ha1U h4U (input_is_real - input_adapter_op_a_0)

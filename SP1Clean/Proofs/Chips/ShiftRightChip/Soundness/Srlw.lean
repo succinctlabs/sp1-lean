@@ -128,13 +128,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- op_a write push is composed at the *committed flag sum* instead; `main`'s bind `h_realeq`
   -- (`is_real - (is_srl + is_sra + is_srlw + is_sraw) = 0`, mirroring `ShiftLeftChip.main`)
   -- identifies the two, so that push's clock bound is derived here as well.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu (bool_of_mul_pred h_realgate) hr).1 (h_cpu (bool_of_mul_pred h_realgate) hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu (bool_of_mul_pred h_realgate))
   refine ⟨?spec, ?aluA,
     Or.inr ⟨bool_of_mul_pred h_sum_b, hregW,
-      fun hgate => h_clk 4 4 (by simp) (by norm_num) (by linear_combination h_realeq + hgate)⟩,
+      fun hgate => h_clk.at_four (by linear_combination h_realeq + hgate)⟩,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
@@ -400,7 +397,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
             lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
   -- CPUState has no required channel; ALUTypeReader assumes `is_real` binary from the in-circuit gate.
   case aluA => exact Or.inr ⟨bool_of_mul_pred h_realgate, bool_of_mul_pred h_realgate,
-    fun hr => ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
+    h_clk⟩
   -- The MSB gadgets expose empty requirement lists canonically; their local semantic
   -- assumptions no longer leak into the parent chip's channel-requirement tail.
 end SP1Clean.ShiftRightChip.SoundSrlw

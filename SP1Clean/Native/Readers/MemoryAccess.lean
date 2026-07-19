@@ -165,10 +165,10 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_real = 1 → Word.isU64 input.new_value) ∧
     -- G1: the **push** places `new_value` at the current timestamp `(clk_high, clk_low + 1)`, so the memory
     -- channel's `MemoryMsg.ClkBound` requirement lands on `clk_low + 1` — the RAM `+1` effect slot, vs the
-    -- register readers' `+4/+3/+2` operand slots. `clk_low` is a raw cross-block input here, so the bound
-    -- comes from the composing chip's `CPUState` sub-`Spec` via
-    -- `Channels.MemoryMsg.clkBound_of_cpuState_bounds`.
-    (input.is_real = 1 → (input.clk_low + 1).val < 2 ^ 24)
+    -- register readers' `+4/+3/+2` operand slots. `clk_low` is a raw cross-block input here (**unshifted**:
+    -- the `+ 1` is applied inside this circuit), so the assumption is the same named `Readers.ClkDiscipline`
+    -- every register reader takes, and soundness picks the `+ 1` slot out of it with `ClkDiscipline.at_one`.
+    ClkDiscipline input.clk_low input.is_real
 
 /-! ### `ProverData`-lifted forms (SC Phase 2pre)
 
@@ -204,7 +204,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
     fun _ h0 => ⟨h_assumptions.2.1 (h_assumptions.1.resolve_left h0),
-      h_assumptions.2.2 (h_assumptions.1.resolve_left h0)⟩⟩
+      h_assumptions.2.2.at_one (h_assumptions.1.resolve_left h0)⟩⟩
   -- Spec consequent (real row); the `isU64 prev_value` conjunct is the memory pull `h_mem` verbatim.
   -- `hr1`/the goal carry the reassembled `{record}.field` projections (the `SpecD` wrapper); `dsimp only`
   -- iota-reduces them to the destructured atoms (`selCur`/`selPrev` stay folded) so the `rw`s below match.

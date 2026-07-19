@@ -39,19 +39,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_bin := bool_of_mul_pred h_gate
   -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
   -- channel's `MemoryMsg.ClkBound` guarantee — `MemoryAccess`'s RAM effect slot (`clk_low + 1`) and
-  -- `ITypeReaderImmutable`'s two read-back pushes (`clk_low + 4` / `+ 3`). Phrased over the bound
-  -- *pair* rather than the row gate: LoadX0's selector is the seven-way sum `isReal`, so taking
-  -- `h_cpu h_bin hr` at the call site keeps the gate out of this statement entirely.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 →
-      (((input_state_clk_0_16 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13
-        ∧ input_state_clk_16_24.val < 2 ^ 8) →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hb => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4 hb.1 hb.2
-  -- the RAM effect slot's offset is the literal `1`, whose `val` needs `Fact (1 < p)` (kept local so the
-  -- instance does not leak into the surrounding heavy `simp` sets).
-  have hv1 : (1 : ZMod p).val = 1 := by
-    haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-    exact ZMod.val_one p
+  -- `ITypeReaderImmutable`'s two read-back pushes (`clk_low + 4` / `+ 3`). The gate is LoadX0's
+  -- seven-way selector sum `isReal`, which the named discipline carries as its `is_real` argument.
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   -- eval→value bridge for the offset bits (the only nested vector field the gates reference in value form).
   obtain ⟨_, _, _, _, _, _, _, _, _, _, hmap_ob⟩ := h_input
   have eob : ∀ i (hi : i < 3), Expression.eval env input_var_offset_bit[i] = input_offset_bit[i] :=
@@ -76,15 +66,13 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   simp only [AddressOperation.circuit] at h_addr
   have h_addr_spec := h_addr h_addr_as
   simp only [circuit_norm, eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
-  have h_it := h_itype ⟨h_bin, h_bin, fun hr =>
-    ⟨h_clk 4 4 (by simp) (by norm_num) (h_cpu h_bin hr),
-     h_clk 3 3 (by simp) (by norm_num) (h_cpu h_bin hr)⟩⟩
+  have h_it := h_itype ⟨h_bin, h_bin, h_clk⟩
   -- the alignment gates, in value form.
   simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_al0 h_al1 h_al2
   simp only [isReal, opcodeVal]
   refine ⟨⟨h_addr_spec,
       h_mem ⟨h_bin, fun _ => h_pv_isu64,
-        fun hr => h_clk 1 1 hv1 (by norm_num) (h_cpu h_bin hr)⟩, h_it,
+        h_clk⟩, h_it,
       bool_of_mul_pred h_b0, bool_of_mul_pred h_b1, bool_of_mul_pred h_b2, bool_of_mul_pred h_b3,
       bool_of_mul_pred h_b4, bool_of_mul_pred h_b5, bool_of_mul_pred h_b6,
       h_bin, h_al2, h_al1, h_al0, h_oa1, h_oa2⟩, ?_⟩
@@ -93,10 +81,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- `ClkBound` of its `clk_low + 1` push clock.
   exact ⟨Or.inr h_addr_as,
     Or.inr ⟨h_bin, fun _ => h_pv_isu64,
-      fun hr => h_clk 1 1 hv1 (by norm_num) (h_cpu h_bin hr)⟩,
-    ⟨h_bin, h_bin, fun hr =>
-      ⟨h_clk 4 4 (by simp) (by norm_num) (h_cpu h_bin hr),
-       h_clk 3 3 (by simp) (by norm_num) (h_cpu h_bin hr)⟩⟩⟩
+      h_clk⟩,
+    ⟨h_bin, h_bin, h_clk⟩⟩
 
 /-- Prover-side row well-formedness: operand `isU64`s + address facts + selector binaries + alignment
 equations + the `op_a_0` forcing facts + the reader/CPUState/MemoryAccess `Spec`s. -/
@@ -137,16 +123,8 @@ theorem completeness :
   simp only [isReal, opcodeVal] at h_assumptions
   obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_pv_isu64, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5,
     h_b6, hbin, h_al2, h_al1, h_al0, h_oa1, h_oa2, h_cpu, h_mem, h_it⟩ := h_assumptions
-  -- G1: the *push*-side clock bounds, from the prover-supplied CPUState clock byte bounds (stated over
-  -- the bound pair, so the seven-way `isReal` selector stays out of the statement).
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 →
-      (((input_state_clk_0_16 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13
-        ∧ input_state_clk_16_24.val < 2 ^ 8) →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hb => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4 hb.1 hb.2
-  have hv1 : (1 : ZMod p).val = 1 := by
-    haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-    exact ZMod.val_one p
+  -- G1: the *push*-side clock bounds, from the prover-supplied CPUState clock byte bounds.
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   simp only [sub_eq_add_neg] at h_oa1 h_oa2
   obtain ⟨_, _, _, _, _, _, _, ⟨_, _, _, hmap_pc⟩, _, _, hmap_ob⟩ := h_input
   have epc : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_state_pc[i]
@@ -173,11 +151,9 @@ theorem completeness :
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
-  · exact ⟨hbin, fun _ => h_pv_isu64, fun hr => h_clk 1 1 hv1 (by norm_num) (h_cpu hr)⟩
+  · exact ⟨hbin, fun _ => h_pv_isu64, h_clk⟩
   · exact h_mem
-  · exact ⟨hbin, hbin, fun hr =>
-      ⟨h_clk 4 4 (by simp) (by norm_num) (h_cpu hr),
-       h_clk 3 3 (by simp) (by norm_num) (h_cpu hr)⟩⟩
+  · exact ⟨hbin, hbin, h_clk⟩
   · exact h_it
   · rcases h_b0 with h | h <;> rw [h] <;> simp
   · rcases h_b1 with h | h <;> rw [h] <;> simp

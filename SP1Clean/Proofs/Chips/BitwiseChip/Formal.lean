@@ -173,10 +173,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- channel's new `MemoryMsg.ClkBound` guarantee — `ALUTypeReader`'s two read-back pushes
   -- (`clk_low + 3` / `+ 2`) and `RegisterWrite`'s op_a write push (`clk_low + 4`). The offset is left
   -- to unification, so this line never names the destructured state columns.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   have h_xor_bool := bool_of_mul_pred h_xor_bin
   have h_or_bool := bool_of_mul_pred h_or_bin
   have h_and_bool := bool_of_mul_pred h_and_bin
@@ -216,13 +213,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · and_intros <;>
       first | exact h_bin | exact ⟨ha, hb, hop3, h_bin⟩ | exact Or.inl rfl
             | exact Or.inr h_bin
-            | exact Or.inr ⟨h_bin, h_bin, fun hr =>
-                ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
+            | exact Or.inr ⟨h_bin, h_bin, h_clk⟩
             | exact Or.inr ⟨h_bin, (fun hr => by
                 have hisu := resultWord_isU64 hr (h_bw ⟨ha, hb, hop3, h_bin⟩) hop_cases
                 simp only [BitwiseU16Operation.resultWord, Vector.getElem_map,
                   circuit_norm] at hisu ⊢
-                exact hisu), fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩
+                exact hisu), h_clk.at_four⟩
 
 set_option maxHeartbeats 32000000 in
 theorem completeness :
@@ -232,10 +228,7 @@ theorem completeness :
   obtain ⟨ha, hb, ha_prev, hbin, hf0, hf1, hf2, hsum, hone0, hone1, hone2, hop_a_0, himm, h_cpu,
     hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ := h_assumptions
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu hr).1 (h_cpu hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   -- `h_env` now bundles the chip's flag/`bw_cols` witness-gen equations with the GFC `ALUTypeReader`
   -- subcircuit's completeness obligation (SC Phase 2pre) — discard the trailing reader obligation.
   obtain ⟨-, h_env_flags, h_env_cols, -⟩ := h_env
@@ -275,8 +268,7 @@ theorem completeness :
   refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨ha, hb, hop3, hbin⟩,
       ?_⟩,
-    ⟨⟨hbin, hbin, fun hr =>
-        ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+    ⟨⟨hbin, hbin, h_clk⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
@@ -284,7 +276,7 @@ theorem completeness :
       (fun hr => ⟨ha_prev hr, ha, (hprevclk hr).1, (hprevclk hr).2.1⟩),
       -- op_c's guarantee is gated by `is_real - imm_c`; `imm_c = 0` reduces that to `is_real = 1`.
       fun hc => ⟨hb, (hprevclk (by rwa [himm, sub_zero] at hc)).2.2⟩⟩⟩,
-    ⟨⟨hbin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩,
+    ⟨⟨hbin, ?_, h_clk.at_four⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     hbool _ hf0',
     hbool _ hf1',

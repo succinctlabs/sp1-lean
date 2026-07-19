@@ -34,15 +34,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- channel's `MemoryMsg.ClkBound` guarantee — `MemoryAccess`'s RAM effect slot (`clk_low + 1`) and
   -- `ITypeReaderImmutable`'s two read-back pushes (`clk_low + 4` / `+ 3`). The offset is left to
   -- unification, so this line never names the destructured state columns.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
-  -- the RAM effect slot's offset is the literal `1`, whose `val` needs `Fact (1 < p)` (kept local so the
-  -- instance does not leak into the surrounding heavy `simp` sets).
-  have hv1 : (1 : ZMod p).val = 1 := by
-    haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-    exact ZMod.val_one p
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   -- the `AddressOperation` Assumptions: operand `isU64`s + fits, the offset bits boolean (literal `0`),
   -- and the address-validity (non-reserved + 8-aligned, so the inverse gate / offset range check hold).
   have h_addr_as : AddressOperation.circuit.Assumptions
@@ -51,19 +43,17 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   simp only [AddressOperation.circuit] at h_addr
   have h_addr_spec := h_addr h_addr_as
   simp only [circuit_norm] at h_addr_spec
-  have h_it := h_itype ⟨h_bin, h_bin, fun hr =>
-    ⟨h_clk 4 4 (by simp) (by norm_num) hr, h_clk 3 3 (by simp) (by norm_num) hr⟩⟩
+  have h_it := h_itype ⟨h_bin, h_bin, h_clk⟩
   -- (W11 memory flip) the pushed `new_value` for SD is the rs2 read (`op_a_memory.prev_value`), whose
   -- `isU64` is exposed by the immutable I-type adapter's `Spec` on a real row — no new assumption needed.
   have h_new : input_is_real = 1 → Word.isU64 input_adapter_op_a_memory_prev_value :=
     fun hr => (h_it.2.2.2.2.2 hr).1
   -- The remaining per-subcircuit channel requirements are structural obligations.
   exact ⟨⟨h_addr_spec,
-      h_mem ⟨h_bin, h_new, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩, h_it, h_bin⟩,
+      h_mem ⟨h_bin, h_new, h_clk⟩, h_it, h_bin⟩,
     Or.inr h_addr_as,
-    Or.inr ⟨h_bin, h_new, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩,
-    ⟨h_bin, h_bin, fun hr =>
-      ⟨h_clk 4 4 (by simp) (by norm_num) hr, h_clk 3 3 (by simp) (by norm_num) hr⟩⟩⟩
+    Or.inr ⟨h_bin, h_new, h_clk⟩,
+    ⟨h_bin, h_bin, h_clk⟩⟩
 
 /-- Prover-side row well-formedness (3-arg form): operand `isU64`s + address-fits bound + the reader
 clock/timestamp `Spec`s + `is_real` binary. -/
@@ -91,13 +81,7 @@ theorem completeness :
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_align, hbin, h_cpu, h_mem, h_it, hdec⟩ := h_assumptions
   -- G1: the *push*-side clock bounds, from the prover-supplied CPUState clock byte bounds.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu hr).1 (h_cpu hr).2
-  have hv1 : (1 : ZMod p).val = 1 := by
-    haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-    exact ZMod.val_one p
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   -- eval→value bridge for the nested `pc` vector the CPUState `Spec` references.
   have hmap_pc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc
       = input_state_pc := h_input.2.1.2.2.2
@@ -108,9 +92,8 @@ theorem completeness :
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
   refine ⟨⟨hbin, ?_⟩, h_addr_as,
     ⟨⟨hbin, fun hr => (h_it.2.2.2.2.2 hr).1,
-        fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩, h_mem⟩,
-    ⟨⟨hbin, hbin, fun hr =>
-        ⟨h_clk 4 4 (by simp) (by norm_num) hr, h_clk 3 3 (by simp) (by norm_num) hr⟩⟩, h_it⟩, ?_⟩
+        h_clk⟩, h_mem⟩,
+    ⟨⟨hbin, hbin, h_clk⟩, h_it⟩, ?_⟩
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · rcases hbin with h | h <;> rw [h] <;> simp
 

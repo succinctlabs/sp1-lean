@@ -40,16 +40,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- channel's new `MemoryMsg.ClkBound` guarantee. Three distinct offsets: `MemoryAccess`'s RAM effect
   -- slot `clk_low + 1`, `ITypeReader`'s op_b read-back `clk_low + 3`, and `RegisterWrite`'s op_a write
   -- `clk_low + 4`. The offset is left to unification, so this never names the destructured state columns.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 →
-      input_is_lb + input_is_lbu = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
-  -- the RAM effect slot's offset is the literal `1`, whose `val` needs `Fact (1 < p)` (kept local so the
-  -- instance does not leak into the surrounding heavy `simp` sets).
-  have hv1 : (1 : ZMod p).val = 1 := by
-    haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-    exact ZMod.val_one p
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   simp only [circuit_norm, byteChannel] at hu8 hmsb_rcv
   -- eval→value bridges (extracted directly from `h_input`; `tauto` over this context is too slow).
   obtain ⟨_, _, _, _, ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _⟩ := h_input
@@ -110,7 +101,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   simp only [AddressOperation.circuit] at h_addr
   have h_addr_spec := h_addr h_addr_as
   simp only [circuit_norm, eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
-  have h_it := h_itype ⟨h_bin, h_bin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩
+  have h_it := h_itype ⟨h_bin, h_bin, h_clk⟩
   -- `msb` is binary on any real row: LB rows get it from the inline MSB byte-pull; LBU rows have `msb = 0`
   -- (the `is_lbu·msb = 0` gate with `is_lbu = 1`).
   have h_msb_bin_real : input_is_lb + input_is_lbu = 1 → (input_msb = 0 ∨ input_msb = 1) := by
@@ -149,15 +140,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- offset — `MemoryAccess` at the RAM `+1` slot, `ITypeReader` at op_b's `+3`, `RegisterWrite` at
   -- op_a's `+4`.
   refine ⟨⟨h_addr_spec,
-      h_mem ⟨h_bin, fun _ => h_pv_isu64, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩, h_it,
+      h_mem ⟨h_bin, fun _ => h_pv_isu64, h_clk⟩, h_it,
       fun h1 => ⟨(h_u8 h1).1, (h_u8 h1).2, h_byte_lt h1⟩, h_msb_fact,
       ⟨hsel0, hsel1, hsel2, hsel3⟩, hmux_eq, h_op_a_0, h_msbgate, h_lb_bin, h_lbu_bin, h_bin⟩,
     Or.inr h_addr_as,
-    Or.inr ⟨h_bin, fun _ => h_pv_isu64, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩,
+    Or.inr ⟨h_bin, fun _ => h_pv_isu64, h_clk⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0,
     fun h1 h0 => off_gate_vacuous h_lb_bin h1 h0,
-    Or.inr ⟨h_bin, h_bin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩,
-    Or.inr ⟨h_bin, h_load_isu64, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩⟩
+    Or.inr ⟨h_bin, h_bin, h_clk⟩,
+    Or.inr ⟨h_bin, h_load_isu64, h_clk.at_four⟩⟩
 
 /-- Prover-side row well-formedness: the address facts + selector binaries + `op_a_0 = 0` + the byte
 value bounds + the sign-bit fact + the limb-selection / byte-mux equations + the reader `Spec`s. -/
@@ -211,12 +202,7 @@ theorem completeness :
   simp only [isReal] at hbin
   haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 →
-      input_is_lb + input_is_lbu = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu hr).1 (h_cpu hr).2
-  have hv1 : (1 : ZMod p).val = 1 := ZMod.val_one p
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   have h_msb_lt : input_msb.val < 256 := by
     rcases h_msb_bin with h | h <;> rw [h] <;> simp [ZMod.val_one]
   have epc : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_state_pc[i]
@@ -266,7 +252,7 @@ theorem completeness :
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
-  · exact ⟨hbin, fun _ => h_pv_isu64, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩
+  · exact ⟨hbin, fun _ => h_pv_isu64, h_clk⟩
   · exact h_mem
   · -- U8Range-pair receive obligation (real row); value is raw (`toRaw` (gated post-#398)).
     intro _
@@ -276,9 +262,9 @@ theorem completeness :
     intro _
     simp only [byteChannel]
     exact (byteRowSpec_msb _ _).mpr ⟨⟨h_msb_lt, hbyte_pa⟩, h_msb_bin, h_msb_iff⟩
-  · exact ⟨hbin, hbin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩
+  · exact ⟨hbin, hbin, h_clk⟩
   · exact h_it
-  · exact ⟨hbin, fun _ => h_load_isu64, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩
+  · exact ⟨hbin, fun _ => h_load_isu64, h_clk.at_four⟩
   · trivial
   · simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega)]; exact hsel0
   · simp only [eob 1 (by omega), eob 2 (by omega), epv 1 (by omega)]; exact hsel1

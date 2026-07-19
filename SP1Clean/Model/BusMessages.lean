@@ -128,6 +128,97 @@ theorem MemoryMsg.clkBound_of_cpuState_bounds (clk0 clk1 delta : ZMod p) (k : �
 
 end ClkBound
 
+end SP1Clean.Channels
+
+/-! ## The readers' clock discipline
+
+`MemoryMsg.ClkBound` is a *per-message* requirement, but the obligation a chip actually owes its readers
+is uniform: **every** intra-row effect offset applied to the row's low clock stays 24-bit. Naming that
+once here — rather than spelling a per-offset numeric conjunct in each of the seven readers'
+`Assumptions` and rebuilding it in each of the 25 chips — is what keeps a future change to the discipline
+(a new effect slot, a wider clock) local to this declaration and the readers that unfold it.
+
+Namespace is `SP1Clean.Readers` (the readers' own), not `SP1Clean.Channels`: this is the *readers'*
+contract, stated over the raw clock limbs. It lives in this module — below `FormalModel/Contracts/
+Readers.lean`, where the rest of the reader contract surface sits — because `Native/Readers/
+RegisterWrite.lean` and `Native/Readers/MemoryAccess.lean` reach `Model/Channels` but deliberately do
+**not** import the contract file (they need none of its `Extracted/` column structs), and every reader
+reaches this module through `Model/Channels`. Repo convention is that namespaces are decoupled from
+directories, so the `Readers.*` names resolve identically wherever the declaration is filed. -/
+
+namespace SP1Clean.Readers
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+
+/-- The clock discipline at **one already-shifted** access clock: the caller applied the effect offset
+before handing the clock over, so only the single 24-bit bound remains. `Readers.RegisterWrite` is the
+one reader in this shape — its `Inputs.clk_low` is the composing chip's recombined clock already `+ 4`ed
+— and `ClkDiscipline.slot` is how a chip produces it from the unshifted discipline. -/
+def ClkDisciplineAt (clk is_real : ZMod p) : Prop :=
+  is_real = 1 → clk.val < 2 ^ 24
+
+/-- The clock discipline a reader's composing chip owes: every intra-row effect offset (`≤ 4`) applied
+to the row's low clock stays 24-bit. Named once so a future change to the discipline touches this
+declaration and the readers that unfold it — not the 25 chips that supply it. -/
+def ClkDiscipline (clk_low is_real : ZMod p) : Prop :=
+  ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → is_real = 1 → (clk_low + delta).val < 2 ^ 24
+
+/-- **The chip's constructor.** The hypothesis is `Readers.CPUState.Spec` spelled over the row's two
+committed clock byte limbs (that contract file sits *above* this module, so the shape is written out
+rather than named); a chip obtains it in soundness by applying its `CPUState` sub-obligation to the
+`is_real` binary gate, and in completeness straight out of `ProverAssumptions`. The arithmetic is
+`Channels.MemoryMsg.clkBound_of_cpuState_bounds`, so this stays inside the standard `Fact (2 ^ 17 < p)`. -/
+theorem ClkDiscipline.of_cpuState_spec {clk0 clk1 is_real : ZMod p}
+    (h : is_real = 1 → ((clk0 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13 ∧ clk1.val < 2 ^ 8) :
+    ClkDiscipline (clk0 + clk1 * 65536) is_real :=
+  fun _ k hk hk4 hr =>
+    Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4 (h hr).1 (h hr).2
+
+set_option linter.unusedSectionVars false in
+/-- Transport the discipline along a gate identification. A chip that composes its readers at a
+*derived* selector (the shift chips' `is_sll + is_sllw` flag sum) while its `CPUState` block runs at the
+public `is_real` proves the two equal in-circuit; this re-gates the discipline once instead of at every
+offset. -/
+theorem ClkDiscipline.of_gate {clk_low is_real gate : ZMod p} (h : ClkDiscipline clk_low is_real)
+    (hgate : gate = 1 → is_real = 1) : ClkDiscipline clk_low gate :=
+  fun delta k hdelta hk hg => h delta k hdelta hk (hgate hg)
+
+set_option linter.unusedSectionVars false in
+/-- Specialize the discipline to one effect slot. -/
+theorem ClkDiscipline.slot {clk_low is_real : ZMod p} (h : ClkDiscipline clk_low is_real)
+    (delta : ZMod p) (k : ℕ) (hdelta : delta.val = k) (hk : k ≤ 4) :
+    ClkDisciplineAt (clk_low + delta) is_real :=
+  h delta k hdelta hk
+
+/-- The RAM effect slot (`MemoryAccess`'s current-timestamp push). -/
+theorem ClkDiscipline.at_one {clk_low is_real : ZMod p} (h : ClkDiscipline clk_low is_real) :
+    ClkDisciplineAt (clk_low + 1) is_real := by
+  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  exact h.slot 1 1 (ZMod.val_one p) (by norm_num)
+
+/-- The op_c operand slot. -/
+theorem ClkDiscipline.at_two {clk_low is_real : ZMod p} (h : ClkDiscipline clk_low is_real) :
+    ClkDisciplineAt (clk_low + 2) is_real :=
+  h.slot 2 2 (by simp) (by norm_num)
+
+/-- The op_b operand slot. -/
+theorem ClkDiscipline.at_three {clk_low is_real : ZMod p} (h : ClkDiscipline clk_low is_real) :
+    ClkDisciplineAt (clk_low + 3) is_real :=
+  h.slot 3 3 (by simp) (by norm_num)
+
+/-- The op_a operand / `rd` write slot. -/
+theorem ClkDiscipline.at_four {clk_low is_real : ZMod p} (h : ClkDiscipline clk_low is_real) :
+    ClkDisciplineAt (clk_low + 4) is_real :=
+  h.slot 4 4 (by simp) (by norm_num)
+
+end SP1Clean.Readers
+
+namespace SP1Clean.Channels
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
 /-- The Program-bus message — the arity-16 instruction-fetch tuple `(pc0, pc1, pc2, opcode, op_a,
 op_b0..3, op_c0..3, op_a_0, imm_b, imm_c)`, matching SP1's `AirInteraction.program`
 (`crates/hypercube/src/lookup/interaction.rs`, `InteractionKind::Program => 16`) and the `.send

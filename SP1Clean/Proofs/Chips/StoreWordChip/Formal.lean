@@ -37,15 +37,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- channel's `MemoryMsg.ClkBound` guarantee — `MemoryAccess`'s RAM effect slot (`clk_low + 1`) and
   -- `ITypeReaderImmutable`'s two read-back pushes (`clk_low + 4` / `+ 3`). The offset is left to
   -- unification, so this line never names the destructured state columns.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
-  -- the RAM effect slot's offset is the literal `1`, whose `val` needs `Fact (1 < p)` (kept local so the
-  -- instance does not leak into the surrounding heavy `simp` sets).
-  have hv1 : (1 : ZMod p).val = 1 := by
-    haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-    exact ZMod.val_one p
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   -- eval→value bridges for the nested vectors the RMW equations reference.
   have hmap_sv : Vector.map (Expression.eval env) input_var_store_value = input_store_value :=
     h_input.2.2.2.2.2
@@ -62,8 +54,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   simp only [esv 0 (by omega), esv 1 (by omega), esv 2 (by omega), esv 3 (by omega),
     epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega),
     eoap 0 (by omega), eoap 1 (by omega)] at hr0 hr1 hr2 hr3
-  have h_it := h_itype ⟨h_bin, h_bin, fun hr =>
-    ⟨h_clk 4 4 (by simp) (by norm_num) hr, h_clk 3 3 (by simp) (by norm_num) hr⟩⟩
+  have h_it := h_itype ⟨h_bin, h_bin, h_clk⟩
   have h_off' : (0 : ZMod p).val + 2 * (0 : ZMod p).val + 4 * input_offset_bit.val
       = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
     simp only [ZMod.val_zero]; omega
@@ -81,11 +72,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_addr_spec := h_addr h_addr_as
   simp only [circuit_norm] at h_addr_spec
   refine ⟨⟨h_addr_spec,
-    h_mem ⟨h_bin, h_sv, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩, h_it,
+    h_mem ⟨h_bin, h_sv, h_clk⟩, h_it,
     ⟨sub_eq_zero.mp hr0, sub_eq_zero.mp hr1, sub_eq_zero.mp hr2, sub_eq_zero.mp hr3⟩, h_bin⟩, ?_⟩
-  exact ⟨Or.inr h_addr_as, Or.inr ⟨h_bin, h_sv, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩,
-    ⟨h_bin, h_bin, fun hr =>
-      ⟨h_clk 4 4 (by simp) (by norm_num) hr, h_clk 3 3 (by simp) (by norm_num) hr⟩⟩⟩
+  exact ⟨Or.inr h_addr_as, Or.inr ⟨h_bin, h_sv, h_clk⟩,
+    ⟨h_bin, h_bin, h_clk⟩⟩
 
 /-- Prover-side row well-formedness (3-arg form): operand `isU64`s + address-fits/alignment + the
 `offset_bit` decomposition + `is_real` binary + the reader `Spec`s + the read-modify-write equations. -/
@@ -125,13 +115,7 @@ theorem completeness :
   obtain ⟨ha, hb, hfit, h_ge, h_align, h_off, hbin, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it, hdec,
       h_sv⟩ := h_assumptions
   -- G1: the *push*-side clock bounds, from the prover-supplied CPUState clock byte bounds.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu hr).1 (h_cpu hr).2
-  have hv1 : (1 : ZMod p).val = 1 := by
-    haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-    exact ZMod.val_one p
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   have hmap_pc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc
       = input_state_pc := h_input.2.1.2.2.2
   have hmap_sv : Vector.map (Expression.eval env.toEnvironment) input_var_store_value
@@ -164,10 +148,9 @@ theorem completeness :
   refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
-  · exact ⟨hbin, h_sv, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩
+  · exact ⟨hbin, h_sv, h_clk⟩
   · exact h_mem
-  · exact ⟨hbin, hbin, fun hr =>
-      ⟨h_clk 4 4 (by simp) (by norm_num) hr, h_clk 3 3 (by simp) (by norm_num) hr⟩⟩
+  · exact ⟨hbin, hbin, h_clk⟩
   · exact h_it
   · simp only [esv 0 (by omega), epv 0 (by omega), eoap 0 (by omega)]
     exact sub_eq_zero_of_eq hr0

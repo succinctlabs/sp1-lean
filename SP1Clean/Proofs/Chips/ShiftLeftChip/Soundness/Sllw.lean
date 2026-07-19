@@ -221,13 +221,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- this line never names the destructured state columns. ShiftLeft composes both children at the
   -- *derived* gate `is_sll + is_sllw`, while `CPUState` runs at the public `is_real`; the binding
   -- constraint `hrealeq` identifies the two, so the bound is stated at the gate.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 →
-      (input_is_sll + input_is_sllw : ZMod p) = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 := by
-    intro _ k hk hk4 hgate
-    have hreal : input_is_real = 1 := by linear_combination hrealeq + hgate
-    exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu (bool_of_mul_pred _hrealbin) hreal).1 (h_cpu (bool_of_mul_pred _hrealbin) hreal).2
+  have h_clk : Readers.ClkDiscipline (input_state_clk_0_16 + input_state_clk_16_24 * 65536)
+      (input_is_sll + input_is_sllw) :=
+    (Readers.ClkDiscipline.of_cpuState_spec (h_cpu (bool_of_mul_pred _hrealbin))).of_gate
+      fun hgate => by linear_combination hrealeq + hgate
   refine ⟨fun hreal => ?_, ?_⟩
   · intro hsllw
     -- branch over a 2-limb (32-bit) word with sign extension (limbs 2,3 = `msb·65535`).
@@ -332,14 +329,13 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       (by linear_combination -hwmsb2) (by linear_combination -hwmsb3)
   · -- The MSB gadget exposes its empty requirement list canonically. The remaining reader/write
     -- assumptions are followed by the nine gate-gated byte pulls, all vacuous off-gate.
-    exact ⟨Or.inr ⟨bool_of_mul_pred _hE2, bool_of_mul_pred _hE2, fun hr =>
-        ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+    exact ⟨Or.inr ⟨bool_of_mul_pred _hE2, bool_of_mul_pred _hE2, h_clk⟩,
       Or.inr ⟨bool_of_mul_pred _hE2, (fun hr => by
         obtain ⟨hq0, hq1, hq2, hq3⟩ := a_isU64 hr
         refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
           simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
         exacts [hq0, hq1, hq2, hq3]),
-        fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩,
+        h_clk.at_four⟩,
       fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
       fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,
       fun h1 h0 => off_gate_vacuous (bool_of_mul_pred _hE2) h1 h0,

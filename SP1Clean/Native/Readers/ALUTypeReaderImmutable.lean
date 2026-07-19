@@ -136,14 +136,13 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
     -- G1: the three read-back **push** access clocks (op_a at `clk_low + 4`, op_b at `+ 3`, op_c at `+ 2`)
     -- are 24-bit — the memory channel's `MemoryMsg.ClkBound` requirement. Not provable here: `clk_low` is a
     -- raw cross-block input, and the bound lives in the composing chip's `CPUState` block. The chip
-    -- discharges all three with `Channels.MemoryMsg.clkBound_of_cpuState_bounds` from its `CPUState`
-    -- sub-`Spec`. All three are gated on plain `is_real = 1`, *not* on op_c's own `is_real - imm_c = 1`
+    -- discharges all three with one `Readers.ClkDiscipline.of_cpuState_spec` from its `CPUState`
+    -- sub-`Spec`, and soundness picks the three slots out of the named discipline below.
+    -- It is gated on plain `is_real = 1`, *not* on op_c's own `is_real - imm_c = 1`
     -- multiplicity: the composing chip can only obtain the immediate gate `(is_real - 1) * imm_c = 0` from
     -- **this reader's `Spec`**, so gating that way would make the chip's discharge circular. Soundness
     -- instead derives `is_real = 1` from `is_real - imm_c = 1` in-circuit (`hreal_of_c` below).
-    (input.is_real = 1 →
-      (input.clk_low + 4).val < 2 ^ 24 ∧ (input.clk_low + 3).val < 2 ^ 24 ∧
-        (input.clk_low + 2).val < 2 ^ 24)
+    ClkDiscipline input.clk_low input.is_real
 
 /-! ### `ProverData`-lifted forms
 
@@ -220,16 +219,16 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   · -- push_a: read-back value = op_a prev, from the paired pull; push clock `clk_low + 4`.
     have ht : input_is_real = 1 := by
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
-    exact ⟨(h_mem_a (by rw [ht])).1, (h_assumptions.2.2 ht).1⟩
+    exact ⟨(h_mem_a (by rw [ht])).1, h_assumptions.2.2.at_four ht⟩
   · -- push_b: read-back value = op_b prev, from the paired pull; push clock `clk_low + 3`.
     have ht : input_is_real = 1 := by
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
-    exact ⟨(h_mem_b (by rw [ht])).1, (h_assumptions.2.2 ht).2.1⟩
+    exact ⟨(h_mem_b (by rw [ht])).1, h_assumptions.2.2.at_three ht⟩
   · -- push_c: read-back value = op_c prev, from the paired (is_real - imm_c)-gated pull; push clock
     -- `clk_low + 2`, whose `ClkBound` comes from the `is_real`-gated assumption via `hreal_of_c`.
     have htc : input_is_real - input_cols_imm_c = 1 := by
       rcases hcbin with h | h; exact absurd h h0; exact h
-    exact ⟨(h_mem_c (by rw [htc])).1, (h_assumptions.2.2 (hreal_of_c htc)).2.2⟩
+    exact ⟨(h_mem_c (by rw [htc])).1, h_assumptions.2.2.at_two (hreal_of_c htc)⟩
 
 set_option maxHeartbeats 4000000 in
 theorem completeness :

@@ -42,19 +42,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- (op_a at `clk_low + 4`, op_b at `+ 3`, op_c at `+ 2`; there is no `RegisterWrite` here, the
   -- result is discarded). The offset is left to unification, so this line never names the
   -- destructured state columns.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   simp only [isReal, clkLow, opcodeVal]
   -- The per-emitter channel-requirement tail: the off-gate-vacuous byte pull (`is_real ∈ {0,1}`
   -- rules out the `¬is_real = 0` ∧ `¬-is_real = -1` antecedents), and the immutable reader.
-  exact ⟨⟨h_reader ⟨h_bin, h_bin, fun hr => ⟨h_clk 4 4 (by simp) (by norm_num) hr,
-      h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+  exact ⟨⟨h_reader ⟨h_bin, h_bin, h_clk⟩,
       h_bin, h_oa1, h_oa2⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0,
-    Or.inr ⟨h_bin, h_bin, fun hr => ⟨h_clk 4 4 (by simp) (by norm_num) hr,
-      h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩⟩
+    Or.inr ⟨h_bin, h_bin, h_clk⟩⟩
 
 /-- Honest prover-side row well-formedness: `is_real` binary, the two `op_a_0` forcing gates, the
 CPUState clock bounds + the immutable-ALU-reader contract, and the dynamic opcode in ALU range
@@ -80,13 +75,9 @@ theorem completeness :
   -- G1: the *push* side clock bounds (op_a `+ 4` / op_b `+ 3` / op_c `+ 2`), from the prover-supplied
   -- CPUState clock byte bounds. The *pull* side bounds are already carried by `h_reader`, since
   -- `ProverAssumptions` names `Readers.ALUTypeReaderImmutable.Spec` wholesale.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu hr).1 (h_cpu hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   refine ⟨⟨h_bin, h_cpu⟩, ?_,
-    ⟨⟨h_bin, h_bin, fun hr => ⟨h_clk 4 4 (by simp) (by norm_num) hr,
-        h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩, h_reader⟩,
+    ⟨⟨h_bin, h_bin, h_clk⟩, h_reader⟩,
     ?_, h_oa1, h_oa2⟩
   · -- the LTU `opcode < 29` byte pull (fires on real rows).
     intro hneg

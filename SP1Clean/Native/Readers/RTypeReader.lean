@@ -157,12 +157,13 @@ into `Readers/RegisterWrite.circuit`, which the composing chip discharges with `
 operation; so all five memory interactions here are read pulls/read-backs (no write to range-check). -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_trusted = 0 ∨ input.is_trusted = 1) ∧
-    -- G1: the two read-back **push** access clocks are 24-bit — the memory channel's
-    -- `MemoryMsg.ClkBound` requirement. Not provable here: `clk_low` is a raw cross-block input, and
-    -- the bound lives in the composing chip's `CPUState` block. The chip discharges both with
-    -- `Channels.MemoryMsg.clkBound_of_cpuState_bounds` from its `CPUState` sub-`Spec`.
-    (input.is_real = 1 →
-      (input.clk_low + 3).val < 2 ^ 24 ∧ (input.clk_low + 2).val < 2 ^ 24)
+    -- G1: the two read-back **push** access clocks (op_b at `clk_low + 3`, op_c at `+ 2`) are 24-bit —
+    -- the memory channel's `MemoryMsg.ClkBound` requirement. Not provable here: `clk_low` is a raw
+    -- cross-block input, and the bound lives in the composing chip's `CPUState` block. Assumed as the
+    -- named `Readers.ClkDiscipline` (offsets `≤ 4`, uniform across the readers) rather than as this
+    -- reader's two numeric offsets, so the chip supplies one `ClkDiscipline.of_cpuState_spec` and
+    -- soundness picks the two slots it needs out of it below.
+    ClkDiscipline input.clk_low input.is_real
 
 /-! ### `ProverData`-lifted forms
 
@@ -218,11 +219,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     -- `clk_low + 3`, whose `ClkBound` is the chip-supplied assumption.
     have ht : input_is_real = 1 := by
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
-    exact ⟨(h_mem_b (by rw [ht])).1, (h_assumptions.2.2 ht).1⟩
+    exact ⟨(h_mem_b (by rw [ht])).1, h_assumptions.2.2.at_three ht⟩
   · -- Goal 4: push_c requirement — same pattern as push_b, at `clk_low + 2`.
     have ht : input_is_real = 1 := by
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
-    exact ⟨(h_mem_c (by rw [ht])).1, (h_assumptions.2.2 ht).2⟩
+    exact ⟨(h_mem_c (by rw [ht])).1, h_assumptions.2.2.at_two ht⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD

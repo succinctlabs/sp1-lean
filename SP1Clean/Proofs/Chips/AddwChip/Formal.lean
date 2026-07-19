@@ -37,16 +37,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- channel's new `MemoryMsg.ClkBound` guarantee — `ALUTypeReader`'s two read-back pushes
   -- (`clk_low + 3` / `+ 2`) and `RegisterWrite`'s op_a write push (`clk_low + 4`). The offset is left
   -- to unification, so this line never names the destructured state columns.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   -- The `ALUTypeReader` sub-`Spec` (its `Assumptions` = ⟨is_real binary, is_trusted binary, the two
   -- read-back push clock bounds⟩ — `is_trusted = is_real`, so both binary facts are `h_bin`); its
   -- op_a/op_b conjunct is now the four-fact tuple `is_real = 1 → isU64 op_a ∧ isU64 op_b ∧ their two
   -- `prev_low` clock bounds`, so the op_b `isU64` moves from `.2` to `.2.1`.
-  have h_rspec := h_adapter ⟨h_bin, h_bin, fun hr =>
-    ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
+  have h_rspec := h_adapter ⟨h_bin, h_bin, h_clk⟩
   have h_ob := h_rspec.2.2.2.2.2.2.2.2.2.1
   -- Build the (ungated) `AddwOperation` Assumptions on the `is_real = 1` branch: op_b from the reader pull,
   -- op_c from the chip Assumption. `h_addspec hr` is the operation's `Spec` on a real row.
@@ -61,13 +57,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       first
         | exact h_bin
         | exact Or.inl rfl
-        | exact Or.inr ⟨h_bin, h_bin, fun hr =>
-            ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
+        | exact Or.inr ⟨h_bin, h_bin, h_clk⟩
         | exact Or.inr ⟨h_bin, (fun hr => by
             have hisu := ((h_addspec hr).2 hr).1
             simp only [AddwOperation.resultWord, Vector.getElem_map, Vector.getElem_mapRange,
               circuit_norm] at hisu ⊢
-            exact hisu), fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩
+            exact hisu), h_clk.at_four⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
@@ -75,10 +70,7 @@ theorem completeness :
   obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ :=
     h_assumptions
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu hr).1 (h_cpu hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   -- `op_c_memory` is grouped since `imm_c` is the final field of the ALU adapter block.
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, ⟨hoc, -, -⟩, -⟩ := h_input
   -- `h_env` now bundles the chip's `value`/`msb` witness-gen equations with the GFC `ALUTypeReader`
@@ -107,8 +99,7 @@ theorem completeness :
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨ha, hb, hbin⟩, ?_⟩,
-    ⟨⟨hbin, hbin, fun hr =>
-        ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+    ⟨⟨hbin, hbin, h_clk⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
@@ -116,7 +107,7 @@ theorem completeness :
       (fun hr => ⟨ha_prev hr, ha, (hprevclk hr).1, (hprevclk hr).2.1⟩),
       -- op_c's guarantee is gated by `is_real - imm_c`; `imm_c = 0` reduces that to `is_real = 1`.
       fun hc => ⟨hb, (hprevclk (by rwa [himm, sub_zero] at hc)).2.2⟩⟩⟩,
-    ⟨⟨hbin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩, ?_⟩
+    ⟨⟨hbin, ?_, h_clk.at_four⟩, trivial⟩, ?_⟩
   · rw [hval, hmsbeq]; exact AddwOperation.spec_populate ha hb input_is_real
   · -- RegisterWrite's `isU64 value` (the op_a write push): the witnessed result word's `isU64` from
     -- `spec_populate.2 hr).1`, bridged from the operation's `populate resultWord` to the chip's explicit

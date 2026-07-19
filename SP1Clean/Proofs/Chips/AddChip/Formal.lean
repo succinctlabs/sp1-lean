@@ -27,17 +27,13 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- memory channel's new `MemoryMsg.ClkBound` guarantee — for `RTypeReader`'s two read-back pushes
   -- (`clk_low + 3` / `+ 2`) and `RegisterWrite`'s op_a write push (`clk_low + 4`). The offsets are
   -- left to unification, so this line never names the destructured state columns.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   -- **Option B cycle-break.** No operand `isU64` is assumed (chip `Assumptions = True`). Apply the
   -- `RTypeReader` sub-soundness `h_adapter` (its `Assumptions` is `⟨is_real binary, is_trusted binary⟩`,
   -- both `h_bin` since `is_trusted = is_real`) to get its `Spec`; its 7th conjunct is the **memory-pull-
   -- derived** operand `isU64` trio `(is_real = 1 → isU64 op_a/op_b/op_c prev)`. Operand `isU64` thus flows
   -- reader → here, not from a chip assumption — no cycle.
-  have h_rspec := h_adapter ⟨h_bin, h_bin, fun hr =>
-    ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
+  have h_rspec := h_adapter ⟨h_bin, h_bin, h_clk⟩
   have h_trio := h_rspec.2.2.2.2.2.2
   -- Feed operand `isU64` (gated on `is_real`; `op_b_val`/`op_c_val` are defeq the `op_b/op_c` prev_values)
   -- into `AddOperation`'s sub-soundness → `isU64 value` (.1) + the gated add identity (.2). The witnessed
@@ -51,11 +47,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     first
       | exact h_bin
       | exact Or.inl rfl
-      | exact Or.inr ⟨h_bin, h_bin, fun hr =>
-          ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
+      | exact Or.inr ⟨h_bin, h_bin, h_clk⟩
       | exact ⟨fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2.1⟩, h_bin⟩
       | exact Or.inr ⟨h_bin, fun hr => (h_addspec hr).1,
-          fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩
+          h_clk.at_four⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
@@ -63,10 +58,7 @@ theorem completeness :
   obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ :=
     h_assumptions
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
-  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
-      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
-    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
-      (h_cpu hr).1 (h_cpu hr).2
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
@@ -88,11 +80,10 @@ theorem completeness :
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     simp only [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
-    ⟨⟨hbin, hbin, fun hr =>
-        ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+    ⟨⟨hbin, hbin, h_clk⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
         fun hr => ⟨ha_prev hr, ha, hb, (hprevclk hr).1, (hprevclk hr).2.1, (hprevclk hr).2.2⟩⟩⟩,
-    ⟨⟨hbin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩, hop_a_0, ?_⟩
+    ⟨⟨hbin, ?_, h_clk.at_four⟩, trivial⟩, hop_a_0, ?_⟩
   · rw [hval]; exact AddOperation.spec_populate ha hb input_is_real
   · -- RegisterWrite's `isU64 value` (op_a write push): the witnessed result `value = populate op_b op_c`,
     -- whose `isU64` is `spec_populate.1`.
