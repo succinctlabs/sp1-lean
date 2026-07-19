@@ -111,6 +111,63 @@ theorem memoryInitProviderTable_requirements
   exact table.channelRequirements_of_requirements
     (Table.weakSoundness tableAssumptions tableConstraints tableGuarantees).2
 
+/-- The fixed SP1 ensemble layout always contains its Memory-finalize provider table. -/
+theorem memoryFinalizeProviderIndex_lt_tablesLength
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    memoryFinalizeProviderIndex < witness.tables.length := by
+  rw [← witness.same_length]
+  simp [memoryFinalizeProviderIndex, sp1Ensemble_tables, sp1Tables_length,
+    sp1ProviderTables_length]
+
+/-- The physical Memory-finalize provider table selected by the stable ensemble layout. -/
+noncomputable def memoryFinalizeProviderTable
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) : Table (ZMod p) :=
+  witness.tables[memoryFinalizeProviderIndex]'(memoryFinalizeProviderIndex_lt_tablesLength witness)
+
+/-- Optional indexing recovers the canonical Memory-finalize provider table. -/
+theorem memoryFinalizeProviderTable_getElem?
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    witness.tables[memoryFinalizeProviderIndex]? = some (memoryFinalizeProviderTable witness) := by
+  rw [List.getElem?_eq_getElem (memoryFinalizeProviderIndex_lt_tablesLength witness)]
+  rfl
+
+/-- The stable Memory-finalize witness position is the boundary pull circuit. -/
+theorem memoryFinalizeProviderTable_component
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    (memoryFinalizeProviderTable witness).component = ⟨MemoryFinalizeChip.circuit⟩ := by
+  unfold memoryFinalizeProviderTable
+  have aligned := witness.same_circuits 35 (by
+    simp [sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length])
+  exact aligned.symm.trans (by rfl)
+
+/-- The stable Memory-finalize table uses the ensemble's shared prover data. -/
+theorem memoryFinalizeProviderTable_data
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    (memoryFinalizeProviderTable witness).data = witness.data := by
+  exact witness.same_data _ (List.getElem_mem
+    (memoryFinalizeProviderIndex_lt_tablesLength witness))
+
+/-- **The pull-side boundary fact.** The Memory-finalize circuit is the flipped bus's **pull** side:
+`channelsWithRequirements = []`, so it owes no channel requirement in-circuit — a pull *receives* the
+`MemoryMsg.isU64` guarantee (via bus balance against the chips' final pushes) rather than proving it.
+Its `ChannelRequirements memoryChannel.toRaw` therefore holds vacuously, through
+`Table.requirements_of_not_mem_of_constraints`.  This is the pull-side analogue of
+`memoryInitProviderTable_requirements`: it gives the finalize frontier's pulls (the `finM` side of the
+per-`MemLoc` balance) the same `ChannelRequirements` shape the init pushes carry, so the memory-bus
+balance can consume both boundary tables uniformly. -/
+theorem memoryFinalizeProviderTable_requirements
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) :
+    (memoryFinalizeProviderTable witness).ChannelRequirements memoryChannel.toRaw := by
+  have tableConstraints : (memoryFinalizeProviderTable witness).Constraints :=
+    constraints (memoryFinalizeProviderTable witness)
+      (witness.mem_allTables_of_mem_tables
+        (List.getElem_mem (memoryFinalizeProviderIndex_lt_tablesLength witness)))
+  refine (memoryFinalizeProviderTable witness).requirements_of_not_mem_of_constraints
+    tableConstraints ?_
+  rw [Table.channelsWithRequirements, memoryFinalizeProviderTable_component witness]
+  simp [MemoryFinalizeChip.circuit]
+
 /-- Every active Program-provider contribution is a decode of the program committed in shared prover
 data.  Zero-multiplicity padding rows impose no semantic condition. -/
 noncomputable def ProgramProviderBound
