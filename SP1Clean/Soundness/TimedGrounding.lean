@@ -270,6 +270,44 @@ def Grounded (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
   ∀ mp ∈ r.memPulls, LocalMemTruth initial initialClock mp.1 ∧
     LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value
 
+omit [Fact (2 ^ 17 < p)] in
+/-- **The aligned→ordinary grounding transport** (Phase B1's reusable core). The engine's `RowOK`
+needs each pull paired positionally with the same-location push at that push's micro-time (`t+3`/`t+2`
+for the register read-backs, `t` for the write slot), so the walk grounds an *aligned* carrier. The
+row `Spec` consumers (`valueOperandsBound_of_grounded`) instead read every pull at the window start
+`t` — the *ordinary* carrier. This lemma bridges them: given a shared state pull and, for each
+ordinary pull, a matching aligned pull carrying the same message inside the pre-write register epoch
+`[t, t+4)`, `localValueAt_shift` moves the aligned currency back to `t`. `LocalMemTruth` is
+carrier-independent (it speaks of the message's own time), so it transfers unchanged. Register-axis
+only; the RAM analogue (loads/stores, Phase R) uses `localValueAt_shift_ram` and the `[t, t+1)`
+window. -/
+theorem grounded_ordinary_of_aligned
+    (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
+    (r_ord r_align : RowFacts p)
+    (hstate : r_align.statePull = r_ord.statePull)
+    (hreg : ∀ mp ∈ r_ord.memPulls, ∃ i : BitVec 5, MemoryMsg.locOf mp.1 = MemLoc.reg i)
+    (hmatch : ∀ mp ∈ r_ord.memPulls,
+      mp.2 = StateMsg.timeNat r_ord.statePull ∧
+      ∃ mp' ∈ r_align.memPulls, mp'.1 = mp.1 ∧
+        StateMsg.timeNat r_align.statePull ≤ mp'.2 ∧
+        mp'.2 < StateMsg.timeNat r_align.statePull + 4)
+    (grounded_align : Grounded program initial initialClock r_align) :
+    Grounded program initial initialClock r_ord := by
+  obtain ⟨hstateTruth_al, hpulls_al⟩ := grounded_align
+  refine ⟨hstate ▸ hstateTruth_al, ?_⟩
+  intro mp hmp
+  obtain ⟨i, hloc⟩ := hreg mp hmp
+  obtain ⟨htord, mp', hmp'_mem, hmsg, hlo, hhi⟩ := hmatch mp hmp
+  obtain ⟨hmemtruth, hval_al⟩ := hpulls_al mp' hmp'_mem
+  refine ⟨hmsg ▸ hmemtruth, ?_⟩
+  rw [hloc, htord]
+  have hval_al' : LocalValueAt initial initialClock (MemLoc.reg i) mp'.2 mp.1.value := by
+    rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.reg i from hmsg ▸ hloc]
+    exact hval_al
+  have hst : StateMsg.timeNat r_align.statePull = StateMsg.timeNat r_ord.statePull := by
+    rw [hstate]
+  refine localValueAt_shift hstateTruth_al (Or.inl ⟨hlo, hhi, ?_, ?_⟩) hval_al' <;> omega
+
 /-- The walk invariant for the **partial** per-key memory frontier `live`: at each key that carries a
 frontier record, that record sits at the key, its own guarantee (`LocalMemTruth`) holds, its value is
 current at the head time `t`, and its time is at most `t` (the SP-6 forward-compatibility bound).
