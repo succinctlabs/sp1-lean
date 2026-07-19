@@ -270,42 +270,106 @@ def Grounded (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
   ∀ mp ∈ r.memPulls, LocalMemTruth initial initialClock mp.1 ∧
     LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value
 
+/-- **The carrier alignment relation** (Phase B1). The engine's `RowOK` pairs each pull positionally
+with the same-location push at that push's micro-time (`t+3`/`t+2` for the register read-backs, `t`
+for the write slot), so the walk must be fed an *aligned* carrier — but `ChipGroundingContracts`
+proves `LocalStepFact`/`FrameFact` over the *ordinary* carrier (every pull read at the window start
+`t`, in emitted order), and the row-`Spec` consumers read the ordinary carrier too. `AlignsWith
+r_align r_ord` records that the two share their state edge and push list and that every ordinary pull
+is matched by an aligned pull carrying the same message inside the pre-write register epoch
+`[t, t+4)`. Register-axis only; the RAM analogue (loads/stores, Phase R) uses `localValueAt_shift_ram`
+and the `[t, t+1)` window. -/
+structure AlignsWith (r_align r_ord : RowFacts p) : Prop where
+  statePull : r_align.statePull = r_ord.statePull
+  statePush : r_align.statePush = r_ord.statePush
+  pushes : r_align.memPushes = r_ord.memPushes
+  reg : ∀ mp ∈ r_ord.memPulls, ∃ i : BitVec 5, MemoryMsg.locOf mp.1 = MemLoc.reg i
+  ordTime : ∀ mp ∈ r_ord.memPulls, mp.2 = StateMsg.timeNat r_ord.statePull
+  match_ : ∀ mp ∈ r_ord.memPulls, ∃ mp' ∈ r_align.memPulls, mp'.1 = mp.1 ∧
+    StateMsg.timeNat r_align.statePull ≤ mp'.2 ∧
+    mp'.2 < StateMsg.timeNat r_align.statePull + 4
+
 omit [Fact (2 ^ 17 < p)] in
-/-- **The aligned→ordinary grounding transport** (Phase B1's reusable core). The engine's `RowOK`
-needs each pull paired positionally with the same-location push at that push's micro-time (`t+3`/`t+2`
-for the register read-backs, `t` for the write slot), so the walk grounds an *aligned* carrier. The
-row `Spec` consumers (`valueOperandsBound_of_grounded`) instead read every pull at the window start
-`t` — the *ordinary* carrier. This lemma bridges them: given a shared state pull and, for each
-ordinary pull, a matching aligned pull carrying the same message inside the pre-write register epoch
-`[t, t+4)`, `localValueAt_shift` moves the aligned currency back to `t`. `LocalMemTruth` is
-carrier-independent (it speaks of the message's own time), so it transfers unchanged. Register-axis
-only; the RAM analogue (loads/stores, Phase R) uses `localValueAt_shift_ram` and the `[t, t+1)`
-window. -/
-theorem grounded_ordinary_of_aligned
-    (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
-    (r_ord r_align : RowFacts p)
-    (hstate : r_align.statePull = r_ord.statePull)
-    (hreg : ∀ mp ∈ r_ord.memPulls, ∃ i : BitVec 5, MemoryMsg.locOf mp.1 = MemLoc.reg i)
-    (hmatch : ∀ mp ∈ r_ord.memPulls,
-      mp.2 = StateMsg.timeNat r_ord.statePull ∧
-      ∃ mp' ∈ r_align.memPulls, mp'.1 = mp.1 ∧
-        StateMsg.timeNat r_align.statePull ≤ mp'.2 ∧
-        mp'.2 < StateMsg.timeNat r_align.statePull + 4)
-    (grounded_align : Grounded program initial initialClock r_align) :
-    Grounded program initial initialClock r_ord := by
-  obtain ⟨hstateTruth_al, hpulls_al⟩ := grounded_align
-  refine ⟨hstate ▸ hstateTruth_al, ?_⟩
+/-- **The shared engine of all three carrier transports.** Ordinary pull currency (every pull read at
+the window start `t`) is derived from aligned pull currency by shifting each matched pull back to `t`
+inside its pre-write register epoch via `localValueAt_shift`. -/
+theorem ordinaryPullCurrency_of_aligned
+    {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
+    {r_align r_ord : RowFacts p} (h : AlignsWith r_align r_ord)
+    (hstateTruth : LocalStateTruth program initial initialClock r_align.statePull)
+    (hcurr_al : ∀ mp ∈ r_align.memPulls, MemoryMsg.isU64 mp.1 ∧
+      LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value) :
+    ∀ mp ∈ r_ord.memPulls, MemoryMsg.isU64 mp.1 ∧
+      LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value := by
   intro mp hmp
-  obtain ⟨i, hloc⟩ := hreg mp hmp
-  obtain ⟨htord, mp', hmp'_mem, hmsg, hlo, hhi⟩ := hmatch mp hmp
-  obtain ⟨hmemtruth, hval_al⟩ := hpulls_al mp' hmp'_mem
-  refine ⟨hmsg ▸ hmemtruth, ?_⟩
-  rw [hloc, htord]
+  obtain ⟨i, hloc⟩ := h.reg mp hmp
+  obtain ⟨mp', hmp'_mem, hmsg, hlo, hhi⟩ := h.match_ mp hmp
+  obtain ⟨hu64, hval_al⟩ := hcurr_al mp' hmp'_mem
+  refine ⟨hmsg ▸ hu64, ?_⟩
+  rw [hloc, h.ordTime mp hmp]
   have hval_al' : LocalValueAt initial initialClock (MemLoc.reg i) mp'.2 mp.1.value := by
     rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.reg i from hmsg ▸ hloc]
     exact hval_al
   have hst : StateMsg.timeNat r_align.statePull = StateMsg.timeNat r_ord.statePull := by
-    rw [hstate]
+    rw [h.statePull]
+  refine localValueAt_shift hstateTruth (Or.inl ⟨hlo, hhi, ?_, ?_⟩) hval_al' <;> omega
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `LocalStepFact` transports from the ordinary carrier (where `ChipGroundingContracts` proves it) to
+the aligned carrier (which the walk consumes): aligned pull currency shifts back to `t`, feeds the
+ordinary step, and its conclusion (pushed-state truth + push truths) is carrier-shared. -/
+theorem localStepFact_align_of_ordinary
+    {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
+    {r_align r_ord : RowFacts p} (h : AlignsWith r_align r_ord)
+    (step_ord : LocalStepFact program initial initialClock r_ord) :
+    LocalStepFact program initial initialClock r_align := by
+  intro hpull hcurr_al
+  have hpull_ord : LocalStateTruth program initial initialClock r_ord.statePull := by
+    rw [← h.statePull]; exact hpull
+  have hcurr_ord := ordinaryPullCurrency_of_aligned h hpull hcurr_al
+  obtain ⟨hpush_ord, hmem_ord⟩ := step_ord hpull_ord hcurr_ord
+  refine ⟨?_, ?_⟩
+  · rw [h.statePush]; exact hpush_ord
+  · rw [h.pushes]; exact hmem_ord
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `FrameFact` transports the same way. -/
+theorem frameFact_align_of_ordinary
+    {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
+    {r_align r_ord : RowFacts p} (h : AlignsWith r_align r_ord)
+    (frame_ord : FrameFact program initial initialClock r_ord) :
+    FrameFact program initial initialClock r_align := by
+  intro hpull hcurr_al loc v hpush hstart
+  have hpull_ord : LocalStateTruth program initial initialClock r_ord.statePull := by
+    rw [← h.statePull]; exact hpull
+  have hcurr_ord := ordinaryPullCurrency_of_aligned h hpull hcurr_al
+  have hpush_ord : ∀ m ∈ r_ord.memPushes, MemoryMsg.locOf m = loc → m.value = v := by
+    rw [← h.pushes]; exact hpush
+  have := frame_ord hpull_ord hcurr_ord loc v hpush_ord (by rw [← h.statePull]; exact hstart)
+  rw [h.statePush]; exact this
+
+omit [Fact (2 ^ 17 < p)] in
+/-- **The aligned→ordinary grounding transport** — the direction the row-`Spec` consumers
+(`valueOperandsBound_of_grounded`) need. `LocalMemTruth` is carrier-independent (it speaks of the
+message's own time), so it transfers by message identity; only the read-time currency is shifted. -/
+theorem grounded_ordinary_of_aligned
+    {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
+    {r_align r_ord : RowFacts p} (h : AlignsWith r_align r_ord)
+    (grounded_align : Grounded program initial initialClock r_align) :
+    Grounded program initial initialClock r_ord := by
+  obtain ⟨hstateTruth_al, hpulls_al⟩ := grounded_align
+  refine ⟨by rw [← h.statePull]; exact hstateTruth_al, ?_⟩
+  intro mp hmp
+  obtain ⟨i, hloc⟩ := h.reg mp hmp
+  obtain ⟨mp', hmp'_mem, hmsg, hlo, hhi⟩ := h.match_ mp hmp
+  obtain ⟨hmemtruth, hval_al⟩ := hpulls_al mp' hmp'_mem
+  refine ⟨hmsg ▸ hmemtruth, ?_⟩
+  rw [hloc, h.ordTime mp hmp]
+  have hval_al' : LocalValueAt initial initialClock (MemLoc.reg i) mp'.2 mp.1.value := by
+    rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.reg i from hmsg ▸ hloc]
+    exact hval_al
+  have hst : StateMsg.timeNat r_align.statePull = StateMsg.timeNat r_ord.statePull := by
+    rw [h.statePull]
   refine localValueAt_shift hstateTruth_al (Or.inl ⟨hlo, hhi, ?_, ?_⟩) hval_al' <;> omega
 
 /-- The walk invariant for the **partial** per-key memory frontier `live`: at each key that carries a
