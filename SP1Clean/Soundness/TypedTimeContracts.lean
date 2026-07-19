@@ -73,7 +73,11 @@ theorem ShiftLeftChip.cpuStateTimeContract :
   firstStraightCPUTimeContract ShiftLeftChip.Inputs, ShiftLeftChip.circuit, ShiftLeftChip.main,
     ShiftLeftChip.rowView
 
-set_option maxHeartbeats 4000000 in
+-- `ShiftRightChip.main` is the longest operation list in the registry, and the `is_real`/flag-sum bind
+-- added one more `assertZero` to it; unfolding that list in `simp` needs more than the default `simp`
+-- recursion depth. Budget only — the proof is the same `firstStraightCPUTimeContract` expansion.
+set_option maxRecDepth 4000 in
+set_option maxHeartbeats 8000000 in
 theorem ShiftRightChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (ShiftRightChip.circuit (p := p))
       ShiftRightChip.rowView := by

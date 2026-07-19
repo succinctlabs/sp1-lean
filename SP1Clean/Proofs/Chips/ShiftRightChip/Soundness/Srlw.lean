@@ -31,7 +31,7 @@ set_option maxHeartbeats 16000000 in
 /-- Soundness of the `srlw` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_early_struct
-  obtain ⟨h_cpu, h_msb1, h_msb2, h_msb3, h_alu, h_regwrite, h_realgate,
+  obtain ⟨h_cpu, h_msb1, h_msb2, h_msb3, h_alu, h_regwrite, h_realgate, h_realeq,
     h_srl_b, h_sra_b, h_srlw_b, h_sraw_b, h_sum_b, h_wimm,
     h_b0, h_b1, h_b2, h_b3, h_b4, h_b5,
     h_s0w, h_s0b, h_s1w, h_s1b, h_s2w, h_s2b, h_s3w, h_s3b, h_onehot,
@@ -125,15 +125,16 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- channel's `MemoryMsg.ClkBound` guarantee for `ALUTypeReader`'s two read-back pushes
   -- (`clk_low + 3` / `+ 2`), which `main` composes at the chip's own `is_real` selector. The offset is
   -- left to unification, so this line never names the destructured state columns. `RegisterWrite`'s
-  -- op_a write push is composed at the *committed flag sum* instead, which `main` never binds to
-  -- `is_real`, so its bound comes from the chip `Assumptions` (see `Defs.Assumptions`) rather than
-  -- from here.
+  -- op_a write push is composed at the *committed flag sum* instead; `main`'s bind `h_realeq`
+  -- (`is_real - (is_srl + is_sra + is_srlw + is_sraw) = 0`, mirroring `ShiftLeftChip.main`)
+  -- identifies the two, so that push's clock bound is derived here as well.
   have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
       (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
     fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
       (h_cpu (bool_of_mul_pred h_realgate) hr).1 (h_cpu (bool_of_mul_pred h_realgate) hr).2
   refine ⟨?spec, ?aluA,
-    Or.inr ⟨bool_of_mul_pred h_sum_b, hregW, fun _ => h_assumptions.2.2⟩,
+    Or.inr ⟨bool_of_mul_pred h_sum_b, hregW,
+      fun hgate => h_clk 4 4 (by simp) (by norm_num) (by linear_combination h_realeq + hgate)⟩,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
@@ -161,7 +162,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         apply Vector.ext; intro i hi
         simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
         interval_cases i <;> rfl
-      obtain ⟨h_rs1U, h_rs2U, -⟩ := h_assumptions
+      obtain ⟨h_rs1U, h_rs2U⟩ := h_assumptions
       set cb0 := env.get (i₀ + 4 + 1 + 1) with hcb0_def
       set cb1 := env.get (i₀ + 4 + 1 + 1 + 1) with hcb1_def
       set cb2 := env.get (i₀ + 4 + 1 + 1 + 2) with hcb2_def

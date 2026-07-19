@@ -41,22 +41,9 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 /-- The register-read operands the chip decomposes are 64-bit values (received facts from the offline
 memory: the writer range-checked them). These are the `rs1`/`rs2` the `Spec` shifts. Lives here (not in
-`Formal`) so the per-op `Soundness/<Op>.lean` split files can import it without a cycle through `Formal`.
-
-The third conjunct is the op_a write push's 24-bit access clock (`Channels.MemoryMsg.ClkBound`, the
-clock half of the memory channel's `Guarantees`). Every other ALU chip derives it in-circuit from the
-`is_real`-gated `CPUState` sub-`Spec`, but ShiftRight cannot: SP1's `is_real` *is* the committed
-variant-flag sum (`sr/mod.rs:335`), and while `main` composes `RegisterWrite` at that sum, it composes
-`CPUState` at the chip's own `Inputs.is_real` selector and carries **no** assert binding the two
-(contrast `ShiftLeftChip.main`'s `is_real - (is_sll + is_sllw) === 0`, the Lean-side glue that lets
-`ShiftLeft` reach its write gate). Until that bind is added to `main` — a faithfulness-surface change,
-out of scope here — the bound is disclosed as a row assumption. It is stated ungated on the
-*recombined* write clock rather than on the raw clock limbs precisely so it also holds on all-zero
-padding rows, where it reads `(4 : ZMod p).val < 2 ^ 24`; on real rows it is exactly what
-`Channels.MemoryMsg.clkBound_of_cpuState_bounds` produces from the CPUState clock byte bounds. -/
+`Formal`) so the per-op `Soundness/<Op>.lean` split files can import it without a cycle through `Formal`. -/
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  Word.isU64 input.adapter.op_b_memory.prev_value ∧ Word.isU64 input.adapter.op_c_memory.prev_value ∧
-  (input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4).val < 2 ^ 24
+  Word.isU64 input.adapter.op_b_memory.prev_value ∧ Word.isU64 input.adapter.op_c_memory.prev_value
 
 /-- **Assertion half** — the literal meaning of SP1's `ShiftRightCols.asserts` *own* (inline) assertZero
 list. `E14 = is_srl + is_sra` (the 64-bit-shift indicator) and `E13 = is_srlw + is_sraw` (the
@@ -235,6 +222,14 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftRightCols (Z
   -- `is_real` boolean gate emitted **inline** (`assertZero`, not `=== 0`) so the `enabled = is_real`
   -- selector is visible to `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table.
   assertZero (input.is_real * (input.is_real - 1))
+  -- SP1 has **no** `is_real` column: `is_real` *is* the variant-flag sum (`sr/mod.rs:335`). Our encoding
+  -- carries `is_real` as an `Inputs` field, so this assert is the Lean-side glue identifying the two —
+  -- exactly `ShiftLeftChip.main`'s `is_real - (is_sll + is_sllw) === 0`. It lets the `RegisterWrite`
+  -- write push (composed at the flag sum) inherit the `is_real`-gated `CPUState` clock byte bounds, so
+  -- the memory channel's `MemoryMsg.ClkBound` guarantee is derived in-circuit rather than assumed.
+  -- Allocates no witness cell (`localLength` is unchanged at 37) and lives outside `AssertSpec`
+  -- (which mirrors only the extracted `ShiftRightCols.asserts` list over committed columns).
+  input.is_real - (is_srl + is_sra + is_srlw + is_sraw) === 0
   -- The inline shift assertZeros (`AssertSpec`), emitted in the same order as `AssertSpec`/Extracted.
   let e14 := is_srl + is_sra
   let e13 := is_srlw + is_sraw
