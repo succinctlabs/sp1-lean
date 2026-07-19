@@ -106,6 +106,155 @@ def exposedOpcode (offset : ℕ) : Expression (ZMod p) :=
   var ⟨offset + 32⟩ * 7 + var ⟨offset + 33⟩ * 8 +
     var ⟨offset + 34⟩ * 22 + var ⟨offset + 35⟩ * 23
 
+/-- The `RegisterWrite` gate committed by the witnessed variant flags (cells `offset+32..35`):
+the flag sum `is_srl + is_sra + is_srlw + is_sraw` (= SP1's `is_real` on shift rows, `sr/mod.rs:335`).
+Named so the exposed write push and its consumers share one statement-level expression instead of
+raw witness indices. -/
+def exposedWriteGate (offset : ℕ) : Expression (ZMod p) :=
+  var ⟨offset + 32⟩ + var ⟨offset + 33⟩ + var ⟨offset + 34⟩ + var ⟨offset + 35⟩
+
+/-- ShiftRight's exact Memory-channel interaction list (ALU-type: the op_c register pull/read-back
+pair is gated by **`is_real - imm_c`** — an immediate does no register read — and addressed by the
+low limb `op_c[0]`).  The five read-side entries descend from the composed `ALUTypeReader` (gate
+`is_real`); the op_a write push from the composed `RegisterWrite`, gated by the witnessed
+variant-flag sum `exposedWriteGate offset` and carrying the placed result word `a`
+(cells `offset..offset+3`) at write clock `clk + 4`.  Keeping this list beside `circuit` makes
+Clean's exposure interface the single structural source consumed by both faithfulness and semantic
+grounding. -/
+def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (memoryChannel (p := p))) :=
+  [ memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pushedIf input.is_real
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pulledIf (input.is_real - input.adapter.imm_c)
+      ⟨input.state.clk_high, input.adapter.op_c_memory.access_timestamp.prev_low,
+       input.adapter.op_c[0], 0, 0, input.adapter.op_c_memory.prev_value⟩,
+    memoryChannel.pushedIf (input.is_real - input.adapter.imm_c)
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2,
+       input.adapter.op_c[0], 0, 0, input.adapter.op_c_memory.prev_value⟩,
+    memoryChannel.pushedIf (exposedWriteGate offset)
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+       input.adapter.op_a, 0, 0, Vector.mapRange 4 fun i => var { index := offset + i }⟩ ]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-B pull occupies its declared slot in ShiftRight's exposed Memory list. -/
+theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf input.is_real
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact (`is_real - imm_c`)-gated source-C pull occupies its declared slot in ShiftRight's
+exposed Memory list. -/
+theorem opCPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf (input.is_real - input.adapter.imm_c)
+      ⟨input.state.clk_high, input.adapter.op_c_memory.access_timestamp.prev_low,
+       input.adapter.op_c[0], 0, 0, input.adapter.op_c_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+/-- ShiftRight's exposed channels: the State pair through the canonical `CPUState` child interface,
+the Memory-channel closed form above, plus the Program-bus instruction fetch (descended from the
+composed `ALUTypeReader`, gate `is_trusted = is_real`, opcode = the committed flag encoding). -/
+def stateExposure (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ExposedChannel (ZMod p)) :=
+  Readers.CPUState.exposedState
+    ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
+      8, input.is_real⟩ ++
+  expose memoryChannel (exposedMemoryInteractions input offset) ++
+  expose programChannel
+    [ programChannel.pulledIf input.is_real
+        ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], exposedOpcode offset,
+         input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
+         input.adapter.op_a_0, 0, input.adapter.imm_c⟩ ]
+
+set_option maxHeartbeats 4000000 in
+private theorem main_exposedChannelsLawful (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).ExposedChannelsLawful (stateExposure input offset) := by
+  unfold Operations.ExposedChannelsLawful
+  intro exposed exposedMem
+  simp only [stateExposure, Readers.CPUState.exposedState, expose, List.mem_append,
+    List.mem_singleton] at exposedMem
+  rcases exposedMem with (rfl | rfl) | rfl
+  · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+      witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+      HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
+    simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+      Readers.CPUState.interactionsWith_state_subcircuit,
+      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+      U16MSBOperation.circuit, U16MSBOperation.channelsWithGuarantees_eq,
+      Readers.ALUTypeReader.circuit, Readers.RegisterWrite.circuit,
+      FormalCircuitBase.channelsWithGuarantees_def,
+      Readers.ALUTypeReader.channelsWithGuarantees_eq,
+      Readers.RegisterWrite.channelsWithGuarantees_eq,
+      List.mem_cons, List.not_mem_nil, or_false,
+      Channels.stateChannel_eq_byteChannel_false, Channels.stateChannel_eq_programChannel_false,
+      Channels.stateChannel_eq_memoryChannel_false, not_false_eq_true,
+      Operations.interactionsWith_assert, Operations.interactionsWith_interact,
+      Operations.interactionsWith_nil, List.nil_append]
+    simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
+      Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
+    simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil]
+  · -- Memory branch: compositional — the ALU-type reader keeps its five Memory interactions and
+    -- `RegisterWrite` its write push via the reader-local `_subcircuit` lemmas; every other
+    -- child is nil.
+    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+      witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+      HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
+    simp only [Operations.interactionsWith_witness,
+      Soundness.aluTypeReader_memoryInteractions_subcircuit,
+      Soundness.registerWrite_memoryInteractions_subcircuit,
+      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+      U16MSBOperation.circuit, U16MSBOperation.channelsWithGuarantees_eq,
+      Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
+      Gadgets.Equality.channelsWithGuarantees_eq,
+      Gadgets.Equality.channelsWithRequirements_eq,
+      FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
+      Channels.memoryChannel_eq_byteChannel_false,
+      Channels.memoryChannel_eq_stateChannel_false, not_false_eq_true,
+      Operations.interactionsWith_assert, Operations.interactionsWith_interact,
+      Operations.interactionsWith_nil, Soundness.aluTypeMemoryInteractions,
+      Soundness.registerWriteMemoryInteractions, List.cons_append, List.nil_append]
+    simp only [circuit_norm]
+    simp only [Channels.byteChannel_eq_memoryChannel_false, if_false,
+      exposedMemoryInteractions, exposedWriteGate, List.map_cons, List.map_nil]
+    rfl
+  · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
+    -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
+    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+      witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+      HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
+    simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
+      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
+      Soundness.aluTypeReader_programInteractions_subcircuit,
+      Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
+      U16MSBOperation.circuit, U16MSBOperation.channelsWithGuarantees_eq,
+      Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
+      FormalCircuitBase.channelsWithGuarantees_def,
+      List.mem_cons, List.not_mem_nil, or_false,
+      Channels.programChannel_eq_byteChannel_false,
+      Channels.programChannel_eq_stateChannel_false,
+      Channels.programChannel_eq_memoryChannel_false,
+      not_false_eq_true, Operations.interactionsWith_assert,
+      Operations.interactionsWith_interact, Operations.interactionsWith_nil,
+      List.map_cons, List.map_nil, List.nil_append,
+      Soundness.aluTypeProgramMessage, exposedOpcode]
+    simp only [Operations.interactionsWith_subcircuit,
+      FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
+      List.filter_nil, List.nil_append]
+    simp only [Channels.byteChannel_eq_programChannel_false, if_false, List.nil_append]
+
 set_option maxHeartbeats 4000000 in
 /-- The `ShiftRight` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `srl`/`sra`/`srlw`/`sraw`
 semantic contract; output is the extracted `ShiftRightCols` column struct. Soundness is proved (assembled
@@ -178,71 +327,20 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftRightCols :=
           intro h1 h0 <;>
           simp only [circuit_norm] at h1 h0 <;>
           exact off_gate_vacuous h_bool h1 h0,
-    -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
-    -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
-    exposedChannels := fun input offset =>
-      Readers.CPUState.exposedState
-        ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
-          8, input.is_real⟩ ++
-      -- The Program-bus instruction fetch (descended from the composed `ALUTypeReader`, gate
-      -- `is_trusted = is_real`, opcode = the committed flag encoding), consumed by
-      -- `Soundness/TypedProgram.lean`.
-      expose programChannel
-        [ programChannel.pulledIf input.is_real
-            ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], exposedOpcode offset,
-             input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
-             input.adapter.op_a_0, 0, input.adapter.imm_c⟩ ],
-    exposedChannels_eq := by
-      intro input offset
-      unfold Operations.ExposedChannelsLawful
-      intro exposed exposedMem
-      simp only [Readers.CPUState.exposedState, expose, List.mem_append,
-        List.mem_singleton] at exposedMem
-      rcases exposedMem with rfl | rfl
-      · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-          HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
-        simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
-          Readers.CPUState.interactionsWith_state_subcircuit,
-          InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-          InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-          U16MSBOperation.circuit, U16MSBOperation.channelsWithGuarantees_eq,
-          Readers.ALUTypeReader.circuit, Readers.RegisterWrite.circuit,
-          FormalCircuitBase.channelsWithGuarantees_def,
-          Readers.ALUTypeReader.channelsWithGuarantees_eq,
-          Readers.RegisterWrite.channelsWithGuarantees_eq,
-          List.mem_cons, List.not_mem_nil, or_false,
-          Channels.stateChannel_eq_byteChannel_false, Channels.stateChannel_eq_programChannel_false,
-          Channels.stateChannel_eq_memoryChannel_false, not_false_eq_true,
-          Operations.interactionsWith_assert, Operations.interactionsWith_interact,
-          Operations.interactionsWith_nil, List.nil_append]
-        simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
-          Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
-        simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil]
-      · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
-        -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
-        simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-          HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
-        simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
-          InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-          InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-          Soundness.aluTypeReader_programInteractions_subcircuit,
-          Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
-          U16MSBOperation.circuit, U16MSBOperation.channelsWithGuarantees_eq,
-          Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
-          FormalCircuitBase.channelsWithGuarantees_def,
-          List.mem_cons, List.not_mem_nil, or_false,
-          Channels.programChannel_eq_byteChannel_false,
-          Channels.programChannel_eq_stateChannel_false,
-          Channels.programChannel_eq_memoryChannel_false,
-          not_false_eq_true, Operations.interactionsWith_assert,
-          Operations.interactionsWith_interact, Operations.interactionsWith_nil,
-          List.map_cons, List.map_nil, List.nil_append,
-          Soundness.aluTypeProgramMessage, exposedOpcode]
-        simp only [Operations.interactionsWith_subcircuit,
-          FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
-          List.filter_nil, List.nil_append]
-        simp only [Channels.byteChannel_eq_programChannel_false, if_false, List.nil_append] }
+    -- W11 (A2): the State pair + Memory closed form + Program fetch, via `stateExposure` above;
+    -- lawfulness is the standalone `main_exposedChannelsLawful` (also the axiom-clean seam for
+    -- `interactionsWith_memory_eq` below while the completeness seam is open).
+    exposedChannels := stateExposure,
+    exposedChannels_eq := main_exposedChannelsLawful }
+
+/-- The completed ShiftRight circuit exposes exactly the Memory interaction list above.  Stated via
+the exposure-lawfulness theorem directly (not through `circuit`) so it stays axiom-clean while the
+completeness seam is open. -/
+theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith memoryChannel.toRaw =
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
+  exact main_exposedChannelsLawful input offset
+    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [stateExposure, Readers.CPUState.exposedState, expose])
 
 end SP1Clean.ShiftRightChip

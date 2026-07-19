@@ -512,7 +512,7 @@ theorem shiftLeftChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [ShiftLeftChip.circuit, Readers.CPUState.exposedState,
+    simp [ShiftLeftChip.circuit, ShiftLeftChip.stateExposure, Readers.CPUState.exposedState,
       Readers.CPUState.stateInteractions, Readers.CPUState.currentMsg, Readers.CPUState.nextMsg,
       statePullOfView, statePushOfView, stateAccess, cpuStatePullMessage, cpuStatePushMessage,
       ShiftLeftChip.rowView, circuit_norm]
@@ -530,7 +530,7 @@ theorem shiftRightChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [ShiftRightChip.circuit, Readers.CPUState.exposedState,
+    simp [ShiftRightChip.circuit, ShiftRightChip.stateExposure, Readers.CPUState.exposedState,
       Readers.CPUState.stateInteractions, Readers.CPUState.currentMsg, Readers.CPUState.nextMsg,
       statePullOfView, statePushOfView, stateAccess, cpuStatePullMessage, cpuStatePushMessage,
       ShiftRightChip.rowView, circuit_norm]

@@ -698,7 +698,8 @@ theorem ShiftLeftChip.programEmissionShape :
         input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
         input.adapter.op_a_0, 0, input.adapter.imm_c⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp [ShiftLeftChip.circuit, Readers.CPUState.exposedState, expose]
+    simp [ShiftLeftChip.circuit, ShiftLeftChip.stateExposure, Readers.CPUState.exposedState,
+      expose]
   · -- The gate is the derived one-hot flag sum; the chip-local whole-`main` binding-constraint
     -- extraction `isReal_eq_exposedGate` identifies it with the public `is_real`.
     intro env constraints
@@ -725,7 +726,8 @@ theorem ShiftRightChip.programEmissionShape :
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
       input.adapter.op_a_0, 0, input.adapter.imm_c⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp [ShiftRightChip.circuit, Readers.CPUState.exposedState, expose]
+    simp [ShiftRightChip.circuit, ShiftRightChip.stateExposure, Readers.CPUState.exposedState,
+      expose]
   · intro env _
     simp [ShiftRightChip.circuit, ShiftRightChip.rowView, circuit_norm]
   · intro env
