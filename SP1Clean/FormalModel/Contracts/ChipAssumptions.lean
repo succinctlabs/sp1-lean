@@ -45,7 +45,15 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   Readers.RegisterAccessCols.Spec
     ⟨input.adapter.op_c_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- G1: the three pulled prior records' 24-bit access clocks (`Channels.MemoryMsg.ClkBound`, the
+  -- clock half of the memory channel's `Guarantees`). A pull's completeness must exhibit the
+  -- guarantee it consumes; in a real trace each prior access sits at a genuine `< 2^24` timestamp.
+  -- Soundness does *not* assume these — they are derived there from the pulls themselves.
+  (input.is_real = 1 →
+    input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 end SP1Clean.AddChip
 
@@ -78,7 +86,14 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   Readers.RegisterAccessCols.Spec
     ⟨input.adapter.op_b_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3⟩ ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- G1: the two pulled prior records' 24-bit access clocks (`Channels.MemoryMsg.ClkBound`, the clock
+  -- half of the memory channel's `Guarantees`). A pull's completeness must exhibit the guarantee it
+  -- consumes; in a real trace each prior access sits at a genuine `< 2^24` timestamp. Soundness does
+  -- *not* assume these — they are derived there from the pulls themselves.
+  (input.is_real = 1 →
+    input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 end SP1Clean.AddiChip
 
@@ -117,7 +132,15 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- G1: the three pulled prior records' 24-bit access clocks (`Channels.MemoryMsg.ClkBound`, the clock
+  -- half of the memory channel's `Guarantees`) — see `AddChip.ProverAssumptions`. Gated on plain
+  -- `is_real` (with `imm_c = 0` above, op_c's `is_real - imm_c` gate reduces to it). Soundness does
+  -- *not* assume these; there they are derived from the pulls themselves.
+  (input.is_real = 1 →
+    input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 end SP1Clean.AddwChip
 
@@ -150,7 +173,14 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   Readers.RegisterAccessCols.Spec
     ⟨input.adapter.op_c_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- G1: the three pulled prior records' 24-bit access clocks (`Channels.MemoryMsg.ClkBound`, the clock
+  -- half of the memory channel's `Guarantees`) — see `AddChip.ProverAssumptions`. Soundness does *not*
+  -- assume these; there they are derived from the pulls themselves.
+  (input.is_real = 1 →
+    input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 end SP1Clean.SubChip
 
@@ -183,6 +213,13 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   Readers.RegisterAccessCols.Spec
     ⟨input.adapter.op_c_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- G1: the three pulled prior records' 24-bit access clocks (`Channels.MemoryMsg.ClkBound`, the clock
+  -- half of the memory channel's `Guarantees`) — see `AddChip.ProverAssumptions`. Soundness does *not*
+  -- assume these; there they are derived from the pulls themselves.
+  (input.is_real = 1 →
+    input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 end SP1Clean.SubwChip

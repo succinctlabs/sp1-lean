@@ -73,8 +73,14 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
       = input.mem.access_timestamp.diff_low_limb + input.mem.access_timestamp.diff_high_limb * 65536 ∧
     input.mem.access_timestamp.diff_low_limb.val < 2 ^ 16 ∧
     input.mem.access_timestamp.diff_high_limb.val < 2 ^ 8 ∧
-    -- (W11 memory flip) the read prior `prev_value` is `isU64`, derived from the memory read-prior pull.
-    Word.isU64 input.mem.prev_value
+    -- (W11 memory flip) the read prior `prev_value` is `isU64`, derived from the memory read-prior pull,
+    -- and — G1 — that prior record's low access clock is 24-bit (`Channels.MemoryMsg.ClkBound`, the clock
+    -- half of the memory channel's `Guarantees`). Unlike the register readers the pulled key here is the
+    -- *previous* timestamp pair `(prev_high, prev_low)`, so the bound lands on `prev_low` directly. It is
+    -- what upgrades the field-level gap decomposition above to a genuine ℕ-level timestamp ordering
+    -- (`Soundness/TimeExtraction.lean`).
+    Word.isU64 input.mem.prev_value ∧
+    input.mem.access_timestamp.prev_low.val < 2 ^ 24
 
 /-- Impose the three `is_real`-gated timestamp asserts (`compare_low` boolean, the high-limb-equality gate,
 the diff decomposition), the two `is_real`-gated byte range checks (`diff_low < 2^16`, `diff_high < 2^8`),
@@ -156,7 +162,13 @@ new_value` conjunct (W11 memory flip): the value placed at the current timestamp
 the just-pulled `prev_value`; a write supplies its store value's range-check) — needed to prove the
 `new_value` **push**'s `MemoryMsg.isU64`. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
-  (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_real = 1 → Word.isU64 input.new_value)
+  (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_real = 1 → Word.isU64 input.new_value) ∧
+    -- G1: the **push** places `new_value` at the current timestamp `(clk_high, clk_low + 1)`, so the memory
+    -- channel's `MemoryMsg.ClkBound` requirement lands on `clk_low + 1` — the RAM `+1` effect slot, vs the
+    -- register readers' `+4/+3/+2` operand slots. `clk_low` is a raw cross-block input here, so the bound
+    -- comes from the composing chip's `CPUState` sub-`Spec` via
+    -- `Channels.MemoryMsg.clkBound_of_cpuState_bounds`.
+    (input.is_real = 1 → (input.clk_low + 1).val < 2 ^ 24)
 
 /-! ### `ProverData`-lifted forms (SC Phase 2pre)
 
@@ -178,18 +190,21 @@ def ProverAssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
-  simp only [circuit_norm, AssumptionsD, SpecD, byteChannel, memoryChannel, MemoryMsg.isU64]
-    at h_holds h_assumptions ⊢
+  simp only [circuit_norm, AssumptionsD, SpecD, byteChannel, memoryChannel, MemoryMsg.isU64,
+    MemoryMsg.ClkBound] at h_holds h_assumptions ⊢
   -- the leading `_` is the inline `is_real` boolean gate (unused in soundness — `Assumptions` already gives
   -- `is_real ∈ {0,1}`); `a1 a2 a3` the three timestamp asserts, `b4 b5` the two byte-pull guarantees, and
-  -- `h_mem` the memory read-prior pull's guarantee (`Word.isU64` of the whole `prev_value` word).
+  -- `h_mem` the memory read-prior pull's guarantee — now a PAIR: `Word.isU64` of the whole `prev_value`
+  -- word and — G1 — the pulled record's `prev_low` 24-bit clock bound.
   obtain ⟨_, a1, a2, a3, b4, b5, h_mem⟩ := h_holds
   -- The byte-pull off-gate `Requirements` + the memory pull off-gate are vacuous; the memory **push** owes
-  -- `Word.isU64` of `new_value`, exactly the `isU64 new_value` `Assumption` (real row via ¬is_real = 0).
+  -- `Word.isU64` of `new_value` and the `ClkBound` of its `clk_low + 1` push clock — exactly the two gated
+  -- `Assumptions` conjuncts (real row via ¬is_real = 0).
   refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
-    fun _ h0 => h_assumptions.2 (h_assumptions.1.resolve_left h0)⟩
+    fun _ h0 => ⟨h_assumptions.2.1 (h_assumptions.1.resolve_left h0),
+      h_assumptions.2.2 (h_assumptions.1.resolve_left h0)⟩⟩
   -- Spec consequent (real row); the `isU64 prev_value` conjunct is the memory pull `h_mem` verbatim.
   -- `hr1`/the goal carry the reassembled `{record}.field` projections (the `SpecD` wrapper); `dsimp only`
   -- iota-reduces them to the destructured atoms (`selCur`/`selPrev` stay folded) so the `rw`s below match.
@@ -198,7 +213,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   have hb4 := b4 (by rw [hr1]); rw [← c16] at hb4
   have hb5 := b5 (by rw [hr1])
   refine ⟨bool_of_mul_pred a1, ?_, ?_, (byteRowSpec_range _ h16p).mp hb4,
-    ((byteRowSpec_u8range_pair _ _).mp hb5).1, h_mem (by rw [hr1])⟩
+    ((byteRowSpec_u8range_pair _ _).mp hb5).1, (h_mem (by rw [hr1])).1, (h_mem (by rw [hr1])).2⟩
   · exact a2
   · simp only [selCur, selPrev]; linear_combination a3
 
@@ -209,8 +224,8 @@ theorem completeness :
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [ProverAssumptionsD] at h_assumptions
   obtain ⟨h_assumptions, h_spec⟩ := h_assumptions
-  simp only [circuit_norm, byteChannel, memoryChannel, MemoryMsg.isU64]
-  obtain ⟨hbin, hnew⟩ := h_assumptions
+  simp only [circuit_norm, byteChannel, memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound]
+  obtain ⟨hbin, hnew, -⟩ := h_assumptions
   -- `hbin` carries the reassembled `{record}.is_real` projection (the `ProverAssumptionsD` reassembly);
   -- `dsimp only` iota-reduces it to the destructured atom so the `simp`/`rw`-gates below match.
   dsimp only at hbin
@@ -226,11 +241,11 @@ theorem completeness :
     · intro h; have h1 := neg_inj.mp h; rw [h0] at h1; exact absurd h1 zero_ne_one
     · intro h; have h1 := neg_inj.mp h; rw [h0] at h1; exact absurd h1 zero_ne_one
   · -- real row (`is_real = 1`): the asserts come from the `Spec` facts, the byte pulls from its ranges, the
-    -- memory pull from its new `isU64 prev_value` conjunct.
-    obtain ⟨hcl, ha2, ha3, hd_low, hd_high, hisu⟩ := h_spec h1
+    -- memory pull from its `isU64 prev_value` + G1 `prev_low` clock-bound conjuncts.
+    obtain ⟨hcl, ha2, ha3, hd_low, hd_high, hisu, hclk⟩ := h_spec h1
     -- the `Spec`-derived facts carry the reassembled `{record}.field` projections; `dsimp only` reduces
     -- them to atoms (`selCur`/`selPrev` stay folded) so the `rw`/`linear_combination`s below match.
-    dsimp only at hcl ha2 ha3 hd_low hd_high hisu
+    dsimp only at hcl ha2 ha3 hd_low hd_high hisu hclk
     dsimp only at *
     simp only [selCur, selPrev] at ha3
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -240,7 +255,7 @@ theorem completeness :
     · rw [h1, one_mul]; linear_combination ha3
     · intro _; rw [← c16]; exact (byteRowSpec_range _ h16p).mpr hd_low
     · intro _; exact (byteRowSpec_u8range_pair _ _).mpr ⟨hd_high, by rw [ZMod.val_zero]; norm_num⟩
-    · intro _; exact hisu
+    · intro _; exact ⟨hisu, hclk⟩
 
 /-- The native memory-access primitive as a Clean `GeneralFormalCircuit`: timestamp monotonicity columns +
 the two Memory-bus interactions at a real 48-bit address, parameterised by the written `new_value`. -/

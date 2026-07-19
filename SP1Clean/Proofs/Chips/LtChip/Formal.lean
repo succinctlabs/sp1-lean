@@ -21,7 +21,7 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 distinct from `op_c_val = adapter.op_c` since `Lt`'s adapter is immediate-capable), `is_real` binary, the
 honest `"lt_flags"` hint (each flag binary, the sum = `is_real`, `is_slt` only on real rows), `op_a_0 = 0`,
 `imm_c = 0` (register-register rows), CPUState clock bounds, three timestamp `Spec`s
-(op_c gated by `is_real - imm_c`). -/
+(op_c gated by `is_real - imm_c`), and the three pulled prior records' 24-bit access clocks. -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
@@ -44,7 +44,16 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- G1: the three pulled prior records' 24-bit access clocks (`Channels.MemoryMsg.ClkBound`, the clock
+  -- half of the memory channel's `Guarantees`). A pull's completeness must exhibit the guarantee it
+  -- consumes; in a real trace each prior access sits at a genuine `< 2^24` timestamp. Gated on plain
+  -- `is_real` (with `imm_c = 0` above, op_c's `is_real - imm_c` gate reduces to it). Soundness does
+  -- *not* assume these — they are derived there from the pulls themselves.
+  (input.is_real = 1 →
+    input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 /-- Semantic contract, stated against the clean RV64 ISA functions (mirrors the R-type chip contract, here spelled
 inline for the **two-variant** ALU adapter): the `ALUTypeReader` sub-`Spec` on the `state`/`adapter`
@@ -150,11 +159,21 @@ set_option maxHeartbeats 800000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start [Spec]
   obtain ⟨ha, hb⟩ := h_assumptions
-  obtain ⟨_cpu, h_lt, h_adapter, _h_rw, h_gate, h_slt_bin, h_sltu_bin, h_sum⟩ := h_holds
+  obtain ⟨h_cpu, h_lt, h_adapter, _h_rw, h_gate, h_slt_bin, h_sltu_bin, h_sum⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   have h_slt_bool := bool_of_mul_pred h_slt_bin
   have h_sltu_bool := bool_of_mul_pred h_sltu_bin
-  refine ⟨⟨h_adapter ⟨h_bin, h_bin⟩, h_bin, fun hr => ⟨fun hslt => ?_, fun hsltu => ?_⟩⟩, ?_⟩
+  -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
+  -- channel's new `MemoryMsg.ClkBound` guarantee — `ALUTypeReader`'s two read-back pushes
+  -- (`clk_low + 3` / `+ 2`) and `RegisterWrite`'s op_a write push (`clk_low + 4`). The offset is left
+  -- to unification, so this line never names the destructured state columns.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
+  refine ⟨⟨h_adapter ⟨h_bin, h_bin, fun hr =>
+      ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+    h_bin, fun hr => ⟨fun hslt => ?_, fun hsltu => ?_⟩⟩, ?_⟩
   · -- `is_slt = 1` ⇒ `is_signed = 1`, so the gadget bit is the signed compare. The structural
     -- `Spec` exposes the semantic bit via `result_semantic`.
     have h_lt_spec := (LtOperationSigned.result_semantic ha hb hr (h_lt ⟨ha, hb, h_bin, h_slt_bool⟩)).1
@@ -188,18 +207,26 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- The per-emitter channel-requirement tail: the bare `CPUState` `Assumptions` (the binary gate), the
   -- composed `LtOperationSigned`/`ALUTypeReader` requirements (bare or `[] ∨ Assumptions` disjuncts).
   · and_intros <;>
-      first | exact h_bin | exact ⟨ha, hb, h_bin, h_slt_bool⟩ | exact ⟨h_bin, h_bin⟩
-            | exact Or.inl rfl | exact Or.inr ⟨h_bin, h_bin⟩
-            | exact Or.inr ⟨h_bin, fun hr => isU64_bitWord
+      first | exact h_bin | exact ⟨ha, hb, h_bin, h_slt_bool⟩
+            | exact Or.inl rfl
+            | exact Or.inr ⟨h_bin, h_bin, fun hr =>
+                ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
+            | exact Or.inr ⟨h_bin, (fun hr => isU64_bitWord
                 (bool_of_eq_ite (LtOperationSigned.result_semantic ha hb hr
-                  (h_lt ⟨ha, hb, h_bin, h_slt_bool⟩)).1)⟩
+                  (h_lt ⟨ha, hb, h_bin, h_slt_bool⟩)).1)),
+                fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩
 
 set_option maxHeartbeats 32000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨ha, hb, ha_prev, hc_prev, hbin, hf0, hf1, hsum, hslt_real, hop_a_0, himm, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ := h_assumptions
+  -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu hr).1 (h_cpu hr).2
   -- `h_env` now bundles the CPUState GFC obligation (SC Phase 2c, prepended) + the chip's flag/`lt_cols`
   -- witness-gen equations + the GFC `ALUTypeReader` subcircuit's completeness obligation — discard both ends.
   obtain ⟨-, h_env_flags, h_env_cols, -⟩ := h_env
@@ -221,11 +248,16 @@ theorem completeness :
       = input_adapter_op_c := h_input.2.2.2.2.2.2.2.1
   refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨ha, hb, hbin, hf0'⟩, ?_⟩,
-    ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
+    ⟨⟨hbin, hbin, fun hr =>
+        ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+      ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
-      hrac_a, hrac_b, hrac_c, hdec, fun hr => ⟨ha_prev hr, ha⟩, hc_prev⟩⟩,
-    ⟨⟨hbin, ?_⟩, trivial⟩,
+      hrac_a, hrac_b, hrac_c, hdec,
+      (fun hr => ⟨ha_prev hr, ha, (hprevclk hr).1, (hprevclk hr).2.1⟩),
+      -- op_c's guarantee is gated by `is_real - imm_c`; `imm_c = 0` reduces that to `is_real = 1`.
+      fun hc => ⟨hc_prev hc, (hprevclk (by rwa [himm, sub_zero] at hc)).2.2⟩⟩⟩,
+    ⟨⟨hbin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     hbool _ hf0',
     hbool _ hf1',

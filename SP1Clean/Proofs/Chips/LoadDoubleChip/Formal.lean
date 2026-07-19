@@ -31,17 +31,31 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_align, h_pv_isu64⟩ := h_assumptions
-  obtain ⟨_h_cpu, h_addr, h_mem, h_itype, _h_regwrite, h_op_a_0, h_gate⟩ := h_holds
+  obtain ⟨h_cpu, h_addr, h_mem, h_itype, _h_regwrite, h_op_a_0, h_gate⟩ := h_holds
   -- the proven `is_real`-binary gate discharges the readers'/`MemoryAccess`'s `Assumptions`; the
   -- `AddressOperation` gadget takes the operand `isU64`s + the address-fits bound.
   have h_bin := bool_of_mul_pred h_gate
+  -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
+  -- channel's new `MemoryMsg.ClkBound` guarantee. Three distinct offsets here: `MemoryAccess`'s RAM
+  -- effect slot `clk_low + 1`, `ITypeReader`'s op_b read-back `clk_low + 3`, and `RegisterWrite`'s
+  -- op_a write `clk_low + 4`. The offset is left to unification, so this line never names the
+  -- destructured state columns.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
+  -- the RAM effect slot's offset is the literal `1`, whose `val` needs `Fact (1 < p)` (kept local so the
+  -- instance does not leak into the surrounding heavy `simp` sets).
+  have hv1 : (1 : ZMod p).val = 1 := by
+    haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    exact ZMod.val_one p
   -- bridge the loaded-word `wv*` (the `ITypeReader` write value) from `eval` to value form: it is the
   -- nested `memory_access.prev_value` (which `ITypeReader.Spec`'s zeroing gates reference).
   have hmap : Vector.map (Expression.eval env) input_var_memory_access_prev_value
       = input_memory_access_prev_value := h_input.2.2.2.1
   have ev : ∀ i (hi : i < 4), Expression.eval env input_var_memory_access_prev_value[i]
       = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap]; simp only [Vector.getElem_map]
-  have h_it := h_itype ⟨h_bin, h_bin⟩
+  have h_it := h_itype ⟨h_bin, h_bin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩
   rw [ev 0 (by omega), ev 1 (by omega), ev 2 (by omega), ev 3 (by omega)] at h_it
   -- the `AddressOperation` Assumptions: operand `isU64`s + fits, the offset bits boolean (literal `0`),
   -- and the address-validity (non-reserved + 8-aligned, so the inverse gate / offset range check hold).
@@ -54,9 +68,16 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`): `MemoryAccess`'s
   -- read push + `RegisterWrite`'s op_a write push both owe `isU64 prev_value` (the loaded word = the full
   -- read value; a chip assumption).
-  exact ⟨⟨h_addr_spec, h_mem ⟨h_bin, fun _ => h_pv_isu64⟩, h_it, h_op_a_0, h_bin⟩,
-    Or.inr h_addr_as, Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩, Or.inr ⟨h_bin, h_bin⟩,
-    Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩⟩
+  -- G1: each push-owning sub-circuit's `Assumptions` gained a `MemoryMsg.ClkBound` conjunct at its own
+  -- offset — `MemoryAccess` at the RAM `+1` slot, `ITypeReader` at op_b's `+3`, `RegisterWrite` at
+  -- op_a's `+4`.
+  exact ⟨⟨h_addr_spec,
+      h_mem ⟨h_bin, fun _ => h_pv_isu64, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩,
+      h_it, h_op_a_0, h_bin⟩,
+    Or.inr h_addr_as,
+    Or.inr ⟨h_bin, fun _ => h_pv_isu64, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩,
+    Or.inr ⟨h_bin, h_bin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩,
+    Or.inr ⟨h_bin, fun _ => h_pv_isu64, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩⟩
 
 /-- Prover-side row well-formedness: operand `isU64`s + address-fits bound plus the `is_real` binary selector. -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
@@ -85,6 +106,14 @@ theorem completeness :
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_align, h_pv_isu64, hbin, h_op_a_0, h_cpu, h_mem, h_it⟩ :=
     h_assumptions
+  -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu hr).1 (h_cpu hr).2
+  have hv1 : (1 : ZMod p).val = 1 := by
+    haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    exact ZMod.val_one p
   -- eval→value bridges for the nested vector fields the reader `Spec`s reference (`pc`, the loaded word).
   have hmap_pv : Vector.map (Expression.eval env.toEnvironment) input_var_memory_access_prev_value
       = input_memory_access_prev_value := h_input.2.2.2.1
@@ -97,8 +126,11 @@ theorem completeness :
   have h_addr_as : AddressOperation.circuit.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
-  refine ⟨⟨hbin, ?_⟩, h_addr_as, ⟨⟨hbin, fun _ => h_pv_isu64⟩, h_mem⟩, ⟨⟨hbin, hbin⟩, ?_⟩,
-    ⟨⟨hbin, fun _ => h_pv_isu64⟩, trivial⟩, h_op_a_0, ?_⟩
+  refine ⟨⟨hbin, ?_⟩, h_addr_as,
+    ⟨⟨hbin, fun _ => h_pv_isu64, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩, h_mem⟩,
+    ⟨⟨hbin, hbin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩, ?_⟩,
+    ⟨⟨hbin, fun _ => h_pv_isu64, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩,
+    h_op_a_0, ?_⟩
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
   · simp only [epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega)]; exact h_it
   · rcases hbin with h | h <;> rw [h] <;> simp

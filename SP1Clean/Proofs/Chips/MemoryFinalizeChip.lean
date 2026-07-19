@@ -52,14 +52,15 @@ set_option linter.unusedSectionVars false in
 /-- The Memory-boundary finalizer: pulls the claimed final record of an address chain. `Spec := True`
 (a pull receives the `isU64` guarantee and owes nothing on the verifier side; the finalize key's
 validity is a bus-balance fact at the capstone, not a per-row constraint). `ProverAssumptions` is
-`MemoryMsg.isU64`: a pull's *completeness* must exhibit the pulled record's guarantee — in a real trace
-the finalize value is the chain's last written word, already `U64`. The off-gate obligations (a pull at
+the channel guarantee `MemoryMsg.isU64 ∧ MemoryMsg.ClkBound`: a pull's *completeness* must exhibit the
+pulled record's guarantee — in a real trace the finalize value is the chain's last written word, already
+`U64`, at that chain's last access clock, already `< 2^24`. The off-gate obligations (a pull at
 a multiplicity other than `-1`/`0` would act as a send) are vacuous under the boolean gate
 (`off_gate_vacuous`). -/
 def circuit : GeneralFormalCircuit (ZMod p) MemoryMsg unit where
   main
   Spec _ _ _ := True
-  ProverAssumptions input _ _ := MemoryMsg.isU64 input
+  ProverAssumptions input _ _ := MemoryMsg.isU64 input ∧ MemoryMsg.ClkBound input
   channelsWithRequirements := []
   soundness := by
     circuit_proof_start
@@ -68,7 +69,7 @@ def circuit : GeneralFormalCircuit (ZMod p) MemoryMsg unit where
   completeness := by
     circuit_proof_start
     refine ⟨by simp [h_env], fun _ => ?_⟩
-    simp only [memoryChannel, MemoryMsg.isU64]
+    simp only [memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound]
     exact h_assumptions
   requirementsChannelsLawful := fun input_var i₀ => by
     simp only [circuit_norm, main, memoryChannel]; grind

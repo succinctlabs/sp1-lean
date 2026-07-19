@@ -415,13 +415,16 @@ theorem memoryChannelGuarantees_of_grounded (decoded : DecodedInstructionRow p)
   apply channelGuarantees_of_consumedMessages decoded.chip.table.operations memoryChannel
     (decoded.environment data) hp
   intro message messageMem
-  change MemoryMsg.isU64 message
+  -- G1: the memory channel's `Guarantees` is the pair `isU64 ∧ ClkBound`, and both are conjuncts of
+  -- the pulled record's `LocalMemTruth` that timed grounding supplies.
+  change MemoryMsg.isU64 message ∧ MemoryMsg.ClkBound message
   have pairMem :
       (message, Semantics.StateMsg.timeNat (statePullMessage (decoded.toChipRow data))) ∈
         (decoded.ordinaryRowFacts data).memPulls := by
     rw [ordinaryRowFacts_memPulls]
     exact List.mem_map.mpr ⟨message, messageMem, rfl⟩
-  exact ((grounded.2 _ pairMem).1).1
+  have truth := (grounded.2 _ pairMem).1
+  exact ⟨truth.1, truth.2.1⟩
 
 end DecodedInstructionRow
 

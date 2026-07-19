@@ -92,6 +92,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have hbltu := bool_of_mul_pred h_bltu
   have hbgeu := bool_of_mul_pred h_bgeu
   have hisbr := bool_of_mul_pred h_isbr_bin
+  -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
+  -- channel's `MemoryMsg.ClkBound` guarantee — here only `ITypeReaderImmutable`'s two read-back pushes
+  -- (`clk_low + 4` / `+ 3`); Branch composes no `MemoryAccess`, so there is no RAM `+1` slot. The
+  -- offset is left to unification, so this line never names the destructured state columns.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpustate h_bin hr).1 (h_cpustate h_bin hr).2
   have hrs1eq : (#v[Expression.eval env input_var_adapter_op_a_memory_prev_value[0],
       Expression.eval env input_var_adapter_op_a_memory_prev_value[1],
       Expression.eval env input_var_adapter_op_a_memory_prev_value[2],
@@ -137,7 +145,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       rw [hl, hg, ZMod.val_one] at h_onehot
       omega
   refine ⟨⟨?_, h_bin, ⟨hbeq, hbne, hblt, hbge, hbltu, hbgeu, hisbr⟩, ?_, ?_, ?_, ?_⟩, ?_⟩
-  · exact h_itype ⟨h_bin, h_bin⟩
+  · exact h_itype ⟨h_bin, h_bin, fun hr =>
+      ⟨h_clk 4 4 (by simp) (by norm_num) hr, h_clk 3 3 (by simp) (by norm_num) hr⟩⟩
   · intro hr1 hbr1
     have hav := (h_add1 ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩ hbr1).2
     rw [hpceq] at hav
@@ -211,7 +220,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     simp only [byteChannel] at hguar
     rw [← c14] at hguar
     exact val_mod_four_of_mul_inv_four_lt ((byteRowSpec_range _ h14p).mp hguar)
-  · refine ⟨⟨h_bin, h_bin⟩, ?_, ?_, ?_⟩ <;>
+  · refine ⟨⟨h_bin, h_bin, fun hr =>
+      ⟨h_clk 4 4 (by simp) (by norm_num) hr, h_clk 3 3 (by simp) (by norm_num) hr⟩⟩, ?_, ?_, ?_⟩ <;>
       intro h1 h0 <;> exact off_gate_vacuous h_bin h1 h0
 
 set_option warn.sorry false in

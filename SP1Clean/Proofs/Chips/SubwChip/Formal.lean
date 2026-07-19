@@ -26,15 +26,24 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_adapter := h_holds.2.2.1
   -- `RegisterWrite` is now `h_holds.2.2.2.1`; the inline gate shifted to `.2.2.2.2`.
   have h_bin := bool_of_mul_pred h_holds.2.2.2.2
+  -- G1: the CPUState sub-`Spec`'s (`h_holds.1`) two clock byte bounds discharge the *push* side of the
+  -- memory channel's `MemoryMsg.ClkBound` guarantee — `RTypeReader`'s two read-back pushes
+  -- (`clk_low + 3` / `+ 2`) and `RegisterWrite`'s op_a write push (`clk_low + 4`). The offset is left to
+  -- unification, so this line never names the destructured state columns.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_holds.1 h_bin hr).1 (h_holds.1 h_bin hr).2
   -- **Option B cycle-break.** No operand `isU64` is assumed (chip `Assumptions = True`). Derive it from the
   -- `RTypeReader` sub-`Spec`'s memory-pull `isU64` trio (its 7th conjunct, gated on `is_real`).
-  have h_rspec := h_adapter ⟨h_bin, h_bin⟩
+  have h_rspec := h_adapter ⟨h_bin, h_bin, fun hr =>
+    ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
   have h_trio := h_rspec.2.2.2.2.2.2
   have h_as : SubwOperation.circuit.Assumptions
       { a := input_adapter_op_b_memory_prev_value, b := input_adapter_op_c_memory_prev_value,
         cols := ⟨Vector.map (Expression.eval env) (Vector.mapRange 2 fun i => var { index := i₀ + i }),
           ⟨env.get (i₀ + 2)⟩⟩, is_real := input_is_real } :=
-    ⟨fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2⟩, h_bin⟩
+    ⟨fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2.1⟩, h_bin⟩
   -- The `RegisterWrite` op_a write push owes `isU64` of the sign-extended write word `[v0, v1, msb·65535,
   -- msb·65535]` (= `SubwOperation.resultWord cols`); align its `Vector.map`/`env.get` slots.
   have h_rw_isU64 : input_is_real = 1 →
@@ -52,17 +61,22 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · and_intros <;>
       first
         | exact h_bin
-        | exact ⟨h_bin, h_bin⟩
         | exact Or.inl rfl
-        | exact Or.inr ⟨h_bin, h_bin⟩
-        | exact ⟨fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2⟩, h_bin⟩
-        | exact Or.inr ⟨h_bin, h_rw_isU64⟩
+        | exact Or.inr ⟨h_bin, h_bin, fun hr =>
+            ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
+        | exact ⟨fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2.1⟩, h_bin⟩
+        | exact Or.inr ⟨h_bin, h_rw_isU64, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec⟩ :=
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ :=
     h_assumptions
+  -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu hr).1 (h_cpu hr).2
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   -- `h_env` now bundles the `value`/`msb` witness-gen equations with the GFC `RTypeReader` subcircuit's
   -- completeness obligation (its third component); the witness equations are the first two.
@@ -96,9 +110,11 @@ theorem completeness :
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     rw [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
-    ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
-      fun hr => ⟨ha_prev hr, ha, hb⟩⟩⟩,
-    ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
+    ⟨⟨hbin, hbin, fun hr =>
+        ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+      ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
+        fun hr => ⟨ha_prev hr, ha, hb, (hprevclk hr).1, (hprevclk hr).2.1, (hprevclk hr).2.2⟩⟩⟩,
+    ⟨⟨hbin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩, ?_⟩
   · rw [hval, hmsbeq]; exact SubwOperation.spec_populate ha hb input_is_real
   · -- RegisterWrite's `isU64 value` (op_a write push): the witnessed op_a write word is the sign-extended
     -- `resultWord (populate op_b op_c)`, whose `isU64` is `spec_populate.2 _ |>.1`. The write value appears

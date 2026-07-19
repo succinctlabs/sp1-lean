@@ -121,8 +121,19 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     h_o12_2 h_o13_2 h_o14_2 h_o15_2 h_w0_2 h_w1_2 h_w2_2 h_w3_2 h_w4_2 h_w5_2 h_byte1 h_byte2_2
     h_byte3 h_byte4_2 h_byte5 h_byte6_2 h_byte7 h_byte8_2
   -- post-#398 the nine byte receives owe no padding requirement.
+  -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
+  -- channel's `MemoryMsg.ClkBound` guarantee for `ALUTypeReader`'s two read-back pushes
+  -- (`clk_low + 3` / `+ 2`), which `main` composes at the chip's own `is_real` selector. The offset is
+  -- left to unification, so this line never names the destructured state columns. `RegisterWrite`'s
+  -- op_a write push is composed at the *committed flag sum* instead, which `main` never binds to
+  -- `is_real`, so its bound comes from the chip `Assumptions` (see `Defs.Assumptions`) rather than
+  -- from here.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu (bool_of_mul_pred h_realgate) hr).1 (h_cpu (bool_of_mul_pred h_realgate) hr).2
   refine ⟨?spec, ?aluA,
-    Or.inr ⟨bool_of_mul_pred h_sum_b, hregW⟩,
+    Or.inr ⟨bool_of_mul_pred h_sum_b, hregW, fun _ => h_assumptions.2.2⟩,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0,
@@ -147,7 +158,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         apply Vector.ext; intro i hi
         simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
         interval_cases i <;> rfl
-      obtain ⟨h_rs1U, h_rs2U⟩ := h_assumptions
+      obtain ⟨h_rs1U, h_rs2U, -⟩ := h_assumptions
       set cb0 := env.get (i₀ + 4 + 1 + 1) with hcb0_def
       set cb1 := env.get (i₀ + 4 + 1 + 1 + 1) with hcb1_def
       set cb2 := env.get (i₀ + 4 + 1 + 1 + 2) with hcb2_def
@@ -507,7 +518,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
             exact ShiftRightMath.srlw_dispatch_1 b_cb0 b_cb1 b_cb2 b_cb3 hcb4 eq_v01 eq_v012 eq_v0123
               lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
   -- CPUState has no required channel; ALUTypeReader assumes `is_real` binary from the in-circuit gate.
-  case aluA => exact Or.inr ⟨bool_of_mul_pred h_realgate, bool_of_mul_pred h_realgate⟩
+  case aluA => exact Or.inr ⟨bool_of_mul_pred h_realgate, bool_of_mul_pred h_realgate,
+    fun hr => ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
   -- The MSB gadgets expose empty requirement lists canonically; their local semantic
   -- assumptions no longer leak into the parent chip's channel-requirement tail.
 end SP1Clean.ShiftRightChip.SoundSraw

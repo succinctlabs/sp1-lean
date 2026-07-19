@@ -41,9 +41,22 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 /-- The register-read operands the chip decomposes are 64-bit values (received facts from the offline
 memory: the writer range-checked them). These are the `rs1`/`rs2` the `Spec` shifts. Lives here (not in
-`Formal`) so the per-op `Soundness/<Op>.lean` split files can import it without a cycle through `Formal`. -/
+`Formal`) so the per-op `Soundness/<Op>.lean` split files can import it without a cycle through `Formal`.
+
+The third conjunct is the op_a write push's 24-bit access clock (`Channels.MemoryMsg.ClkBound`, the
+clock half of the memory channel's `Guarantees`). Every other ALU chip derives it in-circuit from the
+`is_real`-gated `CPUState` sub-`Spec`, but ShiftRight cannot: SP1's `is_real` *is* the committed
+variant-flag sum (`sr/mod.rs:335`), and while `main` composes `RegisterWrite` at that sum, it composes
+`CPUState` at the chip's own `Inputs.is_real` selector and carries **no** assert binding the two
+(contrast `ShiftLeftChip.main`'s `is_real - (is_sll + is_sllw) === 0`, the Lean-side glue that lets
+`ShiftLeft` reach its write gate). Until that bind is added to `main` — a faithfulness-surface change,
+out of scope here — the bound is disclosed as a row assumption. It is stated ungated on the
+*recombined* write clock rather than on the raw clock limbs precisely so it also holds on all-zero
+padding rows, where it reads `(4 : ZMod p).val < 2 ^ 24`; on real rows it is exactly what
+`Channels.MemoryMsg.clkBound_of_cpuState_bounds` produces from the CPUState clock byte bounds. -/
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  Word.isU64 input.adapter.op_b_memory.prev_value ∧ Word.isU64 input.adapter.op_c_memory.prev_value
+  Word.isU64 input.adapter.op_b_memory.prev_value ∧ Word.isU64 input.adapter.op_c_memory.prev_value ∧
+  (input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4).val < 2 ^ 24
 
 /-- **Assertion half** — the literal meaning of SP1's `ShiftRightCols.asserts` *own* (inline) assertZero
 list. `E14 = is_srl + is_sra` (the 64-bit-shift indicator) and `E13 = is_srlw + is_sraw` (the

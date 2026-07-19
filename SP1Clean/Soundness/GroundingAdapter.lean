@@ -126,6 +126,13 @@ structure RowWiring (view : Trace.RowView (ZMod p)) (rf : Semantics.RowFacts p) 
       ∃ mp ∈ rf.memPulls, (∃ index : BitVec 5, MemoryMsg.locOf m = MemLoc.reg index) ∧
         MemoryMsg.locOf m = MemoryMsg.locOf mp.1 ∧ m.value = mp.1.value ∧
         MemoryMsg.timeNat m = StateMsg.timeNat rf.statePull + 4)
+  /-- Every push carries a well-formed 24-bit access timestamp — the `MemoryMsg.ClkBound` half of
+  the memory channel's `Guarantees`, and the timestamp conjunct of the pushed record's
+  `LocalMemTruth`.  Its producer reads it off the row's own `CPUState` clock byte bounds: every push
+  sits at `clk_low + δ` with `δ ≤ 4`, so `Channels.MemoryMsg.clkBound_of_cpuState_bounds` applies.
+  It is *not* derivable from `push_classified`: that arm only relates a push's decoded ℕ time to the
+  window start, which says nothing about the raw field limb the channel constrains. -/
+  push_clkBound : ∀ m ∈ rf.memPushes, Channels.MemoryMsg.ClkBound m
   /-- The row commits no RAM write (register-axis chips; stores are a later batch). -/
   no_ram_write : view.commit.memWrite = none
 
@@ -220,7 +227,7 @@ theorem stepFact_of_advance {kind : ChipKind p}
         show Word.isU64 m.value
         rw [hval]
         exact (hcurr mp hmp).1
-      refine ⟨hu, ?_⟩
+      refine ⟨hu, wiring.push_clkBound m hm, ?_⟩
       rw [hloc, hval]
       cases hlocmp : MemoryMsg.locOf mp.1 with
       | reg i =>
@@ -240,7 +247,7 @@ theorem stepFact_of_advance {kind : ChipKind p}
           rw [locContent_ram_congr (heff.mem.1 wiring.no_ram_write) a]
           exact hc
     · -- the op_a write: the new register value at the `+ 4` effect slot
-      refine ⟨hu64, ?_⟩
+      refine ⟨hu64, wiring.push_clkBound m hm, ?_⟩
       rw [hlocw, hvalw, htw, htime]
       unfold LocalValueAt
       rw [microValue_reg, regEpoch_eq_succ_of (n := n) (by omega) (by omega), hcs']
@@ -257,7 +264,7 @@ theorem stepFact_of_advance {kind : ChipKind p}
         show Word.isU64 m.value
         rw [hval]
         exact (hcurr mp hmp).1
-      refine ⟨hu, ?_⟩
+      refine ⟨hu, wiring.push_clkBound m hm, ?_⟩
       rw [hlocr, hval, htr, htime]
       unfold LocalValueAt
       rw [microValue_reg, regEpoch_eq_succ_of (n := n) (by omega) (by omega), hcs']
@@ -595,6 +602,18 @@ theorem rowWiring_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFacts
       · exact ⟨BitVec.ofNat 5 view.adapter.op_a.val,
           MemoryMsg.locOf_register _ _ hidx rfl rfl, hidx⟩
       · rw [timeNat_rtypeWriteMessage bounds, ← statePull_eq]
+  push_clkBound := by
+    intro m hm
+    rw [pushes_eq] at hm
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hm
+    -- each push sits at `clk_0_16 + clk_16_24 * 65536 + δ` with `δ ∈ {3, 2, 4}`
+    rcases hm with rfl | rfl | rfl
+    · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 3 val_3_zmod_p (by omega)
+        bounds.clk0 bounds.clk1
+    · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 2 val_2_zmod_p (by omega)
+        bounds.clk0 bounds.clk1
+    · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 4 val_4_zmod_p (by omega)
+        bounds.clk0 bounds.clk1
   no_ram_write := by
     rw [commit_eq]
     rfl
@@ -885,7 +904,8 @@ theorem producedMemoryMessages_isU64_of_fullRequirements (decoded : DecodedInstr
     obtain ⟨⟨abstract, amem⟩, -, rfl⟩ := List.mem_map.mp hmem
     exact requirements abstract (List.mem_of_mem_filter amem)
   have hp : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact interaction.guarantee_of_requirements (decoded.environment data).data hp rawReq hpos
+  -- G1: the guarantee is now the pair `isU64 ∧ ClkBound`; the wiring wants only the value half.
+  exact (interaction.guarantee_of_requirements (decoded.environment data).data hp rawReq hpos).1
 
 /-! ### The wiring corollary and the end-to-end demo -/
 

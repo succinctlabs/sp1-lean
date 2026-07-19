@@ -31,11 +31,25 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_pv_isu64⟩ := h_assumptions
-  obtain ⟨_h_cpu, h_addr, h_mem, hu8, hmsb_rcv, h_itype, _h_regwrite, hsel0, hsel1, hsel2, hsel3, hmux,
+  obtain ⟨h_cpu, h_addr, h_mem, hu8, hmsb_rcv, h_itype, _h_regwrite, hsel0, hsel1, hsel2, hsel3, hmux,
     h_op_a_0, h_msbgate, h_lb_gate, h_lbu_gate, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   have h_lb_bin := bool_of_mul_pred h_lb_gate
   have h_lbu_bin := bool_of_mul_pred h_lbu_gate
+  -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
+  -- channel's new `MemoryMsg.ClkBound` guarantee. Three distinct offsets: `MemoryAccess`'s RAM effect
+  -- slot `clk_low + 1`, `ITypeReader`'s op_b read-back `clk_low + 3`, and `RegisterWrite`'s op_a write
+  -- `clk_low + 4`. The offset is left to unification, so this never names the destructured state columns.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 →
+      input_is_lb + input_is_lbu = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
+  -- the RAM effect slot's offset is the literal `1`, whose `val` needs `Fact (1 < p)` (kept local so the
+  -- instance does not leak into the surrounding heavy `simp` sets).
+  have hv1 : (1 : ZMod p).val = 1 := by
+    haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    exact ZMod.val_one p
   simp only [circuit_norm, byteChannel] at hu8 hmsb_rcv
   -- eval→value bridges (extracted directly from `h_input`; `tauto` over this context is too slow).
   obtain ⟨_, _, _, _, ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _⟩ := h_input
@@ -96,7 +110,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   simp only [AddressOperation.circuit] at h_addr
   have h_addr_spec := h_addr h_addr_as
   simp only [circuit_norm, eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
-  have h_it := h_itype ⟨h_bin, h_bin⟩
+  have h_it := h_itype ⟨h_bin, h_bin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩
   -- `msb` is binary on any real row: LB rows get it from the inline MSB byte-pull; LBU rows have `msb = 0`
   -- (the `is_lbu·msb = 0` gate with `is_lbu = 1`).
   have h_msb_bin_real : input_is_lb + input_is_lbu = 1 → (input_msb = 0 ∨ input_msb = 1) := by
@@ -131,13 +145,19 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       (#v[input_selected_byte + 65280 * input_msb, 65535 * input_msb, 65535 * input_msb,
           65535 * input_msb] : Word (ZMod p)) :=
     fun h1 => Word.isU64_of_cases (h_limb0_lt h1) (h_msb_val h1) (h_msb_val h1) (h_msb_val h1)
-  refine ⟨⟨h_addr_spec, h_mem ⟨h_bin, fun _ => h_pv_isu64⟩, h_it,
+  -- G1: each push-owning sub-circuit's `Assumptions` gained a `MemoryMsg.ClkBound` conjunct at its own
+  -- offset — `MemoryAccess` at the RAM `+1` slot, `ITypeReader` at op_b's `+3`, `RegisterWrite` at
+  -- op_a's `+4`.
+  refine ⟨⟨h_addr_spec,
+      h_mem ⟨h_bin, fun _ => h_pv_isu64, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩, h_it,
       fun h1 => ⟨(h_u8 h1).1, (h_u8 h1).2, h_byte_lt h1⟩, h_msb_fact,
       ⟨hsel0, hsel1, hsel2, hsel3⟩, hmux_eq, h_op_a_0, h_msbgate, h_lb_bin, h_lbu_bin, h_bin⟩,
-    Or.inr h_addr_as, Or.inr ⟨h_bin, fun _ => h_pv_isu64⟩,
+    Or.inr h_addr_as,
+    Or.inr ⟨h_bin, fun _ => h_pv_isu64, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0,
     fun h1 h0 => off_gate_vacuous h_lb_bin h1 h0,
-    Or.inr ⟨h_bin, h_bin⟩, Or.inr ⟨h_bin, h_load_isu64⟩⟩
+    Or.inr ⟨h_bin, h_bin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩,
+    Or.inr ⟨h_bin, h_load_isu64, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩⟩
 
 /-- Prover-side row well-formedness: the address facts + selector binaries + `op_a_0 = 0` + the byte
 value bounds + the sign-bit fact + the limb-selection / byte-mux equations + the reader `Spec`s. -/
@@ -190,6 +210,13 @@ theorem completeness :
   obtain ⟨_, _, ⟨_, _, _, hmap_pc⟩, _, ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _⟩ := h_input
   simp only [isReal] at hbin
   haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 →
+      input_is_lb + input_is_lbu = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu hr).1 (h_cpu hr).2
+  have hv1 : (1 : ZMod p).val = 1 := ZMod.val_one p
   have h_msb_lt : input_msb.val < 256 := by
     rcases h_msb_bin with h | h <;> rw [h] <;> simp [ZMod.val_one]
   have epc : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_state_pc[i]
@@ -239,7 +266,7 @@ theorem completeness :
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
   · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
-  · exact ⟨hbin, fun _ => h_pv_isu64⟩
+  · exact ⟨hbin, fun _ => h_pv_isu64, fun hr => h_clk 1 1 hv1 (by norm_num) hr⟩
   · exact h_mem
   · -- U8Range-pair receive obligation (real row); value is raw (`toRaw` (gated post-#398)).
     intro _
@@ -249,9 +276,9 @@ theorem completeness :
     intro _
     simp only [byteChannel]
     exact (byteRowSpec_msb _ _).mpr ⟨⟨h_msb_lt, hbyte_pa⟩, h_msb_bin, h_msb_iff⟩
-  · exact ⟨hbin, hbin⟩
+  · exact ⟨hbin, hbin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩
   · exact h_it
-  · exact ⟨hbin, fun _ => h_load_isu64⟩
+  · exact ⟨hbin, fun _ => h_load_isu64, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩
   · trivial
   · simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega)]; exact hsel0
   · simp only [eob 1 (by omega), eob 2 (by omega), epv 1 (by omega)]; exact hsel1

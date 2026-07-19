@@ -67,6 +67,67 @@ and the chips' operand facts are the *same* proposition — no per-limb bridging
 def MemoryMsg.isU64 (msg : MemoryMsg (ZMod p)) : Prop :=
   Word.isU64 msg.value
 
+/-- **The Memory message's access-clock bound** — the low clock limb is a genuine 24-bit timestamp.
+This is the second half of the memory channel's `Guarantees` (beside `MemoryMsg.isU64`), and it is
+stated on the raw limb rather than on `MicroTime`'s `clkNat`/`timeNat` so this module stays below the
+semantic-execution layer (row-local hygiene, exactly like `isU64`).
+
+It is **not** derivable from a row's own constraints: `Readers.RegisterAccessTimestamp.Spec` bounds
+only the *difference* `clk_target - prev_low - 1`, so as field elements the prior clock could be the
+huge representative `p + clk_target - 1 - diff` and the ℕ-level comparison would fail. SP1 relies on
+exactly the same missing piece — `crates/core/machine/src/air/memory.rs`'s
+`eval_memory_access_timestamp` comments that the underflow argument is valid "as long as both
+`current_comp_val, prev_comp_value` are range-checked to be `< 2^24` and as long as we're working in a
+field larger than `2 * 2^24`" — and neither range check is local to the accessing row. Carrying the
+bound on the bus is what makes it a genuine received fact: a chip that **pulls** a prior record gets
+it for free, which is what discharges `Soundness/TouchChains.lean`'s `TouchOK.pull_lt_push`. -/
+def MemoryMsg.ClkBound (msg : MemoryMsg (ZMod p)) : Prop :=
+  msg.clk_low.val < 2 ^ 24
+
+section ClkBound
+
+local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+
+/-- **The pusher's side of `MemoryMsg.ClkBound`**: the two `Readers.CPUState.Spec` clock byte bounds
+bound the row's recombined low clock plus any intra-row effect offset (`+1`/`+2`/`+3`/`+4`) by `2^24`.
+`clk_0_16` decodes as `8 s + 1` with `s < 2^13` (so `≤ 2^16 - 7`) and `clk_16_24 < 2^8`, giving
+`clk_low ≤ 2^24 - 7` and hence `clk_low + δ ≤ 2^24 - 3` for `δ ≤ 4`.
+
+The `p ≤ 2^24` branch is genuine, not a dodge: there every `ZMod p` value is `< 2^24` outright, which
+is what keeps this lemma — and therefore every chip's Memory-push obligation — inside the
+project-standard `Fact (2 ^ 17 < p)` instead of forcing a repo-wide bump to `Fact (2 ^ 25 < p)`. The
+consumer that actually *uses* the bound (`Soundness/TimeExtraction.lean`) supplies the stronger
+field assumption itself. -/
+theorem MemoryMsg.clkBound_of_cpuState_bounds (clk0 clk1 delta : ZMod p) (k : ℕ)
+    (hdelta : delta.val = k) (hk : k ≤ 4)
+    (clk0Bound : ((clk0 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13)
+    (clk1Bound : clk1.val < 2 ^ 8) :
+    (clk0 + clk1 * 65536 + delta).val < 2 ^ 24 := by
+  by_cases hp : p ≤ 2 ^ 24
+  · exact lt_of_lt_of_le (ZMod.val_lt _) hp
+  have hp : 2 ^ 24 < p := by omega
+  have h17 := Fact.out (p := 2 ^ 17 < p)
+  set scaled := (clk0 - 1) * (8 : ZMod p)⁻¹ with scaledDef
+  have reconstruct : scaled * 8 + 1 = clk0 := by
+    rw [scaledDef, mul_assoc, inv_mul_cancel₀ val_8_ne_zero, mul_one]
+    ring_nf
+  have scaledMulVal : (scaled * 8).val = scaled.val * 8 := by
+    rw [ZMod.val_mul_of_lt (by rw [val_8_zmod_p]; omega), val_8_zmod_p]
+  have clk0Val : clk0.val = scaled.val * 8 + 1 := by
+    calc
+      clk0.val = (scaled * 8 + 1).val := congrArg ZMod.val reconstruct.symm
+      _ = (scaled * 8).val + (1 : ZMod p).val :=
+          ZMod.val_add_of_lt (by rw [scaledMulVal, ZMod.val_one]; omega)
+      _ = scaled.val * 8 + 1 := by rw [scaledMulVal, ZMod.val_one]
+  have highLimbVal : (clk1 * 65536).val = clk1.val * 65536 := by
+    rw [ZMod.val_mul_of_lt (by rw [val_65536_zmod_p]; omega), val_65536_zmod_p]
+  have lowVal : (clk0 + clk1 * 65536).val = clk0.val + clk1.val * 65536 := by
+    rw [ZMod.val_add_of_lt (by rw [highLimbVal]; omega), highLimbVal]
+  rw [ZMod.val_add_of_lt (by rw [lowVal, hdelta]; omega), lowVal, hdelta]
+  omega
+
+end ClkBound
+
 /-- The Program-bus message — the arity-16 instruction-fetch tuple `(pc0, pc1, pc2, opcode, op_a,
 op_b0..3, op_c0..3, op_a_0, imm_b, imm_c)`, matching SP1's `AirInteraction.program`
 (`crates/hypercube/src/lookup/interaction.rs`, `InteractionKind::Program => 16`) and the `.send

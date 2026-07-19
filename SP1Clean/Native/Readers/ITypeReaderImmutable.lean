@@ -107,7 +107,13 @@ set_option linter.unusedSectionVars false in
 the two composed `RegisterAccessCols`) + the program-pull `is_trusted` gate. Discharged by the chip's
 binary gates. The decode bounds are NOT assumed — they are **derived** into the `Spec` (W11 flip). -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
-  (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_trusted = 0 ∨ input.is_trusted = 1)
+  (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_trusted = 0 ∨ input.is_trusted = 1) ∧
+    -- G1: the two read-back **push** access clocks (op_a at `clk_low + 4`, op_b at `clk_low + 3`) are
+    -- 24-bit — the memory channel's `MemoryMsg.ClkBound` requirement. Not provable here: `clk_low` is a
+    -- raw cross-block input, and the bound lives in the composing chip's `CPUState` block. The chip
+    -- discharges both with `Channels.MemoryMsg.clkBound_of_cpuState_bounds` from its `CPUState` sub-`Spec`.
+    (input.is_real = 1 →
+      (input.clk_low + 4).val < 2 ^ 24 ∧ (input.clk_low + 3).val < 2 ^ 24)
 
 /-! ### `ProverData`-lifted forms
 
@@ -129,9 +135,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   circuit_proof_start
   -- `h_holds`: the 2 `RegisterAccessCols` subs, the `op_a_0` gate `hbin`, the inline `is_trusted` gate
   -- `h_trust`, the **program pull's guarantee** `h_prog`, the read-zeroing gates, then the two **memory pull
-  -- guarantees** `h_mem_a`/`h_mem_b` (`MemoryMsg.isU64` of op_a/op_b's `prev_value`).
-  simp only [circuit_norm, AssumptionsD, SpecD, memoryChannel, MemoryMsg.isU64, programChannel]
-    at h_holds h_assumptions ⊢
+  -- guarantees** `h_mem_a`/`h_mem_b` — now PAIRS: `MemoryMsg.isU64` of op_a/op_b's `prev_value` and — G1 —
+  -- `MemoryMsg.ClkBound` of each prior record's `prev_low` access clock.
+  simp only [circuit_norm, AssumptionsD, SpecD, memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound,
+    programChannel] at h_holds h_assumptions ⊢
   obtain ⟨h_rac_a, h_rac_b, hbin, h_trust, h_prog, z0, z1, z2, z3, h_mem_a, h_mem_b⟩ := h_holds
   have htbin := bool_of_mul_pred h_trust
   have e : ∀ i (hi : i < 3), Expression.eval env input_var_pc[i] = input_pc[i] := by
@@ -149,8 +156,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   -- operand a pull off-gate (vacuous) + a push (op_a/op_b both reads → read-back = pull).
   refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin,
       h_rac_a h_assumptions.1, h_rac_b h_assumptions.1, fun ht => ?_,
-      fun ht2 => ⟨h_mem_a (by rw [show input_is_real = 1 from ht2]),
-        h_mem_b (by rw [show input_is_real = 1 from ht2])⟩⟩,
+      fun ht2 => ⟨(h_mem_a (by rw [show input_is_real = 1 from ht2])).1,
+        (h_mem_b (by rw [show input_is_real = 1 from ht2])).1,
+        (h_mem_a (by rw [show input_is_real = 1 from ht2])).2,
+        (h_mem_b (by rw [show input_is_real = 1 from ht2])).2⟩⟩,
     Or.inr h_assumptions.1, Or.inr h_assumptions.1,
     fun h1 h0 => off_gate_vacuous htbin h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
@@ -161,14 +170,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [show input_is_trusted = 1 from ht])
     rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
     exact ⟨ha, hp0, hp1, hp2⟩
-  · -- push_a: read-back value = op_a prev, from the paired pull
+  · -- push_a: read-back value = op_a prev, from the paired pull; its push clock `clk_low + 4`'s
+    -- `ClkBound` is the chip-supplied assumption.
     have ht : input_is_real = 1 := by
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
-    exact h_mem_a (by rw [ht])
-  · -- push_b: read-back value = op_b prev, from the paired pull
+    exact ⟨(h_mem_a (by rw [ht])).1, (h_assumptions.2.2 ht).1⟩
+  · -- push_b: read-back value = op_b prev, from the paired pull; push clock `clk_low + 3`.
     have ht : input_is_real = 1 := by
       rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
-    exact h_mem_b (by rw [ht])
+    exact ⟨(h_mem_b (by rw [ht])).1, (h_assumptions.2.2 ht).2⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD
@@ -176,7 +186,7 @@ theorem completeness :
   circuit_proof_start
   simp only [ProverAssumptionsD] at h_assumptions
   obtain ⟨h_assumptions, h_spec⟩ := h_assumptions
-  obtain ⟨hreal, htrust⟩ := h_assumptions
+  obtain ⟨hreal, htrust, -⟩ := h_assumptions
   -- `h_spec` supplies the read-zeroing gates `z*`, the `op_a_0` binary `hbin`, the two `RegisterAccessCols`
   -- sub-`Spec`s, the gated decode bounds `hdec`, and (W11 memory) the op_a/op_b `isU64` `hisu` — discharging
   -- the program **pull** and the two memory **pulls** (the pushes do NOT appear in completeness goals).
@@ -201,12 +211,13 @@ theorem completeness :
     rw [e 0 (by norm_num), e 1 (by norm_num), e 2 (by norm_num)]
     obtain ⟨ha, hp0, hp1, hp2⟩ := hdec (neg_inj.mp ht)
     exact ⟨ha, hp0, hp1, hp2, hbin⟩
-  · -- mem pull a: the whole-`Word` guarantee is the Spec's op_a `isU64` verbatim
-    simp only [memoryChannel, MemoryMsg.isU64]
-    exact fun hneg => (hisu (neg_inj.mp hneg)).1
+  · -- mem pull a: the guarantee pair (whole-`Word` `isU64` + the message `clk_low`, which *is* the block's
+    -- `prev_low`) is read straight off the `Spec`'s gated four-fact tuple.
+    simp only [memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound]
+    exact fun hneg => ⟨(hisu (neg_inj.mp hneg)).1, (hisu (neg_inj.mp hneg)).2.2.1⟩
   · -- mem pull b
-    simp only [memoryChannel, MemoryMsg.isU64]
-    exact fun hneg => (hisu (neg_inj.mp hneg)).2
+    simp only [memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound]
+    exact fun hneg => ⟨(hisu (neg_inj.mp hneg)).2.1, (hisu (neg_inj.mp hneg)).2.2.2⟩
 
 /-- The native immutable I-type reader as a Clean `GeneralFormalCircuit`: composes a `RegisterAccessCols` per
 operand (both reads), imposes the `op_a_0` binary + read-zeroing gates, and emits the Program/Memory buses. -/

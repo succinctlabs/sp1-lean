@@ -48,7 +48,14 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   (input.is_real = 1 →
     (((jumpTargetWord input)[0] - lsbBit input) * (4 : ZMod p)⁻¹).val < 2 ^ 14) ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
-    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- G1: the two pulled prior records' 24-bit access clocks (`Channels.MemoryMsg.ClkBound`, the clock
+  -- half of the memory channel's `Guarantees`). A pull's completeness must exhibit the guarantee it
+  -- consumes; in a real trace each prior access sits at a genuine `< 2^24` timestamp. Soundness does
+  -- *not* assume these — they are derived there from the pulls themselves.
+  (input.is_real = 1 →
+    input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 set_option maxHeartbeats 8000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
@@ -57,7 +64,16 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   obtain ⟨h_lsbgate, h_cpu, h_add1, h_av3, h_add2, h_oav3, h_it0, _h_regwrite, h_align, h_gate⟩ := h_holds
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_gate
   have h_lsb := bool_of_mul_pred h_lsbgate
-  have h_it : Readers.ITypeReader.Spec _ := h_it0 ⟨h_bin, h_bin⟩
+  -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
+  -- channel's new `MemoryMsg.ClkBound` guarantee — `ITypeReader`'s op_b read-back push (`clk_low + 3`)
+  -- and `RegisterWrite`'s op_a write push (`clk_low + 4`). The offset is left to unification, so this
+  -- line never names the destructured state columns.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
+  have h_it : Readers.ITypeReader.Spec _ :=
+    h_it0 ⟨h_bin, h_bin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩
   have h_op_a_0 : input_adapter_op_a_0 = 0 ∨ input_adapter_op_a_0 = 1 := h_it.2.1
   -- `h_input` flattened: `op_a/op_b_memory` are 3-leaf sub-groups `prev_value ∧ ts_prev_low ∧ ts_diff`.
   obtain ⟨_h_ir, ⟨_h_clkh, _h_clk1, _h_clk0, hpc⟩, _h_a, ⟨_h_amem_pv, _h_amem_pl, _h_amem_dl⟩,
@@ -106,7 +122,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
   refine ⟨⟨h_it, h_bin, h_lsb, ?_, ?_, ?_, ?_⟩,
-    Or.inr ⟨h_bin, h_bin⟩, Or.inr ⟨h_bin, ?_⟩,
+    Or.inr ⟨h_bin, h_bin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩,
+    Or.inr ⟨h_bin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
   · intro hr1
     have := (h_add1 ⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩ hr1).2
@@ -185,7 +202,12 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨h_imm, h_rs1U, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac_a, h_rac_b, h_jt3, h_lt3,
-    h_align_pa, hdec⟩ := h_assumptions
+    h_align_pa, hdec, hprevclk⟩ := h_assumptions
+  -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu hr).1 (h_cpu hr).2
   -- op_b (rs1) read-prior `isU64` in the reader's **raw** `prev_value` form (from the reconstructed
   -- `h_rs1U`), for the pure-read `ITypeReader.Spec`'s memory-pull `isU64` pair.
   have hpb_raw : Word.isU64 input_adapter_op_b_memory_prev_value := by
@@ -292,9 +314,10 @@ theorem completeness :
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
   refine ⟨?_, ⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨hpceq ▸ h_pcU, h4U⟩, h_gate2⟩, ?_⟩,
-    ?_, ⟨⟨h_bin, h_bin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac_a, h_rac_b, hdec,
-      fun hr => ⟨h_oap hr, hpb_raw⟩⟩⟩,
-    ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_⟩
+    ?_, ⟨⟨h_bin, h_bin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩,
+      ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac_a, h_rac_b, hdec,
+        fun hr => ⟨h_oap hr, hpb_raw, (hprevclk hr).1, (hprevclk hr).2⟩⟩⟩,
+    ⟨⟨h_bin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩, ?_, ?_⟩
   · rcases hlsb_bin with h | h <;> rw [h] <;> simp
   · rw [hval1]; exact AddOperation.spec_populate hrs1U h_imm input_is_real
   · rw [hav3]; exact h_jt3

@@ -46,12 +46,19 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   -- (W11 flip) the decode bounds the `RTypeReader` program **pull** now *derives* into its `Spec`
   -- (destination index `< 32`, pc limbs `< 2^16`, on real rows) — completeness must provide them.
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- G1: the three pulled prior records' 24-bit access clocks (`Channels.MemoryMsg.ClkBound`, the clock
+  -- half of the memory channel's `Guarantees`) — see `AddChip.ProverAssumptions`. Soundness does *not*
+  -- assume these; there they are derived from the pulls themselves.
+  (input.is_real = 1 →
+    input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 set_option maxHeartbeats 4000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨_hcpu, h_mulop, ha0, ha1, ha2, ha3, gb_mul, gb_mulh, gb_mulhu, gb_mulhsu, gb_mulw,
+  obtain ⟨h_cpu, h_mulop, ha0, ha1, ha2, ha3, gb_mul, gb_mulh, gb_mulhu, gb_mulhsu, gb_mulw,
     gb_sum, hopa0, hadapter, h_eq_rs, _h_regwrite, h_gate⟩ := h_holds
   have bmul := bool_of_mul_pred gb_mul
   have bmulh := bool_of_mul_pred gb_mulh
@@ -60,17 +67,27 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have bmulw := bool_of_mul_pred gb_mulw
   have bsum := bool_of_mul_pred gb_sum
   have h_bin := bool_of_mul_pred h_gate
+  -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
+  -- channel's `MemoryMsg.ClkBound` guarantee — `RTypeReader`'s two read-back pushes (`clk_low + 3` /
+  -- `+ 2`) and `RegisterWrite`'s op_a write push (`clk_low + 4`). The offset is left to unification,
+  -- so this line never names the destructured state columns.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
   -- **Option B cycle-break.** No operand `isU64` is assumed (chip `Assumptions = True`). Apply the
   -- `RTypeReader` sub-soundness to get its `Spec`; its 7th conjunct is the memory-pull-derived operand `isU64`
   -- trio (gated on `is_real`). The `is_real = sum` row gate (`h_eq_rs`) bridges that to the operation's
   -- flag-sum gate, so the reader's operand `isU64` discharges `MulOperation`'s `sum = 1 → isU64` precondition.
-  have h_rspec := hadapter ⟨h_bin, h_bin⟩
+  have h_rspec := hadapter ⟨h_bin, h_bin, fun hr =>
+    ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩
   have h_trio := h_rspec.2.2.2.2.2.2
   have h_rs : input_is_real
       = env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3) + env.get (i₀ + 4) :=
     sub_eq_zero.mp h_eq_rs
   have hbc : input_is_real = 1 → Word.isU64 input_adapter_op_b_memory_prev_value
-      ∧ Word.isU64 input_adapter_op_c_memory_prev_value := fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2⟩
+      ∧ Word.isU64 input_adapter_op_c_memory_prev_value :=
+    fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2.1⟩
   -- `is_mulw = 1 → sum = 1` (gate = flag-sum, SP1 `alu/mul/mod.rs:234`): one-hot via `sum_eq_one`.
   have h_mw := fun (hmw : (env.get (i₀ + 4) : ZMod p) = 1) =>
     MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inr (Or.inr hmw))))
@@ -99,7 +116,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         first | exact ha0 | exact ha1 | exact ha2 | exact ha3
   refine ⟨⟨h_rspec, h_bin, fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩⟩,
     Or.inr ⟨fun hsum => hbc (h_rs.trans hsum), bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩,
-    Or.inr ⟨h_bin, h_bin⟩, Or.inr ⟨h_bin, h_a_isU64⟩⟩
+    Or.inr ⟨h_bin, h_bin, fun hr =>
+      ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+    Or.inr ⟨h_bin, h_a_isU64, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩⟩
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inl h1)
     obtain ⟨_hisU64, hmul, _hmulhu, _hmulh, _hmulhsu, _hmulw⟩ :=
@@ -161,7 +180,12 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hf4, hsum, hmw_real, hop_a_0, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
+    hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ := h_assumptions
+  -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu hr).1 (h_cpu hr).2
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, hoc, -, -⟩ := h_input
   -- `h_env` bundles the CPUState GFC obligation (discarded), the flags/`cols`/`a` witness-gen
   -- equations, and the trailing `RTypeReader` GFC obligation (discarded).
@@ -223,10 +247,12 @@ theorem completeness :
     by simpa using h_env_a 3,
     hbool _ hf0', hbool _ hf1', hbool _ hf2', hbool _ hf3', hbool _ hf4', hbool _ hsum01',
     hop_a_0,
-    ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
-      fun hr => ⟨ha_prev hr, hbU, hcU⟩⟩⟩,
+    ⟨⟨hbin, hbin, fun hr =>
+        ⟨h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+      ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
+        fun hr => ⟨ha_prev hr, hbU, hcU, (hprevclk hr).1, (hprevclk hr).2.1, (hprevclk hr).2.2⟩⟩⟩,
     by linear_combination -hsumc,
-    ⟨⟨hbin, ?_⟩, trivial⟩,
+    ⟨⟨hbin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp⟩
   · -- `MulOperation.circuit.Spec` at the witnessed columns: the structural `spec_populate` once the
     -- witnessed struct equals `populate …` (each cell is `env.get (i₀+5+k)`, pinned by `h_env_cols'`).

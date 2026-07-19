@@ -22,10 +22,11 @@ This is the in-circuit provider's push side: a single Clean `GeneralFormalCircui
 range-checks the whole `value` word in-circuit with one `WordRangeCheck.circuit` assertion (genuine
 bit-decompositions — not lookups, so it owes nothing to a bus; `Native/Operations/WordRangeCheck.lean`),
 witnesses a multiplicity `m`, and `memoryChannel.pushIf m`-pushes the boundary record; soundness discharges
-the push's `MemoryMsg.isU64` requirement directly from the assertion's `Spec` (`Word.isU64 value`). The
-clock/address fields (`clk_high`, `clk_low`, `addr0..2`) are part of the key but unconstrained by `isU64`, so
-they are pushed through unchecked (the boundary record's claimed key; its `initSpec` validity is the
-`MemoryProvider` predicate's job, `Proofs/Chips/MemoryProvider.lean`).
+the push's `MemoryMsg.isU64` requirement directly from the assertion's `Spec` (`Word.isU64 value`), and the
+channel's `MemoryMsg.ClkBound` requirement from an inline `assertZero input.clk_low` gate — matching SP1's
+memory-init interaction, which literally passes `Expr::zero()` for the clock limbs. The address fields
+(`addr0..2`) and `clk_high` remain part of the key but unconstrained (the boundary record's claimed key; its
+`initSpec` validity is the `MemoryProvider` predicate's job, `Proofs/Chips/MemoryProvider.lean`).
 
 The Program-bus sibling is `Proofs/Chips/ProgramProviderChip.lean`; the byte-bus one `Chips/ByteChip`. -/
 
@@ -44,25 +45,35 @@ SP1's memory-global chips are one boolean-gated row per address), and pushes the
 `input` onto `memoryChannel` with multiplicity `m`. -/
 def main (input : Var MemoryMsg (ZMod p)) : Circuit (ZMod p) Unit := do
   assertion WordRangeCheck.circuit input.value
+  -- The pushed boundary clock is pinned to `0`, which is what discharges the channel's
+  -- `MemoryMsg.ClkBound` requirement. This is *exactly* SP1's memory-init interaction, which passes
+  -- `AB::Expr::zero(), AB::Expr::zero()` for `(clk_high, clk_low)` rather than a witnessed column
+  -- (`crates/core/machine/src/memory/global.rs`, the `MemoryChipType::Initialize` branch) — so the
+  -- gate is a faithfulness improvement, not an extra restriction. A shallow `assertZero` (no witness
+  -- columns), so `localLength` is unchanged.
+  assertZero input.clk_low
   let m ← witnessField 1
   assertZero (m * (m - 1))
   memoryChannel.pushIf m input
 
-/-- The Memory-boundary provider: pushes a boundary record whose value word it range-checks in-circuit.
-`Spec` is `MemoryMsg.isU64` (the value well-formedness the consumers pull-and-derive); soundness discharges
-the push's `isU64` requirement from the `WordRangeCheck` assertion's `Spec`. -/
+/-- The Memory-boundary provider: pushes a boundary record whose value word it range-checks in-circuit
+and whose access clock it pins to `0`. `Spec` mirrors the memory channel's `Guarantees`
+(`MemoryMsg.isU64 ∧ MemoryMsg.ClkBound`, the facts the consumers pull-and-derive); soundness discharges
+the push's requirement from the `WordRangeCheck` assertion's `Spec` and the `clk_low` gate. -/
 def circuit : GeneralFormalCircuit (ZMod p) MemoryMsg unit where
   main
-  Spec input _ _ := MemoryMsg.isU64 input
-  ProverAssumptions input _ _ := MemoryMsg.isU64 input
+  Spec input _ _ := MemoryMsg.isU64 input ∧ MemoryMsg.ClkBound input
+  ProverAssumptions input _ _ := MemoryMsg.isU64 input ∧ input.clk_low = 0
   channelsWithRequirements := [memoryChannel.toRaw]
   soundness := by
     circuit_proof_start [WordRangeCheck.circuit, WordRangeCheck.Assumptions, WordRangeCheck.Spec,
-      MemoryMsg.isU64]
-    exact ⟨h_holds.1, fun _ _ => h_holds.1⟩
+      MemoryMsg.isU64, MemoryMsg.ClkBound]
+    obtain ⟨hvalue, hclk, -⟩ := h_holds
+    refine ⟨⟨hvalue, ?_⟩, fun _ _ => ⟨hvalue, ?_⟩⟩ <;>
+      · simp [MemoryMsg.ClkBound, hclk]
   completeness := by
     circuit_proof_start [WordRangeCheck.circuit, WordRangeCheck.Assumptions, WordRangeCheck.Spec,
       MemoryMsg.isU64]
-    exact ⟨h_assumptions, by simp [h_env]⟩
+    exact ⟨h_assumptions.1, h_assumptions.2, by simp [h_env]⟩
 
 end SP1Clean.MemoryProviderChip

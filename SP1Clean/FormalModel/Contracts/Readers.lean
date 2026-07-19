@@ -104,9 +104,16 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     -- (destination index `< 32`, pc limbs `< 2^16`, on real `is_trusted` rows) — no longer trace-level.
     (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
       input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
-    -- (W11 memory flip) operand `isU64` derived from the three memory read-prior pulls (real rows).
+    -- (W11 memory flip) operand `isU64` derived from the three memory read-prior pulls (real rows),
+    -- and — G1 — each pulled prior record's 24-bit access-clock bound (`Channels.MemoryMsg.ClkBound`,
+    -- the other half of the memory channel's `Guarantees`). The clock bounds are what let the timed
+    -- grounding engine read `RegisterAccessTimestamp.Spec`'s field-level difference decomposition as a
+    -- genuine ℕ-level `prev_clk < access_clk` (`Soundness/TimeExtraction.lean`).
     (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
-      Word.isU64 input.cols.op_b_memory.prev_value ∧ Word.isU64 input.cols.op_c_memory.prev_value)
+      Word.isU64 input.cols.op_b_memory.prev_value ∧ Word.isU64 input.cols.op_c_memory.prev_value ∧
+      input.cols.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+      input.cols.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+      input.cols.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 /-- The Program-bus fetch message this reader pulls, as a `ProgramMsg` value — the R-type form: both
 operands are register indices (`#v[reg, 0, 0, 0]`), `imm_b = imm_c = 0`. It is definitionally the
@@ -163,9 +170,16 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
       input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
     -- (W11 memory flip) op_a/op_b operand `isU64` derived from the two `is_real`-gated memory read-prior
     -- pulls, and op_c's from the `is_real - imm_c`-gated read-prior pull (no register read for an immediate).
+    -- G1: each pulled prior record also carries its 24-bit access-clock bound
+    -- (`Channels.MemoryMsg.ClkBound`, the clock half of the memory channel's `Guarantees`) — the fact the
+    -- timed grounding engine needs to read `RegisterAccessTimestamp.Spec`'s field-level difference
+    -- decomposition as a genuine ℕ-level `prev_clk < access_clk` (`Soundness/TimeExtraction.lean`).
     (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
-      Word.isU64 input.cols.op_b_memory.prev_value) ∧
-    (input.is_real - input.cols.imm_c = 1 → Word.isU64 input.cols.op_c_memory.prev_value)
+      Word.isU64 input.cols.op_b_memory.prev_value ∧
+      input.cols.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+      input.cols.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24) ∧
+    (input.is_real - input.cols.imm_c = 1 → Word.isU64 input.cols.op_c_memory.prev_value ∧
+      input.cols.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 /-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the ALU form: op_b a register index
 (`#v[reg, 0, 0, 0]`), op_c a full `Word` (register or immediate), `imm_c` a decoded flag. Defeq to the
@@ -221,9 +235,13 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
       input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
     -- (W11 memory flip) op_a/op_b operand `isU64` derived from the two `is_real`-gated memory read-prior
     -- pulls, and op_c's from the `is_real - imm_c`-gated read-prior pull (no register read for an immediate).
+    -- G1: plus each pulled prior record's 24-bit access-clock bound (`Channels.MemoryMsg.ClkBound`).
     (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
-      Word.isU64 input.cols.op_b_memory.prev_value) ∧
-    (input.is_real - input.cols.imm_c = 1 → Word.isU64 input.cols.op_c_memory.prev_value)
+      Word.isU64 input.cols.op_b_memory.prev_value ∧
+      input.cols.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+      input.cols.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24) ∧
+    (input.is_real - input.cols.imm_c = 1 → Word.isU64 input.cols.op_c_memory.prev_value ∧
+      input.cols.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 /-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the immutable-ALU form (same fetch as
 `ALUTypeReader`; op_a is a discarded source read). Defeq to the `eval` of the reader `main`'s pull. -/
@@ -270,9 +288,12 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
     (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
       input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
-    -- (W11 memory flip) op_a/op_b operand `isU64` derived from the two memory read-prior pulls (real rows).
+    -- (W11 memory flip) op_a/op_b operand `isU64` derived from the two memory read-prior pulls (real rows),
+    -- plus — G1 — each pulled prior record's 24-bit access-clock bound (`Channels.MemoryMsg.ClkBound`).
     (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
-      Word.isU64 input.cols.op_b_memory.prev_value)
+      Word.isU64 input.cols.op_b_memory.prev_value ∧
+      input.cols.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+      input.cols.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 /-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the I-type form: op_b a register index
 (`#v[reg, 0, 0, 0]`), op_c the immediate `op_c_imm` (a `Word`), `imm_c = 1`. Defeq to the `eval` of the
@@ -315,9 +336,12 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
     (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
       input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
-    -- (W11 memory flip) op_a/op_b operand `isU64` derived from the two memory read-prior pulls (real rows).
+    -- (W11 memory flip) op_a/op_b operand `isU64` derived from the two memory read-prior pulls (real rows),
+    -- plus — G1 — each pulled prior record's 24-bit access-clock bound (`Channels.MemoryMsg.ClkBound`).
     (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
-      Word.isU64 input.cols.op_b_memory.prev_value)
+      Word.isU64 input.cols.op_b_memory.prev_value ∧
+      input.cols.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+      input.cols.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 /-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the immutable-I-type form (same fetch
 as `ITypeReader`; op_a is a source read, e.g. a Store's rs2). Defeq to the `eval` of the reader `main`'s
@@ -363,8 +387,10 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
     (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
       input.pc[0].val < 2 ^ 16 ∧ input.pc[1].val < 2 ^ 16 ∧ input.pc[2].val < 2 ^ 16) ∧
-    -- (W11 memory flip) op_a operand `isU64` derived from the memory read-prior pull (real rows).
-    (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value)
+    -- (W11 memory flip) op_a operand `isU64` derived from the memory read-prior pull (real rows), plus
+    -- — G1 — the pulled prior record's 24-bit access-clock bound (`Channels.MemoryMsg.ClkBound`).
+    (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
+      input.cols.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 /-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the J/U form: both operands are
 immediates (`op_b_imm`/`op_c_imm`, `Word`s), `imm_b = imm_c = 1`. Defeq to the `eval` of the reader

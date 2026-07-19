@@ -35,13 +35,26 @@ def Assumptions (_ : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := True
 set_option maxHeartbeats 4000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨_h_cpu, _h_ltu, h_reader, h_gate, h_oa1, h_oa2⟩ := h_holds
+  obtain ⟨h_cpu, _h_ltu, h_reader, h_gate, h_oa1, h_oa2⟩ := h_holds
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_gate
+  -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
+  -- channel's `MemoryMsg.ClkBound` guarantee — `ALUTypeReaderImmutable`'s three read-back pushes
+  -- (op_a at `clk_low + 4`, op_b at `+ 3`, op_c at `+ 2`; there is no `RegisterWrite` here, the
+  -- result is discarded). The offset is left to unification, so this line never names the
+  -- destructured state columns.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
   simp only [isReal, clkLow, opcodeVal]
   -- The per-emitter channel-requirement tail: the off-gate-vacuous byte pull (`is_real ∈ {0,1}`
   -- rules out the `¬is_real = 0` ∧ `¬-is_real = -1` antecedents), and the immutable reader.
-  exact ⟨⟨h_reader ⟨h_bin, h_bin⟩, h_bin, h_oa1, h_oa2⟩,
-    fun h1 h0 => off_gate_vacuous h_bin h1 h0, Or.inr ⟨h_bin, h_bin⟩⟩
+  exact ⟨⟨h_reader ⟨h_bin, h_bin, fun hr => ⟨h_clk 4 4 (by simp) (by norm_num) hr,
+      h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩,
+      h_bin, h_oa1, h_oa2⟩,
+    fun h1 h0 => off_gate_vacuous h_bin h1 h0,
+    Or.inr ⟨h_bin, h_bin, fun hr => ⟨h_clk 4 4 (by simp) (by norm_num) hr,
+      h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩⟩
 
 /-- Honest prover-side row well-formedness: `is_real` binary, the two `op_a_0` forcing gates, the
 CPUState clock bounds + the immutable-ALU-reader contract, and the dynamic opcode in ALU range
@@ -64,7 +77,17 @@ theorem completeness :
   circuit_proof_start
   simp only [isReal, clkLow, opcodeVal] at h_assumptions
   obtain ⟨h_bin, h_oa1, h_oa2, h_cpu, h_reader, h_op_lt⟩ := h_assumptions
-  refine ⟨⟨h_bin, h_cpu⟩, ?_, ⟨⟨h_bin, h_bin⟩, h_reader⟩, ?_, h_oa1, h_oa2⟩
+  -- G1: the *push* side clock bounds (op_a `+ 4` / op_b `+ 3` / op_c `+ 2`), from the prover-supplied
+  -- CPUState clock byte bounds. The *pull* side bounds are already carried by `h_reader`, since
+  -- `ProverAssumptions` names `Readers.ALUTypeReaderImmutable.Spec` wholesale.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu hr).1 (h_cpu hr).2
+  refine ⟨⟨h_bin, h_cpu⟩, ?_,
+    ⟨⟨h_bin, h_bin, fun hr => ⟨h_clk 4 4 (by simp) (by norm_num) hr,
+        h_clk 3 3 (by simp) (by norm_num) hr, h_clk 2 2 (by simp) (by norm_num) hr⟩⟩, h_reader⟩,
+    ?_, h_oa1, h_oa2⟩
   · -- the LTU `opcode < 29` byte pull (fires on real rows).
     intro hneg
     simp only [byteChannel]

@@ -59,10 +59,19 @@ def LocalValueAt (initial : SailState) (initialClock : ℕ) (location : MemLoc)
     (time : ℕ) (value : Word (ZMod p)) : Prop :=
   microValue initial initialClock location time = some (Word.toBitVec64 value)
 
-/-- Shard-local Memory grounding: limb hygiene plus execution truth at the message's micro-time. -/
+/-- Shard-local Memory grounding: a true memory record is value-well-formed
+(`MemoryMsg.isU64`), carries a well-formed 24-bit access timestamp (`MemoryMsg.ClkBound`), and holds
+the execution's value at that time (`LocalValueAt`).
+
+The two row-local hygiene conjuncts come first, in the memory channel's own `Guarantees` order
+(`isU64 ∧ ClkBound`), because that is exactly the pair a puller receives back out of grounding
+(`Soundness/TypedMemory.lean`'s `memoryChannelGuarantees_of_grounded`) and exactly what
+`Soundness/TouchChains.lean`'s `TouchOK.pull_lt_push` consumes; the semantic conjunct stays last so
+the common `.1` projection (value hygiene) is unchanged. -/
 def LocalMemTruth (initial : SailState) (initialClock : ℕ)
     (message : MemoryMsg (ZMod p)) : Prop :=
   SP1Clean.Channels.MemoryMsg.isU64 message ∧
+  SP1Clean.Channels.MemoryMsg.ClkBound message ∧
   LocalValueAt initial initialClock (MemoryMsg.locOf message)
     (MemoryMsg.timeNat message) message.value
 
@@ -109,15 +118,17 @@ theorem localValueAt_of_initial {initial : SailState} {initialClock time : ℕ}
     cases location <;> simpa [SP1Clean.Machine.trajectory] using content
 
 set_option linter.unusedSectionVars false in
-/-- Initial-provider content and its in-circuit limb range check establish the local Memory truth. -/
+/-- Initial-provider content and its in-circuit limb range check plus access-clock bound establish
+the local Memory truth. -/
 theorem localMemTruth_of_initial {initial : SailState} {initialClock : ℕ}
     {message : MemoryMsg (ZMod p)}
     (isU64 : SP1Clean.Channels.MemoryMsg.isU64 message)
+    (clkBound : SP1Clean.Channels.MemoryMsg.ClkBound message)
     (content : locContent initial (MemoryMsg.locOf message) =
       some (Word.toBitVec64 message.value))
     (before : MemoryMsg.timeNat message ≤ initialClock) :
     LocalMemTruth initial initialClock message :=
-  ⟨isU64, localValueAt_of_initial content before⟩
+  ⟨isU64, clkBound, localValueAt_of_initial content before⟩
 
 set_option linter.unusedSectionVars false in
 /-- At the beginning of semantic step `steps`, local micro-time reads exactly the reached pre-state.

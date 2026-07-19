@@ -31,8 +31,14 @@ def stateChannel : Channel (ZMod p) StateMsg where
   name := "SP1State"
   Guarantees _ _ := True
 
-/-- The Memory channel (SP1 `InteractionKind.Memory`). `Guarantees := MemoryMsg.isU64` — the value's
-well-formedness (each limb `< 2^16`). **W11 polarity flip:** the memory access's *read-back/write* now
+/-- The Memory channel (SP1 `InteractionKind.Memory`). `Guarantees := MemoryMsg.isU64 ∧
+MemoryMsg.ClkBound` — the value's well-formedness (each limb `< 2^16`) **and** the access clock's
+24-bit bound. The clock conjunct is the one fact SP1's timestamp comparison needs but no accessing row
+can prove: `eval_memory_access_timestamp` bounds only `clk_target − prev_low − 1`, so the *prior*
+record's clock bound must be received from whoever pushed it (see `MemoryMsg.ClkBound`). Pushers prove
+it from their `Readers.CPUState` clock byte bounds via `MemoryMsg.clkBound_of_cpuState_bounds`; the
+memory-init provider proves it by constraining its pushed clock to `0` (SP1 hardcodes `Expr::zero()`
+there, `crates/core/machine/src/memory/global.rs`). **W11 polarity flip:** the memory access's *read-back/write* now
 `pushIf`-pushes (proving `isU64` — a writer's ALU-result range-check for `op_a`; the just-pulled read-prior
 guarantee for an `op_b`/`op_c` read-back), and the *read-prior* `pullIf`-pulls (deriving `isU64`), so the
 operand `isU64` is *derived* by the consuming chip rather than carried as a chip-level `Assumptions`
@@ -43,7 +49,7 @@ offline-memory *value-correctness* (read = last write) stays trace-level (`Sound
 this channel carries only the value's `isU64`. The `name` matches the `"SP1Memory"` key in `memoryLookups`. -/
 def memoryChannel : Channel (ZMod p) MemoryMsg where
   name := "SP1Memory"
-  Guarantees msg _ := MemoryMsg.isU64 msg
+  Guarantees msg _ := MemoryMsg.isU64 msg ∧ MemoryMsg.ClkBound msg
 
 /-- The Program channel (SP1 `InteractionKind.Program`). `Guarantees := ProgramMsg.RowSpec` — the rich
 decode well-formedness (indices `< 32`, pc `< 2^16`, `op_a_0` boolean). **W11 polarity flip:** the ROM

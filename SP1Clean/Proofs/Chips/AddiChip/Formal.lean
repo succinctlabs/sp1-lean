@@ -16,30 +16,44 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start [Spec]
-  obtain ⟨_, h_add, h_adapter, _h_regwrite, h_gate⟩ := h_holds
+  obtain ⟨h_cpu, h_add, h_adapter, _h_regwrite, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
+  -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
+  -- channel's new `MemoryMsg.ClkBound` guarantee — `ITypeReader`'s op_b read-back push (`clk_low + 3`)
+  -- and `RegisterWrite`'s op_a write push (`clk_low + 4`). The offset is left to unification, so this
+  -- line never names the destructured state columns.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
   -- **Option B cycle-break.** The immediate `op_c`'s `isU64` is assumed (`h_assumptions`); the register
   -- `op_b`'s `isU64` is *derived* from the `ITypeReader` reader sub-`Spec` (its 6th conjunct is the memory-
-  -- pull-derived pair `is_real=1 → isU64 op_a/op_b prev`). Feeding both into `AddOperation` gives `isU64 value`
-  -- (.1) + the gated add identity (.2); the result `isU64` discharges the new `RegisterWrite` op_a write push.
-  have h_rspec := h_adapter ⟨h_bin, h_bin⟩
+  -- pull-derived tuple `is_real=1 → isU64 op_a/op_b prev ∧ their two `prev_low` clock bounds`). Feeding
+  -- both into `AddOperation` gives `isU64 value` (.1) + the gated add identity (.2); the result `isU64`
+  -- discharges the `RegisterWrite` op_a write push.
+  have h_rspec := h_adapter ⟨h_bin, h_bin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩
   have h_pair := h_rspec.2.2.2.2.2
-  have h_addspec := h_add ⟨fun hr => ⟨(h_pair hr).2, h_assumptions⟩, h_bin⟩
+  have h_addspec := h_add ⟨fun hr => ⟨(h_pair hr).2.1, h_assumptions⟩, h_bin⟩
   refine ⟨⟨h_rspec, h_bin, fun hr => (h_addspec hr).2⟩, ?_⟩
   and_intros <;>
     first
       | exact h_bin
-      | exact ⟨h_bin, h_bin⟩
       | exact Or.inl rfl
-      | exact Or.inr ⟨h_bin, h_bin⟩
-      | exact ⟨fun hr => ⟨(h_pair hr).2, h_assumptions⟩, h_bin⟩
-      | exact Or.inr ⟨fun hr => ⟨(h_pair hr).2, h_assumptions⟩, h_bin⟩
-      | exact Or.inr ⟨h_bin, fun hr => (h_addspec hr).1⟩
+      | exact Or.inr ⟨h_bin, h_bin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩
+      | exact ⟨fun hr => ⟨(h_pair hr).2.1, h_assumptions⟩, h_bin⟩
+      | exact Or.inr ⟨fun hr => ⟨(h_pair hr).2.1, h_assumptions⟩, h_bin⟩
+      | exact Or.inr ⟨h_bin, fun hr => (h_addspec hr).1,
+          fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hdec⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, h_cpu, hrac_a, hrac_b, hdec, hprevclk⟩ := h_assumptions
+  -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu hr).1 (h_cpu hr).2
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, hoc⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
@@ -60,9 +74,10 @@ theorem completeness :
     simp only [Inputs.op_b_val, Inputs.op_c_val]
     simp only [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
-    ⟨⟨hbin, hbin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hdec,
-      fun hr => ⟨ha_prev hr, ha⟩⟩⟩,
-    ⟨⟨hbin, ?_⟩, trivial⟩, ?_⟩
+    ⟨⟨hbin, hbin, fun hr => h_clk 3 3 (by simp) (by norm_num) hr⟩,
+      ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hdec,
+        fun hr => ⟨ha_prev hr, ha, (hprevclk hr).1, (hprevclk hr).2⟩⟩⟩,
+    ⟨⟨hbin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩, ?_⟩
   · rw [hval]; exact AddOperation.spec_populate ha hb input_is_real
   · -- RegisterWrite's `isU64 value` (op_a write push): the witnessed result `value = populate op_b op_c_imm`,
     -- whose `isU64` is `spec_populate.1`.

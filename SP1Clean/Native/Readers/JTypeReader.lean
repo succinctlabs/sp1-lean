@@ -127,16 +127,19 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   circuit_proof_start
   -- `h_holds`: the `RegisterAccessCols` sub, the `op_a_0` gate `hbin`, the inline `is_trusted` gate
   -- `h_trust`, the **program pull's guarantee** `h_prog` (`ProgramMsg.RowSpec`), the zeroing gates, then the
-  -- **memory pull's guarantee** `h_mem_a` (`MemoryMsg.isU64` of op_a's `prev_value`).
-  simp only [circuit_norm, AssumptionsD, SpecD, memoryChannel, MemoryMsg.isU64, programChannel]
-    at h_holds h_assumptions ⊢
+  -- **memory pull's guarantee** `h_mem_a` (`MemoryMsg.isU64` of op_a's `prev_value`, and — G1 —
+  -- `MemoryMsg.ClkBound` of its `prev_low` access clock).
+  simp only [circuit_norm, AssumptionsD, SpecD, memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound,
+    programChannel] at h_holds h_assumptions ⊢
   obtain ⟨h_rac_a, hbin, h_trust, h_prog, z0, z1, z2, z3, h_mem_a⟩ := h_holds
   have htbin := bool_of_mul_pred h_trust
   have e : ∀ i (hi : i < 3), Expression.eval env input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
-  -- Spec: decode bounds (from program pull) + op_a `isU64` (from memory pull — the whole-`Word` message
-  -- makes the pull guarantee the Spec conjunct verbatim). Requirements: rac (Or.inr), program off-gate
-  -- (vacuous), mem pull off-gate (vacuous).
+  -- Spec: decode bounds (from program pull) + op_a `isU64` **and** its prior record's 24-bit clock bound
+  -- (from the memory pull — the whole-`Word` message and the message's `clk_low` *being* the block's
+  -- `prev_low` make the pull guarantee pair the Spec conjunct pair verbatim). Requirements: rac (Or.inr),
+  -- program off-gate (vacuous), mem pull off-gate (vacuous). This reader has **no** memory push (op_a's
+  -- write is factored into `Readers/RegisterWrite.circuit`), so it owes no `ClkBound` `Assumptions`.
   refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin,
       h_rac_a h_assumptions.1, fun ht => ?_,
       fun ht2 => h_mem_a (by rw [show input_is_real = 1 from ht2])⟩,
@@ -173,8 +176,9 @@ theorem completeness :
     rw [e 0 (by norm_num), e 1 (by norm_num), e 2 (by norm_num)]
     obtain ⟨ha, hp0, hp1, hp2⟩ := hdec (neg_inj.mp ht)
     exact ⟨ha, hp0, hp1, hp2, hbin⟩
-  · -- mem pull: the whole-`Word` guarantee is the Spec's op_a `isU64` verbatim
-    simp only [memoryChannel, MemoryMsg.isU64]
+  · -- mem pull: the guarantee pair (`isU64` of the whole `Word`, `ClkBound` of the message's `clk_low`,
+    -- which *is* the block's `prev_low`) is the Spec's op_a conjunct pair verbatim.
+    simp only [memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound]
     exact fun hneg => hisu (neg_inj.mp hneg)
 
 /-- The native J-type reader as a Clean `GeneralFormalCircuit`: composes a single `RegisterAccessCols` for op_a

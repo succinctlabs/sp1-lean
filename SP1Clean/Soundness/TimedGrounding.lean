@@ -586,7 +586,7 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
             exact hval₀
         · -- write last slot: the push's own MemTruth at `t + writeOffset`, shifted to the window
           -- end
-          have hmt := hmt_q.2
+          have hmt := hmt_q.2.2
           rw [hloc_q] at hmt
           cases loc with
           | reg i =>

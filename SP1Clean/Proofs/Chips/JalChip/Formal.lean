@@ -52,13 +52,25 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   (linkTargetWord input)[3] = 0 ∧
   (input.is_real = 1 → ((jumpTargetWord input)[0] * (4 : ZMod p)⁻¹).val < 2 ^ 14) ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
-    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- G1: the pulled prior record's 24-bit access clock (`Channels.MemoryMsg.ClkBound`, the clock half of
+  -- the memory channel's `Guarantees`) — the `JTypeReader` op_a read-prior pull's completeness must
+  -- exhibit the guarantee it consumes. Soundness *derives* it there from the pull itself.
+  (input.is_real = 1 → input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨h_imm, h_pcU, h_pad⟩ := h_assumptions
   obtain ⟨h_cpu, h_add1, h_av3, h_add2, h_oav3, h_jt0, _h_regwrite, h_align, h_gate⟩ := h_holds
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_gate
+  -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
+  -- channel's `MemoryMsg.ClkBound` guarantee — here only `RegisterWrite`'s op_a link write push at
+  -- `clk_low + 4` (`JTypeReader` is a pure read and owes no push bound). The offset is left to
+  -- unification, so this line never names the destructured state columns.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu h_bin hr).1 (h_cpu h_bin hr).2
   have h_jt : Readers.JTypeReader.Spec _ := h_jt0 ⟨h_bin, h_bin⟩
   have h_op_a_0 : input_adapter_op_a_0 = 0 ∨ input_adapter_op_a_0 = 1 := h_jt.2.1
   -- eval-of-pc rewrites: circuit's `a` operand `#v[eval pc[i], 0]` equals the concrete `pcWord`.
@@ -98,7 +110,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rw [← c14] at hguar
     exact val_mod_four_of_mul_inv_four_lt ((byteRowSpec_range _ h14p).mp hguar)
   · exact Or.inr ⟨h_bin, h_bin⟩
-  · refine Or.inr ⟨h_bin, ?_⟩
+  · refine Or.inr ⟨h_bin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩
     -- RegisterWrite op_a write push: `isU64` of the link value `op_a_value`. On `rd ≠ x0` (`op_a_0 = 0`)
     -- it is the link add result `pc + 4`; on `rd = x0` (`op_a_0 = 1`) the `op_a_0` zeroing gates pin it to `0`.
     intro hr1
@@ -115,8 +127,13 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac, h_jt3, h_lt3, h_align_pa, hdec⟩ :=
-    h_assumptions
+  obtain ⟨h_imm, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac, h_jt3, h_lt3, h_align_pa, hdec,
+    hprevclk⟩ := h_assumptions
+  -- G1: the *push* side clock bound, from the prover-supplied CPUState clock byte bounds.
+  have h_clk : ∀ (delta : ZMod p) (k : ℕ), delta.val = k → k ≤ 4 → input_is_real = 1 →
+      (input_state_clk_0_16 + input_state_clk_16_24 * 65536 + delta).val < 2 ^ 24 :=
+    fun _ k hk hk4 hr => Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ k hk hk4
+      (h_cpu hr).1 (h_cpu hr).2
   simp only [jumpTargetWord, linkTargetWord] at h_jt3 h_lt3 h_align_pa
   -- `h_env` now bundles the two witness-vector equations with the GFC `JTypeReader` subcircuit's
   -- completeness obligation (SC Phase 2pre); the witness equations are `he_av`/`he_oav`.
@@ -180,8 +197,9 @@ theorem completeness :
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
   refine ⟨⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
-    ⟨⟨h_bin, h_bin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac, hdec, h_oap⟩⟩,
-    ⟨⟨h_bin, ?_⟩, trivial⟩, ?_, ?_⟩
+    ⟨⟨h_bin, h_bin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac, hdec,
+      fun hr => ⟨h_oap hr, hprevclk hr⟩⟩⟩,
+    ⟨⟨h_bin, ?_, fun hr => h_clk 4 4 (by simp) (by norm_num) hr⟩, trivial⟩, ?_, ?_⟩
   · rw [hval1]; exact AddOperation.spec_populate ha1U h_imm input_is_real
   · rw [hav3]; exact h_jt3
   · rw [hval2]; exact AddOperation.spec_populate ha1U h4U (input_is_real - input_adapter_op_a_0)

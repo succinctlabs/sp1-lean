@@ -65,16 +65,24 @@ set_option linter.unusedSectionVars false in
 `pushIf`'s `MemoryMsg.isU64` requirement. The composing chip discharges `isU64 value` from its operation's
 result range-check (an ALU result) or the loaded-word read pull. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
-  (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_real = 1 → Word.isU64 input.value)
+  (input.is_real = 0 ∨ input.is_real = 1) ∧ (input.is_real = 1 → Word.isU64 input.value) ∧
+    -- G1: the write access clock is 24-bit — the memory channel's `MemoryMsg.ClkBound` requirement.
+    -- `clk_low` is a raw cross-block input here (the chip passes its recombined clock `+ 4`), so the
+    -- bound comes from the chip's `CPUState` sub-`Spec` via
+    -- `Channels.MemoryMsg.clkBound_of_cpuState_bounds`.
+    (input.is_real = 1 → input.clk_low.val < 2 ^ 24)
 
 /-- No local semantic guarantee — `RegisterWrite` only emits the write interaction. -/
 def Spec (_ : Inputs (ZMod p)) : Prop := True
 
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  simp only [circuit_norm, memoryChannel, MemoryMsg.isU64] at h_holds ⊢
-  -- The only obligation is the write `pushIf`'s requirement, `¬is_real=-1 → ¬is_real=0 → isU64 value`.
-  exact fun _ h0 => h_assumptions.2 ((h_assumptions.1).resolve_left h0)
+  simp only [circuit_norm, memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound] at h_holds ⊢
+  -- The only obligation is the write `pushIf`'s requirement,
+  -- `¬is_real=-1 → ¬is_real=0 → isU64 value ∧ clk_low.val < 2^24`.
+  exact fun _ h0 =>
+    ⟨h_assumptions.2.1 ((h_assumptions.1).resolve_left h0),
+      h_assumptions.2.2 ((h_assumptions.1).resolve_left h0)⟩
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start

@@ -173,7 +173,11 @@ theorem MemoryInitProviderBound.localMemTruth_of_mem_produced
   have isU64 := guarantee_of_mem_producedTableMessages
     (memoryInitProviderTable witness) memoryChannel hp
     (memoryInitProviderTable_requirements witness constraints) message member
-  change MemoryMsg.isU64 message at isU64
+  -- G1: the memory channel's `Guarantees` is now the pair `isU64 ∧ ClkBound`, and `LocalMemTruth`
+  -- consumes both — the value half is the provider's `WordRangeCheck`, the clock half its
+  -- `assertZero clk_low` gate.
+  change MemoryMsg.isU64 message ∧ Channels.MemoryMsg.ClkBound message at isU64
+  obtain ⟨isU64, clkBound⟩ := isU64
   unfold producedMessages at member
   obtain ⟨interaction, interactionMem, messageEq⟩ := List.mem_map.mp member
   obtain ⟨typedMem, positive⟩ := List.mem_filter.mp interactionMem
@@ -194,7 +198,7 @@ theorem MemoryInitProviderBound.localMemTruth_of_mem_produced
   change MemoryInitMessageBound initial initialClock rebound.message at semantic
   have reboundEq : rebound = interaction := TypedInteraction.raw_injective rfl
   rw [reboundEq, messageEq] at semantic
-  exact Semantics.localMemTruth_of_initial isU64 semantic.1 semantic.2
+  exact Semantics.localMemTruth_of_initial isU64 clkBound semantic.1 semantic.2
 
 /-- Proof-only facts tying one selected initial Sail state to the public and provider boundary. -/
 structure InitialBoundaryFacts
