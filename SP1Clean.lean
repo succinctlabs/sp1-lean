@@ -373,3 +373,4 @@ import SP1Clean.Proofs.Chips.MemoryFinalizeChip
 import SP1Clean.Soundness.RankedGrounding
 import SP1Clean.Soundness.TouchChains
 import SP1Clean.Soundness.TimedGrounding
+import SP1Clean.Soundness.AlignedCarrier
