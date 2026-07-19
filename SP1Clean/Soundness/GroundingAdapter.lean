@@ -1,5 +1,6 @@
 import SP1Clean.Soundness.RowSoundness
 import SP1Clean.Soundness.TypedTimeContracts
+import SP1Clean.Soundness.AlignedCarrier
 import SP1Clean.Proofs.Chips.AddChip.Contracts
 
 /-! # The grounding adapter — `ChipKind.advance` → the timed-engine per-row records
@@ -485,6 +486,27 @@ def rtypeWriteMessage (view : Trace.RowView (ZMod p)) : MemoryMsg (ZMod p) :=
   ⟨view.state.clk_high, view.state.clk_0_16 + view.state.clk_16_24 * 65536 + 4,
    view.adapter.op_a, 0, 0, view.rdWrite⟩
 
+omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
+/-- A read-prior pull's low clock is the pulled record's timestamp `prev_low` — a `rfl` unfolding of
+the message projection, so a decoded-row goal can be rewritten to the symbolic operand spelling before
+crossing to the reader `Spec` (avoiding the `.clk_low`-of-message whnf blowup on the decoded view). -/
+theorem clk_low_rtypePriorMessage (view : Trace.RowView (ZMod p)) (index : ZMod p)
+    (access : Extracted.RegisterAccessCols (ZMod p)) :
+    (rtypePriorMessage view index access).clk_low = access.access_timestamp.prev_low := rfl
+
+omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
+/-- A read-back push's low clock is the window start plus its effect offset — the symbolic spelling. -/
+theorem clk_low_rtypeReadBackMessage (view : Trace.RowView (ZMod p)) (index : ZMod p)
+    (access : Extracted.RegisterAccessCols (ZMod p)) (delta : ZMod p) :
+    (rtypeReadBackMessage view index access delta).clk_low
+      = view.state.clk_0_16 + view.state.clk_16_24 * 65536 + delta := rfl
+
+omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
+/-- The op_a write push's low clock is the window start plus four — the symbolic spelling. -/
+theorem clk_low_rtypeWriteMessage (view : Trace.RowView (ZMod p)) :
+    (rtypeWriteMessage view).clk_low
+      = view.state.clk_0_16 + view.state.clk_16_24 * 65536 + 4 := rfl
+
 omit [Fact (2 ^ 17 < p)] in
 /-- A read-back push's decoded time is the window start plus its effect offset. -/
 theorem timeNat_rtypeReadBackMessage {view : Trace.RowView (ZMod p)}
@@ -617,6 +639,234 @@ theorem rowWiring_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFacts
   no_ram_write := by
     rw [commit_eq]
     rfl
+
+/-! ### The aligned R-type touch carrier (Phase B1) -/
+
+/-- **The aligned R-type touch list** (the `AlignedCarrier` sibling of `rowWiring_rtype`'s wiring):
+the three produced pushes — op_b's read-back at `+ 3`, op_c's at `+ 2`, and the op_a write at `+ 4`
+— each paired *positionally* with the same-location prior read at that push's own micro-time.  Feeding
+this to `alignedOf` re-pairs the ordinary carrier's window-start pulls with the produced pushes in
+their emitted order, exactly the positional `RowOK` shape the timed grounding walk consumes. -/
+def rtypeTouches (view : Trace.RowView (ZMod p)) (rf : Semantics.RowFacts p) : List (Touch p) :=
+  [((rtypePriorMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory,
+       StateMsg.timeNat rf.statePull + 3),
+     rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3),
+   ((rtypePriorMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory,
+       StateMsg.timeNat rf.statePull + 2),
+     rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2),
+   ((rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory,
+       StateMsg.timeNat rf.statePull),
+     rtypeWriteMessage view)]
+
+/-- **The R-type reader-shape aligned carrier** (SP-2's `rowAligned_rtype`, the `AlignedCarrier`
+sibling of `rowWiring_rtype`): from the same in-circuit numeric facts plus the reader's per-operand
+timestamp `Spec`s and clock bounds, produce the two non-assembly inputs `rowOK_alignedOf` consumes —
+`AlignsWith (alignedOf rf (rtypeTouches …)) rf`, the per-slot `TouchOK`, and the per-key push-time
+`IsChain` — so a caller need only supply the `+ 8` step and mod-8 alignment (both `initialClock`-level)
+to obtain the walk's `RowOK`.
+
+Unlike `rowWiring_rtype` this needs the two source operands' index bounds (`opb_lt`/`opc_lt`), the
+per-operand register-access `RegisterAccessTimestamp.Spec`s at the pushes' access clocks and their
+prior records' 24-bit `ClkBound`s (all supplied by `RTypeReader.Spec` — the `+ 4`/`+ 3`/`+ 2` slots and
+the Phase-G tail), and — for this first instance — pairwise-distinct register indices.  The
+distinctness rules out the SP-6 register-alias rows (`add x3, x1, x1`, whose op_b/op_c read-backs share
+a key while sitting at `+ 3`/`+ 2` out of push-time order); admitting them is the timed engine's
+alias-chain generalization, deferred to a later carrier. -/
+theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFacts p}
+    (bounds : ViewClockBounds view)
+    (real : view.is_real = 1)
+    (opa_lt : view.adapter.op_a.val < 32)
+    (opb_lt : (view.adapter.op_b[0]).val < 32)
+    (opc_lt : (view.adapter.op_c[0]).val < 32)
+    (statePull_eq : rf.statePull = statePullOfView view)
+    (pulls_eq : rf.memPulls =
+      [(rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory,
+          StateMsg.timeNat rf.statePull),
+       (rtypePriorMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory,
+          StateMsg.timeNat rf.statePull),
+       (rtypePriorMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory,
+          StateMsg.timeNat rf.statePull)])
+    (pushes_eq : rf.memPushes =
+      [rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3,
+       rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2,
+       rtypeWriteMessage view])
+    (clkBound_a :
+      MemoryMsg.ClkBound (rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory))
+    (clkBound_b :
+      MemoryMsg.ClkBound (rtypePriorMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory))
+    (clkBound_c :
+      MemoryMsg.ClkBound (rtypePriorMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory))
+    (tsSpec_a : Readers.RegisterAccessTimestamp.Spec
+      ⟨view.adapter.op_a_memory.access_timestamp, view.is_real,
+        (rtypeWriteMessage view).clk_low⟩)
+    (tsSpec_b : Readers.RegisterAccessTimestamp.Spec
+      ⟨view.adapter.op_b_memory.access_timestamp, view.is_real,
+        (rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3).clk_low⟩)
+    (tsSpec_c : Readers.RegisterAccessTimestamp.Spec
+      ⟨view.adapter.op_c_memory.access_timestamp, view.is_real,
+        (rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2).clk_low⟩)
+    (distinct_ab : view.adapter.op_a.val ≠ (view.adapter.op_b[0]).val)
+    (distinct_ac : view.adapter.op_a.val ≠ (view.adapter.op_c[0]).val)
+    (distinct_bc : (view.adapter.op_b[0]).val ≠ (view.adapter.op_c[0]).val) :
+    AlignsWith (alignedOf rf (rtypeTouches view rf)) rf ∧
+      (∀ tc ∈ rtypeTouches view rf,
+        TouchOK (StateMsg.timeNat rf.statePull) tc.1 tc.2) ∧
+      (∀ loc : MemLoc, List.IsChain
+        (fun a b : Touch p => MemoryMsg.timeNat a.2 < MemoryMsg.timeNat b.2)
+        ((rtypeTouches view rf).filter (fun pq => MemoryMsg.locOf pq.2 = loc))) := by
+  -- Register-index → location facts (used everywhere).
+  have hidxA : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) = view.adapter.op_a := by
+    rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
+    exact ZMod.natCast_zmod_val _
+  have hidxB : ((BitVec.ofNat 5 (view.adapter.op_b[0]).val).toNat : ZMod p)
+      = view.adapter.op_b[0] := by
+    rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show (view.adapter.op_b[0]).val < 2 ^ 5 by omega)]
+    exact ZMod.natCast_zmod_val _
+  have hidxC : ((BitVec.ofNat 5 (view.adapter.op_c[0]).val).toNat : ZMod p)
+      = view.adapter.op_c[0] := by
+    rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show (view.adapter.op_c[0]).val < 2 ^ 5 by omega)]
+    exact ZMod.natCast_zmod_val _
+  have hlocPriorA : MemoryMsg.locOf
+      (rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory)
+      = MemLoc.reg (BitVec.ofNat 5 view.adapter.op_a.val) :=
+    MemoryMsg.locOf_register _ _ hidxA rfl rfl
+  have hlocPriorB : MemoryMsg.locOf
+      (rtypePriorMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory)
+      = MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_b[0]).val) :=
+    MemoryMsg.locOf_register _ _ hidxB rfl rfl
+  have hlocPriorC : MemoryMsg.locOf
+      (rtypePriorMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory)
+      = MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_c[0]).val) :=
+    MemoryMsg.locOf_register _ _ hidxC rfl rfl
+  have hlocReadB : MemoryMsg.locOf
+      (rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3)
+      = MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_b[0]).val) :=
+    MemoryMsg.locOf_register _ _ hidxB rfl rfl
+  have hlocReadC : MemoryMsg.locOf
+      (rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2)
+      = MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_c[0]).val) :=
+    MemoryMsg.locOf_register _ _ hidxC rfl rfl
+  have hlocWrite : MemoryMsg.locOf (rtypeWriteMessage view)
+      = MemLoc.reg (BitVec.ofNat 5 view.adapter.op_a.val) :=
+    MemoryMsg.locOf_register _ _ hidxA rfl rfl
+  -- The three `prev_clk < access_clk` facts (SP1's register timestamp comparison).
+  have plt_a : MemoryMsg.timeNat (rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory)
+      < MemoryMsg.timeNat (rtypeWriteMessage view) :=
+    TimeExtraction.memoryTimeNat_lt_of_accessTimestamp
+      (rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory)
+      (rtypeWriteMessage view) view.adapter.op_a_memory.access_timestamp view.is_real real
+      clkBound_a tsSpec_a rfl rfl
+  have plt_b : MemoryMsg.timeNat
+      (rtypePriorMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory)
+      < MemoryMsg.timeNat
+      (rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3) :=
+    TimeExtraction.memoryTimeNat_lt_of_accessTimestamp
+      (rtypePriorMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory)
+      (rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3)
+      view.adapter.op_b_memory.access_timestamp view.is_real real clkBound_b tsSpec_b rfl rfl
+  have plt_c : MemoryMsg.timeNat
+      (rtypePriorMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory)
+      < MemoryMsg.timeNat
+      (rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2) :=
+    TimeExtraction.memoryTimeNat_lt_of_accessTimestamp
+      (rtypePriorMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory)
+      (rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2)
+      view.adapter.op_c_memory.access_timestamp view.is_real real clkBound_c tsSpec_c rfl rfl
+  -- Read-back / write time equalities.
+  have tb : MemoryMsg.timeNat
+      (rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3)
+      = StateMsg.timeNat rf.statePull + 3 := by
+    rw [statePull_eq]
+    exact timeNat_rtypeReadBackMessage bounds _ _ val_3_zmod_p (by omega)
+  have tc2 : MemoryMsg.timeNat
+      (rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2)
+      = StateMsg.timeNat rf.statePull + 2 := by
+    rw [statePull_eq]
+    exact timeNat_rtypeReadBackMessage bounds _ _ val_2_zmod_p (by omega)
+  have tw : MemoryMsg.timeNat (rtypeWriteMessage view) = StateMsg.timeNat rf.statePull + 4 := by
+    rw [statePull_eq]
+    exact timeNat_rtypeWriteMessage bounds
+  refine ⟨?_, ?_, ?_⟩
+  · -- AlignsWith via the generic constructor
+    refine alignsWith_alignedOf rf (rtypeTouches view rf) ?_ ?_ ?_ ?_
+    · rw [pushes_eq]; rfl
+    · intro mp hmp
+      rw [pulls_eq] at hmp
+      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
+      rcases hmp with rfl | rfl | rfl
+      · exact ⟨_, hlocPriorA⟩
+      · exact ⟨_, hlocPriorB⟩
+      · exact ⟨_, hlocPriorC⟩
+    · intro mp hmp
+      rw [pulls_eq] at hmp
+      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
+      rcases hmp with rfl | rfl | rfl <;> rfl
+    · intro mp hmp
+      rw [pulls_eq] at hmp
+      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
+      rcases hmp with rfl | rfl | rfl
+      · exact ⟨_, List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self),
+          rfl, by dsimp only; omega, by dsimp only; omega⟩
+      · exact ⟨_, List.mem_cons_self, rfl, by dsimp only; omega, by dsimp only; omega⟩
+      · exact ⟨_, List.mem_cons_of_mem _ List.mem_cons_self, rfl,
+          by dsimp only; omega, by dsimp only; omega⟩
+  · -- the per-slot `TouchOK`
+    intro tc htc
+    simp only [rtypeTouches, List.mem_cons, List.not_mem_nil, or_false] at htc
+    rcases htc with rfl | rfl | rfl
+    · -- op_b read-back at + 3
+      refine ⟨?_, plt_b, ?_, ?_, Or.inl ⟨rfl, tb⟩⟩
+      · dsimp only; rw [hlocReadB, hlocPriorB]
+      · dsimp only; omega
+      · dsimp only; simp only [hlocPriorB, readWindow_reg]; omega
+    · -- op_c read-back at + 2
+      refine ⟨?_, plt_c, ?_, ?_, Or.inl ⟨rfl, tc2⟩⟩
+      · dsimp only; rw [hlocReadC, hlocPriorC]
+      · dsimp only; omega
+      · dsimp only; simp only [hlocPriorC, readWindow_reg]; omega
+    · -- op_a write at + 4
+      refine ⟨?_, plt_a, ?_, ?_, Or.inr ?_⟩
+      · dsimp only; rw [hlocWrite, hlocPriorA]
+      · dsimp only; omega
+      · dsimp only; simp only [hlocPriorA, readWindow_reg]; omega
+      · dsimp only; rw [hlocWrite, writeOffset_reg]; exact tw
+  · -- per-key push-time `IsChain` (trivial: distinct keys ⇒ each filter is ≤ 1 touch)
+    intro loc
+    have hne_bc : (MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_b[0]).val) : MemLoc)
+        ≠ MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_c[0]).val) := by
+      intro heq
+      rw [MemLoc.reg.injEq] at heq
+      have := congrArg BitVec.toNat heq
+      rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega),
+        Nat.mod_eq_of_lt (by omega)] at this
+      exact distinct_bc this
+    have hne_ab : (MemLoc.reg (BitVec.ofNat 5 view.adapter.op_a.val) : MemLoc)
+        ≠ MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_b[0]).val) := by
+      intro heq
+      rw [MemLoc.reg.injEq] at heq
+      have := congrArg BitVec.toNat heq
+      rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega),
+        Nat.mod_eq_of_lt (by omega)] at this
+      exact distinct_ab this
+    have hne_ac : (MemLoc.reg (BitVec.ofNat 5 view.adapter.op_a.val) : MemLoc)
+        ≠ MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_c[0]).val) := by
+      intro heq
+      rw [MemLoc.reg.injEq] at heq
+      have := congrArg BitVec.toNat heq
+      rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega),
+        Nat.mod_eq_of_lt (by omega)] at this
+      exact distinct_ac this
+    simp only [rtypeTouches, List.filter_cons, List.filter_nil, hlocReadB, hlocReadC, hlocWrite]
+    split_ifs <;>
+      first
+      | exact List.isChain_nil
+      | exact List.isChain_singleton _
+      | (rename_i h1 h2 h3
+         simp only [decide_eq_true_eq] at h1 h2 h3
+         first
+         | exact absurd (h1.trans h2.symm) hne_bc
+         | exact absurd (h1.trans h3.symm) hne_ab.symm
+         | exact absurd (h2.trans h3.symm) hne_ac.symm)
 
 end RType
 
@@ -1004,6 +1254,110 @@ theorem addRow_engineFacts
     subst hchip'
     rfl
   exact engineFacts_of_kind migrated wiring real spec decode ready initial initialClock
+
+set_option maxHeartbeats 1000000 in
+/-- **The Add aligned-carrier validation instance** (the `AlignedCarrier` sibling of
+`rowWiring_rtype_of_decoded`): a genuine decoded Add row's `ordinaryRowFacts` feed `rowAligned_rtype`.
+Extracted here straight from the retained chip `Spec` (its composed `RTypeReader.Spec`): the three
+per-operand 24-bit `ClkBound`s from the Phase-G `prev_low < 2 ^ 24` tail, and the `op_a < 32` decode
+bound from the `is_trusted` conjunct; the exact Memory lists come from
+`addChip_consumed/producedMemoryMessages_eq`.
+
+The three per-operand `RegisterAccessTimestamp.Spec`s are *also* provided by the same `RTypeReader.Spec`
+(its `+ 4`/`+ 3`/`+ 2` `RegisterAccessCols` conjuncts), but are taken here as hypotheses rather than
+extracted in place: unifying the composed `Spec`'s structure-literal `RegisterAccessTimestamp.Spec ⟨…⟩`
+against the decoded-row spelling forces the eval-struct whnf normalization that no heartbeat survives
+(the metavariable landmine — the flat `< 32` / `< 2 ^ 24` bounds cross the same decoder↔circuit spelling
+cheaply, but the nested structure literal does not).  The two source-operand index bounds and the
+pairwise register distinctness are the trace/decode-level residuals the surrounding grounding argument
+supplies (`op_b`/`op_c` register indices are received facts, not local to the chip `Spec`). -/
+theorem addChip_rowAligned (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
+    (hchip : decoded.chip = addChipDescriptor (p := p))
+    (real : (decoded.toChipRow data).view.is_real = 1)
+    (bounds : ViewClockBounds (decoded.toChipRow data).view)
+    (spec : (decoded.toChipRow data).chipSpec data)
+    (tsSpec_a : Readers.RegisterAccessTimestamp.Spec
+      ⟨(decoded.toChipRow data).view.adapter.op_a_memory.access_timestamp,
+        (decoded.toChipRow data).view.is_real,
+        (rtypeWriteMessage (decoded.toChipRow data).view).clk_low⟩)
+    (tsSpec_b : Readers.RegisterAccessTimestamp.Spec
+      ⟨(decoded.toChipRow data).view.adapter.op_b_memory.access_timestamp,
+        (decoded.toChipRow data).view.is_real,
+        (rtypeReadBackMessage (decoded.toChipRow data).view
+          ((decoded.toChipRow data).view.adapter.op_b[0])
+          (decoded.toChipRow data).view.adapter.op_b_memory 3).clk_low⟩)
+    (tsSpec_c : Readers.RegisterAccessTimestamp.Spec
+      ⟨(decoded.toChipRow data).view.adapter.op_c_memory.access_timestamp,
+        (decoded.toChipRow data).view.is_real,
+        (rtypeReadBackMessage (decoded.toChipRow data).view
+          ((decoded.toChipRow data).view.adapter.op_c[0])
+          (decoded.toChipRow data).view.adapter.op_c_memory 2).clk_low⟩)
+    (opb_lt : ((decoded.toChipRow data).view.adapter.op_b[0]).val < 32)
+    (opc_lt : ((decoded.toChipRow data).view.adapter.op_c[0]).val < 32)
+    (distinct_ab : (decoded.toChipRow data).view.adapter.op_a.val
+      ≠ ((decoded.toChipRow data).view.adapter.op_b[0]).val)
+    (distinct_ac : (decoded.toChipRow data).view.adapter.op_a.val
+      ≠ ((decoded.toChipRow data).view.adapter.op_c[0]).val)
+    (distinct_bc : ((decoded.toChipRow data).view.adapter.op_b[0]).val
+      ≠ ((decoded.toChipRow data).view.adapter.op_c[0]).val) :
+    AlignsWith (alignedOf (decoded.ordinaryRowFacts data)
+        (rtypeTouches (decoded.toChipRow data).view (decoded.ordinaryRowFacts data)))
+        (decoded.ordinaryRowFacts data) ∧
+      (∀ tc ∈ rtypeTouches (decoded.toChipRow data).view (decoded.ordinaryRowFacts data),
+        TouchOK (StateMsg.timeNat (decoded.ordinaryRowFacts data).statePull) tc.1 tc.2) ∧
+      (∀ loc : MemLoc, List.IsChain
+        (fun a b : Touch p => MemoryMsg.timeNat a.2 < MemoryMsg.timeNat b.2)
+        ((rtypeTouches (decoded.toChipRow data).view (decoded.ordinaryRowFacts data)).filter
+          (fun pq => MemoryMsg.locOf pq.2 = loc))) := by
+  have consumed_eq := addChip_consumedMemoryMessages_eq decoded data hchip real
+  have produced_eq := addChip_producedMemoryMessages_eq decoded data hchip real
+  have opa_lt : (decoded.toChipRow data).view.adapter.op_a.val < 32 := by
+    obtain ⟨chip, physical⟩ := decoded
+    have hchip' : chip = addChipDescriptor (p := p) := hchip
+    subst hchip'
+    obtain ⟨-, hrspec, -, -⟩ :=
+      (SupportedChip.decodeRow_chipSpec_iff (addChipDescriptor (p := p)) data physical).mp spec
+    obtain ⟨-, -, -, -, -, hbounds, -⟩ := hrspec
+    exact (hbounds real).1
+  have clkBound_a : MemoryMsg.ClkBound (rtypePriorMessage (decoded.toChipRow data).view
+      (decoded.toChipRow data).view.adapter.op_a
+      (decoded.toChipRow data).view.adapter.op_a_memory) := by
+    simp only [MemoryMsg.ClkBound, clk_low_rtypePriorMessage]
+    obtain ⟨chip, physical⟩ := decoded
+    have hchip' : chip = addChipDescriptor (p := p) := hchip
+    subst hchip'
+    obtain ⟨-, hrspec, -, -⟩ :=
+      (SupportedChip.decodeRow_chipSpec_iff (addChipDescriptor (p := p)) data physical).mp spec
+    obtain ⟨-, -, -, -, -, -, htail⟩ := hrspec
+    exact (htail real).2.2.2.1
+  have clkBound_b : MemoryMsg.ClkBound (rtypePriorMessage (decoded.toChipRow data).view
+      ((decoded.toChipRow data).view.adapter.op_b[0])
+      (decoded.toChipRow data).view.adapter.op_b_memory) := by
+    simp only [MemoryMsg.ClkBound, clk_low_rtypePriorMessage]
+    obtain ⟨chip, physical⟩ := decoded
+    have hchip' : chip = addChipDescriptor (p := p) := hchip
+    subst hchip'
+    obtain ⟨-, hrspec, -, -⟩ :=
+      (SupportedChip.decodeRow_chipSpec_iff (addChipDescriptor (p := p)) data physical).mp spec
+    obtain ⟨-, -, -, -, -, -, htail⟩ := hrspec
+    exact (htail real).2.2.2.2.1
+  have clkBound_c : MemoryMsg.ClkBound (rtypePriorMessage (decoded.toChipRow data).view
+      ((decoded.toChipRow data).view.adapter.op_c[0])
+      (decoded.toChipRow data).view.adapter.op_c_memory) := by
+    simp only [MemoryMsg.ClkBound, clk_low_rtypePriorMessage]
+    obtain ⟨chip, physical⟩ := decoded
+    have hchip' : chip = addChipDescriptor (p := p) := hchip
+    subst hchip'
+    obtain ⟨-, hrspec, -, -⟩ :=
+      (SupportedChip.decodeRow_chipSpec_iff (addChipDescriptor (p := p)) data physical).mp spec
+    obtain ⟨-, -, -, -, -, -, htail⟩ := hrspec
+    exact (htail real).2.2.2.2.2
+  refine rowAligned_rtype bounds real opa_lt opb_lt opc_lt rfl ?_ ?_ clkBound_a clkBound_b
+    clkBound_c tsSpec_a tsSpec_b tsSpec_c distinct_ab distinct_ac distinct_bc
+  · rw [DecodedInstructionRow.ordinaryRowFacts_memPulls, consumed_eq]
+    rfl
+  · rw [DecodedInstructionRow.ordinaryRowFacts_memPushes]
+    exact produced_eq
 
 end AddAnchor
 
