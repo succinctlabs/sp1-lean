@@ -334,7 +334,8 @@ installed as a pull guarantee.
 
 The channels communicate field tuples and multiplicities, exactly as SP1's interaction buses do.
 Execution meaning is a theorem about the balanced, timestamped records; it is not a row-local channel
-guarantee. State therefore carries `True`, Program carries structural `RowSpec`, Memory carries `isU64`,
+guarantee. State therefore carries `True`, Program carries structural `RowSpec`, Memory carries
+`isU64 ∧ ClkBound` (value hygiene + a bounded 24-bit access timestamp `clk_low.val < 2^24`),
 and Byte carries its lookup predicate. The global engine combines balance, provider/commitment binding,
 schedule ordering, and per-chip `advance` lemmas to derive Sail execution truth.
 
@@ -371,12 +372,18 @@ without constructing a second lookup projection. `ordinaryRowFacts` feeds those 
 `TimedGrounding`; grounded prior records recover the circuit's Memory `ChannelGuarantees` and live Sail
 register values. `CircuitRegisterOperandPullAt`/`CircuitRegisterOperandPullShape` are the small per-chip
 contract: each register operand must identify its exact emitted pull and bind its message to the common
-`RowView`. `TypedMemoryContracts.lean` proves the first complete descriptor instance for Add directly
-from Add's Clean `exposedMemoryInteractions`; no operation-level Rust/Lean bridge is involved.
+`RowView`. All 24 non-DivRem chips now carry their Clean memory closed forms
+(`exposedMemoryInteractions` + `interactionsWith_memory_eq`), and the memory-clock discipline was
+consolidated into the readers (`Readers.ClkDiscipline`, `Model/BusMessages.lean`; H2a, −181 lines net),
+with ShiftRight deriving its write-push clock bound in-circuit after gaining the `is_real`/flag-sum bind
+(H1). No operation-level Rust/Lean bridge is involved.
 
-**Residual dynamic work.** Instantiate that contract across the supported registry (separately for
-R-, ALU-, I-, J-, load/store, and no-write reader shapes), derive each row's remaining circuit
-assumptions and `advanceReady` facts, and combine them with the proved State position equation. The
+**Residual dynamic work.** The `GroundingAdapter` advance-adapter, the `ChipGroundingContracts` bundle
+(Add instance proved, reducing the seam to `supportedCore_orderedRows_dynamic_of_contracts`), and the
+aligned-carrier transports (`AlignedCarrier.lean` + `AlignsWith`) are landed. Remaining: instantiate the
+bundle across the supported registry (separately for R-, ALU-, I-, J-, load/store, and no-write reader
+shapes), build the memory-channel balance stack, and derive each row's remaining circuit
+assumptions and `advanceReady` facts, combined with the proved State position equation. The
 grounding engine still needs RAM records and same-location intra-row chaining before loads/stores and
 register aliases such as `rd = rs1` are covered. These are the concrete inputs to
 `supportedCore_orderedRows_dynamic`; they are independent of the verifier/ArkLib workstream.

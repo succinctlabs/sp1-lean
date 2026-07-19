@@ -93,9 +93,10 @@ Mirror-rust layout under `SP1Clean/`:
   `limb_lift`), `Bitwise.lean` (`byteOp`, `reassemble_byteOp`, …), `Misc.lean`, `MulCarryChain.lean`,
   `HWord.lean`, `GetElemFastPath.lean` (the upstreaming candidate).
 - **`Model/`** — the SP1 substrate (Sail + buses): `Register.lean`, `SailWrap.lean`, `SailMemory.lean`,
-  `BusMessages.lean` (the State/Memory/Program message structs + their structural per-row predicates),
-  `Channels.lean` (plain Clean channels: State `True`, Program `RowSpec`, Memory `isU64`, Byte
-  `ByteRowSpec`),
+  `BusMessages.lean` (the State/Memory/Program message structs + their structural per-row predicates —
+  incl. `MemoryMsg.ClkBound` and the reader-level `Readers.ClkDiscipline`, the memory-clock discipline),
+  `Channels.lean` (plain Clean channels: State `True`, Program `RowSpec`, Memory `isU64 ∧ ClkBound`,
+  Byte `ByteRowSpec`),
   `InteractionBus/Projection/Recovery.lean`, `ChipAir.lean`, `SP1Constraint.lean`, `ByteTable.lean`, and
   the **semantic-execution substrate** `Semantics/` — `GuestProgram.lean` (the `GuestProgram` +
   `IsInitialState`/`SailStep`/`SailChain`/`SP1Halted` Sail execution model), `ProgramCommitment.lean`
@@ -157,10 +158,16 @@ Mirror-rust layout under `SP1Clean/`:
   plain Clean `Ensemble`, 25 chips + 11 boundary/provider tables); the timed/ranked grounding engine;
   `WitnessDecode.lean` (the deterministic typed row decoder), `LocalExecution.lean` (grounded ordered
   rows → a genuine shard-local Sail chain), and `AIR.lean` (the honest native witness relation,
-  `supported_core_witness_grounding` seam, and proved `supported_core_native_sound` consumer); and the
-  typed interaction/Memory bridge (`TypedInteractions.lean`, `TypedMemory.lean`, and
-  `TypedMemoryContracts.lean`; exact evaluated chip pulls → timed facts/live operands, with Add as the
-  first complete descriptor instance); and the
+  `supported_core_witness_grounding` seam, and proved `supported_core_native_sound` consumer); the
+  grounding-adapter/contract stack that reduces the `supportedCore_orderedRows_dynamic` seam to per-chip
+  obligations — `GroundingAdapter.lean` (the `advance`→timed-engine-record adapter: `RowWiring`,
+  `stepFact_of_advance`/`frameFact_of_advance`, `rowWiring_rtype`), `ChipContracts.lean`
+  (the `ChipGroundingContracts` bundle + `supportedCore_orderedRows_dynamic_of_contracts`, Add proved),
+  `AlignedCarrier.lean` (+ `AlignsWith` in `TimedGrounding.lean`, the ordinary↔aligned `RowFacts`
+  carrier transports), and `TimeExtraction.lean` (the `pull_lt_push` payoff from the memory-channel
+  `ClkBound`); and the typed interaction/Memory bridge (`TypedInteractions.lean`, `TypedMemory.lean`;
+  exact evaluated chip pulls → timed facts/live operands, with Add as the first complete descriptor
+  instance); and the
   auditable instruction-coverage layer — `Opcode.lean` + `Coverage.lean` (the `Opcode → chip → Sail`
   routing table mirroring SP1's `tracing.rs`/`RiscvAir`). The former `InstructionTrace.lean` name-only
   row-routing shadow and `Completeness.lean` routing scaffold were retired in favor of witness decoding,
@@ -214,12 +221,15 @@ SP1-specific trail machinery (see roadmap W11).
 **Structural-bus grounding program (in progress, 2026-07).** Channels communicate the field tuples and
 multiplicities that SP1 actually constrains; they do not assert reachability. `VmChannel` and the earlier
 semantic-channel spike were retired. State has local guarantee `True`, Program carries `RowSpec`, Memory
-carries `isU64`, and Byte carries `ByteRowSpec`. `StateTruth`/`ProgTruth` are conclusions of the timed
+carries `isU64 ∧ ClkBound` (value + a bounded 24-bit access timestamp), and Byte carries `ByteRowSpec`.
+`StateTruth`/`ProgTruth` are conclusions of the timed
 grounding engine from bus balance, boundary/provider facts, program commitment, strict schedule rank, and
 the 25 chip `advance` lemmas. No chip `ProverAssumptions` threads either global truth. The current capstone
 layers distinguish native supported-machine refinement, extracted AIR faithfulness, full SP1 AIR
 soundness, and the eventual ArkLib verifier theorem; see `docs/roadmap.md` W12.
-The exact typed Memory adapter and Add's `RegisterOperandPullShape` instance are landed. Remaining work
+The memory-bus closed forms (`exposedMemoryInteractions` + `interactionsWith_memory_eq`) are landed for
+all 24 non-DivRem chips; the `GroundingAdapter` advance-adapter, the `ChipGroundingContracts` bundle
+(Add instance proved), and the aligned-carrier transports are landed. Remaining work
 is registry-wide chip contracts plus RAM/same-location grounding and the per-position assumptions and
 readiness needed by `supportedCore_orderedRows_dynamic`.
 

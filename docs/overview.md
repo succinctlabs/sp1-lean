@@ -104,7 +104,7 @@ can prove locally:
 |---|---|---|---|
 | State | `(clock, pc)` edge | `True` | exhaustive time-ordered execution path |
 | Program | decoded instruction row | structural `ProgramMsg.RowSpec` | equality with the committed ROM decode |
-| Memory | location, timestamp, value | `MemoryMsg.isU64` | read currency / most-recent write |
+| Memory | location, timestamp, value | `MemoryMsg.isU64 ∧ MemoryMsg.ClkBound` | read currency / most-recent write |
 | Byte | opcode and byte/range operands | `ByteRowSpec` | the local table fact is already semantic |
 
 Execution reachability, ROM commitment, and Memory currency are not channel assumptions. Clean balance
@@ -127,12 +127,18 @@ The new capstone path has these stages:
 
 The remaining dynamic step is deliberately narrow. `TypedInteractions.lean` preserves each exact evaluated
 Clean interaction with its channel type. `TypedMemory.lean` turns active Memory pulls into timed facts and
-live-register bindings. `TypedMemoryContracts.lean` proves Add's exact source-B/source-C operand-pull shape
-from the chip's own exposed interaction list and transports it through the flattened component.
+live-register bindings. All 24 non-DivRem chips now carry their exact Memory closed forms
+(`exposedMemoryInteractions` + `interactionsWith_memory_eq`), and `GroundingAdapter.lean` turns any
+migrated chip's registered `advance` into the timed engine's per-row records; `ChipContracts.lean`
+bundles those into `ChipGroundingContracts` and reduces the named seam to
+`supportedCore_orderedRows_dynamic_of_contracts` (Add's instance `addChip_groundingContracts` proved).
+`AlignedCarrier.lean` + `AlignsWith` reconcile the walk's aligned `RowFacts` carrier with the ordinary
+one the chip contracts and consumers use.
 
-The next scale-out work is to give every registered chip the same exact Memory contract, then extend the
-grounding induction to RAM, repeated touches of one location, and the relevant scheduling cases. This is
-the direct path to closing `supportedCore_orderedRows_dynamic`.
+The next scale-out work is to instantiate `ChipGroundingContracts` for the remaining 23 chips and build
+the memory-channel balance stack, then extend the grounding induction to RAM, repeated touches of one
+location, and the relevant scheduling cases. This is the direct path to closing
+`supportedCore_orderedRows_dynamic`.
 
 The old Eulerian `GatedVm`/`TargetVm` material remains as a frozen proved intermediate and historical proof
 resource. Its `sp1_decoded_rows_sound` admission is not the semantic seam consumed by the new native

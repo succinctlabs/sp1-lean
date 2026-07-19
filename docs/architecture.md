@@ -62,8 +62,9 @@ The dynamic bridge reads the circuits' interactions through a typed adapter, not
 hand-written `memoryLookups` projection. `TypedInteractions.lean` retains each exact evaluated Clean
 interaction and recovers its channel message; `TypedMemory.lean` turns the active Memory pulls into
 timed row facts and live-register bindings. A chip supplies only an exact operand-pull shape over its
-own `exposedChannels` list. Add is the first complete descriptor instance in
-`TypedMemoryContracts.lean`; extending the registry is structural scale-out, while RAM and repeated
+own `exposedChannels` list. `TypedMemory.lean` holds the generic `CircuitRegisterOperandPullContract`
+transport and `Proofs/Chips/AddChip/Contracts.lean` is the first complete descriptor instance;
+extending the registry is structural scale-out, while RAM and repeated
 same-location scheduling remain grounding-engine work.
 
 Whole-machine completeness is the converse `WitnessRelation.Complete`, not Clean circuit soundness and
@@ -270,10 +271,12 @@ SP1Clean/
 │                   DivRem/{Math,Cases,Assembly} and Shift soundness families)
 ├── Soundness/      {State,Byte,Program,Memory}Consistency,       (PILLAR 5 "whole-machine reasoning":
 │                   ChipRow (`ChipKind`+`name`), ChipRegistry,      SP1Ensemble = balanced-trail
-│                   GatedVm/, SP1Ensemble, TimedGrounding, AIR,     intermediate; TimedGrounding + AIR
-│                   TargetVm,                                      own the semantic capstone;
-│                   Opcode, Coverage, AIR, RowView                 Coverage = Opcode→chip→Sail table;
-│                                                               AIR = relation-level capstone boundary)
+│                   SP1Ensemble, TimedGrounding (+AlignsWith),      intermediate; TimedGrounding + AIR +
+│                   AlignedCarrier, GroundingAdapter,               the grounding-adapter/contract stack
+│                   ChipContracts, TimeExtraction, AIR,             own the semantic capstone;
+│                   Opcode, Coverage, RowView                       Coverage = Opcode→chip→Sail table;
+│                   [frozen legacy, retired at seam close:          AIR = relation-level capstone boundary;
+│                    GatedVm/, TargetVm, AdvanceDispatch, Decode]   the bracketed set leaves at Phase P6)
 ├── Comparison.lean the worked-example findings doc — full rationale, no new proofs
 └── Step0Smoke.lean
 SP1Clean.lean  root index — import every module here

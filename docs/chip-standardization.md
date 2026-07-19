@@ -82,7 +82,8 @@ row-local structural guarantees, while the timed/ranked grounding engine derives
 
 The first two are proved for the supported native witness. The last two form the live
 `supportedCore_orderedRows_dynamic` seam. `TypedInteractions.lean` and `TypedMemory.lean` now transport
-facts from the exact evaluated circuit interactions; `TypedMemoryContracts.lean` supplies Add's first full
+facts from the exact evaluated circuit interactions; `TypedMemory.lean`'s generic
+`CircuitRegisterOperandPullContract` + `Proofs/Chips/AddChip/Contracts.lean` supply Add's first full
 operand contract. Extending that pattern across the registry is machine-grounding work, not another
 per-chip transition migration.
 
@@ -100,5 +101,5 @@ currently have that final anchor; remaining operation/fragment anchors are trans
 - `SP1Clean/Soundness/ChipRegistry.lean` — registry projection and 25/25 migration theorem.
 - `SP1Clean/Proofs/Sail/Advance.lean` — shared Sail execution cores.
 - `SP1Clean/Soundness/LocalExecution.lean` — generic row dispatcher and Sail-chain construction.
-- `SP1Clean/Soundness/TypedMemoryContracts.lean` — first exact operand contract.
+- `SP1Clean/Soundness/TypedMemory.lean` (generic transport) + `SP1Clean/Proofs/Chips/AddChip/Contracts.lean` — first exact operand contract.
 - [`architecture.md`](architecture.md) and [`roadmap.md`](roadmap.md) — whole-machine context.
