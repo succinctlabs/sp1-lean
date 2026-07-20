@@ -59,6 +59,7 @@ section Distribution
 
 variable {Message : TypeMap} [ProvableType Message] {channel : Channel (ZMod p) Message}
 
+omit [Fact (2 ^ 24 < p)] in
 /-- Active produced messages distribute over a `flatMap`: the produced messages of a concatenated
 family are the concatenation of each block's produced messages. -/
 theorem producedMessages_flatMap {α : Type*} (l : List α)
@@ -68,6 +69,7 @@ theorem producedMessages_flatMap {α : Type*} (l : List α)
   | nil => rfl
   | cons x l ih => rw [List.flatMap_cons, producedMessages_append, ih, List.flatMap_cons]
 
+omit [Fact (2 ^ 24 < p)] in
 /-- Active consumed messages distribute over a `flatMap`. -/
 theorem consumedMessages_flatMap {α : Type*} (l : List α)
     (f : α → List (TypedInteraction channel)) :
