@@ -158,7 +158,6 @@ theorem ChipGroundingContracts.engineFacts
     (decoded : DecodedInstructionRow p) (hchip : decoded.chip = chip)
     (decodedMem : decoded ∈ decodedInstructionRows (p := p) witness.tables)
     (real : (decoded.toChipRow witness.data).is_real = 1)
-    (openInputs : DecodedRowOpenSoundnessInputs decoded witness.data)
     (guard : RdGuardFact chip (decoded.toChipRow witness.data).view)
     (program : GuestProgram)
     (decode : Target.decodedInROM program
@@ -166,10 +165,6 @@ theorem ChipGroundingContracts.engineFacts
     (initial : SailState) (initialClock : ℕ) :
     LocalStepFact program initial initialClock (decoded.ordinaryRowFacts witness.data) ∧
       FrameFact program initial initialClock (decoded.ordinaryRowFacts witness.data) := by
-  have wiring := contracts.wiring witness constraints balanced decoded hchip decodedMem real
-    openInputs
-  have spec : (decoded.toChipRow witness.data).chipSpec witness.data :=
-    decoded.chipSpec_of_openSoundnessInputs witness constraints balanced decodedMem openInputs
   have ready : ∀ s : SailState, (decoded.toChipRow witness.data).kind.advanceReady
       (decoded.toChipRow witness.data).inputs (decoded.toChipRow witness.data).cols program s :=
     fun s => contracts.readiness witness constraints balanced decoded hchip decodedMem real guard
@@ -178,7 +173,22 @@ theorem ChipGroundingContracts.engineFacts
     show decoded.chip.kind.advance.isSome = true
     rw [hchip]
     exact contracts.migrated
-  exact engineFacts_of_kind migrated wiring real spec decode ready initial initialClock
+  -- Build the row's open Memory inputs from the ASSUMED pull currency (`isU64 ∧ ClkBound`), not from
+  -- the walk's own `Grounded` — the D0 circularity break.  The chip `Assumptions` are constraint-
+  -- derivable (the bundle's `assumptions` field), so `openInputs` is available inside the step/frame
+  -- currency antecedent without the grounded output.
+  have mkOpenInputs : (∀ mp ∈ (decoded.ordinaryRowFacts witness.data).memPulls,
+        SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧ SP1Clean.Channels.MemoryMsg.ClkBound mp.1 ∧
+        LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value) →
+      DecodedRowOpenSoundnessInputs decoded witness.data := fun hcurr =>
+    { assumptions := contracts.assumptions witness constraints balanced decoded hchip decodedMem real
+      memory := decoded.memoryChannelGuarantees_of_pullCurrency witness.data
+        (fun mp hmp => ⟨(hcurr mp hmp).1, (hcurr mp hmp).2.1⟩) }
+  refine engineFacts_of_kind migrated real decode ready initial initialClock
+    (fun hcurr => contracts.wiring witness constraints balanced decoded hchip decodedMem real
+      (mkOpenInputs hcurr))
+    (fun hcurr => decoded.chipSpec_of_openSoundnessInputs witness constraints balanced decodedMem
+      (mkOpenInputs hcurr))
 
 /-- **The dynamic-row consumer**: bundle + the walk's `Grounded` output + the row's positional
 facts assemble the `DynamicGroundedRow` demanded by `supportedCore_orderedRows_dynamic` — through

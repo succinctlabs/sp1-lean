@@ -166,6 +166,7 @@ def LocalStepFact (program : GuestProgram) (initial : SailState) (initialClock :
   LocalStateTruth program initial initialClock r.statePull →
   (∀ mp ∈ r.memPulls,
     SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
+    SP1Clean.Channels.MemoryMsg.ClkBound mp.1 ∧
     LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value) →
   LocalStateTruth program initial initialClock r.statePush ∧
     ∀ message ∈ r.memPushes, LocalMemTruth initial initialClock message

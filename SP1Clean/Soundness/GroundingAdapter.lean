@@ -197,9 +197,12 @@ theorem stepFact_of_advance {kind : ChipKind p}
     (spec : kind.chipSpec inp cols data)
     (decode : Target.decodedInROM program (programAccess (kind.view inp cols)).toRow)
     (ready : ∀ s : SailState, kind.advanceReady inp cols program s)
-    (initial : SailState) (initialClock : ℕ) :
-    LocalStepFact program initial initialClock rf := by
-  intro hpull hcurr
+    (initial : SailState) (initialClock : ℕ)
+    (hpull : LocalStateTruth program initial initialClock rf.statePull)
+    (hcurr : ∀ mp ∈ rf.memPulls, SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
+      LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value) :
+    LocalStateTruth program initial initialClock rf.statePush ∧
+      (∀ message ∈ rf.memPushes, LocalMemTruth initial initialClock message) := by
   obtain ⟨n, state, chain, htime, hpc, hrom, hcfg⟩ := hpull
   have hpull' : LocalStateTruth program initial initialClock rf.statePull :=
     ⟨n, state, chain, htime, hpc, hrom, hcfg⟩
@@ -292,9 +295,14 @@ theorem frameFact_of_advance {kind : ChipKind p}
     (spec : kind.chipSpec inp cols data)
     (decode : Target.decodedInROM program (programAccess (kind.view inp cols)).toRow)
     (ready : ∀ s : SailState, kind.advanceReady inp cols program s)
-    (initial : SailState) (initialClock : ℕ) :
-    FrameFact program initial initialClock rf := by
-  intro hpull hcurr loc v hpush hval
+    (initial : SailState) (initialClock : ℕ)
+    (hpull : LocalStateTruth program initial initialClock rf.statePull)
+    (hcurr : ∀ mp ∈ rf.memPulls, SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
+      LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value)
+    (loc : MemLoc) (v : Word (ZMod p))
+    (hpush : ∀ m ∈ rf.memPushes, MemoryMsg.locOf m = loc → m.value = v)
+    (hval : LocalValueAt initial initialClock loc (StateMsg.timeNat rf.statePull) v) :
+    LocalValueAt initial initialClock loc (StateMsg.timeNat rf.statePush) v := by
   obtain ⟨n, state, chain, htime, hpc, hrom, hcfg⟩ := hpull
   obtain ⟨s', hstep, heff⟩ :=
     wiring.advance_at advance real spec decode ready chain htime hpc hrom hcfg hcurr
@@ -333,18 +341,29 @@ theorem frameFact_of_advance {kind : ChipKind p}
 with its wiring and static facts yields both engine records at once. -/
 theorem engineFacts_of_kind {row : ChipRow p} {rf : Semantics.RowFacts p}
     (migrated : row.kind.advance.isSome = true)
-    (wiring : RowWiring row.view rf)
     {data : ProverData (ZMod p)} {program : GuestProgram}
     (real : row.is_real = 1)
-    (spec : row.chipSpec data)
     (decode : Target.decodedInROM program (programAccess row.view).toRow)
     (ready : ∀ s : SailState, row.kind.advanceReady row.inputs row.cols program s)
-    (initial : SailState) (initialClock : ℕ) :
+    (initial : SailState) (initialClock : ℕ)
+    (wiringOf : (∀ mp ∈ rf.memPulls, SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
+        SP1Clean.Channels.MemoryMsg.ClkBound mp.1 ∧
+        LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value) →
+      RowWiring row.view rf)
+    (specOf : (∀ mp ∈ rf.memPulls, SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
+        SP1Clean.Channels.MemoryMsg.ClkBound mp.1 ∧
+        LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value) →
+      row.chipSpec data) :
     LocalStepFact program initial initialClock rf ∧
       FrameFact program initial initialClock rf := by
   have advance := ChipKind.advancePayload_of_migrated migrated
-  exact ⟨stepFact_of_advance wiring advance real spec decode ready initial initialClock,
-    frameFact_of_advance wiring advance real spec decode ready initial initialClock⟩
+  refine ⟨?_, ?_⟩
+  · intro hpull hcurr
+    exact stepFact_of_advance (wiringOf hcurr) advance real (specOf hcurr) decode ready initial
+      initialClock hpull (fun mp hmp => ⟨(hcurr mp hmp).1, (hcurr mp hmp).2.2⟩)
+  · intro hpull hcurr loc v hpush hval
+    exact frameFact_of_advance (wiringOf hcurr) advance real (specOf hcurr) decode ready initial
+      initialClock hpull (fun mp hmp => ⟨(hcurr mp hmp).1, (hcurr mp hmp).2.2⟩) loc v hpush hval
 
 /-! ## The R-type reader-shape wiring
 
@@ -1191,69 +1210,9 @@ theorem rowWiring_rtype_of_decoded (decoded : DecodedInstructionRow p)
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPushes]
     exact produced_eq
 
-set_option maxHeartbeats 1000000 in
-/-- **The Add validation instance** (SP-2's `addRow_engineFacts`): a genuine decoded Add row of a
-constrained, balanced witness produces both timed-engine records through the generic adapter — no
-Add-specific Sail reasoning beyond the registered `advance` payload.  `decode` and `ready` are the
-static-layer/readiness residuals supplied by the surrounding grounding argument. -/
-theorem addRow_engineFacts
-    (witness : EnsembleWitness (sp1Ensemble (p := p)))
-    (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
-    (decoded : DecodedInstructionRow p) (hchip : decoded.chip = addChipDescriptor (p := p))
-    (decodedMem : decoded ∈ decodedInstructionRows (p := p) witness.tables)
-    (real : (decoded.toChipRow witness.data).is_real = 1)
-    (openInputs : DecodedRowOpenSoundnessInputs decoded witness.data)
-    (program : GuestProgram)
-    (decode : Target.decodedInROM program
-      (programAccess (decoded.toChipRow witness.data).view).toRow)
-    (ready : ∀ s : SailState, (decoded.toChipRow witness.data).kind.advanceReady
-      (decoded.toChipRow witness.data).inputs (decoded.toChipRow witness.data).cols program s)
-    (initial : SailState) (initialClock : ℕ) :
-    LocalStepFact program initial initialClock (decoded.ordinaryRowFacts witness.data) ∧
-      FrameFact program initial initialClock (decoded.ordinaryRowFacts witness.data) := by
-  have realView : (decoded.toChipRow witness.data).view.is_real = 1 := real
-  have byteG := decodedInstructionRow_byteGuarantees witness constraints balanced decoded
-    decodedMem
-  have bounds := addChip_viewClockBounds decoded witness.data hchip byteG realView
-  have spec : (decoded.toChipRow witness.data).chipSpec witness.data :=
-    decoded.chipSpec_of_openSoundnessInputs witness constraints balanced decodedMem openInputs
-  have requirements := fullRequirements_of_openSoundnessInputs witness constraints balanced
-    decoded decodedMem openInputs
-  have consumed_eq := addChip_consumedMemoryMessages_eq decoded witness.data hchip realView
-  have produced_eq := addChip_producedMemoryMessages_eq decoded witness.data hchip realView
-  have writeU64 : Word.isU64 (decoded.toChipRow witness.data).view.rdWrite := by
-    have hmem : rtypeWriteMessage (decoded.toChipRow witness.data).view ∈
-        decoded.producedMemoryMessages witness.data := by
-      rw [produced_eq]
-      exact List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self)
-    exact producedMemoryMessages_isU64_of_fullRequirements decoded witness.data requirements
-      _ hmem
-  have commit_eq : (decoded.toChipRow witness.data).view.commit =
-      Trace.CommitEffect.regWrite := by
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  have opa_lt : (decoded.toChipRow witness.data).view.adapter.op_a.val < 32 := by
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addChipDescriptor (p := p) := hchip
-    subst hchip'
-    -- Hypothesis-directed, metavariable-free: extract the circuit `Spec` through the decoder's
-    -- registered iff and destructure in place.  Applying the abstract `addChip_opa_lt` here would
-    -- hand the unifier metavariables whose resolution forces a full eval-struct normalization.
-    obtain ⟨-, hrspec, -, -⟩ :=
-      (SupportedChip.decodeRow_chipSpec_iff (addChipDescriptor (p := p))
-        witness.data physical).mp spec
-    obtain ⟨-, -, -, -, -, hbounds, -⟩ := hrspec
-    exact (hbounds realView).1
-  have wiring := rowWiring_rtype_of_decoded decoded witness.data bounds commit_eq opa_lt
-    writeU64 consumed_eq produced_eq
-  have migrated : (decoded.toChipRow witness.data).kind.advance.isSome = true := by
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  exact engineFacts_of_kind migrated wiring real spec decode ready initial initialClock
+-- (The former Add-specific `addRow_engineFacts` validation instance was retired with the D0
+-- conditional-feed refactor: `engineFacts_of_kind` now takes currency-`wiringOf`/`specOf` builders,
+-- and the generic bundle consumer `ChipGroundingContracts.engineFacts` supersedes it.)
 
 set_option maxHeartbeats 1000000 in
 /-- **The Add aligned-carrier validation instance** (the `AlignedCarrier` sibling of

@@ -217,6 +217,7 @@ def FrameFact (program : GuestProgram) (initial : SailState) (initialClock : ℕ
     (r : RowFacts p) : Prop :=
   LocalStateTruth program initial initialClock r.statePull →
   (∀ mp ∈ r.memPulls, SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
+      SP1Clean.Channels.MemoryMsg.ClkBound mp.1 ∧
       LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value) →
   ∀ (loc : MemLoc) (v : Word (ZMod p)),
     (∀ m ∈ r.memPushes, MemoryMsg.locOf m = loc → m.value = v) →
@@ -234,6 +235,11 @@ structure RowOK (initialClock : ℕ) (r : RowFacts p) : Prop where
   touches : List.Forall₂ (TouchOK (StateMsg.timeNat r.statePull)) r.memPulls r.memPushes
   chain_mono : ∀ loc : MemLoc, List.IsChain
     (fun a b : Touch p => MemoryMsg.timeNat a.2 < MemoryMsg.timeNat b.2) (rowTouchesAt r loc)
+  /-- Every push this row emits carries a bounded (`< 2^24`) access timestamp — the reader's own
+  constraint-level `clk_low` range check.  Independent of the walk's currency, so the induction can
+  read a same-key re-read pull's `ClkBound` off this field instead of the not-yet-established step
+  output (the currency-circularity break, D0). -/
+  pushClkBound : ∀ m ∈ r.memPushes, SP1Clean.Channels.MemoryMsg.ClkBound m
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- Package a row's per-key touches as the chain bundle consumed by the per-key forcing. -/
@@ -298,14 +304,16 @@ theorem ordinaryPullCurrency_of_aligned
     {r_align r_ord : RowFacts p} (h : AlignsWith r_align r_ord)
     (hstateTruth : LocalStateTruth program initial initialClock r_align.statePull)
     (hcurr_al : ∀ mp ∈ r_align.memPulls, MemoryMsg.isU64 mp.1 ∧
+      MemoryMsg.ClkBound mp.1 ∧
       LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value) :
     ∀ mp ∈ r_ord.memPulls, MemoryMsg.isU64 mp.1 ∧
+      MemoryMsg.ClkBound mp.1 ∧
       LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value := by
   intro mp hmp
   obtain ⟨i, hloc⟩ := h.reg mp hmp
   obtain ⟨mp', hmp'_mem, hmsg, hlo, hhi⟩ := h.match_ mp hmp
-  obtain ⟨hu64, hval_al⟩ := hcurr_al mp' hmp'_mem
-  refine ⟨hmsg ▸ hu64, ?_⟩
+  obtain ⟨hu64, hclk, hval_al⟩ := hcurr_al mp' hmp'_mem
+  refine ⟨hmsg ▸ hu64, hmsg ▸ hclk, ?_⟩
   rw [hloc, h.ordTime mp hmp]
   have hval_al' : LocalValueAt initial initialClock (MemLoc.reg i) mp'.2 mp.1.value := by
     rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.reg i from hmsg ▸ hloc]
@@ -587,6 +595,7 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
     -- read-time currency for `r`'s pulls: every chain pull carries the frontier value (nothing
     -- can follow a same-key write), current throughout the location's pre-effect read window
     have h_curr : ∀ mp ∈ r.memPulls, SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
+        SP1Clean.Channels.MemoryMsg.ClkBound mp.1 ∧
         LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value := by
       intro mp hmp
       obtain ⟨q, hq_zip⟩ := mem_zip_of_mem_left h_rok.touches mp hmp
@@ -600,30 +609,41 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
       have hveq : mp.1.value
           = ((rowTouchesAt r (MemoryMsg.locOf mp.1)).head hne').1.1.value :=
         chain_pull_values _ (h_rok.chainOK _) hlink hne' (mp, q) hmem_own
-      refine ⟨by simpa [SP1Clean.Channels.MemoryMsg.isU64, hveq] using hmt₀.1, ?_⟩
-      rw [← hveq] at hval₀
-      have hlo : StateMsg.timeNat r.statePull ≤ mp.2 :=
-        (h_rok.chainOK (MemoryMsg.locOf mp.1)).read_lo (mp, q) hmem_own
-      have hhi : mp.2 ≤ StateMsg.timeNat r.statePull + readWindow (MemoryMsg.locOf mp.1) :=
-        (h_rok.chainOK (MemoryMsg.locOf mp.1)).read_hi (mp, q) hmem_own
-      cases hloc : MemoryMsg.locOf mp.1 with
-      | reg i =>
-        rw [hloc, readWindow_reg] at hhi
-        rw [hloc] at hval₀
-        exact localValueAt_shift h_head
-          (Or.inl ⟨le_refl _, by omega, by omega, by omega⟩) hval₀
-      | ram a =>
-        rw [hloc, readWindow_ram] at hhi
-        rw [hloc] at hval₀
-        have hread : mp.2 = StateMsg.timeNat head := by omega
-        rw [hread]
-        exact hval₀
+      refine ⟨by simpa [SP1Clean.Channels.MemoryMsg.isU64, hveq] using hmt₀.1, ?_, ?_⟩
+      · -- `ClkBound`: a head pull is the frontier record (bound from `LiveOK`'s `LocalMemTruth`); a
+        -- same-key re-read pull is one of the row's own pushes (bound from `RowOK.pushClkBound`, not
+        -- the not-yet-established step output — the currency-circularity break).
+        rcases chain_pull_head_or_push _ hne' hlink (mp, q) hmem_own with hhd | hpush
+        · rw [show mp.1 = ((rowTouchesAt r (MemoryMsg.locOf mp.1)).head hne').1.1 from hhd]
+          exact hmt₀.2.1
+        · obtain ⟨pq', hpq', hpq'_eq⟩ := mem_chainPushes.mp hpush
+          have hq_mem : mp.1 ∈ r.memPushes := by
+            rw [← hpq'_eq]
+            exact (List.of_mem_zip (mem_rowTouchesAt.mp hpq').1).2
+          exact h_rok.pushClkBound mp.1 hq_mem
+      · rw [← hveq] at hval₀
+        have hlo : StateMsg.timeNat r.statePull ≤ mp.2 :=
+          (h_rok.chainOK (MemoryMsg.locOf mp.1)).read_lo (mp, q) hmem_own
+        have hhi : mp.2 ≤ StateMsg.timeNat r.statePull + readWindow (MemoryMsg.locOf mp.1) :=
+          (h_rok.chainOK (MemoryMsg.locOf mp.1)).read_hi (mp, q) hmem_own
+        cases hloc : MemoryMsg.locOf mp.1 with
+        | reg i =>
+          rw [hloc, readWindow_reg] at hhi
+          rw [hloc] at hval₀
+          exact localValueAt_shift h_head
+            (Or.inl ⟨le_refl _, by omega, by omega, by omega⟩) hval₀
+        | ram a =>
+          rw [hloc, readWindow_ram] at hhi
+          rw [hloc] at hval₀
+          have hread : mp.2 = StateMsg.timeNat head := by omega
+          rw [hread]
+          exact hval₀
     -- (C) fire the row's StepFact
     have h_after := h_step r hr_mem h_rtruth h_curr
     -- the row is Grounded: head pulls are true frontier records, tail pulls are the row's own
     -- (just-fired) read-back pushes
     have h_ground_r : Grounded program initial initialClock r := by
-      refine ⟨h_rtruth, fun mp hmp => ⟨?_, (h_curr mp hmp).2⟩⟩
+      refine ⟨h_rtruth, fun mp hmp => ⟨?_, (h_curr mp hmp).2.2⟩⟩
       obtain ⟨q, hq_zip⟩ := mem_zip_of_mem_left h_rok.touches mp hmp
       have hto : TouchOK (StateMsg.timeNat r.statePull) mp q :=
         List.forall₂_zip h_rok.touches hq_zip

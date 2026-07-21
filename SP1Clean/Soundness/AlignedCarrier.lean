@@ -93,7 +93,8 @@ theorem rowOK_alignedOf (initialClock : ℕ) (r_ord : RowFacts p) (touches : Lis
     (htouch : ∀ tc ∈ touches, TouchOK (StateMsg.timeNat r_ord.statePull) tc.1 tc.2)
     (hchain : ∀ loc : MemLoc, List.IsChain
       (fun a b : Touch p => MemoryMsg.timeNat a.2 < MemoryMsg.timeNat b.2)
-      (touches.filter (fun pq => MemoryMsg.locOf pq.2 = loc))) :
+      (touches.filter (fun pq => MemoryMsg.locOf pq.2 = loc)))
+    (hpushClk : ∀ tc ∈ touches, SP1Clean.Channels.MemoryMsg.ClkBound tc.2) :
     RowOK initialClock (alignedOf r_ord touches) where
   time8 := htime8
   align8 := halign8
@@ -102,5 +103,10 @@ theorem rowOK_alignedOf (initialClock : ℕ) (r_ord : RowFacts p) (touches : Lis
     intro loc
     rw [rowTouchesAt_alignedOf]
     exact hchain loc
+  pushClkBound := by
+    intro m hm
+    simp only [alignedOf, List.mem_map] at hm
+    obtain ⟨tc, htc, rfl⟩ := hm
+    exact hpushClk tc htc
 
 end SP1Clean.Soundness.TimedGrounding
