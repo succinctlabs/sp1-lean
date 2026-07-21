@@ -731,7 +731,8 @@ theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
         TouchOK (StateMsg.timeNat rf.statePull) tc.1 tc.2) ∧
       (∀ loc : MemLoc, List.IsChain
         (fun a b : Touch p => MemoryMsg.timeNat a.2 < MemoryMsg.timeNat b.2)
-        ((rtypeTouches view rf).filter (fun pq => MemoryMsg.locOf pq.2 = loc))) := by
+        ((rtypeTouches view rf).filter (fun pq => MemoryMsg.locOf pq.2 = loc))) ∧
+      (∀ tc ∈ rtypeTouches view rf, SP1Clean.Channels.MemoryMsg.ClkBound tc.2) := by
   -- Register-index → location facts (used everywhere).
   have hidxA : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) = view.adapter.op_a := by
     rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
@@ -804,7 +805,7 @@ theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
   have tw : MemoryMsg.timeNat (rtypeWriteMessage view) = StateMsg.timeNat rf.statePull + 4 := by
     rw [statePull_eq]
     exact timeNat_rtypeWriteMessage bounds
-  refine ⟨?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_⟩
   · -- AlignsWith via the generic constructor
     refine alignsWith_alignedOf rf (rtypeTouches view rf) ?_ ?_ ?_ ?_ ?_
     · -- hpush: the aligned pushes permute the ordinary produced list (op_c/op_b read-backs swap)
@@ -879,6 +880,18 @@ theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
         simp only [List.not_mem_nil] at hx
     intro loc
     exact (List.Pairwise.sublist List.filter_sublist hpair).isChain
+  · -- the per-push `ClkBound` (`hpushClk` for `rowOK_alignedOf`): each push sits at
+    -- `clk_0_16 + clk_16_24 * 65536 + δ` with `δ ∈ {2, 3, 4}` (the rtypeTouches order:
+    -- op_c read-back @ +2, op_b read-back @ +3, op_a write @ +4), constraint-only from `bounds`.
+    intro tc htc
+    simp only [rtypeTouches, List.mem_cons, List.not_mem_nil, or_false] at htc
+    rcases htc with rfl | rfl | rfl
+    · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 2 val_2_zmod_p (by omega)
+        bounds.clk0 bounds.clk1
+    · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 3 val_3_zmod_p (by omega)
+        bounds.clk0 bounds.clk1
+    · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 4 val_4_zmod_p (by omega)
+        bounds.clk0 bounds.clk1
 
 end RType
 
@@ -1254,7 +1267,9 @@ theorem addChip_rowAligned (decoded : DecodedInstructionRow p) (data : ProverDat
       (∀ loc : MemLoc, List.IsChain
         (fun a b : Touch p => MemoryMsg.timeNat a.2 < MemoryMsg.timeNat b.2)
         ((rtypeTouches (decoded.toChipRow data).view (decoded.ordinaryRowFacts data)).filter
-          (fun pq => MemoryMsg.locOf pq.2 = loc))) := by
+          (fun pq => MemoryMsg.locOf pq.2 = loc))) ∧
+      (∀ tc ∈ rtypeTouches (decoded.toChipRow data).view (decoded.ordinaryRowFacts data),
+        SP1Clean.Channels.MemoryMsg.ClkBound tc.2) := by
   have consumed_eq := addChip_consumedMemoryMessages_eq decoded data hchip real
   have produced_eq := addChip_producedMemoryMessages_eq decoded data hchip real
   have opa_lt : (decoded.toChipRow data).view.adapter.op_a.val < 32 := by
