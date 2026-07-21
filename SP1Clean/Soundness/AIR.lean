@@ -187,6 +187,31 @@ theorem clockCount_of_decodedStateWalk (data : ProverData (ZMod p)) :
       simp only [List.length_cons]
       omega
 
+/-- The telescoping endpoint-multiset balance of a State walk: the head plus each row's push equals the
+final plus each row's pull, as multisets.  The `List`-level companion of
+`RankedGrounding.endpointBalanced_of_balanced`, derived directly from `IsWalk` so it carries the
+`statement.publicValues` endpoints natively — the exact State-balance hypothesis `TimedGrounding.walk`
+consumes (after mapping `decodedStateEdge` onto the aligned carrier's `statePush`/`statePull`). -/
+theorem endpointBalance_of_decodedStateWalk (data : ProverData (ZMod p)) :
+    ∀ {initial final : Channels.StateMsg (ZMod p)}
+      {rows : List (DecodedInstructionRow p)},
+      Walk.IsWalk (decodedStateEdge data) initial final rows →
+      initial ::ₘ (↑(rows.map (fun d => (decodedStateEdge data d).2)) :
+          Multiset (Channels.StateMsg (ZMod p)))
+        = final ::ₘ ↑(rows.map (fun d => (decodedStateEdge data d).1)) := by
+  intro initial final rows walk
+  induction rows generalizing initial with
+  | nil =>
+      change initial = final at walk
+      subst final
+      rfl
+  | cons decoded rows ih =>
+      obtain ⟨source, tail⟩ := walk
+      have ihEq := ih tail
+      simp only [List.map_cons, Multiset.cons_coe, Multiset.coe_eq_coe] at ihEq ⊢
+      rw [source]
+      exact (List.Perm.cons initial ihEq).trans (List.Perm.swap final initial _)
+
 /-- The State walk and each chip's proved `+8` clock contract locate every exact decoded row at its
 prefix length. This is the position equation consumed by shard-local Memory currency. -/
 theorem statePullTime_of_decodedStateWalk (data : ProverData (ZMod p)) :
