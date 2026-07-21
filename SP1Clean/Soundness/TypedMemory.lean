@@ -401,30 +401,47 @@ theorem valueOperandsBound_of_grounded (decoded : DecodedInstructionRow p)
     have live := (Semantics.localValueAt_stepStart_iff chain).mp current
     exact live
 
-/-- Timed semantic grounding of the row's exact active prior records supplies the Memory guarantees
-consumed by its original Clean circuit. This is the key direction needed by chip `weakSoundness`:
-grounding does not assume a circuit Spec and does not replace the circuit's interaction list. -/
-theorem memoryChannelGuarantees_of_grounded (decoded : DecodedInstructionRow p)
-    (data : ProverData (ZMod p)) (program : Target.GuestProgram)
-    (initial : SailState) (initialClock : ℕ)
-    (grounded : TimedGrounding.Grounded program initial initialClock
-      (decoded.ordinaryRowFacts data)) :
+/-- The row's Memory guarantees consumed by its original Clean circuit, from the **structural** pull
+currency alone — each pulled record is `isU64 ∧ ClkBound`.  This is the pre-walk (conditional) form: it
+needs neither the semantic `LocalValueAt` binding nor a circuit Spec, so it discharges the monolithic
+`weakSoundness` Memory-channel input *given only the assumed currency*.  That is the key to feeding the
+timed grounding engine without circularity — the engine consumes `LocalStepFact`/`FrameFact`, which
+assume exactly this currency, so their producer never needs the walk's own `Grounded` output. -/
+theorem memoryChannelGuarantees_of_pullCurrency (decoded : DecodedInstructionRow p)
+    (data : ProverData (ZMod p))
+    (pullCurrency : ∀ mp ∈ (decoded.ordinaryRowFacts data).memPulls,
+      MemoryMsg.isU64 mp.1 ∧ MemoryMsg.ClkBound mp.1) :
     decoded.chip.table.operations.ChannelGuarantees memoryChannel.toRaw
       (decoded.environment data) := by
   have hp : 2 < p := by have := Fact.out (p := 2 ^ 24 < p); omega
   apply channelGuarantees_of_consumedMessages decoded.chip.table.operations memoryChannel
     (decoded.environment data) hp
   intro message messageMem
-  -- G1: the memory channel's `Guarantees` is the pair `isU64 ∧ ClkBound`, and both are conjuncts of
-  -- the pulled record's `LocalMemTruth` that timed grounding supplies.
+  -- G1: the memory channel's `Guarantees` is the pair `isU64 ∧ ClkBound`, supplied directly by the
+  -- assumed pull currency.
   change MemoryMsg.isU64 message ∧ MemoryMsg.ClkBound message
   have pairMem :
       (message, Semantics.StateMsg.timeNat (statePullMessage (decoded.toChipRow data))) ∈
         (decoded.ordinaryRowFacts data).memPulls := by
     rw [ordinaryRowFacts_memPulls]
     exact List.mem_map.mpr ⟨message, messageMem, rfl⟩
-  have truth := (grounded.2 _ pairMem).1
-  exact ⟨truth.1, truth.2.1⟩
+  exact pullCurrency _ pairMem
+
+/-- Timed semantic grounding of the row's exact active prior records supplies the Memory guarantees
+consumed by its original Clean circuit — a thin specialization of
+`memoryChannelGuarantees_of_pullCurrency`, since `Grounded` carries each pull's `LocalMemTruth` whose
+`isU64 ∧ ClkBound` conjuncts are exactly the structural currency.  This is the key direction needed by
+chip `weakSoundness`: grounding does not assume a circuit Spec and does not replace the circuit's
+interaction list. -/
+theorem memoryChannelGuarantees_of_grounded (decoded : DecodedInstructionRow p)
+    (data : ProverData (ZMod p)) (program : Target.GuestProgram)
+    (initial : SailState) (initialClock : ℕ)
+    (grounded : TimedGrounding.Grounded program initial initialClock
+      (decoded.ordinaryRowFacts data)) :
+    decoded.chip.table.operations.ChannelGuarantees memoryChannel.toRaw
+      (decoded.environment data) :=
+  memoryChannelGuarantees_of_pullCurrency decoded data
+    (fun mp hmp => ⟨((grounded.2 mp hmp).1).1, ((grounded.2 mp hmp).1).2.1⟩)
 
 end DecodedInstructionRow
 
