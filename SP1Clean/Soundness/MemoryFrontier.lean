@@ -132,15 +132,8 @@ noncomputable def memoryFinalizeFrontier (witness : EnsembleWitness (sp1Ensemble
   ((consumedMessages (typedTableInteractionsWith (memoryFinalizeProviderTable witness)
     memoryChannel)).filter (fun m => decide (Semantics.MemoryMsg.locOf m = loc))).head?
 
-/-- **The finalize-provider per-location uniqueness fact** (mirror of `MemoryInitProviderUnique`).  At
-most one active finalize pull per register or aligned 64-bit RAM cell.  Like the init uniqueness, Clean
-channel balance alone cannot force this, so it is an honest boundary companion fact — to be discharged
-by the extracted-AIR layer, and (unlike the init one) not yet a field of `InitialBoundaryFacts`. -/
-noncomputable def MemoryFinalizeProviderUnique
-    (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop :=
-  (typedTableInteractionsWith (memoryFinalizeProviderTable witness) memoryChannel).Pairwise
-    fun i₁ i₂ => signedVal i₁.mult ≠ 0 → signedVal i₂.mult ≠ 0 →
-      Semantics.MemoryMsg.locOf i₁.message ≠ Semantics.MemoryMsg.locOf i₂.message
+-- `MemoryFinalizeProviderUnique` now lives in `Soundness/ProviderBindings.lean` (next to
+-- `MemoryInitProviderUnique`), so it can be a field of `InitialBoundaryFacts` (added 2026-07-20).
 
 /-! ## The frontier ↔ filtered-multiset bridges -/
 

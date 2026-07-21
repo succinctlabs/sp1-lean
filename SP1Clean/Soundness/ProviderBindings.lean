@@ -215,6 +215,16 @@ noncomputable def MemoryInitProviderUnique
     fun i₁ i₂ => signedVal i₁.mult ≠ 0 → signedVal i₂.mult ≠ 0 →
       MemoryMsg.locOf i₁.message ≠ MemoryMsg.locOf i₂.message
 
+/-- **The finalize-provider per-location uniqueness fact** (mirror of `MemoryInitProviderUnique`).  At
+most one active finalize pull per register or aligned 64-bit RAM cell.  Like the init uniqueness, Clean
+channel balance alone cannot force this, so it is an honest boundary companion fact — discharged by the
+extracted-AIR layer, and (like the init one, since 2026-07-20) a field of `InitialBoundaryFacts`. -/
+noncomputable def MemoryFinalizeProviderUnique
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop :=
+  (typedTableInteractionsWith (memoryFinalizeProviderTable witness) memoryChannel).Pairwise
+    fun i₁ i₂ => signedVal i₁.mult ≠ 0 → signedVal i₂.mult ≠ 0 →
+      MemoryMsg.locOf i₁.message ≠ MemoryMsg.locOf i₂.message
+
 /-- Every exact active Memory-init push is locally true at the selected shard boundary. The value
 range comes from the provider circuit's proved requirement; only state content and initial timing
 come from `MemoryInitProviderBound`. -/
@@ -273,6 +283,7 @@ structure InitialBoundaryFacts
   programProvider : ProgramProviderBound witness
   memoryProvider : MemoryInitProviderBound witness initial (Commit.initClkNat witness.data)
   memoryProviderUnique : MemoryInitProviderUnique witness
+  memoryFinalizeProviderUnique : MemoryFinalizeProviderUnique witness
 
 /-- The selected public boundary is exactly the initial truth needed by shard-local timed grounding.
 No boot or zero-register premise is introduced here. -/
