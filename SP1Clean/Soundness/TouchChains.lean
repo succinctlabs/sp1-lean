@@ -125,14 +125,15 @@ lemma mem_chainPushes {c : List (Touch p)} {m : MemoryMsg (ZMod p)} :
   List.mem_map
 
 /-- The in-circuit-style shape/ordering facts for one paired pull/push touch of a row whose
-state-pull time is `t`: same location; the pulled prior strictly predates the push (SP1's
-`prev_clk < access_clk`); the read happens in the location's pre-effect read window (`[t, t+3]` for
-registers, exactly `t` for RAM); and the push is either a read-back — same value, pushed **at the
-read micro-time** — or the write at `t + writeOffset` (`t + 4` register, `t + 1` RAM). No pre-row
-bound on the pull and no chain-link facts: those are derived from balance (SP-6 D4/D5). -/
+state-pull time is `t`: same location; the read happens in the location's pre-effect read window
+(`[t, t+3]` for registers, exactly `t` for RAM); and the push is either a read-back — same value,
+pushed **at the read micro-time** — or the write at `t + writeOffset` (`t + 4` register, `t + 1` RAM).
+No pre-row bound on the pull, **no** `prev_clk < access_clk` order, and no chain-link facts: the strict
+pull-time order is `ClkBound`-conditional (the prior record's `ClkBound` is *received*), so it is carried
+separately by `RowOK.slotOfClkBound` and rederived inside the walk from the per-key balance (the 1f
+currency-circularity break); the chain links come from balance (SP-6 D4/D5). -/
 structure TouchOK (t : ℕ) (mp : MemoryMsg (ZMod p) × ℕ) (q : MemoryMsg (ZMod p)) : Prop where
   loc_eq : MemoryMsg.locOf q = MemoryMsg.locOf mp.1
-  pull_lt_push : MemoryMsg.timeNat mp.1 < MemoryMsg.timeNat q
   read_lo : t ≤ mp.2
   read_hi : mp.2 ≤ t + readWindow (MemoryMsg.locOf mp.1)
   push_kind : (q.value = mp.1.value ∧ MemoryMsg.timeNat q = mp.2) ∨

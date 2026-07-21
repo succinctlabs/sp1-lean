@@ -240,11 +240,24 @@ structure RowOK (initialClock : ℕ) (r : RowFacts p) : Prop where
   read a same-key re-read pull's `ClkBound` off this field instead of the not-yet-established step
   output (the currency-circularity break, D0). -/
   pushClkBound : ∀ m ∈ r.memPushes, SP1Clean.Channels.MemoryMsg.ClkBound m
+  /-- The `prev_clk < access_clk` order (formerly `TouchOK.pull_lt_push`; SP1's register-timestamp
+  compare), made **conditional on the pulled record's `ClkBound`** — a *received* fact.  The walk
+  supplies that `ClkBound` from the per-key memory balance (`pull_clkBound_of_balance`), keeping this
+  field currency-free at the per-chip layer (the second currency-circularity break, 1f). -/
+  slotOfClkBound : ∀ pq ∈ r.memPulls.zip r.memPushes,
+    SP1Clean.Channels.MemoryMsg.ClkBound (pq : Touch p).1.1 →
+    MemoryMsg.timeNat (pq : Touch p).1.1 < MemoryMsg.timeNat pq.2
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
-/-- Package a row's per-key touches as the chain bundle consumed by the per-key forcing. -/
+/-- Package a row's per-key touches as the chain bundle consumed by the per-key forcing.  The `slot`
+(`prev_clk < access_clk`) fact is rebuilt from the currency-free `RowOK.slotOfClkBound` field given
+`hclk`, the per-key pulled-record `ClkBound`s the walk derives from the memory balance
+(`pull_clkBound_of_balance`) — this is the 1f break: no `TouchOK.pull_lt_push` pre-walk input. -/
 lemma RowOK.chainOK {initialClock : ℕ} {r : RowFacts p} (hok : RowOK initialClock r)
-    (loc : MemLoc) : ChainOK loc (StateMsg.timeNat r.statePull) (rowTouchesAt r loc) := by
+    (loc : MemLoc)
+    (hclk : ∀ pq ∈ rowTouchesAt r loc,
+      SP1Clean.Channels.MemoryMsg.ClkBound (pq : Touch p).1.1) :
+    ChainOK loc (StateMsg.timeNat r.statePull) (rowTouchesAt r loc) := by
   have hmem : ∀ pq ∈ rowTouchesAt r loc,
       TouchOK (StateMsg.timeNat r.statePull) pq.1 pq.2 ∧ MemoryMsg.locOf pq.2 = loc := by
     intro pq hpq
@@ -253,7 +266,8 @@ lemma RowOK.chainOK {initialClock : ℕ} {r : RowFacts p} (hok : RowOK initialCl
   refine
     { pull_loc := fun pq hpq => ?_
       push_loc := fun pq hpq => (hmem pq hpq).2
-      slot := fun pq hpq => (hmem pq hpq).1.pull_lt_push
+      slot := fun pq hpq =>
+        hok.slotOfClkBound pq (mem_rowTouchesAt.mp hpq).1 (hclk pq hpq)
       read_lo := fun pq hpq => (hmem pq hpq).1.read_lo
       read_hi := fun pq hpq => ?_
       push_kind := fun pq hpq => ?_
@@ -482,6 +496,42 @@ lemma push_time_ge {c0 : ℕ} {r : RowFacts p} (hok : RowOK c0 r) {q : MemoryMsg
   obtain ⟨mp, -, hto⟩ := forall₂_exists_left hok.touches q hq
   exact hto.push_lo
 
+omit [Fact (2 ^ 17 < p)] in
+/-- **Balance ⇒ pulled-record `ClkBound`** (the 1f currency-circularity break).  By the per-key
+memory balance, every record a row pulls lies in `optMS (live loc) + pushesAt rows loc`, so it is
+either the per-key frontier record (bounded by `LiveOK`'s `LocalMemTruth`) or one of some row's own
+pushes (bounded by `RowOK.pushClkBound`).  Currency-free — exactly the `ClkBound` input `RowOK.chainOK`
+needs to rebuild the `slot` (`prev_clk < access_clk`) fact without the received `TouchOK.pull_lt_push`. -/
+lemma pull_clkBound_of_balance {initial : SailState} {initialClock t : ℕ}
+    {rows : List (RowFacts p)} {live finM : MemLoc → Option (MemoryMsg (ZMod p))}
+    (h_ok : ∀ r ∈ rows, RowOK initialClock r)
+    (h_live : LiveOK initial initialClock t live)
+    (h_mbal : ∀ loc : MemLoc, optMS (live loc) + pushesAt rows loc
+      = optMS (finM loc) + pullsAt rows loc)
+    {r : RowFacts p} (hr : r ∈ rows) {mp : MemoryMsg (ZMod p) × ℕ} (hmp : mp ∈ r.memPulls) :
+    SP1Clean.Channels.MemoryMsg.ClkBound mp.1 := by
+  have hmp1_in : mp.1 ∈ rowPullsAt r (MemoryMsg.locOf mp.1) := by
+    rw [rowPullsAt]
+    exact List.mem_filter.mpr ⟨List.mem_map.mpr ⟨mp, hmp, rfl⟩, by simp⟩
+  have hmem_pull : mp.1 ∈ pullsAt rows (MemoryMsg.locOf mp.1) := by
+    rw [pullsAt]
+    exact (mem_listSum_map _ rows mp.1).mpr ⟨r, hr, Multiset.mem_coe.mpr hmp1_in⟩
+  have hmem_lhs : mp.1 ∈ optMS (live (MemoryMsg.locOf mp.1))
+      + pushesAt rows (MemoryMsg.locOf mp.1) := by
+    rw [h_mbal (MemoryMsg.locOf mp.1)]
+    exact Multiset.mem_add.mpr (Or.inr hmem_pull)
+  rcases Multiset.mem_add.mp hmem_lhs with hlive_mem | hpush_mem
+  · cases hlv : live (MemoryMsg.locOf mp.1) with
+    | none => rw [hlv] at hlive_mem; simp at hlive_mem
+    | some m' =>
+      rw [hlv, optMS_some, Multiset.mem_singleton] at hlive_mem
+      rw [hlive_mem]
+      exact (h_live (MemoryMsg.locOf mp.1) m' hlv).2.1.2.1
+  · rw [pushesAt] at hpush_mem
+    obtain ⟨r', hr'_mem, hm'⟩ := (mem_listSum_map _ rows mp.1).mp hpush_mem
+    exact (h_ok r' hr'_mem).pushClkBound mp.1
+      (List.mem_of_mem_filter (Multiset.mem_coe.mp hm'))
+
 /-! ## The timed grounding walk -/
 
 omit [Fact (2 ^ 17 < p)] in
@@ -581,6 +631,13 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
       have h1 := push_time_ge (h_ok r' (hsub r' hr'_mem)) hq
       have h2 := h_gap r' hr'_mem
       omega
+    -- the pulled-record `ClkBound`s for `r`'s per-key touches, from the memory balance alone (1f):
+    -- every pull record is the frontier or some row's own push, both `ClkBound`.  This is the
+    -- currency-free input `chainOK` needs to rebuild each chain's `slot` (`prev_clk < access_clk`).
+    have h_pullClk : ∀ (loc : MemLoc), ∀ pq ∈ rowTouchesAt r loc,
+        SP1Clean.Channels.MemoryMsg.ClkBound (pq : Touch p).1.1 := fun loc pq hpq =>
+      pull_clkBound_of_balance h_ok h_live h_mbal hr_mem
+        (List.of_mem_zip (mem_rowTouchesAt.mp hpq).1).1
     -- (B) the per-key chain forcing at every key `r` touches: the frontier holds the chain's head
     -- pull, the intra-row links are derived from balance, the whole chain cancels, and the chain's
     -- last push is the new frontier with the re-established time bound.
@@ -597,7 +654,7 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
         rowPullsAt_eq h_rok.touches loc,
         add_left_comm (optMS (finM loc))
           (↑(chainPulls (rowTouchesAt r loc)) : Multiset (MemoryMsg (ZMod p)))] at hbal
-      exact chainForcing_step_of_gap hne' (h_rok.chainOK loc) (h_opush loc) hbal
+      exact chainForcing_step_of_gap hne' (h_rok.chainOK loc (h_pullClk loc)) (h_opush loc) hbal
     -- read-time currency for `r`'s pulls: every chain pull carries the frontier value (nothing
     -- can follow a same-key write), current throughout the location's pre-effect read window
     have h_curr : ∀ mp ∈ r.memPulls, SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
@@ -614,7 +671,8 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
       obtain ⟨-, hmt₀, hval₀, -⟩ := h_live _ _ hlive_eq
       have hveq : mp.1.value
           = ((rowTouchesAt r (MemoryMsg.locOf mp.1)).head hne').1.1.value :=
-        chain_pull_values _ (h_rok.chainOK _) hlink hne' (mp, q) hmem_own
+        chain_pull_values _ (h_rok.chainOK (MemoryMsg.locOf mp.1) (h_pullClk (MemoryMsg.locOf mp.1)))
+          hlink hne' (mp, q) hmem_own
       refine ⟨by simpa [SP1Clean.Channels.MemoryMsg.isU64, hveq] using hmt₀.1, ?_, ?_⟩
       · -- `ClkBound`: a head pull is the frontier record (bound from `LiveOK`'s `LocalMemTruth`); a
         -- same-key re-read pull is one of the row's own pushes (bound from `RowOK.pushClkBound`, not
@@ -629,9 +687,9 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
           exact h_rok.pushClkBound mp.1 hq_mem
       · rw [← hveq] at hval₀
         have hlo : StateMsg.timeNat r.statePull ≤ mp.2 :=
-          (h_rok.chainOK (MemoryMsg.locOf mp.1)).read_lo (mp, q) hmem_own
+          (h_rok.chainOK (MemoryMsg.locOf mp.1) (h_pullClk (MemoryMsg.locOf mp.1))).read_lo (mp, q) hmem_own
         have hhi : mp.2 ≤ StateMsg.timeNat r.statePull + readWindow (MemoryMsg.locOf mp.1) :=
-          (h_rok.chainOK (MemoryMsg.locOf mp.1)).read_hi (mp, q) hmem_own
+          (h_rok.chainOK (MemoryMsg.locOf mp.1) (h_pullClk (MemoryMsg.locOf mp.1))).read_hi (mp, q) hmem_own
         cases hloc : MemoryMsg.locOf mp.1 with
         | reg i =>
           rw [hloc, readWindow_reg] at hhi
@@ -693,16 +751,16 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
         have hlast_mem : (rowTouchesAt r loc).getLast hemp ∈ rowTouchesAt r loc :=
           List.getLast_mem hemp
         have hloc_q : MemoryMsg.locOf ((rowTouchesAt r loc).getLast hemp).2 = loc :=
-          (h_rok.chainOK loc).push_loc _ hlast_mem
+          (h_rok.chainOK loc (h_pullClk loc)).push_loc _ hlast_mem
         have hq_mem : ((rowTouchesAt r loc).getLast hemp).2 ∈ r.memPushes :=
           (List.of_mem_zip (mem_rowTouchesAt.mp hlast_mem).1).2
         have hmt_q := h_after.2 _ hq_mem
         refine ⟨hloc_q, hmt_q, ?_, by omega⟩
-        rcases (h_rok.chainOK loc).push_kind _ hlast_mem with ⟨hv, -⟩ | hw
+        rcases (h_rok.chainOK loc (h_pullClk loc)).push_kind _ hlast_mem with ⟨hv, -⟩ | hw
         · -- read-back last slot: the whole chain is read-backs of the (still-current) frontier
           -- value — frame across
           obtain ⟨-, -, hval₀, -⟩ := h_live loc _ hlive_eq
-          have hpushv := chain_push_values _ (h_rok.chainOK loc) hlink hemp hv
+          have hpushv := chain_push_values _ (h_rok.chainOK loc (h_pullClk loc)) hlink hemp hv
           refine h_frame r hr_mem h_rtruth h_curr loc
             ((rowTouchesAt r loc).getLast hemp).2.value ?_ ?_
           · intro m' hm' hml
