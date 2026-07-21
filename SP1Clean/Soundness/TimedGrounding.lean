@@ -288,7 +288,13 @@ and the `[t, t+1)` window. -/
 structure AlignsWith (r_align r_ord : RowFacts p) : Prop where
   statePull : r_align.statePull = r_ord.statePull
   statePush : r_align.statePush = r_ord.statePush
-  pushes : r_align.memPushes = r_ord.memPushes
+  /-- The aligned push list is a *permutation* of the ordinary one (not a list equality): the aligned
+  carrier reorders the pushes into per-key push-time order so `RowOK.chain_mono` holds at aliased keys
+  (`add x3,x1,x1`), while the ordinary carrier keeps the emitted order. -/
+  pushes : r_align.memPushes.Perm r_ord.memPushes
+  /-- The aligned pull *messages* are a permutation of the ordinary ones — needed for the memory-bus
+  balance's carrier-invariance (`match_` alone is one-directional and does not give it). -/
+  pulls : (r_align.memPulls.map Prod.fst).Perm (r_ord.memPulls.map Prod.fst)
   reg : ∀ mp ∈ r_ord.memPulls, ∃ i : BitVec 5, MemoryMsg.locOf mp.1 = MemLoc.reg i
   ordTime : ∀ mp ∈ r_ord.memPulls, mp.2 = StateMsg.timeNat r_ord.statePull
   match_ : ∀ mp ∈ r_ord.memPulls, ∃ mp' ∈ r_align.memPulls, mp'.1 = mp.1 ∧
@@ -338,7 +344,7 @@ theorem localStepFact_align_of_ordinary
   obtain ⟨hpush_ord, hmem_ord⟩ := step_ord hpull_ord hcurr_ord
   refine ⟨?_, ?_⟩
   · rw [h.statePush]; exact hpush_ord
-  · rw [h.pushes]; exact hmem_ord
+  · intro m hm; exact hmem_ord m (h.pushes.mem_iff.mp hm)
 
 omit [Fact (2 ^ 17 < p)] in
 /-- `FrameFact` transports the same way. -/
@@ -351,8 +357,8 @@ theorem frameFact_align_of_ordinary
   have hpull_ord : LocalStateTruth program initial initialClock r_ord.statePull := by
     rw [← h.statePull]; exact hpull
   have hcurr_ord := ordinaryPullCurrency_of_aligned h hpull hcurr_al
-  have hpush_ord : ∀ m ∈ r_ord.memPushes, MemoryMsg.locOf m = loc → m.value = v := by
-    rw [← h.pushes]; exact hpush
+  have hpush_ord : ∀ m ∈ r_ord.memPushes, MemoryMsg.locOf m = loc → m.value = v :=
+    fun m hm => hpush m (h.pushes.mem_iff.mpr hm)
   have := frame_ord hpull_ord hcurr_ord loc v hpush_ord (by rw [← h.statePull]; exact hstart)
   rw [h.statePush]; exact this
 

@@ -662,17 +662,20 @@ theorem rowWiring_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFacts
 /-! ### The aligned R-type touch carrier (Phase B1) -/
 
 /-- **The aligned R-type touch list** (the `AlignedCarrier` sibling of `rowWiring_rtype`'s wiring):
-the three produced pushes — op_b's read-back at `+ 3`, op_c's at `+ 2`, and the op_a write at `+ 4`
-— each paired *positionally* with the same-location prior read at that push's own micro-time.  Feeding
-this to `alignedOf` re-pairs the ordinary carrier's window-start pulls with the produced pushes in
-their emitted order, exactly the positional `RowOK` shape the timed grounding walk consumes. -/
+the three produced pushes — op_c's read-back at `+ 2`, op_b's at `+ 3`, and the op_a write at `+ 4`
+— each paired *positionally* with the same-location prior read at that push's own micro-time.  The
+touches are listed in strictly ascending push-time order (`+ 2 < + 3 < + 4`), so every per-key filter
+sublist is push-time sorted even when op_b/op_c alias the same register (`add x3, x1, x1`) — no
+register-index distinctness is needed.  Feeding this to `alignedOf` re-pairs the ordinary carrier's
+window-start pulls with the produced pushes, exactly the positional `RowOK` shape the timed grounding
+walk consumes. -/
 def rtypeTouches (view : Trace.RowView (ZMod p)) (rf : Semantics.RowFacts p) : List (Touch p) :=
-  [((rtypePriorMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory,
-       StateMsg.timeNat rf.statePull + 3),
-     rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3),
-   ((rtypePriorMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory,
+  [((rtypePriorMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory,
        StateMsg.timeNat rf.statePull + 2),
      rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2),
+   ((rtypePriorMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory,
+       StateMsg.timeNat rf.statePull + 3),
+     rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3),
    ((rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory,
        StateMsg.timeNat rf.statePull),
      rtypeWriteMessage view)]
@@ -684,13 +687,12 @@ timestamp `Spec`s and clock bounds, produce the two non-assembly inputs `rowOK_a
 `IsChain` — so a caller need only supply the `+ 8` step and mod-8 alignment (both `initialClock`-level)
 to obtain the walk's `RowOK`.
 
-Unlike `rowWiring_rtype` this needs the two source operands' index bounds (`opb_lt`/`opc_lt`), the
+Unlike `rowWiring_rtype` this needs the two source operands' index bounds (`opb_lt`/`opc_lt`) and the
 per-operand register-access `RegisterAccessTimestamp.Spec`s at the pushes' access clocks and their
 prior records' 24-bit `ClkBound`s (all supplied by `RTypeReader.Spec` — the `+ 4`/`+ 3`/`+ 2` slots and
-the Phase-G tail), and — for this first instance — pairwise-distinct register indices.  The
-distinctness rules out the SP-6 register-alias rows (`add x3, x1, x1`, whose op_b/op_c read-backs share
-a key while sitting at `+ 3`/`+ 2` out of push-time order); admitting them is the timed engine's
-alias-chain generalization, deferred to a later carrier. -/
+the Phase-G tail).  It does **not** need register-index distinctness: because `rtypeTouches` lists the
+pushes in ascending push-time order, the per-key `IsChain` holds even for the SP-6 register-alias rows
+(`add x3, x1, x1`, whose op_b/op_c read-backs share a key). -/
 theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFacts p}
     (bounds : ViewClockBounds view)
     (real : view.is_real = 1)
@@ -723,10 +725,7 @@ theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
         (rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3).clk_low⟩)
     (tsSpec_c : Readers.RegisterAccessTimestamp.Spec
       ⟨view.adapter.op_c_memory.access_timestamp, view.is_real,
-        (rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2).clk_low⟩)
-    (distinct_ab : view.adapter.op_a.val ≠ (view.adapter.op_b[0]).val)
-    (distinct_ac : view.adapter.op_a.val ≠ (view.adapter.op_c[0]).val)
-    (distinct_bc : (view.adapter.op_b[0]).val ≠ (view.adapter.op_c[0]).val) :
+        (rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2).clk_low⟩) :
     AlignsWith (alignedOf rf (rtypeTouches view rf)) rf ∧
       (∀ tc ∈ rtypeTouches view rf,
         TouchOK (StateMsg.timeNat rf.statePull) tc.1 tc.2) ∧
@@ -807,8 +806,16 @@ theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
     exact timeNat_rtypeWriteMessage bounds
   refine ⟨?_, ?_, ?_⟩
   · -- AlignsWith via the generic constructor
-    refine alignsWith_alignedOf rf (rtypeTouches view rf) ?_ ?_ ?_ ?_
-    · rw [pushes_eq]; rfl
+    refine alignsWith_alignedOf rf (rtypeTouches view rf) ?_ ?_ ?_ ?_ ?_
+    · -- hpush: the aligned pushes permute the ordinary produced list (op_c/op_b read-backs swap)
+      rw [pushes_eq]
+      simp only [rtypeTouches, List.map_cons, List.map_nil]
+      exact List.Perm.swap _ _ _
+    · -- hpull: the aligned pull messages permute the ordinary ones (reversal of the three priors)
+      rw [pulls_eq]
+      simp only [rtypeTouches, List.map_cons, List.map_nil]
+      refine (List.Perm.swap _ _ _).trans ((List.Perm.cons _ (List.Perm.swap _ _ _)).trans
+        (List.Perm.swap _ _ _))
     · intro mp hmp
       rw [pulls_eq] at hmp
       simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
@@ -824,68 +831,54 @@ theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
       rw [pulls_eq] at hmp
       simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
       rcases hmp with rfl | rfl | rfl
-      · exact ⟨_, List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self),
+      · -- op_a prior ↦ the write touch (still 3rd)
+        exact ⟨_, List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self),
           rfl, by dsimp only; omega, by dsimp only; omega⟩
-      · exact ⟨_, List.mem_cons_self, rfl, by dsimp only; omega, by dsimp only; omega⟩
-      · exact ⟨_, List.mem_cons_of_mem _ List.mem_cons_self, rfl,
+      · -- op_b prior ↦ op_b read-back (now 2nd)
+        exact ⟨_, List.mem_cons_of_mem _ List.mem_cons_self, rfl,
           by dsimp only; omega, by dsimp only; omega⟩
+      · -- op_c prior ↦ op_c read-back (now 1st)
+        exact ⟨_, List.mem_cons_self, rfl, by dsimp only; omega, by dsimp only; omega⟩
   · -- the per-slot `TouchOK`
     intro tc htc
     simp only [rtypeTouches, List.mem_cons, List.not_mem_nil, or_false] at htc
     rcases htc with rfl | rfl | rfl
-    · -- op_b read-back at + 3
-      refine ⟨?_, plt_b, ?_, ?_, Or.inl ⟨rfl, tb⟩⟩
-      · dsimp only; rw [hlocReadB, hlocPriorB]
-      · dsimp only; omega
-      · dsimp only; simp only [hlocPriorB, readWindow_reg]; omega
     · -- op_c read-back at + 2
       refine ⟨?_, plt_c, ?_, ?_, Or.inl ⟨rfl, tc2⟩⟩
       · dsimp only; rw [hlocReadC, hlocPriorC]
       · dsimp only; omega
       · dsimp only; simp only [hlocPriorC, readWindow_reg]; omega
+    · -- op_b read-back at + 3
+      refine ⟨?_, plt_b, ?_, ?_, Or.inl ⟨rfl, tb⟩⟩
+      · dsimp only; rw [hlocReadB, hlocPriorB]
+      · dsimp only; omega
+      · dsimp only; simp only [hlocPriorB, readWindow_reg]; omega
     · -- op_a write at + 4
       refine ⟨?_, plt_a, ?_, ?_, Or.inr ?_⟩
       · dsimp only; rw [hlocWrite, hlocPriorA]
       · dsimp only; omega
       · dsimp only; simp only [hlocPriorA, readWindow_reg]; omega
       · dsimp only; rw [hlocWrite, writeOffset_reg]; exact tw
-  · -- per-key push-time `IsChain` (trivial: distinct keys ⇒ each filter is ≤ 1 touch)
+  · -- per-key push-time `IsChain` (distinctness-free: the full touch list is strictly push-time
+    -- sorted, so every per-key filter sublist is sorted, hence a chain — this admits alias rows)
+    have hpair : List.Pairwise
+        (fun a b : Touch p => MemoryMsg.timeNat a.2 < MemoryMsg.timeNat b.2)
+        (rtypeTouches view rf) := by
+      simp only [rtypeTouches]
+      refine List.Pairwise.cons ?_ (List.Pairwise.cons ?_ (List.Pairwise.cons ?_ List.Pairwise.nil))
+      · intro x hx
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at hx
+        rcases hx with rfl | rfl
+        · dsimp only; rw [tc2, tb]; omega
+        · dsimp only; rw [tc2, tw]; omega
+      · intro x hx
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at hx
+        rcases hx with rfl
+        dsimp only; rw [tb, tw]; omega
+      · intro x hx
+        simp only [List.not_mem_nil] at hx
     intro loc
-    have hne_bc : (MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_b[0]).val) : MemLoc)
-        ≠ MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_c[0]).val) := by
-      intro heq
-      rw [MemLoc.reg.injEq] at heq
-      have := congrArg BitVec.toNat heq
-      rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega),
-        Nat.mod_eq_of_lt (by omega)] at this
-      exact distinct_bc this
-    have hne_ab : (MemLoc.reg (BitVec.ofNat 5 view.adapter.op_a.val) : MemLoc)
-        ≠ MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_b[0]).val) := by
-      intro heq
-      rw [MemLoc.reg.injEq] at heq
-      have := congrArg BitVec.toNat heq
-      rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega),
-        Nat.mod_eq_of_lt (by omega)] at this
-      exact distinct_ab this
-    have hne_ac : (MemLoc.reg (BitVec.ofNat 5 view.adapter.op_a.val) : MemLoc)
-        ≠ MemLoc.reg (BitVec.ofNat 5 (view.adapter.op_c[0]).val) := by
-      intro heq
-      rw [MemLoc.reg.injEq] at heq
-      have := congrArg BitVec.toNat heq
-      rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega),
-        Nat.mod_eq_of_lt (by omega)] at this
-      exact distinct_ac this
-    simp only [rtypeTouches, List.filter_cons, List.filter_nil, hlocReadB, hlocReadC, hlocWrite]
-    split_ifs <;>
-      first
-      | exact List.isChain_nil
-      | exact List.isChain_singleton _
-      | (rename_i h1 h2 h3
-         simp only [decide_eq_true_eq] at h1 h2 h3
-         first
-         | exact absurd (h1.trans h2.symm) hne_bc
-         | exact absurd (h1.trans h3.symm) hne_ab.symm
-         | exact absurd (h2.trans h3.symm) hne_ac.symm)
+    exact (List.Pairwise.sublist List.filter_sublist hpair).isChain
 
 end RType
 
@@ -1252,13 +1245,7 @@ theorem addChip_rowAligned (decoded : DecodedInstructionRow p) (data : ProverDat
           ((decoded.toChipRow data).view.adapter.op_c[0])
           (decoded.toChipRow data).view.adapter.op_c_memory 2).clk_low⟩)
     (opb_lt : ((decoded.toChipRow data).view.adapter.op_b[0]).val < 32)
-    (opc_lt : ((decoded.toChipRow data).view.adapter.op_c[0]).val < 32)
-    (distinct_ab : (decoded.toChipRow data).view.adapter.op_a.val
-      ≠ ((decoded.toChipRow data).view.adapter.op_b[0]).val)
-    (distinct_ac : (decoded.toChipRow data).view.adapter.op_a.val
-      ≠ ((decoded.toChipRow data).view.adapter.op_c[0]).val)
-    (distinct_bc : ((decoded.toChipRow data).view.adapter.op_b[0]).val
-      ≠ ((decoded.toChipRow data).view.adapter.op_c[0]).val) :
+    (opc_lt : ((decoded.toChipRow data).view.adapter.op_c[0]).val < 32) :
     AlignsWith (alignedOf (decoded.ordinaryRowFacts data)
         (rtypeTouches (decoded.toChipRow data).view (decoded.ordinaryRowFacts data)))
         (decoded.ordinaryRowFacts data) ∧
@@ -1312,7 +1299,7 @@ theorem addChip_rowAligned (decoded : DecodedInstructionRow p) (data : ProverDat
     obtain ⟨-, -, -, -, -, -, htail⟩ := hrspec
     exact (htail real).2.2.2.2.2
   refine rowAligned_rtype bounds real opa_lt opb_lt opc_lt rfl ?_ ?_ clkBound_a clkBound_b
-    clkBound_c tsSpec_a tsSpec_b tsSpec_c distinct_ab distinct_ac distinct_bc
+    clkBound_c tsSpec_a tsSpec_b tsSpec_c
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPulls, consumed_eq]
     rfl
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPushes]

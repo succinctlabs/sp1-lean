@@ -67,7 +67,8 @@ omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 are the ordinary produced list; every ordinary pull is register-located and read at the window start;
 and every ordinary pull's message appears as some touch's aligned pull inside the pre-write epoch. -/
 theorem alignsWith_alignedOf (r_ord : RowFacts p) (touches : List (Touch p))
-    (hpush : touches.map Prod.snd = r_ord.memPushes)
+    (hpush : (touches.map Prod.snd).Perm r_ord.memPushes)
+    (hpull : ((touches.map Prod.fst).map Prod.fst).Perm (r_ord.memPulls.map Prod.fst))
     (hreg : ∀ mp ∈ r_ord.memPulls, ∃ i : BitVec 5, MemoryMsg.locOf mp.1 = MemLoc.reg i)
     (hordTime : ∀ mp ∈ r_ord.memPulls, mp.2 = StateMsg.timeNat r_ord.statePull)
     (hmatch : ∀ mp ∈ r_ord.memPulls, ∃ tc ∈ touches, tc.1.1 = mp.1 ∧
@@ -77,6 +78,7 @@ theorem alignsWith_alignedOf (r_ord : RowFacts p) (touches : List (Touch p))
   statePull := rfl
   statePush := rfl
   pushes := hpush
+  pulls := hpull
   reg := hreg
   ordTime := hordTime
   match_ := by
