@@ -305,4 +305,205 @@ theorem realDecodedMemory_perlocBalance
   have coeEq := Multiset.coe_eq_coe.mpr (realDecodedMemory_perm witness balanced memBinary)
   rw [coeEq]
 
+/-! ## Provider purity: the boundary tables only push (init) / only pull (finalize)
+
+The two premises `initPure`/`finPure` of `MemoryFrontier.memoryFrontierBalance`.  Each boundary
+provider emits exactly **one** boolean-gated Memory interaction per row — the init provider a
+`memoryChannel.pushIf m` (`MemoryProviderChip`), the finalize provider a `memoryChannel.pullIf m`
+(`MemoryFinalizeChip`) — with `m` forced into `{0, 1}` by the inline `assertZero (m * (m - 1))` gate.
+So under `witness.Constraints` the init provider's signed multiplicity is `signedVal m ∈ {0, 1}` (never
+`-1`) and the finalize provider's is `signedVal (-m) ∈ {-1, 0}` (never `1`).  Hence the init table
+contributes nothing to `consumedMessages` (the `signedVal = -1` side) and the finalize table nothing to
+`producedMessages` (the `signedVal = 1` side). -/
+
+/-- `MemoryProviderChip`'s range-check subcircuit declares no channels, so it emits no Memory
+interaction; its `FlatOperation.interactions` filtered to `memoryChannel` is empty. -/
+lemma wordRangeCheck_no_memory (offset : ℕ) (w : Var Word (ZMod p)) :
+    Operations.interactionsWith memoryChannel.toRaw
+      [Operation.subcircuit (WordRangeCheck.circuit.toSubcircuit offset w)] = [] := by
+  have h := InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil
+    WordRangeCheck.circuit memoryChannel.toRaw (n := offset) w ([] : Operations (ZMod p))
+    (by exact List.not_mem_nil) (by exact List.not_mem_nil)
+  rw [Operations.interactionsWith_nil] at h
+  exact h
+
+/-- The init provider's boolean gate `assertZero (m * (m - 1))` forces the witnessed multiplicity
+column (index `offset + 64`, after the 64-witness range check) into `{0, 1}`. -/
+theorem memoryInitProvider_gate_binary (input : Var MemoryMsg (ZMod p)) (offset : ℕ)
+    (env : Environment (ZMod p))
+    (constraints : ConstraintsHold.Shallow env ((MemoryProviderChip.main input).operations offset)) :
+    env.get (offset + 64) = 0 ∨ env.get (offset + 64) = 1 := by
+  have allShallow := (constraintsHold_shallow_iff_forall_mem.mp constraints).1
+  have gate := allShallow (var { index := offset + 64 } * (var { index := offset + 64 } - 1))
+    (by simp only [MemoryProviderChip.main, circuit_norm, Operations.shallowConstraints,
+      List.mem_cons, or_true, true_or])
+  simp only [circuit_norm] at gate
+  exact bool_of_mul_pred gate
+
+/-- The init provider's only Memory interaction is its single `pushIf m` (`m` = the witnessed column
+at index `offset + 64`); the range-check subcircuit contributes nothing. -/
+theorem memoryInitProvider_memoryInteractions (input : Var MemoryMsg (ZMod p)) (offset : ℕ) :
+    ((MemoryProviderChip.main input).operations offset).interactionsWith memoryChannel.toRaw =
+      [(pushedIf (channel := memoryChannel) (var { index := offset + 64 }) input).toRaw] := by
+  classical
+  simp only [MemoryProviderChip.main, circuit_norm]
+  rw [show List.filter (fun i => decide (i.channel = memoryChannel.toRaw))
+      (FlatOperation.interactions (WordRangeCheck.circuit.toSubcircuit offset input.value).ops.toFlat)
+      = [] from by
+    have h := wordRangeCheck_no_memory offset input.value
+    simpa [Operations.interactionsWith_subcircuit, Operations.interactionsWith_nil] using h]
+  rfl
+
+/-- Every typed Memory interaction the init-provider component emits has multiplicity equal to the
+witnessed push column value `env.get (size MemoryMsg + 64)`. -/
+theorem memoryInitProvider_typedMult (env : Environment (ZMod p))
+    (i : TypedInteraction (memoryChannel (p := p)))
+    (hi : i ∈ typedInteractionValuesWith (⟨MemoryProviderChip.circuit⟩ : Component (ZMod p)).operations
+      memoryChannel env) :
+    i.mult = env.get (size MemoryMsg + 64) := by
+  have hint : (⟨MemoryProviderChip.circuit⟩ : Component (ZMod p)).operations.interactionsWith
+      memoryChannel.toRaw =
+      [(pushedIf (channel := memoryChannel) (var { index := size MemoryMsg + 64 })
+        (varFromOffset MemoryMsg 0)).toRaw] := by
+    rw [Component.interactionsWith_eq, Component.rowOperations_mk]
+    exact memoryInitProvider_memoryInteractions (varFromOffset MemoryMsg 0) (size MemoryMsg)
+  have hraw : i.raw ∈ (typedInteractionValuesWith
+      (⟨MemoryProviderChip.circuit⟩ : Component (ZMod p)).operations memoryChannel env).map
+      TypedInteraction.raw := List.mem_map_of_mem hi
+  rw [typedInteractionValuesWith_raw, Operations.interactionValuesWith_eq_map, hint] at hraw
+  simp only [List.map_cons, List.map_nil, List.mem_singleton] at hraw
+  rw [TypedInteraction.mult, hraw]
+  simp only [AbstractInteraction.eval, ChannelInteraction.toRaw_mult, pushedIf_mult, Expression.eval]
+
+/-- Every active init-provider Memory interaction has signed multiplicity in `{0, 1}` (a push at a
+boolean gate), never `-1`. -/
+theorem memoryInitProvider_signedVal (env : Environment (ZMod p))
+    (constraints : (⟨MemoryProviderChip.circuit⟩ : Component (ZMod p)).operations.ConstraintsHold env)
+    (i : TypedInteraction (memoryChannel (p := p)))
+    (hi : i ∈ typedInteractionValuesWith (⟨MemoryProviderChip.circuit⟩ : Component (ZMod p)).operations
+      memoryChannel env) :
+    signedVal i.mult = 0 ∨ signedVal i.mult = 1 := by
+  have hp : 2 < p := by have := Fact.out (p := 2 ^ 24 < p); omega
+  have hmult := memoryInitProvider_typedMult env i hi
+  have shallow := shallowConstraints_of_componentConstraints MemoryProviderChip.circuit env constraints
+  have hbool := memoryInitProvider_gate_binary (varFromOffset MemoryMsg 0) (size MemoryMsg) env shallow
+  rw [hmult, signedVal_is_real hp hbool]
+  rcases val_of_binary hp hbool with hv | hv <;> simp [hv]
+
+/-- **`initPure`.** The Memory-init boundary provider only pushes, so it contributes nothing to the
+Memory channel's consumed side: `consumedMessages` (the `signedVal = -1` filter) is empty. -/
+theorem initPure (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) :
+    consumedMessages (typedTableInteractionsWith (memoryInitProviderTable witness) memoryChannel)
+      = [] := by
+  have key : ∀ i ∈ typedTableInteractionsWith (memoryInitProviderTable witness) memoryChannel,
+      signedVal i.mult ≠ -1 := by
+    intro i hi
+    rw [typedTableInteractionsWith] at hi
+    obtain ⟨row, rowMem, hi⟩ := List.mem_flatMap.mp hi
+    rw [memoryInitProviderTable_component witness] at hi
+    have tableConstraints : (memoryInitProviderTable witness).Constraints :=
+      constraints (memoryInitProviderTable witness) (witness.mem_allTables_of_mem_tables
+        (List.getElem_mem (memoryInitProviderIndex_lt_tablesLength witness)))
+    have rowConstraints := tableConstraints row rowMem
+    rw [memoryInitProviderTable_component witness] at rowConstraints
+    rcases memoryInitProvider_signedVal _ rowConstraints i hi with h | h <;> rw [h] <;> norm_num
+  have hfilter : (typedTableInteractionsWith (memoryInitProviderTable witness) memoryChannel).filter
+      (fun i => signedVal i.mult = -1) = [] := by
+    rw [List.filter_eq_nil_iff]
+    intro i hi
+    simp only [decide_eq_true_eq]
+    exact key i hi
+  unfold consumedMessages
+  rw [hfilter, List.map_nil]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- The finalize provider's only Memory interaction is its single `pullIf m` (`m` = the witnessed
+column at index `offset`). -/
+theorem memoryFinalizeProvider_memoryInteractions (input : Var MemoryMsg (ZMod p)) (offset : ℕ) :
+    ((MemoryFinalizeChip.main input).operations offset).interactionsWith memoryChannel.toRaw =
+      [(pulledIf (channel := memoryChannel) (var { index := offset }) input).toRaw] := by
+  simp only [MemoryFinalizeChip.main, circuit_norm]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- The finalize provider's boolean gate `assertZero (m * (m - 1))` forces the witnessed multiplicity
+column (index `offset`) into `{0, 1}`. -/
+theorem memoryFinalizeProvider_gate_binary (input : Var MemoryMsg (ZMod p)) (offset : ℕ)
+    (env : Environment (ZMod p))
+    (constraints : ConstraintsHold.Shallow env ((MemoryFinalizeChip.main input).operations offset)) :
+    env.get offset = 0 ∨ env.get offset = 1 := by
+  have allShallow := (constraintsHold_shallow_iff_forall_mem.mp constraints).1
+  have gate := allShallow (var { index := offset } * (var { index := offset } - 1))
+    (by simp only [MemoryFinalizeChip.main, circuit_norm, Operations.shallowConstraints,
+      List.mem_cons, true_or])
+  simp only [circuit_norm] at gate
+  exact bool_of_mul_pred gate
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Every typed Memory interaction the finalize-provider component emits has multiplicity `-m`, the
+negation of the witnessed pull column value `env.get (size MemoryMsg)`. -/
+theorem memoryFinalizeProvider_typedMult (env : Environment (ZMod p))
+    (i : TypedInteraction (memoryChannel (p := p)))
+    (hi : i ∈ typedInteractionValuesWith (⟨MemoryFinalizeChip.circuit⟩ : Component (ZMod p)).operations
+      memoryChannel env) :
+    i.mult = -(env.get (size MemoryMsg)) := by
+  have hint : (⟨MemoryFinalizeChip.circuit⟩ : Component (ZMod p)).operations.interactionsWith
+      memoryChannel.toRaw =
+      [(pulledIf (channel := memoryChannel) (var { index := size MemoryMsg })
+        (varFromOffset MemoryMsg 0)).toRaw] := by
+    rw [Component.interactionsWith_eq, Component.rowOperations_mk]
+    exact memoryFinalizeProvider_memoryInteractions (varFromOffset MemoryMsg 0) (size MemoryMsg)
+  have hraw : i.raw ∈ (typedInteractionValuesWith
+      (⟨MemoryFinalizeChip.circuit⟩ : Component (ZMod p)).operations memoryChannel env).map
+      TypedInteraction.raw := List.mem_map_of_mem hi
+  rw [typedInteractionValuesWith_raw, Operations.interactionValuesWith_eq_map, hint] at hraw
+  simp only [List.map_cons, List.map_nil, List.mem_singleton] at hraw
+  rw [TypedInteraction.mult, hraw]
+  simp only [AbstractInteraction.eval, ChannelInteraction.toRaw_mult, pulledIf_mult, Expression.eval,
+    neg_one_mul]
+
+/-- Every active finalize-provider Memory interaction has signed multiplicity in `{-1, 0}` (a pull at
+a boolean gate), never `1`. -/
+theorem memoryFinalizeProvider_signedVal (env : Environment (ZMod p))
+    (constraints : (⟨MemoryFinalizeChip.circuit⟩ : Component (ZMod p)).operations.ConstraintsHold env)
+    (i : TypedInteraction (memoryChannel (p := p)))
+    (hi : i ∈ typedInteractionValuesWith (⟨MemoryFinalizeChip.circuit⟩ : Component (ZMod p)).operations
+      memoryChannel env) :
+    signedVal i.mult = 0 ∨ signedVal i.mult = -1 := by
+  have hp : 2 < p := by have := Fact.out (p := 2 ^ 24 < p); omega
+  have hmult := memoryFinalizeProvider_typedMult env i hi
+  have shallow :=
+    shallowConstraints_of_componentConstraints MemoryFinalizeChip.circuit env constraints
+  have hbool :=
+    memoryFinalizeProvider_gate_binary (varFromOffset MemoryMsg 0) (size MemoryMsg) env shallow
+  rw [hmult, signedVal_neg_is_real hp hbool]
+  rcases val_of_binary hp hbool with hv | hv <;> simp [hv]
+
+/-- **`finPure`.** The Memory-finalize boundary provider only pulls, so it contributes nothing to the
+Memory channel's produced side: `producedMessages` (the `signedVal = 1` filter) is empty. -/
+theorem finPure (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) :
+    producedMessages (typedTableInteractionsWith (memoryFinalizeProviderTable witness) memoryChannel)
+      = [] := by
+  have key : ∀ i ∈ typedTableInteractionsWith (memoryFinalizeProviderTable witness) memoryChannel,
+      signedVal i.mult ≠ 1 := by
+    intro i hi
+    rw [typedTableInteractionsWith] at hi
+    obtain ⟨row, rowMem, hi⟩ := List.mem_flatMap.mp hi
+    rw [memoryFinalizeProviderTable_component witness] at hi
+    have tableConstraints : (memoryFinalizeProviderTable witness).Constraints :=
+      constraints (memoryFinalizeProviderTable witness) (witness.mem_allTables_of_mem_tables
+        (List.getElem_mem (memoryFinalizeProviderIndex_lt_tablesLength witness)))
+    have rowConstraints := tableConstraints row rowMem
+    rw [memoryFinalizeProviderTable_component witness] at rowConstraints
+    rcases memoryFinalizeProvider_signedVal _ rowConstraints i hi with h | h <;> rw [h] <;> norm_num
+  have hfilter : (typedTableInteractionsWith (memoryFinalizeProviderTable witness)
+      memoryChannel).filter (fun i => signedVal i.mult = 1) = [] := by
+    rw [List.filter_eq_nil_iff]
+    intro i hi
+    simp only [decide_eq_true_eq]
+    exact key i hi
+  unfold producedMessages
+  rw [hfilter, List.map_nil]
+
 end SP1Clean.Soundness
