@@ -15,6 +15,7 @@ reader-facing docs one level up (start with [`../architecture.md`](../architectu
 
 ## Index
 
+- [capstone-seam-plan.md](capstone-seam-plan.md) — dependency-ordered plan to close the `supported_core_native_sound` seam and the 7 chip admissions: the closure set, what is already proved, the `rowAligned`-upfront refactor (in progress), the `walk`-assembly steps, the 24-chip rollout, and the parallel admission tracks.
 - [porting-recipe.md](porting-recipe.md) — step-by-step checklist to port a new chip from the Add/Bitwise template: create the four artifacts, wire the root import, verify build + axioms.
 - [proof-patterns.md](proof-patterns.md) — the witnessed-`FormalCircuit` soundness/completeness skeleton; `ZMod p` / `Word` / `circuit_proof_start` landmines; `maxHeartbeats` floors; the `ElaboratedCircuit` field-obligation recipe; the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
 - [lean-sail-notes.md](lean-sail-notes.md) — the Lean 4.31 migration environment: local dependency pins,

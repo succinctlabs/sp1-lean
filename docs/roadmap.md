@@ -65,7 +65,10 @@ is more important and more precisely stated:
    `supportedCore_orderedRows_dynamic_of_contracts` once all 25 `ChipGroundingContracts` land (Add is the
    proved pilot) + the arc-B aligned carrier + assembly-level balances. This engine is the SP1-specific
    realization of Clean's `Balance.lean` "guarantees-to-requirements-reversal" (see `architecture.md`
-   §"Relationship to Clean's `Air` layer"). **Sequencing:** opaqueness-audit the per-chip memory
+   §"Relationship to Clean's `Air` layer"). The dependency-ordered implementation plan for this seam and the
+   seven chip admissions — the closure set, what is already proved, the in-progress `rowAligned`-upfront
+   refactor, the `walk`-assembly steps, and the 24-chip rollout — is
+   [`agents/capstone-seam-plan.md`](agents/capstone-seam-plan.md). **Sequencing:** opaqueness-audit the per-chip memory
    closed-form template (`<chip>_memoryInteractionValues_eq`, currently `@ maxHeartbeats 4M`) using the
    folded-`Spec` pattern *before* the 24-chip rollout — that cost multiplies 25×, so a lower floor on the
    template pays off across the whole rollout.
