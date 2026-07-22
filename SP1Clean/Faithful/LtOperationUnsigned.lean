@@ -26,7 +26,7 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 /-- **Faithfulness anchor.** SP1's `LtOperationUnsigned` constraint list holds iff the native
 gadget's `RawSpec` holds. -/
 theorem ltUnsigned_constraints_faithful (b cc : Word (ZMod p))

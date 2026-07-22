@@ -29,7 +29,7 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 /-- **Chip-level faithfulness anchor.** Under `is_real = 1`, SP1's generated `LoadDouble` chip
 constraint list holds iff: the `AddressOperation` raw spec on the `rs1` register read and the
 immediate (offset bits `0`); the two CPUState clock bounds; the `ITypeReader` per-row

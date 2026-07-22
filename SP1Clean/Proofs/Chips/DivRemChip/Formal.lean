@@ -73,7 +73,6 @@ def stateExposure (input : Var Inputs (ZMod p)) (_offset : ℕ) :
       8, input.is_real⟩
 
 set_option warn.sorry false in
-set_option maxHeartbeats 16000000 in
 private theorem main_exposedChannelsLawful (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).ExposedChannelsLawful (stateExposure input offset) := by
   sorry

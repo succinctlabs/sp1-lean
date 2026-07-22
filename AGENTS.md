@@ -240,6 +240,36 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 ## Clean-native principles (non-negotiable)
 
+**Read Clean's own docs — they are the upstream authority for this whole project.** Our proof-style notes
+below are SP1-specific *instances* of principles Clean already documents generally; when a technique here
+feels ad-hoc, the general rule is in Clean's docs.
+
+*Where to find them.* Browse upstream at **<https://github.com/Verified-zkEVM/clean>** (the `doc/` folder +
+`Clean/Air/README.md` + the repo-root `AGENTS.md`), or read the copy Lake installs in-tree under
+**`.lake/packages/Clean/`** (e.g. `.lake/packages/Clean/doc/performance-problems.md`). Prefer these over any
+local checkout: the 4.31 migration *temporarily* wires Clean as a local **path** dependency, but that is a
+prototyping-only convenience — it must be restored to a pinned git dependency before any non-draft PR, and a
+local sibling path must never be baked into permanent docs. (Because the dep is currently an un-refreshed
+path checkout, `.lake/packages/Clean` can lag upstream `main`; if a doc named below is missing there, read
+it on GitHub.)
+
+Read, in priority order (paths relative to the Clean repo root — i.e. `.lake/packages/Clean/<path>` in-tree,
+or `<path>` on GitHub):
+- `doc/performance-problems.md` — the `whnf`-into-expensive-values doctrine (make dangerous values opaque;
+  cross spellings by syntactic rewriting, not unification), the 9 fix patterns, the kernel-size-cliff
+  completeness recipe (`circuit_proof_start_core`), and the **"keep hypothesis types folded"** section (our
+  "pass the `Spec` folded" fix). Read this **before any nontrivial proof work**, and first when you hit a
+  `whnf`/heartbeat/`(kernel) deep recursion` blowup.
+- `doc/proving-guide.md` — opening/middle/closing tactic moves; the "what (not) to unfold" list.
+- `AGENTS.md` (Clean's own) — subcircuit-boundary discipline (bundle a proof boundary, inline a non-boundary,
+  never leave an unbundled `Circuit` parent proofs treat abstractly), helper-lemma discipline (helpers are
+  for real math, not for unpacking `ConstraintsHold`), spec-states-meaning discipline, and the
+  `ElaboratedCircuit` explicit-`elaborated`-field performance rule.
+- `Clean/Air/README.md` — the flat-AIR channel/ensemble/`Balance.lean` model our grounding engine builds on
+  (incl. the "guarantees-to-requirements-reversal" theorem — the general form of our currency circularities).
+- Secondary: `doc/witgen-authoring.md` (the exportable witness IR), `doc/conventions.md` (local style that
+  differs from Mathlib).
+
 These are the keepers from sp1-lean's "faithful sub-circuit composition" discipline; violations are bugs.
 
 1. **Compose true Clean subcircuits, not inline constraints.** A chip's `main` calls
@@ -349,6 +379,11 @@ after installing or toggling.
 
 ## docs/
 
+- **Clean's own docs (the upstream authority; read first)** — upstream at
+  <https://github.com/Verified-zkEVM/clean>, or in-tree under `.lake/packages/Clean/`: `doc/performance-problems.md`
+  + `doc/proving-guide.md` (proofs/perf), `AGENTS.md` (subcircuit/spec/`ElaboratedCircuit` discipline),
+  `Clean/Air/README.md` (channels/ensembles/balance). See the "Read Clean's own docs" callout under
+  "Clean-native principles" (incl. the path-dependency-is-temporary note).
 - `docs/README.md` — index + "what to read first".
 - `docs/architecture.md` — the chip-centered native/Sail/Rust-oracle/trace chain, layout, design verdict,
   and what's deferred.

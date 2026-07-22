@@ -27,47 +27,39 @@ local macro "firstStraightCPUTimeContract" inputs:term "," circuit:term "," main
     refine ⟨offset,
       ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
         input.is_real⟩, ?_, ?_⟩
-    · simp [input, offset, $circuit:term, $main:term, circuit_norm]
+    · simp only [input, offset, $circuit:term, $main:term, circuit_norm]
     · intro env
-      constructor <;> simp [input, $circuit:term, $rowView:term, circuit_norm]))
+      constructor <;> simp only [input, $circuit:term, $rowView:term, circuit_norm]))
 
-set_option maxHeartbeats 2000000 in
 theorem AddChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (AddChip.circuit (p := p)) AddChip.rowView := by
   firstStraightCPUTimeContract AddChip.Inputs, AddChip.circuit, AddChip.main, AddChip.rowView
 
-set_option maxHeartbeats 2000000 in
 theorem AddiChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (AddiChip.circuit (p := p)) AddiChip.rowView := by
   firstStraightCPUTimeContract AddiChip.Inputs, AddiChip.circuit, AddiChip.main, AddiChip.rowView
 
-set_option maxHeartbeats 2000000 in
 theorem AddwChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (AddwChip.circuit (p := p)) AddwChip.rowView := by
   firstStraightCPUTimeContract AddwChip.Inputs, AddwChip.circuit, AddwChip.main, AddwChip.rowView
 
-set_option maxHeartbeats 2000000 in
 theorem SubChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (SubChip.circuit (p := p)) SubChip.rowView := by
   firstStraightCPUTimeContract SubChip.Inputs, SubChip.circuit, SubChip.main, SubChip.rowView
 
-set_option maxHeartbeats 2000000 in
 theorem SubwChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (SubwChip.circuit (p := p)) SubwChip.rowView := by
   firstStraightCPUTimeContract SubwChip.Inputs, SubwChip.circuit, SubwChip.main, SubwChip.rowView
 
-set_option maxHeartbeats 2000000 in
 theorem BitwiseChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (BitwiseChip.circuit (p := p)) BitwiseChip.rowView := by
   firstStraightCPUTimeContract BitwiseChip.Inputs, BitwiseChip.circuit, BitwiseChip.main,
     BitwiseChip.rowView
 
-set_option maxHeartbeats 2000000 in
 theorem LtChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (LtChip.circuit (p := p)) LtChip.rowView := by
   firstStraightCPUTimeContract LtChip.Inputs, LtChip.circuit, LtChip.main, LtChip.rowView
 
-set_option maxHeartbeats 4000000 in
 theorem ShiftLeftChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (ShiftLeftChip.circuit (p := p)) ShiftLeftChip.rowView := by
   firstStraightCPUTimeContract ShiftLeftChip.Inputs, ShiftLeftChip.circuit, ShiftLeftChip.main,
@@ -77,14 +69,12 @@ theorem ShiftLeftChip.cpuStateTimeContract :
 -- added one more `assertZero` to it; unfolding that list in `simp` needs more than the default `simp`
 -- recursion depth. Budget only — the proof is the same `firstStraightCPUTimeContract` expansion.
 set_option maxRecDepth 4000 in
-set_option maxHeartbeats 8000000 in
 theorem ShiftRightChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (ShiftRightChip.circuit (p := p))
       ShiftRightChip.rowView := by
   firstStraightCPUTimeContract ShiftRightChip.Inputs, ShiftRightChip.circuit, ShiftRightChip.main,
     ShiftRightChip.rowView
 
-set_option maxHeartbeats 4000000 in
 theorem UTypeChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (UTypeChip.circuit (p := p)) UTypeChip.rowView := by
   unfold CircuitCPUStateTimeContract
@@ -94,11 +84,10 @@ theorem UTypeChip.cpuStateTimeContract :
   refine ⟨offset + 7,
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
       input.is_real⟩, ?_, ?_⟩
-  · simp [input, offset, UTypeChip.circuit, UTypeChip.main, circuit_norm]
+  · simp only [input, offset, UTypeChip.circuit, UTypeChip.main, circuit_norm]
   · intro env
-    constructor <;> simp [input, UTypeChip.circuit, UTypeChip.rowView, circuit_norm]
+    constructor <;> simp only [input, UTypeChip.circuit, UTypeChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem JalChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (JalChip.circuit (p := p)) JalChip.rowView := by
   unfold CircuitCPUStateTimeContract
@@ -109,11 +98,10 @@ theorem JalChip.cpuStateTimeContract :
     ⟨input.state,
       #v[var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 }],
       8, input.is_real⟩, ?_, ?_⟩
-  · simp [input, offset, JalChip.circuit, JalChip.main, circuit_norm]
+  · simp only [input, offset, JalChip.circuit, JalChip.main, circuit_norm]
   · intro env
-    constructor <;> simp [input, JalChip.circuit, JalChip.rowView, circuit_norm]
+    constructor <;> simp only [input, JalChip.circuit, JalChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem JalrChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (JalrChip.circuit (p := p)) JalrChip.rowView := by
   unfold CircuitCPUStateTimeContract
@@ -129,9 +117,8 @@ theorem JalrChip.cpuStateTimeContract :
     left
     rfl
   · intro env
-    constructor <;> simp [input, JalrChip.circuit, JalrChip.rowView, circuit_norm]
+    constructor <;> simp only [input, JalrChip.circuit, JalrChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 8000000 in
 theorem BranchChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (BranchChip.circuit (p := p)) BranchChip.rowView := by
   unfold CircuitCPUStateTimeContract
@@ -156,9 +143,8 @@ theorem BranchChip.cpuStateTimeContract :
     left
     rfl
   · intro env
-    constructor <;> simp [input, BranchChip.circuit, BranchChip.rowView, circuit_norm]
+    constructor <;> simp only [input, BranchChip.circuit, BranchChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem LoadByteChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (LoadByteChip.circuit (p := p))
       LoadByteChip.rowView := by
@@ -169,12 +155,11 @@ theorem LoadByteChip.cpuStateTimeContract :
   refine ⟨offset,
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
       input.is_lb + input.is_lbu⟩, ?_, ?_⟩
-  · simp [input, offset, LoadByteChip.circuit, LoadByteChip.main, circuit_norm]
+  · simp only [input, offset, LoadByteChip.circuit, LoadByteChip.main, circuit_norm]
   · intro env
     constructor <;>
-      simp [input, LoadByteChip.rowView, LoadByteChip.isReal, circuit_norm]
+      simp only [input, LoadByteChip.rowView, LoadByteChip.isReal, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem LoadHalfChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (LoadHalfChip.circuit (p := p))
       LoadHalfChip.rowView := by
@@ -185,12 +170,11 @@ theorem LoadHalfChip.cpuStateTimeContract :
   refine ⟨offset,
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
       input.is_lh + input.is_lhu⟩, ?_, ?_⟩
-  · simp [input, offset, LoadHalfChip.circuit, LoadHalfChip.main, circuit_norm]
+  · simp only [input, offset, LoadHalfChip.circuit, LoadHalfChip.main, circuit_norm]
   · intro env
     constructor <;>
-      simp [input, LoadHalfChip.rowView, LoadHalfChip.isReal, circuit_norm]
+      simp only [input, LoadHalfChip.rowView, LoadHalfChip.isReal, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem LoadWordChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (LoadWordChip.circuit (p := p))
       LoadWordChip.rowView := by
@@ -201,12 +185,11 @@ theorem LoadWordChip.cpuStateTimeContract :
   refine ⟨offset,
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
       input.is_lw + input.is_lwu⟩, ?_, ?_⟩
-  · simp [input, offset, LoadWordChip.circuit, LoadWordChip.main, circuit_norm]
+  · simp only [input, offset, LoadWordChip.circuit, LoadWordChip.main, circuit_norm]
   · intro env
     constructor <;>
-      simp [input, LoadWordChip.rowView, LoadWordChip.isReal, circuit_norm]
+      simp only [input, LoadWordChip.rowView, LoadWordChip.isReal, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem LoadX0Chip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (LoadX0Chip.circuit (p := p)) LoadX0Chip.rowView := by
   unfold CircuitCPUStateTimeContract
@@ -217,52 +200,45 @@ theorem LoadX0Chip.cpuStateTimeContract :
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
       input.is_lb + input.is_lbu + input.is_lh + input.is_lhu + input.is_lw + input.is_lwu +
         input.is_ld⟩, ?_, ?_⟩
-  · simp [input, offset, LoadX0Chip.circuit, LoadX0Chip.main, circuit_norm]
+  · simp only [input, offset, LoadX0Chip.circuit, LoadX0Chip.main, circuit_norm]
   · intro env
     constructor <;>
-      simp [input, LoadX0Chip.rowView, LoadX0Chip.isReal, circuit_norm]
+      simp only [input, LoadX0Chip.rowView, LoadX0Chip.isReal, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem LoadDoubleChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (LoadDoubleChip.circuit (p := p))
       LoadDoubleChip.rowView := by
   firstStraightCPUTimeContract LoadDoubleChip.Inputs, LoadDoubleChip.circuit,
     LoadDoubleChip.main, LoadDoubleChip.rowView
 
-set_option maxHeartbeats 2000000 in
 theorem StoreByteChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (StoreByteChip.circuit (p := p))
       StoreByteChip.rowView := by
   firstStraightCPUTimeContract StoreByteChip.Inputs, StoreByteChip.circuit, StoreByteChip.main,
     StoreByteChip.rowView
 
-set_option maxHeartbeats 2000000 in
 theorem StoreHalfChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (StoreHalfChip.circuit (p := p))
       StoreHalfChip.rowView := by
   firstStraightCPUTimeContract StoreHalfChip.Inputs, StoreHalfChip.circuit, StoreHalfChip.main,
     StoreHalfChip.rowView
 
-set_option maxHeartbeats 2000000 in
 theorem StoreWordChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (StoreWordChip.circuit (p := p))
       StoreWordChip.rowView := by
   firstStraightCPUTimeContract StoreWordChip.Inputs, StoreWordChip.circuit, StoreWordChip.main,
     StoreWordChip.rowView
 
-set_option maxHeartbeats 2000000 in
 theorem StoreDoubleChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (StoreDoubleChip.circuit (p := p))
       StoreDoubleChip.rowView := by
   firstStraightCPUTimeContract StoreDoubleChip.Inputs, StoreDoubleChip.circuit,
     StoreDoubleChip.main, StoreDoubleChip.rowView
 
-set_option maxHeartbeats 4000000 in
 theorem MulChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (MulChip.circuit (p := p)) MulChip.rowView := by
   firstStraightCPUTimeContract MulChip.Inputs, MulChip.circuit, MulChip.main, MulChip.rowView
 
-set_option maxHeartbeats 4000000 in
 theorem DivRemChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (DivRemChip.circuit (p := p)) DivRemChip.rowView := by
   unfold CircuitCPUStateTimeContract
@@ -277,9 +253,8 @@ theorem DivRemChip.cpuStateTimeContract :
     simp only [input, offset, DivRemChip.circuit, DivRemChip.main, circuit_norm]
   · intro env
     constructor <;>
-      simp [input, DivRemChip.circuit, DivRemChip.rowView, circuit_norm]
+      simp only [input, DivRemChip.circuit, DivRemChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem AluX0Chip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (AluX0Chip.circuit (p := p)) AluX0Chip.rowView := by
   firstStraightCPUTimeContract AluX0Chip.Inputs, AluX0Chip.circuit, AluX0Chip.main,

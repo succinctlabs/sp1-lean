@@ -1,4 +1,6 @@
 import SP1Clean.Soundness.GroundingAdapter
+import SP1Clean.Soundness.Decode
+import SP1Clean.Soundness.MemoryFrontier
 
 /-! # Per-chip grounding contracts — the `ChipGroundingContracts` bundle
 
@@ -147,6 +149,32 @@ structure ChipGroundingContracts (chip : SupportedChip p) : Prop where
         (decoded.toChipRow witness.data).kind.advanceReady
           (decoded.toChipRow witness.data).inputs (decoded.toChipRow witness.data).cols
           program state
+  /-- The aligned-carrier `RowOK` producer (arc B): the row's memory touches admit an aligned
+  ordering (`AlignsWith`) whose `TouchOK`/per-key `IsChain`/push-`ClkBound`/conditional-slot facts
+  feed `rowOK_alignedOf`.  The source-operand index bounds it needs (`op_b`/`op_c < 32`) are the
+  *decode-intrinsic* register bounds — SP1 range-checks only the write index in-circuit — so this
+  field takes the Program-grounding `decodedInROM` residual (like `engineFacts`) and derives them via
+  `decodedInROM_rtype_op_bc_lt`, adding no boundary assumption. -/
+  rowAligned : ∀ (witness : EnsembleWitness (sp1Ensemble (p := p))),
+    witness.Constraints → witness.BalancedChannels →
+    ∀ decoded : DecodedInstructionRow p, decoded.chip = chip →
+      decoded ∈ decodedInstructionRows (p := p) witness.tables →
+      (decoded.toChipRow witness.data).is_real = 1 →
+      DecodedRowOpenSoundnessInputs decoded witness.data →
+      ∀ (program : GuestProgram),
+        decodedInROM program (programAccess (decoded.toChipRow witness.data).view).toRow →
+        ∃ touches : List (Touch p),
+          AlignsWith (alignedOf (decoded.ordinaryRowFacts witness.data) touches)
+              (decoded.ordinaryRowFacts witness.data) ∧
+            (∀ tc ∈ touches,
+              TouchOK (StateMsg.timeNat (decoded.ordinaryRowFacts witness.data).statePull)
+                tc.1 tc.2) ∧
+            (∀ loc : MemLoc, List.IsChain
+              (fun a b : Touch p => MemoryMsg.timeNat a.2 < MemoryMsg.timeNat b.2)
+              (touches.filter (fun pq => MemoryMsg.locOf pq.2 = loc))) ∧
+            (∀ tc ∈ touches, SP1Clean.Channels.MemoryMsg.ClkBound tc.2) ∧
+            (∀ tc ∈ touches, SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
+              MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2)
 
 /-- **The engine-feed consumer**: any decoded row of a contracted chip produces both timed-engine
 records — the chip-generic form of `addRow_engineFacts`.  `decode` remains the Program-grounding
@@ -255,13 +283,102 @@ theorem supportedCore_orderedRows_dynamic_of_contracts
 ```
 -/
 
+/-! ## Arc-B memory-balance reconciliation (walk input ⑦)
+
+The `TimedGrounding.walk` per-location Memory balance is stated over the *aligned* carrier of the
+*ordered* real rows, while `memoryFrontierBalance` (`Soundness/MemoryFrontier.lean`) proves it over
+`memoryFrontierRows` — the *ordinary* carrier in `realDecodedInstructionRows` order.  These three
+lemmas bridge the gap: `pushesAt`/`pullsAt` are invariant under (a) a permutation of the row batch
+(the exhaustive `Perm`) and (b) the per-row `AlignsWith` push/pull permutations. -/
+
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
+/-- Per-row: an aligned carrier and its ordinary row contribute the *same* per-location push multiset
+(the aligned pushes are a `Perm` of the ordinary ones). -/
+theorem rowPushesAt_coe_eq_of_alignsWith {r_align r_ord : RowFacts p}
+    (h : AlignsWith r_align r_ord) (loc : MemLoc) :
+    (↑(rowPushesAt r_align loc) : Multiset (Channels.MemoryMsg (ZMod p))) =
+      ↑(rowPushesAt r_ord loc) :=
+  Multiset.coe_eq_coe.mpr (h.pushes.filter fun m => Semantics.MemoryMsg.locOf m = loc)
+
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
+/-- Per-row pull twin of `rowPushesAt_coe_eq_of_alignsWith` (the aligned pull *messages* are a `Perm`
+of the ordinary ones). -/
+theorem rowPullsAt_coe_eq_of_alignsWith {r_align r_ord : RowFacts p}
+    (h : AlignsWith r_align r_ord) (loc : MemLoc) :
+    (↑(rowPullsAt r_align loc) : Multiset (Channels.MemoryMsg (ZMod p))) =
+      ↑(rowPullsAt r_ord loc) :=
+  Multiset.coe_eq_coe.mpr (h.pulls.filter fun m => Semantics.MemoryMsg.locOf m = loc)
+
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
+/-- `pushesAt`/`pullsAt` are permutation-invariant in the row batch (a `List.sum` of per-row
+multisets). -/
+theorem pushesAt_perm {rows rows' : List (RowFacts p)} (h : rows.Perm rows') (loc : MemLoc) :
+    pushesAt rows loc = pushesAt rows' loc :=
+  (h.map _).sum_eq
+
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
+theorem pullsAt_perm {rows rows' : List (RowFacts p)} (h : rows.Perm rows') (loc : MemLoc) :
+    pullsAt rows loc = pullsAt rows' loc :=
+  (h.map _).sum_eq
+
+omit [Fact (2 ^ 17 < p)] in
+/-- **Walk input ⑦ over the aligned ordered rows.**  Any row-indexed aligned carrier `g` (each `g d`
+aligning with `d`'s ordinary facts), taken over the exhaustive ordered rows, satisfies the same
+per-location Memory balance `memoryFrontierBalance` proves over `memoryFrontierRows` — transported
+across the `AlignsWith` per-row permutations (`rowPushesAt/PullsAt_coe_eq_of_alignsWith`) and the
+exhaustive batch `Perm` (`pushesAt/pullsAt_perm`). -/
+theorem memoryBalance_of_alignsWith [Fact (2 ^ 24 < p)]
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (balanced : witness.BalancedChannels)
+    (memBinary : ∀ interaction ∈ typedEnsembleInteractionsWith witness Channels.memoryChannel,
+      signedVal interaction.mult = -1 ∨ signedVal interaction.mult = 0 ∨
+        signedVal interaction.mult = 1)
+    (initPure : consumedMessages (typedTableInteractionsWith (memoryInitProviderTable witness)
+      Channels.memoryChannel) = [])
+    (finPure : producedMessages (typedTableInteractionsWith (memoryFinalizeProviderTable witness)
+      Channels.memoryChannel) = [])
+    (initUnique : MemoryInitProviderUnique witness)
+    (finalizeUnique : MemoryFinalizeProviderUnique witness)
+    (paddingEmpty : ∀ decoded ∈ decodedInstructionRows (p := p) witness.tables,
+      (decoded.toChipRow witness.data).is_real ≠ 1 →
+        decoded.producedMemoryMessages witness.data = [] ∧
+          decoded.consumedMemoryMessages witness.data = [])
+    (orderedRows : List (DecodedInstructionRow p))
+    (exhaustive : orderedRows.Perm (realDecodedInstructionRows witness.data witness.tables))
+    (g : DecodedInstructionRow p → RowFacts p)
+    (aligns : ∀ d ∈ orderedRows, AlignsWith (g d) (d.ordinaryRowFacts witness.data))
+    (loc : MemLoc) :
+    optMS (memoryInitFrontier witness loc) + pushesAt (orderedRows.map g) loc =
+      optMS (memoryFinalizeFrontier witness loc) + pullsAt (orderedRows.map g) loc := by
+  have hordinary : memoryFrontierRows witness =
+      (realDecodedInstructionRows witness.data witness.tables).map
+        (fun d => d.ordinaryRowFacts witness.data) := rfl
+  have hpush : pushesAt (orderedRows.map g) loc = pushesAt (memoryFrontierRows witness) loc := by
+    have step1 : pushesAt (orderedRows.map g) loc =
+        pushesAt (orderedRows.map (fun d => d.ordinaryRowFacts witness.data)) loc := by
+      simp only [pushesAt, List.map_map]
+      refine congrArg List.sum (List.map_congr_left fun d hd => ?_)
+      exact rowPushesAt_coe_eq_of_alignsWith (aligns d hd) loc
+    rw [step1, hordinary]
+    exact pushesAt_perm (exhaustive.map _) loc
+  have hpull : pullsAt (orderedRows.map g) loc = pullsAt (memoryFrontierRows witness) loc := by
+    have step1 : pullsAt (orderedRows.map g) loc =
+        pullsAt (orderedRows.map (fun d => d.ordinaryRowFacts witness.data)) loc := by
+      simp only [pullsAt, List.map_map]
+      refine congrArg List.sum (List.map_congr_left fun d hd => ?_)
+      exact rowPullsAt_coe_eq_of_alignsWith (aligns d hd) loc
+    rw [step1, hordinary]
+    exact pullsAt_perm (exhaustive.map _) loc
+  rw [hpush, hpull]
+  exact memoryFrontierBalance witness balanced memBinary initPure finPure initUnique finalizeUnique
+    paddingEmpty loc
+
 /-! ## The Add anchor -/
 
 section AddAnchor
 
 variable [Fact (2 ^ 25 < p)]
 
-set_option maxHeartbeats 1000000 in
 omit [Fact (2 ^ 25 < p)] in
 /-- Add's reader passthrough, evaluated once: the decoded row's committed output `adapter` block is
 the input `adapter` block (the elaborated output passes the reader columns through), which is the
@@ -278,7 +395,7 @@ theorem addChip_adapterPassthrough (env : Environment (ZMod p)) :
       (⟨AddChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
     simp only [Component.rowOutput, circuit_norm]
   rw [← inputEq, ← outputEq]
-  simp [AddChip.circuit, circuit_norm]
+  simp only [AddChip.circuit, circuit_norm]
 
 set_option maxHeartbeats 1000000 in
 /-- **The Add bundle instance** — the rollout template.  Every field is assembled from the
@@ -364,6 +481,33 @@ theorem addChip_groundingContracts :
     have hchip' : chip = addChipDescriptor (p := p) := hchip
     subst hchip'
     exact ⟨addChip_adapterPassthrough (Environment.fromArray physical witness.data), guard⟩
+  rowAligned := by
+    intro witness constraints balanced decoded hchip decodedMem real openInputs program decode
+    refine ⟨rtypeTouches (decoded.toChipRow witness.data).view
+      (decoded.ordinaryRowFacts witness.data), ?_⟩
+    have realView : (decoded.toChipRow witness.data).view.is_real = 1 := real
+    have byteG := decodedInstructionRow_byteGuarantees witness constraints balanced decoded
+      decodedMem
+    have bounds := addChip_viewClockBounds decoded witness.data hchip byteG realView
+    have spec : (decoded.toChipRow witness.data).chipSpec witness.data :=
+      decoded.chipSpec_of_openSoundnessInputs witness constraints balanced decodedMem openInputs
+    -- The R-type source-register bounds (`op_b`/`op_c < 32`) are decode-intrinsic (not range-checked
+    -- in-circuit), recovered from the Program-grounding `decodedInROM` residual.  The opcode/`imm_c`
+    -- facts the inversion keys on are structural for the Add row (fixed `opcode = ADD`, no immediate).
+    have hop : (programAccess (decoded.toChipRow witness.data).view).toRow.opcode
+        = ((ropToOpcode rop.ADD).toNat : ZMod p) := by
+      obtain ⟨chip, physical⟩ := decoded
+      have hchip' : chip = addChipDescriptor (p := p) := hchip
+      subst hchip'
+      show (0 : ZMod p) = ((ropToOpcode rop.ADD).toNat : ZMod p)
+      norm_num [ropToOpcode, Opcode.toNat]
+    have himm : (programAccess (decoded.toChipRow witness.data).view).toRow.imm_c = 0 := by
+      obtain ⟨chip, physical⟩ := decoded
+      have hchip' : chip = addChipDescriptor (p := p) := hchip
+      subst hchip'
+      rfl
+    obtain ⟨_opa_lt, opb_lt, opc_lt⟩ := decodedInROM_rtype_operand_lt rop.ADD decode hop himm
+    exact addChip_rowAligned decoded witness.data hchip realView bounds spec opb_lt opc_lt
 
 end AddAnchor
 

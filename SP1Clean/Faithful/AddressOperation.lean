@@ -20,7 +20,7 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 /-- **Faithfulness anchor.** SP1's `AddressOperation` constraint lists (`asserts` + `interactions`)
 hold iff the native gadget's `RawSpec` holds. -/
 theorem address_constraints_faithful (b cc : Word (ZMod p))

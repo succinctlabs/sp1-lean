@@ -1,9 +1,106 @@
 # Proof patterns & landmines
 
+> **Read Clean's docs first.** This file records *SP1-specific instances*; the general doctrine lives in
+> Clean's own docs (upstream <https://github.com/Verified-zkEVM/clean>, or in-tree under
+> `.lake/packages/Clean/` — see `AGENTS.md` for the "where to find them" note). Before any nontrivial proof
+> work read Clean's `doc/performance-problems.md` (§"The root failure mode" — make the dangerous value
+> opaque, cross spellings by syntactic rewriting) and `doc/proving-guide.md`. **When you hit a new `whnf` /
+> heartbeat / `(kernel) deep recursion` blowup, check `performance-problems.md` first** — most of the
+> landmines below are worked instances of one of its 9 fix patterns (see §"Clean's unifying principle" for
+> the mapping). Clean's `AGENTS.md` owns the subcircuit-boundary, helper-lemma, spec, and
+> `ElaboratedCircuit` disciplines.
+
 Concrete, build-verified patterns for the witnessed-`FormalCircuit` gadgets in `Native/Operations/`
 (+ their proofs in `Proofs/Operations/`).
 Reference templates: `AddOperation.lean` (carry chain), `IsZeroOperation.lean` (tiny witness
 gadget), `BitwiseU16Operation.lean` (byte/opcode), `IsZeroWordOperation.lean` (composed subcircuits).
+
+## Clean's unifying principle (and our instances)
+
+Almost every performance landmine below is one concrete instance of the single doctrine in Clean's
+`doc/performance-problems.md` (upstream <https://github.com/Verified-zkEVM/clean>, or in-tree under
+`.lake/packages/Clean/`): **the elaborator and kernel decide defeq by `whnf`, which is cheap
+on symbolic terms but catastrophic when a term can unfold into a large concrete computation (a `ZMod`
+`.val`/`npow` over a big modulus, a recursive def at a literal depth, a `2^64` power). The fix is always to
+make the dangerous value *opaque* before any defeq touches it, and cross between spellings by *syntactic
+rewriting* (`rw`, `simp only`), never by unification.** Read that doc first; the map below tells you which
+of its patterns each of our notes realizes, so a *new* blowup is anticipated rather than rediscovered.
+
+| Our SP1-specific note (below) | Clean's general rule (Clean's `doc/`) |
+|---|---|
+| §"Keeping a nested sub-op's `cols` folded" (`eval_fromElements ↓100000`) | performance-problems §"Keep hypothesis types folded when applying generic lemmas" + item 1; proving-guide §"What (not) to unfold" |
+| The metavariable landmine — never `exact <lemma> _ _ hyp` at a decoded row (7.4M `Vector.mapRange` unfolds); pass the **folded** `Spec` and match on the head symbol (`memoryTimeNat_lt_of_registerAccessCols`) | performance-problems item 1 + §"Keep hypothesis types folded" — *this is the same fix as the working-tree `GroundingAdapter`/`TimeExtraction` change* |
+| §"The converse core" — make `(m*65535).val` opaque via `obtain`, **not** `set`/`let` | performance-problems item 4 verbatim ("`set` is not enough … only the `obtain`-an-existential form is genuinely opaque"); also explains why soundness survives where completeness explodes |
+| §"Bit-shift chip soundness" — factor `2^64` into an abstract-`BitVec` helper (`srl_toNat`/`sra_toNat`), never `skipKernelTC` | performance-problems item 9 ("kernel has no accelerated `Nat.pow`; factor arithmetic into a `private theorem` over abstract ℕ") |
+| Mul: keep `eval((output …) …)` an opaque atom (don't `simp [Expression.eval]`) | performance-problems items 1/4 (opaque values) |
+| §"`ElaboratedCircuit` field obligations: let the default tactics close them" | complements Clean `AGENTS.md` "pass `elaborated` as an **explicit field** for factored circuits (else `soundness` elaborates with metavariables)" + README roadmap (this automation is known-incomplete upstream) |
+| §"Compile-time / performance landmines" — "`maxHeartbeats` tightening is the wrong lever", "a bump in a simple proof is a code smell" | Clean's thrice-stated "**Never modify maxHeartbeats**" + performance-problems §"Measuring honestly" (`#count_heartbeats` lies; use `set_option maxHeartbeats <low>` / `diagnostics true` to find the true floor) |
+| The 4 gated completeness proofs (Branch/ShiftLeft/ShiftRight/DivRem) | performance-problems §"Kernel size cliffs in completeness proofs": `circuit_proof_start_core` → per-component `dsimp only [main, circuit_norm] at h_env` → `.1`/`.2` → split into a (virtual, free) subcircuit when the parent cliffs |
+
+Two disagreements worth stating honestly (see also `docs/architecture.md` §"Relationship to Clean's `Air`
+layer"): (1) our large `maxHeartbeats` footprint splits into *term-intrinsic* cost (DivRem/Mul/carry chains
+— genuine 64-bit arithmetic at a scale Clean doesn't face) that legitimately needs a raised ceiling, and
+*maskable* blowups the opaqueness patterns above eliminate — treat every bump in a *simple* proof as class
+(2). (2) Clean's "don't hand-unpack `ConstraintsHold` into helper lemmas" rule targets *single-circuit*
+proofs; our `Soundness/` whole-machine layer legitimately reasons about the *ensemble*'s global balance,
+which is a different regime — but per-chip closed-form families (`<chip>_memoryInteractionValues_eq`) are
+closer to what Clean would fold into a bundled `Spec`/`exposedChannels` conjunct.
+
+## maxHeartbeats: the fold recipe + no-bump discipline
+
+**The invariant: don't raise a ceiling — fold the blowup.** `scripts/check_heartbeats.sh` (a CI `guards`
+gate + part of `run_audit.sh`) fails if the `set_option maxHeartbeats` count grows past
+`scripts/heartbeats_baseline.txt`. So a new blowup must be *folded*, not bumped. A genuinely term-intrinsic
+addition (the KEEP-set below) requires a conscious baseline bump in the same PR. This kept the capstone build
+fast; keep it that way. The 2026-07 sweep cut SP1Clean overrides 516 → 461 with these levers:
+
+**1. `simp` → `simp only` — the biggest lever for chip/contract closers.** A full `simp [X.circuit, X.main,
+…, circuit_norm]` drags in the *entire default simpset* — that, not the `circuit`/`main` unfold, is the real
+cost that forced the per-chip ceilings. `simp only [<same args>, circuit_norm]` closes the identical goal
+cheaply (fits the 200k default). This single change removed all `TypedTimeContracts` (26→1) and `TypedState`
+(27→3) overrides. **Gotcha:** in the `firstStraightCPUTimeContract`-style closers, **keep `input, offset` in
+the args** — dropping them makes chips whose CPUState subcircuit is *not* the operations-list head (AluX0,
+and the `right/left/rfl`-navigated Jalr/Branch) time out. Where goal-1 membership isn't at the head, add the
+manual `right/…/left/rfl` navigation (see `TypedTimeContracts` Jalr/Branch).
+
+**2. The `circuit_output_eq` fold — for closed-forms referencing `<chip>.circuit.output`.** The memory
+closed-form family (`<chip>_memoryInteractionValues_eq`, the ×25 capstone rollout) blows up because
+`simp only [circuit_norm]` leaves `<chip>.circuit.output {concrete row}` un-reduced (its residual is the
+*structural* output — witnessed vars via `Vector.mapRange`, **not** a computed `a+b`). `circuit.output`
+reduces to `elaborated.output` only under `explicit_circuit_norm` (Clean's `FormalCircuitBase.output` is
+`@[explicit_circuit_norm]`, not `@[circuit_norm]`), and no global lever bridges it (a global tag yields the
+*worse* normal form `circuit.elaborated.output`, still stuck on the chip's `elaborated` projection). **Fix:
+a per-chip `rfl` helper over an OPAQUE input**, colocated in `Proofs/Chips/<Chip>/Formal.lean` after
+`def circuit`:
+```lean
+@[circuit_norm] theorem <chip>_circuit_output_eq (input : Var <Chip>.Inputs (ZMod p)) (offset : ℕ) :
+    (<Chip>.circuit (p := p)).output input offset = <the chip's elaborated.output struct> := rfl
+```
+then close with `simp only [circuit_norm, …]` (auto-fires the tagged helper; no whole-`circuit` unfold at the
+concrete row). This is Clean's `doc/performance-problems.md` item-1 ("extract witness values through a lemma
+over an opaque variable") — the unfold is symbolic over the opaque `input`, kernel-checked *once*; applying
+it at the concrete row is a pure rewrite. It dropped `addChip_memoryInteractionValues_eq` from 4M to **no
+override**. The RHS struct is copy-pasteable from `Native/Chips/<Chip>/Defs.lean` for hand-written-output
+chips; for auto-elaborated chips, extract the normalized RHS via `lean_goal` on `(<Chip>.circuit.output
+input offset)`. If the `@[circuit_norm]` tag perturbs the chip's own soundness/completeness, drop the tag and
+pass the plain lemma explicitly.
+
+**3. Measure floors by lowering the real ceiling — `#count_heartbeats` LIES.** It runs with an *unlimited*
+budget and under-reports (Clean's `doc/performance-problems.md` §"Measuring honestly"). A prior note here
+claimed `Sll.soundness = 72 heartbeats`; re-measured with `set_option maxHeartbeats <low>` it genuinely needs
+> 200k. Always lower the *actual* ceiling and rebuild to find a floor; never trust `#count_heartbeats`.
+
+**The KEEP-set — genuinely term-intrinsic; do NOT `simp→simp only`-sweep (tested, zero speedup).**
+`compile-profile.md:131` records the exact `simp→simp only` experiment on the DivRem/Mul family with **zero
+speedup** — the cost there is `nlinarith` / `linear_combination` / product-glue `simpa` / `omega` over big
+arithmetic / kernel `2^64`-whnf / kernel `decide`/`bv_decide` / term-size, none a default-simpset drag. Keep
+their ceilings: `Proofs/Operations/DivRemOperation/Core.lean`, `Native/…/DivRemOperation/OwnAsserts.lean`,
+`MulOperation/RawSpec.lean`, `Proofs/Chips/MulChip/Formal.lean` (128M completeness), `MulOperation/Formal.lean`,
+both Shift `Core.lean` `nlinarith` farms, the six Shift `Soundness/{Sll,Sllw,Sra,Sraw,Srl,Srlw}` conjuncts,
+`Math/Word.lean` `toBitVec64`, `Proofs/Sail/Advance.lean`. `Faithful/` (73) is anchor-safe but *not*
+mechanically safe (the full `simp` does real `List`/`Perm`/`decide` work + shapes residuals for downstream
+`rw`) — per-theorem only, low payoff. `Extracted/` (105 × flat 8M) is proof-obligation-free `@[irreducible]
+def` let-chains — the only lever is right-sizing the emit in `update_extracted.py`.
 
 ## The witnessed-`FormalCircuit` recipe
 
@@ -569,11 +666,16 @@ always means a *local* regression against one of these.
   monolithic generated terms were a measurable chunk of their cost).
 
 - **`maxHeartbeats` tightening is the *wrong* lever — don't chase the ceilings.** The heavy Shift/DivRem
-  proofs are kernel / type-checking-bound, not heartbeat-bound: `ShiftLeftChip/Soundness/Sll.soundness`
-  measures at **72** elaboration heartbeats against its 4M ceiling. The high ceilings are non-binding safety
-  margins; lowering them has no wall-clock effect and only risks a future spike. Real cost is term-intrinsic
-  (the `2^64` reductions, the product-glue `simpa`s) — chase *that* (the abstract-`BitVec` helpers + shared-tail
-  dedup below), not the `set_option` numbers.
+  proofs are kernel / type-checking-bound; their real cost is term-intrinsic (the `2^64` reductions, the
+  product-glue `simpa`s) — chase *that* (the abstract-`BitVec` helpers + shared-tail dedup below), not the
+  `set_option` numbers. **Caveat — measure with a low ceiling, not `#count_heartbeats`.** An earlier note here
+  claimed `ShiftLeftChip/Soundness/Sll.soundness` "measures at 72 elaboration heartbeats"; that was a
+  `#count_heartbeats` figure, which runs with an *unlimited* budget and under-reports (Clean's
+  `doc/performance-problems.md` §"Measuring honestly"). Re-measured 2026-07-21 with `set_option maxHeartbeats
+  <low>`, `Sll.soundness` **times out at the 200k default** (`whnf`/`isDefEq`) — its elaboration floor is
+  genuinely > 200k, so its 4M ceiling is *binding* (do not drop it to default), even though a mid-range
+  ratchet buys no wall-clock. To find a true floor, always lower the real ceiling and rebuild; never trust
+  `#count_heartbeats`.
 
 - **For many-case chips, extract semantic evidence instead of splitting full circuit soundness.** The old
   DivRem architecture proved nine `GeneralFormalCircuit.Soundness` theorems over the same enormous `main`

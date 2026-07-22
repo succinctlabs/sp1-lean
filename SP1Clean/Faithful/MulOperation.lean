@@ -114,7 +114,7 @@ simp arg — their bare `Expression.eval` forms as simp args probe every `eval` 
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 /-- **Faithfulness anchor — interaction half, SYNTACTIC.** `MulOperation` emits byte interactions
 from four sources, in order: the two composed `U16toU8OperationSafe` subs on `b`/`c`, the composed
 `U16MSBOperation` sub on the result limb `a[1] = product[2] + product[3]·256`, then 26 inline pulls

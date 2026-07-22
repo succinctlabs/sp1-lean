@@ -3,7 +3,10 @@
 Patterns and pitfalls from the `MulOperation` `FormalCircuit` soundness **and completeness** proofs
 (the 16-limb schoolbook multiply, 5 subcircuits, ~557 columns). These are the primary costs anyone
 working on composed multi-column Clean circuits will likely hit. Complements
-`proof-patterns.md` (general recipe) — this file is the *Mul-scale gotchas*.
+`proof-patterns.md` (general recipe) — this file is the *Mul-scale gotchas*. The `keep eval(output)
+opaque` / `id (ZMod p)` / literal-default pitfalls below are SP1 instances of Clean's general
+opaqueness doctrine — see `proof-patterns.md` §"Clean's unifying principle" and Clean's
+`doc/performance-problems.md`.
 
 **Status:** `MulOperation.soundness` **and** `MulOperation.completeness` are fully proved (all 5
 variants, axiom-clean — `#print axioms` on each, and on `MulOperation.circuit`, shows only `[propext,

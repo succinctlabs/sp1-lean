@@ -5,6 +5,14 @@ The fiddly proof- and build-level techniques used while working on the proofs. T
 reader-facing docs one level up (start with [`../architecture.md`](../architecture.md) and
 [`../release-audit.md`](../release-audit.md)).
 
+> **Read Clean's own docs first.** The Clean dependency (upstream <https://github.com/Verified-zkEVM/clean>,
+> or in-tree under `.lake/packages/Clean/` — see [`../../AGENTS.md`](../../AGENTS.md) for the "where to find
+> them" note) ships the upstream authority for proofs and performance: `doc/performance-problems.md` (the
+> `whnf`/kernel-blowup doctrine — read before any nontrivial proof, and first on any heartbeat/`deep
+> recursion` failure), `doc/proving-guide.md`, `AGENTS.md` (subcircuit/spec/`ElaboratedCircuit` discipline),
+> and `Clean/Air/README.md` (channels/ensembles/balance). Most landmines in `proof-patterns.md` are
+> SP1-specific instances of principles those docs state generally.
+
 ## Index
 
 - [porting-recipe.md](porting-recipe.md) — step-by-step checklist to port a new chip from the Add/Bitwise template: create the four artifacts, wire the root import, verify build + axioms.

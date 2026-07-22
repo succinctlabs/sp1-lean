@@ -17,7 +17,7 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 theorem loadwordcols_constraints_faithful (cols : Extracted.LoadWordColumns (ZMod p))
     (h_real : cols.is_lw + cols.is_lwu = 1) :
     (List.Forall (· = 0) (Extracted.LoadWordColumns.asserts cols) ∧

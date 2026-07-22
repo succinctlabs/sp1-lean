@@ -50,7 +50,6 @@ attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements
 
 
 set_option warn.sorry false in
-set_option maxHeartbeats 64000000 in
 /-- Completeness: `main`'s honest `Populate` witness closures (flags from the `"div_rem_flags"`
 hint) satisfy every constraint under `ProverAssumptions`. -/
 theorem completeness :

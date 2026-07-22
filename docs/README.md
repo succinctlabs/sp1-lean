@@ -4,6 +4,15 @@ The top-level [`README.md`](../README.md) is the public entry point and [`AGENTS
 contributor brief loaded by coding agents. This directory separates current claims from historical design
 records so that an old audit packet is never mistaken for the present theorem boundary.
 
+> **Upstream authority: read Clean's own docs.** This project is built on the Clean DSL (upstream
+> <https://github.com/Verified-zkEVM/clean>; its docs are in the `doc/` folder, singular). Read them either
+> on GitHub or from the in-tree copy Lake installs under `.lake/packages/Clean/` (see
+> [`../AGENTS.md`](../AGENTS.md) for the "where to find them" note — including that the dependency is
+> temporarily a local path checkout during the 4.31 migration). For *how to write proofs and tame
+> elaboration*, Clean's docs are the authority — `doc/performance-problems.md`, `doc/proving-guide.md`,
+> `AGENTS.md`, and `Clean/Air/README.md` (the channel/ensemble/balance model our grounding engine builds
+> on). Our [`agents/proof-patterns.md`](agents/proof-patterns.md) records the SP1-specific instances.
+
 ## Read these first
 
 1. [`overview.md`](overview.md) — concise, current statement of what is implemented, what is reserved, and
@@ -44,6 +53,10 @@ chain and the design choices that led to the current whole-chip boundary.
   pointing to the current status; it is not a description of today's worktree.
 - [`goal-overview.md`](goal-overview.md) — aspirational completed-state document for the full AIR,
   boot-to-halt, and ArkLib verifier layers. Do not cite it as current status.
+- [`archive/`](archive/) — retired handoff records (the pre-4.31 `clean-main-migration.md` /
+  `430-migration-handoff.md` and the `w11-rebase-status.md` ensemble re-base). Provenance only; their
+  durable conclusions are in `roadmap.md`, `architecture.md`, and Clean's own docs
+  (<https://github.com/Verified-zkEVM/clean> or in-tree `.lake/packages/Clean/`).
 
 ## Contributor and agent docs
 

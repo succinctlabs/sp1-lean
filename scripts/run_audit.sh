@@ -91,6 +91,14 @@ echo "the sole sanctioned native_decide; adds Lean.ofReduceBool/trustCompiler, c
 grep -rn 'native_decide' SP1CleanTest --include='*.lean' | wc -l
 
 echo
+echo "== A2 maxHeartbeats no-increase guard (fold blowups, don't bump ceilings) =="
+if scripts/check_heartbeats.sh; then
+  echo "PASS: maxHeartbeats override count at/below baseline"
+else
+  echo "FAIL: maxHeartbeats overrides increased — fold instead of bumping (see above)"; fail=1
+fi
+
+echo
 echo "== A3 axiom census (the authoritative oracle) =="
 python3 scripts/gen_axiom_probe.py || { echo "FAIL: probe generation"; exit 1; }
 census=docs/snapshots/axiom-census.txt

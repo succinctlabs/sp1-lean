@@ -300,6 +300,40 @@ All circuits are field-generic: `variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17
 - **Reuse Clean's primitives.** Range via `Gadgets.ToBits.rangeCheck`; byte ops via Clean's proven
   `ByteXorTable` + opcode-selected Lagrange lookups — no custom SP1 byte-bus.
 
+## Relationship to Clean's `Air` layer
+
+Clean's flat-AIR layer (Clean's `Clean/Air/README.md`) is the upstream analogue of our whole-machine
+stack, and reading it settles three recurring design questions. (This confirms the earlier verdict in
+`audits/2026-07-full-project/04-clean-architecture.md` against the *current* Clean source.)
+
+1. **Build on Clean's balance/channel primitives; do not re-base onto stock `VmTables`.** We use Clean's
+   `FormalCircuit`/`GeneralFormalCircuit`/`RawChannel`/`Ensemble` and `Balance.lean`'s multiset machinery.
+   Clean's `Air.Flat.VmTables`/`Vm.lean` models one *timeless* VM channel with one enabled push + one pull
+   per table; SP1 needs multiple dynamic buses, several register/memory accesses per instruction row,
+   ordered intra-row timestamps, clock rollover, and a proof that the balanced multiset has one exhaustive
+   chronological walk. Forcing that into `VmTables` moves complexity into adapters without removing the
+   SP1-specific theorem — so the plain-`Ensemble` + SP1-specific timed theorem is the right engine.
+2. **Our currency circularities are the SP1 instance of Clean's "guarantees-to-requirements-reversal."**
+   `Air/README.md` states the general problem exactly: ensemble soundness "requires that channel
+   guarantees, which were _assumed_ as part of local circuit proofs, are shown to hold unconditionally from
+   global channel balance and constraints." The D0 conditional-feed and the `pull_lt_push`/`slotOfClkBound`
+   break (`Soundness/{TimedGrounding,GroundingAdapter,TimeExtraction}.lean`) are bespoke realizations of
+   that reversal for the *timed* memory/state axes. Where a channel is *finished* (byte/program — see
+   `agents/bytechip-provider-design.md`), prefer invoking `Balance.lean`'s reversal /
+   `OrderedChannel`/`PartialBalancedChannels` directly over re-deriving it.
+3. **Our timed engine + SP-6 intra-row-chain core are an upstreaming candidate** — a timed/ordered VM-channel
+   generalization of `Vm.lean` (repeated intra-row keys, clock rollover, exhaustive-walk uniqueness).
+   Tracked alongside `docs/upstream/clean/*.patch` and `lean4-getelem-issue.md`.
+
+Two Clean capabilities we do **not** yet use, flagged for future (not capstone-critical):
+- **Witness IR / exportability** (Clean's `doc/witgen-authoring.md`): our witness generators use the
+  non-exportable `witnessNative` escape hatch and our trace conformance rests on `native_decide`; Clean's
+  witness IR (`#assert_exportable`, `#witgen_json`, the verified `Circuit.witgen` interpreter, and
+  `GeneralFormalCircuit.WithHint` for hint-carrying boundaries) is a path to shrink that trust surface —
+  relevant to the executable-verifier workstream.
+- **`scripts/bench/heartbeat-diff`** (Clean's per-module elaboration-cost regression harness) — worth
+  adopting given our large `maxHeartbeats` footprint.
+
 ## Assertion vs `FormalCircuit` — the demotion decision
 
 The Add worked example ("the chip witnesses the result via `populate`, the op is an assert-only `FormalAssertion`"

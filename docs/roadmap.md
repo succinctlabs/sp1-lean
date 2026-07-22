@@ -43,10 +43,14 @@ residual `TraceValueBinding`, W5 HALT, W7's `try_step` reduction, glue.
 
 ## The project debt at a glance
 
-The 4.31 migration re-opened five chip-completeness proofs (`Branch`, `Mul`, `ShiftLeft`, `ShiftRight`,
-and `DivRem`). They remain lower priority than fixing the semantic boundary because completeness can be
-admitted without changing what a verifying row means. The current soundness debt is more important and
-more precisely stated:
+The 4.31 migration re-opened chip-completeness proofs; `Mul` was restored (2026-07-16), leaving **four**
+(`Branch`, `ShiftLeft`, `ShiftRight`, `DivRem`). They remain lower priority than fixing the semantic
+boundary because completeness can be admitted without changing what a verifying row means. Each is the
+"large-composition completeness kernel cliff" case documented in Clean's `doc/performance-problems.md`
+§"Kernel size cliffs in completeness proofs"; the idiomatic repair is `circuit_proof_start_core` →
+per-component `dsimp only [main, circuit_norm] at h_env` → `.1`/`.2` projection → split into a (virtual,
+free) subcircuit where the parent still cliffs, **not** a `maxHeartbeats` bump. The current soundness debt
+is more important and more precisely stated:
 
 1. `DivRemChip.evidenceSoundness` is the single whole-chip seam from the generated DivRem circuit to the
    isolated four-family evidence contract in `Proofs/Chips/DivRemChip/Cases.lean`. Public
@@ -57,7 +61,14 @@ more precisely stated:
    exhaustive State ordering, PC chaining, clock accounting, activity, registry membership, and
    committed Program decode are now proved by `supported_core_witness_grounding`. The remaining theorem
    must establish each ordered row's Memory guarantees, circuit assumptions, operands, and readiness
-   against its evolving Sail state; `supported_core_native_sound` is the proved consumer.
+   against its evolving Sail state; `supported_core_native_sound` is the proved consumer. It closes via
+   `supportedCore_orderedRows_dynamic_of_contracts` once all 25 `ChipGroundingContracts` land (Add is the
+   proved pilot) + the arc-B aligned carrier + assembly-level balances. This engine is the SP1-specific
+   realization of Clean's `Balance.lean` "guarantees-to-requirements-reversal" (see `architecture.md`
+   §"Relationship to Clean's `Air` layer"). **Sequencing:** opaqueness-audit the per-chip memory
+   closed-form template (`<chip>_memoryInteractionValues_eq`, currently `@ maxHeartbeats 4M`) using the
+   folded-`Spec` pattern *before* the 24-chip rollout — that cost multiplies 25×, so a lower floor on the
+   template pays off across the whole rollout.
 3. `sp1_decoded_rows_sound` is the older structural decode seam used only by the frozen Eulerian-trail
    intermediate.
 4. A future whole-machine `WitnessRelation.Complete` theorem may remain one explicitly

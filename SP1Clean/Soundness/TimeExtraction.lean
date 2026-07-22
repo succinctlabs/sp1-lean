@@ -149,4 +149,29 @@ theorem memoryTimeNat_lt_of_accessTimestamp (prior pushed : MemoryMsg (ZMod p))
     (priorLow ▸ prevBound) diffLow diffHigh
   omega
 
+variable [Fact (2 ^ 17 < p)]
+
+/-- **Folded-`Spec` variant for decoded-row use** (the Clean "keep the child `Spec` folded" discipline —
+`clean/doc/performance-problems.md`).  Takes the composed reader's `RegisterAccessCols.Spec` over
+**variable** `accessCols`/`is_real`/`clk_target`, so a concrete decoded-row `RegisterAccessCols.Spec ⟨…⟩`
+matches it by *pattern* on the shared head symbol — no `whnf` into the eval-struct.  All spelling
+reconciliation happens on the three **scalar** bridges (`sameHigh`/`priorLow`/`targetClk`), which cross
+the decoder↔circuit spelling cheaply, instead of unifying the whole `access_timestamp` struct.  This is
+what lets `addChip_rowAligned` build the `prev_clk < access_clk` order straight from the chip `Spec`
+without the metavariable-normalization blowup. -/
+theorem memoryTimeNat_lt_of_registerAccessCols (prior pushed : MemoryMsg (ZMod p))
+    (accessCols : Extracted.RegisterAccessCols (ZMod p)) (is_real clk_target : ZMod p)
+    (real : is_real = 1)
+    (prevBound : MemoryMsg.ClkBound prior)
+    (spec : Readers.RegisterAccessCols.Spec ⟨accessCols, is_real, clk_target⟩)
+    (sameHigh : prior.clk_high = pushed.clk_high)
+    (priorLow : prior.clk_low = accessCols.access_timestamp.prev_low)
+    (targetClk : pushed.clk_low = clk_target) :
+    MemoryMsg.timeNat prior < MemoryMsg.timeNat pushed := by
+  obtain ⟨diffLow, diffHigh⟩ := spec real
+  simp only [MemoryMsg.timeNat, clkNat, sameHigh, priorLow, targetClk]
+  have := prevLow_val_lt_of_accessTimestamp clk_target accessCols.access_timestamp.prev_low
+    accessCols.access_timestamp.diff_low_limb (priorLow ▸ prevBound) diffLow diffHigh
+  omega
+
 end SP1Clean.Soundness.TimeExtraction

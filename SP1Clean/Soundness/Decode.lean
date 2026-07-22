@@ -266,6 +266,32 @@ theorem decodedInROM_rtype_hoist {prog : GuestProgram} {row : ProgramRow (ZMod p
   rw [hi, ← hi0] at hrun
   exact hrun
 
+/-- **The R-type register-index bound, at a decoded row.**  If a committed Program-bus `row` decodes to
+an R-type instruction `op` (opcode `ropToOpcode op`, `imm_c = 0`), then all three operand columns
+`op_a`/`op_b[0]`/`op_c[0]` are 5-bit register indices, hence `< 32`.  This is the decode-intrinsic
+provenance of `rowAligned_rtype`'s `opa_lt`/`opb_lt`/`opc_lt` hypotheses
+(`Soundness/GroundingAdapter.lean`): the source indices are not range-checked in-circuit at all (the
+Program bus's `ProgramMsg.RowSpec` guarantee bounds only the write index `op_a`), so the honest source of
+the bound is the instruction *encoding* — recovered here by inverting the decode
+(`instrToProgramRow_inv_rtype`) and applying `regidxVal_val_lt`, adding no boundary assumption beyond the
+`decodedInROM` the capstone already establishes.  (Making it upfront-derivable from `decodedInROM` — never
+from the grounding-time chip `Spec` — is what lets the walk's per-row `RowOK` be built before grounding.) -/
+theorem decodedInROM_rtype_operand_lt {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : rop)
+    (decode : decodedInROM prog row)
+    (hop : row.opcode = ((ropToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0) :
+    (row.op_a).val < 32 ∧ (row.op_b[0]).val < 32 ∧ (row.op_c[0]).val < 32 := by
+  obtain ⟨s, hs⟩ := sailConfigured_nonempty
+  obtain ⟨w, i, _hfetch, _hrun, hrow⟩ := decode.decodes s hs
+  obtain ⟨rs2, rs1, rd, _hi, ha, hb, hc⟩ := instrToProgramRow_inv_rtype op hrow hop himm
+  refine ⟨?_, ?_, ?_⟩
+  · rw [ha]; exact regidxVal_val_lt rd
+  · rw [hb]
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+    exact regidxVal_val_lt rs1
+  · rw [hc]
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+    exact regidxVal_val_lt rs2
+
 /-- **The MUL hoist** — the guard-load-bearing twin: Move-1's canonicity guard is what makes the per-state
 `i` pinnable at all (`inv_mul'`, no `hpin`). -/
 theorem decodedInROM_mul_hoist {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : mul_op)

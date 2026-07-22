@@ -19,7 +19,7 @@ open scoped SP1Clean.ConstraintCoe
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 set_option linter.unusedSimpArgs false in
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 theorem loadbytecols_constraints_faithful (cols : Extracted.LoadByteColumns (ZMod p))
     (h_real : cols.is_lb + cols.is_lbu = 1) :
     (List.Forall (· = 0) (Extracted.LoadByteColumns.asserts cols) ∧

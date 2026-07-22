@@ -18,6 +18,8 @@ jobs:
         run: scripts/check_no_skipkerneltc.sh
       - name: No native_decide in the main SP1Clean library
         run: scripts/check_no_native_decide.sh
+      - name: No new maxHeartbeats overrides (fold, don't bump)
+        run: scripts/check_heartbeats.sh
 
   build:
     runs-on:

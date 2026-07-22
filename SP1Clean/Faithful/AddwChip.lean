@@ -23,7 +23,7 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 /-- **Chip-level faithfulness anchor.** Under `is_real = 1`, SP1's generated `Addw` chip constraint
 list holds iff the combined spec holds: the `U16MSB` sign-bit spec and the `AddwOperation` raw spec on
 the register-read operands and result word, the two CPUState clock bounds, the ALUTypeReader per-row
@@ -76,7 +76,7 @@ theorem addwcols_constraints_faithful (cols : Extracted.AddwCols (ZMod p)) (h_re
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel StateMsg)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Program-bus interaction, SYNTACTIC.** The single Program fetch the
 whole `AddwChip` row emits (only the `ALUTypeReader` fragment emits Program) projects to the same arity-16
@@ -127,7 +127,7 @@ theorem addwcols_program_interactions_faithful_syntactic
     Extracted.Interaction.toAccess, Extracted.Dir.sign, Opcode.ofNat, ConstraintCoe.coe_eq_val,
     h_ir, h_p0, h_p1, h_p2, h_oa, h_ob, h_oc0, h_oc1, h_oc2, h_oc3, h_oa0, h_imm]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — State-bus interactions, SYNTACTIC.** The State interactions the
 whole `AddwChip` row emits (recovered by descending the chip into its three composed sub-readers) project
@@ -188,7 +188,7 @@ theorem addwcols_state_interactions_faithful_syntactic
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     h_ir, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Memory-bus interactions, SYNTACTIC (composition + WITNESSED + `Perm`
 + `negMult`).** The six Memory interactions the whole `AddwChip` row emits — `ALUTypeReader`'s five reads
@@ -274,7 +274,7 @@ theorem addwcols_memory_interactions_faithful_syntactic
   -- head, rotate the trailing `RegisterWrite` op_a write to the front (`perm_append_comm`).
   exact List.perm_append_comm (l₁ := [_, _, _, _]) (l₂ := [_])
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Byte-bus interactions, SYNTACTIC (multi-fragment `Perm` + WITNESSED).**
 All three fragments emit byte: `CPUState` (2 clock checks), `AddwOperation` (4 result-limb ranges on the
@@ -346,7 +346,7 @@ theorem addwcols_byte_interactions_faithful_syntactic
   -- swap the first two blocks (the `ALUTypeReader 6` tail is shared).
   exact (List.perm_append_comm (l₁ := [_, _]) (l₂ := [_, _, _])).append_right [_, _, _, _, _, _]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 /-- **Chip-level faithfulness anchor — COMBINED, SYNTACTIC.** The full faithfulness statement for `AddwChip`:
 the interactions the row emits on its four buses — `State`, `Byte`, `Memory`, `Program` — taken together
 are a `List.Perm` of SP1's *entire* extracted `AddwCols.interactions` oracle (projected to `LookupAccess`).

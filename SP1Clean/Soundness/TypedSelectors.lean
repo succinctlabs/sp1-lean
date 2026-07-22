@@ -155,7 +155,7 @@ theorem SubwChip.mainSelectorBinary :
     MainSelectorBinary (p := p) SubwChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary SubwChip.main
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 theorem BitwiseChip.mainSelectorBinary :
     MainSelectorBinary (p := p) BitwiseChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary BitwiseChip.main
@@ -164,7 +164,7 @@ theorem LtChip.mainSelectorBinary :
     MainSelectorBinary (p := p) LtChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary LtChip.main
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 theorem ShiftLeftChip.mainSelectorBinary :
     MainSelectorBinary (p := p) ShiftLeftChip.main (fun input => input.is_real) := by
   constructor
@@ -186,7 +186,7 @@ theorem ShiftLeftChip.mainSelectorBinary :
   rw [inputRealEq]
   exact binary
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 theorem ShiftRightChip.mainSelectorBinary :
     MainSelectorBinary (p := p) ShiftRightChip.main (fun input => input.is_real) := by
   constructor
@@ -229,7 +229,7 @@ theorem JalChip.mainSelectorBinary :
   rw [inputRealEq]
   exact binary
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 theorem JalrChip.mainSelectorBinary :
     MainSelectorBinary (p := p) JalrChip.main (fun input => input.is_real) := by
   constructor
@@ -327,7 +327,7 @@ theorem LoadDoubleChip.mainSelectorBinary :
     MainSelectorBinary (p := p) LoadDoubleChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary LoadDoubleChip.main
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 theorem LoadX0Chip.mainSelectorBinary : MainSelectorBinary (p := p) LoadX0Chip.main
     LoadX0Chip.isReal := by
   constructor
@@ -352,7 +352,7 @@ theorem StoreDoubleChip.mainSelectorBinary :
     MainSelectorBinary (p := p) StoreDoubleChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary StoreDoubleChip.main
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 theorem MulChip.mainSelectorBinary :
     MainSelectorBinary (p := p) MulChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary MulChip.main
@@ -375,7 +375,7 @@ private lemma mem_flatConstraints_of_assertion {Input : TypeMap} [ProvableType I
   rw [Operations.toNested_toFlat, Operations.constraints_toFlat]
   exact h
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 set_option maxRecDepth 10000 in
 /-- The selector gate `is_real·(is_real−1)` (`E355`) sits in the `DivRemCore` cluster's own-assert
 tail — a shallow assert of the gadget's `main`, hence one of its deep constraints. -/
@@ -402,7 +402,7 @@ private lemma divRemChip_isReal_gate_mem_main_constraints
   apply List.mem_append_left
   exact mem_flatConstraints_of_assertion (divRemCore_isReal_gate_mem_constraints _ _)
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 /-- DivRem's selector booleanity from the physical row constraints. The boolean gate is no longer
 a shallow assert of the chip `main` — it moved into the `DivRemCore` whole-row assertion cluster —
 so this bypasses the `MainSelectorBinary` shallow interface and extracts the gate from the deep

@@ -66,7 +66,6 @@ theorem AddChip.eval_opCPrevValue (env : Environment (ZMod p))
   rw [hMemory, ProvableStruct.eval_eq_eval]
   rfl
 
-set_option maxHeartbeats 2000000 in
 /-- Closed-form facts for Add's source-B register pull: the exact `RTypeReader` Memory pull is in
 `main`'s retained interaction list, and its gate/index/prior-value expressions evaluate to the
 semantic row view. -/
@@ -87,11 +86,10 @@ theorem AddChip.opBPullContract :
   · intro env
     exact (AddChip.eval_isReal env _).symm
   · intro env
-    simp [AddChip.circuit, AddChip.rowView, Extracted.RTypeReader.toAdapterView, circuit_norm]
+    simp only [AddChip.circuit, AddChip.rowView, Extracted.RTypeReader.toAdapterView, circuit_norm]
   · intro env
-    simp [AddChip.circuit, AddChip.rowView, Extracted.RTypeReader.toAdapterView, circuit_norm]
+    simp only [AddChip.circuit, AddChip.rowView, Extracted.RTypeReader.toAdapterView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 /-- Closed-form facts for Add's source-C register pull. -/
 theorem AddChip.opCPullContract :
     DecodedInstructionRow.CircuitRegisterOperandPullContractAt
@@ -110,9 +108,9 @@ theorem AddChip.opCPullContract :
   · intro env
     exact (AddChip.eval_isReal env _).symm
   · intro env
-    simp [AddChip.circuit, AddChip.rowView, Extracted.RTypeReader.toAdapterView, circuit_norm]
+    simp only [AddChip.circuit, AddChip.rowView, Extracted.RTypeReader.toAdapterView, circuit_norm]
   · intro env
-    simp [AddChip.circuit, AddChip.rowView, Extracted.RTypeReader.toAdapterView, circuit_norm]
+    simp only [AddChip.circuit, AddChip.rowView, Extracted.RTypeReader.toAdapterView, circuit_norm]
 
 /-- Add's two source-register values are carried by the exact `RTypeReader` Memory pulls composed
 into the chip.  This bundle is the template obligation for the other reader families. -/

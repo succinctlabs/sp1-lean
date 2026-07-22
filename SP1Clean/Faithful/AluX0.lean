@@ -26,7 +26,7 @@ private lemma val_29'' [NeZero p] : (29 : ZMod p).val = 29 := by
   have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   exact ZMod.val_natCast_of_lt (show (29 : ℕ) < p by omega)
 
-set_option maxHeartbeats 8000000 in
+set_option maxHeartbeats 4000000 in
 /-- **Chip-level faithfulness anchor.** Under `is_real = 1`, SP1's generated `AluX0` chip constraint list
 holds iff: the two CPUState clock bounds; the `op_a_0 = 1` forcing (`rd = x0`); the four op_a **read**-zeroing
 gates; the op_c immediate gate (`is_real - imm_c` boolean) and the four immediate-consistency gates; the

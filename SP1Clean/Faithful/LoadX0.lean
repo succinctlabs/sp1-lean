@@ -27,7 +27,7 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 8000000 in
+set_option maxHeartbeats 4000000 in
 /-- **Chip-level faithfulness anchor.** Under the one-hot selector hypothesis `is_lb + … + is_ld = 1`,
 SP1's generated `LoadX0` chip constraint list holds iff: the `AddressOperation` raw spec (with the three
 real offset bits); the two CPUState clock bounds; the `ITypeReaderImmutable` per-row well-formedness; the

@@ -65,7 +65,7 @@ def finalBoundaryStateMessage (publicInput : SP1PublicIO (ZMod p)) : StateMsg (Z
 @[simp] theorem statePullMessage_pcBits (row : ChipRow p) :
     Semantics.StateMsg.pcBits (statePullMessage row) =
       Target.rcvPcOf (stateAccess row.view) := by
-  simp [Semantics.StateMsg.pcBits, Semantics.pcBits, statePullMessage, statePullOfView,
+  simp only [Semantics.StateMsg.pcBits, Semantics.pcBits, statePullMessage, statePullOfView,
     Target.rcvPcOf, Target.pcBitsOfVals, stateAccess]
 
 @[simp] theorem statePushMessage_pcBits (row : ChipRow p) :
@@ -398,7 +398,6 @@ theorem DecodedInstructionRow.stateInteractions_signed_binary
   exact statePair_signed_binary _ binary _ _
 
 /- Add is the first concrete check of the shared State-emission contract. -/
-set_option maxHeartbeats 2000000 in
 theorem addChip_stateEmissionShape : StateEmissionShape
     (⟨AddChip.kind, AddChip.circuit, rfl, [.ADD], .nonX0⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -409,10 +408,9 @@ theorem addChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [AddChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [AddChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, AddChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem addiChip_stateEmissionShape : StateEmissionShape
     (⟨AddiChip.kind, AddiChip.circuit, rfl, [.ADDI], .nonX0⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -423,10 +421,9 @@ theorem addiChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [AddiChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [AddiChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, AddiChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem addwChip_stateEmissionShape : StateEmissionShape
     (⟨AddwChip.kind, AddwChip.circuit, rfl, [.ADDW], .nonX0⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -437,10 +434,9 @@ theorem addwChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [AddwChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [AddwChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, AddwChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem subChip_stateEmissionShape : StateEmissionShape
     (⟨SubChip.kind, SubChip.circuit, rfl, [.SUB], .nonX0⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -451,10 +447,9 @@ theorem subChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [SubChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [SubChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, SubChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem subwChip_stateEmissionShape : StateEmissionShape
     (⟨SubwChip.kind, SubwChip.circuit, rfl, [.SUBW], .nonX0⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -465,10 +460,9 @@ theorem subwChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [SubwChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [SubwChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, SubwChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem bitwiseChip_stateEmissionShape : StateEmissionShape
     (⟨BitwiseChip.kind, BitwiseChip.circuit, rfl, [.XOR, .OR, .AND], .nonX0⟩ :
       SupportedChip p) := by
@@ -481,11 +475,10 @@ theorem bitwiseChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [BitwiseChip.circuit, statePullOfView, statePushOfView,
+    simp only [BitwiseChip.circuit, statePullOfView, statePushOfView,
       stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, BitwiseChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem ltChip_stateEmissionShape : StateEmissionShape
     (⟨LtChip.kind, LtChip.circuit, rfl, [.SLT, .SLTU], .nonX0⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -496,10 +489,9 @@ theorem ltChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [LtChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [LtChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, LtChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem shiftLeftChip_stateEmissionShape : StateEmissionShape
     (⟨ShiftLeftChip.kind, ShiftLeftChip.circuit, rfl, [.SLL, .SLLW], .nonX0⟩ :
       SupportedChip p) := by
@@ -517,7 +509,6 @@ theorem shiftLeftChip_stateEmissionShape : StateEmissionShape
       statePullOfView, statePushOfView, stateAccess, cpuStatePullMessage, cpuStatePushMessage,
       ShiftLeftChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem shiftRightChip_stateEmissionShape : StateEmissionShape
     (⟨ShiftRightChip.kind, ShiftRightChip.circuit, rfl, [.SRL, .SRA, .SRLW, .SRAW], .nonX0⟩ :
       SupportedChip p) := by
@@ -535,7 +526,6 @@ theorem shiftRightChip_stateEmissionShape : StateEmissionShape
       statePullOfView, statePushOfView, stateAccess, cpuStatePullMessage, cpuStatePushMessage,
       ShiftRightChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem jalChip_stateEmissionShape : StateEmissionShape
     (⟨JalChip.kind, JalChip.circuit, rfl, [.JAL], .any⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -553,7 +543,6 @@ theorem jalChip_stateEmissionShape : StateEmissionShape
       statePushOfView, stateAccess, cpuStatePullMessage, cpuStateNextMessage,
       JalChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem jalrChip_stateEmissionShape : StateEmissionShape
     (⟨JalrChip.kind, JalrChip.circuit, rfl, [.JALR], .any⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -572,7 +561,6 @@ theorem jalrChip_stateEmissionShape : StateEmissionShape
       statePushOfView, stateAccess, cpuStatePullMessage, cpuStateNextMessage,
       JalrChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem branchChip_stateEmissionShape : StateEmissionShape
     (⟨BranchChip.kind, BranchChip.circuit, rfl,
       [.BEQ, .BNE, .BLT, .BGE, .BLTU, .BGEU], .any⟩ : SupportedChip p) := by
@@ -594,7 +582,6 @@ theorem branchChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStateNextMessage, BranchChip.rowView,
       circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem uTypeChip_stateEmissionShape : StateEmissionShape
     (⟨UTypeChip.kind, UTypeChip.circuit, rfl, [.AUIPC, .LUI], .any⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -610,7 +597,6 @@ theorem uTypeChip_stateEmissionShape : StateEmissionShape
       statePullOfView, statePushOfView, stateAccess, cpuStatePullMessage, cpuStatePushMessage,
       UTypeChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem loadDoubleChip_stateEmissionShape : StateEmissionShape
     (⟨LoadDoubleChip.kind, LoadDoubleChip.circuit, rfl, [.LD], .nonX0⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -622,10 +608,9 @@ theorem loadDoubleChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [LoadDoubleChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [LoadDoubleChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, LoadDoubleChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem loadByteChip_stateEmissionShape : StateEmissionShape
     (⟨LoadByteChip.kind, LoadByteChip.circuit, rfl, [.LB, .LBU], .nonX0⟩ :
       SupportedChip p) := by
@@ -639,11 +624,10 @@ theorem loadByteChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [LoadByteChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [LoadByteChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, LoadByteChip.rowView, LoadByteChip.isReal,
       circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem loadHalfChip_stateEmissionShape : StateEmissionShape
     (⟨LoadHalfChip.kind, LoadHalfChip.circuit, rfl, [.LH, .LHU], .nonX0⟩ :
       SupportedChip p) := by
@@ -657,11 +641,10 @@ theorem loadHalfChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [LoadHalfChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [LoadHalfChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, LoadHalfChip.rowView, LoadHalfChip.isReal,
       circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem loadWordChip_stateEmissionShape : StateEmissionShape
     (⟨LoadWordChip.kind, LoadWordChip.circuit, rfl, [.LW, .LWU], .nonX0⟩ :
       SupportedChip p) := by
@@ -675,11 +658,10 @@ theorem loadWordChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [LoadWordChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [LoadWordChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, LoadWordChip.rowView, LoadWordChip.isReal,
       circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem loadX0Chip_stateEmissionShape : StateEmissionShape
     (⟨LoadX0Chip.kind, LoadX0Chip.circuit, rfl,
       [.LB, .LBU, .LH, .LHU, .LW, .LWU, .LD], .onlyX0⟩ : SupportedChip p) := by
@@ -693,12 +675,11 @@ theorem loadX0Chip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [LoadX0Chip.circuit, statePullOfView, statePushOfView,
+    simp only [LoadX0Chip.circuit, statePullOfView, statePushOfView,
       stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, LoadX0Chip.rowView, LoadX0Chip.isReal,
       circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem storeByteChip_stateEmissionShape : StateEmissionShape
     (⟨StoreByteChip.kind, StoreByteChip.circuit, rfl, [.SB], .any⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -710,11 +691,10 @@ theorem storeByteChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [StoreByteChip.circuit, statePullOfView,
+    simp only [StoreByteChip.circuit, statePullOfView,
       statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, StoreByteChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem storeHalfChip_stateEmissionShape : StateEmissionShape
     (⟨StoreHalfChip.kind, StoreHalfChip.circuit, rfl, [.SH], .any⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -726,10 +706,9 @@ theorem storeHalfChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [StoreHalfChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [StoreHalfChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, StoreHalfChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem storeWordChip_stateEmissionShape : StateEmissionShape
     (⟨StoreWordChip.kind, StoreWordChip.circuit, rfl, [.SW], .any⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -741,10 +720,9 @@ theorem storeWordChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [StoreWordChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [StoreWordChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, StoreWordChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem storeDoubleChip_stateEmissionShape : StateEmissionShape
     (⟨StoreDoubleChip.kind, StoreDoubleChip.circuit, rfl, [.SD], .any⟩ : SupportedChip p) := by
   apply stateEmissionShape_of_circuitExposure
@@ -756,10 +734,9 @@ theorem storeDoubleChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [StoreDoubleChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [StoreDoubleChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, StoreDoubleChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem mulChip_stateEmissionShape : StateEmissionShape
     (⟨MulChip.kind, MulChip.circuit, rfl, [.MUL, .MULH, .MULHU, .MULHSU, .MULW], .nonX0⟩ :
       SupportedChip p) := by
@@ -771,7 +748,7 @@ theorem mulChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [MulChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [MulChip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, MulChip.rowView, circuit_norm]
 
 set_option maxHeartbeats 16000000 in
@@ -793,7 +770,6 @@ theorem divRemChip_stateEmissionShape : StateEmissionShape
       statePullOfView, statePushOfView, stateAccess, cpuStatePullMessage, cpuStatePushMessage,
       DivRemChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
 theorem aluX0Chip_stateEmissionShape : StateEmissionShape
     (⟨AluX0Chip.kind, AluX0Chip.circuit, rfl,
       [.ADD, .ADDI, .ADDW, .SUB, .SUBW, .XOR, .OR, .AND, .SLT, .SLTU,
@@ -809,10 +785,10 @@ theorem aluX0Chip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [AluX0Chip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp only [AluX0Chip.circuit, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, AluX0Chip.rowView, circuit_norm]
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 1000000 in
 /-- Every descriptor in the single supported-machine registry emits exactly one gated State pull and
 one gated State push, with payloads equal to its semantic `RowView`.  This is the registry-level
 contract consumed by deterministic witness decoding. -/
@@ -905,7 +881,7 @@ theorem eval_initialBoundaryStateMessage (env : Environment (ZMod p))
         (Eval.eval env input).init_pc2⟩ := by
   simp only [circuit_norm]
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 1000000 in
 /-- The verifier table contributes exactly the public final pull followed by the public initial push. -/
 theorem witness_verifierStateInteractions_eq
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :

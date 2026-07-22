@@ -32,7 +32,7 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 /-- **Faithfulness anchor (ALUTypeReader fragment).** Under `is_real = is_trusted = 1`, SP1's generated
 `ALUTypeReader` constraint list holds iff the combined spec holds. -/
 theorem alutypereader_constraints_faithful

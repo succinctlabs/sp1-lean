@@ -28,7 +28,7 @@ synthInstance.maxHeartbeats = 1000000
 # LOCAL 4.31 MIGRATION (in progress) — deps repointed to editable sibling checkouts at Lean 4.31,
 # so Clean-API + Sail-generation breakage surfaces early against the real code. The proper published
 # pins (Clean SHA, succinctlabs Sail forks / opencompl + the 3-line platform delta per
-# docs/agents/sail-fork-delta.md) get restored before the PR merges. See docs/agents/clean-main-migration.md.
+# docs/agents/sail-fork-delta.md) get restored before the PR merges. See docs/archive/clean-main-migration.md.
 [[require]]
 name = "mathlib"
 git = "https://github.com/leanprover-community/mathlib4"

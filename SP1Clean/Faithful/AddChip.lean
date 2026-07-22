@@ -41,7 +41,7 @@ def addChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel StateMsg)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — State-bus interactions, SYNTACTIC.** The State interactions the
 whole `AddChip` row emits (recovered by descending the chip into its three composed sub-readers) project
@@ -89,7 +89,7 @@ private theorem addcols_state_interactions_faithful_syntactic
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     h_ir, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Program-bus interaction, SYNTACTIC.** The single Program
 instruction-fetch the whole `AddChip` row emits (only the `RTypeReader` fragment emits Program) projects
@@ -138,7 +138,7 @@ private theorem addcols_program_interactions_faithful_syntactic
     Extracted.Interaction.toAccess, Extracted.Dir.sign, Opcode.ofNat, ConstraintCoe.coe_eq_val,
     h_ir, h_p0, h_p1, h_p2, h_oa, h_ob, h_oc, h_oa0]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Memory-bus interactions, SYNTACTIC (composition + WITNESSED + `Perm`
 + `negMult`).** The six Memory interactions the whole `AddChip` row emits — `RTypeReader`'s five reads
@@ -218,7 +218,7 @@ private theorem addcols_memory_interactions_faithful_syntactic
   -- trails the circuit block but leads the oracle's, so rotate it to the front (`perm_append_comm`).
   exact List.perm_append_comm (l₁ := [_, _, _, _]) (l₂ := [_])
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Byte-bus interactions, SYNTACTIC (multi-fragment `Perm` + WITNESSED).**
 All three fragments emit byte: `CPUState` (2 clock checks), `AddOperation` (4 result-limb ranges on the
@@ -290,7 +290,7 @@ private theorem addcols_byte_interactions_faithful_syntactic
   -- swap the first two blocks (the `RTypeReader 6` tail is shared).
   exact (List.perm_append_comm (l₁ := [_, _]) (l₂ := [_, _, _, _])).append_right [_, _, _, _, _, _]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 /-- **Chip-level faithfulness anchor — COMBINED, SYNTACTIC.** The full faithfulness statement for `AddChip`:
 the interactions the row emits on its four buses — `State`, `Byte`, `Memory`, `Program` — taken together
 are a `List.Perm` of SP1's *entire* extracted `AddCols.interactions` oracle (projected to `LookupAccess`).
@@ -377,7 +377,7 @@ Clean gadgets. The arithmetic calculation stays local; the canonical reader calc
 by `CanonicalReader`. Only the whole-chip theorem below is a faithfulness boundary. -/
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 private theorem add_operation_assertions_local
     (env : Environment (ZMod p)) (input : Var AddOperation.Inputs (ZMod p)) (offset : ℕ)
     (a b value : Word (ZMod p)) (isReal : ZMod p)
@@ -445,7 +445,7 @@ private theorem add_chip_constraints_decompose
     AddOperation.circuit, Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit,
     circuit_norm, List.map_append, List.forall_append]
 
-set_option maxHeartbeats 8000000 in
+set_option maxHeartbeats 4000000 in
 /-- **Complete assertion-system anchor for the native Add row.** For every verifier environment and
 every row bound to the native circuit output, all of SP1 Rust's extracted `assertZero`s vanish iff all
 assertions emitted by the complete native Clean chip (including true subcircuits) vanish. This covers
@@ -624,7 +624,7 @@ theorem addChip_constraints_faithful
       simpa only [eval_mul, eval_sub, Expression.eval] using hGateN
     exact ⟨⟨⟨hAddG, hCpuG⟩, hRTypeG⟩, hGate, hOp, trivial⟩
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 /-- **Complete interaction-system anchor for the native Add row.** Binding the circuit output supplies
 all column equalities needed by the detailed per-bus calculations above; the public conclusion compares
 the canonical four-bus multiset emitted by the native chip with SP1 Rust's complete extracted oracle. -/

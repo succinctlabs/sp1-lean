@@ -32,7 +32,7 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 /-- **Chip-level faithfulness anchor.** Under `is_slt + is_sltu = 1` (a real SLT/SLTU row), SP1's
 generated `Lt` chip constraint lists hold iff the combined spec holds. -/
 theorem ltcols_constraints_faithful (cols : Extracted.LtCols (ZMod p))

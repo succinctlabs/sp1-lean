@@ -29,6 +29,23 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 /-- A register index as the field element committed on the Program bus (its 5-bit value, `0..31`). -/
 def regidxVal (r : regidx) : ZMod p := match r with | .Regidx b => (b.toNat : ZMod p)
 
+/-- **Every committed register index is `< 32`.**  A `regidx` is a `BitVec 5`, so its committed
+`regidxVal` is a field element whose `.val` is the 5-bit register number — necessarily `< 32`.  This is
+the *decode-intrinsic* source-register bound (`op_b`/`op_c < 32`): SP1 does **not** range-check the source
+indices in-circuit (the Program bus's `ProgramMsg.RowSpec` bounds only the write index `op_a`), so this is
+the honest — and only — provenance of the bound, derived from the 5-bit instruction encoding rather than
+assumed on the boundary.  See `decodedInROM_rtype_op_bc_lt` (`Soundness/Decode.lean`) for the row-level
+consumer. -/
+theorem regidxVal_val_lt (r : regidx) : (regidxVal (p := p) r).val < 32 := by
+  obtain ⟨b⟩ := r
+  have hb : b.toNat < 32 := Nat.lt_of_lt_of_le b.isLt (by decide)
+  have hp : b.toNat < p := by
+    have h1 := Fact.out (p := 2 ^ 17 < p)
+    have h2 : (32 : ℕ) ≤ 2 ^ 17 := by norm_num
+    omega
+  rw [regidxVal, ZMod.val_natCast_of_lt hp]
+  exact hb
+
 /-- A 64-bit value as the committed `Word` (four little-endian 16-bit limbs as field elements) — the
 inverse of `Word.toBitVec64`, matching SP1's `Word::from_le_bits` for a (sign-extended) immediate. -/
 def bitVecToWord (v : BitVec 64) : Word (ZMod p) :=

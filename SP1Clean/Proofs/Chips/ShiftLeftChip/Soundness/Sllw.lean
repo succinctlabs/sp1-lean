@@ -34,6 +34,8 @@ def Spec (input : Inputs (ZMod p)) (cols : ShiftLeftCols (ZMod p)) (_ : ProverDa
     (cols.is_sllw = 1 →
       Word.toBitVec64 cols.a = RV64.sllw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))
 
+-- term-intrinsic: elaboration exceeds the 200k default (doc "72 heartbeats" was stale); needs a raised
+-- ceiling. Candidate for structural masking, not a Phase-1 ratchet.
 set_option maxHeartbeats 4000000 in
 /-- Soundness of the `sllw` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by

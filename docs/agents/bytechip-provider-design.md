@@ -1,5 +1,13 @@
 # ByteChip provider — design notes & scope (W11 prerequisite)
 
+> **Balance-reuse note (2026-07-21).** This is our closest read of Clean's `Air/Balance.lean` /
+> `Air/OrderedChannel.lean` / `Air/Vm.lean`, and the natural home for the "reuse Clean's reversal, don't
+> re-derive it" action from `docs/architecture.md` §"Relationship to Clean's `Air` layer". For *finished*
+> channels (byte/program), prefer invoking Clean's `Balance.lean` "guarantees-to-requirements-reversal" /
+> `PartialBalancedChannels` (per Clean's `Clean/Air/README.md`) directly; only the *timed* memory/state
+> axes keep our bespoke walk. Verify against current Clean source before relying on the pin-`2c20f7f0` line
+> numbers below.
+
 **Goal (user-chosen 2026-06-26):** make `byteChannel` a *finished* channel in Clean's `SoundEnsemble`,
 so the byte-bus soundness moves to upstream Clean (`addVm_soundVmChannel_of_soundChannels`) instead of
 our `Soundness/ByteConsistency.lean` `TraceByteLink` assumption. This is the first concrete unblock for

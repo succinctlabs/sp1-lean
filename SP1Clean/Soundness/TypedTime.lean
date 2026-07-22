@@ -153,6 +153,87 @@ theorem Readers.CPUState.bounds_of_byteGuarantees
   · have range := ((byteRowSpec_u8range_pair _ _).mp secondSpec).1
     exact range
 
+/-- **The RegisterAccessTimestamp reader's two Byte pulls imply its two timestamp bounds** — the
+register-column analogue of `CPUState.bounds_of_byteGuarantees`.  This is the byteG-only leaf that makes
+`RegisterAccessCols.Spec` (the `RowOK.slot` timestamp bound) *upfront-derivable*: the reader does only
+Byte pulls (no Memory), so the bounds follow from the finished Byte channel alone, never the
+grounding-time memory pull currency.  Two pulls: a 16-bit `Range` on `diff_low_limb` and a `U8Range` on
+the scaled high part `(clk_target - prev_low - 1 - diff) * 65536⁻¹`.
+
+**Refactor status (rowAligned-upfront, in progress).**  This leaf is step 1 of making
+`Soundness/ChipContracts.lean`'s `rowAligned` field derivable from `byteG` + `decodedInROM` instead of the
+grounding-time chip `Spec` (so the walk's per-row `RowOK` is available before grounding).  What remains is the
+NAVIGATION: from a chip row's whole-circuit `byteG`, reach each of the three nested `RegisterAccessTimestamp`
+subcircuits and apply this leaf, then relate the reader's input columns to the row `view` (a
+`CPUStateTimeBinding`-style binding) and wrap as the three `RegisterAccessCols.Spec`s.  The clean multi-level
+*structured* descent does not chain (a subcircuit's `.ops` is `NestedOperations`, and the bridge
+`channelGuarantees_toFlat` is over `Operations`); the working route is a direct extraction from the
+recursively-flattened interaction list (`circuit_norm`'s `toFlat_subcircuit`/`interactions_subcircuit`), i.e.
+this leaf's byte-pull pattern applied to all six register pulls at the flattened level.  Then
+`addChip_rowAligned`/`rowAligned_rtype` drop their `spec`/`openInputs` argument in favour of `byteG` +
+`decodedInROM_rtype_operand_lt` (`Soundness/Decode.lean`, the decode-intrinsic `op_a/op_b/op_c < 32`). -/
+theorem Readers.RegisterAccessTimestamp.bounds_of_byteGuarantees
+    (input : Var Readers.RegisterAccessTimestamp.Inputs (ZMod p)) (offset : ℕ)
+    (env : Environment (ZMod p))
+    (guarantees : FlatOperation.ChannelGuarantees byteChannel.toRaw env
+      ((Readers.RegisterAccessTimestamp.circuit (p := p)).toSubcircuit offset input).ops.toFlat)
+    (real : Expression.eval env input.is_real = 1) :
+    (Expression.eval env input.cols.diff_low_limb).val < 2 ^ 16 ∧
+      ((Expression.eval env input.clk_target - Expression.eval env input.cols.prev_low - 1 -
+        Expression.eval env input.cols.diff_low_limb) * (65536 : ZMod p)⁻¹).val < 2 ^ 8 := by
+  rw [FlatOperation.channelGuarantees_iff_forall_mem,
+    FormalAssertion.toSubcircuit_interactions] at guarantees
+  let first := byteChannel.pulledIf input.is_real
+    (⟨6, input.cols.diff_low_limb, Expression.const ((16 : ℕ) : ZMod p), 0⟩ :
+      ByteRow (Expression (ZMod p)))
+  let second := byteChannel.pulledIf input.is_real
+    (⟨3, 0, (input.clk_target - input.cols.prev_low - 1 - input.cols.diff_low_limb) *
+      (65536 : ZMod p)⁻¹, 0⟩ : ByteRow (Expression (ZMod p)))
+  have firstGuarantee : first.toRaw.Guarantees env := by
+    apply guarantees first.toRaw
+    · simp only [Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+        circuit_norm, first, List.mem_cons]
+    · rfl
+  have secondGuarantee : second.toRaw.Guarantees env := by
+    apply guarantees second.toRaw
+    · simp only [Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+        circuit_norm, second, List.mem_cons]
+    · rfl
+  have h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 25 < p); omega
+  have negReal : -(Expression.eval env input.is_real) = -1 := by rw [real]
+  have firstMult : (fun x => Expression.eval env x) first.toRaw.mult = -1 := by
+    simpa only [first, circuit_norm] using negReal
+  have secondMult : (fun x => Expression.eval env x) second.toRaw.mult = -1 := by
+    simpa only [second, circuit_norm] using negReal
+  have firstSpec : ByteRowSpec (Eval.eval env first.msg) := by
+    have typed := (ChannelInteraction.toRaw_guarantees env first).mp firstGuarantee
+    have guarantee := typed (by rfl) (by simpa only [circuit_norm] using firstMult)
+    change ByteRowSpec (Eval.eval env first.msg) at guarantee
+    exact guarantee
+  have secondSpec : ByteRowSpec (Eval.eval env second.msg) := by
+    have typed := (ChannelInteraction.toRaw_guarantees env second).mp secondGuarantee
+    have guarantee := typed (by rfl) (by simpa only [circuit_norm] using secondMult)
+    change ByteRowSpec (Eval.eval env second.msg) at guarantee
+    exact guarantee
+  have firstMsgEq : Eval.eval env first.msg =
+      (⟨6, Expression.eval env input.cols.diff_low_limb, ((16 : ℕ) : ZMod p), 0⟩ :
+        ByteRow (ZMod p)) := by
+    dsimp only [first, Channel.pulledIf, pulledIf]
+    simp only [ProvableStruct.eval_eq_eval, ProvableStruct.structEvalLiteralProc,
+      eval_sub, Expression.eval]
+  have secondMsgEq : Eval.eval env second.msg =
+      (⟨3, 0, (Expression.eval env input.clk_target - Expression.eval env input.cols.prev_low - 1 -
+        Expression.eval env input.cols.diff_low_limb) * (65536 : ZMod p)⁻¹, 0⟩ :
+        ByteRow (ZMod p)) := by
+    dsimp only [second, Channel.pulledIf, pulledIf]
+    simp only [ProvableStruct.eval_eq_eval, ProvableStruct.structEvalLiteralProc,
+      eval_sub, eval_mul, Expression.eval]
+  rw [firstMsgEq] at firstSpec
+  rw [secondMsgEq] at secondSpec
+  constructor
+  · exact (byteRowSpec_range _ h16p).mp firstSpec
+  · exact ((byteRowSpec_u8range_pair _ _).mp secondSpec).1
+
 /-- The scalar end of clock extraction: once a chip has isolated its CPU reader's Byte guarantees
 and four field bindings, no circuit structure remains in the no-wraparound argument. -/
 theorem stateTimeStep_of_cpuState_byteGuarantees

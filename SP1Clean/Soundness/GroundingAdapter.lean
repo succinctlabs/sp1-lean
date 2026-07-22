@@ -711,15 +711,8 @@ theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
       [rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3,
        rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2,
        rtypeWriteMessage view])
-    (tsSpec_a : Readers.RegisterAccessTimestamp.Spec
-      ⟨view.adapter.op_a_memory.access_timestamp, view.is_real,
-        (rtypeWriteMessage view).clk_low⟩)
-    (tsSpec_b : Readers.RegisterAccessTimestamp.Spec
-      ⟨view.adapter.op_b_memory.access_timestamp, view.is_real,
-        (rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3).clk_low⟩)
-    (tsSpec_c : Readers.RegisterAccessTimestamp.Spec
-      ⟨view.adapter.op_c_memory.access_timestamp, view.is_real,
-        (rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2).clk_low⟩) :
+    (hslots : ∀ tc ∈ rtypeTouches view rf, SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
+      MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) :
     AlignsWith (alignedOf rf (rtypeTouches view rf)) rf ∧
       (∀ tc ∈ rtypeTouches view rf,
         TouchOK (StateMsg.timeNat rf.statePull) tc.1 tc.2) ∧
@@ -866,24 +859,10 @@ theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
     · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 4 val_4_zmod_p (by omega)
         bounds.clk0 bounds.clk1
   · -- the currency-free **conditional** `slot` (`prev_clk < access_clk` given the pulled record's
-    -- `ClkBound`): each is `memoryTimeNat_lt_of_accessTimestamp` fed the *received* `ClkBound` (the
-    -- `hclk` antecedent, discharged by the walk from balance) and the reader's constraint-level
-    -- `RegisterAccessTimestamp.Spec` — no memory currency at the per-chip layer (the 1f break).
-    intro tc htc hclk
-    simp only [rtypeTouches, List.mem_cons, List.not_mem_nil, or_false] at htc
-    rcases htc with rfl | rfl | rfl
-    · exact TimeExtraction.memoryTimeNat_lt_of_accessTimestamp
-        (rtypePriorMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory)
-        (rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2)
-        view.adapter.op_c_memory.access_timestamp view.is_real real hclk tsSpec_c rfl rfl
-    · exact TimeExtraction.memoryTimeNat_lt_of_accessTimestamp
-        (rtypePriorMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory)
-        (rtypeReadBackMessage view (view.adapter.op_b[0]) view.adapter.op_b_memory 3)
-        view.adapter.op_b_memory.access_timestamp view.is_real real hclk tsSpec_b rfl rfl
-    · exact TimeExtraction.memoryTimeNat_lt_of_accessTimestamp
-        (rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory)
-        (rtypeWriteMessage view) view.adapter.op_a_memory.access_timestamp view.is_real real
-        hclk tsSpec_a rfl rfl
+    -- received `ClkBound`) is supplied by the chip-specific caller (`addChip_rowAligned`) straight
+    -- from the folded chip `Spec` via `memoryTimeNat_lt_of_registerAccessCols` — no nested-`Spec`
+    -- extraction here, the 1f/whnf-blowup fix.
+    exact hslots
 
 end RType
 
@@ -921,7 +900,18 @@ theorem addViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (ZMod
 theorem addChipDescriptor_table :
     (addChipDescriptor (p := p)).table = (⟨AddChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
 
-set_option maxHeartbeats 4000000 in
+omit [Fact (2 ^ 25 < p)] in
+/-- Add's circuit output as its explicit (structural) row — a `rfl` reduction of `circuit.output` over an
+**opaque** `input`.  Applying it at a concrete decoded row is a symbolic rewrite, so the memory closed-form
+below closes via `simp only [circuit_norm, …]` **without** unfolding the composed `main`/`circuit` at the
+concrete row (the `whnf`-into-concrete blowup that used to force a raised ceiling — see
+`../clean/doc/performance-problems.md` §"Keep hypothesis types folded"). -/
+theorem addChip_circuit_output_eq (input : Var AddChip.Inputs (ZMod p)) (offset : ℕ) :
+    (AddChip.circuit (p := p)).output input offset =
+      (⟨input.state, input.adapter,
+        ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩, input.is_real⟩ :
+        Var AddChip.Columns (ZMod p)) := rfl
+
 omit [Fact (2 ^ 25 < p)] in
 /-- **Add's evaluated Memory interaction list**, in the canonical R-type message shapes over the
 row view: the three read-prior pulls and the two read-backs + `op_a` write pushes, all gated by the
@@ -963,7 +953,7 @@ theorem addChip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
     Channel.eval_pulledIf, Channel.eval_pushedIf, eval_registerMemoryMessage]
   simp only [addViewOf, ← inputEq, ← outputEq, rtypePriorMessage, rtypeReadBackMessage,
     rtypeWriteMessage, AddChip.rowView, Extracted.RTypeReader.toAdapterView]
-  simp [AddChip.circuit, circuit_norm]
+  simp only [circuit_norm, addChip_circuit_output_eq]
 
 /-- Lift the raw evaluation to the proof-carrying typed decoder for any retained Add row. -/
 theorem addChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p)
@@ -1235,22 +1225,6 @@ theorem addChip_rowAligned (decoded : DecodedInstructionRow p) (data : ProverDat
     (real : (decoded.toChipRow data).view.is_real = 1)
     (bounds : ViewClockBounds (decoded.toChipRow data).view)
     (spec : (decoded.toChipRow data).chipSpec data)
-    (tsSpec_a : Readers.RegisterAccessTimestamp.Spec
-      ⟨(decoded.toChipRow data).view.adapter.op_a_memory.access_timestamp,
-        (decoded.toChipRow data).view.is_real,
-        (rtypeWriteMessage (decoded.toChipRow data).view).clk_low⟩)
-    (tsSpec_b : Readers.RegisterAccessTimestamp.Spec
-      ⟨(decoded.toChipRow data).view.adapter.op_b_memory.access_timestamp,
-        (decoded.toChipRow data).view.is_real,
-        (rtypeReadBackMessage (decoded.toChipRow data).view
-          ((decoded.toChipRow data).view.adapter.op_b[0])
-          (decoded.toChipRow data).view.adapter.op_b_memory 3).clk_low⟩)
-    (tsSpec_c : Readers.RegisterAccessTimestamp.Spec
-      ⟨(decoded.toChipRow data).view.adapter.op_c_memory.access_timestamp,
-        (decoded.toChipRow data).view.is_real,
-        (rtypeReadBackMessage (decoded.toChipRow data).view
-          ((decoded.toChipRow data).view.adapter.op_c[0])
-          (decoded.toChipRow data).view.adapter.op_c_memory 2).clk_low⟩)
     (opb_lt : ((decoded.toChipRow data).view.adapter.op_b[0]).val < 32)
     (opc_lt : ((decoded.toChipRow data).view.adapter.op_c[0]).val < 32) :
     AlignsWith (alignedOf (decoded.ordinaryRowFacts data)
@@ -1277,7 +1251,25 @@ theorem addChip_rowAligned (decoded : DecodedInstructionRow p) (data : ProverDat
       (SupportedChip.decodeRow_chipSpec_iff (addChipDescriptor (p := p)) data physical).mp spec
     obtain ⟨-, -, -, -, -, hbounds, -⟩ := hrspec
     exact (hbounds real).1
-  refine rowAligned_rtype bounds real opa_lt opb_lt opc_lt rfl ?_ ?_ tsSpec_a tsSpec_b tsSpec_c
+  -- the conditional `slot` (`prev_clk < access_clk` given the pulled record's received `ClkBound`),
+  -- straight from the FOLDED chip `Spec` timestamp sub-specs via `memoryTimeNat_lt_of_registerAccessCols`
+  -- (pattern-match on the folded `RegisterAccessCols.Spec` head — no nested-`Spec` whnf blowup).
+  have hslots : ∀ tc ∈ rtypeTouches (decoded.toChipRow data).view (decoded.ordinaryRowFacts data),
+      SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
+      MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
+    obtain ⟨chip, physical⟩ := decoded
+    have hchip' : chip = addChipDescriptor (p := p) := hchip
+    subst hchip'
+    obtain ⟨-, hrspec, -, -⟩ :=
+      (SupportedChip.decodeRow_chipSpec_iff (addChipDescriptor (p := p)) data physical).mp spec
+    obtain ⟨-, -, hts_a, hts_b, hts_c, -, -⟩ := hrspec
+    intro tc htc hclk
+    simp only [rtypeTouches, List.mem_cons, List.not_mem_nil, or_false] at htc
+    rcases htc with rfl | rfl | rfl
+    · exact TimeExtraction.memoryTimeNat_lt_of_registerAccessCols _ _ _ _ _ real hclk hts_c rfl rfl rfl
+    · exact TimeExtraction.memoryTimeNat_lt_of_registerAccessCols _ _ _ _ _ real hclk hts_b rfl rfl rfl
+    · exact TimeExtraction.memoryTimeNat_lt_of_registerAccessCols _ _ _ _ _ real hclk hts_a rfl rfl rfl
+  refine rowAligned_rtype bounds real opa_lt opb_lt opc_lt rfl ?_ ?_ hslots
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPulls, consumed_eq]
     rfl
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPushes]

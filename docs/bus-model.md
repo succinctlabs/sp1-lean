@@ -7,6 +7,12 @@
 > hygiene-guarantee rule); the migration that supersedes this file is
 > [`proposals/2026-07-architecture-consolidation.md`](proposals/2026-07-architecture-consolidation.md)
 > §3.5. Kept for the design rationale in §5 below; do not cite §0's "current status" as current.
+>
+> **For the channel/ensemble/balance machinery itself, the upstream authority is Clean's own
+> `Clean/Air/README.md`** (flat-AIR components, `Balance.lean`'s `BalancedInteractions` +
+> "guarantees-to-requirements-reversal", `OrderedChannels`/`Vm`). This file's account was written from
+> reading Clean's *source*; prefer Clean's doc for the model and use this file only for the SP1-specific
+> send/receive-duality rationale it adds.
 
 This doc describes how `sp1-clean-native` models SP1's cross-chip **interaction ("bus")
 arithmetic**, relates it to the upstream SP1 Rust source (the `sp1` checkout at `$SP1_DIR`, default
