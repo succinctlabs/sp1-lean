@@ -695,7 +695,7 @@ pushes in ascending push-time order, the per-key `IsChain` holds even for the SP
 (`add x3, x1, x1`, whose op_b/op_c read-backs share a key). -/
 theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFacts p}
     (bounds : ViewClockBounds view)
-    (real : view.is_real = 1)
+    (_real : view.is_real = 1)
     (opa_lt : view.adapter.op_a.val < 32)
     (opb_lt : (view.adapter.op_b[0]).val < 32)
     (opc_lt : (view.adapter.op_c[0]).val < 32)

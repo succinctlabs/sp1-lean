@@ -4,10 +4,12 @@ The historical W-graph below was organized around `Target.sp1_target_execution`.
 stack is stricter: `supported_core_native_sound` proves the native ensemble refines a shard-local Sail
 segment; `supportedCoreLocalExecution_anchors` lifts it to the canonical boot trajectory only when shard
 composition supplies reachability; `supported_core_air_sound` is reserved for extracted/native faithfulness;
-`sp1_air_sound` targets one full upstream shard; and `SP1ExecutionRelation` composes shards into boot-to-halt execution. The old walk
-induction remains a useful lemma, not the headline contract.
+`sp1_air_refinement`/`sp1_air_sound` now give the conditional composition boundary for one exact upstream
+execution cluster; and `SP1ExecutionRelation` specifies authenticated boot-to-halt shard composition. The
+upstream theorem is not closed until its named refinement bundle and temporary commit-row premise are
+instantiated. The old walk induction remains a useful lemma, not the headline contract.
 
-**Status convention (2026-07-16).** The “project debt at a glance” section and
+**Status convention (2026-07-22).** The “project debt at a glance” section and
 [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) are the live plan. The detailed
 W-graph and dated progress snapshots below are retained as implementation history; their old critical path
 and theorem names do not override the current stack above.
@@ -74,7 +76,17 @@ is more important and more precisely stated:
    template pays off across the whole rollout.
 3. `sp1_decoded_rows_sound` is the older structural decode seam used only by the frozen Eulerian-trail
    intermediate.
-4. A future whole-machine `WitnessRelation.Complete` theorem may remain one explicitly
+4. The exact v6.3.1 source relation is now present: generated 34-table execution and 6-table
+   memory-boundary profiles, all table/public-value lists, exact natural interaction balance, and an
+   explicit preprocessed-commitment binding. `CoreAIRRefinementObligations` remains to be instantiated.
+   Its boundary/execution cases must come from the timed grounding proof, not a restatement of the target.
+5. `CoreAIRSemanticAssumptions` is the temporary narrow premise that a newly introduced COMMIT or
+   COMMIT_DEFERRED flag has all eight corresponding rows. The extracted SyscallInstrs proof must still
+   establish each row's operand equality. Resolve the premise with the Rust team or strengthen the AIR.
+6. Concrete `SyscallHandler` refinements are separate deliverables. The baseline target handles raw
+   syscall rows honestly at 264 ticks; precompile behavior is not claimed until the associated cluster
+   proves the handler effect.
+7. A future whole-machine `WitnessRelation.Complete` theorem may remain one explicitly
    completeness-only admission; Clean will not be redesigned merely to conceal that fact.
 
 `scripts/run_audit.sh` gates the exact current file set. The obsolete nine DivRem per-op circuit proofs
@@ -227,7 +239,8 @@ to full store-replay memory.
 
 Model the HALT slice of `SyscallInstrs` (`../sp1 crates/core/machine/src/syscall/instructions/air.rs`:
 `is_halt` ⟹ `next_pc = [HALT_PC,0,0]`, syscall id in `t0`/x5, exit code in `a0`/x10). **Hidden
-prerequisite — done (2026-06-10):** syscall rows advance the clock by **256**, not 8 — `StateAccess`
+prerequisite — done (2026-06-10):** syscall handling adds 256 ticks to the ordinary `CLK_INC = 8`,
+so a syscall row advances by **264** — `StateAccess`
 now carries a per-row `clk_inc` (`Soundness/StateConsistency.lean`, projected at 8 by `stateAccess`
 for all 25 current chips), `stateLookups`/`sndKey` (`Soundness/GatedVm/StateBridge.lean`) key on
 `clk_low + clk_inc`, and the PC-chain layer (`pcChainProp`/`clkStep`/`TraceClkAdvance`/
@@ -302,15 +315,19 @@ in favor of `Channel.pullIf`/`Channel.emit`/gated `toRaw`. Side effect worth kno
 that differed at `mult = 0` — so the ensemble balance plausibly did not bind the program/memory
 emissions; the unification makes the Statement's bus balance genuinely bind them.
 
-Extraction reproducibility (release-audit TB-9) was **not** fixed by the pin alone — the compiler at
+**Historical note (superseded 2026-07-22):** the compatibility normalizer described below no longer
+exists; the direct-circuit backend and all generated circuit files were deleted. At the time,
+extraction reproducibility (release-audit TB-9) was **not** fixed by the pin alone — the compiler at
 the SP1 pin emits a `name`/`main`-**field** `ElaboratedCircuit` from a transient window of Clean main
-(`60665ed0`, later reworked), which no pinned Clean accepts. `update_extracted.py` now normalizes the
-emitter output (`_normalize_circuit_api`: parameterized instance + `pullIf`/`toRaw` names); a full
-regen at the pin reproduces `Extracted/` + `WitnessTests/` byte-identical and the 14 circuit-form
-files up to the (accepted, re-committed) emitter formatting of the two `Lt` files. **Residual: CLOSED
+(`60665ed0`, later reworked), which no pinned Clean accepted. At the time, `update_extracted.py`
+normalized that emitter output (`_normalize_circuit_api`: parameterized instance + `pullIf`/`toRaw`
+names); a full regen at the pin reproduced `Extracted/` + `WitnessTests/` byte-identically and the 14
+circuit-form files up to the (accepted, re-committed) emitter formatting of the two `Lt` files.
+**Residual: CLOSED
 (2026-06-26)** — re-pinned to the merge commit `2c20f7f0` (see the "merged-`main` re-pin" note above;
 `_normalize_circuit_api` extended to strip the now-`ElaboratedCircuit`-less `channelsWithRequirements`
-field + rfl-lemma). Upstream `d25bba8d` (now in the pin) deletes Clean's clashing
+field + rfl-lemma). The normalizer and circuit backend were then deleted in the 2026-07-22 list-only
+cutover. Upstream `d25bba8d` (now in the pin) deletes Clean's clashing
 `Fin.foldl_eq_foldl_finRange`, so the Batteries import-narrowing is no longer forced — kept as the
 project's narrow-import compile strategy, documented in `docs/agents/lean-sail-notes.md`.
 
@@ -363,13 +380,16 @@ eight-tick and syscall 264-tick schedules, and removes `/ 8` from the new execut
 refinement, full upstream public values, semantic execution, and the eventual ArkLib verifier theorem.
 The old headline was renamed to `balanced_state_trail_soundness`; `supported_core_native_sound` is the
 honest proved local-refinement consumer of the disclosed `supportedCore_orderedRows_dynamic` seam,
-`supported_core_air_sound` is reserved for the extracted-faithful
-supported AIR, and `sp1_air_sound` is reserved until the full shard AIR relation exists.
+`supported_core_air_sound` is reserved for the extracted-faithful supported AIR, and the exact-upstream
+`sp1_air_refinement`/`sp1_air_sound` composition boundary is now implemented separately (see below).
 
-**Landed setup continuation (2026-07-13).** `SP1ExecutionStatement`/`SP1ExecutionRelation` distinguish a
-single shard segment from a boot-to-halt composed execution, with explicit `ProgramBinding` and
-`ShardIntegrity` seams. `WitnessRelation.Complete` records the future converse without forcing a Clean
-redesign. `Soundness/SupportedMachine.lean` is now the single 25-chip descriptor used by the registry,
+**Landed setup continuation (updated 2026-07-22).** `SP1ExecutionStatement`/`SP1ExecutionRelation`
+distinguish a single shard segment from boot-to-halt composition. The former opaque `ShardIntegrity`
+parameter has been replaced by a concrete `AuthenticatedLedger` transcribing recursion's rolling-field
+equalities and endpoints, plus narrow septic-balance and deferred-authentication relations. Full-state
+segment stitching is explicit; PC/timestamp continuity is not treated as state identity.
+`WitnessRelation.Complete` records the future converse without forcing a Clean redesign.
+`Soundness/SupportedMachine.lean` remains the single 25-chip native descriptor used by the registry,
 ensemble, and routing surfaces. `Soundness/RankedGrounding.lean` proves that balanced transitions with a
 strict clock rank form an exhaustive trail, eliminating the old disconnected-cycle blind spot.
 
@@ -402,20 +422,35 @@ grounding engine still needs RAM records and same-location intra-row chaining be
 register aliases such as `rd = rs1` are covered. These are the concrete inputs to
 `supportedCore_orderedRows_dynamic`; they are independent of the verifier/ArkLib workstream.
 
+**Landed exact-upstream boundary (2026-07-22).** The audited list-only extractor now emits the complete
+baseline Core system tables, machine-level public-value block, and a fail-closed runtime manifest at
+semantic revision `a630089d9ff484ec6f2feade8d0afbb1447eed11`. `CoreProfile` proves the readable target is
+exactly the 34-table execution cluster plus the separate 6-table memory-boundary cluster, with matching
+main/preprocessed widths and 160 public cells. `Faithful/CoreAIR.lean` defines the heterogeneous rows,
+cluster-specific relation, preprocessed-commitment seam, and exact natural-multiplicity interaction
+balance. `Model/Machine/{Syscall,EventExecution}.lean` gives the 8/264-tick eventful target.
+`Soundness/CoreAIR.lean` exposes a deterministic decoder and field-by-field
+`CoreAIRRefinementObligations`; it proves the ArkLib-ready refinement once those obligations and the
+narrow commit-row provenance premise are supplied. The `.execution` guard prevents the memory-boundary
+cluster from satisfying the shard theorem.
+
 The Rust-faithfulness boundary is also moving from operations to chips. `AddChip` now owns an independent
 native row, a self-contained generated `Extracted/ChipOracle/Add.lean`, and an all-row
 `addChip_faithful` proof comparing complete assertions and interactions. Migrate the remaining chips one
-at a time; do not add operation anchors/direct circuits/witness batteries, and delete each legacy artifact
-when its last chip consumer disappears. The extraction script hard-fails requested chip-oracle/trace
-failures. Its current upstream blocker is concrete: the pinned SP1 `witness_vectors` binary has no
-`--chip` mode, so whole-trace vector regeneration must be restored before provenance is green.
+at a time; do not add operation anchors or witness batteries, and delete each legacy artifact when its
+last chip consumer disappears. Direct Rust-generated circuits are already gone: their definitions are
+hand-maintained under `Native/Operations/`. The extraction script hard-fails requested system/public-value/
+chip-oracle/trace failures and validates the machine manifest even on focused runs. A complete AIR-only
+regeneration against the v6.3.1 overlay reproduced every pre-existing instruction/reader/list artifact
+byte-for-byte.
 
 **Open.** Generalize `TimedGrounding` from ordinary register-only windows to RAM, repeated same-location
 touches, state bumps, syscalls/precompiles, and `SP1MachineModel.schedule`; derive Program commitment truth
 from the provider balance; close `supportedCore_orderedRows_dynamic` and retire the older
-`sp1_decoded_rows_sound`/Eulerian path; cover the full
-upstream table and public-value integrity relations; then instantiate ArkLib knowledge soundness as
-`sp1_verifier_sound` without changing its extraction error.
+`sp1_decoded_rows_sound`/Eulerian path; instantiate the exact upstream table/public-value refinement
+bundle, concrete syscall handlers, and recursive ledger relations; then instantiate ArkLib knowledge
+soundness as `sp1_verifier_sound` without changing its extraction error. ArkLib must extract exact
+non-wrapping natural interaction multiplicities, not merely a field-sum equality.
 
 **Larger-program boundary (not this workstream's critical path).** An executable Lean Core verifier over
 structured proof data, its deterministic refinement to a protocol specification, ArkLib knowledge
@@ -425,13 +460,13 @@ Compressed recursion and the Plonk/Groth16 wrappers are separate verifier target
 priority is to close the typed timed-grounding path and then extend the theorem from the supported
 25-chip slice to the complete upstream Core AIR.
 
-### B1 — the five 4.31 completeness regressions (M each, independent)
+### B1 — the four 4.31 completeness regressions (M each, independent)
 
 `BranchChip.completeness` remains the intended honest-`ProverHint`/shared-dispatch template for
-ShiftLeft and ShiftRight. Mul and DivRem should be revisited only after their chip-level contract and
-generated-row boundaries settle, since another structural refactor would invalidate large witness proofs
-again. Closing these also removes structural `sorryAx` propagation through bundled circuit values, even
-though machine soundness does not consume their completeness fields.
+ShiftLeft and ShiftRight. DivRem should be revisited only after its chip-level contract and generated-row
+boundary settle, since another structural refactor would invalidate a large witness proof again. Closing
+these also removes structural `sorryAx` propagation through bundled circuit values, even though machine
+soundness does not consume their completeness fields.
 
 ---
 
@@ -441,13 +476,15 @@ though machine soundness does not consume their completeness fields.
   (`coverage_kinds_eq_registry`, the covered/uncovered partition — 50 of 53 opcodes; ECALL/EBREAK/UNIMP
   open until W5) in sync as chips are added.
 - In any external claim, cite the machine-derived surface figure — the 25 modeled chips cover the
-  **Supervisor-mode halves of 25 of SP1's 122 `RiscvAir` variants** (v6.2.2-20-g9d249b8d4) — and the
+  **Supervisor-mode halves of 25 of SP1's 122 `RiscvAir` variants**
+  (`v6.3.1-8-ga630089d9`) — and the
   explicit exclusion list (decode/fetch, memory-infra, PageProt, syscalls/traps, Global, Range,
   precompiles, and the User-mode duplicates). `Supervisor/User`: decide whether single-variant coverage
   extends to the User duplicates (same AIR, different bus tags?) or stays a documented gap.
-- Checked-in trace anchors and `Extracted/` modules are elaborated by CI; the `SP1_PINNED_COMMIT`
-  assertion keeps the intended extraction source explicit. This is not yet a reproducibility check:
-  restore the missing Rust `--chip` trace dumper, then add CI that re-extracts and diffs per PR.
+- Checked-in trace anchors and `Extracted/` modules are elaborated by CI. The two-revision provenance,
+  checked-in exporter-patch hashes, unconditional runtime manifest, and successful full AIR-only
+  byte-identical regeneration make the local process reproducible. CI should still add an isolated
+  re-extract-and-diff job so that this does not depend on a developer running the currency check.
 
 ---
 

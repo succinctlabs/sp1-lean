@@ -1,5 +1,5 @@
 import SP1Clean.FormalModel.Contracts.Operations
-import SP1Clean.Extracted.Circuit.U16CompareOperation
+import SP1Clean.FormalModel.Contracts.Operations
 
 /-! # `U16CompareOperation` — `populate` (the witness generator)
 

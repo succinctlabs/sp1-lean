@@ -40,9 +40,9 @@ echo "== A2 proof-deferral inventory (gate: exactly the known-debt set) =="
 #   · AIR                  — `supportedCore_orderedRows_dynamic` (the per-row dynamic grounding seam;
 #     `supported_core_witness_grounding` and `supported_core_native_sound` are its proved consumers)
 #   · DivRemChip/Formal — one explicit `evidenceSoundness` seam from the generated whole-chip
-#     constraints to the isolated four-family evidence contract, plus the requirements-lawfulness
-#     record field. The unused top-level State exposure was retired, closing its former structural
-#     admission; the former nine per-op proofs were retired rather than retained as dead debt.
+#     constraints to the isolated four-family evidence contract, plus the main-exposed and
+#     requirements channel-lawfulness fields. The former nine per-op proofs were retired rather
+#     than retained as dead debt.
 expected_sorries="$(cat <<'LIST'
 SP1Clean/Proofs/Chips/ShiftLeftChip/Formal.lean
 SP1Clean/Proofs/Chips/ShiftRightChip/Formal.lean
@@ -116,7 +116,7 @@ import re, sys
 text = open(sys.argv[1]).read()
 entries = re.findall(r"'([^']+)' (?:depends on axioms: \[([^\]]*)\]|does not depend on any axioms)", text, re.S)
 print(f"census entries: {len(entries)}")
-# Declarations allowed to (transitively) carry sorryAx: the five deferred completeness proofs,
+# Declarations allowed to (transitively) carry sorryAx: the four deferred completeness proofs,
 # DivRem's evidence/channel-law seams, the two machine-grounding seams, and the circuit/registry/
 # capstone structures that embed or consume them.  `#print axioms` is intentionally structural:
 # a `GeneralFormalCircuit` retains its completeness field even when a soundness theorem never
@@ -127,17 +127,9 @@ print(f"census entries: {len(entries)}")
 # isolated quotient/remainder evidence families; `contractSoundness` and public `soundness` are proved
 # from that interface and inherit its sorryAx. This remains a genuine soundness gap, but its statement
 # now exposes selection, edge cases, arithmetic evidence, and final output routing explicitly.
-# *** STALE-SNAPSHOT RECONCILIATION (2026-07-12, C1/Move-2 audit run). *** Re-homing the decode globs to
-# `Model/Semantics/Decode.lean` regenerated the census against the *current* tree for the first time since
-# the 4.30 migration, surfacing two disclosed-debt carriers the previous (stale) snapshot never showed:
-#   · `MulChip.completeness` — the 4.30 Mul-completeness stub (already in the A2 `expected_sorries` set; the
-#     sibling of the already-allowed `DivRemChip.completeness`).
-#   · `sp1_finishedChannel_guarantees` — a capstone-chain member (sibling of the already-allowed
-#     balanced-trail ensemble) that consumes the chip soundness/completeness and so
-#     inherits their sorryAx.
-# Neither is a Move-2 regression: the decode redefinition + collapsed producers + hoists are verified
-# axiom-clean (zero sorryAx). Both are consequences of the pre-existing Mul-completeness + DivRem-soundness
-# stops; disclosed here and in the docs.
+# `sp1_finishedChannel_guarantees` is an expected capstone-chain carrier: it consumes the admitted
+# chip/capstone premises but is not an additional proof admission. Mul completeness was restored on
+# 2026-07-16 and is deliberately absent from both the direct and transitive allowlists.
 #
 # The registry/coverage declarations below project from the single `supportedChips` descriptor.  That
 # descriptor deliberately bundles each route with its `ChipKind` and Clean `Component`, so Lean's axiom

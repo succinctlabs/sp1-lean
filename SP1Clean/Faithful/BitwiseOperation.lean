@@ -1,6 +1,6 @@
 import Mathlib.Tactic
 import SP1Clean.Native.Operations.BitwiseOperation.RawSpec
-import SP1Clean.Extracted.Circuit.BitwiseOperation
+import SP1Clean.Native.Operations.BitwiseOperation.Defs
 import SP1Clean.Faithful.BitwiseU16Operation
 import SP1Clean.Math.Bitwise
 import SP1Clean.Model.InteractionProjection

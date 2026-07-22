@@ -1,8 +1,9 @@
 import SP1Clean.Native.Operations.MulOperation.RawSpec
 
-/-! # `MulOperation` circuit form — `main` + `elaborated` (SP1's `eval`). -/
+/-! # `MulOperation` native circuit
 
-set_option linter.all false  -- auto-generated: skip linters
+The proof-oriented Clean implementation. Its whole-chip faithfulness proof compares the assembled
+native assertion and interaction system with the independent Rust anchor lists. -/
 
 namespace SP1Clean.MulOperation
 

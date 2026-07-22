@@ -161,8 +161,35 @@ theorem pcWalk_of_decodedStateWalk (data : ProverData (ZMod p)) :
         simp [decodedStateEdge]
       · simpa [decodedStateEdge] using ih tail
 
+/-- A State-message walk with a row-dependent positive-width schedule has the expected endpoint
+clock count.  No instruction class or fixed divisor is baked into this telescoping theorem. -/
+theorem clockCount_of_decodedStateWalk_durations (data : ProverData (ZMod p))
+    (duration : DecodedInstructionRow p → ℕ) :
+    ∀ {initial final : Channels.StateMsg (ZMod p)}
+      {rows : List (DecodedInstructionRow p)},
+      Walk.IsWalk (decodedStateEdge data) initial final rows →
+      (∀ decoded ∈ rows,
+        Semantics.StateMsg.timeNat (decodedStateEdge data decoded).2 =
+          Semantics.StateMsg.timeNat (decodedStateEdge data decoded).1 + duration decoded) →
+      Semantics.StateMsg.timeNat initial + (rows.map duration).sum =
+        Semantics.StateMsg.timeNat final := by
+  intro initial final rows walk steps
+  induction rows generalizing initial with
+  | nil =>
+      change initial = final at walk
+      subst final
+      simp
+  | cons decoded rows ih =>
+      obtain ⟨source, tail⟩ := walk
+      have sourceTime := congrArg Semantics.StateMsg.timeNat source
+      have rowStep := steps decoded List.mem_cons_self
+      have tailCount := ih tail (fun other otherMem =>
+        steps other (List.mem_cons_of_mem decoded otherMem))
+      simp only [List.map_cons, List.sum_cons]
+      omega
+
 /-- A full State-message walk whose rows each advance eight ticks has the expected endpoint clock
-count.  This isolates the purely telescoping part from Memory and Sail-state grounding. -/
+count.  This is the ordinary-slice specialization of the row-dependent theorem above. -/
 theorem clockCount_of_decodedStateWalk (data : ProverData (ZMod p)) :
     ∀ {initial final : Channels.StateMsg (ZMod p)}
       {rows : List (DecodedInstructionRow p)},
@@ -212,8 +239,42 @@ theorem endpointBalance_of_decodedStateWalk (data : ProverData (ZMod p)) :
       rw [source]
       exact (List.Perm.cons initial ihEq).trans (List.Perm.swap final initial _)
 
+/-- Locate a row in a State walk by the sum of all preceding row-dependent durations. -/
+theorem statePullTime_of_decodedStateWalk_durations (data : ProverData (ZMod p))
+    (duration : DecodedInstructionRow p → ℕ) :
+    ∀ {initial final : Channels.StateMsg (ZMod p)}
+      {rows : List (DecodedInstructionRow p)},
+      Walk.IsWalk (decodedStateEdge data) initial final rows →
+      (∀ decoded ∈ rows,
+        Semantics.StateMsg.timeNat (decodedStateEdge data decoded).2 =
+          Semantics.StateMsg.timeNat (decodedStateEdge data decoded).1 + duration decoded) →
+      ∀ done decoded suffix, rows = done ++ decoded :: suffix →
+        Semantics.StateMsg.timeNat (decodedStateEdge data decoded).1 =
+          Semantics.StateMsg.timeNat initial + (done.map duration).sum := by
+  intro initial final rows walk steps done
+  induction done generalizing initial rows with
+  | nil =>
+      intro decoded suffix rowsEq
+      subst rows
+      obtain ⟨source, -⟩ := walk
+      simpa using congrArg Semantics.StateMsg.timeNat source
+  | cons head done ih =>
+      intro decoded suffix rowsEq
+      subst rows
+      obtain ⟨source, tail⟩ := walk
+      have headStep := steps head List.mem_cons_self
+      have tailSteps : ∀ row ∈ done ++ decoded :: suffix,
+          Semantics.StateMsg.timeNat (decodedStateEdge data row).2 =
+            Semantics.StateMsg.timeNat (decodedStateEdge data row).1 + duration row := by
+        intro row rowMem
+        exact steps row (List.mem_cons_of_mem head rowMem)
+      have position := ih tail tailSteps decoded suffix rfl
+      have sourceTime := congrArg Semantics.StateMsg.timeNat source
+      simp only [List.map_cons, List.sum_cons]
+      omega
+
 /-- The State walk and each chip's proved `+8` clock contract locate every exact decoded row at its
-prefix length. This is the position equation consumed by shard-local Memory currency. -/
+prefix length. This is the ordinary-slice specialization consumed by shard-local Memory currency. -/
 theorem statePullTime_of_decodedStateWalk (data : ProverData (ZMod p)) :
     ∀ {initial final : Channels.StateMsg (ZMod p)}
       {rows : List (DecodedInstructionRow p)},
@@ -351,23 +412,13 @@ generation inputs, memory initialization, and provider-table obligations; using 
 an explicit top-level completeness `sorry` while that relation and trace generator are verified.  This
 does not require changing Clean's `GeneralFormalCircuit` representation. -/
 
-/-! ## Reserved full target
+/-! ## Full extracted target
 
-Once the full extracted witness exists, the headline theorem should have precisely this shape:
-
-```lean
-theorem sp1_air_sound :
-    WitnessRelation.Sound
-      (SP1AIRRelation (p := p))
-      (Execution.SP1ShardExecutionRelation layout model programBinding) := by
-  -- proof deferred
-```
-
-Here `SP1AIRRelation` must range over the real `SP1PublicValues` layout and a faithful full-machine
-witness (including CPU/syscall, memory, program, byte, global interaction, initialization, and
-finalization tables).  We intentionally do not manufacture a placeholder relation: `False`, `True`,
-an opaque axiom, or a current-ensemble projection would all make the desired signature elaborate while
-changing the theorem being claimed. -/
+`Soundness/CoreAIR.lean` now owns `sp1_air_refinement` and its existential corollary
+`sp1_air_sound`.  Their source is the concrete 34-table/6-table Rust relation in
+`Faithful/CoreAIR.lean`, not this smaller native ensemble.  The theorem takes a field-by-field proof
+bundle and the explicitly disclosed commit-row provenance premise; this file continues to own only
+the 25-chip proof-oriented Clean slice. -/
 
 /-! Shard AIR soundness is not itself a halting theorem.  After recursion authenticates an ordered
 ledger and all companion integrity relations, the composed target has the separate shape:

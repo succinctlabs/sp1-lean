@@ -1,5 +1,7 @@
+import SP1Clean.FormalModel.Contracts.CoreAIR
 import SP1Clean.FormalModel.Contracts.PublicValues
 import SP1Clean.FormalModel.Relations
+import SP1Clean.Model.Machine.EventExecution
 import SP1Clean.Model.Machine.Execution
 import SP1Clean.Model.Semantics.MicroTime
 
@@ -130,108 +132,189 @@ untrusted-program configuration.  The concrete relation belongs to the extracted
 abbrev ProgramBinding (p : ℕ) (Digest : Type) :=
   SP1MachineVerifyingKey (ZMod p) Digest → GuestProgram → Prop
 
-/-- One shard is either an execution segment or a non-execution shard.  The context always carries
-the program opened from the verifying key; `none` is permitted only by the non-execution branch of
-`SP1ShardExecutionRelation`. -/
-structure SP1ShardExecutionWitness (model : Machine.SP1MachineModel) where
-  context : Machine.ExecutionCtx model
-  execution : Option (Machine.ExecutionSegmentWitness context)
+/-! ## Eventful Core shard target -/
 
-/-- The pc/timestamp execution projection of the real upstream shard relation.
+/-- Private, proof-free semantic witness for one Core shard.  An execution shard carries raw event
+trace data checked by the relation below; a non-execution shard carries `none`. -/
+structure SP1EventfulShardExecutionWitness where
+  program : GuestProgram
+  execution : Option Machine.EventExecutionTrace
 
-Execution shards expose a genuine segment of the canonical Sail run.  Non-execution shards preserve
-pc and timestamp exactly, as Rust's `ExecutionRecord.eval_state` requires.  Companion relations must
-still cover digests, global-memory ranges and cumulative sums, deferred proofs, syscalls, and proof
-nonce integrity before this projection can serve as the complete `sp1_air_sound` target. -/
-noncomputable def SP1ShardExecutionRelation {p : ℕ} {Digest : Type}
-    (layout : SP1PublicValuesLayout) (model : Machine.SP1MachineModel)
+/-- Syscall transcript exposed by a shard witness; boundary-only shards expose the empty list. -/
+def SP1EventfulShardExecutionWitness.syscallEvents
+    (witness : SP1EventfulShardExecutionWitness) : List Machine.CoreSyscallEvent :=
+  witness.execution.map Machine.EventExecutionTrace.syscallEvents |>.getD []
+
+/-- An eventful execution segment agrees with the public pc and timestamp endpoints. -/
+def EventSegmentMatches {handler : Machine.SyscallHandler} (initialClock : ℕ)
+    (initialPc : BitVec 64) (finalClock : ℕ) (finalPc : BitVec 64)
+    (program : GuestProgram) (execution : Machine.EventExecutionTrace) : Prop :=
+  execution.Valid handler program ∧
+    execution.Clocked initialClock ∧
+    execution.initialState.regs.get? Register.PC = some initialPc ∧
+    execution.finalState.regs.get? Register.PC = some finalPc ∧
+    execution.finalClock initialClock = finalClock
+
+/-- The two honest semantic cases of a baseline Core shard.
+
+Making the branch a named inductive keeps the top-level audit surface readable and prevents a proof
+from satisfying an opaque disjunction with an unrelated existential.  A boundary shard consumes no
+machine step; an execution shard exposes the exact trace that was decoded from the AIR witness. -/
+inductive SP1CoreShardCase {p : ℕ} {Digest : Type} (handler : Machine.SyscallHandler)
+    (statement : SP1ShardStatement (ZMod p) Digest)
+    (witness : SP1EventfulShardExecutionWitness) : Prop
+  | boundary :
+      statement.publicValues.is_execution_shard = 0 →
+      witness.execution = none →
+      statement.publicValues.pc_start = statement.publicValues.next_pc →
+      statement.publicValues.initial_timestamp = statement.publicValues.last_timestamp →
+      SP1CoreShardCase handler statement witness
+  | execution (trace : Machine.EventExecutionTrace) :
+      statement.publicValues.is_execution_shard = 1 →
+      witness.execution = some trace →
+      RomLoaded witness.program trace.initialState →
+      SailConfigured trace.initialState →
+      EventSegmentMatches (handler := handler)
+        statement.publicValues.initial_timestamp.toNat
+        statement.publicValues.pcStartBits statement.publicValues.last_timestamp.toNat
+        statement.publicValues.nextPcBits witness.program trace →
+      SP1CoreShardCase handler statement witness
+
+/-- Named validity record for the semantic result of one baseline Core shard.
+
+The fields are intentionally the complete public audit surface.  Table-specific proofs may be split
+however is convenient internally, but the AIR refinement must fill these fields explicitly. -/
+structure SP1CoreShardExecutionValid {p : ℕ} {Digest : Type}
+    (layout : SP1PublicValuesLayout) (handler : Machine.SyscallHandler)
+    (programBinding : ProgramBinding p Digest)
+    (statement : SP1ShardStatement (ZMod p) Digest)
+    (witness : SP1EventfulShardExecutionWitness) : Prop where
+  verifyingKeyWellFormed : statement.verifyingKey.WellFormed layout
+  publicValuesWellFormed : statement.publicValues.WellFormed layout
+  configurationMatches : statement.ConfigurationMatches
+  programWellFormed : witness.program.WellFormed
+  programBound : programBinding statement.verifyingKey witness.program
+  entryPoint :
+    BitVec.ofNat 64 statement.verifyingKey.pc_start.toNat = witness.program.pc_start
+  firstExecutionShard : statement.publicValues.is_first_execution_shard = 1 →
+    statement.publicValues.pcStartBits = witness.program.pc_start ∧
+      statement.publicValues.initial_timestamp.toNat = 1 ∧
+      statement.publicValues.is_execution_shard = 1
+  commitRows : CoreAIR.CommitRowsMatch statement.publicValues witness.syscallEvents
+  shardCase : SP1CoreShardCase handler statement witness
+
+/-- Full semantic target for a baseline Core AIR shard.
+
+Ordinary rows are official Sail steps; syscall rows are raw, auditable events interpreted by the
+explicit `handler` relation.  This avoids both failure modes of the older projection: treating every
+row as an ordinary Sail step, or hiding syscall behavior in an existential machine model.  The
+relation remains shard-local; boot reachability and cross-shard state continuity belong to the
+authenticated ledger theorem. -/
+def SP1CoreShardExecutionRelation {p : ℕ} {Digest : Type}
+    (layout : SP1PublicValuesLayout) (handler : Machine.SyscallHandler)
     (programBinding : ProgramBinding p Digest) :
     WitnessRelation.Relation (SP1ShardStatement (ZMod p) Digest)
-      (SP1ShardExecutionWitness model) :=
-  fun statement witness =>
-    statement.verifyingKey.WellFormed layout ∧
-    statement.publicValues.WellFormed layout ∧
-    statement.ConfigurationMatches ∧
-    programBinding statement.verifyingKey witness.context.program ∧
-    BitVec.ofNat 64 statement.verifyingKey.pc_start.toNat = witness.context.program.pc_start ∧
-    (statement.publicValues.is_first_execution_shard = 1 →
-      statement.publicValues.pcStartBits = witness.context.program.pc_start) ∧
-    ((statement.publicValues.is_execution_shard = 0 ∧
-        witness.execution = none ∧
-        statement.publicValues.pc_start = statement.publicValues.next_pc ∧
-        statement.publicValues.initial_timestamp = statement.publicValues.last_timestamp) ∨
-      (statement.publicValues.is_execution_shard = 1 ∧
-        ∃ execution, witness.execution = some execution ∧
-          SegmentMatches statement.publicValues.initial_timestamp.toNat
-            statement.publicValues.pcStartBits statement.publicValues.last_timestamp.toNat
-            statement.publicValues.nextPcBits execution))
+      SP1EventfulShardExecutionWitness :=
+  SP1CoreShardExecutionValid layout handler programBinding
 
-/-! ## Shard composition and the halted execution relation -/
+/-! ## Authenticated shard composition and the halted execution relation -/
 
-/-- The non-execution fields that recursion must authenticate across a shard ledger.  A concrete
-instantiation covers the committed-value and deferred-proof digests, global-memory address/page
-ranges and cumulative sums, syscall flags, proof nonce, and empty-shard rules.  Keeping this as a
-named parameter is preferable to either omitting those fields or pretending they are Sail semantics. -/
-abbrev ShardIntegrity (p : ℕ) (Digest : Type) :=
-  SP1MachineVerifyingKey (ZMod p) Digest → List (SP1PublicValues (ZMod p)) → Prop
+/-- The narrow algebraic check recursion performs on the verifying key's initial global digest and
+the per-shard global cumulative sums.  The ArkLib/recursion adapter instantiates this with SP1's
+septic-curve group law; the relation cannot inspect unrelated public-value fields. -/
+abbrev GlobalCumulativeBalance (p : ℕ) :=
+  SP1SepticDigest (ZMod p) → List (SP1SepticDigest (ZMod p)) → Prop
 
-/-- Alignment of public shard records with consecutive slices of one canonical Sail run.
+/-- Authentication of the final rolling deferred-proof digest.  Its private proof list belongs to
+the recursion witness, not to `SP1PublicValues`, so this boundary exposes only the exact digest it
+must authenticate. -/
+abbrev DeferredDigestAuthenticated (p : ℕ) := Vector (ZMod p) 8 → Prop
 
-`cursor` is the next unclaimed semantic step.  Non-execution shards consume no steps and must preserve
-their execution coordinates.  An execution shard begins exactly at `cursor`, matches its public
-pc/timestamp boundary, and advances the cursor by its segment length.  The final argument exposes the
-cursor after the complete ledger, allowing it to be tied to a halted prefix. -/
-noncomputable def SegmentLayout {p : ℕ} {model : Machine.SP1MachineModel}
-    {ctx : Machine.ExecutionCtx model} :
-    ℕ → List (SP1PublicValues (ZMod p)) →
-      List (Option (Machine.ExecutionSegmentWitness ctx)) → ℕ → Prop
-  | cursor, [], [], endStep => endStep = cursor
-  | cursor, publicValues :: publicRest, none :: segmentRest, endStep =>
+/-- Extract the execution traces from a ledger-aligned optional segment list. -/
+def executionTraces (segments : List (Option Machine.EventExecutionTrace)) :
+    List Machine.EventExecutionTrace :=
+  segments.filterMap id
+
+/-- Full-state alignment of consecutive shard segments.
+
+Public values authenticate PC and clock continuity, but those two fields alone do not authenticate
+registers or RAM.  This relation therefore carries the stronger fact the AIR grounding proof must
+establish: every next execution trace begins at the complete state produced by the preceding trace.
+Non-execution shards consume no semantic step and leave that complete state unchanged. -/
+def EventShardLayout {p : ℕ} (handler : Machine.SyscallHandler) (program : GuestProgram) :
+    List (SP1PublicValues (ZMod p)) → List (Option Machine.EventExecutionTrace) →
+      SailState → SailState → Prop
+  | [], [], source, target => target = source
+  | publicValues :: publicRest, none :: segmentRest, source, target =>
       publicValues.is_execution_shard = 0 ∧
         publicValues.pc_start = publicValues.next_pc ∧
         publicValues.initial_timestamp = publicValues.last_timestamp ∧
-        SegmentLayout cursor publicRest segmentRest endStep
-  | cursor, publicValues :: publicRest, some execution :: segmentRest, endStep =>
+        CoreAIR.CommitRowsMatch publicValues [] ∧
+        EventShardLayout handler program publicRest segmentRest source target
+  | publicValues :: publicRest, some execution :: segmentRest, source, target =>
       publicValues.is_execution_shard = 1 ∧
-        execution.startStep = cursor ∧
-        SegmentMatches publicValues.initial_timestamp.toNat publicValues.pcStartBits
-          publicValues.last_timestamp.toNat publicValues.nextPcBits execution ∧
-        SegmentLayout (cursor + execution.steps) publicRest segmentRest endStep
+        execution.initialState = source ∧
+        RomLoaded program source ∧
+        SailConfigured source ∧
+        EventSegmentMatches (handler := handler)
+          publicValues.initial_timestamp.toNat publicValues.pcStartBits
+          publicValues.last_timestamp.toNat publicValues.nextPcBits program execution ∧
+        CoreAIR.CommitRowsMatch publicValues execution.syscallEvents ∧
+        EventShardLayout handler program publicRest segmentRest execution.finalState target
   | _, _, _, _ => False
 
-/-- Private semantic witness for a composed proof.  The shard segments are audit evidence explaining
-how individual AIR results cover the run; `execution` is the single boot-to-halt canonical prefix that
-the final theorem exposes. -/
-structure SP1ExecutionWitness (model : Machine.SP1MachineModel) where
-  context : Machine.ExecutionCtx model
-  exitCode : ℕ
-  segments : List (Option (Machine.ExecutionSegmentWitness context))
-  execution : Machine.HaltedExecutionWitness context exitCode
+/-- The last execution shard, ignoring any trailing boundary-only shards, ends in the canonical Rust
+HALT syscall and exposes its pre-HALT state. -/
+def LastExecutionHalts (program : GuestProgram) (exitCode : BitVec 64)
+    (segments : List (Option Machine.EventExecutionTrace)) : Prop :=
+  ∃ execution,
+    (executionTraces segments).getLast? = some execution ∧
+      execution.HaltsWith program exitCode
 
-/-- The honest semantic target of recursion/shard composition.
+/-- Proof-free semantic witness recovered from a complete recursive Core proof. -/
+structure SP1ExecutionWitness where
+  program : GuestProgram
+  initialState : SailState
+  finalState : SailState
+  exitCode : BitVec 64
+  segments : List (Option Machine.EventExecutionTrace)
 
-Unlike `SP1ShardExecutionRelation`, this relation begins at semantic step zero, consumes consecutive
-execution shards, and ends at SP1's halting ECALL.  It deliberately takes `shardIntegrity` as an
-explicit companion relation: the Sail execution projection alone cannot validate cryptographic
-digests, global cumulative sums, deferred proofs, syscall bookkeeping, or nonces. -/
-noncomputable def SP1ExecutionRelation {p : ℕ} {Digest : Type}
+/-- The honest eventful target of recursion/shard composition.
+
+The public ledger is concrete (`AuthenticatedLedger`), including every equality checked by SP1's
+compression loop and its complete-proof endpoints.  Only two cryptographic/algebraic facts remain as
+narrow parameters: septic global-sum balance and authentication of the deferred-proof digest.  The
+semantic layout separately requires complete-state stitching, avoiding the unsound inference that
+PC/timestamp continuity alone identifies a machine state. -/
+def SP1ExecutionRelation {p : ℕ} {Digest : Type}
     (layout : SP1PublicValuesLayout) (model : Machine.SP1MachineModel)
-    (programBinding : ProgramBinding p Digest) (shardIntegrity : ShardIntegrity p Digest) :
-    WitnessRelation.Relation (SP1ExecutionStatement (ZMod p) Digest)
-      (SP1ExecutionWitness model) :=
+    (handler : Machine.SyscallHandler) (programBinding : ProgramBinding p Digest)
+    (globalBalance : GlobalCumulativeBalance p)
+    (deferredAuthenticated : DeferredDigestAuthenticated p) :
+    WitnessRelation.Relation (SP1ExecutionStatement (ZMod p) Digest) SP1ExecutionWitness :=
   fun statement witness =>
     statement.verifyingKey.WellFormed layout ∧
     (∀ publicValues ∈ statement.shards,
       publicValues.WellFormed layout ∧
-        (SP1ShardStatement.mk statement.verifyingKey publicValues).ConfigurationMatches) ∧
-    programBinding statement.verifyingKey witness.context.program ∧
-    BitVec.ofNat 64 statement.verifyingKey.pc_start.toNat = witness.context.program.pc_start ∧
-    shardIntegrity statement.verifyingKey statement.shards ∧
-    SP1PublicValues.ExecutionContinuous statement.shards ∧
-    SegmentLayout 0 statement.shards witness.segments witness.execution.steps ∧
-    (∃ publicValues ∈ statement.shards, publicValues.is_execution_shard = 1) ∧
+        (SP1ShardStatement.mk statement.verifyingKey publicValues).ConfigurationMatches ∧
+        (publicValues.is_first_execution_shard = 1 →
+          publicValues.is_execution_shard = 1 ∧
+            publicValues.initial_timestamp.toNat = 1 ∧
+            publicValues.pcStartBits = witness.program.pc_start)) ∧
+    witness.program.WellFormed ∧
+    programBinding statement.verifyingKey witness.program ∧
+    BitVec.ofNat 64 statement.verifyingKey.pc_start.toNat = witness.program.pc_start ∧
+    (∃ wellFormed : witness.program.WellFormed,
+      witness.initialState = model.boot witness.program wellFormed) ∧
+    SP1PublicValues.AuthenticatedLedger 1 statement.shards ∧
+    globalBalance statement.verifyingKey.initial_global_cumulative_sum
+      (statement.shards.map SP1PublicValues.global_cumulative_sum) ∧
+    EventShardLayout handler witness.program statement.shards witness.segments
+      witness.initialState witness.finalState ∧
+    LastExecutionHalts witness.program witness.exitCode witness.segments ∧
     ∃ finalPublicValues,
       statement.shards.getLast? = some finalPublicValues ∧
-        finalPublicValues.exit_code.val = witness.exitCode
+        deferredAuthenticated finalPublicValues.deferred_proofs_digest ∧
+        finalPublicValues.exitCodeBits = witness.exitCode
 
 end SP1Clean.Execution

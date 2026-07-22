@@ -7,8 +7,8 @@ import Mathlib.Tactic.LinearCombination
 The literal `is_real = 1` meaning of SP1's `IsZeroOperation` `asserts` list (`AssertSpec`, stated
 against the result columns), the trivial interaction half (`IsZero` has no bus sends), and the native
 soundness core `isZero_of_assert` the gadget routes through: the defining equation + `result * a = 0`
-force `result` to be the zero indicator of `a`. The auto-generated circuit (`Inputs`/`main`/
-`elaborated`) lives in the sibling `Extracted` module; the `populate` witness in `Populate`; the
+force `result` to be the zero indicator of `a`. The hand-maintained native circuit (`Inputs`/`main`/
+`elaborated`) lives in `Defs`; the `populate` witness in `Populate`; the
 `FormalAssertion` contract (soundness/completeness/`circuit`) in `Formal`.
 
 `Faithful/IsZeroOperation.lean` anchors `AssertSpec` to the extracted `asserts` list. The

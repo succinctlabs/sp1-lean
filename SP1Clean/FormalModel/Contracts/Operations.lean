@@ -3,14 +3,10 @@ import SP1Clean.Extracted.AddwOperation
 import SP1Clean.Extracted.SubwOperation
 import SP1Clean.Extracted.MulOperation
 import SP1Clean.Extracted.BitwiseOperation
-import SP1Clean.Extracted.Circuit.BitwiseOperation
 import SP1Clean.Extracted.U16CompareOperation
-import SP1Clean.Extracted.Circuit.U16CompareOperation
 import SP1Clean.Extracted.U16MSBOperation
-import SP1Clean.Extracted.Circuit.U16MSBOperation
 import SP1Clean.Extracted.U16toU8OperationUnsafe
 import SP1Clean.Extracted.AddrAddOperation
-import SP1Clean.Extracted.Circuit.AddrAddOperation
 import SP1Clean.Extracted.AddressOperation
 import SP1Clean.Extracted.IsZeroOperation
 import SP1Clean.Extracted.IsZeroWordOperation
@@ -30,6 +26,14 @@ namespace SP1Clean.U16MSBOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- Proof-oriented inputs for the native MSB gadget. The column payload remains the exact Rust
+anchor type, but the circuit interface is owned by the formal model. -/
+structure Inputs (F : Type) where
+  a : F
+  cols : Extracted.U16MSBOperation F
+  is_real : F
+deriving ProvableStruct
+
 /-- Semantic contract: `msb`'s booleanness holds **unconditionally** (SP1's `eval_msb` asserts it
 ungated, so it must hold on padding too), and on a real row (`is_real`-gated) the witnessed `msb` is
 the high bit of `a`. `Inputs` (the `eval` params verbatim — the result column struct nested as `cols`)
@@ -44,6 +48,14 @@ end SP1Clean.U16MSBOperation
 namespace SP1Clean.U16CompareOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Proof-oriented inputs for the native 16-bit comparison gadget. -/
+structure Inputs (F : Type) where
+  a : F
+  b : F
+  cols : Extracted.U16CompareOperation F
+  is_real : F
+deriving ProvableStruct
 
 /-- Semantic contract: `bit`'s booleanness holds **unconditionally** (SP1's `eval` asserts it ungated,
 so it must hold on padding too), and on a real row (`is_real`-gated) the witnessed `bit` is the strict
@@ -106,16 +118,54 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
 
 end SP1Clean.U16toU8OperationUnsafe
 
--- `IsZeroOperation`, `IsZeroWordOperation`, `IsEqualWordOperation`: these three form a composition
--- chain (`IsEqualWord` composes `IsZeroWord` composes `IsZeroOperation`) using the `FormalAssertion`
--- circuit form. A composing op's `Extracted` imports the sub's `Formal` (for `.circuit`), so their
--- `Spec`s cannot live here (it would cycle: `Specs.Operation` → composer `Extracted` → sub `Formal`
--- → … → `Specs.Operation`). Each defines its `Spec` (and `spec_populate`) in its own
--- `Operations/<Op>/Formal.lean` instead.
+namespace SP1Clean.IsZeroOperation
+
+/-- Inputs for the native field-zero test. -/
+structure Inputs (F : Type) where
+  a : F
+  cols : Extracted.IsZeroOperation F
+  is_real : F
+deriving ProvableStruct
+
+end SP1Clean.IsZeroOperation
+
+namespace SP1Clean.IsZeroWordOperation
+
+/-- Inputs for the native word-zero test. -/
+structure Inputs (F : Type) where
+  a : Word F
+  cols : Extracted.IsZeroWordOperation F
+  is_real : F
+deriving ProvableStruct
+
+end SP1Clean.IsZeroWordOperation
+
+namespace SP1Clean.IsEqualWordOperation
+
+/-- Inputs for the native word-equality test. -/
+structure Inputs (F : Type) where
+  a : Word F
+  b : Word F
+  cols : Extracted.IsEqualWordOperation F
+  is_real : F
+deriving ProvableStruct
+
+end SP1Clean.IsEqualWordOperation
+
+-- The IsZero composition chain keeps its focused semantic contracts beside its proofs; the stable
+-- input interfaces live here so the native circuits no longer depend on generated circuit modules.
 
 namespace SP1Clean.AddrAddOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Inputs for the native 48-bit address-add gadget. -/
+structure Inputs (F : Type) where
+  a : Word F
+  b : Word F
+  cols : Extracted.AddrAddOperation F
+  is_real : F
+deriving ProvableStruct
 
 /-- Semantic contract for the 48-bit address add: on a real row (`is_real`-gated) the 3-limb result
 is the low 48 bits of the integer sum `a + b`, each limb a genuine 16-bit value. `Inputs` (the `eval`
@@ -224,6 +274,14 @@ namespace SP1Clean.AddwOperation
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
+/-- Inputs for the native 32-bit add-with-sign-extension gadget. -/
+structure Inputs (F : Type) where
+  a : Word F
+  b : Word F
+  cols : Extracted.AddwOperation F
+  is_real : F
+deriving ProvableStruct
+
 /-- The reconstructed 64-bit result word: the two witnessed low limbs, with the two high limbs
 realised as the sign fill `msb * 0xFFFF`. (`Inputs`/`Spec`/`spec_populate` live in the op's
 `Formal.lean` — the composed circuit form imports `U16MSBOperation.Formal`, so its `Spec` cannot live
@@ -238,6 +296,14 @@ namespace SP1Clean.SubwOperation
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
+/-- Inputs for the native 32-bit subtract-with-sign-extension gadget. -/
+structure Inputs (F : Type) where
+  a : Word F
+  b : Word F
+  cols : Extracted.SubwOperation F
+  is_real : F
+deriving ProvableStruct
+
 /-- The reconstructed 64-bit result word: the two witnessed low limbs, with the two high limbs
 realised as the sign fill `msb * 0xFFFF`. (`Inputs`/`Spec`/`spec_populate` live in the op's
 `Formal.lean` — the composed circuit form imports `U16MSBOperation.Formal`, so its `Spec` cannot live
@@ -247,15 +313,43 @@ def resultWord (cols : Extracted.SubwOperation (ZMod p)) : Word (ZMod p) :=
 
 end SP1Clean.SubwOperation
 
--- `LtOperationSigned`'s `Inputs`/`Spec` live in `Operations/LtOperationSigned/`: the auto-generated
--- `Extracted.lean` owns the 5-field `Inputs` (`b`/`cc`/`cols`/`is_signed`/`is_real`), and `Formal.lean`
--- owns the structural `Spec` + the semantic `result_semantic` readout (the contract the chips consume).
--- It lives there (not here) to avoid an import cycle — the generated `main` imports the sub-ops' `.Formal`
--- for `.circuit` (same reasoning as the IsZero*/Addw/BitwiseU16 chains).
+namespace SP1Clean.LtOperationUnsigned
+
+/-- Inputs for the native unsigned word comparison gadget. -/
+structure Inputs (F : Type) where
+  b : Word F
+  cc : Word F
+  cols : Extracted.LtOperationUnsigned F
+  is_real : F
+deriving ProvableStruct
+
+end SP1Clean.LtOperationUnsigned
+
+namespace SP1Clean.LtOperationSigned
+
+/-- Inputs for the native signed/unsigned word comparison selector gadget. -/
+structure Inputs (F : Type) where
+  b : Word F
+  cc : Word F
+  cols : Extracted.LtOperationSigned F
+  is_signed : F
+  is_real : F
+deriving ProvableStruct
+
+end SP1Clean.LtOperationSigned
 
 namespace SP1Clean.BitwiseOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Inputs for the native bytewise bitwise gadget. -/
+structure Inputs (F : Type) where
+  a : Vector F 8
+  b : Vector F 8
+  cols : Extracted.BitwiseOperation F
+  opcode : F
+  is_real : F
+deriving ProvableStruct
 
 /-- Semantic, `is_real`- and opcode-gated contract: on a real row each result byte is the bitwise
 AND/OR/XOR of the operand bytes (as 8-bit values), **and the operand bytes are genuine bytes** — the

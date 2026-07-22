@@ -104,7 +104,7 @@ inline byte pulls, vs 2-3 for Add/Sub/Addw where the same shape is cheap. The se
 To enable it: uncomment this block AND restore these imports at the top of the file —
   import SP1Clean.Model.InteractionRecovery
   import SP1Clean.Faithful.ExtractedInteractionModel
-  import SP1Clean.Extracted.Circuit.MulOperation
+  import SP1Clean.Native.Operations.MulOperation.Defs
   import SP1Clean.Faithful.U16toU8OperationSafe
   import SP1Clean.Faithful.U16MSBOperation
 Speed notes baked into the proof (do not "simplify"): the op5 high-byte products (`eob_v`/`eoc_v`) go in as

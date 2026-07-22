@@ -4,6 +4,7 @@ import SP1Clean.Math.Bitwise
 import SP1Clean.Extracted.U16toU8OperationUnsafe
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
+import Clean.Utils.Tactics
 import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # `U16toU8OperationUnsafe` as a Clean-native `FormalAssertion`

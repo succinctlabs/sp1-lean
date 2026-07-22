@@ -1,6 +1,6 @@
 import SP1Clean.Native.Operations.SubwOperation.RawSpec
 import SP1Clean.Native.Operations.SubwOperation.Populate
-import SP1Clean.Extracted.Circuit.SubwOperation
+import SP1Clean.Native.Operations.SubwOperation.Defs
 
 /-! # `SubwOperation` — the `FormalAssertion` (borrow-form analog of `AddwOperation`)
 

@@ -31,15 +31,46 @@ extracted chip column operations (`CPUState`, `RTypeReader`); their arities matc
 `docs/architecture.md` — so `Interaction.toProp` maps them to `True` below; they are present so the
 extracted modules elaborate faithfully in structure. -/
 
+/-- Exact interaction-kind vocabulary of the pinned upstream machine.  The four established Clean
+channels retain their typed constructors below; system/precompile tables use `AirInteraction.raw`
+until their own typed channel adapters land.  Keeping the complete discriminator here prevents the
+extractor from silently dropping an unfamiliar interaction. -/
+inductive AirInteractionKind where
+  | memory
+  | program
+  | byte
+  | state
+  | syscall
+  | global
+  | shaExtend
+  | shaCompress
+  | keccak
+  | globalAccumulation
+  | memoryGlobalInitControl
+  | memoryGlobalFinalizeControl
+  | instructionFetch
+  | instructionDecode
+  | pageProt
+  | pageProtAccess
+  | pageProtGlobalInitControl
+  | pageProtGlobalFinalizeControl
+  deriving DecidableEq, Repr
+
 inductive AirInteraction (F : Type) where
   | byte (op : ByteOpcode) (a b c : F)
   | state (a b c d e : F)
   | memory (a b c d e f g h i : F)
   | program (a b c : F) (op : Opcode) (d e f g h i j k l m n o : F)
+  /-- Arity-preserving fallback for an upstream bus that does not yet have a typed Clean channel.
+  Its semantics is still the exact cross-table multiset balance in the full AIR relation. -/
+  | raw (kind : AirInteractionKind) (values : List F)
   deriving DecidableEq
 
-inductive Dir | send | receive
-  deriving DecidableEq
+/-! `send`/`receive` are the upstream local-scope cases used by every interaction at the current
+pin.  Keeping separate global variants preserves the full upstream discriminator without changing
+the constructor shape of the already-audited local anchor lists. -/
+inductive Dir | send | receive | sendGlobal | receiveGlobal
+  deriving DecidableEq, Repr
 
 structure Interaction (F : Type) where
   dir : Dir
@@ -79,6 +110,11 @@ the trace-level instruction-fetch membership, `Soundness/ProgramConsistency.lean
     (a b c : ZMod p) (op : Opcode) (d e f g h i j k l m n o mult : ZMod p) :
     (⟨.send, .program a b c op d e f g h i j k l m n o, mult⟩ : Interaction (ZMod p)).toProp ↔ True :=
   Iff.rfl
+
+/-- System-table interactions are interpreted globally, not as a local row predicate. -/
+@[simp] lemma toProp_send_raw {p : ℕ} [NeZero p]
+    (kind : AirInteractionKind) (values : List (ZMod p)) (mult : ZMod p) :
+    (⟨.send, .raw kind values, mult⟩ : Interaction (ZMod p)).toProp ↔ True := Iff.rfl
 
 end Interaction
 

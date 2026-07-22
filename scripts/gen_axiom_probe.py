@@ -55,6 +55,15 @@ TARGETS = [
     ("SP1Clean/Soundness/AIR.lean",
      r"theorem\s+(supportedCore_orderedRows_dynamic|supported_core_witness_grounding|"
      r"supported_core_native_sound)\b"),
+    # Exact v6.3.1 table/profile guards and the public ArkLib-facing Core AIR capstone.  These are
+    # release headlines: adding a new capstone file must not silently leave it outside the census.
+    ("SP1Clean/FormalModel/CoreProfile.lean",
+     r"theorem\s+(checkedIn_semanticRevision|coreCluster_matchesExtracted|"
+     r"coreClusterShapes_matchExtracted|memoryBoundaryCluster_matchesExtracted|"
+     r"memoryBoundaryClusterShapes_matchExtracted|publicValuesWidth_matchesExtracted)\b"),
+    ("SP1Clean/Faithful/CoreAIR.lean", r"theorem\s+(system_isCurrent)\b"),
+    ("SP1Clean/Soundness/CoreAIR.lean",
+     r"(?:theorem|def)\s+(sp1_air_refinement|sp1_air_sound)\b"),
     ("SP1Clean/Soundness/TimedGrounding.lean", r"theorem\s+(walk)\b"),
     ("SP1Clean/Soundness/FinishedChannels.lean", r"theorem\s+(sp1_finishedChannel_guarantees)\b"),
     ("SP1Clean/Soundness/ChipRegistry.lean", r"(?:theorem|def)\s+(allChipKinds\w*)\b"),

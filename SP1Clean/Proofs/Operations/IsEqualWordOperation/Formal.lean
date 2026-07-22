@@ -1,6 +1,6 @@
 import SP1Clean.Native.Operations.IsEqualWordOperation.RawSpec
 import SP1Clean.Native.Operations.IsEqualWordOperation.Populate
-import SP1Clean.Extracted.Circuit.IsEqualWordOperation
+import SP1Clean.Native.Operations.IsEqualWordOperation.Defs
 
 /-! # `IsEqualWordOperation` — the `FormalAssertion` (Spec / soundness / completeness / contract)
 

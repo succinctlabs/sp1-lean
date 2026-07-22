@@ -1,10 +1,10 @@
 # Constraint extraction (`update_extracted.py`)
 
-How SP1's **whole-chip rows, `assertZero` lists, interaction lists, and populate traces** enter this
-project. The stable output is chip-level: Lean gadgets are proof-oriented implementation details and
-are not required to mirror Rust operations. `update_extracted.py` also still emits a number of
-operation modules during the migration, but those are generator-private dependencies of current chip
-oracles, not public verification boundaries.
+How SP1's **complete table rows, `assertZero` lists, interaction lists, public-value block, machine
+shape, and populate traces** enter this project. The stable AIR output is list-only: Lean gadgets and
+circuits are proof-oriented implementation details under `Native/` and are never generated from Rust.
+`update_extracted.py` still emits operation list modules during the chip-boundary migration, but those
+are generator-private dependencies of current chip oracles, not public verification boundaries.
 
 The upstream compiler emits field-generic Lean directly, so there is no Python rewriting of constraint
 expressions. Python only selects targets, supplies reuse imports, wraps modules, and writes deterministic
@@ -13,31 +13,36 @@ files.
 ## The pipeline
 
 ```
-sp1-constraint-compiler  --→  update_extracted.py  --→  Extracted/ChipOracle/<Chip>.lean
-   (rust, field-generic)        (wrap + write)           (Rust row + asserts + interactions)
-             Rust generate_trace  ────────────────────→  SP1CleanTest/TraceGenTests/*Vectors.lean
-                                                                   ↑ compared by
-                                                   Faithful/<Chip>.lean (`ChipFaithful`)
-                                                   TraceGenTests/<Chip>TraceWitness.lean
+RiscvAir::machine() ───────────────→ Extracted/CoreAIRManifest.lean
+Air::eval / eval_public_values ────→ Extracted/{ChipOracle,SystemOracle}/...
+          (audited Rust overlay)      (rows + ordered asserts/interactions only)
+
+Native/ hand-written Clean circuits ─→ Faithful/<Chip>.lean (`ChipFaithful`)
+Rust generate_trace ────────────────→ SP1CleanTest/TraceGenTests/*Vectors.lean
 ```
 
 Run it:
 
-```
-SP1_DIR=../sp1 python3 update_extracted.py
+```sh
+SP1_DIR=/path/to/audited-extractor-overlay EXTRACT_AIR_ONLY=1 python3 update_extracted.py
 ```
 
-`SP1_DIR` must point at an sp1 checkout whose `sp1-constraint-compiler` builds; the default is
-`../sp1` (a sibling sp1 checkout). `CHIPS` selects whole-chip AIR oracles and `TRACE_CHIPS` selects
-whole-chip populate batteries. `OPERATIONS`, `WITNESS_OPERATIONS`, and `CIRCUIT_OPERATIONS` are
-transitional registries: shrink them as chip anchors cease importing helper modules. The output is
-deterministic, so re-running leaves a clean `git diff`.
+`SP1_DIR` must point at the exact extraction overlay checked by `SP1_PINNED_COMMIT` and the two patch
+digests in `update_extracted.py`; the ordinary sibling `../sp1` remains the unmodified semantic source.
+The generator verifies that the overlay's merge base is semantic revision
+`a630089d9ff484ec6f2feade8d0afbb1447eed11` (`v6.3.1-8-ga630089d9`), that runtime-source changes are
+reflection metadata only, and that the dirty exporter diff is byte-identical to the checked-in
+list-only patches. `CHIPS` and `SYSTEM_TABLES` select AIR anchors; `TRACE_CHIPS` selects whole-chip
+populate batteries. `OPERATIONS` and `WITNESS_OPERATIONS` are transitional registries. There is no
+circuit-output registry or circuit emitter. The output is deterministic, so a full regeneration at
+the audited overlay leaves all pre-existing anchors byte-identical.
 
-Requested self-contained chip oracles and whole-chip traces are **hard requirements**: the script exits
-nonzero if either fails, instead of silently leaving stale checked-in artifacts. Current 4.31 migration
-blocker: the pinned local SP1 checkout's `witness_vectors` binary accepts only `--operation`; its former
-`--chip`/`generate_trace` mode must be restored before any trace-vector regeneration can be claimed.
-Existing checked-in trace anchors still elaborate, but that does not repair provenance/reproducibility.
+Profile extraction is unconditional, even under `EXTRACT_ONLY`: regeneration fails before writing AIR
+files unless the baseline 34-table execution cluster, the 6-table memory-boundary cluster, every main
+and preprocessed width, and the 160-cell public-value width match the audited manifest exactly. Requested
+system tables, public values, self-contained chip oracles, and whole-chip traces are hard requirements;
+the script exits nonzero rather than retaining a stale artifact. `EXTRACT_AIR_ONLY=1` intentionally skips
+the independent witness/trace batteries during a conservative Rust-pin audit.
 
 ## What the rust backend emits
 
@@ -69,16 +74,19 @@ an emission detail; a chip anchor may unfold them locally. Canonical generated r
 chip-private arithmetic helpers are embedded in the chip namespace. The goal is not to make any of
 those Rust helpers match Lean gadgets.
 
-### Rust changes that made this possible
+### Audited Rust overlay
 
-All on the `field-generic-constraint-extraction` branch of the sp1 repo:
+The extraction backend is not part of the semantic SP1 pin yet. Its exact review surface is committed
+as `scripts/extractor-patches/core-air-lists.patch` and
+`scripts/extractor-patches/core-air-manifest.patch`; `Extracted/Provenance.lean` records the semantic
+revision, overlay revision, and combined diff hash. The relevant changes are:
 
 - **Field-generic, not `Fin KB`.** Every Lean-emission site now writes the type token `F`
   instead of the concrete `Fin KB`:
   `crates/hypercube/src/ir/ast.rs` (let-step + call-output types),
   `expr.rs` / `var.rs` (`(… : F)⁻¹` inverse constants),
   `shape.rs` (`to_lean_type`: `F`, `(Word F)`, and struct types as `(<name> F)`),
-  `func.rs` (`to_output_lean_type`: `SP1Constraints F`).
+  and the list renderers (`List F` / `List (Interaction F)`).
 - **Two-list output.** `crates/hypercube/src/ir/ast.rs` (`to_lean_components`)
   returns the row constraints as **two** lists — `asserts` (field exprs, each `= 0`) and
   `interactions` (`⟨.send/.receive, <payload>, mult⟩`) — and `crates/core/compiler/src/main.rs`
@@ -89,12 +97,27 @@ All on the `field-generic-constraint-extraction` branch of the sp1 repo:
   `ByteOpcode.ofNat opcode` coercion when the opcode is a
   dynamic field value (e.g. Bitwise); it is an unused-but-harmless hypothesis for
   constant-opcode operations (Add).
-- **Struct emission.** `Shape::collect_lean_struct_defs` (in `shape.rs`) synthesizes
+- **Struct emission.** Shape reflection synthesizes
   `structure <name> (F : Type) where …` from the chip's column shape (recursing nested structs,
   nested-first).
+- **Flat system tables and public values.** Tables without reflection metadata are emitted as an exact
+  `values : Vector F width`; `MachineRecord::eval_public_values` is emitted as its own complete ordered
+  assertion/interaction block.
+- **Machine manifest.** A separate mode reads `RiscvAir::machine().shape().chip_clusters` directly and
+  reports runtime table names and widths. Python compares that output to the theorem profile before
+  writing anything.
+- **No circuit backend.** The transitional Rust-to-Clean-circuit format was deleted from the audited
+  patch. The extractor cannot manufacture a second implementation of a native gadget.
 
-The old `Text`/`Json` emission formats were not preserved where they conflicted (the change to
-field-generic types is intentionally destructive to the prior `Fin KB` text output).
+Large generated lists are split into opaque `assertsPartN`/`interactionsPartN` definitions and then
+concatenated in order. This is only a Lean elaboration boundary: it follows Clean's advice to keep
+expensive values folded and does not alter the extracted list.
+
+The pinned `Global` table is the sole exception to the ordinary heartbeat budget. One of its output
+terms has a dependency closure of roughly 1,300 shared IR bindings, so splitting the surrounding list
+cannot make that term smaller (and finer factoring duplicates the closure). Its generated module carries
+one module-local `set_option maxHeartbeats 1000000`, accounted for explicitly in
+`scripts/heartbeats_baseline.txt`; no other generated Core AIR module receives a heartbeat override.
 
 ## The Lean side
 
@@ -108,6 +131,12 @@ field-generic types is intentionally destructive to the prior `Fin KB` text outp
 - **`Extracted/ChipOracle/<Chip>.lean`** — generated; never hand-edit. It owns the chip-namespaced Rust row and its complete
   `asserts`/`interactions` oracle, reusing canonical generated reader rows/functions instead of cloning
   them per chip.
+- **`Extracted/SystemOracle/<Table>.lean`** — generated flat rows for the eleven non-instruction tables
+  needed by the baseline execution and memory-boundary clusters, plus the machine-level `PublicValues`
+  block. Flat indices are named only in the hand-audited adapter above this layer.
+- **`Extracted/CoreAIRManifest.lean` / `Provenance.lean`** — generated fail-closed profile and source
+  identity. `FormalModel/CoreProfile.lean` proves the readable hand-maintained enum is a permutation of
+  the runtime manifest with identical widths.
 - **`Native/Chips/<Chip>/Defs.lean`** — owns an independent native row. It need not reuse the extracted
   row or any Rust operation struct.
 - **`Faithful/ChipOracle.lean` + `Faithful/<Chip>.lean`** — define the native→Rust row reconfiguration
@@ -116,13 +145,15 @@ field-generic types is intentionally destructive to the prior `Fin KB` text outp
 - **`SP1CleanTest/TraceGenTests/`** — compares rows generated from the native circuit with whole traces
   dumped by Rust.
 
-## Legacy operation outputs (retirement path)
+## Legacy operation-list outputs (retirement path)
 
-`--format lean-circuit`, `CIRCUIT_OPERATIONS`, per-operation witness vectors, and public
-`Faithful/<Operation>.lean` anchors predate the chip boundary. Do not extend them. During migration a
-generated chip oracle may still import `Extracted.<Operation>` because the Rust emitter factors its
-expression that way; this is acceptable as an internal dependency. A chip proof should unfold that call
-locally and expose only its `ChipFaithful` theorem.
+The old `--format lean-circuit` mode and `CIRCUIT_OPERATIONS` registry are gone, and
+`Extracted/Circuit/` has been deleted. The former generated circuit definitions now live as ordinary,
+hand-maintained proof implementations under `Native/Operations/<Op>/Defs.lean`. Per-operation assertion/
+interaction lists, witness vectors, and public `Faithful/<Operation>.lean` anchors still predate the chip
+boundary; do not extend them. During migration a generated chip oracle may import
+`Extracted.<Operation>` because the Rust list emitter factors its expression that way. A chip proof may
+unfold that call locally but exposes only its `ChipFaithful` theorem.
 
 For each migrated chip:
 
@@ -130,8 +161,7 @@ For each migrated chip:
 2. define the simple native→Rust `reconfigure` map;
 3. prove complete assertion and interaction equivalence;
 4. retain/add the whole-chip trace-populate test;
-5. remove any direct circuit, operation witness battery, or operation anchor no longer imported by another
-   chip.
+5. remove any operation list, witness battery, or operation anchor no longer imported by another chip.
 
 ## Adding or refactoring a Lean gadget
 
@@ -164,13 +194,13 @@ a chip-semantics change):
 ## Generated helper factoring (sub-op `++`)
 
 Operations that compose sub-operations (e.g. `AddwOperation`/`SubwOperation` calling
-`U16MSBOperation`) emit a `let CSk := <SubOp>.constraints …` step and return `CSk ++ ⟨[own…], […]⟩`
-(`++` is the componentwise `SP1Constraints` append). The compiler re-emits the sub-op's column
+`U16MSBOperation`) emit parallel `<SubOp>.asserts … ++ [own…]` and
+`<SubOp>.interactions … ++ [own…]` chains. The compiler re-emits the sub-op's column
 **struct** inline (nested-first), which would clash with the sub-op's own standalone
-`Extracted/<SubOp>.lean`. So `update_extracted.py` post-processes a composed fragment: it
-detects each `<SubOp>.constraints` call, **strips** the re-emitted `structure <SubOp> … deriving
-ProvableStruct` block, and adds `import SP1Clean.Extracted.<SubOp>` to the header (so the
-sub-op struct + `constraints` come from its own module). Each `Extracted/` file therefore owns
+`Extracted/<SubOp>.lean`. So `update_extracted.py` discovers struct ownership, asks the compiler to
+reuse each owned sub-struct instead of re-emitting it, and adds `import SP1Clean.Extracted.<SubOp>`
+to the header (so the
+sub-op struct + list definitions come from its own module). Each `Extracted/` file therefore owns
 exactly one struct. This factoring must remain invisible at the public proof boundary: a whole-chip
 anchor may split/unfold the generated append chain as a local calculation, but it concludes with one
 complete chip assertion/interactions theorem.
@@ -181,4 +211,4 @@ complete chip assertion/interactions theorem.
   conformance battery.
 - Extend canonical generated reader reuse as each new chip oracle lands, while keeping chip-private
   Rust arithmetic helpers embedded as implementation details.
-- Remove `CIRCUIT_OPERATIONS` and `WITNESS_OPERATIONS` once their remaining chip consumers migrate.
+- Remove `WITNESS_OPERATIONS` and the remaining operation-list modules once their chip consumers migrate.

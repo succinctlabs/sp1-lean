@@ -1,5 +1,6 @@
 import SP1Clean.Native.Operations.BitwiseOperation.RawSpec
 import SP1Clean.Native.Operations.BitwiseOperation.Populate
+import SP1Clean.Native.Operations.BitwiseOperation.Defs
 
 /-! # `BitwiseOperation` — the `FormalAssertion` (soundness / completeness / contract)
 

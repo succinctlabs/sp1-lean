@@ -43,6 +43,42 @@ def Sound {Public : Type u} {AIRWitness : Type v} {ExecutionWitness : Type w}
   ∀ statement airWitness, air statement airWitness →
     ∃ executionWitness, execution statement executionWitness
 
+/-- A constructive refinement between witness relations.
+
+Unlike `Sound`, this bundle exposes the postprocessor that turns an AIR witness into its semantic
+witness.  The map is deliberately independent of the proof that the AIR relation holds: all
+execution data must be decoded from the statement and witness themselves, while validity is used
+only by `map_valid`.  This prevents an implementation from hiding witness selection inside an
+existential proof and gives ArkLib an ordinary total postprocessor. -/
+structure FunctionalRefinement {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} (air : Relation Public AIRWitness)
+    (execution : Relation Public ExecutionWitness) where
+  map : Public → AIRWitness → ExecutionWitness
+  map_valid : ∀ statement airWitness, air statement airWitness →
+    execution statement (map statement airWitness)
+
+/-- Forget the postprocessor and recover ordinary witness-producing soundness. -/
+theorem FunctionalRefinement.sound {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} {air : Relation Public AIRWitness}
+    {execution : Relation Public ExecutionWitness}
+    (refinement : FunctionalRefinement air execution) : Sound air execution := by
+  intro statement airWitness valid
+  exact ⟨refinement.map statement airWitness, refinement.map_valid statement airWitness valid⟩
+
+/-- Constructive refinements compose without introducing a choice axiom. -/
+def FunctionalRefinement.trans {Public : Type u} {Witness₁ : Type v} {Witness₂ : Type w}
+    {Witness₃ : Type x} {relation₁ : Relation Public Witness₁}
+    {relation₂ : Relation Public Witness₂} {relation₃ : Relation Public Witness₃}
+    (refinement₁₂ : FunctionalRefinement relation₁ relation₂)
+    (refinement₂₃ : FunctionalRefinement relation₂ relation₃) :
+    FunctionalRefinement relation₁ relation₃ where
+  map statement witness₁ :=
+    refinement₂₃.map statement (refinement₁₂.map statement witness₁)
+  map_valid statement witness₁ valid₁ :=
+    refinement₂₃.map_valid statement
+      (refinement₁₂.map statement witness₁)
+      (refinement₁₂.map_valid statement witness₁ valid₁)
+
 /-- Witness-producing completeness is the converse refinement.  It is deliberately independent of
 Clean's per-circuit `GeneralFormalCircuit.Completeness`: a whole-machine proof must construct one
 globally balanced AIR witness, not merely one satisfiable row at a time. -/

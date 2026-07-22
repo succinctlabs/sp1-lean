@@ -151,7 +151,7 @@ because `VmChannel.toRaw` no longer unifies with `Channel.toRaw`.
   completeness `sorry`s surface in the *capstone's* `#print axioms` even though soundness never
   consumes them — the census contradicts the prose.
 - `StateTruth` hardcodes `clk = init + 8*n` (`Model/Semantics/Truth.lean:47`) — known-wrong the
-  moment the HALT chip lands (syscall rows advance clk by 256). A statement change to the headline
+  moment the HALT chip lands (syscall rows add 256 to `CLK_INC = 8`, for a total advance of 264). A statement change to the headline
   guarantee is *scheduled to happen by surprise*.
 - `RowView`/`AdapterView` (`Soundness/RowView.lean`): J/I-type readers stuff `op_a_memory` into
   absent memory slots ("harmless placeholder", `RowView.lean:66-77`); `.noWrite`/`.store` rows carry
@@ -602,7 +602,8 @@ normal-form change (`x + -1*y → x - y`).
 **Disposition:**
 - **Do not re-pin mid-consolidation.** The 4.28-compatible delta lands squarely on the witness
   surface this project depends on (`TraceGenTests` seeds `FlatOperation.dynamicWitnesses` with
-  `main`'s witness closures; `update_extracted.py` emits the circuit witness forms) — absorbing
+  `main`'s witness closures; at the time `update_extracted.py` also emitted circuit witness forms,
+  a backend retired by the 2026-07-22 list-only cutover) — absorbing
   that churn concurrently with the cutover doubles the moving parts.
 - **Track the Lean 4.30 migration as a named strategic item** (post-cutover): staying current with
   Clean now *requires* it, and it entails coordinated toolchain bumps of the two succinctlabs Sail

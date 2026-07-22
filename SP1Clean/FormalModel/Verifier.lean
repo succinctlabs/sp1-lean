@@ -9,8 +9,10 @@ isolates the only deterministic fact an ArkLib adapter needs: extraction into a 
 be post-processed through a witness-producing refinement.
 
 The eventual ArkLib module should instantiate its input relation with `WitnessRelation.asSet`, then
-post-compose ArkLib's straight-line extractor with `WitnessRelation.Sound.extract`.  It should name the
-result `sp1_verifier_sound`; that name is intentionally not used for the AIR theorem. -/
+post-compose ArkLib's straight-line extractor with the explicit map carried by
+`WitnessRelation.FunctionalRefinement`.  It should name the result `sp1_verifier_sound`; that name is
+intentionally not used for the AIR theorem.  Existential `WitnessRelation.Sound` remains useful as a
+propositional corollary, but it is not a sufficient extraction API. -/
 
 namespace SP1Clean.VerifierBoundary
 
@@ -35,6 +37,21 @@ theorem PerfectExtraction.refine {Statement Certificate Witness₁ Witness₂ : 
   obtain ⟨witness₁, valid₁⟩ := extracts statement certificate accepted
   exact sound statement witness₁ valid₁
 
+/-- Post-process an extracted witness through the constructive AIR-refinement map.  This is the
+deterministic analogue of the adapter ArkLib should use: no witness is selected with choice, and the
+same validity proof both computes and authenticates the resulting execution witness. -/
+theorem PerfectExtraction.refineFunctional {Statement Certificate Witness₁ Witness₂ : Type}
+    {accepts : Statement → Certificate → Prop}
+    {relation₁ : WitnessRelation.Relation Statement Witness₁}
+    {relation₂ : WitnessRelation.Relation Statement Witness₂}
+    (extracts : PerfectExtraction accepts relation₁)
+    (refinement : WitnessRelation.FunctionalRefinement relation₁ relation₂) :
+    PerfectExtraction accepts relation₂ := by
+  intro statement certificate accepted
+  obtain ⟨witness₁, valid₁⟩ := extracts statement certificate accepted
+  exact ⟨refinement.map statement witness₁,
+    refinement.map_valid statement witness₁ valid₁⟩
+
 /-! ## ArkLib instantiation target
 
 Once ArkLib is on Lean 4.31 and the full AIR relation exists, the proof-system theorem should be an
@@ -42,15 +59,17 @@ ArkLib theorem of the following form (names abbreviated only for its oracle/prot
 
 ```lean
 theorem sp1_verifier_sound
-    (airSound : WitnessRelation.Sound SP1AIRRelation
-      (Execution.SP1ShardExecutionRelation layout model programBinding))
+    (airRefinement : WitnessRelation.FunctionalRefinement
+      (CoreAIR.Current.Relation preprocessedBinding .execution)
+      (Execution.SP1CoreShardExecutionRelation .base handler programBinding))
     (hVerifier : verifier.knowledgeSoundness init impl
-      (WitnessRelation.asSet SP1AIRRelation) acceptRejectRel knowledgeError) :
+      (WitnessRelation.asSet (CoreAIR.Current.Relation preprocessedBinding .execution))
+      acceptRejectRel knowledgeError) :
     verifier.knowledgeSoundness init impl
       (WitnessRelation.asSet
-        (Execution.SP1ShardExecutionRelation layout model programBinding))
+        (Execution.SP1CoreShardExecutionRelation .base handler programBinding))
       acceptRejectRel knowledgeError := by
-  -- post-compose the ArkLib straight-line extractor with `airSound.extract`;
+  -- post-compose the ArkLib straight-line extractor with `airRefinement.map`;
   -- extraction failure and the knowledge error are otherwise unchanged.
   -- proof deferred to the ArkLib integration layer
 ```

@@ -63,13 +63,15 @@ theorem supported_core_air_sound :
 
 -- Layer 3 (full upstream): the complete Core shard AIR with the real SP1PublicValues
 -- record, then boot-to-halt shard composition over an authenticated ledger.
-theorem sp1_air_sound :
-    WitnessRelation.Sound SP1AIRRelation
-      (Execution.SP1ShardExecutionRelation layout model programBinding)
+def sp1_air_refinement :
+    WitnessRelation.FunctionalRefinement
+      (CoreAIR.Current.Relation preprocessedBinding .execution)
+      (Execution.SP1CoreShardExecutionRelation .base handler programBinding)
 
 theorem sp1_execution_sound :
     WitnessRelation.Sound SP1RecursiveAIRRelation
-      (Execution.SP1ExecutionRelation layout model programBinding shardIntegrity)
+      (Execution.SP1ExecutionRelation layout model handler programBinding
+        globalBalance deferredAuthenticated)
 
 -- Layer 4 (the verifier): ArkLib/VCVio knowledge soundness for the executable
 -- verifier, its straight-line extractor post-composed through sp1_air_sound
@@ -97,7 +99,7 @@ this (`scripts/run_audit.sh` reproduces the census):
 |---|---|---|
 | 1 | Lean kernel + `propext` / `Classical.choice` / `Quot.sound` | axioms |
 | 2 | `Lean.ofReduceBool` / `trustCompiler` (bv_decide on byte-extraction lemmas; the conformance battery) | axioms |
-| 3 | `logupGkrSound` — a verifying GKR+PCS transcript yields the fingerprinted balance | one named axiom |
+| 3 | ArkLib knowledge soundness for LogUp GKR, zero-check, PCS, commitments, and Fiat–Shamir; in particular extraction of exact non-wrapping natural interaction multiplicities | dependency theorem + explicit error bound |
 | 4 | `sailPlatformSurface` — the LeanRV64D platform bundle (~76 axioms: softfloat hooks, reservation set, terminal writes; the RV64IM integer paths touch 4) | named `List Name`, gate-enforced |
 | 5 | the Rust→Lean constraint extractor | outside Lean; byte-identical regeneration gate at the pinned SP1 commit |
 | 6 | `populate` conformance | tested (native_decide @ KoalaBear), quarantined test library, never imported by proofs |
@@ -200,7 +202,7 @@ meaning is a theorem of the engine (§5) about every balanced trace.**
 | Byte | `(op, a, b, c)` (4; Byte) | `ByteRowSpec` (table membership) | — (already row-local: the guarantee *is* the meaning) |
 
 **State** is SP1's execution-threading token: each row pulls "(clk, pc)" and pushes
-"(clk + Δ, next_pc)" — Δ = 8, or 256 for syscall rows — and balance forces every sent state to be
+"(clk + Δ, next_pc)" — Δ = 8, or `8 + 256 = 264` for syscall rows — and balance forces every sent state to be
 consumed exactly once. That balance structure is how one sequential execution decomposes across
 independent tables, and the engine's time-ordered induction turns it back into one real execution;
 the per-chip obligation (§4) is exactly "my row advances it one step". **Program** rows are pushed
@@ -226,8 +228,9 @@ Every chip passes the same five gates. For `AddChip` (SP1's `add_sub` AIR):
 | advance | `Proofs/Chips/AddChip/Bridge.lean` | one real `try_step` from any state matching the row produces the row's committed effect |
 
 The chip's `main` composes the shared readers (CPUState, RTypeReader, RegisterWrite) and the add
-gadget as true Clean subcircuits, returning the extracted column struct — the column layout is the
-single source of truth shared with SP1's Rust. The two per-chip statements, verbatim:
+gadget as true Clean subcircuits, returning its independent native row. One explicit
+native-to-Rust `reconfigure` map is the only column-layout bridge; extraction never generates the
+native circuit. The two per-chip statements, verbatim:
 
 ```lean
 -- the contract (soundness conclusion), stated against the RV64 ISA function:

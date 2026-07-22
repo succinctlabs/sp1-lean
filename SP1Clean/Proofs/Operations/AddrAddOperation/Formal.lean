@@ -1,5 +1,6 @@
 import SP1Clean.Native.Operations.AddrAddOperation.RawSpec
 import SP1Clean.Native.Operations.AddrAddOperation.Populate
+import SP1Clean.Native.Operations.AddrAddOperation.Defs
 
 /-! # `AddrAddOperation` — the `FormalAssertion` (soundness / completeness / contract)
 
@@ -7,8 +8,8 @@ SP1's `AddrAddOperation::eval` (48-bit/3-limb address add) as a Clean `FormalAss
 `Assumptions`, the soundness/completeness proofs (routing through `RawSpec`'s
 `addrAddSemantics_of_carries`/`carries_of_addrAddSemantics`), and the bundled `circuit`. The high
 carry runs against `0`; its booleanity in completeness is supplied by the address-fits `Assumptions`
-conjunct. The arithmetic core lives in `RawSpec`, the auto-generated circuit (`main`/`elaborated`) in
-`Extracted`, the `populate` witness in `Populate`. -/
+conjunct. The arithmetic core lives in `RawSpec`, the native circuit (`main`/`elaborated`) in `Defs`,
+and the `populate` witness in `Populate`. -/
 
 namespace SP1Clean.AddrAddOperation
 

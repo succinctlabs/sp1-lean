@@ -157,6 +157,36 @@ structure SP1PublicValues (F : Type) where
   proof_nonce : Vector F 4
   empty : Vector F 4
 
+/-- Flatten the base (non-`mprotect`) Rust layout in exact `#[repr(C)]` field order.
+
+The result type is the upstream `SP1_PROOF_NUM_PV_ELTS = 160` tripwire.  This is the sole adapter
+passed to the generated public-value and row oracles; semantic code should continue to use the
+named structure fields.  A feature-enabled layout needs a separately sized encoder rather than
+silently inserting or deleting the optional fields here. -/
+def SP1PublicValues.toBaseVector {F : Type} (pv : SP1PublicValues F) : Vector F 160 :=
+  pv.prev_committed_value_digest.flatten ++
+  pv.committed_value_digest.flatten ++
+  pv.prev_deferred_proofs_digest ++
+  pv.deferred_proofs_digest ++
+  pv.pc_start ++ pv.next_pc ++
+  #v[pv.prev_exit_code, pv.exit_code, pv.is_execution_shard] ++
+  pv.previous_init_addr ++ pv.last_init_addr ++
+  pv.previous_finalize_addr ++ pv.last_finalize_addr ++
+  pv.previous_init_page_idx ++ pv.last_init_page_idx ++
+  pv.previous_finalize_page_idx ++ pv.last_finalize_page_idx ++
+  pv.initial_timestamp ++ pv.last_timestamp ++
+  #v[pv.is_timestamp_high_eq, pv.inv_timestamp_high,
+    pv.is_timestamp_low_eq, pv.inv_timestamp_low,
+    pv.global_init_count, pv.global_finalize_count,
+    pv.global_page_prot_init_count, pv.global_page_prot_finalize_count,
+    pv.global_count] ++
+  pv.global_cumulative_sum.x ++ pv.global_cumulative_sum.y ++
+  #v[pv.prev_commit_syscall, pv.commit_syscall,
+    pv.prev_commit_deferred_syscall, pv.commit_deferred_syscall,
+    pv.initial_timestamp_inv, pv.last_timestamp_inv,
+    pv.is_first_execution_shard, pv.is_untrusted_programs_enabled] ++
+  pv.proof_nonce ++ pv.empty
+
 /-- The Rust feature selection is verifier configuration, not witness data. -/
 inductive SP1PublicValuesLayout
   | base
@@ -224,10 +254,7 @@ def SP1ShardStatement.ConfigurationMatches {p : ℕ} {Digest : Type}
       statement.verifyingKey.untrusted_config.enable_untrusted_programs ∧
     statement.publicValues.mprotect = statement.verifyingKey.untrusted_config.mprotect
 
-/-- The execution-coordinate continuity required between adjacent shard records.  Other recursive
-accumulators (committed-value digests, deferred proofs, global memory, syscalls, and nonce integrity)
-belong to the separate shard-integrity relation; naming this projection prevents them from being
-mistaken for execution semantics. -/
+/-- The execution-coordinate projection of one adjacent shard link. -/
 def SP1PublicValues.ExecutionContinues (previous next : SP1PublicValues (ZMod p)) : Prop :=
   previous.next_pc = next.pc_start ∧
     previous.last_timestamp = next.initial_timestamp ∧
@@ -238,6 +265,116 @@ def SP1PublicValues.ExecutionContinuous : List (SP1PublicValues (ZMod p)) → Pr
   | [] | [_] => True
   | previous :: next :: rest =>
       previous.ExecutionContinues next ∧ ExecutionContinuous (next :: rest)
+
+/-- Decode an upstream three-limb pc/address as a natural number. -/
+def SP1Word48.toNat {p : ℕ} (word : SP1Word48 (ZMod p)) : ℕ :=
+  word[0].val + word[1].val * 2 ^ 16 + word[2].val * 2 ^ 32
+
+/-- Decode one four-byte public-value digest word in little-endian order. -/
+def SP1Word32.toNat {p : ℕ} (word : SP1Word32 (ZMod p)) : ℕ :=
+  word[0].val + word[1].val * 2 ^ 8 + word[2].val * 2 ^ 16 + word[3].val * 2 ^ 24
+
+/-- Decode an upstream timestamp using its `(16, 8, 8, 16)` big-endian limb weights. -/
+def SP1Timestamp.toNat {p : ℕ} (timestamp : SP1Timestamp (ZMod p)) : ℕ :=
+  timestamp[0].val * 2 ^ 32 + timestamp[1].val * 2 ^ 24 +
+    timestamp[2].val * 2 ^ 16 + timestamp[3].val
+
+/-! ## Concrete recursive-shard ledger
+
+The recursion circuit does substantially more than the execution-coordinate projection above.  Its
+sequential compression loop carries every rolling value forward and checks it against the next
+shard's `prev_*` field.  The definitions below transcribe that loop directly.  They intentionally do
+not define septic-curve addition or deferred-proof verification: those are proof-system relations,
+not equality links between public records. -/
+
+/-- Every field element in a fixed-size vector is zero. -/
+def SP1VectorZero {p n : ℕ} (values : Vector (ZMod p) n) : Prop :=
+  ∀ value ∈ values.toList, value = 0
+
+/-- The byte-word public-values digest is the all-zero digest. -/
+def SP1WordDigestZero {p : ℕ} (digest : Vector (SP1Word32 (ZMod p)) 8) : Prop :=
+  ∀ word ∈ digest.toList, SP1VectorZero word
+
+/-- Every equality checked between two consecutive core-shard public records by recursion's
+compression loop.  Per-shard cumulative sums are deliberately absent: recursion combines them with
+septic-curve addition rather than carrying one into the next record. -/
+def SP1PublicValues.LedgerContinues (previous next : SP1PublicValues (ZMod p)) : Prop :=
+  previous.committed_value_digest = next.prev_committed_value_digest ∧
+    previous.deferred_proofs_digest = next.prev_deferred_proofs_digest ∧
+    previous.next_pc = next.pc_start ∧
+    previous.last_timestamp = next.initial_timestamp ∧
+    previous.last_init_addr = next.previous_init_addr ∧
+    previous.last_finalize_addr = next.previous_finalize_addr ∧
+    previous.last_init_page_idx = next.previous_init_page_idx ∧
+    previous.last_finalize_page_idx = next.previous_finalize_page_idx ∧
+    previous.exit_code = next.prev_exit_code ∧
+    previous.commit_syscall = next.prev_commit_syscall ∧
+    previous.commit_deferred_syscall = next.prev_commit_deferred_syscall ∧
+    previous.proof_nonce = next.proof_nonce
+
+/-- Exact pairwise continuity of an ordered core-shard ledger. -/
+def SP1PublicValues.LedgerContinuous : List (SP1PublicValues (ZMod p)) → Prop
+  | [] | [_] => True
+  | previous :: next :: rest =>
+      previous.LedgerContinues next ∧ LedgerContinuous (next :: rest)
+
+/-- Initial aggregate boundary imposed when a recursive proof is marked complete.  The timestamp
+encoding is compared semantically (`toNat = 1`); `WellFormed` supplies its canonical limb bounds. -/
+def SP1PublicValues.InitialLedgerBoundary (publicValues : SP1PublicValues (ZMod p)) : Prop :=
+  SP1WordDigestZero publicValues.prev_committed_value_digest ∧
+    SP1VectorZero publicValues.prev_deferred_proofs_digest ∧
+    publicValues.initial_timestamp.toNat = 1 ∧
+    publicValues.previous_init_addr.toNat = 0 ∧
+    publicValues.previous_finalize_addr.toNat = 0 ∧
+    publicValues.previous_init_page_idx.toNat = 0 ∧
+    publicValues.previous_finalize_page_idx.toNat = 0 ∧
+    publicValues.prev_exit_code = 0 ∧
+    publicValues.prev_commit_syscall = 0 ∧
+    publicValues.prev_commit_deferred_syscall = 0
+
+/-- Terminal aggregate boundary imposed by SP1 recursion for a complete proof.  `haltPc` is an
+explicit parameter so this public-values module remains independent of the syscall semantics module;
+the current Core target instantiates it with `1`. -/
+def SP1PublicValues.FinalLedgerBoundary (haltPc : ℕ)
+    (publicValues : SP1PublicValues (ZMod p)) : Prop :=
+  publicValues.next_pc.toNat = haltPc ∧
+    publicValues.last_init_addr.toNat ≠ 0 ∧
+    publicValues.last_finalize_addr.toNat ≠ 0 ∧
+    publicValues.commit_syscall = 1 ∧
+    publicValues.commit_deferred_syscall = 1
+
+/-- Exactly one included record is the first execution shard.  Using `filter.length`, rather than
+uniqueness of record *values*, also detects a duplicated identical record. -/
+def SP1PublicValues.HasUniqueFirstExecutionShard
+    (shards : List (SP1PublicValues (ZMod p))) : Prop :=
+  (shards.filter fun publicValues => publicValues.is_first_execution_shard = 1).length = 1
+
+/-- Public-record checks performed by recursive composition, except for septic-curve aggregation and
+deferred-proof authentication.  Those two external checks have their own narrow theorem parameters at
+the execution boundary; they are not hidden inside this ledger predicate. -/
+def SP1PublicValues.AuthenticatedLedger (haltPc : ℕ)
+    (shards : List (SP1PublicValues (ZMod p))) : Prop :=
+  ∃ first rest final,
+    shards = first :: rest ∧
+      shards.getLast? = some final ∧
+      first.InitialLedgerBoundary ∧
+      final.FinalLedgerBoundary haltPc ∧
+      LedgerContinuous shards ∧
+      HasUniqueFirstExecutionShard shards
+
+/-- The full ledger continuity implies its execution-coordinate projection. -/
+theorem SP1PublicValues.executionContinuous_of_ledgerContinuous
+    {shards : List (SP1PublicValues (ZMod p))}
+    (continuous : LedgerContinuous shards) : ExecutionContinuous shards := by
+  induction shards with
+  | nil => trivial
+  | cons first rest ih =>
+      cases rest with
+      | nil => trivial
+      | cons next tail =>
+          rcases continuous.1 with
+            ⟨-, -, pc, timestamp, -, -, -, -, exitCode, -, -, -⟩
+          exact ⟨⟨pc, timestamp, exitCode⟩, ih continuous.2⟩
 
 /-- Range and Boolean hygiene common to the full upstream public-input AIR.  Digest and septic-curve
 relations are intentionally separate semantic integrity predicates; this definition only prevents
@@ -258,14 +395,12 @@ def SP1PublicValues.WellFormed {p : ℕ} (layout : SP1PublicValuesLayout)
   FieldBool pv.commit_deferred_syscall ∧ FieldBool pv.is_first_execution_shard ∧
   FieldBool pv.is_untrusted_programs_enabled ∧ pv.ConformsLayout layout
 
-/-- Decode an upstream three-limb pc/address as a natural number. -/
-def SP1Word48.toNat {p : ℕ} (word : SP1Word48 (ZMod p)) : ℕ :=
-  word[0].val + word[1].val * 2 ^ 16 + word[2].val * 2 ^ 32
-
-/-- Decode an upstream timestamp using its `(16, 8, 8, 16)` big-endian limb weights. -/
-def SP1Timestamp.toNat {p : ℕ} (timestamp : SP1Timestamp (ZMod p)) : ℕ :=
-  timestamp[0].val * 2 ^ 32 + timestamp[1].val * 2 ^ 24 +
-    timestamp[2].val * 2 ^ 16 + timestamp[3].val
+/-- Project the execution-shard selector's canonical Boolean encoding from public-value hygiene. -/
+theorem SP1PublicValues.executionShard_bool {p : ℕ} {layout : SP1PublicValuesLayout}
+    {pv : SP1PublicValues (ZMod p)} (wellFormed : pv.WellFormed layout) :
+    pv.is_execution_shard = 0 ∨ pv.is_execution_shard = 1 := by
+  unfold SP1PublicValues.WellFormed FieldBool at wellFormed
+  tauto
 
 /-- The shard's initial pc as a Sail-width bit-vector. -/
 def SP1PublicValues.pcStartBits {p : ℕ} (pv : SP1PublicValues (ZMod p)) : BitVec 64 :=

@@ -1,13 +1,14 @@
 import SP1Clean.Native.Operations.U16CompareOperation.RawSpec
 import SP1Clean.Native.Operations.U16CompareOperation.Populate
+import SP1Clean.Native.Operations.U16CompareOperation.Defs
 
 /-! # `U16CompareOperation` — the `FormalAssertion` (soundness / completeness / contract)
 
 SP1's `U16CompareOperation::eval` as a Clean `FormalAssertion`: the `Assumptions`, the
 soundness/completeness proofs (routing through `RawSpec`'s `compare_of_raw`), and the bundled `circuit`.
 The semantic `Spec` carries `bit`'s booleanness unconditionally (SP1's `eval` asserts it **ungated**) plus
-the `is_real`-gated order equation. The arithmetic core lives in `RawSpec`, the elaborated circuit in
-`Extracted`, the `populate_bit` witness in `Populate`. -/
+the `is_real`-gated order equation. The arithmetic core lives in `RawSpec`, the native circuit in
+`Defs`, and the `populate_bit` witness in `Populate`. -/
 
 namespace SP1Clean.U16CompareOperation
 

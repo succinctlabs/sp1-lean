@@ -15,30 +15,39 @@ are scale-out.
 
 ## Whole-machine theorem stack
 
-The circuit and proof-system boundaries are intentionally separate:
+The circuit, AIR, execution, recursion, and proof-system boundaries are intentionally separate:
 
-1. Plain Clean channels enforce structural interaction equality. State records `(clock, pc)` edges;
+1. The proof-oriented native slice uses plain Clean channels. State records `(clock, pc)` edges;
    Program records decoded fetch rows; Memory records timestamped locations and values; Byte records
    finite lookup facts. State does not locally assume reachability and Program does not locally assume
-   ROM commitment.
-2. `Soundness/TimedGrounding.lean` interprets balanced records in time order. Its current proved scope is
-   the ordinary, register-only slice; RAM, repeated touches, state bumps, and syscalls are explicit open
-   generalizations.
-3. `Model/Machine/{Boot,Schedule,Execution}.lean` defines the native semantic machine. A fixed
-   `SP1MachineModel` chooses the loader and opcode-dependent timing policy, so neither can be selected by
-   the proof witness. PolyFun's `DynSystem.Machine` packages the official Sail `try_step` trajectory; it
-   is not used in circuit construction.
-4. `FormalModel/Relations.lean` states AIR soundness as witness-producing refinement. The currently
-   honest native target is `supported_core_native_sound`; the former headline is now
-   `balanced_state_trail_soundness`, accurately naming its Eulerian interaction conclusion. The name
-   `supported_core_air_sound` is reserved for native/extracted faithfulness, and `sp1_air_sound` for a
-   faithful relation over the complete upstream shard AIR and `SP1PublicValues`. Native shard soundness
-   first ends in a local Sail segment; `supportedCoreLocalExecution_anchors` places it in the canonical
-   boot trajectory once shard composition proves the initial state was reached. `SP1ExecutionRelation`
-   composes consecutive anchored shards into boot-to-halt execution.
-5. ArkLib owns probabilistic verifier knowledge soundness. `FormalModel/Verifier.lean` provides the
-   dependency-free extractor/refinement seam; a future ArkLib adapter will state `sp1_verifier_sound` by
-   post-processing an extracted AIR witness through `sp1_air_sound`.
+   ROM commitment. `Soundness/TimedGrounding.lean` interprets those balanced records in time order. Its
+   current proved scope is the ordinary, register-only slice; RAM and repeated same-location touches are
+   the live `supportedCore_orderedRows_dynamic` work.
+2. The upstream-faithfulness slice is independent of that proof decomposition. The list-only extractor
+   emits every row, `assertZero`, interaction, and public-value constraint for the pinned v6.3.1 baseline:
+   the exact 34-table execution cluster and exact 6-table memory-boundary cluster. A runtime-generated
+   manifest checks membership and widths before writing. `Faithful/CoreAIR.lean` assembles those lists
+   into a cluster-indexed, heterogeneous witness relation. Its interaction premise is equality of
+   canonical **natural** multiplicities, not modular field equality; ArkLib's LogUp/GKR extractor must
+   justify that stronger fact with bounds and its knowledge error.
+3. `Model/Machine/{Boot,Schedule,Syscall,EventExecution}.lean` defines the semantic target. Ordinary
+   events are genuine successful Sail `try_step`s and occupy 8 ticks. ECALL events occupy 264 ticks and
+   expose the raw instruction-row syscall data to an explicit `SyscallHandler` relation. Sail does not
+   implement SP1's host handler; a theorem for a concrete handler or precompile cluster must therefore
+   be supplied separately rather than hidden in the ISA step.
+4. `Soundness/CoreAIR.lean` is the auditable deterministic capstone. `sp1_air_refinement` maps an exact
+   `.execution`-cluster witness to `SP1CoreShardExecutionRelation`; `sp1_air_sound` is its existential
+   corollary. The required table proofs are not hidden: `CoreAIRRefinementObligations` lists public-value,
+   program-binding, syscall-transcript/operand, boundary-shard, and eventful-execution obligations. The
+   bundle is not yet instantiated, so the theorem is a proved composition theorem rather than a closed
+   full-Core result. One additional temporary premise, `CoreAIRSemanticAssumptions`, supplies only the
+   missing existence of all eight COMMIT/COMMIT_DEFERRED rows when a rolling flag is introduced.
+5. `SP1ExecutionRelation` is the separate recursion target. Its concrete `AuthenticatedLedger` checks
+   every transcribed adjacent-shard equality and the complete-proof endpoints, while full Sail-state
+   stitching, septic global-sum balance, deferred-proof authentication, and final HALT remain explicit.
+   ArkLib owns probabilistic verifier knowledge soundness. `FormalModel/Verifier.lean` provides the
+   dependency-free post-processing combinator; a future ArkLib adapter states `sp1_verifier_sound` by
+   composing its straight-line extractor with `sp1_air_refinement` without changing the error term.
 
 This factorization prevents an algebraic trail, a Sail execution, and verifier acceptance from being
 presented as the same claim.
@@ -128,10 +137,12 @@ This split is the intended pattern for future complex chips: isolate pure semant
 and subcircuit extraction in one chip-level conformance theorem, and never make the machine layer depend on
 the proof decomposition.
 
-The remaining generated operation modules, direct circuit forms, operation witness vectors, and
-`Faithful/<Operation>.lean` files are **migration debt**. They may remain temporarily where an unmigrated
-chip proof imports them, but new work must not add operation-level faithfulness APIs. Delete each artifact
-once every consuming chip has a native row reconfiguration and a whole-chip `ChipFaithful` anchor.
+The generated direct-circuit forms have now been deleted. Their implementations are hand-maintained
+under `Native/Operations/<Op>/Defs.lean`, so extraction supplies evidence but never executable circuit
+architecture. The remaining generated operation **list** modules, operation witness vectors, and
+`Faithful/<Operation>.lean` files are migration debt. They may remain temporarily where an unmigrated chip
+proof imports them, but new work must not add operation-level faithfulness APIs. Delete each artifact once
+every consuming chip has a native row reconfiguration and a whole-chip `ChipFaithful` anchor.
 
 Each new module's import goes into the root `SP1Clean.lean`.
 
@@ -254,14 +265,15 @@ SP1Clean/
 │                   GetElemFastPath                                the upstreaming candidate)
 ├── Model/          Register, SailWrap, SailMemory, Channels,     (SP1 substrate: Sail wrappers +
 │                   InteractionBus/Projection/Recovery, ChipAir,   structural buses + byte table;
-│                   SP1Constraint, ByteTable, Machine/{Boot,        native boot/schedule/execution)
-│                   Schedule,Execution}
-├── Extracted/      ChipOracle/<Chip>.lean (chip-namespaced Rust  (PILLAR 1 "extracted from Rust" —
-│                   row + complete asserts/interactions); legacy   auto-generated, do NOT hand-edit;
-│                   <Chip>Chip/<Op>/Circuit helper artifacts       regen via update_extracted.py)
+│                   SP1Constraint, ByteTable, Machine/{Boot,        native boot/schedule/raw-syscall/
+│                   Schedule,Syscall,EventExecution,Execution}      eventful execution semantics)
+├── Extracted/      ChipOracle/<Chip>, SystemOracle/<Table>,      (PILLAR 1 "extracted from Rust" —
+│                   {CoreAIRManifest,Provenance}; legacy op lists  rows + ordered lists only;
+│                                                                  auto-generated, do NOT hand-edit)
 ├── FormalModel/    Contracts/{Readers,Operations,Chips,           (THE central audit surface — the
-│                   PublicValues} (Inputs + semantic Specs),        "middle ground" between Extracted
-│                   Relations, Execution, Verifier, Trace/          and the proofs)
+│                   PublicValues,CoreAIR}, CoreProfile,             "middle ground" between Extracted
+│                   CoreAIRRelation, Relations, Execution,          and the proofs)
+│                   Verifier, Trace/
 ├── Native/         Chips/<Op>Chip/Defs (main+elaborated),        (PILLAR 2 "implemented native" —
 │                   Operations/<Op>/{Populate,RawSpec} + flat ops, circuit construction)
 │                   Readers/ (reader sub-circuits)
@@ -273,7 +285,7 @@ SP1Clean/
 │                   ChipRow (`ChipKind`+`name`), ChipRegistry,      SP1Ensemble = balanced-trail
 │                   SP1Ensemble, TimedGrounding (+AlignsWith),      intermediate; TimedGrounding + AIR +
 │                   AlignedCarrier, GroundingAdapter,               the grounding-adapter/contract stack
-│                   ChipContracts, TimeExtraction, AIR,             own the semantic capstone;
+│                   ChipContracts, TimeExtraction, AIR, CoreAIR,     own the native + exact-Rust capstones;
 │                   Opcode, Coverage, RowView                       Coverage = Opcode→chip→Sail table;
 │                   [frozen legacy, retired at seam close:          AIR = relation-level capstone boundary;
 │                    GatedVm/, TargetVm, AdvanceDispatch, Decode]   the bracketed set leaves at Phase P6)
@@ -495,7 +507,7 @@ hypothesis** — exactly as `../sp1-lean` ships it, an honest assumption, not a 
   `ShiftLeftCore.pop*` generators (SP1's `event_to_row`; `popA` is built as the *placement of the recomputed
   `limb_result`* so placements hold by construction), and soundness verifies under that witnessing — but the
   completeness **proof** (~62 inline-constraint discharges + the three reader sub-assertion obligations) is one
-  of the five deferred completeness proofs. Tooling note: the LSP times out on the 680-line chip; a scratch `import` + `example :
+  of the four deferred completeness proofs. Tooling note: the LSP times out on the 680-line chip; a scratch `import` + `example :
   Completeness … := by circuit_proof_start; sorry` elaborates fast and exposes the full goal for iteration.
 - **Real-data threading (the reader column blocks are chip `Inputs`).** All readers are
   `FormalAssertion`s taking their `cols` as inputs, so the chip `Inputs` carry the committed `state`/`adapter`

@@ -385,6 +385,15 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.supportedCore_orderedRows_dynamic
 #print axioms SP1Clean.Soundness.supported_core_witness_grounding
 #print axioms SP1Clean.Soundness.supported_core_native_sound
+#print axioms SP1Clean.CoreProfile.checkedIn_semanticRevision
+#print axioms SP1Clean.CoreProfile.coreCluster_matchesExtracted
+#print axioms SP1Clean.CoreProfile.coreClusterShapes_matchExtracted
+#print axioms SP1Clean.CoreProfile.memoryBoundaryCluster_matchesExtracted
+#print axioms SP1Clean.CoreProfile.memoryBoundaryClusterShapes_matchExtracted
+#print axioms SP1Clean.CoreProfile.publicValuesWidth_matchesExtracted
+#print axioms SP1Clean.CoreAIR.Current.system_isCurrent
+#print axioms SP1Clean.Soundness.sp1_air_refinement
+#print axioms SP1Clean.Soundness.sp1_air_sound
 #print axioms SP1Clean.Soundness.TimedGrounding.walk
 #print axioms SP1Clean.Soundness.sp1_finishedChannel_guarantees
 #print axioms SP1Clean.Soundness.allChipKinds
@@ -406,6 +415,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.Target.decodedInROMg
 #print axioms SP1Clean.Soundness.Target.sailConfigured_nonempty
 #print axioms SP1Clean.Soundness.Target.decodedInROM_rtype_hoist
+#print axioms SP1Clean.Soundness.Target.decodedInROM_rtype_operand_lt
 #print axioms SP1Clean.Soundness.Target.decodedInROM_mul_hoist
 #print axioms SP1Clean.Soundness.Target.decodedInROM_addRow
 #print axioms SP1Clean.Soundness.Target.instrToProgramRow

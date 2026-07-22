@@ -6,29 +6,53 @@ whole-machine claim. Unlike its predecessor, **every quantitative claim in this 
 machine-derived** — by `scripts/run_audit.sh`, whose raw census output is committed at
 `snapshots/axiom-census.txt`. Re-run the harness before citing any number.
 
-**Pins and census regenerated 2026-07-16.** The dependency checkouts are local migration pins; restore
-published git pins before release.
+**2026-07-22 architecture and audit update.** The detailed census below was regenerated after the
+following extraction/full-AIR changes:
+
+- the semantic SP1 ground truth is now unmodified `a630089d9ff484ec6f2feade8d0afbb1447eed11`
+  (`v6.3.1-8-ga630089d9`); extraction uses a separately hash-checked overlay whose runtime-source delta is
+  reflection metadata only;
+- direct Rust-to-Clean circuit output and `Extracted/Circuit/` have been deleted. Extraction emits rows
+  and ordered assertion/interaction lists only; native circuit definitions are hand-maintained;
+- the extractor now fails closed on the runtime 34-table execution cluster, 6-table memory-boundary
+  cluster, all row widths, and 160 public cells. A full v6.3.1 AIR-only run reproduced every pre-existing
+  instruction/reader/list artifact byte-for-byte and generated the missing system/public-value anchors;
+- `CoreAIR.Current.Relation binds cluster` is the concrete heterogeneous upstream witness relation,
+  strengthened to exact natural interaction-multiset equality. The public capstone is explicitly pinned
+  to `.execution`, so the boundary cluster cannot satisfy an execution theorem;
+- `sp1_air_refinement` and `sp1_air_sound` are implemented composition theorems, but are not closed full
+  soundness results: they require the field-by-field `CoreAIRRefinementObligations` bundle plus the narrow
+  temporary COMMIT/COMMIT_DEFERRED row-provenance premise; and
+- syscalls are modeled as raw 264-tick events with an explicit `SyscallHandler`. This is honest about the
+  fact that Sail has no SP1 host handler; a concrete handler/precompile refinement is still required.
+
+Where historical sections describe `sp1_air_sound` as merely reserved, generated circuit normalization,
+the v6.2.2 pin, or baseline system tables as unmodeled, this update controls.
+
+**Pins and census refreshed 2026-07-22.** The dependency checkouts are local
+migration pins; restore published git pins before release.
 
 | What | Value | Command |
 |---|---|---|
-| sp1-lean | `6c399dbd` + this working tree | `git rev-parse HEAD` |
+| sp1-lean | `be5222df` + this working tree | `git rev-parse HEAD` |
 | toolchain | `leanprover/lean4:v4.31.0` | `cat lean-toolchain` |
-| SP1 (the oracle) | `9d249b8d4` = **`v6.2.2-20-g9d249b8d4`**, branch `dtumad/clean-native` | `git -C ../sp1 describe --tags` |
+| SP1 semantic source | `a630089d9` = **`v6.3.1-8-ga630089d9`** | `git -C ../sp1 describe --tags --always` |
+| SP1 extraction overlay | `69a8377c` + checked-in patch digest `a2c43cfa…` | `Extracted/Provenance.lean` |
 | Clean | `8e6ce748` (local 4.31 checkout) | `git -C ../clean rev-parse HEAD` |
 | LeanRV64D | `793034f3` + the disclosed SP1 platform delta | `git -C ../sail-riscv-lean rev-parse HEAD` |
 | RISCV | `e65c352a` | `git -C ../riscv-lean rev-parse HEAD` |
 | Sail runtime | `79b4d085` | `git -C ../lean-sail rev-parse HEAD` |
 | PolyFun | `502582b4` | `git -C .lake/packages/PolyFun rev-parse HEAD` |
 
-Do **not** cite the SP1 pin as "v6.2.2" unqualified — the checkout is 20 commits past the tag, on the
-project's own branch (it carries the `sp1-constraint-compiler` and witness-dump tooling).
-`update_extracted.py` asserts this pin (`SP1_PINNED_COMMIT`); bump it together with regenerated files.
+Do not conflate the semantic revision with the extraction overlay. `update_extracted.py` checks both
+identities, the overlay-to-semantic-base source delta, each component patch hash, and the combined dirty
+diff before it writes an artifact. Bump all of those together with regenerated files.
 
 > **Read this first if you read nothing else.** The Lean 4.31 migration currently has one genuine
 > chip-soundness admission: `DivRemChip.evidenceSoundness`, the whole-chip extraction of unique selection,
 > explicit family arithmetic evidence, and output routing from the generated constraints. Public
 > `contractSoundness` is proved from that stronger statement, but inherits its `sorryAx`. The old nine
-> per-op DivRem proof stubs were deleted. Five chip-completeness proofs and two DivRem circuit-law fields
+> per-op DivRem proof stubs were deleted. Four chip-completeness proofs and two DivRem circuit-law fields
 > are also deferred; they affect bundled circuit axiom censuses but do not strengthen the semantic claim.
 > At machine level, `supportedCore_orderedRows_dynamic` and `sp1_decoded_rows_sound` are the disclosed
 > semantic and legacy structural grounding seams; `supported_core_witness_grounding` is now a proved
@@ -77,8 +101,8 @@ must not be conflated:
   `SP1CleanTest/` for executable witness/trace conformance and therefore trust the compiler.
 - **C. The `sp1-constraint-compiler`** (`../sp1 crates/core/compiler`, at the pin): renders SP1's Rust
   AIR into the Lean constraint lists under `Extracted/`. **Black box assumed correct** — no Lean proof
-  it reflects the Rust `eval`. Currency is now machine-checked (§II K1); the circuit-form emitter
-  incompatibility found in this audit is closed (§II TB-9, W9: `_normalize_circuit_api`).
+  it reflects the Rust `eval`. Currency is now machine-checked (§II K1). The former circuit-form
+  compatibility path is historical: the audited exporter now has no circuit backend (§II TB-9).
 - **D. The LeanRV64D Sail model** as ISA ground truth. Per-chip bridges pull only the platform axioms
   on their execute paths (`sys_enable_experimental_extensions`, `load_reservation`,
   `match_reservation`, `plat_term_write`). **The target theorem, stated over the full `try_step`
@@ -104,7 +128,7 @@ and decode preconditions). What used to be a prose boundary is now the explicit 
 | `OperandsBound` (parameter) | the row's committed operand columns are honoured by the Sail state at its walk position | W2 (binding from memory-bus balance) + W3 (decode from program bus / InstructionDecode-Fetch chips) |
 | `TargetObligations.bound` | every refining state at every walk position satisfies `OperandsBound` | W2 + W3 |
 | `TargetObligations.lift` | one real `try_step` from a refining, operand-bound state produces the row's committed effect (`RowEffect`) | W7 (per-kind interpreter reduction; consumes the existing bridges) |
-| `TargetObligations.halt`/`halt_nonempty` | the walk ends at the halting ECALL with the committed exit code | W5 (ECALL/HALT chip; needs the `clk_increment` 256-vs-8 generalization of `sndKey`) |
+| `TargetObligations.halt`/`halt_nonempty` | the walk ends at the halting ECALL with the committed exit code | W5 (ECALL/HALT chip; needs the mixed 8/264 `clk_increment` generalization of `sndKey`) |
 | `SailConfigured` | the platform residue of a runnable initial state (currently the empty conjunction — the obligation lives in `lift`) | W7 |
 | `RowEffect.rom` strengthening | store-replay memory instead of ROM-intactness only | W2b + W4a |
 | `sp1_decoded_rows_sound` (`DecodedRowsSound`) | Clean `Statement` → facts about the deterministic typed decode: per-row Specs, binary selectors, and State-bus correspondence (`state_accesses_perm`). The balance-translation half is **proven** (`sp1_state_balance_of_balancedInteractions`) | frozen W1b/W1c trail path |
@@ -144,7 +168,7 @@ soundness never consumes `completeness` proofs, so the wiring was safe despite d
 
 | # | Connection | Mechanism | Status (this audit) |
 |---|---|---|---|
-| K1 | SP1 Rust AIR → extracted Lean constraints | `sp1-constraint-compiler` via `update_extracted.py` | **Trusted compiler; currency machine-checked**: re-extraction at the pin reproduces all 70 `Extracted/` modules **byte-identical**. Two process findings: TB-9 (circuit-form emitter incompatibility — closed by W9) and the witness-header drift (now committed). Pin assertion added. |
+| K1 | SP1 Rust AIR → extracted Lean constraints | `sp1-constraint-compiler` via `update_extracted.py` | **Trusted compiler; currency machine-checked**: full AIR-only re-extraction at the v6.3.1 overlay reproduces every pre-existing instruction/reader/list artifact **byte-identically** and emits the pinned system/public/profile anchors. The overlay revision, exact patch set, semantic merge base, and reflection-only source delta are checked before generation. |
 | K2 | extracted complete chip AIR ↔ native chip | `Extracted/ChipOracle/*` + `ChipFaithful` | **Proved for Add and Sub.** Remaining legacy operation/fragment anchors are migration evidence, not the final boundary; 23 whole-chip anchors remain. |
 | K3 | generated/native chip constraints → semantic spec (`toBitVec64 = RV64.op`) | chip `soundness` | **Proved for 24 wired chips; one disclosed DivRem seam.** `DivRemChip.evidenceSoundness` states the stronger row→family-evidence target; public soundness is derived from it. |
 | K4 | semantic spec → RISC-V Sail spec | `Bridge.lean` / `correct_*_native` | **Proved, `sorry`-free, all 25 chips** — including Mul (5 variants) and DivRem (8 variants), which the previous roadmap wrongly listed as missing. Conditional on register/decode reads; pulls the per-path Sail platform axioms. |
@@ -163,7 +187,7 @@ soundness never consumes `completeness` proofs, so the wiring was safe despite d
 | TB-6 | "`populate` unverified" | **OPEN (disclosed)** | K6: conformance, not correspondence |
 | TB-7 | "trace links are holes dressed as hypotheses" | **NARROWED** | PC chain, offline memory, and ROM membership are *derived* from balance; the residue is the named-obligation table (Part I) |
 | TB-8 | "Clean elaboration smuggles axioms" | **CLOSED** | clean-3 headline census |
-| TB-9 *(new)* | "the extraction pipeline is not reproducible against the pinned toolchain" | **CLOSED (2026-06-10, W9)** | root cause refined: the compiler at the pin emits a `name`/`main`-**field** `ElaboratedCircuit` from a *transient window of Clean main* (`60665ed0`, later reworked) — no pinned Clean ever accepted it, so a Clean pin bump alone could not fix it. W9 re-pinned Clean to the PR #398 head (`292b9cc3`), deleted the custom gating, and added `update_extracted.py::_normalize_circuit_api` (parameterized instance + `pullIf`/`toRaw` names). Verified: full regen at the SP1 pin reproduces all 70 `Extracted/` modules + `WitnessTests/` **byte-identical**, and the 14 circuit-form `Operations/*/Extracted.lean` likewise (the three drifted files — Add rfl-lemma layout, the two `Lt` bodies — were re-committed at the pin's emitter formatting). |
+| TB-9 *(new)* | "the extraction pipeline is not reproducible against the pinned toolchain" | **CLOSED; strengthened 2026-07-22** | W9 originally normalized a transient Rust-to-Clean circuit format. The current audited overlay deletes that backend entirely and emits only row shapes plus ordered assertion/interaction lists. `update_extracted.py` checks the exact overlay diff and machine manifest before writing, and a full v6.3.1 AIR-only run reproduced every pre-existing list artifact byte-for-byte. |
 | TB-10 *(new)* | "the `#print axioms` story of the capstone is cleaner than reality" | **DISCLOSED** | `sp1Tables` embeds each chip's full circuit record, so the five completeness admissions and the DivRem soundness seam surface transitively on registry/coverage/capstone projections even when a theorem uses only metadata. The census allowlist names every carrier. |
 
 ### Machine-model divergence catalog (unchanged verdicts re-checked, one addition)
@@ -174,36 +198,38 @@ slot (faithful) · D5 JAL link gate (faithful) · D6 J-type program-bus gate, mu
 chips (deferred → W4) · D9 LogUp/GKR balance (assumed → W8 packages as one axiom) · D10 decode/fetch
 chips (deferred → W3) · D11 field generality (safe over-generalization) · D12 register/operand binding
 (deferred → W2; now a named obligation, not prose). **D13 *(new; resolved 2026-06-10)*:** SP1's
-syscall rows advance the clock by **256** (`SyscallInstrs`); `StateAccess` now carries a per-row
+syscall rows add 256 ticks to `CLK_INC = 8`, advancing the clock by **264** (`SyscallInstrs`); `StateAccess` now carries a per-row
 `clk_inc` and `sndKey`/`stateLookups` key on `clk_low + clk_inc` (`balanced_state_bus` and the PC-chain
 layer re-proved per-access). `stateAccess` projects `clk_inc := 8` — faithful for all 25 wired chips;
-the HALT chip (W5) supplies 256 via a `RowView`-level increment when it lands.
+the HALT chip (W5) supplies 264 via a `RowView`-level increment when it lands.
 
 ---
 
 ## Part III — The machine-checked audit
 
-### 0. Census summary (`scripts/run_audit.sh`, 460 probes, raw output in `snapshots/axiom-census.txt`)
+### 0. Census summary (`scripts/run_audit.sh`, 471 probes, raw output in `snapshots/axiom-census.txt`)
 
-The 2026-07-16 audit elaborates all 460 generated probes. It finds no project `axiom` declarations,
-no `skipKernelTC`, and no main-library `native_decide`. There are 10 direct deferral sites across exactly
-eight allowlisted files: five chip-completeness proofs; `DivRemChip.evidenceSoundness`; two DivRem
+The 2026-07-22 audit elaborates all 471 generated probes. It finds no project `axiom` declarations,
+no `skipKernelTC`, and no main-library `native_decide`. There are 9 direct deferral sites across exactly
+seven allowlisted files: four chip-completeness proofs; `DivRemChip.evidenceSoundness`; two DivRem
 structural channel-law fields; and the two machine seams `sp1_decoded_rows_sound` and
 `supportedCore_orderedRows_dynamic`.
 
-Exactly 32 probed declarations carry `sorryAx`, all allowlisted. This larger transitive set is expected:
+Exactly 31 probed declarations carry `sorryAx`, all allowlisted. This larger transitive set is expected:
 the unified supported-machine descriptor embeds full circuit records, so registry, coverage, and ensemble
-projections inherit admitted structure fields. It does not represent 32 independent proof holes. The
-census now probes every chip's bundled `circuit` and DivRem's separately housed completeness driver;
-this closed a scanner blind spot that had hidden six already-known transitive/direct carriers. Every
-theorem in `FormalModel/Contracts/DivRem.lean` and `Proofs/Chips/DivRemChip/Cases.lean` is now probed and
-has no `sorryAx`; only the generated-row-to-evidence extraction theorem is admitted. Any new direct
+projections inherit admitted structure fields. It does not represent 31 independent proof holes. The
+census now probes every chip's bundled `circuit`, DivRem's separately housed completeness driver, the
+exact Core profile guards, and `sp1_air_refinement`/`sp1_air_sound`; this closed scanner blind spots in
+both the legacy and new capstone surfaces. Every theorem in `FormalModel/Contracts/DivRem.lean` and
+`Proofs/Chips/DivRemChip/Cases.lean` is now probed and has no `sorryAx`; only the
+generated-row-to-evidence extraction theorem is admitted. The two new capstone declarations are also
+`sorryAx`-free (their Sail platform hooks enter through their semantic target types). Any new direct
 deferral file or transitive carrier fails the audit.
 
 ### 1. Method & reproducibility
 
 `scripts/run_audit.sh` (checked in — the predecessor document's "re-create the harness as needed" gap
-is closed) assumes a green `lake build SP1Clean` (3547 jobs on this snapshot), then records pins →
+is closed) assumes a green `lake build SP1Clean` (3578 jobs on this snapshot), then records pins →
 text inventory with gates (sorry-set, no `axiom` declarations, and the no-`skipKernelTC`
 guard `scripts/check_no_skipkerneltc.sh` — also a standalone CI `guards` job) →
 `scripts/gen_axiom_probe.py` (namespace-tracking declaration
@@ -220,7 +246,6 @@ next build).
 | `DivRemChip.main_exposedChannelsLawful` | structural packaging | 4.31 normalization regression in the exposed State interaction proof |
 | `DivRemChip.circuit.requirementsChannelsLawful` | structural packaging | 4.31 normalization regression; not an arithmetic assumption |
 | `BranchChip.completeness` | liveness | legacy witness proof; whole-chip populate conformance is the replacement target |
-| `MulChip.completeness` | liveness | 4.31 `combinedSize`/witness normalization regression |
 | `ShiftLeftChip.completeness` / `ShiftRightChip.completeness` | liveness | 4.31 regressions |
 | `DivRemChip.completeness` | liveness | independent of the soundness contract conversion |
 | `supportedCore_orderedRows_dynamic` | machine soundness | timed Memory/spec/operand/readiness grounding of the proved exact active-row order |
@@ -237,7 +262,7 @@ names. The predecessor's line citations were already stale at audit time.)
 | Lt | C3 | ✓ | ✓ C3 | ✓ | ✓ (unsigned) |
 | Bitwise | `oRB` | ✓ | ✓ C3 | ✓ forward | ✓ |
 | ShiftLeft / ShiftRight | C3 | ✗ `SRY` | ✓ C3 | ✓ forward | — |
-| Mul | **`oRB`** (settled) | ✗ `SRY` | ✓ C3 (5 variants) | ✓ forward; syntactic dormant (~8 min compile) | ✓ |
+| Mul | **`oRB`** (settled) | ✓ | ✓ C3 (5 variants) | ✓ forward; syntactic dormant (~8 min compile) | ✓ |
 | DivRem | ✗ `SRY` at `evidenceSoundness`; public contract factored/proved | ✗ `SRY` | ✓ (8 variants) | — (open) | full-trace test present |
 | Jal / Jalr / Branch | C3 | Jal/Jalr ✓; Branch ✗ `SRY` | ✓ C3 + Sail-model | ✓ | — |
 | UType (LUI/AUIPC) | C3 | ✓ | ✓ C3 | ✓ | — |

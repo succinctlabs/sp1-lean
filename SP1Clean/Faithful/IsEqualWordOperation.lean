@@ -1,7 +1,7 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Native.Operations.IsEqualWordOperation.RawSpec
-import SP1Clean.Extracted.Circuit.IsEqualWordOperation
+import SP1Clean.Native.Operations.IsEqualWordOperation.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
 import SP1Clean.Model.InteractionRecovery

@@ -31,9 +31,9 @@ chain and the design choices that led to the current whole-chip boundary.
 
 ## Current reader-facing docs
 
-- [`overview.md`](overview.md) — honest current overview; it distinguishes the proved supported-native
-  theorem from the reserved `supported_core_air_sound`, `sp1_air_sound`, `sp1_execution_sound`, and
-  `sp1_verifier_sound` layers.
+- [`overview.md`](overview.md) — honest current overview; it distinguishes the supported-native theorem,
+  the conditional exact-upstream `sp1_air_refinement`/`sp1_air_sound` composition boundary, and the still
+  open execution/ArkLib layers.
 - [`architecture.md`](architecture.md) — detailed architecture and migration status.
 - [`release-audit.md`](release-audit.md) — authoritative current proof and trust audit. Regenerate its raw
   census with `scripts/run_audit.sh` before citing numbers.

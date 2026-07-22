@@ -1,6 +1,6 @@
 import SP1Clean.Native.Operations.LtOperationUnsigned.RawSpec
 import SP1Clean.Native.Operations.LtOperationUnsigned.Populate
-import SP1Clean.Extracted.Circuit.LtOperationUnsigned
+import SP1Clean.Native.Operations.LtOperationUnsigned.Defs
 
 /-! # `LtOperationUnsigned` — the `FormalAssertion` (Spec / soundness / completeness / contract)
 

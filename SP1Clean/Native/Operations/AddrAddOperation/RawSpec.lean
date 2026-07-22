@@ -9,8 +9,8 @@ The structural carry-bool + limb-range form `RawSpec` for the 48-bit (3-limb) ad
 two native carry-chain theorems the gadget's soundness/completeness route through:
 `addrAddSemantics_of_carries` (forward) and `carries_of_addrAddSemantics` (backward). The high carry
 runs against `0` (the result keeps only 48 bits); its booleanity is exactly what the address-fits
-side condition supplies in the backward direction. The auto-generated circuit (`Inputs` + `main` +
-`elaborated`) is the sibling `Extracted` module; the `populate` witness lives in `Populate`; the
+side condition supplies in the backward direction. The hand-maintained native circuit (`Inputs` + `main` +
+`elaborated`) lives in `Defs`; the `populate` witness lives in `Populate`; the
 `FormalAssertion` contract (`Assumptions`/`Spec`/soundness/completeness/`circuit`) in `Formal`. -/
 
 namespace SP1Clean.AddrAddOperation

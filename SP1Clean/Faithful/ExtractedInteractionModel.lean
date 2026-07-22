@@ -29,16 +29,45 @@ open SP1Clean
 
 variable {p : ℕ}
 
-/-- The signed multiplicity of an extracted interaction by direction: `.send → +mult`,
-`.receive → -mult` (sends positive, receives negative, matching the LogUp bus `InteractionBus.lean`). -/
+/-- The signed multiplicity of an extracted interaction by direction. Local and global sends are
+positive; local and global receives are negative, matching the upstream interaction polarity. -/
 def Dir.sign (d : Dir) (mult : ZMod p) : ZMod p :=
   match d with
-  | .send => mult
-  | .receive => -mult
+  | .send | .sendGlobal => mult
+  | .receive | .receiveGlobal => -mult
 
-/-- Project one extracted interaction to its `LookupAccess` — the val-image `(kind, table, argvals,
-signedmult)`, the extracted-side mirror of `AbstractInteraction.toAccess`. The `.byte` arm uses the
-sink sign `signedVal (-mult)` (Clean's pull convention); the dynamic buses use `Dir.sign`. -/
+/-- Stable names for the exact upstream bus discriminator when it passes through the older
+four-bus `LookupAccess` compatibility projection. The full Core relation does not use this
+encoding: it compares `AirInteractionKind` and `AirInteraction.raw` directly. -/
+def AirInteractionKind.lookupName : AirInteractionKind → String
+  | .memory => "memory"
+  | .program => "program"
+  | .byte => "byte"
+  | .state => "state"
+  | .syscall => "syscall"
+  | .global => "global"
+  | .shaExtend => "sha-extend"
+  | .shaCompress => "sha-compress"
+  | .keccak => "keccak"
+  | .globalAccumulation => "global-accumulation"
+  | .memoryGlobalInitControl => "memory-global-init-control"
+  | .memoryGlobalFinalizeControl => "memory-global-finalize-control"
+  | .instructionFetch => "instruction-fetch"
+  | .instructionDecode => "instruction-decode"
+  | .pageProt => "page-prot"
+  | .pageProtAccess => "page-prot-access"
+  | .pageProtGlobalInitControl => "page-prot-global-init-control"
+  | .pageProtGlobalFinalizeControl => "page-prot-global-finalize-control"
+
+/-- Project one extracted interaction to its legacy `LookupAccess` compatibility representation.
+The `.byte` arm uses the sink sign `signedVal (-mult)` (Clean's pull convention); the dynamic buses
+use `Dir.sign`.
+
+`LookupAccess` predates the full Core AIR and has only four coarse kinds. A raw system bus therefore
+uses a reserved `"SP1Raw/<kind>"` table name (which preserves its exact discriminator and cannot
+collide with `SP1State`) and the `.State` compatibility bucket. This arm only makes the legacy
+projection total; `CoreAIR.Current.Balance.Valid` compares the exact raw payload ADT and never passes
+through this encoding. -/
 def Interaction.toAccess (intr : Interaction (ZMod p)) : LookupAccess :=
   match intr.payload with
   | .byte op a b c =>
@@ -54,6 +83,9 @@ def Interaction.toAccess (intr : Interaction (ZMod p)) : LookupAccess :=
       (InteractionKind.Program, "SP1Program",
         [a.val, b.val, c.val, op, d.val, e.val, f.val, g.val, h.val,
          i.val, j.val, k.val, l.val, m.val, n.val, o.val],
+        signedVal (intr.dir.sign intr.mult))
+  | .raw kind values =>
+      (InteractionKind.State, "SP1Raw/" ++ kind.lookupName, values.map ZMod.val,
         signedVal (intr.dir.sign intr.mult))
 
 /-- The `.byte` arm of `Interaction.toAccess` as a `rfl`-`simp` lemma (independent of the `Dir`, which

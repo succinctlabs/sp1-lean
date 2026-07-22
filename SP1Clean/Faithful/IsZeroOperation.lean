@@ -1,7 +1,7 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Native.Operations.IsZeroOperation.RawSpec
-import SP1Clean.Extracted.Circuit.IsZeroOperation
+import SP1Clean.Native.Operations.IsZeroOperation.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
 import SP1Clean.Model.InteractionRecovery

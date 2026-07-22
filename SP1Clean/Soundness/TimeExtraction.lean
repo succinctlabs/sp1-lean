@@ -151,6 +151,7 @@ theorem memoryTimeNat_lt_of_accessTimestamp (prior pushed : MemoryMsg (ZMod p))
 
 variable [Fact (2 ^ 17 < p)]
 
+omit [Fact (2 ^ 17 < p)] in
 /-- **Folded-`Spec` variant for decoded-row use** (the Clean "keep the child `Spec` folded" discipline —
 `clean/doc/performance-problems.md`).  Takes the composed reader's `RegisterAccessCols.Spec` over
 **variable** `accessCols`/`is_real`/`clk_target`, so a concrete decoded-row `RegisterAccessCols.Spec ⟨…⟩`

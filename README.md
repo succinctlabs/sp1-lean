@@ -19,8 +19,10 @@ The intended verification stack has three deliberately separate claims:
 2. `sp1_execution_sound`: an authenticated shard ledger composes from boot to the halting ECALL; and
 3. `sp1_verifier_sound`: an ArkLib knowledge-sound verifier extracts such an AIR witness.
 
-Only the supported native-Clean slice has a theorem today. The full upstream AIR and verifier names are
-reserved for their actual relations; they are not aliases for the native ensemble.
+The supported native-Clean theorem and the exact-upstream composition boundary both exist today. The
+latter is not yet a closed full-Core result: `sp1_air_refinement`/`sp1_air_sound` require the explicit
+`CoreAIRRefinementObligations` proof bundle and the disclosed commit-row provenance premise. The execution
+composition and verifier theorems remain reserved for their actual relations.
 
 ## Current verification boundary
 
@@ -34,7 +36,10 @@ The current checkpoint (Lean 4.31) has:
   coverage, PC/clock chaining, and globally grounded Program fetch/decode facts;
 - a production timed-grounding layer and a typed adapter from each circuit's exact evaluated Clean
   interactions to Memory facts; Add is the first complete register-operand contract instance;
-- complete whole-chip Rust AIR oracles and `ChipFaithful` proofs for Add and Sub; and
+- complete whole-chip Rust AIR oracles and `ChipFaithful` proofs for Add and Sub;
+- a list-only v6.3.1 upstream relation containing the exact 34-table execution cluster, separate 6-table
+  memory-boundary cluster, full 160-cell public-value block, runtime manifest, and every generated
+  assertion/interaction list; and
 - executable whole-trace conformance batteries for 10 chips, isolated in `SP1CleanTest`.
 
 The native semantic capstone is:
@@ -52,16 +57,23 @@ ordered row's live Memory operands, circuit assumptions, semantic `Spec`, and `a
 the balanced buses and the evolving Sail state. RAM accesses, repeated touches of one location, state
 bumps, and syscalls are outside the proved ordinary register-only grounding slice.
 
+The parallel upstream capstone consumes `CoreAIR.Current.Relation binds .execution` and produces an
+eventful shard witness. Ordinary events are real Sail steps at 8 ticks; raw syscall events use the exact
+264-tick SP1 schedule and an explicit `SyscallHandler`, because Sail does not implement SP1 host effects.
+ArkLib must separately extract this strengthened witness relation—including exact natural interaction
+multiplicities and the preprocessed-commitment binding—before the deterministic refinement can be used in
+`sp1_verifier_sound`.
+
 Other disclosed proof debt is intentionally kept distinct:
 
 - `DivRemChip.evidenceSoundness` is the one chip-soundness seam, connecting the generated row to a proved
   four-family arithmetic/evidence contract;
-- five chip completeness proofs are deferred after the 4.31 migration (`Branch`, `Mul`, `ShiftLeft`,
+- four chip completeness proofs are deferred after the 4.31 migration (`Branch`, `ShiftLeft`,
   `ShiftRight`, and `DivRem`);
 - two DivRem channel-law packaging fields are deferred; and
 - `sp1_decoded_rows_sound` remains only for the frozen, older Eulerian-trail path.
 
-The audit gate currently permits exactly 10 syntactic deferral sites in eight files. See
+The audit gate currently permits exactly 9 syntactic deferral sites in seven files. See
 [`docs/release-audit.md`](docs/release-audit.md) for the theorem/axiom census and
 [`docs/roadmap.md`](docs/roadmap.md) for the dependency-ordered path forward.
 
@@ -79,9 +91,10 @@ For each migrated chip the intended chain is:
    interaction multisets; and
 5. executable populate/trace conformance against SP1's real Rust prover.
 
-Operation gadgets and local lemmas remain useful inside chip proofs, but operation-level faithfulness and
-the generated direct-to-circuit forms are migration debt. Add and Sub are the completed examples of the
-new whole-chip boundary. DivRem is the complex-chip test case: its nine old per-operation proof bodies were
+Operation gadgets and local lemmas remain useful inside chip proofs, but operation-level faithfulness is
+migration debt. Generated direct-to-circuit forms have been removed; all circuit implementations are
+hand-maintained under `Native/`. Add and Sub are the completed examples of the new whole-chip boundary.
+DivRem is the complex-chip test case: its nine old per-operation proof bodies were
 removed in favor of one isolated four-family semantic contract and one heavy chip-level conformance seam.
 
 At machine level, the four buses are ordinary Clean channels with row-local guarantees only:
@@ -98,7 +111,8 @@ not assumptions smuggled into channel guarantees.
 
 - `SP1Clean/Math/` — generic word, bit-vector, carry, and arithmetic lemmas.
 - `SP1Clean/Model/` — Sail wrappers, bus messages/channels, program commitment, and native machine model.
-- `SP1Clean/Extracted/` — generated Rust constraint/oracle artifacts; do not hand-edit.
+- `SP1Clean/Extracted/` — generated Rust row/list oracles, system tables, manifest, and provenance; no
+  executable circuits; do not hand-edit.
 - `SP1Clean/FormalModel/` — semantic chip contracts, witness relations, execution relations, and the
   dependency-free verifier boundary.
 - `SP1Clean/Native/` — native Clean circuits and proof-oriented gadgets.
@@ -119,7 +133,7 @@ lake lint             # curated environment linters
 scripts/run_audit.sh  # pins, forbidden-feature gates, deferral allowlist, axiom census
 ```
 
-The current validated checkpoint passes all four commands. The audit emits 460 declaration probes, finds
+The current validated checkpoint passes all four commands. The audit emits 471 declaration probes, finds
 no project `axiom` declarations, no `skipKernelTC`, and no `native_decide` in the main library. The
 separate test library contains the sanctioned executable conformance checks.
 

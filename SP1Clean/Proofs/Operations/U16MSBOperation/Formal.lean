@@ -1,5 +1,6 @@
 import SP1Clean.Native.Operations.U16MSBOperation.RawSpec
 import SP1Clean.Native.Operations.U16MSBOperation.Populate
+import SP1Clean.Native.Operations.U16MSBOperation.Defs
 
 /-! # `U16MSBOperation` — the `FormalAssertion` (soundness / completeness / contract)
 
@@ -7,8 +8,8 @@ SP1's `U16MSBOperation::eval_msb` as a Clean `FormalAssertion`: the `Assumptions
 soundness/completeness proofs (routing through `RawSpec`'s `msb_of_raw`), the `spec_populate`
 reconstruction lemma the composing operation uses, and the bundled `circuit`. The semantic `Spec`
 carries `msb`'s booleanness **unconditionally** (SP1's `eval_msb` asserts it ungated) plus the
-`is_real`-gated high-bit equation. The arithmetic core lives in `RawSpec`, the elaborated circuit in
-`Extracted`, the `populate_msb` witness in `Populate`. -/
+`is_real`-gated high-bit equation. The arithmetic core lives in `RawSpec`, the native circuit in
+`Defs`, and the `populate_msb` witness in `Populate`. -/
 
 namespace SP1Clean.U16MSBOperation
 

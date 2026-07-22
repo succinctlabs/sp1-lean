@@ -220,14 +220,14 @@ theorem Readers.RegisterAccessTimestamp.bounds_of_byteGuarantees
         ByteRow (ZMod p)) := by
     dsimp only [first, Channel.pulledIf, pulledIf]
     simp only [ProvableStruct.eval_eq_eval, ProvableStruct.structEvalLiteralProc,
-      eval_sub, Expression.eval]
+      Expression.eval]
   have secondMsgEq : Eval.eval env second.msg =
       (⟨3, 0, (Expression.eval env input.clk_target - Expression.eval env input.cols.prev_low - 1 -
         Expression.eval env input.cols.diff_low_limb) * (65536 : ZMod p)⁻¹, 0⟩ :
         ByteRow (ZMod p)) := by
     dsimp only [second, Channel.pulledIf, pulledIf]
     simp only [ProvableStruct.eval_eq_eval, ProvableStruct.structEvalLiteralProc,
-      eval_sub, eval_mul, Expression.eval]
+      eval_sub, Expression.eval]
   rw [firstMsgEq] at firstSpec
   rw [secondMsgEq] at secondSpec
   constructor

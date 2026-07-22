@@ -43,6 +43,45 @@ structure StepSchedule where
 def ScheduledAccess.time (start : ℕ) (access : ScheduledAccess) : ℕ :=
   start + access.offset
 
+/-- A phase-aware rank for accesses.  `clock` is the externally committed bus timestamp; `step`
+orders the shared endpoint of adjacent windows; `phase` orders accesses that intentionally share a
+timestamp inside one row. -/
+structure SchedulePoint where
+  clock : ℕ
+  step : ℕ
+  phase : ℕ
+deriving DecidableEq, Repr
+
+/-- Lexicographic order used by the generic grounding/frontier layer. -/
+def SchedulePoint.Before (a b : SchedulePoint) : Prop :=
+  a.clock < b.clock ∨
+    (a.clock = b.clock ∧
+      (a.step < b.step ∨ (a.step = b.step ∧ a.phase < b.phase)))
+
+theorem SchedulePoint.before_irrefl (point : SchedulePoint) : ¬ point.Before point := by
+  simp [SchedulePoint.Before]
+
+theorem SchedulePoint.before_trans {a b c : SchedulePoint} :
+    a.Before b → b.Before c → a.Before c := by
+  unfold SchedulePoint.Before
+  omega
+
+/-- Rank one scheduled access by absolute clock, semantic-step index, and row-local phase. -/
+def ScheduledAccess.point (start step phase : ℕ) (access : ScheduledAccess) : SchedulePoint :=
+  ⟨access.time start, step, phase⟩
+
+/-- Every access point lies no later than its window endpoint. -/
+theorem ScheduledAccess.clock_le_endpoint (schedule : StepSchedule) (start step phase : ℕ)
+    (access : ScheduledAccess) (member : access ∈ schedule.accesses) :
+    (access.point start step phase).clock ≤ start + schedule.duration := by
+  unfold ScheduledAccess.point ScheduledAccess.time
+  exact Nat.add_le_add_left (schedule.accesses_bounded access member) start
+
+/-- At a shared endpoint, the outgoing phase of one row precedes the incoming phase of the next. -/
+theorem SchedulePoint.endpoint_before_next (clock step phase nextPhase : ℕ) :
+    SchedulePoint.Before ⟨clock, step, phase⟩ ⟨clock, step + 1, nextPhase⟩ := by
+  simp [SchedulePoint.Before]
+
 /-- The start clock of step `n` for a possibly non-uniform schedule. -/
 def clockAt (initialClock : ℕ) (schedule : ℕ → StepSchedule) : ℕ → ℕ
   | 0 => initialClock
@@ -61,6 +100,32 @@ theorem clockAt_lt_succ (initialClock : ℕ) (schedule : ℕ → StepSchedule) (
   rw [clockAt_succ]
   have h := (schedule n).duration_pos
   omega
+
+/-- Schedule-derived clocks form a strict rank even when consecutive instructions have different
+window widths. -/
+theorem clockAt_strictMono (initialClock : ℕ) (schedule : ℕ → StepSchedule) :
+    StrictMono (clockAt initialClock schedule) :=
+  strictMono_nat_of_lt_succ (clockAt_lt_succ initialClock schedule)
+
+/-- Total elapsed width of the first `steps` schedule windows. -/
+def elapsed (schedule : ℕ → StepSchedule) (steps : ℕ) : ℕ :=
+  ((List.range steps).map fun step => (schedule step).duration).sum
+
+@[simp] theorem elapsed_zero (schedule : ℕ → StepSchedule) : elapsed schedule 0 = 0 := rfl
+
+@[simp] theorem elapsed_succ (schedule : ℕ → StepSchedule) (steps : ℕ) :
+    elapsed schedule (steps + 1) = elapsed schedule steps + (schedule steps).duration := by
+  simp [elapsed, List.range_succ]
+
+/-- Closed form for non-uniform schedule clocks. -/
+theorem clockAt_eq_initial_add_elapsed (initialClock : ℕ)
+    (schedule : ℕ → StepSchedule) (steps : ℕ) :
+    clockAt initialClock schedule steps = initialClock + elapsed schedule steps := by
+  induction steps with
+  | zero => rfl
+  | succ steps ih =>
+      rw [clockAt_succ, ih, elapsed_succ]
+      omega
 
 /-- The current ordinary-instruction convention.  This is a reusable schedule value rather than a
 global semantic assumption; opcode-specific decoding may select a different schedule. -/

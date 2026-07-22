@@ -1,7 +1,7 @@
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.Math.Bitwise
 import SP1Clean.Native.Operations.BitwiseOperation.RawSpec
-import SP1Clean.Extracted.Circuit.BitwiseOperation
+import SP1Clean.FormalModel.Contracts.Operations
 
 /-! # `BitwiseOperation` — `populate` (the witness generator)
 

@@ -52,7 +52,9 @@ closer to what Clean would fold into a bundled `Spec`/`exposedChannels` conjunct
 gate + part of `run_audit.sh`) fails if the `set_option maxHeartbeats` count grows past
 `scripts/heartbeats_baseline.txt`. So a new blowup must be *folded*, not bumped. A genuinely term-intrinsic
 addition (the KEEP-set below) requires a conscious baseline bump in the same PR. This kept the capstone build
-fast; keep it that way. The 2026-07 sweep cut SP1Clean overrides 516 → 461 with these levers:
+fast; keep it that way. The 2026-07 sweep cut SP1Clean overrides 516 → 461 with the levers below. The
+current 462-site baseline adds exactly one term-intrinsic exception for the generated `Global` AIR, whose
+single-output dependency closure has roughly 1,300 bindings and cannot be reduced by list chunking.
 
 **1. `simp` → `simp only` — the biggest lever for chip/contract closers.** A full `simp [X.circuit, X.main,
 …, circuit_norm]` drags in the *entire default simpset* — that, not the `circuit`/`main` unfold, is the real
@@ -188,15 +190,15 @@ Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]`.
   is just `intro`s and `dsimp` is definitional, both LSP-cheap, and the goal shows the cols still folded as
   `cols := fromElements w`, revealing the form + which sub-ops use it.
 
-This closed `DivRemChip.completeness` axiom-clean and let its `maxHeartbeats` drop 256M → 64M (the nested
-decomposition was the whole cost).
+This technique reduced the DivRem completeness core substantially, but the current 4.31 driver remains
+an explicit deferred proof; do not cite the experiment as a closed theorem.
 
 ## The `FormalAssertion` + `populate` demotion (generalizing the Add worked example)
 
 For ops whose witnessed columns are **pinned by the semantic `Spec`** (see `../architecture.md`
 "Assertion vs `FormalCircuit`"), the op is a *witnessless* `FormalAssertion` and the **chip** owns the
 witnessing. Template: `Native/Operations/{AddOperation,SubOperation,AddwOperation,SubwOperation}/`
-(`Populate`/`RawSpec`; circuit form in `Extracted/Circuit/<Op>.lean`, proofs in
+(`Defs`/`Populate`/`RawSpec`; hand-maintained circuit form in `Defs.lean`, proofs in
 `Proofs/Operations/<Op>/Formal.lean`) and `Native/Operations/{U16MSBOperation,U16CompareOperation}.lean`
 (single file, proofs in `Proofs/Operations/<Op>/Formal.lean`).
 
