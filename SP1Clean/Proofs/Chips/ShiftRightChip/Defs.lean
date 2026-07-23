@@ -1,5 +1,6 @@
 import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Proofs.Operations.U16MSBOperation.Formal
+import SP1Clean.Proofs.Operations.ShiftRightOperation.Core
 import SP1Clean.Proofs.Chips.ShiftRightChip.Core
 import SP1Clean.Proofs.Chips.ShiftRightChip.Populate
 import SP1Clean.Proofs.Chips.ShiftRightChip.Dispatch
@@ -44,86 +45,6 @@ memory: the writer range-checked them). These are the `rs1`/`rs2` the `Spec` shi
 `Formal`) so the per-op `Soundness/<Op>.lean` split files can import it without a cycle through `Formal`. -/
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.adapter.op_b_memory.prev_value ∧ Word.isU64 input.adapter.op_c_memory.prev_value
-
-/-- **Assertion half** — the literal meaning of SP1's `ShiftRightCols.asserts` *own* (inline) assertZero
-list. `E14 = is_srl + is_sra` (the 64-bit-shift indicator) and `E13 = is_srlw + is_sraw` (the
-word-shift indicator) gate the two output-placement blocks; the `v_*` powers are the **inverted**
-right-shift form `2^(16 - bitShift)`. In order: the four variant booleans + sum-bound, the
-immediate-consistency `is_w_imm`, the six `c_bits` booleans, the four `shift_u16` byte-selectors +
-booleans + one-hot, the three inverted `v_*` encodings, the four `lower/higher_limb` splits (limbs 2,3
-gated by `E14`), the four `limb_result` reassemblies, the `b_msb`/`srw_msb` sign witnesses, the
-SRL/SRA output placement (gated `E14`), the SRLW/SRAW output placement (gated `E13`), and `op_a_0`. -/
-def AssertSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
-  let srl := cols.is_srl; let sra := cols.is_sra; let srlw := cols.is_srlw; let sraw := cols.is_sraw
-  let e14 := srl + sra; let e13 := srlw + sraw; let sum := srl + sra + srlw + sraw
-  let b0 := cols.c_bits[0]; let b1 := cols.c_bits[1]; let b2 := cols.c_bits[2]
-  let b3 := cols.c_bits[3]; let b4 := cols.c_bits[4]; let b5 := cols.c_bits[5]
-  let s0 := cols.shift_u16[0]; let s1 := cols.shift_u16[1]
-  let s2 := cols.shift_u16[2]; let s3 := cols.shift_u16[3]
-  let byteShift := b4 + b5 * 2 * e14
-  let bmsb := cols.b_msb.msb; let srwmsb := cols.srw_msb.msb
-  let sraFill := cols.b_msb.msb * 65536 - cols.sra_msb_v0123
-  -- variant flags + sum-bound + immediate consistency
-  srl * (srl - 1) = 0 ∧ sra * (sra - 1) = 0 ∧ srlw * (srlw - 1) = 0 ∧ sraw * (sraw - 1) = 0 ∧
-  sum * (sum - 1) = 0 ∧
-  cols.is_w_imm - e13 * cols.adapter.imm_c = 0 ∧
-  -- c_bits booleans
-  b0 * (b0 - 1) = 0 ∧ b1 * (b1 - 1) = 0 ∧ b2 * (b2 - 1) = 0 ∧
-  b3 * (b3 - 1) = 0 ∧ b4 * (b4 - 1) = 0 ∧ b5 * (b5 - 1) = 0 ∧
-  -- shift_u16 byte-shift selectors + booleans
-  s0 * (byteShift - 0) = 0 ∧ s0 * (s0 - 1) = 0 ∧
-  s1 * (byteShift - 1) = 0 ∧ s1 * (s1 - 1) = 0 ∧
-  s2 * (byteShift - 2) = 0 ∧ s2 * (s2 - 1) = 0 ∧
-  s3 * (byteShift - 3) = 0 ∧ s3 * (s3 - 1) = 0 ∧
-  sum * ((s0 + s1 + s2 + s3) - 1) = 0 ∧
-  -- inverted v_* power encodings
-  cols.v_01 - (((1 - b0) + 1) * 2) * ((1 - b1) * 3 + 1) = 0 ∧
-  cols.v_012 - cols.v_01 * ((1 - b2) * 15 + 1) = 0 ∧
-  cols.v_0123 - cols.v_012 * ((1 - b3) * 255 + 1) = 0 ∧
-  -- lower/higher limb split (limbs 2,3 carry the E14 factor)
-  cols.adapter.op_b_memory.prev_value[0] * cols.v_0123
-    - (cols.higher_limb[0] * 65536 + cols.lower_limb[0] * cols.v_0123) = 0 ∧
-  cols.adapter.op_b_memory.prev_value[1] * cols.v_0123
-    - (cols.higher_limb[1] * 65536 + cols.lower_limb[1] * cols.v_0123) = 0 ∧
-  (cols.adapter.op_b_memory.prev_value[2] * cols.v_0123) * e14
-    - (cols.higher_limb[2] * 65536 + cols.lower_limb[2] * cols.v_0123) = 0 ∧
-  (cols.adapter.op_b_memory.prev_value[3] * cols.v_0123) * e14
-    - (cols.higher_limb[3] * 65536 + cols.lower_limb[3] * cols.v_0123) = 0 ∧
-  -- limb_result reassembly (higher_limb[i] + lower_limb[i+1] * v_0123)
-  cols.limb_result[0] - (cols.higher_limb[0] + cols.lower_limb[1] * cols.v_0123) = 0 ∧
-  cols.limb_result[1] - (cols.higher_limb[1] + cols.lower_limb[2] * cols.v_0123) = 0 ∧
-  cols.limb_result[2] - (cols.higher_limb[2] + cols.lower_limb[3] * cols.v_0123) = 0 ∧
-  cols.limb_result[3] - cols.higher_limb[3] = 0 ∧
-  -- MSB sign witnesses
-  (srl + srlw) * bmsb = 0 ∧
-  cols.sra_msb_v0123 - bmsb * cols.v_0123 = 0 ∧
-  (e13 - 1) * srwmsb = 0 ∧
-  -- SRL/SRA output placement (gated e14)
-  e14 * (s0 * (cols.a[0] - cols.limb_result[0])) = 0 ∧
-  e14 * (s0 * (cols.a[1] - cols.limb_result[1])) = 0 ∧
-  e14 * (s0 * (cols.a[2] - cols.limb_result[2])) = 0 ∧
-  e14 * (s0 * (cols.a[3] - (cols.limb_result[3] + sraFill))) = 0 ∧
-  e14 * (s1 * (cols.a[0] - cols.limb_result[1])) = 0 ∧
-  e14 * (s1 * (cols.a[1] - cols.limb_result[2])) = 0 ∧
-  e14 * (s1 * (cols.a[2] - (cols.limb_result[3] + sraFill))) = 0 ∧
-  e14 * (s1 * (cols.a[3] - bmsb * 65535)) = 0 ∧
-  e14 * (s2 * (cols.a[0] - cols.limb_result[2])) = 0 ∧
-  e14 * (s2 * (cols.a[1] - (cols.limb_result[3] + sraFill))) = 0 ∧
-  e14 * (s2 * (cols.a[2] - bmsb * 65535)) = 0 ∧
-  e14 * (s2 * (cols.a[3] - bmsb * 65535)) = 0 ∧
-  e14 * (s3 * (cols.a[0] - (cols.limb_result[3] + sraFill))) = 0 ∧
-  e14 * (s3 * (cols.a[1] - bmsb * 65535)) = 0 ∧
-  e14 * (s3 * (cols.a[2] - bmsb * 65535)) = 0 ∧
-  e14 * (s3 * (cols.a[3] - bmsb * 65535)) = 0 ∧
-  -- SRLW/SRAW output placement (gated e13)
-  e13 * (s0 * (cols.a[0] - cols.limb_result[0])) = 0 ∧
-  e13 * (s0 * (cols.a[1] - (cols.limb_result[1] + sraFill))) = 0 ∧
-  e13 * (s1 * (cols.a[0] - (cols.limb_result[1] + sraFill))) = 0 ∧
-  e13 * (s1 * (cols.a[1] - bmsb * 65535)) = 0 ∧
-  e13 * (cols.a[2] - srwmsb * 65535) = 0 ∧
-  e13 * (cols.a[3] - srwmsb * 65535) = 0 ∧
-  -- op_a_0 zeroing flag
-  cols.adapter.op_a_0 = 0
 
 /-- **Interaction half** — SP1's `ShiftRightCols.interactions` byte-range sends (gated by
 `gate = is_srl + is_sra + is_srlw + is_sraw`): the shift-amount high bits `< 2^10`, and, per limb, the
@@ -230,98 +151,24 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftRightCols (Z
   -- Allocates no witness cell (`localLength` is unchanged at 37) and lives outside `AssertSpec`
   -- (which mirrors only the extracted `ShiftRightCols.asserts` list over committed columns).
   input.is_real - (is_srl + is_sra + is_srlw + is_sraw) === 0
-  -- The inline shift assertZeros (`AssertSpec`), emitted in the same order as `AssertSpec`/Extracted.
-  let e14 := is_srl + is_sra
-  let e13 := is_srlw + is_sraw
-  let sum := is_srl + is_sra + is_srlw + is_sraw
-  let b0 := c_bits[0]; let b1 := c_bits[1]; let b2 := c_bits[2]
-  let b3 := c_bits[3]; let b4 := c_bits[4]; let b5 := c_bits[5]
-  let s0 := shift_u16[0]; let s1 := shift_u16[1]; let s2 := shift_u16[2]; let s3 := shift_u16[3]
-  let byteShift : Expression (ZMod p) := b4 + b5 * 2 * e14
-  let v_0123 := v[0]; let v_012 := v[1]; let v_01 := v[2]
-  let bmsb := b_msb[0]; let srwmsb := srw_msb[0]
-  let c65536 : Expression (ZMod p) := 65536
-  let c65535 : Expression (ZMod p) := 65535
-  let sraFill : Expression (ZMod p) := bmsb * c65536 - sra_msb_v0123[0]
-  let bmsbFill : Expression (ZMod p) := bmsb * c65535
-  let srwFill : Expression (ZMod p) := srwmsb * c65535
-  -- variant flags + sum-bound + immediate consistency
+  -- The chip-local assertions retain the exact Rust order.  The four flag booleans and combined
+  -- boolean gate stay at parent level: the latter must be visible to `ConstraintsHold.Shallow` to
+  -- discharge the off-gate byte requirements.  The remaining 53 assertions form a genuine folded
+  -- proof boundary, whose virtual-subcircuit elaboration preserves the flat operation sequence.
+  let cols : Var ShiftRightCols (ZMod p) :=
+    ⟨input.state, input.adapter, a, ⟨b_msb[0]⟩, ⟨srw_msb[0]⟩, c_bits, sra_msb_v0123[0],
+      v[0], v[1], v[2], lower_limb, higher_limb, limb_result, shift_u16,
+      is_srl, is_sra, is_srlw, is_sraw, is_w_imm⟩
   is_srl * (is_srl - 1) === 0
   is_sra * (is_sra - 1) === 0
   is_srlw * (is_srlw - 1) === 0
   is_sraw * (is_sraw - 1) === 0
-  -- The combined selector `sum` (= the byte-pull gate) is boolean-gated **inline** (`assertZero`, not
-  -- `=== 0`) so it is visible to `ConstraintsHold.Shallow`, discharging the off-gate byte-pull
-  -- `Requirements` without keeping `byteChannel` in `channelsWithRequirements`.
-  assertZero (sum * (sum - 1))
-  is_w_imm - e13 * input.adapter.imm_c === 0
-  -- c_bits booleans
-  b0 * (b0 - 1) === 0
-  b1 * (b1 - 1) === 0
-  b2 * (b2 - 1) === 0
-  b3 * (b3 - 1) === 0
-  b4 * (b4 - 1) === 0
-  b5 * (b5 - 1) === 0
-  -- shift_u16 byte-shift selectors + booleans
-  s0 * (byteShift - 0) === 0
-  s0 * (s0 - 1) === 0
-  s1 * (byteShift - 1) === 0
-  s1 * (s1 - 1) === 0
-  s2 * (byteShift - 2) === 0
-  s2 * (s2 - 1) === 0
-  s3 * (byteShift - 3) === 0
-  s3 * (s3 - 1) === 0
-  sum * ((s0 + s1 + s2 + s3) - 1) === 0
-  -- inverted v_* power encodings
-  v_01 - (((1 - b0) + 1) * 2) * ((1 - b1) * 3 + 1) === 0
-  v_012 - v_01 * ((1 - b2) * 15 + 1) === 0
-  v_0123 - v_012 * ((1 - b3) * 255 + 1) === 0
-  -- lower/higher limb split (limbs 2,3 carry the E14 factor)
-  input.adapter.op_b_memory.prev_value[0] * v_0123
-    - (higher_limb[0] * c65536 + lower_limb[0] * v_0123) === 0
-  input.adapter.op_b_memory.prev_value[1] * v_0123
-    - (higher_limb[1] * c65536 + lower_limb[1] * v_0123) === 0
-  (input.adapter.op_b_memory.prev_value[2] * v_0123) * e14
-    - (higher_limb[2] * c65536 + lower_limb[2] * v_0123) === 0
-  (input.adapter.op_b_memory.prev_value[3] * v_0123) * e14
-    - (higher_limb[3] * c65536 + lower_limb[3] * v_0123) === 0
-  -- limb_result reassembly (higher_limb[i] + lower_limb[i+1] * v_0123)
-  limb_result[0] - (higher_limb[0] + lower_limb[1] * v_0123) === 0
-  limb_result[1] - (higher_limb[1] + lower_limb[2] * v_0123) === 0
-  limb_result[2] - (higher_limb[2] + lower_limb[3] * v_0123) === 0
-  limb_result[3] - higher_limb[3] === 0
-  -- MSB sign witnesses
-  (is_srl + is_srlw) * bmsb === 0
-  sra_msb_v0123[0] - bmsb * v_0123 === 0
-  (e13 - 1) * srwmsb === 0
-  -- SRL/SRA output placement (gated e14)
-  e14 * (s0 * (a[0] - limb_result[0])) === 0
-  e14 * (s0 * (a[1] - limb_result[1])) === 0
-  e14 * (s0 * (a[2] - limb_result[2])) === 0
-  e14 * (s0 * (a[3] - (limb_result[3] + sraFill))) === 0
-  e14 * (s1 * (a[0] - limb_result[1])) === 0
-  e14 * (s1 * (a[1] - limb_result[2])) === 0
-  e14 * (s1 * (a[2] - (limb_result[3] + sraFill))) === 0
-  e14 * (s1 * (a[3] - bmsbFill)) === 0
-  e14 * (s2 * (a[0] - limb_result[2])) === 0
-  e14 * (s2 * (a[1] - (limb_result[3] + sraFill))) === 0
-  e14 * (s2 * (a[2] - bmsbFill)) === 0
-  e14 * (s2 * (a[3] - bmsbFill)) === 0
-  e14 * (s3 * (a[0] - (limb_result[3] + sraFill))) === 0
-  e14 * (s3 * (a[1] - bmsbFill)) === 0
-  e14 * (s3 * (a[2] - bmsbFill)) === 0
-  e14 * (s3 * (a[3] - bmsbFill)) === 0
-  -- SRLW/SRAW output placement (gated e13)
-  e13 * (s0 * (a[0] - limb_result[0])) === 0
-  e13 * (s0 * (a[1] - (limb_result[1] + sraFill))) === 0
-  e13 * (s1 * (a[0] - (limb_result[1] + sraFill))) === 0
-  e13 * (s1 * (a[1] - bmsbFill)) === 0
-  e13 * (a[2] - srwFill) === 0
-  e13 * (a[3] - srwFill) === 0
-  -- op_a_0 zeroing flag
-  input.adapter.op_a_0 === 0
+  let gate := is_srl + is_sra + is_srlw + is_sraw
+  assertZero (gate * (gate - 1))
+  assertion ShiftRightCore.circuit cols
   -- The byte-range pulls (`InteractSpec`), gated by `gate = is_srl+is_sra+is_srlw+is_sraw`.
-  let gate := sum
+  let b0 := c_bits[0]; let b1 := c_bits[1]; let b2 := c_bits[2]
+  let b3 := c_bits[3]; let b4 := c_bits[4]; let b5 := c_bits[5]
   let bitShift : Expression (ZMod p) := b0 * 1 + b1 * 2 + b2 * 4 + b3 * 8
   let shamt : Expression (ZMod p) := bitShift + b4 * 16 + b5 * 32
   let e84 : Expression (ZMod p) := (input.adapter.op_c_memory.prev_value[0] - shamt) * (64 : ZMod p)⁻¹
@@ -343,9 +190,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftRightCols (Z
     (⟨6, lower_limb[3], bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.pullIf gate
     (⟨6, higher_limb[3], 16 - bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
-  return ⟨input.state, input.adapter, a, ⟨b_msb[0]⟩, ⟨srw_msb[0]⟩, c_bits, sra_msb_v0123[0],
-    v[0], v[1], v[2], lower_limb, higher_limb, limb_result, shift_u16,
-    is_srl, is_sra, is_srlw, is_sraw, is_w_imm⟩
+  return cols
 
 set_option maxHeartbeats 4000000 in
 @[implicit_reducible] private def derivedElaborated :
@@ -524,7 +369,7 @@ lemma resultA_isU64
     (h_v01 : env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 2) + -((1 + -env.get (i₀ + 4 + 1 + 1) + 1) * 2 * ((1 + -env.get (i₀ + 4 + 1 + 1 + 1)) * 3 + 1)) = 0)
     (h_v012 : env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 1) + -(env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 2) * ((1 + -env.get (i₀ + 4 + 1 + 1 + 2)) * 15 + 1)) = 0)
     (h_v0123 : env.get (i₀ + 4 + 1 + 1 + 6 + 1) + -(env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 1) * ((1 + -env.get (i₀ + 4 + 1 + 1 + 3)) * 255 + 1)) = 0)
-    (h_split2 : Expression.eval env input_var_adapter_op_b_memory_prev_value[2] * env.get (i₀ + 4 + 1 + 1 + 6 + 1) * (env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4) + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4 + 1)) + -(env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 2) * 65536 + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 2) * env.get (i₀ + 4 + 1 + 1 + 6 + 1)) = 0)
+    (h_split2 : input_adapter_op_b_memory_prev_value[2] * env.get (i₀ + 4 + 1 + 1 + 6 + 1) * (env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4) + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4 + 1)) + -(env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 2) * 65536 + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 2) * env.get (i₀ + 4 + 1 + 1 + 6 + 1)) = 0)
     (h_lr0 : env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4) + -(env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4) + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 1) * env.get (i₀ + 4 + 1 + 1 + 6 + 1)) = 0)
     (h_lr1 : env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 1) + -(env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 1) + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 2) * env.get (i₀ + 4 + 1 + 1 + 6 + 1)) = 0)
     (h_lr2 : env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 2) + -(env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 2) + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 3) * env.get (i₀ + 4 + 1 + 1 + 6 + 1)) = 0)
@@ -648,8 +493,6 @@ lemma resultA_isU64
     -- `b_msb ∈ {0,1}` unconditionally (the `U16MSBOperation` gadget's ungated booleanness).
     have hb3e : Expression.eval env input_var_adapter_op_b_memory_prev_value[3]
         = input_adapter_op_b_memory_prev_value[3] := by rw [← h_obmap]; simp only [Vector.getElem_map]
-    have hb2e : Expression.eval env input_var_adapter_op_b_memory_prev_value[2]
-        = input_adapter_op_b_memory_prev_value[2] := by rw [← h_obmap]; simp only [Vector.getElem_map]
     have hbmsb_bool : env.get (i₀ + 4) = 0 ∨ env.get (i₀ + 4) = 1 :=
       (h_msb1 ⟨fun _ => by rw [hb3e]; exact h_rs1U 3, bool_of_mul_pred h_sra_b⟩).1
     -- The four `limb_result` atomic `u16` bounds (`lr0`/`lr1`/`lr2` via `limb_result_lt`; the bare high
@@ -709,7 +552,7 @@ lemma resultA_isU64
       -- On a word row the limb-2 split is de-gated (`e14 = 0`), forcing `ll2 = 0`.
       have h_split2_dec : env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 2) * 65536
           + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 2) * env.get (i₀ + 4 + 1 + 1 + 6 + 1) = 0 := by
-        have h := h_split2; rw [hb2e, he14_0] at h; linear_combination -h
+        have h := h_split2; rw [he14_0] at h; linear_combination -h
       obtain ⟨-, h_ll2_0⟩ := ShiftRightMath.higher_lower_zero b_cb0 b_cb1 b_cb2 b_cb3 eq_v01 eq_v012
         eq_v0123 lt_lh2 lt_ll2 h_split2_dec
       -- The sign-fill `lr1 + (b_msb·65536 - sra_msb_v0123)` (with `ll2 = 0`, so `lr1 = hl1`) is `u16`.

@@ -190,8 +190,9 @@ DivRem is the complex-chip contract pilot. Its old nine operation-shaped integra
 ## 7. Completeness and executable conformance
 
 Per-chip completeness is the honest-prover direction of each Clean circuit, not the converse of the
-whole-machine semantic relation. Four such proofs are deferred after the Lean/Clean 4.31 migration:
-Branch, ShiftLeft, ShiftRight, and DivRem. These are lower priority than the remaining soundness seams
+whole-machine semantic relation. Three such proofs are deferred after the Lean/Clean 4.31 migration:
+Branch, ShiftLeft, and DivRem. ShiftRight was restored with a folded zero-witness `FormalAssertion`
+boundary for its arithmetic tail, following Clean's large-composition recipe. These are lower priority than the remaining soundness seams
 because they do not change what a satisfying row means.
 
 Whole-machine completeness will require a trace-generatable execution relation, a verified trace generator,
@@ -207,16 +208,16 @@ library.
 
 ## 8. Current gaps and trust boundary
 
-`scripts/run_audit.sh` currently gates exactly 9 direct deferral sites in seven files:
+`scripts/run_audit.sh` currently gates exactly 8 direct deferral sites in six files:
 
-- four chip-completeness proofs;
+- three chip-completeness proofs;
 - `DivRemChip.evidenceSoundness`;
 - two DivRem circuit channel-law fields;
 - the frozen-path `sp1_decoded_rows_sound`; and
 - the live semantic seam `supportedCore_orderedRows_dynamic`.
 
-The generated census contains 471 probes. Thirty-one declarations transitively carry `sorryAx`; this is
-not 31 independent holes, because the supported-machine descriptor embeds complete circuit records and
+The generated census contains 471 probes. Twenty-nine declarations transitively carry `sorryAx`; this is
+not 29 independent holes, because the supported-machine descriptor embeds complete circuit records and
 therefore propagates admitted circuit fields into registry/ensemble projections. The allowlist names every
 permitted carrier, and a new direct file or unexpected transitive carrier fails the audit.
 

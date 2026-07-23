@@ -35,7 +35,7 @@ of its patterns each of our notes realizes, so a *new* blowup is anticipated rat
 | Mul: keep `eval((output …) …)` an opaque atom (don't `simp [Expression.eval]`) | performance-problems items 1/4 (opaque values) |
 | §"`ElaboratedCircuit` field obligations: let the default tactics close them" | complements Clean `AGENTS.md` "pass `elaborated` as an **explicit field** for factored circuits (else `soundness` elaborates with metavariables)" + README roadmap (this automation is known-incomplete upstream) |
 | §"Compile-time / performance landmines" — "`maxHeartbeats` tightening is the wrong lever", "a bump in a simple proof is a code smell" | Clean's thrice-stated "**Never modify maxHeartbeats**" + performance-problems §"Measuring honestly" (`#count_heartbeats` lies; use `set_option maxHeartbeats <low>` / `diagnostics true` to find the true floor) |
-| The 4 gated completeness proofs (Branch/ShiftLeft/ShiftRight/DivRem) | performance-problems §"Kernel size cliffs in completeness proofs": `circuit_proof_start_core` → per-component `dsimp only [main, circuit_norm] at h_env` → `.1`/`.2` → split into a (virtual, free) subcircuit when the parent cliffs |
+| The 3 remaining gated completeness proofs (Branch/ShiftLeft/DivRem); ShiftRight is the validated repair | performance-problems §"Kernel size cliffs in completeness proofs": `circuit_proof_start_core` → per-component `dsimp only [main, circuit_norm] at h_env` → `.1`/`.2` → split into a (virtual, free) subcircuit when the parent cliffs |
 
 Two disagreements worth stating honestly (see also `docs/architecture.md` §"Relationship to Clean's `Air`
 layer"): (1) our large `maxHeartbeats` footprint splits into *term-intrinsic* cost (DivRem/Mul/carry chains
@@ -261,6 +261,15 @@ early lemmas rely on a section `variable [Fact (Nat.Prime p)] [Fact (2^17<p)]` +
 p`; file-level `set_option maxHeartbeats 100000000` + `linter.unusedVariables false`; sed range-extraction
 drops `section`/`end` markers and `/--` openers (strip/restore them).
 
+- **Completeness: preserve the visible flag gate, fold the arithmetic tail.** Clean's shallow channel-law
+  discharge needs the combined shift-flag sum boolean constraint in the parent; hiding that constraint
+  inside a child prevents the parent from proving its gated byte pulls lawful. Keep the four individual
+  flag booleans and combined sum gate in the parent, then compose a zero-witness `FormalAssertion` whose
+  `CoreSpec` is the remaining 53 assertions in exact upstream order. Prove the child with ordinary
+  `circuit_proof_start [CoreSpec]`; prove the parent with `circuit_proof_start_core`. The child exposes no
+  interactions, so a compositional `interactionsWith_subcircuit_eq_nil` lemma erases it from channel proofs
+  without unfolding its constraints. This is a virtual boundary: no witness cell, assertion, interaction,
+  or AIR order changes. The resulting `ShiftRightChip.completeness` and bundled `circuit` are axiom-clean.
 - **Spec on the register read, not a ghost operand.** The asserts decompose
   `adapter.op_b_memory.prev_value` (rs1) and read the shift amount from `op_c_memory.prev_value[0]` (rs2),
   and `main` never touches a separate `op_b_val`. So the `Spec` must shift `rs1 := adapter.op_b_memory
@@ -651,10 +660,13 @@ always means a *local* regression against one of these.
   it landed; **don't regress it** (e.g. by importing a module that re-shadows the rule below Std's). If
   a `have`-dense proof suddenly slows, suspect the fast path isn't in scope.
 
-- **`circuit_proof_start` / bind-chain normalization is NOT the bottleneck — don't chase it.**
-  Measured at 6k–32k heartbeats on medium chips, ~320k (~90s) even on DivRem's `main` (the repo's
-  biggest). The once-per-chip `main_ops_eq` lemma would save ~4% — not worth it. Slow soundness files
-  are slow in their *proof body* (the arithmetic / product-glue `simpa`s), not in the start tactic.
+- **Measure `circuit_proof_start`; a large parent can make its one-shot normalization the bottleneck.**
+  Medium chips still normalize cheaply, and many slow soundness files spend their time in arithmetic.
+  ShiftRight completeness is the counterexample that matters: the exact 53-assert arithmetic tail proves
+  with ordinary `circuit_proof_start` in about four seconds when folded behind its own `FormalAssertion`,
+  while normalizing that tail together with the parent readers, witness closures, and interactions ran for
+  minutes. Use `circuit_proof_start_core` in that parent and normalize projected components separately.
+  Do not infer success or failure from elapsed time alone; require the build's explicit completion line.
 
 - **`ElaboratedCircuit` `localLength_eq`'s `rfl` default whnf-unfolds `main` — seconds on a big main.**
   On a 17-op `main` the default `rfl` costs ~15s; `channelsLawful`'s default fails outright on

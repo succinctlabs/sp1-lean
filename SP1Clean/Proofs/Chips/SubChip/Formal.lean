@@ -1,5 +1,6 @@
 import SP1Clean.Native.Chips.SubChip.Defs
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
+import Clean.Air.Circuit
 
 /-! # `SP1Clean.SubChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
 
@@ -203,9 +204,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
           Soundness.rTypeReader_programInteractions_subcircuit,
           Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
           Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
-          SubOperation.circuit, SubOperation.elaborated,
-          FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil,
-          or_false,
+          SubOperation.circuit, SubOperation.channelsWithGuarantees_eq,
+          FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
           Channels.programChannel_eq_byteChannel_false,
           Channels.programChannel_eq_stateChannel_false,
           Channels.programChannel_eq_memoryChannel_false,
@@ -213,8 +213,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
           Operations.interactionsWith_nil, List.map_cons, List.map_nil, List.nil_append,
           Soundness.rTypeProgramMessage]
         simp only [Operations.interactionsWith_subcircuit,
-          FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
-          List.filter_nil, List.nil_append] }
+        FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
+        List.filter_nil, List.nil_append] }
+
+@[circuit_norm] theorem circuit_main_eq : (circuit (p := p)).main = main := rfl
+
+@[circuit_norm] theorem circuit_localLength_eq (input : Var Inputs (ZMod p)) :
+    (circuit (p := p)).localLength input = 4 := rfl
+
+@[circuit_norm] theorem circuit_size_eq :
+    (circuit (p := p)).size = size Inputs + 4 := by
+  rw [GeneralFormalCircuit.size_eq, circuit_localLength_eq]
 
 /-- The completed Sub circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :

@@ -34,7 +34,8 @@ theorem shiftRight_asserts_faithful (cols : Extracted.ShiftRightCols (ZMod p)) :
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.ShiftRightCols.asserts, Extracted.forall_append_single, List.Forall,
     Nat.cast_one] at h
-  exact h.2
+  unfold SP1Clean.ShiftRightChip.AssertSpec SP1Clean.ShiftRightChip.CoreSpec
+  exact_mod_cast h.2
 
 omit [Fact (2 ^ 17 < p)] in
 /-- **Faithfulness anchor — interaction half.** SP1's `ShiftRightChip` `interactions` byte-range sends

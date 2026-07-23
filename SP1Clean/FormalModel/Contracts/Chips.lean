@@ -41,10 +41,10 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 `AddOperation` type.  `Faithful.AddChip.reconfigure` is the explicit whole-chip bridge to the
 extracted `AddCols` oracle.  The reader blocks remain layout-compatible while that migration proceeds. -/
 structure Columns (F : Type) where
+  is_real : F
   state : Extracted.CPUState F
   adapter : Extracted.RTypeReader F
   add_operation : AddOperation.Columns F
-  is_real : F
 deriving ProvableStruct
 
 /-- The `is_real` selector and the **threaded reader column blocks** `state`/`adapter` (the committed
@@ -140,10 +140,10 @@ local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 owned by the local Lean gadget. `Faithful.SubChip.subChipReconfigure` is the sole bridge to Rust's
 separately generated whole-chip row. -/
 structure Columns (F : Type) where
+  is_real : F
   state : Extracted.CPUState F
   adapter : Extracted.RTypeReader F
   sub_operation : SubOperation.Columns F
-  is_real : F
 deriving ProvableStruct
 
 /-- The `is_real` selector and the threaded reader column blocks `state`/`adapter` (as `AddChip`). The
@@ -331,6 +331,91 @@ structure Inputs (F : Type) where
   state : Extracted.CPUState F
   adapter : Extracted.ALUTypeReader F
 deriving ProvableStruct
+
+/-- The folded tail of `ShiftRightCols.asserts`, beginning immediately after the four flag
+booleans and their combined boolean gate.  This is a genuine proof boundary, not a claimed Rust
+operation: the parent chip emits the five shallow gate constraints itself, then composes the tail
+without making parent proofs normalize the remaining 53 assertions. -/
+def CoreSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
+  let srl := cols.is_srl; let sra := cols.is_sra; let srlw := cols.is_srlw; let sraw := cols.is_sraw
+  let e14 := srl + sra; let e13 := srlw + sraw; let sum := srl + sra + srlw + sraw
+  let b0 := cols.c_bits[0]; let b1 := cols.c_bits[1]; let b2 := cols.c_bits[2]
+  let b3 := cols.c_bits[3]; let b4 := cols.c_bits[4]; let b5 := cols.c_bits[5]
+  let s0 := cols.shift_u16[0]; let s1 := cols.shift_u16[1]
+  let s2 := cols.shift_u16[2]; let s3 := cols.shift_u16[3]
+  let byteShift := b4 + b5 * 2 * e14
+  let bmsb := cols.b_msb.msb; let srwmsb := cols.srw_msb.msb
+  let sraFill := cols.b_msb.msb * 65536 - cols.sra_msb_v0123
+  -- immediate consistency
+  cols.is_w_imm - e13 * cols.adapter.imm_c = 0 ∧
+  -- c_bits booleans
+  b0 * (b0 - 1) = 0 ∧ b1 * (b1 - 1) = 0 ∧ b2 * (b2 - 1) = 0 ∧
+  b3 * (b3 - 1) = 0 ∧ b4 * (b4 - 1) = 0 ∧ b5 * (b5 - 1) = 0 ∧
+  -- shift_u16 byte-shift selectors + booleans
+  s0 * (byteShift - 0) = 0 ∧ s0 * (s0 - 1) = 0 ∧
+  s1 * (byteShift - 1) = 0 ∧ s1 * (s1 - 1) = 0 ∧
+  s2 * (byteShift - 2) = 0 ∧ s2 * (s2 - 1) = 0 ∧
+  s3 * (byteShift - 3) = 0 ∧ s3 * (s3 - 1) = 0 ∧
+  sum * ((s0 + s1 + s2 + s3) - 1) = 0 ∧
+  -- inverted v_* power encodings
+  cols.v_01 - (((1 - b0) + 1) * 2) * ((1 - b1) * 3 + 1) = 0 ∧
+  cols.v_012 - cols.v_01 * ((1 - b2) * 15 + 1) = 0 ∧
+  cols.v_0123 - cols.v_012 * ((1 - b3) * 255 + 1) = 0 ∧
+  -- lower/higher limb split (limbs 2,3 carry the E14 factor)
+  cols.adapter.op_b_memory.prev_value[0] * cols.v_0123
+    - (cols.higher_limb[0] * 65536 + cols.lower_limb[0] * cols.v_0123) = 0 ∧
+  cols.adapter.op_b_memory.prev_value[1] * cols.v_0123
+    - (cols.higher_limb[1] * 65536 + cols.lower_limb[1] * cols.v_0123) = 0 ∧
+  (cols.adapter.op_b_memory.prev_value[2] * cols.v_0123) * e14
+    - (cols.higher_limb[2] * 65536 + cols.lower_limb[2] * cols.v_0123) = 0 ∧
+  (cols.adapter.op_b_memory.prev_value[3] * cols.v_0123) * e14
+    - (cols.higher_limb[3] * 65536 + cols.lower_limb[3] * cols.v_0123) = 0 ∧
+  -- limb_result reassembly (higher_limb[i] + lower_limb[i+1] * v_0123)
+  cols.limb_result[0] - (cols.higher_limb[0] + cols.lower_limb[1] * cols.v_0123) = 0 ∧
+  cols.limb_result[1] - (cols.higher_limb[1] + cols.lower_limb[2] * cols.v_0123) = 0 ∧
+  cols.limb_result[2] - (cols.higher_limb[2] + cols.lower_limb[3] * cols.v_0123) = 0 ∧
+  cols.limb_result[3] - cols.higher_limb[3] = 0 ∧
+  -- MSB sign witnesses
+  (srl + srlw) * bmsb = 0 ∧
+  cols.sra_msb_v0123 - bmsb * cols.v_0123 = 0 ∧
+  (e13 - 1) * srwmsb = 0 ∧
+  -- SRL/SRA output placement (gated e14)
+  e14 * (s0 * (cols.a[0] - cols.limb_result[0])) = 0 ∧
+  e14 * (s0 * (cols.a[1] - cols.limb_result[1])) = 0 ∧
+  e14 * (s0 * (cols.a[2] - cols.limb_result[2])) = 0 ∧
+  e14 * (s0 * (cols.a[3] - (cols.limb_result[3] + sraFill))) = 0 ∧
+  e14 * (s1 * (cols.a[0] - cols.limb_result[1])) = 0 ∧
+  e14 * (s1 * (cols.a[1] - cols.limb_result[2])) = 0 ∧
+  e14 * (s1 * (cols.a[2] - (cols.limb_result[3] + sraFill))) = 0 ∧
+  e14 * (s1 * (cols.a[3] - bmsb * 65535)) = 0 ∧
+  e14 * (s2 * (cols.a[0] - cols.limb_result[2])) = 0 ∧
+  e14 * (s2 * (cols.a[1] - (cols.limb_result[3] + sraFill))) = 0 ∧
+  e14 * (s2 * (cols.a[2] - bmsb * 65535)) = 0 ∧
+  e14 * (s2 * (cols.a[3] - bmsb * 65535)) = 0 ∧
+  e14 * (s3 * (cols.a[0] - (cols.limb_result[3] + sraFill))) = 0 ∧
+  e14 * (s3 * (cols.a[1] - bmsb * 65535)) = 0 ∧
+  e14 * (s3 * (cols.a[2] - bmsb * 65535)) = 0 ∧
+  e14 * (s3 * (cols.a[3] - bmsb * 65535)) = 0 ∧
+  -- SRLW/SRAW output placement (gated e13)
+  e13 * (s0 * (cols.a[0] - cols.limb_result[0])) = 0 ∧
+  e13 * (s0 * (cols.a[1] - (cols.limb_result[1] + sraFill))) = 0 ∧
+  e13 * (s1 * (cols.a[0] - (cols.limb_result[1] + sraFill))) = 0 ∧
+  e13 * (s1 * (cols.a[1] - bmsb * 65535)) = 0 ∧
+  e13 * (cols.a[2] - srwmsb * 65535) = 0 ∧
+  e13 * (cols.a[3] - srwmsb * 65535) = 0 ∧
+  -- op_a_0 zeroing flag
+  cols.adapter.op_a_0 = 0
+
+/-- **Assertion half** — the literal meaning of SP1's `ShiftRightCols.asserts` *own* assertZero
+list. `E14 = is_srl + is_sra` (the 64-bit-shift indicator) and `E13 = is_srlw + is_sraw` (the
+word-shift indicator) gate the two output-placement blocks; the `v_*` powers are the **inverted**
+right-shift form `2^(16 - bitShift)`. In exact upstream order this is the four flag booleans, their
+combined boolean gate, then `CoreSpec`'s remaining 53 assertions. -/
+def AssertSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
+  let srl := cols.is_srl; let sra := cols.is_sra; let srlw := cols.is_srlw; let sraw := cols.is_sraw
+  let sum := srl + sra + srlw + sraw
+  srl * (srl - 1) = 0 ∧ sra * (sra - 1) = 0 ∧ srlw * (srlw - 1) = 0 ∧
+    sraw * (sraw - 1) = 0 ∧ sum * (sum - 1) = 0 ∧ CoreSpec cols
 
 /-- Semantic, `is_real`-gated, **flag-gated** contract with four variant conjuncts: on real rows the
 result column `cols.a` is the RV64 right-shift selected by the committed flag (`cols.is_srl → RV64.srl`

@@ -1,5 +1,6 @@
 import SP1Clean.Native.Chips.AddChip.Defs
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
+import Clean.Air.Circuit
 
 /-! # `SP1Clean.AddChip` — contract: `Assumptions` / soundness / completeness / `circuit`
 
@@ -226,6 +227,15 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns where
       simp only [Operations.interactionsWith_subcircuit,
         FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
         List.filter_nil, List.nil_append]
+
+@[circuit_norm] theorem circuit_main_eq : (circuit (p := p)).main = main := rfl
+
+@[circuit_norm] theorem circuit_localLength_eq (input : Var Inputs (ZMod p)) :
+    (circuit (p := p)).localLength input = 4 := rfl
+
+@[circuit_norm] theorem circuit_size_eq :
+    (circuit (p := p)).size = size Inputs + 4 := by
+  rw [GeneralFormalCircuit.size_eq, circuit_localLength_eq]
 
 /-- The completed Add circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :

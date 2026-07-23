@@ -32,8 +32,12 @@ set_option maxHeartbeats 16000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_early_struct
   obtain ⟨h_cpu, h_msb1, h_msb2, h_msb3, h_alu, h_regwrite, h_realgate, h_realeq,
-    h_srl_b, h_sra_b, h_srlw_b, h_sraw_b, h_sum_b, h_wimm,
-    h_b0, h_b1, h_b2, h_b3, h_b4, h_b5,
+    h_srl_b, h_sra_b, h_srlw_b, h_sraw_b, h_sum_b, h_core,
+    h_byte0, h_byte1, h_byte2, h_byte3, h_byte4, h_byte5, h_byte6, h_byte7, h_byte8⟩ := h_holds
+  have h_core' := h_core trivial
+  simp only [ShiftRightCore.circuit, ShiftRightChip.CoreSpec, Vector.getElem_map,
+    Vector.getElem_mapRange, circuit_norm] at h_core'
+  obtain ⟨h_wimm, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5,
     h_s0w, h_s0b, h_s1w, h_s1b, h_s2w, h_s2b, h_s3w, h_s3b, h_onehot,
     h_v01, h_v012, h_v0123,
     h_split0, h_split1, h_split2, h_split3,
@@ -42,8 +46,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     h_o0, h_o1, h_o2, h_o3, h_o4, h_o5, h_o6, h_o7,
     h_o8, h_o9, h_o10, h_o11, h_o12, h_o13, h_o14, h_o15,
     h_w0, h_w1, h_w2, h_w3, h_w4, h_w5,
-    h_opa0,
-    h_byte0, h_byte1, h_byte2, h_byte3, h_byte4, h_byte5, h_byte6, h_byte7, h_byte8⟩ := h_holds
+    h_opa0⟩ := h_core'
   -- W11 Option B: the op_a write `RegisterWrite` push's `isU64 a` requirement, via the shared result
   -- range-check `resultA_isU64` applied to this row's destructured constraints.
   have h_obmap : Vector.map (Expression.eval env) input_var_adapter_op_b_memory_prev_value =
@@ -239,16 +242,16 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       -- by `e14 = is_srl + is_sra = 1`), bridged to the `((65536:ℕ):ZMod p)` form the close lemmas want.
       have h_b0_dec : input_adapter_op_b_memory_prev_value[0] * v0123
           = hl0 * ((65536 : ℕ) : ZMod p) + ll0 * v0123 := by
-        have h := h_split0; rw [hb0e] at h; push_cast; linear_combination h
+        have h := h_split0; push_cast; linear_combination h
       have h_b1_dec : input_adapter_op_b_memory_prev_value[1] * v0123
           = hl1 * ((65536 : ℕ) : ZMod p) + ll1 * v0123 := by
-        have h := h_split1; rw [hb1e] at h; push_cast; linear_combination h
+        have h := h_split1; push_cast; linear_combination h
       have h_b2_dec : input_adapter_op_b_memory_prev_value[2] * v0123
           = hl2 * ((65536 : ℕ) : ZMod p) + ll2 * v0123 := by
-        have h := h_split2; rw [hb2e, h_srl0, hsra] at h;         push_cast; linear_combination h
+        have h := h_split2; rw [h_srl0, hsra] at h; push_cast; linear_combination h
       have h_b3_dec : input_adapter_op_b_memory_prev_value[3] * v0123
           = hl3 * ((65536 : ℕ) : ZMod p) + ll3 * v0123 := by
-        have h := h_split3; rw [hb3e, h_srl0, hsra] at h;         push_cast; linear_combination h
+        have h := h_split3; rw [h_srl0, hsra] at h; push_cast; linear_combination h
       -- Normalise the goal's shift count `c0.val % 64` to the `c_bits` sum (`is_mod_64`).
       have h_cbsum_lt := cbsum_val_lt_64 b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
       have h_c0mod : input_adapter_op_c_memory_prev_value[0].val % 64

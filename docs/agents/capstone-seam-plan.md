@@ -13,22 +13,22 @@ and [`proof-patterns.md`](proof-patterns.md)); for *what the project proves toda
 ## Goal and closure set
 
 `supported_core_native_sound` becomes axiom-clean (`[propext, Classical.choice, Quot.sound]`, no `sorryAx`)
-once **1 seam + 7 chip admissions** close:
+once **1 seam + 6 chip admissions** close:
 
 - **The seam** — `supportedCore_orderedRows_dynamic` (`Soundness/AIR.lean`), consumed by the capstone.
-- **7 chip admissions** —
+- **6 chip admissions** —
   - `DivRemChip.evidenceSoundness`, `DivRemChip.main_exposedChannelsLawful`,
     `DivRemChip.requirementsChannelsLawful` (`Proofs/Chips/DivRemChip/Formal.lean`);
-  - `{DivRem, Branch, ShiftLeft, ShiftRight}Chip.completeness`
-    (`Proofs/Chips/{DivRemChip/Completeness/Driver, BranchChip/Formal, ShiftLeftChip/Formal,
-    ShiftRightChip/Formal}.lean`).
+  - `{DivRem, Branch, ShiftLeft}Chip.completeness`
+    (`Proofs/Chips/{DivRemChip/Completeness/Driver, BranchChip/Formal,
+    ShiftLeftChip/Formal}.lean`).
 
 **Not in the set:** `sp1_decoded_rows_sound` (a different capstone chain) and `MulChip.completeness`
 (already proved).
 
 Because the seam and the admissions are all quantified over `sp1Ensemble`, and the ensemble transitively
 references the DivRem circuit's still-open structural fields, **every** declaration over the ensemble
-currently reports `sorryAx`. That residue disappears exactly when the seven admissions close — it is not
+currently reports `sorryAx`. That residue disappears exactly when the six admissions close — it is not
 introduced by any new seam work.
 
 ## What is already proved (do not rebuild)
@@ -211,14 +211,14 @@ reader-shape family: `rowWiring_rtype` exists (reuse for the register-register c
 immediate/jump/U-type/load/store/non-writing/DivRem families each need one new `rowWiring_<shape>` lemma,
 amortized over the family. The aggregator `allChips_groundingContracts` (a 25-way `fin_cases`) feeds E1e.
 
-## Tracks A–D — the 7 chip admissions (parallel to the seam)
+## Tracks A–D — the 6 chip admissions (parallel to the seam)
 
 These touch disjoint files and do not gate the seam; the seam threads `contracts` and closes independently.
 
-- **A — ShiftLeft / ShiftRight / Branch completeness.** The validated Mul recipe (`MulChip/Formal.lean`): the
-  `toElements`-cast fix (`ProvableType.ext_iff` + `getElem_toElements_eval_varFromOffset`) and the
-  `attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements` priority bump. Order by effort:
-  ShiftLeft < ShiftRight < Branch.
+- **A — ShiftLeft / Branch completeness.** ShiftRight is closed by the validated folded-core recipe:
+  keep the combined flag constraint in the parent, place the 53-assert arithmetic tail behind a
+  zero-witness `FormalAssertion`, prove that boundary with ordinary `circuit_proof_start`, and use
+  `circuit_proof_start_core` in the parent. Reuse that boundary pattern before trying larger normalization.
 - **B — DivRem completeness** (`DivRemChip/Completeness/Driver.lean`): the ~1531-line body already exists,
   `stop`-gated purely for elaboration cost; tame via the fold + a measured, guard-noted ceiling.
 - **C — DivRem `evidenceSoundness`** (`DivRemChip/Formal.lean`): the math is proved (`Cases.lean` /

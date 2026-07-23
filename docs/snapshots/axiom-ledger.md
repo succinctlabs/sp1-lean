@@ -6,8 +6,8 @@
 ## Current result
 
 The audit passes with **471 elaborated probes**, no project `axiom` declarations, no
-`skipKernelTC`, and no `native_decide` in the main `SP1Clean/` library. Of those probes, **31**
-carry `sorryAx`; all are allowlisted consequences of the **nine direct admissions** below. The
+`skipKernelTC`, and no `native_decide` in the main `SP1Clean/` library. Of those probes, **29**
+carry `sorryAx`; all are allowlisted consequences of the **eight direct admissions** below. The
 larger carrier count is not a count of independent proof holes: Clean's bundled circuit records retain
 their completeness and channel-law fields, and the supported-machine registry deliberately retains the
 full circuit records.
@@ -19,13 +19,12 @@ DivRem `stop` without probing its declaration, and the first Core AIR draft buil
 probing `sp1_air_refinement` or `sp1_air_sound`. Both capstone declarations are `sorryAx`-free; their
 reported Sail platform hooks enter through the semantic target types.
 
-## Direct admissions (9)
+## Direct admissions (8)
 
 | Declaration / field | Kind | Status |
 |---|---|---|
 | `BranchChip.completeness` | completeness/liveness | Lean/Clean normalization regression |
 | `ShiftLeftChip.completeness` | completeness/liveness | Lean/Clean normalization regression |
-| `ShiftRightChip.completeness` | completeness/liveness | Lean/Clean normalization regression |
 | `DivRemChip.completeness` | completeness/liveness | intentionally secondary to the chip contract |
 | `DivRemChip.evidenceSoundness` | **chip soundness** | generated whole-chip row → isolated family evidence |
 | `DivRemChip.main_exposedChannelsLawful` | structural packaging | exposed-channel normalization regression |
@@ -37,11 +36,11 @@ All theorems in the isolated DivRem contract and case-evidence layers are `sorry
 `DivRemChip.contractSoundness` and `DivRemChip.soundness` are proved consumers of the one admitted
 `evidenceSoundness` bridge.
 
-## Transitive `sorryAx` carriers (31)
+## Transitive `sorryAx` carriers (29)
 
 The exact set is machine-gated in `scripts/run_audit.sh`. It consists of:
 
-- 11 chip declarations: the four completeness theorems; the four affected bundled circuits; and
+- 9 chip declarations: the three completeness theorems; the three affected bundled circuits; and
   DivRem's `evidenceSoundness`, `contractSoundness`, and `soundness`;
 - 19 registry/coverage/ensemble/capstone declarations that embed or consume those circuits and the two
   machine seams; and
@@ -60,7 +59,7 @@ not a second admitted proof.
 | generated `bv_decide` axioms | kernel-checked bit-vector decision procedure artifacts used by selected arithmetic proofs | accepted and disclosed per declaration |
 | LeanRV64D platform hooks (`sys_enable_experimental_extensions`, reservation hooks, floating-point hooks, and related platform constants) | axioms present in the Sail model or in theorem statements over it | disclosed Sail-model trust boundary |
 | generated `native_decide` axioms | compiler-trusted conformance evaluation | confined to `SP1CleanTest/`; **forbidden** in the main library |
-| `sorryAx` | incomplete proof | permitted only for the nine direct admissions and their exact allowlisted carriers |
+| `sorryAx` | incomplete proof | permitted only for the eight direct admissions and their exact allowlisted carriers |
 
 The test library currently contains 29 textual `native_decide` occurrences. They check witness/trace
 conformance and are deliberately outside the main library and headline theorem dependency graph.
@@ -74,7 +73,7 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The latest full build completed 3578 jobs with no errors, warnings, or stray `info:` output. The probe
+The latest full build completed 3580 jobs with no errors, warnings, or stray `info:` output. The probe
 is generated from the live tree by `scripts/gen_axiom_probe.py`; an invalid fully qualified declaration
 name makes elaboration fail. Use the raw census rather than `grep sorry` alone: only `#print axioms`
 reveals transitive structure-field contamination.

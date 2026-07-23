@@ -67,12 +67,12 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   -- Equality subcircuit) so it is visible to `ConstraintsHold.Shallow` — required for the chip to be a
   -- `VmTables` table (`tables_channel`'s `enabled` booleanity reads the shallow constraints). W11.
   assertZero (input.is_real * (input.is_real - 1))
-  return ⟨input.state, input.adapter, ⟨value⟩, input.is_real⟩
+  return ⟨input.is_real, input.state, input.adapter, ⟨value⟩⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output input offset :=
-    ⟨input.state, input.adapter,
-      ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩, input.is_real⟩
+    ⟨input.is_real, input.state, input.adapter,
+      ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩⟩
   output_eq := by
     intro input offset
     simp only [main, circuit_norm]
@@ -90,8 +90,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
 unfolding the full composed `main`. -/
 @[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     (elaborated (p := p)).output input offset =
-      (⟨input.state, input.adapter,
-        ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩, input.is_real⟩ :
+      (⟨input.is_real, input.state, input.adapter,
+         ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩⟩ :
         Var Columns (ZMod p)) := rfl
 
 end SP1Clean.AddChip

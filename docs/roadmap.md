@@ -45,8 +45,8 @@ residual `TraceValueBinding`, W5 HALT, W7's `try_step` reduction, glue.
 
 ## The project debt at a glance
 
-The 4.31 migration re-opened chip-completeness proofs; `Mul` was restored (2026-07-16), leaving **four**
-(`Branch`, `ShiftLeft`, `ShiftRight`, `DivRem`). They remain lower priority than fixing the semantic
+The 4.31 migration re-opened chip-completeness proofs; `Mul` was restored (2026-07-16) and
+`ShiftRight` was restored (2026-07-22), leaving **three** (`Branch`, `ShiftLeft`, `DivRem`). They remain lower priority than fixing the semantic
 boundary because completeness can be admitted without changing what a verifying row means. Each is the
 "large-composition completeness kernel cliff" case documented in Clean's `doc/performance-problems.md`
 §"Kernel size cliffs in completeness proofs"; the idiomatic repair is `circuit_proof_start_core` →
@@ -68,7 +68,7 @@ is more important and more precisely stated:
    proved pilot) + the arc-B aligned carrier + assembly-level balances. This engine is the SP1-specific
    realization of Clean's `Balance.lean` "guarantees-to-requirements-reversal" (see `architecture.md`
    §"Relationship to Clean's `Air` layer"). The dependency-ordered implementation plan for this seam and the
-   seven chip admissions — the closure set, what is already proved, the in-progress `rowAligned`-upfront
+   six chip admissions — the closure set, what is already proved, the in-progress `rowAligned`-upfront
    refactor, the `walk`-assembly steps, and the 24-chip rollout — is
    [`agents/capstone-seam-plan.md`](agents/capstone-seam-plan.md). **Sequencing:** opaqueness-audit the per-chip memory
    closed-form template (`<chip>_memoryInteractionValues_eq`, currently `@ maxHeartbeats 4M`) using the
@@ -460,10 +460,12 @@ Compressed recursion and the Plonk/Groth16 wrappers are separate verifier target
 priority is to close the typed timed-grounding path and then extend the theorem from the supported
 25-chip slice to the complete upstream Core AIR.
 
-### B1 — the four 4.31 completeness regressions (M each, independent)
+### B1 — the three 4.31 completeness regressions (M each, independent)
 
-`BranchChip.completeness` remains the intended honest-`ProverHint`/shared-dispatch template for
-ShiftLeft and ShiftRight. DivRem should be revisited only after its chip-level contract and generated-row
+`ShiftRightChip.completeness` now records the validated Clean pattern: keep the combined flag gate visible
+to the parent, move the 53-assert arithmetic tail behind a zero-witness `FormalAssertion`, use ordinary
+`circuit_proof_start` inside that boundary, and `circuit_proof_start_core` in the parent. Branch and
+ShiftLeft remain; DivRem should be revisited only after its chip-level contract and generated-row
 boundary settle, since another structural refactor would invalidate a large witness proof again. Closing
 these also removes structural `sorryAx` propagation through bundled circuit values, even though machine
 soundness does not consume their completeness fields.

@@ -59,4 +59,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main := by
   elaborate_circuit
 
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma channelsWithGuarantees_eq :
+    (elaborated (p := p)).channelsWithGuarantees =
+      ([(byteChannel (p := p)).toRaw, byteChannel.toRaw, byteChannel.toRaw,
+        byteChannel.toRaw] : List (RawChannel (ZMod p))) := rfl
+
 end SP1Clean.SubOperation

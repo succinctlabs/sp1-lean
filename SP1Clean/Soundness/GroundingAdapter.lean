@@ -908,8 +908,8 @@ concrete row (the `whnf`-into-concrete blowup that used to force a raised ceilin
 `../clean/doc/performance-problems.md` §"Keep hypothesis types folded"). -/
 theorem addChip_circuit_output_eq (input : Var AddChip.Inputs (ZMod p)) (offset : ℕ) :
     (AddChip.circuit (p := p)).output input offset =
-      (⟨input.state, input.adapter,
-        ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩, input.is_real⟩ :
+      (⟨input.is_real, input.state, input.adapter,
+         ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩⟩ :
         Var AddChip.Columns (ZMod p)) := rfl
 
 omit [Fact (2 ^ 25 < p)] in

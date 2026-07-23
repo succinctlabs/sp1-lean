@@ -45,6 +45,20 @@ def circuitTraceRow (Input : TypeMap) [ProvableType Input] {Output : TypeMap} [P
   let out : Output (Expression F) := circ.output inputs.length
   (toElements out).toList.map (Expression.eval env.toEnvironment)
 
+/-- Derive one trace row and then cross an explicit whole-row layout boundary. Native proof rows are
+allowed to order or factor their columns differently from Rust; `reconfigure` is the same complete-row
+map audited by `ChipFaithful`. Witness generation still comes exclusively from `main`, and the map is
+applied only after evaluating the circuit output to concrete field values. -/
+def circuitTraceRowMapped (Input : TypeMap) [ProvableType Input]
+    {Output RustOutput : TypeMap} [ProvableType Output] [ProvableType RustOutput]
+    (main : Var Input F → Circuit F (Var Output F))
+    (reconfigure : Output F → RustOutput F) (inputs : List F)
+    (hint : ProverHint F := ProverHint.empty F) : List F :=
+  let circ := main (varFromOffset Input 0)
+  let env := circ.proverEnvironment hint inputs
+  let out : Output (Expression F) := circ.output inputs.length
+  (toElements (reconfigure (ProvableType.eval env.toEnvironment out))).toList
+
 /-- Assemble a whole trace matrix from a per-event row generator: derived rows for the real events,
 then `padRow` repeated up to `height`. The default all-zero `padRow` mirrors SP1's plain zero-filled
 padding; chips with a non-zero `padded_row_template` (the shift chips set the ungated `v_*` power

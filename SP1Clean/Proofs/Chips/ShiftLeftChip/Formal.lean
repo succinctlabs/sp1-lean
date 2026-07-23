@@ -71,7 +71,15 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩ ∧
   (input.is_real = 1 → input.adapter.op_a.val < 32 ∧
-    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
+    input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- G1: completeness of the reader's Memory pulls must exhibit the channel guarantee for each
+  -- pulled prior record. These are honest-trace facts, not soundness assumptions. The op_c bound is
+  -- needed only for a register shift (the `is_real - imm_c` pull is absent for an immediate).
+  (input.is_real = 1 →
+    input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24) ∧
+  (input.is_real - input.adapter.imm_c = 1 →
+    input.adapter.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 set_option maxHeartbeats 4000000 in
 /-- **Soundness.** The flag-gated RV64 `sll`/`sllw` identities on the result column `cols.a`. **Pieced

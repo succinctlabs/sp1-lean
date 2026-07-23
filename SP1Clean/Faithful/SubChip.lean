@@ -3,6 +3,7 @@ import Mathlib.Data.ZMod.Basic
 import SP1Clean.Faithful.ChipOracle
 import SP1Clean.Extracted.ChipOracle.Sub
 import SP1Clean.Native.Chips.SubChip.Defs
+import SP1Clean.Proofs.Chips.SubChip.Formal
 import SP1Clean.Model.InteractionRecovery
 
 /-! # Whole-chip faithfulness anchor — native Sub row ↔ SP1 Rust Sub AIR
@@ -30,12 +31,126 @@ def subChipReconfigure {F : Type} (cols : SubChip.Columns F) : Extracted.SubOrac
     sub_operation := { value := cols.sub_operation.value }
     is_real := cols.is_real }
 
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def subChipDeconfigure {F : Type} (cols : Extracted.SubOracle.SubCols F) : SubChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    sub_operation := { value := cols.sub_operation.value }
+    is_real := cols.is_real }
+
 /-- SP1 Rust's complete Sub-chip oracle, viewed from the native Lean row. -/
 def subChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
     ChipOracle F SubChip.Columns Extracted.SubOracle.SubCols where
   reconfigure := subChipReconfigure
+  deconfigure := subChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
   assertZeros := Extracted.SubOracle.SubCols.asserts
   interactions := Extracted.SubOracle.SubCols.interactions
+
+/-- Native input decoded from a complete Sub row. -/
+def subChipInput {F : Type} (cols : SubChip.Columns F) : SubChip.Inputs F :=
+  { is_real := cols.is_real, state := cols.state, adapter := cols.adapter }
+
+/-- Clean input-first physical row for Sub. The four arithmetic output limbs are exactly the four
+local witnesses introduced by `SubChip.main`. -/
+def subChipPhysicalRow {F : Type} (cols : SubChip.Columns F) : Array F :=
+  inputFirstRow (subChipInput cols) cols.sub_operation.value
+
+@[circuit_norm] theorem eval_subChipInputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : SubChip.Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
+         adapter := Eval.eval env input.adapter } : SubChip.Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_subOperationColumnsRow {F : Type} [FiniteField F]
+    (env : Environment F) (cols : SubOperation.Columns (Expression F)) :
+    Eval.eval env cols =
+      ({ value := Eval.eval env cols.value } : SubOperation.Columns F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_subChipColumns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : SubChip.Columns (Expression F)) :
+    Eval.eval env cols =
+      ({ is_real := Eval.eval env cols.is_real, state := Eval.eval env cols.state,
+         adapter := Eval.eval env cols.adapter,
+         sub_operation := Eval.eval env cols.sub_operation } : SubChip.Columns F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Assemble the native row represented by an input prefix and the four Sub local witnesses. -/
+def subChipColumnsOfInput {F : Type} (input : SubChip.Inputs F) (value : Word F) :
+    SubChip.Columns F :=
+  ⟨input.is_real, input.state, input.adapter, ⟨value⟩⟩
+
+theorem subChipColumnsOfInput_roundtrip {F : Type} (cols : SubChip.Columns F) :
+    subChipColumnsOfInput (subChipInput cols) cols.sub_operation.value = cols := by
+  cases cols
+  rfl
+
+/-- Abstract evaluation lemma for the physical Sub row. Keeping the input and local suffix symbolic
+prevents the kernel from unfolding a concrete nested row while checking every codec instance. -/
+theorem eval_subChipDirectOutput
+    (input : SubChip.Inputs (ZMod p)) (value : Word (ZMod p)) (data : ProverData (ZMod p)) :
+    ProvableType.eval (Environment.fromArray (inputFirstRow input value) data)
+        ((SubChip.elaborated (p := p)).output
+          (varFromOffset SubChip.Inputs 0) (size SubChip.Inputs)) =
+      subChipColumnsOfInput input value := by
+  rw [SubChip.directOutput_eq]
+  rw [← CircuitType.eval_expression, eval_subChipColumns]
+  unfold subChipColumnsOfInput
+  rw [SubChip.Columns.mk.injEq]
+  dsimp only
+  have hinputEval := eval_inputFirstRow input value data
+  rw [eval_subChipInputs, SubChip.Inputs.mk.injEq] at hinputEval
+  constructor
+  · exact hinputEval.1
+  constructor
+  · exact hinputEval.2.1
+  constructor
+  · exact hinputEval.2.2
+  rw [eval_subOperationColumnsRow, SubOperation.Columns.mk.injEq]
+  dsimp only
+  ext i hi
+  rw [← ProvableType.getElem_eval_fields
+    (Environment.fromArray (inputFirstRow input value) data)
+    (Vector.mapRange 4 fun i => var { index := size SubChip.Inputs + i }) i hi]
+  rw [Vector.getElem_mapRange]
+  exact eval_local_inputFirstRow input value data i hi
+
+/-- Constructive native-row codec for Sub. -/
+def subChipRowCodec : ChipRowCodec SubChip.Inputs SubChip.Columns
+    (SubChip.circuit (p := p)) where
+  assignment cols data := {
+    row := subChipPhysicalRow cols
+    input := subChipInput cols
+    width_eq := by
+      rw [subChipPhysicalRow, inputFirstRow_size, Air.Flat.Component.width,
+        SubChip.circuit_size_eq]
+    rowInput_eq := by
+      exact rowInput_inputFirstRow (SubChip.circuit (p := p)) (subChipInput cols)
+        cols.sub_operation.value data
+    rowOutput_eq := by
+      rw [SubChip.circuit_main_eq]
+      rw [SubChip.elaborated.output_eq]
+      rw [Air.Flat.Component.rowInputVar_mk, Air.Flat.Component.rowOffset_mk]
+      exact (eval_subChipDirectOutput (p := p) (subChipInput cols)
+        cols.sub_operation.value data).trans (subChipColumnsOfInput_roundtrip cols) }
+
+/-- Sub uses SP1 bus interactions for byte/range checks and contains no separate Clean lookup. -/
+theorem subChip_lookups_empty :
+    (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).operations.lookups = [] := by
+  rw [Air.Flat.Component.lookups_eq, Air.Flat.Component.rowOperations_mk,
+    SubChip.circuit_main_eq]
+  simp [SubChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
+    Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+    Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    SubOperation.circuit, SubOperation.main, Gadgets.Equality.main, circuit_norm]
 
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel StateMsg)
 open SP1Clean.InteractionRecovery
@@ -656,14 +771,71 @@ theorem subChip_interactions_faithful
       ← ProvableType.getElem_eval_fields, Vector.getElem_mapRange, Expression.eval,
       Nat.add_zero]
 
-/-- The Sub chip packaged at the stable boundary: native whole-chip circuit versus the complete Rust
-whole-chip oracle. Rust operation helpers and Lean gadgets are deliberately absent from the statement. -/
+/-- The extracted Rust row itself reconstructs a complete satisfying Clean row; no caller-supplied
+output binding is part of the public boundary. -/
+theorem subChip_constraints_constructive
+    (rustCols : Extracted.SubOracle.SubCols (ZMod p)) (data : ProverData (ZMod p)) :
+    let assignment := subChipRowCodec.assignment (subChipOracle.deconfigure rustCols) data
+    List.Forall (· = 0) (subChipOracle.assertZeros rustCols) ↔
+      (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).operations.ConstraintsHold
+        assignment.environment := by
+  dsimp only
+  let cols := subChipOracle.deconfigure rustCols
+  let assignment := subChipRowCodec.assignment cols data
+  have hbind : BindsChipOutput SubChip.main assignment.environment
+      (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).rowInputVar
+      (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).rowOffset cols := by
+    have h := NativeRowAssignment.bindsOutput assignment
+    rw [SubChip.circuit_main_eq] at h
+    exact h
+  have hlegacy := subChip_constraints_faithful (p := p) assignment.environment
+    (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).rowInputVar
+    (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).rowOffset cols hbind
+  have hassertions :
+      List.Forall (· = 0) (subChipOracle.assertZeros rustCols) ↔
+        List.Forall (· = 0)
+          (nativeAssertZeros assignment.environment
+            (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).rowOperations) := by
+    simpa only [cols, ChipOracle.nativeAssertZeros_deconfigure,
+      Air.Flat.Component.rowOperations_mk, Air.Flat.Component.rowInputVar_mk,
+      Air.Flat.Component.rowOffset_mk, SubChip.circuit_main_eq] using hlegacy
+  exact hassertions.trans
+    (constraintsHold_iff_nativeAssertZeros (SubChip.circuit (p := p)) assignment.environment
+      subChip_lookups_empty).symm
+
+/-- Constructive interaction half of Sub faithfulness, evaluated on the same reconstructed row. -/
+theorem subChip_interactions_constructive
+    (rustCols : Extracted.SubOracle.SubCols (ZMod p)) (data : ProverData (ZMod p)) :
+    let assignment := subChipRowCodec.assignment (subChipOracle.deconfigure rustCols) data
+    List.Perm
+      (nativeAccesses assignment.environment
+        (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).operations)
+      (subChipOracle.rustAccesses rustCols) := by
+  dsimp only
+  let cols := subChipOracle.deconfigure rustCols
+  let assignment := subChipRowCodec.assignment cols data
+  have hbind : BindsChipOutput SubChip.main assignment.environment
+      (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).rowInputVar
+      (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).rowOffset cols := by
+    have h := NativeRowAssignment.bindsOutput assignment
+    rw [SubChip.circuit_main_eq] at h
+    exact h
+  have hlegacy := subChip_interactions_faithful (p := p) assignment.environment
+    (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).rowInputVar
+    (⟨SubChip.circuit (p := p)⟩ : Air.Flat.Component (ZMod p)).rowOffset cols hbind
+  rw [nativeAccesses_component_eq_rowOperations (SubChip.circuit (p := p))
+    assignment.environment]
+  simpa only [cols, ChipOracle.accesses_deconfigure,
+    Air.Flat.Component.rowOperations_mk, Air.Flat.Component.rowInputVar_mk,
+    Air.Flat.Component.rowOffset_mk, SubChip.circuit_main_eq] using hlegacy
+
+/-- The Sub pilot packaged at the intended stable boundary: native whole-chip circuit versus the
+complete Rust whole-chip oracle. Rust operation helpers and Lean gadgets are deliberately absent from
+the statement. -/
 theorem subChip_faithful :
     ChipFaithful (p := p) SubChip.Inputs SubChip.Columns Extracted.SubOracle.SubCols
-      SubChip.main subChipOracle where
-  assertions := by
-    intro env input offset cols
-    exact subChip_constraints_faithful (p := p) env input offset cols
-  interactions := subChip_interactions_faithful (p := p)
+      SubChip.circuit subChipRowCodec subChipOracle where
+  constraints := subChip_constraints_constructive (p := p)
+  interactions := subChip_interactions_constructive (p := p)
 
 end SP1Clean.Faithful

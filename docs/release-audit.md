@@ -52,7 +52,7 @@ diff before it writes an artifact. Bump all of those together with regenerated f
 > chip-soundness admission: `DivRemChip.evidenceSoundness`, the whole-chip extraction of unique selection,
 > explicit family arithmetic evidence, and output routing from the generated constraints. Public
 > `contractSoundness` is proved from that stronger statement, but inherits its `sorryAx`. The old nine
-> per-op DivRem proof stubs were deleted. Four chip-completeness proofs and two DivRem circuit-law fields
+> per-op DivRem proof stubs were deleted. Three chip-completeness proofs and two DivRem circuit-law fields
 > are also deferred; they affect bundled circuit axiom censuses but do not strengthen the semantic claim.
 > At machine level, `supportedCore_orderedRows_dynamic` and `sp1_decoded_rows_sound` are the disclosed
 > semantic and legacy structural grounding seams; `supported_core_witness_grounding` is now a proved
@@ -188,7 +188,7 @@ soundness never consumes `completeness` proofs, so the wiring was safe despite d
 | TB-7 | "trace links are holes dressed as hypotheses" | **NARROWED** | PC chain, offline memory, and ROM membership are *derived* from balance; the residue is the named-obligation table (Part I) |
 | TB-8 | "Clean elaboration smuggles axioms" | **CLOSED** | clean-3 headline census |
 | TB-9 *(new)* | "the extraction pipeline is not reproducible against the pinned toolchain" | **CLOSED; strengthened 2026-07-22** | W9 originally normalized a transient Rust-to-Clean circuit format. The current audited overlay deletes that backend entirely and emits only row shapes plus ordered assertion/interaction lists. `update_extracted.py` checks the exact overlay diff and machine manifest before writing, and a full v6.3.1 AIR-only run reproduced every pre-existing list artifact byte-for-byte. |
-| TB-10 *(new)* | "the `#print axioms` story of the capstone is cleaner than reality" | **DISCLOSED** | `sp1Tables` embeds each chip's full circuit record, so the five completeness admissions and the DivRem soundness seam surface transitively on registry/coverage/capstone projections even when a theorem uses only metadata. The census allowlist names every carrier. |
+| TB-10 *(new)* | "the `#print axioms` story of the capstone is cleaner than reality" | **DISCLOSED** | `sp1Tables` embeds each chip's full circuit record, so the three completeness admissions and the DivRem soundness seam surface transitively on registry/coverage/capstone projections even when a theorem uses only metadata. The census allowlist names every carrier. |
 
 ### Machine-model divergence catalog (unchanged verdicts re-checked, one addition)
 
@@ -210,14 +210,14 @@ the HALT chip (W5) supplies 264 via a `RowView`-level increment when it lands.
 ### 0. Census summary (`scripts/run_audit.sh`, 471 probes, raw output in `snapshots/axiom-census.txt`)
 
 The 2026-07-22 audit elaborates all 471 generated probes. It finds no project `axiom` declarations,
-no `skipKernelTC`, and no main-library `native_decide`. There are 9 direct deferral sites across exactly
-seven allowlisted files: four chip-completeness proofs; `DivRemChip.evidenceSoundness`; two DivRem
+no `skipKernelTC`, and no main-library `native_decide`. There are 8 direct deferral sites across exactly
+six allowlisted files: three chip-completeness proofs; `DivRemChip.evidenceSoundness`; two DivRem
 structural channel-law fields; and the two machine seams `sp1_decoded_rows_sound` and
 `supportedCore_orderedRows_dynamic`.
 
-Exactly 31 probed declarations carry `sorryAx`, all allowlisted. This larger transitive set is expected:
+Exactly 29 probed declarations carry `sorryAx`, all allowlisted. This larger transitive set is expected:
 the unified supported-machine descriptor embeds full circuit records, so registry, coverage, and ensemble
-projections inherit admitted structure fields. It does not represent 31 independent proof holes. The
+projections inherit admitted structure fields. It does not represent 29 independent proof holes. The
 census now probes every chip's bundled `circuit`, DivRem's separately housed completeness driver, the
 exact Core profile guards, and `sp1_air_refinement`/`sp1_air_sound`; this closed scanner blind spots in
 both the legacy and new capstone surfaces. Every theorem in `FormalModel/Contracts/DivRem.lean` and
@@ -229,7 +229,7 @@ deferral file or transitive carrier fails the audit.
 ### 1. Method & reproducibility
 
 `scripts/run_audit.sh` (checked in — the predecessor document's "re-create the harness as needed" gap
-is closed) assumes a green `lake build SP1Clean` (3578 jobs on this snapshot), then records pins →
+is closed) assumes a green `lake build SP1Clean` (3580 jobs on this snapshot), then records pins →
 text inventory with gates (sorry-set, no `axiom` declarations, and the no-`skipKernelTC`
 guard `scripts/check_no_skipkerneltc.sh` — also a standalone CI `guards` job) →
 `scripts/gen_axiom_probe.py` (namespace-tracking declaration
@@ -246,7 +246,7 @@ next build).
 | `DivRemChip.main_exposedChannelsLawful` | structural packaging | 4.31 normalization regression in the exposed State interaction proof |
 | `DivRemChip.circuit.requirementsChannelsLawful` | structural packaging | 4.31 normalization regression; not an arithmetic assumption |
 | `BranchChip.completeness` | liveness | legacy witness proof; whole-chip populate conformance is the replacement target |
-| `ShiftLeftChip.completeness` / `ShiftRightChip.completeness` | liveness | 4.31 regressions |
+| `ShiftLeftChip.completeness` | liveness | 4.31 regression; ShiftRight is restored via a folded arithmetic `FormalAssertion` boundary |
 | `DivRemChip.completeness` | liveness | independent of the soundness contract conversion |
 | `supportedCore_orderedRows_dynamic` | machine soundness | timed Memory/spec/operand/readiness grounding of the proved exact active-row order |
 | `sp1_decoded_rows_sound` | packaging premise | older structural decode facts for the frozen Eulerian path |
@@ -261,7 +261,8 @@ names. The predecessor's line citations were already stale at audit time.)
 | Add/Addi/Addw/Sub/Subw | C3 | ✓ C3 | ✓ C3 | ✓ full `↔`, syntactic interactions (4 buses) | ✓ |
 | Lt | C3 | ✓ | ✓ C3 | ✓ | ✓ (unsigned) |
 | Bitwise | `oRB` | ✓ | ✓ C3 | ✓ forward | ✓ |
-| ShiftLeft / ShiftRight | C3 | ✗ `SRY` | ✓ C3 | ✓ forward | — |
+| ShiftLeft | C3 | ✗ `SRY` | ✓ C3 | ✓ forward | — |
+| ShiftRight | C3 | ✓ C3 | ✓ C3 | ✓ forward | ✓ |
 | Mul | **`oRB`** (settled) | ✓ | ✓ C3 (5 variants) | ✓ forward; syntactic dormant (~8 min compile) | ✓ |
 | DivRem | ✗ `SRY` at `evidenceSoundness`; public contract factored/proved | ✗ `SRY` | ✓ (8 variants) | — (open) | full-trace test present |
 | Jal / Jalr / Branch | C3 | Jal/Jalr ✓; Branch ✗ `SRY` | ✓ C3 + Sail-model | ✓ | — |

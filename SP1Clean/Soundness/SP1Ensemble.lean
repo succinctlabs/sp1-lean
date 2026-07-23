@@ -166,7 +166,7 @@ theorem sp1StateVerifierMain_stateInteractions (pi : Var SP1PublicIO (ZMod p)) (
 /-- The Clean-table projection of the 25-entry `supportedChips` descriptor. Every chip's `circuit` is
 wrapped as a Clean AIR `Component` (`⟨chip.circuit⟩`). Disclosed 4.31-migration deferral: `#print axioms`
 on this `def` currently shows `sorryAx`, carried by `DivRem.evidenceSoundness` (+ its two channel-law
-fields) and the five deferred completeness proofs (Branch/Mul/ShiftLeft/ShiftRight/DivRem) — the exact
+fields) and the three deferred completeness proofs (Branch/ShiftLeft/DivRem) — the exact
 gated inventory is `docs/release-audit.md` §0. Every other chip's `circuit` is `sorry`-free in both
 directions (only `bv_decide`'s `ofReduceBool`/`trustCompiler` ride along, via `Mul`/`Bitwise`
 soundness). -/

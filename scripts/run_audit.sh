@@ -34,7 +34,7 @@ echo "== A2 proof-deferral inventory (gate: exactly the known-debt set) =="
 # following tactic block and closes via `sorryAx`, so it is a deferral just like `sorry` and must
 # be tracked here). Update this list (and the docs) when one is closed.
 #   · SP1Ensemble        — `sp1_decoded_rows_sound` (structural typed-decode seam)
-#   · Branch/Shift{Left,Right}Chip/Formal — completeness (Lean-4.30/4.31 `whnf` regression;
+#   · Branch/ShiftLeftChip/Formal — completeness (Lean-4.30/4.31 `whnf` regression;
 #     MulChip completeness was restored 2026-07-16 via the recorded normalization pattern)
 #   · DivRemChip/Completeness/Driver — completeness (same blowup; `stop`)
 #   · AIR                  — `supportedCore_orderedRows_dynamic` (the per-row dynamic grounding seam;
@@ -45,7 +45,6 @@ echo "== A2 proof-deferral inventory (gate: exactly the known-debt set) =="
 #     than retained as dead debt.
 expected_sorries="$(cat <<'LIST'
 SP1Clean/Proofs/Chips/ShiftLeftChip/Formal.lean
-SP1Clean/Proofs/Chips/ShiftRightChip/Formal.lean
 SP1Clean/Proofs/Chips/BranchChip/Formal.lean
 SP1Clean/Proofs/Chips/DivRemChip/Completeness/Driver.lean
 SP1Clean/Proofs/Chips/DivRemChip/Formal.lean
@@ -58,7 +57,7 @@ actual=$(grep -rlE "$sorry_re" SP1Clean --include='*.lean' | sort)
 grep -rnE "$sorry_re" SP1Clean --include='*.lean'
 n_exp=$(echo "$expected_sorries" | grep -c .)
 if [ "$actual" = "$(echo "$expected_sorries" | sort)" ]; then
-  echo "PASS: proof-deferral files = expected $n_exp (4 completeness + 1 DivRem contract file + 2 capstone seams)"
+  echo "PASS: proof-deferral files = expected $n_exp (3 completeness + 1 DivRem contract file + 2 capstone seams)"
 else
   echo "FAIL: proof-deferral inventory drifted from the documented set"; fail=1
 fi
@@ -116,7 +115,7 @@ import re, sys
 text = open(sys.argv[1]).read()
 entries = re.findall(r"'([^']+)' (?:depends on axioms: \[([^\]]*)\]|does not depend on any axioms)", text, re.S)
 print(f"census entries: {len(entries)}")
-# Declarations allowed to (transitively) carry sorryAx: the four deferred completeness proofs,
+# Declarations allowed to (transitively) carry sorryAx: the three deferred completeness proofs,
 # DivRem's evidence/channel-law seams, the two machine-grounding seams, and the circuit/registry/
 # capstone structures that embed or consume them.  `#print axioms` is intentionally structural:
 # a `GeneralFormalCircuit` retains its completeness field even when a soundness theorem never
@@ -140,7 +139,6 @@ allowed = {
     "SP1Clean.DivRemChip.completeness",
     "SP1Clean.BranchChip.completeness", "SP1Clean.BranchChip.circuit",
     "SP1Clean.ShiftLeftChip.completeness", "SP1Clean.ShiftLeftChip.circuit",
-    "SP1Clean.ShiftRightChip.completeness", "SP1Clean.ShiftRightChip.circuit",
     "SP1Clean.Soundness.sp1_finishedChannel_guarantees",
     # DivRem whole-chip evidence extraction seam + its public consequences:
     "SP1Clean.DivRemChip.evidenceSoundness", "SP1Clean.DivRemChip.contractSoundness",

@@ -209,7 +209,7 @@ imports within one package; the auto-gen guard is the `Extracted/` + `SP1CleanTe
 consolidation (including system tables, manifest, and provenance), the `FormalModel/Contracts/` audit surface (all `Spec`s +
 the ALU chips' `Assumptions`/`ProverAssumptions`), the `Native/`+`Proofs/` five-pillar re-bucket of
 `Chips`/`Operations`/`Readers`/`WitnessTests`, and all six per-pillar layer libraries. The Lean 4.31
-migration currently defers four chip completeness proofs, the dynamic subtheorem
+migration currently defers three chip completeness proofs, the dynamic subtheorem
 `supportedCore_orderedRows_dynamic`, `sp1_decoded_rows_sound`, and DivRem's whole-chip
 `evidenceSoundness` plus two structural circuit-law fields;
 `scripts/run_audit.sh` is the authoritative inventory. The exact v6.3.1 Core relation and conditional

@@ -23,7 +23,7 @@ session log was intentionally removed from this living file; git history preserv
 | Whole-chip faithfulness | generated complete Rust oracles and `ChipFaithful` proofs landed for Add and Sub |
 | Operation debt | operation-level faithfulness is no longer the public boundary; all generated direct-to-circuit artifacts are gone, while transitional operation list/witness anchors remain |
 | DivRem | nine old operation-shaped proof bodies removed; four-family semantic/evidence contract and routing proofs landed; one whole-chip evidence extraction seam remains |
-| Completeness | four 4.31-regressed chip proofs explicitly deferred; no Clean fork or broad completeness refactor planned |
+| Completeness | ShiftRight restored with Clean's folded-boundary pattern; three 4.31-regressed chip proofs remain explicitly deferred |
 
 ## Current theorem frontier
 
@@ -49,13 +49,12 @@ hand-written lookup substrate.
 
 ## Machine-checked proof debt
 
-`scripts/run_audit.sh` gates exactly 9 syntactic deferral sites in seven files:
+`scripts/run_audit.sh` gates exactly 8 syntactic deferral sites in six files:
 
 | File / declaration | Class |
 |---|---|
 | `BranchChip.completeness` | chip completeness |
 | `ShiftLeftChip.completeness` | chip completeness |
-| `ShiftRightChip.completeness` | chip completeness |
 | `DivRemChip.completeness` | chip completeness |
 | `DivRemChip.evidenceSoundness` | chip soundness |
 | `DivRemChip.main_exposedChannelsLawful` | structural circuit packaging |
@@ -70,10 +69,10 @@ descriptor; it does not indicate one independent admission per carrier.
 
 The current worktree has passed:
 
-- `lake build SP1Clean` — 3578 jobs, no errors, warnings, or `info:` notes;
+- `lake build SP1Clean` — 3580 jobs, no errors, warnings, or `info:` notes;
 - `lake test` — 3196 jobs;
 - `lake lint`; and
-- `scripts/run_audit.sh` — 471 probes, 31 allowlisted transitive `sorryAx` carriers, no local
+- `scripts/run_audit.sh` — 471 probes, 29 allowlisted transitive `sorryAx` carriers, no local
   `axiom`, no `skipKernelTC`, no main-library `native_decide`, and the exact deferral allowlist above.
 
 ## Next work, in dependency order
@@ -96,5 +95,5 @@ The current worktree has passed:
    `sp1_verifier_sound`; PolyFun remains limited to useful semantic machine packaging unless a concrete
    proof obligation justifies more theory.
 
-The four chip-completeness regressions and the DivRem packaging fields can be repaired after the semantic
+The three remaining chip-completeness regressions and the DivRem packaging fields can be repaired after the semantic
 architecture stabilizes, unless one blocks a needed circuit or registry theorem.

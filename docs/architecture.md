@@ -507,7 +507,7 @@ hypothesis** — exactly as `../sp1-lean` ships it, an honest assumption, not a 
   `ShiftLeftCore.pop*` generators (SP1's `event_to_row`; `popA` is built as the *placement of the recomputed
   `limb_result`* so placements hold by construction), and soundness verifies under that witnessing — but the
   completeness **proof** (~62 inline-constraint discharges + the three reader sub-assertion obligations) is one
-  of the four deferred completeness proofs. Tooling note: the LSP times out on the 680-line chip; a scratch `import` + `example :
+  of the three deferred completeness proofs. Tooling note: the LSP times out on the 680-line chip; a scratch `import` + `example :
   Completeness … := by circuit_proof_start; sorry` elaborates fast and exposes the full goal for iteration.
 - **Real-data threading (the reader column blocks are chip `Inputs`).** All readers are
   `FormalAssertion`s taking their `cols` as inputs, so the chip `Inputs` carry the committed `state`/`adapter`

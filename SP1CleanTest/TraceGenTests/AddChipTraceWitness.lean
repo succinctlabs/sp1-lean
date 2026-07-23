@@ -1,4 +1,4 @@
-import SP1Clean.Native.Chips.AddChip.Defs
+import SP1Clean.Faithful.AddChip
 import SP1CleanTest.TraceGenTests.TraceGenerator
 import SP1CleanTest.TraceGenTests.AddChipTraceVectors
 
@@ -8,7 +8,8 @@ import SP1CleanTest.TraceGenTests.AddChipTraceVectors
 dumped event, `EventPopulate.rTypeEventInputs` mirrors the input-column extraction (the only
 hand-written part of SP1's `generate_trace`), and `circuitTraceRow` derives the rest — the
 witnessed `add_operation.value` columns from `main`'s own `witnessVector` closure (which calls
-`AddOperation.populate`), and the 33-column row layout from `main`'s output struct — then zero
+`AddOperation.populate`), and the 33-column Rust layout through the audited whole-row
+`addChipReconfigure` map — then zero
 padding rows mirror SP1's zero-fill. The anchor checks the derived matrix equals the dumped one
 cell-for-cell, covering witness formulas, environment wiring, emission order, the full native Add row
 column layout, and padding in a single `native_decide` (confined here per the WitnessTests
@@ -22,7 +23,8 @@ open SP1Clean
 padding to SP1's height. -/
 def addChipDerivedTrace : List (List (ZMod SP1Prime)) :=
   generateTrace
-    (fun e => circuitTraceRow AddChip.Inputs (AddChip.main (p := SP1Prime)) (rTypeEventInputs e))
+    (fun e => circuitTraceRowMapped AddChip.Inputs (AddChip.main (p := SP1Prime))
+      Faithful.addChipReconfigure (rTypeEventInputs e))
     AddChipTraceEvents AddChipTraceHeight 33
 
 theorem addchip_trace_conforms :
