@@ -248,8 +248,9 @@ sends match exactly); and the independent trace-conformance layer (§9), which e
 rows against the real prover's output rather than the exporter's.
 
 One provenance gap is disclosed rather than closed: the whole-trace dumper that produced the
-trace-conformance vector batteries is not part of the pinned overlay (audit finding F-R-01,
-`docs/audits/2026-07-release-readiness.md`); the batteries' content is still independently
+trace-conformance vector batteries is not part of the pinned overlay (audit finding F-R-01;
+details in `docs/agents/extraction.md` and the archived findings log, git history at
+`14c926bd`); the batteries' content is still independently
 validated cell-for-cell by `native_decide` against the native circuits' own trace generation, and
 reconstruction of the dumper as a third checked-in patch is filed follow-up work.
 
@@ -289,7 +290,8 @@ Spec:
   SP1's Rust implementation.
 
 Every conjunct of every chip Spec was adversarially re-reviewed for this report against the Sail
-clauses and SP1's Rust executor (audit batches A1–A7, `docs/audits/2026-07-release-readiness.md`):
+clauses and SP1's Rust executor (the 2026-07 release-readiness audit, batches A1–A7; findings
+log archived in git history at `14c926bd`):
 operand order for the non-commutative ops, sign-extension and mask widths for all six shifts,
 byte-lane selection and extension widths for all loads, and the store merge math (proven to
 preserve untouched bytes) — with zero soundness findings.
@@ -639,9 +641,11 @@ Stated plainly:
 6. The AIR models the *supervisor-mode* Core profile; user-mode/mprotect table variants,
    precompiles, and the memory-protection chips are out of scope.
 
-This report describes the state of an ongoing verification, not an audit certificate. Findings of
-the 2026-07 release-readiness audit — including everything disclosed above — are logged with
-file-level citations in `docs/audits/2026-07-release-readiness.md`.
+This report describes the state of an ongoing verification, not an audit certificate. Findings
+of the 2026-07 release-readiness audit — including everything disclosed above — were logged with
+file-level citations in a findings log kept out of the release tree by design; retrieve
+docs/audits/2026-07-release-readiness.md (no longer in the tree) from git history at commit
+`14c926bd`.
 
 ## 13. Reproduction
 

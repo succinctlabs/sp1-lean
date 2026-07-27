@@ -215,9 +215,11 @@ imports within one package; the auto-gen guard is the `Extracted/` + `SP1CleanTe
 **Restructure status (updated 2026-07-27; whole-chip oracle migration completed the same day).**
 Landed in the 2026-07 release-readiness campaign: the full 25-chip `Extracted/ChipOracle/`
 migration (native rows everywhere, zero legacy chip files, the `MemoryAccess` struct carrier, the
-reader-family oracle config), the release-readiness audit (`docs/audits/2026-07-release-readiness.md`
-— zero BLOCKERs across the 25-chip spec review, substrate, relation level, Rust-faithfulness
-spot checks, and Clean-idiom sweep), the docs pruning, and the external verification report
+reader-family oracle config), the release-readiness audit (zero BLOCKERs across the 25-chip spec
+review, substrate, relation level, Rust-faithfulness spot checks, and Clean-idiom sweep — the
+full findings log lived at `docs/audits/2026-07-release-readiness.md` through commit `14c926bd`
+and is retrievable from git history; its durable disclosures are inline in the verification
+report and `docs/agents/extraction.md`), the docs pruning, and the external verification report
 (`docs/verification-report.md`). Previously landed: the `Math`/`Model` split, list-only `Extracted/`
 consolidation (including system tables, manifest, and provenance), the `FormalModel/Contracts/` audit surface (all `Spec`s +
 the ALU chips' `Assumptions`/`ProverAssumptions`), the `Native/`+`Proofs/` five-pillar re-bucket of
