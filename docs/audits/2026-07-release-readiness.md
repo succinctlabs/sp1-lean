@@ -365,6 +365,29 @@ only the two disclosed operand `isU64` assumptions.
 - **F-A4-06 (COSMETIC).** `MulChip.ControlSpec` is structuring documentation, not the exported
   conclusion — no drift.
 
+### I-track — Clean-idiom sweep (complete; nothing above idiom severity)
+
+25-chip × I1–I7 table produced (see the sweep report): subcircuit-composition discipline, single
+`main`, semantic Specs on the audit surface (with doc-justified cycle-avoiding exceptions for the
+Native-side memory/x0 chip Specs and the Lt/Bitwise split-Spec plan), zero `InlinedSpec`,
+universal `@[circuit_norm]` rfl-lemma pairs, no unbundled `Circuit` parents (the one
+`assertZeros` def is `circuit_norm`-transparent), helper discipline with the one sanctioned
+DivRem `ConstraintsHold` seam, and Sail `+i`-spacing compliance — all PASS.
+
+- **F-I-01 (STALE-DOC/COSMETIC, backlog).** 16 chips + all 10 readers hand-write
+  `ElaboratedCircuit` field obligations (`output_eq`/`channelsLawful`, some `localLength_eq`)
+  contrary to the AGENTS.md omit-the-field recipe — while Branch/Jal/Jalr/LoadX0/UType prove the
+  clean `elaborate_circuit` form works. Cleanup backlog item; AGENTS.md wording should stop
+  implying the default tactic currently closes these everywhere.
+- **F-I-02 (DISCLOSED-OK).** Mul/DivRem/Shift* forward structural fields from a documented
+  private `derivedElaborated` perf instance — deliberate, commented, no action.
+- **F-I-03 (COSMETIC).** 14 heartbeat sites exceed the documented 16M ceiling; the DivRem ones
+  are commented, four are not (MulChip completeness 128M, MulOperation 40M×2-ish, Bitwise/Lt 32M)
+  — add one-line budget justifications.
+- **F-I-04 (STALE-DOC).** `Readers.MemoryAccess.Spec` + `Readers.RegisterWrite.Spec` live in
+  Native/ vs AGENTS.md's "reader Specs in Contracts/Readers.lean" (other 9 comply).
+- **F-I-05 (DISCLOSED-OK).** The documented exceptions verified sound.
+
 ### R-track — Rust-faithfulness spot checks (complete; no BLOCKER)
 
 The edges ChipFaithful cannot see, all verified against the pinned checkouts:
