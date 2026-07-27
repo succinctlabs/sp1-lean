@@ -24,7 +24,6 @@ Glue,Euclid}.lean`. -/
 namespace SP1Clean.DivRemChip
 
 open Circuit
-open Extracted (DivRemCols)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
@@ -122,7 +121,7 @@ set_option maxHeartbeats 64000000 in
 set_option linter.unusedVariables false in
 /-- Every own-assert (`ownAsserts colsV`) evaluates to `0` at the honest populate witnesses, given the
 per-column eval pins. -/
-theorem ownAsserts_complete (env : Environment (ZMod p)) (colsV : Var DivRemCols (ZMod p))
+theorem ownAsserts_complete (env : Environment (ZMod p)) (colsV : Var Columns (ZMod p))
     (ir : ZMod p) (B C : Word (ZMod p)) (F : Vector (ZMod p) 8)
     (hbU : B.isU64) (hcU : C.isU64) (hbin : ir = 0 ∨ ir = 1)
     (hf0 : F[0] = 0 ∨ F[0] = 1) (hf1 : F[1] = 0 ∨ F[1] = 1) (hf2 : F[2] = 0 ∨ F[2] = 1)

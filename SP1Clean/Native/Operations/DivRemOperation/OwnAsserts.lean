@@ -1,26 +1,25 @@
-import SP1Clean.Extracted.DivRemChip
+import SP1Clean.FormalModel.Contracts.DivRemColumns
 import Clean.Circuit.Basic
 
 /-! # `DivRemChip` — the chip's own assertZero constraints (the `[E13…E367, op_a_0]` list).
 
-The `Extracted.DivRemCols.asserts` own-constraint tail, as a pure `Var DivRemCols → List (Expression …)` function. Kept pure (no `Circuit` monad) so the ~360-step `let E…` chain elaborates without the per-operation offset whnf of a `do`-block; `Defs.main` emits it with one `assertZeros`. Numerals are pinned to `Expression` by per-binding ascriptions. -/
+The `DivRemChip.Columns.asserts` own-constraint tail, as a pure `Var Columns → List (Expression …)` function. Kept pure (no `Circuit` monad) so the ~360-step `let E…` chain elaborates without the per-operation offset whnf of a `do`-block; `Defs.main` emits it with one `assertZeros`. Numerals are pinned to `Expression` by per-binding ascriptions. -/
 
 namespace SP1Clean.DivRemChip
 
-open Extracted (DivRemCols)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 set_option linter.unusedVariables false in
 set_option maxHeartbeats 8000000 in
-/-- SP1's `DivRemCols.eval` own-constraint list (the `[E13…E367, adapter.op_a_0]` tail).
+/-- SP1's `Columns.eval` own-constraint list (the `[E13…E367, adapter.op_a_0]` tail).
 
 **Generic over the carrier `R`** so the one chain serves both levels: the chip/`DivRemCore` `main`s
 emit it at `R = Expression (ZMod p)` (the constraint expressions), while the `DivRemCore.CoreSpec`
 raw bundle (`OwnAssertsHold`) states the same list at `R = ZMod p` (the evaluated row). The
 `DivRemCore.ownAsserts_map_eval` transport lemma connects the two instantiations. -/
 def ownAsserts {R : Type} [Add R] [Sub R] [Mul R] [Zero R] [One R]
-    [OfNat R 65535] [OfNat R 65536] (cols : DivRemCols R) : List R :=
+    [OfNat R 65535] [OfNat R 65536] (cols : Columns R) : List R :=
   let E0 : R := cols.is_divw + cols.is_remw
   let E1 : R := E0 + cols.is_divuw
   let E2 : R := E1 + cols.is_remuw
@@ -394,7 +393,7 @@ def ownAsserts {R : Type} [Add R] [Sub R] [Mul R] [Zero R] [One R]
 set_option maxHeartbeats 8000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- `E355`, the chip selector's boolean gate, is part of the pure DivRem own-assertion list. -/
-theorem isReal_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem isReal_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_real * (cols.is_real - 1) ∈ ownAsserts cols := by
   simp only [ownAsserts]
   repeat first
@@ -405,7 +404,7 @@ theorem isReal_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
 set_option maxHeartbeats 8000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- The `is_div` selector's boolean gate is part of the pure DivRem own-assertion list. -/
-theorem isDiv_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem isDiv_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_div * (cols.is_div - 1) ∈ ownAsserts cols := by
   simp only [ownAsserts]
   repeat first
@@ -415,7 +414,7 @@ theorem isDiv_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
 set_option maxHeartbeats 8000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- The `is_divu` selector's boolean gate is part of the pure DivRem own-assertion list. -/
-theorem isDivu_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem isDivu_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_divu * (cols.is_divu - 1) ∈ ownAsserts cols := by
   simp only [ownAsserts]
   repeat first
@@ -425,7 +424,7 @@ theorem isDivu_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
 set_option maxHeartbeats 8000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- The `is_rem` selector's boolean gate is part of the pure DivRem own-assertion list. -/
-theorem isRem_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem isRem_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_rem * (cols.is_rem - 1) ∈ ownAsserts cols := by
   simp only [ownAsserts]
   repeat first
@@ -435,7 +434,7 @@ theorem isRem_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
 set_option maxHeartbeats 8000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- The `is_remu` selector's boolean gate is part of the pure DivRem own-assertion list. -/
-theorem isRemu_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem isRemu_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_remu * (cols.is_remu - 1) ∈ ownAsserts cols := by
   simp only [ownAsserts]
   repeat first
@@ -445,7 +444,7 @@ theorem isRemu_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
 set_option maxHeartbeats 8000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- The `is_divw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
-theorem isDivw_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem isDivw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_divw * (cols.is_divw - 1) ∈ ownAsserts cols := by
   simp only [ownAsserts]
   repeat first
@@ -455,7 +454,7 @@ theorem isDivw_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
 set_option maxHeartbeats 8000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- The `is_remw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
-theorem isRemw_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem isRemw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_remw * (cols.is_remw - 1) ∈ ownAsserts cols := by
   simp only [ownAsserts]
   repeat first
@@ -465,7 +464,7 @@ theorem isRemw_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
 set_option maxHeartbeats 8000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- The `is_divuw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
-theorem isDivuw_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem isDivuw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_divuw * (cols.is_divuw - 1) ∈ ownAsserts cols := by
   simp only [ownAsserts]
   repeat first
@@ -475,7 +474,7 @@ theorem isDivuw_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
 set_option maxHeartbeats 8000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- The `is_remuw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
-theorem isRemuw_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem isRemuw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_remuw * (cols.is_remuw - 1) ∈ ownAsserts cols := by
   simp only [ownAsserts]
   repeat first
@@ -486,7 +485,7 @@ set_option maxHeartbeats 8000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- `E343`, the `is_real_not_word` scalar's boolean gate, is part of the pure DivRem own-assertion
 list (the upper-Mul gate's binariness lever). -/
-theorem isRealNotWord_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem isRealNotWord_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_real_not_word * (cols.is_real_not_word - 1) ∈ ownAsserts cols := by
   simp only [ownAsserts]
   repeat first
@@ -496,7 +495,7 @@ theorem isRealNotWord_gate_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
 set_option maxHeartbeats 8000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- `E367`, the eight-flag one-hot sum, is part of the pure DivRem own-assertion list. -/
-theorem flagsSum_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem flagsSum_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     (1 : Expression (ZMod p)) - (cols.is_divu + cols.is_remu + cols.is_div + cols.is_rem +
       cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw) ∈ ownAsserts cols := by
   simp only [ownAsserts]
@@ -509,7 +508,7 @@ omit [Fact (2 ^ 24 < p)] in
 /-- The physical non-`x0` routing assertion is the final entry of the pure DivRem own-assertion
 list.  Keeping this membership folded lets whole-chip grounding recover the route without
 unfolding the arithmetic evidence contract. -/
-theorem opA0_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+theorem opA0_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.adapter.op_a_0 ∈ ownAsserts cols := by
   simp only [ownAsserts]
   repeat first

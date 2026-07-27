@@ -392,7 +392,7 @@ set_option maxRecDepth 10000 in
 /-- The selector gate `is_real·(is_real−1)` (`E355`) sits in the `DivRemCore` cluster's own-assert
 tail — a shallow assert of the gadget's `main`, hence one of its deep constraints. -/
 private lemma divRemCore_isReal_gate_mem_constraints
-    (cols : Var Extracted.DivRemCols (ZMod p)) (n : ℕ) :
+    (cols : Var DivRemChip.Columns (ZMod p)) (n : ℕ) :
     cols.is_real * (cols.is_real - 1) ∈ ((DivRemCore.main cols).operations n).constraints := by
   apply mem_constraints_of_mem_shallowConstraints
   change cols.is_real * (cols.is_real - 1) ∈ DivRemChip.ownAsserts cols ++ _
@@ -439,7 +439,7 @@ theorem DivRemChip.circuitSelectorBinary :
         (varFromOffset DivRemChip.Inputs 0 : Var DivRemChip.Inputs (ZMod p)).is_real = 1 := by
     apply bool_of_mul_pred
     simpa only [circuit_norm] using gate
-  have selEq : ∀ (i : DivRemChip.Inputs (ZMod p)) (o : Extracted.DivRemCols (ZMod p)),
+  have selEq : ∀ (i : DivRemChip.Inputs (ZMod p)) (o : DivRemChip.Columns (ZMod p)),
       (DivRemChip.rowView i o).is_real = i.is_real := fun _ _ => rfl
   have inputEq : Eval.eval (Environment.fromArray physical data)
       (varFromOffset DivRemChip.Inputs 0 : Var DivRemChip.Inputs (ZMod p))

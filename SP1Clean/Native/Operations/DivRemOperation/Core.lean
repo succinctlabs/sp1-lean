@@ -1,7 +1,7 @@
 import SP1Clean.Native.Operations.MulOperation
 import SP1Clean.Native.Operations.DivRemOperation.OwnAsserts
 import SP1Clean.Native.Operations.DivRemOperation.AssertZeros
-import SP1Clean.Extracted.DivRemChip
+import SP1Clean.FormalModel.Contracts.DivRemColumns
 import SP1Clean.Model.Channels
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
@@ -12,7 +12,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 The structural twin of `DivRemCompare` (`Compare.lean`): the DivRem chip `main`'s remaining
 non-reader constraint content, as a standalone Clean `FormalAssertion` over the **whole committed
-row** (`Extracted.DivRemCols`). Like the comparison cluster it witnesses nothing — every column it
+row** (`DivRemChip.Columns`). Like the comparison cluster it witnesses nothing — every column it
 constrains is a field of the input `cols` — so its `localLength` is `0`. It carries:
 
 * `MulOperation` ×2 — the two `c_times_quotient = quotient_comp · c` product structs: `lower`
@@ -29,7 +29,7 @@ constrains is a field of the input `cols` — so its `localLength` is `0`. It ca
   `U16MSBOperation` subcircuits in `DivRemCompare`; they are not duplicated here.
 
 The emission order and every argument are verbatim from `Proofs/Chips/DivRemChip/Defs.lean` `main`
-(lines 258–282, 406–456), with each witnessed local replaced by the corresponding `DivRemCols`
+(lines 258–282, 406–456), with each witnessed local replaced by the corresponding `DivRemChip.Columns`
 field per the chip's cols assembly. The semantic contract is `DivRemCore.CoreSpec`
 (`FormalModel/Contracts/DivRem.lean`); the `FormalAssertion` bundle is
 `Proofs/Operations/DivRemOperation/Core.lean`. -/
@@ -37,7 +37,6 @@ field per the chip's cols assembly. The semantic contract is `DivRemCore.CoreSpe
 namespace SP1Clean.DivRemCore
 
 open Circuit
-open Extracted (DivRemCols)
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.DivRemChip (ownAsserts assertZeros)
 
@@ -49,7 +48,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 assertZero tail (`ownAsserts`), and the 32 byte-range pulls, each applied to the committed `cols`
 fields. No witnesses — the only fresh state is the composed `MulOperation` assertions' channel
 activity plus the cluster's own byte pulls. -/
-def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
+def main (cols : Var DivRemChip.Columns (ZMod p)) : Circuit (ZMod p) Unit := do
   -- (1,2) The two `c_times_quotient` product structs (`divrem/mod.rs:721`): `lower` = low product,
   -- gate + `is_mul` = `is_real`; `upper` = high product, gate = `is_real_not_word`,
   -- `is_mulh = is_div + is_rem`, `is_mulhu = is_divu + is_remu`. Both have `is_mulw = 0`.
@@ -150,7 +149,7 @@ set_option maxHeartbeats 4000000 in
 /-- Clean derives the structural metadata; the cluster contributes no fresh witnesses
 (`localLength = 0`) and exposes only the byte-channel guarantees (its own pulls + the composed
 `MulOperation`s'). -/
-instance elaborated : ElaboratedCircuit (ZMod p) DivRemCols unit main := by
+instance elaborated : ElaboratedCircuit (ZMod p) DivRemChip.Columns unit main := by
   elaborate_circuit_with {
     channelsWithGuarantees := [byteChannel.toRaw]
   }
@@ -161,7 +160,7 @@ set_option linter.unusedSectionVars false in
       = [byteChannel.toRaw] := rfl
 
 set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma localLength_eq (x : Var DivRemCols (ZMod p)) :
+@[circuit_norm] lemma localLength_eq (x : Var DivRemChip.Columns (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
 
 end SP1Clean.DivRemCore

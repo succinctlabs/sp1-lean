@@ -11,14 +11,13 @@ the normal signed Euclidean identity with remainder magnitude and sign bounds. -
 namespace SP1Clean.DivRemChip
 
 open SP1Clean.DivRemContract
-open Extracted (DivRemCols)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 set_option maxHeartbeats 16000000 in
 /-- The folded DivRem row contracts imply explicit signed-64 evidence for either `DIV` or `REM`.
 The output-routing equality is deliberately left to the uniform row assembler. -/
-theorem signed64Evidence {input : Inputs (ZMod p)} {cols : DivRemCols (ZMod p)} {case : Case}
+theorem signed64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {case : Case}
     (hbReadU : Word.isU64 input.op_b_val) (hcReadU : Word.isU64 input.op_c_val)
     (hcore : DivRemCore.CoreSpec cols)
     (hcompare : DivRemCompare.CompareSpec (DivRemCompare.Inputs.ofCols cols))

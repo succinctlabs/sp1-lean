@@ -304,7 +304,7 @@ private theorem evalRType_opCPrev (env : Environment (ZMod p))
 /-- Raw satisfaction of the Rust own-assert list transports to the folded value-row contract without
 unfolding `populatedRowAt` or the complete derived `ProvableStruct` evaluator. -/
 theorem evaluatedOwnAssertsHold (env : ProverEnvironment (ZMod p))
-    (colsV : Var Extracted.DivRemCols (ZMod p))
+    (colsV : Var DivRemChip.Columns (ZMod p))
     (h : ∀ e ∈ ownAsserts colsV,
       Expression.eval env.toEnvironment e = 0) :
     DivRemCore.OwnAssertsHold (Eval.eval env colsV) := by
@@ -450,7 +450,7 @@ set_option maxHeartbeats 64000000 in
 `populatedRowAt` expression into that proposition in the parent completeness proof crosses Lean's
 kernel-size cliff. -/
 theorem evaluatedOwnAssertsComplete (env : ProverEnvironment (ZMod p))
-    (colsV : Var Extracted.DivRemCols (ZMod p))
+    (colsV : Var DivRemChip.Columns (ZMod p))
     (ir : ZMod p) (B C : Word (ZMod p)) (f : Vector (ZMod p) 8)
     (hbU : B.isU64) (hcU : C.isU64) (hbin : ir = 0 ∨ ir = 1)
     (hf0 : f[0] = 0 ∨ f[0] = 1) (hf1 : f[1] = 0 ∨ f[1] = 1)

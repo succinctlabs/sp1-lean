@@ -12,12 +12,11 @@ No circuit offsets or witness-layout reductions cross this boundary. -/
 namespace SP1Clean.DivRemChip
 
 open SP1Clean.DivRemContract
-open Extracted (DivRemCols)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 omit [Fact (2 ^ 24 < p)] in
-private theorem unsigned64_word_gate {cols : DivRemCols (ZMod p)} {case : Case}
+private theorem unsigned64_word_gate {cols : Columns (ZMod p)} {case : Case}
     (hfamily : case.family = .unsigned64) (hselected : Selected cols case) :
     cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw = 0 := by
   cases case <;> simp [Case.family] at hfamily
@@ -31,7 +30,7 @@ private theorem unsigned64_word_gate {cols : DivRemCols (ZMod p)} {case : Case}
 set_option maxHeartbeats 16000000 in
 /-- The folded DivRem row contracts imply the explicit unsigned-64 Euclidean evidence for either
 `DIVU` or `REMU`. The output-routing equality is deliberately left to the uniform row assembler. -/
-theorem unsigned64Evidence {input : Inputs (ZMod p)} {cols : DivRemCols (ZMod p)} {case : Case}
+theorem unsigned64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {case : Case}
     (hbReadU : Word.isU64 input.op_b_val) (hcReadU : Word.isU64 input.op_c_val)
     (hcore : DivRemCore.CoreSpec cols)
     (hcompare : DivRemCompare.CompareSpec (DivRemCompare.Inputs.ofCols cols))

@@ -187,7 +187,7 @@ theorem mulChip_circuit_output_eq (input : Var MulChip.Inputs (ZMod p)) (offset 
         varFromOffset Extracted.MulOperation (offset + 5),
         var { index := offset }, var { index := offset + 1 },
         var { index := offset + 2 }, var { index := offset + 3 },
-        var { index := offset + 4 }⟩ : Var Extracted.MulCols (ZMod p)) := rfl
+        var { index := offset + 4 }⟩ : Var MulChip.Columns (ZMod p)) := rfl
 
 omit [Fact (2 ^ 17 < p)] in
 /-- MUL's exposed Memory list evaluates to the canonical R-type six-pack. -/

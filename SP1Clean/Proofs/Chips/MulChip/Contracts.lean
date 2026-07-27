@@ -111,7 +111,7 @@ omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
 /-- Evaluation commutes with the small selector projection.  The source row remains abstract, so
 this generic transport never normalizes MUL's arithmetic columns. -/
 theorem MulChip.eval_selectors {F : Type} [FiniteField F] (env : Environment F)
-    (cols : Extracted.MulCols (Expression F)) :
+    (cols : MulChip.Columns (Expression F)) :
     Eval.eval env (MulChip.selectors cols) = MulChip.selectors (Eval.eval env cols) := by
   rw [ProvableStruct.eval_eq_eval, ProvableStruct.eval_eq_eval]
   rfl

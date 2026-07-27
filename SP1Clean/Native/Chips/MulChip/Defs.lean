@@ -4,7 +4,6 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.MulChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -24,7 +23,6 @@ The chip's own `AssertSpec` tail is the five variant-flag booleans, their sum-bo
 namespace SP1Clean.MulChip
 
 open Circuit
-open Extracted (MulCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
@@ -38,10 +36,10 @@ def hintFlags (h : ProverHint (ZMod p)) : Vector (ZMod p) 5 :=
   ((h "mul_flags" 5)[0]?).getD #v[0, 0, 0, 0, 0]
 
 /-- The literal meaning of SP1's `MulCols.asserts` own (inline) assertZero tail
-(`Extracted/MulChip.lean` `E5,E7,E9,E11,E13,E15,op_a_0`): the five variant-flag booleans (in SP1's
+(`Extracted/ChipOracle/Mul.lean` `E5,E7,E9,E11,E13,E15,op_a_0`): the five variant-flag booleans (in SP1's
 extraction order), the flag-sum boolean, and `op_a_0 = 0`. The schoolbook arithmetic belongs to
 `MulOperation`, not here. -/
-def AssertSpec (cols : MulCols (ZMod p)) : Prop :=
+def AssertSpec (cols : Columns (ZMod p)) : Prop :=
   let m := cols.is_mul; let mh := cols.is_mulh; let mhu := cols.is_mulhu
   let mhsu := cols.is_mulhsu; let mw := cols.is_mulw
   let sum := m + mh + mhu + mhsu + mw
@@ -54,12 +52,12 @@ def AssertSpec (cols : MulCols (ZMod p)) : Prop :=
   cols.adapter.op_a_0 = 0
 
 /-- SP1's `MulCols.interactions` own tail is empty: every byte-range pull lives inside `MulOperation`. -/
-def InteractSpec (_cols : MulCols (ZMod p)) : Prop := True
+def InteractSpec (_cols : Columns (ZMod p)) : Prop := True
 
 /-- Compose the `CPUState`/`RTypeReader` readers and the witnessed `MulOperation` as Clean sub-circuits.
-Witnesses result word `a` and the five variant flags; gates `is_real`; assembles `MulCols`.
+Witnesses result word `a` and the five variant flags; gates `is_real`; assembles `Columns`.
 `RTypeReader` carries the flag-weighted opcode (`E16–E23`). -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let flags ← witnessVectorNative 5 (fun env => hintFlags env.hint)
@@ -135,7 +133,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p))
 
 set_option maxHeartbeats 4000000 in
 @[implicit_reducible] private def derivedElaborated :
-    ElaboratedCircuit (ZMod p) Inputs MulCols main := by
+    ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit_with {
     channelsWithGuarantees :=
       [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
@@ -143,7 +141,7 @@ set_option maxHeartbeats 4000000 in
 
 /-- Clean derives the output layout and all structural proofs from `main`; this public record forwards
 that compact result while keeping the declared channel order visible at the chip boundary. -/
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs MulCols main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output := derivedElaborated.output
   output_eq := derivedElaborated.output_eq
   localLength := derivedElaborated.localLength
@@ -170,7 +168,7 @@ four-limb result word.  This is a symbolic normalization boundary for grounding 
         varFromOffset Extracted.MulOperation (offset + 5),
         var { index := offset }, var { index := offset + 1 },
         var { index := offset + 2 }, var { index := offset + 3 },
-        var { index := offset + 4 }⟩ : Var MulCols (ZMod p)) := rfl
+        var { index := offset + 4 }⟩ : Var Columns (ZMod p)) := rfl
 
 /-- The exact R-type reader input retained after MUL's 54 local cells.  Naming this value keeps
 downstream timestamp and structural proofs independent of the multiplication witness internals. -/
@@ -201,7 +199,7 @@ def rTypeReaderInput (input : Var Inputs (ZMod p)) (offset : ℕ) :
 
 /-- Component-wise evaluation of a completed Mul row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : MulCols (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state
          adapter := Eval.eval env cols.adapter
@@ -212,7 +210,7 @@ def rTypeReaderInput (input : Var Inputs (ZMod p)) (offset : ℕ) :
          is_mulhu := Eval.eval env cols.is_mulhu
          is_mulhsu := Eval.eval env cols.is_mulhsu
          is_mulw := Eval.eval env cols.is_mulw } :
-        MulCols F) := by
+        Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 

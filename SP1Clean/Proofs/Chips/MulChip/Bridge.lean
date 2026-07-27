@@ -179,7 +179,7 @@ theorem correct_mulw_native
 omit [Fact (2 ^ 24 < p)] in
 /-- End-to-end: from the chip `Spec`, the 5-way MUL/MULH/MULHU/MULHSU/MULW Sail identities hold. -/
 theorem mul_chip_reaches_sail
-    (input : MulChip.Inputs (ZMod p)) (cols : Extracted.MulCols (ZMod p))
+    (input : MulChip.Inputs (ZMod p)) (cols : MulChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
@@ -233,7 +233,7 @@ adapter, `cols.a` as the multiply write, opcode the flag-weighted R-type discrim
 (MUL 11, MULH 12, MULHU 13, MULHSU 14, MULW 24). Standalone so `MulChip.advance` — the Phase-4
 `try_step` obligation referencing the whole view — can be stated *before* `kind` and supplied *as*
 `kind.advance`, breaking the `advance ↔ kind.view` reference cycle. -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.MulCols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : MulChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.a,
     cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulhu * 13 + cols.is_mulhsu * 14
@@ -245,7 +245,7 @@ for MULW), converts the chip `Spec`'s flag-gated `RV64.<op>` conjunct to the Sai
 write value (via `RV64.<op>_eq`, the bridge's explicit-`hb` typed pattern), and routes to the matching
 `advance_of_mul <op> (canonical)` / `advance_of_mulw`. `himmb`/`himmc`/`hstraight` are `rfl`
 (RTypeReader), and `hpc0` comes from the reader `Spec`'s bounds. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.MulCols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : MulChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -344,7 +344,7 @@ route to `MulChip.advance` (the uniform 5-way `try_step` lift). -/
 def kind : Soundness.ChipKind p where
   name := "Mul"
   Inputs := MulChip.Inputs
-  Cols := Extracted.MulCols
+  Cols := MulChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧

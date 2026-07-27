@@ -194,7 +194,7 @@ MEMORY_BOUNDARY_CLUSTER: Tuple[str, ...] = (
 # chip-private arithmetic structs and functions stay in the oracle.
 # Grow this set one chip at a time, deleting the corresponding legacy `Extracted/<Chip>Chip.lean`
 # file after its native reconfiguration lands.
-CHIP_ORACLES: Set[str] = {"Add", "Sub", "Subw"}
+CHIP_ORACLES: Set[str] = {"Add", "Sub", "Subw", "Mul", "DivRem"}
 
 # Stable generated reader substrate shared by native chip rows and whole-chip Rust oracles. Reusing
 # these types avoids creating a fresh CPU/register-reader hierarchy per oracle while keeping Rust

@@ -36,7 +36,6 @@ circuit_norm]`. No struct flattening, no brute force, no faithfulness impact. -/
 namespace SP1Clean.DivRemChip
 
 open Circuit
-open Extracted (DivRemCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 -- `2 ^ 24` (subsuming `2 ^ 17`): the chip composes `MulOperation` — see `Defs`.

@@ -123,6 +123,8 @@ import SP1Clean.Extracted.AluX0Chip
 import SP1Clean.Extracted.ChipOracle.Add
 import SP1Clean.Extracted.ChipOracle.Sub
 import SP1Clean.Extracted.ChipOracle.Subw
+import SP1Clean.Extracted.ChipOracle.Mul
+import SP1Clean.Extracted.ChipOracle.DivRem
 import SP1Clean.Extracted.AddOperation
 import SP1Clean.Extracted.AddiChip
 import SP1Clean.Extracted.AddrAddOperation
@@ -134,7 +136,6 @@ import SP1Clean.Extracted.BitwiseOperation
 import SP1Clean.Extracted.BitwiseU16Operation
 import SP1Clean.Extracted.BranchChip
 import SP1Clean.Extracted.CPUState
-import SP1Clean.Extracted.DivRemChip
 import SP1Clean.Extracted.ExtractionDSL
 import SP1Clean.Extracted.Provenance
 import SP1Clean.Extracted.CoreAIRManifest
@@ -166,7 +167,6 @@ import SP1Clean.Extracted.LoadX0Chip
 import SP1Clean.Extracted.LtChip
 import SP1Clean.Extracted.LtOperationSigned
 import SP1Clean.Extracted.LtOperationUnsigned
-import SP1Clean.Extracted.MulChip
 import SP1Clean.Extracted.MulOperation
 import SP1Clean.Extracted.RTypeReader
 import SP1Clean.Extracted.ShiftLeftChip
@@ -213,7 +213,6 @@ import SP1Clean.Faithful.LoadX0
 import SP1Clean.Faithful.LtChip
 import SP1Clean.Faithful.LtOperationUnsigned
 import SP1Clean.Faithful.MulChip
-import SP1Clean.Faithful.MulOperation
 import SP1Clean.Faithful.RTypeReader
 import SP1Clean.Faithful.ShiftLeftChip
 import SP1Clean.Faithful.ShiftRightChip
@@ -379,6 +378,7 @@ import SP1Clean.Soundness.AdvanceDispatch
 import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
 import SP1Clean.FormalModel.Contracts.DivRem
+import SP1Clean.FormalModel.Contracts.DivRemColumns
 import SP1Clean.FormalModel.Contracts.PublicValues
 import SP1Clean.FormalModel.Contracts.CoreAIR
 import SP1Clean.FormalModel.CoreProfile

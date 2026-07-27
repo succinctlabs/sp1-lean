@@ -65,6 +65,20 @@ reproducible immutable git pins is a **release blocker** tracked outside this ca
   (anchors folded into `Faithful/SubwChip.lean` as private, Sub-style); probe −8 entries.
   Axiom census unchanged (chip circuit `[propext, Classical.choice, Quot.sound]`; advance carries
   only the disclosed Sail platform hooks).
+- **Mul + DivRem — complete, all gates green.** The two heaviest chips (168 KB / multi-file
+  Faithful layers). Both trace-conformance anchors now audit the reconfigure maps cell-for-cell
+  against real prover dumps. Structural learnings recorded for the remaining chips: (1) shared
+  operations consumed by another chip's Exact layer get one-line definitional **namespace
+  bridges** in the Faithful file instead of re-pointing (avoids duplicating ~1500-line op lemma
+  sets; `Extracted/MulOperation.lean` + `U16toU8OperationSafe.lean` stay — the latter is imported
+  by `SystemOracle/SyscallInstrs.lean`); (2) a chip row consumed below `Contracts/Chips.lean` in
+  the import order gets its own `Contracts/<Chip>Columns.lean` (DivRem — cycle avoidance);
+  (3) at DivRem scale the `dsimp`-through-reconfigure pattern hits the documented
+  whnf-into-giant-term kernel cliff — replaced with ~82 tiny `rfl` projection lemmas + syntactic
+  rewriting (Clean doctrine); `Faithful.DivRemChip.Exact` 258s (was 95s). Retired:
+  `Faithful/MulOperation.lean`. Census: `divRemChip_faithful` three-axiom clean;
+  `mulChip_faithful` carries only the pre-existing disclosed `bv_decide` axioms.
+  CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem} — 5/25.
 
 ## Phase 3 — audit findings
 
@@ -209,3 +223,72 @@ only the two disclosed operand `isU64` assumptions.
   `opcode.rs`; W-variant unsigned result sign-extension incl. ÷0 → `u64::MAX`.
 - **F-A4-06 (COSMETIC).** `MulChip.ControlSpec` is structuring documentation, not the exported
   conclusion — no drift.
+
+### Batch A6 — LoadByte / LoadHalf / LoadWord / LoadDouble / LoadX0 (complete; no BLOCKER, no WEAK-SPEC)
+
+Tri-model check (Spec ↔ Sail `execute_LOAD`/`extend_value` ↔ Rust `compute_load_value`): byte-lane
+selection (little-endian `addr%8`), limb→byte decomposition, and all extension widths (LB/LBU
+sext8/zext8 via the inline MSB byte pull, LH/LHU, LW/LWU with the LWU `msb·(is_lw−1)=0` gate, LD
+identity) verified correct on every chip. Effective address = 64-bit wrapping `rs1 + sext(imm12)`
+with the imm sign-extension correctly inherited from the ROM decode (unsigned loads still
+sign-extend the immediate — matches RISC-V). **Alignment is a proven AIR conclusion** (hard-wired
+AddressOperation offset bits per width; explicit per-width gates on LoadX0). LoadX0 performs the
+real read with full address semantics and discards the write (values existentially discarded, not
+wrong). RAM read at +1, `clk_inc = 8`. Findings: F-A6-01 (DISCLOSED-OK — RAM-content binding is
+relative to `MemoryPullsBound`; boundary closure = the open obligations, correctly disclosed),
+F-A6-02/05 (COSMETIC placement/brittleness notes), F-A6-03/04 (DISCLOSED-OK confirmations).
+
+**Spec-review sweep A1–A9: COMPLETE. Zero BLOCKERs across all 25 chips + substrate + relation
+level.** Open fix queue: F-A4-01 (Mul one-hot Spec export — the one WEAK-SPEC-low), F-A8-01
+prose + F-A8-02 dead lemma (ByteTable.lean), F-A9-01/F-A1-01 `True ∧` conjuncts, F-A1-02
+docstring, F-A9-05 doc third conjunct. Disclosure items for the report: F-A2-02
+(completeness-side imm variants), F-A8-04/F-A9-02 (SP1MachineModel witness — V-track), F-A5-01
+(4-byte alignment stricter than executor), F-A6-01 (memory-boundary obligations).
+
+### Batch A7 — StoreByte / StoreHalf / StoreWord / StoreDouble (complete; no BLOCKER)
+
+The read-modify-write merge math verified byte-for-byte against the Rust AIR
+(`store_byte/half/word.rs`) and Sail `execute_STORE`; **non-target-byte preservation is a proven
+theorem** (`patchedCellBytes`/`RamCellUpdate` — the "silently corrupts adjacent memory" failure
+mode is proven absent, not just asserted). SH/SW/SD alignment (`addr%2/4/8 = 0`) is a proven
+soundness conclusion from the AddressOperation decomposition with hard-wired offset bits. All four
+carry `.store` RowEffects (widths 1/2/4/8) closing `execute_STORE_reaches_width{1,2,4,8}`;
+op_a-slot = rs2 read-back matches Rust `prev_a()`; RAM +1 / reg +4/+3 timestamp offsets match
+`MemoryAccessPosition`. Findings all DISCLOSED-OK/COSMETIC — notably F-A7-02 (the deliberate
+two-layer design: RowEffect uses rs2 directly, the merge math is separately load-bearing for the
+doubleword-bus reconciliation — both proven) and F-A7-06 (SB/SH/SW state a derivable
+`isU64 store_value` assumption that SD avoids; cosmetic asymmetry).
+
+### Batch A2 — Bitwise / Lt / UType (complete; no BLOCKER)
+
+Verified: `byteOp` table AND=0/OR=1/XOR=2 vs `opcode.rs:163` with the genuine full-64-bit
+reassembly; SLT/SLTU operand order vs Sail `zopz0zI_s/_u`; the MSB-flip signed→unsigned
+comparison construction; LUI/AUIPC placement + sign-extension vs `execute_UTYPE` verbatim
+(AUIPC uses the current pc); immediate forms folded into base opcodes exactly as SP1;
+`clk_inc = 8`; nonX0-vs-any routing matches `emit_alu_event`/`emit_utype_event` incl. the forced
+`a=0` on x0 writes; chip names match `MachineAir::name`.
+
+- **F-A2-01 (DISCLOSED-OK trust boundary).** UType assumes the immediate-decode fact
+  (`toBitVec64 op_b_imm = RV64.lui (immOf adapter)`) rather than deriving the imm20<<12 placement
+  in-circuit — discharged at the program-ROM/grounding layer; report-worthy disclosure.
+- **F-A2-02 (WEAK-SPEC low, completeness-side only).** Bitwise/Lt `ProverAssumptions` assume
+  `imm_c = 0`, so XORI/ORI/ANDI/SLTI/SLTIU have no honest-prover completeness witness (soundness
+  and the Sail bridges cover them). Disclose in the report's completeness paragraph.
+- **F-A2-03/04 (DISCLOSED-OK/COSMETIC).** UType x0 rows vacuous on the value (faithful to SP1's
+  forced `a=0`); Bitwise selector-active fact lives at the grounding layer (selector-chip
+  pattern,= F-A3-07/F-A4-01).
+
+### Batch A3 — ShiftLeft / ShiftRight (complete; no BLOCKER, no WEAK-SPEC)
+
+All six opcodes traced Spec → `RV64.*` → pure Sail restatement → monadic `execute_*`: mask widths
+exactly right (64-bit ops rs2[5:0] via `log2_xlen−1=5`; W-ops rs2[4:0]); SRL zero-fill vs SRA
+bit-63 sign-fill; the counterintuitive SRLW case (logical shift in 32, then SIGN-extension to 64)
+and SRAW (sign-fill from bit 31 of the low-32) both correct; immediate variants fold into the base
+opcodes exactly as SP1's executor does, with identical shamt handling; Assumptions are isU64-only.
+Bridges reach the monadic Sail clauses, not just pure restatements.
+
+- **F-A3-01..06 (DISCLOSED-OK confirmations).** As above, each with quoted Sail clause evidence.
+- **F-A3-07 (COSMETIC — same pattern as F-A4-01).** The public shift Specs don't force a selector
+  flag on real rows (one-hot lives in `ControlFacts.selectorLink` + `advanceReady`). Pattern
+  decision at fix time: export one-hot into the Mul Spec (flagged WEAK-SPEC-low there) and
+  document the selector-chip pattern once for the rest.

@@ -6,7 +6,7 @@ import SP1Clean.Proofs.CircuitProofStart
 /-! # `DivRemCore` — the `FormalAssertion` bundle (soundness / completeness / contract)
 
 The DivRem product/own-assert/byte-range assertion cluster as a Clean `FormalAssertion` over the
-whole committed row (`Extracted.DivRemCols`). The circuit
+whole committed row (`DivRemChip.Columns`). The circuit
 (`Native/Operations/DivRemOperation/Core.lean`) witnesses nothing, so both directions are
 input-level repackaging: soundness maps the two composed `MulOperation` implications, the eight
 product-glue equations, the own-assert tail (through the `ownAsserts_map_eval` var↔value
@@ -18,7 +18,6 @@ each constraint back from the same conjuncts. -/
 namespace SP1Clean.DivRemCore
 
 open Circuit
-open Extracted (DivRemCols)
 open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
@@ -39,8 +38,8 @@ carrier-generic `ownAsserts` chain at `R = Expression (ZMod p)` yields the same 
 `circuit_proof_start` `h_input`). This is the one lemma that lets `CoreSpec`'s raw
 `OwnAssertsHold` bundle be stated over the evaluated row while both `FormalAssertion`
 directions stay pure repackaging. -/
-theorem ownAsserts_map_eval (env : Environment (ZMod p)) (colsV : Var DivRemCols (ZMod p))
-    (cols : DivRemCols (ZMod p))
+theorem ownAsserts_map_eval (env : Environment (ZMod p)) (colsV : Var DivRemChip.Columns (ZMod p))
+    (cols : DivRemChip.Columns (ZMod p))
     (pDiv : Expression.eval env colsV.is_div = cols.is_div)
     (pDivu : Expression.eval env colsV.is_divu = cols.is_divu)
     (pRem : Expression.eval env colsV.is_rem = cols.is_rem)
@@ -251,8 +250,8 @@ theorem ownAsserts_map_eval (env : Environment (ZMod p)) (colsV : Var DivRemCols
 (ownAsserts cols)` block's `h_holds` content) give the evaluated-row `OwnAssertsHold` bundle.
 `colsV`/`cols` are implicit so both solve structurally from `h` and the goal — the pins then
 land on fully-instantiated fields. -/
-theorem ownAssertsHold_of_forall (env : Environment (ZMod p)) {colsV : Var DivRemCols (ZMod p)}
-    {cols : DivRemCols (ZMod p)}
+theorem ownAssertsHold_of_forall (env : Environment (ZMod p)) {colsV : Var DivRemChip.Columns (ZMod p)}
+    {cols : DivRemChip.Columns (ZMod p)}
     (h : ∀ e ∈ DivRemChip.ownAsserts colsV, Expression.eval env e = 0)
         (pDiv : Expression.eval env colsV.is_div = cols.is_div)
     (pDivu : Expression.eval env colsV.is_divu = cols.is_divu)
@@ -306,8 +305,8 @@ theorem ownAssertsHold_of_forall (env : Environment (ZMod p)) {colsV : Var DivRe
 
 /-- Completeness-direction transport: the evaluated-row `OwnAssertsHold` bundle discharges the
 var-level own-assert equations. -/
-theorem forall_of_ownAssertsHold (env : Environment (ZMod p)) {colsV : Var DivRemCols (ZMod p)}
-    {cols : DivRemCols (ZMod p)}
+theorem forall_of_ownAssertsHold (env : Environment (ZMod p)) {colsV : Var DivRemChip.Columns (ZMod p)}
+    {cols : DivRemChip.Columns (ZMod p)}
     (h : OwnAssertsHold cols)
         (pDiv : Expression.eval env colsV.is_div = cols.is_div)
     (pDivu : Expression.eval env colsV.is_divu = cols.is_divu)
@@ -372,7 +371,7 @@ private lemma byteRowSpec_of_isU16 {v : ZMod p} (h : v.val < 2 ^ 16) :
 set_option linter.unusedSectionVars false in
 /-- One-hot flags select a committed case: with all eight variant flags binary and their `val`s
 summing to one, some `Case` carries flag `1` and every other flag is `0`. -/
-theorem selection_of_flags {cols : DivRemCols (ZMod p)}
+theorem selection_of_flags {cols : DivRemChip.Columns (ZMod p)}
     (b0 : cols.is_div = 0 ∨ cols.is_div = 1) (b1 : cols.is_divu = 0 ∨ cols.is_divu = 1)
     (b2 : cols.is_rem = 0 ∨ cols.is_rem = 1) (b3 : cols.is_remu = 0 ∨ cols.is_remu = 1)
     (b4 : cols.is_divw = 0 ∨ cols.is_divw = 1) (b5 : cols.is_remw = 0 ∨ cols.is_remw = 1)
@@ -473,7 +472,7 @@ theorem selection_of_flags {cols : DivRemCols (ZMod p)}
 /-- The core cluster is self-contained. Its composed multiplications recover operand limb bounds
 from their own safe byte-decomposition pulls, while the gate/flag facts come from the core's
 own-assert tail. No range fact has to be assumed by the parent chip. -/
-def Assumptions (_cols : DivRemCols (ZMod p)) : Prop := True
+def Assumptions (_cols : DivRemChip.Columns (ZMod p)) : Prop := True
 
 set_option maxHeartbeats 16000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CoreSpec := by
@@ -1076,7 +1075,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Co
       hByte (by linear_combination - hneg)
     exact byteRowSpec_of_isU16 (by simpa only [eCtq7] using fCtq 7 (by norm_num))
 set_option maxHeartbeats 16000000 in
-private theorem main_requirementsChannelsLawful (input_var : Var DivRemCols (ZMod p)) (i₀ : ℕ) :
+private theorem main_requirementsChannelsLawful (input_var : Var DivRemChip.Columns (ZMod p)) (i₀ : ℕ) :
     ((main input_var).operations i₀).RequirementsChannelsLawful
       (elaborated (p := p)).channelsWithGuarantees [] := by
   have h_byte : (byteChannel (p := p)).toRaw ∈ (elaborated (p := p)).channelsWithGuarantees := by
@@ -1153,7 +1152,7 @@ private theorem main_requirementsChannelsLawful (input_var : Var DivRemCols (ZMo
 `FormalAssertion`: two composed `MulOperation` assertions, the eight product-glue asserts, the
 chip's own assertZero tail, and the 32 gated byte-range pulls over the committed row; no fresh
 witnesses, semantic contract `DivRemCore.CoreSpec`. -/
-def circuit : FormalAssertion (ZMod p) DivRemCols :=
+def circuit : FormalAssertion (ZMod p) DivRemChip.Columns :=
   { main, elaborated,
     Assumptions := Assumptions,
     Spec := CoreSpec,
@@ -1167,7 +1166,7 @@ set_option linter.unusedSectionVars false in
     (circuit (p := p)).channelsWithRequirements = [] := rfl
 
 set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma circuit_localLength (x : Var DivRemCols (ZMod p)) :
+@[circuit_norm] lemma circuit_localLength (x : Var DivRemChip.Columns (ZMod p)) :
     circuit.localLength x = 0 := rfl
 
 end SP1Clean.DivRemCore

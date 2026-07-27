@@ -168,13 +168,13 @@ theorem RoutedEvidence.sound {case : Case} {rs1 rs2 result : BitVec 64}
 /-- Evidence-shaped replacement for a raw per-op circuit proof.  The heavy integration layer only
 needs to establish this implication from the selected row's constraints. -/
 def EvidenceSpec {p : ℕ} [NeZero p] (case : Case) (isReal : ZMod p)
-    (rs1 rs2 result : Word (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) : Prop :=
+    (rs1 rs2 result : Word (ZMod p)) (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   isReal = 1 → case.flag cols = 1 →
     RoutedEvidence case (Word.toBitVec64 rs1) (Word.toBitVec64 rs2) (Word.toBitVec64 result)
 
 /-- Isolated evidence closes the public semantic case contract. -/
 theorem EvidenceSpec.sound {p : ℕ} [NeZero p] {case : Case} {isReal : ZMod p}
-    {rs1 rs2 result : Word (ZMod p)} {cols : Extracted.DivRemCols (ZMod p)}
+    {rs1 rs2 result : Word (ZMod p)} {cols : DivRemChip.Columns (ZMod p)}
     (h : EvidenceSpec case isReal rs1 rs2 result cols) :
     CaseSpec case isReal rs1 rs2 result cols := by
   intro hreal hflag
@@ -182,12 +182,12 @@ theorem EvidenceSpec.sound {p : ℕ} [NeZero p] {case : Case} {isReal : ZMod p}
 
 /-- Evidence for all cases, in the same uniform shape as `DivRemContract.CasesSpec`. -/
 def EvidenceSpecs {p : ℕ} [NeZero p] (isReal : ZMod p)
-    (rs1 rs2 result : Word (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) : Prop :=
+    (rs1 rs2 result : Word (ZMod p)) (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   ∀ case, EvidenceSpec case isReal rs1 rs2 result cols
 
 /-- Once evidence extraction is complete, all eight public case obligations follow immediately. -/
 theorem EvidenceSpecs.sound {p : ℕ} [NeZero p] {isReal : ZMod p}
-    {rs1 rs2 result : Word (ZMod p)} {cols : Extracted.DivRemCols (ZMod p)}
+    {rs1 rs2 result : Word (ZMod p)} {cols : DivRemChip.Columns (ZMod p)}
     (h : EvidenceSpecs isReal rs1 rs2 result cols) :
     CasesSpec isReal rs1 rs2 result cols :=
   fun case => (h case).sound
@@ -195,14 +195,14 @@ theorem EvidenceSpecs.sound {p : ℕ} [NeZero p] {isReal : ZMod p}
 /-- Evidence-shaped row contract exported to the full circuit proof.  Selection and gate
 booleanness are structural facts; arithmetic remains in the uniformly isolated `EvidenceSpecs`. -/
 structure RowEvidence {p : ℕ} [NeZero p] (isReal : ZMod p)
-    (rs1 rs2 result : Word (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) : Prop where
+    (rs1 rs2 result : Word (ZMod p)) (cols : DivRemChip.Columns (ZMod p)) : Prop where
   isReal_binary : isReal = 0 ∨ isReal = 1
   selection : SelectionSpec isReal cols
   cases : EvidenceSpecs isReal rs1 rs2 result cols
 
 /-- The evidence-shaped row interface refines the stable public row contract. -/
 theorem RowEvidence.sound {p : ℕ} [NeZero p] {isReal : ZMod p}
-    {rs1 rs2 result : Word (ZMod p)} {cols : Extracted.DivRemCols (ZMod p)}
+    {rs1 rs2 result : Word (ZMod p)} {cols : DivRemChip.Columns (ZMod p)}
     (h : RowEvidence isReal rs1 rs2 result cols) :
     RowSpec isReal rs1 rs2 result cols :=
   ⟨h.isReal_binary, h.selection, h.cases.sound⟩

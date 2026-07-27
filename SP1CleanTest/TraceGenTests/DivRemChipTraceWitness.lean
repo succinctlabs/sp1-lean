@@ -1,4 +1,4 @@
-import SP1Clean.Proofs.Chips.DivRemChip.Defs
+import SP1Clean.Faithful.DivRemChip
 import SP1CleanTest.TraceGenTests.TraceGenerator
 import SP1CleanTest.TraceGenTests.DivRemChipTraceVectors
 
@@ -43,15 +43,16 @@ def divRemPadInputs : List (ZMod SP1Prime) :=
 /-- The derived padding row: the circuit's witness closures on the padding input with the empty
 hint (default flags = the `is_divu` template). -/
 def divRemPadRow : List (ZMod SP1Prime) :=
-  circuitTraceRow DivRemChip.Inputs (DivRemChip.main (p := SP1Prime)) divRemPadInputs
+  circuitTraceRowMapped DivRemChip.Inputs (DivRemChip.main (p := SP1Prime))
+    Faithful.divRemChipReconfigure divRemPadInputs
 
 /-- The `DivRemChip` trace derived from the circuit: one `circuitTraceRow` per dumped event (flag
 hint from the event's opcode), template padding to SP1's height. -/
 def divRemChipDerivedTrace : List (List (ZMod SP1Prime)) :=
   generateTrace
     (fun e =>
-      circuitTraceRow DivRemChip.Inputs (DivRemChip.main (p := SP1Prime)) (rTypeOpEventInputs e)
-        (divRemHint e.opcode))
+      circuitTraceRowMapped DivRemChip.Inputs (DivRemChip.main (p := SP1Prime))
+        Faithful.divRemChipReconfigure (rTypeOpEventInputs e) (divRemHint e.opcode))
     DivRemChipTraceEvents DivRemChipTraceHeight 246 divRemPadRow
 
 theorem divremchip_trace_conforms :

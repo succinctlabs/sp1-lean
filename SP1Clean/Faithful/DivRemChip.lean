@@ -4,6 +4,7 @@ import SP1Clean.Faithful.IsEqualWordOperation
 import SP1Clean.Faithful.LtOperationUnsigned
 import SP1Clean.Faithful.MulChip
 import SP1Clean.Faithful.U16MSBOperation
+import SP1Clean.Extracted.ChipOracle.DivRem
 import SP1Clean.Proofs.Chips.DivRemChip.Formal
 
 /-!
@@ -28,7 +29,7 @@ open scoped SP1Clean.ConstraintCoe
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 private theorem divRemCols_size :
-    size Extracted.DivRemCols = 246 := rfl
+    size DivRemChip.Columns = 246 := rfl
 
 private theorem divRemInputs_size :
     size DivRemChip.Inputs = 29 := rfl
@@ -84,20 +85,200 @@ private theorem divRem_toElements_u16MSBOperation {F : Type}
     (op : Extracted.U16MSBOperation F) :
     toElements op = #v[op.msb] := rfl
 
-def divRemChipOracle :
-    ChipOracle (ZMod p) Extracted.DivRemCols Extracted.DivRemCols :=
-  ChipOracle.identity Extracted.DivRemCols.asserts
-    Extracted.DivRemCols.interactions
+/-- Copy a shared standalone arithmetic block into the DivRem oracle's chip-private struct copy.
+Same field names; definitional field-copy, not an operation-level faithfulness claim. -/
+def divRemOracleMulOperation {F : Type} (cols : Extracted.MulOperation F) :
+    Extracted.DivRemOracle.MulOperation F :=
+  { carry := cols.carry
+    product := cols.product
+    b_lower_byte := { low_bytes := cols.b_lower_byte.low_bytes }
+    c_lower_byte := { low_bytes := cols.c_lower_byte.low_bytes }
+    b_msb := cols.b_msb
+    c_msb := cols.c_msb
+    product_msb := { msb := cols.product_msb.msb }
+    b_sign_extend := cols.b_sign_extend
+    c_sign_extend := cols.c_sign_extend }
+
+/-- Inverse of `divRemOracleMulOperation`. -/
+def divRemNativeMulOperation {F : Type} (cols : Extracted.DivRemOracle.MulOperation F) :
+    Extracted.MulOperation F :=
+  { carry := cols.carry
+    product := cols.product
+    b_lower_byte := { low_bytes := cols.b_lower_byte.low_bytes }
+    c_lower_byte := { low_bytes := cols.c_lower_byte.low_bytes }
+    b_msb := cols.b_msb
+    c_msb := cols.c_msb
+    product_msb := { msb := cols.product_msb.msb }
+    b_sign_extend := cols.b_sign_extend
+    c_sign_extend := cols.c_sign_extend }
+
+/-- `Extracted.LtOperationUnsigned` → the DivRem oracle's embedded copy. -/
+def divRemOracleLtOperation {F : Type} (cols : Extracted.LtOperationUnsigned F) :
+    Extracted.DivRemOracle.LtOperationUnsigned F :=
+  { u16_compare_operation := { bit := cols.u16_compare_operation.bit }
+    u16_flags := cols.u16_flags
+    not_eq_inv := cols.not_eq_inv
+    comparison_limbs := cols.comparison_limbs }
+
+/-- Inverse of `divRemOracleLtOperation`. -/
+def divRemNativeLtOperation {F : Type} (cols : Extracted.DivRemOracle.LtOperationUnsigned F) :
+    Extracted.LtOperationUnsigned F :=
+  { u16_compare_operation := { bit := cols.u16_compare_operation.bit }
+    u16_flags := cols.u16_flags
+    not_eq_inv := cols.not_eq_inv
+    comparison_limbs := cols.comparison_limbs }
+
+/-- `Extracted.IsZeroWordOperation` → the DivRem oracle's embedded copy. -/
+def divRemOracleIsZeroWord {F : Type} (cols : Extracted.IsZeroWordOperation F) :
+    Extracted.DivRemOracle.IsZeroWordOperation F :=
+  { is_zero_limb_0 := { inverse := cols.is_zero_limb_0.inverse, result := cols.is_zero_limb_0.result }
+    is_zero_limb_1 := { inverse := cols.is_zero_limb_1.inverse, result := cols.is_zero_limb_1.result }
+    is_zero_limb_2 := { inverse := cols.is_zero_limb_2.inverse, result := cols.is_zero_limb_2.result }
+    is_zero_limb_3 := { inverse := cols.is_zero_limb_3.inverse, result := cols.is_zero_limb_3.result }
+    is_zero_first_half := cols.is_zero_first_half
+    is_zero_second_half := cols.is_zero_second_half
+    result := cols.result }
+
+/-- Inverse of `divRemOracleIsZeroWord`. -/
+def divRemNativeIsZeroWord {F : Type} (cols : Extracted.DivRemOracle.IsZeroWordOperation F) :
+    Extracted.IsZeroWordOperation F :=
+  { is_zero_limb_0 := { inverse := cols.is_zero_limb_0.inverse, result := cols.is_zero_limb_0.result }
+    is_zero_limb_1 := { inverse := cols.is_zero_limb_1.inverse, result := cols.is_zero_limb_1.result }
+    is_zero_limb_2 := { inverse := cols.is_zero_limb_2.inverse, result := cols.is_zero_limb_2.result }
+    is_zero_limb_3 := { inverse := cols.is_zero_limb_3.inverse, result := cols.is_zero_limb_3.result }
+    is_zero_first_half := cols.is_zero_first_half
+    is_zero_second_half := cols.is_zero_second_half
+    result := cols.result }
+
+/-- `Extracted.IsEqualWordOperation` → the DivRem oracle's embedded copy. -/
+def divRemOracleIsEqualWord {F : Type} (cols : Extracted.IsEqualWordOperation F) :
+    Extracted.DivRemOracle.IsEqualWordOperation F :=
+  { is_diff_zero := divRemOracleIsZeroWord cols.is_diff_zero }
+
+/-- Inverse of `divRemOracleIsEqualWord`. -/
+def divRemNativeIsEqualWord {F : Type} (cols : Extracted.DivRemOracle.IsEqualWordOperation F) :
+    Extracted.IsEqualWordOperation F :=
+  { is_diff_zero := divRemNativeIsZeroWord cols.is_diff_zero }
+
+/-- Whole-chip row reconfiguration. The reader blocks and the scalar/word columns are already the
+canonical generated substrate; each nested arithmetic block is copied into Rust's chip-private
+struct copies. This is not an operation-level faithfulness claim. -/
+def divRemChipReconfigure {F : Type} (cols : DivRemChip.Columns F) :
+    Extracted.DivRemOracle.DivRemCols F :=
+  { state := cols.state
+    adapter := cols.adapter
+    a := cols.a
+    b := cols.b
+    c := cols.c
+    quotient := cols.quotient
+    quotient_comp := cols.quotient_comp
+    remainder_comp := cols.remainder_comp
+    remainder := cols.remainder
+    abs_remainder := cols.abs_remainder
+    abs_c := cols.abs_c
+    max_abs_c_or_1 := cols.max_abs_c_or_1
+    c_times_quotient := cols.c_times_quotient
+    c_times_quotient_lower := divRemOracleMulOperation cols.c_times_quotient_lower
+    c_times_quotient_upper := divRemOracleMulOperation cols.c_times_quotient_upper
+    c_neg_operation := { value := cols.c_neg_operation.value }
+    rem_neg_operation := { value := cols.rem_neg_operation.value }
+    remainder_lt_operation := divRemOracleLtOperation cols.remainder_lt_operation
+    carry := cols.carry
+    is_c_0 := divRemOracleIsZeroWord cols.is_c_0
+    is_div := cols.is_div
+    is_divu := cols.is_divu
+    is_rem := cols.is_rem
+    is_remu := cols.is_remu
+    is_divw := cols.is_divw
+    is_remw := cols.is_remw
+    is_divuw := cols.is_divuw
+    is_remuw := cols.is_remuw
+    is_overflow := cols.is_overflow
+    is_overflow_b := divRemOracleIsEqualWord cols.is_overflow_b
+    is_overflow_c := divRemOracleIsEqualWord cols.is_overflow_c
+    b_msb := { msb := cols.b_msb.msb }
+    rem_msb := { msb := cols.rem_msb.msb }
+    c_msb := { msb := cols.c_msb.msb }
+    quot_msb := { msb := cols.quot_msb.msb }
+    b_neg := cols.b_neg
+    b_neg_not_overflow := cols.b_neg_not_overflow
+    b_not_neg_not_overflow := cols.b_not_neg_not_overflow
+    is_real_not_word := cols.is_real_not_word
+    rem_neg := cols.rem_neg
+    c_neg := cols.c_neg
+    abs_c_alu_event := cols.abs_c_alu_event
+    abs_rem_alu_event := cols.abs_rem_alu_event
+    is_real := cols.is_real
+    remainder_check_multiplicity := cols.remainder_check_multiplicity }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def divRemChipDeconfigure {F : Type} (cols : Extracted.DivRemOracle.DivRemCols F) :
+    DivRemChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    a := cols.a
+    b := cols.b
+    c := cols.c
+    quotient := cols.quotient
+    quotient_comp := cols.quotient_comp
+    remainder_comp := cols.remainder_comp
+    remainder := cols.remainder
+    abs_remainder := cols.abs_remainder
+    abs_c := cols.abs_c
+    max_abs_c_or_1 := cols.max_abs_c_or_1
+    c_times_quotient := cols.c_times_quotient
+    c_times_quotient_lower := divRemNativeMulOperation cols.c_times_quotient_lower
+    c_times_quotient_upper := divRemNativeMulOperation cols.c_times_quotient_upper
+    c_neg_operation := { value := cols.c_neg_operation.value }
+    rem_neg_operation := { value := cols.rem_neg_operation.value }
+    remainder_lt_operation := divRemNativeLtOperation cols.remainder_lt_operation
+    carry := cols.carry
+    is_c_0 := divRemNativeIsZeroWord cols.is_c_0
+    is_div := cols.is_div
+    is_divu := cols.is_divu
+    is_rem := cols.is_rem
+    is_remu := cols.is_remu
+    is_divw := cols.is_divw
+    is_remw := cols.is_remw
+    is_divuw := cols.is_divuw
+    is_remuw := cols.is_remuw
+    is_overflow := cols.is_overflow
+    is_overflow_b := divRemNativeIsEqualWord cols.is_overflow_b
+    is_overflow_c := divRemNativeIsEqualWord cols.is_overflow_c
+    b_msb := { msb := cols.b_msb.msb }
+    rem_msb := { msb := cols.rem_msb.msb }
+    c_msb := { msb := cols.c_msb.msb }
+    quot_msb := { msb := cols.quot_msb.msb }
+    b_neg := cols.b_neg
+    b_neg_not_overflow := cols.b_neg_not_overflow
+    b_not_neg_not_overflow := cols.b_not_neg_not_overflow
+    is_real_not_word := cols.is_real_not_word
+    rem_neg := cols.rem_neg
+    c_neg := cols.c_neg
+    abs_c_alu_event := cols.abs_c_alu_event
+    abs_rem_alu_event := cols.abs_rem_alu_event
+    is_real := cols.is_real
+    remainder_check_multiplicity := cols.remainder_check_multiplicity }
+
+/-- SP1 Rust's complete DivRem-chip oracle, viewed from the native Lean row. -/
+def divRemChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F DivRemChip.Columns Extracted.DivRemOracle.DivRemCols where
+  reconfigure := divRemChipReconfigure
+  deconfigure := divRemChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.DivRemOracle.DivRemCols.asserts
+  interactions := Extracted.DivRemOracle.DivRemCols.interactions
 
 def divRemChipInput {F : Type}
-    (cols : Extracted.DivRemCols F) : DivRemChip.Inputs F :=
+    (cols : DivRemChip.Columns F) : DivRemChip.Inputs F :=
   { is_real := cols.is_real
     state := cols.state
     adapter := cols.adapter }
 
 /-- Selector, operand, and multiplication witness prefix (native local offsets `0..113`). -/
 def divRemHeaderLocals {F : Type}
-    (cols : Extracted.DivRemCols F) : Vector F 114 :=
+    (cols : DivRemChip.Columns F) : Vector F 114 :=
   Vector.cast (by rfl)
     (#v[cols.is_div, cols.is_divu, cols.is_rem, cols.is_remu,
         cols.is_divw, cols.is_remw, cols.is_divuw, cols.is_remuw] ++
@@ -107,7 +288,7 @@ def divRemHeaderLocals {F : Type}
 
 /-- Sign, product, and zero/equality witness block (native local offsets `114..169`). -/
 def divRemComparisonLocals {F : Type}
-    (cols : Extracted.DivRemCols F) : Vector F 56 :=
+    (cols : DivRemChip.Columns F) : Vector F 56 :=
   Vector.cast (by rfl)
     (
       #v[cols.is_overflow, cols.b_neg, cols.b_neg_not_overflow,
@@ -120,7 +301,7 @@ def divRemComparisonLocals {F : Type}
 
 /-- Arithmetic/comparison tail (native local offsets `170..204`). -/
 def divRemArithmeticLocals {F : Type}
-    (cols : Extracted.DivRemCols F) : Vector F 35 :=
+    (cols : DivRemChip.Columns F) : Vector F 35 :=
   Vector.cast (by rfl)
     (
       cols.abs_c ++ cols.abs_remainder ++ cols.remainder_comp ++
@@ -135,7 +316,7 @@ def divRemArithmeticLocals {F : Type}
 
 /-- Result words and sign bits (native local offsets `205..216`). -/
 def divRemResultLocals {F : Type}
-    (cols : Extracted.DivRemCols F) : Vector F 12 :=
+    (cols : DivRemChip.Columns F) : Vector F 12 :=
   Vector.cast (by rfl)
     (cols.remainder ++ cols.quotient ++
       #v[cols.b_msb.msb, cols.c_msb.msb,
@@ -148,13 +329,13 @@ generator.  It therefore works for every adversarial row and exposes the complet
 whole-chip boundary.  The four opaque chunks keep projection proofs below Clean's kernel-size
 cliff without changing a single physical cell. -/
 def divRemChipLocals {F : Type}
-    (cols : Extracted.DivRemCols F) : Vector F 217 :=
+    (cols : DivRemChip.Columns F) : Vector F 217 :=
   Vector.cast (by rfl)
     (divRemHeaderLocals cols ++ divRemComparisonLocals cols ++
       divRemArithmeticLocals cols ++ divRemResultLocals cols)
 
 def divRemChipPhysicalRow {F : Type}
-    (cols : Extracted.DivRemCols F) : Array F :=
+    (cols : DivRemChip.Columns F) : Array F :=
   inputFirstRow (divRemChipInput cols) (divRemChipLocals cols)
 
 /-- Decode one typed block from the native local-witness suffix. -/
@@ -167,7 +348,7 @@ def divRemLocalBlock {F : Type} (M : TypeMap) [ProvableType M]
 /-- The row returned by the native circuit, reconstructed from an arbitrary local suffix. -/
 def divRemColumnsOfInput {F : Type}
     (input : DivRemChip.Inputs F) (locals : Vector F 217) :
-    Extracted.DivRemCols F :=
+    DivRemChip.Columns F :=
   let flags := divRemLocalBlock (fields 8) locals 0 (by decide)
   let scalars := divRemLocalBlock (fields 7) locals 114 (by decide)
   let misc := divRemLocalBlock (fields 3) locals 194 (by decide)
@@ -251,7 +432,7 @@ set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 2000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemHeaderBlocks_roundtrip {F : Type}
-    (cols : Extracted.DivRemCols F) :
+    (cols : DivRemChip.Columns F) :
     divRemLocalBlock (fields 8) (divRemChipLocals cols) 0 (by decide) =
         #v[cols.is_div, cols.is_divu, cols.is_rem, cols.is_remu,
           cols.is_divw, cols.is_remw, cols.is_divuw, cols.is_remuw] ∧
@@ -300,7 +481,7 @@ set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 2000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemComparisonBlocks_roundtrip {F : Type}
-    (cols : Extracted.DivRemCols F) :
+    (cols : DivRemChip.Columns F) :
     divRemLocalBlock (fields 7) (divRemChipLocals cols) 114 (by decide) =
         #v[cols.is_overflow, cols.b_neg, cols.b_neg_not_overflow,
           cols.b_not_neg_not_overflow, cols.is_real_not_word,
@@ -349,7 +530,7 @@ set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 2000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemArithmeticBlocks_roundtrip {F : Type}
-    (cols : Extracted.DivRemCols F) :
+    (cols : DivRemChip.Columns F) :
     divRemLocalBlock Word (divRemChipLocals cols) 170 (by decide) =
         cols.abs_c ∧
       divRemLocalBlock Word (divRemChipLocals cols) 174 (by decide) =
@@ -412,7 +593,7 @@ set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 2000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemResultBlocks_roundtrip {F : Type}
-    (cols : Extracted.DivRemCols F) :
+    (cols : DivRemChip.Columns F) :
     divRemLocalBlock Word (divRemChipLocals cols) 205 (by decide) =
         cols.remainder ∧
       divRemLocalBlock Word (divRemChipLocals cols) 209 (by decide) =
@@ -462,7 +643,7 @@ private theorem divRemResultBlocks_roundtrip {F : Type}
     rfl
 
 private theorem divRemColumnsOfInput_roundtrip {F : Type}
-    (cols : Extracted.DivRemCols F) :
+    (cols : DivRemChip.Columns F) :
     divRemColumnsOfInput (divRemChipInput cols) (divRemChipLocals cols) =
       cols := by
   obtain ⟨hflags, hqc, ha, hb, hc, hlo, hup⟩ :=
@@ -479,7 +660,7 @@ private theorem divRemColumnsOfInput_roundtrip {F : Type}
     hcarry, hovb, hovc, hisc0, habsc, habsr, hremc, hmax,
     hcneg, hrneg, hmisc, hltc, hltf, hltinv, hltbit,
     hrem, hquot, hbmsb, hcmsb, hrmsb, hqmsb]
-  rw [Extracted.DivRemCols.mk.injEq]
+  rw [DivRemChip.Columns.mk.injEq]
   simp
 
 omit [Fact (2 ^ 24 < p)] in
@@ -679,7 +860,7 @@ private theorem eval_divRemLtOfLocals
 
 set_option maxHeartbeats 2000000 in
 theorem eval_divRemChipDirectOutput
-    (cols : Extracted.DivRemCols (ZMod p))
+    (cols : DivRemChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
     ProvableType.eval
         (Environment.fromArray (divRemChipPhysicalRow cols) data)
@@ -699,7 +880,7 @@ theorem eval_divRemChipDirectOutput
     DivRemChip.populateRow_output_eq]
   rw [← CircuitType.eval_expression,
     DivRemChip.eval_divRemCols_verifier]
-  rw [Extracted.DivRemCols.mk.injEq]
+  rw [DivRemChip.Columns.mk.injEq]
   obtain ⟨hflags, hqc, ha, hb, hc, hlo, hup⟩ :=
     divRemHeaderBlocks_roundtrip cols
   obtain ⟨hscalars, hctq, hcarry, hovb, hovc, hisc0⟩ :=
@@ -921,7 +1102,7 @@ theorem eval_divRemChipDirectOutput
         (congrArg (fun value => value[2]) hmisc)
 
 def divRemChipRowCodec :
-    ChipRowCodec DivRemChip.Inputs Extracted.DivRemCols
+    ChipRowCodec DivRemChip.Inputs DivRemChip.Columns
       (DivRemChip.circuit (p := p)) where
   assignment cols data := {
     row := divRemChipPhysicalRow cols
@@ -975,7 +1156,7 @@ its projection pins from the standard `ProvableStruct` evaluators once. The exac
 proof imports this folded boundary instead of re-normalizing all 246 columns. -/
 theorem divRemOwnAsserts_eval
     (env : Environment (ZMod p))
-    (cols : Var Extracted.DivRemCols (ZMod p)) :
+    (cols : Var DivRemChip.Columns (ZMod p)) :
     (DivRemChip.ownAsserts cols).map (Expression.eval env) =
       DivRemChip.ownAsserts (Eval.eval env cols) := by
   apply DivRemCore.ownAsserts_map_eval env cols (Eval.eval env cols)

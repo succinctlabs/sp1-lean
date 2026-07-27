@@ -5,8 +5,7 @@ import SP1Clean.Extracted.AddwChip
 import SP1Clean.Extracted.BitwiseChip
 import SP1Clean.Extracted.ShiftLeftChip
 import SP1Clean.Extracted.ShiftRightChip
-import SP1Clean.Extracted.MulChip
-import SP1Clean.Extracted.DivRemChip
+import SP1Clean.FormalModel.Contracts.DivRemColumns
 import SP1Clean.Extracted.JalChip
 import SP1Clean.Extracted.JalrChip
 import SP1Clean.Extracted.BranchChip
@@ -509,14 +508,29 @@ end SP1Clean.ShiftRightChip
 
 namespace SP1Clean.MulChip
 
-open Extracted (MulCols)
 -- `Mul`'s column sums reach `~2^20`, so the `MulOperation` gadget it composes is gated on `2^24 < p`;
 -- the whole `Mul` chain (this `Spec` included) carries the same bound (unlike the `2^17` of other chips).
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
+/-- Native MUL-chip row. The reader blocks reuse the project substrate and the arithmetic block is the
+shared `Extracted.MulOperation` column struct (still a standalone generated module — `DivRem` composes
+the same gadget). The five variant selectors are committed columns. `Faithful.mulChipReconfigure` is
+the sole bridge to Rust's separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.RTypeReader F
+  a : Word F
+  mul_operation : Extracted.MulOperation F
+  is_mul : F
+  is_mulh : F
+  is_mulhu : F
+  is_mulhsu : F
+  is_mulw : F
+deriving ProvableStruct
+
 /-- The two operand words (as read for `rs1`/`rs2`), the `is_real` selector, and the **threaded reader
 column blocks** `state`/`adapter` (as `AddChip`; `Mul`/`Mulh`/… are R-type register-register ops, so the
-adapter is the register `RTypeReader`). The five variant selectors are *committed columns* of `MulCols`
+adapter is the register `RTypeReader`). The five variant selectors are *committed columns* of the row
 (gated on in the `Spec` via `cols.is_mul` etc.), not inputs. -/
 structure Inputs (F : Type) where
   is_real : F
@@ -540,7 +554,7 @@ structure SelectorValues (F : Type) where
 deriving ProvableStruct
 
 /-- Project the dispatch cells from a complete MUL row. -/
-def selectors {F : Type} (cols : MulCols F) : SelectorValues F :=
+def selectors {F : Type} (cols : Columns F) : SelectorValues F :=
   ⟨cols.is_mul, cols.is_mulh, cols.is_mulhu, cols.is_mulhsu, cols.is_mulw⟩
 
 /-- Auditable control-flow contract for an active MUL-family row: exactly one committed variant
@@ -556,7 +570,7 @@ def SelectorOneHot (s : SelectorValues (ZMod p)) : Prop :=
 /-- The chip-owned selector/routing part of the MUL AIR, separated from multiplication arithmetic
 and reader semantics.  This is the stable contract proved directly from physical assertions and
 used to justify active-row dispatch and the non-`x0` write route. -/
-def ControlSpec (input : Inputs (ZMod p)) (cols : MulCols (ZMod p)) : Prop :=
+def ControlSpec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) : Prop :=
   let s := selectors cols
   (s.is_mul = 0 ∨ s.is_mul = 1) ∧
   (s.is_mulh = 0 ∨ s.is_mulh = 1) ∧
@@ -623,7 +637,7 @@ RV64.mulh`, signed×signed high 64; `cols.is_mulhu → RV64.mulhu`, unsigned×un
 → RV64.mulhsu`, signed×unsigned high 64; `cols.is_mulw → RV64.mulw`, low-32 product sign-extended to 64).
 Operand order matches the RV64 signature `f rs2_val rs1_val` with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`.
 Vacuous on padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : MulCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.RTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,
@@ -649,15 +663,14 @@ end SP1Clean.MulChip
 
 namespace SP1Clean.DivRemChip
 
-open Extracted (DivRemCols)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The `is_real` selector and the **threaded reader column blocks** `state`/`adapter` (as `MulChip`;
 `DIV`/`REM`/… are R-type register-register ops, so the adapter is the register `RTypeReader`). The
 `rs1`/`rs2` register reads are projected from the adapter (`op_b_val`/`op_c_val` below). The arithmetic
-**operands** `b`/`c` are *separate committed columns* of `DivRemCols`, tied to these reads by the chip's
+**operands** `b`/`c` are *separate committed columns* of `DivRemChip.Columns`, tied to these reads by the chip's
 own-asserts E20–E47 — equal to the read for the 64-bit variants, the sign/zero-extension of the low 32 bits
-for the W-variants. The eight variant selectors are likewise *committed columns* of `DivRemCols` (gated on in
+for the W-variants. The eight variant selectors are likewise *committed columns* of `DivRemChip.Columns` (gated on in
 the `Spec` via `cols.is_div` etc.), not inputs. -/
 structure Inputs (F : Type) where
   is_real : F
@@ -679,7 +692,7 @@ deriving ProvableStruct
 Memory bus pins). The `Spec` and Sail bridge state the RV64 identity on this **raw read**; this is correct even
 for the W-variants because `RV64.divw`/`divuw`/`remw`/`remuw` truncate their inputs to the low 32 bits. The
 flag-dependent arithmetic operand (read for 64-bit ops, sign/zero-extension for W-ops) lives in the committed
-`DivRemCols.b` column, not here. `@[reducible]` so proofs that manipulate the adapter slot see through it. -/
+`DivRemChip.Columns.b` column, not here. `@[reducible]` so proofs that manipulate the adapter slot see through it. -/
 @[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
 /-- The `rs2` source = the register read on the `op_c` memory slot (`op_c_memory.prev_value`). -/
 @[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c_memory.prev_value
@@ -688,7 +701,7 @@ flag-dependent arithmetic operand (read for 64-bit ops, sign/zero-extension for 
 The latter gives names to the binary real-row gate, unique committed case, and eight independently
 verifiable RV64 results. Division by zero and signed overflow are specified by the RV64 functions
 themselves; they are not hidden side assumptions. -/
-def Spec (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : DivRemChip.Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.RTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,

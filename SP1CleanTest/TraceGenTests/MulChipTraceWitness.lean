@@ -1,4 +1,4 @@
-import SP1Clean.Native.Chips.MulChip.Defs
+import SP1Clean.Faithful.MulChip
 import SP1CleanTest.TraceGenTests.TraceGenerator
 import SP1CleanTest.TraceGenTests.MulChipTraceVectors
 
@@ -6,7 +6,8 @@ import SP1CleanTest.TraceGenTests.MulChipTraceVectors
 
 Every row is rebuilt from `MulChip.main`'s own witness closures (the `"mul_flags"` hint flags, the
 45-column `MulOperation` struct via `MulOperation.populate`, the flag-weighted `a` word) plus the
-output-struct layout, with `EventPopulate.rTypeOpEventInputs` mirroring the event → input
+output-struct layout — the Rust 82-column `MulCols` layout reached through the audited whole-row
+`mulChipReconfigure` map — with `EventPopulate.rTypeOpEventInputs` mirroring the event → input
 extraction and `mulHint` building the per-event flag `ProverHint` from the dumped executor opcode
 (MUL = 11, MULH = 12, MULHU = 13, MULHSU = 14, MULW = 24 — the same discriminants the circuit's
 flag-weighted opcode expression uses). The battery cycles **all five variants** and the comparison
@@ -29,8 +30,8 @@ hint from the event's opcode), zero padding to SP1's height. -/
 def mulChipDerivedTrace : List (List (ZMod SP1Prime)) :=
   generateTrace
     (fun e =>
-      circuitTraceRow MulChip.Inputs (MulChip.main (p := SP1Prime)) (rTypeOpEventInputs e)
-        (mulHint e.opcode))
+      circuitTraceRowMapped MulChip.Inputs (MulChip.main (p := SP1Prime))
+        Faithful.mulChipReconfigure (rTypeOpEventInputs e) (mulHint e.opcode))
     MulChipTraceEvents MulChipTraceHeight 82
 
 theorem mulchip_trace_conforms :

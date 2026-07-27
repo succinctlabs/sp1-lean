@@ -1,4 +1,4 @@
-import SP1Clean.Extracted.DivRemChip
+import SP1Clean.FormalModel.Contracts.DivRemColumns
 import SP1Clean.Math.Word
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.Proofs.Operations.IsEqualWordOperation.Formal
@@ -23,7 +23,6 @@ corresponding `RV64` functions and therefore remain visible at this boundary.
 
 namespace SP1Clean.DivRemContract
 
-open Extracted (DivRemCols)
 
 /-- The eight instructions implemented by SP1's single `DivRemChip`. -/
 inductive Case where
@@ -77,7 +76,7 @@ def Case.opcode : Case → ℕ
   | .remuw => 28
 
 /-- The committed selector column belonging to a case. -/
-def Case.flag {F : Type} (case : Case) (cols : DivRemCols F) : F :=
+def Case.flag {F : Type} (case : Case) (cols : DivRemChip.Columns F) : F :=
   match case with
   | .div => cols.is_div
   | .divu => cols.is_divu
@@ -127,47 +126,47 @@ theorem PairSpec.pick {family : Family} {rs1 rs2 quotient remainder : BitVec 64}
   · exact h.2
 
 /-- The flag-weighted opcode consumed by the R-type reader. -/
-def encodedOpcode {p : ℕ} (cols : DivRemCols (ZMod p)) : ZMod p :=
+def encodedOpcode {p : ℕ} (cols : DivRemChip.Columns (ZMod p)) : ZMod p :=
   cols.is_divu * 16 + cols.is_remu * 18 + cols.is_div * 15 + cols.is_rem * 17
     + cols.is_divw * 25 + cols.is_remw * 27 + cols.is_divuw * 26 + cols.is_remuw * 28
 
 /-- `case` is the unique selected instruction in the committed row.  Requiring every other flag to
 be zero makes this useful independently of a particular algebraic one-hot encoding. -/
-def Selected {p : ℕ} (cols : DivRemCols (ZMod p)) (case : Case) : Prop :=
+def Selected {p : ℕ} (cols : DivRemChip.Columns (ZMod p)) (case : Case) : Prop :=
   case.flag cols = 1 ∧ ∀ other, other ≠ case → other.flag cols = 0
 
 /-- A real row commits to one (and, by `Selected`, only one) divide/remainder case. Padding rows are
 not semantically constrained by this interface. -/
-def SelectionSpec {p : ℕ} (isReal : ZMod p) (cols : DivRemCols (ZMod p)) : Prop :=
+def SelectionSpec {p : ℕ} (isReal : ZMod p) (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   isReal = 1 → ∃ case, Selected cols case
 
 /-- The isolated semantic obligation for one instruction case. -/
 def CaseSpec {p : ℕ} [NeZero p] (case : Case) (isReal : ZMod p)
-    (rs1 rs2 result : Word (ZMod p)) (cols : DivRemCols (ZMod p)) : Prop :=
+    (rs1 rs2 result : Word (ZMod p)) (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   isReal = 1 → case.flag cols = 1 →
     Word.toBitVec64 result = case.result (Word.toBitVec64 rs1) (Word.toBitVec64 rs2)
 
 /-- All eight isolated case obligations, without choosing how they are proved. -/
 def CasesSpec {p : ℕ} [NeZero p] (isReal : ZMod p) (rs1 rs2 result : Word (ZMod p))
-    (cols : DivRemCols (ZMod p)) : Prop :=
+    (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   ∀ case, CaseSpec case isReal rs1 rs2 result cols
 
 /-- Stable arithmetic/selection contract exported by the chip layer. Reader and bus behavior remain
 separate chip-level obligations because they describe row plumbing, not division arithmetic. -/
 structure RowSpec {p : ℕ} [NeZero p] (isReal : ZMod p) (rs1 rs2 result : Word (ZMod p))
-    (cols : DivRemCols (ZMod p)) : Prop where
+    (cols : DivRemChip.Columns (ZMod p)) : Prop where
   isReal_binary : isReal = 0 ∨ isReal = 1
   selection : SelectionSpec isReal cols
   cases : CasesSpec isReal rs1 rs2 result cols
 
-theorem Selected.unique {p : ℕ} [Fact p.Prime] {cols : DivRemCols (ZMod p)} {x y : Case}
+theorem Selected.unique {p : ℕ} [Fact p.Prime] {cols : DivRemChip.Columns (ZMod p)} {x y : Case}
     (hx : Selected cols x) (hy : Selected cols y) : x = y := by
   by_contra hxy
   have hy0 := hx.2 y (Ne.symm hxy)
   exact zero_ne_one (hy0.symm.trans hy.1)
 
 /-- Pointwise normal form of a selected row's flags. -/
-theorem Selected.flag_eq {p : ℕ} {cols : DivRemCols (ZMod p)} {case : Case}
+theorem Selected.flag_eq {p : ℕ} {cols : DivRemChip.Columns (ZMod p)} {case : Case}
     (h : Selected cols case) (other : Case) :
     other.flag cols = if other = case then 1 else 0 := by
   by_cases heq : other = case
@@ -176,7 +175,7 @@ theorem Selected.flag_eq {p : ℕ} {cols : DivRemCols (ZMod p)} {case : Case}
   · simp [heq, h.2 other heq]
 
 /-- Selection reduces the flag-weighted reader opcode to the selected case's opcode. -/
-theorem Selected.encodedOpcode {p : ℕ} [Fact p.Prime] {cols : DivRemCols (ZMod p)}
+theorem Selected.encodedOpcode {p : ℕ} [Fact p.Prime] {cols : DivRemChip.Columns (ZMod p)}
     {case : Case} (h : Selected cols case) :
     encodedOpcode cols = (case.opcode : ZMod p) := by
   have hdiv := h.flag_eq .div
@@ -194,7 +193,7 @@ theorem Selected.encodedOpcode {p : ℕ} [Fact p.Prime] {cols : DivRemCols (ZMod
 
 /-- The selection contract really determines a unique instruction on every real row. -/
 theorem SelectionSpec.existsUnique {p : ℕ} [Fact p.Prime] {isReal : ZMod p}
-    {cols : DivRemCols (ZMod p)} (h : SelectionSpec isReal cols) (hr : isReal = 1) :
+    {cols : DivRemChip.Columns (ZMod p)} (h : SelectionSpec isReal cols) (hr : isReal = 1) :
     ∃! case, Selected cols case := by
   obtain ⟨case, hcase⟩ := h hr
   exact ⟨case, hcase, fun other hother => Selected.unique hother hcase⟩
@@ -203,7 +202,6 @@ end SP1Clean.DivRemContract
 
 namespace SP1Clean.DivRemCompare
 
-open SP1Clean.Extracted (DivRemCols)
 open Circuit
 
 /-- The comparison/sign cluster's explicit view of a DivRem row. Passing this compact constructor
@@ -279,7 +277,7 @@ instead of reducing the complete flattened evaluator merely to reach one nested 
   provable_struct_simp
 
 /-- Project exactly the committed columns consumed by the comparison/sign cluster. -/
-def Inputs.ofCols {F : Type} (cols : DivRemCols F) : Inputs F :=
+def Inputs.ofCols {F : Type} (cols : DivRemChip.Columns F) : Inputs F :=
   { op_b_prev_value := cols.adapter.op_b_memory.prev_value,
     op_c_prev_value := cols.adapter.op_c_memory.prev_value,
     c := cols.c,
@@ -318,7 +316,7 @@ def RemainderCheckGateSpec {p : ℕ} (cols : Inputs (ZMod p)) : Prop :=
 
 /-- The semantic evidence certified by the DivRem row's **comparison/sign assertion cluster**
 (`Native/Operations/DivRemOperation/Compare.lean`): the conjunction of the fifteen composed
-sub-operations' semantic `Spec`s, instantiated at the committed `DivRemCols` fields and gated
+sub-operations' semantic `Spec`s, instantiated at the committed `DivRemChip.Columns` fields and gated
 exactly as the chip gates them (`is_real_not_word` / the word-variant sum `e2` / `is_real` /
 `abs_c_alu_event` / `abs_rem_alu_event` / `remainder_check_multiplicity`).
 
@@ -372,7 +370,6 @@ end SP1Clean.DivRemCompare
 
 namespace SP1Clean.DivRemCore
 
-open SP1Clean.Extracted (DivRemCols)
 
 /-- The DivRem row's own assertZero tail, **as evaluated field equations**: every entry of the
 `DivRemChip.ownAsserts` chain (the `[E13…E367, adapter.op_a_0]` list, whose carrier-generic body is
@@ -387,7 +384,7 @@ semantic form IS the chip-level evidence layer (`Proofs/Chips/DivRemChip/{Soundn
 which extracts each needed equation by list membership. The selection facts a consumer most often
 needs (`is_real`/flag binariness, the one-hot sum, `SelectionSpec`) are already derived out of this
 bundle into `CoreSpec`'s explicit conjuncts. -/
-def OwnAssertsHold {p : ℕ} (cols : DivRemCols (ZMod p)) : Prop :=
+def OwnAssertsHold {p : ℕ} (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   ∀ x ∈ DivRemChip.ownAsserts cols, x = 0
 
 /- The semantic evidence certified by the DivRem row's **product/own-assert/byte-range assertion
@@ -417,7 +414,7 @@ This leaf contract is irreducible on purpose. `circuit_proof_start` simplifies t
 `ProductSpec`; if this implication is exposed there, Lean distributes its conjunction into the
 parent proof state and destroys the small proof boundary. Consumers cross it explicitly with
 `rw [LowerProductPlacement]`. -/
-@[irreducible] def LowerProductPlacement {p : ℕ} (cols : DivRemCols (ZMod p)) : Prop :=
+@[irreducible] def LowerProductPlacement {p : ℕ} (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   cols.is_real = 1 →
     cols.c_times_quotient[0] =
       cols.c_times_quotient_lower.product[0] + cols.c_times_quotient_lower.product[1] * 256 ∧
@@ -432,7 +429,7 @@ parent proof state and destroys the small proof boundary. Consumers cross it exp
 
 Like `LowerProductPlacement`, this stays opaque to generic circuit-proof setup and is opened only by
 the product proof that owns the boundary. -/
-@[irreducible] def UpperProductPlacement {p : ℕ} (cols : DivRemCols (ZMod p)) : Prop :=
+@[irreducible] def UpperProductPlacement {p : ℕ} (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   cols.is_div + cols.is_divu + cols.is_rem + cols.is_remu = 1 →
     cols.c_times_quotient[4] =
       cols.c_times_quotient_upper.product[8] + cols.c_times_quotient_upper.product[9] * 256 ∧
@@ -447,7 +444,7 @@ the product proof that owns the boundary. -/
 semantic cluster is kept folded at chip boundaries so proofs need not unfold the unrelated
 selection and range evidence merely to reason about a generated Mul witness block. -/
 def ProductSpec {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
-    (cols : DivRemCols (ZMod p)) : Prop :=
+    (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   let lo := cols.c_times_quotient_lower
   let up := cols.c_times_quotient_upper
   MulOperation.Spec
@@ -460,7 +457,7 @@ def ProductSpec {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 /-- Binary gates, the ungated one-hot equation, and the resulting unique committed instruction
 selection. -/
-def SelectionEvidenceSpec {p : ℕ} (cols : DivRemCols (ZMod p)) : Prop :=
+def SelectionEvidenceSpec {p : ℕ} (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   (cols.is_real = 0 ∨ cols.is_real = 1) ∧
   (cols.is_real_not_word = 0 ∨ cols.is_real_not_word = 1) ∧
   (cols.is_div = 0 ∨ cols.is_div = 1) ∧ (cols.is_divu = 0 ∨ cols.is_divu = 1) ∧
@@ -472,7 +469,7 @@ def SelectionEvidenceSpec {p : ℕ} (cols : DivRemCols (ZMod p)) : Prop :=
   DivRemContract.SelectionSpec cols.is_real cols
 
 /-- The core's 32 byte-table range facts exposed semantically as `< 2^16` bounds. -/
-def RangeSpec {p : ℕ} (cols : DivRemCols (ZMod p)) : Prop :=
+def RangeSpec {p : ℕ} (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   let rn := cols.rem_neg * 65535
   cols.is_real = 1 →
     (cols.c_times_quotient[0] + cols.remainder_comp[0]
@@ -495,7 +492,7 @@ def RangeSpec {p : ℕ} (cols : DivRemCols (ZMod p)) : Prop :=
 
 /-- The arithmetic core's auditable contract, split into four independently folded clusters:
 products/glue, the exact raw Rust assertion tail, selection, and byte ranges. -/
-def CoreSpec {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)] (cols : DivRemCols (ZMod p)) : Prop :=
+def CoreSpec {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)] (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   ProductSpec cols ∧ OwnAssertsHold cols ∧ SelectionEvidenceSpec cols ∧ RangeSpec cols
 
 end SP1Clean.DivRemCore

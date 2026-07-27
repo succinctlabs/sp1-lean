@@ -267,7 +267,7 @@ omit [Fact (2 ^ 24 < p)] in
 /-- End-to-end: from the chip `Spec`, the 8-way DIV/DIVU/REM/REMU/DIVW/DIVUW/REMW/REMUW Sail
 identities hold. -/
 theorem divrem_chip_reaches_sail
-    (input : DivRemChip.Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p))
+    (input : DivRemChip.Inputs (ZMod p)) (cols : DivRemChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
@@ -333,7 +333,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 /-- The DivRem RowView (shared by `kind.view` and `advance`): straight-line `pc+4` next-pc, the R-type
 adapter, `cols.a` as the divide/remainder write, opcode the flag-weighted R-type discriminant
 (DIV 15, DIVU 16, REM 17, REMU 18, DIVW 25, DIVUW 26, REMW 27, REMUW 28). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : DivRemChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.a,
     DivRemContract.encodedOpcode cols, .regWrite⟩
@@ -344,7 +344,7 @@ Each branch pins the R-type opcode `if isU then <U-op> else <s-op>`, converts th
 explicit-`hb` typed pattern — `rw [RV64.<op>_eq]` fails on the internal `decide False`/`decide True`), and
 routes to the matching `advance_of_div/rem/divw/remw isU`. `himmb`/`himmc`/`hstraight` are `rfl` (RTypeReader),
 and `hpc0` comes from the reader `Spec`'s bounds. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : DivRemChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -491,7 +491,7 @@ are sourced from inputs `op_b_val`/`op_c_val`. Carries `Fact (2 ^ 24 < p)`. -/
 def kind : Soundness.ChipKind p where
   name := "DivRem"
   Inputs := DivRemChip.Inputs
-  Cols := Extracted.DivRemCols
+  Cols := DivRemChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧

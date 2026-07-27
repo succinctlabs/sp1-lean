@@ -31,7 +31,7 @@ private def divRemCpuInput
 
 private def divRemReaderInput
     (input : Var DivRemChip.Inputs (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) :
+    (cols : Var DivRemChip.Columns (ZMod p)) :
     Var Readers.RTypeReader.Inputs (ZMod p) :=
   ⟨input.adapter, input.is_real, input.is_real,
     input.state.clk_high,
@@ -45,7 +45,7 @@ private def divRemReaderInput
 
 private def divRemWriteInput
     (input : Var DivRemChip.Inputs (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) :
+    (cols : Var DivRemChip.Columns (ZMod p)) :
     Var Readers.RegisterWrite.Inputs (ZMod p) :=
   ⟨input.state.clk_high,
     input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
@@ -153,7 +153,7 @@ private def divRemCompareAssertions {F : Type} [Field F]
       cols.quotient[1] cols.quot_msb e2
 
 private def divRemRustCompareAssertions {F : Type} [Field F]
-    [CoeHead F ℕ] (cols : DivRemCols F) : List F :=
+    [CoeHead F ℕ] (cols : DivRemChip.Columns F) : List F :=
   let e2 :=
     cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw
   Extracted.IsEqualWordOperation.asserts
@@ -375,7 +375,7 @@ private theorem divRemCompareNativeExact
     Expression.eval]
 
 private def divRemLowerMulAssertions {F : Type} [Field F]
-    [CoeHead F ℕ] (cols : DivRemCols F) : List F :=
+    [CoeHead F ℕ] (cols : DivRemChip.Columns F) : List F :=
   Extracted.MulOperation.asserts
     #v[cols.c_times_quotient[0], cols.c_times_quotient[1],
       cols.c_times_quotient[2], cols.c_times_quotient[3]]
@@ -383,7 +383,7 @@ private def divRemLowerMulAssertions {F : Type} [Field F]
     cols.is_real cols.is_real 0 0 0 0
 
 private def divRemUpperMulAssertions {F : Type} [Field F]
-    [CoeHead F ℕ] (cols : DivRemCols F) : List F :=
+    [CoeHead F ℕ] (cols : DivRemChip.Columns F) : List F :=
   Extracted.MulOperation.asserts
     #v[cols.c_times_quotient[4], cols.c_times_quotient[5],
       cols.c_times_quotient[6], cols.c_times_quotient[7]]
@@ -400,7 +400,7 @@ private def divRemCpuAssertions {F : Type} [Field F]
 private def divRemOpcode {F : Type} [Add F] [Mul F]
     [OfNat F 15] [OfNat F 16] [OfNat F 17] [OfNat F 18]
     [OfNat F 25] [OfNat F 26] [OfNat F 27] [OfNat F 28]
-    (cols : DivRemCols F) : F :=
+    (cols : DivRemChip.Columns F) : F :=
   cols.is_divu * 16 + cols.is_remu * 18 +
     cols.is_div * 15 + cols.is_rem * 17 +
     cols.is_divw * 25 + cols.is_remw * 27 +
@@ -585,11 +585,558 @@ private theorem divRemLtDirectEta {F : Type}
   cases cols
   rfl
 
+/- Small `rfl` projection lemmas that let the giant unfolded oracle bodies be re-expressed over
+native row fields by syntactic rewriting. Rewriting with these tiny proven equations keeps both
+decompose proofs (and their kernel re-checks) linear in the body size; `dsimp`-reducing the folded
+`divRemChipReconfigure` literal through the ~250-cell body instead makes the kernel re-derive every
+projection by whnf on the whole term — the standard kernel-size cliff. -/
+
+private theorem rc_state {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).state = cols.state := rfl
+
+private theorem rc_adapter {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).adapter = cols.adapter := rfl
+
+private theorem rc_a {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).a = cols.a := rfl
+
+private theorem rc_b {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).b = cols.b := rfl
+
+private theorem rc_c {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).c = cols.c := rfl
+
+private theorem rc_quotient {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).quotient = cols.quotient := rfl
+
+private theorem rc_quotient_comp {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).quotient_comp = cols.quotient_comp := rfl
+
+private theorem rc_remainder_comp {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).remainder_comp = cols.remainder_comp := rfl
+
+private theorem rc_remainder {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).remainder = cols.remainder := rfl
+
+private theorem rc_abs_remainder {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).abs_remainder = cols.abs_remainder := rfl
+
+private theorem rc_abs_c {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).abs_c = cols.abs_c := rfl
+
+private theorem rc_max_abs_c_or_1 {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).max_abs_c_or_1 = cols.max_abs_c_or_1 := rfl
+
+private theorem rc_c_times_quotient {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).c_times_quotient = cols.c_times_quotient := rfl
+
+private theorem rc_carry {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).carry = cols.carry := rfl
+
+private theorem rc_is_div {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_div = cols.is_div := rfl
+
+private theorem rc_is_divu {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_divu = cols.is_divu := rfl
+
+private theorem rc_is_rem {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_rem = cols.is_rem := rfl
+
+private theorem rc_is_remu {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_remu = cols.is_remu := rfl
+
+private theorem rc_is_divw {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_divw = cols.is_divw := rfl
+
+private theorem rc_is_remw {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_remw = cols.is_remw := rfl
+
+private theorem rc_is_divuw {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_divuw = cols.is_divuw := rfl
+
+private theorem rc_is_remuw {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_remuw = cols.is_remuw := rfl
+
+private theorem rc_is_overflow {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_overflow = cols.is_overflow := rfl
+
+private theorem rc_b_neg {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).b_neg = cols.b_neg := rfl
+
+private theorem rc_b_neg_not_overflow {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).b_neg_not_overflow = cols.b_neg_not_overflow := rfl
+
+private theorem rc_b_not_neg_not_overflow {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).b_not_neg_not_overflow = cols.b_not_neg_not_overflow := rfl
+
+private theorem rc_is_real_not_word {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_real_not_word = cols.is_real_not_word := rfl
+
+private theorem rc_rem_neg {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).rem_neg = cols.rem_neg := rfl
+
+private theorem rc_c_neg {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).c_neg = cols.c_neg := rfl
+
+private theorem rc_abs_c_alu_event {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).abs_c_alu_event = cols.abs_c_alu_event := rfl
+
+private theorem rc_abs_rem_alu_event {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).abs_rem_alu_event = cols.abs_rem_alu_event := rfl
+
+private theorem rc_is_real {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_real = cols.is_real := rfl
+
+private theorem rc_remainder_check_multiplicity {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).remainder_check_multiplicity = cols.remainder_check_multiplicity := rfl
+
+private theorem rc_c_times_quotient_lower {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).c_times_quotient_lower = divRemOracleMulOperation cols.c_times_quotient_lower := rfl
+
+private theorem rc_c_times_quotient_upper {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).c_times_quotient_upper = divRemOracleMulOperation cols.c_times_quotient_upper := rfl
+
+private theorem rc_remainder_lt_operation {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).remainder_lt_operation = divRemOracleLtOperation cols.remainder_lt_operation := rfl
+
+private theorem rc_is_c_0 {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_c_0 = divRemOracleIsZeroWord cols.is_c_0 := rfl
+
+private theorem rc_is_overflow_b {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_overflow_b = divRemOracleIsEqualWord cols.is_overflow_b := rfl
+
+private theorem rc_is_overflow_c {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).is_overflow_c = divRemOracleIsEqualWord cols.is_overflow_c := rfl
+
+private theorem rc_c_neg_operation_value {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).c_neg_operation.value = cols.c_neg_operation.value := rfl
+
+private theorem rc_rem_neg_operation_value {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).rem_neg_operation.value = cols.rem_neg_operation.value := rfl
+
+private theorem rc_b_msb_msb {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).b_msb.msb = cols.b_msb.msb := rfl
+
+private theorem rc_rem_msb_msb {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).rem_msb.msb = cols.rem_msb.msb := rfl
+
+private theorem rc_c_msb_msb {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).c_msb.msb = cols.c_msb.msb := rfl
+
+private theorem rc_quot_msb_msb {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).quot_msb.msb = cols.quot_msb.msb := rfl
+
+private theorem om_carry {F : Type} (x : Extracted.MulOperation F) :
+    (divRemOracleMulOperation x).carry = x.carry := rfl
+
+private theorem om_product {F : Type} (x : Extracted.MulOperation F) :
+    (divRemOracleMulOperation x).product = x.product := rfl
+
+private theorem om_b_msb {F : Type} (x : Extracted.MulOperation F) :
+    (divRemOracleMulOperation x).b_msb = x.b_msb := rfl
+
+private theorem om_c_msb {F : Type} (x : Extracted.MulOperation F) :
+    (divRemOracleMulOperation x).c_msb = x.c_msb := rfl
+
+private theorem om_b_sign_extend {F : Type} (x : Extracted.MulOperation F) :
+    (divRemOracleMulOperation x).b_sign_extend = x.b_sign_extend := rfl
+
+private theorem om_c_sign_extend {F : Type} (x : Extracted.MulOperation F) :
+    (divRemOracleMulOperation x).c_sign_extend = x.c_sign_extend := rfl
+
+private theorem om_blb {F : Type} (x : Extracted.MulOperation F) :
+    (divRemOracleMulOperation x).b_lower_byte.low_bytes = x.b_lower_byte.low_bytes := rfl
+
+private theorem om_clb {F : Type} (x : Extracted.MulOperation F) :
+    (divRemOracleMulOperation x).c_lower_byte.low_bytes = x.c_lower_byte.low_bytes := rfl
+
+private theorem om_pmsb {F : Type} (x : Extracted.MulOperation F) :
+    (divRemOracleMulOperation x).product_msb.msb = x.product_msb.msb := rfl
+
+private theorem olt_bit {F : Type} (x : Extracted.LtOperationUnsigned F) :
+    (divRemOracleLtOperation x).u16_compare_operation.bit = x.u16_compare_operation.bit := rfl
+
+private theorem olt_u16_flags {F : Type} (x : Extracted.LtOperationUnsigned F) :
+    (divRemOracleLtOperation x).u16_flags = x.u16_flags := rfl
+
+private theorem olt_not_eq_inv {F : Type} (x : Extracted.LtOperationUnsigned F) :
+    (divRemOracleLtOperation x).not_eq_inv = x.not_eq_inv := rfl
+
+private theorem olt_comparison_limbs {F : Type} (x : Extracted.LtOperationUnsigned F) :
+    (divRemOracleLtOperation x).comparison_limbs = x.comparison_limbs := rfl
+
+private theorem ozw_l0_inverse {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_0.inverse = x.is_zero_limb_0.inverse := rfl
+
+private theorem ozw_l0_result {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_0.result = x.is_zero_limb_0.result := rfl
+
+private theorem ozw_l1_inverse {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_1.inverse = x.is_zero_limb_1.inverse := rfl
+
+private theorem ozw_l1_result {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_1.result = x.is_zero_limb_1.result := rfl
+
+private theorem ozw_l2_inverse {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_2.inverse = x.is_zero_limb_2.inverse := rfl
+
+private theorem ozw_l2_result {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_2.result = x.is_zero_limb_2.result := rfl
+
+private theorem ozw_l3_inverse {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_3.inverse = x.is_zero_limb_3.inverse := rfl
+
+private theorem ozw_l3_result {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_3.result = x.is_zero_limb_3.result := rfl
+
+private theorem ozw_is_zero_first_half {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_first_half = x.is_zero_first_half := rfl
+
+private theorem ozw_is_zero_second_half {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_second_half = x.is_zero_second_half := rfl
+
+private theorem ozw_result {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).result = x.result := rfl
+
+private theorem oew_diff {F : Type} (x : Extracted.IsEqualWordOperation F) :
+    (divRemOracleIsEqualWord x).is_diff_zero = divRemOracleIsZeroWord x.is_diff_zero := rfl
+
+
+private theorem om_product_msb {F : Type} (x : Extracted.MulOperation F) :
+    (divRemOracleMulOperation x).product_msb = ⟨x.product_msb.msb⟩ := rfl
+
+private theorem olt_u16co {F : Type} (x : Extracted.LtOperationUnsigned F) :
+    (divRemOracleLtOperation x).u16_compare_operation =
+      ⟨x.u16_compare_operation.bit⟩ := rfl
+
+private theorem ozw_limb_0 {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_0 =
+      ⟨x.is_zero_limb_0.inverse, x.is_zero_limb_0.result⟩ := rfl
+
+private theorem ozw_limb_1 {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_1 =
+      ⟨x.is_zero_limb_1.inverse, x.is_zero_limb_1.result⟩ := rfl
+
+private theorem ozw_limb_2 {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_2 =
+      ⟨x.is_zero_limb_2.inverse, x.is_zero_limb_2.result⟩ := rfl
+
+private theorem ozw_limb_3 {F : Type} (x : Extracted.IsZeroWordOperation F) :
+    (divRemOracleIsZeroWord x).is_zero_limb_3 =
+      ⟨x.is_zero_limb_3.inverse, x.is_zero_limb_3.result⟩ := rfl
+
+private theorem rc_b_msb {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).b_msb = ⟨cols.b_msb.msb⟩ := rfl
+
+private theorem rc_rem_msb {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).rem_msb = ⟨cols.rem_msb.msb⟩ := rfl
+
+private theorem rc_c_msb {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).c_msb = ⟨cols.c_msb.msb⟩ := rfl
+
+private theorem rc_quot_msb {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).quot_msb = ⟨cols.quot_msb.msb⟩ := rfl
+
+private theorem rc_c_neg_operation {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).c_neg_operation = ⟨cols.c_neg_operation.value⟩ := rfl
+
+private theorem rc_rem_neg_operation {F : Type} (cols : DivRemChip.Columns F) :
+    (divRemChipReconfigure cols).rem_neg_operation = ⟨cols.rem_neg_operation.value⟩ := rfl
+
+/- Namespace bridges between the DivRem oracle's embedded chip-private helper copies and the
+canonical standalone generated modules. The two bodies are rendered from the same compiler output,
+so each bridge is a definitional unfolding, not a mathematical claim. They let every heavy
+operation lemma stay stated once against the standalone modules (also consumed by the Mul chip). -/
+
+private theorem divRemOracle_u16tou8safe_value_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (u16_values low_bytes : Vector F 4) (is_real : F) :
+    Extracted.DivRemOracle.U16toU8OperationSafe.value u16_values
+        ⟨low_bytes⟩ is_real =
+      Extracted.U16toU8OperationSafe.value u16_values ⟨low_bytes⟩ is_real := by
+  rw [Extracted.DivRemOracle.U16toU8OperationSafe.value,
+    Extracted.U16toU8OperationSafe.value]
+
+private theorem divRemOracle_u16tou8safe_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (u16_values low_bytes : Vector F 4) (is_real : F) :
+    Extracted.DivRemOracle.U16toU8OperationSafe.asserts u16_values
+        ⟨low_bytes⟩ is_real =
+      Extracted.U16toU8OperationSafe.asserts u16_values ⟨low_bytes⟩ is_real := by
+  rw [Extracted.DivRemOracle.U16toU8OperationSafe.asserts,
+    Extracted.U16toU8OperationSafe.asserts]
+
+private theorem divRemOracle_u16tou8safe_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (u16_values low_bytes : Vector F 4) (is_real : F) :
+    Extracted.DivRemOracle.U16toU8OperationSafe.interactions u16_values
+        ⟨low_bytes⟩ is_real =
+      Extracted.U16toU8OperationSafe.interactions u16_values ⟨low_bytes⟩ is_real := by
+  rw [Extracted.DivRemOracle.U16toU8OperationSafe.interactions,
+    Extracted.U16toU8OperationSafe.interactions]
+
+private theorem divRemOracle_u16msb_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.DivRemOracle.U16MSBOperation.asserts a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.asserts a ⟨msb⟩ is_real := by
+  rw [Extracted.DivRemOracle.U16MSBOperation.asserts,
+    Extracted.U16MSBOperation.asserts]
+
+private theorem divRemOracle_u16msb_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.DivRemOracle.U16MSBOperation.interactions a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.interactions a ⟨msb⟩ is_real := by
+  rw [Extracted.DivRemOracle.U16MSBOperation.interactions,
+    Extracted.U16MSBOperation.interactions]
+
+private theorem divRemOracle_isZero_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a inverse result is_real : F) :
+    Extracted.DivRemOracle.IsZeroOperation.asserts a ⟨inverse, result⟩ is_real =
+      Extracted.IsZeroOperation.asserts a ⟨inverse, result⟩ is_real := by
+  rw [Extracted.DivRemOracle.IsZeroOperation.asserts,
+    Extracted.IsZeroOperation.asserts]
+
+private theorem divRemOracle_isZero_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a inverse result is_real : F) :
+    Extracted.DivRemOracle.IsZeroOperation.interactions a ⟨inverse, result⟩ is_real =
+      Extracted.IsZeroOperation.interactions a ⟨inverse, result⟩ is_real := by
+  rw [Extracted.DivRemOracle.IsZeroOperation.interactions,
+    Extracted.IsZeroOperation.interactions]
+
+private theorem divRemOracle_isZeroWord_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a : Word F) (i0 r0 i1 r1 i2 r2 i3 r3 h1 h2 res is_real : F) :
+    Extracted.DivRemOracle.IsZeroWordOperation.asserts a
+        ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, h1, h2, res⟩ is_real =
+      Extracted.IsZeroWordOperation.asserts a
+        ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, h1, h2, res⟩ is_real := by
+  rw [Extracted.DivRemOracle.IsZeroWordOperation.asserts,
+    Extracted.IsZeroWordOperation.asserts]
+  simp only [divRemOracle_isZero_asserts_eq]
+
+private theorem divRemOracle_isZeroWord_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a : Word F) (i0 r0 i1 r1 i2 r2 i3 r3 h1 h2 res is_real : F) :
+    Extracted.DivRemOracle.IsZeroWordOperation.interactions a
+        ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, h1, h2, res⟩ is_real =
+      Extracted.IsZeroWordOperation.interactions a
+        ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, h1, h2, res⟩ is_real := by
+  rw [Extracted.DivRemOracle.IsZeroWordOperation.interactions,
+    Extracted.IsZeroWordOperation.interactions]
+  simp only [divRemOracle_isZero_interactions_eq]
+
+private theorem divRemOracle_isEqualWord_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (i0 r0 i1 r1 i2 r2 i3 r3 h1 h2 res is_real : F) :
+    Extracted.DivRemOracle.IsEqualWordOperation.asserts a b
+        ⟨⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, h1, h2, res⟩⟩ is_real =
+      Extracted.IsEqualWordOperation.asserts a b
+        ⟨⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, h1, h2, res⟩⟩ is_real := by
+  rw [Extracted.DivRemOracle.IsEqualWordOperation.asserts,
+    Extracted.IsEqualWordOperation.asserts]
+  simp only [divRemOracle_isZeroWord_asserts_eq]
+
+private theorem divRemOracle_isEqualWord_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (i0 r0 i1 r1 i2 r2 i3 r3 h1 h2 res is_real : F) :
+    Extracted.DivRemOracle.IsEqualWordOperation.interactions a b
+        ⟨⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, h1, h2, res⟩⟩ is_real =
+      Extracted.IsEqualWordOperation.interactions a b
+        ⟨⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, h1, h2, res⟩⟩ is_real := by
+  rw [Extracted.DivRemOracle.IsEqualWordOperation.interactions,
+    Extracted.IsEqualWordOperation.interactions]
+  simp only [divRemOracle_isZeroWord_interactions_eq]
+
+private theorem divRemOracle_addOperation_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b value : Word F) (is_real : F) :
+    Extracted.DivRemOracle.AddOperation.asserts a b ⟨value⟩ is_real =
+      Extracted.AddOperation.asserts a b ⟨value⟩ is_real := by
+  rw [Extracted.DivRemOracle.AddOperation.asserts, Extracted.AddOperation.asserts]
+
+private theorem divRemOracle_addOperation_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b value : Word F) (is_real : F) :
+    Extracted.DivRemOracle.AddOperation.interactions a b ⟨value⟩ is_real =
+      Extracted.AddOperation.interactions a b ⟨value⟩ is_real := by
+  rw [Extracted.DivRemOracle.AddOperation.interactions,
+    Extracted.AddOperation.interactions]
+
+private theorem divRemOracle_u16compare_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b bit is_real : F) :
+    Extracted.DivRemOracle.U16CompareOperation.asserts a b ⟨bit⟩ is_real =
+      Extracted.U16CompareOperation.asserts a b ⟨bit⟩ is_real := by
+  rw [Extracted.DivRemOracle.U16CompareOperation.asserts,
+    Extracted.U16CompareOperation.asserts]
+
+private theorem divRemOracle_u16compare_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b bit is_real : F) :
+    Extracted.DivRemOracle.U16CompareOperation.interactions a b ⟨bit⟩ is_real =
+      Extracted.U16CompareOperation.interactions a b ⟨bit⟩ is_real := by
+  rw [Extracted.DivRemOracle.U16CompareOperation.interactions,
+    Extracted.U16CompareOperation.interactions]
+
+private theorem divRemOracle_ltOperation_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (bit : F) (u16_flags : Vector F 4) (not_eq_inv : F)
+    (comparison_limbs : Vector F 2) (is_real : F) :
+    Extracted.DivRemOracle.LtOperationUnsigned.asserts b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real =
+      Extracted.LtOperationUnsigned.asserts b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real := by
+  rw [Extracted.DivRemOracle.LtOperationUnsigned.asserts,
+    Extracted.LtOperationUnsigned.asserts]
+  simp only [divRemOracle_u16compare_asserts_eq]
+
+private theorem divRemOracle_ltOperation_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (bit : F) (u16_flags : Vector F 4) (not_eq_inv : F)
+    (comparison_limbs : Vector F 2) (is_real : F) :
+    Extracted.DivRemOracle.LtOperationUnsigned.interactions b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real =
+      Extracted.LtOperationUnsigned.interactions b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real := by
+  rw [Extracted.DivRemOracle.LtOperationUnsigned.interactions,
+    Extracted.LtOperationUnsigned.interactions]
+  simp only [divRemOracle_u16compare_interactions_eq]
+
+set_option maxHeartbeats 2000000 in
+/-- The DivRem oracle's embedded `MulOperation.asserts` copy agrees with the canonical standalone
+module on every arithmetic block. -/
+private theorem divRemOracle_mulOperation_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b c : Word F) (carry product : Vector F 16) (blb clb : Vector F 4)
+    (bmsb cmsb pmsb bse cse : F)
+    (is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu : F) :
+    Extracted.DivRemOracle.MulOperation.asserts a b c
+        ⟨carry, product, ⟨blb⟩, ⟨clb⟩, bmsb, cmsb, ⟨pmsb⟩, bse, cse⟩
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu =
+      Extracted.MulOperation.asserts a b c
+        ⟨carry, product, ⟨blb⟩, ⟨clb⟩, bmsb, cmsb, ⟨pmsb⟩, bse, cse⟩
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu := by
+  rw [Extracted.DivRemOracle.MulOperation.asserts, Extracted.MulOperation.asserts]
+  simp only [divRemOracle_u16tou8safe_value_eq, divRemOracle_u16tou8safe_asserts_eq,
+    divRemOracle_u16msb_asserts_eq]
+
+set_option maxHeartbeats 2000000 in
+/-- Interaction-list half of `divRemOracle_mulOperation_asserts_eq`. -/
+private theorem divRemOracle_mulOperation_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b c : Word F) (carry product : Vector F 16) (blb clb : Vector F 4)
+    (bmsb cmsb pmsb bse cse : F)
+    (is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu : F) :
+    Extracted.DivRemOracle.MulOperation.interactions a b c
+        ⟨carry, product, ⟨blb⟩, ⟨clb⟩, bmsb, cmsb, ⟨pmsb⟩, bse, cse⟩
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu =
+      Extracted.MulOperation.interactions a b c
+        ⟨carry, product, ⟨blb⟩, ⟨clb⟩, bmsb, cmsb, ⟨pmsb⟩, bse, cse⟩
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu := by
+  rw [Extracted.DivRemOracle.MulOperation.interactions,
+    Extracted.MulOperation.interactions]
+  simp only [divRemOracle_u16tou8safe_value_eq,
+    divRemOracle_u16tou8safe_interactions_eq, divRemOracle_u16msb_interactions_eq]
+
+
+set_option linter.unusedSimpArgs false in
+private theorem divRemOracle_isZeroWord_asserts_eq' {F : Type} [Field F] [CoeHead F ℕ]
+    (a : Word F) (x : Extracted.IsZeroWordOperation F) (is_real : F) :
+    Extracted.DivRemOracle.IsZeroWordOperation.asserts a
+        (divRemOracleIsZeroWord x) is_real =
+      Extracted.IsZeroWordOperation.asserts a x is_real := by
+  rw [Extracted.DivRemOracle.IsZeroWordOperation.asserts,
+    Extracted.IsZeroWordOperation.asserts]
+  simp only [ozw_limb_0, ozw_limb_1, ozw_limb_2, ozw_limb_3,
+    ozw_l0_inverse, ozw_l0_result, ozw_l1_inverse, ozw_l1_result,
+    ozw_l2_inverse, ozw_l2_result, ozw_l3_inverse, ozw_l3_result,
+    ozw_is_zero_first_half, ozw_is_zero_second_half, ozw_result,
+    divRemOracle_isZero_asserts_eq]
+
+set_option linter.unusedSimpArgs false in
+private theorem divRemOracle_isZeroWord_interactions_eq' {F : Type} [Field F] [CoeHead F ℕ]
+    (a : Word F) (x : Extracted.IsZeroWordOperation F) (is_real : F) :
+    Extracted.DivRemOracle.IsZeroWordOperation.interactions a
+        (divRemOracleIsZeroWord x) is_real =
+      Extracted.IsZeroWordOperation.interactions a x is_real := by
+  rw [Extracted.DivRemOracle.IsZeroWordOperation.interactions,
+    Extracted.IsZeroWordOperation.interactions]
+  simp only [ozw_limb_0, ozw_limb_1, ozw_limb_2, ozw_limb_3,
+    ozw_l0_inverse, ozw_l0_result, ozw_l1_inverse, ozw_l1_result,
+    ozw_l2_inverse, ozw_l2_result, ozw_l3_inverse, ozw_l3_result,
+    divRemOracle_isZero_interactions_eq]
+
+set_option linter.unusedSimpArgs false in
+private theorem divRemOracle_isEqualWord_asserts_eq' {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (x : Extracted.IsEqualWordOperation F) (is_real : F) :
+    Extracted.DivRemOracle.IsEqualWordOperation.asserts a b
+        (divRemOracleIsEqualWord x) is_real =
+      Extracted.IsEqualWordOperation.asserts a b x is_real := by
+  rw [Extracted.DivRemOracle.IsEqualWordOperation.asserts,
+    Extracted.IsEqualWordOperation.asserts]
+  simp only [oew_diff, ozw_limb_0, ozw_limb_1, ozw_limb_2, ozw_limb_3,
+    ozw_l0_inverse, ozw_l0_result, ozw_l1_inverse, ozw_l1_result,
+    ozw_l2_inverse, ozw_l2_result, ozw_l3_inverse, ozw_l3_result,
+    ozw_is_zero_first_half, ozw_is_zero_second_half, ozw_result,
+    divRemOracle_isZeroWord_asserts_eq, divRemOracle_isZeroWord_asserts_eq']
+
+set_option linter.unusedSimpArgs false in
+private theorem divRemOracle_isEqualWord_interactions_eq' {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (x : Extracted.IsEqualWordOperation F) (is_real : F) :
+    Extracted.DivRemOracle.IsEqualWordOperation.interactions a b
+        (divRemOracleIsEqualWord x) is_real =
+      Extracted.IsEqualWordOperation.interactions a b x is_real := by
+  rw [Extracted.DivRemOracle.IsEqualWordOperation.interactions,
+    Extracted.IsEqualWordOperation.interactions]
+  simp only [oew_diff, ozw_limb_0, ozw_limb_1, ozw_limb_2, ozw_limb_3,
+    ozw_l0_inverse, ozw_l0_result, ozw_l1_inverse, ozw_l1_result,
+    ozw_l2_inverse, ozw_l2_result, ozw_l3_inverse, ozw_l3_result,
+    divRemOracle_isZeroWord_interactions_eq, divRemOracle_isZeroWord_interactions_eq']
+
+set_option linter.unusedSimpArgs false in
+private theorem divRemOracle_ltOperation_asserts_eq' {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (x : Extracted.LtOperationUnsigned F) (is_real : F) :
+    Extracted.DivRemOracle.LtOperationUnsigned.asserts b cc
+        (divRemOracleLtOperation x) is_real =
+      Extracted.LtOperationUnsigned.asserts b cc x is_real := by
+  rw [Extracted.DivRemOracle.LtOperationUnsigned.asserts,
+    Extracted.LtOperationUnsigned.asserts]
+  simp only [olt_u16co, olt_bit, olt_u16_flags, olt_not_eq_inv,
+    olt_comparison_limbs, divRemOracle_u16compare_asserts_eq]
+
+set_option linter.unusedSimpArgs false in
+private theorem divRemOracle_ltOperation_interactions_eq' {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (x : Extracted.LtOperationUnsigned F) (is_real : F) :
+    Extracted.DivRemOracle.LtOperationUnsigned.interactions b cc
+        (divRemOracleLtOperation x) is_real =
+      Extracted.LtOperationUnsigned.interactions b cc x is_real := by
+  rw [Extracted.DivRemOracle.LtOperationUnsigned.interactions,
+    Extracted.LtOperationUnsigned.interactions]
+  simp only [olt_u16co, olt_bit, olt_u16_flags, olt_not_eq_inv,
+    olt_comparison_limbs, divRemOracle_u16compare_interactions_eq]
+
+set_option maxHeartbeats 2000000 in
+set_option linter.unusedSimpArgs false in
+private theorem divRemOracle_mulOperation_asserts_eq' {F : Type} [Field F] [CoeHead F ℕ]
+    (a b c : Word F) (x : Extracted.MulOperation F)
+    (is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu : F) :
+    Extracted.DivRemOracle.MulOperation.asserts a b c (divRemOracleMulOperation x)
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu =
+      Extracted.MulOperation.asserts a b c x
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu := by
+  rw [Extracted.DivRemOracle.MulOperation.asserts, Extracted.MulOperation.asserts]
+  simp only [om_carry, om_product, om_b_msb, om_c_msb, om_b_sign_extend,
+    om_c_sign_extend, om_blb, om_clb, om_pmsb, om_product_msb,
+    divRemOracle_u16tou8safe_value_eq, divRemOracle_u16tou8safe_asserts_eq,
+    divRemOracle_u16msb_asserts_eq]
+
+set_option maxHeartbeats 2000000 in
+set_option linter.unusedSimpArgs false in
+private theorem divRemOracle_mulOperation_interactions_eq' {F : Type} [Field F] [CoeHead F ℕ]
+    (a b c : Word F) (x : Extracted.MulOperation F)
+    (is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu : F) :
+    Extracted.DivRemOracle.MulOperation.interactions a b c (divRemOracleMulOperation x)
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu =
+      Extracted.MulOperation.interactions a b c x
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu := by
+  rw [Extracted.DivRemOracle.MulOperation.interactions,
+    Extracted.MulOperation.interactions]
+  simp only [om_carry, om_product, om_b_msb, om_c_msb, om_b_sign_extend,
+    om_c_sign_extend, om_blb, om_clb, om_pmsb, om_product_msb,
+    divRemOracle_u16tou8safe_value_eq, divRemOracle_u16tou8safe_interactions_eq,
+    divRemOracle_u16msb_interactions_eq]
+
 omit [Fact (2 ^ 24 < p)] in
 set_option maxHeartbeats 64000000 in
+set_option linter.unusedSimpArgs false in
 private theorem divRemRustAssertionsDecompose
-    (cols : DivRemCols (ZMod p)) :
-    DivRemCols.asserts cols =
+    (cols : DivRemChip.Columns (ZMod p)) :
+    Extracted.DivRemOracle.DivRemCols.asserts (divRemChipReconfigure cols) =
       divRemLowerMulAssertions cols ++
         divRemUpperMulAssertions cols ++
         divRemRustCompareAssertions cols ++
@@ -597,17 +1144,92 @@ private theorem divRemRustAssertionsDecompose
         divRemReaderAssertions cols.state (divRemOpcode cols)
           cols.a cols.adapter cols.is_real ++
         DivRemChip.ownAsserts cols := by
-  rw [DivRemCols.asserts]
+  rw [Extracted.DivRemOracle.DivRemCols.asserts]
+  simp only [rc_state,
+    rc_adapter,
+    rc_a,
+    rc_b,
+    rc_c,
+    rc_quotient,
+    rc_quotient_comp,
+    rc_remainder_comp,
+    rc_remainder,
+    rc_abs_remainder,
+    rc_abs_c,
+    rc_max_abs_c_or_1,
+    rc_c_times_quotient,
+    rc_carry,
+    rc_is_div,
+    rc_is_divu,
+    rc_is_rem,
+    rc_is_remu,
+    rc_is_divw,
+    rc_is_remw,
+    rc_is_divuw,
+    rc_is_remuw,
+    rc_is_overflow,
+    rc_b_neg,
+    rc_b_neg_not_overflow,
+    rc_b_not_neg_not_overflow,
+    rc_is_real_not_word,
+    rc_rem_neg,
+    rc_c_neg,
+    rc_abs_c_alu_event,
+    rc_abs_rem_alu_event,
+    rc_is_real,
+    rc_remainder_check_multiplicity,
+    rc_c_times_quotient_lower,
+    rc_c_times_quotient_upper,
+    rc_remainder_lt_operation,
+    rc_is_c_0,
+    rc_is_overflow_b,
+    rc_is_overflow_c,
+    rc_c_neg_operation_value,
+    rc_rem_neg_operation_value,
+    rc_b_msb_msb,
+    rc_rem_msb_msb,
+    rc_c_msb_msb,
+    rc_quot_msb_msb,
+    om_carry,
+    om_product,
+    om_b_msb,
+    om_c_msb,
+    om_b_sign_extend,
+    om_c_sign_extend,
+    om_blb,
+    om_clb,
+    om_pmsb,
+    olt_bit,
+    olt_u16_flags,
+    olt_not_eq_inv,
+    olt_comparison_limbs,
+    ozw_l0_inverse,
+    ozw_l0_result,
+    ozw_l1_inverse,
+    ozw_l1_result,
+    ozw_l2_inverse,
+    ozw_l2_result,
+    ozw_l3_inverse,
+    ozw_l3_result,
+    ozw_is_zero_first_half,
+    ozw_is_zero_second_half,
+    ozw_result,
+    oew_diff]
+  simp only [om_product_msb, olt_u16co, ozw_limb_0, ozw_limb_1, ozw_limb_2,
+    ozw_limb_3, rc_b_msb, rc_rem_msb, rc_c_msb, rc_quot_msb,
+    rc_c_neg_operation, rc_rem_neg_operation]
+  simp only [divRemOracle_mulOperation_asserts_eq,
+    divRemOracle_mulOperation_asserts_eq',
+    divRemOracle_isEqualWord_asserts_eq, divRemOracle_isEqualWord_asserts_eq',
+    divRemOracle_isZeroWord_asserts_eq, divRemOracle_isZeroWord_asserts_eq',
+    divRemOracle_addOperation_asserts_eq,
+    divRemOracle_ltOperation_asserts_eq, divRemOracle_ltOperation_asserts_eq',
+    divRemOracle_u16msb_asserts_eq]
   simp only [divRemLowerMulAssertions, divRemUpperMulAssertions,
     divRemRustCompareAssertions, divRemCpuAssertions,
     divRemReaderAssertions, divRemOpcode, DivRemChip.ownAsserts]
-  rw [divRemMulEta, divRemMulEta, divRemCpuEta,
-    divRemRTypeEta, divRemVec3Eta]
-  repeat' rw [divRemVec4Eta]
-  rw [divRemAddDirectEta cols.c_neg_operation,
-    divRemAddDirectEta cols.rem_neg_operation,
-    divRemVec2Eta,
-    divRemLtDirectEta cols.remainder_lt_operation]
+  simp only [divRemMulEta, divRemCpuEta, divRemRTypeEta, divRemVec2Eta,
+    divRemVec3Eta, divRemVec4Eta, divRemVec16Eta]
   simp only [List.append_assoc]
   congr 1
   congr 1
@@ -633,13 +1255,13 @@ private theorem divRemRustAssertionsDecompose
   norm_num
 
 private def divRemLowerMulInput
-    (cols : Var DivRemCols (ZMod p)) :
+    (cols : Var DivRemChip.Columns (ZMod p)) :
     Var MulOperation.Inputs (ZMod p) :=
   ⟨cols.quotient_comp, cols.c, cols.c_times_quotient_lower,
     cols.is_real, cols.is_real, 0, 0, 0, 0⟩
 
 private def divRemUpperMulInput
-    (cols : Var DivRemCols (ZMod p)) :
+    (cols : Var DivRemChip.Columns (ZMod p)) :
     Var MulOperation.Inputs (ZMod p) :=
   ⟨cols.quotient_comp, cols.c, cols.c_times_quotient_upper,
     cols.is_real_not_word, 0, cols.is_div + cols.is_rem,
@@ -656,7 +1278,7 @@ private theorem divRemConstraintsMapAssert
 set_option maxHeartbeats 8000000 in
 private theorem divRemCoreNativeDecompose
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
     nativeAssertZeros env
         ((DivRemCore.main cols).operations offset) =
       nativeAssertZeros env
@@ -725,7 +1347,7 @@ private theorem divRemCoreNativeDecompose
 set_option maxHeartbeats 8000000 in
 private theorem divRemLowerForward
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ)
+    (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ)
     (hRust :
       List.Forall (· = 0)
         (divRemLowerMulAssertions (Eval.eval env cols))) :
@@ -767,7 +1389,7 @@ private theorem divRemLowerForward
 set_option maxHeartbeats 8000000 in
 private theorem divRemUpperForward
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ)
+    (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ)
     (hRust :
       List.Forall (· = 0)
         (divRemUpperMulAssertions (Eval.eval env cols))) :
@@ -817,7 +1439,7 @@ private theorem divRemUpperForward
     DivRemChip.eval_divRemCols_isRemu_verifier]
   simpa only [ProvableType.eval_field] using hp
 
-private def divRemLowerGlue (cols : DivRemCols (ZMod p)) :
+private def divRemLowerGlue (cols : DivRemChip.Columns (ZMod p)) :
     List (ZMod p) :=
   [cols.is_real * (cols.c_times_quotient[0] -
       (cols.c_times_quotient_lower.product[0] +
@@ -832,7 +1454,7 @@ private def divRemLowerGlue (cols : DivRemCols (ZMod p)) :
       (cols.c_times_quotient_lower.product[6] +
         cols.c_times_quotient_lower.product[7] * 256))]
 
-private def divRemUpperGlue (cols : DivRemCols (ZMod p)) :
+private def divRemUpperGlue (cols : DivRemChip.Columns (ZMod p)) :
     List (ZMod p) :=
   let gate := cols.is_div + cols.is_divu + cols.is_rem + cols.is_remu
   [gate * (cols.c_times_quotient[4] -
@@ -862,7 +1484,7 @@ private theorem divRemGatedSelectorIff
 
 omit [Fact (2 ^ 24 < p)] in
 private theorem divRemLowerPlacementGlue
-    (cols : DivRemCols (ZMod p))
+    (cols : DivRemChip.Columns (ZMod p))
     (hgate : cols.is_real * (cols.is_real - 1) = 0) :
     MulOutputPlacement
         #v[cols.c_times_quotient[0], cols.c_times_quotient[1],
@@ -879,7 +1501,7 @@ private theorem divRemLowerPlacementGlue
 
 omit [Fact (2 ^ 24 < p)] in
 private theorem divRemUpperPlacementGlue
-    (cols : DivRemCols (ZMod p))
+    (cols : DivRemChip.Columns (ZMod p))
     (hgate :
       let gate :=
         cols.is_div + cols.is_divu + cols.is_rem + cols.is_remu
@@ -910,7 +1532,7 @@ private theorem divRemUpperPlacementGlue
 
 private theorem divRemOwnConstraint
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p))
+    (cols : Var DivRemChip.Columns (ZMod p))
     (hown :
       List.Forall (· = 0)
         (DivRemChip.ownAsserts (Eval.eval env cols)))
@@ -922,7 +1544,7 @@ private theorem divRemOwnConstraint
   exact List.mem_map_of_mem (f := Expression.eval env) hexpression
 
 private structure DivRemMulFlagFacts
-    (cols : DivRemCols (ZMod p)) : Prop where
+    (cols : DivRemChip.Columns (ZMod p)) : Prop where
   real : cols.is_real * (cols.is_real - 1) = 0
   realNotWord :
     cols.is_real_not_word * (cols.is_real_not_word - 1) = 0
@@ -941,7 +1563,7 @@ private structure DivRemMulFlagFacts
 set_option maxHeartbeats 8000000 in
 private theorem divRemMulFlagFacts
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p))
+    (cols : Var DivRemChip.Columns (ZMod p))
     (hown :
       List.Forall (· = 0)
         (DivRemChip.ownAsserts (Eval.eval env cols))) :
@@ -1030,7 +1652,7 @@ private theorem divRemMulPredOfBool {value : ZMod p}
   rcases hvalue with hvalue | hvalue <;> rw [hvalue] <;> norm_num
 
 private structure DivRemGroupGateFacts
-    (cols : DivRemCols (ZMod p)) : Prop where
+    (cols : DivRemChip.Columns (ZMod p)) : Prop where
   upper :
     let gate := cols.is_div + cols.is_divu + cols.is_rem + cols.is_remu
     gate * (gate - 1) = 0
@@ -1042,7 +1664,7 @@ private structure DivRemGroupGateFacts
     gate * (gate - 1) = 0
 
 private theorem divRemGroupGateFacts
-    {cols : DivRemCols (ZMod p)}
+    {cols : DivRemChip.Columns (ZMod p)}
     (hfacts : DivRemMulFlagFacts cols) :
     DivRemGroupGateFacts cols := by
   have bDiv := bool_of_mul_pred hfacts.div
@@ -1084,7 +1706,7 @@ private theorem divRemEvalMulOperation
 omit [Fact (2 ^ 24 < p)] in
 private theorem divRemEvalMulLowerProduct
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p))
+    (cols : Var DivRemChip.Columns (ZMod p))
     (i : ℕ) (hi : i < 16) :
     (Eval.eval env cols).c_times_quotient_lower.product[i] =
       Expression.eval env cols.c_times_quotient_lower.product[i] := by
@@ -1097,7 +1719,7 @@ private theorem divRemEvalMulLowerProduct
 omit [Fact (2 ^ 24 < p)] in
 private theorem divRemEvalMulUpperProduct
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p))
+    (cols : Var DivRemChip.Columns (ZMod p))
     (i : ℕ) (hi : i < 16) :
     (Eval.eval env cols).c_times_quotient_upper.product[i] =
       Expression.eval env cols.c_times_quotient_upper.product[i] := by
@@ -1108,7 +1730,7 @@ private theorem divRemEvalMulUpperProduct
       cols.c_times_quotient_upper.product i hi).symm
 
 private def divRemGlueExpressions
-    (cols : Var DivRemCols (ZMod p)) :
+    (cols : Var DivRemChip.Columns (ZMod p)) :
     List (Expression (ZMod p)) :=
   [cols.is_real * (cols.c_times_quotient[0] -
       (cols.c_times_quotient_lower.product[0] +
@@ -1143,7 +1765,7 @@ omit [Fact (2 ^ 24 < p)] in
 set_option maxHeartbeats 8000000 in
 private theorem divRemGlueExpressionsEval
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) :
+    (cols : Var DivRemChip.Columns (ZMod p)) :
     (divRemGlueExpressions cols).map (Expression.eval env) =
       divRemLowerGlue (Eval.eval env cols) ++
         divRemUpperGlue (Eval.eval env cols) := by
@@ -1163,7 +1785,7 @@ private theorem divRemGlueExpressionsEval
 set_option maxHeartbeats 8000000 in
 private theorem divRemCoreForallDecompose
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
     List.Forall (· = 0)
         (nativeAssertZeros env
           ((DivRemCore.main cols).operations offset)) ↔
@@ -1198,7 +1820,7 @@ private theorem divRemCoreForallDecompose
 set_option maxHeartbeats 8000000 in
 private theorem divRemLowerBackward
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ)
+    (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ)
     (hNative :
       List.Forall (· = 0)
         (nativeAssertZeros env
@@ -1270,7 +1892,7 @@ private theorem divRemLowerBackward
 set_option maxHeartbeats 8000000 in
 private theorem divRemUpperBackward
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ)
+    (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ)
     (hNative :
       List.Forall (· = 0)
         (nativeAssertZeros env
@@ -1377,7 +1999,7 @@ private theorem divRemUpperBackward
 set_option maxHeartbeats 16000000 in
 private theorem divRemCoreAssertionsExact
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
     List.Forall (· = 0)
         (divRemLowerMulAssertions (Eval.eval env cols) ++
           divRemUpperMulAssertions (Eval.eval env cols) ++
@@ -1428,7 +2050,7 @@ private theorem divRemCoreAssertionsExact
 
 omit [Fact (2 ^ 24 < p)] in
 private theorem divRemRustCompare_eq
-    (cols : DivRemCols (ZMod p)) :
+    (cols : DivRemChip.Columns (ZMod p)) :
     divRemRustCompareAssertions cols =
       divRemCompareAssertions (DivRemCompare.Inputs.ofCols cols) := by
   simp only [divRemRustCompareAssertions, divRemCompareAssertions,
@@ -1440,7 +2062,7 @@ omit [Fact (2 ^ 24 < p)] in
 set_option maxHeartbeats 16000000 in
 private theorem divRemEvalCompareOfCols
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) :
+    (cols : Var DivRemChip.Columns (ZMod p)) :
     Eval.eval env (DivRemCompare.Inputs.ofCols cols) =
       DivRemCompare.Inputs.ofCols (Eval.eval env cols) := by
   rw [DivRemCompare.eval_inputs,
@@ -1455,7 +2077,7 @@ private theorem divRemEvalCompareOfCols
 set_option maxHeartbeats 8000000 in
 private theorem divRemCompareAssertionsExact
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
     List.Forall (· = 0)
         (divRemRustCompareAssertions (Eval.eval env cols)) ↔
       List.Forall (· = 0)
@@ -1518,7 +2140,7 @@ private theorem divRemCpuAssertionsExact
 omit [Fact (2 ^ 24 < p)] in
 private theorem divRemEvalOpcode
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) :
+    (cols : Var DivRemChip.Columns (ZMod p)) :
     divRemOpcode (Eval.eval env cols) =
       Expression.eval env (divRemOpcode cols) := by
   simp only [divRemOpcode]
@@ -1595,7 +2217,7 @@ private theorem divRemReaderAssertionsExact
 
 private theorem divRemOpA0OfOwn
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p))
+    (cols : Var DivRemChip.Columns (ZMod p))
     (hown :
       List.Forall (· = 0)
         (DivRemChip.ownAsserts (Eval.eval env cols))) :
@@ -1613,7 +2235,9 @@ private theorem divRemWholeAssertionsExact
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
     let cols := DivRemChip.populatedRowAt input offset
-    List.Forall (· = 0) (DivRemCols.asserts (Eval.eval env cols)) ↔
+    List.Forall (· = 0)
+        (Extracted.DivRemOracle.DivRemCols.asserts
+          (divRemChipReconfigure (Eval.eval env cols))) ↔
       List.Forall (· = 0)
         (nativeAssertZeros env ((DivRemChip.main input).operations offset)) := by
   dsimp only
@@ -1715,7 +2339,7 @@ set_option maxHeartbeats 32000000 in
 private theorem divRemConstraintsFaithful
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.DivRemCols (ZMod p))
+    (cols : DivRemChip.Columns (ZMod p))
     (hbind : BindsChipOutput DivRemChip.main env input offset cols) :
     List.Forall (· = 0) (divRemChipOracle.nativeAssertZeros cols) ↔
       List.Forall (· = 0)
@@ -1726,13 +2350,12 @@ private theorem divRemConstraintsFaithful
     DivRemChip.main_output_eq_populateRow,
     DivRemChip.populateRow_output_eq] at hbind
   subst cols
-  simp only [divRemChipOracle, ChipOracle.nativeAssertZeros,
-    ChipOracle.identity, id_eq]
+  simp only [divRemChipOracle, ChipOracle.nativeAssertZeros]
   rw [← ProvableStruct.eval_eq_eval]
   exact divRemWholeAssertionsExact env input offset
 
 private def divRemLowerMulInteractions {F : Type} [Field F]
-    [CoeHead F ℕ] (cols : DivRemCols F) :
+    [CoeHead F ℕ] (cols : DivRemChip.Columns F) :
     List (Extracted.Interaction F) :=
   Extracted.MulOperation.interactions
     #v[cols.c_times_quotient[0], cols.c_times_quotient[1],
@@ -1741,7 +2364,7 @@ private def divRemLowerMulInteractions {F : Type} [Field F]
     cols.is_real cols.is_real 0 0 0 0
 
 private def divRemUpperMulInteractions {F : Type} [Field F]
-    [CoeHead F ℕ] (cols : DivRemCols F) :
+    [CoeHead F ℕ] (cols : DivRemChip.Columns F) :
     List (Extracted.Interaction F) :=
   Extracted.MulOperation.interactions
     #v[cols.c_times_quotient[4], cols.c_times_quotient[5],
@@ -1807,7 +2430,7 @@ private def divRemReaderInteractions {F : Type} [Field F]
     state.pc opcode a adapter isReal isReal
 
 private def divRemDirectInteractions {F : Type} [Field F]
-    [CoeHead F ℕ] (cols : DivRemCols F) :
+    [CoeHead F ℕ] (cols : DivRemChip.Columns F) :
     List (Extracted.Interaction F) :=
   let rn := cols.rem_neg * 65535
   let e123 :=
@@ -1869,9 +2492,10 @@ private def divRemDirectInteractions {F : Type} [Field F]
 
 omit [Fact (2 ^ 24 < p)] in
 set_option maxHeartbeats 64000000 in
+set_option linter.unusedSimpArgs false in
 private theorem divRemRustInteractionsDecompose
-    (cols : DivRemCols (ZMod p)) :
-    DivRemCols.interactions cols =
+    (cols : DivRemChip.Columns (ZMod p)) :
+    Extracted.DivRemOracle.DivRemCols.interactions (divRemChipReconfigure cols) =
       divRemLowerMulInteractions cols ++
         divRemUpperMulInteractions cols ++
         divRemCompareInteractions (DivRemCompare.Inputs.ofCols cols) ++
@@ -1879,18 +2503,96 @@ private theorem divRemRustInteractionsDecompose
         divRemReaderInteractions cols.state (divRemOpcode cols)
           cols.a cols.adapter cols.is_real ++
         divRemDirectInteractions cols := by
-  rw [DivRemCols.interactions]
+  rw [Extracted.DivRemOracle.DivRemCols.interactions]
+  simp only [rc_state,
+    rc_adapter,
+    rc_a,
+    rc_b,
+    rc_c,
+    rc_quotient,
+    rc_quotient_comp,
+    rc_remainder_comp,
+    rc_remainder,
+    rc_abs_remainder,
+    rc_abs_c,
+    rc_max_abs_c_or_1,
+    rc_c_times_quotient,
+    rc_carry,
+    rc_is_div,
+    rc_is_divu,
+    rc_is_rem,
+    rc_is_remu,
+    rc_is_divw,
+    rc_is_remw,
+    rc_is_divuw,
+    rc_is_remuw,
+    rc_is_overflow,
+    rc_b_neg,
+    rc_b_neg_not_overflow,
+    rc_b_not_neg_not_overflow,
+    rc_is_real_not_word,
+    rc_rem_neg,
+    rc_c_neg,
+    rc_abs_c_alu_event,
+    rc_abs_rem_alu_event,
+    rc_is_real,
+    rc_remainder_check_multiplicity,
+    rc_c_times_quotient_lower,
+    rc_c_times_quotient_upper,
+    rc_remainder_lt_operation,
+    rc_is_c_0,
+    rc_is_overflow_b,
+    rc_is_overflow_c,
+    rc_c_neg_operation_value,
+    rc_rem_neg_operation_value,
+    rc_b_msb_msb,
+    rc_rem_msb_msb,
+    rc_c_msb_msb,
+    rc_quot_msb_msb,
+    om_carry,
+    om_product,
+    om_b_msb,
+    om_c_msb,
+    om_b_sign_extend,
+    om_c_sign_extend,
+    om_blb,
+    om_clb,
+    om_pmsb,
+    olt_bit,
+    olt_u16_flags,
+    olt_not_eq_inv,
+    olt_comparison_limbs,
+    ozw_l0_inverse,
+    ozw_l0_result,
+    ozw_l1_inverse,
+    ozw_l1_result,
+    ozw_l2_inverse,
+    ozw_l2_result,
+    ozw_l3_inverse,
+    ozw_l3_result,
+    ozw_is_zero_first_half,
+    ozw_is_zero_second_half,
+    ozw_result,
+    oew_diff]
+  simp only [om_product_msb, olt_u16co, ozw_limb_0, ozw_limb_1, ozw_limb_2,
+    ozw_limb_3, rc_b_msb, rc_rem_msb, rc_c_msb, rc_quot_msb,
+    rc_c_neg_operation, rc_rem_neg_operation]
+  simp only [divRemOracle_mulOperation_interactions_eq,
+    divRemOracle_mulOperation_interactions_eq',
+    divRemOracle_isEqualWord_interactions_eq,
+    divRemOracle_isEqualWord_interactions_eq',
+    divRemOracle_isZeroWord_interactions_eq,
+    divRemOracle_isZeroWord_interactions_eq',
+    divRemOracle_addOperation_interactions_eq,
+    divRemOracle_ltOperation_interactions_eq,
+    divRemOracle_ltOperation_interactions_eq',
+    divRemOracle_u16msb_interactions_eq]
   simp only [divRemLowerMulInteractions, divRemUpperMulInteractions,
     divRemCompareInteractions, divRemCpuInteractions,
     divRemReaderInteractions, divRemOpcode, divRemDirectInteractions,
     DivRemCompare.Inputs.ofCols]
-  rw [divRemMulEta, divRemMulEta, divRemCpuEta,
-    divRemRTypeEta, divRemVec3Eta]
-  repeat' rw [divRemVec4Eta]
-  rw [divRemAddDirectEta cols.c_neg_operation,
-    divRemAddDirectEta cols.rem_neg_operation,
-    divRemVec2Eta,
-    divRemLtDirectEta cols.remainder_lt_operation]
+  simp only [divRemMulEta, divRemCpuEta, divRemRTypeEta, divRemVec2Eta,
+    divRemVec3Eta, divRemVec4Eta, divRemVec16Eta]
   simp only [List.append_assoc]
   congr 1
 
@@ -2207,7 +2909,7 @@ set_option maxHeartbeats 16000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemCoreByteDecompose
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
     (((DivRemCore.main cols).operations offset).interactionsWith
         byteChannel.toRaw).map (AbstractInteraction.toAccess env) =
       (((MulOperation.main
@@ -2435,7 +3137,7 @@ set_option maxHeartbeats 8000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemLowerMulInteractionsActive
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
     LookupAccessList.active
         ((divRemLowerMulInteractions (Eval.eval env cols)).map
           Extracted.Interaction.toAccess) =
@@ -2473,7 +3175,7 @@ set_option maxHeartbeats 8000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemUpperMulInteractionsActive
     (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
     LookupAccessList.active
         ((divRemUpperMulInteractions (Eval.eval env cols)).map
           Extracted.Interaction.toAccess) =
@@ -2546,7 +3248,7 @@ private theorem divRemCompareAccessesAllByte
 
 omit [Fact (2 ^ 24 < p)] in
 private theorem divRemDirectAccessesAllByte
-    (cols : DivRemCols (ZMod p)) :
+    (cols : DivRemChip.Columns (ZMod p)) :
     (((divRemDirectInteractions cols).map
       Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) =
@@ -2557,8 +3259,8 @@ private theorem divRemDirectAccessesAllByte
 omit [Fact (2 ^ 24 < p)] in
 set_option maxHeartbeats 4000000 in
 private theorem divRemRustByteDecompose
-    (cols : DivRemCols (ZMod p)) :
-    ((DivRemCols.interactions cols).map
+    (cols : DivRemChip.Columns (ZMod p)) :
+    ((Extracted.DivRemOracle.DivRemCols.interactions (divRemChipReconfigure cols)).map
       Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte) =
       (divRemLowerMulInteractions cols).map
@@ -2594,7 +3296,8 @@ private theorem divRemByteInteractionsFaithful
         ((((DivRemChip.main input).operations offset).interactionsWith
           byteChannel.toRaw).map (AbstractInteraction.toAccess env)))
       (LookupAccessList.active
-        (((DivRemCols.interactions (Eval.eval env cols)).map
+        (((Extracted.DivRemOracle.DivRemCols.interactions
+          (divRemChipReconfigure (Eval.eval env cols))).map
           Extracted.Interaction.toAccess).filter
             (fun access => access.1 = InteractionKind.Byte))) := by
   dsimp only
@@ -2667,8 +3370,8 @@ private theorem divRemByteInteractionsFaithful
 
 set_option maxHeartbeats 4000000 in
 private theorem divRemRustStateDecompose
-    (cols : DivRemCols (ZMod p)) :
-    ((DivRemCols.interactions cols).map
+    (cols : DivRemChip.Columns (ZMod p)) :
+    ((Extracted.DivRemOracle.DivRemCols.interactions (divRemChipReconfigure cols)).map
       Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.State) =
       ((divRemCpuInteractions cols.state cols.is_real).map
@@ -2697,7 +3400,8 @@ private theorem divRemStateInteractionsExact
     let cols := DivRemChip.populatedRowAt input offset
     ((((DivRemChip.main input).operations offset).interactionsWith
       stateChannel.toRaw).map (AbstractInteraction.toAccess env)) =
-      ((DivRemCols.interactions (Eval.eval env cols)).map
+      ((Extracted.DivRemOracle.DivRemCols.interactions
+          (divRemChipReconfigure (Eval.eval env cols))).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.State) := by
   dsimp only
@@ -2753,8 +3457,8 @@ private theorem divRemStateInteractionsExact
 
 set_option maxHeartbeats 4000000 in
 private theorem divRemRustProgramDecompose
-    (cols : DivRemCols (ZMod p)) :
-    ((DivRemCols.interactions cols).map
+    (cols : DivRemChip.Columns (ZMod p)) :
+    ((Extracted.DivRemOracle.DivRemCols.interactions (divRemChipReconfigure cols)).map
       Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Program) =
       ((divRemReaderInteractions cols.state (divRemOpcode cols)
@@ -2786,7 +3490,8 @@ private theorem divRemProgramInteractionsExact
       programChannel.toRaw).map
         (AbstractInteraction.toAccess env)).map
           LookupAccessList.negMult) =
-      ((DivRemCols.interactions (Eval.eval env cols)).map
+      ((Extracted.DivRemOracle.DivRemCols.interactions
+          (divRemChipReconfigure (Eval.eval env cols))).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.Program) := by
   dsimp only
@@ -2848,8 +3553,8 @@ private theorem divRemProgramInteractionsExact
 
 set_option maxHeartbeats 4000000 in
 private theorem divRemRustMemoryDecompose
-    (cols : DivRemCols (ZMod p)) :
-    ((DivRemCols.interactions cols).map
+    (cols : DivRemChip.Columns (ZMod p)) :
+    ((Extracted.DivRemOracle.DivRemCols.interactions (divRemChipReconfigure cols)).map
       Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Memory) =
       ((divRemReaderInteractions cols.state (divRemOpcode cols)
@@ -2882,7 +3587,8 @@ private theorem divRemMemoryInteractionsFaithful
         memoryChannel.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)
-      (((DivRemCols.interactions (Eval.eval env cols)).map
+      (((Extracted.DivRemOracle.DivRemCols.interactions
+          (divRemChipReconfigure (Eval.eval env cols))).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.Memory)) := by
   dsimp only
@@ -2968,7 +3674,7 @@ set_option maxHeartbeats 8000000 in
 private theorem divRemInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.DivRemCols (ZMod p))
+    (cols : DivRemChip.Columns (ZMod p))
     (hbind : BindsChipOutput DivRemChip.main env input offset cols) :
     List.Perm
       (LookupAccessList.active
@@ -2982,8 +3688,9 @@ private theorem divRemInteractionsFaithful
   rw [← ProvableStruct.eval_eq_eval] at hbind
   subst cols
   let rustAccesses :=
-    (DivRemCols.interactions
-      (Eval.eval env (DivRemChip.populatedRowAt input offset))).map
+    (Extracted.DivRemOracle.DivRemCols.interactions
+      (divRemChipReconfigure
+        (Eval.eval env (DivRemChip.populatedRowAt input offset)))).map
         Extracted.Interaction.toAccess
   have hState := divRemStateInteractionsExact env input offset
   have hByte := divRemByteInteractionsFaithful env input offset
@@ -3021,7 +3728,7 @@ private theorem divRemInteractionsFaithful
   rw [divRemUnexpectedInteractions]
   simp only [List.map_nil, List.append_nil]
   simp only [divRemChipOracle, ChipOracle.accesses,
-    ChipOracle.nativeInteractions, ChipOracle.identity, id_eq]
+    ChipOracle.nativeInteractions]
   refine List.Perm.trans ?_
     (LookupAccessList.perm_filter_by_kind
       (LookupAccessList.active rustAccesses)).symm
@@ -3035,7 +3742,7 @@ private theorem divRemInteractionsFaithful
 
 set_option maxHeartbeats 4000000 in
 theorem divRemChip_constraints_constructive
-    (rustCols : Extracted.DivRemCols (ZMod p))
+    (rustCols : Extracted.DivRemOracle.DivRemCols (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := divRemChipRowCodec.assignment
       (divRemChipOracle.deconfigure rustCols) data
@@ -3078,7 +3785,7 @@ theorem divRemChip_constraints_constructive
 
 set_option maxHeartbeats 4000000 in
 theorem divRemChip_interactions_constructive
-    (rustCols : Extracted.DivRemCols (ZMod p))
+    (rustCols : Extracted.DivRemOracle.DivRemCols (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := divRemChipRowCodec.assignment
       (divRemChipOracle.deconfigure rustCols) data
@@ -3115,8 +3822,8 @@ theorem divRemChip_interactions_constructive
     DivRemChip.circuit_main_eq] using hfaithful
 
 theorem divRemChip_faithful :
-    ChipFaithful (p := p) DivRemChip.Inputs Extracted.DivRemCols
-      Extracted.DivRemCols DivRemChip.circuit divRemChipRowCodec
+    ChipFaithful (p := p) DivRemChip.Inputs DivRemChip.Columns
+      Extracted.DivRemOracle.DivRemCols DivRemChip.circuit divRemChipRowCodec
         divRemChipOracle where
   constraints := divRemChip_constraints_constructive (p := p)
   interactions := fun rustCols data _ =>

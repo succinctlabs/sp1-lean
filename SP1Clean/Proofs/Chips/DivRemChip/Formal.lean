@@ -20,7 +20,6 @@ remains independently deferred in `Completeness/Driver.lean`. -/
 namespace SP1Clean.DivRemChip
 
 open Circuit
-open Extracted (DivRemCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 -- `2 ^ 24` (subsuming `2 ^ 17`): the chip composes `MulOperation` — see `Defs`.
@@ -29,7 +28,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 /-- Strong, proof-oriented chip contract.  Unlike the public `Spec`, this exposes the arithmetic
 evidence that must be extracted from the generated constraints before the lightweight case layer
 turns it into ISA semantics. -/
-def EvidenceContract (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p))
+def EvidenceContract (input : Inputs (ZMod p)) (cols : Columns (ZMod p))
     (_ : ProverData (ZMod p)) : Prop :=
   Readers.RTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
@@ -43,7 +42,7 @@ def EvidenceContract (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p))
 set_option linter.unusedSectionVars false in
 /-- Evaluation commutes with the comparison cluster's projection from the committed chip row. -/
 private theorem eval_compareInput_ofCols (env : Environment (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) :
+    (cols : Var Columns (ZMod p)) :
     Eval.eval env (DivRemCompare.Inputs.ofCols cols) =
       DivRemCompare.Inputs.ofCols (Eval.eval env cols) := by
   rw [DivRemCompare.eval_inputs, eval_divRemCols_verifier]
@@ -53,7 +52,7 @@ private theorem eval_compareInput_ofCols (env : Environment (ZMod p))
 /-- The R-type reader projection in the expression layer.  Keeping this constructor folded gives
 the parent proof one small evaluator boundary instead of eight independent row-field rewrites. -/
 private def readerInputExpr (input : Var Inputs (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) : Var Readers.RTypeReader.Inputs (ZMod p) :=
+    (cols : Var Columns (ZMod p)) : Var Readers.RTypeReader.Inputs (ZMod p) :=
   { cols := input.adapter, is_real := input.is_real, is_trusted := input.is_real,
     clk_high := input.state.clk_high,
     clk_low := input.state.clk_0_16 + input.state.clk_16_24 * 65536,
@@ -63,7 +62,7 @@ private def readerInputExpr (input : Var Inputs (ZMod p))
     wv0 := cols.a[0], wv1 := cols.a[1], wv2 := cols.a[2], wv3 := cols.a[3] }
 
 /-- Value-level spelling of `readerInputExpr`. -/
-private def readerInputValue (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p)) :
+private def readerInputValue (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) :
     Readers.RTypeReader.Inputs (ZMod p) :=
   { cols := input.adapter, is_real := input.is_real, is_trusted := input.is_real,
     clk_high := input.state.clk_high,
@@ -74,7 +73,7 @@ private def readerInputValue (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod 
 set_option linter.unusedSectionVars false in
 /-- Verifier evaluation commutes with the folded R-type reader projection. -/
 private theorem eval_readerInputExpr (env : Environment (ZMod p))
-    (input : Var Inputs (ZMod p)) (cols : Var DivRemCols (ZMod p)) :
+    (input : Var Inputs (ZMod p)) (cols : Var Columns (ZMod p)) :
     Eval.eval env (readerInputExpr input cols) =
       readerInputValue (Eval.eval env input) (Eval.eval env cols) := by
   simp only [readerInputExpr, readerInputValue, DivRemContract.encodedOpcode]
@@ -83,13 +82,13 @@ private theorem eval_readerInputExpr (env : Environment (ZMod p))
 
 /-- The destination-write projection in the expression layer. -/
 private def writeInputExpr (input : Var Inputs (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) : Var Readers.RegisterWrite.Inputs (ZMod p) :=
+    (cols : Var Columns (ZMod p)) : Var Readers.RegisterWrite.Inputs (ZMod p) :=
   { clk_high := input.state.clk_high,
     clk_low := input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
     op_a := input.adapter.op_a, value := cols.a, is_real := input.is_real }
 
 /-- Value-level spelling of `writeInputExpr`. -/
-private def writeInputValue (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p)) :
+private def writeInputValue (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) :
     Readers.RegisterWrite.Inputs (ZMod p) :=
   { clk_high := input.state.clk_high,
     clk_low := input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
@@ -98,7 +97,7 @@ private def writeInputValue (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p
 set_option linter.unusedSectionVars false in
 /-- Verifier evaluation commutes with the folded destination-write projection. -/
 private theorem eval_writeInputExpr (env : Environment (ZMod p))
-    (input : Var Inputs (ZMod p)) (cols : Var DivRemCols (ZMod p)) :
+    (input : Var Inputs (ZMod p)) (cols : Var Columns (ZMod p)) :
     Eval.eval env (writeInputExpr input cols) =
       writeInputValue (Eval.eval env input) (Eval.eval env cols) := by
   simp only [writeInputExpr, writeInputValue]
@@ -109,7 +108,7 @@ private theorem eval_writeInputExpr (env : Environment (ZMod p))
 stated over opaque value rows: the parent soundness proof can rewrite its evaluated witness prefix
 to one fresh `cols` variable before applying any arithmetic theorem. -/
 private def ConstrainRowSpecs (data : ProverData (ZMod p)) (input : Inputs (ZMod p))
-    (cols : DivRemCols (ZMod p)) : Prop :=
+    (cols : Columns (ZMod p)) : Prop :=
   let cpuInput : Readers.CPUState.Inputs (ZMod p) :=
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
       8, input.is_real⟩
@@ -127,7 +126,7 @@ private def ConstrainRowSpecs (data : ProverData (ZMod p)) (input : Inputs (ZMod
 
 /-- Normalize the constraint-only suffix once, while its input and row are still opaque. -/
 private theorem constrainRow_specs (env : Environment (ZMod p))
-    (input : Var Inputs (ZMod p)) (cols : Var DivRemCols (ZMod p)) (offset : ℕ)
+    (input : Var Inputs (ZMod p)) (cols : Var Columns (ZMod p)) (offset : ℕ)
     (h : ConstraintsHold.Soundness env ((constrainRow input cols).operations offset)) :
     ConstrainRowSpecs env.data (Eval.eval env input) (Eval.eval env cols) := by
   simp only [constrainRow, ConstraintsHold.Soundness, Circuit.bind_forAllNoOffset,
@@ -156,7 +155,7 @@ theorem evidenceSoundness :
   change ConstraintsHold.Soundness env
     ((populateRow input_var >>= constrainRow input_var).operations i₀) at h_holds
   simp only [ConstraintsHold.Soundness, Circuit.bind_forAllNoOffset] at h_holds
-  obtain ⟨cols, hcols⟩ : ∃ cols : DivRemCols (ZMod p),
+  obtain ⟨cols, hcols⟩ : ∃ cols : Columns (ZMod p),
       Eval.eval env ((populateRow input_var).output i₀) = cols := ⟨_, rfl⟩
   have hconstrain := constrainRow_specs env input_var ((populateRow input_var).output i₀)
     (i₀ + (populateRow input_var).localLength i₀) h_holds.2
@@ -176,15 +175,15 @@ theorem evidenceSoundness :
     rw [eval_inputs] at h
     exact h
   have hcolsRealEval : Eval.eval env input_var.is_real = cols.is_real := by
-    have h := congrArg DivRemCols.is_real hcols
+    have h := congrArg Columns.is_real hcols
     rw [eval_divRemCols_verifier, populatedRowAt_isReal_eq] at h
     exact h
   have hcolsAdapterEval : Eval.eval env input_var.adapter = cols.adapter := by
-    have h := congrArg DivRemCols.adapter hcols
+    have h := congrArg Columns.adapter hcols
     rw [eval_divRemCols_verifier, populatedRowAt_adapter_eq] at h
     exact h
   have hcolsStateEval : Eval.eval env input_var.state = cols.state := by
-    have h := congrArg DivRemCols.state hcols
+    have h := congrArg Columns.state hcols
     rw [eval_divRemCols_verifier, populatedRowAt_state_eq] at h
     exact h
   have hinputReal : cols.is_real = input.is_real := hcolsRealEval.symm.trans hinputRealEval
@@ -264,7 +263,7 @@ private theorem populateRow_interactionsWith_eq_nil (channel : RawChannel (ZMod 
 
 /-- The constraint suffix's only State traffic is the canonical `CPUState` pull/push pair. -/
 private theorem constrainRow_interactionsWith_state (input : Var Inputs (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var Columns (ZMod p)) (offset : ℕ) :
     Operations.interactionsWith stateChannel.toRaw ((constrainRow input cols).operations offset) =
       (Readers.CPUState.stateInteractions
         ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
@@ -300,7 +299,7 @@ def exposedProgramMessage (input : Var Inputs (ZMod p)) (offset : ℕ) :
 /-- The constraint suffix's only Program traffic is the R-type reader's canonical fetch.  Keeping
 this projection next to `main` prevents whole-machine proofs from unfolding the witness program. -/
 private theorem constrainRow_interactionsWith_program (input : Var Inputs (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var Columns (ZMod p)) (offset : ℕ) :
     Operations.interactionsWith programChannel.toRaw
         ((constrainRow input cols).operations offset) =
       [(programChannel.pulledIf input.is_real
@@ -338,7 +337,7 @@ private theorem constrainRow_interactionsWith_program (input : Var Inputs (ZMod 
         (by
           change programChannel.toRaw ∉ []
           exact List.not_mem_nil)
-  have coreNil (coreInput : Var Extracted.DivRemCols (ZMod p)) (n : ℕ) :
+  have coreNil (coreInput : Var DivRemChip.Columns (ZMod p)) (n : ℕ) :
       Operations.interactionsWith programChannel.toRaw
         [Operation.subcircuit (DivRemCore.circuit.toSubcircuit n coreInput)] = [] := by
     simpa only [Operations.interactionsWith_nil] using
@@ -410,7 +409,7 @@ def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
 /-- The constraint suffix's Memory traffic is exactly the reader list followed by the destination
 write.  Arithmetic and comparison assertions declare no Memory channel. -/
 private theorem constrainRow_interactionsWith_memory (input : Var Inputs (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var Columns (ZMod p)) (offset : ℕ) :
     Operations.interactionsWith memoryChannel.toRaw ((constrainRow input cols).operations offset) =
       Soundness.rTypeMemoryInteractions (readerInputExpr input cols) ++
         Soundness.registerWriteMemoryInteractions (writeInputExpr input cols) := by
@@ -445,7 +444,7 @@ private theorem constrainRow_interactionsWith_memory (input : Var Inputs (ZMod p
         (by
           change memoryChannel.toRaw ∉ []
           exact List.not_mem_nil)
-  have coreNil (coreInput : Var Extracted.DivRemCols (ZMod p)) (n : ℕ) :
+  have coreNil (coreInput : Var DivRemChip.Columns (ZMod p)) (n : ℕ) :
       Operations.interactionsWith memoryChannel.toRaw
         [Operation.subcircuit (DivRemCore.circuit.toSubcircuit n coreInput)] = [] := by
     simpa only [Operations.interactionsWith_nil] using
@@ -521,7 +520,7 @@ private theorem populateRow_subcircuitRequirements_eq_nil (input : Var Inputs (Z
 
 /-- Exactly the R-type reader and destination write contribute child Memory requirements. -/
 private theorem constrainRow_subcircuitRequirements_eq (input : Var Inputs (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var Columns (ZMod p)) (offset : ℕ) :
     Operations.subcircuitChannelsWithRequirements ((constrainRow input cols).operations offset) =
       [memoryChannel.toRaw, memoryChannel.toRaw] := by
   simp only [constrainRow, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
@@ -546,7 +545,7 @@ private theorem populateRow_shallowChannels_eq_nil (input : Var Inputs (ZMod p))
     Operations.shallowChannels_nil, List.nil_append]
 
 private theorem constrainRow_shallowChannels_eq_nil (input : Var Inputs (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var Columns (ZMod p)) (offset : ℕ) :
     Operations.shallowChannels ((constrainRow input cols).operations offset) = [] := by
   simp only [constrainRow, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
     subcircuitWithAssertion, assertion, Operations.localLength,
@@ -561,7 +560,7 @@ private theorem populateRow_shallowInteractions_eq_nil (input : Var Inputs (ZMod
     Operations.shallowInteractions_nil, List.nil_append]
 
 private theorem constrainRow_shallowInteractions_eq_nil (input : Var Inputs (ZMod p))
-    (cols : Var DivRemCols (ZMod p)) (offset : ℕ) :
+    (cols : Var Columns (ZMod p)) (offset : ℕ) :
     Operations.shallowInteractions ((constrainRow input cols).operations offset) = [] := by
   simp only [constrainRow, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
     subcircuitWithAssertion, assertion, Operations.localLength,
@@ -598,10 +597,10 @@ theorem requirementsChannelsLawful (input : Var Inputs (ZMod p)) (offset : ℕ) 
       List.nil_append] at hInteraction
     exact (List.not_mem_nil hInteraction).elim
 
-/-- The `DivRem` chip row as a `GeneralFormalCircuit`: the generated `DivRemCols` row checked against
+/-- The `DivRem` chip row as a `GeneralFormalCircuit`: the generated `Columns` row checked against
 the public reader/selection/eight-case contract. The disclosed whole-chip seams are
 `evidenceSoundness`, `completeness`, and the requirements-channel law below. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,

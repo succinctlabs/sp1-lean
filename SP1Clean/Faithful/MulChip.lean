@@ -1,9 +1,9 @@
 import SP1Clean.Faithful.ChipOracle
 import SP1Clean.Faithful.CPUState
-import SP1Clean.Faithful.MulOperation
 import SP1Clean.Faithful.RTypeReader
 import SP1Clean.Faithful.U16MSBOperation
 import SP1Clean.Faithful.U16toU8OperationSafe
+import SP1Clean.Extracted.ChipOracle.Mul
 import SP1Clean.Proofs.Chips.MulChip.Formal
 
 /-!
@@ -21,19 +21,80 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-def mulChipOracle :
-    ChipOracle (ZMod p) Extracted.MulCols Extracted.MulCols :=
-  ChipOracle.identity Extracted.MulCols.asserts
-    Extracted.MulCols.interactions
+/-- Copy the shared `Extracted.MulOperation` arithmetic block into the Mul oracle's chip-private
+`MulOperation` row (same field names; the two nested byte-decomposition blocks and the MSB block are
+rebuilt into the oracle's embedded struct copies). -/
+def mulOracleOperation {F : Type} (cols : Extracted.MulOperation F) :
+    Extracted.MulOracle.MulOperation F :=
+  { carry := cols.carry
+    product := cols.product
+    b_lower_byte := { low_bytes := cols.b_lower_byte.low_bytes }
+    c_lower_byte := { low_bytes := cols.c_lower_byte.low_bytes }
+    b_msb := cols.b_msb
+    c_msb := cols.c_msb
+    product_msb := { msb := cols.product_msb.msb }
+    b_sign_extend := cols.b_sign_extend
+    c_sign_extend := cols.c_sign_extend }
+
+/-- Inverse of `mulOracleOperation`. -/
+def mulNativeOperation {F : Type} (cols : Extracted.MulOracle.MulOperation F) :
+    Extracted.MulOperation F :=
+  { carry := cols.carry
+    product := cols.product
+    b_lower_byte := { low_bytes := cols.b_lower_byte.low_bytes }
+    c_lower_byte := { low_bytes := cols.c_lower_byte.low_bytes }
+    b_msb := cols.b_msb
+    c_msb := cols.c_msb
+    product_msb := { msb := cols.product_msb.msb }
+    b_sign_extend := cols.b_sign_extend
+    c_sign_extend := cols.c_sign_extend }
+
+/-- Whole-chip row reconfiguration. The reader blocks and the flag/result columns are already the
+canonical generated substrate; the arithmetic block is copied into Rust's chip-private operation
+row. This is not an operation-level faithfulness claim. -/
+def mulChipReconfigure {F : Type} (cols : MulChip.Columns F) :
+    Extracted.MulOracle.MulCols F :=
+  { state := cols.state
+    adapter := cols.adapter
+    a := cols.a
+    mul_operation := mulOracleOperation cols.mul_operation
+    is_mul := cols.is_mul
+    is_mulh := cols.is_mulh
+    is_mulhu := cols.is_mulhu
+    is_mulhsu := cols.is_mulhsu
+    is_mulw := cols.is_mulw }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def mulChipDeconfigure {F : Type} (cols : Extracted.MulOracle.MulCols F) :
+    MulChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    a := cols.a
+    mul_operation := mulNativeOperation cols.mul_operation
+    is_mul := cols.is_mul
+    is_mulh := cols.is_mulh
+    is_mulhu := cols.is_mulhu
+    is_mulhsu := cols.is_mulhsu
+    is_mulw := cols.is_mulw }
+
+/-- SP1 Rust's complete Mul-chip oracle, viewed from the native Lean row. -/
+def mulChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F MulChip.Columns Extracted.MulOracle.MulCols where
+  reconfigure := mulChipReconfigure
+  deconfigure := mulChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.MulOracle.MulCols.asserts
+  interactions := Extracted.MulOracle.MulCols.interactions
 
 def mulChipInput {F : Type} [Add F]
-    (cols : Extracted.MulCols F) : MulChip.Inputs F :=
+    (cols : MulChip.Columns F) : MulChip.Inputs F :=
   { is_real := cols.is_mul + cols.is_mulh + cols.is_mulhu +
       cols.is_mulhsu + cols.is_mulw
     state := cols.state
     adapter := cols.adapter }
 
-def mulChipLocals {F : Type} (cols : Extracted.MulCols F) :
+def mulChipLocals {F : Type} (cols : MulChip.Columns F) :
     Vector F 54 :=
   Vector.cast (by rfl)
     (#v[cols.is_mul, cols.is_mulh, cols.is_mulhu,
@@ -41,7 +102,7 @@ def mulChipLocals {F : Type} (cols : Extracted.MulCols F) :
       toElements cols.mul_operation ++ cols.a)
 
 def mulChipPhysicalRow {F : Type} [Add F]
-    (cols : Extracted.MulCols F) : Array F :=
+    (cols : MulChip.Columns F) : Array F :=
   inputFirstRow (mulChipInput cols) (mulChipLocals cols)
 
 def mulChipOperationOfLocals {F : Type} (locals : Vector F 54) :
@@ -53,20 +114,20 @@ def mulChipAOfLocals {F : Type} (locals : Vector F 54) : Word F :=
 
 def mulChipColumnsOfInput {F : Type}
     (input : MulChip.Inputs F) (locals : Vector F 54) :
-    Extracted.MulCols F :=
+    MulChip.Columns F :=
   ⟨input.state, input.adapter, mulChipAOfLocals locals,
     mulChipOperationOfLocals locals, locals[0], locals[1],
     locals[2], locals[3], locals[4]⟩
 
 private theorem mulChipLocals_flag {F : Type}
-    (cols : Extracted.MulCols F) (i : ℕ) (hi : i < 5) :
+    (cols : MulChip.Columns F) (i : ℕ) (hi : i < 5) :
     (mulChipLocals cols)[i] =
       #v[cols.is_mul, cols.is_mulh, cols.is_mulhu,
         cols.is_mulhsu, cols.is_mulw][i] := by
   interval_cases i <;> simp [mulChipLocals]
 
 private theorem mulChipOperationOfLocals_roundtrip {F : Type}
-    (cols : Extracted.MulCols F) :
+    (cols : MulChip.Columns F) :
     mulChipOperationOfLocals (mulChipLocals cols) =
       cols.mul_operation := by
   refine (ProvableType.ext_iff (α := Extracted.MulOperation) _ _).mpr
@@ -79,7 +140,7 @@ private theorem mulChipOperationOfLocals_roundtrip {F : Type}
   simp [hsize, hi]
 
 private theorem mulChipAOfLocals_roundtrip {F : Type}
-    (cols : Extracted.MulCols F) :
+    (cols : MulChip.Columns F) :
     mulChipAOfLocals (mulChipLocals cols) = cols.a := by
   apply Vector.ext
   intro i hi
@@ -88,11 +149,11 @@ private theorem mulChipAOfLocals_roundtrip {F : Type}
       show size Extracted.MulOperation = 45 by rfl]
 
 theorem mulChipColumnsOfInput_roundtrip {F : Type} [Add F]
-    (cols : Extracted.MulCols F) :
+    (cols : MulChip.Columns F) :
     mulChipColumnsOfInput (mulChipInput cols) (mulChipLocals cols) =
       cols := by
   unfold mulChipColumnsOfInput mulChipInput
-  rw [Extracted.MulCols.mk.injEq]
+  rw [MulChip.Columns.mk.injEq]
   refine ⟨rfl, rfl, mulChipAOfLocals_roundtrip cols,
     mulChipOperationOfLocals_roundtrip cols, ?_⟩
   constructor
@@ -173,7 +234,7 @@ theorem eval_mulChipDirectOutput
   rw [MulChip.directOutput_eq]
   rw [← CircuitType.eval_expression, MulChip.eval_columns]
   unfold mulChipColumnsOfInput
-  rw [Extracted.MulCols.mk.injEq]
+  rw [MulChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input locals data
   rw [MulChip.eval_inputs, MulChip.Inputs.mk.injEq] at hinputEval
@@ -196,7 +257,7 @@ theorem eval_mulChipDirectOutput
       (eval_local_inputFirstRow input locals data 4 (by decide))
 
 def mulChipRowCodec :
-    ChipRowCodec MulChip.Inputs Extracted.MulCols
+    ChipRowCodec MulChip.Inputs MulChip.Columns
       (MulChip.circuit (p := p)) where
   assignment cols data := {
     row := mulChipPhysicalRow cols
@@ -512,6 +573,112 @@ private theorem mulOperation_eta {F : Type}
       simp only
       rw [vec16_eta, vec16_eta, vec4_eta, vec4_eta]
 
+/- Namespace bridges between the Mul oracle's embedded chip-private helper copies and the canonical
+standalone generated modules. The two bodies are rendered from the same compiler output, so each
+bridge is a definitional unfolding, not a mathematical claim. They let every heavy `MulOperation`
+lemma below stay stated once against the standalone module (also consumed by the DivRem chip). -/
+
+private theorem mulOracleOperation_eta {F : Type}
+    (cols : Extracted.MulOperation F) :
+    ({ carry :=
+        #v[cols.carry[0], cols.carry[1], cols.carry[2], cols.carry[3],
+          cols.carry[4], cols.carry[5], cols.carry[6], cols.carry[7],
+          cols.carry[8], cols.carry[9], cols.carry[10], cols.carry[11],
+          cols.carry[12], cols.carry[13], cols.carry[14], cols.carry[15]]
+       product :=
+        #v[cols.product[0], cols.product[1], cols.product[2], cols.product[3],
+          cols.product[4], cols.product[5], cols.product[6], cols.product[7],
+          cols.product[8], cols.product[9], cols.product[10], cols.product[11],
+          cols.product[12], cols.product[13], cols.product[14], cols.product[15]]
+       b_lower_byte :=
+        { low_bytes :=
+            #v[cols.b_lower_byte.low_bytes[0],
+              cols.b_lower_byte.low_bytes[1],
+              cols.b_lower_byte.low_bytes[2],
+              cols.b_lower_byte.low_bytes[3]] }
+       c_lower_byte :=
+        { low_bytes :=
+            #v[cols.c_lower_byte.low_bytes[0],
+              cols.c_lower_byte.low_bytes[1],
+              cols.c_lower_byte.low_bytes[2],
+              cols.c_lower_byte.low_bytes[3]] }
+       b_msb := cols.b_msb
+       c_msb := cols.c_msb
+       product_msb := { msb := cols.product_msb.msb }
+       b_sign_extend := cols.b_sign_extend
+       c_sign_extend := cols.c_sign_extend } :
+      Extracted.MulOracle.MulOperation F) = mulOracleOperation cols := by
+  rw [mulOracleOperation, Extracted.MulOracle.MulOperation.mk.injEq]
+  refine ⟨vec16_eta _, vec16_eta _, ?_, ?_, rfl, rfl, rfl, rfl, rfl⟩ <;>
+    · rw [Extracted.MulOracle.U16toU8Operation.mk.injEq]
+      exact vec4_eta _
+
+private theorem mulOracle_u16tou8safe_value_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (u16_values : Vector F 4) (low_bytes : Vector F 4) (is_real : F) :
+    Extracted.MulOracle.U16toU8OperationSafe.value u16_values
+        ⟨low_bytes⟩ is_real =
+      Extracted.U16toU8OperationSafe.value u16_values ⟨low_bytes⟩ is_real := by
+  rw [Extracted.MulOracle.U16toU8OperationSafe.value,
+    Extracted.U16toU8OperationSafe.value]
+
+private theorem mulOracle_u16tou8safe_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (u16_values : Vector F 4) (low_bytes : Vector F 4) (is_real : F) :
+    Extracted.MulOracle.U16toU8OperationSafe.asserts u16_values
+        ⟨low_bytes⟩ is_real =
+      Extracted.U16toU8OperationSafe.asserts u16_values ⟨low_bytes⟩ is_real := by
+  rw [Extracted.MulOracle.U16toU8OperationSafe.asserts,
+    Extracted.U16toU8OperationSafe.asserts]
+
+private theorem mulOracle_u16tou8safe_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (u16_values : Vector F 4) (low_bytes : Vector F 4) (is_real : F) :
+    Extracted.MulOracle.U16toU8OperationSafe.interactions u16_values
+        ⟨low_bytes⟩ is_real =
+      Extracted.U16toU8OperationSafe.interactions u16_values ⟨low_bytes⟩ is_real := by
+  rw [Extracted.MulOracle.U16toU8OperationSafe.interactions,
+    Extracted.U16toU8OperationSafe.interactions]
+
+private theorem mulOracle_u16msb_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.MulOracle.U16MSBOperation.asserts a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.asserts a ⟨msb⟩ is_real := by
+  rw [Extracted.MulOracle.U16MSBOperation.asserts,
+    Extracted.U16MSBOperation.asserts]
+
+private theorem mulOracle_u16msb_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.MulOracle.U16MSBOperation.interactions a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.interactions a ⟨msb⟩ is_real := by
+  rw [Extracted.MulOracle.U16MSBOperation.interactions,
+    Extracted.U16MSBOperation.interactions]
+
+set_option maxHeartbeats 2000000 in
+/-- The Mul oracle's embedded `MulOperation.asserts` copy agrees with the canonical standalone
+module on every reconfigured arithmetic block. -/
+private theorem mulOracle_mulOperation_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b c : Word F) (cols : Extracted.MulOperation F)
+    (is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu : F) :
+    Extracted.MulOracle.MulOperation.asserts a b c (mulOracleOperation cols)
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu =
+      Extracted.MulOperation.asserts a b c cols
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu := by
+  rw [Extracted.MulOracle.MulOperation.asserts, Extracted.MulOperation.asserts]
+  simp only [mulOracleOperation, mulOracle_u16tou8safe_value_eq,
+    mulOracle_u16tou8safe_asserts_eq, mulOracle_u16msb_asserts_eq]
+
+set_option maxHeartbeats 2000000 in
+/-- Interaction-list half of `mulOracle_mulOperation_asserts_eq`. -/
+private theorem mulOracle_mulOperation_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b c : Word F) (cols : Extracted.MulOperation F)
+    (is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu : F) :
+    Extracted.MulOracle.MulOperation.interactions a b c (mulOracleOperation cols)
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu =
+      Extracted.MulOperation.interactions a b c cols
+        is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu := by
+  rw [Extracted.MulOracle.MulOperation.interactions,
+    Extracted.MulOperation.interactions]
+  simp only [mulOracleOperation, mulOracle_u16tou8safe_value_eq,
+    mulOracle_u16tou8safe_interactions_eq, mulOracle_u16msb_interactions_eq]
+
 @[circuit_norm] private theorem eval_mulOperationColumns
     {F : Type} [FiniteField F] (env : Environment F)
     (cols : Extracted.MulOperation (Expression F)) :
@@ -722,8 +889,8 @@ private theorem u16Value7 (w : Word (ZMod p))
 
 omit [Fact (2 ^ 24 < p)] in
 private theorem mulCols_asserts_decompose
-    (cols : Extracted.MulCols (ZMod p)) :
-    Extracted.MulCols.asserts cols =
+    (cols : MulChip.Columns (ZMod p)) :
+    Extracted.MulOracle.MulCols.asserts (mulChipReconfigure cols) =
       Extracted.MulOperation.asserts cols.a
         cols.adapter.op_b_memory.prev_value
         cols.adapter.op_c_memory.prev_value cols.mul_operation
@@ -754,8 +921,10 @@ private theorem mulCols_asserts_decompose
           (cols.is_mul + cols.is_mulh + cols.is_mulhu +
             cols.is_mulhsu + cols.is_mulw - 1),
         cols.adapter.op_a_0 ] := by
-  rw [Extracted.MulCols.asserts]
-  rw [mulOperation_eta, cpuState_eta, rTypeReader_eta,
+  rw [Extracted.MulOracle.MulCols.asserts]
+  dsimp only [mulChipReconfigure, mulOracleOperation]
+  rw [mulOracleOperation_eta, mulOracle_mulOperation_asserts_eq,
+    cpuState_eta, rTypeReader_eta,
     vec4_eta, vec4_eta, vec4_eta, vec3_eta]
 
 /-- Rust's twelve selector-gated result-placement equations. -/
@@ -1551,7 +1720,7 @@ set_option maxHeartbeats 1000000 in
 private theorem mulChip_constraints_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.MulCols (ZMod p))
+    (cols : MulChip.Columns (ZMod p))
     (hbind : BindsChipOutput MulChip.main env input offset cols)
     (hinputReal :
       Expression.eval env input.is_real =
@@ -1678,8 +1847,7 @@ private theorem mulChip_constraints_faithful
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
       input.adapter.op_a, a, input.is_real⟩
   rw [mul_chip_constraints_decompose]
-  simp only [ChipOracle.nativeAssertZeros, mulChipOracle,
-    ChipOracle.identity, id_eq]
+  simp only [ChipOracle.nativeAssertZeros, mulChipOracle]
   rw [mulCols_asserts_decompose]
   simp only [List.forall_append, List.forall_cons]
   rw [forall_nil_iff]
@@ -2041,7 +2209,7 @@ private theorem mulChip_constraints_faithful
 
 set_option maxHeartbeats 200000 in
 private theorem mulChipRowCodec_inputReal
-    (cols : Extracted.MulCols (ZMod p))
+    (cols : MulChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := mulChipRowCodec.assignment cols data
     Expression.eval assignment.environment
@@ -2104,7 +2272,7 @@ private theorem mulChipRowCodec_inputReal
 
 set_option maxHeartbeats 1000000 in
 theorem mulChip_constraints_constructive
-    (rustCols : Extracted.MulCols (ZMod p))
+    (rustCols : Extracted.MulOracle.MulCols (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := mulChipRowCodec.assignment
       (mulChipOracle.deconfigure rustCols) data
@@ -2156,8 +2324,8 @@ theorem mulChip_constraints_constructive
 
 omit [Fact (2 ^ 24 < p)] in
 private theorem mulCols_interactions_decompose
-    (cols : Extracted.MulCols (ZMod p)) :
-    Extracted.MulCols.interactions cols =
+    (cols : MulChip.Columns (ZMod p)) :
+    Extracted.MulOracle.MulCols.interactions (mulChipReconfigure cols) =
       Extracted.MulOperation.interactions cols.a
         cols.adapter.op_b_memory.prev_value
         cols.adapter.op_c_memory.prev_value cols.mul_operation
@@ -2179,8 +2347,10 @@ private theorem mulCols_interactions_decompose
           cols.is_mulhsu + cols.is_mulw)
         (cols.is_mul + cols.is_mulh + cols.is_mulhu +
           cols.is_mulhsu + cols.is_mulw) := by
-  rw [Extracted.MulCols.interactions]
-  rw [mulOperation_eta, cpuState_eta, rTypeReader_eta, vec3_eta,
+  rw [Extracted.MulOracle.MulCols.interactions]
+  dsimp only [mulChipReconfigure, mulOracleOperation]
+  rw [mulOracleOperation_eta, mulOracle_mulOperation_interactions_eq,
+    cpuState_eta, rTypeReader_eta, vec3_eta,
     vec4_eta cols.adapter.op_b_memory.prev_value,
     vec4_eta cols.adapter.op_c_memory.prev_value]
   simp only [vec4_eta, List.append_nil]
@@ -2550,7 +2720,7 @@ set_option maxHeartbeats 2000000 in
 private theorem mulChip_state_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.MulCols (ZMod p))
+    (cols : MulChip.Columns (ZMod p))
     (hReal :
       Expression.eval env input.is_real =
         cols.is_mul + cols.is_mulh + cols.is_mulhu +
@@ -2566,7 +2736,7 @@ private theorem mulChip_state_interactions_faithful
     (hPc2 : Expression.eval env input.state.pc[2] = cols.state.pc[2]) :
     ((((MulChip.main input).operations offset).interactionsWith
         stateChannel.toRaw).map (AbstractInteraction.toAccess env)) =
-      ((Extracted.MulCols.interactions cols).map
+      ((Extracted.MulOracle.MulCols.interactions (mulChipReconfigure cols)).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.State) := by
   have hStatePull :
@@ -2619,7 +2789,7 @@ set_option maxHeartbeats 2000000 in
 private theorem mulChip_program_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.MulCols (ZMod p))
+    (cols : MulChip.Columns (ZMod p))
     (hReal :
       Expression.eval env input.is_real =
         cols.is_mul + cols.is_mulh + cols.is_mulhu +
@@ -2639,7 +2809,7 @@ private theorem mulChip_program_interactions_faithful
     (((((MulChip.main input).operations offset).interactionsWith
         programChannel.toRaw).map
           (AbstractInteraction.toAccess env)).map LookupAccessList.negMult) =
-      ((Extracted.MulCols.interactions cols).map
+      ((Extracted.MulOracle.MulCols.interactions (mulChipReconfigure cols)).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.Program) := by
   have hProgramPull :
@@ -2690,7 +2860,7 @@ set_option linter.unusedSimpArgs false in
 private theorem mulChip_memory_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.MulCols (ZMod p))
+    (cols : MulChip.Columns (ZMod p))
     (hReal :
       Expression.eval env input.is_real =
         cols.is_mul + cols.is_mulh + cols.is_mulhu +
@@ -2757,7 +2927,7 @@ private theorem mulChip_memory_interactions_faithful
       (((((MulChip.main input).operations offset).interactionsWith
         memoryChannel.toRaw).map
           (AbstractInteraction.toAccess env)).map LookupAccessList.negMult)
-      (((Extracted.MulCols.interactions cols).map
+      (((Extracted.MulOracle.MulCols.interactions (mulChipReconfigure cols)).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.Memory)) := by
   have hMemoryPull :
@@ -3046,13 +3216,13 @@ set_option maxHeartbeats 4000000 in
 private theorem mulChip_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.MulCols (ZMod p))
+    (cols : MulChip.Columns (ZMod p))
     (hbind : BindsChipOutput MulChip.main env input offset cols)
     (hinputReal :
       Expression.eval env input.is_real =
         Expression.eval env (mul_chip_is_real (p := p) offset))
     (hRust :
-      List.Forall (· = 0) (Extracted.MulCols.asserts cols)) :
+      List.Forall (· = 0) (Extracted.MulOracle.MulCols.asserts (mulChipReconfigure cols))) :
     List.Perm
       (LookupAccessList.active
         (nativeAccesses env ((MulChip.main input).operations offset)))
@@ -3063,7 +3233,7 @@ private theorem mulChip_interactions_faithful
   rw [← ProvableStruct.eval_eq_eval, MulChip.eval_columns] at hbind
   dsimp only at hbind
   simp only [ProvableType.eval_field] at hbind
-  let rustCols : Extracted.MulCols (ZMod p) :=
+  let rustCols : MulChip.Columns (ZMod p) :=
     { state := Eval.eval env input.state
       adapter := Eval.eval env input.adapter
       a := Eval.eval env (mul_chip_a (p := p) offset)
@@ -3424,7 +3594,7 @@ private theorem mulChip_interactions_faithful
           rustRtypeAccesses.filter
             (fun access => access.1 = InteractionKind.Byte) := by
     change
-      ((Extracted.MulCols.interactions rustCols).map
+      ((Extracted.MulOracle.MulCols.interactions (mulChipReconfigure rustCols)).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.Byte) = _
     rw [mulCols_interactions_decompose]
@@ -3536,7 +3706,7 @@ private theorem mulChip_interactions_faithful
 local AIR because one inactive U16-MSB lookup key is normalized through its selector-gated output
 equation. -/
 theorem mulChip_interactions_constructive
-    (rustCols : Extracted.MulCols (ZMod p))
+    (rustCols : Extracted.MulOracle.MulCols (ZMod p))
     (data : ProverData (ZMod p))
     (hRust :
       List.Forall (· = 0) (mulChipOracle.assertZeros rustCols)) :
@@ -3569,8 +3739,11 @@ theorem mulChip_interactions_constructive
               Air.Flat.Component (ZMod p)).rowOffset) :=
     mulChipRowCodec_inputReal cols data
   have hRust' :
-      List.Forall (· = 0) (Extracted.MulCols.asserts cols) := by
-    simpa only [cols, mulChipOracle, ChipOracle.identity, id_eq] using hRust
+      List.Forall (· = 0) (Extracted.MulOracle.MulCols.asserts (mulChipReconfigure cols)) := by
+    have hrd : mulChipReconfigure cols = rustCols :=
+      mulChipOracle.reconfigure_deconfigure rustCols
+    rw [hrd]
+    exact hRust
   have hfaithful := mulChip_interactions_faithful
     assignment.environment
     (⟨MulChip.circuit (p := p)⟩ :
@@ -3587,8 +3760,8 @@ theorem mulChip_interactions_constructive
 
 /-- Whole-chip faithfulness package for the complete pinned v6.3.1 Mul AIR. -/
 theorem mulChip_faithful :
-    ChipFaithful (p := p) MulChip.Inputs Extracted.MulCols
-      Extracted.MulCols MulChip.circuit mulChipRowCodec mulChipOracle where
+    ChipFaithful (p := p) MulChip.Inputs MulChip.Columns
+      Extracted.MulOracle.MulCols MulChip.circuit mulChipRowCodec mulChipOracle where
   constraints := mulChip_constraints_constructive (p := p)
   interactions := mulChip_interactions_constructive (p := p)
 

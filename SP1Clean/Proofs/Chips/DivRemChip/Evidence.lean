@@ -12,13 +12,12 @@ uses the Rust row's output-routing constraints to produce `Cases.RowEvidence`. -
 namespace SP1Clean.DivRemChip
 
 open SP1Clean.DivRemContract
-open Extracted (DivRemCols)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 /-- The selected opcode's output gate routes `cols.a` to the corresponding quotient or remainder
 word. This is intentionally separate from all arithmetic reasoning. -/
-theorem routedWord {cols : DivRemCols (ZMod p)} {case : Case}
+theorem routedWord {cols : Columns (ZMod p)} {case : Case}
     (hcore : DivRemCore.CoreSpec cols) (hselected : Selected cols case) :
     cols.a = match case.output with
       | .quotient => cols.quotient
@@ -102,7 +101,7 @@ theorem routedWord {cols : DivRemCols (ZMod p)} {case : Case}
       simpa [ho] using ha
 
 /-- Bit-vector form of `routedWord`, used by the ISA-facing row-evidence contract. -/
-theorem routedResult {cols : DivRemCols (ZMod p)} {case : Case}
+theorem routedResult {cols : Columns (ZMod p)} {case : Case}
     (hcore : DivRemCore.CoreSpec cols) (hselected : Selected cols case) :
     Word.toBitVec64 cols.a = case.output.pick (Word.toBitVec64 cols.quotient)
       (Word.toBitVec64 cols.remainder) := by
@@ -111,7 +110,7 @@ theorem routedResult {cols : DivRemCols (ZMod p)} {case : Case}
 
 /-- A real DivRem row writes a range-checked quotient or remainder word. This is the exact range
 fact needed by the separately composed destination-register write. -/
-theorem resultIsU64OfCore {cols : DivRemCols (ZMod p)} (hcore : DivRemCore.CoreSpec cols)
+theorem resultIsU64OfCore {cols : Columns (ZMod p)} (hcore : DivRemCore.CoreSpec cols)
     (hreal : cols.is_real = 1) : Word.isU64 cols.a := by
   have hcoreParts := hcore
   obtain ⟨_, _, hselection, hrange⟩ := hcoreParts
@@ -132,7 +131,7 @@ set_option maxHeartbeats 16000000 in
 cluster's complete external contract. The only cross-cluster equation retained verbatim is the
 remainder-check gate equation; `DivRemCompare.soundness` combines it with the internally proved
 `IsZeroWordOperation` result to recover the gate's booleanness. -/
-theorem compareAssumptionsOfCore {input : Inputs (ZMod p)} {cols : DivRemCols (ZMod p)}
+theorem compareAssumptionsOfCore {input : Inputs (ZMod p)} {cols : Columns (ZMod p)}
     (hbReadU : Word.isU64 input.op_b_val) (hcReadU : Word.isU64 input.op_c_val)
     (hcore : DivRemCore.CoreSpec cols) (hadapter : cols.adapter = input.adapter)
     (hreal : cols.is_real = 1) :
@@ -335,7 +334,7 @@ theorem compareAssumptionsOfCore {input : Inputs (ZMod p)} {cols : DivRemCols (Z
 
 set_option maxHeartbeats 16000000 in
 /-- Dispatch the selected row to its one arithmetic-family evidence theorem. -/
-theorem familyEvidenceOfSpecs {input : Inputs (ZMod p)} {cols : DivRemCols (ZMod p)}
+theorem familyEvidenceOfSpecs {input : Inputs (ZMod p)} {cols : Columns (ZMod p)}
     {case : Case} (hbReadU : Word.isU64 input.op_b_val) (hcReadU : Word.isU64 input.op_c_val)
     (hcore : DivRemCore.CoreSpec cols)
     (hcompare : DivRemCompare.CompareSpec (DivRemCompare.Inputs.ofCols cols))
@@ -360,7 +359,7 @@ theorem familyEvidenceOfSpecs {input : Inputs (ZMod p)} {cols : DivRemCols (ZMod
 
 set_option maxHeartbeats 16000000 in
 /-- Folded comparison/core contracts imply the complete evidence-shaped public row contract. -/
-theorem rowEvidenceOfSpecs {input : Inputs (ZMod p)} {cols : DivRemCols (ZMod p)}
+theorem rowEvidenceOfSpecs {input : Inputs (ZMod p)} {cols : Columns (ZMod p)}
     (hbReadU : Word.isU64 input.op_b_val) (hcReadU : Word.isU64 input.op_c_val)
     (hcore : DivRemCore.CoreSpec cols)
     (hcompare : DivRemCompare.Assumptions (DivRemCompare.Inputs.ofCols cols) →

@@ -8,7 +8,6 @@ import Clean.Air.Circuit
 namespace SP1Clean.MulChip
 
 open Circuit
-open Extracted (MulCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
@@ -376,9 +375,9 @@ def exposedProgramInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
 
 set_option maxHeartbeats 8000000 in
 /-- The `Mul` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `mul`/`mulh`/`mulhu`/`mulhsu`/`mulw`
-semantic contract; output is the extracted `MulCols` column struct. Soundness is proved; completeness is
+semantic contract; output is the native `Columns` row. Soundness is proved; completeness is
 the explicitly disclosed 4.31 migration seam above. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs MulCols :=
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     -- `programChannel` dropped (W11 flip — now pulled via `RTypeReader`, a guarantee not a requirement).
     channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw],

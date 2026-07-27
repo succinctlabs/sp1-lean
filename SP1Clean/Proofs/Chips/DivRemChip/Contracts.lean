@@ -55,7 +55,7 @@ private theorem DivRemChip.divRemCore_mem
 /-- DivRemCore's shallow constraint contract exposes the final physical routing assertion without
 normalizing either multiplication subcircuit or the byte-interaction tail. -/
 private theorem DivRemChip.opA0_eq_zero_of_coreShallowConstraints
-    (env : Environment (ZMod p)) (cols : Var Extracted.DivRemCols (ZMod p)) (offset : ℕ)
+    (env : Environment (ZMod p)) (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ)
     (shallow : ConstraintsHold.Shallow env ((DivRemCore.main cols).operations offset)) :
     Expression.eval env cols.adapter.op_a_0 = 0 := by
   simp only [DivRemCore.main, Circuit.operations, Circuit.bind_def, assertion,
