@@ -17,7 +17,6 @@ namespace SP1Clean.AddwOperation
 
 open Circuit
 open SP1Clean.Channels (byteChannel)
-open SP1Clean.Extracted
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 

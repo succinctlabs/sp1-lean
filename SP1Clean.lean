@@ -122,6 +122,9 @@ import SP1Clean.Extracted.ALUTypeReader
 import SP1Clean.Extracted.AluX0Chip
 import SP1Clean.Extracted.ChipOracle.Add
 import SP1Clean.Extracted.ChipOracle.Addi
+import SP1Clean.Extracted.ChipOracle.Addw
+import SP1Clean.Extracted.ChipOracle.Bitwise
+import SP1Clean.Extracted.ChipOracle.Lt
 import SP1Clean.Extracted.ChipOracle.Jal
 import SP1Clean.Extracted.ChipOracle.Jalr
 import SP1Clean.Extracted.ChipOracle.Sub
@@ -132,11 +135,6 @@ import SP1Clean.Extracted.ChipOracle.DivRem
 import SP1Clean.Extracted.AddOperation
 import SP1Clean.Extracted.AddrAddOperation
 import SP1Clean.Extracted.AddressOperation
-import SP1Clean.Extracted.AddwChip
-import SP1Clean.Extracted.AddwOperation
-import SP1Clean.Extracted.BitwiseChip
-import SP1Clean.Extracted.BitwiseOperation
-import SP1Clean.Extracted.BitwiseU16Operation
 import SP1Clean.Extracted.BranchChip
 import SP1Clean.Extracted.CPUState
 import SP1Clean.Extracted.ExtractionDSL
@@ -165,7 +163,6 @@ import SP1Clean.Extracted.LoadDoubleChip
 import SP1Clean.Extracted.LoadHalfChip
 import SP1Clean.Extracted.LoadWordChip
 import SP1Clean.Extracted.LoadX0Chip
-import SP1Clean.Extracted.LtChip
 import SP1Clean.Extracted.LtOperationSigned
 import SP1Clean.Extracted.LtOperationUnsigned
 import SP1Clean.Extracted.MulOperation
@@ -185,11 +182,8 @@ import SP1Clean.Faithful.AluX0
 import SP1Clean.Faithful.AddChip
 import SP1Clean.Faithful.AddOperation
 import SP1Clean.Faithful.AddiChip
-import SP1Clean.Faithful.Addw
 import SP1Clean.Faithful.AddwChip
 import SP1Clean.Faithful.BitwiseChip
-import SP1Clean.Faithful.BitwiseOperation
-import SP1Clean.Faithful.BitwiseU16Operation
 import SP1Clean.Faithful.BranchChip
 import SP1Clean.Faithful.CoreAIR
 import SP1Clean.Faithful.CPUState

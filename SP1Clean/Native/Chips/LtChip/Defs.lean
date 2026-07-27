@@ -5,7 +5,6 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.LtChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -13,7 +12,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # The unified `Lt` chip row (SLT + SLTU) as a `GeneralFormalCircuit`
 
-Keyed on SP1's unified `Extracted.LtCols` (`is_slt`/`is_sltu` selectors), composing the signed gadget
+Keyed on SP1's unified Lt row shape (`is_slt`/`is_sltu` selectors), composing the signed gadget
 `LtOperationSigned` (unsigned core + two `U16MSBOperation` sign columns) and the immediate-capable
 `ALUTypeReader`. Soundness and completeness are proven and axiom-clean (flag-dispatched through
 `LtOperationSigned.Spec`, mapping the compare `bit` to RV64 `slt`/`sltu`). -/
@@ -21,7 +20,6 @@ Keyed on SP1's unified `Extracted.LtCols` (`is_slt`/`is_sltu` selectors), compos
 namespace SP1Clean.LtChip
 
 open Circuit
-open Extracted (LtCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -41,12 +39,25 @@ constraints copy `adapter.op_c` into this word; on register rows it is the actua
 @[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
 @[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c_memory.prev_value
 
+/-- Native Lt-chip row (Rust field order — the chip has no separate `is_real` column; the real-row
+selector is `is_slt + is_sltu`). The reader blocks and the compare block reuse the project substrate
+(`Extracted.LtOperationSigned` is still a standalone generated module — the Branch chip composes the
+same gadget family). `Faithful.LtChip.ltChipReconfigure` is the sole bridge to Rust's separately
+generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ALUTypeReader F
+  is_slt : F
+  is_sltu : F
+  lt_operation : Extracted.LtOperationSigned F
+deriving ProvableStruct
+
 /-- **Assertion half** — the literal meaning of SP1's `LtCols.asserts` *own* (inline) assertZero tail
 (everything past the composed `LtOperationSigned`/`CPUState`/`ALUTypeReader` sub-lists), in extracted
-order (`Extracted/LtChip.lean`: `E2, E4, E6, op_a_0`): the two variant-flag booleans (`is_slt`,
+order (the generated oracle: `E2, E4, E6, op_a_0`): the two variant-flag booleans (`is_slt`,
 `is_sltu`), the sum-bound boolean on `E0 = is_slt + is_sltu`, and the `op_a_0` zeroing flag. The
 signed/unsigned compare arithmetic is *not* here — it is the composed `LtOperationSigned` sub-list. -/
-def AssertSpec (cols : LtCols (ZMod p)) : Prop :=
+def AssertSpec (cols : Columns (ZMod p)) : Prop :=
   let s := cols.is_slt; let u := cols.is_sltu
   let sum := s + u
   s * (s - 1) = 0 ∧
@@ -54,15 +65,15 @@ def AssertSpec (cols : LtCols (ZMod p)) : Prop :=
   sum * (sum - 1) = 0 ∧
   cols.adapter.op_a_0 = 0
 
-/-- **Interaction half** — SP1's `LtCols.interactions` *own* tail is **empty** (`Extracted/LtChip.lean`
+/-- **Interaction half** — SP1's `LtCols.interactions` *own* tail is **empty** (the generated oracle
 ends `… ++ [ ]`): every byte-range pull for the compare lives inside the composed `LtOperationSigned`
 sub-list (the unsigned-core limb checks, the `U16MSB` sign-bit ranges), anchored at the operation level.
 So the chip's own interaction meaning is trivial. -/
-def InteractSpec (_cols : LtCols (ZMod p)) : Prop := True
+def InteractSpec (_cols : Columns (ZMod p)) : Prop := True
 
 /-- The set-less-than result word the reader writes for `rd`: the compare bit (from the gadget's unsigned
 core) in the low limb, zeros above. -/
-def resultWord (cols : LtCols (ZMod p)) : Word (ZMod p) :=
+def resultWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.lt_operation.result.u16_compare_operation.bit, 0, 0, 0]
 
 /-- The two honest variant flags (`is_slt`, `is_sltu`) the prover supplies via the `"lt_flags"`
@@ -75,8 +86,8 @@ two variant flags `is_slt`/`is_sltu`, compose the witnessed `LtOperationSigned` 
 `is_signed := is_slt` mode selector), and `Readers.ALUTypeReader.circuit` (opcode `is_slt·9 + is_sltu·10`;
 the `rd` write value is `[bit, 0, 0, 0]` from the gadget's compare bit), gate `is_real`, emit the two flag
 booleans + their sum-bound (`AssertSpec`, needed by soundness to force `is_slt = 0` in the `SLTU` branch),
-and assemble the extracted `LtCols` struct. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) := do
+and assemble the native `Columns` struct. -/
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let flags ← witnessVectorNative 2 (fun env => hintFlags env.hint)
@@ -116,7 +127,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) 
   return ⟨input.state, input.adapter, is_slt, is_sltu, lt_cols⟩
 
 set_option maxHeartbeats 1000000 in
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs LtCols main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output input offset :=
     ⟨input.state, input.adapter, var { index := offset }, var { index := offset + 1 },
       varFromOffset Extracted.LtOperationSigned (offset + 2)⟩
@@ -136,7 +147,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LtCols main where
 @[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     (elaborated (p := p)).output input offset =
       (⟨input.state, input.adapter, var { index := offset }, var { index := offset + 1 },
-        varFromOffset Extracted.LtOperationSigned (offset + 2)⟩ : Var LtCols (ZMod p)) := rfl
+        varFromOffset Extracted.LtOperationSigned (offset + 2)⟩ : Var Columns (ZMod p)) := rfl
 
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :
@@ -147,11 +158,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LtCols main where
   rfl
 
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : LtCols (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
          is_slt := Eval.eval env cols.is_slt, is_sltu := Eval.eval env cols.is_sltu,
-         lt_operation := Eval.eval env cols.lt_operation } : LtCols F) := by
+         lt_operation := Eval.eval env cols.lt_operation } : Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 

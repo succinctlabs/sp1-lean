@@ -3,7 +3,6 @@ import SP1Clean.Math.Bitwise
 import SP1Clean.Proofs.Operations.BitwiseOperation.Formal
 import SP1Clean.Native.Operations.BitwiseOperation.Populate
 import SP1Clean.Native.Operations.U16toU8OperationSafe
-import SP1Clean.Extracted.BitwiseU16Operation
 import SP1Clean.Extracted.U16toU8OperationUnsafe
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
@@ -28,12 +27,22 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- Proof-oriented local columns for the composed u16 bitwise gadget: the two low-byte decomposition
+blocks (the shared `Extracted.U16toU8Operation` struct, kept because the decomposition is the shared
+generated substrate) plus the native `BitwiseOperation.Columns` result block. The assembled chip
+faithfulness map is the only place that relates this shape to SP1 Rust's helper-operation columns. -/
+structure Columns (F : Type) where
+  b_low_bytes : Extracted.U16toU8Operation F
+  c_low_bytes : Extracted.U16toU8Operation F
+  bitwise_operation : BitwiseOperation.Columns F
+deriving ProvableStruct
+
 /-- The two operand words, the (chip-owned) decomposition + result column struct, the opcode selector
 (AND=0, OR=1, XOR=2), and the `is_real` gate — SP1's `eval` params verbatim. -/
 structure Inputs (F : Type) where
   b : fields 4 F
   c : fields 4 F
-  cols : Extracted.BitwiseU16Operation F
+  cols : Columns F
   opcode : F
   is_real : F
 deriving ProvableStruct
@@ -163,7 +172,7 @@ theorem result_semantic (input : Inputs (ZMod p))
 
 /-- The decomposition + result columns for `populate`: the low bytes are `w[i] % 256`, the result bytes
 are the per-byte `byteOp opcode` of the decomposed operand bytes (mirroring SP1's `populate`). -/
-def populate (b c : Word (ZMod p)) (opcode : ZMod p) : Extracted.BitwiseU16Operation (ZMod p) :=
+def populate (b c : Word (ZMod p)) (opcode : ZMod p) : Columns (ZMod p) :=
   let lb : Extracted.U16toU8Operation (ZMod p) :=
     ⟨#v[((b[0].val % 256 : ℕ) : ZMod p), ((b[1].val % 256 : ℕ) : ZMod p),
         ((b[2].val % 256 : ℕ) : ZMod p), ((b[3].val % 256 : ℕ) : ZMod p)]⟩

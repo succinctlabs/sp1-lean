@@ -1,7 +1,5 @@
 import SP1Clean.FormalModel.Contracts.Readers
-import SP1Clean.Extracted.AddwOperation
 import SP1Clean.Extracted.MulOperation
-import SP1Clean.Extracted.BitwiseOperation
 import SP1Clean.Extracted.U16CompareOperation
 import SP1Clean.Extracted.U16MSBOperation
 import SP1Clean.Extracted.U16toU8OperationUnsafe
@@ -388,11 +386,20 @@ namespace SP1Clean.AddwOperation
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
+/-- Proof-oriented local columns for the 32-bit add gadget: the two witnessed low result limbs
+plus the composed sign-bit block (the shared `Extracted.U16MSBOperation` struct, kept because the
+native gadget composes `U16MSBOperation.circuit`). The assembled chip faithfulness map is the only
+place that relates this shape to SP1 Rust's helper-operation columns. -/
+structure Columns (F : Type) where
+  value : Vector F 2
+  msb : Extracted.U16MSBOperation F
+deriving ProvableStruct
+
 /-- Inputs for the native 32-bit add-with-sign-extension gadget. -/
 structure Inputs (F : Type) where
   a : Word F
   b : Word F
-  cols : Extracted.AddwOperation F
+  cols : Columns F
   is_real : F
 deriving ProvableStruct
 
@@ -400,7 +407,7 @@ deriving ProvableStruct
 realised as the sign fill `msb * 0xFFFF`. (`Inputs`/`Spec`/`spec_populate` live in the op's
 `Formal.lean` — the composed circuit form imports `U16MSBOperation.Formal`, so its `Spec` cannot live
 here without an import cycle, mirroring the IsZero* chain above.) -/
-def resultWord (cols : Extracted.AddwOperation (ZMod p)) : Word (ZMod p) :=
+def resultWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.value[0], cols.value[1], cols.msb.msb * 65535, cols.msb.msb * 65535]
 
 end SP1Clean.AddwOperation
@@ -465,11 +472,18 @@ namespace SP1Clean.BitwiseOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- Proof-oriented local columns for the bytewise bitwise gadget: the eight witnessed result bytes.
+The assembled chip faithfulness map is the only place that relates this shape to SP1 Rust's
+helper-operation columns. -/
+structure Columns (F : Type) where
+  result : Vector F 8
+deriving ProvableStruct
+
 /-- Inputs for the native bytewise bitwise gadget. -/
 structure Inputs (F : Type) where
   a : Vector F 8
   b : Vector F 8
-  cols : Extracted.BitwiseOperation F
+  cols : Columns F
   opcode : F
   is_real : F
 deriving ProvableStruct

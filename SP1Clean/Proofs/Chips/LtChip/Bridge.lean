@@ -181,7 +181,7 @@ omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end: a real `Lt` chip row reaches the RISC-V Sail set-less-than, flag-dispatched.
 Both SLT and SLTU conjuncts are proven and axiom-clean. -/
 theorem lt_chip_reaches_sail
-    (input : LtChip.Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : LtChip.Inputs (ZMod p)) (cols : LtChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
     (h_chip : LtChip.Spec input cols data)
@@ -207,7 +207,7 @@ sign-extended 12-bit immediate (`h_dec`, supplied at the bridge from the program
 Sail I-type set-less-than, flag-dispatched. The chip's `Spec` proves the same RV64 `slt`/`sltu` equation for
 immediate (`imm_c = 1`) rows as for register rows, so both conjuncts are proven and axiom-clean. -/
 theorem lt_chip_reaches_sail_imm
-    (input : LtChip.Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : LtChip.Inputs (ZMod p)) (cols : LtChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
     (h_chip : LtChip.Spec input cols data)
@@ -240,7 +240,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- **Lt's committed bus view** — the chip-agnostic `RowView` (opcode `is_slt·9 + is_sltu·10`, the `pc+4`
 straight-line next-pc, the comparison `resultWord` as `rdWrite`). Standalone so `LtChip.advance` can be
 supplied *as* `kind.advance` (see `AddChip.rowView`). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : LtChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, resultWord cols,
     cols.is_slt * 9 + cols.is_sltu * 10, .regWrite⟩
@@ -249,7 +249,7 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) : Trace.R
 the committed `imm_c` bit chooses register or immediate decoding. The arithmetic always consumes SP1's
 `op_c_memory.prev_value`; on immediate rows the retained `ALUTypeReader` constraints bind that word to
 the decoded `op_c` immediate before `advance_of_itype` is applied. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : LtChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1)
     (hspec : Spec inp cols data)
@@ -326,7 +326,7 @@ A row is register (`imm_c = 0`) or immediate (`imm_c = 1`); the consumer picks t
 def kind : Soundness.ChipKind p where
   name := "Lt"
   Inputs := LtChip.Inputs
-  Cols := Extracted.LtCols
+  Cols := LtChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧ cols.state.pc[0].val < 2 ^ 16 ∧

@@ -4,17 +4,17 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.AddwChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # The ADDW chip row as a `GeneralFormalCircuit`, output = the extracted column struct
+/-! # The native ADDW chip row as a `GeneralFormalCircuit`
 
 Composes `Readers.CPUState.circuit`, the witnessed `AddwOperation.circuit`, and
 `Readers.ALUTypeReader.circuit` as Clean subcircuits/assertions, gates `is_real`, and returns the
-extracted `AddwCols` struct (emitting all four buses: State, Byte, Memory, Program).
+native `Columns` struct (emitting all four buses: State, Byte, Memory, Program). Its relationship to
+Rust is stated only by the whole-chip reconfiguration.
 
 W-instruction: result is 2 limbs + sign bit (`addw_operation.value`/`addw_operation.msb.msb`); the
 64-bit `op_a` write is the sign-extended word `[v0, v1, msb·65535, msb·65535]`. Adapter is the
@@ -23,19 +23,17 @@ immediate-capable `ALUTypeReader` (unlike SUBW's `RTypeReader`); Program-bus opc
 namespace SP1Clean.AddwChip
 
 open Circuit
-open Extracted (AddwCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Compose the `CPUState`/`AddwOperation`/`ALUTypeReader` column blocks as Clean subcircuits/assertions
-and assemble the extracted `AddwCols` struct. The chip witnesses the result low limbs + sign bit via the
+and assemble the native `Columns` struct. The chip witnesses the result low limbs + sign bit via the
 operation's `populate` (`addwValueWitness`/`addwMsbWitness`), then composes the demoted `AddwOperation`
 gadget as a Clean `assertion`. The `ALUTypeReader`'s four `op_a_write_value` limbs are the
-**sign-extended** W result `[value[0], value[1], msb·65535, msb·65535]` (mirroring `Extracted/AddwChip.lean`'s
-`ALUTypeReader.asserts … 19 #v[…value[0], …value[1], msb·65535, msb·65535] …`); the Program-bus opcode is
+**sign-extended** W result `[value[0], value[1], msb·65535, msb·65535]`; the Program-bus opcode is
 `19`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (AddwCols) (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let value ← witnessVectorNative 2 (fun env =>
@@ -66,14 +64,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (AddwCols) (ZMod 
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
   -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
   assertZero (input.is_real * (input.is_real - 1))
-  return ⟨input.state, input.adapter, ⟨value, ⟨msb[0]⟩⟩, input.is_real⟩
+  return ⟨input.is_real, input.state, input.adapter, ⟨value, ⟨msb[0]⟩⟩⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddwCols main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output input offset :=
-    ⟨input.state, input.adapter,
+    ⟨input.is_real, input.state, input.adapter,
       ⟨Vector.mapRange 2 fun i => var { index := offset + i },
-        ⟨var { index := offset + 2 }⟩⟩,
-      input.is_real⟩
+        ⟨var { index := offset + 2 }⟩⟩⟩
   output_eq := by
     intro input offset
     simp only [main, circuit_norm]
@@ -90,10 +87,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddwCols main where
 /-- The explicit completed Addw row, kept folded for chip-boundary proofs. -/
 @[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     (elaborated (p := p)).output input offset =
-      (⟨input.state, input.adapter,
+      (⟨input.is_real, input.state, input.adapter,
         ⟨Vector.mapRange 2 fun i => var { index := offset + i },
-          ⟨var { index := offset + 2 }⟩⟩,
-        input.is_real⟩ : Var AddwCols (ZMod p)) := rfl
+          ⟨var { index := offset + 2 }⟩⟩⟩ : Var Columns (ZMod p)) := rfl
 
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :
@@ -104,11 +100,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddwCols main where
   rfl
 
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : AddwCols (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
-      ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
-         addw_operation := Eval.eval env cols.addw_operation,
-         is_real := Eval.eval env cols.is_real } : AddwCols F) := by
+      ({ is_real := Eval.eval env cols.is_real, state := Eval.eval env cols.state,
+         adapter := Eval.eval env cols.adapter,
+         addw_operation := Eval.eval env cols.addw_operation } : Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 

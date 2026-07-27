@@ -66,7 +66,7 @@ omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end: from the ADDW chip's verified `Spec` (gated-arith conjunct `.2.2`) plus the
 register/PC reads, the RISC-V Sail `ADDW` agrees with the SP1 emulation; identity via `rv64_addw_eq`. -/
 theorem addw_chip_reaches_sail
-    (input : AddwChip.Inputs (ZMod p)) (cols : Extracted.AddwCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : AddwChip.Inputs (ZMod p)) (cols : AddwChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
     (h_chip : AddwChip.Spec input cols data)
@@ -119,7 +119,7 @@ omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (ADDIW): from the ADDW chip's verified `Spec` plus the rs1/PC reads and the immediate decode
 (`op_c_val = sign_extend imm`), Sail's `ADDIW` agrees with the SP1 chip emulation. -/
 theorem addiw_chip_reaches_sail
-    (input : AddwChip.Inputs (ZMod p)) (cols : Extracted.AddwCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : AddwChip.Inputs (ZMod p)) (cols : AddwChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
     (h_chip : AddwChip.Spec input cols data)
@@ -153,7 +153,7 @@ lemma addiw_pure_eq (x y : BitVec 64) :
 /-- **Addw's committed bus view** — the chip-agnostic `RowView` (opcode `19`, the `pc+4` straight-line
 next-pc, the sign-extended W result as `rdWrite`). Standalone so `AddwChip.advance` can be supplied *as*
 `kind.advance` (see `AddChip.rowView`). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.AddwCols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, AddwChip.resultWord cols, 19, .regWrite⟩
 
@@ -165,7 +165,7 @@ execute pure part. The `advanceReady` bundle carries the pc-limb bound, the `imm
 binding `op_c_memory.prev_value = op_c` (the `ALUTypeReader`'s immediate-consistency constraint), and the
 `op_a ≠ 0` routing. Stated to match the `ChipKind.advance` obligation exactly, so
 `kind.advance := some (PLift.up advance)` type-checks. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.AddwCols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1)
     (hspec : Spec inp cols data)
@@ -209,7 +209,7 @@ adapter is `ALUTypeReader`, projected via `toAdapterView`; Program-bus opcode `1
 def kind : Soundness.ChipKind p where
   name := "Addw"
   Inputs := AddwChip.Inputs
-  Cols := Extracted.AddwCols
+  Cols := Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧ cols.state.pc[0].val < 2 ^ 16 ∧

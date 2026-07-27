@@ -11,7 +11,6 @@ bundled `circuit`. -/
 namespace SP1Clean.BitwiseChip
 
 open Circuit
-open Extracted (BitwiseCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -64,7 +63,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
 what the Phase-4 `advance` dispatch needs to route a real row to its single operation (the "at least one flag
 set" it combines with comes from the program-bus decode, since the constraints tie the flag *sum* to `{0,1}`
 but not to `is_real`). Vacuous on padding. Cross-row bus guarantees live at the trace level. -/
-def Spec (input : Inputs (ZMod p)) (cols : BitwiseCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   (input.is_real = 1 →
     (cols.is_and = 1 →
@@ -151,7 +150,7 @@ omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 two 4-byte `U16toU8` low-byte blocks) is the `k`-th result byte. Destructuring `s` exposes the
 constructor so `circuit_norm` routes the `toElements` append without evaluating any byte contents — the
 completeness `populate` bridge applies it symbolically. -/
-private lemma toElements_result_byte (s : Extracted.BitwiseU16Operation (ZMod p)) (k : Fin 8) :
+private lemma toElements_result_byte (s : BitwiseU16Operation.Columns (ZMod p)) (k : Fin 8) :
     (toElements s)[8 + (k : ℕ)]'(by simp only [circuit_norm]; omega)
       = s.bitwise_operation.result[(k : ℕ)] := by
   obtain ⟨a, b, c⟩ := s
@@ -293,7 +292,7 @@ theorem completeness :
       (opcode := env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0) ha hb hop3 input_is_real
       using 2
     rfl
-    refine (ProvableType.ext_iff (α := Extracted.BitwiseU16Operation) _ _).mpr (fun i hi => ?_)
+    refine (ProvableType.ext_iff (α := BitwiseU16Operation.Columns) _ _).mpr (fun i hi => ?_)
     -- Ascribe `h_env_cols`'s IR-native RHS into the plain `toElements (populate …)` form via a *definitional*
     -- `have` (the `.native` eval-match + beta is the CHEAP reduction; the expensive path is the eager
     -- `Eq.trans` isDefEq against `toElements (populate op_prev …)`, whose `combinedSize'` tower + the
@@ -324,7 +323,7 @@ theorem completeness :
               (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value)
               (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value)
               (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0)))[8 + (k : ℕ)]'(by
-          have : size Extracted.BitwiseU16Operation = 16 := rfl; have := k.isLt; omega) :=
+          have : size BitwiseU16Operation.Columns = 16 := rfl; have := k.isLt; omega) :=
         h_env_cols ⟨8 + (k : ℕ), by omega⟩
       rw [hpvb, hpvc] at h
       rw [show i₀ + 3 + 4 + 4 + (k : ℕ) = i₀ + 3 + (8 + (k : ℕ)) by ring, h]
@@ -521,8 +520,8 @@ def exposedProgramInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
 
 /-- The Bitwise chip row as a `GeneralFormalCircuit`: flag-gated RV64 `and`/`or`/`xor` semantic contract,
 composing the witnessed `BitwiseU16Operation` gadget and the immediate-capable register reader; output is
-the extracted `BitwiseCols` column struct. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
+the native `Columns` row. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,

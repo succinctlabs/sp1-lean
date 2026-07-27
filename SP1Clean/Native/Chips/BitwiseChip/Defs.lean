@@ -4,24 +4,22 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.BitwiseChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # The Bitwise chip row (AND/OR/XOR) as a `GeneralFormalCircuit`, output = the extracted column struct
+/-! # The native Bitwise chip row (AND/OR/XOR) as a `GeneralFormalCircuit`
 
 Composes `CPUState`/`BitwiseU16Operation`/`ALUTypeReader` as Clean subcircuits/assertions (emitting all
 four buses), witnesses the three variant flags, threads `byte_opcode` (`is_xor·2 + is_or·1`)
 into the gadget and `cpu_opcode` (`is_xor·3 + is_or·4 + is_and·5`) into the reader, gates `is_real`, and
-assembles the extracted `BitwiseCols` struct. Operands are projected from the adapter's
+assembles the native `Columns` struct. Operands are projected from the adapter's
 `op_b_memory`/`op_c_memory` register reads (not separate columns). Semantic `Spec` in `Formal.lean`. -/
 
 namespace SP1Clean.BitwiseChip
 
 open Circuit
-open Extracted (BitwiseCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -36,6 +34,19 @@ structure Inputs (F : Type) where
   adapter : Extracted.ALUTypeReader F
 deriving ProvableStruct
 
+/-- Native Bitwise-chip row (Rust field order — the chip has no separate `is_real` column; the
+real-row selector is the flag sum). The reader blocks reuse the project substrate; only the composed
+u16 bitwise block is owned by the local Lean gadget. `Faithful.BitwiseChip.bitwiseChipReconfigure` is
+the sole bridge to Rust's separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ALUTypeReader F
+  bitwise_operation : BitwiseU16Operation.Columns F
+  is_xor : F
+  is_or : F
+  is_and : F
+deriving ProvableStruct
+
 /-- `rs1` operand = the `op_b` register read (`op_b_memory.prev_value`); `rs2` operand = the `op_c`
 register read (`op_c_memory.prev_value`). Both feed the bitwise gadget exactly as in the extraction. -/
 @[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
@@ -43,16 +54,16 @@ register read (`op_c_memory.prev_value`). Both feed the bitwise gadget exactly a
 
 /-- The reassembled bitwise result word the reader writes for `rd`: the eight result bytes packed into
 four 16-bit limbs (`BitwiseU16Operation.resultWord`). -/
-def resultWord (cols : BitwiseCols (ZMod p)) : Word (ZMod p) :=
+def resultWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
   BitwiseU16Operation.resultWord cols.bitwise_operation.bitwise_operation.result
 
 /-- **Assertion half** — the literal meaning of SP1's `BitwiseCols.asserts` *own* (inline) assertZero
 tail (everything past the composed `BitwiseU16Operation`/`CPUState`/`ALUTypeReader` sub-lists), in
-extracted order (`Extracted/BitwiseChip.lean`: `E3,E5,E7,E9, op_a_0`): the three opcode-flag booleans
+extracted order (the generated oracle: `E3,E5,E7,E9, op_a_0`): the three opcode-flag booleans
 (`is_xor`, `is_or`, `is_and`), the sum-bound boolean on `E1 = is_xor + is_or + is_and`, and the
 `op_a_0` zeroing flag. The byte-level bitwise arithmetic is *not* here — it is the composed
 `BitwiseU16Operation` sub-list. -/
-def AssertSpec (cols : BitwiseCols (ZMod p)) : Prop :=
+def AssertSpec (cols : Columns (ZMod p)) : Prop :=
   let x := cols.is_xor; let o := cols.is_or; let a := cols.is_and
   let sum := x + o + a
   x * (x - 1) = 0 ∧
@@ -62,10 +73,10 @@ def AssertSpec (cols : BitwiseCols (ZMod p)) : Prop :=
   cols.adapter.op_a_0 = 0
 
 /-- **Interaction half** — SP1's `BitwiseCols.interactions` *own* tail is **empty**
-(`Extracted/BitwiseChip.lean` ends `… ++ [ ]`): every byte-range pull for the bitwise op lives inside
+(the generated oracle ends `… ++ [ ]`): every byte-range pull for the bitwise op lives inside
 the composed `BitwiseU16Operation` sub-list, anchored at the operation level. So the chip's own
 interaction meaning is trivial. -/
-def InteractSpec (_cols : BitwiseCols (ZMod p)) : Prop := True
+def InteractSpec (_cols : Columns (ZMod p)) : Prop := True
 
 /-- The three honest variant flags (`is_xor`, `is_or`, `is_and`) the prover supplies via the
 `"bitwise_flags"` hint key (one-hot for the active variant, all-zero on padding). -/
@@ -78,10 +89,10 @@ witnessed `BitwiseU16Operation` gadget (`subcircuit`, fed the SP1
 `byte_opcode = is_xor·2 + is_or·1 + is_and·0`), and `Readers.ALUTypeReader.circuit`
 (`cpu_opcode = is_xor·3 + is_or·4 + is_and·5`; the `rd` write value is the reassembled result word's four
 limbs), gate `is_real`, emit the three flag booleans + their sum-bound + the `op_a_0` zeroing (`AssertSpec`,
-SP1's `builder.assert_zero(op_a_0)`), and assemble the extracted `BitwiseCols` struct. The `b_low_bytes`/
+SP1's `builder.assert_zero(op_a_0)`), and assemble the native `Columns` struct. The `b_low_bytes`/
 `c_low_bytes` column blocks are witnessed (the gadget enforces the decomposition on its own internal
 copies; these struct fields are not read by the `Spec`). -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let flags ← witnessVectorNative 3 (fun env => hintFlags env.hint)
@@ -90,7 +101,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod
   -- The chip witnesses the `BitwiseU16Operation` column struct (the two `U16toU8` low-byte blocks +
   -- the eight result bytes) via `populate`, then composes `BitwiseU16Operation.circuit` as a Clean
   -- `assertion` (it is a `FormalAssertion`, witnessing nothing of its own).
-  let bw_cols ← witnessNative (var := Var Extracted.BitwiseU16Operation) (fun env =>
+  let bw_cols ← witnessNative (var := Var BitwiseU16Operation.Columns) (fun env =>
     BitwiseU16Operation.populate
       #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
       #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]
@@ -126,10 +137,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod
   return ⟨input.state, input.adapter, bw_cols, is_xor, is_or, is_and⟩
 
 set_option maxHeartbeats 1000000 in
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs BitwiseCols main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output input offset :=
     ⟨input.state, input.adapter,
-      varFromOffset Extracted.BitwiseU16Operation (offset + 3),
+      varFromOffset BitwiseU16Operation.Columns (offset + 3),
       var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 }⟩
   output_eq := by
     intro input offset
@@ -150,9 +161,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs BitwiseCols main where
 @[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     (elaborated (p := p)).output input offset =
       (⟨input.state, input.adapter,
-        varFromOffset Extracted.BitwiseU16Operation (offset + 3),
+        varFromOffset BitwiseU16Operation.Columns (offset + 3),
         var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 }⟩ :
-        Var BitwiseCols (ZMod p)) := rfl
+        Var Columns (ZMod p)) := rfl
 
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :
@@ -163,12 +174,12 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs BitwiseCols main where
   rfl
 
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : BitwiseCols (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
          bitwise_operation := Eval.eval env cols.bitwise_operation,
          is_xor := Eval.eval env cols.is_xor, is_or := Eval.eval env cols.is_or,
-         is_and := Eval.eval env cols.is_and } : BitwiseCols F) := by
+         is_and := Eval.eval env cols.is_and } : Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 

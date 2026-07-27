@@ -44,7 +44,7 @@ structure BitwiseChip.ControlFacts
   opA0Zero : opA0 = 0
 
 /-- The active-selector proposition consumed by Bitwise's `advanceReady`. -/
-def BitwiseChip.ActiveSelector (cols : Extracted.BitwiseCols (ZMod p)) : Prop :=
+def BitwiseChip.ActiveSelector (cols : BitwiseChip.Columns (ZMod p)) : Prop :=
   cols.is_and = 1 ∨ cols.is_or = 1 ∨ cols.is_xor = 1
 
 set_option maxHeartbeats 4000000 in
@@ -179,7 +179,7 @@ theorem BitwiseChip.inputOutputAdapter (env : Environment (ZMod p)) :
 /-- The completed Bitwise view at one physical component row. Keeping this projection folded avoids
 normalizing the full witnessed arithmetic row in every structural theorem statement. -/
 noncomputable def BitwiseChip.physicalCols (env : Environment (ZMod p)) :
-    Extracted.BitwiseCols (ZMod p) :=
+    BitwiseChip.Columns (ZMod p) :=
   (⟨BitwiseChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env
 
 /-- The completed Bitwise view at one physical component row. -/

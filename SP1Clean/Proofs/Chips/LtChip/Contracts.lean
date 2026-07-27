@@ -41,7 +41,7 @@ structure LtChip.ControlFacts (isReal isSlt isSltu opA0 : ZMod p) : Prop where
   opA0Zero : opA0 = 0
 
 /-- The exact one-hot selector proposition consumed by Lt's `advanceReady`. -/
-def LtChip.ActiveSelector (cols : Extracted.LtCols (ZMod p)) : Prop :=
+def LtChip.ActiveSelector (cols : LtChip.Columns (ZMod p)) : Prop :=
   (cols.is_slt = 1 ∧ cols.is_sltu = 0) ∨ (cols.is_slt = 0 ∧ cols.is_sltu = 1)
 
 set_option maxHeartbeats 4000000 in
@@ -157,7 +157,7 @@ theorem LtChip.inputOutputAdapter (env : Environment (ZMod p)) :
 
 /-- The completed Lt columns at one physical component row. -/
 noncomputable def LtChip.physicalCols (env : Environment (ZMod p)) :
-    Extracted.LtCols (ZMod p) :=
+    LtChip.Columns (ZMod p) :=
   (⟨LtChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env
 
 /-- The completed Lt row view at one physical component row. -/

@@ -7,7 +7,6 @@ import Clean.Air.Circuit
 namespace SP1Clean.LtChip
 
 open Circuit
-open Extracted (LtCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -62,7 +61,7 @@ blocks (opcode `is_slt·9 + is_sltu·10`, `rd` write the result word), the prove
 the `is_real`/flag-gated meaning — on real rows the result word is the RV64 `SLT` (when `is_slt = 1`) or
 `SLTU` (when `is_sltu = 1`) of the operands (operand order matching the RV64 signature `f rs2_val rs1_val`
 with `rs1 ↦ op_b_val`). Vacuous on padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : LtCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.ALUTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,
@@ -445,8 +444,8 @@ def exposedProgramInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
 
 /-- The unified `Lt` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `slt`/`sltu` semantic contract,
 composing the witnessed signed-compare gadget and the immediate-capable register reader; output is the
-extracted `LtCols` column struct. Soundness/completeness are proven and axiom-clean. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
+native `Columns` row. Soundness/completeness are proven and axiom-clean. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,

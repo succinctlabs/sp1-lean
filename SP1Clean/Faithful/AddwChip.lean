@@ -1,6 +1,18 @@
+import Mathlib.Tactic
+import Mathlib.Data.ZMod.Basic
 import SP1Clean.Faithful.ChipOracle
-import SP1Clean.Faithful.AddwChipAnchors
+import SP1Clean.Extracted.ChipOracle.Addw
+import SP1Clean.Native.Chips.AddwChip.Defs
 import SP1Clean.Proofs.Chips.AddwChip.Formal
+import SP1Clean.Model.InteractionRecovery
+
+/-! # Whole-chip faithfulness anchor — native ADDW row ↔ SP1 Rust Addw AIR
+
+The public boundary is `addwChip_faithful`: it compares the complete native chip assertion system and
+four-bus interaction multiset with the complete extracted Rust chip oracle after one explicit row
+reconfiguration. The generated Rust expression still contains operation/reader helper calls, but those
+are unfolded only in private calculations below. They are not correspondence claims about the native
+Lean gadget decomposition. -/
 
 namespace SP1Clean.Faithful
 
@@ -10,24 +22,56 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-def addwChipOracle :
-    ChipOracle (ZMod p) Extracted.AddwCols Extracted.AddwCols :=
-  ChipOracle.identity Extracted.AddwCols.asserts Extracted.AddwCols.interactions
+/-- Whole-chip row reconfiguration. The reader blocks are already the canonical generated substrate,
+so only the native arithmetic block (two witnessed low limbs + the composed sign bit) is copied into
+Rust's chip-private operation row. This is not an operation-level faithfulness claim. -/
+def addwChipReconfigure {F : Type} (cols : AddwChip.Columns F) :
+    Extracted.AddwOracle.AddwCols F :=
+  { state := cols.state
+    adapter := cols.adapter
+    addw_operation :=
+      { value := cols.addw_operation.value
+        msb := { msb := cols.addw_operation.msb.msb } }
+    is_real := cols.is_real }
 
-def addwChipInput {F : Type} (cols : Extracted.AddwCols F) : AddwChip.Inputs F :=
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def addwChipDeconfigure {F : Type} (cols : Extracted.AddwOracle.AddwCols F) :
+    AddwChip.Columns F :=
+  { is_real := cols.is_real
+    state := cols.state
+    adapter := cols.adapter
+    addw_operation :=
+      { value := cols.addw_operation.value
+        msb := { msb := cols.addw_operation.msb.msb } } }
+
+/-- SP1 Rust's complete Addw-chip oracle, viewed from the native Lean row. -/
+def addwChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F AddwChip.Columns Extracted.AddwOracle.AddwCols where
+  reconfigure := addwChipReconfigure
+  deconfigure := addwChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.AddwOracle.AddwCols.asserts
+  interactions := Extracted.AddwOracle.AddwCols.interactions
+
+/-- Native input decoded from a complete ADDW row. -/
+def addwChipInput {F : Type} (cols : AddwChip.Columns F) : AddwChip.Inputs F :=
   { is_real := cols.is_real, state := cols.state, adapter := cols.adapter }
 
-def addwChipLocals {F : Type} (cols : Extracted.AddwCols F) : Vector F 3 :=
+/-- The three local witness cells introduced by `AddwChip.main`: the two low result limbs and the
+sign bit. -/
+def addwChipLocals {F : Type} (cols : AddwChip.Columns F) : Vector F 3 :=
   #v[cols.addw_operation.value[0], cols.addw_operation.value[1],
     cols.addw_operation.msb.msb]
 
-def addwChipPhysicalRow {F : Type} (cols : Extracted.AddwCols F) : Array F :=
+/-- Clean input-first physical row for ADDW. -/
+def addwChipPhysicalRow {F : Type} (cols : AddwChip.Columns F) : Array F :=
   inputFirstRow (addwChipInput cols) (addwChipLocals cols)
 
+/-- Assemble the native row represented by an input prefix and the three ADDW local witnesses. -/
 def addwChipColumnsOfInput {F : Type} (input : AddwChip.Inputs F)
-    (locals : Vector F 3) : Extracted.AddwCols F :=
-  ⟨input.state, input.adapter, ⟨#v[locals[0], locals[1]], ⟨locals[2]⟩⟩,
-    input.is_real⟩
+    (locals : Vector F 3) : AddwChip.Columns F :=
+  ⟨input.is_real, input.state, input.adapter, ⟨#v[locals[0], locals[1]], ⟨locals[2]⟩⟩⟩
 
 private theorem vec2_eta {F : Type} (value : Vector F 2) :
     #v[value[0], value[1]] = value := by
@@ -41,18 +85,18 @@ private theorem vec4_eta {F : Type} (value : Vector F 4) :
   intro i hi
   interval_cases i <;> rfl
 
-theorem addwChipColumnsOfInput_roundtrip {F : Type} (cols : Extracted.AddwCols F) :
+theorem addwChipColumnsOfInput_roundtrip {F : Type} (cols : AddwChip.Columns F) :
     addwChipColumnsOfInput (addwChipInput cols) (addwChipLocals cols) = cols := by
   cases cols with
-  | mk state adapter operation isReal =>
+  | mk isReal state adapter operation =>
       cases operation with
       | mk value msb =>
           cases msb with
           | mk msbValue =>
               change
-                (⟨state, adapter, ⟨#v[value[0], value[1]], ⟨msbValue⟩⟩,
-                    isReal⟩ : Extracted.AddwCols F) =
-                  ⟨state, adapter, ⟨value, ⟨msbValue⟩⟩, isReal⟩
+                (⟨isReal, state, adapter, ⟨#v[value[0], value[1]], ⟨msbValue⟩⟩⟩ :
+                    AddwChip.Columns F) =
+                  ⟨isReal, state, adapter, ⟨value, ⟨msbValue⟩⟩⟩
               rw [vec2_eta]
 
 @[circuit_norm] theorem eval_extractedU16MSBOperation {F : Type} [FiniteField F]
@@ -62,23 +106,23 @@ theorem addwChipColumnsOfInput_roundtrip {F : Type} (cols : Extracted.AddwCols F
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
-@[circuit_norm] theorem eval_extractedAddwOperation {F : Type} [FiniteField F]
-    (env : Environment F) (cols : Extracted.AddwOperation (Expression F)) :
+@[circuit_norm] theorem eval_addwOperationColumns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : AddwOperation.Columns (Expression F)) :
     Eval.eval env cols =
       ({ value := Eval.eval env cols.value, msb := Eval.eval env cols.msb } :
-        Extracted.AddwOperation F) := by
+        AddwOperation.Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
-@[circuit_norm] theorem eval_extractedAddwOperation_value {F : Type} [FiniteField F]
-    (env : Environment F) (cols : Extracted.AddwOperation (Expression F)) :
+@[circuit_norm] theorem eval_addwOperationColumns_value {F : Type} [FiniteField F]
+    (env : Environment F) (cols : AddwOperation.Columns (Expression F)) :
     (Eval.eval env cols).value = Eval.eval env cols.value := by
-  rw [eval_extractedAddwOperation]
+  rw [eval_addwOperationColumns]
 
-@[circuit_norm] theorem eval_extractedAddwOperation_msb {F : Type} [FiniteField F]
-    (env : Environment F) (cols : Extracted.AddwOperation (Expression F)) :
+@[circuit_norm] theorem eval_addwOperationColumns_msb {F : Type} [FiniteField F]
+    (env : Environment F) (cols : AddwOperation.Columns (Expression F)) :
     (Eval.eval env cols).msb.msb = Eval.eval env cols.msb.msb := by
-  rw [eval_extractedAddwOperation, eval_extractedU16MSBOperation]
+  rw [eval_addwOperationColumns, eval_extractedU16MSBOperation]
 
 @[circuit_norm] theorem eval_addwOperationInputs {F : Type} [FiniteField F]
     (env : Environment F) (input : AddwOperation.Inputs (Expression F)) :
@@ -112,37 +156,37 @@ theorem eval_addwChipDirectOutput
   rw [AddwChip.directOutput_eq]
   rw [← CircuitType.eval_expression, AddwChip.eval_columns]
   unfold addwChipColumnsOfInput
-  rw [Extracted.AddwCols.mk.injEq]
+  rw [AddwChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input locals data
   rw [AddwChip.eval_inputs, AddwChip.Inputs.mk.injEq] at hinputEval
   constructor
+  · exact hinputEval.1
+  constructor
   · exact hinputEval.2.1
   constructor
   · exact hinputEval.2.2
+  rw [AddwOperation.Columns.mk.injEq]
   constructor
-  · rw [Extracted.AddwOperation.mk.injEq]
-    constructor
-    · rw [eval_extractedAddwOperation_value]
-      ext i hi
-      interval_cases i
-      · rw [← ProvableType.getElem_eval_fields
-          (Environment.fromArray (inputFirstRow input locals) data)
-          (Vector.mapRange 2 fun i => var { index := size AddwChip.Inputs + i })
-          0 (by decide), Vector.getElem_mapRange]
-        exact eval_local_inputFirstRow input locals data 0 (by decide)
-      · rw [← ProvableType.getElem_eval_fields
-          (Environment.fromArray (inputFirstRow input locals) data)
-          (Vector.mapRange 2 fun i => var { index := size AddwChip.Inputs + i })
-          1 (by decide), Vector.getElem_mapRange]
-        exact eval_local_inputFirstRow input locals data 1 (by decide)
-    · rw [Extracted.U16MSBOperation.mk.injEq]
-      simpa only [eval_extractedAddwOperation, eval_extractedU16MSBOperation,
-        ProvableType.eval_field] using
-          (eval_local_inputFirstRow input locals data 2 (by decide))
-  · exact hinputEval.1
+  · rw [eval_addwOperationColumns_value]
+    ext i hi
+    interval_cases i
+    · rw [← ProvableType.getElem_eval_fields
+        (Environment.fromArray (inputFirstRow input locals) data)
+        (Vector.mapRange 2 fun i => var { index := size AddwChip.Inputs + i })
+        0 (by decide), Vector.getElem_mapRange]
+      exact eval_local_inputFirstRow input locals data 0 (by decide)
+    · rw [← ProvableType.getElem_eval_fields
+        (Environment.fromArray (inputFirstRow input locals) data)
+        (Vector.mapRange 2 fun i => var { index := size AddwChip.Inputs + i })
+        1 (by decide), Vector.getElem_mapRange]
+      exact eval_local_inputFirstRow input locals data 1 (by decide)
+  · rw [Extracted.U16MSBOperation.mk.injEq]
+    simpa only [eval_addwOperationColumns, eval_extractedU16MSBOperation,
+      ProvableType.eval_field] using
+        (eval_local_inputFirstRow input locals data 2 (by decide))
 
-def addwChipRowCodec : ChipRowCodec AddwChip.Inputs Extracted.AddwCols
+def addwChipRowCodec : ChipRowCodec AddwChip.Inputs AddwChip.Columns
     (AddwChip.circuit (p := p)) where
   assignment cols data := {
     row := addwChipPhysicalRow cols
@@ -173,21 +217,379 @@ theorem addwChip_lookups_empty :
     AddwOperation.circuit, AddwOperation.main, U16MSBOperation.circuit,
     U16MSBOperation.main, Gadgets.Equality.main, circuit_norm]
 
+open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel StateMsg)
+open SP1Clean.InteractionRecovery
+
+set_option maxHeartbeats 2000000 in
+set_option linter.unusedSimpArgs false in
+/-- **Chip-level faithfulness anchor — Program-bus interaction, SYNTACTIC.** The single Program fetch the
+whole `AddwChip` row emits (only the `ALUTypeReader` fragment emits Program) projects to the same arity-16
+`LookupAccess` as the Program entry of SP1's `AddwCols.interactions` oracle. First ALU-chip syntactic anchor:
+the descent goes through the immediate-capable `ALUTypeReader` (op_c a Word + `imm_c`) and the composed
+`AddwOperation` (its `U16MSB` sub + inline byte all drop under the Program filter); opcode `19`. Witness-free. -/
+private theorem addwcols_program_interactions_faithful_syntactic
+    (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ)
+    (cols : AddwChip.Columns (ZMod p))
+    (h_ir : Expression.eval env input.is_real = cols.is_real)
+    (h_p0 : Expression.eval env input.state.pc[0] = cols.state.pc[0])
+    (h_p1 : Expression.eval env input.state.pc[1] = cols.state.pc[1])
+    (h_p2 : Expression.eval env input.state.pc[2] = cols.state.pc[2])
+    (h_oa : Expression.eval env input.adapter.op_a = cols.adapter.op_a)
+    (h_ob : Expression.eval env input.adapter.op_b = cols.adapter.op_b)
+    (h_oc0 : Expression.eval env input.adapter.op_c[0] = cols.adapter.op_c[0])
+    (h_oc1 : Expression.eval env input.adapter.op_c[1] = cols.adapter.op_c[1])
+    (h_oc2 : Expression.eval env input.adapter.op_c[2] = cols.adapter.op_c[2])
+    (h_oc3 : Expression.eval env input.adapter.op_c[3] = cols.adapter.op_c[3])
+    (h_oa0 : Expression.eval env input.adapter.op_a_0 = cols.adapter.op_a_0)
+    (h_imm : Expression.eval env input.adapter.imm_c = cols.adapter.imm_c) :
+    (((AddwChip.main input).operations offset).interactionsWith programChannel.toRaw).map
+        (AbstractInteraction.toAccess env)
+      = (((Extracted.AddwOracle.AddwCols.interactions (addwChipReconfigure cols)).map Extracted.Interaction.toAccess).filter
+          (fun a => a.1 = InteractionKind.Program)).map LookupAccessList.negMult := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) programChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
+  -- SC Phase 2a: unfold the `Channel` kernel's `pulledIf` to match `circuit_norm`'s raw recovery.
+  have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
+    toAccess_pullIf_program env g m
+  simp only [AddwChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
+    Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+    Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
+    SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, hk, heq]
+  simp [circuit_norm, hk, Gadgets.Equality.main, LookupAccessList.negMult,
+    signedVal_neg hp2,
+    addwChipReconfigure, Extracted.AddwOracle.AddwCols.interactions, Extracted.AddwOracle.AddwOperation.interactions,
+    Extracted.AddwOracle.U16MSBOperation.interactions,
+    Extracted.CPUState.interactions, Extracted.ALUTypeReader.interactions,
+    Extracted.Interaction.toAccess, Extracted.Dir.sign, Opcode.ofNat, ConstraintCoe.coe_eq_val,
+    h_ir, h_p0, h_p1, h_p2, h_oa, h_ob, h_oc0, h_oc1, h_oc2, h_oc3, h_oa0, h_imm]
+
+set_option maxHeartbeats 2000000 in
+set_option linter.unusedSimpArgs false in
+/-- **Chip-level faithfulness anchor — State-bus interactions, SYNTACTIC.** The State interactions the
+whole `AddwChip` row emits (recovered by descending the chip into its three composed sub-readers) project
+to the same `LookupAccess` list as the State entries of SP1's extracted `AddwCols.interactions` oracle.
+Only the `CPUState` fragment emits State, so this is a clean `=` (no fragment-reorder `Perm`); the `Add`
+and `ALUTypeReader` byte/memory/program emits drop under the `State` channel filter. Witness-free (the
+State bus does not touch the witnessed ALU result). -/
+private theorem addwcols_state_interactions_faithful_syntactic
+    (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ)
+    (cols : AddwChip.Columns (ZMod p))
+    (h_ir : Expression.eval env input.is_real = cols.is_real)
+    (h_ch : Expression.eval env input.state.clk_high = cols.state.clk_high)
+    (h_c0 : Expression.eval env input.state.clk_0_16 = cols.state.clk_0_16)
+    (h_c1 : Expression.eval env input.state.clk_16_24 = cols.state.clk_16_24)
+    (h_p0 : Expression.eval env input.state.pc[0] = cols.state.pc[0])
+    (h_p1 : Expression.eval env input.state.pc[1] = cols.state.pc[1])
+    (h_p2 : Expression.eval env input.state.pc[2] = cols.state.pc[2]) :
+    (((AddwChip.main input).operations offset).interactionsWith stateChannel.toRaw).map
+        (AbstractInteraction.toAccess env)
+      = ((Extracted.AddwOracle.AddwCols.interactions (addwChipReconfigure cols)).map Extracted.Interaction.toAccess).filter
+          (fun a => a.1 = InteractionKind.State) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hsk : ∀ (m : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
+      AbstractInteraction.toAccess env ((stateChannel.pushedIf m s).toRaw) =
+        (InteractionKind.State, "SP1State",
+          [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
+           (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
+           (Expression.eval env s.pc2).val], signedVal (Expression.eval env m)) :=
+    fun m s => toAccess_pushIf_state env m s
+  have hsk_pull : ∀ (g : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
+      AbstractInteraction.toAccess env ((stateChannel.pulledIf g s).toRaw) =
+        (InteractionKind.State, "SP1State",
+          [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
+           (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
+           (Expression.eval env s.pc2).val], signedVal (Expression.eval env (-g))) :=
+    fun g s => toAccess_pullIf_state env g s
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) stateChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
+  -- descend the chip into its three sub-readers; the `Add`/`ALUTypeReader` byte/mem/program emits drop under
+  -- the `State` filter (channel distinctness), leaving CPUState's two State interactions.
+  simp only [AddwChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
+    Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+    Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
+    SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, hsk, hsk_pull, heq]
+  -- the residual: CPUState's 2 State interactions (via `hsk`), everything else dropped by the `State`
+  -- filter (byte/mem/program channel distinctness) or emitting nothing (`Gadgets.Equality.main`); the
+  -- oracle `.filter .State` likewise keeps only the CPUState fragment's 2 State entries.
+  simp [circuit_norm, hsk, hsk_pull, toAccess_pushIf_state, toAccess_pullIf_state,
+    Gadgets.Equality.main,
+    addwChipReconfigure, Extracted.AddwOracle.AddwCols.interactions, Extracted.AddwOracle.AddwOperation.interactions, Extracted.AddwOracle.U16MSBOperation.interactions,
+    Extracted.CPUState.interactions, Extracted.ALUTypeReader.interactions,
+    Extracted.Interaction.toAccess, Extracted.Dir.sign,
+    h_ir, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2]
+
+set_option maxHeartbeats 2000000 in
+set_option linter.unusedSimpArgs false in
+/-- **Chip-level faithfulness anchor — Memory-bus interactions, SYNTACTIC (composition + WITNESSED + `Perm`
++ `negMult`).** The six Memory interactions the whole `AddwChip` row emits — `ALUTypeReader`'s five reads
+(op_a read, op_b read+write-back, op_c read+write-back) **plus** `RegisterWrite`'s op_a write (Option B: the
+write factored out, composed by the chip after `AddwOperation`) — project, after the W11-flip `negMult`
+sign-bridge, to a `List.Perm` of the Memory entries of SP1's extracted `AddwCols.interactions` oracle. Two
+shifts from the old clean `=`: (1) the reads/writes are `pullIf`/`pushIf` (the negation of SP1's
+send/receive), so the whole emitted block is `negMult`-bridged; (2) the op_a write now trails the block (from
+the separate `RegisterWrite` sub-assertion) whereas the oracle lists it second — so it is a `List.Perm`. The
+`op_a` write value is the chip-**witnessed** sign-extended W result `#v[value[0], value[1], msb·65535,
+msb·65535]`, bound via `env.get (offset + k)`. op_c's emits are gated `is_real - imm_c`. -/
+private theorem addwcols_memory_interactions_faithful_syntactic
+    (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ)
+    (cols : AddwChip.Columns (ZMod p))
+    (h_ir : Expression.eval env input.is_real = cols.is_real)
+    (h_ch : Expression.eval env input.state.clk_high = cols.state.clk_high)
+    (h_c0 : Expression.eval env input.state.clk_0_16 = cols.state.clk_0_16)
+    (h_c1 : Expression.eval env input.state.clk_16_24 = cols.state.clk_16_24)
+    (h_oa : Expression.eval env input.adapter.op_a = cols.adapter.op_a)
+    (h_ob : Expression.eval env input.adapter.op_b = cols.adapter.op_b)
+    (h_oc0 : Expression.eval env input.adapter.op_c[0] = cols.adapter.op_c[0])
+    (h_imm : Expression.eval env input.adapter.imm_c = cols.adapter.imm_c)
+    (h_wv0 : env.get offset = cols.addw_operation.value[0])
+    (h_wv1 : env.get (offset + 1) = cols.addw_operation.value[1])
+    (h_msb : env.get (offset + 2) = cols.addw_operation.msb.msb)
+    (h_pl_a : Expression.eval env input.adapter.op_a_memory.access_timestamp.prev_low =
+      cols.adapter.op_a_memory.access_timestamp.prev_low)
+    (h_pv_a0 : Expression.eval env input.adapter.op_a_memory.prev_value[0] = cols.adapter.op_a_memory.prev_value[0])
+    (h_pv_a1 : Expression.eval env input.adapter.op_a_memory.prev_value[1] = cols.adapter.op_a_memory.prev_value[1])
+    (h_pv_a2 : Expression.eval env input.adapter.op_a_memory.prev_value[2] = cols.adapter.op_a_memory.prev_value[2])
+    (h_pv_a3 : Expression.eval env input.adapter.op_a_memory.prev_value[3] = cols.adapter.op_a_memory.prev_value[3])
+    (h_pl_b : Expression.eval env input.adapter.op_b_memory.access_timestamp.prev_low =
+      cols.adapter.op_b_memory.access_timestamp.prev_low)
+    (h_pv_b0 : Expression.eval env input.adapter.op_b_memory.prev_value[0] = cols.adapter.op_b_memory.prev_value[0])
+    (h_pv_b1 : Expression.eval env input.adapter.op_b_memory.prev_value[1] = cols.adapter.op_b_memory.prev_value[1])
+    (h_pv_b2 : Expression.eval env input.adapter.op_b_memory.prev_value[2] = cols.adapter.op_b_memory.prev_value[2])
+    (h_pv_b3 : Expression.eval env input.adapter.op_b_memory.prev_value[3] = cols.adapter.op_b_memory.prev_value[3])
+    (h_pl_c : Expression.eval env input.adapter.op_c_memory.access_timestamp.prev_low =
+      cols.adapter.op_c_memory.access_timestamp.prev_low)
+    (h_pv_c0 : Expression.eval env input.adapter.op_c_memory.prev_value[0] = cols.adapter.op_c_memory.prev_value[0])
+    (h_pv_c1 : Expression.eval env input.adapter.op_c_memory.prev_value[1] = cols.adapter.op_c_memory.prev_value[1])
+    (h_pv_c2 : Expression.eval env input.adapter.op_c_memory.prev_value[2] = cols.adapter.op_c_memory.prev_value[2])
+    (h_pv_c3 : Expression.eval env input.adapter.op_c_memory.prev_value[3] = cols.adapter.op_c_memory.prev_value[3]) :
+    List.Perm
+      (((((AddwChip.main input).operations offset).interactionsWith memoryChannel.toRaw).map
+          (AbstractInteraction.toAccess env)).map LookupAccessList.negMult)
+      (((Extracted.AddwOracle.AddwCols.interactions (addwChipReconfigure cols)).map Extracted.Interaction.toAccess).filter
+          (fun a => a.1 = InteractionKind.Memory)) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) memoryChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
+  simp only [AddwChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
+    Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+    Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
+    SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions,
+    toAccess_pushIf_memory, toAccess_pullIf_memory, heq]
+  simp [circuit_norm, toAccess_pushIf_memory, toAccess_pullIf_memory, Gadgets.Equality.main,
+    LookupAccessList.negMult, signedVal_neg hp2,
+    addwChipReconfigure, Extracted.AddwOracle.AddwCols.interactions, Extracted.AddwOracle.AddwOperation.interactions, Extracted.AddwOracle.U16MSBOperation.interactions,
+    Extracted.CPUState.interactions, Extracted.ALUTypeReader.interactions,
+    Extracted.Interaction.toAccess, Extracted.Dir.sign,
+    h_ir, h_ch, h_c0, h_c1, h_oa, h_ob, h_oc0, h_imm,
+    h_wv0, h_wv1, h_msb, h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3,
+    h_pl_b, h_pv_b0, h_pv_b1, h_pv_b2, h_pv_b3,
+    h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3]
+  -- The op_c emits are gated `is_real - imm_c`: align the circuit's `-signedVal`(pull/push) forms with the
+  -- oracle's `signedVal` orientation (the compound-gate sign bridge — `signedVal_neg` after a `ring` nudge).
+  rw [show -signedVal (cols.adapter.imm_c - cols.is_real) = signedVal (cols.is_real - cols.adapter.imm_c) from by
+        rw [(by ring : cols.is_real - cols.adapter.imm_c = -(cols.adapter.imm_c - cols.is_real)),
+          signedVal_neg hp2],
+      show -signedVal (cols.is_real - cols.adapter.imm_c) = signedVal (cols.adapter.imm_c - cols.is_real) from by
+        rw [(by ring : cols.adapter.imm_c - cols.is_real = -(cols.is_real - cols.adapter.imm_c)),
+          signedVal_neg hp2]]
+  -- circuit `[op_a read, op_b read, op_b write, op_c read, op_c write, op_a write]` vs oracle
+  -- `[op_a read, op_a write, op_b read, op_b write, op_c read, op_c write]`: after the shared `op_a read`
+  -- head, rotate the trailing `RegisterWrite` op_a write to the front (`perm_append_comm`).
+  exact List.perm_append_comm (l₁ := [_, _, _, _]) (l₂ := [_])
+
+set_option maxHeartbeats 2000000 in
+set_option linter.unusedSimpArgs false in
+/-- **Chip-level faithfulness anchor — Byte-bus interactions, SYNTACTIC (multi-fragment `Perm` + WITNESSED).**
+All three fragments emit byte: `CPUState` (2 clock checks), `AddwOperation` (4 result-limb ranges on the
+chip-**witnessed** ALU `value`), `ALUTypeReader` (6 timestamp checks). The circuit emits them in order
+`[CPUState 2] ++ [Add 4] ++ [ALUTypeReader 6]`, the oracle lists `[Add 4] ++ [CPUState 2] ++ [ALUTypeReader 6]`
+— the first two blocks swapped, so this is a `List.Perm` (the bus is a multiset). The `Add` block's
+`value[k]` is bound via `env.get (offset + k)`. -/
+private theorem addwcols_byte_interactions_faithful_syntactic
+    (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ)
+    (cols : AddwChip.Columns (ZMod p))
+    (h_ir : Expression.eval env input.is_real = cols.is_real)
+    (h_c0 : Expression.eval env input.state.clk_0_16 = cols.state.clk_0_16)
+    (h_c1 : Expression.eval env input.state.clk_16_24 = cols.state.clk_16_24)
+    (h_imm : Expression.eval env input.adapter.imm_c = cols.adapter.imm_c)
+    (h_wv0 : env.get offset = cols.addw_operation.value[0])
+    (h_wv1 : env.get (offset + 1) = cols.addw_operation.value[1])
+    (h_msb : env.get (offset + 2) = cols.addw_operation.msb.msb)
+    (h_pl_a : Expression.eval env input.adapter.op_a_memory.access_timestamp.prev_low =
+      cols.adapter.op_a_memory.access_timestamp.prev_low)
+    (h_dl_a : Expression.eval env input.adapter.op_a_memory.access_timestamp.diff_low_limb =
+      cols.adapter.op_a_memory.access_timestamp.diff_low_limb)
+    (h_pl_b : Expression.eval env input.adapter.op_b_memory.access_timestamp.prev_low =
+      cols.adapter.op_b_memory.access_timestamp.prev_low)
+    (h_dl_b : Expression.eval env input.adapter.op_b_memory.access_timestamp.diff_low_limb =
+      cols.adapter.op_b_memory.access_timestamp.diff_low_limb)
+    (h_pl_c : Expression.eval env input.adapter.op_c_memory.access_timestamp.prev_low =
+      cols.adapter.op_c_memory.access_timestamp.prev_low)
+    (h_dl_c : Expression.eval env input.adapter.op_c_memory.access_timestamp.diff_low_limb =
+      cols.adapter.op_c_memory.access_timestamp.diff_low_limb) :
+    List.Perm
+      ((((AddwChip.main input).operations offset).interactionsWith byteChannel.toRaw).map
+        (AbstractInteraction.toAccess env))
+      (((Extracted.AddwOracle.AddwCols.interactions (addwChipReconfigure cols)).map Extracted.Interaction.toAccess).filter
+          (fun a => a.1 = InteractionKind.Byte)) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h6 : (6 : ZMod p).val = 6 := by
+    have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+    exact ZMod.val_natCast_of_lt h
+  have h3 : (3 : ZMod p).val = 3 := by
+    have h : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+    exact ZMod.val_natCast_of_lt h
+  have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
+      AbstractInteraction.toAccess env ((pulledIf (channel := byteChannel) g s).toRaw) =
+        (InteractionKind.Byte, "SP1Byte",
+          [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
+           (Expression.eval env s.b).val, (Expression.eval env s.c).val],
+          signedVal (Expression.eval env (-g))) :=
+    fun g s => toAccess_pullIf_byte env g s
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
+  simp only [AddwChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
+    Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+    Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    SP1Clean.AddwOperation.circuit, SP1Clean.AddwOperation.main,
+    SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, GeneralFormalCircuit.toSubcircuit_interactions, hk, heq]
+  simp [circuit_norm, hk, Gadgets.Equality.main,
+    addwChipReconfigure, Extracted.AddwOracle.AddwCols.interactions, Extracted.AddwOracle.AddwOperation.interactions, Extracted.AddwOracle.U16MSBOperation.interactions,
+    Extracted.CPUState.interactions, Extracted.ALUTypeReader.interactions,
+    Extracted.Interaction.toAccess_byte, Extracted.Interaction.toAccess, Extracted.Dir.sign,
+    ZMod.val_zero,
+    h_ir, h_c0, h_c1, h_imm, h_wv0, h_wv1, h_msb,
+    h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c, h6, h3]
+  -- circuit `[CPUState 2] ++ [Add 4] ++ [ALUTypeReader 6]` vs oracle `[Add 4] ++ [CPUState 2] ++ [RT 6]`:
+  -- swap the first two blocks (the `ALUTypeReader 6` tail is shared).
+  exact (List.perm_append_comm (l₁ := [_, _]) (l₂ := [_, _, _])).append_right [_, _, _, _, _, _]
+
+set_option maxHeartbeats 2000000 in
+/-- **Chip-level faithfulness anchor — COMBINED, SYNTACTIC.** The full faithfulness statement for `AddwChip`:
+the interactions the row emits on its four buses — `State`, `Byte`, `Memory`, `Program` — taken together
+are a `List.Perm` of SP1's *entire* extracted `AddwCols.interactions` oracle (projected to `LookupAccess`).
+Assembled from the four per-channel anchors via `perm_filter_by_kind` (which decomposes the oracle image
+into its four `InteractionKind` blocks) + `List.Perm.append` (Byte is the only `Perm`; State/Memory/Program
+are `=`). No semantics, no channel filter — the complete emitted-interaction list vs the complete oracle.
+This closes out `AddwChip`'s four-artifact chain at the syntactic-interaction level. -/
+private theorem addwcols_interactions_faithful_syntactic
+    (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ)
+    (cols : AddwChip.Columns (ZMod p))
+    (h_ir : Expression.eval env input.is_real = cols.is_real)
+    (h_ch : Expression.eval env input.state.clk_high = cols.state.clk_high)
+    (h_c0 : Expression.eval env input.state.clk_0_16 = cols.state.clk_0_16)
+    (h_c1 : Expression.eval env input.state.clk_16_24 = cols.state.clk_16_24)
+    (h_p0 : Expression.eval env input.state.pc[0] = cols.state.pc[0])
+    (h_p1 : Expression.eval env input.state.pc[1] = cols.state.pc[1])
+    (h_p2 : Expression.eval env input.state.pc[2] = cols.state.pc[2])
+    (h_oa : Expression.eval env input.adapter.op_a = cols.adapter.op_a)
+    (h_ob : Expression.eval env input.adapter.op_b = cols.adapter.op_b)
+    (h_oc0 : Expression.eval env input.adapter.op_c[0] = cols.adapter.op_c[0])
+    (h_oc1 : Expression.eval env input.adapter.op_c[1] = cols.adapter.op_c[1])
+    (h_oc2 : Expression.eval env input.adapter.op_c[2] = cols.adapter.op_c[2])
+    (h_oc3 : Expression.eval env input.adapter.op_c[3] = cols.adapter.op_c[3])
+    (h_imm : Expression.eval env input.adapter.imm_c = cols.adapter.imm_c)
+    (h_oa0 : Expression.eval env input.adapter.op_a_0 = cols.adapter.op_a_0)
+    (h_wv0 : env.get offset = cols.addw_operation.value[0])
+    (h_wv1 : env.get (offset + 1) = cols.addw_operation.value[1])
+    (h_msb : env.get (offset + 2) = cols.addw_operation.msb.msb)
+    (h_pl_a : Expression.eval env input.adapter.op_a_memory.access_timestamp.prev_low =
+      cols.adapter.op_a_memory.access_timestamp.prev_low)
+    (h_dl_a : Expression.eval env input.adapter.op_a_memory.access_timestamp.diff_low_limb =
+      cols.adapter.op_a_memory.access_timestamp.diff_low_limb)
+    (h_pv_a0 : Expression.eval env input.adapter.op_a_memory.prev_value[0] = cols.adapter.op_a_memory.prev_value[0])
+    (h_pv_a1 : Expression.eval env input.adapter.op_a_memory.prev_value[1] = cols.adapter.op_a_memory.prev_value[1])
+    (h_pv_a2 : Expression.eval env input.adapter.op_a_memory.prev_value[2] = cols.adapter.op_a_memory.prev_value[2])
+    (h_pv_a3 : Expression.eval env input.adapter.op_a_memory.prev_value[3] = cols.adapter.op_a_memory.prev_value[3])
+    (h_pl_b : Expression.eval env input.adapter.op_b_memory.access_timestamp.prev_low =
+      cols.adapter.op_b_memory.access_timestamp.prev_low)
+    (h_dl_b : Expression.eval env input.adapter.op_b_memory.access_timestamp.diff_low_limb =
+      cols.adapter.op_b_memory.access_timestamp.diff_low_limb)
+    (h_pv_b0 : Expression.eval env input.adapter.op_b_memory.prev_value[0] = cols.adapter.op_b_memory.prev_value[0])
+    (h_pv_b1 : Expression.eval env input.adapter.op_b_memory.prev_value[1] = cols.adapter.op_b_memory.prev_value[1])
+    (h_pv_b2 : Expression.eval env input.adapter.op_b_memory.prev_value[2] = cols.adapter.op_b_memory.prev_value[2])
+    (h_pv_b3 : Expression.eval env input.adapter.op_b_memory.prev_value[3] = cols.adapter.op_b_memory.prev_value[3])
+    (h_pl_c : Expression.eval env input.adapter.op_c_memory.access_timestamp.prev_low =
+      cols.adapter.op_c_memory.access_timestamp.prev_low)
+    (h_dl_c : Expression.eval env input.adapter.op_c_memory.access_timestamp.diff_low_limb =
+      cols.adapter.op_c_memory.access_timestamp.diff_low_limb)
+    (h_pv_c0 : Expression.eval env input.adapter.op_c_memory.prev_value[0] = cols.adapter.op_c_memory.prev_value[0])
+    (h_pv_c1 : Expression.eval env input.adapter.op_c_memory.prev_value[1] = cols.adapter.op_c_memory.prev_value[1])
+    (h_pv_c2 : Expression.eval env input.adapter.op_c_memory.prev_value[2] = cols.adapter.op_c_memory.prev_value[2])
+    (h_pv_c3 : Expression.eval env input.adapter.op_c_memory.prev_value[3] = cols.adapter.op_c_memory.prev_value[3]) :
+    List.Perm
+      (((((AddwChip.main input).operations offset).interactionsWith stateChannel.toRaw).map
+          (AbstractInteraction.toAccess env)) ++
+        ((((AddwChip.main input).operations offset).interactionsWith byteChannel.toRaw).map
+          (AbstractInteraction.toAccess env)) ++
+        (((((AddwChip.main input).operations offset).interactionsWith memoryChannel.toRaw).map
+          (AbstractInteraction.toAccess env)).map LookupAccessList.negMult) ++
+        (((((AddwChip.main input).operations offset).interactionsWith programChannel.toRaw).map
+          (AbstractInteraction.toAccess env)).map LookupAccessList.negMult))
+      (addwChipOracle.accesses cols) := by
+  have hS := addwcols_state_interactions_faithful_syntactic env input offset cols h_ir h_ch h_c0 h_c1 h_p0 h_p1 h_p2
+  have hP := addwcols_program_interactions_faithful_syntactic env input offset cols h_ir h_p0 h_p1 h_p2
+    h_oa h_ob h_oc0 h_oc1 h_oc2 h_oc3 h_oa0 h_imm
+  -- The Program block carries one `negMult` (W11 flip: our pull is `-is_real`); re-negating `hP`'s already-
+  -- negated oracle block recovers the pristine Program filter, so the whole equation stays vs. SP1's oracle.
+  have hP' : ((((AddwChip.main input).operations offset).interactionsWith programChannel.toRaw).map
+      (AbstractInteraction.toAccess env)).map LookupAccessList.negMult
+      = ((Extracted.AddwOracle.AddwCols.interactions (addwChipReconfigure cols)).map Extracted.Interaction.toAccess).filter
+          (fun a => a.1 = InteractionKind.Program) := by rw [hP, LookupAccessList.map_negMult_negMult]
+  have hM := addwcols_memory_interactions_faithful_syntactic env input offset cols h_ir h_ch h_c0 h_c1
+    h_oa h_ob h_oc0 h_imm h_wv0 h_wv1 h_msb h_pl_a h_pv_a0 h_pv_a1 h_pv_a2 h_pv_a3
+    h_pl_b h_pv_b0 h_pv_b1 h_pv_b2 h_pv_b3 h_pl_c h_pv_c0 h_pv_c1 h_pv_c2 h_pv_c3
+  have hB := addwcols_byte_interactions_faithful_syntactic env input offset cols h_ir h_c0 h_c1 h_imm
+    h_wv0 h_wv1 h_msb h_pl_a h_dl_a h_pl_b h_dl_b h_pl_c h_dl_c
+  refine List.Perm.trans ?_ (LookupAccessList.perm_filter_by_kind _).symm
+  -- State + Program blocks are clean `=` (`rw`); Byte + Memory are `Perm`s (`hB`/`hM`) threaded through the
+  -- append structure (W11 memory flip: the Memory block is `negMult`-bridged + reordered, like Program).
+  rw [hS, hP']
+  exact ((hB.append_left _).append hM).append_right _
+
 set_option maxHeartbeats 1000000 in
 private theorem addwOperationAssertions
     (env : Environment (ZMod p)) (input : Var AddwOperation.Inputs (ZMod p))
-    (offset : ℕ) (a b : Word (ZMod p)) (cols : Extracted.AddwOperation (ZMod p))
+    (offset : ℕ) (a b : Word (ZMod p)) (cols : AddwOperation.Columns (ZMod p))
     (isReal : ZMod p)
     (ha : (ProvableStruct.eval env input).a = a)
     (hb : (ProvableStruct.eval env input).b = b)
     (hcols : ProvableStruct.eval env input.cols = cols)
     (hreal : (ProvableStruct.eval env input).is_real = isReal) :
-    List.Forall (· = 0) (Extracted.AddwOperation.asserts a b cols isReal) ↔
+    List.Forall (· = 0)
+        (Extracted.AddwOracle.AddwOperation.asserts a b
+          { value := cols.value, msb := { msb := cols.msb.msb } } isReal) ↔
       List.Forall (· = 0)
         (nativeAssertZeros env ((AddwOperation.main input).operations offset)) := by
   simp [nativeAssertZeros, AddwOperation.main, U16MSBOperation.circuit,
-    U16MSBOperation.main, Extracted.AddwOperation.asserts,
-    Extracted.U16MSBOperation.asserts, Gadgets.Equality.main, circuit_norm]
+    U16MSBOperation.main, Extracted.AddwOracle.AddwOperation.asserts,
+    Extracted.AddwOracle.U16MSBOperation.asserts, Gadgets.Equality.main, circuit_norm]
   have ha0 : Expression.eval env input.a[0] = a[0] := by
     rw [ProvableType.getElem_eval_fields]
     exact congrArg (fun x => x[0]) ha
@@ -209,7 +611,7 @@ private theorem addwOperationAssertions
     exact congrArg (fun x => x[1]) hvalue
   have hmsb : Expression.eval env input.cols.msb.msb = cols.msb.msb := by
     have h := congrArg (fun x => x.msb.msb) hcols
-    rw [← ProvableStruct.eval_eq_eval, eval_extractedAddwOperation,
+    rw [← ProvableStruct.eval_eq_eval, eval_addwOperationColumns,
       eval_extractedU16MSBOperation] at h
     simpa only [ProvableType.eval_field] using h
   have hr : Expression.eval env input.is_real = isReal := by
@@ -366,7 +768,7 @@ private theorem addw_chip_constraints_decompose
 set_option maxHeartbeats 4000000 in
 theorem addwChip_constraints_faithful
     (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.AddwCols (ZMod p))
+    (cols : AddwChip.Columns (ZMod p))
     (hbind : BindsChipOutput AddwChip.main env input offset cols) :
     List.Forall (· = 0) (addwChipOracle.nativeAssertZeros cols) ↔
       List.Forall (· = 0)
@@ -378,7 +780,7 @@ theorem addwChip_constraints_faithful
   let rustValue : Vector (ZMod p) 2 :=
     #v[(Eval.eval env value)[0], (Eval.eval env value)[1]]
   let rustMsb : ZMod p := Eval.eval env msb
-  let rustOperation : Extracted.AddwOperation (ZMod p) :=
+  let rustOperation : AddwOperation.Columns (ZMod p) :=
     { value := rustValue, msb := { msb := rustMsb } }
   let rustA : Word (ZMod p) :=
     #v[adapterValue.op_b_memory.prev_value[0], adapterValue.op_b_memory.prev_value[1],
@@ -429,7 +831,7 @@ theorem addwChip_constraints_faithful
   have hOpCols : ProvableStruct.eval env opInput.cols = rustOperation := by
     simp only [opInput, rustOperation, rustValue, rustMsb,
       ProvableStruct.structEvalLiteralProc]
-    rw [Extracted.AddwOperation.mk.injEq]
+    rw [AddwOperation.Columns.mk.injEq]
     constructor
     · ext i hi
       interval_cases i
@@ -485,13 +887,12 @@ theorem addwChip_constraints_faithful
       #v[value[0], value[1], msb * 65535, msb * 65535], input.is_real⟩
   replace hbind := BindsChipOutput.ofElaborated (AddwChip.elaborated (p := p)) hbind
   rw [AddwChip.directOutput_eq] at hbind
-  simp only [ProvableStruct.structEvalLiteralProc, eval_extractedAddwOperation,
+  simp only [ProvableStruct.structEvalLiteralProc, eval_addwOperationColumns,
     eval_extractedU16MSBOperation] at hbind
   subst cols
   rw [addw_chip_constraints_decompose]
-  simp only [ChipOracle.nativeAssertZeros, addwChipOracle,
-    ChipOracle.identity, id_eq]
-  simp only [Extracted.AddwCols.asserts, List.forall_append, List.forall_cons]
+  simp only [ChipOracle.nativeAssertZeros, addwChipOracle, addwChipReconfigure]
+  simp only [Extracted.AddwOracle.AddwCols.asserts, List.forall_append, List.forall_cons]
   rw [forall_nil_iff]
   dsimp [rustA, rustB, rustValue, rustMsb, rustOperation, adapterValue,
     isReal, opInput, value, msb, addw_chip_value, addw_chip_msb] at hOp
@@ -536,7 +937,7 @@ theorem addwChip_constraints_faithful
 
 set_option maxHeartbeats 2000000 in
 theorem addwChip_constraints_constructive
-    (rustCols : Extracted.AddwCols (ZMod p)) (data : ProverData (ZMod p)) :
+    (rustCols : Extracted.AddwOracle.AddwCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := addwChipRowCodec.assignment
       (addwChipOracle.deconfigure rustCols) data
     List.Forall (· = 0) (addwChipOracle.assertZeros rustCols) ↔
@@ -568,18 +969,16 @@ theorem addwChip_constraints_constructive
     (constraintsHold_iff_nativeAssertZeros (AddwChip.circuit (p := p))
       assignment.environment addwChip_lookups_empty).symm
 
-open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
-
 set_option maxHeartbeats 2000000 in
 theorem addwChip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.AddwCols (ZMod p))
+    (cols : AddwChip.Columns (ZMod p))
     (hbind : BindsChipOutput AddwChip.main env input offset cols) :
     List.Perm (nativeAccesses env ((AddwChip.main input).operations offset))
       (addwChipOracle.accesses cols) := by
   replace hbind := BindsChipOutput.ofElaborated (AddwChip.elaborated (p := p)) hbind
   rw [AddwChip.directOutput_eq] at hbind
-  simp only [ProvableStruct.structEvalLiteralProc, eval_extractedAddwOperation,
+  simp only [ProvableStruct.structEvalLiteralProc, eval_addwOperationColumns,
     eval_extractedU16MSBOperation] at hbind
   subst cols
   simp only [nativeAccesses]
@@ -597,8 +996,6 @@ theorem addwChip_interactions_faithful
       GeneralFormalCircuit.toSubcircuit_interactions, circuit_norm]
   rw [hunexpected]
   simp only [List.map_nil, List.append_nil]
-  simp only [ChipOracle.accesses, ChipOracle.nativeInteractions,
-    addwChipOracle, ChipOracle.identity, id_eq]
   apply addwcols_interactions_faithful_syntactic
   all_goals
     simp only [eval_cpuState, Readers.ALUTypeReader.eval_cols,
@@ -609,7 +1006,7 @@ theorem addwChip_interactions_faithful
 
 set_option maxHeartbeats 2000000 in
 theorem addwChip_interactions_constructive
-    (rustCols : Extracted.AddwCols (ZMod p)) (data : ProverData (ZMod p)) :
+    (rustCols : Extracted.AddwOracle.AddwCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := addwChipRowCodec.assignment
       (addwChipOracle.deconfigure rustCols) data
     List.Perm
@@ -636,7 +1033,7 @@ theorem addwChip_interactions_constructive
     Air.Flat.Component.rowOffset_mk, AddwChip.circuit_main_eq] using hlegacy
 
 theorem addwChip_faithful :
-    ChipFaithful (p := p) AddwChip.Inputs Extracted.AddwCols Extracted.AddwCols
+    ChipFaithful (p := p) AddwChip.Inputs AddwChip.Columns Extracted.AddwOracle.AddwCols
       AddwChip.circuit addwChipRowCodec addwChipOracle where
   constraints := addwChip_constraints_constructive (p := p)
   interactions := fun rustCols data _ =>

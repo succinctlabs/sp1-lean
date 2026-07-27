@@ -1,7 +1,5 @@
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.FormalModel.Contracts.DivRem
-import SP1Clean.Extracted.AddwChip
-import SP1Clean.Extracted.BitwiseChip
 import SP1Clean.Extracted.ShiftLeftChip
 import SP1Clean.Extracted.ShiftRightChip
 import SP1Clean.FormalModel.Contracts.DivRemColumns
@@ -183,7 +181,6 @@ end SP1Clean.SubChip
 
 namespace SP1Clean.AddwChip
 
-open Extracted (AddwCols)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The RV64 `ADDW` function equals the gadget's `signExtend 64 (setWidth 32 (rs1 + rs2))` form:
@@ -196,8 +193,19 @@ lemma rv64_addw_eq (x y : BitVec 64) :
   simp only [BitVec.toNat_add, BitVec.extractLsb'_toNat, BitVec.toNat_setWidth, Nat.shiftRight_zero]
   omega
 
+/-- Native ADDW-chip row. The reader blocks reuse the project substrate; only the arithmetic block is
+owned by the local Lean gadget (two witnessed low limbs + the composed sign-bit block).
+`Faithful.AddwChip.addwChipReconfigure` is the sole bridge to Rust's separately generated whole-chip
+row. -/
+structure Columns (F : Type) where
+  is_real : F
+  state : Extracted.CPUState F
+  adapter : Extracted.ALUTypeReader F
+  addw_operation : AddwOperation.Columns F
+deriving ProvableStruct
+
 /-- The `is_real` selector and the threaded reader column blocks `state`/`adapter` (ADDW's adapter is the
-immediate-capable `ALUTypeReader`, per `Extracted/AddwChip.lean`, unlike SUBW's `RTypeReader`). The
+immediate-capable `ALUTypeReader`, unlike SUBW's `RTypeReader`). The
 `rs1`/`rs2` operands are projected from the adapter register slots — see `Inputs.op_b_val` below. -/
 structure Inputs (F : Type) where
   is_real : F
@@ -214,7 +222,7 @@ column (cf. `SubwChip`/`AddChip`). `@[reducible]` so proofs see through to the a
 
 /-- The sign-extended W result word the reader writes for `rd`: the two low limbs `addw_operation.value`
 plus the sign-fill `msb·0xFFFF` in the high two limbs (= the gadget's `AddwOperation.resultWord`). -/
-def resultWord (cols : AddwCols (ZMod p)) : Word (ZMod p) :=
+def resultWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.addw_operation.value[0], cols.addw_operation.value[1],
      cols.addw_operation.msb.msb * 65535, cols.addw_operation.msb.msb * 65535]
 
@@ -223,7 +231,7 @@ def resultWord (cols : AddwCols (ZMod p)) : Word (ZMod p) :=
 `19`, `rd` write the sign-extended W result `resultWord`), the proven `is_real`-binary fact, and the
 `is_real`-gated arithmetic meaning — on real rows the result word is the RV64 `ADDW` of the operands
 (`RV64.addw op_c_val op_b_val` — the low-32 add sign-extended to 64). Vacuous on padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : AddwCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.ALUTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,

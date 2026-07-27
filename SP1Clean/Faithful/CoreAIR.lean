@@ -1,7 +1,7 @@
 import SP1Clean.Extracted.AluX0Chip
 import SP1Clean.Extracted.ChipOracle.Addi
-import SP1Clean.Extracted.AddwChip
-import SP1Clean.Extracted.BitwiseChip
+import SP1Clean.Extracted.ChipOracle.Addw
+import SP1Clean.Extracted.ChipOracle.Bitwise
 import SP1Clean.Extracted.BranchChip
 import SP1Clean.Extracted.ChipOracle.Add
 import SP1Clean.Extracted.ChipOracle.Sub
@@ -13,7 +13,7 @@ import SP1Clean.Extracted.LoadDoubleChip
 import SP1Clean.Extracted.LoadHalfChip
 import SP1Clean.Extracted.LoadWordChip
 import SP1Clean.Extracted.LoadX0Chip
-import SP1Clean.Extracted.LtChip
+import SP1Clean.Extracted.ChipOracle.Lt
 import SP1Clean.Extracted.ChipOracle.Mul
 import SP1Clean.Extracted.ShiftLeftChip
 import SP1Clean.Extracted.ShiftRightChip
@@ -68,14 +68,14 @@ def MainRow (p : ℕ) [Fact p.Prime] : Table → Type
   | .divRem => DivRemOracle.DivRemCols (ZMod p)
   | .add => AddOracle.AddCols (ZMod p)
   | .addi => AddiOracle.AddiCols (ZMod p)
-  | .addw => AddwCols (ZMod p)
+  | .addw => AddwOracle.AddwCols (ZMod p)
   | .sub => SubOracle.SubCols (ZMod p)
   | .subw => SubwOracle.SubwCols (ZMod p)
-  | .bitwise => BitwiseCols (ZMod p)
+  | .bitwise => BitwiseOracle.BitwiseCols (ZMod p)
   | .mul => MulOracle.MulCols (ZMod p)
   | .shiftRight => ShiftRightCols (ZMod p)
   | .shiftLeft => ShiftLeftCols (ZMod p)
-  | .lt => LtCols (ZMod p)
+  | .lt => LtOracle.LtCols (ZMod p)
   | .aluX0 => AluX0Cols (ZMod p)
   | .loadByte => LoadByteColumns (ZMod p)
   | .loadHalf => LoadHalfColumns (ZMod p)
@@ -119,14 +119,14 @@ def assertions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .divRem => DivRemOracle.DivRemCols.asserts row.main
   | .add => AddOracle.AddCols.asserts row.main
   | .addi => AddiOracle.AddiCols.asserts row.main
-  | .addw => AddwCols.asserts row.main
+  | .addw => AddwOracle.AddwCols.asserts row.main
   | .sub => SubOracle.SubCols.asserts row.main
   | .subw => SubwOracle.SubwCols.asserts row.main
-  | .bitwise => BitwiseCols.asserts row.main
+  | .bitwise => BitwiseOracle.BitwiseCols.asserts row.main
   | .mul => MulOracle.MulCols.asserts row.main
   | .shiftRight => ShiftRightCols.asserts row.main
   | .shiftLeft => ShiftLeftCols.asserts row.main
-  | .lt => LtCols.asserts row.main
+  | .lt => LtOracle.LtCols.asserts row.main
   | .aluX0 => AluX0Cols.asserts row.main
   | .loadByte => LoadByteColumns.asserts row.main
   | .loadHalf => LoadHalfColumns.asserts row.main
@@ -164,14 +164,14 @@ def interactions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .divRem => DivRemOracle.DivRemCols.interactions row.main
   | .add => AddOracle.AddCols.interactions row.main
   | .addi => AddiOracle.AddiCols.interactions row.main
-  | .addw => AddwCols.interactions row.main
+  | .addw => AddwOracle.AddwCols.interactions row.main
   | .sub => SubOracle.SubCols.interactions row.main
   | .subw => SubwOracle.SubwCols.interactions row.main
-  | .bitwise => BitwiseCols.interactions row.main
+  | .bitwise => BitwiseOracle.BitwiseCols.interactions row.main
   | .mul => MulOracle.MulCols.interactions row.main
   | .shiftRight => ShiftRightCols.interactions row.main
   | .shiftLeft => ShiftLeftCols.interactions row.main
-  | .lt => LtCols.interactions row.main
+  | .lt => LtOracle.LtCols.interactions row.main
   | .aluX0 => AluX0Cols.interactions row.main
   | .loadByte => LoadByteColumns.interactions row.main
   | .loadHalf => LoadHalfColumns.interactions row.main

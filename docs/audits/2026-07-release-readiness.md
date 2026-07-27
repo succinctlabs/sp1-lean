@@ -91,6 +91,31 @@ reproducible immutable git pins is a **release blocker** tracked outside this ca
   directly (no namespace bridges needed). Grounding files needed ZERO changes (they consume the
   chips symbolically through `directOutput_eq`/`eval_columns`).
   CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem, Addi, Jalr, Jal, UType} — **9/25**.
+- **Addw + Bitwise + Lt — complete, all gates green** (one trivial fix round: a substring-level
+  script replacement left one `Var BitwiseCols` ascription behind in the Bitwise Native Defs;
+  every Faithful transformation compiled first try). `ALUTypeReader` joined the shared-struct and
+  imported-helper sets (first ALU-adapter oracles). Three distinct retirement outcomes exercised:
+  (1) **Addw** = the Subw pattern — `AddwOperation` → CHIP_ONLY, native `AddwOperation.Columns`
+  (shared `Extracted.U16MSBOperation` sub-block kept), `Faithful/Addw.lean` +
+  `Faithful/AddwChipAnchors.lean` retired (anchors folded in as private; the file-private
+  `aluTypeAssertions` copy kept unchanged); (2) **Bitwise** = a two-level native op rewire —
+  `BitwiseOperation` + `BitwiseU16Operation` both → CHIP_ONLY (importer evidence: after this
+  batch their only non-retired importers were the native op files + Contracts), native
+  `BitwiseOperation.Columns`/`BitwiseU16Operation.Columns` (shared `Extracted.U16toU8Operation`
+  low-byte blocks kept; `U16toU8OperationUnsafe` stays standalone), `Faithful/BitwiseOperation.lean`
+  + `Faithful/BitwiseU16Operation.lean` retired (their anchors had no external consumers);
+  (3) **Lt** = the Mul pattern — ALL sub-ops (`LtOperationSigned`, `LtOperationUnsigned`,
+  `U16CompareOperation`, `U16MSBOperation`) stay standalone (Branch/ShiftLeft/ShiftRight + the
+  DivRem oracle + `Faithful/LtOperationUnsigned.lean`'s cross-file consumers still import them),
+  `LtChip.Columns` keeps the shared `Extracted.LtOperationSigned` block, and the Faithful layer
+  gained eight one-line `ltOracle_*_eq` namespace bridges (af067f7d pattern) so every heavy
+  compare-op lemma stays stated once against the standalone modules. Bitwise/Lt native rows keep
+  Rust field order (no `is_real` column — flag-sum selectors), matching the Mul precedent. All
+  three whole-trace conformance anchors now audit the reconfigure maps cell-for-cell (`lake test`
+  green); probe −12 entries (the retired Addw/Bitwise transitional anchors); grounding files again
+  needed ZERO changes.
+  CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem, Addi, Jalr, Jal, UType, Addw, Bitwise, Lt} —
+  **12/25**.
 
 ## Phase 3 — audit findings
 

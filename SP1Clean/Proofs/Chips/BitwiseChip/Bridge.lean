@@ -127,7 +127,7 @@ theorem correct_xori_native
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (AND): a real Bitwise chip row with `is_and = 1` reaches the Sail `AND`. -/
 theorem bitwise_chip_reaches_sail_and
-    (input : BitwiseChip.Inputs (ZMod p)) (cols : Extracted.BitwiseCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : BitwiseChip.Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1) (h_and : cols.is_and = 1)
     (h_chip : BitwiseChip.Spec input cols data)
@@ -143,7 +143,7 @@ theorem bitwise_chip_reaches_sail_and
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (OR): a real Bitwise chip row with `is_or = 1` reaches the Sail `OR`. -/
 theorem bitwise_chip_reaches_sail_or
-    (input : BitwiseChip.Inputs (ZMod p)) (cols : Extracted.BitwiseCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : BitwiseChip.Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1) (h_or : cols.is_or = 1)
     (h_chip : BitwiseChip.Spec input cols data)
@@ -159,7 +159,7 @@ theorem bitwise_chip_reaches_sail_or
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (XOR): a real Bitwise chip row with `is_xor = 1` reaches the Sail `XOR`. -/
 theorem bitwise_chip_reaches_sail_xor
-    (input : BitwiseChip.Inputs (ZMod p)) (cols : Extracted.BitwiseCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : BitwiseChip.Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1) (h_xor : cols.is_xor = 1)
     (h_chip : BitwiseChip.Spec input cols data)
@@ -176,7 +176,7 @@ omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (ANDI): a real Bitwise chip row with `is_and = 1` whose `op_c` is the sign-extended
 immediate (`h_dec`) reaches the Sail `ANDI`. -/
 theorem bitwise_chip_reaches_sail_andi
-    (input : BitwiseChip.Inputs (ZMod p)) (cols : Extracted.BitwiseCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : BitwiseChip.Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1) (h_and : cols.is_and = 1)
     (h_chip : BitwiseChip.Spec input cols data)
@@ -192,7 +192,7 @@ theorem bitwise_chip_reaches_sail_andi
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (ORI): a real Bitwise chip row with `is_or = 1` and immediate `op_c` reaches the Sail `ORI`. -/
 theorem bitwise_chip_reaches_sail_ori
-    (input : BitwiseChip.Inputs (ZMod p)) (cols : Extracted.BitwiseCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : BitwiseChip.Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1) (h_or : cols.is_or = 1)
     (h_chip : BitwiseChip.Spec input cols data)
@@ -208,7 +208,7 @@ theorem bitwise_chip_reaches_sail_ori
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (XORI): a real Bitwise chip row with `is_xor = 1` and immediate `op_c` reaches the Sail `XORI`. -/
 theorem bitwise_chip_reaches_sail_xori
-    (input : BitwiseChip.Inputs (ZMod p)) (cols : Extracted.BitwiseCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : BitwiseChip.Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1) (h_xor : cols.is_xor = 1)
     (h_chip : BitwiseChip.Spec input cols data)
@@ -234,7 +234,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- **Bitwise's committed bus view** — the chip-agnostic `RowView` (opcode `is_xor·3 + is_or·4 + is_and·5`,
 the `pc+4` straight-line next-pc, the reassembled result word as `rdWrite`). Standalone so `BitwiseChip.advance`
 can be supplied *as* `kind.advance` (see `AddChip.rowView`). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.BitwiseCols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real,
     BitwiseU16Operation.resultWord cols.bitwise_operation.bitwise_operation.result,
@@ -251,7 +251,7 @@ not the `Spec`): the pc-limb bound, the `imm_c` binary, the **at-least-one-flag*
 the program-bus decode, not the chip — see the op-determination note), and the immediate binding
 `imm_c=1 → op_c_memory.prev_value = op_c` (the `ALUTypeReader`'s immediate-consistency constraint). Stated to
 match the `ChipKind.advance` obligation exactly, so `kind.advance := some (PLift.up advance)` type-checks. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.BitwiseCols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1)
     (hspec : Spec inp cols data)
@@ -342,7 +342,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.BitwiseCols (ZMod p)) 
 def kind : Soundness.ChipKind p where
   name := "Bitwise"
   Inputs := BitwiseChip.Inputs
-  Cols := Extracted.BitwiseCols
+  Cols := BitwiseChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧ cols.state.pc[0].val < 2 ^ 16 ∧

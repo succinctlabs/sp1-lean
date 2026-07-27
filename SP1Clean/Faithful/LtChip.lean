@@ -1,4 +1,5 @@
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Extracted.ChipOracle.Lt
 import SP1Clean.Faithful.LtOperationUnsigned
 import SP1Clean.Faithful.U16MSBOperation
 import SP1Clean.Proofs.Chips.LtChip.Formal
@@ -657,22 +658,153 @@ theorem ltSigned_assertions_exact
   rw [eval_vec4_literal, eval_vec4_literal]
   simp only [CircuitType.eval_expr, eval_sub, Expression.eval]
 
-def ltChipOracle :
-    ChipOracle (ZMod p) Extracted.LtCols Extracted.LtCols :=
-  ChipOracle.identity Extracted.LtCols.asserts Extracted.LtCols.interactions
+/-- Rebuild the shared standalone `LtOperationSigned` block as the byte-identical struct embedded in
+the generated Lt oracle namespace. -/
+def ltOracleOperation {F : Type} (cols : Extracted.LtOperationSigned F) :
+    Extracted.LtOracle.LtOperationSigned F :=
+  { result :=
+      { u16_compare_operation := { bit := cols.result.u16_compare_operation.bit }
+        u16_flags := cols.result.u16_flags
+        not_eq_inv := cols.result.not_eq_inv
+        comparison_limbs := cols.result.comparison_limbs }
+    b_msb := { msb := cols.b_msb.msb }
+    c_msb := { msb := cols.c_msb.msb } }
+
+/-- Inverse of `ltOracleOperation`. -/
+def ltNativeOperation {F : Type} (cols : Extracted.LtOracle.LtOperationSigned F) :
+    Extracted.LtOperationSigned F :=
+  { result :=
+      { u16_compare_operation := { bit := cols.result.u16_compare_operation.bit }
+        u16_flags := cols.result.u16_flags
+        not_eq_inv := cols.result.not_eq_inv
+        comparison_limbs := cols.result.comparison_limbs }
+    b_msb := { msb := cols.b_msb.msb }
+    c_msb := { msb := cols.c_msb.msb } }
+
+/-- Whole-chip row reconfiguration. The reader blocks and the flag columns are already the canonical
+generated substrate; the compare block is copied into Rust's chip-private operation row. This is not
+an operation-level faithfulness claim. -/
+def ltChipReconfigure {F : Type} (cols : LtChip.Columns F) :
+    Extracted.LtOracle.LtCols F :=
+  { state := cols.state
+    adapter := cols.adapter
+    is_slt := cols.is_slt
+    is_sltu := cols.is_sltu
+    lt_operation := ltOracleOperation cols.lt_operation }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def ltChipDeconfigure {F : Type} (cols : Extracted.LtOracle.LtCols F) :
+    LtChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    is_slt := cols.is_slt
+    is_sltu := cols.is_sltu
+    lt_operation := ltNativeOperation cols.lt_operation }
+
+/-- SP1 Rust's complete Lt-chip oracle, viewed from the native Lean row. -/
+def ltChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F LtChip.Columns Extracted.LtOracle.LtCols where
+  reconfigure := ltChipReconfigure
+  deconfigure := ltChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.LtOracle.LtCols.asserts
+  interactions := Extracted.LtOracle.LtCols.interactions
+
+/- Namespace bridges between the Lt oracle's embedded chip-private helper copies and the canonical
+standalone generated modules. The two bodies are rendered from the same compiler output, so each
+bridge is a definitional unfolding, not a mathematical claim. They let every heavy compare-op lemma
+below stay stated once against the standalone modules (also consumed by the Branch chip family and
+the DivRem oracle bridges). -/
+
+private theorem ltOracle_u16compare_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b bit is_real : F) :
+    Extracted.LtOracle.U16CompareOperation.asserts a b ⟨bit⟩ is_real =
+      Extracted.U16CompareOperation.asserts a b ⟨bit⟩ is_real := by
+  rw [Extracted.LtOracle.U16CompareOperation.asserts,
+    Extracted.U16CompareOperation.asserts]
+
+private theorem ltOracle_u16compare_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b bit is_real : F) :
+    Extracted.LtOracle.U16CompareOperation.interactions a b ⟨bit⟩ is_real =
+      Extracted.U16CompareOperation.interactions a b ⟨bit⟩ is_real := by
+  rw [Extracted.LtOracle.U16CompareOperation.interactions,
+    Extracted.U16CompareOperation.interactions]
+
+private theorem ltOracle_u16msb_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.LtOracle.U16MSBOperation.asserts a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.asserts a ⟨msb⟩ is_real := by
+  rw [Extracted.LtOracle.U16MSBOperation.asserts,
+    Extracted.U16MSBOperation.asserts]
+
+private theorem ltOracle_u16msb_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.LtOracle.U16MSBOperation.interactions a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.interactions a ⟨msb⟩ is_real := by
+  rw [Extracted.LtOracle.U16MSBOperation.interactions,
+    Extracted.U16MSBOperation.interactions]
+
+private theorem ltOracle_ltUnsigned_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (bit : F) (u16_flags : Vector F 4) (not_eq_inv : F)
+    (comparison_limbs : Vector F 2) (is_real : F) :
+    Extracted.LtOracle.LtOperationUnsigned.asserts b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real =
+      Extracted.LtOperationUnsigned.asserts b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real := by
+  rw [Extracted.LtOracle.LtOperationUnsigned.asserts,
+    Extracted.LtOperationUnsigned.asserts]
+  simp only [ltOracle_u16compare_asserts_eq]
+
+private theorem ltOracle_ltUnsigned_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (bit : F) (u16_flags : Vector F 4) (not_eq_inv : F)
+    (comparison_limbs : Vector F 2) (is_real : F) :
+    Extracted.LtOracle.LtOperationUnsigned.interactions b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real =
+      Extracted.LtOperationUnsigned.interactions b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real := by
+  rw [Extracted.LtOracle.LtOperationUnsigned.interactions,
+    Extracted.LtOperationUnsigned.interactions]
+  simp only [ltOracle_u16compare_interactions_eq]
+
+private theorem ltOracle_ltSigned_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (bit : F) (u16_flags : Vector F 4) (not_eq_inv : F)
+    (comparison_limbs : Vector F 2) (bMsb cMsb is_signed is_real : F) :
+    Extracted.LtOracle.LtOperationSigned.asserts b cc
+        ⟨⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩, ⟨bMsb⟩, ⟨cMsb⟩⟩
+        is_signed is_real =
+      Extracted.LtOperationSigned.asserts b cc
+        ⟨⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩, ⟨bMsb⟩, ⟨cMsb⟩⟩
+        is_signed is_real := by
+  rw [Extracted.LtOracle.LtOperationSigned.asserts,
+    Extracted.LtOperationSigned.asserts]
+  simp only [ltOracle_u16msb_asserts_eq, ltOracle_ltUnsigned_asserts_eq]
+
+private theorem ltOracle_ltSigned_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (bit : F) (u16_flags : Vector F 4) (not_eq_inv : F)
+    (comparison_limbs : Vector F 2) (bMsb cMsb is_signed is_real : F) :
+    Extracted.LtOracle.LtOperationSigned.interactions b cc
+        ⟨⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩, ⟨bMsb⟩, ⟨cMsb⟩⟩
+        is_signed is_real =
+      Extracted.LtOperationSigned.interactions b cc
+        ⟨⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩, ⟨bMsb⟩, ⟨cMsb⟩⟩
+        is_signed is_real := by
+  rw [Extracted.LtOracle.LtOperationSigned.interactions,
+    Extracted.LtOperationSigned.interactions]
+  simp only [ltOracle_u16msb_interactions_eq, ltOracle_ltUnsigned_interactions_eq]
 
 def ltChipInput {F : Type} [Add F]
-    (cols : Extracted.LtCols F) : LtChip.Inputs F :=
+    (cols : LtChip.Columns F) : LtChip.Inputs F :=
   { is_real := cols.is_slt + cols.is_sltu
     state := cols.state
     adapter := cols.adapter }
 
-def ltChipLocals {F : Type} (cols : Extracted.LtCols F) : Vector F 12 :=
+def ltChipLocals {F : Type} (cols : LtChip.Columns F) : Vector F 12 :=
   Vector.cast (by rfl)
     (#v[cols.is_slt, cols.is_sltu] ++ toElements cols.lt_operation)
 
 def ltChipPhysicalRow {F : Type} [Add F]
-    (cols : Extracted.LtCols F) : Array F :=
+    (cols : LtChip.Columns F) : Array F :=
   inputFirstRow (ltChipInput cols) (ltChipLocals cols)
 
 def ltChipOperationOfLocals {F : Type} (locals : Vector F 12) :
@@ -680,20 +812,20 @@ def ltChipOperationOfLocals {F : Type} (locals : Vector F 12) :
   fromElements (Vector.cast (by rfl) (locals.drop 2))
 
 def ltChipColumnsOfInput {F : Type} (input : LtChip.Inputs F)
-    (locals : Vector F 12) : Extracted.LtCols F :=
+    (locals : Vector F 12) : LtChip.Columns F :=
   ⟨input.state, input.adapter, locals[0], locals[1],
     ltChipOperationOfLocals locals⟩
 
-private theorem ltChipLocals_zero {F : Type} (cols : Extracted.LtCols F) :
+private theorem ltChipLocals_zero {F : Type} (cols : LtChip.Columns F) :
     (ltChipLocals cols)[0] = cols.is_slt := by
   simp [ltChipLocals]
 
-private theorem ltChipLocals_one {F : Type} (cols : Extracted.LtCols F) :
+private theorem ltChipLocals_one {F : Type} (cols : LtChip.Columns F) :
     (ltChipLocals cols)[1] = cols.is_sltu := by
   simp [ltChipLocals]
 
 private theorem ltChipOperationOfLocals_roundtrip {F : Type}
-    (cols : Extracted.LtCols F) :
+    (cols : LtChip.Columns F) :
     ltChipOperationOfLocals (ltChipLocals cols) = cols.lt_operation := by
   refine (ProvableType.ext_iff (α := Extracted.LtOperationSigned) _ _).mpr
     (fun i hi => ?_)
@@ -703,10 +835,10 @@ private theorem ltChipOperationOfLocals_roundtrip {F : Type}
   simp
 
 theorem ltChipColumnsOfInput_roundtrip {F : Type} [Add F]
-    (cols : Extracted.LtCols F) :
+    (cols : LtChip.Columns F) :
     ltChipColumnsOfInput (ltChipInput cols) (ltChipLocals cols) = cols := by
   unfold ltChipColumnsOfInput ltChipInput
-  rw [Extracted.LtCols.mk.injEq]
+  rw [LtChip.Columns.mk.injEq]
   constructor
   · rfl
   constructor
@@ -749,7 +881,7 @@ theorem eval_ltChipDirectOutput
   rw [LtChip.directOutput_eq]
   rw [← CircuitType.eval_expression, LtChip.eval_columns]
   unfold ltChipColumnsOfInput
-  rw [Extracted.LtCols.mk.injEq]
+  rw [LtChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input locals data
   rw [LtChip.eval_inputs, LtChip.Inputs.mk.injEq] at hinputEval
@@ -766,7 +898,7 @@ theorem eval_ltChipDirectOutput
   · exact eval_ltChipOperationOfLocals input locals data
 
 def ltChipRowCodec :
-    ChipRowCodec LtChip.Inputs Extracted.LtCols
+    ChipRowCodec LtChip.Inputs LtChip.Columns
       (LtChip.circuit (p := p)) where
   assignment cols data := {
     row := ltChipPhysicalRow cols
@@ -902,8 +1034,8 @@ private theorem forall_nil_iff {alpha : Type} (pred : alpha → Prop) :
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem ltCols_asserts_decompose
-    (cols : Extracted.LtCols (ZMod p)) :
-    Extracted.LtCols.asserts cols =
+    (cols : LtChip.Columns (ZMod p)) :
+    Extracted.LtOracle.LtCols.asserts (ltChipReconfigure cols) =
       Extracted.LtOperationSigned.asserts
         #v[cols.adapter.op_b_memory.prev_value[0],
           cols.adapter.op_b_memory.prev_value[1],
@@ -929,14 +1061,16 @@ private theorem ltCols_asserts_decompose
         (cols.is_slt + cols.is_sltu) *
           (cols.is_slt + cols.is_sltu - 1),
         cols.adapter.op_a_0 ] := by
-  rw [Extracted.LtCols.asserts]
+  rw [Extracted.LtOracle.LtCols.asserts]
+  dsimp only [ltChipReconfigure, ltOracleOperation]
+  simp only [ltOracle_ltSigned_asserts_eq]
   rw [ltSigned_eta, cpuState_eta, aluType_eta, vec3_eta]
   simp only [zero_add]
 
 set_option maxHeartbeats 200000 in
 theorem ltChip_constraints_faithful
     (env : Environment (ZMod p)) (input : Var LtChip.Inputs (ZMod p))
-    (offset : ℕ) (cols : Extracted.LtCols (ZMod p))
+    (offset : ℕ) (cols : LtChip.Columns (ZMod p))
     (hbind : BindsChipOutput LtChip.main env input offset cols)
     (hinputReal : Expression.eval env input.is_real =
       Expression.eval env (lt_chip_is_real offset)) :
@@ -1055,8 +1189,7 @@ theorem ltChip_constraints_faithful
       Expression.eval env (input.is_real - lt_chip_is_real offset) = 0 := by
     simp only [eval_sub, hinputReal, sub_self]
   rw [lt_chip_constraints_decompose]
-  simp only [ChipOracle.nativeAssertZeros, ltChipOracle,
-    ChipOracle.identity, id_eq]
+  simp only [ChipOracle.nativeAssertZeros, ltChipOracle]
   rw [ltCols_asserts_decompose]
   simp only [List.forall_append, List.forall_cons]
   rw [forall_nil_iff]
@@ -1180,7 +1313,7 @@ theorem ltChip_constraints_faithful
 
 set_option maxHeartbeats 200000 in
 private theorem ltChipRowCodec_inputReal
-    (cols : Extracted.LtCols (ZMod p)) (data : ProverData (ZMod p)) :
+    (cols : LtChip.Columns (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := ltChipRowCodec.assignment cols data
     Expression.eval assignment.environment
         (⟨LtChip.circuit (p := p)⟩ :
@@ -1223,7 +1356,7 @@ private theorem ltChipRowCodec_inputReal
 
 set_option maxHeartbeats 200000 in
 theorem ltChip_constraints_constructive
-    (rustCols : Extracted.LtCols (ZMod p)) (data : ProverData (ZMod p)) :
+    (rustCols : Extracted.LtOracle.LtCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := ltChipRowCodec.assignment
       (ltChipOracle.deconfigure rustCols) data
     List.Forall (· = 0) (ltChipOracle.assertZeros rustCols) ↔
@@ -1271,8 +1404,8 @@ theorem ltChip_constraints_constructive
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem ltCols_interactions_decompose
-    (cols : Extracted.LtCols (ZMod p)) :
-    Extracted.LtCols.interactions cols =
+    (cols : LtChip.Columns (ZMod p)) :
+    Extracted.LtOracle.LtCols.interactions (ltChipReconfigure cols) =
       Extracted.LtOperationSigned.interactions
         #v[cols.adapter.op_b_memory.prev_value[0],
           cols.adapter.op_b_memory.prev_value[1],
@@ -1293,7 +1426,9 @@ private theorem ltCols_interactions_decompose
         #v[cols.lt_operation.result.u16_compare_operation.bit, 0, 0, 0]
         cols.adapter (cols.is_slt + cols.is_sltu)
         (cols.is_slt + cols.is_sltu) := by
-  rw [Extracted.LtCols.interactions]
+  rw [Extracted.LtOracle.LtCols.interactions]
+  dsimp only [ltChipReconfigure, ltOracleOperation]
+  simp only [ltOracle_ltSigned_interactions_eq]
   rw [ltSigned_eta, cpuState_eta, aluType_eta, vec3_eta]
   simp only [zero_add, List.append_nil]
 
@@ -1342,7 +1477,7 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 set_option maxHeartbeats 200000 in
 theorem ltChip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var LtChip.Inputs (ZMod p))
-    (offset : ℕ) (cols : Extracted.LtCols (ZMod p))
+    (offset : ℕ) (cols : LtChip.Columns (ZMod p))
     (hbind : BindsChipOutput LtChip.main env input offset cols)
     (hinputReal : Expression.eval env input.is_real =
       Expression.eval env (lt_chip_is_real offset)) :
@@ -1370,7 +1505,7 @@ theorem ltChip_interactions_faithful
   rw [LtChip.directOutput_eq] at hbind
   rw [← ProvableStruct.eval_eq_eval, LtChip.eval_columns] at hbind
   simp only [ProvableType.eval_field] at hbind
-  let rustCols : Extracted.LtCols (ZMod p) :=
+  let rustCols : LtChip.Columns (ZMod p) :=
     { state := Eval.eval env input.state
       adapter := Eval.eval env input.adapter
       is_slt := Expression.eval env (lt_chip_is_slt offset)
@@ -1379,7 +1514,7 @@ theorem ltChip_interactions_faithful
   change rustCols = cols at hbind
   subst cols
   let rustAccesses :=
-    (Extracted.LtCols.interactions rustCols).map
+    (Extracted.LtOracle.LtCols.interactions (ltChipReconfigure rustCols)).map
       Extracted.Interaction.toAccess
   have hReal : Expression.eval env input.is_real =
       env.get offset + env.get (offset + 1) := by
@@ -1423,8 +1558,7 @@ theorem ltChip_interactions_faithful
       GeneralFormalCircuit.toSubcircuit_interactions, circuit_norm]
   rw [hunexpected]
   simp only [List.map_nil, List.append_nil]
-  simp only [ChipOracle.accesses, ChipOracle.nativeInteractions,
-    ltChipOracle, ChipOracle.identity, id_eq]
+  simp only [ChipOracle.accesses, ChipOracle.nativeInteractions, ltChipOracle]
   rw [LtChip.interactionsWith_state_eq, LtChip.interactionsWith_byte_eq,
     LtChip.interactionsWith_memory_eq, LtChip.interactionsWith_program_eq]
   have hStatePull :
@@ -1646,7 +1780,7 @@ theorem ltChip_interactions_faithful
 
 set_option maxHeartbeats 200000 in
 theorem ltChip_interactions_constructive
-    (rustCols : Extracted.LtCols (ZMod p)) (data : ProverData (ZMod p)) :
+    (rustCols : Extracted.LtOracle.LtCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := ltChipRowCodec.assignment
       (ltChipOracle.deconfigure rustCols) data
     List.Perm
@@ -1679,8 +1813,8 @@ theorem ltChip_interactions_constructive
     Air.Flat.Component.rowOffset_mk, LtChip.circuit_main_eq] using hlegacy
 
 theorem ltChip_faithful :
-    ChipFaithful (p := p) LtChip.Inputs Extracted.LtCols
-      Extracted.LtCols LtChip.circuit ltChipRowCodec ltChipOracle where
+    ChipFaithful (p := p) LtChip.Inputs LtChip.Columns
+      Extracted.LtOracle.LtCols LtChip.circuit ltChipRowCodec ltChipOracle where
   constraints := ltChip_constraints_constructive (p := p)
   interactions := fun rustCols data _ =>
     LookupAccessList.active_perm

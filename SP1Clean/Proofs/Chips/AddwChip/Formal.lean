@@ -10,7 +10,6 @@ import Clean.Air.Circuit
 namespace SP1Clean.AddwChip
 
 open Circuit
-open Extracted (AddwCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -173,8 +172,8 @@ theorem opCPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
   simp [exposedMemoryInteractions]
 
 /-- The ADDW chip row as a `GeneralFormalCircuit`: semantic contract, composing the witnessed gadget +
-the CPUState + the immediate-capable register reader; output is the extracted `AddwCols` column struct. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs AddwCols :=
+the CPUState + the immediate-capable register reader; output is the native `Columns` row. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
