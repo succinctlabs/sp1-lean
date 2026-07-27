@@ -171,7 +171,7 @@ theorem whose target is the complete generated interpreter inherits dependencies
 its reduction lemmas. The raw census discloses this boundary instead of describing the headline theorem
 as depending only on three logical axioms.
 
-There are 29 textual `native_decide` occurrences in the test library and none in the main library.
+There are 51 textual `native_decide` occurrences in the test library (the conformance batteries plus the `NonVacuity.lean` chip-assumptions witnesses) and none in the main library.
 They check witness and complete-trace conformance and are not imported by the soundness theorem.
 
 ## Trusted or externally assumed components

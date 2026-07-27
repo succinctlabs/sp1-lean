@@ -374,9 +374,13 @@ The capstone quantifies over a `Machine.SP1MachineModel` (scheduling + boot pack
 by `UsesOrdinarySchedule` (ordinary instructions take the 8-tick schedule). Only the schedule
 field is consumed by the shard-local theorem; boot reachability is deliberately deferred to a
 later anchor. Two honest notes: (i) no `SP1MachineModel` instance is currently constructed
-in-repo, so the theorem is a parametric conditional not yet exercised end-to-end (a witness
-construction is filed work — audit finding F-A8-04/F-A9-02); (ii) the shard-local initial state
-comes from the boundary binding, not from `model.boot`.
+in-repo, so the theorem is a parametric conditional not yet exercised end-to-end — the
+configured-state core is already witnessed (`isInitialState_nonvacuous`,
+`FormalModel/Trace/Witness.lean`), but the model's total boot-loader field (ROM+image loading for
+arbitrary well-formed programs) is filed follow-up work, and an empty-shard witness of the full
+native relation was assessed feasible but is not yet constructed (audit findings
+F-A8-04/F-A9-02); (ii) the shard-local initial state comes from the boundary binding, not from
+`model.boot`.
 
 ### 7.3 What is *not* claimed at this layer
 
@@ -462,7 +466,8 @@ SP1's own field (KoalaBear, `p = 2130706433`):
 
 - **Witness conformance** (11 operation anchors): the native Lean witness functions reproduce,
   on every vector dumped from SP1's real `populate`, the exact column values Rust wrote.
-- **Whole-chip trace conformance** (10 chips, growing with the oracle migration): the chip's
+- **Whole-chip trace conformance** (10 chips today; extending it to all 25 is documented
+  follow-up work in `docs/agents/extraction.md`): the chip's
   *own* `main` acts as a trace generator — witness columns from its witness closures, layout from
   its output struct — and the resulting full padded matrix is checked **cell-for-cell** by
   `native_decide` against a matrix dumped from SP1's real `MachineAir::generate_trace`. For
@@ -476,6 +481,11 @@ These anchors are the project's only `native_decide` uses (they trust the Lean c
 the main library, and disclosed per-anchor in the axiom census. What conformance establishes:
 populate fidelity and non-vacuity evidence on real prover data. What it does not: proof. The two
 layers are complementary by construction. (Provenance caveat for the trace batteries: §4.3.)
+
+Additionally, `SP1CleanTest/NonVacuity.lean` witnesses the satisfiability of every non-trivial
+chip `Assumptions` (all 20 chips whose assumptions are not literally `True`, instantiated at
+SP1's field with the gated store conjuncts exercised on real rows) — closing the "could a chip's
+assumptions be unsatisfiable?" vacuity question at the chip level.
 
 ## 10. Trust base
 

@@ -8,5 +8,10 @@
 # +288: exact whole-chip list faithfulness for all 25 instruction AIRs (+238 Faithful sites),
 # completed 4.31 chip proofs (+30 Proofs), and the timed-grounding rollout (+20 Soundness/Native);
 # these are folded generated-expression closures, not higher ceilings on existing declarations.
-SP1Clean 749
+# +104 (2026-07, oracle-migration completion): the 25 generated ChipOracle modules carry the
+# uniform 8M elaboration boundary per asserts/interactions definition (173 sites vs the 74 in the
+# retired legacy Extracted files — the oracle form embeds chip-private op copies, hence more
+# opaque-definition headers), plus a net +2 hand-written in the Faithful DivRem/Mul/Addw KEEP-set
+# from the anchor fold-ins. Generated elaboration boundaries, not raised ceilings.
+SP1Clean 853
 SP1CleanTest 16

@@ -5,12 +5,12 @@ Snapshot date: 2026-07-27. The raw per-declaration output is
 
 ## Result
 
-- 513 released declarations are probed.
+- 478 released declarations are probed (2026-07 oracle-migration snapshot; the transitional per-op anchors' probes retired with their files).
 - No source proof deferrals occur in `SP1Clean/`.
 - No project `axiom` declarations occur in `SP1Clean/`.
 - No probed declaration carries `sorryAx`.
 - `skipKernelTC` and `native_decide` are absent from the main library.
-- 29 textual `native_decide` uses are isolated in `SP1CleanTest/`.
+- 51 textual `native_decide` uses are isolated in `SP1CleanTest/` (the witness/trace conformance batteries plus the `NonVacuity.lean` chip-assumptions witnesses).
 
 There is no direct-admission allowlist and no transitive `sorryAx` carrier allowlist. Both sets are
 empty.
