@@ -1,0 +1,262 @@
+# Cleanup profile — the house rules for `/cleanup` and `/cleanup-all` in this repo
+
+**Read this before the `mathlib-quality` plugin's own references. Where they conflict, this file
+wins.** The plugin (`commands/cleanup.md`, `references/golfing-rules.md`,
+`references/cleanup-gates.md`) is written for **mathlib**. This repo is a Clean-native formal
+verification of SP1's RISC-V chips with different — and in several places *opposite* — invariants.
+Applying the stock workflow unmodified breaks the build and corrupts the audit surface.
+
+Companion reading, in order: Clean's `doc/performance-problems.md` and `doc/proving-guide.md`
+(upstream authority), then `docs/agents/proof-patterns.md` (this repo's landmines and the
+"Golf & cleanup discipline" section), then `AGENTS.md`.
+
+---
+
+## 1. Why the stock rules are overridden
+
+| Stock rule | What it does here |
+|---|---|
+| Phase 3.5 / rule 3.7 — delete every `set_option maxHeartbeats`, "no exceptions" | **638** exist in `SP1Clean/`, ratcheted by `scripts/check_heartbeats.sh`. Deleting them fails the build and the guard. |
+| Rule 1.15 — unsqueeze terminal `simp only` → bare `simp` | Exact inverse of this repo's `maxHeartbeats` fold recipe; there is a tested KEEP-set (§5). |
+| Item 12 (hard gate) — split `∧` statements into `foo_left`/`foo_right` | As stock, it *deletes* a theorem and mints new names. `scripts/gen_axiom_probe.py` resolves its probe targets by **regex over source text**. Adopted here only in additive form (§4). |
+| Item 11 — make single-file declarations `private` | `gen_axiom_probe.py` **skips `private` decls** → silently shrinks the axiom census. |
+| Item 19 (hard gate) — rewrite `≥`→`≤` in statements and hypotheses | Changes statement text. `Faithful/*` are *syntactic* faithfulness anchors. |
+| Item 5 (hard gate) — forced renames, "existing convention preserved is NOT acceptable" | Breaks `scripts/nolints.json` (FQN-keyed), the `gen_axiom_probe.py` regexes, and `scripts/check_report_citations.sh` (15 hard-coded file+declaration pairs). |
+| Phase 5a — delete "wrapper" lemmas mathlib provides | Targets this repo's deliberate one-line namespace bridges — "shared substrate … not migration debt" (AGENTS.md). |
+| Item 10 — strip docstrings from private/aux declarations | Destroys the institutional memory the landmine notes carry. |
+| A.1 copyright header, `lake exe cache get`, `lake exe runLinter` | Not this project's conventions or commands (§7). |
+
+---
+
+## 2. Hard prohibitions
+
+A violation is a defect: revert and re-dispatch.
+
+1. **Never change an existing declaration's statement.** No `≥`→`≤` rewrite (kills item 19); no
+   restating a conjunction; no inline hypothesis generalisation (kills step 2.6e — generalisation
+   candidates are *reported* to `DEFERRED.md`, never applied). Adding a *new* split lemma is
+   permitted, see §4.
+2. **Never change a declaration's name or visibility.** Renames are queued only (§6); `private` is
+   never added or removed.
+3. **Never delete a declaration.** This kills Phase 5a items 1–3 (mathlib replacement, junk-def
+   inlining, single-use `∃`-lemma inlining).
+4. **Never touch** `SP1Clean/Extracted/**`, `SP1CleanTest/**/Vectors/**`, `*TraceVectors.lean`,
+   `scripts/axiom_probe.lean`, or `SP1Clean.lean` (the root import index). No file moves.
+5. **Never introduce** `native_decide` into `SP1Clean/`, or `skipKernelTC` anywhere.
+6. **Never unsqueeze `simp only` → `simp`.** The permitted direction is `simp` → `simp only`, and
+   only outside the KEEP-set (§5).
+7. **Never add mathlib copyright/authors headers.** **Never delete `/-! ## … -/` subsection
+   dividers** — this repo uses them structurally inside large files.
+8. **`Faithful/**` and `Native/Operations/*/RawSpec.lean` are conservative-only.** Permitted: drop
+   `by exact`, drop a dead `let`, `from by` → `by`. Never restructure proof terms or statement
+   forms — they are *syntactic* faithfulness anchors.
+9. **Never raise a `maxHeartbeats` ceiling.** The performance track (§8) only lowers or removes.
+10. **Never create a top-level `SP1Clean/*.lean` module.** The eight style linters live on the
+    *pillar* libs in `lakefile.toml`; the umbrella `SP1Clean` lib carries no `moreLeanArgs`, so a
+    module outside a pillar subdirectory would silently escape linting.
+
+---
+
+## 3. Comment discipline (stock item 9, as adopted)
+
+**Strip** narrative play-by-play: `-- now we rewrite`, `-- apply the lemma`, `-- case 2`,
+`-- unfold the definition`.
+
+**Keep**, always:
+
+- anything documenting a **landmine or invariant** — the `2^64` and `id (ZMod p)` notes on
+  Shift/DivRem/Mul, the `omit [Fact (2 ^ 17 < p)]` rationale, kernel deep-recursion warnings;
+- anything explaining **why** a proof is shaped the way it is — a roadmap over a dense body, or a
+  note that a `have` is load-bearing for a downstream `omega`;
+- module docstrings, and docstrings on any declaration regardless of visibility.
+
+Precedent: a blanket comment-strip on `Proofs/Chips/ShiftLeftChip/Soundness/Sll.lean` was
+**reverted** for destroying exactly this. The rule is **strip narration, keep rationale** — on a
+dense proof, when in doubt, keep it.
+
+---
+
+## 4. Additive conjunction splits (stock item 12, as adopted)
+
+Where a declaration's conclusion is a conjunction, **add** `foo_left` / `foo_right` (or
+better-named projections) proved from the original, and **leave `foo` byte-identical**. Call sites
+may migrate to the projections; none are required to. Nothing is deleted, no statement changes,
+and the original name stays resolvable for `check_report_citations.sh` and the probe globs.
+
+> **Probe-count consequence.** `gen_axiom_probe.py` matches *every* named theorem in
+> `FormalModel/Contracts/DivRem.lean` and `Proofs/Chips/DivRemChip/Cases.lean`. New lemmas in those
+> two files enlarge the probe set. That is acceptable — `run_audit.sh` checks internal consistency
+> (parsed entries == `#print axioms` lines), not a fixed count — but the probe must be regenerated
+> and `docs/snapshots/axiom-ledger.md` updated at the end of the campaign, with the delta explained.
+
+---
+
+## 5. The `simp` → `simp only` KEEP-set
+
+Tested during the 2026-06 campaign, zero speedup — **do not sweep these**:
+
+```
+SP1Clean/Proofs/Operations/DivRemOperation/Core.lean
+SP1Clean/Native/Operations/DivRemOperation/OwnAsserts.lean
+SP1Clean/Native/Operations/MulOperation/RawSpec.lean
+SP1Clean/Proofs/Chips/MulChip/Formal.lean
+SP1Clean/Proofs/Operations/MulOperation/Formal.lean
+SP1Clean/Proofs/Chips/ShiftLeftChip/Core.lean      (the nlinarith farm)
+SP1Clean/Proofs/Chips/ShiftRightChip/Core.lean     (the nlinarith farm)
+SP1Clean/Proofs/Chips/ShiftLeftChip/Soundness/{Sll,Sllw}.lean
+SP1Clean/Proofs/Chips/ShiftRightChip/Soundness/{Sra,Sraw,Srl,Srlw}.lean
+SP1Clean/Math/Word.lean                             (toBitVec64)
+SP1Clean/Proofs/Sail/Advance.lean
+```
+
+`Faithful/**` is anchor-safe but **not mechanically safe** — per-theorem only, and the payoff is
+low. `Extracted/**` is out of scope; its only lever is `update_extracted.py`.
+
+---
+
+## 6. Load-bearing constructs that look dead
+
+Verify with `lean_goal`, or a build, before removing:
+
+- `have hp : 2 ^ 17 < p := Fact.out` and `have : 131072 < p` — feed a downstream `omega` that needs
+  the magnitude. A grep shows one occurrence (its own line), yet `omega` consumes it implicitly.
+- `haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩` — supplies an instance to
+  later `ZMod.val`/`omega` steps. There is deliberately **no** global `NeZero p` instance: a
+  `Fact (2 ^ 17 < p)`-derived one would make the pervasive `omit [Fact (2 ^ 17 < p)] in` clauses
+  illegal (`Model/ByteTable.lean:84`). Do not add one — it is an owner decision, not a drive-by.
+- `set_option linter.unusedSectionVars false in` before the `circuit_norm` `rfl`-lemmas.
+
+---
+
+## 7. Commands
+
+| Plugin says | Use here |
+|---|---|
+| `lake exe cache get` | *(nothing — do not run it)* |
+| `lake build` | `lake build SP1Clean`. **Pass = exit 0 AND zero `error:` AND zero `warning:` AND zero `info:` notes.** |
+| `lake exe runLinter` | `lake lint` (driver `scripts/sp1Lint.lean`; needs a completed build first) |
+| — | `lake test` — the `SP1CleanTest` conformance anchors, the only `native_decide` |
+| — | `scripts/run_audit.sh` — zero proof deferrals + the axiom census |
+| — | `scripts/check_no_native_decide.sh`, `scripts/check_no_skipkerneltc.sh`, `scripts/check_heartbeats.sh` |
+
+Two traps:
+
+- **`lake env lean <file>` is not a gate.** It exits 0 even on a Lean stack overflow, and it skips
+  the package's lean args, so it passes where `lake build` fails. It is sound only as a
+  *falsifier*: a reported error is real, but a clean run certifies nothing.
+- **The `ring` `info:` leak.** On some goals `ring` runs its `ring1` pass, fails, emits
+  `Try this: ring_nf`, then closes via the `ring_nf` fallback — the proof passes but the build is
+  no longer clean. Close those with `simp` (the `is_real` binary gate and `interval_cases` carry
+  goals), `ring_nf`, or the explicit lemma.
+
+---
+
+## 8. Performance track — investigate, don't ratchet
+
+638 hand-written `maxHeartbeats` lines on a ladder already in use (200k → 128M), distributed
+`Faithful` 305, `Proofs` 232, `Native` 54, `Soundness` 43, `Model` 3, `Math` 1.
+
+**The lead worth chasing:** `Faithful/` holds 48% of the ceilings but only ~115s of elaboration
+across 50 files, and a median downstream closure of 2. Many of those 8M ceilings are vestigial —
+cheap and safe to lower.
+
+Per site:
+
+1. **Diagnose before touching the number.** Clean's `doc/performance-problems.md` is the authority:
+   the whnf-into-expensive-values doctrine (make dangerous values opaque; cross spellings by
+   syntactic rewriting, not unification), the nine fix patterns, the kernel-size-cliff completeness
+   recipe (`circuit_proof_start_core`), and "keep hypothesis types folded". Then
+   `proof-patterns.md` § "maxHeartbeats: the fold recipe + no-bump discipline". **`#count_heartbeats`
+   lies** — measure from the build log.
+2. **Classify the cause**, and record any cause not already documented — new ones are expected.
+   Known classes: unfolded expensive value (the `circuit_output_eq` fold), unfolded hypothesis type,
+   over-broad simp set, missing normalization lemma, metavariable normalization at a decoded row,
+   a `rfl`-check cliff.
+3. **Fix the cause, then lower the ceiling.** Try removal first, then the next lower rung. Keep the
+   lowest rung that compiles **with no elaboration-time regression**.
+4. **Budget.** Full ladder search only where the module elaborates <10s in isolation (79% of modules
+   are <3s). On the heavies, change a ceiling only when the golf pass already altered that proof,
+   and always in a solo batch.
+
+**`simp only` root-cause pass** (replacing the dropped rule 1.15): where a `simp only` carries a
+long explicit lemma list or sits next to a raised ceiling, classify it — over-broad simp set / a
+lemma that should be `@[simp]` or `@[circuit_norm]` / a missing normalization lemma / a fold that
+should be a `rfl`-helper — and fix the cause when it is cheap and local. This repo's own precedent
+is that the right lever is usually a missing `@[circuit_norm]` `rfl`-lemma (`channelsWith*_eq`,
+`localLength_eq`, `circuit_output_eq`), not a bigger ceiling. Non-local findings go to
+`DEFERRED.md`.
+
+Findings are logged to `docs/agents/perf-findings.md`.
+
+---
+
+## 9. Permitted golf
+
+Plugin rules **1.1–1.14, 1.16–1.18, 1.20; 2.3, 2.5, 2.6, 2.9, 2.11, 2.12, 2.15; 3.1, 3.4, 3.6**,
+subject to §2.
+
+**Opt-in only, never applied by default:** `grind` (2.1/2.2) — a whnf-into-expensive-values risk on
+circuit goals; `lia` (2.7/3.3) — do not mass-rewrite `omega` on a 4.31 toolchain without a spot
+check; `push_neg` → `push Not` (1.19) — not adopted.
+
+This repo's own high-yield moves:
+
+- **Eval-map factoring** — the dominant structural win. Chip/op `Formal.lean` proofs repeat a
+  per-limb `have eX : Expression.eval env input_var_X[i] = input_X[i] := by rw [← hX]; simp
+  [Vector.getElem_map]`, one per limb. Collapse them into one quantified helper
+  `have eX : ∀ i (hi : i < n), … := by intro i hi; rw [← hX]; simp [Vector.getElem_map]`, then call
+  `eX i (by omega)` at each site. ~12–25% per file on Load/Store/op `Formal.lean`. Use the existing
+  `SP1Clean.vec4_eval` (`SP1Clean/Math/EvalVec.lean:18`) for the length-4 `#v` → `Vector.map` fold.
+  Do **not** hoist a global per-limb `eX` lemma — investigated and rejected (saves ~1 line/helper
+  while re-churning ~36 clean files at form-variation risk).
+- **Kernel-safe dedup** on the bit-shift / DivRem cores: a byte-identical `have` block repeated
+  across sibling lemmas may be factored **iff** it is pure `ZMod.val`/`Nat` arithmetic with no
+  `2^64`/`BitVec` reduction. Extract it over loose variables and apply symbolically — kernel-safe
+  because a lemma application instantiates an already-checked body. **Hard constraint:** the
+  helper's conclusion must match the original `have`'s type **character-for-character**; it is a
+  downstream `rw` target, and `(16 : ZMod p) - …` is *not* interchangeable with `(16 - … : ZMod p)`.
+  Worked example: `inner_val`/`inner_hi_val` in `Proofs/Chips/ShiftLeftChip/Core.lean`. Leave the
+  abstract-`BitVec` helpers (`srl_toNat`/`sra_toNat`) alone.
+- **Line reflow** to ≤100 chars, except where it would rewrite a frozen statement form (§2.8).
+
+---
+
+## 10. Gates
+
+Per gated group, stopping at the first failure:
+
+1. **Manifest check** — `git status --porcelain`; changed paths ⊆ the group's manifest.
+2. **Layer pre-gate** (shallow waves only) — `lake build SP1Native` / `SP1Model` / … as a fail-fast.
+3. **`lake build SP1Clean`**, teed to a log; `-j 1` for solo/heavy groups.
+4. **Log assertions** — zero `error:`, zero `warning:`, zero `info:`.
+5. **Stale-olean smell test** — immediately re-run `lake build SP1Clean`. All three required: exit
+   0; completes in **<90s**; and **re-elaborates zero modules** from the group. A rebuild on run 2
+   means run 1 never persisted that olean, so run 1 was **not** a pass. On heavy groups also compare
+   run 1's wall clock to the recorded baseline — a **>1.5×** regression fails even when green.
+6. **Source guards** — `check_no_native_decide.sh`, `check_no_skipkerneltc.sh`,
+   `check_heartbeats.sh` (may only ratchet **down**).
+7. **Statement-preservation gate** — replacing the plugin's `theorem_statement_protected`, which
+   greps only the first line of a signature and misses the continuation lines where hypotheses live:
+   - no `-` line on any `theorem`/`lemma`/`def`/`abbrev`/`instance`/`structure` signature;
+   - no modification of a pre-existing signature — compare the normalized token stream from the
+     declaration keyword to `:=`, before vs after;
+   - a `+` of a brand-new declaration only where the audit declared an additive split (§4).
+8. **Commit**, one per batch.
+
+At wave boundaries additionally: `lake lint`, `lake test`, `scripts/run_audit.sh`.
+
+---
+
+## 11. Renames are queued, never applied
+
+The plugin's Phase 5b **does not run in this repo**. Workers append candidates to
+`scratch/cleanup-marathon/renames.jsonl` (not the plugin's `.mathlib-quality/` path) and move on.
+The queue is reported at the end for a human decision.
+
+Renaming here is high-blast-radius: `scripts/nolints.json` is keyed by fully-qualified name;
+`scripts/gen_axiom_probe.py` resolves probe targets by regex over source text;
+`scripts/check_report_citations.sh` hard-codes 15 file+declaration pairs; `docs/verification-report.md`
+cites declarations by name; and `update_extracted.py` regenerates files that reference them.
+
+The stock `naming_gate` insists a rename be *applied*, and treats "existing convention preserved"
+as unacceptable. In this repo, **queueing is the terminal state** — that is a pass, not a deferral.

@@ -340,8 +340,8 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
     environment linters (those run post-import; only `nolints.json`/`@[nolint]` suppress them). `sp1Lint`
     instead filters decls by full module path (drops `Extracted/`+`*Vectors`) and runs a **curated** set of 13
     low-noise linters (incl. the Mathlib `structureInType`/`deprecatedNoSince` hygiene checks, both at zero
-    violations). Residue lives in `scripts/nolints.json` (21 stable entries — 3 `defLemma`
-    obligation-bundle defs + 18 `simpComm`/`simpNF` Math/Model/Sail simp lemmas); `lake exe sp1Lint --update`
+    violations). Residue lives in `scripts/nolints.json` (20 stable entries — 2 `defLemma`
+    obligation-bundle defs + 4 `simpComm` + 14 `simpNF` Math/Model/Sail simp lemmas); `lake exe sp1Lint --update`
     regenerates it; CI runs `lake lint` in the build job. Deliberately **dropped**: `docBlame`/`tacticDocs`
     (doc-coverage noise) and `unusedArguments` (flags only the uniform field-generic / `ProverData` signature
     args — all structural, and a fresh false-positive per new chip).
@@ -418,6 +418,11 @@ after installing or toggling.
   workaround, and the `lake update` trap.
 - `docs/agents/proof-patterns.md` — the witnessed-`FormalCircuit` soundness/completeness recipe + concrete
   landmines + the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
+- `docs/agents/cleanup-profile.md` — **binding house rules for `/cleanup` and `/cleanup-all`.** The
+  `mathlib-quality` plugin is written for mathlib and several of its hard gates would break this build or
+  corrupt the audit surface (it deletes every `maxHeartbeats`, unsqueezes `simp only`, splits `∧` statements,
+  privatises single-file decls, rewrites `≥`→`≤`, and deletes "wrapper" lemmas). Read this file first; it
+  overrides the plugin where they conflict.
 - `docs/agents/porting-recipe.md` — step-by-step checklist to port a new chip from the Add/Bitwise template.
 - `docs/agents/extraction.md` — the constraint-extraction pipeline (compiler → Python → Lean DSL).
 - `docs/agents/mul-operation-learnings.md` — Mul-specific soundness/completeness pitfalls.

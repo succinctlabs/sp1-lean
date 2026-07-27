@@ -183,3 +183,41 @@ On an SP1 pin change:
 - prove the 25-table coverage permutation again; and
 - treat a cluster, width, interaction-kind, or schedule change as an architecture change, not a
   mechanical version bump.
+
+## Cleanup / polish backlog (non-blocking)
+
+Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistically. The
+*how-to-golf-safely* rules live in `docs/agents/cleanup-profile.md` (the binding house rules for
+`/cleanup` and `/cleanup-all`) and `docs/agents/proof-patterns.md` § "Golf & cleanup discipline"
++ § "Compile-time / performance landmines".
+
+- **`linter.style.longLine`** — the one remaining syntactic linter not yet enabled (the last
+  candidate noted in AGENTS.md § Linters). Current fallout, lines over 100 chars in hand-written
+  code: `Proofs/` 3310, `Native/` 1260, `Soundness/` 973, `Model/` 670, `Faithful/` 582,
+  `FormalModel/` 368, `SP1CleanTest/` 59, `Math/` 33 — **7,255 lines across 323 files**. (An
+  earlier note quoted ~1080; that figure covered only `Native/` + `FormalModel/`.) Enable it alone
+  on the core pillar lake libraries, then reflow or per-file-suppress back to zero warnings.
+  Heavy, mechanical. Reflowing is done opportunistically by the cleanup campaign, but the flag is
+  deliberately **not** enabled there — flipping it is a separate, deliberate change.
+- **Shift proof decomposition** — if the repeated `cpuA/msb*/aluA` tail becomes a real bottleneck,
+  extract named evidence and prove the semantic result in a circuit-independent file, following the
+  DivRem `Cases.lean` boundary. Do not recreate the retired DivRem `SpecObligation`/shared-tail
+  architecture.
+- **`/decompose-proof` candidates** — long proof bodies worth splitting into named sub-lemmas:
+  `ShiftLeftChip`/`ShiftRightChip` `Formal.lean` `completeness`, `LoadHalfChip`'s 4-way `h_sel_lt`
+  offset-selection case-bash, `BranchChip` `soundness`/`completeness`. Several are perf-tuned —
+  decompose with care and watch elaboration time.
+- **SailState-staging bridge preamble** — the `hpc_get`/`key`/`hsp_config` preamble recurs across
+  ~10 store/jal/load `Bridge.lean` files → a shared lemma. Re-examine the shape first; upstream
+  #101/#102 rewrote several bridges.
+- **Namespace-isolate the auto-gen (linter hardening, Option B)** — the `sp1Lint` exclusion is a
+  *soft* module-path filter. A hard boundary would relocate all auto-gen to a separate root
+  namespace `SP1Extracted.*` so the stock `runLinter` excludes it by construction. Cost: ~87 module
+  renames + import edits + `update_extracted.py` writer paths + lakefile globs. Not worth it for
+  linting alone.
+
+Explicitly rejected, with reasons: a *global* eval-map `eX` lemma (saves ~1 line/helper while
+re-churning ~36 clean files at form-variation risk); a global `NeZero p` instance (would make the
+pervasive `omit [Fact (2 ^ 17 < p)] in` clauses illegal — an owner decision, not a drive-by);
+`maxHeartbeats` ratcheting as a speedup lever (the *wrong* lever — fold the blowup instead); and
+the `unusedArguments` / `docBlame` / `docBlameThm` / `tacticDocs` environment linters.
