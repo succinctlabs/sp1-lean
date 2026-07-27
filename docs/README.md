@@ -15,15 +15,18 @@ records so that an old audit packet is never mistaken for the present theorem bo
 
 ## Read these first
 
-1. [`overview.md`](overview.md) — concise, current statement of what is implemented, what is reserved, and
+1. [`verification-report.md`](verification-report.md) — the self-contained technical report: what
+   is proved, on what foundations, with what trust base — written for readers who know SP1 and
+   Clean but not this repository.
+2. [`overview.md`](overview.md) — concise, current statement of what is implemented, what is reserved, and
    where the proof stops.
-2. [`architecture.md`](architecture.md) — the whole-chip verification chain, structural buses, typed witness
+3. [`architecture.md`](architecture.md) — the whole-chip verification chain, structural buses, typed witness
    decode, ranked/timed grounding, and theorem layering.
-3. [`release-audit.md`](release-audit.md) — machine-derived pins, trust boundary, direct-deferral inventory,
+4. [`release-audit.md`](release-audit.md) — machine-derived pins, trust boundary, direct-deferral inventory,
    and `#print axioms` census.
-4. [`roadmap.md`](roadmap.md) — dependency-ordered work toward native AIR, full upstream AIR, execution, and
+5. [`roadmap.md`](roadmap.md) — dependency-ordered work toward native AIR, full upstream AIR, execution, and
    verifier soundness.
-5. [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) — compact current checkpoint
+6. [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) — compact current checkpoint
    board for the architecture-consolidation work.
 
 ## Current reader-facing docs
