@@ -4,7 +4,6 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ITypeReaderImmutable
 import SP1Clean.Native.Readers.MemoryAccess
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.StoreWordChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -27,10 +26,24 @@ half of the read `prev_value`, leaving the other half equal to `prev_value`. The
 namespace SP1Clean.StoreWordChip
 
 open Circuit
-open Extracted (StoreWordColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native StoreWord-chip row (Rust field order). The reader and memory blocks reuse the project
+substrate (`Extracted.AddressOperation` is still a standalone generated module — the other loads and
+stores compose the same gadget; `Extracted.MemoryAccessCols` lives in the generated `MemoryAccess`
+struct carrier). `Faithful.StoreWordChip.storeWordChipReconfigure` is the sole bridge to Rust's
+separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ITypeReader F
+  address_operation : Extracted.AddressOperation F
+  memory_access : Extracted.MemoryAccessCols F
+  offset_bit : F
+  store_value : Word F
+  is_real : F
+deriving ProvableStruct
 
 /-- The operand reads + threaded reader column blocks. `op_b_val` is the rs1 base-address value, `op_c_imm`
 the immediate; `state`/`adapter`/`memory_access` are the committed column blocks; `offset_bit` is bit 2 of
@@ -65,12 +78,12 @@ deriving ProvableStruct
 @[reducible] def clkLow (state : Extracted.CPUState (ZMod p)) : ZMod p :=
   state.clk_0_16 + state.clk_16_24 * 65536
 
-/-- Compose the column blocks as Clean sub-circuits and assemble the extracted `StoreWordColumns`.
+/-- Compose the column blocks as Clean sub-circuits and assemble the extracted `Columns`.
 `CPUState` advances pc by 4 / clk by 8; `AddressOperation` computes `rs1 + imm` (offset bit 2 =
 `offset_bit`); `MemoryAccess` is a write (`new_value = store_value`) at the 48-bit address;
 `ITypeReaderImmutable` reads op_a (rs2) / op_b (rs1) (opcode `38 = SW`). The four read-modify-write
 `store_value` merge gates and the `is_real` binary gate are imposed directly. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var StoreWordColumns (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let addr_op ← AddressOperation.circuit
@@ -100,7 +113,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var StoreWordColumns 
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.offset_bit, input.store_value, input.is_real⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreWordColumns main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
   localLength _ := 3 + 1
   localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
@@ -119,11 +132,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreWordColumns main wh
       (⟨input.state, input.adapter,
         ⟨varFromOffset Extracted.AddrAddOperation offset, var ⟨offset + 3⟩⟩,
         input.memory_access, input.offset_bit, input.store_value, input.is_real⟩ :
-        Var StoreWordColumns (ZMod p)) := rfl
+        Var Columns (ZMod p)) := rfl
 
 /-- Component-wise evaluation of a completed StoreWord row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : StoreWordColumns (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state
          adapter := Eval.eval env cols.adapter
@@ -132,7 +145,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreWordColumns main wh
          offset_bit := Eval.eval env cols.offset_bit
          store_value := Eval.eval env cols.store_value
          is_real := Eval.eval env cols.is_real } :
-        StoreWordColumns F) := by
+        Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
@@ -140,7 +153,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreWordColumns main wh
 offset booleans, the `MemoryAccess` timestamp monotonicity (whose `new_value` is `store_value`), the
 `ITypeReaderImmutable` adapter facts, the four read-modify-write `store_value` equations, and the
 `is_real`-binary fact. -/
-def Spec (input : Inputs (ZMod p)) (cols : StoreWordColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   AddressOperation.RowSpec
       ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit, input.is_real⟩
       cols.address_operation ∧

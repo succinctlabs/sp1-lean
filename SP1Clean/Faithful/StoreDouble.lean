@@ -1,4 +1,5 @@
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Extracted.ChipOracle.StoreDouble
 import SP1Clean.Proofs.Chips.StoreDoubleChip.Formal
 
 /-!
@@ -17,32 +18,113 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-def storeDoubleChipOracle :
-    ChipOracle (ZMod p) Extracted.StoreDoubleColumns Extracted.StoreDoubleColumns :=
-  ChipOracle.identity Extracted.StoreDoubleColumns.asserts
-    Extracted.StoreDoubleColumns.interactions
+/-- Rebuild the shared standalone `AddressOperation` block as the byte-identical struct embedded in
+the generated StoreDouble oracle namespace. -/
+def storeDoubleOracleAddressOperation {F : Type} (cols : Extracted.AddressOperation F) :
+    Extracted.StoreDoubleOracle.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Inverse of `storeDoubleOracleAddressOperation`. -/
+def storeDoubleNativeAddressOperation {F : Type}
+    (cols : Extracted.StoreDoubleOracle.AddressOperation F) :
+    Extracted.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Whole-chip row reconfiguration. The reader and memory-access blocks are already the canonical
+generated substrate; the address block is copied into Rust's chip-private operation row. This is not
+an operation-level faithfulness claim. -/
+def storeDoubleChipReconfigure {F : Type} (cols : StoreDoubleChip.Columns F) :
+    Extracted.StoreDoubleOracle.StoreDoubleColumns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := storeDoubleOracleAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    is_real := cols.is_real }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def storeDoubleChipDeconfigure {F : Type} (cols : Extracted.StoreDoubleOracle.StoreDoubleColumns F) :
+    StoreDoubleChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := storeDoubleNativeAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    is_real := cols.is_real }
+
+/-- SP1 Rust's complete StoreDouble-chip oracle, viewed from the native Lean row. -/
+def storeDoubleChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F StoreDoubleChip.Columns Extracted.StoreDoubleOracle.StoreDoubleColumns where
+  reconfigure := storeDoubleChipReconfigure
+  deconfigure := storeDoubleChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.StoreDoubleOracle.StoreDoubleColumns.asserts
+  interactions := Extracted.StoreDoubleOracle.StoreDoubleColumns.interactions
+
+/- Namespace bridges between the StoreDouble oracle's embedded chip-private helper copies and the
+canonical standalone generated modules. The two bodies are rendered from the same compiler output,
+so each bridge is a definitional unfolding, not a mathematical claim. They let the address-op
+lemmas below stay stated once against the standalone modules (also consumed by the other load and
+store chips). -/
+
+private theorem storeDoubleOracle_addrAdd_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.StoreDoubleOracle.AddrAddOperation.asserts a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.asserts a b ⟨value⟩ is_real := by
+  rw [Extracted.StoreDoubleOracle.AddrAddOperation.asserts,
+    Extracted.AddrAddOperation.asserts]
+
+private theorem storeDoubleOracle_addrAdd_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.StoreDoubleOracle.AddrAddOperation.interactions a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.interactions a b ⟨value⟩ is_real := by
+  rw [Extracted.StoreDoubleOracle.AddrAddOperation.interactions,
+    Extracted.AddrAddOperation.interactions]
+
+private theorem storeDoubleOracle_address_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.StoreDoubleOracle.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.StoreDoubleOracle.AddressOperation.asserts,
+    Extracted.AddressOperation.asserts]
+  simp only [storeDoubleOracle_addrAdd_asserts_eq]
+
+private theorem storeDoubleOracle_address_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.StoreDoubleOracle.AddressOperation.interactions b cc offset_bit0 offset_bit1
+        offset_bit2 is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.interactions b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.StoreDoubleOracle.AddressOperation.interactions,
+    Extracted.AddressOperation.interactions]
+  simp only [storeDoubleOracle_addrAdd_interactions_eq]
 
 def storeDoubleChipInput {F : Type}
-    (cols : Extracted.StoreDoubleColumns F) : StoreDoubleChip.Inputs F :=
+    (cols : StoreDoubleChip.Columns F) : StoreDoubleChip.Inputs F :=
   { is_real := cols.is_real
     state := cols.state
     adapter := cols.adapter
     memory_access := cols.memory_access }
 
 def storeDoubleChipLocals {F : Type}
-    (cols : Extracted.StoreDoubleColumns F) : Vector F 4 :=
+    (cols : StoreDoubleChip.Columns F) : Vector F 4 :=
   #v[cols.address_operation.addr_operation.value[0],
     cols.address_operation.addr_operation.value[1],
     cols.address_operation.addr_operation.value[2],
     cols.address_operation.top_two_limb_inv]
 
 def storeDoubleChipPhysicalRow {F : Type}
-    (cols : Extracted.StoreDoubleColumns F) : Array F :=
+    (cols : StoreDoubleChip.Columns F) : Array F :=
   inputFirstRow (storeDoubleChipInput cols) (storeDoubleChipLocals cols)
 
 def storeDoubleChipColumnsOfInput {F : Type}
     (input : StoreDoubleChip.Inputs F) (locals : Vector F 4) :
-    Extracted.StoreDoubleColumns F :=
+    StoreDoubleChip.Columns F :=
   ⟨input.state, input.adapter,
     ⟨⟨#v[locals[0], locals[1], locals[2]]⟩, locals[3]⟩,
     input.memory_access, input.is_real⟩
@@ -112,7 +194,7 @@ private theorem storeDoubleITypeEta {F : Type}
     rfl
 
 theorem storeDoubleChipColumnsOfInput_roundtrip {F : Type}
-    (cols : Extracted.StoreDoubleColumns F) :
+    (cols : StoreDoubleChip.Columns F) :
     storeDoubleChipColumnsOfInput
         (storeDoubleChipInput cols) (storeDoubleChipLocals cols) = cols := by
   cases cols
@@ -214,7 +296,7 @@ theorem evalStoreDoubleDirectOutput
   rw [StoreDoubleChip.directOutput_eq]
   rw [← CircuitType.eval_expression, StoreDoubleChip.eval_columns]
   unfold storeDoubleChipColumnsOfInput
-  rw [Extracted.StoreDoubleColumns.mk.injEq]
+  rw [StoreDoubleChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input locals data
   rw [StoreDoubleChip.eval_inputs, StoreDoubleChip.Inputs.mk.injEq] at hinputEval
@@ -244,7 +326,7 @@ theorem evalStoreDoubleDirectOutput
         (eval_local_inputFirstRow input locals data 3 (by decide))
 
 def storeDoubleChipRowCodec :
-    ChipRowCodec StoreDoubleChip.Inputs Extracted.StoreDoubleColumns
+    ChipRowCodec StoreDoubleChip.Inputs StoreDoubleChip.Columns
       (StoreDoubleChip.circuit (p := p)) where
   assignment cols data := {
     row := storeDoubleChipPhysicalRow cols
@@ -562,7 +644,7 @@ private theorem storeDoubleMemoryAssertionList
 private def storeDoubleChipRustColumns
     (env : Environment (ZMod p))
     (input : Var StoreDoubleChip.Inputs (ZMod p)) (offset : ℕ) :
-    Extracted.StoreDoubleColumns (ZMod p) :=
+    StoreDoubleChip.Columns (ZMod p) :=
   { state := Eval.eval env input.state
     adapter := Eval.eval env input.adapter
     address_operation := Eval.eval env (storeDoubleAddressCols (p := p) offset)
@@ -712,9 +794,10 @@ private theorem storeDoubleRustAssertionsDecompose
         (storeDoubleChipOracle.nativeAssertZeros
           (storeDoubleChipRustColumns env input offset)) ↔
       storeDoubleRustMeaning env input offset := by
-  simp only [ChipOracle.nativeAssertZeros, storeDoubleChipOracle,
-    ChipOracle.identity, id_eq]
-  rw [Extracted.StoreDoubleColumns.asserts]
+  simp only [ChipOracle.nativeAssertZeros, storeDoubleChipOracle]
+  rw [Extracted.StoreDoubleOracle.StoreDoubleColumns.asserts]
+  dsimp only [storeDoubleChipReconfigure, storeDoubleOracleAddressOperation]
+  simp only [storeDoubleOracle_address_asserts_eq]
   unfold storeDoubleRustMeaning storeDoubleRustAddressMeaning
     storeDoubleRustCpuMeaning storeDoubleRustITypeMeaning
     storeDoubleRustTailMeaning
@@ -894,7 +977,7 @@ private theorem storeDoubleChipConstraintsFaithfulOutput
 theorem storeDoubleChipConstraintsFaithful
     (env : Environment (ZMod p))
     (input : Var StoreDoubleChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.StoreDoubleColumns (ZMod p))
+    (cols : StoreDoubleChip.Columns (ZMod p))
     (hbind : BindsChipOutput StoreDoubleChip.main env input offset cols) :
     List.Forall (· = 0)
         (storeDoubleChipOracle.nativeAssertZeros cols) ↔
@@ -913,7 +996,7 @@ theorem storeDoubleChipConstraintsFaithful
     (p := p) env input offset
 
 theorem storeDoubleChipConstraintsConstructive
-    (rustCols : Extracted.StoreDoubleColumns (ZMod p))
+    (rustCols : Extracted.StoreDoubleOracle.StoreDoubleColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := storeDoubleChipRowCodec.assignment
       (storeDoubleChipOracle.deconfigure rustCols) data
@@ -1010,8 +1093,9 @@ private theorem storeDoubleStateInteractionsFaithful
     ((((storeDoubleStateInteractions input).map
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env))) =
-      (((Extracted.StoreDoubleColumns.interactions
-          (storeDoubleChipRustColumns env input offset)).map
+      (((Extracted.StoreDoubleOracle.StoreDoubleColumns.interactions
+          (storeDoubleChipReconfigure
+            (storeDoubleChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.State)) := by
   have hStatePull :
@@ -1042,9 +1126,10 @@ private theorem storeDoubleStateInteractionsFaithful
     fun mult msg => toAccess_pushIf_state env mult msg
   simp only [storeDoubleStateInteractions,
     List.map_cons, List.map_nil, hStatePull, hStatePush]
-  simp [Extracted.StoreDoubleColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.StoreDoubleOracle.StoreDoubleColumns.interactions,
+    storeDoubleChipReconfigure, storeDoubleOracleAddressOperation,
+    Extracted.StoreDoubleOracle.AddressOperation.interactions,
+    Extracted.StoreDoubleOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReaderImmutable.interactions,
     storeDoubleChipRustColumns, storeDoubleEvalAddressCols,
@@ -1061,8 +1146,9 @@ private theorem storeDoubleProgramInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)) =
-      (((Extracted.StoreDoubleColumns.interactions
-          (storeDoubleChipRustColumns env input offset)).map
+      (((Extracted.StoreDoubleOracle.StoreDoubleColumns.interactions
+          (storeDoubleChipReconfigure
+            (storeDoubleChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Program)) := by
   have hp2 : 2 < p := by
@@ -1098,9 +1184,10 @@ private theorem storeDoubleProgramInteractionsFaithful
     fun gate msg => toAccess_pullIf_program env gate msg
   simp only [storeDoubleProgramInteractions,
     List.map_cons, List.map_nil, hProgramPull]
-  simp [Extracted.StoreDoubleColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.StoreDoubleOracle.StoreDoubleColumns.interactions,
+    storeDoubleChipReconfigure, storeDoubleOracleAddressOperation,
+    Extracted.StoreDoubleOracle.AddressOperation.interactions,
+    Extracted.StoreDoubleOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReaderImmutable.interactions,
     storeDoubleChipRustColumns, storeDoubleEvalAddressCols,
@@ -1119,8 +1206,9 @@ private theorem storeDoubleMemoryInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult))
-      (((Extracted.StoreDoubleColumns.interactions
-          (storeDoubleChipRustColumns env input offset)).map
+      (((Extracted.StoreDoubleOracle.StoreDoubleColumns.interactions
+          (storeDoubleChipReconfigure
+            (storeDoubleChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Memory)) := by
   have hp2 : 2 < p := by
@@ -1162,12 +1250,13 @@ private theorem storeDoubleMemoryInteractionsFaithful
     fun mult msg => toAccess_pushIf_memory env mult msg
   simp only [StoreDoubleChip.exposedMemoryInteractions,
     List.map_cons, List.map_nil, hMemoryPull, hMemoryPush]
-  simp [Extracted.StoreDoubleColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.StoreDoubleOracle.StoreDoubleColumns.interactions,
+    storeDoubleChipReconfigure, storeDoubleOracleAddressOperation,
+    Extracted.StoreDoubleOracle.AddressOperation.interactions,
+    Extracted.StoreDoubleOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReaderImmutable.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.StoreDoubleOracle.AddressOperation.value,
     storeDoubleChipRustColumns, storeDoubleEvalAddressCols,
     eval_cpuState, Readers.ITypeReader.eval_cols,
     eval_registerAccessCols, eval_registerAccessTimestamp,
@@ -1361,8 +1450,9 @@ private theorem storeDoubleByteInteractionsFaithful
       ((((StoreDoubleChip.main input).operations offset).interactionsWith
           byteChannel.toRaw).map
             (AbstractInteraction.toAccess env))
-      (((Extracted.StoreDoubleColumns.interactions
-          (storeDoubleChipRustColumns env input offset)).map
+      (((Extracted.StoreDoubleOracle.StoreDoubleColumns.interactions
+          (storeDoubleChipReconfigure
+            (storeDoubleChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
   have h6 : (6 : ZMod p).val = 6 := by
@@ -1389,12 +1479,13 @@ private theorem storeDoubleByteInteractionsFaithful
     storeDoubleAddressByteInteractions, storeDoubleMemoryByteInteractions,
     storeDoubleITypeByteInteractions, List.map_cons, List.map_nil,
     hBytePull]
-  simp [Extracted.StoreDoubleColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.StoreDoubleOracle.StoreDoubleColumns.interactions,
+    storeDoubleChipReconfigure, storeDoubleOracleAddressOperation,
+    Extracted.StoreDoubleOracle.AddressOperation.interactions,
+    Extracted.StoreDoubleOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReaderImmutable.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.StoreDoubleOracle.AddressOperation.value,
     storeDoubleChipRustColumns, storeDoubleEvalAddressCols,
     eval_cpuState, Readers.ITypeReader.eval_cols,
     eval_registerAccessCols, eval_registerAccessTimestamp,
@@ -1436,7 +1527,7 @@ private theorem storeDoubleUnexpectedInteractionsEmpty
 theorem storeDoubleChipInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var StoreDoubleChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.StoreDoubleColumns (ZMod p))
+    (cols : StoreDoubleChip.Columns (ZMod p))
     (hbind : BindsChipOutput StoreDoubleChip.main env input offset cols) :
     List.Perm
       (nativeAccesses env
@@ -1451,15 +1542,15 @@ theorem storeDoubleChipInteractionsFaithful
   change storeDoubleChipRustColumns env input offset = cols at hbind
   subst cols
   let rustAccesses :=
-    (Extracted.StoreDoubleColumns.interactions
-      (storeDoubleChipRustColumns env input offset)).map
+    (Extracted.StoreDoubleOracle.StoreDoubleColumns.interactions
+      (storeDoubleChipReconfigure
+        (storeDoubleChipRustColumns env input offset))).map
         Extracted.Interaction.toAccess
   simp only [nativeAccesses]
   rw [storeDoubleUnexpectedInteractionsEmpty]
   simp only [List.map_nil, List.append_nil]
   simp only [ChipOracle.accesses,
-    ChipOracle.nativeInteractions, storeDoubleChipOracle,
-    ChipOracle.identity, id_eq]
+    ChipOracle.nativeInteractions, storeDoubleChipOracle]
   rw [storeDoubleStateInteractionsEq,
     StoreDoubleChip.interactionsWith_memory_eq,
     storeDoubleProgramInteractionsEq]
@@ -1479,7 +1570,7 @@ theorem storeDoubleChipInteractionsFaithful
     ((hByte.append_left _).append hMemory).append_right _
 
 theorem storeDoubleChipInteractionsConstructive
-    (rustCols : Extracted.StoreDoubleColumns (ZMod p))
+    (rustCols : Extracted.StoreDoubleOracle.StoreDoubleColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := storeDoubleChipRowCodec.assignment
       (storeDoubleChipOracle.deconfigure rustCols) data
@@ -1517,7 +1608,7 @@ theorem storeDoubleChipInteractionsConstructive
 
 theorem storeDoubleChip_faithful :
     ChipFaithful (p := p) StoreDoubleChip.Inputs
-      Extracted.StoreDoubleColumns Extracted.StoreDoubleColumns
+      StoreDoubleChip.Columns Extracted.StoreDoubleOracle.StoreDoubleColumns
       StoreDoubleChip.circuit storeDoubleChipRowCodec
       storeDoubleChipOracle where
   constraints := storeDoubleChipConstraintsConstructive (p := p)

@@ -1,4 +1,5 @@
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Extracted.ChipOracle.StoreWord
 import SP1Clean.Proofs.Chips.StoreWordChip.Formal
 
 /-!
@@ -17,13 +18,98 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-def storeWordChipOracle :
-    ChipOracle (ZMod p) Extracted.StoreWordColumns Extracted.StoreWordColumns :=
-  ChipOracle.identity Extracted.StoreWordColumns.asserts
-    Extracted.StoreWordColumns.interactions
+/-- Rebuild the shared standalone `AddressOperation` block as the byte-identical struct embedded in
+the generated StoreWord oracle namespace. -/
+def storeWordOracleAddressOperation {F : Type} (cols : Extracted.AddressOperation F) :
+    Extracted.StoreWordOracle.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Inverse of `storeWordOracleAddressOperation`. -/
+def storeWordNativeAddressOperation {F : Type}
+    (cols : Extracted.StoreWordOracle.AddressOperation F) :
+    Extracted.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Whole-chip row reconfiguration. The reader and memory-access blocks are already the canonical
+generated substrate; the address block is copied into Rust's chip-private operation row. This is not
+an operation-level faithfulness claim. -/
+def storeWordChipReconfigure {F : Type} (cols : StoreWordChip.Columns F) :
+    Extracted.StoreWordOracle.StoreWordColumns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := storeWordOracleAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    offset_bit := cols.offset_bit
+    store_value := cols.store_value
+    is_real := cols.is_real }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def storeWordChipDeconfigure {F : Type} (cols : Extracted.StoreWordOracle.StoreWordColumns F) :
+    StoreWordChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := storeWordNativeAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    offset_bit := cols.offset_bit
+    store_value := cols.store_value
+    is_real := cols.is_real }
+
+/-- SP1 Rust's complete StoreWord-chip oracle, viewed from the native Lean row. -/
+def storeWordChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F StoreWordChip.Columns Extracted.StoreWordOracle.StoreWordColumns where
+  reconfigure := storeWordChipReconfigure
+  deconfigure := storeWordChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.StoreWordOracle.StoreWordColumns.asserts
+  interactions := Extracted.StoreWordOracle.StoreWordColumns.interactions
+
+/- Namespace bridges between the StoreWord oracle's embedded chip-private helper copies and the
+canonical standalone generated modules. The two bodies are rendered from the same compiler output,
+so each bridge is a definitional unfolding, not a mathematical claim. They let the address-op
+lemmas below stay stated once against the standalone modules (also consumed by the other load and
+store chips). -/
+
+private theorem storeWordOracle_addrAdd_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.StoreWordOracle.AddrAddOperation.asserts a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.asserts a b ⟨value⟩ is_real := by
+  rw [Extracted.StoreWordOracle.AddrAddOperation.asserts,
+    Extracted.AddrAddOperation.asserts]
+
+private theorem storeWordOracle_addrAdd_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.StoreWordOracle.AddrAddOperation.interactions a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.interactions a b ⟨value⟩ is_real := by
+  rw [Extracted.StoreWordOracle.AddrAddOperation.interactions,
+    Extracted.AddrAddOperation.interactions]
+
+private theorem storeWordOracle_address_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.StoreWordOracle.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.StoreWordOracle.AddressOperation.asserts,
+    Extracted.AddressOperation.asserts]
+  simp only [storeWordOracle_addrAdd_asserts_eq]
+
+private theorem storeWordOracle_address_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.StoreWordOracle.AddressOperation.interactions b cc offset_bit0 offset_bit1
+        offset_bit2 is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.interactions b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.StoreWordOracle.AddressOperation.interactions,
+    Extracted.AddressOperation.interactions]
+  simp only [storeWordOracle_addrAdd_interactions_eq]
 
 def storeWordChipInput {F : Type}
-    (cols : Extracted.StoreWordColumns F) : StoreWordChip.Inputs F :=
+    (cols : StoreWordChip.Columns F) : StoreWordChip.Inputs F :=
   { is_real := cols.is_real
     state := cols.state
     adapter := cols.adapter
@@ -32,19 +118,19 @@ def storeWordChipInput {F : Type}
     store_value := cols.store_value }
 
 def storeWordChipLocals {F : Type}
-    (cols : Extracted.StoreWordColumns F) : Vector F 4 :=
+    (cols : StoreWordChip.Columns F) : Vector F 4 :=
   #v[cols.address_operation.addr_operation.value[0],
     cols.address_operation.addr_operation.value[1],
     cols.address_operation.addr_operation.value[2],
     cols.address_operation.top_two_limb_inv]
 
 def storeWordChipPhysicalRow {F : Type}
-    (cols : Extracted.StoreWordColumns F) : Array F :=
+    (cols : StoreWordChip.Columns F) : Array F :=
   inputFirstRow (storeWordChipInput cols) (storeWordChipLocals cols)
 
 def storeWordChipColumnsOfInput {F : Type}
     (input : StoreWordChip.Inputs F) (locals : Vector F 4) :
-    Extracted.StoreWordColumns F :=
+    StoreWordChip.Columns F :=
   ⟨input.state, input.adapter,
     ⟨⟨#v[locals[0], locals[1], locals[2]]⟩, locals[3]⟩,
     input.memory_access, input.offset_bit, input.store_value, input.is_real⟩
@@ -114,7 +200,7 @@ private theorem storeWordITypeEta {F : Type}
     rfl
 
 theorem storeWordChipColumnsOfInput_roundtrip {F : Type}
-    (cols : Extracted.StoreWordColumns F) :
+    (cols : StoreWordChip.Columns F) :
     storeWordChipColumnsOfInput
         (storeWordChipInput cols) (storeWordChipLocals cols) = cols := by
   cases cols
@@ -216,7 +302,7 @@ theorem evalStoreWordDirectOutput
   rw [StoreWordChip.directOutput_eq]
   rw [← CircuitType.eval_expression, StoreWordChip.eval_columns]
   unfold storeWordChipColumnsOfInput
-  rw [Extracted.StoreWordColumns.mk.injEq]
+  rw [StoreWordChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input locals data
   rw [StoreWordChip.eval_inputs, StoreWordChip.Inputs.mk.injEq] at hinputEval
@@ -249,7 +335,7 @@ theorem evalStoreWordDirectOutput
         (eval_local_inputFirstRow input locals data 3 (by decide))
 
 def storeWordChipRowCodec :
-    ChipRowCodec StoreWordChip.Inputs Extracted.StoreWordColumns
+    ChipRowCodec StoreWordChip.Inputs StoreWordChip.Columns
       (StoreWordChip.circuit (p := p)) where
   assignment cols data := {
     row := storeWordChipPhysicalRow cols
@@ -599,7 +685,7 @@ private theorem storeWordMemoryAssertionList
 private def storeWordChipRustColumns
     (env : Environment (ZMod p))
     (input : Var StoreWordChip.Inputs (ZMod p)) (offset : ℕ) :
-    Extracted.StoreWordColumns (ZMod p) :=
+    StoreWordChip.Columns (ZMod p) :=
   { state := Eval.eval env input.state
     adapter := Eval.eval env input.adapter
     address_operation := Eval.eval env (storeWordAddressCols (p := p) offset)
@@ -793,9 +879,10 @@ private theorem storeWordRustAssertionsDecompose
         (storeWordChipOracle.nativeAssertZeros
           (storeWordChipRustColumns env input offset)) ↔
       storeWordRustMeaning env input offset := by
-  simp only [ChipOracle.nativeAssertZeros, storeWordChipOracle,
-    ChipOracle.identity, id_eq]
-  rw [Extracted.StoreWordColumns.asserts]
+  simp only [ChipOracle.nativeAssertZeros, storeWordChipOracle]
+  rw [Extracted.StoreWordOracle.StoreWordColumns.asserts]
+  dsimp only [storeWordChipReconfigure, storeWordOracleAddressOperation]
+  simp only [storeWordOracle_address_asserts_eq]
   unfold storeWordRustMeaning storeWordRustAddressMeaning
     storeWordRustCpuMeaning storeWordRustITypeMeaning
     storeWordRustTailMeaning
@@ -1001,7 +1088,7 @@ private theorem storeWordChipConstraintsFaithfulOutput
 theorem storeWordChipConstraintsFaithful
     (env : Environment (ZMod p))
     (input : Var StoreWordChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.StoreWordColumns (ZMod p))
+    (cols : StoreWordChip.Columns (ZMod p))
     (hbind : BindsChipOutput StoreWordChip.main env input offset cols) :
     List.Forall (· = 0)
         (storeWordChipOracle.nativeAssertZeros cols) ↔
@@ -1020,7 +1107,7 @@ theorem storeWordChipConstraintsFaithful
     (p := p) env input offset
 
 theorem storeWordChipConstraintsConstructive
-    (rustCols : Extracted.StoreWordColumns (ZMod p))
+    (rustCols : Extracted.StoreWordOracle.StoreWordColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := storeWordChipRowCodec.assignment
       (storeWordChipOracle.deconfigure rustCols) data
@@ -1117,8 +1204,9 @@ private theorem storeWordStateInteractionsFaithful
     ((((storeWordStateInteractions input).map
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env))) =
-      (((Extracted.StoreWordColumns.interactions
-          (storeWordChipRustColumns env input offset)).map
+      (((Extracted.StoreWordOracle.StoreWordColumns.interactions
+          (storeWordChipReconfigure
+            (storeWordChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.State)) := by
   have hStatePull :
@@ -1149,9 +1237,10 @@ private theorem storeWordStateInteractionsFaithful
     fun mult msg => toAccess_pushIf_state env mult msg
   simp only [storeWordStateInteractions,
     List.map_cons, List.map_nil, hStatePull, hStatePush]
-  simp [Extracted.StoreWordColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.StoreWordOracle.StoreWordColumns.interactions,
+    storeWordChipReconfigure, storeWordOracleAddressOperation,
+    Extracted.StoreWordOracle.AddressOperation.interactions,
+    Extracted.StoreWordOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReaderImmutable.interactions,
     storeWordChipRustColumns, storeWordEvalAddressCols,
@@ -1168,8 +1257,9 @@ private theorem storeWordProgramInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)) =
-      (((Extracted.StoreWordColumns.interactions
-          (storeWordChipRustColumns env input offset)).map
+      (((Extracted.StoreWordOracle.StoreWordColumns.interactions
+          (storeWordChipReconfigure
+            (storeWordChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Program)) := by
   have hp2 : 2 < p := by
@@ -1205,9 +1295,10 @@ private theorem storeWordProgramInteractionsFaithful
     fun gate msg => toAccess_pullIf_program env gate msg
   simp only [storeWordProgramInteractions,
     List.map_cons, List.map_nil, hProgramPull]
-  simp [Extracted.StoreWordColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.StoreWordOracle.StoreWordColumns.interactions,
+    storeWordChipReconfigure, storeWordOracleAddressOperation,
+    Extracted.StoreWordOracle.AddressOperation.interactions,
+    Extracted.StoreWordOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReaderImmutable.interactions,
     storeWordChipRustColumns, storeWordEvalAddressCols,
@@ -1226,8 +1317,9 @@ private theorem storeWordMemoryInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult))
-      (((Extracted.StoreWordColumns.interactions
-          (storeWordChipRustColumns env input offset)).map
+      (((Extracted.StoreWordOracle.StoreWordColumns.interactions
+          (storeWordChipReconfigure
+            (storeWordChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Memory)) := by
   have hp2 : 2 < p := by
@@ -1269,12 +1361,13 @@ private theorem storeWordMemoryInteractionsFaithful
     fun mult msg => toAccess_pushIf_memory env mult msg
   simp only [StoreWordChip.exposedMemoryInteractions,
     List.map_cons, List.map_nil, hMemoryPull, hMemoryPush]
-  simp [Extracted.StoreWordColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.StoreWordOracle.StoreWordColumns.interactions,
+    storeWordChipReconfigure, storeWordOracleAddressOperation,
+    Extracted.StoreWordOracle.AddressOperation.interactions,
+    Extracted.StoreWordOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReaderImmutable.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.StoreWordOracle.AddressOperation.value,
     storeWordChipRustColumns, storeWordEvalAddressCols,
     eval_cpuState, Readers.ITypeReader.eval_cols,
     eval_registerAccessCols, eval_registerAccessTimestamp,
@@ -1474,8 +1567,9 @@ private theorem storeWordByteInteractionsFaithful
       ((((StoreWordChip.main input).operations offset).interactionsWith
           byteChannel.toRaw).map
             (AbstractInteraction.toAccess env))
-      (((Extracted.StoreWordColumns.interactions
-          (storeWordChipRustColumns env input offset)).map
+      (((Extracted.StoreWordOracle.StoreWordColumns.interactions
+          (storeWordChipReconfigure
+            (storeWordChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
   have h6 : (6 : ZMod p).val = 6 := by
@@ -1502,12 +1596,13 @@ private theorem storeWordByteInteractionsFaithful
     storeWordAddressByteInteractions, storeWordMemoryByteInteractions,
     storeWordITypeByteInteractions, List.map_cons, List.map_nil,
     hBytePull]
-  simp [Extracted.StoreWordColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.StoreWordOracle.StoreWordColumns.interactions,
+    storeWordChipReconfigure, storeWordOracleAddressOperation,
+    Extracted.StoreWordOracle.AddressOperation.interactions,
+    Extracted.StoreWordOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReaderImmutable.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.StoreWordOracle.AddressOperation.value,
     storeWordChipRustColumns, storeWordEvalAddressCols,
     eval_cpuState, Readers.ITypeReader.eval_cols,
     eval_registerAccessCols, eval_registerAccessTimestamp,
@@ -1549,7 +1644,7 @@ private theorem storeWordUnexpectedInteractionsEmpty
 theorem storeWordChipInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var StoreWordChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.StoreWordColumns (ZMod p))
+    (cols : StoreWordChip.Columns (ZMod p))
     (hbind : BindsChipOutput StoreWordChip.main env input offset cols) :
     List.Perm
       (nativeAccesses env
@@ -1564,15 +1659,15 @@ theorem storeWordChipInteractionsFaithful
   change storeWordChipRustColumns env input offset = cols at hbind
   subst cols
   let rustAccesses :=
-    (Extracted.StoreWordColumns.interactions
-      (storeWordChipRustColumns env input offset)).map
+    (Extracted.StoreWordOracle.StoreWordColumns.interactions
+      (storeWordChipReconfigure
+        (storeWordChipRustColumns env input offset))).map
         Extracted.Interaction.toAccess
   simp only [nativeAccesses]
   rw [storeWordUnexpectedInteractionsEmpty]
   simp only [List.map_nil, List.append_nil]
   simp only [ChipOracle.accesses,
-    ChipOracle.nativeInteractions, storeWordChipOracle,
-    ChipOracle.identity, id_eq]
+    ChipOracle.nativeInteractions, storeWordChipOracle]
   rw [storeWordStateInteractionsEq,
     StoreWordChip.interactionsWith_memory_eq,
     storeWordProgramInteractionsEq]
@@ -1592,7 +1687,7 @@ theorem storeWordChipInteractionsFaithful
     ((hByte.append_left _).append hMemory).append_right _
 
 theorem storeWordChipInteractionsConstructive
-    (rustCols : Extracted.StoreWordColumns (ZMod p))
+    (rustCols : Extracted.StoreWordOracle.StoreWordColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := storeWordChipRowCodec.assignment
       (storeWordChipOracle.deconfigure rustCols) data
@@ -1630,7 +1725,7 @@ theorem storeWordChipInteractionsConstructive
 
 theorem storeWordChip_faithful :
     ChipFaithful (p := p) StoreWordChip.Inputs
-      Extracted.StoreWordColumns Extracted.StoreWordColumns
+      StoreWordChip.Columns Extracted.StoreWordOracle.StoreWordColumns
       StoreWordChip.circuit storeWordChipRowCodec
       storeWordChipOracle where
   constraints := storeWordChipConstraintsConstructive (p := p)

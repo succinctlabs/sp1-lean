@@ -220,6 +220,47 @@ reproducible immutable git pins is a **release blocker** tracked outside this ca
   CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem, Addi, Jalr, Jal, UType, Addw, Bitwise, Lt,
   ShiftLeft, ShiftRight, AluX0, Branch, LoadByte, LoadHalf, LoadWord, LoadDouble, LoadX0} —
   **21/25**.
+- **StoreByte + StoreHalf + StoreWord + StoreDouble — complete, all gates green, ZERO proof
+  repair — the migration is DONE: 25/25.** The final (M5c) batch, one chip per green full build.
+  All four closures identical — `{CPUState, RTypeReader, ITypeReader, ITypeReaderImmutable,
+  AddrAddOperation, AddressOperation}` (read straight off the legacy import blocks: stores use the
+  read-only `ITypeReaderImmutable` on the `ITypeReader` row and no `U16MSBOperation`); every regen
+  diff was exactly the one new oracle file (all sibling regenerated modules byte-identical), and
+  every import block verified: `MemoryAccess` carrier + the four reader modules, NO legacy chip
+  import, embedded helpers exactly `AddrAddOperation` + `AddressOperation`. Native `Columns` land
+  in the four Native Defs (the store Specs + merge equations live there — LoadByte pattern); rows
+  keep the shared `Extracted.AddressOperation`/`MemoryAccessCols` blocks. Faithful rewrites are
+  the LoadDouble template verbatim ×4 (4 address-chain bridges each, `cases; rfl`
+  reconfigure/deconfigure, the bespoke direct rust-level assertions decompose:
+  `rw` oracle asserts → `dsimp` reconfigure → address bridge; embedded
+  `<Chip>Oracle.AddressOperation.value` named pre-emptively in the memory/byte interaction simp
+  sets). One non-proof fix round in the whole batch: the StoreHalf `Columns` insertion initially
+  landed between the `Inputs` doc comment and `structure Inputs` (the 8f1ae7a0 AluX0
+  adjacent-doc-comment trap recurring — StoreByte escaped only because its `Inputs` is
+  undocumented); the migration script now anchors the insertion after the `variable` line.
+  Grounding: `Grounding/MemoryChips.lean` needed exactly the 12 mechanical row-type renames
+  (`store*ChipDescriptor_view`/`_ramAccess` + `store*Chip_storeFacts` signatures ×4);
+  every other grounding file zero changes. No store has a trace or witness anchor (verified: zero
+  `Store*` references in `SP1CleanTest/`). **Batch-end retirement sweep** (the 25/25 closure):
+  legacy `Extracted/<Chip>Chip.lean` count is **ZERO**; `Extracted/AddrAddOperation.lean` +
+  `Extracted/AddressOperation.lean` are **KEPT** — no SystemOracle importer, but their generated
+  `asserts`/`interactions`/`value` functions are the canonical statement target of all NINE
+  load/store Faithful files' namespace bridges and address-op lemma sets (plus
+  `Contracts/Operations.lean`, the native gadget layer, and all nine native `Columns` rows) — the
+  Lt pattern, not the Subw rewire; retiring them would re-state the address lemmas 9× against
+  per-chip embedded copies. All 12 transitional Faithful anchors **STAY** with live importer
+  chains (U16MSB ← DivRem/Branch/Mul/Lt; LtOperationUnsigned ← DivRem/Branch/Lt;
+  U16Compare ← LtOperationUnsigned; IsZero ← IsZeroWord ← IsEqualWord ← DivRem;
+  U16toU8Safe/RTypeReader ← Mul; CPUState ← AluX0/Bitwise/Mul/ChipTactics;
+  ALUTypeReader ← Bitwise; ITypeReaderImmutable ← Branch; AddOperation ← DivRem), and every
+  remaining flat `Extracted/` module has ≥2 importers (none newly dead). Final `Extracted/`
+  inventory: 23 flat modules (7 readers/carrier: CPUState, RTypeReader, ITypeReader,
+  ITypeReaderImmutable, JTypeReader, ALUTypeReader, MemoryAccess; 13 shared ops; 3 infra:
+  ExtractionDSL, Provenance, CoreAIRManifest) + 25 `ChipOracle/` + 12 `SystemOracle/`.
+  Gates: per-chip `lake build SP1Clean` 0/0/0 (3610 jobs each); `lake test` green;
+  `lake lint` **passed** (Phase 2 closes with lint back in the gate set); probe regenerated
+  zero-diff (478 probes; no Faithful files deleted).
+  CHIP_ORACLES = all 25 supported instruction chips — **25/25; legacy whole-chip path retired**.
 
 ## Phase 3 — audit findings
 

@@ -174,14 +174,14 @@ private theorem extHashMap_get?_insert_ne (m : Std.ExtHashMap Nat (BitVec 8)) (k
 `commit = .store ⟨addr, value, 2⟩`: a real 2-byte memory write (`value = rs2` = `op_a_memory.prev_value`;
 `MemWrite.byteAt` takes its two low bytes, matching Sail's `extractLsb rs2 15 0`). `rdWrite = store_value`
 is a don't-care for a `writesReg = false` store row. -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.StoreHalfColumns (ZMod p)) :
+def rowView (inp : Inputs (ZMod p)) (cols : StoreHalfChip.Columns (ZMod p)) :
     Trace.RowView (ZMod p) :=
   ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, inp.is_real, inp.store_value, 37,
     .store ⟨cols.address_operation.addr_operation.value, inp.adapter.op_a_memory.prev_value, 2⟩⟩
 
 /-- StoreHalf's exact aligned RAM-access projection. -/
-def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.StoreHalfColumns (ZMod p)) :
+def ramAccessView (inp : Inputs (ZMod p)) (cols : StoreHalfChip.Columns (ZMod p)) :
     Trace.RamAccessView (ZMod p) :=
   { compareLow := inp.memory_access.access_timestamp.compare_low
     prevHigh := inp.memory_access.access_timestamp.prev_high
@@ -196,7 +196,7 @@ def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.StoreHalfColumns (ZM
     newValue := inp.store_value }
 
 /-- The reconciled store address as a `ℕ` (the three committed `AddressOperation` limbs). -/
-def storeAddrNat (cols : Extracted.StoreHalfColumns (ZMod p)) : ℕ :=
+def storeAddrNat (cols : StoreHalfChip.Columns (ZMod p)) : ℕ :=
   cols.address_operation.addr_operation.value[0].val
     + cols.address_operation.addr_operation.value[1].val * 2 ^ 16
     + cols.address_operation.addr_operation.value[2].val * 2 ^ 32
@@ -205,7 +205,7 @@ def storeAddrNat (cols : Extracted.StoreHalfColumns (ZMod p)) : ℕ :=
 operand-word bounds supplied by the grounded Memory bus, and the low-pc-limb bound. Wrapped address
 range and 2-byte alignment facts come from the chip's `AddressOperation.Spec`. Program-ROM
 preservation is composed once through `SailCodeMemoryCompatible`. -/
-def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.StoreHalfColumns (ZMod p))
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : StoreHalfChip.Columns (ZMod p))
     (_prog : GuestProgram) (s : SailState) : Prop :=
   (∀ idx : BitVec 5, (idx.toNat : ZMod p) = inp.adapter.op_a →
      s.get_reg? idx = some (Word.toBitVec64 inp.adapter.op_a_memory.prev_value)) ∧
@@ -219,7 +219,7 @@ set_option maxHeartbeats 2000000 in
 `op_a_memory.prev_value` (`byteAt` at `addr`/`addr+1`); the address reconciles to `(op_b + signExtend
 imm).toNat` via the chip `Spec`'s `AddressOperation.Spec` conjunct. The `hcov`/`hncov` obligations are
 discharged through the shallow kernel-depth helpers. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreHalfColumns (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : StoreHalfChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -353,7 +353,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreHalfColumns (ZMod
 def kind : Soundness.ChipKind p where
   name := "StoreHalf"
   Inputs := StoreHalfChip.Inputs
-  Cols := Extracted.StoreHalfColumns
+  Cols := StoreHalfChip.Columns
   view := rowView
   ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => StoreHalfChip.Spec inp cols data

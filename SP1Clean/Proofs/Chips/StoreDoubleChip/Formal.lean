@@ -9,7 +9,6 @@ in `Defs`; Sail bridge in `Bridge`.) -/
 namespace SP1Clean.StoreDoubleChip
 
 open Circuit
-open Extracted (StoreDoubleColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -162,8 +161,8 @@ theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
       exposedMemoryInteractions input offset := by
   simp [exposedMemoryInteractions]
 
-/-- The `StoreDouble` chip row as a `GeneralFormalCircuit`; output is the extracted `StoreDoubleColumns`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreDoubleColumns :=
+/-- The `StoreDouble` chip row as a `GeneralFormalCircuit`; output is the extracted `Columns`. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,

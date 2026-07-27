@@ -162,14 +162,14 @@ private theorem extHashMap_get?_insert_ne (m : Std.ExtHashMap Nat (BitVec 8)) (k
 subcircuit output recovered from the committed columns, `value = inp.adapter.op_a_memory.prev_value`
 (rs2's register value word; `MemWrite.byteAt` takes its low byte, matching Sail's
 `extractLsb rs2_val 7 0`). `rdWrite` is `inp.store_value` (a don't-care for a `writesReg = false` row). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.StoreByteColumns (ZMod p)) :
+def rowView (inp : Inputs (ZMod p)) (cols : StoreByteChip.Columns (ZMod p)) :
     Trace.RowView (ZMod p) :=
   ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, inp.is_real, inp.store_value, 36,
     .store ⟨cols.address_operation.addr_operation.value, inp.adapter.op_a_memory.prev_value, 1⟩⟩
 
 /-- StoreByte's exact aligned RAM-access projection. -/
-def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.StoreByteColumns (ZMod p)) :
+def ramAccessView (inp : Inputs (ZMod p)) (cols : StoreByteChip.Columns (ZMod p)) :
     Trace.RamAccessView (ZMod p) :=
   { compareLow := inp.memory_access.access_timestamp.compare_low
     prevHigh := inp.memory_access.access_timestamp.prev_high
@@ -185,7 +185,7 @@ def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.StoreByteColumns (ZM
 
 /-- The reconciled store byte-address as a `ℕ` (the three committed `AddressOperation` limbs). Used in
 `AdvanceReady`'s ROM-disjointness clause. -/
-def storeAddrNat (cols : Extracted.StoreByteColumns (ZMod p)) : ℕ :=
+def storeAddrNat (cols : StoreByteChip.Columns (ZMod p)) : ℕ :=
   cols.address_operation.addr_operation.value[0].val
     + cols.address_operation.addr_operation.value[1].val * 2 ^ 16
     + cols.address_operation.addr_operation.value[2].val * 2 ^ 32
@@ -196,7 +196,7 @@ bounds supplied by the grounded Memory bus, and the low-pc-limb bound. Wrapped a
 come from the chip's `AddressOperation.Spec`, rather than being repeated as readiness hypotheses.
 Program-ROM preservation is a
 single execution-boundary `SailCodeMemoryCompatible` contract, not a store AIR precondition. -/
-def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.StoreByteColumns (ZMod p))
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : StoreByteChip.Columns (ZMod p))
     (_prog : GuestProgram) (s : SailState) : Prop :=
   (∀ idx : BitVec 5, (idx.toNat : ZMod p) = inp.adapter.op_a →
      s.get_reg? idx = some (Word.toBitVec64 inp.adapter.op_a_memory.prev_value)) ∧
@@ -211,7 +211,7 @@ is `extractLsb (op_a_memory.prev_value) 7 0` = `byteAt`; the address (`storeAddr
 `(op_b_val + signExtend imm).toNat` via the chip `Spec`'s `AddressOperation.Spec` conjunct + the range facts
 (from `AdvanceReady`). The `hcov`/`hncov`/`hbyteAt` obligations are discharged through the three shallow
 kernel-depth helpers above (see their doc-comment). -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreByteColumns (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : StoreByteChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -312,7 +312,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreByteColumns (ZMod
 def kind : Soundness.ChipKind p where
   name := "StoreByte"
   Inputs := StoreByteChip.Inputs
-  Cols := Extracted.StoreByteColumns
+  Cols := StoreByteChip.Columns
   view := rowView
   ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => StoreByteChip.Spec inp cols data

@@ -135,7 +135,7 @@ omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end: from chip `Assumptions` + decode + register/PC reads, Sail's `SD` agrees with
 the SP1 chip emulation. -/
 theorem sd_chip_reaches_sail
-    (input : StoreDoubleChip.Inputs (ZMod p)) (_cols : Extracted.StoreDoubleColumns (ZMod p))
+    (input : StoreDoubleChip.Inputs (ZMod p)) (_cols : StoreDoubleChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (rs1_idx rs2_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (hconfig : SailState.isValidMemConfig s hs)
@@ -213,14 +213,14 @@ private theorem extHashMap_get?_insert_ne_sd (m : Std.ExtHashMap Nat (BitVec 8))
 
 /-- **StoreDouble's committed bus view** — opcode `39 = SD`, straight-line, `commit = .store ⟨addr, rs2, 8⟩`
 (8-byte write of the full 64-bit `rs2`). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZMod p)) :
+def rowView (inp : Inputs (ZMod p)) (cols : StoreDoubleChip.Columns (ZMod p)) :
     Trace.RowView (ZMod p) :=
   ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, inp.is_real, inp.adapter.op_a_memory.prev_value, 39,
     .store ⟨cols.address_operation.addr_operation.value, inp.adapter.op_a_memory.prev_value, 8⟩⟩
 
 /-- StoreDouble's exact aligned RAM-access projection. -/
-def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZMod p)) :
+def ramAccessView (inp : Inputs (ZMod p)) (cols : StoreDoubleChip.Columns (ZMod p)) :
     Trace.RamAccessView (ZMod p) :=
   { compareLow := inp.memory_access.access_timestamp.compare_low
     prevHigh := inp.memory_access.access_timestamp.prev_high
@@ -232,7 +232,7 @@ def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (
     priorValue := inp.memory_access.prev_value
     newValue := inp.adapter.op_a_memory.prev_value }
 
-def storeAddrNat (cols : Extracted.StoreDoubleColumns (ZMod p)) : ℕ :=
+def storeAddrNat (cols : StoreDoubleChip.Columns (ZMod p)) : ℕ :=
   cols.address_operation.addr_operation.value[0].val
     + cols.address_operation.addr_operation.value[1].val * 2 ^ 16
     + cols.address_operation.addr_operation.value[2].val * 2 ^ 32
@@ -241,7 +241,7 @@ def storeAddrNat (cols : Extracted.StoreDoubleColumns (ZMod p)) : ℕ :=
 operand-word bounds supplied by the grounded Memory bus, and the low-pc bound. Wrapped address range
 and 8-byte alignment facts come from the chip's `AddressOperation.Spec`. Program-ROM preservation
 is composed once through `SailCodeMemoryCompatible`. -/
-def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.StoreDoubleColumns (ZMod p))
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : StoreDoubleChip.Columns (ZMod p))
     (_prog : GuestProgram) (s : SailState) : Prop :=
   (∀ idx : BitVec 5, (idx.toNat : ZMod p) = inp.adapter.op_a →
      s.get_reg? idx = some (Word.toBitVec64 inp.adapter.op_a_memory.prev_value)) ∧
@@ -252,7 +252,7 @@ set_option maxHeartbeats 2000000 in
 /-- **`StoreDoubleChip.advance`** — the per-SD-row `try_step` lift. Over `advance_of_store` +
 `execute_STORE_reaches_width8` (via `decodesStore' 8`): an 8-byte write, no register write; the eight
 bytes are `byteAt` at `addr .. addr+7` = the little-endian bytes of `op_a_memory.prev_value` (full rs2). -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : StoreDoubleChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -506,7 +506,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZM
 def kind : Soundness.ChipKind p where
   name := "StoreDouble"
   Inputs := StoreDoubleChip.Inputs
-  Cols := Extracted.StoreDoubleColumns
+  Cols := StoreDoubleChip.Columns
   view := rowView
   ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => StoreDoubleChip.Spec inp cols data

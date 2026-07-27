@@ -138,6 +138,7 @@ import SP1Clean.Extracted.ChipOracle.LoadHalf
 import SP1Clean.Extracted.ChipOracle.LoadWord
 import SP1Clean.Extracted.ChipOracle.LoadDouble
 import SP1Clean.Extracted.ChipOracle.LoadX0
+import SP1Clean.Extracted.ChipOracle.StoreByte
 import SP1Clean.Extracted.AddOperation
 import SP1Clean.Extracted.AddrAddOperation
 import SP1Clean.Extracted.AddressOperation
@@ -170,10 +171,9 @@ import SP1Clean.Extracted.MulOperation
 import SP1Clean.Extracted.RTypeReader
 import SP1Clean.Extracted.ChipOracle.ShiftLeft
 import SP1Clean.Extracted.ChipOracle.ShiftRight
-import SP1Clean.Extracted.StoreByteChip
-import SP1Clean.Extracted.StoreDoubleChip
-import SP1Clean.Extracted.StoreHalfChip
-import SP1Clean.Extracted.StoreWordChip
+import SP1Clean.Extracted.ChipOracle.StoreHalf
+import SP1Clean.Extracted.ChipOracle.StoreWord
+import SP1Clean.Extracted.ChipOracle.StoreDouble
 import SP1Clean.Extracted.U16CompareOperation
 import SP1Clean.Extracted.U16MSBOperation
 import SP1Clean.Extracted.U16toU8OperationSafe

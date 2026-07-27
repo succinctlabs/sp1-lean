@@ -177,14 +177,14 @@ private theorem extHashMap_get?_insert_ne_sw (m : Std.ExtHashMap Nat (BitVec 8))
 
 /-- **StoreWord's committed bus view** — opcode `38 = SW`, straight-line, `commit = .store ⟨addr, rs2, 4⟩`
 (4-byte write of `rs2[31:0]`). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.StoreWordColumns (ZMod p)) :
+def rowView (inp : Inputs (ZMod p)) (cols : StoreWordChip.Columns (ZMod p)) :
     Trace.RowView (ZMod p) :=
   ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, inp.is_real, inp.store_value, 38,
     .store ⟨cols.address_operation.addr_operation.value, inp.adapter.op_a_memory.prev_value, 4⟩⟩
 
 /-- StoreWord's exact aligned RAM-access projection. -/
-def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.StoreWordColumns (ZMod p)) :
+def ramAccessView (inp : Inputs (ZMod p)) (cols : StoreWordChip.Columns (ZMod p)) :
     Trace.RamAccessView (ZMod p) :=
   { compareLow := inp.memory_access.access_timestamp.compare_low
     prevHigh := inp.memory_access.access_timestamp.prev_high
@@ -197,7 +197,7 @@ def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.StoreWordColumns (ZM
     priorValue := inp.memory_access.prev_value
     newValue := inp.store_value }
 
-def storeAddrNat (cols : Extracted.StoreWordColumns (ZMod p)) : ℕ :=
+def storeAddrNat (cols : StoreWordChip.Columns (ZMod p)) : ℕ :=
   cols.address_operation.addr_operation.value[0].val
     + cols.address_operation.addr_operation.value[1].val * 2 ^ 16
     + cols.address_operation.addr_operation.value[2].val * 2 ^ 32
@@ -206,7 +206,7 @@ def storeAddrNat (cols : Extracted.StoreWordColumns (ZMod p)) : ℕ :=
 operand-word bounds supplied by the grounded Memory bus, and the low-pc bound. Wrapped address range
 and 4-byte alignment facts come from the chip's `AddressOperation.Spec`. Program-ROM preservation
 is composed once through `SailCodeMemoryCompatible`. -/
-def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.StoreWordColumns (ZMod p))
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : StoreWordChip.Columns (ZMod p))
     (_prog : GuestProgram) (s : SailState) : Prop :=
   (∀ idx : BitVec 5, (idx.toNat : ZMod p) = inp.adapter.op_a →
      s.get_reg? idx = some (Word.toBitVec64 inp.adapter.op_a_memory.prev_value)) ∧
@@ -217,7 +217,7 @@ set_option maxHeartbeats 2000000 in
 /-- **`StoreWordChip.advance`** — the per-SW-row `try_step` lift. Over `advance_of_store` +
 `execute_STORE_reaches_width4` (via `decodesStore 4`): a 4-byte write, no register write; the four bytes
 are `byteAt` at `addr .. addr+3` = the low 4 bytes of `op_a_memory.prev_value`. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreWordColumns (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : StoreWordChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -385,7 +385,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreWordColumns (ZMod
 def kind : Soundness.ChipKind p where
   name := "StoreWord"
   Inputs := StoreWordChip.Inputs
-  Cols := Extracted.StoreWordColumns
+  Cols := StoreWordChip.Columns
   view := rowView
   ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => StoreWordChip.Spec inp cols data

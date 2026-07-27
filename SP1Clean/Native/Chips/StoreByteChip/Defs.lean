@@ -5,7 +5,6 @@ import SP1Clean.Native.Readers.ITypeReaderImmutable
 import SP1Clean.Native.Readers.MemoryAccess
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
-import SP1Clean.Extracted.StoreByteChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -25,10 +24,28 @@ for the high byte), and `store_value` adds it to the `offset_bit[1..2]`-selected
 namespace SP1Clean.StoreByteChip
 
 open Circuit
-open Extracted (StoreByteColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native StoreByte-chip row (Rust field order). The reader and memory blocks reuse the project
+substrate (`Extracted.AddressOperation` is still a standalone generated module — the other loads and
+stores compose the same gadget; `Extracted.MemoryAccessCols` lives in the generated `MemoryAccess`
+struct carrier). `Faithful.StoreByteChip.storeByteChipReconfigure` is the sole bridge to Rust's
+separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ITypeReader F
+  address_operation : Extracted.AddressOperation F
+  memory_access : Extracted.MemoryAccessCols F
+  offset_bit : Vector F 3
+  mem_limb : F
+  mem_limb_low_byte : F
+  register_low_byte : F
+  increment : F
+  store_value : Word F
+  is_real : F
+deriving ProvableStruct
 
 structure Inputs (F : Type) where
   is_real : F
@@ -79,7 +96,7 @@ deriving ProvableStruct
   (input.register_low_byte - input.mem_limb_low_byte) * (1 - input.offset_bit[0])
     + 256 * (input.register_low_byte - memHigh input) * input.offset_bit[0]
 
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var StoreByteColumns (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let is_real := input.is_real
   let regHigh := (input.adapter.op_a_memory.prev_value[0] - input.register_low_byte)
     * Expression.const ((256 : ZMod p)⁻¹)
@@ -137,7 +154,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var StoreByteColumns 
     input.store_value, input.is_real⟩
 
 /-- Derive the four address witness cells and the complete four-channel interface from `main`. -/
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreByteColumns main := by
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit
 
 /-- Folded completed-row layout used by the whole-chip Rust AIR codec. -/
@@ -149,11 +166,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreByteColumns main :=
         input.memory_access, input.offset_bit, input.mem_limb,
         input.mem_limb_low_byte, input.register_low_byte, input.increment,
         input.store_value, input.is_real⟩ :
-        Var StoreByteColumns (ZMod p)) := rfl
+        Var Columns (ZMod p)) := rfl
 
 /-- Component-wise evaluation of a completed StoreByte row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : StoreByteColumns (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state
          adapter := Eval.eval env cols.adapter
@@ -166,13 +183,13 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreByteColumns main :=
          increment := Eval.eval env cols.increment
          store_value := Eval.eval env cols.store_value
          is_real := Eval.eval env cols.is_real } :
-        StoreByteColumns F) := by
+        Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
 /-- Semantic contract. The spine sub-`Spec`s, the (real-row-gated) byte bounds, the mem-limb selection,
 the increment identity, the read-modify-write equations, and the `is_real` binary. -/
-def Spec (input : Inputs (ZMod p)) (cols : StoreByteColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   AddressOperation.RowSpec
     ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1],
       input.offset_bit[2], input.is_real⟩

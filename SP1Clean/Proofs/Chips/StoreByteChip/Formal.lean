@@ -9,7 +9,6 @@ in `Defs`; Sail bridge in `Bridge`.) -/
 namespace SP1Clean.StoreByteChip
 
 open Circuit
-open Extracted (StoreByteColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -267,8 +266,8 @@ theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
   simp [exposedMemoryInteractions]
 
 set_option maxHeartbeats 2000000 in
-/-- The `StoreByte` chip row as a `GeneralFormalCircuit`; output is the extracted `StoreByteColumns`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreByteColumns :=
+/-- The `StoreByte` chip row as a `GeneralFormalCircuit`; output is the extracted `Columns`. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   -- `byteChannel` dropped (W11 Phase 0c): the two off-gate byte-pull `Requirements` (register/mem U8 pairs)
   -- are discharged by the inline `is_real` boolean gate in `main`; the residual buses are the readers'.
   { main, elaborated,

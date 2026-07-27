@@ -9,7 +9,6 @@ in `Defs`; Sail bridge in `Bridge`.) -/
 namespace SP1Clean.StoreWordChip
 
 open Circuit
-open Extracted (StoreWordColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -217,8 +216,8 @@ theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
       exposedMemoryInteractions input offset := by
   simp [exposedMemoryInteractions]
 
-/-- The `StoreWord` chip row as a `GeneralFormalCircuit`; output is the extracted `StoreWordColumns`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs StoreWordColumns :=
+/-- The `StoreWord` chip row as a `GeneralFormalCircuit`; output is the extracted `Columns`. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,
