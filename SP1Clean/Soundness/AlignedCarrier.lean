@@ -15,7 +15,8 @@ per-reader-family) instance supplies `touches` — the produced list in order, e
 same-location prior at the push's micro-time — and the per-touch `TouchOK`; `AlignsWith` and `RowOK`
 then follow generically here.
 
-Register-axis only; the RAM analogue (loads/stores) is Phase R. -/
+The constructor is location-generic; register-only callers retain a compatibility wrapper while
+load/store rows use the RAM read window directly. -/
 
 open SP1Clean.Soundness.TimedGrounding
 open SP1Clean.Semantics
@@ -63,9 +64,29 @@ theorem rowTouchesAt_alignedOf (r_ord : RowFacts p) (touches : List (Touch p)) (
   rw [zip_map_fst_snd]
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
-/-- **Generic `AlignsWith` for the aligned constructor.**  The instance supplies: the aligned pushes
-are the ordinary produced list; every ordinary pull is register-located and read at the window start;
-and every ordinary pull's message appears as some touch's aligned pull inside the pre-write epoch. -/
+/-- **Generic `AlignsWith` for the aligned constructor.**  The instance supplies the two message
+permutations, the ordinary read-time convention, and a same-message aligned pull inside the
+location-dependent pre-effect window. -/
+theorem alignsWith_alignedOf_general (r_ord : RowFacts p) (touches : List (Touch p))
+    (hpush : (touches.map Prod.snd).Perm r_ord.memPushes)
+    (hpull : ((touches.map Prod.fst).map Prod.fst).Perm (r_ord.memPulls.map Prod.fst))
+    (hordTime : ∀ mp ∈ r_ord.memPulls, mp.2 = StateMsg.timeNat r_ord.statePull)
+    (hmatch : ∀ mp ∈ r_ord.memPulls, ∃ tc ∈ touches, tc.1.1 = mp.1 ∧
+      StateMsg.timeNat r_ord.statePull ≤ tc.1.2 ∧
+      tc.1.2 ≤ StateMsg.timeNat r_ord.statePull + readWindow (MemoryMsg.locOf mp.1)) :
+    AlignsWith (alignedOf r_ord touches) r_ord where
+  statePull := rfl
+  statePush := rfl
+  pushes := hpush
+  pulls := hpull
+  ordTime := hordTime
+  match_ := by
+    intro mp hmp
+    obtain ⟨tc, htc, hmsg, hlo, hhi⟩ := hmatch mp hmp
+    exact ⟨tc.1, List.mem_map_of_mem htc, hmsg, hlo, hhi⟩
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- Register-only compatibility wrapper for the existing grounding families. -/
 theorem alignsWith_alignedOf (r_ord : RowFacts p) (touches : List (Touch p))
     (hpush : (touches.map Prod.snd).Perm r_ord.memPushes)
     (hpull : ((touches.map Prod.fst).map Prod.fst).Perm (r_ord.memPulls.map Prod.fst))
@@ -74,17 +95,14 @@ theorem alignsWith_alignedOf (r_ord : RowFacts p) (touches : List (Touch p))
     (hmatch : ∀ mp ∈ r_ord.memPulls, ∃ tc ∈ touches, tc.1.1 = mp.1 ∧
       StateMsg.timeNat r_ord.statePull ≤ tc.1.2 ∧
       tc.1.2 < StateMsg.timeNat r_ord.statePull + 4) :
-    AlignsWith (alignedOf r_ord touches) r_ord where
-  statePull := rfl
-  statePush := rfl
-  pushes := hpush
-  pulls := hpull
-  reg := hreg
-  ordTime := hordTime
-  match_ := by
-    intro mp hmp
-    obtain ⟨tc, htc, hmsg, hlo, hhi⟩ := hmatch mp hmp
-    exact ⟨tc.1, List.mem_map_of_mem htc, hmsg, hlo, hhi⟩
+    AlignsWith (alignedOf r_ord touches) r_ord := by
+  refine alignsWith_alignedOf_general r_ord touches hpush hpull hordTime ?_
+  intro mp hmp
+  obtain ⟨i, hloc⟩ := hreg mp hmp
+  obtain ⟨tc, htc, hmsg, hlo, hhi⟩ := hmatch mp hmp
+  refine ⟨tc, htc, hmsg, hlo, ?_⟩
+  rw [hloc, readWindow_reg]
+  omega
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- **Generic `RowOK` for the aligned constructor.**  From the per-touch `TouchOK`, the `+8` clock

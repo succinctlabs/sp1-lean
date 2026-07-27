@@ -8,6 +8,7 @@ import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Faithful.ChipTactics
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.AddOperation
+import SP1Clean.Faithful.ChipOracle
 
 /-! # Faithfulness anchor — `AddOperation` constraints ↔ native `AssertSpec`/`InteractSpec`
 
@@ -47,9 +48,80 @@ theorem add_interactions_faithful (a b value : Word (ZMod p)) :
       SP1Clean.AddOperation.InteractSpec value := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.AddOperation.interactions, List.Forall,
-    Interaction.toProp_send_byte, ByteOpcode.ofNat_six,
+    Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_Range, val_16, one_ne_zero, ne_eq, not_false_eq_true, true_implies,
     SP1Clean.AddOperation.InteractSpec, show (2 : ℕ) ^ 16 = 65536 from by norm_num]
+
+@[circuit_norm] theorem eval_addColumns
+    {F : Type} [FiniteField F] (env : Environment F)
+    (cols : SP1Clean.AddOperation.Columns (Expression F)) :
+    Eval.eval env cols =
+      ({ value := Eval.eval env cols.value } :
+        SP1Clean.AddOperation.Columns F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_extractedAddColumns
+    {F : Type} [FiniteField F] (env : Environment F)
+    (cols : Extracted.AddOperation (Expression F)) :
+    Eval.eval env cols =
+      ({ value := Eval.eval env cols.value } :
+        Extracted.AddOperation F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+private def addAssertionExpressions
+    (input : Var SP1Clean.AddOperation.Inputs (ZMod p)) :
+    List (Expression (ZMod p)) :=
+  let c0 :=
+    (input.a[0] + input.b[0] - input.cols.value[0]) *
+      (65536 : ZMod p)⁻¹
+  let c1 :=
+    (input.a[1] + input.b[1] - input.cols.value[1] + c0) *
+      (65536 : ZMod p)⁻¹
+  let c2 :=
+    (input.a[2] + input.b[2] - input.cols.value[2] + c1) *
+      (65536 : ZMod p)⁻¹
+  let c3 :=
+    (input.a[3] + input.b[3] - input.cols.value[3] + c2) *
+      (65536 : ZMod p)⁻¹
+  [input.is_real * (input.is_real - 1),
+    input.is_real * (c0 * (c0 - 1)),
+    input.is_real * (c1 * (c1 - 1)),
+    input.is_real * (c2 * (c2 - 1)),
+    input.is_real * (c3 * (c3 - 1))]
+
+omit [Fact (2 ^ 17 < p)] in
+set_option maxHeartbeats 1000000 in
+private theorem add_nativeAssertions
+    (env : Environment (ZMod p))
+    (input : Var SP1Clean.AddOperation.Inputs (ZMod p))
+    (offset : ℕ) :
+    nativeAssertZeros env
+        ((SP1Clean.AddOperation.main input).operations offset) =
+      (addAssertionExpressions input).map
+        (Expression.eval env) := by
+  unfold nativeAssertZeros
+  simp [SP1Clean.AddOperation.main, addAssertionExpressions,
+    circuit_norm, Expression.eval]
+
+omit [Fact (2 ^ 17 < p)] in
+set_option maxHeartbeats 1000000 in
+/-- Folded normalization of the native add fragment to the exact generated Rust assertion list. -/
+theorem add_assertions_exact
+    (env : Environment (ZMod p))
+    (input : Var SP1Clean.AddOperation.Inputs (ZMod p))
+    (offset : ℕ) :
+    nativeAssertZeros env
+        ((SP1Clean.AddOperation.main input).operations offset) =
+      Extracted.AddOperation.asserts
+        (Eval.eval env input.a) (Eval.eval env input.b)
+        ⟨Eval.eval env input.cols.value⟩
+        (Expression.eval env input.is_real) := by
+  rw [add_nativeAssertions, Extracted.AddOperation.asserts]
+  simp only [addAssertionExpressions, List.map_cons, List.map_nil,
+    eval_sub, Expression.eval, ProvableType.getElem_eval_fields,
+    add_zero]
 
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery
@@ -92,8 +164,7 @@ theorem add_interactions_faithful_syntactic
   -- RHS: recover the 4 byte pulls from `main`; LHS: expand the extracted list + projection.
   simp only [SP1Clean.AddOperation.main, circuit_norm, hk,
     Extracted.AddOperation.interactions, List.map_cons, List.map_nil,
-    Extracted.Interaction.toAccess_byte, ByteOpcode.ofNat_six, ByteOpcode.idx,
-    h_ir, h_v0, h_v1, h_v2, h_v3, h6]
+    Extracted.Interaction.toAccess_byte, h_ir, h_v0, h_v1, h_v2, h_v3, h6]
 
 /-- **Faithfulness anchor — combined.** The two-list pair form of `add_asserts_faithful` /
 `add_interactions_faithful`, for composing `AddOperation` as a fragment inside a chip-level anchor

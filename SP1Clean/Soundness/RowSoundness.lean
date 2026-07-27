@@ -172,6 +172,34 @@ theorem witness_decodedRow_finishedChannelGuarantees
         (witness.mem_allTables_of_mem_tables (List.mem_of_mem_take tableMem))).2
     · exact decodedMem
 
+/-- An active decoded row inherits the structural well-formedness of its exact Program fetch.
+This is deliberately separate from committed-ROM membership: the finished Program channel supplies
+the limb/index bounds, while `decodedInROM` supplies instruction semantics. -/
+theorem decodedInstructionRow_programRowSpec
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
+    (decoded : DecodedInstructionRow p)
+    (decodedMem : decoded ∈ decodedInstructionRows (p := p) witness.tables)
+    (real : (decoded.toChipRow witness.data).is_real = 1) :
+    ProgramMsg.RowSpec (programMessageOfView (decoded.toChipRow witness.data).view) := by
+  have rowConstraints := decodedInstructionRow_constraints witness constraints decoded decodedMem
+  have interactions := decoded.programInteractions_eq_of_mem witness.data witness.tables decodedMem
+    rowConstraints
+  let target := TypedInteraction.pulledIfValue programChannel
+    (decoded.toChipRow witness.data).is_real
+    (programMessageOfView (decoded.toChipRow witness.data).view)
+  have targetMem : target ∈ decoded.interactionsWith witness.data programChannel := by
+    rw [interactions]
+    exact List.mem_cons_self
+  have targetNegative : target.mult = -1 := by
+    simp only [target, TypedInteraction.pulledIfValue_mult, real]
+  have programGuarantees :=
+    (witness_decodedRow_finishedChannelGuarantees witness constraints balanced decoded decodedMem).2
+  have guarantee := TypedInteraction.guarantee_of_channelGuarantees
+    decoded.chip.table.operations programChannel (decoded.environment witness.data) target targetMem
+    programGuarantees (by rfl) targetNegative
+  simpa only [target, TypedInteraction.pulledIfValue_message, programChannel] using guarantee
+
 /-- The exact hypotheses Clean's circuit theorem consumes for one decoded physical row.  In the
 capstone these are assembled dynamically: Memory truth supplies the remaining guarantees and helps
 discharge the chip-specific assumptions at the row's execution position. -/

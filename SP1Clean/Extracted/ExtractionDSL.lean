@@ -11,9 +11,12 @@ List (Interaction F)` (bus sends/receives) — mirroring Clean's own `Operations
 is **no** `SP1Constraints` wrapper struct: the two lists are independent functions, composed by plain
 `List.append` (`Sub0.asserts … ++ Sub1.asserts … ++ [own…]`).
 
-Byte sends keep their **load-bearing** per-row meaning (range / AND·OR·XOR via `ByteOpcode.constrain`,
-which lives in `Foundations/SP1Constraint.lean`); state/memory/program sends and all receives are
-per-row `True` (their meaning is the trace-level bus balance, `Foundations/InteractionBus.lean`). -/
+Byte sends preserve the upstream opcode as a **raw field element**. This matters for exact whole-AIR
+faithfulness: Rust's `send_byte` accepts an AIR expression, whereas Lean's generated
+`ByteOpcode.ofNat` maps every out-of-range value to `.Range`. The byte table gives a nonzero send
+its load-bearing per-row meaning by requiring that raw field element to be the index of some
+`ByteOpcode`; state/memory/program sends and all receives are per-row `True` (their meaning is the
+trace-level bus balance, `Foundations/InteractionBus.lean`). -/
 
 namespace SP1Clean.Extracted
 
@@ -57,7 +60,9 @@ inductive AirInteractionKind where
   deriving DecidableEq, Repr
 
 inductive AirInteraction (F : Type) where
-  | byte (op : ByteOpcode) (a b c : F)
+  /-- The exact upstream byte-bus tuple. In particular `opcode` is not decoded to `ByteOpcode`
+  here: decoding would lose adversarial field values before row constraints are checked. -/
+  | byte (opcode a b c : F)
   | state (a b c d e : F)
   | memory (a b c d e f g h i : F)
   | program (a b c : F) (op : Opcode) (d e f g h i j k l m n o : F)
@@ -81,12 +86,14 @@ structure Interaction (F : Type) where
 namespace Interaction
 
 def toProp {p : ℕ} [NeZero p] : Interaction (ZMod p) → Prop
-  | ⟨.send, .byte op a b c, mult⟩ => mult ≠ 0 → op.constrain a b c
+  | ⟨.send, .byte opcode a b c, mult⟩ =>
+      mult ≠ 0 → ByteOpcode.constrainField opcode a b c
   | _ => True
 
 @[simp] lemma toProp_send_byte {p : ℕ} [NeZero p]
-    (op : ByteOpcode) (a b c mult : ZMod p) :
-    (⟨.send, .byte op a b c, mult⟩ : Interaction (ZMod p)).toProp ↔ (mult ≠ 0 → op.constrain a b c) :=
+    (opcode a b c mult : ZMod p) :
+    (⟨.send, .byte opcode a b c, mult⟩ : Interaction (ZMod p)).toProp ↔
+      (mult ≠ 0 → ByteOpcode.constrainField opcode a b c) :=
   Iff.rfl
 
 /-- A `receive` of any interaction has trivial per-row meaning — its semantics are the trace-level

@@ -413,6 +413,21 @@ lemma isC0_result_bool (C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
   · exact Or.inl rfl
 
 set_option linter.unusedSectionVars false in
+/-- The remainder-check multiplicity is boolean whenever the row gate is boolean. -/
+lemma ltGate_bool (C : Word (ZMod p)) (f : Vector (ZMod p) 8) {ir : ZMod p}
+    (hir : ir = 0 ∨ ir = 1) : ltGate ir C f = 0 ∨ ltGate ir C f = 1 := by
+  unfold ltGate
+  rcases hir with h0 | h1
+  · left
+    rw [h0, zero_mul]
+  · rw [h1, one_mul]
+    rcases isC0_result_bool C f with hz | ho
+    · right
+      rw [hz, sub_zero]
+    · left
+      rw [ho, sub_self]
+
+set_option linter.unusedSectionVars false in
 /-- 64-bit classes: `cComp` is the zero word iff the raw `c` is zero as a 64-bit value. -/
 lemma cComp_zero_iff_64 {C : Word (ZMod p)} (hC : C.isU64) {f : Vector (ZMod p) 8}
     (h45 : ¬(f[4] + f[5] = 1)) (h67 : ¬(f[6] + f[7] = 1)) :

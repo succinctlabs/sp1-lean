@@ -38,6 +38,29 @@ open SP1Clean.Channels (stateChannel byteChannel StateMsg)
 
 variable {p : ℕ} [Fact p.Prime]
 
+/-- Component-wise evaluation of the canonical CPU-state row. -/
+@[circuit_norm] theorem eval_cols {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.CPUState (Expression F)) :
+    Eval.eval env cols =
+      ({ clk_high := Eval.eval env cols.clk_high,
+         clk_16_24 := Eval.eval env cols.clk_16_24,
+         clk_0_16 := Eval.eval env cols.clk_0_16,
+         pc := Eval.eval env cols.pc } : Extracted.CPUState F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_clk0 {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.CPUState (Expression F)) :
+    (Eval.eval env cols).clk_0_16 = Expression.eval env cols.clk_0_16 := by
+  rw [eval_cols]
+  simp only [circuit_norm]
+
+@[circuit_norm] theorem eval_clk1 {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.CPUState (Expression F)) :
+    (Eval.eval env cols).clk_16_24 = Expression.eval env cols.clk_16_24 := by
+  rw [eval_cols]
+  simp only [circuit_norm]
+
 instance [Fact (2 ^ 17 < p)] : Fact (p > 2) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 omit [Fact p.Prime] in

@@ -49,6 +49,15 @@ deriving ProvableStruct
 @[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
 @[reducible] def Inputs.op_c_imm {F} (i : Inputs F) : Word F := i.adapter.op_c_imm
 
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real
+         state := Eval.eval env input.state
+         adapter := Eval.eval env input.adapter
+         memory_access := Eval.eval env input.memory_access } : Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
 
 /-- The recombined low clock `clk_0_16 + clk_16_24 · 2^16` (matching SP1's `clk_low`). -/
 @[reducible] def clkLow (state : Extracted.CPUState (ZMod p)) : ZMod p :=
@@ -62,13 +71,16 @@ the `is_real` binary gate are imposed directly. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadDoubleColumns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let addr_op ← subcircuit AddressOperation.circuit ⟨input.op_b_val, input.op_c_imm, 0, 0, 0⟩
+  let addr_op ← AddressOperation.circuit
+    ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩
+  let address := AddressOperation.alignedValue
+    ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩ addr_op
   -- SC Phase 2pre: `MemoryAccess` is now a `GeneralFormalCircuit`, composed via the GFC `CoeFun`
   -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
   let _ ← Readers.MemoryAccess.circuit
     ⟨input.memory_access, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
-      addr_op.addr_operation.value[0], addr_op.addr_operation.value[1], addr_op.addr_operation.value[2],
+      address[0], address[1], address[2],
       input.memory_access.prev_value, input.is_real⟩
   -- SC Phase 2pre: `ITypeReader` is now a `GeneralFormalCircuit`, composed via the GFC `CoeFun`.
   let _ ← Readers.ITypeReader.circuit
@@ -102,15 +114,47 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadDoubleColumns main w
   -- `memoryChannel` joins from `MemoryAccess`'s read pulls + `RegisterWrite`'s op_a write push (W11 memory flip).
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
+/-- Folded completed-row layout used by the whole-chip Rust AIR codec. -/
+@[circuit_norm] lemma directOutput_eq
+    (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter,
+        ⟨varFromOffset Extracted.AddrAddOperation offset, var ⟨offset + 3⟩⟩,
+        input.memory_access, input.is_real⟩ :
+        Var LoadDoubleColumns (ZMod p)) := rfl
+
+/-- Component-wise evaluation of a completed LoadDouble row. -/
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : LoadDoubleColumns (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state
+         adapter := Eval.eval env cols.adapter
+         address_operation := Eval.eval env cols.address_operation
+         memory_access := Eval.eval env cols.memory_access
+         is_real := Eval.eval env cols.is_real } :
+        LoadDoubleColumns F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity,
 the `MemoryAccess` timestamp monotonicity, the `ITypeReader` adapter facts (which carry the load meaning —
 `op_a`'s write value is `memory_access.prev_value`), the `op_a != x0` flag, and the `is_real`-binary fact. -/
 def Spec (input : Inputs (ZMod p)) (cols : LoadDoubleColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  AddressOperation.Spec ⟨input.op_b_val, input.op_c_imm, 0, 0, 0⟩ cols.address_operation ∧
+  AddressOperation.RowSpec
+      ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩
+      cols.address_operation ∧
   Readers.MemoryAccess.Spec
     ⟨input.memory_access, input.state.clk_high, clkLow input.state,
-      cols.address_operation.addr_operation.value[0], cols.address_operation.addr_operation.value[1],
-      cols.address_operation.addr_operation.value[2], input.memory_access.prev_value, input.is_real⟩ ∧
+      (AddressOperation.alignedValue
+        ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩
+        cols.address_operation)[0],
+      (AddressOperation.alignedValue
+        ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩
+        cols.address_operation)[1],
+      (AddressOperation.alignedValue
+        ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩
+        cols.address_operation)[2],
+      input.memory_access.prev_value, input.is_real⟩ ∧
   Readers.ITypeReader.Spec
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high, clkLow input.state,
       input.state.pc, 35,

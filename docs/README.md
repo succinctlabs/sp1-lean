@@ -32,13 +32,13 @@ chain and the design choices that led to the current whole-chip boundary.
 ## Current reader-facing docs
 
 - [`overview.md`](overview.md) — honest current overview; it distinguishes the supported-native theorem,
-  the conditional exact-upstream `sp1_air_refinement`/`sp1_air_sound` composition boundary, and the still
-  open execution/ArkLib layers.
+  the conditional exact-upstream `_of_obligations` composition boundary, and the still-open
+  execution/ArkLib layers.
 - [`architecture.md`](architecture.md) — detailed architecture and migration status.
 - [`release-audit.md`](release-audit.md) — authoritative current proof and trust audit. Regenerate its raw
   census with `scripts/run_audit.sh` before citing numbers.
-- [`roadmap.md`](roadmap.md) — live debt and dependency graph. Its older W-item narrative is retained as
-  implementation history and explicitly marked as such.
+- [`roadmap.md`](roadmap.md) — live dependency graph from exact system-table grounding through ArkLib
+  integration and witness-generation completeness.
 - [`bus-model.md`](bus-model.md) — the four plain Clean channels and their row-local guarantees.
 - [`chip-standardization.md`](chip-standardization.md) — the completed 25/25 `ChipKind.advance` interface
   and how the machine layer consumes it.
@@ -51,8 +51,8 @@ chain and the design choices that led to the current whole-chip boundary.
 - [`audits/2026-07-full-project/`](audits/2026-07-full-project/) — frozen repository-wide audit at
   `6c399dbd` before the remediation work. Its findings are preserved as evidence, with a post-audit note
   pointing to the current status; it is not a description of today's worktree.
-- [`goal-overview.md`](goal-overview.md) — aspirational completed-state document for the full AIR,
-  boot-to-halt, and ArkLib verifier layers. Do not cite it as current status.
+- [`goal-overview.md`](goal-overview.md) — completion contract for the full AIR, boot-to-halt, ArkLib
+  verifier, and witness-generation layers. Do not cite it as current status.
 - [`archive/`](archive/) — retired handoff records (the pre-4.31 `clean-main-migration.md` /
   `430-migration-handoff.md` and the `w11-rebase-status.md` ensemble re-base). Provenance only; their
   durable conclusions are in `roadmap.md`, `architecture.md`, and Clean's own docs

@@ -88,9 +88,8 @@ theorem loadX0_w1 (is_unsigned : Bool)
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 1 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 1 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 1 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀) :
     (specX0 is_unsigned 1 imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s := by
@@ -99,19 +98,16 @@ theorem loadX0_w1 (is_unsigned : Bool)
     rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   obtain ⟨hsp_init, hsp_config, hsp_rs1, hmem_eq⟩ := persist_nextPC rs1_idx reg_val pc s hs hconfig h_rs1
-  have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
-      = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
-  have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rwa [hmem_eq, ← hadd]
+  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := by
+    rwa [hmem_eq]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 1 = true := by
-    rwa [is_aligned_vaddr_iff_mod, hadd]
+    rwa [is_aligned_vaddr_iff_mod]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 1 (by omega) h_lo (by rwa [hadd])
+    range_subset_sp1_pma _ 1 (by omega) h_lo h_hi
   have hread := run_vmem_read_of_width_1' rs1_idx reg_val (BitVec.signExtend 64 imm) data₀
-    sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range hm₀
+    sp hsp_init hsp_rs1 h_align' hsp_config h_in_range hm₀
   simp only at hread
   rw [hsp] at hread
   simp [specX0, sp1_loadX0, run_readReg_of_isInitialized _ _ hs,
@@ -126,9 +122,8 @@ theorem loadX0_w2 (is_unsigned : Bool)
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 2 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 2 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁) :
@@ -138,21 +133,18 @@ theorem loadX0_w2 (is_unsigned : Bool)
     rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   obtain ⟨hsp_init, hsp_config, hsp_rs1, hmem_eq⟩ := persist_nextPC rs1_idx reg_val pc s hs hconfig h_rs1
-  have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
-      = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
-  have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rwa [hmem_eq, ← hadd]
-  have hm₁ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
-    rwa [hmem_eq, ← hadd]
+  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := by
+    rwa [hmem_eq]
+  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
+    rwa [hmem_eq]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 2 = true := by
-    rwa [is_aligned_vaddr_iff_mod, hadd]
+    rwa [is_aligned_vaddr_iff_mod]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 2 (by omega) h_lo (by rwa [hadd])
+    range_subset_sp1_pma _ 2 (by omega) h_lo h_hi
   have hread := run_vmem_read_of_width_2' rs1_idx reg_val (BitVec.signExtend 64 imm) data₀ data₁
-    sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range hm₀ hm₁
+    sp hsp_init hsp_rs1 h_align' hsp_config h_in_range hm₀ hm₁
   simp only at hread
   rw [hsp] at hread
   simp [specX0, sp1_loadX0, run_readReg_of_isInitialized _ _ hs,
@@ -168,9 +160,8 @@ theorem loadX0_w4 (is_unsigned : Bool)
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 4 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 4 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁)
@@ -182,26 +173,23 @@ theorem loadX0_w4 (is_unsigned : Bool)
     rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   obtain ⟨hsp_init, hsp_config, hsp_rs1, hmem_eq⟩ := persist_nextPC rs1_idx reg_val pc s hs hconfig h_rs1
-  have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
-      = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
-  have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rwa [hmem_eq, ← hadd]
-  have hm₁ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
-    rwa [hmem_eq, ← hadd]
-  have hm₂ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2]? = some data₂ := by
-    rwa [hmem_eq, ← hadd]
-  have hm₃ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 3]? = some data₃ := by
-    rwa [hmem_eq, ← hadd]
+  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := by
+    rwa [hmem_eq]
+  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
+    rwa [hmem_eq]
+  have hm₂ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 2]? = some data₂ := by
+    rwa [hmem_eq]
+  have hm₃ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]? = some data₃ := by
+    rwa [hmem_eq]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 4 = true := by
-    rwa [is_aligned_vaddr_iff_mod, hadd]
+    rwa [is_aligned_vaddr_iff_mod]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 4 (by omega) h_lo (by rwa [hadd])
+    range_subset_sp1_pma _ 4 (by omega) h_lo h_hi
   have hread := run_vmem_read_of_width_4' rs1_idx reg_val (BitVec.signExtend 64 imm)
     data₀ data₁ data₂ data₃
-    sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range hm₀ hm₁ hm₂ hm₃
+    sp hsp_init hsp_rs1 h_align' hsp_config h_in_range hm₀ hm₁ hm₂ hm₃
   simp only at hread
   rw [hsp] at hread
   simp [specX0, sp1_loadX0, run_readReg_of_isInitialized _ _ hs,
@@ -217,9 +205,8 @@ theorem loadX0_w8 (is_unsigned : Bool)
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 8 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 8 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁)
@@ -235,34 +222,31 @@ theorem loadX0_w8 (is_unsigned : Bool)
     rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   obtain ⟨hsp_init, hsp_config, hsp_rs1, hmem_eq⟩ := persist_nextPC rs1_idx reg_val pc s hs hconfig h_rs1
-  have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
-      = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
-  have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rwa [hmem_eq, ← hadd]
-  have hm₁ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
-    rwa [hmem_eq, ← hadd]
-  have hm₂ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2]? = some data₂ := by
-    rwa [hmem_eq, ← hadd]
-  have hm₃ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 3]? = some data₃ := by
-    rwa [hmem_eq, ← hadd]
-  have hm₄ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4]? = some data₄ := by
-    rwa [hmem_eq, ← hadd]
-  have hm₅ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 5]? = some data₅ := by
-    rwa [hmem_eq, ← hadd]
-  have hm₆ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 6]? = some data₆ := by
-    rwa [hmem_eq, ← hadd]
-  have hm₇ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 7]? = some data₇ := by
-    rwa [hmem_eq, ← hadd]
+  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := by
+    rwa [hmem_eq]
+  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
+    rwa [hmem_eq]
+  have hm₂ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 2]? = some data₂ := by
+    rwa [hmem_eq]
+  have hm₃ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]? = some data₃ := by
+    rwa [hmem_eq]
+  have hm₄ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 4]? = some data₄ := by
+    rwa [hmem_eq]
+  have hm₅ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 5]? = some data₅ := by
+    rwa [hmem_eq]
+  have hm₆ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 6]? = some data₆ := by
+    rwa [hmem_eq]
+  have hm₇ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 7]? = some data₇ := by
+    rwa [hmem_eq]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 8 = true := by
-    rwa [is_aligned_vaddr_iff_mod, hadd]
+    rwa [is_aligned_vaddr_iff_mod]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 8 (by omega) h_lo (by rwa [hadd])
+    range_subset_sp1_pma _ 8 (by omega) h_lo h_hi
   have hread := run_vmem_read_of_width_8' rs1_idx reg_val (BitVec.signExtend 64 imm)
     data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇
-    sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range hm₀ hm₁ hm₂ hm₃ hm₄ hm₅ hm₆ hm₇
+    sp hsp_init hsp_rs1 h_align' hsp_config h_in_range hm₀ hm₁ hm₂ hm₃ hm₄ hm₅ hm₆ hm₇
   simp only at hread
   rw [hsp] at hread
   simp [specX0, sp1_loadX0, run_readReg_of_isInitialized _ _ hs,
@@ -280,13 +264,12 @@ theorem correct_loadX0_lb
     (pc : BitVec 64) (s : SailState) (hs : SailState.isInitialized s)
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc) (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 1 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 1 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 1 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀) :
     (spec_loadX0_lb imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s :=
-  loadX0_w1 false rs1_idx imm reg_val data₀ pc s hs hconfig h_pc h_rs1 h_aligned h_fits h_hi h_lo hmem₀
+  loadX0_w1 false rs1_idx imm reg_val data₀ pc s hs hconfig h_pc h_rs1 h_aligned h_hi h_lo hmem₀
 
 omit [Fact (2 ^ 17 < p)] in
 theorem correct_loadX0_lbu
@@ -294,13 +277,12 @@ theorem correct_loadX0_lbu
     (pc : BitVec 64) (s : SailState) (hs : SailState.isInitialized s)
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc) (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 1 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 1 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 1 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀) :
     (spec_loadX0_lbu imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s :=
-  loadX0_w1 true rs1_idx imm reg_val data₀ pc s hs hconfig h_pc h_rs1 h_aligned h_fits h_hi h_lo hmem₀
+  loadX0_w1 true rs1_idx imm reg_val data₀ pc s hs hconfig h_pc h_rs1 h_aligned h_hi h_lo hmem₀
 
 omit [Fact (2 ^ 17 < p)] in
 theorem correct_loadX0_lh
@@ -308,15 +290,14 @@ theorem correct_loadX0_lh
     (pc : BitVec 64) (s : SailState) (hs : SailState.isInitialized s)
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc) (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 2 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 2 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁) :
     (spec_loadX0_lh imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s :=
   loadX0_w2 false rs1_idx imm reg_val data₀ data₁ pc s hs hconfig h_pc h_rs1
-    h_aligned h_fits h_hi h_lo hmem₀ hmem₁
+    h_aligned h_hi h_lo hmem₀ hmem₁
 
 omit [Fact (2 ^ 17 < p)] in
 theorem correct_loadX0_lhu
@@ -324,15 +305,14 @@ theorem correct_loadX0_lhu
     (pc : BitVec 64) (s : SailState) (hs : SailState.isInitialized s)
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc) (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 2 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 2 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁) :
     (spec_loadX0_lhu imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s :=
   loadX0_w2 true rs1_idx imm reg_val data₀ data₁ pc s hs hconfig h_pc h_rs1
-    h_aligned h_fits h_hi h_lo hmem₀ hmem₁
+    h_aligned h_hi h_lo hmem₀ hmem₁
 
 omit [Fact (2 ^ 17 < p)] in
 theorem correct_loadX0_lw
@@ -340,9 +320,8 @@ theorem correct_loadX0_lw
     (pc : BitVec 64) (s : SailState) (hs : SailState.isInitialized s)
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc) (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 4 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 4 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁)
@@ -350,7 +329,7 @@ theorem correct_loadX0_lw
     (hmem₃ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]? = some data₃) :
     (spec_loadX0_lw imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s :=
   loadX0_w4 false rs1_idx imm reg_val data₀ data₁ data₂ data₃ pc s hs hconfig h_pc h_rs1
-    h_aligned h_fits h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃
+    h_aligned h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃
 
 omit [Fact (2 ^ 17 < p)] in
 theorem correct_loadX0_lwu
@@ -358,9 +337,8 @@ theorem correct_loadX0_lwu
     (pc : BitVec 64) (s : SailState) (hs : SailState.isInitialized s)
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc) (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 4 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 4 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁)
@@ -368,7 +346,7 @@ theorem correct_loadX0_lwu
     (hmem₃ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]? = some data₃) :
     (spec_loadX0_lwu imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s :=
   loadX0_w4 true rs1_idx imm reg_val data₀ data₁ data₂ data₃ pc s hs hconfig h_pc h_rs1
-    h_aligned h_fits h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃
+    h_aligned h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃
 
 omit [Fact (2 ^ 17 < p)] in
 theorem correct_loadX0_ld
@@ -377,9 +355,8 @@ theorem correct_loadX0_ld
     (pc : BitVec 64) (s : SailState) (hs : SailState.isInitialized s)
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc) (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 8 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 8 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁)
@@ -391,7 +368,7 @@ theorem correct_loadX0_ld
     (hmem₇ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 7]? = some data₇) :
     (spec_loadX0_ld imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s :=
   loadX0_w8 true rs1_idx imm reg_val data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ pc s hs hconfig
-    h_pc h_rs1 h_aligned h_fits h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃ hmem₄ hmem₅ hmem₆ hmem₇
+    h_pc h_rs1 h_aligned h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃ hmem₄ hmem₅ hmem₆ hmem₇
 
 /-- End-to-end: for whichever of the 7 load opcodes is active, the Sail `LOAD`-into-`x0` agrees
 with `sp1_loadX0` (advance `nextPC`, discard the read). -/
@@ -400,39 +377,34 @@ theorem loadX0_chip_reaches_sail
     (s : SailState) (hs : SailState.isInitialized s) (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc) (h_rs1 : s.get_reg? rs1 = some reg_val) :
     (∀ (data₀ : BitVec 8),
-        (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 1 = 0 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 < 2 ^ 64 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 ≤ 2 ^ 48 →
+        (reg_val + BitVec.signExtend 64 imm).toNat % 1 = 0 →
+        (reg_val + BitVec.signExtend 64 imm).toNat + 1 ≤ 2 ^ 48 →
         2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ →
         (spec_loadX0_lb imm rs1 0#5).run s = (sp1_loadX0 pc).run s) ∧
     (∀ (data₀ : BitVec 8),
-        (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 1 = 0 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 < 2 ^ 64 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1 ≤ 2 ^ 48 →
+        (reg_val + BitVec.signExtend 64 imm).toNat % 1 = 0 →
+        (reg_val + BitVec.signExtend 64 imm).toNat + 1 ≤ 2 ^ 48 →
         2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ →
         (spec_loadX0_lbu imm rs1 0#5).run s = (sp1_loadX0 pc).run s) ∧
     (∀ (data₀ data₁ : BitVec 8),
-        (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 2 = 0 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 < 2 ^ 64 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48 →
+        (reg_val + BitVec.signExtend 64 imm).toNat % 2 = 0 →
+        (reg_val + BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48 →
         2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ →
         (spec_loadX0_lh imm rs1 0#5).run s = (sp1_loadX0 pc).run s) ∧
     (∀ (data₀ data₁ : BitVec 8),
-        (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 2 = 0 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 < 2 ^ 64 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48 →
+        (reg_val + BitVec.signExtend 64 imm).toNat % 2 = 0 →
+        (reg_val + BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48 →
         2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ →
         (spec_loadX0_lhu imm rs1 0#5).run s = (sp1_loadX0 pc).run s) ∧
     (∀ (data₀ data₁ data₂ data₃ : BitVec 8),
-        (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 4 = 0 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 < 2 ^ 64 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48 →
+        (reg_val + BitVec.signExtend 64 imm).toNat % 4 = 0 →
+        (reg_val + BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48 →
         2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ →
@@ -440,9 +412,8 @@ theorem loadX0_chip_reaches_sail
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]? = some data₃ →
         (spec_loadX0_lw imm rs1 0#5).run s = (sp1_loadX0 pc).run s) ∧
     (∀ (data₀ data₁ data₂ data₃ : BitVec 8),
-        (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 4 = 0 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 < 2 ^ 64 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48 →
+        (reg_val + BitVec.signExtend 64 imm).toNat % 4 = 0 →
+        (reg_val + BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48 →
         2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ →
@@ -450,9 +421,8 @@ theorem loadX0_chip_reaches_sail
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]? = some data₃ →
         (spec_loadX0_lwu imm rs1 0#5).run s = (sp1_loadX0 pc).run s) ∧
     (∀ (data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ : BitVec 8),
-        (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 8 = 0 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 < 2 ^ 64 →
-        reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48 →
+        (reg_val + BitVec.signExtend 64 imm).toNat % 8 = 0 →
+        (reg_val + BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48 →
         2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ →
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ →
@@ -464,26 +434,26 @@ theorem loadX0_chip_reaches_sail
         s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 7]? = some data₇ →
         (spec_loadX0_ld imm rs1 0#5).run s = (sp1_loadX0 pc).run s) := by
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · intro data₀ h_al h_fits h_hi h_lo hm0
-    exact correct_loadX0_lb rs1 imm reg_val data₀ pc s hs hconfig h_pc h_rs1 h_al h_fits h_hi h_lo hm0
-  · intro data₀ h_al h_fits h_hi h_lo hm0
-    exact correct_loadX0_lbu rs1 imm reg_val data₀ pc s hs hconfig h_pc h_rs1 h_al h_fits h_hi h_lo hm0
-  · intro data₀ data₁ h_al h_fits h_hi h_lo hm0 hm1
-    exact correct_loadX0_lh rs1 imm reg_val data₀ data₁ pc s hs hconfig h_pc h_rs1 h_al h_fits h_hi h_lo
+  · intro data₀ h_al h_hi h_lo hm0
+    exact correct_loadX0_lb rs1 imm reg_val data₀ pc s hs hconfig h_pc h_rs1 h_al h_hi h_lo hm0
+  · intro data₀ h_al h_hi h_lo hm0
+    exact correct_loadX0_lbu rs1 imm reg_val data₀ pc s hs hconfig h_pc h_rs1 h_al h_hi h_lo hm0
+  · intro data₀ data₁ h_al h_hi h_lo hm0 hm1
+    exact correct_loadX0_lh rs1 imm reg_val data₀ data₁ pc s hs hconfig h_pc h_rs1 h_al h_hi h_lo
       hm0 hm1
-  · intro data₀ data₁ h_al h_fits h_hi h_lo hm0 hm1
-    exact correct_loadX0_lhu rs1 imm reg_val data₀ data₁ pc s hs hconfig h_pc h_rs1 h_al h_fits h_hi h_lo
+  · intro data₀ data₁ h_al h_hi h_lo hm0 hm1
+    exact correct_loadX0_lhu rs1 imm reg_val data₀ data₁ pc s hs hconfig h_pc h_rs1 h_al h_hi h_lo
       hm0 hm1
-  · intro data₀ data₁ data₂ data₃ h_al h_fits h_hi h_lo hm0 hm1 hm2 hm3
+  · intro data₀ data₁ data₂ data₃ h_al h_hi h_lo hm0 hm1 hm2 hm3
     exact correct_loadX0_lw rs1 imm reg_val data₀ data₁ data₂ data₃ pc s hs hconfig h_pc h_rs1 h_al
-      h_fits h_hi h_lo hm0 hm1 hm2 hm3
-  · intro data₀ data₁ data₂ data₃ h_al h_fits h_hi h_lo hm0 hm1 hm2 hm3
+      h_hi h_lo hm0 hm1 hm2 hm3
+  · intro data₀ data₁ data₂ data₃ h_al h_hi h_lo hm0 hm1 hm2 hm3
     exact correct_loadX0_lwu rs1 imm reg_val data₀ data₁ data₂ data₃ pc s hs hconfig h_pc h_rs1 h_al
-      h_fits h_hi h_lo hm0 hm1 hm2 hm3
-  · intro data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ h_al h_fits h_hi h_lo hm0 hm1 hm2 hm3 hm4 hm5
+      h_hi h_lo hm0 hm1 hm2 hm3
+  · intro data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ h_al h_hi h_lo hm0 hm1 hm2 hm3 hm4 hm5
       hm6 hm7
     exact correct_loadX0_ld rs1 imm reg_val data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ pc s hs
-      hconfig h_pc h_rs1 h_al h_fits h_hi h_lo hm0 hm1 hm2 hm3 hm4 hm5 hm6 hm7
+      hconfig h_pc h_rs1 h_al h_hi h_lo hm0 hm1 hm2 hm3 hm4 hm5 hm6 hm7
 
 end SP1Clean.LoadX0Sail
 
@@ -504,11 +474,26 @@ def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadX0Columns (ZMod p)) :
   ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, isReal inp, #v[(0 : ZMod p), 0, 0, 0], opcodeVal inp, .noWrite⟩
 
+/-- LoadX0's exact aligned RAM-access projection. -/
+def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadX0Columns (ZMod p)) :
+    Trace.RamAccessView (ZMod p) :=
+  { compareLow := inp.memory_access.access_timestamp.compare_low
+    prevHigh := inp.memory_access.access_timestamp.prev_high
+    prevLow := inp.memory_access.access_timestamp.prev_low
+    diffLow := inp.memory_access.access_timestamp.diff_low_limb
+    diffHigh := inp.memory_access.access_timestamp.diff_high_limb
+    address := AddressOperation.alignedValue
+      ⟨inp.op_b_val, inp.op_c_imm, inp.offset_bit[0], inp.offset_bit[1], inp.offset_bit[2],
+        isReal inp⟩
+      cols.address_operation
+    priorValue := inp.memory_access.prev_value
+    newValue := inp.memory_access.prev_value }
+
 /-- **LoadX0's `advanceReady` bundle** (SC Phase 4). Routing (`op_a = 0`, so `rd = x0`), the
 low-pc-limb bound, and — since LoadX0 bundles seven load opcodes behind a weighted-selector opcode
-— a seven-way `(opcode, bounds, memory-read)` disjunction identifying WHICH load this row is. Each
+— a seven-way `(opcode, bounds, memory-read)` disjunction identifying which load this row is. Each
 disjunct carries only what its width-`N` no-write adapter consumes: the opcode value, the width-`N`
-alignment (widths ≥ 2), the address bounds (`fits`/`hi`/`lo`), and the **existence** of the `N` read
+alignment (widths ≥ 2), the wrapped-address bounds (`hi`/`lo`), and the **existence** of the `N` read
 bytes (the values are discarded, so they are existentially quantified rather than pinned to columns). -/
 def advanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadX0Columns (ZMod p))
     (_prog : GuestProgram) (s : SailState) : Prop :=
@@ -516,32 +501,26 @@ def advanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadX0Columns (ZMod 
   (inp.state.pc[0]).val < 2 ^ 16 ∧
   ( -- LB (width 1, signed)
     ( opcodeVal inp = ((loadOpcode 1 false).toNat : ZMod p) ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 < 2 ^ 64 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 ≤ 2 ^ 48 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 ≤ 2 ^ 48 ∧
       2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
         + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
       ∃ b₀ : BitVec 8, s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
         + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some b₀ ) ∨
     -- LBU (width 1, unsigned)
     ( opcodeVal inp = ((loadOpcode 1 true).toNat : ZMod p) ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 < 2 ^ 64 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 ≤ 2 ^ 48 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1 ≤ 2 ^ 48 ∧
       2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
         + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
       ∃ b₀ : BitVec 8, s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
         + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some b₀ ) ∨
     -- LH (width 2, signed)
     ( opcodeVal inp = ((loadOpcode 2 false).toNat : ZMod p) ∧
-      ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 2 = 0 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 < 2 ^ 64 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 ≤ 2 ^ 48 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat % 2 = 0 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 ≤ 2 ^ 48 ∧
       2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
         + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
       ∃ b₀ b₁ : BitVec 8,
@@ -551,12 +530,10 @@ def advanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadX0Columns (ZMod 
           + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1]? = some b₁ ) ∨
     -- LHU (width 2, unsigned)
     ( opcodeVal inp = ((loadOpcode 2 true).toNat : ZMod p) ∧
-      ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 2 = 0 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 < 2 ^ 64 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 ≤ 2 ^ 48 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat % 2 = 0 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 ≤ 2 ^ 48 ∧
       2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
         + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
       ∃ b₀ b₁ : BitVec 8,
@@ -566,12 +543,10 @@ def advanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadX0Columns (ZMod 
           + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1]? = some b₁ ) ∨
     -- LW (width 4, signed)
     ( opcodeVal inp = ((loadOpcode 4 false).toNat : ZMod p) ∧
-      ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 4 = 0 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 < 2 ^ 64 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 ≤ 2 ^ 48 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat % 4 = 0 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 ≤ 2 ^ 48 ∧
       2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
         + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
       ∃ b₀ b₁ b₂ b₃ : BitVec 8,
@@ -585,12 +560,10 @@ def advanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadX0Columns (ZMod 
           + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 3]? = some b₃ ) ∨
     -- LWU (width 4, unsigned)
     ( opcodeVal inp = ((loadOpcode 4 true).toNat : ZMod p) ∧
-      ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 4 = 0 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 < 2 ^ 64 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 ≤ 2 ^ 48 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat % 4 = 0 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 ≤ 2 ^ 48 ∧
       2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
         + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
       ∃ b₀ b₁ b₂ b₃ : BitVec 8,
@@ -604,12 +577,10 @@ def advanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadX0Columns (ZMod 
           + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 3]? = some b₃ ) ∨
     -- LD (width 8, signed)
     ( opcodeVal inp = ((loadOpcode 8 false).toNat : ZMod p) ∧
-      ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 8 = 0 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 8 < 2 ^ 64 ∧
-      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-        + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 8 ≤ 2 ^ 48 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat % 8 = 0 ∧
+      (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+        + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 8 ≤ 2 ^ 48 ∧
       2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
         + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
       ∃ b₀ b₁ b₂ b₃ b₄ b₅ b₆ b₇ : BitVec 8,
@@ -647,28 +618,28 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadX0Columns (ZMod p)
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
   obtain ⟨hopa0, hpc0, hdisj⟩ := hready
   rcases hdisj with
-    ⟨ho, h_fits, h_hi, h_lo, b₀, hm₀⟩ |
-    ⟨ho, h_fits, h_hi, h_lo, b₀, hm₀⟩ |
-    ⟨ho, h_al, h_fits, h_hi, h_lo, b₀, b₁, hm₀, hm₁⟩ |
-    ⟨ho, h_al, h_fits, h_hi, h_lo, b₀, b₁, hm₀, hm₁⟩ |
-    ⟨ho, h_al, h_fits, h_hi, h_lo, b₀, b₁, b₂, b₃, hm₀, hm₁, hm₂, hm₃⟩ |
-    ⟨ho, h_al, h_fits, h_hi, h_lo, b₀, b₁, b₂, b₃, hm₀, hm₁, hm₂, hm₃⟩ |
-    ⟨ho, h_al, h_fits, h_hi, h_lo, b₀, b₁, b₂, b₃, b₄, b₅, b₆, b₇,
+    ⟨ho, h_hi, h_lo, b₀, hm₀⟩ |
+    ⟨ho, h_hi, h_lo, b₀, hm₀⟩ |
+    ⟨ho, h_al, h_hi, h_lo, b₀, b₁, hm₀, hm₁⟩ |
+    ⟨ho, h_al, h_hi, h_lo, b₀, b₁, hm₀, hm₁⟩ |
+    ⟨ho, h_al, h_hi, h_lo, b₀, b₁, b₂, b₃, hm₀, hm₁, hm₂, hm₃⟩ |
+    ⟨ho, h_al, h_hi, h_lo, b₀, b₁, b₂, b₃, hm₀, hm₁, hm₂, hm₃⟩ |
+    ⟨ho, h_al, h_hi, h_lo, b₀, b₁, b₂, b₃, b₄, b₅, b₆, b₇,
       hm₀, hm₁, hm₂, hm₃, hm₄, hm₅, hm₆, hm₇⟩
   · exact advance_of_load_x0_width1 false b₀ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0 hpc0 rfl
-      h_fits h_hi h_lo hm₀
+      h_hi h_lo hm₀
   · exact advance_of_load_x0_width1 true b₀ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0 hpc0 rfl
-      h_fits h_hi h_lo hm₀
+      h_hi h_lo hm₀
   · exact advance_of_load_x0_width2 false b₀ b₁ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0 hpc0 rfl
-      h_al h_fits h_hi h_lo hm₀ hm₁
+      h_al h_hi h_lo hm₀ hm₁
   · exact advance_of_load_x0_width2 true b₀ b₁ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0 hpc0 rfl
-      h_al h_fits h_hi h_lo hm₀ hm₁
+      h_al h_hi h_lo hm₀ hm₁
   · exact advance_of_load_x0_width4 false b₀ b₁ b₂ b₃ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0
-      hpc0 rfl h_al h_fits h_hi h_lo hm₀ hm₁ hm₂ hm₃
+      hpc0 rfl h_al h_hi h_lo hm₀ hm₁ hm₂ hm₃
   · exact advance_of_load_x0_width4 true b₀ b₁ b₂ b₃ hcfg hrom hpcread hvalb hdecrom ho rfl rfl hopa0
-      hpc0 rfl h_al h_fits h_hi h_lo hm₀ hm₁ hm₂ hm₃
+      hpc0 rfl h_al h_hi h_lo hm₀ hm₁ hm₂ hm₃
   · exact advance_of_load_x0_width8 b₀ b₁ b₂ b₃ b₄ b₅ b₆ b₇ hcfg hrom hpcread hvalb hdecrom ho rfl rfl
-      hopa0 hpc0 rfl h_al h_fits h_hi h_lo hm₀ hm₁ hm₂ hm₃ hm₄ hm₅ hm₆ hm₇
+      hopa0 hpc0 rfl h_al h_hi h_lo hm₀ hm₁ hm₂ hm₃ hm₄ hm₅ hm₆ hm₇
 
 /-- `ChipKind` registration for LoadX0 (all seven load opcodes into `x0`). The loaded word is discarded;
 `advance` is the seven-way per-opcode no-register-write transition. -/
@@ -677,6 +648,7 @@ def kind : Soundness.ChipKind p where
   Inputs := LoadX0Chip.Inputs
   Cols := Extracted.LoadX0Columns
   view := rowView
+  ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => LoadX0Chip.Spec inp cols data
   advanceReady := advanceReady
   advance := some (PLift.up advance)

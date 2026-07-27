@@ -24,6 +24,10 @@ TARGETS = [
      # channel-law field lives only inside `circuit`, and every deferred completeness proof is
      # retained transitively by that structure even when a soundness consumer never projects it.
      r"(?:theorem|def)\s+(soundness|completeness|contractSoundness|evidenceSoundness|circuit)\b"),
+    # Branch isolates its heavy soundness/completeness proofs in `Core.lean`; `Formal.circuit`
+    # retains both, but direct probes keep the audit ledger readable.
+    ("SP1Clean/Proofs/Chips/BranchChip/Core.lean",
+     r"theorem\s+(soundness|completeness)\b"),
     # DivRem keeps its heavyweight completeness driver outside `Formal.lean`; without this explicit
     # target the textual admission gate saw the `stop`, but the axiom census silently skipped the
     # declaration itself.
@@ -36,6 +40,10 @@ TARGETS = [
     ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"theorem\s+(correct_\w+|\w*reaches_sail\w*)\b"),
     ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"def\s+(kind)\b"),
     ("SP1Clean/Faithful/*.lean", r"(?:theorem|def)\s+(\w*faithful\w*)\b"),
+    ("SP1Clean/Faithful/DivRemChip/Exact.lean",
+     r"(?:theorem|def)\s+(\w*faithful\w*)\b"),
+    ("SP1Clean/Faithful/SupportedMachine.lean",
+     r"(?:theorem|def)\s+(supportedChipFaithfulness\w*)\b"),
     # The witness/trace conformance anchors now live in the separate `SP1CleanTest` test library (the
     # native_decide quarantine); the census still probes them to disclose their ofReduceBool axioms.
     ("SP1CleanTest/WitnessTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
@@ -53,7 +61,10 @@ TARGETS = [
     ("SP1Clean/Soundness/SP1Ensemble.lean",
      r"(?:theorem|def)\s+((?:sp1|balanced)\w*)\b"),
     ("SP1Clean/Soundness/AIR.lean",
-     r"theorem\s+(supportedCore_orderedRows_dynamic|supported_core_witness_grounding|"
+     r"theorem\s+(statePullAlign8_of_decodedStateWalk|"
+     r"supportedCore_groundingObligations_of_constraints|"
+     r"supportedCore_orderedRows_dynamic_of_obligations|"
+     r"supportedCore_orderedRows_dynamic|supported_core_witness_grounding|"
      r"supported_core_native_sound)\b"),
     # Exact v6.3.1 table/profile guards and the public ArkLib-facing Core AIR capstone.  These are
     # release headlines: adding a new capstone file must not silently leave it outside the census.
@@ -63,7 +74,13 @@ TARGETS = [
      r"memoryBoundaryClusterShapes_matchExtracted|publicValuesWidth_matchesExtracted)\b"),
     ("SP1Clean/Faithful/CoreAIR.lean", r"theorem\s+(system_isCurrent)\b"),
     ("SP1Clean/Soundness/CoreAIR.lean",
-     r"(?:theorem|def)\s+(sp1_air_refinement|sp1_air_sound)\b"),
+     r"(?:theorem|def)\s+(sp1_air_refinement_of_obligations|sp1_air_sound_of_obligations)\b"),
+    # The base execution relation deliberately excludes COMMIT-row existence.  Probe the two
+    # optional program-contract strengthenings separately so a future output theorem cannot hide an
+    # admission behind wrapper or verifying-key terminology.
+    ("SP1Clean/FormalModel/Execution.lean",
+     r"theorem\s+(commitCovered_of_standardWrapper|"
+     r"commitCovered_of_outputSafeVerifyingKey)\b"),
     ("SP1Clean/Soundness/TimedGrounding.lean", r"theorem\s+(walk)\b"),
     ("SP1Clean/Soundness/FinishedChannels.lean", r"theorem\s+(sp1_finishedChannel_guarantees)\b"),
     ("SP1Clean/Soundness/ChipRegistry.lean", r"(?:theorem|def)\s+(allChipKinds\w*)\b"),

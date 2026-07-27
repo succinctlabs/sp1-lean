@@ -1,9 +1,16 @@
 import SP1Clean.Extracted.ExtractionDSL
 import SP1Clean.Extracted.CPUState
+import SP1Clean.Extracted.ITypeReaderImmutable
 import SP1Clean.Extracted.RTypeReader
+import SP1Clean.Extracted.JTypeReader
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Model.InteractionProjection
+import SP1Clean.Native.Readers.ALUTypeReader
+import SP1Clean.Native.Readers.ALUTypeReaderImmutable
 import SP1Clean.Native.Readers.CPUState
+import SP1Clean.Native.Readers.ITypeReader
+import SP1Clean.Native.Readers.ITypeReaderImmutable
+import SP1Clean.Native.Readers.JTypeReader
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import Clean.Circuit.Basic
@@ -22,8 +29,12 @@ operation-by-operation constraint list.  The stable boundary is the whole chip r
 * `assertZeros` is the Rust chip's complete `assertZero` list;
 * `interactions` is the Rust chip's complete interaction list.
 
-`ChipFaithful` then asks for extensional equivalence of the two complete assertion systems and a
-permutation of the two complete interaction multisets.  It deliberately says nothing about how either
+`ChipFaithful` then asks for extensional equivalence of the two complete assertion systems and, on
+rows accepted by those assertions, a permutation of the two complete interaction multisets.  The
+accepted-row qualification is the exact AIR relation boundary: interaction expressions on rows
+rejected by the local AIR never enter a valid trace.  It also lets a proof-oriented native gadget use
+an expression that the local constraints prove equal to Rust's expression, without demanding
+syntactic agreement on malformed rows.  `ChipFaithful` deliberately says nothing about how either
 side factors those lists into readers, operations, or helper gadgets.  In particular, extracted Rust
 operation modules may remain as generator-private implementation details without becoming proof
 boundaries or public faithfulness claims.
@@ -51,6 +62,20 @@ namespace ChipOracle
 variable {F : Type} [FiniteField F] [CoeHead F ℕ]
 variable {NativeCols RustCols : TypeMap}
 
+/-- The common whole-row oracle when the native chip deliberately returns the extracted Rust row
+type unchanged.  The identity here is only a column-layout fact: `ChipFaithful` must still prove
+that the native circuit's complete constraints and interactions agree with the supplied Rust
+functions. -/
+def identity (assertZeros : NativeCols F → List F)
+    (interactions : NativeCols F → List (Extracted.Interaction F)) :
+    ChipOracle F NativeCols NativeCols where
+  reconfigure := id
+  deconfigure := id
+  reconfigure_deconfigure := by intro cols; rfl
+  deconfigure_reconfigure := by intro cols; rfl
+  assertZeros := assertZeros
+  interactions := interactions
+
 /-- Rust's complete chip assertion list, after reconfiguring a native Lean row. -/
 def nativeAssertZeros (oracle : ChipOracle F NativeCols RustCols) (cols : NativeCols F) : List F :=
   oracle.assertZeros (oracle.reconfigure cols)
@@ -77,6 +102,18 @@ subcircuits.  Witness declarations, lookups, and interactions are intentionally 
 def nativeAssertZeros {F : Type} [FiniteField F]
     (env : Environment F) (ops : Operations F) : List F :=
   ops.constraints.map (Expression.eval env)
+
+/-- Flattening an assertion subcircuit preserves exactly the assertion list of its underlying
+`main`.  Keeping this bridge folded avoids unfolding the proof-bearing `FormalAssertion.toSubcircuit`
+record when a whole-chip oracle proof normalizes nested reader constraints. -/
+theorem constraints_formalAssertion_toSubcircuit
+    {F : Type} [FiniteField F] {Input : TypeMap} [ProvableType Input]
+    (circuit : FormalAssertion F Input) (input : Var Input F) (offset : ℕ) :
+    FlatOperation.constraints
+        (FormalAssertion.toSubcircuit circuit offset input).ops.toFlat =
+      Operations.constraints ((circuit.main input).operations offset) := by
+  dsimp only [FormalAssertion.toSubcircuit]
+  rw [Operations.toNested_toFlat, Operations.constraints_toFlat]
 
 /- Direct component-wise evaluation of the canonical generated reader rows. `ProvableStruct.eval`
 preserves components by construction, but passing through the generic derived instance is expensive
@@ -114,6 +151,21 @@ proofs reuse the generated row types without reconstructing parallel reader stru
          op_b_memory := Eval.eval env x.op_b_memory
          op_c := Eval.eval env x.op_c
          op_c_memory := Eval.eval env x.op_c_memory } : Extracted.RTypeReader F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_aluTypeReader
+    {F : Type} [FiniteField F] (env : Environment F)
+    (x : Extracted.ALUTypeReader (Expression F)) :
+    Eval.eval env x =
+      ({ op_a := Eval.eval env x.op_a
+         op_a_memory := Eval.eval env x.op_a_memory
+         op_a_0 := Eval.eval env x.op_a_0
+         op_b := Eval.eval env x.op_b
+         op_b_memory := Eval.eval env x.op_b_memory
+         op_c := Eval.eval env x.op_c
+         op_c_memory := Eval.eval env x.op_c_memory
+         imm_c := Eval.eval env x.imm_c } : Extracted.ALUTypeReader F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
@@ -235,6 +287,31 @@ namespace CanonicalReader
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- The exact assertion list of the innermost timestamp reader.  This is deliberately stated
+through the folded `circuit.main` boundary so a parent reader can collapse each occurrence before
+the simplifier sees the proof-bearing formal-assertion record. -/
+theorem registerAccessTimestampAssertions
+    (env : Environment (ZMod p))
+    (input : Var Readers.RegisterAccessTimestamp.Inputs (ZMod p)) (offset : ℕ) :
+    List.map (Expression.eval env)
+        (Operations.constraints
+          ((Readers.RegisterAccessTimestamp.circuit.main input).operations offset)) =
+      [Expression.eval env (input.is_real * (input.is_real - 1))] := by
+  rfl
+
+/-- Proposition-level form of `registerAccessTimestampAssertions`, used after `List.Forall`
+normalization has fused the row evaluator into its predicate. -/
+theorem registerAccessTimestampConstraints
+    (env : Environment (ZMod p))
+    (input : Var Readers.RegisterAccessTimestamp.Inputs (ZMod p)) (offset : ℕ) :
+    List.Forall ((fun x => x = 0) ∘ Expression.eval env)
+        (Operations.constraints
+          ((Readers.RegisterAccessTimestamp.circuit.main input).operations offset)) ↔
+      (Expression.eval env input.is_real = 0 ∨
+        Expression.eval env input.is_real - 1 = 0) := by
+  simp [Readers.RegisterAccessTimestamp.circuit,
+    Readers.RegisterAccessTimestamp.main, circuit_norm]
+
 omit [Fact (2 ^ 17 < p)] in
 set_option maxHeartbeats 1000000 in
 theorem cpuStateAssertions
@@ -261,6 +338,19 @@ theorem equalityAssertions
   have hx : Expression.eval env (toElements (M := field) x)[0] = Expression.eval env x := rfl
   have hy : Expression.eval env (toElements (M := field) y)[0] = Expression.eval env y := rfl
   rw [hx, hy, sub_eq_zero]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Exact singleton assertion list emitted by the scalar equality gadget.  Whole-chip proofs use
+this folded form to collapse many equality subcircuits independently instead of asking `simp` to
+normalize their combined proof terms. -/
+theorem equalityAssertionList
+    (env : Environment (ZMod p)) (x y : Expression (ZMod p)) (offset : ℕ) :
+    List.map (Expression.eval env)
+        (Operations.constraints
+          ((Gadgets.Equality.main (M := field) (x, y)).operations offset)) =
+      [Expression.eval env x - Expression.eval env y] := by
+  simp [Gadgets.Equality.main, circuit_norm]
+  rfl
 
 omit [Fact (2 ^ 17 < p)] in
 set_option maxHeartbeats 1000000 in
@@ -299,11 +389,380 @@ theorem rTypeAssertions
   have heval (x : Expression (ZMod p)) :
       Expression.eval env (toElements (M := field) x)[0] = Expression.eval env x := rfl
   simp_rw [heval]
-  simp only [eval_sub, Expression.eval]
+  simp only [Expression.eval]
   rw [hop, hreal, htrusted, hw0, hw1, hw2, hw3, htrust]
   intro hzero
   rw [hzero]
   simp
+
+set_option maxHeartbeats 1000000 in
+/-- Exact folded assertion normalization for SP1's I-type adapter and the native pure-reader
+subcircuit. The destination write is intentionally absent from both sides: Rust lists it as an
+interaction, while the native chip composes `RegisterWrite` separately. In particular, neither
+reader assertion system locally strengthens `op_a_0` to a boolean; that fact comes from Program
+membership on trusted rows. -/
+theorem iTypeAssertionsExact
+    (env : Environment (ZMod p)) (input : Var Readers.ITypeReader.Inputs (ZMod p))
+    (offset : ℕ) (clkHigh clkLow opcode isReal isTrusted : ZMod p)
+    (pc : Vector (ZMod p) 3) (writeValue : Word (ZMod p))
+    (cols : Extracted.ITypeReader (ZMod p))
+    (hreal : (ProvableStruct.eval env input).is_real = isReal)
+    (htrusted : (ProvableStruct.eval env input).is_trusted = isTrusted)
+    (hopA0 : Expression.eval env input.cols.op_a_0 = cols.op_a_0)
+    (hwrite0 : Expression.eval env input.wv0 = writeValue[0])
+    (hwrite1 : Expression.eval env input.wv1 = writeValue[1])
+    (hwrite2 : Expression.eval env input.wv2 = writeValue[2])
+    (hwrite3 : Expression.eval env input.wv3 = writeValue[3])
+    (htrust : isTrusted = isReal) :
+    List.Forall (· = 0)
+        (Extracted.ITypeReader.asserts clkHigh clkLow pc opcode writeValue cols
+          isReal isTrusted) ↔
+      List.Forall (· = 0)
+        (nativeAssertZeros env
+          ((Readers.ITypeReader.main input).operations offset)) := by
+  simp only [nativeAssertZeros, Readers.ITypeReader.main, circuit_norm]
+  simp only [Readers.RegisterAccessCols.circuit, circuit_norm]
+  simp only [Readers.RegisterAccessCols.main, circuit_norm]
+  simp only [Readers.RegisterAccessTimestamp.circuit, circuit_norm]
+  simp only [Readers.RegisterAccessTimestamp.main, circuit_norm]
+  simp [Extracted.ITypeReader.asserts, Gadgets.Equality.main, circuit_norm]
+  have heval (x : Expression (ZMod p)) :
+      Expression.eval env (toElements (M := field) x)[0] = Expression.eval env x := rfl
+  simp_rw [heval]
+  simp only [Expression.eval]
+  rw [hopA0, hreal, htrusted, hwrite0, hwrite1, hwrite2, hwrite3, htrust]
+  simp
+  tauto
+
+set_option maxHeartbeats 1000000 in
+/-- Exact folded assertion normalization for SP1's immutable I-type adapter.  This is a
+whole-chip proof helper, not an operation-level faithfulness boundary: it only reassociates the
+canonical Rust and native reader fragments before the enclosing `ChipFaithful` theorem compares
+the complete chip. -/
+theorem iTypeImmutableAssertionsExact
+    (env : Environment (ZMod p))
+    (input : Var Readers.ITypeReaderImmutable.Inputs (ZMod p))
+    (offset : ℕ) (clkHigh clkLow opcode isReal isTrusted : ZMod p)
+    (pc : Vector (ZMod p) 3) (cols : Extracted.ITypeReader (ZMod p))
+    (hreal : (ProvableStruct.eval env input).is_real = isReal)
+    (htrusted : (ProvableStruct.eval env input).is_trusted = isTrusted)
+    (hopA0 : Expression.eval env input.cols.op_a_0 = cols.op_a_0)
+    (hprev0 :
+      Expression.eval env input.cols.op_a_memory.prev_value[0] =
+        cols.op_a_memory.prev_value[0])
+    (hprev1 :
+      Expression.eval env input.cols.op_a_memory.prev_value[1] =
+        cols.op_a_memory.prev_value[1])
+    (hprev2 :
+      Expression.eval env input.cols.op_a_memory.prev_value[2] =
+        cols.op_a_memory.prev_value[2])
+    (hprev3 :
+      Expression.eval env input.cols.op_a_memory.prev_value[3] =
+        cols.op_a_memory.prev_value[3])
+    (htrust : isTrusted = isReal) :
+    List.Forall (· = 0)
+        (Extracted.ITypeReaderImmutable.asserts clkHigh clkLow pc opcode cols
+          isReal isTrusted) ↔
+      List.Forall (· = 0)
+        (nativeAssertZeros env
+          ((Readers.ITypeReaderImmutable.main input).operations offset)) := by
+  simp only [nativeAssertZeros, Readers.ITypeReaderImmutable.main, circuit_norm]
+  simp only [Readers.RegisterAccessCols.circuit, circuit_norm]
+  simp only [Readers.RegisterAccessCols.main, circuit_norm]
+  simp only [Readers.RegisterAccessTimestamp.circuit, circuit_norm]
+  simp only [Readers.RegisterAccessTimestamp.main, circuit_norm]
+  simp [Extracted.ITypeReaderImmutable.asserts, Gadgets.Equality.main,
+    circuit_norm]
+  have heval (x : Expression (ZMod p)) :
+      Expression.eval env (toElements (M := field) x)[0] =
+        Expression.eval env x := rfl
+  simp_rw [heval]
+  simp only [Expression.eval]
+  rw [hopA0, hprev0, hprev1, hprev2, hprev3, hreal, htrusted, htrust]
+  simp
+  tauto
+
+set_option maxHeartbeats 1000000 in
+/-- Compatibility form used by chips whose own Rust AIR additionally pins `op_a_0 = 0`.
+The shared reader assertion system itself is compared exactly by `iTypeAssertionsExact`. -/
+theorem iTypeAssertions
+    (env : Environment (ZMod p)) (input : Var Readers.ITypeReader.Inputs (ZMod p))
+    (offset : ℕ) (clkHigh clkLow opcode isReal isTrusted : ZMod p)
+    (pc : Vector (ZMod p) 3) (writeValue : Word (ZMod p))
+    (cols : Extracted.ITypeReader (ZMod p))
+    (hreal : (ProvableStruct.eval env input).is_real = isReal)
+    (htrusted : (ProvableStruct.eval env input).is_trusted = isTrusted)
+    (hopA0 : Expression.eval env input.cols.op_a_0 = cols.op_a_0)
+    (hwrite0 : Expression.eval env input.wv0 = writeValue[0])
+    (hwrite1 : Expression.eval env input.wv1 = writeValue[1])
+    (hwrite2 : Expression.eval env input.wv2 = writeValue[2])
+    (hwrite3 : Expression.eval env input.wv3 = writeValue[3])
+    (htrust : isTrusted = isReal) :
+    (List.Forall (· = 0)
+        (Extracted.ITypeReader.asserts clkHigh clkLow pc opcode writeValue cols
+          isReal isTrusted) ∧ cols.op_a_0 = 0) ↔
+      (List.Forall (· = 0)
+          (nativeAssertZeros env ((Readers.ITypeReader.main input).operations offset)) ∧
+        cols.op_a_0 = 0) := by
+  rw [iTypeAssertionsExact env input offset clkHigh clkLow opcode isReal isTrusted
+    pc writeValue cols hreal htrusted hopA0 hwrite0 hwrite1 hwrite2 hwrite3 htrust]
+
+set_option maxHeartbeats 1000000 in
+/-- Folded assertion normalization for SP1's J-type adapter and the native pure-reader
+subcircuit. Unlike the older Lean model, neither side asserts `op_a_0` booleanity locally:
+the trusted Program row supplies it. The destination write remains factored into the
+parent native chip and therefore contributes no assertions here. -/
+theorem jTypeAssertions
+    (env : Environment (ZMod p)) (input : Var Readers.JTypeReader.Inputs (ZMod p))
+    (offset : ℕ) (clkHigh clkLow opcode isReal isTrusted : ZMod p)
+    (pc : Vector (ZMod p) 3) (writeValue : Word (ZMod p))
+    (cols : Extracted.JTypeReader (ZMod p))
+    (hreal : (ProvableStruct.eval env input).is_real = isReal)
+    (htrusted : (ProvableStruct.eval env input).is_trusted = isTrusted)
+    (hopA0 : Expression.eval env input.cols.op_a_0 = cols.op_a_0)
+    (hwrite0 : Expression.eval env input.wv0 = writeValue[0])
+    (hwrite1 : Expression.eval env input.wv1 = writeValue[1])
+    (hwrite2 : Expression.eval env input.wv2 = writeValue[2])
+    (hwrite3 : Expression.eval env input.wv3 = writeValue[3])
+    (htrust : isTrusted = isReal) :
+    List.Forall (· = 0)
+        (Extracted.JTypeReader.asserts clkHigh clkLow pc opcode writeValue cols
+          isReal isTrusted) ↔
+      List.Forall (· = 0)
+        (nativeAssertZeros env
+          ((Readers.JTypeReader.main input).operations offset)) := by
+  simp only [nativeAssertZeros, Readers.JTypeReader.main, circuit_norm]
+  simp only [Readers.RegisterAccessCols.circuit, circuit_norm]
+  simp only [Readers.RegisterAccessCols.main, circuit_norm]
+  simp only [Readers.RegisterAccessTimestamp.circuit, circuit_norm]
+  simp only [Readers.RegisterAccessTimestamp.main, circuit_norm]
+  simp [Extracted.JTypeReader.asserts, Gadgets.Equality.main, circuit_norm]
+  have heval (x : Expression (ZMod p)) :
+      Expression.eval env (toElements (M := field) x)[0] =
+        Expression.eval env x := rfl
+  simp_rw [heval]
+  simp only [Expression.eval]
+  rw [hreal, htrusted, hopA0, hwrite0, hwrite1, hwrite2, hwrite3, htrust]
+  simp
+  tauto
+
+/-- Evaluated assertion vector of the immediate-capable ALU adapter.  This stays folded so a
+whole-chip proof never asks `whnf` to normalize the proof-bearing reader record. -/
+def aluTypeAssertionValues
+    (env : Environment (ZMod p))
+    (input : Var Readers.ALUTypeReader.Inputs (ZMod p)) :
+    List (ZMod p) :=
+  [ Expression.eval env (input.is_real * (input.is_real - 1)),
+    Expression.eval env (input.is_real * (input.is_real - 1)),
+    Expression.eval env
+      ((input.is_real - input.cols.imm_c) * (input.is_real - input.cols.imm_c - 1)),
+    Expression.eval env (input.cols.op_a_0 * (input.cols.op_a_0 - 1)) -
+      Expression.eval env 0,
+    Expression.eval env ((input.is_real - 1) * input.cols.imm_c) -
+      Expression.eval env 0,
+    Expression.eval env
+        ((input.is_real - input.cols.imm_c) *
+          (input.is_real - input.cols.imm_c - 1)) -
+      Expression.eval env 0,
+    Expression.eval env
+        (input.cols.imm_c *
+          (input.cols.op_c_memory.prev_value[0] - input.cols.op_c[0])) -
+      Expression.eval env 0,
+    Expression.eval env
+        (input.cols.imm_c *
+          (input.cols.op_c_memory.prev_value[1] - input.cols.op_c[1])) -
+      Expression.eval env 0,
+    Expression.eval env
+        (input.cols.imm_c *
+          (input.cols.op_c_memory.prev_value[2] - input.cols.op_c[2])) -
+      Expression.eval env 0,
+    Expression.eval env
+        (input.cols.imm_c *
+          (input.cols.op_c_memory.prev_value[3] - input.cols.op_c[3])) -
+      Expression.eval env 0,
+    Expression.eval env (input.is_trusted * (input.is_trusted - 1)),
+    Expression.eval env (input.cols.op_a_0 * input.wv0) - Expression.eval env 0,
+    Expression.eval env (input.cols.op_a_0 * input.wv1) - Expression.eval env 0,
+    Expression.eval env (input.cols.op_a_0 * input.wv2) - Expression.eval env 0,
+    Expression.eval env (input.cols.op_a_0 * input.wv3) - Expression.eval env 0 ]
+
+set_option maxHeartbeats 1000000 in
+/-- Folded exact assertion list for `ALUTypeReader`.  Each child assertion is collapsed at its
+own circuit boundary before the resulting short list is assembled. -/
+theorem aluTypeAssertionList
+    (env : Environment (ZMod p))
+    (input : Var Readers.ALUTypeReader.Inputs (ZMod p)) (offset : ℕ) :
+    List.map (Expression.eval env)
+        (Operations.constraints
+          ((Readers.ALUTypeReader.main input).operations offset)) =
+      aluTypeAssertionValues env input := by
+  simp only [Readers.ALUTypeReader.main, circuit_norm]
+  simp only [Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    circuit_norm, constraints_formalAssertion_toSubcircuit]
+  simp only [List.map_append, List.map_cons]
+  repeat' rw [registerAccessTimestampAssertions]
+  repeat' rw [equalityAssertionList]
+  rfl
+
+set_option maxHeartbeats 1000000 in
+/-- Folded assertion normalization for SP1's immediate-capable ALU adapter and the native
+pure-reader subcircuit.  As with `rTypeAssertions`/`iTypeAssertions`, the destination write is
+factored into the parent native chip.  The extra `cols.op_a_0 = 0` conjunct is the parent chip's
+Rust routing constraint; it also makes the native reader's redundant `op_a_0` boolean assertion
+equivalent to the extracted reader fragment. -/
+theorem aluTypeAssertions
+    (env : Environment (ZMod p)) (input : Var Readers.ALUTypeReader.Inputs (ZMod p))
+    (offset : ℕ) (clkHigh clkLow opcode isReal isTrusted : ZMod p)
+    (pc : Vector (ZMod p) 3) (writeValue : Word (ZMod p))
+    (cols : Extracted.ALUTypeReader (ZMod p))
+    (hreal : (ProvableStruct.eval env input).is_real = isReal)
+    (htrusted : (ProvableStruct.eval env input).is_trusted = isTrusted)
+    (hcols : ProvableStruct.eval env input.cols = cols)
+    (hwrite0 : Expression.eval env input.wv0 = writeValue[0])
+    (hwrite1 : Expression.eval env input.wv1 = writeValue[1])
+    (hwrite2 : Expression.eval env input.wv2 = writeValue[2])
+    (hwrite3 : Expression.eval env input.wv3 = writeValue[3])
+    (htrust : isTrusted = isReal) :
+    (List.Forall (· = 0)
+        (Extracted.ALUTypeReader.asserts clkHigh clkLow pc opcode writeValue cols
+          isReal isTrusted) ∧ cols.op_a_0 = 0) ↔
+      (List.Forall (· = 0)
+          (nativeAssertZeros env ((Readers.ALUTypeReader.main input).operations offset)) ∧
+        cols.op_a_0 = 0) := by
+  rw [show nativeAssertZeros env ((Readers.ALUTypeReader.main input).operations offset) =
+      aluTypeAssertionValues env input by
+    exact aluTypeAssertionList env input offset]
+  simp only [Extracted.ALUTypeReader.asserts, aluTypeAssertionValues, List.Forall]
+  have hrealEval : Expression.eval env input.is_real = isReal := by
+    have h := congrArg (fun value => value.is_real) (ProvableStruct.eval_eq_eval env input)
+    rw [Readers.ALUTypeReader.eval_inputs] at h
+    have heq : Expression.eval env input.is_real =
+        (ProvableStruct.eval env input).is_real := by
+      simpa only [ProvableType.eval_field] using h
+    exact heq.trans hreal
+  have htrustedEval : Expression.eval env input.is_trusted = isTrusted := by
+    have h := congrArg (fun value => value.is_trusted) (ProvableStruct.eval_eq_eval env input)
+    rw [Readers.ALUTypeReader.eval_inputs] at h
+    have heq : Expression.eval env input.is_trusted =
+        (ProvableStruct.eval env input).is_trusted := by
+      simpa only [ProvableType.eval_field] using h
+    exact heq.trans htrusted
+  have hcolsEval : Eval.eval env input.cols = cols :=
+    (ProvableStruct.eval_eq_eval env input.cols).trans hcols
+  rw [Readers.ALUTypeReader.eval_cols] at hcolsEval
+  have hopA0 : Expression.eval env input.cols.op_a_0 = cols.op_a_0 := by
+    simpa only [ProvableType.eval_field] using congrArg (fun value => value.op_a_0) hcolsEval
+  have himm : Expression.eval env input.cols.imm_c = cols.imm_c := by
+    simpa only [ProvableType.eval_field] using congrArg (fun value => value.imm_c) hcolsEval
+  have hopC : Eval.eval env input.cols.op_c = cols.op_c :=
+    congrArg (fun value => value.op_c) hcolsEval
+  have hopCPrev : Eval.eval env input.cols.op_c_memory.prev_value =
+      cols.op_c_memory.prev_value := by
+    have h := congrArg (fun value => value.op_c_memory) hcolsEval
+    change Eval.eval env input.cols.op_c_memory = cols.op_c_memory at h
+    rw [Readers.ALUTypeReader.eval_accessCols] at h
+    exact congrArg (fun value => value.prev_value) h
+  have hopC0 : Expression.eval env input.cols.op_c[0] = cols.op_c[0] :=
+    (ProvableType.getElem_eval_fields env input.cols.op_c 0 (by decide)).trans
+      (congrArg (fun value => value[0]) hopC)
+  have hopC1 : Expression.eval env input.cols.op_c[1] = cols.op_c[1] :=
+    (ProvableType.getElem_eval_fields env input.cols.op_c 1 (by decide)).trans
+      (congrArg (fun value => value[1]) hopC)
+  have hopC2 : Expression.eval env input.cols.op_c[2] = cols.op_c[2] :=
+    (ProvableType.getElem_eval_fields env input.cols.op_c 2 (by decide)).trans
+      (congrArg (fun value => value[2]) hopC)
+  have hopC3 : Expression.eval env input.cols.op_c[3] = cols.op_c[3] :=
+    (ProvableType.getElem_eval_fields env input.cols.op_c 3 (by decide)).trans
+      (congrArg (fun value => value[3]) hopC)
+  have hprev0 : Expression.eval env input.cols.op_c_memory.prev_value[0] =
+      cols.op_c_memory.prev_value[0] :=
+    (ProvableType.getElem_eval_fields env input.cols.op_c_memory.prev_value 0
+      (by decide)).trans (congrArg (fun value => value[0]) hopCPrev)
+  have hprev1 : Expression.eval env input.cols.op_c_memory.prev_value[1] =
+      cols.op_c_memory.prev_value[1] :=
+    (ProvableType.getElem_eval_fields env input.cols.op_c_memory.prev_value 1
+      (by decide)).trans (congrArg (fun value => value[1]) hopCPrev)
+  have hprev2 : Expression.eval env input.cols.op_c_memory.prev_value[2] =
+      cols.op_c_memory.prev_value[2] :=
+    (ProvableType.getElem_eval_fields env input.cols.op_c_memory.prev_value 2
+      (by decide)).trans (congrArg (fun value => value[2]) hopCPrev)
+  have hprev3 : Expression.eval env input.cols.op_c_memory.prev_value[3] =
+      cols.op_c_memory.prev_value[3] :=
+    (ProvableType.getElem_eval_fields env input.cols.op_c_memory.prev_value 3
+      (by decide)).trans (congrArg (fun value => value[3]) hopCPrev)
+  simp only [eval_sub, Expression.eval]
+  rw [hopA0, himm, hopC0, hopC1, hopC2, hopC3, hprev0, hprev1, hprev2, hprev3,
+    hrealEval, htrustedEval, hwrite0, hwrite1, hwrite2, hwrite3, htrust]
+  constructor <;> rintro ⟨holds, opAZero⟩ <;> refine ⟨?_, opAZero⟩ <;>
+    simp only [opAZero, zero_mul, sub_zero, true_and, and_true] at holds ⊢ <;> tauto
+
+/-- Evaluated assertion vector of the immutable ALU adapter. Keeping this value opaque is
+performance-critical: unfolding the whole reader under `List.Forall` crosses Clean's `whnf`
+cliff, while rewriting this folded list is cheap for each consuming chip. -/
+def aluTypeImmutableAssertionValues
+    (env : Environment (ZMod p))
+    (input : Var Readers.ALUTypeReaderImmutable.Inputs (ZMod p)) :
+    List (ZMod p) :=
+  [ Expression.eval env (input.is_real * (input.is_real - 1)),
+    Expression.eval env (input.is_real * (input.is_real - 1)),
+    Expression.eval env
+      ((input.is_real - input.cols.imm_c) * (input.is_real - input.cols.imm_c - 1)),
+    Expression.eval env (input.cols.op_a_0 * (input.cols.op_a_0 - 1)) -
+      Expression.eval env 0,
+    Expression.eval env ((input.is_real - 1) * input.cols.imm_c) -
+      Expression.eval env 0,
+    Expression.eval env
+        ((input.is_real - input.cols.imm_c) *
+          (input.is_real - input.cols.imm_c - 1)) -
+      Expression.eval env 0,
+    Expression.eval env
+        (input.cols.imm_c *
+          (input.cols.op_c_memory.prev_value[0] - input.cols.op_c[0])) -
+      Expression.eval env 0,
+    Expression.eval env
+        (input.cols.imm_c *
+          (input.cols.op_c_memory.prev_value[1] - input.cols.op_c[1])) -
+      Expression.eval env 0,
+    Expression.eval env
+        (input.cols.imm_c *
+          (input.cols.op_c_memory.prev_value[2] - input.cols.op_c[2])) -
+      Expression.eval env 0,
+    Expression.eval env
+        (input.cols.imm_c *
+          (input.cols.op_c_memory.prev_value[3] - input.cols.op_c[3])) -
+      Expression.eval env 0,
+    Expression.eval env (input.is_trusted * (input.is_trusted - 1)),
+    Expression.eval env
+        (input.cols.op_a_0 * input.cols.op_a_memory.prev_value[0]) -
+      Expression.eval env 0,
+    Expression.eval env
+        (input.cols.op_a_0 * input.cols.op_a_memory.prev_value[1]) -
+      Expression.eval env 0,
+    Expression.eval env
+        (input.cols.op_a_0 * input.cols.op_a_memory.prev_value[2]) -
+      Expression.eval env 0,
+    Expression.eval env
+        (input.cols.op_a_0 * input.cols.op_a_memory.prev_value[3]) -
+      Expression.eval env 0 ]
+
+set_option maxHeartbeats 1000000 in
+/-- Folded exact assertion list for `ALUTypeReaderImmutable`. This is a structural
+normalizer used only inside whole-chip faithfulness proofs, not a new reader-level
+faithfulness boundary. -/
+theorem aluTypeImmutableAssertionList
+    (env : Environment (ZMod p))
+    (input : Var Readers.ALUTypeReaderImmutable.Inputs (ZMod p)) (offset : ℕ) :
+    List.map (Expression.eval env)
+        (Operations.constraints
+          ((Readers.ALUTypeReaderImmutable.main input).operations offset)) =
+      aluTypeImmutableAssertionValues env input := by
+  simp only [Readers.ALUTypeReaderImmutable.main, circuit_norm]
+  simp only [Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    circuit_norm, constraints_formalAssertion_toSubcircuit]
+  simp only [List.map_append, List.map_cons]
+  simp only [registerAccessTimestampAssertions]
+  repeat' rw [equalityAssertionList]
+  rfl
 
 end CanonicalReader
 
@@ -545,8 +1004,20 @@ theorem nativeAccesses_component_eq_rowOperations {p : ℕ} [Fact p.Prime]
     Air.Flat.Component.interactions_eq]
 
 /-- Whole-chip faithfulness. Assertion lists need only be extensionally equivalent: the Lean chip may
-use different local gadgets or redundant constraints. Interactions are compared as a multiset after
-the project-wide bus-orientation convention in `nativeAccesses`. -/
+use different local gadgets or redundant constraints. On rows satisfying that assertion relation,
+semantically active interactions are compared as a multiset after the project-wide bus-orientation
+convention in `nativeAccesses`.
+
+The premise on `interactions` is essential to the intended abstraction, not a soundness assumption.
+An AIR denotes only rows satisfying its local assertions, so interaction expressions outside that
+set are observationally irrelevant. This formulation permits the native circuit to replace a Rust
+interaction argument by a locally constrained equal expression while still proving equality of the
+complete accepted-trace relation.
+
+Likewise, entries of multiplicity zero are omitted before comparison. Their keys do not enter SP1's
+LogUp argument or Clean's balance semantics; requiring them to agree would expose dead expression
+syntax rather than AIR behavior. `LookupAccessList.multiplicitySum_active` proves that this filtering
+preserves every trace-level bus equation. -/
 structure ChipFaithful {p : ℕ} [Fact p.Prime]
     (Input NativeCols RustCols : TypeMap) [ProvableStruct Input] [ProvableStruct NativeCols]
     (circuit : GeneralFormalCircuit (ZMod p) Input NativeCols)
@@ -558,10 +1029,40 @@ structure ChipFaithful {p : ℕ} [Fact p.Prime]
       (⟨circuit⟩ : Air.Flat.Component (ZMod p)).operations.ConstraintsHold
         assignment.environment
   interactions : ∀ rustCols data,
+    List.Forall (· = 0) (oracle.assertZeros rustCols) →
     let assignment := codec.assignment (oracle.deconfigure rustCols) data
     List.Perm
-      (nativeAccesses assignment.environment
-        (⟨circuit⟩ : Air.Flat.Component (ZMod p)).operations)
-      (oracle.rustAccesses rustCols)
+      (LookupAccessList.active
+        (nativeAccesses assignment.environment
+          (⟨circuit⟩ : Air.Flat.Component (ZMod p)).operations))
+      (LookupAccessList.active (oracle.rustAccesses rustCols))
+
+namespace ChipFaithful
+
+variable {p : ℕ} [Fact p.Prime]
+variable {Input NativeCols RustCols : TypeMap}
+variable [ProvableStruct Input] [ProvableStruct NativeCols]
+variable {circuit : GeneralFormalCircuit (ZMod p) Input NativeCols}
+variable {codec : ChipRowCodec Input NativeCols circuit}
+variable {oracle : ChipOracle (ZMod p) NativeCols RustCols}
+
+/-- The interaction comparison may equivalently be invoked from native constraint satisfaction.
+This is the form used when transporting a satisfying native Clean row to the extracted Rust AIR. -/
+theorem interactions_of_nativeConstraints
+    (faithful : ChipFaithful Input NativeCols RustCols circuit codec oracle)
+    (rustCols : RustCols (ZMod p)) (data : ProverData (ZMod p))
+    (hNative :
+      (⟨circuit⟩ : Air.Flat.Component (ZMod p)).operations.ConstraintsHold
+        (codec.assignment (oracle.deconfigure rustCols) data).environment) :
+    List.Perm
+      (LookupAccessList.active
+        (nativeAccesses
+          (codec.assignment (oracle.deconfigure rustCols) data).environment
+          (⟨circuit⟩ : Air.Flat.Component (ZMod p)).operations))
+      (LookupAccessList.active (oracle.rustAccesses rustCols)) := by
+  apply faithful.interactions rustCols data
+  exact (faithful.constraints rustCols data).mpr hNative
+
+end ChipFaithful
 
 end SP1Clean.Faithful

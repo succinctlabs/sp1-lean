@@ -22,7 +22,15 @@ Two axes:
   a field larger than `2 * 2^24`") — and `Fact (2 ^ 25 < p)` is precisely that `2 · 2^24` field bound.
 -/
 
-namespace SP1Clean.Soundness.TimeExtraction
+namespace SP1Clean.Soundness
+
+/-- The active-row scalar content of one register-access timestamp contract.  This is the minimal
+currency-free fact produced by the timestamp reader's Byte checks and consumed by memory ordering. -/
+def ActiveTimestampBounds {p : ℕ} (prevLow diffLow clkTarget : ZMod p) : Prop :=
+  diffLow.val < 2 ^ 16 ∧
+    ((clkTarget - prevLow - 1 - diffLow) * (65536 : ZMod p)⁻¹).val < 2 ^ 8
+
+namespace TimeExtraction
 
 open SP1Clean.Semantics
 open SP1Clean.Channels (MemoryMsg)
@@ -126,6 +134,28 @@ theorem prevLow_val_lt_of_accessTimestamp (clk_target prev_low diff_low_limb : Z
     rw [reconstruct, ZMod.val_add_of_lt (by rw [succVal]; omega), succVal]
   omega
 
+/-- Natural-number order extracted from SP1's generic two-limb access-timestamp gap equation.
+
+The generic RAM timestamp gadget materializes both difference limbs, rather than defining the high
+limb by division as the register-only gadget does. Rewriting the equation into that register form
+lets `prevLow_val_lt_of_accessTimestamp` carry the no-wrap proof. The caller must supply the
+physical `< 2^24` bound on the component being compared; this is the exact premise named in SP1's
+`eval_memory_access_timestamp` underflow argument. -/
+theorem component_val_lt_of_accessTimestampGap
+    (current previous diffLow diffHigh : ZMod p)
+    (previousBound : previous.val < 2 ^ 24)
+    (diffLowBound : diffLow.val < 2 ^ 16)
+    (diffHighBound : diffHigh.val < 2 ^ 8)
+    (gap : current - previous - 1 = diffLow + diffHigh * 65536) :
+    previous.val < current.val := by
+  have highEq :
+      (current - previous - 1 - diffLow) * (65536 : ZMod p)⁻¹ = diffHigh := by
+    rw [gap]
+    rw [add_sub_cancel_left]
+    rw [mul_assoc, mul_inv_cancel₀ val_65536_ne_zero, mul_one]
+  exact prevLow_val_lt_of_accessTimestamp current previous diffLow previousBound
+    diffLowBound (highEq ▸ diffHighBound)
+
 /-- **The payoff, at the bus layer**: a pulled prior Memory record strictly predates the record the
 row pushes for the same access — `Soundness/TouchChains.lean`'s `TouchOK.pull_lt_push`.
 
@@ -147,6 +177,23 @@ theorem memoryTimeNat_lt_of_accessTimestamp (prior pushed : MemoryMsg (ZMod p))
   simp only [MemoryMsg.timeNat, clkNat, sameHigh, priorLow]
   have := prevLow_val_lt_of_accessTimestamp pushed.clk_low cols.prev_low cols.diff_low_limb
     (priorLow ▸ prevBound) diffLow diffHigh
+  omega
+
+/-- Scalar, currency-separated form of the register timestamp payoff.  The row supplies
+`ActiveTimestampBounds` from its Byte guarantees; the grounding walk later supplies only the pulled
+record's `ClkBound`. -/
+theorem memoryTimeNat_lt_of_activeTimestampBounds (prior pushed : MemoryMsg (ZMod p))
+    (prevLow diffLow clkTarget : ZMod p)
+    (prevBound : MemoryMsg.ClkBound prior)
+    (bounds : ActiveTimestampBounds prevLow diffLow clkTarget)
+    (sameHigh : prior.clk_high = pushed.clk_high)
+    (priorLow : prior.clk_low = prevLow)
+    (targetClk : pushed.clk_low = clkTarget) :
+    MemoryMsg.timeNat prior < MemoryMsg.timeNat pushed := by
+  obtain ⟨diffLowBound, diffHighBound⟩ := bounds
+  simp only [MemoryMsg.timeNat, clkNat, sameHigh, priorLow, targetClk]
+  have := prevLow_val_lt_of_accessTimestamp clkTarget prevLow diffLow
+    (priorLow ▸ prevBound) diffLowBound diffHighBound
   omega
 
 variable [Fact (2 ^ 17 < p)]
@@ -175,4 +222,6 @@ theorem memoryTimeNat_lt_of_registerAccessCols (prior pushed : MemoryMsg (ZMod p
     accessCols.access_timestamp.diff_low_limb (priorLow ▸ prevBound) diffLow diffHigh
   omega
 
-end SP1Clean.Soundness.TimeExtraction
+end TimeExtraction
+
+end SP1Clean.Soundness

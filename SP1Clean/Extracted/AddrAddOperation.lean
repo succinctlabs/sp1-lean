@@ -74,9 +74,9 @@ set_option maxHeartbeats 8000000 in
   (is_real : F)
   : List (Interaction F) :=
   [
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.value[0] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.value[1] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.value[2] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.value[0] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.value[1] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.value[2] 16 0), is_real⟩,
   ]
 
 end AddrAddOperation

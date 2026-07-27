@@ -145,6 +145,27 @@ theorem SailChain.snoc : ∀ {n : ℕ} {a b : SailState}, SailChain n a b →
   | refl s => exact fun hs => .step hs (.refl _)
   | step h1 _ ih => exact fun hs => .step h1 (ih hs)
 
+/-- Compatibility contract between SP1's immutable trusted-program fetch and the official Sail
+interpreter's unified instruction/data memory.
+
+In SP1 v6.3.1, trusted instruction fetch reads `Program.instructions`, while ordinary loads and
+stores read and write the separate Memory state. The ELF loader initially places executable bytes
+in that Memory image too, but a later data store does not change the instruction selected by the
+Program table. Unmodified Sail instead fetches from the same mutable byte map used by data accesses.
+
+Consequently, a direct multi-step Sail refinement additionally needs the pinned program to preserve
+its instruction bytes along the execution under consideration. This is a program-correctness
+contract, not an AIR fact and not an unconditional field of `GuestProgram`. It is deliberately
+stated over reachable prefixes from the selected shard-local initial state, so callers may prove a
+normal inductive code/data-separation invariant rather than the unrealistically strong claim that
+every possible store address is outside ROM. -/
+def SailCodeMemoryCompatible (prog : GuestProgram) (initial : SailState) : Prop :=
+  ∀ {n : ℕ} {state next : SailState},
+    SailChain n initial state →
+      SailStep state next →
+        RomLoaded prog state →
+          RomLoaded prog next
+
 /-! ## Halting (SP1 execution-environment semantics, observed not simulated)
 
 SP1's `ECALL` is not RISC-V privileged `ECALL`: Sail's `execute_ECALL` traps to an M-mode handler,

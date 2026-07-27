@@ -367,15 +367,15 @@ set_option maxHeartbeats 8000000 in
   let E270 : F := cols.state.clk_16_24 * 65536
   let E271 : F := cols.state.clk_0_16 + E270
   U16MSBOperation.interactions cols.adapter.op_b_memory.prev_value[3] { msb := cols.b_msb.msb } cols.is_sra ++ U16MSBOperation.interactions cols.adapter.op_b_memory.prev_value[1] { msb := cols.b_msb.msb } cols.is_sraw ++ U16MSBOperation.interactions cols.a[1] { msb := cols.srw_msb.msb } E13 ++ CPUState.interactions { clk_high := cols.state.clk_high, clk_16_24 := cols.state.clk_16_24, clk_0_16 := cols.state.clk_0_16, pc := #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2]] } #v[E269, cols.state.pc[1], cols.state.pc[2]] 8 E2 ++ ALUTypeReader.interactions cols.state.clk_high E271 #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2]] E21 #v[cols.a[0], cols.a[1], cols.a[2], cols.a[3]] { op_a := cols.adapter.op_a, op_a_memory := { prev_value := #v[cols.adapter.op_a_memory.prev_value[0], cols.adapter.op_a_memory.prev_value[1], cols.adapter.op_a_memory.prev_value[2], cols.adapter.op_a_memory.prev_value[3]], access_timestamp := { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low, diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } }, op_a_0 := cols.adapter.op_a_0, op_b := cols.adapter.op_b, op_b_memory := { prev_value := #v[cols.adapter.op_b_memory.prev_value[0], cols.adapter.op_b_memory.prev_value[1], cols.adapter.op_b_memory.prev_value[2], cols.adapter.op_b_memory.prev_value[3]], access_timestamp := { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low, diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } }, op_c := #v[cols.adapter.op_c[0], cols.adapter.op_c[1], cols.adapter.op_c[2], cols.adapter.op_c[3]], op_c_memory := { prev_value := #v[cols.adapter.op_c_memory.prev_value[0], cols.adapter.op_c_memory.prev_value[1], cols.adapter.op_c_memory.prev_value[2], cols.adapter.op_c_memory.prev_value[3]], access_timestamp := { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low, diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } }, imm_c := cols.adapter.imm_c } E2 E2 ++ [
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) E84 10 0), E2⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.lower_limb[0] E78 0), E2⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.higher_limb[0] E136 0), E2⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.lower_limb[1] E78 0), E2⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.higher_limb[1] E142 0), E2⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.lower_limb[2] E78 0), E2⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.higher_limb[2] E148 0), E2⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.lower_limb[3] E78 0), E2⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.higher_limb[3] E155 0), E2⟩,
+    ⟨.send, (.byte 6 E84 10 0), E2⟩,
+    ⟨.send, (.byte 6 cols.lower_limb[0] E78 0), E2⟩,
+    ⟨.send, (.byte 6 cols.higher_limb[0] E136 0), E2⟩,
+    ⟨.send, (.byte 6 cols.lower_limb[1] E78 0), E2⟩,
+    ⟨.send, (.byte 6 cols.higher_limb[1] E142 0), E2⟩,
+    ⟨.send, (.byte 6 cols.lower_limb[2] E78 0), E2⟩,
+    ⟨.send, (.byte 6 cols.higher_limb[2] E148 0), E2⟩,
+    ⟨.send, (.byte 6 cols.lower_limb[3] E78 0), E2⟩,
+    ⟨.send, (.byte 6 cols.higher_limb[3] E155 0), E2⟩,
   ]
 
 end ShiftRightCols

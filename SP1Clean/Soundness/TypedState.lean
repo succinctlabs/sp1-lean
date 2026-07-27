@@ -473,6 +473,9 @@ theorem bitwiseChip_stateEmissionShape : StateEmissionShape
   dsimp only
   refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  · intros
+    simp [BitwiseChip.circuit, expose, BitwiseChip.exposedStateInteractions,
+      cpuStatePullMessage, cpuStatePushMessage]
   all_goals
     intros
     simp only [BitwiseChip.circuit, statePullOfView, statePushOfView,
@@ -487,6 +490,9 @@ theorem ltChip_stateEmissionShape : StateEmissionShape
   dsimp only
   refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  · intros
+    simp [LtChip.circuit, expose, LtChip.exposedStateInteractions,
+      cpuStatePullMessage, cpuStatePushMessage]
   all_goals
     intros
     simp only [LtChip.circuit, statePullOfView, statePushOfView, stateAccess,
@@ -535,11 +541,12 @@ theorem jalChip_stateEmissionShape : StateEmissionShape
   refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
     fun input offset => cpuStateNextMessage input.state
       #v[var ⟨offset⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩] 8, ?_, ?_, ?_, ?_⟩
+  · intros
+    simp [JalChip.circuit, expose, JalChip.exposedStateInteractions,
+      cpuStatePullMessage, cpuStateNextMessage]
   all_goals
     intros
-    simp [JalChip.circuit,
-      Readers.CPUState.exposedState, Readers.CPUState.stateInteractions,
-      Readers.CPUState.currentMsg, Readers.CPUState.nextMsg, statePullOfView,
+    simp [JalChip.circuit, statePullOfView,
       statePushOfView, stateAccess, cpuStatePullMessage, cpuStateNextMessage,
       JalChip.rowView, circuit_norm]
 
@@ -553,11 +560,12 @@ theorem jalrChip_stateEmissionShape : StateEmissionShape
     fun input offset => cpuStateNextMessage input.state
       #v[var ⟨offset⟩ - var ⟨offset + 8⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩] 8,
     ?_, ?_, ?_, ?_⟩
+  · intros
+    simp [JalrChip.circuit, expose, JalrChip.exposedStateInteractions,
+      cpuStatePullMessage, cpuStateNextMessage]
   all_goals
     intros
-    simp [JalrChip.circuit,
-      Readers.CPUState.exposedState, Readers.CPUState.stateInteractions,
-      Readers.CPUState.currentMsg, Readers.CPUState.nextMsg, statePullOfView,
+    simp [JalrChip.circuit, statePullOfView,
       statePushOfView, stateAccess, cpuStatePullMessage, cpuStateNextMessage,
       JalrChip.rowView, circuit_norm]
 
@@ -571,8 +579,8 @@ theorem branchChip_stateEmissionShape : StateEmissionShape
   dsimp only
   refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
     fun input offset => cpuStateNextMessage input.state
-      #v[var ⟨offset + 6 + 1 + 4 + 4⟩, var ⟨offset + 6 + 1 + 4 + 4 + 1⟩,
-        var ⟨offset + 6 + 1 + 4 + 4 + 2⟩] 8, ?_, ?_, ?_, ?_⟩
+      #v[var ⟨offset + 7⟩, var ⟨offset + 8⟩,
+        var ⟨offset + 9⟩] 8, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
     simp [BranchChip.circuit,
@@ -590,12 +598,13 @@ theorem uTypeChip_stateEmissionShape : StateEmissionShape
   dsimp only
   refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  · intros
+    simp [UTypeChip.circuit, expose, UTypeChip.exposedStateInteractions,
+      cpuStatePullMessage, cpuStatePushMessage]
   all_goals
     intros
-    simp [UTypeChip.circuit, Readers.CPUState.exposedState,
-      Readers.CPUState.stateInteractions, Readers.CPUState.currentMsg, Readers.CPUState.nextMsg,
-      statePullOfView, statePushOfView, stateAccess, cpuStatePullMessage, cpuStatePushMessage,
-      UTypeChip.rowView, circuit_norm]
+    simp [UTypeChip.circuit, statePullOfView, statePushOfView, stateAccess,
+      cpuStatePullMessage, cpuStatePushMessage, UTypeChip.rowView, circuit_norm]
 
 theorem loadDoubleChip_stateEmissionShape : StateEmissionShape
     (⟨LoadDoubleChip.kind, LoadDoubleChip.circuit, rfl, [.LD], .nonX0⟩ : SupportedChip p) := by
@@ -748,7 +757,9 @@ theorem mulChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp only [MulChip.circuit, statePullOfView, statePushOfView, stateAccess,
+    simp [MulChip.circuit, MulChip.exposedStateInteractions,
+      MulChip.exposedMemoryInteractions, MulChip.exposedProgramInteractions,
+      expose, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, MulChip.rowView, circuit_norm]
 
 set_option maxHeartbeats 16000000 in
@@ -765,7 +776,8 @@ theorem divRemChip_stateEmissionShape : StateEmissionShape
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
   all_goals
     intros
-    simp [DivRemChip.circuit, DivRemChip.stateExposure, Readers.CPUState.exposedState,
+    simp [DivRemChip.circuit, DivRemChip.exposedChannels, DivRemChip.stateExposure,
+      Readers.CPUState.exposedState,
       Readers.CPUState.stateInteractions, Readers.CPUState.currentMsg, Readers.CPUState.nextMsg,
       statePullOfView, statePushOfView, stateAccess, cpuStatePullMessage, cpuStatePushMessage,
       DivRemChip.rowView, circuit_norm]
@@ -786,7 +798,9 @@ theorem aluX0Chip_stateEmissionShape : StateEmissionShape
   all_goals
     intros
     simp only [AluX0Chip.circuit, statePullOfView, statePushOfView, stateAccess,
-      cpuStatePullMessage, cpuStatePushMessage, AluX0Chip.rowView, circuit_norm]
+      cpuStatePullMessage, cpuStatePushMessage, AluX0Chip.rowView,
+      AluX0Chip.exposedStateInteractions, expose, List.mem_singleton,
+      true_or, circuit_norm]
 
 set_option maxHeartbeats 1000000 in
 /-- Every descriptor in the single supported-machine registry emits exactly one gated State pull and

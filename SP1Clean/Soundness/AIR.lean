@@ -8,6 +8,7 @@ import SP1Clean.Soundness.LocalExecution
 import SP1Clean.Soundness.RowSoundness
 import SP1Clean.Soundness.TypedProgram
 import SP1Clean.Soundness.TypedTimeContracts
+import SP1Clean.Soundness.ChipContracts
 
 /-! # AIR witness relations and the semantic capstone
 
@@ -16,6 +17,8 @@ This module is the naming boundary the old trail capstone lacked:
 * `SupportedCoreEnsembleRelation` is exactly the algebra checked by the 36-table Clean ensemble;
 * `SP1SemanticBoundaryRelation` separately binds its preprocessed/provider rows to the committed
   program and a concrete local initial Sail state;
+* `SupportedCoreMemoryTimestampRangeRelation` exposes the one physical range premise used by the
+  generic RAM-access underflow argument;
 * `SupportedCoreNativeRelation` is their conjunction; and
 * `SupportedCoreLocalExecutionRelation` is the finite official-Sail target for that slice.
 
@@ -38,6 +41,60 @@ abbrev SupportedCoreStatement (p : ℕ) :=
 abbrev SupportedCoreNativeWitness (p : ℕ) [Fact p.Prime] [Fact (2 ^ 25 < p)] :=
   EnsembleWitness (sp1Ensemble (p := p))
 
+/-- The finite rollout surface left after the generic timed-grounding assembly is proved.  Every
+field is a physical AIR fact: one contract bundle per registered chip, signed-binary Memory
+multiplicities, and absence of active Memory messages on padding rows. -/
+structure SupportedCoreGroundingObligations
+    (witness : SupportedCoreNativeWitness p) : Prop where
+  chipContracts : ∀ chip ∈ supportedChips (p := p), ChipGroundingContracts chip
+  memoryMultiplicityBinary :
+    ∀ interaction ∈ typedEnsembleInteractionsWith witness Channels.memoryChannel,
+      signedVal interaction.mult = -1 ∨ signedVal interaction.mult = 0 ∨
+        signedVal interaction.mult = 1
+  paddingMemoryEmpty : ∀ decoded ∈ decodedInstructionRows (p := p) witness.tables,
+    (decoded.toChipRow witness.data).is_real ≠ 1 →
+      decoded.producedMemoryMessages witness.data = [] ∧
+        decoded.consumedMemoryMessages witness.data = []
+
+/-- The finite rollout of the physical grounding contracts for all 25 entries of
+`supportedChips`. The two structural Memory facts are derived from physical constraints, and every
+chip case is discharged by its registry-facing `ChipGroundingContracts` bundle. -/
+theorem supportedCore_groundingObligations_of_constraints
+    (witness : SupportedCoreNativeWitness p) (constraints : witness.Constraints) :
+    SupportedCoreGroundingObligations witness := by
+  refine
+    { chipContracts := ?_
+      memoryMultiplicityBinary := witness_memoryMultiplicityBinary witness constraints
+      paddingMemoryEmpty := witness_paddingMemoryEmpty witness constraints }
+  intro chip chipMem
+  fin_cases chipMem <;>
+    first
+    | exact addChip_groundingContracts
+    | exact addiChip_groundingContracts
+    | exact addwChip_groundingContracts
+    | exact subChip_groundingContracts
+    | exact subwChip_groundingContracts
+    | exact bitwiseChip_groundingContracts
+    | exact ltChip_groundingContracts
+    | exact shiftLeftChip_groundingContracts
+    | exact shiftRightChip_groundingContracts
+    | exact mulChip_groundingContracts
+    | exact divRemChip_groundingContracts
+    | exact jalChip_groundingContracts
+    | exact jalrChip_groundingContracts
+    | exact branchChip_groundingContracts
+    | exact uTypeChip_groundingContracts
+    | exact loadByteChip_groundingContracts
+    | exact loadHalfChip_groundingContracts
+    | exact loadWordChip_groundingContracts
+    | exact loadDoubleChip_groundingContracts
+    | exact loadX0Chip_groundingContracts
+    | exact storeByteChip_groundingContracts
+    | exact storeHalfChip_groundingContracts
+    | exact storeWordChip_groundingContracts
+    | exact storeDoubleChip_groundingContracts
+    | exact aluX0Chip_groundingContracts
+
 /-- The raw algebraic relation checked by today's Clean ensemble.  It intentionally says nothing
 about which program/provider contents the rows represent. -/
 def SupportedCoreEnsembleRelation :
@@ -53,13 +110,30 @@ def SP1SemanticBoundaryRelation :
     WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
   SemanticBoundaryBinding
 
-/-- The honest native relation used by semantic soundness.  Provider truth is an explicit companion
-predicate, not an implication smuggled out of raw interaction balance. -/
+/-- The explicit physical range premise needed by SP1's generic RAM access-timestamp comparison.
+The local `MemoryAccess` AIR constrains the selected difference to two byte-range-checked limbs, but
+its Rust soundness argument additionally requires both compared components to be `< 2^24`. Low
+components already carry `MemoryMsg.ClkBound`; this companion supplies the pulled high component.
+
+This is intentionally a witness relation rather than an unconditional axiom or an ordering
+assumption. The load/store contracts still derive strict order from the actual AIR equations. The
+eventual exact extracted-AIR layer should prove this relation from SP1's public timestamp range
+checks plus Memory permutation, or continue to disclose it as an external verifier premise. -/
+def SupportedCoreMemoryTimestampRangeRelation :
+    WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
+  fun _statement witness =>
+    ∀ decoded ∈ realDecodedInstructionRows witness.data witness.tables,
+      MemoryPullTimestampHighBound (decoded.ordinaryRowFacts witness.data)
+
+/-- The honest native relation used by semantic soundness. Provider truth and the RAM timestamp
+range fact are explicit companion predicates, not implications smuggled out of raw interaction
+balance. -/
 def SupportedCoreNativeRelation :
     WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
   fun statement witness =>
     SupportedCoreEnsembleRelation statement witness ∧
-      SP1SemanticBoundaryRelation statement witness
+      SP1SemanticBoundaryRelation statement witness ∧
+        SupportedCoreMemoryTimestampRangeRelation statement witness
 
 /-! ## Native grounding and the local-execution capstone -/
 
@@ -307,19 +381,36 @@ theorem statePullTime_of_decodedStateWalk (data : ProverData (ZMod p)) :
       simp only [List.length_cons]
       omega
 
-set_option warn.sorry false in
-/-- The one remaining dynamic grounding seam, now stated over the exact ordered physical rows.
+/-- Every row of the eight-tick State walk begins in the same residue class modulo eight as the
+public initial State record.  This is the `RowOK.align8` input of the timed Memory walk. -/
+theorem statePullAlign8_of_decodedStateWalk (data : ProverData (ZMod p)) :
+    ∀ {initial final : Channels.StateMsg (ZMod p)}
+      {rows : List (DecodedInstructionRow p)},
+      Walk.IsWalk (decodedStateEdge data) initial final rows →
+      (∀ decoded ∈ rows,
+        Semantics.StateMsg.timeNat (decodedStateEdge data decoded).2 =
+          Semantics.StateMsg.timeNat (decodedStateEdge data decoded).1 + 8) →
+      ∀ decoded ∈ rows,
+        Semantics.StateMsg.timeNat (decodedStateEdge data decoded).1 % 8 =
+          Semantics.StateMsg.timeNat initial % 8 := by
+  intro initial final rows walk steps decoded decodedMem
+  obtain ⟨done, suffix, rowsEq⟩ := List.append_of_mem decodedMem
+  have position := statePullTime_of_decodedStateWalk data walk steps done decoded suffix rowsEq
+  rw [position]
+  omega
 
-Ordering, activity, registry membership, Program decode, and clock accounting are all proved outside
-this theorem.  Its proof must use timed Memory grounding to establish each row's
-`DecodedRowOpenSoundnessInputs`, obtain `chipSpec` through
-`DecodedInstructionRow.chipSpec_of_openSoundnessInputs`, and derive current operands plus the
-chip-specific `advanceReady` fact at the corresponding official-Sail prefix. -/
-theorem supportedCore_orderedRows_dynamic
+/-- Generic closure of the ordered-row dynamic seam.  The proof chooses each chip's aligned carrier,
+feeds the seven explicit inputs of `TimedGrounding.walk`, transports its result back to the ordinary
+physical-row carrier, and invokes the chip's retained Clean soundness/Sail bridge.  What remains after
+this theorem is the finite `SupportedCoreGroundingObligations` rollout, not another semantic premise. -/
+theorem supportedCore_orderedRows_dynamic_of_obligations
     (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
     (initial : SailState)
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
     (boundary : InitialBoundaryFacts statement witness initial)
+    (memoryTimestampRange :
+      SupportedCoreMemoryTimestampRangeRelation statement witness)
+    (obligations : SupportedCoreGroundingObligations witness)
     (orderedRows : List (DecodedInstructionRow p))
     (exhaustive : orderedRows.Perm
       (realDecodedInstructionRows witness.data witness.tables))
@@ -330,9 +421,213 @@ theorem supportedCore_orderedRows_dynamic
       ∀ state, Target.SailChain done.length initial state →
         DynamicGroundedRow witness.data statement.program
           (decoded.toChipRow witness.data) state := by
-  sorry
+  classical
+  have sourceFacts : ∀ decoded ∈ orderedRows,
+      decoded ∈ decodedInstructionRows (p := p) witness.tables ∧
+        (decoded.toChipRow witness.data).is_real = 1 := by
+    intro decoded decodedMem
+    have sourceMem := exhaustive.mem_iff.mp decodedMem
+    simpa only [realDecodedInstructionRows, List.mem_filter, decide_eq_true_eq] using sourceMem
+  have contractAt : ∀ decoded ∈ orderedRows, ChipGroundingContracts decoded.chip := by
+    intro decoded decodedMem
+    exact obligations.chipContracts decoded.chip
+      (decodedInstructionRows_chip_mem witness.tables (sourceFacts decoded decodedMem).1)
+  have decodeAt : ∀ decoded ∈ orderedRows,
+      Target.decodedInROM statement.program
+        (programAccess (decoded.toChipRow witness.data).view).toRow :=
+    supportedCore_orderedRows_programDecoded statement witness constraints balanced boundary
+      orderedRows exhaustive
+  have alignedExists : ∀ decoded ∈ orderedRows, ∃ touches : List (TimedGrounding.Touch p),
+      TimedGrounding.AlignsWith
+          (TimedGrounding.alignedOf (decoded.ordinaryRowFacts witness.data) touches)
+          (decoded.ordinaryRowFacts witness.data) ∧
+        (∀ tc ∈ touches,
+          TimedGrounding.TouchOK
+            (Semantics.StateMsg.timeNat (decoded.ordinaryRowFacts witness.data).statePull)
+            tc.1 tc.2) ∧
+        (∀ loc : Semantics.MemLoc, List.IsChain
+          (fun a b : TimedGrounding.Touch p =>
+            Semantics.MemoryMsg.timeNat a.2 < Semantics.MemoryMsg.timeNat b.2)
+          (touches.filter (fun pq => Semantics.MemoryMsg.locOf pq.2 = loc))) ∧
+        (∀ tc ∈ touches, Channels.MemoryMsg.ClkBound tc.2) ∧
+        (∀ tc ∈ touches, Channels.MemoryMsg.ClkBound (tc : TimedGrounding.Touch p).1.1 →
+          Semantics.MemoryMsg.timeNat (tc : TimedGrounding.Touch p).1.1 <
+            Semantics.MemoryMsg.timeNat tc.2) := by
+    intro decoded decodedMem
+    exact (contractAt decoded decodedMem).rowAligned witness constraints balanced decoded rfl
+      (sourceFacts decoded decodedMem).1 (sourceFacts decoded decodedMem).2 statement.program
+      (decodeAt decoded decodedMem)
+      (memoryTimestampRange decoded (exhaustive.mem_iff.mp decodedMem))
+  let touchesOf : DecodedInstructionRow p → List (TimedGrounding.Touch p) := fun decoded =>
+    if decodedMem : decoded ∈ orderedRows then Classical.choose (alignedExists decoded decodedMem)
+    else []
+  have touchesOf_spec : ∀ decoded ∈ orderedRows,
+      TimedGrounding.AlignsWith
+          (TimedGrounding.alignedOf (decoded.ordinaryRowFacts witness.data) (touchesOf decoded))
+          (decoded.ordinaryRowFacts witness.data) ∧
+        (∀ tc ∈ touchesOf decoded,
+          TimedGrounding.TouchOK
+            (Semantics.StateMsg.timeNat (decoded.ordinaryRowFacts witness.data).statePull)
+            tc.1 tc.2) ∧
+        (∀ loc : Semantics.MemLoc, List.IsChain
+          (fun a b : TimedGrounding.Touch p =>
+            Semantics.MemoryMsg.timeNat a.2 < Semantics.MemoryMsg.timeNat b.2)
+          ((touchesOf decoded).filter (fun pq => Semantics.MemoryMsg.locOf pq.2 = loc))) ∧
+        (∀ tc ∈ touchesOf decoded, Channels.MemoryMsg.ClkBound tc.2) ∧
+        (∀ tc ∈ touchesOf decoded,
+          Channels.MemoryMsg.ClkBound (tc : TimedGrounding.Touch p).1.1 →
+            Semantics.MemoryMsg.timeNat (tc : TimedGrounding.Touch p).1.1 <
+              Semantics.MemoryMsg.timeNat tc.2) := by
+    intro decoded decodedMem
+    simp only [touchesOf, dif_pos decodedMem]
+    exact Classical.choose_spec (alignedExists decoded decodedMem)
+  let alignedRow : DecodedInstructionRow p → Semantics.RowFacts p := fun decoded =>
+    TimedGrounding.alignedOf (decoded.ordinaryRowFacts witness.data) (touchesOf decoded)
+  have aligns : ∀ decoded ∈ orderedRows,
+      TimedGrounding.AlignsWith (alignedRow decoded)
+        (decoded.ordinaryRowFacts witness.data) := by
+    intro decoded decodedMem
+    exact (touchesOf_spec decoded decodedMem).1
+  have timeStep : ∀ decoded ∈ orderedRows,
+      Semantics.StateMsg.timeNat (decodedStateEdge witness.data decoded).2 =
+        Semantics.StateMsg.timeNat (decodedStateEdge witness.data decoded).1 + 8 := by
+    intro decoded decodedMem
+    exact witness_realDecodedInstructionRows_timeStep witness constraints balanced decoded
+      (exhaustive.mem_iff.mp decodedMem)
+  have rowOK : ∀ row ∈ orderedRows.map alignedRow,
+      TimedGrounding.RowOK (Commit.initClkNat witness.data) row := by
+    intro row rowMem
+    obtain ⟨decoded, decodedMem, rfl⟩ := List.mem_map.mp rowMem
+    have evidence := touchesOf_spec decoded decodedMem
+    apply TimedGrounding.rowOK_alignedOf (Commit.initClkNat witness.data)
+      (decoded.ordinaryRowFacts witness.data) (touchesOf decoded)
+    · simpa only [TimedGrounding.alignedOf, DecodedInstructionRow.ordinaryRowFacts_statePull,
+        DecodedInstructionRow.ordinaryRowFacts_statePush, decodedStateEdge] using
+        timeStep decoded decodedMem
+    · have aligned := statePullAlign8_of_decodedStateWalk witness.data stateWalk timeStep decoded
+          decodedMem
+      rw [boundary.initialClock]
+      simpa only [TimedGrounding.alignedOf, DecodedInstructionRow.ordinaryRowFacts_statePull,
+        decodedStateEdge, initialBoundaryStateMessage, Semantics.StateMsg.timeNat] using aligned
+    · exact evidence.2.1
+    · exact evidence.2.2.1
+    · exact evidence.2.2.2.1
+    · exact evidence.2.2.2.2
+  have engineFacts : ∀ decoded ∈ orderedRows,
+      Semantics.LocalStepFact statement.program initial (Commit.initClkNat witness.data)
+          (decoded.ordinaryRowFacts witness.data) ∧
+        TimedGrounding.FrameFact statement.program initial (Commit.initClkNat witness.data)
+          (decoded.ordinaryRowFacts witness.data) := by
+    intro decoded decodedMem
+    exact (contractAt decoded decodedMem).engineFacts witness constraints balanced decoded rfl
+      (sourceFacts decoded decodedMem).1 (sourceFacts decoded decodedMem).2 statement.program
+      (decodeAt decoded decodedMem) initial (Commit.initClkNat witness.data)
+      boundary.codeMemoryCompatible
+  have stepFacts : ∀ row ∈ orderedRows.map alignedRow,
+      Semantics.LocalStepFact statement.program initial (Commit.initClkNat witness.data) row := by
+    intro row rowMem
+    obtain ⟨decoded, decodedMem, rfl⟩ := List.mem_map.mp rowMem
+    exact TimedGrounding.localStepFact_align_of_ordinary (aligns decoded decodedMem)
+      (engineFacts decoded decodedMem).1
+  have frameFacts : ∀ row ∈ orderedRows.map alignedRow,
+      TimedGrounding.FrameFact statement.program initial (Commit.initClkNat witness.data) row := by
+    intro row rowMem
+    obtain ⟨decoded, decodedMem, rfl⟩ := List.mem_map.mp rowMem
+    exact TimedGrounding.frameFact_align_of_ordinary (aligns decoded decodedMem)
+      (engineFacts decoded decodedMem).2
+  have stateBalance :
+      initialBoundaryStateMessage statement.publicValues ::ₘ
+          (↑((orderedRows.map alignedRow).map (·.statePush)) :
+            Multiset (Channels.StateMsg (ZMod p))) =
+        finalBoundaryStateMessage statement.publicValues ::ₘ
+          ↑((orderedRows.map alignedRow).map (·.statePull)) := by
+    have pushMap : (orderedRows.map alignedRow).map (·.statePush) =
+        orderedRows.map (fun decoded => (decodedStateEdge witness.data decoded).2) := by
+      simp only [List.map_map]
+      apply List.map_congr_left
+      intro decoded decodedMem
+      rfl
+    have pullMap : (orderedRows.map alignedRow).map (·.statePull) =
+        orderedRows.map (fun decoded => (decodedStateEdge witness.data decoded).1) := by
+      simp only [List.map_map]
+      apply List.map_congr_left
+      intro decoded decodedMem
+      rfl
+    rw [pushMap, pullMap]
+    exact endpointBalance_of_decodedStateWalk witness.data stateWalk
+  have memoryBalance : ∀ loc : Semantics.MemLoc,
+      TimedGrounding.optMS (memoryInitFrontier witness loc) +
+          TimedGrounding.pushesAt (orderedRows.map alignedRow) loc =
+        TimedGrounding.optMS (memoryFinalizeFrontier witness loc) +
+          TimedGrounding.pullsAt (orderedRows.map alignedRow) loc := by
+    intro loc
+    exact memoryBalance_of_alignsWith witness balanced obligations.memoryMultiplicityBinary
+      (initPure witness constraints) (finPure witness constraints) boundary.memoryProviderUnique
+      boundary.memoryFinalizeProviderUnique obligations.paddingMemoryEmpty orderedRows exhaustive
+      alignedRow aligns loc
+  have liveAtHead : TimedGrounding.LiveOK initial (Commit.initClkNat witness.data)
+      (Semantics.StateMsg.timeNat (initialBoundaryStateMessage statement.publicValues))
+      (memoryInitFrontier witness) := by
+    have headTime : Semantics.StateMsg.timeNat
+        (initialBoundaryStateMessage statement.publicValues) = Commit.initClkNat witness.data := by
+      simpa only [initialBoundaryStateMessage, Semantics.StateMsg.timeNat] using
+        boundary.initialClock.symm
+    rw [headTime]
+    exact memoryInit_liveOK constraints boundary
+  have walked := TimedGrounding.walk statement.program initial (Commit.initClkNat witness.data)
+    (finalBoundaryStateMessage statement.publicValues) (memoryFinalizeFrontier witness)
+    orderedRows.length (orderedRows.map alignedRow)
+    (initialBoundaryStateMessage statement.publicValues) (memoryInitFrontier witness)
+    (by simp only [List.length_map]) stepFacts frameFacts rowOK boundary.localStateTruth
+    liveAtHead stateBalance memoryBalance
+  intro done decoded suffix rowsEq state chain
+  have decodedMem : decoded ∈ orderedRows := by
+    rw [rowsEq]
+    exact List.mem_append_right done List.mem_cons_self
+  have groundedAligned : TimedGrounding.Grounded statement.program initial
+      (Commit.initClkNat witness.data) (alignedRow decoded) :=
+    walked.1 (alignedRow decoded) (List.mem_map_of_mem decodedMem)
+  have groundedOrdinary := TimedGrounding.grounded_ordinary_of_aligned
+    (aligns decoded decodedMem) groundedAligned
+  have rowTimeRaw := statePullTime_of_decodedStateWalk witness.data stateWalk timeStep done decoded
+    suffix rowsEq
+  have rowTime : Semantics.StateMsg.timeNat
+      (statePullMessage (decoded.toChipRow witness.data)) =
+        Commit.initClkNat witness.data + 8 * done.length := by
+    rw [boundary.initialClock]
+    simpa only [decodedStateEdge, initialBoundaryStateMessage, Semantics.StateMsg.timeNat] using rowTimeRaw
+  exact decoded.dynamicGrounded_of_contracts witness constraints balanced
+    (sourceFacts decoded decodedMem).1 (contractAt decoded decodedMem) statement.program initial state
+    (Commit.initClkNat witness.data) done.length (decodeAt decoded decodedMem) groundedOrdinary chain
+    (sourceFacts decoded decodedMem).2 rowTime
 
-set_option warn.sorry false in
+/-- Dynamic grounding over the exact ordered physical rows.
+
+Ordering, activity, registry membership, Program decode, and clock accounting are all proved outside
+this theorem.  The timed walk and physical-row bridge are fully proved by
+`supportedCore_orderedRows_dynamic_of_obligations`; the only admitted dependency is the explicitly
+finite `supportedCore_groundingObligations_of_constraints` rollout above. -/
+theorem supportedCore_orderedRows_dynamic
+    (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
+    (initial : SailState)
+    (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
+    (boundary : InitialBoundaryFacts statement witness initial)
+    (memoryTimestampRange :
+      SupportedCoreMemoryTimestampRangeRelation statement witness)
+    (orderedRows : List (DecodedInstructionRow p))
+    (exhaustive : orderedRows.Perm
+      (realDecodedInstructionRows witness.data witness.tables))
+    (stateWalk : Walk.IsWalk (decodedStateEdge witness.data)
+      (initialBoundaryStateMessage statement.publicValues)
+      (finalBoundaryStateMessage statement.publicValues) orderedRows) :
+    ∀ done decoded suffix, orderedRows = done ++ decoded :: suffix →
+      ∀ state, Target.SailChain done.length initial state →
+        DynamicGroundedRow witness.data statement.program
+          (decoded.toChipRow witness.data) state := by
+  exact supportedCore_orderedRows_dynamic_of_obligations statement witness initial constraints balanced
+    boundary memoryTimestampRange (supportedCore_groundingObligations_of_constraints witness constraints)
+    orderedRows exhaustive stateWalk
+
 /-- The sole semantic grounding seam for the supported native slice.
 
 Program-provider commitment is no longer part of this seam:
@@ -345,7 +640,9 @@ theorem supported_core_witness_grounding
     (initial : SailState)
     (publicInputEq : witness.publicInput = statement.publicValues)
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
-    (boundary : InitialBoundaryFacts statement witness initial) :
+    (boundary : InitialBoundaryFacts statement witness initial)
+    (memoryTimestampRange :
+      SupportedCoreMemoryTimestampRangeRelation statement witness) :
     ∃ orderedRows, SupportedCoreGrounding statement witness initial orderedRows := by
   obtain ⟨orderedRows, stateWalk, exhaustiveMultiset⟩ :=
     witness_realDecodedState_exhaustiveTrail witness constraints balanced
@@ -361,7 +658,7 @@ theorem supported_core_witness_grounding
       static := supportedCore_orderedRows_static statement witness constraints balanced boundary
         orderedRows exhaustive
       dynamic := supportedCore_orderedRows_dynamic statement witness initial constraints balanced
-        boundary orderedRows exhaustive stateWalk }
+        boundary memoryTimestampRange orderedRows exhaustive stateWalk }
   · have clockCount := clockCount_of_decodedStateWalk witness.data stateWalk
       (fun decoded decodedMem =>
         witness_realDecodedInstructionRows_timeStep witness constraints balanced decoded
@@ -382,13 +679,15 @@ theorem supported_core_native_sound (model : Machine.SP1MachineModel)
     WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
       (SupportedCoreLocalExecutionRelation model) := by
   intro statement witness valid
-  obtain ⟨⟨publicInputEq, constraints, balanced⟩, initial, boundary⟩ := valid
+  obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩,
+    memoryTimestampRange⟩ := valid
   obtain ⟨rows, -, walk, grounded, clockCount⟩ :=
     supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
-      boundary
+      boundary memoryTimestampRange
   apply groundedRows_localExecution model statement witness.data initial
     (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data) rows
-    boundary.programWellFormed boundary.initialPc boundary.romLoaded boundary.configured walk grounded
+    boundary.programWellFormed boundary.initialPc boundary.romLoaded boundary.configured
+    boundary.codeMemoryCompatible walk grounded
   rw [Machine.localExecutionClock_eq_ordinary ordinary]
   exact clockCount
 
@@ -408,17 +707,21 @@ theorem supported_core_native_complete :
 
 `SupportedCoreTraceGeneratableExecutionRelation` must include decoded-opcode support, canonical witness
 generation inputs, memory initialization, and provider-table obligations; using the broader
-`SupportedCoreLocalExecutionRelation` would make the claim false for unsupported Sail executions.  We accept
-an explicit top-level completeness `sorry` while that relation and trace generator are verified.  This
-does not require changing Clean's `GeneralFormalCircuit` representation. -/
+`SupportedCoreLocalExecutionRelation` would make the claim false for unsupported Sail executions.  No
+placeholder theorem is declared until that relation and trace generator are verified.  This does not
+require changing Clean's `GeneralFormalCircuit` representation. -/
 
 /-! ## Full extracted target
 
-`Soundness/CoreAIR.lean` now owns `sp1_air_refinement` and its existential corollary
-`sp1_air_sound`.  Their source is the concrete 34-table/6-table Rust relation in
-`Faithful/CoreAIR.lean`, not this smaller native ensemble.  The theorem takes a field-by-field proof
-bundle and the explicitly disclosed commit-row provenance premise; this file continues to own only
-the 25-chip proof-oriented Clean slice. -/
+`Soundness/CoreAIR.lean` owns the conditional
+`sp1_air_refinement_of_obligations`/`sp1_air_sound_of_obligations` combinators.  Their source is the
+concrete 34-table/6-table Rust relation in `Faithful/CoreAIR.lean`, not this smaller native ensemble.
+The required field-by-field proof bundle is not yet instantiated, so the unqualified
+`sp1_air_refinement`/`sp1_air_sound` names remain reserved for that closed result.  Its COMMIT
+conclusion is deliberately limited to correctness of rows that exist.  The base composed execution
+relation preserves that distinction; complete eight-row coverage appears only in the optional
+`SP1CommitCoveredExecutionRelation`, derived from the explicit program contract
+`UsesStandardHaltWrapper`.  This file continues to own only the 25-chip proof-oriented Clean slice. -/
 
 /-! Shard AIR soundness is not itself a halting theorem.  After recursion authenticates an ordered
 ledger and all companion integrity relations, the composed target has the separate shape:

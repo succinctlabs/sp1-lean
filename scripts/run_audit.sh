@@ -4,8 +4,8 @@
 # Runs, in order: (A0) pin record, (A2) sorry/axiom text inventory with gates, (A3) the
 # authoritative `#print axioms` census over the released theorem set (via
 # `scripts/gen_axiom_probe.py` → `scripts/axiom_probe.lean`), writing the raw census to
-# `docs/snapshots/axiom-census.txt` and gating that `sorryAx` is reachable only from the
-# known-debt set. Run on a green tree (`lake build SP1Clean` first). Exit 0 = all gates pass.
+# `docs/snapshots/axiom-census.txt` and gating that no released declaration carries `sorryAx`.
+# Run on a green tree (`lake build SP1Clean` first). Exit 0 = all gates pass.
 #
 # Usage: scripts/run_audit.sh   (from the repo root; ~3-5 min, dominated by the probe run)
 
@@ -29,37 +29,17 @@ echo "Sail:      $(git -C "$LEAN_SAIL_DIR" rev-parse HEAD 2>/dev/null || echo '<
 echo "PolyFun:   $(git -C .lake/packages/PolyFun rev-parse HEAD 2>/dev/null || echo '<missing>')"
 
 echo
-echo "== A2 proof-deferral inventory (gate: exactly the known-debt set) =="
-# The known direct proof-holes — both `sorry` and start-of-proof `stop` (`stop` discards the
-# following tactic block and closes via `sorryAx`, so it is a deferral just like `sorry` and must
-# be tracked here). Update this list (and the docs) when one is closed.
-#   · SP1Ensemble        — `sp1_decoded_rows_sound` (structural typed-decode seam)
-#   · Branch/ShiftLeftChip/Formal — completeness (Lean-4.30/4.31 `whnf` regression;
-#     MulChip completeness was restored 2026-07-16 via the recorded normalization pattern)
-#   · DivRemChip/Completeness/Driver — completeness (same blowup; `stop`)
-#   · AIR                  — `supportedCore_orderedRows_dynamic` (the per-row dynamic grounding seam;
-#     `supported_core_witness_grounding` and `supported_core_native_sound` are its proved consumers)
-#   · DivRemChip/Formal — one explicit `evidenceSoundness` seam from the generated whole-chip
-#     constraints to the isolated four-family evidence contract, plus the main-exposed and
-#     requirements channel-lawfulness fields. The former nine per-op proofs were retired rather
-#     than retained as dead debt.
-expected_sorries="$(cat <<'LIST'
-SP1Clean/Proofs/Chips/ShiftLeftChip/Formal.lean
-SP1Clean/Proofs/Chips/BranchChip/Formal.lean
-SP1Clean/Proofs/Chips/DivRemChip/Completeness/Driver.lean
-SP1Clean/Proofs/Chips/DivRemChip/Formal.lean
-SP1Clean/Soundness/AIR.lean
-SP1Clean/Soundness/SP1Ensemble.lean
-LIST
-)"
+echo "== A2 proof-deferral inventory (gate: none) =="
+# Both `sorry` and start-of-proof `stop` introduce `sorryAx`; neither is permitted in the main
+# library. Conditional theorem hypotheses and relation parameters are audited at the statement
+# boundary instead of being disguised as proof deferrals.
 sorry_re='(^[[:space:]]*sorry[[:space:]]*$)|(:=[[:space:]]*sorry)|(=>[[:space:]]*sorry)|(^[[:space:]]*stop([[:space:]]|$))'
 actual=$(grep -rlE "$sorry_re" SP1Clean --include='*.lean' | sort)
 grep -rnE "$sorry_re" SP1Clean --include='*.lean'
-n_exp=$(echo "$expected_sorries" | grep -c .)
-if [ "$actual" = "$(echo "$expected_sorries" | sort)" ]; then
-  echo "PASS: proof-deferral files = expected $n_exp (3 completeness + 1 DivRem contract file + 2 capstone seams)"
+if [ -z "$actual" ]; then
+  echo "PASS: no proof deferrals"
 else
-  echo "FAIL: proof-deferral inventory drifted from the documented set"; fail=1
+  echo "FAIL: proof deferral(s) found"; fail=1
 fi
 
 echo
@@ -115,53 +95,14 @@ import re, sys
 text = open(sys.argv[1]).read()
 entries = re.findall(r"'([^']+)' (?:depends on axioms: \[([^\]]*)\]|does not depend on any axioms)", text, re.S)
 print(f"census entries: {len(entries)}")
-# Declarations allowed to (transitively) carry sorryAx: the three deferred completeness proofs,
-# DivRem's evidence/channel-law seams, the two machine-grounding seams, and the circuit/registry/
-# capstone structures that embed or consume them.  `#print axioms` is intentionally structural:
-# a `GeneralFormalCircuit` retains its completeness field even when a soundness theorem never
-# projects that field.
-#
-# *** DIVREM WHOLE-CHIP CONFORMANCE. *** The obsolete 9-way per-op circuit proofs were retired.
-# `DivRemChip.evidenceSoundness` is now the single stronger seam from the generated chip row to four
-# isolated quotient/remainder evidence families; `contractSoundness` and public `soundness` are proved
-# from that interface and inherit its sorryAx. This remains a genuine soundness gap, but its statement
-# now exposes selection, edge cases, arithmetic evidence, and final output routing explicitly.
-# `sp1_finishedChannel_guarantees` is an expected capstone-chain carrier: it consumes the admitted
-# chip/capstone premises but is not an additional proof admission. Mul completeness was restored on
-# 2026-07-16 and is deliberately absent from both the direct and transitive allowlists.
-#
-# The registry/coverage declarations below project from the single `supportedChips` descriptor.  That
-# descriptor deliberately bundles each route with its `ChipKind` and Clean `Component`, so Lean's axiom
-# dependency analysis sees the admitted DivRem circuit even in name/length projections.  This is
-# transitive structure-field contamination, not an additional proof admission; retaining the unified
-# descriptor prevents the circuit registry and routing census from drifting apart.
-allowed = {
-    "SP1Clean.DivRemChip.completeness",
-    "SP1Clean.BranchChip.completeness", "SP1Clean.BranchChip.circuit",
-    "SP1Clean.ShiftLeftChip.completeness", "SP1Clean.ShiftLeftChip.circuit",
-    "SP1Clean.Soundness.sp1_finishedChannel_guarantees",
-    # DivRem whole-chip evidence extraction seam + its public consequences:
-    "SP1Clean.DivRemChip.evidenceSoundness", "SP1Clean.DivRemChip.contractSoundness",
-    "SP1Clean.DivRemChip.soundness", "SP1Clean.DivRemChip.circuit",
-    "SP1Clean.Soundness.sp1_decoded_rows_sound",
-    "SP1Clean.Soundness.sp1_gatedExecution_prereqs",
-    "SP1Clean.Soundness.sp1Tables", "SP1Clean.Soundness.sp1Tables_length",
-    "SP1Clean.Soundness.sp1Ensemble", "SP1Clean.Soundness.sp1ProviderTables",
-    "SP1Clean.Soundness.sp1ProviderTables_length",
-    "SP1Clean.Soundness.balancedStateTrailFormalEnsemble",
-    "SP1Clean.Soundness.balanced_state_trail_soundness",
-    "SP1Clean.Soundness.supportedCore_orderedRows_dynamic",
-    "SP1Clean.Soundness.supported_core_witness_grounding",
-    "SP1Clean.Soundness.supported_core_native_sound",
-    "SP1Clean.Soundness.Target.sp1_target_soundness",
-    "SP1Clean.Soundness.allChipKinds", "SP1Clean.Soundness.allChipKinds_length",
-    "SP1Clean.Soundness.allChipKinds_migrated",
-    "SP1Clean.Soundness.covered_iff_routed",
-    "SP1Clean.Soundness.reachable_subset_wired",
-    "SP1Clean.Soundness.wired_subset_reachable",
-    "SP1Clean.Soundness.coverage_kinds_eq_registry",
-    "SP1Clean.Soundness.coverage_length",
-}
+expected = sum(
+    1 for line in open("scripts/axiom_probe.lean")
+    if line.startswith("#print axioms ")
+)
+if len(entries) != expected:
+    print(f"FAIL: parsed {len(entries)} census entries for {expected} generated probes")
+    sys.exit(1)
+allowed = set()
 bad = [f for f, axs in entries if "sorryAx" in axs and f not in allowed]
 buckets = {}
 for fqn, axs in entries:
@@ -172,8 +113,22 @@ for key, fqns in sorted(buckets.items(), key=lambda kv: -len(kv[1])):
     print(f"  [{len(fqns):3}] {{{', '.join(sorted(key))}}}")
 if bad:
     print("FAIL: unexpected sorryAx carriers:", *bad, sep="\n  "); sys.exit(1)
-print(f"PASS: sorryAx confined to the known-debt set "
-      f"({sum(1 for f, a in entries if 'sorryAx' in a)} carriers, all allowed)")
+count = sum(1 for _, axioms in entries if "sorryAx" in axioms)
+if count:
+    print(f"FAIL: {count} probed declaration(s) still carry sorryAx"); sys.exit(1)
+main_compiler_trust = [
+    fqn for fqn, axioms in entries
+    if ("native_decide" in axioms or "Lean.ofReduceBool" in axioms or
+        "Lean.trustCompiler" in axioms)
+    and not (fqn.startswith("SP1Clean.WitnessTests.") or
+             fqn.startswith("SP1Clean.TraceGenTests."))
+]
+if main_compiler_trust:
+    print("FAIL: compiler-trusted proof escaped the test library:",
+          *main_compiler_trust, sep="\n  ")
+    sys.exit(1)
+print("PASS: no probed declaration carries sorryAx")
+print("PASS: compiler-trusted proof constants are confined to SP1CleanTest")
 EOF
 
 echo

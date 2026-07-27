@@ -8,6 +8,7 @@ import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.U16CompareOperation
 import SP1Clean.Faithful.ChipTactics
+import SP1Clean.Faithful.ChipOracle
 
 /-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (U16Compare)
 
@@ -34,10 +35,51 @@ theorem u16compare_constraints_faithful (a b : ZMod p)
       SP1Clean.U16CompareOperation.RawSpec a b cols := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.U16CompareOperation.asserts, Extracted.U16CompareOperation.interactions,
-    List.Forall, Interaction.toProp_send_byte, ByteOpcode.ofNat_six,
+    List.Forall, Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_Range, val_16, one_ne_zero, ne_eq, not_false_eq_true, true_implies,
     SP1Clean.U16CompareOperation.RawSpec, sub_self, mul_zero, true_and,
     bool_iff, show (2 : ℕ) ^ 16 = 65536 from by norm_num]
+
+@[circuit_norm] theorem eval_u16CompareColumns
+    {F : Type} [FiniteField F] (env : Environment F)
+    (cols : Extracted.U16CompareOperation (Expression F)) :
+    Eval.eval env cols =
+      ({ bit := Eval.eval env cols.bit } :
+        Extracted.U16CompareOperation F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+omit [Fact (2 ^ 17 < p)] in
+set_option maxHeartbeats 1000000 in
+/-- Folded normalization of the native u16-comparison fragment to the exact generated Rust list. -/
+theorem u16compare_assertions_exact
+    (env : Environment (ZMod p))
+    (input : Var SP1Clean.U16CompareOperation.Inputs (ZMod p))
+    (offset : ℕ) :
+    nativeAssertZeros env
+        ((SP1Clean.U16CompareOperation.main input).operations offset) =
+      Extracted.U16CompareOperation.asserts
+        (Expression.eval env input.a)
+        (Expression.eval env input.b)
+        (Eval.eval env input.cols)
+        (Expression.eval env input.is_real) := by
+  simp [nativeAssertZeros, SP1Clean.U16CompareOperation.main,
+    Gadgets.Equality.main, Extracted.U16CompareOperation.asserts,
+    circuit_norm]
+  have heval (value : Expression (ZMod p)) :
+      Expression.eval env (toElements (M := field) value)[0] =
+        Expression.eval env value := rfl
+  simp_rw [heval]
+  have hinput : Eval.eval env input =
+      ({ a := Eval.eval env input.a, b := Eval.eval env input.b,
+         cols := Eval.eval env input.cols,
+         is_real := Eval.eval env input.is_real } :
+        SP1Clean.U16CompareOperation.Inputs (ZMod p)) := by
+    rw [ProvableStruct.eval_eq_eval]
+    rfl
+  rw [← ProvableStruct.eval_eq_eval, hinput, eval_u16CompareColumns]
+  simp only [eval_sub, Expression.eval, sub_zero,
+    ProvableType.eval_field]
 
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery
@@ -74,7 +116,6 @@ theorem u16compare_interactions_faithful_syntactic
       List.not_mem_nil List.not_mem_nil
   simp only [SP1Clean.U16CompareOperation.main, circuit_norm, hk, heq,
     Extracted.U16CompareOperation.interactions, List.map_cons, List.map_nil,
-    Extracted.Interaction.toAccess_byte, ByteOpcode.ofNat_six, ByteOpcode.idx,
-    h_ir, h_a, h_b, h_bit, h6]
+    Extracted.Interaction.toAccess_byte, h_ir, h_a, h_b, h_bit, h6]
 
 end SP1Clean.Faithful

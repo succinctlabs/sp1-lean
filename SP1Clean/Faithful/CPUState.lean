@@ -36,7 +36,7 @@ theorem cpustate_constraints_faithful
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.CPUState.asserts, Extracted.CPUState.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
-    Interaction.toProp_send_state, ByteOpcode.ofNat_six, ByteOpcode.ofNat_three,
+    Interaction.toProp_send_state, ByteOpcode.constrainField_six, ByteOpcode.constrainField_three,
     ByteOpcode.constrain_Range, ByteOpcode.constrain_U8Range, val_13_zmod_p, ZMod.val_zero,
     one_ne_zero, ne_eq, not_false_eq_true, true_implies, sub_self, mul_zero,
     Nat.ofNat_pos, true_and, and_true, show (2 : ℕ) ^ 8 = 256 by norm_num]
@@ -59,7 +59,7 @@ theorem cpustate_interactions_faithful
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.CPUState.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
-    Interaction.toProp_send_state, ByteOpcode.ofNat_six, ByteOpcode.ofNat_three,
+    Interaction.toProp_send_state, ByteOpcode.constrainField_six, ByteOpcode.constrainField_three,
     ByteOpcode.constrain_Range, ByteOpcode.constrain_U8Range, val_13_zmod_p, ZMod.val_zero,
     one_ne_zero, ne_eq, not_false_eq_true, true_implies,
     Nat.ofNat_pos, true_and, and_true, show (2 : ℕ) ^ 8 = 256 by norm_num]
@@ -108,11 +108,73 @@ theorem cpustate_interactions_faithful_syntactic
     toAccess_pushIf_state, toAccess_pullIf_state,
     Extracted.CPUState.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx,
     h_ir, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2, h_np0, h_np1, h_np2, h_clk, h6, h3]
   -- both sides are now the same 4 `LookupAccess`es; the reader emits [byte,byte,state,state] and the
   -- oracle [state,state,byte,byte] — a two-block rotation, closed by `List.perm_append_comm`.
   exact List.perm_append_comm (l₁ := [_, _]) (l₂ := [_, _])
+
+set_option maxHeartbeats 1000000 in
+/-- **CPUState fragment — State-bus interactions, SYNTACTIC (channel-filtered `=`).**
+The exposed current/successor pair projects exactly to the State entries of SP1's extracted
+`CPUState.interactions`. This is the State companion of
+`cpustate_byte_interactions_faithful_syntactic`, kept folded so enclosing chip proofs do not filter
+the full four-entry reader permutation. -/
+theorem cpustate_state_interactions_faithful_syntactic
+    (env : Environment (ZMod p))
+    (input : Var Readers.CPUState.Inputs (ZMod p))
+    (cols : Extracted.CPUState (ZMod p))
+    (next_pc : Vector (ZMod p) 3) (clk_inc is_real : ZMod p)
+    (h_ir : Expression.eval env input.is_real = is_real)
+    (h_ch : Expression.eval env input.cols.clk_high = cols.clk_high)
+    (h_c0 : Expression.eval env input.cols.clk_0_16 = cols.clk_0_16)
+    (h_c1 : Expression.eval env input.cols.clk_16_24 = cols.clk_16_24)
+    (h_p0 : Expression.eval env input.cols.pc[0] = cols.pc[0])
+    (h_p1 : Expression.eval env input.cols.pc[1] = cols.pc[1])
+    (h_p2 : Expression.eval env input.cols.pc[2] = cols.pc[2])
+    (h_np0 : Expression.eval env input.next_pc[0] = next_pc[0])
+    (h_np1 : Expression.eval env input.next_pc[1] = next_pc[1])
+    (h_np2 : Expression.eval env input.next_pc[2] = next_pc[2])
+    (h_clk : Expression.eval env input.clk_inc = clk_inc) :
+    ((Readers.CPUState.stateInteractions input).map
+        ChannelInteraction.toRaw).map
+          (AbstractInteraction.toAccess env) =
+      ((Extracted.CPUState.interactions cols next_pc clk_inc is_real).map
+        Extracted.Interaction.toAccess).filter
+          (fun access => access.1 = InteractionKind.State) := by
+  have hStatePull :
+      ∀ (gate : Expression (ZMod p))
+        (msg : StateMsg (Expression (ZMod p))),
+        AbstractInteraction.toAccess env
+            (((stateChannel (p := p)).pulledIf gate msg).toRaw) =
+          (InteractionKind.State, "SP1State",
+            [(Expression.eval env msg.clk_high).val,
+             (Expression.eval env msg.clk_low).val,
+             (Expression.eval env msg.pc0).val,
+             (Expression.eval env msg.pc1).val,
+             (Expression.eval env msg.pc2).val],
+            signedVal (Expression.eval env (-gate))) :=
+    fun gate msg => toAccess_pullIf_state env gate msg
+  have hStatePush :
+      ∀ (mult : Expression (ZMod p))
+        (msg : StateMsg (Expression (ZMod p))),
+        AbstractInteraction.toAccess env
+            (((stateChannel (p := p)).pushedIf mult msg).toRaw) =
+          (InteractionKind.State, "SP1State",
+            [(Expression.eval env msg.clk_high).val,
+             (Expression.eval env msg.clk_low).val,
+             (Expression.eval env msg.pc0).val,
+             (Expression.eval env msg.pc1).val,
+             (Expression.eval env msg.pc2).val],
+            signedVal (Expression.eval env mult)) :=
+    fun mult msg => toAccess_pushIf_state env mult msg
+  simp only [Readers.CPUState.stateInteractions,
+    Readers.CPUState.currentMsg, Readers.CPUState.nextMsg,
+    List.map_cons, List.map_nil, hStatePull, hStatePush]
+  simp [circuit_norm,
+    Extracted.CPUState.interactions,
+    Extracted.Interaction.toAccess, Extracted.Dir.sign,
+    h_ir, h_ch, h_c0, h_c1,
+    h_p0, h_p1, h_p2, h_np0, h_np1, h_np2, h_clk]
 
 set_option maxHeartbeats 1000000 in
 /-- **CPUState fragment — Byte-bus interactions, SYNTACTIC (channel-filtered `=`).** The `.Byte`-filtered
@@ -147,7 +209,6 @@ theorem cpustate_byte_interactions_faithful_syntactic
   simp [Readers.CPUState.main, circuit_norm, hbk,
     Extracted.CPUState.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx,
     h_ir, h_c0, h_c1, h6, h3]
 
 end SP1Clean.Faithful

@@ -1,5 +1,6 @@
 import SP1Clean.Native.Chips.JalChip.Defs
 import SP1Clean.Model.InteractionRecovery
+import Clean.Air.Circuit
 
 /-! # `SP1Clean.JalChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
 
@@ -12,13 +13,14 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
-/-- Operands `isU64`; the padding convention `is_real = 0 → op_a_0 = 0` ensures the additive
-`is_real - op_a_0` link-gate is binary on every row. `is_real`-binary is proven from the in-circuit gate,
-not assumed here. -/
+/-- The two addition operands are 64-bit. The pinned Rust padding gate and
+`is_real` boolean gate are both represented in `main`, so neither is assumed
+at the verifier boundary. -/
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.adapter.op_b_imm ∧
-  Word.isU64 (#v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0] : Word (ZMod p)) ∧
-  (input.is_real = 0 → input.adapter.op_a_0 = 0)
+  Word.isU64
+    (#v[input.state.pc[0], input.state.pc[1],
+      input.state.pc[2], 0] : Word (ZMod p))
 
 /-- The jump-target word the chip witnesses for `add_operation.value` (`pc + op_b_imm`, base-2^16). -/
 def jumpTargetWord (input : Inputs (ZMod p)) : Word (ZMod p) :=
@@ -60,16 +62,23 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨h_imm, h_pcU, h_pad⟩ := h_assumptions
-  obtain ⟨h_cpu, h_add1, h_av3, h_add2, h_oav3, h_jt0, _h_regwrite, h_align, h_gate⟩ := h_holds
+  obtain ⟨h_imm, h_pcU⟩ := h_assumptions
+  obtain ⟨h_cpu, h_add1, h_av3, h_add2, h_oav3,
+    h_jt0, _h_regwrite, h_align, h_pad_gate, h_gate⟩ := h_holds
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_gate
+  have h_pad (hr : input_is_real = 0) :
+      input_adapter_op_a_0 = 0 := by
+    rw [hr] at h_pad_gate
+    simpa using h_pad_gate
   -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
   -- channel's `MemoryMsg.ClkBound` guarantee — here only `RegisterWrite`'s op_a link write push at
   -- `clk_low + 4` (`JTypeReader` is a pure read and owes no push bound). The offset is left to
   -- unification, so this line never names the destructured state columns.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   have h_jt : Readers.JTypeReader.Spec _ := h_jt0 ⟨h_bin, h_bin⟩
-  have h_op_a_0 : input_adapter_op_a_0 = 0 ∨ input_adapter_op_a_0 = 1 := h_jt.2.1
+  have h_op_a_0 (hr : input_is_real = 1) :
+      input_adapter_op_a_0 = 0 ∨ input_adapter_op_a_0 = 1 :=
+    h_jt.2.1 hr
   -- eval-of-pc rewrites: circuit's `a` operand `#v[eval pc[i], 0]` equals the concrete `pcWord`.
   have hpc : Vector.map (Expression.eval env) input_var_state_pc = input_state_pc := h_input.2.1.2.2.2
   have epc : ∀ i (hi : i < 3), Expression.eval env input_var_state_pc[i] = input_state_pc[i] :=
@@ -87,7 +96,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
-    · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
+    · rcases h_op_a_0 h with h0 | h0 <;> rw [h, h0] <;> simp
   refine ⟨⟨h_jt, h_bin, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩
   · intro hr1
     have := (h_add1 ⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩ hr1).2
@@ -112,7 +121,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     -- it is the link add result `pc + 4`; on `rd = x0` (`op_a_0 = 1`) the `op_a_0` zeroing gates pin it to `0`.
     intro hr1
     replace hr1 : input_is_real = 1 := hr1
-    rcases h_op_a_0 with h0 | h0
+    rcases h_op_a_0 hr1 with h0 | h0
     · have hg1 : input_is_real - input_adapter_op_a_0 = 1 := by rw [hr1, h0]; simp
       exact (h_add2 ⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩ hg1).1
     · obtain ⟨z0, z1, z2, z3⟩ := h_jt.1
@@ -191,9 +200,9 @@ theorem completeness :
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
   refine ⟨⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
-    ⟨⟨h_bin, h_bin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl h_op_a_0, h_rac, hdec,
+    ⟨⟨h_bin, h_bin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, (fun _ => Or.inl h_op_a_0), h_rac, hdec,
       fun hr => ⟨h_oap hr, hprevclk hr⟩⟩⟩,
-    ⟨⟨h_bin, ?_, h_clk.at_four⟩, trivial⟩, ?_, ?_⟩
+    ⟨⟨h_bin, ?_, h_clk.at_four⟩, trivial⟩, ?_, ?_, ?_⟩
   · rw [hval1]; exact AddOperation.spec_populate ha1U h_imm input_is_real
   · rw [hav3]; exact h_jt3
   · rw [hval2]; exact AddOperation.spec_populate ha1U h4U (input_is_real - input_adapter_op_a_0)
@@ -209,7 +218,66 @@ theorem completeness :
     simp only [byteChannel, hav0]
     rw [← c14]
     exact (byteRowSpec_range _ h14p).mpr (h_align_pa hr1)
+  · rw [h_op_a_0]
+    simp
   · rcases h_bin with h | h <;> rw [h] <;> simp
+
+/-- Exact State-channel pair emitted by the composed CPU-state reader.  Unlike
+the straight-line chips, JAL's successor PC is the witnessed jump target in
+the first three local cells. -/
+def exposedStateInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (stateChannel (p := p))) :=
+  [ stateChannel.pulledIf input.is_real
+      ⟨input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+       input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+    stateChannel.pushedIf input.is_real
+      ⟨input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+       var ⟨offset⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩⟩ ]
+
+/-- Exact Byte-channel list emitted by JAL.  This is the native composition
+order: CPU clock checks, jump-add limbs, link-add limbs, destination-register
+timestamp checks, then the jump-target alignment check.  The pinned Rust AIR
+emits the same multiset in a different order; whole-chip faithfulness compares
+them with `List.Perm`. -/
+def exposedByteInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (byteChannel (p := p))) :=
+  let clkLow := input.state.clk_0_16 + input.state.clk_16_24 * 65536
+  let linkGate := input.is_real - input.adapter.op_a_0
+  [ byteChannel.pulledIf input.is_real
+      ⟨6, (input.state.clk_0_16 - 1) * (8 : ZMod p)⁻¹,
+       Expression.const ((13 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨3, 0, input.state.clk_16_24, 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨6, var ⟨offset⟩, Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨6, var ⟨offset + 1⟩, Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨6, var ⟨offset + 2⟩, Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨6, var ⟨offset + 3⟩, Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf linkGate
+      ⟨6, var ⟨offset + 4⟩, Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf linkGate
+      ⟨6, var ⟨offset + 5⟩, Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf linkGate
+      ⟨6, var ⟨offset + 6⟩, Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf linkGate
+      ⟨6, var ⟨offset + 7⟩, Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨6, input.adapter.op_a_memory.access_timestamp.diff_low_limb,
+       Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨3, 0,
+       (clkLow + 4 - input.adapter.op_a_memory.access_timestamp.prev_low - 1 -
+          input.adapter.op_a_memory.access_timestamp.diff_low_limb) *
+            (65536 : ZMod p)⁻¹,
+       0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨6, (var ⟨offset⟩ : Expression (ZMod p)) * (4 : ZMod p)⁻¹,
+       Expression.const ((14 : ℕ) : ZMod p), 0⟩ ]
 
 /-- Jal's exact Memory-channel interaction list (J-type: both operand slots carry immediates — the
 only register traffic is the rd slot).  The op_a read-prior pull descends from the composed
@@ -234,6 +302,14 @@ theorem opAPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
        input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩ ∈
       exposedMemoryInteractions input offset := by
   simp [exposedMemoryInteractions]
+
+/-- Exact Program fetch emitted by the J-type adapter. -/
+def exposedProgramInteractions (input : Var Inputs (ZMod p)) :
+    List (ChannelInteraction (programChannel (p := p))) :=
+  [ programChannel.pulledIf input.is_real
+      ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 46,
+       input.adapter.op_a, input.adapter.op_b_imm, input.adapter.op_c_imm,
+       input.adapter.op_a_0, 1, 1⟩ ]
 
 /-- The JAL chip row as a `GeneralFormalCircuit`: the data-dependent jump/link semantics, composing the
 two witnessed `AddOperation` gadgets and the J-type reader; output is the extracted `JalColumns`. -/
@@ -279,14 +355,19 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
         subst channel
         exact Or.inl h_byte
       · intro env h_constraints
+        have hshallow := h_constraints
+        simp only [main, Circuit.operations, Circuit.bind_def,
+          Circuit.pure_def, witnessVectorNative,
+          subcircuitWithAssertion, assertion, assertZero,
+          Channel.pullIf, HasAssertEq.assert_eq,
+          Expression.assertEquals, Operations.localLength,
+          ConstraintsHold.Shallow,
+          Operations.forAllNoOffset_append,
+          Operations.forAllNoOffset, true_and, and_true,
+          eval_sub, Expression.eval] at hshallow
         have h_gate : Expression.eval env input_var.is_real *
-            (Expression.eval env input_var.is_real - 1) = 0 := by
-          simpa only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-            witnessVectorNative, subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
-            HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
-            ConstraintsHold.Shallow, Operations.forAllNoOffset_append,
-            Operations.forAllNoOffset, true_and, and_true, eval_mul, eval_sub,
-            Expression.eval] using h_constraints
+            (Expression.eval env input_var.is_real - 1) = 0 :=
+          hshallow.2
         have h_bool : Expression.eval env input_var.is_real = 0 ∨
             Expression.eval env input_var.is_real = 1 := bool_of_mul_pred h_gate
         have h_bool' : (ProvableStruct.eval env input_var).is_real = 0 ∨
@@ -312,23 +393,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
     -- `VmTables` table. Unlike straight-line ALU chips, `next_pc` is the **witnessed** jump target
     -- `add_value[0..2]` (cells `offset+0..2`) the chip feeds the composed `CPUState`.
     exposedChannels := fun input offset =>
-      Readers.CPUState.exposedState
-        ⟨input.state, #v[var ⟨offset⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩],
-          8, input.is_real⟩ ++
+      expose stateChannel (exposedStateInteractions input offset) ++
       expose memoryChannel (exposedMemoryInteractions input offset) ++
       -- The Program-bus instruction fetch (descended from the composed `JTypeReader`, gate
       -- `is_trusted = is_real`, opcode `JAL = 46`), consumed by `Soundness/TypedProgram.lean`.
-      expose programChannel
-        [ programChannel.pulledIf input.is_real
-            ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 46,
-             input.adapter.op_a, input.adapter.op_b_imm, input.adapter.op_c_imm,
-             input.adapter.op_a_0, 1, 1⟩ ],
+      expose programChannel (exposedProgramInteractions input),
     exposedChannels_eq := by
       intro input offset
       unfold Operations.ExposedChannelsLawful
       intro exposed exposedMem
-      simp only [Readers.CPUState.exposedState, expose, List.mem_append,
-        List.mem_singleton] at exposedMem
+      simp only [expose, exposedStateInteractions, exposedProgramInteractions,
+        List.mem_append, List.mem_singleton] at exposedMem
       rcases exposedMem with (rfl | rfl) | rfl
       · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
           witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
@@ -348,6 +423,9 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
         simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
           Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
         simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil]
+        simp [Readers.CPUState.stateInteractions, Readers.CPUState.currentMsg,
+          Readers.CPUState.nextMsg]
+        exact ⟨rfl, rfl⟩
       · -- Memory branch: compositional — the J-type reader keeps its op_a pull and `RegisterWrite`
         -- its write push via the reader-local `_subcircuit` lemmas; every other child is nil.
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
@@ -396,12 +474,223 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
           List.filter_nil, List.nil_append]
         simp only [Channels.byteChannel_eq_programChannel_false, if_false] }
 
+/-- Folded circuit projections used by whole-chip row codecs without unfolding
+the proof-bearing circuit bundle. -/
+@[circuit_norm] theorem circuit_main_eq : (circuit (p := p)).main = main := rfl
+
+@[circuit_norm] theorem circuit_localLength_eq (input : Var Inputs (ZMod p)) :
+    (circuit (p := p)).localLength input = 8 := rfl
+
+@[circuit_norm] theorem circuit_size_eq :
+    (circuit (p := p)).size = size Inputs + 8 := by
+  rw [GeneralFormalCircuit.size_eq, circuit_localLength_eq]
+
+/-- The completed Jal circuit exposes exactly its State interaction pair. -/
+theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith stateChannel.toRaw =
+      (exposedStateInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨stateChannel.toRaw,
+      (exposedStateInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
+
+private def cpuByteInteractionsRaw
+    (input : Var Readers.CPUState.Inputs (ZMod p)) :
+    List (AbstractInteraction (ZMod p)) :=
+  [ (byteChannel.pulledIf input.is_real
+      ⟨6, (input.cols.clk_0_16 - 1) * (8 : ZMod p)⁻¹,
+       Expression.const ((13 : ℕ) : ZMod p), 0⟩).toRaw,
+    (byteChannel.pulledIf input.is_real
+      ⟨3, 0, input.cols.clk_16_24, 0⟩).toRaw ]
+
+omit [Fact (2 ^ 17 < p)] in
+private theorem cpuByteInteractions_exact
+    (input : Var Readers.CPUState.Inputs (ZMod p)) (offset : ℕ) :
+    ((Readers.CPUState.main input).operations offset).interactionsWith byteChannel.toRaw =
+      cpuByteInteractionsRaw input := by
+  simp [Readers.CPUState.main, cpuByteInteractionsRaw, circuit_norm]
+
+private theorem cpuByteInteractions_subcircuit
+    (input : Var Readers.CPUState.Inputs (ZMod p))
+    (offset : ℕ) (ops : Operations (ZMod p)) :
+    Operations.interactionsWith byteChannel.toRaw
+        (.subcircuit ((Readers.CPUState.circuit (p := p)).toSubcircuit offset input) :: ops) =
+      cpuByteInteractionsRaw input ++
+        Operations.interactionsWith byteChannel.toRaw ops :=
+  InteractionRecovery.interactionsWith_generalSubcircuit_of_main_exact_list
+    Readers.CPUState.circuit byteChannel.toRaw input offset ops _
+    (cpuByteInteractions_exact input offset)
+
+private def addByteInteractionsRaw
+    (input : Var AddOperation.Inputs (ZMod p)) :
+    List (AbstractInteraction (ZMod p)) :=
+  [ (byteChannel.pulledIf input.is_real
+      ⟨6, input.cols.value[0], Expression.const ((16 : ℕ) : ZMod p), 0⟩).toRaw,
+    (byteChannel.pulledIf input.is_real
+      ⟨6, input.cols.value[1], Expression.const ((16 : ℕ) : ZMod p), 0⟩).toRaw,
+    (byteChannel.pulledIf input.is_real
+      ⟨6, input.cols.value[2], Expression.const ((16 : ℕ) : ZMod p), 0⟩).toRaw,
+    (byteChannel.pulledIf input.is_real
+      ⟨6, input.cols.value[3], Expression.const ((16 : ℕ) : ZMod p), 0⟩).toRaw ]
+
+omit [Fact (2 ^ 17 < p)] in
+private theorem addByteInteractions_exact
+    (input : Var AddOperation.Inputs (ZMod p)) (offset : ℕ) :
+    ((AddOperation.main input).operations offset).interactionsWith byteChannel.toRaw =
+      addByteInteractionsRaw input := by
+  simp [AddOperation.main, addByteInteractionsRaw, circuit_norm]
+
+private theorem addByteInteractions_subcircuit
+    (input : Var AddOperation.Inputs (ZMod p))
+    (offset : ℕ) (ops : Operations (ZMod p)) :
+    Operations.interactionsWith byteChannel.toRaw
+        (.subcircuit ((AddOperation.circuit (p := p)).toSubcircuit offset input) :: ops) =
+      addByteInteractionsRaw input ++
+        Operations.interactionsWith byteChannel.toRaw ops :=
+  InteractionRecovery.interactionsWith_assertionSubcircuit_of_main_exact
+    AddOperation.circuit byteChannel.toRaw input offset ops _
+    (addByteInteractions_exact input offset)
+
+private def jTypeByteInteractionsRaw
+    (input : Var Readers.JTypeReader.Inputs (ZMod p)) :
+    List (AbstractInteraction (ZMod p)) :=
+  [ (byteChannel.pulledIf input.is_real
+      ⟨6, input.cols.op_a_memory.access_timestamp.diff_low_limb,
+       Expression.const ((16 : ℕ) : ZMod p), 0⟩).toRaw,
+    (byteChannel.pulledIf input.is_real
+      ⟨3, 0,
+       (input.clk_low + 4 - input.cols.op_a_memory.access_timestamp.prev_low - 1 -
+          input.cols.op_a_memory.access_timestamp.diff_low_limb) *
+            (65536 : ZMod p)⁻¹,
+       0⟩).toRaw ]
+
+private theorem jTypeByteInteractions_exact
+    (input : Var Readers.JTypeReader.Inputs (ZMod p)) (offset : ℕ) :
+    ((Readers.JTypeReader.main input).operations offset).interactionsWith byteChannel.toRaw =
+      jTypeByteInteractionsRaw input := by
+  simp [Readers.JTypeReader.main, Readers.RegisterAccessCols.circuit,
+    Readers.RegisterAccessCols.main, Readers.RegisterAccessTimestamp.circuit,
+    Readers.RegisterAccessTimestamp.main, jTypeByteInteractionsRaw,
+    Gadgets.Equality.main, FormalAssertion.toSubcircuit_interactions,
+    circuit_norm]
+
+private theorem jTypeByteInteractions_subcircuit
+    (input : Var Readers.JTypeReader.Inputs (ZMod p))
+    (offset : ℕ) (ops : Operations (ZMod p)) :
+    Operations.interactionsWith byteChannel.toRaw
+        (.subcircuit
+          ((Readers.JTypeReader.circuit (p := p)).toSubcircuit offset input) :: ops) =
+      jTypeByteInteractionsRaw input ++
+        Operations.interactionsWith byteChannel.toRaw ops :=
+  InteractionRecovery.interactionsWith_generalSubcircuit_of_main_exact_list
+    Readers.JTypeReader.circuit byteChannel.toRaw input offset ops _
+    (jTypeByteInteractions_exact input offset)
+
+omit [Fact (2 ^ 17 < p)] in
+private theorem registerWriteByteInteractions_exact
+    (input : Var Readers.RegisterWrite.Inputs (ZMod p)) (offset : ℕ) :
+    ((Readers.RegisterWrite.main input).operations offset).interactionsWith byteChannel.toRaw =
+      [] := by
+  simp [Readers.RegisterWrite.main, circuit_norm]
+
+private theorem registerWriteByteInteractions_subcircuit
+    (input : Var Readers.RegisterWrite.Inputs (ZMod p))
+    (offset : ℕ) (ops : Operations (ZMod p)) :
+    Operations.interactionsWith byteChannel.toRaw
+        (.subcircuit
+          ((Readers.RegisterWrite.circuit (p := p)).toSubcircuit offset input) :: ops) =
+      Operations.interactionsWith byteChannel.toRaw ops := by
+  have h := InteractionRecovery.interactionsWith_assertionSubcircuit_of_main_exact
+    Readers.RegisterWrite.circuit byteChannel.toRaw input offset ops []
+    (registerWriteByteInteractions_exact input offset)
+  simpa only [List.nil_append] using h
+
+private def jalByteInteractionsRaw
+    (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (AbstractInteraction (ZMod p)) :=
+  let pcWordV : Word (Expression (ZMod p)) :=
+    #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
+  let jumpValue : Word (Expression (ZMod p)) :=
+    Vector.mapRange 4 fun i => var { index := offset + i }
+  let linkValue : Word (Expression (ZMod p)) :=
+    Vector.mapRange 4 fun i => var { index := offset + 4 + i }
+  let cpuInput : Var Readers.CPUState.Inputs (ZMod p) :=
+    ⟨input.state, #v[jumpValue[0], jumpValue[1], jumpValue[2]],
+      8, input.is_real⟩
+  let jumpAddInput : Var AddOperation.Inputs (ZMod p) :=
+    ⟨pcWordV, input.adapter.op_b_imm, { value := jumpValue }, input.is_real⟩
+  let linkAddInput : Var AddOperation.Inputs (ZMod p) :=
+    ⟨pcWordV, #v[4, 0, 0, 0], { value := linkValue },
+      input.is_real - input.adapter.op_a_0⟩
+  let readerInput : Var Readers.JTypeReader.Inputs (ZMod p) :=
+    ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+      input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+      input.state.pc, 46, linkValue[0], linkValue[1],
+      linkValue[2], linkValue[3]⟩
+  cpuByteInteractionsRaw cpuInput ++
+    addByteInteractionsRaw jumpAddInput ++
+    addByteInteractionsRaw linkAddInput ++
+    jTypeByteInteractionsRaw readerInput ++
+    [ (byteChannel.pulledIf input.is_real
+        ⟨6, jumpValue[0] * (4 : ZMod p)⁻¹,
+         Expression.const ((14 : ℕ) : ZMod p), 0⟩).toRaw ]
+
+omit [Fact (2 ^ 17 < p)] in
+private theorem jalByteInteractionsRaw_eq_exposed
+    (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    jalByteInteractionsRaw input offset =
+      (exposedByteInteractions input offset).map ChannelInteraction.toRaw := by
+  simp only [jalByteInteractionsRaw, exposedByteInteractions,
+    cpuByteInteractionsRaw, addByteInteractionsRaw,
+    jTypeByteInteractionsRaw, circuit_norm, List.cons_append,
+    List.nil_append]
+
+private theorem jalByteInteractions_exact
+    (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith byteChannel.toRaw =
+      jalByteInteractionsRaw input offset := by
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p))
+      (ops : Operations (ZMod p)) =>
+    @InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil
+      (ZMod p) _ (ProvablePair field field) ProvablePair.instance
+      (Gadgets.Equality.circuit field) byteChannel.toRaw n inp ops
+      List.not_mem_nil List.not_mem_nil
+  simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+    witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+    HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
+  simp only [Operations.interactionsWith_append,
+    Operations.interactionsWith_witness,
+    cpuByteInteractions_subcircuit, addByteInteractions_subcircuit,
+    jTypeByteInteractions_subcircuit,
+    registerWriteByteInteractions_subcircuit, heq,
+    Operations.interactionsWith_assert,
+    Operations.interactionsWith_nil, List.nil_append]
+  simp only [jalByteInteractionsRaw, cpuByteInteractionsRaw,
+    addByteInteractionsRaw, jTypeByteInteractionsRaw,
+    circuit_norm, List.cons_append, List.nil_append]
+
+/-- The completed Jal circuit emits exactly its thirteen Byte interactions. -/
+theorem interactionsWith_byte_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith byteChannel.toRaw =
+      (exposedByteInteractions input offset).map ChannelInteraction.toRaw := by
+  exact (jalByteInteractions_exact input offset).trans
+    (jalByteInteractionsRaw_eq_exposed input offset)
+
 /-- The completed Jal circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith memoryChannel.toRaw =
       (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
   exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
-    (by simp [circuit, Readers.CPUState.exposedState, expose])
+    (by simp [circuit, expose])
+
+/-- The completed Jal circuit exposes exactly its Program fetch. -/
+theorem interactionsWith_program_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith programChannel.toRaw =
+      (exposedProgramInteractions input).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨programChannel.toRaw,
+      (exposedProgramInteractions input).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
 
 end SP1Clean.JalChip

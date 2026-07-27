@@ -52,7 +52,7 @@ closer to what Clean would fold into a bundled `Spec`/`exposedChannels` conjunct
 gate + part of `run_audit.sh`) fails if the `set_option maxHeartbeats` count grows past
 `scripts/heartbeats_baseline.txt`. So a new blowup must be *folded*, not bumped. A genuinely term-intrinsic
 addition (the KEEP-set below) requires a conscious baseline bump in the same PR. This kept the capstone build
-fast; keep it that way. The 2026-07 sweep cut SP1Clean overrides 516 → 461 with the levers below. The
+fast; keep it that way. The 2026-07 sweep cut SP1Clean overrides 516 → 460 with the levers below. The
 current 462-site baseline adds exactly one term-intrinsic exception for the generated `Global` AIR, whose
 single-output dependency closure has roughly 1,300 bindings and cannot be reduced by list chunking.
 
@@ -565,12 +565,10 @@ Every field obligation — `localLength_eq`, `output_eq`, `subcircuitsConsistent
 with a Clean **default tactic** (`Clean/Circuit/Basic.lean`) that runs `simp only [circuit_norm, seval]`
 (plus a `try`-closer). The right move is *always* to make that default succeed by feeding `circuit_norm`
 the right `rfl`-lemmas — **not** to override the field with a bespoke `:= by …`. When you find yourself
-writing an explicit field proof, treat it as a smell: the missing piece is a `circuit_norm` lemma, and
-once it exists the field can be **omitted** so the default tactic resolves the goal. The
-*only* manual `ElaboratedCircuit` field proofs left in the project are the deferred skeletons in
-`Native/Operations/LtOperationUnsigned.lean` and `Native/Operations/AddressOperation.lean` (`localLength_eq`/`output_eq
-:= by sorry`, WIP) plus one explicit `channelsLawful` in `Native/Operations/LtOperationSigned.lean` — everything
-else, including every reader and `Proofs/Chips/AddChip.lean`, omits all four fields.
+writing an explicit field proof, treat it as a smell: the missing piece is usually a `circuit_norm`
+lemma, and once it exists the field can be **omitted** so the default tactic resolves the goal. The
+current main library has no deferred field proof. Preserve any remaining explicit proof only when it
+documents a real structural exception and cannot be replaced by the default tactic.
 
 The recipe that gets you there:
 
@@ -754,9 +752,9 @@ in `Proofs/Chips/ShiftLeftChip/Core.lean`.
   landmines + proof roadmaps; they are the institutional memory of *why* the proof is shaped that way. (A
   blanket comment-strip on `ShiftLeftChip/Soundness/Sll` was reverted for exactly this.)
 
-**Verify every batch:** `lake build SP1Clean` clean (0 warn, no `info:`), `bash scripts/check_no_skipkerneltc.sh`,
-`sorry` grep = only `SP1Ensemble.lean`, then `scripts/run_audit.sh` periodically (the axiom census must stay
-identical). On heavy files watch the per-file elaboration time in the build log and **revert on regression**.
+**Verify every batch:** `lake build SP1Clean` clean (0 warn, no `info:`), then
+`scripts/run_audit.sh` (zero proof deferrals and no unexpected axiom-census change). On heavy files
+watch the per-file elaboration time in the build log and **revert on regression**.
 
 **Merge gotcha (post-`git merge`):** an auto-merge can *silently duplicate* a lemma that both branches added
 near each other — no conflict marker, but `lake build` fails with "`<name>` has already been declared". Always

@@ -46,6 +46,122 @@ theorem isZeroWord_constraints_faithful (a : Word (ZMod p))
   simp only [List.Forall, IsZeroWordOperation.RawSpec, one_mul,
     bool_iff, sub_self, true_and, and_true, and_assoc]
 
+omit [Fact (2 ^ 17 < p)] in
+@[circuit_norm] theorem eval_isZeroWordColumns
+    (env : Environment (ZMod p))
+    (cols : Extracted.IsZeroWordOperation (Expression (ZMod p))) :
+    Eval.eval env cols =
+      ({ is_zero_limb_0 := Eval.eval env cols.is_zero_limb_0
+         is_zero_limb_1 := Eval.eval env cols.is_zero_limb_1
+         is_zero_limb_2 := Eval.eval env cols.is_zero_limb_2
+         is_zero_limb_3 := Eval.eval env cols.is_zero_limb_3
+         is_zero_first_half :=
+           Expression.eval env cols.is_zero_first_half
+         is_zero_second_half :=
+           Expression.eval env cols.is_zero_second_half
+         result := Expression.eval env cols.result } :
+        Extracted.IsZeroWordOperation (ZMod p)) := by
+  provable_struct_simp
+
+private def isZeroWordChild
+    (input : Var SP1Clean.IsZeroWordOperation.Inputs (ZMod p))
+    (i : ℕ) (hi : i < 4) :
+    Var SP1Clean.IsZeroOperation.Inputs (ZMod p) :=
+  let cols :=
+    match i with
+    | 0 => input.cols.is_zero_limb_0
+    | 1 => input.cols.is_zero_limb_1
+    | 2 => input.cols.is_zero_limb_2
+    | _ => input.cols.is_zero_limb_3
+  ⟨input.a[i], cols, input.is_real⟩
+
+private def isZeroWordOwnExpressions
+    (input : Var SP1Clean.IsZeroWordOperation.Inputs (ZMod p)) :
+    List (Expression (ZMod p)) :=
+  let cols := input.cols
+  [input.is_real * (input.is_real - 1),
+    cols.result * (cols.result - 1),
+    cols.is_zero_first_half -
+      cols.is_zero_limb_0.result * cols.is_zero_limb_1.result,
+    cols.is_zero_second_half -
+      cols.is_zero_limb_2.result * cols.is_zero_limb_3.result,
+    input.is_real *
+      (cols.result -
+        cols.is_zero_first_half * cols.is_zero_second_half)]
+
+set_option linter.unusedSectionVars false in
+set_option maxHeartbeats 1000000 in
+private theorem isZeroWord_nativeAssertions
+    (env : Environment (ZMod p))
+    (input : Var SP1Clean.IsZeroWordOperation.Inputs (ZMod p))
+    (offset : ℕ) :
+    nativeAssertZeros env
+        ((SP1Clean.IsZeroWordOperation.main input).operations offset) =
+      nativeAssertZeros env
+          ((SP1Clean.IsZeroOperation.main
+            (isZeroWordChild input 0 (by decide))).operations offset) ++
+        nativeAssertZeros env
+          ((SP1Clean.IsZeroOperation.main
+            (isZeroWordChild input 1 (by decide))).operations offset) ++
+        nativeAssertZeros env
+          ((SP1Clean.IsZeroOperation.main
+            (isZeroWordChild input 2 (by decide))).operations offset) ++
+        nativeAssertZeros env
+          ((SP1Clean.IsZeroOperation.main
+            (isZeroWordChild input 3 (by decide))).operations offset) ++
+        (isZeroWordOwnExpressions input).map
+          (Expression.eval env) := by
+  simp only [nativeAssertZeros, SP1Clean.IsZeroWordOperation.main,
+    Circuit.operations, Circuit.bind_def, assertion,
+    HasAssertEq.assert_eq, Expression.assertEquals,
+    Operations.localLength, Operations.constraints_append,
+    Operations.constraints_subcircuit,
+    constraints_toSubcircuit_formalAssertion,
+    FormalAssertion.toSubcircuit_localLength,
+    Operations.constraints_nil, List.map_append, List.map_nil]
+  simp only [SP1Clean.IsZeroOperation.circuit_localLength,
+    Gadgets.Equality.localLength_eq, Nat.add_zero]
+  simp only [SP1Clean.IsZeroOperation.circuit,
+    Gadgets.Equality.circuit, isZeroWordChild]
+  repeat' rw [CanonicalReader.equalityAssertionList]
+  simp [isZeroWordOwnExpressions, Expression.eval]
+
+set_option maxHeartbeats 1000000 in
+/-- Folded normalization of the native word-zero fragment to the exact generated Rust list. -/
+theorem isZeroWord_assertions_exact
+    (env : Environment (ZMod p))
+    (input : Var SP1Clean.IsZeroWordOperation.Inputs (ZMod p))
+    (offset : ℕ) :
+    nativeAssertZeros env
+        ((SP1Clean.IsZeroWordOperation.main input).operations offset) =
+      Extracted.IsZeroWordOperation.asserts
+        (Eval.eval env input.a)
+        (Eval.eval env input.cols)
+        (Expression.eval env input.is_real) := by
+  rw [eval_isZeroWordColumns,
+    isZeroWord_nativeAssertions,
+    Extracted.IsZeroWordOperation.asserts]
+  rw [isZero_assertions_exact env
+      (isZeroWordChild input 0 (by decide)) offset,
+    isZero_assertions_exact env
+      (isZeroWordChild input 1 (by decide)) offset,
+    isZero_assertions_exact env
+      (isZeroWordChild input 2 (by decide)) offset,
+    isZero_assertions_exact env
+      (isZeroWordChild input 3 (by decide)) offset]
+  simp only [isZeroWordChild, isZeroWordOwnExpressions,
+    List.map_cons, List.map_nil]
+  rw [← ProvableType.getElem_eval_fields env input.a 0 (by decide),
+    ← ProvableType.getElem_eval_fields env input.a 1 (by decide),
+    ← ProvableType.getElem_eval_fields env input.a 2 (by decide),
+    ← ProvableType.getElem_eval_fields env input.a 3 (by decide)]
+  rw [eval_isZeroColumns env input.cols.is_zero_limb_0,
+    eval_isZeroColumns env input.cols.is_zero_limb_1,
+    eval_isZeroColumns env input.cols.is_zero_limb_2,
+    eval_isZeroColumns env input.cols.is_zero_limb_3]
+  repeat' first | rw [eval_sub] | rw [eval_mul]
+  simp only [eval_sub, Expression.eval]
+
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery
 

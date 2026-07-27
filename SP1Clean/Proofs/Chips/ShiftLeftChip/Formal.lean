@@ -2,6 +2,7 @@ import SP1Clean.Proofs.Chips.ShiftLeftChip.Defs
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Soundness.Sll
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Soundness.Sllw
 import SP1Clean.Math.EvalVec
+import Clean.Air.Circuit
 
 /-! # `SP1Clean.ShiftLeftChip` — contract: soundness / completeness / `circuit`
 
@@ -95,124 +96,246 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · exact (SoundSllw.soundness i₀ env input_var input h_input h_assumptions h_holds).1 hr
   · exact (SoundSll.soundness  i₀ env input_var input h_input h_assumptions h_holds).2
 
-set_option warn.sorry false in
-/-- Completeness of the legacy hand-written witness circuit is deferred after the Lean 4.30/4.31
-`whnf` regression. Whole-chip populate conformance is checked against SP1's generated trace vectors;
-this theorem remains the explicit seam needed by Clean's `GeneralFormalCircuit` bundle. -/
+/-- Completeness: `main`'s honest `Populate` witness closures (flags from the `"shift_left_flags"`
+hint) satisfy every constraint under `ProverAssumptions`. The chip-local assertion tail remains
+folded behind `ShiftLeftCore.circuit`, avoiding the Lean 4.31 kernel-size cliff. -/
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
-  stop
-  trivial
+  circuit_proof_start_core
+  simp +instances only [circuit_norm] at h_input
+  provable_struct_simp
+  obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hsum, hop_a_0, himmc, himmbin, hpins, h_cpu,
+    hrac_a, hrac_b, hrac_c, hdec, hprev_ab, hprev_c⟩ := h_assumptions
+  simp only [circuit_norm] at hbU hcU ha_prev hbin hsum hop_a_0 himmc himmbin hpins h_cpu
+  simp only [circuit_norm] at hrac_a hrac_b hrac_c hdec hprev_ab hprev_c
+  obtain ⟨-, h_env_a, h_env_cb, h_env_v, h_env_s, h_env_lo, h_env_hi, h_env_lr,
+    h_env_msb, h_env_fl, -⟩ := h_env
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
+  have hpc := h_input.2.1.2.2.2
+  have hbpv := h_input.2.2.2.2.2.2.1.1
+  have hcpv := h_input.2.2.2.2.2.2.2.2.1.1
+  have himm_eval := h_input.2.2.2.2.2.2.2.2.2
+  have hbpv_map :
+      Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value =
+        input_adapter_op_b_memory_prev_value := by
+    rw [← CircuitType.eval_var_fields]
+    exact hbpv
+  have hapv := h_input.2.2.2.1.1
+  have hopc := h_input.2.2.2.2.2.2.2.1
+  have hapv_map :
+      Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_a_memory_prev_value =
+        input_adapter_op_a_memory_prev_value := by
+    rw [← CircuitType.eval_var_fields]
+    exact hapv
+  have hopc_map :
+      Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c = input_adapter_op_c := by
+    rw [← CircuitType.eval_var_fields]
+    exact hopc
+  have hcpv_map :
+      Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value =
+        input_adapter_op_c_memory_prev_value := by
+    rw [← CircuitType.eval_var_fields]
+    exact hcpv
+  have hpc_map :
+      Vector.map (Expression.eval env.toEnvironment) input_var_state_pc = input_state_pc := by
+    rw [← CircuitType.eval_var_fields]
+    exact hpc
+  have ec0 : Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[0]
+      = input_adapter_op_c_memory_prev_value[0] := by
+    rw [ProvableType.getElem_eval_fields, hcpv]
+  have heb : ∀ (k : ℕ) (hk : k < 4),
+      Expression.eval env.toEnvironment (input_var_adapter_op_b_memory_prev_value[k]'hk)
+        = input_adapter_op_b_memory_prev_value[k]'hk := by
+    intro k hk
+    rw [ProvableType.getElem_eval_fields, hbpv]
+  have heb0 := heb 0 (by norm_num)
+  have heb1 := heb 1 (by norm_num)
+  have heb2 := heb 2 (by norm_num)
+  have heb3 := heb 3 (by norm_num)
+  have epc0 : Expression.eval env.toEnvironment input_var_state_pc[0] = input_state_pc[0] := by
+    rw [ProvableType.getElem_eval_fields, hpc]
+  have epc1 : Expression.eval env.toEnvironment input_var_state_pc[1] = input_state_pc[1] := by
+    rw [ProvableType.getElem_eval_fields, hpc]
+  have epc2 : Expression.eval env.toEnvironment input_var_state_pc[2] = input_state_pc[2] := by
+    rw [ProvableType.getElem_eval_fields, hpc]
+  simp only [circuit_norm] at h_env_a h_env_cb h_env_v h_env_s h_env_lo h_env_hi h_env_lr
+  simp only [circuit_norm] at h_env_msb h_env_fl
+  simp only [vec4_eval, hbpv_map, ec0] at h_env_a h_env_cb h_env_v h_env_s h_env_lo h_env_hi
+  simp only [vec4_eval, hbpv_map, ec0] at h_env_lr h_env_msb
+  set B := input_adapter_op_b_memory_prev_value with hB
+  set c0 := input_adapter_op_c_memory_prev_value[0] with hc0
+  set F := hintFlags env.hint with hF
+  have hA0 : env.get i₀ = (populateA B c0 F)[0] := by simpa using h_env_a 0
+  have hA1 : env.get (i₀ + 1) = (populateA B c0 F)[1] := by simpa using h_env_a 1
+  have hA2 : env.get (i₀ + 2) = (populateA B c0 F)[2] := by simpa using h_env_a 2
+  have hA3 : env.get (i₀ + 3) = (populateA B c0 F)[3] := by simpa using h_env_a 3
+  have hcb0 : env.get (i₀ + 4) = (cBits c0)[0] := by simpa using h_env_cb 0
+  have hcb1 : env.get (i₀ + 4 + 1) = (cBits c0)[1] := by simpa using h_env_cb 1
+  have hcb2 : env.get (i₀ + 4 + 2) = (cBits c0)[2] := by simpa using h_env_cb 2
+  have hcb3 : env.get (i₀ + 4 + 3) = (cBits c0)[3] := by simpa using h_env_cb 3
+  have hcb4 : env.get (i₀ + 4 + 4) = (cBits c0)[4] := by simpa using h_env_cb 4
+  have hcb5 : env.get (i₀ + 4 + 5) = (cBits c0)[5] := by simpa using h_env_cb 5
+  have hv0 : env.get (i₀ + 4 + 6) = (vPowers c0)[0] := by simpa using h_env_v 0
+  have hv1 : env.get (i₀ + 4 + 6 + 1) = (vPowers c0)[1] := by simpa using h_env_v 1
+  have hv2 : env.get (i₀ + 4 + 6 + 2) = (vPowers c0)[2] := by simpa using h_env_v 2
+  have hs0 : env.get (i₀ + 4 + 6 + 3) = (shiftU16 c0 F)[0] := by simpa using h_env_s 0
+  have hs1 : env.get (i₀ + 4 + 6 + 3 + 1) = (shiftU16 c0 F)[1] := by simpa using h_env_s 1
+  have hs2 : env.get (i₀ + 4 + 6 + 3 + 2) = (shiftU16 c0 F)[2] := by simpa using h_env_s 2
+  have hs3 : env.get (i₀ + 4 + 6 + 3 + 3) = (shiftU16 c0 F)[3] := by simpa using h_env_s 3
+  have hlo0 : env.get (i₀ + 4 + 6 + 3 + 4) = (lowerLimb B c0)[0] := by simpa using h_env_lo 0
+  have hlo1 : env.get (i₀ + 4 + 6 + 3 + 4 + 1) = (lowerLimb B c0)[1] := by
+    simpa using h_env_lo 1
+  have hlo2 : env.get (i₀ + 4 + 6 + 3 + 4 + 2) = (lowerLimb B c0)[2] := by
+    simpa using h_env_lo 2
+  have hlo3 : env.get (i₀ + 4 + 6 + 3 + 4 + 3) = (lowerLimb B c0)[3] := by
+    simpa using h_env_lo 3
+  have hhi0 : env.get (i₀ + 4 + 6 + 3 + 4 + 4) = (higherLimb B c0)[0] := by
+    simpa using h_env_hi 0
+  have hhi1 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 1) = (higherLimb B c0)[1] := by
+    simpa using h_env_hi 1
+  have hhi2 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 2) = (higherLimb B c0)[2] := by
+    simpa using h_env_hi 2
+  have hhi3 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 3) = (higherLimb B c0)[3] := by
+    simpa using h_env_hi 3
+  have hlr0 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4) = (limbResult B c0)[0] := by
+    simpa using h_env_lr 0
+  have hlr1 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 1) = (limbResult B c0)[1] := by
+    simpa using h_env_lr 1
+  have hlr2 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 2) = (limbResult B c0)[2] := by
+    simpa using h_env_lr 2
+  have hlr3 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 3) = (limbResult B c0)[3] := by
+    simpa using h_env_lr 3
+  have hmsbc : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4) = sllwMsb B c0 F := h_env_msb
+  have hfl0 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1) = F[0] := by
+    simpa using h_env_fl 0
+  have hfl1 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1 + 1) = F[1] := by
+    simpa using h_env_fl 1
+  have hfl2 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1 + 2)
+      = F[1] * input_adapter_imm_c := by
+    simpa only [circuit_norm, himm_eval] using h_env_fl 2
+  have hsum01 : F[0] + F[1] = 0 ∨ F[0] + F[1] = 1 := by
+    rw [← hsum]
+    exact hbin
+  have hbUw : Word.isU64 B := hbU
+  obtain ⟨hc0v, -, -, -⟩ := Word.lt_cases_of_isU64 hcU
+  obtain ⟨hcba0, hcba1, hcba2, hcba3, hcba4, hcba5⟩ := cBits_asserts c0
+  simp only [← sub_eq_add_neg] at hcba0 hcba1 hcba2 hcba3 hcba4 hcba5
+  obtain ⟨hsel0, hsb0, hsel1, hsb1, hsel2, hsb2, hsel3, hsb3, hone⟩ :=
+    shiftU16_asserts c0 F hf0 hsum01
+  simp only [← sub_eq_add_neg] at hsb0 hsel1 hsb1 hsel2 hsb2 hsel3 hsb3 hone
+  obtain ⟨hva0, hva1, hva2⟩ := v_asserts c0
+  simp only [← sub_eq_add_neg] at hva0 hva1 hva2
+  obtain ⟨hsp0, hsp1, hsp2, hsp3⟩ := split_asserts B c0
+  simp only [← sub_eq_add_neg] at hsp0 hsp1 hsp2 hsp3
+  obtain ⟨hlra0, hlra1, hlra2, hlra3⟩ := limbResult_asserts B c0
+  simp only [← sub_eq_add_neg] at hlra0 hlra1 hlra2 hlra3
+  obtain ⟨hp1, hp2, hp3, hp4, hp5, hp6, hp7, hp8, hp9, hp10, hp11, hp12, hp13, hp14,
+    hp15, hp16, hp17, hp18, hp19, hp20, hp21, hp22⟩ :=
+    place_asserts B c0 F hf0 hf1 hsum01
+  simp only [← sub_eq_add_neg] at hp1 hp2 hp3 hp4 hp5 hp6 hp7 hp8 hp9 hp10 hp11 hp12 hp13 hp14
+  simp only [← sub_eq_add_neg] at hp15 hp16 hp17 hp18 hp19 hp20 hp21 hp22
+  have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by
+    rw [hop_a_0, zero_mul]
+  simp +instances only [main, circuit_norm, h_input]
+  simp only [hA0, hA1, hA2, hA3, hcb0, hcb1, hcb2, hcb3, hcb4, hcb5, hv0, hv1, hv2,
+    hlo0, hlo1, hlo2, hlo3, hhi0, hhi1, hhi2, hhi3, hmsbc, hfl0, hfl1, hfl2,
+    hapv_map, hbpv_map, hopc_map, hcpv_map, hpc_map, ec0, epc0, epc1, epc2]
+  refine ⟨⟨hbin, h_cpu⟩,
+    ⟨⟨fun _ => populateA_val_lt B c0 F hbUw 1 (by norm_num), hf1⟩,
+      sllwMsb_bool B c0 F hbUw, fun h1 => ?_⟩,
+    ⟨⟨hsum01, hsum01, by simpa only [hsum] using h_clk⟩,
+      ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
+        by rw [← hsum]; exact himmc,
+        by rw [← hsum]; exact himmbin,
+        hpins,
+        by rw [← hsum]; exact hrac_a,
+        by rw [← hsum]; exact hrac_b,
+        by rw [← hsum]; exact hrac_c,
+        by rw [← hsum]; exact hdec,
+        by rw [← hsum]; exact fun hr => ⟨ha_prev hr, hbU, (hprev_ab hr).1, (hprev_ab hr).2⟩,
+        by rw [← hsum]; exact fun hc => ⟨hcU, hprev_c hc⟩⟩⟩,
+    ⟨⟨hsum01, fun _ => ?_, by simpa only [hsum] using h_clk.at_four⟩, trivial⟩,
+    by rcases hbin with h | h <;> rw [h] <;> simp,
+    by rw [hsum, sub_self],
+    by rcases hsum01 with h | h <;> rw [h] <;> simp,
+    by rcases hf0 with h | h <;> rw [h] <;> simp,
+    by rcases hf1 with h | h <;> rw [h] <;> simp,
+    ⟨trivial, by
+      simp only [ShiftLeftCore.circuit, ShiftLeftChip.CoreSpec, circuit_norm, Vector.getElem_map,
+        Vector.getElem_mapRange, hA0, hA1, hA2, hA3, hcb0, hcb1, hcb2, hcb3, hcb4, hcb5,
+        hs0, hs1, hs2, hs3, hlo0, hlo1, hlo2, hlo3, hhi0, hhi1, hhi2, hhi3, hlr0,
+        hlr1, hlr2, hlr3]
+      exact ⟨hcba0, hcba1, hcba2, hcba3, hcba4, hcba5,
+        by simp only [sub_zero]; exact_mod_cast hsel0,
+        hsb0, hsel1, hsb1, hsel2, hsb2, hsel3, hsb3, hone,
+        by exact_mod_cast hva0, by exact_mod_cast hva1, by exact_mod_cast hva2,
+        hsp0, hsp1, hsp2, hsp3,
+        hlra0, hlra1, hlra2, hlra3,
+        hp1, hp2, hp3, hp4, hp5, hp6, hp7, hp8, hp9, hp10, hp11, hp12, hp13, hp14,
+        hp15, hp16, hp17, hp18, hp19, hp20, hp21, hp22,
+        by simp, hop_a_0⟩⟩,
+    fun _ => by
+      change ByteRowSpec _
+      convert byteRow_e32 c0 hc0v using 2
+      rw [sub_eq_add_neg],
+    fun _ => by
+      change ByteRowSpec _
+      convert byteRow_lower B c0 0 (by norm_num) using 2
+      rw [sub_eq_add_neg],
+    fun _ => by
+      change ByteRowSpec _
+      convert byteRow_higher B c0 hbUw 0 (by norm_num) using 2,
+    fun _ => by
+      change ByteRowSpec _
+      convert byteRow_lower B c0 1 (by norm_num) using 2
+      rw [sub_eq_add_neg],
+    fun _ => by
+      change ByteRowSpec _
+      convert byteRow_higher B c0 hbUw 1 (by norm_num) using 2,
+    fun _ => by
+      change ByteRowSpec _
+      convert byteRow_lower B c0 2 (by norm_num) using 2
+      rw [sub_eq_add_neg],
+    fun _ => by
+      change ByteRowSpec _
+      convert byteRow_higher B c0 hbUw 2 (by norm_num) using 2,
+    fun _ => by
+      change ByteRowSpec _
+      convert byteRow_lower B c0 3 (by norm_num) using 2
+      rw [sub_eq_add_neg],
+    fun _ => by
+      change ByteRowSpec _
+      convert byteRow_higher B c0 hbUw 3 (by norm_num) using 2⟩
+  · rw [show sllwMsb B c0 F = U16MSBOperation.populate_msb (populateA B c0 F)[1] by
+      rw [sllwMsb, if_pos h1]]
+    exact (U16MSBOperation.spec_populate (populateA_val_lt B c0 F hbUw 1 (by norm_num)) 1).2 rfl
+  · refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
+      simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm, hA0, hA1, hA2, hA3] <;>
+      first
+        | exact populateA_val_lt B c0 F hbUw 0 (by norm_num)
+        | exact populateA_val_lt B c0 F hbUw 1 (by norm_num)
+        | exact populateA_val_lt B c0 F hbUw 2 (by norm_num)
+        | exact populateA_val_lt B c0 F hbUw 3 (by norm_num)
 
-/-- The reader's literal Program gate — the witnessed variant-flag sum `is_sll + is_sllw` (cells
-`offset+30..31`).  ShiftLeft's public `is_real` is only *derived* from this one-hot sum through the
-binding constraint `is_real - (is_sll + is_sllw) === 0`, so the exposed pull carries the reader's
-own gate expression; `isReal_eq_exposedGate` below identifies the two under the row's constraints. -/
-def exposedGate (offset : ℕ) : Expression (ZMod p) :=
-  var ⟨offset + 30⟩ + var ⟨offset + 31⟩
-
-/-- The Program-fetch opcode committed by the witnessed variant flags (cells `offset+30..31`):
-`SLL·6 + SLLW·21`.  Named so the exposed pull and `Soundness/TypedProgram.lean` share one
-statement-level expression instead of raw witness indices. -/
-def exposedOpcode (offset : ℕ) : Expression (ZMod p) :=
-  var ⟨offset + 30⟩ * 6 + var ⟨offset + 31⟩ * 21
-
-/-! ### `ConstraintsHold` selectors for the binding-constraint extraction
-
-Generic `Operations`-level facts (formerly in `Soundness/TypedProgram.lean`) that let
-`isReal_eq_exposedGate` select the one binding assertion without normalizing any unrelated
-arithmetic subcircuit. -/
-
-omit [Fact (2 ^ 17 < p)] in
-private theorem operationsConstraintsHold_append (env : Environment (ZMod p))
-    (left right : Operations (ZMod p)) :
-    (left ++ right).ConstraintsHold env ↔
-      left.ConstraintsHold env ∧ right.ConstraintsHold env := by
-  simp only [Operations.ConstraintsHold, Operations.constraints_append,
-    Operations.lookups_append, List.forall_mem_append]
-  tauto
-
-omit [Fact (2 ^ 17 < p)] in
-private theorem operationsConstraintsHold_assert_singleton (env : Environment (ZMod p))
-    (expression : Expression (ZMod p)) :
-    Operations.ConstraintsHold env [.assert expression] ↔ env expression = 0 := by
-  simp [Operations.ConstraintsHold, circuit_norm]
-
-omit [Fact (2 ^ 17 < p)] in
-private theorem operationsConstraintsHold_witness_singleton (env : Environment (ZMod p))
-    (length : ℕ) (generator : WitgenIR (ZMod p) length) :
-    Operations.ConstraintsHold env [.witness length generator] := by
-  simp [Operations.ConstraintsHold, circuit_norm]
-
-omit [Fact (2 ^ 17 < p)] in
-private theorem equality_of_operationsConstraintsHold_singleton (env : Environment (ZMod p))
-    (left right : Expression (ZMod p)) (offset : ℕ) :
-    Operations.ConstraintsHold env
-        [.subcircuit (@FormalAssertion.toSubcircuit (ZMod p) _ (ProvablePair field field)
-          ProvablePair.instance (Gadgets.Equality.circuit field) offset (left, right))] →
-      env left = env right := by
-  intro constraints
-  have difference :
-      env (toElements (M := field) left)[0] - env (toElements (M := field) right)[0] = 0 := by
-    simpa [Operations.ConstraintsHold, FormalAssertion.toSubcircuit,
-      Gadgets.Equality.main, Gadgets.allZero, Circuit.forEach.operations_eq,
-      FlatOperation.constraints, FlatOperation.lookups, eval_sub, circuit_norm] using constraints
-  have left_eq : env (toElements (M := field) left)[0] = env left := rfl
-  have right_eq : env (toElements (M := field) right)[0] = env right := rfl
-  rw [left_eq, right_eq, sub_eq_zero] at difference
-  exact difference
-
-set_option maxHeartbeats 8000000 in
-/-- Under the row's own constraints, the binding assert `is_real - (is_sll + is_sllw) === 0`
-identifies the exposed derived Program gate with the public `is_real` selector.  This is the one
-whole-`main` `ConstraintsHold` normalization ShiftLeft needs; keeping it here spares
-`Soundness/TypedProgram.lean` from re-normalizing the circuit. -/
+/-- Under the row's own constraints, the shallow parent glue
+`is_real - (is_sll + is_sllw) = 0` identifies the exposed derived Program gate with the public
+`is_real` selector without normalizing any nested arithmetic circuit. -/
 theorem isReal_eq_exposedGate (input : Var Inputs (ZMod p)) (offset : ℕ)
     (env : Environment (ZMod p))
     (rowConstraints : ((main input).operations offset).ConstraintsHold env) :
     env input.is_real = env (exposedGate offset) := by
-  simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-    HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf,
-    Operations.localLength, operationsConstraintsHold_append,
-    operationsConstraintsHold_assert_singleton,
-    operationsConstraintsHold_witness_singleton] at rowConstraints
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, bindConstraints, _⟩ := rowConstraints
-  have bindEq := equality_of_operationsConstraintsHold_singleton env _ _ _ bindConstraints
-  have bindZero :
-      env input.is_real -
-        (env (var ⟨offset + 30⟩) + env (var ⟨offset + 31⟩)) = 0 := by
-    simpa [eval_sub, circuit_norm] using bindEq
-  simpa [exposedGate, circuit_norm] using sub_eq_zero.mp bindZero
-
-/-- ShiftLeft's exact Memory-channel interaction list (ALU-type: the op_c register pull/read-back
-pair is gated by **`exposedGate offset - imm_c`** — an immediate does no register read — and
-addressed by the low limb `op_c[0]`).  Every gate is the reader's literal derived selector
-`exposedGate offset = is_sll + is_sllw` (cells `offset+30..31`), not the public `is_real`
-(identified under the row's constraints by `isReal_eq_exposedGate`).  The op_a write push carries
-the placed result word `a` (cells `offset..offset+3`) at write clock `clk + 4`.  Keeping this list
-beside `circuit` makes Clean's exposure interface the single structural source consumed by both
-faithfulness and semantic grounding. -/
-def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
-    List (ChannelInteraction (memoryChannel (p := p))) :=
-  [ memoryChannel.pulledIf (exposedGate offset)
-      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
-       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
-    memoryChannel.pulledIf (exposedGate offset)
-      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
-       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
-    memoryChannel.pushedIf (exposedGate offset)
-      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3,
-       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
-    memoryChannel.pulledIf (exposedGate offset - input.adapter.imm_c)
-      ⟨input.state.clk_high, input.adapter.op_c_memory.access_timestamp.prev_low,
-       input.adapter.op_c[0], 0, 0, input.adapter.op_c_memory.prev_value⟩,
-    memoryChannel.pushedIf (exposedGate offset - input.adapter.imm_c)
-      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2,
-       input.adapter.op_c[0], 0, 0, input.adapter.op_c_memory.prev_value⟩,
-    memoryChannel.pushedIf (exposedGate offset)
-      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
-       input.adapter.op_a, 0, 0, Vector.mapRange 4 fun i => var { index := offset + i }⟩ ]
+  have shallow := FlatOperation.shallowConstraints_of_constraintsHoldFlat
+    (Circuit.constraintsHold_toFlat_iff.mpr rowConstraints)
+  have allConstraints := (constraintsHold_shallow_iff_forall_mem.mp shallow).1
+  have bindingMem : input.is_real - exposedGate offset ∈
+      ((main input).operations offset).shallowConstraints := by
+    change input.is_real - exposedGate offset ∈
+      input.is_real * (input.is_real - 1) :: (input.is_real - exposedGate offset) :: _
+    exact List.mem_cons_of_mem _ List.mem_cons_self
+  have binding := allConstraints _ bindingMem
+  have bindingZero : env input.is_real - env (exposedGate offset) = 0 := by
+    simpa only [eval_sub] using binding
+  exact sub_eq_zero.mp bindingZero
 
 omit [Fact (2 ^ 17 < p)] in
 /-- The exact source-B pull occupies its declared slot in ShiftLeft's exposed Memory list. -/
@@ -249,7 +372,6 @@ def stateExposure (input : Var Inputs (ZMod p)) (offset : ℕ) :
          input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
          input.adapter.op_a_0, 0, input.adapter.imm_c⟩ ]
 
-set_option maxHeartbeats 4000000 in
 private theorem main_exposedChannelsLawful (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).ExposedChannelsLawful (stateExposure input offset) := by
   unfold Operations.ExposedChannelsLawful
@@ -257,76 +379,9 @@ private theorem main_exposedChannelsLawful (input : Var Inputs (ZMod p)) (offset
   simp only [stateExposure, Readers.CPUState.exposedState, expose, List.mem_append,
     List.mem_singleton] at exposedMem
   rcases exposedMem with (rfl | rfl) | rfl
-  · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-      HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
-    simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
-      Readers.CPUState.interactionsWith_state_subcircuit,
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-      U16MSBOperation.circuit, U16MSBOperation.channelsWithGuarantees_eq,
-      Readers.ALUTypeReader.circuit, Readers.RegisterWrite.circuit,
-      FormalCircuitBase.channelsWithGuarantees_def,
-      Readers.ALUTypeReader.channelsWithGuarantees_eq,
-      Readers.RegisterWrite.channelsWithGuarantees_eq,
-      List.mem_cons, List.not_mem_nil, or_false,
-      Channels.stateChannel_eq_byteChannel_false, Channels.stateChannel_eq_programChannel_false,
-      Channels.stateChannel_eq_memoryChannel_false, not_false_eq_true,
-      Operations.interactionsWith_assert, Operations.interactionsWith_interact,
-      Operations.interactionsWith_nil, List.nil_append]
-    simp only [Operations.interactionsWith_subcircuit, FormalAssertion.toSubcircuit_interactions,
-      Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
-    simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil]
-  · -- Memory branch: compositional — the ALU-type reader keeps its five Memory interactions and
-    -- `RegisterWrite` its write push via the reader-local `_subcircuit` lemmas; every other
-    -- child is nil.
-    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-      HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
-    simp only [Operations.interactionsWith_witness,
-      Soundness.aluTypeReader_memoryInteractions_subcircuit,
-      Soundness.registerWrite_memoryInteractions_subcircuit,
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-      U16MSBOperation.circuit, U16MSBOperation.channelsWithGuarantees_eq,
-      Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
-      Gadgets.Equality.channelsWithGuarantees_eq,
-      Gadgets.Equality.channelsWithRequirements_eq,
-      FormalCircuitBase.channelsWithGuarantees_def, List.mem_cons, List.not_mem_nil, or_false,
-      Channels.memoryChannel_eq_byteChannel_false,
-      Channels.memoryChannel_eq_stateChannel_false, not_false_eq_true,
-      Operations.interactionsWith_assert, Operations.interactionsWith_interact,
-      Operations.interactionsWith_nil, Soundness.aluTypeMemoryInteractions,
-      Soundness.registerWriteMemoryInteractions, List.cons_append, List.nil_append]
-    simp only [circuit_norm]
-    simp only [Channels.byteChannel_eq_memoryChannel_false, if_false,
-      exposedMemoryInteractions, exposedGate, List.map_cons, List.map_nil]
-    rfl
-  · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
-    -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
-    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-      HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
-    simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-      Soundness.aluTypeReader_programInteractions_subcircuit,
-      Readers.CPUState.circuit, Readers.CPUState.channelsWithGuarantees_eq,
-      U16MSBOperation.circuit, U16MSBOperation.channelsWithGuarantees_eq,
-      Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
-      FormalCircuitBase.channelsWithGuarantees_def,
-      List.mem_cons, List.not_mem_nil, or_false,
-      Channels.programChannel_eq_byteChannel_false,
-      Channels.programChannel_eq_stateChannel_false,
-      Channels.programChannel_eq_memoryChannel_false,
-      not_false_eq_true, Operations.interactionsWith_assert,
-      Operations.interactionsWith_interact, Operations.interactionsWith_nil,
-      List.map_cons, List.map_nil, List.nil_append,
-      Soundness.aluTypeProgramMessage, exposedGate, exposedOpcode]
-    simp only [Operations.interactionsWith_subcircuit,
-      FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
-      List.filter_nil, List.nil_append]
-    simp only [Channels.byteChannel_eq_programChannel_false, if_false, List.nil_append]
+  · exact interactionsWith_main_state_eq input offset
+  · exact interactionsWith_main_memory_eq input offset
+  · exact interactionsWith_main_program_eq input offset
 
 set_option maxHeartbeats 4000000 in
 /-- The `ShiftLeft` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `sll`/`sllw` semantic contract;
@@ -341,69 +396,24 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftLeftCols :=
     -- off-gate `Requirements` are discharged locally via the shallow `(is_sll + is_sllw)` boolean gate
     -- (`off_gate_vacuous`), so `byteChannel` can later be *finished* in a Clean `SoundEnsemble`.
     channelsWithRequirements := [memoryChannel.toRaw],
-    requirementsChannelsLawful := fun input_var i₀ => by
-      have h_byte : (byteChannel (p := p)).toRaw ∈
-          (elaborated (p := p)).channelsWithGuarantees := by
-        simp only [circuit_norm]
-      dsimp only [Operations.RequirementsChannelsLawful]
-      refine ⟨?_, ?_, ?_⟩
-      · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
-          HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
-        simp only [Operations.subcircuitChannelsWithRequirements_append,
-          Operations.subcircuitChannelsWithRequirements_witness,
-          Operations.subcircuitChannelsWithRequirements_subcircuit,
-          Operations.subcircuitChannelsWithRequirements_assert,
-          Operations.subcircuitChannelsWithRequirements_interact,
-          Operations.subcircuitChannelsWithRequirements_nil,
-          GeneralFormalCircuit.toSubcircuit_channelsWithRequirements,
-          FormalAssertion.toSubcircuit_channelsWithRequirements,
-          Readers.CPUState.channelsWithRequirements_eq,
-          U16MSBOperation.circuit, Readers.ALUTypeReader.circuit, Readers.RegisterWrite.circuit,
-          Gadgets.Equality.channelsWithRequirements_eq, List.nil_append, List.append_nil]
-        simp only [List.subset_def, List.mem_append, List.mem_cons, List.not_mem_nil, or_false]
-        tauto
-      · intro channel h_channel
-        simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
-          HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
-          Operations.shallowChannels_append, Operations.shallowChannels_witness,
-          Operations.shallowChannels_subcircuit, Operations.shallowChannels_assert,
-          Operations.shallowChannels_interact, Operations.shallowChannels_nil,
-          List.nil_append] at h_channel
-        simp only [ChannelInteraction.toRaw_channel, List.mem_append, List.mem_singleton,
-          List.not_mem_nil, or_false, or_self] at h_channel
-        subst channel
-        exact Or.inl h_byte
-      · intro env h_constraints
-        simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
-          HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
-          ConstraintsHold.Shallow, Operations.forAllNoOffset_append,
-          Operations.forAllNoOffset, true_and, and_true, eval_sub,
-          Expression.eval] at h_constraints
-        have h_bool := bool_of_mul_pred h_constraints.2
-        rw [Operations.inChannelsOrRequirements_iff_forall_mem]
-        intro interaction h_interaction
-        simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
-          HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
-          Operations.shallowInteractions_append, Operations.shallowInteractions_witness,
-          Operations.shallowInteractions_subcircuit, Operations.shallowInteractions_assert,
-          Operations.shallowInteractions_interact, Operations.shallowInteractions_nil,
-          List.nil_append] at h_interaction
-        simp only [List.mem_append, List.mem_singleton, List.not_mem_nil, or_false] at h_interaction
-        rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-          right <;>
-          rw [ChannelInteraction.toRaw_requirements] <;>
-          intro h1 h0 <;>
-          simp only [circuit_norm] at h1 h0 <;>
-          exact off_gate_vacuous h_bool h1 h0,
+    requirementsChannelsLawful := fun input_var i₀ =>
+      requirementsChannelsLawful_main input_var i₀,
     -- W11 (A2): the State pair + Memory closed form + Program fetch, via `stateExposure` above;
     -- lawfulness is the standalone `main_exposedChannelsLawful` (also the axiom-clean seam for
     -- `interactionsWith_memory_eq` below while the completeness seam is open).
     exposedChannels := stateExposure,
     exposedChannels_eq := main_exposedChannelsLawful }
+
+/-- Folded circuit projections used by whole-chip row codecs without unfolding the
+proof-bearing `GeneralFormalCircuit` bundle. -/
+@[circuit_norm] theorem circuit_main_eq : (circuit (p := p)).main = main := rfl
+
+@[circuit_norm] theorem circuit_localLength_eq (input : Var Inputs (ZMod p)) :
+    (circuit (p := p)).localLength input = 33 := rfl
+
+@[circuit_norm] theorem circuit_size_eq :
+    (circuit (p := p)).size = size Inputs + 33 := by
+  rw [GeneralFormalCircuit.size_eq, circuit_localLength_eq]
 
 /-- The completed ShiftLeft circuit exposes exactly the Memory interaction list above.  Stated via
 the exposure-lawfulness theorem directly (not through `circuit`) so it stays axiom-clean while the

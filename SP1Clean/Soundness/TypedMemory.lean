@@ -263,6 +263,7 @@ def RegisterOperandPullAt (chip : SupportedChip p)
   ∀ data physical program state,
     let row := chip.decodeRow data physical
     chip.kind.advanceReady row.inputs row.cols program state →
+    chip.table.operations.ConstraintsHold (Environment.fromArray physical data) →
     row.is_real = 1 →
       ∀ index : BitVec 5, immediate row.view.adapter = 0 →
         (index.toNat : ZMod p) = operandIndex row.view.adapter →
@@ -298,13 +299,13 @@ theorem registerOperandPullShape_of_circuit (kind : ChipKind p)
   constructor
   · intro data physical program state
     dsimp only
-    intro ready real
+    intro ready _constraints real
     apply shape.opB data physical _ program state rfl ready
     rw [← selector_eq]
     exact real
   · intro data physical program state
     dsimp only
-    intro ready real
+    intro ready _constraints real
     apply shape.opC data physical _ program state rfl ready
     rw [← selector_eq]
     exact real
@@ -355,14 +356,15 @@ structure RegisterOperandPulls (decoded : DecodedInstructionRow p)
 theorem registerOperandPulls_of_shape (decoded : DecodedInstructionRow p)
     (data : ProverData (ZMod p)) (program : Target.GuestProgram) (state : SailState)
     (shape : RegisterOperandPullShape decoded.chip)
+    (constraints : decoded.chip.table.operations.ConstraintsHold (decoded.environment data))
     (ready : (decoded.toChipRow data).kind.advanceReady
       (decoded.toChipRow data).inputs (decoded.toChipRow data).cols program state) :
     decoded.RegisterOperandPulls data := by
   constructor
   · intro index real immediate indexEq
-    exact shape.opB data decoded.physical program state ready real index immediate indexEq
+    exact shape.opB data decoded.physical program state ready constraints real index immediate indexEq
   · intro index real immediate indexEq
-    exact shape.opC data decoded.physical program state ready real index immediate indexEq
+    exact shape.opC data decoded.physical program state ready constraints real index immediate indexEq
 
 /-- Timed grounding plus the chip's exact operand-pull interface identifies the row's committed
 source values with the live Sail registers at this execution position. -/

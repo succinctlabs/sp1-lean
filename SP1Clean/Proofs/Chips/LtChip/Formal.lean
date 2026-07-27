@@ -1,5 +1,6 @@
 import SP1Clean.Native.Chips.LtChip.Defs
 import SP1Clean.Math.EvalVec
+import Clean.Air.Circuit
 
 /-! # `SP1Clean.LtChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
 
@@ -159,7 +160,8 @@ set_option maxHeartbeats 800000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start [Spec]
   obtain ⟨ha, hb⟩ := h_assumptions
-  obtain ⟨h_cpu, h_lt, h_adapter, _h_rw, h_gate, h_slt_bin, h_sltu_bin, h_sum⟩ := h_holds
+  obtain ⟨h_cpu, h_lt, h_adapter, _h_rw, h_gate, _h_selector_bind,
+    h_slt_bin, h_sltu_bin, h_sum, _h_op_a_0⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   have h_slt_bool := bool_of_mul_pred h_slt_bin
   have h_sltu_bool := bool_of_mul_pred h_sltu_bin
@@ -236,8 +238,9 @@ theorem completeness :
   -- after the split is only visible in the one branch it was stated under).
   have hpvb : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value
       = input_adapter_op_b_memory_prev_value := h_input.2.2.2.2.2.2.1.1
-  have hpvc : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c
-      = input_adapter_op_c := h_input.2.2.2.2.2.2.2.1
+  have hpvc : Vector.map (Expression.eval env.toEnvironment)
+      input_var_adapter_op_c_memory_prev_value = input_adapter_op_c_memory_prev_value :=
+    h_input.2.2.2.2.2.2.2.2.1.1
   refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨ha, hb, hbin, hf0'⟩, ?_⟩,
     ⟨⟨hbin, hbin, h_clk⟩,
@@ -250,9 +253,11 @@ theorem completeness :
       fun hc => ⟨hc_prev hc, (hprevclk (by rwa [himm, sub_zero] at hc)).2.2⟩⟩⟩,
     ⟨⟨hbin, ?_, h_clk.at_four⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
+    by rw [hflag0, hflag1, ← hsum]; exact sub_self _,
     hbool _ hf0',
     hbool _ hf1',
-    hbool _ hsum01'⟩
+    hbool _ hsum01',
+    hop_a_0⟩
   -- The composed `LtOperationSigned` `FormalAssertion`'s `Spec` at the witnessed `populate`d columns:
   -- `spec_populate` once the witnessed column struct equals `populate …` (each cell is `env.get (i₀+2+k)`,
   -- pinned by the normalised witness hint to `(toElements (populate …))[k]`).
@@ -263,7 +268,8 @@ theorem completeness :
     · rw [hslt_real h, h]
       simp
   convert LtOperationSigned.spec_populate (b := input_adapter_op_b_memory_prev_value)
-    (cc := input_adapter_op_c) (is_signed := env.get i₀) (is_real := input_is_real)
+    (cc := input_adapter_op_c_memory_prev_value) (is_signed := env.get i₀)
+    (is_real := input_is_real)
     ha hb hf0' hbin hgate using 2
   rfl
   refine (ProvableType.ext_iff (α := Extracted.LtOperationSigned) _ _).mpr (fun i hi => ?_)
@@ -278,10 +284,10 @@ theorem completeness :
              Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
              Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
              Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]]
-          #v[Expression.eval env.toEnvironment input_var_adapter_op_c[0],
-             Expression.eval env.toEnvironment input_var_adapter_op_c[1],
-             Expression.eval env.toEnvironment input_var_adapter_op_c[2],
-             Expression.eval env.toEnvironment input_var_adapter_op_c[3]]
+          #v[Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[0],
+             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[1],
+             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[2],
+             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[3]]
           (env.get i₀) (Expression.eval env.toEnvironment input_var_is_real)))[i]'hi := h_env_cols ⟨i, hi⟩
   rw [vec4_eval, vec4_eval, hpvb, hpvc, h_input.1] at hc
   refine Eq.trans ?_
@@ -298,16 +304,83 @@ theorem completeness :
              Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
              Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
              Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]]
-          #v[Expression.eval env.toEnvironment input_var_adapter_op_c[0],
-             Expression.eval env.toEnvironment input_var_adapter_op_c[1],
-             Expression.eval env.toEnvironment input_var_adapter_op_c[2],
-             Expression.eval env.toEnvironment input_var_adapter_op_c[3]]
+          #v[Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[0],
+             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[1],
+             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[2],
+             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[3]]
           (env.get i₀) (Expression.eval env.toEnvironment input_var_is_real)))[0]'(by
             have : size Extracted.LtOperationSigned = 10 := rfl; omega) := h_env_cols 0
   rw [vec4_eval, vec4_eval, hpvb, hpvc, h_input.1] at hc0
   refine isU64_bitWord ?_
   rw [hc0]
   exact witness_bit_bool hr _
+
+/-- Exact State-channel pair emitted by the composed CPU-state reader. -/
+def exposedStateInteractions (input : Var Inputs (ZMod p)) :
+    List (ChannelInteraction (stateChannel (p := p))) :=
+  [ stateChannel.pulledIf input.is_real
+      ⟨input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+       input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+    stateChannel.pushedIf input.is_real
+      ⟨input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+       input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ]
+
+/-- Exact Byte-channel list emitted by Lt: two CPU clock checks, the two signed-MSB checks,
+the selected-limb comparison, and the ALU reader's six register-timestamp checks. The native
+composition emits the CPU rows first; whole-chip faithfulness proves the permutation to Rust's
+operation-first order. -/
+def exposedByteInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (byteChannel (p := p))) :=
+  let clkLow := input.state.clk_0_16 + input.state.clk_16_24 * 65536
+  let opCGate := input.is_real - input.adapter.imm_c
+  let isSlt := var ⟨offset⟩
+  let bit := var ⟨offset + 2⟩
+  let comparison0 := var ⟨offset + 8⟩
+  let comparison1 := var ⟨offset + 9⟩
+  let bMsb := var ⟨offset + 10⟩
+  let cMsb := var ⟨offset + 11⟩
+  [ byteChannel.pulledIf input.is_real
+      ⟨6, (input.state.clk_0_16 - 1) * (8 : ZMod p)⁻¹,
+       Expression.const ((13 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real ⟨3, 0, input.state.clk_16_24, 0⟩,
+    byteChannel.pulledIf isSlt
+      ⟨6, (2 : Expression (ZMod p)) * input.op_b_val[3] - bMsb * 65536,
+       Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf isSlt
+      ⟨6, (2 : Expression (ZMod p)) * input.op_c_val[3] - cMsb * 65536,
+       Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨6, comparison0 - comparison1 + bit * 65536,
+       Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨6, input.adapter.op_a_memory.access_timestamp.diff_low_limb,
+       Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨3, 0,
+       (clkLow + 4 - input.adapter.op_a_memory.access_timestamp.prev_low - 1 -
+          input.adapter.op_a_memory.access_timestamp.diff_low_limb) *
+            (65536 : ZMod p)⁻¹,
+       0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨6, input.adapter.op_b_memory.access_timestamp.diff_low_limb,
+       Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨3, 0,
+       (clkLow + 3 - input.adapter.op_b_memory.access_timestamp.prev_low - 1 -
+          input.adapter.op_b_memory.access_timestamp.diff_low_limb) *
+            (65536 : ZMod p)⁻¹,
+       0⟩,
+    byteChannel.pulledIf opCGate
+      ⟨6, input.adapter.op_c_memory.access_timestamp.diff_low_limb,
+       Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf opCGate
+      ⟨3, 0,
+       (clkLow + 2 - input.adapter.op_c_memory.access_timestamp.prev_low - 1 -
+          input.adapter.op_c_memory.access_timestamp.diff_low_limb) *
+            (65536 : ZMod p)⁻¹,
+       0⟩ ]
 
 /-- Lt's exact Memory-channel interaction list (ALU-type: the op_c register pull/read-back pair is
 gated by **`is_real - imm_c`** — an immediate does no register read — and addressed by the low limb
@@ -361,6 +434,15 @@ statement-level expression instead of raw witness indices. -/
 def exposedOpcode (offset : ℕ) : Expression (ZMod p) :=
   var ⟨offset⟩ * 9 + var ⟨offset + 1⟩ * 10
 
+/-- Exact Program fetch emitted by the ALU adapter, with the instruction opcode reconstructed from
+the two chip-owned variant flags. -/
+def exposedProgramInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (programChannel (p := p))) :=
+  [ programChannel.pulledIf input.is_real
+      ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], exposedOpcode offset,
+       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
+       input.adapter.op_a_0, 0, input.adapter.imm_c⟩ ]
+
 /-- The unified `Lt` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `slt`/`sltu` semantic contract,
 composing the witnessed signed-compare gadget and the immediate-capable register reader; output is the
 extracted `LtCols` column struct. Soundness/completeness are proven and axiom-clean. -/
@@ -374,22 +456,12 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input offset =>
-      expose stateChannel
-        [ stateChannel.pulledIf input.is_real
-            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
-             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          stateChannel.pushedIf input.is_real
-            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
-             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
+      expose stateChannel (exposedStateInteractions input) ++
       expose memoryChannel (exposedMemoryInteractions input offset) ++
       -- The Program-bus instruction fetch (descended from the composed `ALUTypeReader`, gate
       -- `is_trusted = is_real`, opcode = the committed one-hot flag encoding), consumed by
       -- `Soundness/TypedProgram.lean`.
-      expose programChannel
-        [ programChannel.pulledIf input.is_real
-            ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], exposedOpcode offset,
-             input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
-             input.adapter.op_a_0, 0, input.adapter.imm_c⟩ ],
+      expose programChannel (exposedProgramInteractions input offset),
     exposedChannels_eq := by
       intro input offset
       have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
@@ -397,7 +469,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
       have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
       unfold Operations.ExposedChannelsLawful
       intro exposed exposedMem
-      simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
+      simp only [expose, exposedStateInteractions, exposedProgramInteractions,
+        List.mem_append, List.mem_singleton] at exposedMem
       rcases exposedMem with (rfl | rfl) | rfl
       · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
           Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
@@ -448,12 +521,57 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LtCols :=
           FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
           List.filter_nil, List.nil_append] }
 
+/-- Folded circuit projections used by whole-chip row codecs without unfolding the proof bundle. -/
+@[circuit_norm] theorem circuit_main_eq : (circuit (p := p)).main = main := rfl
+
+@[circuit_norm] theorem circuit_localLength_eq (input : Var Inputs (ZMod p)) :
+    (circuit (p := p)).localLength input = 12 := rfl
+
+@[circuit_norm] theorem circuit_size_eq :
+    (circuit (p := p)).size = size Inputs + 12 := by
+  rw [GeneralFormalCircuit.size_eq, circuit_localLength_eq]
+
+/-- The completed Lt circuit exposes exactly its State interaction pair. -/
+theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith stateChannel.toRaw =
+      (exposedStateInteractions input).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨stateChannel.toRaw, (exposedStateInteractions input).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
+
+set_option maxHeartbeats 4000000 in
+/-- The completed Lt circuit emits exactly its eleven Byte interactions. -/
+theorem interactionsWith_byte_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith byteChannel.toRaw =
+      (exposedByteInteractions input offset).map ChannelInteraction.toRaw := by
+  simp [main, exposedByteInteractions,
+    Readers.CPUState.circuit, Readers.CPUState.main,
+    Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+    Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    SP1Clean.LtOperationSigned.circuit, SP1Clean.LtOperationSigned.main,
+    SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
+    SP1Clean.LtOperationUnsigned.circuit, SP1Clean.LtOperationUnsigned.main,
+    SP1Clean.U16CompareOperation.circuit, SP1Clean.U16CompareOperation.main,
+    Gadgets.Equality.main, FormalAssertion.toSubcircuit_interactions,
+    GeneralFormalCircuit.toSubcircuit_interactions, circuit_norm, Nat.add_assoc]
+
 /-- The completed Lt circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith memoryChannel.toRaw =
       (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
   exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
+
+/-- The completed Lt circuit exposes exactly its Program fetch. -/
+theorem interactionsWith_program_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith programChannel.toRaw =
+      (exposedProgramInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨programChannel.toRaw, (exposedProgramInteractions input offset).map
+      ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
 
 end SP1Clean.LtChip

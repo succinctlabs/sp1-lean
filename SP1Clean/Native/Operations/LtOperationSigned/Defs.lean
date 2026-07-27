@@ -68,4 +68,44 @@ set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
 
+/-- Keep the signed-compare interaction boundary folded for enclosing whole-chip proofs.  The gadget
+emits only the byte interactions of its two MSB checks and unsigned comparison; its five local
+equalities emit none. -/
+theorem interactionsWith_byte_eq
+    (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith byteChannel.toRaw =
+      ((U16MSBOperation.main
+        ⟨input.b[3], { msb := input.cols.b_msb.msb },
+          input.is_signed⟩).operations offset).interactionsWith
+            byteChannel.toRaw ++
+      ((U16MSBOperation.main
+        ⟨input.cc[3], { msb := input.cols.c_msb.msb },
+          input.is_signed⟩).operations offset).interactionsWith
+            byteChannel.toRaw ++
+      ((LtOperationUnsigned.main
+        ⟨#v[input.b[0], input.b[1], input.b[2],
+              input.b[3] + input.is_signed * 32768 -
+                65536 * input.cols.b_msb.msb],
+          #v[input.cc[0], input.cc[1], input.cc[2],
+              input.cc[3] + input.is_signed * 32768 -
+                65536 * input.cols.c_msb.msb],
+          { u16_compare_operation :=
+              { bit := input.cols.result.u16_compare_operation.bit }
+            u16_flags :=
+              #v[input.cols.result.u16_flags[0],
+                input.cols.result.u16_flags[1],
+                input.cols.result.u16_flags[2],
+                input.cols.result.u16_flags[3]]
+            not_eq_inv := input.cols.result.not_eq_inv
+            comparison_limbs :=
+              #v[input.cols.result.comparison_limbs[0],
+                input.cols.result.comparison_limbs[1]] },
+          input.is_real⟩).operations offset).interactionsWith
+            byteChannel.toRaw := by
+  simp only [main, circuit_norm,
+    FormalAssertion.toSubcircuit_interactions,
+    U16MSBOperation.circuit, LtOperationUnsigned.circuit,
+    Gadgets.Equality.main, List.filter_nil, List.append_nil]
+  rfl
+
 end SP1Clean.LtOperationSigned

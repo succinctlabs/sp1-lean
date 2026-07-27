@@ -10,7 +10,7 @@ whole committed row (`Extracted.DivRemCols`). The circuit
 (`Native/Operations/DivRemOperation/Core.lean`) witnesses nothing, so both directions are
 input-level repackaging: soundness maps the two composed `MulOperation` implications, the eight
 product-glue equations, the own-assert tail (through the `ownAsserts_map_eval` var↔value
-transport), and the 34 gated byte-pull guarantees onto the matching `CoreSpec` conjuncts — deriving
+transport), and the 32 gated byte-pull guarantees onto the matching `CoreSpec` conjuncts — deriving
 the selection block (`is_real`/flag binariness, one-hot, `SelectionSpec`) from the gate equations
 inside the own-assert tail via the `OwnAsserts.lean` membership lemmas — and completeness feeds
 each constraint back from the same conjuncts. -/
@@ -372,7 +372,7 @@ private lemma byteRowSpec_of_isU16 {v : ZMod p} (h : v.val < 2 ^ 16) :
 set_option linter.unusedSectionVars false in
 /-- One-hot flags select a committed case: with all eight variant flags binary and their `val`s
 summing to one, some `Case` carries flag `1` and every other flag is `0`. -/
-private lemma selected_of_flags {cols : DivRemCols (ZMod p)}
+theorem selection_of_flags {cols : DivRemCols (ZMod p)}
     (b0 : cols.is_div = 0 ∨ cols.is_div = 1) (b1 : cols.is_divu = 0 ∨ cols.is_divu = 1)
     (b2 : cols.is_rem = 0 ∨ cols.is_rem = 1) (b3 : cols.is_remu = 0 ∨ cols.is_remu = 1)
     (b4 : cols.is_divw = 0 ∨ cols.is_divw = 1) (b5 : cols.is_remw = 0 ∨ cols.is_remw = 1)
@@ -470,19 +470,15 @@ private lemma selected_of_flags {cols : DivRemCols (ZMod p)}
     have z7 : cols.is_divuw = 0 := hval0 _ (by omega)
     cases other <;> first | exact absurd rfl hne | assumption
 
-/-- Composer-supplied preconditions: the operand `isU64`s the two composed `MulOperation`s need on
-their active gates. The chip derives `isU64 quotient_comp` from its byte-range pulls
-(`comp_limb_isU16`) and `isU64 c` from the operand columns' read/extension shape (`operand_isU64`);
-everything else the cluster needs (gate/flag binariness) is derived inside `CoreSpec` from the
-own-assert tail itself. -/
-def Assumptions (cols : DivRemCols (ZMod p)) : Prop :=
-  (cols.is_real = 1 → Word.isU64 cols.quotient_comp ∧ Word.isU64 cols.c) ∧
-  (cols.is_real_not_word = 1 → Word.isU64 cols.quotient_comp ∧ Word.isU64 cols.c)
+/-- The core cluster is self-contained. Its composed multiplications recover operand limb bounds
+from their own safe byte-decomposition pulls, while the gate/flag facts come from the core's
+own-assert tail. No range fact has to be assumed by the parent chip. -/
+def Assumptions (_cols : DivRemCols (ZMod p)) : Prop := True
 
 set_option maxHeartbeats 16000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CoreSpec := by
   circuit_proof_start [CoreSpec]
-  obtain ⟨hU1, hU2⟩ := h_assumptions
+  clear h_assumptions
   obtain ⟨-, ⟨-, -, hopa0, -, ⟨hbpv, -, -⟩, -, ⟨hcpv, -, -⟩⟩, ha, hb, hc, hq, hqc, hrc, hr,
     har, hac, hmax, hctq, ⟨-, hloProd, -, -, -, -, -, -, -⟩, ⟨-, hupProd, -, -, -, -, -, -, -⟩,
     hcnegv, hrnegv, ⟨hltbit, -, -, -⟩, hcarry, ⟨-, -, -, -, -, -, hisc0res⟩, hdiv, hdivu, hrem,
@@ -492,7 +488,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CoreSpec
   obtain ⟨hMulLo, hMulUp, hg0, hg1, hg2, hg3, hg4, hg5, hg6, hg7, hOwn,
     hp0, hp1, hp2, hp3, hp4, hp5, hp6, hp7, hp8, hp9, hp10, hp11, hp12, hp13, hp14, hp15,
     hp16, hp17, hp18, hp19, hp20, hp21, hp22, hp23, hp24, hp25, hp26, hp27, hp28, hp29,
-    hp30, hp31, hp32, hp33⟩ := h_holds
+    hp30, hp31⟩ := h_holds
   -- normalize the own-assert block to list-membership form
   simp only [DivRemChip.assertZeros, DivRemChip.forAllNoOffset_map_assert] at hOwn
   -- the gate/flag binaries and the one-hot sum, extracted from the own-assert tail by membership
@@ -527,11 +523,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CoreSpec
     omega
   have bDR := DivRemChip.group_binary2 bDiv bRem (by omega)
   have bDRu := DivRemChip.group_binary2 bDivu bRemu (by omega)
-  have bE2 := DivRemChip.group_binary4 bDivw bRemw bDivuw bRemuw (by omega)
   -- the two composed Mul contracts
-  have hSpecLo := hMulLo ⟨fun h => hU1 h, bIr, fun h => absurd h zero_ne_one, bIr, Or.inl rfl,
+  have hSpecLo := hMulLo ⟨bIr, fun h => absurd h zero_ne_one, bIr, Or.inl rfl,
     Or.inl rfl, Or.inl rfl, Or.inl rfl, by simpa using bIr⟩
-  have hSpecUp := hMulUp ⟨fun h => hU2 h, bIrnw, fun h => absurd h zero_ne_one, Or.inl rfl, bDR,
+  have hSpecUp := hMulUp ⟨bIrnw, fun h => absurd h zero_ne_one, Or.inl rfl, bDR,
     bDRu, Or.inl rfl, Or.inl rfl, by
       rcases DivRemChip.group_binary4 bDiv bRem bDivu bRemu (by omega) with h | h
       · left; linear_combination h
@@ -643,52 +638,95 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CoreSpec
   simp only [eCtq0, eCtq1, eCtq2, eCtq3, eCtq4, eCtq5, eCtq6, eCtq7, eLoP0, eLoP1, eLoP2, eLoP3,
     eLoP4, eLoP5, eLoP6, eLoP7, eUpP8, eUpP9, eUpP10, eUpP11, eUpP12, eUpP13, eUpP14,
     eUpP15] at hg0 hg1 hg2 hg3 hg4 hg5 hg6 hg7
-  refine ⟨⟨hSpecLo, hSpecUp, hg0, hg1, hg2, hg3, ?_, ?_, bIr, bIrnw, bDiv, bDivu, bRem, bRemu,
-    bDivw, bRemw, bDivuw, bRemuw, hsum1,
-    fun _ => selected_of_flags bDiv bDivu bRem bRemu bDivw bRemw bDivuw bRemuw hsum2,
-    ?_, ?_⟩, ?_⟩
-  · -- the g64-gated upper glue
-    intro h64
-    rw [h64, one_mul] at hg4 hg5 hg6 hg7
-    exact ⟨by linear_combination hg4, by linear_combination hg5, by linear_combination hg6,
-      by linear_combination hg7⟩
+  refine ⟨⟨?_, ?_, ?_, ?_⟩, ?_⟩
+  · -- the two products and their u16-limb glue
+    unfold ProductSpec
+    refine And.intro hSpecLo (And.intro hSpecUp (And.intro ?_ ?_))
+    · rw [LowerProductPlacement]
+      intro hir1
+      change input_is_real = 1 at hir1
+      change
+        input_c_times_quotient[0] =
+            input_c_times_quotient_lower_product[0] +
+              input_c_times_quotient_lower_product[1] * 256 ∧
+          input_c_times_quotient[1] =
+            input_c_times_quotient_lower_product[2] +
+              input_c_times_quotient_lower_product[3] * 256 ∧
+          input_c_times_quotient[2] =
+            input_c_times_quotient_lower_product[4] +
+              input_c_times_quotient_lower_product[5] * 256 ∧
+          input_c_times_quotient[3] =
+            input_c_times_quotient_lower_product[6] +
+              input_c_times_quotient_lower_product[7] * 256
+      rw [hir1, one_mul] at hg0 hg1 hg2 hg3
+      exact ⟨by linear_combination hg0, by linear_combination hg1,
+        by linear_combination hg2, by linear_combination hg3⟩
+    · rw [UpperProductPlacement]
+      intro h64
+      change input_is_div + input_is_divu + input_is_rem + input_is_remu = 1 at h64
+      change
+        input_c_times_quotient[4] =
+            input_c_times_quotient_upper_product[8] +
+              input_c_times_quotient_upper_product[9] * 256 ∧
+          input_c_times_quotient[5] =
+            input_c_times_quotient_upper_product[10] +
+              input_c_times_quotient_upper_product[11] * 256 ∧
+          input_c_times_quotient[6] =
+            input_c_times_quotient_upper_product[12] +
+              input_c_times_quotient_upper_product[13] * 256 ∧
+          input_c_times_quotient[7] =
+            input_c_times_quotient_upper_product[14] +
+              input_c_times_quotient_upper_product[15] * 256
+      rw [h64, one_mul] at hg4 hg5 hg6 hg7
+      exact ⟨by linear_combination hg4, by linear_combination hg5, by linear_combination hg6,
+        by linear_combination hg7⟩
   · -- the raw own-assert bundle, transported to the evaluated row
     exact ownAssertsHold_of_forall env hOwn hdiv hdivu hrem hremu hdivw hremw hdivuw hremuw hir
       hirnw hov hbn hbnno hbnnno hrn hcn hace hare hrcm hbm hrm hcm hqm hovbres hovcres hisc0res
       hltbit hopa0 hbpv hcpv ha hb hc hq hqc hr hrc har hac hmax hcnegv hrnegv hctq hcarry
-  · -- the 32 is_real-gated byte-range facts
+  · -- the binary gates, one-hot equation, and committed case selection
+    simp only [SelectionEvidenceSpec]
+    exact ⟨bIr, bIrnw, bDiv, bDivu, bRem, bRemu, bDivw, bRemw, bDivuw, bRemuw, hsum1,
+      fun _ => selection_of_flags bDiv bDivu bRem bRemu bDivw bRemw bDivuw bRemuw hsum2⟩
+  · -- the byte-range evidence
+    simp only [RangeSpec, Nat.cast_ofNat]
     intro hr1
     have hneg : - input_is_real = -1 := by rw [hr1]
-    refine ⟨by simpa only [eCtq0, eRc0, eCar0] using DivRemChip.isU16_of_byteRowSpec (hp0 hneg),
-      by simpa only [eCtq1, eRc1, eCar1, eCar0] using DivRemChip.isU16_of_byteRowSpec (hp1 hneg),
-      by simpa only [eCtq2, eRc2, eCar2, eCar1] using DivRemChip.isU16_of_byteRowSpec (hp2 hneg),
-      by simpa only [eCtq3, eRc3, eCar3, eCar2] using DivRemChip.isU16_of_byteRowSpec (hp3 hneg),
-      by simpa only [eCtq4, eCar4, eCar3] using DivRemChip.isU16_of_byteRowSpec (hp4 hneg),
-      by simpa only [eCtq5, eCar5, eCar4] using DivRemChip.isU16_of_byteRowSpec (hp5 hneg),
-      by simpa only [eCtq6, eCar6, eCar5] using DivRemChip.isU16_of_byteRowSpec (hp6 hneg),
-      by simpa only [eCtq7, eCar7, eCar6] using DivRemChip.isU16_of_byteRowSpec (hp7 hneg),
-      fun i hi => ?_, fun i hi => ?_, fun i hi => ?_, fun i hi => ?_, fun i hi => ?_⟩
-    · interval_cases i
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    · simpa only [eCtq0, eRc0, eCar0] using DivRemChip.isU16_of_byteRowSpec (hp0 hneg)
+    · simpa only [eCtq1, eRc1, eCar1, eCar0] using DivRemChip.isU16_of_byteRowSpec (hp1 hneg)
+    · simpa only [eCtq2, eRc2, eCar2, eCar1] using DivRemChip.isU16_of_byteRowSpec (hp2 hneg)
+    · simpa only [eCtq3, eRc3, eCar3, eCar2] using DivRemChip.isU16_of_byteRowSpec (hp3 hneg)
+    · simpa only [eCtq4, eCar4, eCar3] using DivRemChip.isU16_of_byteRowSpec (hp4 hneg)
+    · simpa only [eCtq5, eCar5, eCar4] using DivRemChip.isU16_of_byteRowSpec (hp5 hneg)
+    · simpa only [eCtq6, eCar6, eCar5] using DivRemChip.isU16_of_byteRowSpec (hp6 hneg)
+    · simpa only [eCtq7, eCar7, eCar6] using DivRemChip.isU16_of_byteRowSpec (hp7 hneg)
+    · intro i hi
+      interval_cases i
       · simpa only [eAc0] using DivRemChip.isU16_of_byteRowSpec (hp8 hneg)
       · simpa only [eAc1] using DivRemChip.isU16_of_byteRowSpec (hp9 hneg)
       · simpa only [eAc2] using DivRemChip.isU16_of_byteRowSpec (hp10 hneg)
       · simpa only [eAc3] using DivRemChip.isU16_of_byteRowSpec (hp11 hneg)
-    · interval_cases i
+    · intro i hi
+      interval_cases i
       · simpa only [eAr0] using DivRemChip.isU16_of_byteRowSpec (hp12 hneg)
       · simpa only [eAr1] using DivRemChip.isU16_of_byteRowSpec (hp13 hneg)
       · simpa only [eAr2] using DivRemChip.isU16_of_byteRowSpec (hp14 hneg)
       · simpa only [eAr3] using DivRemChip.isU16_of_byteRowSpec (hp15 hneg)
-    · interval_cases i
+    · intro i hi
+      interval_cases i
       · simpa only [eQ0] using DivRemChip.isU16_of_byteRowSpec (hp16 hneg)
       · simpa only [eQ1] using DivRemChip.isU16_of_byteRowSpec (hp17 hneg)
       · simpa only [eQ2] using DivRemChip.isU16_of_byteRowSpec (hp18 hneg)
       · simpa only [eQ3] using DivRemChip.isU16_of_byteRowSpec (hp19 hneg)
-    · interval_cases i
+    · intro i hi
+      interval_cases i
       · simpa only [eR0] using DivRemChip.isU16_of_byteRowSpec (hp20 hneg)
       · simpa only [eR1] using DivRemChip.isU16_of_byteRowSpec (hp21 hneg)
       · simpa only [eR2] using DivRemChip.isU16_of_byteRowSpec (hp22 hneg)
       · simpa only [eR3] using DivRemChip.isU16_of_byteRowSpec (hp23 hneg)
-    · interval_cases i
+    · intro i hi
+      interval_cases i
       · simpa only [eCtq0] using DivRemChip.isU16_of_byteRowSpec (hp24 hneg)
       · simpa only [eCtq1] using DivRemChip.isU16_of_byteRowSpec (hp25 hneg)
       · simpa only [eCtq2] using DivRemChip.isU16_of_byteRowSpec (hp26 hneg)
@@ -697,12 +735,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CoreSpec
       · simpa only [eCtq5] using DivRemChip.isU16_of_byteRowSpec (hp29 hneg)
       · simpa only [eCtq6] using DivRemChip.isU16_of_byteRowSpec (hp30 hneg)
       · simpa only [eCtq7] using DivRemChip.isU16_of_byteRowSpec (hp31 hneg)
-  · -- the two e2-gated word-variant range checks
-    intro he2
-    have hneg2 : - (input_is_divw + input_is_remw + input_is_divuw + input_is_remuw) = -1 := by
-      rw [he2]
-    exact ⟨by simpa only [eR1] using DivRemChip.isU16_of_byteRowSpec (hp32 hneg2),
-      by simpa only [eQ1] using DivRemChip.isU16_of_byteRowSpec (hp33 hneg2)⟩
   · -- the requirements tail: subcircuits owe nothing; the pulls' off-gate cases are vacuous
     and_intros <;>
       first
@@ -710,21 +742,58 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CoreSpec
         | trivial
         | (intro h1 h0
            first
-             | exact off_gate_vacuous bIr h1 h0
-             | exact off_gate_vacuous bE2 h1 h0)
+             | exact off_gate_vacuous bIr h1 h0)
 
 set_option maxHeartbeats 16000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions CoreSpec := by
   circuit_proof_start [CoreSpec]
-  obtain ⟨hU1, hU2⟩ := h_assumptions
+  clear h_assumptions
   obtain ⟨-, ⟨-, -, hopa0, -, ⟨hbpv, -, -⟩, -, ⟨hcpv, -, -⟩⟩, ha, hb, hc, hq, hqc, hrc, hr,
     har, hac, hmax, hctq, ⟨-, hloProd, -, -, -, -, -, -, -⟩, ⟨-, hupProd, -, -, -, -, -, -, -⟩,
     hcnegv, hrnegv, ⟨hltbit, -, -, -⟩, hcarry, ⟨-, -, -, -, -, -, hisc0res⟩, hdiv, hdivu, hrem,
     hremu, hdivw, hremw, hdivuw, hremuw, hov, ⟨-, -, -, -, -, -, hovbres⟩,
     ⟨-, -, -, -, -, -, hovcres⟩, hbm, hrm, hcm, hqm, hbn, hbnno, hbnnno, hirnw, hrn, hcn, hace,
     hare, hir, hrcm⟩ := h_input
-  obtain ⟨hSpecLo, hSpecUp, hgl0, hgl1, hgl2, hgl3, hglUp, hOwnH, bIr, bIrnw, bDiv, bDivu, bRem,
-    bRemu, bDivw, bRemw, bDivuw, bRemuw, hsum1, hsel, hByte, hByte2⟩ := h_spec
+  obtain ⟨hProduct, hOwnH, hSelection, hRange⟩ := h_spec
+  unfold ProductSpec at hProduct
+  obtain ⟨hSpecLo, hProduct⟩ := hProduct
+  obtain ⟨hSpecUp, hProduct⟩ := hProduct
+  obtain ⟨hglLo, hglUp⟩ := hProduct
+  rw [LowerProductPlacement] at hglLo
+  rw [UpperProductPlacement] at hglUp
+  change
+    input_is_real = 1 →
+      input_c_times_quotient[0] =
+          input_c_times_quotient_lower_product[0] +
+            input_c_times_quotient_lower_product[1] * 256 ∧
+        input_c_times_quotient[1] =
+          input_c_times_quotient_lower_product[2] +
+            input_c_times_quotient_lower_product[3] * 256 ∧
+        input_c_times_quotient[2] =
+          input_c_times_quotient_lower_product[4] +
+            input_c_times_quotient_lower_product[5] * 256 ∧
+        input_c_times_quotient[3] =
+          input_c_times_quotient_lower_product[6] +
+            input_c_times_quotient_lower_product[7] * 256 at hglLo
+  change
+    input_is_div + input_is_divu + input_is_rem + input_is_remu = 1 →
+      input_c_times_quotient[4] =
+          input_c_times_quotient_upper_product[8] +
+            input_c_times_quotient_upper_product[9] * 256 ∧
+        input_c_times_quotient[5] =
+          input_c_times_quotient_upper_product[10] +
+            input_c_times_quotient_upper_product[11] * 256 ∧
+        input_c_times_quotient[6] =
+          input_c_times_quotient_upper_product[12] +
+            input_c_times_quotient_upper_product[13] * 256 ∧
+        input_c_times_quotient[7] =
+          input_c_times_quotient_upper_product[14] +
+            input_c_times_quotient_upper_product[15] * 256 at hglUp
+  simp only [SelectionEvidenceSpec] at hSelection
+  obtain ⟨bIr, bIrnw, bDiv, bDivu, bRem, bRemu, bDivw, bRemw, bDivuw, bRemuw,
+    hsum1, hsel⟩ := hSelection
+  simp only [RangeSpec, Nat.cast_ofNat] at hRange
+  let hByte := hRange
   have hvals := DivRemChip.flags_val_sum bDivu bRemu bDiv bRem bDivw bRemw bDivuw bRemuw hsum1
   have bDR := DivRemChip.group_binary2 bDiv bRem (by omega)
   have bDRu := DivRemChip.group_binary2 bDivu bRemu (by omega)
@@ -832,19 +901,31 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Co
     rw [← hupProd, Vector.getElem_map]
   have eUpP15 : Expression.eval env.toEnvironment input_var_c_times_quotient_upper_product[15] = input_c_times_quotient_upper_product[15] := by
     rw [← hupProd, Vector.getElem_map]
-  refine ⟨⟨⟨fun h => hU1 h, bIr, fun h => absurd h zero_ne_one, bIr, Or.inl rfl, Or.inl rfl,
+  refine ⟨⟨⟨bIr, fun h => absurd h zero_ne_one, bIr, Or.inl rfl, Or.inl rfl,
       Or.inl rfl, Or.inl rfl, by simpa using bIr⟩, hSpecLo⟩,
-    ⟨⟨fun h => hU2 h, bIrnw, fun h => absurd h zero_ne_one, Or.inl rfl, bDR, bDRu, Or.inl rfl,
+    ⟨⟨bIrnw, fun h => absurd h zero_ne_one, Or.inl rfl, bDR, bDRu, Or.inl rfl,
       Or.inl rfl, by
         rcases DivRemChip.group_binary4 bDiv bRem bDivu bRemu (by omega) with h | h
         · left; linear_combination h
         · right; linear_combination h⟩, hSpecUp⟩, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
-    ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · simp only [eCtq0, eLoP0, eLoP1]; exact hgl0
-  · simp only [eCtq1, eLoP2, eLoP3]; exact hgl1
-  · simp only [eCtq2, eLoP4, eLoP5]; exact hgl2
-  · simp only [eCtq3, eLoP6, eLoP7]; exact hgl3
+    ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · simp only [eCtq0, eLoP0, eLoP1]
+    rcases bIr with h | h
+    · rw [h, zero_mul]
+    · rw [h, one_mul, (hglLo h).1, sub_self]
+  · simp only [eCtq1, eLoP2, eLoP3]
+    rcases bIr with h | h
+    · rw [h, zero_mul]
+    · rw [h, one_mul, (hglLo h).2.1, sub_self]
+  · simp only [eCtq2, eLoP4, eLoP5]
+    rcases bIr with h | h
+    · rw [h, zero_mul]
+    · rw [h, one_mul, (hglLo h).2.2.1, sub_self]
+  · simp only [eCtq3, eLoP6, eLoP7]
+    rcases bIr with h | h
+    · rw [h, zero_mul]
+    · rw [h, one_mul, (hglLo h).2.2.2, sub_self]
   · simp only [eCtq4, eUpP8, eUpP9]
     rcases DivRemChip.group_binary4 bDiv bDivu bRem bRemu (by omega) with h | h
     · rw [h, zero_mul]
@@ -994,15 +1075,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Co
     obtain ⟨c0, c1, c2, c3, c4, c5, c6, c7, fAc, fAr, fQ, fR, fCtq⟩ :=
       hByte (by linear_combination - hneg)
     exact byteRowSpec_of_isU16 (by simpa only [eCtq7] using fCtq 7 (by norm_num))
-  · constructor
-    · intro hneg
-      obtain ⟨w1, w2⟩ := hByte2 (by linear_combination - hneg)
-      exact byteRowSpec_of_isU16 (by simpa only [eR1] using w1)
-    · intro hneg
-      obtain ⟨w1, w2⟩ := hByte2 (by linear_combination - hneg)
-      exact byteRowSpec_of_isU16 (by simpa only [eQ1] using w2)
-
-
 set_option maxHeartbeats 16000000 in
 private theorem main_requirementsChannelsLawful (input_var : Var DivRemCols (ZMod p)) (i₀ : ℕ) :
     ((main input_var).operations i₀).RequirementsChannelsLawful
@@ -1063,32 +1135,23 @@ private theorem main_requirementsChannelsLawful (input_var : Var DivRemCols (ZMo
     have bRemuw := bool_of_mul_pred e339
     have hvals := DivRemChip.flags_val_sum bDivu bRemu bDiv bRem bDivw bRemw bDivuw bRemuw
       (by linear_combination - e367)
-    have bE2 := DivRemChip.group_binary4 bDivw bRemw bDivuw bRemuw (by omega)
     have h_pull_ir (msg : ByteRow (Expression (ZMod p))) :
         (byteChannel.pulledIf input_var.is_real msg).toRaw.Requirements env := by
       rw [ChannelInteraction.toRaw_requirements]
       intro h1 h0
       simp only [pulledIf_mult, circuit_norm] at h1 h0
       exact off_gate_vacuous bIr h1 h0
-    have h_pull_e2 (msg : ByteRow (Expression (ZMod p))) :
-        (byteChannel.pulledIf (input_var.is_divw + input_var.is_remw + input_var.is_divuw
-          + input_var.is_remuw) msg).toRaw.Requirements env := by
-      rw [ChannelInteraction.toRaw_requirements]
-      intro h1 h0
-      simp only [pulledIf_mult, circuit_norm] at h1 h0
-      exact off_gate_vacuous bE2 h1 h0
     simp only [Operations.InChannelsOrRequirements, Operations.forAllNoOffset_append,
       Operations.forAllNoOffset, DivRemChip.forAllNoOffset_map_assert, List.not_mem_nil,
       false_or, true_and, and_true]
     and_intros
     all_goals first
       | exact h_pull_ir _
-      | exact h_pull_e2 _
       | (intro e he; trivial)
 
 /-- The DivRem product/own-assert/byte-range assertion cluster as a Clean-native
 `FormalAssertion`: two composed `MulOperation` assertions, the eight product-glue asserts, the
-chip's own assertZero tail, and the 34 gated byte-range pulls over the committed row; no fresh
+chip's own assertZero tail, and the 32 gated byte-range pulls over the committed row; no fresh
 witnesses, semantic contract `DivRemCore.CoreSpec`. -/
 def circuit : FormalAssertion (ZMod p) DivRemCols :=
   { main, elaborated,
@@ -1108,4 +1171,3 @@ set_option linter.unusedSectionVars false in
     circuit.localLength x = 0 := rfl
 
 end SP1Clean.DivRemCore
-

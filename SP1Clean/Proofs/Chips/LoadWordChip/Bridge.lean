@@ -146,9 +146,8 @@ theorem correct_load_word_native
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 4 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 4 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hext : extend_value is_unsigned (data₃ ++ data₂ ++ data₁ ++ data₀) = val64)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀)
@@ -179,25 +178,22 @@ theorem correct_load_word_native
         h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
     rwa [hsp, SailState.get_reg?_insert_nextPC]
-  have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
-      = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
-  have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]?
-      = some data₀ := by rwa [hmem_eq, ← hadd]
-  have hm₁ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]?
-      = some data₁ := by rwa [hmem_eq, ← hadd]
-  have hm₂ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2]?
-      = some data₂ := by rwa [hmem_eq, ← hadd]
-  have hm₃ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 3]?
-      = some data₃ := by rwa [hmem_eq, ← hadd]
+  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]?
+      = some data₀ := by rwa [hmem_eq]
+  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]?
+      = some data₁ := by rwa [hmem_eq]
+  have hm₂ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 2]?
+      = some data₂ := by rwa [hmem_eq]
+  have hm₃ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]?
+      = some data₃ := by rwa [hmem_eq]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 4 = true := by
-    rwa [is_aligned_vaddr_iff_mod, hadd]
+    rwa [is_aligned_vaddr_iff_mod]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 4 (by omega) h_lo (by rwa [hadd])
+    range_subset_sp1_pma _ 4 (by omega) h_lo h_hi
   have hread := run_vmem_read_of_width_4' rs1_idx reg_val (BitVec.signExtend 64 imm)
-    data₀ data₁ data₂ data₃ sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range
+    data₀ data₁ data₂ data₃ sp hsp_init hsp_rs1 h_align' hsp_config h_in_range
     hm₀ hm₁ hm₂ hm₃
   simp only at hread
   rw [hsp] at hread
@@ -219,9 +215,8 @@ theorem lw_chip_reaches_sail
     (hmsb : input.msb = if input.selected_word[1].val ≥ 32768 then 1 else 0)
     (h_unsigned_msb : is_unsigned = true → input.msb = 0)
     (reg_val : BitVec 64)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 4 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 4 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 4 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some reg_val)
@@ -258,7 +253,7 @@ theorem lw_chip_reaches_sail
   exact correct_load_word_native rs1_idx rd_idx imm reg_val is_unsigned
     (BitVec.ofNat 8 input.selected_word[0].val) (BitVec.ofNat 8 (input.selected_word[0].val >>> 8))
     (BitVec.ofNat 8 input.selected_word[1].val) (BitVec.ofNat 8 (input.selected_word[1].val >>> 8))
-    _ pc s hs hconfig h_pc h_rs1 h_aligned h_fits h_hi h_lo hext hmem₀ hmem₁ hmem₂ hmem₃
+    _ pc s hs hconfig h_pc h_rs1 h_aligned h_hi h_lo hext hmem₀ hmem₁ hmem₂ hmem₃
 
 end SP1Clean.LoadWordSail
 
@@ -312,6 +307,20 @@ def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadWordColumns (ZMod p))
     #v[inp.selected_word[0], inp.selected_word[1], 65535 * inp.msb, 65535 * inp.msb],
     inp.is_lw * 31 + inp.is_lwu * 34, .regWrite⟩
 
+/-- LoadWord's exact aligned RAM-access projection. -/
+def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadWordColumns (ZMod p)) :
+    Trace.RamAccessView (ZMod p) :=
+  { compareLow := inp.memory_access.access_timestamp.compare_low
+    prevHigh := inp.memory_access.access_timestamp.prev_high
+    prevLow := inp.memory_access.access_timestamp.prev_low
+    diffLow := inp.memory_access.access_timestamp.diff_low_limb
+    diffHigh := inp.memory_access.access_timestamp.diff_high_limb
+    address := AddressOperation.alignedValue
+      ⟨inp.op_b_val, inp.op_c_imm, 0, 0, inp.offset_bit, LoadWordChip.isReal inp⟩
+      cols.address_operation
+    priorValue := inp.memory_access.prev_value
+    newValue := inp.memory_access.prev_value }
+
 /-- **LoadWord's `advanceReady` bundle**: routing (`op_a ≠ 0`), the low-pc-limb bound, the LW/LWU
 one-hot, the two loaded-limb bounds (`selected_word[i] < 2^16`), the **4-byte alignment**, the
 address bounds, and the **four-byte memory-read binding**. -/
@@ -321,12 +330,10 @@ def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadWordColumns (ZMo
   (inp.state.pc[0]).val < 2 ^ 16 ∧
   ((inp.is_lw = 1 ∧ inp.is_lwu = 0) ∨ (inp.is_lwu = 1 ∧ inp.is_lw = 0)) ∧
   inp.selected_word[0].val < 65536 ∧ inp.selected_word[1].val < 65536 ∧
-  ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 4 = 0 ∧
-  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 < 2 ^ 64 ∧
-  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 ≤ 2 ^ 48 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat % 4 = 0 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 4 ≤ 2 ^ 48 ∧
   2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
       + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
   s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
@@ -356,7 +363,8 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadWordColumns (ZMod 
     (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
     (hready : AdvanceReady inp cols prog s) :
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
-  obtain ⟨hnonX0, hpc0, hflag, hsel0, hsel1, h_aligned, h_fits, h_hi, h_lo, hmem₀, hmem₁, hmem₂, hmem₃⟩ := hready
+  obtain ⟨hnonX0, hpc0, hflag, hsel0, hsel1, h_aligned, h_hi, h_lo,
+    hmem₀, hmem₁, hmem₂, hmem₃⟩ := hready
   obtain ⟨_h_addr, _h_mem, h_msb_spec, _h_it, _h_limbsel, _h_op_a_0,
     h_lw_gate, _h_lw_bin, _h_lwu_bin, _h_real_bin⟩ := hspec
   obtain ⟨_hmsbbin, hmsbeq⟩ := h_msb_spec
@@ -374,7 +382,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadWordColumns (ZMod 
           rw [hlw, hlwu]; simp only [one_mul, zero_mul, add_zero]
           show (31 : ZMod p) = ((loadOpcode 4 false).toNat : ZMod p)
           rw [show (loadOpcode 4 false).toNat = 31 from by decide]; norm_num)
-      rfl rfl hnonX0 hpc0 rfl h_aligned h_fits h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃ ?_ rfl rfl
+      rfl rfl hnonX0 hpc0 rfl h_aligned h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃ ?_ rfl rfl
     exact loadWord_hval inp false hsel0 hsel1 (fun h1 => hmsbeq h1)
       (fun h => by rw [h, zero_sub, mul_neg_one, neg_eq_zero] at h_lw_gate; exact h_lw_gate)
       (Or.inl ⟨hlw, hlwu, rfl⟩)
@@ -390,7 +398,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadWordColumns (ZMod 
           rw [hlw, hlwu]; simp only [one_mul, zero_mul, zero_add]
           show (34 : ZMod p) = ((loadOpcode 4 true).toNat : ZMod p)
           rw [show (loadOpcode 4 true).toNat = 34 from by decide]; norm_num)
-      rfl rfl hnonX0 hpc0 rfl h_aligned h_fits h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃ ?_ rfl rfl
+      rfl rfl hnonX0 hpc0 rfl h_aligned h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃ ?_ rfl rfl
     exact loadWord_hval inp true hsel0 hsel1 (fun h1 => hmsbeq h1)
       (fun h => by rw [h, zero_sub, mul_neg_one, neg_eq_zero] at h_lw_gate; exact h_lw_gate)
       (Or.inr ⟨hlwu, hlw, rfl⟩)
@@ -400,6 +408,7 @@ def kind : Soundness.ChipKind p where
   Inputs := LoadWordChip.Inputs
   Cols := Extracted.LoadWordColumns
   view := rowView
+  ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => LoadWordChip.Spec inp cols data
   advanceReady := AdvanceReady
   advance := some (PLift.up advance)

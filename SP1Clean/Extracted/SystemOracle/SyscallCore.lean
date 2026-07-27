@@ -46,8 +46,8 @@ set_option maxRecDepth 100000 in
   let E7 : F := cols.values[3] * 256
   let E8 : F := cols.values[2] + E7
   [
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.values[2] 0), cols.values[9]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[3] 16 0), cols.values[9]⟩,
+    ⟨.send, (.byte 3 0 cols.values[2] 0), cols.values[9]⟩,
+    ⟨.send, (.byte 6 cols.values[3] 16 0), cols.values[9]⟩,
     ⟨.receive, (.raw .syscall [cols.values[0], cols.values[1], cols.values[2], cols.values[3], cols.values[4], cols.values[5], cols.values[6], cols.values[7], cols.values[8]]), cols.values[9]⟩,
     ⟨.send, (.raw .global [cols.values[0], cols.values[1], E8, cols.values[4], cols.values[5], cols.values[6], cols.values[7], cols.values[8], 1, 0, 8]), cols.values[9]⟩,
   ]

@@ -23,8 +23,10 @@ per row:
 - for op_a, two **byte** timestamp checks, gated by `is_real`.
 
 The genuine per-row constraints are the single `RegisterAccessCols` timestamp check (composed as a
-`subcircuit`) and the `op_a_0` binary + the four `op_a_0 * op_a_write_value_i = 0` zeroing gates
-(`rd = x0 ⇒ write 0`). The `.program`/`.memory` interactions' meaning is the trace-level multiset balance. -/
+`subcircuit`), the four `op_a_0 * op_a_write_value_i = 0` zeroing gates (`rd = x0 ⇒ write 0`), and the
+two selector gates emitted upstream for `is_real`/`is_trusted`. In particular, there is no standalone
+`op_a_0` boolean assertion: upstream derives that fact from the Program row on trusted rows.
+The `.program`/`.memory` interactions' meaning is the trace-level multiset balance. -/
 
 namespace SP1Clean.Readers.JTypeReader
 
@@ -36,12 +38,12 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 /-- Compose a single `RegisterAccessCols` for op_a (write at `clk_low + 4`) for the timestamp byte checks;
-impose the `op_a_0` binary + four zeroing gates; emit the Program bus (`imm_b = imm_c = 1`, op_b/op_c the
-immediate words) and the two op_a Memory interactions. -/
+impose the four zeroing gates; emit the Program bus (`imm_b = imm_c = 1`, op_b/op_c the immediate words)
+and the op_a read-prior Memory interaction. The Program guarantee supplies `op_a_0` booleanity on
+trusted rows, exactly as in the upstream AIR. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let cols := input.cols
   assertion RegisterAccessCols.circuit ⟨cols.op_a_memory, input.is_real, input.clk_low + 4⟩
-  cols.op_a_0 * (cols.op_a_0 - 1) === 0
   -- W11 polarity flip: the Program-bus instruction fetch is now a **`pullIf`** (the ROM provider pushes &
   -- proves `ProgramMsg.RowSpec`; this reader pulls & *derives* it — the decode bounds flow into the `Spec`).
   -- Local shallow `is_trusted` boolean gate so the pull's off-gate `Requirements` are vacuous, letting
@@ -87,7 +89,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
     · rw [Operations.subcircuitChannelsLawful_iff_forall]
       intro subcircuit h_subcircuit
       simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_subcircuit
-      rcases h_subcircuit with rfl | rfl | rfl | rfl | rfl | rfl <;>
+      rcases h_subcircuit with rfl | rfl | rfl | rfl | rfl <;>
         simp only [circuit_norm]
 
 set_option linter.unusedSectionVars false in
@@ -125,13 +127,13 @@ def ProverAssumptionsD (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
-  -- `h_holds`: the `RegisterAccessCols` sub, the `op_a_0` gate `hbin`, the inline `is_trusted` gate
-  -- `h_trust`, the **program pull's guarantee** `h_prog` (`ProgramMsg.RowSpec`), the zeroing gates, then the
-  -- **memory pull's guarantee** `h_mem_a` (`MemoryMsg.isU64` of op_a's `prev_value`, and — G1 —
+  -- `h_holds`: the `RegisterAccessCols` sub, the inline `is_trusted` gate `h_trust`, the **program pull's
+  -- guarantee** `h_prog` (`ProgramMsg.RowSpec`, including `op_a_0` booleanity), the zeroing gates, then
+  -- the **memory pull's guarantee** `h_mem_a` (`MemoryMsg.isU64` of op_a's `prev_value`, and — G1 —
   -- `MemoryMsg.ClkBound` of its `prev_low` access clock).
   simp only [circuit_norm, AssumptionsD, SpecD, memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound,
     programChannel] at h_holds h_assumptions ⊢
-  obtain ⟨h_rac_a, hbin, h_trust, h_prog, z0, z1, z2, z3, h_mem_a⟩ := h_holds
+  obtain ⟨h_rac_a, h_trust, h_prog, z0, z1, z2, z3, h_mem_a⟩ := h_holds
   have htbin := bool_of_mul_pred h_trust
   have e : ∀ i (hi : i < 3), Expression.eval env input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
@@ -140,16 +142,20 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   -- `prev_low` make the pull guarantee pair the Spec conjunct pair verbatim). Requirements: rac (Or.inr),
   -- program off-gate (vacuous), mem pull off-gate (vacuous). This reader has **no** memory push (op_a's
   -- write is factored into `Readers/RegisterWrite.circuit`), so it owes no `ClkBound` `Assumptions`.
-  refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin,
+  refine ⟨⟨⟨z0, z1, z2, z3⟩, (fun ht => ?_),
       h_rac_a h_assumptions.1, fun ht => ?_,
       fun ht2 => h_mem_a (by rw [show input_is_real = 1 from ht2])⟩,
     Or.inr h_assumptions.1,
     fun h1 h0 => off_gate_vacuous htbin h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0⟩
+  · exact (h_prog (by rw [show input_is_trusted = 1 from ht])).2.2.2.2
   -- Decode bounds are exactly the structural Program-channel guarantee.
-  obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [show input_is_trusted = 1 from ht])
-  rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
-  exact ⟨ha, hp0, hp1, hp2⟩
+  · obtain ⟨ha, hp0, hp1, hp2, _⟩ :=
+      h_prog (by rw [show input_is_trusted = 1 from ht])
+    rw [e 0 (by norm_num)] at hp0
+    rw [e 1 (by norm_num)] at hp1
+    rw [e 2 (by norm_num)] at hp2
+    exact ⟨ha, hp0, hp1, hp2⟩
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD
@@ -158,7 +164,8 @@ theorem completeness :
   simp only [ProverAssumptionsD] at h_assumptions
   obtain ⟨h_assumptions, h_spec⟩ := h_assumptions
   obtain ⟨hreal, htrust⟩ := h_assumptions
-  -- `h_spec` supplies the zeroing gates `z*`, the `op_a_0` binary `hbin`, the `RegisterAccessCols`
+  -- `h_spec` supplies the zeroing gates `z*`, Program-derived conditional `op_a_0` binary `hbin`,
+  -- the `RegisterAccessCols`
   -- sub-`Spec`, the gated decode bounds (now dropped — the program **pull** is supplied by `h_prog`'s
   -- `ProgTruth`, not derived from the Spec), and (W11 memory) the op_a `isU64` `hisu` — discharging the
   -- memory **pull** (the push does NOT appear in completeness goals).
@@ -168,21 +175,21 @@ theorem completeness :
   dsimp only at hbin htrust
   have e : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
-  refine ⟨⟨hreal, hrac_a⟩, ?_, ?_, ?_, z0, z1, z2, z3, ?_⟩
-  · rcases hbin with h | h <;> rw [h] <;> simp     -- `op_a_0` gate
+  refine ⟨⟨hreal, hrac_a⟩, ?_, ?_, z0, z1, z2, z3, ?_⟩
   · rcases htrust with h | h <;> rw [h] <;> simp   -- `is_trusted` gate
   · -- Prove the structural Program row from the semantic reader Spec.
     intro ht
     rw [e 0 (by norm_num), e 1 (by norm_num), e 2 (by norm_num)]
     obtain ⟨ha, hp0, hp1, hp2⟩ := hdec (neg_inj.mp ht)
-    exact ⟨ha, hp0, hp1, hp2, hbin⟩
+    exact ⟨ha, hp0, hp1, hp2, hbin (neg_inj.mp ht)⟩
   · -- mem pull: the guarantee pair (`isU64` of the whole `Word`, `ClkBound` of the message's `clk_low`,
     -- which *is* the block's `prev_low`) is the Spec's op_a conjunct pair verbatim.
     simp only [memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound]
     exact fun hneg => hisu (neg_inj.mp hneg)
 
-/-- The native J-type reader as a Clean `GeneralFormalCircuit`: composes a single `RegisterAccessCols` for op_a
-(write), imposes the `op_a_0` binary + zeroing gates, and emits the Program/Memory buses. -/
+/-- The native J-type reader as a Clean `GeneralFormalCircuit`: composes a single `RegisterAccessCols`
+for op_a, imposes the zeroing gates, and emits the Program/Memory buses. `op_a_0` booleanity is obtained
+from the Program guarantee on trusted rows rather than strengthened locally. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
   -- `byteChannel` dropped (W11 Phase 0c); `programChannel` dropped (W11 flip — now pulled, its off-gate
   -- requirement vacuous via the inline `is_trusted` gate). Only the Memory bus's requirements remain.

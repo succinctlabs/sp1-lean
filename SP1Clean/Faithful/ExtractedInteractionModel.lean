@@ -18,8 +18,9 @@ Clean models the byte lookup as a **pull** — `byteChannel.pullIf is_real` → 
 multiplicity `-is_real` on `byteChannel.toRaw` (`Operations/AddOperation/Extracted.lean`). SP1's
 `send_byte` is the dual **source** endpoint (`Extracted/AddOperation.lean`: `⟨.send, .byte 6 v 16 0,
 is_real⟩`). Same physical lookup, opposite source/sink convention — so the `.byte` arm records the
-**sink** sign `signedVal (-mult)`, matching Clean's pull, while the message tuple `[op.idx, a, b, c]`
-already matches field-for-field. The dynamic buses (State/Memory/Program) use the natural `Dir.sign`
+**sink** sign `signedVal (-mult)`, matching Clean's pull, while the message tuple
+`[opcode.val, a.val, b.val, c.val]` preserves Rust's raw field-valued opcode. The dynamic buses
+(State/Memory/Program) use the natural `Dir.sign`
 (`pushIf` send `+mult`, receive `-mult`) — byte is the sole *pull* bus
 (`Foundations/Channels.lean` `byteChannel` docstring), hence its hardcoded `-mult`. -/
 
@@ -70,8 +71,9 @@ projection total; `CoreAIR.Current.Balance.Valid` compares the exact raw payload
 through this encoding. -/
 def Interaction.toAccess (intr : Interaction (ZMod p)) : LookupAccess :=
   match intr.payload with
-  | .byte op a b c =>
-      (InteractionKind.Byte, "SP1Byte", [op.idx, a.val, b.val, c.val], signedVal (- intr.mult))
+  | .byte opcode a b c =>
+      (InteractionKind.Byte, "SP1Byte",
+        [opcode.val, a.val, b.val, c.val], signedVal (- intr.mult))
   | .state a b c d e =>
       (InteractionKind.State, "SP1State",
         [a.val, b.val, c.val, d.val, e.val], signedVal (intr.dir.sign intr.mult))
@@ -90,9 +92,10 @@ def Interaction.toAccess (intr : Interaction (ZMod p)) : LookupAccess :=
 
 /-- The `.byte` arm of `Interaction.toAccess` as a `rfl`-`simp` lemma (independent of the `Dir`, which
 the byte arm ignores — it records the sink sign `-mult`). Drives the syntactic faithfulness proofs. -/
-@[simp] lemma Interaction.toAccess_byte (op : ByteOpcode) (a b c mult : ZMod p) (d : Dir) :
-    (⟨d, .byte op a b c, mult⟩ : Interaction (ZMod p)).toAccess
-      = (InteractionKind.Byte, "SP1Byte", [op.idx, a.val, b.val, c.val], signedVal (-mult)) :=
+@[simp] lemma Interaction.toAccess_byte (opcode a b c mult : ZMod p) (d : Dir) :
+    (⟨d, .byte opcode a b c, mult⟩ : Interaction (ZMod p)).toAccess
+      = (InteractionKind.Byte, "SP1Byte",
+        [opcode.val, a.val, b.val, c.val], signedVal (-mult)) :=
   rfl
 
 end SP1Clean.Extracted

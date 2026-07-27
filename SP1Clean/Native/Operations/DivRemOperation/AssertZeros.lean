@@ -36,6 +36,13 @@ set_option linter.unusedSectionVars false in
   | cons e es ih => exact ih
 
 set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma shallowConstraints_map_assert (es : List (Expression (ZMod p))) :
+    Operations.shallowConstraints (es.map fun e => (Operation.assert e)) = es := by
+  induction es with
+  | nil => rfl
+  | cons e es ih => simp only [List.map_cons, Operations.shallowConstraints, ih]
+
+set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma forAll_map_assert (offset : ℕ) (cond : Condition (ZMod p))
     (es : List (Expression (ZMod p))) :
     Operations.forAll offset cond (es.map fun e => (Operation.assert e))
@@ -82,6 +89,13 @@ set_option linter.unusedSectionVars false in
   induction es with
   | nil => rfl
   | cons e es ih => simp [Operations.interactions, List.map_cons, ih]
+
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma lookups_map_assert (es : List (Expression (ZMod p))) :
+    Operations.lookups (es.map fun e => (Operation.assert e)) = [] := by
+  induction es with
+  | nil => rfl
+  | cons e es ih => simp [Operations.lookups, List.map_cons, ih]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma shallowInteractions_map_assert (es : List (Expression (ZMod p))) :

@@ -41,6 +41,78 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 -- `local` so this convenience instance does not leak into importing files.
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
+/-- Component-wise evaluation of the ALU reader input bundle.  Keeping this folded projection next
+to the reader avoids repeatedly normalizing the derived `ProvableStruct` instance in whole-chip
+faithfulness proofs. -/
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ cols := Eval.eval env input.cols, is_real := Eval.eval env input.is_real,
+         is_trusted := Eval.eval env input.is_trusted,
+         clk_high := Eval.eval env input.clk_high, clk_low := Eval.eval env input.clk_low,
+         pc := Eval.eval env input.pc, opcode := Eval.eval env input.opcode,
+         wv0 := Eval.eval env input.wv0, wv1 := Eval.eval env input.wv1,
+         wv2 := Eval.eval env input.wv2, wv3 := Eval.eval env input.wv3 } :
+        Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Component-wise evaluation of the nested register-access block. -/
+@[circuit_norm] theorem eval_accessCols {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RegisterAccessCols (Expression F)) :
+    Eval.eval env cols =
+      ({ prev_value := Eval.eval env cols.prev_value,
+         access_timestamp := Eval.eval env cols.access_timestamp } :
+        Extracted.RegisterAccessCols F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Component-wise evaluation of the canonical immediate-capable ALU reader row.  Chip-level
+grounding proofs use this folded boundary instead of normalizing a completed reader circuit. -/
+@[circuit_norm] theorem eval_cols {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.ALUTypeReader (Expression F)) :
+    Eval.eval env cols =
+      ({ op_a := Eval.eval env cols.op_a,
+         op_a_memory := Eval.eval env cols.op_a_memory,
+         op_a_0 := Eval.eval env cols.op_a_0,
+         op_b := Eval.eval env cols.op_b,
+         op_b_memory := Eval.eval env cols.op_b_memory,
+         op_c := Eval.eval env cols.op_c,
+         op_c_memory := Eval.eval env cols.op_c_memory,
+         imm_c := Eval.eval env cols.imm_c } : Extracted.ALUTypeReader F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Evaluation of the destination-zero routing flag through the folded ALU reader row. -/
+@[circuit_norm] theorem eval_opA0 {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.ALUTypeReader (Expression F)) :
+    (Eval.eval env cols).op_a_0 = Expression.eval env cols.op_a_0 := by
+  rw [eval_cols]
+  simp only [circuit_norm]
+
+/-- Scalar immediate-selector projection through the folded ALU reader row. -/
+@[circuit_norm] theorem eval_immC {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.ALUTypeReader (Expression F)) :
+    (Eval.eval env cols).imm_c = Expression.eval env cols.imm_c := by
+  rw [eval_cols]
+  simp only [circuit_norm]
+
+/-- Source-C word projection through the folded ALU reader row. -/
+@[circuit_norm] theorem eval_opC {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.ALUTypeReader (Expression F)) :
+    (Eval.eval env cols).op_c = Eval.eval env cols.op_c := by
+  rw [eval_cols]
+
+/-- Source-C prior-value projection through the folded nested register-access row. -/
+@[circuit_norm] theorem eval_opCPrev {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.ALUTypeReader (Expression F)) :
+    (Eval.eval env cols).op_c_memory.prev_value =
+      Eval.eval env cols.op_c_memory.prev_value := by
+  rw [eval_cols]
+  change (Eval.eval env cols.op_c_memory).prev_value =
+    Eval.eval env cols.op_c_memory.prev_value
+  rw [eval_accessCols]
+
 /-- Compose a `RegisterAccessCols` sub-assertion per operand (op_a/op_b gated `is_real` at clocks
 `clk_low + 4/3`, op_c gated `is_real - imm_c` at `clk_low + 2`), impose the `op_a_0` binary gate, the
 `imm_c` boolean/immediate gates, and emit the Program (`is_trusted`) + Memory (`±is_real`, op_c `±(is_real
@@ -98,6 +170,60 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   memoryChannel.pushIf (input.is_real - cols.imm_c)
     (⟨input.clk_high, input.clk_low + 2, cols.op_c[0], 0, 0,
       cols.op_c_memory.prev_value⟩ : MemoryMsg (Expression (ZMod p)))
+
+set_option linter.unusedSectionVars false in
+private theorem equalityConstraint_mem (x y : Expression (ZMod p)) (offset : ℕ) :
+    x - y ∈ FlatOperation.constraints
+      (((Gadgets.Equality.main (M := field) (x, y)).operations offset).toFlat) := by
+  simp [Gadgets.Equality.main, Circuit.forEach.operations_eq, circuit_norm]
+  change x - y ∈ [x - y]
+  simp
+
+/-- The reader's four immediate-consistency assertions bind the retained source-C value whenever
+`imm_c = 1`.  This is a physical AIR fact, exposed without invoking the reader's semantic `Spec` or
+any Memory guarantee, so `advanceReady` proofs can consume it before timed Memory grounding. -/
+theorem eval_opCPrev_eq_opC_of_mainConstraints
+    (input : Var Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
+    (constraints : Operations.ConstraintsHold env ((main input).operations offset))
+    (immediate : Expression.eval env input.cols.imm_c = 1) :
+    Eval.eval env input.cols.op_c_memory.prev_value = Eval.eval env input.cols.op_c := by
+  have limb (i : Fin 4) :
+      Expression.eval env input.cols.op_c_memory.prev_value[i] =
+        Expression.eval env input.cols.op_c[i] := by
+    have constrained :
+        Expression.eval env
+          (input.cols.imm_c *
+            (input.cols.op_c_memory.prev_value[i] - input.cols.op_c[i]) - 0) = 0 := by
+      apply constraints.1
+      simp only [main, circuit_norm]
+      fin_cases i
+      · right; right; right; right; right; right; left
+        simpa only [Gadgets.Equality.circuit, FormalAssertion.toSubcircuit,
+          Operations.toNested_toFlat] using equalityConstraint_mem
+          (input.cols.imm_c *
+            (input.cols.op_c_memory.prev_value[0] - input.cols.op_c[0])) 0 _
+      · right; right; right; right; right; right; right; left
+        simpa only [Gadgets.Equality.circuit, FormalAssertion.toSubcircuit,
+          Operations.toNested_toFlat] using equalityConstraint_mem
+          (input.cols.imm_c *
+            (input.cols.op_c_memory.prev_value[1] - input.cols.op_c[1])) 0 _
+      · right; right; right; right; right; right; right; right; left
+        simpa only [Gadgets.Equality.circuit, FormalAssertion.toSubcircuit,
+          Operations.toNested_toFlat] using equalityConstraint_mem
+          (input.cols.imm_c *
+            (input.cols.op_c_memory.prev_value[2] - input.cols.op_c[2])) 0 _
+      · right; right; right; right; right; right; right; right; right; left
+        simpa only [Gadgets.Equality.circuit, FormalAssertion.toSubcircuit,
+          Operations.toNested_toFlat] using equalityConstraint_mem
+          (input.cols.imm_c *
+            (input.cols.op_c_memory.prev_value[3] - input.cols.op_c[3])) 0 _
+    simp only [eval_sub, Expression.eval, immediate, one_mul, sub_zero] at constrained
+    exact sub_eq_zero.mp constrained
+  apply Vector.ext
+  intro i hi
+  have left := ProvableType.getElem_eval_fields env input.cols.op_c_memory.prev_value i hi
+  have right := ProvableType.getElem_eval_fields env input.cols.op_c i hi
+  exact left.symm.trans ((limb ⟨i, hi⟩).trans right)
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0

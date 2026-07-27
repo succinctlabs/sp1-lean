@@ -154,19 +154,11 @@ entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` inste
   struct *size*, `subcircuit` consumes full *localLength*), making the default `output_eq` false — place such
   a subcircuit **last** in the return struct, or supply a custom offset-based `output`. This bites Mul/Div
   (compose witnessing `U16toU8`); Lt does **not** (composes `U16Compare` as a `localLength-0` assertion).
-- **Shifts (SRL/SRA/SRLW/SRAW), in progress as a *chip skeleton* (no operation gadget).** SP1 inlines the
-  limb decomposition of the register read into the chip asserts, so `ShiftRightChip` is a skeleton: `main`
-  emits the ~58 inline `=== 0` asserts + 9 byte-range pulls, the semantic flag-gated `Spec` is in
-  `FormalModel/Contracts/Chips.lean`, and the native arithmetic is ported into `Native/Operations/ShiftRightMath.lean` (all four
-  variant `*_close_su16_*_case` lemmas, axiom-clean). The `Spec` shifts the **register reads**
-  (`adapter.op_b_memory.prev_value` by `op_c_memory.prev_value`), not a separate `op_b_val`. The **SRL
-  soundness conjunct is fully proven** (conversion + Stage A + the 4×16 leaf dispatch into `srl_close_su16_*`),
-  and **both faithful anchors** are proven & axiom-clean. The `sra_div_to_bitvec_{false,true}` conversion
-  helpers (SRA's `b_msb` case-split) are in place. **Remaining:** the SRA/SRLW/SRAW `Spec` conjuncts (each
-  reuses the SRL dispatch skeleton across the msb/sign-fill cases — SRA ~2× SRL), the three `U16MSB`
-  subcircuit `Assumptions`, and completeness (a deferred `sorry`; needs a `populate` + `ProverHint` opcode
-  threading). See `proof-patterns.md` "Bit-shift chip soundness". **Mul/Div** are a later track (Mul's
-  carry-chain witnessing + `output_eq` + completeness are still open).
+- **Shifts (SRL/SRA/SRLW/SRAW).** SP1 inlines the limb decomposition of the register read into the chip
+  assertions. Keep the expensive shift values folded and use the abstract-`BitVec` helper pattern in
+  `Proofs/Chips/ShiftRightChip/` and `ShiftLeftChip/`; all variants, completeness, Sail bridges, and
+  whole-chip faithfulness are now proved. Mul and DivRem are likewise completed and are useful examples
+  of splitting pure arithmetic evidence from one whole-chip row proof.
 - **Memory chips (LoadDouble / StoreDouble are the templates).** A memory op composes one extra subcircuit —
   `Readers.MemoryAccess.circuit` (the real-48-bit-address `send prev` / `receive new` pair + the timestamp
   gates) — between the address gadget and the adapter, and the address is the **`AddressOperation` gadget**

@@ -5,6 +5,8 @@
 # Sail/Word or a generated AIR expression whose single dependency closure cannot be chunked — the KEEP-set),
 # bump the number below in the same PR with a one-line justification in the commit.
 # Ratcheting DOWN is always welcome — lower these when you remove overrides.
-# +1: pinned Global AIR's single-output algebraic closure has ~1,300 shared IR bindings.
-SP1Clean 461
+# +288: exact whole-chip list faithfulness for all 25 instruction AIRs (+238 Faithful sites),
+# completed 4.31 chip proofs (+30 Proofs), and the timed-grounding rollout (+20 Soundness/Native);
+# these are folded generated-expression closures, not higher ceilings on existing declarations.
+SP1Clean 749
 SP1CleanTest 16

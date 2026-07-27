@@ -64,6 +64,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var UTypeColumns (ZMo
   addend[1] - input.is_auipc * input.state.pc[1] === 0
   addend[2] - input.is_auipc * input.state.pc[2] === 0
   input.is_auipc * (input.is_auipc - 1) === 0
+  -- Upstream's `when_not(is_real).assert_zero(op_a_0)`.  Besides matching the
+  -- Rust AIR on padding rows, this makes the add gate `is_real - op_a_0`
+  -- boolean without assuming a prover-side padding convention.
+  assertZero ((input.is_real - 1) * input.adapter.op_a_0)
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
   -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
   assertZero (input.is_real * (input.is_real - 1))
@@ -73,5 +77,36 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var UTypeColumns (ZMo
 from `main`, and reuses its structural certificates instead of reducing the full operation list. -/
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs UTypeColumns main := by
   elaborate_circuit
+
+/-- The explicit completed row, kept folded for whole-chip row codecs and faithfulness proofs. -/
+@[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter,
+        #v[var ⟨offset⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩],
+        ⟨Vector.mapRange 4 fun i => var { index := offset + 3 + i }⟩,
+        input.is_auipc, input.is_real⟩ :
+        Var UTypeColumns (ZMod p)) := rfl
+
+/-- Component-wise evaluation of UType's independent input row. -/
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
+         adapter := Eval.eval env input.adapter,
+         is_auipc := Eval.eval env input.is_auipc } : Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Component-wise evaluation of UType's completed output row. -/
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : UTypeColumns (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
+         addend := Eval.eval env cols.addend,
+         add_operation := Eval.eval env cols.add_operation,
+         is_auipc := Eval.eval env cols.is_auipc,
+         is_real := Eval.eval env cols.is_real } : UTypeColumns F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
 
 end SP1Clean.UTypeChip

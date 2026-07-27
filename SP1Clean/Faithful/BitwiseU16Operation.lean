@@ -36,7 +36,19 @@ lemma constrain_iff_byteOp {x a b : ZMod p} {opcode : ZMod p} (hop : opcode.val 
   interval_cases h : opcode.val <;>
     simp [ByteOpcode.constrain, byteOp]
 
-omit [Fact (2 ^ 17 < p)] in
+/-- Raw-opcode form of `constrain_iff_byteOp`. The first conjunct is now an exact statement about
+the field element carried by Rust's byte bus, rather than a lossy eager enum decode. -/
+lemma constrainField_iff_byteOp {x a b : ZMod p} {opcode : ZMod p}
+    (hop : opcode.val < 3) :
+    ByteOpcode.constrainField opcode x a b ↔
+      (x.val < 256 ∧ a.val < 256 ∧ b.val < 256) ∧
+        x.val = byteOp opcode.val a.val b.val := by
+  haveI : NeZero p := ⟨(Nat.Prime.pos Fact.out).ne'⟩
+  have hdecode := ByteOpcode.constrainField_natCast
+    (p := p) (k := opcode.val) (by omega) x a b
+  rw [ZMod.natCast_zmod_val] at hdecode
+  exact hdecode.trans (constrain_iff_byteOp hop)
+
 set_option linter.unusedSimpArgs false in
 /-- **Faithfulness anchor.** SP1's `BitwiseOperation` constraint list (the eight byte-opcode
 sends) holds iff the native per-byte `byteOp` relation holds — the relation the witnessed
@@ -56,6 +68,6 @@ theorem bitwise_byte_constraints_faithful
   haveI : NeZero p := ⟨(Nat.Prime.pos Fact.out).ne'⟩
   simp only [Extracted.BitwiseOperation.asserts, Extracted.BitwiseOperation.interactions, List.Forall,
     Interaction.toProp_send_byte, ne_eq, one_ne_zero, not_false_eq_true, true_implies,
-    true_and, and_true, ConstraintCoe.coe_eq_val, constrain_iff_byteOp hop]
+    true_and, and_true, constrainField_iff_byteOp hop]
 
 end SP1Clean.FaithfulBitwise

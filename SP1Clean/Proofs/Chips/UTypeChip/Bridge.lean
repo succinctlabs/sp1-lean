@@ -149,7 +149,8 @@ can be supplied *as* `kind.advance` (see `AddChip.rowView`). -/
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.UTypeColumns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.add_operation.value,
-    inp.is_auipc * 48 + (1 - inp.is_auipc) * 49, .regWrite⟩
+    inp.is_auipc * 48 + (1 - inp.is_auipc) * 49,
+    .destination cols.adapter.op_a_0⟩
 
 /-- **`UTypeChip.advance`** — the per-U-type-row `try_step` lift (SC Phase 4): a 2-branch adapter over
 `advance_of_utype` (LUI `is_auipc = 0`, opcode 49; AUIPC `is_auipc = 1`, opcode 48). No register reads
@@ -157,8 +158,8 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.UTypeColumns (ZMod p)) : T
 shared core's pc-frame). Each branch discharges the `advance_of_utype` write-value obligation from the Spec's
 gated `RV64.lui`/`RV64.auipc` conjunct: `immOf_bind` connects the chip's `immOf` to the decoded immediate,
 `RV64.lui`/`auipc_eq_add_lui` reduce to the Sail `execute_UTYPE_pure`, and the `pcWord` reassembly ties the
-AUIPC pc to `rcvPcOf`. The `advanceReady` bundle is the pc-limb bound, the `is_auipc` binary, `op_a_0 = 0`
-(`rd ≠ x0`), and `op_a ≠ 0` — all dispatcher-discharged. Stated to match the `ChipKind.advance` obligation. -/
+AUIPC pc to `rcvPcOf`. The same table also accepts `rd = x0`; that branch reuses the straight-line
+architectural no-write core and does not require a result equation. -/
 theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.UTypeColumns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
@@ -166,16 +167,16 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.UTypeColumns (ZMod p))
     (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
     (_hvalb : ValueOperandsBound (rowView inp cols) s)
     (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
-    (hready : cols.state.pc[0].val < 2 ^ 16 ∧ (inp.is_auipc = 0 ∨ inp.is_auipc = 1) ∧
-      cols.adapter.op_a_0 = 0 ∧ (rowView inp cols).adapter.op_a ≠ 0) :
+    (hready : cols.state.pc[0].val < 2 ^ 16 ∧ (inp.is_auipc = 0 ∨ inp.is_auipc = 1)) :
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
-  obtain ⟨hpc0, hauipc_bin, hopa0, hnonX0⟩ := hready
+  obtain ⟨hpc0, hauipc_bin⟩ := hready
   have hreal' : inp.is_real = 1 := hreal
   have hlui := hspec.2.2.2.1
   have hauipc := hspec.2.2.2.2
   set r := rowView inp cols with hr
   have vrd : r.rdWrite = cols.add_operation.value := rfl
   have vopb : cols.adapter.op_b_imm = r.adapter.op_b := rfl
+  have vopa0 : r.adapter.op_a_0 = cols.adapter.op_a_0 := rfl
   have himmc : r.adapter.imm_c = 1 := rfl
   have reassemble : Word.toBitVec64 (UTypeChip.pcWord cols)
       = pcBitsOfVals (cols.state.pc[0].val) (cols.state.pc[1].val) (cols.state.pc[2].val) := by
@@ -183,21 +184,59 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.UTypeColumns (ZMod p))
     congr 1; rw [Word.toNat_def]
     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
       List.getElem_cons_succ, ZMod.val_zero]; ring
-  rcases hauipc_bin with h0 | h1
-  · have hop : r.opcode = ((uopToOpcode uop.LUI).toNat : ZMod p) := by
-      simp [hr, rowView, h0, uopToOpcode, Opcode.toNat]
-    refine advance_of_utype uop.LUI hcfg hrom hpcread hdecrom hop himmc hnonX0 hpc0 rfl ?_
-    intro imm hopb
-    have himmof : UTypeChip.immOf cols.adapter = imm := immOf_bind imm cols.adapter (vopb.trans hopb)
-    rw [vrd, hlui hreal' hopa0 h0, himmof]; simp [execute_UTYPE_pure, RV64.lui, sign_extend]
-  · have hop : r.opcode = ((uopToOpcode uop.AUIPC).toNat : ZMod p) := by
-      simp [hr, rowView, h1, uopToOpcode, Opcode.toNat]
-    refine advance_of_utype uop.AUIPC hcfg hrom hpcread hdecrom hop himmc hnonX0 hpc0 rfl ?_
-    intro imm hopb
-    have himmof : UTypeChip.immOf cols.adapter = imm := immOf_bind imm cols.adapter (vopb.trans hopb)
-    have hpcword : Word.toBitVec64 (UTypeChip.pcWord cols) = rcvPcOf (stateAccess r) := reassemble
-    rw [vrd, hauipc hreal' hopa0 h1, himmof, hpcword, UTypeChip.auipc_eq_add_lui]
-    simp [execute_UTYPE_pure, RV64.lui, sign_extend]
+  have opAFlag : cols.adapter.op_a_0 = 0 ∨ cols.adapter.op_a_0 = 1 :=
+    hspec.1.2.1 hreal'
+  rcases opAFlag with hopa0 | hopa1
+  · have hnonX0 : r.adapter.op_a ≠ 0 := by
+      apply hdecrom.op_a_ne_zero_of_op_a_0_eq_zero
+      simpa only [programAccess, ProgramAccess.toRow] using vopa0.trans hopa0
+    have commitEq : r.commit = Trace.CommitEffect.regWrite := by
+      rw [hr]
+      simp [rowView, Trace.CommitEffect.destination, hopa0]
+    have hwrites : r.commit.writesReg = true := by
+      simp only [commitEq, Trace.CommitEffect.regWrite]
+    have hnomem : r.commit.memWrite = none := by
+      simp only [commitEq, Trace.CommitEffect.regWrite]
+    rcases hauipc_bin with h0 | h1
+    · have hop : r.opcode = ((uopToOpcode uop.LUI).toNat : ZMod p) := by
+        simp [hr, rowView, h0, uopToOpcode, Opcode.toNat]
+      refine advance_of_utype uop.LUI hcfg hrom hpcread hdecrom hop himmc hnonX0 hpc0 rfl ?_
+        (hwrites := hwrites) (hnomem := hnomem)
+      intro imm hopb
+      have himmof : UTypeChip.immOf cols.adapter = imm :=
+        immOf_bind imm cols.adapter (vopb.trans hopb)
+      rw [vrd, hlui hreal' hopa0 h0, himmof]
+      simp [execute_UTYPE_pure, RV64.lui, sign_extend]
+    · have hop : r.opcode = ((uopToOpcode uop.AUIPC).toNat : ZMod p) := by
+        simp [hr, rowView, h1, uopToOpcode, Opcode.toNat]
+      refine advance_of_utype uop.AUIPC hcfg hrom hpcread hdecrom hop himmc hnonX0 hpc0 rfl ?_
+        (hwrites := hwrites) (hnomem := hnomem)
+      intro imm hopb
+      have himmof : UTypeChip.immOf cols.adapter = imm :=
+        immOf_bind imm cols.adapter (vopb.trans hopb)
+      have hpcword : Word.toBitVec64 (UTypeChip.pcWord cols) = rcvPcOf (stateAccess r) :=
+        reassemble
+      rw [vrd, hauipc hreal' hopa0 h1, himmof, hpcword, UTypeChip.auipc_eq_add_lui]
+      simp [execute_UTYPE_pure, RV64.lui, sign_extend]
+  · have hopaZero : r.adapter.op_a = 0 := by
+      apply hdecrom.op_a_eq_zero_of_op_a_0_eq_one
+      simpa only [programAccess, ProgramAccess.toRow] using vopa0.trans hopa1
+    have commitEq : r.commit = Trace.CommitEffect.noWrite := by
+      rw [hr]
+      simp [rowView, Trace.CommitEffect.destination, hopa1]
+    have hnowrite : r.commit.writesReg = false := by
+      simp only [commitEq, Trace.CommitEffect.noWrite]
+    have hnomem : r.commit.memWrite = none := by
+      simp only [commitEq, Trace.CommitEffect.noWrite]
+    rcases hauipc_bin with h0 | h1
+    · have hop : r.opcode = ((uopToOpcode uop.LUI).toNat : ZMod p) := by
+        simp [hr, rowView, h0, uopToOpcode, Opcode.toNat]
+      exact advance_of_utype_x0 uop.LUI hcfg hrom hpcread hdecrom hop himmc hopaZero
+        hpc0 rfl hnowrite hnomem
+    · have hop : r.opcode = ((uopToOpcode uop.AUIPC).toNat : ZMod p) := by
+        simp [hr, rowView, h1, uopToOpcode, Opcode.toNat]
+      exact advance_of_utype_x0 uop.AUIPC hcfg hrom hpcread hdecrom hop himmc hopaZero
+        hpc0 rfl hnowrite hnomem
 
 /-- U-type's `ChipKind` registration. `view` threads straight-line `next_pc`, J-type adapter, opcode
 `is_auipc·48 + (1-is_auipc)·49`; `advance` dispatches the LUI/AUIPC cases through the corresponding local
@@ -209,8 +248,7 @@ def kind : Soundness.ChipKind p where
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧
-    (inp.is_auipc = 0 ∨ inp.is_auipc = 1) ∧ cols.adapter.op_a_0 = 0 ∧
-    (rowView inp cols).adapter.op_a ≠ 0
+    (inp.is_auipc = 0 ∨ inp.is_auipc = 1)
   advance := some (PLift.up advance)
 
 end SP1Clean.UTypeChip

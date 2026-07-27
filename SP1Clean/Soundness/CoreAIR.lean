@@ -3,18 +3,22 @@ import SP1Clean.FormalModel.Execution
 
 /-! # Auditable Core AIR capstone
 
-This is the public deterministic soundness layer for the pinned baseline Core AIR.  Its source is
-the exact Rust row/assertion/interaction relation in `Faithful/CoreAIR.lean`; its target is the
+This is the public deterministic refinement boundary for the pinned baseline Core AIR.  Its source
+is the exact Rust row/assertion/interaction relation in `Faithful/CoreAIR.lean`; its target is the
 eventful SP1/Sail shard relation in `FormalModel/Execution.lean`.
 
-The table proofs are intentionally collected as named fields below.  This keeps the headline theorem
-small without hiding its hard work in an opaque `airValid → executionValid` field.  The decoder is a
-total function of the statement and AIR witness, so this bundle can be used directly as ArkLib's
-post-extraction map.  AIR validity authenticates that already-decoded data; it does not choose it.
+The still-open table proofs are intentionally collected as named fields below.  This makes the
+remaining semantic work auditable, but the bundle is not currently instantiated: in particular,
+`executionCase` is the system-table grounding theorem that must connect the exact upstream rows to an
+eventful Sail segment.  Accordingly the proved combinators are named `_of_obligations`; the unqualified
+`sp1_air_refinement` and `sp1_air_sound` names remain reserved for a closed construction of this bundle.
+The decoder is a total function of the statement and AIR witness, so the eventual construction can be
+used directly as ArkLib's post-extraction map.  AIR validity authenticates already-decoded data; it
+does not choose it.
 
-`commitRowProvenance` is the one temporary upstream premise.  It says that introducing either rolling
-commit flag is accompanied by all eight corresponding syscall rows.  The ordinary proof obligations
-still have to derive each row's digest operand from the extracted constraints. -/
+The shard theorem proves only the forward AIR fact: every COMMIT row that exists has the correct
+digest operand.  Complete eight-row coverage is a separate whole-execution contract of the pinned
+program's standard halt wrapper; no rolling commit flag is treated as row provenance here. -/
 
 namespace SP1Clean.Soundness
 
@@ -95,38 +99,28 @@ structure CoreAIRRefinementObligations {Digest : Type}
 namespace CoreAIRRefinementObligations
 
 omit [Fact (2 ^ 17 < p)] in
-/-- Combine the temporary row-existence premise with the proved per-row operand equations.
-
-The distinction is load-bearing: provenance contributes only the existence of each canonical row;
-`publicCommitOperand` and `deferredCommitOperand` must still come from the exact SyscallInstrs AIR. -/
+/-- Package the two proved per-existing-row operand equations.  This theorem deliberately has no
+coverage premise and draws no converse from either rolling commit flag. -/
 theorem commitRowsMatch {Digest : Type}
     {binds : CoreAIR.Current.PreprocessedBinding p Digest}
     {handler : Machine.SyscallHandler} {programBinding : ProgramBinding p Digest}
     (proofs : CoreAIRRefinementObligations binds handler programBinding)
-    (commitRowProvenance : CoreAIR.SystemSemanticAssumptions
-      (CoreAIR.Current.system binds) .execution (CoreAIR.Current.eventDecoder binds)
-      (fun statement => CoreAIR.PublicCommitIntroduced statement.publicValues)
-      (fun statement => CoreAIR.DeferredCommitIntroduced statement.publicValues))
     (statement : SP1ShardStatement (ZMod p) Digest)
     (witness : CoreAIR.Witness (CoreAIR.Current.Row p))
     (valid : CoreAIR.Current.Relation binds .execution statement witness) :
     CoreAIR.CommitRowsMatch statement.publicValues
       (proofs.decode statement witness).syscallEvents := by
   constructor
-  · intro introduced index
-    obtain ⟨event, eventMem, canonical, indexEq⟩ :=
-      commitRowProvenance.publicCommitRows statement witness valid introduced index
-    refine ⟨event, ?_, canonical, indexEq, ?_⟩
-    · rw [proofs.syscallTranscript statement witness valid]
+  · intro event eventMem index canonical indexEq
+    have sourceMem : event ∈ CoreAIR.Current.syscallEvents witness := by
+      rw [← proofs.syscallTranscript statement witness valid]
       exact eventMem
-    · exact proofs.publicCommitOperand statement witness valid event eventMem index canonical indexEq
-  · intro introduced index
-    obtain ⟨event, eventMem, canonical, indexEq⟩ :=
-      commitRowProvenance.deferredCommitRows statement witness valid introduced index
-    refine ⟨event, ?_, canonical, indexEq, ?_⟩
-    · rw [proofs.syscallTranscript statement witness valid]
+    exact proofs.publicCommitOperand statement witness valid event sourceMem index canonical indexEq
+  · intro event eventMem index canonical indexEq
+    have sourceMem : event ∈ CoreAIR.Current.syscallEvents witness := by
+      rw [← proofs.syscallTranscript statement witness valid]
       exact eventMem
-    · exact proofs.deferredCommitOperand statement witness valid event eventMem index canonical indexEq
+    exact proofs.deferredCommitOperand statement witness valid event sourceMem index canonical indexEq
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Assemble the explicit boundary/execution proof fields into the public shard-case proposition. -/
@@ -148,19 +142,16 @@ theorem shardCase {Digest : Type}
 
 end CoreAIRRefinementObligations
 
-/-- **Constructive baseline Core AIR refinement.**
+/-- **Conditional constructive baseline Core AIR refinement.**
 
 The returned map is the exact postprocessor an ArkLib knowledge extractor should compose with.  This
 theorem is deterministic and has no cryptographic claim: ArkLib must separately establish extraction
 of a witness satisfying `CoreAIR.Current.Relation binds .execution`, including interaction balance
-and the committed preprocessed trace. -/
-def sp1_air_refinement {Digest : Type}
+and the committed preprocessed trace.  It is conditional on the explicit, currently uninstantiated
+`CoreAIRRefinementObligations` bundle. -/
+def sp1_air_refinement_of_obligations {Digest : Type}
     (binds : CoreAIR.Current.PreprocessedBinding p Digest)
     (handler : Machine.SyscallHandler) (programBinding : ProgramBinding p Digest)
-    (commitRowProvenance : CoreAIR.SystemSemanticAssumptions
-      (CoreAIR.Current.system binds) .execution (CoreAIR.Current.eventDecoder binds)
-      (fun statement => CoreAIR.PublicCommitIntroduced statement.publicValues)
-      (fun statement => CoreAIR.DeferredCommitIntroduced statement.publicValues))
     (proofs : CoreAIRRefinementObligations binds handler programBinding) :
     WitnessRelation.FunctionalRefinement (CoreAIR.Current.Relation binds .execution)
       (SP1CoreShardExecutionRelation .base handler programBinding) where
@@ -175,24 +166,22 @@ def sp1_air_refinement {Digest : Type}
       programBound := proofs.programBound statement witness valid
       entryPoint := proofs.entryPoint statement witness valid
       firstExecutionShard := proofs.firstExecutionShard statement witness valid
-      commitRows := proofs.commitRowsMatch commitRowProvenance statement witness valid
+      commitRows := proofs.commitRowsMatch statement witness valid
       shardCase := proofs.shardCase statement witness valid }
 
 omit [Fact (2 ^ 17 < p)] in
-/-- **Pinned baseline Core AIR soundness.**
+/-- **Conditional pinned baseline Core AIR soundness.**
 
 This is the existential corollary used by relation-level clients.  Proof-system integrations should
-prefer `sp1_air_refinement`, which retains the explicit deterministic witness decoder. -/
-theorem sp1_air_sound {Digest : Type}
+prefer `sp1_air_refinement_of_obligations`, which retains the explicit deterministic witness decoder.
+The unqualified `sp1_air_sound` name is deliberately not declared until the obligations have a closed
+construction from the exact AIR relation and disclosed external contracts. -/
+theorem sp1_air_sound_of_obligations {Digest : Type}
     (binds : CoreAIR.Current.PreprocessedBinding p Digest)
     (handler : Machine.SyscallHandler) (programBinding : ProgramBinding p Digest)
-    (commitRowProvenance : CoreAIR.SystemSemanticAssumptions
-      (CoreAIR.Current.system binds) .execution (CoreAIR.Current.eventDecoder binds)
-      (fun statement => CoreAIR.PublicCommitIntroduced statement.publicValues)
-      (fun statement => CoreAIR.DeferredCommitIntroduced statement.publicValues))
     (proofs : CoreAIRRefinementObligations binds handler programBinding) :
     WitnessRelation.Sound (CoreAIR.Current.Relation binds .execution)
       (SP1CoreShardExecutionRelation .base handler programBinding) :=
-  (sp1_air_refinement binds handler programBinding commitRowProvenance proofs).sound
+  (sp1_air_refinement_of_obligations binds handler programBinding proofs).sound
 
 end SP1Clean.Soundness

@@ -290,6 +290,64 @@ def instrToProgramRow (pc : Vector (ZMod p) 3) : instruction → Option (Program
   | _ => none
 
 omit [Fact (2 ^ 17 < p)] in
+/-- Every successfully decoded Program row carries the canonical `op_a_0` indicator.  This is the
+decode-side half of SP1's `rd == x0` routing discipline; individual chip constraints pin the flag to
+the branch of the dispatcher they implement. -/
+theorem instrToProgramRow_op_a_0 {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramRow (ZMod p)} (h : instrToProgramRow pc i = some row) :
+    row.op_a_0 = if row.op_a = 0 then 1 else 0 := by
+  cases i <;> simp_all [instrToProgramRow] <;> rw [← h]
+
+/-- Every register-shaped operand in a successfully projected instruction is a genuine five-bit
+register index.  Immediate operands are deliberately excluded by their `imm_b`/`imm_c` gates: their
+low limbs need not be below 32.  This is the family-independent decode fact required by Memory
+grounding, and avoids re-inverting the instruction separately for every multi-opcode chip. -/
+theorem instrToProgramRow_register_bounds {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramRow (ZMod p)} (h : instrToProgramRow pc i = some row) :
+    row.op_a.val < 32 ∧
+      (row.imm_b = 0 → row.op_b[0].val < 32) ∧
+      (row.imm_c = 0 → row.op_c[0].val < 32) := by
+  cases i <;> simp only [instrToProgramRow] at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst row)
+  all_goals simp [regidxVal_val_lt]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Every successfully projected instruction marks each operand as either a register (`0`) or an
+immediate (`1`).  This is decode provenance for conditional Memory traffic, not a trace-generator
+assumption. -/
+theorem instrToProgramRow_immediate_flags_binary {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramRow (ZMod p)} (h : instrToProgramRow pc i = some row) :
+    (row.imm_b = 0 ∨ row.imm_b = 1) ∧ (row.imm_c = 0 ∨ row.imm_c = 1) := by
+  cases i <;> simp only [instrToProgramRow] at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst row)
+  all_goals simp
+
+/-- Every word obtained from an actual 64-bit bit-vector has four canonical 16-bit limbs.  This is
+the decode-side range fact used when an immediate operand is not carried by the Memory bus. -/
+theorem isU64_bitVecToWord (v : BitVec 64) : Word.isU64 (bitVecToWord (p := p) v) := by
+  have hp : (2 : ℕ) ^ 17 < p := Fact.out
+  have hlt : ∀ i, (BitVec.extractLsb' i 16 v).toNat < 2 ^ 16 :=
+    fun i => (BitVec.extractLsb' i 16 v).isLt
+  have hltp : ∀ i, (BitVec.extractLsb' i 16 v).toNat < p := fun i => by
+    have := hlt i
+    omega
+  refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
+    (simp only [bitVecToWord, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ]; rw [ZMod.val_natCast_of_lt (hltp _)]; exact hlt _)
+
+/-- Immediate operands in a successfully projected instruction are canonical 64-bit words.  The
+claim is conditional because register-shaped operand slots carry indices rather than values. -/
+theorem instrToProgramRow_immediate_words_isU64 {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramRow (ZMod p)} (h : instrToProgramRow pc i = some row) :
+    (row.imm_b = 1 → Word.isU64 row.op_b) ∧
+      (row.imm_c = 1 → Word.isU64 row.op_c) := by
+  cases i <;> simp only [instrToProgramRow] at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst row)
+  all_goals simp [isU64_bitVecToWord]
+  all_goals simp [Word.isU64]
+  all_goals intro i; fin_cases i <;> norm_num
+
+omit [Fact (2 ^ 17 < p)] in
 /-- The R-type projection, unfolded — the committed Program-bus column shape an `RTYPE` decode produces
 (`op_a = rd`, `op_b[0] = rs1`, `op_c[0] = rs2`, high limbs and immediate flags `0`, opcode the SP1
 discriminant). The definitional spec of `instrToProgramRow` on R-type, the anchor a W7 `try_step` decode
@@ -555,6 +613,112 @@ theorem decodedInROM.decodes {prog : GuestProgram} {row : ProgramRow (ZMod p)}
   obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
   exact ⟨w, I, hfetch, hrun s hs, instrToProgramRow'_some hrow⟩
 
+omit [Fact (2 ^ 17 < p)] in
+/-- The official Sail instruction families routed by SP1's `AluX0` chip.  Immediate ALU and shift
+forms are included explicitly: SP1 reuses the corresponding register opcode and distinguishes
+them with `imm_c`. -/
+def IsCoreAluInstruction : instruction → Prop
+  | .RTYPE _ | .ITYPE _ | .SHIFTIOP _ | .ADDIW _ | .RTYPEW _ | .SHIFTIWOP _
+  | .MUL _ | .DIV _ | .REM _ | .MULW _ | .DIVW _ | .REMW _ => True
+  | _ => False
+
+/-- A projected Program row whose SP1 opcode lies in `0..28` comes from exactly one of the Sail
+instruction families handled by `AluX0`.  This is the semantic counterpart of Rust's
+`opcode < 29` byte lookup; it avoids maintaining a second hand-written list of `(opcode, imm_c)`
+pairs in the chip bridge. -/
+theorem instrToProgramRow_isCoreAlu_of_opcode_lt
+    {pc : Vector (ZMod p) 3} {i : instruction} {row : ProgramRow (ZMod p)}
+    (projected : instrToProgramRow pc i = some row) (opcode_lt : row.opcode.val < 29) :
+    IsCoreAluInstruction i := by
+  have opcodeVal (opcode : Opcode) :
+      ((opcode.toNat : ZMod p)).val = opcode.toNat :=
+    ZMod.val_natCast_of_lt (lt_trans (opcode_toNat_lt opcode)
+      (by have := Fact.out (p := 2 ^ 17 < p); omega))
+  have notLt (opcode : Opcode) (outside : 29 ≤ opcode.toNat) :
+      ¬ ((opcode.toNat : ZMod p)).val < 29 := by
+    rw [opcodeVal]
+    omega
+  have uopOutside (op : uop) : 29 ≤ (uopToOpcode op).toNat := by
+    cases op <;> decide
+  have bopOutside (op : bop) : 29 ≤ (bopToOpcode op).toNat := by
+    cases op <;> decide
+  have loadOutside (width : word_width) (isU : Bool) :
+      29 ≤ (loadOpcode width isU).toNat := by
+    simp only [loadOpcode]
+    split_ifs <;> decide
+  have storeOutside (width : word_width) : 29 ≤ (storeOpcode width).toNat := by
+    simp only [storeOpcode]
+    split_ifs <;> decide
+  simp only [instrToProgramRow] at projected
+  split at projected
+  all_goals first | contradiction | (rw [Option.some.injEq] at projected; subst row)
+  all_goals simp only [IsCoreAluInstruction]
+  all_goals first | trivial | (
+    apply notLt _ ?_ opcode_lt
+    first
+    | exact uopOutside _
+    | exact bopOutside _
+    | exact loadOutside _ _
+    | exact storeOutside _
+    | decide)
+
+/-- Program-specific ROM grounding inherits the family-independent register-index bounds of the
+decoded instruction.  Consumers use the immediate gates to request bounds only for operands that
+actually emit register Memory traffic. -/
+theorem decodedInROM.register_bounds {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row) :
+    row.op_a.val < 32 ∧
+      (row.imm_b = 0 → row.op_b[0].val < 32) ∧
+      (row.imm_c = 0 → row.op_c[0].val < 32) := by
+  obtain ⟨-, instruction, -, -, projected⟩ := h
+  exact instrToProgramRow_register_bounds (instrToProgramRow'_some projected)
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Program grounding inherits the two canonical immediate-selector bits of the decoded
+instruction. -/
+theorem decodedInROM.immediate_flags_binary {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row) :
+    (row.imm_b = 0 ∨ row.imm_b = 1) ∧ (row.imm_c = 0 ∨ row.imm_c = 1) := by
+  obtain ⟨-, instruction, -, -, projected⟩ := h
+  exact instrToProgramRow_immediate_flags_binary (instrToProgramRow'_some projected)
+
+/-- Program-grounded immediate operands inherit the canonical `isU64` representation of the
+official decode projection. -/
+theorem decodedInROM.immediate_words_isU64 {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row) :
+    (row.imm_b = 1 → Word.isU64 row.op_b) ∧
+      (row.imm_c = 1 → Word.isU64 row.op_c) := by
+  obtain ⟨-, instruction, -, -, projected⟩ := h
+  exact instrToProgramRow_immediate_words_isU64 (instrToProgramRow'_some projected)
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Program grounding exposes the canonical `op_a_0` indicator without choosing an execution state. -/
+theorem decodedInROM.op_a_0_eq_indicator {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row) :
+    row.op_a_0 = if row.op_a = 0 then 1 else 0 := by
+  obtain ⟨-, i, -, -, hrow⟩ := h
+  exact instrToProgramRow_op_a_0 (instrToProgramRow'_some hrow)
+
+omit [Fact (2 ^ 17 < p)] in
+/-- A decoded row whose canonical zero-register flag is zero has a nonzero `op_a`. -/
+theorem decodedInROM.op_a_ne_zero_of_op_a_0_eq_zero
+    {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row) (flagZero : row.op_a_0 = 0) : row.op_a ≠ 0 := by
+  intro opAZero
+  have indicator := h.op_a_0_eq_indicator
+  rw [if_pos opAZero, flagZero] at indicator
+  exact zero_ne_one indicator
+
+omit [Fact (2 ^ 17 < p)] in
+/-- A decoded row whose canonical zero-register flag is one has `op_a = 0`. -/
+theorem decodedInROM.op_a_eq_zero_of_op_a_0_eq_one
+    {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row) (flagOne : row.op_a_0 = 1) : row.op_a = 0 := by
+  by_contra opANeZero
+  have indicator := h.op_a_0_eq_indicator
+  rw [if_neg opANeZero, flagOne] at indicator
+  exact one_ne_zero indicator
+
 /-- **The I-type decode inversion (W7), generic over the op.** The I-type twin of
 `instrToProgramRow_inv_rtype`: if a decoded `i` projects to a committed row whose opcode is `op`'s
 (`iopToOpcode`) and whose `imm_c = 1`, then `i` *is* `ITYPE (imm, rs1, rd, op)`, with the operand columns
@@ -592,14 +756,106 @@ theorem instrToProgramRow_inv_itype {pc : Vector (ZMod p) 3} {i : instruction}
     exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
   · rename_i imm rs1 rd isU width
     exact absurd (opcodeCast_inj hop)
-      (by cases isU <;> cases op <;> (simp only [loadOpcode, iopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+      (by cases isU <;> cases op <;>
+        (simp only [loadOpcode, iopToOpcode, Opcode.toNat]; split_ifs <;> decide))
   · rename_i imm rs2 rs1 width
     exact absurd (opcodeCast_inj hop)
-      (by cases op <;> (simp only [storeOpcode, iopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+      (by cases op <;>
+        (simp only [storeOpcode, iopToOpcode, Opcode.toNat]; split_ifs <;> decide))
   · rename_i shamt rs1 rd op'
     exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
   · rename_i shamt rs1 rd op'
     exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
+
+/-- **The 64-bit shift-immediate decode inversion.** The normalized shift opcode together with
+`imm_c = 1` distinguishes `.SHIFTIOP` from the register shift carrying the same opcode. -/
+theorem instrToProgramRow_inv_shiftitype {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramRow (ZMod p)} (op : sop)
+    (h : instrToProgramRow pc i = some row)
+    (hop : row.opcode = ((sopToOpcode op).toNat : ZMod p))
+    (himm : row.imm_c = (1 : ZMod p)) :
+    ∃ (shamt : BitVec 6) (rs1 rd : regidx), i = .SHIFTIOP (shamt, rs1, rd, op) ∧
+      row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0] ∧
+      row.op_c = bitVecToWord (shamt.setWidth 64) := by
+  have honezero : (1 : ZMod p) ≠ 0 := by
+    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    exact one_ne_zero
+  simp only [instrToProgramRow] at h
+  split at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst h)
+  all_goals (try (exact absurd himm.symm honezero))
+  · rename_i imm rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i imm rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i imm rd
+    exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
+  · rename_i imm rs2 rs1 op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i imm rs1 rd isU width
+    exact absurd (opcodeCast_inj hop)
+      (by cases isU <;> cases op <;>
+        (simp only [loadOpcode, sopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs2 rs1 width
+    exact absurd (opcodeCast_inj hop)
+      (by cases op <;>
+        (simp only [storeOpcode, sopToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i shamt rs1 rd op'
+    have hz : (sopToOpcode op').toNat = (sopToOpcode op).toNat := opcodeCast_inj hop
+    obtain rfl : op' = op := by
+      cases op' <;> cases op <;> first | rfl | (exact absurd hz (by decide))
+    exact ⟨shamt, rs1, rd, rfl, rfl, rfl, rfl⟩
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
+
+/-- **The word shift-immediate decode inversion.** As above for `.SHIFTIWOP` and its five-bit
+shift amount. -/
+theorem instrToProgramRow_inv_shiftiwtype {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramRow (ZMod p)} (op : sopw)
+    (h : instrToProgramRow pc i = some row)
+    (hop : row.opcode = ((sopwToOpcode op).toNat : ZMod p))
+    (himm : row.imm_c = (1 : ZMod p)) :
+    ∃ (shamt : BitVec 5) (rs1 rd : regidx), i = .SHIFTIWOP (shamt, rs1, rd, op) ∧
+      row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0] ∧
+      row.op_c = bitVecToWord (shamt.setWidth 64) := by
+  have honezero : (1 : ZMod p) ≠ 0 := by
+    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    exact one_ne_zero
+  simp only [instrToProgramRow] at h
+  split at h
+  all_goals first | contradiction | (rw [Option.some.injEq] at h; subst h)
+  all_goals (try (exact absurd himm.symm honezero))
+  · rename_i imm rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i imm rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i imm rd
+    exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
+  · rename_i imm rs1 rd
+    exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
+  · rename_i imm rs2 rs1 op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i imm rs1 rd isU width
+    exact absurd (opcodeCast_inj hop)
+      (by cases isU <;> cases op <;>
+        (simp only [loadOpcode, sopwToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i imm rs2 rs1 width
+    exact absurd (opcodeCast_inj hop)
+      (by cases op <;>
+        (simp only [storeOpcode, sopwToOpcode, Opcode.toNat]; split_ifs <;> decide))
+  · rename_i shamt rs1 rd op'
+    exact absurd (opcodeCast_inj hop) (by cases op' <;> cases op <;> decide)
+  · rename_i shamt rs1 rd op'
+    have hz : (sopwToOpcode op').toNat = (sopwToOpcode op).toNat := opcodeCast_inj hop
+    obtain rfl : op' = op := by
+      cases op' <;> cases op <;> first | rfl | (exact absurd hz (by decide))
+    exact ⟨shamt, rs1, rd, rfl, rfl, rfl, rfl⟩
   · rename_i imm rs1 rd
     exact absurd (opcodeCast_inj hop) (by cases op <;> decide)
 
@@ -735,13 +991,10 @@ theorem decodesRTypew {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : ro
 limb-extracts of a 64-bit value recovers it. Gives both the I-type immediate binding
 (`toBitVec64 op_c = signExtend imm`) and `bitVecToWord` injectivity (the imm-uniqueness `decodesIType` rides). -/
 theorem toBitVec64_bitVecToWord (v : BitVec 64) : Word.toBitVec64 (bitVecToWord (p := p) v) = v := by
-  have hp : (2:ℕ) ^ 17 < p := Fact.out
+  have hp : (2 : ℕ) ^ 17 < p := Fact.out
   have hlt : ∀ i, (BitVec.extractLsb' i 16 v).toNat < 2 ^ 16 := fun i => (BitVec.extractLsb' i 16 v).isLt
   have hltp : ∀ i, (BitVec.extractLsb' i 16 v).toNat < p := fun i => by have := hlt i; omega
-  have hRU : Word.isU64 (bitVecToWord (p := p) v) := by
-    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
-      (simp only [bitVecToWord, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ]; rw [ZMod.val_natCast_of_lt (hltp _)]; exact hlt _)
+  have hRU := isU64_bitVecToWord (p := p) v
   rw [← BitVec.toNat_inj, Word.toBitVec64_toNat hRU, Word.toNat]
   simp only [bitVecToWord, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ]
@@ -775,6 +1028,42 @@ theorem decodesIType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : iop
     instrToProgramRow_inv_itype op (instrToProgramRow'_some hrow) hop himm
   obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
   exact ⟨w, imm, rs1, rd, hfetch, hrun, ha, hb, hc⟩
+
+/-- The configured-state decode producer for 64-bit shift-immediate instructions. -/
+theorem decodesShiftIType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : sop)
+    (h : decodedInROM prog row)
+    (hop : row.opcode = ((sopToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 1) :
+    ∃ (w : BitVec 32) (shamt : BitVec 6) (rs1 rd : BitVec 5),
+      prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (∀ sc, SailConfigured sc → (ext_decode w).run sc
+        = .ok (instruction.SHIFTIOP (shamt, .Regidx rs1, .Regidx rd, op)) sc) ∧
+      row.op_a = (rd.toNat : ZMod p) ∧
+      row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
+      row.op_c = bitVecToWord (shamt.setWidth 64) := by
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨shamt, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_shiftitype op (instrToProgramRow'_some hrow) hop himm
+  obtain ⟨rs1⟩ := rs1r
+  obtain ⟨rd⟩ := rdr
+  exact ⟨w, shamt, rs1, rd, hfetch, hrun, ha, hb, hc⟩
+
+/-- The configured-state decode producer for word shift-immediate instructions. -/
+theorem decodesShiftIWType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : sopw)
+    (h : decodedInROM prog row)
+    (hop : row.opcode = ((sopwToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 1) :
+    ∃ (w : BitVec 32) (shamt : BitVec 5) (rs1 rd : BitVec 5),
+      prog.fetchWord (pcBitsOfRow row) = some w ∧
+      (∀ sc, SailConfigured sc → (ext_decode w).run sc
+        = .ok (instruction.SHIFTIWOP (shamt, .Regidx rs1, .Regidx rd, op)) sc) ∧
+      row.op_a = (rd.toNat : ZMod p) ∧
+      row.op_b = #v[(rs1.toNat : ZMod p), 0, 0, 0] ∧
+      row.op_c = bitVecToWord (shamt.setWidth 64) := by
+  obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
+  obtain ⟨shamt, rs1r, rdr, rfl, ha, hb, hc⟩ :=
+    instrToProgramRow_inv_shiftiwtype op (instrToProgramRow'_some hrow) hop himm
+  obtain ⟨rs1⟩ := rs1r
+  obtain ⟨rd⟩ := rdr
+  exact ⟨w, shamt, rs1, rd, hfetch, hrun, ha, hb, hc⟩
 
 /-- **The ∀-configured-state ADDIW decode producer** — the `.ADDIW` twin of `decodesIType`, keyed on the
 committed `(opcode = ADDW, imm_c = 1)`. Recovers `w` + `imm/rs1/rd` with the decode holding in every

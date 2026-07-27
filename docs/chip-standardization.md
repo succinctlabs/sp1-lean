@@ -80,19 +80,17 @@ row-local structural guarantees, while the timed/ranked grounding engine derives
 - live Memory/register currency; and
 - the `advanceReady` inputs.
 
-The first two are proved for the supported native witness. The last two form the live
-`supportedCore_orderedRows_dynamic` seam. `TypedInteractions.lean` and `TypedMemory.lean` now transport
-facts from the exact evaluated circuit interactions; `TypedMemory.lean`'s generic
-`CircuitRegisterOperandPullContract` + `Proofs/Chips/AddChip/Contracts.lean` supply Add's first full
-operand contract. Extending that pattern across the registry is machine-grounding work, not another
-per-chip transition migration.
+All four are proved for the supported native witness. `TypedInteractions.lean` and
+`TypedMemory.lean` transport facts from the exact evaluated circuit interactions, and the
+registry-wide `ChipGroundingContracts` instances supply every chip's operand and readiness contract.
 
 ## Faithfulness boundary
 
 The `advance` proof establishes semantic conformance of the native chip. It does not by itself prove that
 the native chip is SP1's Rust AIR. The independent whole-chip `ChipFaithful` layer compares the complete
-assertion system and all four interaction multisets through one explicit row reconfiguration. Add and Sub
-currently have that final anchor; remaining operation/fragment anchors are transitional evidence.
+assertion system and all four interaction multisets through one explicit row reconfiguration. All 25
+supported instruction chips now have that final anchor; remaining operation/fragment anchors are
+transitional implementation evidence.
 
 ## References
 
@@ -101,5 +99,6 @@ currently have that final anchor; remaining operation/fragment anchors are trans
 - `SP1Clean/Soundness/ChipRegistry.lean` — registry projection and 25/25 migration theorem.
 - `SP1Clean/Proofs/Sail/Advance.lean` — shared Sail execution cores.
 - `SP1Clean/Soundness/LocalExecution.lean` — generic row dispatcher and Sail-chain construction.
-- `SP1Clean/Soundness/TypedMemory.lean` (generic transport) + `SP1Clean/Proofs/Chips/AddChip/Contracts.lean` — first exact operand contract.
+- `SP1Clean/Soundness/TypedMemory.lean` and `SP1Clean/Soundness/ChipContracts.lean` — generic transport
+  and the registry-wide grounding contracts.
 - [`architecture.md`](architecture.md) and [`roadmap.md`](roadmap.md) — whole-machine context.

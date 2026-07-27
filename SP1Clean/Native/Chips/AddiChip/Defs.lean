@@ -61,6 +61,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AddiCols (ZMod p)
   assertion Readers.RegisterWrite.circuit
     ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
      input.adapter.op_a, value, input.is_real⟩
+  -- Rust routes ADDI rows only when the decoded destination is not x0.  This is the second assertion
+  -- in the extracted chip tail and must be verifier-enforced rather than merely prover-supplied.
+  input.adapter.op_a_0 === 0
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
   -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
   assertZero (input.is_real * (input.is_real - 1))
@@ -80,5 +83,41 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddiCols main where
   -- `memoryChannel` joins from `ITypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+
+/-- The explicit completed row, used by chip-boundary proofs without unfolding the composed `main`. -/
+@[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter,
+        ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩, input.is_real⟩ :
+        Var AddiCols (ZMod p)) := rfl
+
+/-- Component-wise evaluation of Addi's independent input row. -/
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
+         adapter := Eval.eval env input.adapter } : Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Component-wise evaluation of Addi's completed output row. -/
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : AddiCols (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
+         add_operation := Eval.eval env cols.add_operation,
+         is_real := Eval.eval env cols.is_real } : AddiCols F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_inputState {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (Eval.eval env input).state = Eval.eval env input.state := by
+  rw [eval_inputs]
+
+@[circuit_norm] theorem eval_inputAdapter {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (Eval.eval env input).adapter = Eval.eval env input.adapter := by
+  rw [eval_inputs]
 
 end SP1Clean.AddiChip

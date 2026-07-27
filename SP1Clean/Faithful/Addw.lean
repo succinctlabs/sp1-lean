@@ -38,7 +38,8 @@ theorem addw_constraints_faithful (a b : Word (ZMod p)) (cols : Extracted.AddwOp
   simp only [Extracted.AddwOperation.asserts, Extracted.AddwOperation.interactions]
   rw [forall_append_pair, u16msb_constraints_faithful]
   refine and_congr Iff.rfl ?_
-  simp only [List.Forall, Interaction.toProp_send_byte, ByteOpcode.ofNat_six, ByteOpcode.constrain_Range, val_16,
+  simp only [List.Forall, Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
+    ByteOpcode.constrain_Range, val_16,
     one_ne_zero, ne_eq, not_false_eq_true, true_implies, AddwOperation.RawSpec, one_mul, add_zero,
     sub_self, mul_zero, true_and, and_true, bool_iff, show (2 : ℕ) ^ 16 = 65536 from by norm_num]
   tauto
@@ -82,6 +83,6 @@ theorem addw_interactions_faithful_syntactic
       ⟨input.cols.value[1], input.cols.msb, input.is_real⟩ _
       cols.value[1] cols.msb.msb is_real h_ir h_v1 h_msb
   · simp only [hk, circuit_norm, Extracted.Interaction.toAccess_byte,
-      ByteOpcode.ofNat_six, ByteOpcode.idx, h_ir, h_v0, h_v1, h6]
+      h_ir, h_v0, h_v1, h6]
 
 end SP1Clean.Faithful

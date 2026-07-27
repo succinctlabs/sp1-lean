@@ -149,7 +149,7 @@ theorem branch_chip_reaches_sail
     (cols.is_bgeu = 1 →
         (spec_btype imm (.Regidx rs2) (.Regidx rs1) bop.BGEU).run s
           = (sp1_branch (BranchChip.nextPcWord cols)).run s) := by
-  obtain ⟨_, _, h_flags, h_taken_gated, h_fall_gated, h_decision, h_div⟩ := h_chip
+  obtain ⟨_, _, h_flags, _, h_taken_gated, h_fall_gated, h_decision, h_div⟩ := h_chip
   -- 4-byte alignment is now a verified `Spec` conjunct (the in-circuit `÷4` range check), not an assumed
   -- precondition: lift the low-limb divisibility to the committed `next_pc` word.
   have h_align : (Word.toBitVec64 (BranchChip.nextPcWord cols)).toNat % 4 = 0 := by
@@ -214,17 +214,12 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.BranchColumns (ZMod p)
     (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
     (hvalb : ValueOperandsBound (rowView inp cols) s)
     (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
-    (hready : (∀ idx : BitVec 5, (idx.toNat : ZMod p) = cols.adapter.op_a →
-         s.get_reg? idx = some (Word.toBitVec64 cols.adapter.op_a_memory.prev_value)) ∧
-      ((cols.is_beq = 1 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧ cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
-       (cols.is_bne = 1 ∧ cols.is_beq = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧ cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
-       (cols.is_blt = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_bge = 0 ∧ cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
-       (cols.is_bge = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧ cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
-       (cols.is_bltu = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧ cols.is_bgeu = 0) ∨
-       (cols.is_bgeu = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧ cols.is_bltu = 0))) :
+    (hready : ∀ idx : BitVec 5, (idx.toNat : ZMod p) = cols.adapter.op_a →
+      s.get_reg? idx = some (Word.toBitVec64 cols.adapter.op_a_memory.prev_value)) :
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
-  obtain ⟨hopa_bind, hflag⟩ := hready
-  obtain ⟨_, _, h_flags, h_taken_gated, h_fall_gated, h_decision, h_div⟩ := hspec
+  have hopa_bind := hready
+  obtain ⟨_, _, h_flags, h_oneHot, h_taken_gated, h_fall_gated, h_decision, h_div⟩ := hspec
+  have hflag := h_oneHot hreal
   have hreal' : inp.is_real = 1 := hreal
   set r := rowView inp cols with hr
   have himmc : r.adapter.imm_c = 1 := rfl
@@ -311,14 +306,8 @@ def kind : Soundness.ChipKind p where
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun _inp cols _ s =>
-    (∀ idx : BitVec 5, (idx.toNat : ZMod p) = cols.adapter.op_a →
-       s.get_reg? idx = some (Word.toBitVec64 cols.adapter.op_a_memory.prev_value)) ∧
-    ((cols.is_beq = 1 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧ cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
-     (cols.is_bne = 1 ∧ cols.is_beq = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧ cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
-     (cols.is_blt = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_bge = 0 ∧ cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
-     (cols.is_bge = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧ cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
-     (cols.is_bltu = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧ cols.is_bgeu = 0) ∨
-     (cols.is_bgeu = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧ cols.is_bltu = 0))
+    ∀ idx : BitVec 5, (idx.toNat : ZMod p) = cols.adapter.op_a →
+      s.get_reg? idx = some (Word.toBitVec64 cols.adapter.op_a_memory.prev_value)
   advance := some (PLift.up advance)
 
 end SP1Clean.BranchChip

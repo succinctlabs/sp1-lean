@@ -448,6 +448,30 @@ lemma sig_bool_of_class {f : Vector (ZMod p) 8} (hclass : FlagClasses f) :
   · right; rw [h0, h2, zero_add, zero_add]; exact hcl
   · left; exact hcl
 
+/-- If the gated populated remainder-negation cell is one, the unsigned-word flags are absent.
+This is the exact flag fact needed to identify `remainder_comp` with `remainder` in the Add
+subcircuit completeness case. -/
+lemma flags67_eq_zero_of_remNeg_mul_eq_one (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
+    (ir : ZMod p)
+    (hf0 : f[0] = 0 ∨ f[0] = 1) (hf1 : f[1] = 0 ∨ f[1] = 1)
+    (hf2 : f[2] = 0 ∨ f[2] = 1) (hf3 : f[3] = 0 ∨ f[3] = 1)
+    (hf4 : f[4] = 0 ∨ f[4] = 1) (hf5 : f[5] = 0 ∨ f[5] = 1)
+    (hf6 : f[6] = 0 ∨ f[6] = 1) (hf7 : f[7] = 0 ∨ f[7] = 1)
+    (hsum : f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] = 1)
+    (hneg : populateRemNeg B C f * ir = 1) : f[6] + f[7] = 0 := by
+  have hneg' := hneg
+  rw [populateRemNeg_def] at hneg'
+  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with
+      ⟨g0, -, g2, -, g4, g5, g6, g7⟩ | ⟨g0, -, g2, -, g4, g5, g6, g7⟩ |
+      ⟨g0, -, g2, -, g4, g5, g6, g7⟩ | ⟨g0, -, g2, -, g4, g5, g6, g7⟩ |
+      ⟨g0, -, g2, -, g4, g5, g6, g7⟩ | ⟨g0, -, g2, -, g4, g5, g6, g7⟩ |
+      ⟨g0, -, g2, -, g4, g5, g6, g7⟩ | ⟨g0, -, g2, -, g4, g5, g6, g7⟩ <;>
+    first
+      | (rw [g6, g7]; norm_num; done)
+      | (rw [g0, g2, g4, g5] at hneg'
+         simp only [add_zero, zero_mul] at hneg'
+         exact absurd hneg' zero_ne_one)
+
 /-- `rem_neg = 0` on the unsigned classes. -/
 lemma populateRemNeg_zero_of_unsigned (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
     (h : f[0] + f[2] + f[4] + f[5] = 0) : populateRemNeg B C f = 0 := by

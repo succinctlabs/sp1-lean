@@ -168,8 +168,10 @@ structure Inputs (F : Type) where
 deriving ProvableStruct
 
 /-- Semantic contract for the 48-bit address add: on a real row (`is_real`-gated) the 3-limb result
-is the low 48 bits of the integer sum `a + b`, each limb a genuine 16-bit value. `Inputs` (the `eval`
-params verbatim — the result column struct nested as `cols`) is the generated
+is the low 48 bits of the integer sum `a + b`, each limb a genuine 16-bit value, and the
+64-bit-truncated sum contains no bits above that 48-bit result. The final fact is forced by the
+AIR's boolean high carry against zero; it is deliberately a conclusion rather than a soundness
+precondition. `Inputs` (the `eval` params verbatim — the result column struct nested as `cols`) is the generated
 `Operations.AddrAddOperation.Extracted`; the witnessed limbs `input.cols.value` are threaded in by the
 composing operation (via `populate`). The limb ranges + the sum uniquely pin every limb
 (`value[i] = (addr / 2^16ⁱ) % 2^16`), which a composing `AddressOperation` needs to discharge its
@@ -180,7 +182,8 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
         65536 ^ 2 * input.cols.value[2].val =
       (Word.toNat input.a + Word.toNat input.b) % 2 ^ 48) ∧
     input.cols.value[0].val < 2 ^ 16 ∧ input.cols.value[1].val < 2 ^ 16 ∧
-      input.cols.value[2].val < 2 ^ 16
+      input.cols.value[2].val < 2 ^ 16 ∧
+    (Word.toNat input.a + Word.toNat input.b) % 2 ^ 64 < 2 ^ 48
 
 end SP1Clean.AddrAddOperation
 
@@ -189,24 +192,136 @@ namespace SP1Clean.AddressOperation
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
-/-- The two operand words and the three witnessed offset bits. -/
+/-- The two operand words, the three witnessed offset bits, and the row selector passed by the
+composing load/store chip.  The selector is part of the operation input because upstream SP1 gates
+the address-add carry chain, non-reserved-address inverse, and byte lookups by the chip's
+`is_real`; only the three offset-bit boolean constraints are unconditional. -/
 structure Inputs (F : Type) where
   b : fields 4 F
   cc : fields 4 F
   offset_bit0 : F
   offset_bit1 : F
   offset_bit2 : F
+  is_real : F
 deriving ProvableStruct
 
-/-- Semantic contract: the address limbs are the low 48 bits of `b + cc` and the offset bits are
-boolean. -/
+/-- The aligned address returned by SP1's `AddressOperation::eval`.  The operation's witnessed
+columns retain the raw effective address `b + cc`; the value passed to the Memory bus clears its
+low three bits by subtracting the separately constrained offset bits.  Keeping this projection on
+the contract surface makes the distinction between the Sail-visible effective address and the
+8-byte-aligned RAM-bus address explicit. -/
+@[reducible] def alignedValue {F : Type} [Sub F] [Mul F] [OfNat F 2] [OfNat F 4]
+    (input : Inputs F)
+    (cols : Extracted.AddressOperation F) : Vector F 3 :=
+  #v[cols.addr_operation.value[0] - 4 * input.offset_bit2 - 2 * input.offset_bit1 -
+      input.offset_bit0,
+    cols.addr_operation.value[1], cols.addr_operation.value[2]]
+
+/-- The output-independent address property enforced by SP1's `AddressOperation`: a 48-bit,
+non-reserved effective address whose low three bits are exactly the supplied offset columns. This
+is the compact semantic interface consumed by the Sail load/store bridges. -/
+def ValidAddress (input : Inputs (ZMod p)) : Prop :=
+  (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 64 < 2 ^ 48 ∧
+  2 ^ 16 ≤ (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48 ∧
+  input.offset_bit0.val + 2 * input.offset_bit1.val + 4 * input.offset_bit2.val =
+    (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48 % 8
+
+/-- The effective byte address computed by SP1 and by Sail. Both additions are 64-bit wrapping
+additions; the aligned RAM-bus address is a separate projection obtained by clearing the low bits. -/
+def effectiveAddress (input : Inputs (ZMod p)) : BitVec 64 :=
+  Word.toBitVec64 input.b + Word.toBitVec64 input.cc
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `effectiveAddress` is exactly Rust's `u64::wrapping_add`, expressed through the semantic word
+encoding. This is the shared bridge fact that permits negative sign-extended load/store immediates. -/
+theorem effectiveAddress_toNat {input : Inputs (ZMod p)}
+    (hb : Word.isU64 input.b) (hcc : Word.isU64 input.cc) :
+    (effectiveAddress input).toNat =
+      (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 64 := by
+  unfold effectiveAddress
+  rw [BitVec.toNat_add, Word.toBitVec64_toNat hb, Word.toBitVec64_toNat hcc]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The compact AIR address contract, rephrased at the actual wrapped effective address consumed by
+the Sail memory semantics. In particular, this does not assume that the natural-number sum of the
+base and sign-extended immediate avoids 64-bit wraparound. -/
+theorem effectiveAddress_facts {input : Inputs (ZMod p)}
+    (hb : Word.isU64 input.b) (hcc : Word.isU64 input.cc)
+    (h : ValidAddress input) :
+    (effectiveAddress input).toNat < 2 ^ 48 ∧
+      2 ^ 16 ≤ (effectiveAddress input).toNat ∧
+      input.offset_bit0.val + 2 * input.offset_bit1.val + 4 * input.offset_bit2.val =
+        (effectiveAddress input).toNat % 8 := by
+  obtain ⟨hfit, hlo, hoffset⟩ := h
+  have hmod :
+      (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48 =
+        (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 64 := by
+    rw [← Nat.mod_mod_of_dvd _ (by norm_num : 2 ^ 48 ∣ (2 ^ 64 : ℕ)),
+      Nat.mod_eq_of_lt hfit]
+  rw [effectiveAddress_toNat hb hcc]
+  exact ⟨hfit, hmod ▸ hlo, by rw [← hmod]; exact hoffset⟩
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The 48-bit address reconstructed by the AIR is the natural value of the wrapped 64-bit effective
+address. This is the common reconciliation used by load/store row views: the AIR separately proves
+that the wrapped result lies below `2^48`, so reducing that result modulo `2^48` is lossless. -/
+theorem addressMod48_eq_effectiveAddress_toNat {input : Inputs (ZMod p)}
+    (hb : Word.isU64 input.b) (hcc : Word.isU64 input.cc)
+    (h : ValidAddress input) :
+    (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48 =
+      (effectiveAddress input).toNat := by
+  have hfit := (effectiveAddress_facts hb hcc h).1
+  rw [← Nat.mod_mod_of_dvd _ (by norm_num : 2 ^ 48 ∣ (2 ^ 64 : ℕ)),
+    ← effectiveAddress_toNat hb hcc, Nat.mod_eq_of_lt hfit]
+
+/-- Semantic contract: the address limbs are the low 48 bits of `b + cc`; the sum has no
+64-bit-truncated bits above that address; the offset bits are boolean and exactly decompose the
+address modulo eight; the address is outside SP1's reserved low-memory region; and all three
+committed address limbs are genuine 16-bit limbs. Every conjunct is forced by the operation's AIR
+(respectively the address-add carry chain and byte-range pulls, offset boolean gates, low-three-bit
+range check, and top-two-limb inverse gate). Keeping the limb bounds on this semantic surface is
+important: the machine layer interprets the three fields as one canonical 48-bit byte address. -/
 def Spec (input : Inputs (ZMod p)) (cols : Extracted.AddressOperation (ZMod p)) : Prop :=
   (cols.addr_operation.value[0].val + 65536 * cols.addr_operation.value[1].val +
       65536 ^ 2 * cols.addr_operation.value[2].val =
     (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48) ∧
   (input.offset_bit0 = 0 ∨ input.offset_bit0 = 1) ∧
   (input.offset_bit1 = 0 ∨ input.offset_bit1 = 1) ∧
-  (input.offset_bit2 = 0 ∨ input.offset_bit2 = 1)
+  (input.offset_bit2 = 0 ∨ input.offset_bit2 = 1) ∧
+  (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 64 < 2 ^ 48 ∧
+  2 ^ 16 ≤ (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48 ∧
+  input.offset_bit0.val + 2 * input.offset_bit1.val + 4 * input.offset_bit2.val =
+    (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48 % 8 ∧
+  cols.addr_operation.value[0].val < 2 ^ 16 ∧
+  cols.addr_operation.value[1].val < 2 ^ 16 ∧
+  cols.addr_operation.value[2].val < 2 ^ 16
+
+/-- Per-row semantic contract matching SP1's `AddressOperation::eval`: the three offset columns are
+boolean on every row, while the address-add chain, non-reserved-address inverse, and byte lookup
+only claim an effective address on a real row.  Keeping the unconditional booleans here is
+important for parent load/store selector equations, which Rust also leaves ungated. -/
+def RowSpec (input : Inputs (ZMod p)) (cols : Extracted.AddressOperation (ZMod p)) : Prop :=
+  (input.offset_bit0 = 0 ∨ input.offset_bit0 = 1) ∧
+    (input.offset_bit1 = 0 ∨ input.offset_bit1 = 1) ∧
+    (input.offset_bit2 = 0 ∨ input.offset_bit2 = 1) ∧
+    (input.is_real = 1 → Spec input cols)
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Project the compact Sail-facing address contract from the complete operation `Spec`. -/
+theorem validAddress_of_spec {input : Inputs (ZMod p)}
+    {cols : Extracted.AddressOperation (ZMod p)} (h : Spec input cols) :
+    ValidAddress input :=
+  ⟨h.2.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1⟩
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The retained address-add byte pulls make the public three-limb address representation
+canonical. This projection is used by the RAM-cell bridge without reopening the circuit. -/
+theorem limbBounds_of_spec {input : Inputs (ZMod p)}
+    {cols : Extracted.AddressOperation (ZMod p)} (h : Spec input cols) :
+    cols.addr_operation.value[0].val < 2 ^ 16 ∧
+      cols.addr_operation.value[1].val < 2 ^ 16 ∧
+      cols.addr_operation.value[2].val < 2 ^ 16 :=
+  h.2.2.2.2.2.2.2
 
 end SP1Clean.AddressOperation
 

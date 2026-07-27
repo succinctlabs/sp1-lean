@@ -96,7 +96,8 @@ index into `RowsGrounded`. -/
 private theorem executePcWalkAux {Row : Type u}
     (rowOf : Row → ChipRow p)
     (data : ProverData (ZMod p)) (program : GuestProgram) (initial : SailState)
-    (rows : List Row) (grounded : RowsGrounded rowOf data program initial rows) :
+    (rows : List Row) (grounded : RowsGrounded rowOf data program initial rows)
+    (codeMemoryCompatible : SailCodeMemoryCompatible program initial) :
     ∀ (done suffix : List Row) (current final : BitVec 64) (state : SailState),
       rows = done ++ suffix →
       PcWalk rowOf current final suffix →
@@ -126,8 +127,10 @@ private theorem executePcWalkAux {Row : Type u}
         simpa [List.append_assoc] using rows_eq
       have chain' : SailChain (done ++ [row]).length initial next := by
         simpa using chain.snoc step
+      have nextRom : RomLoaded program next :=
+        codeMemoryCompatible chain step rom
       exact ih (done ++ [row]) (sndPcOf (stateAccess (rowOf row).view)) final next rows_eq'
-        tailWalk chain' effect.pc (effect.rom rom) (effect.cfg cfg)
+        tailWalk chain' effect.pc nextRom (effect.cfg cfg)
 
 /-- A fully grounded, ordered row list constructs a genuine local official-Sail chain. -/
 theorem sailChain_of_groundedRows {Row : Type u} (rowOf : Row → ChipRow p)
@@ -135,13 +138,14 @@ theorem sailChain_of_groundedRows {Row : Type u} (rowOf : Row → ChipRow p)
     (rows : List Row) (initialPc finalPc : BitVec 64)
     (walk : PcWalk rowOf initialPc finalPc rows)
     (grounded : RowsGrounded rowOf data program initial rows)
+    (codeMemoryCompatible : SailCodeMemoryCompatible program initial)
     (pc : initial.regs.get? Register.PC = some initialPc)
     (rom : RomLoaded program initial) (cfg : SailConfigured initial) :
     ∃ finalState,
       SailChain rows.length initial finalState ∧
       finalState.regs.get? Register.PC = some finalPc := by
-  simpa using executePcWalkAux rowOf data program initial rows grounded [] rows initialPc finalPc
-    initial (by simp) walk (.refl initial) pc rom cfg
+  simpa using executePcWalkAux rowOf data program initial rows grounded codeMemoryCompatible
+    [] rows initialPc finalPc initial (by simp) walk (.refl initial) pc rom cfg
 
 /-- Package the grounded-row engine as the honest local execution relation.  Schedule/clock equality
 is kept as a structural grounding premise because it comes from decoded State rows, not Sail steps. -/
@@ -155,6 +159,7 @@ theorem groundedRows_localExecution {Row : Type u}
       (supportedPcBits statement.publicValues.init_pc0 statement.publicValues.init_pc1
         statement.publicValues.init_pc2))
     (rom : RomLoaded statement.program initial) (cfg : SailConfigured initial)
+    (codeMemoryCompatible : SailCodeMemoryCompatible statement.program initial)
     (walk : PcWalk rowOf
       (supportedPcBits statement.publicValues.init_pc0 statement.publicValues.init_pc1
         statement.publicValues.init_pc2)
@@ -169,7 +174,8 @@ theorem groundedRows_localExecution {Row : Type u}
         Semantics.clkNat statement.publicValues.final_clk_high statement.publicValues.final_clk_low) :
     ∃ witness, SupportedCoreLocalExecutionRelation model statement witness := by
   obtain ⟨finalState, chain, finalPc⟩ :=
-    sailChain_of_groundedRows rowOf data statement.program initial rows _ _ walk grounded pc rom cfg
+    sailChain_of_groundedRows rowOf data statement.program initial rows _ _ walk grounded
+      codeMemoryCompatible pc rom cfg
   let context : Machine.LocalExecutionCtx model :=
     { program := statement.program, wellFormed, initial, romLoaded := rom, configured := cfg }
   let execution : Machine.LocalExecutionSegmentWitness context :=

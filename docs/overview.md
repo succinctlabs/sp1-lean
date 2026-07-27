@@ -1,32 +1,23 @@
-# SP1 verification: current claim and audit guide
+# Verification overview
 
-**Status: current checkpoint, 2026-07-22.** This document describes the implementation in this worktree.
-The aspirational completed-state document is [`goal-overview.md`](goal-overview.md); the frozen pre-remediation
-audit is under [`audits/2026-07-full-project/`](audits/2026-07-full-project/).
+This repository proves a substantial SP1 AIR-to-execution result, but it does not yet prove full
+upstream Core AIR soundness.
 
-## 1. What this repository is trying to prove
+The closed capstone is `supported_core_native_sound`. It says that a satisfying, balanced witness for
+the 25-chip native Clean machine, together with explicit program/boundary and memory-timestamp
+relations, determines a genuine shard-local execution of the generated RISC-V Sail model. The exact
+v6.3.1 upstream AIR is separately represented by complete extracted assertion and interaction lists.
+All 25 native instruction chips are now proved faithful to their corresponding upstream tables. The
+remaining top-level work is to derive the native theorem's semantic boundary facts from the upstream
+Core system tables and then instantiate the exact-AIR refinement bundle.
 
-SP1 represents RISC-V execution with a family of AIR tables. The long-term claim is that a proof accepted
-by SP1's verifier corresponds to an execution of the committed program in the official RISC-V Sail model.
-That sentence contains three different verification problems, kept separate here:
+No Lean proof in `SP1Clean/` is deferred: the audit finds no `sorry`, `stop`, project `axiom`, or
+`sorryAx`. That fact should not be confused with completion of every desired theorem. Open work is
+represented by theorem premises or by theorem names that are intentionally not declared.
 
-1. **AIR soundness:** a satisfying upstream SP1 shard witness yields a Sail execution segment;
-2. **execution composition:** authenticated consecutive shards compose from boot to the halting ECALL; and
-3. **verifier knowledge soundness:** an accepting cryptographic proof admits extraction of the AIR witness.
+## The theorem that is fully proved
 
-The project implements a substantial supported native-Clean slice and now also has the exact pinned
-upstream table/public-value relation plus an auditable deterministic capstone interface. It does not yet
-claim a closed full-upstream shard proof, boot-to-halt composition theorem, or ArkLib verifier theorem:
-the new `sp1_air_sound` composition theorem still requires its explicit per-table refinement bundle and
-the disclosed commit-row provenance premise.
-
-The stable unit of verification is a whole SP1 chip. Rust operations and Lean gadgets are allowed to use
-different internal decompositions; only the complete chip's assertions, interactions, populate behavior,
-and semantic effect need to be pinned.
-
-## 2. The theorem stack
-
-The implemented native theorem is:
+The current semantic capstone is:
 
 ```lean
 theorem supported_core_native_sound (model : Machine.SP1MachineModel)
@@ -35,210 +26,166 @@ theorem supported_core_native_sound (model : Machine.SP1MachineModel)
       (SupportedCoreLocalExecutionRelation model)
 ```
 
-`SupportedCoreNativeRelation` combines:
+Its source relation has three visible parts:
 
-- the algebraic relation of the 36-table Clean ensemble (`Constraints` plus balanced channels); and
-- explicit semantic binding of provider/boundary tables to the committed program and a local initial Sail
-  state, including per-location uniqueness of the memory-init genesis records
-  (`MemoryInitProviderUnique`, 2026-07-16) — channel balance alone cannot exclude a duplicate genesis
-  record whose stale twin a later pull could match; upstream this is SP1's global-interaction
-  uniqueness argument.
+1. `SupportedCoreEnsembleRelation`
+   - the witness public input equals the statement;
+   - every native Clean table constraint holds; and
+   - all four Clean channels balance.
+2. `SP1SemanticBoundaryRelation`
+   - the program is well formed and bound to the shared prover data;
+   - a concrete initial Sail state has the public PC and clock;
+   - ROM is loaded, the Sail configuration is valid, and code memory is compatible;
+   - Program-provider rows describe that program; and
+   - Memory-init and Memory-finalize provider rows have the required meaning and per-location
+     uniqueness.
+3. `SupportedCoreMemoryTimestampRangeRelation`
+   - the high component of each pulled memory timestamp is below the 24-bit physical bound needed by
+     SP1's timestamp-difference argument.
 
-The conclusion is a finite official-LeanRV64D execution segment between public shard endpoints. It is
-deliberately local: reachability from canonical boot belongs to shard composition, not to a one-shard AIR
-theorem.
+From those facts the proof deterministically decodes the physical rows, obtains an exhaustive
+State-bus order, grounds Program and Memory accesses at every position, applies the registered chip
+contract, and constructs a successful Sail chain. The resulting local segment:
 
-The theorem's assembly is present, but it is not yet axiom-clean. It inherits the named
-`supportedCore_orderedRows_dynamic` admission, which must prove that every exactly decoded and ordered
-physical row obtains current Memory operands, circuit assumptions, its semantic chip `Spec`, and
-`advanceReady` at the corresponding evolving Sail state.
+- uses the statement's program;
+- starts and ends at the public PC and clock boundaries; and
+- consists of exactly the active physical instruction rows.
 
-The theorem names now separate implemented composition boundaries from closed results:
+It does not say that the initial state is reachable from boot, that the final row halts, that shards
+compose, or that a cryptographic verifier accepted a proof. Those are deliberately separate claims.
 
-```lean
-supported_core_air_sound  -- still reserved: native/extracted whole-chip faithfulness + native soundness
-sp1_air_refinement        -- implemented composition from exact upstream rows, conditional on named proofs
-sp1_air_sound             -- implemented existential corollary, with the same explicit open premises
-sp1_execution_sound       -- authenticated shard composition from boot to halt
-sp1_verifier_sound        -- ArkLib knowledge soundness, post-composed through sp1_air_sound
+## Current coverage
+
+| Layer | Current coverage | Status |
+|---|---:|---|
+| Native instruction circuits | 25 / 25 supported tables | soundness and completeness proved |
+| Sail instruction bridges | 25 / 25 supported tables | proved |
+| Whole-chip Rust AIR faithfulness | 25 / 25 supported instruction tables | proved |
+| Grounding contracts used by the native capstone | 25 / 25 descriptors | proved |
+| Exact upstream execution cluster | 34 tables | complete list-level relation present |
+| Exact upstream memory-boundary cluster | 6 tables | complete list-level relation present |
+| Whole-chip Rust trace conformance | 10 chips | executable test evidence, not a theorem premise |
+| Exact upstream AIR to Sail | 34-table execution cluster | open bundle; conditional combinator only |
+| Cross-shard boot-to-halt execution | full shard ledger | relation specified; theorem not yet declared |
+| ArkLib verifier knowledge soundness | Core verifier | out of this workstream's current proof |
+
+The 25 instruction tables are Add, Addi, Addw, Sub, Subw, Bitwise, Lt, ShiftLeft, ShiftRight, Jal,
+Jalr, Branch, UType, five load tables, four store tables, Mul, DivRem, and AluX0. The theorem
+`supportedChipFaithfulness_upstream` proves that the proof-bearing faithfulness index is a permutation
+of the exact `CoreProfile.instructionTables` list. It also tracks the physical order of the native
+`supportedChips` registry.
+
+`ChipFaithful` is a whole-row statement. For every adversarial Rust row it proves equivalence between:
+
+- the complete upstream `assertZero` list; and
+- the native Clean component's complete constraint predicate.
+
+On accepted rows it also proves equality, up to permutation and removal of zero-multiplicity entries,
+of the complete active interaction multiset. Rust helper operations and Lean proof gadgets may be
+factored differently; they are not separate public proof boundaries.
+
+## The exact upstream AIR boundary
+
+The semantic Rust source is pinned to:
+
+```text
+a630089d9ff484ec6f2feade8d0afbb1447eed11
+v6.3.1-8-ga630089d9
 ```
 
-The source relation of `sp1_air_refinement` is not a placeholder. `CoreProfile` is pinned to semantic
-revision `a630089d9ff484ec6f2feade8d0afbb1447eed11` and checks the runtime-extracted 34-table execution
-cluster, 6-table memory-boundary cluster, table widths, and 160 public cells. `Faithful/CoreAIR.lean`
-dispatches every complete generated assertion and interaction list. The capstone consumes only the
-`.execution` cluster; the boundary cluster cannot masquerade as an execution witness.
+The list-only extractor uses a separately pinned descendant. Its machine-source delta from the
+semantic revision consists only of reflection derives/imports; exporter changes are hash-checked
+outside the AIR definitions. The generated manifest fixes table membership, row widths, preprocessed
+widths, and the 160-cell public-values width.
 
-`FormalModel/Verifier.lean` proves the dependency-free extraction/refinement combinator needed by the
-future ArkLib adapter. It does not pretend that deterministic AIR refinement proves Fiat–Shamir,
-commitment, query, LogUp/GKR, or extractor soundness. In particular, the AIR source relation asks for
-exact equality of canonical natural interaction multiplicities. ArkLib must derive that non-wrapping
-multiset fact, with appropriate bounds and its existing knowledge-error term, from the proof protocol.
+`CoreAIR.Current.Relation` contains:
 
-## 3. The supported machine
+- exact heterogeneous row types for every table;
+- the complete generated assertion and interaction list for every row;
+- the complete public-value assertion and interaction block;
+- exact cluster membership and nonempty active traces;
+- a verifying-key/preprocessed-trace binding; and
+- equality of canonical natural send/receive multiplicities.
 
-`Soundness/SupportedMachine.lean` is the single descriptor for the 25 implemented RV64IM instruction
-chips. Each entry owns:
+The final item is intentionally stronger than a modular field equality. An ArkLib LogUp/GKR
+knowledge-soundness theorem must justify extraction of that natural multiset fact, with the appropriate
+bounds and error probability.
 
-- its verified Clean `GeneralFormalCircuit`;
-- its semantic `ChipKind`;
-- its SP1 opcode family; and
-- its `rd == x0` routing guard.
+At this pin, the Core machine AIR sources do not call first-row, last-row, or transition-window
+selectors. The exported row lists therefore do not omit a separate next-row constraint family.
+Changing the Rust pin requires rechecking this fact as well as regenerating the manifest and lists.
 
-The ensemble tables, semantic registry, coverage table, and routing projections are derived from this
-descriptor, preventing independent lists from silently drifting. The supported slice covers the ordinary
-integer ALU, control-flow, multiplication/division, load/store, and `x0` routing tables. Syscalls/HALT,
-precompiles, traps, User-mode duplicate AIRs, recursion, and the full SP1 machine table set remain outside
-the **native Clean descriptor**. They are not silently absent from the upstream relation: the baseline
-exact cluster includes `SyscallCore`, `SyscallInstrs`, MemoryBump, StateBump, MemoryLocal, and Global.
-Precompile clusters, user/mprotect clusters, and retention extensions are separate profile targets.
+## Why full `sp1_air_sound` is not yet declared
 
-Every registered chip now supplies the same per-row transition contract:
+`CoreAIRRefinementObligations` names the remaining deterministic proofs from the exact execution
+cluster to an eventful Sail shard:
+
+- public-value and program well-formedness;
+- verification-key/program binding and entry point;
+- first-execution-shard facts;
+- syscall transcript decoding and per-existing-row digest operands;
+- the non-execution boundary case; and
+- the execution case, including system-table grounding into an exact event trace.
+
+The last field is the main semantic theorem, not bookkeeping. No closed value of this structure exists
+today. The available declarations are therefore deliberately named:
 
 ```lean
-advance : is_real = 1 → chipSpec → SailConfigured state → RomLoaded program state →
-  pc_matches_row → live_operands_match_row → committed_decode → advanceReady →
-  ∃ next, SailStep state next ∧ RowEffect program row state next
+sp1_air_refinement_of_obligations
+sp1_air_sound_of_obligations
 ```
 
-All 25 entries have `advance.isSome = true`, proved by `allChipKinds_migrated`. The old parallel
-`sailEquiv`/`reaches_sail` interface has been retired. `RowEffect` records the next PC, at most one register
-write, at most one contiguous memory write, and preservation of everything else.
+They are useful, proved composition lemmas, but they are not evidence that the obligations have been
+discharged. The unqualified names `sp1_air_refinement` and `sp1_air_sound` are reserved for the closed
+construction.
 
-`ChipKind.advance` remains `Option`-typed as a migration-era representation, but there is no fallback
-semantic path: registry membership plus `allChipKinds_migrated` is what the local-execution dispatcher
-uses.
+The missing bridge is concentrated in the six non-preprocessed Core system tables:
+`SyscallCore`, `SyscallInstrs`, `MemoryBump`, `StateBump`, `MemoryLocal`, and `Global`. It must derive
+the native boundary/provider/timestamp facts, handle the 8-tick ordinary and 264-tick syscall schedule,
+and connect syscall rows to an explicit host-handler contract. It must reuse the 25 chip-faithfulness
+proofs rather than restating instruction semantics.
 
-## 4. The four structural buses
+## COMMIT rows and public output
 
-Chips communicate through ordinary Clean channels. Their guarantees contain only facts a row or provider
-can prove locally:
+The AIR constrains each canonical COMMIT or COMMIT_DEFERRED row that exists. It does not prove the
+converse that a rolling flag implies such a row exists.
 
-| Bus | Message | Local guarantee | Global fact derived later |
-|---|---|---|---|
-| State | `(clock, pc)` edge | `True` | exhaustive time-ordered execution path |
-| Program | decoded instruction row | structural `ProgramMsg.RowSpec` | equality with the committed ROM decode |
-| Memory | location, timestamp, value | `MemoryMsg.isU64 ∧ MemoryMsg.ClkBound` | read currency / most-recent write |
-| Byte | opcode and byte/range operands | `ByteRowSpec` | the local table fact is already semantic |
+Accordingly:
 
-Execution reachability, ROM commitment, and Memory currency are not channel assumptions. Clean balance
-provides algebraic equality of posted and consumed records; the machine grounding layer proves their
-global interpretation.
+- `CommitRowsMatch` is an AIR-level, per-existing-row property;
+- `CompleteCommitCoverage` means that all eight public digest indices occur across the whole
+  execution;
+- `UsesStandardHaltWrapper` is the program-level condition that supplies that coverage; and
+- `OutputSafeVerifyingKey` packages the condition for every program admitted by a verification key.
 
-## 5. From an ensemble witness to Sail execution
+The base execution relation does not assume wrapper use. The optional
+`SP1CommitCoveredExecutionRelation` adds coverage only when one of those program contracts is supplied.
+The model does not yet connect output bytes to the wrapper's hash computation, so complete COMMIT-event
+coverage is not full guest-public-output authentication.
 
-The new capstone path has these stages:
+## Trust and assumptions
 
-1. `WitnessDecode.lean` deterministically decodes all typed circuit tables. It cannot choose unrelated
-   semantic rows or convenient casts.
-2. `RankedGrounding.lean` upgrades balanced State edges to an exhaustive trail by proving strict clock-rank
-   increase, ruling out disconnected balanced cycles.
-3. Program-provider balance binds every active row's committed fetch to the committed program.
-4. `LocalExecution.lean` consumes the ordered rows through their registered `advance` proofs to construct a
-   genuine Sail chain.
-5. `supported_core_witness_grounding` assembles exact row coverage, State ordering, PC walk, clock count,
-   activity, registry membership, and Program decode.
+The audit separates proof incompleteness from external trust:
 
-The remaining dynamic step is deliberately narrow. `TypedInteractions.lean` preserves each exact evaluated
-Clean interaction with its channel type. `TypedMemory.lean` turns active Memory pulls into timed facts and
-live-register bindings. All 24 non-DivRem chips now carry their exact Memory closed forms
-(`exposedMemoryInteractions` + `interactionsWith_memory_eq`), and `GroundingAdapter.lean` turns any
-migrated chip's registered `advance` into the timed engine's per-row records; `ChipContracts.lean`
-bundles those into `ChipGroundingContracts` and reduces the named seam to
-`supportedCore_orderedRows_dynamic_of_contracts` (Add's instance `addChip_groundingContracts` proved).
-`AlignedCarrier.lean` + `AlignsWith` reconcile the walk's aligned `RowFacts` carrier with the ordinary
-one the chip contracts and consumers use.
+- Lean checks the main proof library; standard logical dependencies are `propext`,
+  `Classical.choice`, and `Quot.sound`.
+- Selected bit-vector lemmas use `bv_decide` and disclose their generated proof constants.
+- The official generated Sail target contains platform hooks for reservation, floating-point, random,
+  and termination behavior. A theorem stated over that target inherits those hooks even when the
+  supported RV64IM path does not execute them.
+- The SP1 constraint compiler and extraction overlay are trusted, pin-checked source-to-list tools.
+  Generated outputs are not treated as self-authenticating; whole-chip `ChipFaithful` proofs compare
+  them with the native circuits.
+- `native_decide` is forbidden in `SP1Clean/`. It appears only in `SP1CleanTest/` for executable witness
+  and trace conformance, where compiler trust is explicitly accepted.
+- Cryptographic commitments, PCS opening, LogUp/GKR, Fiat--Shamir, and verifier extraction remain the
+  responsibility of the later ArkLib layer.
 
-The next scale-out work is to instantiate `ChipGroundingContracts` for the remaining 23 chips and build
-the memory-channel balance stack, then extend the grounding induction to RAM, repeated touches of one
-location, and the relevant scheduling cases. This is the direct path to closing
-`supportedCore_orderedRows_dynamic`.
+The semantic boundary and timestamp relations in `SupportedCoreNativeRelation` are theorem premises,
+not hidden axioms. Full upstream soundness requires deriving them from the exact system AIR and
+cryptographic binding relations.
 
-The old Eulerian `GatedVm`/`TargetVm` material remains as a frozen proved intermediate and historical proof
-resource. Its `sp1_decoded_rows_sound` admission is not the semantic seam consumed by the new native
-capstone.
-
-The upstream capstone uses a parallel eventful decoder. Ordinary events must be real Sail steps and
-advance 8 ticks; syscall events advance 264 ticks and satisfy the extracted row laws plus a caller-named
-`SyscallHandler`. This parameter is intentional: Sail does not model SP1 host/precompile effects. A weak
-handler yields a correspondingly weak theorem, so a production instantiation must prove that handler from
-the relevant authenticated syscall/precompile tables. The current baseline does not claim precompile
-semantics merely because it can decode an ECALL row.
-
-## 6. One chip end to end
-
-The completed target boundary for a chip has five artifacts:
-
-1. a native semantic Clean circuit and chip `Spec`;
-2. a Sail bridge from `Spec` to one instruction step;
-3. an auto-generated whole-chip Rust oracle with the complete row, `assertZero` list, and four-bus
-   interaction list;
-4. a `ChipFaithful` theorem relating the native circuit and oracle through one explicit row
-   reconfiguration; and
-5. complete-trace populate conformance against Rust `generate_trace`.
-
-Add and Sub implement this whole-chip boundary today. Their native rows no longer alias generated Rust
-rows, and their proofs compare complete assertion systems and complete interaction multisets. The remaining
-chips retain useful operation/fragment faithfulness anchors during migration, but those are not counted as
-final whole-chip AIR faithfulness.
-
-DivRem is the complex-chip contract pilot. Its old nine operation-shaped integration proofs were deleted.
-`FormalModel/Contracts/DivRem.lean` defines four arithmetic families plus eight opcode-routing cases;
-`Proofs/Chips/DivRemChip/Cases.lean` proves their arithmetic and exceptional behavior. The single admitted
-`DivRemChip.evidenceSoundness` theorem is the remaining generated-row-to-evidence bridge.
-
-## 7. Completeness and executable conformance
-
-Per-chip completeness is the honest-prover direction of each Clean circuit, not the converse of the
-whole-machine semantic relation. Three such proofs are deferred after the Lean/Clean 4.31 migration:
-Branch, ShiftLeft, and DivRem. ShiftRight was restored with a folded zero-witness `FormalAssertion`
-boundary for its arithmetic tail, following Clean's large-composition recipe. These are lower priority than the remaining soundness seams
-because they do not change what a satisfying row means.
-
-Whole-machine completeness will require a trace-generatable execution relation, a verified trace generator,
-provider construction, and global balance. It is acceptable to state that future result with an explicit
-top-level completeness admission while the architecture stabilizes; Clean itself is not being forked to
-hide the distinction.
-
-Executable checks live in the separate `SP1CleanTest` library. Ten chips have complete unmasked trace
-batteries derived from their circuits' witness closures and compared cell-for-cell with SP1's real
-`generate_trace`, including padding and hint-driven flags. Transitional operation witness batteries remain
-where still useful. These checks use `native_decide` and are therefore never imported by the main proof
-library.
-
-## 8. Current gaps and trust boundary
-
-`scripts/run_audit.sh` currently gates exactly 8 direct deferral sites in six files:
-
-- three chip-completeness proofs;
-- `DivRemChip.evidenceSoundness`;
-- two DivRem circuit channel-law fields;
-- the frozen-path `sp1_decoded_rows_sound`; and
-- the live semantic seam `supportedCore_orderedRows_dynamic`.
-
-The generated census contains 471 probes. Twenty-nine declarations transitively carry `sorryAx`; this is
-not 29 independent holes, because the supported-machine descriptor embeds complete circuit records and
-therefore propagates admitted circuit fields into registry/ensemble projections. The allowlist names every
-permitted carrier, and a new direct file or unexpected transitive carrier fails the audit.
-
-The project has no local `axiom` declarations, no `skipKernelTC`, and no `native_decide` in `SP1Clean/`.
-Selected `bv_decide` helper lemmas disclose their generated decision axioms. Sail execution theorems inherit
-the generated model's platform axiom surface; that dependency trust base is reported rather than hidden.
-Rust extraction and executable conformance remain external/toolchain trust boundaries.
-
-The new exact-upstream layer adds open proof obligations without adding `sorry` sites:
-
-- instantiate `CoreAIRRefinementObligations` from the generated lists, using the native chip proofs and
-  the completed timed-grounding engine rather than restating the semantic target;
-- discharge the temporary `CoreAIRSemanticAssumptions` fact that a newly asserted COMMIT or
-  COMMIT_DEFERRED flag has all eight introducing rows; per-row operand equality is still proved separately;
-- prove concrete syscall-handler refinements, and add precompile clusters only when their whole tables and
-  handler effects are covered;
-- prove the recursion/PCS bindings (preprocessed commitment, septic cumulative sums, deferred-proof
-  authentication, and complete full-state shard stitching); and
-- instantiate ArkLib's knowledge-sound extractor for the strengthened exact-multiplicity AIR relation.
-
-Run:
+## Reproduce the current checkpoint
 
 ```bash
 lake build SP1Clean
@@ -247,6 +194,7 @@ lake lint
 scripts/run_audit.sh
 ```
 
-For exact pins, theorem carriers, and risk classification, use
-[`release-audit.md`](release-audit.md). For the implementation sequence, use
-[`roadmap.md`](roadmap.md) and [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md).
+The audit regenerates the declaration list and raw `#print axioms` census. See
+[`release-audit.md`](release-audit.md) for the current machine-derived snapshot,
+[`architecture.md`](architecture.md) for module ownership, and [`roadmap.md`](roadmap.md) for the
+remaining dependency order.

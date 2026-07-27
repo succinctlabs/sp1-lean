@@ -55,6 +55,21 @@ theorem execute_RTYPEW_pure_sllw (x y : BitVec 64) :
     Sail.shift_bits_left, Sail.BitVec.extractLsb]
   rfl
 
+/-- The six-bit Sail `SLLI` pure part agrees with the chip's shared RV64 shift semantics when the
+decoded immediate word supplies the shift amount. -/
+theorem execute_SHIFTIOP_pure_slli (x y : BitVec 64) :
+    Advance.execute_SHIFTIOP_pure x (y.setWidth 6) sop.SLLI = RV64.sll y x := by
+  simp only [Advance.execute_SHIFTIOP_pure, RV64.sll, Sail.shift_bits_left]
+  rfl
+
+/-- The five-bit Sail `SLLIW` pure part agrees with the chip's shared word-shift semantics. -/
+theorem execute_SHIFTIWOP_pure_slliw (x y : BitVec 64) :
+    Advance.execute_SHIFTIWOP_pure x (y.setWidth 5) sopw.SLLIW = RV64.sllw y x := by
+  simp only [Advance.execute_SHIFTIWOP_pure, RV64.sllw, sign_extend,
+    Sail.BitVec.signExtend, Sail.shift_bits_left, Sail.BitVec.extractLsb]
+  congr 2
+  all_goals bv_decide
+
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 17 < p)] in
 /-- Native Sail equivalence (SLL): the chip's semantic RV64 `sll` fact (`h_sll`) plus the register/PC
@@ -137,13 +152,10 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.ShiftLeftCols (ZMod p)) : 
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.a, cols.is_sll * 6 + cols.is_sllw * 21, .regWrite⟩
 
-/-- **`ShiftLeftChip.advance`** — the per-ShiftLeft-row `try_step` lift (SC Phase 4). A multi-op R-type chip
-(SLL / SLLW), so it `rcases` the `advanceReady` flag partition and routes each branch to the op-generic
-straight-line register-write core: `advance_of_rtype rop.SLL` / `advance_of_rtypew ropw.SLLW`. The write
-value is `execute_RTYPE_pure`/`execute_RTYPEW_pure` (proved `= RV64.sll`/`RV64.sllw` by
-`execute_RTYPE_pure_sll`/`execute_RTYPEW_pure_sllw`), matched against the chip `Spec`'s flag-gated `RV64.sll`
-/`RV64.sllw` conjunct. `advanceReady` carries the reader passthrough, the pc-limb bound, `op_a ≠ 0`, `imm_c =
-0`, the R-type operand binding `op_c = op_c_memory.prev_value`, and the one-hot flag partition. -/
+/-- **`ShiftLeftChip.advance`** — the per-row Sail lift for all four upstream forms: SLL/SLLI and
+SLLW/SLLIW.  The variant flag chooses the 64-bit or word operation, while the committed `imm_c` bit
+chooses the register or immediate Sail constructor.  On immediate rows the retained ALU-reader gate
+binds its physical arithmetic operand to the decoded Program operand. -/
 theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.ShiftLeftCols (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
@@ -152,36 +164,63 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.ShiftLeftCols (ZMod p)
     (hvalb : ValueOperandsBound (rowView inp cols) s)
     (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
     (hready : cols.state.pc[0].val < 2 ^ 16 ∧ inp.adapter = cols.adapter ∧
-      (rowView inp cols).adapter.op_a ≠ 0 ∧ cols.adapter.imm_c = 0 ∧
-      cols.adapter.op_c = cols.adapter.op_c_memory.prev_value ∧
+      (rowView inp cols).adapter.op_a ≠ 0 ∧
+      (cols.adapter.imm_c = 0 ∨ cols.adapter.imm_c = 1) ∧
+      (cols.adapter.imm_c = 1 →
+        cols.adapter.op_c_memory.prev_value = cols.adapter.op_c) ∧
       ((cols.is_sll = 1 ∧ cols.is_sllw = 0) ∨ (cols.is_sllw = 1 ∧ cols.is_sll = 0))) :
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
-  obtain ⟨hpc0, hpass, hnonX0, himmc0, hopc_eq, hflag⟩ := hready
+  obtain ⟨hpc0, hpass, hnonX0, himmc, himmediate, hflag⟩ := hready
   have hreal' : inp.is_real = 1 := hreal
   set r := rowView inp cols with hr
   have vrd : r.rdWrite = cols.a := rfl
   have himmb : r.adapter.imm_b = 0 := rfl
-  have himmc : r.adapter.imm_c = 0 := himmc0
   have hstraight : r.next_pc = #v[r.state.pc[0] + 4, r.state.pc[1], r.state.pc[2]] := rfl
   rcases hflag with ⟨h_sll, h_sllw0⟩ | ⟨h_sllw, h_sll0⟩
-  · have hop : r.opcode = ((ropToOpcode rop.SLL).toNat : ZMod p) := by
-      simp [hr, rowView, h_sll, h_sllw0, ropToOpcode, Opcode.toNat]
-    have hval : Word.toBitVec64 r.rdWrite
-        = execute_RTYPE_pure (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
-            (Word.toBitVec64 cols.adapter.op_c_memory.prev_value) rop.SLL := by
-      have hsll_spec := (hspec hreal').1 h_sll
-      simp only [ShiftLeftChip.Inputs.op_c_val, ShiftLeftChip.Inputs.op_b_val, hpass] at hsll_spec
-      rw [execute_RTYPE_pure_sll, vrd, ← hopc_eq]; exact hsll_spec
-    exact advance_of_rtype rop.SLL hcfg hrom hpcread hvalb hdecrom hop himmb himmc hnonX0 hpc0 hstraight hval
-  · have hop : r.opcode = ((ropwToOpcode ropw.SLLW).toNat : ZMod p) := by
-      simp [hr, rowView, h_sllw, h_sll0, ropwToOpcode, Opcode.toNat]
-    have hval : Word.toBitVec64 r.rdWrite
-        = execute_RTYPEW_pure (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
-            (Word.toBitVec64 cols.adapter.op_c_memory.prev_value) ropw.SLLW := by
-      have hsllw_spec := (hspec hreal').2 h_sllw
-      simp only [ShiftLeftChip.Inputs.op_c_val, ShiftLeftChip.Inputs.op_b_val, hpass] at hsllw_spec
-      rw [execute_RTYPEW_pure_sllw, vrd, ← hopc_eq]; exact hsllw_spec
-    exact advance_of_rtypew ropw.SLLW hcfg hrom hpcread hvalb hdecrom hop himmb himmc hnonX0 hpc0 hstraight hval
+  · have hsll_spec := (hspec hreal').1 h_sll
+    simp only [ShiftLeftChip.Inputs.op_c_val, ShiftLeftChip.Inputs.op_b_val, hpass] at hsll_spec
+    rcases himmc with himmc0 | himmc1
+    · have hop : r.opcode = ((ropToOpcode rop.SLL).toNat : ZMod p) := by
+        simp [hr, rowView, h_sll, h_sllw0, ropToOpcode, Opcode.toNat]
+      have hval : Word.toBitVec64 r.rdWrite
+          = execute_RTYPE_pure (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+              (Word.toBitVec64 cols.adapter.op_c_memory.prev_value) rop.SLL := by
+        rw [execute_RTYPE_pure_sll, vrd]
+        exact hsll_spec
+      exact advance_of_rtype rop.SLL hcfg hrom hpcread hvalb hdecrom hop himmb himmc0
+        hnonX0 hpc0 hstraight hval
+    · have hop : r.opcode = ((sopToOpcode sop.SLLI).toNat : ZMod p) := by
+        simp [hr, rowView, h_sll, h_sllw0, sopToOpcode, Opcode.toNat]
+      have hopc_eq := himmediate himmc1
+      have hval : Word.toBitVec64 r.rdWrite
+          = execute_SHIFTIOP_pure (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+              ((Word.toBitVec64 cols.adapter.op_c).setWidth 6) sop.SLLI := by
+        rw [execute_SHIFTIOP_pure_slli, vrd, ← hopc_eq]
+        exact hsll_spec
+      exact advance_of_shiftitype sop.SLLI hcfg hrom hpcread hvalb hdecrom hop himmb himmc1
+        hnonX0 hpc0 hstraight hval
+  · have hsllw_spec := (hspec hreal').2 h_sllw
+    simp only [ShiftLeftChip.Inputs.op_c_val, ShiftLeftChip.Inputs.op_b_val, hpass] at hsllw_spec
+    rcases himmc with himmc0 | himmc1
+    · have hop : r.opcode = ((ropwToOpcode ropw.SLLW).toNat : ZMod p) := by
+        simp [hr, rowView, h_sllw, h_sll0, ropwToOpcode, Opcode.toNat]
+      have hval : Word.toBitVec64 r.rdWrite
+          = execute_RTYPEW_pure (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+              (Word.toBitVec64 cols.adapter.op_c_memory.prev_value) ropw.SLLW := by
+        rw [execute_RTYPEW_pure_sllw, vrd]
+        exact hsllw_spec
+      exact advance_of_rtypew ropw.SLLW hcfg hrom hpcread hvalb hdecrom hop himmb himmc0
+        hnonX0 hpc0 hstraight hval
+    · have hop : r.opcode = ((sopwToOpcode sopw.SLLIW).toNat : ZMod p) := by
+        simp [hr, rowView, h_sllw, h_sll0, sopwToOpcode, Opcode.toNat]
+      have hopc_eq := himmediate himmc1
+      have hval : Word.toBitVec64 r.rdWrite
+          = execute_SHIFTIWOP_pure (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
+              ((Word.toBitVec64 cols.adapter.op_c).setWidth 5) sopw.SLLIW := by
+        rw [execute_SHIFTIWOP_pure_slliw, vrd, ← hopc_eq]
+        exact hsllw_spec
+      exact advance_of_shiftiwtype sopw.SLLIW hcfg hrom hpcread hvalb hdecrom hop himmb himmc1
+        hnonX0 hpc0 hstraight hval
 
 /-- `ChipKind` registration for ShiftLeft (SLL/SLLW). -/
 def kind : Soundness.ChipKind p where
@@ -191,8 +230,9 @@ def kind : Soundness.ChipKind p where
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧ inp.adapter = cols.adapter ∧
-    (rowView inp cols).adapter.op_a ≠ 0 ∧ cols.adapter.imm_c = 0 ∧
-    cols.adapter.op_c = cols.adapter.op_c_memory.prev_value ∧
+    (rowView inp cols).adapter.op_a ≠ 0 ∧
+    (cols.adapter.imm_c = 0 ∨ cols.adapter.imm_c = 1) ∧
+    (cols.adapter.imm_c = 1 → cols.adapter.op_c_memory.prev_value = cols.adapter.op_c) ∧
     ((cols.is_sll = 1 ∧ cols.is_sllw = 0) ∨ (cols.is_sllw = 1 ∧ cols.is_sll = 0))
   advance := some (PLift.up advance)
 

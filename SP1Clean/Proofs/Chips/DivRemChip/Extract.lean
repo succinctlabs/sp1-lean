@@ -127,21 +127,21 @@ lemma isU16_of_byteRowSpec {v : ZMod p}
 The chip composes two `MulOperation`s of `quotient_comp × op_c_val`: `mul_lower` (`is_mul = is_real`)
 for the low 64 bits and `mul_upper` (`is_mulh = is_div+is_rem` signed / `is_mulhu = is_divu+is_remu`
 unsigned) for the high 64 bits. Each is exposed to soundness as an `Assumptions → Spec cols`
-implication. The three lemmas below discharge the `Assumptions` (the only nontrivial input is
-`isU64 quotient_comp`) and project the active conjunct, returning the result word's `toBitVec64`
-product form. -/
+implication. The three lemmas below discharge the gate/flag `Assumptions`; operand bounds are
+established inside `MulOperation` by its safe byte-decomposition pulls. They then project the active
+conjunct, returning the result word's `toBitVec64` product form. -/
 
 /-- `mul_lower`: with `is_mul = ir = 1` (the row is real), the result word is the **low 64 bits** of
 `qc · c`. -/
 lemma mul_lo_spec {qc c : Word (ZMod p)} {ir : ZMod p} {cols : Extracted.MulOperation (ZMod p)}
     (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩)
-    (hqcU : qc.isU64) (hcU : c.isU64) (hir : ir = 1) :
+    (hir : ir = 1) :
     Word.toBitVec64 (MulOperation.resultWord ⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩ cols)
       = qc.toBitVec64 * c.toBitVec64 := by
   have hAs : MulOperation.circuit.Assumptions
       (⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩ : MulOperation.Inputs (ZMod p)) :=
-    ⟨fun _ => ⟨hqcU, hcU⟩, Or.inr hir, fun _ => hir, Or.inr hir, Or.inl rfl, Or.inl rfl, Or.inl rfl,
+    ⟨Or.inr hir, fun _ => hir, Or.inr hir, Or.inl rfl, Or.inl rfl, Or.inl rfl,
      Or.inl rfl, Or.inr (by rw [hir]; ring)⟩
   obtain ⟨_, hmul, _, _, _, _⟩ := MulOperation.result_semantic hAs (h hAs) hir
   exact hmul hir
@@ -152,12 +152,12 @@ lemma mul_hi_spec_unsigned {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
     {cols : Extracted.MulOperation (ZMod p)}
     (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩)
-    (hqcU : qc.isU64) (hcU : c.isU64) (hir : ir = 1) (hihm : ihm = 0) (hihmu : ihmu = 1) :
+    (hir : ir = 1) (hihm : ihm = 0) (hihmu : ihmu = 1) :
     Word.toBitVec64 (MulOperation.resultWord ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ cols)
       = (((qc.toBitVec64).setWidth 128 * (c.toBitVec64).setWidth 128) >>> 64).setWidth 64 := by
   have hAs : MulOperation.circuit.Assumptions
       (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) :=
-    ⟨fun _ => ⟨hqcU, hcU⟩, Or.inr hir, fun _ => hir, Or.inl rfl, Or.inl hihm, Or.inr hihmu, Or.inl rfl,
+    ⟨Or.inr hir, fun _ => hir, Or.inl rfl, Or.inl hihm, Or.inr hihmu, Or.inl rfl,
      Or.inl rfl, Or.inr (by rw [hihm, hihmu]; ring)⟩
   obtain ⟨_, _, hmulhu, _, _, _⟩ := MulOperation.result_semantic hAs (h hAs) hir
   exact hmulhu hihmu
@@ -168,12 +168,12 @@ lemma mul_hi_spec_signed {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
     {cols : Extracted.MulOperation (ZMod p)}
     (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩)
-    (hqcU : qc.isU64) (hcU : c.isU64) (hir : ir = 1) (hihm : ihm = 1) (hihmu : ihmu = 0) :
+    (hir : ir = 1) (hihm : ihm = 1) (hihmu : ihmu = 0) :
     Word.toBitVec64 (MulOperation.resultWord ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ cols)
       = (((qc.toBitVec64).signExtend 128 * (c.toBitVec64).signExtend 128) >>> 64).setWidth 64 := by
   have hAs : MulOperation.circuit.Assumptions
       (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) :=
-    ⟨fun _ => ⟨hqcU, hcU⟩, Or.inr hir, fun _ => hir, Or.inl rfl, Or.inr hihm, Or.inl hihmu, Or.inl rfl,
+    ⟨Or.inr hir, fun _ => hir, Or.inl rfl, Or.inr hihm, Or.inl hihmu, Or.inl rfl,
      Or.inl rfl, Or.inr (by rw [hihm, hihmu]; ring)⟩
   obtain ⟨_, _, _, hmulh, _, _⟩ := MulOperation.result_semantic hAs (h hAs) hir
   exact hmulh hihm
@@ -194,7 +194,7 @@ lemma rwlo_product {qc c : Word (ZMod p)} {ir : ZMod p} {cols : Extracted.MulOpe
     {r0 r1 r2 r3 : ZMod p}
     (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩)
-    (hqcU : qc.isU64) (hcU : c.isU64) (hir : ir = 1)
+    (hir : ir = 1)
     (h0 : r0 = cols.product[0] + cols.product[1] * 256)
     (h1 : r1 = cols.product[2] + cols.product[3] * 256)
     (h2 : r2 = cols.product[4] + cols.product[5] * 256)
@@ -203,14 +203,14 @@ lemma rwlo_product {qc c : Word (ZMod p)} {ir : ZMod p} {cols : Extracted.MulOpe
   have hrw : (#v[r0, r1, r2, r3] : Word (ZMod p))
       = MulOperation.resultWord ⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩ cols := by
     rw [h0, h1, h2, h3]; simp only [MulOperation.resultWord, MulOperation.productVal]; norm_num
-  rw [hrw]; exact mul_lo_spec h hqcU hcU hir
+  rw [hrw]; exact mul_lo_spec h hir
 
 /-- High `ctq` limbs (`mul_upper`, unsigned): the unsigned high 64 of `qc · c`. -/
 lemma rwhi_product_unsigned {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
     {cols : Extracted.MulOperation (ZMod p)} {r4 r5 r6 r7 : ZMod p}
     (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩)
-    (hqcU : qc.isU64) (hcU : c.isU64) (hir : ir = 1) (hihm : ihm = 0) (hihmu : ihmu = 1)
+    (hir : ir = 1) (hihm : ihm = 0) (hihmu : ihmu = 1)
     (h4 : r4 = cols.product[8] + cols.product[9] * 256)
     (h5 : r5 = cols.product[10] + cols.product[11] * 256)
     (h6 : r6 = cols.product[12] + cols.product[13] * 256)
@@ -221,14 +221,14 @@ lemma rwhi_product_unsigned {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
       = MulOperation.resultWord ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ cols := by
     rw [h4, h5, h6, h7]; simp only [MulOperation.resultWord, MulOperation.productVal]
     rw [if_neg (by norm_num), if_pos (Or.inr (Or.inl hihmu))]; norm_num
-  rw [hrw]; exact mul_hi_spec_unsigned h hqcU hcU hir hihm hihmu
+  rw [hrw]; exact mul_hi_spec_unsigned h hir hihm hihmu
 
 /-- High `ctq` limbs (`mul_upper`, signed): the signed high 64 of `qc · c`. -/
 lemma rwhi_product_signed {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
     {cols : Extracted.MulOperation (ZMod p)} {r4 r5 r6 r7 : ZMod p}
     (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩)
-    (hqcU : qc.isU64) (hcU : c.isU64) (hir : ir = 1) (hihm : ihm = 1) (hihmu : ihmu = 0)
+    (hir : ir = 1) (hihm : ihm = 1) (hihmu : ihmu = 0)
     (h4 : r4 = cols.product[8] + cols.product[9] * 256)
     (h5 : r5 = cols.product[10] + cols.product[11] * 256)
     (h6 : r6 = cols.product[12] + cols.product[13] * 256)
@@ -239,7 +239,7 @@ lemma rwhi_product_signed {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
       = MulOperation.resultWord ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ cols := by
     rw [h4, h5, h6, h7]; simp only [MulOperation.resultWord, MulOperation.productVal]
     rw [if_neg (by norm_num), if_pos (Or.inl hihm)]; norm_num
-  rw [hrw]; exact mul_hi_spec_signed h hqcU hcU hir hihm hihmu
+  rw [hrw]; exact mul_hi_spec_signed h hir hihm hihmu
 
 /-! ## Signed overflow detection (`is_overflow = 1` ⟹ `b = i64::MIN`, `c = -1`) -/
 

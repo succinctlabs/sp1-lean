@@ -85,6 +85,26 @@ lemma flags_cases {f : Vector (ZMod p) 8}
        eq_zero_of_val (by omega), eq_zero_of_val (by omega), eq_zero_of_val (by omega),
        eq_zero_of_val (by omega), eq_one_of_val hf7 h⟩
 
+/-- The five flag sums consumed throughout the DivRem circuit are boolean under the one-hot flag
+contract.  Factoring the one-hot case split here keeps it out of the whole-chip completeness term. -/
+lemma flagSums_bool {f : Vector (ZMod p) 8}
+    (hf0 : f[0] = 0 ∨ f[0] = 1) (hf1 : f[1] = 0 ∨ f[1] = 1) (hf2 : f[2] = 0 ∨ f[2] = 1)
+    (hf3 : f[3] = 0 ∨ f[3] = 1) (hf4 : f[4] = 0 ∨ f[4] = 1) (hf5 : f[5] = 0 ∨ f[5] = 1)
+    (hf6 : f[6] = 0 ∨ f[6] = 1) (hf7 : f[7] = 0 ∨ f[7] = 1)
+    (hsum : f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] = 1) :
+    (f[4] + f[5] + f[6] + f[7] = 0 ∨ f[4] + f[5] + f[6] + f[7] = 1) ∧
+      (f[0] + f[2] + f[4] + f[5] = 0 ∨ f[0] + f[2] + f[4] + f[5] = 1) ∧
+      (f[0] + f[1] + f[2] + f[3] = 0 ∨ f[0] + f[1] + f[2] + f[3] = 1) ∧
+      (f[0] + f[2] = 0 ∨ f[0] + f[2] = 1) ∧
+      (f[1] + f[3] = 0 ∨ f[1] + f[3] = 1) := by
+  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with
+      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
+      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
+      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
+      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ <;>
+    rw [g0, g1, g2, g3, g4, g5, g6, g7] <;>
+    norm_num
+
 /-! ## Operand ties (E20–E47) -/
 
 set_option linter.unusedSectionVars false in

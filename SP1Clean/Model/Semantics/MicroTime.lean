@@ -14,7 +14,8 @@ definitions here remain an explicitly scoped compatibility layer until timed gro
   a RAM write lands at offset `+1` (the `MemoryAccess` push offset), a register write at `+4` (the
   op_a write offset); reads/read-backs at `+2`/`+3` observe pre-effect content.
 - `MemLoc` — the register-file/RAM split of the Memory bus's 3-limb address (registers are
-  `addr0 < 32 ∧ addr1 = addr2 = 0`, the shape `MemoryMsg.Spec` names).
+  `addr0 < 32 ∧ addr1 = addr2 = 0`, the shape `MemoryMsg.Spec` names; RAM locations are SP1's
+  canonical aligned 8-byte cells, not overlapping byte-addressed windows).
 - `chainState` — the trajectory as a function: `k` iterations of the official interpreter `try_step`
   (`Option`-valued past a failing step), with the bridge to the relational `SailChain`.
 - `microValue` — the location's content at a micro-time `τ`: the pre- or post-state of window `k`'s
@@ -50,18 +51,32 @@ def StateMsg.pcBits (m : StateMsg (ZMod p)) : BitVec 64 :=
 
 /-! ## Memory locations -/
 
-/-- A Memory-bus location: a register (index < 32, the `addr1 = addr2 = 0` shape) or a RAM address. -/
+/-- An SP1 RAM location is an aligned 8-byte cell.  The 61-bit index is the aligned byte address
+divided by eight; representing the quotient directly makes non-overlap structural. -/
+abbrev RamCell := BitVec 61
+
+/-- The canonical byte address of an SP1 RAM cell. -/
+def RamCell.baseAddr (cell : RamCell) : BitVec 64 :=
+  BitVec.ofNat 64 (cell.toNat * 8)
+
+/-- A Memory-bus location: a register (index < 32, the `addr1 = addr2 = 0` shape) or an aligned
+8-byte RAM cell.  Rust's `CompressedMemory` keys load/store records by `addr & !7`; using the cell
+index here keeps the semantic key at exactly that granularity. -/
 inductive MemLoc
   | reg (idx : BitVec 5)
-  | ram (a : BitVec 64)
+  | ram (cell : RamCell)
 deriving DecidableEq
 
-/-- Decode a Memory message's 3-limb address into its location (register ⟺ the register shape). -/
+/-- Decode a Memory message's 3-limb address into its location (register ⟺ the register shape).
+RAM messages are interpreted at SP1's canonical 8-byte-cell granularity.  Faithful load/store rows
+already carry the aligned address; division by eight additionally makes the semantic boundary total
+for provider records. -/
 def MemoryMsg.locOf (m : MemoryMsg (ZMod p)) : MemLoc :=
   if m.addr0.val < 32 ∧ m.addr1 = 0 ∧ m.addr2 = 0 then
     .reg (BitVec.ofNat 5 m.addr0.val)
   else
-    .ram (BitVec.ofNat 64 (m.addr0.val + m.addr1.val * 2 ^ 16 + m.addr2.val * 2 ^ 32))
+    .ram (BitVec.ofNat 61
+      ((m.addr0.val + m.addr1.val * 2 ^ 16 + m.addr2.val * 2 ^ 32) / 8))
 
 /-- A Memory-bus record with the canonical register address shape decodes to that register.  The
 field equality is the form supplied by the Program/decode layer, while the result is the typed
@@ -95,7 +110,7 @@ def ramWord64? (s : SailState) (a : BitVec 64) : Option (BitVec 64) := do
 /-- A Sail state's content at a location: the 64-bit register value, or the 8-byte RAM word. -/
 def locContent (s : SailState) : MemLoc → Option (BitVec 64)
   | .reg i => s.get_reg? i
-  | .ram a => ramWord64? s a
+  | .ram cell => ramWord64? s cell.baseAddr
 
 /-! ## The trajectory as a function -/
 

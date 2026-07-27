@@ -107,13 +107,18 @@ structure RefinesAt (prog : GuestProgram) (s0 : SailState)
 step: the PC moves to the row's committed `next_pc`; the **register** file is, **when the row writes a
 register** (`commit.writesReg`), exactly `s` except at the `op_a` destination (→ the committed `rdWrite`),
 and **when it does not** (Branch / AluX0 / LoadX0, `commit.writesReg = false`) a pure frame — the SC
-Phase 4 gate that lets a Branch/Store row, whose `op_a` is a *source read*, not corrupt that register; ROM,
-initialization, and configuration persist. `try_step` may also touch bookkeeping registers (`minstret`,
+Phase 4 gate that lets a Branch/Store row, whose `op_a` is a *source read*, not corrupt that register;
+initialization and configuration persist. `try_step` may also touch bookkeeping registers (`minstret`,
 `hart_state`, …) the trace doesn't commit, but those are outside the `BitVec 5` register file. The **memory**
 clause is the orthogonal second axis: `commit.memWrite = none` (all chips but stores) → `s'.mem = s.mem`
 frame; `some mw` (a store) → the committed `width`-byte range at `mw.addrNat` becomes `mw.byteAt`, the rest
-framed. -/
-structure RowEffect (prog : GuestProgram) (r : Trace.RowView (ZMod p))
+framed.
+
+ROM preservation is intentionally not a row-local field. SP1's trusted Program table is immutable
+and separate from data Memory, whereas unmodified Sail fetches from its mutable byte memory. The
+named `SailCodeMemoryCompatible` boundary contract supplies preservation only when the pinned
+program is refined all the way to a multi-step unmodified-Sail chain. -/
+structure RowEffect (_prog : GuestProgram) (r : Trace.RowView (ZMod p))
     (s s' : SailState) : Prop where
   pc : s'.regs.get? Register.PC = some (sndPcOf (stateAccess r))
   regs : (if r.commit.writesReg then
@@ -126,7 +131,6 @@ structure RowEffect (prog : GuestProgram) (r : Trace.RowView (ZMod p))
         (∀ mw : Trace.MemWrite (ZMod p), r.commit.memWrite = some mw →
           (∀ a : ℕ, mw.covers a → s'.mem.get? a = some (mw.byteAt a)) ∧
           (∀ a : ℕ, ¬ mw.covers a → s'.mem.get? a = s.mem.get? a))
-  rom : RomLoaded prog s → RomLoaded prog s'
   init : s.isInitialized → s'.isInitialized
   cfg : SailConfigured s → SailConfigured s'
 
@@ -141,5 +145,14 @@ def ValueOperandsBound (r : Trace.RowView (ZMod p)) (s : SailState) : Prop :=
       s.get_reg? idx = some (Word.toBitVec64 r.adapter.op_b_memory.prev_value)) ∧
   (∀ idx : BitVec 5, r.adapter.imm_c = 0 → (idx.toNat : ZMod p) = r.adapter.op_c[0] →
       s.get_reg? idx = some (Word.toBitVec64 r.adapter.op_c_memory.prev_value))
+
+/-- The live value carried by the adapter's `op_a` prior-record slot.  Most chips use `op_a` as a
+destination and ignore this fact.  Branches, stores, and the `rd = x0` chips use the same physical
+slot as a genuine source, so their `advanceReady` contract consumes it explicitly.  Keeping this
+separate from `ValueOperandsBound` preserves the upstream B/C operand convention while making the
+source-A dependency visible at the grounding boundary. -/
+def SourceAValueBound (r : Trace.RowView (ZMod p)) (s : SailState) : Prop :=
+  ∀ idx : BitVec 5, (idx.toNat : ZMod p) = r.adapter.op_a →
+    s.get_reg? idx = some (Word.toBitVec64 r.adapter.op_a_memory.prev_value)
 
 end SP1Clean.Soundness.Target

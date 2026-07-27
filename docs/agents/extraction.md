@@ -207,8 +207,8 @@ complete chip assertion/interactions theorem.
 
 ## Future work
 
-- Make every supported chip own a native row, a `ChipOracle`, a `ChipFaithful` proof, and a whole-trace
-  conformance battery.
+- Extend whole-trace conformance from the current 10 chips to all 25 already-proved whole-chip
+  `ChipFaithful` anchors.
 - Extend canonical generated reader reuse as each new chip oracle lands, while keeping chip-private
   Rust arithmetic helpers embedded as implementation details.
 - Remove `WITNESS_OPERATIONS` and the remaining operation-list modules once their chip consumers migrate.

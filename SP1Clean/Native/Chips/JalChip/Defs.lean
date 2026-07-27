@@ -69,11 +69,51 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalColumns (ZMod 
   byteChannel.pullIf input.is_real
     (⟨6, (add_value[0] * (4 : ZMod p)⁻¹), Expression.const ((14 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
+  -- Pinned Rust: `when_not(is_real).assert_zero(op_a_0)`. This keeps the
+  -- link-add gate faithful on padding rows and makes its booleanity derivable
+  -- from the AIR rather than a verifier-side convention.
+  assertZero ((input.is_real - 1) * input.adapter.op_a_0)
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, ⟨add_value⟩, ⟨op_a_value⟩, input.is_real⟩
 
 /-- Derive the eight witness cells and the complete four-channel interface structurally from `main`. -/
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalColumns main := by
   elaborate_circuit
+
+/-- Folded completed-row layout used by the whole-chip Rust AIR codec. -/
+@[circuit_norm] lemma directOutput_eq
+    (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter,
+        ⟨Vector.mapRange 4 fun i =>
+          var { index := offset + i }⟩,
+        ⟨Vector.mapRange 4 fun i =>
+          var { index := offset + 4 + i }⟩,
+        input.is_real⟩ :
+        Var JalColumns (ZMod p)) := rfl
+
+/-- Component-wise evaluation of the independent JAL input prefix. -/
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real,
+         state := Eval.eval env input.state,
+         adapter := Eval.eval env input.adapter } :
+        Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Component-wise evaluation of the completed JAL row. -/
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : JalColumns (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state,
+         adapter := Eval.eval env cols.adapter,
+         add_operation := Eval.eval env cols.add_operation,
+         op_a_operation := Eval.eval env cols.op_a_operation,
+         is_real := Eval.eval env cols.is_real } :
+        JalColumns F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
 
 end SP1Clean.JalChip

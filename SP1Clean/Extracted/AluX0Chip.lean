@@ -112,18 +112,18 @@ set_option maxHeartbeats 8000000 in
   let E43 : F := E42 - cols.adapter.op_c_memory.access_timestamp.diff_low_limb
   let E44 : F := E43 * ((65536 : F)⁻¹)
   CPUState.interactions { clk_high := cols.state.clk_high, clk_16_24 := cols.state.clk_16_24, clk_0_16 := cols.state.clk_0_16, pc := #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2]] } #v[E6, cols.state.pc[1], cols.state.pc[2]] 8 cols.is_real ++ [
-    ⟨.send, (.byte (ByteOpcode.ofNat 4) 1 cols.opcode 29), cols.is_real⟩,
+    ⟨.send, (.byte 4 1 cols.opcode 29), cols.is_real⟩,
     ⟨.send, (.program cols.state.pc[0] cols.state.pc[1] cols.state.pc[2] (Opcode.ofNat cols.opcode) cols.adapter.op_a E14 0 0 0 cols.adapter.op_c[0] cols.adapter.op_c[1] cols.adapter.op_c[2] cols.adapter.op_c[3] cols.adapter.op_a_0 0 cols.adapter.imm_c), cols.is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.adapter.op_a_memory.access_timestamp.diff_low_limb 16 0), cols.is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 E29 0), cols.is_real⟩,
+    ⟨.send, (.byte 6 cols.adapter.op_a_memory.access_timestamp.diff_low_limb 16 0), cols.is_real⟩,
+    ⟨.send, (.byte 3 0 E29 0), cols.is_real⟩,
     ⟨.send, (.memory cols.state.clk_high cols.adapter.op_a_memory.access_timestamp.prev_low cols.adapter.op_a 0 0 cols.adapter.op_a_memory.prev_value[0] cols.adapter.op_a_memory.prev_value[1] cols.adapter.op_a_memory.prev_value[2] cols.adapter.op_a_memory.prev_value[3]), cols.is_real⟩,
     ⟨.receive, (.memory cols.state.clk_high E23 cols.adapter.op_a 0 0 cols.adapter.op_a_memory.prev_value[0] cols.adapter.op_a_memory.prev_value[1] cols.adapter.op_a_memory.prev_value[2] cols.adapter.op_a_memory.prev_value[3]), cols.is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.adapter.op_b_memory.access_timestamp.diff_low_limb 16 0), cols.is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 E36 0), cols.is_real⟩,
+    ⟨.send, (.byte 6 cols.adapter.op_b_memory.access_timestamp.diff_low_limb 16 0), cols.is_real⟩,
+    ⟨.send, (.byte 3 0 E36 0), cols.is_real⟩,
     ⟨.send, (.memory cols.state.clk_high cols.adapter.op_b_memory.access_timestamp.prev_low cols.adapter.op_b 0 0 cols.adapter.op_b_memory.prev_value[0] cols.adapter.op_b_memory.prev_value[1] cols.adapter.op_b_memory.prev_value[2] cols.adapter.op_b_memory.prev_value[3]), cols.is_real⟩,
     ⟨.receive, (.memory cols.state.clk_high E30 cols.adapter.op_b 0 0 cols.adapter.op_b_memory.prev_value[0] cols.adapter.op_b_memory.prev_value[1] cols.adapter.op_b_memory.prev_value[2] cols.adapter.op_b_memory.prev_value[3]), cols.is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.adapter.op_c_memory.access_timestamp.diff_low_limb 16 0), E38⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 E44 0), E38⟩,
+    ⟨.send, (.byte 6 cols.adapter.op_c_memory.access_timestamp.diff_low_limb 16 0), E38⟩,
+    ⟨.send, (.byte 3 0 E44 0), E38⟩,
     ⟨.send, (.memory cols.state.clk_high cols.adapter.op_c_memory.access_timestamp.prev_low cols.adapter.op_c[0] 0 0 cols.adapter.op_c_memory.prev_value[0] cols.adapter.op_c_memory.prev_value[1] cols.adapter.op_c_memory.prev_value[2] cols.adapter.op_c_memory.prev_value[3]), E38⟩,
     ⟨.receive, (.memory cols.state.clk_high E37 cols.adapter.op_c[0] 0 0 cols.adapter.op_c_memory.prev_value[0] cols.adapter.op_c_memory.prev_value[1] cols.adapter.op_c_memory.prev_value[2] cols.adapter.op_c_memory.prev_value[3]), E38⟩,
   ]

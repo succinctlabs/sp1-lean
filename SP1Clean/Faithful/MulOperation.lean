@@ -87,7 +87,8 @@ theorem mulOp_interactions_faithful (a b c : Word (ZMod p))
       MulOpInteractSpec a b c cols is_mulw := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.MulOperation.interactions, List.forall_append, List.Forall,
-    Interaction.toProp_send_byte, ByteOpcode.ofNat_three, ByteOpcode.ofNat_five, ByteOpcode.ofNat_six,
+    Interaction.toProp_send_byte, ByteOpcode.constrainField_three,
+    ByteOpcode.constrainField_five, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_U8Range, ByteOpcode.constrain_MSB, ByteOpcode.constrain_Range, val_16_zmod_p,
     one_ne_zero, ne_eq, not_false_eq_true, true_implies, MulOpInteractSpec, hiByteB, hiByteC,
     and_assoc]
@@ -272,8 +273,8 @@ theorem mulOp_interactions_faithful_syntactic [Fact (2 ^ 24 < p)]
     have eoc_v : (Expression.eval env ((input.c[3] - input.cols.c_lower_byte.low_bytes[3])
         * Expression.const 256⁻¹)).val = ((c[3] - cols.c_lower_byte.low_bytes[3]) * 256⁻¹).val := by
       rw [eoc]
-    simp only [Extracted.Interaction.toAccess_byte, hk, ByteOpcode.idx, ByteOpcode.ofNat_three,
-      ByteOpcode.ofNat_five, ByteOpcode.ofNat_six, hvb, hvc, e3, e5, e6, e16, e0, eneg_s, h_bmsb,
+    simp only [Extracted.Interaction.toAccess_byte, hk, hvb, hvc, e3, e5, e6, e16, e0,
+      eneg_s, h_bmsb,
       h_cmsb, h_cy0, h_cy1, h_cy2, h_cy3, h_cy4, h_cy5, h_cy6, h_cy7, h_cy8, h_cy9, h_cy10, h_cy11,
       h_cy12, h_cy13, h_cy14, h_cy15, h_p0, h_p1, h_p2, h_p3, h_p4, h_p5, h_p6, h_p7, h_p8, h_p9,
       h_p10, h_p11, h_p12, h_p13, h_p14, h_p15, h3, h5, h6, h16, ZMod.val_zero]

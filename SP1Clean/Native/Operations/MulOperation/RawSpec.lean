@@ -412,6 +412,47 @@ lemma rest_zero {a b c d e : ZMod p}
   exact ⟨(ZMod.val_eq_zero b).mp (by omega), (ZMod.val_eq_zero c).mp (by omega),
          (ZMod.val_eq_zero d).mp (by omega), (ZMod.val_eq_zero e).mp (by omega)⟩
 
+/-- Five boolean selectors summing to one form exactly one of the five one-hot vectors.  This is
+the dispatch form consumed by the MUL chip's Sail bridge; it is derived from the same boolean and
+sum facts used by the arithmetic operation, with `rest_zero` providing the no-wrap argument. -/
+lemma oneHot_of_sum_one {a b c d e : ZMod p}
+    (ha : a = 0 ∨ a = 1) (hb : b = 0 ∨ b = 1) (hc : c = 0 ∨ c = 1)
+    (hd : d = 0 ∨ d = 1) (he : e = 0 ∨ e = 1)
+    (hsum : a + b + c + d + e = 1) :
+    (a = 1 ∧ b = 0 ∧ c = 0 ∧ d = 0 ∧ e = 0) ∨
+    (b = 1 ∧ a = 0 ∧ c = 0 ∧ d = 0 ∧ e = 0) ∨
+    (c = 1 ∧ a = 0 ∧ b = 0 ∧ d = 0 ∧ e = 0) ∨
+    (d = 1 ∧ a = 0 ∧ b = 0 ∧ c = 0 ∧ e = 0) ∨
+    (e = 1 ∧ a = 0 ∧ b = 0 ∧ c = 0 ∧ d = 0) := by
+  have active : a = 1 ∨ b = 1 ∨ c = 1 ∨ d = 1 ∨ e = 1 := by
+    rcases ha with ha0 | ha1
+    · rcases hb with hb0 | hb1
+      · rcases hc with hc0 | hc1
+        · rcases hd with hd0 | hd1
+          · rcases he with he0 | he1
+            · exfalso
+              simp [ha0, hb0, hc0, hd0, he0] at hsum
+            · exact Or.inr (Or.inr (Or.inr (Or.inr he1)))
+          · exact Or.inr (Or.inr (Or.inr (Or.inl hd1)))
+        · exact Or.inr (Or.inr (Or.inl hc1))
+      · exact Or.inr (Or.inl hb1)
+    · exact Or.inl ha1
+  rcases active with ha1 | hb1 | hc1 | hd1 | he1
+  · obtain ⟨hb0, hc0, hd0, he0⟩ := rest_zero hb hc hd he ha1 hsum
+    exact Or.inl ⟨ha1, hb0, hc0, hd0, he0⟩
+  · have reordered : b + a + c + d + e = 1 := by linear_combination hsum
+    obtain ⟨ha0, hc0, hd0, he0⟩ := rest_zero ha hc hd he hb1 reordered
+    exact Or.inr (Or.inl ⟨hb1, ha0, hc0, hd0, he0⟩)
+  · have reordered : c + a + b + d + e = 1 := by linear_combination hsum
+    obtain ⟨ha0, hb0, hd0, he0⟩ := rest_zero ha hb hd he hc1 reordered
+    exact Or.inr (Or.inr (Or.inl ⟨hc1, ha0, hb0, hd0, he0⟩))
+  · have reordered : d + a + b + c + e = 1 := by linear_combination hsum
+    obtain ⟨ha0, hb0, hc0, he0⟩ := rest_zero ha hb hc he hd1 reordered
+    exact Or.inr (Or.inr (Or.inr (Or.inl ⟨hd1, ha0, hb0, hc0, he0⟩)))
+  · have reordered : e + a + b + c + d = 1 := by linear_combination hsum
+    obtain ⟨ha0, hb0, hc0, hd0⟩ := rest_zero ha hb hc hd he1 reordered
+    exact Or.inr (Or.inr (Or.inr (Or.inr ⟨he1, ha0, hb0, hc0, hd0⟩)))
+
 /-- With five booleans whose sum is `{0,1}`-bounded and at least one set, the sum is exactly `1`. (The
 chip's `is_real = 1` row commits one active variant flag; this turns the sum-bound gate into `sum = 1`,
 the hypothesis `aSelector_eq_resultWord`/`rest_zero` need.) -/

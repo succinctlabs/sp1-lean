@@ -52,8 +52,8 @@ set_option maxHeartbeats 8000000 in
   [
     ⟨.receive, (.state cols.clk_high E1 cols.pc[0] cols.pc[1] cols.pc[2]), is_real⟩,
     ⟨.send, (.state cols.clk_high E4 next_pc[0] next_pc[1] next_pc[2]), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) E6 13 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.clk_16_24 0), is_real⟩,
+    ⟨.send, (.byte 6 E6 13 0), is_real⟩,
+    ⟨.send, (.byte 3 0 cols.clk_16_24 0), is_real⟩,
   ]
 
 end CPUState

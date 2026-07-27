@@ -40,6 +40,24 @@ structure AdapterView (F : Type) where
   op_c_memory : Extracted.RegisterAccessCols F
   imm_c : F
 
+/-- The chip-independent physical view of one generic RAM `MemoryAccess` block. The address is the
+aligned three-limb key actually placed on SP1's Memory bus; `prev*` and `diff*` are the committed
+timestamp columns, and `priorValue`/`newValue` are the pull/push cell words. Current clock limbs and
+the activity gate come from the enclosing `RowView`.
+
+This is deliberately a projection of the real chip row, not a second memory semantics. It exists so
+the whole-machine grounding layer can state one load/store interaction and timestamp contract while
+the chip-level `interactionsWith_memory_eq` theorem remains the authority for actual emissions. -/
+structure RamAccessView (F : Type) where
+  compareLow : F
+  prevHigh : F
+  prevLow : F
+  diffLow : F
+  diffHigh : F
+  address : Vector F 3
+  priorValue : Word F
+  newValue : Word F
+
 /-- The `RTypeReader` (scalar `op_c`, no immediate) projection: widen `op_c` to `#v[op_c, 0, 0, 0]` and
 pin `imm_c := 0`. The op_c gating `is_real - imm_c` and the `op_c[1..3]`/`imm_c` Program slots then
 collapse to the scalar R-type behaviour. -/
@@ -101,6 +119,13 @@ namespace CommitEffect
 def regWrite {F : Type} : CommitEffect F := ⟨true, none⟩
 /-- No register write, no memory write — Branch (`op_a = rs1` source), AluX0 / LoadX0 (`op_a = x0`). -/
 def noWrite {F : Type} : CommitEffect F := ⟨false, none⟩
+/-- A destination-writing reader whose table also accepts `rd = x0`.  SP1's canonical Program row
+uses `op_a_0 = 0` exactly for a nonzero destination and `op_a_0 = 1` for `x0`; the Program-grounding
+premise establishes that provenance before the effect is consumed.  JAL, JALR, and U-type share one
+physical table across both cases, so their architectural effect is selected here rather than by
+inventing separate chip kinds. -/
+def destination {F : Type} [DecidableEq F] [Zero F] (opA0 : F) : CommitEffect F :=
+  if opA0 = 0 then regWrite else noWrite
 /-- No register write, one contiguous memory write — the stores (`op_a = rs2` is a read-back self-write). -/
 def store {F : Type} (mw : MemWrite F) : CommitEffect F := ⟨false, some mw⟩
 end CommitEffect

@@ -63,7 +63,7 @@ theorem alutypereader_constraints_faithful
   simp only [Extracted.ALUTypeReader.asserts, Extracted.ALUTypeReader.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_memory, Interaction.toProp_send_program,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.constrain_Range,
+    ByteOpcode.constrainField_six, ByteOpcode.constrainField_three, ByteOpcode.constrain_Range,
     ByteOpcode.constrain_U8Range, val_16_zmod_p, ZMod.val_zero, one_ne_zero, ne_eq, not_false_eq_true,
     true_implies, sub_self, mul_zero, sub_zero, zero_mul, Nat.ofNat_pos, true_and, and_true,
     show (2 : ℕ) ^ 8 = 256 by norm_num, show (2 : ℕ) ^ 16 = 65536 by norm_num]
@@ -245,8 +245,7 @@ theorem alutypereader_byte_interactions_faithful_syntactic
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     circuit_norm, FormalAssertion.toSubcircuit_interactions]
   simp [circuit_norm, hbk, Gadgets.Equality.main, Extracted.ALUTypeReader.interactions,
-    Extracted.Interaction.toAccess, Extracted.Dir.sign,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx, h6, h3,
+    Extracted.Interaction.toAccess, Extracted.Dir.sign, h6, h3,
     h_ir, h_cl, h_imm, h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c]
 
 end SP1Clean.Faithful

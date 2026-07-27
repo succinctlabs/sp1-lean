@@ -60,18 +60,18 @@ set_option maxRecDepth 100000 in
   let E19 : F := cols.values[18] * 65536
   let E20 : F := cols.values[12] + E19
   [
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.values[15] cols.values[16]), cols.values[19]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[7] 16 0), cols.values[19]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[8] 16 0), cols.values[19]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[9] 16 0), cols.values[19]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[10] 16 0), cols.values[19]⟩,
+    ⟨.send, (.byte 3 0 cols.values[15] cols.values[16]), cols.values[19]⟩,
+    ⟨.send, (.byte 6 cols.values[7] 16 0), cols.values[19]⟩,
+    ⟨.send, (.byte 6 cols.values[8] 16 0), cols.values[19]⟩,
+    ⟨.send, (.byte 6 cols.values[9] 16 0), cols.values[19]⟩,
+    ⟨.send, (.byte 6 cols.values[10] 16 0), cols.values[19]⟩,
     ⟨.receive, (.memory cols.values[3] cols.values[5] cols.values[0] cols.values[1] cols.values[2] cols.values[7] cols.values[8] cols.values[9] cols.values[10]), cols.values[19]⟩,
     ⟨.send, (.raw .global [cols.values[3], cols.values[5], cols.values[0], cols.values[1], cols.values[2], E11, E13, cols.values[10], 0, 1, 1]), cols.values[19]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.values[17] cols.values[18]), cols.values[19]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[11] 16 0), cols.values[19]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[12] 16 0), cols.values[19]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[13] 16 0), cols.values[19]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[14] 16 0), cols.values[19]⟩,
+    ⟨.send, (.byte 3 0 cols.values[17] cols.values[18]), cols.values[19]⟩,
+    ⟨.send, (.byte 6 cols.values[11] 16 0), cols.values[19]⟩,
+    ⟨.send, (.byte 6 cols.values[12] 16 0), cols.values[19]⟩,
+    ⟨.send, (.byte 6 cols.values[13] 16 0), cols.values[19]⟩,
+    ⟨.send, (.byte 6 cols.values[14] 16 0), cols.values[19]⟩,
     ⟨.send, (.memory cols.values[4] cols.values[6] cols.values[0] cols.values[1] cols.values[2] cols.values[11] cols.values[12] cols.values[13] cols.values[14]), cols.values[19]⟩,
     ⟨.send, (.raw .global [cols.values[4], cols.values[6], cols.values[0], cols.values[1], cols.values[2], E18, E20, cols.values[14], 1, 0, 1]), cols.values[19]⟩,
   ]

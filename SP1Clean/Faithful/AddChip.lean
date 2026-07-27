@@ -398,7 +398,7 @@ private theorem addcols_byte_interactions_faithful_syntactic
     Extracted.AddOracle.AddCols.interactions, Extracted.AddOracle.AddOperation.interactions,
     Extracted.CPUState.interactions, Extracted.RTypeReader.interactions,
     Extracted.Interaction.toAccess_byte, Extracted.Interaction.toAccess, Extracted.Dir.sign,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx, ZMod.val_zero,
+    ZMod.val_zero,
     h_ir, h_c0, h_c1, h_wv0, h_wv1, h_wv2, h_wv3,
     h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c, h6, h3]
   -- circuit `[CPUState 2] ++ [Add 4] ++ [RTypeReader 6]` vs oracle `[Add 4] ++ [CPUState 2] ++ [RT 6]`:
@@ -839,6 +839,8 @@ theorem addChip_faithful :
     ChipFaithful (p := p) AddChip.Inputs AddChip.Columns Extracted.AddOracle.AddCols
       AddChip.circuit addChipRowCodec addChipOracle where
   constraints := addChip_constraints_constructive (p := p)
-  interactions := addChip_interactions_constructive (p := p)
+  interactions := fun rustCols data _ =>
+    LookupAccessList.active_perm
+      (addChip_interactions_constructive (p := p) rustCols data)
 
 end SP1Clean.Faithful

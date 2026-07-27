@@ -1,5 +1,7 @@
 import SP1Clean.Native.Chips.MulChip.Defs
 import SP1Clean.Math.EvalVec
+import SP1Clean.Proofs.Chips.MulChip.Structural
+import Clean.Air.Circuit
 
 /-! # `SP1Clean.MulChip` — `Assumptions` / soundness / completeness / `circuit` -/
 
@@ -60,6 +62,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   circuit_proof_start
   obtain ⟨h_cpu, h_mulop, ha0, ha1, ha2, ha3, gb_mul, gb_mulh, gb_mulhu, gb_mulhsu, gb_mulw,
     gb_sum, hopa0, hadapter, h_eq_rs, _h_regwrite, h_gate⟩ := h_holds
+  have ha0_real (hr : input_is_real = 1) := sub_eq_zero.mp (by simpa only [hr, one_mul] using ha0)
+  have ha1_real (hr : input_is_real = 1) := sub_eq_zero.mp (by simpa only [hr, one_mul] using ha1)
+  have ha2_real (hr : input_is_real = 1) := sub_eq_zero.mp (by simpa only [hr, one_mul] using ha2)
+  have ha3_real (hr : input_is_real = 1) := sub_eq_zero.mp (by simpa only [hr, one_mul] using ha3)
   have bmul := bool_of_mul_pred gb_mul
   have bmulh := bool_of_mul_pred gb_mulh
   have bmulhu := bool_of_mul_pred gb_mulhu
@@ -72,26 +78,19 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- `+ 2`) and `RegisterWrite`'s op_a write push (`clk_low + 4`). The offset is left to unification,
   -- so this line never names the destructured state columns.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
-  -- **Option B cycle-break.** No operand `isU64` is assumed (chip `Assumptions = True`). Apply the
-  -- `RTypeReader` sub-soundness to get its `Spec`; its 7th conjunct is the memory-pull-derived operand `isU64`
-  -- trio (gated on `is_real`). The `is_real = sum` row gate (`h_eq_rs`) bridges that to the operation's
-  -- flag-sum gate, so the reader's operand `isU64` discharges `MulOperation`'s `sum = 1 → isU64` precondition.
+  -- No operand range is assumed by the chip: `MulOperation` derives both operand bounds from its
+  -- own safe byte decompositions. The reader `Spec` remains the public register-read contract.
   have h_rspec := hadapter ⟨h_bin, h_bin, h_clk⟩
-  have h_trio := h_rspec.2.2.2.2.2.2
   have h_rs : input_is_real
       = env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3) + env.get (i₀ + 4) :=
     sub_eq_zero.mp h_eq_rs
-  have hbc : input_is_real = 1 → Word.isU64 input_adapter_op_b_memory_prev_value
-      ∧ Word.isU64 input_adapter_op_c_memory_prev_value :=
-    fun hr => ⟨(h_trio hr).2.1, (h_trio hr).2.2.1⟩
   -- `is_mulw = 1 → sum = 1` (gate = flag-sum, SP1 `alu/mul/mod.rs:234`): one-hot via `sum_eq_one`.
   have h_mw := fun (hmw : (env.get (i₀ + 4) : ZMod p) = 1) =>
     MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inr (Or.inr hmw))))
-  -- `MulOperation.Assumptions`: operands `isU64` when the sum-gate is active, bridged `sum = 1 → is_real = 1`
-  -- via `h_rs`; flag binaries; `is_mulw → sum`; sum-bound. Inlined so the operation input (incl. `cols`) is
-  -- inferred from `h_mulop`/`result_semantic`/the goal rather than left ambiguous.
+  -- `MulOperation.Assumptions`: row/flag binaries, `is_mulw → sum`, and the sum bound. Inlined so
+  -- the operation input (including `cols`) is inferred from `h_mulop`/`result_semantic`/the goal.
   have h_spec := h_mulop
-    ⟨fun hsum => hbc (h_rs.trans hsum), bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩
+    ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩
   -- RegisterWrite owes `is_real = 1 → isU64 a`; on a real row `sum = 1` (via `h_rs`), so `a = resultWord`
   -- (`aSelector` linkage) is `isU64` from `result_semantic`.
   have h_a_isU64 : input_is_real = 1 →
@@ -100,7 +99,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hsum1 : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3) + env.get (i₀ + 4) = 1 :=
       h_rs ▸ hr
     obtain ⟨hisU64, _, _, _, _, _⟩ := MulOperation.result_semantic
-      ⟨fun hsum => hbc (h_rs.trans hsum), bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
+      ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
     rw [show (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 50 + i }))
         = MulOperation.resultWord _ _ from ?_]
     · exact hisU64
@@ -109,66 +108,71 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
           Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
           List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-        first | exact ha0 | exact ha1 | exact ha2 | exact ha3
+        first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
   refine ⟨⟨h_rspec, h_bin, fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩⟩,
-    Or.inr ⟨fun hsum => hbc (h_rs.trans hsum), bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩,
+    Or.inr ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩,
     Or.inr ⟨h_bin, h_bin, h_clk⟩,
     Or.inr ⟨h_bin, h_a_isU64, h_clk.at_four⟩⟩
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inl h1)
+    have hr : input_is_real = 1 := h_rs.trans hsum1
     obtain ⟨_hisU64, hmul, _hmulhu, _hmulh, _hmulhsu, _hmulw⟩ :=
-      MulOperation.result_semantic ⟨fun hsum => hbc (h_rs.trans hsum), bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
+      MulOperation.result_semantic ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
     rw [rv64_mul_eq, ← hmul h1]; congr 1
     rw [← MulOperation.aSelector_eq_resultWord _ _ bmul bmulh bmulhu bmulhsu bmulw hsum1]
     apply Vector.ext; intro k hk; interval_cases k <;>
       simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
         Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-      first | exact ha0 | exact ha1 | exact ha2 | exact ha3
+      first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inl h1))
+    have hr : input_is_real = 1 := h_rs.trans hsum1
     obtain ⟨_hisU64, _hmul, _hmulhu, hmulh, _hmulhsu, _hmulw⟩ :=
-      MulOperation.result_semantic ⟨fun hsum => hbc (h_rs.trans hsum), bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
+      MulOperation.result_semantic ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
     rw [rv64_mulh_eq, ← hmulh h1]; congr 1
     rw [← MulOperation.aSelector_eq_resultWord _ _ bmul bmulh bmulhu bmulhsu bmulw hsum1]
     apply Vector.ext; intro k hk; interval_cases k <;>
       simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
         Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-      first | exact ha0 | exact ha1 | exact ha2 | exact ha3
+      first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inl h1)))
+    have hr : input_is_real = 1 := h_rs.trans hsum1
     obtain ⟨_hisU64, _hmul, hmulhu, _hmulh, _hmulhsu, _hmulw⟩ :=
-      MulOperation.result_semantic ⟨fun hsum => hbc (h_rs.trans hsum), bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
+      MulOperation.result_semantic ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
     rw [rv64_mulhu_eq, ← hmulhu h1]; congr 1
     rw [← MulOperation.aSelector_eq_resultWord _ _ bmul bmulh bmulhu bmulhsu bmulw hsum1]
     apply Vector.ext; intro k hk; interval_cases k <;>
       simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
         Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-      first | exact ha0 | exact ha1 | exact ha2 | exact ha3
+      first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inr (Or.inl h1))))
+    have hr : input_is_real = 1 := h_rs.trans hsum1
     obtain ⟨_hisU64, _hmul, _hmulhu, _hmulh, hmulhsu, _hmulw⟩ :=
-      MulOperation.result_semantic ⟨fun hsum => hbc (h_rs.trans hsum), bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
+      MulOperation.result_semantic ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
     rw [rv64_mulhsu_eq, ← hmulhsu h1]; congr 1
     rw [← MulOperation.aSelector_eq_resultWord _ _ bmul bmulh bmulhu bmulhsu bmulw hsum1]
     apply Vector.ext; intro k hk; interval_cases k <;>
       simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
         Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-      first | exact ha0 | exact ha1 | exact ha2 | exact ha3
+      first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inr (Or.inr h1))))
+    have hr : input_is_real = 1 := h_rs.trans hsum1
     obtain ⟨_hisU64, _hmul, _hmulhu, _hmulh, _hmulhsu, hmulw⟩ :=
-      MulOperation.result_semantic ⟨fun hsum => hbc (h_rs.trans hsum), bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
+      MulOperation.result_semantic ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
     rw [rv64_mulw_eq, ← hmulw h1]; congr 1
     rw [← MulOperation.aSelector_eq_resultWord _ _ bmul bmulh bmulhu bmulhsu bmulw hsum1]
     apply Vector.ext; intro k hk; interval_cases k <;>
       simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
         Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-      first | exact ha0 | exact ha1 | exact ha2 | exact ha3
+      first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
 
 set_option maxHeartbeats 128000000 in
 theorem completeness :
@@ -234,9 +238,11 @@ theorem completeness :
     (ProvableType.ext_iff (α := Extracted.MulOperation) _ _).mpr (fun i hi =>
       (getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 5) i hi).trans (h_env_cols' i hi))
   refine ⟨⟨hbin, h_cpu⟩,
-    ⟨⟨fun _ => ⟨hbU, hcU⟩, hsum01', hmw', hf0', hf1', hf2', hf3', hf4', hsum01'⟩, ?_⟩,
-    by simpa using h_env_a 0, by simpa using h_env_a 1, by simpa using h_env_a 2,
-    by simpa using h_env_a 3,
+    ⟨⟨hsum01', hmw', hf0', hf1', hf2', hf3', hf4', hsum01'⟩, ?_⟩,
+    by rw [sub_eq_zero.mpr (by simpa using h_env_a 0), mul_zero],
+    by rw [sub_eq_zero.mpr (by simpa using h_env_a 1), mul_zero],
+    by rw [sub_eq_zero.mpr (by simpa using h_env_a 2), mul_zero],
+    by rw [sub_eq_zero.mpr (by simpa using h_env_a 3), mul_zero],
     hbool _ hf0', hbool _ hf1', hbool _ hf2', hbool _ hf3', hbool _ hf4', hbool _ hsum01',
     hop_a_0,
     ⟨⟨hbin, hbin, h_clk⟩,
@@ -270,7 +276,7 @@ theorem completeness :
       (env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3) + env.get (i₀ + 4))
       hf0' hf1' hf2' hf3' hf4' hsum01'
     obtain ⟨hisU64, _, _, _, _, _⟩ := MulOperation.result_semantic
-      ⟨fun _ => ⟨hbU, hcU⟩, hsum01', hmw', hf0', hf1', hf2', hf3', hf4', hsum01'⟩ h_mulspec hsum1
+      ⟨hsum01', hmw', hf0', hf1', hf2', hf3', hf4', hsum01'⟩ h_mulspec hsum1
     rw [show (Vector.map (Expression.eval env.toEnvironment)
           (Vector.mapRange 4 fun i => var { index := i₀ + 5 + 45 + i }))
         = MulOperation.resultWord _ _ from ?_]
@@ -294,6 +300,18 @@ theorem completeness :
           Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
           List.getElem_cons_succ, Nat.reduceLT, dif_pos, hprod, hpmsb] <;>
         first | exact h_env_a 0 | exact h_env_a 1 | exact h_env_a 2 | exact h_env_a 3
+
+/-- Exact State-channel pair emitted by the composed CPU-state reader. -/
+def exposedStateInteractions (input : Var Inputs (ZMod p)) :
+    List (ChannelInteraction (stateChannel (p := p))) :=
+  [ stateChannel.pulledIf input.is_real
+      ⟨input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+       input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+    stateChannel.pushedIf input.is_real
+      ⟨input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+       input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ]
 
 /-- Mul's exact Memory-channel interaction list.  The op_a write push carries the witnessed result
 word `a` (cells `offset+50..53` — after the 5 variant flags and the 45 `MulOperation` columns).
@@ -345,6 +363,17 @@ def exposedOpcode (offset : ℕ) : Expression (ZMod p) :=
   var ⟨offset⟩ * 11 + var ⟨offset + 1⟩ * 12 + var ⟨offset + 2⟩ * 13 +
     var ⟨offset + 3⟩ * 14 + var ⟨offset + 4⟩ * 24
 
+/-- Exact Program fetch emitted by the R-type adapter, with the instruction opcode reconstructed
+from the five chip-owned variant flags. -/
+def exposedProgramInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (programChannel (p := p))) :=
+  [ programChannel.pulledIf input.is_real
+      ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
+       exposedOpcode offset, input.adapter.op_a,
+       #v[input.adapter.op_b, 0, 0, 0],
+       #v[input.adapter.op_c, 0, 0, 0],
+       input.adapter.op_a_0, 0, 0⟩ ]
+
 set_option maxHeartbeats 8000000 in
 /-- The `Mul` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `mul`/`mulh`/`mulhu`/`mulhsu`/`mulw`
 semantic contract; output is the extracted `MulCols` column struct. Soundness is proved; completeness is
@@ -353,28 +382,19 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs MulCols :=
   { main, elaborated,
     -- `programChannel` dropped (W11 flip — now pulled via `RTypeReader`, a guarantee not a requirement).
     channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw],
+    requirementsChannelsLawful := requirementsChannelsLawful_main,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input offset =>
-      expose stateChannel
-        [ stateChannel.pulledIf input.is_real
-            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
-             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          stateChannel.pushedIf input.is_real
-            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
-             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
+      expose stateChannel (exposedStateInteractions input) ++
       expose memoryChannel (exposedMemoryInteractions input offset) ++
       -- The Program-bus instruction fetch (descended from the composed `RTypeReader`, gate
       -- `is_trusted = is_real`, opcode = the committed one-hot flag encoding), consumed by
       -- `Soundness/TypedProgram.lean`.
-      expose programChannel
-        [ programChannel.pulledIf input.is_real
-            ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], exposedOpcode offset,
-             input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0],
-             #v[input.adapter.op_c, 0, 0, 0], input.adapter.op_a_0, 0, 0⟩ ],
+      expose programChannel (exposedProgramInteractions input offset),
     exposedChannels_eq := by
       intro input offset
       have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
@@ -382,7 +402,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs MulCols :=
       have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
       unfold Operations.ExposedChannelsLawful
       intro exposed exposedMem
-      simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
+      simp only [expose, exposedStateInteractions, exposedProgramInteractions,
+        List.mem_append, List.mem_singleton] at exposedMem
       rcases exposedMem with (rfl | rfl) | rfl
       · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
           Readers.RTypeReader.circuit, Readers.RTypeReader.main,
@@ -412,8 +433,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs MulCols :=
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def,
           Circuit.pure_def, witnessVectorNative, witnessNative, subcircuitWithAssertion,
-          assertion, assertZero, HasAssertEq.assert_eq, Expression.assertEquals,
-          Operations.localLength]
+          assertion, assertZero, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
           InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
           InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
@@ -429,9 +449,17 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs MulCols :=
           not_false_eq_true, Operations.interactionsWith_assert,
           Operations.interactionsWith_nil, List.map_cons, List.map_nil, List.nil_append,
           Soundness.rTypeProgramMessage, exposedOpcode]
-        simp only [Operations.interactionsWith_subcircuit,
-          FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
-          List.filter_nil, List.nil_append] }
+        simp only [circuit_norm, List.nil_append] }
+
+/-- Folded circuit projections used by the whole-chip row codec. -/
+@[circuit_norm] theorem circuit_main_eq : (circuit (p := p)).main = main := rfl
+
+@[circuit_norm] theorem circuit_localLength_eq (input : Var Inputs (ZMod p)) :
+    (circuit (p := p)).localLength input = 54 := rfl
+
+@[circuit_norm] theorem circuit_size_eq :
+    (circuit (p := p)).size = size Inputs + 54 := by
+  rw [GeneralFormalCircuit.size_eq, circuit_localLength_eq]
 
 /-- The completed Mul circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
@@ -439,6 +467,23 @@ theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) 
       (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
   exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
+
+/-- The completed Mul circuit exposes exactly its State interaction pair. -/
+theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith stateChannel.toRaw =
+      (exposedStateInteractions input).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨stateChannel.toRaw, (exposedStateInteractions input).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
+
+/-- The completed Mul circuit exposes exactly its Program fetch. -/
+theorem interactionsWith_program_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith programChannel.toRaw =
+      (exposedProgramInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨programChannel.toRaw, (exposedProgramInteractions input offset).map
+      ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
 
 end SP1Clean.MulChip

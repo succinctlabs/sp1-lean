@@ -161,12 +161,12 @@ set_option maxHeartbeats 8000000 in
   let E78 : F := 65535 * cols.msb
   let E79 : F := 65535 * cols.msb
   AddressOperation.interactions #v[cols.adapter.op_b_memory.prev_value[0], cols.adapter.op_b_memory.prev_value[1], cols.adapter.op_b_memory.prev_value[2], cols.adapter.op_b_memory.prev_value[3]] #v[cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1], cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3]] cols.offset_bit[0] cols.offset_bit[1] cols.offset_bit[2] E17 { addr_operation := { value := #v[cols.address_operation.addr_operation.value[0], cols.address_operation.addr_operation.value[1], cols.address_operation.addr_operation.value[2]] }, top_two_limb_inv := cols.address_operation.top_two_limb_inv } ++ CPUState.interactions { clk_high := cols.state.clk_high, clk_16_24 := cols.state.clk_16_24, clk_0_16 := cols.state.clk_0_16, pc := #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2]] } #v[E74, cols.state.pc[1], cols.state.pc[2]] 8 E17 ++ ITypeReader.interactions cols.state.clk_high E1 #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2]] E4 #v[E76, E77, E78, E79] { op_a := cols.adapter.op_a, op_a_memory := { prev_value := #v[cols.adapter.op_a_memory.prev_value[0], cols.adapter.op_a_memory.prev_value[1], cols.adapter.op_a_memory.prev_value[2], cols.adapter.op_a_memory.prev_value[3]], access_timestamp := { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low, diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } }, op_a_0 := cols.adapter.op_a_0, op_b := cols.adapter.op_b, op_b_memory := { prev_value := #v[cols.adapter.op_b_memory.prev_value[0], cols.adapter.op_b_memory.prev_value[1], cols.adapter.op_b_memory.prev_value[2], cols.adapter.op_b_memory.prev_value[3]], access_timestamp := { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low, diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } }, op_c_imm := #v[cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1], cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3]] } E17 E17 ++ [
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.memory_access.access_timestamp.diff_low_limb 16 0), E17⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.memory_access.access_timestamp.diff_high_limb 0), E17⟩,
+    ⟨.send, (.byte 6 cols.memory_access.access_timestamp.diff_low_limb 16 0), E17⟩,
+    ⟨.send, (.byte 3 0 cols.memory_access.access_timestamp.diff_high_limb 0), E17⟩,
     ⟨.send, (.memory cols.memory_access.access_timestamp.prev_high cols.memory_access.access_timestamp.prev_low E24 E25 E26 cols.memory_access.prev_value[0] cols.memory_access.prev_value[1] cols.memory_access.prev_value[2] cols.memory_access.prev_value[3]), E17⟩,
     ⟨.receive, (.memory cols.state.clk_high E27 E24 E25 E26 cols.memory_access.prev_value[0] cols.memory_access.prev_value[1] cols.memory_access.prev_value[2] cols.memory_access.prev_value[3]), E17⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.selected_limb_low_byte E67), E17⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 5) cols.msb cols.selected_byte 0), cols.is_lb⟩,
+    ⟨.send, (.byte 3 0 cols.selected_limb_low_byte E67), E17⟩,
+    ⟨.send, (.byte 5 cols.msb cols.selected_byte 0), cols.is_lb⟩,
   ]
 
 end LoadByteColumns

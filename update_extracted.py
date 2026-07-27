@@ -320,6 +320,9 @@ FOOTER = "end SP1Clean.Extracted\n"
 LINTERS_OFF = "set_option linter.all false  -- auto-generated: skip linters"
 
 _STRUCT_RE = re.compile(r"^\s*structure\s+([A-Za-z_][A-Za-z0-9_]*)\b", re.MULTILINE)
+_BYTE_OPCODE_RE = re.compile(
+    r"\.byte \(ByteOpcode\.ofNat ([A-Za-z_][A-Za-z0-9_]*|[0-9]+)\)"
+)
 
 
 # ── Compiler driver ─────────────────────────────────────────────────────────────────────────
@@ -371,6 +374,23 @@ def run_profile_manifest(sp1_dir: str) -> dict:
 def _emitted_structs(body: str) -> List[str]:
     """The column-struct names a compiler fragment emits (in source order)."""
     return _STRUCT_RE.findall(body)
+
+
+def _preserve_raw_byte_opcodes(body: str) -> str:
+    """Keep the byte interaction's opcode as the raw field expression emitted by Rust.
+
+    The pinned compiler's Lean printer historically wrapped this value in
+    `ByteOpcode.ofNat`. Lean's enum decoder maps every out-of-range value to `.Range`, so that
+    wrapper is not an injective representation of the upstream AIR tuple. The semantic Rust AIR
+    and Clean's byte channel both carry the raw field value. Strip only the printer wrapper here
+    and fail loudly if a future printer emits a shape this reviewed rewrite does not recognize.
+    """
+    body = _BYTE_OPCODE_RE.sub(r".byte \1", body)
+    if "ByteOpcode.ofNat" in body:
+        raise ValueError(
+            "unrecognized ByteOpcode.ofNat in compiler output; update the raw-opcode rewrite"
+        )
+    return body
 
 
 # ── Ownership resolution ────────────────────────────────────────────────────────────────────
@@ -559,6 +579,7 @@ def render(operation: str, import_modules: Sequence[str], body: str) -> str:
     """Wrap an operation's compiler body in the clean-native module header/footer."""
     # Operations can be very large (MulOperation's ~460-`let` product chain exceeds 1M heartbeats),
     # so give them a generous limit.
+    body = _preserve_raw_byte_opcodes(body)
     body = _bump_constraints_heartbeats(body.strip(), 8000000)
     body = _expand_large_derives(body)
     _sanity_gate(operation, body)
@@ -586,6 +607,7 @@ def _bump_constraints_heartbeats(body: str, heartbeats: int = 1000000) -> str:
 def render_chip(chip: str, import_modules: Sequence[str], body: str) -> str:
     """Wrap a chip's compiler body in a module header that imports the reused operation
     column-struct modules."""
+    body = _preserve_raw_byte_opcodes(body)
     body = _bump_constraints_heartbeats(body.strip(), 8000000)
     body = _expand_large_derives(body)
     _sanity_gate(f"{chip} (chip)", body)
@@ -609,6 +631,7 @@ def render_system_table(
     # recursion allowance needed to elaborate the generated `let` chains; adding one heartbeat
     # override per data definition would hide a chunk-size regression from the repository's
     # no-new-heartbeat audit gate.
+    body = _preserve_raw_byte_opcodes(body)
     body = body.strip().replace(
         "@[irreducible] def ",
         "set_option maxRecDepth 100000 in\n@[irreducible] def ",
@@ -634,6 +657,7 @@ def render_system_table(
 
 def render_public_values(body: str) -> str:
     """Wrap `MachineRecord::eval_public_values`, the non-row AIR block in every Core shard."""
+    body = _preserve_raw_byte_opcodes(body)
     body = body.strip().replace(
         "@[irreducible] def ",
         "set_option maxRecDepth 100000 in\n@[irreducible] def ",

@@ -35,7 +35,7 @@ set_option maxRecDepth 100000 in
   (_publicValues : (Vector F 160))
   : List (Interaction F) :=
   [
-    ⟨.receive, (.byte (ByteOpcode.ofNat 6) preprocessed[0] preprocessed[1] 0), cols.values[0]⟩,
+    ⟨.receive, (.byte 6 preprocessed[0] preprocessed[1] 0), cols.values[0]⟩,
   ]
 
 end RangeCols

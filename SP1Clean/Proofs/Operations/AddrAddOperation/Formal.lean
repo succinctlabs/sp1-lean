@@ -7,9 +7,9 @@ import SP1Clean.Native.Operations.AddrAddOperation.Defs
 SP1's `AddrAddOperation::eval` (48-bit/3-limb address add) as a Clean `FormalAssertion`: the
 `Assumptions`, the soundness/completeness proofs (routing through `RawSpec`'s
 `addrAddSemantics_of_carries`/`carries_of_addrAddSemantics`), and the bundled `circuit`. The high
-carry runs against `0`; its booleanity in completeness is supplied by the address-fits `Assumptions`
-conjunct. The arithmetic core lives in `RawSpec`, the native circuit (`main`/`elaborated`) in `Defs`,
-and the `populate` witness in `Populate`. -/
+carry runs against `0`: its booleanity proves the address-fits fact in soundness, while completeness
+recovers the same fact from the semantic `Spec`. The arithmetic core lives in `RawSpec`, the native
+circuit (`main`/`elaborated`) in `Defs`, and the `populate` witness in `Populate`. -/
 
 namespace SP1Clean.AddrAddOperation
 
@@ -18,19 +18,15 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Operand words fit in 64 bits; their 64-bit-truncated sum keeps only 48 bits (the address-fits
-side condition — without it the high carry `c3 = (a[3]+b[3]+c2)·65536⁻¹` is input-determined and need
-not land in `{0,1}`; soundness does not use it, completeness needs it for the `c3` boolean); and
-`is_real` is binary (discharged by the composing chip's gate). -/
+/-- Operand words fit in 64 bits and `is_real` is binary (discharged by the composing chip's gate).
+The address-fits fact is not an assumption: the AIR's boolean high carry against zero proves it. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
-  Word.isU64 input.a ∧ Word.isU64 input.b ∧
-    ((Word.toNat input.a + Word.toNat input.b) % 2 ^ 64 < 2 ^ 48) ∧
-    (input.is_real = 0 ∨ input.is_real = 1)
+  Word.isU64 input.a ∧ Word.isU64 input.b ∧ (input.is_real = 0 ∨ input.is_real = 1)
 
 set_option maxHeartbeats 1000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨ha, hb, _hfit, hbin⟩ := h_assumptions
+  obtain ⟨ha, hb, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hiv, _⟩ := h_input
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   have h65536 : (2 : ℕ) ^ 16 = 65536 := by norm_num
@@ -59,16 +55,18 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have Rb0 := (byteRowSpec_range _ h16p).mp R0
   have Rb1 := (byteRowSpec_range _ h16p).mp R1
   have Rb2 := (byteRowSpec_range _ h16p).mp R2
-  refine ⟨addrAddSemantics_of_carries (cols := ⟨input_cols_value⟩) ha hb ?_, Rb0, Rb1, Rb2⟩
-  simp only [RawSpec]
-  exact ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2,
+  have hraw : RawSpec input_a input_b (⟨input_cols_value⟩ : Extracted.AddrAddOperation (ZMod p)) := by
+    simp only [RawSpec]
+    exact ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2,
     bool_of_mul_pred hgc3, by rw [← h65536]; exact Rb0, by rw [← h65536]; exact Rb1,
     by rw [← h65536]; exact Rb2⟩
+  exact ⟨addrAddSemantics_of_carries ha hb hraw, Rb0, Rb1, Rb2,
+    addrAddFits_of_carries ha hb hraw⟩
 
 set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨ha, hb, hfit, hbin⟩ := h_assumptions
+  obtain ⟨ha, hb, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hiv, _⟩ := h_input
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   have ea0 : Expression.eval env.toEnvironment input_var_a[0] = input_a[0] := by rw [← hia]; simp only [Vector.getElem_map]
@@ -86,19 +84,19 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   refine ⟨?_, ?_, ?_, ?_⟩
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    obtain ⟨_, hrng0, _, _⟩ := h_spec hr1
+    obtain ⟨_, hrng0, _, _, _⟩ := h_spec hr1
     rw [← c16]; exact (byteRowSpec_range _ h16p).mpr hrng0
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    obtain ⟨_, _, hrng1, _⟩ := h_spec hr1
+    obtain ⟨_, _, hrng1, _, _⟩ := h_spec hr1
     rw [← c16]; exact (byteRowSpec_range _ h16p).mpr hrng1
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    obtain ⟨_, _, _, hrng2⟩ := h_spec hr1
+    obtain ⟨_, _, _, hrng2, _⟩ := h_spec hr1
     rw [← c16]; exact (byteRowSpec_range _ h16p).mpr hrng2
   · rcases hbin with h0 | h1
     · simp [h0]
-    · obtain ⟨heq, hrng0, hrng1, hrng2⟩ := h_spec h1
+    · obtain ⟨heq, hrng0, hrng1, hrng2, hfit⟩ := h_spec h1
       have hraw : RawSpec input_a input_b (⟨input_cols_value⟩ : Extracted.AddrAddOperation (ZMod p)) :=
         carries_of_addrAddSemantics ha hb hfit hrng0 hrng1 hrng2 heq
       simp only [RawSpec] at hraw

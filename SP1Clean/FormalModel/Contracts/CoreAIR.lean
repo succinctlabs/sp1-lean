@@ -1,17 +1,18 @@
 import SP1Clean.FormalModel.Contracts.PublicValues
 import SP1Clean.FormalModel.CoreAIRRelation
 
-/-! # Explicit semantic premises for the Core AIR
+/-! # Commit-row contracts for the Core AIR
 
-Most semantic facts must be consequences of extracted constraints.  This file isolates the one
-temporary upstream fact currently needed by the full public-value theorem: a public commit flag must
-have the complete family of introducing syscall rows.  The instruction AIR proves that each such row's
-operand equals the corresponding public digest word; the premise below supplies only row provenance
-and does not assume those operand equalities.
+The syscall AIR constrains every COMMIT row that exists, but intentionally does not prove the converse
+`commit_syscall = 1 → a COMMIT row exists`.  Row existence is a program-level property of SP1's
+standard halt wrapper and belongs at the composed-execution boundary, across all shards.  This file
+therefore separates two predicates:
 
-This is an ordinary theorem parameter, never an axiom, instance, channel guarantee, or per-chip
-assumption.  A stronger public-value refinement may take it explicitly; instruction execution
-soundness must not. -/
+* `CommitRowsMatch`: per-shard correctness of every existing COMMIT/COMMIT_DEFERRED row, proved from AIR;
+* `CompleteCommitCoverage`: all eight public COMMIT indices occur in a whole-execution transcript,
+  supplied by an explicit standard-wrapper contract.
+
+No rolling-flag transition is used as provenance. -/
 
 namespace SP1Clean.CoreAIR
 
@@ -25,58 +26,35 @@ def DigestRowsCover (syscallCode : ℕ) (events : List CoreSyscallEvent) : Prop 
   ∀ index : Fin 8, ∃ event ∈ events,
     event.IsCanonicalCode syscallCode ∧ event.arg1.toNat = index
 
-/-- The shard changes the rolling public-output commit flag from false to true. -/
-def PublicCommitIntroduced {p : ℕ} (publicValues : SP1PublicValues (ZMod p)) : Prop :=
-  publicValues.prev_commit_syscall = 0 ∧ publicValues.commit_syscall = 1
+/-- Whole-execution coverage promised by the standard `syscall_halt` wrapper. -/
+def CompleteCommitCoverage (events : List CoreSyscallEvent) : Prop :=
+  DigestRowsCover commitSyscallId events
 
-/-- The shard changes the rolling deferred-digest commit flag from false to true. -/
-def DeferredCommitIntroduced {p : ℕ} (publicValues : SP1PublicValues (ZMod p)) : Prop :=
-  publicValues.prev_commit_deferred_syscall = 0 ∧
-    publicValues.commit_deferred_syscall = 1
+/-- Deferred-commit coverage, intentionally separate because not every target theorem needs it. -/
+def CompleteDeferredCommitCoverage (events : List CoreSyscallEvent) : Prop :=
+  DigestRowsCover commitDeferredSyscallId events
 
-/-- The eight canonical COMMIT rows expose exactly the eight public digest words. -/
-def PublicDigestRowsMatch {p : ℕ} (publicValues : SP1PublicValues (ZMod p))
+/-- Every existing canonical COMMIT row has the public digest operand required by its index.  This
+predicate asserts no row existence. -/
+def PublicCommitRowsMatch {p : ℕ} (publicValues : SP1PublicValues (ZMod p))
     (events : List CoreSyscallEvent) : Prop :=
-  ∀ index : Fin 8, ∃ event ∈ events,
-    event.IsCanonicalCode commitSyscallId ∧
-      event.arg1.toNat = index ∧
+  ∀ event ∈ events, ∀ index : Fin 8,
+    event.IsCanonicalCode commitSyscallId → event.arg1.toNat = index →
       event.arg2 = BitVec.ofNat 64 (publicValues.committed_value_digest[index].toNat)
 
-/-- The eight canonical COMMIT_DEFERRED rows expose exactly the eight field elements of the rolling
-deferred-proof digest.  The cast is the `Word.reduce` equation enforced by the row AIR. -/
-def DeferredDigestRowsMatch {p : ℕ} (publicValues : SP1PublicValues (ZMod p))
+/-- Existing COMMIT_DEFERRED rows obey the corresponding rolling-digest operand equation.  Like the
+public form, this is per-row soundness and carries no converse/existence claim. -/
+def DeferredCommitRowsMatch {p : ℕ} (publicValues : SP1PublicValues (ZMod p))
     (events : List CoreSyscallEvent) : Prop :=
-  ∀ index : Fin 8, ∃ event ∈ events,
-    event.IsCanonicalCode commitDeferredSyscallId ∧
-      event.arg1.toNat = index ∧
+  ∀ event ∈ events, ∀ index : Fin 8,
+    event.IsCanonicalCode commitDeferredSyscallId → event.arg1.toNat = index →
       (event.arg2.toNat : ZMod p) = publicValues.deferred_proofs_digest[index]
 
-/-- Public-digest meaning contributed by a shard's decoded syscall rows.  A flag already carried in
-from an earlier shard imposes no duplicate-row requirement here. -/
+/-- Per-shard AIR conclusion for commit syscalls: every existing row is correct.  Coverage is the
+separate whole-execution `CompleteCommitCoverage` contract. -/
 def CommitRowsMatch {p : ℕ} (publicValues : SP1PublicValues (ZMod p))
     (events : List CoreSyscallEvent) : Prop :=
-  (PublicCommitIntroduced publicValues → PublicDigestRowsMatch publicValues events) ∧
-    (DeferredCommitIntroduced publicValues → DeferredDigestRowsMatch publicValues events)
-
-/-- The narrowly scoped temporary premise for a concrete AIR relation and its audited event decoder.
-The two predicates mean that the corresponding rolling flag is *introduced in this shard*
-(`prev = 0 ∧ current = 1`), not merely that an earlier shard already set it. -/
-structure CoreAIRSemanticAssumptions {Statement AIRWitness : Type}
-    (air : WitnessRelation.Relation Statement AIRWitness)
-    (eventsOf : Statement → AIRWitness → List CoreSyscallEvent)
-    (publicCommitFlag deferredCommitFlag : Statement → Prop) : Prop where
-  publicCommitRows : ∀ statement witness,
-    air statement witness → publicCommitFlag statement →
-      DigestRowsCover commitSyscallId (eventsOf statement witness)
-  deferredCommitRows : ∀ statement witness,
-    air statement witness → deferredCommitFlag statement →
-      DigestRowsCover commitDeferredSyscallId (eventsOf statement witness)
-
-/-- Specialize the premise to an exact-table system and its total syscall decoder. -/
-abbrev SystemSemanticAssumptions {Statement : Type} (system : System Statement)
-    (cluster : Cluster) (decoder : EventDecoder system)
-    (publicCommitFlag deferredCommitFlag : Statement → Prop) :=
-  CoreAIRSemanticAssumptions (system.relationFor cluster) decoder.syscallEvents
-    publicCommitFlag deferredCommitFlag
+  PublicCommitRowsMatch publicValues events ∧
+    DeferredCommitRowsMatch publicValues events
 
 end SP1Clean.CoreAIR

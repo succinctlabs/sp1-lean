@@ -235,6 +235,21 @@ def executionTraces (segments : List (Option Machine.EventExecutionTrace)) :
     List Machine.EventExecutionTrace :=
   segments.filterMap id
 
+/-- The syscall transcript of the entire execution, in authenticated shard order. -/
+def executionSyscallEvents (segments : List (Option Machine.EventExecutionTrace)) :
+    List Machine.CoreSyscallEvent :=
+  (executionTraces segments).flatMap Machine.EventExecutionTrace.syscallEvents
+
+/-- Trace-level form of the standard halt wrapper's eight-call COMMIT coverage. -/
+def CompleteCommitCoverage (segments : List (Option Machine.EventExecutionTrace)) : Prop :=
+  CoreAIR.CompleteCommitCoverage (executionSyscallEvents segments)
+
+/-- Optional deferred-commit twin.  It is named separately because the current public-output claim
+authenticates the deferred digest cryptographically and does not yet claim wrapper-derived row coverage. -/
+def CompleteDeferredCommitCoverage
+    (segments : List (Option Machine.EventExecutionTrace)) : Prop :=
+  CoreAIR.CompleteDeferredCommitCoverage (executionSyscallEvents segments)
+
 /-- Full-state alignment of consecutive shard segments.
 
 Public values authenticate PC and clock continuity, but those two fields alone do not authenticate
@@ -271,6 +286,19 @@ def LastExecutionHalts (program : GuestProgram) (exitCode : BitVec 64)
     (executionTraces segments).getLast? = some execution ∧
       execution.HaltsWith program exitCode
 
+/-- Explicit program-level contract for SP1's standard `syscall_halt` wrapper.  It connects a valid,
+fully stitched execution that ends in the raw HALT syscall to eight canonical COMMIT events somewhere
+in the complete cross-shard transcript.  This is not an AIR theorem: callers justify it from the
+verification-key-bound guest program. -/
+def UsesStandardHaltWrapper {p : ℕ} (handler : Machine.SyscallHandler)
+    (program : GuestProgram) : Prop :=
+  ∀ {publicValues : List (SP1PublicValues (ZMod p))}
+    {segments : List (Option Machine.EventExecutionTrace)} {initial final : SailState}
+    {exitCode : BitVec 64},
+    EventShardLayout handler program publicValues segments initial final →
+      LastExecutionHalts program exitCode segments →
+        CompleteCommitCoverage segments
+
 /-- Proof-free semantic witness recovered from a complete recursive Core proof. -/
 structure SP1ExecutionWitness where
   program : GuestProgram
@@ -285,7 +313,10 @@ The public ledger is concrete (`AuthenticatedLedger`), including every equality 
 compression loop and its complete-proof endpoints.  Only two cryptographic/algebraic facts remain as
 narrow parameters: septic global-sum balance and authentication of the deferred-proof digest.  The
 semantic layout separately requires complete-state stitching, avoiding the unsound inference that
-PC/timestamp continuity alone identifies a machine state. -/
+PC/timestamp continuity alone identifies a machine state.  Every COMMIT row that occurs is tied to the
+corresponding shard digest by `EventShardLayout`, but this base relation intentionally does not require
+all eight rows to occur.  Complete coverage belongs to the optional program-level strengthening below;
+it is not inferred from an AIR flag or from the occurrence of a raw HALT ECALL. -/
 def SP1ExecutionRelation {p : ℕ} {Digest : Type}
     (layout : SP1PublicValuesLayout) (model : Machine.SP1MachineModel)
     (handler : Machine.SyscallHandler) (programBinding : ProgramBinding p Digest)
@@ -316,5 +347,61 @@ def SP1ExecutionRelation {p : ℕ} {Digest : Type}
       statement.shards.getLast? = some finalPublicValues ∧
         deferredAuthenticated finalPublicValues.deferred_proofs_digest ∧
         finalPublicValues.exitCodeBits = witness.exitCode
+
+/-- Optional strengthening for claims that need every committed-digest word to occur in the syscall
+transcript.  This is only COMMIT-event coverage: output bytes and the wrapper's hashing behavior are not
+yet modeled, so it must not be described as full guest-public-output authentication. -/
+def SP1CommitCoveredExecutionRelation {p : ℕ} {Digest : Type}
+    (layout : SP1PublicValuesLayout) (model : Machine.SP1MachineModel)
+    (handler : Machine.SyscallHandler) (programBinding : ProgramBinding p Digest)
+    (globalBalance : GlobalCumulativeBalance p)
+    (deferredAuthenticated : DeferredDigestAuthenticated p) :
+    WitnessRelation.Relation (SP1ExecutionStatement (ZMod p) Digest) SP1ExecutionWitness :=
+  fun statement witness =>
+    SP1ExecutionRelation layout model handler programBinding globalBalance
+        deferredAuthenticated statement witness ∧
+      CompleteCommitCoverage witness.segments
+
+/-- A verifying-key-specific contract asserting that every program admitted by the binding relation
+uses the standard halt wrapper.  It can be proved from the exact committed ROM, or retained as an
+explicit application-level hypothesis until program correctness is formalized. -/
+def OutputSafeVerifyingKey {p : ℕ} {Digest : Type} (handler : Machine.SyscallHandler)
+    (programBinding : ProgramBinding p Digest)
+    (verifyingKey : SP1MachineVerifyingKey (ZMod p) Digest) : Prop :=
+  ∀ program, programBinding verifyingKey program →
+    UsesStandardHaltWrapper (p := p) handler program
+
+/-- A base execution plus correctness of its selected program's halt wrapper has complete COMMIT
+coverage.  AIR supplies correctness of every row that exists; `wrapper` supplies existence. -/
+theorem commitCovered_of_standardWrapper {p : ℕ} {Digest : Type}
+    {layout : SP1PublicValuesLayout} {model : Machine.SP1MachineModel}
+    {handler : Machine.SyscallHandler} {programBinding : ProgramBinding p Digest}
+    {globalBalance : GlobalCumulativeBalance p}
+    {deferredAuthenticated : DeferredDigestAuthenticated p}
+    {statement : SP1ExecutionStatement (ZMod p) Digest} {witness : SP1ExecutionWitness}
+    (valid : SP1ExecutionRelation layout model handler programBinding globalBalance
+      deferredAuthenticated statement witness)
+    (wrapper : UsesStandardHaltWrapper (p := p) handler witness.program) :
+    SP1CommitCoveredExecutionRelation layout model handler programBinding globalBalance
+      deferredAuthenticated statement witness := by
+  refine ⟨valid, ?_⟩
+  rcases valid with ⟨_, _, _, _, _, _, _, _, shardLayout, halts, _⟩
+  exact wrapper shardLayout halts
+
+/-- A verification key satisfying the application-level output-safety contract supplies the wrapper
+hypothesis for whichever bound program appears in the recovered execution. -/
+theorem commitCovered_of_outputSafeVerifyingKey {p : ℕ} {Digest : Type}
+    {layout : SP1PublicValuesLayout} {model : Machine.SP1MachineModel}
+    {handler : Machine.SyscallHandler} {programBinding : ProgramBinding p Digest}
+    {globalBalance : GlobalCumulativeBalance p}
+    {deferredAuthenticated : DeferredDigestAuthenticated p}
+    {statement : SP1ExecutionStatement (ZMod p) Digest} {witness : SP1ExecutionWitness}
+    (valid : SP1ExecutionRelation layout model handler programBinding globalBalance
+      deferredAuthenticated statement witness)
+    (outputSafe : OutputSafeVerifyingKey handler programBinding statement.verifyingKey) :
+    SP1CommitCoveredExecutionRelation layout model handler programBinding globalBalance
+      deferredAuthenticated statement witness :=
+  commitCovered_of_standardWrapper valid
+    (outputSafe witness.program valid.2.2.2.1)
 
 end SP1Clean.Execution

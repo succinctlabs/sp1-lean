@@ -48,7 +48,7 @@ set_option maxHeartbeats 8000000 in
   let E5 : F := cols.bit * 65536
   let E6 : F := E4 + E5
   [
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) E6 16 0), is_real⟩,
+    ⟨.send, (.byte 6 E6 16 0), is_real⟩,
   ]
 
 end U16CompareOperation

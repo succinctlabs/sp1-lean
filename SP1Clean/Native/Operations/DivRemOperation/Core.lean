@@ -19,13 +19,14 @@ constrains is a field of the input `cols` — so its `localLength` is `0`. It ca
   (low 64 bits, gate + `is_mul` = `is_real`) and `upper` (high 64 bits, gate = `is_real_not_word`,
   `is_mulh = is_div + is_rem` signed / `is_mulhu = is_divu + is_remu` unsigned);
 * the 8 inline product-glue `assertZero`s tying the `c_times_quotient` u16 limbs to the Mul
-  gadgets' product bytes — limbs 0–3 to `lower`'s bytes 0–7 unconditionally, limbs 4–7 to
+  gadgets' product bytes — limbs 0–3 to `lower`'s bytes 0–7 under `is_real`, limbs 4–7 to
   `upper`'s bytes 8–15 gated by the 64-bit flag sum `g64 = is_div + is_divu + is_rem + is_remu`;
 * the chip's own assertZero tail `assertZeros (ownAsserts cols)` (the `[E13…E367, op_a_0]` list);
-* the 34 `byteChannel` u16 `Range` pulls: the 8 carry-chain limbs (`E123…E151`, rebuilt over the
+* the 32 `byteChannel` u16 `Range` pulls: the 8 carry-chain limbs (`E123…E151`, rebuilt over the
   committed columns with the `rn = rem_neg · 65535` sign-fill addend) and the
-  `abs_c`/`abs_remainder`/`quotient`/`remainder`/`c_times_quotient` limbs, all gated `is_real`,
-  plus the two `e2`-gated word-variant checks on `remainder[1]`/`quotient[1]`.
+  `abs_c`/`abs_remainder`/`quotient`/`remainder`/`c_times_quotient` limbs, all gated `is_real`.
+  The word-gated `remainder[1]`/`quotient[1]` pulls belong to the two corresponding
+  `U16MSBOperation` subcircuits in `DivRemCompare`; they are not duplicated here.
 
 The emission order and every argument are verbatim from `Proofs/Chips/DivRemChip/Defs.lean` `main`
 (lines 258–282, 406–456), with each witnessed local replaced by the corresponding `DivRemCols`
@@ -45,7 +46,7 @@ open SP1Clean.DivRemChip (ownAsserts assertZeros)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 /-- Emit the DivRem row's product cluster (`MulOperation` ×2 + the 8 glue asserts), the chip's own
-assertZero tail (`ownAsserts`), and the 34 byte-range pulls, each applied to the committed `cols`
+assertZero tail (`ownAsserts`), and the 32 byte-range pulls, each applied to the committed `cols`
 fields. No witnesses — the only fresh state is the composed `MulOperation` assertions' channel
 activity plus the cluster's own byte pulls. -/
 def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
@@ -58,21 +59,25 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
   assertion MulOperation.circuit
     ⟨cols.quotient_comp, cols.c, cols.c_times_quotient_upper,
      cols.is_real_not_word, 0, cols.is_div + cols.is_rem, cols.is_divu + cols.is_remu, 0, 0⟩
-  -- Link `c_times_quotient` to the two Mul gadgets' product bytes: the low 64 (limbs 0..3) to
-  -- `lower`'s bytes 0..7 unconditionally, the high 64 (limbs 4..7) to `upper`'s bytes 8..15 gated
-  -- by the 64-bit flag sum (on word rows `upper` is all-zero while `c_times_quotient[4..7]`
-  -- carries the 128-bit product's sign-extension limbs, so an unconditional tie would be
-  -- unsatisfiable by the honest witness).
+  -- Link `c_times_quotient` to the two Mul gadgets' product bytes. SP1 gates the low result
+  -- placement by `is_mul = is_real`; retaining that gate is essential on adversarial padding
+  -- rows. The high 64 (limbs 4..7) is gated by the 64-bit flag sum (on word rows `upper` is
+  -- all-zero while `c_times_quotient[4..7]` carries the 128-bit product's sign-extension limbs,
+  -- so an unconditional tie would be unsatisfiable by the honest witness).
   let c256 : Expression (ZMod p) := 256
   let g64 := cols.is_div + cols.is_divu + cols.is_rem + cols.is_remu
-  cols.c_times_quotient[0] ===
-    cols.c_times_quotient_lower.product[0] + cols.c_times_quotient_lower.product[1] * c256
-  cols.c_times_quotient[1] ===
-    cols.c_times_quotient_lower.product[2] + cols.c_times_quotient_lower.product[3] * c256
-  cols.c_times_quotient[2] ===
-    cols.c_times_quotient_lower.product[4] + cols.c_times_quotient_lower.product[5] * c256
-  cols.c_times_quotient[3] ===
-    cols.c_times_quotient_lower.product[6] + cols.c_times_quotient_lower.product[7] * c256
+  cols.is_real * (cols.c_times_quotient[0] -
+    (cols.c_times_quotient_lower.product[0] +
+      cols.c_times_quotient_lower.product[1] * c256)) === 0
+  cols.is_real * (cols.c_times_quotient[1] -
+    (cols.c_times_quotient_lower.product[2] +
+      cols.c_times_quotient_lower.product[3] * c256)) === 0
+  cols.is_real * (cols.c_times_quotient[2] -
+    (cols.c_times_quotient_lower.product[4] +
+      cols.c_times_quotient_lower.product[5] * c256)) === 0
+  cols.is_real * (cols.c_times_quotient[3] -
+    (cols.c_times_quotient_lower.product[6] +
+      cols.c_times_quotient_lower.product[7] * c256)) === 0
   g64 * (cols.c_times_quotient[4] -
     (cols.c_times_quotient_upper.product[8] + cols.c_times_quotient_upper.product[9] * c256)) === 0
   g64 * (cols.c_times_quotient[5] -
@@ -140,12 +145,6 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
   byteChannel.pullIf g (⟨6, cols.c_times_quotient[5], 16, 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.pullIf g (⟨6, cols.c_times_quotient[6], 16, 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.pullIf g (⟨6, cols.c_times_quotient[7], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  -- Two extra `e2`-gated u16 range checks on `remainder[1]`/`quotient[1]`: the word-variant MSB
-  -- gadgets need `< 2^16` even on padding word rows (`is_real = 0`, word flag set), where the main
-  -- `is_real`-gated checks are off.
-  let e2 := cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw
-  byteChannel.pullIf e2 (⟨6, cols.remainder[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.pullIf e2 (⟨6, cols.quotient[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
 
 set_option maxHeartbeats 4000000 in
 /-- Clean derives the structural metadata; the cluster contributes no fresh witnesses

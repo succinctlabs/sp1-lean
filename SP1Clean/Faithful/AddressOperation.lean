@@ -8,9 +8,10 @@ import SP1Clean.Faithful.ChipTactics
 /-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (Address)
 
 Anchors the native `AddressOperation` gadget's `RawSpec` to **SP1's `AddressOperation` constraint
-definition** (`Extracted/AddressOperation.lean`). A value-returning op (it also emits a separate
-`value : Vector F 3`, unused here), it composes an `AddrAddOperation` sub-list (three `Range` sends at
-`n = 16`) alongside its own offset `Range` send at `n = 13` — hence both `val_16` and `val_13`. -/
+definition** (`Extracted/AddressOperation.lean`). It composes an `AddrAddOperation` sub-list (three
+`Range` sends at `n = 16`) alongside its own offset `Range` send at `n = 13` — hence both `val_16`
+and `val_13`. The companion `address_alignedValue_faithful` anchors the operation's separate
+aligned-address return value, which is consumed by the load/store Memory interactions. -/
 
 namespace SP1Clean.Faithful
 
@@ -19,6 +20,15 @@ open SP1Clean.Extracted
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- SP1's generated operation return and the audited contract-surface projection are identical. -/
+theorem address_alignedValue_faithful (input : SP1Clean.AddressOperation.Inputs (ZMod p))
+    (cols : Extracted.AddressOperation (ZMod p)) :
+    SP1Clean.AddressOperation.alignedValue input cols =
+      Extracted.AddressOperation.value input.b input.cc input.offset_bit0 input.offset_bit1
+        input.offset_bit2 1 cols := by
+  simp only [SP1Clean.AddressOperation.alignedValue, Extracted.AddressOperation.value]
 
 set_option maxHeartbeats 2000000 in
 /-- **Faithfulness anchor.** SP1's `AddressOperation` constraint lists (`asserts` + `interactions`)
@@ -35,7 +45,7 @@ theorem address_constraints_faithful (b cc : Word (ZMod p))
     Extracted.AddrAddOperation.asserts, Extracted.AddrAddOperation.interactions,
     List.Forall, List.cons_append, List.nil_append,
     Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ,
-    Interaction.toProp_send_byte, ByteOpcode.ofNat_six,
+    Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_Range, val_16, val_13_zmod_p, one_ne_zero, ne_eq, not_false_eq_true, true_implies,
     SP1Clean.AddressOperation.RawSpec, SP1Clean.AddrAddOperation.RawSpec,
     one_mul, add_zero, sub_zero, sub_self, mul_zero, true_and, and_assoc, bool_iff,

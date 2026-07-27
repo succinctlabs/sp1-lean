@@ -72,12 +72,12 @@ set_option maxRecDepth 100000 in
   let E4 : F := cols.values[11] * 65536
   let E5 : F := cols.values[12] + E4
   [
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[12] 16 0), cols.values[14]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[9] 16 0), cols.values[14]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.values[11] cols.values[10]), cols.values[14]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 4) 1 cols.values[13] 32), cols.values[14]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[7] 16 0), cols.values[14]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.values[8] 0), cols.values[14]⟩,
+    ⟨.send, (.byte 6 cols.values[12] 16 0), cols.values[14]⟩,
+    ⟨.send, (.byte 6 cols.values[9] 16 0), cols.values[14]⟩,
+    ⟨.send, (.byte 3 0 cols.values[11] cols.values[10]), cols.values[14]⟩,
+    ⟨.send, (.byte 4 1 cols.values[13] 32), cols.values[14]⟩,
+    ⟨.send, (.byte 6 cols.values[7] 16 0), cols.values[14]⟩,
+    ⟨.send, (.byte 3 0 cols.values[8] 0), cols.values[14]⟩,
     ⟨.send, (.memory cols.values[4] cols.values[5] cols.values[13] 0 0 cols.values[0] cols.values[1] cols.values[2] cols.values[3]), cols.values[14]⟩,
     ⟨.receive, (.memory E3 E5 cols.values[13] 0 0 cols.values[0] cols.values[1] cols.values[2] cols.values[3]), cols.values[14]⟩,
   ]

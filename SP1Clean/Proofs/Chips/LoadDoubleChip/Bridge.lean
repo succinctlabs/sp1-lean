@@ -15,7 +15,7 @@ word into the result register `rd`), given:
 * the register read of the base address `rs1` (`h_rs1`),
 * the PC read (`h_pc`),
 * the eight memory bytes that constitute the loaded `Word` (`hmem₀ … hmem₇`),
-* alignment / fits / non-reserved-address facts (`h_aligned` / `h_fits` / `h_lo`),
+* alignment / wrapped-address range facts (`h_aligned` / `h_hi` / `h_lo`),
 
 mirroring `SailMem.run_vmem_read_of_width_8'`. This is the memory analogue of
 `AddBridge.correct_add_native`: the caller supplies the register/PC reads and the
@@ -116,9 +116,8 @@ theorem correct_load_double_native
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 8 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 8 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hloaded : Word.isU64 loaded)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]?
@@ -167,40 +166,37 @@ theorem correct_load_double_native
   -- Register read of `rs1` survives the `nextPC` write.
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
     rwa [hsp, SailState.get_reg?_insert_nextPC]
-  -- The eight memory bytes on `sp` (same memory as `s`), in the `reg_val.toNat + offset.toNat` form.
-  have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
-      = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
-  have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]?
-      = some (BitVec.ofNat 8 loaded[0].val) := by rwa [hmem_eq, ← hadd]
-  have hm₁ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]?
-      = some (BitVec.ofNat 8 (loaded[0].val >>> 8)) := by rwa [hmem_eq, ← hadd]
-  have hm₂ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2]?
-      = some (BitVec.ofNat 8 loaded[1].val) := by rwa [hmem_eq, ← hadd]
-  have hm₃ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 3]?
-      = some (BitVec.ofNat 8 (loaded[1].val >>> 8)) := by rwa [hmem_eq, ← hadd]
-  have hm₄ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 4]?
-      = some (BitVec.ofNat 8 loaded[2].val) := by rwa [hmem_eq, ← hadd]
-  have hm₅ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 5]?
-      = some (BitVec.ofNat 8 (loaded[2].val >>> 8)) := by rwa [hmem_eq, ← hadd]
-  have hm₆ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 6]?
-      = some (BitVec.ofNat 8 loaded[3].val) := by rwa [hmem_eq, ← hadd]
-  have hm₇ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 7]?
-      = some (BitVec.ofNat 8 (loaded[3].val >>> 8)) := by rwa [hmem_eq, ← hadd]
+  -- The eight memory bytes on `sp` (same memory as `s`) at the wrapped effective address.
+  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]?
+      = some (BitVec.ofNat 8 loaded[0].val) := by rwa [hmem_eq]
+  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]?
+      = some (BitVec.ofNat 8 (loaded[0].val >>> 8)) := by rwa [hmem_eq]
+  have hm₂ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 2]?
+      = some (BitVec.ofNat 8 loaded[1].val) := by rwa [hmem_eq]
+  have hm₃ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]?
+      = some (BitVec.ofNat 8 (loaded[1].val >>> 8)) := by rwa [hmem_eq]
+  have hm₄ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 4]?
+      = some (BitVec.ofNat 8 loaded[2].val) := by rwa [hmem_eq]
+  have hm₅ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 5]?
+      = some (BitVec.ofNat 8 (loaded[2].val >>> 8)) := by rwa [hmem_eq]
+  have hm₆ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 6]?
+      = some (BitVec.ofNat 8 loaded[3].val) := by rwa [hmem_eq]
+  have hm₇ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 7]?
+      = some (BitVec.ofNat 8 (loaded[3].val >>> 8)) := by rwa [hmem_eq]
   -- The alignment fact in Sail form, and the range-subset PMA fact.
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 8 = true := by
-    rwa [is_aligned_vaddr_iff_mod, hadd]
+    rwa [is_aligned_vaddr_iff_mod]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 8 (by omega) h_lo (by rwa [hadd])
+    range_subset_sp1_pma _ 8 (by omega) h_lo h_hi
   -- The read result on `sp`.
   have hread := run_vmem_read_of_width_8' rs1_idx reg_val (BitVec.signExtend 64 imm)
     (BitVec.ofNat 8 loaded[0].val) (BitVec.ofNat 8 (loaded[0].val >>> 8))
     (BitVec.ofNat 8 loaded[1].val) (BitVec.ofNat 8 (loaded[1].val >>> 8))
     (BitVec.ofNat 8 loaded[2].val) (BitVec.ofNat 8 (loaded[2].val >>> 8))
     (BitVec.ofNat 8 loaded[3].val) (BitVec.ofNat 8 (loaded[3].val >>> 8))
-    sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range
+    sp hsp_init hsp_rs1 h_align' hsp_config h_in_range
     hm₀ hm₁ hm₂ hm₃ hm₄ hm₅ hm₆ hm₇
   simp only at hread
   -- The `.toNat` of the concatenated read equals `Word.toNat loaded`.
@@ -241,10 +237,10 @@ theorem correct_load_double_native
 
 omit [Fact (2 ^ 17 < p)] in
 /-- **End-to-end composition.** From the `LoadDouble` chip's prover assumptions (the operand `isU64`s
-and the valid/aligned/non-reserved 48-bit address) plus the decode + register/PC reads + the eight
-memory bytes (the read returns the loaded word — offline-memory consistency) plus the read-fits-in-
-physical-memory bound, the RISC-V Sail `LD` execution agrees with the SP1 chip emulation. The loaded
-word is the chip's `memory_access.prev_value` column. The memory analogue of
+and the valid/aligned/non-reserved wrapped 48-bit address) plus the decode + register/PC reads + the
+eight memory bytes (the read returns the loaded word — offline-memory consistency), the RISC-V Sail
+`LD` execution agrees with the SP1 chip emulation. The loaded word is the chip's
+`memory_access.prev_value` column. The memory analogue of
 `AddBridge.add_chip_reaches_sail`. -/
 theorem ld_chip_reaches_sail
     (input : LoadDoubleChip.Inputs (ZMod p)) (cols : Extracted.LoadDoubleColumns (ZMod p))
@@ -252,8 +248,9 @@ theorem ld_chip_reaches_sail
     (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (hconfig : SailState.isValidMemConfig s hs)
     (h_assum : LoadDoubleChip.Assumptions input data)
+    (h_address : AddressOperation.ValidAddress
+      ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩)
     (h_imm : Word.toBitVec64 input.op_c_imm = BitVec.signExtend 64 imm)
-    (h_hi : Word.toNat input.op_b_val + Word.toNat input.op_c_imm + 8 ≤ 2 ^ 48)
     (hloaded : Word.isU64 cols.memory_access.prev_value)
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some (Word.toBitVec64 input.op_b_val))
@@ -276,22 +273,16 @@ theorem ld_chip_reaches_sail
     (spec_ld imm rs1_idx rd_idx).run s
       = (sp1_ld rd_idx pc cols.memory_access.prev_value).run s := by
   haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
-  obtain ⟨h_b, h_c, _h_fits48, h_nonres, h_align48, _h_pv_isu64⟩ := h_assum
-  have hreg : (Word.toBitVec64 input.op_b_val).toNat = Word.toNat input.op_b_val :=
-    Word.toBitVec64_toNat h_b
-  have hoff : (BitVec.signExtend 64 imm).toNat = Word.toNat input.op_c_imm := by
-    rw [← h_imm]; exact Word.toBitVec64_toNat h_c
+  obtain ⟨h_b, h_c, _h_pv_isu64⟩ := h_assum
+  have h_address' := AddressOperation.effectiveAddress_facts h_b h_c h_address
+  simp only [AddressOperation.effectiveAddress, ZMod.val_zero, zero_add] at h_address'
+  rw [h_imm] at h_address'
   refine correct_load_double_native rs1_idx rd_idx imm (Word.toBitVec64 input.op_b_val)
-    cols.memory_access.prev_value pc s hs hconfig h_pc h_rs1 ?_ ?_ ?_ ?_ hloaded
+    cols.memory_access.prev_value pc s hs hconfig h_pc h_rs1 ?_ ?_ ?_ hloaded
     hmem₀ hmem₁ hmem₂ hmem₃ hmem₄ hmem₅ hmem₆ hmem₇
-  · -- alignment: `sum % 8 = 0` from the chip's `sum % 2^48 % 8 = 0`
-    rwa [hreg, hoff, ← Nat.mod_mod_of_dvd _ (by norm_num : (8 : ℕ) ∣ 2 ^ 48)]
-  · -- fits in 64 bits (from the read-fits bound)
-    rw [hreg, hoff]; omega
-  · -- read fits in the 48-bit physical window
-    rwa [hreg, hoff]
-  · -- non-reserved: `2^16 ≤ (reg_val + offset).toNat`, no wrap since `sum < 2^48`
-    rw [BitVec.toNat_add, hreg, hoff, Nat.mod_eq_of_lt (by omega)]; omega
+  · exact h_address'.2.2.symm
+  · omega
+  · exact h_address'.2.1
 
 end SP1Clean.LoadSail
 
@@ -336,6 +327,19 @@ def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadDoubleColumns (ZMod p
   ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, inp.is_real, inp.memory_access.prev_value, 35, .regWrite⟩
 
+/-- LoadDouble's exact aligned RAM-access projection. -/
+def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadDoubleColumns (ZMod p)) :
+    Trace.RamAccessView (ZMod p) :=
+  { compareLow := inp.memory_access.access_timestamp.compare_low
+    prevHigh := inp.memory_access.access_timestamp.prev_high
+    prevLow := inp.memory_access.access_timestamp.prev_low
+    diffLow := inp.memory_access.access_timestamp.diff_low_limb
+    diffHigh := inp.memory_access.access_timestamp.diff_high_limb
+    address := AddressOperation.alignedValue
+      ⟨inp.op_b_val, inp.op_c_imm, 0, 0, 0, inp.is_real⟩ cols.address_operation
+    priorValue := inp.memory_access.prev_value
+    newValue := inp.memory_access.prev_value }
+
 /-- **LoadDouble's `advanceReady` bundle**: routing (`op_a ≠ 0`), the low-pc-limb bound, the four
 loaded-limb bounds (`memory_access.prev_value[i] < 2^16`, i.e. `isU64`), the **8-byte alignment**, the
 address bounds, and the **eight-byte memory-read binding** at `op_b_memory.prev_value + op_c_imm`. -/
@@ -345,12 +349,10 @@ def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadDoubleColumns (Z
   (inp.state.pc[0]).val < 2 ^ 16 ∧
   inp.memory_access.prev_value[0].val < 2 ^ 16 ∧ inp.memory_access.prev_value[1].val < 2 ^ 16 ∧
   inp.memory_access.prev_value[2].val < 2 ^ 16 ∧ inp.memory_access.prev_value[3].val < 2 ^ 16 ∧
-  ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 8 = 0 ∧
-  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 8 < 2 ^ 64 ∧
-  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 8 ≤ 2 ^ 48 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat % 8 = 0 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 8 ≤ 2 ^ 48 ∧
   2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
       + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
   s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
@@ -393,7 +395,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadDoubleColumns (ZMo
     (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
     (hready : AdvanceReady inp cols prog s) :
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
-  obtain ⟨hnonX0, hpc0, hpv0, hpv1, hpv2, hpv3, h_aligned, h_fits, h_hi, h_lo,
+  obtain ⟨hnonX0, hpc0, hpv0, hpv1, hpv2, hpv3, h_aligned, h_hi, h_lo,
     hmem₀, hmem₁, hmem₂, hmem₃, hmem₄, hmem₅, hmem₆, hmem₇⟩ := hready
   refine advance_of_load_width8
     (BitVec.ofNat 8 inp.memory_access.prev_value[0].val)
@@ -407,7 +409,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadDoubleColumns (ZMo
     hcfg hrom hpcread hvalb hdecrom
     (by show (35 : ZMod p) = ((loadOpcode 8 false).toNat : ZMod p)
         rw [show (loadOpcode 8 false).toNat = 35 from by decide]; norm_num)
-    rfl rfl hnonX0 hpc0 rfl h_aligned h_fits h_hi h_lo
+    rfl rfl hnonX0 hpc0 rfl h_aligned h_hi h_lo
     hmem₀ hmem₁ hmem₂ hmem₃ hmem₄ hmem₅ hmem₆ hmem₇ ?_ rfl rfl
   exact loadDouble_hval inp.memory_access.prev_value
     (Word.isU64_of_cases hpv0 hpv1 hpv2 hpv3)
@@ -421,6 +423,7 @@ def kind : Soundness.ChipKind p where
   Inputs := LoadDoubleChip.Inputs
   Cols := Extracted.LoadDoubleColumns
   view := rowView
+  ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => LoadDoubleChip.Spec inp cols data
   advanceReady := AdvanceReady
   advance := some (PLift.up advance)

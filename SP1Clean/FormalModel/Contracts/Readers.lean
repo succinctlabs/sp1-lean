@@ -16,6 +16,35 @@ The `Inputs` structs and semantic `Spec`s for the register-adapter / state reade
 Each declaration keeps its original namespace, so the reader proof files resolve them unchanged
 after `import SP1Clean.FormalModel.Contracts.Readers`. -/
 
+namespace SP1Clean.Readers
+
+/-- Component-wise evaluation of a register-access column block. -/
+@[circuit_norm] theorem evalRegisterAccessColumns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RegisterAccessCols (Expression F)) :
+    Eval.eval env cols =
+      ({ prev_value := Eval.eval env cols.prev_value
+         access_timestamp := Eval.eval env cols.access_timestamp } :
+        Extracted.RegisterAccessCols F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Component-wise evaluation of the I-type adapter row shared by loads and stores.  Keeping this
+folded avoids repeatedly unfolding the derived `ProvableStruct` instance in parent-chip proofs. -/
+@[circuit_norm] theorem evalITypeColumns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.ITypeReader (Expression F)) :
+    Eval.eval env cols =
+      ({ op_a := Eval.eval env cols.op_a
+         op_a_memory := Eval.eval env cols.op_a_memory
+         op_a_0 := Eval.eval env cols.op_a_0
+         op_b := Eval.eval env cols.op_b
+         op_b_memory := Eval.eval env cols.op_b_memory
+         op_c_imm := Eval.eval env cols.op_c_imm } :
+        Extracted.ITypeReader F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+end SP1Clean.Readers
+
 namespace SP1Clean.Readers.RegisterAccessTimestamp
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
@@ -276,13 +305,18 @@ structure Inputs (F : Type) where
 deriving ProvableStruct
 
 /-- Semantic contract for the I-type adapter (op_a a destination write). The four `op_a_0` zeroing gates
-(`op_a_0 * wv_i = 0`, the `rd = x0 ⇒ write 0` rule), the `op_a_0` binary fact, and the op_a/op_b timestamp
-byte bounds (`is_real`-gated, access clocks `clk_low + 4/3`). No op_c register access (it is the immediate).
-The register index bounds + value `isU64` stay non-local (received facts; trace level). -/
+(`op_a_0 * wv_i = 0`, the `rd = x0 ⇒ write 0` rule), the Program-row-derived `op_a_0` binary fact on
+trusted rows, and the op_a/op_b timestamp byte bounds (`is_real`-gated, access clocks `clk_low + 4/3`).
+No op_c register access (it is the immediate). The register index bounds + value `isU64` stay non-local
+(received facts; trace level).
+
+Upstream SP1's `ITypeReader` does not emit a standalone `op_a_0` boolean constraint. It obtains that
+fact from the Program interaction. Trusted Core chips pass `is_trusted = is_real`; chips which need a
+padding value constrain it at the chip boundary. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   (input.cols.op_a_0 * input.wv0 = 0 ∧ input.cols.op_a_0 * input.wv1 = 0 ∧
       input.cols.op_a_0 * input.wv2 = 0 ∧ input.cols.op_a_0 * input.wv3 = 0) ∧
-    (input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1) ∧
+    (input.is_trusted = 1 → input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1) ∧
     RegisterAccessCols.Spec ⟨input.cols.op_a_memory, input.is_real, input.clk_low + 4⟩ ∧
     RegisterAccessCols.Spec ⟨input.cols.op_b_memory, input.is_real, input.clk_low + 3⟩ ∧
     -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
@@ -294,6 +328,15 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
       Word.isU64 input.cols.op_b_memory.prev_value ∧
       input.cols.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
       input.cols.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24)
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The destination-zero flag is boolean when the Program row marks this reader input trusted.
+Keep this projection behind a named lemma so parent-chip proofs do not normalize the full reader
+contract merely to select its second conjunct. -/
+theorem opA0_binary_of_spec (input : Inputs (ZMod p)) (spec : Spec input)
+    (trusted : input.is_trusted = 1) :
+    input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1 :=
+  spec.2.1 trusted
 
 /-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the I-type form: op_b a register index
 (`#v[reg, 0, 0, 0]`), op_c the immediate `op_c_imm` (a `Word`), `imm_c = 1`. Defeq to the `eval` of the
@@ -323,14 +366,15 @@ structure Inputs (F : Type) where
 deriving ProvableStruct
 
 /-- Semantic contract for the immutable I-type adapter. The four `op_a_0` zeroing gates pin the **read**
-value of `x0` to `0` (`op_a_0 * op_a_memory.prev_value_i = 0`), the `op_a_0` binary fact, and the op_a/op_b
-timestamp byte bounds (`is_real`-gated, access clocks `clk_low + 4/3`). -/
+value of `x0` to `0` (`op_a_0 * op_a_memory.prev_value_i = 0`), the Program-row-derived `op_a_0`
+binary fact on trusted rows, and the op_a/op_b timestamp byte bounds (`is_real`-gated, access clocks
+`clk_low + 4/3`). As in upstream SP1, no standalone local boolean gate strengthens the reader AIR. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   (input.cols.op_a_0 * input.cols.op_a_memory.prev_value[0] = 0 ∧
       input.cols.op_a_0 * input.cols.op_a_memory.prev_value[1] = 0 ∧
       input.cols.op_a_0 * input.cols.op_a_memory.prev_value[2] = 0 ∧
       input.cols.op_a_0 * input.cols.op_a_memory.prev_value[3] = 0) ∧
-    (input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1) ∧
+    (input.is_trusted = 1 → input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1) ∧
     RegisterAccessCols.Spec ⟨input.cols.op_a_memory, input.is_real, input.clk_low + 4⟩ ∧
     RegisterAccessCols.Spec ⟨input.cols.op_b_memory, input.is_real, input.clk_low + 3⟩ ∧
     -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
@@ -376,13 +420,19 @@ structure Inputs (F : Type) where
 deriving ProvableStruct
 
 /-- Semantic contract for the J-type adapter (op_a a destination write, op_b/op_c immediates). The four
-`op_a_0` zeroing gates (`op_a_0 * wv_i = 0`, the `rd = x0 ⇒ write 0` rule), the `op_a_0` binary fact, and
-the op_a timestamp byte bounds (`is_real`-gated, access clock `clk_low + 4`). No op_b/op_c register access
-(both are immediates). The register index bounds + value `isU64` stay non-local (received facts; trace level). -/
+`op_a_0` zeroing gates (`op_a_0 * wv_i = 0`, the `rd = x0 ⇒ write 0` rule), the Program-row-derived
+`op_a_0` binary fact on trusted rows, and the op_a timestamp byte bounds (`is_real`-gated, access clock
+`clk_low + 4`). No op_b/op_c register access (both are immediates). The register index bounds + value
+`isU64` stay non-local (received facts; trace level).
+
+The binary fact is intentionally conditional on `is_trusted = 1`: upstream SP1's `JTypeReader` does
+not emit a standalone `op_a_0` boolean constraint. It obtains that fact from the Program interaction.
+The trusted Core chips pass `is_trusted = is_real`; their own padding constraint pins `op_a_0 = 0`
+when `is_real = 0`. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   (input.cols.op_a_0 * input.wv0 = 0 ∧ input.cols.op_a_0 * input.wv1 = 0 ∧
       input.cols.op_a_0 * input.wv2 = 0 ∧ input.cols.op_a_0 * input.wv3 = 0) ∧
-    (input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1) ∧
+    (input.is_trusted = 1 → input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1) ∧
     RegisterAccessCols.Spec ⟨input.cols.op_a_memory, input.is_real, input.clk_low + 4⟩ ∧
     -- (W11 flip) decode bounds derived from the program-bus `ProgramMsg.RowSpec` pull.
     (input.is_trusted = 1 → input.cols.op_a.val < 32 ∧
@@ -391,6 +441,14 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     -- — G1 — the pulled prior record's 24-bit access-clock bound (`Channels.MemoryMsg.ClkBound`).
     (input.is_real = 1 → Word.isU64 input.cols.op_a_memory.prev_value ∧
       input.cols.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24)
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The destination-zero flag is boolean when the Program row marks this reader input trusted.
+This accessor preserves the folded `Spec` boundary in composing-chip proofs. -/
+theorem opA0_binary_of_spec (input : Inputs (ZMod p)) (spec : Spec input)
+    (trusted : input.is_trusted = 1) :
+    input.cols.op_a_0 = 0 ∨ input.cols.op_a_0 = 1 :=
+  spec.2.1 trusted
 
 /-- The Program-bus fetch message this reader pulls (SC Phase 2a) — the J/U form: both operands are
 immediates (`op_b_imm`/`op_c_imm`, `Word`s), `imm_b = imm_c = 1`. Defeq to the `eval` of the reader

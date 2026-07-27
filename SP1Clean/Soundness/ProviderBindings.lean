@@ -280,6 +280,10 @@ structure InitialBoundaryFacts
     Semantics.clkNat statement.publicValues.init_clk_high statement.publicValues.init_clk_low
   romLoaded : RomLoaded statement.program initial
   configured : SailConfigured initial
+  /-- Program-level compatibility needed only for the final refinement to an unmodified Sail chain.
+  SP1's trusted Program fetch is immutable and separate from mutable data Memory; see
+  `SailCodeMemoryCompatible`. -/
+  codeMemoryCompatible : SailCodeMemoryCompatible statement.program initial
   programProvider : ProgramProviderBound witness
   memoryProvider : MemoryInitProviderBound witness initial (Commit.initClkNat witness.data)
   memoryProviderUnique : MemoryInitProviderUnique witness

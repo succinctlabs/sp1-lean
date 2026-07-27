@@ -25,7 +25,6 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-omit [Fact (2 ^ 17 < p)] in
 /-- **Faithfulness anchor.** SP1's `U16toU8OperationSafe` constraint list (the four `U8Range`
 sends) holds iff the native gadget's `RawSpec` (each low/high byte `< 256`) holds. -/
 theorem u16tou8safe_constraints_faithful (u16_values : Vector (ZMod p) 4)
@@ -35,7 +34,8 @@ theorem u16tou8safe_constraints_faithful (u16_values : Vector (ZMod p) 4)
       SP1Clean.U16toU8OperationSafe.RawSpec u16_values cols := by
   haveI : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
   simp only [Extracted.U16toU8OperationSafe.asserts, Extracted.U16toU8OperationSafe.interactions,
-    List.Forall, Interaction.toProp_send_byte, ByteOpcode.ofNat_three, ByteOpcode.constrain_U8Range,
+    List.Forall, Interaction.toProp_send_byte, ByteOpcode.constrainField_three,
+    ByteOpcode.constrain_U8Range,
     one_ne_zero, ne_eq, not_false_eq_true, true_implies, ZMod.val_zero,
     SP1Clean.U16toU8OperationSafe.RawSpec, true_and,
     show (0 : ℕ) < 256 from by norm_num]
@@ -81,7 +81,6 @@ theorem u16tou8safe_interactions_faithful_syntactic
     fun g s => toAccess_pullIf_byte env g s
   simp only [SP1Clean.U16toU8OperationSafe.main, circuit_norm, hk,
     Extracted.U16toU8OperationSafe.interactions, Extracted.Interaction.toAccess_byte,
-    ByteOpcode.ofNat_three, ByteOpcode.idx, ZMod.val_zero,
-    h_ir, h_u0, h_u1, h_u2, h_u3, h_lb0, h_lb1, h_lb2, h_lb3, h3]
+    ZMod.val_zero, h_ir, h_u0, h_u1, h_u2, h_u3, h_lb0, h_lb1, h_lb2, h_lb3, h3]
 
 end SP1Clean.Faithful

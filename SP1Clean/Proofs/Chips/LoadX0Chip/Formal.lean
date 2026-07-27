@@ -1,4 +1,5 @@
 import SP1Clean.Native.Chips.LoadX0Chip.Defs
+import Clean.Air.Circuit
 
 /-! # `SP1Clean.LoadX0Chip` — `Assumptions` / soundness / completeness / `circuit`
 
@@ -13,27 +14,18 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Operands are 64-bit values; the load targets a non-reserved, in-range address. The offset bits are
-bits 0–2 of the address and boolean (alignment per width is enforced in-circuit by the alignment gates,
-not assumed). The final conjunct is the **W11 memory-flip** obligation: the value read from RAM
-(`memory_access.prev_value`, which for a load is the loaded word) is a valid 64-bit word — honest at the
-single-row level (the memory bus range-checks every value it holds; the read pins `new_value = prev_value`). -/
+/-- The register/immediate operands and RAM word are genuine 64-bit values. Address validity,
+non-reservation, and exact offset decomposition follow from `AddressOperation`; per-width alignment
+is enforced by this chip's own selector-gated constraints. -/
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
-    (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
-    2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
-    input.offset_bit[0].val + 2 * input.offset_bit[1].val + 4 * input.offset_bit[2].val
-      = (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 ∧
-    (input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1) ∧
-    (input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1) ∧
-    (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1) ∧
     Word.isU64 input.memory_access.prev_value
 
 set_option maxHeartbeats 16000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_pv_isu64⟩ := h_assumptions
+  obtain ⟨ha, hb, h_pv_isu64⟩ := h_assumptions
   obtain ⟨h_cpu, h_addr, h_mem, h_itype, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5, h_b6, h_gate,
     h_al2, h_al1, h_al0, h_oa1, h_oa2⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
@@ -46,23 +38,13 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   obtain ⟨_, _, _, _, _, _, _, _, _, _, hmap_ob⟩ := h_input
   have eob : ∀ i (hi : i < 3), Expression.eval env input_var_offset_bit[i] = input_offset_bit[i] :=
     fun i hi => by rw [← hmap_ob]; simp only [Vector.getElem_map]
-  -- the `AddressOperation` Assumptions (eval form).
-  have hob0' : Expression.eval env input_var_offset_bit[0] = 0
-      ∨ Expression.eval env input_var_offset_bit[0] = 1 := by rw [eob 0 (by omega)]; exact hob0
-  have hob1' : Expression.eval env input_var_offset_bit[1] = 0
-      ∨ Expression.eval env input_var_offset_bit[1] = 1 := by rw [eob 1 (by omega)]; exact hob1
-  have hob2' : Expression.eval env input_var_offset_bit[2] = 0
-      ∨ Expression.eval env input_var_offset_bit[2] = 1 := by rw [eob 2 (by omega)]; exact hob2
-  have h_off' : (Expression.eval env input_var_offset_bit[0]).val
-        + 2 * (Expression.eval env input_var_offset_bit[1]).val
-        + 4 * (Expression.eval env input_var_offset_bit[2]).val
-      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
-    rw [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)]; exact h_off
-  have h_addr_as : AddressOperation.circuit.Assumptions
+  have h_addr_as : AddressOperation.SoundnessAssumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, Expression.eval env input_var_offset_bit[0],
-          Expression.eval env input_var_offset_bit[1], Expression.eval env input_var_offset_bit[2]⟩
+          Expression.eval env input_var_offset_bit[1], Expression.eval env input_var_offset_bit[2],
+          input_is_lb + input_is_lbu + input_is_lh + input_is_lhu + input_is_lw +
+            input_is_lwu + input_is_ld⟩
         : AddressOperation.Inputs (ZMod p)) :=
-    ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
+    ⟨ha, hb, h_bin⟩
   simp only [AddressOperation.circuit] at h_addr
   have h_addr_spec := h_addr h_addr_as
   simp only [circuit_norm, eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
@@ -142,11 +124,13 @@ theorem completeness :
         + 4 * (Expression.eval env.toEnvironment input_var_offset_bit[2]).val
       = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
     rw [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)]; exact h_off
-  have h_addr_as : AddressOperation.circuit.Assumptions
+  have h_addr_as : AddressOperation.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, Expression.eval env.toEnvironment input_var_offset_bit[0],
           Expression.eval env.toEnvironment input_var_offset_bit[1],
-          Expression.eval env.toEnvironment input_var_offset_bit[2]⟩ : AddressOperation.Inputs (ZMod p)) :=
-    ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
+          Expression.eval env.toEnvironment input_var_offset_bit[2],
+          input_is_lb + input_is_lbu + input_is_lh + input_is_lhu + input_is_lw +
+            input_is_lwu + input_is_ld⟩ : AddressOperation.Inputs (ZMod p)) :=
+    ⟨ha, hb, hbin, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
   refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩,
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
@@ -183,12 +167,16 @@ def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
         + input.is_lw + input.is_lwu + input.is_ld)
       ⟨input.memory_access.access_timestamp.prev_high,
        input.memory_access.access_timestamp.prev_low,
-       var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 },
+       var { index := offset } - (4 : Expression (ZMod p)) * input.offset_bit[2] -
+         (2 : Expression (ZMod p)) * input.offset_bit[1] - input.offset_bit[0],
+       var { index := offset + 1 }, var { index := offset + 2 },
        input.memory_access.prev_value⟩,
     memoryChannel.pushedIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
         + input.is_lw + input.is_lwu + input.is_ld)
       ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 1,
-       var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 },
+       var { index := offset } - (4 : Expression (ZMod p)) * input.offset_bit[2] -
+         (2 : Expression (ZMod p)) * input.offset_bit[1] - input.offset_bit[0],
+       var { index := offset + 1 }, var { index := offset + 2 },
        input.memory_access.prev_value⟩,
     memoryChannel.pulledIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
         + input.is_lw + input.is_lwu + input.is_ld)
@@ -214,7 +202,9 @@ theorem ramPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
         + input.is_lw + input.is_lwu + input.is_ld)
       ⟨input.memory_access.access_timestamp.prev_high,
        input.memory_access.access_timestamp.prev_low,
-       var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 },
+       var { index := offset } - (4 : Expression (ZMod p)) * input.offset_bit[2] -
+         (2 : Expression (ZMod p)) * input.offset_bit[1] - input.offset_bit[0],
+       var { index := offset + 1 }, var { index := offset + 2 },
        input.memory_access.prev_value⟩ ∈
       exposedMemoryInteractions input offset := by
   simp [exposedMemoryInteractions]
@@ -300,6 +290,16 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadX0Columns :=
           Channels.stateChannel_eq_programChannel_false,
           Channels.memoryChannel_eq_programChannel_false,
           decide_false, decide_true, Bool.false_eq_true, if_true, List.nil_append] }
+
+/-- Folded circuit projections used by the whole-chip row codec. -/
+@[circuit_norm] theorem circuit_main_eq : (circuit (p := p)).main = main := rfl
+
+@[circuit_norm] theorem circuit_localLength_eq (input : Var Inputs (ZMod p)) :
+    (circuit (p := p)).localLength input = 4 := rfl
+
+@[circuit_norm] theorem circuit_size_eq :
+    (circuit (p := p)).size = size Inputs + 4 := by
+  rw [GeneralFormalCircuit.size_eq, circuit_localLength_eq]
 
 /-- The completed LoadX0 circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :

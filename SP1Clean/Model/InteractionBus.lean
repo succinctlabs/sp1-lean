@@ -49,6 +49,32 @@ abbrev LookupKey := InteractionKind × String × List ℕ
 @[reducible] def keyOf (a : LookupAccess) : LookupKey := (a.1, a.2.1, a.2.2.1)
 @[reducible] def multOf (a : LookupAccess) : ℤ := a.2.2.2
 
+/-- The semantically active interaction contributions. An AIR interaction whose multiplicity is
+zero contributes neither to LogUp nor to the trace-level signed multiplicity balance, so its
+otherwise-unused key is not observable. This is the `LookupAccess` analogue of Clean's
+`Air.Balance.activeInteractions`. -/
+def active (accesses : LookupAccessList) : LookupAccessList :=
+  accesses.filter (fun access => multOf access ≠ 0)
+
+/-- Reordering a complete interaction list only reorders its active submultiset. -/
+theorem active_perm {left right : LookupAccessList} (h : left.Perm right) :
+    (active left).Perm (active right) :=
+  h.filter _
+
+theorem active_cons (head : LookupAccess) (tail : LookupAccessList) :
+    active (head :: tail) =
+      if multOf head ≠ 0 then head :: active tail else active tail := by
+  by_cases hmult : multOf head = 0 <;> simp [active, hmult]
+
+/-- Filtering for a bus or table commutes with discarding zero-multiplicity entries. -/
+theorem active_filter (accesses : LookupAccessList)
+    (keep : LookupAccess → Bool) :
+    active (accesses.filter keep) = (active accesses).filter keep := by
+  simp only [active, List.filter_filter]
+  congr 1
+  funext access
+  exact Bool.and_comm _ _
+
 /-- Negate a `LookupAccess`'s multiplicity, fixing its key. The faithfulness bridge for the W11
 program-bus polarity flip: our circuit now emits the Program fetch as a `pull` (`−is_real`), so it
 equals SP1's extracted oracle Program block **up to per-entry multiplicity negation** (a sound LogUp
@@ -93,6 +119,15 @@ theorem multiplicitySum_cons (head : LookupAccess) (tail : LookupAccessList) (k 
 theorem multiplicitySum_append (l1 l2 : LookupAccessList) (k : LookupKey) :
     multiplicitySum (l1 ++ l2) k = multiplicitySum l1 k + multiplicitySum l2 k := by
   simp only [multiplicitySum, filterKey, List.filter_append, List.map_append, List.sum_append]
+
+/-- Removing zero-multiplicity contributions preserves the signed balance at every key. -/
+theorem multiplicitySum_active (accesses : LookupAccessList) (k : LookupKey) :
+    multiplicitySum (active accesses) k = multiplicitySum accesses k := by
+  induction accesses with
+  | nil => rfl
+  | cons head tail ih =>
+      by_cases hmult : multOf head = 0
+      <;> simp [active_cons, multiplicitySum_cons, hmult, ih]
 
 /-- Permutation invariance: reordering rows does not change any per-key sum. This is the structural
 fact that makes `isConsistentBalanced` permutation-invariant. -/

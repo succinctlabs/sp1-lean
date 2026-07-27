@@ -48,6 +48,19 @@ noncomputable def decodeTable (chip : SupportedChip p) (data : ProverData (ZMod 
     (row : Array (ZMod p)) :
     (chip.decodeRow data row).kind = chip.kind := rfl
 
+/-- The input projection of a decoded row is the retained component's typed input projection.
+Keeping this theorem generic avoids reducing a concrete completed circuit at dependent call sites. -/
+theorem decodeRow_inputs (chip : SupportedChip p) (data : ProverData (ZMod p))
+    (row : Array (ZMod p)) :
+    (chip.decodeRow data row).inputs =
+      chip.table.rowInput (Environment.fromArray row data) := rfl
+
+/-- Output companion to `decodeRow_inputs`. -/
+theorem decodeRow_cols (chip : SupportedChip p) (data : ProverData (ZMod p))
+    (row : Array (ZMod p)) :
+    (chip.decodeRow data row).cols =
+      chip.table.rowOutput (Environment.fromArray row data) := rfl
+
 /-- The decoded row's semantic predicate is definitionally the typed circuit predicate registered by
 the descriptor. -/
 theorem decodeRow_chipSpec_iff (chip : SupportedChip p) (data : ProverData (ZMod p))
@@ -96,6 +109,24 @@ noncomputable def interactionsWith {Message : TypeMap} [ProvableType Message]
 @[simp] theorem toChipRow_kind (row : DecodedInstructionRow p)
     (data : ProverData (ZMod p)) :
     (row.toChipRow data).kind = row.chip.kind := rfl
+
+/-- The semantic view of a decoded row, exposed without unfolding either the dependent decoder or
+the retained circuit at a concrete environment.  Chip-specific grounding proofs rewrite this once
+and then use their descriptor's small `kind.view` projection lemmas. -/
+theorem toChipRow_view (row : DecodedInstructionRow p)
+    (data : ProverData (ZMod p)) :
+    (row.toChipRow data).view =
+      row.chip.kind.view (row.chip.table.rowInput (row.environment data))
+        (row.chip.table.rowOutput (row.environment data)) := rfl
+
+/-- The optional RAM projection of a decoded row, exposed through the same folded decoder
+interface as `toChipRow_view`. Memory-chip grounding uses this theorem to specialize a concrete
+descriptor without forcing Lean to unfold the heterogeneous `decodeRow` value. -/
+theorem toChipRow_ramAccess (row : DecodedInstructionRow p)
+    (data : ProverData (ZMod p)) :
+    (row.toChipRow data).ramAccess =
+      row.chip.kind.ramAccess (row.chip.table.rowInput (row.environment data))
+        (row.chip.table.rowOutput (row.environment data)) := rfl
 
 end DecodedInstructionRow
 

@@ -66,6 +66,20 @@ deriving ProvableStruct
 /-- The sign-extended immediate = the I-type adapter's `op_c_imm`. -/
 @[reducible] def Inputs.op_c_imm {F} (i : Inputs F) : Word F := i.adapter.op_c_imm
 
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_lw := Eval.eval env input.is_lw
+         is_lwu := Eval.eval env input.is_lwu
+         state := Eval.eval env input.state
+         adapter := Eval.eval env input.adapter
+         memory_access := Eval.eval env input.memory_access
+         offset_bit := Eval.eval env input.offset_bit
+         selected_word := Eval.eval env input.selected_word
+         msb := Eval.eval env input.msb } : Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
 /-- The recombined low clock `clk_0_16 + clk_16_24 · 2^16` (matching SP1's `clk_low`). -/
 @[reducible] def clkLow (state : Extracted.CPUState (ZMod p)) : ZMod p :=
   state.clk_0_16 + state.clk_16_24 * 65536
@@ -83,13 +97,16 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadWordColumns (
   let is_real := input.is_lw + input.is_lwu
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, is_real⟩
-  let addr_op ← subcircuit AddressOperation.circuit ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit⟩
+  let addr_op ← AddressOperation.circuit
+    ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit, is_real⟩
+  let address := AddressOperation.alignedValue
+    ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit, is_real⟩ addr_op
   -- SC Phase 2pre: `MemoryAccess` is now a `GeneralFormalCircuit`, composed via the GFC `CoeFun`
   -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
   let _ ← Readers.MemoryAccess.circuit
     ⟨input.memory_access, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
-      addr_op.addr_operation.value[0], addr_op.addr_operation.value[1], addr_op.addr_operation.value[2],
+      address[0], address[1], address[2],
       input.memory_access.prev_value, is_real⟩
   assertion U16MSBOperation.circuit ⟨input.selected_word[1], ⟨input.msb⟩, input.is_lw⟩
   -- SC Phase 2pre: `ITypeReader` is now a `GeneralFormalCircuit`, composed via the GFC `CoeFun`.
@@ -133,16 +150,53 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadWordColumns main whe
   -- `memoryChannel` joins from `MemoryAccess`'s read pulls + `RegisterWrite`'s op_a write push (W11 memory flip).
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
+/-- Folded completed-row layout used by the whole-chip Rust AIR codec. -/
+@[circuit_norm] lemma directOutput_eq
+    (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter,
+        ⟨varFromOffset Extracted.AddrAddOperation offset, var ⟨offset + 3⟩⟩,
+        input.memory_access, input.offset_bit, input.selected_word, ⟨input.msb⟩,
+        input.is_lw, input.is_lwu⟩ :
+        Var LoadWordColumns (ZMod p)) := rfl
+
+/-- Component-wise evaluation of a completed LoadWord row. -/
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : LoadWordColumns (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state
+         adapter := Eval.eval env cols.adapter
+         address_operation := Eval.eval env cols.address_operation
+         memory_access := Eval.eval env cols.memory_access
+         offset_bit := Eval.eval env cols.offset_bit
+         selected_word := Eval.eval env cols.selected_word
+         msb := Eval.eval env cols.msb
+         is_lw := Eval.eval env cols.is_lw
+         is_lwu := Eval.eval env cols.is_lwu } :
+        LoadWordColumns F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity +
 offset booleans, the `MemoryAccess` timestamp monotonicity, the `U16MSBOperation` high-bit fact, the
 `ITypeReader` adapter facts (the extended loaded word), the four offset-selection equations, the
 `op_a != x0` flag, the `(is_lw-1)·msb` zero-extension gate, and the `is_lw`/`is_lwu`/`is_real` binaries. -/
 def Spec (input : Inputs (ZMod p)) (cols : LoadWordColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  AddressOperation.Spec ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit⟩ cols.address_operation ∧
+  AddressOperation.RowSpec
+      ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit, isReal input⟩
+      cols.address_operation ∧
   Readers.MemoryAccess.Spec
     ⟨input.memory_access, input.state.clk_high, clkLow input.state,
-      cols.address_operation.addr_operation.value[0], cols.address_operation.addr_operation.value[1],
-      cols.address_operation.addr_operation.value[2], input.memory_access.prev_value, isReal input⟩ ∧
+      (AddressOperation.alignedValue
+        ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit, isReal input⟩
+        cols.address_operation)[0],
+      (AddressOperation.alignedValue
+        ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit, isReal input⟩
+        cols.address_operation)[1],
+      (AddressOperation.alignedValue
+        ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit, isReal input⟩
+        cols.address_operation)[2],
+      input.memory_access.prev_value, isReal input⟩ ∧
   U16MSBOperation.Spec ⟨input.selected_word[1], ⟨input.msb⟩, input.is_lw⟩ ∧
   Readers.ITypeReader.Spec
     ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,

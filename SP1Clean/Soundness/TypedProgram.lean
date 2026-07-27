@@ -404,7 +404,7 @@ theorem BitwiseChip.programEmissionShape :
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
       input.adapter.op_a_0, 0, input.adapter.imm_c⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp [BitwiseChip.circuit, expose]
+    simp [BitwiseChip.circuit, BitwiseChip.exposedProgramInteractions, expose]
   · intro env
     simp [BitwiseChip.circuit, BitwiseChip.rowView, circuit_norm]
   · intro env
@@ -421,7 +421,7 @@ theorem LtChip.programEmissionShape :
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
       input.adapter.op_a_0, 0, input.adapter.imm_c⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp [LtChip.circuit, expose]
+    simp [LtChip.circuit, LtChip.exposedProgramInteractions, expose]
   · intro env
     simp [LtChip.circuit, LtChip.rowView, circuit_norm]
   · intro env
@@ -608,7 +608,7 @@ theorem AluX0Chip.programEmissionShape :
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
       input.adapter.op_a_0, 0, input.adapter.imm_c⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp [AluX0Chip.circuit, expose]
+    simp [AluX0Chip.circuit, AluX0Chip.exposedProgramInteractions, expose]
   · intro env
     simp [AluX0Chip.circuit, AluX0Chip.rowView, circuit_norm]
   · intro env
@@ -626,7 +626,7 @@ theorem UTypeChip.programEmissionShape :
       input.adapter.op_a, input.adapter.op_b_imm, input.adapter.op_c_imm,
       input.adapter.op_a_0, 1, 1⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp [UTypeChip.circuit, Readers.CPUState.exposedState, expose]
+    simp [UTypeChip.circuit, UTypeChip.exposedProgramInteractions, expose]
   · intro env
     simp [UTypeChip.circuit, UTypeChip.rowView, circuit_norm]
   · intro env
@@ -643,7 +643,7 @@ theorem JalChip.programEmissionShape :
       input.adapter.op_a, input.adapter.op_b_imm, input.adapter.op_c_imm,
       input.adapter.op_a_0, 1, 1⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp [JalChip.circuit, Readers.CPUState.exposedState, expose]
+    simp [JalChip.circuit, JalChip.exposedProgramInteractions, expose]
   · intro env
     simp [JalChip.circuit, JalChip.rowView, circuit_norm]
   · intro env
@@ -660,7 +660,7 @@ theorem JalrChip.programEmissionShape :
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
       input.adapter.op_a_0, 0, 1⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp [JalrChip.circuit, Readers.CPUState.exposedState, expose]
+    simp [JalrChip.circuit, JalrChip.exposedProgramInteractions, expose]
   · intro env
     simp [JalrChip.circuit, JalrChip.rowView, circuit_norm]
   · intro env
@@ -726,8 +726,8 @@ theorem ShiftRightChip.programEmissionShape :
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
       input.adapter.op_a_0, 0, input.adapter.imm_c⟩, ?_, ?_, ?_⟩
   · intro input offset
-    simp [ShiftRightChip.circuit, ShiftRightChip.stateExposure, Readers.CPUState.exposedState,
-      expose]
+    simp [ShiftRightChip.circuit, ShiftRightChip.stateExposure,
+      Readers.CPUState.exposedState, ShiftRightChip.exposedProgramInteractions, expose]
   · intro env _
     simp [ShiftRightChip.circuit, ShiftRightChip.rowView, circuit_norm]
   · intro env
@@ -746,14 +746,15 @@ theorem MulChip.programEmissionShape :
       #v[input.adapter.op_c, 0, 0, 0], input.adapter.op_a_0, 0, 0⟩,
     ?_, ?_, ?_⟩
   · intro input offset
-    simp [MulChip.circuit, expose]
+    simp [MulChip.circuit, MulChip.exposedStateInteractions,
+      MulChip.exposedMemoryInteractions, MulChip.exposedProgramInteractions,
+      expose]
   · intro env _
     simp [MulChip.circuit, MulChip.rowView, circuit_norm]
   · intro env
     simp [MulChip.circuit, MulChip.rowView, MulChip.exposedOpcode,
       Extracted.RTypeReader.toAdapterView, programMessageOfView, circuit_norm]
 
-set_option maxHeartbeats 4000000 in
 theorem DivRemChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (DivRemChip.circuit (p := p))
       DivRemChip.rowView := by
@@ -771,31 +772,12 @@ theorem DivRemChip.programEmissionShape :
     ?_, ?_, ?_⟩
   · intro input offset
     change circuitInteractionsWith programChannel.toRaw (DivRemChip.main input) offset = _
-    -- The rewired `main` composes just five subcircuits after the witness stream: CPUState,
-    -- RTypeReader (the one Program pull), the two whole-row assertion gadgets (byte-only), and
-    -- RegisterWrite (memory-only).
-    simp only [DivRemChip.main, circuitInteractionsWith_bind,
-      witnessVectorNative_localLength, witnessNative_localLength,
-      assertion_localLength, generalAssertion_localLength,
-      circuitInteractionsWith_witnessVectorNative,
-      circuitInteractionsWith_witnessNative,
-      circuitInteractionsWith_rTypeReader,
-      circuitInteractionsWith_assertion_eq_nil,
-      circuitInteractionsWith_generalAssertion_eq_nil,
-      circuitInteractionsWith_pure,
-      Readers.RTypeReader.circuit_localLength,
-      Readers.CPUState.circuit, Readers.RegisterWrite.circuit,
-      Readers.CPUState.channelsWithGuarantees_eq,
-      Readers.RegisterWrite.channelsWithGuarantees_eq,
-      DivRemCompare.circuit, DivRemCompare.channelsWithGuarantees_eq,
-      DivRemCore.circuit, DivRemCore.channelsWithGuarantees_eq,
-      FormalCircuitBase.channelsWithGuarantees_def,
-      List.mem_cons, List.not_mem_nil, or_false,
-      Channels.programChannel_eq_byteChannel_false,
-      Channels.programChannel_eq_stateChannel_false,
-      Channels.programChannel_eq_memoryChannel_false,
-      not_false_eq_true, add_zero, List.nil_append]
-    simp [rTypeProgramMessage, circuit_norm]
+    simp only [circuitInteractionsWith, DivRemChip.interactionsWith_program_eq,
+      DivRemChip.exposedProgramMessage,
+      DivRemChip.populatedRowAt_isDiv_eq, DivRemChip.populatedRowAt_isDivu_eq,
+      DivRemChip.populatedRowAt_isRem_eq, DivRemChip.populatedRowAt_isRemu_eq,
+      DivRemChip.populatedRowAt_isDivw_eq, DivRemChip.populatedRowAt_isRemw_eq,
+      DivRemChip.populatedRowAt_isDivuw_eq, DivRemChip.populatedRowAt_isRemuw_eq]
   · intro env _
     simp [DivRemChip.circuit, DivRemChip.rowView, circuit_norm]
   · intro env

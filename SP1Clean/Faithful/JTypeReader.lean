@@ -61,7 +61,7 @@ theorem jtypereader_interactions_faithful
   simp only [Extracted.JTypeReader.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_memory, Interaction.toProp_send_program,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.constrain_Range,
+    ByteOpcode.constrainField_six, ByteOpcode.constrainField_three, ByteOpcode.constrain_Range,
     ByteOpcode.constrain_U8Range, val_16_zmod_p, ZMod.val_zero, one_ne_zero, ne_eq, not_false_eq_true,
     true_implies, Nat.ofNat_pos, true_and, and_true,
     show (2 : ℕ) ^ 8 = 256 from by norm_num, show (2 : ℕ) ^ 16 = 65536 from by norm_num]

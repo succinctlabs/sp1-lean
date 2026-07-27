@@ -35,10 +35,11 @@ structure Inputs (F : Type) where
   adapter : Extracted.ALUTypeReader F
 deriving ProvableStruct
 
-/-- `rs1` operand = the `op_b` register read (`op_b_memory.prev_value`); `rs2` operand = the ALU operand
-word `adapter.op_c` (the `op_c` register read, or the immediate). -/
+/-- `rs1` operand = the `op_b` register read (`op_b_memory.prev_value`); the arithmetic C operand is
+the `op_c_memory.prev_value` word returned by `ALUTypeReader.c()` in SP1. On immediate rows the reader
+constraints copy `adapter.op_c` into this word; on register rows it is the actual `rs2` read. -/
 @[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
-@[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c
+@[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c_memory.prev_value
 
 /-- **Assertion half** — the literal meaning of SP1's `LtCols.asserts` *own* (inline) assertZero tail
 (everything past the composed `LtOperationSigned`/`CPUState`/`ALUTypeReader` sub-lists), in extracted
@@ -102,12 +103,16 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) 
   assertion Readers.RegisterWrite.circuit
     ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
      input.adapter.op_a, #v[lt_cols.result.u16_compare_operation.bit, 0, 0, 0], input.is_real⟩
-  -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
-  -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
+  -- Upstream defines the row selector as `is_slt + is_sltu`; this equality is the faithful glue
+  -- between that Rust presentation and the explicit input selector used by Clean's bus interface.
   assertZero (input.is_real * (input.is_real - 1))
+  assertZero (input.is_real - (is_slt + is_sltu))
   is_slt * (is_slt - 1) === 0
   is_sltu * (is_sltu - 1) === 0
   (is_slt + is_sltu) * ((is_slt + is_sltu) - 1) === 0
+  -- The final assertion in Rust's chip-owned tail: real LT rows are routed only to a non-x0
+  -- destination.  This must be enforced by the verifier, not only supplied by witness generation.
+  input.adapter.op_a_0 === 0
   return ⟨input.state, input.adapter, is_slt, is_sltu, lt_cols⟩
 
 set_option maxHeartbeats 1000000 in
@@ -126,5 +131,39 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LtCols main where
   -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+
+/-- The completed Lt row, exposed as a folded value for chip-boundary proofs. -/
+@[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter, var { index := offset }, var { index := offset + 1 },
+        varFromOffset Extracted.LtOperationSigned (offset + 2)⟩ : Var LtCols (ZMod p)) := rfl
+
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
+         adapter := Eval.eval env input.adapter } : Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : LtCols (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
+         is_slt := Eval.eval env cols.is_slt, is_sltu := Eval.eval env cols.is_sltu,
+         lt_operation := Eval.eval env cols.lt_operation } : LtCols F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_inputAdapter {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (Eval.eval env input).adapter = Eval.eval env input.adapter := by
+  rw [eval_inputs]
+
+@[circuit_norm] theorem eval_inputIsReal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (Eval.eval env input).is_real = Expression.eval env input.is_real := by
+  simpa only [CircuitType.eval_expr] using
+    congrArg (fun value : Inputs F => value.is_real) (eval_inputs env input)
 
 end SP1Clean.LtChip

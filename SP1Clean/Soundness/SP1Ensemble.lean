@@ -10,15 +10,12 @@ import SP1Clean.Proofs.Chips.MemoryFinalizeChip
 import SP1Clean.FormalModel.Contracts.PublicValues
 import Clean.Air.FlatEnsemble
 
-/-! # SP1 as a plain Clean `Ensemble` — the final, gated whole-machine capstone (W11 Phase 5)
+/-! # The supported native SP1 machine as a plain Clean `Ensemble`
 
-The whole-machine soundness object for SP1, re-based from the bespoke `GatedVm` data structure onto
-Clean's native `Air.Flat.Ensemble`: 25 chip tables + 11 in-circuit boundary/provider tables over the
-four buses, with the pull-final/push-init State boundary verifier. From the ensemble `Statement`
-(per-table constraints + balanced channels) over the public initial/final machine state, there is a
-valid RISC-V-Sail execution trail from `pc_start` to `next_pc`, with every real instruction
-Sail-correct — the Eulerian-trail machinery (`GatedVm/{Chain,StateBridge,Capstone,SailDispatch}.lean`,
-the `GatedVm` *namespace*) is unchanged; only the ensemble packaging is now Clean-native.
+This module packages the 25 supported instruction tables and 11 native provider/boundary tables over
+the four SP1 buses, together with the pull-final/push-init State verifier. It also proves the
+physical-table alignment and typed-interaction partition used by the timed grounding capstone in
+`Soundness/AIR.lean`.
 
 **Why a plain `Ensemble`, not a `SoundEnsemble`/`addVm`.** `SoundEnsemble.addTable` demands each
 table's `channelsWithGuarantees ⊆ finished`; post-flip every chip's is `[byte, program, memory]`, and
@@ -31,24 +28,11 @@ State via the trail; memory `isU64` via the boundary balance). The multi-VM `VmT
 (roadmap W11 path A) was evaluated and **rejected** (consolidation proposal §3.2 — a timeless engine
 cannot express memory currency); its de-risk spike `Soundness/StateVm.lean` has been deleted.
 
-**Trust boundary / residue.** The `soundness` *assembly* is sorry-free: it threads the two ensemble
-prerequisites into the gated capstone. The bridge from the Clean ensemble `Statement` to those
-prerequisites, `sp1_gatedExecution_prereqs`, is itself a **proven** assembly of two named pieces:
-* (a) **proven (W1a)** — `sp1_state_balance_of_balancedInteractions`: the Clean `BalancedInteractions`
-  → native `isConsistentBalanced` State-bus translation, via the generic `toAccess` adapter
-  `isConsistentBalanced_of_balancedInteractions` (`Model/BalanceBridge.lean`) + the native
-  `{-1, 0, 1}` multiplicity bound (`stateLookups_mult_binary`);
-* (b)+(c) **the structural seam (W1b/W1c)** — `sp1_decoded_rows_sound`: the 36-table
-  witness → deterministic `ChipRow` decode facts `DecodedRowsSound`, carrying per-table
-  `Component.weakSoundness`
-  for the 25 chips (the 11 provider tables decode to no `ChipRow` and contribute no State
-  interactions), each chip's `isU64` operand-`Assumptions` recovery from the memory-bus balance
-  against the init/finalize boundary tables (`Soundness/MemoryIsU64.lean`,
-  `memBalanceHyps_of_boundary`), the byte/program pull guarantees from the finished-channel grounding,
-  the binary gating, and the State-bus decode correspondence (`stateLookups_eq_emitted` lifted over
-  the table flatMap + the verifier boundary) that (a) consumes.
-Closing the seam yields an axiom-clean balanced-State-trail ensemble result.  That result is an
-important interaction argument, but it is not itself zkVM/AIR soundness. -/
+The former unconditional Eulerian-trail wrapper was retired. It tried to derive semantic chip Specs
+from only `Constraints ∧ BalancedChannels`, even though those Specs require program/provider binding
+and the timestamp premise made explicit by `SupportedCoreNativeRelation`. The current capstone proves
+ordered State and Memory grounding directly from that honest relation; no witness-dependent semantic
+fact is hidden in an ensemble-level `Assumptions := True`. -/
 
 namespace SP1Clean.Soundness
 
@@ -163,13 +147,8 @@ theorem sp1StateVerifierMain_stateInteractions (pi : Var SP1PublicIO (ZMod p)) (
 
 /-! ## The SP1 machine as a plain Clean `Ensemble` -/
 
-/-- The Clean-table projection of the 25-entry `supportedChips` descriptor. Every chip's `circuit` is
-wrapped as a Clean AIR `Component` (`⟨chip.circuit⟩`). Disclosed 4.31-migration deferral: `#print axioms`
-on this `def` currently shows `sorryAx`, carried by `DivRem.evidenceSoundness` (+ its two channel-law
-fields) and the three deferred completeness proofs (Branch/ShiftLeft/DivRem) — the exact
-gated inventory is `docs/release-audit.md` §0. Every other chip's `circuit` is `sorry`-free in both
-directions (only `bv_decide`'s `ofReduceBool`/`trustCompiler` ride along, via `Mul`/`Bitwise`
-soundness). -/
+/-- The Clean-table projection of the 25-entry `supportedChips` descriptor. Every chip's verified
+`circuit` is wrapped as a Clean AIR `Component` (`⟨chip.circuit⟩`). -/
 def sp1Tables : List (Component (ZMod p)) :=
   (supportedChips (p := p)).map (·.table)
 
@@ -331,11 +310,6 @@ theorem typedInteractions_balanced
   rw [typedEnsembleInteractionsWith_raw, ← EnsembleWitness.interactionsWith_allTablesWitness]
   exact balanced channel.toRaw channelMem
 
-/-- Scaffold ensemble assumptions — `True`. The chip operand `isU64` assumptions are not expressible on
-`SP1PublicIO`; they are recovered per-witness from the memory-bus balance inside the decode seam
-`sp1_decoded_rows_sound` (W1c). -/
-def sp1Assumptions : SP1PublicIO (ZMod p) → Prop := fun _ => True
-
 /-- **The balanced State-trail intermediate spec.** Over the public initial/final state, there is a heterogeneous trace
 whose every real row reaches its RISC-V Sail spec and whose `current → next` transitions compose into a
 valid execution trail from the public `pc_start` to the public `next_pc` — i.e. a `GatedExecution`
@@ -343,27 +317,19 @@ between the public endpoints. -/
 def balancedStateTrailSpec : SP1PublicIO (ZMod p) → Prop := fun pi =>
   ∃ rows : List (ChipRow p), GatedExecution rows (initEntryOf pi) (finalEntryOf pi)
 
-/-! ## The capstone premise, split: the decode seam (W1b/W1c) + the proven balance translation (W1a)
+/-! ## Frozen Eulerian-path compatibility
 
-`sp1_gatedExecution_prereqs` used to be one monolithic `sorry`. It is now a **proven** assembly of
-* `sp1_decoded_rows_sound` — the **W1b/W1c structural decode seam**: the 36-table
-  witness → deterministic `ChipRow` decode facts `DecodedRowsSound`, and
-* `sp1_state_balance_of_balancedInteractions` — **W1a, proven, axiom-clean**: Clean
-  `BalancedInteractions` on the State channel ⇒ native `isConsistentBalanced` of the decoded access
-  list, through the generic adapter in `Model/BalanceBridge.lean`.  Semantic row grounding is the
-  separate `Soundness/AIR.lean` path: `supported_core_witness_grounding` proves exact physical-row
-  ordering/PC/clock/static facts and inherits only `supportedCore_orderedRows_dynamic`. -/
+The timed-grounding capstone no longer uses this section. It remains as a small compatibility adapter:
+given an explicit `DecodedRowsSound` certificate, Clean State balance yields the older
+`GatedExecution` trail. The certificate is deliberately not claimed to follow from the raw ensemble
+statement; its semantic contents belong to the stronger witness relations in `Soundness/AIR.lean`. -/
 
-/-- **The witness → trace decode bundle (the W1b/W1c seam).** Everything about a constraint-satisfying,
-channel-balanced witness that requires proving facts about the deterministic `ChipRow` decode:
+/-- Facts needed to adapt a deterministically decoded witness to the frozen Eulerian trail:
 
 * `rows`/`data` — the heterogeneous trace decoded from the witness's 25 **chip** tables
   (`same_circuits` + `valueFromOffset`) and the shared prover data; the 11 boundary/provider tables
   (`sp1ProviderTables`) decode to no `ChipRow` and emit no State interactions;
-* `spec_holds` — per-row chip `Spec`, from per-table `Component.weakSoundness` under
-  `witness.Constraints`, with each chip's byte/program pull guarantees grounded against the provider
-  tables and its `isU64` operand `Assumptions` recovered from the memory-bus balance against the
-  init/finalize boundary (`Soundness/MemoryIsU64.lean`, `memBalanceHyps_of_boundary`, W1c);
+* `spec_holds` — every decoded row satisfies its semantic chip contract;
 * `is_real_binary` — binary gating, from each chip's `is_real · (is_real − 1) = 0` constraint;
 * `state_accesses_perm` — the **decode correspondence** the proven balance translation consumes: the
   native State-bus access list (the per-row `stateLookups` aggregate plus the public `±1` boundary) is
@@ -373,8 +339,8 @@ channel-balanced witness that requires proving facts about the deterministic `Ch
   `toAccess` exactly the `(final, -1)`/`(init, +1)` entries); a permutation because the witness lists
   the verifier's interactions first.
 
-(A one-constructor `Prop` inductive, Exists-style, because the bundle carries data (`rows`/`data`)
-alongside the proofs; consume it with `obtain ⟨rows, data, h_spec, hbin, h_corr⟩`.) -/
+This witness-dependent certificate is an explicit premise, not an `Assumptions := True` consequence
+of the raw ensemble. -/
 structure DecodedRowsSound (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop where
   spec_holds : ∀ r ∈ decodedChipRows witness.data witness.tables, r.chipSpec witness.data
   is_real_binary : ∀ r ∈ (decodedChipRows witness.data witness.tables).map ChipRow.view,
@@ -384,20 +350,6 @@ structure DecodedRowsSound (witness : EnsembleWitness (sp1Ensemble (p := p))) : 
         ++ [(InteractionKind.State, "SP1State", initEntryOf witness.publicInput, (1 : ℤ)),
             (InteractionKind.State, "SP1State", finalEntryOf witness.publicInput, (-1 : ℤ))]).Perm
         ((witness.interactionsWith Channels.stateChannel.toRaw).map Interaction.toAccess)
-
-set_option warn.sorry false in
-/-- **The structural decode seam (roadmap W1b + W1c).** From the ensemble `Statement`'s
-per-table constraints and balanced channels, prove `DecodedRowsSound` for the deterministic 25-chip
-`witness.tables ↔ List (ChipRow p)` decode (`same_circuits` + `valueFromOffset`; the 11 provider tables
-contribute no `ChipRow` and no State interactions), per-table `Component.weakSoundness` for
-`spec_holds` (byte/program pull guarantees grounded against the provider tables; the `isU64` operand
-`Assumptions` recovered from the memory-bus balance against the init/finalize boundary), the binary
-gating, and the per-row `stateLookups_eq_emitted` correspondence lifted over the table flatMap (+ the
-verifier boundary). -/
-theorem sp1_decoded_rows_sound (witness : EnsembleWitness (sp1Ensemble (p := p)))
-    (hC : witness.Constraints) (hB : witness.BalancedChannels) :
-    DecodedRowsSound witness := by
-  sorry
 
 /-- **W1a, proven: Clean State-channel balance ⇒ native gated State-bus balance.** From Clean's
 `BalancedInteractions` over the (single-channel) State interactions — one instantiation of
@@ -432,16 +384,10 @@ theorem sp1_state_balance_of_balancedInteractions
     simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
     rcases ha with rfl | rfl <;> simp [multOf]
 
-/-- **The witness → gated-capstone bridge (assembled; `sorry`-free given the decode seam).** From the
-ensemble `Statement`'s per-table constraints and balanced channels, the heterogeneous trace decoded
-from the witness satisfies the three hypotheses of `gatedExecution_of_specs_and_balance`: per-row chip
-`Spec`s, binary `is_real` gating, and the gated State-bus balance with the public
-genesis/finalization boundary. Assembly: `sp1_decoded_rows_sound` supplies rows/data,
-`chipSpec`s, gating, and the State-bus decode correspondence; the proven W1a translation
-`sp1_state_balance_of_balancedInteractions` turns `witness.BalancedChannels` — instantiated at the
-State channel, the head of the ensemble's four-channel list — into the native gated balance. -/
+/-- Assemble an explicit decoded-row certificate and Clean State balance into the three premises of
+the frozen `gatedExecution_of_specs_and_balance` theorem. -/
 theorem sp1_gatedExecution_prereqs (witness : EnsembleWitness (sp1Ensemble (p := p)))
-    (hC : witness.Constraints) (hB : witness.BalancedChannels) :
+    (decodedSound : DecodedRowsSound witness) (hB : witness.BalancedChannels) :
     ∃ (rows : List (ChipRow p)) (data : ProverData (ZMod p)),
       (∀ r ∈ rows, r.chipSpec data) ∧
       (∀ r ∈ rows.map ChipRow.view, r.is_real = 0 ∨ r.is_real = 1) ∧
@@ -449,7 +395,7 @@ theorem sp1_gatedExecution_prereqs (witness : EnsembleWitness (sp1Ensemble (p :=
         ++ [(InteractionKind.State, "SP1State", initEntryOf witness.publicInput, (1 : ℤ)),
             (InteractionKind.State, "SP1State", finalEntryOf witness.publicInput, (-1 : ℤ))]) := by
   let rows := decodedChipRows witness.data witness.tables
-  obtain ⟨h_spec, hbin, h_corr⟩ := sp1_decoded_rows_sound witness hC hB
+  obtain ⟨h_spec, hbin, h_corr⟩ := decodedSound
   -- instantiate the balanced channels at the State channel (the ensemble channel-list head)
   have h_balanced : BalancedInteractions
       (witness.interactionsWith Channels.stateChannel.toRaw) := by
@@ -459,38 +405,19 @@ theorem sp1_gatedExecution_prereqs (witness : EnsembleWitness (sp1Ensemble (p :=
     sp1_state_balance_of_balancedInteractions witness.publicInput rows hbin _
       (fun i hi => EnsembleWitness.channel_eq_of_mem_interactionsWith hi) h_balanced h_corr⟩
 
-/-- **The balanced State-trail ensemble** — an intermediate interaction-consistency object, now a direct
-literal over `sp1Ensemble` (the bespoke `GatedVm.toFormalEnsemble` packaging is retired; discharging
-the `Statement` existential is the `rintro` line). Its `soundness` is the **sorry-free** assembly of
-the gated capstone `gatedExecution_of_specs_and_balance` with `sp1_gatedExecution_prereqs` — itself
-proven, modulo the isolated structural decode seam `sp1_decoded_rows_sound`. -/
-def balancedStateTrailFormalEnsemble : FormalEnsemble (ZMod p) SP1PublicIO where
-  ensemble := sp1Ensemble
-  Assumptions := sp1Assumptions
-  Spec := balancedStateTrailSpec
-  soundness := by
-    rintro publicInput _hA ⟨witness, rfl, hC, hB⟩
-    obtain ⟨rows, data, h_spec, hbin, h_bal⟩ := sp1_gatedExecution_prereqs witness hC hB
-    exact ⟨rows, gatedExecution_of_specs_and_balance rows data
-      (initEntryOf witness.publicInput) (finalEntryOf witness.publicInput) h_spec hbin h_bal⟩
+/-- The frozen Eulerian-path compatibility result, with its semantic decode facts explicit.
 
-/-- **Balanced State-trail soundness.** Clean ensemble constraints and channel balance imply an
-Eulerian State-bus trail.  This is deliberately not named machine or AIR soundness: turning that trail
-into the canonical Sail execution still requires decode, operand binding, timed memory grounding, and
-the halt boundary. -/
-theorem balanced_state_trail_soundness :
-    (sp1Ensemble (p := p)).Soundness (sp1Assumptions (p := p))
-      (balancedStateTrailSpec (p := p)) :=
-  (balancedStateTrailFormalEnsemble (p := p)).soundness
-
-/-! The former `sp1_machine_soundness` name ended here.  It was removed rather than retained as a
-compatibility alias because its conclusion is only an Eulerian interaction trail; keeping the headline
-name would preserve exactly the architectural overclaim the AIR relation layer is meant to eliminate. -/
-
-/-
-The underlying Clean statement remains useful as an intermediate:
-public-input assumptions plus the raw ensemble statement (per-table constraints + balanced channels)
-imply a valid State-bus trail from the public `pc_start` to `next_pc`.
--/
+This is intentionally not an `Ensemble.Soundness` theorem: `DecodedRowsSound` is witness-dependent
+and does not follow from the raw ensemble algebra without the semantic provider/timestamp premises
+used by the current timed-grounding capstone. -/
+theorem balanced_state_trail_of_decoded_rows_sound
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (decodedSound : DecodedRowsSound witness) (balanced : witness.BalancedChannels) :
+    balancedStateTrailSpec witness.publicInput := by
+  obtain ⟨rows, data, spec, binary, stateBalance⟩ :=
+    sp1_gatedExecution_prereqs witness decodedSound balanced
+  exact ⟨rows, gatedExecution_of_specs_and_balance rows data
+    (initEntryOf witness.publicInput) (finalEntryOf witness.publicInput)
+    spec binary stateBalance⟩
 
 end SP1Clean.Soundness

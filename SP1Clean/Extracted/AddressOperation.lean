@@ -69,7 +69,7 @@ set_option maxHeartbeats 8000000 in
   let E15 : F := E14 - offset_bit0
   let E16 : F := E15 * ((8 : F)⁻¹)
   AddrAddOperation.interactions #v[b[0], b[1], b[2], b[3]] #v[cc[0], cc[1], cc[2], cc[3]] { value := #v[cols.addr_operation.value[0], cols.addr_operation.value[1], cols.addr_operation.value[2]] } is_real ++ [
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) E16 13 0), is_real⟩,
+    ⟨.send, (.byte 6 E16 13 0), is_real⟩,
   ]
 
 set_option maxHeartbeats 8000000 in

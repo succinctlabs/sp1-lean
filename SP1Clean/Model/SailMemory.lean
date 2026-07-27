@@ -589,17 +589,16 @@ lemma run_vmem_read_of_width_8'
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 8 = true) ---width
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 8 < 2 ^ 64)
     (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
       (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
-    (hmem₀ : s.mem[reg_val.toNat + offset.toNat]? = some data₀)
-    (hmem₁ : s.mem[reg_val.toNat + offset.toNat + 1]? = some data₁)
-    (hmem₂ : s.mem[reg_val.toNat + offset.toNat + 2]? = some data₂)
-    (hmem₃ : s.mem[reg_val.toNat + offset.toNat + 3]? = some data₃)
-    (hmem₄ : s.mem[reg_val.toNat + offset.toNat + 4]? = some data₄)
-    (hmem₅ : s.mem[reg_val.toNat + offset.toNat + 5]? = some data₅)
-    (hmem₆ : s.mem[reg_val.toNat + offset.toNat + 6]? = some data₆)
-    (hmem₇ : s.mem[reg_val.toNat + offset.toNat + 7]? = some data₇) :
+    (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀)
+    (hmem₁ : s.mem[(reg_val + offset).toNat + 1]? = some data₁)
+    (hmem₂ : s.mem[(reg_val + offset).toNat + 2]? = some data₂)
+    (hmem₃ : s.mem[(reg_val + offset).toNat + 3]? = some data₃)
+    (hmem₄ : s.mem[(reg_val + offset).toNat + 4]? = some data₄)
+    (hmem₅ : s.mem[(reg_val + offset).toNat + 5]? = some data₅)
+    (hmem₆ : s.mem[(reg_val + offset).toNat + 6]? = some data₆)
+    (hmem₇ : s.mem[(reg_val + offset).toNat + 7]? = some data₇) :
     let width := 8
     let data := data₇ ++ data₆ ++ data₅ ++ data₄ ++ data₃ ++ data₂ ++ data₁ ++ data₀
     (vmem_read (.Regidx rs_addr_bv) offset width (MemoryAccessType.Load mem_payload.Data)
@@ -614,16 +613,6 @@ lemma run_vmem_read_of_width_8'
     have h := @run_rX_bits rs_addr_bv s
     simp only [EStateM.run] at h
     rw [h, h_reg_val]
-  have hmod : (reg_val + offset).toNat = reg_val.toNat + offset.toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
-  have hmem₀' : s.mem[(reg_val + offset).toNat]? = some data₀ := by rw [hmod]; exact hmem₀
-  have hmem₁' : s.mem[(reg_val + offset).toNat + 1]? = some data₁ := by rw [hmod]; exact hmem₁
-  have hmem₂' : s.mem[(reg_val + offset).toNat + 2]? = some data₂ := by rw [hmod]; exact hmem₂
-  have hmem₃' : s.mem[(reg_val + offset).toNat + 3]? = some data₃ := by rw [hmod]; exact hmem₃
-  have hmem₄' : s.mem[(reg_val + offset).toNat + 4]? = some data₄ := by rw [hmod]; exact hmem₄
-  have hmem₅' : s.mem[(reg_val + offset).toNat + 5]? = some data₅ := by rw [hmod]; exact hmem₅
-  have hmem₆' : s.mem[(reg_val + offset).toNat + 6]? = some data₆ := by rw [hmod]; exact hmem₆
-  have hmem₇' : s.mem[(reg_val + offset).toNat + 7]? = some data₇ := by rw [hmod]; exact hmem₇
   have hmprv' : Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 = 0#1 := by
     rw [show Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 =
       BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (hs _)) >>> 17) from rfl]
@@ -655,7 +644,7 @@ lemma run_vmem_read_of_width_8'
     hfetch, is_shadow_stack_access]
   have h := run_mem_read_eight_bytes_of_isInitialized reg_val offset
     data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ s hs h_in_range hconfig
-    hmem₀' hmem₁' hmem₂' hmem₃' hmem₄' hmem₅' hmem₆' hmem₇'
+    hmem₀ hmem₁ hmem₂ hmem₃ hmem₄ hmem₅ hmem₆ hmem₇
   simp only [EStateM.run] at h
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend] at h ⊢
   conv_lhs => rw [h]
@@ -970,13 +959,12 @@ lemma run_vmem_read_of_width_4'
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 4 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 4 < 2 ^ 64)
     (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
       (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
-    (hmem₀ : s.mem[reg_val.toNat + offset.toNat]? = some data₀)
-    (hmem₁ : s.mem[reg_val.toNat + offset.toNat + 1]? = some data₁)
-    (hmem₂ : s.mem[reg_val.toNat + offset.toNat + 2]? = some data₂)
-    (hmem₃ : s.mem[reg_val.toNat + offset.toNat + 3]? = some data₃) :
+    (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀)
+    (hmem₁ : s.mem[(reg_val + offset).toNat + 1]? = some data₁)
+    (hmem₂ : s.mem[(reg_val + offset).toNat + 2]? = some data₂)
+    (hmem₃ : s.mem[(reg_val + offset).toNat + 3]? = some data₃) :
     let width := 4
     let data := data₃ ++ data₂ ++ data₁ ++ data₀
     (vmem_read (.Regidx rs_addr_bv) offset width (MemoryAccessType.Load mem_payload.Data)
@@ -991,12 +979,6 @@ lemma run_vmem_read_of_width_4'
     have h := @run_rX_bits rs_addr_bv s
     simp only [EStateM.run] at h
     rw [h, h_reg_val]
-  have hmod : (reg_val + offset).toNat = reg_val.toNat + offset.toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
-  have hmem₀' : s.mem[(reg_val + offset).toNat]? = some data₀ := by rw [hmod]; exact hmem₀
-  have hmem₁' : s.mem[(reg_val + offset).toNat + 1]? = some data₁ := by rw [hmod]; exact hmem₁
-  have hmem₂' : s.mem[(reg_val + offset).toNat + 2]? = some data₂ := by rw [hmod]; exact hmem₂
-  have hmem₃' : s.mem[(reg_val + offset).toNat + 3]? = some data₃ := by rw [hmod]; exact hmem₃
   have hmprv' : Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 = 0#1 := by
     rw [show Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 =
       BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (hs _)) >>> 17) from rfl]
@@ -1028,7 +1010,7 @@ lemma run_vmem_read_of_width_4'
     hfetch, is_shadow_stack_access]
   have h := run_mem_read_four_bytes_of_isInitialized reg_val offset
     data₀ data₁ data₂ data₃ s hs h_in_range hconfig
-    hmem₀' hmem₁' hmem₂' hmem₃'
+    hmem₀ hmem₁ hmem₂ hmem₃
   simp only [EStateM.run] at h
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend] at h ⊢
   conv_lhs => rw [h]
@@ -1142,7 +1124,6 @@ lemma run_vmem_write_of_width_8
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 8 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (_h_does_fit : reg_val.toNat + offset.toNat + 8 < 2 ^ 64)
     (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
       (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     (vmem_write (.Regidx rs_addr_bv) offset 8 data
@@ -1314,7 +1295,6 @@ lemma run_vmem_write_of_width_4
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 4 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (_h_does_fit : reg_val.toNat + offset.toNat + 4 < 2 ^ 64)
     (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
       (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     (vmem_write (.Regidx rs_addr_bv) offset 4 data
@@ -1481,11 +1461,10 @@ lemma run_vmem_read_of_width_2'
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 2 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 2 < 2 ^ 64)
     (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
       (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
-    (hmem₀ : s.mem[reg_val.toNat + offset.toNat]? = some data₀)
-    (hmem₁ : s.mem[reg_val.toNat + offset.toNat + 1]? = some data₁) :
+    (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀)
+    (hmem₁ : s.mem[(reg_val + offset).toNat + 1]? = some data₁) :
     let width := 2
     let data := data₁ ++ data₀
     (vmem_read (.Regidx rs_addr_bv) offset width (MemoryAccessType.Load mem_payload.Data)
@@ -1500,10 +1479,6 @@ lemma run_vmem_read_of_width_2'
     have h := @run_rX_bits rs_addr_bv s
     simp only [EStateM.run] at h
     rw [h, h_reg_val]
-  have hmod : (reg_val + offset).toNat = reg_val.toNat + offset.toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
-  have hmem₀' : s.mem[(reg_val + offset).toNat]? = some data₀ := by rw [hmod]; exact hmem₀
-  have hmem₁' : s.mem[(reg_val + offset).toNat + 1]? = some data₁ := by rw [hmod]; exact hmem₁
   have hmprv' : Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 = 0#1 := by
     rw [show Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 =
       BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (hs _)) >>> 17) from rfl]
@@ -1535,7 +1510,7 @@ lemma run_vmem_read_of_width_2'
     hfetch, is_shadow_stack_access]
   have h := run_mem_read_two_bytes_of_isInitialized reg_val offset
     data₀ data₁ s hs h_in_range hconfig
-    hmem₀' hmem₁'
+    hmem₀ hmem₁
   simp only [EStateM.run] at h
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend] at h ⊢
   conv_lhs => rw [h]
@@ -1637,7 +1612,6 @@ lemma run_vmem_write_of_width_2
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 2 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (_h_does_fit : reg_val.toNat + offset.toNat + 2 < 2 ^ 64)
     (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
       (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     (vmem_write (.Regidx rs_addr_bv) offset 2 data
@@ -1791,10 +1765,9 @@ lemma run_vmem_read_of_width_1'
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 1 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 1 < 2 ^ 64)
     (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
       (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
-    (hmem₀ : s.mem[reg_val.toNat + offset.toNat]? = some data₀) :
+    (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀) :
     let width := 1
     let data := data₀
     (vmem_read (.Regidx rs_addr_bv) offset width (MemoryAccessType.Load mem_payload.Data)
@@ -1809,9 +1782,6 @@ lemma run_vmem_read_of_width_1'
     have h := @run_rX_bits rs_addr_bv s
     simp only [EStateM.run] at h
     rw [h, h_reg_val]
-  have hmod : (reg_val + offset).toNat = reg_val.toNat + offset.toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
-  have hmem₀' : s.mem[(reg_val + offset).toNat]? = some data₀ := by rw [hmod]; exact hmem₀
   have hmprv' : Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 = 0#1 := by
     rw [show Sail.BitVec.extractLsb (s.regs.get Register.mstatus (hs _)) 17 17 =
       BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (hs _)) >>> 17) from rfl]
@@ -1842,7 +1812,7 @@ lemma run_vmem_read_of_width_1'
     hmprv', h_cur_privilege, hmachine, hsatp_bare,
     hfetch, is_shadow_stack_access]
   have h := run_mem_read_one_byte_of_isInitialized reg_val offset
-    data₀ s hs h_in_range hconfig hmem₀'
+    data₀ s hs h_in_range hconfig hmem₀
   simp only [EStateM.run] at h
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend] at h ⊢
   conv_lhs => rw [h]
@@ -1937,7 +1907,6 @@ lemma run_vmem_write_of_width_1
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 1 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (_h_does_fit : reg_val.toNat + offset.toNat + 1 < 2 ^ 64)
     (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
       (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     (vmem_write (.Regidx rs_addr_bv) offset 1 data

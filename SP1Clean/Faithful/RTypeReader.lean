@@ -61,7 +61,8 @@ theorem rtypereader_constraints_faithful
   simp only [Extracted.RTypeReader.asserts, Extracted.RTypeReader.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_memory, Interaction.toProp_send_program,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.constrain_Range,
+    ByteOpcode.constrainField_six, ByteOpcode.constrainField_three,
+    ByteOpcode.constrain_Range,
     ByteOpcode.constrain_U8Range, val_16, ZMod.val_zero, one_ne_zero, ne_eq, not_false_eq_true,
     true_implies, sub_self, mul_zero, sub_zero, Nat.ofNat_pos, true_and, and_true,
     show (2 : ℕ) ^ 8 = 256 by norm_num, show (2 : ℕ) ^ 16 = 65536 by norm_num]
@@ -106,7 +107,8 @@ theorem rtypereader_interactions_faithful
   simp only [Extracted.RTypeReader.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_memory, Interaction.toProp_send_program,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.constrain_Range,
+    ByteOpcode.constrainField_six, ByteOpcode.constrainField_three,
+    ByteOpcode.constrain_Range,
     ByteOpcode.constrain_U8Range, val_16, ZMod.val_zero, one_ne_zero, ne_eq, not_false_eq_true,
     true_implies, Nat.ofNat_pos, true_and, and_true,
     show (2 : ℕ) ^ 8 = 256 by norm_num, show (2 : ℕ) ^ 16 = 65536 by norm_num]
@@ -290,8 +292,7 @@ theorem rtypereader_byte_interactions_faithful_syntactic
   -- the six byte pulls have surfaced (in filter-`if` form); reduce the filters, map via the byte kernel,
   -- unfold the oracle + its `.Byte` filter, and bind the evals.
   simp [circuit_norm, hbk, Gadgets.Equality.main, Extracted.RTypeReader.interactions,
-    Extracted.Interaction.toAccess, Extracted.Dir.sign,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx, h6, h3,
+    Extracted.Interaction.toAccess, Extracted.Dir.sign, h6, h3,
     h_ir, h_cl, h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c]
 
 end SP1Clean.Faithful

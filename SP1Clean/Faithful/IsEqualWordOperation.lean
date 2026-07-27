@@ -42,6 +42,82 @@ theorem isEqualWord_constraints_faithful (a b : Word (ZMod p))
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, mul_eq_zero,
     List.getElem_cons_succ, sub_self, and_true, true_and]
 
+omit [Fact (2 ^ 17 < p)] in
+@[circuit_norm] theorem eval_isEqualWordColumns
+    (env : Environment (ZMod p))
+    (cols : Extracted.IsEqualWordOperation (Expression (ZMod p))) :
+    Eval.eval env cols =
+      ({ is_diff_zero := Eval.eval env cols.is_diff_zero } :
+        Extracted.IsEqualWordOperation (ZMod p)) := by
+  provable_struct_simp
+
+private def isEqualWordChild
+    (input : Var SP1Clean.IsEqualWordOperation.Inputs (ZMod p)) :
+    Var SP1Clean.IsZeroWordOperation.Inputs (ZMod p) :=
+  ⟨#v[input.a[0] - input.b[0], input.a[1] - input.b[1],
+      input.a[2] - input.b[2], input.a[3] - input.b[3]],
+    input.cols.is_diff_zero, input.is_real⟩
+
+set_option linter.unusedSectionVars false in
+set_option maxHeartbeats 1000000 in
+private theorem isEqualWord_nativeAssertions
+    (env : Environment (ZMod p))
+    (input : Var SP1Clean.IsEqualWordOperation.Inputs (ZMod p))
+    (offset : ℕ) :
+    nativeAssertZeros env
+        ((SP1Clean.IsEqualWordOperation.main input).operations offset) =
+      nativeAssertZeros env
+          ((SP1Clean.IsZeroWordOperation.main
+            (isEqualWordChild input)).operations offset) ++
+        [Expression.eval env
+          (input.is_real * (input.is_real - 1))] := by
+  simp only [nativeAssertZeros, SP1Clean.IsEqualWordOperation.main,
+    Circuit.operations, Circuit.bind_def, assertion,
+    HasAssertEq.assert_eq, Expression.assertEquals,
+    Operations.localLength, Operations.constraints_append,
+    Operations.constraints_subcircuit,
+    constraints_toSubcircuit_formalAssertion,
+    FormalAssertion.toSubcircuit_localLength,
+    Operations.constraints_nil, List.map_append, List.map_nil]
+  simp only [SP1Clean.IsZeroWordOperation.circuit_localLength,
+    Nat.add_zero]
+  simp only [SP1Clean.IsZeroWordOperation.circuit,
+    Gadgets.Equality.circuit]
+  rw [CanonicalReader.equalityAssertionList]
+  simp [isEqualWordChild, Expression.eval]
+
+set_option maxHeartbeats 1000000 in
+/-- Folded normalization of the native word-equality fragment to the exact generated Rust list. -/
+theorem isEqualWord_assertions_exact
+    (env : Environment (ZMod p))
+    (input : Var SP1Clean.IsEqualWordOperation.Inputs (ZMod p))
+    (offset : ℕ) :
+    nativeAssertZeros env
+        ((SP1Clean.IsEqualWordOperation.main input).operations offset) =
+      Extracted.IsEqualWordOperation.asserts
+        (Eval.eval env input.a) (Eval.eval env input.b)
+        (Eval.eval env input.cols)
+        (Expression.eval env input.is_real) := by
+  rw [eval_isEqualWordColumns,
+    isEqualWord_nativeAssertions,
+    Extracted.IsEqualWordOperation.asserts,
+    isZeroWord_assertions_exact env (isEqualWordChild input) offset]
+  simp only [isEqualWordChild]
+  have hdiff :
+      Eval.eval env
+          #v[input.a[0] - input.b[0], input.a[1] - input.b[1],
+            input.a[2] - input.b[2], input.a[3] - input.b[3]] =
+        #v[(Eval.eval env input.a)[0] - (Eval.eval env input.b)[0],
+          (Eval.eval env input.a)[1] - (Eval.eval env input.b)[1],
+          (Eval.eval env input.a)[2] - (Eval.eval env input.b)[2],
+          (Eval.eval env input.a)[3] - (Eval.eval env input.b)[3]] := by
+    rw [ProvableType.eval_fields]
+    ext k hk
+    interval_cases k <;>
+      simp [eval_sub, ProvableType.getElem_eval_fields]
+  rw [hdiff]
+  simp only [eval_sub, Expression.eval]
+
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery
 

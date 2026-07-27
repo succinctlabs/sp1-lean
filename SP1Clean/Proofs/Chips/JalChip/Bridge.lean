@@ -175,7 +175,8 @@ the **data-dependent** jump target, `rdWrite = op_a_operation.value` the link `p
 `JalChip.advance` can be supplied *as* `kind.advance` (see `AddChip.rowView`). -/
 def rowView (inp : Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.add_operation.value[0], cols.add_operation.value[1], cols.add_operation.value[2]],
-    cols.adapter.toAdapterView, inp.is_real, cols.op_a_operation.value, 46, .regWrite⟩
+    cols.adapter.toAdapterView, inp.is_real, cols.op_a_operation.value, 46,
+    .destination cols.adapter.op_a_0⟩
 
 /-- **`JalChip.advance`** — the per-JAL-row `try_step` lift (SC Phase 4, the **first computed-`next_pc` chip**):
 over `advance_of_jal` (the jump ladder core, `advance_jump_core`), whose `execute_JAL` sets `nextPC := target`
@@ -183,9 +184,10 @@ and writes the link `pc+4` to `rd`. The per-chip obligations are discharged from
 relation `hsnd` (`sndPcOf = pc + signExtend imm`, from the Spec's `add_operation.value = pc + op_b_imm` jump
 conjunct + the decode's immediate + the `pcWord` reassembly), the link `hlink` (`rdWrite = pc+4`, from the
 `op_a_operation` conjunct + `toBitVec64_four`), and the 4-alignment `halign` (from the `Spec`'s `÷4`
-range-check conjunct via `Word.toBitVec64_toNat_mod_four`). The `advanceReady` bundle carries the pc-limb
-bound, `op_a_0 = 0`, `op_a ≠ 0`, and the **48-bit-target invariant** `add_operation.value[3] = 0` (SP1 pcs are
-3-limb, so the committed 3-limb `next_pc` equals the Sail 64-bit target). Stated to match the field. -/
+range-check conjunct via `Word.toBitVec64_toNat_mod_four`). The decoded Program row selects the two
+architectural cases: a nonzero destination uses the register-writing jump core; `jal x0` reuses the
+computed-PC/no-write control core. The `advanceReady` bundle therefore carries only the pc-limb bound and
+the **48-bit-target invariant** `add_operation.value[3] = 0`. -/
 theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
@@ -193,10 +195,9 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) (
     (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
     (_hvalb : ValueOperandsBound (rowView inp cols) s)
     (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
-    (hready : cols.state.pc[0].val < 2 ^ 16 ∧ cols.adapter.op_a_0 = 0 ∧
-      (rowView inp cols).adapter.op_a ≠ 0 ∧ cols.add_operation.value[3] = 0) :
+    (hready : cols.add_operation.value[3] = 0) :
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
-  obtain ⟨hpc0, hopa0, hnonX0, hv3⟩ := hready
+  have hv3 := hready
   have hreal' : inp.is_real = 1 := hreal
   have reassemble : ∀ (v : Word (ZMod p)), v[3] = 0 →
       pcBitsOfVals v[0].val v[1].val v[2].val = Word.toBitVec64 v := by
@@ -205,6 +206,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) (
   set r := rowView inp cols with hr
   have vrd : r.rdWrite = cols.op_a_operation.value := rfl
   have vopb : cols.adapter.op_b_imm = r.adapter.op_b := rfl
+  have vopa0 : r.adapter.op_a_0 = cols.adapter.op_a_0 := rfl
   have himmc : r.adapter.imm_c = 1 := rfl
   have hop : r.opcode = ((Opcode.JAL).toNat : ZMod p) := by simp [hr, rowView, Opcode.toNat]
   have hpcw : Word.toBitVec64 (JalChip.pcWord cols) = rcvPcOf (stateAccess r) := by
@@ -212,13 +214,45 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) (
     rw [← reassemble _ hp3]; rfl
   have hsnd_eq : sndPcOf (stateAccess r) = Word.toBitVec64 cols.add_operation.value :=
     (reassemble cols.add_operation.value hv3).symm ▸ rfl
-  refine advance_of_jal hcfg hrom hpcread hdecrom hop himmc hnonX0 ?_ ?_ ?_
-  · rw [hsnd_eq, Word.toBitVec64_toNat_mod_four]; exact hspec.2.2.2.2 hreal'
-  · intro imm hopb
+  have halign : (sndPcOf (stateAccess r)).toNat % 4 = 0 := by
+    rw [hsnd_eq, Word.toBitVec64_toNat_mod_four]
+    exact hspec.2.2.2.2 hreal'
+  have hsnd : ∀ imm : BitVec 21, r.adapter.op_b = bitVecToWord (imm.signExtend 64) →
+      sndPcOf (stateAccess r) = rcvPcOf (stateAccess r) + sign_extend (m := 64) imm := by
+    intro imm hopb
     have hbind : cols.adapter.op_b_imm = bitVecToWord (imm.signExtend 64) := vopb.trans hopb
     rw [hsnd_eq, hspec.2.2.1 hreal', hpcw]
-    congr 1; rw [hbind]; exact toBitVec64_bitVecToWord _
-  · rw [vrd, hspec.2.2.2.1 hreal' hopa0, hpcw, toBitVec64_four]
+    congr 1
+    rw [hbind]
+    exact toBitVec64_bitVecToWord _
+  have opAFlag : cols.adapter.op_a_0 = 0 ∨ cols.adapter.op_a_0 = 1 :=
+    hspec.1.2.1 hreal'
+  rcases opAFlag with hopa0 | hopa1
+  · have hnonX0 : r.adapter.op_a ≠ 0 := by
+      apply hdecrom.op_a_ne_zero_of_op_a_0_eq_zero
+      simpa only [programAccess, ProgramAccess.toRow] using vopa0.trans hopa0
+    have commitEq : r.commit = Trace.CommitEffect.regWrite := by
+      rw [hr]
+      simp [rowView, Trace.CommitEffect.destination, hopa0]
+    have hwrites : r.commit.writesReg = true := by
+      simp only [commitEq, Trace.CommitEffect.regWrite]
+    have hnomem : r.commit.memWrite = none := by
+      simp only [commitEq, Trace.CommitEffect.regWrite]
+    refine advance_of_jal hcfg hrom hpcread hdecrom hop himmc hnonX0 halign hsnd ?_
+      (hwrites := hwrites) (hnomem := hnomem)
+    rw [vrd, hspec.2.2.2.1 hreal' hopa0, hpcw, toBitVec64_four]
+  · have hopaZero : r.adapter.op_a = 0 := by
+      apply hdecrom.op_a_eq_zero_of_op_a_0_eq_one
+      simpa only [programAccess, ProgramAccess.toRow] using vopa0.trans hopa1
+    have commitEq : r.commit = Trace.CommitEffect.noWrite := by
+      rw [hr]
+      simp [rowView, Trace.CommitEffect.destination, hopa1]
+    have hnowrite : r.commit.writesReg = false := by
+      simp only [commitEq, Trace.CommitEffect.noWrite]
+    have hnomem : r.commit.memWrite = none := by
+      simp only [commitEq, Trace.CommitEffect.noWrite]
+    exact advance_of_jal_x0 hcfg hrom hpcread hdecrom hop himmc hopaZero halign hsnd
+      hnowrite hnomem
 
 /-- JAL's `ChipKind` registration. `view` threads `next_pc = add_operation.value` (the data-dependent
 jump target), J-type adapter, opcode 46. `advance` derives jump-target alignment from the chip `Spec`
@@ -229,8 +263,7 @@ def kind : Soundness.ChipKind p where
   Cols := Extracted.JalColumns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
-  advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧ cols.adapter.op_a_0 = 0 ∧
-    (rowView inp cols).adapter.op_a ≠ 0 ∧ cols.add_operation.value[3] = 0
+  advanceReady := fun _inp cols _ _ => cols.add_operation.value[3] = 0
   advance := some (PLift.up advance)
 
 end SP1Clean.JalChip

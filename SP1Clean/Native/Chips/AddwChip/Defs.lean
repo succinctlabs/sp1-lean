@@ -60,6 +60,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (AddwCols) (ZMod 
   assertion Readers.RegisterWrite.circuit
     ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
      input.adapter.op_a, #v[value[0], value[1], msb[0] * 65535, msb[0] * 65535], input.is_real⟩
+  -- Rust routes ADDW rows only when the decoded destination is not x0.  Keep the extracted AIR's
+  -- chip-owned `op_a_0 = 0` assertion in the native verifier as well.
+  input.adapter.op_a_0 === 0
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
   -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
   assertZero (input.is_real * (input.is_real - 1))
@@ -83,5 +86,35 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddwCols main where
   -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+
+/-- The explicit completed Addw row, kept folded for chip-boundary proofs. -/
+@[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter,
+        ⟨Vector.mapRange 2 fun i => var { index := offset + i },
+          ⟨var { index := offset + 2 }⟩⟩,
+        input.is_real⟩ : Var AddwCols (ZMod p)) := rfl
+
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
+         adapter := Eval.eval env input.adapter } : Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : AddwCols (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
+         addw_operation := Eval.eval env cols.addw_operation,
+         is_real := Eval.eval env cols.is_real } : AddwCols F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_inputAdapter {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (Eval.eval env input).adapter = Eval.eval env input.adapter := by
+  rw [eval_inputs]
 
 end SP1Clean.AddwChip

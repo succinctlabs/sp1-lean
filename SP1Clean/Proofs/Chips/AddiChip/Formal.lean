@@ -1,5 +1,6 @@
 import SP1Clean.Native.Chips.AddiChip.Defs
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
+import Clean.Air.Circuit
 
 /-! # `SP1Clean.AddiChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
 
@@ -16,7 +17,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start [Spec]
-  obtain ⟨h_cpu, h_add, h_adapter, _h_regwrite, h_gate⟩ := h_holds
+  obtain ⟨h_cpu, h_add, h_adapter, _h_regwrite, _h_op_a_0, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
   -- channel's new `MemoryMsg.ClkBound` guarantee — `ITypeReader`'s op_b read-back push (`clk_low + 3`)
@@ -69,9 +70,9 @@ theorem completeness :
     simp only [hbeq, hceq]
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin, h_clk⟩,
-      ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hdec,
+      ⟨⟨hz _, hz _, hz _, hz _⟩, (fun _ => Or.inl hop_a_0), hrac_a, hrac_b, hdec,
         fun hr => ⟨ha_prev hr, ha, (hprevclk hr).1, (hprevclk hr).2⟩⟩⟩,
-    ⟨⟨hbin, ?_, h_clk.at_four⟩, trivial⟩, ?_⟩
+    ⟨⟨hbin, ?_, h_clk.at_four⟩, trivial⟩, hop_a_0, ?_⟩
   · rw [hval]; exact AddOperation.spec_populate ha hb input_is_real
   · -- RegisterWrite's `isU64 value` (op_a write push): the witnessed result `value = populate op_b op_c_imm`,
     -- whose `isU64` is `spec_populate.1`.
@@ -178,7 +179,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddiCols :=
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def,
           Circuit.pure_def, witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
-          Operations.localLength]
+          HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
           InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
           InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
@@ -193,7 +194,19 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs AddiCols :=
           Channels.programChannel_eq_memoryChannel_false,
           not_false_eq_true, Operations.interactionsWith_assert,
           Operations.interactionsWith_nil, List.map_cons, List.map_nil, List.nil_append,
-          List.append_nil, Soundness.iTypeProgramMessage] }
+          List.append_nil, Soundness.iTypeProgramMessage]
+        simp only [Operations.interactionsWith_subcircuit,
+          FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
+          List.filter_nil, List.nil_append] }
+
+@[circuit_norm] theorem circuit_main_eq : (circuit (p := p)).main = main := rfl
+
+@[circuit_norm] theorem circuit_localLength_eq (input : Var Inputs (ZMod p)) :
+    (circuit (p := p)).localLength input = 4 := rfl
+
+@[circuit_norm] theorem circuit_size_eq :
+    (circuit (p := p)).size = size Inputs + 4 := by
+  rw [GeneralFormalCircuit.size_eq, circuit_localLength_eq]
 
 /-- The completed Addi circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :

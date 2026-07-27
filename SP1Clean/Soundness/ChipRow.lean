@@ -49,6 +49,11 @@ structure ChipKind (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
   [provableCols : ProvableType Cols]
   /-- The chip-agnostic bus view (shared reader blocks, `is_real`, the rd write value, the opcode). -/
   view : Inputs (ZMod p) → Cols (ZMod p) → Trace.RowView (ZMod p)
+  /-- Optional projection of the generic aligned RAM access composed by load/store chips. Register-
+  only chips retain the default `none`. The projection is authenticated later against the chip's
+  exact evaluated Memory interaction list; it is not treated as self-validating metadata. -/
+  ramAccess : Inputs (ZMod p) → Cols (ZMod p) → Option (Trace.RamAccessView (ZMod p)) :=
+    fun _ _ => none
   /-- The per-row in-circuit contract — the chip's verified `Spec` (e.g. `AddChip.Spec`). -/
   chipSpec : Inputs (ZMod p) → Cols (ZMod p) → ProverData (ZMod p) → Prop
   /-- **The chip-specific "row is ready to advance" bundle** (SC Phase 4): the extra facts the trace
@@ -91,6 +96,10 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The chip-agnostic bus view (projects through `r.kind`). -/
 def ChipRow.view (r : ChipRow p) : Trace.RowView (ZMod p) := r.kind.view r.inputs r.cols
+
+/-- The optional physical RAM-access projection registered by a load/store row. -/
+def ChipRow.ramAccess (r : ChipRow p) : Option (Trace.RamAccessView (ZMod p)) :=
+  r.kind.ramAccess r.inputs r.cols
 
 /-- The row's `is_real` selector (= the input selector the buses gate on). -/
 def ChipRow.is_real (r : ChipRow p) : ZMod p := r.view.is_real

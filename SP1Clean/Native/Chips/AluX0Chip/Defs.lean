@@ -76,6 +76,30 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AluX0Cols main where
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
 
+/-- The completed AluX0 row is exactly its threaded input; the chip has no local witness cells. -/
+@[circuit_norm] theorem directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter, input.opcode, input.is_real⟩ :
+        Var AluX0Cols (ZMod p)) := rfl
+
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ state := Eval.eval env input.state, adapter := Eval.eval env input.adapter,
+         opcode := Eval.eval env input.opcode, is_real := Eval.eval env input.is_real } :
+        Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : AluX0Cols (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
+         opcode := Eval.eval env cols.opcode, is_real := Eval.eval env cols.is_real } :
+        AluX0Cols F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
 /-- Semantic contract, composed from the sub-circuit `Spec`s. The `ALUTypeReaderImmutable` adapter facts
 (op_a/op_b/op_c reads + the `op_a_0` read-zeroing — the discarded write), the `is_real`-binary fact, and the
 two `op_a_0` forcing gates (which pin `op_a = x0` on real rows). The CPUState advance is threaded but, like
@@ -86,6 +110,7 @@ def Spec (input : Inputs (ZMod p)) (_cols : AluX0Cols (ZMod p)) (_ : ProverData 
       input.state.pc, opcodeVal input⟩ ∧
   (isReal input = 0 ∨ isReal input = 1) ∧
   isReal input * (input.adapter.op_a_0 - 1) = 0 ∧
-  (isReal input - 1) * input.adapter.op_a_0 = 0
+  (isReal input - 1) * input.adapter.op_a_0 = 0 ∧
+  (isReal input = 1 → input.opcode.val < 29)
 
 end SP1Clean.AluX0Chip

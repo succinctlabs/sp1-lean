@@ -58,6 +58,20 @@ theorem execute_RTYPE_pure_slt (x y : BitVec 64) :
     bool_to_bit, bool_bit_forwards, zopz0zI_s, BitVec.slt]
   cases h2 : x.toInt <b y.toInt <;> simp_all
 
+/-- The immediate and register signed-less-than pure operations share the same bit-level body. -/
+theorem execute_ITYPE_pure_slti (x y : BitVec 64) :
+    SP1Clean.Advance.execute_ITYPE_pure x y iop.SLTI = RV64.slt y x := by
+  rw [show SP1Clean.Advance.execute_ITYPE_pure x y iop.SLTI =
+      execute_RTYPE_pure x y rop.SLT from rfl,
+    execute_RTYPE_pure_slt]
+
+/-- The immediate and register unsigned-less-than pure operations share the same bit-level body. -/
+theorem execute_ITYPE_pure_sltiu (x y : BitVec 64) :
+    SP1Clean.Advance.execute_ITYPE_pure x y iop.SLTIU = RV64.sltu y x := by
+  rw [show SP1Clean.Advance.execute_ITYPE_pure x y iop.SLTIU =
+      execute_RTYPE_pure x y rop.SLTU from rfl,
+    execute_RTYPE_pure_sltu]
+
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 17 < p)] in
 /-- Native Sail equivalence (unsigned): the chip's semantic RV64 `sltu` fact (`h_sltu`) plus the
@@ -231,15 +245,10 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) : Trace.R
     cols.adapter.toAdapterView, inp.is_real, resultWord cols,
     cols.is_slt * 9 + cols.is_sltu * 10, .regWrite⟩
 
-/-- **`LtChip.advance`** — the per-Lt-row `try_step` lift (SC Phase 4, the second multi-op chip): a 2-way
-adapter (SLT/SLTU) over `advance_of_rtype`, register-only (`imm_c = 0`). Each flag branch reads its opcode off
-the `is_slt·9+is_sltu·10` selector (the one-hot in `advanceReady` zeros the other → the single op), and its
-write-value identity from the Spec's gated `RV64.slt`/`sltu` conjunct via `execute_RTYPE_pure_slt`/`_sltu`.
-The `advanceReady` bundle carries the dispatcher-discharged facts: the pc-limb bound, `imm_c = 0`, the flag
-one-hot (op-determination pinned by the program-bus decode), the `op_a ≠ 0` routing, and — since `Lt` commits
-its operand as `op_c_val = adapter.op_c` (a value column, unlike Add/Bitwise's `op_c_memory.prev_value`) — the
-operand binding `op_c = op_c_memory.prev_value` (the register-read tie, forced by memory-bus consistency).
-Stated to match the `ChipKind.advance` obligation exactly, so `kind.advance := some (PLift.up advance)`. -/
+/-- **`LtChip.advance`** — the four-way SLT/SLTU/SLTI/SLTIU lift. The opcode flags choose signedness;
+the committed `imm_c` bit chooses register or immediate decoding. The arithmetic always consumes SP1's
+`op_c_memory.prev_value`; on immediate rows the retained `ALUTypeReader` constraints bind that word to
+the decoded `op_c` immediate before `advance_of_itype` is applied. -/
 theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1)
@@ -248,38 +257,66 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) (data
     (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
     (hvalb : ValueOperandsBound (rowView inp cols) s)
     (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
-    (hready : inp.adapter = cols.adapter ∧ cols.state.pc[0].val < 2 ^ 16 ∧ cols.adapter.imm_c = 0 ∧
-      cols.adapter.op_c = cols.adapter.op_c_memory.prev_value ∧
+    (hready : inp.adapter = cols.adapter ∧ cols.state.pc[0].val < 2 ^ 16 ∧
+      (cols.adapter.imm_c = 0 ∨ cols.adapter.imm_c = 1) ∧
       ((cols.is_slt = 1 ∧ cols.is_sltu = 0) ∨ (cols.is_slt = 0 ∧ cols.is_sltu = 1)) ∧
-      (rowView inp cols).adapter.op_a ≠ 0) :
+      (rowView inp cols).adapter.op_a ≠ 0 ∧
+      (cols.adapter.imm_c = 1 → cols.adapter.op_c_memory.prev_value = cols.adapter.op_c)) :
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
-  obtain ⟨hlink, hpc0, himmc, hopc, hflag, hnonX0⟩ := hready
+  obtain ⟨hlink, hpc0, himmc, hflag, hnonX0, himmbind⟩ := hready
   have hreal' : inp.is_real = 1 := hreal
   set r := rowView inp cols with hr
   have vrd : r.rdWrite = resultWord cols := rfl
   have vopbm : r.adapter.op_b_memory = cols.adapter.op_b_memory := rfl
   have vopcm : r.adapter.op_c_memory = cols.adapter.op_c_memory := rfl
+  have vopc : r.adapter.op_c = cols.adapter.op_c := rfl
   obtain ⟨-, -, hgated⟩ := hspec
   have hg := hgated hreal'
   rcases hflag with ⟨h_slt, h_sltu0⟩ | ⟨h_slt0, h_sltu⟩
-  · have hop : r.opcode = ((ropToOpcode rop.SLT).toNat : ZMod p) := by
-      simp [hr, rowView, h_slt, h_sltu0, ropToOpcode, Opcode.toNat]
-    have hval : r.rdWrite.toBitVec64 = execute_RTYPE_pure r.adapter.op_b_memory.prev_value.toBitVec64
-        r.adapter.op_c_memory.prev_value.toBitVec64 rop.SLT := by
-      have hslt := hg.1 h_slt
-      simp only [LtChip.Inputs.op_c_val, LtChip.Inputs.op_b_val, hlink] at hslt
-      rw [hopc] at hslt
-      rw [vrd, vopbm, vopcm, execute_RTYPE_pure_slt]; exact hslt
-    exact advance_of_rtype rop.SLT hcfg hrom hpcread hvalb hdecrom hop rfl himmc hnonX0 hpc0 rfl hval
-  · have hop : r.opcode = ((ropToOpcode rop.SLTU).toNat : ZMod p) := by
-      simp [hr, rowView, h_slt0, h_sltu, ropToOpcode, Opcode.toNat]
-    have hval : r.rdWrite.toBitVec64 = execute_RTYPE_pure r.adapter.op_b_memory.prev_value.toBitVec64
-        r.adapter.op_c_memory.prev_value.toBitVec64 rop.SLTU := by
-      have hsltu := hg.2 h_sltu
-      simp only [LtChip.Inputs.op_c_val, LtChip.Inputs.op_b_val, hlink] at hsltu
-      rw [hopc] at hsltu
-      rw [vrd, vopbm, vopcm, execute_RTYPE_pure_sltu]; exact hsltu
-    exact advance_of_rtype rop.SLTU hcfg hrom hpcread hvalb hdecrom hop rfl himmc hnonX0 hpc0 rfl hval
+  · have hslt := hg.1 h_slt
+    simp only [LtChip.Inputs.op_c_val, LtChip.Inputs.op_b_val, hlink] at hslt
+    rcases himmc with register | immediate
+    · have hop : r.opcode = ((ropToOpcode rop.SLT).toNat : ZMod p) := by
+        simp [hr, rowView, h_slt, h_sltu0, ropToOpcode, Opcode.toNat]
+      have hval : r.rdWrite.toBitVec64 = execute_RTYPE_pure
+          r.adapter.op_b_memory.prev_value.toBitVec64
+          r.adapter.op_c_memory.prev_value.toBitVec64 rop.SLT := by
+        rw [execute_RTYPE_pure_slt, vrd, vopbm, vopcm]
+        exact hslt
+      exact advance_of_rtype rop.SLT hcfg hrom hpcread hvalb hdecrom hop rfl register
+        hnonX0 hpc0 rfl hval
+    · have binding := himmbind immediate
+      rw [binding] at hslt
+      have hop : r.opcode = ((iopToOpcode iop.SLTI).toNat : ZMod p) := by
+        simp [hr, rowView, h_slt, h_sltu0, iopToOpcode, Opcode.toNat]
+      have hval : r.rdWrite.toBitVec64 = execute_ITYPE_pure
+          r.adapter.op_b_memory.prev_value.toBitVec64 r.adapter.op_c.toBitVec64 iop.SLTI := by
+        rw [execute_ITYPE_pure_slti, vrd, vopbm, vopc]
+        exact hslt
+      exact advance_of_itype iop.SLTI hcfg hrom hpcread hvalb hdecrom hop rfl immediate
+        hnonX0 hpc0 rfl hval
+  · have hsltu := hg.2 h_sltu
+    simp only [LtChip.Inputs.op_c_val, LtChip.Inputs.op_b_val, hlink] at hsltu
+    rcases himmc with register | immediate
+    · have hop : r.opcode = ((ropToOpcode rop.SLTU).toNat : ZMod p) := by
+        simp [hr, rowView, h_slt0, h_sltu, ropToOpcode, Opcode.toNat]
+      have hval : r.rdWrite.toBitVec64 = execute_RTYPE_pure
+          r.adapter.op_b_memory.prev_value.toBitVec64
+          r.adapter.op_c_memory.prev_value.toBitVec64 rop.SLTU := by
+        rw [execute_RTYPE_pure_sltu, vrd, vopbm, vopcm]
+        exact hsltu
+      exact advance_of_rtype rop.SLTU hcfg hrom hpcread hvalb hdecrom hop rfl register
+        hnonX0 hpc0 rfl hval
+    · have binding := himmbind immediate
+      rw [binding] at hsltu
+      have hop : r.opcode = ((iopToOpcode iop.SLTIU).toNat : ZMod p) := by
+        simp [hr, rowView, h_slt0, h_sltu, iopToOpcode, Opcode.toNat]
+      have hval : r.rdWrite.toBitVec64 = execute_ITYPE_pure
+          r.adapter.op_b_memory.prev_value.toBitVec64 r.adapter.op_c.toBitVec64 iop.SLTIU := by
+        rw [execute_ITYPE_pure_sltiu, vrd, vopbm, vopc]
+        exact hsltu
+      exact advance_of_itype iop.SLTIU hcfg hrom hpcread hvalb hdecrom hop rfl immediate
+        hnonX0 hpc0 rfl hval
 
 /-- **Lt's `ChipKind` registration.** Program-bus opcode `is_slt·9 + is_sltu·10`; `advance` dispatches the
 **register** SLT/SLTU and **immediate** SLTI/SLTIU cases, with the latter pinned by the committed Program
@@ -293,9 +330,10 @@ def kind : Soundness.ChipKind p where
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧ cols.state.pc[0].val < 2 ^ 16 ∧
-    cols.adapter.imm_c = 0 ∧ cols.adapter.op_c = cols.adapter.op_c_memory.prev_value ∧
+    (cols.adapter.imm_c = 0 ∨ cols.adapter.imm_c = 1) ∧
     ((cols.is_slt = 1 ∧ cols.is_sltu = 0) ∨ (cols.is_slt = 0 ∧ cols.is_sltu = 1)) ∧
-    (rowView inp cols).adapter.op_a ≠ 0
+    (rowView inp cols).adapter.op_a ≠ 0 ∧
+    (cols.adapter.imm_c = 1 → cols.adapter.op_c_memory.prev_value = cols.adapter.op_c)
   advance := some (PLift.up advance)
 
 end SP1Clean.LtChip

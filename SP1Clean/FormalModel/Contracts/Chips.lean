@@ -299,10 +299,68 @@ structure Inputs (F : Type) where
   adapter : Extracted.ALUTypeReader F
 deriving ProvableStruct
 
-/-- `rs1` operand = the `op_b` register read (`op_b_memory.prev_value`); `rs2` operand = the ALU operand
-word `adapter.op_c` (the `op_c` register read, or the immediate). Mirrors `LtChip.Inputs`. -/
+/-- `rs1` operand = the `op_b` register read (`op_b_memory.prev_value`); the arithmetic C operand is
+the `op_c_memory.prev_value` word returned by SP1's `ALUTypeReader.c()`. On immediate rows the reader
+constraints bind this word to the decoded `adapter.op_c` shift amount. -/
 @[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
-@[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c
+@[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c_memory.prev_value
+
+/-- The folded tail of `ShiftLeftCols.asserts`, beginning immediately after the two flag booleans and
+their combined boolean gate. This is a genuine proof boundary over the committed chip row, not a
+claimed Rust operation. -/
+def CoreSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
+  let sll := cols.is_sll; let sllw := cols.is_sllw
+  let b0 := cols.c_bits[0]; let b1 := cols.c_bits[1]; let b2 := cols.c_bits[2]
+  let b3 := cols.c_bits[3]; let b4 := cols.c_bits[4]; let b5 := cols.c_bits[5]
+  let s0 := cols.shift_u16[0]; let s1 := cols.shift_u16[1]
+  let s2 := cols.shift_u16[2]; let s3 := cols.shift_u16[3]
+  let byteShift := b4 + b5 * 2 * sll
+  b0 * (b0 - 1) = 0 ∧ b1 * (b1 - 1) = 0 ∧ b2 * (b2 - 1) = 0 ∧
+  b3 * (b3 - 1) = 0 ∧ b4 * (b4 - 1) = 0 ∧ b5 * (b5 - 1) = 0 ∧
+  s0 * (byteShift - 0) = 0 ∧ s0 * (s0 - 1) = 0 ∧
+  s1 * (byteShift - 1) = 0 ∧ s1 * (s1 - 1) = 0 ∧
+  s2 * (byteShift - 2) = 0 ∧ s2 * (s2 - 1) = 0 ∧
+  s3 * (byteShift - 3) = 0 ∧ s3 * (s3 - 1) = 0 ∧
+  (sll + sllw) * ((s0 + s1 + s2 + s3) - 1) = 0 ∧
+  cols.v_01 - (b0 + 1) * (b1 * 3 + 1) = 0 ∧
+  cols.v_012 - cols.v_01 * (b2 * 15 + 1) = 0 ∧
+  cols.v_0123 - cols.v_012 * (b3 * 255 + 1) = 0 ∧
+  cols.adapter.op_b_memory.prev_value[0] * cols.v_0123
+    - (cols.higher_limb[0] * 65536 + cols.lower_limb[0] * cols.v_0123) = 0 ∧
+  cols.adapter.op_b_memory.prev_value[1] * cols.v_0123
+    - (cols.higher_limb[1] * 65536 + cols.lower_limb[1] * cols.v_0123) = 0 ∧
+  cols.adapter.op_b_memory.prev_value[2] * cols.v_0123
+    - (cols.higher_limb[2] * 65536 + cols.lower_limb[2] * cols.v_0123) = 0 ∧
+  cols.adapter.op_b_memory.prev_value[3] * cols.v_0123
+    - (cols.higher_limb[3] * 65536 + cols.lower_limb[3] * cols.v_0123) = 0 ∧
+  cols.limb_result[0] - cols.lower_limb[0] * cols.v_0123 = 0 ∧
+  cols.limb_result[1] - (cols.lower_limb[1] * cols.v_0123 + cols.higher_limb[0]) = 0 ∧
+  cols.limb_result[2] - (cols.lower_limb[2] * cols.v_0123 + cols.higher_limb[1]) = 0 ∧
+  cols.limb_result[3] - (cols.lower_limb[3] * cols.v_0123 + cols.higher_limb[2]) = 0 ∧
+  sll * (s0 * (cols.a[0] - cols.limb_result[0])) = 0 ∧
+  sll * (s0 * (cols.a[1] - cols.limb_result[1])) = 0 ∧
+  sll * (s0 * (cols.a[2] - cols.limb_result[2])) = 0 ∧
+  sll * (s0 * (cols.a[3] - cols.limb_result[3])) = 0 ∧
+  sll * (s1 * cols.a[0]) = 0 ∧
+  sll * (s1 * (cols.a[1] - cols.limb_result[0])) = 0 ∧
+  sll * (s1 * (cols.a[2] - cols.limb_result[1])) = 0 ∧
+  sll * (s1 * (cols.a[3] - cols.limb_result[2])) = 0 ∧
+  sll * (s2 * cols.a[0]) = 0 ∧
+  sll * (s2 * cols.a[1]) = 0 ∧
+  sll * (s2 * (cols.a[2] - cols.limb_result[0])) = 0 ∧
+  sll * (s2 * (cols.a[3] - cols.limb_result[1])) = 0 ∧
+  sll * (s3 * cols.a[0]) = 0 ∧
+  sll * (s3 * cols.a[1]) = 0 ∧
+  sll * (s3 * cols.a[2]) = 0 ∧
+  sll * (s3 * (cols.a[3] - cols.limb_result[0])) = 0 ∧
+  sllw * (s0 * (cols.a[0] - cols.limb_result[0])) = 0 ∧
+  sllw * (s0 * (cols.a[1] - cols.limb_result[1])) = 0 ∧
+  sllw * (s1 * cols.a[0]) = 0 ∧
+  sllw * (s1 * (cols.a[1] - cols.limb_result[0])) = 0 ∧
+  sllw * (cols.sllw_msb.msb * 65535 - cols.a[2]) = 0 ∧
+  sllw * (cols.sllw_msb.msb * 65535 - cols.a[3]) = 0 ∧
+  cols.is_sllw_imm - sllw * cols.adapter.imm_c = 0 ∧
+  cols.adapter.op_a_0 = 0
 
 /-- Semantic, `is_real`-gated, **flag-gated** contract: on real rows the result column `cols.a` is the
 RV64 shift-left of the operand by the shift amount, with the variant selected by the committed flag
@@ -461,6 +519,44 @@ deriving ProvableStruct
 @[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
 @[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c_memory.prev_value
 
+/-- The five committed dispatch cells, projected away from MUL's large arithmetic witness.  Control
+proofs use this small view so neither Lean nor an auditor must normalize the 45-cell multiplication
+block merely to determine the selected instruction. -/
+structure SelectorValues (F : Type) where
+  is_mul : F
+  is_mulh : F
+  is_mulhu : F
+  is_mulhsu : F
+  is_mulw : F
+deriving ProvableStruct
+
+/-- Project the dispatch cells from a complete MUL row. -/
+def selectors {F : Type} (cols : MulCols F) : SelectorValues F :=
+  ⟨cols.is_mul, cols.is_mulh, cols.is_mulhu, cols.is_mulhsu, cols.is_mulw⟩
+
+/-- Auditable control-flow contract for an active MUL-family row: exactly one committed variant
+selector is set.  The native AIR derives this from the five selector boolean gates together with
+`is_real = Σ selectors`; the Sail dispatch consumes precisely this proposition. -/
+def SelectorOneHot (s : SelectorValues (ZMod p)) : Prop :=
+  (s.is_mul = 1 ∧ s.is_mulh = 0 ∧ s.is_mulhu = 0 ∧ s.is_mulhsu = 0 ∧ s.is_mulw = 0) ∨
+  (s.is_mulh = 1 ∧ s.is_mul = 0 ∧ s.is_mulhu = 0 ∧ s.is_mulhsu = 0 ∧ s.is_mulw = 0) ∨
+  (s.is_mulhu = 1 ∧ s.is_mul = 0 ∧ s.is_mulh = 0 ∧ s.is_mulhsu = 0 ∧ s.is_mulw = 0) ∨
+  (s.is_mulhsu = 1 ∧ s.is_mul = 0 ∧ s.is_mulh = 0 ∧ s.is_mulhu = 0 ∧ s.is_mulw = 0) ∨
+  (s.is_mulw = 1 ∧ s.is_mul = 0 ∧ s.is_mulh = 0 ∧ s.is_mulhu = 0 ∧ s.is_mulhsu = 0)
+
+/-- The chip-owned selector/routing part of the MUL AIR, separated from multiplication arithmetic
+and reader semantics.  This is the stable contract proved directly from physical assertions and
+used to justify active-row dispatch and the non-`x0` write route. -/
+def ControlSpec (input : Inputs (ZMod p)) (cols : MulCols (ZMod p)) : Prop :=
+  let s := selectors cols
+  (s.is_mul = 0 ∨ s.is_mul = 1) ∧
+  (s.is_mulh = 0 ∨ s.is_mulh = 1) ∧
+  (s.is_mulhu = 0 ∨ s.is_mulhu = 1) ∧
+  (s.is_mulhsu = 0 ∨ s.is_mulhsu = 1) ∧
+  (s.is_mulw = 0 ∨ s.is_mulw = 1) ∧
+  input.is_real = s.is_mul + s.is_mulh + s.is_mulhu + s.is_mulhsu + s.is_mulw ∧
+  input.adapter.op_a_0 = 0
+
 /-- High-half kernel: extracting bits `64..127` of the *wide* (129-bit) product of two extensions
 equals `setWidth 64` of the *narrow* (128-bit) product shifted right by 64. The two products agree on
 their low 128 bits (`setWidth 128` of the wide product is the narrow product), so they agree on bits
@@ -559,6 +655,16 @@ structure Inputs (F : Type) where
   state : Extracted.CPUState F
   adapter : Extracted.RTypeReader F
 deriving ProvableStruct
+
+/-- Component-wise verifier evaluation of the DivRem chip input. -/
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real,
+         state := Eval.eval env input.state,
+         adapter := Eval.eval env input.adapter } : Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
 
 /-- The `rs1` source = the register read on the `op_b` memory slot (`op_b_memory.prev_value`, the value the
 Memory bus pins). The `Spec` and Sail bridge state the RV64 identity on this **raw read**; this is correct even
@@ -804,6 +910,23 @@ def flagsBinary (cols : BranchColumns (ZMod p)) : Prop :=
   (cols.is_bltu = 0 ∨ cols.is_bltu = 1) ∧ (cols.is_bgeu = 0 ∨ cols.is_bgeu = 1) ∧
   (cols.is_branching = 0 ∨ cols.is_branching = 1)
 
+/-- The active branch-opcode selector is exactly one-hot.  This is semantic row information:
+the six physical flag gates and `is_real = Σ flags` establish it in the chip soundness proof, and
+the Sail bridge consumes it to select the unique B-type instruction. -/
+def flagsOneHot (cols : BranchColumns (ZMod p)) : Prop :=
+  (cols.is_beq = 1 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧
+      cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
+    (cols.is_bne = 1 ∧ cols.is_beq = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧
+      cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
+    (cols.is_blt = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_bge = 0 ∧
+      cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
+    (cols.is_bge = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧
+      cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
+    (cols.is_bltu = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧
+      cols.is_bge = 0 ∧ cols.is_bgeu = 0) ∨
+    (cols.is_bgeu = 1 ∧ cols.is_beq = 0 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧
+      cols.is_bge = 0 ∧ cols.is_bltu = 0)
+
 /-- Semantic contract for the Branch row, composed from the immutable I-type reader sub-`Spec`, the proven
 binary facts, and the `is_real`-gated branch semantics. The next_pc value is split into a *provable* half
 (gated by `is_branching` — the two `AddOperation` targets) and a *compare-dependent* half (the six-way
@@ -824,6 +947,7 @@ def Spec (input : Inputs (ZMod p)) (cols : BranchColumns (ZMod p)) (_ : ProverDa
       pc := cols.state.pc, opcode := branchOpcode cols } ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   flagsBinary cols ∧
+  (input.is_real = 1 → flagsOneHot cols) ∧
   (input.is_real = 1 → cols.is_branching = 1 →
     Word.toBitVec64 (nextPcWord cols)
       = Word.toBitVec64 (pcWord cols) + Word.toBitVec64 cols.adapter.op_c_imm) ∧

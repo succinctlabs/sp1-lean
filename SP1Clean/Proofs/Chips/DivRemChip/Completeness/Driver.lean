@@ -6,6 +6,8 @@ import SP1Clean.Proofs.Chips.DivRemChip.Populate.Euclid
 import SP1Clean.Proofs.Chips.DivRemChip.Soundness
 import SP1Clean.Proofs.Chips.DivRemChip.Assembly
 import SP1Clean.Proofs.Chips.DivRemChip.Completeness.OwnComplete
+import SP1Clean.Proofs.Chips.DivRemChip.Completeness.CompareComplete
+import SP1Clean.Proofs.Chips.DivRemChip.Completeness.CoreComplete
 import SP1Clean.Math.EvalVec
 import SP1Clean.Proofs.Chips.DivRemChip.Completeness.BytePulls
 import SP1Clean.Proofs.Chips.DivRemChip.Completeness.SubSpecs
@@ -49,25 +51,96 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements
 
 
-set_option warn.sorry false in
 /-- Completeness: `main`'s honest `Populate` witness closures (flags from the `"div_rem_flags"`
 hint) satisfy every constraint under `ProverAssumptions`. -/
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
-  -- COMPLETENESS DEFERRED (4.30): stop-stub; restore via BitwiseChip type-ascription pattern
-  -- (see docs/proposals/consolidation-progress.md 2026-07-11). Elaborating body times out ~line 505.
-  stop
-  circuit_proof_start
-  obtain ⟨hbU, hcU, ha_prev, hbin, hf0, hf1, hf2, hf3, hf4, hf5, hf6, hf7, hsum, hpad, hop_a_0, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec⟩ := h_assumptions
-  obtain ⟨h_env_flags, h_env_qc, h_env_a, h_env_b, h_env_c, h_env_mullo, h_env_mulhi, h_env_scal,
-    h_env_ctq, h_env_carry, h_env_ovb, h_env_ovc, h_env_isc0, h_env_absc, h_env_absr, h_env_rc,
-    h_env_max, h_env_wcneg, h_env_wrneg, h_env_misc, h_env_cl, h_env_f, h_env_nei, h_env_bit,
-    h_env_rem, h_env_quot, h_env_bmsb, h_env_cmsb, h_env_remmsb, h_env_quotmsb, -⟩ := h_env
+  circuit_proof_start_core
+  let inputExpr := input_var
+  rw [show main input_var = populateRow input_var >>= constrainRow input_var from rfl,
+    Circuit.ConstraintsHold.bind_usesLocalWitnesses] at h_env
+  replace h_env := h_env.1
+  refine ⟨?_, trivial⟩
+  simp +instances only [circuit_norm] at h_input
+  provable_struct_simp
+  dsimp only [ProverAssumptions] at h_assumptions
+  have hbU := h_assumptions.1
+  have hcU := h_assumptions.2.1
+  have ha_prev := h_assumptions.2.2.1
+  have hbin := h_assumptions.2.2.2.1
+  have hf0 := h_assumptions.2.2.2.2.1
+  have hf1 := h_assumptions.2.2.2.2.2.1
+  have hf2 := h_assumptions.2.2.2.2.2.2.1
+  have hf3 := h_assumptions.2.2.2.2.2.2.2.1
+  have hf4 := h_assumptions.2.2.2.2.2.2.2.2.1
+  have hf5 := h_assumptions.2.2.2.2.2.2.2.2.2.1
+  have hf6 := h_assumptions.2.2.2.2.2.2.2.2.2.2.1
+  have hf7 := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.1
+  have hsum := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hpad := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hop_a_0 := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_cpu := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hrac_a := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hrac_b := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hrac_c := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hdec := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hprevclk := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2
+  clear h_assumptions
+  have h_env_flags := h_env.1
+  have h_env_qc := h_env.2.1
+  have h_env_a := h_env.2.2.1
+  have h_env_b := h_env.2.2.2.1
+  have h_env_c := h_env.2.2.2.2.1
+  have h_env_mullo := h_env.2.2.2.2.2.1
+  have h_env_mulhi := h_env.2.2.2.2.2.2.1
+  have h_env_scal := h_env.2.2.2.2.2.2.2.1
+  have h_env_ctq := h_env.2.2.2.2.2.2.2.2.1
+  have h_env_carry := h_env.2.2.2.2.2.2.2.2.2.1
+  have h_env_ovb := h_env.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_ovc := h_env.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_isc0 := h_env.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_absc := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_absr := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_rc := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_max := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_wcneg := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_wrneg := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_misc := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_cl := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_f := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_nei := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_bit := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_rem := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_quot := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_bmsb := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_cmsb := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_remmsb := h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_env_quotmsb :=
+    h_env.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  clear h_env
+  simp only [Witgen.WitgenIR.eval_native_apply] at h_env_flags h_env_qc h_env_a h_env_b h_env_c
+  simp only [Witgen.WitgenIR.eval_native_apply] at h_env_mullo h_env_mulhi h_env_scal h_env_ctq h_env_carry
+  simp only [Witgen.WitgenIR.eval_native_apply] at h_env_ovb h_env_ovc h_env_isc0 h_env_absc h_env_absr
+  simp only [Witgen.WitgenIR.eval_native_apply] at h_env_rc h_env_max h_env_wcneg h_env_wrneg h_env_misc
+  simp only [Witgen.WitgenIR.eval_native_apply] at h_env_cl h_env_f h_env_nei h_env_bit h_env_rem h_env_quot
+  simp only [Witgen.WitgenIR.eval_native_apply] at h_env_bmsb h_env_cmsb h_env_remmsb h_env_quotmsb
   -- project (not destructure — `rcases` on `h_input` disturbs the bound `h_env_*` hypotheses)
-  have hpc := h_input.2.1.2.2.2
-  have hbpv := h_input.2.2.2.2.2.2.1.1
-  have hcpv := h_input.2.2.2.2.2.2.2.2.1
+  have hpc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc = input_state_pc := by
+    rw [← CircuitType.eval_var_fields]
+    exact h_input.2.1.2.2.2
+  have hbpv : Vector.map (Expression.eval env.toEnvironment)
+      input_var_adapter_op_b_memory_prev_value = input_adapter_op_b_memory_prev_value := by
+    rw [← CircuitType.eval_var_fields]
+    exact h_input.2.2.2.2.2.2.1.1
+  have hapv : Vector.map (Expression.eval env.toEnvironment)
+      input_var_adapter_op_a_memory_prev_value = input_adapter_op_a_memory_prev_value := by
+    rw [← CircuitType.eval_var_fields]
+    exact h_input.2.2.2.1.1
+  have hcpv : Vector.map (Expression.eval env.toEnvironment)
+      input_var_adapter_op_c_memory_prev_value = input_adapter_op_c_memory_prev_value := by
+    rw [← CircuitType.eval_var_fields]
+    exact h_input.2.2.2.2.2.2.2.2.1
+  have hir : Expression.eval env.toEnvironment input_var_is_real = input_is_real := h_input.1
   haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   -- reduce the reducible operand projections, then abbreviate the operands and flags
   simp only [Inputs.op_b_val, Inputs.op_c_val] at hbU hcU
@@ -79,6 +152,7 @@ theorem completeness :
   -- small flag hypotheses the `rw`-based `have`s actually need.
   let F := hintFlags env.hint
   have hFdef : F = hintFlags env.hint := rfl
+  have hFlags : hintFlags env.hint = F := hFdef.symm
   rw [← hFdef] at hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum
   obtain ⟨hbU0, hbU1, hbU2, hbU3⟩ := Word.lt_cases_of_isU64 hbU
   obtain ⟨hcU0, hcU1, hcU2, hcU3⟩ := Word.lt_cases_of_isU64 hcU
@@ -109,25 +183,20 @@ theorem completeness :
     rw [← hcpv, Vector.getElem_map]
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   -- one-hot machinery
-  have hOH := flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum
-  have hsums : (F[4] + F[5] + F[6] + F[7] = 0 ∨ F[4] + F[5] + F[6] + F[7] = 1)
-      ∧ (F[0] + F[2] + F[4] + F[5] = 0 ∨ F[0] + F[2] + F[4] + F[5] = 1)
-      ∧ (F[0] + F[1] + F[2] + F[3] = 0 ∨ F[0] + F[1] + F[2] + F[3] = 1)
-      ∧ (F[0] + F[2] = 0 ∨ F[0] + F[2] = 1) ∧ (F[1] + F[3] = 0 ∨ F[1] + F[3] = 1) := by
-    rcases hOH with ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
-      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
-      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
-      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ <;>
-      rw [g0, g1, g2, g3, g4, g5, g6, g7] <;> norm_num
-  obtain ⟨he2sum, hsig, hg64, hd_r, hdu_r⟩ := hsums
+  have hsums := flagSums_bool hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum
+  have he2sum := hsums.1
+  have hsig := hsums.2.1
+  have hg64 := hsums.2.2.1
+  have hd_r := hsums.2.2.2.1
+  have hdu_r := hsums.2.2.2.2
+  clear hsums
   -- the padding template
   have hpadvals : input_is_real = 0 →
       B = #v[0, 0, 0, 0] ∧ C = #v[1, 0, 0, 0] ∧ F = #v[0, 1, 0, 0, 0, 0, 0, 0] := by
     intro h0
     obtain ⟨hb', hc', hf'⟩ := hpad h0
     simp only [Inputs.op_b_val, Inputs.op_c_val] at hb' hc'
-    exact ⟨Vector.toArray_inj.mp hb', Vector.toArray_inj.mp hc',
-      hFdef.trans (Vector.toArray_inj.mp hf')⟩
+    exact ⟨hb', hc', hFdef.trans hf'⟩
   -- flag pins
   have hfl0 : env.get i₀ = F[0] := by simpa using h_env_flags 0
   have hfl1 : env.get (i₀ + 1) = F[1] := by simpa using h_env_flags 1
@@ -141,240 +210,240 @@ theorem completeness :
   have hSC4 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 4)
       = input_is_real * (1 - (F[4] + F[5] + F[6] + F[7])) := by
     have h := h_env_scal 4
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     simpa [populateScal_4] using h
   have hCTQ0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7) = (populateCtq B C F)[0] := by
     have h := h_env_ctq 0
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCTQ1 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 1) = (populateCtq B C F)[1] := by
     have h := h_env_ctq 1
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCTQ2 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 2) = (populateCtq B C F)[2] := by
     have h := h_env_ctq 2
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCTQ3 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 3) = (populateCtq B C F)[3] := by
     have h := h_env_ctq 3
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCTQ4 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 4) = (populateCtq B C F)[4] := by
     have h := h_env_ctq 4
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCTQ5 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 5) = (populateCtq B C F)[5] := by
     have h := h_env_ctq 5
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCTQ6 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 6) = (populateCtq B C F)[6] := by
     have h := h_env_ctq 6
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCTQ7 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 7) = (populateCtq B C F)[7] := by
     have h := h_env_ctq 7
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   -- carry-block element pins (for the `pe1xx` chain-residue cases)
   have hCARRY0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8) = (populateCarry B C F)[0] := by
     have h := h_env_carry 0
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCARRY1 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 1) = (populateCarry B C F)[1] := by
     have h := h_env_carry 1
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCARRY2 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 2) = (populateCarry B C F)[2] := by
     have h := h_env_carry 2
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCARRY3 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 3) = (populateCarry B C F)[3] := by
     have h := h_env_carry 3
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCARRY4 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 4) = (populateCarry B C F)[4] := by
     have h := h_env_carry 4
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCARRY5 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 5) = (populateCarry B C F)[5] := by
     have h := h_env_carry 5
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCARRY6 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 6) = (populateCarry B C F)[6] := by
     have h := h_env_carry 6
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCARRY7 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 7) = (populateCarry B C F)[7] := by
     have h := h_env_carry 7
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   -- `rem_neg` scalar pin (scal slot 5) for the high-half chain rows
   have hREMNEG : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 5) = populateRemNeg B C F := by
     have h := h_env_scal 5
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     simpa [populateScal_5] using h
   -- `remainder_comp` element pins (for the low-half chain rows)
   have hRC0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4)
       = (populateRemComp B C F)[0] := by
     have h := h_env_rc 0
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hRC1 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1)
       = (populateRemComp B C F)[1] := by
     have h := h_env_rc 1
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hRC2 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2)
       = (populateRemComp B C F)[2] := by
     have h := h_env_rc 2
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hRC3 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)
       = (populateRemComp B C F)[3] := by
     have h := h_env_rc 3
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hABSC0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11)
       = (populateAbsC C F)[0] := by
     have h := h_env_absc 0
-    simp only [vec4_eval, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hcpv, hFlags] at h
     exact h
   have hABSC1 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 1)
       = (populateAbsC C F)[1] := by
     have h := h_env_absc 1
-    simp only [vec4_eval, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hcpv, hFlags] at h
     exact h
   have hABSC2 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 2)
       = (populateAbsC C F)[2] := by
     have h := h_env_absc 2
-    simp only [vec4_eval, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hcpv, hFlags] at h
     exact h
   have hABSC3 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 3)
       = (populateAbsC C F)[3] := by
     have h := h_env_absc 3
-    simp only [vec4_eval, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hcpv, hFlags] at h
     exact h
   have hABSR0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 4)
       = (populateAbsRem B C F)[0] := by
     have h := h_env_absr 0
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hABSR1 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 1)
       = (populateAbsRem B C F)[1] := by
     have h := h_env_absr 1
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hABSR2 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 2)
       = (populateAbsRem B C F)[2] := by
     have h := h_env_absr 2
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hABSR3 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 3)
       = (populateAbsRem B C F)[3] := by
     have h := h_env_absr 3
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hMISC0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4)
       = populateCNeg C F * input_is_real := by
     have h := h_env_misc 0
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     simpa [populateMisc_0] using h
   have hMISC1 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 1)
       = populateRemNeg B C F * input_is_real := by
     have h := h_env_misc 1
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     simpa [populateMisc_1] using h
   have hMISC2 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 2)
       = ltGate input_is_real C F := by
     have h := h_env_misc 2
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     simpa [populateMisc_2] using h
   have hNEI : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4)
       = (ltNotEqInvWitness input_is_real B C F)[0] := by
     have h := h_env_nei 0
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     exact h
   have hBIT : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1)
       = (ltBitWitness input_is_real B C F)[0] := by
     have h := h_env_bit 0
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     exact h
   have hREM0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1)
       = (populateRemainder B C F)[0] := by
     have h := h_env_rem 0
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hREM1 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 1)
       = (populateRemainder B C F)[1] := by
     have h := h_env_rem 1
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hREM2 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 2)
       = (populateRemainder B C F)[2] := by
     have h := h_env_rem 2
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hREM3 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 3)
       = (populateRemainder B C F)[3] := by
     have h := h_env_rem 3
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hQUOT0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4)
       = (populateQuotient B C F)[0] := by
     have h := h_env_quot 0
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hQUOT1 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 1)
       = (populateQuotient B C F)[1] := by
     have h := h_env_quot 1
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hQUOT2 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 2)
       = (populateQuotient B C F)[2] := by
     have h := h_env_quot 2
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hQUOT3 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 3)
       = (populateQuotient B C F)[3] := by
     have h := h_env_quot 3
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hBM : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 4)
       = bMsbCell B F := by
     have h := h_env_bmsb
-    simp only [vec4_eval, hbpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hFlags] at h
     exact h
   have hCM : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 4 + 1)
       = cMsbCell C F := by
     have h := h_env_cmsb
-    simp only [vec4_eval, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hcpv, hFlags] at h
     exact h
   have hRM : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 4 + 1 + 1)
       = remMsbCell B C F := by
     have h := h_env_remmsb
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hQM : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + 11
         + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 4 + 1 + 1 + 1)
       = quotMsbCell B C F := by
     have h := h_env_quotmsb
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   -- vector pins: each witnessed operand vector (as it appears in the goal) = its populate word
   have hQCvec : (Vector.map (Expression.eval env.toEnvironment)
@@ -384,7 +453,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_qc ⟨i, hi⟩
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + 4 + 4 + i }) : Word (ZMod p))
@@ -393,7 +462,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_c ⟨i, hi⟩
-    simp only [vec4_eval, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hcpv, hFlags] at h
     exact h
   have hABSCvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i =>
@@ -404,7 +473,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_absc ⟨i, hi⟩
-    simp only [vec4_eval, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hcpv, hFlags] at h
     exact h
   have hABSRvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i =>
@@ -415,7 +484,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_absr ⟨i, hi⟩
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hRCvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i =>
@@ -426,7 +495,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_rc ⟨i, hi⟩
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hMAXvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i =>
@@ -437,7 +506,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_max ⟨i, hi⟩
-    simp only [vec4_eval, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hcpv, hFlags] at h
     exact h
   have hWCNEGvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i =>
@@ -448,7 +517,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_wcneg ⟨i, hi⟩
-    simp only [vec4_eval, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hcpv, hir, hFlags] at h
     exact h
   have hWRNEGvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i =>
@@ -459,7 +528,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_wrneg ⟨i, hi⟩
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     exact h
   have hLTCLvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 2 fun i =>
@@ -470,7 +539,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_cl ⟨i, hi⟩
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     exact h
   have hLTFvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i =>
@@ -481,7 +550,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_f ⟨i, hi⟩
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     exact h
   -- the two Mul struct blocks, as quantified toElements pins + fromElements struct pins
   -- `hMULLO`/`hMULHI`: same nativeValue-blowup as the Bitwise `hc` bridge (`docs/agents/proof-patterns.md`)
@@ -491,7 +560,7 @@ theorem completeness :
   -- `rw`, then close through `getElem_toElements_eval_varFromOffset` (the CHEAP `env.get`-level identity)
   -- instead of the eager `exact`.
   have hMULLO : ∀ i : Fin 45, env.get (i₀ + 8 + 4 + 4 + 4 + 4 + ↑i)
-      = (ProvableType.toElements (populateMulLower input_is_real B C F))[↑i] := by
+      = (SubSpecs.mulWitnessElements (populateMulLower input_is_real B C F)).get i := by
     intro i
     have hc : env.toEnvironment.get (i₀ + 8 + 4 + 4 + 4 + 4 + ↑i)
         = (toElements (populateMulLower (Expression.eval env.toEnvironment input_var_is_real)
@@ -503,11 +572,12 @@ theorem completeness :
                 Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[1],
                 Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[2],
                 Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[3]])
-            F))[↑i] := h_env_mullo i
-    simp only [vec4_eval, hbpv, hcpv] at hc
-    exact hc
+            (hintFlags env.hint)))[↑i] := h_env_mullo i
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at hc
+    exact hc.trans
+      (SubSpecs.mulWitnessElements_get (populateMulLower input_is_real B C F) i).symm
   have hMULHI : ∀ i : Fin 45, env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + ↑i)
-      = (ProvableType.toElements (populateMulUpper input_is_real B C F))[↑i] := by
+      = (SubSpecs.mulWitnessElements (populateMulUpper input_is_real B C F)).get i := by
     intro i
     have hc : env.toEnvironment.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + ↑i)
         = (toElements (populateMulUpper (Expression.eval env.toEnvironment input_var_is_real)
@@ -519,129 +589,51 @@ theorem completeness :
                 Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[1],
                 Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[2],
                 Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[3]])
-            F))[↑i] := h_env_mulhi i
-    simp only [vec4_eval, hbpv, hcpv] at hc
-    exact hc
+            (hintFlags env.hint)))[↑i] := h_env_mulhi i
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at hc
+    exact hc.trans
+      (SubSpecs.mulWitnessElements_get (populateMulUpper input_is_real B C F) i).symm
   have hOVB : ∀ i : Fin 11, env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + ↑i)
-      = (ProvableType.toElements (ovbWitness input_is_real B F))[↑i] := by
+      = (SubSpecs.eqWordWitnessElements (ovbWitness input_is_real B F)).get i := by
     intro i
     have h := h_env_ovb i
-    simp only [vec4_eval, hbpv] at h
-    exact h
+    simp only [circuit_norm, vec4_eval, hbpv, hir, hFlags] at h
+    exact h.trans (SubSpecs.eqWordWitnessElements_get (ovbWitness input_is_real B F) i).symm
   have hOVC : ∀ i : Fin 11, env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + ↑i)
-      = (ProvableType.toElements (ovcWitness input_is_real C F))[↑i] := by
+      = (SubSpecs.eqWordWitnessElements (ovcWitness input_is_real C F)).get i := by
     intro i
     have h := h_env_ovc i
-    simp only [vec4_eval, hcpv] at h
-    exact h
+    simp only [circuit_norm, vec4_eval, hcpv, hir, hFlags] at h
+    exact h.trans (SubSpecs.eqWordWitnessElements_get (ovcWitness input_is_real C F) i).symm
+  let isc0Witness : Extracted.IsZeroWordOperation (ZMod p) := isC0Witness C F
   have hISC0 : ∀ i : Fin 11,
-      env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + ↑i)
-      = (ProvableType.toElements (isC0Witness C F))[↑i] := by
+      env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + ↑i) =
+        (SubSpecs.isZeroWitnessElements (p := p) isc0Witness).get i := by
     intro i
     have h := h_env_isc0 i
-    simp only [vec4_eval, hcpv] at h
-    exact h
-  have hSML : (ProvableType.fromElements (M := Extracted.MulOperation)
-        (Vector.mapRange 45 fun j => env.get (i₀ + 8 + 4 + 4 + 4 + 4 + j)))
-      = populateMulLower input_is_real B C F := by
-    refine (ProvableType.ext_iff _ _).mpr fun i hi => ?_
-    rw [ProvableType.toElements_fromElements]
-    exact (Vector.getElem_mapRange i hi).trans (hMULLO ⟨i, hi⟩)
-  have hSMU : (ProvableType.fromElements (M := Extracted.MulOperation)
-        (Vector.mapRange 45 fun j => env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + j)))
-      = populateMulUpper input_is_real B C F := by
-    refine (ProvableType.ext_iff _ _).mpr fun i hi => ?_
-    rw [ProvableType.toElements_fromElements]
-    exact (Vector.getElem_mapRange i hi).trans (hMULHI ⟨i, hi⟩)
-  -- product byte pins (goal-form offsets)
-  have hPL0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 16)
-      = (populateMulLower input_is_real B C F).product[0] := by
-    rw [← hSML]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPL1 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 1)
-      = (populateMulLower input_is_real B C F).product[1] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 1 = i₀ + 8 + 4 + 4 + 4 + 4 + 17 from by omega, ← hSML]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPL2 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 2)
-      = (populateMulLower input_is_real B C F).product[2] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 2 = i₀ + 8 + 4 + 4 + 4 + 4 + 18 from by omega, ← hSML]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPL3 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 3)
-      = (populateMulLower input_is_real B C F).product[3] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 3 = i₀ + 8 + 4 + 4 + 4 + 4 + 19 from by omega, ← hSML]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPL4 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 4)
-      = (populateMulLower input_is_real B C F).product[4] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 4 = i₀ + 8 + 4 + 4 + 4 + 4 + 20 from by omega, ← hSML]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPL5 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 5)
-      = (populateMulLower input_is_real B C F).product[5] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 5 = i₀ + 8 + 4 + 4 + 4 + 4 + 21 from by omega, ← hSML]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPL6 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 6)
-      = (populateMulLower input_is_real B C F).product[6] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 6 = i₀ + 8 + 4 + 4 + 4 + 4 + 22 from by omega, ← hSML]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPL7 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 7)
-      = (populateMulLower input_is_real B C F).product[7] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 16 + 7 = i₀ + 8 + 4 + 4 + 4 + 4 + 23 from by omega, ← hSML]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPU8 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 8)
-      = (populateMulUpper input_is_real B C F).product[8] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 8 = i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 24
-      from by omega, ← hSMU]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPU9 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 9)
-      = (populateMulUpper input_is_real B C F).product[9] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 9 = i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 25
-      from by omega, ← hSMU]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPU10 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 10)
-      = (populateMulUpper input_is_real B C F).product[10] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 10 = i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 26
-      from by omega, ← hSMU]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPU11 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 11)
-      = (populateMulUpper input_is_real B C F).product[11] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 11 = i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 27
-      from by omega, ← hSMU]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPU12 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 12)
-      = (populateMulUpper input_is_real B C F).product[12] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 12 = i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 28
-      from by omega, ← hSMU]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPU13 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 13)
-      = (populateMulUpper input_is_real B C F).product[13] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 13 = i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 29
-      from by omega, ← hSMU]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPU14 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 14)
-      = (populateMulUpper input_is_real B C F).product[14] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 14 = i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 30
-      from by omega, ← hSMU]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
-  have hPU15 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 15)
-      = (populateMulUpper input_is_real B C F).product[15] := by
-    rw [show i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 16 + 15 = i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 31
-      from by omega, ← hSMU]
-    simp only [explicit_provable_type, circuit_norm, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ]
+    simp only [circuit_norm, vec4_eval, hcpv, hFlags] at h
+    exact h.trans (SubSpecs.isZeroWitnessElements_get isc0Witness i).symm
+  -- Product byte pins, projected through the small opaque layout lemma in `SubSpecs`.
+  have hPL16 := SubSpecs.mulProduct_pins env.get (i₀ + 8 + 4 + 4 + 4 + 4)
+    (populateMulLower input_is_real B C F) hMULLO
+  have hPU16 := SubSpecs.mulProduct_pins env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45)
+    (populateMulUpper input_is_real B C F) hMULHI
+  have hPL0 := hPL16 ⟨0, by norm_num⟩
+  have hPL1 := hPL16 ⟨1, by norm_num⟩
+  have hPL2 := hPL16 ⟨2, by norm_num⟩
+  have hPL3 := hPL16 ⟨3, by norm_num⟩
+  have hPL4 := hPL16 ⟨4, by norm_num⟩
+  have hPL5 := hPL16 ⟨5, by norm_num⟩
+  have hPL6 := hPL16 ⟨6, by norm_num⟩
+  have hPL7 := hPL16 ⟨7, by norm_num⟩
+  have hPU8 := hPU16 ⟨8, by norm_num⟩
+  have hPU9 := hPU16 ⟨9, by norm_num⟩
+  have hPU10 := hPU16 ⟨10, by norm_num⟩
+  have hPU11 := hPU16 ⟨11, by norm_num⟩
+  have hPU12 := hPU16 ⟨12, by norm_num⟩
+  have hPU13 := hPU16 ⟨13, by norm_num⟩
+  have hPU14 := hPU16 ⟨14, by norm_num⟩
+  have hPU15 := hPU16 ⟨15, by norm_num⟩
   -- derived gate facts
   have hirnwbin : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 4) = 0
       ∨ env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 4) = 1 := by
@@ -683,171 +675,44 @@ theorem completeness :
     · left; rw [h, mul_zero]
     · rw [h, mul_one]
       exact populateRemNeg_bool B C hsig
-  have hltgbool : ltGate input_is_real C F = 0 ∨ ltGate input_is_real C F = 1 := by
-    unfold ltGate
-    rcases hbin with h | h
-    · left; rw [h, zero_mul]
-    · rw [h, one_mul]
-      rw [show (isC0Witness C F).result = (IsZeroWordOperation.populate (cComp C F)).result
-        from rfl]
-      rcases IsZeroWordOperation.populate_result_bool (cComp C F) with h2 | h2
-      · right; rw [h2, sub_zero]
-      · left; rw [h2, sub_self]
+  have hltgbool : ltGate input_is_real C F = 0 ∨ ltGate input_is_real C F = 1 :=
+    ltGate_bool C F hbin
   -- byte bounds at the populate values
   obtain ⟨hACb0, hACb1, hACb2, hACb3⟩ := Word.lt_cases_of_isU64 (populateAbsC_isU64 hcU F)
   obtain ⟨hARb0, hARb1, hARb2, hARb3⟩ := Word.lt_cases_of_isU64 (populateAbsRem_isU64 B C F)
   obtain ⟨hQb0, hQb1, hQb2, hQb3⟩ := Word.lt_cases_of_isU64 (populateQuotient_isU64 B C F)
   obtain ⟨hRb0, hRb1, hRb2, hRb3⟩ := Word.lt_cases_of_isU64 (populateRemainder_isU64 B C F)
   -- the ctq glue value bundles
-  have hctqPad : input_is_real = 0 → ∀ (k : ℕ) (hk : k < 8), (populateCtq B C F)[k]'hk = 0 := by
-    intro h0 k hk
-    obtain ⟨hB0, hC0, hF0⟩ := hpadvals h0
-    rw [hB0, hC0, hF0]
-    have hb0 : Word.toBitVec64 (#v[0, 0, 0, 0] : Word (ZMod p)) = 0 := by
-      simp [Word.toBitVec64, Word.toNat]
-    have hc1 : Word.toBitVec64 (#v[1, 0, 0, 0] : Word (ZMod p)) = 1 := by
-      simp [Word.toBitVec64, Word.toNat, ZMod.val_one]
-    have hqb : quotBits (#v[0, 0, 0, 0] : Word (ZMod p)) #v[1, 0, 0, 0]
-        #v[0, 1, 0, 0, 0, 0, 0, 0] = 0 := by
-      simp only [quotBits, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ]
-      rw [hb0, hc1, if_neg (by norm_num), if_neg (by norm_num), if_neg (by norm_num),
-        if_neg (by decide)]
-      decide
-    have hqc : populateQuotComp (#v[0, 0, 0, 0] : Word (ZMod p)) #v[1, 0, 0, 0]
-        #v[0, 1, 0, 0, 0, 0, 0, 0] = wordOfBits 0 := by
-      simp only [populateQuotComp, quotCompBits, Vector.getElem_mk, List.getElem_toArray,
-        List.getElem_cons_zero, List.getElem_cons_succ]
-      rw [if_neg (by norm_num), hqb]
-    have hprod : ctqProd (#v[0, 0, 0, 0] : Word (ZMod p)) #v[1, 0, 0, 0]
-        #v[0, 1, 0, 0, 0, 0, 0, 0] = 0 := by
-      simp only [ctqProd, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ]
-      rw [if_neg (by norm_num), hqc, wordOfBits_toBitVec64]
-      simp
-    simp [populateCtq, ctqLimbNat, hprod]
-  have hctqLoReal : input_is_real = 1 → ∀ (k : ℕ) (hk : k < 4),
-      (populateCtq B C F)[k]'(by omega)
-        = (populateMulLower input_is_real B C F).product[2 * k]'(by omega)
-          + (populateMulLower input_is_real B C F).product[2 * k + 1]'(by omega) * 256 := by
-    intro h1 k hk
-    rw [populateMulLower, if_pos h1]
-    have hloU : Word.isU64 (#v[(populateCtq B C F)[0], (populateCtq B C F)[1],
-        (populateCtq B C F)[2], (populateCtq B C F)[3]] : Word (ZMod p)) := by
-      apply Word.isU64_of_cases <;>
-        simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ] <;>
-        exact populateCtq_val_lt B C F _ (by norm_num)
-    have hsem := MulOperation.semantic_populate (populateQuotComp_isU64 B C F)
-      (cComp_isU64 hcU F) 1 0 0 0 0 (Or.inr rfl) (Or.inl rfl) (Or.inl rfl) (Or.inl rfl)
-      (Or.inl rfl) (Or.inr (by norm_num))
-    obtain ⟨hru, hmul, -, -, -, -⟩ := hsem
-    have hword := word_eq_of_toBitVec64_eq hloU hru (by
-      rw [ctqLo_eq, wordOfBits_toBitVec64]
-      exact (hmul rfl).symm)
-    simp [MulOperation.resultWord, MulOperation.productVal] at hword
-    interval_cases k
-    · simpa using hword.1
-    · simpa using hword.2.1
-    · simpa using hword.2.2.1
-    · simpa using hword.2.2.2
-  have hctqHiReal : input_is_real = 1 → F[0] + F[1] + F[2] + F[3] = 1 → ∀ (k : ℕ) (hk : k < 4),
-      (populateCtq B C F)[4 + k]'(by omega)
-        = (populateMulUpper input_is_real B C F).product[8 + 2 * k]'(by omega)
-          + (populateMulUpper input_is_real B C F).product[8 + 2 * k + 1]'(by omega) * 256 := by
-    intro h1 hg k hk
-    rw [populateMulUpper, if_pos ⟨h1, hg⟩]
-    have hhiU : Word.isU64 (#v[(populateCtq B C F)[4], (populateCtq B C F)[5],
-        (populateCtq B C F)[6], (populateCtq B C F)[7]] : Word (ZMod p)) := by
-      apply Word.isU64_of_cases <;>
-        simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ] <;>
-        exact populateCtq_val_lt B C F _ (by norm_num)
-    have hsigned : F[0] + F[2] = 1 → F[1] + F[3] = 0 → F[0] + F[2] + F[4] + F[5] = 1 →
-        (populateCtq B C F)[4 + k]'(by omega)
-          = (MulOperation.populate (populateQuotComp B C F) (cComp C F)
-              (F[0] + F[2]) 0 0).product[8 + 2 * k]'(by omega)
-            + (MulOperation.populate (populateQuotComp B C F) (cComp C F)
-                (F[0] + F[2]) 0 0).product[8 + 2 * k + 1]'(by omega) * 256 := by
-      intro hs hu hsg
-      rw [hs]
-      have hsem := MulOperation.semantic_populate (populateQuotComp_isU64 B C F)
-        (cComp_isU64 hcU F) 0 1 0 0 0 (Or.inl rfl) (Or.inr rfl) (Or.inl rfl) (Or.inl rfl)
-        (Or.inl rfl) (Or.inr (by norm_num))
-      obtain ⟨hru, -, -, hmulh, -, -⟩ := hsem
-      have hword := word_eq_of_toBitVec64_eq hhiU hru (by
-        rw [ctqHi_eq, wordOfBits_toBitVec64]
-        refine Eq.trans ?_ (hmulh rfl).symm
-        simp [ctqProd, hsg])
-      simp [MulOperation.resultWord, MulOperation.productVal] at hword
-      interval_cases k
-      · simpa using hword.1
-      · simpa using hword.2.1
-      · simpa using hword.2.2.1
-      · simpa using hword.2.2.2
-    have hunsigned : F[0] + F[2] = 0 → F[1] + F[3] = 1 → F[0] + F[2] + F[4] + F[5] = 0 →
-        (populateCtq B C F)[4 + k]'(by omega)
-          = (MulOperation.populate (populateQuotComp B C F) (cComp C F)
-              (F[0] + F[2]) 0 0).product[8 + 2 * k]'(by omega)
-            + (MulOperation.populate (populateQuotComp B C F) (cComp C F)
-                (F[0] + F[2]) 0 0).product[8 + 2 * k + 1]'(by omega) * 256 := by
-      intro hs hu hsg
-      rw [hs]
-      have hsem := MulOperation.semantic_populate (populateQuotComp_isU64 B C F)
-        (cComp_isU64 hcU F) 0 0 1 0 0 (Or.inl rfl) (Or.inl rfl) (Or.inr rfl) (Or.inl rfl)
-        (Or.inl rfl) (Or.inr (by norm_num))
-      obtain ⟨hru, -, hmulhu, -, -, -⟩ := hsem
-      have hword := word_eq_of_toBitVec64_eq hhiU hru (by
-        rw [ctqHi_eq, wordOfBits_toBitVec64]
-        refine Eq.trans ?_ (hmulhu rfl).symm
-        simp [ctqProd, hsg])
-      simp [MulOperation.resultWord, MulOperation.productVal] at hword
-      interval_cases k
-      · simpa using hword.1
-      · simpa using hword.2.1
-      · simpa using hword.2.2.1
-      · simpa using hword.2.2.2
-    rcases hOH with ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
-      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
-      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
-      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩
-    · exact hsigned (by rw [g0, g2]; norm_num) (by rw [g1, g3]; norm_num)
-        (by rw [g0, g2, g4, g5]; norm_num)
-    · exact hunsigned (by rw [g0, g2]; norm_num) (by rw [g1, g3]; norm_num)
-        (by rw [g0, g2, g4, g5]; norm_num)
-    · exact hsigned (by rw [g0, g2]; norm_num) (by rw [g1, g3]; norm_num)
-        (by rw [g0, g2, g4, g5]; norm_num)
-    · exact hunsigned (by rw [g0, g2]; norm_num) (by rw [g1, g3]; norm_num)
-        (by rw [g0, g2, g4, g5]; norm_num)
-    · rw [g0, g1, g2, g3] at hg; norm_num at hg
-    · rw [g0, g1, g2, g3] at hg; norm_num at hg
-    · rw [g0, g1, g2, g3] at hg; norm_num at hg
-    · rw [g0, g1, g2, g3] at hg; norm_num at hg
+  have hctqPad : input_is_real = 0 → ∀ (k : ℕ) (hk : k < 8), (populateCtq B C F)[k]'hk = 0 :=
+    populateCtq_padding_of_template hpadvals
+  have hctqLoReal := populateMulLower_product_pair B C F input_is_real hcU
+  have hctqHiReal := populateMulUpper_product_pair B C F input_is_real hcU
+    hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum
   -- folds for the `own` case (`ownAsserts_complete`): the five `scal` slots, the six whole-vector
   -- operand/witness blocks, and the prev-value bridges that the case bodies above don't already build.
   -- All clone the `hSC4` / `hCvec` patterns. (The three `IsEqual`/`IsZero` struct-result pins reference
   -- `colsV`, so they are derived inside `case own`.)
   have hOV : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45) = populateIsOverflow input_is_real B C F := by
     have h := h_env_scal 0
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     simpa [populateScal_0] using h
   have hBN : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 1) = populateBNeg B F := by
     have h := h_env_scal 1
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     simpa [populateScal_1] using h
   have hBNNO : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 2)
       = populateBNeg B F * (1 - populateIsOverflow input_is_real B C F) := by
     have h := h_env_scal 2
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     simpa [populateScal_2] using h
   have hBNNNO : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 3)
       = (1 - populateBNeg B F) * (1 - populateIsOverflow input_is_real B C F) := by
     have h := h_env_scal 3
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     simpa [populateScal_3] using h
   have hCN : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 6) = populateCNeg C F := by
     have h := h_env_scal 6
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hir, hFlags] at h
     simpa [populateScal_6] using h
   have hBvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + 4 + i }) : Word (ZMod p))
@@ -856,7 +721,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_b ⟨i, hi⟩
-    simp only [vec4_eval, hbpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hFlags] at h
     exact h
   have hAvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + i }) : Word (ZMod p))
@@ -865,7 +730,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_a ⟨i, hi⟩
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hQvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var { index :=
@@ -876,7 +741,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_quot ⟨i, hi⟩
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hRvec : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var { index :=
@@ -887,7 +752,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_rem ⟨i, hi⟩
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCTQvecW : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 8 fun i => var { index := i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + i })
@@ -897,7 +762,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_ctq ⟨i, hi⟩
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   have hCARRYvecW : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 8 fun i => var { index := i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + i })
@@ -907,7 +772,7 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     have h := h_env_carry ⟨i, hi⟩
-    simp only [vec4_eval, hbpv, hcpv] at h
+    simp only [circuit_norm, vec4_eval, hbpv, hcpv, hFlags] at h
     exact h
   -- a signed-class row is real (the divu-padding template `F = #v[0,1,0,…]` has signed sum `0`)
   have hsr : F[0] + F[2] + F[4] + F[5] = 1 → input_is_real = 1 := by
@@ -918,9 +783,496 @@ theorem completeness :
       rw [hF] at hsig'
       norm_num at hsig'
     · exact h
-  -- the 62 top-level constraint conjuncts, in `main`'s emission order: Mul ×2, glue ×8,
-  -- IsEqualWord ×4, IsZeroWord, Add ×2, Lt, U16MSB ×7, CPUState, RTypeReader, ownAsserts,
-  -- byte pulls ×34
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
+  -- Split the witness-only prefix from the five folded proof boundaries in `constrainRow`.
+  -- This is definitional factoring only: the flat operation order remains the Rust row order.
+  simp only [main, ConstraintsHold.Completeness, Circuit.bind_forAllNoOffset]
+  refine ⟨by
+    simp only [populateRow, Circuit.bind_forAllNoOffset, witnessVectorNative,
+      CircuitNormalization.witnessNative_apply_eq, Circuit.pure_def, Circuit.operations,
+      Operations.forAllNoOffset, and_true], ?_⟩
+  -- Expose the five folded constraint boundaries after the witness-only prefix.
+  rw [populateRow_output_eq]
+  simp only [constrainRow, Circuit.bind_forAllNoOffset,
+    subcircuitWithAssertion, assertion, Circuit.pure_def, Circuit.operations,
+    Operations.forAllNoOffset, GeneralFormalCircuit.toSubcircuit_completeness,
+    FormalAssertion.toSubcircuit_completeness, and_true]
+  refine ⟨?cpu, ?rtype, ?compare, ?core, ?regwrite⟩
+  case cpu =>
+    simp +instances only [circuit_norm, h_input]
+    exact ⟨hbin, by rw [← epc0, ← epc1, ← epc2] at h_cpu; exact h_cpu⟩
+  case rtype =>
+    simp +instances only [Readers.RTypeReader.circuit, Readers.RTypeReader.ProverAssumptionsD,
+      Readers.RTypeReader.Assumptions, Readers.RTypeReader.Spec, populatedRowAt, circuit_norm, h_input,
+      epc0, epc1, epc2, hapv, hbpv, hcpv]
+    exact ⟨⟨hbin, hbin, h_clk⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b,
+      hrac_c, hdec, fun hr => ⟨ha_prev hr, hbU, hcU, (hprevclk hr).1, (hprevclk hr).2.1,
+        (hprevclk hr).2.2⟩⟩⟩
+  case compare =>
+    have hCompareInputs := CompareComplete.evaluatedInputs_eq env inputExpr i₀
+      input_is_real B C F hir hbpv hcpv hfl4 hfl5 hfl6 hfl7 hSC4 hCvec
+      hABSCvec hABSRvec hRCvec hMAXvec hWCNEGvec hWRNEGvec hLTCLvec hLTFvec
+      hNEI hBIT hRvec hQvec hBM hCM hRM hQM hMISC0 hMISC1 hMISC2 hOVB hOVC
+      (by simpa only [isc0Witness] using hISC0)
+    refine ⟨?_, ?_⟩
+    · simp only [DivRemCompare.circuit]
+      rw [hCompareInputs]
+      exact CompareComplete.honestAssumptions input_is_real B C F hbU hcU hbin
+        hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum
+    · simp only [DivRemCompare.circuit]
+      rw [hCompareInputs]
+      exact CompareComplete.honestSpec input_is_real B C F hbU hcU hbin
+        hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum hpadvals
+      /-
+      let actual : DivRemCompare.Inputs (ZMod p) :=
+        Eval.eval env (DivRemCompare.Inputs.ofCols (populatedRowAt inputExpr i₀))
+      have hHonest := CompareComplete.honestSpec input_is_real B C F hbU hcU hbin
+        hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum hpadvals
+      unfold DivRemCompare.CompareSpec at hHonest
+      dsimp only [CompareComplete.honestInputs] at hHonest
+      obtain ⟨hEqBFull, hEqCFull, hEqBLow, hEqCLow, hZero, hAddC, hAddR, hLt,
+        hBHigh, hCHigh, hRHigh, hBLow, hCLow, hRLow, hQLow⟩ := hHonest
+      have hEqBFullActual : IsEqualWordOperation.Spec
+          ⟨#v[actual.op_b_prev_value[0], actual.op_b_prev_value[1],
+              actual.op_b_prev_value[2], actual.op_b_prev_value[3]],
+            #v[0, 0, 0, 32768], actual.is_overflow_b, actual.is_real_not_word⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hbpv, hSC4]
+        refine SubSpecs.subSpec_eqWord env.toEnvironment
+          (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8) _ _ _ _
+          (ovbWitness input_is_real B F) ?_ hOVB hEqBFull
+        intro i hi
+        simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+          Vector.getElem_mapRange, circuit_norm]
+      have hEqCFullActual : IsEqualWordOperation.Spec
+          ⟨#v[actual.op_c_prev_value[0], actual.op_c_prev_value[1],
+              actual.op_c_prev_value[2], actual.op_c_prev_value[3]],
+            #v[65535, 65535, 65535, 65535], actual.is_overflow_c,
+            actual.is_real_not_word⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hcpv, hSC4]
+        refine SubSpecs.subSpec_eqWord env.toEnvironment
+          (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11) _ _ _ _
+          (ovcWitness input_is_real C F) ?_ hOVC hEqCFull
+        intro i hi
+        simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+          Vector.getElem_mapRange, circuit_norm]
+      have hEqBLowActual : IsEqualWordOperation.Spec
+          ⟨#v[actual.op_b_prev_value[0], actual.op_b_prev_value[1], 0, 0],
+            #v[0, 32768, 0, 0], actual.is_overflow_b,
+            actual.is_divw + actual.is_remw + actual.is_divuw + actual.is_remuw⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hbpv, hfl4, hfl5, hfl6, hfl7]
+        refine SubSpecs.subSpec_eqWord env.toEnvironment
+          (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8) _ _ _ _
+          (ovbWitness input_is_real B F) ?_ hOVB hEqBLow
+        intro i hi
+        simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+          Vector.getElem_mapRange, circuit_norm]
+      have hEqCLowActual : IsEqualWordOperation.Spec
+          ⟨#v[actual.op_c_prev_value[0], actual.op_c_prev_value[1], 0, 0],
+            #v[65535, 65535, 0, 0], actual.is_overflow_c,
+            actual.is_divw + actual.is_remw + actual.is_divuw + actual.is_remuw⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hcpv, hfl4, hfl5, hfl6, hfl7]
+        refine SubSpecs.subSpec_eqWord env.toEnvironment
+          (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11) _ _ _ _
+          (ovcWitness input_is_real C F) ?_ hOVC hEqCLow
+        intro i hi
+        simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+          Vector.getElem_mapRange, circuit_norm]
+      have hZeroActual : IsZeroWordOperation.Spec
+          ⟨actual.c, actual.is_c_0, actual.is_real⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hCvec]
+        refine SubSpecs.subSpec_isZero env.toEnvironment
+          (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11) _ _ _
+          isc0Witness ?_ hISC0 (by simpa only [isc0Witness] using hZero)
+        intro i hi
+        simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+          Vector.getElem_mapRange, circuit_norm]
+      have hAddCActual : AddOperation.Spec
+          ⟨actual.c, actual.abs_c, ⟨actual.c_neg_operation.value⟩,
+            actual.abs_c_alu_event⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hCvec, hABSCvec, hWCNEGvec, hMISC0]
+        exact hAddC
+      have hAddRActual : AddOperation.Spec
+          ⟨actual.remainder_comp, actual.abs_remainder,
+            ⟨actual.rem_neg_operation.value⟩, actual.abs_rem_alu_event⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hRCvec, hABSRvec, hWRNEGvec, hMISC1]
+        exact hAddR
+      have hLtActual : LtOperationUnsigned.Spec
+          ⟨actual.abs_remainder, actual.max_abs_c_or_1,
+            actual.remainder_lt_operation, actual.remainder_check_multiplicity⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hABSRvec, hMAXvec, hLTFvec, hLTCLvec, hNEI, hBIT, hMISC2]
+        exact hLt
+      have hBHighActual : U16MSBOperation.Spec
+          ⟨actual.op_b_prev_value[3], actual.b_msb, actual.is_real_not_word⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hbpv, hBM, hSC4]
+        exact hBHigh
+      have hCHighActual : U16MSBOperation.Spec
+          ⟨actual.op_c_prev_value[3], actual.c_msb, actual.is_real_not_word⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hcpv, hCM, hSC4]
+        exact hCHigh
+      have hRHighActual : U16MSBOperation.Spec
+          ⟨actual.remainder[3], actual.rem_msb, actual.is_real_not_word⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hRvec, hRM, hSC4]
+        exact hRHigh
+      have hBLowActual : U16MSBOperation.Spec
+          ⟨actual.op_b_prev_value[1], actual.b_msb,
+            actual.is_divw + actual.is_remw + actual.is_divuw + actual.is_remuw⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hbpv, hBM, hfl4, hfl5, hfl6, hfl7]
+        exact hBLow
+      have hCLowActual : U16MSBOperation.Spec
+          ⟨actual.op_c_prev_value[1], actual.c_msb,
+            actual.is_divw + actual.is_remw + actual.is_divuw + actual.is_remuw⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hcpv, hCM, hfl4, hfl5, hfl6, hfl7]
+        exact hCLow
+      have hRLowActual : U16MSBOperation.Spec
+          ⟨actual.remainder[1], actual.rem_msb,
+            actual.is_divw + actual.is_remw + actual.is_divuw + actual.is_remuw⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hRvec, hRM, hfl4, hfl5, hfl6, hfl7]
+        exact hRLow
+      have hQLowActual : U16MSBOperation.Spec
+          ⟨actual.quotient[1], actual.quot_msb,
+            actual.is_divw + actual.is_remw + actual.is_divuw + actual.is_remuw⟩ := by
+        dsimp only [actual]
+        simp +instances only [inputExpr, DivRemCompare.Inputs.ofCols, populatedRowAt,
+          circuit_norm, h_input]
+        rw [hQvec, hQM, hfl4, hfl5, hfl6, hfl7]
+        exact hQLow
+      change DivRemCompare.CompareSpec actual
+      unfold DivRemCompare.CompareSpec
+      exact ⟨hEqBFullActual, hEqCFullActual, hEqBLowActual, hEqCLowActual, hZeroActual,
+        hAddCActual, hAddRActual, hLtActual, hBHighActual, hCHighActual, hRHighActual,
+        hBLowActual, hCLowActual, hRLowActual, hQLowActual⟩
+      -/
+      /-
+      simp +instances only [DivRemCompare.Inputs.ofCols, populatedRowAt, circuit_norm, h_input]
+      simp only [DivRemCompare.CompareSpec]
+      and_intros
+      · rw [hbpv]
+        rcases hbin with h0 | h1
+        · have hg0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 4) = 0 := by
+            rw [hSC4, h0, zero_mul]
+          rw [hg0]
+          refine SubSpecs.subSpec_eqWord env.toEnvironment
+            (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8) _ _ _ _
+            (ovbWitness input_is_real B F) ?_ hOVB (by
+              rw [ovbWitness, if_neg (fun hx => absurd (h0.symm.trans hx) zero_ne_one)]
+              exact IsEqualWordOperation.spec_zero B #v[0, 0, 0, 32768]
+                (rfl : (0 : ZMod p) = 0))
+          intro i hi
+          simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+            Vector.getElem_mapRange, circuit_norm]
+        · rcases he2sum with hw0 | hw1
+          · have hg1 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 4) = 1 := by
+              rw [hSC4, h1, hw0]
+              norm_num
+            rw [hg1]
+            refine SubSpecs.subSpec_eqWord env.toEnvironment
+              (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8) _ _ _ _
+              (ovbWitness input_is_real B F) ?_ hOVB (by
+                rw [ovbWitness, if_pos h1,
+                  if_neg (fun hx => absurd (hw0.symm.trans hx) zero_ne_one)]
+                exact IsEqualWordOperation.spec_populate B #v[0, 0, 0, 32768] 1)
+            intro i hi
+            simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+              Vector.getElem_mapRange, circuit_norm]
+          · have hg0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 4) = 0 := by
+              rw [hSC4, h1, hw1]
+              norm_num
+            rw [hg0]
+            refine SubSpecs.subSpec_eqWord env.toEnvironment
+              (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8) _ _ _ _
+              (ovbWitness input_is_real B F) ?_ hOVB (by
+                rw [ovbWitness, if_pos h1, if_pos hw1]
+                exact IsEqualWordOperation.spec_populate_offGate B #v[0, 0, 0, 32768]
+                  #v[B[0], B[1], 0, 0] #v[0, 32768, 0, 0] (rfl : (0 : ZMod p) = 0))
+            intro i hi
+            simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+              Vector.getElem_mapRange, circuit_norm]
+      · rw [hcpv]
+        rcases hbin with h0 | h1
+        · have hg0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 4) = 0 := by
+            rw [hSC4, h0, zero_mul]
+          rw [hg0]
+          refine SubSpecs.subSpec_eqWord env.toEnvironment
+            (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11) _ _ _ _
+            (ovcWitness input_is_real C F) ?_ hOVC (by
+              rw [ovcWitness, if_neg (fun hx => absurd (h0.symm.trans hx) zero_ne_one)]
+              exact IsEqualWordOperation.spec_zero C #v[65535, 65535, 65535, 65535]
+                (rfl : (0 : ZMod p) = 0))
+          intro i hi
+          simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+            Vector.getElem_mapRange, circuit_norm]
+        · rcases he2sum with hw0 | hw1
+          · have hg1 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 4) = 1 := by
+              rw [hSC4, h1, hw0]
+              norm_num
+            rw [hg1]
+            refine SubSpecs.subSpec_eqWord env.toEnvironment
+              (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11) _ _ _ _
+              (ovcWitness input_is_real C F) ?_ hOVC (by
+                rw [ovcWitness, if_pos h1,
+                  if_neg (fun hx => absurd (hw0.symm.trans hx) zero_ne_one)]
+                exact IsEqualWordOperation.spec_populate C #v[65535, 65535, 65535, 65535] 1)
+            intro i hi
+            simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+              Vector.getElem_mapRange, circuit_norm]
+          · have hg0 : env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 4) = 0 := by
+              rw [hSC4, h1, hw1]
+              norm_num
+            rw [hg0]
+            refine SubSpecs.subSpec_eqWord env.toEnvironment
+              (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11) _ _ _ _
+              (ovcWitness input_is_real C F) ?_ hOVC (by
+                rw [ovcWitness, if_pos h1, if_pos hw1]
+                exact IsEqualWordOperation.spec_populate_offGate C
+                  #v[65535, 65535, 65535, 65535] #v[C[0], C[1], 0, 0]
+                  #v[65535, 65535, 0, 0] (rfl : (0 : ZMod p) = 0))
+            intro i hi
+            simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+              Vector.getElem_mapRange, circuit_norm]
+      · rw [hbpv, hfl4, hfl5, hfl6, hfl7]
+        rcases he2sum with hw0 | hw1
+        · rw [hw0]
+          rcases hbin with h0 | h1
+          · refine SubSpecs.subSpec_eqWord env.toEnvironment
+              (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8) _ _ _ _
+              (ovbWitness input_is_real B F) ?_ hOVB (by
+                rw [ovbWitness, if_neg (fun hx => absurd (h0.symm.trans hx) zero_ne_one)]
+                exact IsEqualWordOperation.spec_zero (#v[B[0], B[1], 0, 0] : Word (ZMod p))
+                  #v[0, 32768, 0, 0] (rfl : (0 : ZMod p) = 0))
+            intro i hi
+            simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+              Vector.getElem_mapRange, circuit_norm]
+          · refine SubSpecs.subSpec_eqWord env.toEnvironment
+              (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8) _ _ _ _
+              (ovbWitness input_is_real B F) ?_ hOVB (by
+                rw [ovbWitness, if_pos h1,
+                  if_neg (fun hx => absurd (hw0.symm.trans hx) zero_ne_one)]
+                exact IsEqualWordOperation.spec_populate_offGate
+                  (#v[B[0], B[1], 0, 0] : Word (ZMod p)) #v[0, 32768, 0, 0]
+                  B #v[0, 0, 0, 32768] (rfl : (0 : ZMod p) = 0))
+            intro i hi
+            simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+              Vector.getElem_mapRange, circuit_norm]
+        · have h1 : input_is_real = 1 := by
+            rcases hbin with h0 | h1
+            · obtain ⟨-, -, hF0⟩ := hpadvals h0
+              rw [hF0] at hw1
+              simp at hw1
+            · exact h1
+          rw [hw1]
+          refine SubSpecs.subSpec_eqWord env.toEnvironment
+            (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8) _ _ _ _
+            (ovbWitness input_is_real B F) ?_ hOVB (by
+              rw [ovbWitness, if_pos h1, if_pos hw1]
+              exact IsEqualWordOperation.spec_populate (#v[B[0], B[1], 0, 0] : Word (ZMod p))
+                #v[0, 32768, 0, 0] 1)
+          intro i hi
+          simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+            Vector.getElem_mapRange, circuit_norm]
+      · rw [hcpv, hfl4, hfl5, hfl6, hfl7]
+        rcases he2sum with hw0 | hw1
+        · rw [hw0]
+          rcases hbin with h0 | h1
+          · refine SubSpecs.subSpec_eqWord env.toEnvironment
+              (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11) _ _ _ _
+              (ovcWitness input_is_real C F) ?_ hOVC (by
+                rw [ovcWitness, if_neg (fun hx => absurd (h0.symm.trans hx) zero_ne_one)]
+                exact IsEqualWordOperation.spec_zero (#v[C[0], C[1], 0, 0] : Word (ZMod p))
+                  #v[65535, 65535, 0, 0] (rfl : (0 : ZMod p) = 0))
+            intro i hi
+            simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+              Vector.getElem_mapRange, circuit_norm]
+          · refine SubSpecs.subSpec_eqWord env.toEnvironment
+              (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11) _ _ _ _
+              (ovcWitness input_is_real C F) ?_ hOVC (by
+                rw [ovcWitness, if_pos h1,
+                  if_neg (fun hx => absurd (hw0.symm.trans hx) zero_ne_one)]
+                exact IsEqualWordOperation.spec_populate_offGate
+                  (#v[C[0], C[1], 0, 0] : Word (ZMod p)) #v[65535, 65535, 0, 0]
+                  C #v[65535, 65535, 65535, 65535] (rfl : (0 : ZMod p) = 0))
+            intro i hi
+            simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+              Vector.getElem_mapRange, circuit_norm]
+        · have h1 : input_is_real = 1 := by
+            rcases hbin with h0 | h1
+            · obtain ⟨-, -, hF0⟩ := hpadvals h0
+              rw [hF0] at hw1
+              simp at hw1
+            · exact h1
+          rw [hw1]
+          refine SubSpecs.subSpec_eqWord env.toEnvironment
+            (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11) _ _ _ _
+            (ovcWitness input_is_real C F) ?_ hOVC (by
+              rw [ovcWitness, if_pos h1, if_pos hw1]
+              exact IsEqualWordOperation.spec_populate (#v[C[0], C[1], 0, 0] : Word (ZMod p))
+                #v[65535, 65535, 0, 0] 1)
+          intro i hi
+          simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+            Vector.getElem_mapRange, circuit_norm]
+      · rw [hCvec]
+        refine SubSpecs.subSpec_isZero env.toEnvironment
+          (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11) _ _ _
+          isc0Witness ?_ hISC0 (by
+            simp only [isc0Witness, isC0Witness]
+            exact IsZeroWordOperation.spec_populate (cComp C F) input_is_real)
+        intro i hi
+        simp only [ProvableType.toElements_fromElements, Vector.getElem_map,
+          Vector.getElem_mapRange, circuit_norm]
+      · rw [hCvec, hABSCvec, hWCNEGvec, hMISC0]
+        rcases hgcneg with hg0 | hg1
+        · rw [hg0]
+          exact fun hx => absurd hx zero_ne_one
+        · rw [hg1, show wCnegWitness input_is_real C F =
+              AddOperation.populate (cComp C F) (populateAbsC C F) from by
+              rw [wCnegWitness, if_pos hg1]]
+          exact AddOperation.spec_populate (cComp_isU64 hcU F)
+            (populateAbsC_isU64 hcU F) 1
+      · rw [hRCvec, hABSRvec, hWRNEGvec, hMISC1]
+        rcases hgrneg with hg0 | hg1
+        · rw [hg0]
+          exact fun hx => absurd hx zero_ne_one
+        · rw [hg1]
+          have h67 := flags67_eq_zero_of_remNeg_mul_eq_one B C input_is_real
+            hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum hg1
+          have hRCR : populateRemComp B C F = populateRemainder B C F := by
+            unfold populateRemComp remCompBits populateRemainder
+            rw [if_neg (fun hx => absurd (h67.symm.trans hx) zero_ne_one)]
+          rw [hRCR, show wRnegWitness input_is_real B C F =
+              AddOperation.populate (populateRemainder B C F) (populateAbsRem B C F) from by
+              rw [wRnegWitness, if_pos hg1]]
+          exact AddOperation.spec_populate (populateRemainder_isU64 B C F)
+            (populateAbsRem_isU64 B C F) 1
+      · rw [hABSRvec, hMAXvec, hLTFvec, hLTCLvec, hNEI, hBIT, hMISC2]
+        rcases hltgbool with hg0 | hg1
+        · rw [hg0, show ltFlagsWitness input_is_real B C F =
+              (#v[0, 0, 0, 0] : Vector (ZMod p) 4) from by
+              rw [ltFlagsWitness, if_neg (fun hx => absurd (hg0.symm.trans hx) zero_ne_one)],
+            show ltClWitness input_is_real B C F = (#v[0, 0] : Vector (ZMod p) 2) from by
+              rw [ltClWitness, if_neg (fun hx => absurd (hg0.symm.trans hx) zero_ne_one)],
+            show (ltNotEqInvWitness input_is_real B C F)[0] = 0 from by
+              rw [ltNotEqInvWitness, if_neg (fun hx => absurd (hg0.symm.trans hx) zero_ne_one)]
+              rfl,
+            show (ltBitWitness input_is_real B C F)[0] = 0 from by
+              rw [ltBitWitness, if_neg (fun hx => absurd (hg0.symm.trans hx) zero_ne_one)]
+              rfl]
+          exact LtOperationUnsigned.spec_zero (populateAbsRem B C F)
+            (populateMaxAbsCOr1 C F) rfl
+        · rw [hg1, show ltClWitness input_is_real B C F =
+              LtOperationUnsigned.comparisonLimbsWitness (populateAbsRem B C F)
+                (populateMaxAbsCOr1 C F) from by rw [ltClWitness, if_pos hg1],
+            show ltFlagsWitness input_is_real B C F =
+              LtOperationUnsigned.flagsWitness (populateAbsRem B C F)
+                (populateMaxAbsCOr1 C F) from by rw [ltFlagsWitness, if_pos hg1],
+            show (ltNotEqInvWitness input_is_real B C F)[0] =
+              (LtOperationUnsigned.notEqInvWitness (populateAbsRem B C F)
+                (populateMaxAbsCOr1 C F))[0] from by rw [ltNotEqInvWitness, if_pos hg1],
+            show (ltBitWitness input_is_real B C F)[0] =
+              U16CompareOperation.populate_bit
+                (LtOperationUnsigned.comparisonLimbsWitness (populateAbsRem B C F)
+                  (populateMaxAbsCOr1 C F))[0]
+                (LtOperationUnsigned.comparisonLimbsWitness (populateAbsRem B C F)
+                  (populateMaxAbsCOr1 C F))[1] from by
+              rw [ltBitWitness, if_pos hg1, ltClWitness, if_pos hg1]
+              rfl]
+          exact LtOperationUnsigned.spec_populate
+      · exact ⟨by rw [hBM]; exact bMsbCell_bool hbU F, fun hg => by
+          obtain ⟨_, hw0⟩ := hirnw_cases hg
+          rw [hBM, heb3, bMsbCell, if_neg (fun hx => absurd (hw0.symm.trans hx) zero_ne_one)]
+          exact (U16MSBOperation.spec_populate hbU3 1).2 rfl⟩
+      · exact ⟨by rw [hCM]; exact cMsbCell_bool hcU F, fun hg => by
+          obtain ⟨_, hw0⟩ := hirnw_cases hg
+          rw [hCM, hec3, cMsbCell, if_neg (fun hx => absurd (hw0.symm.trans hx) zero_ne_one)]
+          exact (U16MSBOperation.spec_populate hcU3 1).2 rfl⟩
+      · exact ⟨by rw [hRM]; exact remMsbCell_bool B C F, fun hg => by
+          obtain ⟨_, hw0⟩ := hirnw_cases hg
+          rw [hRM, hREM3, remMsbCell,
+            if_neg (fun hx => absurd (hw0.symm.trans hx) zero_ne_one)]
+          exact (U16MSBOperation.spec_populate hRb3 1).2 rfl⟩
+      · exact ⟨by rw [hBM]; exact bMsbCell_bool hbU F, fun hg => by
+          have hw1 := hE2_one hg
+          rw [hBM, heb1, bMsbCell, if_pos hw1]
+          exact (U16MSBOperation.spec_populate hbU1 1).2 rfl⟩
+      · exact ⟨by rw [hCM]; exact cMsbCell_bool hcU F, fun hg => by
+          have hw1 := hE2_one hg
+          rw [hCM, hec1, cMsbCell, if_pos hw1]
+          exact (U16MSBOperation.spec_populate hcU1 1).2 rfl⟩
+      · exact ⟨by rw [hRM]; exact remMsbCell_bool B C F, fun hg => by
+          have hw1 := hE2_one hg
+          rw [hRM, hREM1, remMsbCell, if_pos hw1]
+          exact (U16MSBOperation.spec_populate hRb1 1).2 rfl⟩
+      · exact ⟨by rw [hQM]; exact quotMsbCell_bool B C F, fun hg => by
+          have hw1 := hE2_one hg
+          rw [hQM, hQUOT1, quotMsbCell, if_pos hw1]
+          exact (U16MSBOperation.spec_populate hQb1 1).2 rfl⟩
+      -/
+  case core =>
+    refine ⟨?_, ?_⟩
+    · simp only [DivRemCore.circuit, DivRemCore.Assumptions]
+    · simp only [DivRemCore.circuit, DivRemCore.CoreSpec]
+      refine ⟨CoreComplete.evaluatedProductSpec env inputExpr i₀ input_is_real B C F
+        hQCvec hCvec hCTQvecW hMULLO hMULHI hir hSC4 hfl0 hfl1 hfl2 hfl3 hcU hbin
+        hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum hpadvals, ?_,
+        ⟨CoreComplete.evaluatedSelectionEvidenceSpec env inputExpr i₀ input_is_real F
+          hir hSC4 hfl0 hfl1 hfl2 hfl3 hfl4 hfl5 hfl6 hfl7 hbin
+          (by rw [← hSC4]; exact hirnwbin) hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum,
+        CoreComplete.evaluatedRangeSpec env inputExpr i₀ B C F hcU hCTQvecW
+          hCARRYvecW hRCvec hABSCvec hABSRvec hQvec hRvec hREMNEG⟩⟩
+      exact CoreComplete.evaluatedPopulatedOwnAssertsComplete env inputExpr i₀
+        input_is_real B C F hbU hcU hbin hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum hsr
+        hfl0 hfl1 hfl2 hfl3 hfl4 hfl5 hfl6 hfl7 hir
+        hSC4 hOV hBN hBNNO hBNNNO hREMNEG hCN hMISC0 hMISC1 hMISC2
+        hBM hCM hRM hQM
+        hBvec hCvec hQvec hQCvec hRvec hRCvec hAvec hABSCvec hABSRvec hMAXvec
+        hCTQvecW hCARRYvecW hWCNEGvec hWRNEGvec hbpv hcpv
+        hOVB hOVC (by simpa only [isc0Witness] using hISC0)
+        hBIT ((h_input.2.2.2.2.1).trans hop_a_0)
+  case regwrite =>
+    simp +instances only [Readers.RegisterWrite.circuit, Readers.RegisterWrite.Assumptions,
+      Readers.RegisterWrite.Spec, populatedRowAt_a_eq, circuit_norm, h_input]
+    exact ⟨hbin, fun _ => by rw [hAvec]; exact populateA_isU64 B C F, h_clk.at_four⟩
+  /- Legacy flattened child proof, retained temporarily while its cases are regrouped above.
   refine ⟨?mulLo, ?mulHi, ?ctq0, ?ctq1, ?ctq2, ?ctq3, ?ctq4, ?ctq5, ?ctq6, ?ctq7,
     ?eqb, ?eqc, ?eqb2, ?eqc2, ?isc0, ?addc, ?addr, ?lt,
     ?msb0, ?msb1, ?msb2, ?msb3, ?msb4, ?msb5, ?msb6, ?cpu, ?rtype, ?own,
@@ -1274,8 +1626,10 @@ theorem completeness :
     refine ⟨hbin, ?_⟩
     refine SubSpecs.subSpec_isZero env.toEnvironment
       (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11) _ _ _
-      (isC0Witness C F) ?_ hISC0
-      (by rw [isC0Witness]; exact IsZeroWordOperation.spec_populate (cComp C F) input_is_real)
+      isc0Witness ?_ hISC0
+      (by
+        simp only [isc0Witness, isC0Witness]
+        exact IsZeroWordOperation.spec_populate (cComp C F) input_is_real)
     intro i hi
     simp only [ProvableType.toElements_fromElements, Vector.getElem_map, Vector.getElem_mapRange,
         circuit_norm]
@@ -1296,18 +1650,8 @@ theorem completeness :
     · rw [hg0]
       exact ⟨⟨fun hx => absurd hx zero_ne_one, Or.inl rfl⟩, fun hx => absurd hx zero_ne_one⟩
     · rw [hg1]
-      have h67 : F[6] + F[7] = 0 := by
-        have hg1' := hg1
-        rw [populateRemNeg_def] at hg1'
-        rcases hOH with ⟨g0, -, g2, -, g4, g5, g6, g7⟩ | ⟨g0, -, g2, -, g4, g5, g6, g7⟩ |
-          ⟨g0, -, g2, -, g4, g5, g6, g7⟩ | ⟨g0, -, g2, -, g4, g5, g6, g7⟩ |
-          ⟨g0, -, g2, -, g4, g5, g6, g7⟩ | ⟨g0, -, g2, -, g4, g5, g6, g7⟩ |
-          ⟨g0, -, g2, -, g4, g5, g6, g7⟩ | ⟨g0, -, g2, -, g4, g5, g6, g7⟩ <;>
-          first
-            | (rw [g6, g7]; norm_num; done)
-            | (rw [g0, g2, g4, g5] at hg1'
-               simp only [add_zero, zero_mul] at hg1'
-               exact absurd hg1' zero_ne_one)
+      have h67 := flags67_eq_zero_of_remNeg_mul_eq_one B C input_is_real
+        hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum hg1
       have hRCR : populateRemComp B C F = populateRemainder B C F := by
         unfold populateRemComp remCompBits populateRemainder
         rw [if_neg (fun hx => absurd (h67.symm.trans hx) zero_ne_one)]
@@ -1470,12 +1814,14 @@ theorem completeness :
         have hS : (ProvableType.fromElements (M := Extracted.IsZeroWordOperation)
               (Vector.mapRange 11 fun j =>
                 env.get (i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11 + j)))
-            = isC0Witness C F := by
+            = isc0Witness := by
           refine (ProvableType.ext_iff _ _).mpr fun i hi => ?_
           rw [ProvableType.toElements_fromElements]
-          exact (Vector.getElem_mapRange i hi).trans (hISC0 ⟨i, hi⟩)
+          have hi' : i < 11 := by simpa only [circuit_norm] using hi
+          simpa only [Vector.getElem_cast] using
+            (Vector.getElem_mapRange i hi).trans (hISC0 ⟨i, hi'⟩)
         rw [← hS]
-        simp only [iszeroword_result_proj, circuit_norm])
+        simp only [isc0Witness, iszeroword_result_proj, circuit_norm])
       hBIT
       ((h_input.2.2.2.2.1).trans hop_a_0)
   case pe123 =>
@@ -1526,5 +1872,6 @@ theorem completeness :
     try push_cast at hcr
     rw [hCTQ7, hREMNEG, hCARRY7, hCARRY6, ← sub_eq_add_neg, hcr]
     convert byteRow_range16 (chainResidue_field_val_lt B C F 7) using 2
+  -/
 
 end SP1Clean.DivRemChip

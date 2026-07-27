@@ -119,9 +119,8 @@ theorem correct_load_half_native
     (hconfig : SailState.isValidMemConfig s hs)
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some reg_val)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 2 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 2 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (hext : extend_value is_unsigned (data₁ ++ data₀) = val64)
     (hmem₀ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀)
@@ -150,21 +149,18 @@ theorem correct_load_half_native
         h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
     rwa [hsp, SailState.get_reg?_insert_nextPC]
-  have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
-      = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
-  have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]?
-      = some data₀ := by rwa [hmem_eq, ← hadd]
-  have hm₁ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]?
-      = some data₁ := by rwa [hmem_eq, ← hadd]
+  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]?
+      = some data₀ := by rwa [hmem_eq]
+  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]?
+      = some data₁ := by rwa [hmem_eq]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 2 = true := by
-    rwa [is_aligned_vaddr_iff_mod, hadd]
+    rwa [is_aligned_vaddr_iff_mod]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 2 (by omega) h_lo (by rwa [hadd])
+    range_subset_sp1_pma _ 2 (by omega) h_lo h_hi
   have hread := run_vmem_read_of_width_2' rs1_idx reg_val (BitVec.signExtend 64 imm)
-    data₀ data₁ sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range hm₀ hm₁
+    data₀ data₁ sp hsp_init hsp_rs1 h_align' hsp_config h_in_range hm₀ hm₁
   simp only at hread
   rw [hsp] at hread
   simp [spec_lh, sp1_lh, run_readReg_of_isInitialized _ _ hs,
@@ -183,9 +179,8 @@ theorem lh_chip_reaches_sail
     (hmsb : input.msb = if input.selected_half.val ≥ 32768 then 1 else 0)
     (h_unsigned_msb : is_unsigned = true → input.msb = 0)
     (reg_val : BitVec 64)
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 2 = 0)
-    (h_fits : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 2 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 2 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some reg_val)
@@ -215,7 +210,7 @@ theorem lh_chip_reaches_sail
         exact signExtend64_ofNat16_concat_of_lt_32768 _ hsel (by omega)
   exact correct_load_half_native rs1_idx rd_idx imm reg_val is_unsigned
     (BitVec.ofNat 8 input.selected_half.val) (BitVec.ofNat 8 (input.selected_half.val >>> 8))
-    _ pc s hs hconfig h_pc h_rs1 h_aligned h_fits h_hi h_lo hext hmem₀ hmem₁
+    _ pc s hs hconfig h_pc h_rs1 h_aligned h_hi h_lo hext hmem₀ hmem₁
 
 end SP1Clean.LoadHalfSail
 
@@ -267,6 +262,21 @@ def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadHalfColumns (ZMod p))
     #v[inp.selected_half, 65535 * inp.msb, 65535 * inp.msb, 65535 * inp.msb],
     inp.is_lh * 30 + inp.is_lhu * 33, .regWrite⟩
 
+/-- LoadHalf's exact aligned RAM-access projection. -/
+def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadHalfColumns (ZMod p)) :
+    Trace.RamAccessView (ZMod p) :=
+  { compareLow := inp.memory_access.access_timestamp.compare_low
+    prevHigh := inp.memory_access.access_timestamp.prev_high
+    prevLow := inp.memory_access.access_timestamp.prev_low
+    diffLow := inp.memory_access.access_timestamp.diff_low_limb
+    diffHigh := inp.memory_access.access_timestamp.diff_high_limb
+    address := AddressOperation.alignedValue
+      ⟨inp.op_b_val, inp.op_c_imm, 0, inp.offset_bit[0], inp.offset_bit[1],
+        LoadHalfChip.isReal inp⟩
+      cols.address_operation
+    priorValue := inp.memory_access.prev_value
+    newValue := inp.memory_access.prev_value }
+
 /-- **LoadHalf's `advanceReady` bundle**: the routing (`op_a ≠ 0`), the low-pc-limb bound, the
 LH/LHU one-hot, the loaded-limb bound (`selected_half < 2^16` — a genuine precondition to read
 the committed limb as its two little-endian bytes; NOT in the chip `Spec`, which carries
@@ -278,12 +288,10 @@ def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadHalfColumns (ZMo
   (inp.state.pc[0]).val < 2 ^ 16 ∧
   ((inp.is_lh = 1 ∧ inp.is_lhu = 0) ∨ (inp.is_lhu = 1 ∧ inp.is_lh = 0)) ∧
   inp.selected_half.val < 65536 ∧
-  ((Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat) % 2 = 0 ∧
-  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 < 2 ^ 64 ∧
-  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value).toNat
-      + (Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 ≤ 2 ^ 48 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat % 2 = 0 ∧
+  (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
+      + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 2 ≤ 2 ^ 48 ∧
   2 ^ 16 ≤ (Word.toBitVec64 inp.adapter.op_b_memory.prev_value
       + Word.toBitVec64 inp.adapter.op_c_imm).toNat ∧
   s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
@@ -308,7 +316,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadHalfColumns (ZMod 
     (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
     (hready : AdvanceReady inp cols prog s) :
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
-  obtain ⟨hnonX0, hpc0, hflag, hsel, h_aligned, h_fits, h_hi, h_lo, hmem₀, hmem₁⟩ := hready
+  obtain ⟨hnonX0, hpc0, hflag, hsel, h_aligned, h_hi, h_lo, hmem₀, hmem₁⟩ := hready
   obtain ⟨_h_addr, _h_mem, h_msb_spec, _h_it, _h_limbsel, _h_op_a_0,
     h_lhu_gate, _h_lh_bin, _h_lhu_bin, _h_real_bin⟩ := hspec
   obtain ⟨_hmsbbin, hmsbeq⟩ := h_msb_spec
@@ -325,7 +333,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadHalfColumns (ZMod 
           rw [hlh, hlhu]; simp only [one_mul, zero_mul, add_zero]
           show (30 : ZMod p) = ((loadOpcode 2 false).toNat : ZMod p)
           rw [show (loadOpcode 2 false).toNat = 30 from by decide]; norm_num)
-      rfl rfl hnonX0 hpc0 rfl h_aligned h_fits h_hi h_lo hmem₀ hmem₁ ?_ rfl rfl
+      rfl rfl hnonX0 hpc0 rfl h_aligned h_hi h_lo hmem₀ hmem₁ ?_ rfl rfl
     exact loadHalf_hval inp false hsel (fun h1 => hmsbeq h1)
       (fun hu => by rw [hu, one_mul] at h_lhu_gate; exact h_lhu_gate)
       (Or.inl ⟨hlh, hlhu, rfl⟩)
@@ -340,7 +348,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadHalfColumns (ZMod 
           rw [hlh, hlhu]; simp only [one_mul, zero_mul, zero_add]
           show (33 : ZMod p) = ((loadOpcode 2 true).toNat : ZMod p)
           rw [show (loadOpcode 2 true).toNat = 33 from by decide]; norm_num)
-      rfl rfl hnonX0 hpc0 rfl h_aligned h_fits h_hi h_lo hmem₀ hmem₁ ?_ rfl rfl
+      rfl rfl hnonX0 hpc0 rfl h_aligned h_hi h_lo hmem₀ hmem₁ ?_ rfl rfl
     exact loadHalf_hval inp true hsel (fun h1 => hmsbeq h1)
       (fun hu => by rw [hu, one_mul] at h_lhu_gate; exact h_lhu_gate)
       (Or.inr ⟨hlhu, hlh, rfl⟩)
@@ -351,6 +359,7 @@ def kind : Soundness.ChipKind p where
   Inputs := LoadHalfChip.Inputs
   Cols := Extracted.LoadHalfColumns
   view := rowView
+  ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => LoadHalfChip.Spec inp cols data
   advanceReady := AdvanceReady
   advance := some (PLift.up advance)

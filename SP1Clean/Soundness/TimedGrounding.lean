@@ -149,10 +149,10 @@ effect lands at the `+1` `MemoryAccess` push offset. -/
 def ramEpoch (c0 τ : ℕ) : ℕ :=
   if τ < c0 then 0 else (τ - c0) / 8 + (if 1 ≤ (τ - c0) % 8 then 1 else 0)
 
-/-- `microValue` at a RAM address is the `ramEpoch`-indexed trajectory content. -/
-lemma microValue_ram (s0 : SailState) (c0 : ℕ) (a : BitVec 64) (τ : ℕ) :
-    microValue s0 c0 (MemLoc.ram a) τ
-      = (chainState s0 (ramEpoch c0 τ)).bind (locContent · (MemLoc.ram a)) := by
+/-- `microValue` at a RAM cell is the `ramEpoch`-indexed trajectory content. -/
+lemma microValue_ram (s0 : SailState) (c0 : ℕ) (cell : RamCell) (τ : ℕ) :
+    microValue s0 c0 (MemLoc.ram cell) τ
+      = (chainState s0 (ramEpoch c0 τ)).bind (locContent · (MemLoc.ram cell)) := by
   rw [microValue, ramEpoch]
   by_cases h : τ < c0
   · rw [if_pos h, if_pos h]
@@ -181,13 +181,13 @@ both times at the pre-effect point `[t, t+1)` (i.e. exactly `t`); `Or.inr`: both
 epoch `[t+1, t+9)`. -/
 lemma localValueAt_shift_ram {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
     {m : StateMsg (ZMod p)} (h_m : LocalStateTruth program initial initialClock m)
-    {a : BitVec 64} {v : Word (ZMod p)} {τ τ' : ℕ}
+    {cell : RamCell} {v : Word (ZMod p)} {τ τ' : ℕ}
     (hwin : (StateMsg.timeNat m ≤ τ ∧ τ < StateMsg.timeNat m + 1 ∧
              StateMsg.timeNat m ≤ τ' ∧ τ' < StateMsg.timeNat m + 1) ∨
             (StateMsg.timeNat m + 1 ≤ τ ∧ τ < StateMsg.timeNat m + 9 ∧
              StateMsg.timeNat m + 1 ≤ τ' ∧ τ' < StateMsg.timeNat m + 9))
-    (h : LocalValueAt initial initialClock (MemLoc.ram a) τ v) :
-    LocalValueAt initial initialClock (MemLoc.ram a) τ' v := by
+    (h : LocalValueAt initial initialClock (MemLoc.ram cell) τ v) :
+    LocalValueAt initial initialClock (MemLoc.ram cell) τ' v := by
   obtain ⟨n, -, -, htime, -, -, -⟩ := h_m
   have hv := h
   unfold LocalValueAt at hv ⊢
@@ -297,8 +297,8 @@ proves `LocalStepFact`/`FrameFact` over the *ordinary* carrier (every pull read 
 `t`, in emitted order), and the row-`Spec` consumers read the ordinary carrier too. `AlignsWith
 r_align r_ord` records that the two share their state edge and push list and that every ordinary pull
 is matched by an aligned pull carrying the same message inside the pre-write register epoch
-`[t, t+4)`. Register-axis only; the RAM analogue (loads/stores, Phase R) uses `localValueAt_shift_ram`
-and the `[t, t+1)` window. -/
+inside that location's pre-effect read window: `[t, t+4)` for registers and the singleton
+`[t, t+1)` point for RAM. -/
 structure AlignsWith (r_align r_ord : RowFacts p) : Prop where
   statePull : r_align.statePull = r_ord.statePull
   statePush : r_align.statePush = r_ord.statePush
@@ -309,16 +309,15 @@ structure AlignsWith (r_align r_ord : RowFacts p) : Prop where
   /-- The aligned pull *messages* are a permutation of the ordinary ones — needed for the memory-bus
   balance's carrier-invariance (`match_` alone is one-directional and does not give it). -/
   pulls : (r_align.memPulls.map Prod.fst).Perm (r_ord.memPulls.map Prod.fst)
-  reg : ∀ mp ∈ r_ord.memPulls, ∃ i : BitVec 5, MemoryMsg.locOf mp.1 = MemLoc.reg i
   ordTime : ∀ mp ∈ r_ord.memPulls, mp.2 = StateMsg.timeNat r_ord.statePull
   match_ : ∀ mp ∈ r_ord.memPulls, ∃ mp' ∈ r_align.memPulls, mp'.1 = mp.1 ∧
     StateMsg.timeNat r_align.statePull ≤ mp'.2 ∧
-    mp'.2 < StateMsg.timeNat r_align.statePull + 4
+    mp'.2 ≤ StateMsg.timeNat r_align.statePull + readWindow (MemoryMsg.locOf mp.1)
 
 omit [Fact (2 ^ 17 < p)] in
 /-- **The shared engine of all three carrier transports.** Ordinary pull currency (every pull read at
 the window start `t`) is derived from aligned pull currency by shifting each matched pull back to `t`
-inside its pre-write register epoch via `localValueAt_shift`. -/
+inside the location's pre-effect epoch. -/
 theorem ordinaryPullCurrency_of_aligned
     {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
     {r_align r_ord : RowFacts p} (h : AlignsWith r_align r_ord)
@@ -330,17 +329,28 @@ theorem ordinaryPullCurrency_of_aligned
       MemoryMsg.ClkBound mp.1 ∧
       LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value := by
   intro mp hmp
-  obtain ⟨i, hloc⟩ := h.reg mp hmp
   obtain ⟨mp', hmp'_mem, hmsg, hlo, hhi⟩ := h.match_ mp hmp
   obtain ⟨hu64, hclk, hval_al⟩ := hcurr_al mp' hmp'_mem
   refine ⟨hmsg ▸ hu64, hmsg ▸ hclk, ?_⟩
-  rw [hloc, h.ordTime mp hmp]
-  have hval_al' : LocalValueAt initial initialClock (MemLoc.reg i) mp'.2 mp.1.value := by
-    rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.reg i from hmsg ▸ hloc]
-    exact hval_al
   have hst : StateMsg.timeNat r_align.statePull = StateMsg.timeNat r_ord.statePull := by
     rw [h.statePull]
-  refine localValueAt_shift hstateTruth (Or.inl ⟨hlo, hhi, ?_, ?_⟩) hval_al' <;> omega
+  cases hloc : MemoryMsg.locOf mp.1 with
+  | reg i =>
+      have hval_al' : LocalValueAt initial initialClock (MemLoc.reg i) mp'.2 mp.1.value := by
+        rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.reg i from hmsg ▸ hloc]
+        exact hval_al
+      rw [hloc, readWindow_reg] at hhi
+      rw [h.ordTime mp hmp]
+      refine localValueAt_shift hstateTruth (Or.inl ⟨hlo, by omega, ?_, ?_⟩) hval_al' <;>
+        omega
+  | ram a =>
+      have hval_al' : LocalValueAt initial initialClock (MemLoc.ram a) mp'.2 mp.1.value := by
+        rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.ram a from hmsg ▸ hloc]
+        exact hval_al
+      rw [hloc, readWindow_ram] at hhi
+      rw [h.ordTime mp hmp]
+      refine localValueAt_shift_ram hstateTruth (Or.inl ⟨hlo, by omega, ?_, ?_⟩)
+        hval_al' <;> omega
 
 omit [Fact (2 ^ 17 < p)] in
 /-- `LocalStepFact` transports from the ordinary carrier (where `ChipGroundingContracts` proves it) to
@@ -388,17 +398,28 @@ theorem grounded_ordinary_of_aligned
   obtain ⟨hstateTruth_al, hpulls_al⟩ := grounded_align
   refine ⟨by rw [← h.statePull]; exact hstateTruth_al, ?_⟩
   intro mp hmp
-  obtain ⟨i, hloc⟩ := h.reg mp hmp
   obtain ⟨mp', hmp'_mem, hmsg, hlo, hhi⟩ := h.match_ mp hmp
   obtain ⟨hmemtruth, hval_al⟩ := hpulls_al mp' hmp'_mem
   refine ⟨hmsg ▸ hmemtruth, ?_⟩
-  rw [hloc, h.ordTime mp hmp]
-  have hval_al' : LocalValueAt initial initialClock (MemLoc.reg i) mp'.2 mp.1.value := by
-    rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.reg i from hmsg ▸ hloc]
-    exact hval_al
   have hst : StateMsg.timeNat r_align.statePull = StateMsg.timeNat r_ord.statePull := by
     rw [h.statePull]
-  refine localValueAt_shift hstateTruth_al (Or.inl ⟨hlo, hhi, ?_, ?_⟩) hval_al' <;> omega
+  cases hloc : MemoryMsg.locOf mp.1 with
+  | reg i =>
+      have hval_al' : LocalValueAt initial initialClock (MemLoc.reg i) mp'.2 mp.1.value := by
+        rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.reg i from hmsg ▸ hloc]
+        exact hval_al
+      rw [hloc, readWindow_reg] at hhi
+      rw [h.ordTime mp hmp]
+      refine localValueAt_shift hstateTruth_al (Or.inl ⟨hlo, by omega, ?_, ?_⟩)
+        hval_al' <;> omega
+  | ram a =>
+      have hval_al' : LocalValueAt initial initialClock (MemLoc.ram a) mp'.2 mp.1.value := by
+        rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.ram a from hmsg ▸ hloc]
+        exact hval_al
+      rw [hloc, readWindow_ram] at hhi
+      rw [h.ordTime mp hmp]
+      refine localValueAt_shift_ram hstateTruth_al (Or.inl ⟨hlo, by omega, ?_, ?_⟩)
+        hval_al' <;> omega
 
 /-- The walk invariant for the **partial** per-key memory frontier `live`: at each key that carries a
 frontier record, that record sits at the key, its own guarantee (`LocalMemTruth`) holds, its value is

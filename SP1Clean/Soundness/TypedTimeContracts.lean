@@ -125,12 +125,11 @@ theorem BranchChip.cpuStateTimeContract :
   dsimp only
   let input : Var BranchChip.Inputs (ZMod p) := varFromOffset BranchChip.Inputs 0
   let offset := size BranchChip.Inputs
-  refine ⟨offset + 28,
+  refine ⟨offset + 20,
     ⟨input.state,
-      #v[var { index := offset + 15 }, var { index := offset + 16 },
-        var { index := offset + 17 }], 8, input.is_real⟩, ?_, ?_⟩
+      #v[var { index := offset + 7 }, var { index := offset + 8 },
+        var { index := offset + 9 }], 8, input.is_real⟩, ?_, ?_⟩
   · simp only [input, offset, BranchChip.circuit, BranchChip.main, circuit_norm]
-    right
     right
     right
     right
@@ -251,6 +250,8 @@ theorem DivRemChip.cpuStateTimeContract :
   · -- The CPU reader is the first composed subcircuit of the rewired `main` (the whole witness
     -- stream precedes it, hence the `offset + 217`).
     simp only [input, offset, DivRemChip.circuit, DivRemChip.main, circuit_norm]
+    right
+    simp only [DivRemChip.constrainRow, circuit_norm]
   · intro env
     constructor <;>
       simp only [input, DivRemChip.circuit, DivRemChip.rowView, circuit_norm]

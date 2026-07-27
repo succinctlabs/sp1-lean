@@ -504,4 +504,16 @@ theorem flagsSum_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
+set_option maxHeartbeats 8000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- The physical non-`x0` routing assertion is the final entry of the pure DivRem own-assertion
+list.  Keeping this membership folded lets whole-chip grounding recover the route without
+unfolding the arithmetic evidence contract. -/
+theorem opA0_mem_ownAsserts (cols : Var DivRemCols (ZMod p)) :
+    cols.adapter.op_a_0 ∈ ownAsserts cols := by
+  simp only [ownAsserts]
+  repeat first
+    | exact List.Mem.head _
+    | apply List.Mem.tail
+
 end SP1Clean.DivRemChip

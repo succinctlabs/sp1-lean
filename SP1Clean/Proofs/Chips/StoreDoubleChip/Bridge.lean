@@ -54,9 +54,8 @@ theorem correct_store_double_native
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some reg_val)
     (h_rs2 : s.get_reg? rs2_idx = some (Word.toBitVec64 stored))
-    (h_aligned : (reg_val.toNat + (BitVec.signExtend 64 imm).toNat) % 8 = 0)
-    (_h_does_fit : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 < 2 ^ 64)
-    (h_hi : reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48)
+    (h_aligned : (reg_val + BitVec.signExtend 64 imm).toNat % 8 = 0)
+    (h_hi : (reg_val + BitVec.signExtend 64 imm).toNat + 8 ≤ 2 ^ 48)
     (h_lo : 2 ^ 16 ≤ (reg_val + BitVec.signExtend 64 imm).toNat)
     (_hstored : Word.isU64 stored) :
     (spec_sd imm rs1_idx rs2_idx).run s
@@ -90,18 +89,15 @@ theorem correct_store_double_native
   have hsp_rs2 : sp.get_reg? rs2_idx = some (Word.toBitVec64 stored) := by
     rwa [hsp, SailState.get_reg?_insert_nextPC]
   -- The alignment fact in Sail form, and the range-subset PMA fact.
-  have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
-      = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
-    rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 8 = true := by
-    rw [is_aligned_vaddr_iff_mod, hadd]; exact h_aligned
+    rw [is_aligned_vaddr_iff_mod]; exact h_aligned
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 8 (by omega) h_lo (by rw [hadd]; exact h_hi)
+    range_subset_sp1_pma _ 8 (by omega) h_lo h_hi
   -- The write result on `sp` (same memory as `s`).
   have hwrite := run_vmem_write_of_width_8 rs1_idx reg_val (BitVec.signExtend 64 imm)
-    (Word.toBitVec64 stored) sp hsp_init hsp_rs1 h_align' hsp_config _h_does_fit h_in_range
+    (Word.toBitVec64 stored) sp hsp_init hsp_rs1 h_align' hsp_config h_in_range
   simp only [hmem_eq] at hwrite
   -- Collapse the `extractLsb` on the stored value.
   have hext : Sail.BitVec.extractLsb (Word.toBitVec64 stored) 63 0 = Word.toBitVec64 stored := by
@@ -144,8 +140,9 @@ theorem sd_chip_reaches_sail
     (rs1_idx rs2_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (hconfig : SailState.isValidMemConfig s hs)
     (h_assum : StoreDoubleChip.Assumptions input data)
+    (h_address : AddressOperation.ValidAddress
+      ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩)
     (h_imm : Word.toBitVec64 input.op_c_imm = BitVec.signExtend 64 imm)
-    (h_hi : Word.toNat input.op_b_val + Word.toNat input.op_c_imm + 8 ≤ 2 ^ 48)
     (hstored : Word.isU64 input.adapter.op_a_memory.prev_value)
     (h_pc : s.regs.get? Register.PC = some pc)
     (h_rs1 : s.get_reg? rs1_idx = some (Word.toBitVec64 input.op_b_val))
@@ -154,21 +151,19 @@ theorem sd_chip_reaches_sail
       = (sp1_sd pc (Word.toBitVec64 input.op_b_val + BitVec.signExtend 64 imm)
           input.adapter.op_a_memory.prev_value).run s := by
   haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
-  obtain ⟨h_b, h_c, _h_fits48, _h_nonres, h_align48⟩ := h_assum
-  have hreg : (Word.toBitVec64 input.op_b_val).toNat = Word.toNat input.op_b_val :=
-    Word.toBitVec64_toNat h_b
-  have hoff : (BitVec.signExtend 64 imm).toNat = Word.toNat input.op_c_imm := by
-    rw [← h_imm]; exact Word.toBitVec64_toNat h_c
+  obtain ⟨h_b, h_c⟩ := h_assum
+  have hfacts := AddressOperation.effectiveAddress_facts h_b h_c h_address
+  unfold AddressOperation.effectiveAddress at hfacts
+  rw [h_imm] at hfacts
+  have h_align48 :
+      (Word.toBitVec64 input.op_b_val + BitVec.signExtend 64 imm).toNat % 8 = 0 := by
+    simpa only [ZMod.val_zero, zero_add, zero_mul, add_zero] using hfacts.2.2.symm
+  have hhi :
+      (Word.toBitVec64 input.op_b_val + BitVec.signExtend 64 imm).toNat < 2 ^ 48 := by
+    simpa using hfacts.1
   refine correct_store_double_native rs1_idx rs2_idx imm (Word.toBitVec64 input.op_b_val)
-    input.adapter.op_a_memory.prev_value pc s hs hconfig h_pc h_rs1 h_rs2 ?_ ?_ ?_ ?_ hstored
-  · -- alignment: `sum % 8 = 0` from the chip's `sum % 2^48 % 8 = 0`
-    rw [hreg, hoff, ← Nat.mod_mod_of_dvd _ (by norm_num : (8 : ℕ) ∣ 2 ^ 48)]; exact h_align48
-  · -- fits in 64 bits (from the store-fits bound)
-    rw [hreg, hoff]; omega
-  · -- store fits in the 48-bit physical window
-    rw [hreg, hoff]; exact h_hi
-  · -- non-reserved: `2^16 ≤ (reg_val + offset).toNat`, no wrap since `sum < 2^48`
-    rw [BitVec.toNat_add, hreg, hoff, Nat.mod_eq_of_lt (by omega)]; omega
+    input.adapter.op_a_memory.prev_value pc s hs hconfig h_pc h_rs1 h_rs2
+    h_align48 (by omega) (by simpa using hfacts.2.1) hstored
 
 end SP1Clean.StoreSail
 
@@ -224,27 +219,34 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZMod p
     inp.adapter.toAdapterView, inp.is_real, inp.adapter.op_a_memory.prev_value, 39,
     .store ⟨cols.address_operation.addr_operation.value, inp.adapter.op_a_memory.prev_value, 8⟩⟩
 
+/-- StoreDouble's exact aligned RAM-access projection. -/
+def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZMod p)) :
+    Trace.RamAccessView (ZMod p) :=
+  { compareLow := inp.memory_access.access_timestamp.compare_low
+    prevHigh := inp.memory_access.access_timestamp.prev_high
+    prevLow := inp.memory_access.access_timestamp.prev_low
+    diffLow := inp.memory_access.access_timestamp.diff_low_limb
+    diffHigh := inp.memory_access.access_timestamp.diff_high_limb
+    address := AddressOperation.alignedValue
+      ⟨inp.op_b_val, inp.op_c_imm, 0, 0, 0, inp.is_real⟩ cols.address_operation
+    priorValue := inp.memory_access.prev_value
+    newValue := inp.adapter.op_a_memory.prev_value }
+
 def storeAddrNat (cols : Extracted.StoreDoubleColumns (ZMod p)) : ℕ :=
   cols.address_operation.addr_operation.value[0].val
     + cols.address_operation.addr_operation.value[1].val * 2 ^ 16
     + cols.address_operation.addr_operation.value[2].val * 2 ^ 32
 
-/-- **StoreDouble's `advanceReady` bundle** (8-byte twin of StoreWord's): the op_a read-back, the range
-facts, the **8-byte alignment** (`sum % 8 = 0`), the low-pc bound, and the 8-byte ROM-disjointness. -/
-def AdvanceReady (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZMod p))
-    (prog : GuestProgram) (s : SailState) : Prop :=
+/-- **StoreDouble's `advanceReady` bundle** (8-byte twin of StoreWord's): the op_a read-back, the two
+operand-word bounds supplied by the grounded Memory bus, and the low-pc bound. Wrapped address range
+and 8-byte alignment facts come from the chip's `AddressOperation.Spec`. Program-ROM preservation
+is composed once through `SailCodeMemoryCompatible`. -/
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.StoreDoubleColumns (ZMod p))
+    (_prog : GuestProgram) (s : SailState) : Prop :=
   (∀ idx : BitVec 5, (idx.toNat : ZMod p) = inp.adapter.op_a →
      s.get_reg? idx = some (Word.toBitVec64 inp.adapter.op_a_memory.prev_value)) ∧
   Word.isU64 inp.op_b_val ∧ Word.isU64 inp.op_c_imm ∧
-  (Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm + 8 ≤ 2 ^ 48) ∧
-  (2 ^ 16 ≤ (Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm) % 2 ^ 48) ∧
-  ((Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm) % 8 = 0) ∧
-  (inp.state.pc[0].val < 2 ^ 16) ∧
-  (∀ a w, prog.fetchWord a = some w → ∀ i : Fin 4,
-      a.toNat + (i : ℕ) ≠ storeAddrNat cols ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 1
-      ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 2 ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 3
-      ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 4 ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 5
-      ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 6 ∧ a.toNat + (i : ℕ) ≠ storeAddrNat cols + 7)
+  inp.state.pc[0].val < 2 ^ 16
 
 set_option maxHeartbeats 2000000 in
 /-- **`StoreDoubleChip.advance`** — the per-SD-row `try_step` lift. Over `advance_of_store` +
@@ -252,15 +254,17 @@ set_option maxHeartbeats 2000000 in
 bytes are `byteAt` at `addr .. addr+7` = the little-endian bytes of `op_a_memory.prev_value` (full rs2). -/
 theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZMod p))
     (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
-    (_hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
+    (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
     (hpcread : s.regs.get? Register.PC = some (rcvPcOf (stateAccess (rowView inp cols))))
     (hvalb : ValueOperandsBound (rowView inp cols) s)
     (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
     (hready : AdvanceReady inp cols prog s) :
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
-  obtain ⟨hopa_bind, hb64, hc64, hfit, hlo, halign, hpc0, hdisj⟩ := hready
-  obtain ⟨h_addr_spec, _, _, _⟩ := hspec
+  obtain ⟨hopa_bind, hb64, hc64, hpc0⟩ := hready
+  obtain ⟨h_addr_row, _, _, _⟩ := hspec
+  have hreal' : inp.is_real = 1 := by simpa [rowView] using hreal
+  have h_addr_spec := h_addr_row.2.2.2 hreal'
   set r := rowView inp cols with hr
   have h39 : (storeOpcode (8 : word_width)).toNat = 39 := storeOpcode_eight_toNat
   have hop : r.opcode = ((storeOpcode (8 : word_width)).toNat : ZMod p) := by rw [h39]; simp [hr, rowView]
@@ -281,25 +285,29 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZM
     rw [hoc, toBitVec64_bitVecToWord, hse]
   set obv := Word.toBitVec64 inp.op_b_val with hobv
   set opv := Word.toBitVec64 inp.adapter.op_a_memory.prev_value with hopvdef
-  have hobn : obv.toNat = Word.toNat inp.op_b_val := Word.toBitVec64_toNat hb64
-  have hsimmn : (sign_extend (m := 64) imm : BitVec 64).toNat = Word.toNat inp.op_c_imm := by
-    rw [← h_imm]; exact Word.toBitVec64_toNat hc64
-  have haddN : (obv + sign_extend (m := 64) imm).toNat
-      = Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm := by
-    rw [BitVec.toNat_add, hobn, hsimmn, Nat.mod_eq_of_lt (by omega)]
+  set addressInput : AddressOperation.Inputs (ZMod p) :=
+    ⟨inp.op_b_val, inp.op_c_imm, 0, 0, 0, inp.is_real⟩
+  have hvalid : AddressOperation.ValidAddress addressInput := by
+    simpa [addressInput] using AddressOperation.validAddress_of_spec h_addr_spec
+  have haddressFacts := AddressOperation.effectiveAddress_facts hb64 hc64 hvalid
+  have heffective :
+      AddressOperation.effectiveAddress addressInput = obv + sign_extend (m := 64) imm := by
+    simp [AddressOperation.effectiveAddress, addressInput, obv, h_imm]
+  rw [heffective] at haddressFacts
   have hsum : cols.address_operation.addr_operation.value[0].val
       + 65536 * cols.address_operation.addr_operation.value[1].val
       + 65536 ^ 2 * cols.address_operation.addr_operation.value[2].val
       = (Word.toNat inp.op_b_val + Word.toNat inp.op_c_imm) % 2 ^ 48 := h_addr_spec.1
   have haddr : storeAddrNat cols = (obv + sign_extend (m := 64) imm).toNat := by
-    rw [haddN]; unfold storeAddrNat
+    unfold storeAddrNat
     rw [show cols.address_operation.addr_operation.value[0].val
           + cols.address_operation.addr_operation.value[1].val * 2 ^ 16
           + cols.address_operation.addr_operation.value[2].val * 2 ^ 32
         = cols.address_operation.addr_operation.value[0].val
           + 65536 * cols.address_operation.addr_operation.value[1].val
           + 65536 ^ 2 * cols.address_operation.addr_operation.value[2].val from by ring,
-       hsum, Nat.mod_eq_of_lt (by omega)]
+       hsum, AddressOperation.addressMod48_eq_effectiveAddress_toNat hb64 hc64 hvalid,
+       heffective]
   set mw : Trace.MemWrite (ZMod p) :=
     ⟨cols.address_operation.addr_operation.value, inp.adapter.op_a_memory.prev_value, 8⟩ with hmwdef
   have hmw : r.commit.memWrite = some mw := rfl
@@ -352,14 +360,15 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZM
       = BitVec.ofNat 8 (opv.toNat >>> 48) := by rw [← hmwaddr]; exact hbyteAt6
   have hbA7 : mw.byteAt ((obv + sign_extend (m := 64) imm).toNat + 7)
       = BitVec.ofNat 8 (opv.toNat >>> 56) := by rw [← hmwaddr]; exact hbyteAt7
+  have halignNat : (obv + sign_extend (m := 64) imm).toNat % 8 = 0 := by
+    rw [← haddressFacts.2.2]
+    simp [addressInput]
   have haligned8 : is_aligned_vaddr (virtaddr.Virtaddr (obv + sign_extend (m := 64) imm)) 8 = true := by
-    rw [is_aligned_vaddr_iff_mod, haddN]; exact halign
-  have hfit64 : obv.toNat + (sign_extend (m := 64) imm : BitVec 64).toNat + 8 < 2 ^ 64 := by
-    rw [hobn, hsimmn]; omega
+    rwa [is_aligned_vaddr_iff_mod]
   have hinr : range_subset (zero_extend (BitVec.addInt (obv + sign_extend (m := 64) imm) 0))
       (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
     range_subset_sp1_pma (obv + sign_extend (m := 64) imm) 8 (by norm_num)
-      (by rw [haddN]; omega) (by rw [haddN]; omega)
+      haddressFacts.2.1 (by omega)
   have hcov : ∀ a : ℕ, mw.covers a →
       ((fun m : Std.ExtHashMap Nat (BitVec 8) =>
         (((((((m.insert ((obv + sign_extend (m := 64) imm).toNat)
@@ -468,17 +477,6 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZM
       extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 2) a _ (fun hc => h2 hc.symm),
       extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat + 1) a _ (fun hc => h1 hc.symm),
       extHashMap_get?_insert_ne_sd _ ((obv + sign_extend (m := 64) imm).toNat) a _ (fun hc => h0 hc.symm)]
-  have hdisj' : ∀ a w2, prog.fetchWord a = some w2 → ∀ i : Fin 4, ¬ mw.covers (a.toNat + (i : ℕ)) := by
-    intro a w2 hf i hcov'
-    rcases (hcov_iff (a.toNat + (i : ℕ))).mp hcov' with he | he | he | he | he | he | he | he
-    · exact (hdisj a w2 hf i).1 (he.trans haddr.symm)
-    · exact (hdisj a w2 hf i).2.1 (he.trans (by rw [haddr]))
-    · exact (hdisj a w2 hf i).2.2.1 (he.trans (by rw [haddr]))
-    · exact (hdisj a w2 hf i).2.2.2.1 (he.trans (by rw [haddr]))
-    · exact (hdisj a w2 hf i).2.2.2.2.1 (he.trans (by rw [haddr]))
-    · exact (hdisj a w2 hf i).2.2.2.2.2.1 (he.trans (by rw [haddr]))
-    · exact (hdisj a w2 hf i).2.2.2.2.2.2.1 (he.trans (by rw [haddr]))
-    · exact (hdisj a w2 hf i).2.2.2.2.2.2.2 (he.trans (by rw [haddr]))
   refine advance_of_store (.STORE (imm, .Regidx rs2, .Regidx rs1, 8)) (rcvPcOf (stateAccess r)) mw
     (fun m => (((((((m.insert ((obv + sign_extend (m := 64) imm).toNat)
         (BitVec.ofNat 8 opv.toNat)).insert
@@ -500,9 +498,9 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.StoreDoubleColumns (ZM
     hcfg hpcread rfl hfetchReady
     (fun sc hsc => by rw [word_reassemble w]; exact hdecw sc hsc)
     (fun t hframe _ hinit hcfgt => ?_)
-    hcov hncov hdisj' rfl hpc0 rfl hmw
+    hcov hncov rfl hpc0 rfl hmw
   exact execute_STORE_reaches_width8 imm rs1 rs2 obv opv t hinit hcfgt.toValidMemConfig
-    ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2) haligned8 hfit64 hinr
+    ((hframe rs1).trans hrs1) ((hframe rs2).trans hrs2) haligned8 hinr
 
 /-- `ChipKind` registration for StoreDouble (SD, opcode 39). -/
 def kind : Soundness.ChipKind p where
@@ -510,6 +508,7 @@ def kind : Soundness.ChipKind p where
   Inputs := StoreDoubleChip.Inputs
   Cols := Extracted.StoreDoubleColumns
   view := rowView
+  ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => StoreDoubleChip.Spec inp cols data
   advanceReady := AdvanceReady
   advance := some (PLift.up advance)

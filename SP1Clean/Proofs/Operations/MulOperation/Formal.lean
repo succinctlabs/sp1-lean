@@ -12,12 +12,12 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-/-- Operand words fit in 64 bits, the five variant selectors are boolean, and **at most one** is set
-(the `{0,1}` sum-bound — the chip discharges this unconditionally from the in-circuit sum gate, including
-on padding rows where the sum is `0`). On an active row exactly one flag is set; `mulSemantics_of_raw`
+/-- The five variant selectors are boolean and **at most one** is set (the `{0,1}` sum-bound — the
+chip discharges this unconditionally from the in-circuit sum gate, including on padding rows where
+the sum is `0`). Operand bounds are conclusions of the two safe byte decompositions, not
+composer-supplied preconditions. On an active row exactly one flag is set; `mulSemantics_of_raw`
 recovers `sum = 1` per active variant via `sum_eq_one`. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
-  (input.is_real = 1 → Word.isU64 input.b ∧ Word.isU64 input.c) ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   (input.is_mulw = 1 → input.is_real = 1) ∧
   (input.is_mul = 0 ∨ input.is_mul = 1) ∧ (input.is_mulh = 0 ∨ input.is_mulh = 1) ∧
@@ -60,8 +60,9 @@ theorem result_semantic {input : Inputs (ZMod p)} (h_assum : Assumptions input)
     (h_spec : Spec input) (hr : input.is_real = 1) : SemanticSpec input input.cols := by
   obtain ⟨_, _, _, _, _, hgated⟩ := h_spec
   obtain ⟨h_raw, hb_low, hc_low, hb_msb, hc_msb, hmsb_bool, hmsb⟩ := hgated hr
-  obtain ⟨habc_imp, _, _, hmul_b, hmh_b, hmhu_b, hmhsu_b, hmw_b, hsum⟩ := h_assum
-  obtain ⟨hbU, hcU⟩ := habc_imp hr
+  obtain ⟨_, _, hmul_b, hmh_b, hmhu_b, hmhsu_b, hmw_b, hsum⟩ := h_assum
+  have hbU := U16toU8OperationSafe.isU64_of_decomp hb_low
+  have hcU := U16toU8OperationSafe.isU64_of_decomp hc_low
   exact mulSemantics_of_raw hbU hcU hmul_b hmh_b hmhu_b hmhsu_b hmw_b hsum hb_low hc_low
     hmsb_bool hmsb hb_msb hc_msb h_raw
 
@@ -96,7 +97,7 @@ set_option maxHeartbeats 40000000 in
 set_option linter.unusedSimpArgs false in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨habc_imp, hir_bin, hmw_real, hmul_b, hmh_b, hmhu_b, hmhsu_b, hmw_b, hsum⟩ := h_assumptions
+  obtain ⟨hir_bin, hmw_real, hmul_b, hmh_b, hmhu_b, hmhsu_b, hmw_b, hsum⟩ := h_assumptions
   obtain ⟨hib, hic, _hicols, hir, _him_mul, _him_mulh, _him_mulhu, _him_mulhsu, _him_mulw⟩ := h_input
   obtain ⟨_gate, hA, hB, hpm, hb_bool, hc_bool, hb5, hc5, hcF0, hcF1, hcF2, hcF3, hcF4, hcF5, hcF6, hcF7, hcF8, hcF9, hcF10,
     hcF11, hcF12, hcF13, hcF14, hcF15, hpG0, hpG1, hpG2, hpG3, hpG4, hpG5, hpG6, hpG7,
@@ -122,7 +123,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
         rw [ep2, ep3, byte_compose_val pb2 pb3 rfl]; omega, hmw_b⟩).1,
       ?_⟩
     intro hr
-    obtain ⟨hbU, hcU⟩ := habc_imp hr
+    have hb_low := (hA hir_bin) hr
+    have hc_low := (hB hir_bin) hr
+    have hbU := U16toU8OperationSafe.isU64_of_decomp hb_low
+    have hcU := U16toU8OperationSafe.isU64_of_decomp hc_low
     obtain ⟨hbU0, hbU1, hbU2, hbU3⟩ := Word.lt_cases_of_isU64 hbU
     obtain ⟨hcU0, hcU1, hcU2, hcU3⟩ := Word.lt_cases_of_isU64 hcU
     have hneg : - input_is_real = -1 := by rw [hr]
@@ -211,8 +215,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     have pb14 : input_cols_product[14].val < 2 ^ 8 := by rw [← ep14]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG7 hneg)).1
     have pb15 : input_cols_product[15].val < 2 ^ 8 := by rw [← ep15]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG7 hneg)).2
     simp only [hr, one_mul, id_eq, ep0, ep1, ep2, ep3, ep4, ep5, ep6, ep7, ep8, ep9, ep10, ep11, ep12, ep13, ep14, ep15, ecar0, ecar1, ecar2, ecar3, ecar4, ecar5, ecar6, ecar7, ecar8, ecar9, ecar10, ecar11, ecar12, ecar13, ecar14, ecar15, ebl0, ebl1, ebl2, ebl3, ecl0, ecl1, ecl2, ecl3, eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3] at hch0 hch1 hch2 hch3 hch4 hch5 hch6 hch7 hch8 hch9 hch10 hch11 hch12 hch13 hch14 hch15
-    have hb_low := (hA ⟨fun _ => ⟨hbU0, hbU1, hbU2, hbU3⟩, Or.inr hr⟩) hr
-    have hc_low := (hB ⟨fun _ => ⟨hcU0, hcU1, hcU2, hcU3⟩, Or.inr hr⟩) hr
     have hpmspec := hpm ⟨fun _ => by rw [ep2, ep3, byte_compose_val pb2 pb3 rfl]; omega, hmw_b⟩
     have hmsb_bool : input_cols_product_msb_msb = 0 ∨ input_cols_product_msb_msb = 1 := hpmspec.1
     have hmsb : input_is_mulw = 1 → input_cols_product_msb_msb =
@@ -637,7 +639,7 @@ set_option maxHeartbeats 40000000 in
 set_option linter.unusedSimpArgs false in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨habc_imp, hir_bin, hmw_real, hmul_b, hmh_b, hmhu_b, hmhsu_b, hmw_b, hsum⟩ := h_assumptions
+  obtain ⟨hir_bin, hmw_real, hmul_b, hmh_b, hmhu_b, hmhsu_b, hmw_b, hsum⟩ := h_assumptions
   obtain ⟨hib, hic, hicols, _hir, _him_mul, _him_mulh, _him_mulhu, _him_mulhsu, _him_mulw⟩ := h_input
   obtain ⟨h_bsd, h_csd, h_bmb, h_cmb, h_pmb, h_gated⟩ := h_spec
   obtain ⟨ecar_eq, eprod_eq, ebl_eq, ecl_eq, _ebm, _ecm, _epm, _ebse, _ecse⟩ := hicols
@@ -702,8 +704,8 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   -- leading `is_real` binary gate (W11 cwr: byte sends are locally `is_real`-gated, shallow `assertZero`)
   · rcases hir_bin with h | h <;> simp [h]
   -- 3 subcircuit `⟨Assumptions, Spec⟩`: U16toU8(b), U16toU8(c), U16MSB(product)
-  · exact ⟨⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).1, hir_bin⟩, fun h => (h_gated h).2.1⟩
-  · exact ⟨⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).2, hir_bin⟩, fun h => (h_gated h).2.2.1⟩
+  · exact ⟨hir_bin, fun h => (h_gated h).2.1⟩
+  · exact ⟨hir_bin, fun h => (h_gated h).2.2.1⟩
   · refine ⟨⟨fun hmw => ?_, hmw_b⟩, ⟨h_pmb, fun hmw => (h_gated (hmw_real hmw)).2.2.2.2.2.2 hmw⟩⟩
     have hr1 : input_is_real = 1 := hmw_real hmw
     have pb2 : input_cols_product[2].val < 2 ^ 8 := (h_gated hr1).1.2.1 2 (by norm_num)
@@ -892,7 +894,7 @@ theorem semantic_populate {b c : Word (ZMod p)} (hb : b.isU64) (hc : c.isU64)
         is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw⟩ : Inputs (ZMod p))
       (populate b c is_mulh is_mulhsu is_mulw) :=
   result_semantic
-    ⟨fun _ => ⟨hb, hc⟩, Or.inr rfl, fun _ => rfl, hmul, hmh, hmhu, hmhsu, hmw, hsum⟩
+    ⟨Or.inr rfl, fun _ => rfl, hmul, hmh, hmhu, hmhsu, hmw, hsum⟩
     (spec_populate hb hc is_mul is_mulh is_mulhu is_mulhsu is_mulw 1
       hmul hmh hmhu hmhsu hmw hsum) rfl
 

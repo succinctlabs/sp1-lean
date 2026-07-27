@@ -217,8 +217,8 @@ theorem JalChip.mainSelectorBinary :
   have gateMem : input.is_real * (input.is_real - 1) ∈
       ((JalChip.main input).operations offset).shallowConstraints := by
     change input.is_real * (input.is_real - 1) ∈
-      input.is_real * (input.is_real - 1) :: _
-    exact List.mem_cons_self
+      _ :: input.is_real * (input.is_real - 1) :: _
+    exact List.mem_cons_of_mem _ List.mem_cons_self
   have gate := allConstraints _ gateMem
   have binary : Expression.eval env input.is_real = 0 ∨
       Expression.eval env input.is_real = 1 := by
@@ -238,8 +238,8 @@ theorem JalrChip.mainSelectorBinary :
   have gateMem : input.is_real * (input.is_real - 1) ∈
       ((JalrChip.main input).operations offset).shallowConstraints := by
     change input.is_real * (input.is_real - 1) ∈
-      input.is_real * (input.is_real - 1) :: _
-    exact List.mem_cons_self
+      _ :: input.is_real * (input.is_real - 1) :: _
+    exact List.mem_cons_of_mem _ List.mem_cons_self
   have gate := allConstraints _ gateMem
   have binary : Expression.eval env input.is_real = 0 ∨
       Expression.eval env input.is_real = 1 := by
@@ -287,8 +287,8 @@ theorem UTypeChip.mainSelectorBinary :
   have gateMem : input.is_real * (input.is_real - 1) ∈
       ((UTypeChip.main input).operations offset).shallowConstraints := by
     change input.is_real * (input.is_real - 1) ∈
-      input.is_real * (input.is_real - 1) :: _
-    exact List.mem_cons_self
+      _ :: input.is_real * (input.is_real - 1) :: _
+    exact List.mem_cons_of_mem _ List.mem_cons_self
   have gate := allConstraints _ gateMem
   have binary : Expression.eval env input.is_real = 0 ∨
       Expression.eval env input.is_real = 1 := by
@@ -352,10 +352,22 @@ theorem StoreDoubleChip.mainSelectorBinary :
     MainSelectorBinary (p := p) StoreDoubleChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary StoreDoubleChip.main
 
-set_option maxHeartbeats 2000000 in
 theorem MulChip.mainSelectorBinary :
     MainSelectorBinary (p := p) MulChip.main (fun input => input.is_real) := by
-  simpleInputSelectorBinary MulChip.main
+  constructor
+  intro input offset env shallow
+  have gateMem : input.is_real * (input.is_real - 1) ∈
+      ((MulChip.main input).operations offset).shallowConstraints := by
+    simp only [MulChip.main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+      witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+      Operations.localLength, Operations.shallowConstraints, List.mem_cons, List.not_mem_nil,
+      or_false, circuit_norm]
+  have gateZero :=
+    (constraintsHold_shallow_iff_forall_mem.mp shallow).1 _ gateMem
+  change (Eval.eval env input).is_real = 0 ∨ (Eval.eval env input).is_real = 1
+  rw [MulChip.eval_inputs]
+  apply bool_of_mul_pred
+  simpa only [circuit_norm] using gateZero
 
 omit [Fact (2 ^ 24 < p)] in
 /-- Any shallow (top-level) assert of an operations list is among its deep constraints. -/

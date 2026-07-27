@@ -95,18 +95,22 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p))
     + (is_mulh + is_mulhu + is_mulhsu) * (cols.product[14] + cols.product[15] * c256)
     + is_mulw * (cols.product_msb.msb * c65535)
   let a ← witnessVectorNative 4 (fun env => #v[env s0, env s1, env s2, env s3])
-  a[0] === s0
-  a[1] === s1
-  a[2] === s2
-  a[3] === s3
-  is_mul * (is_mul - 1) === 0
-  is_mulh * (is_mulh - 1) === 0
-  is_mulhu * (is_mulhu - 1) === 0
-  is_mulhsu * (is_mulhsu - 1) === 0
-  is_mulw * (is_mulw - 1) === 0
-  (is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw)
-    * ((is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw) - 1) === 0
-  input.adapter.op_a_0 === 0
+  -- Rust gates each result-placement equation by an opcode selector.  Since `is_real` is the
+  -- one-hot selector sum, gating the four combined equations by `is_real` is extensionally
+  -- equivalent on active rows and, critically, leaves `a` unconstrained on padding rows just as
+  -- the pinned AIR does.
+  assertZero (input.is_real * (a[0] - s0))
+  assertZero (input.is_real * (a[1] - s1))
+  assertZero (input.is_real * (a[2] - s2))
+  assertZero (input.is_real * (a[3] - s3))
+  assertZero (is_mul * (is_mul - 1))
+  assertZero (is_mulh * (is_mulh - 1))
+  assertZero (is_mulhu * (is_mulhu - 1))
+  assertZero (is_mulhsu * (is_mulhsu - 1))
+  assertZero (is_mulw * (is_mulw - 1))
+  assertZero ((is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw)
+    * ((is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw) - 1))
+  assertZero input.adapter.op_a_0
   -- `RTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
   -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
   let _ ← Readers.RTypeReader.circuit
@@ -156,5 +160,60 @@ set_option linter.unusedSectionVars false in
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 54 := rfl
+
+/-- Explicit MUL row layout: five selector witnesses, the 45-cell multiplication block, then the
+four-limb result word.  This is a symbolic normalization boundary for grounding and faithfulness. -/
+@[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter,
+        Vector.mapRange 4 fun i => var { index := offset + 50 + i },
+        varFromOffset Extracted.MulOperation (offset + 5),
+        var { index := offset }, var { index := offset + 1 },
+        var { index := offset + 2 }, var { index := offset + 3 },
+        var { index := offset + 4 }⟩ : Var MulCols (ZMod p)) := rfl
+
+/-- The exact R-type reader input retained after MUL's 54 local cells.  Naming this value keeps
+downstream timestamp and structural proofs independent of the multiplication witness internals. -/
+def rTypeReaderInput (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    Var Readers.RTypeReader.Inputs (ZMod p) :=
+  let flags : Vector (Expression (ZMod p)) 5 :=
+    Vector.mapRange 5 fun i => var { index := offset + i }
+  let value : Word (Expression (ZMod p)) :=
+    Vector.mapRange 4 fun i => var { index := offset + 50 + i }
+  let opcode : Expression (ZMod p) :=
+    flags[0] * Expression.const (11 : ZMod p) +
+      flags[1] * Expression.const (12 : ZMod p) +
+      flags[2] * Expression.const (13 : ZMod p) +
+      flags[3] * Expression.const (14 : ZMod p) +
+      flags[4] * Expression.const (24 : ZMod p)
+  ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+    input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
+    opcode, value[0], value[1], value[2], value[3]⟩
+
+/-- Component-wise evaluation of MUL's independent input row. -/
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
+         adapter := Eval.eval env input.adapter } : Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Component-wise evaluation of a completed Mul row. -/
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : MulCols (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state
+         adapter := Eval.eval env cols.adapter
+         a := Eval.eval env cols.a
+         mul_operation := Eval.eval env cols.mul_operation
+         is_mul := Eval.eval env cols.is_mul
+         is_mulh := Eval.eval env cols.is_mulh
+         is_mulhu := Eval.eval env cols.is_mulhu
+         is_mulhsu := Eval.eval env cols.is_mulhsu
+         is_mulw := Eval.eval env cols.is_mulw } :
+        MulCols F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
 
 end SP1Clean.MulChip

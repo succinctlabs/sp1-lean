@@ -1,5 +1,6 @@
 import SP1Clean.Native.Chips.BitwiseChip.Defs
 import SP1Clean.Math.EvalVec
+import Clean.Air.Circuit
 
 /-! # `SP1Clean.BitwiseChip` — contract: `Assumptions` / soundness / completeness / `circuit`
 
@@ -166,8 +167,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   circuit_proof_start [Spec]
   haveI hF1 : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨ha, hb⟩ := h_assumptions
-  obtain ⟨h_cpu, h_bw, _h_adapter, _h_regwrite, h_gate, h_xor_bin, h_or_bin, h_and_bin, h_sum,
-    _h_opa0⟩ := h_holds
+  obtain ⟨h_cpu, h_bw, _h_adapter, _h_regwrite, h_gate, _h_selector_bind,
+    h_xor_bin, h_or_bin, h_and_bin, h_sum, _h_opa0⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
   -- channel's new `MemoryMsg.ClkBound` guarantee — `ALUTypeReader`'s two read-back pushes
@@ -278,6 +279,7 @@ theorem completeness :
       fun hc => ⟨hb, (hprevclk (by rwa [himm, sub_zero] at hc)).2.2⟩⟩⟩,
     ⟨⟨hbin, ?_, h_clk.at_four⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
+    by rw [hsumc]; exact sub_self _,
     hbool _ hf0',
     hbool _ hf1',
     hbool _ hf2',
@@ -341,6 +343,117 @@ theorem completeness :
                show env.get (i₀ + 3 + 4 + 4 + 6) = R[6] from key 6,
                show env.get (i₀ + 3 + 4 + 4 + 7) = R[7] from key 7]
 
+/-- Exact State-channel pair emitted by the composed CPU-state reader. -/
+def exposedStateInteractions (input : Var Inputs (ZMod p)) :
+    List (ChannelInteraction (stateChannel (p := p))) :=
+  [ stateChannel.pulledIf input.is_real
+      ⟨input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+       input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+    stateChannel.pushedIf input.is_real
+      ⟨input.state.clk_high,
+       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+       input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ]
+
+/-- The raw field-valued byte opcode selected by the three chip-owned variant flags:
+`AND = 0`, `OR = 1`, and `XOR = 2`.  The byte table, rather than this expression's type,
+establishes that a real row carries a valid opcode. -/
+def exposedByteOpcode (offset : ℕ) : Expression (ZMod p) :=
+  var ⟨offset⟩ * 2 + var ⟨offset + 1⟩ * 1 + var ⟨offset + 2⟩ * 0
+
+/-- The eight source-B bytes supplied to the bytewise operation: four witnessed low bytes
+interleaved with the four derived high bytes. -/
+def exposedBBytes (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    Vector (Expression (ZMod p)) 8 :=
+  #v[
+    var ⟨offset + 3⟩,
+    (input.op_b_val[0] - var ⟨offset + 3⟩) *
+      Expression.const ((256 : ZMod p)⁻¹),
+    var ⟨offset + 4⟩,
+    (input.op_b_val[1] - var ⟨offset + 4⟩) *
+      Expression.const ((256 : ZMod p)⁻¹),
+    var ⟨offset + 5⟩,
+    (input.op_b_val[2] - var ⟨offset + 5⟩) *
+      Expression.const ((256 : ZMod p)⁻¹),
+    var ⟨offset + 6⟩,
+    (input.op_b_val[3] - var ⟨offset + 6⟩) *
+      Expression.const ((256 : ZMod p)⁻¹)]
+
+/-- The eight source-C bytes supplied to the bytewise operation: four witnessed low bytes
+interleaved with the four derived high bytes. -/
+def exposedCBytes (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    Vector (Expression (ZMod p)) 8 :=
+  #v[
+    var ⟨offset + 7⟩,
+    (input.op_c_val[0] - var ⟨offset + 7⟩) *
+      Expression.const ((256 : ZMod p)⁻¹),
+    var ⟨offset + 8⟩,
+    (input.op_c_val[1] - var ⟨offset + 8⟩) *
+      Expression.const ((256 : ZMod p)⁻¹),
+    var ⟨offset + 9⟩,
+    (input.op_c_val[2] - var ⟨offset + 9⟩) *
+      Expression.const ((256 : ZMod p)⁻¹),
+    var ⟨offset + 10⟩,
+    (input.op_c_val[3] - var ⟨offset + 10⟩) *
+      Expression.const ((256 : ZMod p)⁻¹)]
+
+/-- The eight witnessed bytewise result cells. -/
+def exposedResultBytes (offset : ℕ) : Vector (Expression (ZMod p)) 8 :=
+  #v[var ⟨offset + 11⟩, var ⟨offset + 12⟩,
+    var ⟨offset + 13⟩, var ⟨offset + 14⟩,
+    var ⟨offset + 15⟩, var ⟨offset + 16⟩,
+    var ⟨offset + 17⟩, var ⟨offset + 18⟩]
+
+/-- Exact Byte-channel list emitted by Bitwise: two CPU clock checks, eight raw-opcode
+bitwise rows, and the ALU reader's six register-timestamp checks. -/
+def exposedByteInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (byteChannel (p := p))) :=
+  let clkLow := input.state.clk_0_16 + input.state.clk_16_24 * 65536
+  let opCGate := input.is_real - input.adapter.imm_c
+  let opcode := exposedByteOpcode offset
+  let b := exposedBBytes input offset
+  let c := exposedCBytes input offset
+  let r := exposedResultBytes (p := p) offset
+  [ byteChannel.pulledIf input.is_real
+      ⟨6, (input.state.clk_0_16 - 1) * (8 : ZMod p)⁻¹,
+       Expression.const ((13 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real ⟨3, 0, input.state.clk_16_24, 0⟩,
+    byteChannel.pulledIf input.is_real ⟨opcode, r[0], b[0], c[0]⟩,
+    byteChannel.pulledIf input.is_real ⟨opcode, r[1], b[1], c[1]⟩,
+    byteChannel.pulledIf input.is_real ⟨opcode, r[2], b[2], c[2]⟩,
+    byteChannel.pulledIf input.is_real ⟨opcode, r[3], b[3], c[3]⟩,
+    byteChannel.pulledIf input.is_real ⟨opcode, r[4], b[4], c[4]⟩,
+    byteChannel.pulledIf input.is_real ⟨opcode, r[5], b[5], c[5]⟩,
+    byteChannel.pulledIf input.is_real ⟨opcode, r[6], b[6], c[6]⟩,
+    byteChannel.pulledIf input.is_real ⟨opcode, r[7], b[7], c[7]⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨6, input.adapter.op_a_memory.access_timestamp.diff_low_limb,
+       Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨3, 0,
+       (clkLow + 4 - input.adapter.op_a_memory.access_timestamp.prev_low - 1 -
+          input.adapter.op_a_memory.access_timestamp.diff_low_limb) *
+            (65536 : ZMod p)⁻¹,
+       0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨6, input.adapter.op_b_memory.access_timestamp.diff_low_limb,
+       Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf input.is_real
+      ⟨3, 0,
+       (clkLow + 3 - input.adapter.op_b_memory.access_timestamp.prev_low - 1 -
+          input.adapter.op_b_memory.access_timestamp.diff_low_limb) *
+            (65536 : ZMod p)⁻¹,
+       0⟩,
+    byteChannel.pulledIf opCGate
+      ⟨6, input.adapter.op_c_memory.access_timestamp.diff_low_limb,
+       Expression.const ((16 : ℕ) : ZMod p), 0⟩,
+    byteChannel.pulledIf opCGate
+      ⟨3, 0,
+       (clkLow + 2 - input.adapter.op_c_memory.access_timestamp.prev_low - 1 -
+          input.adapter.op_c_memory.access_timestamp.diff_low_limb) *
+            (65536 : ZMod p)⁻¹,
+       0⟩ ]
+
 /-- Bitwise's exact Memory-channel interaction list (ALU-type: the op_c register pull/read-back pair
 is gated by **`is_real - imm_c`** — an immediate does no register read — and addressed by the low limb
 `op_c[0]`).  The op_a write push carries the byte-packed result word `[r0+r1·256, …, r6+r7·256]` from
@@ -397,6 +510,15 @@ statement-level expression instead of raw witness indices. -/
 def exposedOpcode (offset : ℕ) : Expression (ZMod p) :=
   var ⟨offset⟩ * 3 + var ⟨offset + 1⟩ * 4 + var ⟨offset + 2⟩ * 5
 
+/-- Exact Program fetch emitted by the ALU adapter, with the instruction opcode reconstructed from
+the three chip-owned variant flags. -/
+def exposedProgramInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (programChannel (p := p))) :=
+  [ programChannel.pulledIf input.is_real
+      ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], exposedOpcode offset,
+       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
+       input.adapter.op_a_0, 0, input.adapter.imm_c⟩ ]
+
 /-- The Bitwise chip row as a `GeneralFormalCircuit`: flag-gated RV64 `and`/`or`/`xor` semantic contract,
 composing the witnessed `BitwiseU16Operation` gadget and the immediate-capable register reader; output is
 the extracted `BitwiseCols` column struct. -/
@@ -410,22 +532,12 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
     -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input offset =>
-      expose stateChannel
-        [ stateChannel.pulledIf input.is_real
-            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
-             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
-          stateChannel.pushedIf input.is_real
-            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
-             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
+      expose stateChannel (exposedStateInteractions input) ++
       expose memoryChannel (exposedMemoryInteractions input offset) ++
       -- The Program-bus instruction fetch (descended from the composed `ALUTypeReader`, gate
       -- `is_trusted = is_real`, opcode = the committed one-hot flag encoding), consumed by
       -- `Soundness/TypedProgram.lean`.
-      expose programChannel
-        [ programChannel.pulledIf input.is_real
-            ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], exposedOpcode offset,
-             input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
-             input.adapter.op_a_0, 0, input.adapter.imm_c⟩ ],
+      expose programChannel (exposedProgramInteractions input offset),
     exposedChannels_eq := by
       intro input offset
       have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
@@ -433,7 +545,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
       have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
       unfold Operations.ExposedChannelsLawful
       intro exposed exposedMem
-      simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
+      simp only [expose, exposedStateInteractions, exposedProgramInteractions,
+        List.mem_append, List.mem_singleton] at exposedMem
       rcases exposedMem with (rfl | rfl) | rfl
       · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
           Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
@@ -480,12 +593,55 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs BitwiseCols :=
           FormalAssertion.toSubcircuit_interactions, Gadgets.Equality.main, circuit_norm,
           List.filter_nil, List.nil_append] }
 
+@[circuit_norm] theorem circuit_main_eq : (circuit (p := p)).main = main := rfl
+
+@[circuit_norm] theorem circuit_localLength_eq (input : Var Inputs (ZMod p)) :
+    (circuit (p := p)).localLength input = 19 := rfl
+
+@[circuit_norm] theorem circuit_size_eq :
+    (circuit (p := p)).size = size Inputs + 19 := by
+  rw [GeneralFormalCircuit.size_eq, circuit_localLength_eq]
+
+/-- The completed Bitwise circuit exposes exactly its State interaction pair. -/
+theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith stateChannel.toRaw =
+      (exposedStateInteractions input).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨stateChannel.toRaw, (exposedStateInteractions input).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
+
+set_option maxHeartbeats 4000000 in
+/-- The completed Bitwise circuit emits exactly the sixteen Byte interactions above. -/
+theorem interactionsWith_byte_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith byteChannel.toRaw =
+      (exposedByteInteractions input offset).map ChannelInteraction.toRaw := by
+  simp [main, exposedByteInteractions, exposedByteOpcode, exposedBBytes,
+    exposedCBytes, exposedResultBytes,
+    Readers.CPUState.circuit, Readers.CPUState.main,
+    Readers.ALUTypeReader.circuit, Readers.ALUTypeReader.main,
+    Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    SP1Clean.BitwiseU16Operation.circuit, SP1Clean.BitwiseU16Operation.main,
+    SP1Clean.BitwiseOperation.circuit, SP1Clean.BitwiseOperation.main,
+    Gadgets.Equality.main, FormalAssertion.toSubcircuit_interactions,
+    GeneralFormalCircuit.toSubcircuit_interactions, circuit_norm, Nat.add_assoc]
+
 /-- The completed Bitwise circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith memoryChannel.toRaw =
       (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
   exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
+
+/-- The completed Bitwise circuit exposes exactly its Program fetch. -/
+theorem interactionsWith_program_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith programChannel.toRaw =
+      (exposedProgramInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨programChannel.toRaw,
+      (exposedProgramInteractions input offset).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
 
 end SP1Clean.BitwiseChip

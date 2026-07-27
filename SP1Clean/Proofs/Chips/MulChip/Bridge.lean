@@ -253,11 +253,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.MulCols (ZMod p)) (dat
     (hvalb : ValueOperandsBound (rowView inp cols) s)
     (hdecrom : decodedInROM prog (programAccess (rowView inp cols)).toRow)
     (hready : inp.adapter = cols.adapter ∧ (rowView inp cols).adapter.op_a ≠ 0 ∧
-      ((cols.is_mul = 1 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
-       (cols.is_mulh = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
-       (cols.is_mulhu = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
-       (cols.is_mulhsu = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulw = 0) ∨
-       (cols.is_mulw = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0))) :
+      SelectorOneHot (selectors cols)) :
     ∃ s', SailStep s s' ∧ RowEffect prog (rowView inp cols) s s' := by
   obtain ⟨hlink, hnonX0, hflag⟩ := hready
   have hreal' : inp.is_real = 1 := hreal
@@ -268,6 +264,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.MulCols (ZMod p)) (dat
   obtain ⟨-, -, -, -, -, hbounds, -⟩ := hspec.1
   obtain ⟨-, hpc0, -, -⟩ := hbounds hreal'
   have hbr := hspec.2.2 hreal'
+  simp only [SelectorOneHot, selectors] at hflag
   rcases hflag with ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩ |
     ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩
   · -- is_mul
@@ -352,11 +349,7 @@ def kind : Soundness.ChipKind p where
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => inp.adapter = cols.adapter ∧
     (rowView inp cols).adapter.op_a ≠ 0 ∧
-    ((cols.is_mul = 1 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
-     (cols.is_mulh = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
-     (cols.is_mulhu = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhsu = 0 ∧ cols.is_mulw = 0) ∨
-     (cols.is_mulhsu = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulw = 0) ∨
-     (cols.is_mulw = 1 ∧ cols.is_mul = 0 ∧ cols.is_mulh = 0 ∧ cols.is_mulhu = 0 ∧ cols.is_mulhsu = 0))
+    SelectorOneHot (selectors cols)
   advance := some (PLift.up advance)
 
 end SP1Clean.MulChip

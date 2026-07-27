@@ -33,7 +33,7 @@ theorem addrAdd_constraints_faithful (a b : Word (ZMod p))
       SP1Clean.AddrAddOperation.RawSpec a b cols := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.AddrAddOperation.asserts, Extracted.AddrAddOperation.interactions, List.Forall,
-    Interaction.toProp_send_byte, ByteOpcode.ofNat_six,
+    Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_Range, val_16, one_ne_zero, ne_eq, not_false_eq_true, true_implies,
     SP1Clean.AddrAddOperation.RawSpec, one_mul, add_zero, sub_zero, sub_self, mul_zero,
     true_and, bool_iff, show (2 : ℕ) ^ 16 = 65536 from by norm_num]
@@ -74,7 +74,6 @@ theorem addrAdd_interactions_faithful_syntactic
       List.not_mem_nil List.not_mem_nil
   simp only [SP1Clean.AddrAddOperation.main, circuit_norm, hk, heq,
     Extracted.AddrAddOperation.interactions, List.map_cons, List.map_nil,
-    Extracted.Interaction.toAccess_byte, ByteOpcode.ofNat_six, ByteOpcode.idx,
-    h_ir, h_v0, h_v1, h_v2, h6]
+    Extracted.Interaction.toAccess_byte, h_ir, h_v0, h_v1, h_v2, h6]
 
 end SP1Clean.Faithful

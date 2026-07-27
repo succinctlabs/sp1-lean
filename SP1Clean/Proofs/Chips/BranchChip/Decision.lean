@@ -1,4 +1,4 @@
-import SP1Clean.Math.Word
+import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Math.Gate
 
 /-! # `SP1Clean.BranchChip` — the six-way decision dispatch (shared field lemmas)
@@ -62,6 +62,27 @@ lemma one_hot6 {b0 b1 b2 b3 b4 b5 : ZMod p}
     · left; rw [h, ZMod.val_zero]
     · right; rw [h, ZMod.val_one]
   omega
+
+/-- Six binary flags whose field sum is one form the exact disjunction used by the Branch
+semantic contract.  Keeping the finite case split here prevents the whole-chip soundness proof
+from elaborating it under the full circuit context. -/
+lemma flagsOneHot_of_sum_one {b0 b1 b2 b3 b4 b5 : ZMod p}
+    (h0 : b0 = 0 ∨ b0 = 1) (h1 : b1 = 0 ∨ b1 = 1) (h2 : b2 = 0 ∨ b2 = 1)
+    (h3 : b3 = 0 ∨ b3 = 1) (h4 : b4 = 0 ∨ b4 = 1) (h5 : b5 = 0 ∨ b5 = 1)
+    (hsum : b0 + b1 + b2 + b3 + b4 + b5 = 1) :
+    (b0 = 1 ∧ b1 = 0 ∧ b2 = 0 ∧ b3 = 0 ∧ b4 = 0 ∧ b5 = 0) ∨
+      (b1 = 1 ∧ b0 = 0 ∧ b2 = 0 ∧ b3 = 0 ∧ b4 = 0 ∧ b5 = 0) ∨
+      (b2 = 1 ∧ b0 = 0 ∧ b1 = 0 ∧ b3 = 0 ∧ b4 = 0 ∧ b5 = 0) ∨
+      (b3 = 1 ∧ b0 = 0 ∧ b1 = 0 ∧ b2 = 0 ∧ b4 = 0 ∧ b5 = 0) ∨
+      (b4 = 1 ∧ b0 = 0 ∧ b1 = 0 ∧ b2 = 0 ∧ b3 = 0 ∧ b5 = 0) ∨
+      (b5 = 1 ∧ b0 = 0 ∧ b1 = 0 ∧ b2 = 0 ∧ b3 = 0 ∧ b4 = 0) := by
+  have atMost := one_hot6 h0 h1 h2 h3 h4 h5 (by rw [hsum]; simp)
+  rcases h0 with rfl | rfl <;> rcases h1 with rfl | rfl <;>
+    rcases h2 with rfl | rfl <;> rcases h3 with rfl | rfl <;>
+    rcases h4 with rfl | rfl <;> rcases h5 with rfl | rfl
+  all_goals
+    simp only [ZMod.val_zero, ZMod.val_one] at atMost
+    first | omega | simp at hsum ⊢
 
 omit [Fact (2 ^ 17 < p)] in
 /-- A binary `x` with `x = 1 ↔ ¬ P` (where `bit = if P then 1 else 0`) is `1 - bit`. -/

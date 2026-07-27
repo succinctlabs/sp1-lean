@@ -113,9 +113,11 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod
     ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
      input.adapter.op_a, #v[r[0] + r[1] * 256, r[2] + r[3] * 256, r[4] + r[5] * 256, r[6] + r[7] * 256],
      input.is_real⟩
-  -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
-  -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
+  -- SP1 has no independent `is_real` column for this chip: the real-row selector is exactly the
+  -- sum of the three opcode flags (`alu/bitwise/mod.rs`). `Inputs.is_real` is the native circuit's
+  -- explicit bus gate, so identify it with that Rust selector in the verifier constraints.
   assertZero (input.is_real * (input.is_real - 1))
+  assertZero (input.is_real - (is_xor + is_or + is_and))
   is_xor * (is_xor - 1) === 0
   is_or * (is_or - 1) === 0
   is_and * (is_and - 1) === 0
@@ -143,5 +145,42 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs BitwiseCols main where
   -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+
+/-- The completed Bitwise row, exposed as a folded value for chip-boundary proofs. -/
+@[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter,
+        varFromOffset Extracted.BitwiseU16Operation (offset + 3),
+        var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 }⟩ :
+        Var BitwiseCols (ZMod p)) := rfl
+
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
+         adapter := Eval.eval env input.adapter } : Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : BitwiseCols (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
+         bitwise_operation := Eval.eval env cols.bitwise_operation,
+         is_xor := Eval.eval env cols.is_xor, is_or := Eval.eval env cols.is_or,
+         is_and := Eval.eval env cols.is_and } : BitwiseCols F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_inputAdapter {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (Eval.eval env input).adapter = Eval.eval env input.adapter := by
+  rw [eval_inputs]
+
+@[circuit_norm] theorem eval_inputIsReal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (Eval.eval env input).is_real = Expression.eval env input.is_real := by
+  simpa only [CircuitType.eval_expr] using
+    congrArg (fun value : Inputs F => value.is_real) (eval_inputs env input)
 
 end SP1Clean.BitwiseChip

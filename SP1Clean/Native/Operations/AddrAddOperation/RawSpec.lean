@@ -78,6 +78,59 @@ theorem addrAddSemantics_of_carries {a b : Word (ZMod p)}
   omega
 
 set_option maxHeartbeats 16000000 in
+/-- The high carry's boolean constraint forces the 64-bit-truncated sum to contain no bits above
+the three-limb address. This is an AIR conclusion, not a soundness precondition: the fourth carry
+runs against zero, so any satisfying row necessarily represents a 48-bit address. -/
+theorem addrAddFits_of_carries {a b : Word (ZMod p)}
+    {cols : Extracted.AddrAddOperation (ZMod p)}
+    (ha : Word.isU64 a) (hb : Word.isU64 b)
+    (h_raw : RawSpec a b cols) :
+    (Word.toNat a + Word.toNat b) % 2 ^ 64 < 2 ^ 48 := by
+  obtain ⟨hc0, hc1, hc2, hc3, hv0, hv1, hv2⟩ := h_raw
+  obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
+  obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
+    mul_inv_cancel₀ val_65536_ne_zero
+  set c0 : ZMod p := (a[0] + b[0] - cols.value[0]) * (65536 : ZMod p)⁻¹ with hc0_def
+  set c1 : ZMod p :=
+    (a[1] + b[1] - cols.value[1] + c0) * (65536 : ZMod p)⁻¹ with hc1_def
+  set c2 : ZMod p :=
+    (a[2] + b[2] - cols.value[2] + c1) * (65536 : ZMod p)⁻¹ with hc2_def
+  set c3 : ZMod p := (a[3] + b[3] + c2) * (65536 : ZMod p)⁻¹ with hc3_def
+  have e0 : a[0] + b[0] + (0 : ZMod p) = cols.value[0] + c0 * 65536 := by
+    rw [hc0_def]
+    linear_combination -1 * (a[0] + b[0] - cols.value[0]) * h65inv
+  have e1 : a[1] + b[1] + c0 = cols.value[1] + c1 * 65536 := by
+    rw [hc1_def]
+    linear_combination -1 * (a[1] + b[1] - cols.value[1] + c0) * h65inv
+  have e2 : a[2] + b[2] + c1 = cols.value[2] + c2 * 65536 := by
+    rw [hc2_def]
+    linear_combination -1 * (a[2] + b[2] - cols.value[2] + c1) * h65inv
+  have e3 : a[3] + b[3] + c2 = (0 : ZMod p) + c3 * 65536 := by
+    rw [hc3_def]
+    linear_combination -1 * (a[3] + b[3] + c2) * h65inv
+  have hcZero : (0 : ZMod p) = 0 ∨ (0 : ZMod p) = 1 := Or.inl rfl
+  have zeroLt : ((0 : ZMod p)).val < 2 ^ 16 := by
+    rw [ZMod.val_zero]
+    norm_num
+  have n0 := limb_lift _ _ _ _ _ ha0 hbb0 hv0 hcZero hc0 e0
+  have n1 := limb_lift _ _ _ _ _ ha1 hbb1 hv1 hc0 hc1 e1
+  have n2 := limb_lift _ _ _ _ _ ha2 hbb2 hv2 hc1 hc2 e2
+  have n3 := limb_lift _ _ _ _ _ ha3 hbb3 zeroLt hc2 hc3 e3
+  simp only [ZMod.val_zero, add_zero] at n0 n3
+  have sumEq : Word.toNat a + Word.toNat b =
+      cols.value[0].val + cols.value[1].val * 2 ^ 16 +
+        cols.value[2].val * 2 ^ 32 + c3.val * 2 ^ 64 := by
+    simp only [Word.toNat_def]
+    omega
+  have lowLt : cols.value[0].val + cols.value[1].val * 2 ^ 16 +
+      cols.value[2].val * 2 ^ 32 < 2 ^ 48 := by
+    omega
+  rw [sumEq, Nat.add_mul_mod_self_right, Nat.mod_eq_of_lt (by omega)]
+  exact lowLt
+
+set_option maxHeartbeats 16000000 in
 /-- Backward (completeness) core: a 3-limb result equal to `(a + b) mod 2^48` (with each limb in
 range), together with the address-fits side condition, witnesses the unique boolean carry chain.
 The low carries `c0, c1, c2` are pinned by the value equation; the high carry `c3 = (a[3]+b[3]+c2)·

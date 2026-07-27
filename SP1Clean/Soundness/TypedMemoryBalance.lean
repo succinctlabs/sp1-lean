@@ -1,4 +1,4 @@
-import SP1Clean.Soundness.TypedMemory
+import SP1Clean.Soundness.TypedMemorySelectors
 import SP1Clean.Soundness.ProviderBindings
 
 /-! # The per-`MemLoc` Memory-channel balance
@@ -505,5 +505,64 @@ theorem finPure (witness : EnsembleWitness (sp1Ensemble (p := p)))
     exact key i hi
   unfold producedMessages
   rw [hfilter, List.map_nil]
+
+/-! ## Witness-level structural Memory obligations -/
+
+/-- Physical constraints alone give the signed-binary multiplicity bound for every Memory
+interaction in the supported ensemble.  Instruction rows use the registry-wide selector-gating
+theorem; the only provider participants use their own boolean multiplicity columns. -/
+theorem witness_memoryMultiplicityBinary
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) :
+    ∀ interaction ∈ typedEnsembleInteractionsWith witness memoryChannel,
+      signedVal interaction.mult = -1 ∨ signedVal interaction.mult = 0 ∨
+        signedVal interaction.mult = 1 := by
+  rw [typedEnsembleMemoryInteractions_eq]
+  intro interaction interactionMem
+  rcases List.mem_append.mp interactionMem with instructionMem | providerMem
+  · rw [decodedWitnessMemoryInteractions_eq_flatMap] at instructionMem
+    obtain ⟨decoded, decodedMem, rowInteractionMem⟩ := List.mem_flatMap.mp instructionMem
+    exact decoded.memoryInteractions_signedBinary witness.data witness.tables decodedMem
+      (decodedInstructionRow_constraints witness constraints decoded decodedMem)
+      interaction rowInteractionMem
+  · rcases List.mem_append.mp providerMem with initMem | finalizeMem
+    · rw [typedTableInteractionsWith] at initMem
+      obtain ⟨row, rowMem, rowInteractionMem⟩ := List.mem_flatMap.mp initMem
+      rw [memoryInitProviderTable_component witness] at rowInteractionMem
+      have tableConstraints : (memoryInitProviderTable witness).Constraints :=
+        constraints (memoryInitProviderTable witness) (witness.mem_allTables_of_mem_tables
+          (List.getElem_mem (memoryInitProviderIndex_lt_tablesLength witness)))
+      have rowConstraints := tableConstraints row rowMem
+      rw [memoryInitProviderTable_component witness] at rowConstraints
+      rcases memoryInitProvider_signedVal _ rowConstraints interaction rowInteractionMem with
+        zero | positive
+      · exact Or.inr (Or.inl zero)
+      · exact Or.inr (Or.inr positive)
+    · rw [typedTableInteractionsWith] at finalizeMem
+      obtain ⟨row, rowMem, rowInteractionMem⟩ := List.mem_flatMap.mp finalizeMem
+      rw [memoryFinalizeProviderTable_component witness] at rowInteractionMem
+      have tableConstraints : (memoryFinalizeProviderTable witness).Constraints :=
+        constraints (memoryFinalizeProviderTable witness) (witness.mem_allTables_of_mem_tables
+          (List.getElem_mem (memoryFinalizeProviderIndex_lt_tablesLength witness)))
+      have rowConstraints := tableConstraints row rowMem
+      rw [memoryFinalizeProviderTable_component witness] at rowConstraints
+      rcases memoryFinalizeProvider_signedVal _ rowConstraints interaction rowInteractionMem with
+        zero | negative
+      · exact Or.inr (Or.inl zero)
+      · exact Or.inl negative
+
+/-- A constrained padding instruction row has no active Memory message.  This is a direct
+consequence of selector booleanity and the fact that every retained Memory interaction is gated by
+that selector; it is not an execution or trace-generation assumption. -/
+theorem witness_paddingMemoryEmpty
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) :
+    ∀ decoded ∈ decodedInstructionRows (p := p) witness.tables,
+      (decoded.toChipRow witness.data).is_real ≠ 1 →
+        decoded.producedMemoryMessages witness.data = [] ∧
+          decoded.consumedMemoryMessages witness.data = [] := by
+  intro decoded decodedMem padding
+  exact decoded.paddingMemoryMessages_eq_nil witness.data witness.tables decodedMem
+    (decodedInstructionRow_constraints witness constraints decoded decodedMem) padding
 
 end SP1Clean.Soundness

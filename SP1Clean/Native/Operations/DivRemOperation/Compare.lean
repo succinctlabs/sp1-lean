@@ -3,7 +3,7 @@ import SP1Clean.Proofs.Operations.IsZeroWordOperation.Formal
 import SP1Clean.Proofs.Operations.AddOperation.Formal
 import SP1Clean.Proofs.Operations.U16MSBOperation.Formal
 import SP1Clean.Proofs.Operations.LtOperationUnsigned.Formal
-import SP1Clean.Extracted.DivRemChip
+import SP1Clean.FormalModel.Contracts.DivRem
 import SP1Clean.Model.Channels
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
@@ -13,8 +13,8 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 /-! # `DivRemCompare` — the DivRem chip's comparison/sign assertion cluster
 
 A structural extract of the `DivRemChip` `main`'s fifteen comparison/sign `assertion` compositions,
-as a standalone Clean `FormalAssertion` over the **whole committed row** (`Extracted.DivRemCols`).
-The cluster witnesses nothing — every column it constrains is a field of the input `cols` — so its
+as a standalone Clean `FormalAssertion` over an explicit projection of the committed row.
+The cluster witnesses nothing — every column it constrains is a field of the input view — so its
 `localLength` is `0` and its semantic content is exactly the composed sub-operations' `Spec`s:
 
 * `IsEqualWordOperation` ×4 — signed-overflow detection: `op_b` read vs `i64::MIN` and `op_c` read
@@ -38,7 +38,6 @@ The assertion arguments are verbatim from `Proofs/Chips/DivRemChip/Defs.lean` `m
 namespace SP1Clean.DivRemCompare
 
 open Circuit
-open Extracted (DivRemCols)
 open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -46,9 +45,9 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- Emit the fifteen comparison/sign assertions of the DivRem row, each a true Clean `assertion`
 composition applied to the committed `cols` fields. No witnesses, no direct interactions — all
 channel activity (the sub-operations' byte-range pulls) lives inside the composed subcircuits. -/
-def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let bpv := cols.adapter.op_b_memory.prev_value
-  let cpv := cols.adapter.op_c_memory.prev_value
+def main (cols : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  let bpv := cols.op_b_prev_value
+  let cpv := cols.op_c_prev_value
   let irnw := cols.is_real_not_word
   let e2 := cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw
   -- (1-4) signed-overflow detection: `b` vs `i64::MIN`, `c` vs `-1` — full-word @ `irnw`,
@@ -86,7 +85,7 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
 set_option maxHeartbeats 4000000 in
 /-- Clean derives the structural metadata; the cluster contributes no fresh witnesses
 (`localLength = 0`) and exposes only the sub-operations' byte-channel guarantees. -/
-instance elaborated : ElaboratedCircuit (ZMod p) DivRemCols unit main := by
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main := by
   elaborate_circuit_with {
     channelsWithGuarantees := [byteChannel.toRaw]
   }
@@ -97,7 +96,7 @@ set_option linter.unusedSectionVars false in
       = [byteChannel.toRaw] := rfl
 
 set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma localLength_eq (x : Var DivRemCols (ZMod p)) :
+@[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
 
 end SP1Clean.DivRemCompare

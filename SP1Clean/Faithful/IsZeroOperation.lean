@@ -8,6 +8,7 @@ import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.IsZeroOperation
 import SP1Clean.Faithful.ChipTactics
+import SP1Clean.Faithful.ChipOracle
 
 /-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (IsZero)
 
@@ -55,6 +56,67 @@ theorem isZero_constraints_faithful (a : ZMod p) (cols : Extracted.IsZeroOperati
   rw [isZero_asserts_faithful, isZero_interactions_faithful]
   simp only [SP1Clean.IsZeroOperation.InteractSpec, SP1Clean.IsZeroOperation.AssertSpec,
     SP1Clean.IsZeroOperation.RawSpec, and_true]
+
+omit [Fact (2 ^ 17 < p)] in
+@[circuit_norm] theorem eval_isZeroColumns
+    (env : Environment (ZMod p))
+    (cols : Extracted.IsZeroOperation (Expression (ZMod p))) :
+    Eval.eval env cols =
+      ({ inverse := Expression.eval env cols.inverse
+         result := Expression.eval env cols.result } :
+        Extracted.IsZeroOperation (ZMod p)) := by
+  provable_struct_simp
+
+private def isZeroAssertionExpressions
+    (input : Var SP1Clean.IsZeroOperation.Inputs (ZMod p)) :
+    List (Expression (ZMod p)) :=
+  let e0 := input.cols.inverse * input.a
+  let e1 := 1 - e0
+  let e2 := e1 - input.cols.result
+  let e3 := input.is_real * e2
+  let e4 := input.cols.result - 1
+  let e5 := input.cols.result * e4
+  let e6 := input.is_real * e5
+  let e7 := input.cols.result * input.a
+  let e8 := input.is_real * e7
+  [e3, e6, e8]
+
+omit [Fact (2 ^ 17 < p)] in
+set_option maxHeartbeats 1000000 in
+private theorem isZero_nativeAssertions
+    (env : Environment (ZMod p))
+    (input : Var SP1Clean.IsZeroOperation.Inputs (ZMod p))
+    (offset : ℕ) :
+    nativeAssertZeros env
+        ((SP1Clean.IsZeroOperation.main input).operations offset) =
+      (isZeroAssertionExpressions input).map
+        (Expression.eval env) := by
+  unfold nativeAssertZeros
+  simp only [SP1Clean.IsZeroOperation.main, circuit_norm,
+    List.map_append]
+  repeat' rw [CanonicalReader.equalityAssertionList]
+  simp [isZeroAssertionExpressions, Expression.eval]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Folded normalization of the native assertion fragment to the exact generated Rust list.
+This is an implementation lemma for whole-chip `ChipFaithful` proofs, not an additional
+operation-level verification boundary. -/
+theorem isZero_assertions_exact
+    (env : Environment (ZMod p))
+    (input : Var SP1Clean.IsZeroOperation.Inputs (ZMod p))
+    (offset : ℕ) :
+    nativeAssertZeros env
+        ((SP1Clean.IsZeroOperation.main input).operations offset) =
+      Extracted.IsZeroOperation.asserts
+        (Expression.eval env input.a)
+        (Eval.eval env input.cols)
+        (Expression.eval env input.is_real) := by
+  rw [eval_isZeroColumns, isZero_nativeAssertions,
+    Extracted.IsZeroOperation.asserts]
+  simp only [isZeroAssertionExpressions, List.map_cons,
+    List.map_nil, Expression.eval]
+  repeat' first | rw [eval_sub] | rw [eval_mul]
+  simp only [Expression.eval]
 
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery

@@ -30,14 +30,6 @@ open SP1Clean (ByteOpcode)
 
 namespace ByteOpcode
 
-/-- The opcode's table index as a `ℕ` — the inverse of the auto-generated `ofNat`
-(AND=0, OR=1, XOR=2, U8Range=3, LTU=4, MSB=5, Range=6), matching SP1's `ByteOpcode` numbering. Used as
-the opcode column of a byte-table row. -/
-def idx : ByteOpcode → ℕ
-  | AND => 0 | OR => 1 | XOR => 2 | U8Range => 3 | LTU => 4 | MSB => 5 | Range => 6
-
-@[simp] lemma ofNat_idx (op : ByteOpcode) : ofNat op.idx = op := by cases op <;> rfl
-
 end ByteOpcode
 
 /-- One byte-table row: the opcode column plus the three operand columns — SP1's
@@ -53,7 +45,7 @@ deriving ProvableStruct
 index matches the `opcode` column and whose `constrain` semantics hold on `(a, b, c)`. This *is* SP1's
 preprocessed `ByteChip` content, stated semantically. -/
 def ByteRowSpec {p : ℕ} [NeZero p] (row : ByteRow (ZMod p)) : Prop :=
-  ∃ op : ByteOpcode, ((op.idx : ℕ) : ZMod p) = row.opcode ∧ op.constrain row.a row.b row.c
+  ByteOpcode.constrainField row.opcode row.a row.b row.c
 
 /-- The static byte table as a Clean `Table` (SP1's preprocessed `ByteChip`). Membership is the
 defining `ByteRowSpec`; `Soundness`/`Completeness` are the class defaults (`= Contains`), so the two

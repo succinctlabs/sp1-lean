@@ -18,6 +18,34 @@ open Air.Flat Circuit
 variable {F : Type} [FiniteField F]
 variable {Message : TypeMap} [ProvableType Message]
 
+/-- Full nested constraint satisfaction distributes over operation concatenation. This is the
+`Operations.ConstraintsHold` counterpart of Clean's flat-list `constraintsHold_append`. -/
+theorem operationsConstraintsHold_append (env : Environment F)
+    (left right : Operations F) :
+    (left ++ right).ConstraintsHold env ↔
+      left.ConstraintsHold env ∧ right.ConstraintsHold env := by
+  simp only [Operations.ConstraintsHold, Operations.constraints_append,
+    Operations.lookups_append, List.forall_mem_append]
+  tauto
+
+/-- Extract the field equality represented by one retained Clean equality subcircuit. -/
+theorem equality_of_singleton_constraintsHold
+    (env : Environment F) (left right : Expression F) (offset : ℕ) :
+    Operations.ConstraintsHold env
+        [.subcircuit (@FormalAssertion.toSubcircuit F _ (ProvablePair field field)
+          ProvablePair.instance (Gadgets.Equality.circuit field) offset (left, right))] →
+      env left = env right := by
+  intro constraints
+  have difference :
+      env (toElements (M := field) left)[0] - env (toElements (M := field) right)[0] = 0 := by
+    simpa [Operations.ConstraintsHold, FormalAssertion.toSubcircuit,
+      Gadgets.Equality.main, Gadgets.allZero, Circuit.forEach.operations_eq,
+      FlatOperation.constraints, FlatOperation.lookups, eval_sub, circuit_norm] using constraints
+  have leftEq : env (toElements (M := field) left)[0] = env left := rfl
+  have rightEq : env (toElements (M := field) right)[0] = env right := rfl
+  rw [leftEq, rightEq, sub_eq_zero] at difference
+  exact difference
+
 /-- An evaluated Clean interaction together with evidence that it belongs to `channel`. -/
 structure TypedInteraction (channel : Channel F Message) where
   raw : Interaction F
@@ -280,6 +308,122 @@ theorem eval_pulledIf_message_mem_consumedMessages (ops : Operations (ZMod p))
   have messageMem :=
     TypedInteraction.message_mem_consumedMessages typed _ typedMem negative
   simpa only [typedEq, TypedInteraction.pulledIfValue_message] using messageMem
+
+/-- A finished channel guarantee may be specialized to any exact active syntactic pull in the
+operation list.  This is the pull-side counterpart of `guarantee_of_mem_producedTableMessages`:
+chip contracts prove only interaction membership and the active gate, while this lemma performs
+the generic descent through Clean's raw-channel representation. -/
+theorem guarantee_of_eval_pulledIf_mem (ops : Operations (ZMod p))
+    (channel : Channel (ZMod p) Message) (env : Environment (ZMod p))
+    (enabled : Expression (ZMod p)) (msg : Message (Expression (ZMod p)))
+    (member : (channel.pulledIf enabled msg).toRaw ∈
+      ops.interactionsWith channel.toRaw)
+    (guarantees : ops.ChannelGuarantees channel.toRaw env)
+    (active : Expression.eval env enabled = 1) :
+    channel.Guarantees (Eval.eval env msg) env.data := by
+  rw [Operations.ChannelGuarantees, ← Operations.forall_interactionsWith_iff] at guarantees
+  have pulled := guarantees _ member
+  rw [ChannelInteraction.toRaw_guarantees] at pulled
+  apply pulled
+  · rfl
+  · simp only [Channel.pulledIf, pulledIf_mult, eval_neg, active]
+
+/-- Erase the dependent raw-channel representation after a typed wrapper has fixed its channel.
+Pattern-matching the wrapper is important here: rewriting `raw.channel` directly gives Lean an
+ill-typed dependent motive because the raw message vector is indexed by that channel's arity. -/
+theorem TypedInteraction.guarantee_of_rawGuarantees
+    (channel : Channel (ZMod p) Message) (interaction : TypedInteraction channel)
+    (data : ProverData (ZMod p)) (rawGuarantees : interaction.raw.Guarantees data)
+    (assumes : interaction.raw.assumeGuarantees)
+    (negative : interaction.mult = -1) :
+    channel.Guarantees interaction.message data := by
+  obtain ⟨⟨rawChannel, mult, message, sameSize, assumeRaw⟩, channelEq⟩ := interaction
+  dsimp only at channelEq
+  subst rawChannel
+  exact rawGuarantees assumes negative
+
+/-- A typed evaluated interaction inherits its channel predicate from Clean's finished
+`ChannelGuarantees` whenever it is an assumption-carrying active pull.  Unlike
+`guarantee_of_eval_pulledIf_mem`, this form starts from the exact typed interaction list and is
+therefore convenient after a chip's interaction-shape theorem has already hidden the syntax. -/
+theorem TypedInteraction.guarantee_of_channelGuarantees
+    (ops : Operations (ZMod p)) (channel : Channel (ZMod p) Message)
+    (env : Environment (ZMod p)) (interaction : TypedInteraction channel)
+    (member : interaction ∈ typedInteractionValuesWith ops channel env)
+    (guarantees : ops.ChannelGuarantees channel.toRaw env)
+    (assumes : interaction.raw.assumeGuarantees)
+    (negative : interaction.mult = -1) :
+    channel.Guarantees interaction.message env.data := by
+  unfold typedInteractionValuesWith at member
+  obtain ⟨⟨abstract, abstractMem⟩, -, rfl⟩ := List.mem_map.mp member
+  rw [Operations.ChannelGuarantees, ← Operations.forall_interactionsWith_iff] at guarantees
+  have evaluated : (abstract.eval env).Guarantees env.data :=
+    AbstractInteraction.eval_guarantees.mpr (guarantees abstract abstractMem)
+  exact TypedInteraction.guarantee_of_rawGuarantees channel _ env.data evaluated assumes negative
+
+/-- Full parent constraints restrict to the flattened constraints of any retained subcircuit.
+This is the constraint analogue of `channelGuarantees_subcircuit_of_mem`; it is useful when a
+chip-owned routing assertion deliberately lives inside a semantic proof-boundary subcircuit. -/
+theorem constraintsHoldFlat_subcircuit_of_mem (env : Environment (ZMod p))
+    (ops : Operations (ZMod p)) {n : ℕ} (sub : Subcircuit (ZMod p) n)
+    (subMem : ⟨n, sub⟩ ∈ ops.subcircuits) (constraints : ops.ConstraintsHold env) :
+    FlatOperation.ConstraintsHoldFlat env sub.ops.toFlat := by
+  rw [FlatOperation.constraintsHoldFlat_iff_forall_mem]
+  have allConstraints := Operations.forall_constraints_iff.mp constraints.1
+  have allLookups := Operations.forall_lookups_iff.mp constraints.2
+  exact ⟨allConstraints.2 _ subMem, allLookups.2 _ subMem⟩
+
+/-- Parent constraints restrict to the `main` operation list of any retained
+`GeneralFormalCircuit` boundary.  This is the folded constraint analogue of
+`channelGuarantees_subcircuit_of_mem`; callers need not unfold the completed subcircuit record. -/
+theorem constraintsHold_generalSubcircuit_of_mem {Input Output : TypeMap}
+    [ProvableType Input] [ProvableType Output]
+    (env : Environment (ZMod p)) (ops : Operations (ZMod p))
+    (circuit : GeneralFormalCircuit (ZMod p) Input Output)
+    (input : Var Input (ZMod p)) (offset : ℕ)
+    (subMem : ⟨offset, circuit.toSubcircuit offset input⟩ ∈ ops.subcircuits)
+    (constraints : ops.ConstraintsHold env) :
+    ((circuit.main input).operations offset).ConstraintsHold env := by
+  have nested := constraintsHoldFlat_subcircuit_of_mem env ops
+    (circuit.toSubcircuit offset input) subMem constraints
+  rw [GeneralFormalCircuit.toSubcircuit, GeneralFormalCircuit.toWithHint,
+    GeneralFormalCircuit.WithHint.toSubcircuit, Operations.toNested_toFlat,
+    Circuit.constraintsHold_toFlat_iff] at nested
+  exact nested
+
+/-- Parent constraints restrict to the `main` operation list of any retained `FormalCircuit`
+boundary. This is the witnessed-output companion to
+`constraintsHold_generalSubcircuit_of_mem`. -/
+theorem constraintsHold_formalSubcircuit_of_mem {Input Output : TypeMap}
+    [ProvableType Input] [ProvableType Output]
+    (env : Environment (ZMod p)) (ops : Operations (ZMod p))
+    (circuit : FormalCircuit (ZMod p) Input Output)
+    (input : Var Input (ZMod p)) (offset : ℕ)
+    (subMem : ⟨offset, circuit.toSubcircuit offset input⟩ ∈ ops.subcircuits)
+    (constraints : ops.ConstraintsHold env) :
+    ((circuit.main input).operations offset).ConstraintsHold env := by
+  have nested := constraintsHoldFlat_subcircuit_of_mem env ops
+    (circuit.toSubcircuit offset input) subMem constraints
+  rw [FormalCircuit.toSubcircuit, Operations.toNested_toFlat,
+    Circuit.constraintsHold_toFlat_iff] at nested
+  exact nested
+
+/-- Parent constraints restrict to the `main` operation list of any retained
+`FormalAssertion` boundary. This is the assertion-only companion to
+`constraintsHold_generalSubcircuit_of_mem`. -/
+theorem constraintsHold_assertionSubcircuit_of_mem {Input : TypeMap}
+    [ProvableType Input]
+    (env : Environment (ZMod p)) (ops : Operations (ZMod p))
+    (circuit : FormalAssertion (ZMod p) Input)
+    (input : Var Input (ZMod p)) (offset : ℕ)
+    (subMem : ⟨offset, circuit.toSubcircuit offset input⟩ ∈ ops.subcircuits)
+    (constraints : ops.ConstraintsHold env) :
+    ((circuit.main input).operations offset).ConstraintsHold env := by
+  have nested := constraintsHoldFlat_subcircuit_of_mem env ops
+    (circuit.toSubcircuit offset input) subMem constraints
+  rw [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
+    Circuit.constraintsHold_toFlat_iff] at nested
+  exact nested
 
 /-- Clean requirements on a physical table prove the typed predicate of each exact active push. -/
 theorem guarantee_of_mem_producedTableMessages (table : Table (ZMod p))

@@ -72,6 +72,8 @@ import SP1Clean.Proofs.Chips.AluX0Chip.Bridge
 import SP1Clean.Native.Chips.AluX0Chip.Defs
 import SP1Clean.Proofs.Chips.AluX0Chip.Formal
 import SP1Clean.Model.ProgramChip
+import SP1Clean.Native.Operations.ShiftLeftOperation.Core
+import SP1Clean.Proofs.Operations.ShiftLeftOperation.Core
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Bridge
 import SP1Clean.Proofs.CircuitProofStart
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Core
@@ -80,6 +82,8 @@ import SP1Clean.Proofs.Chips.ShiftLeftChip.Defs
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Soundness.Sll
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Soundness.Sllw
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Formal
+import SP1Clean.Native.Operations.ShiftRightOperation.Core
+import SP1Clean.Proofs.Operations.ShiftRightOperation.Core
 import SP1Clean.Proofs.Chips.ShiftRightChip.Bridge
 import SP1Clean.Proofs.Chips.ShiftRightChip.Core
 import SP1Clean.Proofs.Chips.ShiftRightChip.Populate
@@ -110,6 +114,7 @@ import SP1Clean.Proofs.Chips.SubChip.Formal
 import SP1Clean.Proofs.Chips.SubwChip.Bridge
 import SP1Clean.Native.Chips.SubwChip.Defs
 import SP1Clean.Proofs.Chips.SubwChip.Formal
+import SP1Clean.Proofs.Chips.SubwChip.Contracts
 import SP1Clean.Proofs.Chips.UTypeChip.Bridge
 import SP1Clean.Native.Chips.UTypeChip.Defs
 import SP1Clean.Proofs.Chips.UTypeChip.Formal
@@ -194,6 +199,9 @@ import SP1Clean.Faithful.CoreAIR
 import SP1Clean.Faithful.CPUState
 import SP1Clean.Faithful.ChipOracle
 import SP1Clean.Faithful.ChipTactics
+import SP1Clean.Faithful.DivRemChip
+import SP1Clean.Faithful.DivRemChip.Exact
+import SP1Clean.Faithful.SupportedMachine
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Faithful.ITypeReader
 import SP1Clean.Faithful.ITypeReaderImmutable
@@ -358,12 +366,18 @@ import SP1Clean.Soundness.TypedSelectors
 import SP1Clean.Soundness.ProviderBindings
 import SP1Clean.Soundness.TypedProgram
 import SP1Clean.Soundness.TypedMemory
+import SP1Clean.Soundness.TypedMemorySelectors
 import SP1Clean.Soundness.TypedMemoryBalance
 import SP1Clean.Soundness.MemoryFrontier
 import SP1Clean.Proofs.Chips.AddChip.Contracts
 import SP1Clean.Soundness.LocalExecution
 import SP1Clean.Soundness.RowSoundness
 import SP1Clean.Soundness.GroundingAdapter
+import SP1Clean.Soundness.Grounding.RTypeChips
+import SP1Clean.Soundness.Grounding.ITypeChips
+import SP1Clean.Soundness.Grounding.ALUTypeChips
+import SP1Clean.Soundness.Grounding.JTypeChips
+import SP1Clean.Soundness.Grounding.ControlFlowChips
 import SP1Clean.Soundness.ChipContracts
 import SP1Clean.Soundness.AIR
 import SP1Clean.Soundness.CoreAIR

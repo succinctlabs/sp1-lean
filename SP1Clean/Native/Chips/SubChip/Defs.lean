@@ -79,4 +79,23 @@ unfolding the full composed `main`. -/
         ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩⟩ :
         Var Columns (ZMod p)) := rfl
 
+/-- Component-wise evaluation of Sub's independent native input row. -/
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
+         adapter := Eval.eval env input.adapter } : Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] theorem eval_inputState {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (Eval.eval env input).state = Eval.eval env input.state := by
+  rw [eval_inputs]
+
+@[circuit_norm] theorem eval_inputAdapter {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (Eval.eval env input).adapter = Eval.eval env input.adapter := by
+  rw [eval_inputs]
+
 end SP1Clean.SubChip

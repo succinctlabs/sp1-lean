@@ -10,13 +10,10 @@ import SP1Clean.FormalModel.Contracts.PublicValues
 > Do not add new capstone work here; current soundness work targets typed witness decoding and the
 > ranked/timed grounding engine.
 
-**What this file is.** The *formal target* the whole-machine effort closes toward, stated and proved
-today as a skeleton: from a verifying Clean ensemble over the committed public boundary, the **official
-LeanRV64D Sail interpreter** (`try_step`), run from *any* state that loads the guest program, reaches
-the halting `ECALL` with the committed exit code. The walk induction (Eulerian trail → Sail chain) is
-**proved here, `sorry`-free**; everything not yet derivable is a *named hypothesis* — one per roadmap
-item — so each future work item discharges exactly one named obligation and the meaningfulness boundary
-is the visible list of seams below, not prose.
+**What this file is.** A proved compatibility lemma from the older Eulerian State trail to the
+**official LeanRV64D Sail interpreter** (`try_step`). The walk induction is `sorry`-free; everything
+semantic is an explicit hypothesis in `TargetObligations`. New capstone work uses the ranked/timed
+grounding theorem in `Soundness/AIR.lean`, which derives an ordered Sail chain directly.
 
 **The named seams** (consumed by `sp1_target_execution`, discharged by the roadmap):
 
@@ -44,9 +41,10 @@ The earlier per-row Sail statement (the retired `GatedExecution.step_sound` conj
 the skeleton discharges `lift` from the per-chip `ChipKind.advance` path and uses only the **trail** half
 of `GatedExecution`.
 
-`sp1_target_execution` is axiom-clean (the walk induction is pure logic); the legacy corollary
-`sp1_target_soundness` additionally routes through `balanced_state_trail_soundness` and therefore inherits the
-capstone's `sorryAx` (the `sp1_decoded_rows_sound` structural decode seam) until §B5 closes. -/
+The former ensemble-level `sp1_target_soundness` wrapper was retired with the unconditional
+`sp1_decoded_rows_sound` seam. Its raw `Constraints ∧ BalancedChannels` premise omitted the semantic
+provider and timestamp facts now stated by `SupportedCoreNativeRelation`; retaining it would
+misrepresent the actual proof boundary. -/
 
 namespace SP1Clean.Soundness.Target
 
@@ -161,6 +159,7 @@ private theorem chain_to_refines
     {OperandsBound : Trace.RowView (ZMod p) → SailState → Prop}
     (ob : TargetObligations prog pi rows OperandsBound)
     {s0 : SailState} (h0 : IsInitialState prog s0)
+    (codeMemoryCompatible : SailCodeMemoryCompatible prog s0)
     {path : List (Trace.RowView (ZMod p))} (hw : WalkOf pi.toLegacy rows path)
     (h_entry : pcBitsOfVals pi.init_pc0.val pi.init_pc1.val pi.init_pc2.val = prog.pc_start) :
     ∀ i, i < path.length → ∃ s, SailChain i s0 s ∧ RefinesAt prog s0 path i s := by
@@ -183,7 +182,8 @@ private theorem chain_to_refines
     obtain ⟨s, hchain, href⟩ := ih hi'
     have hob := ob.bound s0 path h0 hw i hi' s href
     obtain ⟨s', hstep, heff⟩ := ob.lift s0 path h0 hw i hi s href hob
-    refine ⟨s', hchain.snoc hstep, ?_, heff.rom href.rom, heff.init href.init,
+    refine ⟨s', hchain.snoc hstep, ?_,
+      codeMemoryCompatible hchain hstep href.rom, heff.init href.init,
       heff.cfg href.cfg, ?_, ?_⟩
     · intro h
       rw [heff.pc]
@@ -225,6 +225,8 @@ theorem sp1_target_execution
     (OperandsBound : Trace.RowView (ZMod p) → SailState → Prop)
     (h_exec : GatedExecution rows (initEntryOf pi.toLegacy) (finalEntryOf pi.toLegacy))
     (ob : TargetObligations prog pi rows OperandsBound)
+    (codeMemoryCompatible :
+      ∀ s0, IsInitialState prog s0 → SailCodeMemoryCompatible prog s0)
     (h_entry : pcBitsOfVals pi.init_pc0.val pi.init_pc1.val pi.init_pc2.val = prog.pc_start) :
     ∀ s0, IsInitialState prog s0 →
       ∃ (n : ℕ) (s_f : SailState),
@@ -235,24 +237,10 @@ theorem sp1_target_execution
   have hne := ob.halt_nonempty path hw
   have hlen : path.length - 1 < path.length := by
     have := List.length_pos_of_ne_nil hne; omega
-  obtain ⟨s_f, hchain, href⟩ := chain_to_refines ob h0 hw h_entry (path.length - 1) hlen
+  obtain ⟨s_f, hchain, href⟩ := chain_to_refines ob h0
+    (codeMemoryCompatible s0 h0) hw h_entry (path.length - 1) hlen
   have hob := ob.bound s0 path h0 hw (path.length - 1) hlen s_f href
   exact ⟨path.length - 1, s_f, hchain, ob.halt s0 path h0 hw hne s_f href hob⟩
-
-/-- **The legacy end-to-end corollary**: the same conclusion from a verifying Clean ensemble `Statement`,
-routed through `balanced_state_trail_soundness`. Inherits the intermediate theorem's `sorryAx` (the decode seam
-`sp1_decoded_rows_sound`) until §B5 closes — the skeleton theorem above is axiom-clean. -/
-theorem sp1_target_soundness
-    (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p))
-    (OperandsBound : Trace.RowView (ZMod p) → SailState → Prop)
-    (ob : ∀ rows : List (ChipRow p), TargetObligations prog pi rows OperandsBound)
-    (h_entry : pcBitsOfVals pi.init_pc0.val pi.init_pc1.val pi.init_pc2.val = prog.pc_start)
-    (h_stmt : (sp1Ensemble (p := p)).Statement pi.toLegacy) :
-    ∀ s0, IsInitialState prog s0 →
-      ∃ (n : ℕ) (s_f : SailState),
-        SailChain n s0 s_f ∧ SP1Halted prog (exitOf pi.exit_code) s_f := by
-  obtain ⟨rows, h_exec⟩ := balanced_state_trail_soundness pi.toLegacy trivial h_stmt
-  exact sp1_target_execution prog pi rows OperandsBound h_exec (ob rows) h_entry
 
 /-- The named-seam census the audit doc cites: one entry per open obligation of
 `sp1_target_execution`, with its roadmap item. -/
@@ -262,7 +250,6 @@ def targetSeams : List String :=
     "TargetObligations.lift — the try_step step-lift per chip kind (W7)",
     "TargetObligations.halt/halt_nonempty — the ECALL/HALT chip (W5; its clk_inc prerequisite landed 2026-06-10)",
     "SailConfigured — populate the platform residue as W7 discovers it (W7)",
-    "RowEffect.rom strengthening to store-replay memory (W2b + W4a)",
-    "GatedExecution from Statement without sorry — close the sp1_decoded_rows_sound structural decode seam (W1b+W1c/§B5; the W1a balance translation is proven)" ]
+    "RowEffect.rom strengthening to store-replay memory (W2b + W4a)" ]
 
 end SP1Clean.Soundness.Target

@@ -81,12 +81,12 @@ set_option maxRecDepth 100000 in
   [
     ⟨.receive, (.state cols.values[4] cols.values[5] cols.values[9] cols.values[10] cols.values[11]), cols.values[13]⟩,
     ⟨.send, (.state E3 E5 cols.values[6] cols.values[7] cols.values[8]), cols.values[13]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) E7 13 0), cols.values[13]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[0] 16 0), cols.values[13]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.values[2] cols.values[1]), cols.values[13]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[6] 16 0), cols.values[13]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[7] 16 0), cols.values[13]⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.values[8] 16 0), cols.values[13]⟩,
+    ⟨.send, (.byte 6 E7 13 0), cols.values[13]⟩,
+    ⟨.send, (.byte 6 cols.values[0] 16 0), cols.values[13]⟩,
+    ⟨.send, (.byte 3 0 cols.values[2] cols.values[1]), cols.values[13]⟩,
+    ⟨.send, (.byte 6 cols.values[6] 16 0), cols.values[13]⟩,
+    ⟨.send, (.byte 6 cols.values[7] 16 0), cols.values[13]⟩,
+    ⟨.send, (.byte 6 cols.values[8] 16 0), cols.values[13]⟩,
   ]
 
 end StateBumpCols

@@ -35,7 +35,6 @@ theorem bitwise_asserts_faithful (a b : Vector (ZMod p) 8) (opcode : ZMod p)
   simp only [Extracted.BitwiseOperation.asserts, List.Forall,
     SP1Clean.BitwiseOperation.AssertSpec]
 
-omit [Fact (2 ^ 17 < p)] in
 /-- **Faithfulness anchor — interaction half.** SP1's `BitwiseOperation` `interactions` list (the
 eight byte-opcode sends) holds iff the native gadget's `InteractSpec` (the per-byte `byteOp`
 relation) holds. -/
@@ -53,14 +52,12 @@ open SP1Clean.InteractionRecovery
 omit [Fact (2 ^ 17 < p)] in
 /-- **Faithfulness anchor — interaction half, SYNTACTIC.** SP1's extracted `BitwiseOperation.interactions`
 and the Clean circuit's emitted byte interactions project to the **same** `LookupAccess` list — the eight
-per-byte `⟨opcode, result[i], a[i], b[i]⟩` AND/OR/XOR sends. Exercises the byte arm on a *variable* opcode:
-the oracle's `(ByteOpcode.ofNat opcode).idx` reduces to `opcode.val` (`coe_eq_val` + the `hidx` round-trip,
-needing `opcode.val < 3`), matching the circuit's raw `opcode` field. Bindings are vector-level (the eight
-per-limb evals are derived inside). -/
+per-byte `⟨opcode, result[i], a[i], b[i]⟩` AND/OR/XOR sends. Both sides preserve the raw field-valued
+opcode, so this structural equality is unconditional; opcode validity belongs to the byte-table
+semantics. Bindings are vector-level (the eight per-limb evals are derived inside). -/
 theorem bitwise_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var SP1Clean.BitwiseOperation.Inputs (ZMod p)) (offset : ℕ)
     (a b : Vector (ZMod p) 8) (cols : Extracted.BitwiseOperation (ZMod p)) (opcode is_real : ZMod p)
-    (hop : opcode.val < 3)
     (h_ir : Expression.eval env input.is_real = is_real)
     (h_op : Expression.eval env input.opcode = opcode)
     (h_a : Vector.map (Expression.eval env) input.a = a)
@@ -70,9 +67,6 @@ theorem bitwise_interactions_faithful_syntactic
         Extracted.Interaction.toAccess
       = (((SP1Clean.BitwiseOperation.main input).operations offset).interactionsWith
           byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
-  have hidx : (ByteOpcode.ofNat opcode.val).idx = opcode.val := by
-    have : opcode.val = 0 ∨ opcode.val = 1 ∨ opcode.val = 2 := by omega
-    rcases this with h | h | h <;> rw [h] <;> rfl
   have ea : ∀ (i : ℕ) (hi : i < 8), Expression.eval env input.a[i] = a[i] :=
     fun i hi => by rw [← h_a, Vector.getElem_map]
   have eb : ∀ (i : ℕ) (hi : i < 8), Expression.eval env input.b[i] = b[i] :=
@@ -88,7 +82,6 @@ theorem bitwise_interactions_faithful_syntactic
     fun g s => toAccess_pullIf_byte env g s
   simp only [SP1Clean.BitwiseOperation.main, circuit_norm, hk,
     Extracted.BitwiseOperation.interactions, List.map_cons, List.map_nil,
-    Extracted.Interaction.toAccess_byte, ConstraintCoe.coe_eq_val, hidx,
-    h_ir, h_op, ea, eb, er]
+    Extracted.Interaction.toAccess_byte, h_ir, h_op, ea, eb, er]
 
 end SP1Clean.Faithful

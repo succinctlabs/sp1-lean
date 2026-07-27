@@ -37,13 +37,16 @@ set_option maxHeartbeats 4000000 in
 /-- Soundness of the `sll` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_early_struct
-  -- `op_b_val`/`op_c_val` are reducible projections (`adapter.op_b_memory.prev_value`/`adapter.op_c`),
-  -- not committed columns. Unfolding them collapses the readback-equality conjunct to `rfl`
-  -- (dropped by `simp`), leaving the three real conjuncts.
+  -- `op_b_val`/`op_c_val` are reducible projections of the physical ALU read-backs.
   simp only [Inputs.op_b_val, Inputs.op_c_val] at h_assumptions ⊢
-  obtain ⟨hb_u64, hc_u64, hc_eq⟩ := h_assumptions
+  obtain ⟨hb_u64, hc_u64⟩ := h_assumptions
   obtain ⟨h_cpu, hmsb, _halu, _hregwrite, _hrealbin, hrealeq,
-    _hE2, _hE4, _hE6,
+    _hE2, _hE4, _hE6, h_core,
+    hbyte1, hbyte2, hbyte3, hbyte4, hbyte5, hbyte6, hbyte7, hbyte8, hbyte9⟩ := h_holds
+  have h_core' := h_core trivial
+  simp only [ShiftLeftCore.circuit, ShiftLeftChip.CoreSpec, Vector.getElem_map,
+    Vector.getElem_mapRange, circuit_norm] at h_core'
+  obtain ⟨
     hcb0b, hcb1b, hcb2b, hcb3b, hcb4b, hcb5b,
     hsu0sel, hsu0b, hsu1sel, hsu1b, hsu2sel, hsu2b, hsu3sel, hsu3b, hsusum,
     hv01e, hv012e, hv0123e,
@@ -52,8 +55,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     hp00, hp01, hp02, hp03, hp10, hp11, hp12, hp13,
     hp20, hp21, hp22, hp23, hp30, hp31, hp32, hp33,
     hw00, hw01, hw10, hw11, hwmsb2, hwmsb3,
-    _himm, _hopa0,
-    hbyte1, hbyte2, hbyte3, hbyte4, hbyte5, hbyte6, hbyte7, hbyte8, hbyte9⟩ := h_holds
+    _himm, _hopa0⟩ := h_core'
   -- The variant flags are now **witnessed columns** (`flags[0..2]` at offsets `i₀+30..32`), not `Inputs`
   -- fields; `set` them under their old names so the proof body is unchanged.
   set input_is_sll := env.get (i₀ + 30) with hsll_def
@@ -248,10 +250,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     --      `hsusum` one-hot; in each, the `is_sll`-gated `hp*` collapse `a` to `limb_result`, and `hreass*`
     --      put it in `ll*v0123 (+hl)` form; feed the matching `sll_close_cb4cb5_{zero,one_zero,zero_one,
     --      one_one}_case` (its `h_b*_dec` are `hsplit*` after `op_b_val = op_b_memory.prev_value` via `hb_eq`).
-    --   e. Rewrite `op_b_val`/`op_c_val` (`hb_eq`/`hc_eq`); conclude the `RV64.sll` identity.
+    --   e. Read both physical operands from the ALU reader; conclude the `RV64.sll` identity.
     obtain ⟨_, _, _, _, _, _, ⟨hbmem, _, _⟩, _, ⟨hcmem, _, _⟩, _⟩ := h_input
-    -- Operand evaluations: the constraint columns read back the register memory; `hb_eq`/`hc_eq` tie
-    -- those to the verifier-threaded `op_b_val`/`op_c_val`.
+    -- Operand evaluations: the constraint columns read back the physical ALU reader values.
     have heb0 : Expression.eval env input_var_adapter_op_b_memory_prev_value[0] = input_adapter_op_b_memory_prev_value[0] := by
       rw [← hbmem, Vector.getElem_map]
     have heb1 : Expression.eval env input_var_adapter_op_b_memory_prev_value[1] = input_adapter_op_b_memory_prev_value[1] := by
@@ -260,8 +261,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       rw [← hbmem, Vector.getElem_map]
     have heb3 : Expression.eval env input_var_adapter_op_b_memory_prev_value[3] = input_adapter_op_b_memory_prev_value[3] := by
       rw [← hbmem, Vector.getElem_map]
-    have heval_c0 : Expression.eval env input_var_adapter_op_c_memory_prev_value[0] = input_adapter_op_c[0] := by
-      rw [hc_eq, ← hcmem, Vector.getElem_map]
+    have heval_c0 : Expression.eval env input_var_adapter_op_c_memory_prev_value[0] =
+        input_adapter_op_c_memory_prev_value[0] := by
+      rw [← hcmem, Vector.getElem_map]
     have hp17 : 131072 < p := by have := Fact.out (p := (2:ℕ)^17 < p); omega
     -- The power encoding `v0123 = 2 ^ S`, `S = cb0 + 2cb1 + 4cb2 + 8cb3`.
     have hv01 : env.get (i₀+4+6) = (env.get (i₀+4) + 1) * (env.get (i₀+4+1) * 3 + 1) := by
@@ -307,7 +309,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       have hb := hbyte9 hneg; rw [hwidth_hl] at hb
       exact (byteRowSpec_range _ (show S < p by omega)).mp hb
     -- The shift-amount width-10 bound (feeds `is_mod_64` inside `sll_assembly`).
-    have h_diff : ((input_adapter_op_c[0] - (env.get (i₀+4) + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4
+    have h_diff : ((input_adapter_op_c_memory_prev_value[0] - (env.get (i₀+4) + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4
         + env.get (i₀+4+3)*8 + env.get (i₀+4+4)*16 + env.get (i₀+4+5)*32)) * (64:ZMod p)⁻¹).val < 1024 := by
       have hb := hbyte1 hneg
       have hbd := (byteRowSpec_range _ (show (10:ℕ) < p by omega)).mp hb
@@ -317,16 +319,16 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     -- Bit-split decompositions, `limb_result` reassembly, and the `is_sll`-collapsed placements.
     have hb0dec : input_adapter_op_b_memory_prev_value[0] * env.get (i₀+4+6+2)
         = env.get (i₀+4+6+3+4+4) * ((65536:ℕ):ZMod p) + env.get (i₀+4+6+3+4) * env.get (i₀+4+6+2) := by
-      rw [← heb0]; push_cast; linear_combination hsplit0
+      push_cast; linear_combination hsplit0
     have hb1dec : input_adapter_op_b_memory_prev_value[1] * env.get (i₀+4+6+2)
         = env.get (i₀+4+6+3+4+4+1) * ((65536:ℕ):ZMod p) + env.get (i₀+4+6+3+4+1) * env.get (i₀+4+6+2) := by
-      rw [← heb1]; push_cast; linear_combination hsplit1
+      push_cast; linear_combination hsplit1
     have hb2dec : input_adapter_op_b_memory_prev_value[2] * env.get (i₀+4+6+2)
         = env.get (i₀+4+6+3+4+4+2) * ((65536:ℕ):ZMod p) + env.get (i₀+4+6+3+4+2) * env.get (i₀+4+6+2) := by
-      rw [← heb2]; push_cast; linear_combination hsplit2
+      push_cast; linear_combination hsplit2
     have hb3dec : input_adapter_op_b_memory_prev_value[3] * env.get (i₀+4+6+2)
         = env.get (i₀+4+6+3+4+4+3) * ((65536:ℕ):ZMod p) + env.get (i₀+4+6+3+4+3) * env.get (i₀+4+6+2) := by
-      rw [← heb3]; push_cast; linear_combination hsplit3
+      push_cast; linear_combination hsplit3
     have hlr0 : env.get (i₀+4+6+3+4+4+4) = env.get (i₀+4+6+3+4) * env.get (i₀+4+6+2) := by
       linear_combination hreass0
     have hlr1 : env.get (i₀+4+6+3+4+4+4+1) = env.get (i₀+4+6+3+4+1) * env.get (i₀+4+6+2) + env.get (i₀+4+6+3+4+4) := by
@@ -347,7 +349,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       rw [hsll] at hsu3sel; linear_combination hsu3sel
     have hssum : env.get (i₀+4+6+3) + env.get (i₀+4+6+3+1) + env.get (i₀+4+6+3+2) + env.get (i₀+4+6+3+3) = 1 := by
       rw [hgate1, one_mul] at hsusum; linear_combination hsusum
-    have h_c0_lt : input_adapter_op_c[0].val < 65536 := by
+    have h_c0_lt : input_adapter_op_c_memory_prev_value[0].val < 65536 := by
       have h := hc_u64 0; norm_num at h ⊢; exact h
     -- Reduce the goal and apply the native assembly.
     have hLHS : Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var {index := i₀+ i})

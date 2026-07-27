@@ -41,7 +41,7 @@ theorem ltSigned_constraints_faithful (b cc : Word (ZMod p))
     ltUnsigned_constraints_faithful]
   simp only [Extracted.U16MSBOperation.asserts, Extracted.U16MSBOperation.interactions,
     List.Forall,
-    Interaction.toProp_send_byte, ByteOpcode.ofNat_six,
+    Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_Range, val_16, ne_eq,
     SP1Clean.LtOperationSigned.RawSpec, Nat.cast_ofNat,
     zero_mul, sub_self, mul_zero, true_and, and_assoc, bool_iff,

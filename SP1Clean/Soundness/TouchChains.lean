@@ -60,7 +60,7 @@ def writeOffset : MemLoc → ℕ
 
 @[simp] lemma writeOffset_reg (i : BitVec 5) : writeOffset (MemLoc.reg i) = 4 := rfl
 
-@[simp] lemma writeOffset_ram (a : BitVec 64) : writeOffset (MemLoc.ram a) = 1 := rfl
+@[simp] lemma writeOffset_ram (cell : RamCell) : writeOffset (MemLoc.ram cell) = 1 := rfl
 
 lemma writeOffset_le (loc : MemLoc) : writeOffset loc ≤ 4 := by
   cases loc <;> simp
@@ -74,7 +74,7 @@ def readWindow : MemLoc → ℕ
 
 @[simp] lemma readWindow_reg (i : BitVec 5) : readWindow (MemLoc.reg i) = 3 := rfl
 
-@[simp] lemma readWindow_ram (a : BitVec 64) : readWindow (MemLoc.ram a) = 0 := rfl
+@[simp] lemma readWindow_ram (cell : RamCell) : readWindow (MemLoc.ram cell) = 0 := rfl
 
 lemma readWindow_le (loc : MemLoc) : readWindow loc ≤ 3 := by
   cases loc <;> simp

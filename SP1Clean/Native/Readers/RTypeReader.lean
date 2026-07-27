@@ -50,6 +50,120 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 -- `local` so this convenience instance does not leak into importing files (see `RegisterAccessTimestamp`).
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
+/-- Component-wise evaluation of the canonical R-type reader row.  Kept beside the native reader so
+soundness and faithfulness clients share one folded evaluator boundary. -/
+@[circuit_norm] theorem eval_cols {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
+    Eval.eval env cols =
+      ({ op_a := Eval.eval env cols.op_a,
+         op_a_memory := Eval.eval env cols.op_a_memory,
+         op_a_0 := Eval.eval env cols.op_a_0,
+         op_b := Eval.eval env cols.op_b,
+         op_b_memory := Eval.eval env cols.op_b_memory,
+         op_c := Eval.eval env cols.op_c,
+         op_c_memory := Eval.eval env cols.op_c_memory } : Extracted.RTypeReader F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Component-wise evaluation of one nested register-access block. -/
+@[circuit_norm] theorem eval_registerAccessCols {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RegisterAccessCols (Expression F)) :
+    Eval.eval env cols =
+      ({ prev_value := Eval.eval env cols.prev_value,
+         access_timestamp := Eval.eval env cols.access_timestamp } :
+        Extracted.RegisterAccessCols F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Component-wise evaluation of the innermost register timestamp block. -/
+@[circuit_norm] theorem eval_registerAccessTimestamp {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RegisterAccessTimestamp (Expression F)) :
+    Eval.eval env cols =
+      ({ prev_low := Eval.eval env cols.prev_low,
+         diff_low_limb := Eval.eval env cols.diff_low_limb } :
+        Extracted.RegisterAccessTimestamp F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+/-- Evaluation of the canonical zero-register indicator through the folded reader row. -/
+@[circuit_norm] theorem eval_opA0 {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
+    (Eval.eval env cols).op_a_0 = Expression.eval env cols.op_a_0 := by
+  rw [eval_cols]
+  simp only [circuit_norm]
+
+@[circuit_norm] theorem eval_opAPrevLow {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
+    (Eval.eval env cols).op_a_memory.access_timestamp.prev_low =
+      Expression.eval env cols.op_a_memory.access_timestamp.prev_low := by
+  calc
+    _ = (Eval.eval env cols.op_a_memory).access_timestamp.prev_low := by rw [eval_cols]
+    _ = (Eval.eval env cols.op_a_memory.access_timestamp).prev_low := by
+      rw [eval_registerAccessCols]
+    _ = Eval.eval env cols.op_a_memory.access_timestamp.prev_low := by
+      rw [eval_registerAccessTimestamp]
+    _ = _ := by simp only [circuit_norm]
+
+@[circuit_norm] theorem eval_opADiffLow {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
+    (Eval.eval env cols).op_a_memory.access_timestamp.diff_low_limb =
+      Expression.eval env cols.op_a_memory.access_timestamp.diff_low_limb := by
+  calc
+    _ = (Eval.eval env cols.op_a_memory).access_timestamp.diff_low_limb := by rw [eval_cols]
+    _ = (Eval.eval env cols.op_a_memory.access_timestamp).diff_low_limb := by
+      rw [eval_registerAccessCols]
+    _ = Eval.eval env cols.op_a_memory.access_timestamp.diff_low_limb := by
+      rw [eval_registerAccessTimestamp]
+    _ = _ := by simp only [circuit_norm]
+
+@[circuit_norm] theorem eval_opBPrevLow {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
+    (Eval.eval env cols).op_b_memory.access_timestamp.prev_low =
+      Expression.eval env cols.op_b_memory.access_timestamp.prev_low := by
+  calc
+    _ = (Eval.eval env cols.op_b_memory).access_timestamp.prev_low := by rw [eval_cols]
+    _ = (Eval.eval env cols.op_b_memory.access_timestamp).prev_low := by
+      rw [eval_registerAccessCols]
+    _ = Eval.eval env cols.op_b_memory.access_timestamp.prev_low := by
+      rw [eval_registerAccessTimestamp]
+    _ = _ := by simp only [circuit_norm]
+
+@[circuit_norm] theorem eval_opBDiffLow {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
+    (Eval.eval env cols).op_b_memory.access_timestamp.diff_low_limb =
+      Expression.eval env cols.op_b_memory.access_timestamp.diff_low_limb := by
+  calc
+    _ = (Eval.eval env cols.op_b_memory).access_timestamp.diff_low_limb := by rw [eval_cols]
+    _ = (Eval.eval env cols.op_b_memory.access_timestamp).diff_low_limb := by
+      rw [eval_registerAccessCols]
+    _ = Eval.eval env cols.op_b_memory.access_timestamp.diff_low_limb := by
+      rw [eval_registerAccessTimestamp]
+    _ = _ := by simp only [circuit_norm]
+
+@[circuit_norm] theorem eval_opCPrevLow {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
+    (Eval.eval env cols).op_c_memory.access_timestamp.prev_low =
+      Expression.eval env cols.op_c_memory.access_timestamp.prev_low := by
+  calc
+    _ = (Eval.eval env cols.op_c_memory).access_timestamp.prev_low := by rw [eval_cols]
+    _ = (Eval.eval env cols.op_c_memory.access_timestamp).prev_low := by
+      rw [eval_registerAccessCols]
+    _ = Eval.eval env cols.op_c_memory.access_timestamp.prev_low := by
+      rw [eval_registerAccessTimestamp]
+    _ = _ := by simp only [circuit_norm]
+
+@[circuit_norm] theorem eval_opCDiffLow {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
+    (Eval.eval env cols).op_c_memory.access_timestamp.diff_low_limb =
+      Expression.eval env cols.op_c_memory.access_timestamp.diff_low_limb := by
+  calc
+    _ = (Eval.eval env cols.op_c_memory).access_timestamp.diff_low_limb := by rw [eval_cols]
+    _ = (Eval.eval env cols.op_c_memory.access_timestamp).diff_low_limb := by
+      rw [eval_registerAccessCols]
+    _ = Eval.eval env cols.op_c_memory.access_timestamp.diff_low_limb := by
+      rw [eval_registerAccessTimestamp]
+    _ = _ := by simp only [circuit_norm]
+
 /-- Witness the four scalar adapter columns (`op_a`, `op_a_0`, `op_b`, `op_c`, all `0`) and compose a
 `RegisterAccessCols.circuit` per operand (access clocks `clk_low + 4/3/2`) — emitting columns in the
 `Extracted.RTypeReader` field order so the assembled output's offsets line up. Then impose the four
@@ -349,5 +463,50 @@ theorem rTypeReader_programInteractions_subcircuit
   InteractionRecovery.interactionsWith_generalSubcircuit_of_main_exact
     Readers.RTypeReader.circuit programChannel.toRaw input offset ops _
     (rTypeReader_programInteractions input offset)
+
+/-- R-type reader raw Memory list: the destination read-prior pull, followed by the two source
+register read-prior/read-back pairs.  The destination write push is deliberately outside the reader
+and is supplied by `Readers.RegisterWrite.circuit` after the chip has computed its result. -/
+def rTypeMemoryInteractions (input : Var Readers.RTypeReader.Inputs (ZMod p)) :
+    List (AbstractInteraction (ZMod p)) :=
+  [(memoryChannel.pulledIf input.is_real
+      ⟨input.clk_high, input.cols.op_a_memory.access_timestamp.prev_low, input.cols.op_a, 0, 0,
+       input.cols.op_a_memory.prev_value⟩).toRaw,
+   (memoryChannel.pulledIf input.is_real
+      ⟨input.clk_high, input.cols.op_b_memory.access_timestamp.prev_low, input.cols.op_b, 0, 0,
+       input.cols.op_b_memory.prev_value⟩).toRaw,
+   (memoryChannel.pushedIf input.is_real
+      ⟨input.clk_high, input.clk_low + 3, input.cols.op_b, 0, 0,
+       input.cols.op_b_memory.prev_value⟩).toRaw,
+   (memoryChannel.pulledIf input.is_real
+      ⟨input.clk_high, input.cols.op_c_memory.access_timestamp.prev_low, input.cols.op_c, 0, 0,
+       input.cols.op_c_memory.prev_value⟩).toRaw,
+   (memoryChannel.pushedIf input.is_real
+      ⟨input.clk_high, input.clk_low + 2, input.cols.op_c, 0, 0,
+       input.cols.op_c_memory.prev_value⟩).toRaw]
+
+theorem rTypeReader_memoryInteractions (input : Var Readers.RTypeReader.Inputs (ZMod p))
+    (offset : ℕ) :
+    ((Readers.RTypeReader.circuit (p := p).main input).operations offset).interactionsWith
+        memoryChannel.toRaw =
+      rTypeMemoryInteractions input := by
+  simp only [Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+    Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+    Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions]
+  simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+    Channels.byteChannel_eq_memoryChannel_false,
+    Channels.programChannel_eq_memoryChannel_false,
+    decide_false, Bool.false_eq_true, List.nil_append, rTypeMemoryInteractions]
+
+theorem rTypeReader_memoryInteractions_subcircuit
+    (input : Var Readers.RTypeReader.Inputs (ZMod p)) (offset : ℕ)
+    (ops : Operations (ZMod p)) :
+    Operations.interactionsWith memoryChannel.toRaw
+        (.subcircuit ((Readers.RTypeReader.circuit (p := p)).toSubcircuit offset input) :: ops) =
+      rTypeMemoryInteractions input ++ Operations.interactionsWith memoryChannel.toRaw ops :=
+  InteractionRecovery.interactionsWith_generalSubcircuit_of_main_exact_list
+    Readers.RTypeReader.circuit memoryChannel.toRaw input offset ops _
+    (rTypeReader_memoryInteractions input offset)
 
 end SP1Clean.Soundness
