@@ -54,7 +54,7 @@ omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end: from `AddiChip.Spec`, rs1/PC reads, and the immediate-decode fact, Sail's `ADDI`
 agrees with the SP1 chip emulation. -/
 theorem addi_chip_reaches_sail
-    (input : AddiChip.Inputs (ZMod p)) (cols : Extracted.AddiCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : AddiChip.Inputs (ZMod p)) (cols : AddiChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
     (h_chip : AddiChip.Spec input cols data)
@@ -79,7 +79,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- **Addi's committed bus view** — the chip-agnostic `RowView` (opcode `1`, the `pc+4` straight-line
 next-pc, `add_operation` result as `rdWrite`). Standalone so `AddiChip.advance` can be supplied *as*
 `kind.advance` (see `AddChip.rowView`). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.AddiCols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.add_operation.value, 1, .regWrite⟩
 
@@ -89,7 +89,7 @@ thin adapter over `advance_of_itype` with opcode `ADDI` + the write-value identi
 round-trip is inside `advance_of_itype`). The `advanceReady` bundle carries the extra state passthrough
 `inp.state = cols.state` (I-type reads its pc bound off `cols.state`). Stated to match the
 `ChipKind.advance` obligation exactly, so `kind.advance := some (PLift.up advance)` type-checks directly. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.AddiCols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1)
     (hspec : Spec inp cols data)
@@ -124,7 +124,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.AddiCols (ZMod p)) (da
 def kind : Soundness.ChipKind p where
   name := "Addi"
   Inputs := AddiChip.Inputs
-  Cols := Extracted.AddiCols
+  Cols := AddiChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady :=fun inp cols _ _ => inp.adapter = cols.adapter ∧ inp.state = cols.state ∧

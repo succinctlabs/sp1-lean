@@ -1,11 +1,12 @@
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Extracted.ChipOracle.Jal
 import SP1Clean.Proofs.Chips.JalChip.Formal
 
 /-! # Whole-chip faithfulness — native Jal row ↔ pinned SP1 Rust AIR
 
 `jalChip_faithful` compares the complete native Clean JAL circuit with the
-v6.3.1 Rust `JalColumns` assertion system and interaction multiset on real,
-`jal x0`, and padding rows.  Rust redundantly zeroes the first three link
+v6.3.1 Rust `JalOracle.JalColumns` assertion system and interaction multiset
+(after one explicit row reconfiguration) on real, `jal x0`, and padding rows.  Rust redundantly zeroes the first three link
 limbs at chip level in addition to the J-type adapter's four-limb zeroing;
 the assertion proof preserves that redundancy on the oracle side and proves
 it propositionally equivalent to the native composition.
@@ -26,33 +27,57 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-def jalChipOracle :
-    ChipOracle (ZMod p) Extracted.JalColumns Extracted.JalColumns :=
-  ChipOracle.identity Extracted.JalColumns.asserts
-    Extracted.JalColumns.interactions
+/-- Whole-chip row reconfiguration. The reader blocks are already the canonical generated substrate,
+so only the native arithmetic blocks are copied into Rust's chip-private operation rows. This is not
+an operation-level faithfulness claim. -/
+def jalChipReconfigure {F : Type} (cols : JalChip.Columns F) :
+    Extracted.JalOracle.JalColumns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    add_operation := { value := cols.add_operation.value }
+    op_a_operation := { value := cols.op_a_operation.value }
+    is_real := cols.is_real }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def jalChipDeconfigure {F : Type} (cols : Extracted.JalOracle.JalColumns F) :
+    JalChip.Columns F :=
+  { is_real := cols.is_real
+    state := cols.state
+    adapter := cols.adapter
+    add_operation := { value := cols.add_operation.value }
+    op_a_operation := { value := cols.op_a_operation.value } }
+
+/-- SP1 Rust's complete Jal-chip oracle, viewed from the native Lean row. -/
+def jalChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F JalChip.Columns Extracted.JalOracle.JalColumns where
+  reconfigure := jalChipReconfigure
+  deconfigure := jalChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.JalOracle.JalColumns.asserts
+  interactions := Extracted.JalOracle.JalColumns.interactions
 
 def jalChipInput {F : Type}
-    (cols : Extracted.JalColumns F) : JalChip.Inputs F :=
+    (cols : JalChip.Columns F) : JalChip.Inputs F :=
   { is_real := cols.is_real, state := cols.state, adapter := cols.adapter }
 
 def jalChipLocals {F : Type}
-    (cols : Extracted.JalColumns F) : Vector F 8 :=
+    (cols : JalChip.Columns F) : Vector F 8 :=
   #v[cols.add_operation.value[0], cols.add_operation.value[1],
     cols.add_operation.value[2], cols.add_operation.value[3],
     cols.op_a_operation.value[0], cols.op_a_operation.value[1],
     cols.op_a_operation.value[2], cols.op_a_operation.value[3]]
 
 def jalChipPhysicalRow {F : Type}
-    (cols : Extracted.JalColumns F) : Array F :=
+    (cols : JalChip.Columns F) : Array F :=
   inputFirstRow (jalChipInput cols) (jalChipLocals cols)
 
 def jalChipColumnsOfInput {F : Type}
     (input : JalChip.Inputs F) (locals : Vector F 8) :
-    Extracted.JalColumns F :=
-  ⟨input.state, input.adapter,
+    JalChip.Columns F :=
+  ⟨input.is_real, input.state, input.adapter,
     ⟨#v[locals[0], locals[1], locals[2], locals[3]]⟩,
-    ⟨#v[locals[4], locals[5], locals[6], locals[7]]⟩,
-    input.is_real⟩
+    ⟨#v[locals[4], locals[5], locals[6], locals[7]]⟩⟩
 
 private theorem vec3_eta {F : Type} (value : Vector F 3) :
     #v[value[0], value[1], value[2]] = value := by
@@ -68,15 +93,24 @@ private theorem vec4_eta {F : Type} (value : Vector F 4) :
 
 @[circuit_norm] private theorem evalAddOperation
     {F : Type} [FiniteField F] (env : Environment F)
-    (cols : Extracted.AddOperation (Expression F)) :
+    (cols : Extracted.JalOracle.AddOperation (Expression F)) :
     Eval.eval env cols =
       ({ value := Eval.eval env cols.value } :
-        Extracted.AddOperation F) := by
+        Extracted.JalOracle.AddOperation F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] private theorem evalAddOperationColumns
+    {F : Type} [FiniteField F] (env : Environment F)
+    (cols : AddOperation.Columns (Expression F)) :
+    Eval.eval env cols =
+      ({ value := Eval.eval env cols.value } :
+        AddOperation.Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
 theorem jalChipColumnsOfInput_roundtrip {F : Type}
-    (cols : Extracted.JalColumns F) :
+    (cols : JalChip.Columns F) :
     jalChipColumnsOfInput (jalChipInput cols) (jalChipLocals cols) = cols := by
   cases cols
   simp [jalChipColumnsOfInput, jalChipInput, jalChipLocals, vec4_eta]
@@ -91,12 +125,12 @@ theorem eval_jalChipDirectOutput
   rw [JalChip.directOutput_eq]
   rw [← CircuitType.eval_expression, JalChip.eval_columns]
   unfold jalChipColumnsOfInput
-  rw [Extracted.JalColumns.mk.injEq]
+  rw [JalChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input locals data
   rw [JalChip.eval_inputs, JalChip.Inputs.mk.injEq] at hinputEval
-  refine ⟨hinputEval.2.1, hinputEval.2.2, ?_, ?_, hinputEval.1⟩
-  · rw [evalAddOperation, Extracted.AddOperation.mk.injEq]
+  refine ⟨hinputEval.1, hinputEval.2.1, hinputEval.2.2, ?_, ?_⟩
+  · rw [evalAddOperationColumns, AddOperation.Columns.mk.injEq]
     apply Vector.ext
     intro i hi
     rw [← ProvableType.getElem_eval_fields
@@ -111,7 +145,7 @@ theorem eval_jalChipDirectOutput
     · exact eval_local_inputFirstRow input locals data 1 (by decide)
     · exact eval_local_inputFirstRow input locals data 2 (by decide)
     · exact eval_local_inputFirstRow input locals data 3 (by decide)
-  · rw [evalAddOperation, Extracted.AddOperation.mk.injEq]
+  · rw [evalAddOperationColumns, AddOperation.Columns.mk.injEq]
     apply Vector.ext
     intro i hi
     rw [← ProvableType.getElem_eval_fields
@@ -134,7 +168,7 @@ theorem eval_jalChipDirectOutput
         (eval_local_inputFirstRow input locals data 7 (by decide))
 
 def jalChipRowCodec :
-    ChipRowCodec JalChip.Inputs Extracted.JalColumns
+    ChipRowCodec JalChip.Inputs JalChip.Columns
       (JalChip.circuit (p := p)) where
   assignment cols data := {
     row := jalChipPhysicalRow cols
@@ -229,13 +263,13 @@ private theorem addAssertions
     (hv : (ProvableStruct.eval env input.cols).value = value)
     (hr : (ProvableStruct.eval env input).is_real = isReal) :
     List.Forall (· = 0)
-        (Extracted.AddOperation.asserts (F := ZMod p)
+        (Extracted.JalOracle.AddOperation.asserts (F := ZMod p)
           a b { value := value } isReal) ↔
       List.Forall (· = 0)
         (nativeAssertZeros env
           ((AddOperation.main input).operations offset)) := by
   simp [nativeAssertZeros, AddOperation.main,
-    Extracted.AddOperation.asserts, circuit_norm]
+    Extracted.JalOracle.AddOperation.asserts, circuit_norm]
   rw [ha, hb, hv, hr]
 
 omit [Fact (2 ^ 17 < p)] in
@@ -388,16 +422,16 @@ private theorem evalVec4Literal {F : Type} [FiniteField F]
 private def rustColumns
     (env : Environment (ZMod p))
     (input : Var JalChip.Inputs (ZMod p)) (offset : ℕ) :
-    Extracted.JalColumns (ZMod p) :=
-  { state := Eval.eval env input.state
+    JalChip.Columns (ZMod p) :=
+  { is_real := Expression.eval env input.is_real
+    state := Eval.eval env input.state
     adapter := Eval.eval env input.adapter
     add_operation := Eval.eval env
       ({ value := jumpValue offset } :
-        Extracted.AddOperation (Expression (ZMod p)))
+        AddOperation.Columns (Expression (ZMod p)))
     op_a_operation := Eval.eval env
       ({ value := linkValue offset } :
-        Extracted.AddOperation (Expression (ZMod p)))
-    is_real := Expression.eval env input.is_real }
+        AddOperation.Columns (Expression (ZMod p))) }
 
 private def rustCpuMeaning
     (env : Environment (ZMod p))
@@ -414,7 +448,7 @@ private def rustJumpAddMeaning
     (env : Environment (ZMod p))
     (input : Var JalChip.Inputs (ZMod p)) (offset : ℕ) : Prop :=
   List.Forall (· = 0)
-    (Extracted.AddOperation.asserts (F := ZMod p)
+    (Extracted.JalOracle.AddOperation.asserts (F := ZMod p)
       #v[(Eval.eval env input.state).pc[0],
         (Eval.eval env input.state).pc[1],
         (Eval.eval env input.state).pc[2], 0]
@@ -424,21 +458,21 @@ private def rustJumpAddMeaning
         (Eval.eval env input.adapter).op_b_imm[3]]
       (Eval.eval env
         ({ value := jumpValue offset } :
-          Extracted.AddOperation (Expression (ZMod p))))
+          Extracted.JalOracle.AddOperation (Expression (ZMod p))))
       (Expression.eval env input.is_real))
 
 private def rustLinkAddMeaning
     (env : Environment (ZMod p))
     (input : Var JalChip.Inputs (ZMod p)) (offset : ℕ) : Prop :=
   List.Forall (· = 0)
-    (Extracted.AddOperation.asserts (F := ZMod p)
+    (Extracted.JalOracle.AddOperation.asserts (F := ZMod p)
       #v[(Eval.eval env input.state).pc[0],
         (Eval.eval env input.state).pc[1],
         (Eval.eval env input.state).pc[2], 0]
       #v[4, 0, 0, 0]
       (Eval.eval env
         ({ value := linkValue offset } :
-          Extracted.AddOperation (Expression (ZMod p))))
+          Extracted.JalOracle.AddOperation (Expression (ZMod p))))
       (Expression.eval env input.is_real -
         (Eval.eval env input.adapter).op_a_0))
 
@@ -448,7 +482,7 @@ private def rustJTypeMeaning
   let adapter := Eval.eval env input.adapter
   let value := (Eval.eval env
     ({ value := linkValue offset } :
-      Extracted.AddOperation (Expression (ZMod p)))).value
+      Extracted.JalOracle.AddOperation (Expression (ZMod p)))).value
   List.Forall (· = 0)
       (Extracted.JTypeReader.asserts (F := ZMod p)
         (Eval.eval env input.state).clk_high
@@ -485,14 +519,14 @@ private theorem rustAssertionsDecompose
           (rustColumns env input offset)) ↔
       rustMeaning env input offset := by
   simp only [ChipOracle.nativeAssertZeros, jalChipOracle,
-    ChipOracle.identity, id_eq]
-  rw [Extracted.JalColumns.asserts]
+    jalChipReconfigure]
+  rw [Extracted.JalOracle.JalColumns.asserts]
   unfold rustMeaning rustCpuMeaning rustJumpAddMeaning
     rustLinkAddMeaning rustJTypeMeaning
   dsimp only [rustColumns]
   simp only [Extracted.CPUState.asserts,
     Extracted.JTypeReader.asserts, List.forall_append, List.Forall,
-    evalAddOperation, vec4_eta, sub_zero, true_and]
+    evalAddOperation, evalAddOperationColumns, vec4_eta, sub_zero, true_and]
   tauto
 
 omit [Fact (2 ^ 17 < p)] in
@@ -538,10 +572,10 @@ private theorem jumpAddMeaningFaithful
       (Eval.eval env input.adapter).op_b_imm[1],
       (Eval.eval env input.adapter).op_b_imm[2],
       (Eval.eval env input.adapter).op_b_imm[3]]
-  let rustValue : Extracted.AddOperation (ZMod p) :=
+  let rustValue : Extracted.JalOracle.AddOperation (ZMod p) :=
     Eval.eval env
       ({ value := jumpValue offset } :
-        Extracted.AddOperation (Expression (ZMod p)))
+        Extracted.JalOracle.AddOperation (Expression (ZMod p)))
   have hAdd := addAssertions (p := p) env addInput (offset + 8)
     rustA rustB rustValue.value (Expression.eval env input.is_real)
     (by
@@ -580,10 +614,10 @@ private theorem linkAddMeaningFaithful
     #v[(Eval.eval env input.state).pc[0],
       (Eval.eval env input.state).pc[1],
       (Eval.eval env input.state).pc[2], 0]
-  let rustValue : Extracted.AddOperation (ZMod p) :=
+  let rustValue : Extracted.JalOracle.AddOperation (ZMod p) :=
     Eval.eval env
       ({ value := linkValue offset } :
-        Extracted.AddOperation (Expression (ZMod p)))
+        Extracted.JalOracle.AddOperation (Expression (ZMod p)))
   let rustGate : ZMod p :=
     Expression.eval env input.is_real -
       (Eval.eval env input.adapter).op_a_0
@@ -627,7 +661,7 @@ private theorem jTypeMeaningFaithful
   let rustValue : Word (ZMod p) :=
     (Eval.eval env
       ({ value := value } :
-        Extracted.AddOperation (Expression (ZMod p)))).value
+        Extracted.JalOracle.AddOperation (Expression (ZMod p)))).value
   have hRustValue : rustValue = Eval.eval env value := by
     simp only [rustValue]
     rw [evalAddOperation]
@@ -712,7 +746,7 @@ private theorem rustMeaningFaithful
     linkAddMeaningFaithful, jTypeMeaningFaithful,
     writeMeaningTrue]
   dsimp only [rustColumns]
-  simp only [evalAddOperation, evalJTypeReader,
+  simp only [evalAddOperationColumns, evalJTypeReader,
     ← ProvableType.getElem_eval_fields,
     ProvableType.eval_field, eval_sub, Expression.eval,
     true_and]
@@ -733,7 +767,7 @@ private theorem constraintsFaithfulOutput
 theorem jalChipConstraintsFaithful
     (env : Environment (ZMod p))
     (input : Var JalChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.JalColumns (ZMod p))
+    (cols : JalChip.Columns (ZMod p))
     (hbind : BindsChipOutput JalChip.main env input offset cols) :
     List.Forall (· = 0)
         (jalChipOracle.nativeAssertZeros cols) ↔
@@ -751,7 +785,7 @@ theorem jalChipConstraintsFaithful
   exact constraintsFaithfulOutput (p := p) env input offset
 
 theorem jalChipConstraintsConstructive
-    (rustCols : Extracted.JalColumns (ZMod p))
+    (rustCols : Extracted.JalOracle.JalColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := jalChipRowCodec.assignment
       (jalChipOracle.deconfigure rustCols) data
@@ -804,8 +838,8 @@ private theorem stateInteractionsFaithful
     (((JalChip.exposedStateInteractions input offset).map
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)) =
-      (((Extracted.JalColumns.interactions
-          (rustColumns env input offset)).map
+      (((Extracted.JalOracle.JalColumns.interactions
+          (jalChipReconfigure (rustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.State)) := by
   have hStatePull :
@@ -836,11 +870,11 @@ private theorem stateInteractionsFaithful
     fun mult msg => toAccess_pushIf_state env mult msg
   simp only [JalChip.exposedStateInteractions,
     List.map_cons, List.map_nil, hStatePull, hStatePush]
-  simp [Extracted.JalColumns.interactions,
-    Extracted.AddOperation.interactions,
+  simp [jalChipReconfigure, Extracted.JalOracle.JalColumns.interactions,
+    Extracted.JalOracle.AddOperation.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     rustColumns, jumpValue, eval_cpuState, evalJTypeReader,
-    evalAddOperation, ← ProvableType.getElem_eval_fields,
+    evalAddOperationColumns, ← ProvableType.getElem_eval_fields,
     Vector.getElem_mapRange, ProvableType.eval_field, Expression.eval]
 
 private theorem permFourBlocks {α : Type}
@@ -863,8 +897,8 @@ private theorem byteInteractionsFaithful
       (((JalChip.exposedByteInteractions input offset).map
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env))
-      (((Extracted.JalColumns.interactions
-          (rustColumns env input offset)).map
+      (((Extracted.JalOracle.JalColumns.interactions
+          (jalChipReconfigure (rustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
   haveI : NeZero p :=
@@ -893,10 +927,10 @@ private theorem byteInteractionsFaithful
     fun gate msg => toAccess_pullIf_byte env gate msg
   simp only [JalChip.exposedByteInteractions,
     List.map_cons, List.map_nil, hBytePull]
-  simp [Extracted.JalColumns.interactions,
-    Extracted.AddOperation.interactions,
+  simp [jalChipReconfigure, Extracted.JalOracle.JalColumns.interactions,
+    Extracted.JalOracle.AddOperation.interactions,
     rustColumns, jumpValue, linkValue,
-    eval_cpuState, evalJTypeReader, evalAddOperation,
+    eval_cpuState, evalJTypeReader, evalAddOperationColumns,
     ← ProvableType.getElem_eval_fields,
     Vector.getElem_mapRange, ProvableType.eval_field,
     Expression.eval, h6, h3,
@@ -917,8 +951,8 @@ private theorem memoryInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)) =
-      (((Extracted.JalColumns.interactions
-          (rustColumns env input offset)).map
+      (((Extracted.JalOracle.JalColumns.interactions
+          (jalChipReconfigure (rustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Memory)) := by
   have hp2 : 2 < p := by
@@ -960,10 +994,10 @@ private theorem memoryInteractionsFaithful
     fun mult msg => toAccess_pushIf_memory env mult msg
   simp only [JalChip.exposedMemoryInteractions,
     List.map_cons, List.map_nil, hMemoryPull, hMemoryPush]
-  simp [Extracted.JalColumns.interactions,
-    Extracted.AddOperation.interactions,
+  simp [jalChipReconfigure, Extracted.JalOracle.JalColumns.interactions,
+    Extracted.JalOracle.AddOperation.interactions,
     rustColumns, jumpValue, linkValue,
-    eval_cpuState, evalJTypeReader, evalAddOperation,
+    eval_cpuState, evalJTypeReader, evalAddOperationColumns,
     eval_registerAccessCols, eval_registerAccessTimestamp,
     ← ProvableType.getElem_eval_fields,
     Vector.getElem_mapRange, ProvableType.eval_field,
@@ -978,8 +1012,8 @@ private theorem programInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)) =
-      (((Extracted.JalColumns.interactions
-          (rustColumns env input offset)).map
+      (((Extracted.JalOracle.JalColumns.interactions
+          (jalChipReconfigure (rustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Program)) := by
   have hp2 : 2 < p := by
@@ -1016,10 +1050,10 @@ private theorem programInteractionsFaithful
     fun gate msg => toAccess_pullIf_program env gate msg
   simp only [JalChip.exposedProgramInteractions,
     List.map_cons, List.map_nil, hProgramPull]
-  simp [Extracted.JalColumns.interactions,
-    Extracted.AddOperation.interactions,
+  simp [jalChipReconfigure, Extracted.JalOracle.JalColumns.interactions,
+    Extracted.JalOracle.AddOperation.interactions,
     rustColumns, eval_cpuState, evalJTypeReader,
-    evalAddOperation, ← ProvableType.getElem_eval_fields,
+    evalAddOperationColumns, ← ProvableType.getElem_eval_fields,
     ProvableType.eval_field, Expression.eval,
     LookupAccessList.negMult, signedVal_neg hp2,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
@@ -1050,7 +1084,7 @@ private theorem unexpectedInteractionsEmpty
 theorem jalChipInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var JalChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.JalColumns (ZMod p))
+    (cols : JalChip.Columns (ZMod p))
     (hbind : BindsChipOutput JalChip.main env input offset cols) :
     List.Perm
       (nativeAccesses env
@@ -1065,15 +1099,14 @@ theorem jalChipInteractionsFaithful
   change rustColumns env input offset = cols at hbind
   subst cols
   let rustAccesses :=
-    (Extracted.JalColumns.interactions
-      (rustColumns env input offset)).map
+    (Extracted.JalOracle.JalColumns.interactions
+      (jalChipReconfigure (rustColumns env input offset))).map
         Extracted.Interaction.toAccess
   simp only [nativeAccesses]
   rw [unexpectedInteractionsEmpty]
   simp only [List.map_nil, List.append_nil]
   simp only [ChipOracle.accesses,
-    ChipOracle.nativeInteractions, jalChipOracle,
-    ChipOracle.identity, id_eq]
+    ChipOracle.nativeInteractions, jalChipOracle]
   rw [JalChip.interactionsWith_state_eq,
     JalChip.interactionsWith_byte_eq,
     JalChip.interactionsWith_memory_eq,
@@ -1095,7 +1128,7 @@ theorem jalChipInteractionsFaithful
     (hByte.append_left _).append_right _
 
 theorem jalChipInteractionsConstructive
-    (rustCols : Extracted.JalColumns (ZMod p))
+    (rustCols : Extracted.JalOracle.JalColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := jalChipRowCodec.assignment
       (jalChipOracle.deconfigure rustCols) data
@@ -1133,7 +1166,7 @@ theorem jalChipInteractionsConstructive
 
 theorem jalChip_faithful :
     ChipFaithful (p := p) JalChip.Inputs
-      Extracted.JalColumns Extracted.JalColumns
+      JalChip.Columns Extracted.JalOracle.JalColumns
       JalChip.circuit jalChipRowCodec jalChipOracle where
   constraints := jalChipConstraintsConstructive (p := p)
   interactions := fun rustCols data _ =>

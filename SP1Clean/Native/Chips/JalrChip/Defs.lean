@@ -5,7 +5,6 @@ import SP1Clean.Native.Readers.ITypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
-import SP1Clean.Extracted.JalrChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -22,7 +21,6 @@ SP1's `Jalr` `air.rs:eval`. -/
 namespace SP1Clean.JalrChip
 
 open Circuit
-open Extracted (JalrColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -54,7 +52,7 @@ def lsbBit (input : Inputs (ZMod p)) : ZMod p :=
 /-- Witness the two add results (`add_operation.value` = `rs1 + imm`, `op_a_operation.value` = `pc + 4`)
 and the `lsb` scalar via `populate`, then compose as Clean `assertion`s. `CPUState` is fed the LSB-cleared
 `next_pc`; the link add's gate is `is_real - op_a_0`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalrColumns (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let add_value ← witnessVectorNative 4 (fun env =>
     AddOperation.populate
       #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
@@ -97,23 +95,23 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalrColumns (ZMod
   -- Pinned Rust: `when_not(is_real).assert_zero(op_a_0)`.
   assertZero ((input.is_real - 1) * input.adapter.op_a_0)
   assertZero (input.is_real * (input.is_real - 1))
-  return ⟨input.state, input.adapter, input.is_real, ⟨add_value⟩, ⟨op_a_value⟩, lsb⟩
+  return ⟨input.is_real, input.state, input.adapter, ⟨add_value⟩, ⟨op_a_value⟩, lsb⟩
 
 /-- Derive the nine witness cells and the complete four-channel interface structurally from `main`. -/
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalrColumns main := by
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit
 
 /-- Folded completed-row layout used by the whole-chip Rust AIR codec. -/
 @[circuit_norm] lemma directOutput_eq
     (input : Var Inputs (ZMod p)) (offset : ℕ) :
     (elaborated (p := p)).output input offset =
-      (⟨input.state, input.adapter, input.is_real,
+      (⟨input.is_real, input.state, input.adapter,
         ⟨Vector.mapRange 4 fun i =>
           var { index := offset + i }⟩,
         ⟨Vector.mapRange 4 fun i =>
           var { index := offset + 4 + i }⟩,
         var { index := offset + 8 }⟩ :
-        Var JalrColumns (ZMod p)) := rfl
+        Var Columns (ZMod p)) := rfl
 
 /-- Component-wise evaluation of the independent JALR input prefix. -/
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
@@ -128,15 +126,15 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalrColumns main := by
 
 /-- Component-wise evaluation of the completed JALR row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : JalrColumns (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
-      ({ state := Eval.eval env cols.state,
+      ({ is_real := Eval.eval env cols.is_real,
+         state := Eval.eval env cols.state,
          adapter := Eval.eval env cols.adapter,
-         is_real := Eval.eval env cols.is_real,
          add_operation := Eval.eval env cols.add_operation,
          op_a_operation := Eval.eval env cols.op_a_operation,
          lsb := Eval.eval env cols.lsb } :
-        JalrColumns F) := by
+        Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 

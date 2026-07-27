@@ -4,7 +4,6 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ITypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.AddiChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -20,28 +19,27 @@ The `is_real`-gated semantic `Spec` (RV64 `add` identity on `cols.add_operation.
 namespace SP1Clean.AddiChip
 
 open Circuit
-open Extracted (AddiCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- **Assertion half** — the literal meaning of SP1's `AddiCols.asserts` *own* (inline) assertZero tail
 (everything past the composed `AddOperation`/`CPUState`/`ITypeReader` sub-lists), in extracted order
-(`Extracted/AddiChip.lean`: `E1, op_a_0`): the `is_real` binary gate and the `op_a_0` zeroing flag. -/
-def AssertSpec (cols : AddiCols (ZMod p)) : Prop :=
+(`Extracted/ChipOracle/Addi.lean`: `E1, op_a_0`): the `is_real` binary gate and the `op_a_0` zeroing flag. -/
+def AssertSpec (cols : Columns (ZMod p)) : Prop :=
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0
 
 /-- **Interaction half** — SP1's `AddiCols.interactions` *own* tail is **empty**
-(`Extracted/AddiChip.lean` ends `… ++ [ ]`): every byte-range pull lives inside the composed
+(`Extracted/ChipOracle/Addi.lean` ends `… ++ [ ]`): every byte-range pull lives inside the composed
 `AddOperation`/`CPUState`/`ITypeReader` sub-lists, anchored there. So the chip's own interaction meaning
 is trivial. -/
-def InteractSpec (_cols : AddiCols (ZMod p)) : Prop := True
+def InteractSpec (_cols : Columns (ZMod p)) : Prop := True
 
 /-- Compose the `CPUState`/`AddOperation`/`ITypeReader` sub-circuits, witness the ALU result word via
-`AddOperation.populate`, gate `is_real`, and assemble the extracted `AddiCols` struct. The `ITypeReader`
+`AddOperation.populate`, gate `is_real`, and assemble the native `Columns` struct. The `ITypeReader`
 carries opcode `1` and the four `op_a_write_value` limbs. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AddiCols (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let value ← witnessVectorNative 4 (fun env =>
@@ -67,12 +65,12 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AddiCols (ZMod p)
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
   -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
   assertZero (input.is_real * (input.is_real - 1))
-  return ⟨input.state, input.adapter, ⟨value⟩, input.is_real⟩
+  return ⟨input.is_real, input.state, input.adapter, ⟨value⟩⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddiCols main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output input offset :=
-    ⟨input.state, input.adapter,
-      ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩, input.is_real⟩
+    ⟨input.is_real, input.state, input.adapter,
+      ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩⟩
   output_eq := by
     intro input offset
     simp only [main, circuit_norm]
@@ -87,9 +85,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddiCols main where
 /-- The explicit completed row, used by chip-boundary proofs without unfolding the composed `main`. -/
 @[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     (elaborated (p := p)).output input offset =
-      (⟨input.state, input.adapter,
-        ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩, input.is_real⟩ :
-        Var AddiCols (ZMod p)) := rfl
+      (⟨input.is_real, input.state, input.adapter,
+        ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩⟩ :
+        Var Columns (ZMod p)) := rfl
 
 /-- Component-wise evaluation of Addi's independent input row. -/
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
@@ -102,11 +100,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddiCols main where
 
 /-- Component-wise evaluation of Addi's completed output row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : AddiCols (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
-      ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
-         add_operation := Eval.eval env cols.add_operation,
-         is_real := Eval.eval env cols.is_real } : AddiCols F) := by
+      ({ is_real := Eval.eval env cols.is_real, state := Eval.eval env cols.state,
+         adapter := Eval.eval env cols.adapter,
+         add_operation := Eval.eval env cols.add_operation } : Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 

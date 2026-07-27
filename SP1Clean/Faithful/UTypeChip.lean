@@ -1,4 +1,5 @@
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Extracted.ChipOracle.UType
 import SP1Clean.Proofs.Chips.UTypeChip.Formal
 
 /-! # Whole-chip faithfulness — native UType row ↔ pinned SP1 Rust AIR
@@ -25,32 +26,59 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-def uTypeChipOracle :
-    ChipOracle (ZMod p) Extracted.UTypeColumns Extracted.UTypeColumns :=
-  ChipOracle.identity Extracted.UTypeColumns.asserts
-    Extracted.UTypeColumns.interactions
+/-- Whole-chip row reconfiguration. The reader blocks are already the canonical generated substrate,
+so only the native arithmetic block is copied into Rust's chip-private operation row. This is not an
+operation-level faithfulness claim. -/
+def uTypeChipReconfigure {F : Type} (cols : UTypeChip.Columns F) :
+    Extracted.UTypeOracle.UTypeColumns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    addend := cols.addend
+    add_operation := { value := cols.add_operation.value }
+    is_auipc := cols.is_auipc
+    is_real := cols.is_real }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def uTypeChipDeconfigure {F : Type} (cols : Extracted.UTypeOracle.UTypeColumns F) :
+    UTypeChip.Columns F :=
+  { is_real := cols.is_real
+    state := cols.state
+    adapter := cols.adapter
+    addend := cols.addend
+    add_operation := { value := cols.add_operation.value }
+    is_auipc := cols.is_auipc }
+
+/-- SP1 Rust's complete U-type-chip oracle, viewed from the native Lean row. -/
+def uTypeChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F UTypeChip.Columns Extracted.UTypeOracle.UTypeColumns where
+  reconfigure := uTypeChipReconfigure
+  deconfigure := uTypeChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.UTypeOracle.UTypeColumns.asserts
+  interactions := Extracted.UTypeOracle.UTypeColumns.interactions
 
 def uTypeChipInput {F : Type}
-    (cols : Extracted.UTypeColumns F) : UTypeChip.Inputs F :=
+    (cols : UTypeChip.Columns F) : UTypeChip.Inputs F :=
   { is_real := cols.is_real, state := cols.state, adapter := cols.adapter,
     is_auipc := cols.is_auipc }
 
 def uTypeChipLocals {F : Type}
-    (cols : Extracted.UTypeColumns F) : Vector F 7 :=
+    (cols : UTypeChip.Columns F) : Vector F 7 :=
   #v[cols.addend[0], cols.addend[1], cols.addend[2],
     cols.add_operation.value[0], cols.add_operation.value[1],
     cols.add_operation.value[2], cols.add_operation.value[3]]
 
 def uTypeChipPhysicalRow {F : Type}
-    (cols : Extracted.UTypeColumns F) : Array F :=
+    (cols : UTypeChip.Columns F) : Array F :=
   inputFirstRow (uTypeChipInput cols) (uTypeChipLocals cols)
 
 def uTypeChipColumnsOfInput {F : Type}
     (input : UTypeChip.Inputs F) (locals : Vector F 7) :
-    Extracted.UTypeColumns F :=
-  ⟨input.state, input.adapter, #v[locals[0], locals[1], locals[2]],
+    UTypeChip.Columns F :=
+  ⟨input.is_real, input.state, input.adapter, #v[locals[0], locals[1], locals[2]],
     ⟨#v[locals[3], locals[4], locals[5], locals[6]]⟩,
-    input.is_auipc, input.is_real⟩
+    input.is_auipc⟩
 
 private theorem vec3_eta {F : Type} (value : Vector F 3) :
     #v[value[0], value[1], value[2]] = value := by
@@ -66,10 +94,19 @@ private theorem vec4_eta {F : Type} (value : Vector F 4) :
 
 @[circuit_norm] private theorem eval_extractedAddOperation
     {F : Type} [FiniteField F] (env : Environment F)
-    (cols : Extracted.AddOperation (Expression F)) :
+    (cols : Extracted.UTypeOracle.AddOperation (Expression F)) :
     Eval.eval env cols =
       ({ value := Eval.eval env cols.value } :
-        Extracted.AddOperation F) := by
+        Extracted.UTypeOracle.AddOperation F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+@[circuit_norm] private theorem evalAddOperationColumns
+    {F : Type} [FiniteField F] (env : Environment F)
+    (cols : AddOperation.Columns (Expression F)) :
+    Eval.eval env cols =
+      ({ value := Eval.eval env cols.value } :
+        AddOperation.Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
@@ -111,7 +148,7 @@ private theorem evalVec4Literal {F : Type} [FiniteField F]
   interval_cases i <;> rfl
 
 theorem uTypeChipColumnsOfInput_roundtrip {F : Type}
-    (cols : Extracted.UTypeColumns F) :
+    (cols : UTypeChip.Columns F) :
     uTypeChipColumnsOfInput (uTypeChipInput cols) (uTypeChipLocals cols) = cols := by
   cases cols
   simp [uTypeChipColumnsOfInput, uTypeChipInput, uTypeChipLocals,
@@ -127,10 +164,12 @@ theorem eval_uTypeChipDirectOutput
   rw [UTypeChip.directOutput_eq]
   rw [← CircuitType.eval_expression, UTypeChip.eval_columns]
   unfold uTypeChipColumnsOfInput
-  rw [Extracted.UTypeColumns.mk.injEq]
+  rw [UTypeChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input locals data
   rw [UTypeChip.eval_inputs, UTypeChip.Inputs.mk.injEq] at hinputEval
+  constructor
+  · exact hinputEval.1
   constructor
   · exact hinputEval.2.1
   constructor
@@ -155,8 +194,8 @@ theorem eval_uTypeChipDirectOutput
         List.getElem_cons_zero, List.getElem_cons_succ] using
         (eval_local_inputFirstRow input locals data 2 (by decide))
   constructor
-  · rw [Extracted.AddOperation.mk.injEq]
-    rw [eval_extractedAddOperation]
+  · rw [AddOperation.Columns.mk.injEq]
+    rw [evalAddOperationColumns]
     apply Vector.ext
     intro i hi
     rw [← ProvableType.getElem_eval_fields
@@ -177,12 +216,10 @@ theorem eval_uTypeChipDirectOutput
     · simpa only [Vector.getElem_mk, List.getElem_toArray,
         List.getElem_cons_zero, List.getElem_cons_succ, Nat.add_assoc] using
         (eval_local_inputFirstRow input locals data 6 (by decide))
-  constructor
   · exact hinputEval.2.2.2
-  · exact hinputEval.1
 
 def uTypeChipRowCodec :
-    ChipRowCodec UTypeChip.Inputs Extracted.UTypeColumns
+    ChipRowCodec UTypeChip.Inputs UTypeChip.Columns
       (UTypeChip.circuit (p := p)) where
   assignment cols data := {
     row := uTypeChipPhysicalRow cols
@@ -284,13 +321,13 @@ private theorem addOperationAssertions
     (hv : (ProvableStruct.eval env input.cols).value = value)
     (hr : (ProvableStruct.eval env input).is_real = isReal) :
     List.Forall (· = 0)
-        (Extracted.AddOperation.asserts (F := ZMod p)
+        (Extracted.UTypeOracle.AddOperation.asserts (F := ZMod p)
           a b { value := value } isReal) ↔
       List.Forall (· = 0)
         (nativeAssertZeros env
           ((AddOperation.main input).operations offset)) := by
   simp [nativeAssertZeros, AddOperation.main,
-    Extracted.AddOperation.asserts, circuit_norm]
+    Extracted.UTypeOracle.AddOperation.asserts, circuit_norm]
   rw [ha, hb, hv, hr]
 
 omit [Fact (2 ^ 17 < p)] in
@@ -477,23 +514,23 @@ private theorem jTypeEta {F : Type}
   simp [vec4_eta]
 
 private theorem addOperationEta {F : Type}
-    (cols : Extracted.AddOperation F) :
+    (cols : Extracted.UTypeOracle.AddOperation F) :
     ({ value :=
         #v[cols.value[0], cols.value[1],
           cols.value[2], cols.value[3]] } :
-      Extracted.AddOperation F) = cols := by
+      Extracted.UTypeOracle.AddOperation F) = cols := by
   cases cols
   simp [vec4_eta]
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem uTypeColumnsAssertsDecompose
-    (cols : Extracted.UTypeColumns (ZMod p)) :
-    Extracted.UTypeColumns.asserts cols =
+    (cols : Extracted.UTypeOracle.UTypeColumns (ZMod p)) :
+    Extracted.UTypeOracle.UTypeColumns.asserts cols =
       Extracted.CPUState.asserts cols.state
         #v[cols.state.pc[0] + 4,
           cols.state.pc[1], cols.state.pc[2]]
         8 cols.is_real ++
-      Extracted.AddOperation.asserts (F := ZMod p)
+      Extracted.UTypeOracle.AddOperation.asserts (F := ZMod p)
         #v[cols.addend[0], cols.addend[1],
           cols.addend[2], 0]
         #v[cols.adapter.op_b_imm[0],
@@ -520,7 +557,7 @@ private theorem uTypeColumnsAssertsDecompose
           cols.is_auipc * cols.state.pc[2],
         0,
         (cols.is_real - 1) * cols.adapter.op_a_0 ] := by
-  rw [Extracted.UTypeColumns.asserts]
+  rw [Extracted.UTypeOracle.UTypeColumns.asserts]
   rw [cpuStateEta, addOperationEta, jTypeEta,
     vec3_eta, vec4_eta cols.add_operation.value]
   simp only [mul_zero, add_zero, sub_zero]
@@ -528,8 +565,9 @@ private theorem uTypeColumnsAssertsDecompose
 private def uTypeRustColumns
     (env : Environment (ZMod p))
     (input : Var UTypeChip.Inputs (ZMod p)) (offset : ℕ) :
-    Extracted.UTypeColumns (ZMod p) :=
-  { state := Eval.eval env input.state
+    UTypeChip.Columns (ZMod p) :=
+  { is_real := Expression.eval env input.is_real
+    state := Eval.eval env input.state
     adapter := Eval.eval env input.adapter
     addend := Eval.eval env
       (#v[var ⟨offset⟩, var ⟨offset + 1⟩,
@@ -537,9 +575,8 @@ private def uTypeRustColumns
         Vector (Expression (ZMod p)) 3)
     add_operation := Eval.eval env
       ({ value := uTypeChipValue offset } :
-        Extracted.AddOperation (Expression (ZMod p)))
-    is_auipc := Expression.eval env input.is_auipc
-    is_real := Expression.eval env input.is_real }
+        AddOperation.Columns (Expression (ZMod p)))
+    is_auipc := Expression.eval env input.is_auipc }
 
 private def uTypeRustCpuMeaning
     (env : Environment (ZMod p))
@@ -555,7 +592,7 @@ private def uTypeRustAddMeaning
     (env : Environment (ZMod p))
     (input : Var UTypeChip.Inputs (ZMod p)) (offset : ℕ) : Prop :=
   List.Forall (· = 0)
-    (Extracted.AddOperation.asserts (F := ZMod p)
+    (Extracted.UTypeOracle.AddOperation.asserts (F := ZMod p)
       #v[(Eval.eval env
           (#v[var ⟨offset⟩, var ⟨offset + 1⟩,
             var ⟨offset + 2⟩] :
@@ -575,7 +612,7 @@ private def uTypeRustAddMeaning
         (Eval.eval env input.adapter).op_b_imm[3]]
       (Eval.eval env
         ({ value := uTypeChipValue offset } :
-          Extracted.AddOperation (Expression (ZMod p))))
+          Extracted.UTypeOracle.AddOperation (Expression (ZMod p))))
       (Expression.eval env input.is_real -
         (Eval.eval env input.adapter).op_a_0))
 
@@ -592,7 +629,7 @@ private def uTypeRustJTypeMeaning
         (1 - Expression.eval env input.is_auipc) * 49)
       (Eval.eval env
         ({ value := uTypeChipValue offset } :
-          Extracted.AddOperation (Expression (ZMod p)))).value
+          Extracted.UTypeOracle.AddOperation (Expression (ZMod p)))).value
       (Eval.eval env input.adapter)
       (Expression.eval env input.is_real)
       (Expression.eval env input.is_real))
@@ -634,7 +671,7 @@ private theorem uTypeRustAssertionsDecompose
           (uTypeRustColumns env input offset)) ↔
       uTypeRustAssertionMeaning env input offset := by
   simp only [ChipOracle.nativeAssertZeros,
-    uTypeChipOracle, ChipOracle.identity, id_eq]
+    uTypeChipOracle, uTypeChipReconfigure]
   rw [uTypeColumnsAssertsDecompose]
   simp only [List.forall_append, List.forall_cons,
     forallNilIff, and_true]
@@ -642,6 +679,7 @@ private theorem uTypeRustAssertionsDecompose
     uTypeRustAddMeaning uTypeRustJTypeMeaning
     uTypeRustScalarMeaning
   dsimp only [uTypeRustColumns]
+  simp only [eval_extractedAddOperation, evalAddOperationColumns]
   tauto
 
 omit [Fact (2 ^ 17 < p)] in
@@ -696,10 +734,10 @@ private theorem uTypeAddMeaningFaithful
       (Eval.eval env input.adapter).op_b_imm[1],
       (Eval.eval env input.adapter).op_b_imm[2],
       (Eval.eval env input.adapter).op_b_imm[3]]
-  let rustValue : Extracted.AddOperation (ZMod p) :=
+  let rustValue : Extracted.UTypeOracle.AddOperation (ZMod p) :=
     Eval.eval env
       ({ value := value } :
-        Extracted.AddOperation (Expression (ZMod p)))
+        Extracted.UTypeOracle.AddOperation (Expression (ZMod p)))
   let rustIsReal : ZMod p :=
     Expression.eval env input.is_real -
       (Eval.eval env input.adapter).op_a_0
@@ -757,7 +795,7 @@ private theorem uTypeJTypeMeaningFaithful
   let rustValue : Word (ZMod p) :=
     (Eval.eval env
       ({ value := value } :
-        Extracted.AddOperation (Expression (ZMod p)))).value
+        Extracted.UTypeOracle.AddOperation (Expression (ZMod p)))).value
   have hRustValue :
       rustValue = Eval.eval env value := by
     simp only [rustValue]
@@ -898,7 +936,7 @@ private theorem uTypeChipConstraintsFaithfulOutput
 theorem uTypeChipConstraintsFaithful
     (env : Environment (ZMod p))
     (input : Var UTypeChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.UTypeColumns (ZMod p))
+    (cols : UTypeChip.Columns (ZMod p))
     (hbind : BindsChipOutput UTypeChip.main env input offset cols) :
     List.Forall (· = 0)
         (uTypeChipOracle.nativeAssertZeros cols) ↔
@@ -919,7 +957,7 @@ theorem uTypeChipConstraintsFaithful
         (p := p) env input offset).symm
 
 theorem uTypeChipConstraintsConstructive
-    (rustCols : Extracted.UTypeColumns (ZMod p))
+    (rustCols : Extracted.UTypeOracle.UTypeColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := uTypeChipRowCodec.assignment
       (uTypeChipOracle.deconfigure rustCols) data
@@ -966,13 +1004,13 @@ theorem uTypeChipConstraintsConstructive
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem uTypeColumnsInteractionsDecompose
-    (cols : Extracted.UTypeColumns (ZMod p)) :
-    Extracted.UTypeColumns.interactions cols =
+    (cols : Extracted.UTypeOracle.UTypeColumns (ZMod p)) :
+    Extracted.UTypeOracle.UTypeColumns.interactions cols =
       Extracted.CPUState.interactions cols.state
         #v[cols.state.pc[0] + 4,
           cols.state.pc[1], cols.state.pc[2]]
         8 cols.is_real ++
-      Extracted.AddOperation.interactions
+      Extracted.UTypeOracle.AddOperation.interactions
         #v[cols.addend[0], cols.addend[1],
           cols.addend[2], 0]
         #v[cols.adapter.op_b_imm[0],
@@ -990,7 +1028,7 @@ private theorem uTypeColumnsInteractionsDecompose
           (1 - cols.is_auipc) * 49)
         cols.add_operation.value cols.adapter
         cols.is_real cols.is_real := by
-  rw [Extracted.UTypeColumns.interactions]
+  rw [Extracted.UTypeOracle.UTypeColumns.interactions]
   rw [cpuStateEta, addOperationEta, jTypeEta,
     vec3_eta, vec4_eta cols.add_operation.value]
   simp only [List.append_nil]
@@ -1005,8 +1043,8 @@ private theorem uTypeStateInteractionsFaithful
     (((UTypeChip.exposedStateInteractions input).map
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)) =
-      (((Extracted.UTypeColumns.interactions
-          (uTypeRustColumns env input offset)).map
+      (((Extracted.UTypeOracle.UTypeColumns.interactions
+          (uTypeChipReconfigure (uTypeRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.State)) := by
   have hStatePull :
@@ -1037,13 +1075,13 @@ private theorem uTypeStateInteractionsFaithful
     fun mult msg => toAccess_pushIf_state env mult msg
   simp only [UTypeChip.exposedStateInteractions,
     List.map_cons, List.map_nil, hStatePull, hStatePush]
-  simp [uTypeColumnsInteractionsDecompose,
+  simp [uTypeColumnsInteractionsDecompose, uTypeChipReconfigure,
     Extracted.CPUState.interactions,
-    Extracted.AddOperation.interactions,
+    Extracted.UTypeOracle.AddOperation.interactions,
     Extracted.JTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     uTypeRustColumns, eval_cpuState, evalJTypeReader,
-    eval_extractedAddOperation,
+    evalAddOperationColumns,
     ← ProvableType.getElem_eval_fields,
     ProvableType.eval_field, Expression.eval]
 
@@ -1053,8 +1091,8 @@ private theorem uTypeByteInteractionsFaithful
     (((UTypeChip.exposedByteInteractions input offset).map
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)) =
-      (((Extracted.UTypeColumns.interactions
-          (uTypeRustColumns env input offset)).map
+      (((Extracted.UTypeOracle.UTypeColumns.interactions
+          (uTypeChipReconfigure (uTypeRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
   haveI : NeZero p :=
@@ -1083,13 +1121,13 @@ private theorem uTypeByteInteractionsFaithful
     fun gate msg => toAccess_pullIf_byte env gate msg
   simp only [UTypeChip.exposedByteInteractions,
     List.map_cons, List.map_nil, hBytePull]
-  simp [uTypeColumnsInteractionsDecompose,
+  simp [uTypeColumnsInteractionsDecompose, uTypeChipReconfigure,
     Extracted.CPUState.interactions,
-    Extracted.AddOperation.interactions,
+    Extracted.UTypeOracle.AddOperation.interactions,
     Extracted.JTypeReader.interactions,
     uTypeRustColumns, uTypeChipValue,
     eval_cpuState, evalJTypeReader,
-    eval_extractedAddOperation,
+    evalAddOperationColumns,
     ← ProvableType.getElem_eval_fields,
     Vector.getElem_mapRange,
     ProvableType.eval_field, Expression.eval,
@@ -1110,8 +1148,8 @@ private theorem uTypeMemoryInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)) =
-      (((Extracted.UTypeColumns.interactions
-          (uTypeRustColumns env input offset)).map
+      (((Extracted.UTypeOracle.UTypeColumns.interactions
+          (uTypeChipReconfigure (uTypeRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Memory)) := by
   have hp2 : 2 < p := by
@@ -1153,13 +1191,13 @@ private theorem uTypeMemoryInteractionsFaithful
     fun mult msg => toAccess_pushIf_memory env mult msg
   simp only [UTypeChip.exposedMemoryInteractions,
     List.map_cons, List.map_nil, hMemoryPull, hMemoryPush]
-  simp [uTypeColumnsInteractionsDecompose,
+  simp [uTypeColumnsInteractionsDecompose, uTypeChipReconfigure,
     Extracted.CPUState.interactions,
-    Extracted.AddOperation.interactions,
+    Extracted.UTypeOracle.AddOperation.interactions,
     Extracted.JTypeReader.interactions,
     uTypeRustColumns, uTypeChipValue,
     eval_cpuState, evalJTypeReader,
-    eval_extractedAddOperation,
+    evalAddOperationColumns,
     eval_registerAccessCols, eval_registerAccessTimestamp,
     ← ProvableType.getElem_eval_fields,
     Vector.getElem_mapRange,
@@ -1175,8 +1213,8 @@ private theorem uTypeProgramInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)) =
-      (((Extracted.UTypeColumns.interactions
-          (uTypeRustColumns env input offset)).map
+      (((Extracted.UTypeOracle.UTypeColumns.interactions
+          (uTypeChipReconfigure (uTypeRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Program)) := by
   have hp2 : 2 < p := by
@@ -1208,12 +1246,12 @@ private theorem uTypeProgramInteractionsFaithful
     fun gate msg => toAccess_pullIf_program env gate msg
   simp only [UTypeChip.exposedProgramInteractions,
     List.map_cons, List.map_nil, hProgramPull]
-  simp [uTypeColumnsInteractionsDecompose,
+  simp [uTypeColumnsInteractionsDecompose, uTypeChipReconfigure,
     Extracted.CPUState.interactions,
-    Extracted.AddOperation.interactions,
+    Extracted.UTypeOracle.AddOperation.interactions,
     Extracted.JTypeReader.interactions,
     uTypeRustColumns, eval_cpuState, evalJTypeReader,
-    eval_extractedAddOperation,
+    evalAddOperationColumns,
     ← ProvableType.getElem_eval_fields,
     ProvableType.eval_field, eval_sub, Expression.eval,
     LookupAccessList.negMult, signedVal_neg hp2,
@@ -1245,7 +1283,7 @@ private theorem uTypeUnexpectedInteractionsEmpty
 theorem uTypeChipInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var UTypeChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.UTypeColumns (ZMod p))
+    (cols : UTypeChip.Columns (ZMod p))
     (hbind : BindsChipOutput UTypeChip.main env input offset cols) :
     List.Perm
       (nativeAccesses env
@@ -1260,15 +1298,14 @@ theorem uTypeChipInteractionsFaithful
   change uTypeRustColumns env input offset = cols at hbind
   subst cols
   let rustAccesses :=
-    (Extracted.UTypeColumns.interactions
-      (uTypeRustColumns env input offset)).map
+    (Extracted.UTypeOracle.UTypeColumns.interactions
+      (uTypeChipReconfigure (uTypeRustColumns env input offset))).map
         Extracted.Interaction.toAccess
   simp only [nativeAccesses]
   rw [uTypeUnexpectedInteractionsEmpty]
   simp only [List.map_nil, List.append_nil]
   simp only [ChipOracle.accesses,
-    ChipOracle.nativeInteractions, uTypeChipOracle,
-    ChipOracle.identity, id_eq]
+    ChipOracle.nativeInteractions, uTypeChipOracle]
   rw [UTypeChip.interactionsWith_state_eq,
     UTypeChip.interactionsWith_byte_eq,
     UTypeChip.interactionsWith_memory_eq,
@@ -1292,7 +1329,7 @@ theorem uTypeChipInteractionsFaithful
   rw [hState, hByte, hMemory, hProgram]
 
 theorem uTypeChipInteractionsConstructive
-    (rustCols : Extracted.UTypeColumns (ZMod p))
+    (rustCols : Extracted.UTypeOracle.UTypeColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := uTypeChipRowCodec.assignment
       (uTypeChipOracle.deconfigure rustCols) data
@@ -1330,7 +1367,7 @@ theorem uTypeChipInteractionsConstructive
 
 theorem uTypeChip_faithful :
     ChipFaithful (p := p) UTypeChip.Inputs
-      Extracted.UTypeColumns Extracted.UTypeColumns
+      UTypeChip.Columns Extracted.UTypeOracle.UTypeColumns
       UTypeChip.circuit uTypeChipRowCodec
       uTypeChipOracle where
   constraints := uTypeChipConstraintsConstructive (p := p)

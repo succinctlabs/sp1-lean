@@ -7,7 +7,6 @@ import Clean.Air.Circuit
 namespace SP1Clean.AddiChip
 
 open Circuit
-open Extracted (AddiCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -108,8 +107,8 @@ theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
 
 /-- The `Addi` chip row as a `GeneralFormalCircuit`: single-variant `is_real`-gated RV64 `add`
 semantic contract over a register source + immediate, composing the witnessed `AddOperation` gadget;
-output is the extracted `AddiCols` column struct. Soundness/completeness are fully proven. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs AddiCols :=
+output is the native `Columns` row. Soundness/completeness are fully proven. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,

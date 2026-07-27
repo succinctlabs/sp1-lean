@@ -4,7 +4,6 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.JTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.UTypeChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -20,7 +19,6 @@ Implements SP1's `UType` `air.rs:eval`. -/
 namespace SP1Clean.UTypeChip
 
 open Circuit
-open Extracted (UTypeColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -30,7 +28,7 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 /-- Witness the addend (3 limbs = `is_auipc * pc`) and add result (4 limbs), then compose `CPUState`,
 `AddOperation` (gate `is_real - op_a_0`), and `JTypeReader`. Pin the addend per-limb with
 `addend[i] = is_auipc * pc[i]` gates. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var UTypeColumns (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let addend ← witnessVectorNative 3 (fun env =>
     #v[env input.is_auipc * env input.state.pc[0],
        env input.is_auipc * env input.state.pc[1],
@@ -71,21 +69,21 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var UTypeColumns (ZMo
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
   -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
   assertZero (input.is_real * (input.is_real - 1))
-  return ⟨input.state, input.adapter, addend, ⟨add_value⟩, input.is_auipc, input.is_real⟩
+  return ⟨input.is_real, input.state, input.adapter, addend, ⟨add_value⟩, input.is_auipc⟩
 
 /-- The explicit-circuit elaborator computes the seven witness cells and the four-channel interface
 from `main`, and reuses its structural certificates instead of reducing the full operation list. -/
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs UTypeColumns main := by
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit
 
 /-- The explicit completed row, kept folded for whole-chip row codecs and faithfulness proofs. -/
 @[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     (elaborated (p := p)).output input offset =
-      (⟨input.state, input.adapter,
+      (⟨input.is_real, input.state, input.adapter,
         #v[var ⟨offset⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩],
         ⟨Vector.mapRange 4 fun i => var { index := offset + 3 + i }⟩,
-        input.is_auipc, input.is_real⟩ :
-        Var UTypeColumns (ZMod p)) := rfl
+        input.is_auipc⟩ :
+        Var Columns (ZMod p)) := rfl
 
 /-- Component-wise evaluation of UType's independent input row. -/
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
@@ -99,13 +97,13 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs UTypeColumns main := by
 
 /-- Component-wise evaluation of UType's completed output row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : UTypeColumns (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
-      ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
+      ({ is_real := Eval.eval env cols.is_real,
+         state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
          addend := Eval.eval env cols.addend,
          add_operation := Eval.eval env cols.add_operation,
-         is_auipc := Eval.eval env cols.is_auipc,
-         is_real := Eval.eval env cols.is_real } : UTypeColumns F) := by
+         is_auipc := Eval.eval env cols.is_auipc } : Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 

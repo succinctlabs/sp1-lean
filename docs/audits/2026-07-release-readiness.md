@@ -79,6 +79,18 @@ reproducible immutable git pins is a **release blocker** tracked outside this ca
   `Faithful/MulOperation.lean`. Census: `divRemChip_faithful` three-axiom clean;
   `mulChip_faithful` carries only the pre-existing disclosed `bv_decide` axioms.
   CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem} — 5/25.
+- **Addi + Jalr + Jal + UType — complete, all gates green, essentially zero proof repair** (a
+  handful of unused-simp-arg removals; Jal and UType compiled first try). First exercise of the
+  reader-family generator config: `ITypeReader` + `JTypeReader` added to the shared-struct and
+  imported-helper sets (nested register-access structs resolve via the existing STRUCT_OWNERSHIP
+  pins; RTypeReader not needed in the closures). Second generator fix landed:
+  `render_chip_oracle`'s namespace marker now accepts both `<Chip>Cols` and `<Chip>Columns`
+  spellings (Jal/Jalr/UType use the latter — fail-loud if neither). `Extracted/AddOperation.lean`
+  stays standalone (DivRem layer still imports it); each oracle embeds a private struct-stripped
+  copy, and this batch's Faithful AddOperation lemmas were file-private so they re-pointed
+  directly (no namespace bridges needed). Grounding files needed ZERO changes (they consume the
+  chips symbolically through `directOutput_eq`/`eval_columns`).
+  CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem, Addi, Jalr, Jal, UType} — **9/25**.
 
 ## Phase 3 — audit findings
 

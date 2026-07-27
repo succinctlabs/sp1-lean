@@ -1,13 +1,14 @@
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Extracted.ChipOracle.Addi
 import SP1Clean.Native.Chips.AddiChip.Defs
 import SP1Clean.Proofs.Chips.AddiChip.Formal
-import SP1Clean.Extracted.AddiChip
 
 /-! # Whole-chip faithfulness — native Addi row ↔ pinned SP1 Rust AIR
 
 `addiChip_faithful` compares every native assertion and emitted bus interaction with the complete
-extracted Rust `AddiCols` oracle, including padding rows. The native add gadget and Rust's
-`AddOperation` remain independent decompositions; they meet only through the completed chip row.
+extracted Rust `AddiOracle.AddiCols` oracle after one explicit row reconfiguration, including padding
+rows. The native add gadget and Rust's `AddOperation` remain independent decompositions; they meet
+only through the completed chip row.
 The I-type destination write that Clean factors into `RegisterWrite` is recombined with the reader
 before the Memory interaction multiset is compared. -/
 
@@ -19,28 +20,52 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-def addiChipOracle :
-    ChipOracle (ZMod p) Extracted.AddiCols Extracted.AddiCols :=
-  ChipOracle.identity Extracted.AddiCols.asserts Extracted.AddiCols.interactions
+/-- Whole-chip row reconfiguration. The reader blocks are already the canonical generated substrate,
+so only the native arithmetic block is copied into Rust's chip-private operation row. This is not an
+operation-level faithfulness claim. -/
+def addiChipReconfigure {F : Type} (cols : AddiChip.Columns F) :
+    Extracted.AddiOracle.AddiCols F :=
+  { state := cols.state
+    adapter := cols.adapter
+    add_operation := { value := cols.add_operation.value }
+    is_real := cols.is_real }
 
-def addiChipInput {F : Type} (cols : Extracted.AddiCols F) : AddiChip.Inputs F :=
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def addiChipDeconfigure {F : Type} (cols : Extracted.AddiOracle.AddiCols F) :
+    AddiChip.Columns F :=
+  { is_real := cols.is_real
+    state := cols.state
+    adapter := cols.adapter
+    add_operation := { value := cols.add_operation.value } }
+
+/-- SP1 Rust's complete Addi-chip oracle, viewed from the native Lean row. -/
+def addiChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F AddiChip.Columns Extracted.AddiOracle.AddiCols where
+  reconfigure := addiChipReconfigure
+  deconfigure := addiChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.AddiOracle.AddiCols.asserts
+  interactions := Extracted.AddiOracle.AddiCols.interactions
+
+def addiChipInput {F : Type} (cols : AddiChip.Columns F) : AddiChip.Inputs F :=
   { is_real := cols.is_real, state := cols.state, adapter := cols.adapter }
 
-def addiChipPhysicalRow {F : Type} (cols : Extracted.AddiCols F) : Array F :=
+def addiChipPhysicalRow {F : Type} (cols : AddiChip.Columns F) : Array F :=
   inputFirstRow (addiChipInput cols) cols.add_operation.value
 
 def addiChipColumnsOfInput {F : Type} (input : AddiChip.Inputs F) (value : Word F) :
-    Extracted.AddiCols F :=
-  ⟨input.state, input.adapter, ⟨value⟩, input.is_real⟩
+    AddiChip.Columns F :=
+  ⟨input.is_real, input.state, input.adapter, ⟨value⟩⟩
 
 @[circuit_norm] theorem eval_extractedAddOperation {F : Type} [FiniteField F]
-    (env : Environment F) (cols : Extracted.AddOperation (Expression F)) :
+    (env : Environment F) (cols : AddOperation.Columns (Expression F)) :
     Eval.eval env cols =
-      ({ value := Eval.eval env cols.value } : Extracted.AddOperation F) := by
+      ({ value := Eval.eval env cols.value } : AddOperation.Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
-theorem addiChipColumnsOfInput_roundtrip {F : Type} (cols : Extracted.AddiCols F) :
+theorem addiChipColumnsOfInput_roundtrip {F : Type} (cols : AddiChip.Columns F) :
     addiChipColumnsOfInput (addiChipInput cols) cols.add_operation.value = cols := by
   cases cols
   rfl
@@ -55,26 +80,26 @@ theorem eval_addiChipDirectOutput
   rw [AddiChip.directOutput_eq]
   rw [← CircuitType.eval_expression, AddiChip.eval_columns]
   unfold addiChipColumnsOfInput
-  rw [Extracted.AddiCols.mk.injEq]
+  rw [AddiChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input value data
   rw [AddiChip.eval_inputs, AddiChip.Inputs.mk.injEq] at hinputEval
   constructor
+  · exact hinputEval.1
+  constructor
   · exact hinputEval.2.1
   constructor
   · exact hinputEval.2.2
-  constructor
-  · rw [Extracted.AddOperation.mk.injEq]
-    rw [eval_extractedAddOperation]
-    ext i hi
-    rw [← ProvableType.getElem_eval_fields
-      (Environment.fromArray (inputFirstRow input value) data)
-      (Vector.mapRange 4 fun i => var { index := size AddiChip.Inputs + i }) i hi]
-    rw [Vector.getElem_mapRange]
-    exact eval_local_inputFirstRow input value data i hi
-  · exact hinputEval.1
+  rw [eval_extractedAddOperation, AddOperation.Columns.mk.injEq]
+  dsimp only
+  ext i hi
+  rw [← ProvableType.getElem_eval_fields
+    (Environment.fromArray (inputFirstRow input value) data)
+    (Vector.mapRange 4 fun i => var { index := size AddiChip.Inputs + i }) i hi]
+  rw [Vector.getElem_mapRange]
+  exact eval_local_inputFirstRow input value data i hi
 
-def addiChipRowCodec : ChipRowCodec AddiChip.Inputs Extracted.AddiCols
+def addiChipRowCodec : ChipRowCodec AddiChip.Inputs AddiChip.Columns
     (AddiChip.circuit (p := p)) where
   assignment cols data := {
     row := addiChipPhysicalRow cols
@@ -114,10 +139,10 @@ private theorem addi_operation_assertions_local
     (hv : (ProvableStruct.eval env input.cols).value = value)
     (hr : (ProvableStruct.eval env input).is_real = isReal) :
     List.Forall (· = 0)
-        (Extracted.AddOperation.asserts a b { value := value } isReal) ↔
+        (Extracted.AddiOracle.AddOperation.asserts a b { value := value } isReal) ↔
       List.Forall (· = 0)
         (nativeAssertZeros env ((AddOperation.main input).operations offset)) := by
-  simp [nativeAssertZeros, AddOperation.main, Extracted.AddOperation.asserts,
+  simp [nativeAssertZeros, AddOperation.main, Extracted.AddiOracle.AddOperation.asserts,
     circuit_norm]
   rw [ha, hb, hv, hr]
 
@@ -168,7 +193,7 @@ private theorem addi_chip_constraints_decompose
 set_option maxHeartbeats 4000000 in
 theorem addiChip_constraints_faithful
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.AddiCols (ZMod p))
+    (cols : AddiChip.Columns (ZMod p))
     (hbind : BindsChipOutput AddiChip.main env input offset cols) :
     List.Forall (· = 0) (addiChipOracle.nativeAssertZeros cols) ↔
       List.Forall (· = 0)
@@ -289,8 +314,8 @@ theorem addiChip_constraints_faithful
   simp only [ProvableStruct.structEvalLiteralProc, eval_extractedAddOperation] at hbind
   subst cols
   rw [addi_chip_constraints_decompose]
-  simp only [ChipOracle.nativeAssertZeros, addiChipOracle, ChipOracle.identity, id_eq]
-  simp only [Extracted.AddiCols.asserts, List.forall_append]
+  simp only [ChipOracle.nativeAssertZeros, addiChipOracle, addiChipReconfigure]
+  simp only [Extracted.AddiOracle.AddiCols.asserts, List.forall_append]
   simp only [List.forall_cons]
   rw [forall_nil_iff]
   dsimp [rustA, rustB, rustValue, adapterValue, isReal, addInput,
@@ -331,7 +356,7 @@ theorem addiChip_constraints_faithful
 
 set_option maxHeartbeats 2000000 in
 theorem addiChip_constraints_constructive
-    (rustCols : Extracted.AddiCols (ZMod p)) (data : ProverData (ZMod p)) :
+    (rustCols : Extracted.AddiOracle.AddiCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := addiChipRowCodec.assignment
       (addiChipOracle.deconfigure rustCols) data
     List.Forall (· = 0) (addiChipOracle.assertZeros rustCols) ↔
@@ -370,7 +395,7 @@ set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 private theorem addicols_state_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.AddiCols (ZMod p))
+    (cols : AddiChip.Columns (ZMod p))
     (hreal : Expression.eval env input.is_real = cols.is_real)
     (hclkHigh : Expression.eval env input.state.clk_high = cols.state.clk_high)
     (hclk0 : Expression.eval env input.state.clk_0_16 = cols.state.clk_0_16)
@@ -380,7 +405,7 @@ private theorem addicols_state_interactions_faithful_syntactic
     (hpc2 : Expression.eval env input.state.pc[2] = cols.state.pc[2]) :
     (((AddiChip.main input).operations offset).interactionsWith stateChannel.toRaw).map
         (AbstractInteraction.toAccess env) =
-      ((Extracted.AddiCols.interactions cols).map
+      ((Extracted.AddiOracle.AddiCols.interactions (addiChipReconfigure cols)).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.State) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -399,7 +424,8 @@ private theorem addicols_state_interactions_faithful_syntactic
     toAccess_pushIf_state, toAccess_pullIf_state, heq]
   simp [circuit_norm, toAccess_pushIf_state, toAccess_pullIf_state,
     Gadgets.Equality.main,
-    Extracted.AddiCols.interactions, Extracted.AddOperation.interactions,
+    addiChipReconfigure, Extracted.AddiOracle.AddiCols.interactions,
+    Extracted.AddiOracle.AddOperation.interactions,
     Extracted.CPUState.interactions, Extracted.ITypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     hreal, hclkHigh, hclk0, hclk1, hpc0, hpc1, hpc2]
@@ -408,7 +434,7 @@ set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 private theorem addicols_program_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.AddiCols (ZMod p))
+    (cols : AddiChip.Columns (ZMod p))
     (hreal : Expression.eval env input.is_real = cols.is_real)
     (hpc0 : Expression.eval env input.state.pc[0] = cols.state.pc[0])
     (hpc1 : Expression.eval env input.state.pc[1] = cols.state.pc[1])
@@ -422,7 +448,7 @@ private theorem addicols_program_interactions_faithful_syntactic
     (himm3 : Expression.eval env input.adapter.op_c_imm[3] = cols.adapter.op_c_imm[3]) :
     (((AddiChip.main input).operations offset).interactionsWith programChannel.toRaw).map
         (AbstractInteraction.toAccess env) =
-      (((Extracted.AddiCols.interactions cols).map
+      (((Extracted.AddiOracle.AddiCols.interactions (addiChipReconfigure cols)).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.Program)).map
             LookupAccessList.negMult := by
@@ -445,7 +471,8 @@ private theorem addicols_program_interactions_faithful_syntactic
     GeneralFormalCircuit.toSubcircuit_interactions, hk, heq]
   simp [circuit_norm, hk, Gadgets.Equality.main,
     LookupAccessList.negMult, signedVal_neg hp2,
-    Extracted.AddiCols.interactions, Extracted.AddOperation.interactions,
+    addiChipReconfigure, Extracted.AddiOracle.AddiCols.interactions,
+    Extracted.AddiOracle.AddOperation.interactions,
     Extracted.CPUState.interactions, Extracted.ITypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     Opcode.ofNat, ConstraintCoe.coe_eq_val,
@@ -456,7 +483,7 @@ set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 private theorem addicols_memory_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.AddiCols (ZMod p))
+    (cols : AddiChip.Columns (ZMod p))
     (hreal : Expression.eval env input.is_real = cols.is_real)
     (hclkHigh : Expression.eval env input.state.clk_high = cols.state.clk_high)
     (hclk0 : Expression.eval env input.state.clk_0_16 = cols.state.clk_0_16)
@@ -490,7 +517,7 @@ private theorem addicols_memory_interactions_faithful_syntactic
     List.Perm
       (((((AddiChip.main input).operations offset).interactionsWith memoryChannel.toRaw).map
           (AbstractInteraction.toAccess env)).map LookupAccessList.negMult)
-      (((Extracted.AddiCols.interactions cols).map
+      (((Extracted.AddiOracle.AddiCols.interactions (addiChipReconfigure cols)).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.Memory)) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -510,7 +537,8 @@ private theorem addicols_memory_interactions_faithful_syntactic
     toAccess_pushIf_memory, toAccess_pullIf_memory, heq]
   simp [circuit_norm, toAccess_pushIf_memory, toAccess_pullIf_memory,
     Gadgets.Equality.main, LookupAccessList.negMult, signedVal_neg hp2,
-    Extracted.AddiCols.interactions, Extracted.AddOperation.interactions,
+    addiChipReconfigure, Extracted.AddiOracle.AddiCols.interactions,
+    Extracted.AddiOracle.AddOperation.interactions,
     Extracted.CPUState.interactions, Extracted.ITypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     hreal, hclkHigh, hclk0, hclk1, hopA, hopB,
@@ -523,7 +551,7 @@ set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 private theorem addicols_byte_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.AddiCols (ZMod p))
+    (cols : AddiChip.Columns (ZMod p))
     (hreal : Expression.eval env input.is_real = cols.is_real)
     (hclk0 : Expression.eval env input.state.clk_0_16 = cols.state.clk_0_16)
     (hclk1 : Expression.eval env input.state.clk_16_24 = cols.state.clk_16_24)
@@ -542,7 +570,7 @@ private theorem addicols_byte_interactions_faithful_syntactic
     List.Perm
       ((((AddiChip.main input).operations offset).interactionsWith byteChannel.toRaw).map
         (AbstractInteraction.toAccess env))
-      (((Extracted.AddiCols.interactions cols).map
+      (((Extracted.AddiOracle.AddiCols.interactions (addiChipReconfigure cols)).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.Byte)) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -572,7 +600,8 @@ private theorem addicols_byte_interactions_faithful_syntactic
     FormalAssertion.toSubcircuit_interactions,
     GeneralFormalCircuit.toSubcircuit_interactions, hk, heq]
   simp [circuit_norm, hk, Gadgets.Equality.main,
-    Extracted.AddiCols.interactions, Extracted.AddOperation.interactions,
+    addiChipReconfigure, Extracted.AddiOracle.AddiCols.interactions,
+    Extracted.AddiOracle.AddOperation.interactions,
     Extracted.CPUState.interactions, Extracted.ITypeReader.interactions,
     Extracted.Interaction.toAccess_byte, Extracted.Interaction.toAccess,
     Extracted.Dir.sign, ZMod.val_zero, hreal, hclk0, hclk1,
@@ -585,7 +614,7 @@ private theorem addicols_byte_interactions_faithful_syntactic
 set_option maxHeartbeats 2000000 in
 private theorem addicols_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.AddiCols (ZMod p))
+    (cols : AddiChip.Columns (ZMod p))
     (hreal : Expression.eval env input.is_real = cols.is_real)
     (hclkHigh : Expression.eval env input.state.clk_high = cols.state.clk_high)
     (hclk0 : Expression.eval env input.state.clk_0_16 = cols.state.clk_0_16)
@@ -646,7 +675,7 @@ private theorem addicols_interactions_faithful_syntactic
       ((((AddiChip.main input).operations offset).interactionsWith
           programChannel.toRaw).map (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult =
-        ((Extracted.AddiCols.interactions cols).map
+        ((Extracted.AddiOracle.AddiCols.interactions (addiChipReconfigure cols)).map
           Extracted.Interaction.toAccess).filter
             (fun access => access.1 = InteractionKind.Program) := by
     rw [hProgram, LookupAccessList.map_negMult_negMult]
@@ -664,7 +693,7 @@ private theorem addicols_interactions_faithful_syntactic
 set_option maxHeartbeats 2000000 in
 theorem addiChip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.AddiCols (ZMod p))
+    (cols : AddiChip.Columns (ZMod p))
     (hbind : BindsChipOutput AddiChip.main env input offset cols) :
     List.Perm (nativeAccesses env ((AddiChip.main input).operations offset))
       (addiChipOracle.accesses cols) := by
@@ -696,7 +725,7 @@ theorem addiChip_interactions_faithful
 
 set_option maxHeartbeats 2000000 in
 theorem addiChip_interactions_constructive
-    (rustCols : Extracted.AddiCols (ZMod p)) (data : ProverData (ZMod p)) :
+    (rustCols : Extracted.AddiOracle.AddiCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := addiChipRowCodec.assignment
       (addiChipOracle.deconfigure rustCols) data
     List.Perm
@@ -723,7 +752,7 @@ theorem addiChip_interactions_constructive
     Air.Flat.Component.rowOffset_mk, AddiChip.circuit_main_eq] using hlegacy
 
 theorem addiChip_faithful :
-    ChipFaithful (p := p) AddiChip.Inputs Extracted.AddiCols Extracted.AddiCols
+    ChipFaithful (p := p) AddiChip.Inputs AddiChip.Columns Extracted.AddiOracle.AddiCols
       AddiChip.circuit addiChipRowCodec addiChipOracle where
   constraints := addiChip_constraints_constructive (p := p)
   interactions := fun rustCols data _ =>

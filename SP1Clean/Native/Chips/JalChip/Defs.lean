@@ -5,7 +5,6 @@ import SP1Clean.Native.Readers.JTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
-import SP1Clean.Extracted.JalChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -21,7 +20,6 @@ and a 4-byte alignment range check (`Range(add_operation.value[0] / 4, 14)`). Th
 namespace SP1Clean.JalChip
 
 open Circuit
-open Extracted (JalColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -35,7 +33,7 @@ lemma h14p : (14 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 /-- Witness the two add results (`add_operation.value` = jump target, `op_a_operation.value` = link
 address) via `AddOperation.populate`, then compose as Clean `assertion`s. The `CPUState` reader is fed
 the data-dependent `next_pc = add_operation.value`; the link add's gate is `is_real - op_a_0`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalColumns (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let add_value ← witnessVectorNative 4 (fun env =>
     AddOperation.populate
       #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
@@ -74,23 +72,22 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalColumns (ZMod 
   -- from the AIR rather than a verifier-side convention.
   assertZero ((input.is_real - 1) * input.adapter.op_a_0)
   assertZero (input.is_real * (input.is_real - 1))
-  return ⟨input.state, input.adapter, ⟨add_value⟩, ⟨op_a_value⟩, input.is_real⟩
+  return ⟨input.is_real, input.state, input.adapter, ⟨add_value⟩, ⟨op_a_value⟩⟩
 
 /-- Derive the eight witness cells and the complete four-channel interface structurally from `main`. -/
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalColumns main := by
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit
 
 /-- Folded completed-row layout used by the whole-chip Rust AIR codec. -/
 @[circuit_norm] lemma directOutput_eq
     (input : Var Inputs (ZMod p)) (offset : ℕ) :
     (elaborated (p := p)).output input offset =
-      (⟨input.state, input.adapter,
+      (⟨input.is_real, input.state, input.adapter,
         ⟨Vector.mapRange 4 fun i =>
           var { index := offset + i }⟩,
         ⟨Vector.mapRange 4 fun i =>
-          var { index := offset + 4 + i }⟩,
-        input.is_real⟩ :
-        Var JalColumns (ZMod p)) := rfl
+          var { index := offset + 4 + i }⟩⟩ :
+        Var Columns (ZMod p)) := rfl
 
 /-- Component-wise evaluation of the independent JAL input prefix. -/
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
@@ -105,14 +102,14 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalColumns main := by
 
 /-- Component-wise evaluation of the completed JAL row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : JalColumns (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
-      ({ state := Eval.eval env cols.state,
+      ({ is_real := Eval.eval env cols.is_real,
+         state := Eval.eval env cols.state,
          adapter := Eval.eval env cols.adapter,
          add_operation := Eval.eval env cols.add_operation,
-         op_a_operation := Eval.eval env cols.op_a_operation,
-         is_real := Eval.eval env cols.is_real } :
-        JalColumns F) := by
+         op_a_operation := Eval.eval env cols.op_a_operation } :
+        Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 

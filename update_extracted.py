@@ -194,20 +194,21 @@ MEMORY_BOUNDARY_CLUSTER: Tuple[str, ...] = (
 # chip-private arithmetic structs and functions stay in the oracle.
 # Grow this set one chip at a time, deleting the corresponding legacy `Extracted/<Chip>Chip.lean`
 # file after its native reconfiguration lands.
-CHIP_ORACLES: Set[str] = {"Add", "Sub", "Subw", "Mul", "DivRem"}
+CHIP_ORACLES: Set[str] = {"Add", "Sub", "Subw", "Mul", "DivRem", "Addi", "Jalr", "Jal", "UType"}
 
 # Stable generated reader substrate shared by native chip rows and whole-chip Rust oracles. Reusing
 # these types avoids creating a fresh CPU/register-reader hierarchy per oracle while keeping Rust
 # arithmetic operation structs chip-private. Extend this set when a new canonical reader lands.
 CHIP_ORACLE_SHARED_STRUCTS: Set[str] = {
-    "CPUState", "RTypeReader", "RegisterAccessCols", "RegisterAccessTimestamp",
+    "CPUState", "RTypeReader", "ITypeReader", "JTypeReader",
+    "RegisterAccessCols", "RegisterAccessTimestamp",
 }
 
 # Generated helpers whose canonical operation/reader module is imported by every chip oracle that
 # calls them. Do not embed a second namespace containing byte-for-byte duplicate functions. Keep this
 # explicit: sharing a row struct alone does not imply that every Rust helper using it has a stable,
 # reusable generated definition.
-CHIP_ORACLE_IMPORTED_HELPERS: Set[str] = {"CPUState", "RTypeReader"}
+CHIP_ORACLE_IMPORTED_HELPERS: Set[str] = {"CPUState", "RTypeReader", "ITypeReader", "JTypeReader"}
 
 # Helpers needed while rendering a self-contained chip oracle but no longer emitted as standalone
 # verification artifacts. They remain in `OPERATIONS` solely so the discovery pass can embed their
@@ -727,10 +728,13 @@ def render_chip_oracle(
     factoring available to Lean reduction without making operation modules part of the chip's theorem
     surface or cloning the shared reader substrate.
     """
-    marker = f"namespace {chip}Cols"
+    # SP1's Rust column structs are named `<Chip>Cols` for most chips but `<Chip>Columns` for the
+    # control-flow/U-type chips (Jal/Jalr/UType); accept whichever the compiler emitted.
+    markers = (f"namespace {chip}Cols", f"namespace {chip}Columns")
+    marker = next((m for m in markers if m in chip_body), None)
+    if marker is None:
+        raise ValueError(f"compiler output for {chip} missing one of `{markers}`")
     before, found, after = chip_body.partition(marker)
-    if not found:
-        raise ValueError(f"compiler output for {chip} missing `{marker}`")
     helpers = _chip_helper_order(chip, chip_body, discovery)
     embedded_helpers = [h for h in helpers if h not in CHIP_ORACLE_IMPORTED_HELPERS]
     helper_defs = "\n\n".join(

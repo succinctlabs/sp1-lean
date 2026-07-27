@@ -7,7 +7,6 @@ import Clean.Air.Circuit
 namespace SP1Clean.JalChip
 
 open Circuit
-open Extracted (JalColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -312,8 +311,8 @@ def exposedProgramInteractions (input : Var Inputs (ZMod p)) :
        input.adapter.op_a_0, 1, 1⟩ ]
 
 /-- The JAL chip row as a `GeneralFormalCircuit`: the data-dependent jump/link semantics, composing the
-two witnessed `AddOperation` gadgets and the J-type reader; output is the extracted `JalColumns`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs JalColumns :=
+two witnessed `AddOperation` gadgets and the J-type reader; output is the native `Columns` row. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   -- `byteChannel` dropped (W11 Phase 0c): the off-gate alignment byte-pull `Requirements` is discharged by
   -- the inline `is_real` boolean gate in `main`; the residual buses are the readers'/add-ops'.
   { main, elaborated,

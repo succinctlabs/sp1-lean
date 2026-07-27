@@ -1,15 +1,11 @@
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.FormalModel.Contracts.DivRem
-import SP1Clean.Extracted.AddiChip
 import SP1Clean.Extracted.AddwChip
 import SP1Clean.Extracted.BitwiseChip
 import SP1Clean.Extracted.ShiftLeftChip
 import SP1Clean.Extracted.ShiftRightChip
 import SP1Clean.FormalModel.Contracts.DivRemColumns
-import SP1Clean.Extracted.JalChip
-import SP1Clean.Extracted.JalrChip
 import SP1Clean.Extracted.BranchChip
-import SP1Clean.Extracted.UTypeChip
 import RISCV.Instructions
 import Clean.Circuit.Subcircuit
 import Clean.Utils.Tactics.ProvableStructDeriving
@@ -86,8 +82,17 @@ end SP1Clean.AddChip
 
 namespace SP1Clean.AddiChip
 
-open Extracted (AddiCols)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native Addi-chip row.  Its arithmetic block follows the local Lean gadget, not Rust's
+`AddOperation` type.  `Faithful.addiChipReconfigure` is the explicit whole-chip bridge to the
+extracted `AddiOracle.AddiCols` oracle.  The reader blocks remain the shared generated substrate. -/
+structure Columns (F : Type) where
+  is_real : F
+  state : Extracted.CPUState F
+  adapter : Extracted.ITypeReader F
+  add_operation : AddOperation.Columns F
+deriving ProvableStruct
 
 /-- The `is_real` selector and the **threaded reader column blocks** `state`/`adapter` (the latter an
 **I-type** `Extracted.ITypeReader` carrying the immediate). The `rs1` source operand and the immediate
@@ -114,7 +119,7 @@ blocks (gated by the `ADDI` opcode `1`, `wv* = add_operation.value`), the *prove
 and the `is_real`-gated arithmetic meaning — on real rows the result column is the RV64 `ADD` of the
 register operand and the immediate (`RV64.add op_c_val op_b_val = op_b_val + op_c_val`). Vacuous on
 padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : AddiCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.ITypeReader.Spec
     { cols := input.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := input.state.clk_high,
@@ -715,8 +720,19 @@ end SP1Clean.DivRemChip
 
 namespace SP1Clean.JalChip
 
-open Extracted (JalColumns)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native JAL-chip row.  The two arithmetic blocks follow the local Lean gadget
+(`AddOperation.Columns`), not Rust's `AddOperation` type; `Faithful.jalChipReconfigure` is the
+explicit whole-chip bridge to the extracted `JalOracle.JalColumns` oracle.  The reader blocks
+remain the shared generated substrate. -/
+structure Columns (F : Type) where
+  is_real : F
+  state : Extracted.CPUState F
+  adapter : Extracted.JTypeReader F
+  add_operation : AddOperation.Columns F
+  op_a_operation : AddOperation.Columns F
+deriving ProvableStruct
 
 /-- The committed **J-type** row blocks the chip reads: the `is_real` selector, the CPUState block
 `state` (clk + `pc`), and the J-type register adapter `adapter` (the destination `op_a`/`op_a_0`, its
@@ -731,7 +747,7 @@ deriving ProvableStruct
 
 /-- The program counter as a 4-limb word (the three committed `pc` limbs + a zero high limb): the `a`
 operand both of the chip's `AddOperation`s add to (`pc + imm = next_pc`, `pc + 4 = link`). -/
-def pcWord (cols : JalColumns (ZMod p)) : Word (ZMod p) :=
+def pcWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0]
 
 /-- Semantic contract for the JAL row, composed from the J-type reader sub-`Spec` plus the
@@ -742,7 +758,7 @@ decode fact, supplied at the Sail bridge), and — when `rd ≠ x0` (`op_a_0 = 0
 (`add_operation.value[0]`) is divisible by 4 — i.e. the target is 4-byte aligned — forced by the
 in-circuit alignment `Range` byte-lookup (`value[0] · 4⁻¹ < 2^14`); the Sail bridge lifts it to the whole
 word (so alignment is no longer an assumed bridge precondition). Vacuous on padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : JalColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.JTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,
@@ -763,15 +779,27 @@ end SP1Clean.JalChip
 
 namespace SP1Clean.UTypeChip
 
-open Extracted (UTypeColumns)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native U-type chip row.  The arithmetic block follows the local Lean gadget
+(`AddOperation.Columns`), not Rust's `AddOperation` type; `Faithful.uTypeChipReconfigure` is the
+explicit whole-chip bridge to the extracted `UTypeOracle.UTypeColumns` oracle.  The reader blocks
+remain the shared generated substrate. -/
+structure Columns (F : Type) where
+  is_real : F
+  state : Extracted.CPUState F
+  adapter : Extracted.JTypeReader F
+  addend : Vector F 3
+  add_operation : AddOperation.Columns F
+  is_auipc : F
+deriving ProvableStruct
 
 /-- The committed **U-type** row blocks the chip reads: the `is_real` selector, the CPUState block `state`
 (clk + `pc`), the J-type register adapter `adapter` (the destination `op_a`/`op_a_0`, its `op_a_memory`
 timestamp, and the two immediate words `op_b_imm`/`op_c_imm`), and the variant selector `is_auipc`
 (`1` = AUIPC, `0` = LUI). Like JAL there are **no** register operands — the immediate is carried in the
 adapter; unlike JAL the chip additionally commits `is_auipc` (and the `addend` column, in the output
-`UTypeColumns`). -/
+`Columns`). -/
 structure Inputs (F : Type) where
   is_real : F
   state : Extracted.CPUState F
@@ -781,7 +809,7 @@ deriving ProvableStruct
 
 /-- The program counter as a 4-limb word (the three committed `pc` limbs + a zero high limb): the `a`
 operand of the chip's `AddOperation` for AUIPC (`pc + imm`). -/
-def pcWord (cols : UTypeColumns (ZMod p)) : Word (ZMod p) :=
+def pcWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0]
 
 /-- The 20-bit U-type immediate recovered from the committed `op_b_imm` limbs (the high 20 bits of the
@@ -797,7 +825,7 @@ row with `rd ≠ x0` (`op_a_0 = 0`, where the additive `is_real - op_a_0` gate f
 writes `RV64.lui imm`, AUIPC (`is_auipc = 1`) writes `RV64.auipc imm pc`, with `imm := immOf adapter` and
 `pc := toBitVec64 pcWord`. The `op_b_imm` ↔ `imm` decode relation is a chip `Assumption` (a trace/program-ROM
 guarantee). Vacuous on padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : UTypeColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.JTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,
@@ -817,8 +845,20 @@ end SP1Clean.UTypeChip
 
 namespace SP1Clean.JalrChip
 
-open Extracted (JalrColumns)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native JALR-chip row.  The two arithmetic blocks follow the local Lean gadget
+(`AddOperation.Columns`), not Rust's `AddOperation` type; `Faithful.jalrChipReconfigure` is the
+explicit whole-chip bridge to the extracted `JalrOracle.JalrColumns` oracle.  The reader blocks
+remain the shared generated substrate. -/
+structure Columns (F : Type) where
+  is_real : F
+  state : Extracted.CPUState F
+  adapter : Extracted.ITypeReader F
+  add_operation : AddOperation.Columns F
+  op_a_operation : AddOperation.Columns F
+  lsb : F
+deriving ProvableStruct
 
 /-- The committed **I-type** row blocks the JALR chip reads: the `is_real` selector, the CPUState block
 `state` (clk + `pc`), and the I-type register adapter `adapter` (the destination `op_a`/`op_a_0` with its
@@ -833,20 +873,20 @@ deriving ProvableStruct
 
 /-- The rs1 register value as a 4-limb word — the `op_b` source read's prior value, the `a` operand of the
 jump `AddOperation` (`rs1 + imm = target`). -/
-def rs1Word (cols : JalrColumns (ZMod p)) : Word (ZMod p) :=
+def rs1Word (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.adapter.op_b_memory.prev_value[0], cols.adapter.op_b_memory.prev_value[1],
      cols.adapter.op_b_memory.prev_value[2], cols.adapter.op_b_memory.prev_value[3]]
 
 /-- The program counter as a 4-limb word (the three committed `pc` limbs + a zero high limb): the `a`
 operand of the link `AddOperation` (`pc + 4 = link`). -/
-def pcWord (cols : JalrColumns (ZMod p)) : Word (ZMod p) :=
+def pcWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0]
 
 /-- The committed, **LSB-cleared** next-pc word the chip feeds `CPUState` — the jump target
 `add_operation.value` with its low bit removed (`value[0] - lsb`), faithful to RISC-V JALR's
 `(rs1 + imm) & ~1` and the Sail `BitVec.update target 0 0#1`. Named by the `Spec`'s LSB-clearing
 conjunct and the Sail bridge. -/
-def nextPcWord (cols : JalrColumns (ZMod p)) : Word (ZMod p) :=
+def nextPcWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.add_operation.value[0] - cols.lsb, cols.add_operation.value[1],
      cols.add_operation.value[2], 0]
 
@@ -861,7 +901,7 @@ is divisible by 4 — i.e. the jump target is 4-byte aligned — forced by the i
 The final conjunct exposes the **LSB-clearing relation** itself — the committed `nextPcWord` is the
 jump target with bit 0 cleared (`~~~1#64 &&&`, the Sail-free form of `BitVec.update _ 0 0#1`) — so the
 Sail bridge *derives* it from this `Spec` rather than assuming it. Vacuous on padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : JalrColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.ITypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,

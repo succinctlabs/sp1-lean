@@ -133,7 +133,7 @@ emulation. The jump-target 4-byte alignment is **derived** from the `Spec`'s div
 in-circuit `÷4` range check), not assumed. Covers **both** `rd ≠ x0` (`op_a_0 = 0`, link write proven) and
 `jal x0` (`op_a_0 = 1 ∧ rd = x0`, link write a no-op on both sides) — closing the `j` pseudo-instruction. -/
 theorem jal_chip_reaches_sail
-    (inp : JalChip.Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) (data : ProverData (ZMod p))
+    (inp : JalChip.Inputs (ZMod p)) (cols : JalChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rd : BitVec 5) (imm : BitVec 21) (pc : BitVec 64) (s : SailState)
     (hs : SailState.isInitialized s)
     (h_real : inp.is_real = 1)
@@ -173,7 +173,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- **JAL's committed bus view** — the chip-agnostic `RowView` (opcode `46`, `next_pc = add_operation.value`
 the **data-dependent** jump target, `rdWrite = op_a_operation.value` the link `pc+4`). Standalone so
 `JalChip.advance` can be supplied *as* `kind.advance` (see `AddChip.rowView`). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : JalChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.add_operation.value[0], cols.add_operation.value[1], cols.add_operation.value[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.op_a_operation.value, 46,
     .destination cols.adapter.op_a_0⟩
@@ -188,7 +188,7 @@ range-check conjunct via `Word.toBitVec64_toNat_mod_four`). The decoded Program 
 architectural cases: a nonzero destination uses the register-writing jump core; `jal x0` reuses the
 computed-PC/no-write control core. The `advanceReady` bundle therefore carries only the pc-limb bound and
 the **48-bit-target invariant** `add_operation.value[3] = 0`. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.JalColumns (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : JalChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -260,7 +260,7 @@ and consumes the committed decode directly; JAL reads no source registers. -/
 def kind : Soundness.ChipKind p where
   name := "Jal"
   Inputs := JalChip.Inputs
-  Cols := Extracted.JalColumns
+  Cols := JalChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun _inp cols _ _ => cols.add_operation.value[3] = 0

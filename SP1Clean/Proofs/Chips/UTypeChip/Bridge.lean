@@ -76,7 +76,7 @@ omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (LUI): a real U-type chip row with `is_auipc = 0` reaches the Sail `LUI`, for `rd ≠ x0`
 (`op_a_0 = 0`, result proven) **or** `lui x0` (`op_a_0 = 1 ∧ rd = x0`, result write a no-op). -/
 theorem utype_chip_reaches_sail_lui
-    (input : UTypeChip.Inputs (ZMod p)) (cols : Extracted.UTypeColumns (ZMod p)) (data : ProverData (ZMod p))
+    (input : UTypeChip.Inputs (ZMod p)) (cols : UTypeChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rd : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1) (h_iaui0 : input.is_auipc = 0)
     (h_op_a : cols.adapter.op_a_0 = 0 ∨ (cols.adapter.op_a_0 = 1 ∧ rd = 0#5))
@@ -94,7 +94,7 @@ omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (AUIPC): a real U-type chip row with `is_auipc = 1` reaches the Sail `AUIPC`, for `rd ≠ x0`
 (`op_a_0 = 0`, result proven) **or** `auipc x0` (`op_a_0 = 1 ∧ rd = x0`, result write a no-op). -/
 theorem utype_chip_reaches_sail_auipc
-    (input : UTypeChip.Inputs (ZMod p)) (cols : Extracted.UTypeColumns (ZMod p)) (data : ProverData (ZMod p))
+    (input : UTypeChip.Inputs (ZMod p)) (cols : UTypeChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rd : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1) (h_iaui1 : input.is_auipc = 1)
     (h_op_a : cols.adapter.op_a_0 = 0 ∨ (cols.adapter.op_a_0 = 1 ∧ rd = 0#5))
@@ -146,7 +146,7 @@ lemma immOf_bind (imm : BitVec 20) (adapter : Extracted.JTypeReader (ZMod p))
 /-- **U-type's committed bus view** — the chip-agnostic `RowView` (opcode `is_auipc·48 + (1-is_auipc)·49`,
 the `pc+4` straight-line next-pc, the `add_operation` result as `rdWrite`). Standalone so `UTypeChip.advance`
 can be supplied *as* `kind.advance` (see `AddChip.rowView`). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.UTypeColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : UTypeChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.add_operation.value,
     inp.is_auipc * 48 + (1 - inp.is_auipc) * 49,
@@ -160,7 +160,7 @@ gated `RV64.lui`/`RV64.auipc` conjunct: `immOf_bind` connects the chip's `immOf`
 `RV64.lui`/`auipc_eq_add_lui` reduce to the Sail `execute_UTYPE_pure`, and the `pcWord` reassembly ties the
 AUIPC pc to `rcvPcOf`. The same table also accepts `rd = x0`; that branch reuses the straight-line
 architectural no-write core and does not require a result equation. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.UTypeColumns (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : UTypeChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -244,7 +244,7 @@ Sail bridge helpers. -/
 def kind : Soundness.ChipKind p where
   name := "UType"
   Inputs := UTypeChip.Inputs
-  Cols := Extracted.UTypeColumns
+  Cols := UTypeChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧

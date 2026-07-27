@@ -10,7 +10,7 @@ identities) lives in `Specs/Chip.lean`. -/
 namespace SP1Clean.UTypeChip
 
 open Circuit
-open Extracted (UTypeColumns)
+
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -280,8 +280,8 @@ def exposedProgramInteractions (input : Var Inputs (ZMod p)) :
        input.adapter.op_a_0, 1, 1⟩ ]
 
 /-- The U-type chip row as a `GeneralFormalCircuit`: the flag-gated `RV64.lui`/`RV64.auipc` semantics,
-composing the witnessed `AddOperation` gadget and the J-type reader; output is the extracted `UTypeColumns`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs UTypeColumns :=
+composing the witnessed `AddOperation` gadget and the J-type reader; output is the native `Columns` row. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     channelsWithRequirements := [stateChannel.toRaw, memoryChannel.toRaw],
     Assumptions := Assumptions, Spec := Spec,

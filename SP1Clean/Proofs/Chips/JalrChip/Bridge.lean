@@ -87,7 +87,7 @@ committed-pc reassembly, the RISC-V `JALR` execution agrees with the SP1 chip em
 LSB-clearing relation and the cleared-target 4-byte alignment are **derived** from the chip `Spec` (the
 in-circuit binary `lsb` gate + `÷4` range check), not assumed. -/
 theorem jalr_chip_reaches_sail
-    (inp : JalrChip.Inputs (ZMod p)) (cols : Extracted.JalrColumns (ZMod p)) (data : ProverData (ZMod p))
+    (inp : JalrChip.Inputs (ZMod p)) (cols : JalrChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rd rs1 : BitVec 5) (imm : BitVec 12) (pc rs1_val : BitVec 64) (s : SailState)
     (hs : SailState.isInitialized s) (hconfig : SailState.isValidMemConfig s hs)
     (h_real : inp.is_real = 1)
@@ -132,7 +132,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The JALR RowView (standalone, so `kind.view` and `advance` share one definition without a cycle):
 the LSB-cleared 3-limb `next_pc` (`add_operation.value[0] - lsb`), the I-type adapter, `op_a_operation.value`
 as the `pc+4` link write, opcode 47. -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.JalrColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : JalrChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state,
     #v[cols.add_operation.value[0] - cols.lsb, cols.add_operation.value[1], cols.add_operation.value[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.op_a_operation.value, 47,
@@ -148,7 +148,7 @@ decode's immediate + the `nextPcWord` reassembly — `nextPcWord[3] = 0` definit
 pc+4`), and the 4-alignment `halign` (from the Spec's `÷4` range-check conjunct). `rs1` is read through
 `ValueOperandsBound`. The decoded Program row selects a normal link write or the architectural
 no-write `jalr x0` case; both use the same physical Rust table. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.JalrColumns (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : JalrChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -230,7 +230,7 @@ the uniform `try_step` effect; `jalr_chip_reaches_sail` remains its local bridge
 def kind : Soundness.ChipKind p where
   name := "Jalr"
   Inputs := JalrChip.Inputs
-  Cols := Extracted.JalrColumns
+  Cols := JalrChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun _inp _cols _ _ => True

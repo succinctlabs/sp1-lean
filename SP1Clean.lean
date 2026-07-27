@@ -121,12 +121,15 @@ import SP1Clean.Proofs.Chips.UTypeChip.Formal
 import SP1Clean.Extracted.ALUTypeReader
 import SP1Clean.Extracted.AluX0Chip
 import SP1Clean.Extracted.ChipOracle.Add
+import SP1Clean.Extracted.ChipOracle.Addi
+import SP1Clean.Extracted.ChipOracle.Jal
+import SP1Clean.Extracted.ChipOracle.Jalr
 import SP1Clean.Extracted.ChipOracle.Sub
 import SP1Clean.Extracted.ChipOracle.Subw
+import SP1Clean.Extracted.ChipOracle.UType
 import SP1Clean.Extracted.ChipOracle.Mul
 import SP1Clean.Extracted.ChipOracle.DivRem
 import SP1Clean.Extracted.AddOperation
-import SP1Clean.Extracted.AddiChip
 import SP1Clean.Extracted.AddrAddOperation
 import SP1Clean.Extracted.AddressOperation
 import SP1Clean.Extracted.AddwChip
@@ -157,8 +160,6 @@ import SP1Clean.Extracted.IsEqualWordOperation
 import SP1Clean.Extracted.IsZeroOperation
 import SP1Clean.Extracted.IsZeroWordOperation
 import SP1Clean.Extracted.JTypeReader
-import SP1Clean.Extracted.JalChip
-import SP1Clean.Extracted.JalrChip
 import SP1Clean.Extracted.LoadByteChip
 import SP1Clean.Extracted.LoadDoubleChip
 import SP1Clean.Extracted.LoadHalfChip
@@ -179,7 +180,6 @@ import SP1Clean.Extracted.U16CompareOperation
 import SP1Clean.Extracted.U16MSBOperation
 import SP1Clean.Extracted.U16toU8OperationSafe
 import SP1Clean.Extracted.U16toU8OperationUnsafe
-import SP1Clean.Extracted.UTypeChip
 import SP1Clean.Faithful.ALUTypeReader
 import SP1Clean.Faithful.AluX0
 import SP1Clean.Faithful.AddChip

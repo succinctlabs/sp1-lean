@@ -1,13 +1,13 @@
 import SP1Clean.Extracted.AluX0Chip
-import SP1Clean.Extracted.AddiChip
+import SP1Clean.Extracted.ChipOracle.Addi
 import SP1Clean.Extracted.AddwChip
 import SP1Clean.Extracted.BitwiseChip
 import SP1Clean.Extracted.BranchChip
 import SP1Clean.Extracted.ChipOracle.Add
 import SP1Clean.Extracted.ChipOracle.Sub
 import SP1Clean.Extracted.ChipOracle.DivRem
-import SP1Clean.Extracted.JalChip
-import SP1Clean.Extracted.JalrChip
+import SP1Clean.Extracted.ChipOracle.Jal
+import SP1Clean.Extracted.ChipOracle.Jalr
 import SP1Clean.Extracted.LoadByteChip
 import SP1Clean.Extracted.LoadDoubleChip
 import SP1Clean.Extracted.LoadHalfChip
@@ -34,7 +34,7 @@ import SP1Clean.Extracted.SystemOracle.Range
 import SP1Clean.Extracted.SystemOracle.StateBump
 import SP1Clean.Extracted.SystemOracle.SyscallCore
 import SP1Clean.Extracted.SystemOracle.SyscallInstrs
-import SP1Clean.Extracted.UTypeChip
+import SP1Clean.Extracted.ChipOracle.UType
 import SP1Clean.FormalModel.Contracts.PublicValues
 import SP1Clean.FormalModel.CoreAIRRelation
 
@@ -67,7 +67,7 @@ def MainRow (p : ℕ) [Fact p.Prime] : Table → Type
   | .syscallCore => SyscallCoreCols (ZMod p)
   | .divRem => DivRemOracle.DivRemCols (ZMod p)
   | .add => AddOracle.AddCols (ZMod p)
-  | .addi => AddiCols (ZMod p)
+  | .addi => AddiOracle.AddiCols (ZMod p)
   | .addw => AddwCols (ZMod p)
   | .sub => SubOracle.SubCols (ZMod p)
   | .subw => SubwOracle.SubwCols (ZMod p)
@@ -86,10 +86,10 @@ def MainRow (p : ℕ) [Fact p.Prime] : Table → Type
   | .storeHalf => StoreHalfColumns (ZMod p)
   | .storeWord => StoreWordColumns (ZMod p)
   | .storeDouble => StoreDoubleColumns (ZMod p)
-  | .uType => UTypeColumns (ZMod p)
+  | .uType => UTypeOracle.UTypeColumns (ZMod p)
   | .branch => BranchColumns (ZMod p)
-  | .jal => JalColumns (ZMod p)
-  | .jalr => JalrColumns (ZMod p)
+  | .jal => JalOracle.JalColumns (ZMod p)
+  | .jalr => JalrOracle.JalrColumns (ZMod p)
   | .syscallInstrs => SyscallInstrsCols (ZMod p)
   | .memoryBump => MemoryBumpCols (ZMod p)
   | .stateBump => StateBumpCols (ZMod p)
@@ -118,7 +118,7 @@ def assertions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .syscallCore => SyscallCoreCols.asserts row.main row.preprocessed publicValues.toBaseVector
   | .divRem => DivRemOracle.DivRemCols.asserts row.main
   | .add => AddOracle.AddCols.asserts row.main
-  | .addi => AddiCols.asserts row.main
+  | .addi => AddiOracle.AddiCols.asserts row.main
   | .addw => AddwCols.asserts row.main
   | .sub => SubOracle.SubCols.asserts row.main
   | .subw => SubwOracle.SubwCols.asserts row.main
@@ -137,10 +137,10 @@ def assertions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .storeHalf => StoreHalfColumns.asserts row.main
   | .storeWord => StoreWordColumns.asserts row.main
   | .storeDouble => StoreDoubleColumns.asserts row.main
-  | .uType => UTypeColumns.asserts row.main
+  | .uType => UTypeOracle.UTypeColumns.asserts row.main
   | .branch => BranchColumns.asserts row.main
-  | .jal => JalColumns.asserts row.main
-  | .jalr => JalrColumns.asserts row.main
+  | .jal => JalOracle.JalColumns.asserts row.main
+  | .jalr => JalrOracle.JalrColumns.asserts row.main
   | .syscallInstrs =>
       SyscallInstrsCols.asserts row.main row.preprocessed publicValues.toBaseVector
   | .memoryBump => MemoryBumpCols.asserts row.main row.preprocessed publicValues.toBaseVector
@@ -163,7 +163,7 @@ def interactions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
       SyscallCoreCols.interactions row.main row.preprocessed publicValues.toBaseVector
   | .divRem => DivRemOracle.DivRemCols.interactions row.main
   | .add => AddOracle.AddCols.interactions row.main
-  | .addi => AddiCols.interactions row.main
+  | .addi => AddiOracle.AddiCols.interactions row.main
   | .addw => AddwCols.interactions row.main
   | .sub => SubOracle.SubCols.interactions row.main
   | .subw => SubwOracle.SubwCols.interactions row.main
@@ -182,10 +182,10 @@ def interactions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .storeHalf => StoreHalfColumns.interactions row.main
   | .storeWord => StoreWordColumns.interactions row.main
   | .storeDouble => StoreDoubleColumns.interactions row.main
-  | .uType => UTypeColumns.interactions row.main
+  | .uType => UTypeOracle.UTypeColumns.interactions row.main
   | .branch => BranchColumns.interactions row.main
-  | .jal => JalColumns.interactions row.main
-  | .jalr => JalrColumns.interactions row.main
+  | .jal => JalOracle.JalColumns.interactions row.main
+  | .jalr => JalrOracle.JalrColumns.interactions row.main
   | .syscallInstrs =>
       SyscallInstrsCols.interactions row.main row.preprocessed publicValues.toBaseVector
   | .memoryBump =>
