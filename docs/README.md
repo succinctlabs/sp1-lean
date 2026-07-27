@@ -26,37 +26,26 @@ records so that an old audit packet is never mistaken for the present theorem bo
 5. [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) — compact current checkpoint
    board for the architecture-consolidation work.
 
-The most useful worked example in the source is `SP1Clean/Comparison.lean`; it explains the original Add
-chain and the design choices that led to the current whole-chip boundary.
-
 ## Current reader-facing docs
 
 - [`overview.md`](overview.md) — honest current overview; it distinguishes the supported-native theorem,
   the conditional exact-upstream `_of_obligations` composition boundary, and the still-open
-  execution/ArkLib layers.
+  execution/ArkLib layers. Its §4 is the current statement of the channel/bus model.
 - [`architecture.md`](architecture.md) — detailed architecture and migration status.
 - [`release-audit.md`](release-audit.md) — authoritative current proof and trust audit. Regenerate its raw
   census with `scripts/run_audit.sh` before citing numbers.
 - [`roadmap.md`](roadmap.md) — live dependency graph from exact system-table grounding through ArkLib
   integration and witness-generation completeness.
-- [`bus-model.md`](bus-model.md) — the four plain Clean channels and their row-local guarantees.
 - [`chip-standardization.md`](chip-standardization.md) — the completed 25/25 `ChipKind.advance` interface
   and how the machine layer consumes it.
-
-## Design records and audit history
-
-- [`proposals/2026-07-architecture-consolidation.md`](proposals/2026-07-architecture-consolidation.md) — the
-  proposal that motivated the one-engine/one-contract split. It is a historical design record; use the
-  progress board and architecture doc for implemented state.
-- [`audits/2026-07-full-project/`](audits/2026-07-full-project/) — frozen repository-wide audit at
-  `6c399dbd` before the remediation work. Its findings are preserved as evidence, with a post-audit note
-  pointing to the current status; it is not a description of today's worktree.
 - [`goal-overview.md`](goal-overview.md) — completion contract for the full AIR, boot-to-halt, ArkLib
   verifier, and witness-generation layers. Do not cite it as current status.
-- [`archive/`](archive/) — retired handoff records (the pre-4.31 `clean-main-migration.md` /
-  `430-migration-handoff.md` and the `w11-rebase-status.md` ensemble re-base). Provenance only; their
-  durable conclusions are in `roadmap.md`, `architecture.md`, and Clean's own docs
-  (<https://github.com/Verified-zkEVM/clean> or in-tree `.lake/packages/Clean/`).
+
+One historical design record stays in the tree: [`bus-model.md`](bus-model.md) (the pre-consolidation
+bus model) — source doc-comments cite its section numbers; read its banner before citing it. The other
+historical records (the pre-remediation audit packet, retired migration handoffs, the 2026-07
+consolidation proposal, one-off talks/spikes/profiling baselines) were removed from the working tree
+once superseded; retrieve them from git history if needed.
 
 ## Contributor and agent docs
 
@@ -65,6 +54,8 @@ See [`agents/README.md`](agents/README.md) for the full index:
 - [`agents/porting-recipe.md`](agents/porting-recipe.md) — chip-porting checklist.
 - [`agents/proof-patterns.md`](agents/proof-patterns.md) — circuit proof recipes and Lean/Clean landmines.
 - [`agents/lean-sail-notes.md`](agents/lean-sail-notes.md) — Lean 4.31 dependency and Sail environment.
+- [`agents/sail-fork-delta.md`](agents/sail-fork-delta.md) — the exact three-line `sail-riscv-lean`
+  platform-configuration delta and how to retire it.
 - [`agents/extraction.md`](agents/extraction.md) — Rust extraction and generated-artifact contract.
 - [`agents/mul-operation-learnings.md`](agents/mul-operation-learnings.md) — multiplication-specific proofs.
 

@@ -16,7 +16,7 @@ log — they are now clean isolated numbers).
 The durable proof-engineering lessons that came out of profiling (the `v[i]` fast path,
 `circuit_proof_start` is not the bottleneck, the `localLength_eq` `rfl` cost, the shared-tail dedup
 pattern) live in `docs/agents/proof-patterns.md` § "Compile-time / performance landmines". An older
-pre-refactor baseline is archived under `docs/snapshots/profile-baseline-2026-06-10/`.
+pre-refactor baseline (2026-06-10 profiling bundle) was removed from the tree; see git history.
 
 ## How to re-run
 

@@ -2,10 +2,11 @@
 
 > **HISTORICAL (2026-07-09).** This document describes the pre-consolidation bus model — including
 > the transitional two-mechanism world (in-circuit channels + the `*Lookups` ℤ-shadows) and the
-> `VmChannel`-decoupled `Guarantees`/`Owed` split. The **authoritative** post-consolidation bus
-> description is [`overview.md`](overview.md) §4 (the four plain coupled `Channel`s + the
-> hygiene-guarantee rule); the migration that supersedes this file is
-> [`proposals/2026-07-architecture-consolidation.md`](proposals/2026-07-architecture-consolidation.md)
+> `VmChannel`-decoupled `Guarantees`/`Owed` split. It is kept because source doc-comments cite its
+> section numbers for design rationale. The **authoritative** post-consolidation bus description is
+> [`overview.md`](overview.md) §4 (the four plain coupled `Channel`s + the hygiene-guarantee rule);
+> the migration that superseded this file is the 2026-07 architecture-consolidation proposal
+> (removed from the tree; see git history)
 > §3.5. Kept for the design rationale in §5 below; do not cite §0's "current status" as current.
 >
 > **For the channel/ensemble/balance machinery itself, the upstream authority is Clean's own
@@ -330,7 +331,7 @@ The components below build up the in-circuit bus, each axiom-clean
      the **memory** bus as three *separate* messages, keyed by the program opcode. That relation is
      inherently cross-bus/cross-message; it lives at the **chip Spec** (`AddChip.Spec`'s `toBitVec64
      cols.add_operation.value = toBitVec64 op_b_val + toBitVec64 op_c_val`) + the **bridge to Sail**
-     (`Proofs/Chips/AddBridge.lean`'s `correct_add_native`), and is glued to the buses only at the trace/ensemble
+     (`Proofs/Chips/AddChip/Bridge.lean`), and is glued to the buses only at the trace/ensemble
      level (LogUp balance + offline-memory + per-chip arithmetic specs). That is the correct altitude.
 
   So the program channel's *natural* enrichment ceiling is **static instruction-decode well-formedness**

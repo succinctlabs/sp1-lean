@@ -29,6 +29,12 @@ SP1_DIR=/path/to/audited-extractor-overlay EXTRACT_AIR_ONLY=1 python3 update_ext
 
 `SP1_DIR` must point at the exact extraction overlay checked by `SP1_PINNED_COMMIT` and the two patch
 digests in `update_extracted.py`; the ordinary sibling `../sp1` remains the unmodified semantic source.
+(A convenient overlay setup is a `git worktree` of the semantic checkout at the pinned overlay commit
+with the two `scripts/extractor-patches/*.patch` files `git apply`'d.) Note one operational wrinkle:
+each run's `cargo` invocation rewrites the overlay's `Cargo.lock` (a newer cargo re-normalizes one
+`slop-algebra` entry), which the strict worktree check then rejects on the *next* run — restore or
+stash the overlay's `Cargo.lock` before every invocation (`git -C $SP1_DIR stash push -- Cargo.lock`).
+`cargo --locked` does not work here (the pinned lockfile predates the running cargo's normalization).
 The generator verifies that the overlay's merge base is semantic revision
 `a630089d9ff484ec6f2feade8d0afbb1447eed11` (`v6.3.1-8-ga630089d9`), that runtime-source changes are
 reflection metadata only, and that the dirty exporter diff is byte-identical to the checked-in
