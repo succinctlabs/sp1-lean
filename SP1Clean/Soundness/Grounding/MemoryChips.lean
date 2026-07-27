@@ -4902,13 +4902,13 @@ theorem storeByteChipDescriptor_table :
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeByteChipDescriptor_view (input : StoreByteChip.Inputs (ZMod p))
-    (output : Extracted.StoreByteColumns (ZMod p)) :
+    (output : StoreByteChip.Columns (ZMod p)) :
     (storeByteChipDescriptor (p := p)).kind.view input output =
       StoreByteChip.rowView input output := rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeByteChipDescriptor_ramAccess (input : StoreByteChip.Inputs (ZMod p))
-    (output : Extracted.StoreByteColumns (ZMod p)) :
+    (output : StoreByteChip.Columns (ZMod p)) :
     (storeByteChipDescriptor (p := p)).kind.ramAccess input output =
       some (StoreByteChip.ramAccessView input output) := rfl
 
@@ -5293,7 +5293,7 @@ omit [Fact (2 ^ 25 < p)] in
 authenticated RAM cell. -/
 theorem storeByteChip_storeFacts
     (input : StoreByteChip.Inputs (ZMod p))
-    (cols : Extracted.StoreByteColumns (ZMod p))
+    (cols : StoreByteChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (real : (StoreByteChip.rowView input cols).is_real = 1)
     (spec : StoreByteChip.Spec input cols data) :
@@ -6261,13 +6261,13 @@ theorem storeHalfChipDescriptor_table :
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeHalfChipDescriptor_view (input : StoreHalfChip.Inputs (ZMod p))
-    (output : Extracted.StoreHalfColumns (ZMod p)) :
+    (output : StoreHalfChip.Columns (ZMod p)) :
     (storeHalfChipDescriptor (p := p)).kind.view input output =
       StoreHalfChip.rowView input output := rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeHalfChipDescriptor_ramAccess (input : StoreHalfChip.Inputs (ZMod p))
-    (output : Extracted.StoreHalfColumns (ZMod p)) :
+    (output : StoreHalfChip.Columns (ZMod p)) :
     (storeHalfChipDescriptor (p := p)).kind.ramAccess input output =
       some (StoreHalfChip.ramAccessView input output) := rfl
 
@@ -6735,7 +6735,7 @@ omit [Fact (2 ^ 25 < p)] in
 authenticated RAM cell. -/
 theorem storeHalfChip_storeFacts
     (input : StoreHalfChip.Inputs (ZMod p))
-    (cols : Extracted.StoreHalfColumns (ZMod p))
+    (cols : StoreHalfChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (real : (StoreHalfChip.rowView input cols).is_real = 1)
     (spec : StoreHalfChip.Spec input cols data) :
@@ -7065,13 +7065,13 @@ theorem storeWordChipDescriptor_table :
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeWordChipDescriptor_view (input : StoreWordChip.Inputs (ZMod p))
-    (output : Extracted.StoreWordColumns (ZMod p)) :
+    (output : StoreWordChip.Columns (ZMod p)) :
     (storeWordChipDescriptor (p := p)).kind.view input output =
       StoreWordChip.rowView input output := rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeWordChipDescriptor_ramAccess (input : StoreWordChip.Inputs (ZMod p))
-    (output : Extracted.StoreWordColumns (ZMod p)) :
+    (output : StoreWordChip.Columns (ZMod p)) :
     (storeWordChipDescriptor (p := p)).kind.ramAccess input output =
       some (StoreWordChip.ramAccessView input output) := rfl
 
@@ -7456,7 +7456,7 @@ authenticated RAM cell. The two cases are exactly the v6.3.1 AIR's `offset_bit`-
 read-modify-write equations. -/
 theorem storeWordChip_storeFacts
     (input : StoreWordChip.Inputs (ZMod p))
-    (cols : Extracted.StoreWordColumns (ZMod p))
+    (cols : StoreWordChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (real : (StoreWordChip.rowView input cols).is_real = 1)
     (spec : StoreWordChip.Spec input cols data) :
@@ -7793,13 +7793,13 @@ theorem storeDoubleChipDescriptor_table :
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeDoubleChipDescriptor_view (input : StoreDoubleChip.Inputs (ZMod p))
-    (output : Extracted.StoreDoubleColumns (ZMod p)) :
+    (output : StoreDoubleChip.Columns (ZMod p)) :
     (storeDoubleChipDescriptor (p := p)).kind.view input output =
       StoreDoubleChip.rowView input output := rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeDoubleChipDescriptor_ramAccess (input : StoreDoubleChip.Inputs (ZMod p))
-    (output : Extracted.StoreDoubleColumns (ZMod p)) :
+    (output : StoreDoubleChip.Columns (ZMod p)) :
     (storeDoubleChipDescriptor (p := p)).kind.ramAccess input output =
       some (StoreDoubleChip.ramAccessView input output) := rfl
 
@@ -7870,7 +7870,7 @@ omit [Fact (2 ^ 25 < p)] in
 /-- StoreDouble's semantic row writes the complete authenticated RAM cell. -/
 theorem storeDoubleChip_storeFacts
     (input : StoreDoubleChip.Inputs (ZMod p))
-    (cols : Extracted.StoreDoubleColumns (ZMod p))
+    (cols : StoreDoubleChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (real : (StoreDoubleChip.rowView input cols).is_real = 1)
     (_spec : StoreDoubleChip.Spec input cols data) :
