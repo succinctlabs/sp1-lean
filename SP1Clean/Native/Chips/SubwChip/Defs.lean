@@ -4,17 +4,17 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.SubwChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # The SUBW chip row as a `GeneralFormalCircuit`, output = the extracted column struct
+/-! # The native SUBW chip row as a `GeneralFormalCircuit`
 
 Composes `Readers.CPUState.circuit`, the witnessed `SubwOperation.circuit`, and
 `Readers.RTypeReader.circuit` as Clean subcircuits/assertions, gates `is_real`, and returns the
-extracted `SubwCols` struct (emitting all four buses).
+native `Columns` struct (emitting all four buses). Its relationship to Rust is stated only by the
+whole-chip reconfiguration.
 
 W-instruction: result is 2 limbs + sign bit (`subw_operation.value`/`subw_operation.msb.msb`); the
 64-bit `op_a` write is the sign-extended word `[v0, v1, msb·65535, msb·65535]`. Adapter is the
@@ -24,17 +24,15 @@ operand order `op_b_val - op_c_val` must match `execute_RTYPEW rs2 rs1 rd .SUBW`
 namespace SP1Clean.SubwChip
 
 open Circuit
-open Extracted (SubwCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Compose the three column blocks as Clean subcircuits/assertions and assemble the extracted `SubwCols`
+/-- Compose the three column blocks as Clean subcircuits/assertions and assemble the native `Columns`
 struct. The `RTypeReader`'s four `op_a_write_value` limbs are the **sign-extended** W result
-`[value[0], value[1], msb·65535, msb·65535]` (mirroring `Extracted/SubwChip.lean`'s `RTypeReader.asserts …
-20 #v[…value[0], …value[1], msb·65535, msb·65535] …`); the Program-bus opcode is `20`. Only the
+`[value[0], value[1], msb·65535, msb·65535]`; the Program-bus opcode is `20`. Only the
 `SubwOperation` gadget witnesses; the two readers are `assertion`s over the threaded `state`/`adapter`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (SubwCols) (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   -- The chip witnesses the result low limbs + sign bit via the operation's `populate`, then composes the
@@ -66,14 +64,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (SubwCols) (ZMod 
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
   -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
   assertZero (input.is_real * (input.is_real - 1))
-  return ⟨input.state, input.adapter, ⟨value, ⟨msb[0]⟩⟩, input.is_real⟩
+  return ⟨input.is_real, input.state, input.adapter, ⟨value, ⟨msb[0]⟩⟩⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs SubwCols main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output input offset :=
-    ⟨input.state, input.adapter,
+    ⟨input.is_real, input.state, input.adapter,
       ⟨Vector.mapRange 2 fun i => var { index := offset + i },
-        ⟨var { index := offset + 2 }⟩⟩,
-      input.is_real⟩
+        ⟨var { index := offset + 2 }⟩⟩⟩
   output_eq := by
     intro input offset
     simp only [main, circuit_norm]
@@ -91,10 +88,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs SubwCols main where
 instead of unfolding the complete witnessed SUBW circuit at a concrete environment. -/
 @[circuit_norm] lemma directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     (elaborated (p := p)).output input offset =
-      (⟨input.state, input.adapter,
+      (⟨input.is_real, input.state, input.adapter,
         ⟨Vector.mapRange 2 fun i => var { index := offset + i },
-          ⟨var { index := offset + 2 }⟩⟩,
-        input.is_real⟩ : Var SubwCols (ZMod p)) := rfl
+          ⟨var { index := offset + 2 }⟩⟩⟩ : Var Columns (ZMod p)) := rfl
 
 /-- Component-wise evaluation of SUBW's independent input row. -/
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
@@ -106,11 +102,11 @@ instead of unfolding the complete witnessed SUBW circuit at a concrete environme
   rfl
 
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : SubwCols (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
-      ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
-         subw_operation := Eval.eval env cols.subw_operation,
-         is_real := Eval.eval env cols.is_real } : SubwCols F) := by
+      ({ is_real := Eval.eval env cols.is_real, state := Eval.eval env cols.state,
+         adapter := Eval.eval env cols.adapter,
+         subw_operation := Eval.eval env cols.subw_operation } : Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 

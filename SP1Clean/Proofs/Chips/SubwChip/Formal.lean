@@ -7,7 +7,6 @@ import Clean.Air.Circuit
 namespace SP1Clean.SubwChip
 
 open Circuit
-open Extracted (SubwCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -175,8 +174,8 @@ theorem opCPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
   simp [exposedMemoryInteractions]
 
 /-- The SUBW chip row as a `GeneralFormalCircuit`: semantic contract, composing the witnessed gadget +
-the two readers; output is the extracted `SubwCols` column struct. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs SubwCols :=
+the two readers; output is the native `Columns` row. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,

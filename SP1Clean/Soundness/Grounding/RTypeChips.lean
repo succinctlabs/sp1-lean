@@ -44,10 +44,9 @@ omit [Fact (2 ^ 25 < p)] in
 /-- SUBW's explicit sign-extended output row, kept as a symbolic rewrite boundary. -/
 theorem subwChip_circuit_output_eq (input : Var SubwChip.Inputs (ZMod p)) (offset : ℕ) :
     (SubwChip.circuit (p := p)).output input offset =
-      (⟨input.state, input.adapter,
+      (⟨input.is_real, input.state, input.adapter,
         ⟨Vector.mapRange 2 fun i => var { index := offset + i },
-          ⟨var { index := offset + 2 }⟩⟩,
-        input.is_real⟩ : Var Extracted.SubwCols (ZMod p)) := rfl
+          ⟨var { index := offset + 2 }⟩⟩⟩ : Var SubwChip.Columns (ZMod p)) := rfl
 
 omit [Fact (2 ^ 25 < p)] in
 /-- SUBW's public exposed Memory list evaluates to the canonical R-type six-pack. -/

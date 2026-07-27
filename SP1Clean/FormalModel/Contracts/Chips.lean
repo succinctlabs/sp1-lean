@@ -2,7 +2,6 @@ import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.FormalModel.Contracts.DivRem
 import SP1Clean.Extracted.AddiChip
 import SP1Clean.Extracted.AddwChip
-import SP1Clean.Extracted.SubwChip
 import SP1Clean.Extracted.BitwiseChip
 import SP1Clean.Extracted.ShiftLeftChip
 import SP1Clean.Extracted.ShiftRightChip
@@ -237,7 +236,6 @@ end SP1Clean.AddwChip
 
 namespace SP1Clean.SubwChip
 
-open Extracted (SubwCols)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The RV64 `SUBW` function equals the gadget's `signExtend 64 (setWidth 32 (rs1 - rs2))` form. -/
@@ -248,6 +246,17 @@ lemma rv64_subw_eq (x y : BitVec 64) :
   apply BitVec.eq_of_toNat_eq
   simp only [BitVec.toNat_sub, BitVec.extractLsb'_toNat, BitVec.toNat_setWidth, Nat.shiftRight_zero]
   omega
+
+/-- Native SUBW-chip row. The reader blocks reuse the project substrate; only the arithmetic block is
+owned by the local Lean gadget (two witnessed low limbs + the composed sign-bit block).
+`Faithful.SubwChip.subwChipReconfigure` is the sole bridge to Rust's separately generated whole-chip
+row. -/
+structure Columns (F : Type) where
+  is_real : F
+  state : Extracted.CPUState F
+  adapter : Extracted.RTypeReader F
+  subw_operation : SubwOperation.Columns F
+deriving ProvableStruct
 
 /-- The `is_real` selector and the threaded reader column blocks `state`/`adapter` (as `SubChip`; SUBW's
 adapter is the register `RTypeReader`). The `rs1`/`rs2` operands are projected — see `Inputs.op_b_val`. -/
@@ -265,7 +274,7 @@ deriving ProvableStruct
 value the reader carries is the **sign-extended** W result `[v0, v1, msb·65535, msb·65535]` (the gadget's
 `SubwOperation.resultWord`), and the gated-arith conjunct is `toBitVec64 resultWord = RV64.subw op_c op_b`
 (the low-32 subtract `rs1 - rs2` sign-extended; not commutative). Vacuous on padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : SubwCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   True ∧
   Readers.RTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,

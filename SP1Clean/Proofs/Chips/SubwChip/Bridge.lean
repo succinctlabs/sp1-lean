@@ -63,7 +63,7 @@ theorem correct_subw_native
 
 omit [Fact (2 ^ 17 < p)] in
 theorem subw_chip_reaches_sail
-    (input : SubwChip.Inputs (ZMod p)) (cols : Extracted.SubwCols (ZMod p)) (data : ProverData (ZMod p))
+    (input : SubwChip.Inputs (ZMod p)) (cols : SubwChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
     (h_chip : SubwChip.Spec input cols data)
@@ -94,7 +94,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- **SUBW's committed bus view** — the chip-agnostic `RowView` (opcode `20`, the `pc+4` straight-line
 next-pc, the sign-extended W result `[v0, v1, msb·65535, msb·65535]` as `rdWrite`). Standalone so
 `SubwChip.advance` can be supplied *as* `kind.advance` (see `AddChip.rowView`). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.SubwCols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real,
     #v[cols.subw_operation.value[0], cols.subw_operation.value[1],
@@ -106,7 +106,7 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.SubwCols (ZMod p)) : Trace
 identity `hval` — the chip `Spec`'s gated `RV64.subw op_c op_b` conjunct, threaded through `SubwChip.rv64_subw_eq`
 + `subw_pure_eq` into `execute_RTYPEW_pure op_b op_c SUBW` (the low-32 subtract sign-extended to 64). Stated to
 match the `ChipKind.advance` obligation exactly, so `kind.advance := some (PLift.up advance)` type-checks. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.SubwCols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1)
     (hspec : Spec inp cols data)
@@ -141,7 +141,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.SubwCols (ZMod p)) (da
 def kind : Soundness.ChipKind p where
   name := "Subw"
   Inputs := SubwChip.Inputs
-  Cols := Extracted.SubwCols
+  Cols := SubwChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady :=fun inp cols _ _ => inp.adapter = cols.adapter ∧ (rowView inp cols).adapter.op_a ≠ 0

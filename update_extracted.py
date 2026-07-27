@@ -194,7 +194,7 @@ MEMORY_BOUNDARY_CLUSTER: Tuple[str, ...] = (
 # chip-private arithmetic structs and functions stay in the oracle.
 # Grow this set one chip at a time, deleting the corresponding legacy `Extracted/<Chip>Chip.lean`
 # file after its native reconfiguration lands.
-CHIP_ORACLES: Set[str] = {"Add", "Sub"}
+CHIP_ORACLES: Set[str] = {"Add", "Sub", "Subw"}
 
 # Stable generated reader substrate shared by native chip rows and whole-chip Rust oracles. Reusing
 # these types avoids creating a fresh CPU/register-reader hierarchy per oracle while keeping Rust
@@ -212,7 +212,7 @@ CHIP_ORACLE_IMPORTED_HELPERS: Set[str] = {"CPUState", "RTypeReader"}
 # Helpers needed while rendering a self-contained chip oracle but no longer emitted as standalone
 # verification artifacts. They remain in `OPERATIONS` solely so the discovery pass can embed their
 # generated definitions inside the owning chip namespace.
-CHIP_ONLY_HELPERS: Set[str] = {"SubOperation"}
+CHIP_ONLY_HELPERS: Set[str] = {"SubOperation", "SubwOperation"}
 
 # Explicit struct→owning-module overrides, ONLY for cases the default rules can't infer:
 #   * struct name ≠ its owning module's name, or

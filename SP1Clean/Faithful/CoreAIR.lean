@@ -21,7 +21,7 @@ import SP1Clean.Extracted.StoreByteChip
 import SP1Clean.Extracted.StoreDoubleChip
 import SP1Clean.Extracted.StoreHalfChip
 import SP1Clean.Extracted.StoreWordChip
-import SP1Clean.Extracted.SubwChip
+import SP1Clean.Extracted.ChipOracle.Subw
 import SP1Clean.Extracted.SystemOracle.Byte
 import SP1Clean.Extracted.SystemOracle.Global
 import SP1Clean.Extracted.SystemOracle.MemoryBump
@@ -70,7 +70,7 @@ def MainRow (p : ℕ) [Fact p.Prime] : Table → Type
   | .addi => AddiCols (ZMod p)
   | .addw => AddwCols (ZMod p)
   | .sub => SubOracle.SubCols (ZMod p)
-  | .subw => SubwCols (ZMod p)
+  | .subw => SubwOracle.SubwCols (ZMod p)
   | .bitwise => BitwiseCols (ZMod p)
   | .mul => MulCols (ZMod p)
   | .shiftRight => ShiftRightCols (ZMod p)
@@ -121,7 +121,7 @@ def assertions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .addi => AddiCols.asserts row.main
   | .addw => AddwCols.asserts row.main
   | .sub => SubOracle.SubCols.asserts row.main
-  | .subw => SubwCols.asserts row.main
+  | .subw => SubwOracle.SubwCols.asserts row.main
   | .bitwise => BitwiseCols.asserts row.main
   | .mul => MulCols.asserts row.main
   | .shiftRight => ShiftRightCols.asserts row.main
@@ -166,7 +166,7 @@ def interactions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .addi => AddiCols.interactions row.main
   | .addw => AddwCols.interactions row.main
   | .sub => SubOracle.SubCols.interactions row.main
-  | .subw => SubwCols.interactions row.main
+  | .subw => SubwOracle.SubwCols.interactions row.main
   | .bitwise => BitwiseCols.interactions row.main
   | .mul => MulCols.interactions row.main
   | .shiftRight => ShiftRightCols.interactions row.main

@@ -325,17 +325,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.subChip_constraints_faithful
 #print axioms SP1Clean.Faithful.subChip_interactions_faithful
 #print axioms SP1Clean.Faithful.subChip_faithful
-#print axioms SP1Clean.Faithful.subw_constraints_faithful
-#print axioms SP1Clean.Faithful.subw_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.subwChip_constraints_faithful
 #print axioms SP1Clean.Faithful.subwChip_interactions_faithful
 #print axioms SP1Clean.Faithful.subwChip_faithful
-#print axioms SP1Clean.Faithful.subwcols_constraints_faithful
-#print axioms SP1Clean.Faithful.subwcols_state_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.subwcols_program_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.subwcols_memory_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.subwcols_byte_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.subwcols_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.u16compare_constraints_faithful
 #print axioms SP1Clean.Faithful.u16compare_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.u16msb_constraints_faithful

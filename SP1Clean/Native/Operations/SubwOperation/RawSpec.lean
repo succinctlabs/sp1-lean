@@ -1,6 +1,5 @@
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.Math.Word
-import SP1Clean.Extracted.SubwOperation
 import Mathlib.Tactic.LinearCombination
 import Mathlib.Tactic.IntervalCases
 
@@ -17,7 +16,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The borrow-bool + low-limb-range form of the two-limb subtract chain (carry init `1`,
 complement `65535 - b[i]`), against the witnessed low limbs `cols.value[0]`, `cols.value[1]`. -/
-def RawSpec (a b : Word (ZMod p)) (cols : Extracted.SubwOperation (ZMod p)) : Prop :=
+def RawSpec (a b : Word (ZMod p)) (cols : Columns (ZMod p)) : Prop :=
   let c0 : ZMod p := (a[0] + 65535 - b[0] - cols.value[0] + 1) * 65536⁻¹
   let c1 : ZMod p := (a[1] + 65535 - b[1] - cols.value[1] + c0) * 65536⁻¹
   (c0 = 0 ∨ c0 = 1) ∧ (c1 = 0 ∨ c1 = 1) ∧
@@ -26,7 +25,7 @@ def RawSpec (a b : Word (ZMod p)) (cols : Extracted.SubwOperation (ZMod p)) : Pr
 set_option maxHeartbeats 16000000 in
 /-- Forward (soundness) core: the two-limb borrow chain + the sign bit imply the reconstructed
 result is a 64-bit value equal to the sign extension of the low-32 subtract. -/
-theorem subwSemantics_of_carries {a b : Word (ZMod p)} {cols : Extracted.SubwOperation (ZMod p)}
+theorem subwSemantics_of_carries {a b : Word (ZMod p)} {cols : Columns (ZMod p)}
     (ha : a.isU64) (hb : b.isU64) (h_raw : RawSpec a b cols)
     (h_msb : cols.msb.msb = if cols.value[1].val ≥ 32768 then 1 else 0) :
     (resultWord cols).isU64 ∧
@@ -73,7 +72,7 @@ theorem subwSemantics_of_carries {a b : Word (ZMod p)} {cols : Extracted.SubwOpe
 set_option maxHeartbeats 16000000 in
 /-- Backward (completeness) core — the converse of `subwSemantics_of_carries`. Borrow-form analog of
 `AddwOperation.carries_of_addwSemantics`. -/
-theorem carries_of_subwSemantics {a b : Word (ZMod p)} {cols : Extracted.SubwOperation (ZMod p)}
+theorem carries_of_subwSemantics {a b : Word (ZMod p)} {cols : Columns (ZMod p)}
     (ha : a.isU64) (hb : b.isU64)
     (hU : (resultWord cols).isU64)
     (hbv : Word.toBitVec64 (resultWord cols)

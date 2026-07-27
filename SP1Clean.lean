@@ -122,6 +122,7 @@ import SP1Clean.Extracted.ALUTypeReader
 import SP1Clean.Extracted.AluX0Chip
 import SP1Clean.Extracted.ChipOracle.Add
 import SP1Clean.Extracted.ChipOracle.Sub
+import SP1Clean.Extracted.ChipOracle.Subw
 import SP1Clean.Extracted.AddOperation
 import SP1Clean.Extracted.AddiChip
 import SP1Clean.Extracted.AddrAddOperation
@@ -174,8 +175,6 @@ import SP1Clean.Extracted.StoreByteChip
 import SP1Clean.Extracted.StoreDoubleChip
 import SP1Clean.Extracted.StoreHalfChip
 import SP1Clean.Extracted.StoreWordChip
-import SP1Clean.Extracted.SubwChip
-import SP1Clean.Extracted.SubwOperation
 import SP1Clean.Extracted.U16CompareOperation
 import SP1Clean.Extracted.U16MSBOperation
 import SP1Clean.Extracted.U16toU8OperationSafe
@@ -223,7 +222,6 @@ import SP1Clean.Faithful.StoreDouble
 import SP1Clean.Faithful.StoreHalf
 import SP1Clean.Faithful.StoreWord
 import SP1Clean.Faithful.SubChip
-import SP1Clean.Faithful.Subw
 import SP1Clean.Faithful.SubwChip
 import SP1Clean.Faithful.U16CompareOperation
 import SP1Clean.Faithful.U16MSBOperation
