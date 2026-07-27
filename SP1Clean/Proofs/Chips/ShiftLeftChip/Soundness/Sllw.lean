@@ -13,7 +13,6 @@ local `Spec` named exactly `Spec` (so `circuit_proof_start` reduces it). -/
 namespace SP1Clean.ShiftLeftChip.SoundSllw
 
 open Circuit
-open Extracted (ShiftLeftCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -29,7 +28,7 @@ lemma sllw_rv64_eq {b c : Word (ZMod p)} (hb : Word.isU64 b) (hc : Word.isU64 c)
   simp only [RV64.sllw, ShiftLeftCore.extractLsb32_toBitVec64 hb, ShiftLeftCore.extractLsb5_toBitVec64 hc]
 
 /-- The `sllw` conjunct of `ShiftLeftChip.Spec`, as a standalone single-conjunct spec. -/
-def Spec (input : Inputs (ZMod p)) (cols : ShiftLeftCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   input.is_real = 1 →
     (cols.is_sllw = 1 →
       Word.toBitVec64 cols.a = RV64.sllw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))

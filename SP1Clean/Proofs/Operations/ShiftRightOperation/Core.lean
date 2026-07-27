@@ -13,13 +13,12 @@ combined gate is available to Clean's shallow channel-law proof.
 namespace SP1Clean.ShiftRightCore
 
 open Circuit
-open Extracted (ShiftRightCols)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The assertion block has no semantic precondition: its own constraints establish the complete
 structural `AssertSpec`. -/
-def Assumptions (_ : ShiftRightCols (ZMod p)) : Prop := True
+def Assumptions (_ : ShiftRightChip.Columns (ZMod p)) : Prop := True
 
 omit [Fact (2 ^ 17 < p)] in
 theorem soundness :
@@ -48,7 +47,7 @@ theorem completeness :
   exact h_spec
 
 /-- The 53-assert ShiftRight chip-local tail as a zero-witness Clean `FormalAssertion`. -/
-def circuit : FormalAssertion (ZMod p) ShiftRightCols where
+def circuit : FormalAssertion (ZMod p) ShiftRightChip.Columns where
   main
   elaborated
   Assumptions := Assumptions
@@ -62,7 +61,7 @@ set_option linter.unusedSectionVars false in
     (circuit (p := p)).channelsWithRequirements = ([] : List (RawChannel (ZMod p))) := rfl
 
 set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma circuit_localLength (cols : Var ShiftRightCols (ZMod p)) :
+@[circuit_norm] lemma circuit_localLength (cols : Var ShiftRightChip.Columns (ZMod p)) :
     circuit.localLength cols = 0 := rfl
 
 omit [Fact (2 ^ 17 < p)] in
@@ -70,7 +69,7 @@ omit [Fact (2 ^ 17 < p)] in
 as a named compositional lemma lets parent exposure proofs erase the folded core without unfolding
 its 53 assertions. -/
 theorem interactionsWith_subcircuit_eq_nil (channel : RawChannel (ZMod p))
-    (cols : Var ShiftRightCols (ZMod p)) (offset : ℕ) (ops : Operations (ZMod p)) :
+    (cols : Var ShiftRightChip.Columns (ZMod p)) (offset : ℕ) (ops : Operations (ZMod p)) :
     Operations.interactionsWith channel
         (.subcircuit (circuit.toSubcircuit offset cols) :: ops) =
       Operations.interactionsWith channel ops := by

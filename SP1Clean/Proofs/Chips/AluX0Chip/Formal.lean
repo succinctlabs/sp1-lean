@@ -9,7 +9,6 @@ reader contract purely from the in-circuit gates. -/
 namespace SP1Clean.AluX0Chip
 
 open Circuit
-open Extracted (AluX0Cols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -226,8 +225,8 @@ theorem opCPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
   simp [exposedMemoryInteractions]
 
 /-- The `AluX0` chip row as a `GeneralFormalCircuit`: validates the ALU-into-`x0` program/register accesses
-and advances state (the result discarded); output is the extracted `AluX0Cols`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs AluX0Cols :=
+and advances state (the result discarded); output is the native `Columns` row. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   -- `byteChannel` dropped (W11 Phase 0c): the off-gate LTU byte-pull `Requirements` is discharged by the
   -- inline `is_real` boolean gate in `main`; the residual buses (state/memory/program) are the readers'.
   { main, elaborated,

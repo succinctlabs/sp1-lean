@@ -119,7 +119,7 @@ import SP1Clean.Proofs.Chips.UTypeChip.Bridge
 import SP1Clean.Native.Chips.UTypeChip.Defs
 import SP1Clean.Proofs.Chips.UTypeChip.Formal
 import SP1Clean.Extracted.ALUTypeReader
-import SP1Clean.Extracted.AluX0Chip
+import SP1Clean.Extracted.ChipOracle.AluX0
 import SP1Clean.Extracted.ChipOracle.Add
 import SP1Clean.Extracted.ChipOracle.Addi
 import SP1Clean.Extracted.ChipOracle.Addw
@@ -167,8 +167,8 @@ import SP1Clean.Extracted.LtOperationSigned
 import SP1Clean.Extracted.LtOperationUnsigned
 import SP1Clean.Extracted.MulOperation
 import SP1Clean.Extracted.RTypeReader
-import SP1Clean.Extracted.ShiftLeftChip
-import SP1Clean.Extracted.ShiftRightChip
+import SP1Clean.Extracted.ChipOracle.ShiftLeft
+import SP1Clean.Extracted.ChipOracle.ShiftRight
 import SP1Clean.Extracted.StoreByteChip
 import SP1Clean.Extracted.StoreDoubleChip
 import SP1Clean.Extracted.StoreHalfChip

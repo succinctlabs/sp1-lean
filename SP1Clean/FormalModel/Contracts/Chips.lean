@@ -1,7 +1,5 @@
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.FormalModel.Contracts.DivRem
-import SP1Clean.Extracted.ShiftLeftChip
-import SP1Clean.Extracted.ShiftRightChip
 import SP1Clean.FormalModel.Contracts.DivRemColumns
 import SP1Clean.Extracted.BranchChip
 import RISCV.Instructions
@@ -305,7 +303,6 @@ end SP1Clean.SubwChip
 
 namespace SP1Clean.ShiftLeftChip
 
-open Extracted (ShiftLeftCols)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The `is_real` selector and the **threaded reader column blocks** `state`/`adapter` (the committed
@@ -326,10 +323,33 @@ constraints bind this word to the decoded `adapter.op_c` shift amount. -/
 @[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
 @[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c_memory.prev_value
 
-/-- The folded tail of `ShiftLeftCols.asserts`, beginning immediately after the two flag booleans and
-their combined boolean gate. This is a genuine proof boundary over the committed chip row, not a
-claimed Rust operation. -/
-def CoreSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
+/-- Native ShiftLeft-chip row (Rust field order — the chip has no separate `is_real` column; the
+real-row selector is `is_sll + is_sllw`). The reader blocks and the SLLW MSB block reuse the project
+substrate (`Extracted.U16MSBOperation` is still a standalone generated module — the Branch/load
+chip families compose the same gadget). `Faithful.shiftLeftChipReconfigure` is the sole bridge to
+Rust's separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ALUTypeReader F
+  a : Word F
+  c_bits : Vector F 6
+  v_01 : F
+  v_012 : F
+  v_0123 : F
+  shift_u16 : Vector F 4
+  lower_limb : Word F
+  higher_limb : Word F
+  limb_result : Word F
+  sllw_msb : Extracted.U16MSBOperation F
+  is_sll : F
+  is_sllw : F
+  is_sllw_imm : F
+deriving ProvableStruct
+
+/-- The folded tail of the generated ShiftLeft `asserts` list, beginning immediately after the two
+flag booleans and their combined boolean gate. This is a genuine proof boundary over the committed
+chip row, not a claimed Rust operation. -/
+def CoreSpec (cols : Columns (ZMod p)) : Prop :=
   let sll := cols.is_sll; let sllw := cols.is_sllw
   let b0 := cols.c_bits[0]; let b1 := cols.c_bits[1]; let b2 := cols.c_bits[2]
   let b3 := cols.c_bits[3]; let b4 := cols.c_bits[4]; let b5 := cols.c_bits[5]
@@ -388,7 +408,7 @@ RV64 shift-left of the operand by the shift amount, with the variant selected by
 columns (`cols.is_sll → RV64.sll`, the 64-bit logical left shift; `cols.is_sllw → RV64.sllw`, the
 low-32 left shift sign-extended to 64). Operand order matches the RV64 signature `f rs2_val rs1_val`
 with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`. Vacuous on padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : ShiftLeftCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   input.is_real = 1 →
     (cols.is_sll = 1 →
       Word.toBitVec64 cols.a = RV64.sll (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
@@ -399,7 +419,6 @@ end SP1Clean.ShiftLeftChip
 
 namespace SP1Clean.ShiftRightChip
 
-open Extracted (ShiftRightCols)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- As `ShiftLeftChip.Inputs`: the shift operand word (`rs1`, `op_b_val`), the shift-amount source word
@@ -411,11 +430,38 @@ structure Inputs (F : Type) where
   adapter : Extracted.ALUTypeReader F
 deriving ProvableStruct
 
-/-- The folded tail of `ShiftRightCols.asserts`, beginning immediately after the four flag
-booleans and their combined boolean gate.  This is a genuine proof boundary, not a claimed Rust
+/-- Native ShiftRight-chip row (Rust field order — the chip has no separate `is_real` column; the
+real-row selector is the four-flag sum). The reader blocks and the two MSB blocks reuse the project
+substrate (`Extracted.U16MSBOperation` stays a standalone generated module).
+`Faithful.shiftRightChipReconfigure` is the sole bridge to Rust's separately generated whole-chip
+row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ALUTypeReader F
+  a : Word F
+  b_msb : Extracted.U16MSBOperation F
+  srw_msb : Extracted.U16MSBOperation F
+  c_bits : Vector F 6
+  sra_msb_v0123 : F
+  v_0123 : F
+  v_012 : F
+  v_01 : F
+  lower_limb : Word F
+  higher_limb : Word F
+  limb_result : Vector F 4
+  shift_u16 : Vector F 4
+  is_srl : F
+  is_sra : F
+  is_srlw : F
+  is_sraw : F
+  is_w_imm : F
+deriving ProvableStruct
+
+/-- The folded tail of the generated ShiftRight `asserts` list, beginning immediately after the four
+flag booleans and their combined boolean gate.  This is a genuine proof boundary, not a claimed Rust
 operation: the parent chip emits the five shallow gate constraints itself, then composes the tail
 without making parent proofs normalize the remaining 53 assertions. -/
-def CoreSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
+def CoreSpec (cols : Columns (ZMod p)) : Prop :=
   let srl := cols.is_srl; let sra := cols.is_sra; let srlw := cols.is_srlw; let sraw := cols.is_sraw
   let e14 := srl + sra; let e13 := srlw + sraw; let sum := srl + sra + srlw + sraw
   let b0 := cols.c_bits[0]; let b1 := cols.c_bits[1]; let b2 := cols.c_bits[2]
@@ -485,12 +531,12 @@ def CoreSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
   -- op_a_0 zeroing flag
   cols.adapter.op_a_0 = 0
 
-/-- **Assertion half** — the literal meaning of SP1's `ShiftRightCols.asserts` *own* assertZero
+/-- **Assertion half** — the literal meaning of the generated ShiftRight `asserts` *own* assertZero
 list. `E14 = is_srl + is_sra` (the 64-bit-shift indicator) and `E13 = is_srlw + is_sraw` (the
 word-shift indicator) gate the two output-placement blocks; the `v_*` powers are the **inverted**
 right-shift form `2^(16 - bitShift)`. In exact upstream order this is the four flag booleans, their
 combined boolean gate, then `CoreSpec`'s remaining 53 assertions. -/
-def AssertSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
+def AssertSpec (cols : Columns (ZMod p)) : Prop :=
   let srl := cols.is_srl; let sra := cols.is_sra; let srlw := cols.is_srlw; let sraw := cols.is_sraw
   let sum := srl + sra + srlw + sraw
   srl * (srl - 1) = 0 ∧ sra * (sra - 1) = 0 ∧ srlw * (srlw - 1) = 0 ∧
@@ -504,7 +550,7 @@ chip actually decomposes — `rs1 ↦ adapter.op_b_memory.prev_value` (the shift
 adapter.op_c_memory.prev_value` (the shift amount) — stated directly on the adapter columns, since SP1's
 shift chip inlines the decomposition of the register read rather than passing a separate operand word to
 an operation gadget. Operand order `f rs2 rs1`. Vacuous on padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : ShiftRightCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   let rs1 := input.adapter.op_b_memory.prev_value
   let rs2 := input.adapter.op_c_memory.prev_value
   input.is_real = 1 →

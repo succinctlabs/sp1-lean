@@ -28,7 +28,6 @@ closures are conformance-checked against SP1's real `generate_trace` in
 namespace SP1Clean.ShiftRightChip
 
 open Circuit
-open Extracted (ShiftRightCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -435,10 +434,10 @@ private theorem main_exposedChannelsLawful (input : Var Inputs (ZMod p)) (offset
 
 set_option maxHeartbeats 4000000 in
 /-- The `ShiftRight` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `srl`/`sra`/`srlw`/`sraw`
-semantic contract; output is the extracted `ShiftRightCols` column struct. Soundness is proved (assembled
+semantic contract; output is the native `Columns` row struct. Soundness is proved (assembled
 from the four per-op `Soundness/<Op>.lean` files); the explicitly deferred completeness seam is recorded
 above. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs ShiftRightCols :=
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,

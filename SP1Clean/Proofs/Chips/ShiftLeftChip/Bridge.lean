@@ -116,7 +116,7 @@ theorem correct_sllw_native
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end: from the chip `Spec`, the SLL/SLLW Sail identities hold. -/
 theorem shiftleft_chip_reaches_sail
-    (input : ShiftLeftChip.Inputs (ZMod p)) (cols : Extracted.ShiftLeftCols (ZMod p))
+    (input : ShiftLeftChip.Inputs (ZMod p)) (cols : ShiftLeftChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
@@ -148,7 +148,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The ShiftLeft RowView (standalone, shared by `kind.view` and `advance`): straight-line `next_pc`,
 the ALU adapter, `cols.a` as the shift-result write, opcode `is_sll·6 + is_sllw·21` (SLL = 6, SLLW = 21). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.ShiftLeftCols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : ShiftLeftChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.a, cols.is_sll * 6 + cols.is_sllw * 21, .regWrite⟩
 
@@ -156,7 +156,7 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.ShiftLeftCols (ZMod p)) : 
 SLLW/SLLIW.  The variant flag chooses the 64-bit or word operation, while the committed `imm_c` bit
 chooses the register or immediate Sail constructor.  On immediate rows the retained ALU-reader gate
 binds its physical arithmetic operand to the decoded Program operand. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.ShiftLeftCols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : ShiftLeftChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -226,7 +226,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.ShiftLeftCols (ZMod p)
 def kind : Soundness.ChipKind p where
   name := "ShiftLeft"
   Inputs := ShiftLeftChip.Inputs
-  Cols := Extracted.ShiftLeftCols
+  Cols := ShiftLeftChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧ inp.adapter = cols.adapter ∧

@@ -23,13 +23,13 @@ structure ShiftLeftChip.ControlFacts
   opA0Zero : opA0 = 0
 
 /-- The exact one-hot selector proposition consumed by ShiftLeft's `advanceReady`. -/
-def ShiftLeftChip.ActiveSelector (cols : Extracted.ShiftLeftCols (ZMod p)) : Prop :=
+def ShiftLeftChip.ActiveSelector (cols : ShiftLeftChip.Columns (ZMod p)) : Prop :=
   (cols.is_sll = 1 ∧ cols.is_sllw = 0) ∨
     (cols.is_sllw = 1 ∧ cols.is_sll = 0)
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem ShiftLeftChip.opA0Zero_of_coreSpec
-    (cols : Extracted.ShiftLeftCols (ZMod p))
+    (cols : ShiftLeftChip.Columns (ZMod p))
     (core : ShiftLeftChip.CoreSpec cols) :
     cols.adapter.op_a_0 = 0 := by
   simp only [ShiftLeftChip.CoreSpec] at core
@@ -153,7 +153,7 @@ theorem ShiftLeftChip.inputOutputAdapter (env : Environment (ZMod p)) :
 
 /-- The completed ShiftLeft columns at one physical component row. -/
 noncomputable def ShiftLeftChip.physicalCols (env : Environment (ZMod p)) :
-    Extracted.ShiftLeftCols (ZMod p) :=
+    ShiftLeftChip.Columns (ZMod p) :=
   (⟨ShiftLeftChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env
 
 /-- The completed ShiftLeft row view at one physical component row. -/

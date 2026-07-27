@@ -7,7 +7,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 This zero-witness `FormalAssertion` boundary emits the 53-assert tail represented by
 `ShiftRightChip.CoreSpec`.  The parent deliberately keeps the preceding four flag booleans and
 combined boolean gate at chip level: Clean's shallow channel-law proof needs to see that combined
-gate.  This is a proof-oriented gadget over the whole committed `ShiftRightCols` row, not a claim
+gate.  This is a proof-oriented gadget over the whole committed `ShiftRightChip.Columns` row, not a claim
 that upstream SP1 has a corresponding Rust operation.  Virtual subcircuit elaboration preserves the
 original operation order.
 -/
@@ -15,13 +15,12 @@ original operation order.
 namespace SP1Clean.ShiftRightCore
 
 open Circuit
-open Extracted (ShiftRightCols)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Emit the folded tail of the chip-local ShiftRight assertion list over the committed row.  The
 circuit witnesses nothing and has no channel activity. -/
-def main (cols : Var ShiftRightCols (ZMod p)) : Circuit (ZMod p) Unit := do
+def main (cols : Var ShiftRightChip.Columns (ZMod p)) : Circuit (ZMod p) Unit := do
   let srl := cols.is_srl
   let sra := cols.is_sra
   let srlw := cols.is_srlw
@@ -112,7 +111,7 @@ def main (cols : Var ShiftRightCols (ZMod p)) : Circuit (ZMod p) Unit := do
   cols.adapter.op_a_0 === 0
 
 /-- The assertion cluster has no witnesses, outputs, subcircuits, or channel interactions. -/
-instance elaborated : ElaboratedCircuit (ZMod p) ShiftRightCols unit main := by
+instance elaborated : ElaboratedCircuit (ZMod p) ShiftRightChip.Columns unit main := by
   elaborate_circuit
 
 set_option linter.unusedSectionVars false in
@@ -120,7 +119,7 @@ set_option linter.unusedSectionVars false in
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p))) = [] := rfl
 
 set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma localLength_eq (cols : Var ShiftRightCols (ZMod p)) :
+@[circuit_norm] lemma localLength_eq (cols : Var ShiftRightChip.Columns (ZMod p)) :
     (elaborated (p := p)).localLength cols = 0 := rfl
 
 end SP1Clean.ShiftRightCore

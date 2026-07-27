@@ -13,13 +13,12 @@ proof-oriented gadget over the whole committed row, not a claimed upstream Rust 
 namespace SP1Clean.ShiftLeftCore
 
 open Circuit
-open Extracted (ShiftLeftCols)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Emit the folded tail of the chip-local ShiftLeft assertion list. The circuit witnesses nothing
 and has no channel activity. -/
-def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
+def main (cols : Var ShiftLeftChip.Columns (ZMod p)) : Circuit (ZMod p) Unit := do
   let sll := cols.is_sll
   let sllw := cols.is_sllw
   let b0 := cols.c_bits[0]
@@ -91,7 +90,7 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
   cols.adapter.op_a_0 === 0
 
 /-- The assertion cluster has no witnesses, outputs, subcircuits, or channel interactions. -/
-instance elaborated : ElaboratedCircuit (ZMod p) ShiftLeftCols unit main := by
+instance elaborated : ElaboratedCircuit (ZMod p) ShiftLeftChip.Columns unit main := by
   elaborate_circuit
 
 set_option linter.unusedSectionVars false in
@@ -99,7 +98,7 @@ set_option linter.unusedSectionVars false in
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p))) = [] := rfl
 
 set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma localLength_eq (cols : Var ShiftLeftCols (ZMod p)) :
+@[circuit_norm] lemma localLength_eq (cols : Var ShiftLeftChip.Columns (ZMod p)) :
     (elaborated (p := p)).localLength cols = 0 := rfl
 
 end SP1Clean.ShiftLeftCore

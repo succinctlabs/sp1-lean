@@ -10,7 +10,6 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.ShiftRightChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -21,7 +20,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 `SRL`/`SRA`/`SRLW`/`SRAW`: as with `ShiftLeftChip`, no operation-level extraction — the inverted-`v`
 power encodings, the `b_msb`/`srw_msb` sign-extension MSB gadgets, the `lower/higher_limb` bit-split,
 the `limb_result` reassembly, and the four-variant output placement are inlined into
-`Extracted/ShiftRightChip.lean`.
+the generated ShiftRight oracle (`Extracted/ChipOracle/ShiftRight.lean`).
 
 `AssertSpec` / `InteractSpec` capture the structural meaning of SP1's two extracted constraint lists;
 the semantic flag-gated RV64 `srl`/`sra`/`srlw`/`sraw` `Spec` is in `Specs/Chip.lean`.
@@ -33,7 +32,6 @@ the semantic flag-gated RV64 `srl`/`sra`/`srlw`/`sraw` `Spec` is in `Specs/Chip.
 namespace SP1Clean.ShiftRightChip
 
 open Circuit
-open Extracted (ShiftRightCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -46,11 +44,11 @@ memory: the writer range-checked them). These are the `rs1`/`rs2` the `Spec` shi
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.adapter.op_b_memory.prev_value ∧ Word.isU64 input.adapter.op_c_memory.prev_value
 
-/-- **Interaction half** — SP1's `ShiftRightCols.interactions` byte-range sends (gated by
+/-- **Interaction half** — SP1's `Columns.interactions` byte-range sends (gated by
 `gate = is_srl + is_sra + is_srlw + is_sraw`): the shift-amount high bits `< 2^10`, and, per limb, the
 `lower_limb` `< 2^bitShift` and `higher_limb` `< 2^(16 - bitShift)` ranges. (Note the lower/higher
 widths are swapped versus `ShiftLeftChip`, as the right shift keeps the high bits.) -/
-def InteractSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
+def InteractSpec (cols : Columns (ZMod p)) : Prop :=
   let b0 := cols.c_bits[0]; let b1 := cols.c_bits[1]; let b2 := cols.c_bits[2]
   let b3 := cols.c_bits[3]; let b4 := cols.c_bits[4]; let b5 := cols.c_bits[5]
   let bitShift : ZMod p := b0 * 1 + b1 * 2 + b2 * 4 + b3 * 8
@@ -235,7 +233,7 @@ private instance witnessPrefixExplicit (input : Var Inputs (ZMod p)) :
 /-- The post-witness circuit body.  Naming this pure composition keeps the large assertion tail
 folded while structural consumers select the early reader boundary. -/
 @[circuit_norm] private def postWitness (input : Var Inputs (ZMod p)) (witnesses : WitnessVars (ZMod p)) :
-    Circuit (ZMod p) (Var ShiftRightCols (ZMod p)) := do
+    Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let a := witnesses.a
   let b_msb := witnesses.b_msb
   let srw_msb := witnesses.srw_msb
@@ -274,13 +272,13 @@ folded while structural consumers select the early reader boundary. -/
   -- the memory channel's `MemoryMsg.ClkBound` guarantee is derived in-circuit rather than assumed.
   -- This is parent glue rather than an independent proof boundary, so keep it as a shallow inline
   -- assertion. It allocates no witness cell (`localLength` is unchanged at 37) and lives outside
-  -- `AssertSpec` (which mirrors only the extracted `ShiftRightCols.asserts` list over committed columns).
+  -- `AssertSpec` (which mirrors only the extracted `Columns.asserts` list over committed columns).
   assertZero (input.is_real - (is_srl + is_sra + is_srlw + is_sraw))
   -- The chip-local assertions retain the exact Rust order.  The four flag booleans and combined
   -- boolean gate stay at parent level: the latter must be visible to `ConstraintsHold.Shallow` to
   -- discharge the off-gate byte requirements.  The remaining 53 assertions form a genuine folded
   -- proof boundary, whose virtual-subcircuit elaboration preserves the flat operation sequence.
-  let cols : Var ShiftRightCols (ZMod p) :=
+  let cols : Var Columns (ZMod p) :=
     ⟨input.state, input.adapter, a, ⟨b_msb[0]⟩, ⟨srw_msb[0]⟩, c_bits, sra_msb_v0123[0],
       v[0], v[1], v[2], lower_limb, higher_limb, limb_result, shift_u16,
       is_srl, is_sra, is_srlw, is_sraw, is_w_imm⟩
@@ -321,9 +319,9 @@ set_option maxHeartbeats 4000000 in
 /-- Compose the threaded `CPUState`/`ALUTypeReader` reader blocks and the **three** `U16MSBOperation`
 gadgets (`b_msb` on `op_b` limb 3 gated `is_sra` and limb 1 gated `is_sraw`; `srw_msb` on `a[1]` gated
 `is_srlw + is_sraw`), witness the shift column block, gate `is_real`, emit the ~58 inline shift
-assertions (`AssertSpec`) and the nine byte-range pulls (`InteractSpec`), and assemble the extracted
-`ShiftRightCols` struct. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftRightCols (ZMod p)) := do
+assertions (`AssertSpec`) and the nine byte-range pulls (`InteractSpec`), and assemble the native
+`Columns` struct. -/
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let witnesses ← witnessPrefix input
@@ -1255,7 +1253,7 @@ private theorem core_mem_postWitness
 
 /-- The exact row passed to the folded arithmetic core after the witness prefix. -/
 def coreInput (input : Var Inputs (ZMod p)) (offset : ℕ) :
-    Var ShiftRightCols (ZMod p) :=
+    Var Columns (ZMod p) :=
   (postWitness input ((witnessPrefix input).output offset)).output (offset + 37)
 
 @[circuit_norm] theorem coreInput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
@@ -1273,7 +1271,7 @@ def coreInput (input : Var Inputs (ZMod p)) (offset : ℕ) :
         varFromOffset (Vector · 4) (offset + 28),
         var { index := offset + 32 }, var { index := offset + 33 },
         var { index := offset + 34 }, var { index := offset + 35 },
-        var { index := offset + 36 }⟩ : Var ShiftRightCols (ZMod p)) := rfl
+        var { index := offset + 36 }⟩ : Var Columns (ZMod p)) := rfl
 
 private theorem constraints_main_bind_decompose
     (input : Var Inputs (ZMod p)) (offset : ℕ) :
@@ -1469,7 +1467,7 @@ theorem core_mem_subcircuits (input : Var Inputs (ZMod p)) (offset : ℕ) :
 
 set_option maxHeartbeats 4000000 in
 @[implicit_reducible] private def derivedElaborated :
-    ElaboratedCircuit (ZMod p) Inputs ShiftRightCols main := by
+    ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit_with {
     channelsWithGuarantees :=
       [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
@@ -1477,7 +1475,7 @@ set_option maxHeartbeats 4000000 in
 
 /-- Clean owns the output layout and every structural proof.  This thin public record forwards them
 while keeping the declared channel order visible at the chip boundary. -/
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs ShiftRightCols main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output := derivedElaborated.output
   output_eq := derivedElaborated.output_eq
   localLength := derivedElaborated.localLength
@@ -1511,7 +1509,7 @@ set_option linter.unusedSectionVars false in
         varFromOffset (Vector · 4) (offset + 28),
         var { index := offset + 32 }, var { index := offset + 33 },
         var { index := offset + 34 }, var { index := offset + 35 },
-        var { index := offset + 36 }⟩ : Var ShiftRightCols (ZMod p)) := rfl
+        var { index := offset + 36 }⟩ : Var Columns (ZMod p)) := rfl
 
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :
@@ -1522,7 +1520,7 @@ set_option linter.unusedSectionVars false in
   rfl
 
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : ShiftRightCols (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
          a := Eval.eval env cols.a, b_msb := Eval.eval env cols.b_msb,
@@ -1536,7 +1534,7 @@ set_option linter.unusedSectionVars false in
          shift_u16 := Eval.eval env cols.shift_u16,
          is_srl := Eval.eval env cols.is_srl, is_sra := Eval.eval env cols.is_sra,
          is_srlw := Eval.eval env cols.is_srlw, is_sraw := Eval.eval env cols.is_sraw,
-         is_w_imm := Eval.eval env cols.is_w_imm } : ShiftRightCols F) := by
+         is_w_imm := Eval.eval env cols.is_w_imm } : Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
@@ -1785,7 +1783,7 @@ write `RegisterWrite` push owes (Option B memory flip): the shift result is rang
 variant fires, so the push's `isU64 a` requirement is sound on those rows. Proved as a standalone
 `Soundness` (over the same `main`) so the four split per-variant `Soundness/<Op>.lean` files can each
 discharge their `RegisterWrite` requirement via `(isU64_sound …).1` without re-deriving the bound. -/
-def IsU64Spec (_ : Inputs (ZMod p)) (cols : ShiftRightCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def IsU64Spec (_ : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 1 → Word.isU64 cols.a
 
 set_option maxHeartbeats 16000000 in

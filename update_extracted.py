@@ -196,7 +196,7 @@ MEMORY_BOUNDARY_CLUSTER: Tuple[str, ...] = (
 # file after its native reconfiguration lands.
 CHIP_ORACLES: Set[str] = {
     "Add", "Sub", "Subw", "Mul", "DivRem", "Addi", "Jalr", "Jal", "UType", "Addw",
-    "Bitwise", "Lt",
+    "Bitwise", "Lt", "ShiftLeft", "ShiftRight", "AluX0",
 }
 
 # Stable generated reader substrate shared by native chip rows and whole-chip Rust oracles. Reusing

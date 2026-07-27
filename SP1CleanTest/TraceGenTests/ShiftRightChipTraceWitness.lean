@@ -1,4 +1,4 @@
-import SP1Clean.Proofs.Chips.ShiftRightChip.Defs
+import SP1Clean.Faithful.ShiftRightChip
 import SP1CleanTest.TraceGenTests.TraceGenerator
 import SP1CleanTest.TraceGenTests.ShiftRightChipTraceVectors
 
@@ -27,18 +27,20 @@ def shiftRightHint (op : ℕ) : ProverHint (ZMod SP1Prime) := fun key n =>
   | _, _ => #[]
 
 /-- The derived padding row: the circuit's witness closures on all-zero inputs with the empty hint
-(= SP1's `padded_row_template`, `v_* = 16/256/65536`). -/
+(= SP1's `padded_row_template`, `v_* = 16/256/65536`), crossed through the audited native→Rust row
+map. -/
 def shiftRightPadRow : List (ZMod SP1Prime) :=
-  circuitTraceRow ShiftRightChip.Inputs (ShiftRightChip.main (p := SP1Prime))
-    (List.replicate 33 0)
+  circuitTraceRowMapped ShiftRightChip.Inputs (ShiftRightChip.main (p := SP1Prime))
+    Faithful.shiftRightChipReconfigure (List.replicate 33 0)
 
-/-- The `ShiftRightChip` trace derived from the circuit: one `circuitTraceRow` per dumped event
-(flag hint from the event's opcode), template padding to SP1's height. -/
+/-- The `ShiftRightChip` trace derived from the circuit: one `circuitTraceRowMapped` per dumped
+event (flag hint from the event's opcode, rows crossed through `shiftRightChipReconfigure` — the
+same whole-row map audited by `ChipFaithful`), template padding to SP1's height. -/
 def shiftRightChipDerivedTrace : List (List (ZMod SP1Prime)) :=
   generateTrace
     (fun e =>
-      circuitTraceRow ShiftRightChip.Inputs (ShiftRightChip.main (p := SP1Prime))
-        (aluTypeOpEventInputs e) (shiftRightHint e.opcode))
+      circuitTraceRowMapped ShiftRightChip.Inputs (ShiftRightChip.main (p := SP1Prime))
+        Faithful.shiftRightChipReconfigure (aluTypeOpEventInputs e) (shiftRightHint e.opcode))
     ShiftRightChipTraceEvents ShiftRightChipTraceHeight 69 shiftRightPadRow
 
 theorem shiftrightchip_trace_conforms :

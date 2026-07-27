@@ -116,6 +116,34 @@ reproducible immutable git pins is a **release blocker** tracked outside this ca
   needed ZERO changes.
   CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem, Addi, Jalr, Jal, UType, Addw, Bitwise, Lt} —
   **12/25**.
+- **ShiftLeft + ShiftRight + AluX0 — complete, all gates green, ZERO proof repair** (both shift
+  batches compiled first try end-to-end incl. the two heaviest Faithful files; AluX0 needed one
+  trivial syntax-fix round — the migration script inserted the native `Columns` struct between
+  `main`'s doc comment and `def main`, two adjacent doc comments — not a proof repair). The two shift chips had **no standalone sub-op modules to retire** — SP1 inlines their
+  shift logic into the chip (no `ShiftLeftOperation`/`ShiftRightOperation` extraction exists; the
+  native `Native/Operations/Shift*Operation/Core.lean` gadgets are Lean-only whole-row cores), so
+  the only helper is `U16MSBOperation`, which **stays standalone** (importer evidence:
+  Branch/LoadHalf/LoadWord legacy chips + `LtOperationSigned` + `MulOperation` +
+  `DivRemColumns` + `Contracts/Operations` still import it); each shift oracle embeds a private
+  copy bridged by two one-line `shift{Left,Right}Oracle_u16msb_*_eq` lemmas (Lt pattern). Native
+  `Columns` rows keep Rust field order (flag-sum selectors, no `is_real` column; ShiftRight's two
+  MSB blocks keep the shared `Extracted.U16MSBOperation` type). ShiftLeft/ShiftRight `Columns`
+  land on the Contracts audit surface (their `CoreSpec`/`AssertSpec`/`Spec` already lived there);
+  AluX0's lands in its Native Defs (Spec lives there). **AluX0 = the bespoke inlined-reader case**:
+  the generated oracle confirms `eval_op_a_immutable` stays inlined (no embedded helpers at all —
+  only qualified `CPUState` calls), so the reconfigure is a pure four-field repackaging and the
+  Faithful re-point is the smallest yet; the `alux0cols_constraints_faithful` list-level anchor
+  re-typed to the oracle row unchanged. Generator lesson recorded: EXTRACT_ONLY closures must
+  include the chip's **reader modules even when nothing calls their asserts** (first AluX0 run
+  omitted `ALUTypeReader` → struct ownership fell back to the chip itself and the oracle imported
+  legacy `Extracted.AluX0Chip`; fail-loud came only from reading the generated imports — check
+  them). Both shift whole-trace conformance anchors (incl. the non-zero `padded_row_template`
+  rows) switched to `circuitTraceRowMapped` through the audited reconfigure maps; AluX0 has no
+  trace anchor (verified: no dumper). Grounding files + TypedSelectors again needed ZERO changes.
+  Legacy `Extracted/{ShiftLeft,ShiftRight,AluX0}Chip.lean` retired; probe regenerated with zero
+  entry-count change (no Faithful files deleted). `lake test` green.
+  CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem, Addi, Jalr, Jal, UType, Addw, Bitwise, Lt,
+  ShiftLeft, ShiftRight, AluX0} — **15/25**.
 
 ## Phase 3 — audit findings
 

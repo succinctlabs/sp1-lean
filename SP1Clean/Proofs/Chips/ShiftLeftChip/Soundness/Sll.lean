@@ -13,7 +13,6 @@ local `Spec` named exactly `Spec` (so `circuit_proof_start` reduces it). -/
 namespace SP1Clean.ShiftLeftChip.SoundSll
 
 open Circuit
-open Extracted (ShiftLeftCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -26,7 +25,7 @@ lemma sll_rv64_eq (c b : BitVec 64) : RV64.sll c b = b <<< (c.toNat % 64) := by
   simp only [RV64.sll]; rw [BitVec.shiftLeft_eq']; congr 1
 
 /-- The `sll` conjunct of `ShiftLeftChip.Spec`, as a standalone single-conjunct spec. -/
-def Spec (input : Inputs (ZMod p)) (cols : ShiftLeftCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   input.is_real = 1 →
     (cols.is_sll = 1 →
       Word.toBitVec64 cols.a = RV64.sll (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))

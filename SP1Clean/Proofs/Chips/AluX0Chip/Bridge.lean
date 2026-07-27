@@ -250,7 +250,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The AluX0 RowView (shared by `kind.view` and `advance`): straight-line `pc+4` next-pc, the
 ALU-type adapter, the zero word as the (discarded) `x0` write, the dynamic `opcode` column,
 `.noWrite` commit (rd = x0). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.AluX0Cols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : AluX0Chip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, #v[(0 : ZMod p), 0, 0, 0], cols.opcode, .noWrite⟩
 
@@ -258,7 +258,7 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.AluX0Cols (ZMod p)) : Trac
 The dynamic-opcode range is proved locally by the chip's Byte-table lookup and passed through the
 grounding contract. Its correlation with `imm_c` comes from the committed Program row itself; keeping
 that correlation out of this predicate avoids a second hand-maintained instruction table. -/
-def advanceReady (cols : Extracted.AluX0Cols (ZMod p)) : Prop :=
+def advanceReady (cols : AluX0Chip.Columns (ZMod p)) : Prop :=
   cols.adapter.op_a = 0 ∧ cols.state.pc[0].val < 2 ^ 16 ∧
   cols.opcode.val < 29
 
@@ -266,7 +266,7 @@ def advanceReady (cols : Extracted.AluX0Cols (ZMod p)) : Prop :=
 bound come from `advanceReady`; the chip's locally proved range fact selects the Core ALU portion of
 the Program projection. `advance_of_alu_x0_program` performs the constructor-level dispatch, including
 register, immediate, word, multiplication, and division/remainder families. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.AluX0Cols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : AluX0Chip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (_hreal : (rowView inp cols).is_real = 1) (_hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -285,7 +285,7 @@ register facts are needed only to make the corresponding Sail reads succeed. -/
 def kind : Soundness.ChipKind p where
   name := "AluX0"
   Inputs := AluX0Chip.Inputs
-  Cols := Extracted.AluX0Cols
+  Cols := AluX0Chip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun _ cols _ _ => advanceReady cols

@@ -7,7 +7,6 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.ShiftLeftChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -18,7 +17,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 `SLL`/`SLLW`: SP1's shift logic (the six shift-amount bits `c_bits`, the `v_01/v_012/v_0123` power
 encodings, the `shift_u16` byte-shift one-hot selector, the `lower_limb`/`higher_limb` bit-split, the
 `limb_result` reassembly, and the SLLW MSB sign-extension) is inlined into
-`Extracted/ShiftLeftChip.lean`'s `asserts`/`interactions` — no separate operation-level extraction.
+the generated ShiftLeft oracle's `asserts`/`interactions` (`Extracted/ChipOracle/ShiftLeft.lean`) — no separate operation-level extraction.
 
 `AssertSpec` / `InteractSpec` capture the structural meaning of SP1's two extracted constraint lists;
 the semantic, flag-gated `Spec` (RV64 `sll`/`sllw` identity) is in `Specs/Chip.lean`.
@@ -31,7 +30,6 @@ block honestly (the `Populate` closures, flags via the `"shift_left_flags"` `Pro
 namespace SP1Clean.ShiftLeftChip
 
 open Circuit
-open Extracted (ShiftLeftCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -43,20 +41,20 @@ the per-op `Soundness/<Op>.lean` split files can import it without a cycle throu
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
 
-/-- **Assertion half** — the literal meaning of SP1's `ShiftLeftCols.asserts` own assertZero list.
+/-- **Assertion half** — the literal meaning of SP1's `Columns.asserts` own assertZero list.
 The three shallow selector constraints stay in the parent chip so Clean's channel-law proof can see
 the combined gate; `CoreSpec` is the remaining assertion tail in upstream order. -/
-def AssertSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
+def AssertSpec (cols : Columns (ZMod p)) : Prop :=
   let sll := cols.is_sll
   let sllw := cols.is_sllw
   let gate := sll + sllw
   gate * (gate - 1) = 0 ∧ sll * (sll - 1) = 0 ∧ sllw * (sllw - 1) = 0 ∧ CoreSpec cols
 
-/-- **Interaction half** — the literal meaning of SP1's `ShiftLeftCols.interactions` *own* byte-range
+/-- **Interaction half** — the literal meaning of SP1's `Columns.interactions` *own* byte-range
 sends (gated by `gate = is_sll + is_sllw`): the shift-amount high bits `< 2^10`, and, per limb, the
 `lower_limb` `< 2^(16 - bitShift)` and `higher_limb` `< 2^bitShift` ranges (`bitShift` = low four
 shift-amount bits). Each send's meaning is `gate ≠ 0 → value.val < 2 ^ width.val` (`Range.constrain`). -/
-def InteractSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
+def InteractSpec (cols : Columns (ZMod p)) : Prop :=
   let b0 := cols.c_bits[0]; let b1 := cols.c_bits[1]; let b2 := cols.c_bits[2]
   let b3 := cols.c_bits[3]; let b4 := cols.c_bits[4]; let b5 := cols.c_bits[5]
   let bitShift : ZMod p := b0 * 1 + b1 * 2 + b2 * 4 + b3 * 8
@@ -209,7 +207,7 @@ private instance witnessPrefixExplicit (input : Var Inputs (ZMod p)) :
 /-- The post-witness circuit body. Naming this pure composition keeps the large assertion tail folded
 while structural consumers select the early reader boundary. -/
 @[circuit_norm] private def postWitness (input : Var Inputs (ZMod p)) (witnesses : WitnessVars (ZMod p)) :
-    Circuit (ZMod p) (Var ShiftLeftCols (ZMod p)) := do
+    Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let a := witnesses.a
   let c_bits := witnesses.c_bits
   let v := witnesses.v
@@ -244,14 +242,14 @@ while structural consumers select the early reader boundary. -/
   let bitShift := b0 * 1 + b1 * 2 + b2 * 4 + b3 * 8
   let shamt := bitShift + b4 * 16 + b5 * 32
   let e32 := (input.adapter.op_c_memory.prev_value[0] - shamt) * Expression.const ((64 : ZMod p)⁻¹)
-  -- ## The inline shift assertZero constraints (in `Extracted/ShiftLeftChip.lean` `asserts` order)
+  -- ## The inline shift assertZero constraints (in the generated oracle `asserts` order)
   -- variant flags. The combined selector `is_sll + is_sllw` (= the byte-pull gate) is boolean-gated
   -- **inline** (`assertZero`, not `=== 0`) so it is visible to `ConstraintsHold.Shallow`, discharging the
   -- off-gate byte-pull `Requirements` without keeping `byteChannel` in `channelsWithRequirements`.
   assertZero ((is_sll + is_sllw) * ((is_sll + is_sllw) - 1))
   is_sll * (is_sll - 1) === 0
   is_sllw * (is_sllw - 1) === 0
-  let cols : Var ShiftLeftCols (ZMod p) :=
+  let cols : Var Columns (ZMod p) :=
     ⟨input.state, input.adapter, a, c_bits, v[0], v[1], v[2], shift_u16,
       lower_limb, higher_limb, limb_result, ⟨sllw_msb[0]⟩, is_sll, is_sllw, is_sllw_imm⟩
   assertion ShiftLeftCore.circuit cols
@@ -283,9 +281,9 @@ gadget as Clean sub-assertions, **witness** the shift column block honestly (the
 `sllw_msb` — the `Populate` closures, ported from SP1's `event_to_row`; the variant flags come from the
 `"shift_left_flags"` `ProverHint`), gate `is_real` (`= is_sll + is_sllw`), emit the inline shift
 assertZero constraints (`AssertSpec`) and the nine `gate`-gated byte-range pulls (`InteractSpec`), and
-assemble the extracted `ShiftLeftCols` struct. (Soundness ranges over every satisfying assignment
+assemble the native `Columns` struct. (Soundness ranges over every satisfying assignment
 regardless of the generators; the generators carry completeness and the `TraceGenTests` conformance.) -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftLeftCols (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let witnesses ← witnessPrefix input
@@ -1109,7 +1107,7 @@ private theorem core_mem_postWitness
 
 /-- The exact row passed to the folded arithmetic core after the witness prefix. -/
 def coreInput (input : Var Inputs (ZMod p)) (offset : ℕ) :
-    Var ShiftLeftCols (ZMod p) :=
+    Var Columns (ZMod p) :=
   (postWitness input ((witnessPrefix input).output offset)).output (offset + 33)
 
 @[circuit_norm] theorem coreInput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
@@ -1125,7 +1123,7 @@ def coreInput (input : Var Inputs (ZMod p)) (offset : ℕ) :
         varFromOffset (Vector · 4) (offset + 25),
         ⟨var { index := offset + 29 }⟩,
         var { index := offset + 30 }, var { index := offset + 31 },
-        var { index := offset + 32 }⟩ : Var ShiftLeftCols (ZMod p)) := rfl
+        var { index := offset + 32 }⟩ : Var Columns (ZMod p)) := rfl
 
 private theorem constraints_main_bind_decompose
     (input : Var Inputs (ZMod p)) (offset : ℕ) :
@@ -1265,7 +1263,7 @@ theorem core_mem_subcircuits (input : Var Inputs (ZMod p)) (offset : ℕ) :
 
 set_option maxHeartbeats 4000000 in
 @[implicit_reducible] private def derivedElaborated :
-    ElaboratedCircuit (ZMod p) Inputs ShiftLeftCols main := by
+    ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit_with {
     channelsWithGuarantees :=
       [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
@@ -1273,7 +1271,7 @@ set_option maxHeartbeats 4000000 in
 
 /-- Clean owns the output layout and every structural proof.  This thin public record forwards them
 while keeping the declared channel order visible at the chip boundary. -/
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs ShiftLeftCols main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output := derivedElaborated.output
   output_eq := derivedElaborated.output_eq
   localLength := derivedElaborated.localLength
@@ -1305,7 +1303,7 @@ set_option linter.unusedSectionVars false in
         varFromOffset (Vector · 4) (offset + 25),
         ⟨var { index := offset + 29 }⟩,
         var { index := offset + 30 }, var { index := offset + 31 },
-        var { index := offset + 32 }⟩ : Var ShiftLeftCols (ZMod p)) := rfl
+        var { index := offset + 32 }⟩ : Var Columns (ZMod p)) := rfl
 
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :
@@ -1316,7 +1314,7 @@ set_option linter.unusedSectionVars false in
   rfl
 
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : ShiftLeftCols (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
          a := Eval.eval env cols.a, c_bits := Eval.eval env cols.c_bits,
@@ -1328,7 +1326,7 @@ set_option linter.unusedSectionVars false in
          limb_result := Eval.eval env cols.limb_result,
          sllw_msb := Eval.eval env cols.sllw_msb,
          is_sll := Eval.eval env cols.is_sll, is_sllw := Eval.eval env cols.is_sllw,
-         is_sllw_imm := Eval.eval env cols.is_sllw_imm } : ShiftLeftCols F) := by
+         is_sllw_imm := Eval.eval env cols.is_sllw_imm } : Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 

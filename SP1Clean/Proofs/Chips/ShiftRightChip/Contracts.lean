@@ -25,7 +25,7 @@ structure ShiftRightChip.ControlFacts
   opA0Zero : opA0 = 0
 
 /-- The exact one-hot selector proposition consumed by ShiftRight's `advanceReady`. -/
-def ShiftRightChip.ActiveSelector (cols : Extracted.ShiftRightCols (ZMod p)) : Prop :=
+def ShiftRightChip.ActiveSelector (cols : ShiftRightChip.Columns (ZMod p)) : Prop :=
   (cols.is_srl = 1 ∧ cols.is_sra = 0 ∧ cols.is_srlw = 0 ∧ cols.is_sraw = 0) ∨
   (cols.is_sra = 1 ∧ cols.is_srl = 0 ∧ cols.is_srlw = 0 ∧ cols.is_sraw = 0) ∨
   (cols.is_srlw = 1 ∧ cols.is_srl = 0 ∧ cols.is_sra = 0 ∧ cols.is_sraw = 0) ∨
@@ -33,7 +33,7 @@ def ShiftRightChip.ActiveSelector (cols : Extracted.ShiftRightCols (ZMod p)) : P
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem ShiftRightChip.opA0Zero_of_coreSpec
-    (cols : Extracted.ShiftRightCols (ZMod p))
+    (cols : ShiftRightChip.Columns (ZMod p))
     (core : ShiftRightChip.CoreSpec cols) :
     cols.adapter.op_a_0 = 0 := by
   simp only [ShiftRightChip.CoreSpec] at core
@@ -197,7 +197,7 @@ theorem ShiftRightChip.inputOutputAdapter (env : Environment (ZMod p)) :
 
 /-- The completed ShiftRight columns at one physical component row. -/
 noncomputable def ShiftRightChip.physicalCols (env : Environment (ZMod p)) :
-    Extracted.ShiftRightCols (ZMod p) :=
+    ShiftRightChip.Columns (ZMod p) :=
   (⟨ShiftRightChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env
 
 /-- The completed ShiftRight row view at one physical component row. -/

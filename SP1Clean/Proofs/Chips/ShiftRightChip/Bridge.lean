@@ -208,7 +208,7 @@ theorem correct_sraw_native
 omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end: from the chip `Spec`, the 4-way SRL/SRA/SRLW/SRAW Sail identities hold. -/
 theorem shiftright_chip_reaches_sail
-    (input : ShiftRightChip.Inputs (ZMod p)) (cols : Extracted.ShiftRightCols (ZMod p))
+    (input : ShiftRightChip.Inputs (ZMod p)) (cols : ShiftRightChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
     (h_real : input.is_real = 1)
@@ -256,7 +256,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The ShiftRight RowView (standalone, shared by `kind.view` and `advance`): straight-line `next_pc`,
 the ALU adapter, `cols.a` as the shift-result write, opcode `is_srl·7 + is_sra·8 + is_srlw·22 + is_sraw·23`
 (SRL = 7, SRA = 8, SRLW = 22, SRAW = 23). -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.ShiftRightCols (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : ShiftRightChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.a,
     cols.is_srl * 7 + cols.is_sra * 8 + cols.is_srlw * 22 + cols.is_sraw * 23, .regWrite⟩
@@ -264,7 +264,7 @@ def rowView (inp : Inputs (ZMod p)) (cols : Extracted.ShiftRightCols (ZMod p)) :
 /-- **`ShiftRightChip.advance`** — the per-row Sail lift for all eight upstream forms:
 SRL/SRLI, SRA/SRAI, SRLW/SRLIW, and SRAW/SRAIW.  The four-way selector chooses the operation and the
 committed `imm_c` bit chooses the register or immediate Sail constructor. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.ShiftRightCols (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : ShiftRightChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -373,7 +373,7 @@ adapter register read-backs `op_b_memory.prev_value`/`op_c_memory.prev_value`. -
 def kind : Soundness.ChipKind p where
   name := "ShiftRight"
   Inputs := ShiftRightChip.Inputs
-  Cols := Extracted.ShiftRightCols
+  Cols := ShiftRightChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧ inp.adapter = cols.adapter ∧

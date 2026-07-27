@@ -1,4 +1,5 @@
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Extracted.ChipOracle.ShiftLeft
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Formal
 
 /-! # Whole-chip faithfulness — ShiftLeft
@@ -80,10 +81,80 @@ private theorem aluTypeReader_eta {F : Type}
   cases cols
   simp only [vec4_eta]
 
+/-- Whole-chip row reconfiguration. The reader blocks and the shift columns are already the
+canonical generated substrate; the SLLW MSB block is copied into Rust's chip-private embedded
+`U16MSBOperation` row. This is not an operation-level faithfulness claim. -/
+def shiftLeftChipReconfigure {F : Type} (cols : ShiftLeftChip.Columns F) :
+    Extracted.ShiftLeftOracle.ShiftLeftCols F :=
+  { state := cols.state
+    adapter := cols.adapter
+    a := cols.a
+    c_bits := cols.c_bits
+    v_01 := cols.v_01
+    v_012 := cols.v_012
+    v_0123 := cols.v_0123
+    shift_u16 := cols.shift_u16
+    lower_limb := cols.lower_limb
+    higher_limb := cols.higher_limb
+    limb_result := cols.limb_result
+    sllw_msb := { msb := cols.sllw_msb.msb }
+    is_sll := cols.is_sll
+    is_sllw := cols.is_sllw
+    is_sllw_imm := cols.is_sllw_imm }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def shiftLeftChipDeconfigure {F : Type} (cols : Extracted.ShiftLeftOracle.ShiftLeftCols F) :
+    ShiftLeftChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    a := cols.a
+    c_bits := cols.c_bits
+    v_01 := cols.v_01
+    v_012 := cols.v_012
+    v_0123 := cols.v_0123
+    shift_u16 := cols.shift_u16
+    lower_limb := cols.lower_limb
+    higher_limb := cols.higher_limb
+    limb_result := cols.limb_result
+    sllw_msb := { msb := cols.sllw_msb.msb }
+    is_sll := cols.is_sll
+    is_sllw := cols.is_sllw
+    is_sllw_imm := cols.is_sllw_imm }
+
+/-- SP1 Rust's complete ShiftLeft-chip oracle, viewed from the native Lean row. -/
+def shiftLeftChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F ShiftLeftChip.Columns Extracted.ShiftLeftOracle.ShiftLeftCols where
+  reconfigure := shiftLeftChipReconfigure
+  deconfigure := shiftLeftChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.ShiftLeftOracle.ShiftLeftCols.asserts
+  interactions := Extracted.ShiftLeftOracle.ShiftLeftCols.interactions
+
+/- Namespace bridges between the ShiftLeft oracle's embedded chip-private `U16MSBOperation` copy
+and the canonical standalone generated module. The two bodies are rendered from the same compiler
+output, so each bridge is a definitional unfolding, not a mathematical claim. -/
+
+private theorem shiftLeftOracle_u16msb_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.ShiftLeftOracle.U16MSBOperation.asserts a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.asserts a ⟨msb⟩ is_real := by
+  rw [Extracted.ShiftLeftOracle.U16MSBOperation.asserts,
+    Extracted.U16MSBOperation.asserts]
+
+private theorem shiftLeftOracle_u16msb_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.ShiftLeftOracle.U16MSBOperation.interactions a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.interactions a ⟨msb⟩ is_real := by
+  rw [Extracted.ShiftLeftOracle.U16MSBOperation.interactions,
+    Extracted.U16MSBOperation.interactions]
+
 omit [Fact (2 ^ 17 < p)] in
 private theorem shiftLeftExtractedAssertionsDecompose
-    (cols : Extracted.ShiftLeftCols (ZMod p)) :
-    List.Forall (· = 0) (Extracted.ShiftLeftCols.asserts cols) ↔
+    (cols : ShiftLeftChip.Columns (ZMod p)) :
+    List.Forall (· = 0)
+        (Extracted.ShiftLeftOracle.ShiftLeftCols.asserts
+          (shiftLeftChipReconfigure cols)) ↔
       (List.Forall (· = 0)
           (Extracted.U16MSBOperation.asserts (F := ZMod p)
             cols.a[1] cols.sllw_msb cols.is_sllw) ∧
@@ -98,26 +169,22 @@ private theorem shiftLeftExtractedAssertionsDecompose
             cols.a cols.adapter (cols.is_sll + cols.is_sllw)
             (cols.is_sll + cols.is_sllw)) ∧
        ShiftLeftChip.AssertSpec cols) := by
-  simp only [Extracted.ShiftLeftCols.asserts, List.forall_append]
+  simp only [Extracted.ShiftLeftOracle.ShiftLeftCols.asserts, List.forall_append]
+  dsimp only [shiftLeftChipReconfigure]
+  simp only [shiftLeftOracle_u16msb_asserts_eq]
   rw [cpuState_eta cols.state, aluTypeReader_eta cols.adapter]
   simp only [ShiftLeftChip.AssertSpec, ShiftLeftChip.CoreSpec, List.Forall]
   simp only [vec3_eta, vec4_eta]
   tauto
 
-def shiftLeftChipOracle :
-    ChipOracle (ZMod p) Extracted.ShiftLeftCols
-      Extracted.ShiftLeftCols :=
-  ChipOracle.identity Extracted.ShiftLeftCols.asserts
-    Extracted.ShiftLeftCols.interactions
-
 def shiftLeftChipInput {F : Type} [Add F]
-    (cols : Extracted.ShiftLeftCols F) : ShiftLeftChip.Inputs F :=
+    (cols : ShiftLeftChip.Columns F) : ShiftLeftChip.Inputs F :=
   { is_real := cols.is_sll + cols.is_sllw
     state := cols.state
     adapter := cols.adapter }
 
 def shiftLeftChipLocals {F : Type}
-    (cols : Extracted.ShiftLeftCols F) : Vector F 33 :=
+    (cols : ShiftLeftChip.Columns F) : Vector F 33 :=
   #v[
     cols.a[0], cols.a[1], cols.a[2], cols.a[3],
     cols.c_bits[0], cols.c_bits[1], cols.c_bits[2],
@@ -135,13 +202,13 @@ def shiftLeftChipLocals {F : Type}
     cols.is_sllw_imm]
 
 def shiftLeftChipPhysicalRow {F : Type} [Add F]
-    (cols : Extracted.ShiftLeftCols F) : Array F :=
+    (cols : ShiftLeftChip.Columns F) : Array F :=
   inputFirstRow (shiftLeftChipInput cols)
     (shiftLeftChipLocals cols)
 
 def shiftLeftChipColumnsOfInput {F : Type}
     (input : ShiftLeftChip.Inputs F) (locals : Vector F 33) :
-    Extracted.ShiftLeftCols F :=
+    ShiftLeftChip.Columns F :=
   { state := input.state
     adapter := input.adapter
     a := #v[locals[0], locals[1], locals[2], locals[3]]
@@ -160,11 +227,11 @@ def shiftLeftChipColumnsOfInput {F : Type}
     is_sllw_imm := locals[32] }
 
 theorem shiftLeftChipColumnsOfInput_roundtrip {F : Type} [Add F]
-    (cols : Extracted.ShiftLeftCols F) :
+    (cols : ShiftLeftChip.Columns F) :
     shiftLeftChipColumnsOfInput (shiftLeftChipInput cols)
         (shiftLeftChipLocals cols) = cols := by
   unfold shiftLeftChipColumnsOfInput shiftLeftChipInput
-  rw [Extracted.ShiftLeftCols.mk.injEq]
+  rw [ShiftLeftChip.Columns.mk.injEq]
   constructor
   · rfl
   constructor
@@ -263,7 +330,7 @@ theorem eval_shiftLeftChipDirectOutput
   rw [ShiftLeftChip.directOutput_eq]
   rw [← CircuitType.eval_expression, ShiftLeftChip.eval_columns]
   unfold shiftLeftChipColumnsOfInput
-  rw [Extracted.ShiftLeftCols.mk.injEq]
+  rw [ShiftLeftChip.Columns.mk.injEq]
   dsimp only
   have hinput := eval_inputFirstRow input locals data
   rw [ShiftLeftChip.eval_inputs, ShiftLeftChip.Inputs.mk.injEq] at hinput
@@ -326,7 +393,7 @@ theorem eval_shiftLeftChipDirectOutput
       (eval_local_inputFirstRow input locals data 32 (by decide))
 
 def shiftLeftChipRowCodec :
-    ChipRowCodec ShiftLeftChip.Inputs Extracted.ShiftLeftCols
+    ChipRowCodec ShiftLeftChip.Inputs ShiftLeftChip.Columns
       (ShiftLeftChip.circuit (p := p)) where
   assignment cols data := {
     row := shiftLeftChipPhysicalRow cols
@@ -393,7 +460,7 @@ private def slGate (offset : ℕ) : Expression (ZMod p) :=
 
 private def slCols
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ) :
-    Var Extracted.ShiftLeftCols (ZMod p) :=
+    Var ShiftLeftChip.Columns (ZMod p) :=
   { state := input.state
     adapter := input.adapter
     a := slA offset
@@ -483,7 +550,7 @@ private theorem shiftLeftNativeAssertionsDecompose
 private def shiftLeftRustColumns
     (env : Environment (ZMod p))
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ) :
-    Extracted.ShiftLeftCols (ZMod p) :=
+    ShiftLeftChip.Columns (ZMod p) :=
   Eval.eval env (slCols input offset)
 
 omit [Fact (2 ^ 17 < p)] in
@@ -602,7 +669,7 @@ private theorem shiftLeftRustAssertionsDecompose
           (shiftLeftRustColumns env input offset)) ↔
       slRustMeaning env input offset := by
   simp only [ChipOracle.nativeAssertZeros, shiftLeftChipOracle,
-    ChipOracle.identity, id_eq, slRustMeaning]
+    slRustMeaning]
   exact shiftLeftExtractedAssertionsDecompose
     (shiftLeftRustColumns env input offset)
 
@@ -906,7 +973,7 @@ private theorem shiftLeftAluAssertions
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem shiftLeftCoreSpec_opA0
-    (cols : Extracted.ShiftLeftCols (ZMod p)) :
+    (cols : ShiftLeftChip.Columns (ZMod p)) :
     ShiftLeftChip.CoreSpec cols → cols.adapter.op_a_0 = 0 := by
   simp only [ShiftLeftChip.CoreSpec]
   tauto
@@ -1094,7 +1161,7 @@ set_option maxHeartbeats 2000000 in
 theorem shiftLeftChip_constraints_faithful
     (env : Environment (ZMod p))
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.ShiftLeftCols (ZMod p))
+    (cols : ShiftLeftChip.Columns (ZMod p))
     (hbind : BindsChipOutput ShiftLeftChip.main env input offset cols)
     (hinputReal :
       Expression.eval env input.is_real =
@@ -1114,19 +1181,19 @@ theorem shiftLeftChip_constraints_faithful
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem shiftLeftChipLocals_thirty {F : Type}
-    (cols : Extracted.ShiftLeftCols F) :
+    (cols : ShiftLeftChip.Columns F) :
     (shiftLeftChipLocals cols)[30] = cols.is_sll := by
   rfl
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem shiftLeftChipLocals_thirtyOne {F : Type}
-    (cols : Extracted.ShiftLeftCols F) :
+    (cols : ShiftLeftChip.Columns F) :
     (shiftLeftChipLocals cols)[31] = cols.is_sllw := by
   rfl
 
 set_option maxHeartbeats 1000000 in
 private theorem shiftLeftChipRowCodec_inputReal
-    (cols : Extracted.ShiftLeftCols (ZMod p))
+    (cols : ShiftLeftChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := shiftLeftChipRowCodec.assignment cols data
     Expression.eval assignment.environment
@@ -1174,7 +1241,7 @@ private theorem shiftLeftChipRowCodec_inputReal
 
 set_option maxHeartbeats 2000000 in
 theorem shiftLeftChip_constraints_constructive
-    (rustCols : Extracted.ShiftLeftCols (ZMod p))
+    (rustCols : Extracted.ShiftLeftOracle.ShiftLeftCols (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := shiftLeftChipRowCodec.assignment
       (shiftLeftChipOracle.deconfigure rustCols) data
@@ -1252,8 +1319,8 @@ private theorem shiftLeftStateInteractionsFaithful
     (((ShiftLeftChip.exposedStateInteractions input).map
             ChannelInteraction.toRaw).map
               (AbstractInteraction.toAccess env)) =
-      (((Extracted.ShiftLeftCols.interactions
-          (shiftLeftRustColumns env input offset)).map
+      (((Extracted.ShiftLeftOracle.ShiftLeftCols.interactions
+          (shiftLeftChipReconfigure (shiftLeftRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.State)) := by
   have hReal := shiftLeftRealEval env input offset hinputReal
@@ -1285,8 +1352,9 @@ private theorem shiftLeftStateInteractionsFaithful
     fun mult msg => toAccess_pushIf_state env mult msg
   simp only [ShiftLeftChip.exposedStateInteractions,
     List.map_cons, List.map_nil, hStatePull, hStatePush]
-  simp [Extracted.ShiftLeftCols.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.ShiftLeftOracle.ShiftLeftCols.interactions,
+    shiftLeftChipReconfigure,
+    Extracted.ShiftLeftOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ALUTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
@@ -1304,8 +1372,8 @@ private theorem shiftLeftByteInteractionsFaithful
       (((ShiftLeftChip.exposedByteInteractions input offset).map
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env))
-      (((Extracted.ShiftLeftCols.interactions
-          (shiftLeftRustColumns env input offset)).map
+      (((Extracted.ShiftLeftOracle.ShiftLeftCols.interactions
+          (shiftLeftChipReconfigure (shiftLeftRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
   haveI : NeZero p :=
@@ -1341,8 +1409,9 @@ private theorem shiftLeftByteInteractionsFaithful
   rw [shiftLeftRustColumns_eq]
   simp only [ShiftLeftChip.exposedByteInteractions,
     List.map_cons, List.map_nil, hBytePull]
-  simp [Extracted.ShiftLeftCols.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.ShiftLeftOracle.ShiftLeftCols.interactions,
+    shiftLeftChipReconfigure,
+    Extracted.ShiftLeftOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ALUTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
@@ -1373,8 +1442,8 @@ private theorem shiftLeftMemoryInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult))
-      (((Extracted.ShiftLeftCols.interactions
-          (shiftLeftRustColumns env input offset)).map
+      (((Extracted.ShiftLeftOracle.ShiftLeftCols.interactions
+          (shiftLeftChipReconfigure (shiftLeftRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Memory)) := by
   have hp2 : 2 < p := by
@@ -1441,8 +1510,9 @@ private theorem shiftLeftMemoryInteractionsFaithful
   rw [shiftLeftRustColumns_eq]
   simp only [ShiftLeftChip.exposedMemoryInteractions,
     List.map_cons, List.map_nil, hMemoryPull, hMemoryPush]
-  simp [Extracted.ShiftLeftCols.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.ShiftLeftOracle.ShiftLeftCols.interactions,
+    shiftLeftChipReconfigure,
+    Extracted.ShiftLeftOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ALUTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
@@ -1469,8 +1539,8 @@ private theorem shiftLeftProgramInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)) =
-      (((Extracted.ShiftLeftCols.interactions
-          (shiftLeftRustColumns env input offset)).map
+      (((Extracted.ShiftLeftOracle.ShiftLeftCols.interactions
+          (shiftLeftChipReconfigure (shiftLeftRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Program)) := by
   have hp2 : 2 < p := by
@@ -1516,8 +1586,9 @@ private theorem shiftLeftProgramInteractionsFaithful
   rw [shiftLeftRustColumns_eq]
   simp only [ShiftLeftChip.exposedProgramInteractions,
     List.map_cons, List.map_nil, hProgramPull]
-  simp [Extracted.ShiftLeftCols.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.ShiftLeftOracle.ShiftLeftCols.interactions,
+    shiftLeftChipReconfigure,
+    Extracted.ShiftLeftOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ALUTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
@@ -1555,7 +1626,7 @@ private theorem shiftLeftUnexpectedInteractionsEmpty
 theorem shiftLeftChip_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.ShiftLeftCols (ZMod p))
+    (cols : ShiftLeftChip.Columns (ZMod p))
     (hbind : BindsChipOutput ShiftLeftChip.main env input offset cols)
     (hinputReal :
       Expression.eval env input.is_real =
@@ -1571,15 +1642,14 @@ theorem shiftLeftChip_interactions_faithful
     (shiftLeftRustColumns_eq_output env input offset).trans hbind
   subst cols
   let rustAccesses :=
-    (Extracted.ShiftLeftCols.interactions
-      (shiftLeftRustColumns env input offset)).map
+    (Extracted.ShiftLeftOracle.ShiftLeftCols.interactions
+      (shiftLeftChipReconfigure (shiftLeftRustColumns env input offset))).map
         Extracted.Interaction.toAccess
   simp only [nativeAccesses]
   rw [shiftLeftUnexpectedInteractionsEmpty]
   simp only [List.map_nil, List.append_nil]
   simp only [ChipOracle.accesses,
-    ChipOracle.nativeInteractions, shiftLeftChipOracle,
-    ChipOracle.identity, id_eq]
+    ChipOracle.nativeInteractions, shiftLeftChipOracle]
   rw [ShiftLeftChip.interactionsWith_main_state_exposed_eq,
     ShiftLeftChip.interactionsWith_main_byte_eq,
     ShiftLeftChip.interactionsWith_main_memory_eq,
@@ -1605,7 +1675,7 @@ theorem shiftLeftChip_interactions_faithful
 
 set_option maxHeartbeats 2000000 in
 theorem shiftLeftChip_interactions_constructive
-    (rustCols : Extracted.ShiftLeftCols (ZMod p))
+    (rustCols : Extracted.ShiftLeftOracle.ShiftLeftCols (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := shiftLeftChipRowCodec.assignment
       (shiftLeftChipOracle.deconfigure rustCols) data
@@ -1644,7 +1714,7 @@ theorem shiftLeftChip_interactions_constructive
 
 theorem shiftLeftChip_faithful :
     ChipFaithful (p := p) ShiftLeftChip.Inputs
-      Extracted.ShiftLeftCols Extracted.ShiftLeftCols
+      ShiftLeftChip.Columns Extracted.ShiftLeftOracle.ShiftLeftCols
       ShiftLeftChip.circuit shiftLeftChipRowCodec
       shiftLeftChipOracle where
   constraints := shiftLeftChip_constraints_constructive (p := p)

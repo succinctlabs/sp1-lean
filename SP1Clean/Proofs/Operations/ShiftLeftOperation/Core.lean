@@ -11,12 +11,11 @@ The native circuit emits the chip-local constraint tail. Its folded public contr
 namespace SP1Clean.ShiftLeftCore
 
 open Circuit
-open Extracted (ShiftLeftCols)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The assertion block has no semantic precondition. -/
-def Assumptions (_ : ShiftLeftCols (ZMod p)) : Prop := True
+def Assumptions (_ : ShiftLeftChip.Columns (ZMod p)) : Prop := True
 
 omit [Fact (2 ^ 17 < p)] in
 theorem soundness :
@@ -45,7 +44,7 @@ theorem completeness :
   exact h_spec
 
 /-- The zero-witness ShiftLeft chip-local tail as a Clean `FormalAssertion`. -/
-def circuit : FormalAssertion (ZMod p) ShiftLeftCols where
+def circuit : FormalAssertion (ZMod p) ShiftLeftChip.Columns where
   main
   elaborated
   Assumptions := Assumptions
@@ -59,13 +58,13 @@ set_option linter.unusedSectionVars false in
     (circuit (p := p)).channelsWithRequirements = ([] : List (RawChannel (ZMod p))) := rfl
 
 set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma circuit_localLength (cols : Var ShiftLeftCols (ZMod p)) :
+@[circuit_norm] lemma circuit_localLength (cols : Var ShiftLeftChip.Columns (ZMod p)) :
     circuit.localLength cols = 0 := rfl
 
 omit [Fact (2 ^ 17 < p)] in
 /-- The assertion-only core contributes no interaction on any channel when composed. -/
 theorem interactionsWith_subcircuit_eq_nil (channel : RawChannel (ZMod p))
-    (cols : Var ShiftLeftCols (ZMod p)) (offset : ℕ) (ops : Operations (ZMod p)) :
+    (cols : Var ShiftLeftChip.Columns (ZMod p)) (offset : ℕ) (ops : Operations (ZMod p)) :
     Operations.interactionsWith channel
         (.subcircuit (circuit.toSubcircuit offset cols) :: ops) =
       Operations.interactionsWith channel ops := by

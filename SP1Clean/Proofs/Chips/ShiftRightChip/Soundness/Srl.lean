@@ -11,14 +11,13 @@ a single-conjunct local `Spec`. -/
 namespace SP1Clean.ShiftRightChip.SoundSrl
 
 open Circuit
-open Extracted (ShiftRightCols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 /-- The `srl` conjunct of `ShiftRightChip.Spec`, as a standalone single-conjunct spec. -/
-def Spec (input : Inputs (ZMod p)) (cols : ShiftRightCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   input.is_real = 1 →
     (cols.is_srl = 1 →
       Word.toBitVec64 cols.a = RV64.srl (Word.toBitVec64 input.adapter.op_c_memory.prev_value)

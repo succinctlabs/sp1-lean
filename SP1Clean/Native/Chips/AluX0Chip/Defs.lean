@@ -3,7 +3,6 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReaderImmutable
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
-import SP1Clean.Extracted.AluX0Chip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -20,7 +19,6 @@ Composes `CPUState` and `ALUTypeReaderImmutable` (op_a reads writing 0 to `x0`, 
 namespace SP1Clean.AluX0Chip
 
 open Circuit
-open Extracted (AluX0Cols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -45,11 +43,20 @@ deriving ProvableStruct
 /-- The committed ALU opcode fed to the reader's Program bus (a single dynamic column). -/
 @[reducible] def opcodeVal (input : Inputs (ZMod p)) : ZMod p := input.opcode
 
+/-- Native AluX0-chip row (Rust field order). All four blocks reuse the project substrate;
+`Faithful.aluX0ChipReconfigure` is the sole bridge to Rust's separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ALUTypeReader F
+  opcode : F
+  is_real : F
+deriving ProvableStruct
+
 /-- Compose the `CPUState` reader (pc+4 / clk+8), the LTU `opcode < 29` range check, and the
 `ALUTypeReaderImmutable` adapter (op_a/op_b/op_c reads, op_c gated by `is_real - imm_c`), then impose the
 `is_real` binary gate and the two `op_a_0` forcing gates (`op_a = x0` on real rows). The opcode fed to the
-reader is the committed `opcode` column. Assembles the extracted `AluX0Cols`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AluX0Cols (ZMod p)) := do
+reader is the committed `opcode` column. Assembles the native `Columns` row. -/
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   byteChannel.pullIf input.is_real (⟨4, 1, input.opcode, 29⟩ : ByteRow (Expression (ZMod p)))
@@ -64,7 +71,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AluX0Cols (ZMod p
   return ⟨input.state, input.adapter, input.opcode, input.is_real⟩
 
 set_option maxHeartbeats 4000000 in
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs AluX0Cols main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   -- Nothing is witnessed: the state/adapter/opcode/is_real are threaded inputs, the readers are
   -- `FormalAssertion`s (localLength 0), and the LTU send + gates witness nothing.
   localLength _ := 0
@@ -80,7 +87,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AluX0Cols main where
 @[circuit_norm] theorem directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     (elaborated (p := p)).output input offset =
       (⟨input.state, input.adapter, input.opcode, input.is_real⟩ :
-        Var AluX0Cols (ZMod p)) := rfl
+        Var Columns (ZMod p)) := rfl
 
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :
@@ -92,11 +99,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AluX0Cols main where
   rfl
 
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : AluX0Cols (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
          opcode := Eval.eval env cols.opcode, is_real := Eval.eval env cols.is_real } :
-        AluX0Cols F) := by
+        Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
@@ -104,7 +111,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AluX0Cols main where
 (op_a/op_b/op_c reads + the `op_a_0` read-zeroing — the discarded write), the `is_real`-binary fact, and the
 two `op_a_0` forcing gates (which pin `op_a = x0` on real rows). The CPUState advance is threaded but, like
 `LoadX0`, not surfaced in the contract (the Sail bridge derives the `pc + 4` step itself). -/
-def Spec (input : Inputs (ZMod p)) (_cols : AluX0Cols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (_cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.ALUTypeReaderImmutable.Spec
     ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
       input.state.pc, opcodeVal input⟩ ∧

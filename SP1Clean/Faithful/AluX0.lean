@@ -1,7 +1,7 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Model.SP1Constraint
-import SP1Clean.Extracted.AluX0Chip
+import SP1Clean.Extracted.ChipOracle.AluX0
 import SP1Clean.Faithful.CPUState
 import SP1Clean.Faithful.ChipOracle
 import SP1Clean.Proofs.Chips.AluX0Chip.Formal
@@ -35,10 +35,12 @@ gates; the op_c immediate gate (`is_real - imm_c` boolean) and the four immediat
 dynamic opcode in ALU range (`opcode < 29`, the LTU send); and the op_a/op_b/op_c register timestamp byte
 bounds (op_c guarded by `imm_c ≠ 1`). Every fragment reduces with the same machinery as
 `Faithful/ALUTypeReader.lean`; the reader is inlined (not a sub-`asserts` call). -/
-theorem alux0cols_constraints_faithful (cols : Extracted.AluX0Cols (ZMod p))
+theorem alux0cols_constraints_faithful
+    (cols : Extracted.AluX0Oracle.AluX0Cols (ZMod p))
     (h_real : cols.is_real = 1) :
-    (List.Forall (· = 0) (Extracted.AluX0Cols.asserts cols) ∧
-      List.Forall Interaction.toProp (Extracted.AluX0Cols.interactions cols)) ↔
+    (List.Forall (· = 0) (Extracted.AluX0Oracle.AluX0Cols.asserts cols) ∧
+      List.Forall Interaction.toProp
+        (Extracted.AluX0Oracle.AluX0Cols.interactions cols)) ↔
       ((((cols.state.clk_0_16 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13 ∧ cols.state.clk_16_24.val < 256)
         ∧ (cols.adapter.op_a_0 - 1 = 0 ∧
             cols.adapter.op_a_0 * cols.adapter.op_a_memory.prev_value[0] = 0 ∧
@@ -66,7 +68,8 @@ theorem alux0cols_constraints_faithful (cols : Extracted.AluX0Cols (ZMod p))
                 - cols.adapter.op_c_memory.access_timestamp.prev_low - 1
                 - cols.adapter.op_c_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹).val < 256)) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  simp only [Extracted.AluX0Cols.asserts, Extracted.AluX0Cols.interactions]
+  simp only [Extracted.AluX0Oracle.AluX0Cols.asserts,
+    Extracted.AluX0Oracle.AluX0Cols.interactions]
   rw [Extracted.forall_append_pair]
   simp only [h_real]
   rw [cpustate_constraints_faithful]
@@ -82,25 +85,48 @@ theorem alux0cols_constraints_faithful (cols : Extracted.AluX0Cols (ZMod p))
 
 /-! ## Constructive whole-chip boundary -/
 
-def aluX0ChipOracle :
-    ChipOracle (ZMod p) Extracted.AluX0Cols Extracted.AluX0Cols :=
-  ChipOracle.identity Extracted.AluX0Cols.asserts Extracted.AluX0Cols.interactions
+/-- Whole-chip row reconfiguration. Every AluX0 block is already the canonical generated
+substrate, so the map is a pure field-order repackaging into Rust's separately generated row. -/
+def aluX0ChipReconfigure {F : Type} (cols : AluX0Chip.Columns F) :
+    Extracted.AluX0Oracle.AluX0Cols F :=
+  { state := cols.state
+    adapter := cols.adapter
+    opcode := cols.opcode
+    is_real := cols.is_real }
 
-def aluX0ChipInput {F : Type} (cols : Extracted.AluX0Cols F) : AluX0Chip.Inputs F :=
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def aluX0ChipDeconfigure {F : Type} (cols : Extracted.AluX0Oracle.AluX0Cols F) :
+    AluX0Chip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    opcode := cols.opcode
+    is_real := cols.is_real }
+
+/-- SP1 Rust's complete AluX0-chip oracle, viewed from the native Lean row. -/
+def aluX0ChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F AluX0Chip.Columns Extracted.AluX0Oracle.AluX0Cols where
+  reconfigure := aluX0ChipReconfigure
+  deconfigure := aluX0ChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.AluX0Oracle.AluX0Cols.asserts
+  interactions := Extracted.AluX0Oracle.AluX0Cols.interactions
+
+def aluX0ChipInput {F : Type} (cols : AluX0Chip.Columns F) : AluX0Chip.Inputs F :=
   { state := cols.state, adapter := cols.adapter, opcode := cols.opcode,
     is_real := cols.is_real }
 
-def aluX0ChipLocals {F : Type} (_cols : Extracted.AluX0Cols F) : Vector F 0 :=
+def aluX0ChipLocals {F : Type} (_cols : AluX0Chip.Columns F) : Vector F 0 :=
   #v[]
 
-def aluX0ChipPhysicalRow {F : Type} (cols : Extracted.AluX0Cols F) : Array F :=
+def aluX0ChipPhysicalRow {F : Type} (cols : AluX0Chip.Columns F) : Array F :=
   inputFirstRow (aluX0ChipInput cols) (aluX0ChipLocals cols)
 
 def aluX0ChipColumnsOfInput {F : Type} (input : AluX0Chip.Inputs F) :
-    Extracted.AluX0Cols F :=
+    AluX0Chip.Columns F :=
   ⟨input.state, input.adapter, input.opcode, input.is_real⟩
 
-theorem aluX0ChipColumnsOfInput_roundtrip {F : Type} (cols : Extracted.AluX0Cols F) :
+theorem aluX0ChipColumnsOfInput_roundtrip {F : Type} (cols : AluX0Chip.Columns F) :
     aluX0ChipColumnsOfInput (aluX0ChipInput cols) = cols := by
   cases cols
   rfl
@@ -114,13 +140,13 @@ theorem eval_aluX0ChipDirectOutput
   rw [AluX0Chip.directOutput_eq]
   rw [← CircuitType.eval_expression, AluX0Chip.eval_columns]
   unfold aluX0ChipColumnsOfInput
-  rw [Extracted.AluX0Cols.mk.injEq]
+  rw [AluX0Chip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input #v[] data
   rw [AluX0Chip.eval_inputs, AluX0Chip.Inputs.mk.injEq] at hinputEval
   exact hinputEval
 
-def aluX0ChipRowCodec : ChipRowCodec AluX0Chip.Inputs Extracted.AluX0Cols
+def aluX0ChipRowCodec : ChipRowCodec AluX0Chip.Inputs AluX0Chip.Columns
     (AluX0Chip.circuit (p := p)) where
   assignment cols data := {
     row := aluX0ChipPhysicalRow cols
@@ -186,7 +212,7 @@ private theorem aluX0_chip_constraints_decompose
 set_option maxHeartbeats 4000000 in
 theorem aluX0Chip_constraints_faithful
     (env : Environment (ZMod p)) (input : Var AluX0Chip.Inputs (ZMod p))
-    (offset : ℕ) (cols : Extracted.AluX0Cols (ZMod p))
+    (offset : ℕ) (cols : AluX0Chip.Columns (ZMod p))
     (hbind : BindsChipOutput AluX0Chip.main env input offset cols) :
     List.Forall (· = 0) (aluX0ChipOracle.nativeAssertZeros cols) ↔
       List.Forall (· = 0)
@@ -226,9 +252,10 @@ theorem aluX0Chip_constraints_faithful
   simp only [ProvableStruct.structEvalLiteralProc] at hbind
   subst cols
   rw [aluX0_chip_constraints_decompose]
-  simp only [ChipOracle.nativeAssertZeros, aluX0ChipOracle,
-    ChipOracle.identity, id_eq]
-  simp only [Extracted.AluX0Cols.asserts, List.forall_append, List.forall_cons]
+  simp only [ChipOracle.nativeAssertZeros, aluX0ChipOracle]
+  dsimp only [aluX0ChipReconfigure]
+  simp only [Extracted.AluX0Oracle.AluX0Cols.asserts, List.forall_append,
+    List.forall_cons]
   dsimp [rustState, rustNextPc, stateValue, isReal, cpuInput] at hCpu
   simp_rw [← ProvableStruct.eval_eq_eval] at hCpu
   rw [hCpu]
@@ -268,7 +295,7 @@ theorem aluX0Chip_constraints_faithful
 
 set_option maxHeartbeats 4000000 in
 theorem aluX0Chip_constraints_constructive
-    (rustCols : Extracted.AluX0Cols (ZMod p)) (data : ProverData (ZMod p)) :
+    (rustCols : Extracted.AluX0Oracle.AluX0Cols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := aluX0ChipRowCodec.assignment
       (aluX0ChipOracle.deconfigure rustCols) data
     List.Forall (· = 0) (aluX0ChipOracle.assertZeros rustCols) ↔
@@ -306,7 +333,7 @@ theorem aluX0Chip_constraints_constructive
 set_option maxHeartbeats 4000000 in
 theorem aluX0Chip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var AluX0Chip.Inputs (ZMod p))
-    (offset : ℕ) (cols : Extracted.AluX0Cols (ZMod p))
+    (offset : ℕ) (cols : AluX0Chip.Columns (ZMod p))
     (hbind : BindsChipOutput AluX0Chip.main env input offset cols) :
     List.Perm (nativeAccesses env ((AluX0Chip.main input).operations offset))
       (aluX0ChipOracle.accesses cols) := by
@@ -344,7 +371,8 @@ theorem aluX0Chip_interactions_faithful
   rw [hunexpected]
   simp only [List.map_nil, List.append_nil]
   simp only [ChipOracle.accesses, ChipOracle.nativeInteractions,
-    aluX0ChipOracle, ChipOracle.identity, id_eq]
+    aluX0ChipOracle]
+  dsimp only [aluX0ChipReconfigure]
   rw [AluX0Chip.interactionsWith_state_eq, AluX0Chip.interactionsWith_byte_eq,
     AluX0Chip.interactionsWith_memory_eq, AluX0Chip.interactionsWith_program_eq]
   have hStatePull :
@@ -448,7 +476,7 @@ theorem aluX0Chip_interactions_faithful
     AluX0Chip.exposedMemoryInteractions, AluX0Chip.exposedProgramInteractions,
     List.map_cons, List.map_nil, hStatePull, hStatePush, hBytePull,
     hMemoryPull, hMemoryPush, hProgramPull]
-  simp [Extracted.AluX0Cols.interactions, Extracted.CPUState.interactions,
+  simp [Extracted.AluX0Oracle.AluX0Cols.interactions, Extracted.CPUState.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     Expression.eval, ProvableType.eval_field,
     eval_cpuState, eval_aluTypeReader, eval_registerAccessCols,
@@ -463,7 +491,7 @@ theorem aluX0Chip_interactions_faithful
 
 set_option maxHeartbeats 4000000 in
 theorem aluX0Chip_interactions_constructive
-    (rustCols : Extracted.AluX0Cols (ZMod p)) (data : ProverData (ZMod p)) :
+    (rustCols : Extracted.AluX0Oracle.AluX0Cols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := aluX0ChipRowCodec.assignment
       (aluX0ChipOracle.deconfigure rustCols) data
     List.Perm
@@ -493,8 +521,8 @@ theorem aluX0Chip_interactions_constructive
     Air.Flat.Component.rowOffset_mk, AluX0Chip.circuit_main_eq] using hlegacy
 
 theorem aluX0Chip_faithful :
-    ChipFaithful (p := p) AluX0Chip.Inputs Extracted.AluX0Cols
-      Extracted.AluX0Cols AluX0Chip.circuit aluX0ChipRowCodec
+    ChipFaithful (p := p) AluX0Chip.Inputs AluX0Chip.Columns
+      Extracted.AluX0Oracle.AluX0Cols AluX0Chip.circuit aluX0ChipRowCodec
       aluX0ChipOracle where
   constraints := aluX0Chip_constraints_constructive (p := p)
   interactions := fun rustCols data _ =>
