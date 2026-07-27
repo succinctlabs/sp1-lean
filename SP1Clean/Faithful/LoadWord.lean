@@ -1,4 +1,5 @@
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Extracted.ChipOracle.LoadWord
 import SP1Clean.Proofs.Chips.LoadWordChip.Formal
 
 /-!
@@ -17,13 +18,115 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-def loadWordChipOracle :
-    ChipOracle (ZMod p) Extracted.LoadWordColumns Extracted.LoadWordColumns :=
-  ChipOracle.identity Extracted.LoadWordColumns.asserts
-    Extracted.LoadWordColumns.interactions
+/-- Rebuild the shared standalone `AddressOperation` block as the byte-identical struct embedded in
+the generated LoadWord oracle namespace. -/
+def loadWordOracleAddressOperation {F : Type} (cols : Extracted.AddressOperation F) :
+    Extracted.LoadWordOracle.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Inverse of `loadWordOracleAddressOperation`. -/
+def loadWordNativeAddressOperation {F : Type} (cols : Extracted.LoadWordOracle.AddressOperation F) :
+    Extracted.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Whole-chip row reconfiguration. The reader and memory-access blocks are already the canonical
+generated substrate; the address and sign-bit blocks are copied into Rust's chip-private operation
+rows. This is not an operation-level faithfulness claim. -/
+def loadWordChipReconfigure {F : Type} (cols : LoadWordChip.Columns F) :
+    Extracted.LoadWordOracle.LoadWordColumns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := loadWordOracleAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    offset_bit := cols.offset_bit
+    selected_word := cols.selected_word
+    msb := { msb := cols.msb.msb }
+    is_lw := cols.is_lw
+    is_lwu := cols.is_lwu }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def loadWordChipDeconfigure {F : Type} (cols : Extracted.LoadWordOracle.LoadWordColumns F) :
+    LoadWordChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := loadWordNativeAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    offset_bit := cols.offset_bit
+    selected_word := cols.selected_word
+    msb := { msb := cols.msb.msb }
+    is_lw := cols.is_lw
+    is_lwu := cols.is_lwu }
+
+/-- SP1 Rust's complete LoadWord-chip oracle, viewed from the native Lean row. -/
+def loadWordChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F LoadWordChip.Columns Extracted.LoadWordOracle.LoadWordColumns where
+  reconfigure := loadWordChipReconfigure
+  deconfigure := loadWordChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.LoadWordOracle.LoadWordColumns.asserts
+  interactions := Extracted.LoadWordOracle.LoadWordColumns.interactions
+
+/- Namespace bridges between the LoadWord oracle's embedded chip-private helper copies and the
+canonical standalone generated modules. The two bodies are rendered from the same compiler output,
+so each bridge is a definitional unfolding, not a mathematical claim. They let the address- and
+sign-bit-op lemmas below stay stated once against the standalone modules (also consumed by the
+other load and store chips). -/
+
+private theorem loadWordOracle_addrAdd_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.LoadWordOracle.AddrAddOperation.asserts a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.asserts a b ⟨value⟩ is_real := by
+  rw [Extracted.LoadWordOracle.AddrAddOperation.asserts,
+    Extracted.AddrAddOperation.asserts]
+
+private theorem loadWordOracle_addrAdd_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.LoadWordOracle.AddrAddOperation.interactions a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.interactions a b ⟨value⟩ is_real := by
+  rw [Extracted.LoadWordOracle.AddrAddOperation.interactions,
+    Extracted.AddrAddOperation.interactions]
+
+private theorem loadWordOracle_address_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.LoadWordOracle.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.LoadWordOracle.AddressOperation.asserts,
+    Extracted.AddressOperation.asserts]
+  simp only [loadWordOracle_addrAdd_asserts_eq]
+
+private theorem loadWordOracle_address_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.LoadWordOracle.AddressOperation.interactions b cc offset_bit0 offset_bit1
+        offset_bit2 is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.interactions b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.LoadWordOracle.AddressOperation.interactions,
+    Extracted.AddressOperation.interactions]
+  simp only [loadWordOracle_addrAdd_interactions_eq]
+
+private theorem loadWordOracle_u16msb_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.LoadWordOracle.U16MSBOperation.asserts a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.asserts a ⟨msb⟩ is_real := by
+  rw [Extracted.LoadWordOracle.U16MSBOperation.asserts,
+    Extracted.U16MSBOperation.asserts]
+
+private theorem loadWordOracle_u16msb_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.LoadWordOracle.U16MSBOperation.interactions a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.interactions a ⟨msb⟩ is_real := by
+  rw [Extracted.LoadWordOracle.U16MSBOperation.interactions,
+    Extracted.U16MSBOperation.interactions]
 
 def loadWordChipInput {F : Type}
-    (cols : Extracted.LoadWordColumns F) : LoadWordChip.Inputs F :=
+    (cols : LoadWordChip.Columns F) : LoadWordChip.Inputs F :=
   { is_lw := cols.is_lw
     is_lwu := cols.is_lwu
     state := cols.state
@@ -34,19 +137,19 @@ def loadWordChipInput {F : Type}
     msb := cols.msb.msb }
 
 def loadWordChipLocals {F : Type}
-    (cols : Extracted.LoadWordColumns F) : Vector F 4 :=
+    (cols : LoadWordChip.Columns F) : Vector F 4 :=
   #v[cols.address_operation.addr_operation.value[0],
     cols.address_operation.addr_operation.value[1],
     cols.address_operation.addr_operation.value[2],
     cols.address_operation.top_two_limb_inv]
 
 def loadWordChipPhysicalRow {F : Type}
-    (cols : Extracted.LoadWordColumns F) : Array F :=
+    (cols : LoadWordChip.Columns F) : Array F :=
   inputFirstRow (loadWordChipInput cols) (loadWordChipLocals cols)
 
 def loadWordChipColumnsOfInput {F : Type}
     (input : LoadWordChip.Inputs F) (locals : Vector F 4) :
-    Extracted.LoadWordColumns F :=
+    LoadWordChip.Columns F :=
   ⟨input.state, input.adapter,
     ⟨⟨#v[locals[0], locals[1], locals[2]]⟩, locals[3]⟩,
     input.memory_access, input.offset_bit, input.selected_word, ⟨input.msb⟩,
@@ -117,7 +220,7 @@ private theorem loadWordITypeEta {F : Type}
     rfl
 
 theorem loadWordChipColumnsOfInput_roundtrip {F : Type}
-    (cols : Extracted.LoadWordColumns F) :
+    (cols : LoadWordChip.Columns F) :
     loadWordChipColumnsOfInput
         (loadWordChipInput cols) (loadWordChipLocals cols) = cols := by
   cases cols
@@ -251,7 +354,7 @@ theorem evalLoadWordDirectOutput
   rw [LoadWordChip.directOutput_eq]
   rw [← CircuitType.eval_expression, LoadWordChip.eval_columns]
   unfold loadWordChipColumnsOfInput
-  rw [Extracted.LoadWordColumns.mk.injEq]
+  rw [LoadWordChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input locals data
   rw [LoadWordChip.eval_inputs, LoadWordChip.Inputs.mk.injEq] at hinputEval
@@ -294,7 +397,7 @@ theorem evalLoadWordDirectOutput
       (varFromOffset LoadWordChip.Inputs 0).msb input.msb hMsbExpr)
 
 def loadWordChipRowCodec :
-    ChipRowCodec LoadWordChip.Inputs Extracted.LoadWordColumns
+    ChipRowCodec LoadWordChip.Inputs LoadWordChip.Columns
       (LoadWordChip.circuit (p := p)) where
   assignment cols data := {
     row := loadWordChipPhysicalRow cols
@@ -691,7 +794,7 @@ private theorem loadWordU16MSBAssertions
 private def loadWordChipRustColumns
     (env : Environment (ZMod p))
     (input : Var LoadWordChip.Inputs (ZMod p)) (offset : ℕ) :
-    Extracted.LoadWordColumns (ZMod p) :=
+    LoadWordChip.Columns (ZMod p) :=
   { state := Eval.eval env input.state
     adapter := Eval.eval env input.adapter
     address_operation := Eval.eval env (loadWordAddressCols (p := p) offset)
@@ -885,7 +988,7 @@ private theorem loadWordNativeAssertionsDecompose
   rfl
 
 private def loadWordExtractedMeaning
-    (cols : Extracted.LoadWordColumns (ZMod p)) : Prop :=
+    (cols : LoadWordChip.Columns (ZMod p)) : Prop :=
   let isReal := cols.is_lw + cols.is_lwu
   let clkLow := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let ts := cols.memory_access.access_timestamp
@@ -949,10 +1052,14 @@ private def loadWordExtractedMeaning
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem loadWordExtractedAssertionsDecompose
-    (cols : Extracted.LoadWordColumns (ZMod p)) :
-    List.Forall (· = 0) (Extracted.LoadWordColumns.asserts cols) ↔
+    (cols : LoadWordChip.Columns (ZMod p)) :
+    List.Forall (· = 0)
+        (Extracted.LoadWordOracle.LoadWordColumns.asserts
+          (loadWordChipReconfigure cols)) ↔
       loadWordExtractedMeaning cols := by
-  simp only [Extracted.LoadWordColumns.asserts, List.forall_append]
+  simp only [Extracted.LoadWordOracle.LoadWordColumns.asserts, List.forall_append]
+  dsimp only [loadWordChipReconfigure, loadWordOracleAddressOperation]
+  simp only [loadWordOracle_address_asserts_eq, loadWordOracle_u16msb_asserts_eq]
   simp only [loadWordVec3Eta, loadWordVec4Eta]
   simp only [loadWordExtractedMeaning, List.Forall, Nat.cast_one]
   have hAddress := congrArg
@@ -1008,8 +1115,7 @@ private theorem loadWordRustAssertionsDecompose
         (loadWordChipOracle.nativeAssertZeros
           (loadWordChipRustColumns env input offset)) ↔
       loadWordRustMeaning env input offset := by
-  simp only [ChipOracle.nativeAssertZeros, loadWordChipOracle,
-    ChipOracle.identity, id_eq]
+  simp only [ChipOracle.nativeAssertZeros, loadWordChipOracle]
   rw [loadWordRustMeaning_eq]
   exact loadWordExtractedAssertionsDecompose
     (loadWordChipRustColumns env input offset)
@@ -1240,7 +1346,7 @@ private theorem loadWordChipConstraintsFaithfulOutput
 theorem loadWordChipConstraintsFaithful
     (env : Environment (ZMod p))
     (input : Var LoadWordChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.LoadWordColumns (ZMod p))
+    (cols : LoadWordChip.Columns (ZMod p))
     (hbind : BindsChipOutput LoadWordChip.main env input offset cols) :
     List.Forall (· = 0)
         (loadWordChipOracle.nativeAssertZeros cols) ↔
@@ -1259,7 +1365,7 @@ theorem loadWordChipConstraintsFaithful
     (p := p) env input offset
 
 theorem loadWordChipConstraintsConstructive
-    (rustCols : Extracted.LoadWordColumns (ZMod p))
+    (rustCols : Extracted.LoadWordOracle.LoadWordColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := loadWordChipRowCodec.assignment
       (loadWordChipOracle.deconfigure rustCols) data
@@ -1357,8 +1463,9 @@ private theorem loadWordStateInteractionsFaithful
     ((((loadWordStateInteractions input).map
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env))) =
-      (((Extracted.LoadWordColumns.interactions
-          (loadWordChipRustColumns env input offset)).map
+      (((Extracted.LoadWordOracle.LoadWordColumns.interactions
+          (loadWordChipReconfigure
+            (loadWordChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.State)) := by
   have hStatePull :
@@ -1389,10 +1496,11 @@ private theorem loadWordStateInteractionsFaithful
     fun mult msg => toAccess_pushIf_state env mult msg
   simp only [loadWordStateInteractions,
     List.map_cons, List.map_nil, hStatePull, hStatePush]
-  simp [Extracted.LoadWordColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.LoadWordOracle.LoadWordColumns.interactions,
+    loadWordChipReconfigure, loadWordOracleAddressOperation,
+    Extracted.LoadWordOracle.AddressOperation.interactions,
+    Extracted.LoadWordOracle.AddrAddOperation.interactions,
+    Extracted.LoadWordOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
     loadWordChipRustColumns, loadWordEvalAddressCols,
@@ -1410,8 +1518,9 @@ private theorem loadWordProgramInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)) =
-      (((Extracted.LoadWordColumns.interactions
-          (loadWordChipRustColumns env input offset)).map
+      (((Extracted.LoadWordOracle.LoadWordColumns.interactions
+          (loadWordChipReconfigure
+            (loadWordChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Program)) := by
   have hp2 : 2 < p := by
@@ -1443,10 +1552,11 @@ private theorem loadWordProgramInteractionsFaithful
     fun gate msg => toAccess_pullIf_program env gate msg
   simp only [loadWordProgramInteractions,
     List.map_cons, List.map_nil, hProgramPull]
-  simp [Extracted.LoadWordColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.LoadWordOracle.LoadWordColumns.interactions,
+    loadWordChipReconfigure, loadWordOracleAddressOperation,
+    Extracted.LoadWordOracle.AddressOperation.interactions,
+    Extracted.LoadWordOracle.AddrAddOperation.interactions,
+    Extracted.LoadWordOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
     loadWordChipRustColumns, loadWordEvalAddressCols,
@@ -1491,8 +1601,9 @@ private theorem loadWordMemoryInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult))
-      (((Extracted.LoadWordColumns.interactions
-          (loadWordChipRustColumns env input offset)).map
+      (((Extracted.LoadWordOracle.LoadWordColumns.interactions
+          (loadWordChipReconfigure
+            (loadWordChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Memory)) := by
   have hp2 : 2 < p := by
@@ -1534,13 +1645,14 @@ private theorem loadWordMemoryInteractionsFaithful
     fun mult msg => toAccess_pushIf_memory env mult msg
   simp only [LoadWordChip.exposedMemoryInteractions,
     List.map_cons, List.map_nil, hMemoryPull, hMemoryPush]
-  simp [Extracted.LoadWordColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.LoadWordOracle.LoadWordColumns.interactions,
+    loadWordChipReconfigure, loadWordOracleAddressOperation,
+    Extracted.LoadWordOracle.AddressOperation.interactions,
+    Extracted.LoadWordOracle.AddrAddOperation.interactions,
+    Extracted.LoadWordOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.LoadWordOracle.AddressOperation.value,
     loadWordChipRustColumns, loadWordEvalAddressCols,
     loadWordEvalU16MSB,
     eval_cpuState, Readers.ITypeReader.eval_cols,
@@ -1777,8 +1889,9 @@ private theorem loadWordByteInteractionsFaithful
       ((((LoadWordChip.main input).operations offset).interactionsWith
           byteChannel.toRaw).map
             (AbstractInteraction.toAccess env))
-      (((Extracted.LoadWordColumns.interactions
-          (loadWordChipRustColumns env input offset)).map
+      (((Extracted.LoadWordOracle.LoadWordColumns.interactions
+          (loadWordChipReconfigure
+            (loadWordChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
   have h6 : (6 : ZMod p).val = 6 := by
@@ -1806,13 +1919,14 @@ private theorem loadWordByteInteractionsFaithful
     loadWordU16MSBByteInteractions, loadWordITypeByteInteractions,
     List.map_cons, List.map_nil,
     hBytePull]
-  simp [Extracted.LoadWordColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.LoadWordOracle.LoadWordColumns.interactions,
+    loadWordChipReconfigure, loadWordOracleAddressOperation,
+    Extracted.LoadWordOracle.AddressOperation.interactions,
+    Extracted.LoadWordOracle.AddrAddOperation.interactions,
+    Extracted.LoadWordOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.LoadWordOracle.AddressOperation.value,
     loadWordChipRustColumns, loadWordEvalAddressCols,
     loadWordEvalU16MSB,
     eval_cpuState, Readers.ITypeReader.eval_cols,
@@ -1855,7 +1969,7 @@ private theorem loadWordUnexpectedInteractionsEmpty
 theorem loadWordChipInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var LoadWordChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.LoadWordColumns (ZMod p))
+    (cols : LoadWordChip.Columns (ZMod p))
     (hbind : BindsChipOutput LoadWordChip.main env input offset cols) :
     List.Perm
       (nativeAccesses env
@@ -1870,15 +1984,15 @@ theorem loadWordChipInteractionsFaithful
   change loadWordChipRustColumns env input offset = cols at hbind
   subst cols
   let rustAccesses :=
-    (Extracted.LoadWordColumns.interactions
-      (loadWordChipRustColumns env input offset)).map
+    (Extracted.LoadWordOracle.LoadWordColumns.interactions
+      (loadWordChipReconfigure
+        (loadWordChipRustColumns env input offset))).map
         Extracted.Interaction.toAccess
   simp only [nativeAccesses]
   rw [loadWordUnexpectedInteractionsEmpty]
   simp only [List.map_nil, List.append_nil]
   simp only [ChipOracle.accesses,
-    ChipOracle.nativeInteractions, loadWordChipOracle,
-    ChipOracle.identity, id_eq]
+    ChipOracle.nativeInteractions, loadWordChipOracle]
   rw [loadWordStateInteractionsEq,
     LoadWordChip.interactionsWith_memory_eq,
     loadWordProgramInteractionsEq]
@@ -1898,7 +2012,7 @@ theorem loadWordChipInteractionsFaithful
     ((hByte.append_left _).append hMemory).append_right _
 
 theorem loadWordChipInteractionsConstructive
-    (rustCols : Extracted.LoadWordColumns (ZMod p))
+    (rustCols : Extracted.LoadWordOracle.LoadWordColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := loadWordChipRowCodec.assignment
       (loadWordChipOracle.deconfigure rustCols) data
@@ -1936,7 +2050,7 @@ theorem loadWordChipInteractionsConstructive
 
 theorem loadWordChip_faithful :
     ChipFaithful (p := p) LoadWordChip.Inputs
-      Extracted.LoadWordColumns Extracted.LoadWordColumns
+      LoadWordChip.Columns Extracted.LoadWordOracle.LoadWordColumns
       LoadWordChip.circuit loadWordChipRowCodec
       loadWordChipOracle where
   constraints := loadWordChipConstraintsConstructive (p := p)

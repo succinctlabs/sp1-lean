@@ -470,12 +470,12 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 Straight-line `next_pc = pc+4`, ITypeReader adapter, the umbrella `isReal` selector, `rdWrite`
 the zero word (the `x0` destination discards the read), the weighted-selector `opcodeVal`, and
 `commit = .noWrite`. -/
-def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadX0Columns (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (_cols : LoadX0Chip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, isReal inp, #v[(0 : ZMod p), 0, 0, 0], opcodeVal inp, .noWrite⟩
 
 /-- LoadX0's exact aligned RAM-access projection. -/
-def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadX0Columns (ZMod p)) :
+def ramAccessView (inp : Inputs (ZMod p)) (cols : LoadX0Chip.Columns (ZMod p)) :
     Trace.RamAccessView (ZMod p) :=
   { compareLow := inp.memory_access.access_timestamp.compare_low
     prevHigh := inp.memory_access.access_timestamp.prev_high
@@ -495,7 +495,7 @@ low-pc-limb bound, and — since LoadX0 bundles seven load opcodes behind a weig
 disjunct carries only what its width-`N` no-write adapter consumes: the opcode value, the width-`N`
 alignment (widths ≥ 2), the wrapped-address bounds (`hi`/`lo`), and the **existence** of the `N` read
 bytes (the values are discarded, so they are existentially quantified rather than pinned to columns). -/
-def advanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadX0Columns (ZMod p))
+def advanceReady (inp : Inputs (ZMod p)) (_cols : LoadX0Chip.Columns (ZMod p))
     (_prog : GuestProgram) (s : SailState) : Prop :=
   inp.adapter.op_a = 0 ∧
   (inp.state.pc[0]).val < 2 ^ 16 ∧
@@ -607,7 +607,7 @@ dispatch into the width-`N` no-write load adapters (`advance_of_load_x0_width{1,
 (so `rd = x0`, the read discarded) and the low-pc bound come from `advanceReady`; `himmb`/`himmc`/
 `hstraight` are `rfl` (the ITypeReader `toAdapterView`). Each branch reads its opcode + bounds + the
 existence of the `N` read bytes off `advanceReady`. This proof **is** `kind.advance` below. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadX0Columns (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : LoadX0Chip.Columns (ZMod p))
     (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
     (_hreal : (rowView inp cols).is_real = 1) (_hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -646,7 +646,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadX0Columns (ZMod p)
 def kind : Soundness.ChipKind p where
   name := "LoadX0"
   Inputs := LoadX0Chip.Inputs
-  Cols := Extracted.LoadX0Columns
+  Cols := LoadX0Chip.Columns
   view := rowView
   ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => LoadX0Chip.Spec inp cols data

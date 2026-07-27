@@ -301,14 +301,14 @@ lemma loadWord_hval (input : Inputs (ZMod p)) (isU : Bool)
 Straight-line `next_pc = pc+4`, ITypeReader adapter,
 `rdWrite = #v[selected_word[0], selected_word[1], 65535·msb, 65535·msb]`, opcode
 `is_lw·31 + is_lwu·34`, `commit = .regWrite`. -/
-def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadWordColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (_cols : LoadWordChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, LoadWordChip.isReal inp,
     #v[inp.selected_word[0], inp.selected_word[1], 65535 * inp.msb, 65535 * inp.msb],
     inp.is_lw * 31 + inp.is_lwu * 34, .regWrite⟩
 
 /-- LoadWord's exact aligned RAM-access projection. -/
-def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadWordColumns (ZMod p)) :
+def ramAccessView (inp : Inputs (ZMod p)) (cols : LoadWordChip.Columns (ZMod p)) :
     Trace.RamAccessView (ZMod p) :=
   { compareLow := inp.memory_access.access_timestamp.compare_low
     prevHigh := inp.memory_access.access_timestamp.prev_high
@@ -324,7 +324,7 @@ def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadWordColumns (ZMo
 /-- **LoadWord's `advanceReady` bundle**: routing (`op_a ≠ 0`), the low-pc-limb bound, the LW/LWU
 one-hot, the two loaded-limb bounds (`selected_word[i] < 2^16`), the **4-byte alignment**, the
 address bounds, and the **four-byte memory-read binding**. -/
-def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadWordColumns (ZMod p))
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : LoadWordChip.Columns (ZMod p))
     (_prog : GuestProgram) (s : SailState) : Prop :=
   inp.adapter.op_a ≠ 0 ∧
   (inp.state.pc[0]).val < 2 ^ 16 ∧
@@ -354,7 +354,7 @@ flag dispatch fixing `isU`; each branch derives the opcode (31/34 = LW/LWU) and 
 `advance_of_load_width4` with the memory binding / bounds / alignment / routing carried in
 `advanceReady`. The LWU-zero fact is derived from the `Spec`'s `msb·(is_lw−1) = 0` gate at
 `is_lw = 0`. `hreal` unused. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadWordColumns (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : LoadWordChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
     (_hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -406,7 +406,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadWordColumns (ZMod 
 def kind : Soundness.ChipKind p where
   name := "LoadWord"
   Inputs := LoadWordChip.Inputs
-  Cols := Extracted.LoadWordColumns
+  Cols := LoadWordChip.Columns
   view := rowView
   ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => LoadWordChip.Spec inp cols data

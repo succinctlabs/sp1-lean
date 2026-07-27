@@ -1,4 +1,5 @@
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Extracted.ChipOracle.LoadDouble
 import SP1Clean.Proofs.Chips.LoadDoubleChip.Formal
 
 /-!
@@ -17,32 +18,113 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-def loadDoubleChipOracle :
-    ChipOracle (ZMod p) Extracted.LoadDoubleColumns Extracted.LoadDoubleColumns :=
-  ChipOracle.identity Extracted.LoadDoubleColumns.asserts
-    Extracted.LoadDoubleColumns.interactions
+/-- Rebuild the shared standalone `AddressOperation` block as the byte-identical struct embedded in
+the generated LoadDouble oracle namespace. -/
+def loadDoubleOracleAddressOperation {F : Type} (cols : Extracted.AddressOperation F) :
+    Extracted.LoadDoubleOracle.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Inverse of `loadDoubleOracleAddressOperation`. -/
+def loadDoubleNativeAddressOperation {F : Type}
+    (cols : Extracted.LoadDoubleOracle.AddressOperation F) :
+    Extracted.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Whole-chip row reconfiguration. The reader and memory-access blocks are already the canonical
+generated substrate; the address block is copied into Rust's chip-private operation row. This is not
+an operation-level faithfulness claim. -/
+def loadDoubleChipReconfigure {F : Type} (cols : LoadDoubleChip.Columns F) :
+    Extracted.LoadDoubleOracle.LoadDoubleColumns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := loadDoubleOracleAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    is_real := cols.is_real }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def loadDoubleChipDeconfigure {F : Type} (cols : Extracted.LoadDoubleOracle.LoadDoubleColumns F) :
+    LoadDoubleChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := loadDoubleNativeAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    is_real := cols.is_real }
+
+/-- SP1 Rust's complete LoadDouble-chip oracle, viewed from the native Lean row. -/
+def loadDoubleChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F LoadDoubleChip.Columns Extracted.LoadDoubleOracle.LoadDoubleColumns where
+  reconfigure := loadDoubleChipReconfigure
+  deconfigure := loadDoubleChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.LoadDoubleOracle.LoadDoubleColumns.asserts
+  interactions := Extracted.LoadDoubleOracle.LoadDoubleColumns.interactions
+
+/- Namespace bridges between the LoadDouble oracle's embedded chip-private helper copies and the
+canonical standalone generated modules. The two bodies are rendered from the same compiler output,
+so each bridge is a definitional unfolding, not a mathematical claim. They let the address-op
+lemmas below stay stated once against the standalone modules (also consumed by the other load and
+store chips). -/
+
+private theorem loadDoubleOracle_addrAdd_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.LoadDoubleOracle.AddrAddOperation.asserts a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.asserts a b ⟨value⟩ is_real := by
+  rw [Extracted.LoadDoubleOracle.AddrAddOperation.asserts,
+    Extracted.AddrAddOperation.asserts]
+
+private theorem loadDoubleOracle_addrAdd_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.LoadDoubleOracle.AddrAddOperation.interactions a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.interactions a b ⟨value⟩ is_real := by
+  rw [Extracted.LoadDoubleOracle.AddrAddOperation.interactions,
+    Extracted.AddrAddOperation.interactions]
+
+private theorem loadDoubleOracle_address_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.LoadDoubleOracle.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.LoadDoubleOracle.AddressOperation.asserts,
+    Extracted.AddressOperation.asserts]
+  simp only [loadDoubleOracle_addrAdd_asserts_eq]
+
+private theorem loadDoubleOracle_address_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.LoadDoubleOracle.AddressOperation.interactions b cc offset_bit0 offset_bit1
+        offset_bit2 is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.interactions b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.LoadDoubleOracle.AddressOperation.interactions,
+    Extracted.AddressOperation.interactions]
+  simp only [loadDoubleOracle_addrAdd_interactions_eq]
 
 def loadDoubleChipInput {F : Type}
-    (cols : Extracted.LoadDoubleColumns F) : LoadDoubleChip.Inputs F :=
+    (cols : LoadDoubleChip.Columns F) : LoadDoubleChip.Inputs F :=
   { is_real := cols.is_real
     state := cols.state
     adapter := cols.adapter
     memory_access := cols.memory_access }
 
 def loadDoubleChipLocals {F : Type}
-    (cols : Extracted.LoadDoubleColumns F) : Vector F 4 :=
+    (cols : LoadDoubleChip.Columns F) : Vector F 4 :=
   #v[cols.address_operation.addr_operation.value[0],
     cols.address_operation.addr_operation.value[1],
     cols.address_operation.addr_operation.value[2],
     cols.address_operation.top_two_limb_inv]
 
 def loadDoubleChipPhysicalRow {F : Type}
-    (cols : Extracted.LoadDoubleColumns F) : Array F :=
+    (cols : LoadDoubleChip.Columns F) : Array F :=
   inputFirstRow (loadDoubleChipInput cols) (loadDoubleChipLocals cols)
 
 def loadDoubleChipColumnsOfInput {F : Type}
     (input : LoadDoubleChip.Inputs F) (locals : Vector F 4) :
-    Extracted.LoadDoubleColumns F :=
+    LoadDoubleChip.Columns F :=
   ⟨input.state, input.adapter,
     ⟨⟨#v[locals[0], locals[1], locals[2]]⟩, locals[3]⟩,
     input.memory_access, input.is_real⟩
@@ -112,7 +194,7 @@ private theorem loadDoubleITypeEta {F : Type}
     rfl
 
 theorem loadDoubleChipColumnsOfInput_roundtrip {F : Type}
-    (cols : Extracted.LoadDoubleColumns F) :
+    (cols : LoadDoubleChip.Columns F) :
     loadDoubleChipColumnsOfInput
         (loadDoubleChipInput cols) (loadDoubleChipLocals cols) = cols := by
   cases cols
@@ -214,7 +296,7 @@ theorem evalLoadDoubleDirectOutput
   rw [LoadDoubleChip.directOutput_eq]
   rw [← CircuitType.eval_expression, LoadDoubleChip.eval_columns]
   unfold loadDoubleChipColumnsOfInput
-  rw [Extracted.LoadDoubleColumns.mk.injEq]
+  rw [LoadDoubleChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input locals data
   rw [LoadDoubleChip.eval_inputs, LoadDoubleChip.Inputs.mk.injEq] at hinputEval
@@ -244,7 +326,7 @@ theorem evalLoadDoubleDirectOutput
         (eval_local_inputFirstRow input locals data 3 (by decide))
 
 def loadDoubleChipRowCodec :
-    ChipRowCodec LoadDoubleChip.Inputs Extracted.LoadDoubleColumns
+    ChipRowCodec LoadDoubleChip.Inputs LoadDoubleChip.Columns
       (LoadDoubleChip.circuit (p := p)) where
   assignment cols data := {
     row := loadDoubleChipPhysicalRow cols
@@ -513,7 +595,7 @@ private theorem loadDoubleMemoryAssertionList
 private def loadDoubleChipRustColumns
     (env : Environment (ZMod p))
     (input : Var LoadDoubleChip.Inputs (ZMod p)) (offset : ℕ) :
-    Extracted.LoadDoubleColumns (ZMod p) :=
+    LoadDoubleChip.Columns (ZMod p) :=
   { state := Eval.eval env input.state
     adapter := Eval.eval env input.adapter
     address_operation := Eval.eval env (loadDoubleAddressCols (p := p) offset)
@@ -668,9 +750,10 @@ private theorem loadDoubleRustAssertionsDecompose
         (loadDoubleChipOracle.nativeAssertZeros
           (loadDoubleChipRustColumns env input offset)) ↔
       loadDoubleRustMeaning env input offset := by
-  simp only [ChipOracle.nativeAssertZeros, loadDoubleChipOracle,
-    ChipOracle.identity, id_eq]
-  rw [Extracted.LoadDoubleColumns.asserts]
+  simp only [ChipOracle.nativeAssertZeros, loadDoubleChipOracle]
+  rw [Extracted.LoadDoubleOracle.LoadDoubleColumns.asserts]
+  dsimp only [loadDoubleChipReconfigure, loadDoubleOracleAddressOperation]
+  simp only [loadDoubleOracle_address_asserts_eq]
   unfold loadDoubleRustMeaning loadDoubleRustAddressMeaning
     loadDoubleRustCpuMeaning loadDoubleRustITypeMeaning
     loadDoubleRustTailMeaning
@@ -873,7 +956,7 @@ private theorem loadDoubleChipConstraintsFaithfulOutput
 theorem loadDoubleChipConstraintsFaithful
     (env : Environment (ZMod p))
     (input : Var LoadDoubleChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.LoadDoubleColumns (ZMod p))
+    (cols : LoadDoubleChip.Columns (ZMod p))
     (hbind : BindsChipOutput LoadDoubleChip.main env input offset cols) :
     List.Forall (· = 0)
         (loadDoubleChipOracle.nativeAssertZeros cols) ↔
@@ -892,7 +975,7 @@ theorem loadDoubleChipConstraintsFaithful
     (p := p) env input offset
 
 theorem loadDoubleChipConstraintsConstructive
-    (rustCols : Extracted.LoadDoubleColumns (ZMod p))
+    (rustCols : Extracted.LoadDoubleOracle.LoadDoubleColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := loadDoubleChipRowCodec.assignment
       (loadDoubleChipOracle.deconfigure rustCols) data
@@ -989,8 +1072,9 @@ private theorem loadDoubleStateInteractionsFaithful
     ((((loadDoubleStateInteractions input).map
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env))) =
-      (((Extracted.LoadDoubleColumns.interactions
-          (loadDoubleChipRustColumns env input offset)).map
+      (((Extracted.LoadDoubleOracle.LoadDoubleColumns.interactions
+          (loadDoubleChipReconfigure
+            (loadDoubleChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.State)) := by
   have hStatePull :
@@ -1021,9 +1105,10 @@ private theorem loadDoubleStateInteractionsFaithful
     fun mult msg => toAccess_pushIf_state env mult msg
   simp only [loadDoubleStateInteractions,
     List.map_cons, List.map_nil, hStatePull, hStatePush]
-  simp [Extracted.LoadDoubleColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.LoadDoubleOracle.LoadDoubleColumns.interactions,
+    loadDoubleChipReconfigure, loadDoubleOracleAddressOperation,
+    Extracted.LoadDoubleOracle.AddressOperation.interactions,
+    Extracted.LoadDoubleOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
     loadDoubleChipRustColumns, loadDoubleEvalAddressCols,
@@ -1040,8 +1125,9 @@ private theorem loadDoubleProgramInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)) =
-      (((Extracted.LoadDoubleColumns.interactions
-          (loadDoubleChipRustColumns env input offset)).map
+      (((Extracted.LoadDoubleOracle.LoadDoubleColumns.interactions
+          (loadDoubleChipReconfigure
+            (loadDoubleChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Program)) := by
   have hp2 : 2 < p := by
@@ -1077,9 +1163,10 @@ private theorem loadDoubleProgramInteractionsFaithful
     fun gate msg => toAccess_pullIf_program env gate msg
   simp only [loadDoubleProgramInteractions,
     List.map_cons, List.map_nil, hProgramPull]
-  simp [Extracted.LoadDoubleColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.LoadDoubleOracle.LoadDoubleColumns.interactions,
+    loadDoubleChipReconfigure, loadDoubleOracleAddressOperation,
+    Extracted.LoadDoubleOracle.AddressOperation.interactions,
+    Extracted.LoadDoubleOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
     loadDoubleChipRustColumns, loadDoubleEvalAddressCols,
@@ -1115,8 +1202,9 @@ private theorem loadDoubleMemoryInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult))
-      (((Extracted.LoadDoubleColumns.interactions
-          (loadDoubleChipRustColumns env input offset)).map
+      (((Extracted.LoadDoubleOracle.LoadDoubleColumns.interactions
+          (loadDoubleChipReconfigure
+            (loadDoubleChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Memory)) := by
   have hp2 : 2 < p := by
@@ -1158,12 +1246,13 @@ private theorem loadDoubleMemoryInteractionsFaithful
     fun mult msg => toAccess_pushIf_memory env mult msg
   simp only [LoadDoubleChip.exposedMemoryInteractions,
     List.map_cons, List.map_nil, hMemoryPull, hMemoryPush]
-  simp [Extracted.LoadDoubleColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.LoadDoubleOracle.LoadDoubleColumns.interactions,
+    loadDoubleChipReconfigure, loadDoubleOracleAddressOperation,
+    Extracted.LoadDoubleOracle.AddressOperation.interactions,
+    Extracted.LoadDoubleOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.LoadDoubleOracle.AddressOperation.value,
     loadDoubleChipRustColumns, loadDoubleEvalAddressCols,
     eval_cpuState, Readers.ITypeReader.eval_cols,
     eval_registerAccessCols, eval_registerAccessTimestamp,
@@ -1359,8 +1448,9 @@ private theorem loadDoubleByteInteractionsFaithful
       ((((LoadDoubleChip.main input).operations offset).interactionsWith
           byteChannel.toRaw).map
             (AbstractInteraction.toAccess env))
-      (((Extracted.LoadDoubleColumns.interactions
-          (loadDoubleChipRustColumns env input offset)).map
+      (((Extracted.LoadDoubleOracle.LoadDoubleColumns.interactions
+          (loadDoubleChipReconfigure
+            (loadDoubleChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
   have h6 : (6 : ZMod p).val = 6 := by
@@ -1387,12 +1477,13 @@ private theorem loadDoubleByteInteractionsFaithful
     loadDoubleAddressByteInteractions, loadDoubleMemoryByteInteractions,
     loadDoubleITypeByteInteractions, List.map_cons, List.map_nil,
     hBytePull]
-  simp [Extracted.LoadDoubleColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.LoadDoubleOracle.LoadDoubleColumns.interactions,
+    loadDoubleChipReconfigure, loadDoubleOracleAddressOperation,
+    Extracted.LoadDoubleOracle.AddressOperation.interactions,
+    Extracted.LoadDoubleOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.LoadDoubleOracle.AddressOperation.value,
     loadDoubleChipRustColumns, loadDoubleEvalAddressCols,
     eval_cpuState, Readers.ITypeReader.eval_cols,
     eval_registerAccessCols, eval_registerAccessTimestamp,
@@ -1434,7 +1525,7 @@ private theorem loadDoubleUnexpectedInteractionsEmpty
 theorem loadDoubleChipInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var LoadDoubleChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.LoadDoubleColumns (ZMod p))
+    (cols : LoadDoubleChip.Columns (ZMod p))
     (hbind : BindsChipOutput LoadDoubleChip.main env input offset cols) :
     List.Perm
       (nativeAccesses env
@@ -1449,15 +1540,15 @@ theorem loadDoubleChipInteractionsFaithful
   change loadDoubleChipRustColumns env input offset = cols at hbind
   subst cols
   let rustAccesses :=
-    (Extracted.LoadDoubleColumns.interactions
-      (loadDoubleChipRustColumns env input offset)).map
+    (Extracted.LoadDoubleOracle.LoadDoubleColumns.interactions
+      (loadDoubleChipReconfigure
+        (loadDoubleChipRustColumns env input offset))).map
         Extracted.Interaction.toAccess
   simp only [nativeAccesses]
   rw [loadDoubleUnexpectedInteractionsEmpty]
   simp only [List.map_nil, List.append_nil]
   simp only [ChipOracle.accesses,
-    ChipOracle.nativeInteractions, loadDoubleChipOracle,
-    ChipOracle.identity, id_eq]
+    ChipOracle.nativeInteractions, loadDoubleChipOracle]
   rw [loadDoubleStateInteractionsEq,
     LoadDoubleChip.interactionsWith_memory_eq,
     loadDoubleProgramInteractionsEq]
@@ -1477,7 +1568,7 @@ theorem loadDoubleChipInteractionsFaithful
     ((hByte.append_left _).append hMemory).append_right _
 
 theorem loadDoubleChipInteractionsConstructive
-    (rustCols : Extracted.LoadDoubleColumns (ZMod p))
+    (rustCols : Extracted.LoadDoubleOracle.LoadDoubleColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := loadDoubleChipRowCodec.assignment
       (loadDoubleChipOracle.deconfigure rustCols) data
@@ -1515,7 +1606,7 @@ theorem loadDoubleChipInteractionsConstructive
 
 theorem loadDoubleChip_faithful :
     ChipFaithful (p := p) LoadDoubleChip.Inputs
-      Extracted.LoadDoubleColumns Extracted.LoadDoubleColumns
+      LoadDoubleChip.Columns Extracted.LoadDoubleOracle.LoadDoubleColumns
       LoadDoubleChip.circuit loadDoubleChipRowCodec
       loadDoubleChipOracle where
   constraints := loadDoubleChipConstraintsConstructive (p := p)

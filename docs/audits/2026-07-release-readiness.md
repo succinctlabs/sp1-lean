@@ -181,6 +181,45 @@ reproducible immutable git pins is a **release blocker** tracked outside this ca
   builds 0/0/0; `lake test` green; probe regenerated zero-diff (no Faithful files deleted).
   CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem, Addi, Jalr, Jal, UType, Addw, Bitwise, Lt,
   ShiftLeft, ShiftRight, AluX0, Branch, LoadByte, LoadHalf} — **18/25**.
+- **LoadWord + LoadDouble + LoadX0 — complete, all gates green, ZERO proof repair** (all three
+  chips compiled 0/0/0 first try end-to-end — the first memory-family batch with no repair round,
+  because the two f19308bd corrections were applied pre-emptively: the embedded
+  `<Chip>Oracle.AddressOperation.value` spelling in the memory/byte interaction simp sets, and the
+  mandatory generated-import-block inspection). The previous batch's generator capabilities
+  (`MemoryAccess` struct carrier + `ITypeReaderImmutable` imported-helper wiring) did all the
+  config work — this batch's only generator change is the three `CHIP_ORACLES` entries, and its
+  carrier-decoupling prediction held: closures needed **no sibling load chips**
+  (LoadWord = `{CPUState, RTypeReader, ITypeReader, AddrAddOperation, AddressOperation,
+  U16MSBOperation}`; LoadDouble = the same minus `U16MSBOperation`; LoadX0 = LoadDouble's plus
+  `ITypeReaderImmutable`), and every regen diff was exactly the one new oracle file (all sibling
+  regenerated modules byte-identical). Import blocks verified per chip: the `MemoryAccess` carrier
+  + reader modules imported (LoadX0 additionally `ITypeReaderImmutable` — the no-struct helper
+  import), NO legacy `<X>Chip` module, embedded helpers exactly `AddrAddOperation` +
+  `AddressOperation` (+ `U16MSBOperation` for LoadWord). Native `Columns` land in the Native Defs
+  (all three Specs live there — Lt/loads pattern); rows keep the shared
+  `Extracted.AddressOperation`/`MemoryAccessCols` blocks (+ `Extracted.U16MSBOperation` for
+  LoadWord's sign-bit block). **LoadX0 = the bespoke reader-only load row** (seven per-width
+  selectors, per-width alignment gates, no value logic): its oracle calls the canonical
+  `ITypeReaderImmutable.asserts`/`.interactions` directly (imported helper — no namespace bridge,
+  the 8f1ae7a0/AluX0 pattern), so its Faithful re-point needed only the four address-chain
+  bridges. Faithful rewrites: LoadWord = the LoadHalf template verbatim (6 bridges incl. the two
+  U16MSB bridges, `msb := { msb := cols.msb.msb }` copy); LoadDouble = 4 bridges + its bespoke
+  direct rust-level assertions decompose (`rw` oracle asserts → `dsimp` reconfigure → address
+  bridge — its RustAddressMeaning was already stated at the eta-expanded constructor, so the
+  bridge output matched syntactically); LoadX0 = 4 bridges. Grounding:
+  `Grounding/MemoryChips.lean` again needed exactly the mechanical row-type renames in the
+  descriptor/oneHot/selectedBytes lemma signatures; every other grounding file zero changes.
+  **No standalone operation retired** (importer evidence re-checked post-batch:
+  `AddrAddOperation`/`AddressOperation` keep the four legacy store chips + Contracts + native
+  gadget importers — standalone until M5c; `U16MSBOperation` keeps `LtOperationSigned` +
+  `MulOperation` + `DivRemColumns` + Contracts). None of the three chips has a trace anchor
+  (verified: no Load dumps in `SP1CleanTest/TraceGenTests/`); `lake test` green (the test library
+  verified up-to-date against the new oleans — 3276 jobs, no test module imports the migrated
+  rows); probe regenerated zero-diff (478 probes; no Faithful files deleted). Legacy
+  `Extracted/{LoadWord,LoadDouble,LoadX0}Chip.lean` retired.
+  CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem, Addi, Jalr, Jal, UType, Addw, Bitwise, Lt,
+  ShiftLeft, ShiftRight, AluX0, Branch, LoadByte, LoadHalf, LoadWord, LoadDouble, LoadX0} —
+  **21/25**.
 
 ## Phase 3 — audit findings
 

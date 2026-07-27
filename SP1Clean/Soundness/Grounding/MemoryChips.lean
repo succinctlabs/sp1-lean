@@ -3183,13 +3183,13 @@ theorem loadWordChipDescriptor_rdGuard :
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadWordChipDescriptor_view (input : LoadWordChip.Inputs (ZMod p))
-    (output : Extracted.LoadWordColumns (ZMod p)) :
+    (output : LoadWordChip.Columns (ZMod p)) :
     (loadWordChipDescriptor (p := p)).kind.view input output =
       LoadWordChip.rowView input output := rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadWordChipDescriptor_ramAccess (input : LoadWordChip.Inputs (ZMod p))
-    (output : Extracted.LoadWordColumns (ZMod p)) :
+    (output : LoadWordChip.Columns (ZMod p)) :
     (loadWordChipDescriptor (p := p)).kind.ramAccess input output =
       some (LoadWordChip.ramAccessView input output) := rfl
 
@@ -3277,7 +3277,7 @@ omit [Fact (2 ^ 25 < p)] in
 /-- A real LoadWord row selects exactly one of LW and LWU. -/
 theorem loadWord_oneHot
     (input : LoadWordChip.Inputs (ZMod p))
-    (cols : Extracted.LoadWordColumns (ZMod p))
+    (cols : LoadWordChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (spec : LoadWordChip.Spec input cols data)
     (real : LoadWordChip.isReal input = 1) :
@@ -3301,7 +3301,7 @@ omit [Fact (2 ^ 25 < p)] in
 address. -/
 theorem loadWord_selectedBytes
     (input : LoadWordChip.Inputs (ZMod p))
-    (cols : Extracted.LoadWordColumns (ZMod p))
+    (cols : LoadWordChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (spec : LoadWordChip.Spec input cols data)
     (priorBound : Word.isU64 input.memory_access.prev_value) :
@@ -3680,13 +3680,13 @@ theorem loadDoubleChipDescriptor_rdGuard :
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadDoubleChipDescriptor_view (input : LoadDoubleChip.Inputs (ZMod p))
-    (output : Extracted.LoadDoubleColumns (ZMod p)) :
+    (output : LoadDoubleChip.Columns (ZMod p)) :
     (loadDoubleChipDescriptor (p := p)).kind.view input output =
       LoadDoubleChip.rowView input output := rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadDoubleChipDescriptor_ramAccess (input : LoadDoubleChip.Inputs (ZMod p))
-    (output : Extracted.LoadDoubleColumns (ZMod p)) :
+    (output : LoadDoubleChip.Columns (ZMod p)) :
     (loadDoubleChipDescriptor (p := p)).kind.ramAccess input output =
       some (LoadDoubleChip.ramAccessView input output) := rfl
 
@@ -4047,13 +4047,13 @@ theorem loadX0ChipDescriptor_rdGuard :
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadX0ChipDescriptor_view (input : LoadX0Chip.Inputs (ZMod p))
-    (output : Extracted.LoadX0Columns (ZMod p)) :
+    (output : LoadX0Chip.Columns (ZMod p)) :
     (loadX0ChipDescriptor (p := p)).kind.view input output =
       LoadX0Chip.rowView input output := rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadX0ChipDescriptor_ramAccess (input : LoadX0Chip.Inputs (ZMod p))
-    (output : Extracted.LoadX0Columns (ZMod p)) :
+    (output : LoadX0Chip.Columns (ZMod p)) :
     (loadX0ChipDescriptor (p := p)).kind.ramAccess input output =
       some (LoadX0Chip.ramAccessView input output) := rfl
 
@@ -4245,7 +4245,7 @@ omit [Fact (2 ^ 25 < p)] in
 /-- An active LoadX0 row selects exactly one of its seven upstream load opcodes. -/
 theorem loadX0_oneHot
     (input : LoadX0Chip.Inputs (ZMod p))
-    (cols : Extracted.LoadX0Columns (ZMod p))
+    (cols : LoadX0Chip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (spec : LoadX0Chip.Spec input cols data)
     (real : LoadX0Chip.isReal input = 1) :
@@ -4501,7 +4501,7 @@ seven-opcode readiness disjunction consumed by its Sail bridge. The width-specif
 keep the large disjunction out of the dependent whole-chip grounding proof. -/
 theorem loadX0AdvanceReady_of_semanticFacts
     (input : LoadX0Chip.Inputs (ZMod p))
-    (cols : Extracted.LoadX0Columns (ZMod p))
+    (cols : LoadX0Chip.Columns (ZMod p))
     (data : ProverData (ZMod p)) (program : GuestProgram) (state : SailState)
     (spec : LoadX0Chip.Spec input cols data)
     (real : LoadX0Chip.isReal input = 1)

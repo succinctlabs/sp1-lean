@@ -5,7 +5,6 @@ import SP1Clean.Native.Readers.ITypeReader
 import SP1Clean.Native.Readers.MemoryAccess
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.LoadDoubleChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -19,7 +18,7 @@ sign-extension. Composes — as Clean sub-circuits — the `CPUState` reader (pc
 `AddressOperation` gadget (address `= rs1 + imm` truncated to 48 bits, offset bits `0`), the
 `MemoryAccess` primitive (a memory **read**: `new_value = prev_value`, at the computed 48-bit address),
 and the `ITypeReader` adapter with the **loaded word** `memory_access.prev_value` as `op_a`'s write value.
-Output is the extracted `LoadDoubleColumns` struct.
+Output is the extracted `Columns` struct.
 
 The chip `Spec` is the composition of the sub-circuits' own `Spec`s + the proven `is_real`-binary fact +
 the `op_a != x0` gate; the load *meaning* (`rd = memory_access.prev_value`) is carried by the `ITypeReader`
@@ -30,10 +29,22 @@ sub-`Spec` (its write value is the loaded word). The bus's cross-row offline-mem
 namespace SP1Clean.LoadDoubleChip
 
 open Circuit
-open Extracted (LoadDoubleColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native LoadDouble-chip row (Rust field order). The reader and memory blocks reuse the project
+substrate (`Extracted.AddressOperation` is still a standalone generated module — the other loads and
+stores compose the same gadget; `Extracted.MemoryAccessCols` lives in the generated `MemoryAccess`
+struct carrier). `Faithful.LoadDoubleChip.loadDoubleChipReconfigure` is the sole bridge to Rust's
+separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ITypeReader F
+  address_operation : Extracted.AddressOperation F
+  memory_access : Extracted.MemoryAccessCols F
+  is_real : F
+deriving ProvableStruct
 
 /-- The operand reads + threaded reader column blocks. `op_b_val` is the rs1 base-address value (the
 `op_b` register read), `op_c_imm` the sign-extended immediate; `state`/`adapter`/`memory_access` are the
@@ -63,12 +74,12 @@ deriving ProvableStruct
 @[reducible] def clkLow (state : Extracted.CPUState (ZMod p)) : ZMod p :=
   state.clk_0_16 + state.clk_16_24 * 65536
 
-/-- Compose the four column blocks as Clean sub-circuits and assemble the extracted `LoadDoubleColumns`.
+/-- Compose the four column blocks as Clean sub-circuits and assemble the extracted `Columns`.
 `CPUState` advances pc by 4 / clk by 8; `AddressOperation` computes `rs1 + imm` (offset bits `0` — LD is
 8-byte aligned); `MemoryAccess` is a read (`new_value = prev_value`) at the 48-bit address; `ITypeReader`
 writes the loaded word `memory_access.prev_value` to `op_a` (opcode `35 = LD`). The `op_a != x0` gate and
 the `is_real` binary gate are imposed directly. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadDoubleColumns (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let addr_op ← AddressOperation.circuit
@@ -99,7 +110,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadDoubleColumns
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.is_real⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadDoubleColumns main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit]
   -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks are threaded
   -- inputs and the gates witness nothing.
@@ -121,25 +132,25 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadDoubleColumns main w
       (⟨input.state, input.adapter,
         ⟨varFromOffset Extracted.AddrAddOperation offset, var ⟨offset + 3⟩⟩,
         input.memory_access, input.is_real⟩ :
-        Var LoadDoubleColumns (ZMod p)) := rfl
+        Var Columns (ZMod p)) := rfl
 
 /-- Component-wise evaluation of a completed LoadDouble row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : LoadDoubleColumns (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state
          adapter := Eval.eval env cols.adapter
          address_operation := Eval.eval env cols.address_operation
          memory_access := Eval.eval env cols.memory_access
          is_real := Eval.eval env cols.is_real } :
-        LoadDoubleColumns F) := by
+        Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity,
 the `MemoryAccess` timestamp monotonicity, the `ITypeReader` adapter facts (which carry the load meaning —
 `op_a`'s write value is `memory_access.prev_value`), the `op_a != x0` flag, and the `is_real`-binary fact. -/
-def Spec (input : Inputs (ZMod p)) (cols : LoadDoubleColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   AddressOperation.RowSpec
       ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩
       cols.address_operation ∧

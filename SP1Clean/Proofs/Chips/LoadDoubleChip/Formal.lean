@@ -11,7 +11,6 @@ proofs, and the bundled `circuit`. -/
 namespace SP1Clean.LoadDoubleChip
 
 open Circuit
-open Extracted (LoadDoubleColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -176,8 +175,8 @@ theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
       exposedMemoryInteractions input offset := by
   simp [exposedMemoryInteractions]
 
-/-- The `LoadDouble` chip row as a `GeneralFormalCircuit`; output is the extracted `LoadDoubleColumns`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadDoubleColumns :=
+/-- The `LoadDouble` chip row as a `GeneralFormalCircuit`; output is the extracted `Columns`. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,

@@ -9,10 +9,10 @@ import SP1Clean.Extracted.ChipOracle.DivRem
 import SP1Clean.Extracted.ChipOracle.Jal
 import SP1Clean.Extracted.ChipOracle.Jalr
 import SP1Clean.Extracted.ChipOracle.LoadByte
-import SP1Clean.Extracted.LoadDoubleChip
+import SP1Clean.Extracted.ChipOracle.LoadDouble
 import SP1Clean.Extracted.ChipOracle.LoadHalf
-import SP1Clean.Extracted.LoadWordChip
-import SP1Clean.Extracted.LoadX0Chip
+import SP1Clean.Extracted.ChipOracle.LoadWord
+import SP1Clean.Extracted.ChipOracle.LoadX0
 import SP1Clean.Extracted.ChipOracle.Lt
 import SP1Clean.Extracted.ChipOracle.Mul
 import SP1Clean.Extracted.ChipOracle.ShiftLeft
@@ -79,9 +79,9 @@ def MainRow (p : ℕ) [Fact p.Prime] : Table → Type
   | .aluX0 => AluX0Oracle.AluX0Cols (ZMod p)
   | .loadByte => LoadByteOracle.LoadByteColumns (ZMod p)
   | .loadHalf => LoadHalfOracle.LoadHalfColumns (ZMod p)
-  | .loadWord => LoadWordColumns (ZMod p)
-  | .loadDouble => LoadDoubleColumns (ZMod p)
-  | .loadX0 => LoadX0Columns (ZMod p)
+  | .loadWord => LoadWordOracle.LoadWordColumns (ZMod p)
+  | .loadDouble => LoadDoubleOracle.LoadDoubleColumns (ZMod p)
+  | .loadX0 => LoadX0Oracle.LoadX0Columns (ZMod p)
   | .storeByte => StoreByteColumns (ZMod p)
   | .storeHalf => StoreHalfColumns (ZMod p)
   | .storeWord => StoreWordColumns (ZMod p)
@@ -130,9 +130,9 @@ def assertions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .aluX0 => AluX0Oracle.AluX0Cols.asserts row.main
   | .loadByte => LoadByteOracle.LoadByteColumns.asserts row.main
   | .loadHalf => LoadHalfOracle.LoadHalfColumns.asserts row.main
-  | .loadWord => LoadWordColumns.asserts row.main
-  | .loadDouble => LoadDoubleColumns.asserts row.main
-  | .loadX0 => LoadX0Columns.asserts row.main
+  | .loadWord => LoadWordOracle.LoadWordColumns.asserts row.main
+  | .loadDouble => LoadDoubleOracle.LoadDoubleColumns.asserts row.main
+  | .loadX0 => LoadX0Oracle.LoadX0Columns.asserts row.main
   | .storeByte => StoreByteColumns.asserts row.main
   | .storeHalf => StoreHalfColumns.asserts row.main
   | .storeWord => StoreWordColumns.asserts row.main
@@ -175,9 +175,9 @@ def interactions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .aluX0 => AluX0Oracle.AluX0Cols.interactions row.main
   | .loadByte => LoadByteOracle.LoadByteColumns.interactions row.main
   | .loadHalf => LoadHalfOracle.LoadHalfColumns.interactions row.main
-  | .loadWord => LoadWordColumns.interactions row.main
-  | .loadDouble => LoadDoubleColumns.interactions row.main
-  | .loadX0 => LoadX0Columns.interactions row.main
+  | .loadWord => LoadWordOracle.LoadWordColumns.interactions row.main
+  | .loadDouble => LoadDoubleOracle.LoadDoubleColumns.interactions row.main
+  | .loadX0 => LoadX0Oracle.LoadX0Columns.interactions row.main
   | .storeByte => StoreByteColumns.interactions row.main
   | .storeHalf => StoreHalfColumns.interactions row.main
   | .storeWord => StoreWordColumns.interactions row.main

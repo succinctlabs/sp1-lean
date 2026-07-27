@@ -243,7 +243,7 @@ eight memory bytes (the read returns the loaded word — offline-memory consiste
 `memory_access.prev_value` column. The memory analogue of
 `AddBridge.add_chip_reaches_sail`. -/
 theorem ld_chip_reaches_sail
-    (input : LoadDoubleChip.Inputs (ZMod p)) (cols : Extracted.LoadDoubleColumns (ZMod p))
+    (input : LoadDoubleChip.Inputs (ZMod p)) (cols : LoadDoubleChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (hconfig : SailState.isValidMemConfig s hs)
@@ -323,12 +323,12 @@ lemma loadDouble_hval (pv : Word (ZMod p)) (hpv : Word.isU64 pv) :
 /-- **LoadDouble's committed bus view** — standalone (identical to the former inline `kind.view`).
 Straight-line `next_pc = pc+4`, ITypeReader adapter, `rdWrite = memory_access.prev_value` (the full
 8-byte loaded word, no extension), opcode `35 = LD`, `commit = .regWrite`. -/
-def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadDoubleColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (_cols : LoadDoubleChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, inp.is_real, inp.memory_access.prev_value, 35, .regWrite⟩
 
 /-- LoadDouble's exact aligned RAM-access projection. -/
-def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadDoubleColumns (ZMod p)) :
+def ramAccessView (inp : Inputs (ZMod p)) (cols : LoadDoubleChip.Columns (ZMod p)) :
     Trace.RamAccessView (ZMod p) :=
   { compareLow := inp.memory_access.access_timestamp.compare_low
     prevHigh := inp.memory_access.access_timestamp.prev_high
@@ -343,7 +343,7 @@ def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadDoubleColumns (Z
 /-- **LoadDouble's `advanceReady` bundle**: routing (`op_a ≠ 0`), the low-pc-limb bound, the four
 loaded-limb bounds (`memory_access.prev_value[i] < 2^16`, i.e. `isU64`), the **8-byte alignment**, the
 address bounds, and the **eight-byte memory-read binding** at `op_b_memory.prev_value + op_c_imm`. -/
-def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadDoubleColumns (ZMod p))
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : LoadDoubleChip.Columns (ZMod p))
     (_prog : GuestProgram) (s : SailState) : Prop :=
   inp.adapter.op_a ≠ 0 ∧
   (inp.state.pc[0]).val < 2 ^ 16 ∧
@@ -386,7 +386,7 @@ set_option maxHeartbeats 4000000 in
 (`loadDouble_hval`) reduces the write value to the full 8-byte read; `advance_of_load_width8` (no `hpin`,
 pinned by the width-validity guard) consumes the memory bindings / bounds / alignment / routing carried in
 `advanceReady`. `hspec`/`hreal` unused. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadDoubleColumns (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : LoadDoubleChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
     (_hreal : (rowView inp cols).is_real = 1) (_hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -421,7 +421,7 @@ bridge helper. -/
 def kind : Soundness.ChipKind p where
   name := "LoadDouble"
   Inputs := LoadDoubleChip.Inputs
-  Cols := Extracted.LoadDoubleColumns
+  Cols := LoadDoubleChip.Columns
   view := rowView
   ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => LoadDoubleChip.Spec inp cols data
