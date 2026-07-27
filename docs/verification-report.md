@@ -167,8 +167,10 @@ invariants.)
 ### 3.3 What the Sail layer contributes to the trust base
 
 The generated model's *platform hooks* remain external axioms of the Lean environment — concretely
-`plat_term_write`, the LR/SC reservation operations, `get_16_random_bits`,
-`sys_enable_experimental_extensions`, and `print` — disclosed per-theorem by the axiom census.
+the seven the supported slice touches: `plat_term_write`, the four LR/SC reservation operations
+(`load_reservation`, `match_reservation`, `valid_reservation`, `cancel_reservation`),
+`get_16_random_bits`, and `sys_enable_experimental_extensions` — disclosed per-theorem by the
+axiom census. (The Sail runtime's `print` is a total definition, not an axiom.)
 None is given a nontrivial axiomatized *property*; they are opaque effects the supported
 instruction slice does not semantically depend on. A handful of shift/multiply helper lemmas are
 discharged with `bv_decide` and carry Lean's standard SAT-checker constants. Everything else in
@@ -182,11 +184,12 @@ The "what does SP1 actually constrain" side enters Lean through `update_extracte
 drives SP1's own constraint compiler as a **trusted but heavily fenced oracle**:
 
 - `SP1_DIR` must be the audited *extraction overlay*: a checkout whose merge base with the
-  semantic pin is exactly `a630089d9…`, whose committed delta is verified line-by-line to be
-  reflection metadata only (`use sp1_derive` / `#[derive(...)`), and whose working tree carries
-  exactly the two checked-in exporter patches (`scripts/extractor-patches/*.patch`),
-  byte-hash-verified against the live diff. Every gate is fail-closed (`SystemExit` before any
-  file is written).
+  semantic pin is exactly `a630089d9…`, whose committed delta over the **semantic AIR sources**
+  (the 25 chip files) is verified line-by-line to be reflection metadata only (`use sp1_derive` /
+  `#[derive(...)`) — changes outside that surface are confined by an explicit allowlist to the
+  exporter's own directories — and whose working tree carries exactly the two checked-in exporter
+  patches (`scripts/extractor-patches/*.patch`), byte-hash-verified against the live diff. Every
+  gate is fail-closed (`SystemExit` before any file is written).
 - The exporter emits, per table, the complete column structure, the ordered `assertZero` list,
   and the ordered interaction list — **never a Clean circuit**, so extraction cannot manufacture
   the proof's other side. The patches were audited hunk-by-hunk: they operate strictly on the
@@ -194,9 +197,11 @@ drives SP1's own constraint compiler as a **trusted but heavily fenced oracle**:
 - A machine-shape manifest is extracted unconditionally and compared against the audited profile
   (34-table execution cluster, 6-table memory-boundary cluster, every main/preprocessed width,
   the 160-cell public-values block) before anything regenerates; `Extracted/Provenance.lean` pins
-  the semantic revision, overlay revision, and patch digest, tied to `CoreProfile` by `rfl`.
-- Regeneration is byte-idempotent: a full run at the pinned overlay reproduces all 62 generated
-  modules identically (re-verified at this snapshot).
+  the semantic revision, overlay revision, and patch digest (the semantic revision additionally
+  tied to `CoreProfile` by an `rfl` theorem; the other two enforced by the regeneration gates).
+- Regeneration is byte-idempotent: a full `EXTRACT_AIR_ONLY` run at the pinned overlay reproduces
+  all 62 generated AIR modules identically (re-verified at this snapshot; the separate
+  trace-battery pass is the disclosed §4.3 provenance gap).
 
 The readable table profile is additionally hand-transcribed in
 `FormalModel/CoreProfile.lean` and proved to match the generated manifest by `decide`
@@ -277,8 +282,9 @@ Spec:
   pulls), and honest witness generation satisfies it.
 - **The Sail bridge** (`Proofs/Chips/AddChip/Bridge.lean` + the chip's `advance` contract): a
   Spec-satisfying real row, wired to decoded program-ROM operands, realizes one step of the
-  official interpreter — with separate proven arms for `rd ≠ x0` and the discarded `rd = x0`
-  write.
+  official interpreter. (Add is a `rd ≠ x0` chip — SP1 routes the `rd = x0` variant of every ALU
+  opcode to the separate AluX0 table, whose own bridge proves the discarded write; chips that
+  genuinely admit `rd = x0` rows, like Jal/Jalr, carry two proven bridge arms.)
 - **Faithfulness** (`Faithful/AddChip.lean`, §4.2) and **conformance** (§9) close the loop to
   SP1's Rust implementation.
 
@@ -356,6 +362,16 @@ properties on read and verify them on write, justifying the global argument on p
 the entire read-side meaning is downstream of the balance theorem and the timestamp discipline,
 inside the kernel.
 
+The comparison to StarkWare's S-two AIR verification (§11) is instructive precisely because their
+memory model differs. Cairo memory is *read-only*, so S-two needs only functional
+well-definedness of its memory maps, and it **assumes** this (`IsMemAssign`, enforced upstream by
+preprocessed distinct-value columns — "we do not verify… add it as a hypothesis"). SP1's
+read-write memory requires the strictly harder "every read sees the last write," which this
+section derives in-kernel from channel balance plus the 24-bit timestamp rank rather than
+assuming it. Conversely, S-two proves in Lean the LogUp lookup argument that underwrites its bus
+(including a quantitative soundness-error bound), whereas we take multiset balance as an
+interface and defer that layer (C2).
+
 ## 7. From grounded rows to Sail execution
 
 ### 7.1 Decode, walk, and the local chain
@@ -432,6 +448,13 @@ interpreter, on the committed program, whose PC and clock endpoints are the stat
 values. Axiom census: `propext`, `Classical.choice`, `Quot.sound`, plus the disclosed Sail
 platform hooks and `bv_decide` constants inherited from the bridges (§3.3). No `sorryAx`
 anywhere in the released set (empty allowlist, gated in CI).
+
+This existential, public-endpoint-anchored shape matches the independently developed S-two
+AIR-soundness theorem (§11; arXiv 2606.04311, App. A: `∃ mem, ∃ exec, exec 0 = initialState ∧
+exec (Fin.last n) = finalState ∧ ∀ i, NextState mem …`), which likewise concludes the
+*existence* of a semantic execution segment between agreed endpoints rather than a functional or
+verifier-level statement — corroborating that this is the natural target for an AIR-soundness
+result, with the shard-local restriction being ours alone.
 
 ### 8.3 The exact-upstream layer is honestly conditional
 
@@ -537,7 +560,13 @@ The closest related effort is Nethermind's formal verification of the OpenVM RV3
 against the Lean RISC-V specification, with an execution/memory-consistency development — and the
 comparison below is about *methodological shape*, not quality. Where their scope is broader
 (e.g. full RV32IM including AUIPC-class and all immediate-variant opcodes verified individually,
-against a spec instantiated for RV32), we say so.
+against a spec instantiated for RV32), we say so. **Dating note:** this comparison is against
+their v1.5.0 report (OpenVM engagement commit `645460f`); the live `openvm-fv` repository has
+since re-targeted OpenVM v2.0.0 with the same 45-opcode Lean surface, and additionally carries
+per-chip soundness proofs for the Keccak-f[1600], Keccak sponge, and SHA-256/512 precompile chips
+(against FIPS reference models) plus a three-gate axiom-footprint CI whose independent
+`lean4export` re-export is a genuinely strong axiom-discipline mechanism — both real strengths
+beyond the report compared here.
 
 | Dimension | Nethermind / OpenVM | This work / SP1 |
 |---|---|---|
@@ -546,10 +575,31 @@ against a spec instantiated for RV32), we say so.
 | Circuit side | Transpiled/extracted constraints are the proof object; AIR columns hand-transcribed with "eyeball correspondence" macros | Independent hand-built Clean circuits; extracted lists are a *comparison target*; whole-chip bidirectional `ChipFaithful` + interaction-multiset permutation |
 | Bus semantics | `BusEntry` classes: well-formedness assumed on read / asserted on write; bus *axioms* (pc bounds, timestamp bounds) justified **on paper** (their §E1–E12, §M1–M6) | Channel guarantees are row-local facts backed by receiver circuits; all read-side meaning derived in-kernel from Clean's balance theorem + timestamp rank (§6); zero paper bus axioms |
 | Consistency | Rising-bus theorem: execution/memory bus entries can be reordered chronologically, conditional on balance hypotheses; per-opcode row-local equivalence theorems | One glued theorem: balanced constrained witness → existence of a Sail interpreter run with matching public endpoints (§8.2); per-chip statements are internal lemmas of it |
-| Prover conformance | none reported | `native_decide` witness + whole-trace batteries vs the real prover at SP1's field (§9) |
-| Crypto trust | Lookup argument + proof system assumed (their I1/I2) | Same boundary, expressed as named relations/obligations (C1–C3) with an ArkLib-shaped target signature |
+| Prover conformance | none against the real prover/witness generator (their CI gates — an axiom-hygiene scan, an in-build `collectAxioms` audit, and an independent re-export comparator — police the *axiom footprint*, not prover-trace conformance) | `native_decide` witness + whole-trace batteries vs the real prover at SP1's field (§9) |
+| Crypto trust | Lookup argument + proof system assumed (their I1 = lookup/bus argument, I2 = proof system; their I3/I4 cover spec faithfulness and Lean's kernel) | Same boundary, expressed as named relations/obligations (C1–C3) with an ArkLib-shaped target signature |
 | Claim discipline | Per-opcode theorems + consistency lemmas | Reserved-name policy: headline names undeclared until unconditional (§8.3) |
 | Their broader coverage | Immediate-variant opcodes verified as first-class; RV32 spec assumptions (S1–S4, A1–A4) documented per-proof | Immediate variants fold into base chips (as SP1 itself does); completeness witnesses currently cover register-register forms only for Bitwise/Lt (disclosed) |
+
+**A third reference point: StarkWare's S-two AIR verification.** The other closely comparable
+effort is StarkWare/CMU's Lean 4 verification of the S-two Cairo-AIR (Avigad, Ganor, Goldberg,
+Levit, Nir, Seginer, Titelman, arXiv 2606.04311, June 2026). Its top theorem `trace_sound` has
+the *same existential, endpoint-anchored shape* as ours — AIR satisfiability yields
+`∃ mem, ∃ exec : Fin (n+1) → RegisterState Felt252` chaining the public initial state to the
+public final state under the Cairo `NextState` relation — a useful independent confirmation that
+"AIR witness ⇒ existence of a semantic execution segment between public endpoints" is the right
+claim shape for a zkVM AIR-soundness result. Three axes distinguish the projects:
+
+| Axis | StarkWare / S-two | This work / SP1 |
+|---|---|---|
+| AIR into Lean | Hand-re-modeled constraint-*generating* code; a fixed, collapsed component set (an idealization); trust that "the S-two code has been modeled in Lean correctly" | Pin-checked extraction of the exact shipping constraint/interaction lists, reconciled by bidirectional `ChipFaithful` |
+| Semantics authority | Self-defined Cairo `NextState`, formalizing the informal Cairo whitepaper | Official RISC-V Sail interpreter (`try_step`), mechanically translated |
+| Lookup argument | The LogUp lookup argument is **proved in Lean**, with a quantitative bad-set soundness-error bound | Field-level LogUp/GKR soundness **deferred** (C2); we prove only *from* multiset balance |
+
+On the first two axes our exact-extraction and official-Sail choices are more faithful to the
+shipping system; on the third, S-two reaches one layer deeper into the proof system than we
+currently do, and their AIR-soundness reduction is a completed whole-program proof (theirs found
+and fixed real production bugs — a missing range check and insufficient LogUp security bits)
+where ours is shard-local with the `executionCase` obligation still open.
 
 The essential difference is where the bus argument lives. Both projects face the same global
 question — *why do reads see the right values?* Nethermind answers it with a well-structured
@@ -574,7 +624,14 @@ Stated plainly:
    knowledge soundness extracting a full AIR witness with an explicit error bound, and
    `sp1_air_sound` turning that witness into the Sail execution relation. The
    `FormalModel/Verifier.lean` boundary (a deterministic `PerfectExtraction` analogue with
-   composition lemmas) is shaped for that seam.
+   composition lemmas) is shaped for that seam. StarkWare's S-two verification (§11) is a
+   concrete precedent for the layer immediately below `sp1_air_sound`: they formalize the LogUp
+   lookup argument itself in Lean — the logarithmic-derivative counting lemma and explicit
+   bad-set cardinality bounds quantifying the soundness error — while still treating the
+   underlying circle STARK and the Fiat–Shamir randomness as assumed. That is exactly the
+   intermediate abstraction our C2 obligation names (multiset balance ⇒ field-level LogUp
+   soundness with an error bound), and their lemmas are a candidate model for how the ArkLib
+   layer can discharge C2 rather than assume it.
 4. **Completeness at the ensemble level is undeclared** (per-chip completeness is proved;
    Bitwise/Lt completeness witnesses currently cover register-register forms only).
 5. **Trusted surfaces T1–T4** (§10), including the temporary local dependency pins and the
