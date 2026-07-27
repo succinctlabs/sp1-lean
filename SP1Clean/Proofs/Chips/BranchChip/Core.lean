@@ -12,7 +12,6 @@ constraints, and interactions match pinned SP1 v6.3.1.
 namespace SP1Clean.BranchChip
 
 open Circuit
-open Extracted (BranchColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]

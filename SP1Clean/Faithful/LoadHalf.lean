@@ -1,4 +1,5 @@
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Extracted.ChipOracle.LoadHalf
 import SP1Clean.Proofs.Chips.LoadHalfChip.Formal
 
 /-!
@@ -17,13 +18,115 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-def loadHalfChipOracle :
-    ChipOracle (ZMod p) Extracted.LoadHalfColumns Extracted.LoadHalfColumns :=
-  ChipOracle.identity Extracted.LoadHalfColumns.asserts
-    Extracted.LoadHalfColumns.interactions
+/-- Rebuild the shared standalone `AddressOperation` block as the byte-identical struct embedded in
+the generated LoadHalf oracle namespace. -/
+def loadHalfOracleAddressOperation {F : Type} (cols : Extracted.AddressOperation F) :
+    Extracted.LoadHalfOracle.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Inverse of `loadHalfOracleAddressOperation`. -/
+def loadHalfNativeAddressOperation {F : Type} (cols : Extracted.LoadHalfOracle.AddressOperation F) :
+    Extracted.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Whole-chip row reconfiguration. The reader and memory-access blocks are already the canonical
+generated substrate; the address and sign-bit blocks are copied into Rust's chip-private operation
+rows. This is not an operation-level faithfulness claim. -/
+def loadHalfChipReconfigure {F : Type} (cols : LoadHalfChip.Columns F) :
+    Extracted.LoadHalfOracle.LoadHalfColumns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := loadHalfOracleAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    offset_bit := cols.offset_bit
+    selected_half := cols.selected_half
+    msb := { msb := cols.msb.msb }
+    is_lh := cols.is_lh
+    is_lhu := cols.is_lhu }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def loadHalfChipDeconfigure {F : Type} (cols : Extracted.LoadHalfOracle.LoadHalfColumns F) :
+    LoadHalfChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := loadHalfNativeAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    offset_bit := cols.offset_bit
+    selected_half := cols.selected_half
+    msb := { msb := cols.msb.msb }
+    is_lh := cols.is_lh
+    is_lhu := cols.is_lhu }
+
+/-- SP1 Rust's complete LoadHalf-chip oracle, viewed from the native Lean row. -/
+def loadHalfChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F LoadHalfChip.Columns Extracted.LoadHalfOracle.LoadHalfColumns where
+  reconfigure := loadHalfChipReconfigure
+  deconfigure := loadHalfChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.LoadHalfOracle.LoadHalfColumns.asserts
+  interactions := Extracted.LoadHalfOracle.LoadHalfColumns.interactions
+
+/- Namespace bridges between the LoadHalf oracle's embedded chip-private helper copies and the
+canonical standalone generated modules. The two bodies are rendered from the same compiler output,
+so each bridge is a definitional unfolding, not a mathematical claim. They let the address- and
+sign-bit-op lemmas below stay stated once against the standalone modules (also consumed by the
+other load and store chips). -/
+
+private theorem loadHalfOracle_addrAdd_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.LoadHalfOracle.AddrAddOperation.asserts a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.asserts a b ⟨value⟩ is_real := by
+  rw [Extracted.LoadHalfOracle.AddrAddOperation.asserts,
+    Extracted.AddrAddOperation.asserts]
+
+private theorem loadHalfOracle_addrAdd_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.LoadHalfOracle.AddrAddOperation.interactions a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.interactions a b ⟨value⟩ is_real := by
+  rw [Extracted.LoadHalfOracle.AddrAddOperation.interactions,
+    Extracted.AddrAddOperation.interactions]
+
+private theorem loadHalfOracle_address_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.LoadHalfOracle.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.LoadHalfOracle.AddressOperation.asserts,
+    Extracted.AddressOperation.asserts]
+  simp only [loadHalfOracle_addrAdd_asserts_eq]
+
+private theorem loadHalfOracle_address_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.LoadHalfOracle.AddressOperation.interactions b cc offset_bit0 offset_bit1
+        offset_bit2 is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.interactions b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.LoadHalfOracle.AddressOperation.interactions,
+    Extracted.AddressOperation.interactions]
+  simp only [loadHalfOracle_addrAdd_interactions_eq]
+
+private theorem loadHalfOracle_u16msb_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.LoadHalfOracle.U16MSBOperation.asserts a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.asserts a ⟨msb⟩ is_real := by
+  rw [Extracted.LoadHalfOracle.U16MSBOperation.asserts,
+    Extracted.U16MSBOperation.asserts]
+
+private theorem loadHalfOracle_u16msb_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.LoadHalfOracle.U16MSBOperation.interactions a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.interactions a ⟨msb⟩ is_real := by
+  rw [Extracted.LoadHalfOracle.U16MSBOperation.interactions,
+    Extracted.U16MSBOperation.interactions]
 
 def loadHalfChipInput {F : Type}
-    (cols : Extracted.LoadHalfColumns F) : LoadHalfChip.Inputs F :=
+    (cols : LoadHalfChip.Columns F) : LoadHalfChip.Inputs F :=
   { is_lh := cols.is_lh
     is_lhu := cols.is_lhu
     state := cols.state
@@ -34,19 +137,19 @@ def loadHalfChipInput {F : Type}
     msb := cols.msb.msb }
 
 def loadHalfChipLocals {F : Type}
-    (cols : Extracted.LoadHalfColumns F) : Vector F 4 :=
+    (cols : LoadHalfChip.Columns F) : Vector F 4 :=
   #v[cols.address_operation.addr_operation.value[0],
     cols.address_operation.addr_operation.value[1],
     cols.address_operation.addr_operation.value[2],
     cols.address_operation.top_two_limb_inv]
 
 def loadHalfChipPhysicalRow {F : Type}
-    (cols : Extracted.LoadHalfColumns F) : Array F :=
+    (cols : LoadHalfChip.Columns F) : Array F :=
   inputFirstRow (loadHalfChipInput cols) (loadHalfChipLocals cols)
 
 def loadHalfChipColumnsOfInput {F : Type}
     (input : LoadHalfChip.Inputs F) (locals : Vector F 4) :
-    Extracted.LoadHalfColumns F :=
+    LoadHalfChip.Columns F :=
   ⟨input.state, input.adapter,
     ⟨⟨#v[locals[0], locals[1], locals[2]]⟩, locals[3]⟩,
     input.memory_access, input.offset_bit, input.selected_half, ⟨input.msb⟩,
@@ -117,7 +220,7 @@ private theorem loadHalfITypeEta {F : Type}
     rfl
 
 theorem loadHalfChipColumnsOfInput_roundtrip {F : Type}
-    (cols : Extracted.LoadHalfColumns F) :
+    (cols : LoadHalfChip.Columns F) :
     loadHalfChipColumnsOfInput
         (loadHalfChipInput cols) (loadHalfChipLocals cols) = cols := by
   cases cols
@@ -251,7 +354,7 @@ theorem evalLoadHalfDirectOutput
   rw [LoadHalfChip.directOutput_eq]
   rw [← CircuitType.eval_expression, LoadHalfChip.eval_columns]
   unfold loadHalfChipColumnsOfInput
-  rw [Extracted.LoadHalfColumns.mk.injEq]
+  rw [LoadHalfChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input locals data
   rw [LoadHalfChip.eval_inputs, LoadHalfChip.Inputs.mk.injEq] at hinputEval
@@ -294,7 +397,7 @@ theorem evalLoadHalfDirectOutput
       (varFromOffset LoadHalfChip.Inputs 0).msb input.msb hMsbExpr)
 
 def loadHalfChipRowCodec :
-    ChipRowCodec LoadHalfChip.Inputs Extracted.LoadHalfColumns
+    ChipRowCodec LoadHalfChip.Inputs LoadHalfChip.Columns
       (LoadHalfChip.circuit (p := p)) where
   assignment cols data := {
     row := loadHalfChipPhysicalRow cols
@@ -695,7 +798,7 @@ private theorem loadHalfU16MSBAssertions
 private def loadHalfChipRustColumns
     (env : Environment (ZMod p))
     (input : Var LoadHalfChip.Inputs (ZMod p)) (offset : ℕ) :
-    Extracted.LoadHalfColumns (ZMod p) :=
+    LoadHalfChip.Columns (ZMod p) :=
   { state := Eval.eval env input.state
     adapter := Eval.eval env input.adapter
     address_operation := Eval.eval env (loadHalfAddressCols (p := p) offset)
@@ -889,7 +992,7 @@ private theorem loadHalfNativeAssertionsDecompose
   rfl
 
 private def loadHalfExtractedMeaning
-    (cols : Extracted.LoadHalfColumns (ZMod p)) : Prop :=
+    (cols : LoadHalfChip.Columns (ZMod p)) : Prop :=
   let isReal := cols.is_lh + cols.is_lhu
   let clkLow := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let ts := cols.memory_access.access_timestamp
@@ -953,10 +1056,14 @@ private def loadHalfExtractedMeaning
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem loadHalfExtractedAssertionsDecompose
-    (cols : Extracted.LoadHalfColumns (ZMod p)) :
-    List.Forall (· = 0) (Extracted.LoadHalfColumns.asserts cols) ↔
+    (cols : LoadHalfChip.Columns (ZMod p)) :
+    List.Forall (· = 0)
+        (Extracted.LoadHalfOracle.LoadHalfColumns.asserts
+          (loadHalfChipReconfigure cols)) ↔
       loadHalfExtractedMeaning cols := by
-  simp only [Extracted.LoadHalfColumns.asserts, List.forall_append]
+  simp only [Extracted.LoadHalfOracle.LoadHalfColumns.asserts, List.forall_append]
+  dsimp only [loadHalfChipReconfigure, loadHalfOracleAddressOperation]
+  simp only [loadHalfOracle_address_asserts_eq, loadHalfOracle_u16msb_asserts_eq]
   simp only [loadHalfVec3Eta, loadHalfVec4Eta]
   simp only [loadHalfExtractedMeaning, List.Forall, Nat.cast_one]
   have hAddress := congrArg
@@ -1013,8 +1120,7 @@ private theorem loadHalfRustAssertionsDecompose
         (loadHalfChipOracle.nativeAssertZeros
           (loadHalfChipRustColumns env input offset)) ↔
       loadHalfRustMeaning env input offset := by
-  simp only [ChipOracle.nativeAssertZeros, loadHalfChipOracle,
-    ChipOracle.identity, id_eq]
+  simp only [ChipOracle.nativeAssertZeros, loadHalfChipOracle]
   rw [loadHalfRustMeaning_eq]
   exact loadHalfExtractedAssertionsDecompose
     (loadHalfChipRustColumns env input offset)
@@ -1245,7 +1351,7 @@ private theorem loadHalfChipConstraintsFaithfulOutput
 theorem loadHalfChipConstraintsFaithful
     (env : Environment (ZMod p))
     (input : Var LoadHalfChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.LoadHalfColumns (ZMod p))
+    (cols : LoadHalfChip.Columns (ZMod p))
     (hbind : BindsChipOutput LoadHalfChip.main env input offset cols) :
     List.Forall (· = 0)
         (loadHalfChipOracle.nativeAssertZeros cols) ↔
@@ -1264,7 +1370,7 @@ theorem loadHalfChipConstraintsFaithful
     (p := p) env input offset
 
 theorem loadHalfChipConstraintsConstructive
-    (rustCols : Extracted.LoadHalfColumns (ZMod p))
+    (rustCols : Extracted.LoadHalfOracle.LoadHalfColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := loadHalfChipRowCodec.assignment
       (loadHalfChipOracle.deconfigure rustCols) data
@@ -1362,8 +1468,9 @@ private theorem loadHalfStateInteractionsFaithful
     ((((loadHalfStateInteractions input).map
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env))) =
-      (((Extracted.LoadHalfColumns.interactions
-          (loadHalfChipRustColumns env input offset)).map
+      (((Extracted.LoadHalfOracle.LoadHalfColumns.interactions
+          (loadHalfChipReconfigure
+            (loadHalfChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.State)) := by
   have hStatePull :
@@ -1394,10 +1501,11 @@ private theorem loadHalfStateInteractionsFaithful
     fun mult msg => toAccess_pushIf_state env mult msg
   simp only [loadHalfStateInteractions,
     List.map_cons, List.map_nil, hStatePull, hStatePush]
-  simp [Extracted.LoadHalfColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.LoadHalfOracle.LoadHalfColumns.interactions,
+    loadHalfChipReconfigure, loadHalfOracleAddressOperation,
+    Extracted.LoadHalfOracle.AddressOperation.interactions,
+    Extracted.LoadHalfOracle.AddrAddOperation.interactions,
+    Extracted.LoadHalfOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
     loadHalfChipRustColumns, loadHalfEvalAddressCols,
@@ -1415,8 +1523,9 @@ private theorem loadHalfProgramInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)) =
-      (((Extracted.LoadHalfColumns.interactions
-          (loadHalfChipRustColumns env input offset)).map
+      (((Extracted.LoadHalfOracle.LoadHalfColumns.interactions
+          (loadHalfChipReconfigure
+            (loadHalfChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Program)) := by
   have hp2 : 2 < p := by
@@ -1448,10 +1557,11 @@ private theorem loadHalfProgramInteractionsFaithful
     fun gate msg => toAccess_pullIf_program env gate msg
   simp only [loadHalfProgramInteractions,
     List.map_cons, List.map_nil, hProgramPull]
-  simp [Extracted.LoadHalfColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.LoadHalfOracle.LoadHalfColumns.interactions,
+    loadHalfChipReconfigure, loadHalfOracleAddressOperation,
+    Extracted.LoadHalfOracle.AddressOperation.interactions,
+    Extracted.LoadHalfOracle.AddrAddOperation.interactions,
+    Extracted.LoadHalfOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
     loadHalfChipRustColumns, loadHalfEvalAddressCols,
@@ -1500,8 +1610,9 @@ private theorem loadHalfMemoryInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult))
-      (((Extracted.LoadHalfColumns.interactions
-          (loadHalfChipRustColumns env input offset)).map
+      (((Extracted.LoadHalfOracle.LoadHalfColumns.interactions
+          (loadHalfChipReconfigure
+            (loadHalfChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Memory)) := by
   have hp2 : 2 < p := by
@@ -1543,13 +1654,14 @@ private theorem loadHalfMemoryInteractionsFaithful
     fun mult msg => toAccess_pushIf_memory env mult msg
   simp only [LoadHalfChip.exposedMemoryInteractions,
     List.map_cons, List.map_nil, hMemoryPull, hMemoryPush]
-  simp [Extracted.LoadHalfColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.LoadHalfOracle.LoadHalfColumns.interactions,
+    loadHalfChipReconfigure, loadHalfOracleAddressOperation,
+    Extracted.LoadHalfOracle.AddressOperation.interactions,
+    Extracted.LoadHalfOracle.AddrAddOperation.interactions,
+    Extracted.LoadHalfOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.LoadHalfOracle.AddressOperation.value,
     loadHalfChipRustColumns, loadHalfEvalAddressCols,
     loadHalfEvalU16MSB,
     eval_cpuState, Readers.ITypeReader.eval_cols,
@@ -1786,8 +1898,9 @@ private theorem loadHalfByteInteractionsFaithful
       ((((LoadHalfChip.main input).operations offset).interactionsWith
           byteChannel.toRaw).map
             (AbstractInteraction.toAccess env))
-      (((Extracted.LoadHalfColumns.interactions
-          (loadHalfChipRustColumns env input offset)).map
+      (((Extracted.LoadHalfOracle.LoadHalfColumns.interactions
+          (loadHalfChipReconfigure
+            (loadHalfChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
   have h6 : (6 : ZMod p).val = 6 := by
@@ -1815,13 +1928,14 @@ private theorem loadHalfByteInteractionsFaithful
     loadHalfU16MSBByteInteractions, loadHalfITypeByteInteractions,
     List.map_cons, List.map_nil,
     hBytePull]
-  simp [Extracted.LoadHalfColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
-    Extracted.U16MSBOperation.interactions,
+  simp [Extracted.LoadHalfOracle.LoadHalfColumns.interactions,
+    loadHalfChipReconfigure, loadHalfOracleAddressOperation,
+    Extracted.LoadHalfOracle.AddressOperation.interactions,
+    Extracted.LoadHalfOracle.AddrAddOperation.interactions,
+    Extracted.LoadHalfOracle.U16MSBOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.LoadHalfOracle.AddressOperation.value,
     loadHalfChipRustColumns, loadHalfEvalAddressCols,
     loadHalfEvalU16MSB,
     eval_cpuState, Readers.ITypeReader.eval_cols,
@@ -1864,7 +1978,7 @@ private theorem loadHalfUnexpectedInteractionsEmpty
 theorem loadHalfChipInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var LoadHalfChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.LoadHalfColumns (ZMod p))
+    (cols : LoadHalfChip.Columns (ZMod p))
     (hbind : BindsChipOutput LoadHalfChip.main env input offset cols) :
     List.Perm
       (nativeAccesses env
@@ -1879,15 +1993,15 @@ theorem loadHalfChipInteractionsFaithful
   change loadHalfChipRustColumns env input offset = cols at hbind
   subst cols
   let rustAccesses :=
-    (Extracted.LoadHalfColumns.interactions
-      (loadHalfChipRustColumns env input offset)).map
+    (Extracted.LoadHalfOracle.LoadHalfColumns.interactions
+      (loadHalfChipReconfigure
+        (loadHalfChipRustColumns env input offset))).map
         Extracted.Interaction.toAccess
   simp only [nativeAccesses]
   rw [loadHalfUnexpectedInteractionsEmpty]
   simp only [List.map_nil, List.append_nil]
   simp only [ChipOracle.accesses,
-    ChipOracle.nativeInteractions, loadHalfChipOracle,
-    ChipOracle.identity, id_eq]
+    ChipOracle.nativeInteractions, loadHalfChipOracle]
   rw [loadHalfStateInteractionsEq,
     LoadHalfChip.interactionsWith_memory_eq,
     loadHalfProgramInteractionsEq]
@@ -1907,7 +2021,7 @@ theorem loadHalfChipInteractionsFaithful
     ((hByte.append_left _).append hMemory).append_right _
 
 theorem loadHalfChipInteractionsConstructive
-    (rustCols : Extracted.LoadHalfColumns (ZMod p))
+    (rustCols : Extracted.LoadHalfOracle.LoadHalfColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := loadHalfChipRowCodec.assignment
       (loadHalfChipOracle.deconfigure rustCols) data
@@ -1945,7 +2059,7 @@ theorem loadHalfChipInteractionsConstructive
 
 theorem loadHalfChip_faithful :
     ChipFaithful (p := p) LoadHalfChip.Inputs
-      Extracted.LoadHalfColumns Extracted.LoadHalfColumns
+      LoadHalfChip.Columns Extracted.LoadHalfOracle.LoadHalfColumns
       LoadHalfChip.circuit loadHalfChipRowCodec
       loadHalfChipOracle where
   constraints := loadHalfChipConstraintsConstructive (p := p)

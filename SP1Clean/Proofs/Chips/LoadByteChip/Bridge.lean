@@ -243,14 +243,14 @@ lemma loadByte_hval (input : Inputs (ZMod p)) (isU : Bool)
 /-- **LoadByte's committed bus view** — standalone (identical to the former inline `kind.view`) so
 `LoadByteChip.advance` can be supplied *as* `kind.advance`. Straight-line `next_pc = pc+4`, ITypeReader
 adapter, `rdWrite = #v[sb+65280·msb, 65535·msb, …]`, opcode `is_lb·29 + is_lbu·32`, `commit = .regWrite`. -/
-def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadByteColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (_cols : LoadByteChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, LoadByteChip.isReal inp,
     #v[inp.selected_byte + 65280 * inp.msb, 65535 * inp.msb, 65535 * inp.msb, 65535 * inp.msb],
     inp.is_lb * 29 + inp.is_lbu * 32, .regWrite⟩
 
 /-- LoadByte's exact aligned RAM-access projection. -/
-def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadByteColumns (ZMod p)) :
+def ramAccessView (inp : Inputs (ZMod p)) (cols : LoadByteChip.Columns (ZMod p)) :
     Trace.RamAccessView (ZMod p) :=
   { compareLow := inp.memory_access.access_timestamp.compare_low
     prevHigh := inp.memory_access.access_timestamp.prev_high
@@ -267,7 +267,7 @@ def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadByteColumns (ZMo
 /-- **LoadByte's `advanceReady` bundle**: the routing (`op_a ≠ 0` — x0 destinations route to LoadX0), the
 low-pc-limb bound, the LB/LBU one-hot, the address bounds, and the **memory byte-read binding** (the load's
 non-standard precondition, phrased in the ITypeReader columns `op_b_memory.prev_value`/`op_c_imm`). -/
-def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadByteColumns (ZMod p))
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : LoadByteChip.Columns (ZMod p))
     (_prog : GuestProgram) (s : SailState) : Prop :=
   inp.adapter.op_a ≠ 0 ∧
   (inp.state.pc[0]).val < 2 ^ 16 ∧
@@ -284,7 +284,7 @@ set_option maxHeartbeats 4000000 in
 consume the memory axis**). 2-way LB/LBU flag dispatch fixing `isU`; each branch derives the opcode
 (29/32 = LB/LBU) and the `rdWrite ≡ extend_value` identity (`loadByte_hval`) from the chip `Spec`, then feeds
 `advance_of_load_width1` with the memory binding / bounds / routing carried in `advanceReady`. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadByteColumns (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : LoadByteChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -336,7 +336,7 @@ bounds / routing carried in `advanceReady`. -/
 def kind : Soundness.ChipKind p where
   name := "LoadByte"
   Inputs := LoadByteChip.Inputs
-  Cols := Extracted.LoadByteColumns
+  Cols := LoadByteChip.Columns
   view := rowView
   ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => LoadByteChip.Spec inp cols data

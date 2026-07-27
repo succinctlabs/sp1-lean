@@ -1,4 +1,5 @@
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Extracted.ChipOracle.LoadByte
 import SP1Clean.Proofs.Chips.LoadByteChip.Formal
 
 /-!
@@ -17,13 +18,105 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-def loadByteChipOracle :
-    ChipOracle (ZMod p) Extracted.LoadByteColumns Extracted.LoadByteColumns :=
-  ChipOracle.identity Extracted.LoadByteColumns.asserts
-    Extracted.LoadByteColumns.interactions
+/-- Rebuild the shared standalone `AddressOperation` block as the byte-identical struct embedded in
+the generated LoadByte oracle namespace. -/
+def loadByteOracleAddressOperation {F : Type} (cols : Extracted.AddressOperation F) :
+    Extracted.LoadByteOracle.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Inverse of `loadByteOracleAddressOperation`. -/
+def loadByteNativeAddressOperation {F : Type} (cols : Extracted.LoadByteOracle.AddressOperation F) :
+    Extracted.AddressOperation F :=
+  { addr_operation := { value := cols.addr_operation.value }
+    top_two_limb_inv := cols.top_two_limb_inv }
+
+/-- Whole-chip row reconfiguration. The reader and memory-access blocks are already the canonical
+generated substrate; the address block is copied into Rust's chip-private operation row. This is not
+an operation-level faithfulness claim. -/
+def loadByteChipReconfigure {F : Type} (cols : LoadByteChip.Columns F) :
+    Extracted.LoadByteOracle.LoadByteColumns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := loadByteOracleAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    offset_bit := cols.offset_bit
+    selected_limb := cols.selected_limb
+    selected_limb_low_byte := cols.selected_limb_low_byte
+    selected_byte := cols.selected_byte
+    msb := cols.msb
+    is_lb := cols.is_lb
+    is_lbu := cols.is_lbu }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def loadByteChipDeconfigure {F : Type} (cols : Extracted.LoadByteOracle.LoadByteColumns F) :
+    LoadByteChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    address_operation := loadByteNativeAddressOperation cols.address_operation
+    memory_access := cols.memory_access
+    offset_bit := cols.offset_bit
+    selected_limb := cols.selected_limb
+    selected_limb_low_byte := cols.selected_limb_low_byte
+    selected_byte := cols.selected_byte
+    msb := cols.msb
+    is_lb := cols.is_lb
+    is_lbu := cols.is_lbu }
+
+/-- SP1 Rust's complete LoadByte-chip oracle, viewed from the native Lean row. -/
+def loadByteChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F LoadByteChip.Columns Extracted.LoadByteOracle.LoadByteColumns where
+  reconfigure := loadByteChipReconfigure
+  deconfigure := loadByteChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.LoadByteOracle.LoadByteColumns.asserts
+  interactions := Extracted.LoadByteOracle.LoadByteColumns.interactions
+
+/- Namespace bridges between the LoadByte oracle's embedded chip-private helper copies and the
+canonical standalone generated modules. The two bodies are rendered from the same compiler output,
+so each bridge is a definitional unfolding, not a mathematical claim. They let the address-op
+lemmas below stay stated once against the standalone modules (also consumed by the other load and
+store chips). -/
+
+private theorem loadByteOracle_addrAdd_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.LoadByteOracle.AddrAddOperation.asserts a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.asserts a b ⟨value⟩ is_real := by
+  rw [Extracted.LoadByteOracle.AddrAddOperation.asserts,
+    Extracted.AddrAddOperation.asserts]
+
+private theorem loadByteOracle_addrAdd_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b : Word F) (value : Vector F 3) (is_real : F) :
+    Extracted.LoadByteOracle.AddrAddOperation.interactions a b ⟨value⟩ is_real =
+      Extracted.AddrAddOperation.interactions a b ⟨value⟩ is_real := by
+  rw [Extracted.LoadByteOracle.AddrAddOperation.interactions,
+    Extracted.AddrAddOperation.interactions]
+
+private theorem loadByteOracle_address_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.LoadByteOracle.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.asserts b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.LoadByteOracle.AddressOperation.asserts,
+    Extracted.AddressOperation.asserts]
+  simp only [loadByteOracle_addrAdd_asserts_eq]
+
+private theorem loadByteOracle_address_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (offset_bit0 offset_bit1 offset_bit2 is_real : F)
+    (value : Vector F 3) (top_two_limb_inv : F) :
+    Extracted.LoadByteOracle.AddressOperation.interactions b cc offset_bit0 offset_bit1
+        offset_bit2 is_real ⟨⟨value⟩, top_two_limb_inv⟩ =
+      Extracted.AddressOperation.interactions b cc offset_bit0 offset_bit1 offset_bit2
+        is_real ⟨⟨value⟩, top_two_limb_inv⟩ := by
+  rw [Extracted.LoadByteOracle.AddressOperation.interactions,
+    Extracted.AddressOperation.interactions]
+  simp only [loadByteOracle_addrAdd_interactions_eq]
 
 def loadByteChipInput {F : Type}
-    (cols : Extracted.LoadByteColumns F) : LoadByteChip.Inputs F :=
+    (cols : LoadByteChip.Columns F) : LoadByteChip.Inputs F :=
   { is_lb := cols.is_lb
     is_lbu := cols.is_lbu
     state := cols.state
@@ -36,19 +129,19 @@ def loadByteChipInput {F : Type}
     msb := cols.msb }
 
 def loadByteChipLocals {F : Type}
-    (cols : Extracted.LoadByteColumns F) : Vector F 4 :=
+    (cols : LoadByteChip.Columns F) : Vector F 4 :=
   #v[cols.address_operation.addr_operation.value[0],
     cols.address_operation.addr_operation.value[1],
     cols.address_operation.addr_operation.value[2],
     cols.address_operation.top_two_limb_inv]
 
 def loadByteChipPhysicalRow {F : Type}
-    (cols : Extracted.LoadByteColumns F) : Array F :=
+    (cols : LoadByteChip.Columns F) : Array F :=
   inputFirstRow (loadByteChipInput cols) (loadByteChipLocals cols)
 
 def loadByteChipColumnsOfInput {F : Type}
     (input : LoadByteChip.Inputs F) (locals : Vector F 4) :
-    Extracted.LoadByteColumns F :=
+    LoadByteChip.Columns F :=
   ⟨input.state, input.adapter,
     ⟨⟨#v[locals[0], locals[1], locals[2]]⟩, locals[3]⟩,
     input.memory_access, input.offset_bit, input.selected_limb,
@@ -120,7 +213,7 @@ private theorem loadByteITypeEta {F : Type}
     rfl
 
 theorem loadByteChipColumnsOfInput_roundtrip {F : Type}
-    (cols : Extracted.LoadByteColumns F) :
+    (cols : LoadByteChip.Columns F) :
     loadByteChipColumnsOfInput
         (loadByteChipInput cols) (loadByteChipLocals cols) = cols := by
   cases cols
@@ -223,7 +316,7 @@ theorem evalLoadByteDirectOutput
   rw [LoadByteChip.directOutput_eq]
   rw [← CircuitType.eval_expression, LoadByteChip.eval_columns]
   unfold loadByteChipColumnsOfInput
-  rw [Extracted.LoadByteColumns.mk.injEq]
+  rw [LoadByteChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow input locals data
   rw [LoadByteChip.eval_inputs, LoadByteChip.Inputs.mk.injEq] at hinputEval
@@ -257,7 +350,7 @@ theorem evalLoadByteDirectOutput
         (eval_local_inputFirstRow input locals data 3 (by decide))
 
 def loadByteChipRowCodec :
-    ChipRowCodec LoadByteChip.Inputs Extracted.LoadByteColumns
+    ChipRowCodec LoadByteChip.Inputs LoadByteChip.Columns
       (LoadByteChip.circuit (p := p)) where
   assignment cols data := {
     row := loadByteChipPhysicalRow cols
@@ -607,7 +700,7 @@ private theorem loadByteMemoryAssertionList
 private def loadByteChipRustColumns
     (env : Environment (ZMod p))
     (input : Var LoadByteChip.Inputs (ZMod p)) (offset : ℕ) :
-    Extracted.LoadByteColumns (ZMod p) :=
+    LoadByteChip.Columns (ZMod p) :=
   { state := Eval.eval env input.state
     adapter := Eval.eval env input.adapter
     address_operation := Eval.eval env (loadByteAddressCols (p := p) offset)
@@ -790,7 +883,7 @@ private theorem loadByteNativeAssertionsDecompose
   rfl
 
 private def loadByteExtractedMeaning
-    (cols : Extracted.LoadByteColumns (ZMod p)) : Prop :=
+    (cols : LoadByteChip.Columns (ZMod p)) : Prop :=
   let isReal := cols.is_lb + cols.is_lbu
   let clkLow := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let ts := cols.memory_access.access_timestamp
@@ -856,10 +949,14 @@ private def loadByteExtractedMeaning
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem loadByteExtractedAssertionsDecompose
-    (cols : Extracted.LoadByteColumns (ZMod p)) :
-    List.Forall (· = 0) (Extracted.LoadByteColumns.asserts cols) ↔
+    (cols : LoadByteChip.Columns (ZMod p)) :
+    List.Forall (· = 0)
+        (Extracted.LoadByteOracle.LoadByteColumns.asserts
+          (loadByteChipReconfigure cols)) ↔
       loadByteExtractedMeaning cols := by
-  simp only [Extracted.LoadByteColumns.asserts, List.forall_append]
+  simp only [Extracted.LoadByteOracle.LoadByteColumns.asserts, List.forall_append]
+  dsimp only [loadByteChipReconfigure, loadByteOracleAddressOperation]
+  simp only [loadByteOracle_address_asserts_eq]
   simp only [loadByteVec3Eta, loadByteVec4Eta]
   simp only [loadByteExtractedMeaning, List.Forall, Nat.cast_one]
   have hAddress := congrArg
@@ -914,8 +1011,7 @@ private theorem loadByteRustAssertionsDecompose
         (loadByteChipOracle.nativeAssertZeros
           (loadByteChipRustColumns env input offset)) ↔
       loadByteRustMeaning env input offset := by
-  simp only [ChipOracle.nativeAssertZeros, loadByteChipOracle,
-    ChipOracle.identity, id_eq]
+  simp only [ChipOracle.nativeAssertZeros, loadByteChipOracle]
   rw [loadByteRustMeaning_eq]
   exact loadByteExtractedAssertionsDecompose
     (loadByteChipRustColumns env input offset)
@@ -1130,7 +1226,7 @@ private theorem loadByteChipConstraintsFaithfulOutput
 theorem loadByteChipConstraintsFaithful
     (env : Environment (ZMod p))
     (input : Var LoadByteChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.LoadByteColumns (ZMod p))
+    (cols : LoadByteChip.Columns (ZMod p))
     (hbind : BindsChipOutput LoadByteChip.main env input offset cols) :
     List.Forall (· = 0)
         (loadByteChipOracle.nativeAssertZeros cols) ↔
@@ -1149,7 +1245,7 @@ theorem loadByteChipConstraintsFaithful
     (p := p) env input offset
 
 theorem loadByteChipConstraintsConstructive
-    (rustCols : Extracted.LoadByteColumns (ZMod p))
+    (rustCols : Extracted.LoadByteOracle.LoadByteColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := loadByteChipRowCodec.assignment
       (loadByteChipOracle.deconfigure rustCols) data
@@ -1247,8 +1343,9 @@ private theorem loadByteStateInteractionsFaithful
     ((((loadByteStateInteractions input).map
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env))) =
-      (((Extracted.LoadByteColumns.interactions
-          (loadByteChipRustColumns env input offset)).map
+      (((Extracted.LoadByteOracle.LoadByteColumns.interactions
+          (loadByteChipReconfigure
+            (loadByteChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.State)) := by
   have hStatePull :
@@ -1279,9 +1376,10 @@ private theorem loadByteStateInteractionsFaithful
     fun mult msg => toAccess_pushIf_state env mult msg
   simp only [loadByteStateInteractions,
     List.map_cons, List.map_nil, hStatePull, hStatePush]
-  simp [Extracted.LoadByteColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.LoadByteOracle.LoadByteColumns.interactions,
+    loadByteChipReconfigure, loadByteOracleAddressOperation,
+    Extracted.LoadByteOracle.AddressOperation.interactions,
+    Extracted.LoadByteOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
     loadByteChipRustColumns, loadByteEvalAddressCols,
@@ -1298,8 +1396,9 @@ private theorem loadByteProgramInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult)) =
-      (((Extracted.LoadByteColumns.interactions
-          (loadByteChipRustColumns env input offset)).map
+      (((Extracted.LoadByteOracle.LoadByteColumns.interactions
+          (loadByteChipReconfigure
+            (loadByteChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Program)) := by
   have hp2 : 2 < p := by
@@ -1331,9 +1430,10 @@ private theorem loadByteProgramInteractionsFaithful
     fun gate msg => toAccess_pullIf_program env gate msg
   simp only [loadByteProgramInteractions,
     List.map_cons, List.map_nil, hProgramPull]
-  simp [Extracted.LoadByteColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.LoadByteOracle.LoadByteColumns.interactions,
+    loadByteChipReconfigure, loadByteOracleAddressOperation,
+    Extracted.LoadByteOracle.AddressOperation.interactions,
+    Extracted.LoadByteOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
     loadByteChipRustColumns, loadByteEvalAddressCols,
@@ -1381,8 +1481,9 @@ private theorem loadByteMemoryInteractionsFaithful
         ChannelInteraction.toRaw).map
           (AbstractInteraction.toAccess env)).map
             LookupAccessList.negMult))
-      (((Extracted.LoadByteColumns.interactions
-          (loadByteChipRustColumns env input offset)).map
+      (((Extracted.LoadByteOracle.LoadByteColumns.interactions
+          (loadByteChipReconfigure
+            (loadByteChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Memory)) := by
   have hp2 : 2 < p := by
@@ -1424,12 +1525,13 @@ private theorem loadByteMemoryInteractionsFaithful
     fun mult msg => toAccess_pushIf_memory env mult msg
   simp only [LoadByteChip.exposedMemoryInteractions,
     List.map_cons, List.map_nil, hMemoryPull, hMemoryPush]
-  simp [Extracted.LoadByteColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.LoadByteOracle.LoadByteColumns.interactions,
+    loadByteChipReconfigure, loadByteOracleAddressOperation,
+    Extracted.LoadByteOracle.AddressOperation.interactions,
+    Extracted.LoadByteOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.LoadByteOracle.AddressOperation.value,
     loadByteChipRustColumns, loadByteEvalAddressCols,
     eval_cpuState, Readers.ITypeReader.eval_cols,
     eval_registerAccessCols, eval_registerAccessTimestamp,
@@ -1647,8 +1749,9 @@ private theorem loadByteByteInteractionsFaithful
       ((((LoadByteChip.main input).operations offset).interactionsWith
           byteChannel.toRaw).map
             (AbstractInteraction.toAccess env))
-      (((Extracted.LoadByteColumns.interactions
-          (loadByteChipRustColumns env input offset)).map
+      (((Extracted.LoadByteOracle.LoadByteColumns.interactions
+          (loadByteChipReconfigure
+            (loadByteChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
   have h6 : (6 : ZMod p).val = 6 := by
@@ -1679,12 +1782,13 @@ private theorem loadByteByteInteractionsFaithful
     loadByteInlineByteInteractions, loadByteITypeByteInteractions,
     List.map_cons, List.map_nil,
     hBytePull]
-  simp [Extracted.LoadByteColumns.interactions,
-    Extracted.AddressOperation.interactions,
-    Extracted.AddrAddOperation.interactions,
+  simp [Extracted.LoadByteOracle.LoadByteColumns.interactions,
+    loadByteChipReconfigure, loadByteOracleAddressOperation,
+    Extracted.LoadByteOracle.AddressOperation.interactions,
+    Extracted.LoadByteOracle.AddrAddOperation.interactions,
     Extracted.CPUState.interactions,
     Extracted.ITypeReader.interactions,
-    Extracted.AddressOperation.value,
+    Extracted.LoadByteOracle.AddressOperation.value,
     loadByteChipRustColumns, loadByteEvalAddressCols,
     eval_cpuState, Readers.ITypeReader.eval_cols,
     eval_registerAccessCols, eval_registerAccessTimestamp,
@@ -1726,7 +1830,7 @@ private theorem loadByteUnexpectedInteractionsEmpty
 theorem loadByteChipInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var LoadByteChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.LoadByteColumns (ZMod p))
+    (cols : LoadByteChip.Columns (ZMod p))
     (hbind : BindsChipOutput LoadByteChip.main env input offset cols) :
     List.Perm
       (nativeAccesses env
@@ -1741,15 +1845,15 @@ theorem loadByteChipInteractionsFaithful
   change loadByteChipRustColumns env input offset = cols at hbind
   subst cols
   let rustAccesses :=
-    (Extracted.LoadByteColumns.interactions
-      (loadByteChipRustColumns env input offset)).map
+    (Extracted.LoadByteOracle.LoadByteColumns.interactions
+      (loadByteChipReconfigure
+        (loadByteChipRustColumns env input offset))).map
         Extracted.Interaction.toAccess
   simp only [nativeAccesses]
   rw [loadByteUnexpectedInteractionsEmpty]
   simp only [List.map_nil, List.append_nil]
   simp only [ChipOracle.accesses,
-    ChipOracle.nativeInteractions, loadByteChipOracle,
-    ChipOracle.identity, id_eq]
+    ChipOracle.nativeInteractions, loadByteChipOracle]
   rw [loadByteStateInteractionsEq,
     LoadByteChip.interactionsWith_memory_eq,
     loadByteProgramInteractionsEq]
@@ -1769,7 +1873,7 @@ theorem loadByteChipInteractionsFaithful
     ((hByte.append_left _).append hMemory).append_right _
 
 theorem loadByteChipInteractionsConstructive
-    (rustCols : Extracted.LoadByteColumns (ZMod p))
+    (rustCols : Extracted.LoadByteOracle.LoadByteColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := loadByteChipRowCodec.assignment
       (loadByteChipOracle.deconfigure rustCols) data
@@ -1807,7 +1911,7 @@ theorem loadByteChipInteractionsConstructive
 
 theorem loadByteChip_faithful :
     ChipFaithful (p := p) LoadByteChip.Inputs
-      Extracted.LoadByteColumns Extracted.LoadByteColumns
+      LoadByteChip.Columns Extracted.LoadByteOracle.LoadByteColumns
       LoadByteChip.circuit loadByteChipRowCodec
       loadByteChipOracle where
   constraints := loadByteChipConstraintsConstructive (p := p)

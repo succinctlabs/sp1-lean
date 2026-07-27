@@ -9,7 +9,6 @@ channel-exposure surface.
 
 namespace SP1Clean.BranchChip
 
-open Extracted (BranchColumns)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 

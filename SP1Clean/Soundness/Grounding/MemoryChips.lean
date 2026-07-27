@@ -1864,20 +1864,20 @@ theorem loadByteChipDescriptor_rdGuard :
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadByteChipDescriptor_view (input : LoadByteChip.Inputs (ZMod p))
-    (output : Extracted.LoadByteColumns (ZMod p)) :
+    (output : LoadByteChip.Columns (ZMod p)) :
     (loadByteChipDescriptor (p := p)).kind.view input output =
       LoadByteChip.rowView input output := rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadByteChipDescriptor_ramAccess (input : LoadByteChip.Inputs (ZMod p))
-    (output : Extracted.LoadByteColumns (ZMod p)) :
+    (output : LoadByteChip.Columns (ZMod p)) :
     (loadByteChipDescriptor (p := p)).kind.ramAccess input output =
       some (LoadByteChip.ramAccessView input output) := rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadByteChipDescriptor_chipSpec
     (input : LoadByteChip.Inputs (ZMod p))
-    (output : Extracted.LoadByteColumns (ZMod p))
+    (output : LoadByteChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
     (loadByteChipDescriptor (p := p)).kind.chipSpec input output data =
       LoadByteChip.Spec input output data := rfl
@@ -1885,7 +1885,7 @@ theorem loadByteChipDescriptor_chipSpec
 omit [Fact (2 ^ 25 < p)] in
 theorem loadByteChipDescriptor_advanceReady
     (input : LoadByteChip.Inputs (ZMod p))
-    (output : Extracted.LoadByteColumns (ZMod p))
+    (output : LoadByteChip.Columns (ZMod p))
     (program : GuestProgram) (state : SailState) :
     (loadByteChipDescriptor (p := p)).kind.advanceReady input output program state =
       LoadByteChip.AdvanceReady input output program state := rfl
@@ -2208,7 +2208,7 @@ omit [Fact (2 ^ 25 < p)] in
 offset. This is the arithmetic seam between the whole-chip contract and Sail's byte memory. -/
 theorem loadByte_selectedMemoryByte
     (input : LoadByteChip.Inputs (ZMod p))
-    (cols : Extracted.LoadByteColumns (ZMod p))
+    (cols : LoadByteChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (spec : LoadByteChip.Spec input cols data)
     (real : LoadByteChip.isReal input = 1)
@@ -2336,7 +2336,7 @@ omit [Fact (2 ^ 25 < p)] in
 /-- A real LoadByte row selects exactly one of LB and LBU. -/
 theorem loadByte_oneHot
     (input : LoadByteChip.Inputs (ZMod p))
-    (cols : Extracted.LoadByteColumns (ZMod p))
+    (cols : LoadByteChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (spec : LoadByteChip.Spec input cols data)
     (real : LoadByteChip.isReal input = 1) :
@@ -2669,13 +2669,13 @@ theorem loadHalfChipDescriptor_rdGuard :
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadHalfChipDescriptor_view (input : LoadHalfChip.Inputs (ZMod p))
-    (output : Extracted.LoadHalfColumns (ZMod p)) :
+    (output : LoadHalfChip.Columns (ZMod p)) :
     (loadHalfChipDescriptor (p := p)).kind.view input output =
       LoadHalfChip.rowView input output := rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadHalfChipDescriptor_ramAccess (input : LoadHalfChip.Inputs (ZMod p))
-    (output : Extracted.LoadHalfColumns (ZMod p)) :
+    (output : LoadHalfChip.Columns (ZMod p)) :
     (loadHalfChipDescriptor (p := p)).kind.ramAccess input output =
       some (LoadHalfChip.ramAccessView input output) := rfl
 
@@ -2763,7 +2763,7 @@ omit [Fact (2 ^ 25 < p)] in
 /-- A real LoadHalf row selects exactly one of LH and LHU. -/
 theorem loadHalf_oneHot
     (input : LoadHalfChip.Inputs (ZMod p))
-    (cols : Extracted.LoadHalfColumns (ZMod p))
+    (cols : LoadHalfChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (spec : LoadHalfChip.Spec input cols data)
     (real : LoadHalfChip.isReal input = 1) :
@@ -2787,7 +2787,7 @@ omit [Fact (2 ^ 25 < p)] in
 address. -/
 theorem loadHalf_selectedBytes
     (input : LoadHalfChip.Inputs (ZMod p))
-    (cols : Extracted.LoadHalfColumns (ZMod p))
+    (cols : LoadHalfChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (spec : LoadHalfChip.Spec input cols data)
     (priorBound : Word.isU64 input.memory_access.prev_value) :

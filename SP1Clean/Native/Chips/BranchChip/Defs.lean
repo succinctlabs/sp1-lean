@@ -6,7 +6,6 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ITypeReaderImmutable
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
-import SP1Clean.Extracted.BranchChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -25,7 +24,6 @@ is threaded via `ProverHint`. Implements pinned SP1 v6.3.1's `Branch` `air.rs::e
 namespace SP1Clean.BranchChip
 
 open Circuit
-open Extracted (BranchColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -63,7 +61,7 @@ def rs2WordInput (input : Inputs (ZMod p)) : Word (ZMod p) :=
 six opcode flags, `is_branching`, three `next_pc` limbs, and the ten `LtOperationSigned` columns.
 The witness closure uses `AddOperation.populate` to compute the selected target, while the circuit
 itself commits only SP1's inline carry equations and its three `next_pc` range interactions. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let rs1WordV : Word (Expression (ZMod p)) :=
     #v[input.adapter.op_a_memory.prev_value[0], input.adapter.op_a_memory.prev_value[1],
        input.adapter.op_a_memory.prev_value[2], input.adapter.op_a_memory.prev_value[3]]
@@ -164,7 +162,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
     is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu, is_branching, cmp⟩
 
 /-- Derive the 20 Rust-owned witness cells and complete four-channel interface from `main`. -/
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs BranchColumns main := by
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit
 
 /-- Folded completed-row layout used by the whole-chip Rust AIR codec.  The 20 Rust-owned local
@@ -183,7 +181,7 @@ cells are, in order, the six opcode flags, `is_branching`, the three `next_pc` l
         var { index := offset + 5 },
         var { index := offset + 6 },
         varFromOffset Extracted.LtOperationSigned (offset + 10)⟩ :
-        Var BranchColumns (ZMod p)) := rfl
+        Var Columns (ZMod p)) := rfl
 
 /-- Component-wise evaluation of the independent Branch input prefix. -/
 @[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
@@ -207,7 +205,7 @@ reducibility to unfold the completed circuit while recovering the first input ce
 
 /-- Component-wise evaluation of the completed Branch row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : BranchColumns (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state,
          adapter := Eval.eval env cols.adapter,
@@ -220,7 +218,7 @@ reducibility to unfold the completed circuit while recovering the first input ce
          is_bgeu := Eval.eval env cols.is_bgeu,
          is_branching := Eval.eval env cols.is_branching,
          compare_operation := Eval.eval env cols.compare_operation } :
-        BranchColumns F) := by
+        Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 

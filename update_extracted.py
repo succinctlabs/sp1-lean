@@ -196,7 +196,7 @@ MEMORY_BOUNDARY_CLUSTER: Tuple[str, ...] = (
 # file after its native reconfiguration lands.
 CHIP_ORACLES: Set[str] = {
     "Add", "Sub", "Subw", "Mul", "DivRem", "Addi", "Jalr", "Jal", "UType", "Addw",
-    "Bitwise", "Lt", "ShiftLeft", "ShiftRight", "AluX0",
+    "Bitwise", "Lt", "ShiftLeft", "ShiftRight", "AluX0", "Branch", "LoadByte", "LoadHalf",
 }
 
 # Stable generated reader substrate shared by native chip rows and whole-chip Rust oracles. Reusing
@@ -205,6 +205,13 @@ CHIP_ORACLES: Set[str] = {
 CHIP_ORACLE_SHARED_STRUCTS: Set[str] = {
     "CPUState", "RTypeReader", "ITypeReader", "JTypeReader", "ALUTypeReader",
     "RegisterAccessCols", "RegisterAccessTimestamp",
+    # The memory-access blocks nested in every load/store row, owned by the `MemoryAccess`
+    # struct-carrier module (see `STRUCT_CARRIERS`).
+    "MemoryAccessCols", "MemoryAccessTimestamp",
+    # `ITypeReaderImmutable` operates on the `ITypeReader` row and so owns no struct of its own;
+    # it is listed here for reader-roster uniformity (a no-op for struct reuse) and does its real
+    # work via `CHIP_ORACLE_IMPORTED_HELPERS` below.
+    "ITypeReaderImmutable",
 }
 
 # Generated helpers whose canonical operation/reader module is imported by every chip oracle that
@@ -213,6 +220,7 @@ CHIP_ORACLE_SHARED_STRUCTS: Set[str] = {
 # reusable generated definition.
 CHIP_ORACLE_IMPORTED_HELPERS: Set[str] = {
     "CPUState", "RTypeReader", "ITypeReader", "JTypeReader", "ALUTypeReader",
+    "ITypeReaderImmutable",
 }
 
 # Helpers needed while rendering a self-contained chip oracle but no longer emitted as standalone
@@ -239,8 +247,21 @@ STRUCT_OWNERSHIP: Dict[str, str] = {
     "RegisterAccessTimestamp": "RTypeReader",
     # The memory-access column structs (`MemoryAccessCols`/`MemoryAccessTimestamp`) are nested only
     # in the Load/Store chip column structs (no standalone operation emits them), so they have no
-    # natural operation owner — the collision handler in `resolve_ownership` assigns them to the
-    # first emitting chip (LoadByte) and the rest import that chip module.
+    # natural operation owner. They used to fall to the first-emitting chip (LoadByte), but a chip
+    # oracle cannot be a struct definition site (every load/store eventually migrates), so they are
+    # owned by the dedicated struct-carrier module `MemoryAccess` (see `STRUCT_CARRIERS`).
+    "MemoryAccessCols": "MemoryAccess",
+    "MemoryAccessTimestamp": "MemoryAccess",
+}
+
+# Struct-carrier modules: canonical definition sites for structs with no operation owner whose
+# definition must outlive the chip files that emit them. Each entry maps a carrier module name to
+# `(donor, struct names in emission order)`: the carrier file is rendered by carving those struct
+# declarations byte-for-byte out of the donor chip's no-reuse discovery body (so the definitions
+# remain compiler-derived, never hand-written). The carrier is written only on runs that discover
+# the donor. `STRUCT_OWNERSHIP` must point each carried struct at its carrier module.
+STRUCT_CARRIERS: Dict[str, Tuple[str, Tuple[str, ...]]] = {
+    "MemoryAccess": ("LoadByte", ("MemoryAccessTimestamp", "MemoryAccessCols")),
 }
 
 DEFAULT_SP1_DIR = "../sp1"
@@ -612,6 +633,30 @@ def _bump_constraints_heartbeats(body: str, heartbeats: int = 1000000) -> str:
     return body.replace(needle, f"set_option maxHeartbeats {heartbeats} in\n{needle}")
 
 
+def render_struct_carrier(carrier: str, donor: str, struct_names: Sequence[str],
+                          donor_body: str) -> str:
+    """Render a struct-carrier module (see `STRUCT_CARRIERS`): the named struct declarations are
+    carved byte-for-byte out of the donor chip's no-reuse discovery body, so the canonical
+    definitions stay compiler-derived while outliving the donor's legacy chip file."""
+    blocks: Dict[str, str] = {
+        match.group(1): match.group(0) for match in _DERIVE_STRUCT_RE.finditer(donor_body)
+    }
+    missing = [name for name in struct_names if name not in blocks]
+    if missing:
+        raise ValueError(
+            f"struct carrier {carrier}: donor {donor} discovery body does not declare {missing}")
+    body = "\n\n".join(_expand_large_derives(blocks[name]) for name in struct_names)
+    struct_list = ", ".join(f"`{name}`" for name in struct_names)
+    doc = (
+        f"/-! # AUTO-GENERATED — do not edit by hand.\n\n"
+        f"Struct-carrier module: the canonical definition site for {struct_list}.\n"
+        f"Carved by `update_extracted.py` out of the `sp1-constraint-compiler --chip {donor}`\n"
+        f"discovery output (no standalone operation emits these structs; every load/store chip\n"
+        f"row nests them). Regenerate with `SP1_DIR=… python3 update_extracted.py`. -/"
+    )
+    return _header([], doc) + "\n" + body + "\n\n" + FOOTER
+
+
 def render_chip(chip: str, import_modules: Sequence[str], body: str) -> str:
     """Wrap a chip's compiler body in a module header that imports the reused operation
     column-struct modules."""
@@ -744,6 +789,14 @@ def render_chip_oracle(
     before, found, after = chip_body.partition(marker)
     helpers = _chip_helper_order(chip, chip_body, discovery)
     embedded_helpers = [h for h in helpers if h not in CHIP_ORACLE_IMPORTED_HELPERS]
+    shared_helpers = [h for h in helpers if h in CHIP_ORACLE_IMPORTED_HELPERS]
+    # An imported helper's module is usually already present via shared-struct ownership (CPUState,
+    # the reader modules). A helper that owns no struct — `ITypeReaderImmutable` operates on the
+    # `ITypeReader` row — must still be imported so its qualified `asserts`/`interactions` calls
+    # resolve; without this the oracle would reference an unimported module (or silently re-embed).
+    import_modules = list(import_modules) + [
+        h for h in shared_helpers if h not in import_modules
+    ]
     helper_defs = "\n\n".join(
         _without_generated_structures(discovery[h]) for h in embedded_helpers
     )
@@ -759,7 +812,6 @@ def render_chip_oracle(
     body = _expand_large_derives(body)
     _sanity_gate(f"{chip} (self-contained chip oracle)", body)
     helper_list = ", ".join(embedded_helpers) if embedded_helpers else "no private helpers"
-    shared_helpers = [h for h in helpers if h in CHIP_ORACLE_IMPORTED_HELPERS]
     shared_list = ", ".join(shared_helpers) if shared_helpers else "no shared helpers"
     doc = (
         f"/-! # AUTO-GENERATED whole-chip Rust AIR oracle — do not edit by hand.\n\n"
@@ -1271,6 +1323,17 @@ def main() -> None:
     _write(os.path.join(EXTRACTED_DIR, "Provenance.lean"), render_provenance())
     _write(os.path.join(EXTRACTED_DIR, "CoreAIRManifest.lean"), profile_output)
     written = 2
+    for carrier, (carrier_donor, carrier_structs) in STRUCT_CARRIERS.items():
+        if carrier_donor not in discovery:
+            continue
+        print(f"Processing struct carrier {carrier}")
+        try:
+            _write(os.path.join(EXTRACTED_DIR, f"{carrier}.lean"),
+                   render_struct_carrier(carrier, carrier_donor, carrier_structs,
+                                         discovery[carrier_donor]))
+            written += 1
+        except Exception as e:  # noqa: BLE001
+            raise SystemExit(f"struct-carrier render {carrier} failed: {e}")
     for op in [o for o in OPERATIONS if o in emitted and o not in CHIP_ONLY_HELPERS]:
         print(f"Processing {op}")
         try:

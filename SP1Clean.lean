@@ -132,10 +132,12 @@ import SP1Clean.Extracted.ChipOracle.Subw
 import SP1Clean.Extracted.ChipOracle.UType
 import SP1Clean.Extracted.ChipOracle.Mul
 import SP1Clean.Extracted.ChipOracle.DivRem
+import SP1Clean.Extracted.ChipOracle.Branch
+import SP1Clean.Extracted.ChipOracle.LoadByte
+import SP1Clean.Extracted.ChipOracle.LoadHalf
 import SP1Clean.Extracted.AddOperation
 import SP1Clean.Extracted.AddrAddOperation
 import SP1Clean.Extracted.AddressOperation
-import SP1Clean.Extracted.BranchChip
 import SP1Clean.Extracted.CPUState
 import SP1Clean.Extracted.ExtractionDSL
 import SP1Clean.Extracted.Provenance
@@ -158,9 +160,8 @@ import SP1Clean.Extracted.IsEqualWordOperation
 import SP1Clean.Extracted.IsZeroOperation
 import SP1Clean.Extracted.IsZeroWordOperation
 import SP1Clean.Extracted.JTypeReader
-import SP1Clean.Extracted.LoadByteChip
+import SP1Clean.Extracted.MemoryAccess
 import SP1Clean.Extracted.LoadDoubleChip
-import SP1Clean.Extracted.LoadHalfChip
 import SP1Clean.Extracted.LoadWordChip
 import SP1Clean.Extracted.LoadX0Chip
 import SP1Clean.Extracted.LtOperationSigned

@@ -6,7 +6,6 @@ import SP1Clean.Native.Readers.ITypeReader
 import SP1Clean.Native.Readers.MemoryAccess
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.LoadHalfChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -30,10 +29,26 @@ lives at the trace level (`Soundness/MemoryConsistency.lean`). -/
 namespace SP1Clean.LoadHalfChip
 
 open Circuit
-open Extracted (LoadHalfColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native LoadHalf-chip row (Rust field order). The reader and memory blocks reuse the project
+substrate (`Extracted.AddressOperation` / `Extracted.U16MSBOperation` are still standalone generated
+modules — the other loads and stores compose the same gadgets; `Extracted.MemoryAccessCols` lives in
+the generated `MemoryAccess` struct carrier). `Faithful.LoadHalfChip.loadHalfChipReconfigure` is the
+sole bridge to Rust's separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ITypeReader F
+  address_operation : Extracted.AddressOperation F
+  memory_access : Extracted.MemoryAccessCols F
+  offset_bit : Vector F 2
+  selected_half : F
+  msb : Extracted.U16MSBOperation F
+  is_lh : F
+  is_lhu : F
+deriving ProvableStruct
 
 /-- The operand reads + threaded reader column blocks. `op_b_val` is the rs1 base-address value, `op_c_imm`
 the sign-extended immediate; `state`/`adapter`/`memory_access` are the committed column blocks; `offset_bit`
@@ -75,13 +90,13 @@ deriving ProvableStruct
 /-- The row selector `is_lh + is_lhu` (SP1's `is_real`). -/
 @[reducible] def isReal (input : Inputs (ZMod p)) : ZMod p := input.is_lh + input.is_lhu
 
-/-- Compose the column blocks as Clean sub-circuits and assemble the extracted `LoadHalfColumns`.
+/-- Compose the column blocks as Clean sub-circuits and assemble the extracted `Columns`.
 `CPUState` advances pc by 4 / clk by 8; `AddressOperation` computes `rs1 + imm` (offset bits 1–2 =
 `offset_bit[0..1]`, bit 0 = 0 since LH is 2-byte aligned); `MemoryAccess` is a read at the 48-bit
 address; `U16MSBOperation` pins `msb` to the high bit of `selected_half` (gated by `is_lh`); `ITypeReader`
 writes the extended word to `op_a` (opcode `30·is_lh + 33·is_lhu`). The four 2-bit offset-selection gates,
 the `op_a != x0` gate, the `is_lhu·msb` zero-extension gate, and the binary gates are imposed directly. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadHalfColumns (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let is_real := input.is_lh + input.is_lhu
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, is_real⟩
@@ -127,7 +142,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadHalfColumns (
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.offset_bit,
     input.selected_half, ⟨input.msb⟩, input.is_lh, input.is_lhu⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadHalfColumns main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
   -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks/gates witness nothing.
   localLength _ := 3 + 1
@@ -150,11 +165,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadHalfColumns main whe
         ⟨varFromOffset Extracted.AddrAddOperation offset, var ⟨offset + 3⟩⟩,
         input.memory_access, input.offset_bit, input.selected_half, ⟨input.msb⟩,
         input.is_lh, input.is_lhu⟩ :
-        Var LoadHalfColumns (ZMod p)) := rfl
+        Var Columns (ZMod p)) := rfl
 
 /-- Component-wise evaluation of a completed LoadHalf row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : LoadHalfColumns (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state
          adapter := Eval.eval env cols.adapter
@@ -165,13 +180,13 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadHalfColumns main whe
          msb := Eval.eval env cols.msb
          is_lh := Eval.eval env cols.is_lh
          is_lhu := Eval.eval env cols.is_lhu } :
-        LoadHalfColumns F) := by
+        Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s plus the four offset-selection equations,
 the `op_a != x0` flag, the `is_lhu·msb` zero-extension gate, and the `is_lh`/`is_lhu`/`is_real` binaries. -/
-def Spec (input : Inputs (ZMod p)) (cols : LoadHalfColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   AddressOperation.RowSpec
     ⟨input.op_b_val, input.op_c_imm, 0, input.offset_bit[0], input.offset_bit[1], isReal input⟩
     cols.address_operation ∧

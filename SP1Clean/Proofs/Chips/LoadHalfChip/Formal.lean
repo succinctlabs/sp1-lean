@@ -9,7 +9,6 @@ in `Defs`; Sail bridge in `Bridge`.) -/
 namespace SP1Clean.LoadHalfChip
 
 open Circuit
-open Extracted (LoadHalfColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -299,8 +298,8 @@ theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
       exposedMemoryInteractions input offset := by
   simp [exposedMemoryInteractions]
 
-/-- The `LoadHalf` chip row as a `GeneralFormalCircuit`; output is the extracted `LoadHalfColumns`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadHalfColumns :=
+/-- The `LoadHalf` chip row as a `GeneralFormalCircuit`; output is the extracted `Columns`. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,

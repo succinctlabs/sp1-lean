@@ -139,7 +139,7 @@ defined once over `RowView` and shared across chips. -/
 structure RowView (F : Type) where
   state : Extracted.CPUState F
   /-- The committed `next_pc` (3 u16 limbs) the chip passes to `CPUState::eval` — the chip-agnostic
-  trace shadow of SP1's dedicated `next_pc` column block (e.g. `Extracted/BranchChip.lean`). For a
+  trace shadow of SP1's dedicated `next_pc` column block (e.g. the Branch oracle row). For a
   straight-line chip it is `#v[pc[0]+4, pc[1], pc[2]]`; for a control-flow chip it is the data-dependent
   branch/jump target. Read abstractly by the State-bus PC chain (`Soundness/StateConsistency.lean`). -/
   next_pc : Vector F 3

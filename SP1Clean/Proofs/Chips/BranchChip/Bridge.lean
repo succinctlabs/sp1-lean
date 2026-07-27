@@ -118,7 +118,7 @@ committed rs1/rs2 ↔ Sail reassembly, the immediate decode, and the committed-p
 branch-target 4-byte alignment is **derived** from the `Spec`'s divisibility conjunct (the in-circuit
 `÷4` range check), not assumed. -/
 theorem branch_chip_reaches_sail
-    (inp : BranchChip.Inputs (ZMod p)) (cols : Extracted.BranchColumns (ZMod p))
+    (inp : BranchChip.Inputs (ZMod p)) (cols : BranchChip.Columns (ZMod p))
     (data : ProverData (ZMod p))
     (rs1 rs2 : BitVec 5) (imm : BitVec 13) (pc rs1_val rs2_val : BitVec 64) (s : SailState)
     (hs : SailState.isInitialized s)
@@ -195,7 +195,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 cols.next_pc` the **data-dependent** branch target, `rdWrite = 0` and `commit = .noWrite` — branches write
 no register). Standalone (identical to the former inline `kind.view`) so `BranchChip.advance` can be
 supplied *as* `kind.advance`. -/
-def rowView (inp : Inputs (ZMod p)) (cols : Extracted.BranchColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (cols : BranchChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨cols.state, #v[cols.next_pc[0], cols.next_pc[1], cols.next_pc[2]],
     cols.adapter.toAdapterView, inp.is_real, #v[0, 0, 0, 0], branchOpcode cols, .noWrite⟩
 
@@ -207,7 +207,7 @@ tied to the chip `Spec`'s six-way `is_branching` decision (via the `zopz0z*↔sl
 `rs2Word` = the `op_a`/`op_b` register read-backs), the taken/fall next-pc conjuncts, and the `÷4` alignment.
 `advanceReady` carries the **`op_a` SOURCE read binding** — branches read `rs1` in the `op_a` slot, which
 `ValueOperandsBound` (op_b/op_c only) does not supply — plus the 6-way one-hot flag partition. -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.BranchColumns (ZMod p)) (data : ProverData (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : BranchChip.Columns (ZMod p)) (data : ProverData (ZMod p))
     (prog : GuestProgram) (s : SailState)
     (hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -302,7 +302,7 @@ opcode `Σ is_b*·k`; `commit = .noWrite` (no destination write). `advance` is t
 def kind : Soundness.ChipKind p where
   name := "Branch"
   Inputs := BranchChip.Inputs
-  Cols := Extracted.BranchColumns
+  Cols := BranchChip.Columns
   view := rowView
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun _inp cols _ s =>

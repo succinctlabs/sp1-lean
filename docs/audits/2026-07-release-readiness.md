@@ -144,6 +144,43 @@ reproducible immutable git pins is a **release blocker** tracked outside this ca
   entry-count change (no Faithful files deleted). `lake test` green.
   CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem, Addi, Jalr, Jal, UType, Addw, Bitwise, Lt,
   ShiftLeft, ShiftRight, AluX0} — **15/25**.
+- **Branch + LoadByte + LoadHalf — complete, all gates green, one proof repair.** First
+  memory-family oracles; the trickiest generator config to date, landing two capabilities:
+  (1) `ITypeReaderImmutable` joined the shared-struct/imported-helper sets — the first imported
+  helper that owns **no** struct (it operates on the `ITypeReader` row), so `render_chip_oracle`
+  now also imports any called `CHIP_ORACLE_IMPORTED_HELPERS` module missing from the struct-owner
+  import list (previously imports came *only* from struct ownership — an unresolved-name hazard);
+  (2) the **`MemoryAccess` struct carrier** (`STRUCT_CARRIERS`): `MemoryAccessCols`/
+  `MemoryAccessTimestamp` are nested in every load/store row but no operation emits them, and
+  their old first-emitter owner (LoadByte) was becoming an oracle — a chip file cannot stay a
+  struct definition site. The new carrier module `Extracted/MemoryAccess.lean` is carved
+  byte-for-byte out of the donor chip's no-reuse discovery body (definitions stay
+  compiler-derived, never hand-written); `STRUCT_OWNERSHIP` pins both structs to it; the two load
+  oracles and all seven remaining legacy load/store chips import it (each legacy regen diff =
+  exactly the 2 import/doc lines); `Native/Readers/MemoryAccess.lean` re-pointed to it. Native
+  `Columns`: Branch's lands in Contracts/Chips.lean (Spec on the audit surface), the loads' in
+  their Native Defs (Lt pattern, Spec lives there); loads keep the shared
+  `Extracted.AddressOperation`/`U16MSBOperation`/`MemoryAccessCols` blocks, Branch keeps shared
+  `Extracted.LtOperationSigned`. Namespace bridges: 8 `branchOracle_*_eq` (the Lt compare-op
+  chain), 4 `loadByteOracle_*_eq` (address chain), 6 `loadHalfOracle_*_eq` (address + U16MSB).
+  The 8f1ae7a0 HARD RULE paid off again: the first LoadByte regen **silently embedded** the
+  MemoryAccess structs (the two names were not yet in `CHIP_ORACLE_SHARED_STRUCTS`) — caught only
+  by the mandatory generated-import-block inspection, not by any build failure. The batch's one
+  proof repair: the loads' brute-force interaction `simp` sets must name the **embedded**
+  `<Chip>Oracle.AddressOperation.value` (the whole-chip interactions call the embedded copy's
+  aligned-address helper, not the standalone's — a `Type mismatch` at the closing perm otherwise);
+  LoadHalf then compiled first try with the spelling fixed pre-emptively. Grounding:
+  `Grounding/MemoryChips.lean` needed exactly the mechanical row-type rename in its descriptor/mux
+  lemma signatures (it names the load rows, as predicted); ControlFlowChips + all other grounding
+  files zero changes. **No standalone operation retired** (importer evidence: `LtOperationSigned`
+  keeps its native-gadget/Contracts importers; `IsZeroOperation`/`IsEqualWordOperation` keep
+  DivRemColumns + SystemOracle importers; `U16CompareOperation`/`LtOperationUnsigned` keep
+  SystemOracle + DivRem importers; `AddrAddOperation`/`AddressOperation`/`U16MSBOperation` keep
+  the seven legacy load/store importers). None of the three chips has a trace anchor (verified:
+  `SP1CleanTest/TraceGenTests/` has no Branch/Load dumps); witness anchors unaffected. Per-chip
+  builds 0/0/0; `lake test` green; probe regenerated zero-diff (no Faithful files deleted).
+  CHIP_ORACLES = {Add, Sub, Subw, Mul, DivRem, Addi, Jalr, Jal, UType, Addw, Bitwise, Lt,
+  ShiftLeft, ShiftRight, AluX0, Branch, LoadByte, LoadHalf} — **18/25**.
 
 ## Phase 3 — audit findings
 

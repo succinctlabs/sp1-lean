@@ -1,7 +1,6 @@
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.FormalModel.Contracts.DivRem
 import SP1Clean.FormalModel.Contracts.DivRemColumns
-import SP1Clean.Extracted.BranchChip
 import RISCV.Instructions
 import Clean.Circuit.Subcircuit
 import Clean.Utils.Tactics.ProvableStructDeriving
@@ -979,8 +978,25 @@ end SP1Clean.JalrChip
 
 namespace SP1Clean.BranchChip
 
-open Extracted (BranchColumns)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native Branch-chip row (Rust field order). The reader blocks and the compare block reuse the
+project substrate (`Extracted.LtOperationSigned` is still a standalone generated module — the Lt
+chip composes the same gadget family). `Faithful.BranchChip.branchChipReconfigure` is the sole
+bridge to Rust's separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ITypeReader F
+  next_pc : Vector F 3
+  is_beq : F
+  is_bne : F
+  is_blt : F
+  is_bge : F
+  is_bltu : F
+  is_bgeu : F
+  is_branching : F
+  compare_operation : Extracted.LtOperationSigned F
+deriving ProvableStruct
 
 /-- The committed **B-type** row blocks the Branch chip reads: the `is_real` selector (bound in-circuit to
 the flag sum `Σ is_b*`), the CPUState block `state` (clk + `pc`), and the immutable I-type register adapter
@@ -996,31 +1012,31 @@ deriving ProvableStruct
 
 /-- The rs1 register value as a 4-limb word — the `op_a` source read's prior value, the `a`/`b` operand of
 the compare (`a < b`, with `a ↦ rs1`). -/
-def rs1Word (cols : BranchColumns (ZMod p)) : Word (ZMod p) :=
+def rs1Word (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.adapter.op_a_memory.prev_value[0], cols.adapter.op_a_memory.prev_value[1],
      cols.adapter.op_a_memory.prev_value[2], cols.adapter.op_a_memory.prev_value[3]]
 
 /-- The rs2 register value as a 4-limb word — the `op_b` source read's prior value. -/
-def rs2Word (cols : BranchColumns (ZMod p)) : Word (ZMod p) :=
+def rs2Word (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.adapter.op_b_memory.prev_value[0], cols.adapter.op_b_memory.prev_value[1],
      cols.adapter.op_b_memory.prev_value[2], cols.adapter.op_b_memory.prev_value[3]]
 
 /-- The program counter as a 4-limb word (the three committed `pc` limbs + a zero high limb): the `a`
 operand both of the chip's `AddOperation`s add to (`pc + imm = taken target`, `pc + 4 = fall-through`). -/
-def pcWord (cols : BranchColumns (ZMod p)) : Word (ZMod p) :=
+def pcWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0]
 
 /-- The committed `next_pc` (three 16-bit limbs) padded to a 4-limb word. -/
-def nextPcWord (cols : BranchColumns (ZMod p)) : Word (ZMod p) :=
+def nextPcWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
   #v[cols.next_pc[0], cols.next_pc[1], cols.next_pc[2], 0]
 
 /-- The reconstructed branch opcode `Σ is_b* · k` (BEQ 40 … BGEU 45), fed to the program-bus read. -/
-def branchOpcode (cols : BranchColumns (ZMod p)) : ZMod p :=
+def branchOpcode (cols : Columns (ZMod p)) : ZMod p :=
   cols.is_beq * 40 + cols.is_bne * 41 + cols.is_blt * 42 + cols.is_bge * 43
     + cols.is_bltu * 44 + cols.is_bgeu * 45
 
 /-- The six opcode flags and the `is_branching` decision are all binary. -/
-def flagsBinary (cols : BranchColumns (ZMod p)) : Prop :=
+def flagsBinary (cols : Columns (ZMod p)) : Prop :=
   (cols.is_beq = 0 ∨ cols.is_beq = 1) ∧ (cols.is_bne = 0 ∨ cols.is_bne = 1) ∧
   (cols.is_blt = 0 ∨ cols.is_blt = 1) ∧ (cols.is_bge = 0 ∨ cols.is_bge = 1) ∧
   (cols.is_bltu = 0 ∨ cols.is_bltu = 1) ∧ (cols.is_bgeu = 0 ∨ cols.is_bgeu = 1) ∧
@@ -1029,7 +1045,7 @@ def flagsBinary (cols : BranchColumns (ZMod p)) : Prop :=
 /-- The active branch-opcode selector is exactly one-hot.  This is semantic row information:
 the six physical flag gates and `is_real = Σ flags` establish it in the chip soundness proof, and
 the Sail bridge consumes it to select the unique B-type instruction. -/
-def flagsOneHot (cols : BranchColumns (ZMod p)) : Prop :=
+def flagsOneHot (cols : Columns (ZMod p)) : Prop :=
   (cols.is_beq = 1 ∧ cols.is_bne = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧
       cols.is_bltu = 0 ∧ cols.is_bgeu = 0) ∨
     (cols.is_bne = 1 ∧ cols.is_beq = 0 ∧ cols.is_blt = 0 ∧ cols.is_bge = 0 ∧
@@ -1055,7 +1071,7 @@ skeletal `LtOperationSigned`). On a real row:
   forced by the in-circuit alignment `Range` byte-lookup (`next_pc[0] · 4⁻¹ < 2^14`); the Sail bridge lifts
   it to the whole word (so alignment is no longer an assumed bridge precondition).
 Vacuous on padding. -/
-def Spec (input : Inputs (ZMod p)) (cols : BranchColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.ITypeReaderImmutable.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,

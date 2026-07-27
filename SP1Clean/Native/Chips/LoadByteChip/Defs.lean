@@ -6,7 +6,6 @@ import SP1Clean.Native.Readers.MemoryAccess
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
-import SP1Clean.Extracted.LoadByteChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -29,10 +28,28 @@ lookups, so this chip emits them directly via `byteChannel.pullIf` (witnessing n
 namespace SP1Clean.LoadByteChip
 
 open Circuit
-open Extracted (LoadByteColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native LoadByte-chip row (Rust field order). The reader and memory blocks reuse the project
+substrate (`Extracted.AddressOperation` is still a standalone generated module — the other loads and
+stores compose the same gadget; `Extracted.MemoryAccessCols` lives in the generated `MemoryAccess`
+struct carrier). `Faithful.LoadByteChip.loadByteChipReconfigure` is the sole bridge to Rust's
+separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ITypeReader F
+  address_operation : Extracted.AddressOperation F
+  memory_access : Extracted.MemoryAccessCols F
+  offset_bit : Vector F 3
+  selected_limb : F
+  selected_limb_low_byte : F
+  selected_byte : F
+  msb : F
+  is_lb : F
+  is_lbu : F
+deriving ProvableStruct
 
 structure Inputs (F : Type) where
   is_lb : F
@@ -76,7 +93,7 @@ deriving ProvableStruct
 @[reducible] def highByte (input : Inputs (ZMod p)) : ZMod p :=
   (input.selected_limb - input.selected_limb_low_byte) * (256 : ZMod p)⁻¹
 
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadByteColumns (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let is_real := input.is_lb + input.is_lbu
   let high := (input.selected_limb - input.selected_limb_low_byte)
     * Expression.const ((256 : ZMod p)⁻¹)
@@ -135,7 +152,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadByteColumns (
     input.selected_limb, input.selected_limb_low_byte, input.selected_byte, input.msb,
     input.is_lb, input.is_lbu⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadByteColumns main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit]
   localLength _ := 3 + 1
   localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit]
@@ -158,11 +175,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadByteColumns main whe
         input.memory_access, input.offset_bit, input.selected_limb,
         input.selected_limb_low_byte, input.selected_byte, input.msb,
         input.is_lb, input.is_lbu⟩ :
-        Var LoadByteColumns (ZMod p)) := rfl
+        Var Columns (ZMod p)) := rfl
 
 /-- Component-wise evaluation of a completed LoadByte row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
-    (env : Environment F) (cols : LoadByteColumns (Expression F)) :
+    (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
       ({ state := Eval.eval env cols.state
          adapter := Eval.eval env cols.adapter
@@ -175,14 +192,14 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadByteColumns main whe
          msb := Eval.eval env cols.msb
          is_lb := Eval.eval env cols.is_lb
          is_lbu := Eval.eval env cols.is_lbu } :
-        LoadByteColumns F) := by
+        Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
 /-- Semantic contract. The spine sub-`Spec`s, the (real-row-gated) byte bounds, the (LB-gated) sign-bit
 fact, the four limb-selection equations, the byte-mux equation, the `op_a != x0` flag, the `is_lbu·msb`
 zero-extension gate, and the selector binaries. -/
-def Spec (input : Inputs (ZMod p)) (cols : LoadByteColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   AddressOperation.RowSpec
     ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1],
       input.offset_bit[2], isReal input⟩

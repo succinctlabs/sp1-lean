@@ -1,7 +1,7 @@
 import SP1Clean.Math.Word
 import SP1Clean.Model.ByteTable
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.LoadByteChip
+import SP1Clean.Extracted.MemoryAccess
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel

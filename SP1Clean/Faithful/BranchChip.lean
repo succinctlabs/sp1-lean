@@ -1,4 +1,5 @@
 import SP1Clean.Faithful.LtChip
+import SP1Clean.Extracted.ChipOracle.Branch
 import SP1Clean.Faithful.LtOperationUnsigned
 import SP1Clean.Faithful.U16MSBOperation
 import SP1Clean.Faithful.ITypeReaderImmutable
@@ -20,14 +21,155 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-def branchChipOracle :
-    ChipOracle (ZMod p) Extracted.BranchColumns
-      Extracted.BranchColumns :=
-  ChipOracle.identity Extracted.BranchColumns.asserts
-    Extracted.BranchColumns.interactions
+/-- Rebuild the shared standalone `LtOperationSigned` block as the byte-identical struct embedded in
+the generated Branch oracle namespace. -/
+def branchOracleCompareOperation {F : Type} (cols : Extracted.LtOperationSigned F) :
+    Extracted.BranchOracle.LtOperationSigned F :=
+  { result :=
+      { u16_compare_operation := { bit := cols.result.u16_compare_operation.bit }
+        u16_flags := cols.result.u16_flags
+        not_eq_inv := cols.result.not_eq_inv
+        comparison_limbs := cols.result.comparison_limbs }
+    b_msb := { msb := cols.b_msb.msb }
+    c_msb := { msb := cols.c_msb.msb } }
+
+/-- Inverse of `branchOracleCompareOperation`. -/
+def branchNativeCompareOperation {F : Type} (cols : Extracted.BranchOracle.LtOperationSigned F) :
+    Extracted.LtOperationSigned F :=
+  { result :=
+      { u16_compare_operation := { bit := cols.result.u16_compare_operation.bit }
+        u16_flags := cols.result.u16_flags
+        not_eq_inv := cols.result.not_eq_inv
+        comparison_limbs := cols.result.comparison_limbs }
+    b_msb := { msb := cols.b_msb.msb }
+    c_msb := { msb := cols.c_msb.msb } }
+
+/-- Whole-chip row reconfiguration. The reader blocks, the flag/next-pc columns, and the compare
+block's cell values are already the canonical generated substrate; the compare block is copied into
+Rust's chip-private operation row. This is not an operation-level faithfulness claim. -/
+def branchChipReconfigure {F : Type} (cols : BranchChip.Columns F) :
+    Extracted.BranchOracle.BranchColumns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    next_pc := cols.next_pc
+    is_beq := cols.is_beq
+    is_bne := cols.is_bne
+    is_blt := cols.is_blt
+    is_bge := cols.is_bge
+    is_bltu := cols.is_bltu
+    is_bgeu := cols.is_bgeu
+    is_branching := cols.is_branching
+    compare_operation := branchOracleCompareOperation cols.compare_operation }
+
+/-- Inverse whole-row map used to reconstruct the native proof row from an arbitrary Rust row. -/
+def branchChipDeconfigure {F : Type} (cols : Extracted.BranchOracle.BranchColumns F) :
+    BranchChip.Columns F :=
+  { state := cols.state
+    adapter := cols.adapter
+    next_pc := cols.next_pc
+    is_beq := cols.is_beq
+    is_bne := cols.is_bne
+    is_blt := cols.is_blt
+    is_bge := cols.is_bge
+    is_bltu := cols.is_bltu
+    is_bgeu := cols.is_bgeu
+    is_branching := cols.is_branching
+    compare_operation := branchNativeCompareOperation cols.compare_operation }
+
+/-- SP1 Rust's complete Branch-chip oracle, viewed from the native Lean row. -/
+def branchChipOracle {F : Type} [FiniteField F] [CoeHead F ℕ] :
+    ChipOracle F BranchChip.Columns Extracted.BranchOracle.BranchColumns where
+  reconfigure := branchChipReconfigure
+  deconfigure := branchChipDeconfigure
+  reconfigure_deconfigure := by intro cols; cases cols; rfl
+  deconfigure_reconfigure := by intro cols; cases cols; rfl
+  assertZeros := Extracted.BranchOracle.BranchColumns.asserts
+  interactions := Extracted.BranchOracle.BranchColumns.interactions
+
+/- Namespace bridges between the Branch oracle's embedded chip-private helper copies and the
+canonical standalone generated modules. The two bodies are rendered from the same compiler output,
+so each bridge is a definitional unfolding, not a mathematical claim. They let every heavy
+compare-op lemma below stay stated once against the standalone modules (also consumed by the Lt
+chip and the DivRem oracle bridges). -/
+
+private theorem branchOracle_u16compare_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b bit is_real : F) :
+    Extracted.BranchOracle.U16CompareOperation.asserts a b ⟨bit⟩ is_real =
+      Extracted.U16CompareOperation.asserts a b ⟨bit⟩ is_real := by
+  rw [Extracted.BranchOracle.U16CompareOperation.asserts,
+    Extracted.U16CompareOperation.asserts]
+
+private theorem branchOracle_u16compare_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a b bit is_real : F) :
+    Extracted.BranchOracle.U16CompareOperation.interactions a b ⟨bit⟩ is_real =
+      Extracted.U16CompareOperation.interactions a b ⟨bit⟩ is_real := by
+  rw [Extracted.BranchOracle.U16CompareOperation.interactions,
+    Extracted.U16CompareOperation.interactions]
+
+private theorem branchOracle_u16msb_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.BranchOracle.U16MSBOperation.asserts a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.asserts a ⟨msb⟩ is_real := by
+  rw [Extracted.BranchOracle.U16MSBOperation.asserts,
+    Extracted.U16MSBOperation.asserts]
+
+private theorem branchOracle_u16msb_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (a msb is_real : F) :
+    Extracted.BranchOracle.U16MSBOperation.interactions a ⟨msb⟩ is_real =
+      Extracted.U16MSBOperation.interactions a ⟨msb⟩ is_real := by
+  rw [Extracted.BranchOracle.U16MSBOperation.interactions,
+    Extracted.U16MSBOperation.interactions]
+
+private theorem branchOracle_ltUnsigned_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (bit : F) (u16_flags : Vector F 4) (not_eq_inv : F)
+    (comparison_limbs : Vector F 2) (is_real : F) :
+    Extracted.BranchOracle.LtOperationUnsigned.asserts b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real =
+      Extracted.LtOperationUnsigned.asserts b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real := by
+  rw [Extracted.BranchOracle.LtOperationUnsigned.asserts,
+    Extracted.LtOperationUnsigned.asserts]
+  simp only [branchOracle_u16compare_asserts_eq]
+
+private theorem branchOracle_ltUnsigned_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (bit : F) (u16_flags : Vector F 4) (not_eq_inv : F)
+    (comparison_limbs : Vector F 2) (is_real : F) :
+    Extracted.BranchOracle.LtOperationUnsigned.interactions b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real =
+      Extracted.LtOperationUnsigned.interactions b cc
+        ⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩ is_real := by
+  rw [Extracted.BranchOracle.LtOperationUnsigned.interactions,
+    Extracted.LtOperationUnsigned.interactions]
+  simp only [branchOracle_u16compare_interactions_eq]
+
+private theorem branchOracle_ltSigned_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (bit : F) (u16_flags : Vector F 4) (not_eq_inv : F)
+    (comparison_limbs : Vector F 2) (bMsb cMsb is_signed is_real : F) :
+    Extracted.BranchOracle.LtOperationSigned.asserts b cc
+        ⟨⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩, ⟨bMsb⟩, ⟨cMsb⟩⟩
+        is_signed is_real =
+      Extracted.LtOperationSigned.asserts b cc
+        ⟨⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩, ⟨bMsb⟩, ⟨cMsb⟩⟩
+        is_signed is_real := by
+  rw [Extracted.BranchOracle.LtOperationSigned.asserts,
+    Extracted.LtOperationSigned.asserts]
+  simp only [branchOracle_u16msb_asserts_eq, branchOracle_ltUnsigned_asserts_eq]
+
+private theorem branchOracle_ltSigned_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
+    (b cc : Word F) (bit : F) (u16_flags : Vector F 4) (not_eq_inv : F)
+    (comparison_limbs : Vector F 2) (bMsb cMsb is_signed is_real : F) :
+    Extracted.BranchOracle.LtOperationSigned.interactions b cc
+        ⟨⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩, ⟨bMsb⟩, ⟨cMsb⟩⟩
+        is_signed is_real =
+      Extracted.LtOperationSigned.interactions b cc
+        ⟨⟨⟨bit⟩, u16_flags, not_eq_inv, comparison_limbs⟩, ⟨bMsb⟩, ⟨cMsb⟩⟩
+        is_signed is_real := by
+  rw [Extracted.BranchOracle.LtOperationSigned.interactions,
+    Extracted.LtOperationSigned.interactions]
+  simp only [branchOracle_u16msb_interactions_eq, branchOracle_ltUnsigned_interactions_eq]
 
 def branchChipInput {F : Type} [Add F]
-    (cols : Extracted.BranchColumns F) : BranchChip.Inputs F :=
+    (cols : BranchChip.Columns F) : BranchChip.Inputs F :=
   { is_real :=
       cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
         cols.is_bltu + cols.is_bgeu
@@ -35,25 +177,25 @@ def branchChipInput {F : Type} [Add F]
     adapter := cols.adapter }
 
 private theorem branchChipInput_isReal {F : Type} [Add F]
-    (cols : Extracted.BranchColumns F) :
+    (cols : BranchChip.Columns F) :
     (branchChipInput cols).is_real =
       cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
         cols.is_bltu + cols.is_bgeu := rfl
 
 def branchChipPrefix {F : Type}
-    (cols : Extracted.BranchColumns F) : Vector F 10 :=
+    (cols : BranchChip.Columns F) : Vector F 10 :=
   #v[cols.is_beq, cols.is_bne, cols.is_blt, cols.is_bge,
     cols.is_bltu, cols.is_bgeu, cols.is_branching,
     cols.next_pc[0], cols.next_pc[1], cols.next_pc[2]]
 
 def branchChipLocals {F : Type}
-    (cols : Extracted.BranchColumns F) : Vector F 20 :=
+    (cols : BranchChip.Columns F) : Vector F 20 :=
   Vector.cast (by rfl)
     (branchChipPrefix cols ++
       toElements cols.compare_operation)
 
 def branchChipPhysicalRow {F : Type} [Add F]
-    (cols : Extracted.BranchColumns F) : Array F :=
+    (cols : BranchChip.Columns F) : Array F :=
   inputFirstRow (branchChipInput cols) (branchChipLocals cols)
 
 private theorem vec3_eta {F : Type} (value : Vector F 3) :
@@ -63,13 +205,13 @@ private theorem vec3_eta {F : Type} (value : Vector F 3) :
   interval_cases i <;> rfl
 
 private theorem branchChipLocals_prefix {F : Type}
-    (cols : Extracted.BranchColumns F) (i : ℕ) (hi : i < 10) :
+    (cols : BranchChip.Columns F) (i : ℕ) (hi : i < 10) :
     (branchChipLocals cols)[i] = (branchChipPrefix cols)[i] := by
   unfold branchChipLocals
   rw [Vector.getElem_cast, Vector.getElem_append_left hi]
 
 private theorem branchChipLocals_suffix {F : Type}
-    (cols : Extracted.BranchColumns F) (i : ℕ)
+    (cols : BranchChip.Columns F) (i : ℕ)
     (hi : i < size Extracted.LtOperationSigned) :
     (branchChipLocals cols)[10 + i]'(by
       have hsize : size Extracted.LtOperationSigned = 10 := rfl
@@ -86,49 +228,49 @@ private theorem branchChipLocals_suffix {F : Type}
   omega
 
 private theorem branchChipPrefix_zero {F : Type}
-    (cols : Extracted.BranchColumns F) :
+    (cols : BranchChip.Columns F) :
     (branchChipPrefix cols)[0] = cols.is_beq := rfl
 
 private theorem branchChipPrefix_one {F : Type}
-    (cols : Extracted.BranchColumns F) :
+    (cols : BranchChip.Columns F) :
     (branchChipPrefix cols)[1] = cols.is_bne := rfl
 
 private theorem branchChipPrefix_two {F : Type}
-    (cols : Extracted.BranchColumns F) :
+    (cols : BranchChip.Columns F) :
     (branchChipPrefix cols)[2] = cols.is_blt := rfl
 
 private theorem branchChipPrefix_three {F : Type}
-    (cols : Extracted.BranchColumns F) :
+    (cols : BranchChip.Columns F) :
     (branchChipPrefix cols)[3] = cols.is_bge := rfl
 
 private theorem branchChipPrefix_four {F : Type}
-    (cols : Extracted.BranchColumns F) :
+    (cols : BranchChip.Columns F) :
     (branchChipPrefix cols)[4] = cols.is_bltu := rfl
 
 private theorem branchChipPrefix_five {F : Type}
-    (cols : Extracted.BranchColumns F) :
+    (cols : BranchChip.Columns F) :
     (branchChipPrefix cols)[5] = cols.is_bgeu := rfl
 
 private theorem branchChipPrefix_six {F : Type}
-    (cols : Extracted.BranchColumns F) :
+    (cols : BranchChip.Columns F) :
     (branchChipPrefix cols)[6] = cols.is_branching := rfl
 
 private theorem branchChipPrefix_seven {F : Type}
-    (cols : Extracted.BranchColumns F) :
+    (cols : BranchChip.Columns F) :
     (branchChipPrefix cols)[7] = cols.next_pc[0] := rfl
 
 private theorem branchChipPrefix_eight {F : Type}
-    (cols : Extracted.BranchColumns F) :
+    (cols : BranchChip.Columns F) :
     (branchChipPrefix cols)[8] = cols.next_pc[1] := rfl
 
 private theorem branchChipPrefix_nine {F : Type}
-    (cols : Extracted.BranchColumns F) :
+    (cols : BranchChip.Columns F) :
     (branchChipPrefix cols)[9] = cols.next_pc[2] := rfl
 
 omit [Fact (2 ^ 17 < p)] in
 set_option maxHeartbeats 1000000 in
 private theorem eval_branchChipCompare
-    (cols : Extracted.BranchColumns (ZMod p))
+    (cols : BranchChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
     Eval.eval
         (Environment.fromArray
@@ -155,7 +297,7 @@ private theorem eval_branchChipCompare
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem eval_branchChipPrefixLocal
-    (cols : Extracted.BranchColumns (ZMod p))
+    (cols : BranchChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) (i : ℕ) (hi : i < 10) :
     Expression.eval
         (Environment.fromArray
@@ -169,7 +311,7 @@ private theorem eval_branchChipPrefixLocal
 
 set_option maxHeartbeats 1000000 in
 theorem eval_branchChipDirectOutput
-    (cols : Extracted.BranchColumns (ZMod p))
+    (cols : BranchChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
     ProvableType.eval
         (Environment.fromArray
@@ -181,7 +323,7 @@ theorem eval_branchChipDirectOutput
       cols := by
   rw [BranchChip.directOutput_eq]
   rw [← CircuitType.eval_expression, BranchChip.eval_columns]
-  rw [Extracted.BranchColumns.mk.injEq]
+  rw [BranchChip.Columns.mk.injEq]
   dsimp only
   have hinputEval := eval_inputFirstRow
     (branchChipInput cols) (branchChipLocals cols) data
@@ -225,7 +367,7 @@ theorem eval_branchChipDirectOutput
   · exact eval_branchChipCompare cols data
 
 def branchChipRowCodec :
-    ChipRowCodec BranchChip.Inputs Extracted.BranchColumns
+    ChipRowCodec BranchChip.Inputs BranchChip.Columns
       (BranchChip.circuit (p := p)) where
   assignment cols data := {
     row := branchChipPhysicalRow cols
@@ -550,7 +692,7 @@ private theorem branchLtSignedEta {F : Type}
       exact ⟨branchLtUnsignedEta result, rfl, rfl⟩
 
 private def branchRustTail
-    (cols : Extracted.BranchColumns (ZMod p)) : List (ZMod p) :=
+    (cols : BranchChip.Columns (ZMod p)) : List (ZMod p) :=
   let f0 := cols.is_beq
   let f1 := cols.is_bne
   let f2 := cols.is_blt
@@ -606,8 +748,8 @@ omit [Fact (2 ^ 17 < p)] in
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 2000000 in
 private theorem branchColumns_asserts_decompose
-    (cols : Extracted.BranchColumns (ZMod p)) :
-    Extracted.BranchColumns.asserts cols =
+    (cols : BranchChip.Columns (ZMod p)) :
+    Extracted.BranchOracle.BranchColumns.asserts (branchChipReconfigure cols) =
       Extracted.CPUState.asserts cols.state cols.next_pc 8
           (cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
             cols.is_bltu + cols.is_bgeu) ++
@@ -628,14 +770,16 @@ private theorem branchColumns_asserts_decompose
           (cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
             cols.is_bltu + cols.is_bgeu) ++
       branchRustTail cols := by
-  rw [Extracted.BranchColumns.asserts]
+  rw [Extracted.BranchOracle.BranchColumns.asserts]
+  dsimp only [branchChipReconfigure, branchOracleCompareOperation]
+  simp only [branchOracle_ltSigned_asserts_eq]
   rw [branchCpuEta, branchITypeEta, branchLtSignedEta]
   simp only [vec3_eta, vec4_eta]
   simp only [branchRustTail, zero_add, add_zero, sub_zero]
   ring_nf
 
 private def branchRustInteractionTail
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     List (Extracted.Interaction (ZMod p)) :=
   let sum := cols.is_beq + cols.is_bne + cols.is_blt +
     cols.is_bge + cols.is_bltu + cols.is_bgeu
@@ -649,8 +793,8 @@ omit [Fact (2 ^ 17 < p)] in
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 2000000 in
 private theorem branchColumns_interactions_decompose
-    (cols : Extracted.BranchColumns (ZMod p)) :
-    Extracted.BranchColumns.interactions cols =
+    (cols : BranchChip.Columns (ZMod p)) :
+    Extracted.BranchOracle.BranchColumns.interactions (branchChipReconfigure cols) =
       Extracted.CPUState.interactions cols.state cols.next_pc 8
           (cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
             cols.is_bltu + cols.is_bgeu) ++
@@ -671,7 +815,9 @@ private theorem branchColumns_interactions_decompose
           (cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
             cols.is_bltu + cols.is_bgeu) ++
       branchRustInteractionTail cols := by
-  rw [Extracted.BranchColumns.interactions]
+  rw [Extracted.BranchOracle.BranchColumns.interactions]
+  dsimp only [branchChipReconfigure, branchOracleCompareOperation]
+  simp only [branchOracle_ltSigned_interactions_eq]
   rw [branchCpuEta, branchITypeEta, branchLtSignedEta]
   simp only [vec3_eta, vec4_eta]
   simp only [branchRustInteractionTail]
@@ -690,7 +836,7 @@ private theorem branchNextPcMap_eq (offset : ℕ) :
 private def branchChipRustColumns
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ) :
-    Extracted.BranchColumns (ZMod p) :=
+    BranchChip.Columns (ZMod p) :=
   { state := Eval.eval env input.state
     adapter := Eval.eval env input.adapter
     next_pc := Eval.eval env
@@ -765,8 +911,7 @@ private theorem branchRustAssertionsDecompose
         (branchChipOracle.nativeAssertZeros
           (branchChipRustColumns env input offset)) ↔
       branchRustMeaning env input offset := by
-  simp only [ChipOracle.nativeAssertZeros, branchChipOracle,
-    ChipOracle.identity, id_eq]
+  simp only [ChipOracle.nativeAssertZeros, branchChipOracle]
   rw [branchColumns_asserts_decompose]
   unfold branchRustMeaning branchRustCpuMeaning
     branchRustITypeMeaning branchRustLtMeaning branchRustTailMeaning
@@ -967,7 +1112,7 @@ private theorem branchMeaningFaithful
 theorem branchChip_constraints_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.BranchColumns (ZMod p))
+    (cols : BranchChip.Columns (ZMod p))
     (hbind : BindsChipOutput BranchChip.main env input offset cols)
     (hinputReal :
       Expression.eval env input.is_real =
@@ -992,7 +1137,7 @@ theorem branchChip_constraints_faithful
 
 set_option maxHeartbeats 2000000 in
 private theorem branchChipRowCodec_inputReal
-    (cols : Extracted.BranchColumns (ZMod p))
+    (cols : BranchChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := branchChipRowCodec.assignment cols data
     Expression.eval assignment.environment
@@ -1059,7 +1204,7 @@ private theorem branchChipRowCodec_inputReal
 
 set_option maxHeartbeats 200000 in
 theorem branchChip_constraints_constructive
-    (rustCols : Extracted.BranchColumns (ZMod p))
+    (rustCols : Extracted.BranchOracle.BranchColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := branchChipRowCodec.assignment
       (branchChipOracle.deconfigure rustCols) data
@@ -1385,19 +1530,19 @@ private def branchRustAccesses
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ) :
     LookupAccessList :=
-  (Extracted.BranchColumns.interactions
-    (branchChipRustColumns env input offset)).map
+  (Extracted.BranchOracle.BranchColumns.interactions
+    (branchChipReconfigure (branchChipRustColumns env input offset))).map
       Extracted.Interaction.toAccess
 
 private def branchCpuRustAccesses
-    (cols : Extracted.BranchColumns (ZMod p)) : LookupAccessList :=
+    (cols : BranchChip.Columns (ZMod p)) : LookupAccessList :=
   (Extracted.CPUState.interactions cols.state cols.next_pc 8
     (cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
       cols.is_bltu + cols.is_bgeu)).map
         Extracted.Interaction.toAccess
 
 private def branchITypeRustAccesses
-    (cols : Extracted.BranchColumns (ZMod p)) : LookupAccessList :=
+    (cols : BranchChip.Columns (ZMod p)) : LookupAccessList :=
   (Extracted.ITypeReaderImmutable.interactions cols.state.clk_high
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536)
     cols.state.pc
@@ -1411,7 +1556,7 @@ private def branchITypeRustAccesses
         Extracted.Interaction.toAccess
 
 private def branchLtRustAccesses
-    (cols : Extracted.BranchColumns (ZMod p)) : LookupAccessList :=
+    (cols : BranchChip.Columns (ZMod p)) : LookupAccessList :=
   (Extracted.LtOperationSigned.interactions
     cols.adapter.op_a_memory.prev_value
     cols.adapter.op_b_memory.prev_value
@@ -1421,7 +1566,7 @@ private def branchLtRustAccesses
         Extracted.Interaction.toAccess
 
 private def branchTailRustAccesses
-    (cols : Extracted.BranchColumns (ZMod p)) : LookupAccessList :=
+    (cols : BranchChip.Columns (ZMod p)) : LookupAccessList :=
   (branchRustInteractionTail cols).map
     Extracted.Interaction.toAccess
 
@@ -1443,7 +1588,7 @@ private theorem branchRustAccesses_decompose
 omit [Fact (2 ^ 17 < p)] in
 set_option maxHeartbeats 1000000 in
 private theorem branchITypeRustAccesses_noState
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     (branchITypeRustAccesses cols).filter
         (fun access => access.1 = InteractionKind.State) = [] := by
   simp [branchITypeRustAccesses,
@@ -1453,7 +1598,7 @@ private theorem branchITypeRustAccesses_noState
 omit [Fact (2 ^ 17 < p)] in
 set_option maxHeartbeats 2000000 in
 private theorem branchLtRustAccesses_noState
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     (branchLtRustAccesses cols).filter
         (fun access => access.1 = InteractionKind.State) = [] := by
   simp [branchLtRustAccesses,
@@ -1465,7 +1610,7 @@ private theorem branchLtRustAccesses_noState
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem branchTailRustAccesses_noState
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     (branchTailRustAccesses cols).filter
         (fun access => access.1 = InteractionKind.State) = [] := by
   simp [branchTailRustAccesses, branchRustInteractionTail,
@@ -1579,7 +1724,7 @@ private theorem branchStateInteractions_faithful
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem branchCpuRustAccesses_noMemory
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     (branchCpuRustAccesses cols).filter
         (fun access => access.1 = InteractionKind.Memory) = [] := by
   simp [branchCpuRustAccesses, Extracted.CPUState.interactions,
@@ -1587,7 +1732,7 @@ private theorem branchCpuRustAccesses_noMemory
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem branchLtRustAccesses_noMemory
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     (branchLtRustAccesses cols).filter
         (fun access => access.1 = InteractionKind.Memory) = [] := by
   simp [branchLtRustAccesses,
@@ -1599,7 +1744,7 @@ private theorem branchLtRustAccesses_noMemory
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem branchTailRustAccesses_noMemory
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     (branchTailRustAccesses cols).filter
         (fun access => access.1 = InteractionKind.Memory) = [] := by
   simp [branchTailRustAccesses, branchRustInteractionTail,
@@ -1727,7 +1872,7 @@ private theorem branchMemoryInteractions_faithful
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem branchCpuRustAccesses_noProgram
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     (branchCpuRustAccesses cols).filter
         (fun access => access.1 = InteractionKind.Program) = [] := by
   simp [branchCpuRustAccesses, Extracted.CPUState.interactions,
@@ -1735,7 +1880,7 @@ private theorem branchCpuRustAccesses_noProgram
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem branchLtRustAccesses_noProgram
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     (branchLtRustAccesses cols).filter
         (fun access => access.1 = InteractionKind.Program) = [] := by
   simp [branchLtRustAccesses,
@@ -1747,7 +1892,7 @@ private theorem branchLtRustAccesses_noProgram
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem branchTailRustAccesses_noProgram
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     (branchTailRustAccesses cols).filter
         (fun access => access.1 = InteractionKind.Program) = [] := by
   simp [branchTailRustAccesses, branchRustInteractionTail,
@@ -2019,7 +2164,7 @@ private theorem branchLtByte_faithful
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem branchLtRustAccesses_allByte
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     (branchLtRustAccesses cols).filter
         (fun access => access.1 = InteractionKind.Byte) =
       branchLtRustAccesses cols := by
@@ -2032,7 +2177,7 @@ private theorem branchLtRustAccesses_allByte
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem branchTailRustAccesses_allByte
-    (cols : Extracted.BranchColumns (ZMod p)) :
+    (cols : BranchChip.Columns (ZMod p)) :
     (branchTailRustAccesses cols).filter
         (fun access => access.1 = InteractionKind.Byte) =
       branchTailRustAccesses cols := by
@@ -2142,7 +2287,7 @@ set_option maxHeartbeats 1000000 in
 theorem branchChip_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
-    (cols : Extracted.BranchColumns (ZMod p))
+    (cols : BranchChip.Columns (ZMod p))
     (hbind : BindsChipOutput BranchChip.main env input offset cols)
     (hinputReal :
       Expression.eval env input.is_real =
@@ -2165,8 +2310,7 @@ theorem branchChip_interactions_faithful
   rw [branchUnexpectedInteractions_empty]
   simp only [List.map_nil, List.append_nil]
   simp only [ChipOracle.accesses,
-    ChipOracle.nativeInteractions, branchChipOracle,
-    ChipOracle.identity, id_eq]
+    ChipOracle.nativeInteractions, branchChipOracle]
   rw [branchStateInteractions_eq,
     BranchChip.interactionsWith_memory_eq,
     branchProgramInteractions_eq]
@@ -2191,7 +2335,7 @@ theorem branchChip_interactions_faithful
 
 set_option maxHeartbeats 200000 in
 theorem branchChip_interactions_constructive
-    (rustCols : Extracted.BranchColumns (ZMod p))
+    (rustCols : Extracted.BranchOracle.BranchColumns (ZMod p))
     (data : ProverData (ZMod p)) :
     let assignment := branchChipRowCodec.assignment
       (branchChipOracle.deconfigure rustCols) data
@@ -2228,7 +2372,7 @@ theorem branchChip_interactions_constructive
 
 theorem branchChip_faithful :
     ChipFaithful (p := p) BranchChip.Inputs
-      Extracted.BranchColumns Extracted.BranchColumns
+      BranchChip.Columns Extracted.BranchOracle.BranchColumns
       BranchChip.circuit branchChipRowCodec branchChipOracle where
   constraints := branchChip_constraints_constructive (p := p)
   interactions := fun rustCols data _ =>

@@ -256,14 +256,14 @@ lemma loadHalf_hval (input : Inputs (ZMod p)) (isU : Bool)
 so `LoadHalfChip.advance` can be supplied *as* `kind.advance`. Straight-line `next_pc = pc+4`,
 ITypeReader adapter, `rdWrite = #v[selected_half, 65535·msb, 65535·msb, 65535·msb]`, opcode
 `is_lh·30 + is_lhu·33`, `commit = .regWrite`. -/
-def rowView (inp : Inputs (ZMod p)) (_cols : Extracted.LoadHalfColumns (ZMod p)) : Trace.RowView (ZMod p) :=
+def rowView (inp : Inputs (ZMod p)) (_cols : LoadHalfChip.Columns (ZMod p)) : Trace.RowView (ZMod p) :=
   ⟨inp.state, #v[inp.state.pc[0] + 4, inp.state.pc[1], inp.state.pc[2]],
     inp.adapter.toAdapterView, LoadHalfChip.isReal inp,
     #v[inp.selected_half, 65535 * inp.msb, 65535 * inp.msb, 65535 * inp.msb],
     inp.is_lh * 30 + inp.is_lhu * 33, .regWrite⟩
 
 /-- LoadHalf's exact aligned RAM-access projection. -/
-def ramAccessView (inp : Inputs (ZMod p)) (cols : Extracted.LoadHalfColumns (ZMod p)) :
+def ramAccessView (inp : Inputs (ZMod p)) (cols : LoadHalfChip.Columns (ZMod p)) :
     Trace.RamAccessView (ZMod p) :=
   { compareLow := inp.memory_access.access_timestamp.compare_low
     prevHigh := inp.memory_access.access_timestamp.prev_high
@@ -282,7 +282,7 @@ LH/LHU one-hot, the loaded-limb bound (`selected_half < 2^16` — a genuine prec
 the committed limb as its two little-endian bytes; NOT in the chip `Spec`, which carries
 `U16MSBOperation.Spec` instead), the **2-byte alignment**, the address bounds, and the
 **two-byte memory-read binding**. -/
-def AdvanceReady (inp : Inputs (ZMod p)) (_cols : Extracted.LoadHalfColumns (ZMod p))
+def AdvanceReady (inp : Inputs (ZMod p)) (_cols : LoadHalfChip.Columns (ZMod p))
     (_prog : GuestProgram) (s : SailState) : Prop :=
   inp.adapter.op_a ≠ 0 ∧
   (inp.state.pc[0]).val < 2 ^ 16 ∧
@@ -307,7 +307,7 @@ flag dispatch fixing `isU`; each branch derives the opcode (30/33 = LH/LHU) and 
 supplies the sign-bit fact), then feeds `advance_of_load_width2` with the memory binding / bounds /
 alignment / routing carried in `advanceReady`. `hreal` is unused (the loaded-limb bound is carried
 in `advanceReady`, not derived from the `Spec`). -/
-theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadHalfColumns (ZMod p))
+theorem advance (inp : Inputs (ZMod p)) (cols : LoadHalfChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) (prog : GuestProgram) (s : SailState)
     (_hreal : (rowView inp cols).is_real = 1) (hspec : Spec inp cols data)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -357,7 +357,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Extracted.LoadHalfColumns (ZMod 
 def kind : Soundness.ChipKind p where
   name := "LoadHalf"
   Inputs := LoadHalfChip.Inputs
-  Cols := Extracted.LoadHalfColumns
+  Cols := LoadHalfChip.Columns
   view := rowView
   ramAccess := fun inp cols => some (ramAccessView inp cols)
   chipSpec := fun inp cols data => LoadHalfChip.Spec inp cols data

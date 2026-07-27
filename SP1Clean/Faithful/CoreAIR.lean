@@ -2,15 +2,15 @@ import SP1Clean.Extracted.ChipOracle.AluX0
 import SP1Clean.Extracted.ChipOracle.Addi
 import SP1Clean.Extracted.ChipOracle.Addw
 import SP1Clean.Extracted.ChipOracle.Bitwise
-import SP1Clean.Extracted.BranchChip
+import SP1Clean.Extracted.ChipOracle.Branch
 import SP1Clean.Extracted.ChipOracle.Add
 import SP1Clean.Extracted.ChipOracle.Sub
 import SP1Clean.Extracted.ChipOracle.DivRem
 import SP1Clean.Extracted.ChipOracle.Jal
 import SP1Clean.Extracted.ChipOracle.Jalr
-import SP1Clean.Extracted.LoadByteChip
+import SP1Clean.Extracted.ChipOracle.LoadByte
 import SP1Clean.Extracted.LoadDoubleChip
-import SP1Clean.Extracted.LoadHalfChip
+import SP1Clean.Extracted.ChipOracle.LoadHalf
 import SP1Clean.Extracted.LoadWordChip
 import SP1Clean.Extracted.LoadX0Chip
 import SP1Clean.Extracted.ChipOracle.Lt
@@ -77,8 +77,8 @@ def MainRow (p : ℕ) [Fact p.Prime] : Table → Type
   | .shiftLeft => ShiftLeftOracle.ShiftLeftCols (ZMod p)
   | .lt => LtOracle.LtCols (ZMod p)
   | .aluX0 => AluX0Oracle.AluX0Cols (ZMod p)
-  | .loadByte => LoadByteColumns (ZMod p)
-  | .loadHalf => LoadHalfColumns (ZMod p)
+  | .loadByte => LoadByteOracle.LoadByteColumns (ZMod p)
+  | .loadHalf => LoadHalfOracle.LoadHalfColumns (ZMod p)
   | .loadWord => LoadWordColumns (ZMod p)
   | .loadDouble => LoadDoubleColumns (ZMod p)
   | .loadX0 => LoadX0Columns (ZMod p)
@@ -87,7 +87,7 @@ def MainRow (p : ℕ) [Fact p.Prime] : Table → Type
   | .storeWord => StoreWordColumns (ZMod p)
   | .storeDouble => StoreDoubleColumns (ZMod p)
   | .uType => UTypeOracle.UTypeColumns (ZMod p)
-  | .branch => BranchColumns (ZMod p)
+  | .branch => BranchOracle.BranchColumns (ZMod p)
   | .jal => JalOracle.JalColumns (ZMod p)
   | .jalr => JalrOracle.JalrColumns (ZMod p)
   | .syscallInstrs => SyscallInstrsCols (ZMod p)
@@ -128,8 +128,8 @@ def assertions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .shiftLeft => ShiftLeftOracle.ShiftLeftCols.asserts row.main
   | .lt => LtOracle.LtCols.asserts row.main
   | .aluX0 => AluX0Oracle.AluX0Cols.asserts row.main
-  | .loadByte => LoadByteColumns.asserts row.main
-  | .loadHalf => LoadHalfColumns.asserts row.main
+  | .loadByte => LoadByteOracle.LoadByteColumns.asserts row.main
+  | .loadHalf => LoadHalfOracle.LoadHalfColumns.asserts row.main
   | .loadWord => LoadWordColumns.asserts row.main
   | .loadDouble => LoadDoubleColumns.asserts row.main
   | .loadX0 => LoadX0Columns.asserts row.main
@@ -138,7 +138,7 @@ def assertions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .storeWord => StoreWordColumns.asserts row.main
   | .storeDouble => StoreDoubleColumns.asserts row.main
   | .uType => UTypeOracle.UTypeColumns.asserts row.main
-  | .branch => BranchColumns.asserts row.main
+  | .branch => BranchOracle.BranchColumns.asserts row.main
   | .jal => JalOracle.JalColumns.asserts row.main
   | .jalr => JalrOracle.JalrColumns.asserts row.main
   | .syscallInstrs =>
@@ -173,8 +173,8 @@ def interactions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .shiftLeft => ShiftLeftOracle.ShiftLeftCols.interactions row.main
   | .lt => LtOracle.LtCols.interactions row.main
   | .aluX0 => AluX0Oracle.AluX0Cols.interactions row.main
-  | .loadByte => LoadByteColumns.interactions row.main
-  | .loadHalf => LoadHalfColumns.interactions row.main
+  | .loadByte => LoadByteOracle.LoadByteColumns.interactions row.main
+  | .loadHalf => LoadHalfOracle.LoadHalfColumns.interactions row.main
   | .loadWord => LoadWordColumns.interactions row.main
   | .loadDouble => LoadDoubleColumns.interactions row.main
   | .loadX0 => LoadX0Columns.interactions row.main
@@ -183,7 +183,7 @@ def interactions (publicValues : SP1PublicValues (ZMod p)) (table : Table)
   | .storeWord => StoreWordColumns.interactions row.main
   | .storeDouble => StoreDoubleColumns.interactions row.main
   | .uType => UTypeOracle.UTypeColumns.interactions row.main
-  | .branch => BranchColumns.interactions row.main
+  | .branch => BranchOracle.BranchColumns.interactions row.main
   | .jal => JalOracle.JalColumns.interactions row.main
   | .jalr => JalrOracle.JalrColumns.interactions row.main
   | .syscallInstrs =>

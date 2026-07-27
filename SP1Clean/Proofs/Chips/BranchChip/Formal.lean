@@ -5,7 +5,6 @@ import SP1Clean.Proofs.Chips.BranchChip.Core
 namespace SP1Clean.BranchChip
 
 open Circuit
-open Extracted (BranchColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -255,7 +254,7 @@ private theorem main_exposedChannelsLawful
       List.nil_append]
 
 /-- The exact pinned-SP1 Branch `GeneralFormalCircuit`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs BranchColumns :=
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     channelsWithRequirements := [memoryChannel.toRaw],
     Assumptions := Assumptions,
