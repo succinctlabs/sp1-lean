@@ -743,6 +743,7 @@ def render_chip_oracle(
             rf"SP1Clean.Extracted.{helper}.\1",
             body,
         )
+    body = _preserve_raw_byte_opcodes(body)
     body = _bump_constraints_heartbeats(body.strip(), 8000000)
     body = _expand_large_derives(body)
     _sanity_gate(f"{chip} (self-contained chip oracle)", body)
