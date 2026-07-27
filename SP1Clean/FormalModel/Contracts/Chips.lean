@@ -55,12 +55,11 @@ manipulate the adapter slot see through it. -/
 /-- The `rs2` source operand = the register read on the `op_c` memory slot (`op_c_memory.prev_value`). -/
 @[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c_memory.prev_value
 
-/-- Semantic contract, composed from the sub-circuits' own `Spec`s. The four conjuncts: the two reader
-sub-`Spec`s on the `state`/`adapter` blocks, the *proven* `is_real`-binary fact, and the `is_real`-gated
-arithmetic meaning — on real rows the result column is the RV64 `ADD` of the operands
-(`RV64.add op_c_val op_b_val = op_b_val + op_c_val`). Vacuous on padding. -/
+/-- Semantic contract, composed from the sub-circuits' own `Spec`s. The three conjuncts: the
+`RTypeReader` reader sub-`Spec` on the `state`/`adapter` blocks, the *proven* `is_real`-binary fact,
+and the `is_real`-gated arithmetic meaning — on real rows the result column is the RV64 `ADD` of the
+operands (`RV64.add op_c_val op_b_val = op_b_val + op_c_val`). Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  True ∧
   Readers.RTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,
@@ -157,11 +156,11 @@ Memory-bus values), projected rather than carried as separate committed columns 
 @[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
 @[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c_memory.prev_value
 
-/-- Semantic contract, mirroring `AddChip`. The fourth conjunct: on real rows the result column is the
-RV64 `SUB` of the operands (`RV64.sub op_c_val op_b_val = op_b_val - op_c_val`, the fixed `rs1 - rs2`
+/-- Semantic contract, mirroring `AddChip` (the same three conjuncts, one `RTypeReader` sub-`Spec`).
+The third conjunct: on real rows the result column is the RV64 `SUB` of the operands
+(`RV64.sub op_c_val op_b_val = op_b_val - op_c_val`, the fixed `rs1 - rs2`
 order — `SUB` is not commutative). -/
 def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  True ∧
   Readers.RTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,
@@ -284,7 +283,6 @@ value the reader carries is the **sign-extended** W result `[v0, v1, msb·65535,
 `SubwOperation.resultWord`), and the gated-arith conjunct is `toBitVec64 resultWord = RV64.subw op_c op_b`
 (the low-32 subtract `rs1 - rs2` sign-extended; not commutative). Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  True ∧
   Readers.RTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
       clk_high := cols.state.clk_high,
@@ -685,14 +683,17 @@ lemma rv64_mulw_eq (x y : BitVec 64) :
     Nat.shiftRight_zero, Nat.reduceAdd, Nat.reduceSub]
   rw [Nat.mod_mod_of_dvd _ ⟨2 ^ 32, by norm_num⟩, ← Nat.mul_mod]
 
-/-- Semantic contract, composed from the sub-circuits' own `Spec`s (as `AddChip`). Three conjuncts: the
+/-- Semantic contract, composed from the sub-circuits' own `Spec`s (as `AddChip`). Four conjuncts: the
 `RTypeReader` reader sub-`Spec` on the `state`/`adapter` blocks (the register reads/write, gated by the
 flag-weighted R-type opcode `is_mul·11 + is_mulh·12 + is_mulhu·13 + is_mulhsu·14 + is_mulw·24` and the
-result `cols.a` as the `op_a` write value), the *proven* `is_real`-binary fact, and the `is_real`-gated,
+result `cols.a` as the `op_a` write value), the *proven* `is_real`-binary fact, the `is_real`-gated,
 **flag-gated** arithmetic with five variant conjuncts: on real rows the result column `cols.a` is the RV64
 multiply selected by the committed flag (`cols.is_mul → RV64.mul`, the low-64 product; `cols.is_mulh →
 RV64.mulh`, signed×signed high 64; `cols.is_mulhu → RV64.mulhu`, unsigned×unsigned high 64; `cols.is_mulhsu
-→ RV64.mulhsu`, signed×unsigned high 64; `cols.is_mulw → RV64.mulw`, low-32 product sign-extended to 64).
+→ RV64.mulhsu`, signed×unsigned high 64; `cols.is_mulw → RV64.mulw`, low-32 product sign-extended to 64) —
+and the *proven* selector **one-hot**: on real rows exactly one committed variant flag is set
+(`SelectorOneHot (selectors cols)`, from the five selector boolean gates plus the circuit's
+`is_real = Σ selectors` assert), so a real row cannot satisfy the five gated conjuncts vacuously.
 Operand order matches the RV64 signature `f rs2_val rs1_val` with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`.
 Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
@@ -715,7 +716,8 @@ def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZM
     (cols.is_mulhsu = 1 →
       Word.toBitVec64 cols.a = RV64.mulhsu (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
     (cols.is_mulw = 1 →
-      Word.toBitVec64 cols.a = RV64.mulw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)))
+      Word.toBitVec64 cols.a = RV64.mulw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))) ∧
+  (input.is_real = 1 → SelectorOneHot (selectors cols))
 
 end SP1Clean.MulChip
 

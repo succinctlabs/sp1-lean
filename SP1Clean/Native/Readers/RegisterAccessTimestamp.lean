@@ -25,7 +25,7 @@ SP1's `eval_register_access_*` emits, per operand, two byte-bus timestamp checks
 
 Each is a `byteChannel.pull ⟨op, is_real·value, width, 0⟩`: a pull (multiplicity `-1`) hands soundness
 the channel's `Guarantees = ByteRowSpec` of the message *for free* (the in-circuit byte-op correctness),
-which the proof projects through `byteRowSpec_range`/`byteRowSpec_u8range`. Gating stays in the message
+which the proof projects through `byteRowSpec_range`/`byteRowSpec_u8range_pair`. Gating stays in the message
 (`is_real·value`): on `is_real = 1` the real bound, on `is_real = 0` the vacuous zero-row. Because a pull
 can't carry a gated multiplicity (Clean fires `Guarantees` only at `mult = -1`), the byte-op correctness
 is *assumed* from the channel — discharged at the ensemble/balance level (the absent `ByteChip`

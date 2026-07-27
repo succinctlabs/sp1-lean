@@ -671,7 +671,9 @@ theorem supported_core_witness_grounding
     exact clockCount
 
 /-- **Supported native-Clean soundness.** A satisfying, channel-balanced witness whose provider
-tables are semantically bound produces a genuine local official-Sail execution between its public
+tables are semantically bound and whose memory timestamps satisfy the
+`SupportedCoreMemoryTimestampRangeRelation` bound (the third conjunct of
+`SupportedCoreNativeRelation`) produces a genuine local official-Sail execution between its public
 endpoints.  This deliberately concludes a shard-local segment; boot reachability is supplied later by
 `supportedCoreLocalExecution_anchors` when consecutive shards are composed. -/
 theorem supported_core_native_sound (model : Machine.SP1MachineModel)

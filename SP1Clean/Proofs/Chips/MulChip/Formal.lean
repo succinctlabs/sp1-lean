@@ -108,7 +108,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
           List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
         first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
-  refine ⟨⟨h_rspec, h_bin, fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩⟩,
+  refine ⟨⟨h_rspec, h_bin, fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩,
+      -- F-A4-01: the exported selector one-hot — the five boolean gates + `is_real = Σ flags`.
+      fun hr => by simpa only [SelectorOneHot, selectors] using
+        MulOperation.oneHot_of_sum_one bmul bmulh bmulhu bmulhsu bmulw (h_rs.symm.trans hr)⟩,
     Or.inr ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩,
     Or.inr ⟨h_bin, h_bin, h_clk⟩,
     Or.inr ⟨h_bin, h_a_isU64, h_clk.at_four⟩⟩
@@ -173,6 +176,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
       first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
 
+-- 128M: whole-chip completeness must normalize the 54-cell witness stream (5 flags + the 45-cell
+-- `MulOperation` populate + the 4-cell result) against every composed reader/operation obligation
+-- in one `circuit_proof_start` pass — the largest single witness closure in the tree.
 set_option maxHeartbeats 128000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by

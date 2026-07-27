@@ -536,3 +536,72 @@ Bridges reach the monadic Sail clauses, not just pure restatements.
   flag on real rows (one-hot lives in `ControlFacts.selectorLink` + `advanceReady`). Pattern
   decision at fix time: export one-hot into the Mul Spec (flagged WEAK-SPEC-low there) and
   document the selector-chip pattern once for the rest.
+
+### Phase 3 — fix batch + non-vacuity (V-track) execution (2026-07-27)
+
+All queued Phase-3 source fixes applied in one pass; gate `lake build SP1Clean` green first try
+(3610 jobs, 0 errors / 0 warnings / 0 info), `lake test` green, `lake lint` PASS,
+`gen_axiom_probe.py` zero-diff (478 probes, names unchanged), citations checker PASS. Targeted
+`#print axioms` re-check on every touched theorem: no new axioms, no `sorryAx` (Mul retains only
+its pre-existing `bv_decide` disclosures; Add/Sub/Subw circuits stay
+`[propext, Classical.choice, Quot.sound]`).
+
+- **F-A4-01 FIXED (the one WEAK-SPEC).** `MulChip.Spec` now exports the selector one-hot as a
+  fourth conjunct `input.is_real = 1 → SelectorOneHot (selectors cols)`
+  (`Contracts/Chips.lean`); soundness proves it from the five selector boolean gates + the
+  circuit's `is_real = Σ flags` assert via `MulOperation.oneHot_of_sum_one` (`MulChip/Formal.lean`
+  — a real row can no longer satisfy the five gated conjuncts vacuously). Completeness untouched
+  (`ProverSpec = True`); consumers re-arified (`MulChip/Bridge.lean` `.2.2 → .2.2.1` ×2). The
+  selector-chip pattern for the rest (F-A3-07 shifts etc.) stays at the grounding layer as decided.
+- **F-A9-01/F-A1-01 FIXED.** The dead `True ∧` conjunct dropped from the Add/Sub/Subw Specs
+  (`Contracts/Chips.lean`); downstream destructuring re-arified in the three chip Bridges
+  (`h_chip.2.2.2 → .2.2`, `obtain ⟨-, hrspec, -, harith⟩ → ⟨hrspec, -, harith⟩`) and
+  `GroundingAdapter.addChip_opa_lt`. Soundness proofs needed no change (`circuit_proof_start`
+  already simp-normalized the `True ∧` away).
+- **F-A1-02 FIXED.** Add docstring now says three conjuncts / one `RTypeReader` sub-`Spec`; Sub
+  docstring re-numbered ("third conjunct") and points at the shared shape.
+- **F-A8-01/07 FIXED.** `Model/ByteTable.lean` header + range-check section rewritten: `Range` is
+  **not** among `byte_table()`'s six ops — its receiver is SP1's separate preprocessed `RangeChip`
+  (`range/air.rs`), mirrored by `RangeChip.circuit8/13/16`; the Lean `ByteRowSpec` covers all
+  seven opcodes so one Byte channel backs both receivers (now consistent with the
+  `Proofs/Chips/ByteChip/RangeChip.lean` header).
+- **F-A8-02 FIXED.** Dead a-slot `byteRowSpec_u8range` deleted (zero proof consumers); doc
+  mentions repointed to the load-bearing `byteRowSpec_u8range_pair` (`ByteTable.lean` ×3,
+  `Native/Readers/RegisterAccessTimestamp.lean`).
+- **F-A9-05 FIXED.** `supported_core_native_sound`'s doc now names the
+  `SupportedCoreMemoryTimestampRangeRelation` third conjunct (`Soundness/AIR.lean`).
+- **F-I-03 FIXED.** One-line budget justifications added at the four uncommented >16M heartbeat
+  sites: MulChip completeness 128M, MulOperation soundness/completeness 40M×2, Bitwise + Lt
+  completeness 32M×2.
+- **V3 LANDED.** New `SP1CleanTest/NonVacuity.lean` (picked up by the `SP1CleanTest.+` glob →
+  `lake test`): a concrete satisfying input row for **all 20** chips whose soundness
+  `Assumptions ≠ True` (Addi/Addw `isU64 op_c_val`; Bitwise/Lt/ShiftLeft/ShiftRight/DivRem/
+  StoreDouble 2×isU64; loads + LoadX0 3×isU64; Jal/Jalr/Branch imm+read+pc isU64s; SB/SH/SW with
+  `is_real = 1` so the gated `isU64 store_value` conjunct is exercised non-vacuously; UType incl.
+  its semantic decode conjunct — the zero row is a genuine LUI-of-zero, `RV64.lui 0 = 0`). All at
+  KoalaBear via `unfold` + `native_decide` (test-lib only). Add/Sub/Subw/AluX0/Mul assume `True`.
+- **V2 DISCLOSED (timebox held, no partial code).** No `Machine.SP1MachineModel` witness landed.
+  Assessment: `FormalModel/Trace/Witness.lean` already proves `IsInitialState` satisfiable
+  axiom-clean (`isInitialState_nonvacuous`: `configuredState pc` discharges the full 12-field
+  `SailConfigured` + `isInitialized` for the empty program), but the model's `boot` field demands
+  a **total loader** — for *every* well-formed program a Sail state with ROM+image bytes loaded —
+  i.e. a mem-fold construction with `RomLoaded`/`imageLoaded` proofs needing per-entry
+  disjointness from `rom_nodup`+alignment and rom/image overlap agreement via
+  `ImageCompatibleWithROM`, plus `RegistersZero`. Estimated well beyond the 90-min box (≈ days);
+  the report's existing "no SP1MachineModel instance is constructed" language stands, and can cite
+  `isInitialState_nonvacuous` as the partial non-vacuity already in-repo.
+- **V1 ASSESSED (not implemented).** An empty-shard `∃ s w, SupportedCoreNativeRelation s w`
+  witness has **no structural blocker**: with all 36 chip/provider tables empty, per-row
+  `Constraints` and the chip contributions to `BalancedChannels` are vacuous;
+  `SupportedCoreMemoryTimestampRangeRelation` quantifies over real decoded rows (none); and
+  `SemanticBoundaryBinding`'s `InitialBoundaryFacts` are satisfiable with
+  `configuredState (supportedPcBits …)` + an empty committed program (romLoaded/provider bounds
+  vacuous). The genuine costs: (1) the ensemble's `verifierTable` always has **one row** (the
+  public values), so the State balance needs the statement's init = final endpoints (satisfiable
+  by choosing them equal) and that row's constraint/balance facts must be discharged concretely;
+  (2) `StatementFor` needs a small concrete canonical `ProverData` (`CanonicalEncoding` demands
+  real singleton `sp1.pc_start`/`sp1.init_clk` rows — `fun _ _ => #[]` does not qualify);
+  (3) constructing the 37-table `EnsembleWitness` and pushing `Constraints`/`BalancedChannels`
+  through Clean's flat-ensemble API. Estimate 1–3 days — not "genuinely cheap", so per the
+  timebox it is reported, not built. Natural home when built: `SP1CleanTest` (the balance
+  arithmetic at the concrete prime can then use `decide`/`native_decide`).

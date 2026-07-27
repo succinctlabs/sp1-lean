@@ -212,6 +212,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
                   (h_lt ⟨ha, hb, h_bin, h_slt_bool⟩)).1)),
                 h_clk.at_four⟩
 
+-- 32M: whole-chip completeness normalizes the flag-hinted witness stream (SLT/SLTU flags + the
+-- signed/unsigned comparison gadget closures) against the composed reader obligations at once.
 set_option maxHeartbeats 32000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by

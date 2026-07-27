@@ -1922,7 +1922,7 @@ theorem addChip_opa_lt (inp : AddChip.Inputs (ZMod p)) (cols : AddChip.Columns (
     (data : ProverData (ZMod p)) (real : inp.is_real = 1)
     (spec : AddChip.Spec inp cols data) :
     (AddChip.rowView inp cols).adapter.op_a.val < 32 := by
-  obtain ⟨-, hrspec, -, -⟩ := spec
+  obtain ⟨hrspec, -, -⟩ := spec
   obtain ⟨-, -, -, -, -, hbounds, -⟩ := hrspec
   exact (hbounds real).1
 

@@ -60,7 +60,7 @@ theorem sub_chip_reaches_sail
     (spec_sub (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_sub (.Regidx rd_idx) pc cols.sub_operation.value).run s :=
   correct_sub_native input.op_b_val input.op_c_val cols.sub_operation.value
-    rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_chip.2.2.2 h_real)
+    rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_chip.2.2 h_real)
 
 end SP1Clean.SubSail
 
@@ -106,7 +106,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) (data : Prover
   have vrd : r.rdWrite = cols.sub_operation.value := rfl
   have vopbm : r.adapter.op_b_memory = cols.adapter.op_b_memory := rfl
   have vopcm : r.adapter.op_c_memory = cols.adapter.op_c_memory := rfl
-  obtain ⟨-, hrspec, -, harith⟩ := hspec
+  obtain ⟨hrspec, -, harith⟩ := hspec
   obtain ⟨-, -, -, -, -, hbounds, -⟩ := hrspec
   obtain ⟨-, hpc0, -, -⟩ := hbounds hreal'
   have hop : r.opcode = ((ropToOpcode rop.SUB).toNat : ZMod p) := by

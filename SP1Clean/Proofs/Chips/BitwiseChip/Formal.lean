@@ -220,6 +220,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
                   circuit_norm] at hisu ⊢
                 exact hisu), h_clk.at_four⟩
 
+-- 32M: whole-chip completeness normalizes the flag-hinted witness stream (3 opcode flags + the
+-- 8-fold byte-pair `BitwiseU16Operation` lookups) against the composed reader obligations at once.
 set_option maxHeartbeats 32000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by

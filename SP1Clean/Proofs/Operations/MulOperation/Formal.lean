@@ -93,6 +93,8 @@ private lemma op5_iff_of_msb_eq {x lo msb : ZMod p}
   · rename_i h; exact ⟨Or.inr rfl, iff_of_true rfl (key.mp h)⟩
   · rename_i h; exact ⟨Or.inl rfl, iff_of_false zero_ne_one (fun hc => h (key.mpr hc))⟩
 
+-- 40M: the gadget composes the 8×8 limb product's carry chain plus four sub-gadget boundaries;
+-- soundness normalizes all 45 witnessed columns' constraints in one `circuit_proof_start` pass.
 set_option maxHeartbeats 40000000 in
 set_option linter.unusedSimpArgs false in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
@@ -635,6 +637,8 @@ theorem spec_populate {b c : Word (ZMod p)} (hb : b.isU64) (hc : c.isU64)
   rw [if_pos hw]
   exact (U16MSBOperation.spec_populate hpm_arg_lt 1).2 rfl
 
+-- 40M: completeness re-runs the same 45-column carry-chain normalization as soundness above,
+-- with the `populate` witness closure substituted cell-by-cell.
 set_option maxHeartbeats 40000000 in
 set_option linter.unusedSimpArgs false in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by

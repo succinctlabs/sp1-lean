@@ -78,7 +78,7 @@ theorem subw_chip_reaches_sail
     #v[cols.subw_operation.value[0], cols.subw_operation.value[1],
        cols.subw_operation.msb.msb * 65535, cols.subw_operation.msb.msb * 65535]
     rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2
-    ((h_chip.2.2.2 h_real).trans
+    ((h_chip.2.2 h_real).trans
       (SubwChip.rv64_subw_eq (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)))
 
 end SP1Clean.SubwSail
@@ -123,7 +123,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) (data : Prover
       cols.subw_operation.msb.msb * 65535, cols.subw_operation.msb.msb * 65535] := rfl
   have vopbm : r.adapter.op_b_memory = cols.adapter.op_b_memory := rfl
   have vopcm : r.adapter.op_c_memory = cols.adapter.op_c_memory := rfl
-  obtain ⟨-, hrspec, -, harith⟩ := hspec
+  obtain ⟨hrspec, -, harith⟩ := hspec
   obtain ⟨-, -, -, -, -, hbounds, -⟩ := hrspec
   obtain ⟨-, hpc0, -, -⟩ := hbounds hreal'
   have hop : r.opcode = ((ropwToOpcode ropw.SUBW).toNat : ZMod p) := by

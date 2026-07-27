@@ -202,9 +202,9 @@ theorem mul_chip_reaches_sail
     (cols.is_mulw = 1 →
         (spec_mulw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
           = (sp1_mul (.Regidx rd_idx) pc cols.a).run s) := by
-  -- `MulChip.Spec` is now `RTypeReader.Spec ∧ is_real-binary ∧ (is_real = 1 → 5 flag conjuncts)`;
-  -- the arithmetic the bridge needs is the third conjunct.
-  obtain ⟨h_mul, h_mulh, h_mulhu, h_mulhsu, h_mulw⟩ := h_chip.2.2 h_real
+  -- `MulChip.Spec` is `RTypeReader.Spec ∧ is_real-binary ∧ (is_real = 1 → 5 flag conjuncts) ∧
+  -- (is_real = 1 → SelectorOneHot)`; the arithmetic the bridge needs is the third conjunct.
+  obtain ⟨h_mul, h_mulh, h_mulhu, h_mulhsu, h_mulw⟩ := h_chip.2.2.1 h_real
   refine ⟨fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_⟩
   · exact correct_mul_native input.op_b_val input.op_c_val cols.a
       rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mul h)
@@ -263,7 +263,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : MulChip.Columns (ZMod p)) (data 
   have vopcm : r.adapter.op_c_memory = cols.adapter.op_c_memory := rfl
   obtain ⟨-, -, -, -, -, hbounds, -⟩ := hspec.1
   obtain ⟨-, hpc0, -, -⟩ := hbounds hreal'
-  have hbr := hspec.2.2 hreal'
+  have hbr := hspec.2.2.1 hreal'
   simp only [SelectorOneHot, selectors] at hflag
   rcases hflag with ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩ |
     ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩
