@@ -249,10 +249,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.addiChip_constraints_faithful
 #print axioms SP1Clean.Faithful.addiChip_interactions_faithful
 #print axioms SP1Clean.Faithful.addiChip_faithful
-#print axioms SP1Clean.Faithful.addrAdd_constraints_faithful
-#print axioms SP1Clean.Faithful.addrAdd_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.address_alignedValue_faithful
-#print axioms SP1Clean.Faithful.address_constraints_faithful
 #print axioms SP1Clean.Faithful.addw_constraints_faithful
 #print axioms SP1Clean.Faithful.addw_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.addwChip_constraints_faithful
@@ -284,10 +280,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.cpustate_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.cpustate_state_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.cpustate_byte_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.itypereader_constraints_faithful
-#print axioms SP1Clean.Faithful.itypereader_memory_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.itypereader_program_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.itypereader_byte_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.itypereaderimmutable_constraints_faithful
 #print axioms SP1Clean.Faithful.itypereaderimmutable_memory_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.itypereaderimmutable_program_interactions_faithful_syntactic
@@ -300,9 +292,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.isZero_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.isZeroWord_constraints_faithful
 #print axioms SP1Clean.Faithful.isZeroWord_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.jtypereader_asserts_faithful
-#print axioms SP1Clean.Faithful.jtypereader_interactions_faithful
-#print axioms SP1Clean.Faithful.jtypereader_constraints_faithful
 #print axioms SP1Clean.Faithful.jalChip_faithful
 #print axioms SP1Clean.Faithful.jalrChip_faithful
 #print axioms SP1Clean.Faithful.loadByteChip_faithful
@@ -313,7 +302,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.ltChip_constraints_faithful
 #print axioms SP1Clean.Faithful.ltChip_interactions_faithful
 #print axioms SP1Clean.Faithful.ltChip_faithful
-#print axioms SP1Clean.Faithful.ltSigned_constraints_faithful
 #print axioms SP1Clean.Faithful.ltUnsigned_constraints_faithful
 #print axioms SP1Clean.Faithful.ltUnsigned_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.mulChip_faithful
@@ -354,8 +342,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.u16msb_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.u16tou8safe_constraints_faithful
 #print axioms SP1Clean.Faithful.u16tou8safe_interactions_faithful_syntactic
-#print axioms SP1Clean.Faithful.u16tou8unsafe_constraints_faithful
-#print axioms SP1Clean.Faithful.u16tou8unsafe_interactions_faithful_syntactic
 #print axioms SP1Clean.Faithful.uTypeChip_faithful
 #print axioms SP1Clean.Faithful.divRemChip_faithful
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness

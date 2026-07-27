@@ -29,9 +29,9 @@ The instruction → chip → Sail **routing/identity** home is `Soundness/Covera
 registry and everything downstream (`sp1Tables`, the capstone, `Coverage`) are stated under
 `[Fact (2 ^ 24 < p)]` with a local `Fact (2 ^ 17 < p)` derived from it; KoalaBear (p ≈ 2³¹) satisfies it.
 
-Disclosed deferral (4.31 migration): `DivRem`'s `evidenceSoundness` and three chip completeness proofs
-(Branch/ShiftLeft/DivRem) currently ride `sorryAx` — see `docs/release-audit.md` §0 for
-the gated inventory. Every other chip's `circuit` is axiom-clean in both directions. -/
+Every chip's `circuit` is axiom-clean in both directions (soundness and completeness): the census in
+`docs/snapshots/axiom-ledger.md` and the zero-deferral gate in `scripts/run_audit.sh` certify no
+`sorryAx` anywhere in the released set. -/
 
 namespace SP1Clean.Soundness
 

@@ -2,7 +2,7 @@ import SP1Clean.Model.Semantics.Truth
 
 /-! # Intra-row same-key touch chains — the SP-6 port
 
-The production port of `docs/spikes/sp6_intra_row_chains.lean`: within one row at window time `t`,
+The production port of the SP-6 de-risk spike (retired from `docs/spikes/`; in git history): within one row at window time `t`,
 the same-key Memory touches form a **slot-ordered chain** — the first pull claims a strictly
 pre-row record, each later pull re-claims the row's own previous push, and push times are strictly
 increasing inside the row window. This admits register-alias rows (`add x1, x1, x2`; `bne x1, x1`),

@@ -118,7 +118,6 @@ import SP1Clean.Proofs.Chips.SubwChip.Contracts
 import SP1Clean.Proofs.Chips.UTypeChip.Bridge
 import SP1Clean.Native.Chips.UTypeChip.Defs
 import SP1Clean.Proofs.Chips.UTypeChip.Formal
-import SP1Clean.Comparison
 import SP1Clean.Extracted.ALUTypeReader
 import SP1Clean.Extracted.AluX0Chip
 import SP1Clean.Extracted.ChipOracle.Add
@@ -187,8 +186,6 @@ import SP1Clean.Faithful.AluX0
 import SP1Clean.Faithful.AddChip
 import SP1Clean.Faithful.AddOperation
 import SP1Clean.Faithful.AddiChip
-import SP1Clean.Faithful.AddrAddOperation
-import SP1Clean.Faithful.AddressOperation
 import SP1Clean.Faithful.Addw
 import SP1Clean.Faithful.AddwChip
 import SP1Clean.Faithful.BitwiseChip
@@ -203,12 +200,10 @@ import SP1Clean.Faithful.DivRemChip
 import SP1Clean.Faithful.DivRemChip.Exact
 import SP1Clean.Faithful.SupportedMachine
 import SP1Clean.Faithful.ExtractedInteractionModel
-import SP1Clean.Faithful.ITypeReader
 import SP1Clean.Faithful.ITypeReaderImmutable
 import SP1Clean.Faithful.IsEqualWordOperation
 import SP1Clean.Faithful.IsZeroOperation
 import SP1Clean.Faithful.IsZeroWordOperation
-import SP1Clean.Faithful.JTypeReader
 import SP1Clean.Faithful.JalChip
 import SP1Clean.Faithful.JalrChip
 import SP1Clean.Faithful.LoadByte
@@ -217,7 +212,6 @@ import SP1Clean.Faithful.LoadHalf
 import SP1Clean.Faithful.LoadWord
 import SP1Clean.Faithful.LoadX0
 import SP1Clean.Faithful.LtChip
-import SP1Clean.Faithful.LtOperationSigned
 import SP1Clean.Faithful.LtOperationUnsigned
 import SP1Clean.Faithful.MulChip
 import SP1Clean.Faithful.MulOperation
@@ -234,7 +228,6 @@ import SP1Clean.Faithful.SubwChip
 import SP1Clean.Faithful.U16CompareOperation
 import SP1Clean.Faithful.U16MSBOperation
 import SP1Clean.Faithful.U16toU8OperationSafe
-import SP1Clean.Faithful.U16toU8OperationUnsafe
 import SP1Clean.Faithful.UTypeChip
 import SP1Clean.Math.Bitwise
 import SP1Clean.Math.EvalVec

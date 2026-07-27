@@ -20,7 +20,7 @@ obligation is vacuous — no table guarantees `byteChannel` yet; the consumers j
 Generic over `PublicIO`: the providers don't touch the public input, so the capstone (Phase 5) instantiates
 this at `SP1PublicIO` and continues chaining (`|>.addTable <program> |>.addFinishedChannel programChannel
 |> …`) into the plain `Ensemble` capstone. The byte-op `LTU` (op 4) and a variable-width `RangeChip` are the
-documented hard tails (`docs/agents/bytechip-provider-design.md`); no consumer pulls them, so they are not
+documented hard tails (see the retired byte-provider design note in git history); no consumer pulls them, so they are not
 needed to balance the current machine. -/
 
 namespace SP1Clean.ByteChip
