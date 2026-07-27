@@ -82,13 +82,16 @@ those Rust helpers match Lean gadgets.
 
 ### Audited Rust overlay
 
-The extraction backend is not part of the semantic SP1 pin yet. Its exact review surface is committed
-as `scripts/extractor-patches/core-air-lists.patch` and
-`scripts/extractor-patches/core-air-manifest.patch`; `Extracted/Provenance.lean` records the semantic
-revision, overlay revision, and combined diff hash. The relevant changes are:
+The extraction backend is not part of the semantic SP1 pin yet. Its exact review surface has two
+layers: (a) the overlay's **committed** delta over the semantic revision (the field-generic
+emission + reflection derives — verified reflection/emission-only by `verify_extractor_overlay`),
+and (b) the two **uncommitted** patch files `scripts/extractor-patches/core-air-lists.patch` /
+`core-air-manifest.patch` (touching exactly `main.rs`, `ir/ast.rs`, `ir/expr.rs`, `ir/lean.rs`;
+byte-hash-checked against the live worktree diff). `Extracted/Provenance.lean` records the
+semantic revision, overlay revision, and combined diff hash. The relevant changes are:
 
-- **Field-generic, not `Fin KB`.** Every Lean-emission site now writes the type token `F`
-  instead of the concrete `Fin KB`:
+- **Field-generic, not `Fin KB`** *(overlay committed delta)*. Every Lean-emission site writes the
+  type token `F` instead of the concrete `Fin KB`:
   `crates/hypercube/src/ir/ast.rs` (let-step + call-output types),
   `expr.rs` / `var.rs` (`(… : F)⁻¹` inverse constants),
   `shape.rs` (`to_lean_type`: `F`, `(Word F)`, and struct types as `(<name> F)`),
@@ -150,6 +153,16 @@ one module-local `set_option maxHeartbeats 1000000`, accounted for explicitly in
   the interaction theorem compares the complete projected four-bus multiset.
 - **`SP1CleanTest/TraceGenTests/`** — compares rows generated from the native circuit with whole traces
   dumped by Rust.
+
+  > **Trace-battery provenance caveat (release-readiness audit F-R-01).** The whole-trace dumper
+  > (`witness_vectors --chip`) that produced the 10 `*ChipTraceVectors.lean` batteries is **not
+  > present at the pinned extractor overlay** (`witness_vectors.rs` there supports `--operation`
+  > only), nor at any commit in the sp1 history — the batteries were dumped from then-uncommitted
+  > tooling. The AIR anchors are unaffected (`EXTRACT_AIR_ONLY=1` reproduces all generated AIR
+  > modules byte-identically at the pin), and the batteries' *content* is independently validated by
+  > the `native_decide` anchors against the native circuits' own trace generation — but a full
+  > (non-AIR-only) regeneration currently fails at the pin. Follow-up: reconstruct the `--chip` mode
+  > as a third checked-in extractor patch and re-dump to confirm byte-identity.
 
 ## Legacy operation-list outputs (retirement path)
 

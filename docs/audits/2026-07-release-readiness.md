@@ -224,6 +224,45 @@ only the two disclosed operand `isU64` assumptions.
 - **F-A4-06 (COSMETIC).** `MulChip.ControlSpec` is structuring documentation, not the exported
   conclusion — no drift.
 
+### R-track — Rust-faithfulness spot checks (complete; no BLOCKER)
+
+The edges ChipFaithful cannot see, all verified against the pinned checkouts:
+- **R1 PASS** — all 36 `MachineAir::name` strings + the 34/6 cluster split independently traced to
+  `riscv/mod.rs` (Global correctly in both clusters; mprotect-gated user tables correctly
+  excluded; `.Perm`-based certificates make order irrelevant, matching Rust's BTreeSet).
+- **R2 PASS** — EventPopulate transcriptions field-exact vs the adapter `populate` paths
+  (incl. the register-variant timestamp populate); **hint circularity refuted structurally**: the
+  event opcode reaches only the flag hint, the input builders forget it, and the dumped opcode is
+  the decoded instruction — independent of the result.
+- **R3 PASS** — all 53 opcodes route identically to `tracing.rs` (x0 splits exact; stores/
+  branches/jumps have no x0 split on both sides; ECALL/EBREAK/UNIMP uncovered on both sides).
+- **R4 PASS** — both extractor patches are export-only (post-`air.eval` IR rendering; the ast.rs
+  change makes extraction MORE complete); digests re-verified; overlay committed delta is
+  derive-lines-only, enforced by SystemExit.
+- **R5 PASS** — every pin/hash/profile gate is fail-closed (SystemExit before writing);
+  `Provenance.lean` pins semantic+extractor revisions + patch digest, tied by `rfl`.
+- **R6 PASS** — Add oracle re-derived symbol-by-symbol from the Rust AIR source: 4-limb carry
+  chain with the 2^16-inverse form, double `is_real` booleanity (faithful duplication),
+  `(6, value[i], 16, 0)` range sends, `clk_inc=8`/`PC_INC=4` wiring — exact.
+
+- **F-R-01 (WEAK-SPEC — disclosed now, reconstruction filed as follow-up).** The whole-trace
+  dumper (`witness_vectors --chip`) invoked by the TraceGen writer does not exist at the pinned
+  overlay 69a8377c — nor at ANY commit in the sp1 history (verified by an all-history scan). The
+  10 chip trace-vector batteries were dumped from uncommitted tooling, so they are not
+  reproducible from the pinned exporter (the AIR layer is unaffected — EXTRACT_AIR_ONLY
+  reproduces byte-identically). The vectors' CONTENT is still independently validated (the
+  native_decide anchors check them cell-for-cell against the native circuit's own trace
+  generation, and R2 verified the transcriptions + data consistency), but the provenance chain to
+  pinned Rust is weaker than the witness-vector layer's. Follow-up (user-confirmed direction,
+  2026-07-27): the extraction tooling lives on sp1's `dtumad/clean-native` branch (the overlay
+  pin is its tip); reconstruct/commit the `--chip` whole-trace mode there and re-dump to confirm
+  byte-identity as part of the same follow-up that restores the reproducible dependency pins —
+  not in this campaign. Disclosed in `docs/agents/extraction.md`.
+- **F-R-02 (STALE-DOC, fix queued).** `extraction.md:90-96` attributes the field-generic
+  `expr.rs/var.rs/shape.rs` changes to the patch files; they are in the overlay's committed
+  reflection diff. Doc drift only.
+- **F-R-03 (DISCLOSED-OK).** Canonicalized assert ordering + faithful booleanity duplication.
+
 ### Batch A6 — LoadByte / LoadHalf / LoadWord / LoadDouble / LoadX0 (complete; no BLOCKER, no WEAK-SPEC)
 
 Tri-model check (Spec ↔ Sail `execute_LOAD`/`extend_value` ↔ Rust `compute_load_value`): byte-lane
