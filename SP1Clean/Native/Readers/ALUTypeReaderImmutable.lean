@@ -104,21 +104,15 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
     dsimp only [ElaboratedCircuit.ChannelsLawful]
     intro input offset
     dsimp only [Operations.ChannelsLawful]
-    refine ⟨?_, ?_, ?_⟩
-    · simp only [circuit_norm, main, RegisterAccessCols.circuit]
-    · intro env
-      rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
-      intro interaction h_interaction
-      simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
-      rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl | rfl
-      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
-      all_goals exact Or.inl (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
-    · rw [Operations.subcircuitChannelsLawful_iff_forall]
-      intro subcircuit h_subcircuit
-      simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_subcircuit
-      rcases h_subcircuit with
-        rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-        simp only [circuit_norm]
+    refine ⟨by simp only [circuit_norm, main, RegisterAccessCols.circuit], ?_,
+      by simp only [circuit_norm, main, RegisterAccessCols.circuit]⟩
+    intro env
+    rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
+    intro interaction h_interaction
+    simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
+    rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+    all_goals exact Or.inl (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
@@ -160,7 +154,10 @@ def ProverAssumptionsD (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Assumptions input ∧ Spec input
 
-set_option maxHeartbeats 4000000 in
+-- Heartbeat ladder (2026-07-28): the former 4000000 ceilings on `soundness`/`completeness` were
+-- ~130-400× over. Control run at a 1-heartbeat budget gave real `isDefEq` timeouts; measured floors
+-- are (20000, 30000] for `soundness` and (10000, 20000] for `completeness`, so the plain default
+-- carries ≥6.7× headroom on both and neither declaration needs a budget.
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
   simp only [circuit_norm, AssumptionsD, SpecD, Spec, memoryChannel, MemoryMsg.isU64,
@@ -180,29 +177,23 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     intro i hi; rw [← h_input.1.2.1.1, Vector.getElem_map]
   rw [eva 0 (by norm_num)] at z0; rw [eva 1 (by norm_num)] at z1
   rw [eva 2 (by norm_num)] at z2; rw [eva 3 (by norm_num)] at z3
-  -- the immediate gates bridge (op_c + op_c_memory.prev_value), as in `ALUTypeReader.soundness`.
-  have hoc := h_input.1.2.2.2.2.2.1
-  have hpv := h_input.1.2.2.2.2.2.2.1.1
   -- G1: the op_c **push** is gated by `is_real - imm_c`, but the chip-supplied clock bounds are gated on
   -- plain `is_real` (see `Assumptions`). The in-circuit immediate gate `h_immc` bridges the two: off a real
   -- row it forces `imm_c = 0`, so an op_c multiplicity of `1` means the row is real.
   have hreal_of_c : input_is_real - input_cols_imm_c = 1 → input_is_real = 1 := by
     intro htc
-    rcases h_assumptions.1 with h | h
-    · -- `h_assumptions` carries the reassembled `{record}.is_real` projection; retype it to the
-      -- destructured atom (defeq by iota) so the `rw`s below match syntactically.
-      have hz : input_is_real = 0 := h
-      have himm : input_cols_imm_c = 0 := by rw [hz] at h_immc; simpa using h_immc
-      rw [hz, himm] at htc; simp at htc
-    · exact h
+    refine h_assumptions.1.resolve_left fun h => ?_
+    -- `h_assumptions` carries the reassembled `{record}.is_real` projection; retype it to the
+    -- destructured atom (defeq by iota) so the `rw`s below match syntactically.
+    have hz : input_is_real = 0 := h
+    have himm : input_cols_imm_c = 0 := by rw [hz] at h_immc; simpa using h_immc
+    rw [hz, himm] at htc; simp at htc
   refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin, h_immc, hcbin, ?_,
       h_rac_a h_assumptions.1, h_rac_b h_assumptions.1, h_rac_c hcbin,
       fun ht => ?_,
-      fun ht2 => ⟨(h_mem_a (by rw [show input_is_real = 1 from ht2])).1,
-        (h_mem_b (by rw [show input_is_real = 1 from ht2])).1,
-        (h_mem_a (by rw [show input_is_real = 1 from ht2])).2,
-        (h_mem_b (by rw [show input_is_real = 1 from ht2])).2⟩,
-      fun ht3 => h_mem_c (by rw [show input_is_real - input_cols_imm_c = 1 from ht3])⟩,
+      fun ht2 => ⟨(h_mem_a (by rw [ht2])).1, (h_mem_b (by rw [ht2])).1,
+        (h_mem_a (by rw [ht2])).2, (h_mem_b (by rw [ht2])).2⟩,
+      fun ht3 => h_mem_c (by rw [ht3])⟩,
     Or.inr h_assumptions.1, Or.inr h_assumptions.1, Or.inr hcbin,
     fun h1 h0 => off_gate_vacuous htbin h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions.1 h1 h0,
@@ -211,26 +202,24 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     fun _ h0 => ?_,
     fun h1 h0 => off_gate_vacuous hcbin h1 h0,
     fun _ h0 => ?_⟩
-  · rw [← hoc, ← hpv]; simp only [Vector.getElem_map]; exact ⟨i0, i1, i2, i3⟩
+  · -- the immediate gates bridge (op_c + op_c_memory.prev_value), as in `ALUTypeReader.soundness`.
+    rw [← h_input.1.2.2.2.2.2.1, ← h_input.1.2.2.2.2.2.2.1.1]
+    simp only [Vector.getElem_map]; exact ⟨i0, i1, i2, i3⟩
   · -- Decode bounds are exactly the structural Program-channel guarantee.
-    obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [show input_is_trusted = 1 from ht])
+    obtain ⟨ha, hp0, hp1, hp2, _⟩ := h_prog (by rw [ht])
     rw [e 0 (by norm_num)] at hp0; rw [e 1 (by norm_num)] at hp1; rw [e 2 (by norm_num)] at hp2
     exact ⟨ha, hp0, hp1, hp2⟩
   · -- push_a: read-back value = op_a prev, from the paired pull; push clock `clk_low + 4`.
-    have ht : input_is_real = 1 := by
-      rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
+    have ht : input_is_real = 1 := h_assumptions.1.resolve_left h0
     exact ⟨(h_mem_a (by rw [ht])).1, h_assumptions.2.2.at_four ht⟩
   · -- push_b: read-back value = op_b prev, from the paired pull; push clock `clk_low + 3`.
-    have ht : input_is_real = 1 := by
-      rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
+    have ht : input_is_real = 1 := h_assumptions.1.resolve_left h0
     exact ⟨(h_mem_b (by rw [ht])).1, h_assumptions.2.2.at_three ht⟩
   · -- push_c: read-back value = op_c prev, from the paired (is_real - imm_c)-gated pull; push clock
     -- `clk_low + 2`, whose `ClkBound` comes from the `is_real`-gated assumption via `hreal_of_c`.
-    have htc : input_is_real - input_cols_imm_c = 1 := by
-      rcases hcbin with h | h; exact absurd h h0; exact h
+    have htc : input_is_real - input_cols_imm_c = 1 := hcbin.resolve_left h0
     exact ⟨(h_mem_c (by rw [htc])).1, h_assumptions.2.2.at_two (hreal_of_c htc)⟩
 
-set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD
       (fun _ _ _ => True) := by
@@ -251,15 +240,13 @@ theorem completeness :
     intro i hi; rw [← h_input.1.2.1.1, Vector.getElem_map]
   rw [← eva 0 (by norm_num)] at z0; rw [← eva 1 (by norm_num)] at z1
   rw [← eva 2 (by norm_num)] at z2; rw [← eva 3 (by norm_num)] at z3
-  have hoc := h_input.1.2.2.2.2.2.1
-  have hpv := h_input.1.2.2.2.2.2.2.1.1
   have eoc : ∀ (i : ℕ) (hi : i < 4),
       Expression.eval env.toEnvironment (input_var_cols_op_c[i]'hi) = input_cols_op_c[i]'hi := by
-    intro i hi; rw [← hoc, Vector.getElem_map]
+    intro i hi; rw [← h_input.1.2.2.2.2.2.1, Vector.getElem_map]
   have epv : ∀ (i : ℕ) (hi : i < 4),
       Expression.eval env.toEnvironment (input_var_cols_op_c_memory_prev_value[i]'hi)
         = input_cols_op_c_memory_prev_value[i]'hi := by
-    intro i hi; rw [← hpv, Vector.getElem_map]
+    intro i hi; rw [← h_input.1.2.2.2.2.2.2.1.1, Vector.getElem_map]
   have e : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
   refine ⟨⟨hreal, hrac_a⟩, ⟨hreal, hrac_b⟩, ⟨h_immbin_or, hrac_c⟩,
@@ -300,8 +287,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
     channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
       dsimp only [Operations.RequirementsChannelsLawful]
-      refine ⟨?_, ?_, ?_⟩
-      · simp only [circuit_norm, main, RegisterAccessCols.circuit]
+      refine ⟨by simp only [circuit_norm, main, RegisterAccessCols.circuit], ?_, ?_⟩
       · intro channel h_channel
         simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_channel
         rcases h_channel with rfl | rfl | rfl | rfl | rfl | rfl | rfl
@@ -310,22 +296,19 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
       · intro env h_constraints
         rw [constraintsHold_shallow_iff_forall_mem] at h_constraints
         have h_trusted : (ProvableStruct.eval env input_var).is_trusted = 0 ∨
-            (ProvableStruct.eval env input_var).is_trusted = 1 := by
-          apply bool_of_mul_pred
-          have h_gate := h_constraints.1
-            (input_var.is_trusted * (input_var.is_trusted - 1)) (by
-              simp only [circuit_norm, main, RegisterAccessCols.circuit,
-                Operations.shallowConstraints, List.mem_cons])
-          simpa only [circuit_norm] using h_gate
+            (ProvableStruct.eval env input_var).is_trusted = 1 :=
+          bool_of_mul_pred (by
+            simpa only [circuit_norm] using h_constraints.1
+              (input_var.is_trusted * (input_var.is_trusted - 1))
+              (by simp only [circuit_norm, main, RegisterAccessCols.circuit,
+                    Operations.shallowConstraints, List.mem_cons]))
         rw [Operations.inChannelsOrRequirements_iff_forall_mem]
         intro interaction h_interaction
         simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
         rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl | rfl
         · right
-          rw [ChannelInteraction.toRaw_requirements]
-          intro h1 h0
-          simp only [circuit_norm] at h1 h0
-          exact off_gate_vacuous h_trusted h1 h0
+          rw [ChannelInteraction.toRaw_requirements]; intro h1 h0
+          simp only [circuit_norm] at h1 h0; exact off_gate_vacuous h_trusted h1 h0
         all_goals exact Or.inl List.mem_cons_self }
 
 end SP1Clean.Readers.ALUTypeReaderImmutable

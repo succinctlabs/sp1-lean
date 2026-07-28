@@ -85,84 +85,76 @@ soundness and faithfulness clients share one folded evaluator boundary. -/
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
+/-! The six per-operand timestamp projections below all cross the same two folded boundaries
+(`RegisterAccessCols` then `RegisterAccessTimestamp`); the two helpers do that crossing once over a
+loose block.  Going through `simp only [circuit_norm]` instead blows the heartbeat budget — the
+folded `rw` chain is what keeps the nested `Eval.eval` opaque. -/
+
+private theorem evalPrevLow_aux {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RegisterAccessCols (Expression F)) :
+    (Eval.eval env cols).access_timestamp.prev_low =
+      Expression.eval env cols.access_timestamp.prev_low := by
+  calc
+    _ = (Eval.eval env cols.access_timestamp).prev_low := by rw [eval_registerAccessCols]
+    _ = Eval.eval env cols.access_timestamp.prev_low := by rw [eval_registerAccessTimestamp]
+    _ = _ := by simp only [circuit_norm]
+
+private theorem evalDiffLow_aux {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RegisterAccessCols (Expression F)) :
+    (Eval.eval env cols).access_timestamp.diff_low_limb =
+      Expression.eval env cols.access_timestamp.diff_low_limb := by
+  calc
+    _ = (Eval.eval env cols.access_timestamp).diff_low_limb := by rw [eval_registerAccessCols]
+    _ = Eval.eval env cols.access_timestamp.diff_low_limb := by rw [eval_registerAccessTimestamp]
+    _ = _ := by simp only [circuit_norm]
+
 /-- Evaluation of the canonical zero-register indicator through the folded reader row. -/
 @[circuit_norm] theorem eval_opA0 {F : Type} [FiniteField F]
     (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
     (Eval.eval env cols).op_a_0 = Expression.eval env cols.op_a_0 := by
-  rw [eval_cols]
   simp only [circuit_norm]
 
 @[circuit_norm] theorem eval_opAPrevLow {F : Type} [FiniteField F]
     (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
     (Eval.eval env cols).op_a_memory.access_timestamp.prev_low =
       Expression.eval env cols.op_a_memory.access_timestamp.prev_low := by
-  calc
-    _ = (Eval.eval env cols.op_a_memory).access_timestamp.prev_low := by rw [eval_cols]
-    _ = (Eval.eval env cols.op_a_memory.access_timestamp).prev_low := by
-      rw [eval_registerAccessCols]
-    _ = Eval.eval env cols.op_a_memory.access_timestamp.prev_low := by
-      rw [eval_registerAccessTimestamp]
-    _ = _ := by simp only [circuit_norm]
+  rw [eval_cols]
+  exact evalPrevLow_aux env cols.op_a_memory
 
 @[circuit_norm] theorem eval_opADiffLow {F : Type} [FiniteField F]
     (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
     (Eval.eval env cols).op_a_memory.access_timestamp.diff_low_limb =
       Expression.eval env cols.op_a_memory.access_timestamp.diff_low_limb := by
-  calc
-    _ = (Eval.eval env cols.op_a_memory).access_timestamp.diff_low_limb := by rw [eval_cols]
-    _ = (Eval.eval env cols.op_a_memory.access_timestamp).diff_low_limb := by
-      rw [eval_registerAccessCols]
-    _ = Eval.eval env cols.op_a_memory.access_timestamp.diff_low_limb := by
-      rw [eval_registerAccessTimestamp]
-    _ = _ := by simp only [circuit_norm]
+  rw [eval_cols]
+  exact evalDiffLow_aux env cols.op_a_memory
 
 @[circuit_norm] theorem eval_opBPrevLow {F : Type} [FiniteField F]
     (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
     (Eval.eval env cols).op_b_memory.access_timestamp.prev_low =
       Expression.eval env cols.op_b_memory.access_timestamp.prev_low := by
-  calc
-    _ = (Eval.eval env cols.op_b_memory).access_timestamp.prev_low := by rw [eval_cols]
-    _ = (Eval.eval env cols.op_b_memory.access_timestamp).prev_low := by
-      rw [eval_registerAccessCols]
-    _ = Eval.eval env cols.op_b_memory.access_timestamp.prev_low := by
-      rw [eval_registerAccessTimestamp]
-    _ = _ := by simp only [circuit_norm]
+  rw [eval_cols]
+  exact evalPrevLow_aux env cols.op_b_memory
 
 @[circuit_norm] theorem eval_opBDiffLow {F : Type} [FiniteField F]
     (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
     (Eval.eval env cols).op_b_memory.access_timestamp.diff_low_limb =
       Expression.eval env cols.op_b_memory.access_timestamp.diff_low_limb := by
-  calc
-    _ = (Eval.eval env cols.op_b_memory).access_timestamp.diff_low_limb := by rw [eval_cols]
-    _ = (Eval.eval env cols.op_b_memory.access_timestamp).diff_low_limb := by
-      rw [eval_registerAccessCols]
-    _ = Eval.eval env cols.op_b_memory.access_timestamp.diff_low_limb := by
-      rw [eval_registerAccessTimestamp]
-    _ = _ := by simp only [circuit_norm]
+  rw [eval_cols]
+  exact evalDiffLow_aux env cols.op_b_memory
 
 @[circuit_norm] theorem eval_opCPrevLow {F : Type} [FiniteField F]
     (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
     (Eval.eval env cols).op_c_memory.access_timestamp.prev_low =
       Expression.eval env cols.op_c_memory.access_timestamp.prev_low := by
-  calc
-    _ = (Eval.eval env cols.op_c_memory).access_timestamp.prev_low := by rw [eval_cols]
-    _ = (Eval.eval env cols.op_c_memory.access_timestamp).prev_low := by
-      rw [eval_registerAccessCols]
-    _ = Eval.eval env cols.op_c_memory.access_timestamp.prev_low := by
-      rw [eval_registerAccessTimestamp]
-    _ = _ := by simp only [circuit_norm]
+  rw [eval_cols]
+  exact evalPrevLow_aux env cols.op_c_memory
 
 @[circuit_norm] theorem eval_opCDiffLow {F : Type} [FiniteField F]
     (env : Environment F) (cols : Extracted.RTypeReader (Expression F)) :
     (Eval.eval env cols).op_c_memory.access_timestamp.diff_low_limb =
       Expression.eval env cols.op_c_memory.access_timestamp.diff_low_limb := by
-  calc
-    _ = (Eval.eval env cols.op_c_memory).access_timestamp.diff_low_limb := by rw [eval_cols]
-    _ = (Eval.eval env cols.op_c_memory.access_timestamp).diff_low_limb := by
-      rw [eval_registerAccessCols]
-    _ = Eval.eval env cols.op_c_memory.access_timestamp.diff_low_limb := by
-      rw [eval_registerAccessTimestamp]
-    _ = _ := by simp only [circuit_norm]
+  rw [eval_cols]
+  exact evalDiffLow_aux env cols.op_c_memory
 
 /-- Witness the four scalar adapter columns (`op_a`, `op_a_0`, `op_b`, `op_c`, all `0`) and compose a
 `RegisterAccessCols.circuit` per operand (access clocks `clk_low + 4/3/2`) — emitting columns in the
@@ -237,20 +229,15 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
     dsimp only [ElaboratedCircuit.ChannelsLawful]
     intro input offset
     dsimp only [Operations.ChannelsLawful]
-    refine ⟨?_, ?_, ?_⟩
-    · simp only [circuit_norm, main, RegisterAccessCols.circuit]
-    · intro env
-      rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
-      intro interaction h_interaction
-      simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
-      rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl
-      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
-      all_goals exact Or.inl (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
-    · rw [Operations.subcircuitChannelsLawful_iff_forall]
-      intro subcircuit h_subcircuit
-      simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_subcircuit
-      rcases h_subcircuit with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-        simp only [circuit_norm]
+    refine ⟨by simp only [circuit_norm, main, RegisterAccessCols.circuit], ?_,
+      by simp only [circuit_norm, main, RegisterAccessCols.circuit]⟩
+    intro env
+    rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
+    intro interaction h_interaction
+    simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
+    rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl
+    · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+    all_goals exact Or.inl (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
 
 -- Expose this reader's own declared channel lists + `localLength` as `@[circuit_norm]` rfl-lemmas so the
 -- composing `AddChip`'s `channelsLawful` / `circuit_proof_start` is discharged automatically.
@@ -331,12 +318,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
       (h_mem_a hneg).2, (h_mem_b hneg).2, (h_mem_c hneg).2⟩
   · -- Goal 3: push_b requirement — the same prev_value Word as the paired pull (h_mem_b), pushed at
     -- `clk_low + 3`, whose `ClkBound` is the chip-supplied assumption.
-    have ht : input_is_real = 1 := by
-      rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
+    have ht : input_is_real = 1 := h_assumptions.1.resolve_left h0
     exact ⟨(h_mem_b (by rw [ht])).1, h_assumptions.2.2.at_three ht⟩
   · -- Goal 4: push_c requirement — same pattern as push_b, at `clk_low + 2`.
-    have ht : input_is_real = 1 := by
-      rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
+    have ht : input_is_real = 1 := h_assumptions.1.resolve_left h0
     exact ⟨(h_mem_c (by rw [ht])).1, h_assumptions.2.2.at_two ht⟩
 
 theorem completeness :
@@ -382,8 +367,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
     channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
       dsimp only [Operations.RequirementsChannelsLawful]
-      refine ⟨?_, ?_, ?_⟩
-      · simp only [circuit_norm, main, RegisterAccessCols.circuit]
+      refine ⟨by simp only [circuit_norm, main, RegisterAccessCols.circuit], ?_, ?_⟩
       · intro channel h_channel
         simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_channel
         rcases h_channel with rfl | rfl | rfl | rfl | rfl | rfl
@@ -392,22 +376,19 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
       · intro env h_constraints
         rw [constraintsHold_shallow_iff_forall_mem] at h_constraints
         have h_trusted : (ProvableStruct.eval env input_var).is_trusted = 0 ∨
-            (ProvableStruct.eval env input_var).is_trusted = 1 := by
-          apply bool_of_mul_pred
-          have h_gate := h_constraints.1
-            (input_var.is_trusted * (input_var.is_trusted - 1)) (by
-              simp only [circuit_norm, main, RegisterAccessCols.circuit,
-                Operations.shallowConstraints, List.mem_cons])
-          simpa only [circuit_norm] using h_gate
+            (ProvableStruct.eval env input_var).is_trusted = 1 :=
+          bool_of_mul_pred (by
+            simpa only [circuit_norm] using h_constraints.1
+              (input_var.is_trusted * (input_var.is_trusted - 1))
+              (by simp only [circuit_norm, main, RegisterAccessCols.circuit,
+                    Operations.shallowConstraints, List.mem_cons]))
         rw [Operations.inChannelsOrRequirements_iff_forall_mem]
         intro interaction h_interaction
         simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
         rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl
         · right
-          rw [ChannelInteraction.toRaw_requirements]
-          intro h1 h0
-          simp only [circuit_norm] at h1 h0
-          exact off_gate_vacuous h_trusted h1 h0
+          rw [ChannelInteraction.toRaw_requirements]; intro h1 h0
+          simp only [circuit_norm] at h1 h0; exact off_gate_vacuous h_trusted h1 h0
         all_goals exact Or.inl List.mem_cons_self }
 
 set_option linter.unusedSectionVars false in

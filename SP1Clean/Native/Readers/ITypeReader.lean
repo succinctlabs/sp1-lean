@@ -54,7 +54,6 @@ boundary used by chip-level grounding and faithfulness proofs. -/
 @[circuit_norm] theorem eval_opA0 {F : Type} [FiniteField F]
     (env : Environment F) (cols : Extracted.ITypeReader (Expression F)) :
     (Eval.eval env cols).op_a_0 = Expression.eval env cols.op_a_0 := by
-  rw [eval_cols]
   simp only [circuit_norm]
 
 /-- Compose a `RegisterAccessCols` per operand (op_a write at `clk_low + 4`, op_b read at `clk_low + 3`)
@@ -108,20 +107,15 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
     dsimp only [ElaboratedCircuit.ChannelsLawful]
     intro input offset
     dsimp only [Operations.ChannelsLawful]
-    refine ⟨?_, ?_, ?_⟩
-    · simp only [circuit_norm, main, RegisterAccessCols.circuit]
-    · intro env
-      rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
-      intro interaction h_interaction
-      simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
-      rcases h_interaction with rfl | rfl | rfl | rfl
-      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
-      all_goals exact Or.inl (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
-    · rw [Operations.subcircuitChannelsLawful_iff_forall]
-      intro subcircuit h_subcircuit
-      simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_subcircuit
-      rcases h_subcircuit with rfl | rfl | rfl | rfl | rfl | rfl <;>
-        simp only [circuit_norm]
+    refine ⟨by simp only [circuit_norm, main, RegisterAccessCols.circuit], ?_,
+      by simp only [circuit_norm, main, RegisterAccessCols.circuit]⟩
+    intro env
+    rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
+    intro interaction h_interaction
+    simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
+    rcases h_interaction with rfl | rfl | rfl | rfl
+    · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+    all_goals exact Or.inl (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
@@ -178,6 +172,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   -- operand a pull off-gate (vacuous); op_a is read-only (no push), op_b has one push.
   refine ⟨⟨⟨z0, z1, z2, z3⟩, (fun ht => ?_),
       h_rac_a h_assumptions.1, h_rac_b h_assumptions.1, fun ht => ?_,
+      -- the `show` retyping is load-bearing: unlike `ALUTypeReader`, this file's opening `simp only`
+      -- does not unfold `Spec`, so `ht2` carries the reassembled `{record}.is_real` projection and a
+      -- bare `rw [ht2]` finds no occurrence in the destructured goal.
       fun ht2 => ⟨(h_mem_a (by rw [show input_is_real = 1 from ht2])).1,
         (h_mem_b (by rw [show input_is_real = 1 from ht2])).1,
         (h_mem_a (by rw [show input_is_real = 1 from ht2])).2,
@@ -194,8 +191,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     exact ⟨ha, hp0, hp1, hp2⟩
   · -- push_b requirement — the same `prev_value` word as the paired pull (h_mem_b), pushed at
     -- `clk_low + 3`, whose `ClkBound` is the chip-supplied assumption.
-    have ht : input_is_real = 1 := by
-      rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
+    have ht : input_is_real = 1 := h_assumptions.1.resolve_left h0
     exact ⟨(h_mem_b (by rw [ht])).1, h_assumptions.2.2.at_three ht⟩
 
 theorem completeness :
@@ -244,8 +240,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
     channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
       dsimp only [Operations.RequirementsChannelsLawful]
-      refine ⟨?_, ?_, ?_⟩
-      · simp only [circuit_norm, main, RegisterAccessCols.circuit]
+      refine ⟨by simp only [circuit_norm, main, RegisterAccessCols.circuit], ?_, ?_⟩
       · intro channel h_channel
         simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_channel
         rcases h_channel with rfl | rfl | rfl | rfl
@@ -254,22 +249,19 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
       · intro env h_constraints
         rw [constraintsHold_shallow_iff_forall_mem] at h_constraints
         have h_trusted : (ProvableStruct.eval env input_var).is_trusted = 0 ∨
-            (ProvableStruct.eval env input_var).is_trusted = 1 := by
-          apply bool_of_mul_pred
-          have h_gate := h_constraints.1
-            (input_var.is_trusted * (input_var.is_trusted - 1)) (by
-              simp only [circuit_norm, main, RegisterAccessCols.circuit,
-                Operations.shallowConstraints, List.mem_cons])
-          simpa only [circuit_norm] using h_gate
+            (ProvableStruct.eval env input_var).is_trusted = 1 :=
+          bool_of_mul_pred (by
+            simpa only [circuit_norm] using h_constraints.1
+              (input_var.is_trusted * (input_var.is_trusted - 1))
+              (by simp only [circuit_norm, main, RegisterAccessCols.circuit,
+                    Operations.shallowConstraints, List.mem_cons]))
         rw [Operations.inChannelsOrRequirements_iff_forall_mem]
         intro interaction h_interaction
         simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
         rcases h_interaction with rfl | rfl | rfl | rfl
         · right
-          rw [ChannelInteraction.toRaw_requirements]
-          intro h1 h0
-          simp only [circuit_norm] at h1 h0
-          exact off_gate_vacuous h_trusted h1 h0
+          rw [ChannelInteraction.toRaw_requirements]; intro h1 h0
+          simp only [circuit_norm] at h1 h0; exact off_gate_vacuous h_trusted h1 h0
         all_goals exact Or.inl List.mem_cons_self }
 
 set_option linter.unusedSectionVars false in

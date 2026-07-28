@@ -87,14 +87,12 @@ grounding proofs use this folded boundary instead of normalizing a completed rea
 @[circuit_norm] theorem eval_opA0 {F : Type} [FiniteField F]
     (env : Environment F) (cols : Extracted.ALUTypeReader (Expression F)) :
     (Eval.eval env cols).op_a_0 = Expression.eval env cols.op_a_0 := by
-  rw [eval_cols]
   simp only [circuit_norm]
 
 /-- Scalar immediate-selector projection through the folded ALU reader row. -/
 @[circuit_norm] theorem eval_immC {F : Type} [FiniteField F]
     (env : Environment F) (cols : Extracted.ALUTypeReader (Expression F)) :
     (Eval.eval env cols).imm_c = Expression.eval env cols.imm_c := by
-  rw [eval_cols]
   simp only [circuit_norm]
 
 /-- Source-C word projection through the folded ALU reader row. -/
@@ -176,8 +174,7 @@ private theorem equalityConstraint_mem (x y : Expression (ZMod p)) (offset : ℕ
     x - y ∈ FlatOperation.constraints
       (((Gadgets.Equality.main (M := field) (x, y)).operations offset).toFlat) := by
   simp [Gadgets.Equality.main, Circuit.forEach.operations_eq, circuit_norm]
-  change x - y ∈ [x - y]
-  simp
+  exact List.mem_singleton_self _
 
 /-- The reader's four immediate-consistency assertions bind the retained source-C value whenever
 `imm_c = 1`.  This is a physical AIR fact, exposed without invoking the reader's semantic `Spec` or
@@ -199,24 +196,16 @@ theorem eval_opCPrev_eq_opC_of_mainConstraints
       fin_cases i
       · right; right; right; right; right; right; left
         simpa only [Gadgets.Equality.circuit, FormalAssertion.toSubcircuit,
-          Operations.toNested_toFlat] using equalityConstraint_mem
-          (input.cols.imm_c *
-            (input.cols.op_c_memory.prev_value[0] - input.cols.op_c[0])) 0 _
+          Operations.toNested_toFlat] using equalityConstraint_mem _ 0 _
       · right; right; right; right; right; right; right; left
         simpa only [Gadgets.Equality.circuit, FormalAssertion.toSubcircuit,
-          Operations.toNested_toFlat] using equalityConstraint_mem
-          (input.cols.imm_c *
-            (input.cols.op_c_memory.prev_value[1] - input.cols.op_c[1])) 0 _
+          Operations.toNested_toFlat] using equalityConstraint_mem _ 0 _
       · right; right; right; right; right; right; right; right; left
         simpa only [Gadgets.Equality.circuit, FormalAssertion.toSubcircuit,
-          Operations.toNested_toFlat] using equalityConstraint_mem
-          (input.cols.imm_c *
-            (input.cols.op_c_memory.prev_value[2] - input.cols.op_c[2])) 0 _
+          Operations.toNested_toFlat] using equalityConstraint_mem _ 0 _
       · right; right; right; right; right; right; right; right; right; left
         simpa only [Gadgets.Equality.circuit, FormalAssertion.toSubcircuit,
-          Operations.toNested_toFlat] using equalityConstraint_mem
-          (input.cols.imm_c *
-            (input.cols.op_c_memory.prev_value[3] - input.cols.op_c[3])) 0 _
+          Operations.toNested_toFlat] using equalityConstraint_mem _ 0 _
     simp only [eval_sub, Expression.eval, immediate, one_mul, sub_zero] at constrained
     exact sub_eq_zero.mp constrained
   apply Vector.ext
@@ -240,21 +229,15 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
     dsimp only [ElaboratedCircuit.ChannelsLawful]
     intro input offset
     dsimp only [Operations.ChannelsLawful]
-    refine ⟨?_, ?_, ?_⟩
-    · simp only [circuit_norm, main, RegisterAccessCols.circuit]
-    · intro env
-      rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
-      intro interaction h_interaction
-      simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
-      rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl
-      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
-      all_goals exact Or.inl (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
-    · rw [Operations.subcircuitChannelsLawful_iff_forall]
-      intro subcircuit h_subcircuit
-      simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_subcircuit
-      rcases h_subcircuit with
-        rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-        simp only [circuit_norm]
+    refine ⟨by simp only [circuit_norm, main, RegisterAccessCols.circuit], ?_,
+      by simp only [circuit_norm, main, RegisterAccessCols.circuit]⟩
+    intro env
+    rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
+    intro interaction h_interaction
+    simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
+    rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl
+    · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+    all_goals exact Or.inl (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
@@ -322,13 +305,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   -- multiplicity is `0`, and a multiplicity of `1` therefore means the row is real.
   have hreal_of_c : input_is_real - input_cols_imm_c = 1 → input_is_real = 1 := by
     intro htc
-    rcases h_assumptions.1 with h | h
-    · -- `h_assumptions` carries the reassembled `{record}.is_real` projection; retype it to the
-      -- destructured atom (defeq by iota) so the `rw`s below match syntactically.
-      have hz : input_is_real = 0 := h
-      have himm : input_cols_imm_c = 0 := by rw [hz] at h_immc; simpa using h_immc
-      rw [hz, himm] at htc; simp at htc
-    · exact h
+    refine h_assumptions.1.resolve_left fun h => ?_
+    -- `h_assumptions` carries the reassembled `{record}.is_real` projection; retype it to the
+    -- destructured atom (defeq by iota) so the `rw`s below match syntactically.
+    have hz : input_is_real = 0 := h
+    have himm : input_cols_imm_c = 0 := by rw [hz] at h_immc; simpa using h_immc
+    rw [hz, himm] at htc; simp at htc
   -- The pull guarantees / push requirements are pairs: the whole-`Word` `isU64` of the message's `value`
   -- field (the eval already substituted away) and the `ClkBound` of its `clk_low` field — which for a
   -- read-prior pull *is* the block's `prev_low`, and for a read-back push is `clk_low + 3` / `+ 2`.
@@ -355,14 +337,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
     exact ⟨ha, hp0, hp1, hp2⟩
   · -- push_b requirement — same whole-`Word` prev_value as the paired pull (h_mem_b), pushed at
     -- `clk_low + 3`, whose `ClkBound` is the chip-supplied assumption.
-    have ht : input_is_real = 1 := by
-      rcases h_assumptions.1 with h | h; exact absurd h h0; exact h
+    have ht : input_is_real = 1 := h_assumptions.1.resolve_left h0
     exact ⟨(h_mem_b (by rw [ht])).1, h_assumptions.2.2.at_three ht⟩
   · -- push_c requirement — same whole-`Word` prev_value as the paired (is_real - imm_c)-gated pull
     -- (h_mem_c), pushed at `clk_low + 2`; its `ClkBound` comes from the `is_real`-gated assumption via
     -- `hreal_of_c`.
-    have htc : input_is_real - input_cols_imm_c = 1 := by
-      rcases hcbin with h | h; exact absurd h h0; exact h
+    have htc : input_is_real - input_cols_imm_c = 1 := hcbin.resolve_left h0
     exact ⟨(h_mem_c (by rw [htc])).1, h_assumptions.2.2.at_two (hreal_of_c htc)⟩
 
 theorem completeness :
@@ -379,15 +359,13 @@ theorem completeness :
   dsimp only at hbin htrust
   -- Align the `Spec`'s HSub (`-`) hyps with the goal's `circuit_norm` `+ -` form, and bridge the immediate
   -- gates' `input_cols_op_c[i]` (value) to the `Expression.eval env …[i]` form via the `h_input` Word eqs.
-  have hoc := h_input.1.2.2.2.2.2.1
-  have hpv := h_input.1.2.2.2.2.2.2.1.1
   have eoc : ∀ (i : ℕ) (hi : i < 4),
       Expression.eval env.toEnvironment (input_var_cols_op_c[i]'hi) = input_cols_op_c[i]'hi := by
-    intro i hi; rw [← hoc, Vector.getElem_map]
+    intro i hi; rw [← h_input.1.2.2.2.2.2.1, Vector.getElem_map]
   have epv : ∀ (i : ℕ) (hi : i < 4),
       Expression.eval env.toEnvironment (input_var_cols_op_c_memory_prev_value[i]'hi)
         = input_cols_op_c_memory_prev_value[i]'hi := by
-    intro i hi; rw [← hpv, Vector.getElem_map]
+    intro i hi; rw [← h_input.1.2.2.2.2.2.2.1.1, Vector.getElem_map]
   have e : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_pc[i] = input_pc[i] := by
     intro i hi; have := congrArg (fun v => v[i]'hi) h_input.2.2.2.2.2.1; simpa using this
   refine ⟨⟨hreal, hrac_a⟩, ⟨hreal, hrac_b⟩, ⟨h_immbin_or, hrac_c⟩,
@@ -428,8 +406,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
     channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ => by
       dsimp only [Operations.RequirementsChannelsLawful]
-      refine ⟨?_, ?_, ?_⟩
-      · simp only [circuit_norm, main, RegisterAccessCols.circuit]
+      refine ⟨by simp only [circuit_norm, main, RegisterAccessCols.circuit], ?_, ?_⟩
       · intro channel h_channel
         simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_channel
         rcases h_channel with rfl | rfl | rfl | rfl | rfl | rfl
@@ -438,22 +415,19 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
       · intro env h_constraints
         rw [constraintsHold_shallow_iff_forall_mem] at h_constraints
         have h_trusted : (ProvableStruct.eval env input_var).is_trusted = 0 ∨
-            (ProvableStruct.eval env input_var).is_trusted = 1 := by
-          apply bool_of_mul_pred
-          have h_gate := h_constraints.1
-            (input_var.is_trusted * (input_var.is_trusted - 1)) (by
-              simp only [circuit_norm, main, RegisterAccessCols.circuit,
-                Operations.shallowConstraints, List.mem_cons])
-          simpa only [circuit_norm] using h_gate
+            (ProvableStruct.eval env input_var).is_trusted = 1 :=
+          bool_of_mul_pred (by
+            simpa only [circuit_norm] using h_constraints.1
+              (input_var.is_trusted * (input_var.is_trusted - 1))
+              (by simp only [circuit_norm, main, RegisterAccessCols.circuit,
+                    Operations.shallowConstraints, List.mem_cons]))
         rw [Operations.inChannelsOrRequirements_iff_forall_mem]
         intro interaction h_interaction
         simp only [circuit_norm, main, RegisterAccessCols.circuit] at h_interaction
         rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl
         · right
-          rw [ChannelInteraction.toRaw_requirements]
-          intro h1 h0
-          simp only [circuit_norm] at h1 h0
-          exact off_gate_vacuous h_trusted h1 h0
+          rw [ChannelInteraction.toRaw_requirements]; intro h1 h0
+          simp only [circuit_norm] at h1 h0; exact off_gate_vacuous h_trusted h1 h0
         all_goals exact Or.inl List.mem_cons_self }
 
 set_option linter.unusedSectionVars false in
