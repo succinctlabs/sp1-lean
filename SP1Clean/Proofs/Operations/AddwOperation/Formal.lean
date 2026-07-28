@@ -29,12 +29,11 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     Word.toBitVec64 (resultWord input.cols) =
       (BitVec.setWidth 32 (Word.toBitVec64 input.a + Word.toBitVec64 input.b)).signExtend 64)
 
-set_option maxHeartbeats 4000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨ha, hb, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, ⟨hiv, _⟩, _⟩ := h_input
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
+  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat
   have h65536 : (2 : ℕ) ^ 16 = 65536 := by norm_num
   have ea : ∀ i (hi : i < 4), Expression.eval env input_var_a[i] = input_a[i] := by
     intro i hi; rw [← hia]; simp only [Vector.getElem_map]
@@ -49,9 +48,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have h_msb_as : U16MSBOperation.circuit.Assumptions
       (⟨input_cols_value[1], ⟨input_cols_msb_msb⟩, input_is_real⟩ : U16MSBOperation.Inputs (ZMod p)) := by
     refine ⟨fun hr1eq => ?_, hbin⟩
-    have hr1' : input_is_real = 1 := hr1eq
-    have hneg : - input_is_real = -1 := by rw [hr1']
-    have R1 := hr1 hneg
+    have R1 := hr1 (by rw [show input_is_real = 1 from hr1eq] : - input_is_real = -1)
     rw [← c16] at R1
     show input_cols_value[1].val < 2 ^ 16
     exact (byteRowSpec_range _ sixteen_lt).mp R1
@@ -70,12 +67,11 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   · rw [← h65536]; exact (byteRowSpec_range _ sixteen_lt).mp R0
   · rw [← h65536]; exact (byteRowSpec_range _ sixteen_lt).mp R1
 
-set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨ha, hb, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, ⟨hiv, _⟩, _⟩ := h_input
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
+  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat
   have ev : ∀ i (hi : i < 2),
       Expression.eval env.toEnvironment input_var_cols_value[i] = input_cols_value[i] := by
     intro i hi; rw [← hiv]; simp only [Vector.getElem_map]
@@ -97,28 +93,23 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     exact ⟨⟨hUv0, hUv1⟩, h_raw, h_msbval⟩
   simp only [circuit_norm, byteChannel, ea, eb, ev]
   refine ⟨⟨⟨fun hr1 => (key hr1).1.2, hbin⟩, ⟨h_spec.1, fun hr1 => (key hr1).2.2⟩⟩, ?_, ?_, ?_, ?_, ?_⟩
-  · intro hneg
-    have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr (key hr1).1.1
-  · intro hneg
-    have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr (key hr1).1.2
+  · refine fun hneg => ?_
+    rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr (key (neg_inj.mp hneg)).1.1
+  · refine fun hneg => ?_
+    rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr (key (neg_inj.mp hneg)).1.2
   · -- SP1's ungated `is_real` boolean gate `is_real * (is_real - 1) = 0`
     rcases hbin with h | h <;> rw [h] <;> simp
   · rcases hbin with h0 | h1
     · simp [h0]
-    · obtain ⟨_, h_raw, _⟩ := key h1
-      obtain ⟨hc0, _, _, _⟩ := h_raw
+    · obtain ⟨_, ⟨hc0, _, _, _⟩, _⟩ := key h1
       rw [h1, one_mul]
       rcases hc0 with h | h <;> rw [h] <;> simp
   · rcases hbin with h0 | h1
     · simp [h0]
-    · obtain ⟨_, h_raw, _⟩ := key h1
-      obtain ⟨_, hc1, _, _⟩ := h_raw
+    · obtain ⟨_, ⟨_, hc1, _, _⟩, _⟩ := key h1
       rw [h1, one_mul]
       rcases hc1 with h | h <;> rw [h] <;> simp
 
-set_option maxHeartbeats 8000000 in
 /-- The witnessed columns `populate a b` satisfy the gadget `Spec` for any `is_real`. The composing
 `AddwChip` uses this to discharge the `assertion AddwOperation.circuit` prover obligation. -/
 theorem spec_populate {a b : Word (ZMod p)} (ha : a.isU64) (hb : b.isU64) (is_real : ZMod p) :
@@ -180,14 +171,11 @@ theorem spec_populate {a b : Word (ZMod p)} (ha : a.isU64) (hb : b.isU64) (is_re
       = if (populate a b).value[1].val ≥ 32768 then 1 else 0 := by
     show addwMsbWitness a b = if (addwValueWitness a b)[1].val ≥ 32768 then 1 else 0
     simp only [addwMsbWitness]
-    by_cases h : (addwValueWitness a b)[1].val ≥ 32768
-    · rw [if_pos h]; have : (addwValueWitness a b)[1].val / 32768 = 1 := by omega
-      rw [this, Nat.cast_one]
-    · rw [if_neg h]; have : (addwValueWitness a b)[1].val / 32768 = 0 := by omega
-      rw [this, Nat.cast_zero]
-  have hbool : addwMsbWitness a b = 0 ∨ addwMsbWitness a b = 1 := by
-    have hm : addwMsbWitness a b = if (addwValueWitness a b)[1].val ≥ 32768 then 1 else 0 := h_msb
-    rw [hm]; split <;> simp
+    split
+    · rw [show (addwValueWitness a b)[1].val / 32768 = 1 by omega, Nat.cast_one]
+    · rw [show (addwValueWitness a b)[1].val / 32768 = 0 by omega, Nat.cast_zero]
+  have hbool : (populate a b).msb.msb = 0 ∨ (populate a b).msb.msb = 1 := by
+    rw [h_msb]; split <;> simp
   exact ⟨hbool, fun _ => addwSemantics_of_carries ha hb h_raw h_msb⟩
 
 /-- SP1's `AddwOperation::eval` as a Clean-native `FormalAssertion`: composes the demoted `U16MSBOperation`,

@@ -79,12 +79,16 @@ theorem result_semantic {input : Inputs (ZMod p)}
       (fun _ => ⟨hbitbool, fun _ => hbitord hir⟩) h_sel,
     flags_sum_zero_iff_eq input.b input.cc hb hcc h_sel⟩
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 set_option linter.unusedSectionVars false in
 /-- The witnessed columns `populate b cc` satisfy the `is_real = 1`-form `Selectors`: the one-hot flag
 at the most-significant differing limb makes every prefix selector vanish, the comparison limbs are the
-selected pair, and the non-equality inverse closes the gate. (SP1's `populate_unsigned` correctness.) -/
+selected pair, and the non-equality inverse closes the gate. (SP1's `populate_unsigned` correctness.)
+
+Each differing-limb branch binds the inverse cancellation once as `k`; leading the ladder with the
+*failing* `ring1` stops both `linear_combination`s being tried on the eleven goals that do not need
+them. **`ring1`, not `ring`** — `ring`'s `ring_nf` fallback never fails, so a leading `ring` swallows
+the non-equality goal and blocks the alternatives behind it. -/
 theorem sel_populate {b cc : Word (ZMod p)} :
     Selectors b cc (populate b cc) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -100,43 +104,46 @@ theorem sel_populate {b cc : Word (ZMod p)} :
               List.getElem_cons_zero, List.getElem_cons_succ, sub_self, sub_zero, zero_sub, mul_zero,
               zero_mul, mul_one, one_mul, add_zero, zero_add, neg_zero]
         · -- limb 0 differs
+          have k := inv_mul_cancel₀ (sub_ne_zero.mpr h0)
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
             simp only [ne_eq, h3, h2, h1, h0, eq_self_iff_true, not_true_eq_false, not_false_eq_true,
               true_or, or_true, if_true, if_false, Vector.getElem_mk, List.getElem_toArray,
               List.getElem_cons_zero, List.getElem_cons_succ, sub_self, sub_zero, zero_sub, mul_zero,
               zero_mul, mul_one, one_mul, add_zero, zero_add, neg_zero] <;>
-            first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h0) | linear_combination - inv_mul_cancel₀ (sub_ne_zero.mpr h0) | ring
+            first | ring1 | linear_combination k | linear_combination -k
       · -- limb 1 differs
+        have k := inv_mul_cancel₀ (sub_ne_zero.mpr h1)
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
           simp only [ne_eq, h3, h2, h1, eq_self_iff_true, not_true_eq_false, not_false_eq_true,
             true_or, or_true, if_true, if_false, Vector.getElem_mk, List.getElem_toArray,
             List.getElem_cons_zero, List.getElem_cons_succ, sub_self, sub_zero, zero_sub, mul_zero,
             zero_mul, mul_one, one_mul, add_zero, zero_add, neg_zero] <;>
-          first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h1) | linear_combination - inv_mul_cancel₀ (sub_ne_zero.mpr h1) | ring
+          first | ring1 | linear_combination k | linear_combination -k
     · -- limb 2 differs
+      have k := inv_mul_cancel₀ (sub_ne_zero.mpr h2)
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         simp only [ne_eq, h3, h2, eq_self_iff_true, not_true_eq_false, not_false_eq_true,
           true_or, or_true, if_true, if_false, Vector.getElem_mk, List.getElem_toArray,
           List.getElem_cons_zero, List.getElem_cons_succ, sub_self, sub_zero, zero_sub, mul_zero,
           zero_mul, mul_one, one_mul, add_zero, zero_add, neg_zero] <;>
-        first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h2) | linear_combination - inv_mul_cancel₀ (sub_ne_zero.mpr h2) | ring
+        first | ring1 | linear_combination k | linear_combination -k
   · -- limb 3 differs (most significant)
+    have k := inv_mul_cancel₀ (sub_ne_zero.mpr h3)
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [ne_eq, h3, eq_self_iff_true, not_true_eq_false, not_false_eq_true,
         true_or, or_true, if_true, if_false, Vector.getElem_mk, List.getElem_toArray,
         List.getElem_cons_zero, List.getElem_cons_succ, sub_self, sub_zero, zero_sub, mul_zero,
         zero_mul, mul_one, one_mul, add_zero, zero_add, neg_zero] <;>
-      first | linear_combination inv_mul_cancel₀ (sub_ne_zero.mpr h3) | linear_combination - inv_mul_cancel₀ (sub_ne_zero.mpr h3) | ring
+      first | ring1 | linear_combination k | linear_combination -k
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSectionVars false in
 /-- The witnessed columns `populate b cc` satisfy the gadget `Spec` on a real row. The composing
 `LtOperationSigned` uses this to discharge the `assertion LtOperationUnsigned.circuit` obligation
 (its `Assumptions` — the operand `isU64`s — are supplied separately by the composer). -/
 theorem spec_populate {b cc : Word (ZMod p)} :
     Spec (⟨b, cc, populate b cc, 1⟩ : Inputs (ZMod p)) := by
-  have h_sel : Selectors b cc (populate b cc) := sel_populate
-  obtain ⟨hf0, hf1, hf2, hf3, hsum, hs3, hs2, hs1, hs0, hcl0, hcl1, hinv⟩ := h_sel
+  obtain ⟨hf0, hf1, hf2, hf3, hsum, hs3, hs2, hs1, hs0, hcl0, hcl1, hinv⟩ :=
+    (sel_populate : Selectors b cc (populate b cc))
   have hbit : (populate b cc).u16_compare_operation.bit
       = if (populate b cc).comparison_limbs[0].val < (populate b cc).comparison_limbs[1].val
         then 1 else 0 := rfl
@@ -144,7 +151,6 @@ theorem spec_populate {b cc : Word (ZMod p)} :
     by linear_combination hs1, by linear_combination hs0, hcl0, hcl1, by linear_combination hinv,
     U16CompareOperation.populate_bit_bool _ _, fun _ => hbit⟩
 
-set_option maxHeartbeats 4000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hbcc_imp, hbin⟩ := h_assumptions
@@ -189,7 +195,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       by linear_combination hE35, by linear_combination hE43, by linear_combination hE48,
       by linear_combination hE49, by linear_combination -hE54, hbitbool, hbitord⟩, Or.inr hCmpAs⟩
 
-set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hbcc_imp, hbin⟩ := h_assumptions
@@ -225,20 +230,15 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       ⟨input_cols_comparison_limbs[0], input_cols_comparison_limbs[1],
         ⟨input_cols_u16_compare_operation_bit⟩, input_is_real⟩ := ⟨hbitbool, hbitord⟩
   simp only [eb, ec, ef, ecl]
-  refine ⟨⟨hCmpAs, hCmpSpec⟩, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨⟨hCmpAs, hCmpSpec⟩, ?_, ?_, ?_, ?_, ?_, ?_, by linear_combination hs3,
+    by linear_combination hs2, by linear_combination hs1, by linear_combination hs0,
+    by linear_combination hcl0eq, by linear_combination hcl1eq, by linear_combination -hinv⟩
   · rcases hbin with h | h <;> rw [h] <;> ring
   · rcases hf0 with h | h <;> rw [h] <;> ring
   · rcases hf1 with h | h <;> rw [h] <;> ring
   · rcases hf2 with h | h <;> rw [h] <;> ring
   · rcases hf3 with h | h <;> rw [h] <;> ring
   · rcases hsum with h | h <;> rw [h] <;> ring
-  · linear_combination hs3
-  · linear_combination hs2
-  · linear_combination hs1
-  · linear_combination hs0
-  · linear_combination hcl0eq
-  · linear_combination hcl1eq
-  · linear_combination -hinv
 
 set_option linter.unusedSectionVars false in
 /-- `Spec` at the all-zero column struct with the gate off (`is_real = 0`) — the inactive-row
