@@ -41,7 +41,12 @@ namespace SP1Clean.SailDecode
 
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option maxHeartbeats 8000000
+-- Measured ladder (LSP re-elaboration, control run at `maxHeartbeats 1` produced 3 real timeouts):
+-- 8M ok / 200k ok / 100k ok / 50k ok / 40k FAILS (`timeout at transform` inside the branch-skip
+-- walk's guard `simp`). True floor is in (40k, 50k]; the declared 8M was ~170x over. Kept as a site
+-- at 400k — the 200k default leaves only ~4x margin over a cost that scales with the Sail decoder's
+-- branch count, and this walk's failure mode is a mid-cascade error, not a graceful one.
+set_option maxHeartbeats 400000
 set_option maxRecDepth 100000
 set_option linter.unusedSimpArgs false
 

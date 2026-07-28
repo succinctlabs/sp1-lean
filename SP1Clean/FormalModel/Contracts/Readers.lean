@@ -25,8 +25,7 @@ namespace SP1Clean.Readers
       ({ prev_value := Eval.eval env cols.prev_value
          access_timestamp := Eval.eval env cols.access_timestamp } :
         Extracted.RegisterAccessCols F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Component-wise evaluation of the I-type adapter row shared by loads and stores.  Keeping this
 folded avoids repeatedly unfolding the derived `ProvableStruct` instance in parent-chip proofs. -/
@@ -40,8 +39,7 @@ folded avoids repeatedly unfolding the derived `ProvableStruct` instance in pare
          op_b_memory := Eval.eval env cols.op_b_memory
          op_c_imm := Eval.eval env cols.op_c_imm } :
         Extracted.ITypeReader F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 end SP1Clean.Readers
 

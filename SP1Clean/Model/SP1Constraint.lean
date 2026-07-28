@@ -58,8 +58,7 @@ def idx : ByteOpcode → ℕ
   | MSB => 5
   | Range => 6
 
-@[simp] lemma ofNat_idx (op : ByteOpcode) : ofNat op.idx = op := by
-  cases op <;> rfl
+@[simp] lemma ofNat_idx (op : ByteOpcode) : ofNat op.idx = op := by cases op <;> rfl
 
 /-- The byte-opcode constraint. `Range` (used by Add's `slice_range_check_u16`) bounds
 `a.val < 2 ^ b.val`; `U8Range` (used by CPUState's `clk_16_24` byte check) bounds all three
@@ -92,20 +91,15 @@ lemma constrainField_natCast {p k : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   have hp : 2 ^ 17 < p := Fact.out
   constructor
   · rintro ⟨op, hop, hc⟩
-    have hopLt : op.idx < p := by
-      cases op <;> simp only [idx] <;> omega
+    have hopLt : op.idx < p := by cases op <;> simp only [idx] <;> omega
     have hkLt : k < p := by omega
     have hidx : op.idx = k := by
       have hval := congrArg ZMod.val hop
       rwa [ZMod.val_natCast_of_lt hopLt, ZMod.val_natCast_of_lt hkLt] at hval
-    have hopEq : op = ofNat k := by
-      rw [← ofNat_idx op, hidx]
-    rwa [← hopEq]
+    rwa [← hidx, ofNat_idx]
   · intro hc
-    refine ⟨ofNat k, ?_, hc⟩
-    have hidx : (ofNat k).idx = k := by
-      interval_cases k <;> rfl
-    rw [hidx]
+    have hidx : (ofNat k).idx = k := by interval_cases k <;> rfl
+    exact ⟨ofNat k, by rw [hidx], hc⟩
 
 @[simp] lemma constrainField_zero {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     (a b c : ZMod p) :

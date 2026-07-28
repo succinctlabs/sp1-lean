@@ -53,6 +53,17 @@ def programRowKey (row : ProgramRow (ZMod p)) : LookupKey :=
       row.op_c[0].val, row.op_c[1].val, row.op_c[2].val, row.op_c[3].val,
       row.op_a_0.val, row.imm_b.val, row.imm_c.val])
 
+/-- Two `Word`s agreeing limb-by-limb under `ZMod.val` are equal (`ZMod.val` is injective for
+`[NeZero p]`). Factored out because the key-determines-the-row argument recovers both `op_b` and
+`op_c` this way. -/
+private theorem word_eq_of_val {w1 w2 : Word (ZMod p)} (h0 : w1[0].val = w2[0].val)
+    (h1 : w1[1].val = w2[1].val) (h2 : w1[2].val = w2[2].val) (h3 : w1[3].val = w2[3].val) :
+    w1 = w2 := by
+  refine Vector.ext fun i hi => ?_
+  rcases i with _|_|_|_|i
+  exacts [ZMod.val_injective p h0, ZMod.val_injective p h1, ZMod.val_injective p h2,
+    ZMod.val_injective p h3, by omega]
+
 /-- **The key determines the row.** The Program-bus key is the full `ZMod.val`-projection of every
 meaningful field, and `ZMod.val` is injective (`[NeZero p]`), so two rows with the same key are equal
 (the `op_c` `Word` recovered limb-by-limb via `Vector.ext`). This is what lets the provider's *membership*
@@ -63,23 +74,10 @@ theorem programRow_eq_of_key {r1 r2 : ProgramRow (ZMod p)} (h : programRowKey r1
   obtain ⟨h0, h1, h2, h3, h4, hb0, hb1, hb2, hb3, hc0, hc1, hc2, hc3, ha0, himmb, himm⟩ := h
   cases r1; cases r2
   simp only [ProgramRow.mk.injEq]
-  refine ⟨ZMod.val_injective p h0, ZMod.val_injective p h1, ZMod.val_injective p h2,
-    ZMod.val_injective p h3, ZMod.val_injective p h4, ?_, ZMod.val_injective p himmb, ?_,
-    ZMod.val_injective p ha0, ZMod.val_injective p himm⟩
-  · apply Vector.ext; intro i hi
-    rcases i with _|_|_|_|i
-    · exact ZMod.val_injective p hb0
-    · exact ZMod.val_injective p hb1
-    · exact ZMod.val_injective p hb2
-    · exact ZMod.val_injective p hb3
-    · omega
-  · apply Vector.ext; intro i hi
-    rcases i with _|_|_|_|i
-    · exact ZMod.val_injective p hc0
-    · exact ZMod.val_injective p hc1
-    · exact ZMod.val_injective p hc2
-    · exact ZMod.val_injective p hc3
-    · omega
+  exact ⟨ZMod.val_injective p h0, ZMod.val_injective p h1, ZMod.val_injective p h2,
+    ZMod.val_injective p h3, ZMod.val_injective p h4, word_eq_of_val hb0 hb1 hb2 hb3,
+    ZMod.val_injective p himmb, word_eq_of_val hc0 hc1 hc2 hc3, ZMod.val_injective p ha0,
+    ZMod.val_injective p himm⟩
 
 /-- The **rich ROM-membership predicate** SP1's program/decode chip establishes for every received row —
 the *received* facts `Foundations/Channels.lean`'s `ProgramMsg.Spec` defers: the register indices are
