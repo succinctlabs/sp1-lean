@@ -88,21 +88,21 @@ set_option linter.unusedSectionVars false in
     Operations.interactions (es.map fun e => (Operation.assert e)) = [] := by
   induction es with
   | nil => rfl
-  | cons e es ih => simp [Operations.interactions, List.map_cons, ih]
+  | cons e es ih => simp only [Operations.interactions, List.map_cons, ih]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma lookups_map_assert (es : List (Expression (ZMod p))) :
     Operations.lookups (es.map fun e => (Operation.assert e)) = [] := by
   induction es with
   | nil => rfl
-  | cons e es ih => simp [Operations.lookups, List.map_cons, ih]
+  | cons e es ih => simp only [Operations.lookups, List.map_cons, ih]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma shallowInteractions_map_assert (es : List (Expression (ZMod p))) :
     Operations.shallowInteractions (es.map fun e => (Operation.assert e)) = [] := by
   induction es with
   | nil => rfl
-  | cons e es ih => simp [Operations.shallowInteractions, List.map_cons, ih]
+  | cons e es ih => simp only [Operations.shallowInteractions, List.map_cons, ih]
 
 -- `interactionsWith` (per-channel filter) of a list of pure `.assert` ops is empty — lets the
 -- `exposedChannels_eq` State-bus descent close over `assertZeros (ownAsserts cols)` without unfolding.
@@ -120,10 +120,10 @@ instance : ExplicitCircuits (F := ZMod p) assertZeros where
   output _ _ := ()
   localLength _ _ := 0
   operations es _ := es.map fun e => .assert e
-  localLength_eq es _ := by simp [assertZeros, Circuit.localLength, circuit_norm]
+  localLength_eq es _ := by simp only [assertZeros, Circuit.localLength, circuit_norm]
   subcircuitsConsistent es _ := by
-    simp [assertZeros, Operations.SubcircuitsConsistent, circuit_norm]
+    simp only [assertZeros, Operations.SubcircuitsConsistent, circuit_norm]
   channelsWithGuarantees _ _ := []
-  channelsLawful es _ := by simp [assertZeros, Operations.ChannelsLawful, circuit_norm]
+  channelsLawful es _ := by simp only [assertZeros, Operations.ChannelsLawful, circuit_norm]
 
 end SP1Clean.DivRemChip

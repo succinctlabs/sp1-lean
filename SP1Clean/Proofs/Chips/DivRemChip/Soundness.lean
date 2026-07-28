@@ -15,7 +15,13 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 local instance neZeroP_soundness : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
-set_option maxHeartbeats 4000000 in
+/-- A boolean field element has `val ≤ 1`. A file-local copy of `SP1Clean.bool_val_le`: importing
+`Math/Gate.lean` for it would drag that module's blanket `Mathlib.Tactic` import into this
+(DivRem-class, import-cost-sensitive) module's closure. -/
+private lemma bool_val_le_aux {x : ZMod p} (h : x = 0 ∨ x = 1) : x.val ≤ 1 := by
+  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rcases h with h | h <;> simp [h, ZMod.val_one]
+
 /-- **Unsigned carry-chain reassembly.** The chip pins `c·quotient + remainder = b` through an
 eight-limb base-`2^16` carry chain. On the unsigned, non-overflow branch the high four limbs carry no
 sign fill (`b_neg = rem_neg = 0`), so the eight limb equations are:
@@ -70,15 +76,14 @@ lemma euclid_identity_unsigned
   have H7 := limb_lift ctq[7] 0 0 carry[6] carry[7] hv7 (by simp) (by simp) hc6 hc7
     (by rw [add_zero, zero_add]; exact hh7)
   simp only [ZMod.val_zero] at L0 H4 H5 H6 H7
-  -- carry `.val ≤ 1`.
-  have C0 : (carry[0]).val ≤ 1 := by rcases hc0 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have C1 : (carry[1]).val ≤ 1 := by rcases hc1 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have C2 : (carry[2]).val ≤ 1 := by rcases hc2 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have C3 : (carry[3]).val ≤ 1 := by rcases hc3 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have C4 : (carry[4]).val ≤ 1 := by rcases hc4 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have C5 : (carry[5]).val ≤ 1 := by rcases hc5 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have C6 : (carry[6]).val ≤ 1 := by rcases hc6 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have C7 : (carry[7]).val ≤ 1 := by rcases hc7 with h | h <;> rw [h] <;> simp [ZMod.val_one]
+  have C0 : (carry[0]).val ≤ 1 := bool_val_le_aux hc0
+  have C1 : (carry[1]).val ≤ 1 := bool_val_le_aux hc1
+  have C2 : (carry[2]).val ≤ 1 := bool_val_le_aux hc2
+  have C3 : (carry[3]).val ≤ 1 := bool_val_le_aux hc3
+  have C4 : (carry[4]).val ≤ 1 := bool_val_le_aux hc4
+  have C5 : (carry[5]).val ≤ 1 := bool_val_le_aux hc5
+  have C6 : (carry[6]).val ≤ 1 := bool_val_le_aux hc6
+  have C7 : (carry[7]).val ≤ 1 := bool_val_le_aux hc7
   -- the product is bounded by `(2^64-1)^2`, ruling out the top carry.
   have hpb : cn * qn ≤ (2 ^ 64 - 1) * (2 ^ 64 - 1) := Nat.mul_le_mul (by omega) (by omega)
   rw [Word.toNat_def, Word.toNat_def]
@@ -168,14 +173,14 @@ lemma flags_val_sum {f0 f1 f2 f3 f4 f5 f6 f7 : ZMod p}
     f0.val + f1.val + f2.val + f3.val + f4.val + f5.val + f6.val + f7.val = 1 := by
   haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 8 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  have e0 : f0.val ≤ 1 := by rcases b0 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have e1 : f1.val ≤ 1 := by rcases b1 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have e2 : f2.val ≤ 1 := by rcases b2 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have e3 : f3.val ≤ 1 := by rcases b3 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have e4 : f4.val ≤ 1 := by rcases b4 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have e5 : f5.val ≤ 1 := by rcases b5 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have e6 : f6.val ≤ 1 := by rcases b6 with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have e7 : f7.val ≤ 1 := by rcases b7 with h | h <;> rw [h] <;> simp [ZMod.val_one]
+  have e0 : f0.val ≤ 1 := bool_val_le_aux b0
+  have e1 : f1.val ≤ 1 := bool_val_le_aux b1
+  have e2 : f2.val ≤ 1 := bool_val_le_aux b2
+  have e3 : f3.val ≤ 1 := bool_val_le_aux b3
+  have e4 : f4.val ≤ 1 := bool_val_le_aux b4
+  have e5 : f5.val ≤ 1 := bool_val_le_aux b5
+  have e6 : f6.val ≤ 1 := bool_val_le_aux b6
+  have e7 : f7.val ≤ 1 := bool_val_le_aux b7
   have hlt : f0.val + f1.val + f2.val + f3.val + f4.val + f5.val + f6.val + f7.val < p := by omega
   have key : ((f0.val + f1.val + f2.val + f3.val + f4.val + f5.val + f6.val + f7.val : ℕ) : ZMod p)
       = 1 := by push_cast [ZMod.natCast_zmod_val]; linear_combination hsum
@@ -281,7 +286,10 @@ private lemma toNat_eq_toInt_add128 (x : BitVec 128) :
   · have h1 : ¬ x.toInt < 0 := by rw [BitVec.msb_eq_toInt] at hm; simpa using hm
     rw [if_neg h1, toInt_eq_toNat_sub128, if_neg hm]; ring
 
-set_option maxHeartbeats 8000000 in
+-- Ladder-measured 2026-07-27 (lowering the real ceiling, re-elaborating each rung): 20000 FAILS
+-- (`whnf`/`isDefEq` timeout in the final `norm_num`/`omega` block), 50000 FAILS, 100000 ok. The
+-- floor is genuinely > 50000, so this ceiling is binding; 500000 keeps ~5x margin. Was 8000000.
+set_option maxHeartbeats 500000 in
 /-- **Signed Euclidean identity from the carry chain.** The signed analogue of
 `euclid_identity_unsigned`: the eight carry-chain limb equations carry the `b_neg`/`rem_neg` sign fills
 on the high limbs (`b_neg = b.msb`, `rem_neg = remainder_comp.msb`), and the `c_times_quotient` limbs are
@@ -339,16 +347,16 @@ lemma euclid_identity_signed
   have hbnv : (b_neg*65535 : ZMod p).val = b_neg.val * 65535 := by
     rcases hbn_bin with h | h <;> rw [h] <;> simp [val_65535_zmod_p, ZMod.val_one]
   rw [hrnv, hbnv] at H4 H5 H6 H7
-  have C0 : carry[0].val ≤ 1 := by rcases hc0 with h|h <;> rw [h] <;> simp [ZMod.val_one]
-  have C1 : carry[1].val ≤ 1 := by rcases hc1 with h|h <;> rw [h] <;> simp [ZMod.val_one]
-  have C2 : carry[2].val ≤ 1 := by rcases hc2 with h|h <;> rw [h] <;> simp [ZMod.val_one]
-  have C3 : carry[3].val ≤ 1 := by rcases hc3 with h|h <;> rw [h] <;> simp [ZMod.val_one]
-  have C4 : carry[4].val ≤ 1 := by rcases hc4 with h|h <;> rw [h] <;> simp [ZMod.val_one]
-  have C5 : carry[5].val ≤ 1 := by rcases hc5 with h|h <;> rw [h] <;> simp [ZMod.val_one]
-  have C6 : carry[6].val ≤ 1 := by rcases hc6 with h|h <;> rw [h] <;> simp [ZMod.val_one]
-  have C7 : carry[7].val ≤ 1 := by rcases hc7 with h|h <;> rw [h] <;> simp [ZMod.val_one]
-  have BN : b_neg.val ≤ 1 := by rcases hbn_bin with h|h <;> rw [h] <;> simp [ZMod.val_one]
-  have RN : rem_neg.val ≤ 1 := by rcases hrn_bin with h|h <;> rw [h] <;> simp [ZMod.val_one]
+  have C0 : carry[0].val ≤ 1 := bool_val_le_aux hc0
+  have C1 : carry[1].val ≤ 1 := bool_val_le_aux hc1
+  have C2 : carry[2].val ≤ 1 := bool_val_le_aux hc2
+  have C3 : carry[3].val ≤ 1 := bool_val_le_aux hc3
+  have C4 : carry[4].val ≤ 1 := bool_val_le_aux hc4
+  have C5 : carry[5].val ≤ 1 := bool_val_le_aux hc5
+  have C6 : carry[6].val ≤ 1 := bool_val_le_aux hc6
+  have C7 : carry[7].val ≤ 1 := bool_val_le_aux hc7
+  have BN : b_neg.val ≤ 1 := bool_val_le_aux hbn_bin
+  have RN : rem_neg.val ≤ 1 := bool_val_le_aux hrn_bin
   have hsplit := prod128_toNat_split hlo hhi
   rw [Word.toBitVec64_toNat hloU, Word.toBitVec64_toNat hhiU] at hsplit
   -- **Heavy telescoping in pure ℕ** (the unsigned-style step that omega handles without the kernel
@@ -386,12 +394,9 @@ lemma euclid_identity_signed
     constructor <;> nlinarith
   have hbtn : b.toNat < 2 ^ 64 := toNat_lt_2_64 hbU
   have hrtn : remc.toNat < 2 ^ 64 := toNat_lt_2_64 hremcU
-  have hbnv01 : b_neg.val = 0 ∨ b_neg.val = 1 := by
-    rcases hbn_bin with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have hrnv01 : rem_neg.val = 0 ∨ rem_neg.val = 1 := by
-    rcases hrn_bin with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have hc7v01 : carry[7].val = 0 ∨ carry[7].val = 1 := by
-    rcases hc7 with h | h <;> rw [h] <;> simp [ZMod.val_one]
+  have hbnv01 : b_neg.val = 0 ∨ b_neg.val = 1 := by omega
+  have hrnv01 : rem_neg.val = 0 ∨ rem_neg.val = 1 := by omega
+  have hc7v01 : carry[7].val = 0 ∨ carry[7].val = 1 := by omega
   zify at hT
   -- small ℤ step: substitute `prod128.toNat` (via `hpn`) into the telescoped `hT`, fix the three sign
   -- bits `b_neg`/`rem_neg`/`carry[7]` to concrete `0/1` (so the `·2^128` terms are constants, keeping
@@ -440,7 +445,7 @@ lemma sign_conditions {b remc c quotient : BitVec 64} {b_neg rem_neg : ZMod p}
   have hrn0_msb : rem_neg = 0 → 0 ≤ remc.toInt := by
     intro h; rw [hrm] at hrneg
     rcases Int.lt_or_le remc.toInt 0 with hl | hl
-    · rw [decide_eq_true (by exact hl)] at hrneg; rw [hrneg] at h; exact absurd h.symm h01
+    · rw [decide_eq_true hl] at hrneg; rw [hrneg] at h; exact absurd h.symm h01
     · exact hl
   have hrn1_msb : rem_neg = 1 → remc.toInt ≤ 0 := by
     intro h; rw [hrm] at hrneg
@@ -586,7 +591,9 @@ lemma extractLsb_lo_congr {w1 w2 : Word (ZMod p)} (hw1 : w1.isU64) (hw2 : w2.isU
   apply BitVec.eq_of_toNat_eq
   rw [extractLsb_lo_toNat hw1, extractLsb_lo_toNat hw2, h0, h1]
 
-set_option maxHeartbeats 4000000 in
+-- Ladder-measured 2026-07-27: 20000 FAILS (`whnf` timeout on the `Nat.mod_eq_of_lt`/`nlinarith`
+-- product bound), 50000 ok. Floor in (20000, 50000]; 400000 keeps ~8x margin. Was 4000000.
+set_option maxHeartbeats 400000 in
 /-- **Unsigned word Euclidean identity (low product only).** For `DIVUW`/`REMUW` the operand/quotient/
 remainder columns are all zero-extended low-32 (`< 2^32`), so the *low* 64-bit product (`mul_lower`,
 `ctqlo = qc·c`) already captures the whole product. The four low carry-chain limb equations then pin the
@@ -613,12 +620,12 @@ lemma euclid_identity_word_unsigned
   obtain ⟨bb0, bb1, _, _⟩ := Word.lt_cases_of_isU64 hbU
   have hqlt : qc.toNat < 2 ^ 32 := by
     obtain ⟨q0, q1, _, _⟩ := Word.lt_cases_of_isU64 hqU
-    rw [Word.toNat_def, show qc[2].val = 0 from by rw [hq2, ZMod.val_zero],
-        show qc[3].val = 0 from by rw [hq3, ZMod.val_zero]]; omega
+    rw [Word.toNat_def, show qc[2].val = 0 by rw [hq2, ZMod.val_zero],
+        show qc[3].val = 0 by rw [hq3, ZMod.val_zero]]; omega
   have hclt : c.toNat < 2 ^ 32 := by
     obtain ⟨cc0, cc1, _, _⟩ := Word.lt_cases_of_isU64 hcU
-    rw [Word.toNat_def, show c[2].val = 0 from by rw [hc2, ZMod.val_zero],
-        show c[3].val = 0 from by rw [hc3, ZMod.val_zero]]; omega
+    rw [Word.toNat_def, show c[2].val = 0 by rw [hc2, ZMod.val_zero],
+        show c[3].val = 0 by rw [hc3, ZMod.val_zero]]; omega
   -- low 64 product = qc·c (no wraparound: both < 2^32).
   have hprod : ctqlo.toNat = qc.toNat * c.toNat := by
     rw [← Word.toBitVec64_toNat hloU, hlo, BitVec.toNat_mul, Word.toBitVec64_toNat hqU,
@@ -632,7 +639,7 @@ lemma euclid_identity_word_unsigned
     (by rw [hb2]; simp [ZMod.val_zero]) hcb1 hcb2 hl2
   have L3 := limb_lift ctqlo[3] rem[3] b[3] carry[2] carry[3] l3 (by rw [hr3]; simp [ZMod.val_zero])
     (by rw [hb3]; simp [ZMod.val_zero]) hcb2 hcb3 hl3
-  have C3 : carry[3].val ≤ 1 := by rcases hcb3 with h | h <;> rw [h] <;> simp [ZMod.val_one]
+  have C3 : carry[3].val ≤ 1 := bool_val_le_aux hcb3
   have hbv2 : b[2].val = 0 := by rw [hb2, ZMod.val_zero]
   have hbv3 : b[3].val = 0 := by rw [hb3, ZMod.val_zero]
   have hrv2 : rem[2].val = 0 := by rw [hr2, ZMod.val_zero]
@@ -666,7 +673,9 @@ private lemma toInt_mul64_of_bound {x y : BitVec 64}
   rw [BitVec.toInt_mul]
   apply Int.bmod_eq_of_le_mul_two <;> push_cast <;> omega
 
-set_option maxHeartbeats 8000000 in
+-- Ladder-measured 2026-07-27: 20000 FAILS, 50000 FAILS (`whnf`/`isDefEq` timeout on the `nlinarith`
+-- product bound), 100000 ok. Floor in (50000, 100000]; 500000 keeps ~5x margin. Was 8000000.
+set_option maxHeartbeats 500000 in
 /-- **Signed word Euclidean identity (low product only).** The signed analogue of
 `euclid_identity_word_unsigned`: for `DIVW`/`REMW` the operand/quotient/remainder columns are all
 *sign-extended* low-32 (top two limbs the sign fill of bit 31), so the *low* 64-bit product
@@ -739,7 +748,7 @@ lemma euclid_identity_word_signed
   have eR := toNat_eq_toInt_add64 remc.toBitVec64
   rw [Word.toBitVec64_toNat hrU] at eR
   have hc3v : (carry[3].val : ℤ) = 0 ∨ (carry[3].val : ℤ) = 1 := by
-    rcases hcb3 with h | h <;> rw [h] <;> simp [ZMod.val_one, ZMod.val_zero]
+    have := bool_val_le_aux hcb3; omega
   zify at hT
   rw [eQ, eB, eR] at hT
   -- clear the carry-chain / sign-fill clutter so the integrality `omega` runs in a minimal context
