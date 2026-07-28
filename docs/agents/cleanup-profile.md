@@ -386,6 +386,17 @@ Per gated group, stopping at the first failure:
 2. **Layer pre-gate** (shallow waves only) — `lake build SP1Native` / `SP1Model` / … as a fail-fast.
 3. **`lake build SP1Clean`**, teed to a log; `-j 1` for solo/heavy groups.
 4. **Log assertions** — zero `error:`, zero `warning:`, zero `info:`.
+> **Do not blanket-kill `lean --server` / `lake serve` before a gate build.** It looks like harmless
+> hygiene and it is not: the `lean-lsp` MCP server owns child lean processes, and a `pkill` matching
+> them takes the MCP connection down for the whole session. Reconnecting needs a Claude Code restart,
+> which strands every editing worker (they verify through the LSP and must not run builds). This
+> happened once in this campaign and cost a session restart.
+>
+> The kill was never what established truth anyway — the **olean-deletion escalation** in gate 5 is.
+> If a module you touched does not appear in run 1's job list, delete its
+> `.olean`/`.ilean`/`.trace`/`.hash` and rebuild it explicitly. That distinguishes a genuine cached
+> pass from an olean written seconds earlier by a dying process, which a 1-second no-op rerun cannot.
+
 5. **Stale-olean smell test** — immediately re-run `lake build SP1Clean`. All three required: exit
    0; completes in **<90s**; and **re-elaborates zero modules** from the group. A rebuild on run 2
    means run 1 never persisted that olean, so run 1 was **not** a pass. On heavy groups also compare
