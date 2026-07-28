@@ -1,4 +1,5 @@
 import SP1Clean.FormalModel.Contracts.Operations
+import SP1Clean.Math.EvalVec
 import SP1Clean.Math.Word
 import SP1Clean.Model.ByteTable
 import SP1Clean.Model.Channels
@@ -20,7 +21,12 @@ range-checked (`(value[0] - 4·b₂ - 2·b₁ - b₀)/8 < 2^13`) to pin the offs
 Address limbs are witnessed via `AddrAddOperation.populate`; `AddrAddOperation` (a `FormalAssertion`)
 is composed as a Clean `assertion` (`is_real := 1`). `RawSpec` composes `AddrAddOperation.RawSpec`
 plus the offset constraints; `Faithful/AddressOperation.lean` anchors it to the generated
-`Extracted.AddressOperation.asserts`/`interactions` lists. Soundness and completeness are axiom-clean. -/
+`Extracted.AddressOperation.asserts`/`interactions` lists. Soundness and completeness are axiom-clean.
+
+Measured elaboration floors (ladder against a 1-heartbeat control): `metadata_of_constraints`
+(5k, 10k], `soundness` (5k, 10k], `completeness` (30k, 40k]. All three formerly carried a
+4000000-heartbeat ceiling — 100-800x over — and now run at the plain default with >=5x
+headroom. -/
 
 namespace SP1Clean.AddressOperation
 
@@ -48,9 +54,7 @@ def RawSpec (b cc : Word (ZMod p)) (offset_bit0 offset_bit1 offset_bit2 : ZMod p
 omit [Fact p.Prime] in
 /-- `2 ^ 13 < p`, the side condition for the offset `rangeCheck 13`. -/
 lemma hn13 : 2 ^ 13 < p := by
-  have h := Fact.out (p := 2 ^ 17 < p)
-  have : (2 : ℕ) ^ 13 < 2 ^ 17 := by norm_num
-  omega
+  have := Fact.out (p := 2 ^ 17 < p); omega
 
 /-- Soundness needs only genuine 64-bit operands. The circuit itself proves that their sum is a
 valid 48-bit address and constrains the remaining address metadata. -/
@@ -76,7 +80,6 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
     input.offset_bit0.val + 2 * input.offset_bit1.val + 4 * input.offset_bit2.val
       = (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48 % 8
 
-set_option maxHeartbeats 4000000 in
 /-- The two address-specific AIR checks have their advertised Rust meaning: the inverse gate
 excludes the reserved low 64 KiB, while the 13-bit byte-table range check proves that the three
 boolean offset columns are precisely the low bits of the raw address. -/
@@ -110,22 +113,13 @@ theorem metadata_of_constraints
     dsimp only [q, offset]
     convert hRange using 1
     ring_nf
-  have h0le : offset0.val ≤ 1 := by
-    rcases hob0 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have h1le : offset1.val ≤ 1 := by
-    rcases hob1 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have h2le : offset2.val ≤ 1 := by
-    rcases hob2 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have h2val : (2 : ZMod p).val = 2 := by
-    rw [show (2 : ZMod p) = ((2 : ℕ) : ZMod p) by norm_cast,
-      ZMod.val_natCast_of_lt (by omega)]
-  have h4val : (4 : ZMod p).val = 4 := by
-    rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) by norm_cast,
-      ZMod.val_natCast_of_lt (by omega)]
+  have h0le : offset0.val ≤ 1 := bool_val_le hob0
+  have h1le : offset1.val ≤ 1 := bool_val_le hob1
+  have h2le : offset2.val ≤ 1 := bool_val_le hob2
   have h2mul : (2 * offset1).val = 2 * offset1.val := by
-    rw [ZMod.val_mul, h2val, Nat.mod_eq_of_lt (by omega)]
+    rw [ZMod.val_mul, val_2_zmod_p, Nat.mod_eq_of_lt (by omega)]
   have h4mul : (4 * offset2).val = 4 * offset2.val := by
-    rw [ZMod.val_mul, h4val, Nat.mod_eq_of_lt (by omega)]
+    rw [ZMod.val_mul, val_4_zmod_p, Nat.mod_eq_of_lt (by omega)]
   have hFirstAdd :
       (4 * offset2 + 2 * offset1).val = 4 * offset2.val + 2 * offset1.val := by
     rw [ZMod.val_add_of_lt (by rw [h4mul, h2mul]; omega), h4mul, h2mul]
@@ -135,19 +129,12 @@ theorem metadata_of_constraints
     rw [ZMod.val_add_of_lt (by rw [hFirstAdd]; omega), hFirstAdd]
     omega
   have hOffsetLt : offset.val < 8 := by omega
-  have h8val : (8 : ZMod p).val = 8 := by
-    rw [show (8 : ZMod p) = ((8 : ℕ) : ZMod p) by norm_cast,
-      ZMod.val_natCast_of_lt (by omega)]
-  have h8ne : (8 : ZMod p) ≠ 0 := by
-    intro h
-    rw [h, ZMod.val_zero] at h8val
-    omega
   have hField : v0 = offset + q * 8 := by
     dsimp only [q]
-    rw [mul_assoc, inv_mul_cancel₀ h8ne, mul_one]
+    rw [mul_assoc, inv_mul_cancel₀ val_8_ne_zero, mul_one]
     ring
   have hMulVal : (q * 8).val = q.val * 8 := by
-    rw [ZMod.val_mul, h8val, Nat.mod_eq_of_lt (by omega)]
+    rw [ZMod.val_mul, val_8_zmod_p, Nat.mod_eq_of_lt (by omega)]
   have hAddVal : (offset + q * 8).val = offset.val + q.val * 8 := by
     rw [ZMod.val_add_of_lt (by rw [hMulVal]; omega), hMulVal]
   have hv0eq : v0.val = offset.val + q.val * 8 := by rw [hField, hAddVal]
@@ -163,7 +150,6 @@ theorem addressSemantics_of_raw {input : Inputs (ZMod p)}
     (hb : Word.isU64 input.b) (hcc : Word.isU64 input.cc)
     (h_raw : RawSpec input.b input.cc input.offset_bit0 input.offset_bit1 input.offset_bit2 cols) :
     Spec input cols := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨h_aa_raw, hob0, hob1, hob2, h_inv, h_range⟩ := h_raw
   have hbW : Word.isU64 #v[input.b[0], input.b[1], input.b[2], input.b[3]] :=
     Word.isU64_of_cases (hb 0) (hb 1) (hb 2) (hb 3)
@@ -179,11 +165,9 @@ theorem addressSemantics_of_raw {input : Inputs (ZMod p)}
   have hSumInput :
       cols.addr_operation.value[0].val + 65536 * cols.addr_operation.value[1].val +
           65536 ^ 2 * cols.addr_operation.value[2].val =
-        (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48 := by
-    exact h_sum
+        (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48 := h_sum
   have hFitInput :
-      (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 64 < 2 ^ 48 := by
-    exact h_fit
+      (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 64 < 2 ^ 48 := h_fit
   obtain ⟨_, _, _, _, hv0, hv1, hv2⟩ := h_aa_raw
   have hMetadata := metadata_of_constraints hv0 hv1 hv2 hob0 hob1 hob2 h_inv h_range
   refine ⟨hSumInput, hob0, hob1, hob2, hFitInput, ?_, ?_, hv0, hv1, hv2⟩
@@ -243,16 +227,16 @@ set_option linter.unusedSectionVars false in
     ((elaborated (p := p)).channelsWithGuarantees
       : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
 
-set_option maxHeartbeats 4000000 in
 theorem soundness :
     GeneralFormalCircuit.Soundness (ZMod p) main
       (fun input _ => SoundnessAssumptions input) (fun input cols _ => RowSpec input cols) := by
   circuit_proof_start
   obtain ⟨hb, hcc, hbin⟩ := h_assumptions
   obtain ⟨h_addrAdd, _, hob0, hob1, hob2, h_inv, h_range⟩ := h_holds
-  refine ⟨⟨bool_of_mul_pred hob0, bool_of_mul_pred hob1,
-      bool_of_mul_pred hob2, fun hr => ?_⟩,
-    Or.inr ⟨hb, hcc, hbin⟩, ?_⟩
+  have b0 := bool_of_mul_pred hob0
+  have b1 := bool_of_mul_pred hob1
+  have b2 := bool_of_mul_pred hob2
+  refine ⟨⟨b0, b1, b2, fun hr => ?_⟩, Or.inr ⟨hb, hcc, hbin⟩, ?_⟩
   have hr' : input_is_real = 1 := by simpa only using hr
   -- The address-sum equation is the composed `AddrAdd` `assertion`'s `Spec` (its `Assumptions →
   -- Spec`, fed the operand `isU64`s + the shared row selector, then the gated content); the
@@ -261,9 +245,7 @@ theorem soundness :
   have h_aa := (h_addrAdd ⟨hb, hcc, hbin⟩) hr'
   simp only [circuit_norm] at h_aa
   have c13 : ((13 : ℕ) : ZMod p) = (13 : ZMod p) := by norm_cast
-  have h13p : (13 : ℕ) < p := by
-    have := Fact.out (p := 2 ^ 17 < p)
-    omega
+  have h13p : (13 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have hneg : - input_is_real = -1 := congrArg Neg.neg hr'
   have h_range := h_range hneg
   simp only [byteChannel] at h_range
@@ -272,19 +254,15 @@ theorem soundness :
   have h_inv_real : env.get (i₀ + 3) *
       (env.get (i₀ + 1) + env.get (i₀ + 2)) - 1 = 0 := by
     simpa only [hr'] using h_inv
-  have hMetadata := metadata_of_constraints h_aa.2.1 h_aa.2.2.1 h_aa.2.2.2.1
-    (bool_of_mul_pred hob0) (bool_of_mul_pred hob1) (bool_of_mul_pred hob2)
+  have hMetadata := metadata_of_constraints h_aa.2.1 h_aa.2.2.1 h_aa.2.2.2.1 b0 b1 b2
     h_inv_real h_range_nat
-  simp only [Spec, Vector.getElem_map, Vector.getElem_mapRange,
-    Expression.eval]
-  exact ⟨h_aa.1, bool_of_mul_pred hob0, bool_of_mul_pred hob1,
-    bool_of_mul_pred hob2, h_aa.2.2.2.2, by rw [← h_aa.1]; exact hMetadata.1,
+  simp only [Spec, Vector.getElem_map, Vector.getElem_mapRange, Expression.eval]
+  exact ⟨h_aa.1, b0, b1, b2, h_aa.2.2.2.2, by rw [← h_aa.1]; exact hMetadata.1,
     by rw [← h_aa.1]; exact hMetadata.2,
     h_aa.2.1, h_aa.2.2.1, h_aa.2.2.2.1⟩
   · intro h1 h0
     exact off_gate_vacuous hbin h1 h0
 
-set_option maxHeartbeats 4000000 in
 theorem completeness :
   GeneralFormalCircuit.Completeness (ZMod p) main
       (fun input _ _ => Assumptions input) (fun _ _ _ => True) := by
@@ -298,12 +276,12 @@ theorem completeness :
       Expression.eval env.toEnvironment input_var_b[1],
       Expression.eval env.toEnvironment input_var_b[2],
       Expression.eval env.toEnvironment input_var_b[3]] : Word (ZMod p)) = input_b := by
-    rw [← hbi]; apply Vector.ext; intro i hi; simp only [Vector.getElem_map]; interval_cases i <;> rfl
+    rw [← hbi]; exact vec4_eval _ _
   have hceq : (#v[Expression.eval env.toEnvironment input_var_cc[0],
       Expression.eval env.toEnvironment input_var_cc[1],
       Expression.eval env.toEnvironment input_var_cc[2],
       Expression.eval env.toEnvironment input_var_cc[3]] : Word (ZMod p)) = input_cc := by
-    rw [← hci]; apply Vector.ext; intro i hi; simp only [Vector.getElem_map]; interval_cases i <;> rfl
+    rw [← hci]; exact vec4_eval _ _
   have hval : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 3 fun i => var {index := i₀ + i}) : Vector (ZMod p) 3)
       = AddrAddOperation.populate input_b input_cc := by
@@ -333,10 +311,6 @@ theorem completeness :
     intro h
     have hval2 : (v1 + v2).val = v1.val + v2.val := ZMod.val_add_of_lt (by omega)
     rw [h, ZMod.val_zero] at hval2; omega
-  have h8ne : (8 : ZMod p) ≠ 0 := by
-    have h8v : ((8 : ℕ) : ZMod p).val = 8 := ZMod.val_natCast_of_lt (lt_trans (by norm_num) hp)
-    rw [show (8 : ZMod p) = ((8 : ℕ) : ZMod p) from by norm_cast]
-    intro hz; rw [hz, ZMod.val_zero] at h8v; exact absurd h8v (by norm_num)
   have hcast0 : ((input_offset_bit0.val : ℕ) : ZMod p) = input_offset_bit0 := ZMod.natCast_zmod_val _
   have hcast1 : ((input_offset_bit1.val : ℕ) : ZMod p) = input_offset_bit1 := ZMod.natCast_zmod_val _
   have hcast2 : ((input_offset_bit2.val : ℕ) : ZMod p) = input_offset_bit2 := ZMod.natCast_zmod_val _
@@ -377,7 +351,7 @@ theorem completeness :
         * (8 : ZMod p)⁻¹).val < 2 ^ 13
     rw [hdecomp, show ((8 * (A % 2 ^ 16 / 8) : ℕ) : ZMod p)
         = (8 : ZMod p) * ((A % 2 ^ 16 / 8 : ℕ) : ZMod p) from by push_cast; ring,
-      mul_comm (8 : ZMod p), mul_assoc, mul_inv_cancel₀ h8ne, mul_one,
+      mul_comm (8 : ZMod p), mul_assoc, mul_inv_cancel₀ val_8_ne_zero, mul_one,
       ZMod.val_natCast_of_lt (by omega : A % 2 ^ 16 / 8 < p)]
     omega
 

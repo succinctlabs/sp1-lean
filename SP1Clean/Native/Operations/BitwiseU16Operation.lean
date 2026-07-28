@@ -18,7 +18,13 @@ pulls). Here that is a `FormalAssertion` that **composes `BitwiseOperation.circu
 decompositions plus the `is_real` binary gate — witnessing nothing (the `b_low_bytes`/`c_low_bytes`/
 `bitwise_operation.result` columns are chip-owned inputs). The structural `Spec` *is* the composed
 `BitwiseOperation.Spec`; the whole-word readout (`toBitVec64 (resultWord …) = b op c`) is derived by
-`result_semantic`, which the `BitwiseChip` soundness consumes. -/
+`result_semantic`, which the `BitwiseChip` soundness consumes.
+
+Measured elaboration floors (ladder against a 1-heartbeat control, the four sites laddered at
+different rungs to separate ownership — at the control rung all four report at the shared
+`variable` line): `result_semantic` (15k, 20k], `spec_populate` (10k, 15k], `soundness` (5k, 10k],
+`completeness` <=5k. All four formerly carried a 4000000-heartbeat ceiling — 200-800x over — and
+now run at the plain default with >=10x headroom. -/
 
 namespace SP1Clean.BitwiseU16Operation
 
@@ -79,14 +85,12 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
 /-- The reassembly identity `low + (w − low)·256⁻¹·256 = w`. -/
 lemma reassemble (w low : ZMod p) :
     w = low + (w - low) * (256 : ZMod p)⁻¹ * 256 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rw [mul_assoc, inv_mul_cancel₀ val_256_ne_zero, mul_one]; ring
 
 /-- A limb's value splits as its low byte plus 256× its high byte, given both are bytes. -/
 lemma limb_split {w low : ZMod p} (hlo : low.val < 256)
     (hhi : ((w - low) * (256 : ZMod p)⁻¹).val < 256) :
     w.val = low.val + ((w - low) * (256 : ZMod p)⁻¹).val * 256 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   conv_lhs => rw [reassemble w low]
   exact val_lo_add_hi hlo hhi
 
@@ -102,7 +106,6 @@ lemma decomp_limb_split {w : Word (ZMod p)} {low : Extracted.U16toU8Operation (Z
         List.getElem_cons_succ] at hlo hhi ⊢
       exact limb_split hlo hhi
 
-set_option maxHeartbeats 4000000 in
 /-- **Whole-word readout.** From the structural `Spec` on a real row, the reassembled result word is
 the AND/OR/XOR (as 64-bit values) of the two operands. The `BitwiseChip` soundness consumes this. -/
 theorem result_semantic (input : Inputs (ZMod p))
@@ -116,7 +119,6 @@ theorem result_semantic (input : Inputs (ZMod p))
     (input.opcode = 2 →
       Word.toBitVec64 (resultWord input.cols.bitwise_operation.result)
         = Word.toBitVec64 input.b ^^^ Word.toBitVec64 input.c) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   set b := input.b with hb_def
   set c := input.c with hc_def
   set lb := input.cols.b_low_bytes with hlb_def
@@ -181,7 +183,6 @@ def populate (b c : Word (ZMod p)) (opcode : ZMod p) : Columns (ZMod p) :=
         ((c[2].val % 256 : ℕ) : ZMod p), ((c[3].val % 256 : ℕ) : ZMod p)]⟩
   ⟨lb, lc, BitwiseOperation.populate (decompBytes b lb) (decompBytes c lc) opcode⟩
 
-set_option maxHeartbeats 4000000 in
 /-- The witnessed columns `populate b c opcode` satisfy the gadget `Spec` for any `is_real`, given the
 operands are 64-bit and the opcode is AND/OR/XOR: the populated low bytes (`w[i] % 256`) and the derived
 high bytes are genuine bytes, so the composed `BitwiseOperation.spec_populate` applies. The composing
@@ -189,7 +190,6 @@ high bytes are genuine bytes, so the composed `BitwiseOperation.spec_populate` a
 theorem spec_populate {b c : Word (ZMod p)} (hb : Word.isU64 b) (hc : Word.isU64 c)
     {opcode : ZMod p} (hop : opcode.val < 3) (is_real : ZMod p) :
     Spec (⟨b, c, populate b c opcode, opcode, is_real⟩ : Inputs (ZMod p)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp256 : (256 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have e8 : (2 : ℕ) ^ 8 = 256 := by norm_num
   have e16 : (2 : ℕ) ^ 16 = 65536 := by norm_num
@@ -243,7 +243,6 @@ set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
 
-set_option maxHeartbeats 4000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨_hb, _hc, hop, hbin⟩ := h_assumptions
@@ -266,7 +265,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   refine ⟨?_, Or.inr ⟨hop, hbin⟩⟩
   simpa only [decompBytes, eb, ec, elb, elc, ← sub_eq_add_neg] using h_spec
 
-set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨_hb, _hc, hop, hbin⟩ := h_assumptions
@@ -303,3 +301,4 @@ set_option linter.unusedSectionVars false in
     circuit.localLength x = 0 := rfl
 
 end SP1Clean.BitwiseU16Operation
+

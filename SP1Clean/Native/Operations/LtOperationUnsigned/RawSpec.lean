@@ -14,7 +14,14 @@ limb; `not_eq_inv` witnesses they differ; a `U16CompareOperation` on the selecte
 `bit = (b <ᵤ cc)`. `RawSpec` is the literal constraint list at `is_real = 1`.
 
 Soundness cores (`ltUnsigned_core`, `comparison_limbs_lt`, `flags_sum_zero_iff_eq`) live here so
-`LtOperationSigned` can reuse them via `ltUnsigned_semantic` without an import cycle. -/
+`LtOperationSigned` can reuse them via `ltUnsigned_semantic` without an import cycle.
+
+Measured elaboration floors (ladder against a 1-heartbeat control, `at_most_one` pinned high while
+its three consumers were laddered — it masks them with a kernel `unknown constant` cascade):
+`at_most_one` (400k, 500k] — **genuinely binding**, the only ceiling left in this file, and its
+declared 1000000 is only ~2x its floor, so it is kept as-is; `ltUnsigned_core` (30k, 35k];
+`flags_sum_zero_iff_eq` (20k, 25k]; `comparison_limbs_lt` (5k, 10k]. Those three former
+1000000-heartbeat ceilings were removed — the plain default carries >=5x headroom on each. -/
 
 namespace SP1Clean.LtOperationUnsigned
 
@@ -88,7 +95,6 @@ def Selectors (b cc : Word (ZMod p)) (cols : Extracted.LtOperationUnsigned (ZMod
   ((cc[3] * f3 + cc[2] * f2 + cc[1] * f1 + cc[0] * f0) - cl1 = 0) ∧
   (((1 - sumf) - 1) * (cols.not_eq_inv * (cl0 - cl1) - 1) = 0)
 
-set_option maxHeartbeats 1000000 in
 /-- Soundness core: the boolean flags select the most-significant differing limb (all higher limbs
 forced equal by the prefix-sum selectors, the selected limb forced distinct by the `not_eq_inv`
 witness), so the `U16CompareOperation` on the selected limb pair reproduces the whole-word order.
@@ -199,7 +205,6 @@ theorem ltUnsigned_core {cols : Extracted.LtOperationUnsigned (ZMod p)}
     simp only [Word.toNat_def]
     split_ifs <;> first | rfl | (exfalso; omega)
 
-set_option maxHeartbeats 1000000 in
 /-- The selected comparison limbs are genuine 16-bit values (each is one operand limb or `0`). Needed
 to discharge the composed `U16CompareOperation`'s `Assumptions`. -/
 theorem comparison_limbs_lt {cols : Extracted.LtOperationUnsigned (ZMod p)}
@@ -223,7 +228,6 @@ theorem comparison_limbs_lt {cols : Extracted.LtOperationUnsigned (ZMod p)}
   · exact ⟨by rw [show cols.comparison_limbs[0] = b[0] by linear_combination -hcl0]; exact hb0,
       by rw [show cols.comparison_limbs[1] = cc[0] by linear_combination -hcl1]; exact hd0⟩
 
-set_option maxHeartbeats 1000000 in
 /-- Equality companion to `ltUnsigned_core`: the one-hot flags sum to `0` exactly when the operands are
 equal. Same five-case selector split — the all-flags-zero case forces every limb equal; each one-flag
 case forces the selected limb distinct (so the words differ) while the flag sum is `1 ≠ 0`. -/

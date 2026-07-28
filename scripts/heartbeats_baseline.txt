@@ -48,7 +48,25 @@
 # carrying a plain inherited default rather than masking a whnf blowup (unlike the shift cores in
 # W1/g3). Not a single site was within 30x of its measured floor. The ladders are recorded in the
 # doc-comments at each former site.
+# -15 (2026-07-28, proof-cleanup W2/r3): ratchet DOWN, no ceiling raised. 17 directives deleted, 2
+# re-added strictly lower, net -15. By batch: the type-reader family shed both 4000000 sites in
+# ALUTypeReaderImmutable.lean (b1); AddressOperation.lean dropped three 4000000 and
+# BitwiseU16Operation.lean all four 4000000 (b2); Faithful/CPUState.lean dropped both 1000000 (b4).
+# Two results from this round are worth recording because they are the campaign's first counter-
+# examples to the "every ceiling is an inherited default" pattern:
+#   * LtOperationUnsigned/RawSpec.lean removed three 1000000 sites but KEPT the fourth --
+#     `at_most_one` measured a floor in (400k, 500k] against its declared 1000000, the first
+#     correctly-sized ceiling found. Its three companions were carry-overs of that justified number
+#     sideways within the same file, and those are the three that went.
+#   * MulOperation/RawSpec.lean `full_product` is the first TERM-INTRINSIC ceiling: floor 1.0-1.2M,
+#     the highest of the ~110 sites measured so far, driven by a 16-column `omega` telescope over
+#     2^128 literals plus a 256-monomial `ring`. It is not foldable, so it was kept and merely
+#     tightened 16000000 -> 6000000 (~5x headroom). The same file removed one 8000000 outright and
+#     tightened a third site 1600000 -> 500000.
+# Faithful/CPUState.lean's measured floors (800-2500 against a declared 1000000) are the lowest
+# recorded anywhere in the campaign and predict that the large majority of the ~300 remaining
+# Faithful/ ceilings are removable. All ladders are recorded in the doc-comments at each site.
 # NOTE: the recorded count includes one phantom — SP1Clean/Proofs/Sail/Advance.lean:2325 has the
 # literal inside a doc-comment, so the grep sees a site that does not exist. Pre-existing.
-SP1Clean 781
+SP1Clean 766
 SP1CleanTest 16
