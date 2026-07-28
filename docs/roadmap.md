@@ -192,10 +192,12 @@ Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistica
 + § "Compile-time / performance landmines".
 
 - **`linter.style.longLine`** — the one remaining syntactic linter not yet enabled (the last
-  candidate noted in AGENTS.md § Linters). Current fallout, lines over 100 chars in hand-written
-  code: `Proofs/` 3310, `Native/` 1260, `Soundness/` 973, `Model/` 670, `Faithful/` 582,
-  `FormalModel/` 368, `SP1CleanTest/` 59, `Math/` 33 — **7,255 lines across 323 files**. (An
-  earlier note quoted ~1080; that figure covered only `Native/` + `FormalModel/`.) Enable it alone
+  candidate noted in AGENTS.md § Linters). Current fallout, lines over 100 **codepoints** in
+  hand-written code: `Proofs/` 2965, `Native/` 1122, `Soundness/` 798, `Faithful/` 546,
+  `Model/` 511, `FormalModel/` 317, `SP1CleanTest/` 30, `Math/` 13 — **6,302 lines across 311
+  files**. (An earlier note quoted ~1080; that figure covered only `Native/` + `FormalModel/`.
+  **Measure with codepoints, not bytes** — `awk 'length($0)>100'` counts bytes and over-reports by
+  ~15% on this tree, whose docstrings are unicode-dense; the linter counts codepoints.) Enable it alone
   on the core pillar lake libraries, then reflow or per-file-suppress back to zero warnings.
   Heavy, mechanical. Reflowing is done opportunistically by the cleanup campaign, but the flag is
   deliberately **not** enabled there — flipping it is a separate, deliberate change.
