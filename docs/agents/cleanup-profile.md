@@ -42,6 +42,13 @@ A violation is a defect: revert and re-dispatch.
    inlining, single-use `∃`-lemma inlining). *Adding* declarations is permitted — see §4a.
 4. **Never touch** `SP1Clean/Extracted/**`, `SP1CleanTest/**/Vectors/**`, `*TraceVectors.lean`,
    `scripts/axiom_probe.lean`, or `SP1Clean.lean` (the root import index). No file moves.
+4b. **Never change a `def` / `abbrev` *body*.** Statements are already frozen by §2.1, but a `def`'s
+   body is part of its meaning: importers see it through definitional unfolding, so editing one
+   changes downstream elaboration in a way a sibling worker's cached olean cannot see. A theorem or
+   lemma *proof* body is invisible to importers and is the campaign's actual working surface.
+   This rule is what makes it safe to edit files at different topological depths in one gate group —
+   with statements frozen, attributes suspended (§10), and `def` bodies untouched, there is no
+   channel by which one worker's edit can invalidate another's LSP verdict.
 5. **Never introduce** `native_decide` into `SP1Clean/`, or `skipKernelTC` anywhere.
 6. **Never unsqueeze `simp only` → `simp`.** The permitted direction is `simp` → `simp only`, and
    only outside the KEEP-set (§5).
