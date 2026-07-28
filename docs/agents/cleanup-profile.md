@@ -180,21 +180,29 @@ Verify with `lean_goal`, or a build, before removing:
   `Fact (2 ^ 17 < p)`-derived one would make the pervasive `omit [Fact (2 ^ 17 < p)] in` clauses
   illegal (`Model/ByteTable.lean:84`). Do not add one — it is an owner decision, not a drive-by.
 
-> **The derivation source decides — do not treat all `Fact`/`NeZero` locals as load-bearing.** This
-> rule was originally written too broadly and was telling workers to keep dead code. Three measured
-> cases:
+> **Do not treat `Fact`/`NeZero` locals as load-bearing by inspection — and do not trust the
+> derivation source either.** This rule has now been wrong in *both* directions. It first said every
+> such local is load-bearing (which preserved dead code); the derivation-source table that replaced
+> it said the `2 ^ 17`-derived form is always load-bearing — and all four such copies in
+> `Native/Operations/BitwiseU16Operation.lean` turned out to be dead.
 >
-> | local | derived from | verdict |
-> |---|---|---|
-> | `NeZero p` | `Fact (2 ^ 17 < p)` | **keep** — no global exists, on purpose (above) |
-> | `NeZero p` | `Fact p.Prime` (`⟨(Fact.out (p := p.Prime)).ne_zero⟩`) | **dead, remove** — synthesizable |
-> | `Fact (1 < p)` | `Fact p.Prime` | **dead, remove** — synthesizable |
+> **What actually decides it: whether `Fact p.Prime` is already in that declaration's *elaborated
+> signature*.** The hazard the rule exists to prevent is not "the proof breaks" — a broken proof is
+> loud and safe. It is that deleting the local can make `Fact p.Prime` newly *used*, which **adds a
+> binder to the signature**. That is a statement change, and it is quiet.
 >
-> Anything synthesizable from `Fact p.Prime` is already in scope and the local shadows nothing. Only
-> the magnitude-derived (`2 ^ 17`) form is load-bearing. Likewise `Math/Word.lean` declares
-> `instFact_2_17_of_2_24` and `instFact_2_24_of_2_25`, so an in-proof `have` re-deriving
-> `Fact (2 ^ 17 < p)` under a stronger hypothesis is also dead — four such copies were deleted
-> outright during the `sixteen_lt` hoist. **Verify by deletion + re-elaboration, never by grep.**
+> **The recipe — `#check`, delete, re-elaborate, `#check` again.** Compare the printed signatures
+> before and after; they must be byte-identical. Deletion-and-re-elaboration alone is necessary but
+> **not sufficient**, because a signature can gain a binder while every proof still compiles. Never
+> grep.
+>
+> Measured so far: `NeZero p` and `Fact (1 < p)` from `Fact p.Prime` — dead (many sites);
+> `NeZero p` from `Fact (2 ^ 17 < p)` — dead in `BitwiseU16Operation`, load-bearing elsewhere, so
+> **check each one**. In-proof `have`s re-deriving `Fact (2 ^ 17 < p)` under a stronger hypothesis are
+> dead by construction, since `Math/Word.lean` declares `instFact_2_17_of_2_24` and
+> `instFact_2_24_of_2_25` (four were deleted during the `sixteen_lt` hoist). There is deliberately no
+> *global* `NeZero p` (§6 above) — that remains true and is a separate question from whether a given
+> local is dead.
 
 - A `change` that only restates an `abbrev` is free to delete when the closer is a term rather than a
   tactic that needed the syntactic form. `MicroTime.chainState_succ_front` went from 8 lines to 2
