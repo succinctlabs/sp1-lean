@@ -32,9 +32,14 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 2000000 in
 /-- **Faithfulness anchor (ALUTypeReader fragment).** Under `is_real = is_trusted = 1`, SP1's generated
-`ALUTypeReader` constraint list holds iff the combined spec holds. -/
+`ALUTypeReader` constraint list holds iff the combined spec holds.
+
+Heartbeat ladder (2026-07-28; the file's control run at 1 heartbeat produced four real timeouts, all
+reported at the shared `variable` line, so the four sites were separated by laddering at distinct
+rungs): passes at 5000, fails at 1500 (`isDefEq`, inside the `simp only` list below). True floor in
+(1500, 5000]; the former 2M ceiling was ~400-1300x over it and the plain 200000 default leaves >=40x
+headroom, so the override was removed rather than lowered. -/
 theorem alutypereader_constraints_faithful
     (clk_high clk_low : ZMod p) (pc : Vector (ZMod p) 3) (opcode : ZMod p)
     (op_a_write_value : Word (ZMod p)) (cols : Extracted.ALUTypeReader (ZMod p)) :
@@ -72,11 +77,15 @@ theorem alutypereader_constraints_faithful
 open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel ProgramMsg)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 1000000 in
 /-- **Faithfulness anchor (ALUTypeReader fragment) — Program-bus interaction, SYNTACTIC.** Sibling of
 `rtypereader_program_…`: the single Program fetch projects to the same arity-16 `LookupAccess` as the
 oracle's Program entry. ALU-type differences vs R-type: `op_c` is a full **Word** (`op_c[0..3]` in the
-Program tuple) and the immediate flag `imm_c` is carried (vs R-type's scalar op_c + `imm_c = 0`). -/
+Program tuple) and the immediate flag `imm_c` is carried (vs R-type's scalar op_c + `imm_c = 0`).
+
+Heartbeat ladder (2026-07-28, laddered at a rung distinct from its three file-mates): passes at
+10000, fails at 5000 (`whnf`, reported at this signature). True floor in (5000, 10000]; the former
+1M ceiling was ~100-200x over it and the plain 200000 default leaves >=20x headroom, so the
+override was removed rather than lowered. -/
 theorem alutypereader_program_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var Readers.ALUTypeReader.Inputs (ZMod p)) (offset : ℕ)
     (clk_high clk_low : ZMod p) (pc : Vector (ZMod p) 3) (opcode : ZMod p)
@@ -122,7 +131,6 @@ theorem alutypereader_program_interactions_faithful_syntactic
     signedVal_neg hp2,
     h_it, h_p0, h_p1, h_p2, h_oc, h_oa, h_ob, h_oc0, h_oc1, h_oc2, h_oc3, h_oa0, h_imm]
 
-set_option maxHeartbeats 1000000 in
 /-- **Faithfulness anchor (ALUTypeReader fragment) — Memory-bus interactions, SYNTACTIC.** Option B: the
 reader is now a **pure read** — its op_a (`rd`) **write** is factored out into `RegisterWrite` (composed by
 the chip). So the **five** Memory interactions the reader actually emits (op_a read, op_b read+write-back,
@@ -132,7 +140,12 @@ Memory-index 1), after the W11-flip `negMult` sign-bridge (our pull/push polarit
 send/receive). ALU-type differences vs R-type: the `op_c` register read uses the low limb `op_c[0]` as its
 address, and its emits are gated by `is_real - imm_c` (`h_imm` binds it). The relocated op_a write is
 recovered at the chip level by `RegisterWrite`'s own emit. Same `op_a(read), op_b, op_c` order, so a clean
-`=` after the erase. -/
+`=` after the erase.
+
+Heartbeat ladder (2026-07-28, laddered at a rung distinct from its three file-mates): passes at
+10000, fails at 5000 (`whnf`, reported at this signature). True floor in (5000, 10000]; the former
+1M ceiling was ~100-200x over it and the plain 200000 default leaves >=20x headroom, so the
+override was removed rather than lowered. -/
 theorem alutypereader_memory_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var Readers.ALUTypeReader.Inputs (ZMod p)) (offset : ℕ)
     (clk_high clk_low : ZMod p) (pc : Vector (ZMod p) 3) (opcode : ZMod p)
@@ -194,12 +207,16 @@ theorem alutypereader_memory_interactions_faithful_syntactic
   · rw [(by ring : cols.imm_c - is_real = -(is_real - cols.imm_c)), signedVal_neg hp2]
   · rw [(by ring : is_real - cols.imm_c = -(cols.imm_c - is_real)), signedVal_neg hp2]
 
-set_option maxHeartbeats 1000000 in
 /-- **Faithfulness anchor (ALUTypeReader fragment) — Byte-bus interactions, SYNTACTIC.** Sibling of
 `rtypereader_byte_…` (the nested `RegisterAccessCols → RegisterAccessTimestamp` descent surfacing the six
 timestamp byte checks). ALU-type difference: the op_c timestamp byte checks are gated by `is_real - imm_c`
 (the op_c `RegisterAccessCols` carries that multiplicity) — bound via `h_imm`, the mult matching the
-oracle's `E29` (`sub_eq_add_neg` folds the circuit's `+ -` to the oracle's `-`). -/
+oracle's `E29` (`sub_eq_add_neg` folds the circuit's `+ -` to the oracle's `-`).
+
+Heartbeat ladder (2026-07-28, laddered at a rung distinct from its three file-mates): passes at
+10000, fails at 3500 (`whnf`, reported at this signature). True floor in (3500, 10000]; the former
+1M ceiling was ~100-290x over it and the plain 200000 default leaves >=20x headroom, so the
+override was removed rather than lowered. -/
 theorem alutypereader_byte_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var Readers.ALUTypeReader.Inputs (ZMod p)) (offset : ℕ)
     (clk_high clk_low : ZMod p) (pc : Vector (ZMod p) 3) (opcode : ZMod p)

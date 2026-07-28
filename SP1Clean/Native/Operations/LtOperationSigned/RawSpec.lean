@@ -111,12 +111,19 @@ def RawSpec (b cc : Word (ZMod p)) (cols : Extracted.LtOperationSigned (ZMod p))
   (is_signed = 0 ∨ is_signed = 1) ∧
   ((is_signed - 1) * bm = 0) ∧ ((is_signed - 1) * cm = 0)
 
-set_option maxHeartbeats 800000 in
 /-- Soundness readout from `RawSpec` (consumed by `Formal.lean`'s `result_semantic` and the composing
 chips): the compare `bit` is the signed (`is_signed = 1`, via `toInt` of the biased words) /
 unsigned (`is_signed = 0`) less-than indicator, and on the unsigned branch the flag sum is `0`
 exactly when the operands are equal. Loose-variable form (no `Inputs`/`Spec` dependency) so it stays
-out of the `Formal` import cycle. -/
+out of the `Formal` import cycle.
+
+Heartbeat ladder (2026-07-28; the control run at 1 heartbeat produced a real timeout): passes at
+20000, fails at 10000 (`simp`'s nested `isDefEq`, in the `is_signed = 1` branch's
+`ltUnsigned_semantic` application). True floor in (10000, 20000]; the former 800000 ceiling was
+~40-80x over it and the plain 200000 default leaves >=10x headroom, so the override was removed
+rather than lowered. The file's unceilinged siblings `adj_bias`/`toInt_compare_of_bias` do the
+heavier `omega`-over-`2 ^ 64` work and never needed one — the sibling screen called this
+correctly. -/
 theorem ltSigned_semantic {b cc : Word (ZMod p)} {cols : Extracted.LtOperationSigned (ZMod p)}
     {is_signed : ZMod p}
     (hb : Word.isU64 b) (hcc : Word.isU64 cc)

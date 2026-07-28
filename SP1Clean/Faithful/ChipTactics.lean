@@ -13,10 +13,10 @@ Two pieces shared across the per-chip `Faithful/*Chip.lean` anchors:
   `<op> ++ CPUState ++ <reader>` layout is identical modulo five identifiers; `cpustate_constraints_faithful`
   is baked in.
 
-This module lives in `Faithful/` (not `Foundations/`) because the `faithful_chip` macro hard-references
-`SP1Clean.Extracted.forall_append_pair` and `SP1Clean.Faithful.cpustate_constraints_faithful` by
-definition-site resolution — both `import`s above are load-bearing. Establish `NeZero p` in the caller
-before invoking the macro. -/
+This module lives in `Faithful/` (not the foundational `Math/` + `Model/` layer) because the
+`faithful_chip` macro hard-references `SP1Clean.Extracted.forall_append_pair` and
+`SP1Clean.Faithful.cpustate_constraints_faithful` by definition-site resolution — both `import`s
+above are load-bearing. Establish `NeZero p` in the caller before invoking the macro. -/
 
 namespace SP1Clean.Faithful
 

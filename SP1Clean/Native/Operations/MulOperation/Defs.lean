@@ -12,7 +12,12 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-set_option maxHeartbeats 8000000 in
+-- Ceiling ladder (measured): the budget here is spent in the **LCNF compiler**, not in proof
+-- elaboration — at a 40000 budget `main` elaborates fine and only code generation times out, at
+-- line 21 rather than inside the term. Floor bracketed to (40000, 60000]; the former 8M ceiling was
+-- ~130-200x over. Lowered rather than removed: the plain 200000 default leaves under 3.5x headroom,
+-- and code-generation cost is more load-sensitive than elaboration. 400000 keeps ~6.7x over it.
+set_option maxHeartbeats 400000 in
 /-- SP1's `MulOperation::eval` as a Clean `FormalAssertion`: compose `U16toU8OperationSafe`/`U16MSBOperation`
 over the `populate`d `cols` (gated on `is_real` / `is_mulw`), `is_real`-gated `slice_range_check` byte pulls
 on the carries (u16) and products (u8 pairs), the two sign-extend definitions, and the 16 `is_real`-gated
@@ -95,6 +100,5 @@ set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := by
   rfl
-
 
 end SP1Clean.MulOperation
