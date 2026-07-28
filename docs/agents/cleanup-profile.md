@@ -199,6 +199,18 @@ Verify with `lean_goal`, or a build, before removing:
 - A `change` that only restates an `abbrev` is free to delete when the closer is a term rather than a
   tactic that needed the syntactic form. `MicroTime.chainState_succ_front` went from 8 lines to 2
   this way (three pure-defeq `change`s dropped, body now `exact congrArg (·.bind Machine.stepOnce) ih`).
+
+- **`have ⟨…⟩ := h` destructures without consuming; `rcases`/`obtain` clears `h`.** Where a proof needs
+  a hypothesis both whole *and* destructured, the usual `refine ⟨valid, ?_⟩` + `rcases valid` dance is
+  unnecessary — `have ⟨_, …, shardLayout, halts, _⟩ := valid` keeps `valid` in scope. Worth checking
+  wherever you see a hypothesis reintroduced right after being cased on.
+
+- **Two declarations can be the same declaration definitionally without looking it.** `TimeExtraction`
+  had three payoff theorems with byte-identical bodies because `Readers.RegisterAccessTimestamp.Spec`
+  applied to `real` *is* `ActiveTimestampBounds …`, and `RegisterAccessCols.Spec` is *defined as* the
+  timestamp `Spec`. Two collapsed to three-line term applications of the first. When sibling theorems
+  share a proof body verbatim, check whether their hypotheses are defeq before assuming they are
+  genuinely different results.
 - `set_option linter.unusedSectionVars false in` before the `circuit_norm` `rfl`-lemmas.
 
 ---
