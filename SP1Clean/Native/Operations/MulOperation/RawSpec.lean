@@ -102,7 +102,16 @@ lemma low_half
         + (b7*c7)*256^6) := by rw [hS]; ring
   omega
 
-set_option maxHeartbeats 16000000 in
+-- Ladder-measured 2026-07-28, one clean LSP re-elaboration per rung (control at a 1-heartbeat
+-- budget produced a real `elaborator` timeout, so every rung below is a genuine re-elaboration):
+-- 200000 FAIL / 400000 FAIL / 1000000 FAIL / 1200000 ok / 2000000 ok / 4000000 ok.
+-- True floor (1000000, 1200000] — genuinely binding, and the highest floor measured anywhere in
+-- this tree. The cost is term-intrinsic, not a duplication proxy: the `omega` telescope runs over
+-- sixteen column equations with `2^128`-sized literal coefficients, and the `ring` normalises a
+-- 256-monomial 16x16 convolution. (The 8-column sibling `low_half` does the same work at a
+-- quarter of the term size and needs no budget at all.) The former 16000000 value was ~13x over;
+-- this is 5x the lowest passing rung. Do not raise it without re-running the ladder.
+set_option maxHeartbeats 6000000 in
 /-- **Full-product schoolbook reassembly** (the high-half keystone). The 16-column
 mod-`2^128` analogue of `low_half`: given the sixteen schoolbook column equations over the
 sixteen sign/zero-extended operand bytes, the sixteen product bytes reassemble — mod `2^128` —
@@ -821,7 +830,10 @@ lemma signExtend128_toNat (w : Word (ZMod p)) (hw : w.isU64) :
   · rw [if_pos hm, if_pos (hmsb_iff.mp hm)]
   · rw [if_neg hm, if_neg (fun hc => hm (hmsb_iff.mpr hc))]
 
-set_option maxHeartbeats 8000000 in
+-- Ladder-measured 2026-07-28 (same control run as `full_product`, with that lemma pinned high so
+-- its failures could not mask this one): 200000 ok / 40000 ok / 20000 FAIL (`whnf` at this
+-- signature). True floor (20000, 40000], so the plain default carries >=5x headroom and the former
+-- 8000000 ceiling was ~200-400x over. Ceiling removed; do not reinstate without a measurement.
 /-- The high-64 slice (`MULH*` family) of the witnessed product equals bits 64..127 of the
 128-bit product of the two extended operand values `Bext`, `Cext`. -/
 lemma high_half_eq (cols : Extracted.MulOperation (ZMod p)) (bb cc : Fin 16 → ZMod p)
@@ -883,7 +895,13 @@ lemma high_half_eq (cols : Extracted.MulOperation (ZMod p)) (bb cc : Fin 16 → 
   rw [Nat.mod_eq_of_lt hBlt, Nat.mod_eq_of_lt hClt]
   omega
 
-set_option maxHeartbeats 1600000 in
+-- Ladder-measured 2026-07-28, with `full_product` and `high_half_eq` pinned high (both mask this
+-- theorem through `(kernel) unknown constant` when they fail): 200000 ok / 100000 ok / 60000 FAIL
+-- (`synthesize pending MVars` at the MULHSU branch's `hSbb`, plus `whnf` at this signature) /
+-- 40000 FAIL. True floor (60000, 100000] — the plain default leaves only 2-3.3x headroom, under
+-- the removal threshold, so the site is kept. The former 1600000 value is lowered to 5x the
+-- lowest passing rung.
+set_option maxHeartbeats 500000 in
 /-- Forward (soundness) core: the raw schoolbook form implies the per-variant semantic result.
 The `MUL` (low-64, unsigned) conjunct is proved end-to-end here via the native `low_half` reassembly;
 the four high-half / `MULW` conjuncts are scoped sorries (they read further slices off the *full*
@@ -1084,8 +1102,8 @@ theorem mulSemantics_of_raw {input : Inputs (ZMod p)} {cols : Extracted.MulOpera
       congr 1
       rw [hbse_eq, hb_msb]
       split_ifs with hge
-      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) from by norm_cast,
-            ZMod.val_natCast_of_lt (show (255:ℕ) < p from by have := Fact.out (p := 2 ^ 24 < p); omega)]
+      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) by norm_cast,
+            ZMod.val_natCast_of_lt (show (255:ℕ) < p by have := Fact.out (p := 2 ^ 24 < p); omega)]
         norm_num
       · simp
     have hScc : (byteAt cc 0).val + (byteAt cc 1).val*256^1 + (byteAt cc 2).val*256^2 + (byteAt cc 3).val*256^3 + (byteAt cc 4).val*256^4 + (byteAt cc 5).val*256^5 + (byteAt cc 6).val*256^6 + (byteAt cc 7).val*256^7 + (byteAt cc 8).val*256^8 + (byteAt cc 9).val*256^9 + (byteAt cc 10).val*256^10 + (byteAt cc 11).val*256^11 + (byteAt cc 12).val*256^12 + (byteAt cc 13).val*256^13 + (byteAt cc 14).val*256^14 + (byteAt cc 15).val*256^15 = ((Word.toBitVec64 input.c).signExtend 128).toNat := by
@@ -1093,8 +1111,8 @@ theorem mulSemantics_of_raw {input : Inputs (ZMod p)} {cols : Extracted.MulOpera
       congr 1
       rw [hcse_eq, hc_msb]
       split_ifs with hge
-      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) from by norm_cast,
-            ZMod.val_natCast_of_lt (show (255:ℕ) < p from by have := Fact.out (p := 2 ^ 24 < p); omega)]
+      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) by norm_cast,
+            ZMod.val_natCast_of_lt (show (255:ℕ) < p by have := Fact.out (p := 2 ^ 24 < p); omega)]
         norm_num
       · simp
     rw [hrw, ← ofNat128_signExtend input.b, ← ofNat128_signExtend input.c]
@@ -1114,8 +1132,8 @@ theorem mulSemantics_of_raw {input : Inputs (ZMod p)} {cols : Extracted.MulOpera
       congr 1
       rw [hbse_eq, hb_msb]
       split_ifs with hge
-      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) from by norm_cast,
-            ZMod.val_natCast_of_lt (show (255:ℕ) < p from by have := Fact.out (p := 2 ^ 24 < p); omega)]
+      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) by norm_cast,
+            ZMod.val_natCast_of_lt (show (255:ℕ) < p by have := Fact.out (p := 2 ^ 24 < p); omega)]
         norm_num
       · simp
     have hScc : (byteAt cc 0).val + (byteAt cc 1).val*256^1 + (byteAt cc 2).val*256^2 + (byteAt cc 3).val*256^3 + (byteAt cc 4).val*256^4 + (byteAt cc 5).val*256^5 + (byteAt cc 6).val*256^6 + (byteAt cc 7).val*256^7 + (byteAt cc 8).val*256^8 + (byteAt cc 9).val*256^9 + (byteAt cc 10).val*256^10 + (byteAt cc 11).val*256^11 + (byteAt cc 12).val*256^12 + (byteAt cc 13).val*256^13 + (byteAt cc 14).val*256^14 + (byteAt cc 15).val*256^15 = Word.toNat input.c := by
