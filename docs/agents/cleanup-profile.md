@@ -239,10 +239,17 @@ Two traps:
 - **`lake env lean <file>` is not a gate.** It exits 0 even on a Lean stack overflow, and it skips
   the package's lean args, so it passes where `lake build` fails. It is sound only as a
   *falsifier*: a reported error is real, but a clean run certifies nothing.
-- **The `ring` `info:` leak.** On some goals `ring` runs its `ring1` pass, fails, emits
-  `Try this: ring_nf`, then closes via the `ring_nf` fallback — the proof passes but the build is
-  no longer clean. Close those with `simp` (the `is_real` binary gate and `interval_cases` carry
-  goals), `ring_nf`, or the explicit lemma.
+- **The `ring` fallback bites twice, and both bites come from the same fact: `ring` never fails.**
+  On a goal it cannot close outright it runs `ring1`, fails, emits `Try this: ring_nf`, and then
+  succeeds via the `ring_nf` fallback.
+  1. **The `info:` leak.** The proof passes but the build is no longer clean. Close those goals with
+     `simp` (the `is_real` binary gate and `interval_cases` carry goals), `ring_nf`, or the explicit
+     lemma.
+  2. **`ring` cannot lead a `first` ladder.** `first | ring | linear_combination k | …` breaks every
+     branch with `unsolved goals`: because `ring` "succeeds" as a mere normalisation on the goal that
+     actually needed `linear_combination`, it shadows every alternative behind it. **Use `ring1` as
+     the leading alternative.** A *trailing* `ring` is safe only because everything reaching it is
+     already `ring1`-closable. Measured on `LtOperationUnsigned.sel_populate`.
 
 ---
 
