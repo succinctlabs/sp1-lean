@@ -321,6 +321,21 @@ cast; if it passes at the default, the cast is the cost. Fix inside the proof bo
 `generalize` the cast away, then run the original tactic. This was `Model/SailWrap.lean`'s entire
 ceiling, and the lemma is tagged globally, so the hazard reaches every `simp` over that head symbol.
 
+**1c. LCNF-compiler-bound, not elaboration-bound — check *which phase* times out.** A budget can be
+spent on **code generation** rather than on proving. `Native/Operations/MulOperation/Defs.lean`'s
+`def main` elaborates fine at 40000; the failure is `(deterministic) timeout at «LCNF compiler»`,
+reported at the `def main` line, over sixteen giant schoolbook product expressions. Two consequences:
+
+- **None of the fold recipes apply.** Opaque values, folded hypothesis types, `circuit_output_eq` —
+  all of them target elaboration, and there is no tactic here to fold. Do not burn passes on them.
+- **`noncomputable def` is *rejected*, not deferred.** It would remove the compiled body, and
+  `SP1CleanTest/TraceGenTests` derives whole-chip traces from the chips' own `main` witness closures
+  under `native_decide`. Dropping the code would plausibly break `lake test`.
+
+Such a site is **lowered, not removed**, and deliberately keeps more headroom than an elaboration-bound
+one (~6.7× rather than the usual ~5×), because code-generation cost is more load-sensitive. Read the
+phase name in the timeout before classifying anything.
+
 **2. A duplicated `.val`-bridge fact — a raised ceiling as proxy, not term-intrinsic cost.** Look for the repeated `have` before you touch the
 number. `ShiftLeftChip/Core.lean` carried 16 ceilings; its SLLW half was re-deriving `mul_v_val` /
 `hi_lo_val` / `mul_v_add_val` by hand while the SLL half *in the same file* already called them, and
