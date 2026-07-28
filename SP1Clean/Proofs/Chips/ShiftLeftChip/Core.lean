@@ -1,7 +1,7 @@
 import SP1Clean.Math.Word
 import SP1Clean.Math.HWord
 import SP1Clean.Math.Bitwise
-import SP1Clean.Native.Operations.ShiftBounds
+import SP1Clean.Math.ShiftBounds
 import Mathlib.Tactic.LinearCombination
 import Mathlib.Tactic.IntervalCases
 

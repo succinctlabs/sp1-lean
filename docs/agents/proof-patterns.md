@@ -372,7 +372,7 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   soundness/`completeness` collapse to one `exact (…).mp`/`linear_combination (…).mpr` call apiece. State the
   lemma conclusions **verbatim** in the chip `Spec`'s shape (incl. `Word.toBitVec64`/`.slt`/`.ult` forms) so
   the call sites need no goal-bridging. `BranchChip` did this (16M→8M soundness, 16M→4M completeness, ~540-line
-  `Formal` + a 3.5 s `Decision`); cf. the `Native/Operations/ShiftBounds.lean` `nlinarith` dedup. The `id (ZMod p)`
+  `Formal` + a 3.5 s `Decision`); cf. the `Math/ShiftBounds.lean` `nlinarith` dedup. The `id (ZMod p)`
   field-carrier landmine bites at the seam: `simp only [id_eq] at <gate-hyp>` to strip it before feeding the
   loose-`ZMod p` lemma (see the `id_eq` note above).
 - **`maxHeartbeats` floors.** `toBitVec64`/`asm8` rw chains are whnf-heavy: `set_option maxHeartbeats 2000000 in`

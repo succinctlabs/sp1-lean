@@ -285,7 +285,7 @@ ceiling, and the lemma is tagged globally, so the hazard reaches every `simp` ov
 number. `ShiftLeftChip/Core.lean` carried 16 ceilings; its SLLW half was re-deriving `mul_v_val` /
 `hi_lo_val` / `mul_v_add_val` by hand while the SLL half *in the same file* already called them, and
 two residual `nlinarith` calls were re-proving `< 65536` limb bounds that
-`Native/Operations/ShiftBounds.lo_hi_lt` already proves once over loose variables. Fixing the
+`Math/ShiftBounds.lo_hi_lt` already proves once over loose variables. Fixing the
 duplication dropped 26 `nlinarith` to 3 and made **all 16 ceilings removable**. That is the
 difference between raising a budget and driving the proof to closure.
 
@@ -335,7 +335,7 @@ circuit goals; `lia` (2.7/3.3) — do not mass-rewrite `omega` on a 4.31 toolcha
 check; `push_neg` → `push Not` (1.19) — not adopted.
 
 **The single most common finding in this campaign: the lemma already exists, it just is not cited.**
-This repo has good shared substrate — `Native/Operations/ShiftBounds.lean` (`lo_hi_lt`, `hi_lo_lt`,
+This repo has good shared substrate — `Math/ShiftBounds.lean` (`lo_hi_lt`, `hi_lo_lt`,
 `factor_le`), `Math/Word.lean`'s `val_N_zmod_p` / `val_N_ne_zero` families, `Math/Gate.lean`'s
 `bool_val_le`, `Math/EvalVec.lean`'s `vec4_eval` — and proofs all over the tree re-derive those exact
 facts by hand instead. Measured instances: a 20-line `key` in `ShiftLeftChip/Populate.lean` that was

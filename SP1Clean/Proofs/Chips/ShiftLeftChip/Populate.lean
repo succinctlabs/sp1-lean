@@ -1,6 +1,6 @@
 import SP1Clean.Math.Word
 import SP1Clean.Model.ByteTable
-import SP1Clean.Native.Operations.ShiftBounds
+import SP1Clean.Math.ShiftBounds
 import SP1Clean.Native.Operations.U16MSBOperation.Populate
 
 /-! # `ShiftLeftChip` — native witness generation (`populate`)

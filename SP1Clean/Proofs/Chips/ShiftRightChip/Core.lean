@@ -1,5 +1,5 @@
 import SP1Clean.Math.Word
-import SP1Clean.Native.Operations.ShiftBounds
+import SP1Clean.Math.ShiftBounds
 import Mathlib.Tactic
 
 /-! # ShiftRight native arithmetic — the SRL math layer

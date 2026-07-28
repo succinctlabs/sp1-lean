@@ -236,6 +236,7 @@ import SP1Clean.Model.InteractionProjection
 import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Math.Misc
 import SP1Clean.Math.MulCarryChain
+import SP1Clean.Math.ShiftBounds
 import SP1Clean.Model.Register
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.SailDecode
@@ -292,7 +293,6 @@ import SP1Clean.Proofs.Operations.LtOperationUnsigned.Formal
 import SP1Clean.Native.Operations.LtOperationUnsigned.Populate
 import SP1Clean.Native.Operations.LtOperationUnsigned.RawSpec
 import SP1Clean.Native.Operations.MulOperation
-import SP1Clean.Native.Operations.ShiftBounds
 import SP1Clean.Proofs.Operations.SubOperation.Formal
 import SP1Clean.Native.Operations.SubOperation.Defs
 import SP1Clean.Native.Operations.SubOperation.Populate
