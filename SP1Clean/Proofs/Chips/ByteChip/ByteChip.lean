@@ -57,9 +57,7 @@ instance : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 omit [Fact p.Prime] in
 /-- `2^8 < p` — the bit-width bound `Gadgets.ToBits.rangeCheck 8` needs. -/
 lemma two_pow_eight_lt : (2 : ℕ) ^ 8 < p := by
-  have h := Fact.out (p := 2 ^ 17 < p)
-  have : (2 : ℕ) ^ 8 < 2 ^ 17 := by norm_num
-  omega
+  have := Fact.out (p := 2 ^ 17 < p); omega
 
 /-! ## op 3 — `U8Range`: push `⟨3, 0, b, c⟩` for two range-checked bytes -/
 
@@ -115,8 +113,7 @@ lemma byte_msb_iff {b msb : ZMod p} (hb : b.val < 2 ^ 8)
     msb = 1 ↔ 128 ≤ b.val := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
-  have h256 : (2 : ℕ) ^ 8 = 256 := by norm_num
-  rw [h256] at hb hr
+  rw [show (2 : ℕ) ^ 8 = 256 from by norm_num] at hb hr
   have h2 : (2 * b : ZMod p).val = 2 * b.val := by
     rw [two_mul, ZMod.val_add_of_lt (by omega)]; omega
   rcases hbool with h0 | h1
@@ -316,9 +313,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
     circuit_proof_start [Gadgets.ToBits.rangeCheck, Gadgets.Xor.ByteXorTable]
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     obtain ⟨hb, hc, -, -, hxor⟩ := h_holds
-    have hval2 : (2 : ZMod p).val = 2 := by
-      rw [show (2 : ZMod p) = ((2 : ℕ) : ZMod p) by norm_cast]
-      exact ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)
+    have hval2 : (2 : ZMod p).val = 2 := val_2_zmod_p
     refine ⟨⟨hb, hc⟩,
       fun _ _ => (byteRowSpec_byteOp _ _ _ (by rw [hval2]; norm_num)).mpr ⟨⟨?_, hb, hc⟩, ?_⟩⟩
     · rw [hxor]; exact Nat.xor_lt_two_pow (n := 8) hb hc

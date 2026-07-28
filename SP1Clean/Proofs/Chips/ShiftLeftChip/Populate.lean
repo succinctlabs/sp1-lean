@@ -1,5 +1,6 @@
 import SP1Clean.Math.Word
 import SP1Clean.Model.ByteTable
+import SP1Clean.Native.Operations.ShiftBounds
 import SP1Clean.Native.Operations.U16MSBOperation.Populate
 
 /-! # `ShiftLeftChip` — native witness generation (`populate`)
@@ -146,16 +147,10 @@ private lemma two_pow_mod_sixteen (x : ℕ) :
   · have h16 : x % 16 = x % 8 + 8 := by omega
     rw [h16, h, pow_add]; ring
 
-omit [Fact (2 ^ 17 < p)] in
-/-- The six `c_bits` booleanness asserts, in goal form. -/
-theorem cBits_asserts (c0 : ZMod p) :
-    (cBits c0)[0] * ((cBits c0)[0] + -1) = 0 ∧ (cBits c0)[1] * ((cBits c0)[1] + -1) = 0 ∧
-    (cBits c0)[2] * ((cBits c0)[2] + -1) = 0 ∧ (cBits c0)[3] * ((cBits c0)[3] + -1) = 0 ∧
-    (cBits c0)[4] * ((cBits c0)[4] + -1) = 0 ∧ (cBits c0)[5] * ((cBits c0)[5] + -1) = 0 := by
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    · simp only [cBits, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ]
-      rcases Nat.mod_two_eq_zero_or_one (c0.val >>> _) with h | h <;> rw [h] <;> simp
+/-- ℕ core of the split's high part: a u16 divided by `2^(16-s)` is below `2^s`. -/
+private lemma div_pow_lt {s x : ℕ} (hs : s ≤ 16) (hx : x < 2 ^ 16) :
+    x / 2 ^ (16 - s) < 2 ^ s :=
+  Nat.div_lt_of_lt_mul (by rw [← pow_add, show 16 - s + s = 16 from by omega]; exact hx)
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Each `c_bits` entry is binary (disjunction form, for the dispatch lemmas). -/
@@ -165,6 +160,17 @@ theorem cBits_bool (c0 : ZMod p) (i : ℕ) (hi : i < 6) :
     · simp only [cBits, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
       rcases Nat.mod_two_eq_zero_or_one (c0.val >>> _) with h | h <;> rw [h] <;> simp
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The six `c_bits` booleanness asserts, in goal form. -/
+theorem cBits_asserts (c0 : ZMod p) :
+    (cBits c0)[0] * ((cBits c0)[0] + -1) = 0 ∧ (cBits c0)[1] * ((cBits c0)[1] + -1) = 0 ∧
+    (cBits c0)[2] * ((cBits c0)[2] + -1) = 0 ∧ (cBits c0)[3] * ((cBits c0)[3] + -1) = 0 ∧
+    (cBits c0)[4] * ((cBits c0)[4] + -1) = 0 ∧ (cBits c0)[5] * ((cBits c0)[5] + -1) = 0 := by
+  have h : ∀ i (hi : i < 6), (cBits c0)[i] * ((cBits c0)[i] + (-1 : ZMod p)) = 0 := fun i hi => by
+    rcases cBits_bool c0 i hi with h | h <;> rw [h] <;> simp
+  exact ⟨h 0 (by norm_num), h 1 (by norm_num), h 2 (by norm_num), h 3 (by norm_num),
+    h 4 (by norm_num), h 5 (by norm_num)⟩
 
 omit [Fact (2 ^ 17 < p)] in
 /-- The committed byte-shift expression equals the cast of `byteShiftNat` (for binary `f[0]`). -/
@@ -197,8 +203,6 @@ theorem shiftU16_asserts (c0 : ZMod p) (f : Vector (ZMod p) 2)
     (shiftU16 c0 f)[3] * ((shiftU16 c0 f)[3] + -1) = 0 ∧
     (f[0] + f[1]) * ((shiftU16 c0 f)[0] + (shiftU16 c0 f)[1] + (shiftU16 c0 f)[2]
       + (shiftU16 c0 f)[3] + -1) = 0 := by
-  have hg : (f[0] + f[1]) * (f[0] + f[1] + -1) = 0 := by
-    rcases hsum01 with h | h <;> rw [h] <;> ring
   rw [byteShift_expr_eq c0 f hf0]
   have hk4 := byteShiftNat_lt c0 f
   simp only [shiftU16, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
@@ -289,18 +293,11 @@ theorem limbResult_asserts (b : Word (ZMod p)) (c0 : ZMod p) :
 
 /-- `(2 : ZMod p)` is neither `0` nor `1` (so binary flags with a binary sum are one-hot). -/
 lemma two_ne_zero_one : (2 : ZMod p) ≠ 0 ∧ (2 : ZMod p) ≠ 1 := by
-  have hp := Fact.out (p := 2 ^ 17 < p)
-  constructor
-  · intro h
-    have := congrArg ZMod.val h
-    rw [ZMod.val_zero, show ((2 : ZMod p)) = ((2 : ℕ) : ZMod p) by push_cast; rfl,
-      ZMod.val_natCast_of_lt (by omega)] at this
-    omega
-  · intro h
-    have := congrArg ZMod.val h
-    rw [ZMod.val_one, show ((2 : ZMod p)) = ((2 : ℕ) : ZMod p) by push_cast; rfl,
-      ZMod.val_natCast_of_lt (by omega)] at this
-    omega
+  haveI : Fact (1 < p) := ⟨(Fact.out : p.Prime).one_lt⟩
+  refine ⟨fun h => ?_, fun h => ?_⟩ <;>
+    · have hv := congrArg ZMod.val h
+      simp only [val_2_zmod_p, ZMod.val_zero, ZMod.val_one] at hv
+      omega
 
 /-- Binary flags with a binary sum are one-hot: `f[0] = 1` forces `f[1] = 0`. -/
 lemma flag1_zero_of_flag0_one (f : Vector (ZMod p) 2) (hf1 : f[1] = 0 ∨ f[1] = 1)
@@ -373,25 +370,10 @@ theorem limbResultNat_lt (b : Word (ZMod p)) (c0 : ZMod p) (hb : Word.isU64 b)
       x % 2 ^ (16 - c0.val % 16) * 2 ^ (c0.val % 16) + y / 2 ^ (16 - c0.val % 16) < 2 ^ 16 := by
     intro x y _ hy
     set s := c0.val % 16
-    have hlow : x % 2 ^ (16 - s) ≤ 2 ^ (16 - s) - 1 :=
-      Nat.le_sub_one_of_lt (Nat.mod_lt _ (pow_pos (by norm_num) _))
-    have hhigh : y / 2 ^ (16 - s) < 2 ^ s := by
-      rw [Nat.div_lt_iff_lt_mul (pow_pos (by norm_num) _), ← pow_add]
-      have h16 : s + (16 - s) = 16 := by omega
-      rw [h16]; exact hy
-    have hpow : 2 ^ (16 - s) * 2 ^ s = 2 ^ 16 := by
-      rw [← pow_add]; congr 1; omega
-    calc x % 2 ^ (16 - s) * 2 ^ s + y / 2 ^ (16 - s)
-        ≤ (2 ^ (16 - s) - 1) * 2 ^ s + (2 ^ s - 1) := by
-          have := Nat.le_sub_one_of_lt hhigh
-          exact Nat.add_le_add (Nat.mul_le_mul_right _ hlow) this
-      _ < 2 ^ 16 := by
-          have hsp : 1 ≤ 2 ^ s := Nat.one_le_two_pow
-          have h1 : (2 ^ (16 - s) - 1) * 2 ^ s = 2 ^ (16 - s) * 2 ^ s - 2 ^ s := by
-            rw [Nat.sub_mul, one_mul]
-          rw [h1, hpow]
-          have h2 : 2 ^ s ≤ 2 ^ 16 := Nat.pow_le_pow_right (by norm_num) (by omega)
-          omega
+    have hpow : 2 ^ (16 - s) * 2 ^ s = 65536 := by
+      rw [← pow_add, show 16 - s + s = 16 by omega]; norm_num
+    exact ShiftBounds.hi_lo_lt hpow (Nat.mod_lt _ (pow_pos (by norm_num) _))
+      (div_pow_lt (by omega) hy)
   interval_cases i <;>
     simp only [limbResultNat, bitShiftNat, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ]
@@ -420,9 +402,7 @@ theorem populateA_val_lt (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 
     intro x hx
     rcases U16MSBOperation.populate_msb_bool hx with h | h <;> rw [h]
     · rw [zero_mul, ZMod.val_zero]; norm_num
-    · rw [one_mul, show ((65535 : ZMod p)) = ((65535 : ℕ) : ZMod p) by push_cast; rfl,
-        ZMod.val_natCast_of_lt (by omega)]
-      norm_num
+    · rw [one_mul, val_65535_zmod_p]; norm_num
   by_cases h0 : f[0] = 1
   · have hk4 := byteShiftNat_lt c0 f
     have hcases : byteShiftNat c0 f = 0 ∨ byteShiftNat c0 f = 1 ∨ byteShiftNat c0 f = 2
@@ -432,8 +412,7 @@ theorem populateA_val_lt (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 
         interval_cases i <;>
           first | exact hlr _ (by norm_num) | exact hzero
   · by_cases h1 : f[1] = 1
-    · have hcases : byteShiftNat c0 f = 0 ∨ ¬(byteShiftNat c0 f = 0) := em _
-      rcases hcases with hbs | hbs <;>
+    · by_cases hbs : byteShiftNat c0 f = 0 <;>
         · simp only [populateA, h0, h1, hbs, if_true, if_false]
           interval_cases i <;>
             first
@@ -490,12 +469,7 @@ theorem cBits_shamt_sum (c0 : ZMod p) :
 theorem e32_eq (c0 : ZMod p) :
     (c0 - ((c0.val % 64 : ℕ) : ZMod p)) * ((64 : ZMod p))⁻¹ = ((c0.val / 64 : ℕ) : ZMod p) := by
   have hp := Fact.out (p := 2 ^ 17 < p)
-  have h64ne : (64 : ZMod p) ≠ 0 := by
-    rw [show ((64 : ZMod p)) = ((64 : ℕ) : ZMod p) by push_cast; rfl]
-    intro h
-    have := congrArg ZMod.val h
-    rw [ZMod.val_zero, ZMod.val_natCast_of_lt (by omega)] at this
-    omega
+  have h64ne : (64 : ZMod p) ≠ 0 := by simp [← ZMod.val_eq_zero, val_64_zmod_p]
   obtain ⟨q, r, hqr, hrlt⟩ : ∃ q r, c0.val = 64 * q + r ∧ r < 64 :=
     ⟨c0.val / 64, c0.val % 64, (Nat.div_add_mod _ _).symm, Nat.mod_lt _ (by norm_num)⟩
   have hq : c0.val / 64 = q := by omega
@@ -519,44 +493,29 @@ theorem lowerLimb_val_lt (b : Word (ZMod p)) (c0 : ZMod p) (i : ℕ) (hi : i < 4
   have hpos : 0 < 2 ^ (16 - bitShiftNat c0) := pow_pos (by norm_num) _
   have hle : 2 ^ (16 - bitShiftNat c0) ≤ 2 ^ 16 := Nat.pow_le_pow_right (by norm_num) (by omega)
   interval_cases i <;>
-    simp only [lowerLimb, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-      List.getElem_cons_succ]
-  · rw [ZMod.val_natCast_of_lt (by have := Nat.mod_lt (b[0]).val hpos; omega)]
-    exact Nat.mod_lt _ hpos
-  · rw [ZMod.val_natCast_of_lt (by have := Nat.mod_lt (b[1]).val hpos; omega)]
-    exact Nat.mod_lt _ hpos
-  · rw [ZMod.val_natCast_of_lt (by have := Nat.mod_lt (b[2]).val hpos; omega)]
-    exact Nat.mod_lt _ hpos
-  · rw [ZMod.val_natCast_of_lt (by have := Nat.mod_lt (b[3]).val hpos; omega)]
-    exact Nat.mod_lt _ hpos
+    · simp only [lowerLimb, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ]
+      rw [ZMod.val_natCast_of_lt (lt_of_lt_of_le (Nat.mod_lt _ hpos) (by omega))]
+      exact Nat.mod_lt _ hpos
 
 /-- Each `higher_limb` entry's `.val` is below `2^bitShift` (for u16 operand limbs). -/
 theorem higherLimb_val_lt (b : Word (ZMod p)) (c0 : ZMod p) (hb : Word.isU64 b)
     (i : ℕ) (hi : i < 4) : (higherLimb b c0)[i].val < 2 ^ bitShiftNat c0 := by
   have hp := Fact.out (p := 2 ^ 17 < p)
-  have hpos : 0 < 2 ^ (16 - bitShiftNat c0) := pow_pos (by norm_num) _
-  have key : ∀ x : ℕ, x < 2 ^ 16 → x / 2 ^ (16 - bitShiftNat c0) < 2 ^ bitShiftNat c0 := by
-    intro x hx
-    rw [Nat.div_lt_iff_lt_mul hpos, ← pow_add]
-    have h16 : bitShiftNat c0 + (16 - bitShiftNat c0) = 16 := by
-      have : bitShiftNat c0 ≤ 15 := by unfold bitShiftNat; omega
-      omega
-    rw [h16]; exact hx
+  have hbs : bitShiftNat c0 ≤ 16 := by unfold bitShiftNat; omega
   have hsmall : ∀ x : ℕ, x < 2 ^ 16 → x / 2 ^ (16 - bitShiftNat c0) < p := by
     intro x hx
-    have h1 := key x hx
-    have h2 : 2 ^ bitShiftNat c0 ≤ 2 ^ 16 := by
-      apply Nat.pow_le_pow_right (by norm_num)
-      unfold bitShiftNat; omega
+    have h1 := div_pow_lt hbs hx
+    have h2 : 2 ^ bitShiftNat c0 ≤ 2 ^ 16 := Nat.pow_le_pow_right (by norm_num) hbs
     omega
   obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb
   interval_cases i <;>
     simp only [higherLimb, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
       List.getElem_cons_succ]
-  · rw [ZMod.val_natCast_of_lt (hsmall _ hb0)]; exact key _ hb0
-  · rw [ZMod.val_natCast_of_lt (hsmall _ hb1)]; exact key _ hb1
-  · rw [ZMod.val_natCast_of_lt (hsmall _ hb2)]; exact key _ hb2
-  · rw [ZMod.val_natCast_of_lt (hsmall _ hb3)]; exact key _ hb3
+  · rw [ZMod.val_natCast_of_lt (hsmall _ hb0)]; exact div_pow_lt hbs hb0
+  · rw [ZMod.val_natCast_of_lt (hsmall _ hb1)]; exact div_pow_lt hbs hb1
+  · rw [ZMod.val_natCast_of_lt (hsmall _ hb2)]; exact div_pow_lt hbs hb2
+  · rw [ZMod.val_natCast_of_lt (hsmall _ hb3)]; exact div_pow_lt hbs hb3
 
 /-- Provide a `Range` byte-table row (the producer direction of `byteRowSpec_range`, for
 variable widths). -/
@@ -573,8 +532,7 @@ theorem byteRow_e32 (c0 : ZMod p) (hc : c0.val < 2 ^ 16) :
       (10 : ZMod p), 0⟩ : ByteRow (ZMod p)) := by
   have hp := Fact.out (p := 2 ^ 17 < p)
   rw [cBits_shamt_sum, ← sub_eq_add_neg, e32_eq]
-  refine ⟨ByteOpcode.Range, by norm_cast, ?_⟩
-  simp only [ByteOpcode.constrain]
+  refine byteRowSpec_range_intro ?_
   rw [show ((10 : ZMod p)) = ((10 : ℕ) : ZMod p) by push_cast; rfl,
     ZMod.val_natCast_of_lt (show (10 : ℕ) < p by omega)]
   exact e32_val_lt c0 hc
@@ -594,8 +552,7 @@ theorem byteRow_lower (b : Word (ZMod p)) (c0 : ZMod p) (i : ℕ) (hi : i < 4) :
       show ((16 : ZMod p)) = ((16 : ℕ) : ZMod p) by push_cast; rfl,
       ← Nat.cast_sub (by omega)]
   rw [hw]
-  refine ⟨ByteOpcode.Range, by norm_cast, ?_⟩
-  simp only [ByteOpcode.constrain]
+  refine byteRowSpec_range_intro ?_
   rw [ZMod.val_natCast_of_lt (show 16 - c0.val % 16 < p by omega)]
   have h := lowerLimb_val_lt b c0 i hi
   unfold bitShiftNat at h
@@ -611,8 +568,7 @@ theorem byteRow_higher (b : Word (ZMod p)) (c0 : ZMod p) (hb : Word.isU64 b)
       0⟩ : ByteRow (ZMod p)) := by
   have hp := Fact.out (p := 2 ^ 17 < p)
   rw [cBits_bitShift_sum]
-  refine ⟨ByteOpcode.Range, by norm_cast, ?_⟩
-  simp only [ByteOpcode.constrain]
+  refine byteRowSpec_range_intro ?_
   rw [ZMod.val_natCast_of_lt (show c0.val % 16 < p by omega)]
   have h := higherLimb_val_lt b c0 hb i hi
   unfold bitShiftNat at h

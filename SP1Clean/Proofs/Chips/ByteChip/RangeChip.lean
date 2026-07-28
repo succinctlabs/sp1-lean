@@ -52,7 +52,6 @@ omit [Fact p.Prime] in
 lemma two_pow_lt {n : ℕ} (h : n ≤ 16) : (2 : ℕ) ^ n < p := by
   have hp := Fact.out (p := 2 ^ 17 < p)
   have h1 : (2 : ℕ) ^ n ≤ 2 ^ 16 := Nat.pow_le_pow_right (by norm_num) h
-  have h2 : (2 : ℕ) ^ 16 < 2 ^ 17 := by norm_num
   omega
 
 /-- The committed value `a` — the `a` slot of SP1's `RangeChip` send `⟨6, a, bits, 0⟩`. The bit-width
