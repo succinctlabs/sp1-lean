@@ -349,9 +349,31 @@ correlated with the true floor: 16M families flooring at ≤40k, 8M at ≤20k, 1
 highest-floor file in a batch carrying the same number as the lowest. Treat the number as evidence of
 nothing but a copy-paste.
 
-**Batch several sites per file per pass.** Separating ownership requires laddering sites at *distinct*
-rungs, so two sites cost ~7 LSP round-trips if done serially. Plan the rung schedule for all of a
-file's sites up front.
+**Batch whole files, and use the rung itself as the label.** Separating ownership requires laddering
+sites at *distinct* rungs — but the timeout message **embeds the rung it hit**, so giving each
+candidate *group* a distinct rung disambiguates them even when every error is reported at the same
+position (the shared `variable` line). That turns ownership separation from a serial search into one
+pass. Measured: `Faithful/ChipOracle.lean` settled **11 sites in 6 passes (0.55 passes/site)** against
+~3.5 passes/site for the serial method.
+
+**The two-pass file protocol** — settles most files in two round-trips:
+1. **Pass A:** delete *every* ceiling in the file, elaborate. Whatever survives is done.
+2. **Pass B:** set all survivors to `40000`, elaborate. Whatever passes has ≥5× headroom at the plain
+   200k default and can be removed too.
+3. Only what fails B needs a staggered ladder.
+
+Gate pass B on **40000, not the plain default** — the floor distribution inside a single namespace is
+wider than it first appears (`ChipOracle`'s eleven ran ≤500 to 30000, a 60× spread).
+
+**Two diagnostics that fall out of this, both validated:**
+
+- **Where a site fails tells you its floor class.** Sites failing at their **signature** are the
+  high-floor ones; sites failing inside a **tactic line** floor in the hundreds-to-low-thousands and
+  mask nothing. In `ChipOracle` this sorted all eleven correctly.
+- **The sibling screen is a reliable *ranker*, not a keep/remove oracle.** It ordered all eleven
+  `ChipOracle` sites by floor with zero measurements — but the group it flagged "plausibly genuine"
+  (the only one with no unceilinged comparable sibling) was still ~40× over-provisioned. Use it to
+  prioritise and to predict *relative* cost; never to decide removal without a ladder.
 
 2. **Classify the cause**, and record any cause not already documented — new ones are expected.
    Known classes: unfolded expensive value (the `circuit_output_eq` fold), unfolded hypothesis type,
