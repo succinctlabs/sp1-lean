@@ -22,7 +22,6 @@ def RawSpec (a b : Word (ZMod p)) (cols : Columns (ZMod p)) : Prop :=
   (c0 = 0 ∨ c0 = 1) ∧ (c1 = 0 ∨ c1 = 1) ∧
   cols.value[0].val < 65536 ∧ cols.value[1].val < 65536
 
-set_option maxHeartbeats 16000000 in
 /-- Forward (soundness) core: the two-limb borrow chain + the sign bit imply the reconstructed
 result is a 64-bit value equal to the sign extension of the low-32 subtract. -/
 theorem subwSemantics_of_carries {a b : Word (ZMod p)} {cols : Columns (ZMod p)}
@@ -69,7 +68,6 @@ theorem subwSemantics_of_carries {a b : Word (ZMod p)} {cols : Columns (ZMod p)}
     (BitVec.setWidth 32 (Word.toBitVec64 a - Word.toBitVec64 b)) cols.msb.msb
     hv0 hv1 h_msb rfl rfl hX
 
-set_option maxHeartbeats 16000000 in
 /-- Backward (completeness) core — the converse of `subwSemantics_of_carries`. Borrow-form analog of
 `AddwOperation.carries_of_addwSemantics`. -/
 theorem carries_of_subwSemantics {a b : Word (ZMod p)} {cols : Columns (ZMod p)}

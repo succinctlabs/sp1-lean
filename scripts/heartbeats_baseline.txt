@@ -22,7 +22,18 @@
 # re-measured and KEPT, hence not counted here: ShiftRightChip/Core.lean relocated its 2000000
 # file-scope ceiling to a scoped 1600000 on the single binding lemma `srlw_within_byte_shift` (1->1
 # site), and Model/SailDecode.lean ratcheted 8000000 -> 400000 (floor (40k, 50k]).
+# -6 (2026-07-27, proof-cleanup W1/g4): ratchet DOWN, no ceiling raised. Removals, all measured:
+# Math/Word.lean dropped the 2000000 on `toBitVec64_signExtend_word` (floor (2000, 5000] — `Math/`
+# now carries zero ceilings), Addw/SubwOperation/RawSpec.lean dropped all four 16000000 ceilings
+# (floors <=40k — the same carry-over the Add/Sub/AddrAdd RawSpec family showed), and
+# AddrAddOperation/Populate.lean dropped its 4000000 (floor (6000, 10000]). One site was relocated,
+# hence not counted: Model/SailWrap.lean retired its file-scoped 10000000 — which covered all 57
+# declarations — for a scoped 400000 on the single binding lemma `rX_bits_eq_get_reg?` (floor
+# (50k, 100k]; 1->1 site). The two write_reg commutation lemmas that actually drove the old file
+# ceiling were folded instead: a permutative `@[simp] Std.ExtDHashMap.insert_insert_comm` was being
+# ordered by `Lean.Meta.acLt` across a `▸` cast whose proof is a 31-arm match; `unfold` + two
+# `generalize`s take them from >400k to under the plain default.
 # NOTE: the recorded count includes one phantom — SP1Clean/Proofs/Sail/Advance.lean:2325 has the
 # literal inside a doc-comment, so the grep sees a site that does not exist. Pre-existing.
-SP1Clean 805
+SP1Clean 799
 SP1CleanTest 16

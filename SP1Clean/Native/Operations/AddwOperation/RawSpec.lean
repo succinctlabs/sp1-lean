@@ -21,7 +21,6 @@ def RawSpec (a b : Word (ZMod p)) (cols : Columns (ZMod p)) : Prop :=
   (c0 = 0 ∨ c0 = 1) ∧ (c1 = 0 ∨ c1 = 1) ∧
   cols.value[0].val < 65536 ∧ cols.value[1].val < 65536
 
-set_option maxHeartbeats 16000000 in
 /-- Forward (soundness) core: the two-limb carry chain + the sign bit imply the reconstructed
 result is a 64-bit value equal to the sign extension of the low-32 add. -/
 theorem addwSemantics_of_carries {a b : Word (ZMod p)} {cols : Columns (ZMod p)}
@@ -62,7 +61,6 @@ theorem addwSemantics_of_carries {a b : Word (ZMod p)} {cols : Columns (ZMod p)}
     (BitVec.setWidth 32 (Word.toBitVec64 a + Word.toBitVec64 b)) cols.msb.msb
     hv0 hv1 h_msb rfl rfl hX
 
-set_option maxHeartbeats 16000000 in
 /-- Backward (completeness) core — the converse of `addwSemantics_of_carries`: a 64-bit value equal to
 the sign extension of the low-32 add witnesses the unique boolean carry chain + ranges **and** the sign
 bit. Needed because `AddwOperation` is a `FormalAssertion` (its completeness must reconstruct the U16MSB

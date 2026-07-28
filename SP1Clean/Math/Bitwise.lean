@@ -41,11 +41,10 @@ lemma byteOp_lt256 (op a b : ℕ) (ha : a < 256) (hb : b < 256) :
   have ha8 : a < 2 ^ 8 := by omega
   have hb8 : b < 2 ^ 8 := by omega
   unfold byteOp
-  split
+  split_ifs
   · have := Nat.and_lt_two_pow (n := 8) a hb8; omega
-  · split
-    · have := Nat.or_lt_two_pow (n := 8) ha8 hb8; omega
-    · have := Nat.xor_lt_two_pow (n := 8) ha8 hb8; omega
+  · have := Nat.or_lt_two_pow (n := 8) ha8 hb8; omega
+  · have := Nat.xor_lt_two_pow (n := 8) ha8 hb8; omega
 
 /-- The byte op on `BitVec 64`, opcode-indexed to match `byteOp`. -/
 def bitOp64 (op : ℕ) (x y : BitVec 64) : BitVec 64 :=
