@@ -19,11 +19,12 @@ open SP1Clean.ShiftBounds
 -- Heavy `nlinarith`/`omega`/`linear_combination` Nat-arithmetic proofs.
 -- Repeated per-limb `.val`/bound `nlinarith` goals live in `ShiftBounds`;
 -- the SRA/SRLW dispatch chains are the heaviest users left.
--- Ceiling measured (not guessed) by lowering the real limit, per Clean's
--- `doc/performance-problems.md` §"Measuring honestly": the file's floor sits between the 200000
--- default (fails at `sra_close_su16_3_case`, `whnf`/`isDefEq`) and 400000; 2000000 keeps a ~5x
--- margin. Do not raise it — fold the blowup instead.
-set_option maxHeartbeats 2000000
+-- This file carries NO file-scoped heartbeat ceiling: it runs at the plain default. The former 2M
+-- file ceiling was re-measured per Clean's `doc/performance-problems.md` §"Measuring honestly" and
+-- turned out to be held up by exactly one lemma, `srlw_within_byte_shift`, which now carries its
+-- own scoped budget (see the note there). The 16-way `c_bits` dispatches in `limb_result_lt`,
+-- `sign_fill_lt`, and `higher_lower_zero` are ordered bullets, not `first` ladders, precisely so
+-- they do not re-elaborate every earlier alternative's `ring1` side conditions per goal.
 -- Some ported close-lemma signatures keep hypotheses (e.g. `h_v_val`) for interface uniformity
 -- across the byte-shift cases even where a given case's proof does not consume them.
 set_option linter.unusedVariables false
@@ -830,7 +831,7 @@ lemma limb_16_lt_aux {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 `ops_U64_a_local`'s `lr_blast` helper to discharge each of 16 cb-patterns
 without re-deriving bound-form conversions inside each leaf. Callers supply
 (S, M, N) plus the substituted `h_inner_eq` and `h_v0123_explicit` from the
-`hcb0..hcb3` rcases; the lemma converts the cb-shape bounds to (M, N) form and
+`cb0..cb3` case split; the lemma converts the cb-shape bounds to (M, N) form and
 delegates to `limb_16_lt_aux`. -/
 lemma lr_blast_per_pattern {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (S M N : ℕ) (h_S_le : S ≤ 16) (h_MN : M * N = 65536) (h_M_pos : 0 < M)
@@ -869,73 +870,49 @@ lemma limb_result_lt {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (lt_ll : ll.val < 2 ^ (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
                             + cb3 * 8 : ZMod p).val) :
     (hl + ll * v0123).val < 65536 := by
-  rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
-    rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3 <;>
-    first
-    | exact lr_blast_per_pattern 0 65536 1 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 1 32768 2 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 2 16384 4 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 3 8192 8 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 4 4096 16 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 5 2048 32 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 6 1024 64 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 7 512 128 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 8 256 256 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 9 128 512 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 10 64 1024 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 11 32 2048 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 12 16 4096 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 13 8 8192 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 14 4 16384 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
-    | exact lr_blast_per_pattern 15 2 32768 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl lt_ll
+  -- `rcases … with rfl` substitutes the `cb`s, so every side-condition block below is uniform;
+  -- `key` fixes the two range hypotheses once, and the 16 cases are ordered bullets rather than a
+  -- `first` ladder (which would re-elaborate every earlier alternative's `ring1` per goal).
+  have key : ∀ (S M N : ℕ), S ≤ 16 → M * N = 65536 → 0 < M → M = 2 ^ (16 - S) → N = 2 ^ S →
+      cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8 = ((S : ℕ) : ZMod p) →
+      v0123 = ((M : ℕ) : ZMod p) → (hl + ll * v0123).val < 65536 :=
+    fun S M N h_S_le h_MN h_M_pos h_M_eq h_N_eq h_inner h_v =>
+      lr_blast_per_pattern S M N h_S_le h_MN h_M_pos h_M_eq h_N_eq h_inner h_v lt_hl lt_ll
+  -- `cb0` splits outermost, so the goals arrive in bit-reversed shift order.
+  rcases b_cb0 with rfl | rfl <;> rcases b_cb1 with rfl | rfl <;>
+    rcases b_cb2 with rfl | rfl <;> rcases b_cb3 with rfl | rfl
+  · exact key 0 65536 1 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 8 256 256 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 4 4096 16 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 12 16 4096 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 2 16384 4 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 10 64 1024 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 6 1024 64 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 14 4 16384 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 1 32768 2 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 9 128 512 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 5 2048 32 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 13 8 8192 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 3 8192 8 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 11 32 2048 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 7 512 128 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 15 2 32768 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
 
 /-- **Sign-fill per-pattern bound.** For the SRAW negative arm, the sign-extended limb
 `hl + (65536 - v0123)` (with `v0123 = M = 2^(16-S)`, `hl < M`) is `< 65536`. Converts the
@@ -979,73 +956,47 @@ lemma sign_fill_lt {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (lt_hl : hl.val < 2 ^ (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
                                   + cb3 * 8) : ZMod p).val) :
     (hl + (((65536 : ℕ) : ZMod p) - v0123)).val < 65536 := by
-  rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
-    rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3 <;>
-    first
-    | exact sf_blast_per_pattern 0 65536 1 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 1 32768 2 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 2 16384 4 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 3 8192 8 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 4 4096 16 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 5 2048 32 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 6 1024 64 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 7 512 128 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 8 256 256 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 9 128 512 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 10 64 1024 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 11 32 2048 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 12 16 4096 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 13 8 8192 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 14 4 16384 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
-    | exact sf_blast_per_pattern 15 2 32768 (by omega) (by decide) (by omega) rfl rfl
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        lt_hl
+  -- Same shape as `limb_result_lt`: substitute the `cb`s, share the range hypothesis through
+  -- `key`, and dispatch the 16 cases as ordered bullets instead of a re-searched `first` ladder.
+  have key : ∀ (S M N : ℕ), S ≤ 16 → M * N = 65536 → 0 < M → M = 2 ^ (16 - S) → N = 2 ^ S →
+      cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8 = ((S : ℕ) : ZMod p) →
+      v0123 = ((M : ℕ) : ZMod p) → (hl + (((65536 : ℕ) : ZMod p) - v0123)).val < 65536 :=
+    fun S M N h_S_le h_MN h_M_pos h_M_eq h_N_eq h_inner h_v =>
+      sf_blast_per_pattern S M N h_S_le h_MN h_M_pos h_M_eq h_N_eq h_inner h_v lt_hl
+  rcases b_cb0 with rfl | rfl <;> rcases b_cb1 with rfl | rfl <;>
+    rcases b_cb2 with rfl | rfl <;> rcases b_cb3 with rfl | rfl
+  · exact key 0 65536 1 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 8 256 256 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 4 4096 16 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 12 16 4096 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 2 16384 4 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 10 64 1024 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 6 1024 64 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 14 4 16384 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 1 32768 2 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 9 128 512 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 5 2048 32 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 13 8 8192 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 3 8192 8 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 11 32 2048 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 7 512 128 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
+  · exact key 15 2 32768 (by omega) (by decide) (by omega) rfl rfl (by push_cast; ring1)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1)
 
 /-- **De-gated split forces zero (16-way).** When the limb-2 (or limb-3) split `hl * 65536 + ll * v0123`
 is constrained to `0` — which happens on the W path, where the high-limb split asserts carry the `e14 = 0`
@@ -1116,57 +1067,43 @@ lemma higher_lower_zero {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     rw [inner_hi_val h_S_le_16 h_cb_sum_eq, h_M_eq] at lt_hl'
     rw [inner_val h_S_le_16 h_cb_sum_eq, h_N_eq] at lt_ll'
     exact zero_aux M N h_MN h_M_pos h_v0123_eq lt_hl' lt_ll' h_dec
-  rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
-    rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3 <;>
-    first
-    | exact cb_aux lt_hl lt_ll 0 65536 1 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 8 256 256 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 4 4096 16 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 12 16 4096 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 2 16384 4 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 10 64 1024 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 6 1024 64 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 14 4 16384 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 1 32768 2 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 9 128 512 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 5 2048 32 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 13 8 8192 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 3 8192 8 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 11 32 2048 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 7 512 128 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-    | exact cb_aux lt_hl lt_ll 15 2 32768 (by omega) (by decide) (by omega) (by decide) (by decide)
-        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
-        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring1)
+  -- As in `limb_result_lt`/`sign_fill_lt`: substituting the `cb`s makes the two side conditions
+  -- uniform, `key` pins the range hypotheses once, and the 16 cases become ordered bullets.
+  have key := cb_aux lt_hl lt_ll
+  rcases b_cb0 with rfl | rfl <;> rcases b_cb1 with rfl | rfl <;>
+    rcases b_cb2 with rfl | rfl <;> rcases b_cb3 with rfl | rfl
+  · exact key 0 65536 1 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 8 256 256 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 4 4096 16 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 12 16 4096 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 2 16384 4 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 10 64 1024 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 6 1024 64 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 14 4 16384 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 1 32768 2 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 9 128 512 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 5 2048 32 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 13 8 8192 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 3 8192 8 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 11 32 2048 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 7 512 128 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
+  · exact key 15 2 32768 (by omega) (by decide) (by omega) (by decide) (by decide)
+      (by rw [eq_v0123, eq_v012, eq_v01]; push_cast; ring1) (by push_cast; ring1)
 
 /-- For `X < 2^W` and `K ∣ 2^W`, `X / K + 2^W - 2^W/K = 2^W - 1 - (2^W - 1 - X) / K`.
 Used by `sra_close_su16_*_case` (W=64) and `sraw_close_su16_*_case_msb1` (W=32) to
@@ -1643,6 +1580,15 @@ def toNat {p : ℕ} [NeZero p] (w : HWord (ZMod p)) : ℕ := w[0].val + w[1].val
 def toBitVec32 {p : ℕ} [NeZero p] (w : HWord (ZMod p)) : BitVec 32 := BitVec.ofNat 32 (toNat w)
 end HWord
 
+-- The single declaration in this file that does not fit the default budget: the six `nlinarith`
+-- byte-bound calls below are the whole cost. Measured, not guessed (control run at 1 heartbeat
+-- gave 46 real timeouts, so every rung is a genuine re-elaboration): 250000 fails here
+-- (`whnf` at the header, `isDefEq` at the `h_lhs1_lt` call) while 320000 passes, so the floor is
+-- (250000, 320000]; 1600000 keeps a 5x margin. Every *other* declaration in the file — including
+-- `sra_close_su16_3_case`, which the previous measurement mis-attributed as the binding site —
+-- passes at the plain default once this one is pinned, which is why the ceiling is scoped to this
+-- lemma rather than to the whole file. Do not raise it; fold the blowup instead.
+set_option maxHeartbeats 1600000 in
 lemma srlw_within_byte_shift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (M N : ℕ) (h_MN : M * N = 65536) (h_M_pos : 0 < M)
     {b0 b1 ll0 ll1 hl0 hl1 v0123 : ZMod p}
