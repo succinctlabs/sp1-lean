@@ -118,22 +118,14 @@ contradiction kernel for the four-flag case bashes. -/
 private lemma numeral_ne_01 :
     ((2 : ZMod p) ≠ 0 ∧ (2 : ZMod p) ≠ 1) ∧ ((3 : ZMod p) ≠ 0 ∧ (3 : ZMod p) ≠ 1) ∧
     ((4 : ZMod p) ≠ 0 ∧ (4 : ZMod p) ≠ 1) := by
-  have hp := Fact.out (p := 2 ^ 17 < p)
-  refine ⟨⟨?_, ?_⟩, ⟨?_, ?_⟩, ⟨?_, ?_⟩⟩ <;>
-    · intro h
-      first
-        | (have := congrArg ZMod.val h
-           rw [show ((2 : ZMod p)) = ((2 : ℕ) : ZMod p) by push_cast; rfl,
-             ZMod.val_natCast_of_lt (by omega)] at this
-           simp [ZMod.val_zero, ZMod.val_one] at this)
-        | (have := congrArg ZMod.val h
-           rw [show ((3 : ZMod p)) = ((3 : ℕ) : ZMod p) by push_cast; rfl,
-             ZMod.val_natCast_of_lt (by omega)] at this
-           simp [ZMod.val_zero, ZMod.val_one] at this)
-        | (have := congrArg ZMod.val h
-           rw [show ((4 : ZMod p)) = ((4 : ℕ) : ZMod p) by push_cast; rfl,
-             ZMod.val_natCast_of_lt (by omega)] at this
-           simp [ZMod.val_zero, ZMod.val_one] at this)
+  haveI : Fact (1 < p) := ⟨(Fact.out : p.Prime).one_lt⟩
+  have key : ∀ {x : ZMod p} {n : ℕ}, x.val = n → 1 < n → x ≠ 0 ∧ x ≠ 1 := by
+    intro x n hx hn
+    refine ⟨fun h => ?_, fun h => ?_⟩ <;> rw [h] at hx
+    · rw [ZMod.val_zero] at hx; omega
+    · rw [ZMod.val_one] at hx; omega
+  exact ⟨key val_2_zmod_p one_lt_two, key val_3_zmod_p (by norm_num),
+    key val_4_zmod_p (by norm_num)⟩
 
 /-- Binary flags with a binary sum are one-hot: each set flag forces the other three to zero. -/
 theorem one_hot_resolve (f : Vector (ZMod p) 4)
@@ -159,8 +151,7 @@ private lemma two_pow_inv_four (x : ℕ) :
     2 ^ (4 - x % 4) = (1 - x % 2 + 1) * 2 * ((1 - x / 2 % 2) * 3 + 1) := by
   rcases Nat.mod_two_eq_zero_or_one x with h0 | h0 <;>
     rcases Nat.mod_two_eq_zero_or_one (x / 2) with h1 | h1 <;>
-    · have h4 : x % 4 = x % 2 + 2 * (x / 2 % 2) := by omega
-      rw [h4, h0, h1]; norm_num
+    · rw [show x % 4 = x % 2 + 2 * (x / 2 % 2) from by omega, h0, h1]; norm_num
 
 omit [Fact (2 ^ 17 < p)] in
 /-- The three inverted `v_*` power-encoding asserts, in goal form (witnessed order
@@ -178,29 +169,24 @@ theorem vInv_asserts (c0 : ZMod p) :
   refine ⟨?_, ?_, ?_⟩
   · rcases Nat.mod_two_eq_zero_or_one c0.val with h0 | h0 <;>
       rcases Nat.mod_two_eq_zero_or_one (c0.val / 2) with h1 | h1 <;>
-      · have h4 : c0.val % 4 = c0.val % 2 + 2 * (c0.val / 2 % 2) := by omega
-        rw [h4, h0, h1]
+      · rw [show c0.val % 4 = c0.val % 2 + 2 * (c0.val / 2 % 2) from by omega, h0, h1]
         norm_num
   · rcases Nat.mod_two_eq_zero_or_one (c0.val / 4) with h | h
-    · have h8 : c0.val % 8 = c0.val % 4 := by omega
-      have hd : 8 - c0.val % 4 = 4 - c0.val % 4 + 4 := by omega
-      rw [h8, h, hd, pow_add]
+    · rw [show c0.val % 8 = c0.val % 4 from by omega, h,
+        show 8 - c0.val % 4 = 4 - c0.val % 4 + 4 from by omega, pow_add]
       push_cast
       ring
-    · have h8 : c0.val % 8 = c0.val % 4 + 4 := by omega
-      have hd : 8 - (c0.val % 4 + 4) = 4 - c0.val % 4 := by omega
-      rw [h8, h, hd]
+    · rw [show c0.val % 8 = c0.val % 4 + 4 from by omega, h,
+        show 8 - (c0.val % 4 + 4) = 4 - c0.val % 4 from by omega]
       push_cast
       ring
   · rcases Nat.mod_two_eq_zero_or_one (c0.val / 8) with h | h
-    · have h16 : c0.val % 16 = c0.val % 8 := by omega
-      have hd : 16 - c0.val % 8 = 8 - c0.val % 8 + 8 := by omega
-      rw [h16, h, hd, pow_add]
+    · rw [show c0.val % 16 = c0.val % 8 from by omega, h,
+        show 16 - c0.val % 8 = 8 - c0.val % 8 + 8 from by omega, pow_add]
       push_cast
       ring
-    · have h16 : c0.val % 16 = c0.val % 8 + 8 := by omega
-      have hd : 16 - (c0.val % 8 + 8) = 8 - c0.val % 8 := by omega
-      rw [h16, h, hd]
+    · rw [show c0.val % 16 = c0.val % 8 + 8 from by omega, h,
+        show 16 - (c0.val % 8 + 8) = 8 - c0.val % 8 from by omega]
       push_cast
       ring
 
@@ -287,7 +273,7 @@ theorem msb_asserts (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
     rcases hf1 with hb1 | hb1
     · rcases hf3 with hb3 | hb3
       · rw [hb1, hb3]; ring
-      · obtain ⟨hz0, hz1, hz2⟩ := h3 hb3
+      · obtain ⟨hz0, -, hz2⟩ := h3 hb3
         rw [hb1, hz0, hz2]; ring
     · obtain ⟨hz0, hz2, hz3⟩ := h1 hb1
       rw [hz0, hz2, hz3, hb1]; ring
@@ -302,6 +288,14 @@ theorem byteShiftNat_lt (c0 : ZMod p) (f : Vector (ZMod p) 4) : byteShiftNat c0 
   have h5 := Nat.mod_lt (c0.val >>> 5) (show 0 < 2 by norm_num)
   unfold byteShiftNat
   split <;> omega
+
+set_option linter.unusedSectionVars false in
+/-- The four `byteShiftNat` cases, as the case bashes consume them. -/
+private lemma byteShift_cases (c0 : ZMod p) (f : Vector (ZMod p) 4) :
+    byteShiftNat c0 f = 0 ∨ byteShiftNat c0 f = 1 ∨ byteShiftNat c0 f = 2
+      ∨ byteShiftNat c0 f = 3 := by
+  have := byteShiftNat_lt c0 f
+  omega
 
 /-- The 22 result-placement asserts (16 `e14`-gated SRL/SRA + 6 `e13`-gated SRLW/SRAW), in goal
 form: at the populate values every placement product vanishes (for one-hot flags). -/
@@ -354,48 +348,37 @@ theorem place_asserts (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
   obtain ⟨ho0, ho1, ho2, ho3⟩ := one_hot_resolve f hf0 hf1 hf2 hf3 hsum01
   rcases hf0 with h0 | h0
   · rcases hf1 with h1 | h1
-    · -- word variants or padding: `e14 = 0`
+    · -- word variants or padding: `e14 = 0`, so bit 5 never participates
+      have hk2 : byteShiftNat c0 f = 0 ∨ byteShiftNat c0 f = 1 := by
+        have := Nat.mod_lt (c0.val >>> 4) (show 0 < 2 by norm_num)
+        unfold byteShiftNat
+        rw [h0, h1, if_neg (by rw [zero_add]; exact zero_ne_one)]
+        omega
       rcases hf2 with h2 | h2
       · rcases hf3 with h3 | h3
         · -- padding
           simp [h0, h1, h2, h3, populateA, srwMsb, shiftU16]
         · -- SRAW
           obtain ⟨-, -, hz2⟩ := ho3 h3
-          have hk2 : byteShiftNat c0 f = 0 ∨ byteShiftNat c0 f = 1 := by
-            have := Nat.mod_lt (c0.val >>> 4) (show 0 < 2 by norm_num)
-            unfold byteShiftNat
-            rw [h0, h1, if_neg (by rw [zero_add]; exact zero_ne_one)]
-            omega
           rcases hk2 with hbs | hbs <;>
             · simp only [populateA, srwMsb, shiftU16, sraMsbV0123, h0, h1, hz2, h3, hbs]
               norm_num
               ring
       · -- SRLW
         obtain ⟨-, -, hz3⟩ := ho2 h2
-        have hk2 : byteShiftNat c0 f = 0 ∨ byteShiftNat c0 f = 1 := by
-          have := Nat.mod_lt (c0.val >>> 4) (show 0 < 2 by norm_num)
-          unfold byteShiftNat
-          rw [h0, h1, if_neg (by rw [zero_add]; exact zero_ne_one)]
-          omega
         rcases hk2 with hbs | hbs <;>
           · simp only [populateA, srwMsb, shiftU16, sraMsbV0123, h0, h1, h2, hz3, hbs]
             norm_num
             ring
     · -- SRA
       obtain ⟨hz0, hz2, hz3⟩ := ho1 h1
-      have hk4 := byteShiftNat_lt c0 f
-      have hcases : byteShiftNat c0 f = 0 ∨ byteShiftNat c0 f = 1 ∨ byteShiftNat c0 f = 2
-          ∨ byteShiftNat c0 f = 3 := by omega
-      rcases hcases with hbs | hbs | hbs | hbs <;>
+      rcases byteShift_cases c0 f with hbs | hbs | hbs | hbs <;>
         · simp only [populateA, srwMsb, shiftU16, sraMsbV0123, h1, hz0, hz2, hz3, hbs]
           norm_num
           ring
   · -- SRL
     obtain ⟨hz1, hz2, hz3⟩ := ho0 h0
-    have hk4 := byteShiftNat_lt c0 f
-    have hcases : byteShiftNat c0 f = 0 ∨ byteShiftNat c0 f = 1 ∨ byteShiftNat c0 f = 2
-        ∨ byteShiftNat c0 f = 3 := by omega
-    rcases hcases with hbs | hbs | hbs | hbs <;>
+    rcases byteShift_cases c0 f with hbs | hbs | hbs | hbs <;>
       · simp only [populateA, srwMsb, shiftU16, sraMsbV0123, h0, hz1, hz2, hz3, hbs]
         norm_num
         ring
@@ -408,35 +391,33 @@ private lemma effVal_lt (x g : ZMod p) (hg : g = 0 ∨ g = 1) (hx : x.val < 2 ^ 
   · rw [zero_mul, ZMod.val_zero]; norm_num
   · rw [one_mul]; exact hx
 
+/-- ℕ core of the split's high part: a u16 divided by `2^s` is below `2^(16-s)`. -/
+private lemma div_pow_lt {s x : ℕ} (hs : s ≤ 16) (hx : x < 2 ^ 16) :
+    x / 2 ^ s < 2 ^ (16 - s) :=
+  Nat.div_lt_of_lt_mul (by rw [← pow_add, show s + (16 - s) = 16 from by omega]; exact hx)
+
 /-- Each `lower_limb` entry's `.val` is below `2^bitShift`. -/
 theorem lowerLimb_val_lt (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
     (i : ℕ) (hi : i < 4) : (lowerLimb b c0 f)[i].val < 2 ^ (c0.val % 16) := by
   have hp := Fact.out (p := 2 ^ 17 < p)
   have hpos : 0 < 2 ^ (c0.val % 16) := pow_pos (by norm_num) _
   have hle : 2 ^ (c0.val % 16) ≤ 2 ^ 16 := Nat.pow_le_pow_right (by norm_num) (by omega)
+  have key : ∀ x : ZMod p,
+      ((x.val % 2 ^ (c0.val % 16) : ℕ) : ZMod p).val < 2 ^ (c0.val % 16) := fun x => by
+    rw [ZMod.val_natCast_of_lt (by have := Nat.mod_lt x.val hpos; omega)]
+    exact Nat.mod_lt _ hpos
   interval_cases i <;>
-    simp only [lowerLimb, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-      List.getElem_cons_succ]
-  · rw [ZMod.val_natCast_of_lt (by have := Nat.mod_lt (b[0]).val hpos; omega)]
-    exact Nat.mod_lt _ hpos
-  · rw [ZMod.val_natCast_of_lt (by have := Nat.mod_lt (b[1]).val hpos; omega)]
-    exact Nat.mod_lt _ hpos
-  · rw [ZMod.val_natCast_of_lt (by have := Nat.mod_lt ((f[0] + f[1]) * b[2]).val hpos; omega)]
-    exact Nat.mod_lt _ hpos
-  · rw [ZMod.val_natCast_of_lt (by have := Nat.mod_lt ((f[0] + f[1]) * b[3]).val hpos; omega)]
-    exact Nat.mod_lt _ hpos
+    · simp only [lowerLimb, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ]
+      exact key _
 
 /-- Each `higher_limb` entry's `.val` is below `2^(16 - bitShift)` (u16 effective limbs). -/
 theorem higherLimb_val_lt (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
     (hb : Word.isU64 b) (he14 : f[0] + f[1] = 0 ∨ f[0] + f[1] = 1)
     (i : ℕ) (hi : i < 4) : (higherLimb b c0 f)[i].val < 2 ^ (16 - c0.val % 16) := by
   have hp := Fact.out (p := 2 ^ 17 < p)
-  have hpos : 0 < 2 ^ (c0.val % 16) := pow_pos (by norm_num) _
-  have key : ∀ x : ℕ, x < 2 ^ 16 → x / 2 ^ (c0.val % 16) < 2 ^ (16 - c0.val % 16) := by
-    intro x hx
-    rw [Nat.div_lt_iff_lt_mul hpos, ← pow_add]
-    have h16 : 16 - c0.val % 16 + c0.val % 16 = 16 := by omega
-    rw [h16]; exact hx
+  have key : ∀ x : ℕ, x < 2 ^ 16 → x / 2 ^ (c0.val % 16) < 2 ^ (16 - c0.val % 16) :=
+    fun _ hx => div_pow_lt (by omega) hx
   have hsmall : ∀ x : ℕ, x < 2 ^ 16 → x / 2 ^ (c0.val % 16) < p := by
     intro x hx
     have h1 := key x hx
@@ -458,30 +439,13 @@ set_option linter.unusedSectionVars false in
 theorem limbResultNat_lt (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
     (hb : Word.isU64 b) (he14 : f[0] + f[1] = 0 ∨ f[0] + f[1] = 1)
     (i : ℕ) (hi : i < 4) : (limbResultNat b c0 f)[i] < 2 ^ 16 := by
-  have hs : c0.val % 16 ≤ 15 := by omega
   have key : ∀ (x y : ℕ), x < 2 ^ 16 → y < 2 ^ 16 →
       x / 2 ^ (c0.val % 16) + y % 2 ^ (c0.val % 16) * 2 ^ (16 - c0.val % 16) < 2 ^ 16 := by
     intro x y hx _
-    set s := c0.val % 16
-    have hpos : 0 < 2 ^ s := pow_pos (by norm_num) _
-    have hhigh : x / 2 ^ s < 2 ^ (16 - s) := by
-      rw [Nat.div_lt_iff_lt_mul hpos, ← pow_add]
-      have h16 : 16 - s + s = 16 := by omega
-      rw [h16]; exact hx
-    have hlow : y % 2 ^ s ≤ 2 ^ s - 1 :=
-      Nat.le_sub_one_of_lt (Nat.mod_lt y hpos)
-    have hpow : 2 ^ s * 2 ^ (16 - s) = 2 ^ 16 := by
-      rw [← pow_add]; congr 1; omega
-    calc x / 2 ^ s + y % 2 ^ s * 2 ^ (16 - s)
-        ≤ (2 ^ (16 - s) - 1) + (2 ^ s - 1) * 2 ^ (16 - s) := by
-          exact Nat.add_le_add (Nat.le_sub_one_of_lt hhigh) (Nat.mul_le_mul_right _ hlow)
-      _ < 2 ^ 16 := by
-          have h1 : (2 ^ s - 1) * 2 ^ (16 - s) = 2 ^ s * 2 ^ (16 - s) - 2 ^ (16 - s) := by
-            rw [Nat.sub_mul, one_mul]
-          rw [h1, hpow]
-          have h2 : 2 ^ (16 - s) ≤ 2 ^ 16 := Nat.pow_le_pow_right (by norm_num) (by omega)
-          have h3 : 1 ≤ 2 ^ (16 - s) := Nat.one_le_two_pow
-          omega
+    have hpow : 2 ^ (16 - c0.val % 16) * 2 ^ (c0.val % 16) = 65536 := by
+      rw [← pow_add, show 16 - c0.val % 16 + c0.val % 16 = 16 from by omega]; norm_num
+    exact ShiftBounds.lo_hi_lt hpow (div_pow_lt (by omega) hx)
+      (Nat.mod_lt _ (pow_pos (by norm_num) _))
   obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb
   have he2 := effVal_lt (b[2]) (f[0] + f[1]) he14 hb2
   have he3 := effVal_lt (b[3]) (f[0] + f[1]) he14 hb3
@@ -585,25 +549,19 @@ private lemma fill_bound (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 
 private lemma lr3_lt (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
     (hb : Word.isU64 b) (he14 : f[0] + f[1] = 0 ∨ f[0] + f[1] = 1) :
     (limbResultNat b c0 f)[3] < 2 ^ (16 - c0.val % 16) := by
-  have hpos : 0 < 2 ^ (c0.val % 16) := pow_pos (by norm_num) _
   have he3 := effVal_lt (b[3]) (f[0] + f[1]) he14 (Word.lt_cases_of_isU64 hb).2.2.2
   simp only [limbResultNat, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
     List.getElem_cons_zero]
-  rw [Nat.div_lt_iff_lt_mul hpos, ← pow_add]
-  have h16 : 16 - c0.val % 16 + c0.val % 16 = 16 := by omega
-  rw [h16]; exact he3
+  exact div_pow_lt (by omega) he3
 
 /-- `limb_result[1]` is below `2^(16-s)` on word rows (`e14 = 0` zeroes its `lower` summand). -/
 private lemma lr1_lt_word (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
     (hb : Word.isU64 b) (hz : f[0] + f[1] = 0) :
     (limbResultNat b c0 f)[1] < 2 ^ (16 - c0.val % 16) := by
-  have hpos : 0 < 2 ^ (c0.val % 16) := pow_pos (by norm_num) _
   have hb1 := (Word.lt_cases_of_isU64 hb).2.1
   simp only [limbResultNat, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
     List.getElem_cons_zero, hz, zero_mul, ZMod.val_zero, Nat.zero_mod, add_zero]
-  rw [Nat.div_lt_iff_lt_mul hpos, ← pow_add]
-  have h16 : 16 - c0.val % 16 + c0.val % 16 = 16 := by omega
-  rw [h16]; exact hb1
+  exact div_pow_lt (by omega) hb1
 
 /-- Each placed result limb has `.val < 2^16`. -/
 theorem populateA_val_lt (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
@@ -619,17 +577,12 @@ theorem populateA_val_lt (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 
   have hmul65535 : ∀ x : ZMod p, x = 0 ∨ x = 1 → (x * 65535).val < 2 ^ 16 := by
     rintro x (h | h) <;> rw [h]
     · rw [zero_mul, ZMod.val_zero]; norm_num
-    · rw [one_mul, show ((65535 : ZMod p)) = ((65535 : ℕ) : ZMod p) by push_cast; rfl,
-        ZMod.val_natCast_of_lt (by omega)]
-      norm_num
+    · rw [one_mul, val_65535_zmod_p]; norm_num
   by_cases h14 : f[0] + f[1] = 1
   · have he14 : f[0] + f[1] = 0 ∨ f[0] + f[1] = 1 := Or.inr h14
     have hlr := fun j hj => limbResult_val_lt b c0 f hb he14 j hj
     have hfill := fill_bound b c0 f hbm 3 (by norm_num) (lr3_lt b c0 f hb he14)
-    have hk4 := byteShiftNat_lt c0 f
-    have hcases : byteShiftNat c0 f = 0 ∨ byteShiftNat c0 f = 1 ∨ byteShiftNat c0 f = 2
-        ∨ byteShiftNat c0 f = 3 := by omega
-    rcases hcases with hbs | hbs | hbs | hbs <;>
+    rcases byteShift_cases c0 f with hbs | hbs | hbs | hbs <;>
       · simp only [populateA, h14, if_true, hbs, Vector.getElem_mk, List.getElem_toArray,
           List.getElem_cons_zero, List.getElem_cons_succ]
         interval_cases i <;>
@@ -701,8 +654,7 @@ theorem byteRow_lower (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
       0⟩ : ByteRow (ZMod p)) := by
   have hp := Fact.out (p := 2 ^ 17 < p)
   rw [ShiftLeftChip.cBits_bitShift_sum]
-  refine ⟨ByteOpcode.Range, by norm_cast, ?_⟩
-  simp only [ByteOpcode.constrain]
+  refine ShiftLeftChip.byteRowSpec_range_intro ?_
   rw [ZMod.val_natCast_of_lt (show c0.val % 16 < p by omega)]
   exact lowerLimb_val_lt b c0 f i hi
 
@@ -724,8 +676,7 @@ theorem byteRow_higher (b : Word (ZMod p)) (c0 : ZMod p) (f : Vector (ZMod p) 4)
       show ((16 : ZMod p)) = ((16 : ℕ) : ZMod p) by push_cast; rfl,
       ← Nat.cast_sub (by omega)]
   rw [hw]
-  refine ⟨ByteOpcode.Range, by norm_cast, ?_⟩
-  simp only [ByteOpcode.constrain]
+  refine ShiftLeftChip.byteRowSpec_range_intro ?_
   rw [ZMod.val_natCast_of_lt (show 16 - c0.val % 16 < p by omega)]
   exact higherLimb_val_lt b c0 f hb he14 i hi
 

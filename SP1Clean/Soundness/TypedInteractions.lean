@@ -43,8 +43,7 @@ theorem equality_of_singleton_constraintsHold
       FlatOperation.constraints, FlatOperation.lookups, eval_sub, circuit_norm] using constraints
   have leftEq : env (toElements (M := field) left)[0] = env left := rfl
   have rightEq : env (toElements (M := field) right)[0] = env right := rfl
-  rw [leftEq, rightEq, sub_eq_zero] at difference
-  exact difference
+  rwa [leftEq, rightEq, sub_eq_zero] at difference
 
 /-- An evaluated Clean interaction together with evidence that it belongs to `channel`. -/
 structure TypedInteraction (channel : Channel F Message) where
@@ -69,10 +68,7 @@ def pushedIfValue (channel : Channel F Message) (enabled : F) (msg : Message F) 
 typed wrapper. -/
 theorem raw_injective {channel : Channel F Message} :
     Function.Injective (@raw F _ Message _ channel) := by
-  intro left right equal
-  cases left
-  cases right
-  cases equal
+  rintro ⟨-, -⟩ ⟨-, -⟩ rfl
   rfl
 
 @[simp] theorem pulledIfValue_raw (channel : Channel F Message) (enabled : F) (msg : Message F) :
@@ -103,11 +99,7 @@ theorem message_eq_iff {channel : Channel F Message}
       interaction.raw.msg = (toElements msg).toArray := by
   unfold message
   rw [ProvableType.fromElements_eq_iff]
-  constructor
-  · intro h
-    exact congrArg Vector.toArray h
-  · intro h
-    exact Vector.toArray_inj.mp h
+  exact ⟨congrArg Vector.toArray, fun h => Vector.toArray_inj.mp h⟩
 
 @[simp] theorem pulledIfValue_mult (channel : Channel F Message) (enabled : F) (msg : Message F) :
     (pulledIfValue channel enabled msg).mult = -enabled := rfl
@@ -160,17 +152,11 @@ theorem guarantee_of_requirements {p : ℕ} [Fact p.Prime]
   dsimp only at channelEq
   subst rawChannel
   change signedVal mult = 1 at positive
-  have multOne : mult = 1 := by
-    rw [← intCast_signedVal mult, positive]
-    norm_num
+  have multOne : mult = 1 := by rw [← intCast_signedVal mult, positive]; norm_num
   change channel.toRaw.Requirements mult ⟨message, sameSize⟩ data at requirements
   simp only [Channel.toRaw] at requirements
-  letI : Fact (ringChar (ZMod p) ≠ 2) := ⟨by
-    rw [ZMod.ringChar_zmod_n]
-    omega⟩
-  have multNeNeg : mult ≠ -1 := by
-    rw [multOne]
-    exact one_ne_neg_one
+  letI : Fact (ringChar (ZMod p) ≠ 2) := ⟨by rw [ZMod.ringChar_zmod_n]; omega⟩
+  have multNeNeg : mult ≠ -1 := by rw [multOne]; exact one_ne_neg_one
   have guarantee := requirements multNeNeg (by simp [multOne])
   simpa only [TypedInteraction.message, Interaction.msgVector] using guarantee
 
@@ -193,8 +179,7 @@ theorem mem_typedInteractionValuesWith (ops : Operations F)
         (Operations.channel_eq_of_mem_interactionsWith member) ∈
       typedInteractionValuesWith ops channel env := by
   unfold typedInteractionValuesWith
-  apply List.mem_map.mpr
-  exact ⟨⟨interaction, member⟩, by simp, rfl⟩
+  exact List.mem_map.mpr ⟨⟨interaction, member⟩, by simp, rfl⟩
 
 /-- A typed view of a channel with no syntactic interactions is empty. -/
 theorem typedInteractionValuesWith_eq_nil_of_interactionsWith_eq_nil
@@ -250,6 +235,13 @@ variable {p : ℕ} [Fact p.Prime]
 variable {Message : TypeMap} [ProvableType Message]
 variable {channel : Channel (ZMod p) Message}
 
+/-- The centered value of the canonical pull multiplicity `-1`.  Every active-pull argument in this
+module descends through it. -/
+private lemma signedVal_neg_one (hp : 2 < p) : signedVal (-1 : ZMod p) = -1 := by
+  rw [signedVal_neg_is_real hp (Or.inr rfl), ZMod.val_one_eq_one_mod,
+    Nat.mod_eq_of_lt (by omega)]
+  norm_num
+
 /-- The signed multiplicity at one typed message.  Equality is checked on the channel's canonical
 element encoding, so this is exactly Clean's `balanceOf` with a typed key. -/
 noncomputable def typedMultiplicitySum (interactions : List (TypedInteraction channel))
@@ -277,8 +269,7 @@ theorem TypedInteraction.message_mem_consumedMessages
     (member : interaction ∈ interactions) (negative : signedVal interaction.mult = -1) :
     interaction.message ∈ consumedMessages interactions := by
   unfold consumedMessages
-  apply List.mem_map.mpr
-  refine ⟨interaction, List.mem_filter.mpr ⟨member, ?_⟩, rfl⟩
+  refine List.mem_map.mpr ⟨interaction, List.mem_filter.mpr ⟨member, ?_⟩, rfl⟩
   simpa only [decide_eq_true_eq] using negative
 
 /-- An active syntactic `pulledIf` retained by an operation list contributes its evaluated message
@@ -302,9 +293,7 @@ theorem eval_pulledIf_message_mem_consumedMessages (ops : Operations (ZMod p))
     simpa only [typed, abstract] using TypedInteraction.eval_pulledIf channel env enabled msg
   have negative : signedVal typed.mult = -1 := by
     rw [typedEq, TypedInteraction.pulledIfValue_mult, active]
-    rw [signedVal_neg_is_real hp (Or.inr rfl), ZMod.val_one_eq_one_mod,
-      Nat.mod_eq_of_lt (by omega)]
-    norm_num
+    exact signedVal_neg_one hp
   have messageMem :=
     TypedInteraction.message_mem_consumedMessages typed _ typedMem negative
   simpa only [typedEq, TypedInteraction.pulledIfValue_message] using messageMem
@@ -386,10 +375,9 @@ theorem constraintsHold_generalSubcircuit_of_mem {Input Output : TypeMap}
     ((circuit.main input).operations offset).ConstraintsHold env := by
   have nested := constraintsHoldFlat_subcircuit_of_mem env ops
     (circuit.toSubcircuit offset input) subMem constraints
-  rw [GeneralFormalCircuit.toSubcircuit, GeneralFormalCircuit.toWithHint,
+  rwa [GeneralFormalCircuit.toSubcircuit, GeneralFormalCircuit.toWithHint,
     GeneralFormalCircuit.WithHint.toSubcircuit, Operations.toNested_toFlat,
     Circuit.constraintsHold_toFlat_iff] at nested
-  exact nested
 
 /-- Parent constraints restrict to the `main` operation list of any retained `FormalCircuit`
 boundary. This is the witnessed-output companion to
@@ -404,9 +392,8 @@ theorem constraintsHold_formalSubcircuit_of_mem {Input Output : TypeMap}
     ((circuit.main input).operations offset).ConstraintsHold env := by
   have nested := constraintsHoldFlat_subcircuit_of_mem env ops
     (circuit.toSubcircuit offset input) subMem constraints
-  rw [FormalCircuit.toSubcircuit, Operations.toNested_toFlat,
+  rwa [FormalCircuit.toSubcircuit, Operations.toNested_toFlat,
     Circuit.constraintsHold_toFlat_iff] at nested
-  exact nested
 
 /-- Parent constraints restrict to the `main` operation list of any retained
 `FormalAssertion` boundary. This is the assertion-only companion to
@@ -421,9 +408,8 @@ theorem constraintsHold_assertionSubcircuit_of_mem {Input : TypeMap}
     ((circuit.main input).operations offset).ConstraintsHold env := by
   have nested := constraintsHoldFlat_subcircuit_of_mem env ops
     (circuit.toSubcircuit offset input) subMem constraints
-  rw [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
+  rwa [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Circuit.constraintsHold_toFlat_iff] at nested
-  exact nested
 
 /-- Clean requirements on a physical table prove the typed predicate of each exact active push. -/
 theorem guarantee_of_mem_producedTableMessages (table : Table (ZMod p))
@@ -471,15 +457,10 @@ theorem channelGuarantees_of_consumedMessages (ops : Operations (ZMod p))
     mem_typedInteractionValuesWith ops channel env currentMem
   have pullSigned : signedVal typed.mult = -1 := by
     change signedVal (Expression.eval env interaction.mult) = -1
-    rw [pullMult, signedVal_neg_is_real hp (Or.inr rfl)]
-    rw [ZMod.val_one_eq_one_mod, Nat.mod_eq_of_lt (by omega)]
-    norm_num
-  have messageMem : typed.message ∈
-      consumedMessages (typedInteractionValuesWith ops channel env) := by
-    unfold consumedMessages
-    apply List.mem_map.mpr
-    refine ⟨typed, List.mem_filter.mpr ⟨typedMem, ?_⟩, rfl⟩
-    simpa only [decide_eq_true_eq] using pullSigned
+    rw [pullMult]
+    exact signedVal_neg_one hp
+  have messageMem :=
+    TypedInteraction.message_mem_consumedMessages typed _ typedMem pullSigned
   have grounded := guarantees typed.message messageMem
   have messageEq : typed.message =
       fromElements (message.map (Expression.eval env)) := by
@@ -487,8 +468,7 @@ theorem channelGuarantees_of_consumedMessages (ops : Operations (ZMod p))
     simp only [typed, interaction, TypedInteraction.eval_raw, AbstractInteraction.eval,
       ProvableType.toElements_fromElements]
     rfl
-  rw [messageEq] at grounded
-  exact grounded
+  rwa [messageEq] at grounded
 
 @[simp] theorem producedMessages_append (left right : List (TypedInteraction channel)) :
     producedMessages (left ++ right) = producedMessages left ++ producedMessages right := by
@@ -543,8 +523,7 @@ theorem typedMultiplicitySum_eq_zero_of_balanced
             interaction.raw.msg = (toElements msg).toArray).map
               fun interaction => interaction.mult).sum := by
         unfold typedMultiplicitySum
-        rw [intCast_list_sum]
-        rw [List.map_map]
+        rw [intCast_list_sum, List.map_map]
         exact congrArg List.sum (List.map_congr_left fun interaction _ =>
           intCast_signedVal interaction.mult)
       _ = balanceOf (interactions.map TypedInteraction.raw) (toElements msg).toArray := by
@@ -570,9 +549,7 @@ theorem typedMultiplicitySum_eq_zero_of_balanced
       (interactions.filter fun interaction =>
         interaction.raw.msg = (toElements msg).toArray).length ≤ interactions.length :=
     List.length_filter_le _ _
-  have strictBound : |typedMultiplicitySum interactions msg| < (p : ℤ) := by
-    omega
-  exact Int.eq_zero_of_abs_lt_dvd divides strictBound
+  exact Int.eq_zero_of_abs_lt_dvd divides (by omega)
 
 @[simp] private theorem typedMultiplicitySum_cons
     (interaction : TypedInteraction channel) (interactions : List (TypedInteraction channel))
@@ -606,11 +583,9 @@ theorem provider_matches_active_pull
   rw [List.map_append] at rawProviderMem
   rcases List.mem_append.mp rawProviderMem with consumerMem | providerMem
   · obtain ⟨consumer, consumerMem, consumerRaw⟩ := List.mem_map.mp consumerMem
-    have shape := consumerShape consumer consumerMem
     have providerMult : rawProvider.mult = consumer.mult := by
-      simpa only [TypedInteraction.mult] using
-        congrArg Interaction.mult consumerRaw.symm
-    rcases shape with zero | pull
+      simpa only [TypedInteraction.mult] using congrArg Interaction.mult consumerRaw.symm
+    rcases consumerShape consumer consumerMem with zero | pull
     · exact (providerNeZero (providerMult.trans zero)).elim
     · exact (providerNePull (providerMult.trans pull)).elim
   · obtain ⟨provider, providerMem, providerRaw⟩ := List.mem_map.mp providerMem
@@ -618,9 +593,8 @@ theorem provider_matches_active_pull
     · rw [TypedInteraction.message_eq_iff]
       exact (congrArg Interaction.msg providerRaw).trans
         (sameMessage.trans (TypedInteraction.message_toElements target).symm)
-    · intro providerZero
-      apply providerNeZero
-      exact (congrArg Interaction.mult providerRaw).symm.trans providerZero
+    · exact fun providerZero =>
+        providerNeZero ((congrArg Interaction.mult providerRaw).symm.trans providerZero)
 
 @[simp] private theorem producedMessages_cons
     (interaction : TypedInteraction channel) (interactions : List (TypedInteraction channel)) :
