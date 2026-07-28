@@ -13,5 +13,16 @@
 # retired legacy Extracted files — the oracle form embeds chip-private op copies, hence more
 # opaque-definition headers), plus a net +2 hand-written in the Faithful DivRem/Mul/Addw KEEP-set
 # from the anchor fold-ins. Generated elaboration boundaries, not raised ceilings.
-SP1Clean 818
+# -13 (2026-07-27, proof-cleanup W1/g3): ratchet DOWN, no ceiling raised. ShiftRightChip/Dispatch.lean
+# dropped all 12 of its 1000000 ceilings (the 16-way `first | exact …` ladder became `rcases … with
+# rfl | rfl` + a hoisted `key` + ordered bullets, so ~8 failing alternatives per goal — each a full
+# rw/push_cast/ring1 — are no longer elaborated and discarded; floor re-measured at (25k, 35k]), and
+# Model/SailMemory.lean dropped its unmeasured 10000000 file ceiling (the Sail mem_read/translateAddr
+# peels measure <=20k, so the family was carrying a default it never needed). Two sites were
+# re-measured and KEPT, hence not counted here: ShiftRightChip/Core.lean relocated its 2000000
+# file-scope ceiling to a scoped 1600000 on the single binding lemma `srlw_within_byte_shift` (1->1
+# site), and Model/SailDecode.lean ratcheted 8000000 -> 400000 (floor (40k, 50k]).
+# NOTE: the recorded count includes one phantom — SP1Clean/Proofs/Sail/Advance.lean:2325 has the
+# literal inside a doc-comment, so the grep sees a site that does not exist. Pre-existing.
+SP1Clean 805
 SP1CleanTest 16
