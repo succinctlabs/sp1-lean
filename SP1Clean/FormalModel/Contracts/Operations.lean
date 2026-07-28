@@ -235,8 +235,7 @@ theorem effectiveAddress_toNat {input : Inputs (ZMod p)}
     (hb : Word.isU64 input.b) (hcc : Word.isU64 input.cc) :
     (effectiveAddress input).toNat =
       (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 64 := by
-  unfold effectiveAddress
-  rw [BitVec.toNat_add, Word.toBitVec64_toNat hb, Word.toBitVec64_toNat hcc]
+  rw [effectiveAddress, BitVec.toNat_add, Word.toBitVec64_toNat hb, Word.toBitVec64_toNat hcc]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- The compact AIR address contract, rephrased at the actual wrapped effective address consumed by
@@ -256,7 +255,7 @@ theorem effectiveAddress_facts {input : Inputs (ZMod p)}
     rw [← Nat.mod_mod_of_dvd _ (by norm_num : 2 ^ 48 ∣ (2 ^ 64 : ℕ)),
       Nat.mod_eq_of_lt hfit]
   rw [effectiveAddress_toNat hb hcc]
-  exact ⟨hfit, hmod ▸ hlo, by rw [← hmod]; exact hoffset⟩
+  exact ⟨hfit, hmod ▸ hlo, by rwa [← hmod]⟩
 
 omit [Fact (2 ^ 17 < p)] in
 /-- The 48-bit address reconstructed by the AIR is the natural value of the wrapped 64-bit effective
