@@ -5,7 +5,8 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 This file deliberately separates the small State boundary consumed by the current 25-chip ensemble
 from SP1's real shard public-values record.  The latter mirrors
 `sp1_hypercube::air::PublicValues<[F; 4], [F; 3], [F; 4], F>`; keeping the distinction in the type
-names prevents a supported-core theorem from silently presenting itself as full SP1 AIR soundness. -/
+names prevents a supported-core theorem from silently presenting itself as full SP1 AIR
+soundness. -/
 
 namespace SP1Clean
 
@@ -27,8 +28,8 @@ deriving ProvableStruct
 abbrev SP1PublicIO := SP1StateBoundary
 
 /-- Exact public-values type of the supported-core prefix theorem.  Naming the prefix explicitly
-prevents callers from importing the terminal-only `exit_code` below into a statement that the current
-Clean ensemble does not constrain. -/
+prevents callers from importing the terminal-only `exit_code` below into a statement that the
+current Clean ensemble does not constrain. -/
 abbrev SupportedCorePrefixPublicValues := SP1StateBoundary
 
 /-- Legacy terminal-state scaffold: State endpoints plus an exit code.  The current Clean ensemble
@@ -73,8 +74,8 @@ abbrev SP1TargetPublicIO.toLegacy {F : Type} (pv : SP1TargetPublicIO F) : SP1Pub
 /-! ## The real SP1 shard public-values layout
 
 The aliases below name the three Rust word representations directly.  They are semantic data types,
-not yet a `ProvableType`: the full AIR will receive its own verifier/public-input circuit only when all
-fields below are constrained and extraction-faithful. -/
+not yet a `ProvableType`: the full AIR will receive its own verifier/public-input circuit only when
+all fields below are constrained and extraction-faithful. -/
 
 /-- One 32-bit word represented by four byte limbs (`W1 = [F; 4]`). -/
 abbrev SP1Word32 (F : Type) := Vector F 4
@@ -97,8 +98,8 @@ structure SP1MProtectPublicValues (F : Type) where
   untrusted_memory : Vector (SP1Word48 F) 2
 
 /-- Verifying-key configuration corresponding to Rust's `UntrustedConfig`.  As with public values,
-the `Option` is a type-level rendering of the compile-time `mprotect` layout choice, not data a prover
-may select independently of the verifier. -/
+the `Option` is a type-level rendering of the compile-time `mprotect` layout choice, not data a
+prover may select independently of the verifier. -/
 structure SP1UntrustedConfig (F : Type) where
   enable_untrusted_programs : F
   mprotect : Option (SP1MProtectPublicValues F)
@@ -199,14 +200,15 @@ structure SP1ShardStatement (F Digest : Type) where
   verifyingKey : SP1MachineVerifyingKey F Digest
   publicValues : SP1PublicValues F
 
-/-- Public input to the composed execution theorem.  A proof-system adapter may expose only the final
-recursive public values, but its recursion theorem must recover this ordered shard ledger before the
-AIR results can be composed. -/
+/-- Public input to the composed execution theorem.  A proof-system adapter may expose only the
+final recursive public values, but its recursion theorem must recover this ordered shard ledger
+before the AIR results can be composed. -/
 structure SP1ExecutionStatement (F Digest : Type) where
   verifyingKey : SP1MachineVerifyingKey F Digest
   shards : List (SP1PublicValues F)
 
-/-- View every entry in a composed ledger as a shard statement under the one machine verifying key. -/
+/-- View every entry in a composed ledger as a shard statement under the one machine verifying
+key. -/
 def SP1ExecutionStatement.shardStatements {F Digest : Type}
     (statement : SP1ExecutionStatement F Digest) : List (SP1ShardStatement F Digest) :=
   statement.shards.map fun publicValues => ⟨statement.verifyingKey, publicValues⟩
@@ -214,12 +216,15 @@ def SP1ExecutionStatement.shardStatements {F Digest : Type}
 /-- A field element used as a Boolean selector. -/
 def FieldBool {p : ℕ} (value : ZMod p) : Prop := value = 0 ∨ value = 1
 
+/-- Canonical byte-limb encoding of a 32-bit public-value word. -/
 def SP1Word32.WellFormed {p : ℕ} (word : SP1Word32 (ZMod p)) : Prop :=
   ∀ value ∈ word.toList, value.val < 2 ^ 8
 
+/-- Canonical 16-bit-limb encoding of a 48-bit address or pc. -/
 def SP1Word48.WellFormed {p : ℕ} (word : SP1Word48 (ZMod p)) : Prop :=
   ∀ value ∈ word.toList, value.val < 2 ^ 16
 
+/-- Canonical `(16, 8, 8, 16)` limb encoding of an upstream timestamp. -/
 def SP1Timestamp.WellFormed {p : ℕ} (timestamp : SP1Timestamp (ZMod p)) : Prop :=
   timestamp[0].val < 2 ^ 16 ∧ timestamp[1].val < 2 ^ 8 ∧
     timestamp[2].val < 2 ^ 8 ∧ timestamp[3].val < 2 ^ 16
@@ -349,9 +354,9 @@ def SP1PublicValues.HasUniqueFirstExecutionShard
     (shards : List (SP1PublicValues (ZMod p))) : Prop :=
   (shards.filter fun publicValues => publicValues.is_first_execution_shard = 1).length = 1
 
-/-- Public-record checks performed by recursive composition, except for septic-curve aggregation and
-deferred-proof authentication.  Those two external checks have their own narrow theorem parameters at
-the execution boundary; they are not hidden inside this ledger predicate. -/
+/-- Public-record checks performed by recursive composition, except for septic-curve aggregation
+and deferred-proof authentication.  Those two external checks have their own narrow theorem
+parameters at the execution boundary; they are not hidden inside this ledger predicate. -/
 def SP1PublicValues.AuthenticatedLedger (haltPc : ℕ)
     (shards : List (SP1PublicValues (ZMod p))) : Prop :=
   ∃ first rest final,
@@ -372,8 +377,7 @@ theorem SP1PublicValues.executionContinuous_of_ledgerContinuous
       cases rest with
       | nil => trivial
       | cons next tail =>
-          rcases continuous.1 with
-            ⟨-, -, pc, timestamp, -, -, -, -, exitCode, -, -, -⟩
+          obtain ⟨-, -, pc, timestamp, -, -, -, -, exitCode, -, -, -⟩ := continuous.1
           exact ⟨⟨pc, timestamp, exitCode⟩, ih continuous.2⟩
 
 /-- Range and Boolean hygiene common to the full upstream public-input AIR.  Digest and septic-curve
@@ -399,8 +403,7 @@ def SP1PublicValues.WellFormed {p : ℕ} (layout : SP1PublicValuesLayout)
 theorem SP1PublicValues.executionShard_bool {p : ℕ} {layout : SP1PublicValuesLayout}
     {pv : SP1PublicValues (ZMod p)} (wellFormed : pv.WellFormed layout) :
     pv.is_execution_shard = 0 ∨ pv.is_execution_shard = 1 := by
-  unfold SP1PublicValues.WellFormed FieldBool at wellFormed
-  tauto
+  unfold SP1PublicValues.WellFormed FieldBool at wellFormed; tauto
 
 /-- The shard's initial pc as a Sail-width bit-vector. -/
 def SP1PublicValues.pcStartBits {p : ℕ} (pv : SP1PublicValues (ZMod p)) : BitVec 64 :=
