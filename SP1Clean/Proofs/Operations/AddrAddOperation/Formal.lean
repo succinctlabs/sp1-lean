@@ -52,9 +52,9 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   rw [← c16] at R0 R1 R2
   rw [hr1eq, one_mul] at hgc0 hgc1 hgc2 hgc3
   simp only [sub_zero] at hgc3
-  have Rb0 := (byteRowSpec_range _ h16p).mp R0
-  have Rb1 := (byteRowSpec_range _ h16p).mp R1
-  have Rb2 := (byteRowSpec_range _ h16p).mp R2
+  have Rb0 := (byteRowSpec_range _ sixteen_lt).mp R0
+  have Rb1 := (byteRowSpec_range _ sixteen_lt).mp R1
+  have Rb2 := (byteRowSpec_range _ sixteen_lt).mp R2
   have hraw : RawSpec input_a input_b (⟨input_cols_value⟩ : Extracted.AddrAddOperation (ZMod p)) := by
     simp only [RawSpec]
     exact ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2,
@@ -85,15 +85,15 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     obtain ⟨_, hrng0, _, _, _⟩ := h_spec hr1
-    rw [← c16]; exact (byteRowSpec_range _ h16p).mpr hrng0
+    rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr hrng0
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     obtain ⟨_, _, hrng1, _, _⟩ := h_spec hr1
-    rw [← c16]; exact (byteRowSpec_range _ h16p).mpr hrng1
+    rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr hrng1
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     obtain ⟨_, _, _, hrng2, _⟩ := h_spec hr1
-    rw [← c16]; exact (byteRowSpec_range _ h16p).mpr hrng2
+    rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr hrng2
   · rcases hbin with h0 | h1
     · simp [h0]
     · obtain ⟨heq, hrng0, hrng1, hrng2, hfit⟩ := h_spec h1

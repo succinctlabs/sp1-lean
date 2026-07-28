@@ -22,10 +22,6 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 instance : Fact (p > 2) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
-omit [Fact p.Prime] in
-/-- `16 < p`, so the `Range` byte-row width column `16` round-trips through `byteRowSpec_range`. -/
-lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-
 /-- The four base-2^16 limbs of `(a - b) mod 2^64` via two's-complement (`65535 - bᵢ` per
 limb, carry init `1`). Chip-level populate/trace conformance checks the assembled row against Rust;
 there is intentionally no operation-level extraction boundary. -/

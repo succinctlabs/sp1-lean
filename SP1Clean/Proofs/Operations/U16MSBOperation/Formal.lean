@@ -39,7 +39,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   rw [← c16] at R
   refine msb_of_raw (ha hr1eq) ?_
   simp only [RawSpec]
-  exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ h16p).mp R⟩
+  exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ sixteen_lt).mp R⟩
 
 set_option maxHeartbeats 2000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
@@ -59,7 +59,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       rw [two_mul, ZMod.val_add_of_lt (by omega)]; omega
     have hmsb := hmsbeq hr1
     rw [← c16]
-    apply (byteRowSpec_range _ h16p).mpr
+    apply (byteRowSpec_range _ sixteen_lt).mpr
     rw [hmsb]
     by_cases hge : input_a.val ≥ 32768
     · rw [if_pos hge, one_mul]

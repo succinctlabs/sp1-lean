@@ -120,6 +120,12 @@ lemma ofNat64_clear_lsb_and {M b : ℕ} (hb : b ≤ 1) (hM : M % 2 = 0) :
 
 /-! ## Field constants (`ZMod p`, `Fact (2 ^ 17 < p)`) -/
 
+/-- `16 < p`, the `ByteRowSpec` range-check side condition. This is the `ℕ` bound that
+`byteRowSpec_range` takes as an argument, so it sits underneath the `val_N_zmod_p` family rather
+than beside it. Previously spelled byte-identically in ten chip/operation/reader namespaces. -/
+lemma sixteen_lt [Fact (2 ^ 17 < p)] : (16 : ℕ) < p := by
+  have := Fact.out (p := 2 ^ 17 < p); omega
+
 @[simp] lemma val_65536_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
     (65536 : ZMod p).val = 65536 :=
   ZMod.val_natCast_of_lt (show (65536 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)

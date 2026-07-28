@@ -33,10 +33,6 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
-omit [Fact p.Prime] in
-/-- `16 < p`, so the `Range` width column `16` round-trips through `byteRowSpec_range`. -/
-lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-
 /-- The cross-block inputs. `mem` is the chip-owned `MemoryAccessCols` (`prev_value` + the 5 timestamp
 columns); `clk_high`/`clk_low` are the current clock limbs; `addr0/1/2` the 3-limb memory address (from
 `AddressOperation`); `new_value` the value placed at the current timestamp (`= prev_value` for a read,
@@ -199,7 +195,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   dsimp only at hr1 ⊢
   rw [hr1, one_mul] at a1 a2 a3
   refine ⟨bool_of_mul_pred a1, a2, ?_,
-    (byteRowSpec_range _ h16p).mp (by rw [Nat.cast_ofNat]; exact b4 (by rw [hr1])),
+    (byteRowSpec_range _ sixteen_lt).mp (by rw [Nat.cast_ofNat]; exact b4 (by rw [hr1])),
     ((byteRowSpec_u8range_pair _ _).mp (b5 (by rw [hr1]))).1, h_mem (by rw [hr1])⟩
   simp only [selCur, selPrev]; linear_combination a3
 
@@ -232,7 +228,7 @@ theorem completeness :
     · rw [h1, one_mul]; rcases hcl with h | h <;> rw [h] <;> ring
     · rw [h1, one_mul]; linear_combination ha2
     · rw [h1, one_mul]; linear_combination ha3
-    · intro _; simpa only [Nat.cast_ofNat] using (byteRowSpec_range _ h16p).mpr hd_low
+    · intro _; simpa only [Nat.cast_ofNat] using (byteRowSpec_range _ sixteen_lt).mpr hd_low
     · intro _; exact (byteRowSpec_u8range_pair _ _).mpr ⟨hd_high, by rw [ZMod.val_zero]; norm_num⟩
     · intro _; exact ⟨hisu, hclk⟩
 

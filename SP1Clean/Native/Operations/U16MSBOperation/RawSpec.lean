@@ -15,10 +15,6 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 instance : Fact (p > 2) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
-omit [Fact p.Prime] in
-/-- `16 < p`, so the `Range` byte-row width column `16` round-trips through `byteRowSpec_range`. -/
-lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-
 /-- The booleanness + range form of the msb constraint (the literal meaning of the extracted
 constraint list at `is_real = 1`), stated against the result column `cols.msb`. The range term
 `2 * a - cols.msb * 65536` is `2*a - msb*2^16` (the auto-generated `main`'s normal form). -/

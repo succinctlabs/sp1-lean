@@ -39,7 +39,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   rw [← c16] at R
   refine compare_of_raw ha hb ?_
   simp only [RawSpec]
-  exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ h16p).mp R⟩
+  exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ sixteen_lt).mp R⟩
 
 set_option maxHeartbeats 2000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
@@ -56,7 +56,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     obtain ⟨ha, hb⟩ := hab hr1
     have hbit := hbiteq hr1
     rw [← c16]
-    apply (byteRowSpec_range _ h16p).mpr
+    apply (byteRowSpec_range _ sixteen_lt).mpr
     rw [hbit]
     by_cases hlt : input_a.val < input_b.val
     · rw [if_pos hlt]

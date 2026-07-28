@@ -34,10 +34,6 @@ omit [Fact p.Prime] in
 /-- `14 < p`, so the alignment `Range` byte-row width column `14` round-trips through `byteRowSpec_range`. -/
 lemma h14p : (14 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 
-omit [Fact p.Prime] in
-/-- `16 < p`, for the `next_pc[1]`/`next_pc[2]` u16 range sends. -/
-lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-
 /-- The six honest opcode flags the prover supplies via the `"branch_flags"` hint key (one-hot for the
 active branch opcode `Σ is_b*·k`, all-zero on padding). Falls back to all-zero when the key is absent. -/
 def hintFlags (h : ProverHint (ZMod p)) : Vector (ZMod p) 6 :=

@@ -134,8 +134,8 @@ theorem soundness :
     rw [← c14] at h0
     rw [← c16] at h1 h2
     have r0 := (byteRowSpec_range _ SP1Clean.BranchChip.h14p).mp h0
-    have r1 := (byteRowSpec_range _ SP1Clean.BranchChip.h16p).mp h1
-    have r2 := (byteRowSpec_range _ SP1Clean.BranchChip.h16p).mp h2
+    have r1 := (byteRowSpec_range _ SP1Clean.sixteen_lt).mp h1
+    have r2 := (byteRowSpec_range _ SP1Clean.sixteen_lt).mp h2
     simp only [AddOperation.InteractSpec, next, Vector.getElem_mk,
       List.getElem_toArray, List.getElem_cons_zero,
       List.getElem_cons_succ, ZMod.val_zero]
@@ -873,7 +873,7 @@ theorem completeness :
       norm_cast
     simp only [byteChannel, hnp1]
     rw [← c16]
-    exact (byteRowSpec_range _ SP1Clean.BranchChip.h16p).mpr hranges.2.1
+    exact (byteRowSpec_range _ SP1Clean.sixteen_lt).mpr hranges.2.1
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have hranges := h_ranges hr1
@@ -882,6 +882,6 @@ theorem completeness :
       norm_cast
     simp only [byteChannel, hnp2]
     rw [← c16]
-    exact (byteRowSpec_range _ SP1Clean.BranchChip.h16p).mpr hranges.2.2
+    exact (byteRowSpec_range _ SP1Clean.sixteen_lt).mpr hranges.2.2
 
 end SP1Clean.BranchChip

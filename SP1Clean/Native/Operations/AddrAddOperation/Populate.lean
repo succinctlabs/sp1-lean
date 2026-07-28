@@ -17,10 +17,6 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 instance : Fact (p > 2) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
-omit [Fact p.Prime] in
-/-- `16 < p`, so the `Range` byte-row width column `16` round-trips through `byteRowSpec_range`. -/
-lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-
 /-- Native port of SP1's `AddrAddOperation::populate`: the three base-2^16 limbs of `(a + b) mod 2^48`. -/
 def populate (a b : Word (ZMod p)) : Vector (ZMod p) 3 :=
   let s0 := a[0].val + b[0].val

@@ -52,10 +52,6 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 -- derived from `Fact (2^17 < p)` would make downstream `omit [Fact (2^17 < p)] in` clauses illegal).
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
-omit [Fact p.Prime] in
-/-- `16 < p`, needed so the `Range` width column `16` round-trips through `byteRowSpec_range`. -/
-lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-
 /-- The `cols` block (`prev_low`, `diff_low_limb`) is an **input** (the composing chip witnesses it);
 `main` witnesses nothing and imposes the two `is_real`-gated byte checks over `input.cols.*`: a 16-bit
 `Range` on `diff_low_limb` and a `U8Range` (`< 256`) on the scaled high part `(clk_target - prev_low - 1 -
@@ -120,7 +116,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
   have hneg : - input_is_real = -1 := by rw [hr1]
-  exact ⟨(byteRowSpec_range _ h16p).mp (by rw [Nat.cast_ofNat]; exact h_holds.2.1 hneg),
+  exact ⟨(byteRowSpec_range _ sixteen_lt).mp (by rw [Nat.cast_ofNat]; exact h_holds.2.1 hneg),
     ((byteRowSpec_u8range_pair _ _).mp (h_holds.2.2 hneg)).1⟩
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
@@ -131,7 +127,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   refine ⟨?_, ?_, ?_⟩
   · rcases h_assumptions with h | h <;> simp only [h, sub_self, mul_zero, zero_mul]
   · intro hneg
-    simpa only [Nat.cast_ofNat] using (byteRowSpec_range _ h16p).mpr (h_spec (neg_inj.mp hneg)).1
+    simpa only [Nat.cast_ofNat] using (byteRowSpec_range _ sixteen_lt).mpr (h_spec (neg_inj.mp hneg)).1
   · intro hneg
     exact (byteRowSpec_u8range_pair _ _).mpr
       ⟨(h_spec (neg_inj.mp hneg)).2, by rw [ZMod.val_zero]; norm_num⟩

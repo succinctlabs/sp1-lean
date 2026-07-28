@@ -48,8 +48,8 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     exact ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2, bool_of_mul_pred hgc3⟩
   · simp only [InteractSpec]
     rw [← h65536]
-    exact ⟨(byteRowSpec_range _ h16p).mp R0, (byteRowSpec_range _ h16p).mp R1,
-      (byteRowSpec_range _ h16p).mp R2, (byteRowSpec_range _ h16p).mp R3⟩
+    exact ⟨(byteRowSpec_range _ sixteen_lt).mp R0, (byteRowSpec_range _ sixteen_lt).mp R1,
+      (byteRowSpec_range _ sixteen_lt).mp R2, (byteRowSpec_range _ sixteen_lt).mp R3⟩
 
 set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
@@ -64,13 +64,13 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   simp only [circuit_norm, byteChannel, ev hia, ev hib, ev hiv]
   refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · intro hneg; rw [← c16]
-    exact (byteRowSpec_range _ h16p).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).1
+    exact (byteRowSpec_range _ sixteen_lt).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).1
   · intro hneg; rw [← c16]
-    exact (byteRowSpec_range _ h16p).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).2.1
+    exact (byteRowSpec_range _ sixteen_lt).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).2.1
   · intro hneg; rw [← c16]
-    exact (byteRowSpec_range _ h16p).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).2.2.1
+    exact (byteRowSpec_range _ sixteen_lt).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).2.2.1
   · intro hneg; rw [← c16]
-    exact (byteRowSpec_range _ h16p).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).2.2.2
+    exact (byteRowSpec_range _ sixteen_lt).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).2.2.2
   · rcases hbin with h0 | h1
     · simp [h0]
     · obtain ⟨hv, hbv⟩ := h_spec h1

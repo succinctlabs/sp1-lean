@@ -132,9 +132,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     obtain ⟨hbU0, hbU1, hbU2, hbU3⟩ := Word.lt_cases_of_isU64 hbU
     obtain ⟨hcU0, hcU1, hcU2, hcU3⟩ := Word.lt_cases_of_isU64 hcU
     have hneg : - input_is_real = -1 := by rw [hr]
-    have h16p : (16 : ℕ) < p := by
-      have h := Fact.out (p := 2 ^ 24 < p); have e : (2 : ℕ) ^ 24 = 16777216 := by norm_num
-      omega
     obtain ⟨ecar_eq, eprod_eq, ebl_eq, ecl_eq, ebm_eq, ecm_eq, _, _, _⟩ := _hicols
     have eb0 : Expression.eval env input_var_b[0] = input_b[0] := by rw [← hib, Vector.getElem_map]
     have eb1 : Expression.eval env input_var_b[1] = input_b[1] := by rw [← hib, Vector.getElem_map]
@@ -184,22 +181,22 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     have ecl1 : Expression.eval env input_var_cols_c_lower_byte_low_bytes[1] = input_cols_c_lower_byte_low_bytes[1] := by rw [← ecl_eq, Vector.getElem_map]
     have ecl2 : Expression.eval env input_var_cols_c_lower_byte_low_bytes[2] = input_cols_c_lower_byte_low_bytes[2] := by rw [← ecl_eq, Vector.getElem_map]
     have ecl3 : Expression.eval env input_var_cols_c_lower_byte_low_bytes[3] = input_cols_c_lower_byte_low_bytes[3] := by rw [← ecl_eq, Vector.getElem_map]
-    have cb0 : input_cols_carry[0].val < 2 ^ 16 := by rw [← ecar0]; exact (byteRowSpec_range _ h16p).mp (hcF0 hneg)
-    have cb1 : input_cols_carry[1].val < 2 ^ 16 := by rw [← ecar1]; exact (byteRowSpec_range _ h16p).mp (hcF1 hneg)
-    have cb2 : input_cols_carry[2].val < 2 ^ 16 := by rw [← ecar2]; exact (byteRowSpec_range _ h16p).mp (hcF2 hneg)
-    have cb3 : input_cols_carry[3].val < 2 ^ 16 := by rw [← ecar3]; exact (byteRowSpec_range _ h16p).mp (hcF3 hneg)
-    have cb4 : input_cols_carry[4].val < 2 ^ 16 := by rw [← ecar4]; exact (byteRowSpec_range _ h16p).mp (hcF4 hneg)
-    have cb5 : input_cols_carry[5].val < 2 ^ 16 := by rw [← ecar5]; exact (byteRowSpec_range _ h16p).mp (hcF5 hneg)
-    have cb6 : input_cols_carry[6].val < 2 ^ 16 := by rw [← ecar6]; exact (byteRowSpec_range _ h16p).mp (hcF6 hneg)
-    have cb7 : input_cols_carry[7].val < 2 ^ 16 := by rw [← ecar7]; exact (byteRowSpec_range _ h16p).mp (hcF7 hneg)
-    have cb8 : input_cols_carry[8].val < 2 ^ 16 := by rw [← ecar8]; exact (byteRowSpec_range _ h16p).mp (hcF8 hneg)
-    have cb9 : input_cols_carry[9].val < 2 ^ 16 := by rw [← ecar9]; exact (byteRowSpec_range _ h16p).mp (hcF9 hneg)
-    have cb10 : input_cols_carry[10].val < 2 ^ 16 := by rw [← ecar10]; exact (byteRowSpec_range _ h16p).mp (hcF10 hneg)
-    have cb11 : input_cols_carry[11].val < 2 ^ 16 := by rw [← ecar11]; exact (byteRowSpec_range _ h16p).mp (hcF11 hneg)
-    have cb12 : input_cols_carry[12].val < 2 ^ 16 := by rw [← ecar12]; exact (byteRowSpec_range _ h16p).mp (hcF12 hneg)
-    have cb13 : input_cols_carry[13].val < 2 ^ 16 := by rw [← ecar13]; exact (byteRowSpec_range _ h16p).mp (hcF13 hneg)
-    have cb14 : input_cols_carry[14].val < 2 ^ 16 := by rw [← ecar14]; exact (byteRowSpec_range _ h16p).mp (hcF14 hneg)
-    have cb15 : input_cols_carry[15].val < 2 ^ 16 := by rw [← ecar15]; exact (byteRowSpec_range _ h16p).mp (hcF15 hneg)
+    have cb0 : input_cols_carry[0].val < 2 ^ 16 := by rw [← ecar0]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF0 hneg)
+    have cb1 : input_cols_carry[1].val < 2 ^ 16 := by rw [← ecar1]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF1 hneg)
+    have cb2 : input_cols_carry[2].val < 2 ^ 16 := by rw [← ecar2]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF2 hneg)
+    have cb3 : input_cols_carry[3].val < 2 ^ 16 := by rw [← ecar3]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF3 hneg)
+    have cb4 : input_cols_carry[4].val < 2 ^ 16 := by rw [← ecar4]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF4 hneg)
+    have cb5 : input_cols_carry[5].val < 2 ^ 16 := by rw [← ecar5]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF5 hneg)
+    have cb6 : input_cols_carry[6].val < 2 ^ 16 := by rw [← ecar6]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF6 hneg)
+    have cb7 : input_cols_carry[7].val < 2 ^ 16 := by rw [← ecar7]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF7 hneg)
+    have cb8 : input_cols_carry[8].val < 2 ^ 16 := by rw [← ecar8]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF8 hneg)
+    have cb9 : input_cols_carry[9].val < 2 ^ 16 := by rw [← ecar9]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF9 hneg)
+    have cb10 : input_cols_carry[10].val < 2 ^ 16 := by rw [← ecar10]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF10 hneg)
+    have cb11 : input_cols_carry[11].val < 2 ^ 16 := by rw [← ecar11]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF11 hneg)
+    have cb12 : input_cols_carry[12].val < 2 ^ 16 := by rw [← ecar12]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF12 hneg)
+    have cb13 : input_cols_carry[13].val < 2 ^ 16 := by rw [← ecar13]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF13 hneg)
+    have cb14 : input_cols_carry[14].val < 2 ^ 16 := by rw [← ecar14]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF14 hneg)
+    have cb15 : input_cols_carry[15].val < 2 ^ 16 := by rw [← ecar15]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF15 hneg)
     have pb0 : input_cols_product[0].val < 2 ^ 8 := by rw [← ep0]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG0 hneg)).1
     have pb1 : input_cols_product[1].val < 2 ^ 8 := by rw [← ep1]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG0 hneg)).2
     have pb2 : input_cols_product[2].val < 2 ^ 8 := by rw [← ep2]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 hneg)).1
@@ -647,9 +644,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   obtain ⟨hib, hic, hicols, _hir, _him_mul, _him_mulh, _him_mulhu, _him_mulhsu, _him_mulw⟩ := h_input
   obtain ⟨h_bsd, h_csd, h_bmb, h_cmb, h_pmb, h_gated⟩ := h_spec
   obtain ⟨ecar_eq, eprod_eq, ebl_eq, ecl_eq, _ebm, _ecm, _epm, _ebse, _ecse⟩ := hicols
-  have h16p : (16 : ℕ) < p := by
-    have h := Fact.out (p := 2 ^ 24 < p); have e : (2 : ℕ) ^ 24 = 16777216 := by norm_num
-    omega
   have eb0 : Expression.eval env.toEnvironment input_var_b[0] = input_b[0] := by rw [← hib, Vector.getElem_map]
   have eb1 : Expression.eval env.toEnvironment input_var_b[1] = input_b[1] := by rw [← hib, Vector.getElem_map]
   have eb2 : Expression.eval env.toEnvironment input_var_b[2] = input_b[2] := by rw [← hib, Vector.getElem_map]
@@ -736,22 +730,22 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       rcases hbool with h | h <;> rw [h] <;> (first | rw [ZMod.val_zero] | rw [ZMod.val_one]) <;> norm_num
     exact (byteRowSpec_msb _ _).mpr ⟨⟨hmlt, hhi3⟩, hbool, hiff⟩
   -- 16 carry `slice_range_check_u16` byte pulls
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 0 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 1 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 2 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 3 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 4 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 5 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 6 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 7 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 8 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 9 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 10 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 11 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 12 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 13 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 14 (by norm_num))
-  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 15 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 0 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 1 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 2 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 3 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 4 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 5 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 6 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 7 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 8 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 9 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 10 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 11 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 12 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 13 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 14 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ sixteen_lt).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 15 (by norm_num))
   -- 8 product `slice_range_check_u8` byte-pair pulls
   · exact fun hneg => (byteRowSpec_u8range_pair _ _).mpr
       ⟨(h_gated (neg_inj.mp hneg)).1.2.1 0 (by norm_num), (h_gated (neg_inj.mp hneg)).1.2.1 1 (by norm_num)⟩

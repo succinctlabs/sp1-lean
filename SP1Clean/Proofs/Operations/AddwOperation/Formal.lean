@@ -16,10 +16,6 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-omit [Fact p.Prime] in
-/-- `16 < p`, so the `Range` byte-row width column `16` round-trips through `byteRowSpec_range`. -/
-lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-
 /-- Operand words fit in 64 bits, and `is_real` is binary. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   Word.isU64 input.a ∧ Word.isU64 input.b ∧ (input.is_real = 0 ∨ input.is_real = 1)
@@ -58,7 +54,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     have R1 := hr1 hneg
     rw [← c16] at R1
     show input_cols_value[1].val < 2 ^ 16
-    exact (byteRowSpec_range _ h16p).mp R1
+    exact (byteRowSpec_range _ sixteen_lt).mp R1
   -- The two direct byte pulls are vacuous off-gate. The composed MSB gadget now exposes its empty
   -- requirement list through canonical metadata, so its local assumption does not leak into this tail.
   refine ⟨⟨(h_msb h_msb_as).1, ?_⟩,
@@ -71,8 +67,8 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   refine addwSemantics_of_carries ha hb ?_ ((h_msb h_msb_as).2 hr1eq)
   simp only [RawSpec]
   refine ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, ?_, ?_⟩
-  · rw [← h65536]; exact (byteRowSpec_range _ h16p).mp R0
-  · rw [← h65536]; exact (byteRowSpec_range _ h16p).mp R1
+  · rw [← h65536]; exact (byteRowSpec_range _ sixteen_lt).mp R0
+  · rw [← h65536]; exact (byteRowSpec_range _ sixteen_lt).mp R1
 
 set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
@@ -103,10 +99,10 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   refine ⟨⟨⟨fun hr1 => (key hr1).1.2, hbin⟩, ⟨h_spec.1, fun hr1 => (key hr1).2.2⟩⟩, ?_, ?_, ?_, ?_, ?_⟩
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    rw [← c16]; exact (byteRowSpec_range _ h16p).mpr (key hr1).1.1
+    rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr (key hr1).1.1
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    rw [← c16]; exact (byteRowSpec_range _ h16p).mpr (key hr1).1.2
+    rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr (key hr1).1.2
   · -- SP1's ungated `is_real` boolean gate `is_real * (is_real - 1) = 0`
     rcases hbin with h | h <;> rw [h] <;> simp
   · rcases hbin with h0 | h1
