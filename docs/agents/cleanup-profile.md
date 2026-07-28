@@ -39,7 +39,7 @@ A violation is a defect: revert and re-dispatch.
 2. **Never change a declaration's name or visibility.** Renames are queued only (§6); `private` is
    never added or removed.
 3. **Never delete a declaration.** This kills Phase 5a items 1–3 (mathlib replacement, junk-def
-   inlining, single-use `∃`-lemma inlining).
+   inlining, single-use `∃`-lemma inlining). *Adding* declarations is permitted — see §4a.
 4. **Never touch** `SP1Clean/Extracted/**`, `SP1CleanTest/**/Vectors/**`, `*TraceVectors.lean`,
    `scripts/axiom_probe.lean`, or `SP1Clean.lean` (the root import index). No file moves.
 5. **Never introduce** `native_decide` into `SP1Clean/`, or `skipKernelTC` anywhere.
@@ -82,6 +82,31 @@ Where a declaration's conclusion is a conjunction, **add** `foo_left` / `foo_rig
 better-named projections) proved from the original, and **leave `foo` byte-identical**. Call sites
 may migrate to the projections; none are required to. Nothing is deleted, no statement changes,
 and the original name stays resolvable for `check_report_citations.sh` and the probe globs.
+
+## 4a. Extracted helpers are permitted
+
+Adding a **new** declaration is allowed in exactly two shapes. Nothing existing may change either way.
+
+1. **Additive conjunction split** (§4 above).
+2. **A helper extracted from existing proof bodies** — a shared preamble repeated across sibling
+   lemmas, or the kernel-safe dedup lemma of §9. This is not a loophole: it is the repo's own
+   documented dominant structural win, and `proof-patterns.md` explicitly prescribes extracting a
+   repeated `have` block "as a lemma **over loose variables**" applied symbolically.
+
+Rules for a new helper:
+
+- **Declare it `private`** when it is used only within its own file. (Prohibition §2.2 forbids
+  changing the visibility of an *existing* declaration; a new one may be born `private`.) This also
+  keeps `gen_axiom_probe.py` churn at zero — it skips `private` declarations.
+- **Do not name it to match a probe glob.** Avoid `*faithful*`, `soundness`, `completeness`,
+  `circuit`, `kind`, `correct_*`, `*reaches_sail*`, and the specific names listed in
+  `scripts/gen_axiom_probe.py`. An `_aux`-style name is fine.
+- In `FormalModel/Contracts/DivRem.lean` and `Proofs/Chips/DivRemChip/Cases.lean` **every** named
+  theorem is a probe target, so a non-`private` addition there changes the probe count. Permitted,
+  but say so in your report so the count is regenerated and explained.
+- The helper's conclusion must match the original `have`'s type **character-for-character** where it
+  is a `rw` target (§9) — but see the scope refinement there; the constraint is narrower than it
+  first appears.
 
 > **Probe-count consequence.** `gen_axiom_probe.py` matches *every* named theorem in
 > `FormalModel/Contracts/DivRem.lean` and `Proofs/Chips/DivRemChip/Cases.lean`. New lemmas in those
@@ -168,12 +193,35 @@ Per site:
    recipe (`circuit_proof_start_core`), and "keep hypothesis types folded". Then
    `proof-patterns.md` § "maxHeartbeats: the fold recipe + no-bump discipline". **`#count_heartbeats`
    lies** — measure from the build log.
+**The single highest-value rule, learned on the shift cores: a raised ceiling is usually a proxy for
+a duplicated fact, not term-intrinsic cost.** Look for the repeated `have` before you touch the
+number. `ShiftLeftChip/Core.lean` carried 16 ceilings; its SLLW half was re-deriving `mul_v_val` /
+`hi_lo_val` / `mul_v_add_val` by hand while the SLL half *in the same file* already called them, and
+two residual `nlinarith` calls were re-proving `< 65536` limb bounds that
+`Native/Operations/ShiftBounds.lo_hi_lt` already proves once over loose variables. Fixing the
+duplication dropped 26 `nlinarith` to 3 and made **all 16 ceilings removable**. That is the
+difference between raising a budget and driving the proof to closure.
+
 2. **Classify the cause**, and record any cause not already documented — new ones are expected.
    Known classes: unfolded expensive value (the `circuit_output_eq` fold), unfolded hypothesis type,
    over-broad simp set, missing normalization lemma, metavariable normalization at a decoded row,
    a `rfl`-check cliff.
 3. **Fix the cause, then lower the ceiling.** Try removal first, then the next lower rung. Keep the
    lowest rung that compiles **with no elaboration-time regression**.
+
+**Two methodology rules, both learned the hard way in this campaign — a ladder search that skips
+either one produces wrong answers:**
+
+- **Always run a control at `maxHeartbeats 1`** and confirm it produces real timeout errors. Without
+  it, a "pass" at a low rung may be a cached LSP result rather than a genuine re-elaboration, and you
+  will report a floor that was never tested.
+- **Watch for *masking* sites.** If a producer (`def`) times out, every dependent theorem cascades
+  with `Unknown identifier …` / `Function expected at …` instead of its own timeout — so the
+  dependents' true floors are invisible and they read as "binding" when they may be hundreds of times
+  over. Pin the producer high, ladder the dependents separately, then ladder the producer.
+  `DivRemOperation/OwnAsserts.lean` is the worked case: `def ownAsserts` masked twelve
+  `*_mem_ownAsserts` theorems that all turned out to have floors ≤20k against a declared 8M.
+  A naive ladder **under-removes** here; it does not produce unsound results, just timid ones.
 4. **Budget.** Full ladder search only where the module elaborates <10s in isolation (79% of modules
    are <3s). On the heavies, change a ceiling only when the golf pass already altered that proof,
    and always in a solo batch.
@@ -214,7 +262,13 @@ This repo's own high-yield moves:
   `2^64`/`BitVec` reduction. Extract it over loose variables and apply symbolically — kernel-safe
   because a lemma application instantiates an already-checked body. **Hard constraint:** the
   helper's conclusion must match the original `have`'s type **character-for-character**; it is a
-  downstream `rw` target, and `(16 : ZMod p) - …` is *not* interchangeable with `(16 - … : ZMod p)`.
+  downstream `rw` target.
+
+  *Scope refinement (measured, W1/g2/bH3).* The constraint is about the **ascription position**,
+  which decides which numeral gets elaborated at which type. It is **not** about redundant outer
+  parens: `((16 : ZMod p) - X).val` and `(16 - X : ZMod p).val` elaborate to the same term, and every
+  downstream `rw` fires across that spelling. Treat differing ascription placement as blocking;
+  treat cosmetic parenthesisation as fine. The stricter reading costs real golf for no safety.
   Worked example: `inner_val`/`inner_hi_val` in `Proofs/Chips/ShiftLeftChip/Core.lean`. Leave the
   abstract-`BitVec` helpers (`srl_toNat`/`sra_toNat`) alone.
 - **Line reflow** to ≤100 chars, except where it would rewrite a frozen statement form (§2.8).
@@ -240,7 +294,8 @@ Per gated group, stopping at the first failure:
    - no `-` line on any `theorem`/`lemma`/`def`/`abbrev`/`instance`/`structure` signature;
    - no modification of a pre-existing signature — compare the normalized token stream from the
      declaration keyword to `:=`, before vs after;
-   - a `+` of a brand-new declaration only where the audit declared an additive split (§4).
+   - a `+` of a brand-new declaration only where the audit declared an additive split (§4) or an
+     extracted helper (§4a) — and for a helper, check it is `private` and does not match a probe glob.
 8. **Commit**, one per batch.
 
 At wave boundaries additionally: `lake lint`, `lake test`, `scripts/run_audit.sh`.
