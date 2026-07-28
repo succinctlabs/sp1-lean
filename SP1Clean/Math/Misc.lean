@@ -40,8 +40,7 @@ end Int
     (x : α) (y y' : β x) :
     m.insert x y = m'.insert x y' ↔
       (y = y' ∧ ∀ x', x ≠ x' → m.get? x' = m'.get? x') := by
-  simp [Std.ExtDHashMap.ext_get?_iff,
-    Std.ExtDHashMap.get?_insert]
+  simp [Std.ExtDHashMap.ext_get?_iff, Std.ExtDHashMap.get?_insert]
   refine ⟨fun h => ?_, fun h k => ?_⟩
   · refine ⟨by simpa using h x, fun x' hx' => ?_⟩
     simpa [beq_iff_eq, hx'] using h x'
@@ -53,8 +52,7 @@ end Int
     (m : Std.ExtDHashMap α β)
     (x : α) (y y' : β x) :
     m.insert x y = m.insert x y' ↔ y = y' := by
-  simp [Std.ExtDHashMap.ext_get?_iff,
-    Std.ExtDHashMap.get?_insert]
+  simp [Std.ExtDHashMap.ext_get?_iff, Std.ExtDHashMap.get?_insert]
   refine ⟨fun h => ?_, fun h k => ?_⟩
   · simpa using h x
   · split_ifs <;> simp [h]
@@ -68,10 +66,7 @@ instance Fin.noZeroDivisors_of_prime (p : ℕ)
     (m.insert a b).insert a b' = m.insert a b' := by
   refine Std.ExtDHashMap.ext_get? fun a' => ?_
   simp [Std.ExtDHashMap.get?_insert]
-  by_cases h : a = a'
-  · induction h
-    simp
-  · simp [h]
+  by_cases h : a = a' <;> simp [h]
 
 @[simp] theorem Std.ExtDHashMap.insert_insert_comm [BEq α] [Hashable α] [LawfulBEq α]
     (m : Std.ExtDHashMap α β) (a a' : α) (b : β a) (b' : β a') (h : a ≠ a') :
@@ -79,17 +74,12 @@ instance Fin.noZeroDivisors_of_prime (p : ℕ)
   refine Std.ExtDHashMap.ext_get? fun x => ?_
   simp [get?_insert]
   split_ifs
-  · refine (h ?_).elim
-    aesop
-  · aesop
-  · aesop
-  · aesop
+  · exact (h (by aesop)).elim
+  all_goals rfl
 
 instance : Fintype (BitVec n) where
-  elems := Finset.image (BitVec.ofFin) Finset.univ
-  complete := by
-    intro x
-    simp [Finset.mem_image]
+  elems := Finset.image BitVec.ofFin Finset.univ
+  complete x := by simp [Finset.mem_image]
 
 section toBatteries
 
@@ -112,12 +102,11 @@ theorem modify_bind_get_bind_of_forall_eq (f : σ → σ)
 
 @[simp]
 lemma insert_insert_insert_cancel {α : Type _} {β : α → Type _}
-  [BEq α] [LawfulBEq α] [Hashable α] (m : Std.ExtDHashMap α β)
+    [BEq α] [LawfulBEq α] [Hashable α] (m : Std.ExtDHashMap α β)
     (a₁ a₂ : α) {v v' : β a₁} (w : β a₂) :
     ((m.insert a₁ v).insert a₂ w).insert a₁ v' =
       (m.insert a₂ w).insert a₁ v' := by
-  refine Std.ExtDHashMap.ext_get? ?_
-  intro k
+  refine Std.ExtDHashMap.ext_get? fun k => ?_
   aesop (add safe (by rw [Std.ExtDHashMap.get?_insert]))
 
 end back
@@ -128,15 +117,15 @@ end LawfulMonadStateOf
 
 namespace StateT
 
-/-- `StateT` is has lawful state operations. This is applied for `StateM` as well do
-to the reducibility of that definition. -/
+/-- `StateT` has lawful state operations. This applies to `StateM` as well, due to the
+reducibility of that definition. -/
 instance {m σ} [Monad m] [LawfulMonad m] : LawfulMonadStateOf σ (StateT σ m) where
   modifyGet_eq f := StateT.ext fun s => by simp
   get_bind_const mx := StateT.ext fun s => by simp
   get_bind_get_bind mx := StateT.ext fun s => by simp
   get_bind_set_bind mx := StateT.ext fun s => by simp
-  set_bind_get s := StateT.ext fun s => by simp
-  set_bind_set s s' := StateT.ext fun s => by simp
+  set_bind_get _ := StateT.ext fun s => by simp
+  set_bind_set _ _ := StateT.ext fun s => by simp
 
 end StateT
 

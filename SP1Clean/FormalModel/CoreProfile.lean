@@ -9,16 +9,18 @@ files happen to exist.  Generated extraction metadata must prove that it has exa
 before it can instantiate the full Core AIR relation.
 
 The target is the trusted/supervisor baseline Core cluster and its separate memory-boundary cluster.
-The optional retention extensions, user-mode `mprotect` clusters, and precompile clusters are distinct
-profiles; silently admitting one of those tables into this profile would change the theorem. -/
+The optional retention extensions, user-mode `mprotect` clusters, and precompile clusters are
+distinct profiles; silently admitting one of those tables into this profile would change the
+theorem. -/
 
 namespace SP1Clean.CoreProfile
 
-/-- Exact Rust checkout used as the current semantic ground truth.  The extraction compiler still has
-its own separately audited provenance until its patches have been rebased and regenerated. -/
+/-- Exact Rust checkout used as the current semantic ground truth.  The extraction compiler still
+has its own separately audited provenance until its patches have been rebased and regenerated. -/
 def sp1SemanticRevision : String := "a630089d9ff484ec6f2feade8d0afbb1447eed11"
 
-/-- Human-readable description emitted by `git describe --tags --always` at the semantic revision. -/
+/-- Human-readable description emitted by `git describe --tags --always` at the semantic
+revision. -/
 def sp1SemanticDescription : String := "v6.3.1-8-ga630089d9"
 
 /-- Generated AIR artifacts and the hand-audited profile name the same unmodified Rust source. -/
@@ -65,8 +67,9 @@ inductive Table
   | memoryGlobalFinalize
 deriving DecidableEq, Repr
 
-/-- The exact `MachineAir::name` spelling used in Rust.  Extraction compares names at the whole-table
-boundary, so enum-variant spellings such as Rust's `MemoryGlobalFinal` are deliberately irrelevant. -/
+/-- The exact `MachineAir::name` spelling used in Rust.  Extraction compares names at the
+whole-table boundary, so enum-variant spellings such as Rust's `MemoryGlobalFinal` are deliberately
+irrelevant. -/
 def Table.airName : Table → String
   | .program => "Program"
   | .byteLookup => "Byte"
@@ -160,16 +163,17 @@ def preprocessedTables : List Table := [.program, .byteLookup, .rangeLookup]
 
 /-- The 25 instruction tables in the baseline trusted Core cluster. -/
 def instructionTables : List Table :=
-  [ .divRem, .add, .addi, .addw, .sub, .subw, .bitwise, .mul, .shiftRight,
+  [.divRem, .add, .addi, .addw, .sub, .subw, .bitwise, .mul, .shiftRight,
     .shiftLeft, .lt, .aluX0, .loadByte, .loadHalf, .loadWord, .loadDouble, .loadX0,
-    .storeByte, .storeHalf, .storeWord, .storeDouble, .uType, .branch, .jal, .jalr ]
+    .storeByte, .storeHalf, .storeWord, .storeDouble, .uType, .branch, .jal, .jalr]
 
 /-- Non-instruction tables in the baseline trusted Core cluster. -/
 def coreSystemTables : List Table :=
   [.syscallCore, .syscallInstrs, .memoryBump, .stateBump, .memoryLocal, .global]
 
-/-- Exact table set of the baseline trusted Core cluster.  The order here is explanatory; Rust stores
-the cluster in a `BTreeSet`, so equality with extraction is set/no-dup equality, not list order. -/
+/-- Exact table set of the baseline trusted Core cluster.  The order here is explanatory; Rust
+stores the cluster in a `BTreeSet`, so equality with extraction is set/no-dup equality, not list
+order. -/
 def coreCluster : List Table :=
   preprocessedTables ++ [.syscallCore] ++ instructionTables ++
     [.syscallInstrs, .memoryBump, .stateBump, .memoryLocal, .global]

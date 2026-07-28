@@ -3,9 +3,9 @@ import Mathlib.Data.Set.Basic
 /-! # Witness relations and their languages
 
 AIR soundness is most naturally a refinement between two witness relations.  The left relation says
-that a public statement has a valid algebraic witness; the right says that it has a semantic execution
-witness.  Keeping both witnesses explicit avoids conflating an AIR theorem with a proof-system
-verifier theorem. -/
+that a public statement has a valid algebraic witness; the right says that it has a semantic
+execution witness.  Keeping both witnesses explicit avoids conflating an AIR theorem with a
+proof-system verifier theorem. -/
 
 namespace SP1Clean.WitnessRelation
 
@@ -21,7 +21,8 @@ def asSet {Public : Type u} {Witness : Type v} (relation : Relation Public Witne
   { pair | relation pair.1 pair.2 }
 
 /-- The public language obtained by existentially hiding a relation's witness. -/
-def language {Public : Type u} {Witness : Type v} (relation : Relation Public Witness) : Set Public :=
+def language {Public : Type u} {Witness : Type v} (relation : Relation Public Witness) :
+    Set Public :=
   { statement | ∃ witness, relation statement witness }
 
 @[simp] theorem mem_asSet_iff {Public : Type u} {Witness : Type v}
@@ -61,9 +62,9 @@ structure FunctionalRefinement {Public : Type u} {AIRWitness : Type v}
 theorem FunctionalRefinement.sound {Public : Type u} {AIRWitness : Type v}
     {ExecutionWitness : Type w} {air : Relation Public AIRWitness}
     {execution : Relation Public ExecutionWitness}
-    (refinement : FunctionalRefinement air execution) : Sound air execution := by
-  intro statement airWitness valid
-  exact ⟨refinement.map statement airWitness, refinement.map_valid statement airWitness valid⟩
+    (refinement : FunctionalRefinement air execution) : Sound air execution :=
+  fun statement airWitness valid =>
+    ⟨refinement.map statement airWitness, refinement.map_valid statement airWitness valid⟩
 
 /-- Constructive refinements compose without introducing a choice axiom. -/
 def FunctionalRefinement.trans {Public : Type u} {Witness₁ : Type v} {Witness₂ : Type w}
@@ -87,9 +88,9 @@ def Complete {Public : Type u} {AIRWitness : Type v} {ExecutionWitness : Type w}
   ∀ statement executionWitness, execution statement executionWitness →
     ∃ airWitness, air statement airWitness
 
-/-- Bidirectional correctness of two witness relations.  Soundness is the release-critical direction;
-whole-machine completeness may remain an explicitly disclosed admission while trace generation is
-being verified. -/
+/-- Bidirectional correctness of two witness relations.  Soundness is the release-critical
+direction; whole-machine completeness may remain an explicitly disclosed admission while trace
+generation is being verified. -/
 structure Correct {Public : Type u} {AIRWitness : Type v} {ExecutionWitness : Type w}
     (air : Relation Public AIRWitness) (execution : Relation Public ExecutionWitness) : Prop where
   sound : Sound air execution
@@ -102,10 +103,8 @@ theorem Sound.trans {Public : Type u} {Witness₁ : Type v} {Witness₂ : Type w
     {relation₁ : Relation Public Witness₁} {relation₂ : Relation Public Witness₂}
     {relation₃ : Relation Public Witness₃}
     (h₁₂ : Sound relation₁ relation₂) (h₂₃ : Sound relation₂ relation₃) :
-    Sound relation₁ relation₃ := by
-  intro statement witness₁ h₁
-  obtain ⟨witness₂, h₂⟩ := h₁₂ statement witness₁ h₁
-  exact h₂₃ statement witness₂ h₂
+    Sound relation₁ relation₃ :=
+  fun statement witness₁ h₁ => (h₁₂ statement witness₁ h₁).elim (h₂₃ statement)
 
 /-- Turn an existential refinement proof into the deterministic post-processing function expected by
 an extraction framework.  This is the only choice made at the AIR/ArkLib boundary; the accompanying
@@ -127,17 +126,15 @@ theorem Sound.extract_valid {Public : Type u} {Witness₁ : Type v} {Witness₂ 
 theorem Sound.language_subset {Public : Type u} {AIRWitness : Type v} {ExecutionWitness : Type w}
     {air : Relation Public AIRWitness} {execution : Relation Public ExecutionWitness}
     (sound : Sound air execution) :
-    language air ⊆ language execution := by
-  rintro statement ⟨airWitness, valid⟩
-  exact sound statement airWitness valid
+    language air ⊆ language execution :=
+  fun statement ⟨airWitness, valid⟩ => sound statement airWitness valid
 
 /-- Witness-producing completeness gives the converse public-language inclusion. -/
 theorem Complete.language_subset {Public : Type u} {AIRWitness : Type v} {ExecutionWitness : Type w}
     {air : Relation Public AIRWitness} {execution : Relation Public ExecutionWitness}
     (complete : Complete air execution) :
-    language execution ⊆ language air := by
-  rintro statement ⟨executionWitness, valid⟩
-  exact complete statement executionWitness valid
+    language execution ⊆ language air :=
+  fun statement ⟨executionWitness, valid⟩ => complete statement executionWitness valid
 
 theorem Correct.language_eq {Public : Type u} {AIRWitness : Type v} {ExecutionWitness : Type w}
     {air : Relation Public AIRWitness} {execution : Relation Public ExecutionWitness}

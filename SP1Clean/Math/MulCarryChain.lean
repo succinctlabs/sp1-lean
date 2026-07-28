@@ -52,9 +52,8 @@ theorem carry_le (cp : ℕ → ℕ) (hcp : ∀ i, cp i ≤ cpBound) :
     omega
 
 /-- The product byte is always a genuine byte (`< 256`). -/
-theorem product_lt (cp : ℕ → ℕ) (i : ℕ) : product cp i < 256 := by
-  simp only [product]
-  exact Nat.mod_lt _ (by omega)
+theorem product_lt (cp : ℕ → ℕ) (i : ℕ) : product cp i < 256 :=
+  Nat.mod_lt _ (by omega)
 
 /-- The carry stays below the `2^16` range-check bound. -/
 theorem carry_lt (cp : ℕ → ℕ) (hcp : ∀ i, cp i ≤ cpBound) (i : ℕ) :
@@ -109,8 +108,8 @@ theorem carry_val [NeZero p] (cp : ℕ → ℕ) (hcp : ∀ i, cp i ≤ cpBound)
   have := carry_lt cp hcp i
   exact ZMod.val_natCast_of_lt (by omega)
 
-/-- The product byte cast into `ZMod p` round-trips through `.val`, giving the `< 256` range fact the
-product lookups need. -/
+/-- The product byte cast into `ZMod p` round-trips through `.val`, giving the `< 256` range fact
+the product lookups need. -/
 theorem product_val [NeZero p] (cp : ℕ → ℕ) (hp : 256 < p) (i : ℕ) :
     (((product cp i : ℕ) : ZMod p)).val = product cp i := by
   have := product_lt cp i
@@ -144,8 +143,8 @@ theorem cpNat_le_cpBound (b c : ℕ → ℕ) (k : ℕ) (hk : k ≤ 15)
 
 /-- When the left stream `b` has support in `[0,15]` (vanishes past index 15), the byte convolution
 meets `cpBound` at *every* limb `k` — not only `k ≤ 15`: at most 16 terms are nonzero (those with
-`i ≤ 15`), each a product of two bytes (`≤ 255 · 255`). This is the *total* hypothesis the carry-chain
-range lemmas (`carry_lt`/`carry_val`) require. -/
+`i ≤ 15`), each a product of two bytes (`≤ 255 · 255`). This is the *total* hypothesis the
+carry-chain range lemmas (`carry_lt`/`carry_val`) require. -/
 theorem cpNat_le_cpBound_total (b c : ℕ → ℕ) (hb : ∀ i, b i ≤ 255) (hc : ∀ i, c i ≤ 255)
     (hb0 : ∀ i, 16 ≤ i → b i = 0) (k : ℕ) :
     cpNat b c k ≤ cpBound := by
