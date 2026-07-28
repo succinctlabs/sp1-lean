@@ -89,9 +89,7 @@ theorem MemoryMsg.locOf_register [Fact p.Prime] [Fact (2 ^ 17 < p)]
   unfold MemoryMsg.locOf
   rw [← addr0, addr1, addr2]
   have indexLtP : index.toNat < p := by
-    have indexLt : index.toNat < 32 := index.isLt
-    have := Fact.out (p := 2 ^ 17 < p)
-    omega
+    have := index.isLt; have := Fact.out (p := 2 ^ 17 < p); omega
   simp only [ZMod.val_natCast, Nat.mod_eq_of_lt indexLtP, index.isLt, true_and, if_true,
     BitVec.ofNat_toNat, BitVec.setWidth_eq]
 
@@ -127,15 +125,12 @@ theorem sailChain_of_chainState {s0 s : SailState} :
   induction k generalizing s with
   | zero => intro h; cases h; exact .refl s0
   | succ k ih =>
-    intro h
-    change (Machine.trajectory s0 k).bind Machine.stepOnce = some s at h
+    intro h; change (Machine.trajectory s0 k).bind Machine.stepOnce = some s at h
     rcases hbind : Machine.trajectory s0 k with _ | s'
     · rw [hbind] at h; cases h
-    · rw [hbind, Option.bind_some] at h
-      unfold Machine.stepOnce at h
+    · rw [hbind, Option.bind_some] at h; unfold Machine.stepOnce at h
       rcases hrun : (try_step 0 false).run s' with b | e
-      · rw [hrun] at h; cases h
-        exact (ih hbind).snoc ⟨_, hrun⟩
+      · rw [hrun] at h; cases h; exact (ih hbind).snoc ⟨_, hrun⟩
       · rw [hrun] at h; cases h
 
 /-- The front-step unfolding: `chainState` is defined by appending at the tail, but a chain peels at
@@ -144,14 +139,8 @@ theorem chainState_succ_front {s0 s1 : SailState} (h : stepOnce s0 = some s1) :
     ∀ k, chainState s0 (k + 1) = chainState s1 k := by
   intro k
   induction k with
-  | zero =>
-    change Machine.stepOnce s0 = some s1
-    exact h
-  | succ k ih =>
-    change (Machine.trajectory s0 (k + 1)).bind Machine.stepOnce =
-      (Machine.trajectory s1 k).bind Machine.stepOnce
-    change Machine.trajectory s0 (k + 1) = Machine.trajectory s1 k at ih
-    rw [ih]
+  | zero => exact h
+  | succ k ih => exact congrArg (·.bind Machine.stepOnce) ih
 
 /-- Determinism, the other direction: a `SailChain` forces the `chainState` value. -/
 theorem chainState_of_sailChain {s0 s : SailState} :
@@ -161,11 +150,8 @@ theorem chainState_of_sailChain {s0 s : SailState} :
   | refl s => rfl
   | @step n s s' _ hstep _ ih =>
     obtain ⟨b, hrun⟩ := hstep
-    have hstep1 : Machine.stepOnce s = some s' := by
-      unfold Machine.stepOnce
-      rw [hrun]
-    rw [chainState_succ_front hstep1 n]
-    exact ih
+    have hstep1 : Machine.stepOnce s = some s' := by unfold Machine.stepOnce; rw [hrun]
+    rw [chainState_succ_front hstep1 n]; exact ih
 
 /-! ## The location content at a micro-time -/
 

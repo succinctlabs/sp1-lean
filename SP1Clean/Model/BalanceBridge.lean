@@ -54,8 +54,7 @@ theorem isConsistentBalanced_of_intCast_zero {p : ℕ} [NeZero p]
   have hdvd : (p : ℤ) ∣ multiplicitySum accesses k :=
     (ZMod.intCast_zmod_eq_zero_iff_dvd _ p).mp (hmod k)
   have hbound : |multiplicitySum accesses k| ≤ ((filterKey accesses k).map multOf).length := by
-    apply abs_sum_le_length_of_binary
-    intro x hx
+    refine abs_sum_le_length_of_binary _ fun x hx => ?_
     obtain ⟨a, ha, rfl⟩ := List.mem_map.mp hx
     exact hbin a (List.mem_of_mem_filter ha)
   have hlen2 : ((filterKey accesses k).map multOf).length ≤ accesses.length := by
@@ -94,20 +93,16 @@ theorem intCast_multiplicitySum_map_toAccess
     (h_zero : ∀ msg : Array (ZMod p), balanceOf interactions msg = 0)
     (k : LookupKey) :
     ((multiplicitySum (interactions.map Interaction.toAccess) k : ℤ) : ZMod p) = 0 := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).ne_zero⟩
   by_cases h_ex : ∃ i ∈ interactions, keyOf (Interaction.toAccess i) = k
   · obtain ⟨i₀, hi₀, hk₀⟩ := h_ex
     have h_pred : ∀ i ∈ interactions,
         decide (keyOf (Interaction.toAccess i) = k) = decide (i.msg = i₀.msg) := by
       intro i hi
       rw [decide_eq_decide, ← hk₀]
-      constructor
-      · intro h
-        have h3 : i.msg.toList.map ZMod.val = i₀.msg.toList.map ZMod.val :=
-          congrArg (fun t => t.2.2) h
-        exact Array.toList_inj.mp (List.map_injective_iff.mpr (ZMod.val_injective p) h3)
-      · intro h
-        simp only [Interaction.toAccess, keyOf, h_channel i hi, h_channel i₀ hi₀, h]
+      refine ⟨fun h => ?_, fun h => ?_⟩
+      · exact Array.toList_inj.mp (List.map_injective_iff.mpr (ZMod.val_injective p)
+          (congrArg (fun t => t.2.2) h))
+      · simp only [Interaction.toAccess, keyOf, h_channel i hi, h_channel i₀ hi₀, h]
     have h_filter : (interactions.map Interaction.toAccess).filter (fun a => keyOf a = k)
         = (interactions.filter (fun i => i.msg = i₀.msg)).map Interaction.toAccess := by
       rw [List.filter_map]
@@ -115,16 +110,14 @@ theorem intCast_multiplicitySum_map_toAccess
     calc ((multiplicitySum (interactions.map Interaction.toAccess) k : ℤ) : ZMod p)
         = ((((interactions.filter (fun i => i.msg = i₀.msg)).map
             (fun i => signedVal i.mult)).sum : ℤ) : ZMod p) := by
-          rw [multiplicitySum, filterKey, h_filter, List.map_map]
-          rfl
+          rw [multiplicitySum, filterKey, h_filter, List.map_map]; rfl
       _ = ((interactions.filter (fun i => i.msg = i₀.msg)).map (fun i => i.mult)).sum := by
           rw [intCast_list_sum, List.map_map]
           exact congrArg List.sum (List.map_congr_left fun i _ => intCast_signedVal i.mult)
       _ = balanceOf interactions i₀.msg := rfl
       _ = 0 := h_zero i₀.msg
   · have h0 : multiplicitySum (interactions.map Interaction.toAccess) k = 0 := by
-      apply multiplicitySum_eq_zero_of_keyOf_ne
-      intro a ha hak
+      refine multiplicitySum_eq_zero_of_keyOf_ne fun a ha hak => ?_
       obtain ⟨i, hi, rfl⟩ := List.mem_map.mp ha
       exact h_ex ⟨i, hi, hak⟩
     rw [h0, Int.cast_zero]
@@ -144,13 +137,10 @@ theorem isConsistentBalanced_of_balancedInteractions
     (h_bal : BalancedInteractions interactions)
     (h_bin : ∀ a ∈ accesses, multOf a = -1 ∨ multOf a = 0 ∨ multOf a = 1) :
     isConsistentBalanced accesses := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).ne_zero⟩
   refine isConsistentBalanced_of_intCast_zero (p := p) accesses ?_ h_bin ?_
   · rcases h_bal.1 with hlt | hchar
-    · rw [h_perm.length_eq, List.length_map]
-      rwa [ZMod.ringChar_zmod_n] at hlt
-    · rw [ZMod.ringChar_zmod_n] at hchar
-      exact absurd hchar (Fact.out (p := p.Prime)).ne_zero
+    · rw [h_perm.length_eq, List.length_map]; rwa [ZMod.ringChar_zmod_n] at hlt
+    · rw [ZMod.ringChar_zmod_n] at hchar; exact absurd hchar (Fact.out (p := p.Prime)).ne_zero
   · intro k
     rw [multiplicitySum_perm _ _ h_perm k]
     exact intCast_multiplicitySum_map_toAccess interactions channel h_channel h_bal.2 k

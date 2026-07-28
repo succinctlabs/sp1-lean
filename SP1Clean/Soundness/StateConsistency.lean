@@ -125,12 +125,9 @@ theorem traceStateValid_of_stateLink (rows : List (Trace.RowView (ZMod p)))
 its signed contributions have multiplicity 0. The emission is genuinely `is_real`-gated, matching SP1's
 `send/receive … is_real`. -/
 theorem stateLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_real = 0) :
-    ∀ k, multiplicitySum (stateLookups r) k = 0 := by
-  have hz : ((stateAccess r).is_real.val : ℤ) = 0 := by
-    simp only [stateAccess, h, ZMod.val_zero, Nat.cast_zero]
-  intro k
-  simp only [stateLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, hz, neg_zero,
-    ite_self, add_zero]
+    ∀ k, multiplicitySum (stateLookups r) k = 0 := fun _ => by
+  simp only [stateLookups, stateAccess, multiplicitySum_cons, multiplicitySum_nil, multOf, h,
+    ZMod.val_zero, Nat.cast_zero, neg_zero, ite_self, add_zero]
 
 /-- **Gated multiplicities are `{-1, 0, 1}`.** For a binary `is_real` row, both `stateLookups`
 contributions carry multiplicity `±is_real.val ∈ {-1, 0, 1}` — the multiplicity bound the field → ℤ
@@ -188,10 +185,8 @@ theorem state_successor_of_balance [NeZero p]
     refine ⟨hbne, ZMod.val_injective p hch, ZMod.val_injective p hcl, ?_⟩
     apply Vector.ext; intro i hi
     rcases i with _ | _ | _ | i
-    · exact ZMod.val_injective p hp0
-    · exact ZMod.val_injective p hp1
-    · exact ZMod.val_injective p hp2
-    · exact absurd hi (by omega)
+    exacts [ZMod.val_injective p hp0, ZMod.val_injective p hp1, ZMod.val_injective p hp2,
+      absurd hi (by omega)]
   · -- the send of `b`: its multiplicity is `+is_real.val ≥ 0`, contradicting `multOf bacc < 0`
     simp only [multOf] at hbacc_neg
     exact absurd hbacc_neg (not_lt.mpr (by positivity))
@@ -261,8 +256,7 @@ theorem clkInjective_getElem {rows : List (Trace.RowView (ZMod p))}
     (h_clk : (stateAccess rows[i]).clk_high * (2 ^ 24 : ZMod p) + (stateAccess rows[i]).clk_low =
         (stateAccess rows[j]).clk_high * (2 ^ 24 : ZMod p) + (stateAccess rows[j]).clk_low) :
     i = j := by
-  have hlen : (aggregateStateAccesses rows).length = rows.length := by
-    simp [aggregateStateAccesses]
+  have hlen : (aggregateStateAccesses rows).length = rows.length := by simp [aggregateStateAccesses]
   have key := h_inj ⟨i, by rw [hlen]; exact hi⟩ ⟨j, by rw [hlen]; exact hj⟩
   simp only [aggregateStateAccesses, List.get_eq_getElem, List.getElem_map] at key
   exact congrArg Fin.val (key h_clk)
@@ -294,8 +288,7 @@ theorem state_adjacent_pc_handoff [NeZero p]
   have h_eq : (stateAccess b').clk_high * (2 ^ 24 : ZMod p) + (stateAccess b').clk_low =
       (stateAccess (rows[i + 1]'hi1)).clk_high * (2 ^ 24 : ZMod p) +
         (stateAccess (rows[i + 1]'hi1)).clk_low := by
-    have hch : (stateAccess b').clk_high = (stateAccess (rows[i]'hi)).clk_high := by
-      simp only [stateAccess]; exact hb'_ch
+    have hch : (stateAccess b').clk_high = (stateAccess (rows[i]'hi)).clk_high := hb'_ch
     rw [hch, hb'_cl, ← h_clkadv, add_assoc]
   -- pin b' to the adjacent row index
   obtain ⟨k, hk, hk_eq⟩ := List.getElem_of_mem hb'_mem
