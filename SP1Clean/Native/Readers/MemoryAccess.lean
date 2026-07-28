@@ -127,27 +127,16 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
       ([.assert _, .subcircuit _, .subcircuit _, .subcircuit _, .interact _, .interact _,
         .interact _, .interact _] : Operations (ZMod p))
         [byteChannel.toRaw, memoryChannel.toRaw]
-    refine ⟨?_, ?_, ?_⟩
-    · intro channel h_channel
-      simp only [circuit_norm] at h_channel
-    · intro env
-      rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
-      intro interaction h_interaction
-      simp only [Operations.shallowInteractions_assert,
-        Operations.shallowInteractions_subcircuit, Operations.shallowInteractions_interact,
-        Operations.shallowInteractions_nil,
-        List.mem_cons, List.not_mem_nil, or_false] at h_interaction
-      rcases h_interaction with rfl | rfl | rfl | rfl
-      · exact Or.inl List.mem_cons_self
-      · exact Or.inl List.mem_cons_self
-      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
-      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
-    · rw [Operations.subcircuitChannelsLawful_iff_forall]
-      intro subcircuit h_subcircuit
-      simp only [Operations.subcircuits_assert, Operations.subcircuits_subcircuit,
-        Operations.subcircuits_interact, Operations.subcircuits_nil, List.mem_cons,
-        List.not_mem_nil, or_false] at h_subcircuit
-      rcases h_subcircuit with rfl | rfl | rfl <;> simp only [circuit_norm]
+    refine ⟨by simp only [circuit_norm], ?_, by simp only [circuit_norm]⟩
+    intro env
+    rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
+    intro interaction h_interaction
+    simp only [circuit_norm] at h_interaction
+    rcases h_interaction with rfl | rfl | rfl | rfl
+    · exact Or.inl List.mem_cons_self
+    · exact Or.inl List.mem_cons_self
+    · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+    · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
@@ -189,7 +178,6 @@ def ProverAssumptionsD (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD SpecD := by
   circuit_proof_start
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, AssumptionsD, SpecD, byteChannel, memoryChannel, MemoryMsg.isU64,
     MemoryMsg.ClkBound] at h_holds h_assumptions ⊢
   -- the leading `_` is the inline `is_real` boolean gate (unused in soundness — `Assumptions` already gives
@@ -210,18 +198,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main AssumptionsD Sp
   -- iota-reduces them to the destructured atoms (`selCur`/`selPrev` stay folded) so the `rw`s below match.
   dsimp only at hr1 ⊢
   rw [hr1, one_mul] at a1 a2 a3
-  have hb4 := b4 (by rw [hr1]); rw [← c16] at hb4
-  have hb5 := b5 (by rw [hr1])
-  refine ⟨bool_of_mul_pred a1, ?_, ?_, (byteRowSpec_range _ h16p).mp hb4,
-    ((byteRowSpec_u8range_pair _ _).mp hb5).1, (h_mem (by rw [hr1])).1, (h_mem (by rw [hr1])).2⟩
-  · exact a2
-  · simp only [selCur, selPrev]; linear_combination a3
+  refine ⟨bool_of_mul_pred a1, a2, ?_,
+    (byteRowSpec_range _ h16p).mp (by rw [Nat.cast_ofNat]; exact b4 (by rw [hr1])),
+    ((byteRowSpec_u8range_pair _ _).mp (b5 (by rw [hr1]))).1, h_mem (by rw [hr1])⟩
+  simp only [selCur, selPrev]; linear_combination a3
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD
       (fun _ _ _ => True) := by
   circuit_proof_start
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [ProverAssumptionsD] at h_assumptions
   obtain ⟨h_assumptions, h_spec⟩ := h_assumptions
   simp only [circuit_norm, byteChannel, memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound]
@@ -232,28 +217,22 @@ theorem completeness :
   rcases hbin with h0 | h1
   · -- padding row (`is_real = 0`): the leading gate + every gated assert is `0 · _`, the byte/memory pulls
     -- fire only off-padding.
-    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-    · simp only [h0, zero_mul]
-    · simp only [h0, zero_mul]
-    · simp only [h0, zero_mul]
-    · simp only [h0, zero_mul]
-    · intro h; have h1 := neg_inj.mp h; rw [h0] at h1; exact absurd h1 zero_ne_one
-    · intro h; have h1 := neg_inj.mp h; rw [h0] at h1; exact absurd h1 zero_ne_one
-    · intro h; have h1 := neg_inj.mp h; rw [h0] at h1; exact absurd h1 zero_ne_one
+    have hne : ∀ {P : Prop}, - input_is_real = -1 → P :=
+      fun h => absurd (neg_inj.mp h) (by rw [h0]; exact zero_ne_one)
+    refine ⟨?_, ?_, ?_, ?_, hne, hne, hne⟩ <;> simp only [h0, zero_mul]
   · -- real row (`is_real = 1`): the asserts come from the `Spec` facts, the byte pulls from its ranges, the
     -- memory pull from its `isU64 prev_value` + G1 `prev_low` clock-bound conjuncts.
     obtain ⟨hcl, ha2, ha3, hd_low, hd_high, hisu, hclk⟩ := h_spec h1
     -- the `Spec`-derived facts carry the reassembled `{record}.field` projections; `dsimp only` reduces
     -- them to atoms (`selCur`/`selPrev` stay folded) so the `rw`/`linear_combination`s below match.
-    dsimp only at hcl ha2 ha3 hd_low hd_high hisu hclk
     dsimp only at *
     simp only [selCur, selPrev] at ha3
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-    · simp [h1]
+    · simp only [h1, sub_self, mul_zero]
     · rw [h1, one_mul]; rcases hcl with h | h <;> rw [h] <;> ring
     · rw [h1, one_mul]; linear_combination ha2
     · rw [h1, one_mul]; linear_combination ha3
-    · intro _; rw [← c16]; exact (byteRowSpec_range _ h16p).mpr hd_low
+    · intro _; simpa only [Nat.cast_ofNat] using (byteRowSpec_range _ h16p).mpr hd_low
     · intro _; exact (byteRowSpec_u8range_pair _ _).mpr ⟨hd_high, by rw [ZMod.val_zero]; norm_num⟩
     · intro _; exact ⟨hisu, hclk⟩
 
@@ -274,17 +253,13 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
           .interact _, .interact _] : Operations (ZMod p))
           [byteChannel.toRaw, memoryChannel.toRaw] [memoryChannel.toRaw]
       dsimp only [Operations.RequirementsChannelsLawful]
-      refine ⟨?_, ?_, ?_⟩
+      refine ⟨by simp only [circuit_norm], ?_, ?_⟩
       · intro channel h_channel
+        -- `circuit_norm`'s `or_self` collapses the trailing duplicate: a 3- not 4-way split.
         simp only [circuit_norm] at h_channel
-      · intro channel h_channel
-        simp only [Operations.shallowChannels_assert, Operations.shallowChannels_subcircuit,
-          Operations.shallowChannels_interact,
-          Operations.shallowChannels_nil, List.mem_cons, List.not_mem_nil, or_false] at h_channel
-        rcases h_channel with rfl | rfl | rfl | rfl
+        rcases h_channel with rfl | rfl | rfl
         · exact Or.inl List.mem_cons_self
         · exact Or.inl List.mem_cons_self
-        · exact Or.inr List.mem_cons_self
         · exact Or.inr List.mem_cons_self
       · intro env h_constraints
         have h_bool : (ProvableStruct.eval env input_var).is_real = 0 ∨
@@ -293,23 +268,15 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
           simpa only [circuit_norm] using h_constraints.1
         rw [Operations.inChannelsOrRequirements_iff_forall_mem]
         intro interaction h_interaction
-        simp only [Operations.shallowInteractions_assert,
-          Operations.shallowInteractions_subcircuit, Operations.shallowInteractions_interact,
-          Operations.shallowInteractions_nil,
-          List.mem_cons, List.not_mem_nil, or_false] at h_interaction
-        rcases h_interaction with rfl | rfl | rfl | rfl
-        · right
-          rw [ChannelInteraction.toRaw_requirements]
-          intro h1 h0
-          simp only [circuit_norm] at h1 h0
-          exact off_gate_vacuous h_bool h1 h0
-        · right
-          rw [ChannelInteraction.toRaw_requirements]
-          intro h1 h0
-          simp only [circuit_norm] at h1 h0
-          exact off_gate_vacuous h_bool h1 h0
-        · exact Or.inl List.mem_cons_self
-        · exact Or.inl List.mem_cons_self }
+        simp only [circuit_norm] at h_interaction
+        -- The two byte pulls and the memory read-prior pull are `is_real`-gated, so their
+        -- requirement is off-gate vacuous; only the memory **push** (unnegated multiplicity
+        -- `is_real`) has to be delegated to `channelsWithRequirements`.
+        rcases h_interaction with rfl | rfl | rfl | rfl <;>
+          first
+            | (right; rw [ChannelInteraction.toRaw_requirements]; intro h1 h0;
+               simp only [circuit_norm] at h1 h0; exact off_gate_vacuous h_bool h1 h0)
+            | exact Or.inl List.mem_cons_self }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

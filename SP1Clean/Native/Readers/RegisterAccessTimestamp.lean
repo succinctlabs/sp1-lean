@@ -85,23 +85,13 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
     intro input offset
     change Operations.ChannelsLawful
       ([.assert _, .interact _, .interact _] : Operations (ZMod p)) [byteChannel.toRaw]
-    refine ⟨?_, ?_, ?_⟩
-    · intro channel h_channel
-      simp only [Operations.subcircuitChannelsWithGuarantees_assert,
-        Operations.subcircuitChannelsWithGuarantees_interact,
-        Operations.subcircuitChannelsWithGuarantees_nil, List.not_mem_nil] at h_channel
+    refine ⟨by simp only [circuit_norm], ?_, by simp only [circuit_norm]⟩
     · intro env
       rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
       intro interaction h_interaction
-      simp only [Operations.shallowInteractions_assert,
-        Operations.shallowInteractions_interact, Operations.shallowInteractions_nil,
-        List.mem_cons, List.not_mem_nil, or_false] at h_interaction
+      simp only [circuit_norm] at h_interaction
       rcases h_interaction with rfl | rfl <;>
         exact Or.inl (List.mem_singleton_self byteChannel.toRaw)
-    · rw [Operations.subcircuitChannelsLawful_iff_forall]
-      intro subcircuit h_subcircuit
-      simp only [Operations.subcircuits_assert, Operations.subcircuits_interact,
-        Operations.subcircuits_nil, List.not_mem_nil] at h_subcircuit
 
 -- Expose the declared channel list + `localLength` as `@[circuit_norm]` rfl-lemmas so the composing
 -- `RegisterAccessCols` reader's `channelsLawful` / `circuit_proof_start` is discharged automatically.
@@ -124,36 +114,27 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   -- `Spec` = the two byte bounds (`is_real`-gated), derived from the gated-receive guarantees (which fire
   -- at `mult = -1`, i.e. `is_real = 1`); post-#398 a receive owes no padding requirement at all.
   circuit_proof_start
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel] at h_holds ⊢
   -- The two trailing conjuncts are the byte pulls' own `Requirements` (post-`cedc171b`): each fires only
   -- at an off-gate multiplicity (`-is_real ∉ {0,-1}`), impossible under the binary `Assumptions` — vacuous.
   refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
   have hneg : - input_is_real = -1 := by rw [hr1]
-  have hb1 := h_holds.2.1 hneg
-  have hb2 := h_holds.2.2 hneg
-  rw [← c16] at hb1
-  refine ⟨(byteRowSpec_range _ h16p).mp hb1, ?_⟩
-  exact ((byteRowSpec_u8range_pair _ _).mp hb2).1
+  exact ⟨(byteRowSpec_range _ h16p).mp (by rw [Nat.cast_ofNat]; exact h_holds.2.1 hneg),
+    ((byteRowSpec_u8range_pair _ _).mp (h_holds.2.2 hneg)).1⟩
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   -- The two byte pulls' completeness obligation (their `ByteRowSpec` guarantee) only fires on real rows
   -- (`-is_real = -1`); there the `Spec` byte bounds supply it.
   circuit_proof_start
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel]
   refine ⟨?_, ?_, ?_⟩
-  · rcases h_assumptions with h | h <;> simp [h]
+  · rcases h_assumptions with h | h <;> simp only [h, sub_self, mul_zero, zero_mul]
   · intro hneg
-    have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    obtain ⟨hb1, _⟩ := h_spec hr1
-    rw [← c16]
-    exact (byteRowSpec_range _ h16p).mpr hb1
+    simpa only [Nat.cast_ofNat] using (byteRowSpec_range _ h16p).mpr (h_spec (neg_inj.mp hneg)).1
   · intro hneg
-    have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    obtain ⟨_, hb2⟩ := h_spec hr1
-    exact (byteRowSpec_u8range_pair _ _).mpr ⟨hb2, by rw [ZMod.val_zero]; norm_num⟩
+    exact (byteRowSpec_u8range_pair _ _).mpr
+      ⟨(h_spec (neg_inj.mp hneg)).2, by rw [ZMod.val_zero]; norm_num⟩
 
 /-- The inner timestamp reader as a Clean `FormalAssertion`: takes the chip-owned `cols` block plus
 `is_real`/`clk_target`, imposes the two `is_real`-gated byte checks, with `Spec` the two byte bounds. -/
@@ -169,17 +150,13 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
       change Operations.RequirementsChannelsLawful
         ([.assert _, .interact _, .interact _] : Operations (ZMod p)) [byteChannel.toRaw] []
       dsimp only [Operations.RequirementsChannelsLawful]
-      refine ⟨?_, ?_, ?_⟩
+      refine ⟨by simp only [circuit_norm], ?_, ?_⟩
       · intro channel h_channel
-        simp only [Operations.subcircuitChannelsWithRequirements_assert,
-          Operations.subcircuitChannelsWithRequirements_interact,
-          Operations.subcircuitChannelsWithRequirements_nil, List.not_mem_nil] at h_channel
-      · intro channel h_channel
-        simp only [Operations.shallowChannels_assert, Operations.shallowChannels_interact,
-          Operations.shallowChannels_nil, List.mem_cons, List.not_mem_nil,
-          or_false] at h_channel
-        rcases h_channel with rfl | rfl <;>
-          exact Or.inl (List.mem_singleton_self byteChannel.toRaw)
+        -- `circuit_norm` collapses the duplicated `byteChannel` alternatives (`or_self`), so this
+        -- leaves a single equation rather than the two-way disjunction the explicit list left.
+        simp only [circuit_norm] at h_channel
+        subst h_channel
+        exact Or.inl (List.mem_singleton_self byteChannel.toRaw)
       · intro env h_constraints
         have h_bool : (ProvableStruct.eval env input_var).is_real = 0 ∨
             (ProvableStruct.eval env input_var).is_real = 1 := by
@@ -187,9 +164,7 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
           simpa only [circuit_norm] using h_constraints.1
         rw [Operations.inChannelsOrRequirements_iff_forall_mem]
         intro interaction h_interaction
-        simp only [Operations.shallowInteractions_assert,
-          Operations.shallowInteractions_interact, Operations.shallowInteractions_nil,
-          List.mem_cons, List.not_mem_nil, or_false] at h_interaction
+        simp only [circuit_norm] at h_interaction
         rcases h_interaction with rfl | rfl <;> right <;>
           rw [ChannelInteraction.toRaw_requirements] <;>
           intro h1 h0 <;>

@@ -66,10 +66,7 @@ instance [Fact (2 ^ 17 < p)] : Fact (p > 2) := ⟨by have := Fact.out (p := 2 ^ 
 omit [Fact p.Prime] in
 /-- `2 ^ 13 < p`, from which `13 < p` (the `Range` width-column round-trip in `byteRowSpec_range`)
 follows. -/
-lemma hn13 [Fact (2 ^ 17 < p)] : 2 ^ 13 < p := by
-  have h := Fact.out (p := 2 ^ 17 < p)
-  have : (2 : ℕ) ^ 13 < 2 ^ 17 := by norm_num
-  omega
+lemma hn13 [Fact (2 ^ 17 < p)] : 2 ^ 13 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 
 /-- Current-state message emitted by the reader.  Shared by `main` and its exposed-channel interface. -/
 @[circuit_norm] def currentMsg (input : Var Inputs (ZMod p)) : StateMsg (Expression (ZMod p)) :=
@@ -124,26 +121,16 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
     change Operations.ChannelsLawful
       ([.assert _, .interact _, .interact _, .interact _, .interact _] : Operations (ZMod p))
         [byteChannel.toRaw, stateChannel.toRaw]
-    refine ⟨?_, ?_, ?_⟩
-    · intro channel h_channel
-      simp only [Operations.subcircuitChannelsWithGuarantees_assert,
-        Operations.subcircuitChannelsWithGuarantees_interact,
-        Operations.subcircuitChannelsWithGuarantees_nil, List.not_mem_nil] at h_channel
-    · intro env
-      rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
-      intro interaction h_interaction
-      simp only [Operations.shallowInteractions_assert,
-        Operations.shallowInteractions_interact, Operations.shallowInteractions_nil,
-        List.mem_cons, List.not_mem_nil, or_false] at h_interaction
-      rcases h_interaction with rfl | rfl | rfl | rfl
-      · exact Or.inl List.mem_cons_self
-      · exact Or.inl List.mem_cons_self
-      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
-      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
-    · rw [Operations.subcircuitChannelsLawful_iff_forall]
-      intro subcircuit h_subcircuit
-      simp only [Operations.subcircuits_assert, Operations.subcircuits_interact,
-        Operations.subcircuits_nil, List.not_mem_nil] at h_subcircuit
+    refine ⟨by simp only [circuit_norm], ?_, by simp only [circuit_norm]⟩
+    intro env
+    rw [Operations.inChannelsOrGuarantees_iff_forall_mem]
+    intro interaction h_interaction
+    simp only [circuit_norm] at h_interaction
+    rcases h_interaction with rfl | rfl | rfl | rfl
+    · exact Or.inl List.mem_cons_self
+    · exact Or.inl List.mem_cons_self
+    · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
+    · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
@@ -178,13 +165,12 @@ theorem soundness [Fact (2 ^ 17 < p)] :
   have h13p : (13 : ℕ) < p := lt_trans (Nat.lt_two_pow_self) hn13
   simp only [circuit_norm, AssumptionsD, SpecD, Spec, Assumptions, byteChannel, stateChannel]
     at h_holds h_assumptions ⊢
-  obtain ⟨h_gate, h_b1, h_b2⟩ := h_holds
+  obtain ⟨-, h_b1, h_b2⟩ := h_holds
   refine ⟨fun hr1 => ?_, fun h1 h0 => off_gate_vacuous h_assumptions h1 h0,
     fun h1 h0 => off_gate_vacuous h_assumptions h1 h0⟩
   have hneg : -(input_is_real) = -1 := by rw [hr1]
-  refine ⟨(byteRowSpec_range _ h13p).mp ?_, ((byteRowSpec_u8range_pair _ _).mp (h_b2 hneg)).1⟩
-  rw [Nat.cast_ofNat]
-  exact h_b1 hneg
+  exact ⟨(byteRowSpec_range _ h13p).mp (by rw [Nat.cast_ofNat]; exact h_b1 hneg),
+    ((byteRowSpec_u8range_pair _ _).mp (h_b2 hneg)).1⟩
 
 theorem completeness [Fact (2 ^ 17 < p)] :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) main ProverAssumptionsD
@@ -195,12 +181,9 @@ theorem completeness [Fact (2 ^ 17 < p)] :
   obtain ⟨h_bin, h_spec⟩ := h_assumptions
   simp only [circuit_norm, byteChannel, stateChannel]
   refine ⟨?_, ?_, ?_⟩
-  · rcases h_bin with h | h <;> simp [h]
+  · rcases h_bin with h | h <;> simp only [h, sub_self, mul_zero, zero_mul]
   · intro hneg
-    obtain ⟨hb1, _⟩ := h_spec (neg_inj.mp hneg)
-    have key := (byteRowSpec_range _ h13p).mpr hb1
-    rw [Nat.cast_ofNat] at key
-    exact key
+    simpa only [Nat.cast_ofNat] using (byteRowSpec_range _ h13p).mpr (h_spec (neg_inj.mp hneg)).1
   · intro hneg
     obtain ⟨_, hb2⟩ := h_spec (neg_inj.mp hneg)
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hb2, by rw [ZMod.val_zero]; norm_num⟩
@@ -231,18 +214,13 @@ def circuit [Fact (2 ^ 17 < p)] : GeneralFormalCircuit (ZMod p) Inputs unit wher
       ([.assert _, .interact _, .interact _, .interact _, .interact _] : Operations (ZMod p))
         [byteChannel.toRaw, stateChannel.toRaw] []
     dsimp only [Operations.RequirementsChannelsLawful]
-    refine ⟨?_, ?_, ?_⟩
+    refine ⟨by simp only [circuit_norm], ?_, ?_⟩
     · intro channel h_channel
-      simp only [Operations.subcircuitChannelsWithRequirements_assert,
-        Operations.subcircuitChannelsWithRequirements_interact,
-        Operations.subcircuitChannelsWithRequirements_nil, List.not_mem_nil] at h_channel
-    · intro channel h_channel
-      simp only [Operations.shallowChannels_assert, Operations.shallowChannels_interact,
-        Operations.shallowChannels_nil, List.mem_cons, List.not_mem_nil, or_false] at h_channel
-      rcases h_channel with rfl | rfl | rfl | rfl
+      -- `circuit_norm`'s `or_self` collapses the trailing duplicate: a 3- not 4-way split.
+      simp only [circuit_norm] at h_channel
+      rcases h_channel with rfl | rfl | rfl
       · exact Or.inl List.mem_cons_self
       · exact Or.inl List.mem_cons_self
-      · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
       · exact Or.inl (List.mem_cons_of_mem _ List.mem_cons_self)
     · intro env h_constraints
       have h_bool : (ProvableStruct.eval env input_var).is_real = 0 ∨
@@ -251,30 +229,16 @@ def circuit [Fact (2 ^ 17 < p)] : GeneralFormalCircuit (ZMod p) Inputs unit wher
         simpa only [circuit_norm] using h_constraints.1
       rw [Operations.inChannelsOrRequirements_iff_forall_mem]
       intro interaction h_interaction
-      simp only [Operations.shallowInteractions_assert,
-        Operations.shallowInteractions_interact, Operations.shallowInteractions_nil,
-        List.mem_cons, List.not_mem_nil, or_false] at h_interaction
-      rcases h_interaction with rfl | rfl | rfl | rfl
-      · right
-        rw [ChannelInteraction.toRaw_requirements]
-        intro h1 h0
-        simp only [circuit_norm] at h1 h0
-        exact off_gate_vacuous h_bool h1 h0
-      · right
-        rw [ChannelInteraction.toRaw_requirements]
-        intro h1 h0
-        simp only [circuit_norm] at h1 h0
-        exact off_gate_vacuous h_bool h1 h0
-      · right
-        simp only [ChannelInteraction.toRaw_requirements, ChannelInteraction.Requirements,
-          stateChannel]
-        intros
-        trivial
-      · right
-        simp only [ChannelInteraction.toRaw_requirements, ChannelInteraction.Requirements,
-          stateChannel]
-        intros
-        trivial
+      simp only [circuit_norm] at h_interaction
+      -- Two shapes only: the State pair's requirement is `True`, and the two byte pulls are
+      -- `is_real`-gated so their requirement is off-gate vacuous. (The State *push* carries the
+      -- unnegated multiplicity `is_real`, so it cannot go through `off_gate_vacuous`.)
+      rcases h_interaction with rfl | rfl | rfl | rfl <;> right <;>
+        first
+          | (simp only [ChannelInteraction.toRaw_requirements, ChannelInteraction.Requirements,
+                stateChannel]; intros; trivial)
+          | (rw [ChannelInteraction.toRaw_requirements]; intro h1 h0;
+             simp only [circuit_norm] at h1 h0; exact off_gate_vacuous h_bool h1 h0)
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength [Fact (2 ^ 17 < p)] (x : Var Inputs (ZMod p)) :
@@ -291,9 +255,8 @@ lemma interactionsWith_state_subcircuit [Fact (2 ^ 17 < p)]
         (.subcircuit ((circuit (p := p)).toSubcircuit offset input) :: ops) =
       (stateInteractions input).map ChannelInteraction.toRaw ++
         Operations.interactionsWith stateChannel.toRaw ops := by
-  refine InteractionRecovery.interactionsWith_generalSubcircuit_eq_of_singleton_exposure
+  exact InteractionRecovery.interactionsWith_generalSubcircuit_eq_of_singleton_exposure
     (circuit (p := p))
-    ⟨stateChannel.toRaw, (stateInteractions input).map ChannelInteraction.toRaw⟩ input ops ?_
-  rfl
+    ⟨stateChannel.toRaw, (stateInteractions input).map ChannelInteraction.toRaw⟩ input ops rfl
 
 end SP1Clean.Readers.CPUState

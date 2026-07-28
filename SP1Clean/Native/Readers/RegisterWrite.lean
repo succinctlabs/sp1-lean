@@ -52,7 +52,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
   channelsWithGuarantees := []
-  channelsLawful := by simp [circuit_norm, main, memoryChannel]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
@@ -81,9 +80,8 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   simp only [circuit_norm, memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound] at h_holds ⊢
   -- The only obligation is the write `pushIf`'s requirement,
   -- `¬is_real=-1 → ¬is_real=0 → isU64 value ∧ clk_low.val < 2^24`.
-  exact fun _ h0 =>
-    ⟨h_assumptions.2.1 ((h_assumptions.1).resolve_left h0),
-      h_assumptions.2.2 ((h_assumptions.1).resolve_left h0)⟩
+  exact fun _ h0 => ⟨h_assumptions.2.1 (h_assumptions.1.resolve_left h0),
+    h_assumptions.2.2 (h_assumptions.1.resolve_left h0)⟩
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -94,9 +92,7 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     soundness := soundness, completeness := completeness,
-    channelsWithRequirements := [memoryChannel.toRaw],
-    requirementsChannelsLawful := fun input_var i₀ => by
-      simp only [circuit_norm, main, memoryChannel] }
+    channelsWithRequirements := [memoryChannel.toRaw] }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
