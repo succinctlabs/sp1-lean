@@ -25,7 +25,6 @@ constraint list at `is_real = 1`), stated against the result column `cols.msb`. 
 def RawSpec (a : ZMod p) (cols : Extracted.U16MSBOperation (ZMod p)) : Prop :=
   (cols.msb = 0 ∨ cols.msb = 1) ∧ (2 * a - cols.msb * 65536).val < 2 ^ 16
 
-set_option maxHeartbeats 2000000 in
 /-- Forward (soundness) core: booleanness + range force `msb` to be the high bit of `a`. -/
 theorem msb_of_raw {a : ZMod p} {cols : Extracted.U16MSBOperation (ZMod p)}
     (ha : a.val < 2 ^ 16) (h_raw : RawSpec a cols) :

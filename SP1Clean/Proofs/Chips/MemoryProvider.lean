@@ -14,7 +14,7 @@ write." Two contributions per address are left unmatched *within* the trace: the
 those boundary rows; their preprocessed/public-value trace carries exactly the per-address initial and
 final `(clk, addr, value)` records, and balancing the bus against them closes the chain.
 
-This module models that boundary receiver natively — the closed-bus sibling of `Chips/ProgramChip.lean`'s
+This module models that boundary receiver natively — the closed-bus sibling of `Model/ProgramChip.lean`'s
 `ProgramProvider`. A `MemoryProvider initSpec` is any Memory-bus contribution list whose every entry sits
 at the key of some `initSpec`-valid boundary record. As with the byte/program buses, the Memory-bus key is
 the *full* `ZMod.val`-projection of the timestamp, the three address limbs, and the four value limbs, so

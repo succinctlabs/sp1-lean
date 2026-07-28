@@ -33,9 +33,7 @@ local instance : Fact (p > 2) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega
 omit [Fact p.Prime] in
 /-- `2 ^ 16 < p` — the width bound `rangeCheck 16` needs for the limbs. -/
 lemma two_pow_sixteen_lt : (2 : ℕ) ^ 16 < p := by
-  have h := Fact.out (p := 2 ^ 17 < p)
-  have h2 : (2 : ℕ) ^ 16 < 2 ^ 17 := by norm_num
-  omega
+  have := Fact.out (p := 2 ^ 17 < p); omega
 
 /-- Range-check each of the four limbs of `w` to 16 bits (four genuine bit-decomposition
 `assertion`s — no witnesses of its own beyond the sub-gadgets' bit columns, no interactions). -/
@@ -82,9 +80,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 /-- The whole-`Word` 16-bit range check as a Clean `FormalAssertion`: four per-limb
 `rangeCheck 16` bit decompositions, exposed as the single semantic `Spec` `Word.isU64 w`. -/
 def circuit : FormalAssertion (ZMod p) Word :=
-  { main, elaborated,
-    Assumptions := Assumptions, Spec := Spec,
-    soundness := soundness, completeness := completeness }
+  { main, elaborated, Assumptions, Spec, soundness, completeness }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Word (ZMod p)) :
