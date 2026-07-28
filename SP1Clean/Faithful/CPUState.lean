@@ -113,12 +113,16 @@ theorem cpustate_interactions_faithful_syntactic
   -- oracle [state,state,byte,byte] — a two-block rotation, closed by `List.perm_append_comm`.
   exact List.perm_append_comm (l₁ := [_, _]) (l₂ := [_, _])
 
-set_option maxHeartbeats 1000000 in
 /-- **CPUState fragment — State-bus interactions, SYNTACTIC (channel-filtered `=`).**
 The exposed current/successor pair projects exactly to the State entries of SP1's extracted
 `CPUState.interactions`. This is the State companion of
 `cpustate_byte_interactions_faithful_syntactic`, kept folded so enclosing chip proofs do not filter
-the full four-entry reader permutation. -/
+the full four-entry reader permutation.
+
+Heartbeat ladder (2026-07-28, control run at 1 heartbeat produced real timeouts): passes at 1500,
+fails at 800 (`whnf` inside the closing `simp`), so the true floor is in (800, 1500]. The former
+1000000 ceiling was ~700-1200x over it and the plain 200000 default leaves >=130x headroom, so the
+override was removed rather than lowered. -/
 theorem cpustate_state_interactions_faithful_syntactic
     (env : Environment (ZMod p))
     (input : Var Readers.CPUState.Inputs (ZMod p))
@@ -176,12 +180,16 @@ theorem cpustate_state_interactions_faithful_syntactic
     h_ir, h_ch, h_c0, h_c1,
     h_p0, h_p1, h_p2, h_np0, h_np1, h_np2, h_clk]
 
-set_option maxHeartbeats 1000000 in
 /-- **CPUState fragment — Byte-bus interactions, SYNTACTIC (channel-filtered `=`).** The `.Byte`-filtered
 companion of `cpustate_interactions_faithful_syntactic`: the two byte clock-range checks the reader emits
 project to the same `LookupAccess` list as the Byte entries of SP1's extracted `CPUState.interactions`
 oracle. Both emit `byte,byte` in the same order, so this is a clean `=` (no `Perm`). The reusable byte
-chunk every chip's combined byte anchor composes. -/
+chunk every chip's combined byte anchor composes.
+
+Heartbeat ladder (2026-07-28, control run at 1 heartbeat produced real timeouts): passes at 2500,
+fails at 2000 (`isDefEq` inside the closing `simp`), so the true floor is in (2000, 2500]. The former
+1000000 ceiling was ~400-500x over it and the plain 200000 default leaves >=80x headroom, so the
+override was removed rather than lowered. -/
 theorem cpustate_byte_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var Readers.CPUState.Inputs (ZMod p)) (offset : ℕ)
     (cols : Extracted.CPUState (ZMod p)) (next_pc : Vector (ZMod p) 3) (clk_inc is_real : ZMod p)

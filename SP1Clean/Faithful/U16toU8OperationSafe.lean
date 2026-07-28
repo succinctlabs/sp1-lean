@@ -38,7 +38,7 @@ theorem u16tou8safe_constraints_faithful (u16_values : Vector (ZMod p) 4)
     ByteOpcode.constrain_U8Range,
     one_ne_zero, ne_eq, not_false_eq_true, true_implies, ZMod.val_zero,
     SP1Clean.U16toU8OperationSafe.RawSpec, true_and,
-    show (0 : ℕ) < 256 from by norm_num]
+    show (0 : ℕ) < 256 by norm_num]
 
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery
