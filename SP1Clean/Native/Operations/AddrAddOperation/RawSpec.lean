@@ -34,7 +34,6 @@ lemma hn16 : 2 ^ 16 < p := by
   have : (2 : ℕ) ^ 16 < 2 ^ 17 := by norm_num
   omega
 
-set_option maxHeartbeats 16000000 in
 /-- Forward (soundness) core: the 3-limb carry-bool + range form implies the witnessed low-48-bit
 result is `(a + b) mod 2^48`. The high carry `c3` runs against `0` (no `value[3]` column); soundness
 needs only its booleanity (from `RawSpec`), not the address-fits assumption. Stated over plain words
@@ -77,7 +76,6 @@ theorem addrAddSemantics_of_carries {a b : Word (ZMod p)}
   have hc3_lt : c3.val ≤ 1 := by rcases hc3 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
   omega
 
-set_option maxHeartbeats 16000000 in
 /-- The high carry's boolean constraint forces the 64-bit-truncated sum to contain no bits above
 the three-limb address. This is an AIR conclusion, not a soundness precondition: the fourth carry
 runs against zero, so any satisfying row necessarily represents a 48-bit address. -/
@@ -130,7 +128,10 @@ theorem addrAddFits_of_carries {a b : Word (ZMod p)}
   rw [sumEq, Nat.add_mul_mod_self_right, Nat.mod_eq_of_lt (by omega)]
   exact lowLt
 
-set_option maxHeartbeats 16000000 in
+-- Measured floor (ladder search, 2026-07): passes at 60000, times out at 45000. 400000 keeps a ~7x
+-- margin; the previous 16000000 was ~250x vestigial. The two theorems above needed no ceiling at
+-- all (both elaborate under 15000).
+set_option maxHeartbeats 400000 in
 /-- Backward (completeness) core: a 3-limb result equal to `(a + b) mod 2^48` (with each limb in
 range), together with the address-fits side condition, witnesses the unique boolean carry chain.
 The low carries `c0, c1, c2` are pinned by the value equation; the high carry `c3 = (a[3]+b[3]+c2)·

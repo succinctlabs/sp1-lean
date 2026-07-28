@@ -27,7 +27,6 @@ list — four `Range` byte sends). -/
 def InteractSpec (value : Word (ZMod p)) : Prop :=
   value[0].val < 65536 ∧ value[1].val < 65536 ∧ value[2].val < 65536 ∧ value[3].val < 65536
 
-set_option maxHeartbeats 16000000 in
 /-- Forward (soundness) core — native port of `AddOperation.spec`: the carry-bool +
 range form implies the result is a 64-bit value equal to the BitVec sum. -/
 theorem addSemantics_of_carries {a b value : Word (ZMod p)}
@@ -70,7 +69,6 @@ theorem addSemantics_of_carries {a b value : Word (ZMod p)}
   have hc3_lt : c3.val ≤ 1 := by rcases hc3 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
   omega
 
-set_option maxHeartbeats 16000000 in
 /-- Backward (completeness) core — native port of `AddOperation.spec_inv`: a 64-bit
 value equal to the BitVec sum witnesses the unique boolean carry chain + ranges. -/
 theorem carries_of_addSemantics {a b value : Word (ZMod p)}

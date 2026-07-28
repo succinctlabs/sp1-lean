@@ -33,7 +33,9 @@ def RawSpec (a b value : Word (ZMod p)) : Prop :=
   (c0 = 0 ∨ c0 = 1) ∧ (c1 = 0 ∨ c1 = 1) ∧ (c2 = 0 ∨ c2 = 1) ∧ (c3 = 0 ∨ c3 = 1) ∧
   value[0].val < 65536 ∧ value[1].val < 65536 ∧ value[2].val < 65536 ∧ value[3].val < 65536
 
-set_option maxHeartbeats 16000000 in
+-- Measured floor (ladder search, 2026-07): passes at 80000, times out at 60000. 400000 keeps a ~5x
+-- margin; the previous 16000000 was ~200x vestigial.
+set_option maxHeartbeats 400000 in
 /-- Forward (soundness) core: the borrow-bool + range form implies the result is a 64-bit
 value equal to the BitVec difference. -/
 theorem subSemantics_of_carries {a b value : Word (ZMod p)}
@@ -84,7 +86,9 @@ theorem subSemantics_of_carries {a b value : Word (ZMod p)}
   have hc3_lt : c3.val ≤ 1 := by rcases hc3 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
   omega
 
-set_option maxHeartbeats 16000000 in
+-- Measured floor (ladder search, 2026-07): passes at 60000, times out at 40000. 400000 keeps a ~7x
+-- margin; the previous 16000000 was ~250x vestigial.
+set_option maxHeartbeats 400000 in
 /-- Backward (completeness) core: a 64-bit value equal to the BitVec difference witnesses the
 unique boolean borrow chain + ranges. -/
 theorem carries_of_subSemantics {a b value : Word (ZMod p)}
