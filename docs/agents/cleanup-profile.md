@@ -365,10 +365,20 @@ mathlib's own `Nat.cast_ofNat` sitting next to a sibling file that used the real
 
 **So before golfing a `have`, search for it.** `lean_local_search` on the statement shape, and grep
 the `Math/` and `ShiftBounds` families. This is cheaper than any tactic golf and it is where the
-lines actually are. Two cautions learned: adding the import may be free (check whether the blanket
-`Mathlib.Tactic` it drags in is *already* in the module's closure and its consumers'), and a rewrite
-direction can be unsafe even when the forward one is fine — `rw [Nat.cast_ofNat]` is safe, while
-`rw [← Nat.cast_ofNat]` latches onto the wrong numeral.
+lines actually are. Adding the import may be free — check whether the blanket `Mathlib.Tactic` it
+drags in is *already* in the module's closure and its consumers'.
+
+> **Cashing a lever does not have to mean rewriting with it.** Measured on `AddOperation.soundness`:
+> `rw [Nat.cast_ofNat]` (forward, against a goal) is safe, but `rw [← Nat.cast_ofNat]` rewrites the
+> `6` opcode column, and pinning it as `rw [← Nat.cast_ofNat (n := 16)]` does **not** rescue it — it
+> targets the right column but yields `↑(OfNat.ofNat 16)`, a *different spelling* from `↑16`, which is
+> a live char-for-char hazard against the downstream `byteRowSpec_range` match.
+>
+> The safe way to retire a hand-rolled copy in the `←` direction is to **keep the local `have` and
+> prove it by the real lemma** — `have c16 … := Nat.cast_ofNat` instead of `:= by norm_cast`. The
+> duplication is gone, every downstream `rw [← c16]` keeps its exact spelling, and nothing moves. Use
+> the forward idiom only where the *goal* carries the cast; substituting it at 4–6 hypothesis call
+> sites per file costs more lines than the `have` it deletes.
 
 This repo's own high-yield moves:
 
