@@ -13,5 +13,5 @@
 # retired legacy Extracted files — the oracle form embeds chip-private op copies, hence more
 # opaque-definition headers), plus a net +2 hand-written in the Faithful DivRem/Mul/Addw KEEP-set
 # from the anchor fold-ins. Generated elaboration boundaries, not raised ceilings.
-SP1Clean 853
+SP1Clean 818
 SP1CleanTest 16
