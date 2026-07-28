@@ -95,9 +95,13 @@ Adding a **new** declaration is allowed in exactly two shapes. Nothing existing 
 
 Rules for a new helper:
 
-- **Declare it `private`** when it is used only within its own file. (Prohibition §2.2 forbids
-  changing the visibility of an *existing* declaration; a new one may be born `private`.) This also
-  keeps `gen_axiom_probe.py` churn at zero — it skips `private` declarations.
+- **Prefer `private`** when it is used only within its own file. (Prohibition §2.2 forbids changing
+  the visibility of an *existing* declaration; a new one may be born `private`.) This keeps
+  `gen_axiom_probe.py` churn at zero, since it skips `private` declarations. A **public** helper is
+  also fine when it matches the sibling files' existing convention — the safety properties that
+  actually matter are (a) it does not match a probe glob, and (b) its namespace does not collide with
+  a same-named declaration elsewhere. `ShiftRightMath.inner_val`/`inner_hi_val` are public precisely
+  because the pre-existing `ShiftLeftCore` pair is; different namespaces, no collision, no glob.
 - **Do not name it to match a probe glob.** Avoid `*faithful*`, `soundness`, `completeness`,
   `circuit`, `kind`, `correct_*`, `*reaches_sail*`, and the specific names listed in
   `scripts/gen_axiom_probe.py`. An `_aux`-style name is fine.
