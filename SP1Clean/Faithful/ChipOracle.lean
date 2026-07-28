@@ -313,7 +313,6 @@ theorem registerAccessTimestampConstraints
     Readers.RegisterAccessTimestamp.main, circuit_norm]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 theorem cpuStateAssertions
     (env : Environment (ZMod p)) (input : Var Readers.CPUState.Inputs (ZMod p))
     (offset : ℕ) (cols : Extracted.CPUState (ZMod p)) (nextPc : Vector (ZMod p) 3)
@@ -328,7 +327,6 @@ theorem cpuStateAssertions
   rw [hr]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 theorem equalityAssertions
     (env : Environment (ZMod p)) (x y : Expression (ZMod p)) (offset : ℕ) :
     List.Forall (· = 0)
@@ -353,7 +351,6 @@ theorem equalityAssertionList
   rfl
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 theorem registerWriteAssertions
     (env : Environment (ZMod p)) (input : Var Readers.RegisterWrite.Inputs (ZMod p))
     (offset : ℕ) :
@@ -361,7 +358,6 @@ theorem registerWriteAssertions
         (nativeAssertZeros env ((Readers.RegisterWrite.main input).operations offset)) ↔ True := by
   simp [nativeAssertZeros, Readers.RegisterWrite.main, circuit_norm]
 
-set_option maxHeartbeats 1000000 in
 theorem rTypeAssertions
     (env : Environment (ZMod p)) (input : Var Readers.RTypeReader.Inputs (ZMod p))
     (offset : ℕ) (clkHigh clkLow opcode isReal isTrusted : ZMod p)
@@ -395,7 +391,6 @@ theorem rTypeAssertions
   rw [hzero]
   simp
 
-set_option maxHeartbeats 1000000 in
 /-- Exact folded assertion normalization for SP1's I-type adapter and the native pure-reader
 subcircuit. The destination write is intentionally absent from both sides: Rust lists it as an
 interaction, while the native chip composes `RegisterWrite` separately. In particular, neither
@@ -434,7 +429,6 @@ theorem iTypeAssertionsExact
   simp
   tauto
 
-set_option maxHeartbeats 1000000 in
 /-- Exact folded assertion normalization for SP1's immutable I-type adapter.  This is a
 whole-chip proof helper, not an operation-level faithfulness boundary: it only reassociates the
 canonical Rust and native reader fragments before the enclosing `ChipFaithful` theorem compares
@@ -482,7 +476,6 @@ theorem iTypeImmutableAssertionsExact
   simp
   tauto
 
-set_option maxHeartbeats 1000000 in
 /-- Compatibility form used by chips whose own Rust AIR additionally pins `op_a_0 = 0`.
 The shared reader assertion system itself is compared exactly by `iTypeAssertionsExact`. -/
 theorem iTypeAssertions
@@ -507,7 +500,6 @@ theorem iTypeAssertions
   rw [iTypeAssertionsExact env input offset clkHigh clkLow opcode isReal isTrusted
     pc writeValue cols hreal htrusted hopA0 hwrite0 hwrite1 hwrite2 hwrite3 htrust]
 
-set_option maxHeartbeats 1000000 in
 /-- Folded assertion normalization for SP1's J-type adapter and the native pure-reader
 subcircuit. Unlike the older Lean model, neither side asserts `op_a_0` booleanity locally:
 the trusted Program row supplies it. The destination write remains factored into the
@@ -586,7 +578,6 @@ def aluTypeAssertionValues
     Expression.eval env (input.cols.op_a_0 * input.wv2) - Expression.eval env 0,
     Expression.eval env (input.cols.op_a_0 * input.wv3) - Expression.eval env 0 ]
 
-set_option maxHeartbeats 1000000 in
 /-- Folded exact assertion list for `ALUTypeReader`.  Each child assertion is collapsed at its
 own circuit boundary before the resulting short list is assembled. -/
 theorem aluTypeAssertionList
@@ -604,7 +595,6 @@ theorem aluTypeAssertionList
   repeat' rw [equalityAssertionList]
   rfl
 
-set_option maxHeartbeats 1000000 in
 /-- Folded assertion normalization for SP1's immediate-capable ALU adapter and the native
 pure-reader subcircuit.  As with `rTypeAssertions`/`iTypeAssertions`, the destination write is
 factored into the parent native chip.  The extra `cols.op_a_0 = 0` conjunct is the parent chip's
@@ -630,8 +620,7 @@ theorem aluTypeAssertions
           (nativeAssertZeros env ((Readers.ALUTypeReader.main input).operations offset)) ∧
         cols.op_a_0 = 0) := by
   rw [show nativeAssertZeros env ((Readers.ALUTypeReader.main input).operations offset) =
-      aluTypeAssertionValues env input by
-    exact aluTypeAssertionList env input offset]
+      aluTypeAssertionValues env input from aluTypeAssertionList env input offset]
   simp only [Extracted.ALUTypeReader.asserts, aluTypeAssertionValues, List.Forall]
   have hrealEval : Expression.eval env input.is_real = isReal := by
     have h := congrArg (fun value => value.is_real) (ProvableStruct.eval_eq_eval env input)
@@ -745,7 +734,6 @@ def aluTypeImmutableAssertionValues
         (input.cols.op_a_0 * input.cols.op_a_memory.prev_value[3]) -
       Expression.eval env 0 ]
 
-set_option maxHeartbeats 1000000 in
 /-- Folded exact assertion list for `ALUTypeReaderImmutable`. This is a structural
 normalizer used only inside whole-chip faithfulness proofs, not a new reader-level
 faithfulness boundary. -/

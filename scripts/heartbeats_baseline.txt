@@ -66,7 +66,29 @@
 # Faithful/CPUState.lean's measured floors (800-2500 against a declared 1000000) are the lowest
 # recorded anywhere in the campaign and predict that the large majority of the ~300 remaining
 # Faithful/ ceilings are removable. All ladders are recorded in the doc-comments at each site.
+# -28 (2026-07-28, proof-cleanup W2/r4): ratchet DOWN, no ceiling raised. 29 directives deleted, 1
+# re-added strictly lower, net -28 — the largest single-round drop of the campaign. By batch:
+# Faithful/ChipOracle.lean shed ALL ELEVEN of its 1000000 sites (b1), with measured floors from
+# <=500 up to 30000 against a uniform declared 1M; the cause was proved from inside the file, since
+# three unceilinged theorems doing the same kind of work sit interleaved among the eleven — i.e. the
+# ceilings were copied down the file, not measured. The Proofs/Operations/*/Formal.lean family
+# finished the sweep W2/r2 began: LtOperationUnsigned (4), SubwOperation (3), AddwOperation (3),
+# IsZeroWordOperation (2) (b2). Faithful/ALUTypeReader.lean dropped all four and
+# Native/Operations/LtOperationSigned/RawSpec.lean its remaining one (b4).
+# Two results are worth recording:
+#   * MulOperation/Defs.lean is the campaign's first LCNF-COMPILER-BOUND ceiling: the budget is
+#     spent in code generation over 16 schoolbook product expressions, not in elaboration (at a
+#     40000 budget `main` elaborates fine and only codegen times out). Floor (40000, 60000]; kept
+#     and tightened 8000000 -> 400000 (~6.7x headroom) rather than removed, because the plain
+#     200000 default leaves under 3.5x and codegen cost is more load-sensitive than elaboration.
+#     `noncomputable def` was rejected: SP1CleanTest/TraceGenTests derives traces from `main`'s
+#     witness closures under `native_decide`, so it would break `lake test`.
+#   * b2 found that `ring` CANNOT LEAD a `first` ladder — it never fails, so it shadows every
+#     alternative behind it (and its ring_nf fallback is what leaks the `Try this:` info note).
+#     `ring1` is the correct leading alternative. This was also the round's first cause fix that
+#     moved a ceiling from keep-and-lower to removable (`sel_populate`).
+# All ladders are recorded in the doc-comments at each former site.
 # NOTE: the recorded count includes one phantom — SP1Clean/Proofs/Sail/Advance.lean:2325 has the
 # literal inside a doc-comment, so the grep sees a site that does not exist. Pre-existing.
-SP1Clean 766
+SP1Clean 738
 SP1CleanTest 16
