@@ -109,16 +109,12 @@ theorem MemoryMsg.clkBound_of_cpuState_bounds (clk0 clk1 delta : ZMod p) (k : �
   have h17 := Fact.out (p := 2 ^ 17 < p)
   set scaled := (clk0 - 1) * (8 : ZMod p)⁻¹ with scaledDef
   have reconstruct : scaled * 8 + 1 = clk0 := by
-    rw [scaledDef, mul_assoc, inv_mul_cancel₀ val_8_ne_zero, mul_one]
-    ring_nf
+    rw [scaledDef, mul_assoc, inv_mul_cancel₀ val_8_ne_zero, mul_one, sub_add_cancel]
   have scaledMulVal : (scaled * 8).val = scaled.val * 8 := by
     rw [ZMod.val_mul_of_lt (by rw [val_8_zmod_p]; omega), val_8_zmod_p]
   have clk0Val : clk0.val = scaled.val * 8 + 1 := by
-    calc
-      clk0.val = (scaled * 8 + 1).val := congrArg ZMod.val reconstruct.symm
-      _ = (scaled * 8).val + (1 : ZMod p).val :=
-          ZMod.val_add_of_lt (by rw [scaledMulVal, ZMod.val_one]; omega)
-      _ = scaled.val * 8 + 1 := by rw [scaledMulVal, ZMod.val_one]
+    rw [← reconstruct, ZMod.val_add_of_lt (by rw [scaledMulVal, ZMod.val_one]; omega),
+      scaledMulVal, ZMod.val_one]
   have highLimbVal : (clk1 * 65536).val = clk1.val * 65536 := by
     rw [ZMod.val_mul_of_lt (by rw [val_65536_zmod_p]; omega), val_65536_zmod_p]
   have lowVal : (clk0 + clk1 * 65536).val = clk0.val + clk1.val * 65536 := by
@@ -194,9 +190,8 @@ theorem ClkDiscipline.slot {clk_low is_real : ZMod p} (h : ClkDiscipline clk_low
 
 /-- The RAM effect slot (`MemoryAccess`'s current-timestamp push). -/
 theorem ClkDiscipline.at_one {clk_low is_real : ZMod p} (h : ClkDiscipline clk_low is_real) :
-    ClkDisciplineAt (clk_low + 1) is_real := by
-  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  exact h.slot 1 1 (ZMod.val_one p) (by norm_num)
+    ClkDisciplineAt (clk_low + 1) is_real :=
+  h.slot 1 1 (ZMod.val_one p) (by norm_num)
 
 /-- The op_c operand slot. -/
 theorem ClkDiscipline.at_two {clk_low is_real : ZMod p} (h : ClkDiscipline clk_low is_real) :

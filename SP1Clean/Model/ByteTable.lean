@@ -32,10 +32,6 @@ namespace SP1Clean
 
 open SP1Clean (ByteOpcode)
 
-namespace ByteOpcode
-
-end ByteOpcode
-
 /-- One byte-table row: the opcode column plus the three operand columns — SP1's
 `AirInteraction.byte (op a b c)` shape (arity 4). -/
 structure ByteRow (F : Type) where
@@ -105,9 +101,7 @@ lemma byteRowSpec_range (x : ZMod p) {n : ℕ} (hnp : n < p) :
   · rintro ⟨op, hop, hc⟩
     have hk : op.idx = 6 := cast_le6_inj (by cases op <;> decide) (by norm_num) (by rw [hop]; norm_cast)
     cases op <;> simp only [ByteOpcode.idx] at hk <;>
-      first
-        | omega
-        | (simp only [ByteOpcode.constrain] at hc; rwa [hvaln] at hc)
+      first | omega | (simp only [ByteOpcode.constrain] at hc; rwa [hvaln] at hc)
   · intro hx
     exact ⟨ByteOpcode.Range, by norm_cast, by simp only [ByteOpcode.constrain, hvaln]; exact hx⟩
 
@@ -134,7 +128,7 @@ lemma byteRowSpec_byteOp {op : ZMod p} (r b c : ZMod p) (hop : op.val < 3) :
       first
         | omega
         | (rw [← hidxval]; simpa only [ByteOpcode.constrain, byteOp_zero, byteOp_one, byteOp_two] using hc)
-  · rintro h
+  · intro h
     refine ⟨ByteOpcode.ofNat op.val, ?_, ?_⟩
     · have hidx : (ByteOpcode.ofNat op.val).idx = op.val := by interval_cases op.val <;> rfl
       rw [hidx, ZMod.natCast_zmod_val]
@@ -150,15 +144,12 @@ slots. Forward: `cast_le6_inj` turns the opcode column `= 3` into the *natural* 
 false index equations); then `U8Range.constrain` bounds both slots. Backward: provide `U8Range`. -/
 lemma byteRowSpec_u8range_pair (b c : ZMod p) :
     ByteRowSpec (⟨(3 : ZMod p), 0, b, c⟩ : ByteRow (ZMod p)) ↔ (b.val < 2 ^ 8 ∧ c.val < 2 ^ 8) := by
-  have h256 : (2 : ℕ) ^ 8 = 256 := by norm_num
-  rw [h256]
+  rw [show (2 : ℕ) ^ 8 = 256 from by norm_num]
   constructor
   · rintro ⟨op, hop, hc⟩
     have hk : op.idx = 3 := cast_le6_inj (by cases op <;> decide) (by norm_num) (by rw [hop]; norm_cast)
     cases op <;> simp only [ByteOpcode.idx] at hk <;>
-      first
-        | omega
-        | (simp only [ByteOpcode.constrain] at hc; exact ⟨hc.2.1, hc.2.2⟩)
+      first | omega | (simp only [ByteOpcode.constrain] at hc; exact ⟨hc.2.1, hc.2.2⟩)
   · rintro ⟨hb, hc⟩
     exact ⟨ByteOpcode.U8Range, by norm_cast, ⟨by simp, hb, hc⟩⟩
 
