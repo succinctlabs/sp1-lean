@@ -150,15 +150,10 @@ signed contributions have multiplicity `±0`. The emission is `is_real`-gated, m
 `send/receive … is_real`. -/
 theorem memoryLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_real = 0) :
     ∀ k, multiplicitySum (memoryLookups r) k = 0 := by
-  have hz : (r.is_real.val : ℤ) = 0 := by simp only [h, ZMod.val_zero, Nat.cast_zero]
   -- With the multiplicative gate `is_real * (1 - imm)`, `is_real = 0` zeroes op_b/op_c regardless of imm.
-  have hzb : ((r.is_real * (1 - r.adapter.imm_b)).val : ℤ) = 0 := by
-    simp only [h, zero_mul, ZMod.val_zero, Nat.cast_zero]
-  have hzc : ((r.is_real * (1 - r.adapter.imm_c)).val : ℤ) = 0 := by
-    simp only [h, zero_mul, ZMod.val_zero, Nat.cast_zero]
   intro k
-  simp only [memoryLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, hz, hzb, hzc, neg_zero,
-    ite_self, add_zero]
+  simp only [memoryLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, h, zero_mul,
+    ZMod.val_zero, Nat.cast_zero, neg_zero, ite_self, add_zero]
 
 open Circuit SP1Clean.InteractionRecovery
 open SP1Clean.Channels (memoryChannel MemoryMsg)
@@ -327,10 +322,9 @@ theorem memAccessLookups_padding [NeZero p] (mem : Extracted.MemoryAccessCols (Z
     (h : is_real = 0) :
     ∀ k, multiplicitySum
         (memAccessLookups mem clk_high clk_low addr0 addr1 addr2 new_value is_real) k = 0 := by
-  have hz : (is_real.val : ℤ) = 0 := by simp only [h, ZMod.val_zero, Nat.cast_zero]
   intro k
-  simp only [memAccessLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, hz, neg_zero,
-    ite_self, add_zero]
+  simp only [memAccessLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, h, ZMod.val_zero,
+    Nat.cast_zero, neg_zero, ite_self, add_zero]
 
 /-- **Projection = emission (memory access).** The real-address projection `memAccessLookups` equals the
 `Memory`-filtered, `toAccess`-imaged interactions the native `Readers/MemoryAccess` block emits — the
@@ -423,23 +417,15 @@ structure TraceMemClkValid (rows : List (Trace.RowView (ZMod p))) : Prop where
 hypothesis the vendored closure (`isConsistentOnline_iff_isConsistentOffline`) requires. -/
 theorem memAccessList_isTimestampSorted (rows : List (Trace.RowView (ZMod p)))
     (h : TraceMemClkValid rows) : (memAccessList rows).isTimestampSorted := by
-  change List.Pairwise timestamp_ordering (rows.reverse.flatMap _)
-  rw [List.pairwise_flatMap]
-  refine ⟨?_, h.inter_row_sorted⟩
-  intro r hr
-  rw [List.mem_reverse] at hr
-  exact h.intra_row_sorted r hr
+  rw [MemoryAccessList.isTimestampSorted, memAccessList, List.pairwise_flatMap]
+  exact ⟨fun r hr => h.intra_row_sorted r (List.mem_reverse.mp hr), h.inter_row_sorted⟩
 
 /-- **No-duplicate-timestamps discharge.** Under `TraceMemClkValid`, the encoded access list has no
 repeated timestamps — the closure's second hypothesis. -/
 theorem memAccessList_Notimestampdup (rows : List (Trace.RowView (ZMod p)))
     (h : TraceMemClkValid rows) : (memAccessList rows).Notimestampdup := by
-  have h_sorted := memAccessList_isTimestampSorted rows h
-  change List.Pairwise MemoryAccessList.timestamps_neq _
-  apply List.Pairwise.imp ?_ h_sorted
-  intro x y hxy
-  obtain ⟨t2, _, _, _⟩ := x
-  obtain ⟨t1, _, _, _⟩ := y
+  refine List.Pairwise.imp ?_ (memAccessList_isTimestampSorted rows h)
+  rintro ⟨t2, _, _, _⟩ ⟨t1, _, _, _⟩ hxy
   simp only [timestamp_ordering] at hxy
   simp only [MemoryAccessList.timestamps_neq]
   omega
@@ -519,14 +505,14 @@ def eventsAt (rows : List (Trace.RowView (ZMod p))) (addr : ℕ) : List (MemEven
 (`∈ memEventsFiltered`). Shared by the single-address chain proof and the `isU64` recovery. -/
 theorem mem_memEventsFiltered_of_mem_eventsAt {rows : List (Trace.RowView (ZMod p))}
     {addr : ℕ} {e : MemEvent (ZMod p)} (he : e ∈ eventsAt rows addr) :
-    e ∈ memEventsFiltered rows := by
-  rw [eventsAt] at he; exact List.mem_of_mem_filter he
+    e ∈ memEventsFiltered rows :=
+  List.mem_of_mem_filter he
 
 /-- Membership in `eventsAt rows addr` pins the event's address (`.val`). -/
 theorem addr_of_mem_eventsAt {rows : List (Trace.RowView (ZMod p))}
     {addr : ℕ} {e : MemEvent (ZMod p)} (he : e ∈ eventsAt rows addr) :
     e.addr.val = addr := by
-  rw [eventsAt] at he; have := (List.mem_filter.mp he).2; simpa using this
+  simpa using (List.mem_filter.mp he).2
 
 /-- The vendored `filterAddress` of the filtered access list is `eventsAt` mapped through `toAccess` —
 the bridge that lets the per-address single-address proof work at the event level (where `prevTs` lives).
@@ -688,10 +674,7 @@ theorem mem_neg_entry_is_recv [NeZero p] (r : Trace.RowView (ZMod p)) (hwf : Mem
   · -- op_b receive
     simp only [multOf] at hneg
     have hisreal : r.is_real ≠ 0 := fun h0 => by simp [h0] at hneg
-    have himmb : r.adapter.imm_b = 0 := by
-      rcases hwfb with h | h
-      · exact h
-      · simp [h] at hneg
+    have himmb : r.adapter.imm_b = 0 := hwfb.resolve_right fun h => by simp [h] at hneg
     refine ⟨opBEvent r, ?_, ?_⟩
     · rw [rowMemEventsGated, if_neg hisreal, if_pos himmb]
       exact List.mem_cons.mpr (Or.inr (List.mem_append.mpr (Or.inl (List.mem_cons.mpr (Or.inl rfl)))))
@@ -701,10 +684,7 @@ theorem mem_neg_entry_is_recv [NeZero p] (r : Trace.RowView (ZMod p)) (hwf : Mem
   · -- op_c receive
     simp only [multOf] at hneg
     have hisreal : r.is_real ≠ 0 := fun h0 => by simp [h0] at hneg
-    have himmc : r.adapter.imm_c = 0 := by
-      rcases hwfc with h | h
-      · exact h
-      · simp [h] at hneg
+    have himmc : r.adapter.imm_c = 0 := hwfc.resolve_right fun h => by simp [h] at hneg
     refine ⟨opCEvent r, ?_, ?_⟩
     · rw [rowMemEventsGated, if_neg hisreal, if_pos himmc]
       exact List.mem_cons.mpr (Or.inr (List.mem_append.mpr (Or.inr (List.mem_cons.mpr (Or.inl rfl)))))
@@ -753,16 +733,14 @@ theorem isConsistentSingleAddress_of_chain :
     intro h_sorted h_adj h_gen
     cases rest with
     | nil =>
-      have hz : wordToNat e.prevValue = 0 := h_gen (by simp)
-      simpa [MemEvent.toAccess, MemoryAccessList.isConsistentSingleAddress] using hz
+      simpa [MemEvent.toAccess, MemoryAccessList.isConsistentSingleAddress] using h_gen (by simp)
     | cons e' rest' =>
-      have hR : wordToNat e.prevValue = wordToNat e'.value := (List.isChain_cons_cons.mp h_adj).1
       have hrec := ih (List.Pairwise.of_cons h_sorted) (List.isChain_cons_cons.mp h_adj).2 (by
         intro _
         have hg := h_gen (by simp)
         rwa [List.getLast_cons (by simp)] at hg)
       simp only [List.map_cons, MemoryAccessList.isConsistentSingleAddress, MemEvent.toAccess]
-      exact ⟨hR, hrec⟩
+      exact ⟨(List.isChain_cons_cons.mp h_adj).1, hrec⟩
 
 /-- **Timestamp injectivity of filtered events.** Two filtered events with equal low clock are equal
 (from `Notimestampdup`: the mapped access list has pairwise-distinct timestamps). The Memory analogue of
@@ -803,8 +781,7 @@ theorem getLast_clk_le {events : List (MemEvent (ZMod p))}
       (by rw [List.length_map]; omega) (by rw [List.length_map]; omega) (by omega)
     simp only [List.getElem_map, MemEvent.toAccess, timestamp_ordering] at hp
     rw [← hgi]; omega
-  · have hieq : i = events.length - 1 := by omega
-    subst hieq
+  · obtain rfl : i = events.length - 1 := by omega
     exact le_of_eq (by rw [← hgi])
 
 /-- **Provider-is-genesis (honest residual).** A `memProv` boundary entry sitting at an event's send key
@@ -828,10 +805,9 @@ theorem isConsistentSingleAddress_of_balance [NeZero p] (rows : List (Trace.RowV
     (h_bal : isConsistentBalanced (aggregateChipRows rows memoryLookups ++ memProv))
     (h_sorted : MemoryAccessList.isTimestampSorted ((eventsAt rows addr).map MemEvent.toAccess)) :
     MemoryAccessList.isConsistentSingleAddress ((eventsAt rows addr).map MemEvent.toAccess) h_sorted := by
-  have hsub : ∀ {e}, e ∈ eventsAt rows addr → e ∈ memEventsFiltered rows := by
-    intro e he; exact mem_memEventsFiltered_of_mem_eventsAt he
-  have haddr : ∀ {e}, e ∈ eventsAt rows addr → e.addr.val = addr := by
-    intro e he; exact addr_of_mem_eventsAt he
+  have hsub : ∀ {e}, e ∈ eventsAt rows addr → e ∈ memEventsFiltered rows :=
+    mem_memEventsFiltered_of_mem_eventsAt
+  have haddr : ∀ {e}, e ∈ eventsAt rows addr → e.addr.val = addr := addr_of_mem_eventsAt
   refine isConsistentSingleAddress_of_chain (eventsAt rows addr) h_sorted ?_ ?_
   · -- adjacency: each read equals the next (earlier) write
     rw [List.isChain_iff_getElem]

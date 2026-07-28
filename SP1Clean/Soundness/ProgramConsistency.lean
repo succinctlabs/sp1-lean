@@ -5,7 +5,6 @@ import SP1Clean.Model.ProgramChip
 import SP1Clean.Model.InteractionProjection
 import SP1Clean.Model.InteractionRecovery
 
-
 /-! # Trace-level Program-bus (instruction-fetch) consistency
 
 The trace-level meaning of the `.program` interaction that `Readers/RTypeReader.lean` + the chip
@@ -14,7 +13,7 @@ emits one `send (.program …) is_trusted` per row (`Extracted/RTypeReader.lean:
 instruction fetch — gated, on the Add chip, by `is_real` (`is_trusted = is_real`).
 
 We project each row to a single signed `LookupAccess` contribution (`Row.programLookups`, `+is_real`)
-feeding the multiset bus of `Foundations/InteractionBus.lean`, and to a `ProgramAccess` record. The
+feeding the multiset bus of `Model/InteractionBus.lean`, and to a `ProgramAccess` record. The
 program-bus consistency is **membership**: every real row's fetched `(pc, opcode, operands)` tuple lies
 in the committed program ROM. That ROM is the off-chip `ProgramChip`'s receive side, not modelled here,
 so — exactly as the State bus threads `TraceStateLink` — the membership link is threaded as
@@ -106,11 +105,9 @@ single signed contribution has multiplicity 0. The emission is `is_real`-gated, 
 `send … is_trusted` (`is_trusted = is_real` on Add). -/
 theorem programLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_real = 0) :
     ∀ k, multiplicitySum (programLookups r) k = 0 := by
-  have hz : ((programAccess r).is_real.val : ℤ) = 0 := by
-    simp only [programAccess, h, ZMod.val_zero, Nat.cast_zero]
   intro k
-  simp only [programLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, hz,
-    neg_zero, ite_self, add_zero]
+  simp only [programLookups, programAccess, multiplicitySum_cons, multiplicitySum_nil, multOf, h,
+    ZMod.val_zero, Nat.cast_zero, neg_zero, ite_self, add_zero]
 
 /-- **`TraceProgramLink` discharged down to bus balance.** Given a native `ProgramProvider` (SP1's
 preprocessed program/decode chip — it carries only validly-decoded ROM rows, `Chips/ProgramChip.lean`)

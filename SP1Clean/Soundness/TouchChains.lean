@@ -2,11 +2,11 @@ import SP1Clean.Model.Semantics.Truth
 
 /-! # Intra-row same-key touch chains — the SP-6 port
 
-The production port of the SP-6 de-risk spike (retired from `docs/spikes/`; in git history): within one row at window time `t`,
-the same-key Memory touches form a **slot-ordered chain** — the first pull claims a strictly
-pre-row record, each later pull re-claims the row's own previous push, and push times are strictly
-increasing inside the row window. This admits register-alias rows (`add x1, x1, x2`; `bne x1, x1`),
-which the previous `RowOK.locs_nodup` invariant excluded.
+The production port of the SP-6 de-risk spike (retired from `docs/spikes/`; in git history): within
+one row at window time `t`, the same-key Memory touches form a **slot-ordered chain** — the first
+pull claims a strictly pre-row record, each later pull re-claims the row's own previous push, and
+push times are strictly increasing inside the row window. This admits register-alias rows
+(`add x1, x1, x2`; `bne x1, x1`), which the previous `RowOK.locs_nodup` invariant excluded.
 
 Everything here is restated over the real bus types: keys are `MemoryMsg.locOf`, times are
 `MemoryMsg.timeNat`/`StateMsg.timeNat`, rows are `RowFacts`. The multiset algebra is Fact-free, so
@@ -62,8 +62,7 @@ def writeOffset : MemLoc → ℕ
 
 @[simp] lemma writeOffset_ram (cell : RamCell) : writeOffset (MemLoc.ram cell) = 1 := rfl
 
-lemma writeOffset_le (loc : MemLoc) : writeOffset loc ≤ 4 := by
-  cases loc <;> simp
+lemma writeOffset_le (loc : MemLoc) : writeOffset loc ≤ 4 := by cases loc <;> simp
 
 /-- The per-location inclusive pre-effect read-window width: register reads observe pre-write
 content anywhere in `[t, t + 3]`; RAM reads must sit at `δ = 0` (read time `= t`), since the RAM
@@ -76,8 +75,7 @@ def readWindow : MemLoc → ℕ
 
 @[simp] lemma readWindow_ram (cell : RamCell) : readWindow (MemLoc.ram cell) = 0 := rfl
 
-lemma readWindow_le (loc : MemLoc) : readWindow loc ≤ 3 := by
-  cases loc <;> simp
+lemma readWindow_le (loc : MemLoc) : readWindow loc ≤ 3 := by cases loc <;> simp
 
 /-! ## Optional boundary records -/
 
@@ -90,9 +88,7 @@ def optMS {α : Type} (o : Option α) : Multiset α := ↑o.toList
 @[simp] lemma optMS_some {α : Type} (a : α) : optMS (some a) = {a} := rfl
 
 lemma mem_optMS {α : Type} {a : α} {o : Option α} : a ∈ optMS o ↔ o = some a := by
-  cases o with
-  | none => simp
-  | some b => simp [eq_comm]
+  cases o <;> simp [eq_comm]
 
 /-! ## Touches -/
 
@@ -142,20 +138,16 @@ structure TouchOK (t : ℕ) (mp : MemoryMsg (ZMod p) × ℕ) (q : MemoryMsg (ZMo
 /-- All pushes land at/after the row window start. -/
 lemma TouchOK.push_lo {t : ℕ} {mp : MemoryMsg (ZMod p) × ℕ} {q : MemoryMsg (ZMod p)}
     (h : TouchOK t mp q) : t ≤ MemoryMsg.timeNat q := by
-  rcases h.push_kind with ⟨-, hq⟩ | hq
-  · have := h.read_lo
-    omega
-  · omega
+  have := h.read_lo
+  rcases h.push_kind with ⟨-, hq⟩ | hq <;> omega
 
 /-- All pushes land by the row's last effect slot. -/
 lemma TouchOK.push_hi {t : ℕ} {mp : MemoryMsg (ZMod p) × ℕ} {q : MemoryMsg (ZMod p)}
     (h : TouchOK t mp q) : MemoryMsg.timeNat q ≤ t + 4 := by
-  rcases h.push_kind with ⟨-, hq⟩ | hq
-  · have h1 := h.read_hi
-    have h2 := readWindow_le (MemoryMsg.locOf mp.1)
-    omega
-  · have := writeOffset_le (MemoryMsg.locOf q)
-    omega
+  have h1 := h.read_hi
+  have h2 := readWindow_le (MemoryMsg.locOf mp.1)
+  have h3 := writeOffset_le (MemoryMsg.locOf q)
+  rcases h.push_kind with ⟨-, hq⟩ | hq <;> omega
 
 /-! ## Per-key touch chains of a row -/
 
@@ -194,20 +186,16 @@ structure ChainOK (loc : MemLoc) (t : ℕ) (c : List (Touch p)) : Prop where
 lemma ChainOK.push_lo {loc : MemLoc} {t : ℕ} {c : List (Touch p)} (h : ChainOK loc t c) :
     ∀ pq ∈ c, t ≤ MemoryMsg.timeNat pq.2 := by
   intro pq hpq
-  rcases h.push_kind pq hpq with ⟨-, ht⟩ | hw
-  · have := h.read_lo pq hpq
-    omega
-  · omega
+  have := h.read_lo pq hpq
+  rcases h.push_kind pq hpq with ⟨-, ht⟩ | hw <;> omega
 
 lemma ChainOK.push_hi {loc : MemLoc} {t : ℕ} {c : List (Touch p)} (h : ChainOK loc t c) :
     ∀ pq ∈ c, MemoryMsg.timeNat pq.2 ≤ t + 4 := by
   intro pq hpq
-  rcases h.push_kind pq hpq with ⟨-, ht⟩ | hw
-  · have h1 := h.read_hi pq hpq
-    have h2 := readWindow_le loc
-    omega
-  · have := writeOffset_le loc
-    omega
+  have h1 := h.read_hi pq hpq
+  have h2 := readWindow_le loc
+  have h3 := writeOffset_le loc
+  rcases h.push_kind pq hpq with ⟨-, ht⟩ | hw <;> omega
 
 lemma ChainOK.tail {loc : MemLoc} {t : ℕ} {a : Touch p} {c : List (Touch p)}
     (h : ChainOK loc t (a :: c)) : ChainOK loc t c where
@@ -437,8 +425,7 @@ theorem chainLinks_of_balance {loc : MemLoc} {t : ℕ} {live : Option (MemoryMsg
       · exact absurd h (headPull_not_matched hslot hhi hok.push_mono hP)
     have hbal' : pq.1.1 ::ₘ ((↑(chainPushes (pq :: rest)) : Multiset (MemoryMsg (ZMod p))) + P)
         = ↑(chainPulls (pq :: rest)) + R := by
-      rw [hlive, optMS_some, Multiset.singleton_add] at hbal
-      exact hbal
+      rwa [hlive, optMS_some, Multiset.singleton_add] at hbal
     obtain ⟨-, hlink⟩ := chainLinks_aux (pq :: rest) pq.1.1 P R hslot hhi hok.push_mono hP hbal'
     exact ⟨hlive, hlink⟩
 
@@ -460,12 +447,10 @@ theorem chainForcing_step {t : ℕ} {live : MemoryMsg (ZMod p)} {own : List (Tou
   rw [hhead] at hshift
   have hstep : (own.getLast hne).2 ::ₘ ((↑(chainPulls own) : Multiset (MemoryMsg (ZMod p))) + P)
       = ↑(chainPulls own) + R := by
-    rw [← Multiset.cons_add, ← hshift, Multiset.cons_add]
-    exact hbal
+    rw [← Multiset.cons_add, ← hshift, Multiset.cons_add]; exact hbal
   have h2 : (↑(chainPulls own) : Multiset (MemoryMsg (ZMod p))) + ((own.getLast hne).2 ::ₘ P)
       = ↑(chainPulls own) + R := by
-    rw [Multiset.add_cons]
-    exact hstep
+    rw [Multiset.add_cons]; exact hstep
   exact ⟨add_left_cancel h2, hhi _ (List.getLast_mem hne)⟩
 
 /-- **The walk's per-key induction step** (the design-literal composite consuming the `t + 8`
@@ -484,8 +469,7 @@ theorem chainForcing_step_of_gap {loc : MemLoc} {t : ℕ} {live : Option (Memory
   obtain ⟨hlive, hlink⟩ := chainLinks_of_balance hne hok hP hbal
   have hbal' : (own.head hne).1.1 ::ₘ ((↑(chainPushes own) : Multiset (MemoryMsg (ZMod p))) + P)
       = ↑(chainPulls own) + R := by
-    rw [hlive, optMS_some, Multiset.singleton_add] at hbal
-    exact hbal
+    rwa [hlive, optMS_some, Multiset.singleton_add] at hbal
   obtain ⟨hcancel, hlast⟩ := chainForcing_step hne hlink rfl hok.push_hi hbal'
   exact ⟨hlive, hlink, hcancel, hlast⟩
 
@@ -507,23 +491,10 @@ private lemma readback_of_succ {loc : MemLoc} {t : ℕ} {a b : Touch p} {rest : 
       (List.isChain_cons_cons.mp hok.push_mono).1
     have hb_mem : b ∈ a :: b :: rest := List.mem_cons_of_mem _ List.mem_cons_self
     have hbhi := hok.read_hi b hb_mem
-    rcases hok.push_kind b hb_mem with ⟨-, hbt⟩ | hbw
-    · cases loc with
-      | reg i =>
-        rw [writeOffset_reg] at hw
-        rw [readWindow_reg] at hbhi
-        omega
-      | ram addr =>
-        rw [writeOffset_ram] at hw
-        rw [readWindow_ram] at hbhi
-        omega
-    · cases loc with
-      | reg i =>
-        rw [writeOffset_reg] at hw hbw
-        omega
-      | ram addr =>
-        rw [writeOffset_ram] at hw hbw
-        omega
+    -- at both locations the read window closes at or before the write slot, so no same-key slot
+    -- can follow a write: `reg` 3 ≤ 4, `ram` 0 ≤ 1.
+    have hle : readWindow loc ≤ writeOffset loc := by cases loc <;> simp
+    rcases hok.push_kind b hb_mem with ⟨-, hbt⟩ | hbw <;> omega
 
 /-- **Chain pull currency**: every pull in a linked chain carries the head pull's value — later
 pulls re-claim read-backs only, since nothing can follow a write. -/
@@ -533,9 +504,7 @@ lemma chain_pull_values {loc : MemLoc} {t : ℕ} :
       ∀ (hc : c ≠ []), ∀ pq ∈ c, pq.1.1.value = (c.head hc).1.1.value
   | [], _, _, hc => absurd rfl hc
   | [a], _, _, _ => by
-      intro pq hpq
-      rcases List.mem_singleton.mp hpq with rfl
-      rfl
+      intro pq hpq; rw [List.mem_singleton.mp hpq]; rfl
   | a :: b :: rest, hok, hlink, _ => by
       intro pq hpq
       rcases List.mem_cons.mp hpq with rfl | hpq'
@@ -555,8 +524,7 @@ lemma chain_push_values {loc : MemLoc} {t : ℕ} :
   | [], _, _, hc, _ => absurd rfl hc
   | [a], _, _, _, hlast => by
       intro pq hpq
-      rcases List.mem_singleton.mp hpq with rfl
-      simpa using hlast
+      rw [List.mem_singleton.mp hpq]; simpa using hlast
   | a :: b :: rest, hok, hlink, _, hlast => by
       have hlast' := hlast
       rw [List.getLast_cons (List.cons_ne_nil b rest)] at hlast'
@@ -577,9 +545,7 @@ lemma chain_pull_head_or_push :
       ∀ pq ∈ c, pq.1.1 = (c.head hc).1.1 ∨ pq.1.1 ∈ chainPushes c
   | [], hc, _ => absurd rfl hc
   | [a], _, _ => by
-      intro pq hpq
-      rcases List.mem_singleton.mp hpq with rfl
-      exact Or.inl rfl
+      intro pq hpq; rw [List.mem_singleton.mp hpq]; exact Or.inl rfl
   | a :: b :: rest, _, hlink => by
       intro pq hpq
       rcases List.mem_cons.mp hpq with rfl | hpq'
@@ -602,10 +568,8 @@ private lemma coe_map_pop {α β : Type} (f : α → β) (l1 l2 : List α) (r : 
 
 /-- Re-insert the popped row into a batch membership. -/
 lemma mem_middle {α : Type} {l1 l2 : List α} (r₀ : α) {r : α} (h : r ∈ l1 ++ l2) :
-    r ∈ l1 ++ r₀ :: l2 := by
-  rcases List.mem_append.mp h with h | h
-  · exact List.mem_append_left _ h
-  · exact List.mem_append_right _ (List.mem_cons_of_mem _ h)
+    r ∈ l1 ++ r₀ :: l2 :=
+  List.mem_append.mpr ((List.mem_append.mp h).imp id (List.mem_cons_of_mem _))
 
 /-- **State-balance uniqueness of the minimal row** (proved, not assumed — SP-6 invariant 2). With
 the `+8` clock discipline and all pull times `≥ t`, once the popped row pulls the head record at
@@ -633,15 +597,12 @@ theorem stateBalance_unique_minimal {t : ℕ} {head fin : StateMsg (ZMod p)}
       ∈ head ::ₘ (↑((l1 ++ r₀ :: l2).map (·.statePush)) : Multiset (StateMsg (ZMod p))) := by
     rw [hbal]
     exact Multiset.mem_cons_of_mem (Multiset.mem_coe.mpr (List.mem_map_of_mem hr'_full))
-  have hr'_head : r'.statePull = head := by
-    rcases Multiset.mem_cons.mp hmem with h | h
-    · exact h
-    · exfalso
-      obtain ⟨r'', hr''_mem, heq⟩ := List.mem_map.mp (Multiset.mem_coe.mp h)
-      have h8 := htime8 r'' hr''_mem
-      have hm := hmin r'' hr''_mem
-      rw [heq] at h8
-      omega
+  have hr'_head : r'.statePull = head := (Multiset.mem_cons.mp hmem).resolve_right fun h => by
+    obtain ⟨r'', hr''_mem, heq⟩ := List.mem_map.mp (Multiset.mem_coe.mp h)
+    have h8 := htime8 r'' hr''_mem
+    have hm := hmin r'' hr''_mem
+    rw [heq] at h8
+    omega
   -- Step 2: two copies of `head` among the pulls sink the balance — cancelling the left `head`
   -- forces some push to equal `head`, impossible by the `+8` time discipline.
   have hpop : (↑((l1 ++ r₀ :: l2).map (·.statePull)) : Multiset (StateMsg (ZMod p)))

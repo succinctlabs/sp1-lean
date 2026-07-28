@@ -110,17 +110,14 @@ theorem commitRowsMatch {Digest : Type}
     (valid : CoreAIR.Current.Relation binds .execution statement witness) :
     CoreAIR.CommitRowsMatch statement.publicValues
       (proofs.decode statement witness).syscallEvents := by
+  have transcript := proofs.syscallTranscript statement witness valid
   constructor
   · intro event eventMem index canonical indexEq
-    have sourceMem : event ∈ CoreAIR.Current.syscallEvents witness := by
-      rw [← proofs.syscallTranscript statement witness valid]
-      exact eventMem
-    exact proofs.publicCommitOperand statement witness valid event sourceMem index canonical indexEq
+    rw [transcript] at eventMem
+    exact proofs.publicCommitOperand statement witness valid event eventMem index canonical indexEq
   · intro event eventMem index canonical indexEq
-    have sourceMem : event ∈ CoreAIR.Current.syscallEvents witness := by
-      rw [← proofs.syscallTranscript statement witness valid]
-      exact eventMem
-    exact proofs.deferredCommitOperand statement witness valid event sourceMem index canonical indexEq
+    rw [transcript] at eventMem
+    exact proofs.deferredCommitOperand statement witness valid event eventMem index canonical indexEq
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Assemble the explicit boundary/execution proof fields into the public shard-case proposition. -/
