@@ -49,6 +49,15 @@ A violation is a defect: revert and re-dispatch.
    This rule is what makes it safe to edit files at different topological depths in one gate group —
    with statements frozen, attributes suspended (§10), and `def` bodies untouched, there is no
    channel by which one worker's edit can invalidate another's LSP verdict.
+
+   > **But separate the two schedules.** Correctness permits a mixed-depth *gate group*; workability
+   > does not permit a mixed-depth *editing round*. While any worker holds a shallow file dirty on
+   > disk, every file importing it answers only `Imports are out of date and must be rebuilt`, and
+   > that lockout does **not** self-clear (`lean_goal` does not help; the olean's recorded source hash
+   > genuinely differs — diagnose by comparing `<Mod>.trace` against `<Mod>.trace.nobuild`). A whole
+   > W1 batch lost in-place verification this way. So: **one editing round = one depth level** (a true
+   > antichain, no import edges by construction), but **one gate = many rounds**. Rounds are free;
+   > gate builds are ~10 minutes.
 5. **Never introduce** `native_decide` into `SP1Clean/`, or `skipKernelTC` anywhere.
 6. **Never unsqueeze `simp only` → `simp`.** The permitted direction is `simp` → `simp only`, and
    only outside the KEEP-set (§5).
@@ -241,6 +250,26 @@ binding site was recorded once as `sra_close_su16_3_case` and is actually `srlw_
 pinning that single lemma leaves ~42 of the file's 43 declarations clean at the plain default. Always
 confirm which declaration owns the reported line before concluding a whole file needs a budget — and
 prefer a **scoped `set_option … in` on the one lemma** over a file-scoped ceiling.
+
+Two refinements, both measured:
+
+- **At very low rungs the error is reported at the shared `variable` line**, which is useless for
+  attribution. Separate ownership by laddering the sites at *different* rungs until each failure
+  lands inside a declaration body.
+- **Re-ladder after fixing a cause — the owner moves.** `SailWrap.lean`'s ceiling was owned by two
+  lemmas before its `acLt` fix and by a completely different third lemma afterwards. A floor measured
+  before the fix tells you nothing about the file after it.
+
+**1b. Permutative-`simp` term ordering over a dependent cast.** A **permutative** `@[simp]` lemma
+(`a ∘ b = b ∘ a` shaped — here `Std.ExtDHashMap.insert_insert_comm` in `Math/Misc.lean`) makes `simp`
+decide the rewrite direction with `Lean.Meta.acLt`, whose cost scales with the size of the compared
+arguments. When one argument is a `▸` cast whose proof is a wide `match` (`reg_idx_must_64 idx ▸ val`,
+a 31-arm match), that comparison dominates everything. It presents as an opaque
+`(deterministic) timeout at «Lean.Meta.acLt»` **with no hint of which simp lemma is responsible** —
+the tactic looks innocent. Diagnostic: find a sibling lemma doing the same rewrite *without* the
+cast; if it passes at the default, the cast is the cost. Fix inside the proof body: `unfold`, then
+`generalize` the cast away, then run the original tactic. This was `Model/SailWrap.lean`'s entire
+ceiling, and the lemma is tagged globally, so the hazard reaches every `simp` over that head symbol.
 
 **2. A duplicated `.val`-bridge fact — a raised ceiling as proxy, not term-intrinsic cost.** Look for the repeated `have` before you touch the
 number. `ShiftLeftChip/Core.lean` carried 16 ceilings; its SLLW half was re-deriving `mul_v_val` /
