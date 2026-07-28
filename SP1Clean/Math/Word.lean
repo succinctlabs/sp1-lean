@@ -16,7 +16,8 @@ variable {p : ℕ}
 /-- The `Mul`/`DivRem`/capstone strong field bound subsumes the project-standard `2^17` bound. -/
 instance instFact_2_17_of_2_24 [Fact (2 ^ 24 < p)] : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
-/-- The engine's machine-level bound (SP-3: state axis `2^24+256`, memory axis `2^25+2^17`) subsumes the strong chip bound. Dormant until the engine (proposal step S4) consumes it. -/
+/-- The engine's machine-level bound (SP-3: state axis `2^24+256`, memory axis `2^25+2^17`) subsumes
+the strong chip bound. Dormant until the engine (proposal step S4) consumes it. -/
 instance instFact_2_24_of_2_25 [Fact (2 ^ 25 < p)] : Fact (2 ^ 24 < p) := ⟨by have := Fact.out (p := 2 ^ 25 < p); omega⟩
 
 -- Project-wide `circuit_norm` augmentation. These four pure, terminating projections recur inline in
@@ -120,68 +121,57 @@ lemma ofNat64_clear_lsb_and {M b : ℕ} (hb : b ≤ 1) (hM : M % 2 = 0) :
 /-! ## Field constants (`ZMod p`, `Fact (2 ^ 17 < p)`) -/
 
 @[simp] lemma val_65536_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (65536 : ZMod p).val = 65536 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (65536 : ℕ) < p by omega)
+    (65536 : ZMod p).val = 65536 :=
+  ZMod.val_natCast_of_lt (show (65536 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 lemma val_65536_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (65536 : ZMod p) ≠ 0 := by
   simp [← ZMod.val_eq_zero, val_65536_zmod_p]
 
 @[simp] lemma val_2_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (2 : ZMod p).val = 2 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (2 : ℕ) < p by omega)
+    (2 : ZMod p).val = 2 :=
+  ZMod.val_natCast_of_lt (show (2 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 @[simp] lemma val_3_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (3 : ZMod p).val = 3 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (3 : ℕ) < p by omega)
+    (3 : ZMod p).val = 3 :=
+  ZMod.val_natCast_of_lt (show (3 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 @[simp] lemma val_4_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (4 : ZMod p).val = 4 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (4 : ℕ) < p by omega)
+    (4 : ZMod p).val = 4 :=
+  ZMod.val_natCast_of_lt (show (4 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 lemma val_4_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (4 : ZMod p) ≠ 0 := by
   simp [← ZMod.val_eq_zero, val_4_zmod_p]
 
 @[simp] lemma val_8_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (8 : ZMod p).val = 8 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (8 : ℕ) < p by omega)
+    (8 : ZMod p).val = 8 :=
+  ZMod.val_natCast_of_lt (show (8 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 lemma val_8_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (8 : ZMod p) ≠ 0 := by
   simp [← ZMod.val_eq_zero, val_8_zmod_p]
 
 @[simp] lemma val_13_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (13 : ZMod p).val = 13 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (13 : ℕ) < p by omega)
+    (13 : ZMod p).val = 13 :=
+  ZMod.val_natCast_of_lt (show (13 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 @[simp] lemma val_14_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (14 : ZMod p).val = 14 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (14 : ℕ) < p by omega)
+    (14 : ZMod p).val = 14 :=
+  ZMod.val_natCast_of_lt (show (14 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 @[simp] lemma val_16_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (16 : ZMod p).val = 16 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
+    (16 : ZMod p).val = 16 :=
+  ZMod.val_natCast_of_lt (show (16 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 @[simp] lemma val_32_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (32 : ZMod p).val = 32 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (32 : ℕ) < p by omega)
+    (32 : ZMod p).val = 32 :=
+  ZMod.val_natCast_of_lt (show (32 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 @[simp] lemma val_64_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (64 : ZMod p).val = 64 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (64 : ℕ) < p by omega)
+    (64 : ZMod p).val = 64 :=
+  ZMod.val_natCast_of_lt (show (64 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 @[simp] lemma val_32768_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (32768 : ZMod p).val = 32768 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (32768 : ℕ) < p by omega)
+    (32768 : ZMod p).val = 32768 :=
+  ZMod.val_natCast_of_lt (show (32768 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 /-- The `÷4` alignment check `(x · 4⁻¹).val < 2^14` pins `x = (x · 4⁻¹) · 4` exactly in `ℕ`: since
 `(x · 4⁻¹).val · 4 < 2^16 < p` there is no wrap, so `x.val = (x · 4⁻¹).val · 4`. The shared core of the
@@ -190,7 +180,6 @@ lemma val_eq_mul_inv_four_mul_four [Fact p.Prime] [Fact (2 ^ 17 < p)] {x : ZMod 
     (h : (x * (4 : ZMod p)⁻¹).val < 2 ^ 14) : x.val = (x * (4 : ZMod p)⁻¹).val * 4 := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  rw [show (2 : ℕ) ^ 14 = 16384 from by norm_num] at h
   have h41 : (4 : ZMod p)⁻¹ * 4 = 1 := inv_mul_cancel₀ val_4_ne_zero
   conv_lhs => rw [show x = (x * (4 : ZMod p)⁻¹) * 4 by rw [mul_assoc, h41, mul_one]]
   rw [ZMod.val_mul, val_4_zmod_p, Nat.mod_eq_of_lt (by omega)]
@@ -207,13 +196,11 @@ the field subtraction `value[0] - lsb` to `ℕ`. -/
 lemma val_lt_65536_of_mul_inv_four_lt [Fact p.Prime] [Fact (2 ^ 17 < p)] {x : ZMod p}
     (h : (x * (4 : ZMod p)⁻¹).val < 2 ^ 14) : x.val < 2 ^ 16 := by
   have he := val_eq_mul_inv_four_mul_four h
-  rw [show (2 : ℕ) ^ 14 = 16384 from by norm_num] at h
-  rw [he, show (2 : ℕ) ^ 16 = 65536 from by norm_num]; omega
+  omega
 
 @[simp] lemma val_65535_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
-    (65535 : ZMod p).val = 65535 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (65535 : ℕ) < p by omega)
+    (65535 : ZMod p).val = 65535 :=
+  ZMod.val_natCast_of_lt (show (65535 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 lemma val_65535_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (65535 : ZMod p) ≠ 0 := by
   simp [← ZMod.val_eq_zero, val_65535_zmod_p]
@@ -272,12 +259,16 @@ lemma bool_of_mul_pred [Fact (Nat.Prime p)] {x : ZMod p}
     rw [mul_zero, ← mul_assoc, inv_mul_cancel₀ hx, one_mul] at hx1
     linear_combination hx1
 
-set_option maxHeartbeats 2000000 in
 /-- **Sign-extension reassembly** (the ADDW/SUBW keystone). The four-limb word
 `#v[v0, v1, m*65535, m*65535]` — where `v0, v1` are the low two 16-bit limbs of a 32-bit
 result and `m ∈ {0,1}` is the high bit of `v1` — is the 64-bit sign extension of the 32-bit
 value `X` whose `toNat` is `v0 + v1*2^16`. The two high limbs realise the sign fill because
-`65535*(2^32 + 2^48) = 2^64 - 2^32`, which is exactly `toNat_signExtend`'s correction term. -/
+`65535*(2^32 + 2^48) = 2^64 - 2^32`, which is exactly `toNat_signExtend`'s correction term.
+
+Measured 2026-07-27: this lemma used to carry a scoped 2000000 heartbeat ceiling — the only one in
+`Math/`. Control at 1 heartbeat gave a real `whnf` timeout here, so the ladder is genuine; it then
+ran 20k ok / 5k ok / 2k FAIL (`whnf` on the signature plus `isDefEq` in the `split_ifs` tail). True
+floor (2000, 5000], i.e. the plain default carries ≥40x headroom, so the ceiling was removed. -/
 lemma toBitVec64_signExtend_word [NeZero p] [Fact (2 ^ 17 < p)]
     (R : Word (ZMod p)) (X : BitVec 32) (m : ZMod p)
     (hr0 : R[0].val < 2 ^ 16) (hr1 : R[1].val < 2 ^ 16)
@@ -300,12 +291,10 @@ lemma toBitVec64_signExtend_word [NeZero p] [Fact (2 ^ 17 < p)]
     rw [BitVec.msb_eq_decide, decide_eq_true_eq, hX]; omega
   split_ifs with hmsb
   · have hge : R[1].val ≥ 32768 := hmsb_iff.mp hmsb
-    have hmv : (m * 65535 : ZMod p).val = 65535 := by
-      rw [hm, if_pos hge, one_mul, val_65535_zmod_p]
+    have hmv : (m * 65535 : ZMod p).val = 65535 := by rw [hm, if_pos hge, one_mul, val_65535_zmod_p]
     rw [hr2, hr3, hmv]; omega
   · have hlt : ¬ R[1].val ≥ 32768 := fun hc => hmsb (hmsb_iff.mpr hc)
-    have hmv : (m * 65535 : ZMod p).val = 0 := by
-      rw [hm, if_neg hlt, zero_mul, ZMod.val_zero]
+    have hmv : (m * 65535 : ZMod p).val = 0 := by rw [hm, if_neg hlt, zero_mul, ZMod.val_zero]
     rw [hr2, hr3, hmv]; omega
 
 end SP1Clean
