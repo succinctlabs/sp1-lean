@@ -39,7 +39,16 @@
 # BitwiseOperation/Populate.lean each dropped a 2000000 on `spec_populate` (floors in (5000, 10000]
 # for both — the structurally identical AddOperation.spec_populate never carried one). The measured
 # ladders are recorded in the doc-comments at each former site.
+# -14 (2026-07-28, proof-cleanup W2/r2): ratchet DOWN, no ceiling raised. The whole
+# `Proofs/Operations/*/Formal.lean` soundness/completeness family shed every ceiling it carried —
+# eight 1000000 and six 2000000 sites, uniformly two per file, across AddOperation, SubOperation,
+# AddrAddOperation, BitwiseOperation, U16MSBOperation, U16CompareOperation and IsZeroOperation.
+# The duplicated-fact check ran first and did find real duplication, but that was NOT the ceilings'
+# cause: every floor was already 30-100x under its ceiling BEFORE any golf, so this family was
+# carrying a plain inherited default rather than masking a whnf blowup (unlike the shift cores in
+# W1/g3). Not a single site was within 30x of its measured floor. The ladders are recorded in the
+# doc-comments at each former site.
 # NOTE: the recorded count includes one phantom — SP1Clean/Proofs/Sail/Advance.lean:2325 has the
 # literal inside a doc-comment, so the grep sees a site that does not exist. Pre-existing.
-SP1Clean 795
+SP1Clean 781
 SP1CleanTest 16

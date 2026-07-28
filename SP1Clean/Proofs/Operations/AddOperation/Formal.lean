@@ -23,12 +23,11 @@ is itself `is_real`-gated, e.g. DivRem's `abs_remainder`) can still discharge th
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 1 → Word.isU64 input.a ∧ Word.isU64 input.b) ∧ (input.is_real = 0 ∨ input.is_real = 1)
 
-set_option maxHeartbeats 1000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hab_imp, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hiv, _⟩ := h_input
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
+  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat
   have h65536 : (2 : ℕ) ^ 16 = 65536 := by norm_num
   have ev {w : Word (Expression (ZMod p))} {v : Word (ZMod p)} (h : Vector.map (Expression.eval env) w = v) :
       ∀ i (_ : i < 4), Expression.eval env w[i] = v[i] := fun i _ => by rw [← h, Vector.getElem_map]
@@ -51,26 +50,23 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     exact ⟨(byteRowSpec_range _ sixteen_lt).mp R0, (byteRowSpec_range _ sixteen_lt).mp R1,
       (byteRowSpec_range _ sixteen_lt).mp R2, (byteRowSpec_range _ sixteen_lt).mp R3⟩
 
-set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hab_imp, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hiv, _⟩ := h_input
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
+  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat
   have ev {w : Word (Expression (ZMod p))} {v : Word (ZMod p)}
       (h : Vector.map (Expression.eval env.toEnvironment) w = v) :
       ∀ i (_ : i < 4), Expression.eval env.toEnvironment w[i] = v[i] :=
     fun i _ => by rw [← h, Vector.getElem_map]
+  have key (hneg : - input_is_real = -1) :=
+    Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1
   simp only [circuit_norm, byteChannel, ev hia, ev hib, ev hiv]
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · intro hneg; rw [← c16]
-    exact (byteRowSpec_range _ sixteen_lt).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).1
-  · intro hneg; rw [← c16]
-    exact (byteRowSpec_range _ sixteen_lt).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).2.1
-  · intro hneg; rw [← c16]
-    exact (byteRowSpec_range _ sixteen_lt).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).2.2.1
-  · intro hneg; rw [← c16]
-    exact (byteRowSpec_range _ sixteen_lt).mpr (Word.lt_cases_of_isU64 (h_spec (neg_inj.mp hneg)).1).2.2.2
+  refine ⟨fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, ?_⟩
+  · rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr (key hneg).1
+  · rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr (key hneg).2.1
+  · rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr (key hneg).2.2.1
+  · rw [← c16]; exact (byteRowSpec_range _ sixteen_lt).mpr (key hneg).2.2.2
   · rcases hbin with h0 | h1
     · simp [h0]
     · obtain ⟨hv, hbv⟩ := h_spec h1

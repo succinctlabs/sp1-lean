@@ -28,7 +28,6 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
     (input.a ≠ 0 → input.cols.inverse * input.a = 1)
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   intro hr1
@@ -37,10 +36,9 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have hA : AssertSpec input_a ⟨input_cols_inverse, input_cols_result⟩ :=
     ⟨by simpa [sub_eq_add_neg] using h_eq,
       bool_of_mul_pred (by simpa only [sub_eq_add_neg] using h_bool), h_mul⟩
-  exact ⟨isZero_of_assert hA, fun ha => inverse_of_assert hA ha⟩
+  exact ⟨isZero_of_assert hA, inverse_of_assert hA⟩
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   rcases h_assumptions with h0 | h1
@@ -51,8 +49,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     · by_cases ha : input_a = 0
       · simp [hres, ha]
       · rw [hres, if_neg ha, hinv ha]; simp
-    · rw [hres]; by_cases ha : input_a = 0 <;> simp [ha]
-    · rw [hres]; by_cases ha : input_a = 0 <;> simp [ha]
+    all_goals (rw [hres]; by_cases ha : input_a = 0 <;> simp [ha])
 
 omit [Fact (2 ^ 17 < p)] in
 /-- The result `populate a` satisfies the gadget `Spec` for any `is_real`. The composing word-level

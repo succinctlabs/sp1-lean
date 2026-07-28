@@ -24,11 +24,10 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 1 → input.a.val < 2 ^ 16 ∧ input.b.val < 2 ^ 16) ∧
   (input.is_real = 0 ∨ input.is_real = 1)
 
-set_option maxHeartbeats 2000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hab, hbin⟩ := h_assumptions
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
+  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat
   simp only [circuit_norm, byteChannel] at h_holds ⊢
   obtain ⟨hr, _hbool, hgc⟩ := h_holds
   refine ⟨⟨bool_of_mul_pred hgc, ?_⟩, fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
@@ -41,14 +40,13 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   simp only [RawSpec]
   exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ sixteen_lt).mp R⟩
 
-set_option maxHeartbeats 2000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
   obtain ⟨hab, hbin⟩ := h_assumptions
   obtain ⟨hbitbool, hbiteq⟩ := h_spec
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
+  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat
   simp only [circuit_norm, byteChannel]
   refine ⟨?_, ?_, ?_⟩
   · intro hneg

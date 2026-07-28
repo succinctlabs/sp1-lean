@@ -23,7 +23,6 @@ composing operation feed free byte columns without range-checking them itself. -
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   input.opcode.val < 3 ∧ (input.is_real = 0 ∨ input.is_real = 1)
 
-set_option maxHeartbeats 2000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hopcode, hbin⟩ := h_assumptions
@@ -44,27 +43,19 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
     fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   have hneg : - input_is_real = -1 := by rw [h1]
-  have R0 := hg0 hneg; have R1 := hg1 hneg; have R2 := hg2 hneg; have R3 := hg3 hneg
-  have R4 := hg4 hneg; have R5 := hg5 hneg; have R6 := hg6 hneg; have R7 := hg7 hneg
   -- The byte table guarantees each fired send's operands are bytes and `result = byteOp`.
   have H : ∀ i : Fin 8,
       (input_cols_result[(i : ℕ)].val < 256 ∧ input_a[(i : ℕ)].val < 256 ∧ input_b[(i : ℕ)].val < 256) ∧
         input_cols_result[(i : ℕ)].val
           = byteOp input_opcode.val input_a[(i : ℕ)].val input_b[(i : ℕ)].val := by
+    have B := fun {r a b : ZMod p} => (byteRowSpec_byteOp (p := p) r a b hopcode).mp
     intro i
     fin_cases i
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R0
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R1
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R2
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R3
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R4
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R5
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R6
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R7
+    exacts [B (hg0 hneg), B (hg1 hneg), B (hg2 hneg), B (hg3 hneg),
+      B (hg4 hneg), B (hg5 hneg), B (hg6 hneg), B (hg7 hneg)]
   exact ⟨fun i => ⟨(H i).1.2.1, (H i).1.2.2⟩,
     bitwise_of_byteOp (a := input_a) (b := input_b) (fun i => (H i).2)⟩
 
-set_option maxHeartbeats 2000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hopcode, hbin⟩ := h_assumptions
@@ -93,17 +84,11 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     exact (byteRowSpec_byteOp _ _ _ hopcode).mpr
       ⟨⟨by rw [hres]; exact byteOp_lt256 _ _ _ hb.1 hb.2, hb.1, hb.2⟩, hres⟩
   simp only [circuit_norm, byteChannel, ea, eb, er]
-  refine ⟨fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, fun hneg => ?_,
-    fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, ?_⟩
-  · exact key (neg_inj.mp hneg) 0
-  · exact key (neg_inj.mp hneg) 1
-  · exact key (neg_inj.mp hneg) 2
-  · exact key (neg_inj.mp hneg) 3
-  · exact key (neg_inj.mp hneg) 4
-  · exact key (neg_inj.mp hneg) 5
-  · exact key (neg_inj.mp hneg) 6
-  · exact key (neg_inj.mp hneg) 7
-  · rcases hbin with h | h <;> rw [h] <;> simp
+  refine ⟨fun hn => key (neg_inj.mp hn) 0, fun hn => key (neg_inj.mp hn) 1,
+    fun hn => key (neg_inj.mp hn) 2, fun hn => key (neg_inj.mp hn) 3,
+    fun hn => key (neg_inj.mp hn) 4, fun hn => key (neg_inj.mp hn) 5,
+    fun hn => key (neg_inj.mp hn) 6, fun hn => key (neg_inj.mp hn) 7, ?_⟩
+  rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- The `BitwiseOperation` gadget as a Clean-native `FormalAssertion`: `is_real`- and opcode-gated
 semantic spec, byte-bus AND/OR/XOR pulls, witnessing nothing. -/
