@@ -42,10 +42,20 @@ A violation is a defect: revert and re-dispatch.
    inlining, single-use `∃`-lemma inlining). *Adding* declarations is permitted — see §4a.
 4. **Never touch** `SP1Clean/Extracted/**`, `SP1CleanTest/**/Vectors/**`, `*TraceVectors.lean`,
    `scripts/axiom_probe.lean`, or `SP1Clean.lean` (the root import index). No file moves.
-4b. **Never change a `def` / `abbrev` *body*.** Statements are already frozen by §2.1, but a `def`'s
-   body is part of its meaning: importers see it through definitional unfolding, so editing one
-   changes downstream elaboration in a way a sibling worker's cached olean cannot see. A theorem or
-   lemma *proof* body is invisible to importers and is the campaign's actual working surface.
+4b. **Never change a `def` / `abbrev` *data* body.** Statements are already frozen by §2.1, but a
+   `def`'s body is part of its meaning: importers see it through definitional unfolding, so editing
+   one changes downstream elaboration in a way a sibling worker's cached olean cannot see. A theorem
+   or lemma *proof* body is invisible to importers and is the campaign's actual working surface.
+
+   > **Exception — Prop-valued fields are fair game.** A `Prop`-valued field of a `def`/`instance`
+   > (`channelsLawful`, `localLength_eq`, `subcircuitsConsistent`, `output_eq`, and every
+   > `ElaboratedCircuit` obligation) is a *proof*, and Lean's proof irrelevance is definitional: any
+   > two proofs of the same `Prop` are already defeq, so no importer can observe which one you wrote.
+   > These are exactly as invisible as a theorem body, and they are golfable. Only **data** fields and
+   > the declaration's type are frozen. This matters: `Native/Readers/` alone carries ~90 lines of
+   > near-verbatim `channelsLawful` / `requirementsChannelsLawful` boilerplate, and
+   > `proof-patterns.md` says such obligations should almost never have a hand-written proof at all —
+   > the goal is to let Clean's default tactic close them.
    This rule is what makes it safe to edit files at different topological depths in one gate group —
    with statements frozen, attributes suspended (§10), and `def` bodies untouched, there is no
    channel by which one worker's edit can invalidate another's LSP verdict.
@@ -323,6 +333,22 @@ subject to §2.
 **Opt-in only, never applied by default:** `grind` (2.1/2.2) — a whnf-into-expensive-values risk on
 circuit goals; `lia` (2.7/3.3) — do not mass-rewrite `omega` on a 4.31 toolchain without a spot
 check; `push_neg` → `push Not` (1.19) — not adopted.
+
+**The single most common finding in this campaign: the lemma already exists, it just is not cited.**
+This repo has good shared substrate — `Native/Operations/ShiftBounds.lean` (`lo_hi_lt`, `hi_lo_lt`,
+`factor_le`), `Math/Word.lean`'s `val_N_zmod_p` / `val_N_ne_zero` families, `Math/Gate.lean`'s
+`bool_val_le`, `Math/EvalVec.lean`'s `vec4_eval` — and proofs all over the tree re-derive those exact
+facts by hand instead. Measured instances: a 20-line `key` in `ShiftLeftChip/Populate.lean` that was
+literally `ShiftBounds.hi_lo_lt`; `two_ne_zero_one` (13 lines) and `h64ne` (6 lines) hand-rolling
+`val_2_zmod_p` / `val_64_zmod_p`; `hval2` being literally `val_2_zmod_p`; four hand-rolled copies of
+mathlib's own `Nat.cast_ofNat` sitting next to a sibling file that used the real one.
+
+**So before golfing a `have`, search for it.** `lean_local_search` on the statement shape, and grep
+the `Math/` and `ShiftBounds` families. This is cheaper than any tactic golf and it is where the
+lines actually are. Two cautions learned: adding the import may be free (check whether the blanket
+`Mathlib.Tactic` it drags in is *already* in the module's closure and its consumers'), and a rewrite
+direction can be unsafe even when the forward one is fine — `rw [Nat.cast_ofNat]` is safe, while
+`rw [← Nat.cast_ofNat]` latches onto the wrong numeral.
 
 This repo's own high-yield moves:
 
