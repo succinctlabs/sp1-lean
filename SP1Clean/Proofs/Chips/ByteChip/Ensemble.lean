@@ -37,25 +37,17 @@ capstone chains the remaining buses + the State `VmTables` onto it. -/
 def byteProviderEnsemble (PublicIO : TypeMap) [ProvableType PublicIO] :
     SoundEnsemble (ZMod p) PublicIO :=
   SoundEnsemble.empty (ZMod p) PublicIO
-    |>.addTable ⟨U8Range.circuit⟩
-        (by simp [circuit_norm, U8Range.circuit]) (by simp [circuit_norm, U8Range.circuit])
-    |>.addTable ⟨MSB.circuit⟩
-        (by simp [circuit_norm, MSB.circuit]) (by simp [circuit_norm, MSB.circuit])
-    |>.addTable ⟨AndByte.circuit⟩
-        (by simp [circuit_norm, AndByte.circuit]) (by simp [circuit_norm, AndByte.circuit])
-    |>.addTable ⟨OrByte.circuit⟩
-        (by simp [circuit_norm, OrByte.circuit]) (by simp [circuit_norm, OrByte.circuit])
-    |>.addTable ⟨XorByte.circuit⟩
-        (by simp [circuit_norm, XorByte.circuit]) (by simp [circuit_norm, XorByte.circuit])
+    |>.addTable ⟨U8Range.circuit⟩ (by simp [circuit_norm, U8Range.circuit]) (by simp [circuit_norm])
+    |>.addTable ⟨MSB.circuit⟩ (by simp [circuit_norm, MSB.circuit]) (by simp [circuit_norm])
+    |>.addTable ⟨AndByte.circuit⟩ (by simp [circuit_norm, AndByte.circuit]) (by simp [circuit_norm])
+    |>.addTable ⟨OrByte.circuit⟩ (by simp [circuit_norm, OrByte.circuit]) (by simp [circuit_norm])
+    |>.addTable ⟨XorByte.circuit⟩ (by simp [circuit_norm, XorByte.circuit]) (by simp [circuit_norm])
     |>.addTable ⟨RangeChip.circuit8⟩
-        (by simp [circuit_norm, RangeChip.circuit8, RangeChip.circuit])
-        (by simp [circuit_norm, RangeChip.circuit8, RangeChip.circuit])
+        (by simp [circuit_norm, RangeChip.circuit8, RangeChip.circuit]) (by simp [circuit_norm])
     |>.addTable ⟨RangeChip.circuit13⟩
-        (by simp [circuit_norm, RangeChip.circuit13, RangeChip.circuit])
-        (by simp [circuit_norm, RangeChip.circuit13, RangeChip.circuit])
+        (by simp [circuit_norm, RangeChip.circuit13, RangeChip.circuit]) (by simp [circuit_norm])
     |>.addTable ⟨RangeChip.circuit16⟩
-        (by simp [circuit_norm, RangeChip.circuit16, RangeChip.circuit])
-        (by simp [circuit_norm, RangeChip.circuit16, RangeChip.circuit])
+        (by simp [circuit_norm, RangeChip.circuit16, RangeChip.circuit]) (by simp [circuit_norm])
     |>.addFinishedChannel byteChannel.toRaw
 
 /-- `byteChannel` is a finished channel of `byteProviderEnsemble` — the byte-bus soundness is now an

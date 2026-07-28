@@ -20,8 +20,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 def programProviderEnsemble (PublicIO : TypeMap) [ProvableType PublicIO] :
     SoundEnsemble (ZMod p) PublicIO :=
   SoundEnsemble.empty (ZMod p) PublicIO
-    |>.addTable ⟨circuit⟩
-        (by simp [circuit_norm, circuit]) (by simp [circuit_norm, circuit])
+    |>.addTable ⟨circuit⟩ (by simp [circuit_norm, circuit]) (by simp [circuit_norm])
     |>.addFinishedChannel programChannel.toRaw
 
 @[simp] theorem programProviderEnsemble_finished (PublicIO : TypeMap) [ProvableType PublicIO] :

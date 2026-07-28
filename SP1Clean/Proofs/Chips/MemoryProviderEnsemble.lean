@@ -35,8 +35,7 @@ adds when `finished = []` and `memoryChannel` finishes cleanly. Generic over `Pu
 def memoryProviderEnsemble (PublicIO : TypeMap) [ProvableType PublicIO] :
     SoundEnsemble (ZMod p) PublicIO :=
   SoundEnsemble.empty (ZMod p) PublicIO
-    |>.addTable ⟨circuit⟩
-        (by simp [circuit_norm, circuit]) (by simp [circuit_norm, circuit])
+    |>.addTable ⟨circuit⟩ (by simp [circuit_norm, circuit]) (by simp [circuit_norm])
     |>.addFinishedChannel memoryChannel.toRaw
 
 /-- `memoryChannel` is a finished channel of `memoryProviderEnsemble` — the Memory-bus `isU64` value
