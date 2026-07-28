@@ -28,7 +28,6 @@ def populate (a b : Word (ZMod p)) : Vector (ZMod p) 3 :=
   let s2 := a[2].val + b[2].val + s1 / 65536
   #v[((s0 % 65536 : ℕ) : ZMod p), ((s1 % 65536 : ℕ) : ZMod p), ((s2 % 65536 : ℕ) : ZMod p)]
 
-set_option maxHeartbeats 4000000 in
 /-- `populate a b` satisfies the gadget `Spec` when the 64-bit-truncated sum is a valid 48-bit
 address. The composing chip uses this completeness-side condition to discharge its assertion
 obligation; soundness derives the same bound from the AIR. -/

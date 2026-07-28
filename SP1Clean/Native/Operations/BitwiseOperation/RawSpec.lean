@@ -40,15 +40,15 @@ theorem bitwise_of_byteOp {a b : Vector (ZMod p) 8} {opcode : ZMod p} {result : 
   have hp : 2 ^ 17 < p := Fact.out
   refine ⟨fun hop i => ?_, fun hop i => ?_, fun hop i => ?_⟩
   · have hov : opcode.val = 0 := by
-      rw [hop, show ((0 : ZMod p)) = ((0 : ℕ) : ZMod p) from by norm_cast]
+      rw [hop, show ((0 : ZMod p)) = ((0 : ℕ) : ZMod p) by norm_cast]
       exact ZMod.val_natCast_of_lt (by omega)
     rw [h_byteOp i, hov, byteOp_zero]
   · have hov : opcode.val = 1 := by
-      rw [hop, show ((1 : ZMod p)) = ((1 : ℕ) : ZMod p) from by norm_cast]
+      rw [hop, show ((1 : ZMod p)) = ((1 : ℕ) : ZMod p) by norm_cast]
       exact ZMod.val_natCast_of_lt (by omega)
     rw [h_byteOp i, hov, byteOp_one]
   · have hov : opcode.val = 2 := by
-      rw [hop, show ((2 : ZMod p)) = ((2 : ℕ) : ZMod p) from by norm_cast]
+      rw [hop, show ((2 : ZMod p)) = ((2 : ℕ) : ZMod p) by norm_cast]
       exact ZMod.val_natCast_of_lt (by omega)
     rw [h_byteOp i, hov, byteOp_two]
 
