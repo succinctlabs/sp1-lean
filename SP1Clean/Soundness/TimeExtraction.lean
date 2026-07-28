@@ -45,47 +45,27 @@ theorem clkNat_add_eight_of_cpuState_bounds (clkHigh clk0 clk1 : ZMod p)
     (clk1Bound : clk1.val < 2 ^ 8) :
     clkNat clkHigh (clk0 + clk1 * 65536 + 8) =
       clkNat clkHigh (clk0 + clk1 * 65536) + 8 := by
+  have hp := Fact.out (p := 2 ^ 25 < p)
   let scaled := (clk0 - 1) * (8 : ZMod p)⁻¹
-  have eightNe : (8 : ZMod p) ≠ 0 := val_8_ne_zero
   have scaledBound : scaled.val < 2 ^ 13 := clk0Bound
   have reconstruct : scaled * 8 + 1 = clk0 := by
     dsimp only [scaled]
-    rw [mul_assoc, inv_mul_cancel₀ eightNe, mul_one]
+    rw [mul_assoc, inv_mul_cancel₀ val_8_ne_zero, mul_one]
     ring_nf
-  have scaledMulLt : scaled.val * (8 : ZMod p).val < p := by
-    rw [val_8_zmod_p]
-    have := Fact.out (p := 2 ^ 25 < p)
-    omega
   have scaledMulVal : (scaled * 8).val = scaled.val * 8 := by
-    rw [ZMod.val_mul_of_lt scaledMulLt, val_8_zmod_p]
-  have clk0AddLt : (scaled * 8).val + (1 : ZMod p).val < p := by
-    rw [scaledMulVal, ZMod.val_one]
-    have := Fact.out (p := 2 ^ 25 < p)
-    omega
+    rw [ZMod.val_mul_of_lt (by rw [val_8_zmod_p]; omega), val_8_zmod_p]
   have clk0Val : clk0.val = scaled.val * 8 + 1 := by
     calc
       clk0.val = (scaled * 8 + 1).val := congrArg ZMod.val reconstruct.symm
-      _ = (scaled * 8).val + (1 : ZMod p).val := ZMod.val_add_of_lt clk0AddLt
+      _ = (scaled * 8).val + (1 : ZMod p).val :=
+        ZMod.val_add_of_lt (by rw [scaledMulVal, ZMod.val_one]; omega)
       _ = scaled.val * 8 + 1 := by rw [scaledMulVal, ZMod.val_one]
-  have highLimbMulLt : clk1.val * (65536 : ZMod p).val < p := by
-    rw [val_65536_zmod_p]
-    have := Fact.out (p := 2 ^ 25 < p)
-    omega
   have highLimbVal : (clk1 * 65536).val = clk1.val * 65536 := by
-    rw [ZMod.val_mul_of_lt highLimbMulLt, val_65536_zmod_p]
-  have lowAddLt : clk0.val + (clk1 * 65536).val < p := by
-    rw [clk0Val, highLimbVal]
-    have := Fact.out (p := 2 ^ 25 < p)
-    omega
+    rw [ZMod.val_mul_of_lt (by rw [val_65536_zmod_p]; omega), val_65536_zmod_p]
   have lowVal : (clk0 + clk1 * 65536).val = clk0.val + clk1.val * 65536 := by
-    rw [ZMod.val_add_of_lt lowAddLt, highLimbVal]
-  have incrementAddLt : (clk0 + clk1 * 65536).val + (8 : ZMod p).val < p := by
-    rw [lowVal, clk0Val, val_8_zmod_p]
-    have := Fact.out (p := 2 ^ 25 < p)
-    omega
-  have incrementedVal : (clk0 + clk1 * 65536 + 8).val =
-      (clk0 + clk1 * 65536).val + 8 := by
-    rw [ZMod.val_add_of_lt incrementAddLt, val_8_zmod_p]
+    rw [ZMod.val_add_of_lt (by rw [clk0Val, highLimbVal]; omega), highLimbVal]
+  have incrementedVal : (clk0 + clk1 * 65536 + 8).val = (clk0 + clk1 * 65536).val + 8 := by
+    rw [ZMod.val_add_of_lt (by rw [lowVal, clk0Val, val_8_zmod_p]; omega), val_8_zmod_p]
   simp only [clkNat, incrementedVal]
   omega
 
@@ -148,13 +128,27 @@ theorem component_val_lt_of_accessTimestampGap
     (diffHighBound : diffHigh.val < 2 ^ 8)
     (gap : current - previous - 1 = diffLow + diffHigh * 65536) :
     previous.val < current.val := by
-  have highEq :
-      (current - previous - 1 - diffLow) * (65536 : ZMod p)⁻¹ = diffHigh := by
-    rw [gap]
-    rw [add_sub_cancel_left]
-    rw [mul_assoc, mul_inv_cancel₀ val_65536_ne_zero, mul_one]
+  have highEq : (current - previous - 1 - diffLow) * (65536 : ZMod p)⁻¹ = diffHigh := by
+    rw [gap, add_sub_cancel_left, mul_assoc, mul_inv_cancel₀ val_65536_ne_zero, mul_one]
   exact prevLow_val_lt_of_accessTimestamp current previous diffLow previousBound
     diffLowBound (highEq ▸ diffHighBound)
+
+/-- Scalar, currency-separated form of the register timestamp payoff.  The row supplies
+`ActiveTimestampBounds` from its Byte guarantees; the grounding walk later supplies only the pulled
+record's `ClkBound`.  The two `Spec`-shaped variants below are instances of it. -/
+theorem memoryTimeNat_lt_of_activeTimestampBounds (prior pushed : MemoryMsg (ZMod p))
+    (prevLow diffLow clkTarget : ZMod p)
+    (prevBound : MemoryMsg.ClkBound prior)
+    (bounds : ActiveTimestampBounds prevLow diffLow clkTarget)
+    (sameHigh : prior.clk_high = pushed.clk_high)
+    (priorLow : prior.clk_low = prevLow)
+    (targetClk : pushed.clk_low = clkTarget) :
+    MemoryMsg.timeNat prior < MemoryMsg.timeNat pushed := by
+  obtain ⟨diffLowBound, diffHighBound⟩ := bounds
+  simp only [MemoryMsg.timeNat, clkNat, sameHigh, priorLow, targetClk]
+  have := prevLow_val_lt_of_accessTimestamp clkTarget prevLow diffLow
+    (priorLow ▸ prevBound) diffLowBound diffHighBound
+  omega
 
 /-- **The payoff, at the bus layer**: a pulled prior Memory record strictly predates the record the
 row pushes for the same access — `Soundness/TouchChains.lean`'s `TouchOK.pull_lt_push`.
@@ -172,29 +166,9 @@ theorem memoryTimeNat_lt_of_accessTimestamp (prior pushed : MemoryMsg (ZMod p))
       ⟨cols, is_real, pushed.clk_low⟩)
     (sameHigh : prior.clk_high = pushed.clk_high)
     (priorLow : prior.clk_low = cols.prev_low) :
-    MemoryMsg.timeNat prior < MemoryMsg.timeNat pushed := by
-  obtain ⟨diffLow, diffHigh⟩ := spec real
-  simp only [MemoryMsg.timeNat, clkNat, sameHigh, priorLow]
-  have := prevLow_val_lt_of_accessTimestamp pushed.clk_low cols.prev_low cols.diff_low_limb
-    (priorLow ▸ prevBound) diffLow diffHigh
-  omega
-
-/-- Scalar, currency-separated form of the register timestamp payoff.  The row supplies
-`ActiveTimestampBounds` from its Byte guarantees; the grounding walk later supplies only the pulled
-record's `ClkBound`. -/
-theorem memoryTimeNat_lt_of_activeTimestampBounds (prior pushed : MemoryMsg (ZMod p))
-    (prevLow diffLow clkTarget : ZMod p)
-    (prevBound : MemoryMsg.ClkBound prior)
-    (bounds : ActiveTimestampBounds prevLow diffLow clkTarget)
-    (sameHigh : prior.clk_high = pushed.clk_high)
-    (priorLow : prior.clk_low = prevLow)
-    (targetClk : pushed.clk_low = clkTarget) :
-    MemoryMsg.timeNat prior < MemoryMsg.timeNat pushed := by
-  obtain ⟨diffLowBound, diffHighBound⟩ := bounds
-  simp only [MemoryMsg.timeNat, clkNat, sameHigh, priorLow, targetClk]
-  have := prevLow_val_lt_of_accessTimestamp clkTarget prevLow diffLow
-    (priorLow ▸ prevBound) diffLowBound diffHighBound
-  omega
+    MemoryMsg.timeNat prior < MemoryMsg.timeNat pushed :=
+  memoryTimeNat_lt_of_activeTimestampBounds prior pushed cols.prev_low cols.diff_low_limb
+    pushed.clk_low prevBound (spec real) sameHigh priorLow rfl
 
 variable [Fact (2 ^ 17 < p)]
 
@@ -215,12 +189,10 @@ theorem memoryTimeNat_lt_of_registerAccessCols (prior pushed : MemoryMsg (ZMod p
     (sameHigh : prior.clk_high = pushed.clk_high)
     (priorLow : prior.clk_low = accessCols.access_timestamp.prev_low)
     (targetClk : pushed.clk_low = clk_target) :
-    MemoryMsg.timeNat prior < MemoryMsg.timeNat pushed := by
-  obtain ⟨diffLow, diffHigh⟩ := spec real
-  simp only [MemoryMsg.timeNat, clkNat, sameHigh, priorLow, targetClk]
-  have := prevLow_val_lt_of_accessTimestamp clk_target accessCols.access_timestamp.prev_low
-    accessCols.access_timestamp.diff_low_limb (priorLow ▸ prevBound) diffLow diffHigh
-  omega
+    MemoryMsg.timeNat prior < MemoryMsg.timeNat pushed :=
+  memoryTimeNat_lt_of_activeTimestampBounds prior pushed
+    accessCols.access_timestamp.prev_low accessCols.access_timestamp.diff_low_limb clk_target
+    prevBound (spec real) sameHigh priorLow targetClk
 
 end TimeExtraction
 

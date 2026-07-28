@@ -113,15 +113,11 @@ theorem supportedCoreLocalExecution_anchors {p : ℕ} {model : Machine.SP1Machin
     (initialReached : Machine.trajectory global.initial startStep =
       some localWitness.context.initial) :
     ∃ witness, SupportedCoreExecutionRelation model statement witness := by
-  obtain ⟨wellFormed, localProgram, boundary⟩ := localValid
-  have programEq : localWitness.context.program = global.program :=
-    localProgram.trans globalProgram.symm
-  let execution := localWitness.execution.anchor startStep programEq initialReached
-  refine ⟨⟨global, execution⟩, wellFormed, globalProgram, ?_⟩
-  obtain ⟨initialPc, finalPc, finalClock⟩ := boundary
-  exact ⟨initialPc, finalPc, by
-    rw [Machine.LocalExecutionSegmentWitness.clockAt_anchor]
-    exact finalClock⟩
+  obtain ⟨wellFormed, localProgram, initialPc, finalPc, finalClock⟩ := localValid
+  refine ⟨⟨global, localWitness.execution.anchor startStep
+    (localProgram.trans globalProgram.symm) initialReached⟩,
+    wellFormed, globalProgram, initialPc, finalPc, ?_⟩
+  rwa [Machine.LocalExecutionSegmentWitness.clockAt_anchor]
 
 /-! ## Full upstream shard statement -/
 
@@ -384,9 +380,8 @@ theorem commitCovered_of_standardWrapper {p : ℕ} {Digest : Type}
     (wrapper : UsesStandardHaltWrapper (p := p) handler witness.program) :
     SP1CommitCoveredExecutionRelation layout model handler programBinding globalBalance
       deferredAuthenticated statement witness := by
-  refine ⟨valid, ?_⟩
-  rcases valid with ⟨_, _, _, _, _, _, _, _, shardLayout, halts, _⟩
-  exact wrapper shardLayout halts
+  have ⟨_, _, _, _, _, _, _, _, shardLayout, halts, _⟩ := valid
+  exact ⟨valid, wrapper shardLayout halts⟩
 
 /-- A verification key satisfying the application-level output-safety contract supplies the wrapper
 hypothesis for whichever bound program appears in the recovered execution. -/

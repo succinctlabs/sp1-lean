@@ -25,7 +25,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The state-bus **receive** key of a row's state access: its current `(clk, pc)` — the first entry of
 `stateLookups` (a `-is_real` receive). Matches `stateLookups` exactly. -/
 def rcvKey (sa : StateAccess (ZMod p)) : LookupKey :=
-  (InteractionKind.State, "SP1State", [sa.clk_high.val, sa.clk_low.val, sa.pc[0].val, sa.pc[1].val, sa.pc[2].val])
+  (InteractionKind.State, "SP1State",
+    [sa.clk_high.val, sa.clk_low.val, sa.pc[0].val, sa.pc[1].val, sa.pc[2].val])
 
 /-- The state-bus **send** key: the next state `(clk+clk_inc, next_pc)` — the second entry of
 `stateLookups` (a `+is_real` send). `clk_inc` is the access's per-row clock advance (8 for every current
@@ -65,9 +66,7 @@ lemma mult_stateLookups (r : Trace.RowView (ZMod p)) (k : LookupKey) :
     rcvKey, sndKey]
   split_ifs <;> ring
 
-private lemma val_one_int : ((1 : ZMod p).val : ℤ) = 1 := by
-  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  simp [ZMod.val_one]
+private lemma val_one_int : ((1 : ZMod p).val : ℤ) = 1 := by simp [ZMod.val_one]
 
 /-- **Step A.** The aggregated state bus's per-key sum equals `indeg − outdeg` of the real-row edge
 multigraph: `#{real r : sndKey = k} − #{real r : rcvKey = k}` (sends positive, receives negative). -/
@@ -79,13 +78,12 @@ lemma multiplicitySum_aggregate (rows : List (Trace.RowView (ZMod p)))
   induction rows with
   | nil => simp [aggregateChipRows, multiplicitySum_nil]
   | cons r rs IH =>
-    have hr := hbin r (by simp)
     have hsa : (stateAccess r).is_real = r.is_real := rfl
     have per_row :
         (if sndKey (stateAccess r) = k then ((stateAccess r).is_real.val : ℤ) else 0)
           - (if rcvKey (stateAccess r) = k then ((stateAccess r).is_real.val : ℤ) else 0)
         = (if decide (sndP k r) then (1 : ℤ) else 0) - (if decide (rcvP k r) then 1 else 0) := by
-      rcases hr with h0 | h1
+      rcases hbin r (by simp) with h0 | h1
       · simp [sndP, rcvP, hsa, h0]
       · have hre : (stateAccess r).is_real ≠ 0 := by rw [hsa, h1]; exact one_ne_zero
         have ho : ((stateAccess r).is_real.val : ℤ) = 1 := by rw [hsa, h1]; exact val_one_int
@@ -105,8 +103,7 @@ lemma outdeg_realRowEdges (rows : List (Trace.RowView (ZMod p))) (k : LookupKey)
       = rows.countP (fun r => decide (rcvP k r)) := by
   simp only [GatedVm.outdeg, stateEdge, realRowEdges]
   rw [← Multiset.countP_eq_card_filter, Multiset.countP_filter, Multiset.coe_countP]
-  apply List.countP_congr
-  intro r _
+  refine List.countP_congr fun r _ => ?_
   simp [rcvP, and_comm]
 
 /-- In-degree at `k` = `#{real r : sndKey = k}`. -/
@@ -115,8 +112,7 @@ lemma indeg_realRowEdges (rows : List (Trace.RowView (ZMod p))) (k : LookupKey) 
       = rows.countP (fun r => decide (sndP k r)) := by
   simp only [GatedVm.indeg, stateEdge, realRowEdges]
   rw [← Multiset.countP_eq_card_filter, Multiset.countP_filter, Multiset.coe_countP]
-  apply List.countP_congr
-  intro r _
+  refine List.countP_congr fun r _ => ?_
   simp [sndP, and_comm]
 
 /-- **Bus ⇒ `Balanced`.** The native state-bus balance of `row bus ++ [genesis +init, final −1]` is
@@ -134,8 +130,6 @@ theorem balanced_state_bus
       (InteractionKind.State, "SP1State", initEntry)
       (InteractionKind.State, "SP1State", finalEntry) := by
   intro k
-  have hb := h_bal k
-  rw [multiplicitySum_append, multiplicitySum_aggregate rows hbin k] at hb
   have hbd : multiplicitySum
       [(InteractionKind.State, "SP1State", initEntry, (1 : ℤ)),
        (InteractionKind.State, "SP1State", finalEntry, (-1 : ℤ))] k
@@ -143,7 +137,8 @@ theorem balanced_state_bus
         - (if (InteractionKind.State, "SP1State", finalEntry) = k then 1 else 0) := by
     simp only [multiplicitySum_cons, multiplicitySum_nil, keyOf, multOf, add_zero]
     split_ifs <;> ring
-  rw [hbd] at hb
+  have hb := h_bal k
+  rw [multiplicitySum_append, multiplicitySum_aggregate rows hbin k, hbd] at hb
   rw [outdeg_realRowEdges rows k, indeg_realRowEdges rows k]
   simp only [eq_comm] at hb
   linarith
@@ -175,8 +170,6 @@ theorem state_trail_of_balance
 theorem trail_rows_real {rows path : List (Trace.RowView (ZMod p))}
     (h : (↑path : Multiset (Trace.RowView (ZMod p))) ≤ realRowEdges rows)
     {r : Trace.RowView (ZMod p)} (hr : r ∈ path) : (stateAccess r).is_real ≠ 0 := by
-  have hmem : r ∈ realRowEdges rows := Multiset.mem_of_le h (by simpa using hr)
-  simp only [realRowEdges, Multiset.mem_filter] at hmem
-  exact hmem.2
+  exact (Multiset.mem_filter.mp (Multiset.mem_of_le h (by simpa using hr))).2
 
 end SP1Clean.Soundness

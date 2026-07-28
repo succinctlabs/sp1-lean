@@ -95,11 +95,8 @@ theorem localStateTruth_initial {program : GuestProgram} {initial : SailState}
     (pc : initial.regs.get? Register.PC = some (StateMsg.pcBits message))
     (rom : RomLoaded program initial) (configured : SailConfigured initial) :
     LocalStateTruth program initial initialClock message := by
-  apply localStateTruth_of_sailChain (.refl initial) (steps := 0)
-  · simpa using time
-  · exact pc
-  · exact rom
-  · exact configured
+  refine localStateTruth_of_sailChain (.refl initial) (steps := 0) ?_ pc rom configured
+  simpa using time
 
 set_option linter.unusedSectionVars false in
 /-- Before or at the shard's first clock, `microValue` reads the selected initial state. -/
@@ -110,10 +107,8 @@ theorem localValueAt_of_initial {initial : SailState} {initialClock time : ℕ}
     LocalValueAt initial initialClock location time value := by
   unfold LocalValueAt microValue
   by_cases strict : time < initialClock
-  · rw [if_pos strict]
-    exact content
-  · have equal : time = initialClock := by omega
-    subst time
+  · rwa [if_pos strict]
+  · obtain rfl : time = initialClock := by omega
     rw [if_neg (Nat.lt_irrefl _)]
     cases location <;> simpa [SP1Clean.Machine.trajectory] using content
 
@@ -139,11 +134,8 @@ theorem localValueAt_stepStart_iff {initial state : SailState} {initialClock ste
     LocalValueAt initial initialClock location (initialClock + 8 * steps) value ↔
       locContent state location = some (Word.toBitVec64 value) := by
   unfold LocalValueAt microValue
-  rw [if_neg (by omega)]
-  rw [Nat.add_sub_cancel_left]
-  have divEq : 8 * steps / 8 = steps := by omega
-  have modEq : 8 * steps % 8 = 0 := by omega
-  rw [divEq, modEq]
+  rw [if_neg (by omega), Nat.add_sub_cancel_left, show 8 * steps / 8 = steps by omega,
+    show 8 * steps % 8 = 0 by omega]
   cases location <;> norm_num <;> rw [chainState_of_sailChain chain] <;> rfl
 
 /-! ## The per-row advance obligation -/
