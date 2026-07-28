@@ -197,8 +197,45 @@ Per site:
    recipe (`circuit_proof_start_core`), and "keep hypothesis types folded". Then
    `proof-patterns.md` § "maxHeartbeats: the fold recipe + no-bump discipline". **`#count_heartbeats`
    lies** — measure from the build log.
-**The single highest-value rule, learned on the shift cores: a raised ceiling is usually a proxy for
-a duplicated fact, not term-intrinsic cost.** Look for the repeated `have` before you touch the
+> **Never write the literal string `set_option maxHeartbeats` inside a comment or docstring.**
+> `scripts/check_heartbeats.sh` counts sites with a raw `grep -rc "set_option maxHeartbeats"` — it
+> does not parse Lean, so a comment mentioning the option scores as a live ceiling and silently
+> corrupts the ratchet. When recording a measured ladder (which you should), phrase it without the
+> literal: "the former 8M ceiling was ~170× over". Two workers hit this; one caught it, one did not.
+> A pre-existing instance at `Proofs/Sail/Advance.lean:2325` means the 853 baseline has always
+> counted at least one phantom.
+
+### Cause classes, most valuable first
+
+**1. Search duplication in a `first | … | …` ladder.** The largest single win of the campaign:
+`ShiftRightChip/Dispatch.lean` went **1591 → 861 lines (−730)** and shed all 12 of its ceilings.
+Each lemma did `rcases` into 16 goals `<;> first | exact close 0 65536 … | exact close 1 32768 … |`
+… `| 15 …`. `first` restarts the ladder for every goal, and the matching alternative sits at
+`bitreverse4(goal index)`, so ~8 alternatives per goal were elaborated *all the way through their
+`rw […]; push_cast; ring1` side conditions* and then discarded — ≈128 wasted `ring1` per lemma,
+≈1500 across the file. That was the entire ceiling. The fix is inside the proof bodies: `rcases …
+with rfl | rfl` (substituting makes the side-condition blocks uniform across all 16 cases), hoist the
+fixed arguments into one local `have key := fun …` instead of repeating them 16×, and replace the
+`first` ladder with **ordered bullets**, one per goal. Whenever you see `<;> first |` over many goals,
+suspect this before anything else.
+
+> **Sorting the ladder does not help — only bullets do.** `ShiftRightChip/Core.lean`'s `cb_aux`
+> ladder was *already* in goal order (0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15 — which independently
+> confirms the bit-reversal permutation) and still paid the full 120 wasted alternatives, because
+> `first` restarts from the top for every goal regardless of ordering. Do not try the cheap fix.
+>
+> **A `have key := fun … =>` binding has no expected type**, so named arguments like `(cb4 := cb4)`
+> become mandatory where `exact` did not need them. Giving `key` an explicit `∀` type avoids the trap
+> entirely, and is the better habit.
+
+**Reading a timeout's location.** A `(deterministic) timeout at whnf` is reported at **column 1 of a
+signature**, which is not necessarily the declaration you think failed. `ShiftRightChip/Core.lean`'s
+binding site was recorded once as `sra_close_su16_3_case` and is actually `srlw_within_byte_shift`;
+pinning that single lemma leaves ~42 of the file's 43 declarations clean at the plain default. Always
+confirm which declaration owns the reported line before concluding a whole file needs a budget — and
+prefer a **scoped `set_option … in` on the one lemma** over a file-scoped ceiling.
+
+**2. A duplicated `.val`-bridge fact — a raised ceiling as proxy, not term-intrinsic cost.** Look for the repeated `have` before you touch the
 number. `ShiftLeftChip/Core.lean` carried 16 ceilings; its SLLW half was re-deriving `mul_v_val` /
 `hi_lo_val` / `mul_v_add_val` by hand while the SLL half *in the same file* already called them, and
 two residual `nlinarith` calls were re-proving `< 65536` limb bounds that
@@ -294,10 +331,17 @@ Per gated group, stopping at the first failure:
 6. **Source guards** — `check_no_native_decide.sh`, `check_no_skipkerneltc.sh`,
    `check_heartbeats.sh` (may only ratchet **down**).
 7. **Statement-preservation gate** — replacing the plugin's `theorem_statement_protected`, which
-   greps only the first line of a signature and misses the continuation lines where hypotheses live:
-   - no `-` line on any `theorem`/`lemma`/`def`/`abbrev`/`instance`/`structure` signature;
-   - no modification of a pre-existing signature — compare the normalized token stream from the
-     declaration keyword to `:=`, before vs after;
+   greps only the first line of a signature and misses the continuation lines where hypotheses live.
+   The check is on the **set** of normalized signatures, not on the presence of `-` lines:
+   - parse every declaration (including `@[...]`-attributed ones) from its keyword to `:=`/`where`,
+     comment-stripped and whitespace-normalized, and compare the resulting **multiset** per file,
+     before vs after;
+   - no signature may be removed or modified;
+   - **a pure reorder is permitted.** Moving a declaration emits a `-`/`+` pair for an identical
+     normalized signature; that is a position change, not a statement change, and it is often needed
+     to let one lemma cite another (`DivRemChip/Math.lean`'s `divu_remu_spec` ⇐ `udiv_umod_bitvec`
+     wanted exactly this). A `-`-line rule rejects it spuriously; a multiset rule does not.
+     Reordering across a `/-! ## … -/` divider still needs care — the prose describes what follows.
    - a `+` of a brand-new declaration only where the audit declared an additive split (§4) or an
      extracted helper (§4a) — and for a helper, check it is `private` and does not match a probe glob.
 8. **Commit**, one per batch.
