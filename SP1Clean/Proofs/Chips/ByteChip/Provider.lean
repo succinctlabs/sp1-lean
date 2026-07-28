@@ -32,12 +32,9 @@ def byteRowKey (row : ByteRow (ZMod p)) : LookupKey :=
 `ZMod.val` is injective (`[NeZero p]`), so two rows with the same key are equal. This is what lets the
 provider's *membership* (it carries only valid rows) transfer to the *consumer's* sent row. -/
 theorem byteRow_eq_of_key {r1 r2 : ByteRow (ZMod p)} (h : byteRowKey r1 = byteRowKey r2) : r1 = r2 := by
-  simp only [byteRowKey, Prod.mk.injEq, List.cons.injEq, and_true, true_and] at h
-  obtain ⟨h0, h1, h2, h3⟩ := h
   cases r1; cases r2
-  simp only [ByteRow.mk.injEq]
-  exact ⟨ZMod.val_injective p h0, ZMod.val_injective p h1,
-    ZMod.val_injective p h2, ZMod.val_injective p h3⟩
+  simpa only [byteRowKey, Prod.mk.injEq, List.cons.injEq, and_true, true_and, ByteRow.mk.injEq,
+    (ZMod.val_injective p).eq_iff] using h
 
 /-- The **`ByteChip` provider**: any Byte-bus contribution list whose every entry sits at the key of some
 valid (`ByteRowSpec`) byte row. This is the native, predicate-characterized content of SP1's preprocessed

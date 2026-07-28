@@ -115,18 +115,14 @@ branch **without expanding the channel record** (which would break a child's bot
 `channelsLawful` does, e.g. under `Fact p.Prime` only.) -/
 private lemma toRaw_eq_false_of_name_ne {M1 M2 : TypeMap} [ProvableType M1] [ProvableType M2]
     {c1 : Channel (ZMod p) M1} {c2 : Channel (ZMod p) M2} (h : c1.name ≠ c2.name) :
-    (c1.toRaw = c2.toRaw) = False := by
-  simp only [eq_iff_iff, iff_false]
-  intro he
-  exact h (by rw [← Channel.toRaw_name c1, ← Channel.toRaw_name c2, he])
+    (c1.toRaw = c2.toRaw) = False :=
+  eq_false fun he => h (by rw [← Channel.toRaw_name c1, ← Channel.toRaw_name c2, he])
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- Name-distinctness at the `RawChannel` layer. -/
 private lemma rawChannel_eq_false_of_name_ne {rc1 rc2 : RawChannel (ZMod p)}
-    (h : rc1.name ≠ rc2.name) : (rc1 = rc2) = False := by
-  simp only [eq_iff_iff, iff_false]
-  intro he
-  exact h (by rw [he])
+    (h : rc1.name ≠ rc2.name) : (rc1 = rc2) = False :=
+  eq_false fun he => h (by rw [he])
 
 -- Per-pair `= False` instances (`@[circuit_norm]`) for every ordered pair of distinct buses a channel
 -- list or `interactionsWith` filter can compare — kept as pre-instantiated simp rules so the
@@ -196,27 +192,18 @@ omit [Fact (2 ^ 17 < p)] in
 -- avoids every chip reopening the `RawChannel` record merely to filter its non-State interactions.
 omit [Fact (2 ^ 17 < p)] in
 lemma byteChannel_toRaw_ne_stateChannel :
-    (byteChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
-  intro h
-  have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
-  simp only [Channel.toRaw_name, byteChannel, stateChannel] at hn
-  exact (by decide : ("SP1Byte" : String) ≠ "SP1State") hn
+    (byteChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw :=
+  of_eq_false byteChannel_eq_stateChannel_false
 
 omit [Fact (2 ^ 17 < p)] in
 lemma programChannel_toRaw_ne_stateChannel :
-    (programChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
-  intro h
-  have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
-  simp only [Channel.toRaw_name, programChannel, stateChannel] at hn
-  exact (by decide : ("SP1Program" : String) ≠ "SP1State") hn
+    (programChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw :=
+  of_eq_false programChannel_eq_stateChannel_false
 
 omit [Fact (2 ^ 17 < p)] in
 lemma memoryChannel_toRaw_ne_stateChannel :
-    (memoryChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
-  intro h
-  have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
-  simp only [Channel.toRaw_name, memoryChannel, stateChannel] at hn
-  exact (by decide : ("SP1Memory" : String) ≠ "SP1State") hn
+    (memoryChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw :=
+  of_eq_false memoryChannel_eq_stateChannel_false
 
 -- These belong with Clean's `channels_lawful` default (`Clean/Circuit/Basic.lean`, which runs
 -- `simp only [circuit_norm, seval]; try trivial`) — a pinned dep we don't edit — so we tag them here

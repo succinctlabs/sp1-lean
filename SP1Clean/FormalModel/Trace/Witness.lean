@@ -82,8 +82,8 @@ lemma cfgState_init (pc : BitVec 64) : (configuredState pc).isInitialized := by
 
 lemma cfgState_pc (pc : BitVec 64) : (configuredState pc).regs.get? Register.PC = some pc := by
   simp only [configuredState]
-  rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide), Std.ExtDHashMap.get?_insert, dif_neg (by decide),
-    Std.ExtDHashMap.get?_insert_self]
+  rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide), Std.ExtDHashMap.get?_insert,
+    dif_neg (by decide), Std.ExtDHashMap.get?_insert_self]
 
 lemma cfgState_priv (pc : BitVec 64) :
     (configuredState pc).regs.get? Register.cur_privilege = some Privilege.Machine := by

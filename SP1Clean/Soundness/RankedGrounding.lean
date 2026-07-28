@@ -47,15 +47,11 @@ theorem endpointBalanced_of_balanced (edges : Multiset Edge) (edge : Edge → Ve
   have sourceFilter :
       edges.filter (fun row => vertex = (edge row).1) =
         edges.filter (fun row => (edge row).1 = vertex) := by
-    congr 1
-    funext row
-    simp [eq_comm]
+    simp only [eq_comm]
   have targetFilter :
       edges.filter (fun row => vertex = (edge row).2) =
         edges.filter (fun row => (edge row).2 = vertex) := by
-    congr 1
-    funext row
-    simp [eq_comm]
+    simp only [eq_comm]
   rw [sourceFilter, targetFilter]
   have h := balanced vertex
   simp only [outdeg, indeg] at h
@@ -66,7 +62,7 @@ theorem endpointBalanced_of_balanced (edges : Multiset Edge) (edge : Edge → Ve
   · by_cases hi : vertex = initial
     · simp [hif, hi] at h ⊢
       omega
-    · have hif' : final ≠ initial := fun equal => hif equal.symm
+    · have hif' : final ≠ initial := Ne.symm hif
       by_cases hf : vertex = final <;> simp [hi, hf, hif'] at h ⊢ <;> omega
 
 omit [DecidableEq Edge] in
@@ -82,15 +78,11 @@ theorem balanced_of_endpointBalanced (edges : Multiset Edge) (edge : Edge → Ve
   have sourceFilter :
       edges.filter (fun row => vertex = (edge row).1) =
         edges.filter (fun row => (edge row).1 = vertex) := by
-    congr 1
-    funext row
-    simp [eq_comm]
+    simp only [eq_comm]
   have targetFilter :
       edges.filter (fun row => vertex = (edge row).2) =
         edges.filter (fun row => (edge row).2 = vertex) := by
-    congr 1
-    funext row
-    simp [eq_comm]
+    simp only [eq_comm]
   rw [sourceFilter, targetFilter] at counts
   simp only [outdeg, indeg]
   by_cases hif : initial = final
@@ -100,7 +92,7 @@ theorem balanced_of_endpointBalanced (edges : Multiset Edge) (edge : Edge → Ve
   · by_cases hi : vertex = initial
     · simp [hif, hi] at counts ⊢
       omega
-    · have hif' : final ≠ initial := fun equal => hif equal.symm
+    · have hif' : final ≠ initial := Ne.symm hif
       by_cases hf : vertex = final <;> simp [hi, hf, hif'] at counts ⊢ <;> omega
 
 omit [DecidableEq Edge] [DecidableEq Vertex] in
@@ -118,8 +110,7 @@ theorem endpointBalanced_of_isWalk (edge : Edge → Vertex × Vertex) :
         final ::ₘ (↑rest : Multiset Edge).map (fun row => (edge row).1) at ih
       change initial ::ₘ (edge row).2 ::ₘ (↑rest : Multiset Edge).map (fun row => (edge row).2) =
         final ::ₘ (edge row).1 ::ₘ (↑rest : Multiset Edge).map (fun row => (edge row).1)
-      rw [← source]
-      rw [Multiset.cons_swap final (edge row).1]
+      rw [← source, Multiset.cons_swap final (edge row).1]
       exact congrArg (Multiset.cons (edge row).1) ih
 
 omit [DecidableEq Vertex] in
