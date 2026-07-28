@@ -7,22 +7,24 @@ import Mathlib.Tactic.Linarith
 
 The shared graph substrate of the whole-machine soundness layer, stated abstractly over a directed
 multigraph and **independent of SP1 / channels / fields**. (Relocated from `GatedVm/Chain.lean`: the
-content is live — `IsWalk` is the walk predicate of the production capstone (`Soundness/AIR.lean`) and
-`exists_trail` powers `RankedGrounding.exists_exhaustiveTrail` — only its original Eulerian-capstone
-consumer is the frozen legacy path.)
+content is live — `IsWalk` is the walk predicate of the production capstone (`Soundness/AIR.lean`)
+and `exists_trail` powers `RankedGrounding.exists_exhaustiveTrail` — only its original
+Eulerian-capstone consumer is the frozen legacy path.)
 
-Model the state bus as a directed multigraph: each real row is an edge `current_state → next_state`
-(`edge a = (current, next)` for `a` ranging over a multiset `E` of row labels), and the boundary
-verifier contributes a genesis production of `init` and a finalization consumption of `final`. The
-gated state-bus balance (`multiplicitySum = 0` at every state value) is exactly the **degree balance**
+Model the state bus as a directed multigraph: each real row is an edge
+`current_state → next_state` (`edge a = (current, next)` for `a` ranging over a multiset `E` of row
+labels), and the boundary verifier contributes a genesis production of `init` and a finalization
+consumption of `final`. The gated state-bus balance (`multiplicitySum = 0` at every state value) is
+exactly the **degree balance**
 
-  `outdeg v − indeg v = [v = src] − [v = snk]`   (one source `src = init`, one sink `snk = final`),
+  `outdeg v − indeg v = [v = src] − [v = snk]`
+  (one source `src = init`, one sink `snk = final`),
 
-`Balanced E edge src snk` below. From it we extract a **trail** (a walk whose edge multiset is `≤ E`)
-from `src` to `snk` — `exists_trail` — with **no** clock-injectivity or clock-advance side conditions:
-the whole-program transition path is forced by balance alone. The proof is a clean strong induction on
-the edge multiset: take an out-edge of the source, erase it, observe the remainder is balanced with the
-source shifted one step along, recurse. -/
+`Balanced E edge src snk` below. From it we extract a **trail** (a walk whose edge multiset is
+`≤ E`) from `src` to `snk` — `exists_trail` — with **no** clock-injectivity or clock-advance side
+conditions: the whole-program transition path is forced by balance alone. The proof is a clean
+strong induction on the edge multiset: take an out-edge of the source, erase it, observe the
+remainder is balanced with the source shifted one step along, recurse. -/
 
 namespace SP1Clean.Soundness
 
@@ -76,16 +78,12 @@ lemma balanced_erase {E : Multiset α} {e : α} (he : e ∈ E) (edge : α → V 
     simp only [indeg]; exact_mod_cast card_filter_erase he (fun a => (edge a).2 = v)
   have hv := h v
   have e1 : (if (edge e).1 = v then (1 : ℤ) else 0) = (if v = src then 1 else 0) := by
-    rcases eq_or_ne v src with hc | hc
-    · rw [if_pos (h1.trans hc.symm), if_pos hc]
-    · rw [if_neg (fun hh => hc (h1.symm.trans hh).symm), if_neg hc]
+    simp [h1, eq_comm]
   have e2 : (if (edge e).2 = v then (1 : ℤ) else 0) = (if v = (edge e).2 then 1 else 0) := by
-    rcases eq_or_ne v (edge e).2 with hc | hc
-    · rw [if_pos hc.symm, if_pos hc]
-    · rw [if_neg (fun hh => hc hh.symm), if_neg hc]
+    simp [eq_comm]
   rw [e1] at ho
   rw [e2] at hi
-  linarith [ho, hi, hv]
+  linarith
 
 /-- **Balance ⇒ trail (the Eulerian core).** From degree balance alone — no clock injectivity, no
 clock-advance — a walk from `src` to `snk` exists whose edges are a sub-multiset of `E`. The
@@ -103,16 +101,13 @@ theorem exists_trail (edge : α → V × V) (E : Multiset α) :
       have hpos : 0 < outdeg E edge src := by omega
       simp only [outdeg] at hpos
       obtain ⟨e, he_filter⟩ := Multiset.exists_mem_of_ne_zero (Multiset.card_pos.mp hpos)
-      rw [Multiset.mem_filter] at he_filter
-      obtain ⟨he_mem, he1⟩ := he_filter
+      obtain ⟨he_mem, he1⟩ := Multiset.mem_filter.mp he_filter
       have hbal' : Balanced (E.erase e) edge (edge e).2 snk := balanced_erase he_mem edge h he1
-      have hlt : E.erase e < E := by
-        conv_rhs => rw [← Multiset.cons_erase he_mem]
-        exact Multiset.lt_cons_self _ _
-      obtain ⟨path', hwalk', hsub'⟩ := IH (E.erase e) hlt (edge e).2 snk hbal'
+      obtain ⟨path', hwalk', hsub'⟩ :=
+        IH (E.erase e) (Multiset.erase_lt.mpr he_mem) (edge e).2 snk hbal'
       refine ⟨e :: path', ⟨he1, hwalk'⟩, ?_⟩
-      have hle : (e ::ₘ (↑path' : Multiset α)) ≤ e ::ₘ E.erase e := Multiset.cons_le_cons e hsub'
-      rwa [Multiset.cons_erase he_mem] at hle
+      rw [← Multiset.cons_erase he_mem]
+      exact Multiset.cons_le_cons e hsub'
 
 end Walk
 

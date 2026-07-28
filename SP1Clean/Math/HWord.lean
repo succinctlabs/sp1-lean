@@ -4,11 +4,12 @@ import Mathlib.Tactic.LinearCombination
 
 /-! # Minimal half-word (32-bit) foundation
 
-A trimmed 2-limb companion to `Foundations/Word.lean`. An `HWord` is two little-endian 16-bit limbs of a
-field element; `toBitVec32` reassembles the 32-bit value. Only the surface the SLLW shift core needs is kept:
-`isU32`, `toNat`, `toBitVec32`, and the load-bearing `toBitVec32_toNat`. The 32→64 sign-extension fill is
-**not** re-derived here — the SLLW assembly reuses `Word.toBitVec64_signExtend_word` (`Foundations/Word.lean`)
-on the four-limb output word directly. -/
+A trimmed 2-limb companion to `Foundations/Word.lean`. An `HWord` is two little-endian 16-bit limbs
+of a field element; `toBitVec32` reassembles the 32-bit value. Only the surface the SLLW shift core
+needs is kept: `isU32`, `toNat`, `toBitVec32`, and the load-bearing `toBitVec32_toNat`. The 32→64
+sign-extension fill is **not** re-derived here — the SLLW assembly reuses
+`Word.toBitVec64_signExtend_word` (`Foundations/Word.lean`) on the four-limb output word
+directly. -/
 
 namespace SP1Clean
 

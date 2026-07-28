@@ -17,8 +17,8 @@ variable {F : Type} [FiniteField F]
 
 /-!
 Clean already derives the explicit operations, length, and output of `witnessNative`; these three
-lemmas merely expose those existing class fields to `circuit_norm`.  They are candidates for upstream
-Clean and carry no independent witness representation or semantics.
+lemmas merely expose those existing class fields to `circuit_norm`.  They are candidates for
+upstream Clean and carry no independent witness representation or semantics.
 -/
 
 @[circuit_norm] lemma witnessNative_operations_eq
@@ -47,18 +47,14 @@ Clean and carry no independent witness representation or semantics.
     (compute : ProverEnvironment F → value F) (offset : ℕ) :
     witnessNative (F := F) (var := var) compute offset =
       (inst.var_eq ▸ varFromOffset value offset,
-        [.witness (size value) (.nativeValue compute)]) := by
-  apply Prod.ext
-  · exact ExplicitCircuits.output_eq compute offset
-  · exact ExplicitCircuits.operations_eq compute offset
+        [.witness (size value) (.nativeValue compute)]) :=
+  Prod.ext (ExplicitCircuits.output_eq compute offset)
+    (ExplicitCircuits.operations_eq compute offset)
 
 end SP1Clean.CircuitNormalization
 
 private def tryTactic (tactic : TSyntax `tactic) : TacticM Unit := do
-  try
-    evalTactic tactic
-  catch _ =>
-    pure ()
+  try evalTactic tactic catch _ => pure ()
 
 /-- Clean's standard proof start with `provable_struct_simp` moved before `main` expansion. -/
 elab "circuit_proof_start_early_struct" : tactic => do
