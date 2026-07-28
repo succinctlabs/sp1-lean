@@ -329,10 +329,15 @@ two residual `nlinarith` calls were re-proving `< 65536` limb bounds that
 duplication dropped 26 `nlinarith` to 3 and made **all 16 ceilings removable**. That is the
 difference between raising a budget and driving the proof to closure.
 
-**Lead with the sibling-comparison screen — it is nearly free and it has been predictive.** Before
-laddering anything, find a declaration in the same file (or its mirror file) that does *the same kind
-of work* and carries **no** ceiling. If one exists, the ceiling is almost certainly vestigial, and the
-ladder is then only confirming what the comparison already told you. Worked cases: `SailWrap`'s
+**Lead with the sibling-comparison screen — it is nearly free, and it predicts *both* answers.**
+Before laddering anything, find a declaration in the same file (or its mirror file) that does the same
+kind of work and carries **no** ceiling, then ask whether it does *more* or *less* work than the
+ceilinged one. `MulOperation/RawSpec.lean` ran two screens that **split**, and both calls were right
+before a single rung: `full_product` vs the unceilinged `low_half` does 16 columns rather than 8
+(256 monomials vs 64, coefficients to `2^120` vs `2^56`) → predicted **real**, confirmed;
+`high_half_eq` vs the unceilinged `product_reassembly`, which does strictly *more* work → predicted
+**vestigial**, confirmed. So the screen is not merely a vestigial-detector; an unceilinged sibling
+doing *less* work is evidence the ceiling is genuine. Worked cases: `SailWrap`'s
 `Sail.writeReg_writeReg_comm` — same tactic, same hashmap comm step, no dependent cast — passes at the
 default and pinpointed the `acLt` cause; `Faithful/CPUState.lean`'s third interaction anchor does
 strictly *more* work than the two ceilinged ones (same `hbk`, same binding hypotheses, plus a 4-entry
@@ -368,6 +373,11 @@ either one produces wrong answers:**
   `DivRemOperation/OwnAsserts.lean` is the worked case: `def ownAsserts` masked twelve
   `*_mem_ownAsserts` theorems that all turned out to have floors ≤20k against a declared 8M.
   A naive ladder **under-removes** here; it does not produce unsound results, just timid ones.
+  > **Masking is rung-dependent — never conclude "no masking" from one low rung.**
+  > `MulOperation/RawSpec.full_product` masks or does not mask depending where you probe: at 200k/400k
+  > it fails *inside* its tactic block, gets added `sorry`'d, and its dependents stay visible; at 1M
+  > the failure moves to `whnf` at the **signature** and both dependents cascade to
+  > `(kernel) unknown constant`. Check for masking at the rung you actually intend to use.
 4. **Budget.** Full ladder search only where the module elaborates <10s in isolation (79% of modules
    are <3s). On the heavies, change a ceiling only when the golf pass already altered that proof,
    and always in a solo batch.
