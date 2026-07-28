@@ -1,7 +1,6 @@
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.Math.Bitwise
 import SP1Clean.Native.Operations.BitwiseOperation.RawSpec
-import SP1Clean.FormalModel.Contracts.Operations
 
 /-! # `BitwiseOperation` — `populate` (the witness generator)
 
@@ -25,10 +24,14 @@ def populate (a b : Vector (ZMod p) 8) (opcode : ZMod p) : Columns (ZMod p) :=
       ((byteOp opcode.val a[6].val b[6].val : ℕ) : ZMod p),
       ((byteOp opcode.val a[7].val b[7].val : ℕ) : ZMod p)]⟩
 
-set_option maxHeartbeats 2000000 in
 /-- The witnessed result bytes `populate a b opcode` satisfy the gadget `Spec` for any `is_real`, given
 the operand bytes are genuine bytes and the opcode is one of AND/OR/XOR. The composing
-`BitwiseU16Operation` uses this to discharge its `assertion BitwiseOperation.circuit` prover obligation. -/
+`BitwiseU16Operation` uses this to discharge its `assertion BitwiseOperation.circuit` prover obligation.
+
+Heartbeat budget: measured 2026-07 by ladder (control run at 1 heartbeat gave a real `isDefEq`
+timeout). Passes at 20000 and 10000, fails at 5000 (`simp`-nested `whnf` in the `fin_cases` block),
+so the true floor is in (5000, 10000] and the plain default carries ≥20× headroom. The former
+2000000 ceiling here was ~200-400× over and was removed. -/
 theorem spec_populate {a b : Vector (ZMod p) 8} {opcode : ZMod p}
     (hbytes : ∀ i : Fin 8, a[(i : ℕ)].val < 256 ∧ b[(i : ℕ)].val < 256) (_hopcode : opcode.val < 3)
     (is_real : ZMod p) :

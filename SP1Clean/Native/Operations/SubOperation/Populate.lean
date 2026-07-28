@@ -37,9 +37,13 @@ def populate (a b : Word (ZMod p)) : Word (ZMod p) :=
   #v[((s0 % 65536 : ℕ) : ZMod p), ((s1 % 65536 : ℕ) : ZMod p),
      ((s2 % 65536 : ℕ) : ZMod p), ((s3 % 65536 : ℕ) : ZMod p)]
 
-set_option maxHeartbeats 2000000 in
 /-- `populate a b` satisfies the gadget `Spec` for any `is_real`. The composing chip uses this to
-discharge its assertion obligation. -/
+discharge its assertion obligation.
+
+Heartbeat budget: measured 2026-07 by ladder (control run at 1 heartbeat gave a real `elaborator`
+timeout). Passes at 20000 and 10000, fails at 5000 (`whnf` at the signature), so the floor is in
+(5000, 10000] and the plain default carries ≥20× headroom. The former 2000000 ceiling was ~200-400×
+over and was removed; the structurally identical `AddOperation.spec_populate` never carried one. -/
 theorem spec_populate {a b : Word (ZMod p)} (ha : a.isU64) (hb : b.isU64) (is_real : ZMod p) :
     Spec (⟨a, b, { value := populate a b }, is_real⟩ : Inputs (ZMod p)) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩

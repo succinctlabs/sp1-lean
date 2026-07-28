@@ -65,12 +65,10 @@ def circuit : GeneralFormalCircuit (ZMod p) MemoryMsg unit where
   soundness := by
     circuit_proof_start
     have hb : env.get i₀ * (env.get i₀ - 1) = 0 := h_holds.1
-    exact fun h1 h0 => off_gate_vacuous (bool_of_mul_pred hb) h1 h0
+    exact off_gate_vacuous (bool_of_mul_pred hb)
   completeness := by
     circuit_proof_start
-    refine ⟨by simp [h_env], fun _ => ?_⟩
-    simp only [memoryChannel, MemoryMsg.isU64, MemoryMsg.ClkBound]
-    exact h_assumptions
+    exact ⟨by simp [h_env], fun _ => h_assumptions⟩
   requirementsChannelsLawful := fun input_var i₀ => by
     simp only [circuit_norm, main, memoryChannel]; grind
 

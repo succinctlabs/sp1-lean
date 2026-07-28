@@ -41,16 +41,12 @@ local instance : Fact (p > 2) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega
 omit [Fact p.Prime] in
 /-- `2^5 < p` — the width bound `rangeCheck 5` needs for the register index. -/
 lemma two_pow_five_lt : (2 : ℕ) ^ 5 < p := by
-  have h := Fact.out (p := 2 ^ 17 < p)
-  have h2 : (2 : ℕ) ^ 5 < 2 ^ 17 := by norm_num
-  omega
+  have := Fact.out (p := 2 ^ 17 < p); omega
 
 omit [Fact p.Prime] in
 /-- `2^16 < p` — the width bound `rangeCheck 16` needs for the pc limbs. -/
 lemma two_pow_sixteen_lt : (2 : ℕ) ^ 16 < p := by
-  have h := Fact.out (p := 2 ^ 17 < p)
-  have h2 : (2 : ℕ) ^ 16 < 2 ^ 17 := by norm_num
-  omega
+  have := Fact.out (p := 2 ^ 17 < p); omega
 
 /-- Range-checks the write-register index `op_a` (5-bit) and the three pc limbs (16-bit), asserts `op_a_0`
 boolean, witnesses a multiplicity `m`, and pushes the committed instruction fetch `input` onto

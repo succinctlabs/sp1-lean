@@ -70,7 +70,7 @@ def circuit : GeneralFormalCircuit (ZMod p) MemoryMsg unit where
       MemoryMsg.isU64, MemoryMsg.ClkBound]
     obtain ⟨hvalue, hclk, -⟩ := h_holds
     refine ⟨⟨hvalue, ?_⟩, fun _ _ => ⟨hvalue, ?_⟩⟩ <;>
-      · simp [MemoryMsg.ClkBound, hclk]
+      simp only [MemoryMsg.ClkBound, hclk, ZMod.val_zero, Nat.two_pow_pos]
   completeness := by
     circuit_proof_start [WordRangeCheck.circuit, WordRangeCheck.Assumptions, WordRangeCheck.Spec,
       MemoryMsg.isU64]

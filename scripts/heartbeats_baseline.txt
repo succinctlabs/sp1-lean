@@ -33,7 +33,13 @@
 # ceiling were folded instead: a permutative `@[simp] Std.ExtDHashMap.insert_insert_comm` was being
 # ordered by `Lean.Meta.acLt` across a `▸` cast whose proof is a 31-arm match; `unfold` + two
 # `generalize`s take them from >400k to under the plain default.
+# -4 (2026-07-28, proof-cleanup W2/r1): ratchet DOWN, no ceiling raised. All four removals were
+# measured by ladder and every one sat 200-400x over its floor:
+# U16toU8OperationSafe.lean dropped both 1000000 ceilings, SubOperation/Populate.lean and
+# BitwiseOperation/Populate.lean each dropped a 2000000 on `spec_populate` (floors in (5000, 10000]
+# for both — the structurally identical AddOperation.spec_populate never carried one). The measured
+# ladders are recorded in the doc-comments at each former site.
 # NOTE: the recorded count includes one phantom — SP1Clean/Proofs/Sail/Advance.lean:2325 has the
 # literal inside a doc-comment, so the grep sees a site that does not exist. Pre-existing.
-SP1Clean 799
+SP1Clean 795
 SP1CleanTest 16

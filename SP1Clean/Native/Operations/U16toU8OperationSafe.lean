@@ -26,9 +26,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 omit [Fact p.Prime] in
 /-- `2 ^ 8 < p`, the side condition `Gadgets.ToBits.rangeCheck 8` needs. -/
 lemma hn8 : 2 ^ 8 < p := by
-  have h := Fact.out (p := 2 ^ 17 < p)
-  have : (2 : ℕ) ^ 8 < 2 ^ 17 := by norm_num
-  omega
+  have := Fact.out (p := 2 ^ 17 < p); omega
 
 /-- The literal meaning of SP1's `U16toU8OperationSafe` constraint list at `is_real = 1`: each
 low byte and each derived high byte `(u16_values[i] - low_bytes[i]) * 256⁻¹` is a genuine byte. -/
@@ -77,11 +75,6 @@ lemma high_byte_lt (u : ZMod p) (hu : u.val < 2 ^ 16) :
     ((u - ((u.val % 256 : ℕ) : ZMod p)) * (256 : ZMod p)⁻¹).val < 2 ^ 8 := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
-  have e16 : (2 : ℕ) ^ 16 = 65536 := by norm_num
-  have e8 : (2 : ℕ) ^ 8 = 256 := by norm_num
-  have e17 : (2 : ℕ) ^ 17 = 131072 := by norm_num
-  rw [e16] at hu
-  rw [e17] at hp
   have key : ((u.val % 256 : ℕ) : ZMod p) + ((256 * (u.val / 256) : ℕ) : ZMod p) = u := by
     rw [← Nat.cast_add, show u.val % 256 + 256 * (u.val / 256) = u.val from by omega,
       ZMod.natCast_zmod_val]
@@ -93,7 +86,7 @@ lemma high_byte_lt (u : ZMod p) (hu : u.val < 2 ^ 16) :
     push_cast
     rw [mul_comm (256 : ZMod p) ((u.val / 256 : ℕ) : ZMod p), mul_assoc,
       mul_inv_cancel₀ val_256_ne_zero, mul_one]
-  rw [hcollapse, ZMod.val_natCast_of_lt (by omega : u.val / 256 < p), e8]
+  rw [hcollapse, ZMod.val_natCast_of_lt (by omega : u.val / 256 < p)]
   omega
 
 /-! ## The witnessed `FormalCircuit` -/
@@ -142,9 +135,7 @@ theorem spec_populate {u16_values : Word (ZMod p)}
     (h2 : u16_values[2].val < 2 ^ 16) (h3 : u16_values[3].val < 2 ^ 16) (is_real : ZMod p) :
     Spec (⟨u16_values, populate u16_values, is_real⟩ : Inputs (ZMod p)) := by
   have hp256 : (256 : ℕ) < p := by
-    have h : (2 : ℕ) ^ 17 < p := Fact.out
-    have h2' : (2 : ℕ) ^ 17 = 131072 := by norm_num
-    omega
+    have := Fact.out (p := 2 ^ 17 < p); omega
   have lowlt : ∀ (u : ZMod p), (((u.val % 256 : ℕ) : ZMod p)).val < 256 := fun u => by
     rw [ZMod.val_natCast_of_lt (by omega : u.val % 256 < p)]; omega
   intro _ i
@@ -156,21 +147,24 @@ theorem spec_populate {u16_values : Word (ZMod p)}
   · exact ⟨lowlt _, high_byte_lt _ h2, reassemble _ _⟩
   · exact ⟨lowlt _, high_byte_lt _ h3, reassemble _ _⟩
 
-set_option maxHeartbeats 1000000 in
+-- Heartbeat budget: measured 2026-07 by ladder after the eval-map factoring below (control run at
+-- 1 heartbeat gave two real `elaborator` timeouts, one per theorem, both reported at the shared
+-- `variable` line, so the two were laddered at different rungs to separate ownership). `soundness`
+-- passes at 20000 and 10000 and fails at 5000 (`whnf` at its signature); `completeness` passes at
+-- 5000. Both floors sit an order of magnitude under the plain default, whose 20x-plus headroom
+-- retired the two former 1000000 ceilings here.
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   have hbin := h_assumptions
   obtain ⟨hiu, hicols, _⟩ := h_input
   have e8 : (2 : ℕ) ^ 8 = 256 := by norm_num
-  have ea0 : Expression.eval env input_var_u16_values[0] = input_u16_values[0] := by rw [← hiu]; simp only [Vector.getElem_map]
-  have ea1 : Expression.eval env input_var_u16_values[1] = input_u16_values[1] := by rw [← hiu]; simp only [Vector.getElem_map]
-  have ea2 : Expression.eval env input_var_u16_values[2] = input_u16_values[2] := by rw [← hiu]; simp only [Vector.getElem_map]
-  have ea3 : Expression.eval env input_var_u16_values[3] = input_u16_values[3] := by rw [← hiu]; simp only [Vector.getElem_map]
-  have el0 : Expression.eval env input_var_cols_low_bytes[0] = input_cols_low_bytes[0] := by rw [← hicols]; simp only [Vector.getElem_map]
-  have el1 : Expression.eval env input_var_cols_low_bytes[1] = input_cols_low_bytes[1] := by rw [← hicols]; simp only [Vector.getElem_map]
-  have el2 : Expression.eval env input_var_cols_low_bytes[2] = input_cols_low_bytes[2] := by rw [← hicols]; simp only [Vector.getElem_map]
-  have el3 : Expression.eval env input_var_cols_low_bytes[3] = input_cols_low_bytes[3] := by rw [← hicols]; simp only [Vector.getElem_map]
-  simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, el0, el1, el2, el3] at h_holds ⊢
+  have ea : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env input_var_u16_values[i] = input_u16_values[i] := by
+    intro i hi; rw [← hiu]; simp only [Vector.getElem_map]
+  have el : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env input_var_cols_low_bytes[i] = input_cols_low_bytes[i] := by
+    intro i hi; rw [← hicols]; simp only [Vector.getElem_map]
+  simp only [circuit_norm, byteChannel, ea, el] at h_holds ⊢
   obtain ⟨hr0, hr1, hr2, hr3, _hbool⟩ := h_holds
   -- The four trailing conjuncts are the byte pulls' own `Requirements` — vacuous off-gate.
   refine ⟨fun hr1eq => ?_, fun h1 h0 => off_gate_vacuous hbin h1 h0,
@@ -186,31 +180,26 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   · exact ⟨R2.1, R2.2, reassemble _ _⟩
   · exact ⟨R3.1, R3.2, reassemble _ _⟩
 
-set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   have hbin := h_assumptions
   obtain ⟨hiu, hicols, _⟩ := h_input
   have e8 : (2 : ℕ) ^ 8 = 256 := by norm_num
-  have ea0 : Expression.eval env.toEnvironment input_var_u16_values[0] = input_u16_values[0] := by rw [← hiu]; simp only [Vector.getElem_map]
-  have ea1 : Expression.eval env.toEnvironment input_var_u16_values[1] = input_u16_values[1] := by rw [← hiu]; simp only [Vector.getElem_map]
-  have ea2 : Expression.eval env.toEnvironment input_var_u16_values[2] = input_u16_values[2] := by rw [← hiu]; simp only [Vector.getElem_map]
-  have ea3 : Expression.eval env.toEnvironment input_var_u16_values[3] = input_u16_values[3] := by rw [← hiu]; simp only [Vector.getElem_map]
-  have el0 : Expression.eval env.toEnvironment input_var_cols_low_bytes[0] = input_cols_low_bytes[0] := by rw [← hicols]; simp only [Vector.getElem_map]
-  have el1 : Expression.eval env.toEnvironment input_var_cols_low_bytes[1] = input_cols_low_bytes[1] := by rw [← hicols]; simp only [Vector.getElem_map]
-  have el2 : Expression.eval env.toEnvironment input_var_cols_low_bytes[2] = input_cols_low_bytes[2] := by rw [← hicols]; simp only [Vector.getElem_map]
-  have el3 : Expression.eval env.toEnvironment input_var_cols_low_bytes[3] = input_cols_low_bytes[3] := by rw [← hicols]; simp only [Vector.getElem_map]
-  simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, el0, el1, el2, el3]
-  refine ⟨?_, ?_, ?_, ?_, by rcases hbin with h | h <;> rw [h] <;> simp⟩ <;>
-  · intro hneg
-    have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    have hsp := h_spec hr1
-    rw [byteRowSpec_u8range_pair, e8]
-    first
-      | exact ⟨(hsp 0).1, (hsp 0).2.1⟩
-      | exact ⟨(hsp 1).1, (hsp 1).2.1⟩
-      | exact ⟨(hsp 2).1, (hsp 2).2.1⟩
-      | exact ⟨(hsp 3).1, (hsp 3).2.1⟩
+  have ea : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env.toEnvironment input_var_u16_values[i] = input_u16_values[i] := by
+    intro i hi; rw [← hiu]; simp only [Vector.getElem_map]
+  have el : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env.toEnvironment input_var_cols_low_bytes[i] = input_cols_low_bytes[i] := by
+    intro i hi; rw [← hicols]; simp only [Vector.getElem_map]
+  simp only [circuit_norm, byteChannel, ea, el]
+  refine ⟨?_, ?_, ?_, ?_, by rcases hbin with h | h <;> rw [h] <;> simp⟩
+  all_goals intro hneg
+  all_goals have hsp := h_spec (neg_inj.mp hneg)
+  all_goals rw [byteRowSpec_u8range_pair, e8]
+  · exact ⟨(hsp 0).1, (hsp 0).2.1⟩
+  · exact ⟨(hsp 1).1, (hsp 1).2.1⟩
+  · exact ⟨(hsp 2).1, (hsp 2).2.1⟩
+  · exact ⟨(hsp 3).1, (hsp 3).2.1⟩
 
 /-- SP1's `U16toU8OperationSafe::eval` as a Clean-native `FormalAssertion`: `is_real`-gated byte-bus
 range checks over the `populate`d low bytes, no fresh witnesses (the column struct is an input). -/
