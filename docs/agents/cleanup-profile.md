@@ -309,6 +309,25 @@ two residual `nlinarith` calls were re-proving `< 65536` limb bounds that
 duplication dropped 26 `nlinarith` to 3 and made **all 16 ceilings removable**. That is the
 difference between raising a budget and driving the proof to closure.
 
+**Lead with the sibling-comparison screen — it is nearly free and it has been predictive.** Before
+laddering anything, find a declaration in the same file (or its mirror file) that does *the same kind
+of work* and carries **no** ceiling. If one exists, the ceiling is almost certainly vestigial, and the
+ladder is then only confirming what the comparison already told you. Worked cases: `SailWrap`'s
+`Sail.writeReg_writeReg_comm` — same tactic, same hashmap comm step, no dependent cast — passes at the
+default and pinpointed the `acLt` cause; `Faithful/CPUState.lean`'s third interaction anchor does
+strictly *more* work than the two ceilinged ones (same `hbk`, same binding hypotheses, plus a 4-entry
+`List.Perm` instead of a filtered `=`) and has never carried a ceiling — which correctly predicted
+both floors at ≤2500 against a declared 1M.
+
+**Declared magnitudes are uninformative.** Across ~100 measured sites the declared value has never
+correlated with the true floor: 16M families flooring at ≤40k, 8M at ≤20k, 1M at ≤1500, and the
+highest-floor file in a batch carrying the same number as the lowest. Treat the number as evidence of
+nothing but a copy-paste.
+
+**Batch several sites per file per pass.** Separating ownership requires laddering sites at *distinct*
+rungs, so two sites cost ~7 LSP round-trips if done serially. Plan the rung schedule for all of a
+file's sites up front.
+
 2. **Classify the cause**, and record any cause not already documented — new ones are expected.
    Known classes: unfolded expensive value (the `circuit_output_eq` fold), unfolded hypothesis type,
    over-broad simp set, missing normalization lemma, metavariable normalization at a decoded row,
