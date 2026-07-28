@@ -57,12 +57,10 @@ lemma signedVal_neg_is_real (hp : 2 < p) {is_real : ZMod p} (h : is_real = 0 ∨
   haveI : NeZero p := ⟨by omega⟩
   rcases h with h | h <;> subst h
   · simp [signedVal, ZMod.val_zero]
-  · have hv : (-1 : ZMod p).val = p - 1 := by
-      obtain ⟨m, hm⟩ : ∃ m, p = m + 1 := ⟨p - 1, by omega⟩
-      subst hm; simp [ZMod.val_neg_one]
-    have hv1 : (1 : ZMod p).val = 1 := by
-      rw [ZMod.val_one_eq_one_mod, Nat.mod_eq_of_lt (show 1 < p by omega)]
-    simp only [signedVal, hv, hv1]
+  · haveI : Fact (1 < p) := ⟨by omega⟩
+    have hv : (-1 : ZMod p).val = p - 1 := by
+      simpa [ZMod.val_one] using ZMod.val_neg_of_ne_zero (1 : ZMod p)
+    simp only [signedVal, hv, ZMod.val_one]
     rw [if_neg (by omega), Nat.cast_sub (show 1 ≤ p by omega)]
     push_cast; ring
 
@@ -81,15 +79,14 @@ lemma signedVal_neg [Fact p.Prime] (hp : 2 < p) (x : ZMod p) :
   rcases eq_or_ne x 0 with hx | hx
   · subst hx; simp [signedVal, ZMod.val_zero]
   · have hxlt : x.val < p := ZMod.val_lt x
-    have hxpos : 0 < x.val := by rw [ZMod.val_pos]; exact hx
+    have hxpos : 0 < x.val := ZMod.val_pos.mpr hx
     haveI : NeZero x := ⟨hx⟩
     have hvneg : (-x).val = p - x.val := ZMod.val_neg_of_ne_zero x
     have hne : 2 * x.val ≠ p := fun he => hodd ⟨x.val, he.symm⟩
     unfold signedVal
     rw [hvneg]
     by_cases h : 2 * x.val ≤ p
-    · have h' : 2 * x.val < p := lt_of_le_of_ne h hne
-      rw [if_pos h, if_neg (by omega), Nat.cast_sub (by omega)]; ring
+    · rw [if_pos h, if_neg (by omega), Nat.cast_sub (by omega)]; ring
     · rw [if_neg h, if_pos (by omega), Nat.cast_sub (by omega)]; ring
 
 /-- `signedVal` is a **section** of the canonical projection `ℤ → ZMod p`: casting the centered
@@ -122,6 +119,21 @@ noncomputable def AbstractInteraction.toAccess (env : Environment (ZMod p))
     (i.msg.map (Expression.eval env)).toList.map ZMod.val,
     signedVal (Expression.eval env i.mult))
 
+omit [NeZero p] in
+/-- The `toAccess`-image of **any** channel interaction: bus kind and table name from the channel
+`name`, the message's `toElements` list evaluated and then val-projected, and the centered signed
+multiplicity. This is the shared kernel of the seven per-bus `toAccess_{push,pull}If_*` lemmas below;
+each of those specialises it by rewriting with its message's `toList` helper. -/
+private lemma toAccess_toRaw {Message : TypeMap} [ProvableType Message]
+    (env : Environment (ZMod p)) {channel : Channel (ZMod p) Message}
+    (i : ChannelInteraction channel) :
+    AbstractInteraction.toAccess env i.toRaw =
+      (kindOf channel.name, channel.name,
+        ((toElements i.msg).toList.map (Expression.eval env)).map ZMod.val,
+        signedVal (Expression.eval env i.mult)) := by
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, Channel.toRaw,
+    Vector.toList_map]
+
 open SP1Clean.Channels (stateChannel StateMsg)
 
 /- **4.30 `combinedSize'` note.** In 4.30 `ProvableStruct.combinedSize'` became `List.sum ∘ List.map size`,
@@ -140,6 +152,7 @@ private lemma toList_word {α : Type} (w : Vector α 4) :
     w.toList = [w[0], w[1], w[2], w[3]] := by
   apply List.ext_getElem (by simp)
   intro i h1 h2
+  -- the `length` normalization is what gives `interval_cases` its upper bound on `i`
   simp only [List.length_cons, List.length_nil] at h2
   interval_cases i <;> simp
 
@@ -167,12 +180,9 @@ lemma toAccess_pushIf_state (env : Environment (ZMod p)) (mult : Expression (ZMo
          (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val],
         signedVal (Expression.eval env mult)) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
-    Channel.toRaw, kindOf, stateChannel, if_true]
-  simp only [Vector.toList_map, Prod.mk.injEq]
-  refine ⟨by trivial, trivial, ?_, trivial⟩
-  rw [stateMsg_toList]
-  simp only [List.map_cons, List.map_nil]
+  simp only [toAccess_toRaw, pushedIf, stateChannel, kindOf, stateMsg_toList, List.map_cons,
+    List.map_nil]
+  rfl
 
 omit [NeZero p] in
 /-- **Kernel of the State "received = projection" (gated VM pull).** The `pullIf`/`stateChannel`/`StateMsg`
@@ -188,12 +198,9 @@ lemma toAccess_pullIf_state (env : Environment (ZMod p)) (gate : Expression (ZMo
          (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
-    Channel.toRaw, kindOf, stateChannel, if_true]
-  simp only [Vector.toList_map, Prod.mk.injEq]
-  refine ⟨by trivial, trivial, ?_, trivial⟩
-  rw [stateMsg_toList]
-  simp only [List.map_cons, List.map_nil]
+  simp only [toAccess_toRaw, pulledIf, stateChannel, kindOf, stateMsg_toList, List.map_cons,
+    List.map_nil]
+  rfl
 
 open SP1Clean.Channels (memoryChannel MemoryMsg programChannel ProgramMsg)
 
@@ -228,12 +235,11 @@ omit [NeZero p] in
 /-- **Kernel of the Memory "emitted = projection".** The `toAccess`-image of a pushed `memoryChannel`
 message (a plain `Channel.emit`, default `toRaw`; post-#398 `circuit_norm` normal form: `pushIf`) is the
 9-field `memoryLookups`-style `LookupAccess`: bus `.Memory`, table `"SP1Memory"`, the nine fields
-val-projected, and the signed multiplicity. The `toElements` unfold is done with `simp only`
-(deterministic, linear) — plain `simp` over the full set blows up at `whnf` for the 9/16-field structs;
-the trailing `simp` only normalizes the resulting `Vector.cast`/`++`/`map`/`toList` chain. -/
+val-projected, and the signed multiplicity. The `toElements` unfold stays `simp only` (deterministic,
+linear) — plain `simp` over the full set blows up at `whnf` for the 9/16-field structs. -/
 lemma toAccess_pushIf_memory (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : MemoryMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (pushedIf (channel :=memoryChannel) mult msg).toRaw =
+    AbstractInteraction.toAccess env (pushedIf (channel := memoryChannel) mult msg).toRaw =
       (InteractionKind.Memory, "SP1Memory",
         [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
          (Expression.eval env msg.addr0).val, (Expression.eval env msg.addr1).val,
@@ -241,12 +247,9 @@ lemma toAccess_pushIf_memory (env : Environment (ZMod p)) (mult : Expression (ZM
          (Expression.eval env msg.value[1]).val, (Expression.eval env msg.value[2]).val,
          (Expression.eval env msg.value[3]).val],
         signedVal (Expression.eval env mult)) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
-    Channel.toRaw, kindOf, memoryChannel, if_true]
-  simp only [Vector.toList_map, Prod.mk.injEq]
-  refine ⟨by trivial, trivial, ?_, trivial⟩
-  rw [memoryMsg_toList]
-  simp only [List.map_cons, List.map_nil]
+  simp only [toAccess_toRaw, pushedIf, memoryChannel, kindOf, memoryMsg_toList, List.map_cons,
+    List.map_nil]
+  rfl
 
 omit [NeZero p] in
 /-- **Kernel of the Memory "received = projection" (gated VM pull).** The `pullIf`/`memoryChannel`/`MemoryMsg`
@@ -265,12 +268,9 @@ lemma toAccess_pullIf_memory (env : Environment (ZMod p)) (gate : Expression (ZM
          (Expression.eval env msg.value[1]).val, (Expression.eval env msg.value[2]).val,
          (Expression.eval env msg.value[3]).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
-    Channel.toRaw, kindOf, memoryChannel, if_true]
-  simp only [Vector.toList_map, Prod.mk.injEq]
-  refine ⟨by trivial, trivial, ?_, trivial⟩
-  rw [memoryMsg_toList]
-  simp only [List.map_cons, List.map_nil]
+  simp only [toAccess_toRaw, pulledIf, memoryChannel, kindOf, memoryMsg_toList, List.map_cons,
+    List.map_nil]
+  rfl
 
 omit [NeZero p] in
 /-- **Kernel of the Program "emitted = projection".** The `toAccess`-image of a pushed `programChannel`
@@ -290,12 +290,9 @@ lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (Z
          (Expression.eval env msg.op_c[3]).val, (Expression.eval env msg.op_a_0).val,
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env mult)) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushedIf,
-    Channel.toRaw, kindOf, programChannel, if_true]
-  simp only [Vector.toList_map, Prod.mk.injEq]
-  refine ⟨by trivial, trivial, ?_, trivial⟩
-  rw [programMsg_toList]
-  simp only [List.map_cons, List.map_nil]
+  simp only [toAccess_toRaw, pushedIf, programChannel, kindOf, programMsg_toList, List.map_cons,
+    List.map_nil]
+  rfl
 
 omit [NeZero p] in
 /-- **Kernel of the Program "received = projection" (gated VM pull).** The `pullIf`/`programChannel`/
@@ -317,12 +314,9 @@ lemma toAccess_pullIf_program (env : Environment (ZMod p)) (gate : Expression (Z
          (Expression.eval env msg.op_c[3]).val, (Expression.eval env msg.op_a_0).val,
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf,
-    Channel.toRaw, kindOf, programChannel, if_true]
-  simp only [Vector.toList_map, Prod.mk.injEq]
-  refine ⟨by trivial, trivial, ?_, trivial⟩
-  rw [programMsg_toList]
-  simp only [List.map_cons, List.map_nil]
+  simp only [toAccess_toRaw, pulledIf, programChannel, kindOf, programMsg_toList, List.map_cons,
+    List.map_nil]
+  rfl
 
 open SP1Clean.Channels (byteChannel)
 
@@ -343,16 +337,13 @@ four `ByteRow` fields val-projected, and the signed multiplicity `signedVal (eva
 `pullIf`/`byteChannel`/`ByteRow` analog of `toAccess_pushIf_state`. -/
 lemma toAccess_pullIf_byte (env : Environment (ZMod p)) (gate : Expression (ZMod p))
     (msg : ByteRow (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (pulledIf (channel :=byteChannel) gate msg).toRaw =
+    AbstractInteraction.toAccess env (pulledIf (channel := byteChannel) gate msg).toRaw =
       (InteractionKind.Byte, "SP1Byte",
         [(Expression.eval env msg.opcode).val, (Expression.eval env msg.a).val,
          (Expression.eval env msg.b).val, (Expression.eval env msg.c).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pulledIf, Channel.toRaw, kindOf,
-    byteChannel]
-  simp only [Vector.toList_map, Prod.mk.injEq]
-  refine ⟨by trivial, trivial, ?_, trivial⟩
-  rw [byteRow_toList]
-  simp only [List.map_cons, List.map_nil]
+  simp only [toAccess_toRaw, pulledIf, byteChannel, kindOf, byteRow_toList, List.map_cons,
+    List.map_nil]
+  rfl
 
 end SP1Clean

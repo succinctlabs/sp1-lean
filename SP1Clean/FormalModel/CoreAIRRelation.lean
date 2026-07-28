@@ -29,8 +29,7 @@ def Cluster.tables : Cluster → List Table
   | .memoryBoundary => memoryBoundaryCluster
 
 theorem Cluster.tables_nodup (cluster : Cluster) : cluster.tables.Nodup := by
-  cases cluster <;> simp only [Cluster.tables, coreCluster_nodup,
-    memoryBoundaryCluster_nodup]
+  cases cluster <;> simp only [Cluster.tables, coreCluster_nodup, memoryBoundaryCluster_nodup]
 
 /-- Heterogeneous trace matrices indexed by the audited table enum. -/
 structure TableTrace (Row : Table → Type) where

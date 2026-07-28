@@ -95,8 +95,7 @@ def TraceByteConsistent (rows : List (Trace.RowView (ZMod p))) : Prop :=
 private theorem multiplicitySum_eq_zero_of_multOf {l : LookupAccessList} (k : LookupKey)
     (h : ∀ a ∈ l, multOf a = 0) : multiplicitySum l k = 0 := by
   simp only [multiplicitySum]
-  apply List.sum_eq_zero
-  intro x hx
+  refine List.sum_eq_zero fun x hx => ?_
   obtain ⟨a, ha, rfl⟩ := List.mem_map.1 hx
   exact h a (List.mem_of_mem_filter ha)
 
@@ -106,9 +105,7 @@ sends have multiplicity `is_real.val = 0`. The emission is genuinely `is_real`-g
 `send_byte(…, is_real)`. -/
 theorem byteLookups_padding (r : Trace.RowView (ZMod p)) (h : r.is_real = 0) :
     ∀ k, multiplicitySum (byteLookups r) k = 0 := by
-  intro k
-  apply multiplicitySum_eq_zero_of_multOf
-  intro a ha
+  refine fun k => multiplicitySum_eq_zero_of_multOf k fun a ha => ?_
   simp only [byteLookups, List.mem_map] at ha
   obtain ⟨row, _, rfl⟩ := ha
   simp only [byteSend, multOf, h, ZMod.val_zero, Nat.cast_zero]

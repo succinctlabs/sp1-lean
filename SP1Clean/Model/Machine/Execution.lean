@@ -160,8 +160,7 @@ theorem localExecutionClock_eq_ordinary {model : SP1MachineModel}
     funext n
     unfold localScheduleAt
     split
-    · exact ordinary ctx.program _
-    · rfl
+    exacts [ordinary ctx.program _, rfl]
   rw [schedules, clockAt_ordinary]
 
 /-- Once a shard-local initial state is located in a canonical trajectory, every later local state is
@@ -170,8 +169,7 @@ theorem trajectory_from_reached {model : SP1MachineModel} {global : ExecutionCtx
     {shard : LocalExecutionCtx model} {startStep : ℕ}
     (initialReached : trajectory global.initial startStep = some shard.initial) (n : ℕ) :
     trajectory global.initial (startStep + n) = trajectory shard.initial n := by
-  rw [trajectory_add, initialReached]
-  rfl
+  rw [trajectory_add, initialReached]; rfl
 
 /-- The local and canonical schedule views agree after anchoring the local initial state. -/
 theorem localScheduleAt_eq_scheduleAt {model : SP1MachineModel} {global : ExecutionCtx model}
@@ -236,8 +234,7 @@ def LocalExecutionSegmentWitness.anchor {model : SP1MachineModel}
   initialReached := initialReached
   finalReached := by
     change trajectory global.initial (startStep + execution.steps) = some execution.finalState
-    rw [trajectory_add, initialReached]
-    exact execution.reached
+    rw [trajectory_add, initialReached]; exact execution.reached
 
 /-- Anchoring preserves the shard's schedule-derived clock. -/
 theorem LocalExecutionSegmentWitness.clockAt_anchor {model : SP1MachineModel}
