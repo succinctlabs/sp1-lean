@@ -179,6 +179,26 @@ Verify with `lean_goal`, or a build, before removing:
   later `ZMod.val`/`omega` steps. There is deliberately **no** global `NeZero p` instance: a
   `Fact (2 ^ 17 < p)`-derived one would make the pervasive `omit [Fact (2 ^ 17 < p)] in` clauses
   illegal (`Model/ByteTable.lean:84`). Do not add one — it is an owner decision, not a drive-by.
+
+> **The derivation source decides — do not treat all `Fact`/`NeZero` locals as load-bearing.** This
+> rule was originally written too broadly and was telling workers to keep dead code. Three measured
+> cases:
+>
+> | local | derived from | verdict |
+> |---|---|---|
+> | `NeZero p` | `Fact (2 ^ 17 < p)` | **keep** — no global exists, on purpose (above) |
+> | `NeZero p` | `Fact p.Prime` (`⟨(Fact.out (p := p.Prime)).ne_zero⟩`) | **dead, remove** — synthesizable |
+> | `Fact (1 < p)` | `Fact p.Prime` | **dead, remove** — synthesizable |
+>
+> Anything synthesizable from `Fact p.Prime` is already in scope and the local shadows nothing. Only
+> the magnitude-derived (`2 ^ 17`) form is load-bearing. Likewise `Math/Word.lean` declares
+> `instFact_2_17_of_2_24` and `instFact_2_24_of_2_25`, so an in-proof `have` re-deriving
+> `Fact (2 ^ 17 < p)` under a stronger hypothesis is also dead — four such copies were deleted
+> outright during the `sixteen_lt` hoist. **Verify by deletion + re-elaboration, never by grep.**
+
+- A `change` that only restates an `abbrev` is free to delete when the closer is a term rather than a
+  tactic that needed the syntactic form. `MicroTime.chainState_succ_front` went from 8 lines to 2
+  this way (three pure-defeq `change`s dropped, body now `exact congrArg (·.bind Machine.stepOnce) ih`).
 - `set_option linter.unusedSectionVars false in` before the `circuit_norm` `rfl`-lemmas.
 
 ---
