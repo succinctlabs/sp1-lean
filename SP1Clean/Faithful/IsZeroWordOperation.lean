@@ -90,7 +90,7 @@ private def isZeroWordOwnExpressions
         cols.is_zero_first_half * cols.is_zero_second_half)]
 
 set_option linter.unusedSectionVars false in
-set_option maxHeartbeats 1000000 in
+-- Measured (W3/r3c/b2): clears 40000 heartbeats; the former 1M ceiling was >=25x over, removed.
 private theorem isZeroWord_nativeAssertions
     (env : Environment (ZMod p))
     (input : Var SP1Clean.IsZeroWordOperation.Inputs (ZMod p))
@@ -126,7 +126,7 @@ private theorem isZeroWord_nativeAssertions
   repeat' rw [CanonicalReader.equalityAssertionList]
   simp [isZeroWordOwnExpressions, Expression.eval]
 
-set_option maxHeartbeats 1000000 in
+-- Measured (W3/r3c/b2): clears 40000 heartbeats; the former 1M ceiling was >=25x over, removed.
 /-- Folded normalization of the native word-zero fragment to the exact generated Rust list. -/
 theorem isZeroWord_assertions_exact
     (env : Environment (ZMod p))

@@ -26,7 +26,8 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 2000000 in
+-- The former 2M ceiling was ~33x over; measured floor in (50000, 60000], kept at 6.7x headroom.
+set_option maxHeartbeats 400000 in
 /-- **Faithfulness anchor.** SP1's `LtOperationUnsigned` constraint list holds iff the native
 gadget's `RawSpec` holds. -/
 theorem ltUnsigned_constraints_faithful (b cc : Word (ZMod p))
@@ -43,7 +44,7 @@ theorem ltUnsigned_constraints_faithful (b cc : Word (ZMod p))
     SP1Clean.LtOperationUnsigned.RawSpec, SP1Clean.U16CompareOperation.RawSpec,
     Nat.cast_zero, Nat.cast_one,
     zero_add, sub_self, mul_zero, true_and, and_assoc, bool_iff,
-    show (2 : ℕ) ^ 16 = 65536 from by norm_num]
+    show (2 : ℕ) ^ 16 = 65536 by norm_num]
   itauto
 
 @[circuit_norm] theorem eval_ltUnsignedColumns
@@ -245,7 +246,6 @@ private theorem native_ltUnsignedAssertions_decompose
     List.map_append, ← nativeAssertZeros,
     ltUnsignedConstraintTail_eval]
 
-set_option maxHeartbeats 1000000 in
 /-- Folded normalization of the native unsigned-comparison fragment to the exact generated list. -/
 theorem ltUnsigned_assertions_exact
     (env : Environment (ZMod p))
