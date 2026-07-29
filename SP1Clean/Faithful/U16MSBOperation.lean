@@ -55,7 +55,6 @@ theorem u16msb_constraints_faithful (a msb : ZMod p) :
   rfl
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 /-- Folded normalization of the native MSB fragment to the exact generated Rust assertion list. -/
 theorem u16msb_assertions_exact
     (env : Environment (ZMod p))
@@ -103,16 +102,8 @@ theorem u16msb_interactions_faithful_syntactic
       = (((SP1Clean.U16MSBOperation.main input).operations offset).interactionsWith
           byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h6 : (6 : ZMod p).val = 6 := by
-    have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
-  have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pulledIf (channel := byteChannel) g s).toRaw) =
-        (InteractionKind.Byte, "SP1Byte",
-          [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
-           (Expression.eval env s.b).val, (Expression.eval env s.c).val],
-          signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_pullIf_byte env g s
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
+  have hk := toAccess_pullIf_byte_forall env
   have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
     @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
       ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp

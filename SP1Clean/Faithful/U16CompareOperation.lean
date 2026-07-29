@@ -38,7 +38,7 @@ theorem u16compare_constraints_faithful (a b : ZMod p)
     List.Forall, Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_Range, val_16, one_ne_zero, ne_eq, not_false_eq_true, true_implies,
     SP1Clean.U16CompareOperation.RawSpec, sub_self, mul_zero, true_and,
-    bool_iff, show (2 : ℕ) ^ 16 = 65536 from by norm_num]
+    bool_iff, show (2 : ℕ) ^ 16 = 65536 by norm_num]
 
 @[circuit_norm] theorem eval_u16CompareColumns
     {F : Type} [FiniteField F] (env : Environment F)
@@ -50,7 +50,6 @@ theorem u16compare_constraints_faithful (a b : ZMod p)
   rfl
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 /-- Folded normalization of the native u16-comparison fragment to the exact generated Rust list. -/
 theorem u16compare_assertions_exact
     (env : Environment (ZMod p))
@@ -100,16 +99,8 @@ theorem u16compare_interactions_faithful_syntactic
       = (((SP1Clean.U16CompareOperation.main input).operations offset).interactionsWith
           byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h6 : (6 : ZMod p).val = 6 := by
-    have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
-  have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pulledIf (channel := byteChannel) g s).toRaw) =
-        (InteractionKind.Byte, "SP1Byte",
-          [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
-           (Expression.eval env s.b).val, (Expression.eval env s.c).val],
-          signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_pullIf_byte env g s
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
+  have hk := toAccess_pullIf_byte_forall env
   have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
     @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
       ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp

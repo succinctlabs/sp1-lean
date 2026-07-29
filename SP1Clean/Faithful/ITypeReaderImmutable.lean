@@ -31,7 +31,6 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 2000000 in
 /-- **Faithfulness anchor (ITypeReaderImmutable fragment).** Under `is_real = is_trusted = 1`, SP1's
 generated `ITypeReaderImmutable` constraint list holds iff the four `op_a_0` *read*-zeroing equations and
 the two register operands' (op_a, op_b) timestamp byte bounds hold. -/
@@ -60,13 +59,12 @@ theorem itypereaderimmutable_constraints_faithful
     ByteOpcode.constrain_Range,
     ByteOpcode.constrain_U8Range, val_16, ZMod.val_zero, one_ne_zero, ne_eq, not_false_eq_true,
     true_implies, sub_self, mul_zero, sub_zero, Nat.ofNat_pos, true_and, and_true,
-    show (2 : ℕ) ^ 8 = 256 from by norm_num, show (2 : ℕ) ^ 16 = 65536 from by norm_num]
+    show (2 : ℕ) ^ 8 = 256 by norm_num, show (2 : ℕ) ^ 16 = 65536 by norm_num]
   tauto
 
 open SP1Clean.Channels (byteChannel memoryChannel programChannel)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 2000000 in
 /-- Exact Memory-bus projection for the immutable I-type reader. Both operands are reads, so the
 native pull/push pairs cover the complete four-entry Rust Memory block; `nativeAccesses` dualizes
 the Clean direction to the Rust send/receive convention. -/
@@ -135,7 +133,6 @@ theorem itypereaderimmutable_memory_interactions_faithful_syntactic
     hvalueA0, hvalueA1, hvalueA2, hvalueA3, hprevB,
     hvalueB0, hvalueB1, hvalueB2, hvalueB3]
 
-set_option maxHeartbeats 1000000 in
 /-- Exact Program-bus projection for the immutable I-type reader, including `imm_c = 1`. -/
 theorem itypereaderimmutable_program_interactions_faithful_syntactic
     (env : Environment (ZMod p))
@@ -191,7 +188,6 @@ theorem itypereaderimmutable_program_interactions_faithful_syntactic
     hpc0, hpc1, hpc2, hopcode, hopA, hopB, hopA0,
     himm0, himm1, himm2, himm3]
 
-set_option maxHeartbeats 1000000 in
 /-- Exact four-entry timestamp Byte block for the immutable I-type reader. -/
 theorem itypereaderimmutable_byte_interactions_faithful_syntactic
     (env : Environment (ZMod p))
@@ -215,27 +211,9 @@ theorem itypereaderimmutable_byte_interactions_faithful_syntactic
         (fun access => access.1 = InteractionKind.Byte) := by
   haveI : NeZero p :=
     ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h6 : (6 : ZMod p).val = 6 := by
-    have h : (6 : ℕ) < p := by
-      have := Fact.out (p := 2 ^ 17 < p)
-      omega
-    exact ZMod.val_natCast_of_lt h
-  have h3 : (3 : ZMod p).val = 3 := by
-    have h : (3 : ℕ) < p := by
-      have := Fact.out (p := 2 ^ 17 < p)
-      omega
-    exact ZMod.val_natCast_of_lt h
-  have hbk : ∀ (g : Expression (ZMod p))
-      (row : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env
-          ((pulledIf (channel := byteChannel) g row).toRaw) =
-        (InteractionKind.Byte, "SP1Byte",
-          [(Expression.eval env row.opcode).val,
-           (Expression.eval env row.a).val,
-           (Expression.eval env row.b).val,
-           (Expression.eval env row.c).val],
-          signedVal (Expression.eval env (-g))) :=
-    fun g row => toAccess_pullIf_byte env g row
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
+  have h3 : (3 : ZMod p).val = 3 := val_3_zmod_p
+  have hbk := toAccess_pullIf_byte_forall env
   have heq := fun (n : ℕ)
       (inp : Var (ProvablePair field field) (ZMod p)) =>
     @filter_interactions_formalAssertion_eq_nil

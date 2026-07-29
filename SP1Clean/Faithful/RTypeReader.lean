@@ -34,7 +34,6 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 2000000 in
 /-- **Faithfulness anchor (RTypeReader fragment).** Under `is_real = is_trusted = 1`, SP1's generated
 `RTypeReader` constraint list holds iff the four `op_a_0` zeroing equations and the three operands'
 timestamp byte bounds hold. The `.program`/`.memory` interactions contribute `True` (their meaning is
@@ -84,7 +83,6 @@ theorem rtypereader_asserts_faithful
   simp only [Extracted.RTypeReader.asserts, List.Forall, sub_self, mul_zero, sub_zero,
     true_and, and_true]
 
-set_option maxHeartbeats 2000000 in
 /-- **RTypeReader fragment — interaction half.** Under `is_real = is_trusted = 1`, SP1's generated
 `RTypeReader` `interactions` list holds iff the three operands' timestamp byte bounds. The
 `.program`/`.memory` interactions contribute `True`; the bounds come from the per-operand byte
@@ -117,7 +115,6 @@ theorem rtypereader_interactions_faithful
 open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel ProgramMsg)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 1000000 in
 /-- **Faithfulness anchor (RTypeReader fragment) — Memory-bus interactions, SYNTACTIC.** Option B: the
 reader is now a **pure read** — its op_a (`rd`) **write** is factored out into `RegisterWrite` (composed by
 the chip). So the **five** Memory interactions the reader actually emits (`interactionsWith memoryChannel`:
@@ -188,7 +185,6 @@ theorem rtypereader_memory_interactions_faithful_syntactic
     h_pl_b, h_pv_b0, h_pv_b1, h_pv_b2, h_pv_b3,
     h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3]
 
-set_option maxHeartbeats 1000000 in
 /-- **Faithfulness anchor (RTypeReader fragment) — Program-bus interaction, SYNTACTIC.** The single
 Program instruction-fetch the reader emits projects to the same arity-16 `LookupAccess` as the Program
 entry of SP1's extracted oracle. Exercises the `.program` arm of `Extracted.Interaction.toAccess`,
@@ -236,7 +232,6 @@ theorem rtypereader_program_interactions_faithful_syntactic
     signedVal_neg hp2,
     h_it, h_p0, h_p1, h_p2, h_oc, h_oa, h_ob, h_oct, h_oa0]
 
-set_option maxHeartbeats 1000000 in
 /-- **Faithfulness anchor (RTypeReader fragment) — Byte-bus interactions, SYNTACTIC.** The six timestamp
 byte checks the reader emits — recovered **through two nested subcircuit levels** (`RTypeReader →
 RegisterAccessCols → RegisterAccessTimestamp`) — project to the same `LookupAccess` list as the Byte
@@ -265,19 +260,9 @@ theorem rtypereader_byte_interactions_faithful_syntactic
       = ((Extracted.RTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
           is_trusted).map Extracted.Interaction.toAccess).filter (fun a => a.1 = InteractionKind.Byte) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h6 : (6 : ZMod p).val = 6 := by
-    have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
-  have h3 : (3 : ZMod p).val = 3 := by
-    have h : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
-  have hbk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pulledIf (channel := byteChannel) g s).toRaw) =
-        (InteractionKind.Byte, "SP1Byte",
-          [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
-           (Expression.eval env s.b).val, (Expression.eval env s.c).val],
-          signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_pullIf_byte env g s
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
+  have h3 : (3 : ZMod p).val = 3 := val_3_zmod_p
+  have hbk := toAccess_pullIf_byte_forall env
   have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
     @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
       ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp

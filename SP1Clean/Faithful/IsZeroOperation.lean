@@ -82,7 +82,6 @@ private def isZeroAssertionExpressions
   [e3, e6, e8]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem isZero_nativeAssertions
     (env : Environment (ZMod p))
     (input : Var SP1Clean.IsZeroOperation.Inputs (ZMod p))

@@ -50,7 +50,7 @@ theorem add_interactions_faithful (a b value : Word (ZMod p)) :
   simp only [Extracted.AddOperation.interactions, List.Forall,
     Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_Range, val_16, one_ne_zero, ne_eq, not_false_eq_true, true_implies,
-    SP1Clean.AddOperation.InteractSpec, show (2 : ℕ) ^ 16 = 65536 from by norm_num]
+    SP1Clean.AddOperation.InteractSpec, show (2 : ℕ) ^ 16 = 65536 by norm_num]
 
 @[circuit_norm] theorem eval_addColumns
     {F : Type} [FiniteField F] (env : Environment F)
@@ -92,7 +92,6 @@ private def addAssertionExpressions
     input.is_real * (c3 * (c3 - 1))]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem add_nativeAssertions
     (env : Environment (ZMod p))
     (input : Var SP1Clean.AddOperation.Inputs (ZMod p))
@@ -106,7 +105,6 @@ private theorem add_nativeAssertions
     circuit_norm, Expression.eval]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 /-- Folded normalization of the native add fragment to the exact generated Rust assertion list. -/
 theorem add_assertions_exact
     (env : Environment (ZMod p))
@@ -150,17 +148,8 @@ theorem add_interactions_faithful_syntactic
       = (((SP1Clean.AddOperation.main input).operations offset).interactionsWith
           byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h6 : (6 : ZMod p).val = 6 := by
-    have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
-  -- the byte kernel maps each recovered `pullIf` pull to its `LookupAccess`
-  have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pulledIf (channel := byteChannel) g s).toRaw) =
-        (InteractionKind.Byte, "SP1Byte",
-          [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
-           (Expression.eval env s.b).val, (Expression.eval env s.c).val],
-          signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_pullIf_byte env g s
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
+  have hk := toAccess_pullIf_byte_forall env
   -- RHS: recover the 4 byte pulls from `main`; LHS: expand the extracted list + projection.
   simp only [SP1Clean.AddOperation.main, circuit_norm, hk,
     Extracted.AddOperation.interactions, List.map_cons, List.map_nil,
