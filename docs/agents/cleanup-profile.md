@@ -180,6 +180,14 @@ and the original name stays resolvable for `check_report_citations.sh` and the p
 > this one file**. This is a solved, isolated case — do not budget a sweep for it. Re-run the scan
 > only if a future wave adds one.
 
+> **Known tension: `private` helpers cannot cross a module boundary, so this rule can force a
+> duplicate.** W8/b2 extracted `registerIndexCast` in `GroundingAdapter.lean` and
+> `itypeRegisterIndexCast` in `ITypeChips.lean` — the *same* 3-line lemma. `ITypeChips` imports
+> `GroundingAdapter` but cannot see a `private` declaration there, so the duplication is **forced by
+> this rule**, not a batch oversight. That is an accepted cost: `private` keeps the axiom census
+> stable (`gen_axiom_probe.py` skips `private` lines), which matters more than two duplicated lines.
+> Record such pairs in `DEFERRED.md` as owner decisions rather than promoting one to public.
+
 ## 4a. Extracted helpers are permitted
 
 Adding a **new** declaration is allowed in exactly two shapes. Nothing existing may change either way.
@@ -914,9 +922,20 @@ Per gated group, stopping at the first failure:
 > **Absence from an IN-PROGRESS job list is not evidence of a cache hit.** Lake prints a job line
 > only on *completion*, so a 286s module is invisible for its entire run. A W6 gate grepped for
 > `Faithful.DivRemChip.Exact` mid-build, found nothing, and nearly reported that the round had missed
-> its import closure — the exact opposite of the truth. **Check the worker's argv
-> (`ps -ef | grep "lean --worker"`), not the log**, while a build is running. Job-list absence is
-> only meaningful once `EXIT=` has been written.
+> its import closure — the exact opposite of the truth. Check the running process, not the log;
+> job-list absence is only meaningful once `EXIT=` has been written.
+>
+> **Two different `lean` process shapes — do not confuse them.** They need different patterns and
+> serve different purposes:
+> - **LSP file workers**: `lean --worker -Dserver.reportDelayMs=0 file:///…`, children of
+>   `lean --server`. These are what leak and hold GB after an agent exits. Reap with
+>   `pkill -f "lean --worker"` — this is correct and has freed 10–22 GB at several gates.
+> - **Build workers** spawned by `lake build`: argv is `lean --tstack=400000 -Dlinter.style.…`,
+>   with **no `--worker` token**. `grep "lean --worker"` therefore reports *nothing* mid-build, which
+>   reads as a hang. For liveness during a build use **`ps -ef | grep tstack`**, then
+>   `ps -o command= -p <pid>` to name the exact `.lean` file being elaborated.
+>
+> Never `pkill` the build-worker pattern while a gate build is running.
 >
 > **But when a build genuinely IS hung, `sample <pid>` is the diagnostic — not RSS.** W6/r2 hit a
 > real >1230s hang and the memory reading was actively misleading: RSS sat flat at 3.2 GB, which
