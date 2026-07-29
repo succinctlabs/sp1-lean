@@ -276,8 +276,7 @@ private theorem pulledWord_isU64_of_guarantees
       typedInteractionValuesWith operations memoryChannel env)
     (guarantees : operations.ChannelGuarantees memoryChannel.toRaw env) :
     Word.isU64 message.value := by
-  let interaction :=
-    TypedInteraction.pulledIfValue (memoryChannel (p := p)) 1 message
+  let interaction := TypedInteraction.pulledIfValue (memoryChannel (p := p)) 1 message
   have negative : interaction.mult = -1 := by
     simp only [interaction, TypedInteraction.pulledIfValue_mult]
   have guarantee := TypedInteraction.guarantee_of_channelGuarantees
@@ -487,8 +486,7 @@ theorem ramAccessTimestampFacts_of_contract {Input Output : TypeMap}
   have bound := binding env access
   rw [inputEq, outputEq] at bound
   have fields := bound accessEq
-  have readerReal : Expression.eval env readerInput.is_real = 1 :=
-    fields.real_eq.trans real
+  have readerReal : Expression.eval env readerInput.is_real = 1 := fields.real_eq.trans real
   have facts := Readers.MemoryAccess.timestampFacts_of_constraintsAndByteGuarantees
     readerInput readerOffset env readerConstraints readerGuarantees readerReal
   rwa [fields.compare_eq, fields.prevHigh_eq, fields.prevLow_eq, fields.diffLow_eq,
@@ -528,8 +526,7 @@ theorem AddressOperation.offsetBits_bool_of_constraints
       (input.offset_bit0 * (input.offset_bit0 - 1) - 0) = 0 := by
     apply constraints.1
     simp only [AddressOperation.main, circuit_norm]
-    right
-    right
+    iterate 2 right
     left
     simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
       Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -538,9 +535,7 @@ theorem AddressOperation.offsetBits_bool_of_constraints
       (input.offset_bit1 * (input.offset_bit1 - 1) - 0) = 0 := by
     apply constraints.1
     simp only [AddressOperation.main, circuit_norm]
-    right
-    right
-    right
+    iterate 3 right
     left
     simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
       Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -549,17 +544,13 @@ theorem AddressOperation.offsetBits_bool_of_constraints
       (input.offset_bit2 * (input.offset_bit2 - 1) - 0) = 0 := by
     apply constraints.1
     simp only [AddressOperation.main, circuit_norm]
-    right
-    right
-    right
-    right
+    iterate 4 right
     left
     simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
       Operations.constraints_toFlat, Gadgets.Equality.circuit] using
       memoryEqualityConstraint_mem (input.offset_bit2 * (input.offset_bit2 - 1)) 0 _
   simp only [eval_sub, Expression.eval, sub_zero] at gate0 gate1 gate2
-  exact ⟨bool_of_mul_pred gate0, bool_of_mul_pred gate1,
-    bool_of_mul_pred gate2⟩
+  exact ⟨bool_of_mul_pred gate0, bool_of_mul_pred gate1, bool_of_mul_pred gate2⟩
 
 omit [Fact (2 ^ 25 < p)] in
 /-- The physical inverse constraint of `AddressOperation` forces at least one upper 16-bit
@@ -575,26 +566,19 @@ theorem AddressOperation.upperLimbs_not_both_zero_of_constraints
   intro real
   have inverseEq : Expression.eval env
       (var { index := offset + 3 } *
-        (var { index := offset + 1 } + var { index := offset + 2 }) -
-          input.is_real) = 0 := by
+        (var { index := offset + 1 } + var { index := offset + 2 }) - input.is_real) = 0 := by
     let inverse : Expression (ZMod p) :=
       var { index := offset + 3 } *
-        (var { index := offset + 1 } + var { index := offset + 2 }) -
-          input.is_real
+        (var { index := offset + 1 } + var { index := offset + 2 }) - input.is_real
     have inverseDiffEq : Expression.eval env
         ((toElements (M := field) inverse)[0] -
           (toElements (M := field) (0 : Expression (ZMod p)))[0]) = 0 := by
       apply constraints.1
       simp only [AddressOperation.main, circuit_norm]
-      right
-      right
-      right
-      right
-      right
+      iterate 5 right
       simp [inverse, FormalAssertion.toSubcircuit, Gadgets.Equality.main,
         Circuit.forEach.operations_eq, FlatOperation.constraints, circuit_norm]
-    have element (x : Expression (ZMod p)) :
-        (toElements (M := field) x)[0] = x := rfl
+    have element (x : Expression (ZMod p)) : (toElements (M := field) x)[0] = x := rfl
     rw [element, element] at inverseDiffEq
     simpa only [inverse, eval_sub, Expression.eval, sub_zero] using inverseDiffEq
   intro upperZero
@@ -722,15 +706,13 @@ theorem rawAddress_eq_ramCellBase_add_offset
   have hp : 2 ^ 17 < p := Fact.out
   have bounds := AddressOperation.limbBounds_of_spec spec
   have offsetEq :
-      addressOffset input =
-        address48Nat cols.addr_operation.value % 8 := by
+      addressOffset input = address48Nat cols.addr_operation.value % 8 := by
     have h := spec.2.2.2.2.2.2.1
     rw [← spec.1] at h
     norm_num [addressOffset, address48Nat, Nat.add_mod] at h ⊢
     omega
   have rawModLow :
-      address48Nat cols.addr_operation.value % 8 =
-        cols.addr_operation.value[0].val % 8 := by
+      address48Nat cols.addr_operation.value % 8 = cols.addr_operation.value[0].val % 8 := by
     norm_num [address48Nat, Nat.add_mod]
     omega
   have offsetLe : addressOffset input ≤ cols.addr_operation.value[0].val := by
@@ -778,8 +760,7 @@ theorem rawAddress_eq_ramCellBase_add_offset
     omega
   have alignedMod : address48Nat access.address % 8 = 0 := by
     rw [alignedNat]
-    exact Nat.sub_mod_eq_zero_of_mod_eq
-      (offsetEq.symm.trans (Nat.mod_eq_of_lt offsetLt).symm)
+    exact Nat.sub_mod_eq_zero_of_mod_eq (offsetEq.symm.trans (Nat.mod_eq_of_lt offsetLt).symm)
   have alignedLt : address48Nat access.address < 2 ^ 48 := by
     have rawLt : address48Nat cols.addr_operation.value < 2 ^ 48 := by
       simp only [address48Nat]
@@ -997,8 +978,7 @@ theorem rowWiring_loadRam {view : Trace.RowView (ZMod p)}
     simp only [List.mem_cons, List.not_mem_nil, or_false] at messageMem
     rcases messageMem with rfl | rfl | rfl
     · left
-      refine ⟨(ramPriorMessage access, StateMsg.timeNat rf.statePull), ?_, ?_, ?_,
-        ?_, ?_, ?_⟩
+      refine ⟨(ramPriorMessage access, StateMsg.timeNat rf.statePull), ?_, ?_, ?_, ?_, ?_, ?_⟩
       · rw [pulls_eq]
         exact List.mem_cons_self
       · rw [locOf_ramPushMessage view access isRam, locOf_ramPriorMessage access isRam]
@@ -1027,8 +1007,7 @@ theorem rowWiring_loadRam {view : Trace.RowView (ZMod p)}
     · refine Or.inr (Or.inl ?_)
       have indexEq : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
           view.adapter.op_a := by
-        rw [BitVec.toNat_ofNat,
-          Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
+        rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
         exact ZMod.natCast_zmod_val _
       refine ⟨by rw [commit_eq]; rfl, write_isU64, ?_, rfl, ?_⟩
       · exact ⟨BitVec.ofNat 5 view.adapter.op_a.val,
@@ -1111,8 +1090,7 @@ theorem rowWiring_immutableLoadRam {view : Trace.RowView (ZMod p)}
     simp only [List.mem_cons, List.not_mem_nil, or_false] at messageMem
     rcases messageMem with rfl | rfl | rfl
     · left
-      refine ⟨(ramPriorMessage access, StateMsg.timeNat rf.statePull), ?_, ?_, ?_,
-        ?_, ?_, ?_⟩
+      refine ⟨(ramPriorMessage access, StateMsg.timeNat rf.statePull), ?_, ?_, ?_, ?_, ?_, ?_⟩
       · rw [pulls_eq]
         exact List.mem_cons_self
       · rw [locOf_ramPushMessage view access isRam, locOf_ramPriorMessage access isRam]
@@ -1132,13 +1110,10 @@ theorem rowWiring_immutableLoadRam {view : Trace.RowView (ZMod p)}
         exact List.mem_cons_of_mem _ List.mem_cons_self
       · have indexEq : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
             view.adapter.op_a := by
-          rw [BitVec.toNat_ofNat,
-            Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
+          rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
           exact ZMod.natCast_zmod_val _
-        exact ⟨BitVec.ofNat 5 view.adapter.op_a.val,
-          MemoryMsg.locOf_register _ _ indexEq rfl rfl⟩
-      · rw [timeNat_rtypeReadBackMessage bounds _ _ val_4_zmod_p (by omega),
-          ← statePull_eq]
+        exact ⟨BitVec.ofNat 5 view.adapter.op_a.val, MemoryMsg.locOf_register _ _ indexEq rfl rfl⟩
+      · rw [timeNat_rtypeReadBackMessage bounds _ _ val_4_zmod_p (by omega), ← statePull_eq]
     · left
       refine ⟨(rtypePriorMessage view view.adapter.op_b[0] view.adapter.op_b_memory,
         StateMsg.timeNat rf.statePull), ?_, rfl, rfl, ?_, ?_, ?_⟩
@@ -1252,13 +1227,10 @@ theorem rowWiring_storeRam {view : Trace.RowView (ZMod p)}
         exact List.mem_cons_of_mem _ List.mem_cons_self
       · have indexEq : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
             view.adapter.op_a := by
-          rw [BitVec.toNat_ofNat,
-            Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
+          rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
           exact ZMod.natCast_zmod_val _
-        exact ⟨BitVec.ofNat 5 view.adapter.op_a.val,
-          MemoryMsg.locOf_register _ _ indexEq rfl rfl⟩
-      · rw [timeNat_rtypeReadBackMessage bounds _ _ val_4_zmod_p (by omega),
-          ← statePull_eq]
+        exact ⟨BitVec.ofNat 5 view.adapter.op_a.val, MemoryMsg.locOf_register _ _ indexEq rfl rfl⟩
+      · rw [timeNat_rtypeReadBackMessage bounds _ _ val_4_zmod_p (by omega), ← statePull_eq]
     · left
       refine ⟨(rtypePriorMessage view view.adapter.op_b[0] view.adapter.op_b_memory,
         StateMsg.timeNat rf.statePull), ?_, rfl, rfl, ?_, ?_, ?_⟩
@@ -1322,8 +1294,7 @@ theorem rowWiring_loadRam_of_shape {chip : SupportedChip p}
     rfl rfl ?_ ?_
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPulls,
       consumedMemoryMessages_eq_of_loadShape shape decoded data hchip real]
-    simp only [List.map_cons, List.map_nil,
-      DecodedInstructionRow.ordinaryRowFacts_statePull]
+    simp only [List.map_cons, List.map_nil, DecodedInstructionRow.ordinaryRowFacts_statePull]
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPushes,
       producedMemoryMessages_eq_of_loadShape shape decoded data hchip real]
 
@@ -1346,8 +1317,7 @@ theorem rowWiring_immutableLoadRam_of_shape {chip : SupportedChip p}
     rfl rfl ?_ ?_
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPulls,
       consumedMemoryMessages_eq_of_immutableRamShape shape decoded data hchip real]
-    simp only [List.map_cons, List.map_nil,
-      DecodedInstructionRow.ordinaryRowFacts_statePull]
+    simp only [List.map_cons, List.map_nil, DecodedInstructionRow.ordinaryRowFacts_statePull]
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPushes,
       producedMemoryMessages_eq_of_immutableRamShape shape decoded data hchip real]
 
@@ -1375,8 +1345,7 @@ theorem rowWiring_storeRam_of_shape {chip : SupportedChip p}
     new_isU64 rfl rfl ?_ ?_
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPulls,
       consumedMemoryMessages_eq_of_immutableRamShape shape decoded data hchip real]
-    simp only [List.map_cons, List.map_nil,
-      DecodedInstructionRow.ordinaryRowFacts_statePull]
+    simp only [List.map_cons, List.map_nil, DecodedInstructionRow.ordinaryRowFacts_statePull]
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPushes,
       producedMemoryMessages_eq_of_immutableRamShape shape decoded data hchip real]
 
@@ -1474,13 +1443,11 @@ theorem rowAligned_ramItype {view : Trace.RowView (ZMod p)}
           MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   have hidxA : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
       view.adapter.op_a := by
-    rw [BitVec.toNat_ofNat,
-      Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
+    rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
     exact ZMod.natCast_zmod_val _
   have hidxB : ((BitVec.ofNat 5 view.adapter.op_b[0].val).toNat : ZMod p) =
       view.adapter.op_b[0] := by
-    rw [BitVec.toNat_ofNat,
-      Nat.mod_eq_of_lt (show view.adapter.op_b[0].val < 2 ^ 5 by omega)]
+    rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show view.adapter.op_b[0].val < 2 ^ 5 by omega)]
     exact ZMod.natCast_zmod_val _
   have hlocRamPrior := locOf_ramPriorMessage access isRam
   have hlocRamPush := locOf_ramPushMessage view access isRam
@@ -1744,8 +1711,7 @@ theorem rowAligned_loadRam_of_shape {chip : SupportedChip p}
         _ _ _ _ _ hclk timestampA rfl rfl rfl
   have hidxA : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
       view.adapter.op_a := by
-    rw [BitVec.toNat_ofNat,
-      Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
+    rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
     exact ZMod.natCast_zmod_val _
   refine rowAligned_ramItype (rtypeWriteMessage view) bounds real isRam opa_lt opb_lt
     rfl ?_ ?_ (MemoryMsg.locOf_register _ _ hidxA rfl rfl) ?_ ?_ hslots
@@ -1808,10 +1774,8 @@ theorem rowAligned_immutableRam_of_shape {chip : SupportedChip p}
   let access := shape.access decoded data
   let rf := decoded.ordinaryRowFacts data
   let aPush := rtypeReadBackMessage view view.adapter.op_a view.adapter.op_a_memory 4
-  have consumed :=
-    consumedMemoryMessages_eq_of_immutableRamShape shape decoded data hchip real
-  have produced :=
-    producedMemoryMessages_eq_of_immutableRamShape shape decoded data hchip real
+  have consumed := consumedMemoryMessages_eq_of_immutableRamShape shape decoded data hchip real
+  have produced := producedMemoryMessages_eq_of_immutableRamShape shape decoded data hchip real
   obtain ⟨ramTimestamp, timestampA, timestampB⟩ := timestamps
   have hslots : ∀ tc ∈ ramItypeTouches view access rf aPush,
       Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
@@ -1831,8 +1795,7 @@ theorem rowAligned_immutableRam_of_shape {chip : SupportedChip p}
         _ _ _ _ _ hclk timestampA rfl rfl rfl
   have hidxA : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
       view.adapter.op_a := by
-    rw [BitVec.toNat_ofNat,
-      Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
+    rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
     exact ZMod.natCast_zmod_val _
   refine rowAligned_ramItype aPush bounds real isRam opa_lt opb_lt rfl ?_ ?_
     (MemoryMsg.locOf_register _ _ hidxA rfl rfl) ?_ ?_ hslots
@@ -1845,6 +1808,207 @@ theorem rowAligned_immutableRam_of_shape {chip : SupportedChip p}
       (by omega) bounds.clk0 bounds.clk1
 
 /-! ## Concrete Memory interaction shapes -/
+
+/-! ### Per-chip boilerplate macros
+
+The nine memory chips below instantiate the same generic transports, so their proof *bodies* are
+byte-identical modulo the chip's name. Each macro takes the descriptor root (`loadByte`,
+`storeWord`, …) and derives the `…ChipDescriptor_table` / `…Chip_viewOf_decoded` / `…Chip_*_env`
+lemma names from it; the irregular LoadByte lemmas (`loadByteViewOf_decoded` and friends, named
+before the `…Chip_` convention settled) keep their spelled-out bodies. Macros are not
+declarations, so no statement, name, or axiom set moves. -/
+
+/-- Rewrite a chip descriptor's component-level `Assumptions` to its folded row-input form. -/
+local macro "chipAssumptionsIff " r:ident : tactic => do
+  let tbl := Lean.mkIdent (.mkSimple (r.getId.toString ++ "ChipDescriptor_table"))
+  `(tactic|
+    (rw [$tbl:ident]
+     unfold Component.Assumptions
+     rw [$(Lean.mkIdent `circuitRowInputOf_eq_component):ident]
+     rfl))
+
+/-- Discharge an interaction-shape bundle's `access_eq` field at a literal chip descriptor. -/
+local macro "chipShapeAccessEq" : tactic =>
+  `(tactic|
+    (intro decoded data hchip
+     obtain ⟨chip, physical⟩ := decoded
+     have hchip' : chip = _ := hchip
+     subst hchip'
+     rfl))
+
+/-- Transport a chip's environment-level `ViewClockBounds` to the decoded-row boundary. -/
+local macro "chipViewClockBounds " r:ident : tactic => do
+  let s := r.getId.toString
+  let tbl := Lean.mkIdent (.mkSimple (s ++ "ChipDescriptor_table"))
+  let vof := Lean.mkIdent (.mkSimple (s ++ "Chip_viewOf_decoded"))
+  let bounds := Lean.mkIdent (.mkSimple (s ++ "Chip_viewClockBounds_env"))
+  let (decoded, data) := (Lean.mkIdent `decoded, Lean.mkIdent `data)
+  let (hchip, guarantees, real) :=
+    (Lean.mkIdent `hchip, Lean.mkIdent `guarantees, Lean.mkIdent `real)
+  `(tactic|
+    (obtain ⟨chip, physical⟩ := $decoded
+     have hchip' : chip = _ := $hchip
+     subst hchip'
+     rw [$tbl:ident] at $guarantees:ident
+     rw [$vof:ident] at $real:ident ⊢
+     exact $bounds:ident $data physical $guarantees $real))
+
+/-- Transport a chip's environment-level memory timestamp bounds to the decoded-row boundary. -/
+local macro "chipTimestampBounds " r:ident : tactic => do
+  let s := r.getId.toString
+  let tbl := Lean.mkIdent (.mkSimple (s ++ "ChipDescriptor_table"))
+  let vof := Lean.mkIdent (.mkSimple (s ++ "Chip_viewOf_decoded"))
+  let raof := Lean.mkIdent (.mkSimple (s ++ "Chip_ramAccessOf_decoded"))
+  let bounds := Lean.mkIdent (.mkSimple (s ++ "Chip_timestampBounds_env"))
+  let (decoded, data, hchip) := (Lean.mkIdent `decoded, Lean.mkIdent `data, Lean.mkIdent `hchip)
+  let (constraints, guarantees, real) :=
+    (Lean.mkIdent `constraints, Lean.mkIdent `guarantees, Lean.mkIdent `real)
+  `(tactic|
+    (obtain ⟨chip, physical⟩ := $decoded
+     have hchip' : chip = _ := $hchip
+     subst hchip'
+     rw [$tbl:ident] at $constraints:ident $guarantees:ident
+     rw [$vof:ident] at $real:ident ⊢
+     rw [$raof:ident]
+     exact $bounds:ident $data physical $constraints $guarantees $real))
+
+/-- Transport a chip's environment-level `RamAccessIsRam` to the decoded-row boundary. -/
+local macro "chipIsRam " r:ident : tactic => do
+  let s := r.getId.toString
+  let tbl := Lean.mkIdent (.mkSimple (s ++ "ChipDescriptor_table"))
+  let vof := Lean.mkIdent (.mkSimple (s ++ "Chip_viewOf_decoded"))
+  let raof := Lean.mkIdent (.mkSimple (s ++ "Chip_ramAccessOf_decoded"))
+  let isRam := Lean.mkIdent (.mkSimple (s ++ "Chip_isRam_env"))
+  let (decoded, data, hchip) := (Lean.mkIdent `decoded, Lean.mkIdent `data, Lean.mkIdent `hchip)
+  let (constraints, real) := (Lean.mkIdent `constraints, Lean.mkIdent `real)
+  `(tactic|
+    (obtain ⟨chip, physical⟩ := $decoded
+     have hchip' : chip = _ := $hchip
+     subst hchip'
+     rw [$tbl:ident] at $constraints:ident
+     rw [$vof:ident] at $real:ident
+     rw [$raof:ident]
+     exact $isRam:ident $data physical $constraints $real))
+
+/-- Fold a decoded row's view down to the chip's opaque `circuitRowViewOf` projection. -/
+local macro "chipViewOfDecoded " r:ident : tactic => do
+  let s := r.getId.toString
+  let tbl := Lean.mkIdent (.mkSimple (s ++ "ChipDescriptor_table"))
+  let vw := Lean.mkIdent (.mkSimple (s ++ "ChipDescriptor_view"))
+  `(tactic|
+    (rw [DecodedInstructionRow.toChipRow_view]
+     simp only [$tbl:ident, $vw:ident]
+     unfold $(Lean.mkIdent `circuitRowViewOf):ident
+     rfl))
+
+/-- RAM companion of `chipViewOfDecoded`. -/
+local macro "chipRamAccessOfDecoded " r:ident : tactic => do
+  let s := r.getId.toString
+  let tbl := Lean.mkIdent (.mkSimple (s ++ "ChipDescriptor_table"))
+  let ra := Lean.mkIdent (.mkSimple (s ++ "ChipDescriptor_ramAccess"))
+  `(tactic|
+    (unfold $(Lean.mkIdent `decodedRamAccess):ident
+     rw [DecodedInstructionRow.toChipRow_ramAccess]
+     simp only [$tbl:ident, $ra:ident, Option.getD_some]
+     unfold $(Lean.mkIdent `circuitRamAccessOf):ident
+     rfl))
+
+/-- Read a chip's `ViewClockBounds` off its retained CPU-state time contract. -/
+local macro "chipViewClockBoundsEnv " r:ident : tactic => do
+  let s := r.getId.toString
+  let ns := Lean.Name.mkSimple (s.capitalize ++ "Chip")
+  let (circ, rv) := (Lean.mkIdent (ns ++ `circuit), Lean.mkIdent (ns ++ `rowView))
+  let contract := Lean.mkIdent (ns ++ `cpuStateTimeContract)
+  let (data, physical) := (Lean.mkIdent `data, Lean.mkIdent `physical)
+  let (guarantees, real) := (Lean.mkIdent `guarantees, Lean.mkIdent `real)
+  `(tactic|
+    (rw [$(Lean.mkIdent `circuitRowViewOf_eq):ident] at $real:ident ⊢
+     exact viewClockBounds_of_cpuStateContract $circ $rv $contract $data $physical
+       $guarantees $real))
+
+/-- Read a chip's `RamAccessIsRam` off its retained address contract; `sel` is the chip's
+`is_real` selector, spelled either as a named projection or as an explicit lambda. -/
+local macro "chipIsRamEnv " r:ident sel:term : tactic => do
+  let s := r.getId.toString
+  let ns := Lean.Name.mkSimple (s.capitalize ++ "Chip")
+  let (circ, rv) := (Lean.mkIdent (ns ++ `circuit), Lean.mkIdent (ns ++ `rowView))
+  let rav := Lean.mkIdent (ns ++ `ramAccessView)
+  let contract := Lean.mkIdent (ns ++ `ramAddressContract)
+  let (data, physical) := (Lean.mkIdent `data, Lean.mkIdent `physical)
+  let (constraints, real) := (Lean.mkIdent `constraints, Lean.mkIdent `real)
+  `(tactic|
+    (rw [$(Lean.mkIdent `circuitRowViewOf_eq):ident] at $real:ident
+     rw [$(Lean.mkIdent `circuitRamAccessOf_eq):ident]
+     exact ramAccessIsRam_of_addressContract $circ
+       (fun input cols => some ($rav input cols))
+       $sel $contract $data $physical $constraints
+       (by simpa only [$rv:ident] using $real) _ rfl))
+
+/-- Discharge a normal load's `Assumptions` from its folded base/immediate/RAM premises. -/
+local macro "chipLoadAssumptionsEnv " r:ident : tactic => do
+  let s := r.getId.toString
+  let ns := Lean.Name.mkSimple (s.capitalize ++ "Chip")
+  let (assumptions, rv) := (Lean.mkIdent (ns ++ `Assumptions), Lean.mkIdent (ns ++ `rowView))
+  let rav := Lean.mkIdent (ns ++ `ramAccessView)
+  let opB := Lean.mkIdent (ns ++ `Inputs ++ `op_b_val)
+  let opC := Lean.mkIdent (ns ++ `Inputs ++ `op_c_imm)
+  let (base, immediate, ram) :=
+    (Lean.mkIdent `base, Lean.mkIdent `immediate, Lean.mkIdent `ram)
+  `(tactic|
+    (rw [$(Lean.mkIdent `circuitRowViewOf_eq_typed):ident] at $base:ident $immediate:ident
+     rw [$(Lean.mkIdent `circuitRamAccessOf_eq_typed):ident] at $ram:ident
+     unfold $assumptions:ident
+     refine ⟨?_, ?_, ?_⟩
+     · simpa only [$opB:ident, $rv:ident, Extracted.ITypeReader.toAdapterView] using $base
+     · simpa only [$opC:ident, $rv:ident, Extracted.ITypeReader.toAdapterView] using $immediate
+     · simpa only [$rav:ident] using $ram))
+
+/-- Peel a chip's exposed Memory interaction list down to `layout`'s message constructors. The
+per-chip closing `simp only` over the message projections stays at the call site: its lemma list
+is what differs between the register-writing loads, `LoadX0`, and the stores. -/
+local macro "chipMemoryValues " r:ident layout:ident : tactic => do
+  let s := r.getId.toString
+  let ns := Lean.Name.mkSimple (s.capitalize ++ "Chip")
+  let inputs := Lean.mkIdent (ns ++ `Inputs)
+  let (main, iwm) :=
+    (Lean.mkIdent (ns ++ `main), Lean.mkIdent (ns ++ `interactionsWith_memory_eq))
+  let emi := Lean.mkIdent (ns ++ `exposedMemoryInteractions)
+  let env := Lean.mkIdent `env
+  `(tactic|
+    (rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
+     change List.map (AbstractInteraction.eval $env)
+         ((($main (varFromOffset $inputs 0)).operations
+           (size $inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
+     rw [$iwm:ident]
+     simp only [$emi:ident, $layout:ident, List.map_cons, List.map_nil,
+       TypedInteraction.pulledIfValue_raw, TypedInteraction.pushedIfValue_raw,
+       Channel.eval_pulledIf, Channel.eval_pushedIf, eval_registerMemoryMessage]))
+
+/-- Lift a chip's evaluated Memory list to the folded decoded-row boundary against `layout`. -/
+local macro "chipTypedMemoryInteractions " r:ident layout:ident : tactic => do
+  let s := r.getId.toString
+  let ns := Lean.Name.mkSimple (s.capitalize ++ "Chip")
+  let (circ, inputs) := (Lean.mkIdent (ns ++ `circuit), Lean.mkIdent (ns ++ `Inputs))
+  let desc := Lean.mkIdent (.mkSimple (s ++ "ChipDescriptor"))
+  let tbl := Lean.mkIdent (.mkSimple (s ++ "ChipDescriptor_table"))
+  let vw := Lean.mkIdent (.mkSimple (s ++ "ChipDescriptor_view"))
+  let ra := Lean.mkIdent (.mkSimple (s ++ "ChipDescriptor_ramAccess"))
+  let values := Lean.mkIdent (.mkSimple (s ++ "Chip_memoryInteractionValues_eq"))
+  let (decoded, data, hchip) := (Lean.mkIdent `decoded, Lean.mkIdent `data, Lean.mkIdent `hchip)
+  `(tactic|
+    (apply $(Lean.mkIdent `typedMemoryInteractions_of_values):ident $desc $layout ?_
+       $decoded $data $hchip
+     intro env
+     have inputEq : Eval.eval env (varFromOffset $inputs 0) =
+         (⟨$circ (p := p)⟩ : Component (ZMod p)).rowInput env :=
+       eval_varFromOffset_valueFromOffset $inputs 0 env
+     have outputEq : Eval.eval env
+         (($circ (p := p)).output (varFromOffset $inputs 0) (size $inputs)) =
+         (⟨$circ (p := p)⟩ : Component (ZMod p)).rowOutput env := by
+       simp only [Component.rowOutput, circuit_norm]
+     simp only [$tbl:ident, $vw:ident, $ra:ident, Option.getD_some]
+     rw [← inputEq, ← outputEq]
+     exact $values:ident env))
 
 section LoadByte
 
@@ -2007,10 +2171,7 @@ theorem loadByteChipDescriptor_assumptions_iff
     (loadByteChipDescriptor (p := p)).table.Assumptions env ↔
       LoadByteChip.Assumptions
         (circuitRowInputOf LoadByteChip.circuit env) env.data := by
-  rw [loadByteChipDescriptor_table]
-  unfold Component.Assumptions
-  rw [circuitRowInputOf_eq_component]
-  rfl
+  chipAssumptionsIff loadByte
 
 /-- Opaque evaluation spelling shared by concrete memory chips. Keeping a completed chip's output
 folded is essential at the dependent decoder boundary: unification must not normalize the whole
@@ -2066,8 +2227,7 @@ theorem circuitRowViewOf_eq_typed {Input Output : TypeMap}
     (env : Environment (ZMod p)) :
     circuitRowViewOf circuit view env =
       view (circuitRowInputOf circuit env) (circuitRowOutputOf circuit env) := by
-  rw [circuitRowViewOf_eq, circuitRowInputOf_eq_component,
-    circuitRowOutputOf_eq_component]
+  rw [circuitRowViewOf_eq, circuitRowInputOf_eq_component, circuitRowOutputOf_eq_component]
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
 /-- RAM-access companion to `circuitRowViewOf_eq_typed`. -/
@@ -2078,8 +2238,7 @@ theorem circuitRamAccessOf_eq_typed {Input Output : TypeMap}
     (env : Environment (ZMod p)) :
     circuitRamAccessOf circuit access env =
       access (circuitRowInputOf circuit env) (circuitRowOutputOf circuit env) := by
-  rw [circuitRamAccessOf_eq, circuitRowInputOf_eq_component,
-    circuitRowOutputOf_eq_component]
+  rw [circuitRamAccessOf_eq, circuitRowInputOf_eq_component, circuitRowOutputOf_eq_component]
 
 /-! ### LoadByte's retained circuit contracts -/
 
@@ -2118,8 +2277,7 @@ theorem LoadByteChip.ramTimestampContract :
   · simp only [input, offset, readerInput, LoadByteChip.circuit, LoadByteChip.main,
       Readers.MemoryAccess.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     constructor <;>
       simp only [input, readerInput, LoadByteChip.circuit, LoadByteChip.rowView,
         LoadByteChip.ramAccessView, LoadByteChip.isReal, circuit_norm]
@@ -2139,8 +2297,7 @@ theorem LoadByteChip.ramAddressContract :
   · simp only [input, offset, addressInput, LoadByteChip.circuit, LoadByteChip.main,
       AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     simp only [input, offset, addressInput, LoadByteChip.circuit,
       LoadByteChip.ramAccessView, AddressOperation.alignedValue,
       AddressOperation.circuit, circuit_norm]
@@ -2275,30 +2432,26 @@ theorem loadByte_selectedMemoryByte
         · simp [addressOffset, bitZero, bitOne, bitTwo]
         · change (wordBytes
             (Word.toBitVec64 input.memory_access.prev_value))[0] = _
-          rw [wordBytes_zero _ priorBound, ← selectedZero bitOne bitTwo,
-            lowMux bitZero]
+          rw [wordBytes_zero _ priorBound, ← selectedZero bitOne bitTwo, lowMux bitZero]
           exact lowByte
       · refine ⟨⟨1, by omega⟩, ?_, ?_⟩
         · simp [addressOffset, bitZero, bitOne, bitTwo, valOne]
         · change (wordBytes
             (Word.toBitVec64 input.memory_access.prev_value))[1] = _
-          rw [wordBytes_one _ priorBound, ← selectedZero bitOne bitTwo,
-            highMux bitZero]
+          rw [wordBytes_one _ priorBound, ← selectedZero bitOne bitTwo, highMux bitZero]
           exact highByte
     · rcases bitZeroBinary with bitZero | bitZero
       · refine ⟨⟨2, by omega⟩, ?_, ?_⟩
         · simp [addressOffset, bitZero, bitOne, bitTwo, valOne]
         · change (wordBytes
             (Word.toBitVec64 input.memory_access.prev_value))[2] = _
-          rw [wordBytes_two _ priorBound, ← selectedOne bitOne bitTwo,
-            lowMux bitZero]
+          rw [wordBytes_two _ priorBound, ← selectedOne bitOne bitTwo, lowMux bitZero]
           exact lowByte
       · refine ⟨⟨3, by omega⟩, ?_, ?_⟩
         · simp [addressOffset, bitZero, bitOne, bitTwo, valOne]
         · change (wordBytes
             (Word.toBitVec64 input.memory_access.prev_value))[3] = _
-          rw [wordBytes_three _ priorBound, ← selectedOne bitOne bitTwo,
-            highMux bitZero]
+          rw [wordBytes_three _ priorBound, ← selectedOne bitOne bitTwo, highMux bitZero]
           exact highByte
   · rcases bitOneBinary with bitOne | bitOne
     · rcases bitZeroBinary with bitZero | bitZero
@@ -2306,30 +2459,26 @@ theorem loadByte_selectedMemoryByte
         · simp [addressOffset, bitZero, bitOne, bitTwo, valOne]
         · change (wordBytes
             (Word.toBitVec64 input.memory_access.prev_value))[4] = _
-          rw [wordBytes_four _ priorBound, ← selectedTwo bitOne bitTwo,
-            lowMux bitZero]
+          rw [wordBytes_four _ priorBound, ← selectedTwo bitOne bitTwo, lowMux bitZero]
           exact lowByte
       · refine ⟨⟨5, by omega⟩, ?_, ?_⟩
         · simp [addressOffset, bitZero, bitOne, bitTwo, valOne]
         · change (wordBytes
             (Word.toBitVec64 input.memory_access.prev_value))[5] = _
-          rw [wordBytes_five _ priorBound, ← selectedTwo bitOne bitTwo,
-            highMux bitZero]
+          rw [wordBytes_five _ priorBound, ← selectedTwo bitOne bitTwo, highMux bitZero]
           exact highByte
     · rcases bitZeroBinary with bitZero | bitZero
       · refine ⟨⟨6, by omega⟩, ?_, ?_⟩
         · simp [addressOffset, bitZero, bitOne, bitTwo, valOne]
         · change (wordBytes
             (Word.toBitVec64 input.memory_access.prev_value))[6] = _
-          rw [wordBytes_six _ priorBound, ← selectedThree bitOne bitTwo,
-            lowMux bitZero]
+          rw [wordBytes_six _ priorBound, ← selectedThree bitOne bitTwo, lowMux bitZero]
           exact lowByte
       · refine ⟨⟨7, by omega⟩, ?_, ?_⟩
         · simp [addressOffset, bitZero, bitOne, bitTwo, valOne]
         · change (wordBytes
             (Word.toBitVec64 input.memory_access.prev_value))[7] = _
-          rw [wordBytes_seven _ priorBound, ← selectedThree bitOne bitTwo,
-            highMux bitZero]
+          rw [wordBytes_seven _ priorBound, ← selectedThree bitOne bitTwo, highMux bitZero]
           exact highByte
 
 omit [Fact (2 ^ 25 < p)] in
@@ -2351,8 +2500,7 @@ theorem loadByte_oneHot
   · rcases lbuBinary with lbuZero | lbuOne
     · exact Or.inl ⟨lbOne, lbuZero⟩
     · rw [LoadByteChip.isReal, lbOne, lbuOne] at real
-      have oneZero : (1 : ZMod p) = 0 := by
-        linear_combination real
+      have oneZero : (1 : ZMod p) = 0 := by linear_combination real
       exact (one_ne_zero oneZero).elim
 
 /-- Specialize the generic literal-descriptor transport to LoadByte without unfolding its
@@ -2416,8 +2564,7 @@ theorem loadByteViewOf_opA0 (env : Environment (ZMod p)) :
   unfold loadByteViewOf
   simp only [LoadByteChip.rowView]
   rw [circuitRowInputOf_eq_eval]
-  change (Eval.eval env
-    (varFromOffset (F := ZMod p) LoadByteChip.Inputs 0)).adapter.op_a_0 = _
+  change (Eval.eval env (varFromOffset (F := ZMod p) LoadByteChip.Inputs 0)).adapter.op_a_0 = _
   rw [loadByteEvalInputAdapter]
   exact Readers.ITypeReader.eval_opA0 env _
 
@@ -2436,8 +2583,7 @@ theorem loadByteRamAccessOf_decoded
       loadByteRamAccessOf (Environment.fromArray physical data) := by
   unfold decodedRamAccess
   rw [DecodedInstructionRow.toChipRow_ramAccess]
-  simp only [loadByteChipDescriptor_table, loadByteChipDescriptor_ramAccess,
-    Option.getD_some]
+  simp only [loadByteChipDescriptor_table, loadByteChipDescriptor_ramAccess, Option.getD_some]
   rw [loadByteRamAccessOf_eq]
   rfl
 
@@ -2476,18 +2622,9 @@ theorem loadByteTimestampBounds_env
       (loadByteRamAccessOf (Environment.fromArray physical data)) := by
   rw [loadByteViewOf_eq] at real ⊢
   rw [loadByteRamAccessOf_eq]
-  constructor
-  · exact ramAccessTimestampFacts_of_contract LoadByteChip.circuit LoadByteChip.rowView
-      (fun input cols => some (LoadByteChip.ramAccessView input cols))
-      LoadByteChip.ramTimestampContract data physical constraints guarantees
-      (LoadByteChip.ramAccessView
-        ((⟨LoadByteChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput
-          (Environment.fromArray physical data))
-        ((⟨LoadByteChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput
-          (Environment.fromArray physical data)))
-      rfl real
-  · exact itypeTimestampBounds_of_contract LoadByteChip.circuit LoadByteChip.rowView
-      LoadByteChip.itypeTimestampContract data physical guarantees real
+  exact loadMemoryTimestampBounds_of_contracts LoadByteChip.circuit
+    LoadByteChip.rowView LoadByteChip.ramAccessView LoadByteChip.ramTimestampContract
+    LoadByteChip.itypeTimestampContract data physical constraints guarantees real
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadByteIsRam_env
@@ -2502,15 +2639,8 @@ theorem loadByteIsRam_env
   rw [loadByteRamAccessOf_eq]
   exact ramAccessIsRam_of_addressContract LoadByteChip.circuit
     (fun input cols => some (LoadByteChip.ramAccessView input cols))
-    LoadByteChip.isReal
-    LoadByteChip.ramAddressContract data physical constraints
-    (by simpa only [LoadByteChip.rowView] using real)
-    (LoadByteChip.ramAccessView
-      ((⟨LoadByteChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput
-        (Environment.fromArray physical data))
-      ((⟨LoadByteChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput
-        (Environment.fromArray physical data)))
-    rfl
+    LoadByteChip.isReal LoadByteChip.ramAddressContract data physical constraints
+    (by simpa only [LoadByteChip.rowView] using real) _ rfl
 
 theorem loadByteChip_viewClockBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -2602,15 +2732,7 @@ theorem loadByteChip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
           (Eval.eval env ((LoadByteChip.circuit (p := p)).output
             (varFromOffset (F := ZMod p) LoadByteChip.Inputs 0)
             (size LoadByteChip.Inputs))))).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((LoadByteChip.main (varFromOffset LoadByteChip.Inputs 0)).operations
-        (size LoadByteChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [LoadByteChip.interactionsWith_memory_eq]
-  simp only [LoadByteChip.exposedMemoryInteractions, loadMemoryInteractions,
-    List.map_cons, List.map_nil, TypedInteraction.pulledIfValue_raw,
-    TypedInteraction.pushedIfValue_raw, Channel.eval_pulledIf, Channel.eval_pushedIf,
-    eval_registerMemoryMessage]
+  chipMemoryValues loadByte loadMemoryInteractions
   simp only [ramPriorMessage, ramPushMessage, rtypePriorMessage, rtypeReadBackMessage,
     rtypeWriteMessage, LoadByteChip.rowView, LoadByteChip.ramAccessView,
     LoadByteChip.isReal, AddressOperation.alignedValue,
@@ -2623,32 +2745,14 @@ theorem loadByteChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow
     decoded.interactionsWith data memoryChannel =
       loadMemoryInteractions (decoded.toChipRow data).view
         (decodedRamAccess decoded data) := by
-  apply typedMemoryInteractions_of_values loadByteChipDescriptor loadMemoryInteractions
-    ?_ decoded data hchip
-  intro env
-  have inputEq : Eval.eval env (varFromOffset LoadByteChip.Inputs 0) =
-      (⟨LoadByteChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset LoadByteChip.Inputs 0 env
-  have outputEq : Eval.eval env
-      ((LoadByteChip.circuit (p := p)).output
-        (varFromOffset LoadByteChip.Inputs 0) (size LoadByteChip.Inputs)) =
-      (⟨LoadByteChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, circuit_norm]
-  simp only [loadByteChipDescriptor_table, loadByteChipDescriptor_view,
-    loadByteChipDescriptor_ramAccess, Option.getD_some]
-  rw [← inputEq, ← outputEq]
-  exact loadByteChip_memoryInteractionValues_eq env
+  chipTypedMemoryInteractions loadByte loadMemoryInteractions
 
 /-- LoadByte instantiates the authenticated normal-load interaction shape. -/
 noncomputable def loadByteChip_loadMemoryInteractionShape :
     LoadMemoryInteractionShape (loadByteChipDescriptor (p := p)) where
   access := decodedRamAccess
   access_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadByteChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+    chipShapeAccessEq
   interactions := loadByteChip_typedMemoryInteractions_eq
 
 end LoadByte
@@ -2684,10 +2788,7 @@ theorem loadHalfChipDescriptor_assumptions_iff
     (loadHalfChipDescriptor (p := p)).table.Assumptions env ↔
       LoadHalfChip.Assumptions
         (circuitRowInputOf LoadHalfChip.circuit env) env.data := by
-  rw [loadHalfChipDescriptor_table]
-  unfold Component.Assumptions
-  rw [circuitRowInputOf_eq_component]
-  rfl
+  chipAssumptionsIff loadHalf
 
 omit [Fact (2 ^ 25 < p)] in
 /-- Assemble LoadHalf's assumptions from the grounded base, immediate, and prior RAM word. -/
@@ -2701,16 +2802,7 @@ theorem loadHalfAssumptions_env
       (circuitRamAccessOf LoadHalfChip.circuit LoadHalfChip.ramAccessView env).priorValue) :
     LoadHalfChip.Assumptions
       (circuitRowInputOf LoadHalfChip.circuit env) data := by
-  rw [circuitRowViewOf_eq_typed] at base immediate
-  rw [circuitRamAccessOf_eq_typed] at ram
-  unfold LoadHalfChip.Assumptions
-  constructor
-  · simpa only [LoadHalfChip.Inputs.op_b_val, LoadHalfChip.rowView,
-      Extracted.ITypeReader.toAdapterView] using base
-  constructor
-  · simpa only [LoadHalfChip.Inputs.op_c_imm, LoadHalfChip.rowView,
-      Extracted.ITypeReader.toAdapterView] using immediate
-  · simpa only [LoadHalfChip.ramAccessView] using ram
+  chipLoadAssumptionsEnv loadHalf
 
 /-- Specialize the folded semantic-row transport to LoadHalf. -/
 theorem loadHalfSpec_of_decoded
@@ -2754,8 +2846,7 @@ theorem loadHalfView_opA0 (env : Environment (ZMod p)) :
   rw [circuitRowViewOf_eq_typed]
   simp only [LoadHalfChip.rowView]
   rw [circuitRowInputOf_eq_eval]
-  change (Eval.eval env
-    (varFromOffset (F := ZMod p) LoadHalfChip.Inputs 0)).adapter.op_a_0 = _
+  change (Eval.eval env (varFromOffset (F := ZMod p) LoadHalfChip.Inputs 0)).adapter.op_a_0 = _
   rw [ProvableStruct.eval_var_eq_eval]
   exact Readers.ITypeReader.eval_opA0 env _
 
@@ -2778,8 +2869,7 @@ theorem loadHalf_oneHot
   · rcases lhuBinary with lhuZero | lhuOne
     · exact Or.inl ⟨lhOne, lhuZero⟩
     · rw [LoadHalfChip.isReal, lhOne, lhuOne] at real
-      have oneZero : (1 : ZMod p) = 0 := by
-        linear_combination real
+      have oneZero : (1 : ZMod p) = 0 := by linear_combination real
       exact (one_ne_zero oneZero).elim
 
 omit [Fact (2 ^ 25 < p)] in
@@ -2913,8 +3003,7 @@ theorem LoadHalfChip.ramTimestampContract :
   · simp only [input, offset, addressInput, readerInput, LoadHalfChip.circuit,
       LoadHalfChip.main, Readers.MemoryAccess.circuit, AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     constructor <;>
       simp only [input, readerInput, LoadHalfChip.circuit,
         LoadHalfChip.rowView, LoadHalfChip.ramAccessView, LoadHalfChip.isReal,
@@ -2935,8 +3024,7 @@ theorem LoadHalfChip.ramAddressContract :
   · simp only [input, offset, addressInput, LoadHalfChip.circuit, LoadHalfChip.main,
       AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     simp only [input, offset, addressInput, LoadHalfChip.circuit,
       LoadHalfChip.ramAccessView, AddressOperation.alignedValue,
       AddressOperation.circuit, circuit_norm]
@@ -2969,22 +3057,14 @@ theorem loadHalfChip_viewOf_decoded
       ⟨loadHalfChipDescriptor (p := p), physical⟩ data).view =
       circuitRowViewOf LoadHalfChip.circuit LoadHalfChip.rowView
         (Environment.fromArray physical data) := by
-  rw [DecodedInstructionRow.toChipRow_view]
-  simp only [loadHalfChipDescriptor_table, loadHalfChipDescriptor_view]
-  unfold circuitRowViewOf
-  rfl
+  chipViewOfDecoded loadHalf
 
 theorem loadHalfChip_ramAccessOf_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p)) :
     decodedRamAccess ⟨loadHalfChipDescriptor (p := p), physical⟩ data =
       circuitRamAccessOf LoadHalfChip.circuit LoadHalfChip.ramAccessView
         (Environment.fromArray physical data) := by
-  unfold decodedRamAccess
-  rw [DecodedInstructionRow.toChipRow_ramAccess]
-  simp only [loadHalfChipDescriptor_table, loadHalfChipDescriptor_ramAccess,
-    Option.getD_some]
-  unfold circuitRamAccessOf
-  rfl
+  chipRamAccessOfDecoded loadHalf
 
 theorem loadHalfChip_viewClockBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -2995,9 +3075,7 @@ theorem loadHalfChip_viewClockBounds_env
       (Environment.fromArray physical data)).is_real = 1) :
     ViewClockBounds (circuitRowViewOf LoadHalfChip.circuit LoadHalfChip.rowView
       (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real ⊢
-  exact viewClockBounds_of_cpuStateContract LoadHalfChip.circuit LoadHalfChip.rowView
-    LoadHalfChip.cpuStateTimeContract data physical guarantees real
+  chipViewClockBoundsEnv loadHalf
 
 theorem loadHalfChip_timestampBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -3016,18 +3094,9 @@ theorem loadHalfChip_timestampBounds_env
         (Environment.fromArray physical data)) := by
   rw [circuitRowViewOf_eq] at real ⊢
   rw [circuitRamAccessOf_eq]
-  constructor
-  · exact ramAccessTimestampFacts_of_contract LoadHalfChip.circuit LoadHalfChip.rowView
-      (fun input cols => some (LoadHalfChip.ramAccessView input cols))
-      LoadHalfChip.ramTimestampContract data physical constraints guarantees
-      (LoadHalfChip.ramAccessView
-        ((⟨LoadHalfChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput
-          (Environment.fromArray physical data))
-        ((⟨LoadHalfChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput
-          (Environment.fromArray physical data)))
-      rfl real
-  · exact itypeTimestampBounds_of_contract LoadHalfChip.circuit LoadHalfChip.rowView
-      LoadHalfChip.itypeTimestampContract data physical guarantees real
+  exact loadMemoryTimestampBounds_of_contracts LoadHalfChip.circuit
+    LoadHalfChip.rowView LoadHalfChip.ramAccessView LoadHalfChip.ramTimestampContract
+    LoadHalfChip.itypeTimestampContract data physical constraints guarantees real
 
 omit [Fact (2 ^ 25 < p)] in
 theorem loadHalfChip_isRam_env
@@ -3040,19 +3109,7 @@ theorem loadHalfChip_isRam_env
     RamAccessIsRam
       (circuitRamAccessOf LoadHalfChip.circuit LoadHalfChip.ramAccessView
         (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real
-  rw [circuitRamAccessOf_eq]
-  exact ramAccessIsRam_of_addressContract LoadHalfChip.circuit
-    (fun input cols => some (LoadHalfChip.ramAccessView input cols))
-    LoadHalfChip.isReal
-    LoadHalfChip.ramAddressContract data physical constraints
-    (by simpa only [LoadHalfChip.rowView] using real)
-    (LoadHalfChip.ramAccessView
-      ((⟨LoadHalfChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput
-        (Environment.fromArray physical data))
-      ((⟨LoadHalfChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput
-        (Environment.fromArray physical data)))
-    rfl
+  chipIsRamEnv loadHalf LoadHalfChip.isReal
 
 theorem loadHalfChip_viewClockBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -3061,12 +3118,7 @@ theorem loadHalfChip_viewClockBounds
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadHalfChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadHalfChipDescriptor_table] at guarantees
-  rw [loadHalfChip_viewOf_decoded] at real ⊢
-  exact loadHalfChip_viewClockBounds_env data physical guarantees real
+  chipViewClockBounds loadHalf
 
 theorem loadHalfChip_timestampBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -3078,13 +3130,7 @@ theorem loadHalfChip_timestampBounds
     (real : (decoded.toChipRow data).view.is_real = 1) :
     LoadMemoryTimestampBounds (decoded.toChipRow data).view
       (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadHalfChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadHalfChipDescriptor_table] at constraints guarantees
-  rw [loadHalfChip_viewOf_decoded] at real ⊢
-  rw [loadHalfChip_ramAccessOf_decoded]
-  exact loadHalfChip_timestampBounds_env data physical constraints guarantees real
+  chipTimestampBounds loadHalf
 
 theorem loadHalfChip_isRam
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -3093,13 +3139,7 @@ theorem loadHalfChip_isRam
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     RamAccessIsRam (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadHalfChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadHalfChipDescriptor_table] at constraints
-  rw [loadHalfChip_viewOf_decoded] at real
-  rw [loadHalfChip_ramAccessOf_decoded]
-  exact loadHalfChip_isRam_env data physical constraints real
+  chipIsRam loadHalf
 
 omit [Fact (2 ^ 25 < p)] in
 /-- LoadHalf's public exposed Memory list evaluates to the normal-load six-message layout. -/
@@ -3116,15 +3156,7 @@ theorem loadHalfChip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
           (Eval.eval env ((LoadHalfChip.circuit (p := p)).output
             (varFromOffset (F := ZMod p) LoadHalfChip.Inputs 0)
             (size LoadHalfChip.Inputs))))).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((LoadHalfChip.main (varFromOffset LoadHalfChip.Inputs 0)).operations
-        (size LoadHalfChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [LoadHalfChip.interactionsWith_memory_eq]
-  simp only [LoadHalfChip.exposedMemoryInteractions, loadMemoryInteractions,
-    List.map_cons, List.map_nil, TypedInteraction.pulledIfValue_raw,
-    TypedInteraction.pushedIfValue_raw, Channel.eval_pulledIf, Channel.eval_pushedIf,
-    eval_registerMemoryMessage]
+  chipMemoryValues loadHalf loadMemoryInteractions
   simp only [ramPriorMessage, ramPushMessage, rtypePriorMessage, rtypeReadBackMessage,
     rtypeWriteMessage, LoadHalfChip.rowView, LoadHalfChip.ramAccessView,
     LoadHalfChip.isReal, AddressOperation.alignedValue,
@@ -3137,32 +3169,14 @@ theorem loadHalfChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow
     decoded.interactionsWith data memoryChannel =
       loadMemoryInteractions (decoded.toChipRow data).view
         (decodedRamAccess decoded data) := by
-  apply typedMemoryInteractions_of_values loadHalfChipDescriptor loadMemoryInteractions
-    ?_ decoded data hchip
-  intro env
-  have inputEq : Eval.eval env (varFromOffset LoadHalfChip.Inputs 0) =
-      (⟨LoadHalfChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset LoadHalfChip.Inputs 0 env
-  have outputEq : Eval.eval env
-      ((LoadHalfChip.circuit (p := p)).output
-        (varFromOffset LoadHalfChip.Inputs 0) (size LoadHalfChip.Inputs)) =
-      (⟨LoadHalfChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, circuit_norm]
-  simp only [loadHalfChipDescriptor_table, loadHalfChipDescriptor_view,
-    loadHalfChipDescriptor_ramAccess, Option.getD_some]
-  rw [← inputEq, ← outputEq]
-  exact loadHalfChip_memoryInteractionValues_eq env
+  chipTypedMemoryInteractions loadHalf loadMemoryInteractions
 
 /-- LoadHalf instantiates the authenticated normal-load interaction shape. -/
 noncomputable def loadHalfChip_loadMemoryInteractionShape :
     LoadMemoryInteractionShape (loadHalfChipDescriptor (p := p)) where
   access := decodedRamAccess
   access_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadHalfChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+    chipShapeAccessEq
   interactions := loadHalfChip_typedMemoryInteractions_eq
 
 end LoadHalf
@@ -3198,10 +3212,7 @@ theorem loadWordChipDescriptor_assumptions_iff
     (loadWordChipDescriptor (p := p)).table.Assumptions env ↔
       LoadWordChip.Assumptions
         (circuitRowInputOf LoadWordChip.circuit env) env.data := by
-  rw [loadWordChipDescriptor_table]
-  unfold Component.Assumptions
-  rw [circuitRowInputOf_eq_component]
-  rfl
+  chipAssumptionsIff loadWord
 
 omit [Fact (2 ^ 25 < p)] in
 /-- Assemble LoadWord's assumptions from the grounded base, immediate, and prior RAM word. -/
@@ -3215,16 +3226,7 @@ theorem loadWordAssumptions_env
       (circuitRamAccessOf LoadWordChip.circuit LoadWordChip.ramAccessView env).priorValue) :
     LoadWordChip.Assumptions
       (circuitRowInputOf LoadWordChip.circuit env) data := by
-  rw [circuitRowViewOf_eq_typed] at base immediate
-  rw [circuitRamAccessOf_eq_typed] at ram
-  unfold LoadWordChip.Assumptions
-  constructor
-  · simpa only [LoadWordChip.Inputs.op_b_val, LoadWordChip.rowView,
-      Extracted.ITypeReader.toAdapterView] using base
-  constructor
-  · simpa only [LoadWordChip.Inputs.op_c_imm, LoadWordChip.rowView,
-      Extracted.ITypeReader.toAdapterView] using immediate
-  · simpa only [LoadWordChip.ramAccessView] using ram
+  chipLoadAssumptionsEnv loadWord
 
 /-- Specialize the folded semantic-row transport to LoadWord. -/
 theorem loadWordSpec_of_decoded
@@ -3268,8 +3270,7 @@ theorem loadWordView_opA0 (env : Environment (ZMod p)) :
   rw [circuitRowViewOf_eq_typed]
   simp only [LoadWordChip.rowView]
   rw [circuitRowInputOf_eq_eval]
-  change (Eval.eval env
-    (varFromOffset (F := ZMod p) LoadWordChip.Inputs 0)).adapter.op_a_0 = _
+  change (Eval.eval env (varFromOffset (F := ZMod p) LoadWordChip.Inputs 0)).adapter.op_a_0 = _
   rw [ProvableStruct.eval_var_eq_eval]
   exact Readers.ITypeReader.eval_opA0 env _
 
@@ -3292,8 +3293,7 @@ theorem loadWord_oneHot
   · rcases lwuBinary with lwuZero | lwuOne
     · exact Or.inl ⟨lwOne, lwuZero⟩
     · rw [LoadWordChip.isReal, lwOne, lwuOne] at real
-      have oneZero : (1 : ZMod p) = 0 := by
-        linear_combination real
+      have oneZero : (1 : ZMod p) = 0 := by linear_combination real
       exact (one_ne_zero oneZero).elim
 
 omit [Fact (2 ^ 25 < p)] in
@@ -3412,8 +3412,7 @@ theorem LoadWordChip.ramTimestampContract :
   let input : Var LoadWordChip.Inputs (ZMod p) := varFromOffset LoadWordChip.Inputs 0
   let offset := size LoadWordChip.Inputs
   let addressInput : Var AddressOperation.Inputs (ZMod p) :=
-    ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit,
-      input.is_lw + input.is_lwu⟩
+    ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit, input.is_lw + input.is_lwu⟩
   let readerInput : Var Readers.MemoryAccess.Inputs (ZMod p) :=
     ⟨input.memory_access, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
@@ -3428,8 +3427,7 @@ theorem LoadWordChip.ramTimestampContract :
   · simp only [input, offset, addressInput, readerInput, LoadWordChip.circuit,
       LoadWordChip.main, Readers.MemoryAccess.circuit, AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     constructor <;>
       simp only [input, readerInput, LoadWordChip.circuit, LoadWordChip.rowView,
         LoadWordChip.ramAccessView, LoadWordChip.isReal, circuit_norm]
@@ -3442,14 +3440,12 @@ theorem LoadWordChip.ramAddressContract :
   let input : Var LoadWordChip.Inputs (ZMod p) := varFromOffset LoadWordChip.Inputs 0
   let offset := size LoadWordChip.Inputs
   let addressInput : Var AddressOperation.Inputs (ZMod p) :=
-    ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit,
-      input.is_lw + input.is_lwu⟩
+    ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit, input.is_lw + input.is_lwu⟩
   refine .intro offset addressInput ?_ ?_ ?_
   · simp only [input, offset, addressInput, LoadWordChip.circuit, LoadWordChip.main,
       AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     simp only [input, offset, addressInput, LoadWordChip.circuit,
       LoadWordChip.ramAccessView, AddressOperation.alignedValue,
       AddressOperation.circuit, circuit_norm]
@@ -3482,22 +3478,14 @@ theorem loadWordChip_viewOf_decoded
       ⟨loadWordChipDescriptor (p := p), physical⟩ data).view =
       circuitRowViewOf LoadWordChip.circuit LoadWordChip.rowView
         (Environment.fromArray physical data) := by
-  rw [DecodedInstructionRow.toChipRow_view]
-  simp only [loadWordChipDescriptor_table, loadWordChipDescriptor_view]
-  unfold circuitRowViewOf
-  rfl
+  chipViewOfDecoded loadWord
 
 theorem loadWordChip_ramAccessOf_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p)) :
     decodedRamAccess ⟨loadWordChipDescriptor (p := p), physical⟩ data =
       circuitRamAccessOf LoadWordChip.circuit LoadWordChip.ramAccessView
         (Environment.fromArray physical data) := by
-  unfold decodedRamAccess
-  rw [DecodedInstructionRow.toChipRow_ramAccess]
-  simp only [loadWordChipDescriptor_table, loadWordChipDescriptor_ramAccess,
-    Option.getD_some]
-  unfold circuitRamAccessOf
-  rfl
+  chipRamAccessOfDecoded loadWord
 
 theorem loadWordChip_viewClockBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -3508,9 +3496,7 @@ theorem loadWordChip_viewClockBounds_env
       (Environment.fromArray physical data)).is_real = 1) :
     ViewClockBounds (circuitRowViewOf LoadWordChip.circuit LoadWordChip.rowView
       (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real ⊢
-  exact viewClockBounds_of_cpuStateContract LoadWordChip.circuit LoadWordChip.rowView
-    LoadWordChip.cpuStateTimeContract data physical guarantees real
+  chipViewClockBoundsEnv loadWord
 
 theorem loadWordChip_timestampBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -3544,12 +3530,7 @@ theorem loadWordChip_isRam_env
     RamAccessIsRam
       (circuitRamAccessOf LoadWordChip.circuit LoadWordChip.ramAccessView
         (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real
-  rw [circuitRamAccessOf_eq]
-  exact ramAccessIsRam_of_addressContract LoadWordChip.circuit
-    (fun input cols => some (LoadWordChip.ramAccessView input cols))
-    LoadWordChip.isReal LoadWordChip.ramAddressContract data physical constraints
-    (by simpa only [LoadWordChip.rowView] using real) _ rfl
+  chipIsRamEnv loadWord LoadWordChip.isReal
 
 theorem loadWordChip_viewClockBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -3558,12 +3539,7 @@ theorem loadWordChip_viewClockBounds
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadWordChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadWordChipDescriptor_table] at guarantees
-  rw [loadWordChip_viewOf_decoded] at real ⊢
-  exact loadWordChip_viewClockBounds_env data physical guarantees real
+  chipViewClockBounds loadWord
 
 theorem loadWordChip_timestampBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -3575,13 +3551,7 @@ theorem loadWordChip_timestampBounds
     (real : (decoded.toChipRow data).view.is_real = 1) :
     LoadMemoryTimestampBounds (decoded.toChipRow data).view
       (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadWordChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadWordChipDescriptor_table] at constraints guarantees
-  rw [loadWordChip_viewOf_decoded] at real ⊢
-  rw [loadWordChip_ramAccessOf_decoded]
-  exact loadWordChip_timestampBounds_env data physical constraints guarantees real
+  chipTimestampBounds loadWord
 
 theorem loadWordChip_isRam
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -3590,13 +3560,7 @@ theorem loadWordChip_isRam
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     RamAccessIsRam (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadWordChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadWordChipDescriptor_table] at constraints
-  rw [loadWordChip_viewOf_decoded] at real
-  rw [loadWordChip_ramAccessOf_decoded]
-  exact loadWordChip_isRam_env data physical constraints real
+  chipIsRam loadWord
 
 omit [Fact (2 ^ 25 < p)] in
 /-- LoadWord's public exposed Memory list evaluates to the normal-load six-message layout. -/
@@ -3613,15 +3577,7 @@ theorem loadWordChip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
           (Eval.eval env ((LoadWordChip.circuit (p := p)).output
             (varFromOffset (F := ZMod p) LoadWordChip.Inputs 0)
             (size LoadWordChip.Inputs))))).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((LoadWordChip.main (varFromOffset LoadWordChip.Inputs 0)).operations
-        (size LoadWordChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [LoadWordChip.interactionsWith_memory_eq]
-  simp only [LoadWordChip.exposedMemoryInteractions, loadMemoryInteractions,
-    List.map_cons, List.map_nil, TypedInteraction.pulledIfValue_raw,
-    TypedInteraction.pushedIfValue_raw, Channel.eval_pulledIf, Channel.eval_pushedIf,
-    eval_registerMemoryMessage]
+  chipMemoryValues loadWord loadMemoryInteractions
   simp only [ramPriorMessage, ramPushMessage, rtypePriorMessage, rtypeReadBackMessage,
     rtypeWriteMessage, LoadWordChip.rowView, LoadWordChip.ramAccessView,
     LoadWordChip.isReal, AddressOperation.alignedValue,
@@ -3634,32 +3590,14 @@ theorem loadWordChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow
     decoded.interactionsWith data memoryChannel =
       loadMemoryInteractions (decoded.toChipRow data).view
         (decodedRamAccess decoded data) := by
-  apply typedMemoryInteractions_of_values loadWordChipDescriptor loadMemoryInteractions
-    ?_ decoded data hchip
-  intro env
-  have inputEq : Eval.eval env (varFromOffset LoadWordChip.Inputs 0) =
-      (⟨LoadWordChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset LoadWordChip.Inputs 0 env
-  have outputEq : Eval.eval env
-      ((LoadWordChip.circuit (p := p)).output
-        (varFromOffset LoadWordChip.Inputs 0) (size LoadWordChip.Inputs)) =
-      (⟨LoadWordChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, circuit_norm]
-  simp only [loadWordChipDescriptor_table, loadWordChipDescriptor_view,
-    loadWordChipDescriptor_ramAccess, Option.getD_some]
-  rw [← inputEq, ← outputEq]
-  exact loadWordChip_memoryInteractionValues_eq env
+  chipTypedMemoryInteractions loadWord loadMemoryInteractions
 
 /-- LoadWord instantiates the authenticated normal-load interaction shape. -/
 noncomputable def loadWordChip_loadMemoryInteractionShape :
     LoadMemoryInteractionShape (loadWordChipDescriptor (p := p)) where
   access := decodedRamAccess
   access_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadWordChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+    chipShapeAccessEq
   interactions := loadWordChip_typedMemoryInteractions_eq
 
 end LoadWord
@@ -3695,10 +3633,7 @@ theorem loadDoubleChipDescriptor_assumptions_iff
     (loadDoubleChipDescriptor (p := p)).table.Assumptions env ↔
       LoadDoubleChip.Assumptions
         (circuitRowInputOf LoadDoubleChip.circuit env) env.data := by
-  rw [loadDoubleChipDescriptor_table]
-  unfold Component.Assumptions
-  rw [circuitRowInputOf_eq_component]
-  rfl
+  chipAssumptionsIff loadDouble
 
 omit [Fact (2 ^ 25 < p)] in
 /-- Assemble LoadDouble's assumptions from the grounded base, immediate, and prior RAM word. -/
@@ -3712,16 +3647,7 @@ theorem loadDoubleAssumptions_env
       (circuitRamAccessOf LoadDoubleChip.circuit LoadDoubleChip.ramAccessView env).priorValue) :
     LoadDoubleChip.Assumptions
       (circuitRowInputOf LoadDoubleChip.circuit env) data := by
-  rw [circuitRowViewOf_eq_typed] at base immediate
-  rw [circuitRamAccessOf_eq_typed] at ram
-  unfold LoadDoubleChip.Assumptions
-  constructor
-  · simpa only [LoadDoubleChip.Inputs.op_b_val, LoadDoubleChip.rowView,
-      Extracted.ITypeReader.toAdapterView] using base
-  constructor
-  · simpa only [LoadDoubleChip.Inputs.op_c_imm, LoadDoubleChip.rowView,
-      Extracted.ITypeReader.toAdapterView] using immediate
-  · simpa only [LoadDoubleChip.ramAccessView] using ram
+  chipLoadAssumptionsEnv loadDouble
 
 /-- Specialize the folded semantic-row transport to LoadDouble. -/
 theorem loadDoubleSpec_of_decoded
@@ -3765,8 +3691,7 @@ theorem loadDoubleView_opA0 (env : Environment (ZMod p)) :
   rw [circuitRowViewOf_eq_typed]
   simp only [LoadDoubleChip.rowView]
   rw [circuitRowInputOf_eq_eval]
-  change (Eval.eval env
-    (varFromOffset (F := ZMod p) LoadDoubleChip.Inputs 0)).adapter.op_a_0 = _
+  change (Eval.eval env (varFromOffset (F := ZMod p) LoadDoubleChip.Inputs 0)).adapter.op_a_0 = _
   rw [ProvableStruct.eval_var_eq_eval]
   exact Readers.ITypeReader.eval_opA0 env _
 
@@ -3793,8 +3718,7 @@ theorem LoadDoubleChip.ramTimestampContract :
   · simp only [input, offset, addressInput, readerInput, LoadDoubleChip.circuit,
       LoadDoubleChip.main, Readers.MemoryAccess.circuit, AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     constructor <;>
       simp only [input, readerInput, LoadDoubleChip.circuit, LoadDoubleChip.rowView,
         LoadDoubleChip.ramAccessView, circuit_norm]
@@ -3812,8 +3736,7 @@ theorem LoadDoubleChip.ramAddressContract :
   · simp only [input, offset, addressInput, LoadDoubleChip.circuit, LoadDoubleChip.main,
       AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     simp only [input, offset, addressInput, LoadDoubleChip.circuit,
       LoadDoubleChip.ramAccessView, AddressOperation.alignedValue,
       AddressOperation.circuit, circuit_norm]
@@ -3846,22 +3769,14 @@ theorem loadDoubleChip_viewOf_decoded
       ⟨loadDoubleChipDescriptor (p := p), physical⟩ data).view =
       circuitRowViewOf LoadDoubleChip.circuit LoadDoubleChip.rowView
         (Environment.fromArray physical data) := by
-  rw [DecodedInstructionRow.toChipRow_view]
-  simp only [loadDoubleChipDescriptor_table, loadDoubleChipDescriptor_view]
-  unfold circuitRowViewOf
-  rfl
+  chipViewOfDecoded loadDouble
 
 theorem loadDoubleChip_ramAccessOf_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p)) :
     decodedRamAccess ⟨loadDoubleChipDescriptor (p := p), physical⟩ data =
       circuitRamAccessOf LoadDoubleChip.circuit LoadDoubleChip.ramAccessView
         (Environment.fromArray physical data) := by
-  unfold decodedRamAccess
-  rw [DecodedInstructionRow.toChipRow_ramAccess]
-  simp only [loadDoubleChipDescriptor_table, loadDoubleChipDescriptor_ramAccess,
-    Option.getD_some]
-  unfold circuitRamAccessOf
-  rfl
+  chipRamAccessOfDecoded loadDouble
 
 theorem loadDoubleChip_viewClockBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -3872,9 +3787,7 @@ theorem loadDoubleChip_viewClockBounds_env
       (Environment.fromArray physical data)).is_real = 1) :
     ViewClockBounds (circuitRowViewOf LoadDoubleChip.circuit LoadDoubleChip.rowView
       (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real ⊢
-  exact viewClockBounds_of_cpuStateContract LoadDoubleChip.circuit LoadDoubleChip.rowView
-    LoadDoubleChip.cpuStateTimeContract data physical guarantees real
+  chipViewClockBoundsEnv loadDouble
 
 theorem loadDoubleChip_timestampBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -3909,12 +3822,7 @@ theorem loadDoubleChip_isRam_env
     RamAccessIsRam
       (circuitRamAccessOf LoadDoubleChip.circuit LoadDoubleChip.ramAccessView
         (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real
-  rw [circuitRamAccessOf_eq]
-  exact ramAccessIsRam_of_addressContract LoadDoubleChip.circuit
-    (fun input cols => some (LoadDoubleChip.ramAccessView input cols))
-    (fun input => input.is_real) LoadDoubleChip.ramAddressContract data physical constraints
-    (by simpa only [LoadDoubleChip.rowView] using real) _ rfl
+  chipIsRamEnv loadDouble (fun input => input.is_real)
 
 theorem loadDoubleChip_viewClockBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -3923,12 +3831,7 @@ theorem loadDoubleChip_viewClockBounds
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadDoubleChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadDoubleChipDescriptor_table] at guarantees
-  rw [loadDoubleChip_viewOf_decoded] at real ⊢
-  exact loadDoubleChip_viewClockBounds_env data physical guarantees real
+  chipViewClockBounds loadDouble
 
 theorem loadDoubleChip_timestampBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -3940,13 +3843,7 @@ theorem loadDoubleChip_timestampBounds
     (real : (decoded.toChipRow data).view.is_real = 1) :
     LoadMemoryTimestampBounds (decoded.toChipRow data).view
       (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadDoubleChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadDoubleChipDescriptor_table] at constraints guarantees
-  rw [loadDoubleChip_viewOf_decoded] at real ⊢
-  rw [loadDoubleChip_ramAccessOf_decoded]
-  exact loadDoubleChip_timestampBounds_env data physical constraints guarantees real
+  chipTimestampBounds loadDouble
 
 theorem loadDoubleChip_isRam
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -3955,13 +3852,7 @@ theorem loadDoubleChip_isRam
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     RamAccessIsRam (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadDoubleChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadDoubleChipDescriptor_table] at constraints
-  rw [loadDoubleChip_viewOf_decoded] at real
-  rw [loadDoubleChip_ramAccessOf_decoded]
-  exact loadDoubleChip_isRam_env data physical constraints real
+  chipIsRam loadDouble
 
 omit [Fact (2 ^ 25 < p)] in
 /-- LoadDouble's public exposed Memory list evaluates to the normal-load six-message layout. -/
@@ -3979,15 +3870,7 @@ theorem loadDoubleChip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
           (Eval.eval env ((LoadDoubleChip.circuit (p := p)).output
             (varFromOffset (F := ZMod p) LoadDoubleChip.Inputs 0)
             (size LoadDoubleChip.Inputs))))).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((LoadDoubleChip.main (varFromOffset LoadDoubleChip.Inputs 0)).operations
-        (size LoadDoubleChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [LoadDoubleChip.interactionsWith_memory_eq]
-  simp only [LoadDoubleChip.exposedMemoryInteractions, loadMemoryInteractions,
-    List.map_cons, List.map_nil, TypedInteraction.pulledIfValue_raw,
-    TypedInteraction.pushedIfValue_raw, Channel.eval_pulledIf, Channel.eval_pushedIf,
-    eval_registerMemoryMessage]
+  chipMemoryValues loadDouble loadMemoryInteractions
   simp only [ramPriorMessage, ramPushMessage, rtypePriorMessage, rtypeReadBackMessage,
     rtypeWriteMessage, LoadDoubleChip.rowView, LoadDoubleChip.ramAccessView,
     AddressOperation.alignedValue, Extracted.ITypeReader.toAdapterView,
@@ -4000,32 +3883,14 @@ theorem loadDoubleChip_typedMemoryInteractions_eq (decoded : DecodedInstructionR
     decoded.interactionsWith data memoryChannel =
       loadMemoryInteractions (decoded.toChipRow data).view
         (decodedRamAccess decoded data) := by
-  apply typedMemoryInteractions_of_values loadDoubleChipDescriptor loadMemoryInteractions
-    ?_ decoded data hchip
-  intro env
-  have inputEq : Eval.eval env (varFromOffset LoadDoubleChip.Inputs 0) =
-      (⟨LoadDoubleChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset LoadDoubleChip.Inputs 0 env
-  have outputEq : Eval.eval env
-      ((LoadDoubleChip.circuit (p := p)).output
-        (varFromOffset LoadDoubleChip.Inputs 0) (size LoadDoubleChip.Inputs)) =
-      (⟨LoadDoubleChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, circuit_norm]
-  simp only [loadDoubleChipDescriptor_table, loadDoubleChipDescriptor_view,
-    loadDoubleChipDescriptor_ramAccess, Option.getD_some]
-  rw [← inputEq, ← outputEq]
-  exact loadDoubleChip_memoryInteractionValues_eq env
+  chipTypedMemoryInteractions loadDouble loadMemoryInteractions
 
 /-- LoadDouble instantiates the authenticated normal-load interaction shape. -/
 noncomputable def loadDoubleChip_loadMemoryInteractionShape :
     LoadMemoryInteractionShape (loadDoubleChipDescriptor (p := p)) where
   access := decodedRamAccess
   access_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+    chipShapeAccessEq
   interactions := loadDoubleChip_typedMemoryInteractions_eq
 
 end LoadDouble
@@ -4062,10 +3927,7 @@ theorem loadX0ChipDescriptor_assumptions_iff
     (loadX0ChipDescriptor (p := p)).table.Assumptions env ↔
       LoadX0Chip.Assumptions
         (circuitRowInputOf LoadX0Chip.circuit env) env.data := by
-  rw [loadX0ChipDescriptor_table]
-  unfold Component.Assumptions
-  rw [circuitRowInputOf_eq_component]
-  rfl
+  chipAssumptionsIff loadX0
 
 omit [Fact (2 ^ 25 < p)] in
 /-- Assemble LoadX0's assumptions from the grounded base, immediate, and prior RAM word. -/
@@ -4079,16 +3941,7 @@ theorem loadX0Assumptions_env
       (circuitRamAccessOf LoadX0Chip.circuit LoadX0Chip.ramAccessView env).priorValue) :
     LoadX0Chip.Assumptions
       (circuitRowInputOf LoadX0Chip.circuit env) data := by
-  rw [circuitRowViewOf_eq_typed] at base immediate
-  rw [circuitRamAccessOf_eq_typed] at ram
-  unfold LoadX0Chip.Assumptions
-  constructor
-  · simpa only [LoadX0Chip.Inputs.op_b_val, LoadX0Chip.rowView,
-      Extracted.ITypeReader.toAdapterView] using base
-  constructor
-  · simpa only [LoadX0Chip.Inputs.op_c_imm, LoadX0Chip.rowView,
-      Extracted.ITypeReader.toAdapterView] using immediate
-  · simpa only [LoadX0Chip.ramAccessView] using ram
+  chipLoadAssumptionsEnv loadX0
 
 /-- Specialize the folded semantic-row transport to LoadX0. -/
 theorem loadX0Spec_of_decoded
@@ -4133,8 +3986,7 @@ theorem loadX0View_opA0 (env : Environment (ZMod p)) :
   rw [circuitRowViewOf_eq_typed]
   simp only [LoadX0Chip.rowView]
   rw [circuitRowInputOf_eq_eval]
-  change (Eval.eval env
-    (varFromOffset (F := ZMod p) LoadX0Chip.Inputs 0)).adapter.op_a_0 = _
+  change (Eval.eval env (varFromOffset (F := ZMod p) LoadX0Chip.Inputs 0)).adapter.op_a_0 = _
   rw [ProvableStruct.eval_var_eq_eval]
   exact Readers.ITypeReader.eval_opA0 env _
 
@@ -4159,8 +4011,7 @@ theorem loadX0View_isReal (env : Environment (ZMod p)) :
   rw [circuitRowViewOf_eq_typed]
   simp only [LoadX0Chip.rowView, LoadX0Chip.isReal]
   rw [circuitRowInputOf_eq_eval]
-  change LoadX0Chip.isReal
-      (Eval.eval env (varFromOffset (F := ZMod p) LoadX0Chip.Inputs 0)) = _
+  change LoadX0Chip.isReal (Eval.eval env (varFromOffset (F := ZMod p) LoadX0Chip.Inputs 0)) = _
   rw [LoadX0Chip.isReal, ProvableStruct.eval_var_eq_eval]
   simp only [circuit_norm]
 
@@ -4198,14 +4049,12 @@ private theorem loadX0OneHot7_atMost {b0 b1 b2 b3 b4 b5 b6 : ZMod p}
       loadX0Val_of_binary h6⟩
   obtain ⟨v0, v1, v2, v3, v4, v5, v6⟩ := hvals
   have totalCast :
-      total = ((b0.val + b1.val + b2.val + b3.val + b4.val + b5.val +
-        b6.val : ℕ) : ZMod p) := by
+      total = ((b0.val + b1.val + b2.val + b3.val + b4.val + b5.val + b6.val : ℕ) : ZMod p) := by
     rw [totalEq]
     push_cast [ZMod.natCast_zmod_val]
     ring
   have totalVal :
-      total.val =
-        b0.val + b1.val + b2.val + b3.val + b4.val + b5.val + b6.val := by
+      total.val = b0.val + b1.val + b2.val + b3.val + b4.val + b5.val + b6.val := by
     rw [totalCast]
     exact ZMod.val_natCast_of_lt (by omega)
   have totalBinary : total.val = 0 ∨ total.val = 1 := by
@@ -4300,8 +4149,7 @@ private theorem loadX0ByteEvidence
   have offsetLt : addressOffset (loadX0AddressInput input) < 8 := by
     rw [offsetEq]
     exact Nat.mod_lt _ (by norm_num)
-  obtain ⟨byte, memory⟩ :=
-    memoryAt 0 (by simpa only [Nat.add_zero] using offsetLt)
+  obtain ⟨byte, memory⟩ := memoryAt 0 (by simpa only [Nat.add_zero] using offsetLt)
   rw [Nat.add_zero] at memory
   exact ⟨opcodeEq, Nat.add_one_le_iff.mpr rawLt, low, byte, memory⟩
 
@@ -4347,8 +4195,7 @@ private theorem loadX0HalfEvidence
     rw [offsetEq]
     exact Nat.mod_lt _ (by norm_num)
   have high :
-      (AddressOperation.effectiveAddress (loadX0AddressInput input)).toNat + 2 ≤
-        2 ^ 48 := by
+      (AddressOperation.effectiveAddress (loadX0AddressInput input)).toNat + 2 ≤ 2 ^ 48 := by
     obtain ⟨k, hk⟩ := Nat.dvd_of_mod_eq_zero alignment
     omega
   obtain ⟨byte₀, memory₀⟩ := memoryAt 0 (by omega)
@@ -4403,8 +4250,7 @@ private theorem loadX0WordEvidence
     rw [offsetEq, Nat.mod_mod_of_dvd _ (by norm_num : 4 ∣ 8)]
     exact alignment
   have high :
-      (AddressOperation.effectiveAddress (loadX0AddressInput input)).toNat + 4 ≤
-        2 ^ 48 := by
+      (AddressOperation.effectiveAddress (loadX0AddressInput input)).toNat + 4 ≤ 2 ^ 48 := by
     obtain ⟨k, hk⟩ := Nat.dvd_of_mod_eq_zero alignment
     omega
   obtain ⟨byte₀, memory₀⟩ := memoryAt 0 (by
@@ -4476,8 +4322,7 @@ private theorem loadX0DoubleEvidence
     rw [← offsetEq]
     simp [addressOffset, loadX0AddressInput, bit₀, bit₁, bit₂]
   have high :
-      (AddressOperation.effectiveAddress (loadX0AddressInput input)).toNat + 8 ≤
-        2 ^ 48 := by
+      (AddressOperation.effectiveAddress (loadX0AddressInput input)).toNat + 8 ≤ 2 ^ 48 := by
     obtain ⟨k, hk⟩ := Nat.dvd_of_mod_eq_zero alignment
     omega
   have offsetZero : addressOffset (loadX0AddressInput input) = 0 := by
@@ -4517,14 +4362,12 @@ theorem loadX0AdvanceReady_of_semanticFacts
     LoadX0Chip.advanceReady input cols program state := by
   have oneHot := loadX0_oneHot input cols data spec real
   have addressFacts := AddressOperation.effectiveAddress_facts
-    baseBound immediateBound
-      (AddressOperation.validAddress_of_spec (spec.1.2.2.2 real))
+    baseBound immediateBound (AddressOperation.validAddress_of_spec (spec.1.2.2.2 real))
   have offsetEq :
       addressOffset (loadX0AddressInput input) =
         (AddressOperation.effectiveAddress (loadX0AddressInput input)).toNat % 8 := by
     simpa only [addressOffset, loadX0AddressInput] using addressFacts.2.2
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, ldGate, wordGate, halfGate, _, _⟩ :=
-    spec
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, ldGate, wordGate, halfGate, _, _⟩ := spec
   unfold LoadX0Chip.advanceReady
   refine ⟨guard, pcBound, ?_⟩
   rcases oneHot with lb | lbu | lh | lhu | lw | lwu | ld
@@ -4556,8 +4399,7 @@ theorem loadX0AdvanceReady_of_semanticFacts
           lh.2.2.1, lh.2.2.2.1, lh.2.2.2.2.1, lh.2.2.2.2.2.1,
           lh.2.2.2.2.2.2]) bit₀ addressFacts.1 addressFacts.2.1 offsetEq memoryAt
   · apply Or.inr
-    apply Or.inr
-    apply Or.inr
+    iterate 2 apply Or.inr
     apply Or.inl
     have bit₀ : input.offset_bit[0] = 0 := by
       simpa [lhu.1, lhu.2.1, lhu.2.2.1, lhu.2.2.2.1, lhu.2.2.2.2.1,
@@ -4569,9 +4411,7 @@ theorem loadX0AdvanceReady_of_semanticFacts
           lhu.2.2.1, lhu.2.2.2.1, lhu.2.2.2.2.1, lhu.2.2.2.2.2.1,
           lhu.2.2.2.2.2.2]) bit₀ addressFacts.1 addressFacts.2.1 offsetEq memoryAt
   · apply Or.inr
-    apply Or.inr
-    apply Or.inr
-    apply Or.inr
+    iterate 3 apply Or.inr
     apply Or.inl
     have bit₀ : input.offset_bit[0] = 0 := by
       simpa [lw.1, lw.2.1, lw.2.2.1, lw.2.2.2.1, lw.2.2.2.2.1,
@@ -4586,10 +4426,7 @@ theorem loadX0AdvanceReady_of_semanticFacts
           lw.2.2.1, lw.2.2.2.1, lw.2.2.2.2.1, lw.2.2.2.2.2.1,
           lw.2.2.2.2.2.2]) bit₀ bit₁ addressFacts.1 addressFacts.2.1 offsetEq memoryAt
   · apply Or.inr
-    apply Or.inr
-    apply Or.inr
-    apply Or.inr
-    apply Or.inr
+    iterate 4 apply Or.inr
     apply Or.inl
     have bit₀ : input.offset_bit[0] = 0 := by
       simpa [lwu.1, lwu.2.1, lwu.2.2.1, lwu.2.2.2.1, lwu.2.2.2.2.1,
@@ -4604,11 +4441,7 @@ theorem loadX0AdvanceReady_of_semanticFacts
           lwu.2.2.1, lwu.2.2.2.1, lwu.2.2.2.2.1, lwu.2.2.2.2.2.1,
           lwu.2.2.2.2.2.2]) bit₀ bit₁ addressFacts.1 addressFacts.2.1 offsetEq memoryAt
   · apply Or.inr
-    apply Or.inr
-    apply Or.inr
-    apply Or.inr
-    apply Or.inr
-    apply Or.inr
+    iterate 5 apply Or.inr
     have bit₀ : input.offset_bit[0] = 0 := by
       simpa [ld.1, ld.2.1, ld.2.2.1, ld.2.2.2.1, ld.2.2.2.2.1,
         ld.2.2.2.2.2.1, ld.2.2.2.2.2.2] using halfGate
@@ -4651,8 +4484,7 @@ theorem LoadX0Chip.ramTimestampContract :
   · simp only [input, offset, addressInput, isReal, readerInput, LoadX0Chip.circuit,
       LoadX0Chip.main, Readers.MemoryAccess.circuit, AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     constructor <;>
       simp only [input, isReal, readerInput, LoadX0Chip.circuit, LoadX0Chip.rowView,
         LoadX0Chip.ramAccessView, LoadX0Chip.isReal, circuit_norm]
@@ -4672,8 +4504,7 @@ theorem LoadX0Chip.ramAddressContract :
   · simp only [input, offset, addressInput, LoadX0Chip.circuit, LoadX0Chip.main,
       AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     simp only [input, offset, addressInput, LoadX0Chip.circuit,
       LoadX0Chip.ramAccessView, AddressOperation.alignedValue,
       AddressOperation.circuit, circuit_norm]
@@ -4708,22 +4539,14 @@ theorem loadX0Chip_viewOf_decoded
       ⟨loadX0ChipDescriptor (p := p), physical⟩ data).view =
       circuitRowViewOf LoadX0Chip.circuit LoadX0Chip.rowView
         (Environment.fromArray physical data) := by
-  rw [DecodedInstructionRow.toChipRow_view]
-  simp only [loadX0ChipDescriptor_table, loadX0ChipDescriptor_view]
-  unfold circuitRowViewOf
-  rfl
+  chipViewOfDecoded loadX0
 
 theorem loadX0Chip_ramAccessOf_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p)) :
     decodedRamAccess ⟨loadX0ChipDescriptor (p := p), physical⟩ data =
       circuitRamAccessOf LoadX0Chip.circuit LoadX0Chip.ramAccessView
         (Environment.fromArray physical data) := by
-  unfold decodedRamAccess
-  rw [DecodedInstructionRow.toChipRow_ramAccess]
-  simp only [loadX0ChipDescriptor_table, loadX0ChipDescriptor_ramAccess,
-    Option.getD_some]
-  unfold circuitRamAccessOf
-  rfl
+  chipRamAccessOfDecoded loadX0
 
 theorem loadX0Chip_viewClockBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -4734,9 +4557,7 @@ theorem loadX0Chip_viewClockBounds_env
       (Environment.fromArray physical data)).is_real = 1) :
     ViewClockBounds (circuitRowViewOf LoadX0Chip.circuit LoadX0Chip.rowView
       (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real ⊢
-  exact viewClockBounds_of_cpuStateContract LoadX0Chip.circuit LoadX0Chip.rowView
-    LoadX0Chip.cpuStateTimeContract data physical guarantees real
+  chipViewClockBoundsEnv loadX0
 
 theorem loadX0Chip_timestampBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -4770,12 +4591,7 @@ theorem loadX0Chip_isRam_env
     RamAccessIsRam
       (circuitRamAccessOf LoadX0Chip.circuit LoadX0Chip.ramAccessView
         (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real
-  rw [circuitRamAccessOf_eq]
-  exact ramAccessIsRam_of_addressContract LoadX0Chip.circuit
-    (fun input cols => some (LoadX0Chip.ramAccessView input cols))
-    LoadX0Chip.isReal LoadX0Chip.ramAddressContract data physical constraints
-    (by simpa only [LoadX0Chip.rowView] using real) _ rfl
+  chipIsRamEnv loadX0 LoadX0Chip.isReal
 
 theorem loadX0Chip_viewClockBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -4784,12 +4600,7 @@ theorem loadX0Chip_viewClockBounds
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadX0ChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadX0ChipDescriptor_table] at guarantees
-  rw [loadX0Chip_viewOf_decoded] at real ⊢
-  exact loadX0Chip_viewClockBounds_env data physical guarantees real
+  chipViewClockBounds loadX0
 
 theorem loadX0Chip_timestampBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -4801,13 +4612,7 @@ theorem loadX0Chip_timestampBounds
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ImmutableRamTimestampBounds (decoded.toChipRow data).view
       (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadX0ChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadX0ChipDescriptor_table] at constraints guarantees
-  rw [loadX0Chip_viewOf_decoded] at real ⊢
-  rw [loadX0Chip_ramAccessOf_decoded]
-  exact loadX0Chip_timestampBounds_env data physical constraints guarantees real
+  chipTimestampBounds loadX0
 
 theorem loadX0Chip_isRam
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -4816,13 +4621,7 @@ theorem loadX0Chip_isRam
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     RamAccessIsRam (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = loadX0ChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [loadX0ChipDescriptor_table] at constraints
-  rw [loadX0Chip_viewOf_decoded] at real
-  rw [loadX0Chip_ramAccessOf_decoded]
-  exact loadX0Chip_isRam_env data physical constraints real
+  chipIsRam loadX0
 
 omit [Fact (2 ^ 25 < p)] in
 /-- LoadX0's public exposed Memory list evaluates to the immutable RAM/I-type six-message layout. -/
@@ -4839,15 +4638,7 @@ theorem loadX0Chip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
           (Eval.eval env ((LoadX0Chip.circuit (p := p)).output
             (varFromOffset (F := ZMod p) LoadX0Chip.Inputs 0)
             (size LoadX0Chip.Inputs))))).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((LoadX0Chip.main (varFromOffset LoadX0Chip.Inputs 0)).operations
-        (size LoadX0Chip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [LoadX0Chip.interactionsWith_memory_eq]
-  simp only [LoadX0Chip.exposedMemoryInteractions, immutableRamMemoryInteractions,
-    List.map_cons, List.map_nil, TypedInteraction.pulledIfValue_raw,
-    TypedInteraction.pushedIfValue_raw, Channel.eval_pulledIf, Channel.eval_pushedIf,
-    eval_registerMemoryMessage]
+  chipMemoryValues loadX0 immutableRamMemoryInteractions
   simp only [ramPriorMessage, ramPushMessage, rtypePriorMessage, rtypeReadBackMessage,
     LoadX0Chip.rowView, LoadX0Chip.ramAccessView, LoadX0Chip.isReal,
     AddressOperation.alignedValue, Extracted.ITypeReader.toAdapterView,
@@ -4860,32 +4651,14 @@ theorem loadX0Chip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p
     decoded.interactionsWith data memoryChannel =
       immutableRamMemoryInteractions (decoded.toChipRow data).view
         (decodedRamAccess decoded data) := by
-  apply typedMemoryInteractions_of_values loadX0ChipDescriptor
-    immutableRamMemoryInteractions ?_ decoded data hchip
-  intro env
-  have inputEq : Eval.eval env (varFromOffset LoadX0Chip.Inputs 0) =
-      (⟨LoadX0Chip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset LoadX0Chip.Inputs 0 env
-  have outputEq : Eval.eval env
-      ((LoadX0Chip.circuit (p := p)).output
-        (varFromOffset LoadX0Chip.Inputs 0) (size LoadX0Chip.Inputs)) =
-      (⟨LoadX0Chip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, circuit_norm]
-  simp only [loadX0ChipDescriptor_table, loadX0ChipDescriptor_view,
-    loadX0ChipDescriptor_ramAccess, Option.getD_some]
-  rw [← inputEq, ← outputEq]
-  exact loadX0Chip_memoryInteractionValues_eq env
+  chipTypedMemoryInteractions loadX0 immutableRamMemoryInteractions
 
 /-- LoadX0 instantiates the authenticated immutable RAM/I-type interaction shape. -/
 noncomputable def loadX0Chip_immutableRamMemoryInteractionShape :
     ImmutableRamMemoryInteractionShape (loadX0ChipDescriptor (p := p)) where
   access := decodedRamAccess
   access_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadX0ChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+    chipShapeAccessEq
   interactions := loadX0Chip_typedMemoryInteractions_eq
 
 end LoadX0
@@ -4921,10 +4694,7 @@ theorem storeByteChipDescriptor_assumptions_iff
     (storeByteChipDescriptor (p := p)).table.Assumptions env ↔
       StoreByteChip.Assumptions
         (circuitRowInputOf StoreByteChip.circuit env) env.data := by
-  rw [storeByteChipDescriptor_table]
-  unfold Component.Assumptions
-  rw [circuitRowInputOf_eq_component]
-  rfl
+  chipAssumptionsIff storeByte
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeByteAssumptions_env
@@ -5128,11 +4898,9 @@ theorem StoreByteChip.mergeFacts
       input.adapter.op_a_memory.prev_value[0] =
         input.register_low_byte + StoreByteChip.regHigh input * 256 := by
     simpa only [StoreByteChip.regHigh] using
-      byteQuotient_reassembles
-        input.adapter.op_a_memory.prev_value[0] input.register_low_byte
+      byteQuotient_reassembles input.adapter.op_a_memory.prev_value[0] input.register_low_byte
   have memoryDecomp :
-      input.mem_limb =
-        input.mem_limb_low_byte + StoreByteChip.memHigh input * 256 := by
+      input.mem_limb = input.mem_limb_low_byte + StoreByteChip.memHigh input * 256 := by
     simpa only [StoreByteChip.memHigh] using
       byteQuotient_reassembles input.mem_limb input.mem_limb_low_byte
   have oldDecomp :
@@ -5142,14 +4910,12 @@ theorem StoreByteChip.mergeFacts
     exact memoryDecomp
   rcases bit0 with bit0Zero | bit0One
   · have incrementLow :
-        input.increment =
-          input.register_low_byte - input.mem_limb_low_byte := by
+        input.increment = input.register_low_byte - input.mem_limb_low_byte := by
       rw [increment, bit0Zero]
       ring
     have newEq : ∀ i : Fin 4,
         input.store_value[i] =
-          if i = limb then
-            input.register_low_byte + StoreByteChip.memHigh input * 256
+          if i = limb then input.register_low_byte + StoreByteChip.memHigh input * 256
           else input.memory_access.prev_value[i] := by
       intro i
       rw [merged i]
@@ -5171,14 +4937,12 @@ theorem StoreByteChip.mergeFacts
     simp only [ZMod.val_zero]
     omega
   · have incrementHigh :
-        input.increment =
-          256 * (input.register_low_byte - StoreByteChip.memHigh input) := by
+        input.increment = 256 * (input.register_low_byte - StoreByteChip.memHigh input) := by
       rw [increment, bit0One]
       ring
     have newEq : ∀ i : Fin 4,
         input.store_value[i] =
-          if i = limb then
-            input.mem_limb_low_byte + input.register_low_byte * 256
+          if i = limb then input.mem_limb_low_byte + input.register_low_byte * 256
           else input.memory_access.prev_value[i] := by
       intro i
       rw [merged i]
@@ -5241,8 +5005,7 @@ private theorem StoreByteChip.storeValue_isU64_of_mergeFacts
   obtain ⟨limb, _offsetEq, memSelected, merged⟩ :=
     StoreByteChip.limbFacts input selection rmw bit1 bit2
   have memoryDecomp :
-      input.mem_limb =
-        input.mem_limb_low_byte + StoreByteChip.memHigh input * 256 := by
+      input.mem_limb = input.mem_limb_low_byte + StoreByteChip.memHigh input * 256 := by
     simpa only [StoreByteChip.memHigh] using
       byteQuotient_reassembles input.mem_limb input.mem_limb_low_byte
   have oldDecomp :
@@ -5252,8 +5015,7 @@ private theorem StoreByteChip.storeValue_isU64_of_mergeFacts
     exact memoryDecomp
   rcases bit0 with bit0Zero | bit0One
   · have incrementLow :
-        input.increment =
-          input.register_low_byte - input.mem_limb_low_byte := by
+        input.increment = input.register_low_byte - input.mem_limb_low_byte := by
       rw [increment, bit0Zero]
       ring
     intro i
@@ -5270,8 +5032,7 @@ private theorem StoreByteChip.storeValue_isU64_of_mergeFacts
       omega
     · exact priorBound i
   · have incrementHigh :
-        input.increment =
-          256 * (input.register_low_byte - StoreByteChip.memHigh input) := by
+        input.increment = 256 * (input.register_low_byte - StoreByteChip.memHigh input) := by
       rw [increment, bit0One]
       ring
     intro i
@@ -5308,22 +5069,18 @@ theorem storeByteChip_storeFacts
       input.offset_bit[1], input.offset_bit[2], input.is_real⟩
   let access := StoreByteChip.ramAccessView input cols
   let write : Trace.MemWrite (ZMod p) :=
-    ⟨cols.address_operation.addr_operation.value,
-      input.adapter.op_a_memory.prev_value, 1⟩
+    ⟨cols.address_operation.addr_operation.value, input.adapter.op_a_memory.prev_value, 1⟩
   obtain ⟨addressSpec, memorySpec, readerSpec, byteBounds, selection,
     increment, rmw, _gate⟩ := spec
   have realInput : input.is_real = 1 := by
     simpa only [StoreByteChip.rowView] using real
   have addressEq :
-      access.address =
-        AddressOperation.alignedValue addressInput cols.address_operation := by
+      access.address = AddressOperation.alignedValue addressInput cols.address_operation := by
     rfl
   have address :
-      write.addrNat =
-        (ramCellOfAccess access).baseAddr.toNat + addressOffset addressInput := by
+      write.addrNat = (ramCellOfAccess access).baseAddr.toNat + addressOffset addressInput := by
     have raw := rawAddress_eq_ramCellBase_add_offset
-      addressInput cols.address_operation access addressEq
-        (addressSpec.2.2.2 realInput)
+      addressInput cols.address_operation access addressEq (addressSpec.2.2.2 realInput)
     simpa only [write, Trace.MemWrite.addrNat, address48Nat] using raw
   have priorBound : Word.isU64 input.memory_access.prev_value :=
     (memorySpec realInput).2.2.2.2.2.1
@@ -5331,12 +5088,9 @@ theorem storeByteChip_storeFacts
     (readerSpec.2.2.2.2.2 realInput).1
   obtain ⟨registerLowBound, registerHighBound,
     memoryLowBound, memoryHighBound⟩ := byteBounds realInput
-  have bit0 : input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1 :=
-    addressSpec.1
-  have bit1 : input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1 :=
-    addressSpec.2.1
-  have bit2 : input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1 :=
-    addressSpec.2.2.1
+  have bit0 : input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1 := addressSpec.1
+  have bit1 : input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1 := addressSpec.2.1
+  have bit2 : input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1 := addressSpec.2.2.1
   obtain ⟨selected, offsetEq, _storeBound, bytes⟩ :=
     StoreByteChip.mergeFacts input registerLowBound registerHighBound
       memoryLowBound memoryHighBound selection increment rmw bit0 bit1 bit2
@@ -5344,16 +5098,14 @@ theorem storeByteChip_storeFacts
   have offsetEq' : addressOffset addressInput = selected.val := by
     simpa only [addressInput] using offsetEq
   have addressSelected :
-      write.addrNat =
-        (ramCellOfAccess access).baseAddr.toNat + selected.val := by
+      write.addrNat = (ramCellOfAccess access).baseAddr.toNat + selected.val := by
     simpa only [offsetEq'] using address
   refine ⟨write, rfl,
     Trace.MemWrite.inCell_of_address_width
       (offset := selected.val) (width := 1) addressSelected rfl (by
       have := selected.isLt
       omega), ?_⟩
-  apply ramCellUpdate_of_patchedCell
-    (offset := selected.val) (width := 1) addressSelected rfl
+  apply ramCellUpdate_of_patchedCell (offset := selected.val) (width := 1) addressSelected rfl
   symm
   simpa only [access, write, StoreByteChip.ramAccessView] using
     patchedCellBytes_one cols.address_operation.addr_operation.value
@@ -5386,21 +5138,16 @@ theorem StoreByteChip.byteBounds_of_mainGuarantees
   have registerMem :
       registerPull.toRaw ∈
         ((StoreByteChip.main input).operations offset).shallowInteractions := by
-    simp only [StoreByteChip.main, registerPull, circuit_norm,
-      Operations.shallowInteractions]
+    simp only [StoreByteChip.main, registerPull, circuit_norm, Operations.shallowInteractions]
   have memoryMem :
-      memoryPull.toRaw ∈
-        ((StoreByteChip.main input).operations offset).shallowInteractions := by
-    simp only [StoreByteChip.main, memoryPull, circuit_norm,
-      Operations.shallowInteractions]
+      memoryPull.toRaw ∈ ((StoreByteChip.main input).operations offset).shallowInteractions := by
+    simp only [StoreByteChip.main, memoryPull, circuit_norm, Operations.shallowInteractions]
   have registerRaw := guarantees registerPull.toRaw
     (Operations.mem_interactions_of_mem_shallowInteractions registerMem) (by rfl)
   have memoryRaw := guarantees memoryPull.toRaw
     (Operations.mem_interactions_of_mem_shallowInteractions memoryMem) (by rfl)
-  have registerGuarantee :=
-    (ChannelInteraction.toRaw_guarantees env registerPull).mp registerRaw
-  have memoryGuarantee :=
-    (ChannelInteraction.toRaw_guarantees env memoryPull).mp memoryRaw
+  have registerGuarantee := (ChannelInteraction.toRaw_guarantees env registerPull).mp registerRaw
+  have memoryGuarantee := (ChannelInteraction.toRaw_guarantees env memoryPull).mp memoryRaw
   have negReal : -(Expression.eval env input.is_real) = -1 := by rw [real]
   have registerMult :
       (fun x => Expression.eval env x) registerPull.toRaw.mult = -1 := by
@@ -5409,13 +5156,11 @@ theorem StoreByteChip.byteBounds_of_mainGuarantees
       (fun x => Expression.eval env x) memoryPull.toRaw.mult = -1 := by
     simpa only [memoryPull, circuit_norm] using negReal
   have registerSpec : ByteRowSpec (Eval.eval env registerPull.msg) := by
-    have guarantee := registerGuarantee (by rfl)
-      (by simpa only [circuit_norm] using registerMult)
+    have guarantee := registerGuarantee (by rfl) (by simpa only [circuit_norm] using registerMult)
     change ByteRowSpec (Eval.eval env registerPull.msg) at guarantee
     exact guarantee
   have memorySpec : ByteRowSpec (Eval.eval env memoryPull.msg) := by
-    have guarantee := memoryGuarantee (by rfl)
-      (by simpa only [circuit_norm] using memoryMult)
+    have guarantee := memoryGuarantee (by rfl) (by simpa only [circuit_norm] using memoryMult)
     change ByteRowSpec (Eval.eval env memoryPull.msg) at guarantee
     exact guarantee
   have registerMsgEq : Eval.eval env registerPull.msg =
@@ -5448,10 +5193,7 @@ private theorem storeByteSelect0Constraint_mem
         * (input.offset_bit[2] - (1 : Expression (ZMod p))) - 0 ∈
       ((StoreByteChip.main input).operations offset).constraints := by
   simp only [StoreByteChip.main, circuit_norm]
-  right
-  right
-  right
-  right
+  iterate 4 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -5468,11 +5210,7 @@ private theorem storeByteSelect1Constraint_mem
         * (input.offset_bit[2] - (1 : Expression (ZMod p))) - 0 ∈
       ((StoreByteChip.main input).operations offset).constraints := by
   simp only [StoreByteChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
+  iterate 5 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -5489,12 +5227,7 @@ private theorem storeByteSelect2Constraint_mem
         * input.offset_bit[2] - 0 ∈
       ((StoreByteChip.main input).operations offset).constraints := by
   simp only [StoreByteChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
-  right
+  iterate 6 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -5510,13 +5243,7 @@ private theorem storeByteSelect3Constraint_mem
         * input.offset_bit[1] * input.offset_bit[2] - 0 ∈
       ((StoreByteChip.main input).operations offset).constraints := by
   simp only [StoreByteChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
-  right
-  right
+  iterate 7 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -5535,14 +5262,7 @@ private theorem storeByteIncrementConstraint_mem
               Expression.const ((256 : ZMod p)⁻¹)) * input.offset_bit[0]) - 0 ∈
       ((StoreByteChip.main input).operations offset).constraints := by
   simp only [StoreByteChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
+  iterate 8 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -5563,15 +5283,7 @@ private theorem storeByteRmw0Constraint_mem
             ((1 : Expression (ZMod p)) - input.offset_bit[2])) - 0 ∈
       ((StoreByteChip.main input).operations offset).constraints := by
   simp only [StoreByteChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
+  iterate 9 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -5590,16 +5302,7 @@ private theorem storeByteRmw1Constraint_mem
             ((1 : Expression (ZMod p)) - input.offset_bit[2])) - 0 ∈
       ((StoreByteChip.main input).operations offset).constraints := by
   simp only [StoreByteChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
+  iterate 10 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -5618,17 +5321,7 @@ private theorem storeByteRmw2Constraint_mem
             input.offset_bit[2]) - 0 ∈
       ((StoreByteChip.main input).operations offset).constraints := by
   simp only [StoreByteChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
+  iterate 11 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -5646,18 +5339,7 @@ private theorem storeByteRmw3Constraint_mem
           input.increment * input.offset_bit[1] * input.offset_bit[2]) - 0 ∈
       ((StoreByteChip.main input).operations offset).constraints := by
   simp only [StoreByteChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
-  right
+  iterate 12 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -5764,12 +5446,10 @@ theorem StoreByteChip.rawFacts_of_mainConstraints
   simp only [eval_sub, Expression.eval, sub_zero] at select0 select1 select2 select3
   simp only [eval_sub, Expression.eval, sub_zero] at increment rmw0 rmw1 rmw2 rmw3
   have evalStore :
-      Eval.eval env inputVar.store_value =
-        (Eval.eval env inputVar).store_value := by
+      Eval.eval env inputVar.store_value = (Eval.eval env inputVar).store_value := by
     rw [ProvableStruct.eval_var_eq_eval]
     rfl
-  have hmapStore := evalStore.trans
-    (congrArg StoreByteChip.Inputs.store_value inputEq)
+  have hmapStore := evalStore.trans (congrArg StoreByteChip.Inputs.store_value inputEq)
   rw [CircuitType.eval_var_fields] at hmapStore
   have evalPriorWord :
       Eval.eval env inputVar.memory_access.prev_value =
@@ -5784,12 +5464,10 @@ theorem StoreByteChip.rawFacts_of_mainConstraints
     (fun x : StoreByteChip.Inputs (ZMod p) => x.memory_access.prev_value) inputEq)
   rw [CircuitType.eval_var_fields] at hmapPrior
   have evalOffsetWord :
-      Eval.eval env inputVar.offset_bit =
-        (Eval.eval env inputVar).offset_bit := by
+      Eval.eval env inputVar.offset_bit = (Eval.eval env inputVar).offset_bit := by
     rw [ProvableStruct.eval_var_eq_eval]
     rfl
-  have hmapOffset := evalOffsetWord.trans
-    (congrArg StoreByteChip.Inputs.offset_bit inputEq)
+  have hmapOffset := evalOffsetWord.trans (congrArg StoreByteChip.Inputs.offset_bit inputEq)
   rw [CircuitType.eval_var_fields] at hmapOffset
   have evalStoreAt : ∀ i (hi : i < 4),
       Expression.eval env inputVar.store_value[i] = input.store_value[i] :=
@@ -5809,12 +5487,10 @@ theorem StoreByteChip.rawFacts_of_mainConstraints
     evalMemLimbField.trans (congrArg StoreByteChip.Inputs.mem_limb inputEq)
   have evalMemLow :
       Expression.eval env inputVar.mem_limb_low_byte = input.mem_limb_low_byte :=
-    evalMemLowField.trans
-      (congrArg StoreByteChip.Inputs.mem_limb_low_byte inputEq)
+    evalMemLowField.trans (congrArg StoreByteChip.Inputs.mem_limb_low_byte inputEq)
   have evalRegisterLow :
       Expression.eval env inputVar.register_low_byte = input.register_low_byte :=
-    evalRegisterLowField.trans
-      (congrArg StoreByteChip.Inputs.register_low_byte inputEq)
+    evalRegisterLowField.trans (congrArg StoreByteChip.Inputs.register_low_byte inputEq)
   have evalIncrement :
       Expression.eval env inputVar.increment = input.increment :=
     evalIncrementField.trans (congrArg StoreByteChip.Inputs.increment inputEq)
@@ -5897,11 +5573,9 @@ theorem StoreByteChip.storeValue_isU64_of_constraints
     Word.isU64
       ((⟨StoreByteChip.circuit (p := p)⟩ :
         Component (ZMod p)).rowInput env).store_value := by
-  let input : Var StoreByteChip.Inputs (ZMod p) :=
-    varFromOffset StoreByteChip.Inputs 0
+  let input : Var StoreByteChip.Inputs (ZMod p) := varFromOffset StoreByteChip.Inputs 0
   let offset := size StoreByteChip.Inputs
-  let addressInput : Var AddressOperation.Inputs (ZMod p) :=
-    storeByteAddressInput input
+  let addressInput : Var AddressOperation.Inputs (ZMod p) := storeByteAddressInput input
   let component : Component (ZMod p) := ⟨StoreByteChip.circuit⟩
   have rowConstraints : component.rowOperations.ConstraintsHold env :=
     (Component.constraintsHold_iff env).mp constraints
@@ -5912,41 +5586,33 @@ theorem StoreByteChip.storeValue_isU64_of_constraints
       component.rowOperations.ChannelGuarantees byteChannel.toRaw env :=
     (Component.channelGuarantees_iff env byteChannel.toRaw).mp guarantees
   have mainGuarantees :
-      ((StoreByteChip.main input).operations offset).ChannelGuarantees
-        byteChannel.toRaw env := by
+      ((StoreByteChip.main input).operations offset).ChannelGuarantees byteChannel.toRaw env := by
     exact rowGuarantees
   have addressConstraints := constraintsHold_generalSubcircuit_of_mem env
     ((StoreByteChip.main input).operations offset) AddressOperation.circuit
     addressInput offset (storeByteAddress_mem input offset) mainConstraints
   have offsetBools :=
-    AddressOperation.offsetBits_bool_of_constraints
-      addressInput offset env addressConstraints
+    AddressOperation.offsetBits_bool_of_constraints addressInput offset env addressConstraints
   have inputEq : Eval.eval env input = component.rowInput env :=
     eval_varFromOffset_valueFromOffset StoreByteChip.Inputs 0 env
   obtain ⟨evalMemLimbField, evalMemLowField, evalRegisterLowField,
     _evalIncrementField, evalRealField⟩ :=
     StoreByteChip.evalScalarFields input env
   have evalMemLimb :
-      Expression.eval env input.mem_limb =
-        (component.rowInput env).mem_limb :=
+      Expression.eval env input.mem_limb = (component.rowInput env).mem_limb :=
     evalMemLimbField.trans (congrArg StoreByteChip.Inputs.mem_limb inputEq)
   have evalMemLow :
-      Expression.eval env input.mem_limb_low_byte =
-        (component.rowInput env).mem_limb_low_byte :=
-    evalMemLowField.trans
-      (congrArg StoreByteChip.Inputs.mem_limb_low_byte inputEq)
+      Expression.eval env input.mem_limb_low_byte = (component.rowInput env).mem_limb_low_byte :=
+    evalMemLowField.trans (congrArg StoreByteChip.Inputs.mem_limb_low_byte inputEq)
   have evalRegisterLow :
-      Expression.eval env input.register_low_byte =
-        (component.rowInput env).register_low_byte :=
-    evalRegisterLowField.trans
-      (congrArg StoreByteChip.Inputs.register_low_byte inputEq)
+      Expression.eval env input.register_low_byte = (component.rowInput env).register_low_byte :=
+    evalRegisterLowField.trans (congrArg StoreByteChip.Inputs.register_low_byte inputEq)
   have evalReal :
       Expression.eval env input.is_real = (component.rowInput env).is_real :=
     evalRealField.trans (congrArg StoreByteChip.Inputs.is_real inputEq)
   have byteBounds := StoreByteChip.byteBounds_of_mainGuarantees
     input offset env mainGuarantees (evalReal.trans real)
-  obtain ⟨registerLowBound, _registerHighBound,
-    memoryLowBound, memoryHighBound⟩ := byteBounds
+  obtain ⟨registerLowBound, _registerHighBound, memoryLowBound, memoryHighBound⟩ := byteBounds
   rw [evalRegisterLow] at registerLowBound
   rw [evalMemLow] at memoryLowBound
   rw [evalMemLimb, evalMemLow] at memoryHighBound
@@ -5954,37 +5620,31 @@ theorem StoreByteChip.storeValue_isU64_of_constraints
     input (component.rowInput env) offset env inputEq mainConstraints
   obtain ⟨selection, increment, rmw⟩ := rawFacts
   have evalOffsetWord :
-      Eval.eval env input.offset_bit =
-        (Eval.eval env input).offset_bit := by
+      Eval.eval env input.offset_bit = (Eval.eval env input).offset_bit := by
     rw [ProvableStruct.eval_var_eq_eval]
     rfl
-  have hmapOffset := evalOffsetWord.trans
-    (congrArg StoreByteChip.Inputs.offset_bit inputEq)
+  have hmapOffset := evalOffsetWord.trans (congrArg StoreByteChip.Inputs.offset_bit inputEq)
   rw [CircuitType.eval_var_fields] at hmapOffset
   have evalOffset : ∀ i (hi : i < 3),
-      Expression.eval env input.offset_bit[i] =
-        (component.rowInput env).offset_bit[i] :=
+      Expression.eval env input.offset_bit[i] = (component.rowInput env).offset_bit[i] :=
     fun i hi => by rw [← hmapOffset]; simp only [Vector.getElem_map]
   have bit0 :
       (component.rowInput env).offset_bit[0] = 0 ∨
         (component.rowInput env).offset_bit[0] = 1 := by
     have raw := offsetBools.1
-    rw [storeByteAddressInput_offsetBit0 env input,
-      evalOffset 0 (by omega)] at raw
+    rw [storeByteAddressInput_offsetBit0 env input, evalOffset 0 (by omega)] at raw
     exact raw
   have bit1 :
       (component.rowInput env).offset_bit[1] = 0 ∨
         (component.rowInput env).offset_bit[1] = 1 := by
     have raw := offsetBools.2.1
-    rw [storeByteAddressInput_offsetBit1 env input,
-      evalOffset 1 (by omega)] at raw
+    rw [storeByteAddressInput_offsetBit1 env input, evalOffset 1 (by omega)] at raw
     exact raw
   have bit2 :
       (component.rowInput env).offset_bit[2] = 0 ∨
         (component.rowInput env).offset_bit[2] = 1 := by
     have raw := offsetBools.2.2
-    rw [storeByteAddressInput_offsetBit2 env input,
-      evalOffset 2 (by omega)] at raw
+    rw [storeByteAddressInput_offsetBit2 env input, evalOffset 2 (by omega)] at raw
     exact raw
   exact StoreByteChip.storeValue_isU64_of_mergeFacts
     (component.rowInput env) registerLowBound memoryLowBound
@@ -6016,8 +5676,7 @@ theorem StoreByteChip.ramTimestampContract :
   · simp only [input, offset, addressInput, readerInput, StoreByteChip.circuit,
       StoreByteChip.main, Readers.MemoryAccess.circuit, AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     constructor <;>
       simp only [input, readerInput, StoreByteChip.circuit, StoreByteChip.rowView,
         StoreByteChip.ramAccessView, circuit_norm]
@@ -6036,8 +5695,7 @@ theorem StoreByteChip.ramAddressContract :
   · simp only [input, offset, addressInput, StoreByteChip.circuit, StoreByteChip.main,
       AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     simp only [input, offset, addressInput, StoreByteChip.circuit,
       StoreByteChip.ramAccessView, AddressOperation.alignedValue,
       AddressOperation.circuit, circuit_norm]
@@ -6067,22 +5725,14 @@ theorem storeByteChip_viewOf_decoded
       ⟨storeByteChipDescriptor (p := p), physical⟩ data).view =
       circuitRowViewOf StoreByteChip.circuit StoreByteChip.rowView
         (Environment.fromArray physical data) := by
-  rw [DecodedInstructionRow.toChipRow_view]
-  simp only [storeByteChipDescriptor_table, storeByteChipDescriptor_view]
-  unfold circuitRowViewOf
-  rfl
+  chipViewOfDecoded storeByte
 
 theorem storeByteChip_ramAccessOf_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p)) :
     decodedRamAccess ⟨storeByteChipDescriptor (p := p), physical⟩ data =
       circuitRamAccessOf StoreByteChip.circuit StoreByteChip.ramAccessView
         (Environment.fromArray physical data) := by
-  unfold decodedRamAccess
-  rw [DecodedInstructionRow.toChipRow_ramAccess]
-  simp only [storeByteChipDescriptor_table, storeByteChipDescriptor_ramAccess,
-    Option.getD_some]
-  unfold circuitRamAccessOf
-  rfl
+  chipRamAccessOfDecoded storeByte
 
 theorem storeByteChip_viewClockBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -6093,9 +5743,7 @@ theorem storeByteChip_viewClockBounds_env
       (Environment.fromArray physical data)).is_real = 1) :
     ViewClockBounds (circuitRowViewOf StoreByteChip.circuit StoreByteChip.rowView
       (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real ⊢
-  exact viewClockBounds_of_cpuStateContract StoreByteChip.circuit StoreByteChip.rowView
-    StoreByteChip.cpuStateTimeContract data physical guarantees real
+  chipViewClockBoundsEnv storeByte
 
 theorem storeByteChip_timestampBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -6129,12 +5777,7 @@ theorem storeByteChip_isRam_env
     RamAccessIsRam
       (circuitRamAccessOf StoreByteChip.circuit StoreByteChip.ramAccessView
         (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real
-  rw [circuitRamAccessOf_eq]
-  exact ramAccessIsRam_of_addressContract StoreByteChip.circuit
-    (fun input cols => some (StoreByteChip.ramAccessView input cols))
-    (fun input => input.is_real) StoreByteChip.ramAddressContract data physical constraints
-    (by simpa only [StoreByteChip.rowView] using real) _ rfl
+  chipIsRamEnv storeByte (fun input => input.is_real)
 
 theorem storeByteChip_viewClockBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -6143,12 +5786,7 @@ theorem storeByteChip_viewClockBounds
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeByteChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeByteChipDescriptor_table] at guarantees
-  rw [storeByteChip_viewOf_decoded] at real ⊢
-  exact storeByteChip_viewClockBounds_env data physical guarantees real
+  chipViewClockBounds storeByte
 
 theorem storeByteChip_timestampBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -6160,13 +5798,7 @@ theorem storeByteChip_timestampBounds
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ImmutableRamTimestampBounds (decoded.toChipRow data).view
       (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeByteChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeByteChipDescriptor_table] at constraints guarantees
-  rw [storeByteChip_viewOf_decoded] at real ⊢
-  rw [storeByteChip_ramAccessOf_decoded]
-  exact storeByteChip_timestampBounds_env data physical constraints guarantees real
+  chipTimestampBounds storeByte
 
 theorem storeByteChip_isRam
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -6175,13 +5807,7 @@ theorem storeByteChip_isRam
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     RamAccessIsRam (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeByteChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeByteChipDescriptor_table] at constraints
-  rw [storeByteChip_viewOf_decoded] at real
-  rw [storeByteChip_ramAccessOf_decoded]
-  exact storeByteChip_isRam_env data physical constraints real
+  chipIsRam storeByte
 
 omit [Fact (2 ^ 25 < p)] in
 /-- StoreByte's public exposed Memory list evaluates to the immutable RAM/I-type layout. -/
@@ -6199,15 +5825,7 @@ theorem storeByteChip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
           (Eval.eval env ((StoreByteChip.circuit (p := p)).output
             (varFromOffset (F := ZMod p) StoreByteChip.Inputs 0)
             (size StoreByteChip.Inputs))))).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((StoreByteChip.main (varFromOffset StoreByteChip.Inputs 0)).operations
-        (size StoreByteChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [StoreByteChip.interactionsWith_memory_eq]
-  simp only [StoreByteChip.exposedMemoryInteractions, immutableRamMemoryInteractions,
-    List.map_cons, List.map_nil, TypedInteraction.pulledIfValue_raw,
-    TypedInteraction.pushedIfValue_raw, Channel.eval_pulledIf, Channel.eval_pushedIf,
-    eval_registerMemoryMessage]
+  chipMemoryValues storeByte immutableRamMemoryInteractions
   simp only [ramPriorMessage, ramPushMessage, rtypePriorMessage, rtypeReadBackMessage,
     StoreByteChip.rowView, StoreByteChip.ramAccessView, AddressOperation.alignedValue,
     Extracted.ITypeReader.toAdapterView, StoreByteChip.circuit, circuit_norm]
@@ -6219,32 +5837,14 @@ theorem storeByteChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRo
     decoded.interactionsWith data memoryChannel =
       immutableRamMemoryInteractions (decoded.toChipRow data).view
         (decodedRamAccess decoded data) := by
-  apply typedMemoryInteractions_of_values storeByteChipDescriptor
-    immutableRamMemoryInteractions ?_ decoded data hchip
-  intro env
-  have inputEq : Eval.eval env (varFromOffset StoreByteChip.Inputs 0) =
-      (⟨StoreByteChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset StoreByteChip.Inputs 0 env
-  have outputEq : Eval.eval env
-      ((StoreByteChip.circuit (p := p)).output
-        (varFromOffset StoreByteChip.Inputs 0) (size StoreByteChip.Inputs)) =
-      (⟨StoreByteChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, circuit_norm]
-  simp only [storeByteChipDescriptor_table, storeByteChipDescriptor_view,
-    storeByteChipDescriptor_ramAccess, Option.getD_some]
-  rw [← inputEq, ← outputEq]
-  exact storeByteChip_memoryInteractionValues_eq env
+  chipTypedMemoryInteractions storeByte immutableRamMemoryInteractions
 
 /-- StoreByte instantiates the authenticated immutable RAM/I-type interaction shape. -/
 noncomputable def storeByteChip_immutableRamMemoryInteractionShape :
     ImmutableRamMemoryInteractionShape (storeByteChipDescriptor (p := p)) where
   access := decodedRamAccess
   access_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeByteChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+    chipShapeAccessEq
   interactions := storeByteChip_typedMemoryInteractions_eq
 
 end StoreByte
@@ -6280,10 +5880,7 @@ theorem storeHalfChipDescriptor_assumptions_iff
     (storeHalfChipDescriptor (p := p)).table.Assumptions env ↔
       StoreHalfChip.Assumptions
         (circuitRowInputOf StoreHalfChip.circuit env) env.data := by
-  rw [storeHalfChipDescriptor_table]
-  unfold Component.Assumptions
-  rw [circuitRowInputOf_eq_component]
-  rfl
+  chipAssumptionsIff storeHalf
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeHalfAssumptions_env
@@ -6433,10 +6030,7 @@ private theorem storeHalfRmw0Constraint_mem
             * ((1 : Expression (ZMod p)) - input.offset_bit[1])) - 0 ∈
       ((StoreHalfChip.main input).operations offset).constraints := by
   simp only [StoreHalfChip.main, circuit_norm]
-  right
-  right
-  right
-  right
+  iterate 4 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -6460,11 +6054,7 @@ private theorem storeHalfRmw1Constraint_mem
             * ((1 : Expression (ZMod p)) - input.offset_bit[1])) - 0 ∈
       ((StoreHalfChip.main input).operations offset).constraints := by
   simp only [StoreHalfChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
+  iterate 5 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -6488,12 +6078,7 @@ private theorem storeHalfRmw2Constraint_mem
             * input.offset_bit[1]) - 0 ∈
       ((StoreHalfChip.main input).operations offset).constraints := by
   simp only [StoreHalfChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
-  right
+  iterate 6 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -6516,13 +6101,7 @@ private theorem storeHalfRmw3Constraint_mem
             * input.offset_bit[0] * input.offset_bit[1]) - 0 ∈
       ((StoreHalfChip.main input).operations offset).constraints := by
   simp only [StoreHalfChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
-  right
-  right
+  iterate 7 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -6565,12 +6144,10 @@ theorem StoreHalfChip.rmwFacts_of_mainConstraints
   have raw3 := constraints.1 _ (storeHalfRmw3Constraint_mem inputVar offset)
   simp only [eval_sub, Expression.eval, sub_zero] at raw0 raw1 raw2 raw3
   have evalStore :
-      Eval.eval env inputVar.store_value =
-        (Eval.eval env inputVar).store_value := by
+      Eval.eval env inputVar.store_value = (Eval.eval env inputVar).store_value := by
     rw [ProvableStruct.eval_var_eq_eval]
     rfl
-  have hmapStore := evalStore.trans
-    (congrArg StoreHalfChip.Inputs.store_value inputEq)
+  have hmapStore := evalStore.trans (congrArg StoreHalfChip.Inputs.store_value inputEq)
   rw [CircuitType.eval_var_fields] at hmapStore
   have evalPriorWord :
       Eval.eval env inputVar.memory_access.prev_value =
@@ -6589,8 +6166,7 @@ theorem StoreHalfChip.rmwFacts_of_mainConstraints
         (Eval.eval env inputVar).adapter.op_a_memory.prev_value := by
     rw [ProvableStruct.eval_var_eq_eval]
     have hAdapter :
-        (ProvableStruct.eval env inputVar).adapter =
-          Eval.eval env inputVar.adapter := rfl
+        (ProvableStruct.eval env inputVar).adapter = Eval.eval env inputVar.adapter := rfl
     rw [hAdapter, ProvableStruct.eval_eq_eval]
     have hMemory :
         (ProvableStruct.eval env inputVar.adapter).op_a_memory =
@@ -6601,12 +6177,10 @@ theorem StoreHalfChip.rmwFacts_of_mainConstraints
     (fun x : StoreHalfChip.Inputs (ZMod p) => x.adapter.op_a_memory.prev_value) inputEq)
   rw [CircuitType.eval_var_fields] at hmapSource
   have evalOffsetWord :
-      Eval.eval env inputVar.offset_bit =
-        (Eval.eval env inputVar).offset_bit := by
+      Eval.eval env inputVar.offset_bit = (Eval.eval env inputVar).offset_bit := by
     rw [ProvableStruct.eval_var_eq_eval]
     rfl
-  have hmapOffset := evalOffsetWord.trans
-    (congrArg StoreHalfChip.Inputs.offset_bit inputEq)
+  have hmapOffset := evalOffsetWord.trans (congrArg StoreHalfChip.Inputs.offset_bit inputEq)
   rw [CircuitType.eval_var_fields] at hmapOffset
   have evalStoreAt : ∀ i (hi : i < 4),
       Expression.eval env inputVar.store_value[i] = input.store_value[i] :=
@@ -6678,11 +6252,9 @@ theorem StoreHalfChip.storeValue_isU64_of_constraints
     Word.isU64
       ((⟨StoreHalfChip.circuit (p := p)⟩ :
         Component (ZMod p)).rowInput env).store_value := by
-  let input : Var StoreHalfChip.Inputs (ZMod p) :=
-    varFromOffset StoreHalfChip.Inputs 0
+  let input : Var StoreHalfChip.Inputs (ZMod p) := varFromOffset StoreHalfChip.Inputs 0
   let offset := size StoreHalfChip.Inputs
-  let addressInput : Var AddressOperation.Inputs (ZMod p) :=
-    storeHalfAddressInput input
+  let addressInput : Var AddressOperation.Inputs (ZMod p) := storeHalfAddressInput input
   let component : Component (ZMod p) := ⟨StoreHalfChip.circuit⟩
   have rowConstraints : component.rowOperations.ConstraintsHold env :=
     (Component.constraintsHold_iff env).mp constraints
@@ -6693,37 +6265,31 @@ theorem StoreHalfChip.storeValue_isU64_of_constraints
     ((StoreHalfChip.main input).operations offset) AddressOperation.circuit
     addressInput offset (storeHalfAddress_mem input offset) mainConstraints
   have offsetBools :=
-    AddressOperation.offsetBits_bool_of_constraints
-      addressInput offset env addressConstraints
+    AddressOperation.offsetBits_bool_of_constraints addressInput offset env addressConstraints
   have inputEq : Eval.eval env input = component.rowInput env :=
     eval_varFromOffset_valueFromOffset StoreHalfChip.Inputs 0 env
   have rmw := StoreHalfChip.rmwFacts_of_mainConstraints
     input (component.rowInput env) offset env inputEq mainConstraints
   have evalOffsetWord :
-      Eval.eval env input.offset_bit =
-        (Eval.eval env input).offset_bit := by
+      Eval.eval env input.offset_bit = (Eval.eval env input).offset_bit := by
     rw [ProvableStruct.eval_var_eq_eval]
     rfl
-  have hmapOffset := evalOffsetWord.trans
-    (congrArg StoreHalfChip.Inputs.offset_bit inputEq)
+  have hmapOffset := evalOffsetWord.trans (congrArg StoreHalfChip.Inputs.offset_bit inputEq)
   rw [CircuitType.eval_var_fields] at hmapOffset
   have evalOffset : ∀ i (hi : i < 2),
-      Expression.eval env input.offset_bit[i] =
-        (component.rowInput env).offset_bit[i] :=
+      Expression.eval env input.offset_bit[i] = (component.rowInput env).offset_bit[i] :=
     fun i hi => by rw [← hmapOffset]; simp only [Vector.getElem_map]
   have bit0 :
       (component.rowInput env).offset_bit[0] = 0 ∨
         (component.rowInput env).offset_bit[0] = 1 := by
     have raw := offsetBools.2.1
-    rw [storeHalfAddressInput_offsetBit1 env input,
-      evalOffset 0 (by omega)] at raw
+    rw [storeHalfAddressInput_offsetBit1 env input, evalOffset 0 (by omega)] at raw
     exact raw
   have bit1 :
       (component.rowInput env).offset_bit[1] = 0 ∨
         (component.rowInput env).offset_bit[1] = 1 := by
     have raw := offsetBools.2.2
-    rw [storeHalfAddressInput_offsetBit2 env input,
-      evalOffset 1 (by omega)] at raw
+    rw [storeHalfAddressInput_offsetBit2 env input, evalOffset 1 (by omega)] at raw
     exact raw
   obtain ⟨selected, _offset, merged⟩ :=
     StoreHalfChip.mergeFacts (component.rowInput env) rmw bit0 bit1
@@ -6746,51 +6312,39 @@ theorem storeHalfChip_storeFacts
         (Word.toBitVec64 (StoreHalfChip.ramAccessView input cols).priorValue)
         (Word.toBitVec64 (StoreHalfChip.ramAccessView input cols).newValue) := by
   let addressInput : AddressOperation.Inputs (ZMod p) :=
-    ⟨input.op_b_val, input.op_c_imm, 0, input.offset_bit[0], input.offset_bit[1],
-      input.is_real⟩
+    ⟨input.op_b_val, input.op_c_imm, 0, input.offset_bit[0], input.offset_bit[1], input.is_real⟩
   let access := StoreHalfChip.ramAccessView input cols
   let write : Trace.MemWrite (ZMod p) :=
-    ⟨cols.address_operation.addr_operation.value,
-      input.adapter.op_a_memory.prev_value, 2⟩
+    ⟨cols.address_operation.addr_operation.value, input.adapter.op_a_memory.prev_value, 2⟩
   have addressEq :
-      access.address =
-        AddressOperation.alignedValue addressInput cols.address_operation := by
+      access.address = AddressOperation.alignedValue addressInput cols.address_operation := by
     rfl
   have realInput : input.is_real = 1 := by
     simpa only [StoreHalfChip.rowView] using real
   have address :
-      write.addrNat =
-        (ramCellOfAccess access).baseAddr.toNat + addressOffset addressInput := by
+      write.addrNat = (ramCellOfAccess access).baseAddr.toNat + addressOffset addressInput := by
     have raw := rawAddress_eq_ramCellBase_add_offset
-      addressInput cols.address_operation access addressEq
-        (spec.1.2.2.2 realInput)
+      addressInput cols.address_operation access addressEq (spec.1.2.2.2 realInput)
     simpa only [write, Trace.MemWrite.addrNat, address48Nat] using raw
-  have priorBound : Word.isU64 input.memory_access.prev_value :=
-    (spec.2.1 realInput).2.2.2.2.2.1
+  have priorBound : Word.isU64 input.memory_access.prev_value := (spec.2.1 realInput).2.2.2.2.2.1
   have sourceBound : Word.isU64 input.adapter.op_a_memory.prev_value :=
     ((spec.2.2.1).2.2.2.2.2 realInput).1
-  have bit0 : input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1 :=
-    spec.1.2.1
-  have bit1 : input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1 :=
-    spec.1.2.2.1
-  obtain ⟨selected, offsetEq, merged⟩ :=
-    StoreHalfChip.mergeFacts input spec.2.2.2.1 bit0 bit1
+  have bit0 : input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1 := spec.1.2.1
+  have bit1 : input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1 := spec.1.2.2.1
+  obtain ⟨selected, offsetEq, merged⟩ := StoreHalfChip.mergeFacts input spec.2.2.2.1 bit0 bit1
   have storeBound : Word.isU64 input.store_value :=
-    StoreHalfChip.storeValue_isU64_of_mergeFacts
-      input selected merged priorBound sourceBound
+    StoreHalfChip.storeValue_isU64_of_mergeFacts input selected merged priorBound sourceBound
   have offsetEq' : addressOffset addressInput = 2 * selected.val := by
     simpa only [addressInput] using offsetEq
   have addressSelected :
-      write.addrNat =
-        (ramCellOfAccess access).baseAddr.toNat + 2 * selected.val := by
+      write.addrNat = (ramCellOfAccess access).baseAddr.toNat + 2 * selected.val := by
     simpa only [offsetEq'] using address
   refine ⟨write, rfl,
     Trace.MemWrite.inCell_of_address_width
       (offset := 2 * selected.val) (width := 2) addressSelected rfl (by
       have := selected.isLt
       omega), ?_⟩
-  apply ramCellUpdate_of_patchedCell
-    (offset := 2 * selected.val) (width := 2) addressSelected rfl
+  apply ramCellUpdate_of_patchedCell (offset := 2 * selected.val) (width := 2) addressSelected rfl
   symm
   simpa only [access, write, StoreHalfChip.ramAccessView] using
     patchedCellBytes_two cols.address_operation.addr_operation.value
@@ -6805,8 +6359,7 @@ theorem StoreHalfChip.ramTimestampContract :
   let input : Var StoreHalfChip.Inputs (ZMod p) := varFromOffset StoreHalfChip.Inputs 0
   let offset := size StoreHalfChip.Inputs
   let addressInput : Var AddressOperation.Inputs (ZMod p) :=
-    ⟨input.op_b_val, input.op_c_imm, 0, input.offset_bit[0], input.offset_bit[1],
-      input.is_real⟩
+    ⟨input.op_b_val, input.op_c_imm, 0, input.offset_bit[0], input.offset_bit[1], input.is_real⟩
   let readerInput : Var Readers.MemoryAccess.Inputs (ZMod p) :=
     ⟨input.memory_access, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
@@ -6821,8 +6374,7 @@ theorem StoreHalfChip.ramTimestampContract :
   · simp only [input, offset, addressInput, readerInput, StoreHalfChip.circuit,
       StoreHalfChip.main, Readers.MemoryAccess.circuit, AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     constructor <;>
       simp only [input, readerInput, StoreHalfChip.circuit, StoreHalfChip.rowView,
         StoreHalfChip.ramAccessView, circuit_norm]
@@ -6835,14 +6387,12 @@ theorem StoreHalfChip.ramAddressContract :
   let input : Var StoreHalfChip.Inputs (ZMod p) := varFromOffset StoreHalfChip.Inputs 0
   let offset := size StoreHalfChip.Inputs
   let addressInput : Var AddressOperation.Inputs (ZMod p) :=
-    ⟨input.op_b_val, input.op_c_imm, 0, input.offset_bit[0], input.offset_bit[1],
-      input.is_real⟩
+    ⟨input.op_b_val, input.op_c_imm, 0, input.offset_bit[0], input.offset_bit[1], input.is_real⟩
   refine .intro offset addressInput ?_ ?_ ?_
   · simp only [input, offset, addressInput, StoreHalfChip.circuit, StoreHalfChip.main,
       AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     simp only [input, offset, addressInput, StoreHalfChip.circuit,
       StoreHalfChip.ramAccessView, AddressOperation.alignedValue,
       AddressOperation.circuit, circuit_norm]
@@ -6872,22 +6422,14 @@ theorem storeHalfChip_viewOf_decoded
       ⟨storeHalfChipDescriptor (p := p), physical⟩ data).view =
       circuitRowViewOf StoreHalfChip.circuit StoreHalfChip.rowView
         (Environment.fromArray physical data) := by
-  rw [DecodedInstructionRow.toChipRow_view]
-  simp only [storeHalfChipDescriptor_table, storeHalfChipDescriptor_view]
-  unfold circuitRowViewOf
-  rfl
+  chipViewOfDecoded storeHalf
 
 theorem storeHalfChip_ramAccessOf_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p)) :
     decodedRamAccess ⟨storeHalfChipDescriptor (p := p), physical⟩ data =
       circuitRamAccessOf StoreHalfChip.circuit StoreHalfChip.ramAccessView
         (Environment.fromArray physical data) := by
-  unfold decodedRamAccess
-  rw [DecodedInstructionRow.toChipRow_ramAccess]
-  simp only [storeHalfChipDescriptor_table, storeHalfChipDescriptor_ramAccess,
-    Option.getD_some]
-  unfold circuitRamAccessOf
-  rfl
+  chipRamAccessOfDecoded storeHalf
 
 theorem storeHalfChip_viewClockBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -6898,9 +6440,7 @@ theorem storeHalfChip_viewClockBounds_env
       (Environment.fromArray physical data)).is_real = 1) :
     ViewClockBounds (circuitRowViewOf StoreHalfChip.circuit StoreHalfChip.rowView
       (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real ⊢
-  exact viewClockBounds_of_cpuStateContract StoreHalfChip.circuit StoreHalfChip.rowView
-    StoreHalfChip.cpuStateTimeContract data physical guarantees real
+  chipViewClockBoundsEnv storeHalf
 
 theorem storeHalfChip_timestampBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -6934,12 +6474,7 @@ theorem storeHalfChip_isRam_env
     RamAccessIsRam
       (circuitRamAccessOf StoreHalfChip.circuit StoreHalfChip.ramAccessView
         (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real
-  rw [circuitRamAccessOf_eq]
-  exact ramAccessIsRam_of_addressContract StoreHalfChip.circuit
-    (fun input cols => some (StoreHalfChip.ramAccessView input cols))
-    (fun input => input.is_real) StoreHalfChip.ramAddressContract data physical constraints
-    (by simpa only [StoreHalfChip.rowView] using real) _ rfl
+  chipIsRamEnv storeHalf (fun input => input.is_real)
 
 theorem storeHalfChip_viewClockBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -6948,12 +6483,7 @@ theorem storeHalfChip_viewClockBounds
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeHalfChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeHalfChipDescriptor_table] at guarantees
-  rw [storeHalfChip_viewOf_decoded] at real ⊢
-  exact storeHalfChip_viewClockBounds_env data physical guarantees real
+  chipViewClockBounds storeHalf
 
 theorem storeHalfChip_timestampBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -6965,13 +6495,7 @@ theorem storeHalfChip_timestampBounds
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ImmutableRamTimestampBounds (decoded.toChipRow data).view
       (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeHalfChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeHalfChipDescriptor_table] at constraints guarantees
-  rw [storeHalfChip_viewOf_decoded] at real ⊢
-  rw [storeHalfChip_ramAccessOf_decoded]
-  exact storeHalfChip_timestampBounds_env data physical constraints guarantees real
+  chipTimestampBounds storeHalf
 
 theorem storeHalfChip_isRam
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -6980,13 +6504,7 @@ theorem storeHalfChip_isRam
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     RamAccessIsRam (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeHalfChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeHalfChipDescriptor_table] at constraints
-  rw [storeHalfChip_viewOf_decoded] at real
-  rw [storeHalfChip_ramAccessOf_decoded]
-  exact storeHalfChip_isRam_env data physical constraints real
+  chipIsRam storeHalf
 
 omit [Fact (2 ^ 25 < p)] in
 /-- StoreHalf's public exposed Memory list evaluates to the immutable RAM/I-type layout. -/
@@ -7004,15 +6522,7 @@ theorem storeHalfChip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
           (Eval.eval env ((StoreHalfChip.circuit (p := p)).output
             (varFromOffset (F := ZMod p) StoreHalfChip.Inputs 0)
             (size StoreHalfChip.Inputs))))).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((StoreHalfChip.main (varFromOffset StoreHalfChip.Inputs 0)).operations
-        (size StoreHalfChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [StoreHalfChip.interactionsWith_memory_eq]
-  simp only [StoreHalfChip.exposedMemoryInteractions, immutableRamMemoryInteractions,
-    List.map_cons, List.map_nil, TypedInteraction.pulledIfValue_raw,
-    TypedInteraction.pushedIfValue_raw, Channel.eval_pulledIf, Channel.eval_pushedIf,
-    eval_registerMemoryMessage]
+  chipMemoryValues storeHalf immutableRamMemoryInteractions
   simp only [ramPriorMessage, ramPushMessage, rtypePriorMessage, rtypeReadBackMessage,
     StoreHalfChip.rowView, StoreHalfChip.ramAccessView, AddressOperation.alignedValue,
     Extracted.ITypeReader.toAdapterView, StoreHalfChip.circuit, circuit_norm]
@@ -7023,32 +6533,14 @@ theorem storeHalfChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRo
     decoded.interactionsWith data memoryChannel =
       immutableRamMemoryInteractions (decoded.toChipRow data).view
         (decodedRamAccess decoded data) := by
-  apply typedMemoryInteractions_of_values storeHalfChipDescriptor
-    immutableRamMemoryInteractions ?_ decoded data hchip
-  intro env
-  have inputEq : Eval.eval env (varFromOffset StoreHalfChip.Inputs 0) =
-      (⟨StoreHalfChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset StoreHalfChip.Inputs 0 env
-  have outputEq : Eval.eval env
-      ((StoreHalfChip.circuit (p := p)).output
-        (varFromOffset StoreHalfChip.Inputs 0) (size StoreHalfChip.Inputs)) =
-      (⟨StoreHalfChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, circuit_norm]
-  simp only [storeHalfChipDescriptor_table, storeHalfChipDescriptor_view,
-    storeHalfChipDescriptor_ramAccess, Option.getD_some]
-  rw [← inputEq, ← outputEq]
-  exact storeHalfChip_memoryInteractionValues_eq env
+  chipTypedMemoryInteractions storeHalf immutableRamMemoryInteractions
 
 /-- StoreHalf instantiates the authenticated immutable RAM/I-type interaction shape. -/
 noncomputable def storeHalfChip_immutableRamMemoryInteractionShape :
     ImmutableRamMemoryInteractionShape (storeHalfChipDescriptor (p := p)) where
   access := decodedRamAccess
   access_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeHalfChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+    chipShapeAccessEq
   interactions := storeHalfChip_typedMemoryInteractions_eq
 
 end StoreHalf
@@ -7084,10 +6576,7 @@ theorem storeWordChipDescriptor_assumptions_iff
     (storeWordChipDescriptor (p := p)).table.Assumptions env ↔
       StoreWordChip.Assumptions
         (circuitRowInputOf StoreWordChip.circuit env) env.data := by
-  rw [storeWordChipDescriptor_table]
-  unfold Component.Assumptions
-  rw [circuitRowInputOf_eq_component]
-  rfl
+  chipAssumptionsIff storeWord
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeWordAssumptions_env
@@ -7149,10 +6638,7 @@ private theorem storeWordRmw0Constraint_mem
             input.memory_access.prev_value[0]) * (1 - input.offset_bit)) - 0 ∈
       ((StoreWordChip.main input).operations offset).constraints := by
   simp only [StoreWordChip.main, circuit_norm]
-  right
-  right
-  right
-  right
+  iterate 4 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -7172,11 +6658,7 @@ private theorem storeWordRmw1Constraint_mem
             input.memory_access.prev_value[1]) * (1 - input.offset_bit)) - 0 ∈
       ((StoreWordChip.main input).operations offset).constraints := by
   simp only [StoreWordChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
+  iterate 5 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -7196,12 +6678,7 @@ private theorem storeWordRmw2Constraint_mem
             input.memory_access.prev_value[2]) * input.offset_bit) - 0 ∈
       ((StoreWordChip.main input).operations offset).constraints := by
   simp only [StoreWordChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
-  right
+  iterate 6 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -7221,13 +6698,7 @@ private theorem storeWordRmw3Constraint_mem
             input.memory_access.prev_value[3]) * input.offset_bit) - 0 ∈
       ((StoreWordChip.main input).operations offset).constraints := by
   simp only [StoreWordChip.main, circuit_norm]
-  right
-  right
-  right
-  right
-  right
-  right
-  right
+  iterate 7 right
   left
   simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
     Operations.constraints_toFlat, Gadgets.Equality.circuit] using
@@ -7246,8 +6717,7 @@ private theorem StoreWordChip.evalOffsetBit
       (Eval.eval env input).offset_bit := by
   rw [ProvableStruct.eval_var_eq_eval]
   have hOffset :
-      (ProvableStruct.eval env input).offset_bit =
-        Eval.eval env input.offset_bit := rfl
+      (ProvableStruct.eval env input).offset_bit = Eval.eval env input.offset_bit := rfl
   rw [hOffset, ProvableType.eval_field]
 
 private def storeWordAddressInput
@@ -7304,12 +6774,10 @@ theorem StoreWordChip.rmwFacts_of_mainConstraints
   have raw3 := constraints.1 _ (storeWordRmw3Constraint_mem inputVar offset)
   simp only [eval_sub, Expression.eval, sub_zero] at raw0 raw1 raw2 raw3
   have evalStore :
-      Eval.eval env inputVar.store_value =
-        (Eval.eval env inputVar).store_value := by
+      Eval.eval env inputVar.store_value = (Eval.eval env inputVar).store_value := by
     rw [ProvableStruct.eval_var_eq_eval]
     rfl
-  have hmapSv := evalStore.trans
-    (congrArg StoreWordChip.Inputs.store_value inputEq)
+  have hmapSv := evalStore.trans (congrArg StoreWordChip.Inputs.store_value inputEq)
   rw [CircuitType.eval_var_fields] at hmapSv
   have evalPriorWord :
       Eval.eval env inputVar.memory_access.prev_value =
@@ -7328,8 +6796,7 @@ theorem StoreWordChip.rmwFacts_of_mainConstraints
         (Eval.eval env inputVar).adapter.op_a_memory.prev_value := by
     rw [ProvableStruct.eval_var_eq_eval]
     have hAdapter :
-        (ProvableStruct.eval env inputVar).adapter =
-          Eval.eval env inputVar.adapter := rfl
+        (ProvableStruct.eval env inputVar).adapter = Eval.eval env inputVar.adapter := rfl
     rw [hAdapter, ProvableStruct.eval_eq_eval]
     have hMemory :
         (ProvableStruct.eval env inputVar.adapter).op_a_memory =
@@ -7351,14 +6818,12 @@ theorem StoreWordChip.rmwFacts_of_mainConstraints
         input.adapter.op_a_memory.prev_value[i] :=
     fun i hi => by rw [← hmapSource]; simp only [Vector.getElem_map]
   have evalOffsetInput := StoreWordChip.evalOffsetBit env inputVar
-  have evalOffset := evalOffsetInput.trans
-    (congrArg StoreWordChip.Inputs.offset_bit inputEq)
+  have evalOffset := evalOffsetInput.trans (congrArg StoreWordChip.Inputs.offset_bit inputEq)
   simp only [evalSv 0 (by omega), evalSv 1 (by omega), evalSv 2 (by omega),
     evalSv 3 (by omega), evalPrior 0 (by omega), evalPrior 1 (by omega),
     evalPrior 2 (by omega), evalPrior 3 (by omega), evalSource 0 (by omega),
     evalSource 1 (by omega), evalOffset] at raw0 raw1 raw2 raw3
-  exact ⟨sub_eq_zero.mp raw0, sub_eq_zero.mp raw1,
-    sub_eq_zero.mp raw2, sub_eq_zero.mp raw3⟩
+  exact ⟨sub_eq_zero.mp raw0, sub_eq_zero.mp raw1, sub_eq_zero.mp raw2, sub_eq_zero.mp raw3⟩
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
 private theorem StoreWordChip.storeValue_isU64_of_rmwFacts
@@ -7415,11 +6880,9 @@ theorem StoreWordChip.storeValue_isU64_of_constraints
     Word.isU64
       ((⟨StoreWordChip.circuit (p := p)⟩ :
         Component (ZMod p)).rowInput env).store_value := by
-  let input : Var StoreWordChip.Inputs (ZMod p) :=
-    varFromOffset StoreWordChip.Inputs 0
+  let input : Var StoreWordChip.Inputs (ZMod p) := varFromOffset StoreWordChip.Inputs 0
   let offset := size StoreWordChip.Inputs
-  let addressInput : Var AddressOperation.Inputs (ZMod p) :=
-    storeWordAddressInput input
+  let addressInput : Var AddressOperation.Inputs (ZMod p) := storeWordAddressInput input
   let component : Component (ZMod p) := ⟨StoreWordChip.circuit⟩
   have rowConstraints : component.rowOperations.ConstraintsHold env :=
     (Component.constraintsHold_iff env).mp constraints
@@ -7442,8 +6905,7 @@ theorem StoreWordChip.storeValue_isU64_of_constraints
       (component.rowInput env).offset_bit :=
     evalOffsetInput.trans (congrArg StoreWordChip.Inputs.offset_bit inputEq)
   have offsetBool :
-      (component.rowInput env).offset_bit = 0 ∨
-        (component.rowInput env).offset_bit = 1 := by
+      (component.rowInput env).offset_bit = 0 ∨ (component.rowInput env).offset_bit = 1 := by
     rw [storeWordAddressInput_offsetBit2 env input] at offsetBoolRaw
     rw [offsetEq] at offsetBoolRaw
     exact offsetBoolRaw
@@ -7470,27 +6932,21 @@ theorem storeWordChip_storeFacts
     ⟨input.op_b_val, input.op_c_imm, 0, 0, input.offset_bit, input.is_real⟩
   let access := StoreWordChip.ramAccessView input cols
   let write : Trace.MemWrite (ZMod p) :=
-    ⟨cols.address_operation.addr_operation.value,
-      input.adapter.op_a_memory.prev_value, 4⟩
+    ⟨cols.address_operation.addr_operation.value, input.adapter.op_a_memory.prev_value, 4⟩
   have addressEq :
-      access.address =
-        AddressOperation.alignedValue addressInput cols.address_operation := by
+      access.address = AddressOperation.alignedValue addressInput cols.address_operation := by
     rfl
   have realInput : input.is_real = 1 := by
     simpa only [StoreWordChip.rowView] using real
   have address :
-      write.addrNat =
-        (ramCellOfAccess access).baseAddr.toNat + addressOffset addressInput := by
+      write.addrNat = (ramCellOfAccess access).baseAddr.toNat + addressOffset addressInput := by
     have raw := rawAddress_eq_ramCellBase_add_offset
-      addressInput cols.address_operation access addressEq
-        (spec.1.2.2.2 realInput)
+      addressInput cols.address_operation access addressEq (spec.1.2.2.2 realInput)
     simpa only [write, Trace.MemWrite.addrNat, address48Nat] using raw
-  have priorBound : Word.isU64 input.memory_access.prev_value :=
-    (spec.2.1 realInput).2.2.2.2.2.1
+  have priorBound : Word.isU64 input.memory_access.prev_value := (spec.2.1 realInput).2.2.2.2.2.1
   have sourceBound : Word.isU64 input.adapter.op_a_memory.prev_value :=
     ((spec.2.2.1).2.2.2.2.2 realInput).1
-  have offsetBool : input.offset_bit = 0 ∨ input.offset_bit = 1 :=
-    spec.1.2.2.1
+  have offsetBool : input.offset_bit = 0 ∨ input.offset_bit = 1 := spec.1.2.2.1
   have storeBound : Word.isU64 input.store_value :=
     StoreWordChip.storeValue_isU64_of_rmwFacts input spec.2.2.2.1
       offsetBool priorBound sourceBound
@@ -7503,8 +6959,7 @@ theorem storeWordChip_storeFacts
       simpa only [offsetZeroNat] using address
     rw [offsetZero] at rmw0 rmw1 rmw2 rmw3
     ring_nf at rmw0 rmw1 rmw2 rmw3
-    refine ⟨write, rfl,
-      Trace.MemWrite.inCell_of_address_width addressZero rfl (by norm_num), ?_⟩
+    refine ⟨write, rfl, Trace.MemWrite.inCell_of_address_width addressZero rfl (by norm_num), ?_⟩
     apply ramCellUpdate_of_patchedCell addressZero rfl
     symm
     simpa only [access, write, StoreWordChip.ramAccessView] using
@@ -7518,8 +6973,7 @@ theorem storeWordChip_storeFacts
       simpa only [offsetFour] using address
     rw [offsetOne] at rmw0 rmw1 rmw2 rmw3
     ring_nf at rmw0 rmw1 rmw2 rmw3
-    refine ⟨write, rfl,
-      Trace.MemWrite.inCell_of_address_width addressFour rfl (by norm_num), ?_⟩
+    refine ⟨write, rfl, Trace.MemWrite.inCell_of_address_width addressFour rfl (by norm_num), ?_⟩
     apply ramCellUpdate_of_patchedCell addressFour rfl
     symm
     simpa only [access, write, StoreWordChip.ramAccessView] using
@@ -7550,8 +7004,7 @@ theorem StoreWordChip.ramTimestampContract :
   · simp only [input, offset, addressInput, readerInput, StoreWordChip.circuit,
       StoreWordChip.main, Readers.MemoryAccess.circuit, AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     constructor <;>
       simp only [input, readerInput, StoreWordChip.circuit, StoreWordChip.rowView,
         StoreWordChip.ramAccessView, circuit_norm]
@@ -7569,8 +7022,7 @@ theorem StoreWordChip.ramAddressContract :
   · simp only [input, offset, addressInput, StoreWordChip.circuit, StoreWordChip.main,
       AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     simp only [input, offset, addressInput, StoreWordChip.circuit,
       StoreWordChip.ramAccessView, AddressOperation.alignedValue,
       AddressOperation.circuit, circuit_norm]
@@ -7600,22 +7052,14 @@ theorem storeWordChip_viewOf_decoded
       ⟨storeWordChipDescriptor (p := p), physical⟩ data).view =
       circuitRowViewOf StoreWordChip.circuit StoreWordChip.rowView
         (Environment.fromArray physical data) := by
-  rw [DecodedInstructionRow.toChipRow_view]
-  simp only [storeWordChipDescriptor_table, storeWordChipDescriptor_view]
-  unfold circuitRowViewOf
-  rfl
+  chipViewOfDecoded storeWord
 
 theorem storeWordChip_ramAccessOf_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p)) :
     decodedRamAccess ⟨storeWordChipDescriptor (p := p), physical⟩ data =
       circuitRamAccessOf StoreWordChip.circuit StoreWordChip.ramAccessView
         (Environment.fromArray physical data) := by
-  unfold decodedRamAccess
-  rw [DecodedInstructionRow.toChipRow_ramAccess]
-  simp only [storeWordChipDescriptor_table, storeWordChipDescriptor_ramAccess,
-    Option.getD_some]
-  unfold circuitRamAccessOf
-  rfl
+  chipRamAccessOfDecoded storeWord
 
 theorem storeWordChip_viewClockBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -7626,9 +7070,7 @@ theorem storeWordChip_viewClockBounds_env
       (Environment.fromArray physical data)).is_real = 1) :
     ViewClockBounds (circuitRowViewOf StoreWordChip.circuit StoreWordChip.rowView
       (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real ⊢
-  exact viewClockBounds_of_cpuStateContract StoreWordChip.circuit StoreWordChip.rowView
-    StoreWordChip.cpuStateTimeContract data physical guarantees real
+  chipViewClockBoundsEnv storeWord
 
 theorem storeWordChip_timestampBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -7662,12 +7104,7 @@ theorem storeWordChip_isRam_env
     RamAccessIsRam
       (circuitRamAccessOf StoreWordChip.circuit StoreWordChip.ramAccessView
         (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real
-  rw [circuitRamAccessOf_eq]
-  exact ramAccessIsRam_of_addressContract StoreWordChip.circuit
-    (fun input cols => some (StoreWordChip.ramAccessView input cols))
-    (fun input => input.is_real) StoreWordChip.ramAddressContract data physical constraints
-    (by simpa only [StoreWordChip.rowView] using real) _ rfl
+  chipIsRamEnv storeWord (fun input => input.is_real)
 
 theorem storeWordChip_viewClockBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -7676,12 +7113,7 @@ theorem storeWordChip_viewClockBounds
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeWordChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeWordChipDescriptor_table] at guarantees
-  rw [storeWordChip_viewOf_decoded] at real ⊢
-  exact storeWordChip_viewClockBounds_env data physical guarantees real
+  chipViewClockBounds storeWord
 
 theorem storeWordChip_timestampBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -7693,13 +7125,7 @@ theorem storeWordChip_timestampBounds
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ImmutableRamTimestampBounds (decoded.toChipRow data).view
       (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeWordChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeWordChipDescriptor_table] at constraints guarantees
-  rw [storeWordChip_viewOf_decoded] at real ⊢
-  rw [storeWordChip_ramAccessOf_decoded]
-  exact storeWordChip_timestampBounds_env data physical constraints guarantees real
+  chipTimestampBounds storeWord
 
 theorem storeWordChip_isRam
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -7708,13 +7134,7 @@ theorem storeWordChip_isRam
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     RamAccessIsRam (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeWordChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeWordChipDescriptor_table] at constraints
-  rw [storeWordChip_viewOf_decoded] at real
-  rw [storeWordChip_ramAccessOf_decoded]
-  exact storeWordChip_isRam_env data physical constraints real
+  chipIsRam storeWord
 
 omit [Fact (2 ^ 25 < p)] in
 /-- StoreWord's public exposed Memory list evaluates to the immutable RAM/I-type layout. -/
@@ -7732,15 +7152,7 @@ theorem storeWordChip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
           (Eval.eval env ((StoreWordChip.circuit (p := p)).output
             (varFromOffset (F := ZMod p) StoreWordChip.Inputs 0)
             (size StoreWordChip.Inputs))))).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((StoreWordChip.main (varFromOffset StoreWordChip.Inputs 0)).operations
-        (size StoreWordChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [StoreWordChip.interactionsWith_memory_eq]
-  simp only [StoreWordChip.exposedMemoryInteractions, immutableRamMemoryInteractions,
-    List.map_cons, List.map_nil, TypedInteraction.pulledIfValue_raw,
-    TypedInteraction.pushedIfValue_raw, Channel.eval_pulledIf, Channel.eval_pushedIf,
-    eval_registerMemoryMessage]
+  chipMemoryValues storeWord immutableRamMemoryInteractions
   simp only [ramPriorMessage, ramPushMessage, rtypePriorMessage, rtypeReadBackMessage,
     StoreWordChip.rowView, StoreWordChip.ramAccessView, AddressOperation.alignedValue,
     Extracted.ITypeReader.toAdapterView, StoreWordChip.circuit, circuit_norm]
@@ -7751,32 +7163,14 @@ theorem storeWordChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRo
     decoded.interactionsWith data memoryChannel =
       immutableRamMemoryInteractions (decoded.toChipRow data).view
         (decodedRamAccess decoded data) := by
-  apply typedMemoryInteractions_of_values storeWordChipDescriptor
-    immutableRamMemoryInteractions ?_ decoded data hchip
-  intro env
-  have inputEq : Eval.eval env (varFromOffset StoreWordChip.Inputs 0) =
-      (⟨StoreWordChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset StoreWordChip.Inputs 0 env
-  have outputEq : Eval.eval env
-      ((StoreWordChip.circuit (p := p)).output
-        (varFromOffset StoreWordChip.Inputs 0) (size StoreWordChip.Inputs)) =
-      (⟨StoreWordChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, circuit_norm]
-  simp only [storeWordChipDescriptor_table, storeWordChipDescriptor_view,
-    storeWordChipDescriptor_ramAccess, Option.getD_some]
-  rw [← inputEq, ← outputEq]
-  exact storeWordChip_memoryInteractionValues_eq env
+  chipTypedMemoryInteractions storeWord immutableRamMemoryInteractions
 
 /-- StoreWord instantiates the authenticated immutable RAM/I-type interaction shape. -/
 noncomputable def storeWordChip_immutableRamMemoryInteractionShape :
     ImmutableRamMemoryInteractionShape (storeWordChipDescriptor (p := p)) where
   access := decodedRamAccess
   access_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeWordChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+    chipShapeAccessEq
   interactions := storeWordChip_typedMemoryInteractions_eq
 
 end StoreWord
@@ -7812,10 +7206,7 @@ theorem storeDoubleChipDescriptor_assumptions_iff
     (storeDoubleChipDescriptor (p := p)).table.Assumptions env ↔
       StoreDoubleChip.Assumptions
         (circuitRowInputOf StoreDoubleChip.circuit env) env.data := by
-  rw [storeDoubleChipDescriptor_table]
-  unfold Component.Assumptions
-  rw [circuitRowInputOf_eq_component]
-  rfl
+  chipAssumptionsIff storeDouble
 
 omit [Fact (2 ^ 25 < p)] in
 theorem storeDoubleAssumptions_env
@@ -7884,27 +7275,22 @@ theorem storeDoubleChip_storeFacts
     ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩
   let access := StoreDoubleChip.ramAccessView input cols
   let write : Trace.MemWrite (ZMod p) :=
-    ⟨cols.address_operation.addr_operation.value,
-      input.adapter.op_a_memory.prev_value, 8⟩
+    ⟨cols.address_operation.addr_operation.value, input.adapter.op_a_memory.prev_value, 8⟩
   have addressEq :
-      access.address =
-        AddressOperation.alignedValue addressInput cols.address_operation := by
+      access.address = AddressOperation.alignedValue addressInput cols.address_operation := by
     rfl
   have realInput : input.is_real = 1 := by
     simpa only [StoreDoubleChip.rowView] using real
   have address :
-      write.addrNat =
-        (ramCellOfAccess access).baseAddr.toNat + addressOffset addressInput := by
+      write.addrNat = (ramCellOfAccess access).baseAddr.toNat + addressOffset addressInput := by
     have raw := rawAddress_eq_ramCellBase_add_offset
-      addressInput cols.address_operation access addressEq
-        (_spec.1.2.2.2 realInput)
+      addressInput cols.address_operation access addressEq (_spec.1.2.2.2 realInput)
     simpa only [write, Trace.MemWrite.addrNat, address48Nat] using raw
   have offsetZero : addressOffset addressInput = 0 := by
     simp [addressOffset, addressInput]
   have addressZero : write.addrNat = (ramCellOfAccess access).baseAddr.toNat + 0 := by
     simpa only [offsetZero] using address
-  refine ⟨write, rfl,
-    Trace.MemWrite.inCell_of_address_width addressZero rfl (by norm_num), ?_⟩
+  refine ⟨write, rfl, Trace.MemWrite.inCell_of_address_width addressZero rfl (by norm_num), ?_⟩
   apply ramCellUpdate_of_patchedCell addressZero rfl
   rw [patchedCellBytes_zero_eight, cellBytesToWord_wordBytes]
   rfl
@@ -7914,8 +7300,7 @@ theorem StoreDoubleChip.ramTimestampContract :
     CircuitRamAccessTimestampContract (p := p) (StoreDoubleChip.circuit (p := p))
       StoreDoubleChip.rowView
       (fun input cols => some (StoreDoubleChip.ramAccessView input cols)) := by
-  let input : Var StoreDoubleChip.Inputs (ZMod p) :=
-    varFromOffset StoreDoubleChip.Inputs 0
+  let input : Var StoreDoubleChip.Inputs (ZMod p) := varFromOffset StoreDoubleChip.Inputs 0
   let offset := size StoreDoubleChip.Inputs
   let addressInput : Var AddressOperation.Inputs (ZMod p) :=
     ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩
@@ -7933,8 +7318,7 @@ theorem StoreDoubleChip.ramTimestampContract :
   · simp only [input, offset, addressInput, readerInput, StoreDoubleChip.circuit,
       StoreDoubleChip.main, Readers.MemoryAccess.circuit, AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     constructor <;>
       simp only [input, readerInput, StoreDoubleChip.circuit, StoreDoubleChip.rowView,
         StoreDoubleChip.ramAccessView, circuit_norm]
@@ -7944,8 +7328,7 @@ theorem StoreDoubleChip.ramAddressContract :
     CircuitRamAddressContract (p := p) (StoreDoubleChip.circuit (p := p))
       (fun input cols => some (StoreDoubleChip.ramAccessView input cols))
       (fun input => input.is_real) := by
-  let input : Var StoreDoubleChip.Inputs (ZMod p) :=
-    varFromOffset StoreDoubleChip.Inputs 0
+  let input : Var StoreDoubleChip.Inputs (ZMod p) := varFromOffset StoreDoubleChip.Inputs 0
   let offset := size StoreDoubleChip.Inputs
   let addressInput : Var AddressOperation.Inputs (ZMod p) :=
     ⟨input.op_b_val, input.op_c_imm, 0, 0, 0, input.is_real⟩
@@ -7953,8 +7336,7 @@ theorem StoreDoubleChip.ramAddressContract :
   · simp only [input, offset, addressInput, StoreDoubleChip.circuit, StoreDoubleChip.main,
       AddressOperation.circuit, circuit_norm]
   · intro env access haccess
-    have accessEq := Option.some.inj haccess
-    subst access
+    obtain rfl := Option.some.inj haccess
     simp only [input, offset, addressInput, StoreDoubleChip.circuit,
       StoreDoubleChip.ramAccessView, AddressOperation.alignedValue,
       AddressOperation.circuit, circuit_norm]
@@ -7965,8 +7347,7 @@ omit [Fact (2 ^ 25 < p)] in
 theorem StoreDoubleChip.immutableItypeTimestampContract :
     CircuitImmutableITypeTimestampContract (p := p) (StoreDoubleChip.circuit (p := p))
       StoreDoubleChip.rowView := by
-  let input : Var StoreDoubleChip.Inputs (ZMod p) :=
-    varFromOffset StoreDoubleChip.Inputs 0
+  let input : Var StoreDoubleChip.Inputs (ZMod p) := varFromOffset StoreDoubleChip.Inputs 0
   let offset := size StoreDoubleChip.Inputs
   let readerInput : Var Readers.ITypeReaderImmutable.Inputs (ZMod p) :=
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
@@ -7985,22 +7366,14 @@ theorem storeDoubleChip_viewOf_decoded
       ⟨storeDoubleChipDescriptor (p := p), physical⟩ data).view =
       circuitRowViewOf StoreDoubleChip.circuit StoreDoubleChip.rowView
         (Environment.fromArray physical data) := by
-  rw [DecodedInstructionRow.toChipRow_view]
-  simp only [storeDoubleChipDescriptor_table, storeDoubleChipDescriptor_view]
-  unfold circuitRowViewOf
-  rfl
+  chipViewOfDecoded storeDouble
 
 theorem storeDoubleChip_ramAccessOf_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p)) :
     decodedRamAccess ⟨storeDoubleChipDescriptor (p := p), physical⟩ data =
       circuitRamAccessOf StoreDoubleChip.circuit StoreDoubleChip.ramAccessView
         (Environment.fromArray physical data) := by
-  unfold decodedRamAccess
-  rw [DecodedInstructionRow.toChipRow_ramAccess]
-  simp only [storeDoubleChipDescriptor_table, storeDoubleChipDescriptor_ramAccess,
-    Option.getD_some]
-  unfold circuitRamAccessOf
-  rfl
+  chipRamAccessOfDecoded storeDouble
 
 theorem storeDoubleChip_viewClockBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -8011,9 +7384,7 @@ theorem storeDoubleChip_viewClockBounds_env
       (Environment.fromArray physical data)).is_real = 1) :
     ViewClockBounds (circuitRowViewOf StoreDoubleChip.circuit StoreDoubleChip.rowView
       (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real ⊢
-  exact viewClockBounds_of_cpuStateContract StoreDoubleChip.circuit StoreDoubleChip.rowView
-    StoreDoubleChip.cpuStateTimeContract data physical guarantees real
+  chipViewClockBoundsEnv storeDouble
 
 theorem storeDoubleChip_timestampBounds_env
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -8047,12 +7418,7 @@ theorem storeDoubleChip_isRam_env
     RamAccessIsRam
       (circuitRamAccessOf StoreDoubleChip.circuit StoreDoubleChip.ramAccessView
         (Environment.fromArray physical data)) := by
-  rw [circuitRowViewOf_eq] at real
-  rw [circuitRamAccessOf_eq]
-  exact ramAccessIsRam_of_addressContract StoreDoubleChip.circuit
-    (fun input cols => some (StoreDoubleChip.ramAccessView input cols))
-    (fun input => input.is_real) StoreDoubleChip.ramAddressContract data physical constraints
-    (by simpa only [StoreDoubleChip.rowView] using real) _ rfl
+  chipIsRamEnv storeDouble (fun input => input.is_real)
 
 theorem storeDoubleChip_viewClockBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -8061,12 +7427,7 @@ theorem storeDoubleChip_viewClockBounds
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeDoubleChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeDoubleChipDescriptor_table] at guarantees
-  rw [storeDoubleChip_viewOf_decoded] at real ⊢
-  exact storeDoubleChip_viewClockBounds_env data physical guarantees real
+  chipViewClockBounds storeDouble
 
 theorem storeDoubleChip_timestampBounds
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -8078,13 +7439,7 @@ theorem storeDoubleChip_timestampBounds
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ImmutableRamTimestampBounds (decoded.toChipRow data).view
       (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeDoubleChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeDoubleChipDescriptor_table] at constraints guarantees
-  rw [storeDoubleChip_viewOf_decoded] at real ⊢
-  rw [storeDoubleChip_ramAccessOf_decoded]
-  exact storeDoubleChip_timestampBounds_env data physical constraints guarantees real
+  chipTimestampBounds storeDouble
 
 theorem storeDoubleChip_isRam
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -8093,13 +7448,7 @@ theorem storeDoubleChip_isRam
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     RamAccessIsRam (decodedRamAccess decoded data) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = storeDoubleChipDescriptor (p := p) := hchip
-  subst hchip'
-  rw [storeDoubleChipDescriptor_table] at constraints
-  rw [storeDoubleChip_viewOf_decoded] at real
-  rw [storeDoubleChip_ramAccessOf_decoded]
-  exact storeDoubleChip_isRam_env data physical constraints real
+  chipIsRam storeDouble
 
 omit [Fact (2 ^ 25 < p)] in
 /-- StoreDouble's public exposed Memory list evaluates to the immutable RAM/I-type layout. -/
@@ -8117,15 +7466,7 @@ theorem storeDoubleChip_memoryInteractionValues_eq (env : Environment (ZMod p)) 
           (Eval.eval env ((StoreDoubleChip.circuit (p := p)).output
             (varFromOffset (F := ZMod p) StoreDoubleChip.Inputs 0)
             (size StoreDoubleChip.Inputs))))).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((StoreDoubleChip.main (varFromOffset StoreDoubleChip.Inputs 0)).operations
-        (size StoreDoubleChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [StoreDoubleChip.interactionsWith_memory_eq]
-  simp only [StoreDoubleChip.exposedMemoryInteractions, immutableRamMemoryInteractions,
-    List.map_cons, List.map_nil, TypedInteraction.pulledIfValue_raw,
-    TypedInteraction.pushedIfValue_raw, Channel.eval_pulledIf, Channel.eval_pushedIf,
-    eval_registerMemoryMessage]
+  chipMemoryValues storeDouble immutableRamMemoryInteractions
   simp only [ramPriorMessage, ramPushMessage, rtypePriorMessage, rtypeReadBackMessage,
     StoreDoubleChip.rowView, StoreDoubleChip.ramAccessView, AddressOperation.alignedValue,
     Extracted.ITypeReader.toAdapterView, StoreDoubleChip.circuit, circuit_norm]
@@ -8136,32 +7477,14 @@ theorem storeDoubleChip_typedMemoryInteractions_eq (decoded : DecodedInstruction
     decoded.interactionsWith data memoryChannel =
       immutableRamMemoryInteractions (decoded.toChipRow data).view
         (decodedRamAccess decoded data) := by
-  apply typedMemoryInteractions_of_values storeDoubleChipDescriptor
-    immutableRamMemoryInteractions ?_ decoded data hchip
-  intro env
-  have inputEq : Eval.eval env (varFromOffset StoreDoubleChip.Inputs 0) =
-      (⟨StoreDoubleChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset StoreDoubleChip.Inputs 0 env
-  have outputEq : Eval.eval env
-      ((StoreDoubleChip.circuit (p := p)).output
-        (varFromOffset StoreDoubleChip.Inputs 0) (size StoreDoubleChip.Inputs)) =
-      (⟨StoreDoubleChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, circuit_norm]
-  simp only [storeDoubleChipDescriptor_table, storeDoubleChipDescriptor_view,
-    storeDoubleChipDescriptor_ramAccess, Option.getD_some]
-  rw [← inputEq, ← outputEq]
-  exact storeDoubleChip_memoryInteractionValues_eq env
+  chipTypedMemoryInteractions storeDouble immutableRamMemoryInteractions
 
 /-- StoreDouble instantiates the authenticated immutable RAM/I-type interaction shape. -/
 noncomputable def storeDoubleChip_immutableRamMemoryInteractionShape :
     ImmutableRamMemoryInteractionShape (storeDoubleChipDescriptor (p := p)) where
   access := decodedRamAccess
   access_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+    chipShapeAccessEq
   interactions := storeDoubleChip_typedMemoryInteractions_eq
 
 end StoreDouble
