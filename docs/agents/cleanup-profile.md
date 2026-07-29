@@ -204,6 +204,25 @@ Verify with `lean_goal`, or a build, before removing:
 > *global* `NeZero p` (§6 above) — that remains true and is a separate question from whether a given
 > local is dead.
 
+- **`autoImplicit` is ON here, and it fails *silently* when you hoist a statement.** A lemma whose
+  **statement** mentions a name reachable only through a targeted `open` — e.g. `byteChannel`, which
+  lives in `SP1Clean.Channels` — does not error. The name is **auto-bound as a fresh implicit
+  variable**, and the lemma elaborates as something weaker and different; it surfaces later as a
+  confusing mismatch printing `Channels.byteChannel` against `byteChannel`. Any hoist mentioning a
+  channel in its statement needs `open SP1Clean.Channels (byteChannel) in` (the shape
+  `Faithful/CPUState.lean:67` already uses mid-file). **Validate a new shared statement by *applying*
+  it to an existing call site** — a scratch `example` discharging the verbatim hand-written `have` —
+  before rolling it out.
+
+- **`unusedSectionVars` is not globally suppressed on the proof pillar**, so a hoisted lemma usually
+  needs an explicit `omit [Fact (2 ^ 17 < p)] in`. Note `Fact p.Prime` is often *genuinely* used, via
+  `instFiniteFieldFOfFactPrime` in the type. `ChipTactics.bool_iff` is the reference shape.
+
+- **Check for an import cycle before promising a hoist covers every site.** `ChipTactics.lean` imports
+  `Faithful/CPUState.lean` (its `faithful_chip` hard-references `cpustate_constraints_faithful`), so
+  CPUState cannot cite anything hoisted there — 2 of the 13 `hbk` sites are excluded for this reason
+  alone, with byte-identical statements. A partial correct hoist beats a forced general one.
+
 - A `change` that only restates an `abbrev` is free to delete when the closer is a term rather than a
   tactic that needed the syntactic form. `MicroTime.chainState_succ_front` went from 8 lines to 2
   this way (three pure-defeq `change`s dropped, body now `exact congrArg (·.bind Machine.stepOnce) ih`).
