@@ -190,6 +190,25 @@ theorem stateEmissionShape_of_circuitExposure (kind : ChipKind p)
   exact @circuitStateEmissionShape_of_exposure p _ kind.Inputs kind.Cols
     kind.provableInputs kind.provableCols circuit kind.view contract
 
+
+/-- Registry boilerplate: reduce a descriptor's State-emission goal to the four exposure-contract
+field goals for one chip circuit. -/
+local macro "stateExposureStart " circuit:term ", " rowView:term : tactic =>
+  `(tactic| (
+    apply stateEmissionShape_of_circuitExposure
+    change CircuitStateExposureContract $circuit:term $rowView:term
+    unfold CircuitStateExposureContract
+    dsimp only))
+
+/-- As `stateExposureStart`, additionally supplying the standard `is_real`-gated CPUState
+pull/push witnesses shared by every chip that neither jumps nor derives its gate from width flags. -/
+local macro "stateExposureStandard " circuit:term ", " rowView:term : tactic =>
+  `(tactic| (
+    stateExposureStart $circuit:term, $rowView:term
+    refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
+      fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩))
+
+
 /-- Lift a chip's raw emission contract to the proof-carrying typed decoder. -/
 theorem DecodedInstructionRow.stateInteractions_eq
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
@@ -400,12 +419,7 @@ theorem DecodedInstructionRow.stateInteractions_signed_binary
 /- Add is the first concrete check of the shared State-emission contract. -/
 theorem addChip_stateEmissionShape : StateEmissionShape
     (⟨AddChip.kind, AddChip.circuit, rfl, [.ADD], .nonX0⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (AddChip.circuit (p := p)) AddChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (AddChip.circuit (p := p)), AddChip.rowView
   all_goals
     intros
     simp only [AddChip.circuit, statePullOfView, statePushOfView, stateAccess,
@@ -413,12 +427,7 @@ theorem addChip_stateEmissionShape : StateEmissionShape
 
 theorem addiChip_stateEmissionShape : StateEmissionShape
     (⟨AddiChip.kind, AddiChip.circuit, rfl, [.ADDI], .nonX0⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (AddiChip.circuit (p := p)) AddiChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (AddiChip.circuit (p := p)), AddiChip.rowView
   all_goals
     intros
     simp only [AddiChip.circuit, statePullOfView, statePushOfView, stateAccess,
@@ -426,12 +435,7 @@ theorem addiChip_stateEmissionShape : StateEmissionShape
 
 theorem addwChip_stateEmissionShape : StateEmissionShape
     (⟨AddwChip.kind, AddwChip.circuit, rfl, [.ADDW], .nonX0⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (AddwChip.circuit (p := p)) AddwChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (AddwChip.circuit (p := p)), AddwChip.rowView
   all_goals
     intros
     simp only [AddwChip.circuit, statePullOfView, statePushOfView, stateAccess,
@@ -439,12 +443,7 @@ theorem addwChip_stateEmissionShape : StateEmissionShape
 
 theorem subChip_stateEmissionShape : StateEmissionShape
     (⟨SubChip.kind, SubChip.circuit, rfl, [.SUB], .nonX0⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (SubChip.circuit (p := p)) SubChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (SubChip.circuit (p := p)), SubChip.rowView
   all_goals
     intros
     simp only [SubChip.circuit, statePullOfView, statePushOfView, stateAccess,
@@ -452,12 +451,7 @@ theorem subChip_stateEmissionShape : StateEmissionShape
 
 theorem subwChip_stateEmissionShape : StateEmissionShape
     (⟨SubwChip.kind, SubwChip.circuit, rfl, [.SUBW], .nonX0⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (SubwChip.circuit (p := p)) SubwChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (SubwChip.circuit (p := p)), SubwChip.rowView
   all_goals
     intros
     simp only [SubwChip.circuit, statePullOfView, statePushOfView, stateAccess,
@@ -466,13 +460,7 @@ theorem subwChip_stateEmissionShape : StateEmissionShape
 theorem bitwiseChip_stateEmissionShape : StateEmissionShape
     (⟨BitwiseChip.kind, BitwiseChip.circuit, rfl, [.XOR, .OR, .AND], .nonX0⟩ :
       SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (BitwiseChip.circuit (p := p))
-    BitwiseChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (BitwiseChip.circuit (p := p)), BitwiseChip.rowView
   · intros
     simp [BitwiseChip.circuit, expose, BitwiseChip.exposedStateInteractions,
       cpuStatePullMessage, cpuStatePushMessage]
@@ -484,12 +472,7 @@ theorem bitwiseChip_stateEmissionShape : StateEmissionShape
 
 theorem ltChip_stateEmissionShape : StateEmissionShape
     (⟨LtChip.kind, LtChip.circuit, rfl, [.SLT, .SLTU], .nonX0⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (LtChip.circuit (p := p)) LtChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (LtChip.circuit (p := p)), LtChip.rowView
   · intros
     simp [LtChip.circuit, expose, LtChip.exposedStateInteractions,
       cpuStatePullMessage, cpuStatePushMessage]
@@ -501,13 +484,7 @@ theorem ltChip_stateEmissionShape : StateEmissionShape
 theorem shiftLeftChip_stateEmissionShape : StateEmissionShape
     (⟨ShiftLeftChip.kind, ShiftLeftChip.circuit, rfl, [.SLL, .SLLW], .nonX0⟩ :
       SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (ShiftLeftChip.circuit (p := p))
-    ShiftLeftChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (ShiftLeftChip.circuit (p := p)), ShiftLeftChip.rowView
   all_goals
     intros
     simp [ShiftLeftChip.circuit, ShiftLeftChip.stateExposure, Readers.CPUState.exposedState,
@@ -518,13 +495,7 @@ theorem shiftLeftChip_stateEmissionShape : StateEmissionShape
 theorem shiftRightChip_stateEmissionShape : StateEmissionShape
     (⟨ShiftRightChip.kind, ShiftRightChip.circuit, rfl, [.SRL, .SRA, .SRLW, .SRAW], .nonX0⟩ :
       SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (ShiftRightChip.circuit (p := p))
-    ShiftRightChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (ShiftRightChip.circuit (p := p)), ShiftRightChip.rowView
   all_goals
     intros
     simp [ShiftRightChip.circuit, ShiftRightChip.stateExposure, Readers.CPUState.exposedState,
@@ -534,10 +505,7 @@ theorem shiftRightChip_stateEmissionShape : StateEmissionShape
 
 theorem jalChip_stateEmissionShape : StateEmissionShape
     (⟨JalChip.kind, JalChip.circuit, rfl, [.JAL], .any⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (JalChip.circuit (p := p)) JalChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
+  stateExposureStart (JalChip.circuit (p := p)), JalChip.rowView
   refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
     fun input offset => cpuStateNextMessage input.state
       #v[var ⟨offset⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩] 8, ?_, ?_, ?_, ?_⟩
@@ -552,10 +520,7 @@ theorem jalChip_stateEmissionShape : StateEmissionShape
 
 theorem jalrChip_stateEmissionShape : StateEmissionShape
     (⟨JalrChip.kind, JalrChip.circuit, rfl, [.JALR], .any⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (JalrChip.circuit (p := p)) JalrChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
+  stateExposureStart (JalrChip.circuit (p := p)), JalrChip.rowView
   refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
     fun input offset => cpuStateNextMessage input.state
       #v[var ⟨offset⟩ - var ⟨offset + 8⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩] 8,
@@ -572,11 +537,7 @@ theorem jalrChip_stateEmissionShape : StateEmissionShape
 theorem branchChip_stateEmissionShape : StateEmissionShape
     (⟨BranchChip.kind, BranchChip.circuit, rfl,
       [.BEQ, .BNE, .BLT, .BGE, .BLTU, .BGEU], .any⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (BranchChip.circuit (p := p))
-    BranchChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
+  stateExposureStart (BranchChip.circuit (p := p)), BranchChip.rowView
   refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
     fun input offset => cpuStateNextMessage input.state
       #v[var ⟨offset + 7⟩, var ⟨offset + 8⟩,
@@ -592,12 +553,7 @@ theorem branchChip_stateEmissionShape : StateEmissionShape
 
 theorem uTypeChip_stateEmissionShape : StateEmissionShape
     (⟨UTypeChip.kind, UTypeChip.circuit, rfl, [.AUIPC, .LUI], .any⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (UTypeChip.circuit (p := p)) UTypeChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (UTypeChip.circuit (p := p)), UTypeChip.rowView
   · intros
     simp [UTypeChip.circuit, expose, UTypeChip.exposedStateInteractions,
       cpuStatePullMessage, cpuStatePushMessage]
@@ -608,13 +564,7 @@ theorem uTypeChip_stateEmissionShape : StateEmissionShape
 
 theorem loadDoubleChip_stateEmissionShape : StateEmissionShape
     (⟨LoadDoubleChip.kind, LoadDoubleChip.circuit, rfl, [.LD], .nonX0⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (LoadDoubleChip.circuit (p := p))
-    LoadDoubleChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (LoadDoubleChip.circuit (p := p)), LoadDoubleChip.rowView
   all_goals
     intros
     simp only [LoadDoubleChip.circuit, statePullOfView, statePushOfView, stateAccess,
@@ -623,11 +573,7 @@ theorem loadDoubleChip_stateEmissionShape : StateEmissionShape
 theorem loadByteChip_stateEmissionShape : StateEmissionShape
     (⟨LoadByteChip.kind, LoadByteChip.circuit, rfl, [.LB, .LBU], .nonX0⟩ :
       SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (LoadByteChip.circuit (p := p))
-    LoadByteChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
+  stateExposureStart (LoadByteChip.circuit (p := p)), LoadByteChip.rowView
   refine ⟨fun input _ => input.is_lb + input.is_lbu,
     fun input _ => cpuStatePullMessage input.state,
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
@@ -640,11 +586,7 @@ theorem loadByteChip_stateEmissionShape : StateEmissionShape
 theorem loadHalfChip_stateEmissionShape : StateEmissionShape
     (⟨LoadHalfChip.kind, LoadHalfChip.circuit, rfl, [.LH, .LHU], .nonX0⟩ :
       SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (LoadHalfChip.circuit (p := p))
-    LoadHalfChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
+  stateExposureStart (LoadHalfChip.circuit (p := p)), LoadHalfChip.rowView
   refine ⟨fun input _ => input.is_lh + input.is_lhu,
     fun input _ => cpuStatePullMessage input.state,
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
@@ -657,11 +599,7 @@ theorem loadHalfChip_stateEmissionShape : StateEmissionShape
 theorem loadWordChip_stateEmissionShape : StateEmissionShape
     (⟨LoadWordChip.kind, LoadWordChip.circuit, rfl, [.LW, .LWU], .nonX0⟩ :
       SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (LoadWordChip.circuit (p := p))
-    LoadWordChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
+  stateExposureStart (LoadWordChip.circuit (p := p)), LoadWordChip.rowView
   refine ⟨fun input _ => input.is_lw + input.is_lwu,
     fun input _ => cpuStatePullMessage input.state,
     fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
@@ -674,10 +612,7 @@ theorem loadWordChip_stateEmissionShape : StateEmissionShape
 theorem loadX0Chip_stateEmissionShape : StateEmissionShape
     (⟨LoadX0Chip.kind, LoadX0Chip.circuit, rfl,
       [.LB, .LBU, .LH, .LHU, .LW, .LWU, .LD], .onlyX0⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (LoadX0Chip.circuit (p := p)) LoadX0Chip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
+  stateExposureStart (LoadX0Chip.circuit (p := p)), LoadX0Chip.rowView
   refine ⟨fun input _ => input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
       + input.is_lw + input.is_lwu + input.is_ld,
     fun input _ => cpuStatePullMessage input.state,
@@ -691,13 +626,7 @@ theorem loadX0Chip_stateEmissionShape : StateEmissionShape
 
 theorem storeByteChip_stateEmissionShape : StateEmissionShape
     (⟨StoreByteChip.kind, StoreByteChip.circuit, rfl, [.SB], .any⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (StoreByteChip.circuit (p := p))
-    StoreByteChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (StoreByteChip.circuit (p := p)), StoreByteChip.rowView
   all_goals
     intros
     simp only [StoreByteChip.circuit, statePullOfView,
@@ -706,13 +635,7 @@ theorem storeByteChip_stateEmissionShape : StateEmissionShape
 
 theorem storeHalfChip_stateEmissionShape : StateEmissionShape
     (⟨StoreHalfChip.kind, StoreHalfChip.circuit, rfl, [.SH], .any⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (StoreHalfChip.circuit (p := p))
-    StoreHalfChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (StoreHalfChip.circuit (p := p)), StoreHalfChip.rowView
   all_goals
     intros
     simp only [StoreHalfChip.circuit, statePullOfView, statePushOfView, stateAccess,
@@ -720,13 +643,7 @@ theorem storeHalfChip_stateEmissionShape : StateEmissionShape
 
 theorem storeWordChip_stateEmissionShape : StateEmissionShape
     (⟨StoreWordChip.kind, StoreWordChip.circuit, rfl, [.SW], .any⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (StoreWordChip.circuit (p := p))
-    StoreWordChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (StoreWordChip.circuit (p := p)), StoreWordChip.rowView
   all_goals
     intros
     simp only [StoreWordChip.circuit, statePullOfView, statePushOfView, stateAccess,
@@ -734,13 +651,7 @@ theorem storeWordChip_stateEmissionShape : StateEmissionShape
 
 theorem storeDoubleChip_stateEmissionShape : StateEmissionShape
     (⟨StoreDoubleChip.kind, StoreDoubleChip.circuit, rfl, [.SD], .any⟩ : SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (StoreDoubleChip.circuit (p := p))
-    StoreDoubleChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (StoreDoubleChip.circuit (p := p)), StoreDoubleChip.rowView
   all_goals
     intros
     simp only [StoreDoubleChip.circuit, statePullOfView, statePushOfView, stateAccess,
@@ -749,12 +660,7 @@ theorem storeDoubleChip_stateEmissionShape : StateEmissionShape
 theorem mulChip_stateEmissionShape : StateEmissionShape
     (⟨MulChip.kind, MulChip.circuit, rfl, [.MUL, .MULH, .MULHU, .MULHSU, .MULW], .nonX0⟩ :
       SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (MulChip.circuit (p := p)) MulChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (MulChip.circuit (p := p)), MulChip.rowView
   all_goals
     intros
     simp [MulChip.circuit, MulChip.exposedStateInteractions,
@@ -762,18 +668,11 @@ theorem mulChip_stateEmissionShape : StateEmissionShape
       expose, statePullOfView, statePushOfView, stateAccess,
       cpuStatePullMessage, cpuStatePushMessage, MulChip.rowView, circuit_norm]
 
-set_option maxHeartbeats 16000000 in
 theorem divRemChip_stateEmissionShape : StateEmissionShape
     (⟨DivRemChip.kind, DivRemChip.circuit, rfl,
       [.DIV, .DIVU, .REM, .REMU, .DIVW, .DIVUW, .REMW, .REMUW], .nonX0⟩ :
       SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (DivRemChip.circuit (p := p))
-    DivRemChip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (DivRemChip.circuit (p := p)), DivRemChip.rowView
   all_goals
     intros
     simp [DivRemChip.circuit, DivRemChip.exposedChannels, DivRemChip.stateExposure,
@@ -789,12 +688,7 @@ theorem aluX0Chip_stateEmissionShape : StateEmissionShape
        .MUL, .MULH, .MULHU, .MULHSU, .MULW,
        .DIV, .DIVU, .REM, .REMU, .DIVW, .DIVUW, .REMW, .REMUW], .onlyX0⟩ :
       SupportedChip p) := by
-  apply stateEmissionShape_of_circuitExposure
-  change CircuitStateExposureContract (p := p) (AluX0Chip.circuit (p := p)) AluX0Chip.rowView
-  unfold CircuitStateExposureContract
-  dsimp only
-  refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
-    fun input _ => cpuStatePushMessage input.state, ?_, ?_, ?_, ?_⟩
+  stateExposureStandard (AluX0Chip.circuit (p := p)), AluX0Chip.rowView
   all_goals
     intros
     simp only [AluX0Chip.circuit, statePullOfView, statePushOfView, stateAccess,
@@ -802,7 +696,6 @@ theorem aluX0Chip_stateEmissionShape : StateEmissionShape
       AluX0Chip.exposedStateInteractions, expose, List.mem_singleton,
       true_or, circuit_norm]
 
-set_option maxHeartbeats 1000000 in
 /-- Every descriptor in the single supported-machine registry emits exactly one gated State pull and
 one gated State push, with payloads equal to its semantic `RowView`.  This is the registry-level
 contract consumed by deterministic witness decoding. -/
@@ -895,7 +788,6 @@ theorem eval_initialBoundaryStateMessage (env : Environment (ZMod p))
         (Eval.eval env input).init_pc2⟩ := by
   simp only [circuit_norm]
 
-set_option maxHeartbeats 1000000 in
 /-- The verifier table contributes exactly the public final pull followed by the public initial push. -/
 theorem witness_verifierStateInteractions_eq
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :

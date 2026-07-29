@@ -31,6 +31,22 @@ local macro "firstStraightCPUTimeContract" inputs:term "," circuit:term "," main
     · intro env
       constructor <;> simp only [input, $circuit:term, $rowView:term, circuit_norm]))
 
+/-- As `firstStraightCPUTimeContract`, for the load chips whose row selector is a named sum of
+width flags rather than a single `is_real` column. -/
+local macro "widthGatedStraightCPUTimeContract" inputs:term "," circuit:term "," main:term ","
+    rowView:term "," isReal:term "," gate:term : tactic =>
+  `(tactic| (
+    unfold CircuitCPUStateTimeContract
+    dsimp only
+    let input : Var $inputs (ZMod p) := varFromOffset $inputs 0
+    let offset := size $inputs
+    refine ⟨offset,
+      ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
+        $gate input⟩, ?_, ?_⟩
+    · simp only [input, offset, $circuit:term, $main:term, circuit_norm]
+    · intro env
+      constructor <;> simp only [input, $rowView:term, $isReal:term, circuit_norm]))
+
 theorem AddChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (AddChip.circuit (p := p)) AddChip.rowView := by
   firstStraightCPUTimeContract AddChip.Inputs, AddChip.circuit, AddChip.main, AddChip.rowView
@@ -147,62 +163,26 @@ theorem BranchChip.cpuStateTimeContract :
 theorem LoadByteChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (LoadByteChip.circuit (p := p))
       LoadByteChip.rowView := by
-  unfold CircuitCPUStateTimeContract
-  dsimp only
-  let input : Var LoadByteChip.Inputs (ZMod p) := varFromOffset LoadByteChip.Inputs 0
-  let offset := size LoadByteChip.Inputs
-  refine ⟨offset,
-    ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
-      input.is_lb + input.is_lbu⟩, ?_, ?_⟩
-  · simp only [input, offset, LoadByteChip.circuit, LoadByteChip.main, circuit_norm]
-  · intro env
-    constructor <;>
-      simp only [input, LoadByteChip.rowView, LoadByteChip.isReal, circuit_norm]
+  widthGatedStraightCPUTimeContract LoadByteChip.Inputs, LoadByteChip.circuit, LoadByteChip.main,
+    LoadByteChip.rowView, LoadByteChip.isReal, (fun input => input.is_lb + input.is_lbu)
 
 theorem LoadHalfChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (LoadHalfChip.circuit (p := p))
       LoadHalfChip.rowView := by
-  unfold CircuitCPUStateTimeContract
-  dsimp only
-  let input : Var LoadHalfChip.Inputs (ZMod p) := varFromOffset LoadHalfChip.Inputs 0
-  let offset := size LoadHalfChip.Inputs
-  refine ⟨offset,
-    ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
-      input.is_lh + input.is_lhu⟩, ?_, ?_⟩
-  · simp only [input, offset, LoadHalfChip.circuit, LoadHalfChip.main, circuit_norm]
-  · intro env
-    constructor <;>
-      simp only [input, LoadHalfChip.rowView, LoadHalfChip.isReal, circuit_norm]
+  widthGatedStraightCPUTimeContract LoadHalfChip.Inputs, LoadHalfChip.circuit, LoadHalfChip.main,
+    LoadHalfChip.rowView, LoadHalfChip.isReal, (fun input => input.is_lh + input.is_lhu)
 
 theorem LoadWordChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (LoadWordChip.circuit (p := p))
       LoadWordChip.rowView := by
-  unfold CircuitCPUStateTimeContract
-  dsimp only
-  let input : Var LoadWordChip.Inputs (ZMod p) := varFromOffset LoadWordChip.Inputs 0
-  let offset := size LoadWordChip.Inputs
-  refine ⟨offset,
-    ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
-      input.is_lw + input.is_lwu⟩, ?_, ?_⟩
-  · simp only [input, offset, LoadWordChip.circuit, LoadWordChip.main, circuit_norm]
-  · intro env
-    constructor <;>
-      simp only [input, LoadWordChip.rowView, LoadWordChip.isReal, circuit_norm]
+  widthGatedStraightCPUTimeContract LoadWordChip.Inputs, LoadWordChip.circuit, LoadWordChip.main,
+    LoadWordChip.rowView, LoadWordChip.isReal, (fun input => input.is_lw + input.is_lwu)
 
 theorem LoadX0Chip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (LoadX0Chip.circuit (p := p)) LoadX0Chip.rowView := by
-  unfold CircuitCPUStateTimeContract
-  dsimp only
-  let input : Var LoadX0Chip.Inputs (ZMod p) := varFromOffset LoadX0Chip.Inputs 0
-  let offset := size LoadX0Chip.Inputs
-  refine ⟨offset,
-    ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8,
-      input.is_lb + input.is_lbu + input.is_lh + input.is_lhu + input.is_lw + input.is_lwu +
-        input.is_ld⟩, ?_, ?_⟩
-  · simp only [input, offset, LoadX0Chip.circuit, LoadX0Chip.main, circuit_norm]
-  · intro env
-    constructor <;>
-      simp only [input, LoadX0Chip.rowView, LoadX0Chip.isReal, circuit_norm]
+  widthGatedStraightCPUTimeContract LoadX0Chip.Inputs, LoadX0Chip.circuit, LoadX0Chip.main,
+    LoadX0Chip.rowView, LoadX0Chip.isReal, (fun input => input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+      + input.is_lw + input.is_lwu + input.is_ld)
 
 theorem LoadDoubleChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (LoadDoubleChip.circuit (p := p))
@@ -302,7 +282,6 @@ local macro "timeRegistryCase " kind:term ", " contract:term : tactic =>
     apply circuitStateTimeStep_of_cpuStateContract
     exact $contract:term))
 
-set_option maxHeartbeats 8000000 in
 /-- Every chip in the stable supported-machine registry derives strict clock progress from its own
 physical CPU reader and the Byte channel. -/
 theorem supportedChip_stateTimeConstraintShape (chip : SupportedChip p)

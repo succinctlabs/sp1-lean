@@ -130,7 +130,6 @@ def CircuitCPUStateTimeContract {Input Output : TypeMap}
         (Expression.eval env cpuInput.cols.clk_16_24)
         (view (Eval.eval env inputVar) (Eval.eval env (circuit.output inputVar offset)))
 
-set_option maxHeartbeats 1000000 in
 /-- The CPUState reader's two Byte pulls imply the two evaluated clock bounds on an active row.
 State is absent from the premise: its channel guarantee is structurally `True` and does not justify
 clock arithmetic.  Keeping this at the expression boundary avoids a costly, irrelevant normalization
@@ -776,7 +775,6 @@ theorem stateTimeStep_of_cpuState_byteGuarantees
     (Expression.eval env cpuInput.cols.clk_0_16)
     (Expression.eval env cpuInput.cols.clk_16_24) clk0Bound clk1Bound
 
-set_option maxHeartbeats 1000000 in
 /-- A retained `CPUState` reader plus the finished Byte guarantees proves exact eight-tick progress
 for the completed chip circuit.  This is the reusable bridge from local chip composition to the
 natural-number ranking used by the State trail. -/

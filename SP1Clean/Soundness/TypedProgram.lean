@@ -306,99 +306,80 @@ theorem DecodedInstructionRow.programInteractions_eq
     DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow] using
     contract data decoded.physical constraints
 
+
+/-- Registry boilerplate: reduce a chip's Program-emission goal to the three exposure-contract
+field goals. -/
+local macro "programExposureStart" : tactic =>
+  `(tactic| (
+    apply circuitProgramEmissionShape_of_exposure
+    unfold CircuitProgramExposureContract
+    dsimp only))
+
+/-- The shared closing normalization for chips whose Program exposure, gate, and fetch payload all
+follow the plain reader template. -/
+local macro "programExposureTail " circuit:term ", " rowView:term ", "
+    adapterView:term : tactic =>
+  `(tactic| (
+    · intro input offset
+      simp [$circuit:term, expose]
+    · intro env
+      simp [$circuit:term, $rowView:term, circuit_norm]
+    · intro env
+      simp [$circuit:term, $rowView:term, $adapterView:term,
+        programMessageOfView, circuit_norm]))
+
+
 theorem AddChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (AddChip.circuit (p := p)) AddChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 0,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0],
       #v[input.adapter.op_c, 0, 0, 0], input.adapter.op_a_0, 0, 0⟩,
     ?_, ?_, ?_⟩
-  · intro input offset
-    simp [AddChip.circuit, expose]
-  · intro env
-    simp [AddChip.circuit, AddChip.rowView, circuit_norm]
-  · intro env
-    simp [AddChip.circuit, AddChip.rowView, Extracted.RTypeReader.toAdapterView,
-      programMessageOfView, circuit_norm]
+  programExposureTail AddChip.circuit, AddChip.rowView, Extracted.RTypeReader.toAdapterView
 
 theorem AddiChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (AddiChip.circuit (p := p)) AddiChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 1,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
       input.adapter.op_a_0, 0, 1⟩, ?_, ?_, ?_⟩
-  · intro input offset
-    simp [AddiChip.circuit, expose]
-  · intro env
-    simp [AddiChip.circuit, AddiChip.rowView, circuit_norm]
-  · intro env
-    simp [AddiChip.circuit, AddiChip.rowView, Extracted.ITypeReader.toAdapterView,
-      programMessageOfView, circuit_norm]
+  programExposureTail AddiChip.circuit, AddiChip.rowView, Extracted.ITypeReader.toAdapterView
 
 theorem AddwChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (AddwChip.circuit (p := p)) AddwChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 19,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
       input.adapter.op_a_0, 0, input.adapter.imm_c⟩, ?_, ?_, ?_⟩
-  · intro input offset
-    simp [AddwChip.circuit, expose]
-  · intro env
-    simp [AddwChip.circuit, AddwChip.rowView, circuit_norm]
-  · intro env
-    simp [AddwChip.circuit, AddwChip.rowView, Extracted.ALUTypeReader.toAdapterView,
-      programMessageOfView, circuit_norm]
+  programExposureTail AddwChip.circuit, AddwChip.rowView, Extracted.ALUTypeReader.toAdapterView
 
 theorem SubChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (SubChip.circuit (p := p)) SubChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 2,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0],
       #v[input.adapter.op_c, 0, 0, 0], input.adapter.op_a_0, 0, 0⟩,
     ?_, ?_, ?_⟩
-  · intro input offset
-    simp [SubChip.circuit, expose]
-  · intro env
-    simp [SubChip.circuit, SubChip.rowView, circuit_norm]
-  · intro env
-    simp [SubChip.circuit, SubChip.rowView, Extracted.RTypeReader.toAdapterView,
-      programMessageOfView, circuit_norm]
+  programExposureTail SubChip.circuit, SubChip.rowView, Extracted.RTypeReader.toAdapterView
 
 theorem SubwChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (SubwChip.circuit (p := p)) SubwChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 20,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0],
       #v[input.adapter.op_c, 0, 0, 0], input.adapter.op_a_0, 0, 0⟩,
     ?_, ?_, ?_⟩
-  · intro input offset
-    simp [SubwChip.circuit, expose]
-  · intro env
-    simp [SubwChip.circuit, SubwChip.rowView, circuit_norm]
-  · intro env
-    simp [SubwChip.circuit, SubwChip.rowView, Extracted.RTypeReader.toAdapterView,
-      programMessageOfView, circuit_norm]
+  programExposureTail SubwChip.circuit, SubwChip.rowView, Extracted.RTypeReader.toAdapterView
 
 theorem BitwiseChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (BitwiseChip.circuit (p := p)) BitwiseChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input offset =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], BitwiseChip.exposedOpcode offset,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
@@ -413,9 +394,7 @@ theorem BitwiseChip.programEmissionShape :
 
 theorem LtChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (LtChip.circuit (p := p)) LtChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input offset =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], LtChip.exposedOpcode offset,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
@@ -431,9 +410,7 @@ theorem LtChip.programEmissionShape :
 theorem LoadDoubleChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (LoadDoubleChip.circuit (p := p))
       LoadDoubleChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 35,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
@@ -449,9 +426,7 @@ theorem LoadDoubleChip.programEmissionShape :
 theorem LoadByteChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (LoadByteChip.circuit (p := p))
       LoadByteChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_lb + input.is_lbu, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
       input.is_lb * 29 + input.is_lbu * 32, input.adapter.op_a,
@@ -468,9 +443,7 @@ theorem LoadByteChip.programEmissionShape :
 theorem LoadHalfChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (LoadHalfChip.circuit (p := p))
       LoadHalfChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_lh + input.is_lhu, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
       input.is_lh * 30 + input.is_lhu * 33, input.adapter.op_a,
@@ -487,9 +460,7 @@ theorem LoadHalfChip.programEmissionShape :
 theorem LoadWordChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (LoadWordChip.circuit (p := p))
       LoadWordChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_lw + input.is_lwu, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
       input.is_lw * 31 + input.is_lwu * 34, input.adapter.op_a,
@@ -506,9 +477,7 @@ theorem LoadWordChip.programEmissionShape :
 theorem LoadX0Chip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (LoadX0Chip.circuit (p := p))
       LoadX0Chip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_lb + input.is_lbu + input.is_lh + input.is_lhu +
       input.is_lw + input.is_lwu + input.is_ld,
     fun input _ =>
@@ -528,9 +497,7 @@ theorem LoadX0Chip.programEmissionShape :
 theorem StoreByteChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (StoreByteChip.circuit (p := p))
       StoreByteChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 36,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
@@ -546,9 +513,7 @@ theorem StoreByteChip.programEmissionShape :
 theorem StoreHalfChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (StoreHalfChip.circuit (p := p))
       StoreHalfChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 37,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
@@ -564,9 +529,7 @@ theorem StoreHalfChip.programEmissionShape :
 theorem StoreWordChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (StoreWordChip.circuit (p := p))
       StoreWordChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 38,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
@@ -582,9 +545,7 @@ theorem StoreWordChip.programEmissionShape :
 theorem StoreDoubleChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (StoreDoubleChip.circuit (p := p))
       StoreDoubleChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 39,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
@@ -600,9 +561,7 @@ theorem StoreDoubleChip.programEmissionShape :
 theorem AluX0Chip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (AluX0Chip.circuit (p := p))
       AluX0Chip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], input.opcode,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c,
@@ -617,9 +576,7 @@ theorem AluX0Chip.programEmissionShape :
 
 theorem UTypeChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (UTypeChip.circuit (p := p)) UTypeChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
       input.is_auipc * 48 + (1 - input.is_auipc) * 49,
@@ -635,9 +592,7 @@ theorem UTypeChip.programEmissionShape :
 
 theorem JalChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (JalChip.circuit (p := p)) JalChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 46,
       input.adapter.op_a, input.adapter.op_b_imm, input.adapter.op_c_imm,
@@ -652,9 +607,7 @@ theorem JalChip.programEmissionShape :
 
 theorem JalrChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (JalrChip.circuit (p := p)) JalrChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input _ =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], 47,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
@@ -669,9 +622,7 @@ theorem JalrChip.programEmissionShape :
 
 theorem BranchChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (BranchChip.circuit (p := p)) BranchChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input offset =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2], BranchChip.exposedOpcode offset,
       input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
@@ -688,9 +639,7 @@ theorem BranchChip.programEmissionShape :
 theorem ShiftLeftChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (ShiftLeftChip.circuit (p := p))
       ShiftLeftChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun _ offset => ShiftLeftChip.exposedGate offset,
     fun input offset =>
       ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
@@ -717,9 +666,7 @@ theorem ShiftLeftChip.programEmissionShape :
 theorem ShiftRightChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (ShiftRightChip.circuit (p := p))
       ShiftRightChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input offset =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
       ShiftRightChip.exposedOpcode offset,
@@ -736,9 +683,7 @@ theorem ShiftRightChip.programEmissionShape :
 
 theorem MulChip.programEmissionShape :
     CircuitProgramEmissionShape (p := p) (MulChip.circuit (p := p)) MulChip.rowView := by
-  apply circuitProgramEmissionShape_of_exposure
-  unfold CircuitProgramExposureContract
-  dsimp only
+  programExposureStart
   refine ⟨fun input _ => input.is_real, fun input offset =>
     ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
       MulChip.exposedOpcode offset,
@@ -973,7 +918,6 @@ theorem decodedWitnessProgramInteractions_eq
   exact decoded.programInteractions_eq_of_mem witness.data witness.tables decodedMem
     (decodedInstructionRow_constraints witness constraints decoded decodedMem)
 
-set_option maxHeartbeats 2000000 in
 /-- Every decoded Program interaction is a disabled row or an active pull. -/
 theorem decodedWitnessProgramInteractions_pullShape
     (witness : EnsembleWitness (sp1Ensemble (p := p)))
@@ -993,7 +937,6 @@ theorem decodedWitnessProgramInteractions_pullShape
   · right
     rw [TypedInteraction.pulledIfValue_mult, active]
 
-set_option maxHeartbeats 2000000 in
 /-- Every active deterministically decoded instruction fetch is a genuine decode of the guest
 program committed in `ProverData`.  This is the Program-channel grounding theorem: row constraints
 identify the exact pull, Clean balance finds a matching nonzero provider contribution, and the

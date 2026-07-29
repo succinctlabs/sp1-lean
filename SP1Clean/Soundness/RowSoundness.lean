@@ -56,9 +56,9 @@ local macro "busRegistryCase " circuit:term ", " elaborated:term : tactic =>
   `(tactic| (
     change ($elaborated:term).channelsWithGuarantees ⊆ _ ∧
       ($circuit:term).channelsWithRequirements ⊆ _
-    simp [$circuit:term, $elaborated:term, circuit_norm]))
+    simp only [$circuit:term, $elaborated:term, circuit_norm]))
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 800000 in
 /-- Every descriptor in the single supported-machine registry declares only the four SP1 buses. -/
 theorem supportedChip_usesSupportedBusChannels (chip : SupportedChip p)
     (chipMem : chip ∈ supportedChips (p := p)) :

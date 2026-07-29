@@ -26,7 +26,6 @@ open SP1Clean.Channels
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-set_option maxHeartbeats 1000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- Evaluate the canonical register-shaped Memory pull without unfolding a concrete chip input. -/
 theorem eval_registerMemoryMessage (env : Environment (ZMod p))

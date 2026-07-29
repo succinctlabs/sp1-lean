@@ -82,6 +82,32 @@ local macro "finish_uniform_memory_gating" : tactic =>
     intro
     trivial))
 
+/-- Registry boilerplate for a chip whose exact Memory list is uniformly gated by its typed
+selector, with no extra source-gate hypothesis. -/
+local macro "uniformMemoryGating " main:term ", " selector:term ", "
+    exposed:term ", " exactEq:term : tactic =>
+  `(tactic| (
+    apply mainMemorySelectorGated_of_exposed $main:term $selector:term $exposed:term $exactEq:term
+    intro input offset env _constraints
+    simp only [$exposed:term]
+    finish_uniform_memory_gating))
+
+/-- Registry boilerplate for a chip whose Memory list needs the immediate-aware source-C gate. -/
+local macro "subGateMemoryGating " main:term ", " exposed:term ", " exactEq:term ", "
+    subGateThm:term : tactic =>
+  `(tactic| (
+    apply mainMemorySelectorGated_of_exposed $main:term (fun input _ => input.is_real)
+      $exposed:term $exactEq:term
+    intro input offset env constraints
+    have subGate := $subGateThm:term input offset env constraints
+    rcases subGate with subGate | subGate <;>
+      simp only [$exposed:term, List.forall_mem_cons,
+        Channel.pulledIf, Channel.pushedIf, pulledIf_mult, pushedIf_mult,
+        Expression.eval, neg_one_mul, List.not_mem_nil, false_implies, true_and,
+        subGate, true_or, or_true]
+    all_goals simp))
+
+
 /-! ## Immediate-aware ALU reader gate -/
 
 omit [Fact (2 ^ 24 < p)] in
@@ -361,326 +387,224 @@ theorem memorySelectorConstraintShape_of_circuit (kind : ChipKind p)
     MemorySelectorConstraintShape ⟨kind, circuit, specEq, opcodes, rdGuard⟩ :=
   shape
 
+/-- Lift a chip's `main`-local Memory gating theorem to its completed whole-chip circuit. -/
+local macro "liftMemoryGating " circuit:term ", " rowView:term ", " selector:term ", "
+    gated:term : tactic =>
+  `(tactic| (
+    apply circuitMemorySelectorGated_of_main $circuit:term $rowView:term $selector:term
+    · intro env input offset
+      simp only [$rowView:term, circuit_norm]
+    · exact $gated:term))
+
+/-- As `liftMemoryGating`, for chips whose `RowView` selector is a named `isReal` abbreviation. -/
+local macro "liftMemoryGatingWith " circuit:term ", " rowView:term ", " isReal:term ", "
+    selector:term ", " gated:term : tactic =>
+  `(tactic| (
+    apply circuitMemorySelectorGated_of_main $circuit:term $rowView:term $selector:term
+    · intro env input offset
+      simp only [$rowView:term, $isReal:term, circuit_norm]
+    · exact $gated:term))
+
 /-! ## Initial registry anchor -/
 
 /-- Add's exact six-entry Memory list is uniformly gated by its typed input selector. -/
 theorem AddChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) AddChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed AddChip.main (fun input _ => input.is_real)
-    AddChip.exposedMemoryInteractions AddChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [AddChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating AddChip.main, (fun input _ => input.is_real),
+    AddChip.exposedMemoryInteractions, AddChip.interactionsWith_memory_eq
 
 /-- Add's local selector theorem lifted to its completed whole-chip circuit. -/
 theorem AddChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) AddChip.circuit AddChip.rowView := by
-  apply circuitMemorySelectorGated_of_main AddChip.circuit AddChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [AddChip.rowView, circuit_norm]
-  · exact AddChip.mainMemorySelectorGated
+  liftMemoryGating AddChip.circuit, AddChip.rowView,
+    (fun input _ => input.is_real), AddChip.mainMemorySelectorGated
 
 /-! ## Uniform-selector instruction chips -/
 
 theorem AddiChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) AddiChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed AddiChip.main (fun input _ => input.is_real)
-    AddiChip.exposedMemoryInteractions AddiChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [AddiChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating AddiChip.main, (fun input _ => input.is_real),
+    AddiChip.exposedMemoryInteractions, AddiChip.interactionsWith_memory_eq
 
 theorem AddiChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) AddiChip.circuit AddiChip.rowView := by
-  apply circuitMemorySelectorGated_of_main AddiChip.circuit AddiChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [AddiChip.rowView, circuit_norm]
-  · exact AddiChip.mainMemorySelectorGated
+  liftMemoryGating AddiChip.circuit, AddiChip.rowView,
+    (fun input _ => input.is_real), AddiChip.mainMemorySelectorGated
 
 theorem SubChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) SubChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed SubChip.main (fun input _ => input.is_real)
-    SubChip.exposedMemoryInteractions SubChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [SubChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating SubChip.main, (fun input _ => input.is_real),
+    SubChip.exposedMemoryInteractions, SubChip.interactionsWith_memory_eq
 
 theorem SubChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) SubChip.circuit SubChip.rowView := by
-  apply circuitMemorySelectorGated_of_main SubChip.circuit SubChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [SubChip.rowView, circuit_norm]
-  · exact SubChip.mainMemorySelectorGated
+  liftMemoryGating SubChip.circuit, SubChip.rowView,
+    (fun input _ => input.is_real), SubChip.mainMemorySelectorGated
 
 theorem SubwChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) SubwChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed SubwChip.main (fun input _ => input.is_real)
-    SubwChip.exposedMemoryInteractions SubwChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [SubwChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating SubwChip.main, (fun input _ => input.is_real),
+    SubwChip.exposedMemoryInteractions, SubwChip.interactionsWith_memory_eq
 
 theorem SubwChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) SubwChip.circuit SubwChip.rowView := by
-  apply circuitMemorySelectorGated_of_main SubwChip.circuit SubwChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [SubwChip.rowView, circuit_norm]
-  · exact SubwChip.mainMemorySelectorGated
+  liftMemoryGating SubwChip.circuit, SubwChip.rowView,
+    (fun input _ => input.is_real), SubwChip.mainMemorySelectorGated
 
 theorem MulChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) MulChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed MulChip.main (fun input _ => input.is_real)
-    MulChip.exposedMemoryInteractions MulChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [MulChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating MulChip.main, (fun input _ => input.is_real),
+    MulChip.exposedMemoryInteractions, MulChip.interactionsWith_memory_eq
 
 theorem MulChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) MulChip.circuit MulChip.rowView := by
-  apply circuitMemorySelectorGated_of_main MulChip.circuit MulChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [MulChip.rowView, circuit_norm]
-  · exact MulChip.mainMemorySelectorGated
+  liftMemoryGating MulChip.circuit, MulChip.rowView,
+    (fun input _ => input.is_real), MulChip.mainMemorySelectorGated
 
 theorem DivRemChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) DivRemChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed DivRemChip.main (fun input _ => input.is_real)
-    DivRemChip.exposedMemoryInteractions DivRemChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [DivRemChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating DivRemChip.main, (fun input _ => input.is_real),
+    DivRemChip.exposedMemoryInteractions, DivRemChip.interactionsWith_memory_eq
 
 theorem DivRemChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) DivRemChip.circuit DivRemChip.rowView := by
-  apply circuitMemorySelectorGated_of_main DivRemChip.circuit DivRemChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [DivRemChip.rowView, circuit_norm]
-  · exact DivRemChip.mainMemorySelectorGated
+  liftMemoryGating DivRemChip.circuit, DivRemChip.rowView,
+    (fun input _ => input.is_real), DivRemChip.mainMemorySelectorGated
 
 theorem JalChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) JalChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed JalChip.main (fun input _ => input.is_real)
-    JalChip.exposedMemoryInteractions JalChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [JalChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating JalChip.main, (fun input _ => input.is_real),
+    JalChip.exposedMemoryInteractions, JalChip.interactionsWith_memory_eq
 
 theorem JalChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) JalChip.circuit JalChip.rowView := by
-  apply circuitMemorySelectorGated_of_main JalChip.circuit JalChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [JalChip.rowView, circuit_norm]
-  · exact JalChip.mainMemorySelectorGated
+  liftMemoryGating JalChip.circuit, JalChip.rowView,
+    (fun input _ => input.is_real), JalChip.mainMemorySelectorGated
 
 theorem JalrChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) JalrChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed JalrChip.main (fun input _ => input.is_real)
-    JalrChip.exposedMemoryInteractions JalrChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [JalrChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating JalrChip.main, (fun input _ => input.is_real),
+    JalrChip.exposedMemoryInteractions, JalrChip.interactionsWith_memory_eq
 
 theorem JalrChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) JalrChip.circuit JalrChip.rowView := by
-  apply circuitMemorySelectorGated_of_main JalrChip.circuit JalrChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [JalrChip.rowView, circuit_norm]
-  · exact JalrChip.mainMemorySelectorGated
+  liftMemoryGating JalrChip.circuit, JalrChip.rowView,
+    (fun input _ => input.is_real), JalrChip.mainMemorySelectorGated
 
 theorem BranchChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) BranchChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed BranchChip.main (fun input _ => input.is_real)
-    BranchChip.exposedMemoryInteractions BranchChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [BranchChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating BranchChip.main, (fun input _ => input.is_real),
+    BranchChip.exposedMemoryInteractions, BranchChip.interactionsWith_memory_eq
 
 theorem BranchChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) BranchChip.circuit BranchChip.rowView := by
-  apply circuitMemorySelectorGated_of_main BranchChip.circuit BranchChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [BranchChip.rowView, circuit_norm]
-  · exact BranchChip.mainMemorySelectorGated
+  liftMemoryGating BranchChip.circuit, BranchChip.rowView,
+    (fun input _ => input.is_real), BranchChip.mainMemorySelectorGated
 
 theorem UTypeChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) UTypeChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed UTypeChip.main (fun input _ => input.is_real)
-    UTypeChip.exposedMemoryInteractions UTypeChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [UTypeChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating UTypeChip.main, (fun input _ => input.is_real),
+    UTypeChip.exposedMemoryInteractions, UTypeChip.interactionsWith_memory_eq
 
 theorem UTypeChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) UTypeChip.circuit UTypeChip.rowView := by
-  apply circuitMemorySelectorGated_of_main UTypeChip.circuit UTypeChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [UTypeChip.rowView, circuit_norm]
-  · exact UTypeChip.mainMemorySelectorGated
+  liftMemoryGating UTypeChip.circuit, UTypeChip.rowView,
+    (fun input _ => input.is_real), UTypeChip.mainMemorySelectorGated
 
 theorem LoadDoubleChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) LoadDoubleChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed LoadDoubleChip.main (fun input _ => input.is_real)
-    LoadDoubleChip.exposedMemoryInteractions LoadDoubleChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [LoadDoubleChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating LoadDoubleChip.main, (fun input _ => input.is_real),
+    LoadDoubleChip.exposedMemoryInteractions, LoadDoubleChip.interactionsWith_memory_eq
 
 theorem LoadDoubleChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) LoadDoubleChip.circuit LoadDoubleChip.rowView := by
-  apply circuitMemorySelectorGated_of_main LoadDoubleChip.circuit LoadDoubleChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [LoadDoubleChip.rowView, circuit_norm]
-  · exact LoadDoubleChip.mainMemorySelectorGated
+  liftMemoryGating LoadDoubleChip.circuit, LoadDoubleChip.rowView,
+    (fun input _ => input.is_real), LoadDoubleChip.mainMemorySelectorGated
 
 theorem LoadByteChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) LoadByteChip.main
       (fun input _ => input.is_lb + input.is_lbu) := by
-  apply mainMemorySelectorGated_of_exposed LoadByteChip.main
-    (fun input _ => input.is_lb + input.is_lbu)
-    LoadByteChip.exposedMemoryInteractions LoadByteChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [LoadByteChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating LoadByteChip.main, (fun input _ => input.is_lb + input.is_lbu),
+    LoadByteChip.exposedMemoryInteractions, LoadByteChip.interactionsWith_memory_eq
 
 theorem LoadByteChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) LoadByteChip.circuit LoadByteChip.rowView := by
-  apply circuitMemorySelectorGated_of_main LoadByteChip.circuit LoadByteChip.rowView
-    (fun input _ => input.is_lb + input.is_lbu)
-  · intro env input offset
-    simp only [LoadByteChip.rowView, LoadByteChip.isReal, circuit_norm]
-  · exact LoadByteChip.mainMemorySelectorGated
+  liftMemoryGatingWith LoadByteChip.circuit, LoadByteChip.rowView, LoadByteChip.isReal,
+    (fun input _ => input.is_lb + input.is_lbu), LoadByteChip.mainMemorySelectorGated
 
 theorem LoadHalfChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) LoadHalfChip.main
       (fun input _ => input.is_lh + input.is_lhu) := by
-  apply mainMemorySelectorGated_of_exposed LoadHalfChip.main
-    (fun input _ => input.is_lh + input.is_lhu)
-    LoadHalfChip.exposedMemoryInteractions LoadHalfChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [LoadHalfChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating LoadHalfChip.main, (fun input _ => input.is_lh + input.is_lhu),
+    LoadHalfChip.exposedMemoryInteractions, LoadHalfChip.interactionsWith_memory_eq
 
 theorem LoadHalfChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) LoadHalfChip.circuit LoadHalfChip.rowView := by
-  apply circuitMemorySelectorGated_of_main LoadHalfChip.circuit LoadHalfChip.rowView
-    (fun input _ => input.is_lh + input.is_lhu)
-  · intro env input offset
-    simp only [LoadHalfChip.rowView, LoadHalfChip.isReal, circuit_norm]
-  · exact LoadHalfChip.mainMemorySelectorGated
+  liftMemoryGatingWith LoadHalfChip.circuit, LoadHalfChip.rowView, LoadHalfChip.isReal,
+    (fun input _ => input.is_lh + input.is_lhu), LoadHalfChip.mainMemorySelectorGated
 
 theorem LoadWordChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) LoadWordChip.main
       (fun input _ => input.is_lw + input.is_lwu) := by
-  apply mainMemorySelectorGated_of_exposed LoadWordChip.main
-    (fun input _ => input.is_lw + input.is_lwu)
-    LoadWordChip.exposedMemoryInteractions LoadWordChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [LoadWordChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating LoadWordChip.main, (fun input _ => input.is_lw + input.is_lwu),
+    LoadWordChip.exposedMemoryInteractions, LoadWordChip.interactionsWith_memory_eq
 
 theorem LoadWordChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) LoadWordChip.circuit LoadWordChip.rowView := by
-  apply circuitMemorySelectorGated_of_main LoadWordChip.circuit LoadWordChip.rowView
-    (fun input _ => input.is_lw + input.is_lwu)
-  · intro env input offset
-    simp only [LoadWordChip.rowView, LoadWordChip.isReal, circuit_norm]
-  · exact LoadWordChip.mainMemorySelectorGated
+  liftMemoryGatingWith LoadWordChip.circuit, LoadWordChip.rowView, LoadWordChip.isReal,
+    (fun input _ => input.is_lw + input.is_lwu), LoadWordChip.mainMemorySelectorGated
 
 theorem LoadX0Chip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) LoadX0Chip.main
       (fun input _ => input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
         + input.is_lw + input.is_lwu + input.is_ld) := by
-  apply mainMemorySelectorGated_of_exposed LoadX0Chip.main
-    (fun input _ => input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
-      + input.is_lw + input.is_lwu + input.is_ld)
-    LoadX0Chip.exposedMemoryInteractions LoadX0Chip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [LoadX0Chip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating LoadX0Chip.main, (fun input _ => input.is_lb + input.is_lbu + input.is_lh + input.is_lhu + input.is_lw + input.is_lwu + input.is_ld),
+    LoadX0Chip.exposedMemoryInteractions, LoadX0Chip.interactionsWith_memory_eq
 
 theorem LoadX0Chip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) LoadX0Chip.circuit LoadX0Chip.rowView := by
-  apply circuitMemorySelectorGated_of_main LoadX0Chip.circuit LoadX0Chip.rowView
-    (fun input _ => input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
-      + input.is_lw + input.is_lwu + input.is_ld)
-  · intro env input offset
-    simp only [LoadX0Chip.rowView, LoadX0Chip.isReal, circuit_norm]
-  · exact LoadX0Chip.mainMemorySelectorGated
+  liftMemoryGatingWith LoadX0Chip.circuit, LoadX0Chip.rowView, LoadX0Chip.isReal,
+    (fun input _ => input.is_lb + input.is_lbu + input.is_lh + input.is_lhu + input.is_lw + input.is_lwu + input.is_ld), LoadX0Chip.mainMemorySelectorGated
 
 theorem StoreByteChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) StoreByteChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed StoreByteChip.main (fun input _ => input.is_real)
-    StoreByteChip.exposedMemoryInteractions StoreByteChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [StoreByteChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating StoreByteChip.main, (fun input _ => input.is_real),
+    StoreByteChip.exposedMemoryInteractions, StoreByteChip.interactionsWith_memory_eq
 
 theorem StoreByteChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) StoreByteChip.circuit StoreByteChip.rowView := by
-  apply circuitMemorySelectorGated_of_main StoreByteChip.circuit StoreByteChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [StoreByteChip.rowView, circuit_norm]
-  · exact StoreByteChip.mainMemorySelectorGated
+  liftMemoryGating StoreByteChip.circuit, StoreByteChip.rowView,
+    (fun input _ => input.is_real), StoreByteChip.mainMemorySelectorGated
 
 theorem StoreHalfChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) StoreHalfChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed StoreHalfChip.main (fun input _ => input.is_real)
-    StoreHalfChip.exposedMemoryInteractions StoreHalfChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [StoreHalfChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating StoreHalfChip.main, (fun input _ => input.is_real),
+    StoreHalfChip.exposedMemoryInteractions, StoreHalfChip.interactionsWith_memory_eq
 
 theorem StoreHalfChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) StoreHalfChip.circuit StoreHalfChip.rowView := by
-  apply circuitMemorySelectorGated_of_main StoreHalfChip.circuit StoreHalfChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [StoreHalfChip.rowView, circuit_norm]
-  · exact StoreHalfChip.mainMemorySelectorGated
+  liftMemoryGating StoreHalfChip.circuit, StoreHalfChip.rowView,
+    (fun input _ => input.is_real), StoreHalfChip.mainMemorySelectorGated
 
 theorem StoreWordChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) StoreWordChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed StoreWordChip.main (fun input _ => input.is_real)
-    StoreWordChip.exposedMemoryInteractions StoreWordChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [StoreWordChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating StoreWordChip.main, (fun input _ => input.is_real),
+    StoreWordChip.exposedMemoryInteractions, StoreWordChip.interactionsWith_memory_eq
 
 theorem StoreWordChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) StoreWordChip.circuit StoreWordChip.rowView := by
-  apply circuitMemorySelectorGated_of_main StoreWordChip.circuit StoreWordChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [StoreWordChip.rowView, circuit_norm]
-  · exact StoreWordChip.mainMemorySelectorGated
+  liftMemoryGating StoreWordChip.circuit, StoreWordChip.rowView,
+    (fun input _ => input.is_real), StoreWordChip.mainMemorySelectorGated
 
 theorem StoreDoubleChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) StoreDoubleChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed StoreDoubleChip.main (fun input _ => input.is_real)
-    StoreDoubleChip.exposedMemoryInteractions StoreDoubleChip.interactionsWith_memory_eq
-  intro input offset env _constraints
-  simp only [StoreDoubleChip.exposedMemoryInteractions]
-  finish_uniform_memory_gating
+  uniformMemoryGating StoreDoubleChip.main, (fun input _ => input.is_real),
+    StoreDoubleChip.exposedMemoryInteractions, StoreDoubleChip.interactionsWith_memory_eq
 
 theorem StoreDoubleChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) StoreDoubleChip.circuit StoreDoubleChip.rowView := by
-  apply circuitMemorySelectorGated_of_main StoreDoubleChip.circuit StoreDoubleChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [StoreDoubleChip.rowView, circuit_norm]
-  · exact StoreDoubleChip.mainMemorySelectorGated
+  liftMemoryGating StoreDoubleChip.circuit, StoreDoubleChip.rowView,
+    (fun input _ => input.is_real), StoreDoubleChip.mainMemorySelectorGated
 
 /-! ## Immediate-aware instruction chips -/
 
@@ -693,7 +617,6 @@ private def AddwChip.aluReaderInput (input : Var AddwChip.Inputs (ZMod p)) (offs
     var ⟨offset⟩, var ⟨offset + 1⟩, var ⟨offset + 2⟩ * 65535,
     var ⟨offset + 2⟩ * 65535⟩
 
-set_option maxHeartbeats 1000000 in
 /-- Addw's full row constraints restrict to its composed ALU reader. -/
 private theorem AddwChip.aluReaderConstraints
     (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
@@ -723,7 +646,6 @@ private theorem AddwChip.aluReaderConstraints
     Readers.ALUTypeReader.circuit (AddwChip.aluReaderInput input offset) (offset + 3) env
       ((AddwChip.main input).operations offset) readerMem constraints
 
-set_option maxHeartbeats 1000000 in
 /-- Addw's full constraints imply binaryity of its physical input selector. -/
 private theorem AddwChip.selectorBinary_of_constraints
     (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
@@ -734,7 +656,6 @@ private theorem AddwChip.selectorBinary_of_constraints
   have selectorBinary := AddwChip.mainSelectorBinary.binary input offset env shallow
   simpa only [circuit_norm] using selectorBinary
 
-set_option maxHeartbeats 1000000 in
 /-- The two field equations relevant to Addw's immediate-aware source-C gate. -/
 private theorem AddwChip.readerGateFacts
     (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
@@ -751,7 +672,6 @@ private theorem AddwChip.readerGateFacts
   · simpa only [eval_mul, expression_eval_sub, Expression.eval] using paddingGate
   · simpa only [eval_mul, expression_eval_sub, Expression.eval] using subGatePolynomial
 
-set_option maxHeartbeats 1000000 in
 /-- Addw's ALU reader forces the immediate-aware source-C gate to be either zero or the physical
 row selector. -/
 private theorem AddwChip.subGate_eq_zero_or_isReal
@@ -771,24 +691,13 @@ private theorem AddwChip.subGate_eq_zero_or_isReal
 
 theorem AddwChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) AddwChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed AddwChip.main (fun input _ => input.is_real)
-    AddwChip.exposedMemoryInteractions AddwChip.interactionsWith_memory_eq
-  intro input offset env constraints
-  have subGate := AddwChip.subGate_eq_zero_or_isReal input offset env constraints
-  rcases subGate with subGate | subGate <;>
-    simp only [AddwChip.exposedMemoryInteractions, List.forall_mem_cons,
-      Channel.pulledIf, Channel.pushedIf, pulledIf_mult, pushedIf_mult,
-      Expression.eval, neg_one_mul, List.not_mem_nil, false_implies, true_and,
-      subGate, true_or, or_true]
-  all_goals simp
+  subGateMemoryGating AddwChip.main, AddwChip.exposedMemoryInteractions,
+    AddwChip.interactionsWith_memory_eq, AddwChip.subGate_eq_zero_or_isReal
 
 theorem AddwChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) AddwChip.circuit AddwChip.rowView := by
-  apply circuitMemorySelectorGated_of_main AddwChip.circuit AddwChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [AddwChip.rowView, circuit_norm]
-  · exact AddwChip.mainMemorySelectorGated
+  liftMemoryGating AddwChip.circuit, AddwChip.rowView,
+    (fun input _ => input.is_real), AddwChip.mainMemorySelectorGated
 
 /-- The exact ALU-reader input assembled by Bitwise's `main`. -/
 private def BitwiseChip.aluReaderInput
@@ -802,7 +711,6 @@ private def BitwiseChip.aluReaderInput
     var ⟨offset + 15⟩ + var ⟨offset + 16⟩ * 256,
     var ⟨offset + 17⟩ + var ⟨offset + 18⟩ * 256⟩
 
-set_option maxHeartbeats 1000000 in
 /-- Bitwise's full row constraints restrict to its composed ALU reader. -/
 private theorem BitwiseChip.aluReaderConstraints
     (input : Var BitwiseChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
@@ -818,7 +726,6 @@ private theorem BitwiseChip.aluReaderConstraints
     (BitwiseChip.aluReaderInput input offset) (offset + 19) env
       ((BitwiseChip.main input).operations offset) readerMem constraints
 
-set_option maxHeartbeats 1000000 in
 /-- Bitwise's immediate-aware source-C gate is zero or the physical row selector. -/
 private theorem BitwiseChip.subGate_eq_zero_or_isReal
     (input : Var BitwiseChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
@@ -842,24 +749,13 @@ private theorem BitwiseChip.subGate_eq_zero_or_isReal
 
 theorem BitwiseChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) BitwiseChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed BitwiseChip.main (fun input _ => input.is_real)
-    BitwiseChip.exposedMemoryInteractions BitwiseChip.interactionsWith_memory_eq
-  intro input offset env constraints
-  have subGate := BitwiseChip.subGate_eq_zero_or_isReal input offset env constraints
-  rcases subGate with subGate | subGate <;>
-    simp only [BitwiseChip.exposedMemoryInteractions, List.forall_mem_cons,
-      Channel.pulledIf, Channel.pushedIf, pulledIf_mult, pushedIf_mult,
-      Expression.eval, neg_one_mul, List.not_mem_nil, false_implies, true_and,
-      subGate, true_or, or_true]
-  all_goals simp
+  subGateMemoryGating BitwiseChip.main, BitwiseChip.exposedMemoryInteractions,
+    BitwiseChip.interactionsWith_memory_eq, BitwiseChip.subGate_eq_zero_or_isReal
 
 theorem BitwiseChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) BitwiseChip.circuit BitwiseChip.rowView := by
-  apply circuitMemorySelectorGated_of_main BitwiseChip.circuit BitwiseChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [BitwiseChip.rowView, circuit_norm]
-  · exact BitwiseChip.mainMemorySelectorGated
+  liftMemoryGating BitwiseChip.circuit, BitwiseChip.rowView,
+    (fun input _ => input.is_real), BitwiseChip.mainMemorySelectorGated
 
 /-- The exact ALU-reader input assembled by Lt's `main`. -/
 private def LtChip.aluReaderInput (input : Var LtChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -869,7 +765,6 @@ private def LtChip.aluReaderInput (input : Var LtChip.Inputs (ZMod p)) (offset :
     var ⟨offset⟩ * 9 + var ⟨offset + 1⟩ * 10,
     var ⟨offset + 2⟩, 0, 0, 0⟩
 
-set_option maxHeartbeats 1000000 in
 /-- Lt's full row constraints restrict to its composed ALU reader. -/
 private theorem LtChip.aluReaderConstraints
     (input : Var LtChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
@@ -885,7 +780,6 @@ private theorem LtChip.aluReaderConstraints
     (LtChip.aluReaderInput input offset) (offset + 12) env
       ((LtChip.main input).operations offset) readerMem constraints
 
-set_option maxHeartbeats 1000000 in
 /-- Lt's immediate-aware source-C gate is zero or the physical row selector. -/
 private theorem LtChip.subGate_eq_zero_or_isReal
     (input : Var LtChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
@@ -908,24 +802,13 @@ private theorem LtChip.subGate_eq_zero_or_isReal
 
 theorem LtChip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) LtChip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed LtChip.main (fun input _ => input.is_real)
-    LtChip.exposedMemoryInteractions LtChip.interactionsWith_memory_eq
-  intro input offset env constraints
-  have subGate := LtChip.subGate_eq_zero_or_isReal input offset env constraints
-  rcases subGate with subGate | subGate <;>
-    simp only [LtChip.exposedMemoryInteractions, List.forall_mem_cons,
-      Channel.pulledIf, Channel.pushedIf, pulledIf_mult, pushedIf_mult,
-      Expression.eval, neg_one_mul, List.not_mem_nil, false_implies, true_and,
-      subGate, true_or, or_true]
-  all_goals simp
+  subGateMemoryGating LtChip.main, LtChip.exposedMemoryInteractions,
+    LtChip.interactionsWith_memory_eq, LtChip.subGate_eq_zero_or_isReal
 
 theorem LtChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) LtChip.circuit LtChip.rowView := by
-  apply circuitMemorySelectorGated_of_main LtChip.circuit LtChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [LtChip.rowView, circuit_norm]
-  · exact LtChip.mainMemorySelectorGated
+  liftMemoryGating LtChip.circuit, LtChip.rowView,
+    (fun input _ => input.is_real), LtChip.mainMemorySelectorGated
 
 /-! ## ShiftLeft's derived selector -/
 
@@ -940,7 +823,6 @@ private theorem ShiftLeftChip.aluReaderConstraints
       ((ShiftLeftChip.main input).operations offset)
       (ShiftLeftChip.aluReader_mem_subcircuits input offset) constraints
 
-set_option maxHeartbeats 1000000 in
 /-- ShiftLeft's immediate-aware source-C gate is zero or its witnessed variant selector. -/
 private theorem ShiftLeftChip.subGate_eq_zero_or_exposedGate
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
@@ -981,11 +863,8 @@ theorem ShiftLeftChip.mainMemorySelectorGated :
 
 theorem ShiftLeftChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) ShiftLeftChip.circuit ShiftLeftChip.rowView := by
-  apply circuitMemorySelectorGated_of_main ShiftLeftChip.circuit ShiftLeftChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [ShiftLeftChip.rowView, circuit_norm]
-  · exact ShiftLeftChip.mainMemorySelectorGated
+  liftMemoryGating ShiftLeftChip.circuit, ShiftLeftChip.rowView,
+    (fun input _ => input.is_real), ShiftLeftChip.mainMemorySelectorGated
 
 /-- The ShiftRight row's explicit binding assertion identifies its public selector with the
 variant-flag sum used by the factored register write. -/
@@ -1024,7 +903,6 @@ private theorem ShiftRightChip.aluReaderGateFacts
   exact aluTypeReader_gateFacts_of_constraints
     (ShiftRightChip.aluReaderInput input offset) (offset + 37) env readerConstraints
 
-set_option maxHeartbeats 1000000 in
 /-- ShiftRight's immediate-aware source-C gate is zero or the physical row selector. -/
 private theorem ShiftRightChip.subGate_eq_zero_or_isReal
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
@@ -1073,11 +951,8 @@ theorem ShiftRightChip.mainMemorySelectorGated :
 
 theorem ShiftRightChip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) ShiftRightChip.circuit ShiftRightChip.rowView := by
-  apply circuitMemorySelectorGated_of_main ShiftRightChip.circuit ShiftRightChip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [ShiftRightChip.rowView, circuit_norm]
-  · exact ShiftRightChip.mainMemorySelectorGated
+  liftMemoryGating ShiftRightChip.circuit, ShiftRightChip.rowView,
+    (fun input _ => input.is_real), ShiftRightChip.mainMemorySelectorGated
 
 /-! ## Immutable ALU reader (`AluX0`) -/
 
@@ -1132,24 +1007,13 @@ private theorem AluX0Chip.subGate_eq_zero_or_isReal
 
 theorem AluX0Chip.mainMemorySelectorGated :
     MainMemorySelectorGated (p := p) AluX0Chip.main (fun input _ => input.is_real) := by
-  apply mainMemorySelectorGated_of_exposed AluX0Chip.main (fun input _ => input.is_real)
-    AluX0Chip.exposedMemoryInteractions AluX0Chip.interactionsWith_memory_eq
-  intro input offset env constraints
-  have subGate := AluX0Chip.subGate_eq_zero_or_isReal input offset env constraints
-  rcases subGate with subGate | subGate <;>
-    simp only [AluX0Chip.exposedMemoryInteractions, List.forall_mem_cons,
-      Channel.pulledIf, Channel.pushedIf, pulledIf_mult, pushedIf_mult,
-      Expression.eval, neg_one_mul, List.not_mem_nil, false_implies, true_and,
-      subGate, true_or, or_true]
-  all_goals simp
+  subGateMemoryGating AluX0Chip.main, AluX0Chip.exposedMemoryInteractions,
+    AluX0Chip.interactionsWith_memory_eq, AluX0Chip.subGate_eq_zero_or_isReal
 
 theorem AluX0Chip.circuitMemorySelectorGated :
     CircuitMemorySelectorGated (p := p) AluX0Chip.circuit AluX0Chip.rowView := by
-  apply circuitMemorySelectorGated_of_main AluX0Chip.circuit AluX0Chip.rowView
-    (fun input _ => input.is_real)
-  · intro env input offset
-    simp only [AluX0Chip.rowView, circuit_norm]
-  · exact AluX0Chip.mainMemorySelectorGated
+  liftMemoryGating AluX0Chip.circuit, AluX0Chip.rowView,
+    (fun input _ => input.is_real), AluX0Chip.mainMemorySelectorGated
 
 /-! ## Registry closure -/
 
@@ -1162,7 +1026,6 @@ local macro "memorySelectorRegistryCase " kind:term ", " shape:term : tactic =>
     apply memorySelectorConstraintShape_of_circuit
     exact $shape:term))
 
-set_option maxHeartbeats 8000000 in
 /-- Every descriptor in the single supported-machine registry gates each of its actual Memory
 interactions by the selector exposed from that same constrained physical row. -/
 theorem supportedChip_memorySelectorConstraintShape (chip : SupportedChip p)

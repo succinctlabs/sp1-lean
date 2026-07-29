@@ -139,6 +139,47 @@ local macro "simpleInputSelectorBinary" main:term : tactic =>
     rw [← ProvableStruct.eval_eq_eval env input] at shallow
     exact bool_of_mul_pred (by tauto)))
 
+/-- Boilerplate for chips whose `is_real` boolean gate is the *first* shallow assert of `main`.
+Extracting the gate by list position keeps the proof from unfolding the whole chip circuit. -/
+local macro "headGateSelectorBinary" main:term : tactic =>
+  `(tactic| (
+    constructor
+    intro input offset env shallow
+    have allConstraints := (constraintsHold_shallow_iff_forall_mem.mp shallow).1
+    have gateMem : input.is_real * (input.is_real - 1) ∈
+        (($main:term input).operations offset).shallowConstraints := by
+      change input.is_real * (input.is_real - 1) ∈
+        input.is_real * (input.is_real - 1) :: _
+      exact List.mem_cons_self
+    have binary : Expression.eval env input.is_real = 0 ∨
+        Expression.eval env input.is_real = 1 := by
+      apply bool_of_mul_pred
+      simpa only [circuit_norm] using allConstraints _ gateMem
+    have inputRealEq : (Eval.eval env input).is_real = Expression.eval env input.is_real := by
+      simp only [circuit_norm]
+    rw [inputRealEq]
+    exact binary))
+
+/-- As `headGateSelectorBinary`, for chips whose gate is the *second* shallow assert. -/
+local macro "secondGateSelectorBinary" main:term : tactic =>
+  `(tactic| (
+    constructor
+    intro input offset env shallow
+    have allConstraints := (constraintsHold_shallow_iff_forall_mem.mp shallow).1
+    have gateMem : input.is_real * (input.is_real - 1) ∈
+        (($main:term input).operations offset).shallowConstraints := by
+      change input.is_real * (input.is_real - 1) ∈
+        _ :: input.is_real * (input.is_real - 1) :: _
+      exact List.mem_cons_of_mem _ List.mem_cons_self
+    have binary : Expression.eval env input.is_real = 0 ∨
+        Expression.eval env input.is_real = 1 := by
+      apply bool_of_mul_pred
+      simpa only [circuit_norm] using allConstraints _ gateMem
+    have inputRealEq : (Eval.eval env input).is_real = Expression.eval env input.is_real := by
+      simp only [circuit_norm]
+    rw [inputRealEq]
+    exact binary))
+
 theorem AddiChip.mainSelectorBinary :
     MainSelectorBinary (p := p) AddiChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary AddiChip.main
@@ -155,7 +196,6 @@ theorem SubwChip.mainSelectorBinary :
     MainSelectorBinary (p := p) SubwChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary SubwChip.main
 
-set_option maxHeartbeats 2000000 in
 theorem BitwiseChip.mainSelectorBinary :
     MainSelectorBinary (p := p) BitwiseChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary BitwiseChip.main
@@ -164,93 +204,22 @@ theorem LtChip.mainSelectorBinary :
     MainSelectorBinary (p := p) LtChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary LtChip.main
 
-set_option maxHeartbeats 2000000 in
 theorem ShiftLeftChip.mainSelectorBinary :
     MainSelectorBinary (p := p) ShiftLeftChip.main (fun input => input.is_real) := by
-  constructor
-  intro input offset env shallow
-  have allConstraints := (constraintsHold_shallow_iff_forall_mem.mp shallow).1
-  have gateMem : input.is_real * (input.is_real - 1) ∈
-      ((ShiftLeftChip.main input).operations offset).shallowConstraints := by
-    change input.is_real * (input.is_real - 1) ∈
-      input.is_real * (input.is_real - 1) :: _
-    exact List.mem_cons_self
-  have gate : Expression.eval env (input.is_real * (input.is_real - 1)) = 0 := by
-    exact allConstraints _ gateMem
-  have binary : Expression.eval env input.is_real = 0 ∨
-      Expression.eval env input.is_real = 1 := by
-    apply bool_of_mul_pred
-    simpa only [circuit_norm] using gate
-  have inputRealEq : (Eval.eval env input).is_real = Expression.eval env input.is_real := by
-    simp only [circuit_norm]
-  rw [inputRealEq]
-  exact binary
+  headGateSelectorBinary ShiftLeftChip.main
 
-set_option maxHeartbeats 2000000 in
 theorem ShiftRightChip.mainSelectorBinary :
     MainSelectorBinary (p := p) ShiftRightChip.main (fun input => input.is_real) := by
-  constructor
-  intro input offset env shallow
-  have allConstraints := (constraintsHold_shallow_iff_forall_mem.mp shallow).1
-  have gateMem : input.is_real * (input.is_real - 1) ∈
-      ((ShiftRightChip.main input).operations offset).shallowConstraints := by
-    change input.is_real * (input.is_real - 1) ∈
-      input.is_real * (input.is_real - 1) :: _
-    exact List.mem_cons_self
-  have gate : Expression.eval env (input.is_real * (input.is_real - 1)) = 0 := by
-    exact allConstraints _ gateMem
-  have binary : Expression.eval env input.is_real = 0 ∨
-      Expression.eval env input.is_real = 1 := by
-    apply bool_of_mul_pred
-    simpa only [circuit_norm] using gate
-  have inputRealEq : (Eval.eval env input).is_real = Expression.eval env input.is_real := by
-    simp only [circuit_norm]
-  rw [inputRealEq]
-  exact binary
+  headGateSelectorBinary ShiftRightChip.main
 
-set_option maxHeartbeats 1000000 in
 theorem JalChip.mainSelectorBinary :
     MainSelectorBinary (p := p) JalChip.main (fun input => input.is_real) := by
-  constructor
-  intro input offset env shallow
-  have allConstraints := (constraintsHold_shallow_iff_forall_mem.mp shallow).1
-  have gateMem : input.is_real * (input.is_real - 1) ∈
-      ((JalChip.main input).operations offset).shallowConstraints := by
-    change input.is_real * (input.is_real - 1) ∈
-      _ :: input.is_real * (input.is_real - 1) :: _
-    exact List.mem_cons_of_mem _ List.mem_cons_self
-  have gate := allConstraints _ gateMem
-  have binary : Expression.eval env input.is_real = 0 ∨
-      Expression.eval env input.is_real = 1 := by
-    apply bool_of_mul_pred
-    simpa only [circuit_norm] using gate
-  have inputRealEq : (Eval.eval env input).is_real = Expression.eval env input.is_real := by
-    simp only [circuit_norm]
-  rw [inputRealEq]
-  exact binary
+  secondGateSelectorBinary JalChip.main
 
-set_option maxHeartbeats 2000000 in
 theorem JalrChip.mainSelectorBinary :
     MainSelectorBinary (p := p) JalrChip.main (fun input => input.is_real) := by
-  constructor
-  intro input offset env shallow
-  have allConstraints := (constraintsHold_shallow_iff_forall_mem.mp shallow).1
-  have gateMem : input.is_real * (input.is_real - 1) ∈
-      ((JalrChip.main input).operations offset).shallowConstraints := by
-    change input.is_real * (input.is_real - 1) ∈
-      _ :: input.is_real * (input.is_real - 1) :: _
-    exact List.mem_cons_of_mem _ List.mem_cons_self
-  have gate := allConstraints _ gateMem
-  have binary : Expression.eval env input.is_real = 0 ∨
-      Expression.eval env input.is_real = 1 := by
-    apply bool_of_mul_pred
-    simpa only [circuit_norm] using gate
-  have inputRealEq : (Eval.eval env input).is_real = Expression.eval env input.is_real := by
-    simp only [circuit_norm]
-  rw [inputRealEq]
-  exact binary
+  secondGateSelectorBinary JalrChip.main
 
-set_option maxHeartbeats 1000000 in
 theorem BranchChip.mainSelectorBinary :
     MainSelectorBinary (p := p) BranchChip.main (fun input => input.is_real) := by
   constructor
@@ -278,26 +247,9 @@ theorem BranchChip.mainSelectorBinary :
   · right
     linear_combination link + selectorOne
 
-set_option maxHeartbeats 1000000 in
 theorem UTypeChip.mainSelectorBinary :
     MainSelectorBinary (p := p) UTypeChip.main (fun input => input.is_real) := by
-  constructor
-  intro input offset env shallow
-  have allConstraints := (constraintsHold_shallow_iff_forall_mem.mp shallow).1
-  have gateMem : input.is_real * (input.is_real - 1) ∈
-      ((UTypeChip.main input).operations offset).shallowConstraints := by
-    change input.is_real * (input.is_real - 1) ∈
-      _ :: input.is_real * (input.is_real - 1) :: _
-    exact List.mem_cons_of_mem _ List.mem_cons_self
-  have gate := allConstraints _ gateMem
-  have binary : Expression.eval env input.is_real = 0 ∨
-      Expression.eval env input.is_real = 1 := by
-    apply bool_of_mul_pred
-    simpa only [circuit_norm] using gate
-  have inputRealEq : (Eval.eval env input).is_real = Expression.eval env input.is_real := by
-    simp only [circuit_norm]
-  rw [inputRealEq]
-  exact binary
+  secondGateSelectorBinary UTypeChip.main
 
 theorem LoadByteChip.mainSelectorBinary : MainSelectorBinary (p := p) LoadByteChip.main
     LoadByteChip.isReal := by
@@ -327,7 +279,6 @@ theorem LoadDoubleChip.mainSelectorBinary :
     MainSelectorBinary (p := p) LoadDoubleChip.main (fun input => input.is_real) := by
   simpleInputSelectorBinary LoadDoubleChip.main
 
-set_option maxHeartbeats 2000000 in
 theorem LoadX0Chip.mainSelectorBinary : MainSelectorBinary (p := p) LoadX0Chip.main
     LoadX0Chip.isReal := by
   constructor
@@ -387,7 +338,6 @@ private lemma mem_flatConstraints_of_assertion {Input : TypeMap} [ProvableType I
   rw [Operations.toNested_toFlat, Operations.constraints_toFlat]
   exact h
 
-set_option maxHeartbeats 2000000 in
 set_option maxRecDepth 10000 in
 /-- The selector gate `is_real·(is_real−1)` (`E355`) sits in the `DivRemCore` cluster's own-assert
 tail — a shallow assert of the gadget's `main`, hence one of its deep constraints. -/
@@ -398,7 +348,6 @@ private lemma divRemCore_isReal_gate_mem_constraints
   change cols.is_real * (cols.is_real - 1) ∈ DivRemChip.ownAsserts cols ++ _
   exact List.mem_append_left _ (DivRemChip.isReal_gate_mem_ownAsserts cols)
 
-set_option maxHeartbeats 8000000 in
 set_option maxRecDepth 10000 in
 /-- The selector gate is a deep constraint of the chip `main`: its deep constraint list is
 `CPUState ++ (RTypeReader ++ (Compare ++ (Core ++ (RegisterWrite ++ []))))`, and the gate lives in
@@ -414,7 +363,6 @@ private lemma divRemChip_isReal_gate_mem_main_constraints
   apply List.mem_append_left
   exact mem_flatConstraints_of_assertion (divRemCore_isReal_gate_mem_constraints _ _)
 
-set_option maxHeartbeats 2000000 in
 /-- DivRem's selector booleanity from the physical row constraints. The boolean gate is no longer
 a shallow assert of the chip `main` — it moved into the `DivRemCore` whole-row assertion cluster —
 so this bypasses the `MainSelectorBinary` shallow interface and extracts the gate from the deep
@@ -470,7 +418,6 @@ local macro "selectorRegistryCase " kind:term ", " selector:term ", " contract:t
       rfl
     · exact $contract:term))
 
-set_option maxHeartbeats 8000000 in
 /-- Every descriptor in the single supported-machine registry derives its selector from the actual
 shallow AIR constraints of the circuit retained by that descriptor. -/
 theorem supportedChip_selectorConstraintShape (chip : SupportedChip p)
