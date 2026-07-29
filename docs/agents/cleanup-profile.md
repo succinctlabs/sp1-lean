@@ -833,9 +833,18 @@ Per gated group, stopping at the first failure:
 > `Soundness/` modules and stops. **`Proofs/Chips/` depth does not by itself imply a wide closure.**
 > The same 30 files at `Math/` depth would have rebuilt ~240 modules — that is where the cost lives.
 >
-> **A DivRem-touching round pays a fixed ~285s toll no matter what it edits.**
-> `Faithful.DivRemChip.Exact` alone is 7× the heaviest module either W5 round changed and ~74% of
-> r2's wall clock. When scheduling, treat it as a constant, not as attributable to the batch.
+> **A DivRem-touching round pays a fixed ~285–300s toll no matter what it edits — and "touching"
+> means *transitively*.** `Faithful.DivRemChip.Exact` measured 298s on the W6/r1 gate, ~78% of a
+> 356s build, while **not being in that round's manifest at all**; `Soundness.Grounding.RTypeChips`
+> (109s) and `Soundness.GroundingAdapter` (74s) were likewise untouched. All 13 changed modules
+> together elaborated in ~106s. So the critical path of a wave gate is usually a module the batch
+> never edited. Two consequences: do not attribute gate wall-clock to the batch, and **a round that
+> avoids perturbing `Faithful/DivRemChip/Exact`'s import closure gates in well under two minutes** —
+> worth deliberately scheduling for when a wave has a cheap group available.
+>
+> **Reap before an `Exact`-touching build; it is not optional.** The W6/r1 gate found 4 stale
+> `lean --worker` children holding **10.5 GB** (2.6 GB each), three of them still pinned on files
+> from the round that had just finished — editing workers do not clean up their own LSP sessions.
 > **Never kill `lean --server` or `lake serve` — but stale `lean --worker` processes from *exited*
 > agents are fair game.** The distinction matters and cost the campaign a session restart before it
 > was understood. The `lean-lsp` MCP server *is* `lean --server`/`lake serve`; killing those takes the
