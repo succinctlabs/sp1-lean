@@ -342,7 +342,6 @@ private theorem loadHalfEvalU16MSBSingleton
   rw [loadHalfEvalU16MSB, Extracted.U16MSBOperation.mk.injEq]
   exact (ProvableType.eval_field env value).trans hvalue
 
-set_option maxHeartbeats 1000000 in
 theorem evalLoadHalfDirectOutput
     (input : LoadHalfChip.Inputs (ZMod p))
     (locals : Vector (ZMod p) 4) (data : ProverData (ZMod p)) :
@@ -405,8 +404,7 @@ def loadHalfChipRowCodec :
     width_eq := by
       rw [loadHalfChipPhysicalRow, inputFirstRow_size,
         Air.Flat.Component.width, LoadHalfChip.circuit_size_eq]
-    rowInput_eq := by
-      exact rowInput_inputFirstRow (LoadHalfChip.circuit (p := p))
+    rowInput_eq := rowInput_inputFirstRow (LoadHalfChip.circuit (p := p))
         (loadHalfChipInput cols) (loadHalfChipLocals cols) data
     rowOutput_eq := by
       change ProvableType.eval _ ((LoadHalfChip.main _).output _) = _
@@ -627,7 +625,6 @@ private theorem loadHalfNativeConstraintsDecompose
     circuit_norm, List.map_append, List.forall_append]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem loadHalfAddrAddAssertions
     (env : Environment (ZMod p))
     (input : Var AddrAddOperation.Inputs (ZMod p)) (offset : ℕ) :
@@ -658,7 +655,6 @@ private theorem loadHalfAddrAddAssertions
     ProvableType.eval_field, ProvableType.getElem_eval_fields]
   simp only [List.singleton_append, List.Forall]
 
-set_option maxHeartbeats 2000000 in
 private theorem loadHalfAddressAssertions
     (env : Environment (ZMod p))
     (input : Var AddressOperation.Inputs (ZMod p))
@@ -726,7 +722,6 @@ private def loadHalfMemoryAssertionValues
           (ts.diff_low_limb + ts.diff_high_limb * 65536))) -
         Expression.eval env 0 ]
 
-set_option maxHeartbeats 1000000 in
 omit [Fact (2 ^ 17 < p)] in
 private theorem loadHalfMemoryAssertionList
     (env : Environment (ZMod p))
@@ -745,7 +740,6 @@ private theorem loadHalfMemoryAssertionList
   simp only [ProvableType.eval_field, eval_sub, Expression.eval]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem loadHalfNativeU16MSBAssertionList
     (env : Environment (ZMod p))
     (input : Var U16MSBOperation.Inputs (ZMod p)) (offset : ℕ) :
@@ -770,7 +764,6 @@ private theorem loadHalfNativeU16MSBAssertionList
   rw [hscalar]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem loadHalfU16MSBAssertions
     (env : Environment (ZMod p))
     (input : Var U16MSBOperation.Inputs (ZMod p)) (offset : ℕ)
@@ -1241,7 +1234,6 @@ private theorem loadHalfCpuMeaningFaithful
   simp only [cpu, loadHalfCpuInput] at hCpu
   exact hCpu
 
-set_option maxHeartbeats 1000000 in
 private theorem loadHalfITypeMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var LoadHalfChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -1444,8 +1436,8 @@ private theorem loadHalfStateInteractionsEq
     (input : Var LoadHalfChip.Inputs (ZMod p)) (offset : ℕ) :
     ((LoadHalfChip.main input).operations offset).interactionsWith
         stateChannel.toRaw =
-      (loadHalfStateInteractions input).map ChannelInteraction.toRaw := by
-  exact (LoadHalfChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
+      (loadHalfStateInteractions input).map ChannelInteraction.toRaw :=
+  (LoadHalfChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
     input offset
     ⟨stateChannel.toRaw,
       (loadHalfStateInteractions input).map ChannelInteraction.toRaw⟩
@@ -1455,8 +1447,8 @@ private theorem loadHalfProgramInteractionsEq
     (input : Var LoadHalfChip.Inputs (ZMod p)) (offset : ℕ) :
     ((LoadHalfChip.main input).operations offset).interactionsWith
         programChannel.toRaw =
-      (loadHalfProgramInteractions input).map ChannelInteraction.toRaw := by
-  exact (LoadHalfChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
+      (loadHalfProgramInteractions input).map ChannelInteraction.toRaw :=
+  (LoadHalfChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
     input offset
     ⟨programChannel.toRaw,
       (loadHalfProgramInteractions input).map ChannelInteraction.toRaw⟩
@@ -1595,8 +1587,8 @@ private theorem loadHalfPermMemoryBlocks {α : Type}
     List.perm_append_comm
   have htail :
       List.Perm [opAPull, opBPull, opBPush, opAPush]
-        [opAPull, opAPush, opBPull, opBPush] := by
-    exact List.Perm.cons opAPull
+        [opAPull, opAPush, opBPull, opBPush] :=
+    List.Perm.cons opAPull
       ((List.Perm.cons opBPull
         (List.Perm.swap opBPush opAPush []).symm).trans
           (List.Perm.swap opBPull opAPush [opBPush]).symm)
@@ -1903,12 +1895,10 @@ private theorem loadHalfByteInteractionsFaithful
             (loadHalfChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
-  have h6 : (6 : ZMod p).val = 6 := by
-    exact ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num)
-      (Fact.out (p := 2 ^ 17 < p)))
-  have h3 : (3 : ZMod p).val = 3 := by
-    exact ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num)
-      (Fact.out (p := 2 ^ 17 < p)))
+  have h6 : (6 : ZMod p).val = 6 :=
+    ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
+  have h3 : (3 : ZMod p).val = 3 :=
+    ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
   have hBytePull :
       ∀ (gate : Expression (ZMod p))
         (msg : ByteRow (Expression (ZMod p))),

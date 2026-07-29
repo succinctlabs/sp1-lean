@@ -360,8 +360,7 @@ def storeByteChipRowCodec :
     width_eq := by
       rw [storeByteChipPhysicalRow, inputFirstRow_size,
         Air.Flat.Component.width, StoreByteChip.circuit_size_eq]
-    rowInput_eq := by
-      exact rowInput_inputFirstRow (StoreByteChip.circuit (p := p))
+    rowInput_eq := rowInput_inputFirstRow (StoreByteChip.circuit (p := p))
         (storeByteChipInput cols) (storeByteChipLocals cols) data
     rowOutput_eq := by
       change ProvableType.eval _ ((StoreByteChip.main _).output _) = _
@@ -575,7 +574,6 @@ private theorem storeByteNativeConstraintsDecompose
     circuit_norm, List.map_append, List.forall_append]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem storeByteAddrAddAssertions
     (env : Environment (ZMod p))
     (input : Var AddrAddOperation.Inputs (ZMod p)) (offset : ℕ) :
@@ -606,7 +604,6 @@ private theorem storeByteAddrAddAssertions
     ProvableType.eval_field, ProvableType.getElem_eval_fields]
   simp only [List.singleton_append, List.Forall]
 
-set_option maxHeartbeats 2000000 in
 private theorem storeByteAddressAssertions
     (env : Environment (ZMod p))
     (input : Var AddressOperation.Inputs (ZMod p))
@@ -673,7 +670,6 @@ private def storeByteITypeImmutableAssertionValues
         (input.cols.op_a_0 * input.cols.op_a_memory.prev_value[3]) -
       Expression.eval env 0 ]
 
-set_option maxHeartbeats 1000000 in
 private theorem storeByteITypeImmutableAssertionList
     (env : Environment (ZMod p))
     (input : Var Readers.ITypeReaderImmutable.Inputs (ZMod p))
@@ -691,7 +687,6 @@ private theorem storeByteITypeImmutableAssertionList
   repeat' rw [CanonicalReader.equalityAssertionList]
   rfl
 
-set_option maxHeartbeats 1000000 in
 private theorem storeByteITypeImmutableAssertions
     (env : Environment (ZMod p))
     (input : Var Readers.ITypeReaderImmutable.Inputs (ZMod p))
@@ -745,7 +740,6 @@ private def storeByteMemoryAssertionValues
           (ts.diff_low_limb + ts.diff_high_limb * 65536))) -
         Expression.eval env 0 ]
 
-set_option maxHeartbeats 1000000 in
 omit [Fact (2 ^ 17 < p)] in
 private theorem storeByteMemoryAssertionList
     (env : Environment (ZMod p))
@@ -1075,7 +1069,6 @@ private theorem storeByteCpuMeaningFaithful
   simp only [cpu, storeByteCpuInput] at hCpu
   exact hCpu
 
-set_option maxHeartbeats 1000000 in
 private theorem storeByteITypeMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var StoreByteChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -1255,8 +1248,8 @@ private theorem storeByteStateInteractionsEq
     (input : Var StoreByteChip.Inputs (ZMod p)) (offset : ℕ) :
     ((StoreByteChip.main input).operations offset).interactionsWith
         stateChannel.toRaw =
-      (storeByteStateInteractions input).map ChannelInteraction.toRaw := by
-  exact (StoreByteChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
+      (storeByteStateInteractions input).map ChannelInteraction.toRaw :=
+  (StoreByteChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
     input offset
     ⟨stateChannel.toRaw,
       (storeByteStateInteractions input).map ChannelInteraction.toRaw⟩
@@ -1266,8 +1259,8 @@ private theorem storeByteProgramInteractionsEq
     (input : Var StoreByteChip.Inputs (ZMod p)) (offset : ℕ) :
     ((StoreByteChip.main input).operations offset).interactionsWith
         programChannel.toRaw =
-      (storeByteProgramInteractions input).map ChannelInteraction.toRaw := by
-  exact (StoreByteChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
+      (storeByteProgramInteractions input).map ChannelInteraction.toRaw :=
+  (StoreByteChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
     input offset
     ⟨programChannel.toRaw,
       (storeByteProgramInteractions input).map ChannelInteraction.toRaw⟩
@@ -1665,12 +1658,10 @@ private theorem storeByteByteInteractionsFaithful
             (storeByteChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
-  have h6 : (6 : ZMod p).val = 6 := by
-    exact ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num)
-      (Fact.out (p := 2 ^ 17 < p)))
-  have h3 : (3 : ZMod p).val = 3 := by
-    exact ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num)
-      (Fact.out (p := 2 ^ 17 < p)))
+  have h6 : (6 : ZMod p).val = 6 :=
+    ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
+  have h3 : (3 : ZMod p).val = 3 :=
+    ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
   have hBytePull :
       ∀ (gate : Expression (ZMod p))
         (msg : ByteRow (Expression (ZMod p))),

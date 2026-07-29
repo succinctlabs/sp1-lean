@@ -304,7 +304,6 @@ theorem loadByteChipColumnsOfInput_roundtrip {F : Type}
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
-set_option maxHeartbeats 1000000 in
 theorem evalLoadByteDirectOutput
     (input : LoadByteChip.Inputs (ZMod p))
     (locals : Vector (ZMod p) 4) (data : ProverData (ZMod p)) :
@@ -358,8 +357,7 @@ def loadByteChipRowCodec :
     width_eq := by
       rw [loadByteChipPhysicalRow, inputFirstRow_size,
         Air.Flat.Component.width, LoadByteChip.circuit_size_eq]
-    rowInput_eq := by
-      exact rowInput_inputFirstRow (LoadByteChip.circuit (p := p))
+    rowInput_eq := rowInput_inputFirstRow (LoadByteChip.circuit (p := p))
         (loadByteChipInput cols) (loadByteChipLocals cols) data
     rowOutput_eq := by
       change ProvableType.eval _ ((LoadByteChip.main _).output _) = _
@@ -580,7 +578,6 @@ private theorem loadByteNativeConstraintsDecompose
     circuit_norm, List.map_append, List.forall_append, List.forall_cons]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem loadByteAddrAddAssertions
     (env : Environment (ZMod p))
     (input : Var AddrAddOperation.Inputs (ZMod p)) (offset : ℕ) :
@@ -611,7 +608,6 @@ private theorem loadByteAddrAddAssertions
     ProvableType.eval_field, ProvableType.getElem_eval_fields]
   simp only [List.singleton_append, List.Forall]
 
-set_option maxHeartbeats 2000000 in
 private theorem loadByteAddressAssertions
     (env : Environment (ZMod p))
     (input : Var AddressOperation.Inputs (ZMod p))
@@ -679,7 +675,6 @@ private def loadByteMemoryAssertionValues
           (ts.diff_low_limb + ts.diff_high_limb * 65536))) -
         Expression.eval env 0 ]
 
-set_option maxHeartbeats 1000000 in
 omit [Fact (2 ^ 17 < p)] in
 private theorem loadByteMemoryAssertionList
     (env : Environment (ZMod p))
@@ -1117,7 +1112,6 @@ private theorem loadByteCpuMeaningFaithful
   simp only [cpu, loadByteCpuInput] at hCpu
   exact hCpu
 
-set_option maxHeartbeats 1000000 in
 private theorem loadByteITypeMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var LoadByteChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -1319,8 +1313,8 @@ private theorem loadByteStateInteractionsEq
     (input : Var LoadByteChip.Inputs (ZMod p)) (offset : ℕ) :
     ((LoadByteChip.main input).operations offset).interactionsWith
         stateChannel.toRaw =
-      (loadByteStateInteractions input).map ChannelInteraction.toRaw := by
-  exact (LoadByteChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
+      (loadByteStateInteractions input).map ChannelInteraction.toRaw :=
+  (LoadByteChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
     input offset
     ⟨stateChannel.toRaw,
       (loadByteStateInteractions input).map ChannelInteraction.toRaw⟩
@@ -1330,8 +1324,8 @@ private theorem loadByteProgramInteractionsEq
     (input : Var LoadByteChip.Inputs (ZMod p)) (offset : ℕ) :
     ((LoadByteChip.main input).operations offset).interactionsWith
         programChannel.toRaw =
-      (loadByteProgramInteractions input).map ChannelInteraction.toRaw := by
-  exact (LoadByteChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
+      (loadByteProgramInteractions input).map ChannelInteraction.toRaw :=
+  (LoadByteChip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
     input offset
     ⟨programChannel.toRaw,
       (loadByteProgramInteractions input).map ChannelInteraction.toRaw⟩
@@ -1466,8 +1460,8 @@ private theorem loadBytePermMemoryBlocks {α : Type}
     List.perm_append_comm
   have htail :
       List.Perm [opAPull, opBPull, opBPush, opAPush]
-        [opAPull, opAPush, opBPull, opBPush] := by
-    exact List.Perm.cons opAPull
+        [opAPull, opAPush, opBPull, opBPush] :=
+    List.Perm.cons opAPull
       ((List.Perm.cons opBPull
         (List.Perm.swap opBPush opAPush []).symm).trans
           (List.Perm.swap opBPull opAPush [opBPush]).symm)
@@ -1754,15 +1748,12 @@ private theorem loadByteByteInteractionsFaithful
             (loadByteChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
-  have h6 : (6 : ZMod p).val = 6 := by
-    exact ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num)
-      (Fact.out (p := 2 ^ 17 < p)))
-  have h3 : (3 : ZMod p).val = 3 := by
-    exact ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num)
-      (Fact.out (p := 2 ^ 17 < p)))
-  have h5 : (5 : ZMod p).val = 5 := by
-    exact ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num)
-      (Fact.out (p := 2 ^ 17 < p)))
+  have h6 : (6 : ZMod p).val = 6 :=
+    ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
+  have h3 : (3 : ZMod p).val = 3 :=
+    ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
+  have h5 : (5 : ZMod p).val = 5 :=
+    ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
   have hBytePull :
       ∀ (gate : Expression (ZMod p))
         (msg : ByteRow (Expression (ZMod p))),

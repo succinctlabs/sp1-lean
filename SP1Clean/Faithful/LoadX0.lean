@@ -308,7 +308,6 @@ theorem loadX0ChipColumnsOfInput_roundtrip {F : Type}
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
-set_option maxHeartbeats 1000000 in
 theorem evalLoadX0DirectOutput
     (input : LoadX0Chip.Inputs (ZMod p))
     (locals : Vector (ZMod p) 4) (data : ProverData (ZMod p)) :
@@ -362,8 +361,7 @@ def loadX0ChipRowCodec :
     width_eq := by
       rw [loadX0ChipPhysicalRow, inputFirstRow_size,
         Air.Flat.Component.width, LoadX0Chip.circuit_size_eq]
-    rowInput_eq := by
-      exact rowInput_inputFirstRow (LoadX0Chip.circuit (p := p))
+    rowInput_eq := rowInput_inputFirstRow (LoadX0Chip.circuit (p := p))
         (loadX0ChipInput cols) (loadX0ChipLocals cols) data
     rowOutput_eq := by
       change ProvableType.eval _ ((LoadX0Chip.main _).output _) = _
@@ -570,7 +568,6 @@ private theorem loadX0NativeConstraintsDecompose
     circuit_norm, List.map_append, List.forall_append, List.forall_cons]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem loadX0AddrAddAssertions
     (env : Environment (ZMod p))
     (input : Var AddrAddOperation.Inputs (ZMod p)) (offset : ℕ) :
@@ -601,7 +598,6 @@ private theorem loadX0AddrAddAssertions
     ProvableType.eval_field, ProvableType.getElem_eval_fields]
   simp only [List.singleton_append, List.Forall]
 
-set_option maxHeartbeats 2000000 in
 private theorem loadX0AddressAssertions
     (env : Environment (ZMod p))
     (input : Var AddressOperation.Inputs (ZMod p))
@@ -669,7 +665,6 @@ private def loadX0MemoryAssertionValues
           (ts.diff_low_limb + ts.diff_high_limb * 65536))) -
         Expression.eval env 0 ]
 
-set_option maxHeartbeats 1000000 in
 omit [Fact (2 ^ 17 < p)] in
 private theorem loadX0MemoryAssertionList
     (env : Environment (ZMod p))
@@ -1115,7 +1110,6 @@ private theorem loadX0CpuMeaningFaithful
   simp only [cpu, loadX0CpuInput, loadX0IsReal] at hCpu
   exact hCpu
 
-set_option maxHeartbeats 1000000 in
 private theorem loadX0ITypeMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var LoadX0Chip.Inputs (ZMod p)) (offset : ℕ) :
@@ -1332,8 +1326,8 @@ private theorem loadX0StateInteractionsEq
     (input : Var LoadX0Chip.Inputs (ZMod p)) (offset : ℕ) :
     ((LoadX0Chip.main input).operations offset).interactionsWith
         stateChannel.toRaw =
-      (loadX0StateInteractions input).map ChannelInteraction.toRaw := by
-  exact (LoadX0Chip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
+      (loadX0StateInteractions input).map ChannelInteraction.toRaw :=
+  (LoadX0Chip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
     input offset
     ⟨stateChannel.toRaw,
       (loadX0StateInteractions input).map ChannelInteraction.toRaw⟩
@@ -1344,8 +1338,8 @@ private theorem loadX0ProgramInteractionsEq
     (input : Var LoadX0Chip.Inputs (ZMod p)) (offset : ℕ) :
     ((LoadX0Chip.main input).operations offset).interactionsWith
         programChannel.toRaw =
-      (loadX0ProgramInteractions input).map ChannelInteraction.toRaw := by
-  exact (LoadX0Chip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
+      (loadX0ProgramInteractions input).map ChannelInteraction.toRaw :=
+  (LoadX0Chip.circuit (p := p)).interactionsWith_eq_of_mem_exposedChannels
     input offset
     ⟨programChannel.toRaw,
       (loadX0ProgramInteractions input).map ChannelInteraction.toRaw⟩
@@ -1761,12 +1755,10 @@ private theorem loadX0ByteInteractionsFaithful
             (loadX0ChipRustColumns env input offset))).map
             Extracted.Interaction.toAccess).filter
         (fun access => access.1 = InteractionKind.Byte)) := by
-  have h6 : (6 : ZMod p).val = 6 := by
-    exact ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num)
-      (Fact.out (p := 2 ^ 17 < p)))
-  have h3 : (3 : ZMod p).val = 3 := by
-    exact ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num)
-      (Fact.out (p := 2 ^ 17 < p)))
+  have h6 : (6 : ZMod p).val = 6 :=
+    ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
+  have h3 : (3 : ZMod p).val = 3 :=
+    ZMod.val_natCast_of_lt (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
   have hBytePull :
       ∀ (gate : Expression (ZMod p))
         (msg : ByteRow (Expression (ZMod p))),
