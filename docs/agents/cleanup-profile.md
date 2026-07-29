@@ -188,6 +188,16 @@ and the original name stays resolvable for `check_report_citations.sh` and the p
 > stable (`gen_axiom_probe.py` skips `private` lines), which matters more than two duplicated lines.
 > Record such pairs in `DEFERRED.md` as owner decisions rather than promoting one to public.
 
+> **A `change … at h` that *looks* like a free abbrev-restatement may be bridging two distinct
+> constants.** §6 records that a `change` restating an abbreviation is safe to delete. W8/b5 hit the
+> counter-case: collapsing `change … at clockCount; exact clockCount` to a bare `exact` in
+> `supported_core_witness_grounding` fails with **`maximum recursion depth has been reached`**,
+> because `StateMsg.timeNat (initialBoundaryStateMessage …)` and `Semantics.clkNat …` are two
+> *different* constants that merely happen to be defeq — the `change` is doing real bridging work.
+> Note the error is **`maxRecDepth`, not heartbeats**, so a ceiling ladder will not diagnose it and
+> raising a budget will not fix it. Before deleting a `change`, check whether both sides name the
+> same constant.
+
 ## 4a. Extracted helpers are permitted
 
 Adding a **new** declaration is allowed in exactly two shapes. Nothing existing may change either way.
