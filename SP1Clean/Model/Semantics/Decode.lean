@@ -36,7 +36,7 @@ def regidxVal (r : regidx) : ZMod p := match r with | .Regidx b => (b.toNat : ZM
 is the *decode-intrinsic* source-register bound (`op_b`/`op_c < 32`): SP1 does **not** range-check
 the source indices in-circuit (the Program bus's `ProgramMsg.RowSpec` bounds only the write index
 `op_a`), so this is the honest — and only — provenance of the bound, derived from the 5-bit
-instruction encoding rather than assumed on the boundary. See `decodedInROM_rtype_op_bc_lt`
+instruction encoding rather than assumed on the boundary. See `decodedInROM_rtype_operand_lt`
 (`Soundness/Decode.lean`) for the row-level consumer. -/
 theorem regidxVal_val_lt (r : regidx) : (regidxVal (p := p) r).val < 32 := by
   obtain ⟨b⟩ := r

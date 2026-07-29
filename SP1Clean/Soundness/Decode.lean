@@ -233,6 +233,23 @@ theorem sailConfigured_nonempty : ∃ s, SailConfigured s := by
   obtain ⟨s0, h⟩ := isInitialState_nonvacuous
   exact ⟨s0, h.configured⟩
 
+/-- The pinning step shared by every `decodedInROM` hoist: a committed scalar operand column
+(`op_a`) determines its register, because `regidxVal` is injective on the 5-bit range. -/
+private theorem regidx_eq_of_regCol {r r' : regidx} {x : ZMod p}
+    (h : x = regidxVal r) (h' : x = regidxVal r') : r' = r := by
+  obtain ⟨b⟩ := r
+  obtain ⟨b'⟩ := r'
+  simp only [regidxVal] at h h'
+  exact congrArg regidx.Regidx (regidx_bv_inj (h'.symm.trans h))
+
+/-- The `op_b`/`op_c` twin of `regidx_eq_of_regCol`: those columns commit the register in limb `0`
+of a `Word`, so the pinning goes through `v[0]`. -/
+private theorem regidx_eq_of_vecCol {r r' : regidx} {v : Vector (ZMod p) 4}
+    (h : v = #v[regidxVal r, 0, 0, 0]) (h' : v = #v[regidxVal r', 0, 0, 0]) : r' = r := by
+  refine regidx_eq_of_regCol (x := v[0]) ?_ ?_
+  · rw [h]; simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+  · rw [h']; simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+
 /-- **The RTYPE hoist.** Name `i₀` at the unconditional witness state; for arbitrary `s` the row's columns
 pin the per-state `i` to `i₀` (both invert to `RTYPE` with `regidx_bv_inj`-equal registers). Keyed on the
 committed `(opcode, imm_c)`. -/
@@ -246,23 +263,13 @@ theorem decodedInROM_rtype_hoist {prog : GuestProgram} {row : ProgramRow (ZMod p
   refine ⟨w, i0, hfetch, ?_, hrow0⟩
   intro s hs
   obtain ⟨i, hrun, hrow⟩ := hbody s hs
-  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ :=
+  obtain ⟨rs2, rs1, rd, hi0, ha, hb, hc⟩ :=
     instrToProgramRow_inv_rtype op (instrToProgramRow'_some hrow0) hop himm
-  obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  obtain ⟨rs2r', rs1r', rdr', hi, ha', hb', hc'⟩ :=
+  obtain ⟨rs2', rs1', rd', hi, ha', hb', hc'⟩ :=
     instrToProgramRow_inv_rtype op (instrToProgramRow'_some hrow) hop himm
-  obtain ⟨rs2'⟩ := rs2r'; obtain ⟨rs1'⟩ := rs1r'; obtain ⟨rd'⟩ := rdr'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have hh := congrArg (fun v => v[0]) (hc.symm.trans hc')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hh
-    exact hh.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have hh := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hh
-    exact hh.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have hh := ha.symm.trans ha'; simp only [regidxVal] at hh; exact hh.symm)
-  subst e2 e1 e0
+  obtain rfl : rs2' = rs2 := regidx_eq_of_vecCol hc hc'
+  obtain rfl : rs1' = rs1 := regidx_eq_of_vecCol hb hb'
+  obtain rfl : rd' = rd := regidx_eq_of_regCol ha ha'
   rw [hi, ← hi0] at hrun
   exact hrun
 
@@ -305,23 +312,13 @@ theorem decodedInROM_mul_hoist {prog : GuestProgram} {row : ProgramRow (ZMod p)}
   refine ⟨w, i0, hfetch, ?_, hrow0⟩
   intro s hs
   obtain ⟨i, hrun, hrow⟩ := hbody s hs
-  obtain ⟨rs2r, rs1r, rdr, hi0, ha, hb, hc⟩ :=
+  obtain ⟨rs2, rs1, rd, hi0, ha, hb, hc⟩ :=
     instrToProgramRow_inv_mul' op hcanon hrow0 hop himm
-  obtain ⟨rs2⟩ := rs2r; obtain ⟨rs1⟩ := rs1r; obtain ⟨rd⟩ := rdr
-  obtain ⟨rs2r', rs1r', rdr', hi, ha', hb', hc'⟩ :=
+  obtain ⟨rs2', rs1', rd', hi, ha', hb', hc'⟩ :=
     instrToProgramRow_inv_mul' op hcanon hrow hop himm
-  obtain ⟨rs2'⟩ := rs2r'; obtain ⟨rs1'⟩ := rs1r'; obtain ⟨rd'⟩ := rdr'
-  have e2 : rs2' = rs2 := regidx_bv_inj (by
-    have hh := congrArg (fun v => v[0]) (hc.symm.trans hc')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hh
-    exact hh.symm)
-  have e1 : rs1' = rs1 := regidx_bv_inj (by
-    have hh := congrArg (fun v => v[0]) (hb.symm.trans hb')
-    simp only [regidxVal, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hh
-    exact hh.symm)
-  have e0 : rd' = rd := regidx_bv_inj (by
-    have hh := ha.symm.trans ha'; simp only [regidxVal] at hh; exact hh.symm)
-  subst e2 e1 e0
+  obtain rfl : rs2' = rs2 := regidx_eq_of_vecCol hc hc'
+  obtain rfl : rs1' = rs1 := regidx_eq_of_vecCol hb hb'
+  obtain rfl : rd' = rd := regidx_eq_of_regCol ha ha'
   rw [hi, ← hi0] at hrun
   exact hrun
 

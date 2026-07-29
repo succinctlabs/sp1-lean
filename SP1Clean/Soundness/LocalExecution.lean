@@ -182,7 +182,6 @@ theorem groundedRows_localExecution {Row : Type u}
     { steps := rows.length
       finalState := finalState
       reached := Semantics.chainState_of_sailChain chain }
-  refine ⟨⟨context, execution⟩, wellFormed, rfl, pc, finalPc, ?_⟩
-  exact clockMatches
+  exact ⟨⟨context, execution⟩, wellFormed, rfl, pc, finalPc, clockMatches⟩
 
 end SP1Clean.Soundness

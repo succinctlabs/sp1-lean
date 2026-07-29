@@ -81,8 +81,8 @@ theorem memoryInitProviderTable_component
 /-- The stable Memory-init table uses the ensemble's shared prover data. -/
 theorem memoryInitProviderTable_data
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
-    (memoryInitProviderTable witness).data = witness.data := by
-  exact witness.same_data _ (List.getElem_mem
+    (memoryInitProviderTable witness).data = witness.data :=
+  witness.same_data _ (List.getElem_mem
     (memoryInitProviderIndex_lt_tablesLength witness))
 
 /-- The Memory-init circuit's own constraints prove every active push's channel requirement. -/
@@ -143,8 +143,8 @@ theorem memoryFinalizeProviderTable_component
 /-- The stable Memory-finalize table uses the ensemble's shared prover data. -/
 theorem memoryFinalizeProviderTable_data
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
-    (memoryFinalizeProviderTable witness).data = witness.data := by
-  exact witness.same_data _ (List.getElem_mem
+    (memoryFinalizeProviderTable witness).data = witness.data :=
+  witness.same_data _ (List.getElem_mem
     (memoryFinalizeProviderIndex_lt_tablesLength witness))
 
 /-- **The pull-side boundary fact.** The Memory-finalize circuit is the flipped bus's **pull** side:

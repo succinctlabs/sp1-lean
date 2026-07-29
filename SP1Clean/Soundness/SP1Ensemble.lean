@@ -280,8 +280,8 @@ theorem decodedWitnessInstructionInteractionsWith_eq_tables
     (witness : EnsembleWitness (sp1Ensemble (p := p)))
     (channel : Channel (ZMod p) Message) :
     decodedWitnessInstructionInteractionsWith witness.data witness.tables channel =
-      (witness.tables.take 25).flatMap (typedTableInteractionsWith · channel) := by
-  exact decodedInstructionInteractionsWith_eq_tables witness.data channel
+      (witness.tables.take 25).flatMap (typedTableInteractionsWith · channel) :=
+  decodedInstructionInteractionsWith_eq_tables witness.data channel
     (witness_instructionTables_aligned witness)
 
 /-- Exact typed partition of the ensemble interaction list into verifier boundary, decoded

@@ -341,19 +341,19 @@ theorem mem_chip_of_mem_decodeInstructionTables :
 theorem decodedInstructionRows_chip_mem
     (tables : List (Table (ZMod p))) {decoded : DecodedInstructionRow p}
     (decodedMem : decoded ∈ decodedInstructionRows (p := p) tables) :
-    decoded.chip ∈ supportedChips (p := p) := by
-  exact mem_chip_of_mem_decodeInstructionTables decodedMem
+    decoded.chip ∈ supportedChips (p := p) :=
+  mem_chip_of_mem_decodeInstructionTables decodedMem
 
 /-- Every deterministically decoded instruction row belongs to the audited semantic registry. -/
 theorem decodedChipRows_kind_mem
     (data : ProverData (ZMod p)) (tables : List (Table (ZMod p))) {row : ChipRow p}
-    (hrow : row ∈ decodedChipRows data tables) : row.kind ∈ allChipKinds (p := p) := by
-  exact mem_kind_of_mem_decodeChipTables data hrow
+    (hrow : row ∈ decodedChipRows data tables) : row.kind ∈ allChipKinds (p := p) :=
+  mem_kind_of_mem_decodeChipTables data hrow
 
 /-- Active decoded rows inherit registry membership without a second routing list. -/
 theorem realDecodedChipRows_kind_mem
     (data : ProverData (ZMod p)) (tables : List (Table (ZMod p))) {row : ChipRow p}
-    (hrow : row ∈ realDecodedChipRows data tables) : row.kind ∈ allChipKinds (p := p) := by
-  exact decodedChipRows_kind_mem data tables (mem_realDecodedChipRows_iff data tables row |>.mp hrow).1
+    (hrow : row ∈ realDecodedChipRows data tables) : row.kind ∈ allChipKinds (p := p) :=
+  decodedChipRows_kind_mem data tables (mem_realDecodedChipRows_iff data tables row |>.mp hrow).1
 
 end SP1Clean.Soundness
