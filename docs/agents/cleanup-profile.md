@@ -781,6 +781,23 @@ Per gated group, stopping at the first failure:
 
 1. **Manifest check** — `git status --porcelain`; changed paths ⊆ the group's manifest.
 2. **Layer pre-gate** (shallow waves only) — `lake build SP1Native` / `SP1Model` / … as a fail-fast.
+> **A gate worker must never issue a blocking foreground build.** There are *two* independent
+> timeouts and they kill different things: the per-command cap kills the **command**, while an
+> agent-level stream watchdog kills the **agent** after ~600s with no output. A full build is
+> 300–450s of silence, so a foreground `lake build` risks both. This has cost the campaign a
+> re-dispatch. The pattern that works:
+> ```
+> # detached, with a completion sentinel
+> (lake build SP1Clean > logs/<group>-gate.log 2>&1; echo "EXIT=$?" >> logs/<group>-gate.log)
+> # then poll with SHORT foreground commands — each returns instantly, so the watchdog sees progress
+> tail -3 logs/<group>-gate.log; grep -c "Built" logs/<group>-gate.log
+> ```
+> Poll until the log contains `EXIT=`. Apply the same pattern to `lake lint`, `lake test`, and
+> `scripts/run_audit.sh` — all three are slow enough to trip the watchdog.
+>
+> **A long build is not a hang.** Calibrated: 75–79 jobs / 285–384s for a typical wave group. Tell
+> the gate worker the expected cost, or it may abandon a healthy build.
+
 3. **`lake build SP1Clean`**, teed to a log. **There is no `-j` option** — Lake 4.31 in this
    toolchain accepts only `-J/--json`; both `lake build SP1Clean -j 3` and `lake -j 3 build
    SP1Clean` fail to parse, and two W4 gate runs were burned discovering it. To serialise a
