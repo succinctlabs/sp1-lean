@@ -51,7 +51,6 @@ private def divRemWriteInput
     input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
     input.adapter.op_a, cols.a, input.is_real⟩
 
-set_option maxHeartbeats 4000000 in
 private theorem divRemNativeDecompose
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -227,7 +226,6 @@ private def divRemRustCompareAssertions {F : Type} [Field F]
     Extracted.U16MSBOperation.asserts
       cols.quotient[1] cols.quot_msb e2
 
-set_option maxHeartbeats 4000000 in
 private theorem divRemCompareNativeDecompose
     (env : Environment (ZMod p))
     (input : Var DivRemCompare.Inputs (ZMod p)) (offset : ℕ) :
@@ -351,7 +349,6 @@ private theorem divRemEvalVec3Literal {F : Type} [FiniteField F]
     (#v[a, b, c] : Vector (Expression F) 3) i hi]
   interval_cases i <;> rfl
 
-set_option maxHeartbeats 8000000 in
 private theorem divRemCompareNativeExact
     (env : Environment (ZMod p))
     (input : Var DivRemCompare.Inputs (ZMod p)) (offset : ℕ) :
@@ -989,7 +986,6 @@ private theorem divRemOracle_ltOperation_interactions_eq {F : Type} [Field F] [C
     Extracted.LtOperationUnsigned.interactions]
   simp only [divRemOracle_u16compare_interactions_eq]
 
-set_option maxHeartbeats 2000000 in
 /-- The DivRem oracle's embedded `MulOperation.asserts` copy agrees with the canonical standalone
 module on every arithmetic block. -/
 private theorem divRemOracle_mulOperation_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
@@ -1006,7 +1002,6 @@ private theorem divRemOracle_mulOperation_asserts_eq {F : Type} [Field F] [CoeHe
   simp only [divRemOracle_u16tou8safe_value_eq, divRemOracle_u16tou8safe_asserts_eq,
     divRemOracle_u16msb_asserts_eq]
 
-set_option maxHeartbeats 2000000 in
 /-- Interaction-list half of `divRemOracle_mulOperation_asserts_eq`. -/
 private theorem divRemOracle_mulOperation_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
     (a b c : Word F) (carry product : Vector F 16) (blb clb : Vector F 4)
@@ -1100,7 +1095,6 @@ private theorem divRemOracle_ltOperation_interactions_eq' {F : Type} [Field F] [
   simp only [olt_u16co, olt_bit, olt_u16_flags, olt_not_eq_inv,
     olt_comparison_limbs, divRemOracle_u16compare_interactions_eq]
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 private theorem divRemOracle_mulOperation_asserts_eq' {F : Type} [Field F] [CoeHead F ℕ]
     (a b c : Word F) (x : Extracted.MulOperation F)
@@ -1115,7 +1109,6 @@ private theorem divRemOracle_mulOperation_asserts_eq' {F : Type} [Field F] [CoeH
     divRemOracle_u16tou8safe_value_eq, divRemOracle_u16tou8safe_asserts_eq,
     divRemOracle_u16msb_asserts_eq]
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 private theorem divRemOracle_mulOperation_interactions_eq' {F : Type} [Field F] [CoeHead F ℕ]
     (a b c : Word F) (x : Extracted.MulOperation F)
@@ -1275,7 +1268,6 @@ private theorem divRemConstraintsMapAssert
   | cons e es ih =>
       simp only [List.map_cons, Operations.constraints_assert, ih]
 
-set_option maxHeartbeats 8000000 in
 private theorem divRemCoreNativeDecompose
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
@@ -1344,7 +1336,6 @@ private theorem divRemCoreNativeDecompose
   simp only [Expression.eval, sub_zero, List.append_nil,
     List.nil_append, List.cons_append, List.append_assoc]
 
-set_option maxHeartbeats 8000000 in
 private theorem divRemLowerForward
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ)
@@ -1386,7 +1377,6 @@ private theorem divRemLowerForward
     DivRemChip.eval_divRemCols_isReal_verifier]
   simpa only [ProvableType.eval_field] using hp
 
-set_option maxHeartbeats 8000000 in
 private theorem divRemUpperForward
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ)
@@ -1560,7 +1550,6 @@ private structure DivRemMulFlagFacts
     cols.is_divu + cols.is_remu + cols.is_div + cols.is_rem +
       cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw = 1
 
-set_option maxHeartbeats 8000000 in
 private theorem divRemMulFlagFacts
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p))
@@ -1762,7 +1751,6 @@ private def divRemGlueExpressions
           cols.c_times_quotient_upper.product[15] * 256))]
 
 omit [Fact (2 ^ 24 < p)] in
-set_option maxHeartbeats 8000000 in
 private theorem divRemGlueExpressionsEval
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) :
@@ -1782,7 +1770,7 @@ private theorem divRemGlueExpressionsEval
   simp only [ProvableType.eval_field]
   rfl
 
-set_option maxHeartbeats 8000000 in
+set_option maxHeartbeats 400000 in
 private theorem divRemCoreForallDecompose
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
@@ -1817,7 +1805,7 @@ private theorem divRemCoreForallDecompose
   simp only [List.forall_append]
   tauto
 
-set_option maxHeartbeats 8000000 in
+set_option maxHeartbeats 400000 in
 private theorem divRemLowerBackward
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ)
@@ -1889,7 +1877,7 @@ private theorem divRemLowerBackward
     ProvableType.eval_field, ProvableType.getElem_eval_fields,
     Expression.eval] using hRust
 
-set_option maxHeartbeats 8000000 in
+set_option maxHeartbeats 400000 in
 private theorem divRemUpperBackward
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ)
@@ -1996,7 +1984,6 @@ private theorem divRemUpperBackward
     ProvableType.eval_field, ProvableType.getElem_eval_fields,
     Expression.eval] using hRust
 
-set_option maxHeartbeats 16000000 in
 private theorem divRemCoreAssertionsExact
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
@@ -2059,7 +2046,6 @@ private theorem divRemRustCompare_eq
   rw [divRemVec2Eta]
 
 omit [Fact (2 ^ 24 < p)] in
-set_option maxHeartbeats 16000000 in
 private theorem divRemEvalCompareOfCols
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) :
@@ -2074,7 +2060,6 @@ private theorem divRemEvalCompareOfCols
     eval_isZeroWordColumns, eval_extractedAddColumns,
     eval_ltUnsignedColumns, eval_u16CompareColumns]
 
-set_option maxHeartbeats 8000000 in
 private theorem divRemCompareAssertionsExact
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
@@ -2112,7 +2097,6 @@ private theorem divRemEvalPopulatedIsReal
     DivRemChip.populatedRowAt_isReal_eq]
   simp only [ProvableType.eval_field]
 
-set_option maxHeartbeats 2000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemCpuAssertionsExact
     (env : Environment (ZMod p))
@@ -2154,7 +2138,6 @@ private theorem divRemEvalOpcode
     DivRemChip.eval_divRemCols_isRemuw_verifier]
   simp only [ProvableType.eval_field, Expression.eval]
 
-set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemReaderAssertionsExact
     (env : Environment (ZMod p))
@@ -2229,7 +2212,7 @@ private theorem divRemOpA0OfOwn
   change Eval.eval env cols.adapter.op_a_0 = 0
   simpa only [ProvableType.eval_field] using hop
 
-set_option maxHeartbeats 32000000 in
+set_option maxHeartbeats 800000 in
 set_option maxRecDepth 100000 in
 private theorem divRemWholeAssertionsExact
     (env : Environment (ZMod p))
@@ -2335,7 +2318,6 @@ private theorem divRemWholeAssertionsExact
           (And.intro hCpuRust
             (And.intro hReaderRust hOwn))))
 
-set_option maxHeartbeats 32000000 in
 private theorem divRemConstraintsFaithful
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ)
@@ -2491,7 +2473,6 @@ private def divRemDirectInteractions {F : Type} [Field F]
     ⟨.send, .byte 6 cols.c_times_quotient[7] 16 0, cols.is_real⟩ ]
 
 omit [Fact (2 ^ 24 < p)] in
-set_option maxHeartbeats 64000000 in
 set_option linter.unusedSimpArgs false in
 private theorem divRemRustInteractionsDecompose
     (cols : DivRemChip.Columns (ZMod p)) :
@@ -2597,7 +2578,6 @@ private theorem divRemRustInteractionsDecompose
   congr 1
 
 omit [Fact (2 ^ 24 < p)] in
-set_option maxHeartbeats 8000000 in
 set_option maxRecDepth 100000 in
 open Classical in
 private theorem divRemFilterByte
@@ -2606,7 +2586,6 @@ private theorem divRemFilterByte
         (fun interaction => interaction.channel = byteChannel.toRaw) =
       Operations.interactionsWith byteChannel.toRaw ops := rfl
 
-set_option maxHeartbeats 8000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemNativeByteDecompose
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -2763,7 +2742,6 @@ private theorem divRemU16MSBInteractionsExact
   · rfl
   · simp only [eval_u16MSBColumns, ProvableType.eval_field]
 
-set_option maxHeartbeats 16000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemCompareInteractionsExact
     (env : Environment (ZMod p))
@@ -2807,7 +2785,6 @@ private theorem divRemCompareInteractionsExact
     Extracted.IsZeroOperation.interactions,
     List.map_nil, List.nil_append, List.map_append, List.append_assoc]
 
-set_option maxHeartbeats 2000000 in
 private theorem divRemCpuByteInteractionsExact
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -2841,7 +2818,6 @@ private theorem divRemCpuByteInteractionsExact
     divRemEvalPopulatedIsReal env input offset]
   simpa only [divRemCpuInteractions, state, nextPc, isReal] using h
 
-set_option maxHeartbeats 4000000 in
 private theorem divRemReaderByteInteractionsExact
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -2905,7 +2881,6 @@ private theorem divRemReaderByteInteractionsExact
   simpa only [divRemReaderInteractions, state, adapter, a, opcode,
     isReal] using h
 
-set_option maxHeartbeats 16000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemCoreByteDecompose
     (env : Environment (ZMod p))
@@ -3055,7 +3030,6 @@ private theorem divRemEvalMulProductMsb
   rw [divRemEvalMulOperation, eval_u16MSBColumns]
   simp only [ProvableType.eval_field]
 
-set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemMulInteractionsExact
     (env : Environment (ZMod p))
@@ -3133,7 +3107,6 @@ private theorem divRemMulInteractionsExact
     (hproduct 14 (by decide)) (hproduct 15 (by decide))
   simpa only [Extracted.MulOperation.interactions] using hExact
 
-set_option maxHeartbeats 8000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemLowerMulInteractionsActive
     (env : Environment (ZMod p))
@@ -3171,7 +3144,6 @@ private theorem divRemLowerMulInteractionsActive
     simpa only [divRemLowerMulInteractions, input,
       divRemLowerMulInput, row, Expression.eval] using h
 
-set_option maxHeartbeats 8000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemUpperMulInteractionsActive
     (env : Environment (ZMod p))
@@ -3257,7 +3229,6 @@ private theorem divRemDirectAccessesAllByte
   simp [divRemDirectInteractions, Extracted.Interaction.toAccess]
 
 omit [Fact (2 ^ 24 < p)] in
-set_option maxHeartbeats 4000000 in
 private theorem divRemRustByteDecompose
     (cols : DivRemChip.Columns (ZMod p)) :
     ((Extracted.DivRemOracle.DivRemCols.interactions (divRemChipReconfigure cols)).map
@@ -3285,7 +3256,6 @@ private theorem divRemRustByteDecompose
   rw [divRemMulAccessesAllByte, divRemMulAccessesAllByte,
     divRemCompareAccessesAllByte, divRemDirectAccessesAllByte]
 
-set_option maxHeartbeats 16000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemByteInteractionsFaithful
     (env : Environment (ZMod p))
@@ -3368,7 +3338,6 @@ private theorem divRemByteInteractionsFaithful
   simpa only [cols, row, lower, upper, compare, cpu, reader, direct,
     List.append_assoc] using hRotate.append_right direct
 
-set_option maxHeartbeats 4000000 in
 private theorem divRemRustStateDecompose
     (cols : DivRemChip.Columns (ZMod p)) :
     ((Extracted.DivRemOracle.DivRemCols.interactions (divRemChipReconfigure cols)).map
@@ -3393,7 +3362,6 @@ private theorem divRemRustStateDecompose
     Extracted.RTypeReader.interactions,
     Extracted.Interaction.toAccess]
 
-set_option maxHeartbeats 4000000 in
 private theorem divRemStateInteractionsExact
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -3455,7 +3423,6 @@ private theorem divRemStateInteractionsExact
   simpa only [divRemCpuInteractions, divRemCpuInput,
     state, nextPc, isReal] using hCpu
 
-set_option maxHeartbeats 4000000 in
 private theorem divRemRustProgramDecompose
     (cols : DivRemChip.Columns (ZMod p)) :
     ((Extracted.DivRemOracle.DivRemCols.interactions (divRemChipReconfigure cols)).map
@@ -3481,7 +3448,6 @@ private theorem divRemRustProgramDecompose
     Extracted.CPUState.interactions,
     Extracted.Interaction.toAccess]
 
-set_option maxHeartbeats 4000000 in
 private theorem divRemProgramInteractionsExact
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -3551,7 +3517,6 @@ private theorem divRemProgramInteractionsExact
     divRemEvalPopulatedIsReal env input offset]
   rfl
 
-set_option maxHeartbeats 4000000 in
 private theorem divRemRustMemoryDecompose
     (cols : DivRemChip.Columns (ZMod p)) :
     ((Extracted.DivRemOracle.DivRemCols.interactions (divRemChipReconfigure cols)).map
@@ -3577,7 +3542,6 @@ private theorem divRemRustMemoryDecompose
     Extracted.CPUState.interactions,
     Extracted.Interaction.toAccess]
 
-set_option maxHeartbeats 8000000 in
 private theorem divRemMemoryInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -3670,7 +3634,6 @@ private theorem divRemUnexpectedInteractions
   simp only [decide_eq_true_eq] at hunexpected
   tauto
 
-set_option maxHeartbeats 8000000 in
 private theorem divRemInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ)
@@ -3740,7 +3703,6 @@ private theorem divRemInteractionsFaithful
   exact ((hStateActive.append hByteActive).append hMemoryActive).append
     hProgramActive
 
-set_option maxHeartbeats 4000000 in
 theorem divRemChip_constraints_constructive
     (rustCols : Extracted.DivRemOracle.DivRemCols (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -3783,7 +3745,6 @@ theorem divRemChip_constraints_constructive
       (DivRemChip.circuit (p := p))
       assignment.environment divRemChip_lookups_empty).symm
 
-set_option maxHeartbeats 4000000 in
 theorem divRemChip_interactions_constructive
     (rustCols : Extracted.DivRemOracle.DivRemCols (ZMod p))
     (data : ProverData (ZMod p)) :
