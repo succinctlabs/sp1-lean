@@ -135,6 +135,29 @@ better-named projections) proved from the original, and **leave `foo` byte-ident
 may migrate to the projections; none are required to. Nothing is deleted, no statement changes,
 and the original name stays resolvable for `check_report_citations.sh` and the probe globs.
 
+> ### ⚠ `by exact` on a `def`'s Prop-valued field can be load-bearing OPACITY — A/B-time DOWNSTREAM
+>
+> This is the campaign's first *measured* golf regression, and it nearly shipped. W6/b5 converted
+> `divRemChipRowCodec`'s `rowInput_eq` field from `by exact <term>` to the bare term — a §4b
+> Prop-field golf this profile explicitly permits, correct by proof irrelevance, −1 line, and clean
+> in its own file. The downstream effect: `Faithful/DivRemChip/Exact.lean` imports that module and
+> cites `divRemChipRowCodec` five times, and its elaboration went **260s → >1230s and still
+> climbing**, pinned in `Lean_Meta_isDefEqDelta` / `whnfImp` / `unfoldDefinition`.
+>
+> **Why:** a tactic block is auto-abstracted into an *opaque auxiliary proof constant*; the term-mode
+> form is inlined, so `isDefEqDelta` unfolds it straight into `DivRemChip.circuit`. That is exactly
+> Clean's whnf-into-expensive-values doctrine — triggered by one line, in a different file.
+>
+> **Rule:** dropping `by exact` is still permitted, but on a **`def`'s field that any heavy module
+> unfolds**, `by exact` must be treated as deliberate opacity. A/B-time the *downstream* consumers,
+> not just the edited file. Reverting the single hunk restored 260s; nothing else changed.
+>
+> **And the reason it hung instead of erroring:** the blown-up work landed inside
+> `divRemRustAssertionsDecompose`, the one survivor still carrying a **64M** budget — enough to
+> absorb roughly an hour of extra `whnf`. **A high surviving ceiling silently converts a downstream
+> regression from a loud error into a slow build.** This is an argument for the ratchet beyond
+> tidiness: every ceiling lowered makes the next regression louder.
+
 ## 4a. Extracted helpers are permitted
 
 Adding a **new** declaration is allowed in exactly two shapes. Nothing existing may change either way.
@@ -848,8 +871,20 @@ Per gated group, stopping at the first failure:
 > Poll until the log contains `EXIT=`. Apply the same pattern to `lake lint`, `lake test`, and
 > `scripts/run_audit.sh` — all three are slow enough to trip the watchdog.
 >
-> **A long build is not a hang.** Calibrated: 75–79 jobs / 285–384s for a typical wave group. Tell
+> **A long build is not a hang.** Calibrated: 59–79 jobs / 285–384s for a typical wave group. Tell
 > the gate worker the expected cost, or it may abandon a healthy build.
+>
+> **But when a build genuinely IS hung, `sample <pid>` is the diagnostic — not RSS.** W6/r2 hit a
+> real >1230s hang and the memory reading was actively misleading: RSS sat flat at 3.2 GB, which
+> looks stuck, but the *healthy* 260s run plateaus at the same 3.17 GB within 40s — that is just the
+> import footprint. The stack sample discriminated immediately
+> (`Lean_Meta_isDefEqDelta` / `whnfImp` / `unfoldDefinition` / `reduceRec` = delta-unfolding blowup,
+> not progress). It is cheap; reach for it before killing or before waiting longer.
+>
+> **Do not commit anything while a gate is running.** W6/r2's gate had `HEAD` move under it mid-run
+> because a docs-only commit landed between two of its commands. Its manifest was unaffected, but a
+> gate that diffs against a *remembered* SHA rather than live `HEAD` would have mis-reported. Gates
+> should read `HEAD` live; orchestrators should hold docs commits until the gate reports.
 
 3. **`lake build SP1Clean`**, teed to a log. **There is no `-j` option** — Lake 4.31 in this
    toolchain accepts only `-J/--json`; both `lake build SP1Clean -j 3` and `lake -j 3 build
