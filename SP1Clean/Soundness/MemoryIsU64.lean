@@ -135,16 +135,8 @@ theorem memEventsFiltered_value_cases (rows : List (Trace.RowView (ZMod p)))
   rcases he with rfl | he
   · exact Or.inl ⟨r, hr, hreal, rfl⟩
   · refine Or.inr ?_
-    rw [List.mem_append] at he
-    rcases he with he | he
-    · by_cases himmb : r.adapter.imm_b = 0
-      · rw [if_pos himmb, List.mem_singleton] at he
-        subst he; rfl
-      · rw [if_neg himmb] at he; exact absurd he List.not_mem_nil
-    · by_cases himmc : r.adapter.imm_c = 0
-      · rw [if_pos himmc, List.mem_singleton] at he
-        subst he; rfl
-      · rw [if_neg himmc] at he; exact absurd he List.not_mem_nil
+    rcases List.mem_append.mp he with he | he <;> split_ifs at he <;>
+      simp only [List.mem_singleton, List.not_mem_nil] at he <;> subst he <;> rfl
 
 /-- **The chain induction (W1c core).** Along a per-address decreasing-timestamp event list that (a)
 satisfies the limb-level read=writer chain, (b) bottoms out reading the genesis `0`, and (c) at every

@@ -40,28 +40,21 @@ omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- `(L.map fst).zip (L.map snd) = L` for a list of pairs. -/
 private lemma zip_map_fst_snd (L : List (Touch p)) :
     (L.map Prod.fst).zip (L.map Prod.snd) = L := by
-  rw [List.zip_map']
-  simp
+  simp [List.zip_map']
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- `Forall₂ (TouchOK t)` over the split lists reduces to a per-entry membership fact. -/
 private lemma forall₂_touchOK_map {t : ℕ} (L : List (Touch p))
     (h : ∀ tc ∈ L, TouchOK t tc.1 tc.2) :
-    List.Forall₂ (TouchOK t) (L.map Prod.fst) (L.map Prod.snd) := by
-  induction L with
-  | nil => exact List.Forall₂.nil
-  | cons tc rest ih =>
-    exact List.Forall₂.cons (h tc List.mem_cons_self)
-      (ih (fun tc' htc' => h tc' (List.mem_cons_of_mem tc htc')))
+    List.Forall₂ (TouchOK t) (L.map Prod.fst) (L.map Prod.snd) :=
+  List.forall₂_map_left_iff.mpr (List.forall₂_map_right_iff.mpr (List.forall₂_same.mpr h))
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- The aligned carrier's per-key touches are exactly the touch list filtered at the key. -/
 theorem rowTouchesAt_alignedOf (r_ord : RowFacts p) (touches : List (Touch p)) (loc : MemLoc) :
     rowTouchesAt (alignedOf r_ord touches) loc =
       touches.filter (fun pq => MemoryMsg.locOf pq.2 = loc) := by
-  unfold rowTouchesAt alignedOf
-  dsimp only
-  rw [zip_map_fst_snd]
+  simp only [rowTouchesAt, alignedOf, zip_map_fst_snd]
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- **Generic `AlignsWith` for the aligned constructor.**  The instance supplies the two message
@@ -100,9 +93,7 @@ theorem alignsWith_alignedOf (r_ord : RowFacts p) (touches : List (Touch p))
   intro mp hmp
   obtain ⟨i, hloc⟩ := hreg mp hmp
   obtain ⟨tc, htc, hmsg, hlo, hhi⟩ := hmatch mp hmp
-  refine ⟨tc, htc, hmsg, hlo, ?_⟩
-  rw [hloc, readWindow_reg]
-  omega
+  exact ⟨tc, htc, hmsg, hlo, by rw [hloc, readWindow_reg]; omega⟩
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- **Generic `RowOK` for the aligned constructor.**  From the per-touch `TouchOK`, the `+8` clock
@@ -123,15 +114,9 @@ theorem rowOK_alignedOf (initialClock : ℕ) (r_ord : RowFacts p) (touches : Lis
   time8 := htime8
   align8 := halign8
   touches := forall₂_touchOK_map touches htouch
-  chain_mono := by
-    intro loc
-    rw [rowTouchesAt_alignedOf]
-    exact hchain loc
+  chain_mono := by simpa only [rowTouchesAt_alignedOf] using hchain
   pushClkBound := by
-    intro m hm
-    simp only [alignedOf, List.mem_map] at hm
-    obtain ⟨tc, htc, rfl⟩ := hm
-    exact hpushClk tc htc
+    intro m hm; obtain ⟨tc, htc, rfl⟩ := List.mem_map.mp hm; exact hpushClk tc htc
   slotOfClkBound := by
     intro pq hpq hclk
     simp only [alignedOf] at hpq

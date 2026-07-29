@@ -56,13 +56,21 @@ lemma populateQuotComp_isU64 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
 lemma populateRemComp_isU64 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
     Word.isU64 (populateRemComp B C f) := wordOfBits_isU64 _
 
-set_option linter.unusedSectionVars false in
-/-- The zero word is `isU64`. -/
-lemma zeroWord_isU64 : Word.isU64 (#v[0, 0, 0, 0] : Word (ZMod p)) := by
+omit [Fact p.Prime] in
+/-- A four-limb literal word is `isU64` as soon as each limb's value is a u16. The shared
+`#v[…]`-getElem reduction behind `zeroWord_isU64` / `oneWord_isU64` / `signFill_isU64` /
+`zeroFill_isU64`. -/
+private lemma vecLit_isU64 {a b c d : ZMod p} (ha : a.val < 2 ^ 16) (hb : b.val < 2 ^ 16)
+    (hc : c.val < 2 ^ 16) (hd : d.val < 2 ^ 16) :
+    Word.isU64 (#v[a, b, c, d] : Word (ZMod p)) := by
   apply Word.isU64_of_cases <;>
-    · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, ZMod.val_zero]
-      norm_num
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ] <;>
+    assumption
+
+/-- The zero word is `isU64`. -/
+lemma zeroWord_isU64 : Word.isU64 (#v[0, 0, 0, 0] : Word (ZMod p)) :=
+  vecLit_isU64 (by simp) (by simp) (by simp) (by simp)
 
 /-- The committed result `a` is `isU64` (all three branches). -/
 lemma populateA_isU64 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
@@ -71,8 +79,7 @@ lemma populateA_isU64 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
   split
   · exact populateQuotient_isU64 B C f
   · split
-    · exact populateRemainder_isU64 B C f
-    · exact zeroWord_isU64
+    exacts [populateRemainder_isU64 B C f, zeroWord_isU64]
 
 /-- A sign-fill word `#v[x, y, m·65535, m·65535]` is `isU64` for u16 `x`/`y` and boolean `m`. -/
 private lemma signFill_isU64 {x y m : ZMod p} (hx : x.val < 2 ^ 16) (hy : y.val < 2 ^ 16)
@@ -82,20 +89,12 @@ private lemma signFill_isU64 {x y m : ZMod p} (hx : x.val < 2 ^ 16) (hy : y.val 
     rcases hm with h | h <;> rw [h]
     · rw [zero_mul, ZMod.val_zero]; norm_num
     · rw [one_mul, val_65535_zmod_p]; norm_num
-  apply Word.isU64_of_cases <;>
-    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-      List.getElem_cons_succ] <;>
-    assumption
+  exact vecLit_isU64 hx hy h65535 h65535
 
-set_option linter.unusedSectionVars false in
 /-- A zero-extension word `#v[x, y, 0, 0]` is `isU64` for u16 `x`/`y`. -/
 private lemma zeroFill_isU64 {x y : ZMod p} (hx : x.val < 2 ^ 16) (hy : y.val < 2 ^ 16) :
-    Word.isU64 (#v[x, y, 0, 0] : Word (ZMod p)) := by
-  have h0 : (0 : ZMod p).val < 2 ^ 16 := by rw [ZMod.val_zero]; norm_num
-  apply Word.isU64_of_cases <;>
-    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-      List.getElem_cons_succ] <;>
-    assumption
+    Word.isU64 (#v[x, y, 0, 0] : Word (ZMod p)) :=
+  vecLit_isU64 hx hy (by simp) (by simp)
 
 /-- The committed operand `b` is `isU64` given the raw read is. -/
 lemma bComp_isU64 {B : Word (ZMod p)} (hB : B.isU64) (f : Vector (ZMod p) 8) :
@@ -105,8 +104,7 @@ lemma bComp_isU64 {B : Word (ZMod p)} (hB : B.isU64) (f : Vector (ZMod p) 8) :
   split
   · exact signFill_isU64 h0 h1 (U16MSBOperation.populate_msb_bool h1)
   · split
-    · exact zeroFill_isU64 h0 h1
-    · exact hB
+    exacts [zeroFill_isU64 h0 h1, hB]
 
 /-- The committed operand `c` is `isU64` given the raw read is. -/
 lemma cComp_isU64 {C : Word (ZMod p)} (hC : C.isU64) (f : Vector (ZMod p) 8) :
@@ -116,33 +114,25 @@ lemma cComp_isU64 {C : Word (ZMod p)} (hC : C.isU64) (f : Vector (ZMod p) 8) :
   split
   · exact signFill_isU64 h0 h1 (U16MSBOperation.populate_msb_bool h1)
   · split
-    · exact zeroFill_isU64 h0 h1
-    · exact hC
+    exacts [zeroFill_isU64 h0 h1, hC]
 
 /-- The committed `abs_c` is `isU64` given the raw read is. -/
 lemma populateAbsC_isU64 {C : Word (ZMod p)} (hC : C.isU64) (f : Vector (ZMod p) 8) :
     Word.isU64 (populateAbsC C f) := by
   unfold populateAbsC
   split
-  · exact wordOfBits_isU64 _
-  · exact cComp_isU64 hC f
+  exacts [wordOfBits_isU64 _, cComp_isU64 hC f]
 
 /-- The committed `abs_remainder` is `isU64`. -/
 lemma populateAbsRem_isU64 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
     Word.isU64 (populateAbsRem B C f) := by
   unfold populateAbsRem
   split
-  · exact wordOfBits_isU64 _
-  · exact populateRemComp_isU64 B C f
+  exacts [wordOfBits_isU64 _, populateRemComp_isU64 B C f]
 
 /-- The word `#v[1, 0, 0, 0]` is `isU64`. -/
-private lemma oneWord_isU64 : Word.isU64 (#v[1, 0, 0, 0] : Word (ZMod p)) := by
-  have h1 : (1 : ZMod p).val < 2 ^ 16 := by rw [ZMod.val_one]; norm_num
-  have h0 : (0 : ZMod p).val < 2 ^ 16 := by rw [ZMod.val_zero]; norm_num
-  apply Word.isU64_of_cases <;>
-    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-      List.getElem_cons_succ] <;>
-    assumption
+private lemma oneWord_isU64 : Word.isU64 (#v[1, 0, 0, 0] : Word (ZMod p)) :=
+  vecLit_isU64 (by rw [ZMod.val_one]; norm_num) (by simp) (by simp) (by simp)
 
 /-- The committed `max_abs_c_or_1` is `isU64` given the raw read is. -/
 lemma populateMaxAbsCOr1_isU64 {C : Word (ZMod p)} (hC : C.isU64) (f : Vector (ZMod p) 8) :
@@ -151,8 +141,7 @@ lemma populateMaxAbsCOr1_isU64 {C : Word (ZMod p)} (hC : C.isU64) (f : Vector (Z
       = if Word.toNat (populateAbsC C f) = 0 then #v[1, 0, 0, 0] else populateAbsC C f := rfl
   rw [heq]
   split
-  · exact oneWord_isU64
-  · exact populateAbsC_isU64 hC f
+  exacts [oneWord_isU64, populateAbsC_isU64 hC f]
 
 /-- Each `populateCtq` limb value is its u16 residue. -/
 lemma populateCtq_val (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) (i : ℕ) (hi : i < 8) :
@@ -173,8 +162,7 @@ lemma bMsbCell_bool {B : Word (ZMod p)} (hB : B.isU64) (f : Vector (ZMod p) 8) :
   obtain ⟨h0, h1, h2, h3⟩ := Word.lt_cases_of_isU64 hB
   unfold bMsbCell
   split
-  · exact U16MSBOperation.populate_msb_bool h1
-  · exact U16MSBOperation.populate_msb_bool h3
+  exacts [U16MSBOperation.populate_msb_bool h1, U16MSBOperation.populate_msb_bool h3]
 
 /-- As `bMsbCell_bool`, for `c`. -/
 lemma cMsbCell_bool {C : Word (ZMod p)} (hC : C.isU64) (f : Vector (ZMod p) 8) :
@@ -182,8 +170,7 @@ lemma cMsbCell_bool {C : Word (ZMod p)} (hC : C.isU64) (f : Vector (ZMod p) 8) :
   obtain ⟨h0, h1, h2, h3⟩ := Word.lt_cases_of_isU64 hC
   unfold cMsbCell
   split
-  · exact U16MSBOperation.populate_msb_bool h1
-  · exact U16MSBOperation.populate_msb_bool h3
+  exacts [U16MSBOperation.populate_msb_bool h1, U16MSBOperation.populate_msb_bool h3]
 
 /-- The remainder MSB cell is boolean (the populated remainder is always `isU64`). -/
 lemma remMsbCell_bool (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
@@ -191,8 +178,7 @@ lemma remMsbCell_bool (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
   obtain ⟨h0, h1, h2, h3⟩ := Word.lt_cases_of_isU64 (populateRemainder_isU64 B C f)
   unfold remMsbCell
   split
-  · exact U16MSBOperation.populate_msb_bool h1
-  · exact U16MSBOperation.populate_msb_bool h3
+  exacts [U16MSBOperation.populate_msb_bool h1, U16MSBOperation.populate_msb_bool h3]
 
 /-- The quotient MSB cell is boolean. -/
 lemma quotMsbCell_bool (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
@@ -200,8 +186,7 @@ lemma quotMsbCell_bool (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
   obtain ⟨h0, h1, h2, h3⟩ := Word.lt_cases_of_isU64 (populateQuotient_isU64 B C f)
   unfold quotMsbCell
   split
-  · exact U16MSBOperation.populate_msb_bool h1
-  · exact Or.inl rfl
+  exacts [U16MSBOperation.populate_msb_bool h1, Or.inl rfl]
 
 /-- The sign/neg cells are boolean given the signed-class flag sum is. -/
 lemma populateRemNeg_bool (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
@@ -240,36 +225,24 @@ lemma remAddendNat_lt (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
   · next h =>
     have := wordOfNat_val_lt (p := p) (remCompBits B C f).toNat i h
     simpa [populateRemComp, wordOfBits] using this
-  · rcases populateRemNeg_bool B C hsig with h | h <;> rw [h]
-    · rw [ZMod.val_zero]; norm_num
-    · rw [ZMod.val_one]; norm_num
+  · rcases populateRemNeg_bool B C hsig with h | h <;> rw [h] <;> simp [ZMod.val_one]
 
 /-- Every chain carry is boolean (ℕ form): two u16 addends plus a boolean carry stay below
 `2 · 2^16`, so the quotient by `2^16` is at most `1`. -/
 lemma carryNat_le_one (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
     (hsig : f[0] + f[2] + f[4] + f[5] = 0 ∨ f[0] + f[2] + f[4] + f[5] = 1) (i : ℕ) :
     carryNat B C f i ≤ 1 := by
+  have hctq : ∀ j, ctqLimbNat B C f j < 2 ^ 16 := fun _ => Nat.mod_lt _ (by norm_num)
   induction i with
-  | zero =>
-    have h0 : ctqLimbNat B C f 0 < 2 ^ 16 := Nat.mod_lt _ (by norm_num)
-    have h1 := remAddendNat_lt B C hsig 0
-    unfold carryNat
-    omega
+  | zero => have := hctq 0; have := remAddendNat_lt B C hsig 0; unfold carryNat; omega
   | succ n ih =>
-    have h0 : ctqLimbNat B C f (n + 1) < 2 ^ 16 := Nat.mod_lt _ (by norm_num)
-    have h1 := remAddendNat_lt B C hsig (n + 1)
-    unfold carryNat
-    omega
+    have := hctq (n + 1); have := remAddendNat_lt B C hsig (n + 1); unfold carryNat; omega
 
 /-- The generic u16 `Range` byte-table row: every `is_real`-gated pull in the chip's byte tail is a
 width-16 `Range` row on a populate value with a known `< 2^16` bound. -/
 theorem byteRow_range16 {x : ZMod p} (h : x.val < 2 ^ 16) :
     ByteRowSpec (⟨6, x, 16, 0⟩ : ByteRow (ZMod p)) := by
-  refine ⟨ByteOpcode.Range, by norm_cast, ?_⟩
-  simp only [ByteOpcode.constrain]
-  rw [show ((16 : ZMod p)) = ((16 : ℕ) : ZMod p) by push_cast; rfl,
-    ZMod.val_natCast_of_lt (show (16 : ℕ) < p by have := Fact.out (p := 2 ^ 24 < p); omega)]
-  exact h
+  simpa only [Nat.cast_ofNat] using (byteRowSpec_range x sixteen_lt).mpr h
 
 /-- Every committed carry cell is boolean. -/
 lemma populateCarry_bool (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
@@ -277,8 +250,6 @@ lemma populateCarry_bool (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
     (populateCarry B C f)[i]'hi = 0 ∨ (populateCarry B C f)[i]'hi = 1 := by
   have h := carryNat_le_one B C hsig i
   simp only [populateCarry, Vector.getElem_ofFn]
-  rcases Nat.le_one_iff_eq_zero_or_eq_one.mp h with h0 | h1
-  · exact Or.inl (by rw [h0]; norm_num)
-  · exact Or.inr (by rw [h1]; norm_num)
+  rcases Nat.le_one_iff_eq_zero_or_eq_one.mp h with h | h <;> rw [h] <;> norm_num
 
 end SP1Clean.DivRemChip
