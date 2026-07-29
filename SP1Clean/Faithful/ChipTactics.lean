@@ -33,6 +33,24 @@ lemma bool_iff {x : ZMod p} : x * (x - 1) = 0 ↔ (x = 0 ∨ x = 1) :=
   ⟨SP1Clean.bool_of_mul_pred,
     fun h => by rcases h with h | h <;> rw [h] <;> ring⟩
 
+omit [Fact (2 ^ 17 < p)] in
+open SP1Clean.Channels (byteChannel) in
+/-- **Byte-pull `toAccess` kernel, ∀-form.** The `∀ g s`-quantified spelling of
+`SP1Clean.toAccess_pullIf_byte`: the `toAccess`-image of a gated byte *pull* is the `byteSend`-style
+`LookupAccess`. Every interaction anchor over the Byte bus needs it in exactly this shape as a
+`simp only` rewrite, and thirteen of them wrote the eta-expanded `have hk : ∀ g s, …` block out by
+hand; each becomes `have hk := toAccess_pullIf_byte_forall env`. The two `Faithful/CPUState.lean`
+copies are the exception — this module *imports* that one (`faithful_chip` cites
+`cpustate_constraints_faithful`), so they cannot cite it back. -/
+lemma toAccess_pullIf_byte_forall (env : Environment (ZMod p)) :
+    ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
+      AbstractInteraction.toAccess env ((pulledIf (channel := byteChannel) g s).toRaw) =
+        (InteractionKind.Byte, "SP1Byte",
+          [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
+           (Expression.eval env s.b).val, (Expression.eval env s.c).val],
+          signedVal (Expression.eval env (-g))) :=
+  fun g s => toAccess_pullIf_byte env g s
+
 /-- **Chip-level faithfulness anchor skeleton.** Discharges a `*cols_constraints_faithful` goal whose
 constraint list is `<op-fragment> ++ CPUState ++ <reader> ++ [binary gate, op_a_0 = 0]`.
 
