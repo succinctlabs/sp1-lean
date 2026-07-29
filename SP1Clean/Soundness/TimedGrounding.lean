@@ -86,17 +86,11 @@ lemma microValue_reg (s0 : SailState) (c0 : ℕ) (i : BitVec 5) (τ : ℕ) :
 
 lemma regEpoch_eq_of {c0 τ n : ℕ} (h : c0 + 8 * n ≤ τ) (h' : τ < c0 + 8 * n + 4) :
     regEpoch c0 τ = n := by
-  simp only [regEpoch]
-  split
-  · omega
-  · split <;> omega
+  simp only [regEpoch]; split_ifs <;> omega
 
 lemma regEpoch_eq_succ_of {c0 τ n : ℕ} (h : c0 + 8 * n + 4 ≤ τ) (h' : τ < c0 + 8 * n + 12) :
     regEpoch c0 τ = n + 1 := by
-  simp only [regEpoch]
-  split
-  · omega
-  · split <;> omega
+  simp only [regEpoch]; split_ifs <;> omega
 
 /-- One real Sail step determines `stepOnce`. -/
 lemma stepOnce_of_sailStep {s s' : SailState} (h : SailStep s s') : stepOnce s = some s' := by
@@ -129,17 +123,15 @@ lemma localValueAt_shift {program : GuestProgram} {initial : SailState} {initial
     (h : LocalValueAt initial initialClock (MemLoc.reg i) τ v) :
     LocalValueAt initial initialClock (MemLoc.reg i) τ' v := by
   obtain ⟨n, -, -, htime, -, -, -⟩ := h_m
-  have hv := h
-  unfold LocalValueAt at hv ⊢
-  rw [microValue_reg] at hv ⊢
+  unfold LocalValueAt at h ⊢
+  rw [microValue_reg] at h ⊢
   have he : regEpoch initialClock τ' = regEpoch initialClock τ := by
     rcases hwin with ⟨h1, h2, h3, h4⟩ | ⟨h1, h2, h3, h4⟩
     · rw [regEpoch_eq_of (n := n) (by omega) (by omega),
         regEpoch_eq_of (n := n) (by omega) (by omega)]
     · rw [regEpoch_eq_succ_of (n := n) (by omega) (by omega),
         regEpoch_eq_succ_of (n := n) (by omega) (by omega)]
-  rw [he]
-  exact hv
+  rwa [he]
 
 /-! ## The RAM-epoch view of `microValue` -/
 
@@ -162,17 +154,11 @@ lemma microValue_ram (s0 : SailState) (c0 : ℕ) (cell : RamCell) (τ : ℕ) :
 
 lemma ramEpoch_eq_of {c0 τ n : ℕ} (h : c0 + 8 * n ≤ τ) (h' : τ < c0 + 8 * n + 1) :
     ramEpoch c0 τ = n := by
-  simp only [ramEpoch]
-  split
-  · omega
-  · split <;> omega
+  simp only [ramEpoch]; split_ifs <;> omega
 
 lemma ramEpoch_eq_succ_of {c0 τ n : ℕ} (h : c0 + 8 * n + 1 ≤ τ) (h' : τ < c0 + 8 * n + 9) :
     ramEpoch c0 τ = n + 1 := by
-  simp only [ramEpoch]
-  split
-  · omega
-  · split <;> omega
+  simp only [ramEpoch]; split_ifs <;> omega
 
 omit [Fact (2 ^ 17 < p)] in
 /-- **Intra-epoch shift, RAM.** The RAM analogue of `localValueAt_shift`: a RAM `LocalValueAt` fact
@@ -189,17 +175,15 @@ lemma localValueAt_shift_ram {program : GuestProgram} {initial : SailState} {ini
     (h : LocalValueAt initial initialClock (MemLoc.ram cell) τ v) :
     LocalValueAt initial initialClock (MemLoc.ram cell) τ' v := by
   obtain ⟨n, -, -, htime, -, -, -⟩ := h_m
-  have hv := h
-  unfold LocalValueAt at hv ⊢
-  rw [microValue_ram] at hv ⊢
+  unfold LocalValueAt at h ⊢
+  rw [microValue_ram] at h ⊢
   have he : ramEpoch initialClock τ' = ramEpoch initialClock τ := by
     rcases hwin with ⟨h1, h2, h3, h4⟩ | ⟨h1, h2, h3, h4⟩
     · rw [ramEpoch_eq_of (n := n) (by omega) (by omega),
         ramEpoch_eq_of (n := n) (by omega) (by omega)]
     · rw [ramEpoch_eq_succ_of (n := n) (by omega) (by omega),
         ramEpoch_eq_succ_of (n := n) (by omega) (by omega)]
-  rw [he]
-  exact hv
+  rwa [he]
 
 /-! ## The per-row records
 
@@ -272,14 +256,11 @@ lemma RowOK.chainOK {initialClock : ℕ} {r : RowFacts p} (hok : RowOK initialCl
       read_hi := fun pq hpq => ?_
       push_kind := fun pq hpq => ?_
       push_mono := hok.chain_mono loc }
-  · rw [← (hmem pq hpq).1.loc_eq]
-    exact (hmem pq hpq).2
+  · rw [← (hmem pq hpq).1.loc_eq]; exact (hmem pq hpq).2
   · have h := (hmem pq hpq).1.read_hi
     rwa [(hmem pq hpq).1.loc_eq.symm.trans (hmem pq hpq).2] at h
   · rcases (hmem pq hpq).1.push_kind with h | h
-    · exact Or.inl h
-    · right
-      rwa [(hmem pq hpq).2] at h
+    exacts [Or.inl h, Or.inr (by rwa [(hmem pq hpq).2] at h)]
 
 /-- The engine's per-row conclusion: every pull guarantee of the row holds (the state pull's
 `LocalStateTruth`, each memory pull's `LocalMemTruth`), plus the read-time currency the row's step fact
@@ -315,6 +296,28 @@ structure AlignsWith (r_align r_ord : RowFacts p) : Prop where
     mp'.2 ≤ StateMsg.timeNat r_align.statePull + readWindow (MemoryMsg.locOf mp.1)
 
 omit [Fact (2 ^ 17 < p)] in
+/-- **Read-window shift, location-generic.** The `MemLoc`-uniform packaging of
+`localValueAt_shift` / `localValueAt_shift_ram`: inside one row's pre-effect read window
+(`[t, t + readWindow loc]` — `[t, t+3]` for registers, the singleton `t` for RAM) a
+`LocalValueAt` fact moves freely, because that window sits inside the location's pre-effect
+epoch in both cases. -/
+private lemma localValueAt_shift_window {program : GuestProgram} {initial : SailState}
+    {initialClock : ℕ} {m : StateMsg (ZMod p)}
+    (h_m : LocalStateTruth program initial initialClock m) (loc : MemLoc) {v : Word (ZMod p)}
+    {τ τ' : ℕ}
+    (hlo : StateMsg.timeNat m ≤ τ) (hhi : τ ≤ StateMsg.timeNat m + readWindow loc)
+    (hlo' : StateMsg.timeNat m ≤ τ') (hhi' : τ' ≤ StateMsg.timeNat m + readWindow loc)
+    (h : LocalValueAt initial initialClock loc τ v) :
+    LocalValueAt initial initialClock loc τ' v := by
+  cases loc with
+  | reg i =>
+    rw [readWindow_reg] at hhi hhi'
+    exact localValueAt_shift h_m (Or.inl ⟨hlo, by omega, hlo', by omega⟩) h
+  | ram a =>
+    rw [readWindow_ram] at hhi hhi'
+    exact localValueAt_shift_ram h_m (Or.inl ⟨hlo, by omega, hlo', by omega⟩) h
+
+omit [Fact (2 ^ 17 < p)] in
 /-- **The shared engine of all three carrier transports.** Ordinary pull currency (every pull read at
 the window start `t`) is derived from aligned pull currency by shifting each matched pull back to `t`
 inside the location's pre-effect epoch. -/
@@ -331,26 +334,10 @@ theorem ordinaryPullCurrency_of_aligned
   intro mp hmp
   obtain ⟨mp', hmp'_mem, hmsg, hlo, hhi⟩ := h.match_ mp hmp
   obtain ⟨hu64, hclk, hval_al⟩ := hcurr_al mp' hmp'_mem
-  refine ⟨hmsg ▸ hu64, hmsg ▸ hclk, ?_⟩
-  have hst : StateMsg.timeNat r_align.statePull = StateMsg.timeNat r_ord.statePull := by
-    rw [h.statePull]
-  cases hloc : MemoryMsg.locOf mp.1 with
-  | reg i =>
-      have hval_al' : LocalValueAt initial initialClock (MemLoc.reg i) mp'.2 mp.1.value := by
-        rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.reg i from hmsg ▸ hloc]
-        exact hval_al
-      rw [hloc, readWindow_reg] at hhi
-      rw [h.ordTime mp hmp]
-      refine localValueAt_shift hstateTruth (Or.inl ⟨hlo, by omega, ?_, ?_⟩) hval_al' <;>
-        omega
-  | ram a =>
-      have hval_al' : LocalValueAt initial initialClock (MemLoc.ram a) mp'.2 mp.1.value := by
-        rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.ram a from hmsg ▸ hloc]
-        exact hval_al
-      rw [hloc, readWindow_ram] at hhi
-      rw [h.ordTime mp hmp]
-      refine localValueAt_shift_ram hstateTruth (Or.inl ⟨hlo, by omega, ?_, ?_⟩)
-        hval_al' <;> omega
+  rw [hmsg] at hu64 hclk hval_al
+  refine ⟨hu64, hclk, ?_⟩
+  rw [h.ordTime mp hmp, ← h.statePull]
+  exact localValueAt_shift_window hstateTruth _ hlo hhi le_rfl (Nat.le_add_right _ _) hval_al
 
 omit [Fact (2 ^ 17 < p)] in
 /-- `LocalStepFact` transports from the ordinary carrier (where `ChipGroundingContracts` proves it) to
@@ -400,26 +387,10 @@ theorem grounded_ordinary_of_aligned
   intro mp hmp
   obtain ⟨mp', hmp'_mem, hmsg, hlo, hhi⟩ := h.match_ mp hmp
   obtain ⟨hmemtruth, hval_al⟩ := hpulls_al mp' hmp'_mem
-  refine ⟨hmsg ▸ hmemtruth, ?_⟩
-  have hst : StateMsg.timeNat r_align.statePull = StateMsg.timeNat r_ord.statePull := by
-    rw [h.statePull]
-  cases hloc : MemoryMsg.locOf mp.1 with
-  | reg i =>
-      have hval_al' : LocalValueAt initial initialClock (MemLoc.reg i) mp'.2 mp.1.value := by
-        rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.reg i from hmsg ▸ hloc]
-        exact hval_al
-      rw [hloc, readWindow_reg] at hhi
-      rw [h.ordTime mp hmp]
-      refine localValueAt_shift hstateTruth_al (Or.inl ⟨hlo, by omega, ?_, ?_⟩)
-        hval_al' <;> omega
-  | ram a =>
-      have hval_al' : LocalValueAt initial initialClock (MemLoc.ram a) mp'.2 mp.1.value := by
-        rw [← hmsg, ← show MemoryMsg.locOf mp'.1 = MemLoc.ram a from hmsg ▸ hloc]
-        exact hval_al
-      rw [hloc, readWindow_ram] at hhi
-      rw [h.ordTime mp hmp]
-      refine localValueAt_shift_ram hstateTruth_al (Or.inl ⟨hlo, by omega, ?_, ?_⟩)
-        hval_al' <;> omega
+  rw [hmsg] at hmemtruth hval_al
+  refine ⟨hmemtruth, ?_⟩
+  rw [h.ordTime mp hmp, ← h.statePull]
+  exact localValueAt_shift_window hstateTruth_al _ hlo hhi le_rfl (Nat.le_add_right _ _) hval_al
 
 /-- The walk invariant for the **partial** per-key memory frontier `live`: at each key that carries a
 frontier record, that record sits at the key, its own guarantee (`LocalMemTruth`) holds, its value is
@@ -493,22 +464,19 @@ private lemma listSum_map_pop {α β : Type} (f : α → Multiset β) (l1 l2 : L
 
 private lemma coe_map_pop {α β : Type} (f : α → β) (l1 l2 : List α) (r : α) :
     (↑((l1 ++ r :: l2).map f) : Multiset β) = f r ::ₘ ↑((l1 ++ l2).map f) := by
-  refine Multiset.coe_eq_coe.mpr ?_
-  exact List.perm_middle.map f
+  exact Multiset.coe_eq_coe.mpr (List.perm_middle.map f)
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 private lemma pushesAt_pop (l1 l2 : List (RowFacts p)) (r : RowFacts p) (loc : MemLoc) :
     pushesAt (l1 ++ r :: l2) loc
       = (↑(rowPushesAt r loc) : Multiset (MemoryMsg (ZMod p))) + pushesAt (l1 ++ l2) loc := by
-  simp only [pushesAt]
-  exact listSum_map_pop _ l1 l2 r
+  simp only [pushesAt]; exact listSum_map_pop _ l1 l2 r
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 private lemma pullsAt_pop (l1 l2 : List (RowFacts p)) (r : RowFacts p) (loc : MemLoc) :
     pullsAt (l1 ++ r :: l2) loc
       = (↑(rowPullsAt r loc) : Multiset (MemoryMsg (ZMod p))) + pullsAt (l1 ++ l2) loc := by
-  simp only [pullsAt]
-  exact listSum_map_pop _ l1 l2 r
+  simp only [pullsAt]; exact listSum_map_pop _ l1 l2 r
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- All pushes of a row happen at/after its state-pull time. -/
@@ -532,15 +500,12 @@ lemma pull_clkBound_of_balance {initial : SailState} {initialClock t : ℕ}
     {r : RowFacts p} (hr : r ∈ rows) {mp : MemoryMsg (ZMod p) × ℕ} (hmp : mp ∈ r.memPulls) :
     SP1Clean.Channels.MemoryMsg.ClkBound mp.1 := by
   have hmp1_in : mp.1 ∈ rowPullsAt r (MemoryMsg.locOf mp.1) := by
-    rw [rowPullsAt]
-    exact List.mem_filter.mpr ⟨List.mem_map.mpr ⟨mp, hmp, rfl⟩, by simp⟩
+    rw [rowPullsAt]; exact List.mem_filter.mpr ⟨List.mem_map.mpr ⟨mp, hmp, rfl⟩, by simp⟩
   have hmem_pull : mp.1 ∈ pullsAt rows (MemoryMsg.locOf mp.1) := by
-    rw [pullsAt]
-    exact (mem_listSum_map _ rows mp.1).mpr ⟨r, hr, Multiset.mem_coe.mpr hmp1_in⟩
+    rw [pullsAt]; exact (mem_listSum_map _ rows mp.1).mpr ⟨r, hr, Multiset.mem_coe.mpr hmp1_in⟩
   have hmem_lhs : mp.1 ∈ optMS (live (MemoryMsg.locOf mp.1))
       + pushesAt rows (MemoryMsg.locOf mp.1) := by
-    rw [h_mbal (MemoryMsg.locOf mp.1)]
-    exact Multiset.mem_add.mpr (Or.inr hmem_pull)
+    rw [h_mbal (MemoryMsg.locOf mp.1)]; exact Multiset.mem_add.mpr (Or.inr hmem_pull)
   rcases Multiset.mem_add.mp hmem_lhs with hlive_mem | hpush_mem
   · cases hlv : live (MemoryMsg.locOf mp.1) with
     | none => rw [hlv] at hlive_mem; simp at hlive_mem
@@ -627,14 +592,12 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
         rw [hr''_eq] at h8
         omega
     have h_rtruth : LocalStateTruth program initial initialClock r.statePull := by
-      rw [hr_pull]
-      exact h_head
+      rw [hr_pull]; exact h_head
     have ht_head : StateMsg.timeNat r.statePull = StateMsg.timeNat head := by rw [hr_pull]
     -- pop `r` out of the batch
     obtain ⟨l1, l2, rfl⟩ : ∃ l1 l2, rows = l1 ++ r :: l2 := List.append_of_mem hr_mem
     have hlen' : (l1 ++ l2).length = N := by
-      simp only [List.length_append, List.length_cons] at hlen ⊢
-      omega
+      simp only [List.length_append, List.length_cons] at hlen ⊢; omega
     have hsub : ∀ r' ∈ l1 ++ l2, r' ∈ l1 ++ r :: l2 := fun r' hr' => mem_middle r hr'
     -- the SP-6 state gap (invariants 1 + 2): every remaining row's window starts ≥ t + 8
     have h_gap : ∀ r' ∈ l1 ++ l2,
@@ -659,6 +622,8 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
         SP1Clean.Channels.MemoryMsg.ClkBound (pq : Touch p).1.1 := fun loc pq hpq =>
       pull_clkBound_of_balance h_ok h_live h_mbal hr_mem
         (List.of_mem_zip (mem_rowTouchesAt.mp hpq).1).1
+    have hcok : ∀ loc : MemLoc, ChainOK loc (StateMsg.timeNat r.statePull) (rowTouchesAt r loc) :=
+      fun loc => h_rok.chainOK loc (h_pullClk loc)
     -- (B) the per-key chain forcing at every key `r` touches: the frontier holds the chain's head
     -- pull, the intra-row links are derived from balance, the whole chain cancels, and the chain's
     -- last push is the new frontier with the re-established time bound.
@@ -675,12 +640,15 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
         rowPullsAt_eq h_rok.touches loc,
         add_left_comm (optMS (finM loc))
           (↑(chainPulls (rowTouchesAt r loc)) : Multiset (MemoryMsg (ZMod p)))] at hbal
-      exact chainForcing_step_of_gap hne' (h_rok.chainOK loc (h_pullClk loc)) (h_opush loc) hbal
-    -- read-time currency for `r`'s pulls: every chain pull carries the frontier value (nothing
-    -- can follow a same-key write), current throughout the location's pre-effect read window
-    have h_curr : ∀ mp ∈ r.memPulls, SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
-        SP1Clean.Channels.MemoryMsg.ClkBound mp.1 ∧
-        LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value := by
+      exact chainForcing_step_of_gap hne' (hcok loc) (h_opush loc) hbal
+    -- each pull's source: the per-key chain forces it to carry the frontier record's value, and to
+    -- be either that record itself (a chain-head pull) or one of the row's own pushes (a same-key
+    -- re-read), read inside the location's pre-effect window
+    have h_src : ∀ mp ∈ r.memPulls,
+        (∃ m0, live (MemoryMsg.locOf mp.1) = some m0 ∧ mp.1.value = m0.value ∧
+          (mp.1 = m0 ∨ mp.1 ∈ r.memPushes)) ∧
+        StateMsg.timeNat r.statePull ≤ mp.2 ∧
+        mp.2 ≤ StateMsg.timeNat r.statePull + readWindow (MemoryMsg.locOf mp.1) := by
       intro mp hmp
       obtain ⟨q, hq_zip⟩ := mem_zip_of_mem_left h_rok.touches mp hmp
       have hto : TouchOK (StateMsg.timeNat r.statePull) mp q :=
@@ -689,61 +657,41 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
         mem_rowTouchesAt.mpr ⟨hq_zip, hto.loc_eq⟩
       have hne' : rowTouchesAt r (MemoryMsg.locOf mp.1) ≠ [] := List.ne_nil_of_mem hmem_own
       obtain ⟨hlive_eq, hlink, -, -⟩ := h_key _ hne'
+      refine ⟨⟨_, hlive_eq, chain_pull_values _ (hcok _) hlink hne' (mp, q) hmem_own, ?_⟩,
+        (hcok _).read_lo (mp, q) hmem_own, (hcok _).read_hi (mp, q) hmem_own⟩
+      rcases chain_pull_head_or_push _ hne' hlink (mp, q) hmem_own with hhd | hpush
+      · exact Or.inl hhd
+      · refine Or.inr ?_
+        obtain ⟨pq', hpq', hpq'_eq⟩ := mem_chainPushes.mp hpush
+        rw [← hpq'_eq]
+        exact (List.of_mem_zip (mem_rowTouchesAt.mp hpq').1).2
+    -- read-time currency for `r`'s pulls: every chain pull carries the frontier value (nothing
+    -- can follow a same-key write), current throughout the location's pre-effect read window
+    have h_curr : ∀ mp ∈ r.memPulls, SP1Clean.Channels.MemoryMsg.isU64 mp.1 ∧
+        SP1Clean.Channels.MemoryMsg.ClkBound mp.1 ∧
+        LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value := by
+      intro mp hmp
+      obtain ⟨⟨m0, hlive_eq, hveq, hsrc⟩, hlo, hhi⟩ := h_src mp hmp
       obtain ⟨-, hmt₀, hval₀, -⟩ := h_live _ _ hlive_eq
-      have hveq : mp.1.value
-          = ((rowTouchesAt r (MemoryMsg.locOf mp.1)).head hne').1.1.value :=
-        chain_pull_values _ (h_rok.chainOK (MemoryMsg.locOf mp.1) (h_pullClk (MemoryMsg.locOf mp.1)))
-          hlink hne' (mp, q) hmem_own
       refine ⟨by simpa [SP1Clean.Channels.MemoryMsg.isU64, hveq] using hmt₀.1, ?_, ?_⟩
       · -- `ClkBound`: a head pull is the frontier record (bound from `LiveOK`'s `LocalMemTruth`); a
         -- same-key re-read pull is one of the row's own pushes (bound from `RowOK.pushClkBound`, not
         -- the not-yet-established step output — the currency-circularity break).
-        rcases chain_pull_head_or_push _ hne' hlink (mp, q) hmem_own with hhd | hpush
-        · rw [show mp.1 = ((rowTouchesAt r (MemoryMsg.locOf mp.1)).head hne').1.1 from hhd]
-          exact hmt₀.2.1
-        · obtain ⟨pq', hpq', hpq'_eq⟩ := mem_chainPushes.mp hpush
-          have hq_mem : mp.1 ∈ r.memPushes := by
-            rw [← hpq'_eq]
-            exact (List.of_mem_zip (mem_rowTouchesAt.mp hpq').1).2
-          exact h_rok.pushClkBound mp.1 hq_mem
-      · rw [← hveq] at hval₀
-        have hlo : StateMsg.timeNat r.statePull ≤ mp.2 :=
-          (h_rok.chainOK (MemoryMsg.locOf mp.1) (h_pullClk (MemoryMsg.locOf mp.1))).read_lo (mp, q) hmem_own
-        have hhi : mp.2 ≤ StateMsg.timeNat r.statePull + readWindow (MemoryMsg.locOf mp.1) :=
-          (h_rok.chainOK (MemoryMsg.locOf mp.1) (h_pullClk (MemoryMsg.locOf mp.1))).read_hi (mp, q) hmem_own
-        cases hloc : MemoryMsg.locOf mp.1 with
-        | reg i =>
-          rw [hloc, readWindow_reg] at hhi
-          rw [hloc] at hval₀
-          exact localValueAt_shift h_head
-            (Or.inl ⟨le_refl _, by omega, by omega, by omega⟩) hval₀
-        | ram a =>
-          rw [hloc, readWindow_ram] at hhi
-          rw [hloc] at hval₀
-          have hread : mp.2 = StateMsg.timeNat head := by omega
-          rw [hread]
-          exact hval₀
+        rcases hsrc with rfl | hpush
+        · exact hmt₀.2.1
+        · exact h_rok.pushClkBound mp.1 hpush
+      · rw [← hveq, ← ht_head] at hval₀
+        exact localValueAt_shift_window h_rtruth _ le_rfl (Nat.le_add_right _ _) hlo hhi hval₀
     -- (C) fire the row's StepFact
     have h_after := h_step r hr_mem h_rtruth h_curr
     -- the row is Grounded: head pulls are true frontier records, tail pulls are the row's own
     -- (just-fired) read-back pushes
     have h_ground_r : Grounded program initial initialClock r := by
       refine ⟨h_rtruth, fun mp hmp => ⟨?_, (h_curr mp hmp).2.2⟩⟩
-      obtain ⟨q, hq_zip⟩ := mem_zip_of_mem_left h_rok.touches mp hmp
-      have hto : TouchOK (StateMsg.timeNat r.statePull) mp q :=
-        List.forall₂_zip h_rok.touches hq_zip
-      have hmem_own : (mp, q) ∈ rowTouchesAt r (MemoryMsg.locOf mp.1) :=
-        mem_rowTouchesAt.mpr ⟨hq_zip, hto.loc_eq⟩
-      have hne' : rowTouchesAt r (MemoryMsg.locOf mp.1) ≠ [] := List.ne_nil_of_mem hmem_own
-      obtain ⟨hlive_eq, hlink, -, -⟩ := h_key _ hne'
-      rcases chain_pull_head_or_push _ hne' hlink (mp, q) hmem_own with hhd | hpush
-      · rw [show mp.1 = ((rowTouchesAt r (MemoryMsg.locOf mp.1)).head hne').1.1 from hhd]
-        exact (h_live _ _ hlive_eq).2.1
-      · obtain ⟨pq', hpq', hpq'_eq⟩ := mem_chainPushes.mp hpush
-        have hq_mem : mp.1 ∈ r.memPushes := by
-          rw [← hpq'_eq]
-          exact (List.of_mem_zip (mem_rowTouchesAt.mp hpq').1).2
-        exact h_after.2 mp.1 hq_mem
+      obtain ⟨⟨m0, hlive_eq, -, hsrc⟩, -, -⟩ := h_src mp hmp
+      rcases hsrc with rfl | hpush
+      · exact (h_live _ _ hlive_eq).2.1
+      · exact h_after.2 mp.1 hpush
     have h8 := h_rok.time8
     -- the new frontier: the chain's last push where the row touched, unchanged elsewhere
     have h_liveOK' : LiveOK initial initialClock (StateMsg.timeNat r.statePush)
@@ -762,8 +710,7 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
           have hmem' : m' ∈ rowPushesAt r loc := List.mem_filter.mpr ⟨hm', by simpa using hml⟩
           rw [rowPushesAt_eq h_rok.touches loc, hemp] at hmem'
           simp [chainPushes] at hmem'
-        · rw [ht_head]
-          exact hval_m
+        · rw [ht_head]; exact hval_m
       · -- touched key: the chain's last push is the new frontier record
         obtain ⟨hlive_eq, hlink, -, hlast⟩ := h_key loc hemp
         rw [List.getLast?_eq_some_getLast hemp] at hm
@@ -772,16 +719,16 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
         have hlast_mem : (rowTouchesAt r loc).getLast hemp ∈ rowTouchesAt r loc :=
           List.getLast_mem hemp
         have hloc_q : MemoryMsg.locOf ((rowTouchesAt r loc).getLast hemp).2 = loc :=
-          (h_rok.chainOK loc (h_pullClk loc)).push_loc _ hlast_mem
+          (hcok loc).push_loc _ hlast_mem
         have hq_mem : ((rowTouchesAt r loc).getLast hemp).2 ∈ r.memPushes :=
           (List.of_mem_zip (mem_rowTouchesAt.mp hlast_mem).1).2
         have hmt_q := h_after.2 _ hq_mem
         refine ⟨hloc_q, hmt_q, ?_, by omega⟩
-        rcases (h_rok.chainOK loc (h_pullClk loc)).push_kind _ hlast_mem with ⟨hv, -⟩ | hw
+        rcases (hcok loc).push_kind _ hlast_mem with ⟨hv, -⟩ | hw
         · -- read-back last slot: the whole chain is read-backs of the (still-current) frontier
           -- value — frame across
           obtain ⟨-, -, hval₀, -⟩ := h_live loc _ hlive_eq
-          have hpushv := chain_push_values _ (h_rok.chainOK loc (h_pullClk loc)) hlink hemp hv
+          have hpushv := chain_push_values _ (hcok loc) hlink hemp hv
           refine h_frame r hr_mem h_rtruth h_curr loc
             ((rowTouchesAt r loc).getLast hemp).2.value ?_ ?_
           · intro m' hm' hml
@@ -789,12 +736,10 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
             rw [rowPushesAt_eq h_rok.touches loc] at hmem'
             obtain ⟨pq', hpq', hpq'_eq⟩ := mem_chainPushes.mp hmem'
             rw [← hpq'_eq, hpushv pq' hpq', hpushv _ hlast_mem]
-          · rw [hpushv _ hlast_mem, ht_head]
-            exact hval₀
+          · rw [hpushv _ hlast_mem, ht_head]; exact hval₀
         · -- write last slot: the push's own MemTruth at `t + writeOffset`, shifted to the window
           -- end
-          have hmt := hmt_q.2.2
-          rw [hloc_q] at hmt
+          have hmt := hmt_q.2.2; rw [hloc_q] at hmt
           cases loc with
           | reg i =>
             rw [writeOffset_reg] at hw
@@ -807,9 +752,8 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
     -- state balance advances: cancel the consumed head
     have h_sbal' : r.statePush ::ₘ (↑((l1 ++ l2).map (·.statePush)) : Multiset (StateMsg (ZMod p)))
         = fin ::ₘ ↑((l1 ++ l2).map (·.statePull)) := by
-      have h := h_sbal
-      rw [coe_map_pop, coe_map_pop, hr_pull, Multiset.cons_swap fin head] at h
-      exact (Multiset.cons_inj_right _).mp h
+      rw [coe_map_pop, coe_map_pop, hr_pull, Multiset.cons_swap fin head] at h_sbal
+      exact (Multiset.cons_inj_right _).mp h_sbal
     -- per-key memory balance advances: cancel the consumed frontier chain
     have h_mbal' : ∀ loc : MemLoc,
         optMS (((rowTouchesAt r loc).getLast?.map (·.2)).or (live loc)) + pushesAt (l1 ++ l2) loc
@@ -820,8 +764,7 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
         rw [pushesAt_pop, pullsAt_pop, rowPushesAt_eq h_rok.touches loc,
           rowPullsAt_eq h_rok.touches loc, hemp] at hbal
         simp only [chainPushes, chainPulls, List.map_nil, Multiset.coe_nil, zero_add] at hbal
-        rw [hemp]
-        simpa using hbal
+        rw [hemp]; simpa using hbal
       · obtain ⟨-, -, hcancel, -⟩ := h_key loc hemp
         rw [List.getLast?_eq_some_getLast hemp]
         simp only [Option.map_some, Option.some_or, optMS_some, Multiset.singleton_add]
