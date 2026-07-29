@@ -460,6 +460,19 @@ two residual `nlinarith` calls were re-proving `< 65536` limb bounds that
 duplication dropped 26 `nlinarith` to 3 and made **all 16 ceilings removable**. That is the
 difference between raising a budget and driving the proof to closure.
 
+**Screen on what `main` composes, not on which family the file belongs to.** This is the single most
+useful predictor found, and it corrects an assumption that held for most of the campaign. The
+`Proofs/Chips/*/Formal.lean` family is **not uniform**: the ALU chips went **8 of 11 removed**, every
+removal clearing ≤40000 on the first pass, while the jump/U-type chips in the same family went
+**0 for 4**. The discriminator is structural — `JalrChip` composes *two* witnessed `AddOperation`
+gadgets plus `ITypeReader` plus `RegisterWrite`, and `UTypeChip`'s `AddOperation` addend is itself
+witnessed. `JalrChip`'s two sites floor at **(2M, 4M]** against a declared 8M: about 2×, the
+tightest in the tree, and correctly sized all along.
+
+So: count the witnessed sub-gadgets `main` composes before predicting anything. A file in a
+"family that removes cleanly" can still be genuinely binding, and a whole wave's expectation should
+not be set by its directory.
+
 **Lead with the sibling-comparison screen — it is nearly free, and it predicts *both* answers.**
 Before laddering anything, find a declaration in the same file (or its mirror file) that does the same
 kind of work and carries **no** ceiling, then ask whether it does *more* or *less* work than the
