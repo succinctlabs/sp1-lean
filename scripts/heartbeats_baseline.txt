@@ -111,5 +111,34 @@
 # that prose was counted as a live ceiling throughout. b1 rewrote the prose, so exactly one unit of
 # the -51 is this bookkeeping correction with NO site changing. The recorded count is now honest:
 # as of this round there is no known phantom, and 687 should equal the number of real directives.
-SP1Clean 687
+# -16 (2026-07-28, proof-cleanup W3/r2): ratchet DOWN, no ceiling raised. 16 directives deleted, 0
+# re-added — and the count reconciles EXACTLY (687 - 16 = 671), the first round since the phantom
+# retirement to confirm the recorded number is honest. By batch: DivRemChip/Populate/Euclid.lean shed
+# all TEN of its ceilings (b1) — five 400000, two 800000, one 1000000, one 1600000 and one further
+# 800000; three chip `elaborated` instances dropped one each, MulChip/BitwiseChip/LtChip (b2) and
+# AluX0Chip (b3); DivRemOperation/Compare.lean dropped both of its (b4).
+# The round's headline result is b1's CAUSE FIX, the campaign's best efficiency at 0.4 passes/site:
+#   * Euclid.lean's ten ceilings were all downstream of ONE unspelled fact — the base-2^16 carry
+#     split `s = s % 2^16 + (s / 2^16) * 65536`. Each of the eight `chain_residue_field_i` lemmas
+#     re-derived it inline as a 15-line tactic proof, and the aggregate/class-core lemmas above them
+#     paid for eight copies of that derivation. Hoisting it to one `private lemma
+#     residue_carry_split` turned each of the eight into a 6-line term proof (-70 lines) and every
+#     ceiling in the file fell out with it. Four further private helpers (`remExtNat_eq`,
+#     `remExtNat_lt`, `bExtNat_lt`, `setWidth32_toNat`) collapsed the repeated bound/aggregate
+#     plumbing at the two signed class cores. `euclid_limbs_sW` and `chain_residue_field_7` remain
+#     [propext, Classical.choice, Quot.sound].
+#   * b4's two sites (DivRemOperation/Compare.lean) are the round's second cause fix: a single
+#     `simp_all` under `circuit_proof_start` owned the whole file's budget. Narrowed to
+#     `rcases` + `rw` + `simp` (with a hoisted `eval_getElem` private helper), the measured floor
+#     dropped from (40000, 100000] to under 40000 and both sites became removable.
+#     `DivRemCompare.soundness` remains [propext, Classical.choice, Quot.sound].
+# Also landed this round with no ceiling effect: 22 `Native/Chips/<Chip>/Defs.lean` files (b2+b3)
+# deleted the `ElaboratedCircuit` `localLength_eq`/`output_eq` Prop fields wherever Clean's default
+# tactic closes them. That is a PERFORMANCE decision, not a style one — the default `intros; rfl`
+# whnf's the whole chip `main` — so all 19 affected files were A/B-timed before the omission was
+# kept. b2 found the omission REGRESSES +63-132% on the three chips whose `main` composes
+# `U16MSBOperation`, and fails outright on two; those kept their hand-written fields. Every retained
+# omission measured neutral-or-better (-3% to 0%). The family is split 15 explicit-`where` /
+# 6 `elaborate_circuit` / 1 private-derivation forward.
+SP1Clean 671
 SP1CleanTest 16
