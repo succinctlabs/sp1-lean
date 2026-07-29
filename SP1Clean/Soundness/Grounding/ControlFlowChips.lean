@@ -24,6 +24,53 @@ open SP1Clean.Channels (StateMsg MemoryMsg memoryChannel byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+omit [Fact (2 ^ 17 < p)] in
+/-- A register index below 32 round-trips through its canonical five-bit encoding.  This duplicates
+`ITypeChips`' `itypeRegisterIndexCast`: that copy is `private`, so it is invisible across the module
+boundary even though this file imports it. -/
+private theorem controlRegisterIndexCast (x : ZMod p) (bound : x.val < 32) :
+    ((BitVec.ofNat 5 x.val).toNat : ZMod p) = x := by
+  rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show x.val < 2 ^ 5 by omega)]
+  exact ZMod.natCast_zmod_val _
+
+/-- Discharge a `viewOf` projection by evaluating the chip's row output at the canonical input
+offset.  Only the chip's `Inputs`/`circuit`/`viewOf`/`rowView` names vary; the caller's `env` binder
+is referenced by name, so a signature mismatch is a loud `unknown identifier`. -/
+local macro "ctrlViewProjection " inputs:term ", " circuit:term ", " viewOf:term ", "
+    rowView:term : tactic => do
+  let env := Lean.mkIdent `env
+  `(tactic| (
+    let input : Var $inputs (ZMod p) := varFromOffset $inputs 0
+    let offset := size $inputs
+    have outputEq : Eval.eval $env (($circuit (p := p)).output input offset) =
+        (⟨$circuit (p := p)⟩ : Component (ZMod p)).rowOutput $env := by
+      simp only [Component.rowOutput, input, offset, circuit_norm]
+    simp only [$viewOf:term, $rowView:term]
+    rw [← outputEq]
+    simp only [input, offset, $circuit:term, circuit_norm]))
+
+/-- Substitute a decoded row's descriptor.  This removes only the constructor/substitution preamble
+every per-chip lemma below repeats; the caller's `decoded`/`hchip` binders are referenced by name
+and the destructured `physical` stays visible to the closer. -/
+local macro "descriptorSubst " desc:term : tactic => do
+  let decoded := Lean.mkIdent `decoded
+  let hchip := Lean.mkIdent `hchip
+  let physical := Lean.mkIdent `physical
+  `(tactic| (
+    obtain ⟨chip, $physical:ident⟩ := $decoded
+    have descriptorEq : chip = $desc := $hchip
+    subst descriptorEq))
+
+/-- Split a membership hypothesis against an exact two-element pull/push list.  The `rfl` patterns
+are built with `mkIdent`: a quotation-local `rfl` is renamed by hygiene and then binds a *name*
+instead of substituting. -/
+local macro "twoElementCases " h:ident ", " listEq:term : tactic => do
+  let rfl' := Lean.mkIdent `rfl
+  `(tactic| (
+    rw [$listEq:term] at $h:ident
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at $h:ident
+    rcases $h:ident with $rfl':ident | $rfl':ident))
+
 section ConditionalIType
 
 variable [Fact (2 ^ 25 < p)]
@@ -68,9 +115,7 @@ theorem rowWiring_itypeDestination {view : Trace.RowView (ZMod p)}
     exact timeNat_statePushOfView_eight bounds
   readTime := by
     intro mp hmp
-    rw [pulls_eq] at hmp
-    simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
-    rcases hmp with rfl | rfl <;> rfl
+    twoElementCases hmp, pulls_eq <;> rfl
   opA_pull := by
     intro index indexEq
     refine ⟨(rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory,
@@ -97,9 +142,7 @@ theorem rowWiring_itypeDestination {view : Trace.RowView (ZMod p)}
     · exact MemoryMsg.locOf_register _ index indexEq rfl rfl
   push_classified := by
     intro message messageMem
-    rw [pushes_eq] at messageMem
-    simp only [List.mem_cons, List.not_mem_nil, or_false] at messageMem
-    rcases messageMem with rfl | rfl
+    twoElementCases messageMem, pushes_eq
     · left
       refine ⟨(rtypePriorMessage view view.adapter.op_b[0] view.adapter.op_b_memory,
         StateMsg.timeNat rf.statePull), ?_, rfl, rfl, ?_, ?_, ?_⟩
@@ -112,21 +155,12 @@ theorem rowWiring_itypeDestination {view : Trace.RowView (ZMod p)}
           ← statePull_eq]
         omega
       · intro _ _
-        rw [commit_eq]
-        unfold Trace.CommitEffect.destination
-        split <;> rfl
+        rw [commit_eq]; unfold Trace.CommitEffect.destination; split <;> rfl
     · rcases op_a_0_binary with opA0 | opA0
       · refine Or.inr (Or.inl ?_)
-        have indexEq : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
-            view.adapter.op_a := by
-          rw [BitVec.toNat_ofNat,
-            Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
-          exact ZMod.natCast_zmod_val _
+        have indexEq := controlRegisterIndexCast view.adapter.op_a opa_lt
         refine ⟨?_, write_isU64, ?_, rfl, ?_⟩
-        · rw [commit_eq]
-          unfold Trace.CommitEffect.destination
-          rw [if_pos opA0]
-          rfl
+        · rw [commit_eq]; unfold Trace.CommitEffect.destination; rw [if_pos opA0]; rfl
         · exact ⟨BitVec.ofNat 5 view.adapter.op_a.val,
             MemoryMsg.locOf_register _ _ indexEq rfl rfl, indexEq⟩
         · rw [timeNat_rtypeWriteMessage bounds, ← statePull_eq]
@@ -136,16 +170,12 @@ theorem rowWiring_itypeDestination {view : Trace.RowView (ZMod p)}
           simp [zero_index opA0]
         refine ⟨?_, write_isU64, MemoryMsg.locOf_register _ 0#5 indexEq rfl rfl,
           zero_value opA0, ?_⟩
-        · rw [commit_eq]
-          unfold Trace.CommitEffect.destination
-          rw [if_neg (by simp [opA0])]
-          rfl
+        · rw [commit_eq]; unfold Trace.CommitEffect.destination
+          rw [if_neg (by simp [opA0])]; rfl
         · rw [timeNat_rtypeWriteMessage bounds, ← statePull_eq]
   push_clkBound := by
     intro message messageMem
-    rw [pushes_eq] at messageMem
-    simp only [List.mem_cons, List.not_mem_nil, or_false] at messageMem
-    rcases messageMem with rfl | rfl
+    twoElementCases messageMem, pushes_eq
     · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 3 val_3_zmod_p
         (by omega) bounds.clk0 bounds.clk1
     · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 4 val_4_zmod_p
@@ -153,9 +183,7 @@ theorem rowWiring_itypeDestination {view : Trace.RowView (ZMod p)}
   ram_frame := by
     intro program s s' heff _ cell v _ hcontent
     rw [locContent_ram_congr (heff.mem.1 (by
-      rw [commit_eq]
-      unfold Trace.CommitEffect.destination
-      split <;> rfl)) cell]
+      rw [commit_eq]; unfold Trace.CommitEffect.destination; split <;> rfl)) cell]
     exact hcontent
 
 /-- Construct the conditional-destination wiring from the ordinary exact I-type shape. -/
@@ -218,35 +246,20 @@ theorem jalrChipDescriptor_assumptions_iff (data : ProverData (ZMod p))
       JalrChip.Assumptions
         ((⟨JalrChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput
           (Environment.fromArray physical data)) data := by
-  rw [jalrChipDescriptor_table]
-  rfl
+  rw [jalrChipDescriptor_table]; rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem jalrViewOf_state (env : Environment (ZMod p)) :
     (jalrViewOf env).state =
       (Eval.eval env (varFromOffset (F := ZMod p) JalrChip.Inputs 0)).state := by
-  let input : Var JalrChip.Inputs (ZMod p) := varFromOffset JalrChip.Inputs 0
-  let offset := size JalrChip.Inputs
-  have outputEq : Eval.eval env ((JalrChip.circuit (p := p)).output input offset) =
-      (⟨JalrChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, input, offset, circuit_norm]
-  simp only [jalrViewOf, JalrChip.rowView]
-  rw [← outputEq]
-  simp only [input, offset, JalrChip.circuit, circuit_norm]
+  ctrlViewProjection JalrChip.Inputs, JalrChip.circuit, jalrViewOf, JalrChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem jalrViewOf_adapter (env : Environment (ZMod p)) :
     (jalrViewOf env).adapter =
       (Eval.eval env
         (varFromOffset (F := ZMod p) JalrChip.Inputs 0)).adapter.toAdapterView := by
-  let input : Var JalrChip.Inputs (ZMod p) := varFromOffset JalrChip.Inputs 0
-  let offset := size JalrChip.Inputs
-  have outputEq : Eval.eval env ((JalrChip.circuit (p := p)).output input offset) =
-      (⟨JalrChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, input, offset, circuit_norm]
-  simp only [jalrViewOf, JalrChip.rowView]
-  rw [← outputEq]
-  simp only [input, offset, JalrChip.circuit, circuit_norm]
+  ctrlViewProjection JalrChip.Inputs, JalrChip.circuit, jalrViewOf, JalrChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem jalrViewOf_isReal (env : Environment (ZMod p)) :
@@ -263,14 +276,7 @@ theorem jalrViewOf_rdWrite (env : Environment (ZMod p)) :
     (jalrViewOf env).rdWrite =
       Eval.eval env ((Vector.mapRange 4 fun i =>
         var { index := size JalrChip.Inputs + 4 + i }) : Word (Expression (ZMod p))) := by
-  let input : Var JalrChip.Inputs (ZMod p) := varFromOffset JalrChip.Inputs 0
-  let offset := size JalrChip.Inputs
-  have outputEq : Eval.eval env ((JalrChip.circuit (p := p)).output input offset) =
-      (⟨JalrChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, input, offset, circuit_norm]
-  simp only [jalrViewOf, JalrChip.rowView]
-  rw [← outputEq]
-  simp only [input, offset, JalrChip.circuit, circuit_norm]
+  ctrlViewProjection JalrChip.Inputs, JalrChip.circuit, jalrViewOf, JalrChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 /-- JALR's exposed Memory list evaluates to the canonical I-type four-pack. -/
@@ -295,9 +301,7 @@ theorem jalrChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p)
     (data : ProverData (ZMod p)) (hchip : decoded.chip = jalrChipDescriptor (p := p)) :
     decoded.interactionsWith data memoryChannel =
       itypeMemoryInteractions (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalrChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst jalrChipDescriptor (p := p)
   apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
   rw [DecodedInstructionRow.interactionsWith_raw]
   simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
@@ -310,9 +314,7 @@ theorem jalrChip_itypeMemoryInteractionShape :
   interactions := jalrChip_typedMemoryInteractions_eq
   imm_c_eq_one := by
     intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = jalrChipDescriptor (p := p) := hchip
-    subst hchip'
+    descriptorSubst jalrChipDescriptor (p := p)
     rfl
 
 /-- The retained JALR I-type reader after the two add words and LSB witness. -/
@@ -354,9 +356,7 @@ theorem jalrChip_viewClockBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalrChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst jalrChipDescriptor (p := p)
   exact viewClockBounds_of_cpuStateContract (JalrChip.circuit (p := p)) JalrChip.rowView
     JalrChip.cpuStateTimeContract data physical guarantees real
 
@@ -366,9 +366,7 @@ theorem jalrChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ITypeTimestampBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalrChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst jalrChipDescriptor (p := p)
   exact itypeTimestampBounds_of_contract JalrChip.circuit JalrChip.rowView
     JalrChip.itypeTimestampContract data physical guarantees real
 
@@ -431,18 +429,10 @@ private theorem consumedMessages_immutableItypeFour (a ra b rb : MemoryMsg (ZMod
        TypedInteraction.pushedIfValue memoryChannel 1 ra,
        TypedInteraction.pulledIfValue memoryChannel 1 b,
        TypedInteraction.pushedIfValue memoryChannel 1 rb] = [a, b] := by
-  have filtered : List.filter (fun i => signedVal i.mult = -1)
-      [TypedInteraction.pulledIfValue (memoryChannel (p := p)) 1 a,
-       TypedInteraction.pushedIfValue memoryChannel 1 ra,
-       TypedInteraction.pulledIfValue memoryChannel 1 b,
-       TypedInteraction.pushedIfValue memoryChannel 1 rb] =
-      [TypedInteraction.pulledIfValue memoryChannel 1 a,
-       TypedInteraction.pulledIfValue memoryChannel 1 b] := by
-    simp only [List.filter_cons, List.filter_nil, immutableItypePull_one_signed,
-      immutableItypePush_one_signed]
-    norm_num
-  rw [consumedMessages, filtered]
-  simp only [List.map_cons, List.map_nil, TypedInteraction.pulledIfValue_message]
+  unfold consumedMessages
+  simp only [List.filter_cons, List.filter_nil, immutableItypePull_one_signed,
+    immutableItypePush_one_signed]
+  norm_num
 
 omit [Fact (2 ^ 25 < p)] in
 private theorem producedMessages_immutableItypeFour (a ra b rb : MemoryMsg (ZMod p)) :
@@ -451,18 +441,10 @@ private theorem producedMessages_immutableItypeFour (a ra b rb : MemoryMsg (ZMod
        TypedInteraction.pushedIfValue memoryChannel 1 ra,
        TypedInteraction.pulledIfValue memoryChannel 1 b,
        TypedInteraction.pushedIfValue memoryChannel 1 rb] = [ra, rb] := by
-  have filtered : List.filter (fun i => signedVal i.mult = 1)
-      [TypedInteraction.pulledIfValue (memoryChannel (p := p)) 1 a,
-       TypedInteraction.pushedIfValue memoryChannel 1 ra,
-       TypedInteraction.pulledIfValue memoryChannel 1 b,
-       TypedInteraction.pushedIfValue memoryChannel 1 rb] =
-      [TypedInteraction.pushedIfValue memoryChannel 1 ra,
-       TypedInteraction.pushedIfValue memoryChannel 1 rb] := by
-    simp only [List.filter_cons, List.filter_nil, immutableItypePull_one_signed,
-      immutableItypePush_one_signed]
-    norm_num
-  rw [producedMessages, filtered]
-  simp only [List.map_cons, List.map_nil, TypedInteraction.pushedIfValue_message]
+  unfold producedMessages
+  simp only [List.filter_cons, List.filter_nil, immutableItypePull_one_signed,
+    immutableItypePush_one_signed]
+  norm_num
 
 /-- An active immutable I-type row consumes its two source-register priors. -/
 theorem consumedMemoryMessages_eq_of_immutableItypeShape {chip : SupportedChip p}
@@ -565,9 +547,7 @@ theorem rowWiring_immutableItype {view : Trace.RowView (ZMod p)}
     exact timeNat_statePushOfView_eight bounds
   readTime := by
     intro mp hmp
-    rw [pulls_eq] at hmp
-    simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
-    rcases hmp with rfl | rfl <;> rfl
+    twoElementCases hmp, pulls_eq <;> rfl
   opA_pull := by
     intro index indexEq
     refine ⟨(rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory,
@@ -592,20 +572,14 @@ theorem rowWiring_immutableItype {view : Trace.RowView (ZMod p)}
     exact Bool.noConfusion writes
   push_classified := by
     intro message messageMem
-    rw [pushes_eq] at messageMem
-    simp only [List.mem_cons, List.not_mem_nil, or_false] at messageMem
-    rcases messageMem with rfl | rfl
+    twoElementCases messageMem, pushes_eq
     · refine Or.inr (Or.inr (Or.inl ?_))
       refine ⟨by rw [commit_eq]; rfl,
         (rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory,
           StateMsg.timeNat rf.statePull), ?_, ?_, rfl, rfl, ?_⟩
       · rw [pulls_eq]
         exact List.mem_cons_self
-      · have indexEq : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
-            view.adapter.op_a := by
-          rw [BitVec.toNat_ofNat,
-            Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
-          exact ZMod.natCast_zmod_val _
+      · have indexEq := controlRegisterIndexCast view.adapter.op_a opa_lt
         exact ⟨BitVec.ofNat 5 view.adapter.op_a.val,
           MemoryMsg.locOf_register _ _ indexEq rfl rfl⟩
       · rw [timeNat_rtypeReadBackMessage bounds _ _ val_4_zmod_p (by omega),
@@ -626,9 +600,7 @@ theorem rowWiring_immutableItype {view : Trace.RowView (ZMod p)}
         rfl
   push_clkBound := by
     intro message messageMem
-    rw [pushes_eq] at messageMem
-    simp only [List.mem_cons, List.not_mem_nil, or_false] at messageMem
-    rcases messageMem with rfl | rfl
+    twoElementCases messageMem, pushes_eq
     · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 4 val_4_zmod_p
         (by omega) bounds.clk0 bounds.clk1
     · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 3 val_3_zmod_p
@@ -679,16 +651,8 @@ theorem rowAligned_immutableItype {view : Trace.RowView (ZMod p)}
       (∀ tc ∈ immutableItypeTouches view rf,
         SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
           MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
-  have hidxA : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
-      view.adapter.op_a := by
-    rw [BitVec.toNat_ofNat,
-      Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
-    exact ZMod.natCast_zmod_val _
-  have hidxB : ((BitVec.ofNat 5 view.adapter.op_b[0].val).toNat : ZMod p) =
-      view.adapter.op_b[0] := by
-    rw [BitVec.toNat_ofNat,
-      Nat.mod_eq_of_lt (show view.adapter.op_b[0].val < 2 ^ 5 by omega)]
-    exact ZMod.natCast_zmod_val _
+  have hidxA := controlRegisterIndexCast view.adapter.op_a opa_lt
+  have hidxB := controlRegisterIndexCast view.adapter.op_b[0] opb_lt
   have hlocPriorA : MemoryMsg.locOf
       (rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory) =
       MemLoc.reg (BitVec.ofNat 5 view.adapter.op_a.val) :=
@@ -724,19 +688,13 @@ theorem rowAligned_immutableItype {view : Trace.RowView (ZMod p)}
       simp only [immutableItypeTouches, List.map_cons, List.map_nil]
       exact List.Perm.swap _ _ []
     · intro mp hmp
-      rw [pulls_eq] at hmp
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
-      rcases hmp with rfl | rfl
+      twoElementCases hmp, pulls_eq
       · exact ⟨_, hlocPriorA⟩
       · exact ⟨_, hlocPriorB⟩
     · intro mp hmp
-      rw [pulls_eq] at hmp
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
-      rcases hmp with rfl | rfl <;> rfl
+      twoElementCases hmp, pulls_eq <;> rfl
     · intro mp hmp
-      rw [pulls_eq] at hmp
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
-      rcases hmp with rfl | rfl
+      twoElementCases hmp, pulls_eq
       · exact ⟨_, List.mem_cons_of_mem _ List.mem_cons_self, rfl,
           by dsimp only; omega, by dsimp only; omega⟩
       · exact ⟨_, List.mem_cons_self, rfl,
@@ -881,35 +839,20 @@ theorem branchChipDescriptor_assumptions_iff (data : ProverData (ZMod p))
       BranchChip.Assumptions
         ((⟨BranchChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput
           (Environment.fromArray physical data)) data := by
-  rw [branchChipDescriptor_table]
-  rfl
+  rw [branchChipDescriptor_table]; rfl
 
 omit [Fact (2 ^ 25 < p)] in
 theorem branchViewOf_state (env : Environment (ZMod p)) :
     (branchViewOf env).state =
       (Eval.eval env (varFromOffset (F := ZMod p) BranchChip.Inputs 0)).state := by
-  let input : Var BranchChip.Inputs (ZMod p) := varFromOffset BranchChip.Inputs 0
-  let offset := size BranchChip.Inputs
-  have outputEq : Eval.eval env ((BranchChip.circuit (p := p)).output input offset) =
-      (⟨BranchChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, input, offset, circuit_norm]
-  simp only [branchViewOf, BranchChip.rowView]
-  rw [← outputEq]
-  simp only [input, offset, BranchChip.circuit, circuit_norm]
+  ctrlViewProjection BranchChip.Inputs, BranchChip.circuit, branchViewOf, BranchChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem branchViewOf_adapter (env : Environment (ZMod p)) :
     (branchViewOf env).adapter =
       (Eval.eval env
         (varFromOffset (F := ZMod p) BranchChip.Inputs 0)).adapter.toAdapterView := by
-  let input : Var BranchChip.Inputs (ZMod p) := varFromOffset BranchChip.Inputs 0
-  let offset := size BranchChip.Inputs
-  have outputEq : Eval.eval env ((BranchChip.circuit (p := p)).output input offset) =
-      (⟨BranchChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, input, offset, circuit_norm]
-  simp only [branchViewOf, BranchChip.rowView]
-  rw [← outputEq]
-  simp only [input, offset, BranchChip.circuit, circuit_norm]
+  ctrlViewProjection BranchChip.Inputs, BranchChip.circuit, branchViewOf, BranchChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem branchViewOf_isReal (env : Environment (ZMod p)) :
@@ -945,9 +888,7 @@ theorem branchChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p
     (data : ProverData (ZMod p)) (hchip : decoded.chip = branchChipDescriptor (p := p)) :
     decoded.interactionsWith data memoryChannel =
       immutableItypeMemoryInteractions (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = branchChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst branchChipDescriptor (p := p)
   apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
   rw [DecodedInstructionRow.interactionsWith_raw]
   simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
@@ -960,15 +901,11 @@ theorem branchChip_immutableItypeMemoryInteractionShape :
   interactions := branchChip_typedMemoryInteractions_eq
   imm_b_eq_zero := by
     intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = branchChipDescriptor (p := p) := hchip
-    subst hchip'
+    descriptorSubst branchChipDescriptor (p := p)
     rfl
   imm_c_eq_one := by
     intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = branchChipDescriptor (p := p) := hchip
-    subst hchip'
+    descriptorSubst branchChipDescriptor (p := p)
     rfl
 
 /-- The retained immutable I-type reader after Branch's 28 witness cells. -/
@@ -1015,9 +952,7 @@ theorem branchChip_viewClockBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = branchChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst branchChipDescriptor (p := p)
   exact viewClockBounds_of_cpuStateContract (BranchChip.circuit (p := p)) BranchChip.rowView
     BranchChip.cpuStateTimeContract data physical guarantees real
 
@@ -1027,9 +962,7 @@ theorem branchChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ImmutableITypeTimestampBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = branchChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst branchChipDescriptor (p := p)
   exact immutableItypeTimestampBounds_of_contract BranchChip.circuit BranchChip.rowView
     BranchChip.immutableItypeTimestampContract data physical guarantees real
 

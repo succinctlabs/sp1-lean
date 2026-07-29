@@ -475,5 +475,9 @@
 #   placement preceded the constant it cited and all 25 call sites failed with "Unknown identifier
 #   `circuitMemorySelectorGated_of_main<hyg>`" — hygiene, not a typo. Place a macro AFTER the constants
 #   it references.
-SP1Clean 327
+# -1 (2026-07-29, proof-cleanup W8/r2): ratchet DOWN, no ceiling raised. Grounding/ALUTypeChips.lean
+#   dropped the 4000000 ceiling on ShiftLeftChip.aluTypeTimestampContract (measured floor <=40000,
+#   ~100x over). Its control run also masked an unceilinged consumer, so masking was present but cost
+#   nothing here. Grounding/{ControlFlow,Memory}Chips.lean carry no ceilings.
+SP1Clean 326
 SP1CleanTest 16

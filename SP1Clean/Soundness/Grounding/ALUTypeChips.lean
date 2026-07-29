@@ -26,6 +26,56 @@ open SP1Clean.Channels (StateMsg MemoryMsg memoryChannel byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- Substitute a decoded row's descriptor.  This removes only the constructor/substitution preamble
+every per-chip lemma below repeats; the caller's `decoded`/`hchip` binders are referenced by name
+and the destructured `physical` stays visible to the closer, so a signature mismatch is a loud
+`unknown identifier`. -/
+local macro "descriptorSubst " desc:term : tactic => do
+  let decoded := Lean.mkIdent `decoded
+  let hchip := Lean.mkIdent `hchip
+  let physical := Lean.mkIdent `physical
+  `(tactic| (
+    obtain ⟨chip, $physical:ident⟩ := $decoded
+    have descriptorEq : chip = $desc := $hchip
+    subst descriptorEq))
+
+/-- Discharge a `viewOf` state projection from the chip's own input/output state binding.  Only the
+chip names and the `viewOf`/`rowView` unfold set vary. -/
+local macro "aluViewState " inputs:term ", " circuit:term ", " inputOutput:term ", "
+    unfolds:Lean.Parser.Tactic.simpLemma,* : tactic => do
+  let env := Lean.mkIdent `env
+  `(tactic| (
+    have inputEq : Eval.eval $env (varFromOffset $inputs 0) =
+        (⟨$circuit (p := p)⟩ : Component (ZMod p)).rowInput $env :=
+      eval_varFromOffset_valueFromOffset $inputs 0 $env
+    simp only [$unfolds,*]
+    exact ($inputOutput $env).symm.trans
+      (congrArg (fun input : $inputs (ZMod p) => input.state) inputEq.symm)))
+
+/-- As `aluViewState`, for the adapter projection through the shared `ALUTypeReader` view map. -/
+local macro "aluViewAdapter " inputs:term ", " circuit:term ", " inputOutput:term ", "
+    unfolds:Lean.Parser.Tactic.simpLemma,* : tactic => do
+  let env := Lean.mkIdent `env
+  `(tactic| (
+    have inputEq : Eval.eval $env (varFromOffset $inputs 0) =
+        (⟨$circuit (p := p)⟩ : Component (ZMod p)).rowInput $env :=
+      eval_varFromOffset_valueFromOffset $inputs 0 $env
+    simp only [$unfolds,*]
+    exact congrArg Extracted.ALUTypeReader.toAdapterView
+      (($inputOutput $env).symm.trans
+        (congrArg (fun input : $inputs (ZMod p) => input.adapter) inputEq.symm))))
+
+/-- Open a chip's Memory-interaction evaluation at its own `main`, without unfolding the completed
+circuit: rewrite the component list, restate it at `main`, then apply the chip's exposed list. -/
+local macro "memoryValuesPreamble " inputs:term ", " main:term ", " interEq:term : tactic => do
+  let env := Lean.mkIdent `env
+  `(tactic| (
+    rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
+    change List.map (AbstractInteraction.eval $env)
+        ((($main (varFromOffset $inputs 0)).operations
+          (size $inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
+    rw [$interEq:term]))
+
 section Shape
 
 variable [Fact (2 ^ 25 < p)]
@@ -807,25 +857,16 @@ omit [Fact (2 ^ 25 < p)] in
 theorem addwViewOf_state (env : Environment (ZMod p)) :
     (addwViewOf env).state =
       (Eval.eval env (varFromOffset (F := ZMod p) AddwChip.Inputs 0)).state := by
-  have inputEq : Eval.eval env (varFromOffset AddwChip.Inputs 0) =
-      (⟨AddwChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset AddwChip.Inputs 0 env
-  simp only [addwViewOf, AddwChip.rowView]
-  exact (AddwChip.inputOutputState env).symm.trans
-    (congrArg (fun input : AddwChip.Inputs (ZMod p) => input.state) inputEq.symm)
+  aluViewState AddwChip.Inputs, AddwChip.circuit, AddwChip.inputOutputState,
+    addwViewOf, AddwChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem addwViewOf_adapter (env : Environment (ZMod p)) :
     (addwViewOf env).adapter =
       (Eval.eval env
         (varFromOffset (F := ZMod p) AddwChip.Inputs 0)).adapter.toAdapterView := by
-  have inputEq : Eval.eval env (varFromOffset AddwChip.Inputs 0) =
-      (⟨AddwChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset AddwChip.Inputs 0 env
-  simp only [addwViewOf, AddwChip.rowView]
-  exact congrArg Extracted.ALUTypeReader.toAdapterView
-    ((AddwChip.inputOutputAdapter env).symm.trans
-      (congrArg (fun input : AddwChip.Inputs (ZMod p) => input.adapter) inputEq.symm))
+  aluViewAdapter AddwChip.Inputs, AddwChip.circuit, AddwChip.inputOutputAdapter,
+    addwViewOf, AddwChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem addwViewOf_opA0 (env : Environment (ZMod p)) :
@@ -867,8 +908,7 @@ theorem addwViewOf_rdWrite (env : Environment (ZMod p)) :
   change AddwChip.resultWord
     (Eval.eval env ((AddwChip.elaborated (p := p)).output input offset)) = _
   rw [AddwChip.directOutput_eq, AddwChip.eval_columns]
-  apply Vector.ext
-  intro i hi
+  apply Vector.ext; intro i hi
   interval_cases i <;> simp only [offset, AddwChip.resultWord,
     Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
 
@@ -878,11 +918,7 @@ theorem addwChip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
     (⟨AddwChip.circuit (p := p)⟩ : Component (ZMod p)).operations.interactionValuesWith
         (memoryChannel (p := p)).toRaw env =
       (aluViewMemoryInteractions (addwViewOf env)).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((AddwChip.main (varFromOffset AddwChip.Inputs 0)).operations
-        (size AddwChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [AddwChip.interactionsWith_memory_eq]
+  memoryValuesPreamble AddwChip.Inputs, AddwChip.main, AddwChip.interactionsWith_memory_eq
   simp only [AddwChip.exposedMemoryInteractions, aluViewMemoryInteractions, List.map_cons,
     List.map_nil, TypedInteraction.pulledIfValue_raw, TypedInteraction.pushedIfValue_raw,
     Channel.eval_pulledIf, Channel.eval_pushedIf, eval_registerMemoryMessage]
@@ -895,9 +931,7 @@ theorem addwChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p)
     (data : ProverData (ZMod p)) (hchip : decoded.chip = addwChipDescriptor (p := p)) :
     decoded.interactionsWith data memoryChannel =
       aluViewMemoryInteractions (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = addwChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst addwChipDescriptor (p := p)
   apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
   rw [DecodedInstructionRow.interactionsWith_raw]
   simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
@@ -929,9 +963,7 @@ theorem addwChip_viewClockBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = addwChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst addwChipDescriptor (p := p)
   exact viewClockBounds_of_cpuStateContract (AddwChip.circuit (p := p)) AddwChip.rowView
     AddwChip.cpuStateTimeContract data physical guarantees real
 
@@ -942,9 +974,7 @@ theorem addwChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ALUTypeTimestampBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = addwChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst addwChipDescriptor (p := p)
   exact aluTypeTimestampBounds_of_contract AddwChip.circuit AddwChip.rowView
     AddwChip.aluTypeTimestampContract data physical constraints guarantees real
 
@@ -961,8 +991,8 @@ theorem addwChip_immediate_isU64 {program : GuestProgram}
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
     (decode : decodedInROM program (programAccess (decoded.toChipRow data).view).toRow)
     (immediate : (decoded.toChipRow data).view.adapter.imm_c = 1) :
-    Word.isU64 (decoded.toChipRow data).view.adapter.op_c := by
-  exact decode.immediate_words_isU64.2 (by
+    Word.isU64 (decoded.toChipRow data).view.adapter.op_c :=
+  decode.immediate_words_isU64.2 (by
     simpa only [programAccess, ProgramAccess.toRow] using immediate)
 
 /-- Descriptor-level form of Addw's physical immediate-consistency binding. -/
@@ -972,9 +1002,7 @@ theorem addwChip_opCBinding_of_constraints (decoded : DecodedInstructionRow p)
     (immediate : (decoded.toChipRow data).view.adapter.imm_c = 1) :
     (decoded.toChipRow data).view.adapter.op_c_memory.prev_value =
       (decoded.toChipRow data).view.adapter.op_c := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = addwChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst addwChipDescriptor (p := p)
   exact AddwChip.rowViewOpCBinding_of_constraints
     (Environment.fromArray physical data) constraints immediate
 
@@ -1005,25 +1033,16 @@ omit [Fact (2 ^ 25 < p)] in
 theorem bitwiseViewOf_state (env : Environment (ZMod p)) :
     (bitwiseViewOf env).state =
       (Eval.eval env (varFromOffset (F := ZMod p) BitwiseChip.Inputs 0)).state := by
-  have inputEq : Eval.eval env (varFromOffset BitwiseChip.Inputs 0) =
-      (⟨BitwiseChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset BitwiseChip.Inputs 0 env
-  simp only [bitwiseViewOf, BitwiseChip.physicalView, BitwiseChip.rowView]
-  exact (BitwiseChip.inputOutputState env).symm.trans
-    (congrArg (fun input : BitwiseChip.Inputs (ZMod p) => input.state) inputEq.symm)
+  aluViewState BitwiseChip.Inputs, BitwiseChip.circuit, BitwiseChip.inputOutputState,
+    bitwiseViewOf, BitwiseChip.physicalView, BitwiseChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem bitwiseViewOf_adapter (env : Environment (ZMod p)) :
     (bitwiseViewOf env).adapter =
       (Eval.eval env
         (varFromOffset (F := ZMod p) BitwiseChip.Inputs 0)).adapter.toAdapterView := by
-  have inputEq : Eval.eval env (varFromOffset BitwiseChip.Inputs 0) =
-      (⟨BitwiseChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset BitwiseChip.Inputs 0 env
-  simp only [bitwiseViewOf, BitwiseChip.physicalView, BitwiseChip.rowView]
-  exact congrArg Extracted.ALUTypeReader.toAdapterView
-    ((BitwiseChip.inputOutputAdapter env).symm.trans
-      (congrArg (fun input : BitwiseChip.Inputs (ZMod p) => input.adapter) inputEq.symm))
+  aluViewAdapter BitwiseChip.Inputs, BitwiseChip.circuit, BitwiseChip.inputOutputAdapter,
+    bitwiseViewOf, BitwiseChip.physicalView, BitwiseChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem bitwiseViewOf_isReal (env : Environment (ZMod p)) :
@@ -1054,8 +1073,7 @@ theorem bitwiseViewOf_rdWrite (env : Environment (ZMod p)) :
   change BitwiseU16Operation.resultWord
       ((Eval.eval env ((BitwiseChip.elaborated (p := p)).output input offset)).bitwise_operation.bitwise_operation.result) = _
   rw [BitwiseChip.directOutput_eq, BitwiseChip.eval_columns]
-  apply Vector.ext
-  intro i hi
+  apply Vector.ext; intro i hi
   interval_cases i <;> simp only [offset, BitwiseU16Operation.resultWord,
     Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
 
@@ -1065,11 +1083,7 @@ theorem bitwiseChip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
     (⟨BitwiseChip.circuit (p := p)⟩ : Component (ZMod p)).operations.interactionValuesWith
         (memoryChannel (p := p)).toRaw env =
       (aluViewMemoryInteractions (bitwiseViewOf env)).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((BitwiseChip.main (varFromOffset BitwiseChip.Inputs 0)).operations
-        (size BitwiseChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [BitwiseChip.interactionsWith_memory_eq]
+  memoryValuesPreamble BitwiseChip.Inputs, BitwiseChip.main, BitwiseChip.interactionsWith_memory_eq
   simp only [BitwiseChip.exposedMemoryInteractions, aluViewMemoryInteractions, List.map_cons,
     List.map_nil, TypedInteraction.pulledIfValue_raw, TypedInteraction.pushedIfValue_raw,
     Channel.eval_pulledIf, Channel.eval_pushedIf, eval_registerMemoryMessage]
@@ -1082,9 +1096,7 @@ theorem bitwiseChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow 
     (data : ProverData (ZMod p)) (hchip : decoded.chip = bitwiseChipDescriptor (p := p)) :
     decoded.interactionsWith data memoryChannel =
       aluViewMemoryInteractions (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = bitwiseChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst bitwiseChipDescriptor (p := p)
   apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
   rw [DecodedInstructionRow.interactionsWith_raw]
   simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
@@ -1116,9 +1128,7 @@ theorem bitwiseChip_viewClockBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = bitwiseChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst bitwiseChipDescriptor (p := p)
   exact viewClockBounds_of_cpuStateContract (BitwiseChip.circuit (p := p)) BitwiseChip.rowView
     BitwiseChip.cpuStateTimeContract data physical guarantees real
 
@@ -1129,9 +1139,7 @@ theorem bitwiseChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ALUTypeTimestampBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = bitwiseChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst bitwiseChipDescriptor (p := p)
   exact aluTypeTimestampBounds_of_contract BitwiseChip.circuit BitwiseChip.rowView
     BitwiseChip.aluTypeTimestampContract data physical constraints guarantees real
 
@@ -1148,8 +1156,8 @@ theorem bitwiseChip_immediate_isU64 {program : GuestProgram}
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
     (decode : decodedInROM program (programAccess (decoded.toChipRow data).view).toRow)
     (immediate : (decoded.toChipRow data).view.adapter.imm_c = 1) :
-    Word.isU64 (decoded.toChipRow data).view.adapter.op_c := by
-  exact decode.immediate_words_isU64.2 (by
+    Word.isU64 (decoded.toChipRow data).view.adapter.op_c :=
+  decode.immediate_words_isU64.2 (by
     simpa only [programAccess, ProgramAccess.toRow] using immediate)
 
 /-- Descriptor-level form of Bitwise's physical immediate-consistency binding. -/
@@ -1159,9 +1167,7 @@ theorem bitwiseChip_opCBinding_of_constraints (decoded : DecodedInstructionRow p
     (immediate : (decoded.toChipRow data).view.adapter.imm_c = 1) :
     (decoded.toChipRow data).view.adapter.op_c_memory.prev_value =
       (decoded.toChipRow data).view.adapter.op_c := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = bitwiseChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst bitwiseChipDescriptor (p := p)
   exact BitwiseChip.rowViewOpCBinding_of_constraints
     (Environment.fromArray physical data) constraints immediate
 
@@ -1192,24 +1198,15 @@ omit [Fact (2 ^ 25 < p)] in
 theorem ltViewOf_state (env : Environment (ZMod p)) :
     (ltViewOf env).state =
       (Eval.eval env (varFromOffset (F := ZMod p) LtChip.Inputs 0)).state := by
-  have inputEq : Eval.eval env (varFromOffset LtChip.Inputs 0) =
-      (⟨LtChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset LtChip.Inputs 0 env
-  simp only [ltViewOf, LtChip.physicalView, LtChip.rowView]
-  exact (LtChip.inputOutputState env).symm.trans
-    (congrArg (fun input : LtChip.Inputs (ZMod p) => input.state) inputEq.symm)
+  aluViewState LtChip.Inputs, LtChip.circuit, LtChip.inputOutputState,
+    ltViewOf, LtChip.physicalView, LtChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem ltViewOf_adapter (env : Environment (ZMod p)) :
     (ltViewOf env).adapter =
       (Eval.eval env (varFromOffset (F := ZMod p) LtChip.Inputs 0)).adapter.toAdapterView := by
-  have inputEq : Eval.eval env (varFromOffset LtChip.Inputs 0) =
-      (⟨LtChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset LtChip.Inputs 0 env
-  simp only [ltViewOf, LtChip.physicalView, LtChip.rowView]
-  exact congrArg Extracted.ALUTypeReader.toAdapterView
-    ((LtChip.inputOutputAdapter env).symm.trans
-      (congrArg (fun input : LtChip.Inputs (ZMod p) => input.adapter) inputEq.symm))
+  aluViewAdapter LtChip.Inputs, LtChip.circuit, LtChip.inputOutputAdapter,
+    ltViewOf, LtChip.physicalView, LtChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem ltViewOf_isReal (env : Environment (ZMod p)) :
@@ -1233,8 +1230,7 @@ theorem ltViewOf_rdWrite (env : Environment (ZMod p)) :
   change LtChip.resultWord
     (Eval.eval env ((LtChip.elaborated (p := p)).output input offset)) = _
   rw [LtChip.directOutput_eq, LtChip.eval_columns]
-  apply Vector.ext
-  intro i hi
+  apply Vector.ext; intro i hi
   interval_cases i <;> simp only [offset, LtChip.resultWord, circuit_norm]
 
 omit [Fact (2 ^ 25 < p)] in
@@ -1243,11 +1239,7 @@ theorem ltChip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
     (⟨LtChip.circuit (p := p)⟩ : Component (ZMod p)).operations.interactionValuesWith
         (memoryChannel (p := p)).toRaw env =
       (aluViewMemoryInteractions (ltViewOf env)).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((LtChip.main (varFromOffset LtChip.Inputs 0)).operations
-        (size LtChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [LtChip.interactionsWith_memory_eq]
+  memoryValuesPreamble LtChip.Inputs, LtChip.main, LtChip.interactionsWith_memory_eq
   simp only [LtChip.exposedMemoryInteractions, aluViewMemoryInteractions, List.map_cons,
     List.map_nil, TypedInteraction.pulledIfValue_raw, TypedInteraction.pushedIfValue_raw,
     Channel.eval_pulledIf, Channel.eval_pushedIf, eval_registerMemoryMessage]
@@ -1260,9 +1252,7 @@ theorem ltChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p)
     (data : ProverData (ZMod p)) (hchip : decoded.chip = ltChipDescriptor (p := p)) :
     decoded.interactionsWith data memoryChannel =
       aluViewMemoryInteractions (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = ltChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst ltChipDescriptor (p := p)
   apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
   rw [DecodedInstructionRow.interactionsWith_raw]
   simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
@@ -1293,9 +1283,7 @@ theorem ltChip_viewClockBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = ltChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst ltChipDescriptor (p := p)
   exact viewClockBounds_of_cpuStateContract (LtChip.circuit (p := p)) LtChip.rowView
     LtChip.cpuStateTimeContract data physical guarantees real
 
@@ -1306,9 +1294,7 @@ theorem ltChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ALUTypeTimestampBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = ltChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst ltChipDescriptor (p := p)
   exact aluTypeTimestampBounds_of_contract LtChip.circuit LtChip.rowView
     LtChip.aluTypeTimestampContract data physical constraints guarantees real
 
@@ -1325,8 +1311,8 @@ theorem ltChip_immediate_isU64 {program : GuestProgram}
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
     (decode : decodedInROM program (programAccess (decoded.toChipRow data).view).toRow)
     (immediate : (decoded.toChipRow data).view.adapter.imm_c = 1) :
-    Word.isU64 (decoded.toChipRow data).view.adapter.op_c := by
-  exact decode.immediate_words_isU64.2 (by
+    Word.isU64 (decoded.toChipRow data).view.adapter.op_c :=
+  decode.immediate_words_isU64.2 (by
     simpa only [programAccess, ProgramAccess.toRow] using immediate)
 
 /-- Descriptor-level form of Lt's physical immediate-consistency binding. -/
@@ -1336,9 +1322,7 @@ theorem ltChip_opCBinding_of_constraints (decoded : DecodedInstructionRow p)
     (immediate : (decoded.toChipRow data).view.adapter.imm_c = 1) :
     (decoded.toChipRow data).view.adapter.op_c_memory.prev_value =
       (decoded.toChipRow data).view.adapter.op_c := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = ltChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst ltChipDescriptor (p := p)
   exact LtChip.rowViewOpCBinding_of_constraints
     (Environment.fromArray physical data) constraints immediate
 
@@ -1371,25 +1355,16 @@ theorem shiftLeftViewOf_state (env : Environment (ZMod p)) :
     (shiftLeftViewOf env).state =
       (Eval.eval env
         (varFromOffset (F := ZMod p) ShiftLeftChip.Inputs 0)).state := by
-  have inputEq : Eval.eval env (varFromOffset ShiftLeftChip.Inputs 0) =
-      (⟨ShiftLeftChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset ShiftLeftChip.Inputs 0 env
-  simp only [shiftLeftViewOf, ShiftLeftChip.physicalView, ShiftLeftChip.rowView]
-  exact (ShiftLeftChip.inputOutputState env).symm.trans
-    (congrArg (fun input : ShiftLeftChip.Inputs (ZMod p) => input.state) inputEq.symm)
+  aluViewState ShiftLeftChip.Inputs, ShiftLeftChip.circuit, ShiftLeftChip.inputOutputState,
+    shiftLeftViewOf, ShiftLeftChip.physicalView, ShiftLeftChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem shiftLeftViewOf_adapter (env : Environment (ZMod p)) :
     (shiftLeftViewOf env).adapter =
       (Eval.eval env
         (varFromOffset (F := ZMod p) ShiftLeftChip.Inputs 0)).adapter.toAdapterView := by
-  have inputEq : Eval.eval env (varFromOffset ShiftLeftChip.Inputs 0) =
-      (⟨ShiftLeftChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset ShiftLeftChip.Inputs 0 env
-  simp only [shiftLeftViewOf, ShiftLeftChip.physicalView, ShiftLeftChip.rowView]
-  exact congrArg Extracted.ALUTypeReader.toAdapterView
-    ((ShiftLeftChip.inputOutputAdapter env).symm.trans
-      (congrArg (fun input : ShiftLeftChip.Inputs (ZMod p) => input.adapter) inputEq.symm))
+  aluViewAdapter ShiftLeftChip.Inputs, ShiftLeftChip.circuit, ShiftLeftChip.inputOutputAdapter,
+    shiftLeftViewOf, ShiftLeftChip.physicalView, ShiftLeftChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem shiftLeftViewOf_isReal (env : Environment (ZMod p)) :
@@ -1419,8 +1394,7 @@ theorem shiftLeftViewOf_rdWrite (env : Environment (ZMod p)) :
   change
     (Eval.eval env ((ShiftLeftChip.elaborated (p := p)).output input offset)).a = _
   rw [ShiftLeftChip.directOutput_eq, ShiftLeftChip.eval_columns]
-  apply Vector.ext
-  intro i hi
+  apply Vector.ext; intro i hi
   interval_cases i <;> simp only [offset, circuit_norm]
 
 omit [Fact (2 ^ 25 < p)] in
@@ -1455,11 +1429,8 @@ theorem shiftLeftChip_memoryInteractionValues_eq (env : Environment (ZMod p))
     (⟨ShiftLeftChip.circuit (p := p)⟩ : Component (ZMod p)).operations.interactionValuesWith
         (memoryChannel (p := p)).toRaw env =
       (aluViewMemoryInteractions (shiftLeftViewOf env)).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((ShiftLeftChip.main (varFromOffset ShiftLeftChip.Inputs 0)).operations
-        (size ShiftLeftChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [ShiftLeftChip.interactionsWith_main_memory_eq]
+  memoryValuesPreamble ShiftLeftChip.Inputs, ShiftLeftChip.main,
+    ShiftLeftChip.interactionsWith_main_memory_eq
   simp only [ShiftLeftChip.exposedMemoryInteractions, aluViewMemoryInteractions, List.map_cons,
     List.map_nil, TypedInteraction.pulledIfValue_raw, TypedInteraction.pushedIfValue_raw,
     Channel.eval_pulledIf, Channel.eval_pushedIf, eval_registerMemoryMessage]
@@ -1477,9 +1448,7 @@ theorem shiftLeftChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRo
     (constraints : decoded.chip.table.operations.ConstraintsHold (decoded.environment data)) :
     decoded.interactionsWith data memoryChannel =
       aluViewMemoryInteractions (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = shiftLeftChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst shiftLeftChipDescriptor (p := p)
   apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
   rw [DecodedInstructionRow.interactionsWith_raw]
   simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
@@ -1491,9 +1460,9 @@ theorem shiftLeftChip_aluTypeMemoryInteractionShape :
     ConstrainedALUTypeMemoryInteractionShape (shiftLeftChipDescriptor (p := p)) :=
   shiftLeftChip_typedMemoryInteractions_eq
 
-set_option maxHeartbeats 4000000 in
 omit [Fact (2 ^ 25 < p)] in
-/-- ShiftLeft's retained reader through the constraint-aware scalar timestamp contract. -/
+/-- ShiftLeft's retained reader through the constraint-aware scalar timestamp contract.
+The former 4M ceiling measured ~100x over; floor is at or below 40000. -/
 theorem ShiftLeftChip.aluTypeTimestampContract :
     CircuitALUTypeTimestampContract (p := p) (ShiftLeftChip.circuit (p := p))
       ShiftLeftChip.rowView := by
@@ -1532,9 +1501,7 @@ theorem shiftLeftChip_viewClockBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = shiftLeftChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst shiftLeftChipDescriptor (p := p)
   exact viewClockBounds_of_cpuStateContract
     (ShiftLeftChip.circuit (p := p)) ShiftLeftChip.rowView
     ShiftLeftChip.cpuStateTimeContract data physical guarantees real
@@ -1547,9 +1514,7 @@ theorem shiftLeftChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ALUTypeTimestampBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = shiftLeftChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst shiftLeftChipDescriptor (p := p)
   exact aluTypeTimestampBounds_of_contract ShiftLeftChip.circuit ShiftLeftChip.rowView
     ShiftLeftChip.aluTypeTimestampContract data physical constraints guarantees real
 
@@ -1566,8 +1531,8 @@ theorem shiftLeftChip_immediate_isU64 {program : GuestProgram}
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
     (decode : decodedInROM program (programAccess (decoded.toChipRow data).view).toRow)
     (immediate : (decoded.toChipRow data).view.adapter.imm_c = 1) :
-    Word.isU64 (decoded.toChipRow data).view.adapter.op_c := by
-  exact decode.immediate_words_isU64.2 (by
+    Word.isU64 (decoded.toChipRow data).view.adapter.op_c :=
+  decode.immediate_words_isU64.2 (by
     simpa only [programAccess, ProgramAccess.toRow] using immediate)
 
 /-- Descriptor-level form of ShiftLeft's physical immediate-consistency binding. -/
@@ -1578,9 +1543,7 @@ theorem shiftLeftChip_opCBinding_of_constraints (decoded : DecodedInstructionRow
     (immediate : (decoded.toChipRow data).view.adapter.imm_c = 1) :
     (decoded.toChipRow data).view.adapter.op_c_memory.prev_value =
       (decoded.toChipRow data).view.adapter.op_c := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = shiftLeftChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst shiftLeftChipDescriptor (p := p)
   exact ShiftLeftChip.rowViewOpCBinding_of_constraints
     (Environment.fromArray physical data) constraints immediate
 
@@ -1614,25 +1577,16 @@ theorem shiftRightViewOf_state (env : Environment (ZMod p)) :
     (shiftRightViewOf env).state =
       (Eval.eval env
         (varFromOffset (F := ZMod p) ShiftRightChip.Inputs 0)).state := by
-  have inputEq : Eval.eval env (varFromOffset ShiftRightChip.Inputs 0) =
-      (⟨ShiftRightChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset ShiftRightChip.Inputs 0 env
-  simp only [shiftRightViewOf, ShiftRightChip.physicalView, ShiftRightChip.rowView]
-  exact (ShiftRightChip.inputOutputState env).symm.trans
-    (congrArg (fun input : ShiftRightChip.Inputs (ZMod p) => input.state) inputEq.symm)
+  aluViewState ShiftRightChip.Inputs, ShiftRightChip.circuit, ShiftRightChip.inputOutputState,
+    shiftRightViewOf, ShiftRightChip.physicalView, ShiftRightChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem shiftRightViewOf_adapter (env : Environment (ZMod p)) :
     (shiftRightViewOf env).adapter =
       (Eval.eval env
         (varFromOffset (F := ZMod p) ShiftRightChip.Inputs 0)).adapter.toAdapterView := by
-  have inputEq : Eval.eval env (varFromOffset ShiftRightChip.Inputs 0) =
-      (⟨ShiftRightChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
-    eval_varFromOffset_valueFromOffset ShiftRightChip.Inputs 0 env
-  simp only [shiftRightViewOf, ShiftRightChip.physicalView, ShiftRightChip.rowView]
-  exact congrArg Extracted.ALUTypeReader.toAdapterView
-    ((ShiftRightChip.inputOutputAdapter env).symm.trans
-      (congrArg (fun input : ShiftRightChip.Inputs (ZMod p) => input.adapter) inputEq.symm))
+  aluViewAdapter ShiftRightChip.Inputs, ShiftRightChip.circuit, ShiftRightChip.inputOutputAdapter,
+    shiftRightViewOf, ShiftRightChip.physicalView, ShiftRightChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem shiftRightViewOf_isReal (env : Environment (ZMod p)) :
@@ -1662,8 +1616,7 @@ theorem shiftRightViewOf_rdWrite (env : Environment (ZMod p)) :
   change
     (Eval.eval env ((ShiftRightChip.elaborated (p := p)).output input offset)).a = _
   rw [ShiftRightChip.directOutput_eq, ShiftRightChip.eval_columns]
-  apply Vector.ext
-  intro i hi
+  apply Vector.ext; intro i hi
   interval_cases i <;> simp only [offset, circuit_norm]
 
 omit [Fact (2 ^ 25 < p)] in
@@ -1701,11 +1654,8 @@ theorem shiftRightChip_memoryInteractionValues_eq (env : Environment (ZMod p))
     (⟨ShiftRightChip.circuit (p := p)⟩ : Component (ZMod p)).operations.interactionValuesWith
         (memoryChannel (p := p)).toRaw env =
       (aluViewMemoryInteractions (shiftRightViewOf env)).map TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((ShiftRightChip.main (varFromOffset ShiftRightChip.Inputs 0)).operations
-        (size ShiftRightChip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [ShiftRightChip.interactionsWith_main_memory_eq]
+  memoryValuesPreamble ShiftRightChip.Inputs, ShiftRightChip.main,
+    ShiftRightChip.interactionsWith_main_memory_eq
   simp only [ShiftRightChip.exposedMemoryInteractions, aluViewMemoryInteractions, List.map_cons,
     List.map_nil, TypedInteraction.pulledIfValue_raw, TypedInteraction.pushedIfValue_raw,
     Channel.eval_pulledIf, Channel.eval_pushedIf, eval_registerMemoryMessage,
@@ -1723,9 +1673,7 @@ theorem shiftRightChip_typedMemoryInteractions_eq (decoded : DecodedInstructionR
     (constraints : decoded.chip.table.operations.ConstraintsHold (decoded.environment data)) :
     decoded.interactionsWith data memoryChannel =
       aluViewMemoryInteractions (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = shiftRightChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst shiftRightChipDescriptor (p := p)
   apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
   rw [DecodedInstructionRow.interactionsWith_raw]
   simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
@@ -1761,9 +1709,7 @@ theorem shiftRightChip_viewClockBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = shiftRightChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst shiftRightChipDescriptor (p := p)
   exact viewClockBounds_of_cpuStateContract
     (ShiftRightChip.circuit (p := p)) ShiftRightChip.rowView
     ShiftRightChip.cpuStateTimeContract data physical guarantees real
@@ -1776,9 +1722,7 @@ theorem shiftRightChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ALUTypeTimestampBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = shiftRightChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst shiftRightChipDescriptor (p := p)
   exact aluTypeTimestampBounds_of_contract ShiftRightChip.circuit ShiftRightChip.rowView
     ShiftRightChip.aluTypeTimestampContract data physical constraints guarantees real
 
@@ -1795,8 +1739,8 @@ theorem shiftRightChip_immediate_isU64 {program : GuestProgram}
     (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
     (decode : decodedInROM program (programAccess (decoded.toChipRow data).view).toRow)
     (immediate : (decoded.toChipRow data).view.adapter.imm_c = 1) :
-    Word.isU64 (decoded.toChipRow data).view.adapter.op_c := by
-  exact decode.immediate_words_isU64.2 (by
+    Word.isU64 (decoded.toChipRow data).view.adapter.op_c :=
+  decode.immediate_words_isU64.2 (by
     simpa only [programAccess, ProgramAccess.toRow] using immediate)
 
 /-- Descriptor-level form of ShiftRight's physical immediate-consistency binding. -/
@@ -1807,9 +1751,7 @@ theorem shiftRightChip_opCBinding_of_constraints (decoded : DecodedInstructionRo
     (immediate : (decoded.toChipRow data).view.adapter.imm_c = 1) :
     (decoded.toChipRow data).view.adapter.op_c_memory.prev_value =
       (decoded.toChipRow data).view.adapter.op_c := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = shiftRightChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst shiftRightChipDescriptor (p := p)
   exact ShiftRightChip.rowViewOpCBinding_of_constraints
     (Environment.fromArray physical data) constraints immediate
 
@@ -1947,11 +1889,7 @@ theorem aluX0Chip_memoryInteractionValues_eq (env : Environment (ZMod p)) :
         (memoryChannel (p := p)).toRaw env =
       (immutableAluViewMemoryInteractions (aluX0ViewOf env)).map
         TypedInteraction.raw := by
-  rw [Operations.interactionValuesWith_eq_map, Component.interactionsWith_eq]
-  change List.map (AbstractInteraction.eval env)
-      (((AluX0Chip.main (varFromOffset AluX0Chip.Inputs 0)).operations
-        (size AluX0Chip.Inputs)).interactionsWith (memoryChannel (p := p)).toRaw) = _
-  rw [AluX0Chip.interactionsWith_memory_eq]
+  memoryValuesPreamble AluX0Chip.Inputs, AluX0Chip.main, AluX0Chip.interactionsWith_memory_eq
   simp only [AluX0Chip.exposedMemoryInteractions, immutableAluViewMemoryInteractions,
     List.map_cons, List.map_nil, TypedInteraction.pulledIfValue_raw,
     TypedInteraction.pushedIfValue_raw, Channel.eval_pulledIf, Channel.eval_pushedIf,
@@ -1966,9 +1904,7 @@ theorem aluX0Chip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p)
     (hchip : decoded.chip = aluX0ChipDescriptor (p := p)) :
     decoded.interactionsWith data memoryChannel =
       immutableAluViewMemoryInteractions (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = aluX0ChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst aluX0ChipDescriptor (p := p)
   apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
   rw [DecodedInstructionRow.interactionsWith_raw]
   simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
@@ -1981,9 +1917,7 @@ theorem aluX0Chip_immutableALUTypeMemoryInteractionShape :
   interactions := aluX0Chip_typedMemoryInteractions_eq
   imm_b_eq_zero := by
     intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = aluX0ChipDescriptor (p := p) := hchip
-    subst hchip'
+    descriptorSubst aluX0ChipDescriptor (p := p)
     rfl
 
 private def AluX0Chip.immutableAluReaderInput
@@ -2019,9 +1953,7 @@ theorem aluX0Chip_viewClockBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = aluX0ChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst aluX0ChipDescriptor (p := p)
   exact viewClockBounds_of_cpuStateContract (AluX0Chip.circuit (p := p))
     AluX0Chip.rowView AluX0Chip.cpuStateTimeContract data physical guarantees real
 
@@ -2032,9 +1964,7 @@ theorem aluX0Chip_activeTimestampBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ALUTypeTimestampBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = aluX0ChipDescriptor (p := p) := hchip
-  subst hchip'
+  descriptorSubst aluX0ChipDescriptor (p := p)
   exact immutableAluTypeTimestampBounds_of_contract AluX0Chip.circuit
     AluX0Chip.rowView AluX0Chip.immutableAluTypeTimestampContract
       data physical guarantees real
