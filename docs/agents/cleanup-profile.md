@@ -158,6 +158,28 @@ and the original name stays resolvable for `check_report_citations.sh` and the p
 > regression from a loud error into a slow build.** This is an argument for the ratchet beyond
 > tidiness: every ceiling lowered makes the next regression louder.
 
+> ### Commented-out legacy proof bodies — the campaign's largest single-file win
+>
+> `Completeness/Driver.lean` went **1876 → 546 lines (−70.9%)**, elaboration **9.49s → 5.92s (−38%)**.
+> **1,025 of those lines were commented-out superseded proof bodies** in three `/- … -/` blocks — two
+> old `case compare` alternatives and one 601-line block whose own header read *"Legacy flattened
+> child proof, retained temporarily while its cases are regrouped above."* The regrouping had long
+> since landed.
+>
+> Deleting them is permitted and is **not** a §2.3 violation — a comment is not a declaration, and
+> §3's strip-narration rule covers dead code far more clearly than it covers prose. Keep `/-! ## -/`
+> subsection dividers (§2.7) and any comment carrying rationale.
+>
+> **The second-order win is larger than it looks:** removing the comments exposed **94 dead
+> `have`/`obtain` bindings** whose only consumers were inside them (the `hCTQ*`/`hCARRY*`/`hPL*`/… 
+> families), worth a further −259 lines over two fixpoint passes. Run the dead-binding pass **after**
+> the comment deletion, and iterate to a fixpoint — a third pass found none.
+>
+> **Scope, measured:** a tree-wide scan for non-doc `/- … -/` blocks ≥25 lines containing tactic text
+> (`have`/`obtain`/`rcases`/`refine`/`simp only`/`exact`/`rw [`) found **exactly three blocks, all in
+> this one file**. This is a solved, isolated case — do not budget a sweep for it. Re-run the scan
+> only if a future wave adds one.
+
 ## 4a. Extracted helpers are permitted
 
 Adding a **new** declaration is allowed in exactly two shapes. Nothing existing may change either way.
