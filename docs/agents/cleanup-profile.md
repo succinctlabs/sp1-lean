@@ -170,6 +170,14 @@ Rules for a new helper:
 > (parsed entries == `#print axioms` lines), not a fixed count — but the probe must be regenerated
 > and `docs/snapshots/axiom-ledger.md` updated at the end of the campaign, with the delta explained.
 
+> **Never *infer* an axiom change from the tactics you removed — measure it.** A worker replaced some
+> `omega` calls in `FormalModel/Contracts/Chips.lean` and reported that two lemmas had dropped
+> `Classical.choice`. Measured on both versions in place: `rv64_addw_eq` never carried it, and
+> `rv64_mulw_eq` went `[propext]` → `[propext, Quot.sound]` — a strict *addition*, the opposite
+> direction from the claim. Nothing left the permitted set, so the change was admissible, but the
+> claim was false and had already been relayed upward before the gate caught it.
+> **`#print axioms` on the pre-edit version too, or say nothing about axioms.**
+
 ---
 
 ## 5. The `simp` → `simp only` KEEP-set
