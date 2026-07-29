@@ -903,10 +903,11 @@ lemma high_half_eq (cols : Extracted.MulOperation (ZMod p)) (bb cc : Fin 16 → 
 -- lowest passing rung.
 set_option maxHeartbeats 500000 in
 /-- Forward (soundness) core: the raw schoolbook form implies the per-variant semantic result.
-The `MUL` (low-64, unsigned) conjunct is proved end-to-end here via the native `low_half` reassembly;
-the four high-half / `MULW` conjuncts are scoped sorries (they read further slices off the *full*
-128-bit `product_reassembly`, deferred to a later pass). The `U16toU8`/`U16MSB` sub-op `Spec`s are
-threaded in (they are discharged by the composed subcircuits in `soundness`). -/
+**All five conjuncts are proved here** — `MUL` (low-64, unsigned) via the native `low_half`
+reassembly, and the four high-half / `MULW` variants off further slices of the full 128-bit
+`product_reassembly`. The `U16toU8`/`U16MSB` sub-op `Spec`s are threaded in (they are discharged by
+the composed subcircuits in `soundness`). This theorem is `[propext, Classical.choice, Quot.sound]`;
+it carries no `sorryAx` and no `bv_decide` axiom. -/
 theorem mulSemantics_of_raw {input : Inputs (ZMod p)} {cols : Extracted.MulOperation (ZMod p)}
     (hbU : Word.isU64 input.b) (hcU : Word.isU64 input.c)
     (hmul_b : input.is_mul = 0 ∨ input.is_mul = 1) (hmh_b : input.is_mulh = 0 ∨ input.is_mulh = 1)
