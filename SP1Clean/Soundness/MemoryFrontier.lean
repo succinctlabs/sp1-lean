@@ -103,15 +103,11 @@ lemma pairwise_distinct_filter_length_le_one {α : Type*} {γ : Type*} [Decidabl
       List.Pairwise.sublist List.filter_sublist h
     rw [hfilter] at hpw
     have hne : f a ≠ f b := (List.pairwise_cons.mp hpw).1 b List.mem_cons_self
-    have ha : f a = loc := by
-      have hmem : a ∈ l.filter (fun a => decide (f a = loc)) := by
-        rw [hfilter]; exact List.mem_cons_self
+    have hloc : ∀ x ∈ a :: b :: t, f x = loc := fun x hx => by
+      have hmem : x ∈ l.filter (fun a => decide (f a = loc)) := by rw [hfilter]; exact hx
       simpa using (List.mem_filter.mp hmem).2
-    have hb : f b = loc := by
-      have hmem : b ∈ l.filter (fun a => decide (f a = loc)) := by
-        rw [hfilter]; exact List.mem_cons_of_mem _ List.mem_cons_self
-      simpa using (List.mem_filter.mp hmem).2
-    exact hne (ha.trans hb.symm)
+    exact hne ((hloc a List.mem_cons_self).trans
+      (hloc b (List.mem_cons_of_mem _ List.mem_cons_self)).symm)
 
 end Generic
 
@@ -224,6 +220,45 @@ lemma rowPullsAt_ordinaryRowFacts_coe (decoded : DecodedInstructionRow p)
   rw [Multiset.filter_coe]
   simp only [rowPullsAt, DecodedInstructionRow.ordinaryRowFacts_memPulls, key]
 
+/-- Shared skeleton of the two active-carrier bridges below, over a loose per-row selector pair: the
+active carrier's aggregate at `loc` is the filter of *all* decoded rows' messages, once each row's
+per-location list is that row's filtered message list (`hrow`) and padding rows contribute nothing. -/
+private lemma frontierRows_agg_eq (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (rowSel : RowFacts p → MemLoc → List (MemoryMsg (ZMod p)))
+    (msgSel : DecodedInstructionRow p → ProverData (ZMod p) → List (MemoryMsg (ZMod p)))
+    (hrow : ∀ (decoded : DecodedInstructionRow p) (loc : MemLoc),
+      (↑(rowSel (decoded.ordinaryRowFacts witness.data) loc) : Multiset (MemoryMsg (ZMod p))) =
+        Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+          (↑(msgSel decoded witness.data) : Multiset (MemoryMsg (ZMod p))))
+    (paddingEmpty : ∀ decoded ∈ decodedInstructionRows (p := p) witness.tables,
+      (decoded.toChipRow witness.data).is_real ≠ 1 → msgSel decoded witness.data = [])
+    (loc : MemLoc) :
+    ((memoryFrontierRows witness).map
+        (fun r => (↑(rowSel r loc) : Multiset (MemoryMsg (ZMod p))))).sum =
+      Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+        (↑((decodedInstructionRows (p := p) witness.tables).flatMap
+          (fun decoded => msgSel decoded witness.data)) : Multiset (MemoryMsg (ZMod p))) := by
+  have hL : ((memoryFrontierRows witness).map
+        (fun r => (↑(rowSel r loc) : Multiset (MemoryMsg (ZMod p))))).sum =
+      ((realDecodedInstructionRows witness.data witness.tables).map
+        (fun decoded => Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+          (↑(msgSel decoded witness.data) : Multiset (MemoryMsg (ZMod p))))).sum := by
+    rw [memoryFrontierRows, List.map_map]
+    exact congrArg List.sum (List.map_congr_left fun decoded _ => hrow decoded loc)
+  have hR : Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+      (↑((decodedInstructionRows (p := p) witness.tables).flatMap
+        (fun decoded => msgSel decoded witness.data)) : Multiset (MemoryMsg (ZMod p))) =
+      ((realDecodedInstructionRows witness.data witness.tables).map
+        (fun decoded => Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+          (↑(msgSel decoded witness.data) : Multiset (MemoryMsg (ZMod p))))).sum := by
+    rw [filter_coe_flatMap,
+      show realDecodedInstructionRows witness.data witness.tables =
+        (decodedInstructionRows (p := p) witness.tables).filter
+          (fun row => decide ((row.toChipRow witness.data).is_real = 1)) from rfl]
+    exact sum_map_eq_sum_filter _ _ _ (fun decoded decodedMem hq => by
+      rw [paddingEmpty decoded decodedMem (by simpa using hq)]; rfl)
+  rw [hL, hR]
+
 /-- **The active push bridge.** The active carrier's total per-location pushes equal the filter of all
 decoded rows' produced Memory messages — the term appearing in B4's balance.  Padding rows drop out
 (`paddingEmpty`). -/
@@ -237,32 +272,10 @@ lemma pushesAt_memoryFrontierRows (witness : EnsembleWitness (sp1Ensemble (p := 
       Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
         (↑((decodedInstructionRows (p := p) witness.tables).flatMap
           (fun decoded => decoded.producedMemoryMessages witness.data)) :
-            Multiset (MemoryMsg (ZMod p))) := by
-  have hL : pushesAt (memoryFrontierRows witness) loc =
-      ((realDecodedInstructionRows witness.data witness.tables).map
-        (fun decoded => Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
-          (↑(decoded.producedMemoryMessages witness.data) : Multiset (MemoryMsg (ZMod p))))).sum := by
-    rw [pushesAt, memoryFrontierRows, List.map_map]
-    refine congrArg List.sum (List.map_congr_left ?_)
-    intro decoded _
-    simp only [Function.comp]
-    exact rowPushesAt_ordinaryRowFacts_coe decoded witness.data loc
-  have hR : Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
-      (↑((decodedInstructionRows (p := p) witness.tables).flatMap
-        (fun decoded => decoded.producedMemoryMessages witness.data)) :
-          Multiset (MemoryMsg (ZMod p))) =
-      ((realDecodedInstructionRows witness.data witness.tables).map
-        (fun decoded => Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
-          (↑(decoded.producedMemoryMessages witness.data) :
-            Multiset (MemoryMsg (ZMod p))))).sum := by
-    rw [filter_coe_flatMap,
-      show realDecodedInstructionRows witness.data witness.tables =
-        (decodedInstructionRows (p := p) witness.tables).filter
-          (fun row => decide ((row.toChipRow witness.data).is_real = 1)) from rfl]
-    exact sum_map_eq_sum_filter _ _ _ (fun decoded decodedMem hq => by
-      have hne : (decoded.toChipRow witness.data).is_real ≠ 1 := by simpa using hq
-      rw [(paddingEmpty decoded decodedMem hne).1]; rfl)
-  rw [hL, hR]
+            Multiset (MemoryMsg (ZMod p))) :=
+  frontierRows_agg_eq witness rowPushesAt DecodedInstructionRow.producedMemoryMessages
+    (fun decoded loc => rowPushesAt_ordinaryRowFacts_coe decoded witness.data loc)
+    (fun decoded decodedMem hne => (paddingEmpty decoded decodedMem hne).1) loc
 
 /-- **The active pull bridge** (consumed analogue of `pushesAt_memoryFrontierRows`). -/
 lemma pullsAt_memoryFrontierRows (witness : EnsembleWitness (sp1Ensemble (p := p)))
@@ -275,32 +288,10 @@ lemma pullsAt_memoryFrontierRows (witness : EnsembleWitness (sp1Ensemble (p := p
       Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
         (↑((decodedInstructionRows (p := p) witness.tables).flatMap
           (fun decoded => decoded.consumedMemoryMessages witness.data)) :
-            Multiset (MemoryMsg (ZMod p))) := by
-  have hL : pullsAt (memoryFrontierRows witness) loc =
-      ((realDecodedInstructionRows witness.data witness.tables).map
-        (fun decoded => Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
-          (↑(decoded.consumedMemoryMessages witness.data) : Multiset (MemoryMsg (ZMod p))))).sum := by
-    rw [pullsAt, memoryFrontierRows, List.map_map]
-    refine congrArg List.sum (List.map_congr_left ?_)
-    intro decoded _
-    simp only [Function.comp]
-    exact rowPullsAt_ordinaryRowFacts_coe decoded witness.data loc
-  have hR : Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
-      (↑((decodedInstructionRows (p := p) witness.tables).flatMap
-        (fun decoded => decoded.consumedMemoryMessages witness.data)) :
-          Multiset (MemoryMsg (ZMod p))) =
-      ((realDecodedInstructionRows witness.data witness.tables).map
-        (fun decoded => Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
-          (↑(decoded.consumedMemoryMessages witness.data) :
-            Multiset (MemoryMsg (ZMod p))))).sum := by
-    rw [filter_coe_flatMap,
-      show realDecodedInstructionRows witness.data witness.tables =
-        (decodedInstructionRows (p := p) witness.tables).filter
-          (fun row => decide ((row.toChipRow witness.data).is_real = 1)) from rfl]
-    exact sum_map_eq_sum_filter _ _ _ (fun decoded decodedMem hq => by
-      have hne : (decoded.toChipRow witness.data).is_real ≠ 1 := by simpa using hq
-      rw [(paddingEmpty decoded decodedMem hne).2]; rfl)
-  rw [hL, hR]
+            Multiset (MemoryMsg (ZMod p))) :=
+  frontierRows_agg_eq witness rowPullsAt DecodedInstructionRow.consumedMemoryMessages
+    (fun decoded loc => rowPullsAt_ordinaryRowFacts_coe decoded witness.data loc)
+    (fun decoded decodedMem hne => (paddingEmpty decoded decodedMem hne).2) loc
 
 /-! ## The frontier balance -/
 
@@ -331,9 +322,8 @@ theorem memoryFrontierBalance (witness : EnsembleWitness (sp1Ensemble (p := p)))
     optMS (memoryInitFrontier witness loc) + pushesAt (memoryFrontierRows witness) loc =
       optMS (memoryFinalizeFrontier witness loc) + pullsAt (memoryFrontierRows witness) loc := by
   have hbal := realDecodedMemory_perlocBalance witness balanced memBinary loc
-  rw [filter_coe_append, filter_coe_append, filter_coe_append, filter_coe_append,
-    initPure, finPure] at hbal
-  simp only [Multiset.coe_nil, Multiset.filter_zero, add_zero, zero_add] at hbal
+  simp only [filter_coe_append, initPure, finPure, Multiset.coe_nil, Multiset.filter_zero,
+    add_zero, zero_add] at hbal
   rw [optMS_memoryInitFrontier witness initUnique,
     optMS_memoryFinalizeFrontier witness finalizeUnique,
     pushesAt_memoryFrontierRows witness paddingEmpty,
@@ -372,8 +362,7 @@ theorem memoryInitMessageBound_of_mem_produced
   have semantic := bound interaction.raw rawMem multNonzero
   change MemoryInitMessageBound initial initialClock rebound.message at semantic
   have reboundEq : rebound = interaction := TypedInteraction.raw_injective rfl
-  rw [reboundEq, messageEq] at semantic
-  exact semantic
+  rwa [reboundEq, messageEq] at semantic
 
 /-- **The genesis `LiveOK` invariant** at the shard-initial clock `t₀ = initClkNat`.  Every active
 init push at a location `loc` is the frontier record there: it sits at `loc`, its `LocalMemTruth`
