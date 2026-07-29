@@ -47,6 +47,32 @@ A violation is a defect: revert and re-dispatch.
    one changes downstream elaboration in a way a sibling worker's cached olean cannot see. A theorem
    or lemma *proof* body is invisible to importers and is the campaign's actual working surface.
 
+   > **Omitting an `ElaboratedCircuit` field is a *performance* decision, not just a style one —
+   > A/B time it.** `proof-patterns.md` says these obligations should almost never be hand-written, and
+   > deleting them so Clean's default (`by intros; rfl`, `Clean/Circuit/Basic.lean:229,236`) fires is
+   > usually right. But the default **whnf's the entire chip `main`**, while a hand-written
+   > `simp only [circuit_norm, main, <subcircuits>]` never does. Measured across 19 `Native/Chips`
+   > files:
+   >
+   > | `main` composes | effect of omitting |
+   > |---|---|
+   > | `AddressOperation` **+ `U16MSBOperation`** | **+63% to +132%**, or outright `timeout at whnf` |
+   > | `AddressOperation` only | −3% (safe) |
+   > | ALU chips whose `output_eq` body was already `simp only [main, circuit_norm]` | ~0% (safe) |
+   >
+   > The driver is **not** "is it a load chip" — it is whether `main` pulls in the sign-extension block.
+   > `LoadDoubleChip` and `StoreDoubleChip` are loads/stores and are fine; `LoadHalf`/`LoadWord`/
+   > `LoadByte` are not. And the ALU chips are neutral because their hand-written body unfolded `main`
+   > anyway, so there was nothing to save.
+   >
+   > **The trap:** the defaults *succeed* on most files, so an untimed worker reports a clean −2 lines
+   > while silently adding 60–130%. A full `lake build` will not catch it either — +3s on a 2.5s module
+   > vanishes inside a ~480s build. These files sit at a ~2.2s import floor, so real deltas are
+   > compressed; validate your instrument on a known-regressing file before trusting a null result.
+   >
+   > **Ordering:** run the omission pass *before* the ceiling pass. A defaulted `output_eq` can
+   > manufacture a fresh ceiling — on `LtChip` it would have re-created the exact 1M just removed.
+   >
    > **Exception — Prop-valued fields are fair game.** A `Prop`-valued field of a `def`/`instance`
    > (`channelsLawful`, `localLength_eq`, `subcircuitsConsistent`, `output_eq`, and every
    > `ElaboratedCircuit` obligation) is a *proof*, and Lean's proof irrelevance is definitional: any
