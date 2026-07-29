@@ -896,6 +896,13 @@ Per gated group, stopping at the first failure:
 > **A long build is not a hang.** Calibrated: 59–79 jobs / 285–384s for a typical wave group. Tell
 > the gate worker the expected cost, or it may abandon a healthy build.
 >
+> **Absence from an IN-PROGRESS job list is not evidence of a cache hit.** Lake prints a job line
+> only on *completion*, so a 286s module is invisible for its entire run. A W6 gate grepped for
+> `Faithful.DivRemChip.Exact` mid-build, found nothing, and nearly reported that the round had missed
+> its import closure — the exact opposite of the truth. **Check the worker's argv
+> (`ps -ef | grep "lean --worker"`), not the log**, while a build is running. Job-list absence is
+> only meaningful once `EXIT=` has been written.
+>
 > **But when a build genuinely IS hung, `sample <pid>` is the diagnostic — not RSS.** W6/r2 hit a
 > real >1230s hang and the memory reading was actively misleading: RSS sat flat at 3.2 GB, which
 > looks stuck, but the *healthy* 260s run plateaus at the same 3.17 GB within 40s — that is just the
@@ -967,6 +974,19 @@ Per gated group, stopping at the first failure:
    run 1's wall clock to the recorded baseline — a **>1.5×** regression fails even when green.
 6. **Source guards** — `check_no_native_decide.sh`, `check_no_skipkerneltc.sh`,
    `check_heartbeats.sh` (may only ratchet **down**).
+> **Compare multisets per file; never verify against a briefed count.** A W6 gate was told
+> "`Driver.lean` has 20 signatures both sides" — the 20 belonged to its *sibling* file, and
+> `Driver.lean` is a single-theorem file (1 → 1). Because the gate compared per-file multisets rather
+> than checking the quoted number, the mis-attribution cost nothing. A gate that verified the count
+> would have been checking the wrong file and passing for the wrong reason.
+>
+> **Expect the batch report to undersell structural work.** The same round's briefing described b7 as
+> "hypothesis reordering, line joining, and whitespace"; it also contained a genuine hoist (a shared
+> `2^S` power encoding lifted into a preamble, replacing verbatim re-derivations in three branches).
+> Entirely in-body, no new declarations, signature multiset identical — legitimate and in scope, but
+> not cosmetic. **This is precisely what the additive-declaration check is for**; run it on every
+> batch regardless of how the batch describes itself.
+
 7. **Statement-preservation gate** — replacing the plugin's `theorem_statement_protected`, which
    greps only the first line of a signature and misses the continuation lines where hypotheses live.
    The check is on the **set** of normalized signatures, not on the presence of `-` lines:
