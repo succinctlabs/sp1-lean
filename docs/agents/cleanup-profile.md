@@ -424,6 +424,19 @@ Everything that passes is removable: a site passing at ≤40000 *implies* it pas
 default with ≥5× headroom, so there is nothing left to check. Only the sites that fail need a
 staggered follow-up, and those can again be batched by distinct rung.
 
+> **Use distinct rungs at *one* magnitude — `40000, 39999, 39998, …` — not rungs spread across
+> decades.** The rung is only a *label* in this pass; spreading them across magnitudes conflates "which
+> site failed" with "what its floor is", and answers a question you did not ask. One uniform magnitude
+> with unique labels answers the only question the pass poses — *does this site clear 40000?* — for
+> every site simultaneously. `Advance.lean` settled **34 sites in a single pass** this way.
+>
+> **Measure a file-scoped ceiling separately from the scoped `… in` ones.** A file-scoped
+> `set_option maxHeartbeats N` (no `in`) covers *every* declaration in the file, so it cannot take a
+> distinct rung alongside the scoped sites — doing so makes every unceilinged declaration fail at one
+> indistinguishable rung. Do the scoped sites first at uniform labels, then remove them and give the
+> file-scoped one the whole file at a single rung. `Advance.lean`'s file-scoped 4M turned out to be
+> owned by exactly one tactic call.
+
 > Earlier guidance here described a two-pass form — delete-all, then 40000-all. **Pass A is redundant
 > whenever pass B passes in full**, since the ≤40000 result already subsumes it. Keep the delete-all
 > pass only as an optional cheap first shot on a file you expect to clear entirely. Measured:
@@ -555,6 +568,15 @@ Per gated group, stopping at the first failure:
 2. **Layer pre-gate** (shallow waves only) — `lake build SP1Native` / `SP1Model` / … as a fail-fast.
 3. **`lake build SP1Clean`**, teed to a log; `-j 1` for solo/heavy groups.
 4. **Log assertions** — zero `error:`, zero `warning:`, zero `info:`.
+> **Never kill `lean --server` or `lake serve` — but stale `lean --worker` processes from *exited*
+> agents are fair game.** The distinction matters and cost the campaign a session restart before it
+> was understood. The `lean-lsp` MCP server *is* `lean --server`/`lake serve`; killing those takes the
+> MCP connection down for everyone. Their `lean --worker` children, however, outlive the agents that
+> opened them: `Advance.lean`'s worker found **7 stale workers holding 22 GB RSS**, which is the likely
+> reason an earlier attempt at that file died outright. Reaping those is safe and sometimes necessary
+> before a Tier-S file.
+>
+> The original over-broad form of this rule read:
 > **Do not blanket-kill `lean --server` / `lake serve` before a gate build.** It looks like harmless
 > hygiene and it is not: the `lean-lsp` MCP server owns child lean processes, and a `pkill` matching
 > them takes the MCP connection down for the whole session. Reconnecting needs a Claude Code restart,
