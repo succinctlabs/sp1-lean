@@ -186,8 +186,7 @@ cells are, in order, the six opcode flags, `is_branching`, the three `next_pc` l
       ({ is_real := Eval.eval env input.is_real,
          state := Eval.eval env input.state,
          adapter := Eval.eval env input.adapter } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Folded projection of the Branch input activity flag.
 
@@ -215,8 +214,7 @@ reducibility to unfold the completed circuit while recovering the first input ce
          is_branching := Eval.eval env cols.is_branching,
          compare_operation := Eval.eval env cols.compare_operation } :
         Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (input : Var Inputs (ZMod p)) :

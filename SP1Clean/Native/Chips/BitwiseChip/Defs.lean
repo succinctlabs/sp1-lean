@@ -136,17 +136,15 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   input.adapter.op_a_0 === 0
   return ⟨input.state, input.adapter, bw_cols, is_xor, is_or, is_and⟩
 
-set_option maxHeartbeats 1000000 in
+-- Measured (W3/r2/b2): this instance clears 40000 heartbeats, so the former 1M ceiling was ~25x
+-- over its floor and the plain default carries >=5x headroom.
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output input offset :=
     ⟨input.state, input.adapter,
       varFromOffset BitwiseU16Operation.Columns (offset + 3),
       var { index := offset }, var { index := offset + 1 }, var { index := offset + 2 }⟩
-  output_eq := by
-    intro input offset
-    simp only [main, circuit_norm]
   channelsLawful := by
-    simp [circuit_norm, main, BitwiseU16Operation.circuit, Readers.ALUTypeReader.circuit,
+    simp only [circuit_norm, main, BitwiseU16Operation.circuit, Readers.ALUTypeReader.circuit,
       Readers.CPUState.circuit, Readers.RegisterWrite.circuit]
   -- witnesses the three flags (3) + the `BitwiseU16Operation` column struct (`b_low_bytes` 4 +
   -- `c_low_bytes` 4 + `bitwise_operation.result` 8 = 16); `BitwiseU16Operation`, the two readers and
@@ -170,8 +168,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
     Eval.eval env input =
       ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
          adapter := Eval.eval env input.adapter } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
     (env : Environment F) (cols : Columns (Expression F)) :
@@ -180,8 +177,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
          bitwise_operation := Eval.eval env cols.bitwise_operation,
          is_xor := Eval.eval env cols.is_xor, is_or := Eval.eval env cols.is_or,
          is_and := Eval.eval env cols.is_and } : Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 @[circuit_norm] theorem eval_inputAdapter {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :

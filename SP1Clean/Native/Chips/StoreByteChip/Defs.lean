@@ -76,8 +76,7 @@ deriving ProvableStruct
          register_low_byte := Eval.eval env input.register_low_byte
          increment := Eval.eval env input.increment
          store_value := Eval.eval env input.store_value } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 
 @[reducible] def clkLow (state : Extracted.CPUState (ZMod p)) : ZMod p :=
@@ -184,8 +183,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
          store_value := Eval.eval env cols.store_value
          is_real := Eval.eval env cols.is_real } :
         Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Semantic contract. The spine sub-`Spec`s, the (real-row-gated) byte bounds, the mem-limb selection,
 the increment identity, the read-modify-write equations, and the `is_real` binary. -/

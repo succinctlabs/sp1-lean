@@ -131,7 +131,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, a, cols, is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw⟩
 
-set_option maxHeartbeats 4000000 in
+-- Measured (W3/r2/b2): this derivation clears 40000 heartbeats, so the former 4M ceiling was ~100x
+-- over its floor and the plain default carries >=5x headroom. Elaboration-bound, not LCNF-bound.
 @[implicit_reducible] private def derivedElaborated :
     ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit_with {
@@ -194,8 +195,7 @@ def rTypeReaderInput (input : Var Inputs (ZMod p)) (offset : ℕ) :
     Eval.eval env input =
       ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
          adapter := Eval.eval env input.adapter } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Component-wise evaluation of a completed Mul row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
@@ -211,7 +211,6 @@ def rTypeReaderInput (input : Var Inputs (ZMod p)) (offset : ℕ) :
          is_mulhsu := Eval.eval env cols.is_mulhsu
          is_mulw := Eval.eval env cols.is_mulw } :
         Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 end SP1Clean.MulChip

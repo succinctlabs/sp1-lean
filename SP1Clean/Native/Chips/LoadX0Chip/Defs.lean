@@ -93,8 +93,7 @@ deriving ProvableStruct
          adapter := Eval.eval env input.adapter
          memory_access := Eval.eval env input.memory_access
          offset_bit := Eval.eval env input.offset_bit } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 
 /-- The recombined low clock `clk_0_16 + clk_16_24 · 2^16` (matching SP1's `clk_low`). -/
@@ -190,8 +189,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
          is_lwu := Eval.eval env cols.is_lwu
          is_ld := Eval.eval env cols.is_ld } :
         Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity,
 the `MemoryAccess` timestamp monotonicity (a read), the `ITypeReaderImmutable` adapter facts (op_a/op_b

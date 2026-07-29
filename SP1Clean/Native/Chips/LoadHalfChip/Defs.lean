@@ -79,8 +79,7 @@ deriving ProvableStruct
          offset_bit := Eval.eval env input.offset_bit
          selected_half := Eval.eval env input.selected_half
          msb := Eval.eval env input.msb } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 
 /-- The recombined low clock `clk_0_16 + clk_16_24 · 2^16` (matching SP1's `clk_low`). -/
@@ -143,7 +142,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
     input.selected_half, ⟨input.msb⟩, input.is_lh, input.is_lhu⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
-  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
+  channelsLawful := by simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
   -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks/gates witness nothing.
   localLength _ := 3 + 1
   localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
@@ -181,8 +180,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
          is_lh := Eval.eval env cols.is_lh
          is_lhu := Eval.eval env cols.is_lhu } :
         Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s plus the four offset-selection equations,
 the `op_a != x0` flag, the `is_lhu·msb` zero-extension gate, and the `is_lh`/`is_lhu`/`is_real` binaries. -/

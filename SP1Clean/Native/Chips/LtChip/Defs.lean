@@ -126,15 +126,14 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   input.adapter.op_a_0 === 0
   return ⟨input.state, input.adapter, is_slt, is_sltu, lt_cols⟩
 
-set_option maxHeartbeats 1000000 in
+-- Measured (W3/r2/b2): this instance clears 40000 heartbeats, so the former 1M ceiling was ~25x
+-- over its floor and the plain default carries >=5x headroom.
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output input offset :=
     ⟨input.state, input.adapter, var { index := offset }, var { index := offset + 1 },
       varFromOffset Extracted.LtOperationSigned (offset + 2)⟩
-  output_eq := by
-    intro input offset
-    simp only [main, circuit_norm]
-  channelsLawful := by simp [circuit_norm, main, LtOperationSigned.circuit, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, Readers.RegisterWrite.circuit]
+  output_eq := by intro input offset; simp only [main, circuit_norm]
+  channelsLawful := by simp only [circuit_norm, main, LtOperationSigned.circuit, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, Readers.RegisterWrite.circuit]
   -- witnesses the two flags (2) + the `LtOperationSigned` block (1 + 1 + 8 = 10); the readers/write are
   -- `assertion`s (`localLength 0`) over the threaded `state`/`adapter` inputs. 2 + 10 = 12.
   localLength _ := 12
@@ -154,8 +153,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
     Eval.eval env input =
       ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
          adapter := Eval.eval env input.adapter } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
     (env : Environment F) (cols : Columns (Expression F)) :
@@ -163,8 +161,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
       ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
          is_slt := Eval.eval env cols.is_slt, is_sltu := Eval.eval env cols.is_sltu,
          lt_operation := Eval.eval env cols.lt_operation } : Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 @[circuit_norm] theorem eval_inputAdapter {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :
