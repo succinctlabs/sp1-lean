@@ -417,5 +417,36 @@
 # opaque auxiliary proof constant; the term-mode form is inlined and delta-unfolds into
 # `DivRemChip.circuit`. Reverting that ONE hunk restored 260s. Prop-valued fields remain golfable, but
 # on a `def` that a heavy module unfolds, `by exact` is load-bearing opacity — A/B time it downstream.
-SP1Clean 374
+# -4 (2026-07-28, proof-cleanup W6/r3): ratchet DOWN, no ceiling raised. Closes wave W6 (485 -> 370).
+#   * b6 — DivRemChip/Completeness/{Driver,CoreComplete}.lean: 2 of 2 removed, 128,000,000 -> 0. Both
+#     sites cleared 40000 outright, >=1600x over their declared 64,000,000. The `ownAsserts`/`CoreSpec`
+#     seam that binds elsewhere is ABSENT here: both ceilinged theorems are `apply` + `exact` onto
+#     already-proved helpers, so the unfolded list never reaches a `congr`/`isDefEq` step — the refined
+#     predictor held again, and no §2.4b owner-fold decision was needed. Same batch deleted 1,025 lines
+#     of commented-out legacy proof bodies from Driver.lean (three `/- ... -/` blocks, one of 601 lines,
+#     whose own header said it was "retained temporarily while its cases are regrouped above") plus the
+#     94 dead `have`/`obtain` bindings the comments had been the only consumers of: 1876 -> 546 lines
+#     (-70.9%), elaboration 9.49s -> 6.9s under the gate. A tree-wide scan for non-doc `/- ... -/` blocks
+#     >=25 lines containing tactic text found exactly three, all in this file — the pattern does not
+#     recur elsewhere. The stale module-doc prose ("62-case `refine`") was corrected to the five-case
+#     `refine` the file has had at both HEAD and worktree; no docstring or `/-! ## -/` divider was lost.
+#   * b7 — ShiftRight/{Formal,Soundness/{Sra,Sraw,Srl,Srlw}}.lean + ShiftLeft/Soundness/{Sll,Sllw}.lean:
+#     2 of 8 removed, 80,000,000 -> 7,200,000 (11.1x), -312 lines. The 6 keeps all unify a large expanded
+#     chip-constraint conjunction against the `Requirements` tuple inside one `refine <...>` — binding
+#     position byte-identical at 100:56 in all four ShiftRight files. Sized at 4x bracket top: Sra/Sraw
+#     16,000,000 -> 1,600,000 (floors (200k, 400k]), Srl/Srlw 16,000,000 -> 800,000 ((100k, 200k]),
+#     Sll 4,000,000 -> 1,600,000, Sllw 4,000,000 -> 800,000. All six held under the gate's `moreLeanArgs`
+#     with zero adjustments.
+#     LADDER RESULT worth preserving: 48 `first |` ladders found across the seven files, ALL cheap two-way
+#     on single goals, NONE restart-per-goal — not the `ShiftRightChip/Dispatch.lean` pathology of W1/g3.
+#     Collapsed for readability (-96 lines) with NO perf claim, and the control is clean: Sll/Sllw contain
+#     zero ladders yet sit in the same floor brackets as their laddered ShiftRight counterparts.
+#     A DIVERGENCE AXIS THAT DOES NOT GENERALISE: on ShiftRight, signed/unsigned predicts the floor
+#     (Sra/Sraw (200k, 400k]; Srl/Srlw (100k, 200k]) via the `by_cases ... >= 32768` sign split — but
+#     ShiftLeft splits the OTHER way (Sll (200k, 400k], Sllw (100k, 200k]). The axis is a ShiftRight
+#     fact, not a shift fact; do not extrapolate it to a new shift family.
+#     b7 also DECLINED four `by exact` drops on opacity grounds (all in ShiftRightChip/Formal.lean), one
+#     of whose docstrings states it is "kept as its own opaque declaration to avoid a kernel proof-size
+#     cliff" — the correct call given the measured 260s -> >1230s regression recorded above.
+SP1Clean 370
 SP1CleanTest 16

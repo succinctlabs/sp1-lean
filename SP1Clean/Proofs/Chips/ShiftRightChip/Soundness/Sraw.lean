@@ -26,7 +26,7 @@ def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZM
 set_option linter.unusedVariables false in
 set_option linter.unusedTactic false in
 set_option linter.unreachableTactic false in
-set_option maxHeartbeats 16000000 in
+set_option maxHeartbeats 1600000 in
 /-- Soundness of the `sraw` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_early_struct
@@ -55,59 +55,23 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- Soundness files); `h_holds`'s destructured hyps are now `x - y` form (4.30 circuit_norm), and the
   -- rest of this proof relies on that `-` form downstream, so convert local COPIES (never mutate the
   -- originals) just for this one call.
-  have h_srl_b2 := h_srl_b
-  have h_sra_b2 := h_sra_b
-  have h_srlw_b2 := h_srlw_b
-  have h_sraw_b2 := h_sraw_b
-  have h_sum_b2 := h_sum_b
-  have h_b0_2 := h_b0
-  have h_b1_2 := h_b1
-  have h_b2_2 := h_b2
-  have h_b3_2 := h_b3
-  have h_b4_2 := h_b4
-  have h_s0b2 := h_s0b
-  have h_s1w2 := h_s1w
-  have h_s1b2 := h_s1b
-  have h_s2w2 := h_s2w
-  have h_s2b2 := h_s2b
-  have h_s3w2 := h_s3w
-  have h_s3b2 := h_s3b
-  have h_onehot2 := h_onehot
-  have h_v01_2 := h_v01
-  have h_v012_2 := h_v012
-  have h_v0123_2 := h_v0123
-  have h_split2_2 := h_split2
-  have h_lr0_2 := h_lr0
-  have h_lr1_2 := h_lr1
-  have h_lr2_2 := h_lr2
-  have h_lr3_2 := h_lr3
+  have h_srl_b2 := h_srl_b; have h_sra_b2 := h_sra_b; have h_srlw_b2 := h_srlw_b
+  have h_sraw_b2 := h_sraw_b; have h_sum_b2 := h_sum_b; have h_b0_2 := h_b0
+  have h_b1_2 := h_b1; have h_b2_2 := h_b2; have h_b3_2 := h_b3; have h_b4_2 := h_b4
+  have h_s0b2 := h_s0b; have h_s1w2 := h_s1w; have h_s1b2 := h_s1b; have h_s2w2 := h_s2w
+  have h_s2b2 := h_s2b; have h_s3w2 := h_s3w; have h_s3b2 := h_s3b
+  have h_onehot2 := h_onehot; have h_v01_2 := h_v01; have h_v012_2 := h_v012
+  have h_v0123_2 := h_v0123; have h_split2_2 := h_split2
+  have h_lr0_2 := h_lr0; have h_lr1_2 := h_lr1; have h_lr2_2 := h_lr2; have h_lr3_2 := h_lr3
   have h_smv2 := h_smv
-  have h_o0_2 := h_o0
-  have h_o1_2 := h_o1
-  have h_o2_2 := h_o2
-  have h_o3_2 := h_o3
-  have h_o4_2 := h_o4
-  have h_o5_2 := h_o5
-  have h_o6_2 := h_o6
-  have h_o7_2 := h_o7
-  have h_o8_2 := h_o8
-  have h_o9_2 := h_o9
-  have h_o10_2 := h_o10
-  have h_o11_2 := h_o11
-  have h_o12_2 := h_o12
-  have h_o13_2 := h_o13
-  have h_o14_2 := h_o14
-  have h_o15_2 := h_o15
-  have h_w0_2 := h_w0
-  have h_w1_2 := h_w1
-  have h_w2_2 := h_w2
-  have h_w3_2 := h_w3
-  have h_w4_2 := h_w4
-  have h_w5_2 := h_w5
-  have h_byte2_2 := h_byte2
-  have h_byte4_2 := h_byte4
-  have h_byte6_2 := h_byte6
-  have h_byte8_2 := h_byte8
+  have h_o0_2 := h_o0; have h_o1_2 := h_o1; have h_o2_2 := h_o2; have h_o3_2 := h_o3
+  have h_o4_2 := h_o4; have h_o5_2 := h_o5; have h_o6_2 := h_o6; have h_o7_2 := h_o7
+  have h_o8_2 := h_o8; have h_o9_2 := h_o9; have h_o10_2 := h_o10; have h_o11_2 := h_o11
+  have h_o12_2 := h_o12; have h_o13_2 := h_o13; have h_o14_2 := h_o14; have h_o15_2 := h_o15
+  have h_w0_2 := h_w0; have h_w1_2 := h_w1; have h_w2_2 := h_w2
+  have h_w3_2 := h_w3; have h_w4_2 := h_w4; have h_w5_2 := h_w5
+  have h_byte2_2 := h_byte2; have h_byte4_2 := h_byte4
+  have h_byte6_2 := h_byte6; have h_byte8_2 := h_byte8
   simp only [sub_eq_add_neg] at h_srl_b2 h_sra_b2 h_srlw_b2 h_sraw_b2 h_sum_b2 h_b0_2 h_b1_2 h_b2_2
   simp only [sub_eq_add_neg] at h_b3_2 h_b4_2 h_s0b2 h_s1w2 h_s1b2 h_s2w2 h_s2b2 h_s3w2 h_s3b2
   simp only [sub_eq_add_neg] at h_onehot2 h_v01_2 h_v012_2 h_v0123_2 h_split2_2 h_lr0_2 h_lr1_2
@@ -296,23 +260,17 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         · -- byteShift = 0: a[0] = limb_result[0], a[1] = limb_result[1] + sraFill.
           have su1z : su1 = 0 := by
             have hh := h_s1w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su2z : su2 = 0 := by
             have hh := h_s2w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su3z : su3 = 0 := by
             have hh := h_s3w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su0o : su0 = 1 := by
             have hh := honehot1; rw [su1z, su2z, su3z] at hh; simpa using hh
           have ha0 : env.get i₀ = lr0 := by
-            have hh := h_w0; rw [hsraw, h_srlw0, su0o] at hh;             linear_combination hh
+            have hh := h_w0; rw [hsraw, h_srlw0, su0o] at hh; linear_combination hh
           have ha1 : env.get (i₀ + 1) = lr1 + (((65536 : ℕ) : ZMod p) - v0123) := by
             have hh := h_w1; rw [hsraw, h_srlw0, su0o, hbmsb1, eq_smv1] at hh
             push_cast; linear_combination hh
@@ -351,19 +309,13 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         · -- byteShift = 1: a[0] = limb_result[1] + sraFill, a[1] = bmsb·65535 = 65535.
           have su0z : su0 = 0 := by
             have hh := h_s0w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su2z : su2 = 0 := by
             have hh := h_s2w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su3z : su3 = 0 := by
             have hh := h_s3w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su1o : su1 = 1 := by
             have hh := honehot1; rw [su0z, su2z, su3z] at hh; simpa using hh
           have ha0 : env.get i₀ = lr1 + (((65536 : ℕ) : ZMod p) - v0123) := by
@@ -412,23 +364,17 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         · -- byteShift = 0.
           have su1z : su1 = 0 := by
             have hh := h_s1w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su2z : su2 = 0 := by
             have hh := h_s2w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su3z : su3 = 0 := by
             have hh := h_s3w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su0o : su0 = 1 := by
             have hh := honehot1; rw [su1z, su2z, su3z] at hh; simpa using hh
           have ha0 : env.get i₀ = lr0 := by
-            have hh := h_w0; rw [hsraw, h_srlw0, su0o] at hh;             linear_combination hh
+            have hh := h_w0; rw [hsraw, h_srlw0, su0o] at hh; linear_combination hh
           have ha1 : env.get (i₀ + 1) = lr1 := by
             have hh := h_w1; rw [hsraw, h_srlw0, su0o, hbmsb0, hsmv0] at hh
             linear_combination hh
@@ -467,19 +413,13 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         · -- byteShift = 1.
           have su0z : su0 = 0 := by
             have hh := h_s0w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su2z : su2 = 0 := by
             have hh := h_s2w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su3z : su3 = 0 := by
             have hh := h_s3w; rw [hcb4, h_srl0, h_sra0] at hh; simp at hh
-            first
-              | exact hh
-              | exact hh.resolve_right (by norm_num [hne2, hne3])
+            first | exact hh | exact hh.resolve_right (by norm_num [hne2, hne3])
           have su1o : su1 = 1 := by
             have hh := honehot1; rw [su0z, su2z, su3z] at hh; simpa using hh
           have ha0 : env.get i₀ = lr1 := by

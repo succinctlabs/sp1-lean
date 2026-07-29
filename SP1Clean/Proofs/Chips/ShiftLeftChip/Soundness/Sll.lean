@@ -30,9 +30,9 @@ def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZM
     (cols.is_sll = 1 →
       Word.toBitVec64 cols.a = RV64.sll (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))
 
--- term-intrinsic: elaboration exceeds the 200k default (doc "72 heartbeats" was stale); needs a raised
--- ceiling. Candidate for structural masking (the `isDefEq`/`whnf` timeout signature), not a Phase-1 ratchet.
-set_option maxHeartbeats 4000000 in
+-- Genuinely binding (a `whnf`-bound elaboration tower): the former 4M ceiling was ~10× over, measured
+-- floor bracket (200000, 400000]; sized at 4× the bracket top.
+set_option maxHeartbeats 1600000 in
 /-- Soundness of the `sll` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_early_struct
@@ -59,33 +59,36 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- fields; `set` them under their old names so the proof body is unchanged.
   set input_is_sll := env.get (i₀ + 30) with hsll_def
   set input_is_sllw := env.get (i₀ + 31) with hsllw_def
+  -- The shared power encoding of the shift amount (`v0123 = 2 ^ S`, `S = cb0 + 2cb1 + 4cb2 + 8cb3`)
+  -- together with the two width normalizations every byte-range bound below is stated at. Derived once
+  -- here; `a1_bound_cond`, `a_isU64` and the SLL branch each used to re-derive it verbatim.
+  have hp17 : 131072 < p := by have := Fact.out (p := (2:ℕ)^17 < p); omega
+  have hv01 : env.get (i₀+4+6) = (env.get (i₀+4) + 1) * (env.get (i₀+4+1) * 3 + 1) := by
+    linear_combination hv01e
+  have hv012 : env.get (i₀+4+6+1) = env.get (i₀+4+6) * (env.get (i₀+4+2) * 15 + 1) := by
+    linear_combination hv012e
+  have hv0123 : env.get (i₀+4+6+2) = env.get (i₀+4+6+1) * (env.get (i₀+4+3) * 255 + 1) := by
+    linear_combination hv0123e
+  obtain ⟨S, hSle, hv0123val, h_inner⟩ := ShiftLeftCore.v0123_pow
+    (bool_of_mul_pred hcb0b) (bool_of_mul_pred hcb1b) (bool_of_mul_pred hcb2b) (bool_of_mul_pred hcb3b)
+    hv01 hv012 hv0123
+  have hwidth_hl : (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8 : ZMod p)
+      = ((S : ℕ) : ZMod p) := by
+    have hi := h_inner; push_cast at hi ⊢; linear_combination hi
+  have hwidth_ll : (16 - (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8) : ZMod p)
+      = (((16 - S) : ℕ) : ZMod p) := by
+    push_cast [Nat.cast_sub (show S ≤ 16 by omega)]; linear_combination -hwidth_hl
   -- The SLLW result limb 1 (`a[1] = env.get (i₀+1)`) is 16-bit whenever `is_sllw = 1`. Proved once here
   -- (self-contained from the byte guarantees + placement), reused for the U16MSB sub-assertion's operand
   -- bound in both the SLLW branch and the channel-requirement tail.
   have a1_bound_cond : input_is_sllw = 1 → (env.get (i₀+1)).val < 2 ^ 16 := by
     intro hsllw1
-    have hp17 : 131072 < p := by have := Fact.out (p := (2:ℕ)^17 < p); omega
     have h2ne : (2 : ZMod p) ≠ 0 := by
       intro h; have hv := val_2_zmod_p (p := p); rw [h, ZMod.val_zero] at hv; omega
     have hsll0 : input_is_sll = 0 := by
       have e2 := _hE2; rw [hsllw1] at e2
       exact ShiftLeftCore.eq_zero_of_mul_const h2ne (by linear_combination e2 - _hE4)
     have hgate1 : (input_is_sll + input_is_sllw : ZMod p) = 1 := by rw [hsll0, hsllw1, zero_add]
-    have hv01 : env.get (i₀+4+6) = (env.get (i₀+4) + 1) * (env.get (i₀+4+1) * 3 + 1) := by
-      linear_combination hv01e
-    have hv012 : env.get (i₀+4+6+1) = env.get (i₀+4+6) * (env.get (i₀+4+2) * 15 + 1) := by
-      linear_combination hv012e
-    have hv0123 : env.get (i₀+4+6+2) = env.get (i₀+4+6+1) * (env.get (i₀+4+3) * 255 + 1) := by
-      linear_combination hv0123e
-    obtain ⟨S, hSle, hv0123val, h_inner⟩ := ShiftLeftCore.v0123_pow
-      (bool_of_mul_pred hcb0b) (bool_of_mul_pred hcb1b) (bool_of_mul_pred hcb2b) (bool_of_mul_pred hcb3b)
-      hv01 hv012 hv0123
-    have hwidth_hl : (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8 : ZMod p)
-        = ((S : ℕ) : ZMod p) := by
-      have hi := h_inner; push_cast at hi ⊢; linear_combination hi
-    have hwidth_ll : (16 - (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8) : ZMod p)
-        = (((16 - S) : ℕ) : ZMod p) := by
-      push_cast [Nat.cast_sub (show S ≤ 16 by omega)]; linear_combination -hwidth_hl
     have hneg : -(input_is_sll + input_is_sllw) = -1 := by rw [hgate1]
     have hll0 : (env.get (i₀+4+6+3+4)).val < 2 ^ (16 - S) := by
       have hb := hbyte2 hneg; rw [hwidth_ll] at hb
@@ -123,22 +126,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       (env.get i₀).val < 2 ^ 16 ∧ (env.get (i₀+1)).val < 2 ^ 16 ∧
       (env.get (i₀+2)).val < 2 ^ 16 ∧ (env.get (i₀+3)).val < 2 ^ 16 := by
     intro hgate1
-    have hp17 : 131072 < p := by have := Fact.out (p := (2:ℕ)^17 < p); omega
-    have hv01 : env.get (i₀+4+6) = (env.get (i₀+4) + 1) * (env.get (i₀+4+1) * 3 + 1) := by
-      linear_combination hv01e
-    have hv012 : env.get (i₀+4+6+1) = env.get (i₀+4+6) * (env.get (i₀+4+2) * 15 + 1) := by
-      linear_combination hv012e
-    have hv0123 : env.get (i₀+4+6+2) = env.get (i₀+4+6+1) * (env.get (i₀+4+3) * 255 + 1) := by
-      linear_combination hv0123e
-    obtain ⟨S, hSle, hv0123val, h_inner⟩ := ShiftLeftCore.v0123_pow
-      (bool_of_mul_pred hcb0b) (bool_of_mul_pred hcb1b) (bool_of_mul_pred hcb2b) (bool_of_mul_pred hcb3b)
-      hv01 hv012 hv0123
-    have hwidth_hl : (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8 : ZMod p)
-        = ((S : ℕ) : ZMod p) := by
-      have hi := h_inner; push_cast at hi ⊢; linear_combination hi
-    have hwidth_ll : (16 - (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8) : ZMod p)
-        = (((16 - S) : ℕ) : ZMod p) := by
-      push_cast [Nat.cast_sub (show S ≤ 16 by omega)]; linear_combination -hwidth_hl
     have hneg : -(input_is_sll + input_is_sllw) = -1 := by rw [hgate1]
     have hll0 : (env.get (i₀+4+6+3+4)).val < 2 ^ (16 - S) := by
       have hb := hbyte2 hneg; rw [hwidth_ll] at hb
@@ -263,24 +250,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have heval_c0 : Expression.eval env input_var_adapter_op_c_memory_prev_value[0] =
         input_adapter_op_c_memory_prev_value[0] := by
       rw [← hcmem, Vector.getElem_map]
-    have hp17 : 131072 < p := by have := Fact.out (p := (2:ℕ)^17 < p); omega
-    -- The power encoding `v0123 = 2 ^ S`, `S = cb0 + 2cb1 + 4cb2 + 8cb3`.
-    have hv01 : env.get (i₀+4+6) = (env.get (i₀+4) + 1) * (env.get (i₀+4+1) * 3 + 1) := by
-      linear_combination hv01e
-    have hv012 : env.get (i₀+4+6+1) = env.get (i₀+4+6) * (env.get (i₀+4+2) * 15 + 1) := by
-      linear_combination hv012e
-    have hv0123 : env.get (i₀+4+6+2) = env.get (i₀+4+6+1) * (env.get (i₀+4+3) * 255 + 1) := by
-      linear_combination hv0123e
-    obtain ⟨S, hSle, hv0123val, h_inner⟩ := ShiftLeftCore.v0123_pow
-      (bool_of_mul_pred hcb0b) (bool_of_mul_pred hcb1b) (bool_of_mul_pred hcb2b) (bool_of_mul_pred hcb3b)
-      hv01 hv012 hv0123
-    -- Width normalizations (close-lemma exponent form) shared by the byte-range bounds.
-    have hwidth_hl : (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8 : ZMod p)
-        = ((S : ℕ) : ZMod p) := by
-      have hi := h_inner; push_cast at hi ⊢; linear_combination hi
-    have hwidth_ll : (16 - (env.get (i₀+4)*1 + env.get (i₀+4+1)*2 + env.get (i₀+4+2)*4 + env.get (i₀+4+3)*8) : ZMod p)
-        = (((16 - S) : ℕ) : ZMod p) := by
-      push_cast [Nat.cast_sub (show S ≤ 16 by omega)]; linear_combination -hwidth_hl
     -- Fire and convert the nine byte-range guarantees (gate = 1 on the real `is_sll` row).
     have hneg : -(input_is_sll + input_is_sllw) = -1 := by rw [hgate1]
     have hll0 : (env.get (i₀+4+6+3+4)).val < 2 ^ (16 - S) := by

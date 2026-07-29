@@ -83,13 +83,15 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   (input.is_real - input.adapter.imm_c = 1 →
     input.adapter.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
-set_option maxHeartbeats 4000000 in
 /-- **Soundness.** The flag-gated RV64 `srl`/`sra`/`srlw`/`sraw` identities on the result column `cols.a`.
 **Pieced together** from the four per-conjunct `Soundness/{Srl,Sra,Srlw,Sraw}.lean` files — each its own
 `GeneralFormalCircuit.Soundness` over a single-conjunct `Spec`, split out so the heavy per-variant proofs
 compile in parallel — plus the shared `Operations.Requirements` tail (the same in every variant, reused
 here from `SoundSrl`). `circuit_proof_start_core` only introduces the binders (no `simp`), so the
-sub-theorems' raw `h_holds`/`h_input`/`h_assumptions` binders match directly. -/
+sub-theorems' raw `h_holds`/`h_input`/`h_assumptions` binders match directly.
+
+The former 4M ceiling was ~100× over: the four per-conjunct proofs carry the cost in their own modules,
+so this assembly clears ≤40000 against the plain default. -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_core
   refine ⟨fun hr => ⟨?_, ?_, ?_, ?_⟩, ?_⟩
@@ -155,8 +157,7 @@ theorem completeness :
         = input_adapter_op_b_memory_prev_value[k]'hk := by
     intro k hk
     rw [ProvableType.getElem_eval_fields, hbpv]
-  have heb0 := heb 0 (by norm_num); have heb1 := heb 1 (by norm_num)
-  have heb2 := heb 2 (by norm_num); have heb3 := heb 3 (by norm_num)
+  have heb1 := heb 1 (by norm_num); have heb3 := heb 3 (by norm_num)
   have epc0 : Expression.eval env.toEnvironment input_var_state_pc[0] = input_state_pc[0] := by
     rw [ProvableType.getElem_eval_fields, hpc]
   have epc1 : Expression.eval env.toEnvironment input_var_state_pc[1] = input_state_pc[1] := by
@@ -318,36 +319,22 @@ theorem completeness :
         hp16, hp17, hp18, hp19, hp20, hp21, hp22,
         hop_a_0⟩⟩,
     fun _ => by
-      change ByteRowSpec _
-      convert ShiftLeftChip.byteRow_e32 c0 hc0v using 2
+      change ByteRowSpec _; convert ShiftLeftChip.byteRow_e32 c0 hc0v using 2; rw [sub_eq_add_neg],
+    fun _ => by change ByteRowSpec _; convert byteRow_lower B c0 F 0 (by norm_num) using 2,
+    fun _ => by
+      change ByteRowSpec _; convert byteRow_higher B c0 F hbUw he14 0 (by norm_num) using 2
       rw [sub_eq_add_neg],
+    fun _ => by change ByteRowSpec _; convert byteRow_lower B c0 F 1 (by norm_num) using 2,
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_lower B c0 F 0 (by norm_num) using 2,
-    fun _ => by
-      change ByteRowSpec _
-      convert byteRow_higher B c0 F hbUw he14 0 (by norm_num) using 2
+      change ByteRowSpec _; convert byteRow_higher B c0 F hbUw he14 1 (by norm_num) using 2
       rw [sub_eq_add_neg],
+    fun _ => by change ByteRowSpec _; convert byteRow_lower B c0 F 2 (by norm_num) using 2,
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_lower B c0 F 1 (by norm_num) using 2,
-    fun _ => by
-      change ByteRowSpec _
-      convert byteRow_higher B c0 F hbUw he14 1 (by norm_num) using 2
+      change ByteRowSpec _; convert byteRow_higher B c0 F hbUw he14 2 (by norm_num) using 2
       rw [sub_eq_add_neg],
+    fun _ => by change ByteRowSpec _; convert byteRow_lower B c0 F 3 (by norm_num) using 2,
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_lower B c0 F 2 (by norm_num) using 2,
-    fun _ => by
-      change ByteRowSpec _
-      convert byteRow_higher B c0 F hbUw he14 2 (by norm_num) using 2
-      rw [sub_eq_add_neg],
-    fun _ => by
-      change ByteRowSpec _
-      convert byteRow_lower B c0 F 3 (by norm_num) using 2,
-    fun _ => by
-      change ByteRowSpec _
-      convert byteRow_higher B c0 F hbUw he14 3 (by norm_num) using 2
+      change ByteRowSpec _; convert byteRow_higher B c0 F hbUw he14 3 (by norm_num) using 2
       rw [sub_eq_add_neg]⟩
   · -- SRA: the sign witness is the high bit of `B[3]`
     rw [bMsb_eq_sra B F h1 (ho1 h1).2.2]
@@ -432,11 +419,13 @@ private theorem main_exposedChannelsLawful (input : Var Inputs (ZMod p)) (offset
   · exact main_memoryInteractions_eq input offset
   · exact main_programInteractions_eq input offset
 
-set_option maxHeartbeats 4000000 in
 /-- The `ShiftRight` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `srl`/`sra`/`srlw`/`sraw`
 semantic contract; output is the native `Columns` row struct. Soundness is proved (assembled
 from the four per-op `Soundness/<Op>.lean` files); the explicitly deferred completeness seam is recorded
-above. -/
+above.
+
+The former 4M ceiling was ~100× over: every field here is a reference to an already-elaborated theorem,
+so the bundle clears ≤40000 against the plain default. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
