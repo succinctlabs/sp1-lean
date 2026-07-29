@@ -88,7 +88,28 @@
 #     `ring1` is the correct leading alternative. This was also the round's first cause fix that
 #     moved a ceiling from keep-and-lower to removable (`sel_populate`).
 # All ladders are recorded in the doc-comments at each former site.
-# NOTE: the recorded count includes one phantom — SP1Clean/Proofs/Sail/Advance.lean:2325 has the
-# literal inside a doc-comment, so the grep sees a site that does not exist. Pre-existing.
-SP1Clean 738
+# -51 (2026-07-28, proof-cleanup W3/r1): ratchet DOWN, no ceiling raised. This is 50 REAL removals
+# plus the retirement of the long-standing PHANTOM described in the note below — read the two
+# together, because 738 -> 687 does NOT correspond to 51 live sites disappearing.
+# By batch: Proofs/Sail/Advance.lean shed ALL 35 of its real ceilings (b1) and now carries ZERO,
+# the campaign's largest single-file result; six Faithful/ files shed all 14 of theirs (b2) —
+# RTypeReader (5), ITypeReaderImmutable (4), AddOperation (2), IsZeroOperation/U16MSBOperation/
+# U16CompareOperation (1 each), confirming W2/r3's prediction that the bulk of Faithful/ is
+# removable; MulOperation/Formal.lean removed one 4000000 and tightened its two 40000000 sites to
+# 1000000 (b4). Soundness/TimedGrounding.lean (b3) carried no ceilings and removed none.
+# The round's headline result is a CAUSE FIX, not a clearing pass:
+#   * Advance.lean's file-scoped 4000000 — which covered all ~200 declarations of a 3950-line file —
+#     was owned in its entirety by ONE tactic call: `grind [reg_idx_must_64]` in `get_reg?_writeBack`.
+#     `grind` had to whnf through `reg_idx_must_64`'s 31-arm `match` on `Register`: the same
+#     dependent-cast hazard Model/SailWrap.lean documents at its `acLt` fix, reached through `grind`
+#     rather than a permutative `simp`. Replacing it with explicit cast cancellation
+#     (`eqRec_eq_cast` -> `cast_eq_iff_heq` -> `cast_heq`) cleared the file entirely: it now
+#     elaborates in 23s at the plain default, and all 34 remaining scoped sites fell out with it.
+#     The theorem remains [propext, Classical.choice, Quot.sound].
+# PHANTOM RETIRED: the note below has applied to every baseline this campaign recorded. Advance.lean
+# spelled the literal directive text inside a doc-comment, and check_heartbeats.sh greps raw text, so
+# that prose was counted as a live ceiling throughout. b1 rewrote the prose, so exactly one unit of
+# the -51 is this bookkeeping correction with NO site changing. The recorded count is now honest:
+# as of this round there is no known phantom, and 687 should equal the number of real directives.
+SP1Clean 687
 SP1CleanTest 16

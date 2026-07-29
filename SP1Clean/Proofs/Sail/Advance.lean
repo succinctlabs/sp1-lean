@@ -22,8 +22,6 @@ open SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace
 open SP1Clean.TryStepReduction
 open SP1Clean.SailMem
 
-set_option maxHeartbeats 4000000
-
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The row's committed next-pc as a 64-bit value — data-dependent (straight-line `pc+4` or the control-flow
@@ -590,13 +588,23 @@ theorem SailConfigured.writeMinstret {s : SailState} (cfg : SailConfigured s) (b
 
 /-- **Register read-back.** The value `wX_bits`/`execute` writes to a non-`x0` register `rd` reads back
 through `get_reg?` — the `bitVecToRegidxVal`/`reg_idx_must_64` casts cancel. This is the `RowEffect.regs`
-rd-write clause. -/
+rd-write clause.
+
+The two `▸` casts are cancelled **explicitly** (`eqRec_eq_cast` → `cast_eq_iff_heq` →
+`cast_heq`) rather than by `grind`: `grind` has to whnf through `reg_idx_must_64`'s 31-arm
+`match` on `Register`, and that single call was the sole owner of this file's former file-scope
+heartbeat ceiling — the same dependent-cast hazard `Model/SailWrap.lean` documents at its
+`acLt` fix. -/
 theorem get_reg?_writeBack (s : SailState) (rd : BitVec 5) (rd_ne : rd ≠ 0#5) (v : BitVec 64) :
     SailState.get_reg? ({s with regs := s.regs.insert (reg_idx_to_Register rd) (bitVecToRegidxVal rd v)}) rd
       = some v := by
   simp only [SailState.get_reg?, Std.ExtDHashMap.get?_insert_self, if_neg (show ¬(rd = 0) from rd_ne),
     bitVecToRegidxVal]
-  grind [reg_idx_must_64]
+  simp only [eqRec_eq_cast]
+  apply cast_eq_iff_heq.mpr
+  congr 1
+  · exact reg_idx_must_64 rd
+  · exact cast_heq _ v
 
 /-- `reg_idx_to_Register` is injective on **nonzero** indices — it collides only at `0#5`/`31#5` (both map
 to `x31`, the default arm), and `x0` is hardwired-`some 0` in `get_reg?` so that collision is inert. -/
@@ -1475,7 +1483,6 @@ theorem execute_MULW_reaches (rs2_idx rs1_idx rd_idx : BitVec 5)
     run_bind_of_run' s_a _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
-set_option maxHeartbeats 4000000 in
 /-- The **register-writing** MUL-family chip `advance` (RowView-generic; mirrors `advance_of_div`).
 **Move-2:** the `mul_op` is pinned by the canonicity guard `hcanon` (via `decodesMul`/`inv_mul'`), so this
 covers all four canonical MUL ops — MUL/MULH/MULHU/MULHSU — writing `rd` the low/high product.  The
@@ -1518,7 +1525,6 @@ theorem advance_of_mul {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : S
       rwa [if_neg hrd_ne] at this)
     hrd_ne hopa'.symm hval hstraight hpc0 hwrites hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- The **register-writing** MULW chip `advance` (RowView-generic; mirrors `advance_of_divw`).  No
 `mul_op` — MULW is fixed by its own opcode; writes `rd` the 32→64 sign-extended low product. -/
 theorem advance_of_mulw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
@@ -1977,7 +1983,6 @@ theorem advance_of_jalr_x0 {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s
 
 /-! ## Loads: `execute_LOAD` reads memory; the register write is sourced from `RefinesAt.mem` (Phase 3b.2) -/
 
-set_option maxHeartbeats 10000000 in
 /-- **The width-1 `execute_LOAD` reaches `Retire_Success`.** From the quiescent memory config, the `rs1`
 read (`reg_val`), the address bounds, and the single memory byte `data₀` at `reg_val + signExtend imm`,
 `execute (.LOAD …)` (width 1) runs to `Retire_Success` writing only `rd` with `extend_value is_unsigned
@@ -2010,7 +2015,6 @@ theorem execute_LOAD_reaches_width1 (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5
   rw [run_bind_of_run' t _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
-set_option maxHeartbeats 4000000 in
 /-- **The load register-writing core.** The `advance_write_core` twin whose `hexec` additionally receives
 the **memory frame** `t.mem = s.mem` and `SailConfigured t` — so a load's `execute_LOAD` (which reads
 `t.mem`) can be discharged. Straight-line (`nextPC = pc+4`), writes only `rd`; identical ladder + five-clause
@@ -2136,7 +2140,6 @@ theorem advance_load_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
           SailState.get_reg?_insert_of_ne (hmne idx)]
   · exact SailConfigured.congr cfg hinitf hcfg_frame
 
-set_option maxHeartbeats 4000000 in
 /-- **The width-1 load chip `advance`** (RowView-generic, one call per width-1 load variant). Over
 `advance_load_core` + `execute_LOAD_reaches_width1`: straight-line, one `rs1` register read (→ `op_b` via
 `ValueOperandsBound`), `op_c` the sign-extended offset. The load's non-standard precondition — the memory
@@ -2196,7 +2199,6 @@ theorem advance_of_load_width1 {prog : GuestProgram} {r : Trace.RowView (ZMod p)
 
 /-! ## Stores: `execute_STORE` writes memory (the first `commit.memWrite = some` chip) (Phase 3b.3) -/
 
-set_option maxHeartbeats 10000000 in
 /-- **The STORE execute stage reaches `Retire_Success`** (width 1). `execute (.STORE …)` on a
 state `t` whose `rs1` (base) / `rs2` (value source) reads are known, and whose store address is
 1-aligned / fits / in the SP1 PMA window, runs to `Retire_Success` writing ONLY memory: the low
@@ -2221,7 +2223,6 @@ theorem execute_STORE_reaches (imm : BitVec 12) (rs1_idx rs2_idx : BitVec 5)
   simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, PreSail.assert, h_rs2, hwrite,
     RETIRE_SUCCESS]
 
-set_option maxHeartbeats 10000000 in
 /-- **The width-2 `execute_STORE` reaches `Retire_Success`** (SH). The `execute_STORE_reaches` (width 1)
 twin: additionally requires 2-byte ALIGNMENT, and writes the low half `rs2[15:0]` as two little-endian
 bytes at `[addr, addr+1]`, leaving every register (incl. the staged `nextPC = pc+4`) untouched. Reduces
@@ -2245,7 +2246,6 @@ theorem execute_STORE_reaches_width2 (imm : BitVec 12) (rs1_idx rs2_idx : BitVec
   simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, PreSail.assert, h_rs2, hwrite,
     RETIRE_SUCCESS]
 
-set_option maxHeartbeats 10000000 in
 /-- **The width-4 `execute_STORE` reaches `Retire_Success`** (SW). The 4-byte (word) twin: requires
 4-byte ALIGNMENT, writes `rs2[31:0]` as four little-endian bytes at `[addr … addr+3]`, leaving every
 register untouched. Reduces via `SailMem.run_vmem_write_of_width_4` (4-deep `mem.insert` fold). -/
@@ -2272,7 +2272,6 @@ theorem execute_STORE_reaches_width4 (imm : BitVec 12) (rs1_idx rs2_idx : BitVec
   simp [execute_STORE, LeanRV64D.Functions.xlen_bytes, PreSail.assert, h_rs2, hwrite,
     RETIRE_SUCCESS]
 
-set_option maxHeartbeats 10000000 in
 /-- **The width-8 `execute_STORE` reaches `Retire_Success`** (SD). The 8-byte (double-word) twin:
 requires 8-byte ALIGNMENT, writes the full 64-bit `rs2` as eight little-endian bytes at
 `[addr … addr+7]`, leaving every register untouched. Reduces via `SailMem.run_vmem_write_of_width_8`
@@ -2321,8 +2320,9 @@ only memory (`{t with mem := writeMem t.mem}`); the byte-range readoff is suppli
 
 SP1's immutable Program-table fetch is not identified here with Sail's mutable instruction bytes:
 ROM preservation is composed once at the execution boundary through `SailCodeMemoryCompatible`,
-rather than repeated as a store-chip precondition. (Inherits the file-scope
-`set_option maxHeartbeats 4000000`.) -/
+rather than repeated as a store-chip precondition. (This theorem now elaborates at the default
+heartbeat budget; the file-scope 4000000-heartbeat ceiling it used to inherit was retired once its
+sole owner, `get_reg?_writeBack`, was driven to closure.) -/
 theorem advance_of_store {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
     (I : instruction) (pc : BitVec 64) (mw : Trace.MemWrite (ZMod p))
     (writeMem : Std.ExtHashMap Nat (BitVec 8) → Std.ExtHashMap Nat (BitVec 8))
@@ -2431,7 +2431,6 @@ theorem advance_of_store {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
 
 /-! ## Loads width 2/4 (LoadHalf/LoadWord) — Phase 3b.2 -/
 
-set_option maxHeartbeats 10000000 in
 /-- **The width-2 `execute_LOAD` reaches `Retire_Success`.** The `execute_LOAD_reaches_width1`
 twin for a 2-byte (half-word) read: additionally requires 2-byte ALIGNMENT
 (`(reg_val + signExtend imm) % 2 = 0`), and the loaded value is the little-endian half
@@ -2466,7 +2465,6 @@ theorem execute_LOAD_reaches_width2 (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5
   rw [run_bind_of_run' t _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
-set_option maxHeartbeats 4000000 in
 /-- **The width-2 load chip `advance`** (RowView-generic, one call per width-2 load variant).
 The `advance_of_load_width1` twin over `advance_load_core` + `execute_LOAD_reaches_width2`.
 Differs from width 1 by the 2-byte ALIGNMENT precondition `h_aligned` and the second read
@@ -2532,7 +2530,6 @@ theorem advance_of_load_width2 {prog : GuestProgram} {r : Trace.RowView (ZMod p)
       rwa [if_neg hrd_ne] at this)
     hrd_ne hopa'.symm hval hstraight hpc0 hwrites hnomem
 
-set_option maxHeartbeats 10000000 in
 /-- **The width-4 `execute_LOAD` reaches `Retire_Success`.** The 4-byte (word) read twin:
 requires 4-byte ALIGNMENT, loads the little-endian word `data₃ ++ data₂ ++ data₁ ++ data₀`.
 Built from `SailMem.run_vmem_read_of_width_4'`. -/
@@ -2568,7 +2565,6 @@ theorem execute_LOAD_reaches_width4 (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5
   rw [run_bind_of_run' t _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
-set_option maxHeartbeats 10000000 in
 /-- **The width-8 `execute_LOAD` reaches `Retire_Success`.** The 8-byte (double-word) read twin:
 requires 8-byte ALIGNMENT, loads the little-endian word `data₇ ++ … ++ data₀`.
 Built from `SailMem.run_vmem_read_of_width_8'`. -/
@@ -2610,7 +2606,6 @@ theorem execute_LOAD_reaches_width8 (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5
   rw [run_bind_of_run' t _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]
   rfl
 
-set_option maxHeartbeats 4000000 in
 /-- **The width-4 load chip `advance`.** The `advance_of_load_width2` twin: 4-byte alignment
 + four read bytes → the word `byte₃ ++ byte₂ ++ byte₁ ++ byte₀`. -/
 theorem advance_of_load_width4 {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
@@ -2683,7 +2678,6 @@ theorem advance_of_load_width4 {prog : GuestProgram} {r : Trace.RowView (ZMod p)
       rwa [if_neg hrd_ne] at this)
     hrd_ne hopa'.symm hval hstraight hpc0 hwrites hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **The width-8 load chip `advance`** (LD). The `advance_of_load_width4` twin, but WITHOUT `hpin`:
 the width-8 `LD` opcode is the non-injective `else`→LD image of `loadOpcode`, so the decode is pinned
 by the width-validity guard via `decodesLoad' 8 false (by decide)`. Signed (`isU = false`, though for a
@@ -2781,7 +2775,6 @@ theorem advance_of_load_width8 {prog : GuestProgram} {r : Trace.RowView (ZMod p)
 
 /-! ## LoadX0 (load-into-x0, result discarded): the no-write LOAD core + per-width adapters -/
 
-set_option maxHeartbeats 4000000 in
 /-- **The no-write straight-line LOAD core** (SC Phase 4 · LoadX0). The intersection of
 `advance_load_core` (a LOAD execute, so `hexec` receives the memory frame `t.mem = s.mem` and the
 `execute_LOAD` read discharges) and `advance_alu_x0_core` (the write is into `x0`, so `execute I`
@@ -2879,7 +2872,6 @@ theorem advance_load_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} 
     rw [hxf idx]; exact hframe_sa idx
   · exact SailConfigured.congr cfg hinitf hcfg_frame
 
-set_option maxHeartbeats 4000000 in
 /-- **The width-1 no-write load chip `advance`** (LoadX0 · LB/LBU). The `advance_of_load_width1` twin
 with the `x0` ending: `op_a = 0` forces `rd = 0#5` (`regidx_bv_inj`), the read value is discarded
 (`if_pos rfl`), `commit.writesReg = false`, `commit.memWrite = none` — no `hval` (the value is thrown
@@ -2937,7 +2929,6 @@ theorem advance_of_load_x0_width1 {prog : GuestProgram} {r : Trace.RowView (ZMod
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **The width-2 no-write load chip `advance`** (LoadX0 · LH/LHU). The `advance_of_load_x0_width1` twin
 with the 2-byte alignment precondition + a second read byte. -/
 theorem advance_of_load_x0_width2 {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
@@ -3002,7 +2993,6 @@ theorem advance_of_load_x0_width2 {prog : GuestProgram} {r : Trace.RowView (ZMod
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **The width-4 no-write load chip `advance`** (LoadX0 · LW/LWU). The `advance_of_load_x0_width2` twin
 with 4-byte alignment + four read bytes. -/
 theorem advance_of_load_x0_width4 {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
@@ -3076,7 +3066,6 @@ theorem advance_of_load_x0_width4 {prog : GuestProgram} {r : Trace.RowView (ZMod
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **The width-8 no-write load chip `advance`** (LoadX0 · LD). The `advance_of_load_width8` twin
 (signed `isU = false`, `decodesLoad' 8 false`) with the `x0` no-write ending: 8-byte alignment +
 eight read bytes, all discarded. -/
@@ -3172,7 +3161,6 @@ theorem advance_of_load_x0_width8 {prog : GuestProgram} {r : Trace.RowView (ZMod
 
 /-! ## AluX0 (ALU-into-x0, result discarded): the no-write straight-line core + family adapters -/
 
-set_option maxHeartbeats 4000000 in
 /-- **The no-write straight-line ALU core** (SC Phase 4).  The AluX0 (write-into-x0, result
 discarded) twin of `advance_write_core` / the no-write branch of `advance_of_ctrl`: the execute
 stage returns the state UNCHANGED (the `wX_bits 0#5` no-op leaves the register file fixed),
@@ -3307,7 +3295,6 @@ theorem advance_of_utype_x0 {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {
       rwa [if_pos rfl] at reached)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **R-type into x0** (ADD/SUB/XOR/OR/AND/SLL/SRL/SRA/SLT/SLTU, `imm_c = 0`).  Generic over `op`.
 `rd` is forced to `0#5` from the committed `op_a = 0` (via `regidx_bv_inj`, the LoadX0 move), so the
 `rtype_execute_reaches` value drops out (`if_pos rfl`) and the whole row is straight-line no-write. -/
@@ -3346,7 +3333,6 @@ theorem advance_of_alu_x0_rtype {prog : GuestProgram} {r : Trace.RowView (ZMod p
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **RTYPEW into x0** (ADDW/SUBW/SLLW/SRLW/SRAW, `imm_c = 0`).  The `execute_RTYPEW` twin of
 `advance_of_alu_x0_rtype`. -/
 theorem advance_of_alu_x0_rtypew {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (op : ropw)
@@ -3384,7 +3370,6 @@ theorem advance_of_alu_x0_rtypew {prog : GuestProgram} {r : Trace.RowView (ZMod 
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **ITYPE into x0** (ADDI, `imm_c = 1`).  One register read (`rs1` → `op_b`), the immediate in `op_c`. -/
 theorem advance_of_alu_x0_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (op : iop)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -3418,7 +3403,6 @@ theorem advance_of_alu_x0_itype {prog : GuestProgram} {r : Trace.RowView (ZMod p
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **Shift-immediate into x0** (`SLLI`/`SRLI`/`SRAI`, `imm_c = 1`).  SP1 uses the same
 internal opcode as the corresponding register shift and distinguishes the form through `imm_c`;
 the discarded destination makes the row an architectural no-write. -/
@@ -3465,7 +3449,6 @@ theorem advance_of_alu_x0_shiftitype {prog : GuestProgram}
       rwa [if_pos rfl] at reached)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **Word shift-immediate into x0** (`SLLIW`/`SRLIW`/`SRAIW`, `imm_c = 1`). -/
 theorem advance_of_alu_x0_shiftiwtype {prog : GuestProgram}
     {r : Trace.RowView (ZMod p)} {s : SailState} (op : sopw)
@@ -3510,7 +3493,6 @@ theorem advance_of_alu_x0_shiftiwtype {prog : GuestProgram}
       rwa [if_pos rfl] at reached)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **ADDIW into x0** (`opcode = ADDW`, `imm_c = 1`). -/
 theorem advance_of_alu_x0_addiw {prog : GuestProgram}
     {r : Trace.RowView (ZMod p)} {s : SailState}
@@ -3554,7 +3536,6 @@ theorem advance_of_alu_x0_addiw {prog : GuestProgram}
       rwa [if_pos rfl] at reached)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **DIV/DIVU into x0** (`imm_c = 0`). -/
 theorem advance_of_alu_x0_div {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -3591,7 +3572,6 @@ theorem advance_of_alu_x0_div {prog : GuestProgram} {r : Trace.RowView (ZMod p)}
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **REM/REMU into x0** (`imm_c = 0`; note the bool-first `SailRV64.rem isU`). -/
 theorem advance_of_alu_x0_rem {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -3628,7 +3608,6 @@ theorem advance_of_alu_x0_rem {prog : GuestProgram} {r : Trace.RowView (ZMod p)}
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **DIVW/DIVUW into x0** (`imm_c = 0`). -/
 theorem advance_of_alu_x0_divw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -3665,7 +3644,6 @@ theorem advance_of_alu_x0_divw {prog : GuestProgram} {r : Trace.RowView (ZMod p)
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **REMW/REMUW into x0** (`imm_c = 0`; bool-first `SailRV64.remw isU`). -/
 theorem advance_of_alu_x0_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (isU : Bool)
     (hcfg : SailConfigured s) (hrom : RomLoaded prog s)
@@ -3702,7 +3680,6 @@ theorem advance_of_alu_x0_remw {prog : GuestProgram} {r : Trace.RowView (ZMod p)
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **MUL-family into x0** (MUL/MULH/MULHU/MULHSU, `imm_c = 0`).  Generic over `op : mul_op`
 with the canonicity guard `hcanon` (so the guarded decode fixes the instruction).  `rd` is forced to `0#5`
 from the committed `op_a = 0` (`regidx_bv_inj`), the `execute_MUL_reaches op` value drops out
@@ -3745,7 +3722,6 @@ theorem advance_of_alu_x0_mul {prog : GuestProgram} {r : Trace.RowView (ZMod p)}
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 4000000 in
 /-- **MULW into x0** (`imm_c = 0`).  No `mul_op`, so the instruction is fully fixed by the
 opcode — the `execute_MULW` twin of `advance_of_alu_x0_divw`. -/
 theorem advance_of_alu_x0_mulw {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
@@ -3783,7 +3759,6 @@ theorem advance_of_alu_x0_mulw {prog : GuestProgram} {r : Trace.RowView (ZMod p)
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-set_option maxHeartbeats 8000000 in
 /-- **Complete v6.3.1 AluX0 dispatch.**  The Byte-table range fact identifies SP1's dynamic
 opcode as an ALU opcode, while the verification-key-bound Program row identifies the actual Sail
 instruction constructor.  Dispatching on that constructor covers both register and immediate
