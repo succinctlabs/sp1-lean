@@ -58,8 +58,10 @@ private def isEqualWordChild
       input.a[2] - input.b[2], input.a[3] - input.b[3]],
     input.cols.is_diff_zero, input.is_real⟩
 
+-- Perf (measured 2026-07-28, control at 1 heartbeat gave a real timeout): elaborates inside 40000
+-- heartbeats, so the plain default carries >=5x headroom — the former 1000000-heartbeat ceiling
+-- was >=25x over and has been removed.
 set_option linter.unusedSectionVars false in
-set_option maxHeartbeats 1000000 in
 private theorem isEqualWord_nativeAssertions
     (env : Environment (ZMod p))
     (input : Var SP1Clean.IsEqualWordOperation.Inputs (ZMod p))
@@ -86,8 +88,11 @@ private theorem isEqualWord_nativeAssertions
   rw [CanonicalReader.equalityAssertionList]
   simp [isEqualWordChild, Expression.eval]
 
-set_option maxHeartbeats 1000000 in
-/-- Folded normalization of the native word-equality fragment to the exact generated Rust list. -/
+/-- Folded normalization of the native word-equality fragment to the exact generated Rust list.
+
+Perf (measured 2026-07-28, control at 2 heartbeats gave a real timeout): elaborates inside 40000
+heartbeats, so the plain default carries >=5x headroom — the former 1000000-heartbeat ceiling was
+>=25x over and has been removed. -/
 theorem isEqualWord_assertions_exact
     (env : Environment (ZMod p))
     (input : Var SP1Clean.IsEqualWordOperation.Inputs (ZMod p))

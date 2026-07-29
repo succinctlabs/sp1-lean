@@ -145,10 +145,13 @@ def main (cols : Var DivRemChip.Columns (ZMod p)) : Circuit (ZMod p) Unit := do
   byteChannel.pullIf g (⟨6, cols.c_times_quotient[6], 16, 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.pullIf g (⟨6, cols.c_times_quotient[7], 16, 0⟩ : ByteRow (Expression (ZMod p)))
 
-set_option maxHeartbeats 4000000 in
 /-- Clean derives the structural metadata; the cluster contributes no fresh witnesses
 (`localLength = 0`) and exposes only the byte-channel guarantees (its own pulls + the composed
-`MulOperation`s'). -/
+`MulOperation`s').
+
+Perf (measured 2026-07-28, control at 1 heartbeat gave a real timeout here): elaborates inside
+40000 heartbeats, so the plain default carries >=5x headroom — the former 4000000-heartbeat
+ceiling was >=100x over and has been removed. -/
 instance elaborated : ElaboratedCircuit (ZMod p) DivRemChip.Columns unit main := by
   elaborate_circuit_with {
     channelsWithGuarantees := [byteChannel.toRaw]
