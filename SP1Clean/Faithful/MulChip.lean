@@ -353,7 +353,6 @@ private theorem mul_pred_of_bool {x : ZMod p} (h : x = 0 ∨ x = 1) :
     x * (x - 1) = 0 := by
   rcases h with h | h <;> simp [h]
 
-set_option maxHeartbeats 4000000 in
 private theorem mul_chip_constraints_decompose
     (env : Environment (ZMod p)) (input : Var MulChip.Inputs (ZMod p))
     (offset : ℕ) :
@@ -651,7 +650,6 @@ private theorem mulOracle_u16msb_interactions_eq {F : Type} [Field F] [CoeHead F
   rw [Extracted.MulOracle.U16MSBOperation.interactions,
     Extracted.U16MSBOperation.interactions]
 
-set_option maxHeartbeats 2000000 in
 /-- The Mul oracle's embedded `MulOperation.asserts` copy agrees with the canonical standalone
 module on every reconfigured arithmetic block. -/
 private theorem mulOracle_mulOperation_asserts_eq {F : Type} [Field F] [CoeHead F ℕ]
@@ -665,7 +663,6 @@ private theorem mulOracle_mulOperation_asserts_eq {F : Type} [Field F] [CoeHead 
   simp only [mulOracleOperation, mulOracle_u16tou8safe_value_eq,
     mulOracle_u16tou8safe_asserts_eq, mulOracle_u16msb_asserts_eq]
 
-set_option maxHeartbeats 2000000 in
 /-- Interaction-list half of `mulOracle_mulOperation_asserts_eq`. -/
 private theorem mulOracle_mulOperation_interactions_eq {F : Type} [Field F] [CoeHead F ℕ]
     (a b c : Word F) (cols : Extracted.MulOperation F)
@@ -1716,7 +1713,7 @@ theorem mulOperation_assertions_backward
   · close_mul_constraint hp14
   · close_mul_constraint hp15
 
-set_option maxHeartbeats 1000000 in
+set_option maxHeartbeats 600000 in
 private theorem mulChip_constraints_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
@@ -2207,7 +2204,6 @@ private theorem mulChip_constraints_faithful
         Expression.eval, Nat.add_zero] using hsumOp
     · simpa only [rustAdapter, adapterValue] using hRustOpA0
 
-set_option maxHeartbeats 200000 in
 private theorem mulChipRowCodec_inputReal
     (cols : MulChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -2270,7 +2266,6 @@ private theorem mulChipRowCodec_inputReal
     List.getElem_cons_succ] at h0 h1 h2 h3 h4
   rw [h0, h1, h2, h3, h4]
 
-set_option maxHeartbeats 1000000 in
 theorem mulChip_constraints_constructive
     (rustCols : Extracted.MulOracle.MulCols (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -2368,7 +2363,6 @@ open SP1Clean.Channels (byteChannel stateChannel memoryChannel programChannel)
 open SP1Clean.InteractionRecovery
 
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 2000000 in
 theorem mulOperation_interactions_exact
     (env : Environment (ZMod p))
     (input : Var SP1Clean.MulOperation.Inputs (ZMod p)) (offset : ℕ)
@@ -2691,7 +2685,6 @@ theorem mulOperation_interactions_active
     exact congrArg LookupAccessList.active (hexact a (htarget.trans heq))
 
 omit [Fact (2 ^ 24 < p)] in
-set_option maxHeartbeats 100000 in
 theorem mulOperation_mulw_facts
     (a b c : Word (ZMod p))
     (cols : Extracted.MulOperation (ZMod p))
@@ -2716,7 +2709,6 @@ theorem mulOperation_mulw_facts
     _hsum, _hr, _hbimp, _hcimp⟩ := hRust
   exact ⟨bool_of_mul_pred hw0, ho3⟩
 
-set_option maxHeartbeats 2000000 in
 private theorem mulChip_state_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
@@ -2785,7 +2777,6 @@ private theorem mulChip_state_interactions_faithful
     hReal, hClkLow, hClkHighLimb, hPc0, hPc0']
   simp
 
-set_option maxHeartbeats 2000000 in
 private theorem mulChip_program_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
@@ -2855,7 +2846,6 @@ private theorem mulChip_program_interactions_faithful
   rw [neg_one_mul, signedVal_neg hp2]
   simp
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 private theorem mulChip_memory_interactions_faithful
     (env : Environment (ZMod p))
@@ -2997,7 +2987,6 @@ private theorem mulChip_memory_interactions_faithful
   exact (List.perm_append_comm
     (l₁ := [_, _, _, _]) (l₂ := [_])).append_left [_]
 
-set_option maxHeartbeats 4000000 in
 private theorem mulChip_byte_interactions_decompose
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ) :
     ((MulChip.main input).operations offset).interactionsWith
@@ -3037,7 +3026,6 @@ private theorem mulChip_byte_interactions_decompose
     circuit_norm, Nat.add_assoc]
 
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 4000000 in
 private theorem mulChip_operation_interactions_active
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
@@ -3212,7 +3200,7 @@ private theorem mulOperation_accesses_filter_byte
     Extracted.U16MSBOperation.interactions,
     Extracted.Interaction.toAccess]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 1000000 in
 private theorem mulChip_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
