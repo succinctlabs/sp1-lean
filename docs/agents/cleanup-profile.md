@@ -21,7 +21,7 @@ Companion reading, in order: Clean's `doc/performance-problems.md` and `doc/prov
 | Item 12 (hard gate) — split `∧` statements into `foo_left`/`foo_right` | As stock, it *deletes* a theorem and mints new names. `scripts/gen_axiom_probe.py` resolves its probe targets by **regex over source text**. Adopted here only in additive form (§4). |
 | Item 11 — make single-file declarations `private` | `gen_axiom_probe.py` **skips `private` decls** → silently shrinks the axiom census. |
 | Item 19 (hard gate) — rewrite `≥`→`≤` in statements and hypotheses | Changes statement text. `Faithful/*` are *syntactic* faithfulness anchors. |
-| Item 5 (hard gate) — forced renames, "existing convention preserved is NOT acceptable" | Breaks `scripts/nolints.json` (FQN-keyed), the `gen_axiom_probe.py` regexes, and `scripts/check_report_citations.sh` (15 hard-coded file+declaration pairs). |
+| Item 5 (hard gate) — forced renames, "existing convention preserved is NOT acceptable" | Breaks `scripts/nolints.json` (FQN-keyed), the `gen_axiom_probe.py` regexes, and `scripts/check_report_citations.sh` (16 hard-coded file+declaration pairs). |
 | Phase 5a — delete "wrapper" lemmas mathlib provides | Targets this repo's deliberate one-line namespace bridges — "shared substrate … not migration debt" (AGENTS.md). |
 | Item 10 — strip docstrings from private/aux declarations | Destroys the institutional memory the landmine notes carry. |
 | A.1 copyright header, `lake exe cache get`, `lake exe runLinter` | Not this project's conventions or commands (§7). |
@@ -989,6 +989,18 @@ Per gated group, stopping at the first failure:
    run 1's wall clock to the recorded baseline — a **>1.5×** regression fails even when green.
 6. **Source guards** — `check_no_native_decide.sh`, `check_no_skipkerneltc.sh`,
    `check_heartbeats.sh` (may only ratchet **down**).
+> **`local macro` is an established construct in `Soundness/`, and it is invisible to the
+> statement-preservation gate.** It predates the marathon (introduced by `829a8596`/`a5f900fe`/
+> `64883a2a`) and `lake lint` has always passed over it, so a batch may use it without treating it as
+> novel linter exposure. Crucially, macros are **not declarations** — they do not appear in a
+> signature multiset, so a batch that adds 11 of them must still show an *identical* multiset. If the
+> multiset grew, something other than a macro was added.
+>
+> **Careful with provenance claims on this branch.** `dtumad/proof-cleanup` diverged from `main` long
+> before the marathon and carries substantial unrelated work, so `git grep <thing> main` answers
+> "did this exist before the *branch*", **not** "did the marathon introduce this". Use
+> `git grep <thing> <pre-batch-sha>` or `git log -S … main..HEAD` and read the commit subjects.
+>
 > **Compare multisets per file; never verify against a briefed count.** A W6 gate was told
 > "`Driver.lean` has 20 signatures both sides" — the 20 belonged to its *sibling* file, and
 > `Driver.lean` is a single-theorem file (1 → 1). Because the gate compared per-file multisets rather
@@ -1020,7 +1032,7 @@ Per gated group, stopping at the first failure:
 
 At wave boundaries additionally: `lake lint`, `lake test`, `scripts/run_audit.sh`, and
 `scripts/check_report_citations.sh` — the last is **not** invoked by `run_audit.sh`, so run it
-yourself or the 15 hard-coded file+declaration citations go unchecked for the whole campaign.
+yourself or the 16 hard-coded file+declaration citations go unchecked for the whole campaign.
 
 > **`run_audit.sh` rewrites `docs/snapshots/axiom-census.txt` as a side effect**, so it leaves the
 > tree dirty even on a pass. Inspect the delta before restoring: a *hygienic* change (the
@@ -1038,7 +1050,7 @@ The queue is reported at the end for a human decision.
 
 Renaming here is high-blast-radius: `scripts/nolints.json` is keyed by fully-qualified name;
 `scripts/gen_axiom_probe.py` resolves probe targets by regex over source text;
-`scripts/check_report_citations.sh` hard-codes 15 file+declaration pairs; `docs/verification-report.md`
+`scripts/check_report_citations.sh` hard-codes 16 file+declaration pairs; `docs/verification-report.md`
 cites declarations by name; and `update_extracted.py` regenerates files that reference them.
 
 The stock `naming_gate` insists a rename be *applied*, and treats "existing convention preserved"
