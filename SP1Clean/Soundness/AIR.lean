@@ -272,21 +272,8 @@ theorem clockCount_of_decodedStateWalk (data : ProverData (ZMod p)) :
         Semantics.StateMsg.timeNat (decodedStateEdge data decoded).2 =
           Semantics.StateMsg.timeNat (decodedStateEdge data decoded).1 + 8) →
       Semantics.StateMsg.timeNat initial + 8 * rows.length =
-        Semantics.StateMsg.timeNat final := by
-  intro initial final rows walk steps
-  induction rows generalizing initial with
-  | nil =>
-      change initial = final at walk
-      subst final
-      simp
-  | cons decoded rows ih =>
-      obtain ⟨source, tail⟩ := walk
-      have sourceTime := congrArg Semantics.StateMsg.timeNat source
-      have rowStep := steps decoded List.mem_cons_self
-      have tailCount := ih tail (fun other otherMem =>
-        steps other (List.mem_cons_of_mem decoded otherMem))
-      simp only [List.length_cons]
-      omega
+        Semantics.StateMsg.timeNat final := fun walk steps => by
+  simpa [Nat.mul_comm] using clockCount_of_decodedStateWalk_durations data (fun _ => 8) walk steps
 
 /-- The telescoping endpoint-multiset balance of a State walk: the head plus each row's push equals the
 final plus each row's pull, as multisets.  The `List`-level companion of
@@ -358,28 +345,11 @@ theorem statePullTime_of_decodedStateWalk (data : ProverData (ZMod p)) :
           Semantics.StateMsg.timeNat (decodedStateEdge data decoded).1 + 8) →
       ∀ done decoded suffix, rows = done ++ decoded :: suffix →
         Semantics.StateMsg.timeNat (decodedStateEdge data decoded).1 =
-          Semantics.StateMsg.timeNat initial + 8 * done.length := by
-  intro initial final rows walk steps done
-  induction done generalizing initial rows with
-  | nil =>
-      intro decoded suffix rowsEq
-      subst rows
-      obtain ⟨source, -⟩ := walk
-      simpa using congrArg Semantics.StateMsg.timeNat source
-  | cons head done ih =>
-      intro decoded suffix rowsEq
-      subst rows
-      obtain ⟨source, tail⟩ := walk
-      have headStep := steps head List.mem_cons_self
-      have tailSteps : ∀ row ∈ done ++ decoded :: suffix,
-          Semantics.StateMsg.timeNat (decodedStateEdge data row).2 =
-            Semantics.StateMsg.timeNat (decodedStateEdge data row).1 + 8 := by
-        intro row rowMem
-        exact steps row (List.mem_cons_of_mem head rowMem)
-      have position := ih tail tailSteps decoded suffix rfl
-      have sourceTime := congrArg Semantics.StateMsg.timeNat source
-      simp only [List.length_cons]
-      omega
+          Semantics.StateMsg.timeNat initial + 8 * done.length :=
+  fun walk steps done decoded suffix rowsEq => by
+    simpa [Nat.mul_comm] using
+      statePullTime_of_decodedStateWalk_durations data (fun _ => 8) walk steps done decoded suffix
+        rowsEq
 
 /-- Every row of the eight-tick State walk begins in the same residue class modulo eight as the
 public initial State record.  This is the `RowOK.align8` input of the timed Memory walk. -/

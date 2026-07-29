@@ -72,6 +72,62 @@ open SP1Clean.Channels (StateMsg MemoryMsg)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- Open the current `decoded` row and substitute its chip descriptor — the three-line
+`obtain`/`have`/`subst` preamble that every `ChipGroundingContracts` field of every chip anchor
+repeats.  `chip`/`physical`/`decoded`/`hchip` are deliberately non-hygienic: the field bodies go on
+to use `physical` to build `Environment.fromArray`.  Declared above the first `section` because a
+`local macro` is scoped to its enclosing section, not to the file. -/
+local macro "chip_subst " desc:term : tactic =>
+  `(tactic|
+    (obtain ⟨$(Lean.mkIdent `chip), $(Lean.mkIdent `physical)⟩ := $(Lean.mkIdent `decoded)
+     have hchip' : $(Lean.mkIdent `chip) = $desc := $(Lean.mkIdent `hchip)
+     subst hchip'))
+
+/-- The complete body of a definitional field (`commit_eq`, `imm_b_eq`, …): introduce the row, its
+prover data and the descriptor equation, substitute, and close by `rfl`. -/
+local macro "chip_field_rfl " desc:term : tactic =>
+  `(tactic|
+    (intro $(Lean.mkIdent `decoded) $(Lean.mkIdent `data) $(Lean.mkIdent `hchip)
+     chip_subst $desc
+     rfl))
+
+/-- The whole `routing` field of every chip whose `op_a = 0` flag is already discharged by a
+`rowViewOpA0_eq_zero_of_constraints` lemma: derive the row constraints, substitute the descriptor,
+read the flag off the row view, and feed it to canonical Program decode.  Every binder here is
+introduced and consumed inside the expansion, so no name needs to escape hygiene. -/
+local macro "chip_routing_rowViewOpA0 " flagLemma:ident ", " desc:term : tactic =>
+  `(tactic|
+    (intro witness constraints decoded hchip decodedMem real program decode
+     have rowConstraints :=
+       decodedInstructionRow_constraints witness constraints decoded decodedMem
+     obtain ⟨chip, physical⟩ := decoded
+     have hchip' : chip = $desc := hchip
+     subst hchip'
+     exact decode.op_a_ne_zero_of_op_a_0_eq_zero
+       ($flagLemma (Environment.fromArray physical witness.data) rowConstraints)))
+
+/-- The `op_b`/`op_c` `isU64` preamble shared by the six RAM anchors whose `assumptions` field reads
+its row through `circuitRowViewOf`: name the row environment, extract the decoded immediate, and
+restate the pulled base word and the immediate against the circuit's own row view.  `env`,
+`immediate`, `base` and `immediate'` are all consumed by the caller afterwards, so they are
+introduced non-hygienically. -/
+local macro "chip_base_immediate " viewDecoded:ident ", " circ:ident ", " rowView:ident : tactic =>
+  `(tactic|
+    (let $(Lean.mkIdent `env) :=
+       Environment.fromArray $(Lean.mkIdent `physical) $(Lean.mkIdent `witness).data
+     have $(Lean.mkIdent `immediate) := $(Lean.mkIdent `decode).immediate_words_isU64.2 (by
+       simp only [programAccess, ProgramAccess.toRow, $viewDecoded:ident,
+         circuitRowViewOf_eq_typed, $rowView:ident, Extracted.ITypeReader.toAdapterView])
+     have $(Lean.mkIdent `base) : Word.isU64
+         ((circuitRowViewOf $circ $rowView
+           $(Lean.mkIdent `env)).adapter.op_b_memory.prev_value) := by
+       simpa only [$viewDecoded:ident, $(Lean.mkIdent `env):ident] using
+         $(Lean.mkIdent `pulled).2.2
+     have $(Lean.mkIdent `immediate') : Word.isU64
+         (circuitRowViewOf $circ $rowView $(Lean.mkIdent `env)).adapter.op_c := by
+       simpa only [programAccess, ProgramAccess.toRow, $viewDecoded:ident,
+         $(Lean.mkIdent `env):ident] using $(Lean.mkIdent `immediate)))
+
 /-- The `rd == x0` routing conclusion for one decoded row, phrased against the descriptor's declared
 `RdGuard`.  A chip contract proves it from the chip's own routing constraint and canonical Program
 decode; `readiness` may then consume it (notably `.nonX0` chips' `op_a ≠ 0` invariant). -/
@@ -1424,7 +1480,6 @@ section LoadByteAnchor
 
 variable [Fact (2 ^ 25 < p)]
 
-set_option maxHeartbeats 1000000 in
 private theorem loadByteChip_loadMemoryGroundingData_of_eq
     (chip : SupportedChip p) (shape : LoadMemoryInteractionShape chip)
     (chipEq : chip = loadByteChipDescriptor (p := p))
@@ -1437,32 +1492,14 @@ private theorem loadByteChip_loadMemoryGroundingData_of_eq
   · exact loadByteChip_viewClockBounds
   · exact loadByteChip_timestampBounds
   · exact loadByteChip_isRam
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadByteChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadByteChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadByteChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadByteChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  · chip_field_rfl loadByteChipDescriptor (p := p)
+  · chip_field_rfl loadByteChipDescriptor (p := p)
+  · chip_field_rfl loadByteChipDescriptor (p := p)
+  · chip_field_rfl loadByteChipDescriptor (p := p)
   · intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have pulled := loadPulledWords_isU64_of_shape
       loadByteChip_loadMemoryInteractionShape decoded witness.data hchip real memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadByteChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst loadByteChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     have immC :
         (programAccess
@@ -1491,9 +1528,7 @@ private theorem loadByteChip_loadMemoryGroundingData_of_eq
   · intro witness constraints decoded hchip decodedMem real
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadByteChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst loadByteChipDescriptor (p := p)
     rw [loadByteViewOf_decoded, loadByteViewOf_opA0]
     let input : Var LoadByteChip.Inputs (ZMod p) := varFromOffset LoadByteChip.Inputs 0
     let offset := size LoadByteChip.Inputs
@@ -1512,37 +1547,32 @@ private theorem loadByteChip_loadMemoryGroundingData_of_eq
     have chipSpec := decoded.chipSpec_of_openSoundnessInputs witness constraints balanced
       decodedMem openInputs
     have isRam := loadByteChip_isRam decoded witness.data hchip rowConstraints real
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadByteChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst loadByteChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input := circuitRowInputOf (p := p) LoadByteChip.circuit env
     let cols := circuitRowOutputOf (p := p) LoadByteChip.circuit env
     have decodedSpec :
         ((loadByteChipDescriptor (p := p)).decodeRow witness.data physical).chipSpec
-          witness.data := by
-      exact chipSpec
+          witness.data := chipSpec
     have spec : LoadByteChip.Spec input cols witness.data := by
       simpa only [input, cols, env] using
         loadByteSpec_of_decoded witness.data physical decodedSpec
     have realInput : LoadByteChip.isReal input = 1 := by
-      have realView := real
-      unfold ChipRow.is_real at realView
-      rw [loadByteViewOf_decoded] at realView
-      simpa only [input, loadByteViewOf, LoadByteChip.rowView] using realView
-    have concreteAssumptions : LoadByteChip.Assumptions input witness.data := by
-      exact (loadByteChipDescriptor_assumptions_iff env).mp openInputs.assumptions
+      unfold ChipRow.is_real at real
+      rw [loadByteViewOf_decoded] at real
+      simpa only [input, loadByteViewOf, LoadByteChip.rowView] using real
+    have concreteAssumptions : LoadByteChip.Assumptions input witness.data :=
+      (loadByteChipDescriptor_assumptions_iff env).mp openInputs.assumptions
     obtain ⟨baseBound, immediateBound, priorBound⟩ := concreteAssumptions
     have guardInput : input.adapter.op_a ≠ 0 := by
-      have guardView := guard
-      unfold RdGuardFact at guardView
-      rw [loadByteChipDescriptor_rdGuard] at guardView
+      unfold RdGuardFact at guard
+      rw [loadByteChipDescriptor_rdGuard] at guard
       change
         ((DecodedInstructionRow.mk loadByteChipDescriptor physical).toChipRow
-          witness.data).view.adapter.op_a ≠ 0 at guardView
-      rw [loadByteViewOf_decoded] at guardView
+          witness.data).view.adapter.op_a ≠ 0 at guard
+      rw [loadByteViewOf_decoded] at guard
       simpa only [input, loadByteViewOf, LoadByteChip.rowView,
-        Extracted.ITypeReader.toAdapterView] using guardView
+        Extracted.ITypeReader.toAdapterView] using guard
     have pcBound : input.state.pc[0].val < 2 ^ 16 := by
       have bound := programSpec.2.1
       change
@@ -1631,7 +1661,6 @@ section LoadHalfAnchor
 
 variable [Fact (2 ^ 25 < p)]
 
-set_option maxHeartbeats 1000000 in
 private theorem loadHalfChip_loadMemoryGroundingData_of_eq
     (chip : SupportedChip p) (shape : LoadMemoryInteractionShape chip)
     (chipEq : chip = loadHalfChipDescriptor (p := p))
@@ -1644,44 +1673,16 @@ private theorem loadHalfChip_loadMemoryGroundingData_of_eq
   · exact loadHalfChip_viewClockBounds
   · exact loadHalfChip_timestampBounds
   · exact loadHalfChip_isRam
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadHalfChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadHalfChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadHalfChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadHalfChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  · chip_field_rfl loadHalfChipDescriptor (p := p)
+  · chip_field_rfl loadHalfChipDescriptor (p := p)
+  · chip_field_rfl loadHalfChipDescriptor (p := p)
+  · chip_field_rfl loadHalfChipDescriptor (p := p)
   · intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have pulled := loadPulledWords_isU64_of_shape
       loadHalfChip_loadMemoryInteractionShape decoded witness.data hchip real memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadHalfChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have immediate := decode.immediate_words_isU64.2 (by
-      simp only [programAccess, ProgramAccess.toRow, loadHalfChip_viewOf_decoded,
-        circuitRowViewOf_eq_typed, LoadHalfChip.rowView,
-        Extracted.ITypeReader.toAdapterView])
-    have base : Word.isU64
-        ((circuitRowViewOf LoadHalfChip.circuit LoadHalfChip.rowView env).adapter.op_b_memory.prev_value) := by
-      simpa only [loadHalfChip_viewOf_decoded, env] using pulled.2.2
-    have immediate' : Word.isU64
-        (circuitRowViewOf LoadHalfChip.circuit LoadHalfChip.rowView env).adapter.op_c := by
-      simpa only [programAccess, ProgramAccess.toRow, loadHalfChip_viewOf_decoded, env]
-        using immediate
+    chip_subst loadHalfChipDescriptor (p := p)
+    chip_base_immediate loadHalfChip_viewOf_decoded, LoadHalfChip.circuit,
+      LoadHalfChip.rowView
     have ram : Word.isU64
         (circuitRamAccessOf LoadHalfChip.circuit LoadHalfChip.ramAccessView env).priorValue := by
       simpa only [loadHalfChip_loadMemoryInteractionShape,
@@ -1697,9 +1698,7 @@ private theorem loadHalfChip_loadMemoryGroundingData_of_eq
   · intro witness constraints decoded hchip decodedMem real
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadHalfChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst loadHalfChipDescriptor (p := p)
     rw [loadHalfChip_viewOf_decoded, loadHalfView_opA0]
     let input : Var LoadHalfChip.Inputs (ZMod p) := varFromOffset LoadHalfChip.Inputs 0
     let offset := size LoadHalfChip.Inputs
@@ -1718,9 +1717,7 @@ private theorem loadHalfChip_loadMemoryGroundingData_of_eq
     have chipSpec := decoded.chipSpec_of_openSoundnessInputs witness constraints balanced
       decodedMem openInputs
     have isRam := loadHalfChip_isRam decoded witness.data hchip rowConstraints real
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadHalfChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst loadHalfChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input := circuitRowInputOf (p := p) LoadHalfChip.circuit env
     let cols := circuitRowOutputOf (p := p) LoadHalfChip.circuit env
@@ -1733,23 +1730,21 @@ private theorem loadHalfChip_loadMemoryGroundingData_of_eq
       simpa only [input, cols, env] using
         loadHalfSpec_of_decoded witness.data physical decodedSpec
     have realInput : LoadHalfChip.isReal input = 1 := by
-      have realView := real
-      unfold ChipRow.is_real at realView
-      rw [loadHalfChip_viewOf_decoded, circuitRowViewOf_eq_typed] at realView
-      simpa only [input, cols, LoadHalfChip.rowView] using realView
+      unfold ChipRow.is_real at real
+      rw [loadHalfChip_viewOf_decoded, circuitRowViewOf_eq_typed] at real
+      simpa only [input, cols, LoadHalfChip.rowView] using real
     have concreteAssumptions : LoadHalfChip.Assumptions input witness.data :=
       (loadHalfChipDescriptor_assumptions_iff env).mp openInputs.assumptions
     obtain ⟨baseBound, immediateBound, priorBound⟩ := concreteAssumptions
     have guardInput : input.adapter.op_a ≠ 0 := by
-      have guardView := guard
-      unfold RdGuardFact at guardView
-      rw [loadHalfChipDescriptor_rdGuard] at guardView
+      unfold RdGuardFact at guard
+      rw [loadHalfChipDescriptor_rdGuard] at guard
       change
         ((DecodedInstructionRow.mk loadHalfChipDescriptor physical).toChipRow
-          witness.data).view.adapter.op_a ≠ 0 at guardView
-      rw [loadHalfChip_viewOf_decoded, circuitRowViewOf_eq_typed] at guardView
+          witness.data).view.adapter.op_a ≠ 0 at guard
+      rw [loadHalfChip_viewOf_decoded, circuitRowViewOf_eq_typed] at guard
       simpa only [input, cols, LoadHalfChip.rowView,
-        Extracted.ITypeReader.toAdapterView] using guardView
+        Extracted.ITypeReader.toAdapterView] using guard
     have pcBound : input.state.pc[0].val < 2 ^ 16 := by
       have bound := programSpec.2.1
       change
@@ -1871,7 +1866,6 @@ section LoadWordAnchor
 
 variable [Fact (2 ^ 25 < p)]
 
-set_option maxHeartbeats 1000000 in
 private theorem loadWordChip_loadMemoryGroundingData_of_eq
     (chip : SupportedChip p) (shape : LoadMemoryInteractionShape chip)
     (chipEq : chip = loadWordChipDescriptor (p := p))
@@ -1884,44 +1878,16 @@ private theorem loadWordChip_loadMemoryGroundingData_of_eq
   · exact loadWordChip_viewClockBounds
   · exact loadWordChip_timestampBounds
   · exact loadWordChip_isRam
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadWordChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadWordChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadWordChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadWordChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  · chip_field_rfl loadWordChipDescriptor (p := p)
+  · chip_field_rfl loadWordChipDescriptor (p := p)
+  · chip_field_rfl loadWordChipDescriptor (p := p)
+  · chip_field_rfl loadWordChipDescriptor (p := p)
   · intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have pulled := loadPulledWords_isU64_of_shape
       loadWordChip_loadMemoryInteractionShape decoded witness.data hchip real memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadWordChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have immediate := decode.immediate_words_isU64.2 (by
-      simp only [programAccess, ProgramAccess.toRow, loadWordChip_viewOf_decoded,
-        circuitRowViewOf_eq_typed, LoadWordChip.rowView,
-        Extracted.ITypeReader.toAdapterView])
-    have base : Word.isU64
-        ((circuitRowViewOf LoadWordChip.circuit LoadWordChip.rowView env).adapter.op_b_memory.prev_value) := by
-      simpa only [loadWordChip_viewOf_decoded, env] using pulled.2.2
-    have immediate' : Word.isU64
-        (circuitRowViewOf LoadWordChip.circuit LoadWordChip.rowView env).adapter.op_c := by
-      simpa only [programAccess, ProgramAccess.toRow, loadWordChip_viewOf_decoded, env]
-        using immediate
+    chip_subst loadWordChipDescriptor (p := p)
+    chip_base_immediate loadWordChip_viewOf_decoded, LoadWordChip.circuit,
+      LoadWordChip.rowView
     have ram : Word.isU64
         (circuitRamAccessOf LoadWordChip.circuit LoadWordChip.ramAccessView env).priorValue := by
       simpa only [loadWordChip_loadMemoryInteractionShape,
@@ -1937,9 +1903,7 @@ private theorem loadWordChip_loadMemoryGroundingData_of_eq
   · intro witness constraints decoded hchip decodedMem real
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadWordChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst loadWordChipDescriptor (p := p)
     rw [loadWordChip_viewOf_decoded, loadWordView_opA0]
     let input : Var LoadWordChip.Inputs (ZMod p) := varFromOffset LoadWordChip.Inputs 0
     let offset := size LoadWordChip.Inputs
@@ -1958,9 +1922,7 @@ private theorem loadWordChip_loadMemoryGroundingData_of_eq
     have chipSpec := decoded.chipSpec_of_openSoundnessInputs witness constraints balanced
       decodedMem openInputs
     have isRam := loadWordChip_isRam decoded witness.data hchip rowConstraints real
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadWordChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst loadWordChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input := circuitRowInputOf (p := p) LoadWordChip.circuit env
     let cols := circuitRowOutputOf (p := p) LoadWordChip.circuit env
@@ -1973,23 +1935,21 @@ private theorem loadWordChip_loadMemoryGroundingData_of_eq
       simpa only [input, cols, env] using
         loadWordSpec_of_decoded witness.data physical decodedSpec
     have realInput : LoadWordChip.isReal input = 1 := by
-      have realView := real
-      unfold ChipRow.is_real at realView
-      rw [loadWordChip_viewOf_decoded, circuitRowViewOf_eq_typed] at realView
-      simpa only [input, cols, LoadWordChip.rowView] using realView
+      unfold ChipRow.is_real at real
+      rw [loadWordChip_viewOf_decoded, circuitRowViewOf_eq_typed] at real
+      simpa only [input, cols, LoadWordChip.rowView] using real
     have concreteAssumptions : LoadWordChip.Assumptions input witness.data :=
       (loadWordChipDescriptor_assumptions_iff env).mp openInputs.assumptions
     obtain ⟨baseBound, immediateBound, priorBound⟩ := concreteAssumptions
     have guardInput : input.adapter.op_a ≠ 0 := by
-      have guardView := guard
-      unfold RdGuardFact at guardView
-      rw [loadWordChipDescriptor_rdGuard] at guardView
+      unfold RdGuardFact at guard
+      rw [loadWordChipDescriptor_rdGuard] at guard
       change
         ((DecodedInstructionRow.mk loadWordChipDescriptor physical).toChipRow
-          witness.data).view.adapter.op_a ≠ 0 at guardView
-      rw [loadWordChip_viewOf_decoded, circuitRowViewOf_eq_typed] at guardView
+          witness.data).view.adapter.op_a ≠ 0 at guard
+      rw [loadWordChip_viewOf_decoded, circuitRowViewOf_eq_typed] at guard
       simpa only [input, cols, LoadWordChip.rowView,
-        Extracted.ITypeReader.toAdapterView] using guardView
+        Extracted.ITypeReader.toAdapterView] using guard
     have pcBound : input.state.pc[0].val < 2 ^ 16 := by
       have bound := programSpec.2.1
       change
@@ -2124,7 +2084,6 @@ section LoadDoubleAnchor
 
 variable [Fact (2 ^ 25 < p)]
 
-set_option maxHeartbeats 1000000 in
 private theorem loadDoubleChip_loadMemoryGroundingData_of_eq
     (chip : SupportedChip p) (shape : LoadMemoryInteractionShape chip)
     (chipEq : chip = loadDoubleChipDescriptor (p := p))
@@ -2137,45 +2096,16 @@ private theorem loadDoubleChip_loadMemoryGroundingData_of_eq
   · exact loadDoubleChip_viewClockBounds
   · exact loadDoubleChip_timestampBounds
   · exact loadDoubleChip_isRam
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  · chip_field_rfl loadDoubleChipDescriptor (p := p)
+  · chip_field_rfl loadDoubleChipDescriptor (p := p)
+  · chip_field_rfl loadDoubleChipDescriptor (p := p)
+  · chip_field_rfl loadDoubleChipDescriptor (p := p)
   · intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have pulled := loadPulledWords_isU64_of_shape
       loadDoubleChip_loadMemoryInteractionShape decoded witness.data hchip real memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have immediate := decode.immediate_words_isU64.2 (by
-      simp only [programAccess, ProgramAccess.toRow, loadDoubleChip_viewOf_decoded,
-        circuitRowViewOf_eq_typed, LoadDoubleChip.rowView,
-        Extracted.ITypeReader.toAdapterView])
-    have base : Word.isU64
-        ((circuitRowViewOf LoadDoubleChip.circuit
-          LoadDoubleChip.rowView env).adapter.op_b_memory.prev_value) := by
-      simpa only [loadDoubleChip_viewOf_decoded, env] using pulled.2.2
-    have immediate' : Word.isU64
-        (circuitRowViewOf LoadDoubleChip.circuit LoadDoubleChip.rowView env).adapter.op_c := by
-      simpa only [programAccess, ProgramAccess.toRow, loadDoubleChip_viewOf_decoded, env]
-        using immediate
+    chip_subst loadDoubleChipDescriptor (p := p)
+    chip_base_immediate loadDoubleChip_viewOf_decoded, LoadDoubleChip.circuit,
+      LoadDoubleChip.rowView
     have ram : Word.isU64
         (circuitRamAccessOf LoadDoubleChip.circuit
           LoadDoubleChip.ramAccessView env).priorValue := by
@@ -2192,9 +2122,7 @@ private theorem loadDoubleChip_loadMemoryGroundingData_of_eq
   · intro witness constraints decoded hchip decodedMem real
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst loadDoubleChipDescriptor (p := p)
     rw [loadDoubleChip_viewOf_decoded, loadDoubleView_opA0]
     let input : Var LoadDoubleChip.Inputs (ZMod p) :=
       varFromOffset LoadDoubleChip.Inputs 0
@@ -2214,9 +2142,7 @@ private theorem loadDoubleChip_loadMemoryGroundingData_of_eq
     have chipSpec := decoded.chipSpec_of_openSoundnessInputs witness constraints balanced
       decodedMem openInputs
     have isRam := loadDoubleChip_isRam decoded witness.data hchip rowConstraints real
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst loadDoubleChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input := circuitRowInputOf (p := p) LoadDoubleChip.circuit env
     let cols := circuitRowOutputOf (p := p) LoadDoubleChip.circuit env
@@ -2229,23 +2155,21 @@ private theorem loadDoubleChip_loadMemoryGroundingData_of_eq
       simpa only [input, cols, env] using
         loadDoubleSpec_of_decoded witness.data physical decodedSpec
     have realInput : input.is_real = 1 := by
-      have realView := real
-      unfold ChipRow.is_real at realView
-      rw [loadDoubleChip_viewOf_decoded, circuitRowViewOf_eq_typed] at realView
-      simpa only [input, cols, LoadDoubleChip.rowView] using realView
+      unfold ChipRow.is_real at real
+      rw [loadDoubleChip_viewOf_decoded, circuitRowViewOf_eq_typed] at real
+      simpa only [input, cols, LoadDoubleChip.rowView] using real
     have concreteAssumptions : LoadDoubleChip.Assumptions input witness.data :=
       (loadDoubleChipDescriptor_assumptions_iff env).mp openInputs.assumptions
     obtain ⟨baseBound, immediateBound, priorBound⟩ := concreteAssumptions
     have guardInput : input.adapter.op_a ≠ 0 := by
-      have guardView := guard
-      unfold RdGuardFact at guardView
-      rw [loadDoubleChipDescriptor_rdGuard] at guardView
+      unfold RdGuardFact at guard
+      rw [loadDoubleChipDescriptor_rdGuard] at guard
       change
         ((DecodedInstructionRow.mk loadDoubleChipDescriptor physical).toChipRow
-          witness.data).view.adapter.op_a ≠ 0 at guardView
-      rw [loadDoubleChip_viewOf_decoded, circuitRowViewOf_eq_typed] at guardView
+          witness.data).view.adapter.op_a ≠ 0 at guard
+      rw [loadDoubleChip_viewOf_decoded, circuitRowViewOf_eq_typed] at guard
       simpa only [input, cols, LoadDoubleChip.rowView,
-        Extracted.ITypeReader.toAdapterView] using guardView
+        Extracted.ITypeReader.toAdapterView] using guard
     have pcBound : input.state.pc[0].val < 2 ^ 16 := by
       have bound := programSpec.2.1
       change
@@ -2414,7 +2338,6 @@ section LoadX0Anchor
 
 variable [Fact (2 ^ 25 < p)]
 
-set_option maxHeartbeats 1000000 in
 private theorem loadX0Chip_immutableLoadMemoryGroundingData_of_eq
     (chip : SupportedChip p) (shape : ImmutableRamMemoryInteractionShape chip)
     (chipEq : chip = loadX0ChipDescriptor (p := p))
@@ -2428,45 +2351,16 @@ private theorem loadX0Chip_immutableLoadMemoryGroundingData_of_eq
   · exact loadX0Chip_viewClockBounds
   · exact loadX0Chip_timestampBounds
   · exact loadX0Chip_isRam
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadX0ChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadX0ChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadX0ChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadX0ChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  · chip_field_rfl loadX0ChipDescriptor (p := p)
+  · chip_field_rfl loadX0ChipDescriptor (p := p)
+  · chip_field_rfl loadX0ChipDescriptor (p := p)
+  · chip_field_rfl loadX0ChipDescriptor (p := p)
   · intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have pulled := immutableRamPulledWords_isU64_of_shape
       loadX0Chip_immutableRamMemoryInteractionShape decoded witness.data hchip real memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadX0ChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have immediate := decode.immediate_words_isU64.2 (by
-      simp only [programAccess, ProgramAccess.toRow, loadX0Chip_viewOf_decoded,
-        circuitRowViewOf_eq_typed, LoadX0Chip.rowView,
-        Extracted.ITypeReader.toAdapterView])
-    have base : Word.isU64
-        ((circuitRowViewOf LoadX0Chip.circuit
-          LoadX0Chip.rowView env).adapter.op_b_memory.prev_value) := by
-      simpa only [loadX0Chip_viewOf_decoded, env] using pulled.2.2
-    have immediate' : Word.isU64
-        (circuitRowViewOf LoadX0Chip.circuit LoadX0Chip.rowView env).adapter.op_c := by
-      simpa only [programAccess, ProgramAccess.toRow, loadX0Chip_viewOf_decoded, env]
-        using immediate
+    chip_subst loadX0ChipDescriptor (p := p)
+    chip_base_immediate loadX0Chip_viewOf_decoded, LoadX0Chip.circuit,
+      LoadX0Chip.rowView
     have ram : Word.isU64
         (circuitRamAccessOf LoadX0Chip.circuit
           LoadX0Chip.ramAccessView env).priorValue := by
@@ -2482,9 +2376,7 @@ private theorem loadX0Chip_immutableLoadMemoryGroundingData_of_eq
   · intro witness constraints decoded hchip decodedMem real
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadX0ChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst loadX0ChipDescriptor (p := p)
     rw [loadX0Chip_viewOf_decoded, loadX0View_opA0]
     let input : Var LoadX0Chip.Inputs (ZMod p) :=
       varFromOffset LoadX0Chip.Inputs 0
@@ -2515,9 +2407,7 @@ private theorem loadX0Chip_immutableLoadMemoryGroundingData_of_eq
     have chipSpec := decoded.chipSpec_of_openSoundnessInputs witness constraints balanced
       decodedMem openInputs
     have isRam := loadX0Chip_isRam decoded witness.data hchip rowConstraints real
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = loadX0ChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst loadX0ChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input := circuitRowInputOf (p := p) LoadX0Chip.circuit env
     let cols := circuitRowOutputOf (p := p) LoadX0Chip.circuit env
@@ -2529,23 +2419,21 @@ private theorem loadX0Chip_immutableLoadMemoryGroundingData_of_eq
       simpa only [input, cols, env] using
         loadX0Spec_of_decoded witness.data physical decodedSpec
     have realInput : LoadX0Chip.isReal input = 1 := by
-      have realView := real
-      unfold ChipRow.is_real at realView
-      rw [loadX0Chip_viewOf_decoded, circuitRowViewOf_eq_typed] at realView
-      simpa only [input, cols, LoadX0Chip.rowView] using realView
+      unfold ChipRow.is_real at real
+      rw [loadX0Chip_viewOf_decoded, circuitRowViewOf_eq_typed] at real
+      simpa only [input, cols, LoadX0Chip.rowView] using real
     have concreteAssumptions : LoadX0Chip.Assumptions input witness.data :=
       (loadX0ChipDescriptor_assumptions_iff env).mp openInputs.assumptions
     obtain ⟨baseBound, immediateBound, priorBound⟩ := concreteAssumptions
     have guardInput : input.adapter.op_a = 0 := by
-      have guardView := guard
-      unfold RdGuardFact at guardView
-      rw [loadX0ChipDescriptor_rdGuard] at guardView
+      unfold RdGuardFact at guard
+      rw [loadX0ChipDescriptor_rdGuard] at guard
       change
         ((DecodedInstructionRow.mk loadX0ChipDescriptor physical).toChipRow
-          witness.data).view.adapter.op_a = 0 at guardView
-      rw [loadX0Chip_viewOf_decoded, circuitRowViewOf_eq_typed] at guardView
+          witness.data).view.adapter.op_a = 0 at guard
+      rw [loadX0Chip_viewOf_decoded, circuitRowViewOf_eq_typed] at guard
       simpa only [input, cols, LoadX0Chip.rowView,
-        Extracted.ITypeReader.toAdapterView] using guardView
+        Extracted.ITypeReader.toAdapterView] using guard
     have pcBound : input.state.pc[0].val < 2 ^ 16 := by
       have bound := programSpec.2.1
       change
@@ -2636,20 +2524,10 @@ private theorem storeByteChip_storeMemoryGroundingData_of_eq
   · exact storeByteChip_viewClockBounds
   · exact storeByteChip_timestampBounds
   · exact storeByteChip_isRam
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeByteChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeByteChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  · chip_field_rfl storeByteChipDescriptor (p := p)
+  · chip_field_rfl storeByteChipDescriptor (p := p)
   · intro decoded data hchip real spec
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeByteChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst storeByteChipDescriptor (p := p)
     let env := Environment.fromArray physical data
     let input := circuitRowInputOf (p := p) StoreByteChip.circuit env
     let cols := circuitRowOutputOf (p := p) StoreByteChip.circuit env
@@ -2673,22 +2551,9 @@ private theorem storeByteChip_storeMemoryGroundingData_of_eq
       decodedInstructionRow_constraints witness constraints decoded decodedMem
     have byteG :=
       decodedInstructionRow_byteGuarantees witness constraints balanced decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeByteChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have immediate := decode.immediate_words_isU64.2 (by
-      simp only [programAccess, ProgramAccess.toRow, storeByteChip_viewOf_decoded,
-        circuitRowViewOf_eq_typed, StoreByteChip.rowView,
-        Extracted.ITypeReader.toAdapterView])
-    have base : Word.isU64
-        ((circuitRowViewOf StoreByteChip.circuit
-          StoreByteChip.rowView env).adapter.op_b_memory.prev_value) := by
-      simpa only [storeByteChip_viewOf_decoded, env] using pulled.2.2
-    have immediate' : Word.isU64
-        (circuitRowViewOf StoreByteChip.circuit StoreByteChip.rowView env).adapter.op_c := by
-      simpa only [programAccess, ProgramAccess.toRow, storeByteChip_viewOf_decoded, env]
-        using immediate
+    chip_subst storeByteChipDescriptor (p := p)
+    chip_base_immediate storeByteChip_viewOf_decoded, StoreByteChip.circuit,
+      StoreByteChip.rowView
     have prior : Word.isU64
         (circuitRowInputOf StoreByteChip.circuit env).memory_access.prev_value := by
       have priorAccess : Word.isU64
@@ -2700,12 +2565,11 @@ private theorem storeByteChip_storeMemoryGroundingData_of_eq
       simpa only [StoreByteChip.ramAccessView] using priorAccess
     have realInput :
         (circuitRowInputOf StoreByteChip.circuit env).is_real = 1 := by
-      have realView := real
       change
         ((DecodedInstructionRow.mk storeByteChipDescriptor physical).toChipRow
-          witness.data).view.is_real = 1 at realView
-      rw [storeByteChip_viewOf_decoded, circuitRowViewOf_eq_typed] at realView
-      simpa only [StoreByteChip.rowView] using realView
+          witness.data).view.is_real = 1 at real
+      rw [storeByteChip_viewOf_decoded, circuitRowViewOf_eq_typed] at real
+      simpa only [StoreByteChip.rowView] using real
     rw [storeByteChipDescriptor_table] at rowConstraints byteG
     have priorPhysical : Word.isU64
         ((⟨StoreByteChip.circuit (p := p)⟩ :
@@ -2734,9 +2598,7 @@ private theorem storeByteChip_storeMemoryGroundingData_of_eq
       openInputs state operands sourceA pulls
     have programSpec := decodedInstructionRow_programRowSpec witness constraints balanced decoded
       decodedMem real
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeByteChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst storeByteChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input := circuitRowInputOf (p := p) StoreByteChip.circuit env
     let cols := circuitRowOutputOf (p := p) StoreByteChip.circuit env
@@ -2754,11 +2616,10 @@ private theorem storeByteChip_storeMemoryGroundingData_of_eq
         ∀ idx : BitVec 5, (idx.toNat : ZMod p) = input.adapter.op_a →
           state.get_reg? idx =
             some (Word.toBitVec64 input.adapter.op_a_memory.prev_value) := by
-      have sourceAView := sourceA
-      unfold SourceAValueBound at sourceAView
-      rw [storeByteChip_viewOf_decoded, circuitRowViewOf_eq_typed] at sourceAView
+      unfold SourceAValueBound at sourceA
+      rw [storeByteChip_viewOf_decoded, circuitRowViewOf_eq_typed] at sourceA
       simpa only [input, cols, StoreByteChip.rowView,
-        Extracted.ITypeReader.toAdapterView] using sourceAView
+        Extracted.ITypeReader.toAdapterView] using sourceA
     refine storeByteAdvanceReady_of_decoded witness.data physical program state ?_
     change StoreByteChip.AdvanceReady input cols program state
     exact ⟨sourceAInput, baseBound, immediateBound, pcBound⟩
@@ -2797,20 +2658,10 @@ private theorem storeHalfChip_storeMemoryGroundingData_of_eq
   · exact storeHalfChip_viewClockBounds
   · exact storeHalfChip_timestampBounds
   · exact storeHalfChip_isRam
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeHalfChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeHalfChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  · chip_field_rfl storeHalfChipDescriptor (p := p)
+  · chip_field_rfl storeHalfChipDescriptor (p := p)
   · intro decoded data hchip real spec
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeHalfChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst storeHalfChipDescriptor (p := p)
     let env := Environment.fromArray physical data
     let input := circuitRowInputOf (p := p) StoreHalfChip.circuit env
     let cols := circuitRowOutputOf (p := p) StoreHalfChip.circuit env
@@ -2832,22 +2683,9 @@ private theorem storeHalfChip_storeMemoryGroundingData_of_eq
       storeHalfChip_immutableRamMemoryInteractionShape decoded witness.data hchip real memory
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeHalfChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have immediate := decode.immediate_words_isU64.2 (by
-      simp only [programAccess, ProgramAccess.toRow, storeHalfChip_viewOf_decoded,
-        circuitRowViewOf_eq_typed, StoreHalfChip.rowView,
-        Extracted.ITypeReader.toAdapterView])
-    have base : Word.isU64
-        ((circuitRowViewOf StoreHalfChip.circuit
-          StoreHalfChip.rowView env).adapter.op_b_memory.prev_value) := by
-      simpa only [storeHalfChip_viewOf_decoded, env] using pulled.2.2
-    have immediate' : Word.isU64
-        (circuitRowViewOf StoreHalfChip.circuit StoreHalfChip.rowView env).adapter.op_c := by
-      simpa only [programAccess, ProgramAccess.toRow, storeHalfChip_viewOf_decoded, env]
-        using immediate
+    chip_subst storeHalfChipDescriptor (p := p)
+    chip_base_immediate storeHalfChip_viewOf_decoded, StoreHalfChip.circuit,
+      StoreHalfChip.rowView
     have prior : Word.isU64
         (circuitRowInputOf StoreHalfChip.circuit env).memory_access.prev_value := by
       have priorAccess : Word.isU64
@@ -2894,9 +2732,7 @@ private theorem storeHalfChip_storeMemoryGroundingData_of_eq
       openInputs state operands sourceA pulls
     have programSpec := decodedInstructionRow_programRowSpec witness constraints balanced decoded
       decodedMem real
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeHalfChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst storeHalfChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input := circuitRowInputOf (p := p) StoreHalfChip.circuit env
     let cols := circuitRowOutputOf (p := p) StoreHalfChip.circuit env
@@ -2914,11 +2750,10 @@ private theorem storeHalfChip_storeMemoryGroundingData_of_eq
         ∀ idx : BitVec 5, (idx.toNat : ZMod p) = input.adapter.op_a →
           state.get_reg? idx =
             some (Word.toBitVec64 input.adapter.op_a_memory.prev_value) := by
-      have sourceAView := sourceA
-      unfold SourceAValueBound at sourceAView
-      rw [storeHalfChip_viewOf_decoded, circuitRowViewOf_eq_typed] at sourceAView
+      unfold SourceAValueBound at sourceA
+      rw [storeHalfChip_viewOf_decoded, circuitRowViewOf_eq_typed] at sourceA
       simpa only [input, cols, StoreHalfChip.rowView,
-        Extracted.ITypeReader.toAdapterView] using sourceAView
+        Extracted.ITypeReader.toAdapterView] using sourceA
     refine storeHalfAdvanceReady_of_decoded witness.data physical program state ?_
     change StoreHalfChip.AdvanceReady input cols program state
     exact ⟨sourceAInput, baseBound, immediateBound, pcBound⟩
@@ -2957,20 +2792,10 @@ private theorem storeWordChip_storeMemoryGroundingData_of_eq
   · exact storeWordChip_viewClockBounds
   · exact storeWordChip_timestampBounds
   · exact storeWordChip_isRam
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeWordChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeWordChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  · chip_field_rfl storeWordChipDescriptor (p := p)
+  · chip_field_rfl storeWordChipDescriptor (p := p)
   · intro decoded data hchip real spec
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeWordChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst storeWordChipDescriptor (p := p)
     let env := Environment.fromArray physical data
     let input := circuitRowInputOf (p := p) StoreWordChip.circuit env
     let cols := circuitRowOutputOf (p := p) StoreWordChip.circuit env
@@ -2992,22 +2817,9 @@ private theorem storeWordChip_storeMemoryGroundingData_of_eq
       storeWordChip_immutableRamMemoryInteractionShape decoded witness.data hchip real memory
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeWordChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have immediate := decode.immediate_words_isU64.2 (by
-      simp only [programAccess, ProgramAccess.toRow, storeWordChip_viewOf_decoded,
-        circuitRowViewOf_eq_typed, StoreWordChip.rowView,
-        Extracted.ITypeReader.toAdapterView])
-    have base : Word.isU64
-        ((circuitRowViewOf StoreWordChip.circuit
-          StoreWordChip.rowView env).adapter.op_b_memory.prev_value) := by
-      simpa only [storeWordChip_viewOf_decoded, env] using pulled.2.2
-    have immediate' : Word.isU64
-        (circuitRowViewOf StoreWordChip.circuit StoreWordChip.rowView env).adapter.op_c := by
-      simpa only [programAccess, ProgramAccess.toRow, storeWordChip_viewOf_decoded, env]
-        using immediate
+    chip_subst storeWordChipDescriptor (p := p)
+    chip_base_immediate storeWordChip_viewOf_decoded, StoreWordChip.circuit,
+      StoreWordChip.rowView
     have prior : Word.isU64
         (circuitRowInputOf StoreWordChip.circuit env).memory_access.prev_value := by
       have priorAccess : Word.isU64
@@ -3054,9 +2866,7 @@ private theorem storeWordChip_storeMemoryGroundingData_of_eq
       openInputs state operands sourceA pulls
     have programSpec := decodedInstructionRow_programRowSpec witness constraints balanced decoded
       decodedMem real
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeWordChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst storeWordChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input := circuitRowInputOf (p := p) StoreWordChip.circuit env
     let cols := circuitRowOutputOf (p := p) StoreWordChip.circuit env
@@ -3074,11 +2884,10 @@ private theorem storeWordChip_storeMemoryGroundingData_of_eq
         ∀ idx : BitVec 5, (idx.toNat : ZMod p) = input.adapter.op_a →
           state.get_reg? idx =
             some (Word.toBitVec64 input.adapter.op_a_memory.prev_value) := by
-      have sourceAView := sourceA
-      unfold SourceAValueBound at sourceAView
-      rw [storeWordChip_viewOf_decoded, circuitRowViewOf_eq_typed] at sourceAView
+      unfold SourceAValueBound at sourceA
+      rw [storeWordChip_viewOf_decoded, circuitRowViewOf_eq_typed] at sourceA
       simpa only [input, cols, StoreWordChip.rowView,
-        Extracted.ITypeReader.toAdapterView] using sourceAView
+        Extracted.ITypeReader.toAdapterView] using sourceA
     refine storeWordAdvanceReady_of_decoded witness.data physical program state ?_
     change StoreWordChip.AdvanceReady input cols program state
     exact ⟨sourceAInput, baseBound, immediateBound, pcBound⟩
@@ -3117,20 +2926,10 @@ private theorem storeDoubleChip_storeMemoryGroundingData_of_eq
   · exact storeDoubleChip_viewClockBounds
   · exact storeDoubleChip_timestampBounds
   · exact storeDoubleChip_isRam
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  · intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  · chip_field_rfl storeDoubleChipDescriptor (p := p)
+  · chip_field_rfl storeDoubleChipDescriptor (p := p)
   · intro decoded data hchip real spec
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst storeDoubleChipDescriptor (p := p)
     let env := Environment.fromArray physical data
     let input := circuitRowInputOf (p := p) StoreDoubleChip.circuit env
     let cols := circuitRowOutputOf (p := p) StoreDoubleChip.circuit env
@@ -3150,22 +2949,9 @@ private theorem storeDoubleChip_storeMemoryGroundingData_of_eq
   · intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have pulled := immutableRamPulledWords_isU64_of_shape
       storeDoubleChip_immutableRamMemoryInteractionShape decoded witness.data hchip real memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have immediate := decode.immediate_words_isU64.2 (by
-      simp only [programAccess, ProgramAccess.toRow, storeDoubleChip_viewOf_decoded,
-        circuitRowViewOf_eq_typed, StoreDoubleChip.rowView,
-        Extracted.ITypeReader.toAdapterView])
-    have base : Word.isU64
-        ((circuitRowViewOf StoreDoubleChip.circuit
-          StoreDoubleChip.rowView env).adapter.op_b_memory.prev_value) := by
-      simpa only [storeDoubleChip_viewOf_decoded, env] using pulled.2.2
-    have immediate' : Word.isU64
-        (circuitRowViewOf StoreDoubleChip.circuit StoreDoubleChip.rowView env).adapter.op_c := by
-      simpa only [programAccess, ProgramAccess.toRow, storeDoubleChip_viewOf_decoded, env]
-        using immediate
+    chip_subst storeDoubleChipDescriptor (p := p)
+    chip_base_immediate storeDoubleChip_viewOf_decoded, StoreDoubleChip.circuit,
+      StoreDoubleChip.rowView
     have assumptions := storeDoubleAssumptions_env env witness.data base immediate'
     exact (storeDoubleChipDescriptor_assumptions_iff env).mpr assumptions
   · exact storeDoubleChipDescriptor_rdGuard
@@ -3173,9 +2959,7 @@ private theorem storeDoubleChip_storeMemoryGroundingData_of_eq
       openInputs state operands sourceA pulls
     have programSpec := decodedInstructionRow_programRowSpec witness constraints balanced decoded
       decodedMem real
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = storeDoubleChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst storeDoubleChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input := circuitRowInputOf (p := p) StoreDoubleChip.circuit env
     let cols := circuitRowOutputOf (p := p) StoreDoubleChip.circuit env
@@ -3193,11 +2977,10 @@ private theorem storeDoubleChip_storeMemoryGroundingData_of_eq
         ∀ idx : BitVec 5, (idx.toNat : ZMod p) = input.adapter.op_a →
           state.get_reg? idx =
             some (Word.toBitVec64 input.adapter.op_a_memory.prev_value) := by
-      have sourceAView := sourceA
-      unfold SourceAValueBound at sourceAView
-      rw [storeDoubleChip_viewOf_decoded, circuitRowViewOf_eq_typed] at sourceAView
+      unfold SourceAValueBound at sourceA
+      rw [storeDoubleChip_viewOf_decoded, circuitRowViewOf_eq_typed] at sourceA
       simpa only [input, cols, StoreDoubleChip.rowView,
-        Extracted.ITypeReader.toAdapterView] using sourceAView
+        Extracted.ITypeReader.toAdapterView] using sourceA
     refine storeDoubleAdvanceReady_of_decoded witness.data physical program state ?_
     change StoreDoubleChip.AdvanceReady input cols program state
     exact ⟨sourceAInput, baseBound, immediateBound, pcBound⟩
@@ -3230,24 +3013,12 @@ theorem addiChip_itypeGroundingData :
   memoryShape := addiChip_itypeMemoryInteractionShape
   viewClockBounds := addiChip_viewClockBounds
   timestampBounds := addiChip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addiChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_b_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addiChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl addiChipDescriptor (p := p)
+  imm_b_eq := by chip_field_rfl addiChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have immediate := addiChip_immediate_isU64 decoded witness.data hchip decode
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addiChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst addiChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     change Word.isU64
       ((⟨AddiChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env).adapter.op_c_imm
@@ -3264,9 +3035,7 @@ theorem addiChip_itypeGroundingData :
     intro witness constraints decoded hchip decodedMem real program decode
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addiChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst addiChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input : Var AddiChip.Inputs (ZMod p) := varFromOffset AddiChip.Inputs 0
     let offset := size AddiChip.Inputs
@@ -3286,9 +3055,7 @@ theorem addiChip_itypeGroundingData :
   readiness := by
     intro witness constraints balanced decoded hchip decodedMem real guard program decode
       _openInputs state _operands _sourceA _pulls
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addiChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst addiChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     exact ⟨AddiChip.inputOutputAdapter env, AddiChip.inputOutputState env, guard⟩
 
@@ -3312,18 +3079,8 @@ theorem addwChip_aluTypeGroundingData :
   memoryShape := addwChip_aluTypeMemoryInteractionShape.constrained
   viewClockBounds := addwChip_viewClockBounds
   timestampBounds := addwChip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addwChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_b_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addwChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl addwChipDescriptor (p := p)
+  imm_b_eq := by chip_field_rfl addwChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have rowConstraints :=
@@ -3339,9 +3096,7 @@ theorem addwChip_aluTypeGroundingData :
           rowConstraints immediate
         rw [binding]
         exact addwChip_immediate_isU64 decoded witness.data decode immediate
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addwChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst addwChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     change Word.isU64
       ((⟨AddwChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env).adapter.op_c_memory.prev_value
@@ -3352,9 +3107,7 @@ theorem addwChip_aluTypeGroundingData :
     intro witness constraints decoded hchip decodedMem real program decode
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addwChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst addwChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input : Var AddwChip.Inputs (ZMod p) := varFromOffset AddwChip.Inputs 0
     let offset := size AddwChip.Inputs
@@ -3381,9 +3134,7 @@ theorem addwChip_aluTypeGroundingData :
     have immBinary := addwChip_immBinary decoded witness.data decode
     have binding := fun immediate => addwChip_opCBinding_of_constraints decoded witness.data hchip
       rowConstraints immediate
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addwChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst addwChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     exact ⟨AddwChip.inputOutputAdapter env, programSpec.2.1, immBinary, binding, guard⟩
 
@@ -3407,18 +3158,8 @@ theorem bitwiseChip_aluTypeGroundingData :
   memoryShape := bitwiseChip_aluTypeMemoryInteractionShape.constrained
   viewClockBounds := bitwiseChip_viewClockBounds
   timestampBounds := bitwiseChip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = bitwiseChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_b_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = bitwiseChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl bitwiseChipDescriptor (p := p)
+  imm_b_eq := by chip_field_rfl bitwiseChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have rowConstraints :=
@@ -3434,9 +3175,7 @@ theorem bitwiseChip_aluTypeGroundingData :
           rowConstraints immediate
         rw [binding]
         exact bitwiseChip_immediate_isU64 decoded witness.data decode immediate
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = bitwiseChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst bitwiseChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     change Word.isU64
         ((⟨BitwiseChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput
@@ -3450,15 +3189,8 @@ theorem bitwiseChip_aluTypeGroundingData :
       BitwiseChip.physicalView, BitwiseChip.rowView, Extracted.ALUTypeReader.toAdapterView, env]
       using ⟨operands.1, opCU64⟩
   routing := by
-    intro witness constraints decoded hchip decodedMem real program decode
-    have rowConstraints :=
-      decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = bitwiseChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have flagZero := BitwiseChip.rowViewOpA0_eq_zero_of_constraints env rowConstraints
-    exact decode.op_a_ne_zero_of_op_a_0_eq_zero flagZero
+    chip_routing_rowViewOpA0 BitwiseChip.rowViewOpA0_eq_zero_of_constraints,
+      bitwiseChipDescriptor (p := p)
   readiness := by
     intro witness constraints balanced decoded hchip decodedMem real guard program decode
       _openInputs state _operands _sourceA _pulls
@@ -3469,9 +3201,7 @@ theorem bitwiseChip_aluTypeGroundingData :
     have immBinary := bitwiseChip_immBinary decoded witness.data decode
     have binding := fun immediate => bitwiseChip_opCBinding_of_constraints decoded witness.data hchip
       rowConstraints immediate
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = bitwiseChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst bitwiseChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     have active := BitwiseChip.rowViewSelectorActive_of_constraints env rowConstraints real
     exact ⟨BitwiseChip.inputOutputAdapter env, programSpec.2.1, immBinary, active, guard, binding⟩
@@ -3496,18 +3226,8 @@ theorem ltChip_aluTypeGroundingData :
   memoryShape := ltChip_aluTypeMemoryInteractionShape.constrained
   viewClockBounds := ltChip_viewClockBounds
   timestampBounds := ltChip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = ltChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_b_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = ltChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl ltChipDescriptor (p := p)
+  imm_b_eq := by chip_field_rfl ltChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have rowConstraints :=
@@ -3523,9 +3243,7 @@ theorem ltChip_aluTypeGroundingData :
           rowConstraints immediate
         rw [binding]
         exact ltChip_immediate_isU64 decoded witness.data decode immediate
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = ltChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst ltChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     change Word.isU64
         ((⟨LtChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput
@@ -3537,15 +3255,8 @@ theorem ltChip_aluTypeGroundingData :
       DecodedInstructionRow.toChipRow, ltViewOf_decodeRow, ltViewOf, LtChip.physicalView,
       LtChip.rowView, Extracted.ALUTypeReader.toAdapterView, env] using ⟨operands.1, opCU64⟩
   routing := by
-    intro witness constraints decoded hchip decodedMem real program decode
-    have rowConstraints :=
-      decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = ltChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have flagZero := LtChip.rowViewOpA0_eq_zero_of_constraints env rowConstraints
-    exact decode.op_a_ne_zero_of_op_a_0_eq_zero flagZero
+    chip_routing_rowViewOpA0 LtChip.rowViewOpA0_eq_zero_of_constraints,
+      ltChipDescriptor (p := p)
   readiness := by
     intro witness constraints balanced decoded hchip decodedMem real guard program decode
       _openInputs state _operands _sourceA _pulls
@@ -3556,9 +3267,7 @@ theorem ltChip_aluTypeGroundingData :
     have immBinary := ltChip_immBinary decoded witness.data decode
     have binding := fun immediate => ltChip_opCBinding_of_constraints decoded witness.data hchip
       rowConstraints immediate
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = ltChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst ltChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     have active := LtChip.rowViewSelectorActive_of_constraints env rowConstraints real
     exact ⟨LtChip.inputOutputAdapter env, programSpec.2.1, immBinary, active, guard, binding⟩
@@ -3583,18 +3292,8 @@ theorem shiftLeftChip_aluTypeGroundingData :
   memoryShape := shiftLeftChip_aluTypeMemoryInteractionShape
   viewClockBounds := shiftLeftChip_viewClockBounds
   timestampBounds := shiftLeftChip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = shiftLeftChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_b_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = shiftLeftChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl shiftLeftChipDescriptor (p := p)
+  imm_b_eq := by chip_field_rfl shiftLeftChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have rowConstraints :=
@@ -3610,9 +3309,7 @@ theorem shiftLeftChip_aluTypeGroundingData :
           rowConstraints immediate
         rw [binding]
         exact shiftLeftChip_immediate_isU64 decoded witness.data decode immediate
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = shiftLeftChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst shiftLeftChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     change Word.isU64
         ((⟨ShiftLeftChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput
@@ -3626,15 +3323,8 @@ theorem shiftLeftChip_aluTypeGroundingData :
       ShiftLeftChip.physicalView, ShiftLeftChip.rowView,
       Extracted.ALUTypeReader.toAdapterView, env] using ⟨operands.1, opCU64⟩
   routing := by
-    intro witness constraints decoded hchip decodedMem real program decode
-    have rowConstraints :=
-      decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = shiftLeftChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have flagZero := ShiftLeftChip.rowViewOpA0_eq_zero_of_constraints env rowConstraints
-    exact decode.op_a_ne_zero_of_op_a_0_eq_zero flagZero
+    chip_routing_rowViewOpA0 ShiftLeftChip.rowViewOpA0_eq_zero_of_constraints,
+      shiftLeftChipDescriptor (p := p)
   readiness := by
     intro witness constraints balanced decoded hchip decodedMem real guard program decode
       _openInputs state _operands _sourceA _pulls
@@ -3646,9 +3336,7 @@ theorem shiftLeftChip_aluTypeGroundingData :
     have binding := fun immediate =>
       shiftLeftChip_opCBinding_of_constraints decoded witness.data hchip
         rowConstraints immediate
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = shiftLeftChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst shiftLeftChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     have active := ShiftLeftChip.rowViewSelectorActive_of_constraints env rowConstraints real
     exact
@@ -3675,18 +3363,8 @@ theorem shiftRightChip_aluTypeGroundingData :
   memoryShape := shiftRightChip_aluTypeMemoryInteractionShape
   viewClockBounds := shiftRightChip_viewClockBounds
   timestampBounds := shiftRightChip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = shiftRightChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_b_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = shiftRightChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl shiftRightChipDescriptor (p := p)
+  imm_b_eq := by chip_field_rfl shiftRightChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have rowConstraints :=
@@ -3702,9 +3380,7 @@ theorem shiftRightChip_aluTypeGroundingData :
           rowConstraints immediate
         rw [binding]
         exact shiftRightChip_immediate_isU64 decoded witness.data decode immediate
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = shiftRightChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst shiftRightChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     change Word.isU64
         ((⟨ShiftRightChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput
@@ -3717,15 +3393,8 @@ theorem shiftRightChip_aluTypeGroundingData :
       ShiftRightChip.physicalView, ShiftRightChip.rowView,
       Extracted.ALUTypeReader.toAdapterView, env] using ⟨operands.1, opCU64⟩
   routing := by
-    intro witness constraints decoded hchip decodedMem real program decode
-    have rowConstraints :=
-      decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = shiftRightChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have flagZero := ShiftRightChip.rowViewOpA0_eq_zero_of_constraints env rowConstraints
-    exact decode.op_a_ne_zero_of_op_a_0_eq_zero flagZero
+    chip_routing_rowViewOpA0 ShiftRightChip.rowViewOpA0_eq_zero_of_constraints,
+      shiftRightChipDescriptor (p := p)
   readiness := by
     intro witness constraints balanced decoded hchip decodedMem real guard program decode
       _openInputs state _operands _sourceA _pulls
@@ -3737,9 +3406,7 @@ theorem shiftRightChip_aluTypeGroundingData :
     have binding := fun immediate =>
       shiftRightChip_opCBinding_of_constraints decoded witness.data hchip
         rowConstraints immediate
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = shiftRightChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst shiftRightChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     have active := ShiftRightChip.rowViewSelectorActive_of_constraints env rowConstraints real
     exact
@@ -3766,25 +3433,16 @@ theorem aluX0Chip_immutableALUTypeGroundingData :
   memoryShape := aluX0Chip_immutableALUTypeMemoryInteractionShape
   viewClockBounds := aluX0Chip_viewClockBounds
   timestampBounds := aluX0Chip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = aluX0ChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl aluX0ChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = aluX0ChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst aluX0ChipDescriptor (p := p)
     trivial
   routing := by
     intro witness constraints decoded hchip decodedMem real program decode
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = aluX0ChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst aluX0ChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input : Var AluX0Chip.Inputs (ZMod p) :=
       varFromOffset AluX0Chip.Inputs 0
@@ -3792,11 +3450,10 @@ theorem aluX0Chip_immutableALUTypeGroundingData :
     have mainConstraints : ((AluX0Chip.main input).operations offset).ConstraintsHold env :=
       (Component.constraintsHold_iff env).mp rowConstraints
     have inputReal : (Eval.eval env input).is_real = 1 := by
-      have realView := real
       change ((aluX0ChipDescriptor (p := p)).decodeRow witness.data physical).view.is_real = 1
-        at realView
-      rw [aluX0ViewOf_decodeRow, aluX0ViewOf_isReal] at realView
-      exact realView
+        at real
+      rw [aluX0ViewOf_decodeRow, aluX0ViewOf_isReal] at real
+      exact real
     have inputFlag := AluX0Chip.opA0_eq_one_of_constraints
       input offset env mainConstraints inputReal
     have viewFlag :
@@ -3813,9 +3470,7 @@ theorem aluX0Chip_immutableALUTypeGroundingData :
       decodedMem real
     have chipSpec := decoded.chipSpec_of_openSoundnessInputs witness constraints balanced
       decodedMem openInputs
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = aluX0ChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst aluX0ChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     have decodedSpec :
         ((aluX0ChipDescriptor (p := p)).decodeRow witness.data physical).chipSpec
@@ -3830,16 +3485,14 @@ theorem aluX0Chip_immutableALUTypeGroundingData :
     have concreteSpec : AluX0Chip.Spec
         ((aluX0ChipDescriptor (p := p)).decodeRow witness.data physical).inputs
         ((aluX0ChipDescriptor (p := p)).decodeRow witness.data physical).cols
-        witness.data := by
-      exact circuitSpec
+        witness.data := circuitSpec
     have inputReal :
         (Eval.eval env
           (varFromOffset (F := ZMod p) AluX0Chip.Inputs 0)).is_real = 1 := by
-      have realView := real
       change ((aluX0ChipDescriptor (p := p)).decodeRow witness.data physical).view.is_real = 1
-        at realView
-      rw [aluX0ViewOf_decodeRow, aluX0ViewOf_isReal] at realView
-      exact realView
+        at real
+      rw [aluX0ViewOf_decodeRow, aluX0ViewOf_isReal] at real
+      exact real
     have decodedInputReal :
         ((aluX0ChipDescriptor (p := p)).decodeRow witness.data physical).inputs.is_real = 1 := by
       simpa only [SupportedChip.decodeRow, aluX0ChipDescriptor_table, Component.rowInput,
@@ -3873,46 +3526,20 @@ theorem addChip_rtypeGroundingData :
   memoryShape := addChip_rtypeMemoryInteractionShape
   viewClockBounds := addChip_viewClockBounds
   timestampBounds := addChip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_b_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_c_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl addChipDescriptor (p := p)
+  imm_b_eq := by chip_field_rfl addChipDescriptor (p := p)
+  imm_c_eq := by chip_field_rfl addChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst addChipDescriptor (p := p)
     exact trivial
   routing := by
-    intro witness constraints decoded hchip decodedMem real program decode
-    have rowConstraints :=
-      decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have flagZero := AddChip.rowViewOpA0_eq_zero_of_constraints env rowConstraints
-    exact decode.op_a_ne_zero_of_op_a_0_eq_zero flagZero
+    chip_routing_rowViewOpA0 AddChip.rowViewOpA0_eq_zero_of_constraints,
+      addChipDescriptor (p := p)
   readiness := by
     intro witness constraints balanced decoded hchip decodedMem real guard program decode
       _openInputs state _operands _sourceA _pulls
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = addChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst addChipDescriptor (p := p)
     exact ⟨AddChip.inputOutputAdapter (Environment.fromArray physical witness.data), guard⟩
 
 /-- **The Add bundle instance**, assembled by the shared R-type constructor. -/
@@ -3935,46 +3562,20 @@ theorem subChip_rtypeGroundingData :
   memoryShape := subChip_rtypeMemoryInteractionShape
   viewClockBounds := subChip_viewClockBounds
   timestampBounds := subChip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_b_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_c_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl subChipDescriptor (p := p)
+  imm_b_eq := by chip_field_rfl subChipDescriptor (p := p)
+  imm_c_eq := by chip_field_rfl subChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst subChipDescriptor (p := p)
     exact trivial
   routing := by
-    intro witness constraints decoded hchip decodedMem real program decode
-    have rowConstraints :=
-      decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have flagZero := SubChip.rowViewOpA0_eq_zero_of_constraints env rowConstraints
-    exact decode.op_a_ne_zero_of_op_a_0_eq_zero flagZero
+    chip_routing_rowViewOpA0 SubChip.rowViewOpA0_eq_zero_of_constraints,
+      subChipDescriptor (p := p)
   readiness := by
     intro witness constraints balanced decoded hchip decodedMem real guard program decode
       _openInputs state _operands _sourceA _pulls
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst subChipDescriptor (p := p)
     exact ⟨SubChip.inputOutputAdapter (Environment.fromArray physical witness.data), guard⟩
 
 /-- **The Sub bundle instance**, assembled by the shared R-type constructor. -/
@@ -3997,46 +3598,20 @@ theorem subwChip_rtypeGroundingData :
   memoryShape := subwChip_rtypeMemoryInteractionShape
   viewClockBounds := subwChip_viewClockBounds
   timestampBounds := subwChip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subwChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_b_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subwChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_c_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subwChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl subwChipDescriptor (p := p)
+  imm_b_eq := by chip_field_rfl subwChipDescriptor (p := p)
+  imm_c_eq := by chip_field_rfl subwChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subwChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst subwChipDescriptor (p := p)
     exact trivial
   routing := by
-    intro witness constraints decoded hchip decodedMem real program decode
-    have rowConstraints :=
-      decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subwChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have flagZero := SubwChip.rowViewOpA0_eq_zero_of_constraints env rowConstraints
-    exact decode.op_a_ne_zero_of_op_a_0_eq_zero flagZero
+    chip_routing_rowViewOpA0 SubwChip.rowViewOpA0_eq_zero_of_constraints,
+      subwChipDescriptor (p := p)
   readiness := by
     intro witness constraints balanced decoded hchip decodedMem real guard program decode
       _openInputs state _operands _sourceA _pulls
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = subwChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst subwChipDescriptor (p := p)
     exact ⟨SubwChip.inputOutputAdapter (Environment.fromArray physical witness.data), guard⟩
 
 /-- **The SUBW bundle instance**, assembled by the shared R-type constructor. -/
@@ -4063,37 +3638,18 @@ theorem mulChip_rtypeGroundingData :
   memoryShape := mulChip_rtypeMemoryInteractionShape
   viewClockBounds := mulChip_viewClockBounds
   timestampBounds := mulChip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = mulChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_b_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = mulChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_c_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = mulChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl mulChipDescriptor (p := p)
+  imm_b_eq := by chip_field_rfl mulChipDescriptor (p := p)
+  imm_c_eq := by chip_field_rfl mulChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = mulChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst mulChipDescriptor (p := p)
     exact trivial
   routing := by
     intro witness constraints decoded hchip decodedMem real program decode
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = mulChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst mulChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input : Var MulChip.Inputs (ZMod p) := varFromOffset MulChip.Inputs 0
     let offset := size MulChip.Inputs
@@ -4117,9 +3673,7 @@ theorem mulChip_rtypeGroundingData :
     have realView : (decoded.toChipRow witness.data).view.is_real = 1 := real
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = mulChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst mulChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     let input : Var MulChip.Inputs (ZMod p) := varFromOffset MulChip.Inputs 0
     let offset := size MulChip.Inputs
@@ -4165,31 +3719,14 @@ theorem divRemChip_rtypeGroundingData :
   memoryShape := divRemChip_rtypeMemoryInteractionShape
   viewClockBounds := divRemChip_viewClockBounds
   timestampBounds := divRemChip_activeTimestampBounds
-  commit_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = divRemChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_b_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = divRemChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_c_eq := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = divRemChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  commit_eq := by chip_field_rfl divRemChipDescriptor (p := p)
+  imm_b_eq := by chip_field_rfl divRemChipDescriptor (p := p)
+  imm_c_eq := by chip_field_rfl divRemChipDescriptor (p := p)
   assumptions := by
     intro witness constraints balanced decoded hchip decodedMem real program decode memory
     have operands := rtypeOperandWords_isU64_of_shape divRemChip_rtypeMemoryInteractionShape
       decoded witness.data hchip real memory
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = divRemChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst divRemChipDescriptor (p := p)
     let env := Environment.fromArray physical witness.data
     have adapter := DivRemChip.inputOutputAdapter env
     change Word.isU64
@@ -4200,21 +3737,12 @@ theorem divRemChip_rtypeGroundingData :
     simpa only [env, DecodedInstructionRow.toChipRow, divRemViewOf_decodeRow, divRemViewOf,
       DivRemChip.rowView, Extracted.RTypeReader.toAdapterView] using operands
   routing := by
-    intro witness constraints decoded hchip decodedMem real program decode
-    have rowConstraints :=
-      decodedInstructionRow_constraints witness constraints decoded decodedMem
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = divRemChipDescriptor (p := p) := hchip
-    subst hchip'
-    let env := Environment.fromArray physical witness.data
-    have flagZero := DivRemChip.rowViewOpA0_eq_zero_of_constraints env rowConstraints
-    exact decode.op_a_ne_zero_of_op_a_0_eq_zero flagZero
+    chip_routing_rowViewOpA0 DivRemChip.rowViewOpA0_eq_zero_of_constraints,
+      divRemChipDescriptor (p := p)
   readiness := by
     intro witness constraints balanced decoded hchip decodedMem real guard program decode
       _openInputs state _operands _sourceA _pulls
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = divRemChipDescriptor (p := p) := hchip
-    subst hchip'
+    chip_subst divRemChipDescriptor (p := p)
     exact ⟨DivRemChip.inputOutputAdapter (Environment.fromArray physical witness.data), guard⟩
 
 /-- **The DivRem bundle instance**, assembled by the shared R-type constructor. -/
@@ -4242,9 +3770,7 @@ theorem jalChip_commitEq (decoded : DecodedInstructionRow p) (data : ProverData 
     (hchip : decoded.chip = jalChipDescriptor (p := p)) :
     (decoded.toChipRow data).view.commit =
       Trace.CommitEffect.destination (decoded.toChipRow data).view.adapter.op_a_0 := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst jalChipDescriptor (p := p)
   rfl
 
 /-- The folded JAL chip `Spec` exposes the J-type reader's destination selector and x0 zeroing. -/
@@ -4256,9 +3782,7 @@ theorem jalChip_specFacts (decoded : DecodedInstructionRow p) (data : ProverData
       (decoded.toChipRow data).view.adapter.op_a_0 = 1) ∧
     ((decoded.toChipRow data).view.adapter.op_a_0 = 1 →
       Word.toBitVec64 (decoded.toChipRow data).view.rdWrite = 0) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst jalChipDescriptor (p := p)
   let env := Environment.fromArray physical data
   change JalChip.Spec
     ((⟨JalChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env)
@@ -4310,7 +3834,6 @@ theorem jalChip_specFacts (decoded : DecodedInstructionRow p) (data : ProverData
   simp only [jalViewOf, JalChip.rowView, Extracted.JTypeReader.toAdapterView]
   simpa only [env, readerInput, wordFour_eta] using facts
 
-set_option maxHeartbeats 2000000 in
 /-- JAL's three circuit assumptions follow from the committed Program row on an active row. -/
 theorem jalChip_assumptions :
     ChipAssumptionsContract (jalChipDescriptor (p := p)) := by
@@ -4326,9 +3849,7 @@ theorem jalChip_assumptions :
         (decoded.toChipRow witness.data).view.state.pc[1],
         (decoded.toChipRow witness.data).view.state.pc[2], 0] : Word (ZMod p)) :=
     Word.isU64_of_cases programSpec.2.1 programSpec.2.2.1 programSpec.2.2.2.1 (by simp)
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst jalChipDescriptor (p := p)
   let env := Environment.fromArray physical witness.data
   have inputEq : Eval.eval env (varFromOffset JalChip.Inputs 0) =
       ((⟨JalChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env) :=
@@ -4340,8 +3861,8 @@ theorem jalChip_assumptions :
       (jalViewOf env).state.pc[2], 0] : Word (ZMod p)) at pcWord
   rw [jalViewOf_state, inputEq] at pcWord
   have concrete : JalChip.Assumptions
-      ((⟨JalChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env) witness.data := by
-    exact ⟨immediate, pcWord⟩
+      ((⟨JalChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env) witness.data :=
+      ⟨immediate, pcWord⟩
   exact (jalChipDescriptor_assumptions_iff witness.data physical).mpr concrete
 
 /-- JAL accepts either destination branch, so its registry routing guard is vacuous. -/
@@ -4362,9 +3883,7 @@ theorem jalChip_readiness : ChipReadinessContract (jalChipDescriptor (p := p)) :
     openInputs state operands sourceA _pulls
   have rowConstraints :=
     decodedInstructionRow_constraints witness constraints decoded decodedMem
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst jalChipDescriptor (p := p)
   exact JalChip.addValueHigh_eq_zero_of_constraints
     (Environment.fromArray physical witness.data) rowConstraints
 
@@ -4399,9 +3918,7 @@ theorem uTypeChip_commitEq (decoded : DecodedInstructionRow p) (data : ProverDat
     (hchip : decoded.chip = uTypeChipDescriptor (p := p)) :
     (decoded.toChipRow data).view.commit =
       Trace.CommitEffect.destination (decoded.toChipRow data).view.adapter.op_a_0 := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = uTypeChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst uTypeChipDescriptor (p := p)
   rfl
 
 /-- The folded U-type chip `Spec` exposes the J-type reader's selector and x0 zeroing facts. -/
@@ -4413,9 +3930,7 @@ theorem uTypeChip_specFacts (decoded : DecodedInstructionRow p) (data : ProverDa
       (decoded.toChipRow data).view.adapter.op_a_0 = 1) ∧
     ((decoded.toChipRow data).view.adapter.op_a_0 = 1 →
       Word.toBitVec64 (decoded.toChipRow data).view.rdWrite = 0) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = uTypeChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst uTypeChipDescriptor (p := p)
   let env := Environment.fromArray physical data
   change UTypeChip.Spec
     ((⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env)
@@ -4470,7 +3985,6 @@ theorem uTypeChip_specFacts (decoded : DecodedInstructionRow p) (data : ProverDa
   simp only [uTypeViewOf, UTypeChip.rowView, Extracted.JTypeReader.toAdapterView]
   simpa only [env, readerInput, wordFour_eta] using facts
 
-set_option maxHeartbeats 1000000 in
 /-- U-type's immediate, PC, padding, and U-immediate decode assumptions all come from the active
 Program row plus its physical LUI/AUIPC selector gate. -/
 theorem uTypeChip_assumptions :
@@ -4489,9 +4003,7 @@ theorem uTypeChip_assumptions :
         (decoded.toChipRow witness.data).view.state.pc[1],
         (decoded.toChipRow witness.data).view.state.pc[2], 0] : Word (ZMod p)) :=
     Word.isU64_of_cases programSpec.2.1 programSpec.2.2.1 programSpec.2.2.2.1 (by simp)
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = uTypeChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst uTypeChipDescriptor (p := p)
   let env := Environment.fromArray physical witness.data
   have inputEq : Eval.eval env (varFromOffset UTypeChip.Inputs 0) =
       ((⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env) :=
@@ -4554,8 +4066,8 @@ theorem uTypeChip_assumptions :
       rw [opBInput, immEq, toBitVec64_bitVecToWord]
       exact uTypeSignExtend_shiftLeft imm
   have concrete : UTypeChip.Assumptions
-      ((⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env) witness.data := by
-    exact ⟨immediate, pcWord, decodeRelation⟩
+      ((⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env) witness.data :=
+      ⟨immediate, pcWord, decodeRelation⟩
   exact (uTypeChipDescriptor_assumptions_iff witness.data physical).mpr concrete
 
 /-- U-type accepts both destination branches. -/
@@ -4578,9 +4090,7 @@ theorem uTypeChip_readiness : ChipReadinessContract (uTypeChipDescriptor (p := p
     decodedInstructionRow_constraints witness constraints decoded decodedMem
   have programSpec := decodedInstructionRow_programRowSpec witness constraints balanced decoded
     decodedMem real
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = uTypeChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst uTypeChipDescriptor (p := p)
   exact ⟨programSpec.2.1,
     UTypeChip.isAuipc_binary_of_constraints
       (Environment.fromArray physical witness.data) rowConstraints⟩
@@ -4616,9 +4126,7 @@ theorem jalrChip_commitEq (decoded : DecodedInstructionRow p) (data : ProverData
     (hchip : decoded.chip = jalrChipDescriptor (p := p)) :
     (decoded.toChipRow data).view.commit =
       Trace.CommitEffect.destination (decoded.toChipRow data).view.adapter.op_a_0 := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalrChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst jalrChipDescriptor (p := p)
   rfl
 
 /-- The folded JALR chip `Spec` exposes the mutable I-type reader's destination selector and x0
@@ -4631,9 +4139,7 @@ theorem jalrChip_specFacts (decoded : DecodedInstructionRow p) (data : ProverDat
       (decoded.toChipRow data).view.adapter.op_a_0 = 1) ∧
     ((decoded.toChipRow data).view.adapter.op_a_0 = 1 →
       Word.toBitVec64 (decoded.toChipRow data).view.rdWrite = 0) := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalrChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst jalrChipDescriptor (p := p)
   let env := Environment.fromArray physical data
   change JalrChip.Spec
     ((⟨JalrChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env)
@@ -4698,7 +4204,6 @@ private theorem jalrAssumptions_of_components
     JalrChip.Assumptions input data :=
   ⟨immediate, source, pc⟩
 
-set_option maxHeartbeats 2000000 in
 /-- JALR's immediate, source word, and PC assumptions are grounded by the committed
 Program row and the exact source-B Memory pull. -/
 theorem jalrChip_assumptions :
@@ -4718,9 +4223,7 @@ theorem jalrChip_assumptions :
         (decoded.toChipRow witness.data).view.state.pc[1],
         (decoded.toChipRow witness.data).view.state.pc[2], 0] : Word (ZMod p)) :=
     Word.isU64_of_cases programSpec.2.1 programSpec.2.2.1 programSpec.2.2.2.1 (by simp)
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalrChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst jalrChipDescriptor (p := p)
   let env := Environment.fromArray physical witness.data
   have inputEq : Eval.eval env (varFromOffset JalrChip.Inputs 0) =
       ((⟨JalrChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env) :=
@@ -4762,9 +4265,7 @@ theorem jalrChip_assumptions :
 theorem jalrChip_immBEq (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
     (hchip : decoded.chip = jalrChipDescriptor (p := p)) :
     (programAccess (decoded.toChipRow data).view).toRow.imm_b = 0 := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalrChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst jalrChipDescriptor (p := p)
   rfl
 
 /-- JALR accepts both destination branches. -/
@@ -4785,9 +4286,7 @@ theorem jalrChip_readiness :
     ChipReadinessContract (jalrChipDescriptor (p := p)) := by
   intro witness constraints balanced decoded hchip decodedMem real guard program decode
     openInputs state operands sourceA _pulls
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = jalrChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst jalrChipDescriptor (p := p)
   exact True.intro
 
 /-- JALR's residue for the conditional-destination I-type constructor. -/
@@ -4822,9 +4321,7 @@ theorem branchChip_commitEq (decoded : DecodedInstructionRow p)
     (data : ProverData (ZMod p))
     (hchip : decoded.chip = branchChipDescriptor (p := p)) :
     (decoded.toChipRow data).view.commit = Trace.CommitEffect.noWrite := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = branchChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst branchChipDescriptor (p := p)
   rfl
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
@@ -4844,7 +4341,6 @@ private theorem branchAssumptions_of_components
     BranchChip.Assumptions input data :=
   ⟨immediate, sourceA, sourceB, pc⟩
 
-set_option maxHeartbeats 2000000 in
 /-- Branch's immediate, both source words, and PC assumptions come respectively from the committed
 Program row, exact immutable-reader pulls, and the Program-row limb bounds. -/
 theorem branchChip_assumptions :
@@ -4864,9 +4360,7 @@ theorem branchChip_assumptions :
         (decoded.toChipRow witness.data).view.state.pc[1],
         (decoded.toChipRow witness.data).view.state.pc[2], 0] : Word (ZMod p)) :=
     Word.isU64_of_cases programSpec.2.1 programSpec.2.2.1 programSpec.2.2.2.1 (by simp)
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = branchChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst branchChipDescriptor (p := p)
   let env := Environment.fromArray physical witness.data
   have inputEq : Eval.eval env (varFromOffset BranchChip.Inputs 0) =
       ((⟨BranchChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env) :=
@@ -4940,9 +4434,7 @@ theorem branchChip_readiness :
     ChipReadinessContract (branchChipDescriptor (p := p)) := by
   intro witness constraints balanced decoded hchip decodedMem real guard program decode
     openInputs state operands sourceA _pulls
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = branchChipDescriptor (p := p) := hchip
-  subst hchip'
+  chip_subst branchChipDescriptor (p := p)
   exact sourceA
 
 /-- Branch's residue for the immutable I-type constructor. -/

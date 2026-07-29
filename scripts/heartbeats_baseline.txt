@@ -479,5 +479,18 @@
 #   dropped the 4000000 ceiling on ShiftLeftChip.aluTypeTimestampContract (measured floor <=40000,
 #   ~100x over). Its control run also masked an unceilinged consumer, so masking was present but cost
 #   nothing here. Grounding/{ControlFlow,Memory}Chips.lean carry no ceilings.
-SP1Clean 326
+# -9 (2026-07-29, proof-cleanup W8/r3): ratchet DOWN, no ceiling raised. All 9 removals are in
+#   Soundness/ChipContracts.lean, which now carries ZERO — declared budget 12000000 -> 0. This closes
+#   the campaign's last large ceiling cluster. The sites: the five private *ChipData_of_eq lemmas
+#   (1000000 each) plus jalChip_assumptions (2000000), uTypeChip_assumptions (1000000),
+#   jalrChip_assumptions (2000000), branchChip_assumptions (2000000). Every one cleared 40000 against
+#   the plain 200000 default, i.e. >=5x headroom.
+#   MASKING WAS PRESENT AT THE CONTROL RUNG BUT COST NOTHING, and the batch explained why rather than
+#   asserting it: all 9 producers cascaded onto consumers at rung 1, yet every masked consumer is
+#   UNCEILINGED and no ceilinged site depends on another (the five *_of_eq privates feed unceilinged
+#   wrappers; the four *_assumptions feed unceilinged *_groundingContracts). Since the 40000 pass
+#   produced zero errors, nothing could be hidden.
+#   NO RE-LADDER NEEDED despite a -508-line golf of the same file: full-file elaboration went
+#   31.1s -> 30.9s (no regression), and no ceilings remain in the file to re-measure.
+SP1Clean 317
 SP1CleanTest 16
