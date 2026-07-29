@@ -185,9 +185,7 @@ lemma rv64_addw_eq (x y : BitVec 64) :
     RV64.addw x y = (BitVec.setWidth 32 (y + x)).signExtend 64 := by
   simp only [RV64.addw, BitVec.add_eq]
   congr 1
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.extractLsb'_toNat, BitVec.toNat_setWidth, Nat.shiftRight_zero]
-  omega
+  exact (BitVec.setWidth_add y x (by omega)).symm
 
 /-- Native ADDW-chip row. The reader blocks reuse the project substrate; only the arithmetic block is
 owned by the local Lean gadget (two witnessed low limbs + the composed sign-bit block).
@@ -644,9 +642,7 @@ private lemma high64_mul (b' c' : BitVec 129) (b'' c'' : BitVec 128)
     (hb : b'' = BitVec.setWidth 128 b') (hc : c'' = BitVec.setWidth 128 c') :
     BitVec.extractLsb 127 64 (b' * c') = ((b'' * c'') >>> 64).setWidth 64 := by
   have hmul : b'' * c'' = BitVec.setWidth 128 (b' * c') := by
-    rw [hb, hc]; apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.toNat_setWidth, BitVec.toNat_mul]
-    rw [Nat.mod_mod_of_dvd _ ⟨2, by ring⟩, ← Nat.mul_mod]
+    rw [hb, hc]; exact (BitVec.setWidth_mul b' c' (by omega)).symm
   rw [hmul]; generalize (b' * c') = P; bv_decide
 
 /-- `RV64.mul rs2 rs1 = rs1 * rs2` (commuted into the gadget's `b * c` form). -/
@@ -678,10 +674,7 @@ lemma rv64_mulw_eq (x y : BitVec 64) :
     RV64.mulw x y = ((y * x).setWidth 32).signExtend 64 := by
   simp only [RV64.mulw]
   congr 1
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_mul, BitVec.toNat_setWidth, BitVec.extractLsb, BitVec.extractLsb'_toNat,
-    Nat.shiftRight_zero, Nat.reduceAdd, Nat.reduceSub]
-  rw [Nat.mod_mod_of_dvd _ ⟨2 ^ 32, by norm_num⟩, ← Nat.mul_mod]
+  exact (BitVec.setWidth_mul y x (by omega)).symm
 
 /-- Semantic contract, composed from the sub-circuits' own `Spec`s (as `AddChip`). Four conjuncts: the
 `RTypeReader` reader sub-`Spec` on the `state`/`adapter` blocks (the register reads/write, gated by the
@@ -745,8 +738,7 @@ deriving ProvableStruct
       ({ is_real := Eval.eval env input.is_real,
          state := Eval.eval env input.state,
          adapter := Eval.eval env input.adapter } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- The `rs1` source = the register read on the `op_b` memory slot (`op_b_memory.prev_value`, the value the
 Memory bus pins). The `Spec` and Sail bridge state the RV64 identity on this **raw read**; this is correct even
