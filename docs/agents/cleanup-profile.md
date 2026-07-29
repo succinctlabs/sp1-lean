@@ -367,6 +367,19 @@ cast; if it passes at the default, the cast is the cost. Fix inside the proof bo
 `generalize` the cast away, then run the original tactic. This was `Model/SailWrap.lean`'s entire
 ceiling, and the lemma is tagged globally, so the hazard reaches every `simp` over that head symbol.
 
+**1d. `simp_all` under `circuit_proof_start` — and the one place the sibling screen mis-predicts.**
+A single `simp_all` closing a small goal against the *entire* post-`circuit_proof_start` context can own
+a whole file's budget. `DivRemOperation/Compare.soundness` spent 4M on one `simp_all` closing a
+four-case numeral goal; narrowing it to `rcases … <;> rw [hrcmGate, hz, hv] <;> simp` took the floor
+from (40000, 100000] — a keep-and-lower — down past 40000, making the site removable.
+
+> **This is the known false negative for the sibling screen.** The *byte-identical* `simp_all` block in
+> that file's `completeness` cleared the same rung, because that proof destructures less context. So
+> two sites with identical tactic text can have very different floors, and an unceilinged sibling
+> running the same tactic is **not** evidence the ceilinged one is vestigial. When the suspect tactic
+> is context-sensitive (`simp_all`, `omega` over a large hypothesis set, `aesop`), measure rather than
+> screen.
+
 **1c. LCNF-compiler-bound, not elaboration-bound — check *which phase* times out.** A budget can be
 spent on **code generation** rather than on proving. `Native/Operations/MulOperation/Defs.lean`'s
 `def main` elaborates fine at 40000; the failure is `(deterministic) timeout at «LCNF compiler»`,
