@@ -185,81 +185,57 @@ omit [Fact (2 ^ 17 < p)] in
 carries a non-canonical proof term. -/
 theorem wordByte_zero (word : Word (ZMod p)) (bound : Word.isU64 word) :
     (Word.toBitVec64 word).extractLsb' 0 8 =
-      BitVec.ofNat 8 word[0].val := by
-  have byte := wordBytes_zero word bound
-  change (Word.toBitVec64 word).extractLsb' 0 8 =
-    BitVec.ofNat 8 word[0].val at byte
-  exact byte
+      BitVec.ofNat 8 word[0].val :=
+  wordBytes_zero word bound
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Direct extraction form of `wordBytes_one`. -/
 theorem wordByte_one (word : Word (ZMod p)) (bound : Word.isU64 word) :
     (Word.toBitVec64 word).extractLsb' 8 8 =
-      BitVec.ofNat 8 (word[0].val >>> 8) := by
-  have byte := wordBytes_one word bound
-  change (Word.toBitVec64 word).extractLsb' 8 8 =
-    BitVec.ofNat 8 (word[0].val >>> 8) at byte
-  exact byte
+      BitVec.ofNat 8 (word[0].val >>> 8) :=
+  wordBytes_one word bound
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Direct extraction form of `wordBytes_two`. -/
 theorem wordByte_two (word : Word (ZMod p)) (bound : Word.isU64 word) :
     (Word.toBitVec64 word).extractLsb' 16 8 =
-      BitVec.ofNat 8 word[1].val := by
-  have byte := wordBytes_two word bound
-  change (Word.toBitVec64 word).extractLsb' 16 8 =
-    BitVec.ofNat 8 word[1].val at byte
-  exact byte
+      BitVec.ofNat 8 word[1].val :=
+  wordBytes_two word bound
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Direct extraction form of `wordBytes_three`. -/
 theorem wordByte_three (word : Word (ZMod p)) (bound : Word.isU64 word) :
     (Word.toBitVec64 word).extractLsb' 24 8 =
-      BitVec.ofNat 8 (word[1].val >>> 8) := by
-  have byte := wordBytes_three word bound
-  change (Word.toBitVec64 word).extractLsb' 24 8 =
-    BitVec.ofNat 8 (word[1].val >>> 8) at byte
-  exact byte
+      BitVec.ofNat 8 (word[1].val >>> 8) :=
+  wordBytes_three word bound
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Direct extraction form of `wordBytes_four`. -/
 theorem wordByte_four (word : Word (ZMod p)) (bound : Word.isU64 word) :
     (Word.toBitVec64 word).extractLsb' 32 8 =
-      BitVec.ofNat 8 word[2].val := by
-  have byte := wordBytes_four word bound
-  change (Word.toBitVec64 word).extractLsb' 32 8 =
-    BitVec.ofNat 8 word[2].val at byte
-  exact byte
+      BitVec.ofNat 8 word[2].val :=
+  wordBytes_four word bound
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Direct extraction form of `wordBytes_five`. -/
 theorem wordByte_five (word : Word (ZMod p)) (bound : Word.isU64 word) :
     (Word.toBitVec64 word).extractLsb' 40 8 =
-      BitVec.ofNat 8 (word[2].val >>> 8) := by
-  have byte := wordBytes_five word bound
-  change (Word.toBitVec64 word).extractLsb' 40 8 =
-    BitVec.ofNat 8 (word[2].val >>> 8) at byte
-  exact byte
+      BitVec.ofNat 8 (word[2].val >>> 8) :=
+  wordBytes_five word bound
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Direct extraction form of `wordBytes_six`. -/
 theorem wordByte_six (word : Word (ZMod p)) (bound : Word.isU64 word) :
     (Word.toBitVec64 word).extractLsb' 48 8 =
-      BitVec.ofNat 8 word[3].val := by
-  have byte := wordBytes_six word bound
-  change (Word.toBitVec64 word).extractLsb' 48 8 =
-    BitVec.ofNat 8 word[3].val at byte
-  exact byte
+      BitVec.ofNat 8 word[3].val :=
+  wordBytes_six word bound
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Direct extraction form of `wordBytes_seven`. -/
 theorem wordByte_seven (word : Word (ZMod p)) (bound : Word.isU64 word) :
     (Word.toBitVec64 word).extractLsb' 56 8 =
-      BitVec.ofNat 8 (word[3].val >>> 8) := by
-  have byte := wordBytes_seven word bound
-  change (Word.toBitVec64 word).extractLsb' 56 8 =
-    BitVec.ofNat 8 (word[3].val >>> 8) at byte
-  exact byte
+      BitVec.ofNat 8 (word[3].val >>> 8) :=
+  wordBytes_seven word bound
 
 /-- Splitting a 64-bit word into bytes and reassembling it is the identity. -/
 theorem cellBytesToWord_wordBytes (word : BitVec 64) :
@@ -273,46 +249,33 @@ theorem extractLsb_cellBytesToWord (bytes : Vector (BitVec 8) 8) (i : Fin 8) :
   fin_cases i <;> simp only [cellBytesToWord]
   · rw [BitVec.extractLsb'_append_eq_right]
     simp
-  · rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_right]
+  · rw [BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_right]
     simp
-  · rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_right]
+  · rw [BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_right]
     simp
-  · rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_right]
+  · rw [BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_right]
     simp
-  · rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_right]
+  · rw [BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_right]
     simp
-  · rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_right]
+  · rw [BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_right]
     simp
-  · rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_right]
+  · rw [BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_right]
     simp
-  · rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
-    rw [BitVec.extractLsb'_append_eq_of_le (by omega)]
+  · rw [BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_of_le (by omega),
+      BitVec.extractLsb'_append_eq_of_le (by omega), BitVec.extractLsb'_append_eq_of_le (by omega)]
     simp
 
 /-- Little-endian byte assembly loses no information. -/
@@ -404,8 +367,7 @@ theorem patchedCellBytes_zero_eight (old : BitVec 64)
   apply Vector.ext
   intro i hi
   let index : Fin 8 := ⟨i, hi⟩
-  change (patchedCellBytes old mw 0 8)[index] =
-    (wordBytes (Word.toBitVec64 mw.value))[index]
+  change (patchedCellBytes old mw 0 8)[index] = (wordBytes (Word.toBitVec64 mw.value))[index]
   interval_cases i <;> simp [index, patchedCellBytes, wordBytes]
 
 omit [Fact (2 ^ 17 < p)] in
@@ -427,78 +389,44 @@ theorem patchedCellBytes_zero_four
   apply Vector.ext
   intro i hi
   let index : Fin 8 := ⟨i, hi⟩
-  change
-    (patchedCellBytes (Word.toBitVec64 old)
-      ⟨address, stored, 4⟩ 0 4)[index] =
-        (wordBytes (Word.toBitVec64 new))[index]
+  change (patchedCellBytes (Word.toBitVec64 old) ⟨address, stored, 4⟩ 0 4)[index] =
+    (wordBytes (Word.toBitVec64 new))[index]
   interval_cases i
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_pos (by
-      change 0 ≤ 0 ∧ 0 < 0 + 4
-      omega)]
+    rw [patchedCellBytes_getElem, if_pos (by change 0 ≤ 0 ∧ 0 < 0 + 4; omega)]
     norm_num
-    change
-      (Word.toBitVec64 stored).extractLsb' 0 8 =
-        (Word.toBitVec64 new).extractLsb' 0 8
+    change (Word.toBitVec64 stored).extractLsb' 0 8 = (Word.toBitVec64 new).extractLsb' 0 8
     rw [wordByte_zero stored storedBound, wordByte_zero new newBound, new0]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_pos (by
-      change 0 ≤ 1 ∧ 1 < 0 + 4
-      omega)]
+    rw [patchedCellBytes_getElem, if_pos (by change 0 ≤ 1 ∧ 1 < 0 + 4; omega)]
     norm_num
-    change
-      (Word.toBitVec64 stored).extractLsb' 8 8 =
-        (Word.toBitVec64 new).extractLsb' 8 8
+    change (Word.toBitVec64 stored).extractLsb' 8 8 = (Word.toBitVec64 new).extractLsb' 8 8
     rw [wordByte_one stored storedBound, wordByte_one new newBound, new0]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_pos (by
-      change 0 ≤ 2 ∧ 2 < 0 + 4
-      omega)]
+    rw [patchedCellBytes_getElem, if_pos (by change 0 ≤ 2 ∧ 2 < 0 + 4; omega)]
     norm_num
-    change
-      (Word.toBitVec64 stored).extractLsb' 16 8 =
-        (Word.toBitVec64 new).extractLsb' 16 8
+    change (Word.toBitVec64 stored).extractLsb' 16 8 = (Word.toBitVec64 new).extractLsb' 16 8
     rw [wordByte_two stored storedBound, wordByte_two new newBound, new1]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_pos (by
-      change 0 ≤ 3 ∧ 3 < 0 + 4
-      omega)]
+    rw [patchedCellBytes_getElem, if_pos (by change 0 ≤ 3 ∧ 3 < 0 + 4; omega)]
     norm_num
-    change
-      (Word.toBitVec64 stored).extractLsb' 24 8 =
-        (Word.toBitVec64 new).extractLsb' 24 8
+    change (Word.toBitVec64 stored).extractLsb' 24 8 = (Word.toBitVec64 new).extractLsb' 24 8
     rw [wordByte_three stored storedBound, wordByte_three new newBound, new1]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_neg (by
-      change ¬(0 ≤ 4 ∧ 4 < 0 + 4)
-      omega)]
-    change
-      (Word.toBitVec64 old).extractLsb' 32 8 =
-        (Word.toBitVec64 new).extractLsb' 32 8
+    rw [patchedCellBytes_getElem, if_neg (by change ¬(0 ≤ 4 ∧ 4 < 0 + 4); omega)]
+    change (Word.toBitVec64 old).extractLsb' 32 8 = (Word.toBitVec64 new).extractLsb' 32 8
     rw [wordByte_four old oldBound, wordByte_four new newBound, new2]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_neg (by
-      change ¬(0 ≤ 5 ∧ 5 < 0 + 4)
-      omega)]
-    change
-      (Word.toBitVec64 old).extractLsb' 40 8 =
-        (Word.toBitVec64 new).extractLsb' 40 8
+    rw [patchedCellBytes_getElem, if_neg (by change ¬(0 ≤ 5 ∧ 5 < 0 + 4); omega)]
+    change (Word.toBitVec64 old).extractLsb' 40 8 = (Word.toBitVec64 new).extractLsb' 40 8
     rw [wordByte_five old oldBound, wordByte_five new newBound, new2]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_neg (by
-      change ¬(0 ≤ 6 ∧ 6 < 0 + 4)
-      omega)]
-    change
-      (Word.toBitVec64 old).extractLsb' 48 8 =
-        (Word.toBitVec64 new).extractLsb' 48 8
+    rw [patchedCellBytes_getElem, if_neg (by change ¬(0 ≤ 6 ∧ 6 < 0 + 4); omega)]
+    change (Word.toBitVec64 old).extractLsb' 48 8 = (Word.toBitVec64 new).extractLsb' 48 8
     rw [wordByte_six old oldBound, wordByte_six new newBound, new3]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_neg (by
-      change ¬(0 ≤ 7 ∧ 7 < 0 + 4)
-      omega)]
-    change
-      (Word.toBitVec64 old).extractLsb' 56 8 =
-        (Word.toBitVec64 new).extractLsb' 56 8
+    rw [patchedCellBytes_getElem, if_neg (by change ¬(0 ≤ 7 ∧ 7 < 0 + 4); omega)]
+    change (Word.toBitVec64 old).extractLsb' 56 8 = (Word.toBitVec64 new).extractLsb' 56 8
     rw [wordByte_seven old oldBound, wordByte_seven new newBound, new3]
 
 omit [Fact (2 ^ 17 < p)] in
@@ -520,78 +448,44 @@ theorem patchedCellBytes_four_four
   apply Vector.ext
   intro i hi
   let index : Fin 8 := ⟨i, hi⟩
-  change
-    (patchedCellBytes (Word.toBitVec64 old)
-      ⟨address, stored, 4⟩ 4 4)[index] =
-        (wordBytes (Word.toBitVec64 new))[index]
+  change (patchedCellBytes (Word.toBitVec64 old) ⟨address, stored, 4⟩ 4 4)[index] =
+    (wordBytes (Word.toBitVec64 new))[index]
   interval_cases i
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_neg (by
-      change ¬(4 ≤ 0 ∧ 0 < 4 + 4)
-      omega)]
-    change
-      (Word.toBitVec64 old).extractLsb' 0 8 =
-        (Word.toBitVec64 new).extractLsb' 0 8
+    rw [patchedCellBytes_getElem, if_neg (by change ¬(4 ≤ 0 ∧ 0 < 4 + 4); omega)]
+    change (Word.toBitVec64 old).extractLsb' 0 8 = (Word.toBitVec64 new).extractLsb' 0 8
     rw [wordByte_zero old oldBound, wordByte_zero new newBound, new0]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_neg (by
-      change ¬(4 ≤ 1 ∧ 1 < 4 + 4)
-      omega)]
-    change
-      (Word.toBitVec64 old).extractLsb' 8 8 =
-        (Word.toBitVec64 new).extractLsb' 8 8
+    rw [patchedCellBytes_getElem, if_neg (by change ¬(4 ≤ 1 ∧ 1 < 4 + 4); omega)]
+    change (Word.toBitVec64 old).extractLsb' 8 8 = (Word.toBitVec64 new).extractLsb' 8 8
     rw [wordByte_one old oldBound, wordByte_one new newBound, new0]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_neg (by
-      change ¬(4 ≤ 2 ∧ 2 < 4 + 4)
-      omega)]
-    change
-      (Word.toBitVec64 old).extractLsb' 16 8 =
-        (Word.toBitVec64 new).extractLsb' 16 8
+    rw [patchedCellBytes_getElem, if_neg (by change ¬(4 ≤ 2 ∧ 2 < 4 + 4); omega)]
+    change (Word.toBitVec64 old).extractLsb' 16 8 = (Word.toBitVec64 new).extractLsb' 16 8
     rw [wordByte_two old oldBound, wordByte_two new newBound, new1]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_neg (by
-      change ¬(4 ≤ 3 ∧ 3 < 4 + 4)
-      omega)]
-    change
-      (Word.toBitVec64 old).extractLsb' 24 8 =
-        (Word.toBitVec64 new).extractLsb' 24 8
+    rw [patchedCellBytes_getElem, if_neg (by change ¬(4 ≤ 3 ∧ 3 < 4 + 4); omega)]
+    change (Word.toBitVec64 old).extractLsb' 24 8 = (Word.toBitVec64 new).extractLsb' 24 8
     rw [wordByte_three old oldBound, wordByte_three new newBound, new1]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_pos (by
-      change 4 ≤ 4 ∧ 4 < 4 + 4
-      omega)]
+    rw [patchedCellBytes_getElem, if_pos (by change 4 ≤ 4 ∧ 4 < 4 + 4; omega)]
     norm_num
-    change
-      (Word.toBitVec64 stored).extractLsb' 0 8 =
-        (Word.toBitVec64 new).extractLsb' 32 8
+    change (Word.toBitVec64 stored).extractLsb' 0 8 = (Word.toBitVec64 new).extractLsb' 32 8
     rw [wordByte_zero stored storedBound, wordByte_four new newBound, new2]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_pos (by
-      change 4 ≤ 5 ∧ 5 < 4 + 4
-      omega)]
+    rw [patchedCellBytes_getElem, if_pos (by change 4 ≤ 5 ∧ 5 < 4 + 4; omega)]
     norm_num
-    change
-      (Word.toBitVec64 stored).extractLsb' 8 8 =
-        (Word.toBitVec64 new).extractLsb' 40 8
+    change (Word.toBitVec64 stored).extractLsb' 8 8 = (Word.toBitVec64 new).extractLsb' 40 8
     rw [wordByte_one stored storedBound, wordByte_five new newBound, new2]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_pos (by
-      change 4 ≤ 6 ∧ 6 < 4 + 4
-      omega)]
+    rw [patchedCellBytes_getElem, if_pos (by change 4 ≤ 6 ∧ 6 < 4 + 4; omega)]
     norm_num
-    change
-      (Word.toBitVec64 stored).extractLsb' 16 8 =
-        (Word.toBitVec64 new).extractLsb' 48 8
+    change (Word.toBitVec64 stored).extractLsb' 16 8 = (Word.toBitVec64 new).extractLsb' 48 8
     rw [wordByte_two stored storedBound, wordByte_six new newBound, new3]
   · dsimp only [index]
-    rw [patchedCellBytes_getElem, if_pos (by
-      change 4 ≤ 7 ∧ 7 < 4 + 4
-      omega)]
+    rw [patchedCellBytes_getElem, if_pos (by change 4 ≤ 7 ∧ 7 < 4 + 4; omega)]
     norm_num
-    change
-      (Word.toBitVec64 stored).extractLsb' 24 8 =
-        (Word.toBitVec64 new).extractLsb' 56 8
+    change (Word.toBitVec64 stored).extractLsb' 24 8 = (Word.toBitVec64 new).extractLsb' 56 8
     rw [wordByte_three stored storedBound, wordByte_seven new newBound, new3]
 
 omit [Fact (2 ^ 17 < p)] in
@@ -618,10 +512,8 @@ theorem patchedCellBytes_two
   apply Vector.ext
   intro i hi
   let index : Fin 8 := ⟨i, hi⟩
-  change
-    (patchedCellBytes (Word.toBitVec64 old)
-      ⟨address, stored, 2⟩ (2 * selected.val) 2)[index] =
-        (wordBytes (Word.toBitVec64 new))[index]
+  change (patchedCellBytes (Word.toBitVec64 old) ⟨address, stored, 2⟩ (2 * selected.val) 2)[index]
+    = (wordBytes (Word.toBitVec64 new))[index]
   fin_cases selected <;> interval_cases i <;>
     simp [index, patchedCellBytes, wordBytes] at new0 new1 new2 new3 ⊢
   all_goals
@@ -828,10 +720,8 @@ theorem patchedCellBytes_one
   apply Vector.ext
   intro i hi
   let index : Fin 8 := ⟨i, hi⟩
-  change
-    (patchedCellBytes (Word.toBitVec64 old)
-      ⟨address, stored, 1⟩ selected.val 1)[index] =
-        (wordBytes (Word.toBitVec64 new))[index]
+  change (patchedCellBytes (Word.toBitVec64 old) ⟨address, stored, 1⟩ selected.val 1)[index] =
+    (wordBytes (Word.toBitVec64 new))[index]
   rw [newBytes index, patchedCellBytes_getElem]
   by_cases selectedEq : index = selected
   · subst selected
@@ -865,16 +755,14 @@ theorem ramCellUpdate_of_patchedCell
     (newEq : new = cellBytesToWord (patchedCellBytes old mw offset width)) :
     RamCellUpdate mw cell old new := by
   intro bytes assembled
-  rw [eq_wordBytes_of_cellBytesToWord_eq assembled]
-  rw [newEq]
+  rw [eq_wordBytes_of_cellBytesToWord_eq assembled, newEq]
   apply congrArg cellBytesToWord
   apply Vector.ext
   intro i hi
   let index : Fin 8 := ⟨i, hi⟩
   change (updatedCellBytes mw cell (wordBytes old))[index] =
     (patchedCellBytes old mw offset width)[index]
-  rw [updatedCellBytes_getElem]
-  rw [patchedCellBytes_getElem]
+  rw [updatedCellBytes_getElem, patchedCellBytes_getElem]
   by_cases covered : offset ≤ index.val ∧ index.val < offset + width
   · rw [if_pos covered, if_pos]
     · unfold Trace.MemWrite.byteAt
@@ -927,24 +815,15 @@ theorem locContent_ram_congr_cell {state state' : SailState} (cell : RamCell)
       state'.mem.get? (cell.baseAddr.toNat + i.val) =
         state.mem.get? (cell.baseAddr.toNat + i.val)) :
     locContent state' (MemLoc.ram cell) = locContent state (MemLoc.ram cell) := by
+  -- `frameAt` re-indexes `frame` by a raw `ℕ`, so the eight `rw`s below match the literal offsets
+  -- that `ramWord64?` reads (a `Fin` numeral's `.val` does not reduce at `rw`'s transparency).
+  have frameAt : ∀ (k : ℕ), k < 8 → state'.mem.get? (cell.baseAddr.toNat + k) =
+      state.mem.get? (cell.baseAddr.toNat + k) := fun k hk => frame ⟨k, hk⟩
   have frame0 : state'.mem.get? cell.baseAddr.toNat =
-      state.mem.get? cell.baseAddr.toNat := by simpa using frame 0
-  have frame1 : state'.mem.get? (cell.baseAddr.toNat + 1) =
-      state.mem.get? (cell.baseAddr.toNat + 1) := frame 1
-  have frame2 : state'.mem.get? (cell.baseAddr.toNat + 2) =
-      state.mem.get? (cell.baseAddr.toNat + 2) := frame 2
-  have frame3 : state'.mem.get? (cell.baseAddr.toNat + 3) =
-      state.mem.get? (cell.baseAddr.toNat + 3) := frame 3
-  have frame4 : state'.mem.get? (cell.baseAddr.toNat + 4) =
-      state.mem.get? (cell.baseAddr.toNat + 4) := frame 4
-  have frame5 : state'.mem.get? (cell.baseAddr.toNat + 5) =
-      state.mem.get? (cell.baseAddr.toNat + 5) := frame 5
-  have frame6 : state'.mem.get? (cell.baseAddr.toNat + 6) =
-      state.mem.get? (cell.baseAddr.toNat + 6) := frame 6
-  have frame7 : state'.mem.get? (cell.baseAddr.toNat + 7) =
-      state.mem.get? (cell.baseAddr.toNat + 7) := frame 7
+      state.mem.get? cell.baseAddr.toNat := by simpa using frameAt 0 (by omega)
   simp only [locContent, ramWord64?]
-  rw [frame0, frame1, frame2, frame3, frame4, frame5, frame6, frame7]
+  rw [frame0, frameAt 1 (by omega), frameAt 2 (by omega), frameAt 3 (by omega),
+    frameAt 4 (by omega), frameAt 5 (by omega), frameAt 6 (by omega), frameAt 7 (by omega)]
 
 /-- Reading a complete RAM word exposes its eight constituent bytes. -/
 theorem cellBytes_of_ramWord64?_eq_some {state : SailState} {cell : RamCell}
@@ -1025,25 +904,15 @@ theorem ramCellPost_of_update
     · rw [(effect.mem.2 mw commit).2 _ covered]
       exact byteRead i
   have assembled' := update bytes assembled
+  -- Re-indexed by a raw `ℕ` so the eight `rw`s match the literal offsets `ramWord64?` reads.
+  have byteWriteAt : ∀ (k : ℕ) (hk : k < 8), state'.mem.get? (cell.baseAddr.toNat + k) =
+      some (updatedCellBytes mw cell bytes)[k] := fun k hk => byteWrite ⟨k, hk⟩
   have byteWrite0 : state'.mem.get? cell.baseAddr.toNat =
-      some (updatedCellBytes mw cell bytes)[0] := by simpa using byteWrite 0
-  have byteWrite1 : state'.mem.get? (cell.baseAddr.toNat + 1) =
-      some (updatedCellBytes mw cell bytes)[1] := byteWrite 1
-  have byteWrite2 : state'.mem.get? (cell.baseAddr.toNat + 2) =
-      some (updatedCellBytes mw cell bytes)[2] := byteWrite 2
-  have byteWrite3 : state'.mem.get? (cell.baseAddr.toNat + 3) =
-      some (updatedCellBytes mw cell bytes)[3] := byteWrite 3
-  have byteWrite4 : state'.mem.get? (cell.baseAddr.toNat + 4) =
-      some (updatedCellBytes mw cell bytes)[4] := byteWrite 4
-  have byteWrite5 : state'.mem.get? (cell.baseAddr.toNat + 5) =
-      some (updatedCellBytes mw cell bytes)[5] := byteWrite 5
-  have byteWrite6 : state'.mem.get? (cell.baseAddr.toNat + 6) =
-      some (updatedCellBytes mw cell bytes)[6] := byteWrite 6
-  have byteWrite7 : state'.mem.get? (cell.baseAddr.toNat + 7) =
-      some (updatedCellBytes mw cell bytes)[7] := byteWrite 7
+      some (updatedCellBytes mw cell bytes)[0] := by simpa using byteWriteAt 0 (by omega)
   simp only [locContent, ramWord64?]
-  rw [byteWrite0, byteWrite1, byteWrite2, byteWrite3,
-    byteWrite4, byteWrite5, byteWrite6, byteWrite7]
+  rw [byteWrite0, byteWriteAt 1 (by omega), byteWriteAt 2 (by omega), byteWriteAt 3 (by omega),
+    byteWriteAt 4 (by omega), byteWriteAt 5 (by omega), byteWriteAt 6 (by omega),
+    byteWriteAt 7 (by omega)]
   exact congrArg some assembled'
 
 /-- Assemble the `RowWiring.ram_frame` obligation for a store.  The written cell uses the

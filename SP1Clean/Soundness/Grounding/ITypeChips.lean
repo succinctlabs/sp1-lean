@@ -142,6 +142,23 @@ theorem producedMemoryMessages_eq_of_itypeShape {chip : SupportedChip p}
   rw [real]
   exact producedMessages_itypeFour _ _ _ _
 
+omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
+/-- A register index below 32 round-trips through its canonical five-bit encoding. -/
+private theorem itypeRegisterIndexCast (x : ZMod p) (bound : x.val < 32) :
+    ((BitVec.ofNat 5 x.val).toNat : ZMod p) = x := by
+  rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show x.val < 2 ^ 5 by omega)]
+  exact ZMod.natCast_zmod_val _
+
+/-- Split a membership hypothesis against an exact two-element pull/push list.  The `rfl` patterns
+are built with `mkIdent`: a quotation-local `rfl` is renamed by hygiene and then binds a *name*
+instead of substituting. -/
+local macro "twoElementCases " h:ident ", " listEq:term : tactic => do
+  let rfl' := Lean.mkIdent `rfl
+  `(tactic| (
+    rw [$listEq:term] at $h:ident
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at $h:ident
+    rcases $h:ident with $rfl':ident | $rfl':ident))
+
 /-- Wiring for the canonical I-type register window. -/
 theorem rowWiring_itype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFacts p}
     (bounds : ViewClockBounds view)
@@ -167,9 +184,7 @@ theorem rowWiring_itype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFacts
     exact timeNat_statePushOfView_eight bounds
   readTime := by
     intro mp hmp
-    rw [pulls_eq] at hmp
-    simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
-    rcases hmp with rfl | rfl <;> rfl
+    twoElementCases hmp, pulls_eq <;> rfl
   opA_pull := by
     intro index indexEq
     refine ⟨(rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory,
@@ -196,9 +211,7 @@ theorem rowWiring_itype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFacts
     · exact MemoryMsg.locOf_register _ index indexEq rfl rfl
   push_classified := by
     intro message hmessage
-    rw [pushes_eq] at hmessage
-    simp only [List.mem_cons, List.not_mem_nil, or_false] at hmessage
-    rcases hmessage with rfl | rfl
+    twoElementCases hmessage, pushes_eq
     · left
       refine ⟨(rtypePriorMessage view view.adapter.op_b[0] view.adapter.op_b_memory,
         StateMsg.timeNat rf.statePull), ?_, rfl, rfl, ?_, ?_, ?_⟩
@@ -214,20 +227,14 @@ theorem rowWiring_itype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFacts
         rw [commit_eq]
         rfl
     · refine Or.inr (Or.inl ?_)
-      have hidx : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
-          view.adapter.op_a := by
-        rw [BitVec.toNat_ofNat,
-          Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
-        exact ZMod.natCast_zmod_val _
+      have hidx := itypeRegisterIndexCast _ opa_lt
       refine ⟨by rw [commit_eq]; rfl, write_isU64, ?_, rfl, ?_⟩
       · exact ⟨BitVec.ofNat 5 view.adapter.op_a.val,
           MemoryMsg.locOf_register _ _ hidx rfl rfl, hidx⟩
       · rw [timeNat_rtypeWriteMessage bounds, ← statePull_eq]
   push_clkBound := by
     intro message hmessage
-    rw [pushes_eq] at hmessage
-    simp only [List.mem_cons, List.not_mem_nil, or_false] at hmessage
-    rcases hmessage with rfl | rfl
+    twoElementCases hmessage, pushes_eq
     · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 3 val_3_zmod_p
         (by omega) bounds.clk0 bounds.clk1
     · exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 4 val_4_zmod_p
@@ -274,16 +281,8 @@ theorem rowAligned_itype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
       (∀ tc ∈ itypeTouches view rf,
         SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
           MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
-  have hidxA : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
-      view.adapter.op_a := by
-    rw [BitVec.toNat_ofNat,
-      Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
-    exact ZMod.natCast_zmod_val _
-  have hidxB : ((BitVec.ofNat 5 view.adapter.op_b[0].val).toNat : ZMod p) =
-      view.adapter.op_b[0] := by
-    rw [BitVec.toNat_ofNat,
-      Nat.mod_eq_of_lt (show view.adapter.op_b[0].val < 2 ^ 5 by omega)]
-    exact ZMod.natCast_zmod_val _
+  have hidxA := itypeRegisterIndexCast _ opa_lt
+  have hidxB := itypeRegisterIndexCast _ opb_lt
   have hlocPriorA : MemoryMsg.locOf
       (rtypePriorMessage view view.adapter.op_a view.adapter.op_a_memory) =
       MemLoc.reg (BitVec.ofNat 5 view.adapter.op_a.val) :=
@@ -317,19 +316,13 @@ theorem rowAligned_itype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
       simp only [itypeTouches, List.map_cons, List.map_nil]
       exact List.Perm.swap _ _ []
     · intro mp hmp
-      rw [pulls_eq] at hmp
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
-      rcases hmp with rfl | rfl
+      twoElementCases hmp, pulls_eq
       · exact ⟨_, hlocPriorA⟩
       · exact ⟨_, hlocPriorB⟩
     · intro mp hmp
-      rw [pulls_eq] at hmp
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
-      rcases hmp with rfl | rfl <;> rfl
+      twoElementCases hmp, pulls_eq <;> rfl
     · intro mp hmp
-      rw [pulls_eq] at hmp
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmp
-      rcases hmp with rfl | rfl
+      twoElementCases hmp, pulls_eq
       · exact ⟨_, List.mem_cons_of_mem _ List.mem_cons_self, rfl,
           by dsimp only; omega, by dsimp only; omega⟩
       · exact ⟨_, List.mem_cons_self, rfl,

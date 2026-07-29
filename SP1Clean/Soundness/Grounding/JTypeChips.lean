@@ -24,6 +24,32 @@ open SP1Clean.Channels (StateMsg MemoryMsg memoryChannel byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- The scalar row-view projections of a J-type chip: cross the completed component's `rowOutput`
+by the symbolic `circuit.output` spelling, then read the projection off the chip's own `rowView`.
+The caller's environment binder is referenced by name (`env`). -/
+local macro "jtypeViewProjection " inputs:term ", " circuit:term ", " viewOf:term ", "
+    rowView:term : tactic => do
+  let env := Lean.mkIdent `env
+  `(tactic| (
+    let input : Var $inputs (ZMod p) := varFromOffset $inputs 0
+    let offset := size $inputs
+    have outputEq : Eval.eval $env (($circuit (p := p)).output input offset) =
+        (⟨$circuit (p := p)⟩ : Component (ZMod p)).rowOutput $env := by
+      simp only [Component.rowOutput, input, offset, circuit_norm]
+    simp only [$viewOf:term, $rowView:term]
+    rw [← outputEq]
+    simp only [input, offset, $circuit:term, circuit_norm]))
+
+/-- Discharge a descriptor-indexed shape field that holds by structural reduction at the concrete
+chip's decoded row. -/
+local macro "descriptorRfl " desc:term : tactic =>
+  `(tactic| (
+    intro decoded data hchip
+    obtain ⟨chip, physical⟩ := decoded
+    have descriptorEq : chip = $desc := hchip
+    subst descriptorEq
+    rfl))
+
 section Shape
 
 variable [Fact (2 ^ 25 < p)]
@@ -541,28 +567,14 @@ omit [Fact (2 ^ 25 < p)] in
 theorem jalViewOf_state (env : Environment (ZMod p)) :
     (jalViewOf env).state =
       (Eval.eval env (varFromOffset (F := ZMod p) JalChip.Inputs 0)).state := by
-  let input : Var JalChip.Inputs (ZMod p) := varFromOffset JalChip.Inputs 0
-  let offset := size JalChip.Inputs
-  have outputEq : Eval.eval env ((JalChip.circuit (p := p)).output input offset) =
-      (⟨JalChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, input, offset, circuit_norm]
-  simp only [jalViewOf, JalChip.rowView]
-  rw [← outputEq]
-  simp only [input, offset, JalChip.circuit, circuit_norm]
+  jtypeViewProjection JalChip.Inputs, JalChip.circuit, jalViewOf, JalChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem jalViewOf_adapter (env : Environment (ZMod p)) :
     (jalViewOf env).adapter =
       (Eval.eval env
         (varFromOffset (F := ZMod p) JalChip.Inputs 0)).adapter.toAdapterView := by
-  let input : Var JalChip.Inputs (ZMod p) := varFromOffset JalChip.Inputs 0
-  let offset := size JalChip.Inputs
-  have outputEq : Eval.eval env ((JalChip.circuit (p := p)).output input offset) =
-      (⟨JalChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, input, offset, circuit_norm]
-  simp only [jalViewOf, JalChip.rowView]
-  rw [← outputEq]
-  simp only [input, offset, JalChip.circuit, circuit_norm]
+  jtypeViewProjection JalChip.Inputs, JalChip.circuit, jalViewOf, JalChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem jalViewOf_isReal (env : Environment (ZMod p)) :
@@ -579,14 +591,7 @@ theorem jalViewOf_rdWrite (env : Environment (ZMod p)) :
     (jalViewOf env).rdWrite =
       Eval.eval env ((Vector.mapRange 4 fun i =>
         var { index := size JalChip.Inputs + 4 + i }) : Word (Expression (ZMod p))) := by
-  let input : Var JalChip.Inputs (ZMod p) := varFromOffset JalChip.Inputs 0
-  let offset := size JalChip.Inputs
-  have outputEq : Eval.eval env ((JalChip.circuit (p := p)).output input offset) =
-      (⟨JalChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, input, offset, circuit_norm]
-  simp only [jalViewOf, JalChip.rowView]
-  rw [← outputEq]
-  simp only [input, offset, JalChip.circuit, circuit_norm]
+  jtypeViewProjection JalChip.Inputs, JalChip.circuit, jalViewOf, JalChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 /-- JAL's completed exposed Memory list evaluates to the canonical J-type pair. -/
@@ -623,18 +628,8 @@ theorem jalChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p)
 theorem jalChip_jtypeMemoryInteractionShape :
     JTypeMemoryInteractionShape (jalChipDescriptor (p := p)) where
   interactions := jalChip_typedMemoryInteractions_eq
-  imm_b_eq_one := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = jalChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_c_eq_one := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = jalChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  imm_b_eq_one := by descriptorRfl jalChipDescriptor (p := p)
+  imm_c_eq_one := by descriptorRfl jalChipDescriptor (p := p)
 
 /-- The exact J-type reader input retained after JAL's two four-limb witness vectors. -/
 def jalChipJTypeInput (input : Var JalChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -730,9 +725,8 @@ theorem uTypeChipDescriptor_assumptions_iff (data : ProverData (ZMod p))
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
 private theorem uTypeEqualityConstraint_mem (x y : Expression (ZMod p)) (offset : ℕ) :
-    x - y ∈ ((Gadgets.Equality.main (M := field) (x, y)).operations offset).constraints := by
-  simp [Gadgets.Equality.main, Circuit.forEach.operations_eq, circuit_norm]
-  rfl
+    x - y ∈ ((Gadgets.Equality.main (M := field) (x, y)).operations offset).constraints :=
+  jalEqualityConstraint_mem x y offset
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
 /-- The two canonical bit-vector presentations of a U-type immediate agree: sign-extend then shift
@@ -804,28 +798,14 @@ omit [Fact (2 ^ 25 < p)] in
 theorem uTypeViewOf_state (env : Environment (ZMod p)) :
     (uTypeViewOf env).state =
       (Eval.eval env (varFromOffset (F := ZMod p) UTypeChip.Inputs 0)).state := by
-  let input : Var UTypeChip.Inputs (ZMod p) := varFromOffset UTypeChip.Inputs 0
-  let offset := size UTypeChip.Inputs
-  have outputEq : Eval.eval env ((UTypeChip.circuit (p := p)).output input offset) =
-      (⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, input, offset, circuit_norm]
-  simp only [uTypeViewOf, UTypeChip.rowView]
-  rw [← outputEq]
-  simp only [input, offset, UTypeChip.circuit, circuit_norm]
+  jtypeViewProjection UTypeChip.Inputs, UTypeChip.circuit, uTypeViewOf, UTypeChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem uTypeViewOf_adapter (env : Environment (ZMod p)) :
     (uTypeViewOf env).adapter =
       (Eval.eval env
         (varFromOffset (F := ZMod p) UTypeChip.Inputs 0)).adapter.toAdapterView := by
-  let input : Var UTypeChip.Inputs (ZMod p) := varFromOffset UTypeChip.Inputs 0
-  let offset := size UTypeChip.Inputs
-  have outputEq : Eval.eval env ((UTypeChip.circuit (p := p)).output input offset) =
-      (⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, input, offset, circuit_norm]
-  simp only [uTypeViewOf, UTypeChip.rowView]
-  rw [← outputEq]
-  simp only [input, offset, UTypeChip.circuit, circuit_norm]
+  jtypeViewProjection UTypeChip.Inputs, UTypeChip.circuit, uTypeViewOf, UTypeChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 theorem uTypeViewOf_isReal (env : Environment (ZMod p)) :
@@ -842,14 +822,7 @@ theorem uTypeViewOf_rdWrite (env : Environment (ZMod p)) :
     (uTypeViewOf env).rdWrite =
       Eval.eval env ((Vector.mapRange 4 fun i =>
         var { index := size UTypeChip.Inputs + 3 + i }) : Word (Expression (ZMod p))) := by
-  let input : Var UTypeChip.Inputs (ZMod p) := varFromOffset UTypeChip.Inputs 0
-  let offset := size UTypeChip.Inputs
-  have outputEq : Eval.eval env ((UTypeChip.circuit (p := p)).output input offset) =
-      (⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env := by
-    simp only [Component.rowOutput, input, offset, circuit_norm]
-  simp only [uTypeViewOf, UTypeChip.rowView]
-  rw [← outputEq]
-  simp only [input, offset, UTypeChip.circuit, circuit_norm]
+  jtypeViewProjection UTypeChip.Inputs, UTypeChip.circuit, uTypeViewOf, UTypeChip.rowView
 
 omit [Fact (2 ^ 25 < p)] in
 /-- U-type's completed exposed Memory list evaluates to the canonical J-type pair. -/
@@ -886,18 +859,8 @@ theorem uTypeChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p)
 theorem uTypeChip_jtypeMemoryInteractionShape :
     JTypeMemoryInteractionShape (uTypeChipDescriptor (p := p)) where
   interactions := uTypeChip_typedMemoryInteractions_eq
-  imm_b_eq_one := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = uTypeChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
-  imm_c_eq_one := by
-    intro decoded data hchip
-    obtain ⟨chip, physical⟩ := decoded
-    have hchip' : chip = uTypeChipDescriptor (p := p) := hchip
-    subst hchip'
-    rfl
+  imm_b_eq_one := by descriptorRfl uTypeChipDescriptor (p := p)
+  imm_c_eq_one := by descriptorRfl uTypeChipDescriptor (p := p)
 
 /-- The exact J-type reader input retained after U-type's seven witness cells. -/
 def uTypeChipJTypeInput (input : Var UTypeChip.Inputs (ZMod p)) (offset : ℕ) :

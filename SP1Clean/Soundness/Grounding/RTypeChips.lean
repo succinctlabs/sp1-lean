@@ -17,6 +17,38 @@ open SP1Clean.Channels (memoryChannel byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- Substitute a decoded row's descriptor and discharge one Byte-guarantee contract at the exposed
+row.  This removes only the constructor/substitution preamble that every per-chip lemma below
+repeats; each expansion still proves that concrete chip's own obligation.  The caller's binders are
+referenced by name (`decoded`, `data`, `hchip`, `guarantees`, `real`), so the macro is usable only
+at a lemma with exactly that signature — a mismatch is a loud `unknown identifier`. -/
+local macro "byteGuaranteeContract " desc:term ", " closer:term : tactic => do
+  let decoded := Lean.mkIdent `decoded
+  let data := Lean.mkIdent `data
+  let hchip := Lean.mkIdent `hchip
+  let guarantees := Lean.mkIdent `guarantees
+  let real := Lean.mkIdent `real
+  `(tactic| (
+    obtain ⟨chip, physical⟩ := $decoded
+    have descriptorEq : chip = $desc := $hchip
+    subst descriptorEq
+    exact $closer $data physical $guarantees $real))
+
+/-- Lift a chip's evaluated Memory interaction list to the typed decoded-row boundary. -/
+local macro "typedMemoryLift " desc:term ", " decodeRow:term ", " table:term ", "
+    valuesEq:term : tactic => do
+  let decoded := Lean.mkIdent `decoded
+  let data := Lean.mkIdent `data
+  let hchip := Lean.mkIdent `hchip
+  `(tactic| (
+    obtain ⟨chip, physical⟩ := $decoded
+    have descriptorEq : chip = $desc := $hchip
+    subst descriptorEq
+    apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
+    rw [DecodedInstructionRow.interactionsWith_raw]
+    simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
+      $decodeRow:term, $table:term] using $valuesEq (Environment.fromArray physical $data)))
+
 section Subw
 
 variable [Fact (2 ^ 25 < p)]
@@ -79,14 +111,8 @@ theorem subwChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p)
     (data : ProverData (ZMod p)) (hchip : decoded.chip = subwChipDescriptor (p := p)) :
     decoded.interactionsWith data memoryChannel =
       rtypeMemoryInteractions (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = subwChipDescriptor (p := p) := hchip
-  subst hchip'
-  apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
-  rw [DecodedInstructionRow.interactionsWith_raw]
-  simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
-    subwViewOf_decodeRow, subwChipDescriptor_table] using
-    subwChip_memoryInteractionValues_eq (Environment.fromArray physical data)
+  typedMemoryLift subwChipDescriptor (p := p), subwViewOf_decodeRow, subwChipDescriptor_table,
+    subwChip_memoryInteractionValues_eq
 
 /-- SUBW instantiates the common R-type interaction shape. -/
 theorem subwChip_rtypeMemoryInteractionShape :
@@ -126,11 +152,9 @@ theorem subwChip_viewClockBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = subwChipDescriptor (p := p) := hchip
-  subst hchip'
-  exact viewClockBounds_of_cpuStateContract (SubwChip.circuit (p := p)) SubwChip.rowView
-    SubwChip.cpuStateTimeContract data physical guarantees real
+  byteGuaranteeContract subwChipDescriptor (p := p),
+    viewClockBounds_of_cpuStateContract (SubwChip.circuit (p := p)) SubwChip.rowView
+      SubwChip.cpuStateTimeContract
 
 /-- Finished Byte guarantees supply SUBW's three register timestamp decompositions. -/
 theorem subwChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
@@ -139,11 +163,9 @@ theorem subwChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     RTypeTimestampBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = subwChipDescriptor (p := p) := hchip
-  subst hchip'
-  exact rtypeTimestampBounds_of_contract SubwChip.circuit SubwChip.rowView
-    SubwChip.rtypeTimestampContract data physical guarantees real
+  byteGuaranteeContract subwChipDescriptor (p := p),
+    rtypeTimestampBounds_of_contract SubwChip.circuit SubwChip.rowView
+      SubwChip.rtypeTimestampContract
 
 end Subw
 
@@ -220,14 +242,8 @@ theorem mulChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p)
     (data : ProverData (ZMod p)) (hchip : decoded.chip = mulChipDescriptor (p := p)) :
     decoded.interactionsWith data memoryChannel =
       rtypeMemoryInteractions (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = mulChipDescriptor (p := p) := hchip
-  subst hchip'
-  apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
-  rw [DecodedInstructionRow.interactionsWith_raw]
-  simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
-    mulViewOf_decodeRow, mulChipDescriptor_table] using
-    mulChip_memoryInteractionValues_eq (Environment.fromArray physical data)
+  typedMemoryLift mulChipDescriptor (p := p), mulViewOf_decodeRow, mulChipDescriptor_table,
+    mulChip_memoryInteractionValues_eq
 
 theorem mulChip_rtypeMemoryInteractionShape :
     RTypeMemoryInteractionShape (mulChipDescriptor (p := p)) :=
@@ -253,11 +269,9 @@ theorem mulChip_viewClockBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = mulChipDescriptor (p := p) := hchip
-  subst hchip'
-  exact viewClockBounds_of_cpuStateContract (MulChip.circuit (p := p)) MulChip.rowView
-    MulChip.cpuStateTimeContract data physical guarantees real
+  byteGuaranteeContract mulChipDescriptor (p := p),
+    viewClockBounds_of_cpuStateContract (MulChip.circuit (p := p)) MulChip.rowView
+      MulChip.cpuStateTimeContract
 
 theorem mulChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
     (data : ProverData (ZMod p)) (hchip : decoded.chip = mulChipDescriptor (p := p))
@@ -265,11 +279,9 @@ theorem mulChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     RTypeTimestampBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = mulChipDescriptor (p := p) := hchip
-  subst hchip'
-  exact rtypeTimestampBounds_of_contract MulChip.circuit MulChip.rowView
-    MulChip.rtypeTimestampContract data physical guarantees real
+  byteGuaranteeContract mulChipDescriptor (p := p),
+    rtypeTimestampBounds_of_contract MulChip.circuit MulChip.rowView
+      MulChip.rtypeTimestampContract
 
 end Mul
 
@@ -384,18 +396,34 @@ theorem divRemChip_typedMemoryInteractions_eq (decoded : DecodedInstructionRow p
     (data : ProverData (ZMod p)) (hchip : decoded.chip = divRemChipDescriptor (p := p)) :
     decoded.interactionsWith data memoryChannel =
       rtypeMemoryInteractions (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = divRemChipDescriptor (p := p) := hchip
-  subst hchip'
-  apply (List.map_injective_iff.mpr TypedInteraction.raw_injective)
-  rw [DecodedInstructionRow.interactionsWith_raw]
-  simpa only [DecodedInstructionRow.environment, DecodedInstructionRow.toChipRow,
-    divRemViewOf_decodeRow, divRemChipDescriptor_table] using
-    divRemChip_memoryInteractionValues_eq (Environment.fromArray physical data)
+  typedMemoryLift divRemChipDescriptor (p := p), divRemViewOf_decodeRow, divRemChipDescriptor_table,
+    divRemChip_memoryInteractionValues_eq
 
 theorem divRemChip_rtypeMemoryInteractionShape :
     RTypeMemoryInteractionShape (divRemChipDescriptor (p := p)) :=
   divRemChip_typedMemoryInteractions_eq
+
+/-- The DivRem timestamp contract's per-slot adapter projection.  The `simpa` set is fixed; only
+the projected `RTypeReader` field varies, so naming the shape keeps the twelve fields readable. -/
+local macro "divRemAdapterField " proj:term : tactic => do
+  let input := Lean.mkIdent `input
+  let offset := Lean.mkIdent `offset
+  let readerInput := Lean.mkIdent `readerInput
+  let adapterEq := Lean.mkIdent `adapterEq
+  `(tactic| simpa only [$input:ident, $offset:ident, $readerInput:ident,
+      DivRemChip.rTypeReaderInput, DivRemChip.eval_inputs,
+      Extracted.RTypeReader.toAdapterView, circuit_norm] using congrArg $proj $adapterEq)
+
+/-- As `divRemAdapterField`, for the three `clk_low + δ` target slots read off the state block. -/
+local macro "divRemTargetField " delta:term : tactic => do
+  let input := Lean.mkIdent `input
+  let offset := Lean.mkIdent `offset
+  let readerInput := Lean.mkIdent `readerInput
+  let stateEq := Lean.mkIdent `stateEq
+  `(tactic| simpa only [$input:ident, $offset:ident, $readerInput:ident,
+      DivRemChip.rTypeReaderInput, DivRemChip.eval_inputs, circuit_norm] using
+      congrArg (fun state : Extracted.CPUState (ZMod p) =>
+        state.clk_0_16 + state.clk_16_24 * 65536 + $delta) $stateEq)
 
 theorem DivRemChip.rtypeTimestampContract :
     CircuitRTypeTimestampContract (p := p) (DivRemChip.circuit (p := p))
@@ -414,51 +442,15 @@ theorem DivRemChip.rtypeTimestampContract :
     refine {
       real_eq := by
         simp only [input, offset, readerInput, DivRemChip.rTypeReaderInput, circuit_norm]
-      aPrev_eq := by
-        simpa only [input, offset, readerInput, DivRemChip.rTypeReaderInput,
-          DivRemChip.eval_inputs, Extracted.RTypeReader.toAdapterView, circuit_norm] using
-          congrArg (fun adapter : Extracted.RTypeReader (ZMod p) =>
-            adapter.op_a_memory.access_timestamp.prev_low) adapterEq
-      aDiff_eq := by
-        simpa only [input, offset, readerInput, DivRemChip.rTypeReaderInput,
-          DivRemChip.eval_inputs, Extracted.RTypeReader.toAdapterView, circuit_norm] using
-          congrArg (fun adapter : Extracted.RTypeReader (ZMod p) =>
-            adapter.op_a_memory.access_timestamp.diff_low_limb) adapterEq
-      bPrev_eq := by
-        simpa only [input, offset, readerInput, DivRemChip.rTypeReaderInput,
-          DivRemChip.eval_inputs, Extracted.RTypeReader.toAdapterView, circuit_norm] using
-          congrArg (fun adapter : Extracted.RTypeReader (ZMod p) =>
-            adapter.op_b_memory.access_timestamp.prev_low) adapterEq
-      bDiff_eq := by
-        simpa only [input, offset, readerInput, DivRemChip.rTypeReaderInput,
-          DivRemChip.eval_inputs, Extracted.RTypeReader.toAdapterView, circuit_norm] using
-          congrArg (fun adapter : Extracted.RTypeReader (ZMod p) =>
-            adapter.op_b_memory.access_timestamp.diff_low_limb) adapterEq
-      cPrev_eq := by
-        simpa only [input, offset, readerInput, DivRemChip.rTypeReaderInput,
-          DivRemChip.eval_inputs, Extracted.RTypeReader.toAdapterView, circuit_norm] using
-          congrArg (fun adapter : Extracted.RTypeReader (ZMod p) =>
-            adapter.op_c_memory.access_timestamp.prev_low) adapterEq
-      cDiff_eq := by
-        simpa only [input, offset, readerInput, DivRemChip.rTypeReaderInput,
-          DivRemChip.eval_inputs, Extracted.RTypeReader.toAdapterView, circuit_norm] using
-          congrArg (fun adapter : Extracted.RTypeReader (ZMod p) =>
-            adapter.op_c_memory.access_timestamp.diff_low_limb) adapterEq
-      targetA_eq := by
-        simpa only [input, offset, readerInput, DivRemChip.rTypeReaderInput,
-          DivRemChip.eval_inputs, circuit_norm] using
-          congrArg (fun state : Extracted.CPUState (ZMod p) =>
-            state.clk_0_16 + state.clk_16_24 * 65536 + 4) stateEq
-      targetB_eq := by
-        simpa only [input, offset, readerInput, DivRemChip.rTypeReaderInput,
-          DivRemChip.eval_inputs, circuit_norm] using
-          congrArg (fun state : Extracted.CPUState (ZMod p) =>
-            state.clk_0_16 + state.clk_16_24 * 65536 + 3) stateEq
-      targetC_eq := by
-        simpa only [input, offset, readerInput, DivRemChip.rTypeReaderInput,
-          DivRemChip.eval_inputs, circuit_norm] using
-          congrArg (fun state : Extracted.CPUState (ZMod p) =>
-            state.clk_0_16 + state.clk_16_24 * 65536 + 2) stateEq }
+      aPrev_eq := by divRemAdapterField (·.op_a_memory.access_timestamp.prev_low)
+      aDiff_eq := by divRemAdapterField (·.op_a_memory.access_timestamp.diff_low_limb)
+      bPrev_eq := by divRemAdapterField (·.op_b_memory.access_timestamp.prev_low)
+      bDiff_eq := by divRemAdapterField (·.op_b_memory.access_timestamp.diff_low_limb)
+      cPrev_eq := by divRemAdapterField (·.op_c_memory.access_timestamp.prev_low)
+      cDiff_eq := by divRemAdapterField (·.op_c_memory.access_timestamp.diff_low_limb)
+      targetA_eq := by divRemTargetField 4
+      targetB_eq := by divRemTargetField 3
+      targetC_eq := by divRemTargetField 2 }
 
 theorem divRemChip_viewClockBounds (decoded : DecodedInstructionRow p)
     (data : ProverData (ZMod p)) (hchip : decoded.chip = divRemChipDescriptor (p := p))
@@ -466,11 +458,9 @@ theorem divRemChip_viewClockBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     ViewClockBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = divRemChipDescriptor (p := p) := hchip
-  subst hchip'
-  exact viewClockBounds_of_cpuStateContract (DivRemChip.circuit (p := p)) DivRemChip.rowView
-    DivRemChip.cpuStateTimeContract data physical guarantees real
+  byteGuaranteeContract divRemChipDescriptor (p := p),
+    viewClockBounds_of_cpuStateContract (DivRemChip.circuit (p := p)) DivRemChip.rowView
+      DivRemChip.cpuStateTimeContract
 
 theorem divRemChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
     (data : ProverData (ZMod p)) (hchip : decoded.chip = divRemChipDescriptor (p := p))
@@ -478,11 +468,9 @@ theorem divRemChip_activeTimestampBounds (decoded : DecodedInstructionRow p)
       (decoded.environment data))
     (real : (decoded.toChipRow data).view.is_real = 1) :
     RTypeTimestampBounds (decoded.toChipRow data).view := by
-  obtain ⟨chip, physical⟩ := decoded
-  have hchip' : chip = divRemChipDescriptor (p := p) := hchip
-  subst hchip'
-  exact rtypeTimestampBounds_of_contract DivRemChip.circuit DivRemChip.rowView
-    DivRemChip.rtypeTimestampContract data physical guarantees real
+  byteGuaranteeContract divRemChipDescriptor (p := p),
+    rtypeTimestampBounds_of_contract DivRemChip.circuit DivRemChip.rowView
+      DivRemChip.rtypeTimestampContract
 
 end DivRem
 
