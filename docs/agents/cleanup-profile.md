@@ -405,6 +405,21 @@ Per site:
 > Removal is unaffected: a site that clears ≤40000 against a 200000 default has ≥5× headroom either
 > way.
 >
+> **Read the phase name in the timeout message before classifying a site.** Every deterministic
+> timeout names the phase that exhausted the budget, and the three cost classes are distinguishable
+> from that string alone — no experiment needed:
+> - `whnf` (usually at the signature) — an elaboration-bound `circuit_proof_start` tower. Foldable.
+> - `isDefEq` — an abstraction or unification blowup; see cause classes 1d/1e.
+> - `«abstract nested proofs»` — post-elaboration, **not** codegen. Neither foldable nor term-intrinsic.
+> - `«LCNF compiler»` — genuinely codegen-bound (`MulOperation/Defs.lean` is the only known case;
+>   `main` elaborates fine at 40000 and only codegen times out). `noncomputable def` is NOT the fix —
+>   `SP1CleanTest/TraceGenTests` derives traces from `main`'s witness closures, so it breaks `lake test`.
+>
+> `MulChip/Formal.lean` is the worked example: `soundness`/`completeness` are `whnf`-bound while
+> `circuit` is `«abstract nested proofs»`-bound, so the file is neither term-intrinsic like
+> `RawSpec.full_product` nor codegen-bound like `MulOperation/Defs.lean` — and its three ceilings
+> needed three different justifications despite sitting in one file.
+>
 > **Re-ladder after a heavy golf — it is the only way to tell whether you changed the cost or just
 > the line count.** `OwnComplete.lean` went 817 → 495 lines (−39%) and its floor bracket was
 > **identical before and after**: FAIL 40000 · FAIL 100000 · PASS 200000, both times. That is a
