@@ -9,7 +9,6 @@ channel-exposure surface.
 
 namespace SP1Clean.BranchChip
 
-
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Operands `isU64`; `is_real` and the flag/branch bits are proven from AIR gates. -/

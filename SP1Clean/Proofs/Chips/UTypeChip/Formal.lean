@@ -1,5 +1,6 @@
 import SP1Clean.Native.Chips.UTypeChip.Defs
 import SP1Clean.Model.InteractionRecovery
+import SP1Clean.Math.EvalVec
 import Clean.Air.Circuit
 
 /-! # `SP1Clean.UTypeChip` — contract: `Assumptions` / soundness / completeness / `circuit`
@@ -61,7 +62,8 @@ lemma auipc_eq_add_lui (imm : BitVec 20) (pcv : BitVec 64) :
     RV64.auipc imm pcv = pcv + RV64.lui imm := by
   rw [RV64.auipc, RV64.lui]; exact BitVec.add_comm _ _
 
-set_option maxHeartbeats 2000000 in
+-- Measured: binding. Fails at 40000, passes at 100000; the former 2000000 was ~20x its floor.
+set_option maxHeartbeats 500000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨h_imm, h_pcU, h_dec⟩ := h_assumptions
@@ -133,7 +135,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
         simp only [Vector.getElem_mapRange, circuit_norm] <;> simp_all
 
-set_option maxHeartbeats 2000000 in
+-- Measured: binding, same band as `soundness` above (fails at 40000, passes at 100000).
+set_option maxHeartbeats 500000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -162,8 +165,7 @@ theorem completeness :
         Expression.eval env.toEnvironment input_var_adapter_op_b_imm[1],
         Expression.eval env.toEnvironment input_var_adapter_op_b_imm[2],
         Expression.eval env.toEnvironment input_var_adapter_op_b_imm[3]] : Word (ZMod p))
-      = input_adapter_op_b_imm := by
-    rw [← hob]; apply Vector.ext; intro i hi; simp only [Vector.getElem_map]; interval_cases i <;> rfl
+      = input_adapter_op_b_imm := (vec4_eval _ _).trans hob
   have hval : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var { index := i₀ + 3 + i }) : Word (ZMod p))
       = AddOperation.populate #v[env.get i₀, env.get (i₀ + 1), env.get (i₀ + 2), 0]
@@ -412,8 +414,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
 /-- The completed UType circuit exposes exactly its State interaction pair. -/
 theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith stateChannel.toRaw =
-      (exposedStateInteractions input).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+      (exposedStateInteractions input).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨stateChannel.toRaw, (exposedStateInteractions input).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
 
@@ -522,10 +524,10 @@ private theorem registerWriteByteInteractions_subcircuit
         (.subcircuit
           ((Readers.RegisterWrite.circuit (p := p)).toSubcircuit offset input) :: ops) =
       Operations.interactionsWith byteChannel.toRaw ops := by
-  have h := InteractionRecovery.interactionsWith_assertionSubcircuit_of_main_exact
-    Readers.RegisterWrite.circuit byteChannel.toRaw input offset ops []
-    (registerWriteByteInteractions_exact input offset)
-  simpa only [List.nil_append] using h
+  simpa only [List.nil_append] using
+    InteractionRecovery.interactionsWith_assertionSubcircuit_of_main_exact
+      Readers.RegisterWrite.circuit byteChannel.toRaw input offset ops []
+      (registerWriteByteInteractions_exact input offset)
 
 private def uTypeByteInteractionsRaw
     (input : Var Inputs (ZMod p)) (offset : ℕ) :
@@ -580,23 +582,23 @@ private theorem uTypeByteInteractions_exact
 /-- The completed UType circuit emits exactly its eight Byte interactions. -/
 theorem interactionsWith_byte_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith byteChannel.toRaw =
-      (exposedByteInteractions input offset).map ChannelInteraction.toRaw := by
-  exact (uTypeByteInteractions_exact input offset).trans
+      (exposedByteInteractions input offset).map ChannelInteraction.toRaw :=
+  (uTypeByteInteractions_exact input offset).trans
     (uTypeByteInteractionsRaw_eq_exposed input offset)
 
 /-- The completed UType circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith memoryChannel.toRaw =
-      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
 
 /-- The completed UType circuit exposes exactly its Program fetch. -/
 theorem interactionsWith_program_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith programChannel.toRaw =
-      (exposedProgramInteractions input).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+      (exposedProgramInteractions input).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨programChannel.toRaw,
       (exposedProgramInteractions input).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])

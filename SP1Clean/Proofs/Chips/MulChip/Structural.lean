@@ -71,9 +71,6 @@ theorem rTypeReader_mem (input : Var Inputs (ZMod p)) (offset : ℕ) :
     FormalAssertion.toSubcircuit_localLength, Readers.CPUState.circuit_localLength,
     MulOperation.circuit_localLength, Readers.RTypeReader.circuit_localLength,
     List.nil_append, List.append_nil, List.mem_cons, List.not_mem_nil, or_false, circuit_norm]
-  right
-  right
-  left
-  rfl
+  exact Or.inr (Or.inr (Or.inl rfl))
 
 end SP1Clean.MulChip

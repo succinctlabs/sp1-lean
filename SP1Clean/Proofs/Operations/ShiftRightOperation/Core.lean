@@ -72,9 +72,8 @@ theorem interactionsWith_subcircuit_eq_nil (channel : RawChannel (ZMod p))
     (cols : Var ShiftRightChip.Columns (ZMod p)) (offset : ℕ) (ops : Operations (ZMod p)) :
     Operations.interactionsWith channel
         (.subcircuit (circuit.toSubcircuit offset cols) :: ops) =
-      Operations.interactionsWith channel ops := by
-  exact InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil
-    circuit channel cols ops (by exact List.not_mem_nil)
-      (by exact List.not_mem_nil)
+      Operations.interactionsWith channel ops :=
+  InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil
+    circuit channel cols ops List.not_mem_nil List.not_mem_nil
 
 end SP1Clean.ShiftRightCore

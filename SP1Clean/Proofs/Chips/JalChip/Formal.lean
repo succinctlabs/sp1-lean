@@ -1,5 +1,6 @@
 import SP1Clean.Native.Chips.JalChip.Defs
 import SP1Clean.Model.InteractionRecovery
+import SP1Clean.Math.EvalVec
 import Clean.Air.Circuit
 
 /-! # `SP1Clean.JalChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
@@ -84,8 +85,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have ha1eq : (#v[Expression.eval env input_var_state_pc[0], Expression.eval env input_var_state_pc[1],
       Expression.eval env input_var_state_pc[2], 0] : Word (ZMod p))
-      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by
-    rw [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]
+      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by simp only [epc]
   have ha1U : Word.isU64 (#v[Expression.eval env input_var_state_pc[0],
       Expression.eval env input_var_state_pc[1], Expression.eval env input_var_state_pc[2], 0]
         : Word (ZMod p)) := ha1eq ▸ h_pcU
@@ -109,7 +109,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · -- 4-byte alignment of the jump target, from the in-circuit `÷4` byte-range pull `h_align`
     -- (`(value[0] · 4⁻¹).val < 2^14 ⇒ value[0].val % 4 = 0`). The Sail bridge lifts it to the whole word.
     intro hr1
-    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := Nat.cast_ofNat
     have hguar := h_align (by rw [hr1])
     simp only [byteChannel] at hguar
     rw [← c14] at hguar
@@ -151,8 +151,7 @@ theorem completeness :
   have ha1eq : (#v[Expression.eval env.toEnvironment input_var_state_pc[0],
       Expression.eval env.toEnvironment input_var_state_pc[1],
       Expression.eval env.toEnvironment input_var_state_pc[2], 0] : Word (ZMod p))
-      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by
-    rw [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]
+      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by simp only [epc]
   have ha1U : Word.isU64 (#v[Expression.eval env.toEnvironment input_var_state_pc[0],
       Expression.eval env.toEnvironment input_var_state_pc[1],
       Expression.eval env.toEnvironment input_var_state_pc[2], 0] : Word (ZMod p)) := ha1eq ▸ h_pcU
@@ -161,8 +160,7 @@ theorem completeness :
       Expression.eval env.toEnvironment input_var_adapter_op_b_imm[1],
       Expression.eval env.toEnvironment input_var_adapter_op_b_imm[2],
       Expression.eval env.toEnvironment input_var_adapter_op_b_imm[3]] : Word (ZMod p))
-      = input_adapter_op_b_imm := by
-    rw [← hob]; apply Vector.ext; intro i hi; simp only [Vector.getElem_map]; interval_cases i <;> rfl
+      = input_adapter_op_b_imm := (vec4_eval _ _).trans hob
   have hval1 : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + i}) : Word (ZMod p))
       = AddOperation.populate #v[Expression.eval env.toEnvironment input_var_state_pc[0],
@@ -213,7 +211,7 @@ theorem completeness :
       (by rw [h_op_a_0]; simpa using hr)).1
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := Nat.cast_ofNat
     simp only [byteChannel, hav0]
     rw [← c14]
     exact (byteRowSpec_range _ h14p).mpr (h_align_pa hr1)
@@ -487,8 +485,8 @@ the proof-bearing circuit bundle. -/
 /-- The completed Jal circuit exposes exactly its State interaction pair. -/
 theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith stateChannel.toRaw =
-      (exposedStateInteractions input offset).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+      (exposedStateInteractions input offset).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨stateChannel.toRaw,
       (exposedStateInteractions input offset).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
@@ -599,10 +597,10 @@ private theorem registerWriteByteInteractions_subcircuit
         (.subcircuit
           ((Readers.RegisterWrite.circuit (p := p)).toSubcircuit offset input) :: ops) =
       Operations.interactionsWith byteChannel.toRaw ops := by
-  have h := InteractionRecovery.interactionsWith_assertionSubcircuit_of_main_exact
-    Readers.RegisterWrite.circuit byteChannel.toRaw input offset ops []
-    (registerWriteByteInteractions_exact input offset)
-  simpa only [List.nil_append] using h
+  simpa only [List.nil_append] using
+    InteractionRecovery.interactionsWith_assertionSubcircuit_of_main_exact
+      Readers.RegisterWrite.circuit byteChannel.toRaw input offset ops []
+      (registerWriteByteInteractions_exact input offset)
 
 private def jalByteInteractionsRaw
     (input : Var Inputs (ZMod p)) (offset : ℕ) :
@@ -671,23 +669,23 @@ private theorem jalByteInteractions_exact
 /-- The completed Jal circuit emits exactly its thirteen Byte interactions. -/
 theorem interactionsWith_byte_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith byteChannel.toRaw =
-      (exposedByteInteractions input offset).map ChannelInteraction.toRaw := by
-  exact (jalByteInteractions_exact input offset).trans
+      (exposedByteInteractions input offset).map ChannelInteraction.toRaw :=
+  (jalByteInteractions_exact input offset).trans
     (jalByteInteractionsRaw_eq_exposed input offset)
 
 /-- The completed Jal circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith memoryChannel.toRaw =
-      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
 
 /-- The completed Jal circuit exposes exactly its Program fetch. -/
 theorem interactionsWith_program_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith programChannel.toRaw =
-      (exposedProgramInteractions input).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+      (exposedProgramInteractions input).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨programChannel.toRaw,
       (exposedProgramInteractions input).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])

@@ -1,5 +1,6 @@
 import SP1Clean.Native.Chips.JalrChip.Defs
 import SP1Clean.Model.InteractionRecovery
+import SP1Clean.Math.EvalVec
 import Clean.Air.Circuit
 
 /-! # `SP1Clean.JalrChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
@@ -57,6 +58,8 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
     input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
+-- Measured: genuinely binding. Fails at 2000000, passes at 4000000 — the declared budget is only
+-- ~2x the pass rung, the tightest ceiling measured in the tree. Do not lower.
 set_option maxHeartbeats 8000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -83,41 +86,27 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- `h_input` flattened: `op_a/op_b_memory` are 3-leaf sub-groups `prev_value ∧ ts_prev_low ∧ ts_diff`.
   obtain ⟨_h_ir, ⟨_h_clkh, _h_clk1, _h_clk0, hpc⟩, _h_a, ⟨_h_amem_pv, _h_amem_pl, _h_amem_dl⟩,
     _h_a0, _h_b, ⟨h_bmem_pv, _h_bmem_pl, _h_bmem_dl⟩, _hcimm⟩ := h_input
-  have rb0 : Expression.eval env input_var_adapter_op_b_memory_prev_value[0]
-      = input_adapter_op_b_memory_prev_value[0] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb1 : Expression.eval env input_var_adapter_op_b_memory_prev_value[1]
-      = input_adapter_op_b_memory_prev_value[1] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb2 : Expression.eval env input_var_adapter_op_b_memory_prev_value[2]
-      = input_adapter_op_b_memory_prev_value[2] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb3 : Expression.eval env input_var_adapter_op_b_memory_prev_value[3]
-      = input_adapter_op_b_memory_prev_value[3] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
+  have erb : ∀ i (hi : i < 4), Expression.eval env input_var_adapter_op_b_memory_prev_value[i]
+      = input_adapter_op_b_memory_prev_value[i] :=
+    fun i hi => by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
   have hrs1eq : (#v[Expression.eval env input_var_adapter_op_b_memory_prev_value[0],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[1],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[2],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[3]] : Word (ZMod p))
       = #v[input_adapter_op_b_memory_prev_value[0], input_adapter_op_b_memory_prev_value[1],
         input_adapter_op_b_memory_prev_value[2], input_adapter_op_b_memory_prev_value[3]] := by
-    rw [rb0, rb1, rb2, rb3]
+    simp only [erb]
   have hrs1U : Word.isU64 (#v[Expression.eval env input_var_adapter_op_b_memory_prev_value[0],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[1],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[2],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[3]] : Word (ZMod p)) :=
     hrs1eq ▸ h_rs1U
-  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
-    have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
-      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
-        ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
-  have ep0 : Expression.eval env input_var_state_pc[0] = input_state_pc[0] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep1 : Expression.eval env input_var_state_pc[1] = input_state_pc[1] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep2 : Expression.eval env input_var_state_pc[2] = input_state_pc[2] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
+  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
+  have epc : ∀ i (hi : i < 3), Expression.eval env input_var_state_pc[i] = input_state_pc[i] :=
+    fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have hpceq : (#v[Expression.eval env input_var_state_pc[0], Expression.eval env input_var_state_pc[1],
       Expression.eval env input_var_state_pc[2], 0] : Word (ZMod p))
-      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by rw [ep0, ep1, ep2]
+      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by simp only [epc]
   have hpcU : Word.isU64 (#v[Expression.eval env input_var_state_pc[0],
       Expression.eval env input_var_state_pc[1], Expression.eval env input_var_state_pc[2], 0]
         : Word (ZMod p)) := hpceq ▸ h_pcU
@@ -142,7 +131,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · -- 4-byte alignment of the cleared low limb, from the (otherwise-unused) byte-range pull `h_align`:
     -- `((add_value[0] - lsb) · 4⁻¹).val < 2^14 ⇒ (add_value[0] - lsb).val % 4 = 0`.
     intro hr1
-    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := Nat.cast_ofNat
     have hguar := h_align (by rw [hr1])
     simp only [byteChannel] at hguar
     rw [← c14] at hguar
@@ -153,7 +142,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     intro hr1
     have hguar := h_align (by rw [hr1])
     simp only [byteChannel] at hguar
-    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := Nat.cast_ofNat
     rw [← c14] at hguar
     have hlt := (byteRowSpec_range _ h14p).mp hguar
     rw [sub_eq_add_neg] at hlt
@@ -164,17 +153,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hlsble : (env.get (i₀ + 4 + 4)).val ≤ 1 := by
       haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
       rcases h_lsb with h | h <;> rw [h] <;> simp [ZMod.val_one]
+    -- load-bearing for the `ZMod.val_add_of_lt` side goal's `omega` (the magnitude of `p`).
     have hp : 2 ^ 17 < p := Fact.out
-    have e16 : (2 : ℕ) ^ 16 = 65536 := by norm_num
-    have e17 : (2 : ℕ) ^ 17 = 131072 := by norm_num
     have hav0 : (env.get i₀).val
         = (env.get i₀ + -env.get (i₀ + 4 + 4)).val + (env.get (i₀ + 4 + 4)).val := by
       conv_lhs => rw [show env.get i₀
         = (env.get i₀ + -env.get (i₀ + 4 + 4)) + env.get (i₀ + 4 + 4) from by ring]
       rw [ZMod.val_add_of_lt (by omega)]
     have hav3 : (env.get (i₀ + 3)).val = 0 := by rw [h_av3]; simp
-    have e32 : (2 : ℕ) ^ 32 = 4294967296 := by norm_num
-    have e48 : (2 : ℕ) ^ 48 = 281474976710656 := by norm_num
     simp only [JalrChip.nextPcWord, Word.toBitVec64, Word.toNat_def, Vector.getElem_map,
       Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
       List.getElem_cons_succ, ZMod.val_zero, circuit_norm]
@@ -202,6 +188,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
         simp only [Vector.getElem_mapRange, circuit_norm] <;> simp_all
 
+-- Measured: genuinely binding, same band as `soundness` above (fails at 2000000, passes at
+-- 4000000). Do not lower.
 set_option maxHeartbeats 8000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
@@ -224,56 +212,35 @@ theorem completeness :
   obtain ⟨he_av, he_oav, he_lsb, -, _⟩ := h_env
   obtain ⟨_h_ir, ⟨_h_clkh, _h_clk1, _h_clk0, hpc⟩, _h_a, ⟨_h_amem_pv, _h_amem_pl, _h_amem_dl⟩,
     _h_a0, _h_b, ⟨h_bmem_pv, _h_bmem_pl, _h_bmem_dl⟩, hcimm⟩ := h_input
-  have rb0 : Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0]
-      = input_adapter_op_b_memory_prev_value[0] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb1 : Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1]
-      = input_adapter_op_b_memory_prev_value[1] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb2 : Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2]
-      = input_adapter_op_b_memory_prev_value[2] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
-  have rb3 : Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]
-      = input_adapter_op_b_memory_prev_value[3] := by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
+  have erb : ∀ i (hi : i < 4),
+      Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[i]
+      = input_adapter_op_b_memory_prev_value[i] :=
+    fun i hi => by rw [← h_bmem_pv]; simp only [Vector.getElem_map]
   have hrs1eq : (#v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]] : Word (ZMod p))
       = #v[input_adapter_op_b_memory_prev_value[0], input_adapter_op_b_memory_prev_value[1],
         input_adapter_op_b_memory_prev_value[2], input_adapter_op_b_memory_prev_value[3]] := by
-    rw [rb0, rb1, rb2, rb3]
+    simp only [erb]
   have hrs1U : Word.isU64 (#v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]] : Word (ZMod p)) :=
     hrs1eq ▸ h_rs1U
-  have ci0 : Expression.eval env.toEnvironment input_var_adapter_op_c_imm[0]
-      = input_adapter_op_c_imm[0] := by rw [← hcimm]; simp only [Vector.getElem_map]
-  have ci1 : Expression.eval env.toEnvironment input_var_adapter_op_c_imm[1]
-      = input_adapter_op_c_imm[1] := by rw [← hcimm]; simp only [Vector.getElem_map]
-  have ci2 : Expression.eval env.toEnvironment input_var_adapter_op_c_imm[2]
-      = input_adapter_op_c_imm[2] := by rw [← hcimm]; simp only [Vector.getElem_map]
-  have ci3 : Expression.eval env.toEnvironment input_var_adapter_op_c_imm[3]
-      = input_adapter_op_c_imm[3] := by rw [← hcimm]; simp only [Vector.getElem_map]
   have hcimm_eq : (#v[Expression.eval env.toEnvironment input_var_adapter_op_c_imm[0],
       Expression.eval env.toEnvironment input_var_adapter_op_c_imm[1],
       Expression.eval env.toEnvironment input_var_adapter_op_c_imm[2],
       Expression.eval env.toEnvironment input_var_adapter_op_c_imm[3]] : Word (ZMod p))
-      = input_adapter_op_c_imm := by
-    rw [← hcimm]; apply Vector.ext; intro i hi; simp only [Vector.getElem_map]; interval_cases i <;> rfl
-  have ep0 : Expression.eval env.toEnvironment input_var_state_pc[0] = input_state_pc[0] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep1 : Expression.eval env.toEnvironment input_var_state_pc[1] = input_state_pc[1] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
-  have ep2 : Expression.eval env.toEnvironment input_var_state_pc[2] = input_state_pc[2] := by
-    rw [← hpc]; simp only [Vector.getElem_map]
+      = input_adapter_op_c_imm := (vec4_eval _ _).trans hcimm
+  have epc : ∀ i (hi : i < 3),
+      Expression.eval env.toEnvironment input_var_state_pc[i] = input_state_pc[i] :=
+    fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have hpceq : (#v[Expression.eval env.toEnvironment input_var_state_pc[0],
       Expression.eval env.toEnvironment input_var_state_pc[1],
       Expression.eval env.toEnvironment input_var_state_pc[2], 0] : Word (ZMod p))
-      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by rw [ep0, ep1, ep2]
-  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
-    have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
-      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
-        ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
+      = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by simp only [epc]
+  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
   have hval1 : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + i}) : Word (ZMod p))
       = AddOperation.populate #v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
@@ -332,7 +299,7 @@ theorem completeness :
       (by rw [h_op_a_0]; simpa using hr)).1
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
-    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := Nat.cast_ofNat
     simp only [byteChannel, hav0, he_lsb]
     rw [← c14]
     exact (byteRowSpec_range _ h14p).mpr (h_align_pa hr1)
@@ -508,8 +475,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
           Operations.forAllNoOffset, true_and, and_true, eval_sub,
           Expression.eval] at hshallow
         have h_gate : Expression.eval env input_var.is_real *
-            (Expression.eval env input_var.is_real - 1) = 0 := by
-          exact hshallow.2
+            (Expression.eval env input_var.is_real - 1) = 0 := hshallow.2
         have h_bool : Expression.eval env input_var.is_real = 0 ∨
             Expression.eval env input_var.is_real = 1 := bool_of_mul_pred h_gate
         have h_bool' : (ProvableStruct.eval env input_var).is_real = 0 ∨
@@ -632,8 +598,8 @@ the proof-bearing circuit bundle. -/
 /-- The completed Jalr circuit exposes exactly its State interaction pair. -/
 theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith stateChannel.toRaw =
-      (exposedStateInteractions input offset).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+      (exposedStateInteractions input offset).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨stateChannel.toRaw,
       (exposedStateInteractions input offset).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
@@ -753,10 +719,10 @@ private theorem registerWriteByteInteractions_subcircuit
         (.subcircuit
           ((Readers.RegisterWrite.circuit (p := p)).toSubcircuit offset input) :: ops) =
       Operations.interactionsWith byteChannel.toRaw ops := by
-  have h := InteractionRecovery.interactionsWith_assertionSubcircuit_of_main_exact
-    Readers.RegisterWrite.circuit byteChannel.toRaw input offset ops []
-    (registerWriteByteInteractions_exact input offset)
-  simpa only [List.nil_append] using h
+  simpa only [List.nil_append] using
+    InteractionRecovery.interactionsWith_assertionSubcircuit_of_main_exact
+      Readers.RegisterWrite.circuit byteChannel.toRaw input offset ops []
+      (registerWriteByteInteractions_exact input offset)
 
 private def jalrByteInteractionsRaw
     (input : Var Inputs (ZMod p)) (offset : ℕ) :
@@ -831,23 +797,23 @@ private theorem jalrByteInteractions_exact
 /-- The completed Jalr circuit emits exactly its fifteen Byte interactions. -/
 theorem interactionsWith_byte_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith byteChannel.toRaw =
-      (exposedByteInteractions input offset).map ChannelInteraction.toRaw := by
-  exact (jalrByteInteractions_exact input offset).trans
+      (exposedByteInteractions input offset).map ChannelInteraction.toRaw :=
+  (jalrByteInteractions_exact input offset).trans
     (jalrByteInteractionsRaw_eq_exposed input offset)
 
 /-- The completed Jalr circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith memoryChannel.toRaw =
-      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
 
 /-- The completed Jalr circuit exposes exactly its Program fetch. -/
 theorem interactionsWith_program_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith programChannel.toRaw =
-      (exposedProgramInteractions input).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+      (exposedProgramInteractions input).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
     ⟨programChannel.toRaw,
       (exposedProgramInteractions input).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
