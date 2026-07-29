@@ -183,5 +183,29 @@
 #     Net: no lemma left the permitted axiom set in either direction, so the change is admissible —
 #     but this round produced NO axiom improvement, and a reported one should be measured, not
 #     inferred from which tactics were removed.
-SP1Clean 668
+# -14 (2026-07-28, proof-cleanup W3/r3b+r3c): ratchet DOWN, no ceiling raised. 15 directives deleted,
+# 1 re-added strictly lower, net -14; the count reconciles EXACTLY (668 - 14 = 654), the THIRD
+# consecutive round to confirm the recorded number is honest and that no phantom has re-appeared.
+# By batch (r3b): DivRemChip/Extract.lean dropped both of its (b2); Faithful/IsEqualWordOperation.lean
+# dropped both 1000000 sites and DivRemOperation/Core.lean its last 4000000 — that file now carries
+# ZERO, having entered W3/r3a with four (b3). By batch (r3c): LtOperationSigned/Formal.lean shed all
+# four and IsEqualWordOperation/Formal.lean both (b1); Faithful/IsZeroWordOperation.lean both (b2).
+# Two results are worth recording:
+#   * r3c/b1 CLOSES the `Proofs/Operations/*/Formal.lean` family at 32/32 ceilings removed across
+#     thirteen files (14 -> 26 -> 32 over W2/r2, W2/r4 and this round). Verified at the gate: all
+#     thirteen now grep to zero. The fourteenth file, MulOperation/Formal.lean, is NOT part of that
+#     32 — it is the deliberate KEEP-set member whose two sites W3/r1/b4 measured (floors 100k and
+#     150k) and tightened 40000000 -> 1000000. So the family is closed, not merely swept: every
+#     ceiling in it has now been either removed against a measured floor or kept against one.
+#   * r3c/b2 produced the campaign's FIRST `Faithful/` KEEP, in a directory where the previous three
+#     sweeps (W2/r3, W2/r4, W3/r1) had removed every ceiling they measured:
+#     `ltUnsigned_constraints_faithful` measured a floor in (50000, 60000], driven by `itauto` over a
+#     13-gate propositional goal. That search is exponential in the gate count and the goal is
+#     genuinely propositional, so the §2.8 levers (fold, hoist, narrow the simp set) have nothing to
+#     bite on. Kept and tightened 2000000 -> 400000 (~6.7x headroom). Its file-mate
+#     `ltUnsigned_assertions_exact` was removable and went. The batch reports the running Faithful/
+#     tally as 38 measured / 37 removed / 1 kept; the gate verified the KEEP itself, not that tally.
+# 269 ceilings remain in Faithful/, all in the 25 whole-chip anchor files, which W2/r3's prediction
+# still expects to be largely removable.
+SP1Clean 654
 SP1CleanTest 16

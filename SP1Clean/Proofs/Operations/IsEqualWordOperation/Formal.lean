@@ -32,7 +32,6 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
   IsZeroWordOperation.Spec ⟨diff input, input.cols.is_diff_zero, input.is_real⟩
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hsub, _hbool⟩ := h_holds
@@ -43,7 +42,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   simpa only [diff, ← hia, ← hib, Vector.getElem_map, sub_eq_add_neg] using S
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hia, hib, -⟩ := h_input
