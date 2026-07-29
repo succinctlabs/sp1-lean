@@ -469,6 +469,21 @@ Per site:
 > Pin suspected producers high, re-run, and confirm the dependency by grepping for citations rather
 > than inferring it from the error.
 >
+> **The predictor now works PROSPECTIVELY, and it separates proofs that look identical.** W7/b2
+> classified all 12 sites correctly *before* measuring. Its survivor closes seven
+> `.shallowConstraints` goals with one `all_goals simp only [MulChip.main, …, circuit_norm]` — the
+> only site letting an unfolded `main` operations list reach a unification step. `LtChip` and
+> `BitwiseChip` run the **visually identical** `controlExpressions_subset_constraints` and clear
+> 40000, because each branch narrows with `right; …; left` *first* and only then applies a targeted
+> `simpa … using equalityConstraint_mem`. **Tactic-text similarity is not evidence of similar cost;
+> the narrowing order is.**
+>
+> **A uniform per-file ceiling count across a family is usually a copied default.** Confirmed four
+> times: the `RawSpec` family (all 16M, floors ≤40k), `Proofs/Operations/*/Formal.lean` (32 of 32
+> removed), `Faithful/ChipOracle.lean` (11 of 11, floors ≤500–30000 against a uniform declared 1M),
+> and `Proofs/Chips/*/Contracts.lean` (11 of 12). Treat "every file in this family has exactly one"
+> as a *prior for removal* — then measure anyway, since the twelfth was real.
+>
 > A cheap tell for locating it: **when the timeout's reported position walks along a tactic chain as
 > you raise the budget, that chain is the cost.** That is how the 20× bare `congr 1` chain in
 > `divRemRustAssertionsDecompose` was found — the position moved from `:1234` to `:1242` between the
