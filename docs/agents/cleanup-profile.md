@@ -358,6 +358,18 @@ Per site:
 > A pre-existing instance at `Proofs/Sail/Advance.lean:2325` means the 853 baseline has always
 > counted at least one phantom.
 
+> **A declared ceiling's magnitude predicts nothing — in either direction.** `StoreByteChip.circuit`
+> is declared 2M and *fails at 1,000,000*: under 2× headroom, the campaign's first genuinely
+> under-provisioned site. Its two siblings **in the same file** sit ~40× over their floors. So a
+> large number is not evidence of slack and a small number is not evidence of tightness; only a
+> measured ladder distinguishes them. Do not triage sites by declared value.
+>
+> **"Kept" and "correctly sized" are different findings, and only a ladder separates them.** W4/b4
+> kept all 19 of its ceilings *and* found 18 of them oversized — it removed none while cutting the
+> aggregate declared budget 174M → 31.5M (5.5×). A batch that removes nothing has not necessarily
+> failed; report the ratchet separately from the removal count, or a real 5.5× win reads as a
+> zero-yield batch.
+
 ### Cause classes, most valuable first
 
 **1. Search duplication in a `first | … | …` ladder.** The largest single win of the campaign:
@@ -644,6 +656,13 @@ This repo's own high-yield moves:
   > `simp only` rule** — took 176 → **25**. Total −466 (−40% of the file), and elaboration improved
   > 19.0s → 15.8s. Whenever you have collapsed N copies to N one-liners, ask whether one quantified
   > rule replaces the whole family.
+  >
+  > **The quantified `simp only` rule only fires when the helper's bound *is* the vector's own
+  > length.** `StoreWordChip`'s `eoap : ∀ i (hi : i < 2), … prev_value[i] = …` is stated at bound 2
+  > over a **length-4** `Word`, so the `getElem` side condition is a derived `omega` term rather
+  > than `hi` itself and simp cannot key the pattern. It **fails silently** — no tactic error; it
+  > surfaces four lines later as `Application type mismatch` on the consuming `exact`. When the
+  > bound and the length disagree, leave that helper at explicit indices.
   Do **not** hoist a global per-limb `eX` lemma — investigated and rejected (saves ~1 line/helper
   while re-churning ~36 clean files at form-variation risk).
 - **Kernel-safe dedup** on the bit-shift / DivRem cores: a byte-identical `have` block repeated
@@ -670,7 +689,12 @@ Per gated group, stopping at the first failure:
 
 1. **Manifest check** — `git status --porcelain`; changed paths ⊆ the group's manifest.
 2. **Layer pre-gate** (shallow waves only) — `lake build SP1Native` / `SP1Model` / … as a fail-fast.
-3. **`lake build SP1Clean`**, teed to a log; `-j 1` for solo/heavy groups.
+3. **`lake build SP1Clean`**, teed to a log. **There is no `-j` option** — Lake 4.31 in this
+   toolchain accepts only `-J/--json`; both `lake build SP1Clean -j 3` and `lake -j 3 build
+   SP1Clean` fail to parse, and two W4 gate runs were burned discovering it. To serialise a
+   Tier-S build, control concurrency by *not running anything else* (reap stale `lean --worker`
+   children first, per the note below) rather than by a flag. Default parallelism measured
+   640% CPU / 7:24 wall on a cold-ish 3610-job build.
 4. **Log assertions** — zero `error:`, zero `warning:`, zero `info:`.
 > **Never kill `lean --server` or `lake serve` — but stale `lean --worker` processes from *exited*
 > agents are fair game.** The distinction matters and cost the campaign a session restart before it
