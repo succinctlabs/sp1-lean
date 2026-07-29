@@ -487,6 +487,11 @@ wider than it first appears (`ChipOracle`'s eleven ran ≤500 to 30000, a 60× s
 
 **Two diagnostics that fall out of this, both validated:**
 
+> **An in-body failure position is not stable across runs.** Three identical invocations at rung
+> 60000 on `DivRemOperation/Core.lean` named **three different owners**, while the *signature*
+> positions stayed fixed. Trust a signature position for attribution; treat a secondary in-body
+> position as a hint only, and re-run before concluding which declaration owns a budget.
+
 - **Where a site fails tells you its floor class.** Sites failing at their **signature** are the
   high-floor ones; sites failing inside a **tactic line** floor in the hundreds-to-low-thousands and
   mask nothing. In `ChipOracle` this sorted all eleven correctly.
@@ -579,6 +584,14 @@ This repo's own high-yield moves:
   `have eX : ∀ i (hi : i < n), … := by intro i hi; rw [← hX]; simp [Vector.getElem_map]`, then call
   `eX i (by omega)` at each site. ~12–25% per file on Load/Store/op `Formal.lean`. Use the existing
   `SP1Clean.vec4_eval` (`SP1Clean/Math/EvalVec.lean:18`) for the length-4 `#v` → `Vector.map` fold.
+
+  > **Then take the second step: partially apply the helper.** Collapsing each repeated bridge to a
+  > one-liner is only half the win. On `DivRemOperation/Core.lean` the same two-line
+  > `rw [← h, Vector.getElem_map]` bridge appeared **176 times**; folding to one-liners took 352 → 176
+  > lines, and *partial application* — replacing each per-index family with one **quantified
+  > `simp only` rule** — took 176 → **25**. Total −466 (−40% of the file), and elaboration improved
+  > 19.0s → 15.8s. Whenever you have collapsed N copies to N one-liners, ask whether one quantified
+  > rule replaces the whole family.
   Do **not** hoist a global per-limb `eX` lemma — investigated and rejected (saves ~1 line/helper
   while re-churning ~36 clean files at form-variation risk).
 - **Kernel-safe dedup** on the bit-shift / DivRem cores: a byte-identical `have` block repeated
