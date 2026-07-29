@@ -22,11 +22,9 @@ lemma signedAbsBehavior {x abs negValue : Word (ZMod p)} {neg event : ZMod p}
     (x.toBitVec64.msb = true → abs.toBitVec64 = -x.toBitVec64) := by
   constructor
   · intro hmsb
-    have hn : neg = 0 := by rw [hneg, hmsb]; simp
-    rw [hpos hn]
+    rw [hpos (by rw [hneg, hmsb]; simp)]
   · intro hmsb
-    have hn : neg = 1 := by rw [hneg, hmsb]; simp
-    have he : event = 1 := hevent.trans hn
+    have he : event = 1 := hevent.trans (by rw [hneg, hmsb]; simp)
     obtain ⟨_, hsum⟩ := hadd he
     have hz : Word.toBitVec64 (#v[0, 0, 0, 0] : Word (ZMod p)) = 0#64 := by
       norm_num [Word.toBitVec64, Word.toNat_def]

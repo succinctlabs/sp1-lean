@@ -12,7 +12,12 @@ completeness feeds each subcircuit its `Assumptions ∧ Spec` prover obligation 
 `Assumptions`/`CompareSpec`. The external assumptions provide the independently available gate
 facts and operand ranges. For the remainder comparison they provide only the generated gate
 equation: this bundle first proves the `IsZero` result boolean, then derives the comparison
-multiplicity's booleanness internally. -/
+multiplicity's booleanness internally.
+
+Both directions used to carry a 4000000-heartbeat ceiling. Measured 2026-07-28 (control at one
+heartbeat, then a distinct-rung pass): `completeness` cleared 39999 as found; `soundness` failed at
+40000 inside `hbin_rcm`'s `simp_all` and clears it once that closer is narrowed to a targeted
+`rw`/`simp`. Both ceilings were therefore removed — the plain default carries ≥5× headroom. -/
 
 namespace SP1Clean.DivRemCompare
 
@@ -46,29 +51,23 @@ def Assumptions (cols : Inputs (ZMod p)) : Prop :=
   (e2 = 1 → bpv[1].val < 2 ^ 16 ∧ cpv[1].val < 2 ^ 16 ∧ cols.remainder[1].val < 2 ^ 16 ∧
     cols.quotient[1].val < 2 ^ 16)
 
-set_option maxHeartbeats 4000000 in
+omit [Fact (2 ^ 17 < p)] in
+/-- Element-level reading of a whole-vector `h_input` eval equation: the assertion arguments read
+`bpv/cpv/remainder/quotient` through `getElem`, which the vector-shaped `h_input` rules miss. -/
+private lemma eval_getElem {n : ℕ} {env : Environment (ZMod p)}
+    {vs : Vector (Expression (ZMod p)) n} {ws : Vector (ZMod p) n}
+    (h : Vector.map (Expression.eval env) vs = ws) (i : ℕ) (_ : i < n) :
+    Expression.eval env vs[i] = ws[i] := by
+  rw [← h]; simp only [Vector.getElem_map]
+
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CompareSpec := by
   circuit_proof_start [CompareSpec]
   obtain ⟨hbin_ir, hbin_irnw, hbin_e2, hbin_ace, hbin_are, hrcmGate,
     hU_ac, hU_ar, hU_lt, hR3, hR1⟩ := h_assumptions
-  -- the operand-word eval equations needed at element level (the assertion arguments read
-  -- `bpv/cpv/remainder/quotient` through `getElem`, which the whole-vector `h_input` rules miss)
-  have hbpvm := h_input.1
-  have hcpvm := h_input.2.1
-  have hquotm := h_input.2.2.2.1
-  have hremm := h_input.2.2.2.2.2.1
-  have hb : ∀ i (_ : i < 4),
-      Expression.eval env input_var_op_b_prev_value[i] = input_op_b_prev_value[i] :=
-    fun i hi => by rw [← hbpvm]; simp only [Vector.getElem_map]
-  have hc : ∀ i (_ : i < 4),
-      Expression.eval env input_var_op_c_prev_value[i] = input_op_c_prev_value[i] :=
-    fun i hi => by rw [← hcpvm]; simp only [Vector.getElem_map]
-  have hr : ∀ i (_ : i < 4),
-      Expression.eval env input_var_remainder[i] = input_remainder[i] :=
-    fun i hi => by rw [← hremm]; simp only [Vector.getElem_map]
-  have hq : ∀ i (_ : i < 4),
-      Expression.eval env input_var_quotient[i] = input_quotient[i] :=
-    fun i hi => by rw [← hquotm]; simp only [Vector.getElem_map]
+  have hb := eval_getElem h_input.1
+  have hc := eval_getElem h_input.2.1
+  have hr := eval_getElem h_input.2.2.2.2.2.1
+  have hq := eval_getElem h_input.2.2.2.1
   simp only [hb, hc, hr, hq] at h_holds
   obtain ⟨hovb_full, hovc_full, hovb_low, hovc_low, hisc0, hadd_c, hadd_r, hlt,
     hmsb_b3, hmsb_c3, hmsb_r3, hmsb_b1, hmsb_c1, hmsb_r1, hmsb_q1⟩ := h_holds
@@ -78,7 +77,8 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CompareS
   have hbin_rcm : input_remainder_check_multiplicity = 0 ∨
       input_remainder_check_multiplicity = 1 := by
     simp only [RemainderCheckGateSpec] at hrcmGate
-    rcases hzbin with hz | hz <;> rcases hbin_ir with hr | hr <;> simp_all
+    rcases hzbin with hz | hz <;> rcases hbin_ir with hv | hv <;>
+      rw [hrcmGate, hz, hv] <;> simp
   refine ⟨⟨hovb_full hbin_irnw, hovc_full hbin_irnw, hovb_low hbin_e2, hovc_low hbin_e2,
     hisc0Spec,
     hadd_c ⟨hU_ac, hbin_ace⟩, hadd_r ⟨hU_ar, hbin_are⟩, hlt ⟨hU_lt, hbin_rcm⟩,
@@ -88,36 +88,24 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CompareS
     hmsb_r1 ⟨fun h => (hR1 h).2.2.1, hbin_e2⟩, hmsb_q1 ⟨fun h => (hR1 h).2.2.2, hbin_e2⟩⟩, ?_⟩
   and_intros <;> exact Or.inl rfl
 
-set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions CompareSpec := by
   circuit_proof_start [CompareSpec]
   obtain ⟨hbin_ir, hbin_irnw, hbin_e2, hbin_ace, hbin_are, hrcmGate,
     hU_ac, hU_ar, hU_lt, hR3, hR1⟩ := h_assumptions
   obtain ⟨hs1, hs2, hs3, hs4, hs5, hs6, hs7, hs8, hs9, hs10, hs11, hs12, hs13, hs14, hs15⟩ :=
     h_spec
-  have hbpvm := h_input.1
-  have hcpvm := h_input.2.1
-  have hquotm := h_input.2.2.2.1
-  have hremm := h_input.2.2.2.2.2.1
-  have hb : ∀ i (_ : i < 4),
-      Expression.eval env.toEnvironment input_var_op_b_prev_value[i] = input_op_b_prev_value[i] :=
-    fun i hi => by rw [← hbpvm]; simp only [Vector.getElem_map]
-  have hc : ∀ i (_ : i < 4),
-      Expression.eval env.toEnvironment input_var_op_c_prev_value[i] = input_op_c_prev_value[i] :=
-    fun i hi => by rw [← hcpvm]; simp only [Vector.getElem_map]
-  have hr : ∀ i (_ : i < 4),
-      Expression.eval env.toEnvironment input_var_remainder[i] = input_remainder[i] :=
-    fun i hi => by rw [← hremm]; simp only [Vector.getElem_map]
-  have hq : ∀ i (_ : i < 4),
-      Expression.eval env.toEnvironment input_var_quotient[i] = input_quotient[i] :=
-    fun i hi => by rw [← hquotm]; simp only [Vector.getElem_map]
+  have hb := eval_getElem h_input.1
+  have hc := eval_getElem h_input.2.1
+  have hr := eval_getElem h_input.2.2.2.2.2.1
+  have hq := eval_getElem h_input.2.2.2.1
   simp only [hb, hc, hr, hq]
   have hzbin : input_is_c_0_result = 0 ∨ input_is_c_0_result = 1 := by
     simpa only using hs5.1
   have hbin_rcm : input_remainder_check_multiplicity = 0 ∨
       input_remainder_check_multiplicity = 1 := by
     simp only [RemainderCheckGateSpec] at hrcmGate
-    rcases hzbin with hz | hz <;> rcases hbin_ir with hr | hr <;> simp_all
+    rcases hzbin with hz | hz <;> rcases hbin_ir with hv | hv <;>
+      rw [hrcmGate, hz, hv] <;> simp
   exact ⟨⟨hbin_irnw, hs1⟩, ⟨hbin_irnw, hs2⟩, ⟨hbin_e2, hs3⟩, ⟨hbin_e2, hs4⟩, ⟨hbin_ir, hs5⟩,
     ⟨⟨hU_ac, hbin_ace⟩, hs6⟩, ⟨⟨hU_ar, hbin_are⟩, hs7⟩, ⟨⟨hU_lt, hbin_rcm⟩, hs8⟩,
     ⟨⟨fun h => (hR3 h).1, hbin_irnw⟩, hs9⟩, ⟨⟨fun h => (hR3 h).2.1, hbin_irnw⟩, hs10⟩,
