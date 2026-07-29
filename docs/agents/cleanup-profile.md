@@ -1029,6 +1029,39 @@ Per gated group, stopping at the first failure:
 > A batch that edits an import chain must **say so explicitly in its report**, as W8/b1 did, so the
 > gate knows which verdicts were provisional.
 
+> ### `local macro` — the `Soundness/` workhorse, and its three traps
+>
+> The dominant golf lever in the grounding layer: **−379 lines** (W7/b1, `Typed*`), **−241** (W8/b2,
+> `Grounding/*`), **−137** (W8/b3). Macros are **not declarations** — they leave the signature
+> multiset untouched and never reach the axiom probe — and the construct predates the marathon, so
+> `lake lint` has always passed over it.
+>
+> **Two break-evens, measured, and they are different numbers:**
+> - **Lines: ≈5 call sites** for a caller-capturing macro (W8/b2).
+> - **Time: lower.** W8/b3's controlled A/B (2 runs each) isolated the cost to *declaration*, not
+>   expansion — body alone 5.178s, body + the 4 macros **unused** 5.403s, body + 40 expansions
+>   5.454s. So ~0.07s per macro declared, and the expansions are free. A file that added 3 macros got
+>   *faster*. Don't declare a macro you use twice; don't hesitate over expansion count.
+>
+> **Three traps, each failing far from its cause:**
+> 1. **Definition-site resolution.** A macro body resolves identifiers where the macro is *defined*.
+>    Placing it before a constant it cites fails every call site with ``Unknown identifier `foo✝` `` —
+>    reads like a typo or a stale name. Place the macro *after* what it references.
+> 2. **Quotation-local `rfl` binds instead of substituting.** In an `rcases` pattern it introduces a
+>    *name* `rfl`, and the failure surfaces ~20 lines later as an `Application type mismatch` on
+>    `rfl`, not at the macro. Fix: ``mkIdent `rfl``.
+> 3. **Antiquotation category must match the splice site.** `unfolds:term,*` cannot splice into
+>    `simp only [$unfolds,*]`: it fails at the *macro definition* with `Application type mismatch …
+>    Lean.Syntax.TSepArray `term ","` vs `TSepArray [simpStar, simpErase, simpLemma]`, and then every
+>    call site — up to 1500 lines away — reports the useless
+>    `Tactic '_private.….«tacticAluViewState_,_,_,_,,»' has not been implemented`. Fix: declare it
+>    `unfolds:Lean.Parser.Tactic.simpLemma,*` (bare `simpLemma` is not in scope outside
+>    `Lean.Parser.Tactic`).
+>
+> **What a macro cannot reach:** caller binders (`env`, `input`, `real`, `decoded`, `hchip`,
+> `guarantees`) are unreachable from a quotation without `Lean.mkIdent`, and repetition that is a
+> **term inside a `have` type** rather than a tactic shape needs a §4a `private` helper instead.
+
 > **`local macro` is an established construct in `Soundness/`, and it is invisible to the
 > statement-preservation gate.** It predates the marathon (introduced by `829a8596`/`a5f900fe`/
 > `64883a2a`) and `lake lint` has always passed over it, so a batch may use it without treating it as
