@@ -23,12 +23,12 @@ open SP1Clean.Extracted
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+-- Perf: 4 of this file's 6 former 1M-4M heartbeat ceilings floored <=40000 and were removed.
 
 private lemma val_29'' [NeZero p] : (29 : ZMod p).val = 29 := by
   have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   exact ZMod.val_natCast_of_lt (show (29 : ℕ) < p by omega)
 
-set_option maxHeartbeats 4000000 in
 /-- **Chip-level faithfulness anchor.** Under `is_real = 1`, SP1's generated `AluX0` chip constraint list
 holds iff: the two CPUState clock bounds; the `op_a_0 = 1` forcing (`rd = x0`); the four op_a **read**-zeroing
 gates; the op_c immediate gate (`is_real - imm_c` boolean) and the four immediate-consistency gates; the
@@ -176,7 +176,6 @@ theorem aluX0Chip_lookups_empty :
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     Gadgets.Equality.main, circuit_norm]
 
-set_option maxHeartbeats 1000000 in
 private theorem aluX0_chip_constraints_decompose
     (env : Environment (ZMod p)) (input : Var AluX0Chip.Inputs (ZMod p))
     (offset : ℕ) :
@@ -209,7 +208,7 @@ private theorem aluX0_chip_constraints_decompose
     Readers.ALUTypeReaderImmutable.circuit, circuit_norm, List.map_append,
     List.forall_append, List.forall_cons]
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 theorem aluX0Chip_constraints_faithful
     (env : Environment (ZMod p)) (input : Var AluX0Chip.Inputs (ZMod p))
     (offset : ℕ) (cols : AluX0Chip.Columns (ZMod p))
@@ -293,7 +292,6 @@ theorem aluX0Chip_constraints_faithful
       simp
   tauto
 
-set_option maxHeartbeats 4000000 in
 theorem aluX0Chip_constraints_constructive
     (rustCols : Extracted.AluX0Oracle.AluX0Cols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := aluX0ChipRowCodec.assignment
@@ -330,7 +328,7 @@ theorem aluX0Chip_constraints_constructive
     (constraintsHold_iff_nativeAssertZeros (AluX0Chip.circuit (p := p))
       assignment.environment aluX0Chip_lookups_empty).symm
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 400000 in
 theorem aluX0Chip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var AluX0Chip.Inputs (ZMod p))
     (offset : ℕ) (cols : AluX0Chip.Columns (ZMod p))
@@ -489,7 +487,6 @@ theorem aluX0Chip_interactions_faithful
     ProvableType.eval_field, Expression.eval]
   simp only [hsign, true_and]
 
-set_option maxHeartbeats 4000000 in
 theorem aluX0Chip_interactions_constructive
     (rustCols : Extracted.AluX0Oracle.AluX0Cols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := aluX0ChipRowCodec.assignment

@@ -19,6 +19,7 @@ open SP1Clean.Extracted
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+-- Perf: 10 of this file's 11 former 1M-4M heartbeat ceilings floored <=40000 and were removed.
 
 /-- Whole-chip row reconfiguration. The reader blocks are already the canonical generated substrate,
 so only the native arithmetic block is copied into Rust's chip-private operation row. This is not an
@@ -130,7 +131,6 @@ theorem addiChip_lookups_empty :
     AddOperation.circuit, AddOperation.main, Gadgets.Equality.main, circuit_norm]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 2000000 in
 private theorem addi_operation_assertions_local
     (env : Environment (ZMod p)) (input : Var AddOperation.Inputs (ZMod p)) (offset : ℕ)
     (a b value : Word (ZMod p)) (isReal : ZMod p)
@@ -152,7 +152,6 @@ private theorem forall_nil_iff {alpha : Type} (pred : alpha → Prop) :
 private def addi_chip_value (offset : ℕ) : Word (Expression (ZMod p)) :=
   Vector.mapRange 4 fun i => var { index := offset + i }
 
-set_option maxHeartbeats 1000000 in
 private theorem addi_chip_constraints_decompose
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ) :
     List.Forall (· = 0) (nativeAssertZeros env ((AddiChip.main input).operations offset)) ↔
@@ -190,7 +189,6 @@ private theorem addi_chip_constraints_decompose
     AddOperation.circuit, Readers.ITypeReader.circuit, Readers.RegisterWrite.circuit,
     circuit_norm, List.map_append, List.forall_append]
 
-set_option maxHeartbeats 4000000 in
 theorem addiChip_constraints_faithful
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
     (cols : AddiChip.Columns (ZMod p))
@@ -354,7 +352,6 @@ theorem addiChip_constraints_faithful
       simpa only [eval_mul, eval_sub, Expression.eval] using hGateN
     exact ⟨⟨⟨hAddG, hCpuG⟩, hITypeG⟩, hGate, hOp, trivial⟩
 
-set_option maxHeartbeats 2000000 in
 theorem addiChip_constraints_constructive
     (rustCols : Extracted.AddiOracle.AddiCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := addiChipRowCodec.assignment
@@ -391,7 +388,6 @@ theorem addiChip_constraints_constructive
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 private theorem addicols_state_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
@@ -430,7 +426,6 @@ private theorem addicols_state_interactions_faithful_syntactic
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     hreal, hclkHigh, hclk0, hclk1, hpc0, hpc1, hpc2]
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 private theorem addicols_program_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
@@ -479,7 +474,6 @@ private theorem addicols_program_interactions_faithful_syntactic
     hreal, hpc0, hpc1, hpc2, hopA, hopB, hopA0,
     himm0, himm1, himm2, himm3]
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 private theorem addicols_memory_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
@@ -547,7 +541,6 @@ private theorem addicols_memory_interactions_faithful_syntactic
     hvalueB0, hvalueB1, hvalueB2, hvalueB3]
   exact List.perm_append_comm (l₁ := [_, _]) (l₂ := [_])
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 private theorem addicols_byte_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
@@ -611,7 +604,6 @@ private theorem addicols_byte_interactions_faithful_syntactic
     (List.perm_append_comm (l₁ := [_, _]) (l₂ := [_, _, _, _])).append_right
       [_, _, _, _]
 
-set_option maxHeartbeats 2000000 in
 private theorem addicols_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
     (cols : AddiChip.Columns (ZMod p))
@@ -690,7 +682,7 @@ private theorem addicols_interactions_faithful_syntactic
   rw [hState, hProgram']
   exact ((hByte.append_left _).append hMemory).append_right _
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 400000 in
 theorem addiChip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
     (cols : AddiChip.Columns (ZMod p))
@@ -723,7 +715,6 @@ theorem addiChip_interactions_faithful
       ← ProvableType.getElem_eval_fields, Vector.getElem_mapRange,
       Expression.eval, Nat.add_zero]
 
-set_option maxHeartbeats 2000000 in
 theorem addiChip_interactions_constructive
     (rustCols : Extracted.AddiOracle.AddiCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := addiChipRowCodec.assignment

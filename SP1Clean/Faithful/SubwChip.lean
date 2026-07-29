@@ -21,6 +21,7 @@ open SP1Clean.Extracted
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+-- Perf: 8 of this file's 11 former 1M-4M heartbeat ceilings floored <=40000 and were removed.
 
 /-- Whole-chip row reconfiguration. The reader blocks are already the canonical generated substrate,
 so only the native arithmetic block (two witnessed low limbs + the composed sign bit) is copied into
@@ -211,7 +212,7 @@ theorem subwChip_lookups_empty :
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel StateMsg)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 250000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — State-bus interactions, SYNTACTIC.** The State interactions the
 whole `SubwChip` row emits (recovered by descending the chip into its three composed sub-readers) project
@@ -275,7 +276,7 @@ private theorem subwcols_state_interactions_faithful_syntactic
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     h_ir, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2]
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 250000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Program-bus interaction, SYNTACTIC.** The single Program
 instruction-fetch the whole `SubwChip` row emits (only the `RTypeReader` fragment emits Program) projects
@@ -326,7 +327,6 @@ private theorem subwcols_program_interactions_faithful_syntactic
     Extracted.Interaction.toAccess, Extracted.Dir.sign, Opcode.ofNat, ConstraintCoe.coe_eq_val,
     h_ir, h_p0, h_p1, h_p2, h_oa, h_ob, h_oc, h_oa0]
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Memory-bus interactions, SYNTACTIC (composition + WITNESSED + `Perm`
 + `negMult`).** The six Memory interactions the whole `SubwChip` row emits — `RTypeReader`'s five reads
@@ -406,7 +406,6 @@ private theorem subwcols_memory_interactions_faithful_syntactic
   -- rotate the relocated op_a write (`RegisterWrite`) to the front.
   exact List.perm_append_comm (l₁ := [_, _, _, _]) (l₂ := [_])
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Byte-bus interactions, SYNTACTIC (multi-fragment `Perm` + WITNESSED).**
 All three fragments emit byte: `CPUState` (2 clock checks), `SubwOperation` (the `U16MSB` sign check + 2
@@ -480,7 +479,6 @@ private theorem subwcols_byte_interactions_faithful_syntactic
   -- swap the first two blocks (the `RTypeReader 6` tail is shared).
   exact (List.perm_append_comm (l₁ := [_, _]) (l₂ := [_, _, _])).append_right [_, _, _, _, _, _]
 
-set_option maxHeartbeats 2000000 in
 /-- **Chip-level faithfulness anchor — COMBINED, SYNTACTIC.** The full faithfulness statement for `SubwChip`:
 the interactions the row emits on its four buses — `State`, `Byte`, `Memory`, `Program` — taken together
 are a `List.Perm` of SP1's *entire* extracted `SubwCols.interactions` oracle (projected to `LookupAccess`).
@@ -563,7 +561,6 @@ private theorem subwcols_interactions_faithful_syntactic
 Clean gadgets. These private lemmas are deliberately local normalization steps: only the whole-chip
 theorem below is part of the faithfulness boundary. -/
 
-set_option maxHeartbeats 1000000 in
 private theorem subwOperationAssertions
     (env : Environment (ZMod p)) (input : Var SubwOperation.Inputs (ZMod p))
     (offset : ℕ) (a b : Word (ZMod p)) (cols : SubwOperation.Columns (ZMod p))
@@ -624,7 +621,6 @@ private def subw_chip_value (offset : ℕ) : Vector (Expression (ZMod p)) 2 :=
 private def subw_chip_msb (offset : ℕ) : Expression (ZMod p) :=
   var { index := offset + 2 }
 
-set_option maxHeartbeats 1000000 in
 private theorem subw_chip_constraints_decompose
     (env : Environment (ZMod p)) (input : Var SubwChip.Inputs (ZMod p)) (offset : ℕ) :
     List.Forall (· = 0) (nativeAssertZeros env ((SubwChip.main input).operations offset)) ↔
@@ -665,7 +661,6 @@ private theorem subw_chip_constraints_decompose
     Readers.CPUState.circuit, SubwOperation.circuit, Readers.RTypeReader.circuit,
     Readers.RegisterWrite.circuit, circuit_norm, List.map_append, List.forall_append]
 
-set_option maxHeartbeats 4000000 in
 /-- **Complete assertion-system anchor for the native SUBW row.** For every verifier environment and
 every row bound to the native circuit output, all of SP1 Rust's extracted `assertZero`s vanish iff all
 assertions emitted by the complete native Clean chip (including true subcircuits) vanish. This covers
@@ -839,7 +834,7 @@ theorem subwChip_constraints_faithful
     refine ⟨⟨⟨hOpG, hCpuG⟩, ?_⟩, hGate, hOpA0, trivial⟩
     simpa only [vec4_eta] using hRTypeG
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 400000 in
 /-- **Complete interaction-system anchor for the native SUBW row.** Binding the circuit output supplies
 all column equalities needed by the detailed per-bus calculations above; the public conclusion compares
 the canonical four-bus multiset emitted by the native chip with SP1 Rust's complete extracted oracle. -/
@@ -877,7 +872,6 @@ theorem subwChip_interactions_faithful
       ← ProvableType.getElem_eval_fields, Vector.getElem_mapRange,
       Expression.eval, Nat.add_zero]
 
-set_option maxHeartbeats 2000000 in
 /-- The extracted Rust row itself reconstructs a complete satisfying Clean row; no caller-supplied
 output binding is part of the public boundary. -/
 theorem subwChip_constraints_constructive
@@ -913,7 +907,6 @@ theorem subwChip_constraints_constructive
     (constraintsHold_iff_nativeAssertZeros (SubwChip.circuit (p := p))
       assignment.environment subwChip_lookups_empty).symm
 
-set_option maxHeartbeats 2000000 in
 /-- Constructive interaction half of SUBW faithfulness, evaluated on the same reconstructed row. -/
 theorem subwChip_interactions_constructive
     (rustCols : Extracted.SubwOracle.SubwCols (ZMod p)) (data : ProverData (ZMod p)) :

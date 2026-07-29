@@ -21,6 +21,7 @@ open SP1Clean.Extracted
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+-- Perf: 9 of this file's 12 former 1M-4M heartbeat ceilings floored <=40000 and were removed.
 
 /-- Whole-chip row reconfiguration. The reader blocks are already the canonical generated substrate,
 so only the native arithmetic block (two witnessed low limbs + the composed sign bit) is copied into
@@ -220,7 +221,7 @@ theorem addwChip_lookups_empty :
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel StateMsg)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 250000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Program-bus interaction, SYNTACTIC.** The single Program fetch the
 whole `AddwChip` row emits (only the `ALUTypeReader` fragment emits Program) projects to the same arity-16
@@ -271,7 +272,7 @@ private theorem addwcols_program_interactions_faithful_syntactic
     Extracted.Interaction.toAccess, Extracted.Dir.sign, Opcode.ofNat, ConstraintCoe.coe_eq_val,
     h_ir, h_p0, h_p1, h_p2, h_oa, h_ob, h_oc0, h_oc1, h_oc2, h_oc3, h_oa0, h_imm]
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 250000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — State-bus interactions, SYNTACTIC.** The State interactions the
 whole `AddwChip` row emits (recovered by descending the chip into its three composed sub-readers) project
@@ -332,7 +333,6 @@ private theorem addwcols_state_interactions_faithful_syntactic
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     h_ir, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2]
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Memory-bus interactions, SYNTACTIC (composition + WITNESSED + `Perm`
 + `negMult`).** The six Memory interactions the whole `AddwChip` row emits — `ALUTypeReader`'s five reads
@@ -418,7 +418,6 @@ private theorem addwcols_memory_interactions_faithful_syntactic
   -- head, rotate the trailing `RegisterWrite` op_a write to the front (`perm_append_comm`).
   exact List.perm_append_comm (l₁ := [_, _, _, _]) (l₂ := [_])
 
-set_option maxHeartbeats 2000000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Byte-bus interactions, SYNTACTIC (multi-fragment `Perm` + WITNESSED).**
 All three fragments emit byte: `CPUState` (2 clock checks), `AddwOperation` (4 result-limb ranges on the
@@ -490,7 +489,6 @@ private theorem addwcols_byte_interactions_faithful_syntactic
   -- swap the first two blocks (the `ALUTypeReader 6` tail is shared).
   exact (List.perm_append_comm (l₁ := [_, _]) (l₂ := [_, _, _])).append_right [_, _, _, _, _, _]
 
-set_option maxHeartbeats 2000000 in
 /-- **Chip-level faithfulness anchor — COMBINED, SYNTACTIC.** The full faithfulness statement for `AddwChip`:
 the interactions the row emits on its four buses — `State`, `Byte`, `Memory`, `Program` — taken together
 are a `List.Perm` of SP1's *entire* extracted `AddwCols.interactions` oracle (projected to `LookupAccess`).
@@ -573,7 +571,6 @@ private theorem addwcols_interactions_faithful_syntactic
   rw [hS, hP']
   exact ((hB.append_left _).append hM).append_right _
 
-set_option maxHeartbeats 1000000 in
 private theorem addwOperationAssertions
     (env : Environment (ZMod p)) (input : Var AddwOperation.Inputs (ZMod p))
     (offset : ℕ) (a b : Word (ZMod p)) (cols : AddwOperation.Columns (ZMod p))
@@ -625,7 +622,6 @@ private theorem addwOperationAssertions
   rw [ha0, ha1, hb0, hb1, hv0, hv1, hmsb, hr, hreal]
   simp
 
-set_option maxHeartbeats 1000000 in
 private theorem aluTypeAssertions
     (env : Environment (ZMod p)) (input : Var Readers.ALUTypeReader.Inputs (ZMod p))
     (offset : ℕ) (clkHigh clkLow opcode isReal isTrusted : ZMod p)
@@ -724,7 +720,6 @@ private def addw_chip_value (offset : ℕ) : Vector (Expression (ZMod p)) 2 :=
 private def addw_chip_msb (offset : ℕ) : Expression (ZMod p) :=
   var { index := offset + 2 }
 
-set_option maxHeartbeats 1000000 in
 private theorem addw_chip_constraints_decompose
     (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ) :
     List.Forall (· = 0) (nativeAssertZeros env ((AddwChip.main input).operations offset)) ↔
@@ -765,7 +760,6 @@ private theorem addw_chip_constraints_decompose
     Readers.CPUState.circuit, AddwOperation.circuit, Readers.ALUTypeReader.circuit,
     Readers.RegisterWrite.circuit, circuit_norm, List.map_append, List.forall_append]
 
-set_option maxHeartbeats 4000000 in
 theorem addwChip_constraints_faithful
     (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ)
     (cols : AddwChip.Columns (ZMod p))
@@ -935,7 +929,6 @@ theorem addwChip_constraints_faithful
     refine ⟨⟨⟨hOpG, hCpuG⟩, ?_⟩, hGate, hOpA0, trivial⟩
     simpa only [vec4_eta] using hAluG
 
-set_option maxHeartbeats 2000000 in
 theorem addwChip_constraints_constructive
     (rustCols : Extracted.AddwOracle.AddwCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := addwChipRowCodec.assignment
@@ -969,7 +962,7 @@ theorem addwChip_constraints_constructive
     (constraintsHold_iff_nativeAssertZeros (AddwChip.circuit (p := p))
       assignment.environment addwChip_lookups_empty).symm
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 400000 in
 theorem addwChip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ)
     (cols : AddwChip.Columns (ZMod p))
@@ -1004,7 +997,6 @@ theorem addwChip_interactions_faithful
       ← ProvableType.getElem_eval_fields, Vector.getElem_mapRange,
       Expression.eval, Nat.add_zero]
 
-set_option maxHeartbeats 2000000 in
 theorem addwChip_interactions_constructive
     (rustCols : Extracted.AddwOracle.AddwCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := addwChipRowCodec.assignment
