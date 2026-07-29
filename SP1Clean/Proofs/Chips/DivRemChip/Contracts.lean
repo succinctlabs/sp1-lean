@@ -33,8 +33,7 @@ theorem DivRemChip.rTypeReader_mem (input : Var DivRemChip.Inputs (ZMod p)) (off
   simp only [DivRemChip.main, DivRemChip.rTypeReaderInput, circuit_norm]
   right
   simp only [DivRemChip.constrainRow, circuit_norm]
-  right
-  left
+  right; left
   simp only [DivRemChip.populateRow_output_eq, Nat.add_zero]
 
 /-- The DivRem arithmetic-core assertion boundary is retained at the same post-witness offset. -/
@@ -46,10 +45,7 @@ private theorem DivRemChip.divRemCore_mem
   simp only [DivRemChip.main, circuit_norm]
   right
   simp only [DivRemChip.constrainRow, circuit_norm]
-  right
-  right
-  right
-  left
+  right; right; right; left
   simp only [DivRemChip.populateRow_output_eq, Nat.add_zero]
 
 /-- DivRemCore's shallow constraint contract exposes the final physical routing assertion without
@@ -84,18 +80,16 @@ theorem DivRemChip.eval_output_adapter (input : Var DivRemChip.Inputs (ZMod p)) 
     (env : Environment (ZMod p)) :
     (Eval.eval env input).adapter =
       (Eval.eval env ((DivRemChip.circuit (p := p)).output input offset)).adapter := by
-  rw [DivRemChip.circuit_output_eq]
-  rw [DivRemChip.eval_inputs, DivRemChip.eval_divRemCols_adapter_verifier,
-    DivRemChip.populatedRowAt_adapter_eq]
+  rw [DivRemChip.circuit_output_eq, DivRemChip.eval_inputs,
+    DivRemChip.eval_divRemCols_adapter_verifier, DivRemChip.populatedRowAt_adapter_eq]
 
 /-- DivRem's direct output passes the independent CPU-state block through unchanged. -/
 theorem DivRemChip.eval_output_state (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ)
     (env : Environment (ZMod p)) :
     (Eval.eval env input).state =
       (Eval.eval env ((DivRemChip.circuit (p := p)).output input offset)).state := by
-  rw [DivRemChip.circuit_output_eq]
-  rw [DivRemChip.eval_inputs, DivRemChip.eval_divRemCols_state_verifier,
-    DivRemChip.populatedRowAt_state_eq]
+  rw [DivRemChip.circuit_output_eq, DivRemChip.eval_inputs,
+    DivRemChip.eval_divRemCols_state_verifier, DivRemChip.populatedRowAt_state_eq]
 
 /-- Scalar projection of DivRem's committed destination word. -/
 theorem DivRemChip.eval_output_a (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ)

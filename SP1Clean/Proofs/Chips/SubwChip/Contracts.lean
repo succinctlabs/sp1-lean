@@ -27,17 +27,12 @@ private theorem subwInputOpA0_eq_zero_of_mainConstraints
   have flagConstraint : Expression.eval env (input.adapter.op_a_0 - 0) = 0 := by
     apply constraints.1
     simp only [SubwChip.main, circuit_norm]
-    right
-    right
-    right
-    right
-    left
+    right; right; right; right; left
     simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
       Operations.constraints_toFlat, Gadgets.Equality.circuit] using
       equalityConstraint_mem input.adapter.op_a_0 0 _
   rw [eval_sub] at flagConstraint
-  have flagEq := sub_eq_zero.mp flagConstraint
-  simpa only [Expression.eval] using flagEq
+  simpa only [Expression.eval] using sub_eq_zero.mp flagConstraint
 
 /-- SUBW passes its independent R-type adapter input through to the committed output row. -/
 theorem SubwChip.inputOutputAdapter (env : Environment (ZMod p)) :

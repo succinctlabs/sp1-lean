@@ -33,19 +33,15 @@ private theorem addInputOpA0_eq_zero_of_mainConstraints
   have flagConstraint : Expression.eval env (input.adapter.op_a_0 - 0) = 0 := by
     apply constraints.1
     simp only [AddChip.main, circuit_norm]
-    right
-    right
-    right
-    right
-    left
+    right; right; right; right; left
     simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
       Operations.constraints_toFlat, Gadgets.Equality.circuit] using
       equalityConstraint_mem input.adapter.op_a_0 0 _
   rw [eval_sub] at flagConstraint
-  have flagEq := sub_eq_zero.mp flagConstraint
-  simpa only [Expression.eval] using flagEq
+  simpa only [Expression.eval] using sub_eq_zero.mp flagConstraint
 
-set_option maxHeartbeats 1000000 in
+-- This lemma and its `op_c` twin run at the plain default: the former 1000000 ceilings were ~25x
+-- over; measured floors <= 40000.
 omit [Fact (2 ^ 24 < p)] in
 /-- Add's evaluated `op_b` reader index is the corresponding evaluated input projection. -/
 theorem AddChip.eval_opB (env : Environment (ZMod p)) (input : Var AddChip.Inputs (ZMod p)) :
@@ -56,7 +52,6 @@ theorem AddChip.eval_opB (env : Environment (ZMod p)) (input : Var AddChip.Input
   symm
   simp only [ProvableStruct.structEvalProjectionExpr]
 
-set_option maxHeartbeats 1000000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- Add's evaluated `op_c` reader index is the corresponding evaluated input projection. -/
 theorem AddChip.eval_opC (env : Environment (ZMod p)) (input : Var AddChip.Inputs (ZMod p)) :
@@ -133,8 +128,8 @@ theorem AddChip.inputOpA0_eq_zero_of_constraints (env : Environment (ZMod p))
     ((⟨AddChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env).adapter.op_a_0 = 0 := by
   let input : Var AddChip.Inputs (ZMod p) := varFromOffset AddChip.Inputs 0
   let offset := size AddChip.Inputs
-  have rowConstraints : Operations.ConstraintsHold env ((AddChip.main input).operations offset) := by
-    exact (Component.constraintsHold_iff env).mp constraints
+  have rowConstraints : Operations.ConstraintsHold env ((AddChip.main input).operations offset) :=
+    (Component.constraintsHold_iff env).mp constraints
   have flagConstraint : Expression.eval env input.adapter.op_a_0 = 0 :=
     addInputOpA0_eq_zero_of_mainConstraints input offset env rowConstraints
   have inputEq : Eval.eval env input =

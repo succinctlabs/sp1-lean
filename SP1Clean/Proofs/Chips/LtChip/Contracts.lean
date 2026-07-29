@@ -44,7 +44,7 @@ structure LtChip.ControlFacts (isReal isSlt isSltu opA0 : ZMod p) : Prop where
 def LtChip.ActiveSelector (cols : LtChip.Columns (ZMod p)) : Prop :=
   (cols.is_slt = 1 ∧ cols.is_sltu = 0) ∨ (cols.is_slt = 0 ∧ cols.is_sltu = 1)
 
-set_option maxHeartbeats 4000000 in
+-- Runs at the plain default: the former 4000000 ceiling was ~100x over; measured floor <= 40000.
 private theorem LtChip.controlExpressions_subset_constraints
     (input : Var LtChip.Inputs (ZMod p)) (offset : ℕ) :
     ∀ e ∈ LtChip.controlExpressions (p := p) input offset,

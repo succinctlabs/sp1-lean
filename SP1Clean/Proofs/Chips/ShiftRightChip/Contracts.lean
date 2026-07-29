@@ -39,7 +39,7 @@ private theorem ShiftRightChip.opA0Zero_of_coreSpec
   simp only [ShiftRightChip.CoreSpec] at core
   tauto
 
-set_option maxHeartbeats 4000000 in
+-- Runs at the plain default: the former 4000000 ceiling was ~100x over; measured floor <= 40000.
 /-- The physical ShiftRight constraints identify `is_real` with the flag sum, make all four flags
 binary, and enforce the non-`x0` destination route in the folded core. -/
 theorem ShiftRightChip.controlFacts_of_mainConstraints

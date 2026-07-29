@@ -15,7 +15,7 @@ private theorem equalityConstraint_mem (x y : Expression (ZMod p)) (offset : ℕ
   simp [Gadgets.Equality.main, Circuit.forEach.operations_eq, circuit_norm]
   rfl
 
-set_option maxHeartbeats 1000000 in
+-- Runs at the plain default: the former 1000000 ceiling was ~25x over; measured floor <= 40000.
 /-- Project LoadWord's literal `op_a_0 === 0` assertion from the folded native `main`. -/
 theorem LoadWordChip.eval_inputOpA0_eq_zero_of_mainConstraints
     (input : Var LoadWordChip.Inputs (ZMod p)) (offset : ℕ)
@@ -26,17 +26,7 @@ theorem LoadWordChip.eval_inputOpA0_eq_zero_of_mainConstraints
   have routeConstraint : Expression.eval env (input.adapter.op_a_0 - 0) = 0 := by
     apply constraints.1
     simp only [LoadWordChip.main, circuit_norm]
-    right
-    right
-    right
-    right
-    right
-    right
-    right
-    right
-    right
-    right
-    left
+    right; right; right; right; right; right; right; right; right; right; left
     simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
       Operations.constraints_toFlat, Gadgets.Equality.circuit] using
       equalityConstraint_mem input.adapter.op_a_0 0 _

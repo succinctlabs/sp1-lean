@@ -47,7 +47,7 @@ structure BitwiseChip.ControlFacts
 def BitwiseChip.ActiveSelector (cols : BitwiseChip.Columns (ZMod p)) : Prop :=
   cols.is_and = 1 ∨ cols.is_or = 1 ∨ cols.is_xor = 1
 
-set_option maxHeartbeats 4000000 in
+-- Runs at the plain default: the former 4000000 ceiling was ~100x over; measured floor <= 40000.
 private theorem BitwiseChip.controlExpressions_subset_constraints
     (input : Var BitwiseChip.Inputs (ZMod p)) (offset : ℕ) :
     ∀ e ∈ BitwiseChip.controlExpressions (p := p) input offset,
@@ -135,8 +135,7 @@ theorem BitwiseChip.selectorActive_of_mainConstraints
   rcases control.andBinary with and0 | and1
   · rcases control.orBinary with or0 | or1
     · rcases control.xorBinary with xor0 | xor1
-      · exfalso
-        rw [xor0, or0, and0] at sumOne
+      · rw [xor0, or0, and0] at sumOne
         simp at sumOne
       · exact Or.inr (Or.inr xor1)
     · exact Or.inr (Or.inl or1)
