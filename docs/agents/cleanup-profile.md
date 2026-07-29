@@ -369,6 +369,32 @@ Per site:
 > aggregate declared budget 174M → 31.5M (5.5×). A batch that removes nothing has not necessarily
 > failed; report the ratchet separately from the removal count, or a real 5.5× win reads as a
 > zero-yield batch.
+>
+> **What predicts removability is the declaration's *role*, not its chip and not its file's family.**
+> Three W4/W5 batches over the *same nine Load/Store chips* settled this. At the
+> `Proofs/Chips/*/Formal.lean` layer: **0 of 19** removable, floors (150k, 400k]. At the
+> `Proofs/Chips/*/Bridge.lean` layer: **21 of 21**. At the `Faithful/` anchor layer: **52 of 52**.
+> Same chips, three orders of magnitude apart — because chip `Formal.lean` proofs are
+> `circuit_proof_start` whnf towers while the anchors are `rw`/`simp only` syntactic bridges over
+> already-elaborated oracle lists. Within one layer the role still discriminates: across the six
+> `Faithful/` ALU anchors, `*_memory_*`/`*_byte_*`/`*_constraints_faithful` all floor ≤40000, while
+> `*cols_state_*`/`*cols_program_*` floor in (40k, 60k] and `*_interactions_faithful` in (60k, 100k].
+> Counter-intuitively **State/Program anchors cost more than Byte anchors** — Byte has 12 emits and
+> clears 40000, Program has 1 and does not. The cost is channel-distinctness filtering, not emit
+> count. Screen by role; never extrapolate a floor across layers.
+>
+> **A floor measured through the LSP is not a floor against the gate.** The `lean-lsp` server does
+> not apply the pillar libs' `moreLeanArgs`, the same reason `lake env lean` cannot certify a pass
+> (§7). So when KEEPING a ceiling, set it at roughly **4× the measured floor bracket**, not at the
+> bare lowest passing rung — a 1× margin is measured under weaker options than the build will use.
+> Removal is unaffected: a site that clears ≤40000 against a 200000 default has ≥5× headroom either
+> way.
+>
+> **Prefix scratchpad helper scripts with your batch id.** The scratchpad is shared across concurrent
+> workers. A W5 worker's `rung.py` was silently overwritten mid-batch by a sibling's same-named
+> script using a different sentinel convention, so its delete pass wrote `maxHeartbeats 0` — a
+> **valid but wrong** Lean option — instead of removing the lines. It failed no build and raised no
+> error; only the worker's own post-pass grep caught it. Use `w5b1_rung.py`, not `rung.py`.
 
 ### Cause classes, most valuable first
 
@@ -440,6 +466,17 @@ from (40000, 100000] — a keep-and-lower — down past 40000, making the site r
 > running the same tactic is **not** evidence the ceilinged one is vestigial. When the suspect tactic
 > is context-sensitive (`simp_all`, `omega` over a large hypothesis set, `aesop`), measure rather than
 > screen.
+>
+> **The high-yield instance: an inline obligation with no chip content.** In the load `Bridge.lean`
+> files, `advance_of_load_width{1,2,4}`'s `hpin` obligation was discharged inline as
+> `by intro w' u' h; simp only [loadOpcode] at h; cases u' <;> split_ifs … <;> simp_all [...]` — a
+> `simp_all` against the whole post-`obtain` `advance` context, twice per file across six places.
+> The obligation is a pure `loadOpcode` fact about loose `isU`; it never needed the context at all.
+> Extracting it as a `private lemma` (§4a) moved all three sites from **FAIL at 400000 to PASS at
+> ≤40000**, over 100×, and turned three "genuinely binding" ceilings into removable ones.
+> **`Model/Semantics/Decode.lean` already owned the exact `storeOpcode_pin_one` analogue — only
+> `loadOpcode` lacked one.** When an inline `by …` obligation mentions none of the surrounding
+> circuit's variables, that asymmetry *is* the cost; look for a proved sibling before measuring.
 
 **1e. A `set` over a large term is an `isDefEq` abstraction across the whole goal.**
 `set x := <big populate tower> with h` forces an abstraction pass over everything in scope, and on a
