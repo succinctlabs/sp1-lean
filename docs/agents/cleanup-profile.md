@@ -225,6 +225,15 @@ Verify with `lean_goal`, or a build, before removing:
 > loud and safe. It is that deleting the local can make `Fact p.Prime` newly *used*, which **adds a
 > binder to the signature**. That is a statement change, and it is quiet.
 >
+> **A cheaper standing check: `linter.unusedSectionVars`.** Zero `unusedSectionVars` warnings ⟺ every
+> section instance is still used ⟺ no binder was dropped. So if a golf stops using an instance, the
+> fix is **not** `omit` (which removes the binder and *changes the signature*) — it is
+> `set_option linter.unusedSectionVars false in`, which keeps the auto-included binder and leaves the
+> signature byte-identical. `LtOperationSigned.zero_ne_one'` is the worked case: its one-line rewrite
+> stopped using `Fact (2 ^ 17 < p)`, and the `set_option` is what preserved the statement. Note the
+> asymmetry — a **new** declaration takes the ordinary `omit [Fact (2 ^ 17 < p)] in`, because it has
+> no prior signature to preserve.
+>
 > **The recipe — `#check`, delete, re-elaborate, `#check` again.** Compare the printed signatures
 > before and after; they must be byte-identical. Deletion-and-re-elaboration alone is necessary but
 > **not sufficient**, because a signature can gain a binder while every proof still compiles. Never
