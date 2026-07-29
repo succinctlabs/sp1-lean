@@ -989,6 +989,27 @@ Per gated group, stopping at the first failure:
    run 1's wall clock to the recorded baseline — a **>1.5×** regression fails even when green.
 6. **Source guards** — `check_no_native_decide.sh`, `check_no_skipkerneltc.sh`,
    `check_heartbeats.sh` (may only ratchet **down**).
+> ### ⚠ `lake env lean` does NOT rebuild edited dependencies — it checks against stale oleans
+>
+> This is the campaign's preferred per-file verifier (it applies the pillar's `moreLeanArgs`, which
+> the LSP does not). But `lake env` **only sets the environment — it builds nothing**. Measured:
+> after W8/b1 edited `TypedMemoryBalance.lean`, its source was 4 hours newer than its `.olean`, and
+> a `lake env lean` run on the *dependent* `MemoryFrontier.lean` resolved happily against the stale
+> one and reported green.
+>
+> So the instrument is **stronger than the LSP on flags and weaker on freshness** — the LSP at least
+> answers `Imports are out of date`. Neither is a pass oracle for a *pair* of edited files.
+>
+> **Mitigations, in order:**
+> 1. Work **deepest-first** within a batch, so each file is verified before its dependencies move.
+>    (Necessary, not sufficient: the deep file is then never re-checked against the new shallow one.)
+> 2. After editing a dependency, run `lake build <Dep.Module>` to refresh its olean, *then* re-verify
+>    the dependents.
+> 3. Treat the gate's full `lake build SP1Clean` as the only joint confirmation — which it already is.
+>
+> A batch that edits an import chain must **say so explicitly in its report**, as W8/b1 did, so the
+> gate knows which verdicts were provisional.
+
 > **`local macro` is an established construct in `Soundness/`, and it is invisible to the
 > statement-preservation gate.** It predates the marathon (introduced by `829a8596`/`a5f900fe`/
 > `64883a2a`) and `lake lint` has always passed over it, so a batch may use it without treating it as

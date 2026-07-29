@@ -76,7 +76,10 @@ remain reserved. See `docs/roadmap.md` and `docs/architecture.md`.
 - Tests: `lake test` (the `SP1CleanTest` `testDriver`). Builds/elaborates the witness- and trace-conformance
   anchors — the project's **only** `native_decide` — checked against batteries dumped from SP1's real Rust
   prover. Runs on top of the cached main-library oleans (the test lib imports `SP1Clean`, never vice-versa).
-- Single file: `lake env lean SP1Clean/Proofs/Chips/AddChip/Formal.lean` (builds deps from cache, then elaborates).
+- Single file: `lake env lean SP1Clean/Proofs/Chips/AddChip/Formal.lean` (elaborates against the
+  **already-built** oleans). ⚠ `lake env` only sets the environment — **it does not build anything**.
+  If you have edited a dependency, its olean is stale and this command silently checks against the
+  *old* one. Run `lake build <Dep.Module>` first, or finish with `lake build SP1Clean`.
   ⚠️ `lake env lean <file>` **exits 0 even on a Lean stack overflow**, and a stale cached olean can make
   downstream checks pass falsely — **always finish a phase with `lake build SP1Clean`**.
 - **Build concurrency.** Elaboration is heavy (full build is ~1800+ jobs across Clean + mathlib + Sail; the
