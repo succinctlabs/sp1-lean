@@ -380,5 +380,42 @@
 # there cleared 40000, including three declared at 4000000. Ask the fold question first; use role only
 # to break ties within one family.
 # All ladders are recorded in the doc-comments at each site.
-SP1Clean 428
+# -54 (2026-07-29, proof-cleanup W6/r2): ratchet DOWN, no ceiling raised. 54 directives deleted, 0
+# re-added; the count reconciles EXACTLY (428 - 39 - 12 - 3 = 374), the EIGHTH consecutive round to
+# confirm the recorded number is honest.
+# By batch:
+#   * b3 — Faithful/DivRemChip/Exact.lean, the DENSEST ceiling file in the repo: 39 of 44 removed,
+#     declared budget 464,000,000 -> 66,000,000. Survivors: `divRemCoreForallDecompose`,
+#     `divRemLowerBackward` and `divRemUpperBackward` (all floors in (40000, 100000], kept at 400000)
+#     and `divRemWholeAssertionsExact` (floor in (100000, 200000], kept at 800000) — each at ~4x its
+#     bracket top per the LSP-vs-gate margin rule. `divRemRustAssertionsDecompose` was LEFT UNCHANGED
+#     at 64,000,000: it fails at 8,000,000, and 4x its bracket top is exactly 64,000,000, so it was
+#     already sized correctly.
+#   * b4 — Faithful/MulChip.lean: 12 of 16 removed, 30,500,000 -> 1,800,000. Two survivors are the
+#     campaign's first ceilings declared BELOW the plain 200000 default —
+#     `mulOperation_assertions_forward` (100000, floor (40000, 60000]) and `_backward` (100000, floor
+#     (40000, 80000]) — ~1.7x and ~1.25x headroom, left byte-identical since they neither qualify for
+#     removal nor may be raised.
+#   * b5 — Faithful/DivRemChip.lean: 3 of 7 removed, 82,000,000 -> 2,400,000; one site was 64,000,000
+#     against a <=40000 floor, ~1600x over. The four keeps are three of the `*_roundtrip` family plus
+#     `divRemChip_lookups_empty`.
+# MASKING struck in ALL THREE batches and would have cost 5 removals: b3 twice (two sites cascading
+# `(kernel) unknown constant '_private....'`, hiding a 16,000,000 and a 32,000,000 at ~400x and ~800x
+# over), b4 once (hiding a 1,000,000 at >=25x), b5 once (hiding a 2,000,000 at >=50x — and there the
+# MASK MOVED BETWEEN PASSES, naming a different producer at 40000 than at 100000 as the producers'
+# pass/fail set changed, and also landing on two UNCEILINGED consumers).
+# THE REFINED PREDICTOR HELD at n=44, n=16 and n=7: what binds is not touching an unfolded generated
+# list but letting it reach a `congr`/`isDefEq`/unification step. b5 supplies the sharpest near-miss —
+# `divRemHeaderBlocks_roundtrip` and its three siblings share identical tactic text, but the header
+# chunk's offsets all land in the first `Vector` append arm so its `rw` ladder terminates early; it
+# clears 40000 while the other three bind at `whnf`.
+# A GATE FINDING, and the first measured cost of a §2.4b Prop-field golf: b5 also converted
+# `divRemChipRowCodec`'s `rowInput_eq` field from `by exact <term>` to the bare term. Statement
+# unchanged and axiom-clean, but the DOWNSTREAM module `Faithful/DivRemChip/Exact.lean` — which cites
+# `divRemChipRowCodec` — went from 260s to >1230s (killed, still climbing; `sample` showed the process
+# pinned in `isDefEqDelta`/`whnf`/`unfoldDefinition`). A tactic-block field is auto-abstracted into an
+# opaque auxiliary proof constant; the term-mode form is inlined and delta-unfolds into
+# `DivRemChip.circuit`. Reverting that ONE hunk restored 260s. Prop-valued fields remain golfable, but
+# on a `def` that a heavy module unfolds, `by exact` is load-bearing opacity — A/B time it downstream.
+SP1Clean 374
 SP1CleanTest 16

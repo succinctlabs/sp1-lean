@@ -429,7 +429,6 @@ private theorem divRemLocalBlock_eq_of_get {F : Type}
   exact hget i hi
 
 set_option linter.unusedSimpArgs false in
-set_option maxHeartbeats 2000000 in
 set_option maxRecDepth 100000 in
 private theorem divRemHeaderBlocks_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :
@@ -478,7 +477,7 @@ private theorem divRemHeaderBlocks_roundtrip {F : Type}
   all_goals (congr 1; omega)
 
 set_option linter.unusedSimpArgs false in
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 400000 in
 set_option maxRecDepth 100000 in
 private theorem divRemComparisonBlocks_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :
@@ -527,7 +526,7 @@ private theorem divRemComparisonBlocks_roundtrip {F : Type}
   all_goals (congr 1; omega)
 
 set_option linter.unusedSimpArgs false in
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 800000 in
 set_option maxRecDepth 100000 in
 private theorem divRemArithmeticBlocks_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :
@@ -590,7 +589,7 @@ private theorem divRemArithmeticBlocks_roundtrip {F : Type}
     rfl
 
 set_option linter.unusedSimpArgs false in
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 400000 in
 set_option maxRecDepth 100000 in
 private theorem divRemResultBlocks_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :
@@ -858,7 +857,6 @@ private theorem eval_divRemLtOfLocals
   · rw [DivRemChip.populatedRowAt_ltComparisonLimbs_eq]
     exact eval_divRemLocalBlock input locals data (fields 2) 197 (by decide)
 
-set_option maxHeartbeats 2000000 in
 theorem eval_divRemChipDirectOutput
     (cols : DivRemChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -1121,7 +1119,7 @@ def divRemChipRowCodec :
         Air.Flat.Component.rowOffset_mk]
       exact eval_divRemChipDirectOutput (p := p) cols data }
 
-set_option maxHeartbeats 8000000 in
+set_option maxHeartbeats 800000 in
 theorem divRemChip_lookups_empty :
     (⟨DivRemChip.circuit (p := p)⟩ :
       Air.Flat.Component (ZMod p)).operations.lookups = [] := by
@@ -1149,7 +1147,6 @@ theorem divRemChip_lookups_empty :
     U16toU8OperationSafe.circuit, U16toU8OperationSafe.main,
     DivRemChip.assertZeros, Gadgets.Equality.main, circuit_norm]
 
-set_option maxHeartbeats 64000000 in
 /-- Evaluate the large Rust-shaped own-assert tail without unfolding it at the chip boundary.
 `DivRemCore.ownAsserts_map_eval` is the expensive carrier-generic theorem; this wrapper supplies
 its projection pins from the standard `ProvableStruct` evaluators once. The exact whole-chip
