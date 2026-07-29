@@ -383,6 +383,21 @@ Per site:
 > clears 40000, Program has 1 and does not. The cost is channel-distinctness filtering, not emit
 > count. Screen by role; never extrapolate a floor across layers.
 >
+> **The unifying cause, and it is Clean's own doctrine: does the proof ever hold an unfolded
+> generated Rust list in a goal?** That single question explains every result above. Jal/Jalr/UType
+> use the folded `native*Meaning`/`rust*Meaning` template — every heavy step hides behind a
+> `private def … : Prop` — and went **18 of 18 removed**, all floors ≤40000. Lt and Bitwise do not
+> fully fold, and their four survivors are precisely the sites where a 19-cell `toElements`, a raw
+> `asserts` list, or the four-bus interaction list reaches an `isDefEq`. This is
+> `doc/performance-problems.md`'s whnf-into-expensive-values doctrine, measured. **The fix for a
+> binding site is therefore usually to fold, not to lower** — see cause class 1d.
+>
+> Two corollaries that break the sibling screen in both directions: a declared **200000** ceiling is
+> not automatically a no-op (`ltChip_interactions_faithful` fails at 100000 — it sits at the plain
+> default with *zero* headroom, the campaign's second under-provisioned site), and two **adjacent**
+> lemmas over the same 19-cell structure split >25× (`toElements_…` floors in (800k, 1M];
+> `getElem_toElements_…` clears 40000).
+>
 > **A floor measured through the LSP is not a floor against the gate.** The `lean-lsp` server does
 > not apply the pillar libs' `moreLeanArgs`, the same reason `lake env lean` cannot certify a pass
 > (§7). So when KEEPING a ceiling, set it at roughly **4× the measured floor bracket**, not at the
