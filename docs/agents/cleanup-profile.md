@@ -226,6 +226,12 @@ Verify with `lean_goal`, or a build, before removing:
 - A `change` that only restates an `abbrev` is free to delete when the closer is a term rather than a
   tactic that needed the syntactic form. `MicroTime.chainState_succ_front` went from 8 lines to 2
   this way (three pure-defeq `change`s dropped, body now `exact congrArg (·.bind Machine.stepOnce) ih`).
+  > **But check it is really restating the *same* constant.** `TimedGrounding.stepOnce_of_sailStep`'s
+  > `change SP1Clean.Machine.stepOnce s = some s'` looks like the same pattern and is **load-bearing**:
+  > `Semantics.stepOnce` is a *distinct constant*, so the `change` is precisely what makes the next
+  > line's `unfold` possible. Deleting it gives ``unfold` failed to unfold `Machine.stepOnce``. The
+  > rule is about a defeq restatement of one abbrev — not about a `change` that crosses two constants
+  > which merely print alike.
 
 - **`have ⟨…⟩ := h` destructures without consuming; `rcases`/`obtain` clears `h`.** Where a proof needs
   a hypothesis both whole *and* destructured, the usual `refine ⟨valid, ?_⟩` + `rcases valid` dance is
@@ -289,6 +295,12 @@ Per site:
    recipe (`circuit_proof_start_core`), and "keep hypothesis types folded". Then
    `proof-patterns.md` § "maxHeartbeats: the fold recipe + no-bump discipline". **`#count_heartbeats`
    lies** — measure from the build log.
+> **`set_option … in` must precede the docstring, not sit between it and the declaration.** Putting it
+> after a `/-- … -/` gives `unexpected token 'set_option'; expected 'lemma'` — and the real damage is
+> that a ladder pass then **silently skips that site's rung**, with no timeout appearing, so the pass
+> reports a clean result for a site it never actually tested. Check placement before trusting a
+> measurement round.
+>
 > **Never write the literal string `set_option maxHeartbeats` inside a comment or docstring.**
 > `scripts/check_heartbeats.sh` counts sites with a raw `grep -rc "set_option maxHeartbeats"` — it
 > does not parse Lean, so a comment mentioning the option scores as a live ceiling and silently
@@ -311,6 +323,14 @@ fixed arguments into one local `have key := fun …` instead of repeating them 1
 `first` ladder with **ordered bullets**, one per goal. Whenever you see `<;> first |` over many goals,
 suspect this before anything else.
 
+> **First check whether the ladder is just `assumption`.** If every alternative is a bare context
+> reference (`first | exact h0 | exact h1 | … | exact h15` over `interval_cases`-generated goals), the
+> whole thing collapses to plain **`assumption`** — one token, no restart-from-top duplication, and it
+> *removes* lines rather than adding them. This is strictly cheaper than the ordered-bullets rewrite
+> below, which costs roughly +14 lines per site. Measured on `MulOperation/Formal.lean`, where it also
+> retired two 211-codepoint lines and verified at a *lower* rung than the site needed pre-fix. Only
+> reach for ordered bullets when the alternatives are genuine tactic blocks with side conditions.
+>
 > **Sorting the ladder does not help — only bullets do.** `ShiftRightChip/Core.lean`'s `cb_aux`
 > ladder was *already* in goal order (0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15 — which independently
 > confirms the bit-reversal permutation) and still paid the full 120 wasted alternatives, because
