@@ -36,7 +36,6 @@ def sp1_sw (pc : BitVec 64) (addr : BitVec 64) (data : BitVec 32) : SailM Execut
       (addr.toNat + 3) (BitVec.ofNat 8 (data.toNat >>> 24))) }
   pure RETIRE_SUCCESS
 
-set_option maxHeartbeats 10000000 in
 /-- Core correctness. This statement is purely about `BitVec`s / the `SailState`, independent of `p`. -/
 theorem correct_store_word_native
     (rs1_idx rs2_idx : BitVec 5) (imm : BitVec 12) (reg_val : BitVec 64)
@@ -53,7 +52,7 @@ theorem correct_store_word_native
           (Sail.BitVec.extractLsb stored 31 0)).run s := by
   have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   have hsp_init : SailState.isInitialized sp :=
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
@@ -66,12 +65,12 @@ theorem correct_store_word_native
       show (s.regs.insert Register.nextPC (pc + 4#64)).get reg _ = _
       rw [Std.ExtDHashMap.get_insert]; simp [Ne.symm hne]
     exact
-      { h_cur_privilege := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hcp
-        h_mprv_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmprv
-        h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsec
-        h_mseccfg_pmm := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsecpmm
-        h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
-        h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
+      { h_cur_privilege := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mprv_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_pmm := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_htif_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
     rwa [hsp, SailState.get_reg?_insert_nextPC]
   have hsp_rs2 : sp.get_reg? rs2_idx = some stored := by
@@ -213,7 +212,6 @@ def AdvanceReady (inp : Inputs (ZMod p)) (_cols : StoreWordChip.Columns (ZMod p)
   Word.isU64 inp.op_b_val ∧ Word.isU64 inp.op_c_imm ∧
   inp.state.pc[0].val < 2 ^ 16
 
-set_option maxHeartbeats 2000000 in
 /-- **`StoreWordChip.advance`** — the per-SW-row `try_step` lift. Over `advance_of_store` +
 `execute_STORE_reaches_width4` (via `decodesStore 4`): a 4-byte write, no register write; the four bytes
 are `byteAt` at `addr .. addr+3` = the low 4 bytes of `op_a_memory.prev_value`. -/

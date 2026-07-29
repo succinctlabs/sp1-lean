@@ -45,7 +45,6 @@ def sp1_sd (pc : BitVec 64) (addr : BitVec 64) (stored : Word (ZMod p)) : SailM 
       (addr.toNat + 7) (BitVec.ofNat 8 (data.toNat >>> 56))) }
   pure RETIRE_SUCCESS
 
-set_option maxHeartbeats 10000000 in
 omit [Fact (2 ^ 17 < p)] in
 theorem correct_store_double_native
     (rs1_idx rs2_idx : BitVec 5) (imm : BitVec 12) (reg_val : BitVec 64)
@@ -63,7 +62,7 @@ theorem correct_store_double_native
   haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   -- The post-nextPC-write state: only `regs` changes, so `mem`/config registers persist.
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   have hsp_init : SailState.isInitialized sp :=
@@ -77,12 +76,12 @@ theorem correct_store_double_native
       show (s.regs.insert Register.nextPC (pc + 4#64)).get reg _ = _
       rw [Std.ExtDHashMap.get_insert]; simp [Ne.symm hne]
     exact
-      { h_cur_privilege := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hcp
-        h_mprv_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmprv
-        h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsec
-        h_mseccfg_pmm := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsecpmm
-        h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
-        h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
+      { h_cur_privilege := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mprv_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_pmm := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_htif_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
   -- Register reads of `rs1` (base) and `rs2` (stored value) survive the `nextPC` write.
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
     rwa [hsp, SailState.get_reg?_insert_nextPC]
@@ -248,7 +247,6 @@ def AdvanceReady (inp : Inputs (ZMod p)) (_cols : StoreDoubleChip.Columns (ZMod 
   Word.isU64 inp.op_b_val ∧ Word.isU64 inp.op_c_imm ∧
   inp.state.pc[0].val < 2 ^ 16
 
-set_option maxHeartbeats 2000000 in
 /-- **`StoreDoubleChip.advance`** — the per-SD-row `try_step` lift. Over `advance_of_store` +
 `execute_STORE_reaches_width8` (via `decodesStore' 8`): an 8-byte write, no register write; the eight
 bytes are `byteAt` at `addr .. addr+7` = the little-endian bytes of `op_a_memory.prev_value` (full rs2). -/

@@ -67,12 +67,12 @@ private lemma persist_nextPC (rs1_idx : BitVec 5) (reg_val pc : BitVec 64)
       show (s.regs.insert Register.nextPC (pc + 4#64)).get reg _ = _
       rw [Std.ExtDHashMap.get_insert]; simp [Ne.symm hne]
     exact
-      { h_cur_privilege := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hcp
-        h_mprv_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmprv
-        h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsec
-        h_mseccfg_pmm := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsecpmm
-        h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
-        h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
+      { h_cur_privilege := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mprv_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_pmm := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_htif_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
   · rwa [SailState.get_reg?_insert_nextPC]
 
 /-! ## The four width-core lemmas
@@ -80,7 +80,6 @@ private lemma persist_nextPC (rs1_idx : BitVec 5) (reg_val pc : BitVec 64)
 Each proves the read succeeds and the `x0` write is discarded, so `specX0 _ W imm rs1 0#5` reduces to
 `sp1_loadX0 pc`. Generic in `is_unsigned` (the discarded `extend_value` mode). -/
 
-set_option maxHeartbeats 10000000 in
 omit [Fact (2 ^ 17 < p)] in
 theorem loadX0_w1 (is_unsigned : Bool)
     (rs1_idx : BitVec 5) (imm : BitVec 12) (reg_val : BitVec 64) (data₀ : BitVec 8)
@@ -95,11 +94,10 @@ theorem loadX0_w1 (is_unsigned : Bool)
     (specX0 is_unsigned 1 imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s := by
   have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   obtain ⟨hsp_init, hsp_config, hsp_rs1, hmem_eq⟩ := persist_nextPC rs1_idx reg_val pc s hs hconfig h_rs1
-  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rwa [hmem_eq]
+  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := hmem_eq ▸ hmem₀
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 1 = true := by
     rwa [is_aligned_vaddr_iff_mod]
   have h_in_range :
@@ -114,7 +112,6 @@ theorem loadX0_w1 (is_unsigned : Bool)
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
     LeanRV64D.Functions.xlen_bytes, PreSail.assert, hread]
 
-set_option maxHeartbeats 10000000 in
 omit [Fact (2 ^ 17 < p)] in
 theorem loadX0_w2 (is_unsigned : Bool)
     (rs1_idx : BitVec 5) (imm : BitVec 12) (reg_val : BitVec 64) (data₀ data₁ : BitVec 8)
@@ -130,13 +127,11 @@ theorem loadX0_w2 (is_unsigned : Bool)
     (specX0 is_unsigned 2 imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s := by
   have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   obtain ⟨hsp_init, hsp_config, hsp_rs1, hmem_eq⟩ := persist_nextPC rs1_idx reg_val pc s hs hconfig h_rs1
-  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rwa [hmem_eq]
-  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
-    rwa [hmem_eq]
+  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := hmem_eq ▸ hmem₀
+  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := hmem_eq ▸ hmem₁
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 2 = true := by
     rwa [is_aligned_vaddr_iff_mod]
   have h_in_range :
@@ -151,7 +146,6 @@ theorem loadX0_w2 (is_unsigned : Bool)
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
     LeanRV64D.Functions.xlen_bytes, PreSail.assert, hread]
 
-set_option maxHeartbeats 10000000 in
 omit [Fact (2 ^ 17 < p)] in
 theorem loadX0_w4 (is_unsigned : Bool)
     (rs1_idx : BitVec 5) (imm : BitVec 12) (reg_val : BitVec 64)
@@ -170,17 +164,13 @@ theorem loadX0_w4 (is_unsigned : Bool)
     (specX0 is_unsigned 4 imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s := by
   have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   obtain ⟨hsp_init, hsp_config, hsp_rs1, hmem_eq⟩ := persist_nextPC rs1_idx reg_val pc s hs hconfig h_rs1
-  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rwa [hmem_eq]
-  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
-    rwa [hmem_eq]
-  have hm₂ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 2]? = some data₂ := by
-    rwa [hmem_eq]
-  have hm₃ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]? = some data₃ := by
-    rwa [hmem_eq]
+  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := hmem_eq ▸ hmem₀
+  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := hmem_eq ▸ hmem₁
+  have hm₂ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 2]? = some data₂ := hmem_eq ▸ hmem₂
+  have hm₃ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]? = some data₃ := hmem_eq ▸ hmem₃
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 4 = true := by
     rwa [is_aligned_vaddr_iff_mod]
   have h_in_range :
@@ -196,7 +186,6 @@ theorem loadX0_w4 (is_unsigned : Bool)
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
     LeanRV64D.Functions.xlen_bytes, PreSail.assert, hread]
 
-set_option maxHeartbeats 10000000 in
 omit [Fact (2 ^ 17 < p)] in
 theorem loadX0_w8 (is_unsigned : Bool)
     (rs1_idx : BitVec 5) (imm : BitVec 12) (reg_val : BitVec 64)
@@ -219,25 +208,17 @@ theorem loadX0_w8 (is_unsigned : Bool)
     (specX0 is_unsigned 8 imm rs1_idx 0#5).run s = (sp1_loadX0 pc).run s := by
   have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   obtain ⟨hsp_init, hsp_config, hsp_rs1, hmem_eq⟩ := persist_nextPC rs1_idx reg_val pc s hs hconfig h_rs1
-  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := by
-    rwa [hmem_eq]
-  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := by
-    rwa [hmem_eq]
-  have hm₂ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 2]? = some data₂ := by
-    rwa [hmem_eq]
-  have hm₃ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]? = some data₃ := by
-    rwa [hmem_eq]
-  have hm₄ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 4]? = some data₄ := by
-    rwa [hmem_eq]
-  have hm₅ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 5]? = some data₅ := by
-    rwa [hmem_eq]
-  have hm₆ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 6]? = some data₆ := by
-    rwa [hmem_eq]
-  have hm₇ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 7]? = some data₇ := by
-    rwa [hmem_eq]
+  have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]? = some data₀ := hmem_eq ▸ hmem₀
+  have hm₁ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 1]? = some data₁ := hmem_eq ▸ hmem₁
+  have hm₂ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 2]? = some data₂ := hmem_eq ▸ hmem₂
+  have hm₃ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 3]? = some data₃ := hmem_eq ▸ hmem₃
+  have hm₄ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 4]? = some data₄ := hmem_eq ▸ hmem₄
+  have hm₅ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 5]? = some data₅ := hmem_eq ▸ hmem₅
+  have hm₆ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 6]? = some data₆ := hmem_eq ▸ hmem₆
+  have hm₇ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 7]? = some data₇ := hmem_eq ▸ hmem₇
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 8 = true := by
     rwa [is_aligned_vaddr_iff_mod]
   have h_in_range :
@@ -601,7 +582,6 @@ def advanceReady (inp : Inputs (ZMod p)) (_cols : LoadX0Chip.Columns (ZMod p))
         s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
           + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 7]? = some b₇ ) )
 
-set_option maxHeartbeats 4000000 in
 /-- **`LoadX0Chip.advance`** — the per-LoadX0-row `try_step` lift (SC Phase 4), a seven-way opcode
 dispatch into the width-`N` no-write load adapters (`advance_of_load_x0_width{1,2,4,8}`). `op_a = 0`
 (so `rd = x0`, the read discarded) and the low-pc bound come from `advanceReady`; `himmb`/`himmc`/

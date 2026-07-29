@@ -45,7 +45,7 @@ theorem correct_jal_native
     (spec_jal imm (.Regidx rd)).run s
       = (sp1_jal (.Regidx rd) pc next_pc_word op_a_word).run s := by
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   have hsp_init : SailState.isInitialized sp :=
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
@@ -85,7 +85,7 @@ theorem correct_jal_native_x0
     (spec_jal imm (.Regidx 0#5)).run s
       = (sp1_jal (.Regidx 0#5) pc next_pc_word op_a_word).run s := by
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   have hsp_init : SailState.isInitialized sp :=
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)

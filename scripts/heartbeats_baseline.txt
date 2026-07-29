@@ -231,5 +231,57 @@
 #     above the ALU chips) but the declared numbers were pure copy-paste, five of the nine files
 #     carrying a uniform 16000000 against floors an order of magnitude below it. "Kept" and
 #     "correctly sized" are different findings, and only a ladder separates them.
-SP1Clean 644
+# -147 (2026-07-29, proof-cleanup W5/r1): ratchet DOWN, no ceiling raised. 147 directives deleted,
+# 0 re-added; the count reconciles EXACTLY (644 - 147 = 497), the FIFTH consecutive round to confirm
+# the recorded number is honest and that no phantom has re-appeared. This is the LARGEST SINGLE-ROUND
+# DROP OF THE CAMPAIGN, more than twice the previous record (W3/r1's -51).
+# By batch, measured at the gate rather than taken from the dispatch manifest, whose per-batch
+# numbers were wrong in all four cases:
+#   * b1 — the nine Faithful/ Load/Store anchors (LoadByte/Half/Word/Double/X0, StoreByte/Half/
+#     Word/Double): ALL 52 sites removed, aggregate declared budget 61,000,000 -> 0. Not one
+#     survivor across nine files.
+#   * b2 — the six Faithful/ ALU anchors (AddChip, AddiChip, AddwChip, SubChip, SubwChip, AluX0):
+#     43 of 58 removed, 127,000,000 -> 6,400,000. The 15 KEPT sites are exactly the two roles W4
+#     identified as costly — the `*cols_state_*`/`*cols_program_*` anchors (floors 40k-60k, kept at
+#     250000) and the `*_interactions_faithful` anchors (floors 60k-100k, kept at 400000) — plus
+#     `aluX0Chip_constraints_faithful`, kept at 2000000, the only site in the batch above the plain
+#     default.
+#   * b3 — the five remaining Faithful/ instruction anchors (LtChip, BitwiseChip, JalChip, JalrChip,
+#     UTypeChip): 31 of 35 removed, 58,000,000 -> 3,000,000. Jal/Jalr/UType went 18 of 18. The four
+#     survivors are LtChip:1477 (unchanged at 200000) and three lowered BitwiseChip sites
+#     (2000000, 400000, 400000).
+#   * b4 — the ten Proofs/Chips/*/Bridge.lean files: ALL 21 sites removed, 148,000,000 -> 0. Three
+#     of those 21 were GENUINE, not vestigial, and are the round's cause fix (below).
+# Two results are worth recording:
+#   * b4's THREE GENUINE CEILINGS, closed by a cause fix rather than a ladder. `LoadByte`/`LoadHalf`/
+#     `LoadWord` `.advance` still FAILED at 400000. Their `hpin` obligation was discharged inline as
+#     a `simp_all` against the whole post-`obtain` `advance` context, but the obligation is a pure
+#     `loadOpcode` fact about loose `isU` that never needed that context at all. Extracting
+#     `loadOpcode_pin_{one,two,four}` as `private lemma`s (§4a) moved all three to PASS at <=40000 —
+#     over 100x — and turned three binding ceilings into removable ones.
+#     `Model/Semantics/Decode.lean` ALREADY OWNED the exact `storeOpcode_pin_one` analogue; only
+#     `loadOpcode` lacked one, which is why the store half of the same batch never needed the fix.
+#     These are the only three declarations added this round; all are `private` and none matches a
+#     `gen_axiom_probe.py` glob (the probe regenerates byte-identical at 478 entries).
+#   * THE UNIFYING FINDING, now measured across three layers over the SAME nine Load/Store chips:
+#     removability tracks whether the proof ever holds an UNFOLDED GENERATED RUST LIST in a goal.
+#     `Proofs/Chips/*/Formal.lean` — 0 of 19 removable (W4/g1/b4); `Proofs/Chips/*/Bridge.lean` —
+#     21 of 21; the `Faithful/` anchors — 52 of 52. Same chips, three orders of magnitude apart,
+#     because chip `Formal.lean` proofs are `circuit_proof_start` whnf towers while the bridges and
+#     anchors are syntactic `rw`/`simp only` work over already-elaborated oracle lists. Screen by
+#     the declaration's ROLE; never extrapolate a floor across layers.
+# TWO DISCLOSURES:
+#   * `ltChip_interactions_faithful` (Faithful/LtChip.lean:1477) is UNDER-PROVISIONED: floor in
+#     (100000, 200000] against a declared 200000 — the plain default, with ZERO headroom. Raising it
+#     is prohibited (§2.9); the real fix is a cause fix on the `isDefEq` at LtChip.lean:1690. Any
+#     drift in `Proofs/Chips/LtChip/Formal.lean` or `Extracted/ChipOracle/Lt.lean` will break the
+#     build with nothing to absorb it. This is the campaign's SECOND such site, after
+#     `StoreByteChip.circuit`.
+#   * b2 and b3 sized their KEPT ceilings at ~2-4x the measured floor rather than at the bare lowest
+#     passing rung, because those floors were measured through the LSP, which does not apply the
+#     pillar libs' `moreLeanArgs`. The gate build agreed with every kept value — no site needed
+#     adjusting — but that margin is why they are not tighter, and it should not be silently
+#     re-lowered by a later pass.
+# All ladders are recorded in the doc-comments at each former site.
+SP1Clean 497
 SP1CleanTest 16

@@ -102,7 +102,6 @@ def sp1_lb (rd : BitVec 5) (pc : BitVec 64) (val64 : BitVec 64) : SailM Executio
   wX_bits (.Regidx rd) val64
   pure RETIRE_SUCCESS
 
-set_option maxHeartbeats 10000000 in
 /-- Core correctness: a width-1 Sail `LOAD` reading the byte `data₀` at the address agrees with writing
 `extend_value is_unsigned data₀` to `rd`. Purely about `BitVec`s / the `SailState`, independent of `p`. -/
 theorem correct_load_byte_native
@@ -119,7 +118,7 @@ theorem correct_load_byte_native
     (spec_lb imm rs1_idx rd_idx is_unsigned).run s = (sp1_lb rd_idx pc val64).run s := by
   have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   have hsp_init : SailState.isInitialized sp :=
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
@@ -132,16 +131,16 @@ theorem correct_load_byte_native
       show (s.regs.insert Register.nextPC (pc + 4#64)).get reg _ = _
       rw [Std.ExtDHashMap.get_insert]; simp [Ne.symm hne]
     exact
-      { h_cur_privilege := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hcp
-        h_mprv_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmprv
-        h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsec
-        h_mseccfg_pmm := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsecpmm
-        h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
-        h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
+      { h_cur_privilege := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mprv_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_pmm := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_htif_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
     rwa [hsp, SailState.get_reg?_insert_nextPC]
   have hm₀ : sp.mem[(reg_val + BitVec.signExtend 64 imm).toNat]?
-      = some data₀ := by rw [hmem_eq]; exact hmem₀
+      = some data₀ := by rwa [hmem_eq]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 1 = true := by
     rw [is_aligned_vaddr_iff_mod]; omega
   have h_in_range :
@@ -279,7 +278,16 @@ def AdvanceReady (inp : Inputs (ZMod p)) (_cols : LoadByteChip.Columns (ZMod p))
   s.mem[(Word.toBitVec64 inp.adapter.op_b_memory.prev_value
       + Word.toBitVec64 inp.adapter.op_c_imm).toNat]? = some (BitVec.ofNat 8 inp.selected_byte.val)
 
-set_option maxHeartbeats 4000000 in
+/-- **The width/sign pin for the width-1 loads** (LB · LBU) — `advance_of_load_width1`'s `hpin`.
+Stated over loose `isU` so both flag branches of `advance` below cite it instead of re-running the
+`loadOpcode` case split against the whole `advance` context (that inline `simp_all` was the file's
+entire elaboration budget). The `Model/Semantics/Decode.lean` `storeOpcode_pin_one` analogue. -/
+private lemma loadOpcode_pin_one (isU : Bool) (w' : word_width) (u' : Bool)
+    (h : (loadOpcode w' u').toNat = (loadOpcode 1 isU).toNat) : w' = 1 ∧ u' = isU := by
+  simp only [loadOpcode] at h
+  cases isU <;> cases u' <;> split_ifs at h with h1 h2 h4 <;>
+    simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq]
+
 /-- **`LoadByteChip.advance`** — the per-LoadByte-row `try_step` lift (SC Phase 4, the **first chip to
 consume the memory axis**). 2-way LB/LBU flag dispatch fixing `isU`; each branch derives the opcode
 (29/32 = LB/LBU) and the `rdWrite ≡ extend_value` identity (`loadByte_hval`) from the chip `Spec`, then feeds
@@ -302,10 +310,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : LoadByteChip.Columns (ZMod p))
   rcases hflag with ⟨hlb, hlbu⟩ | ⟨hlbu, hlb⟩
   · -- LB : isU = false, opcode 29
     refine advance_of_load_width1 false (BitVec.ofNat 8 inp.selected_byte.val)
-      (by intro w' u' h; simp only [loadOpcode] at h
-          cases u' <;> split_ifs at h with h1 h2 h4 <;>
-            simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq])
-      hcfg hrom hpcread hvalb hdecrom
+      (loadOpcode_pin_one false) hcfg hrom hpcread hvalb hdecrom
       (by show inp.is_lb * 29 + inp.is_lbu * 32 = _
           rw [hlb, hlbu]; simp only [one_mul, zero_mul, add_zero]
           show (29 : ZMod p) = ((loadOpcode 1 false).toNat : ZMod p)
@@ -316,10 +321,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : LoadByteChip.Columns (ZMod p))
       (Or.inl ⟨hlb, hlbu, rfl⟩)
   · -- LBU : isU = true, opcode 32
     refine advance_of_load_width1 true (BitVec.ofNat 8 inp.selected_byte.val)
-      (by intro w' u' h; simp only [loadOpcode] at h
-          cases u' <;> split_ifs at h with h1 h2 h4 <;>
-            simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq])
-      hcfg hrom hpcread hvalb hdecrom
+      (loadOpcode_pin_one true) hcfg hrom hpcread hvalb hdecrom
       (by show inp.is_lb * 29 + inp.is_lbu * 32 = _
           rw [hlb, hlbu]; simp only [one_mul, zero_mul, zero_add]
           show (32 : ZMod p) = ((loadOpcode 1 true).toNat : ZMod p)

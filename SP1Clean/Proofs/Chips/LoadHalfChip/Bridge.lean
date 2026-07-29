@@ -108,7 +108,6 @@ def sp1_lh (rd : BitVec 5) (pc : BitVec 64) (val64 : BitVec 64) : SailM Executio
   wX_bits (.Regidx rd) val64
   pure RETIRE_SUCCESS
 
-set_option maxHeartbeats 10000000 in
 /-- Core correctness: a width-2 Sail `LOAD` reading the two bytes `data₀ data₁` at the (2-aligned)
 address agrees with writing `extend_value is_unsigned <read>` to `rd`. Purely about `BitVec`s /
 the `SailState`, so independent of the field `p`. -/
@@ -300,7 +299,16 @@ def AdvanceReady (inp : Inputs (ZMod p)) (_cols : LoadHalfChip.Columns (ZMod p))
       + Word.toBitVec64 inp.adapter.op_c_imm).toNat + 1]?
       = some (BitVec.ofNat 8 (inp.selected_half.val >>> 8))
 
-set_option maxHeartbeats 4000000 in
+/-- **The width/sign pin for the width-2 loads** (LH · LHU) — `advance_of_load_width2`'s `hpin`.
+Stated over loose `isU` so both flag branches of `advance` below cite it instead of re-running the
+`loadOpcode` case split against the whole `advance` context (that inline `simp_all` was the file's
+entire elaboration budget). The `Model/Semantics/Decode.lean` `storeOpcode_pin_one` analogue. -/
+private lemma loadOpcode_pin_two (isU : Bool) (w' : word_width) (u' : Bool)
+    (h : (loadOpcode w' u').toNat = (loadOpcode 2 isU).toNat) : w' = 2 ∧ u' = isU := by
+  simp only [loadOpcode] at h
+  cases isU <;> cases u' <;> split_ifs at h with h1 h2 h4 <;>
+    simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq]
+
 /-- **`LoadHalfChip.advance`** — the per-LoadHalf-row `try_step` lift (SC Phase 4). 2-way LH/LHU
 flag dispatch fixing `isU`; each branch derives the opcode (30/33 = LH/LHU) and the
 `rdWrite ≡ extend_value` identity (`loadHalf_hval`) from the chip `Spec` (its `U16MSBOperation.Spec`
@@ -325,10 +333,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : LoadHalfChip.Columns (ZMod p))
   · -- LH : isU = false, opcode 30
     refine advance_of_load_width2 false (BitVec.ofNat 8 inp.selected_half.val)
       (BitVec.ofNat 8 (inp.selected_half.val >>> 8))
-      (by intro w' u' h; simp only [loadOpcode] at h
-          cases u' <;> split_ifs at h with h1 h2 h4 <;>
-            simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq])
-      hcfg hrom hpcread hvalb hdecrom
+      (loadOpcode_pin_two false) hcfg hrom hpcread hvalb hdecrom
       (by show inp.is_lh * 30 + inp.is_lhu * 33 = _
           rw [hlh, hlhu]; simp only [one_mul, zero_mul, add_zero]
           show (30 : ZMod p) = ((loadOpcode 2 false).toNat : ZMod p)
@@ -340,10 +345,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : LoadHalfChip.Columns (ZMod p))
   · -- LHU : isU = true, opcode 33
     refine advance_of_load_width2 true (BitVec.ofNat 8 inp.selected_half.val)
       (BitVec.ofNat 8 (inp.selected_half.val >>> 8))
-      (by intro w' u' h; simp only [loadOpcode] at h
-          cases u' <;> split_ifs at h with h1 h2 h4 <;>
-            simp_all [SP1Clean.Soundness.Opcode.toNat, beq_iff_eq])
-      hcfg hrom hpcread hvalb hdecrom
+      (loadOpcode_pin_two true) hcfg hrom hpcread hvalb hdecrom
       (by show inp.is_lh * 30 + inp.is_lhu * 33 = _
           rw [hlh, hlhu]; simp only [one_mul, zero_mul, zero_add]
           show (33 : ZMod p) = ((loadOpcode 2 true).toNat : ZMod p)

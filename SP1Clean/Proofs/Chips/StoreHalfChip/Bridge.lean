@@ -34,7 +34,6 @@ def sp1_sh (pc : BitVec 64) (addr : BitVec 64) (data : BitVec 16) : SailM Execut
       (addr.toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))) }
   pure RETIRE_SUCCESS
 
-set_option maxHeartbeats 10000000 in
 /-- Core correctness. This statement is purely about `BitVec`s / the `SailState`, independent of `p`. -/
 theorem correct_store_half_native
     (rs1_idx rs2_idx : BitVec 5) (imm : BitVec 12) (reg_val : BitVec 64)
@@ -64,16 +63,16 @@ theorem correct_store_half_native
       show (s.regs.insert Register.nextPC (pc + 4#64)).get reg _ = _
       rw [Std.ExtDHashMap.get_insert]; simp [Ne.symm hne]
     exact
-      { h_cur_privilege := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hcp
-        h_mprv_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmprv
-        h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsec
-        h_mseccfg_pmm := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsecpmm
-        h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
-        h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
+      { h_cur_privilege := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mprv_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_pmm := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_htif_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
-    rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs1
+    rwa [hsp, SailState.get_reg?_insert_nextPC]
   have hsp_rs2 : sp.get_reg? rs2_idx = some stored := by
-    rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs2
+    rwa [hsp, SailState.get_reg?_insert_nextPC]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 2 = true := by
     rw [is_aligned_vaddr_iff_mod]; exact h_aligned
   have h_in_range :
@@ -212,7 +211,6 @@ def AdvanceReady (inp : Inputs (ZMod p)) (_cols : StoreHalfChip.Columns (ZMod p)
   Word.isU64 inp.op_b_val ∧ Word.isU64 inp.op_c_imm ∧
   inp.state.pc[0].val < 2 ^ 16
 
-set_option maxHeartbeats 2000000 in
 /-- **`StoreHalfChip.advance`** — the per-SH-row `try_step` lift (SC Phase 4 · Phase 3b.3). Over
 `advance_of_store` (the width-general memory-write ladder core), whose `execute_STORE_reaches_width2` (via
 `decodesStore 2`) commits the 2-byte write and no register write. The write value is the low half of
