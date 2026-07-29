@@ -384,6 +384,12 @@ Per site:
 > clears 40000, Program has 1 and does not. The cost is channel-distinctness filtering, not emit
 > count. Screen by role; never extrapolate a floor across layers.
 >
+> **But role is the weaker predictor, and its brackets do not transfer between chip families.** On
+> `Faithful/BranchChip.lean` *every* state/program/memory/byte/interactions anchor cleared 40000 —
+> including three declared at 4M — and the survivors were exclusively the constraints-decompose /
+> meaning family. The ALU role brackets above are an ALU fact, not a `Faithful/` fact. **Ask the fold
+> question first; use role only to break ties within one family.**
+>
 > **The unifying cause, and it is Clean's own doctrine: does the proof ever hold an unfolded
 > generated Rust list in a goal?** That single question explains every result above. Jal/Jalr/UType
 > use the folded `native*Meaning`/`rust*Meaning` template — every heavy step hides behind a
@@ -420,6 +426,13 @@ Per site:
 > `circuit` is `«abstract nested proofs»`-bound, so the file is neither term-intrinsic like
 > `RawSpec.full_product` nor codegen-bound like `MulOperation/Defs.lean` — and its three ceilings
 > needed three different justifications despite sitting in one file.
+>
+> **Caveat, measured at n=56: the phase name MOVES WITH THE RUNG.** Two `Faithful/BranchChip.lean`
+> survivors reported different phases at the control rung than at the binding rung. So the phase is a
+> **cost class, not a stable fingerprint** — read it at the *binding* rung (the lowest that fails),
+> not at rung 1, and do not treat a rung-1 phase as the site's identity. The same sample's control-rung
+> distribution (`elaborator` 21 · `isDefEq` 14 · `«synthesize pending MVars»` 14 · `whnf` 7) bears
+> almost no resemblance to its binding-rung distribution.
 >
 > **Re-ladder after a heavy golf — it is the only way to tell whether you changed the cost or just
 > the line count.** `OwnComplete.lean` went 817 → 495 lines (−39%) and its floor bracket was
