@@ -74,14 +74,12 @@ deriving ProvableStruct
          state := Eval.eval env input.state
          adapter := Eval.eval env input.adapter
          memory_access := Eval.eval env input.memory_access } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 @[circuit_norm] theorem eval_addressInput {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :
     Eval.eval env (addressInput input) = addressInput (Eval.eval env input) := by
-  simp only [addressInput, Inputs.op_b_val, Inputs.op_c_imm,
-    eval_inputs]
+  simp only [addressInput, Inputs.op_b_val, Inputs.op_c_imm, eval_inputs]
   rw [ProvableStruct.eval_eq_eval]
   simp only [ProvableStruct.structEvalLiteralProc]
   rw [Readers.evalITypeColumns]
@@ -122,16 +120,16 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.is_real⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
-  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
+  channelsLawful := by
+    simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit,
+      Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
   -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks are threaded
   -- inputs and the gate witnesses nothing.
   localLength _ := 3 + 1
-  localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
   output input i0 :=
     ⟨input.state, input.adapter,
       ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
       input.memory_access, input.is_real⟩
-  output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
   -- `programChannel` joins the byte guarantee propagated up from `ITypeReaderImmutable`'s program **pull** (W11 flip).
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
@@ -154,8 +152,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
          memory_access := Eval.eval env cols.memory_access
          is_real := Eval.eval env cols.is_real } :
         Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity,
 the `MemoryAccess` timestamp monotonicity (whose `new_value` is the rs2 word — the store meaning), the

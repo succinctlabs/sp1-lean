@@ -59,11 +59,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output input offset :=
     ⟨input.is_real, input.state, input.adapter,
       ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩⟩
-  output_eq := by
-    intro input offset
-    simp only [main, circuit_norm]
   channelsLawful := by
-    simp [circuit_norm, main, Readers.CPUState.circuit, Readers.RTypeReader.circuit,
+    simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.RTypeReader.circuit,
       Readers.RegisterWrite.circuit, SubOperation.circuit]
   localLength _ := 4
   -- `programChannel` joins the byte guarantee propagated up from `RTypeReader`'s program **pull** (W11 flip);
@@ -85,8 +82,7 @@ unfolding the full composed `main`. -/
     Eval.eval env input =
       ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
          adapter := Eval.eval env input.adapter } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 @[circuit_norm] theorem eval_inputState {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :

@@ -92,8 +92,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
       ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
          adapter := Eval.eval env input.adapter,
          is_auipc := Eval.eval env input.is_auipc } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Component-wise evaluation of UType's completed output row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
@@ -104,7 +103,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
          addend := Eval.eval env cols.addend,
          add_operation := Eval.eval env cols.add_operation,
          is_auipc := Eval.eval env cols.is_auipc } : Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 end SP1Clean.UTypeChip

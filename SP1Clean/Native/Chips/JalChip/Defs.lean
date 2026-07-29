@@ -97,8 +97,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
          state := Eval.eval env input.state,
          adapter := Eval.eval env input.adapter } :
         Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Component-wise evaluation of the completed JAL row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
@@ -110,7 +109,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
          add_operation := Eval.eval env cols.add_operation,
          op_a_operation := Eval.eval env cols.op_a_operation } :
         Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 end SP1Clean.JalChip

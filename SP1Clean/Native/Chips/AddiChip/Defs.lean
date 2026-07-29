@@ -71,11 +71,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   output input offset :=
     ⟨input.is_real, input.state, input.adapter,
       ⟨Vector.mapRange 4 fun i => var { index := offset + i }⟩⟩
-  output_eq := by
-    intro input offset
-    simp only [main, circuit_norm]
-  channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit,
-    Readers.ITypeReader.circuit, Readers.RegisterWrite.circuit]
+  channelsLawful := by
+    simp only [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit,
+      Readers.ITypeReader.circuit, Readers.RegisterWrite.circuit]
   localLength _ := 4
   -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `ITypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
@@ -95,8 +93,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
     Eval.eval env input =
       ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
          adapter := Eval.eval env input.adapter } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Component-wise evaluation of Addi's completed output row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
@@ -105,8 +102,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
       ({ is_real := Eval.eval env cols.is_real, state := Eval.eval env cols.state,
          adapter := Eval.eval env cols.adapter,
          add_operation := Eval.eval env cols.add_operation } : Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 @[circuit_norm] theorem eval_inputState {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :

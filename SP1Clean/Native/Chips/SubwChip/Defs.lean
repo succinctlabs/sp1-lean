@@ -71,11 +71,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
     ⟨input.is_real, input.state, input.adapter,
       ⟨Vector.mapRange 2 fun i => var { index := offset + i },
         ⟨var { index := offset + 2 }⟩⟩⟩
-  output_eq := by
-    intro input offset
-    simp only [main, circuit_norm]
   channelsLawful := by
-    simp [circuit_norm, main, Readers.CPUState.circuit, Readers.RTypeReader.circuit,
+    simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.RTypeReader.circuit,
       Readers.RegisterWrite.circuit, SubwOperation.circuit]
   -- 2 result limbs + 1 sign bit; readers are `assertion`s (`localLength 0`).
   localLength _ := 3
@@ -98,8 +95,7 @@ instead of unfolding the complete witnessed SUBW circuit at a concrete environme
     Eval.eval env input =
       ({ is_real := Eval.eval env input.is_real, state := Eval.eval env input.state,
          adapter := Eval.eval env input.adapter } : Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
     (env : Environment F) (cols : Columns (Expression F)) :
@@ -107,7 +103,6 @@ instead of unfolding the complete witnessed SUBW circuit at a concrete environme
       ({ is_real := Eval.eval env cols.is_real, state := Eval.eval env cols.state,
          adapter := Eval.eval env cols.adapter,
          subw_operation := Eval.eval env cols.subw_operation } : Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 end SP1Clean.SubwChip

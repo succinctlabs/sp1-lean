@@ -70,18 +70,17 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   (input.is_real - 1) * input.adapter.op_a_0 === 0
   return ⟨input.state, input.adapter, input.opcode, input.is_real⟩
 
-set_option maxHeartbeats 4000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   -- Nothing is witnessed: the state/adapter/opcode/is_real are threaded inputs, the readers are
   -- `FormalAssertion`s (localLength 0), and the LTU send + gates witness nothing.
   localLength _ := 0
-  localLength_eq := by intro input n; simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
   output input _ := ⟨input.state, input.adapter, input.opcode, input.is_real⟩
-  output_eq := by intro input n; simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
   -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReaderImmutable`'s program
   -- **pull** (W11 flip): the reader pulls the instruction fetch as a guarantee, which propagates here.
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
-  channelsLawful := by simp [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
+  channelsLawful := by
+    simp only [circuit_norm, main, Readers.CPUState.circuit,
+      Readers.ALUTypeReaderImmutable.circuit]
 
 /-- The completed AluX0 row is exactly its threaded input; the chip has no local witness cells. -/
 @[circuit_norm] theorem directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
@@ -95,8 +94,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
       ({ state := Eval.eval env input.state, adapter := Eval.eval env input.adapter,
          opcode := Eval.eval env input.opcode, is_real := Eval.eval env input.is_real } :
         Inputs F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
     (env : Environment F) (cols : Columns (Expression F)) :
@@ -104,8 +102,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
       ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
          opcode := Eval.eval env cols.opcode, is_real := Eval.eval env cols.is_real } :
         Columns F) := by
-  rw [ProvableStruct.eval_eq_eval]
-  rfl
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Semantic contract, composed from the sub-circuit `Spec`s. The `ALUTypeReaderImmutable` adapter facts
 (op_a/op_b/op_c reads + the `op_a_0` read-zeroing — the discarded write), the `is_real`-binary fact, and the
