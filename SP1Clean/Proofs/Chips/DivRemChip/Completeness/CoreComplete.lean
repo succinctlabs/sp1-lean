@@ -231,11 +231,9 @@ theorem evaluatedProductSpec (env : ProverEnvironment (ZMod p)) (input : Var Inp
         hf4 hf5 hf6 hf7 hsum)
       (And.intro ?_ ?_))
   · rw [DivRemCore.LowerProductPlacement]
-    rw [eIR, eCtq, eLo]
-    exact fun _ => lowerGlue ir B C f hcU hbin hpad
+    rw [eIR, eCtq, eLo]; exact fun _ => lowerGlue ir B C f hcU hbin hpad
   · rw [DivRemCore.UpperProductPlacement]
-    rw [eF0, eF1, eF2, eF3, eCtq, eUp]
-    exact upperGlue ir B C f hcU hbin hf0 hf1 hf2 hf3
+    rw [eF0, eF1, eF2, eF3, eCtq, eUp]; exact upperGlue ir B C f hcU hbin hf0 hf1 hf2 hf3
       hf4 hf5 hf6 hf7 hsum hpad
 
 /-! ## Own-assert evaluator boundary
@@ -308,147 +306,82 @@ theorem evaluatedOwnAssertsHold (env : ProverEnvironment (ZMod p))
     (h : ∀ e ∈ ownAsserts colsV,
       Expression.eval env.toEnvironment e = 0) :
     DivRemCore.OwnAssertsHold (Eval.eval env colsV) := by
-  have hEval := eval_divRemCols env colsV
+  have hEval := (eval_divRemCols env colsV).symm
   apply DivRemCore.ownAssertsHold_of_forall env.toEnvironment h
-  case pDiv =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.is_div) hEval.symm
-  case pDivu =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.is_divu) hEval.symm
-  case pRem =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.is_rem) hEval.symm
-  case pRemu =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.is_remu) hEval.symm
-  case pDivw =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.is_divw) hEval.symm
-  case pRemw =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.is_remw) hEval.symm
-  case pDivuw =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.is_divuw) hEval.symm
-  case pRemuw =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.is_remuw) hEval.symm
-  case pIr =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.is_real) hEval.symm
-  case pIrnw =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.is_real_not_word) hEval.symm
-  case pOv =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.is_overflow) hEval.symm
-  case pBn =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.b_neg) hEval.symm
-  case pBnno =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.b_neg_not_overflow) hEval.symm
-  case pBnnno =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.b_not_neg_not_overflow) hEval.symm
-  case pRn =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.rem_neg) hEval.symm
-  case pCn =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.c_neg) hEval.symm
-  case pAce =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.abs_c_alu_event) hEval.symm
-  case pAre =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.abs_rem_alu_event) hEval.symm
+  case pDiv => simpa only [CircuitType.eval_expr] using congrArg (·.is_div) hEval
+  case pDivu => simpa only [CircuitType.eval_expr] using congrArg (·.is_divu) hEval
+  case pRem => simpa only [CircuitType.eval_expr] using congrArg (·.is_rem) hEval
+  case pRemu => simpa only [CircuitType.eval_expr] using congrArg (·.is_remu) hEval
+  case pDivw => simpa only [CircuitType.eval_expr] using congrArg (·.is_divw) hEval
+  case pRemw => simpa only [CircuitType.eval_expr] using congrArg (·.is_remw) hEval
+  case pDivuw => simpa only [CircuitType.eval_expr] using congrArg (·.is_divuw) hEval
+  case pRemuw => simpa only [CircuitType.eval_expr] using congrArg (·.is_remuw) hEval
+  case pIr => simpa only [CircuitType.eval_expr] using congrArg (·.is_real) hEval
+  case pIrnw => simpa only [CircuitType.eval_expr] using congrArg (·.is_real_not_word) hEval
+  case pOv => simpa only [CircuitType.eval_expr] using congrArg (·.is_overflow) hEval
+  case pBn => simpa only [CircuitType.eval_expr] using congrArg (·.b_neg) hEval
+  case pBnno => simpa only [CircuitType.eval_expr] using congrArg (·.b_neg_not_overflow) hEval
+  case pBnnno => simpa only [CircuitType.eval_expr] using congrArg (·.b_not_neg_not_overflow) hEval
+  case pRn => simpa only [CircuitType.eval_expr] using congrArg (·.rem_neg) hEval
+  case pCn => simpa only [CircuitType.eval_expr] using congrArg (·.c_neg) hEval
+  case pAce => simpa only [CircuitType.eval_expr] using congrArg (·.abs_c_alu_event) hEval
+  case pAre => simpa only [CircuitType.eval_expr] using congrArg (·.abs_rem_alu_event) hEval
   case pRcm =>
-    simpa only [CircuitType.eval_expr] using
-      congrArg (fun cols => cols.remainder_check_multiplicity) hEval.symm
+    simpa only [CircuitType.eval_expr] using congrArg (·.remainder_check_multiplicity) hEval
   case pBm =>
-    exact (evalU16MSB_msb env.toEnvironment colsV.b_msb).symm.trans
-      (congrArg (fun cols => cols.b_msb.msb) hEval.symm)
+    exact (evalU16MSB_msb env.toEnvironment colsV.b_msb).symm.trans (congrArg (·.b_msb.msb) hEval)
   case pRm =>
     exact (evalU16MSB_msb env.toEnvironment colsV.rem_msb).symm.trans
-      (congrArg (fun cols => cols.rem_msb.msb) hEval.symm)
+      (congrArg (·.rem_msb.msb) hEval)
   case pCm =>
-    exact (evalU16MSB_msb env.toEnvironment colsV.c_msb).symm.trans
-      (congrArg (fun cols => cols.c_msb.msb) hEval.symm)
+    exact (evalU16MSB_msb env.toEnvironment colsV.c_msb).symm.trans (congrArg (·.c_msb.msb) hEval)
   case pQm =>
     exact (evalU16MSB_msb env.toEnvironment colsV.quot_msb).symm.trans
-      (congrArg (fun cols => cols.quot_msb.msb) hEval.symm)
+      (congrArg (·.quot_msb.msb) hEval)
   case pOvb =>
     exact (evalIsEqualWord_result env.toEnvironment colsV.is_overflow_b).symm.trans
-      (congrArg (fun cols => cols.is_overflow_b.is_diff_zero.result) hEval.symm)
+      (congrArg (·.is_overflow_b.is_diff_zero.result) hEval)
   case pOvc =>
     exact (evalIsEqualWord_result env.toEnvironment colsV.is_overflow_c).symm.trans
-      (congrArg (fun cols => cols.is_overflow_c.is_diff_zero.result) hEval.symm)
+      (congrArg (·.is_overflow_c.is_diff_zero.result) hEval)
   case pIsc0 =>
     exact (evalIsZeroWord_result env.toEnvironment colsV.is_c_0).symm.trans
-      (congrArg (fun cols => cols.is_c_0.result) hEval.symm)
+      (congrArg (·.is_c_0.result) hEval)
   case pLtb =>
     exact (evalLtUnsigned_bit env.toEnvironment colsV.remainder_lt_operation).symm.trans
-      (congrArg (fun cols => cols.remainder_lt_operation.u16_compare_operation.bit)
-        hEval.symm)
+      (congrArg (·.remainder_lt_operation.u16_compare_operation.bit) hEval)
   case pOpa0 =>
     exact (evalRType_opA0 env.toEnvironment colsV.adapter).symm.trans
-      (congrArg (fun cols => cols.adapter.op_a_0) hEval.symm)
+      (congrArg (·.adapter.op_a_0) hEval)
   case vBpv =>
     exact (evalRType_opBPrev env.toEnvironment colsV.adapter).symm.trans
-      (congrArg (fun cols => cols.adapter.op_b_memory.prev_value) hEval.symm)
+      (congrArg (·.adapter.op_b_memory.prev_value) hEval)
   case vCpv =>
     exact (evalRType_opCPrev env.toEnvironment colsV.adapter).symm.trans
-      (congrArg (fun cols => cols.adapter.op_c_memory.prev_value) hEval.symm)
-  case vA =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.a) hEval.symm
-  case vB =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.b) hEval.symm
-  case vC =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.c) hEval.symm
-  case vQ =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.quotient) hEval.symm
-  case vQC =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.quotient_comp) hEval.symm
-  case vR =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.remainder) hEval.symm
-  case vRC =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.remainder_comp) hEval.symm
-  case vAR =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.abs_remainder) hEval.symm
-  case vAC =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.abs_c) hEval.symm
-  case vMax =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.max_abs_c_or_1) hEval.symm
+      (congrArg (·.adapter.op_c_memory.prev_value) hEval)
+  case vA => simpa only [ProvableType.eval_fields] using congrArg (·.a) hEval
+  case vB => simpa only [ProvableType.eval_fields] using congrArg (·.b) hEval
+  case vC => simpa only [ProvableType.eval_fields] using congrArg (·.c) hEval
+  case vQ => simpa only [ProvableType.eval_fields] using congrArg (·.quotient) hEval
+  case vQC => simpa only [ProvableType.eval_fields] using congrArg (·.quotient_comp) hEval
+  case vR => simpa only [ProvableType.eval_fields] using congrArg (·.remainder) hEval
+  case vRC => simpa only [ProvableType.eval_fields] using congrArg (·.remainder_comp) hEval
+  case vAR => simpa only [ProvableType.eval_fields] using congrArg (·.abs_remainder) hEval
+  case vAC => simpa only [ProvableType.eval_fields] using congrArg (·.abs_c) hEval
+  case vMax => simpa only [ProvableType.eval_fields] using congrArg (·.max_abs_c_or_1) hEval
   case vCnegV =>
     exact (evalAdd_value env.toEnvironment colsV.c_neg_operation).symm.trans
-      (congrArg (fun cols => cols.c_neg_operation.value) hEval.symm)
+      (congrArg (·.c_neg_operation.value) hEval)
   case vRnegV =>
     exact (evalAdd_value env.toEnvironment colsV.rem_neg_operation).symm.trans
-      (congrArg (fun cols => cols.rem_neg_operation.value) hEval.symm)
-  case vCtq =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.c_times_quotient) hEval.symm
-  case vCarry =>
-    simpa only [ProvableType.eval_fields] using
-      congrArg (fun cols => cols.carry) hEval.symm
+      (congrArg (·.rem_neg_operation.value) hEval)
+  case vCtq => simpa only [ProvableType.eval_fields] using congrArg (·.c_times_quotient) hEval
+  case vCarry => simpa only [ProvableType.eval_fields] using congrArg (·.carry) hEval
 
-set_option maxHeartbeats 64000000 in
 /-- Honest populate pins imply the folded own-assert contract directly.  Keeping the raw
 `∀ e ∈ ownAsserts ...` proposition internal is essential: substituting the 246-column
 `populatedRowAt` expression into that proposition in the parent completeness proof crosses Lean's
-kernel-size cliff. -/
+kernel-size cliff.  (Its former 64M heartbeat ceiling was ~1600× over; floor ≤ 40000.) -/
 theorem evaluatedOwnAssertsComplete (env : ProverEnvironment (ZMod p))
     (colsV : Var DivRemChip.Columns (ZMod p))
     (ir : ZMod p) (B C : Word (ZMod p)) (f : Vector (ZMod p) 8)
@@ -535,10 +468,9 @@ theorem evaluatedOwnAssertsComplete (env : ProverEnvironment (ZMod p))
     eCTQvec eCARRYvec eCNEGVvec eRNEGVvec eBPVvec eCPVvec eOVBR eOVCR eISC0
     eLTBIT eOPA0
 
-set_option maxHeartbeats 64000000 in
 /-- Flat witness-layout form of `evaluatedOwnAssertsComplete`.  Its hypotheses mention only input
 expressions and local-witness offsets, so the parent chip proof never has to elaborate a projection
-through the complete `populatedRowAt` term. -/
+through the complete `populatedRowAt` term.  (Its former 64M heartbeat ceiling was ~1600× over.) -/
 theorem evaluatedPopulatedOwnAssertsComplete
     (env : ProverEnvironment (ZMod p)) (input : Var Inputs (ZMod p)) (off : ℕ)
     (ir : ZMod p) (B C : Word (ZMod p)) (f : Vector (ZMod p) 8)
@@ -640,84 +572,45 @@ theorem evaluatedPopulatedOwnAssertsComplete
     DivRemCore.OwnAssertsHold (Eval.eval env (populatedRowAt input off)) := by
   apply evaluatedOwnAssertsComplete env (populatedRowAt input off) ir B C f hbU hcU hbin
     hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum hsr
-  · rw [populatedRowAt_isDiv_eq]
-    simpa only [circuit_norm] using hF0
-  · rw [populatedRowAt_isDivu_eq]
-    simpa only [circuit_norm] using hF1
-  · rw [populatedRowAt_isRem_eq]
-    simpa only [circuit_norm] using hF2
-  · rw [populatedRowAt_isRemu_eq]
-    simpa only [circuit_norm] using hF3
-  · rw [populatedRowAt_isDivw_eq]
-    simpa only [circuit_norm] using hF4
-  · rw [populatedRowAt_isRemw_eq]
-    simpa only [circuit_norm] using hF5
-  · rw [populatedRowAt_isDivuw_eq]
-    simpa only [circuit_norm] using hF6
-  · rw [populatedRowAt_isRemuw_eq]
-    simpa only [circuit_norm] using hF7
-  · rw [populatedRowAt_isReal_eq]
-    exact hIR
-  · rw [populatedRowAt_isRealNotWord_eq]
-    simpa only [circuit_norm] using hIRNW
-  · rw [populatedRowAt_isOverflow_eq]
-    simpa only [circuit_norm] using hOV
-  · rw [populatedRowAt_bNeg_eq]
-    simpa only [circuit_norm] using hBN
-  · rw [populatedRowAt_bNegNotOverflow_eq]
-    simpa only [circuit_norm] using hBNNO
-  · rw [populatedRowAt_bNotNegNotOverflow_eq]
-    simpa only [circuit_norm] using hBNNNO
-  · rw [populatedRowAt_remNeg_eq]
-    simpa only [circuit_norm] using hRN
-  · rw [populatedRowAt_cNeg_eq]
-    simpa only [circuit_norm] using hCN
-  · rw [populatedRowAt_absCEvent_eq]
-    simpa only [circuit_norm] using hACE
-  · rw [populatedRowAt_absRemEvent_eq]
-    simpa only [circuit_norm] using hARE
-  · rw [populatedRowAt_remainderCheckMultiplicity_eq]
-    simpa only [circuit_norm] using hRCM
-  · rw [populatedRowAt_bMsb_eq]
-    simpa only [circuit_norm] using hBM
-  · rw [populatedRowAt_cMsb_eq]
-    simpa only [circuit_norm] using hCM
-  · rw [populatedRowAt_remMsb_eq]
-    simpa only [circuit_norm] using hRM
-  · rw [populatedRowAt_quotMsb_eq]
-    simpa only [circuit_norm] using hQM
-  · rw [populatedRowAt_b_eq]
-    exact hBvec
-  · rw [populatedRowAt_c_eq]
-    exact hCvec
-  · rw [populatedRowAt_quotient_eq]
-    exact hQvec
-  · rw [populatedRowAt_quotientComp_eq]
-    exact hQCvec
-  · rw [populatedRowAt_remainder_eq]
-    exact hRvec
-  · rw [populatedRowAt_remainderComp_eq]
-    exact hRCvec
-  · rw [populatedRowAt_a_eq]
-    exact hAvec
-  · rw [populatedRowAt_absC_eq]
-    exact hABSCvec
-  · rw [populatedRowAt_absRemainder_eq]
-    exact hABSRvec
-  · rw [populatedRowAt_maxAbsCOr1_eq]
-    exact hMAXvec
-  · rw [populatedRowAt_ctq_eq]
-    exact hCTQvec
-  · rw [populatedRowAt_carry_eq]
-    exact hCARRYvec
-  · rw [populatedRowAt_cNegValue_eq]
-    exact hCNEGVvec
-  · rw [populatedRowAt_remNegValue_eq]
-    exact hRNEGVvec
-  · rw [populatedRowAt_adapter_eq]
-    exact hBPVvec
-  · rw [populatedRowAt_adapter_eq]
-    exact hCPVvec
+  · rw [populatedRowAt_isDiv_eq]; simpa only [circuit_norm] using hF0
+  · rw [populatedRowAt_isDivu_eq]; simpa only [circuit_norm] using hF1
+  · rw [populatedRowAt_isRem_eq]; simpa only [circuit_norm] using hF2
+  · rw [populatedRowAt_isRemu_eq]; simpa only [circuit_norm] using hF3
+  · rw [populatedRowAt_isDivw_eq]; simpa only [circuit_norm] using hF4
+  · rw [populatedRowAt_isRemw_eq]; simpa only [circuit_norm] using hF5
+  · rw [populatedRowAt_isDivuw_eq]; simpa only [circuit_norm] using hF6
+  · rw [populatedRowAt_isRemuw_eq]; simpa only [circuit_norm] using hF7
+  · rw [populatedRowAt_isReal_eq]; exact hIR
+  · rw [populatedRowAt_isRealNotWord_eq]; simpa only [circuit_norm] using hIRNW
+  · rw [populatedRowAt_isOverflow_eq]; simpa only [circuit_norm] using hOV
+  · rw [populatedRowAt_bNeg_eq]; simpa only [circuit_norm] using hBN
+  · rw [populatedRowAt_bNegNotOverflow_eq]; simpa only [circuit_norm] using hBNNO
+  · rw [populatedRowAt_bNotNegNotOverflow_eq]; simpa only [circuit_norm] using hBNNNO
+  · rw [populatedRowAt_remNeg_eq]; simpa only [circuit_norm] using hRN
+  · rw [populatedRowAt_cNeg_eq]; simpa only [circuit_norm] using hCN
+  · rw [populatedRowAt_absCEvent_eq]; simpa only [circuit_norm] using hACE
+  · rw [populatedRowAt_absRemEvent_eq]; simpa only [circuit_norm] using hARE
+  · rw [populatedRowAt_remainderCheckMultiplicity_eq]; simpa only [circuit_norm] using hRCM
+  · rw [populatedRowAt_bMsb_eq]; simpa only [circuit_norm] using hBM
+  · rw [populatedRowAt_cMsb_eq]; simpa only [circuit_norm] using hCM
+  · rw [populatedRowAt_remMsb_eq]; simpa only [circuit_norm] using hRM
+  · rw [populatedRowAt_quotMsb_eq]; simpa only [circuit_norm] using hQM
+  · rw [populatedRowAt_b_eq]; exact hBvec
+  · rw [populatedRowAt_c_eq]; exact hCvec
+  · rw [populatedRowAt_quotient_eq]; exact hQvec
+  · rw [populatedRowAt_quotientComp_eq]; exact hQCvec
+  · rw [populatedRowAt_remainder_eq]; exact hRvec
+  · rw [populatedRowAt_remainderComp_eq]; exact hRCvec
+  · rw [populatedRowAt_a_eq]; exact hAvec
+  · rw [populatedRowAt_absC_eq]; exact hABSCvec
+  · rw [populatedRowAt_absRemainder_eq]; exact hABSRvec
+  · rw [populatedRowAt_maxAbsCOr1_eq]; exact hMAXvec
+  · rw [populatedRowAt_ctq_eq]; exact hCTQvec
+  · rw [populatedRowAt_carry_eq]; exact hCARRYvec
+  · rw [populatedRowAt_cNegValue_eq]; exact hCNEGVvec
+  · rw [populatedRowAt_remNegValue_eq]; exact hRNEGVvec
+  · rw [populatedRowAt_adapter_eq]; exact hBPVvec
+  · rw [populatedRowAt_adapter_eq]; exact hCPVvec
   · rw [populatedRowAt_isOverflowB_eq]
     have hS : (ProvableType.fromElements (M := Extracted.IsEqualWordOperation)
           (Vector.mapRange 11 fun j =>
@@ -749,10 +642,8 @@ theorem evaluatedPopulatedOwnAssertsComplete
         (isC0Witness C f) hISC0
     rw [← hS]
     simp only [iszeroword_result_proj, circuit_norm]
-  · rw [populatedRowAt_ltBit_eq]
-    simpa only [circuit_norm] using hLTBIT
-  · rw [populatedRowAt_adapter_eq]
-    exact hOPA0
+  · rw [populatedRowAt_ltBit_eq]; simpa only [circuit_norm] using hLTBIT
+  · rw [populatedRowAt_adapter_eq]; exact hOPA0
 
 /-- Honest flag pins imply the complete folded selection contract. -/
 theorem evaluatedSelectionEvidenceSpec
@@ -844,32 +735,25 @@ theorem evaluatedRangeSpec
     DivRemCore.RangeSpec (Eval.eval env (populatedRowAt input off)) := by
   let cols := Eval.eval env (populatedRowAt input off)
   have eCTQ : cols.c_times_quotient = populateCtq B C f := by
-    dsimp only [cols]
-    rw [eval_divRemCols_ctq, populatedRowAt_ctq_eq]
+    dsimp only [cols]; rw [eval_divRemCols_ctq, populatedRowAt_ctq_eq]
     simpa +instances only [circuit_norm] using hCTQ
   have eCarry : cols.carry = populateCarry B C f := by
-    dsimp only [cols]
-    rw [eval_divRemCols_carry, populatedRowAt_carry_eq]
+    dsimp only [cols]; rw [eval_divRemCols_carry, populatedRowAt_carry_eq]
     simpa +instances only [circuit_norm] using hCarry
   have eRC : cols.remainder_comp = populateRemComp B C f := by
-    dsimp only [cols]
-    rw [eval_divRemCols_remainderComp, populatedRowAt_remainderComp_eq]
+    dsimp only [cols]; rw [eval_divRemCols_remainderComp, populatedRowAt_remainderComp_eq]
     simpa +instances only [circuit_norm] using hRC
   have eAC : cols.abs_c = populateAbsC C f := by
-    dsimp only [cols]
-    rw [eval_divRemCols_absC, populatedRowAt_absC_eq]
+    dsimp only [cols]; rw [eval_divRemCols_absC, populatedRowAt_absC_eq]
     simpa +instances only [circuit_norm] using hAC
   have eAR : cols.abs_remainder = populateAbsRem B C f := by
-    dsimp only [cols]
-    rw [eval_divRemCols_absRemainder, populatedRowAt_absRemainder_eq]
+    dsimp only [cols]; rw [eval_divRemCols_absRemainder, populatedRowAt_absRemainder_eq]
     simpa +instances only [circuit_norm] using hAR
   have eQ : cols.quotient = populateQuotient B C f := by
-    dsimp only [cols]
-    rw [eval_divRemCols_quotient, populatedRowAt_quotient_eq]
+    dsimp only [cols]; rw [eval_divRemCols_quotient, populatedRowAt_quotient_eq]
     simpa +instances only [circuit_norm] using hQ
   have eR : cols.remainder = populateRemainder B C f := by
-    dsimp only [cols]
-    rw [eval_divRemCols_remainder, populatedRowAt_remainder_eq]
+    dsimp only [cols]; rw [eval_divRemCols_remainder, populatedRowAt_remainder_eq]
     simpa +instances only [circuit_norm] using hR
   have eRN : cols.rem_neg = populateRemNeg B C f :=
     (eval_populatedRowAt_remNeg env input off).trans hRN
@@ -877,56 +761,36 @@ theorem evaluatedRangeSpec
   simp only [DivRemCore.RangeSpec, Nat.cast_ofNat]
   intro _
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [eCTQ, eRC, eCarry, chain_residue_field_0]
-    exact chainResidue_field_val_lt B C f 0
+  · rw [eCTQ, eRC, eCarry, chain_residue_field_0]; exact chainResidue_field_val_lt B C f 0
   · rw [eCTQ, eRC, eCarry]
     have hcr := chain_residue_field_1 B C f
-    push_cast at hcr
-    rw [hcr]
-    exact chainResidue_field_val_lt B C f 1
+    push_cast at hcr; rw [hcr]; exact chainResidue_field_val_lt B C f 1
   · rw [eCTQ, eRC, eCarry]
     have hcr := chain_residue_field_2 B C f
-    push_cast at hcr
-    rw [hcr]
-    exact chainResidue_field_val_lt B C f 2
+    push_cast at hcr; rw [hcr]; exact chainResidue_field_val_lt B C f 2
   · rw [eCTQ, eRC, eCarry]
     have hcr := chain_residue_field_3 B C f
-    push_cast at hcr
-    rw [hcr]
-    exact chainResidue_field_val_lt B C f 3
+    push_cast at hcr; rw [hcr]; exact chainResidue_field_val_lt B C f 3
   · rw [eCTQ, eRN, eCarry]
     have hcr := chain_residue_field_4 B C f
-    push_cast at hcr
-    rw [hcr]
-    exact chainResidue_field_val_lt B C f 4
+    push_cast at hcr; rw [hcr]; exact chainResidue_field_val_lt B C f 4
   · rw [eCTQ, eRN, eCarry]
     have hcr := chain_residue_field_5 B C f
-    push_cast at hcr
-    rw [hcr]
-    exact chainResidue_field_val_lt B C f 5
+    push_cast at hcr; rw [hcr]; exact chainResidue_field_val_lt B C f 5
   · rw [eCTQ, eRN, eCarry]
     have hcr := chain_residue_field_6 B C f
-    push_cast at hcr
-    rw [hcr]
-    exact chainResidue_field_val_lt B C f 6
+    push_cast at hcr; rw [hcr]; exact chainResidue_field_val_lt B C f 6
   · rw [eCTQ, eRN, eCarry]
     have hcr := chain_residue_field_7 B C f
-    push_cast at hcr
-    rw [hcr]
-    exact chainResidue_field_val_lt B C f 7
+    push_cast at hcr; rw [hcr]; exact chainResidue_field_val_lt B C f 7
   · intro i hi
-    rw [eAC]
-    exact (populateAbsC_isU64 hcU f) ⟨i, hi⟩
+    rw [eAC]; exact (populateAbsC_isU64 hcU f) ⟨i, hi⟩
   · intro i hi
-    rw [eAR]
-    exact (populateAbsRem_isU64 B C f) ⟨i, hi⟩
+    rw [eAR]; exact (populateAbsRem_isU64 B C f) ⟨i, hi⟩
   · intro i hi
-    rw [eQ]
-    exact (populateQuotient_isU64 B C f) ⟨i, hi⟩
+    rw [eQ]; exact (populateQuotient_isU64 B C f) ⟨i, hi⟩
   · intro i hi
-    rw [eR]
-    exact (populateRemainder_isU64 B C f) ⟨i, hi⟩
+    rw [eR]; exact (populateRemainder_isU64 B C f) ⟨i, hi⟩
   · intro i hi
-    rw [eCTQ]
-    exact populateCtq_val_lt B C f i hi
+    rw [eCTQ]; exact populateCtq_val_lt B C f i hi
 end SP1Clean.DivRemChip.CoreComplete
