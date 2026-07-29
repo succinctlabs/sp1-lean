@@ -85,8 +85,7 @@ theorem correct_sll_native
     (spec_sll (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_sl (.Regidx rd_idx) pc a_val).run s := by
   simp only [spec_sll, sp1_sl]
-  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by
-    rw [run_readReg, h_pc]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
   rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
     SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
   simp [execute_RTYPE_eq_execute_RTYPE', execute_RTYPE', execute_RTYPE_pure_sll, h_rs1, h_rs2, h_sll]
@@ -106,8 +105,7 @@ theorem correct_sllw_native
     (spec_sllw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
       = (sp1_sl (.Regidx rd_idx) pc a_val).run s := by
   simp only [spec_sllw, sp1_sl]
-  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by
-    rw [run_readReg, h_pc]
+  have hpcrun : (LeanRV64D.readReg Register.PC).run s = .ok pc s := by rw [run_readReg, h_pc]
   rw [SP1Clean.TryStepReduction.run_bind_of_run s _ pc hpcrun,
     SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
   simp [execute_RTYPEW_eq_execute_RTYPEW', execute_RTYPEW', execute_RTYPEW_pure_sllw,
@@ -130,11 +128,10 @@ theorem shiftleft_chip_reaches_sail
     (cols.is_sllw = 1 →
         (spec_sllw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
           = (sp1_sl (.Regidx rd_idx) pc cols.a).run s) := by
-  refine ⟨fun hsll => ?_, fun hsllw => ?_⟩
-  · exact correct_sll_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 ((h_chip h_real).1 hsll)
-  · exact correct_sllw_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 ((h_chip h_real).2 hsllw)
+  exact ⟨fun h => correct_sll_native _ _ _ rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2
+      ((h_chip h_real).1 h),
+    fun h => correct_sllw_native _ _ _ rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2
+      ((h_chip h_real).2 h)⟩
 
 end SP1Clean.ShiftLeftSail
 

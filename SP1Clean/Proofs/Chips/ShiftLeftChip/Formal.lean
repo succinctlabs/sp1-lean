@@ -21,7 +21,9 @@ compile in parallel — plus the shared channel-requirement tail (the same in bo
 `"shift_left_flags"` `ProverHint`): every witnessed cell is pinned to its populate projection, the
 constraints close by the `Populate.lean` value-level bundles, and the nine byte-range pulls by the
 populate bound lemmas. The closures themselves are conformance-checked cell-for-cell against SP1's real
-`generate_trace` in `TraceGenTests/ShiftLeftChipTraceWitness.lean`. -/
+`generate_trace` in `TraceGenTests/ShiftLeftChipTraceWitness.lean`.
+
+Perf: the former 4M budgets on `soundness` and `circuit` were ~100× over; both floor at ≤40000. -/
 
 namespace SP1Clean.ShiftLeftChip
 
@@ -81,7 +83,6 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   (input.is_real - input.adapter.imm_c = 1 →
     input.adapter.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
-set_option maxHeartbeats 4000000 in
 /-- **Soundness.** The flag-gated RV64 `sll`/`sllw` identities on the result column `cols.a`. **Pieced
 together** from the two per-conjunct `Soundness/{Sll,Sllw}.lean` files — each its own
 `GeneralFormalCircuit.Soundness` over a single-conjunct `Spec`, split out so the heavy per-variant proofs
@@ -117,28 +118,23 @@ theorem completeness :
   have hbpv_map :
       Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value =
         input_adapter_op_b_memory_prev_value := by
-    rw [← CircuitType.eval_var_fields]
-    exact hbpv
+    rw [← CircuitType.eval_var_fields]; exact hbpv
   have hapv := h_input.2.2.2.1.1
   have hopc := h_input.2.2.2.2.2.2.2.1
   have hapv_map :
       Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_a_memory_prev_value =
         input_adapter_op_a_memory_prev_value := by
-    rw [← CircuitType.eval_var_fields]
-    exact hapv
+    rw [← CircuitType.eval_var_fields]; exact hapv
   have hopc_map :
       Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c = input_adapter_op_c := by
-    rw [← CircuitType.eval_var_fields]
-    exact hopc
+    rw [← CircuitType.eval_var_fields]; exact hopc
   have hcpv_map :
       Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value =
         input_adapter_op_c_memory_prev_value := by
-    rw [← CircuitType.eval_var_fields]
-    exact hcpv
+    rw [← CircuitType.eval_var_fields]; exact hcpv
   have hpc_map :
       Vector.map (Expression.eval env.toEnvironment) input_var_state_pc = input_state_pc := by
-    rw [← CircuitType.eval_var_fields]
-    exact hpc
+    rw [← CircuitType.eval_var_fields]; exact hpc
   have ec0 : Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[0]
       = input_adapter_op_c_memory_prev_value[0] := by
     rw [ProvableType.getElem_eval_fields, hcpv]
@@ -182,33 +178,20 @@ theorem completeness :
   have hs2 : env.get (i₀ + 4 + 6 + 3 + 2) = (shiftU16 c0 F)[2] := by simpa using h_env_s 2
   have hs3 : env.get (i₀ + 4 + 6 + 3 + 3) = (shiftU16 c0 F)[3] := by simpa using h_env_s 3
   have hlo0 : env.get (i₀ + 4 + 6 + 3 + 4) = (lowerLimb B c0)[0] := by simpa using h_env_lo 0
-  have hlo1 : env.get (i₀ + 4 + 6 + 3 + 4 + 1) = (lowerLimb B c0)[1] := by
-    simpa using h_env_lo 1
-  have hlo2 : env.get (i₀ + 4 + 6 + 3 + 4 + 2) = (lowerLimb B c0)[2] := by
-    simpa using h_env_lo 2
-  have hlo3 : env.get (i₀ + 4 + 6 + 3 + 4 + 3) = (lowerLimb B c0)[3] := by
-    simpa using h_env_lo 3
-  have hhi0 : env.get (i₀ + 4 + 6 + 3 + 4 + 4) = (higherLimb B c0)[0] := by
-    simpa using h_env_hi 0
-  have hhi1 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 1) = (higherLimb B c0)[1] := by
-    simpa using h_env_hi 1
-  have hhi2 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 2) = (higherLimb B c0)[2] := by
-    simpa using h_env_hi 2
-  have hhi3 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 3) = (higherLimb B c0)[3] := by
-    simpa using h_env_hi 3
-  have hlr0 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4) = (limbResult B c0)[0] := by
-    simpa using h_env_lr 0
-  have hlr1 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 1) = (limbResult B c0)[1] := by
-    simpa using h_env_lr 1
-  have hlr2 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 2) = (limbResult B c0)[2] := by
-    simpa using h_env_lr 2
-  have hlr3 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 3) = (limbResult B c0)[3] := by
-    simpa using h_env_lr 3
+  have hlo1 : env.get (i₀ + 4 + 6 + 3 + 4 + 1) = (lowerLimb B c0)[1] := by simpa using h_env_lo 1
+  have hlo2 : env.get (i₀ + 4 + 6 + 3 + 4 + 2) = (lowerLimb B c0)[2] := by simpa using h_env_lo 2
+  have hlo3 : env.get (i₀ + 4 + 6 + 3 + 4 + 3) = (lowerLimb B c0)[3] := by simpa using h_env_lo 3
+  have hhi0 : env.get (i₀ + 4 + 6 + 3 + 4 + 4) = (higherLimb B c0)[0] := by simpa using h_env_hi 0
+  have hhi1 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 1) = (higherLimb B c0)[1] := by simpa using h_env_hi 1
+  have hhi2 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 2) = (higherLimb B c0)[2] := by simpa using h_env_hi 2
+  have hhi3 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 3) = (higherLimb B c0)[3] := by simpa using h_env_hi 3
+  have hlr0 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4) = (limbResult B c0)[0] := by simpa using h_env_lr 0
+  have hlr1 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 1) = (limbResult B c0)[1] := by simpa using h_env_lr 1
+  have hlr2 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 2) = (limbResult B c0)[2] := by simpa using h_env_lr 2
+  have hlr3 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 3) = (limbResult B c0)[3] := by simpa using h_env_lr 3
   have hmsbc : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4) = sllwMsb B c0 F := h_env_msb
-  have hfl0 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1) = F[0] := by
-    simpa using h_env_fl 0
-  have hfl1 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1 + 1) = F[1] := by
-    simpa using h_env_fl 1
+  have hfl0 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1) = F[0] := by simpa using h_env_fl 0
+  have hfl1 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1 + 1) = F[1] := by simpa using h_env_fl 1
   have hfl2 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1 + 2)
       = F[1] * input_adapter_imm_c := by
     simpa only [circuit_norm, himm_eval] using h_env_fl 2
@@ -261,9 +244,8 @@ theorem completeness :
     by rcases hf1 with h | h <;> rw [h] <;> simp,
     ⟨trivial, by
       simp only [ShiftLeftCore.circuit, ShiftLeftChip.CoreSpec, circuit_norm, Vector.getElem_map,
-        Vector.getElem_mapRange, hA0, hA1, hA2, hA3, hcb0, hcb1, hcb2, hcb3, hcb4, hcb5,
-        hs0, hs1, hs2, hs3, hlo0, hlo1, hlo2, hlo3, hhi0, hhi1, hhi2, hhi3, hlr0,
-        hlr1, hlr2, hlr3]
+        Vector.getElem_mapRange, hA0, hA1, hA2, hA3, hcb0, hcb1, hcb2, hcb3, hcb4, hcb5, hs0, hs1,
+        hs2, hs3, hlo0, hlo1, hlo2, hlo3, hhi0, hhi1, hhi2, hhi3, hlr0, hlr1, hlr2, hlr3]
       exact ⟨hcba0, hcba1, hcba2, hcba3, hcba4, hcba5,
         by simp only [sub_zero]; exact_mod_cast hsel0,
         hsb0, hsel1, hsb1, hsel2, hsb2, hsel3, hsb3, hone,
@@ -274,37 +256,23 @@ theorem completeness :
         hp15, hp16, hp17, hp18, hp19, hp20, hp21, hp22,
         by simp, hop_a_0⟩⟩,
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_e32 c0 hc0v using 2
-      rw [sub_eq_add_neg],
+      change ByteRowSpec _; convert byteRow_e32 c0 hc0v using 2; rw [sub_eq_add_neg],
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_lower B c0 0 (by norm_num) using 2
-      rw [sub_eq_add_neg],
+      change ByteRowSpec _; convert byteRow_lower B c0 0 (by norm_num) using 2; rw [sub_eq_add_neg],
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_higher B c0 hbUw 0 (by norm_num) using 2,
+      change ByteRowSpec _; convert byteRow_higher B c0 hbUw 0 (by norm_num) using 2,
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_lower B c0 1 (by norm_num) using 2
-      rw [sub_eq_add_neg],
+      change ByteRowSpec _; convert byteRow_lower B c0 1 (by norm_num) using 2; rw [sub_eq_add_neg],
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_higher B c0 hbUw 1 (by norm_num) using 2,
+      change ByteRowSpec _; convert byteRow_higher B c0 hbUw 1 (by norm_num) using 2,
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_lower B c0 2 (by norm_num) using 2
-      rw [sub_eq_add_neg],
+      change ByteRowSpec _; convert byteRow_lower B c0 2 (by norm_num) using 2; rw [sub_eq_add_neg],
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_higher B c0 hbUw 2 (by norm_num) using 2,
+      change ByteRowSpec _; convert byteRow_higher B c0 hbUw 2 (by norm_num) using 2,
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_lower B c0 3 (by norm_num) using 2
-      rw [sub_eq_add_neg],
+      change ByteRowSpec _; convert byteRow_lower B c0 3 (by norm_num) using 2; rw [sub_eq_add_neg],
     fun _ => by
-      change ByteRowSpec _
-      convert byteRow_higher B c0 hbUw 3 (by norm_num) using 2⟩
+      change ByteRowSpec _; convert byteRow_higher B c0 hbUw 3 (by norm_num) using 2⟩
   · rw [show sllwMsb B c0 F = U16MSBOperation.populate_msb (populateA B c0 F)[1] by
       rw [sllwMsb, if_pos h1]]
     exact (U16MSBOperation.spec_populate (populateA_val_lt B c0 F hbUw 1 (by norm_num)) 1).2 rfl
@@ -382,7 +350,6 @@ private theorem main_exposedChannelsLawful (input : Var Inputs (ZMod p)) (offset
   · exact interactionsWith_main_memory_eq input offset
   · exact interactionsWith_main_program_eq input offset
 
-set_option maxHeartbeats 4000000 in
 /-- The `ShiftLeft` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `sll`/`sllw` semantic contract;
 output is the native `Columns` row struct. Soundness is proved (assembled from the two per-op
 `Soundness/<Op>.lean` files); the explicitly deferred completeness seam is recorded above. -/

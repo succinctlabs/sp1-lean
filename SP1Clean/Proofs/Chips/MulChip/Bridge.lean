@@ -205,17 +205,11 @@ theorem mul_chip_reaches_sail
   -- `MulChip.Spec` is `RTypeReader.Spec ∧ is_real-binary ∧ (is_real = 1 → 5 flag conjuncts) ∧
   -- (is_real = 1 → SelectorOneHot)`; the arithmetic the bridge needs is the third conjunct.
   obtain ⟨h_mul, h_mulh, h_mulhu, h_mulhsu, h_mulw⟩ := h_chip.2.2.1 h_real
-  refine ⟨fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_⟩
-  · exact correct_mul_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mul h)
-  · exact correct_mulh_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mulh h)
-  · exact correct_mulhu_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mulhu h)
-  · exact correct_mulhsu_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mulhsu h)
-  · exact correct_mulw_native input.op_b_val input.op_c_val cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mulw h)
+  exact ⟨fun h => correct_mul_native _ _ _ rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mul h),
+    fun h => correct_mulh_native _ _ _ rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mulh h),
+    fun h => correct_mulhu_native _ _ _ rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mulhu h),
+    fun h => correct_mulhsu_native _ _ _ rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mulhsu h),
+    fun h => correct_mulw_native _ _ _ rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mulw h)⟩
 
 end SP1Clean.MulSail
 
@@ -264,6 +258,8 @@ theorem advance (inp : Inputs (ZMod p)) (cols : MulChip.Columns (ZMod p)) (data 
   obtain ⟨-, -, -, -, -, hbounds, -⟩ := hspec.1
   obtain ⟨-, hpc0, -, -⟩ := hbounds hreal'
   have hbr := hspec.2.2.1 hreal'
+  -- Normalize the five flag-gated arithmetic conjuncts once, while the row is still opaque.
+  simp only [MulChip.Inputs.op_c_val, MulChip.Inputs.op_b_val, hlink] at hbr
   simp only [SelectorOneHot, selectors] at hflag
   rcases hflag with ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩ |
     ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩
@@ -273,13 +269,11 @@ theorem advance (inp : Inputs (ZMod p)) (cols : MulChip.Columns (ZMod p)) (data 
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.mul (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) mulOp_mul := by
-      have hs := hbr.1 h1
-      simp only [MulChip.Inputs.op_c_val, MulChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.mul (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) mulOp_mul
         = RV64.mul (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.mul_eq _ _
-      rw [vrd, vopbm, vopcm, hb]; exact hs
+      rw [vrd, vopbm, vopcm, hb]; exact hbr.1 h1
     exact advance_of_mul mulOp_mul (by decide) hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
   · -- is_mulh
     have hop : r.opcode = ((mulOpToOpcode mulOp_mulh).toNat : ZMod p) := by
@@ -287,13 +281,11 @@ theorem advance (inp : Inputs (ZMod p)) (cols : MulChip.Columns (ZMod p)) (data 
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.mul (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) mulOp_mulh := by
-      have hs := hbr.2.1 h1
-      simp only [MulChip.Inputs.op_c_val, MulChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.mul (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) mulOp_mulh
         = RV64.mulh (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.mulh_eq _ _
-      rw [vrd, vopbm, vopcm, hb]; exact hs
+      rw [vrd, vopbm, vopcm, hb]; exact hbr.2.1 h1
     exact advance_of_mul mulOp_mulh (by decide) hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
   · -- is_mulhu
     have hop : r.opcode = ((mulOpToOpcode mulOp_mulhu).toNat : ZMod p) := by
@@ -301,13 +293,11 @@ theorem advance (inp : Inputs (ZMod p)) (cols : MulChip.Columns (ZMod p)) (data 
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.mul (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) mulOp_mulhu := by
-      have hs := hbr.2.2.1 h1
-      simp only [MulChip.Inputs.op_c_val, MulChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.mul (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) mulOp_mulhu
         = RV64.mulhu (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.mulhu_eq _ _
-      rw [vrd, vopbm, vopcm, hb]; exact hs
+      rw [vrd, vopbm, vopcm, hb]; exact hbr.2.2.1 h1
     exact advance_of_mul mulOp_mulhu (by decide) hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
   · -- is_mulhsu
     have hop : r.opcode = ((mulOpToOpcode mulOp_mulhsu).toNat : ZMod p) := by
@@ -315,13 +305,11 @@ theorem advance (inp : Inputs (ZMod p)) (cols : MulChip.Columns (ZMod p)) (data 
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.mul (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) mulOp_mulhsu := by
-      have hs := hbr.2.2.2.1 h1
-      simp only [MulChip.Inputs.op_c_val, MulChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.mul (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) mulOp_mulhsu
         = RV64.mulhsu (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.mulhsu_eq _ _
-      rw [vrd, vopbm, vopcm, hb]; exact hs
+      rw [vrd, vopbm, vopcm, hb]; exact hbr.2.2.2.1 h1
     exact advance_of_mul mulOp_mulhsu (by decide) hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
   · -- is_mulw
     have hop : r.opcode = ((Opcode.MULW).toNat : ZMod p) := by
@@ -329,13 +317,11 @@ theorem advance (inp : Inputs (ZMod p)) (cols : MulChip.Columns (ZMod p)) (data 
     have hval : Word.toBitVec64 r.rdWrite
         = SailRV64.mulw (Word.toBitVec64 r.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 r.adapter.op_b_memory.prev_value) := by
-      have hs := hbr.2.2.2.2 h1
-      simp only [MulChip.Inputs.op_c_val, MulChip.Inputs.op_b_val, hlink] at hs
       have hb : SailRV64.mulw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
           (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)
         = RV64.mulw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
             (Word.toBitVec64 cols.adapter.op_b_memory.prev_value) := RV64.mulw_eq _ _
-      rw [vrd, vopbm, vopcm, hb]; exact hs
+      rw [vrd, vopbm, vopcm, hb]; exact hbr.2.2.2.2 h1
     exact advance_of_mulw hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
 
 /-- `ChipKind` registration for Mul (MUL/MULH/MULHU/MULHSU/MULW). `rs1`/`rs2` are sourced from

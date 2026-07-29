@@ -62,42 +62,22 @@ theorem routedWord {cols : Columns (ZMod p)} {case : Case}
   | quotient =>
       have hg : cols.is_divu + cols.is_div + cols.is_divw + cols.is_divuw = 1 := by
         simpa [ho] using hqGate
-      have ha0 : cols.a[0] = cols.quotient[0] := by
-        rw [hg] at e184
-        linear_combination -e184
-      have ha1 : cols.a[1] = cols.quotient[1] := by
-        rw [hg] at e194
-        linear_combination -e194
-      have ha2 : cols.a[2] = cols.quotient[2] := by
-        rw [hg] at e204
-        linear_combination -e204
-      have ha3 : cols.a[3] = cols.quotient[3] := by
-        rw [hg] at e214
-        linear_combination -e214
+      have ha0 : cols.a[0] = cols.quotient[0] := by rw [hg] at e184; linear_combination -e184
+      have ha1 : cols.a[1] = cols.quotient[1] := by rw [hg] at e194; linear_combination -e194
+      have ha2 : cols.a[2] = cols.quotient[2] := by rw [hg] at e204; linear_combination -e204
+      have ha3 : cols.a[3] = cols.quotient[3] := by rw [hg] at e214; linear_combination -e214
       have ha : cols.a = cols.quotient := by
-        apply Vector.ext
-        intro i hi
-        interval_cases i <;> assumption
+        apply Vector.ext; intro i hi; interval_cases i <;> assumption
       simpa [ho] using ha
   | remainder =>
       have hg : cols.is_remu + cols.is_rem + cols.is_remw + cols.is_remuw = 1 := by
         simpa [ho] using hrGate
-      have ha0 : cols.a[0] = cols.remainder[0] := by
-        rw [hg] at e189
-        linear_combination -e189
-      have ha1 : cols.a[1] = cols.remainder[1] := by
-        rw [hg] at e199
-        linear_combination -e199
-      have ha2 : cols.a[2] = cols.remainder[2] := by
-        rw [hg] at e209
-        linear_combination -e209
-      have ha3 : cols.a[3] = cols.remainder[3] := by
-        rw [hg] at e219
-        linear_combination -e219
+      have ha0 : cols.a[0] = cols.remainder[0] := by rw [hg] at e189; linear_combination -e189
+      have ha1 : cols.a[1] = cols.remainder[1] := by rw [hg] at e199; linear_combination -e199
+      have ha2 : cols.a[2] = cols.remainder[2] := by rw [hg] at e209; linear_combination -e209
+      have ha3 : cols.a[3] = cols.remainder[3] := by rw [hg] at e219; linear_combination -e219
       have ha : cols.a = cols.remainder := by
-        apply Vector.ext
-        intro i hi
-        interval_cases i <;> assumption
+        apply Vector.ext; intro i hi; interval_cases i <;> assumption
       simpa [ho] using ha
 
 /-- Bit-vector form of `routedWord`, used by the ISA-facing row-evidence contract. -/
@@ -126,7 +106,8 @@ theorem resultIsU64OfCore {cols : Columns (ZMod p)} (hcore : DivRemCore.CoreSpec
   rw [routedWord hcore hcase]
   cases case.output <;> assumption
 
-set_option maxHeartbeats 16000000 in
+-- Perf: the former 16M budget was ~160× over; measured floor bracket (60000, 100000].
+set_option maxHeartbeats 400000 in
 /-- The arithmetic core and the two committed source-register bounds discharge the comparison
 cluster's complete external contract. The only cross-cluster equation retained verbatim is the
 remainder-check gate equation; `DivRemCompare.soundness` combines it with the internally proved
@@ -167,12 +148,8 @@ theorem compareAssumptionsOfCore {input : Inputs (ZMod p)} {cols : Columns (ZMod
       (DivRemCompare.Inputs.ofCols cols) := by
     simp only [DivRemCompare.RemainderCheckGateSpec, DivRemCompare.Inputs.ofCols]
     linear_combination -e305
-  have hbColsU : Word.isU64 cols.adapter.op_b_memory.prev_value := by
-    rw [hadapter]
-    exact hbReadU
-  have hcColsU : Word.isU64 cols.adapter.op_c_memory.prev_value := by
-    rw [hadapter]
-    exact hcReadU
+  have hbColsU : Word.isU64 cols.adapter.op_b_memory.prev_value := by rw [hadapter]; exact hbReadU
+  have hcColsU : Word.isU64 cols.adapter.op_c_memory.prev_value := by rw [hadapter]; exact hcReadU
   obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hbColsU
   obtain ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64 hcColsU
   have hcEq0 : cols.c[0] = cols.adapter.op_c_memory.prev_value[0] :=
@@ -204,18 +181,15 @@ theorem compareAssumptionsOfCore {input : Inputs (ZMod p)} {cols : Columns (ZMod
         (hrem 2 (by norm_num)) (hrem 3 (by norm_num))⟩
   have realOfAce (h : cols.abs_c_alu_event = 1) : cols.is_real = 1 := by
     rcases bIr with hr | hr
-    · rw [h, hr] at e286
-      simp at e286
+    · rw [h, hr] at e286; simp at e286
     · exact hr
   have realOfAre (h : cols.abs_rem_alu_event = 1) : cols.is_real = 1 := by
     rcases bIr with hr | hr
-    · rw [h, hr] at e288
-      simp at e288
+    · rw [h, hr] at e288; simp at e288
     · exact hr
   have realOfIrnw (h : cols.is_real_not_word = 1) : cols.is_real = 1 := by
     rcases bIr with hr | hr
-    · rw [h, hr] at e13
-      simp at e13
+    · rw [h, hr] at e13; simp at e13
     · exact hr
   have remainderCompUOfReal (hr : cols.is_real = 1) : Word.isU64 cols.remainder_comp := by
     have hremU := (realWordRanges hr).2.2.2
@@ -242,8 +216,7 @@ theorem compareAssumptionsOfCore {input : Inputs (ZMod p)} {cols : Columns (ZMod
     have hrc2 : cols.remainder_comp[2].val < 2 ^ 16 := by
       rcases hgroups with h64 | hword | huword
       · have heq : cols.remainder_comp[2] = cols.remainder[2] := by
-          rw [h64] at e81
-          linear_combination e81
+          rw [h64] at e81; linear_combination e81
         rw [heq]
         exact hremRange
       · rcases hword with ⟨hword, hsigned⟩
@@ -251,20 +224,17 @@ theorem compareAssumptionsOfCore {input : Inputs (ZMod p)} {cols : Columns (ZMod
           rw [hsigned] at e17
           linear_combination e17
         have heq : cols.remainder_comp[2] = cols.rem_msb.msb * 65535 := by
-          rw [hword] at e76
-          linear_combination e76
+          rw [hword] at e76; linear_combination e76
         rw [heq, hmsb]
         rcases bRneg with h | h <;> rw [h] <;> simp [val_65535_zmod_p]
       · have heq : cols.remainder_comp[2] = 0 := by
-          rw [huword] at e73
-          linear_combination e73
+          rw [huword] at e73; linear_combination e73
         rw [heq]
         simp
     have hrc3 : cols.remainder_comp[3].val < 2 ^ 16 := by
       rcases hgroups with h64 | hword | huword
       · have heq : cols.remainder_comp[3] = cols.remainder[3] := by
-          rw [h64] at e91
-          linear_combination e91
+          rw [h64] at e91; linear_combination e91
         rw [heq]
         exact (Word.lt_cases_of_isU64 hremU).2.2.2
       · rcases hword with ⟨hword, hsigned⟩
@@ -272,13 +242,11 @@ theorem compareAssumptionsOfCore {input : Inputs (ZMod p)} {cols : Columns (ZMod
           rw [hsigned] at e17
           linear_combination e17
         have heq : cols.remainder_comp[3] = cols.rem_msb.msb * 65535 := by
-          rw [hword] at e86
-          linear_combination e86
+          rw [hword] at e86; linear_combination e86
         rw [heq, hmsb]
         rcases bRneg with h | h <;> rw [h] <;> simp [val_65535_zmod_p]
       · have heq : cols.remainder_comp[3] = 0 := by
-          rw [huword] at e83
-          linear_combination e83
+          rw [huword] at e83; linear_combination e83
         rw [heq]
         simp
     exact Word.isU64_of_cases (by rw [hrc0]; exact (Word.lt_cases_of_isU64 hremU).1)
@@ -310,9 +278,7 @@ theorem compareAssumptionsOfCore {input : Inputs (ZMod p)} {cols : Columns (ZMod
     have hm3 : cols.max_abs_c_or_1[3] = cols.abs_c[3] := by
       simpa [hz] using sub_eq_zero.mp e302
     have hmax : cols.max_abs_c_or_1 = cols.abs_c := by
-      apply Vector.ext
-      intro i hi
-      interval_cases i <;> assumption
+      apply Vector.ext; intro i hi; interval_cases i <;> assumption
     exact ⟨(realWordRanges hreal).2.1, hmax ▸ (realWordRanges hreal).1⟩
   have hR3 : cols.is_real_not_word = 1 →
       cols.adapter.op_b_memory.prev_value[3].val < 2 ^ 16 ∧
@@ -332,8 +298,8 @@ theorem compareAssumptionsOfCore {input : Inputs (ZMod p)} {cols : Columns (ZMod
   simp only [DivRemCompare.Assumptions, DivRemCompare.Inputs.ofCols]
   exact ⟨bIr, bIrnw, bE2, bAce, bAre, hrcmGate, hUac, hUar, hUlt, hR3, hR1⟩
 
-set_option maxHeartbeats 16000000 in
-/-- Dispatch the selected row to its one arithmetic-family evidence theorem. -/
+/-- Dispatch the selected row to its one arithmetic-family evidence theorem.  (Its former 16M
+budget, and `rowEvidenceOfSpecs`'s, were ~400× over: both floor at ≤40000.) -/
 theorem familyEvidenceOfSpecs {input : Inputs (ZMod p)} {cols : Columns (ZMod p)}
     {case : Case} (hbReadU : Word.isU64 input.op_b_val) (hcReadU : Word.isU64 input.op_c_val)
     (hcore : DivRemCore.CoreSpec cols)
@@ -357,7 +323,6 @@ theorem familyEvidenceOfSpecs {input : Inputs (ZMod p)} {cols : Columns (ZMod p)
       simpa [hf] using
         unsigned32Evidence hbReadU hcReadU hcore hcompare hreal hinputReal hadapter hselected hf
 
-set_option maxHeartbeats 16000000 in
 /-- Folded comparison/core contracts imply the complete evidence-shaped public row contract. -/
 theorem rowEvidenceOfSpecs {input : Inputs (ZMod p)} {cols : Columns (ZMod p)}
     (hbReadU : Word.isU64 input.op_b_val) (hcReadU : Word.isU64 input.op_c_val)

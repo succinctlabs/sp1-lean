@@ -349,5 +349,36 @@
 # WAVE W5 TOTALS across its three rounds: -827 lines, 159 directives removed, ceiling trajectory
 # 644 -> 485. (r1 -155 / -147; r2 -336 / -12; r3 -336 / -0.)
 # All ladders are recorded in the doc-comments at each site.
-SP1Clean 485
+# -57 (2026-07-29, proof-cleanup W6/r1): ratchet DOWN, no ceiling raised. 57 directives deleted, 0
+# re-added; the count reconciles EXACTLY (485 - 57 = 428), the SEVENTH consecutive round to confirm
+# the recorded number is honest and that no phantom has re-appeared.
+# By batch:
+#   * b1 — the three heavy Faithful/ anchors (BranchChip, ShiftRightChip, ShiftLeftChip): 51 of 56
+#     removed, declared budget 98,400,000 -> 4,000,000 (24.6x). The five survivors were all sized at
+#     4x their measured bracket, per the LSP-vs-gate margin rule: two BranchChip sites with floors in
+#     (100000, 200000] kept at 800000, one with a floor in (200000, 400000] kept at 1600000, and one
+#     site each in ShiftRightChip and ShiftLeftChip with floors in (40000, 100000] kept at 400000.
+#     The golf yield was +1 line — zero `by exact`, zero `from by`, zero dead `let` and zero narration
+#     comments across 6158 lines. This is the THIRD consecutive Faithful/ batch to find the golf
+#     surface empty; that directory is now best treated as a ceiling-only target.
+#   * b2 — ten chip Formal/Bridge/Evidence files (Branch, DivRem, Jalr, Mul, ShiftLeft, ShiftRight):
+#     6 of 7 removed, 62,000,000 -> 400,000 (155x), -186 lines. The single keep is
+#     `DivRemChip.compareAssumptionsOfCore`, floor bracket (60000, 100000], kept at 400000 against a
+#     declared 16000000 — roughly 160x oversized.
+# TWO MEASUREMENT FINDINGS worth preserving:
+#   * The FOLDED-VS-UNFOLDED PREDICTOR was EXACT on all 56 of b1's sites — its first large-sample
+#     confirmation, and it landed on precisely the heavy Branch/shift families W4 had found anomalous
+#     at the chip layer. All 51 removals are folded-template anchors; all 5 survivors demonstrably
+#     hold an unfolded list in a goal.
+#   * MASKING struck in BOTH batches. b1's two `shift{Right,Left}CoreAssertions` each cascaded
+#     `(kernel) unknown constant` into an UNCEILINGED downstream declaration, and b2's
+#     `rowEvidenceOfSpecs` was masked by `compareAssumptionsOfCore` and only became measurable once
+#     that site was pinned high. A naive single-pass ladder would have UNDER-REMOVED in both.
+# A CORRECTION TO THE RECORDED METHOD: the timeout PHASE NAME MOVES WITH THE RUNG (measured at n=56),
+# so it is a cost class read at the BINDING rung, not a stable fingerprint read at rung 1. And W5's
+# ALU ROLE BRACKETS DID NOT TRANSFER to Branch — every state/program/memory/byte/interactions anchor
+# there cleared 40000, including three declared at 4000000. Ask the fold question first; use role only
+# to break ties within one family.
+# All ladders are recorded in the doc-comments at each site.
+SP1Clean 428
 SP1CleanTest 16

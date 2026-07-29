@@ -135,8 +135,7 @@ private theorem constrainRow_specs (env : Environment (ZMod p))
   simp only [subcircuitWithAssertion, Operations.forAllNoOffset,
     GeneralFormalCircuit.toSubcircuit_assumptions,
     GeneralFormalCircuit.toSubcircuit_soundness, and_true] at hcpu hreader
-  simp only [assertion, Operations.forAllNoOffset,
-    FormalAssertion.toSubcircuit_assumptions,
+  simp only [assertion, Operations.forAllNoOffset, FormalAssertion.toSubcircuit_assumptions,
     FormalAssertion.toSubcircuit_soundness, and_true] at hcompare hcore hwrite
   rw [eval_compareInput_ofCols] at hcompare
   provable_struct_simp
@@ -163,29 +162,20 @@ theorem evidenceSoundness :
   rw [h_input, hcols] at hconstrain
   rw [populateRow_output_eq] at hcols
   have hinputRealEval : Eval.eval env input_var.is_real = input.is_real := by
-    have h := congrArg Inputs.is_real h_input
-    rw [eval_inputs] at h
-    exact h
+    have h := congrArg Inputs.is_real h_input; rwa [eval_inputs] at h
   have hinputAdapterEval : Eval.eval env input_var.adapter = input.adapter := by
-    have h := congrArg Inputs.adapter h_input
-    rw [eval_inputs] at h
-    exact h
+    have h := congrArg Inputs.adapter h_input; rwa [eval_inputs] at h
   have hinputStateEval : Eval.eval env input_var.state = input.state := by
-    have h := congrArg Inputs.state h_input
-    rw [eval_inputs] at h
-    exact h
+    have h := congrArg Inputs.state h_input; rwa [eval_inputs] at h
   have hcolsRealEval : Eval.eval env input_var.is_real = cols.is_real := by
     have h := congrArg Columns.is_real hcols
-    rw [eval_divRemCols_verifier, populatedRowAt_isReal_eq] at h
-    exact h
+    rwa [eval_divRemCols_verifier, populatedRowAt_isReal_eq] at h
   have hcolsAdapterEval : Eval.eval env input_var.adapter = cols.adapter := by
     have h := congrArg Columns.adapter hcols
-    rw [eval_divRemCols_verifier, populatedRowAt_adapter_eq] at h
-    exact h
+    rwa [eval_divRemCols_verifier, populatedRowAt_adapter_eq] at h
   have hcolsStateEval : Eval.eval env input_var.state = cols.state := by
     have h := congrArg Columns.state hcols
-    rw [eval_divRemCols_verifier, populatedRowAt_state_eq] at h
-    exact h
+    rwa [eval_divRemCols_verifier, populatedRowAt_state_eq] at h
   have hinputReal : cols.is_real = input.is_real := hcolsRealEval.symm.trans hinputRealEval
   have hadapter : cols.adapter = input.adapter := hcolsAdapterEval.symm.trans hinputAdapterEval
   have hstate : cols.state = input.state := hcolsStateEval.symm.trans hinputStateEval
@@ -256,9 +246,8 @@ private theorem populateRow_interactionsWith_eq_nil (channel : RawChannel (ZMod 
     (input : Var Inputs (ZMod p)) (offset : ℕ) :
     Operations.interactionsWith channel ((populateRow input).operations offset) = [] := by
   simp only [populateRow, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
-    Operations.localLength, Operations.interactionsWith_append,
-    Operations.interactionsWith_witness,
+    witnessVectorNative, CircuitNormalization.witnessNative_apply_eq, Operations.localLength,
+    Operations.interactionsWith_append, Operations.interactionsWith_witness,
     Operations.interactionsWith_nil, List.nil_append]
 
 /-- The constraint suffix's only State traffic is the canonical `CPUState` pull/push pair. -/
@@ -270,19 +259,15 @@ private theorem constrainRow_interactionsWith_state (input : Var Inputs (ZMod p)
           8, input.is_real⟩).map ChannelInteraction.toRaw := by
   simp only [constrainRow, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
     subcircuitWithAssertion, assertion, Operations.localLength,
-    Operations.interactionsWith_append,
-    Readers.CPUState.interactionsWith_state_subcircuit,
+    Operations.interactionsWith_append, Readers.CPUState.interactionsWith_state_subcircuit,
     InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
-    InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
-    DivRemCompare.circuit, DivRemCompare.channelsWithGuarantees_eq,
-    DivRemCore.circuit, DivRemCore.channelsWithGuarantees_eq,
-    Readers.RTypeReader.circuit, Readers.RTypeReader.channelsWithGuarantees_eq,
-    Readers.RegisterWrite.circuit, Readers.RegisterWrite.channelsWithGuarantees_eq,
-    FormalCircuitBase.channelsWithGuarantees_def,
-    List.mem_cons, List.not_mem_nil, or_false,
-    Channels.stateChannel_eq_byteChannel_false,
-    Channels.stateChannel_eq_programChannel_false,
-    Channels.stateChannel_eq_memoryChannel_false,
+    InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil, DivRemCompare.circuit,
+    DivRemCompare.channelsWithGuarantees_eq, DivRemCore.circuit,
+    DivRemCore.channelsWithGuarantees_eq, Readers.RTypeReader.circuit,
+    Readers.RTypeReader.channelsWithGuarantees_eq, Readers.RegisterWrite.circuit,
+    Readers.RegisterWrite.channelsWithGuarantees_eq, FormalCircuitBase.channelsWithGuarantees_def,
+    List.mem_cons, List.not_mem_nil, or_false, Channels.stateChannel_eq_byteChannel_false,
+    Channels.stateChannel_eq_programChannel_false, Channels.stateChannel_eq_memoryChannel_false,
     not_false_eq_true, Operations.interactionsWith_nil, List.append_nil]
 
 /-- The committed Program fetch denoted by the generated DivRem row.  The opcode is the exact
@@ -296,6 +281,40 @@ def exposedProgramMessage (input : Var Inputs (ZMod p)) (offset : ℕ) :
     input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0],
     #v[input.adapter.op_c, 0, 0, 0], input.adapter.op_a_0, 0, 0⟩
 
+/-! ### Per-child interaction projections
+
+`constrainRow` composes five children; on any one channel most of them are silent.  The two helpers
+below state that silence once, over a loose channel, so the Program and Memory projections below
+each cite them instead of re-deriving four `interactionsWith … = []` facts inline. -/
+
+omit [Fact (2 ^ 24 < p)] in
+/-- A composed general subcircuit declaring the channel neither as a guarantee nor as a requirement
+contributes no interaction on it. -/
+private theorem generalChild_nil {Input Output : TypeMap}
+    [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit (ZMod p) Input Output) (channel : RawChannel (ZMod p))
+    (h_g : channel ∉ circuit.channelsWithGuarantees)
+    (h_r : channel ∉ circuit.channelsWithRequirements)
+    (input : Var Input (ZMod p)) (n : ℕ) :
+    Operations.interactionsWith channel
+      [Operation.subcircuit (circuit.toSubcircuit n input)] = [] := by
+  simpa only [Operations.interactionsWith_nil] using
+    InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil circuit channel input
+      ([] : Operations (ZMod p)) h_g h_r
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Formal-assertion companion to `generalChild_nil`. -/
+private theorem assertionChild_nil {Input : TypeMap} [ProvableType Input]
+    (circuit : FormalAssertion (ZMod p) Input) (channel : RawChannel (ZMod p))
+    (h_g : channel ∉ circuit.channelsWithGuarantees)
+    (h_r : channel ∉ circuit.channelsWithRequirements)
+    (input : Var Input (ZMod p)) (n : ℕ) :
+    Operations.interactionsWith channel
+      [Operation.subcircuit (circuit.toSubcircuit n input)] = [] := by
+  simpa only [Operations.interactionsWith_nil] using
+    InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil circuit channel input
+      ([] : Operations (ZMod p)) h_g h_r
+
 /-- The constraint suffix's only Program traffic is the R-type reader's canonical fetch.  Keeping
 this projection next to `main` prevents whole-machine proofs from unfolding the witness program. -/
 private theorem constrainRow_interactionsWith_program (input : Var Inputs (ZMod p))
@@ -304,19 +323,12 @@ private theorem constrainRow_interactionsWith_program (input : Var Inputs (ZMod 
         ((constrainRow input cols).operations offset) =
       [(programChannel.pulledIf input.is_real
         (Soundness.rTypeProgramMessage (readerInputExpr input cols))).toRaw] := by
-  have cpuNil (cpuInput : Var Readers.CPUState.Inputs (ZMod p)) (n : ℕ) :
-      Operations.interactionsWith programChannel.toRaw
-        [Operation.subcircuit (Readers.CPUState.circuit.toSubcircuit n cpuInput)] = [] := by
-    simpa only [Operations.interactionsWith_nil] using
-      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil Readers.CPUState.circuit
-        programChannel.toRaw cpuInput ([] : Operations (ZMod p))
-        (by
-          change programChannel.toRaw ∉ [byteChannel.toRaw, stateChannel.toRaw]
-          simp [Channels.programChannel_eq_byteChannel_false,
-            Channels.programChannel_eq_stateChannel_false])
-        (by
-          change programChannel.toRaw ∉ []
-          exact List.not_mem_nil)
+  have cpuNil := generalChild_nil (Readers.CPUState.circuit (p := p)) programChannel.toRaw
+    (by
+      change programChannel.toRaw ∉ [byteChannel.toRaw, stateChannel.toRaw]
+      simp [Channels.programChannel_eq_byteChannel_false,
+        Channels.programChannel_eq_stateChannel_false])
+    (by change programChannel.toRaw ∉ []; exact List.not_mem_nil)
   have readerExact (readerInput : Var Readers.RTypeReader.Inputs (ZMod p)) (n : ℕ) :
       Operations.interactionsWith programChannel.toRaw
         [Operation.subcircuit (Readers.RTypeReader.circuit.toSubcircuit n readerInput)] =
@@ -325,51 +337,26 @@ private theorem constrainRow_interactionsWith_program (input : Var Inputs (ZMod 
     simpa only [Operations.interactionsWith_nil, List.append_nil] using
       Soundness.rTypeReader_programInteractions_subcircuit
         readerInput n ([] : Operations (ZMod p))
-  have compareNil (compareInput : Var DivRemCompare.Inputs (ZMod p)) (n : ℕ) :
-      Operations.interactionsWith programChannel.toRaw
-        [Operation.subcircuit (DivRemCompare.circuit.toSubcircuit n compareInput)] = [] := by
-    simpa only [Operations.interactionsWith_nil] using
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil DivRemCompare.circuit
-        programChannel.toRaw compareInput ([] : Operations (ZMod p))
-        (by
-          change programChannel.toRaw ∉ [byteChannel.toRaw]
-          simp [Channels.programChannel_eq_byteChannel_false])
-        (by
-          change programChannel.toRaw ∉ []
-          exact List.not_mem_nil)
-  have coreNil (coreInput : Var DivRemChip.Columns (ZMod p)) (n : ℕ) :
-      Operations.interactionsWith programChannel.toRaw
-        [Operation.subcircuit (DivRemCore.circuit.toSubcircuit n coreInput)] = [] := by
-    simpa only [Operations.interactionsWith_nil] using
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil DivRemCore.circuit
-        programChannel.toRaw coreInput ([] : Operations (ZMod p))
-        (by
-          change programChannel.toRaw ∉ [byteChannel.toRaw]
-          simp [Channels.programChannel_eq_byteChannel_false])
-        (by
-          change programChannel.toRaw ∉ []
-          exact List.not_mem_nil)
-  have writeNil (writeInput : Var Readers.RegisterWrite.Inputs (ZMod p)) (n : ℕ) :
-      Operations.interactionsWith programChannel.toRaw
-        [Operation.subcircuit (Readers.RegisterWrite.circuit.toSubcircuit n writeInput)] = [] := by
-    simpa only [Operations.interactionsWith_nil] using
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil
-        Readers.RegisterWrite.circuit programChannel.toRaw writeInput ([] : Operations (ZMod p))
-        (by
-          simp only [Readers.RegisterWrite.circuit,
-            FormalCircuitBase.channelsWithGuarantees_def,
-            Readers.RegisterWrite.channelsWithGuarantees_eq, List.not_mem_nil,
-            not_false_eq_true])
-        (by
-          change (programChannel (p := p)).toRaw ∉ [(memoryChannel (p := p)).toRaw]
-          simp [
-            Channels.programChannel_eq_memoryChannel_false])
+  have compareNil := assertionChild_nil (DivRemCompare.circuit (p := p)) programChannel.toRaw
+    (by change programChannel.toRaw ∉ [byteChannel.toRaw]
+        simp [Channels.programChannel_eq_byteChannel_false])
+    (by change programChannel.toRaw ∉ []; exact List.not_mem_nil)
+  have coreNil := assertionChild_nil (DivRemCore.circuit (p := p)) programChannel.toRaw
+    (by change programChannel.toRaw ∉ [byteChannel.toRaw]
+        simp [Channels.programChannel_eq_byteChannel_false])
+    (by change programChannel.toRaw ∉ []; exact List.not_mem_nil)
+  have writeNil := assertionChild_nil (Readers.RegisterWrite.circuit (p := p)) programChannel.toRaw
+    (by
+      simp only [Readers.RegisterWrite.circuit, FormalCircuitBase.channelsWithGuarantees_def,
+        Readers.RegisterWrite.channelsWithGuarantees_eq, List.not_mem_nil, not_false_eq_true])
+    (by
+      change (programChannel (p := p)).toRaw ∉ [(memoryChannel (p := p)).toRaw]
+      simp [Channels.programChannel_eq_memoryChannel_false])
   simp only [constrainRow, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
     subcircuitWithAssertion, assertion, Operations.localLength,
     Operations.interactionsWith_append]
   rw [cpuNil, readerExact, compareNil, coreNil, writeNil]
-  simp only [Operations.interactionsWith_nil, List.nil_append, List.append_nil,
-    readerInputExpr]
+  simp only [Operations.interactionsWith_nil, List.nil_append, List.append_nil, readerInputExpr]
 
 /-- The complete chip's exact Program projection, phrased through the folded witness layout. -/
 theorem interactionsWith_program_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
@@ -377,9 +364,8 @@ theorem interactionsWith_program_eq (input : Var Inputs (ZMod p)) (offset : ℕ)
       [(programChannel.pulledIf input.is_real
         (exposedProgramMessage input offset)).toRaw] := by
   simp only [main, Circuit.operations, Circuit.bind_def, Operations.interactionsWith_append,
-    populateRow_interactionsWith_eq_nil, constrainRow_interactionsWith_program,
-    List.nil_append, populateRow_output_eq,
-    readerInputExpr, Soundness.rTypeProgramMessage, exposedProgramMessage]
+    populateRow_interactionsWith_eq_nil, constrainRow_interactionsWith_program, List.nil_append,
+    populateRow_output_eq, readerInputExpr, Soundness.rTypeProgramMessage, exposedProgramMessage]
 
 /-- DivRem's exact six-entry Memory traffic: the R-type reader's destination prior plus two source
 read pairs, followed by the result write at micro-time four.  The list is stated at the chip boundary
@@ -413,49 +399,26 @@ private theorem constrainRow_interactionsWith_memory (input : Var Inputs (ZMod p
     Operations.interactionsWith memoryChannel.toRaw ((constrainRow input cols).operations offset) =
       Soundness.rTypeMemoryInteractions (readerInputExpr input cols) ++
         Soundness.registerWriteMemoryInteractions (writeInputExpr input cols) := by
-  have cpuNil (cpuInput : Var Readers.CPUState.Inputs (ZMod p)) (n : ℕ) :
-      Operations.interactionsWith memoryChannel.toRaw
-        [Operation.subcircuit (Readers.CPUState.circuit.toSubcircuit n cpuInput)] = [] := by
-    simpa only [Operations.interactionsWith_nil] using
-      InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil Readers.CPUState.circuit
-        memoryChannel.toRaw cpuInput ([] : Operations (ZMod p))
-        (by
-          change memoryChannel.toRaw ∉ [byteChannel.toRaw, stateChannel.toRaw]
-          simp [Channels.memoryChannel_eq_byteChannel_false,
-            Channels.memoryChannel_eq_stateChannel_false])
-        (by
-          change memoryChannel.toRaw ∉ []
-          exact List.not_mem_nil)
+  have cpuNil := generalChild_nil (Readers.CPUState.circuit (p := p)) memoryChannel.toRaw
+    (by
+      change memoryChannel.toRaw ∉ [byteChannel.toRaw, stateChannel.toRaw]
+      simp [Channels.memoryChannel_eq_byteChannel_false,
+        Channels.memoryChannel_eq_stateChannel_false])
+    (by change memoryChannel.toRaw ∉ []; exact List.not_mem_nil)
   have readerExact (readerInput : Var Readers.RTypeReader.Inputs (ZMod p)) (n : ℕ) :
       Operations.interactionsWith memoryChannel.toRaw
         [Operation.subcircuit (Readers.RTypeReader.circuit.toSubcircuit n readerInput)] =
           Soundness.rTypeMemoryInteractions readerInput := by
     simpa only [Operations.interactionsWith_nil, List.append_nil] using
       Soundness.rTypeReader_memoryInteractions_subcircuit readerInput n ([] : Operations (ZMod p))
-  have compareNil (compareInput : Var DivRemCompare.Inputs (ZMod p)) (n : ℕ) :
-      Operations.interactionsWith memoryChannel.toRaw
-        [Operation.subcircuit (DivRemCompare.circuit.toSubcircuit n compareInput)] = [] := by
-    simpa only [Operations.interactionsWith_nil] using
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil DivRemCompare.circuit
-        memoryChannel.toRaw compareInput ([] : Operations (ZMod p))
-        (by
-          change memoryChannel.toRaw ∉ [byteChannel.toRaw]
-          simp [Channels.memoryChannel_eq_byteChannel_false])
-        (by
-          change memoryChannel.toRaw ∉ []
-          exact List.not_mem_nil)
-  have coreNil (coreInput : Var DivRemChip.Columns (ZMod p)) (n : ℕ) :
-      Operations.interactionsWith memoryChannel.toRaw
-        [Operation.subcircuit (DivRemCore.circuit.toSubcircuit n coreInput)] = [] := by
-    simpa only [Operations.interactionsWith_nil] using
-      InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil DivRemCore.circuit
-        memoryChannel.toRaw coreInput ([] : Operations (ZMod p))
-        (by
-          change memoryChannel.toRaw ∉ [byteChannel.toRaw]
-          simp [Channels.memoryChannel_eq_byteChannel_false])
-        (by
-          change memoryChannel.toRaw ∉ []
-          exact List.not_mem_nil)
+  have compareNil := assertionChild_nil (DivRemCompare.circuit (p := p)) memoryChannel.toRaw
+    (by change memoryChannel.toRaw ∉ [byteChannel.toRaw]
+        simp [Channels.memoryChannel_eq_byteChannel_false])
+    (by change memoryChannel.toRaw ∉ []; exact List.not_mem_nil)
+  have coreNil := assertionChild_nil (DivRemCore.circuit (p := p)) memoryChannel.toRaw
+    (by change memoryChannel.toRaw ∉ [byteChannel.toRaw]
+        simp [Channels.memoryChannel_eq_byteChannel_false])
+    (by change memoryChannel.toRaw ∉ []; exact List.not_mem_nil)
   have writeExact (writeInput : Var Readers.RegisterWrite.Inputs (ZMod p)) (n : ℕ) :
       Operations.interactionsWith memoryChannel.toRaw
         [Operation.subcircuit (Readers.RegisterWrite.circuit.toSubcircuit n writeInput)] =
@@ -530,10 +493,9 @@ private theorem constrainRow_subcircuitRequirements_eq (input : Var Inputs (ZMod
     Operations.subcircuitChannelsWithRequirements_nil,
     GeneralFormalCircuit.toSubcircuit_channelsWithRequirements,
     FormalAssertion.toSubcircuit_channelsWithRequirements,
-    Readers.CPUState.channelsWithRequirements_eq,
-    DivRemCompare.channelsWithRequirements_eq, DivRemCore.channelsWithRequirements_eq,
-    Readers.RTypeReader.circuit, Readers.RegisterWrite.circuit,
-    List.nil_append, List.append_nil]
+    Readers.CPUState.channelsWithRequirements_eq, DivRemCompare.channelsWithRequirements_eq,
+    DivRemCore.channelsWithRequirements_eq, Readers.RTypeReader.circuit,
+    Readers.RegisterWrite.circuit, List.nil_append, List.append_nil]
   rfl
 
 /-- Neither half emits a shallow interaction; all channel traffic belongs to composed children. -/
@@ -548,9 +510,8 @@ private theorem constrainRow_shallowChannels_eq_nil (input : Var Inputs (ZMod p)
     (cols : Var Columns (ZMod p)) (offset : ℕ) :
     Operations.shallowChannels ((constrainRow input cols).operations offset) = [] := by
   simp only [constrainRow, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    subcircuitWithAssertion, assertion, Operations.localLength,
-    Operations.shallowChannels_append, Operations.shallowChannels_subcircuit,
-    Operations.shallowChannels_nil, List.nil_append]
+    subcircuitWithAssertion, assertion, Operations.localLength, Operations.shallowChannels_append,
+    Operations.shallowChannels_subcircuit, Operations.shallowChannels_nil, List.nil_append]
 
 private theorem populateRow_shallowInteractions_eq_nil (input : Var Inputs (ZMod p)) (offset : ℕ) :
     Operations.shallowInteractions ((populateRow input).operations offset) = [] := by
@@ -648,9 +609,7 @@ theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
         ⟨input.state,
           #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
           8, input.is_real⟩).map ChannelInteraction.toRaw := by
-  simp only [main, Circuit.operations, Circuit.bind_def,
-    Operations.interactionsWith_append,
-    populateRow_interactionsWith_eq_nil,
-    constrainRow_interactionsWith_state, List.nil_append]
+  simp only [main, Circuit.operations, Circuit.bind_def, Operations.interactionsWith_append,
+    populateRow_interactionsWith_eq_nil, constrainRow_interactionsWith_state, List.nil_append]
 
 end SP1Clean.DivRemChip

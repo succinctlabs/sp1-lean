@@ -74,7 +74,7 @@ theorem correct_branch_native
     (spec_btype imm (.Regidx rs2) (.Regidx rs1) op).run s
       = (sp1_branch next_pc_word).run s := by
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   have hsp_init : SailState.isInitialized sp :=
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
@@ -172,14 +172,12 @@ theorem branch_chip_reaches_sail
         · exact absurd (hbr.mp h) hcond
       rw [h_fall_gated h_real hb0, h_pcw, JalSail.toBitVec64_four]
   obtain ⟨d_beq, d_bne, d_blt, d_bge, d_bltu, d_bgeu⟩ := h_decision h_real
-  refine ⟨fun hf => key bop.BEQ ?_, fun hf => key bop.BNE ?_, fun hf => key bop.BLT ?_,
-    fun hf => key bop.BGE ?_, fun hf => key bop.BLTU ?_, fun hf => key bop.BGEU ?_⟩
-  · have := d_beq hf; rwa [h_rs1v, h_rs2v] at this
-  · have := d_bne hf; rwa [h_rs1v, h_rs2v] at this
-  · have := d_blt hf; rwa [h_rs1v, h_rs2v] at this
-  · have := d_bge hf; rwa [h_rs1v, h_rs2v] at this
-  · have := d_bltu hf; rwa [h_rs1v, h_rs2v] at this
-  · have := d_bgeu hf; rwa [h_rs1v, h_rs2v] at this
+  exact ⟨fun hf => key bop.BEQ (by have := d_beq hf; rwa [h_rs1v, h_rs2v] at this),
+    fun hf => key bop.BNE (by have := d_bne hf; rwa [h_rs1v, h_rs2v] at this),
+    fun hf => key bop.BLT (by have := d_blt hf; rwa [h_rs1v, h_rs2v] at this),
+    fun hf => key bop.BGE (by have := d_bge hf; rwa [h_rs1v, h_rs2v] at this),
+    fun hf => key bop.BLTU (by have := d_bltu hf; rwa [h_rs1v, h_rs2v] at this),
+    fun hf => key bop.BGEU (by have := d_bgeu hf; rwa [h_rs1v, h_rs2v] at this)⟩
 
 end SP1Clean.BranchSail
 

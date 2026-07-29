@@ -229,19 +229,10 @@ theorem shiftright_chip_reaches_sail
         (spec_sraw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
           = (sp1_sr (.Regidx rd_idx) pc cols.a).run s) := by
   obtain ⟨h_srl, h_sra, h_srlw, h_sraw⟩ := h_chip h_real
-  refine ⟨fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_⟩
-  · exact correct_srl_native input.adapter.op_b_memory.prev_value
-      input.adapter.op_c_memory.prev_value cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_srl h)
-  · exact correct_sra_native input.adapter.op_b_memory.prev_value
-      input.adapter.op_c_memory.prev_value cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_sra h)
-  · exact correct_srlw_native input.adapter.op_b_memory.prev_value
-      input.adapter.op_c_memory.prev_value cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_srlw h)
-  · exact correct_sraw_native input.adapter.op_b_memory.prev_value
-      input.adapter.op_c_memory.prev_value cols.a
-      rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_sraw h)
+  exact ⟨fun h => correct_srl_native _ _ _ rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_srl h),
+    fun h => correct_sra_native _ _ _ rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_sra h),
+    fun h => correct_srlw_native _ _ _ rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_srlw h),
+    fun h => correct_sraw_native _ _ _ rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_sraw h)⟩
 
 end SP1Clean.ShiftRightSail
 
