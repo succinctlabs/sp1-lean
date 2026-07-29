@@ -410,6 +410,20 @@ Per site:
 > whole-`main` `.operations` list carried through a `change`/`Forall` decomposition; `let ops :=
 > (…).operations` followed by bare (non-`only`) `simp`. **Screen on the unification step.**
 >
+> **Masking is the single most expensive measurement error, and the mask itself MOVES.** It has
+> struck in every large batch: W5/b2 hid 6 of 43 removals; W6/b1 twice; W6/b2 once; W6/b3 twice
+> (hiding a 16M and a 32M ceiling ~400× and ~800× over); W6/b4 once (a 1M at ≥25×); W6/b5 once (a 2M
+> at ≥50×). Across W6 alone a naive single-pass ladder would have under-removed by **five**.
+> Two properties make it hard to spot:
+> - the cascade lands on **unceilinged** consumers too, where it reads as independent breakage;
+> - **which producer is named changes between rungs.** In W6/b5 the same masked line reported
+>   `unknown constant …divRemComparisonBlocks_roundtrip` at the 40000 rung and
+>   `…divRemArithmeticBlocks_roundtrip` at 100k, because the producers' pass/fail set had changed.
+>
+> So a `(kernel) unknown constant '_private.…'` is never a result — it is a *re-measure* instruction.
+> Pin suspected producers high, re-run, and confirm the dependency by grepping for citations rather
+> than inferring it from the error.
+>
 > A cheap tell for locating it: **when the timeout's reported position walks along a tactic chain as
 > you raise the budget, that chain is the cost.** That is how the 20× bare `congr 1` chain in
 > `divRemRustAssertionsDecompose` was found — the position moved from `:1234` to `:1242` between the
