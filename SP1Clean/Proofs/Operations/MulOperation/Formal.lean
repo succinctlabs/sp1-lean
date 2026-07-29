@@ -93,9 +93,11 @@ private lemma op5_iff_of_msb_eq {x lo msb : ZMod p}
   · rename_i h; exact ⟨Or.inr rfl, iff_of_true rfl (key.mp h)⟩
   · rename_i h; exact ⟨Or.inl rfl, iff_of_false zero_ne_one (fun hc => h (key.mpr hc))⟩
 
--- 40M: the gadget composes the 8×8 limb product's carry chain plus four sub-gadget boundaries;
+-- The gadget composes the 8×8 limb product's carry chain plus four sub-gadget boundaries;
 -- soundness normalizes all 45 witnessed columns' constraints in one `circuit_proof_start` pass.
-set_option maxHeartbeats 40000000 in
+-- Measured (W3/r1/b4): fails at 100k, passes at the plain default — the former 40M ceiling was
+-- ~200-400× over.  Kept at ~5× the measured floor rather than removed.
+set_option maxHeartbeats 1000000 in
 set_option linter.unusedSimpArgs false in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -133,103 +135,73 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     obtain ⟨hcU0, hcU1, hcU2, hcU3⟩ := Word.lt_cases_of_isU64 hcU
     have hneg : - input_is_real = -1 := by rw [hr]
     obtain ⟨ecar_eq, eprod_eq, ebl_eq, ecl_eq, ebm_eq, ecm_eq, _, _, _⟩ := _hicols
-    have eb0 : Expression.eval env input_var_b[0] = input_b[0] := by rw [← hib, Vector.getElem_map]
-    have eb1 : Expression.eval env input_var_b[1] = input_b[1] := by rw [← hib, Vector.getElem_map]
-    have eb2 : Expression.eval env input_var_b[2] = input_b[2] := by rw [← hib, Vector.getElem_map]
-    have eb3 : Expression.eval env input_var_b[3] = input_b[3] := by rw [← hib, Vector.getElem_map]
-    have ec0 : Expression.eval env input_var_c[0] = input_c[0] := by rw [← hic, Vector.getElem_map]
-    have ec1 : Expression.eval env input_var_c[1] = input_c[1] := by rw [← hic, Vector.getElem_map]
-    have ec2 : Expression.eval env input_var_c[2] = input_c[2] := by rw [← hic, Vector.getElem_map]
-    have ec3 : Expression.eval env input_var_c[3] = input_c[3] := by rw [← hic, Vector.getElem_map]
-    have ep0 : Expression.eval env input_var_cols_product[0] = input_cols_product[0] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep1 : Expression.eval env input_var_cols_product[1] = input_cols_product[1] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep2 : Expression.eval env input_var_cols_product[2] = input_cols_product[2] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep3 : Expression.eval env input_var_cols_product[3] = input_cols_product[3] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep4 : Expression.eval env input_var_cols_product[4] = input_cols_product[4] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep5 : Expression.eval env input_var_cols_product[5] = input_cols_product[5] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep6 : Expression.eval env input_var_cols_product[6] = input_cols_product[6] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep7 : Expression.eval env input_var_cols_product[7] = input_cols_product[7] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep8 : Expression.eval env input_var_cols_product[8] = input_cols_product[8] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep9 : Expression.eval env input_var_cols_product[9] = input_cols_product[9] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep10 : Expression.eval env input_var_cols_product[10] = input_cols_product[10] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep11 : Expression.eval env input_var_cols_product[11] = input_cols_product[11] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep12 : Expression.eval env input_var_cols_product[12] = input_cols_product[12] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep13 : Expression.eval env input_var_cols_product[13] = input_cols_product[13] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep14 : Expression.eval env input_var_cols_product[14] = input_cols_product[14] := by rw [← eprod_eq, Vector.getElem_map]
-    have ep15 : Expression.eval env input_var_cols_product[15] = input_cols_product[15] := by rw [← eprod_eq, Vector.getElem_map]
-    have ecar0 : Expression.eval env input_var_cols_carry[0] = input_cols_carry[0] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar1 : Expression.eval env input_var_cols_carry[1] = input_cols_carry[1] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar2 : Expression.eval env input_var_cols_carry[2] = input_cols_carry[2] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar3 : Expression.eval env input_var_cols_carry[3] = input_cols_carry[3] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar4 : Expression.eval env input_var_cols_carry[4] = input_cols_carry[4] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar5 : Expression.eval env input_var_cols_carry[5] = input_cols_carry[5] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar6 : Expression.eval env input_var_cols_carry[6] = input_cols_carry[6] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar7 : Expression.eval env input_var_cols_carry[7] = input_cols_carry[7] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar8 : Expression.eval env input_var_cols_carry[8] = input_cols_carry[8] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar9 : Expression.eval env input_var_cols_carry[9] = input_cols_carry[9] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar10 : Expression.eval env input_var_cols_carry[10] = input_cols_carry[10] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar11 : Expression.eval env input_var_cols_carry[11] = input_cols_carry[11] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar12 : Expression.eval env input_var_cols_carry[12] = input_cols_carry[12] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar13 : Expression.eval env input_var_cols_carry[13] = input_cols_carry[13] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar14 : Expression.eval env input_var_cols_carry[14] = input_cols_carry[14] := by rw [← ecar_eq, Vector.getElem_map]
-    have ecar15 : Expression.eval env input_var_cols_carry[15] = input_cols_carry[15] := by rw [← ecar_eq, Vector.getElem_map]
-    have ebl0 : Expression.eval env input_var_cols_b_lower_byte_low_bytes[0] = input_cols_b_lower_byte_low_bytes[0] := by rw [← ebl_eq, Vector.getElem_map]
-    have ebl1 : Expression.eval env input_var_cols_b_lower_byte_low_bytes[1] = input_cols_b_lower_byte_low_bytes[1] := by rw [← ebl_eq, Vector.getElem_map]
-    have ebl2 : Expression.eval env input_var_cols_b_lower_byte_low_bytes[2] = input_cols_b_lower_byte_low_bytes[2] := by rw [← ebl_eq, Vector.getElem_map]
-    have ebl3 : Expression.eval env input_var_cols_b_lower_byte_low_bytes[3] = input_cols_b_lower_byte_low_bytes[3] := by rw [← ebl_eq, Vector.getElem_map]
-    have ecl0 : Expression.eval env input_var_cols_c_lower_byte_low_bytes[0] = input_cols_c_lower_byte_low_bytes[0] := by rw [← ecl_eq, Vector.getElem_map]
-    have ecl1 : Expression.eval env input_var_cols_c_lower_byte_low_bytes[1] = input_cols_c_lower_byte_low_bytes[1] := by rw [← ecl_eq, Vector.getElem_map]
-    have ecl2 : Expression.eval env input_var_cols_c_lower_byte_low_bytes[2] = input_cols_c_lower_byte_low_bytes[2] := by rw [← ecl_eq, Vector.getElem_map]
-    have ecl3 : Expression.eval env input_var_cols_c_lower_byte_low_bytes[3] = input_cols_c_lower_byte_low_bytes[3] := by rw [← ecl_eq, Vector.getElem_map]
-    have cb0 : input_cols_carry[0].val < 2 ^ 16 := by rw [← ecar0]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF0 hneg)
-    have cb1 : input_cols_carry[1].val < 2 ^ 16 := by rw [← ecar1]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF1 hneg)
-    have cb2 : input_cols_carry[2].val < 2 ^ 16 := by rw [← ecar2]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF2 hneg)
-    have cb3 : input_cols_carry[3].val < 2 ^ 16 := by rw [← ecar3]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF3 hneg)
-    have cb4 : input_cols_carry[4].val < 2 ^ 16 := by rw [← ecar4]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF4 hneg)
-    have cb5 : input_cols_carry[5].val < 2 ^ 16 := by rw [← ecar5]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF5 hneg)
-    have cb6 : input_cols_carry[6].val < 2 ^ 16 := by rw [← ecar6]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF6 hneg)
-    have cb7 : input_cols_carry[7].val < 2 ^ 16 := by rw [← ecar7]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF7 hneg)
-    have cb8 : input_cols_carry[8].val < 2 ^ 16 := by rw [← ecar8]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF8 hneg)
-    have cb9 : input_cols_carry[9].val < 2 ^ 16 := by rw [← ecar9]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF9 hneg)
-    have cb10 : input_cols_carry[10].val < 2 ^ 16 := by rw [← ecar10]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF10 hneg)
-    have cb11 : input_cols_carry[11].val < 2 ^ 16 := by rw [← ecar11]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF11 hneg)
-    have cb12 : input_cols_carry[12].val < 2 ^ 16 := by rw [← ecar12]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF12 hneg)
-    have cb13 : input_cols_carry[13].val < 2 ^ 16 := by rw [← ecar13]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF13 hneg)
-    have cb14 : input_cols_carry[14].val < 2 ^ 16 := by rw [← ecar14]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF14 hneg)
-    have cb15 : input_cols_carry[15].val < 2 ^ 16 := by rw [← ecar15]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF15 hneg)
-    have pb0 : input_cols_product[0].val < 2 ^ 8 := by rw [← ep0]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG0 hneg)).1
-    have pb1 : input_cols_product[1].val < 2 ^ 8 := by rw [← ep1]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG0 hneg)).2
-    have pb2 : input_cols_product[2].val < 2 ^ 8 := by rw [← ep2]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 hneg)).1
-    have pb3 : input_cols_product[3].val < 2 ^ 8 := by rw [← ep3]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 hneg)).2
-    have pb4 : input_cols_product[4].val < 2 ^ 8 := by rw [← ep4]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG2 hneg)).1
-    have pb5 : input_cols_product[5].val < 2 ^ 8 := by rw [← ep5]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG2 hneg)).2
-    have pb6 : input_cols_product[6].val < 2 ^ 8 := by rw [← ep6]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG3 hneg)).1
-    have pb7 : input_cols_product[7].val < 2 ^ 8 := by rw [← ep7]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG3 hneg)).2
-    have pb8 : input_cols_product[8].val < 2 ^ 8 := by rw [← ep8]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG4 hneg)).1
-    have pb9 : input_cols_product[9].val < 2 ^ 8 := by rw [← ep9]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG4 hneg)).2
-    have pb10 : input_cols_product[10].val < 2 ^ 8 := by rw [← ep10]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG5 hneg)).1
-    have pb11 : input_cols_product[11].val < 2 ^ 8 := by rw [← ep11]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG5 hneg)).2
-    have pb12 : input_cols_product[12].val < 2 ^ 8 := by rw [← ep12]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG6 hneg)).1
-    have pb13 : input_cols_product[13].val < 2 ^ 8 := by rw [← ep13]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG6 hneg)).2
-    have pb14 : input_cols_product[14].val < 2 ^ 8 := by rw [← ep14]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG7 hneg)).1
-    have pb15 : input_cols_product[15].val < 2 ^ 8 := by rw [← ep15]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG7 hneg)).2
-    simp only [hr, one_mul, id_eq, ep0, ep1, ep2, ep3, ep4, ep5, ep6, ep7, ep8, ep9, ep10, ep11, ep12, ep13, ep14, ep15, ecar0, ecar1, ecar2, ecar3, ecar4, ecar5, ecar6, ecar7, ecar8, ecar9, ecar10, ecar11, ecar12, ecar13, ecar14, ecar15, ebl0, ebl1, ebl2, ebl3, ecl0, ecl1, ecl2, ecl3, eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3] at hch0 hch1 hch2 hch3 hch4 hch5 hch6 hch7 hch8 hch9 hch10 hch11 hch12 hch13 hch14 hch15
-    have hpmspec := hpm ⟨fun _ => by rw [ep2, ep3, byte_compose_val pb2 pb3 rfl]; omega, hmw_b⟩
+    have eb : ∀ (i : ℕ) (hi : i < 4), Expression.eval env input_var_b[i] = input_b[i] := by
+      intro i hi; rw [← hib, Vector.getElem_map]
+    have ec : ∀ (i : ℕ) (hi : i < 4), Expression.eval env input_var_c[i] = input_c[i] := by
+      intro i hi; rw [← hic, Vector.getElem_map]
+    have ep : ∀ (i : ℕ) (hi : i < 16),
+        Expression.eval env input_var_cols_product[i] = input_cols_product[i] := by
+      intro i hi; rw [← eprod_eq, Vector.getElem_map]
+    have ecar : ∀ (i : ℕ) (hi : i < 16),
+        Expression.eval env input_var_cols_carry[i] = input_cols_carry[i] := by
+      intro i hi; rw [← ecar_eq, Vector.getElem_map]
+    have ebl : ∀ (i : ℕ) (hi : i < 4),
+        Expression.eval env input_var_cols_b_lower_byte_low_bytes[i]
+          = input_cols_b_lower_byte_low_bytes[i] := by
+      intro i hi; rw [← ebl_eq, Vector.getElem_map]
+    have ecl : ∀ (i : ℕ) (hi : i < 4),
+        Expression.eval env input_var_cols_c_lower_byte_low_bytes[i]
+          = input_cols_c_lower_byte_low_bytes[i] := by
+      intro i hi; rw [← ecl_eq, Vector.getElem_map]
+    have cb0 : input_cols_carry[0].val < 2 ^ 16 := by rw [← ecar 0 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF0 hneg)
+    have cb1 : input_cols_carry[1].val < 2 ^ 16 := by rw [← ecar 1 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF1 hneg)
+    have cb2 : input_cols_carry[2].val < 2 ^ 16 := by rw [← ecar 2 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF2 hneg)
+    have cb3 : input_cols_carry[3].val < 2 ^ 16 := by rw [← ecar 3 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF3 hneg)
+    have cb4 : input_cols_carry[4].val < 2 ^ 16 := by rw [← ecar 4 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF4 hneg)
+    have cb5 : input_cols_carry[5].val < 2 ^ 16 := by rw [← ecar 5 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF5 hneg)
+    have cb6 : input_cols_carry[6].val < 2 ^ 16 := by rw [← ecar 6 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF6 hneg)
+    have cb7 : input_cols_carry[7].val < 2 ^ 16 := by rw [← ecar 7 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF7 hneg)
+    have cb8 : input_cols_carry[8].val < 2 ^ 16 := by rw [← ecar 8 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF8 hneg)
+    have cb9 : input_cols_carry[9].val < 2 ^ 16 := by rw [← ecar 9 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF9 hneg)
+    have cb10 : input_cols_carry[10].val < 2 ^ 16 := by rw [← ecar 10 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF10 hneg)
+    have cb11 : input_cols_carry[11].val < 2 ^ 16 := by rw [← ecar 11 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF11 hneg)
+    have cb12 : input_cols_carry[12].val < 2 ^ 16 := by rw [← ecar 12 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF12 hneg)
+    have cb13 : input_cols_carry[13].val < 2 ^ 16 := by rw [← ecar 13 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF13 hneg)
+    have cb14 : input_cols_carry[14].val < 2 ^ 16 := by rw [← ecar 14 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF14 hneg)
+    have cb15 : input_cols_carry[15].val < 2 ^ 16 := by rw [← ecar 15 (by omega)]; exact (byteRowSpec_range _ sixteen_lt).mp (hcF15 hneg)
+    have pb0 : input_cols_product[0].val < 2 ^ 8 := by rw [← ep 0 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG0 hneg)).1
+    have pb1 : input_cols_product[1].val < 2 ^ 8 := by rw [← ep 1 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG0 hneg)).2
+    have pb2 : input_cols_product[2].val < 2 ^ 8 := by rw [← ep 2 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 hneg)).1
+    have pb3 : input_cols_product[3].val < 2 ^ 8 := by rw [← ep 3 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 hneg)).2
+    have pb4 : input_cols_product[4].val < 2 ^ 8 := by rw [← ep 4 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG2 hneg)).1
+    have pb5 : input_cols_product[5].val < 2 ^ 8 := by rw [← ep 5 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG2 hneg)).2
+    have pb6 : input_cols_product[6].val < 2 ^ 8 := by rw [← ep 6 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG3 hneg)).1
+    have pb7 : input_cols_product[7].val < 2 ^ 8 := by rw [← ep 7 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG3 hneg)).2
+    have pb8 : input_cols_product[8].val < 2 ^ 8 := by rw [← ep 8 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG4 hneg)).1
+    have pb9 : input_cols_product[9].val < 2 ^ 8 := by rw [← ep 9 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG4 hneg)).2
+    have pb10 : input_cols_product[10].val < 2 ^ 8 := by rw [← ep 10 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG5 hneg)).1
+    have pb11 : input_cols_product[11].val < 2 ^ 8 := by rw [← ep 11 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG5 hneg)).2
+    have pb12 : input_cols_product[12].val < 2 ^ 8 := by rw [← ep 12 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG6 hneg)).1
+    have pb13 : input_cols_product[13].val < 2 ^ 8 := by rw [← ep 13 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG6 hneg)).2
+    have pb14 : input_cols_product[14].val < 2 ^ 8 := by rw [← ep 14 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG7 hneg)).1
+    have pb15 : input_cols_product[15].val < 2 ^ 8 := by rw [← ep 15 (by omega)]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG7 hneg)).2
+    simp only [hr, one_mul, id_eq, ep, ecar, ebl, ecl, eb, ec] at hch0 hch1 hch2 hch3 hch4 hch5 hch6 hch7 hch8 hch9 hch10 hch11 hch12 hch13 hch14 hch15
+    have hpmspec := hpm ⟨fun _ => by rw [ep 2 (by omega), ep 3 (by omega), byte_compose_val pb2 pb3 rfl]; omega, hmw_b⟩
     have hmsb_bool : input_cols_product_msb_msb = 0 ∨ input_cols_product_msb_msb = 1 := hpmspec.1
     have hmsb : input_is_mulw = 1 → input_cols_product_msb_msb =
         if (input_cols_product[2] + input_cols_product[3] * 256).val ≥ 32768 then 1 else 0 := by
-      intro h; have := hpmspec.2 h; rwa [ep2, ep3] at this
+      intro h; have := hpmspec.2 h; rwa [ep 2 (by omega), ep 3 (by omega)] at this
     have hb_msb : input_cols_b_msb = if input_b[3].val ≥ 32768 then 1 else 0 := by
       obtain ⟨hlo3, hhi3, hreass3⟩ := hb_low 3
       dsimp only at hlo3 hhi3 hreass3
       have hg := (byteRowSpec_msb _ _).mp (hb5 hneg)
-      simp only [circuit_norm, eb3, ebl3, ebm_eq, ← sub_eq_add_neg] at hg
+      simp only [circuit_norm, eb, ebl, ebm_eq, ← sub_eq_add_neg] at hg
       exact msb_eq_of_op5 hlo3 hhi3 hreass3 hg.2.1 hg.2.2
     have hc_msb : input_cols_c_msb = if input_c[3].val ≥ 32768 then 1 else 0 := by
       obtain ⟨hlo3, hhi3, hreass3⟩ := hc_low 3
       dsimp only at hlo3 hhi3 hreass3
       have hg := (byteRowSpec_msb _ _).mp (hc5 hneg)
-      simp only [circuit_norm, ec3, ecl3, ecm_eq, ← sub_eq_add_neg] at hg
+      simp only [circuit_norm, ec, ecl, ecm_eq, ← sub_eq_add_neg] at hg
       exact msb_eq_of_op5 hlo3 hhi3 hreass3 hg.2.1 hg.2.2
     refine ⟨?_, hb_low, hc_low, hb_msb, hc_msb, hmsb_bool, hmsb⟩
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -300,13 +272,9 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
           Vector.getElem_mapRange]
         linear_combination hch15
     · intro k hk
-      interval_cases k <;>
-        simp only [productVal, Nat.reduceLT, dif_pos] <;>
-        first | exact pb0 | exact pb1 | exact pb2 | exact pb3 | exact pb4 | exact pb5 | exact pb6 | exact pb7 | exact pb8 | exact pb9 | exact pb10 | exact pb11 | exact pb12 | exact pb13 | exact pb14 | exact pb15
+      interval_cases k <;> simp only [productVal, Nat.reduceLT, dif_pos] <;> assumption
     · intro k hk
-      interval_cases k <;>
-        simp only [carryVal, Nat.reduceLT, dif_pos] <;>
-        first | exact cb0 | exact cb1 | exact cb2 | exact cb3 | exact cb4 | exact cb5 | exact cb6 | exact cb7 | exact cb8 | exact cb9 | exact cb10 | exact cb11 | exact cb12 | exact cb13 | exact cb14 | exact cb15
+      interval_cases k <;> simp only [carryVal, Nat.reduceLT, dif_pos] <;> assumption
     · exact hsdb
     · exact hsdc
     · exact bool_of_mul_pred (by simpa only [sub_eq_add_neg] using hb_bool)
@@ -435,7 +403,6 @@ lemma extStream_eq_zero (l0 l1 l2 l3 sgn i : ℕ) (h : 16 ≤ i) :
     extStream l0 l1 l2 l3 sgn i = 0 := by
   unfold extStream; rw [List.getD_eq_default _ _ (by simp; omega)]
 
-set_option maxHeartbeats 4000000 in
 /-- `populate b c is_mulh is_mulhsu is_mulw` satisfies the structural `Spec` for any `is_real` and any
 boolean variant flags with a `{0,1}`-bounded sum (mirroring `Assumptions`). The composing chip uses
 this to discharge its `MulOperation` assertion obligation in completeness. -/
@@ -634,9 +601,10 @@ theorem spec_populate {b c : Word (ZMod p)} (hb : b.isU64) (hc : c.isU64)
   rw [if_pos hw]
   exact (U16MSBOperation.spec_populate hpm_arg_lt 1).2 rfl
 
--- 40M: completeness re-runs the same 45-column carry-chain normalization as soundness above,
--- with the `populate` witness closure substituted cell-by-cell.
-set_option maxHeartbeats 40000000 in
+-- Completeness re-runs the same 45-column carry-chain normalization as soundness above, with the
+-- `populate` witness closure substituted cell-by-cell.  Measured (W3/r1/b4): fails at 100k, passes
+-- at 150k — the former 40M ceiling was ~270× over.  Kept at ~5× the measured floor, not removed.
+set_option maxHeartbeats 1000000 in
 set_option linter.unusedSimpArgs false in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -644,58 +612,27 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   obtain ⟨hib, hic, hicols, _hir, _him_mul, _him_mulh, _him_mulhu, _him_mulhsu, _him_mulw⟩ := h_input
   obtain ⟨h_bsd, h_csd, h_bmb, h_cmb, h_pmb, h_gated⟩ := h_spec
   obtain ⟨ecar_eq, eprod_eq, ebl_eq, ecl_eq, _ebm, _ecm, _epm, _ebse, _ecse⟩ := hicols
-  have eb0 : Expression.eval env.toEnvironment input_var_b[0] = input_b[0] := by rw [← hib, Vector.getElem_map]
-  have eb1 : Expression.eval env.toEnvironment input_var_b[1] = input_b[1] := by rw [← hib, Vector.getElem_map]
-  have eb2 : Expression.eval env.toEnvironment input_var_b[2] = input_b[2] := by rw [← hib, Vector.getElem_map]
-  have eb3 : Expression.eval env.toEnvironment input_var_b[3] = input_b[3] := by rw [← hib, Vector.getElem_map]
-  have ec0 : Expression.eval env.toEnvironment input_var_c[0] = input_c[0] := by rw [← hic, Vector.getElem_map]
-  have ec1 : Expression.eval env.toEnvironment input_var_c[1] = input_c[1] := by rw [← hic, Vector.getElem_map]
-  have ec2 : Expression.eval env.toEnvironment input_var_c[2] = input_c[2] := by rw [← hic, Vector.getElem_map]
-  have ec3 : Expression.eval env.toEnvironment input_var_c[3] = input_c[3] := by rw [← hic, Vector.getElem_map]
-  have ep0 : Expression.eval env.toEnvironment input_var_cols_product[0] = input_cols_product[0] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep1 : Expression.eval env.toEnvironment input_var_cols_product[1] = input_cols_product[1] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep2 : Expression.eval env.toEnvironment input_var_cols_product[2] = input_cols_product[2] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep3 : Expression.eval env.toEnvironment input_var_cols_product[3] = input_cols_product[3] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep4 : Expression.eval env.toEnvironment input_var_cols_product[4] = input_cols_product[4] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep5 : Expression.eval env.toEnvironment input_var_cols_product[5] = input_cols_product[5] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep6 : Expression.eval env.toEnvironment input_var_cols_product[6] = input_cols_product[6] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep7 : Expression.eval env.toEnvironment input_var_cols_product[7] = input_cols_product[7] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep8 : Expression.eval env.toEnvironment input_var_cols_product[8] = input_cols_product[8] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep9 : Expression.eval env.toEnvironment input_var_cols_product[9] = input_cols_product[9] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep10 : Expression.eval env.toEnvironment input_var_cols_product[10] = input_cols_product[10] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep11 : Expression.eval env.toEnvironment input_var_cols_product[11] = input_cols_product[11] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep12 : Expression.eval env.toEnvironment input_var_cols_product[12] = input_cols_product[12] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep13 : Expression.eval env.toEnvironment input_var_cols_product[13] = input_cols_product[13] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep14 : Expression.eval env.toEnvironment input_var_cols_product[14] = input_cols_product[14] := by rw [← eprod_eq, Vector.getElem_map]
-  have ep15 : Expression.eval env.toEnvironment input_var_cols_product[15] = input_cols_product[15] := by rw [← eprod_eq, Vector.getElem_map]
-  have ecar0 : Expression.eval env.toEnvironment input_var_cols_carry[0] = input_cols_carry[0] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar1 : Expression.eval env.toEnvironment input_var_cols_carry[1] = input_cols_carry[1] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar2 : Expression.eval env.toEnvironment input_var_cols_carry[2] = input_cols_carry[2] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar3 : Expression.eval env.toEnvironment input_var_cols_carry[3] = input_cols_carry[3] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar4 : Expression.eval env.toEnvironment input_var_cols_carry[4] = input_cols_carry[4] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar5 : Expression.eval env.toEnvironment input_var_cols_carry[5] = input_cols_carry[5] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar6 : Expression.eval env.toEnvironment input_var_cols_carry[6] = input_cols_carry[6] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar7 : Expression.eval env.toEnvironment input_var_cols_carry[7] = input_cols_carry[7] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar8 : Expression.eval env.toEnvironment input_var_cols_carry[8] = input_cols_carry[8] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar9 : Expression.eval env.toEnvironment input_var_cols_carry[9] = input_cols_carry[9] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar10 : Expression.eval env.toEnvironment input_var_cols_carry[10] = input_cols_carry[10] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar11 : Expression.eval env.toEnvironment input_var_cols_carry[11] = input_cols_carry[11] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar12 : Expression.eval env.toEnvironment input_var_cols_carry[12] = input_cols_carry[12] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar13 : Expression.eval env.toEnvironment input_var_cols_carry[13] = input_cols_carry[13] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar14 : Expression.eval env.toEnvironment input_var_cols_carry[14] = input_cols_carry[14] := by rw [← ecar_eq, Vector.getElem_map]
-  have ecar15 : Expression.eval env.toEnvironment input_var_cols_carry[15] = input_cols_carry[15] := by rw [← ecar_eq, Vector.getElem_map]
-  have ebl0 : Expression.eval env.toEnvironment input_var_cols_b_lower_byte_low_bytes[0] = input_cols_b_lower_byte_low_bytes[0] := by rw [← ebl_eq, Vector.getElem_map]
-  have ebl1 : Expression.eval env.toEnvironment input_var_cols_b_lower_byte_low_bytes[1] = input_cols_b_lower_byte_low_bytes[1] := by rw [← ebl_eq, Vector.getElem_map]
-  have ebl2 : Expression.eval env.toEnvironment input_var_cols_b_lower_byte_low_bytes[2] = input_cols_b_lower_byte_low_bytes[2] := by rw [← ebl_eq, Vector.getElem_map]
-  have ebl3 : Expression.eval env.toEnvironment input_var_cols_b_lower_byte_low_bytes[3] = input_cols_b_lower_byte_low_bytes[3] := by rw [← ebl_eq, Vector.getElem_map]
-  have ecl0 : Expression.eval env.toEnvironment input_var_cols_c_lower_byte_low_bytes[0] = input_cols_c_lower_byte_low_bytes[0] := by rw [← ecl_eq, Vector.getElem_map]
-  have ecl1 : Expression.eval env.toEnvironment input_var_cols_c_lower_byte_low_bytes[1] = input_cols_c_lower_byte_low_bytes[1] := by rw [← ecl_eq, Vector.getElem_map]
-  have ecl2 : Expression.eval env.toEnvironment input_var_cols_c_lower_byte_low_bytes[2] = input_cols_c_lower_byte_low_bytes[2] := by rw [← ecl_eq, Vector.getElem_map]
-  have ecl3 : Expression.eval env.toEnvironment input_var_cols_c_lower_byte_low_bytes[3] = input_cols_c_lower_byte_low_bytes[3] := by rw [← ecl_eq, Vector.getElem_map]
-  simp only [eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3, ep0, ep1, ep2, ep3, ep4, ep5, ep6, ep7, ep8, ep9,
-    ep10, ep11, ep12, ep13, ep14, ep15, ecar0, ecar1, ecar2, ecar3, ecar4, ecar5, ecar6, ecar7, ecar8,
-    ecar9, ecar10, ecar11, ecar12, ecar13, ecar14, ecar15, ebl0, ebl1, ebl2, ebl3, ecl0, ecl1, ecl2,
-    ecl3] at *
+  have eb : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env.toEnvironment input_var_b[i] = input_b[i] := by
+    intro i hi; rw [← hib, Vector.getElem_map]
+  have ec : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env.toEnvironment input_var_c[i] = input_c[i] := by
+    intro i hi; rw [← hic, Vector.getElem_map]
+  have ep : ∀ (i : ℕ) (hi : i < 16),
+      Expression.eval env.toEnvironment input_var_cols_product[i] = input_cols_product[i] := by
+    intro i hi; rw [← eprod_eq, Vector.getElem_map]
+  have ecar : ∀ (i : ℕ) (hi : i < 16),
+      Expression.eval env.toEnvironment input_var_cols_carry[i] = input_cols_carry[i] := by
+    intro i hi; rw [← ecar_eq, Vector.getElem_map]
+  have ebl : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env.toEnvironment input_var_cols_b_lower_byte_low_bytes[i]
+        = input_cols_b_lower_byte_low_bytes[i] := by
+    intro i hi; rw [← ebl_eq, Vector.getElem_map]
+  have ecl : ∀ (i : ℕ) (hi : i < 4),
+      Expression.eval env.toEnvironment input_var_cols_c_lower_byte_low_bytes[i]
+        = input_cols_c_lower_byte_low_bytes[i] := by
+    intro i hi; rw [← ecl_eq, Vector.getElem_map]
+  simp only [eb, ec, ep, ecar, ebl, ecl] at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
     ?_, ?_, ?_, ?_, ?_⟩
