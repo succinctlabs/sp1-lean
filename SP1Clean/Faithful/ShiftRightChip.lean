@@ -5,9 +5,10 @@ import SP1Clean.Proofs.Chips.ShiftRightChip.Formal
 /-! # Whole-chip faithfulness — ShiftRight
 
 This module compares the complete native Clean ShiftRight row with the complete constraint and
-interaction system extracted from the pinned SP1 v6.3.1 `ShiftRightChip`. The comparison is whole-chip:
-the native proof-oriented decomposition may differ from Rust's internal operation layout, while the
-decoded row, all `assertZero`s, and the full bus-interaction multiset agree exactly.
+interaction system extracted from the pinned SP1 v6.3.1 `ShiftRightChip`. The comparison is
+whole-chip: the native proof-oriented decomposition may differ from Rust's internal operation
+layout, while the decoded row, all `assertZero`s, and the full bus-interaction multiset agree
+exactly.
 -/
 
 namespace SP1Clean.Faithful
@@ -349,7 +350,6 @@ private theorem evalLocalVector
   simpa only [Nat.add_assoc] using
     (eval_local_inputFirstRow input locals data (base + i) hlocal)
 
-set_option maxHeartbeats 2000000 in
 theorem eval_shiftRightChipDirectOutput
     (input : ShiftRightChip.Inputs (ZMod p))
     (locals : Vector (ZMod p) 37)
@@ -607,7 +607,6 @@ private def srNativeMeaning
         ((ShiftRightCore.main (srCols input offset)).operations
           (offset + 37)))
 
-set_option maxHeartbeats 4000000 in
 private theorem shiftRightNativeAssertionsDecompose
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -799,7 +798,6 @@ private theorem shiftRightRustAssertionsDecompose
     (shiftRightRustColumns env input offset)
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem nativeU16MSBAssertionList
     (env : Environment (ZMod p))
     (input : Var U16MSBOperation.Inputs (ZMod p)) (offset : ℕ) :
@@ -823,7 +821,6 @@ private theorem nativeU16MSBAssertionList
   rw [hscalar]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem u16MSBAssertions
     (env : Environment (ZMod p))
     (input : Var U16MSBOperation.Inputs (ZMod p)) (offset : ℕ)
@@ -848,7 +845,7 @@ private theorem u16MSBAssertions
     eval_sub, Expression.eval, hreal, hmsbEval, hmsb]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 400000 in
 private theorem shiftRightCoreAssertions
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -954,7 +951,6 @@ private theorem shiftRightGateEval
     shiftRightRustColumns_isSrlw, shiftRightRustColumns_isSraw]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem shiftRightCpuAssertions
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ)
@@ -998,7 +994,6 @@ private theorem shiftRightCpuAssertions
   exact hCpu
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem shiftRightU16B3Assertions
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -1028,7 +1023,6 @@ private theorem shiftRightU16B3Assertions
   exact hU16
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem shiftRightU16B1Assertions
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -1058,7 +1052,6 @@ private theorem shiftRightU16B1Assertions
   exact hU16
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem shiftRightU16WordAssertions
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -1092,7 +1085,6 @@ private theorem shiftRightU16WordAssertions
   dsimp only [u16Input, cols] at hU16
   exact hU16
 
-set_option maxHeartbeats 1000000 in
 private theorem shiftRightAluAssertions
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1305,7 +1297,6 @@ private theorem shiftRightSelectorLink
     Expression.eval env (input.is_real - srGate offset) = 0 := by
   rw [eval_sub, hinputReal, sub_self]
 
-set_option maxHeartbeats 2000000 in
 private theorem shiftRightMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1385,7 +1376,6 @@ private theorem shiftRightMeaningFaithful
       hCpuRust, hAluRust, hSrlRust, hSraRust,
       hSrlwRust, hSrawRust, hGateRust, hCoreRust⟩
 
-set_option maxHeartbeats 2000000 in
 private theorem shiftRightConstraintsFaithfulOutput
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1415,7 +1405,6 @@ private theorem shiftRightRustColumns_eq_output
   rw [ShiftRightChip.eval_columns, ShiftRightChip.eval_columns]
   simp only [ProvableType.varFromOffset_fields]
 
-set_option maxHeartbeats 2000000 in
 theorem shiftRightChip_constraints_faithful
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1461,7 +1450,6 @@ private theorem shiftRightChipLocals_thirtyFive {F : Type}
     (shiftRightChipLocals cols)[35] = cols.is_sraw := by
   rfl
 
-set_option maxHeartbeats 1000000 in
 private theorem shiftRightChipRowCodec_inputReal
     (cols : ShiftRightChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -1517,7 +1505,6 @@ private theorem shiftRightChipRowCodec_inputReal
   simp only [shiftRightChipInput] at hSrl hSra hSrlw hSraw
   rw [hSrl, hSra, hSrlw, hSraw]
 
-set_option maxHeartbeats 2000000 in
 theorem shiftRightChip_constraints_constructive
     (rustCols : Extracted.ShiftRightOracle.ShiftRightCols (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -1998,7 +1985,6 @@ theorem shiftRightChip_interactions_faithful
   simpa only [List.append_assoc] using
     ((hByte.append_left _).append hMemory).append_right _
 
-set_option maxHeartbeats 2000000 in
 theorem shiftRightChip_interactions_constructive
     (rustCols : Extracted.ShiftRightOracle.ShiftRightCols (ZMod p))
     (data : ProverData (ZMod p)) :

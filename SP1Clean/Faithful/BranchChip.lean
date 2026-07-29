@@ -268,7 +268,6 @@ private theorem branchChipPrefix_nine {F : Type}
     (branchChipPrefix cols)[9] = cols.next_pc[2] := rfl
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem eval_branchChipCompare
     (cols : BranchChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -309,7 +308,6 @@ private theorem eval_branchChipPrefixLocal
     (branchChipLocals cols) data i (by omega)).trans
       (branchChipLocals_prefix cols i hi)
 
-set_option maxHeartbeats 1000000 in
 theorem eval_branchChipDirectOutput
     (cols : BranchChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -535,7 +533,7 @@ private def branchNativeMeaning
         ((Readers.ITypeReaderImmutable.main
           (branchITypeInput input offset)).operations (offset + 20)))
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 800000 in
 private theorem branchNativeAssertionsDecompose
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -746,7 +744,7 @@ private def branchRustTail
 
 omit [Fact (2 ^ 17 < p)] in
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 800000 in
 private theorem branchColumns_asserts_decompose
     (cols : BranchChip.Columns (ZMod p)) :
     Extracted.BranchOracle.BranchColumns.asserts (branchChipReconfigure cols) =
@@ -791,7 +789,6 @@ private def branchRustInteractionTail
 
 omit [Fact (2 ^ 17 < p)] in
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 2000000 in
 private theorem branchColumns_interactions_decompose
     (cols : BranchChip.Columns (ZMod p)) :
     Extracted.BranchOracle.BranchColumns.interactions (branchChipReconfigure cols) =
@@ -945,7 +942,6 @@ private theorem branchCpuMeaningFaithful
   simpa only [branchSum, branchFlag, eval_add,
     Expression.eval] using hCpu
 
-set_option maxHeartbeats 1000000 in
 private theorem branchITypeMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1018,7 +1014,6 @@ private theorem branchITypeMeaningFaithful
     Readers.ITypeReader.eval_cols, ProvableType.eval_field,
     eval_add, eval_mul, Expression.eval] using hIType
 
-set_option maxHeartbeats 1000000 in
 private theorem branchLtMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1063,7 +1058,7 @@ private theorem branchLtMeaningFaithful
 
 omit [Fact (2 ^ 17 < p)] in
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 1600000 in
 private theorem branchTailMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1135,7 +1130,6 @@ theorem branchChip_constraints_faithful
       ((branchMeaningFaithful env input offset hinputReal).trans
         (branchNativeAssertionsDecompose env input offset).symm)
 
-set_option maxHeartbeats 2000000 in
 private theorem branchChipRowCodec_inputReal
     (cols : BranchChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -1202,7 +1196,6 @@ private theorem branchChipRowCodec_inputReal
   have h012345 := congrArg₂ (· + ·) h01234 h5
   simpa only [Nat.add_zero] using hInput.trans h012345.symm
 
-set_option maxHeartbeats 200000 in
 theorem branchChip_constraints_constructive
     (rustCols : Extracted.BranchOracle.BranchColumns (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -1258,7 +1251,6 @@ open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 4000000 in
 private theorem ltSigned_interactions_exact
     (env : Environment (ZMod p))
     (input : Var LtOperationSigned.Inputs (ZMod p)) (offset : ℕ) :
@@ -1464,7 +1456,6 @@ private theorem branchITypeByteInteractions_subcircuit
     Readers.ITypeReaderImmutable.circuit byteChannel.toRaw
     input offset ops _ rfl
 
-set_option maxHeartbeats 4000000 in
 private theorem branchByteInteractions_decompose
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ) :
     ((BranchChip.main input).operations offset).interactionsWith
@@ -1586,7 +1577,6 @@ private theorem branchRustAccesses_decompose
     branchTailRustAccesses]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem branchITypeRustAccesses_noState
     (cols : BranchChip.Columns (ZMod p)) :
     (branchITypeRustAccesses cols).filter
@@ -1596,7 +1586,6 @@ private theorem branchITypeRustAccesses_noState
     Extracted.Interaction.toAccess]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 2000000 in
 private theorem branchLtRustAccesses_noState
     (cols : BranchChip.Columns (ZMod p)) :
     (branchLtRustAccesses cols).filter
@@ -1661,7 +1650,6 @@ private theorem branchRustColumns_opcode
   simp only [branchChipRustColumns, branchOpcode, branchFlag,
     Expression.eval]
 
-set_option maxHeartbeats 2000000 in
 private theorem branchStateInteractions_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1750,7 +1738,6 @@ private theorem branchTailRustAccesses_noMemory
   simp [branchTailRustAccesses, branchRustInteractionTail,
     Extracted.Interaction.toAccess]
 
-set_option maxHeartbeats 2000000 in
 private theorem branchITypeMemory_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1831,7 +1818,6 @@ private theorem branchITypeMemory_faithful
   simp only [eval_cpuState, ProvableType.eval_field]
   rw [hReader, LookupAccessList.map_negMult_negMult]
 
-set_option maxHeartbeats 1000000 in
 private theorem branchMemoryInteractions_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1898,7 +1884,6 @@ private theorem branchTailRustAccesses_noProgram
   simp [branchTailRustAccesses, branchRustInteractionTail,
     Extracted.Interaction.toAccess]
 
-set_option maxHeartbeats 2000000 in
 private theorem branchITypeProgram_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1974,7 +1959,6 @@ private theorem branchITypeProgram_faithful
   simp only [eval_cpuState, ProvableType.eval_field]
   rw [hReader, LookupAccessList.map_negMult_negMult]
 
-set_option maxHeartbeats 1000000 in
 private theorem branchProgramInteractions_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -2034,7 +2018,6 @@ private theorem branchRustColumns_signed
   simp only [branchChipRustColumns, branchFlag,
     Expression.eval]
 
-set_option maxHeartbeats 1000000 in
 private theorem branchCpuByte_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -2064,7 +2047,6 @@ private theorem branchCpuByte_faithful
     branchRustColumns_nextPc, branchRustColumns_sum]
   simpa only [cpuInput] using hCpu
 
-set_option maxHeartbeats 1000000 in
 private theorem branchITypeByte_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -2121,7 +2103,6 @@ private theorem branchITypeByte_faithful
   simp only [eval_cpuState, ProvableType.eval_field]
   exact hReader
 
-set_option maxHeartbeats 4000000 in
 private theorem branchLtByte_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -2184,7 +2165,6 @@ private theorem branchTailRustAccesses_allByte
   simp [branchTailRustAccesses, branchRustInteractionTail,
     Extracted.Interaction.toAccess]
 
-set_option maxHeartbeats 1000000 in
 private theorem branchTailByte_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -2225,7 +2205,6 @@ private theorem branchTailByte_faithful
     ← ProvableType.getElem_eval_fields,
     Expression.eval, hinputReal, h6, h14, h16]
 
-set_option maxHeartbeats 1000000 in
 private theorem branchByteInteractions_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -2283,7 +2262,6 @@ private theorem branchUnexpectedInteractions_empty
   simp only [decide_eq_true_eq] at hunexpected
   tauto
 
-set_option maxHeartbeats 1000000 in
 theorem branchChip_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -2333,7 +2311,6 @@ theorem branchChip_interactions_faithful
   simpa only [List.append_assoc] using
     (hByte.append_left _).append_right _
 
-set_option maxHeartbeats 200000 in
 theorem branchChip_interactions_constructive
     (rustCols : Extracted.BranchOracle.BranchColumns (ZMod p))
     (data : ProverData (ZMod p)) :

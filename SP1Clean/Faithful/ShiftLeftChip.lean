@@ -316,7 +316,6 @@ private theorem evalLocalVector
   simpa only [Nat.add_assoc] using
     (eval_local_inputFirstRow input locals data (base + i) hlocal)
 
-set_option maxHeartbeats 2000000 in
 theorem eval_shiftLeftChipDirectOutput
     (input : ShiftLeftChip.Inputs (ZMod p))
     (locals : Vector (ZMod p) 33)
@@ -528,7 +527,6 @@ private def slNativeMeaning
         ((ShiftLeftCore.main (slCols input offset)).operations
           (offset + 33)))
 
-set_option maxHeartbeats 4000000 in
 private theorem shiftLeftNativeAssertionsDecompose
     (env : Environment (ZMod p))
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -674,7 +672,6 @@ private theorem shiftLeftRustAssertionsDecompose
     (shiftLeftRustColumns env input offset)
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem nativeU16MSBAssertionList
     (env : Environment (ZMod p))
     (input : Var U16MSBOperation.Inputs (ZMod p)) (offset : ℕ) :
@@ -698,7 +695,6 @@ private theorem nativeU16MSBAssertionList
   rw [hscalar]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem u16MSBAssertions
     (env : Environment (ZMod p))
     (input : Var U16MSBOperation.Inputs (ZMod p)) (offset : ℕ)
@@ -723,7 +719,7 @@ private theorem u16MSBAssertions
     eval_sub, Expression.eval, hreal, hmsbEval, hmsb]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 400000 in
 private theorem shiftLeftCoreAssertions
     (env : Environment (ZMod p))
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -826,7 +822,6 @@ private theorem shiftLeftGateEval
   rw [shiftLeftRustColumns_isSll, shiftLeftRustColumns_isSllw]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem shiftLeftCpuAssertions
     (env : Environment (ZMod p))
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ)
@@ -870,7 +865,6 @@ private theorem shiftLeftCpuAssertions
   exact hCpu
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem shiftLeftU16Assertions
     (env : Environment (ZMod p))
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -897,7 +891,6 @@ private theorem shiftLeftU16Assertions
   dsimp only [u16Input, cols] at hU16
   exact hU16
 
-set_option maxHeartbeats 1000000 in
 private theorem shiftLeftAluAssertions
     (env : Environment (ZMod p))
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -1065,7 +1058,6 @@ private theorem shiftLeftSelectorLink
     Expression.eval env (input.is_real - slGate offset) = 0 := by
   rw [eval_sub, hinputReal, sub_self]
 
-set_option maxHeartbeats 2000000 in
 private theorem shiftLeftMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1127,7 +1119,6 @@ private theorem shiftLeftMeaningFaithful
     exact ⟨hU16Rust, hCpuRust, hAluRust,
       hGateRust, hSllRust, hSllwRust, hCoreRust⟩
 
-set_option maxHeartbeats 2000000 in
 private theorem shiftLeftConstraintsFaithfulOutput
     (env : Environment (ZMod p))
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1157,7 +1148,6 @@ private theorem shiftLeftRustColumns_eq_output
   rw [ShiftLeftChip.eval_columns, ShiftLeftChip.eval_columns]
   simp only [ProvableType.varFromOffset_fields]
 
-set_option maxHeartbeats 2000000 in
 theorem shiftLeftChip_constraints_faithful
     (env : Environment (ZMod p))
     (input : Var ShiftLeftChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1191,7 +1181,6 @@ private theorem shiftLeftChipLocals_thirtyOne {F : Type}
     (shiftLeftChipLocals cols)[31] = cols.is_sllw := by
   rfl
 
-set_option maxHeartbeats 1000000 in
 private theorem shiftLeftChipRowCodec_inputReal
     (cols : ShiftLeftChip.Columns (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -1239,7 +1228,6 @@ private theorem shiftLeftChipRowCodec_inputReal
   simp only [shiftLeftChipInput] at hSll hSllw
   exact (congrArg₂ (· + ·) hSll hSllw).symm
 
-set_option maxHeartbeats 2000000 in
 theorem shiftLeftChip_constraints_constructive
     (rustCols : Extracted.ShiftLeftOracle.ShiftLeftCols (ZMod p))
     (data : ProverData (ZMod p)) :
@@ -1673,7 +1661,6 @@ theorem shiftLeftChip_interactions_faithful
   simpa only [List.append_assoc] using
     ((hByte.append_left _).append hMemory).append_right _
 
-set_option maxHeartbeats 2000000 in
 theorem shiftLeftChip_interactions_constructive
     (rustCols : Extracted.ShiftLeftOracle.ShiftLeftCols (ZMod p))
     (data : ProverData (ZMod p)) :
