@@ -140,5 +140,48 @@
 # `U16MSBOperation`, and fails outright on two; those kept their hand-written fields. Every retained
 # omission measured neutral-or-better (-3% to 0%). The family is split 15 explicit-`where` /
 # 6 `elaborate_circuit` / 1 private-derivation forward.
-SP1Clean 671
+# -3 (2026-07-28, proof-cleanup W3/r3a): ratchet DOWN, no ceiling raised. 5 directives deleted, 2
+# re-added strictly lower, net -3; the count reconciles EXACTLY (671 - 3 = 668), the second
+# consecutive round to confirm no phantom. By batch: DivRemOperation/Core.lean removed a 64000000
+# and a 16000000 outright and tightened its two remaining 16000000 sites to 500000 and 400000 (b1);
+# DivRemOperation/Compare.lean dropped its last 4000000, on the `elaborated` instance, and now
+# carries zero (b3). FormalModel/Contracts/Chips.lean (b2) carried none.
+# This round's interest is NOT the ceiling count — it is the campaign's LARGEST SINGLE-FILE LINE
+# RESULT and the first KEEP-set ceiling pair confirmed correctly-sized at both ends:
+#   * DivRemOperation/Core.lean went 1172 -> 706 lines (-466, -40%). The file hand-wrote the same
+#     two-line `rw [← h, Vector.getElem_map]` eval-transport bridge 176 TIMES across three proofs.
+#     Extracting it to one `private lemma eval_getElem` halved that to 176 one-liners; the second
+#     and larger half was PARTIALLY APPLYING it — `have gvA := eval_getElem vA` yields a quantified
+#     rewrite rule covering a whole index family, so 176 `have`s collapsed to 16 and the trailing
+#     `simp only` shed 80 explicit arguments. 176 -> 25 lines. This generalises: wherever a proof
+#     spells one bridge per (vector, index) pair, one partially-applied helper per vector suffices.
+#     The same file's `selection_of_flags` dropped 56 lines by replacing eight blocks of seven
+#     `have z_i : ... = 0` with `cases other <;> dsimp only [Case.flag] <;> first | ... | ...`.
+#   * The two KEPT ceilings are the campaign's first pair measured genuine BEFORE AND AFTER a major
+#     golf: `soundness` and `completeness` both fail at 40000 either way, so the golf did not create
+#     the need and does not remove it. They were merely ~200x oversized at 16000000 and are now at
+#     500000/400000 (~12x headroom over the measured floor).
+#     Timing A/B, solo, same machine: 21.58s -> 15.79s CPU (10.56s -> 8.88s wall), i.e. the -40%
+#     rewrite also bought -27% CPU. A large line reduction on a Tier-S file did not cost elaboration.
+#   * b2 DECLINED a -4 on `rv64_subw_eq`: `bv_decide` closes it, but that would add
+#     `Lean.ofReduceBool`/`Lean.trustCompiler` to an audit-surface lemma that is currently clean.
+#     It stands unchanged at [propext, Quot.sound]. The three substitutions b2 DID make replace
+#     hand-rolled `eq_of_toNat_eq` + `omega`/`Nat.mod_mod_of_dvd` chains with the library lemmas
+#     `BitVec.setWidth_add` / `BitVec.setWidth_mul` (-8 lines on the audit surface).
+#     GATE CORRECTION: b2 reported these as an axiom improvement ("addw/mulw dropped the
+#     `Classical.choice` that `omega` had pulled in"). Measured before-and-after, that is NOT what
+#     happened, and the note is recorded here so the claim is not carried forward:
+#       - `rv64_addw_eq`  [propext, Quot.sound] -> [propext, Quot.sound]   (unchanged; it never
+#         carried `Classical.choice` — `omega` had not leaked one)
+#       - `rv64_mulw_eq`  [propext] -> [propext, Quot.sound]               (a strict ADDITION, not
+#         a drop; negligible, since `Quot.sound` is inside the permitted set, but it is the
+#         opposite direction from the one claimed)
+#       - `rv64_mulh_eq`  unchanged in substance: [propext, Classical.choice, Quot.sound] plus the
+#         same THREE pre-existing `bv_decide` axioms. Only the auto-generated index of the
+#         `high64_mul` one moved (`ax_1_5` -> `ax_1_6`) because that proof term changed; no
+#         `bv_decide` axiom was gained or lost.
+#     Net: no lemma left the permitted axiom set in either direction, so the change is admissible —
+#     but this round produced NO axiom improvement, and a reported one should be measured, not
+#     inferred from which tactics were removed.
+SP1Clean 668
 SP1CleanTest 16
