@@ -1058,6 +1058,17 @@ Per gated group, stopping at the first failure:
 >    `unfolds:Lean.Parser.Tactic.simpLemma,*` (bare `simpLemma` is not in scope outside
 >    `Lean.Parser.Tactic`).
 >
+> 4. **`local macro` is scoped to the enclosing `section`, not the file.** Declaring one inside
+>    `section LoadByte` makes every call site in later sections report a bare `error: unknown tactic`,
+>    which reads like a parser bug. Hoist the macro block above the first `section`.
+> 5. **A macro whose *definition* fails still registers its syntax.** Every call site then reports
+>    ``Tactic `_private.….tacticFoo__` has not been implemented``, which completely hides the real
+>    error at the definition. Two batches lost time to this. When you see "has not been implemented",
+>    scroll up to the macro definition — the diagnosis is never at the call site.
+> 6. **Toolchain: `String.take` returns `String.Slice` in 4.31**, so `.toUpper` on it fails with
+>    `Invalid field 'toUpper': The environment does not contain 'String.Slice.toUpper'`. Use
+>    `String.capitalize` when deriving names inside a macro.
+>
 > **What a macro cannot reach:** caller binders (`env`, `input`, `real`, `decoded`, `hchip`,
 > `guarantees`) are unreachable from a quotation without `Lean.mkIdent`, and repetition that is a
 > **term inside a `have` type** rather than a tactic shape needs a §4a `private` helper instead.
