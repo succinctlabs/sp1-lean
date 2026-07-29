@@ -20,7 +20,8 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (input.is_real = 1 → Word.isU64 input.store_value)
 
-set_option maxHeartbeats 4000000 in
+-- Measured floors: both proofs in (150000, 300000]; the declared stamps were 7-13x over.
+set_option maxHeartbeats 1500000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
@@ -45,9 +46,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
   have eoap : ∀ i (hi : i < 2), Expression.eval env input_var_adapter_op_a_memory_prev_value[i]
       = input_adapter_op_a_memory_prev_value[i] := fun i hi => by rw [← hmap_oap]; simp only [Vector.getElem_map]
-  simp only [esv 0 (by omega), esv 1 (by omega), esv 2 (by omega), esv 3 (by omega),
-    epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega),
-    eoap 0 (by omega), eoap 1 (by omega)] at hr0 hr1 hr2 hr3
+  simp only [esv, epv, eoap 0 (by omega), eoap 1 (by omega)] at hr0 hr1 hr2 hr3
   have h_it := h_itype ⟨h_bin, h_bin, h_clk⟩
   have h_addr_as : AddressOperation.SoundnessAssumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0,
@@ -91,7 +90,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_
       ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
     (input.is_real = 1 → Word.isU64 input.store_value)
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 1500000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -133,19 +132,15 @@ theorem completeness :
     ⟨ha, hb, hbin, hfit, Or.inl rfl, Or.inl rfl, h_off_bin, h_ge, h_off'⟩
   refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
-  · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
+  · simp only [epc]; exact h_cpu
   · exact ⟨hbin, h_sv, h_clk⟩
   · exact h_mem
   · exact ⟨hbin, hbin, h_clk⟩
   · exact h_it
-  · simp only [esv 0 (by omega), epv 0 (by omega), eoap 0 (by omega)]
-    exact sub_eq_zero_of_eq hr0
-  · simp only [esv 1 (by omega), epv 1 (by omega), eoap 1 (by omega)]
-    exact sub_eq_zero_of_eq hr1
-  · simp only [esv 2 (by omega), epv 2 (by omega), eoap 0 (by omega)]
-    exact sub_eq_zero_of_eq hr2
-  · simp only [esv 3 (by omega), epv 3 (by omega), eoap 1 (by omega)]
-    exact sub_eq_zero_of_eq hr3
+  · simp only [esv, epv, eoap 0 (by omega)]; exact sub_eq_zero_of_eq hr0
+  · simp only [esv, epv, eoap 1 (by omega)]; exact sub_eq_zero_of_eq hr1
+  · simp only [esv, epv, eoap 0 (by omega)]; exact sub_eq_zero_of_eq hr2
+  · simp only [esv, epv, eoap 1 (by omega)]; exact sub_eq_zero_of_eq hr3
   · rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- StoreWord's exact Memory-channel interaction list — the store-family shape: the composed

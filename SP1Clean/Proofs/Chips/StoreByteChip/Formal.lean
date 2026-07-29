@@ -20,7 +20,9 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (input.is_real = 1 → Word.isU64 input.store_value)
 
-set_option maxHeartbeats 16000000 in
+-- Measured floors: soundness ≤ 400000, completeness ≤ 300000 (the 16M stamps were ~40x over); the
+-- `circuit` budget below is genuine — it still fails at 1000000, so it stays as declared.
+set_option maxHeartbeats 2000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
@@ -44,12 +46,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
   have esv : ∀ i (hi : i < 4), Expression.eval env input_var_store_value[i] = input_store_value[i] :=
     fun i hi => by rw [← hmap_sv]; simp only [Vector.getElem_map]
-  simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega), epv 1 (by omega),
-    epv 2 (by omega), epv 3 (by omega)] at hsel0 hsel1 hsel2 hsel3
-  simp only [eob 0 (by omega)] at hincr
-  simp only [esv 0 (by omega), esv 1 (by omega), esv 2 (by omega), esv 3 (by omega),
-    epv 0 (by omega), epv 1 (by omega), epv 2 (by omega), epv 3 (by omega),
-    eob 1 (by omega), eob 2 (by omega)] at hr0 hr1 hr2 hr3
+  simp only [eob, epv] at hsel0 hsel1 hsel2 hsel3
+  simp only [eob] at hincr
+  simp only [esv, epv, eob] at hr0 hr1 hr2 hr3
   -- the real-row byte bounds, from the two inline U8Range-pair receives.
   have h_bytes : input_is_real = 1 →
       input_register_low_byte.val < 256 ∧
@@ -72,7 +71,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     ⟨ha, hb, h_bin⟩
   simp only [AddressOperation.circuit] at h_addr
   have h_addr_spec := h_addr h_addr_as
-  simp only [circuit_norm, eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
+  simp only [circuit_norm, eob] at h_addr_spec
   have h_it := h_itype ⟨h_bin, h_bin, h_clk⟩
   refine ⟨⟨h_addr_spec,
       h_mem ⟨h_bin, h_sv, h_clk⟩, h_it,
@@ -128,7 +127,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_
       ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
     (input.is_real = 1 → Word.isU64 input.store_value)
 
-set_option maxHeartbeats 16000000 in
+set_option maxHeartbeats 1500000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -152,26 +151,15 @@ theorem completeness :
       = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
   have esv : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_store_value[i]
       = input_store_value[i] := fun i hi => by rw [← hmap_sv]; simp only [Vector.getElem_map]
-  have hob0' : Expression.eval env.toEnvironment input_var_offset_bit[0] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[0] = 1 := by rw [eob 0 (by omega)]; exact hob0
-  have hob1' : Expression.eval env.toEnvironment input_var_offset_bit[1] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[1] = 1 := by rw [eob 1 (by omega)]; exact hob1
-  have hob2' : Expression.eval env.toEnvironment input_var_offset_bit[2] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[2] = 1 := by rw [eob 2 (by omega)]; exact hob2
-  have h_off' : (Expression.eval env.toEnvironment input_var_offset_bit[0]).val
-        + 2 * (Expression.eval env.toEnvironment input_var_offset_bit[1]).val
-        + 4 * (Expression.eval env.toEnvironment input_var_offset_bit[2]).val
-      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
-    rw [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)]; exact h_off
   have h_addr_as : AddressOperation.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, Expression.eval env.toEnvironment input_var_offset_bit[0],
           Expression.eval env.toEnvironment input_var_offset_bit[1],
           Expression.eval env.toEnvironment input_var_offset_bit[2],
-          input_is_real⟩ : AddressOperation.Inputs (ZMod p)) :=
-    ⟨ha, hb, hbin, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
+          input_is_real⟩ : AddressOperation.Inputs (ZMod p)) := by
+    simp only [eob]; exact ⟨ha, hb, hbin, hfit, hob0, hob1, hob2, h_ge, h_off⟩
   refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
-  · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
+  · simp only [epc]; exact h_cpu
   · exact ⟨hbin, h_sv, h_clk⟩
   · exact h_mem
   · exact ⟨hbin, hbin, h_clk⟩
@@ -182,19 +170,15 @@ theorem completeness :
   · intro _
     simp only [byteChannel]
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hmem_pa, hmemhi_pa⟩
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega)]; exact hsel0
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 1 (by omega)]; exact hsel1
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 2 (by omega)]; exact hsel2
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 3 (by omega)]; exact hsel3
-  · simp only [eob 0 (by omega)]; exact sub_eq_zero_of_eq hincr_pa
-  · simp only [esv 0 (by omega), eob 1 (by omega), eob 2 (by omega), epv 0 (by omega)]
-    exact sub_eq_zero_of_eq hr0
-  · simp only [esv 1 (by omega), eob 1 (by omega), eob 2 (by omega), epv 1 (by omega)]
-    exact sub_eq_zero_of_eq hr1
-  · simp only [esv 2 (by omega), eob 1 (by omega), eob 2 (by omega), epv 2 (by omega)]
-    exact sub_eq_zero_of_eq hr2
-  · simp only [esv 3 (by omega), eob 1 (by omega), eob 2 (by omega), epv 3 (by omega)]
-    exact sub_eq_zero_of_eq hr3
+  · simp only [eob, epv]; exact hsel0
+  · simp only [eob, epv]; exact hsel1
+  · simp only [eob, epv]; exact hsel2
+  · simp only [eob, epv]; exact hsel3
+  · simp only [eob]; exact sub_eq_zero_of_eq hincr_pa
+  · simp only [esv, eob, epv]; exact sub_eq_zero_of_eq hr0
+  · simp only [esv, eob, epv]; exact sub_eq_zero_of_eq hr1
+  · simp only [esv, eob, epv]; exact sub_eq_zero_of_eq hr2
+  · simp only [esv, eob, epv]; exact sub_eq_zero_of_eq hr3
   · rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- StoreByte's exact Memory-channel interaction list — the store-family shape: the composed

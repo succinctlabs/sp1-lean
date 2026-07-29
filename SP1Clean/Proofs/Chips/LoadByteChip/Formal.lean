@@ -19,7 +19,21 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     Word.isU64 input.memory_access.prev_value
 
-set_option maxHeartbeats 16000000 in
+/-- The byte sign-extension low limb `byte + 65280·msb` is 16-bit whenever the byte is 8-bit and
+`msb` is binary. Shared by soundness and completeness, which both build the loaded word
+`#v[byte + 65280·msb, 65535·msb, 65535·msb, 65535·msb]`. -/
+private lemma sext_limb0_lt {b m : ZMod p} (hb : b.val < 256) (hm : m = 0 ∨ m = 1) :
+    (b + 65280 * m : ZMod p).val < 2 ^ 16 := by
+  have hp65536 : (65536 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  rcases hm with h | h
+  · rw [h, mul_zero, add_zero]; omega
+  · have h65280 : (65280 : ZMod p).val = 65280 := by
+      rw [show (65280 : ZMod p) = ((65280 : ℕ) : ZMod p) by norm_cast,
+        ZMod.val_natCast_of_lt (by omega)]
+    rw [h, mul_one, ZMod.val_add, h65280, Nat.mod_eq_of_lt (by omega)]; omega
+
+-- Measured floors: soundness ≤ 400000, completeness ≤ 300000; the former 16M stamps were ~40x over.
+set_option maxHeartbeats 2000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
@@ -49,12 +63,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     ⟨ha, hb, h_bin⟩
   simp only [AddressOperation.circuit] at h_addr
   have h_addr_spec := h_addr h_addr_as
-  simp only [circuit_norm, eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
-  have hob0 : input_offset_bit[0] = 0 ∨ input_offset_bit[0] = 1 := by
-    exact h_addr_spec.1
-  simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega), epv 1 (by omega),
-    epv 2 (by omega), epv 3 (by omega)] at hsel0 hsel1 hsel2 hsel3
-  simp only [eob 0 (by omega)] at hmux
+  simp only [circuit_norm, eob] at h_addr_spec
+  have hob0 : input_offset_bit[0] = 0 ∨ input_offset_bit[0] = 1 := h_addr_spec.1
+  simp only [eob, epv] at hsel0 hsel1 hsel2 hsel3
+  simp only [eob] at hmux
   -- the byte-mux equation in value form.
   have hmux_eq : input_selected_byte = input_offset_bit[0]
       * ((input_selected_limb - input_selected_limb_low_byte) * (256 : ZMod p)⁻¹)
@@ -94,32 +106,16 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     · have hlbu : input_is_lbu = 1 := by rw [hlb, zero_add] at h1; exact h1
       left; rw [hlbu, one_mul] at h_msbgate; exact h_msbgate
     · exact (h_msb_fact hlb).1
-  have hp65536 : (65536 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   -- the loaded word `#v[selected_byte + 65280·msb, 65535·msb, 65535·msb, 65535·msb]` (op_a write value) is
   -- `isU64` on real rows: limb 0 = the byte-sign-extended low limb (`selected_byte < 256` + `65280·msb`), the
   -- high limbs the sign fill `65535·msb` — all `< 2^16` since `selected_byte < 256` and `msb ∈ {0,1}`.
-  have h_msb_val : input_is_lb + input_is_lbu = 1 → (65535 * input_msb : ZMod p).val < 2 ^ 16 := by
-    intro h1
-    rcases h_msb_bin_real h1 with h | h
-    · rw [h, mul_zero, ZMod.val_zero]; norm_num
-    · rw [h, mul_one, show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) by norm_cast,
-        ZMod.val_natCast_of_lt (by omega)]; norm_num
-  have h_limb0_lt : input_is_lb + input_is_lbu = 1 →
-      (input_selected_byte + 65280 * input_msb : ZMod p).val < 2 ^ 16 := by
-    intro h1
-    have hbyte := h_byte_lt h1
-    rcases h_msb_bin_real h1 with h | h
-    · rw [h, mul_zero, add_zero]; omega
-    · rw [h, mul_one]
-      have h65280 : (65280 : ZMod p).val = 65280 := by
-        rw [show (65280 : ZMod p) = ((65280 : ℕ) : ZMod p) by norm_cast, ZMod.val_natCast_of_lt (by omega)]
-      have hval : (input_selected_byte + 65280 : ZMod p).val = input_selected_byte.val + 65280 := by
-        rw [ZMod.val_add, h65280, Nat.mod_eq_of_lt (by omega)]
-      rw [hval]; omega
+  have h_msb_val : input_is_lb + input_is_lbu = 1 → (65535 * input_msb : ZMod p).val < 2 ^ 16 :=
+    fun h1 => by rcases h_msb_bin_real h1 with h | h <;> simp [h]
   have h_load_isu64 : input_is_lb + input_is_lbu = 1 → Word.isU64
       (#v[input_selected_byte + 65280 * input_msb, 65535 * input_msb, 65535 * input_msb,
           65535 * input_msb] : Word (ZMod p)) :=
-    fun h1 => Word.isU64_of_cases (h_limb0_lt h1) (h_msb_val h1) (h_msb_val h1) (h_msb_val h1)
+    fun h1 => Word.isU64_of_cases (sext_limb0_lt (h_byte_lt h1) (h_msb_bin_real h1))
+      (h_msb_val h1) (h_msb_val h1) (h_msb_val h1)
   -- G1: each push-owning sub-circuit's `Assumptions` gained a `MemoryMsg.ClkBound` conjunct at its own
   -- offset — `MemoryAccess` at the RAM `+1` slot, `ITypeReader` at op_b's `+3`, `RegisterWrite` at
   -- op_a's `+4`.
@@ -173,7 +169,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_
         input.selected_byte + 65280 * input.msb, 65535 * input.msb, 65535 * input.msb,
         65535 * input.msb⟩
 
-set_option maxHeartbeats 16000000 in
+set_option maxHeartbeats 1500000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -195,48 +191,24 @@ theorem completeness :
       = input_offset_bit[i] := fun i hi => by rw [← hmap_ob]; simp only [Vector.getElem_map]
   have epv : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_memory_access_prev_value[i]
       = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have hob0' : Expression.eval env.toEnvironment input_var_offset_bit[0] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[0] = 1 := by rw [eob 0 (by omega)]; exact hob0
-  have hob1' : Expression.eval env.toEnvironment input_var_offset_bit[1] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[1] = 1 := by rw [eob 1 (by omega)]; exact hob1
-  have hob2' : Expression.eval env.toEnvironment input_var_offset_bit[2] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[2] = 1 := by rw [eob 2 (by omega)]; exact hob2
-  have h_off' : (Expression.eval env.toEnvironment input_var_offset_bit[0]).val
-        + 2 * (Expression.eval env.toEnvironment input_var_offset_bit[1]).val
-        + 4 * (Expression.eval env.toEnvironment input_var_offset_bit[2]).val
-      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
-    rw [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)]; exact h_off
   have h_addr_as : AddressOperation.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, Expression.eval env.toEnvironment input_var_offset_bit[0],
           Expression.eval env.toEnvironment input_var_offset_bit[1],
           Expression.eval env.toEnvironment input_var_offset_bit[2],
-          input_is_lb + input_is_lbu⟩ : AddressOperation.Inputs (ZMod p)) :=
-    ⟨ha, hb, hbin, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
+          input_is_lb + input_is_lbu⟩ : AddressOperation.Inputs (ZMod p)) := by
+    simp only [eob]; exact ⟨ha, hb, hbin, hfit, hob0, hob1, hob2, h_ge, h_off⟩
   -- the loaded word `#v[selected_byte + 65280·msb, 65535·msb, 65535·msb, 65535·msb]` (op_a write value) is
   -- `isU64`: `selected_byte < 256` (prover) + `msb ∈ {0,1}` (prover) bound every limb `< 2^16`.
-  have hp65536 : (65536 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have h_msb_val : (65535 * input_msb : ZMod p).val < 2 ^ 16 := by
-    rcases h_msb_bin with h | h
-    · rw [h, mul_zero, ZMod.val_zero]; norm_num
-    · rw [h, mul_one, show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) by norm_cast,
-        ZMod.val_natCast_of_lt (by omega)]; norm_num
-  have h_limb0_lt : (input_selected_byte + 65280 * input_msb : ZMod p).val < 2 ^ 16 := by
-    rcases h_msb_bin with h | h
-    · rw [h, mul_zero, add_zero]; omega
-    · rw [h, mul_one]
-      have h65280 : (65280 : ZMod p).val = 65280 := by
-        rw [show (65280 : ZMod p) = ((65280 : ℕ) : ZMod p) by norm_cast, ZMod.val_natCast_of_lt (by omega)]
-      have hval : (input_selected_byte + 65280 : ZMod p).val = input_selected_byte.val + 65280 := by
-        rw [ZMod.val_add, h65280, Nat.mod_eq_of_lt (by omega)]
-      rw [hval]; omega
+    rcases h_msb_bin with h | h <;> simp [h]
   have h_load_isu64 : Word.isU64
       (#v[input_selected_byte + 65280 * input_msb, 65535 * input_msb, 65535 * input_msb,
           65535 * input_msb] : Word (ZMod p)) :=
-    Word.isU64_of_cases h_limb0_lt h_msb_val h_msb_val h_msb_val
+    Word.isU64_of_cases (sext_limb0_lt hbyte_pa h_msb_bin) h_msb_val h_msb_val h_msb_val
   refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ?_, ?_, ⟨?_, ?_⟩, ⟨?_, ?_⟩,
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
-  · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
+  · simp only [epc]; exact h_cpu
   · exact ⟨hbin, fun _ => h_pv_isu64, h_clk⟩
   · exact h_mem
   · -- U8Range-pair receive obligation (real row); value is raw (`toRaw` (gated post-#398)).
@@ -251,11 +223,11 @@ theorem completeness :
   · exact h_it
   · exact ⟨hbin, fun _ => h_load_isu64, h_clk.at_four⟩
   · trivial
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 0 (by omega)]; exact hsel0
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 1 (by omega)]; exact hsel1
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 2 (by omega)]; exact hsel2
-  · simp only [eob 1 (by omega), eob 2 (by omega), epv 3 (by omega)]; exact hsel3
-  · simp only [eob 0 (by omega)]; exact sub_eq_zero_of_eq hmux_pa
+  · simp only [eob, epv]; exact hsel0
+  · simp only [eob, epv]; exact hsel1
+  · simp only [eob, epv]; exact hsel2
+  · simp only [eob, epv]; exact hsel3
+  · simp only [eob]; exact sub_eq_zero_of_eq hmux_pa
   · exact h_op_a_0
   · exact h_msbgate
   · rcases h_lb_bin with h | h <;> rw [h] <;> simp

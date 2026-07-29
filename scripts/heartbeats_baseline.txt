@@ -207,5 +207,29 @@
 #     tally as 38 measured / 37 removed / 1 kept; the gate verified the KEEP itself, not that tally.
 # 269 ceilings remain in Faithful/, all in the 25 whole-chip anchor files, which W2/r3's prediction
 # still expects to be largely removable.
-SP1Clean 654
+# -10 (2026-07-29, proof-cleanup W4/g1): ratchet DOWN, no ceiling raised. 10 directives deleted, 0
+# re-added; the count reconciles EXACTLY (654 - 10 = 644), the FOURTH consecutive round to confirm
+# the recorded number is honest and that no phantom has re-appeared. By batch: DivRemChip/Defs.lean
+# removed one of its two and tightened the other 8000000 -> 250000, and Populate/Abs.lean dropped
+# its 1000000 (b1); the ALU chip `Formal.lean` family shed eight — AluX0Chip all three, Bitwise two
+# of three, Lt one of three, Addw and Subw their single sites — and lowered the three survivors
+# (Bitwise 32000000 -> 5000000, Lt 800000 -> 500000 and 4000000 -> 300000) (b3). b2 and b4 removed
+# none; see below for why that is the correct result in both cases.
+# The round's headline result is a NEGATIVE one, and it is the reason this file's "screen on what
+# `main` composes" guidance was written:
+#   * The `Proofs/Chips/*/Formal.lean` family is NOT uniform, and directory membership predicts
+#     nothing. The ALU half went 8 of 11 removed, every removal clearing 40000 on the first pass.
+#     The jump/U-type half in the SAME family went 0 for 4: JalrChip's two sites floor in
+#     (2000000, 4000000] against a declared 8000000 — about 2x, the TIGHTEST ratio measured anywhere
+#     in the campaign and correctly sized all along. UTypeChip's two were merely oversized and went
+#     2000000 -> 500000. The discriminator is structural: JalrChip composes two witnessed
+#     `AddOperation` gadgets plus `ITypeReader` plus `RegisterWrite`, and UTypeChip's `AddOperation`
+#     addend is itself witnessed. Count the witnessed sub-gadgets `main` composes before predicting.
+#   * The nine load/store `Formal.lean` files (b4) are the campaign's first whole batch where every
+#     site was KEPT and every site was oversized: 19 ceilings, 0 removed, 18 lowered, aggregate
+#     declared budget 174M -> 31.5M (-82%). The floors are real (the sign-extension block puts these
+#     above the ALU chips) but the declared numbers were pure copy-paste, five of the nine files
+#     carrying a uniform 16000000 against floors an order of magnitude below it. "Kept" and
+#     "correctly sized" are different findings, and only a ladder separates them.
+SP1Clean 644
 SP1CleanTest 16

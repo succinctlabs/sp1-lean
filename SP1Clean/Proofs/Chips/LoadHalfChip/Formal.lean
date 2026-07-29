@@ -20,7 +20,34 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     Word.isU64 input.memory_access.prev_value
 
-set_option maxHeartbeats 16000000 in
+omit [Fact (2 ^ 17 < p)] in
+/-- The offset-selected half is 16-bit: the four corner gates pin it to one of the four 16-bit
+memory limbs. Shared verbatim by soundness and completeness. -/
+private lemma sel_lt_of_corners {s b0 b1 v0 v1 v2 v3 : ZMod p}
+    (hb0 : b0 = 0 ∨ b0 = 1) (hb1 : b1 = 0 ∨ b1 = 1)
+    (h0 : (s - v0) * (b0 - 1) * (b1 - 1) = 0) (h1 : (s - v1) * b0 * (b1 - 1) = 0)
+    (h2 : (s - v2) * (b0 - 1) * b1 = 0) (h3 : (s - v3) * b0 * b1 = 0)
+    (hv0 : v0.val < 2 ^ 16) (hv1 : v1.val < 2 ^ 16) (hv2 : v2.val < 2 ^ 16) (hv3 : v3.val < 2 ^ 16) :
+    s.val < 2 ^ 16 := by
+  have hz : ∀ x : ZMod p, x = 0 → x - 1 ≠ 0 :=
+    fun x hx => by rw [hx, zero_sub]; exact neg_ne_zero.mpr one_ne_zero
+  have hn : ∀ x : ZMod p, x = 1 → x ≠ 0 := fun x hx => by rw [hx]; exact one_ne_zero
+  rcases hb0 with e0 | e0 <;> rcases hb1 with e1 | e1
+  · rw [sub_eq_zero.mp
+      ((mul_eq_zero.mp ((mul_eq_zero.mp h0).resolve_right (hz _ e1))).resolve_right (hz _ e0))]
+    exact hv0
+  · rw [sub_eq_zero.mp
+      ((mul_eq_zero.mp ((mul_eq_zero.mp h2).resolve_right (hn _ e1))).resolve_right (hz _ e0))]
+    exact hv2
+  · rw [sub_eq_zero.mp
+      ((mul_eq_zero.mp ((mul_eq_zero.mp h1).resolve_right (hz _ e1))).resolve_right (hn _ e0))]
+    exact hv1
+  · rw [sub_eq_zero.mp
+      ((mul_eq_zero.mp ((mul_eq_zero.mp h3).resolve_right (hn _ e1))).resolve_right (hn _ e0))]
+    exact hv3
+
+-- Measured floors: soundness ≤ 400000, completeness ≤ 300000; the former 16M stamps were ~40x over.
+set_option maxHeartbeats 2000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
@@ -44,8 +71,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     fun i hi => by rw [← hmap_ob]; simp only [Vector.getElem_map]
   have epv : ∀ i (hi : i < 4), Expression.eval env input_var_memory_access_prev_value[i]
       = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  simp only [eob 0 (by omega), eob 1 (by omega), epv 0 (by omega), epv 1 (by omega),
-    epv 2 (by omega), epv 3 (by omega)] at hsel0 hsel1 hsel2 hsel3
+  simp only [eob, epv] at hsel0 hsel1 hsel2 hsel3
   have h_it := h_itype ⟨h_bin, h_bin, h_clk⟩
   have h_addr_as : AddressOperation.SoundnessAssumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, Expression.eval env input_var_offset_bit[0],
@@ -54,48 +80,20 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     ⟨ha, hb, h_bin⟩
   simp only [AddressOperation.circuit] at h_addr
   have h_addr_spec := h_addr h_addr_as
-  simp only [circuit_norm, eob 0 (by omega), eob 1 (by omega)] at h_addr_spec
-  have hob0 : input_offset_bit[0] = 0 ∨ input_offset_bit[0] = 1 := by
-    exact h_addr_spec.2.1
-  have hob1 : input_offset_bit[1] = 0 ∨ input_offset_bit[1] = 1 := by
-    exact h_addr_spec.2.2.1
+  simp only [circuit_norm, eob] at h_addr_spec
+  have hob0 : input_offset_bit[0] = 0 ∨ input_offset_bit[0] = 1 := h_addr_spec.2.1
+  have hob1 : input_offset_bit[1] = 0 ∨ input_offset_bit[1] = 1 := h_addr_spec.2.2.1
   -- `selected_half < 2^16` on a real row: it equals one of the four 16-bit limbs by the offset corner.
-  have h_sel_lt : input_selected_half.val < 2 ^ 16 := by
-    rcases hob0 with hb0 | hb0
-    · rcases hob1 with hb1 | hb1
-      · -- (0,0): gate 0 ⟹ selected_half = prev_value[0].
-        have ho : input_offset_bit[1] - 1 ≠ 0 := by rw [hb1, zero_sub]; exact neg_ne_zero.mpr one_ne_zero
-        have hi : input_offset_bit[0] - 1 ≠ 0 := by rw [hb0, zero_sub]; exact neg_ne_zero.mpr one_ne_zero
-        rw [sub_eq_zero.mp ((mul_eq_zero.mp ((mul_eq_zero.mp hsel0).resolve_right ho)).resolve_right hi)]
-        exact hpv0
-      · -- (0,1): gate 2 ⟹ selected_half = prev_value[2].
-        have ho : input_offset_bit[1] ≠ 0 := by rw [hb1]; exact one_ne_zero
-        have hi : input_offset_bit[0] - 1 ≠ 0 := by rw [hb0, zero_sub]; exact neg_ne_zero.mpr one_ne_zero
-        rw [sub_eq_zero.mp ((mul_eq_zero.mp ((mul_eq_zero.mp hsel2).resolve_right ho)).resolve_right hi)]
-        exact hpv2
-    · rcases hob1 with hb1 | hb1
-      · -- (1,0): gate 1 ⟹ selected_half = prev_value[1].
-        have ho : input_offset_bit[1] - 1 ≠ 0 := by rw [hb1, zero_sub]; exact neg_ne_zero.mpr one_ne_zero
-        have hi : input_offset_bit[0] ≠ 0 := by rw [hb0]; exact one_ne_zero
-        rw [sub_eq_zero.mp ((mul_eq_zero.mp ((mul_eq_zero.mp hsel1).resolve_right ho)).resolve_right hi)]
-        exact hpv1
-      · -- (1,1): gate 3 ⟹ selected_half = prev_value[3].
-        have ho : input_offset_bit[1] ≠ 0 := by rw [hb1]; exact one_ne_zero
-        have hi : input_offset_bit[0] ≠ 0 := by rw [hb0]; exact one_ne_zero
-        rw [sub_eq_zero.mp ((mul_eq_zero.mp ((mul_eq_zero.mp hsel3).resolve_right ho)).resolve_right hi)]
-        exact hpv3
+  have h_sel_lt : input_selected_half.val < 2 ^ 16 :=
+    sel_lt_of_corners hob0 hob1 hsel0 hsel1 hsel2 hsel3 hpv0 hpv1 hpv2 hpv3
   have h_msb_as : U16MSBOperation.circuit.Assumptions
       (⟨input_selected_half, ⟨input_msb⟩, input_is_lh⟩ : U16MSBOperation.Inputs (ZMod p)) :=
     ⟨fun _ => h_sel_lt, h_lh_bin⟩
   have h_msb_spec := h_msb h_msb_as
   -- `msb` binary (from `U16MSBOperation.Spec`) → sign-fill limb `65535·msb ∈ {0, 65535} < 2^16`.
   have h_msb_val : (65535 * input_msb : ZMod p).val < 2 ^ 16 := by
-    have hp65535 : (65535 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h_msb_bin : input_msb = 0 ∨ input_msb = 1 := h_msb_spec.1
-    rcases h_msb_bin with h | h
-    · rw [h, mul_zero, ZMod.val_zero]; norm_num
-    · rw [h, mul_one, show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) by norm_cast,
-        ZMod.val_natCast_of_lt hp65535]; norm_num
+    rcases h_msb_bin with h | h <;> simp [h]
   -- the loaded word `#v[selected_half, 65535·msb, 65535·msb, 65535·msb]` (op_a write value) is `isU64` —
   -- from the selected memory limb (`h_sel_lt`) + the binary `msb` sign fill (`h_msb_val`).
   have h_load_isu64 : Word.isU64
@@ -149,7 +147,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_
         input.state.pc, input.is_lh * 30 + input.is_lhu * 33,
         input.selected_half, 65535 * input.msb, 65535 * input.msb, 65535 * input.msb⟩
 
-set_option maxHeartbeats 16000000 in
+set_option maxHeartbeats 1500000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -173,49 +171,20 @@ theorem completeness :
       = input_offset_bit[i] := fun i hi => by rw [← hmap_ob]; simp only [Vector.getElem_map]
   have epv : ∀ i (hi : i < 4), Expression.eval env.toEnvironment input_var_memory_access_prev_value[i]
       = input_memory_access_prev_value[i] := fun i hi => by rw [← hmap_pv]; simp only [Vector.getElem_map]
-  have hob0' : Expression.eval env.toEnvironment input_var_offset_bit[0] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[0] = 1 := by rw [eob 0 (by omega)]; exact hob0
-  have hob1' : Expression.eval env.toEnvironment input_var_offset_bit[1] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[1] = 1 := by rw [eob 1 (by omega)]; exact hob1
-  have h_off' : (0 : ZMod p).val + 2 * (Expression.eval env.toEnvironment input_var_offset_bit[0]).val
-        + 4 * (Expression.eval env.toEnvironment input_var_offset_bit[1]).val
-      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
-    rw [eob 0 (by omega), eob 1 (by omega)]; simp only [ZMod.val_zero]; omega
   have h_addr_as : AddressOperation.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, Expression.eval env.toEnvironment input_var_offset_bit[0],
           Expression.eval env.toEnvironment input_var_offset_bit[1],
-          input_is_lh + input_is_lhu⟩ : AddressOperation.Inputs (ZMod p)) :=
-    ⟨ha, hb, hbin, hfit, Or.inl rfl, hob0', hob1', h_ge, h_off'⟩
-  have h_sel_lt : input_selected_half.val < 2 ^ 16 := by
-    rcases hob0 with hb0 | hb0
-    · rcases hob1 with hb1 | hb1
-      · have ho : input_offset_bit[1] - 1 ≠ 0 := by rw [hb1, zero_sub]; exact neg_ne_zero.mpr one_ne_zero
-        have hi : input_offset_bit[0] - 1 ≠ 0 := by rw [hb0, zero_sub]; exact neg_ne_zero.mpr one_ne_zero
-        rw [sub_eq_zero.mp ((mul_eq_zero.mp ((mul_eq_zero.mp hsel0).resolve_right ho)).resolve_right hi)]
-        exact hpv0
-      · have ho : input_offset_bit[1] ≠ 0 := by rw [hb1]; exact one_ne_zero
-        have hi : input_offset_bit[0] - 1 ≠ 0 := by rw [hb0, zero_sub]; exact neg_ne_zero.mpr one_ne_zero
-        rw [sub_eq_zero.mp ((mul_eq_zero.mp ((mul_eq_zero.mp hsel2).resolve_right ho)).resolve_right hi)]
-        exact hpv2
-    · rcases hob1 with hb1 | hb1
-      · have ho : input_offset_bit[1] - 1 ≠ 0 := by rw [hb1, zero_sub]; exact neg_ne_zero.mpr one_ne_zero
-        have hi : input_offset_bit[0] ≠ 0 := by rw [hb0]; exact one_ne_zero
-        rw [sub_eq_zero.mp ((mul_eq_zero.mp ((mul_eq_zero.mp hsel1).resolve_right ho)).resolve_right hi)]
-        exact hpv1
-      · have ho : input_offset_bit[1] ≠ 0 := by rw [hb1]; exact one_ne_zero
-        have hi : input_offset_bit[0] ≠ 0 := by rw [hb0]; exact one_ne_zero
-        rw [sub_eq_zero.mp ((mul_eq_zero.mp ((mul_eq_zero.mp hsel3).resolve_right ho)).resolve_right hi)]
-        exact hpv3
+          input_is_lh + input_is_lhu⟩ : AddressOperation.Inputs (ZMod p)) := by
+    simp only [eob]
+    exact ⟨ha, hb, hbin, hfit, Or.inl rfl, hob0, hob1, h_ge, by simpa using h_off⟩
+  have h_sel_lt : input_selected_half.val < 2 ^ 16 :=
+    sel_lt_of_corners hob0 hob1 hsel0 hsel1 hsel2 hsel3 hpv0 hpv1 hpv2 hpv3
   -- `isU64 prev_value` (from the four 16-bit limbs) for `MemoryAccess`'s read push; the loaded-word `isU64`
   -- (`h_load_isu64`) for `RegisterWrite`'s op_a write push.
   have h_pv_isu64 : Word.isU64 input_memory_access_prev_value := Word.isU64_of_cases hpv0 hpv1 hpv2 hpv3
   have h_msb_val : (65535 * input_msb : ZMod p).val < 2 ^ 16 := by
-    have hp65535 : (65535 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h_msb_bin : input_msb = 0 ∨ input_msb = 1 := h_msb_spec.1
-    rcases h_msb_bin with h | h
-    · rw [h, mul_zero, ZMod.val_zero]; norm_num
-    · rw [h, mul_one, show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) by norm_cast,
-        ZMod.val_natCast_of_lt hp65535]; norm_num
+    rcases h_msb_bin with h | h <;> simp [h]
   have h_load_isu64 : Word.isU64
       (#v[input_selected_half, 65535 * input_msb, 65535 * input_msb, 65535 * input_msb] : Word (ZMod p)) :=
     Word.isU64_of_cases h_sel_lt h_msb_val h_msb_val h_msb_val
@@ -223,7 +192,7 @@ theorem completeness :
     ⟨?_, ?_⟩, ⟨?_, ?_⟩,
     ?_, ?_, ?_, ?_, h_op_a_0, ?_, ?_, ?_, ?_⟩
   · exact hbin
-  · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
+  · simp only [epc]; exact h_cpu
   · exact ⟨hbin, fun _ => h_pv_isu64, h_clk⟩
   · exact h_mem
   · exact h_msb_spec
@@ -231,10 +200,10 @@ theorem completeness :
   · exact h_it
   · exact ⟨hbin, fun _ => h_load_isu64, h_clk.at_four⟩
   · trivial
-  · simp only [eob 0 (by omega), eob 1 (by omega), epv 0 (by omega)]; exact hsel0
-  · simp only [eob 0 (by omega), eob 1 (by omega), epv 1 (by omega)]; exact hsel1
-  · simp only [eob 0 (by omega), eob 1 (by omega), epv 2 (by omega)]; exact hsel2
-  · simp only [eob 0 (by omega), eob 1 (by omega), epv 3 (by omega)]; exact hsel3
+  · simp only [eob, epv]; exact hsel0
+  · simp only [eob, epv]; exact hsel1
+  · simp only [eob, epv]; exact hsel2
+  · simp only [eob, epv]; exact hsel3
   · exact h_msbgate
   · rcases h_lh_bin with h | h <;> rw [h] <;> simp
   · rcases h_lhu_bin with h | h <;> rw [h] <;> simp
