@@ -429,6 +429,14 @@ from (40000, 100000] — a keep-and-lower — down past 40000, making the site r
 > is context-sensitive (`simp_all`, `omega` over a large hypothesis set, `aesop`), measure rather than
 > screen.
 
+**1e. A `set` over a large term is an `isDefEq` abstraction across the whole goal.**
+`set x := <big populate tower> with h` forces an abstraction pass over everything in scope, and on a
+witness-tower goal that alone can own the budget. `BitwiseChip.completeness` failed at 1M **at the
+`set` line**; deleting it took the same proof from FAIL@1M to PASS@1M — and the `with hR` binding was
+dead, with the downstream `show … = _ from key k` rules reading their RHS off `key` instead. Check
+whether a `set`'s binding is actually used before assuming it is load-bearing; a bare `set` for
+readability on a large term is a perf hazard.
+
 **1c. LCNF-compiler-bound, not elaboration-bound — check *which phase* times out.** A budget can be
 spent on **code generation** rather than on proving. `Native/Operations/MulOperation/Defs.lean`'s
 `def main` elaborates fine at 40000; the failure is `(deterministic) timeout at «LCNF compiler»`,
