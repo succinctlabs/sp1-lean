@@ -41,8 +41,7 @@ lemma eqWordWitnessElements_get (wit : Extracted.IsEqualWordOperation (ZMod p)) 
     (eqWordWitnessElements wit).get i =
       (ProvableType.toElements wit)[i.val]'(by
         simpa only [eqWord_size_eq] using i.isLt) := by
-  rw [eqWordWitnessElements_eq, Vector.get_cast]
-  rfl
+  rw [eqWordWitnessElements_eq, Vector.get_cast]; rfl
 
 /-- The generated `IsZeroWordOperation` witness block has eleven cells.  Keeping this equality
 opaque prevents parent proofs from reducing the nested operation's full `ProvableType` merely to
@@ -64,8 +63,7 @@ lemma isZeroWitnessElements_get (wit : Extracted.IsZeroWordOperation (ZMod p)) (
     (isZeroWitnessElements wit).get i =
       (ProvableType.toElements wit)[i.val]'(by
         simpa only [isZero_size_eq] using i.isLt) := by
-  rw [isZeroWitnessElements_eq, Vector.get_cast]
-  rfl
+  rw [isZeroWitnessElements_eq, Vector.get_cast]; rfl
 
 set_option linter.unusedSectionVars false in
 /-- The generated `MulOperation` component spelling, exposed as a syntactic rewrite. -/
@@ -75,8 +73,7 @@ lemma mul_toComponents (cols : Extracted.MulOperation (ZMod p)) :
         .cons cols.c_lower_byte <| .cons cols.b_msb <| .cons cols.c_msb <|
         .cons cols.product_msb <| .cons cols.b_sign_extend <|
         .cons cols.c_sign_extend .nil) := by
-  rcases cols with ⟨carry, product, bLower, cLower, bMsb, cMsb, productMsb, bSign, cSign⟩
-  rfl
+  rcases cols with ⟨carry, product, bLower, cLower, bMsb, cMsb, productMsb, bSign, cSign⟩; rfl
 
 lemma mul_size_eq : size (Extracted.MulOperation) = 45 := rfl
 
@@ -97,8 +94,7 @@ lemma mulWitnessElements_get (cols : Extracted.MulOperation (ZMod p)) (i : Fin 4
     (mulWitnessElements cols).get i =
       (ProvableType.toElements cols)[i.val]'(by
         simpa only [mul_size_eq] using i.isLt) := by
-  rw [mulWitnessElements_eq, Vector.get_cast]
-  rfl
+  rw [mulWitnessElements_eq, Vector.get_cast]; rfl
 
 /-- The thirteen cells following `carry` and `product`.  Their internal layout is irrelevant to
 the DivRem parent proof, so it stays folded behind this definition. -/
@@ -175,7 +171,6 @@ theorem eqWord_cols_eq_of_pins (env : Environment (ZMod p)) (off : ℕ)
   intro i
   have hi : i.val < 11 := by simpa only [circuit_norm] using i.isLt
   have h := hpop ⟨i, hi⟩
-  change env.get (off + i.val) = (eqWordWitnessElements wit).get ⟨i, hi⟩ at h
   rw [eqWordWitnessElements_eq, Vector.get_cast] at h
   exact h
 
@@ -191,7 +186,6 @@ theorem isZero_cols_eq_of_pins (env : Environment (ZMod p)) (off : ℕ)
   intro i
   have hi : i.val < 11 := by simpa only [circuit_norm] using i.isLt
   have h := hpop ⟨i, hi⟩
-  change env.get (off + i.val) = (isZeroWitnessElements wit).get ⟨i, hi⟩ at h
   rw [isZeroWitnessElements_eq, Vector.get_cast] at h
   exact h
 
@@ -271,7 +265,6 @@ theorem mul_cols_eq_of_pins (env : Environment (ZMod p)) (off : ℕ)
   intro i
   have hi : i.val < 45 := by simpa only [circuit_norm] using i.isLt
   have h := hpop ⟨i, hi⟩
-  change env.get (off + i.val) = (mulWitnessElements wit).get ⟨i, hi⟩ at h
   rw [mulWitnessElements_eq, Vector.get_cast] at h
   exact h
 
@@ -307,16 +300,7 @@ theorem subSpec_eqWord (env : Environment (ZMod p)) (off : ℕ)
       (⟨a, b, wit, is_real⟩ : IsEqualWordOperation.Inputs (ZMod p))) :
     IsEqualWordOperation.Spec
       (⟨a, b, cols, is_real⟩ : IsEqualWordOperation.Inputs (ZMod p)) := by
-  have hpop' : ∀ i : Fin (size (Extracted.IsEqualWordOperation)),
-      env.get (off + ↑i) = (ProvableType.toElements wit)[↑i] := by
-    intro i
-    have hi : i.val < 11 := by simpa only [circuit_norm] using i.isLt
-    have h := hpop ⟨i, hi⟩
-    change env.get (off + i.val) = (eqWordWitnessElements wit).get ⟨i, hi⟩ at h
-    rw [eqWordWitnessElements_eq, Vector.get_cast] at h
-    change env.get (off + i.val) = (ProvableType.toElements wit).get i
-    exact h
-  rw [cols_eq_of_pins env off cols wit hcell hpop']
+  rw [eqWord_cols_eq_of_pins env off cols wit hcell hpop]
   exact hSpec
 
 set_option linter.unusedSectionVars false in
@@ -331,18 +315,7 @@ theorem subSpec_isZero (env : Environment (ZMod p)) (off : ℕ)
       (⟨a, wit, is_real⟩ : IsZeroWordOperation.Inputs (ZMod p))) :
     IsZeroWordOperation.Spec
       (⟨a, cols, is_real⟩ : IsZeroWordOperation.Inputs (ZMod p)) := by
-  have hpop' : ∀ i : Fin (size (Extracted.IsZeroWordOperation)),
-      env.get (off + ↑i) = (ProvableType.toElements wit)[↑i] := by
-    intro i
-    have hi : i.val < 11 := by simpa only [circuit_norm] using i.isLt
-    have h := hpop ⟨i, hi⟩
-    change env.get (off + i.val) =
-      (isZeroWitnessElements wit).get ⟨i, hi⟩ at h
-    rw [isZeroWitnessElements_eq] at h
-    rw [Vector.get_cast] at h
-    change env.get (off + i.val) = (ProvableType.toElements wit).get i
-    exact h
-  rw [cols_eq_of_pins env off cols wit hcell hpop']
+  rw [isZero_cols_eq_of_pins env off cols wit hcell hpop]
   exact hSpec
 
 end SP1Clean.DivRemChip.SubSpecs
