@@ -747,7 +747,17 @@ Per gated group, stopping at the first failure:
    Tier-S build, control concurrency by *not running anything else* (reap stale `lean --worker`
    children first, per the note below) rather than by a flag. Default parallelism measured
    640% CPU / 7:24 wall on a cold-ish 3610-job build.
-4. **Log assertions** — zero `error:`, zero `warning:`, zero `info:`.
+4. **Log assertions** — zero `error:`, zero `warning:`, zero `info:`. Stronger and cheaper than three
+   greps: filter out `✔ Built` / completion / timing lines and assert the **remainder is empty**. On a
+   green tree this build emits no non-checkmark output at all, so any residue is a finding.
+> **`scripts/guardrails.sh` blocks `git checkout --`** as a destructive command. A gate that needs to
+> regenerate-and-compare a tracked file (e.g. `scripts/axiom_probe.lean`, to prove the census is
+> unmoved) must back it up to the scratchpad and restore with `cp`, not `git checkout --`.
+>
+> **A `Faithful/`- or `Bridge.lean`-only group gates far cheaper than its file count suggests.** The
+> W5/r1 gate changed 30 files and rebuilt only **75 of 3610 jobs** (285s) — these layers have very
+> shallow downstream closures. Budget gate time by *downstream closure*, not by lines touched; the
+> same 30 files at `Math/` depth would have rebuilt ~240 modules.
 > **Never kill `lean --server` or `lake serve` — but stale `lean --worker` processes from *exited*
 > agents are fair game.** The distinction matters and cost the campaign a session restart before it
 > was understood. The `lean-lsp` MCP server *is* `lean --server`/`lake serve`; killing those takes the
