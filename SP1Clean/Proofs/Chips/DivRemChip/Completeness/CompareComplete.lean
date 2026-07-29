@@ -266,8 +266,7 @@ private theorem evaluatedOperationView_eq (env : ProverEnvironment (ZMod p))
   have hEvalISC0 := SubSpecs.eval_isZeroFieldsBlock_eq env.toEnvironment
     (off + 8 + 4 + 4 + 4 + 4 + 45 + 45 + 7 + 8 + 8 + 11 + 11)
     (isC0Witness C f) hISC0
-  rw [CircuitType.eval_expression_prover_to_verifier]
-  rw [operationView_eval]
+  rw [CircuitType.eval_expression_prover_to_verifier, operationView_eval]
   apply operationView_ext
   · simp +instances only [operationView, DivRemCompare.Inputs.ofCols, populatedRowAt, honestInputs]
     exact hEvalISC0

@@ -27,7 +27,27 @@ private theorem unsigned64_word_gate {cols : Columns (ZMod p)} {case : Case}
       hselected.flag_eq .divuw, hselected.flag_eq .remuw]
     simp
 
-set_option maxHeartbeats 16000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- The companion to `unsigned64_word_gate`: selecting a `DIVU`/`REMU` case also pins the four
+signed flags to zero and makes the two unsigned-64 flags sum to one. Hoisting the eight-way case
+split out of `unsigned64Evidence` keeps it off that proof's 121-hypothesis assertion context. -/
+private lemma unsigned64_flags {cols : Columns (ZMod p)} {case : Case}
+    (hselected : Selected cols case) (hfamily : case.family = .unsigned64) :
+    cols.is_div = 0 ∧ cols.is_rem = 0 ∧ cols.is_divw = 0 ∧ cols.is_remw = 0 ∧
+      cols.is_divu + cols.is_remu = 1 := by
+  have hdiv := hselected.flag_eq .div
+  have hrem := hselected.flag_eq .rem
+  have hdivu := hselected.flag_eq .divu
+  have hremu := hselected.flag_eq .remu
+  have hdivw := hselected.flag_eq .divw
+  have hremw := hselected.flag_eq .remw
+  cases case <;>
+    simp [Case.family] at hfamily <;>
+    simp [Case.flag] at hdiv hrem hdivu hremu hdivw hremw <;>
+    simp [hdiv, hrem, hdivu, hremu, hdivw, hremw]
+
+-- The former 16M ceiling was ~40× over; measured floor bracket (40000, 400000].
+set_option maxHeartbeats 2000000 in
 /-- The folded DivRem row contracts imply the explicit unsigned-64 Euclidean evidence for either
 `DIVU` or `REMU`. The output-routing equality is deliberately left to the uniform row assembler. -/
 theorem unsigned64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {case : Case}
@@ -60,125 +80,75 @@ theorem unsigned64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {
     eopa0⟩ := hown
   have hword : cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw = 0 :=
     unsigned64_word_gate hfamily hselected
+  obtain ⟨hfdiv, hfrem, hfdivw, hfremw, hunsigned⟩ := unsigned64_flags hselected hfamily
   have hsigned : cols.is_div + cols.is_rem + cols.is_divw + cols.is_remw = 0 := by
-    cases case <;> simp [Case.family] at hfamily
-    all_goals
-      change Case.div.flag cols + Case.rem.flag cols + Case.divw.flag cols +
-        Case.remw.flag cols = 0
-      rw [hselected.flag_eq .div, hselected.flag_eq .rem,
-        hselected.flag_eq .divw, hselected.flag_eq .remw]
-      simp
-  have hunsigned : cols.is_divu + cols.is_remu = 1 := by
-    cases case <;> simp [Case.family] at hfamily
-    all_goals
-      change Case.divu.flag cols + Case.remu.flag cols = 1
-      rw [hselected.flag_eq .divu, hselected.flag_eq .remu]
-      simp
+    linear_combination hfdiv + hfrem + hfdivw + hfremw
   have h64 : cols.is_divu + cols.is_remu + cols.is_div + cols.is_rem = 1 := by
-    cases case <;> simp [Case.family] at hfamily
-    all_goals
-      change Case.divu.flag cols + Case.remu.flag cols + Case.div.flag cols +
-        Case.rem.flag cols = 1
-      rw [hselected.flag_eq .divu, hselected.flag_eq .remu,
-        hselected.flag_eq .div, hselected.flag_eq .rem]
-      simp
+    linear_combination hunsigned + hfdiv + hfrem
   have hir : cols.is_real = 1 := hinputReal.trans hreal
   have hirnw : cols.is_real_not_word = 1 := by
-    rw [hword, hir] at e13
-    linear_combination e13
+    rw [hword, hir] at e13; linear_combination e13
   have hbneg : cols.b_neg = 0 := by
-    rw [hsigned] at e15
-    linear_combination -e15
+    rw [hsigned] at e15; linear_combination -e15
   have hrneg : cols.rem_neg = 0 := by
-    rw [hsigned] at e17
-    linear_combination -e17
+    rw [hsigned] at e17; linear_combination -e17
   have hcneg : cols.c_neg = 0 := by
-    rw [hsigned] at e19
-    linear_combination -e19
+    rw [hsigned] at e19; linear_combination -e19
   have hov : cols.is_overflow = 0 := by
-    rw [hsigned] at e96
-    linear_combination e96
+    rw [hsigned] at e96; linear_combination e96
   rw [hadapter] at e20 e21 e22 e23 e29 e35 e41 e47
   have hb0 : cols.b[0] = input.op_b_val[0] := by linear_combination -e20
   have hb1 : cols.b[1] = input.op_b_val[1] := by linear_combination -e22
   have hb2 : cols.b[2] = input.op_b_val[2] := by
-    rw [hword] at e29
-    linear_combination e29
+    rw [hword] at e29; linear_combination e29
   have hb3 : cols.b[3] = input.op_b_val[3] := by
-    rw [hword] at e41
-    linear_combination e41
+    rw [hword] at e41; linear_combination e41
   have hc0 : cols.c[0] = input.op_c_val[0] := by linear_combination -e21
   have hc1 : cols.c[1] = input.op_c_val[1] := by linear_combination -e23
   have hc2 : cols.c[2] = input.op_c_val[2] := by
-    rw [hword] at e35
-    linear_combination e35
+    rw [hword] at e35; linear_combination e35
   have hc3 : cols.c[3] = input.op_c_val[3] := by
-    rw [hword] at e47
-    linear_combination e47
+    rw [hword] at e47; linear_combination e47
   have hbEq : cols.b = input.op_b_val := by
-    apply Vector.ext
-    intro i hi
-    interval_cases i <;> assumption
+    apply Vector.ext; intro i hi; interval_cases i <;> assumption
   have hcEq : cols.c = input.op_c_val := by
-    apply Vector.ext
-    intro i hi
-    interval_cases i <;> assumption
+    apply Vector.ext; intro i hi; interval_cases i <;> assumption
   have hbU : Word.isU64 cols.b := hbEq ▸ hbReadU
   have hcU : Word.isU64 cols.c := hcEq ▸ hcReadU
   obtain ⟨_r0, _r1, _r2, _r3, _r4, _r5, _r6, _r7,
-    _habsCU, _habsRU, hquotRange, hremRange, hctqRange⟩ := hrange hir
-  have hquotU : Word.isU64 cols.quotient := by
-    apply Word.isU64_of_cases
-    · exact hquotRange 0 (by norm_num)
-    · exact hquotRange 1 (by norm_num)
-    · exact hquotRange 2 (by norm_num)
-    · exact hquotRange 3 (by norm_num)
-  have hremU : Word.isU64 cols.remainder := by
-    apply Word.isU64_of_cases
-    · exact hremRange 0 (by norm_num)
-    · exact hremRange 1 (by norm_num)
-    · exact hremRange 2 (by norm_num)
-    · exact hremRange 3 (by norm_num)
+    habsCRange, habsRRange, hquotRange, hremRange, hctqRange⟩ := hrange hir
+  have hquotU : Word.isU64 cols.quotient := Word.isU64_of_cases
+    (hquotRange 0 (by norm_num)) (hquotRange 1 (by norm_num))
+    (hquotRange 2 (by norm_num)) (hquotRange 3 (by norm_num))
+  have hremU : Word.isU64 cols.remainder := Word.isU64_of_cases
+    (hremRange 0 (by norm_num)) (hremRange 1 (by norm_num))
+    (hremRange 2 (by norm_num)) (hremRange 3 (by norm_num))
   have hqc0 : cols.quotient_comp[0] = cols.quotient[0] := by linear_combination e48
   have hqc1 : cols.quotient_comp[1] = cols.quotient[1] := by linear_combination e49
   have hqc2 : cols.quotient_comp[2] = cols.quotient[2] := by
-    rw [h64] at e59
-    linear_combination e59
+    rw [h64] at e59; linear_combination e59
   have hqc3 : cols.quotient_comp[3] = cols.quotient[3] := by
-    rw [h64] at e69
-    linear_combination e69
+    rw [h64] at e69; linear_combination e69
   have hqcEq : cols.quotient_comp = cols.quotient := by
-    apply Vector.ext
-    intro i hi
-    interval_cases i <;> assumption
+    apply Vector.ext; intro i hi; interval_cases i <;> assumption
   have hqcU : Word.isU64 cols.quotient_comp := hqcEq ▸ hquotU
   have hrc0 : cols.remainder_comp[0] = cols.remainder[0] := by linear_combination e70
   have hrc1 : cols.remainder_comp[1] = cols.remainder[1] := by linear_combination e71
   have hrc2 : cols.remainder_comp[2] = cols.remainder[2] := by
-    rw [h64] at e81
-    linear_combination e81
+    rw [h64] at e81; linear_combination e81
   have hrc3 : cols.remainder_comp[3] = cols.remainder[3] := by
-    rw [h64] at e91
-    linear_combination e91
+    rw [h64] at e91; linear_combination e91
   have hrcEq : cols.remainder_comp = cols.remainder := by
-    apply Vector.ext
-    intro i hi
-    interval_cases i <;> assumption
+    apply Vector.ext; intro i hi; interval_cases i <;> assumption
   have hrcU : Word.isU64 cols.remainder_comp := hrcEq ▸ hremU
   have hctqLoU : Word.isU64 (#v[cols.c_times_quotient[0], cols.c_times_quotient[1],
-      cols.c_times_quotient[2], cols.c_times_quotient[3]] : Word (ZMod p)) := by
-    apply Word.isU64_of_cases
-    · exact hctqRange 0 (by norm_num)
-    · exact hctqRange 1 (by norm_num)
-    · exact hctqRange 2 (by norm_num)
-    · exact hctqRange 3 (by norm_num)
+      cols.c_times_quotient[2], cols.c_times_quotient[3]] : Word (ZMod p)) := Word.isU64_of_cases
+    (hctqRange 0 (by norm_num)) (hctqRange 1 (by norm_num))
+    (hctqRange 2 (by norm_num)) (hctqRange 3 (by norm_num))
   have hctqHiU : Word.isU64 (#v[cols.c_times_quotient[4], cols.c_times_quotient[5],
-      cols.c_times_quotient[6], cols.c_times_quotient[7]] : Word (ZMod p)) := by
-    apply Word.isU64_of_cases
-    · exact hctqRange 4 (by norm_num)
-    · exact hctqRange 5 (by norm_num)
-    · exact hctqRange 6 (by norm_num)
-    · exact hctqRange 7 (by norm_num)
+      cols.c_times_quotient[6], cols.c_times_quotient[7]] : Word (ZMod p)) := Word.isU64_of_cases
+    (hctqRange 4 (by norm_num)) (hctqRange 5 (by norm_num))
+    (hctqRange 6 (by norm_num)) (hctqRange 7 (by norm_num))
   unfold DivRemCore.ProductSpec at hproduct
   obtain ⟨hmulLo, hproduct⟩ := hproduct
   obtain ⟨hmulHi, hproduct⟩ := hproduct
@@ -190,12 +160,7 @@ theorem unsigned64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {
     linear_combination h64
   obtain ⟨hglue4, hglue5, hglue6, hglue7⟩ := hglueHi hg64
   have hlo := rwlo_product (fun _ => hmulLo) hir hglue0 hglue1 hglue2 hglue3
-  have hsigned64 : cols.is_div + cols.is_rem = 0 := by
-    cases case <;> simp [Case.family] at hfamily
-    all_goals
-      change Case.div.flag cols + Case.rem.flag cols = 0
-      rw [hselected.flag_eq .div, hselected.flag_eq .rem]
-      simp
+  have hsigned64 : cols.is_div + cols.is_rem = 0 := by linear_combination hfdiv + hfrem
   have hhi := rwhi_product_unsigned (fun _ => hmulHi) hirnw hsigned64 hunsigned
     hglue4 hglue5 hglue6 hglue7
   have hcarry0 := bool_of_mul_pred e309
@@ -208,32 +173,24 @@ theorem unsigned64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {
   have hcarry7 := bool_of_mul_pred e323
   have hchain0 : cols.c_times_quotient[0] + cols.remainder_comp[0] =
       cols.b[0] + cols.carry[0] * 65536 := by
-    rw [hov] at e154
-    linear_combination e154
+    rw [hov] at e154; linear_combination e154
   have hchain1 : cols.c_times_quotient[1] + cols.remainder_comp[1] + cols.carry[0] =
       cols.b[1] + cols.carry[1] * 65536 := by
-    rw [hov] at e157
-    linear_combination e157
+    rw [hov] at e157; linear_combination e157
   have hchain2 : cols.c_times_quotient[2] + cols.remainder_comp[2] + cols.carry[1] =
       cols.b[2] + cols.carry[2] * 65536 := by
-    rw [hov] at e160
-    linear_combination e160
+    rw [hov] at e160; linear_combination e160
   have hchain3 : cols.c_times_quotient[3] + cols.remainder_comp[3] + cols.carry[2] =
       cols.b[3] + cols.carry[3] * 65536 := by
-    rw [hov] at e163
-    linear_combination e163
+    rw [hov] at e163; linear_combination e163
   have hchain4 : cols.c_times_quotient[4] + cols.carry[3] = cols.carry[4] * 65536 := by
-    rw [hov, hbneg, hrneg] at e167
-    linear_combination e167
+    rw [hov, hbneg, hrneg] at e167; linear_combination e167
   have hchain5 : cols.c_times_quotient[5] + cols.carry[4] = cols.carry[5] * 65536 := by
-    rw [hov, hbneg, hrneg] at e171
-    linear_combination e171
+    rw [hov, hbneg, hrneg] at e171; linear_combination e171
   have hchain6 : cols.c_times_quotient[6] + cols.carry[5] = cols.carry[6] * 65536 := by
-    rw [hov, hbneg, hrneg] at e175
-    linear_combination e175
+    rw [hov, hbneg, hrneg] at e175; linear_combination e175
   have hchain7 : cols.c_times_quotient[7] + cols.carry[6] = cols.carry[7] * 65536 := by
-    rw [hov, hbneg, hrneg] at e179
-    linear_combination e179
+    rw [hov, hbneg, hrneg] at e179; linear_combination e179
   have hid := hid_of_carry_chain hcU hbU hqcU hrcU hctqLoU hctqHiU
     hcarry0 hcarry1 hcarry2 hcarry3 hcarry4 hcarry5 hcarry6 hcarry7
     hchain0 hchain1 hchain2 hchain3 hchain4 hchain5 hchain6 hchain7 hlo hhi
@@ -266,18 +223,12 @@ theorem unsigned64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {
       have hr2 : cols.remainder_comp[2] = cols.b[2] := by linear_combination e242
       have hr3 : cols.remainder_comp[3] = cols.b[3] := by linear_combination e244
       rw [Word.toNat_def, Word.toNat_def, hr0, hr1, hr2, hr3]
-  have habsCU : Word.isU64 cols.abs_c := by
-    apply Word.isU64_of_cases
-    · exact _habsCU 0 (by norm_num)
-    · exact _habsCU 1 (by norm_num)
-    · exact _habsCU 2 (by norm_num)
-    · exact _habsCU 3 (by norm_num)
-  have habsRU : Word.isU64 cols.abs_remainder := by
-    apply Word.isU64_of_cases
-    · exact _habsRU 0 (by norm_num)
-    · exact _habsRU 1 (by norm_num)
-    · exact _habsRU 2 (by norm_num)
-    · exact _habsRU 3 (by norm_num)
+  have habsCU : Word.isU64 cols.abs_c := Word.isU64_of_cases
+    (habsCRange 0 (by norm_num)) (habsCRange 1 (by norm_num))
+    (habsCRange 2 (by norm_num)) (habsCRange 3 (by norm_num))
+  have habsRU : Word.isU64 cols.abs_remainder := Word.isU64_of_cases
+    (habsRRange 0 (by norm_num)) (habsRRange 1 (by norm_num))
+    (habsRRange 2 (by norm_num)) (habsRRange 3 (by norm_num))
   have hlt : cols.c.toNat ≠ 0 → cols.remainder_comp.toNat < cols.c.toNat := by
     intro hcNe
     have hzeroResult := IsZeroWordOperation.result_semantic hisZero hir
@@ -288,66 +239,46 @@ theorem unsigned64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {
       simp
     rw [if_neg hcnz] at hzeroResult
     have hrcm : cols.remainder_check_multiplicity = 1 := by
-      rw [hzeroResult, hir] at e305
-      linear_combination -e305
+      rw [hzeroResult, hir] at e305; linear_combination -e305
     have hmax0 : cols.max_abs_c_or_1[0] = cols.abs_c[0] := by
-      rw [hzeroResult] at e299
-      linear_combination e299
+      rw [hzeroResult] at e299; linear_combination e299
     have hmax1 : cols.max_abs_c_or_1[1] = cols.abs_c[1] := by
-      rw [hzeroResult] at e300
-      linear_combination e300
+      rw [hzeroResult] at e300; linear_combination e300
     have hmax2 : cols.max_abs_c_or_1[2] = cols.abs_c[2] := by
-      rw [hzeroResult] at e301
-      linear_combination e301
+      rw [hzeroResult] at e301; linear_combination e301
     have hmax3 : cols.max_abs_c_or_1[3] = cols.abs_c[3] := by
-      rw [hzeroResult] at e302
-      linear_combination e302
+      rw [hzeroResult] at e302; linear_combination e302
     have hmaxEq : cols.max_abs_c_or_1 = cols.abs_c := by
-      apply Vector.ext
-      intro i hi
-      interval_cases i <;> assumption
+      apply Vector.ext; intro i hi; interval_cases i <;> assumption
     have hmaxU : Word.isU64 cols.max_abs_c_or_1 := hmaxEq ▸ habsCU
     have hbit := (LtOperationUnsigned.result_semantic habsRU hmaxU hrcm hltSpec).1
     have hbit1 : cols.remainder_lt_operation.u16_compare_operation.bit = 1 := by
-      rw [hrcm] at e307
-      linear_combination -e307
+      rw [hrcm] at e307; linear_combination -e307
     rw [hbit1] at hbit
     have hcmp : cols.abs_remainder.toNat < cols.max_abs_c_or_1.toNat := by
       by_contra hnot
       rw [if_neg hnot] at hbit
       exact one_ne_zero hbit
     have habsR0 : cols.abs_remainder[0] = cols.remainder_comp[0] := by
-      rw [hrneg] at e250
-      linear_combination e250
+      rw [hrneg] at e250; linear_combination e250
     have habsR1 : cols.abs_remainder[1] = cols.remainder_comp[1] := by
-      rw [hrneg] at e256
-      linear_combination e256
+      rw [hrneg] at e256; linear_combination e256
     have habsR2 : cols.abs_remainder[2] = cols.remainder_comp[2] := by
-      rw [hrneg] at e262
-      linear_combination e262
+      rw [hrneg] at e262; linear_combination e262
     have habsR3 : cols.abs_remainder[3] = cols.remainder_comp[3] := by
-      rw [hrneg] at e268
-      linear_combination e268
+      rw [hrneg] at e268; linear_combination e268
     have habsREq : cols.abs_remainder = cols.remainder_comp := by
-      apply Vector.ext
-      intro i hi
-      interval_cases i <;> assumption
+      apply Vector.ext; intro i hi; interval_cases i <;> assumption
     have habsC0 : cols.abs_c[0] = cols.c[0] := by
-      rw [hcneg] at e247
-      linear_combination e247
+      rw [hcneg] at e247; linear_combination e247
     have habsC1 : cols.abs_c[1] = cols.c[1] := by
-      rw [hcneg] at e253
-      linear_combination e253
+      rw [hcneg] at e253; linear_combination e253
     have habsC2 : cols.abs_c[2] = cols.c[2] := by
-      rw [hcneg] at e259
-      linear_combination e259
+      rw [hcneg] at e259; linear_combination e259
     have habsC3 : cols.abs_c[3] = cols.c[3] := by
-      rw [hcneg] at e265
-      linear_combination e265
+      rw [hcneg] at e265; linear_combination e265
     have habsCEq : cols.abs_c = cols.c := by
-      apply Vector.ext
-      intro i hi
-      interval_cases i <;> assumption
+      apply Vector.ext; intro i hi; interval_cases i <;> assumption
     simpa [habsREq, hmaxEq, habsCEq] using hcmp
   rw [hfamily]
   change Cases.Unsigned64Evidence (Word.toBitVec64 input.op_b_val)

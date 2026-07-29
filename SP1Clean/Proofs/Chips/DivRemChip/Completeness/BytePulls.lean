@@ -16,7 +16,6 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-
 /-- A gated single-cell byte Range lookup: the cell `env.get idx` equals a populate value `v` with
 `v.val < 2^16`, so the (`gate`-conditioned) `byteChannel` guarantee holds. The `gate` is irrelevant
 (the lookup is unconditional once the row is committed), so it is left abstract. -/
