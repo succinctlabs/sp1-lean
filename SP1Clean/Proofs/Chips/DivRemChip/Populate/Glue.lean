@@ -138,11 +138,8 @@ lemma populateMulLower_product_pair (B C : Word (ZMod p)) (f : Vector (ZMod p) 8
     rw [ctqLo_eq, wordOfBits_toBitVec64]
     exact (hmul rfl).symm)
   simp [MulOperation.resultWord, MulOperation.productVal] at hword
-  interval_cases k
-  · simpa using hword.1
-  · simpa using hword.2.1
-  · simpa using hword.2.2.1
-  · simpa using hword.2.2.2
+  obtain ⟨w0, w1, w2, w3⟩ := hword
+  interval_cases k <;> assumption
 
 /-- On a real division row, each high `c_times_quotient` limb is the corresponding pair of bytes in
 the upper-product witness.  The one-hot flag facts choose the signed or unsigned Mul semantics. -/
@@ -165,13 +162,13 @@ lemma populateMulUpper_product_pair (B C : Word (ZMod p)) (f : Vector (ZMod p) 8
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ] <;>
       exact populateCtq_val_lt B C f _ (by norm_num)
-  have hsigned : f[0] + f[2] = 1 → f[1] + f[3] = 0 → f[0] + f[2] + f[4] + f[5] = 1 →
+  have hsigned : f[0] + f[2] = 1 → f[0] + f[2] + f[4] + f[5] = 1 →
       (populateCtq B C f)[4 + k]'(by omega)
         = (MulOperation.populate (populateQuotComp B C f) (cComp C f)
             (f[0] + f[2]) 0 0).product[8 + 2 * k]'(by omega)
           + (MulOperation.populate (populateQuotComp B C f) (cComp C f)
               (f[0] + f[2]) 0 0).product[8 + 2 * k + 1]'(by omega) * 256 := by
-    intro hs hu hsg
+    intro hs hsg
     rw [hs]
     have hsem := MulOperation.semantic_populate (populateQuotComp_isU64 B C f)
       (cComp_isU64 hcU f) 0 1 0 0 0 (Or.inl rfl) (Or.inr rfl) (Or.inl rfl) (Or.inl rfl)
@@ -182,18 +179,15 @@ lemma populateMulUpper_product_pair (B C : Word (ZMod p)) (f : Vector (ZMod p) 8
       refine Eq.trans ?_ (hmulh rfl).symm
       simp [ctqProd, hsg])
     simp [MulOperation.resultWord, MulOperation.productVal] at hword
-    interval_cases k
-    · simpa using hword.1
-    · simpa using hword.2.1
-    · simpa using hword.2.2.1
-    · simpa using hword.2.2.2
-  have hunsigned : f[0] + f[2] = 0 → f[1] + f[3] = 1 → f[0] + f[2] + f[4] + f[5] = 0 →
+    obtain ⟨w0, w1, w2, w3⟩ := hword
+    interval_cases k <;> assumption
+  have hunsigned : f[0] + f[2] = 0 → f[0] + f[2] + f[4] + f[5] = 0 →
       (populateCtq B C f)[4 + k]'(by omega)
         = (MulOperation.populate (populateQuotComp B C f) (cComp C f)
             (f[0] + f[2]) 0 0).product[8 + 2 * k]'(by omega)
           + (MulOperation.populate (populateQuotComp B C f) (cComp C f)
               (f[0] + f[2]) 0 0).product[8 + 2 * k + 1]'(by omega) * 256 := by
-    intro hs hu hsg
+    intro hs hsg
     rw [hs]
     have hsem := MulOperation.semantic_populate (populateQuotComp_isU64 B C f)
       (cComp_isU64 hcU f) 0 0 1 0 0 (Or.inl rfl) (Or.inl rfl) (Or.inr rfl) (Or.inl rfl)
@@ -204,31 +198,17 @@ lemma populateMulUpper_product_pair (B C : Word (ZMod p)) (f : Vector (ZMod p) 8
       refine Eq.trans ?_ (hmulhu rfl).symm
       simp [ctqProd, hsg])
     simp [MulOperation.resultWord, MulOperation.productVal] at hword
-    interval_cases k
-    · simpa using hword.1
-    · simpa using hword.2.1
-    · simpa using hword.2.2.1
-    · simpa using hword.2.2.2
+    obtain ⟨w0, w1, w2, w3⟩ := hword
+    interval_cases k <;> assumption
   rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with
-      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
-      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
-      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ |
-      ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ | ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩
-  · exact hsigned (by rw [g0, g2]; norm_num) (by rw [g1, g3]; norm_num)
-      (by rw [g0, g2, g4, g5]; norm_num)
-  · exact hunsigned (by rw [g0, g2]; norm_num) (by rw [g1, g3]; norm_num)
-      (by rw [g0, g2, g4, g5]; norm_num)
-  · exact hsigned (by rw [g0, g2]; norm_num) (by rw [g1, g3]; norm_num)
-      (by rw [g0, g2, g4, g5]; norm_num)
-  · exact hunsigned (by rw [g0, g2]; norm_num) (by rw [g1, g3]; norm_num)
-      (by rw [g0, g2, g4, g5]; norm_num)
-  · rw [g0, g1, g2, g3] at hg
-    norm_num at hg
-  · rw [g0, g1, g2, g3] at hg
-    norm_num at hg
-  · rw [g0, g1, g2, g3] at hg
-    norm_num at hg
-  · rw [g0, g1, g2, g3] at hg
+      h | h | h | h | h | h | h | h
+  all_goals obtain ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ := h
+  · exact hsigned (by rw [g0, g2]; norm_num) (by rw [g0, g2, g4, g5]; norm_num)
+  · exact hunsigned (by rw [g0, g2]; norm_num) (by rw [g0, g2, g4, g5]; norm_num)
+  · exact hsigned (by rw [g0, g2]; norm_num) (by rw [g0, g2, g4, g5]; norm_num)
+  · exact hunsigned (by rw [g0, g2]; norm_num) (by rw [g0, g2, g4, g5]; norm_num)
+  all_goals
+    rw [g0, g1, g2, g3] at hg
     norm_num at hg
 
 /-- Every committed product limb is zero on SP1's canonical DivRem padding template. -/
@@ -265,9 +245,7 @@ lemma populateCtq_padding_of_eq {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
     (hB : B = #v[0, 0, 0, 0]) (hC : C = #v[1, 0, 0, 0])
     (hf : f = #v[0, 1, 0, 0, 0, 0, 0, 0]) (k : ℕ) (hk : k < 8) :
     (populateCtq B C f)[k]'hk = 0 := by
-  subst B
-  subst C
-  subst f
+  subst B C f
   exact populateCtq_padding k hk
 
 /-- Program-row form of the padding lemma, consuming the canonical padding-template contract in

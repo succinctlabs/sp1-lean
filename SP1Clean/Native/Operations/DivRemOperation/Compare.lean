@@ -82,7 +82,6 @@ def main (cols : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   assertion U16MSBOperation.circuit ⟨cols.remainder[1], cols.rem_msb, e2⟩
   assertion U16MSBOperation.circuit ⟨cols.quotient[1], cols.quot_msb, e2⟩
 
-set_option maxHeartbeats 4000000 in
 /-- Clean derives the structural metadata; the cluster contributes no fresh witnesses
 (`localLength = 0`) and exposes only the sub-operations' byte-channel guarantees. -/
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main := by

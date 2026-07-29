@@ -32,8 +32,8 @@ structure Unsigned64Evidence (rs1 rs2 quotient remainder : BitVec 64) : Prop whe
 theorem Unsigned64Evidence.sound {rs1 rs2 quotient remainder : BitVec 64}
     (h : Unsigned64Evidence rs1 rs2 quotient remainder) :
     PairSpec .unsigned64 rs1 rs2 quotient remainder := by
-  have hpair := udiv_umod_bitvec h.identity h.remainder_lt h.divisor_zero
-  simpa [PairSpec, Family.result, RV64.divu, RV64.remu] using hpair
+  simpa [PairSpec, Family.result, RV64.divu, RV64.remu] using
+    udiv_umod_bitvec h.identity h.remainder_lt h.divisor_zero
 
 /-- The three semantically distinct branches of signed 64-bit division. -/
 inductive Signed64Evidence (rs1 rs2 quotient remainder : BitVec 64) : Prop where
@@ -144,12 +144,10 @@ theorem FamilyEvidence.sound {family : Family} {rs1 rs2 quotient remainder : Bit
   | signed64 => exact Signed64Evidence.sound h
   | unsigned64 => exact Unsigned64Evidence.sound h
   | signed32 =>
-      obtain ⟨quotient32, remainder32, hq, hr, hcase⟩ := h
-      rw [hq, hr]
+      obtain ⟨quotient32, remainder32, rfl, rfl, hcase⟩ := h
       exact Signed32Evidence.sound hcase
   | unsigned32 =>
-      obtain ⟨quotient32, remainder32, hq, hr, hcase⟩ := h
-      rw [hq, hr]
+      obtain ⟨quotient32, remainder32, rfl, rfl, hcase⟩ := h
       exact Unsigned32Evidence.sound hcase
 
 /-- Arithmetic evidence plus the chip's final output-routing equality for one selected opcode. -/
@@ -161,8 +159,7 @@ def RoutedEvidence (case : Case) (rs1 rs2 result : BitVec 64) : Prop :=
 /-- Routed family evidence establishes the selected opcode's result. -/
 theorem RoutedEvidence.sound {case : Case} {rs1 rs2 result : BitVec 64}
     (h : RoutedEvidence case rs1 rs2 result) : result = case.result rs1 rs2 := by
-  obtain ⟨quotient, remainder, hfamily, hresult⟩ := h
-  rw [hresult]
+  obtain ⟨quotient, remainder, hfamily, rfl⟩ := h
   simpa [Case.result] using (FamilyEvidence.sound hfamily).pick case.output
 
 /-- Evidence-shaped replacement for a raw per-op circuit proof.  The heavy integration layer only
@@ -176,9 +173,8 @@ def EvidenceSpec {p : ℕ} [NeZero p] (case : Case) (isReal : ZMod p)
 theorem EvidenceSpec.sound {p : ℕ} [NeZero p] {case : Case} {isReal : ZMod p}
     {rs1 rs2 result : Word (ZMod p)} {cols : DivRemChip.Columns (ZMod p)}
     (h : EvidenceSpec case isReal rs1 rs2 result cols) :
-    CaseSpec case isReal rs1 rs2 result cols := by
-  intro hreal hflag
-  exact (h hreal hflag).sound
+    CaseSpec case isReal rs1 rs2 result cols :=
+  fun hreal hflag => (h hreal hflag).sound
 
 /-- Evidence for all cases, in the same uniform shape as `DivRemContract.CasesSpec`. -/
 def EvidenceSpecs {p : ℕ} [NeZero p] (isReal : ZMod p)
