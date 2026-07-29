@@ -122,8 +122,7 @@ theorem PairSpec.pick {family : Family} {rs1 rs2 quotient remainder : BitVec 64}
     (h : PairSpec family rs1 rs2 quotient remainder) (output : Output) :
     output.pick quotient remainder = family.result output rs1 rs2 := by
   cases output
-  · exact h.1
-  · exact h.2
+  exacts [h.1, h.2]
 
 /-- The flag-weighted opcode consumed by the R-type reader. -/
 def encodedOpcode {p : ℕ} (cols : DivRemChip.Columns (ZMod p)) : ZMod p :=
@@ -162,8 +161,7 @@ structure RowSpec {p : ℕ} [NeZero p] (isReal : ZMod p) (rs1 rs2 result : Word 
 theorem Selected.unique {p : ℕ} [Fact p.Prime] {cols : DivRemChip.Columns (ZMod p)} {x y : Case}
     (hx : Selected cols x) (hy : Selected cols y) : x = y := by
   by_contra hxy
-  have hy0 := hx.2 y (Ne.symm hxy)
-  exact zero_ne_one (hy0.symm.trans hy.1)
+  exact zero_ne_one ((hx.2 y (Ne.symm hxy)).symm.trans hy.1)
 
 /-- Pointwise normal form of a selected row's flags. -/
 theorem Selected.flag_eq {p : ℕ} {cols : DivRemChip.Columns (ZMod p)} {case : Case}

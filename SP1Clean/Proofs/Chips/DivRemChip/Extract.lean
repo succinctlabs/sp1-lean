@@ -15,7 +15,11 @@ variables (a Word `qc`/`c`, an opaque result-column `cols`, a bare `ByteRowSpec`
 chip's `cols`/`env.get` terms — so `Formal.lean` does the offset bookkeeping once and applies these.
 
 Kept out of `Formal.lean` so each extraction step is an independently-checkable named lemma that
-compiles fast (no heavy `circuit_norm` reduction). -/
+compiles fast (no heavy `circuit_norm` reduction).
+
+Perf note: the two `fromElements` projection lemmas below each carried a 4000000-heartbeat ceiling.
+Measured (control at 1 heartbeat = 2 real timeouts; both then clean at 40000), so the plain default
+carries ≥5× headroom and both ceilings were removed — they were ~100× over their floor. -/
 
 namespace SP1Clean.DivRemChip
 
@@ -43,7 +47,6 @@ lemma field_fromElements_one {F : Type} (v : Vector F 1) :
   match l, hl with
   | [_], _ => rfl
 
-set_option maxHeartbeats 4000000 in
 lemma iszeroword_result_proj {F : Type} (W : Vector F 11) :
     (fromElements W : Extracted.IsZeroWordOperation F).result = W[10] := by
   -- 4.30: `ProvableType.fromStruct` is an *instance* that `simp` no longer unfolds; unfold the
@@ -53,7 +56,6 @@ lemma iszeroword_result_proj {F : Type} (W : Vector F 11) :
   rw [field_fromElements_one]
   simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop, Nat.reduceAdd]
 
-set_option maxHeartbeats 4000000 in
 /-- `IsEqualWordOperation` wraps a single `is_diff_zero : IsZeroWordOperation` (11 elements), so the
 overflow flags `is_overflow_b`/`is_overflow_c` (witnessed `fromElements` over 11 scalars) expose their
 `.is_diff_zero.result` at the same flat element 10. The single-field `fromElements`'s `.is_diff_zero`
@@ -110,9 +112,7 @@ lemma byteRowSpec_range_val {x w : ZMod p}
       | (simp only [ByteOpcode.constrain] at hc; exact hc)
 
 /-- `(16 : ZMod p).val = 16` (the byte-bus 16-bit range width column). -/
-@[simp] lemma val_16_zmod_p : (16 : ZMod p).val = 16 := by
-  have : (2 ^ 17 : ℕ) < p := Fact.out
-  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
+@[simp] lemma val_16_zmod_p : (16 : ZMod p).val = 16 := _root_.SP1Clean.val_16_zmod_p
 
 /-- A 16-bit byte-bus pull `⟨6, v, 16, 0⟩` gives `v.val < 2^16`. The byte channel's `Guarantees` is
 definitionally `ByteRowSpec`, so `Formal` applies this directly to `hb_* hr` (the real-row guarantee).
@@ -134,7 +134,8 @@ conjunct, returning the result word's `toBitVec64` product form. -/
 /-- `mul_lower`: with `is_mul = ir = 1` (the row is real), the result word is the **low 64 bits** of
 `qc · c`. -/
 lemma mul_lo_spec {qc c : Word (ZMod p)} {ir : ZMod p} {cols : Extracted.MulOperation (ZMod p)}
-    (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
+    (h : MulOperation.circuit.Assumptions
+           (⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩)
     (hir : ir = 1) :
     Word.toBitVec64 (MulOperation.resultWord ⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩ cols)
@@ -150,7 +151,8 @@ lemma mul_lo_spec {qc c : Word (ZMod p)} {ir : ZMod p} {cols : Extracted.MulOper
 is the **unsigned high 64 bits** of `qc · c`. -/
 lemma mul_hi_spec_unsigned {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
     {cols : Extracted.MulOperation (ZMod p)}
-    (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
+    (h : MulOperation.circuit.Assumptions
+           (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩)
     (hir : ir = 1) (hihm : ihm = 0) (hihmu : ihmu = 1) :
     Word.toBitVec64 (MulOperation.resultWord ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ cols)
@@ -166,7 +168,8 @@ lemma mul_hi_spec_unsigned {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
 the **signed high 64 bits** of `qc · c`. -/
 lemma mul_hi_spec_signed {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
     {cols : Extracted.MulOperation (ZMod p)}
-    (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
+    (h : MulOperation.circuit.Assumptions
+           (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩)
     (hir : ir = 1) (hihm : ihm = 1) (hihmu : ihmu = 0) :
     Word.toBitVec64 (MulOperation.resultWord ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ cols)
@@ -192,7 +195,8 @@ low/high Word's `toBitVec64` *is* the corresponding slice of the product `qc · 
 product[2i+1]·256`). -/
 lemma rwlo_product {qc c : Word (ZMod p)} {ir : ZMod p} {cols : Extracted.MulOperation (ZMod p)}
     {r0 r1 r2 r3 : ZMod p}
-    (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
+    (h : MulOperation.circuit.Assumptions
+           (⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, ir, 0, 0, 0, 0⟩)
     (hir : ir = 1)
     (h0 : r0 = cols.product[0] + cols.product[1] * 256)
@@ -208,7 +212,8 @@ lemma rwlo_product {qc c : Word (ZMod p)} {ir : ZMod p} {cols : Extracted.MulOpe
 /-- High `ctq` limbs (`mul_upper`, unsigned): the unsigned high 64 of `qc · c`. -/
 lemma rwhi_product_unsigned {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
     {cols : Extracted.MulOperation (ZMod p)} {r4 r5 r6 r7 : ZMod p}
-    (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
+    (h : MulOperation.circuit.Assumptions
+           (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩)
     (hir : ir = 1) (hihm : ihm = 0) (hihmu : ihmu = 1)
     (h4 : r4 = cols.product[8] + cols.product[9] * 256)
@@ -226,7 +231,8 @@ lemma rwhi_product_unsigned {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
 /-- High `ctq` limbs (`mul_upper`, signed): the signed high 64 of `qc · c`. -/
 lemma rwhi_product_signed {qc c : Word (ZMod p)} {ir ihm ihmu : ZMod p}
     {cols : Extracted.MulOperation (ZMod p)} {r4 r5 r6 r7 : ZMod p}
-    (h : MulOperation.circuit.Assumptions (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
+    (h : MulOperation.circuit.Assumptions
+           (⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩ : MulOperation.Inputs (ZMod p)) →
          MulOperation.circuit.Spec ⟨qc, c, cols, ir, 0, ihm, ihmu, 0, 0⟩)
     (hir : ir = 1) (hihm : ihm = 1) (hihmu : ihmu = 0)
     (h4 : r4 = cols.product[8] + cols.product[9] * 256)
@@ -261,8 +267,7 @@ lemma overflow_of_iseqword {b c : Word (ZMod p)}
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ] at hrb hrc
   rw [hrb, hrc] at hprod
-  have h32768 : (32768 : ZMod p).val = 32768 :=
-    ZMod.val_natCast_of_lt (show (32768 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
+  have h32768 : (32768 : ZMod p).val = 32768 := val_32768_zmod_p
   split_ifs at hprod with hbc hcc
   · obtain ⟨hb0, hb1, hb2, hb3⟩ := hbc
     obtain ⟨hc0, hc1, hc2, hc3⟩ := hcc
@@ -271,7 +276,7 @@ lemma overflow_of_iseqword {b c : Word (ZMod p)}
       simp only [ZMod.val_zero, h32768]; norm_num
     · rw [Word.toNat_def, hc0, hc1, hc2, hc3]
       simp only [val_65535_zmod_p]; norm_num
-  all_goals simp_all
+  all_goals simp at hprod
 
 /-- **Half-word overflow.** The `*W` overflow branch uses the *low-half* `IsEqualWord` pair (the operand
 columns' bottom two limbs, top two zeroed, against `i32::MIN`/`-1` low halves). Both products being `1`
@@ -290,8 +295,7 @@ lemma overflow_of_iseqword_word {b c : Word (ZMod p)}
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ] at hrb hrc
   rw [hrb, hrc] at hprod
-  have h32768 : (32768 : ZMod p).val = 32768 :=
-    ZMod.val_natCast_of_lt (show (32768 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
+  have h32768 : (32768 : ZMod p).val = 32768 := val_32768_zmod_p
   split_ifs at hprod with hbc hcc
   · obtain ⟨hb0, hb1, _, _⟩ := hbc
     obtain ⟨hc0, hc1, _, _⟩ := hcc
@@ -302,7 +306,7 @@ lemma overflow_of_iseqword_word {b c : Word (ZMod p)}
     · apply BitVec.eq_of_toNat_eq
       rw [extractLsb_lo_toNat hcU, hc0, hc1, BitVec.neg_one_eq_allOnes, BitVec.toNat_allOnes]
       simp only [val_65535_zmod_p]; norm_num
-  all_goals simp_all
+  all_goals simp at hprod
 
 local instance : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
@@ -323,13 +327,7 @@ lemma group_binary4 {a b c d : ZMod p} (ha : a = 0 ∨ a = 1) (hb : b = 0 ∨ b 
 /-- A 2-flag group sum is binary (the word selectors `E6 = is_divw + is_remw`, `E7 = is_divuw + is_remuw`). -/
 lemma group_binary2 {a b : ZMod p} (ha : a = 0 ∨ a = 1) (hb : b = 0 ∨ b = 1)
     (hv : a.val + b.val ≤ 1) : a + b = 0 ∨ a + b = 1 := by
-  have v0 : (0 : ZMod p).val = 0 := ZMod.val_zero
-  have v1 : (1 : ZMod p).val = 1 := ZMod.val_one p
-  rcases ha with h | h <;> rcases hb with h' | h' <;> subst_vars <;>
-    first
-      | (left; ring1)
-      | (right; ring1)
-      | (exfalso; omega)
+  simpa using group_binary4 ha hb (Or.inl rfl) (Or.inl rfl) (by simpa using hv)
 
 /-- One-hot limb bound (the `?_tail` `quotient_comp`/`remainder_comp` `isU64` lever): a high comp-limb `qc`
 is pinned by exactly one variant selector — `s5` (64-bit) ⇒ `qc = q` (the byte-checked output limb), `s6`
@@ -360,10 +358,22 @@ lemma comp_limb_isU16 {s5 s6 s7 qc q msb : ZMod p}
       have := (CharP.cast_eq_zero_iff (ZMod p) p 2).mp h2
       exact absurd (Nat.le_of_dvd (by norm_num) this) (by omega)
 
-/-- Operand-column `isU64` for the word-truncated/sign-extended operands `b`/`c`: the low two limbs equal the
-raw register read (so `isU64` of the read bounds them), and the high two limbs are `read·(1-e2) + sign·e2·65535`
-— the read on 64-bit rows (`e2 = 0`), the sign/zero fill `∈ {0, 65535}` on word rows (`e2 = 1`, `sign` binary).
-Every limb is `< 2^16`. -/
+/-- The high-limb fill value `read·(1-e2) + sign·e2·65535` is `< 2^16`: it is the byte-checked
+read on `e2 = 0` and the sign/zero fill `∈ {0, 65535}` on `e2 = 1`. Shared by the two high limbs
+of `operand_isU64`. -/
+private lemma fill_limb_isU16 {r e2 s : ZMod p} (hr : r.val < 2 ^ 16)
+    (he2 : e2 = 0 ∨ e2 = 1) (hs : s = 0 ∨ s = 1) :
+    (r * (1 - e2) + s * e2 * 65535).val < 2 ^ 16 := by
+  rcases he2 with he | he <;> rw [he]
+  · simpa using hr
+  · rcases hs with hs' | hs' <;> rw [hs'] <;>
+      simp only [sub_self, mul_zero, zero_mul, one_mul, mul_one, zero_add, add_zero,
+        ZMod.val_zero, val_65535_zmod_p] <;> norm_num
+
+/-- Operand-column `isU64` for the word-truncated/sign-extended operands `b`/`c`: the low two limbs
+equal the raw register read (so `isU64` of the read bounds them), and the high two limbs are
+`read·(1-e2) + sign·e2·65535` — the read on 64-bit rows (`e2 = 0`), the sign/zero fill
+`∈ {0, 65535}` on word rows (`e2 = 1`, `sign` binary). Every limb is `< 2^16`. -/
 lemma operand_isU64 {w : Word (ZMod p)} {r0 r1 r2 r3 e2 s : ZMod p}
     (h0 : w[0] = r0) (h1 : w[1] = r1)
     (h2 : w[2] = r2 * (1 - e2) + s * e2 * 65535) (h3 : w[3] = r3 * (1 - e2) + s * e2 * 65535)
@@ -372,16 +382,8 @@ lemma operand_isU64 {w : Word (ZMod p)} {r0 r1 r2 r3 e2 s : ZMod p}
   apply Word.isU64_of_cases
   · rw [h0]; exact hr0
   · rw [h1]; exact hr1
-  · rw [h2]; rcases he2 with he | he <;> rw [he]
-    · simpa using hr2
-    · rcases hs with hs' | hs' <;> rw [hs'] <;>
-        simp only [sub_self, mul_zero, zero_mul, one_mul, mul_one, zero_add, add_zero,
-          ZMod.val_zero, val_65535_zmod_p] <;> norm_num
-  · rw [h3]; rcases he2 with he | he <;> rw [he]
-    · simpa using hr3
-    · rcases hs with hs' | hs' <;> rw [hs'] <;>
-        simp only [sub_self, mul_zero, zero_mul, one_mul, mul_one, zero_add, add_zero,
-          ZMod.val_zero, val_65535_zmod_p] <;> norm_num
+  · rw [h2]; exact fill_limb_isU16 hr2 he2 hs
+  · rw [h3]; exact fill_limb_isU16 hr3 he2 hs
 
 set_option linter.unusedSectionVars false in
 /-- The low 32 bits of `toBitVec64 w` depend only on limbs 0,1 — the lever for the `*w` read-lift: the
