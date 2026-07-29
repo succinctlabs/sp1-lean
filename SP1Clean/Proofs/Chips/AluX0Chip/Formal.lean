@@ -19,11 +19,8 @@ the completeness direction: soundness uses the same trusted Byte table row to re
 `opcode.val < 29`. -/
 lemma byteRowSpec_ltu_29_iff {op : ZMod p} :
     ByteRowSpec (⟨(4 : ZMod p), 1, op, 29⟩ : ByteRow (ZMod p)) ↔ op.val < 29 := by
-  have hp2 : 1 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  have h29 : ((29 : ZMod p)).val = 29 := by
-    have h29p : (29 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    rw [show (29 : ZMod p) = ((29 : ℕ) : ZMod p) from by norm_cast, ZMod.val_natCast_of_lt h29p]
-  haveI : Fact (1 < p) := ⟨hp2⟩
+  have h29 : (29 : ZMod p).val = 29 :=
+    ZMod.val_natCast_of_lt (show (29 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
   constructor
   · rintro ⟨byteOpcode, opcodeEq, constrained⟩
     have indexEq : byteOpcode.idx = 4 :=
@@ -49,7 +46,7 @@ well-formedness obligations; `is_real` binary and the reader contract are derive
 in-circuit gates. -/
 def Assumptions (_ : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop := True
 
-set_option maxHeartbeats 4000000 in
+-- Runs at the plain default: the former 4000000 ceiling was ~100x over; measured floor <= 40000.
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨h_cpu, h_ltu, h_reader, h_gate, h_oa1, h_oa2⟩ := h_holds
@@ -88,7 +85,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
       input.state.pc, opcodeVal input⟩ ∧
   (isReal input = 1 → input.opcode.val < 29)
 
-set_option maxHeartbeats 4000000 in
+-- Runs at the plain default: the former 4000000 ceiling was ~100x over; measured floor <= 40000.
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -293,8 +290,8 @@ theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ⟨stateChannel.toRaw, (exposedStateInteractions input).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
 
-set_option maxHeartbeats 2000000 in
-/-- The completed AluX0 circuit emits exactly the nine Byte interactions above. -/
+/-- The completed AluX0 circuit emits exactly the nine Byte interactions above.
+Runs at the plain default: the former 2000000 ceiling was ~50x over; measured floor <= 40000. -/
 theorem interactionsWith_byte_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith byteChannel.toRaw =
       (exposedByteInteractions input).map ChannelInteraction.toRaw := by

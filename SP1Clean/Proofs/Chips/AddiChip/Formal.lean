@@ -1,5 +1,6 @@
 import SP1Clean.Native.Chips.AddiChip.Defs
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
+import SP1Clean.Math.EvalVec
 import Clean.Air.Circuit
 
 /-! # `SP1Clean.AddiChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
@@ -50,13 +51,8 @@ theorem completeness :
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, hoc⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
-  have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
-      Vector.map (Expression.eval env.toEnvironment) vv = v →
-      (#v[Expression.eval env.toEnvironment vv[0], Expression.eval env.toEnvironment vv[1],
-        Expression.eval env.toEnvironment vv[2], Expression.eval env.toEnvironment vv[3]] : Word (ZMod p)) = v :=
-    fun vv v h => by rw [← h]; apply Vector.ext; intro i hi; simp only [Vector.getElem_map]; interval_cases i <;> rfl
-  have hbeq := mapEq input_var_adapter_op_b_memory_prev_value _ hob
-  have hceq := mapEq input_var_adapter_op_c_imm _ hoc
+  have hbeq := (vec4_eval env.toEnvironment input_var_adapter_op_b_memory_prev_value).trans hob
+  have hceq := (vec4_eval env.toEnvironment input_var_adapter_op_c_imm).trans hoc
   have hval : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + i}) : Word (ZMod p))
       = AddOperation.populate input_adapter_op_b_memory_prev_value input_adapter_op_c_imm := by
@@ -135,21 +131,9 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
              input.adapter.op_a_0, 0, 1⟩ ],
     exposedChannels_eq := by
       intro input offset
-      have h_byte : (byteChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
-        intro h
-        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
-        simp only [Channel.toRaw_name, byteChannel, stateChannel] at hn
-        exact (by decide : ("SP1Byte" : String) ≠ "SP1State") hn
-      have h_program : (programChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
-        intro h
-        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
-        simp only [Channel.toRaw_name, programChannel, stateChannel] at hn
-        exact (by decide : ("SP1Program" : String) ≠ "SP1State") hn
-      have h_memory : (memoryChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
-        intro h
-        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
-        simp only [Channel.toRaw_name, memoryChannel, stateChannel] at hn
-        exact (by decide : ("SP1Memory" : String) ≠ "SP1State") hn
+      have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
+      have h_program := Channels.programChannel_toRaw_ne_stateChannel (p := p)
+      have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
       unfold Operations.ExposedChannelsLawful
       intro exposed exposedMem
       simp only [expose, List.mem_append, List.mem_singleton] at exposedMem

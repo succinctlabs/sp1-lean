@@ -88,21 +88,19 @@ private lemma rv64_sltu_eq (x y : BitVec 64) :
     RV64.sltu y x = if x.toNat < y.toNat then 1#64 else 0#64 := by
   by_cases h : x.toNat < y.toNat <;> simp [RV64.sltu, BitVec.ult, h]
 
+set_option linter.unusedSectionVars false in
 /-- The `resultWord` `#v[bit, 0, 0, 0]` packs to the 64-bit `0/1` indicator carried by its low limb:
 when the compare `bit` is `if P then 1 else 0`, the word's `toBitVec64` is `if P then 1#64 else 0#64`. -/
 private lemma toBitVec64_bitWord (bit : ZMod p) (P : Prop) [Decidable P]
     (h : bit = if P then 1 else 0) :
     Word.toBitVec64 (#v[bit, 0, 0, 0] : Word (ZMod p)) = if P then 1#64 else 0#64 := by
-  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   subst h
   by_cases hP : P <;> simp [hP, Word.toBitVec64, Word.toNat, ZMod.val_one, ZMod.val_zero]
 
+set_option linter.unusedSectionVars false in
 /-- A binary field element's `val` is a valid 16-bit limb. -/
 private lemma val_lt_of_bool {b : ZMod p} (h : b = 0 ∨ b = 1) : b.val < 2 ^ 16 := by
-  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  rcases h with h | h <;> rw [h]
-  · rw [ZMod.val_zero]; norm_num
-  · rw [ZMod.val_one]; norm_num
+  have := bool_val_le h; omega
 
 /-- The Lt result word `#v[bit, 0, 0, 0]` is a valid u64 whenever the compare `bit` is binary (the
 op_a write push's `isU64 value` obligation). -/
@@ -155,7 +153,8 @@ private lemma witness_bit_bool {b cc : Word (ZMod p)} {s r : ZMod p} (hr : r = 1
     (toElements (LtOperationSigned.populate b cc s r))[0]'hi = 1 := by
   rw [toElements_col0]; exact populate_bit_bool hr
 
-set_option maxHeartbeats 800000 in
+-- Measured: the former 800000 ceiling was ~8x over; floor (60000, 100000].
+set_option maxHeartbeats 500000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start [Spec]
   obtain ⟨ha, hb⟩ := h_assumptions
@@ -183,20 +182,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       rcases h_slt_bool with h0 | h1
       · exact h0
       · exfalso
+        haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
         rw [h1, hsltu] at h_sum
-        have h20 : (2 : ZMod p) = 0 := by
-          have e : (2 : ZMod p) = (1 + 1) * (1 + 1 - 1) := by ring
-          rw [e]; exact h_sum
-        have hp := Fact.out (p := 2 ^ 17 < p)
-        have h2 : ((2 : ℕ) : ZMod p) ≠ 0 := by
-          rw [Ne, CharP.cast_eq_zero_iff (ZMod p) p]
-          intro hd
-          have := Nat.le_of_dvd (by norm_num) hd
-          omega
-        exact h2 (by exact_mod_cast h20)
-    have h01 : (0 : ZMod p) ≠ 1 := by
-      haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-      exact zero_ne_one
+        exact (show (2 : ZMod p) ≠ 0 by simp [← ZMod.val_eq_zero, val_2_zmod_p])
+          (by linear_combination h_sum)
+    have h01 : (0 : ZMod p) ≠ 1 := zero_ne_one
     rw [h_slt0] at h_lt_spec
     simp only [if_neg h01] at h_lt_spec
     simp only [resultWord, rv64_sltu_eq, Word.toBitVec64_toNat ha,
@@ -212,9 +202,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
                   (h_lt ⟨ha, hb, h_bin, h_slt_bool⟩)).1)),
                 h_clk.at_four⟩
 
--- 32M: whole-chip completeness normalizes the flag-hinted witness stream (SLT/SLTU flags + the
+-- Whole-chip completeness normalizes the flag-hinted witness stream (SLT/SLTU flags + the
 -- signed/unsigned comparison gadget closures) against the composed reader obligations at once.
-set_option maxHeartbeats 32000000 in
+-- Measured: the former 32000000 ceiling was ~530x over; floor (45000, 60000].
+set_option maxHeartbeats 300000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -540,8 +531,8 @@ theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ⟨stateChannel.toRaw, (exposedStateInteractions input).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
 
-set_option maxHeartbeats 4000000 in
-/-- The completed Lt circuit emits exactly its eleven Byte interactions. -/
+/-- The completed Lt circuit emits exactly its eleven Byte interactions.
+Runs at the plain default: the former 4000000 ceiling was ~100x over; measured floor <= 40000. -/
 theorem interactionsWith_byte_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith byteChannel.toRaw =
       (exposedByteInteractions input offset).map ChannelInteraction.toRaw := by

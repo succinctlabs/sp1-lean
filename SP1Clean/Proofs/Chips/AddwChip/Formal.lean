@@ -1,5 +1,6 @@
 import SP1Clean.Native.Chips.AddwChip.Defs
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
+import SP1Clean.Math.EvalVec
 import Clean.Air.Circuit
 
 /-! # `SP1Clean.AddwChip` — contract: `Assumptions` / soundness / completeness / `circuit`
@@ -18,7 +19,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 `FormalModel/Contracts/ChipAssumptions.lean` (same `SP1Clean.AddwChip` namespace). -/
 
 set_option maxRecDepth 4000 in
-set_option maxHeartbeats 2000000 in
+-- Runs at the plain default: the former 2000000 ceiling was ~50x over; measured floor <= 40000.
 /-- W-instruction soundness (Option B memory flip). Landmines: use `.2.1`/`.2.2.1`/… projections on
 `h_holds` (never `obtain`/`rcases`), keep `Spec` opaque so `RV64.addw` stays out of `circuit_norm`; arith
 goes via `rv64_addw_eq` by hand. `op_b`'s `isU64` is **derived** from the `ALUTypeReader` reader `Spec`'s
@@ -77,13 +78,8 @@ theorem completeness :
   -- subcircuit's completeness obligation (SC Phase 2pre) — discard the trailing reader obligation.
   obtain ⟨-, h_env_val, h_env_msb, -⟩ := h_env
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
-  have mapEq : ∀ (vv : Word (Expression (ZMod p))) (v : Word (ZMod p)),
-      Vector.map (Expression.eval env.toEnvironment) vv = v →
-      (#v[Expression.eval env.toEnvironment vv[0], Expression.eval env.toEnvironment vv[1],
-        Expression.eval env.toEnvironment vv[2], Expression.eval env.toEnvironment vv[3]] : Word (ZMod p)) = v :=
-    fun vv v h => by rw [← h]; apply Vector.ext; intro i hi; simp only [Vector.getElem_map]; interval_cases i <;> rfl
-  have hbeq := mapEq input_var_adapter_op_b_memory_prev_value _ hob
-  have hceq := mapEq input_var_adapter_op_c_memory_prev_value _ hoc
+  have hbeq := (vec4_eval env.toEnvironment input_var_adapter_op_b_memory_prev_value).trans hob
+  have hceq := (vec4_eval env.toEnvironment input_var_adapter_op_c_memory_prev_value).trans hoc
   have hval : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 2 fun i => var { index := i₀ + i }) : Vector (ZMod p) 2)
       = AddwOperation.addwValueWitness input_adapter_op_b_memory_prev_value
@@ -200,21 +196,9 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
              input.adapter.op_a_0, 0, input.adapter.imm_c⟩ ],
     exposedChannels_eq := by
       intro input offset
-      have h_byte : (byteChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
-        intro h
-        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
-        simp only [Channel.toRaw_name, byteChannel, stateChannel] at hn
-        exact (by decide : ("SP1Byte" : String) ≠ "SP1State") hn
-      have h_program : (programChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
-        intro h
-        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
-        simp only [Channel.toRaw_name, programChannel, stateChannel] at hn
-        exact (by decide : ("SP1Program" : String) ≠ "SP1State") hn
-      have h_memory : (memoryChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw := by
-        intro h
-        have hn := congrArg (fun c : RawChannel (ZMod p) => c.name) h
-        simp only [Channel.toRaw_name, memoryChannel, stateChannel] at hn
-        exact (by decide : ("SP1Memory" : String) ≠ "SP1State") hn
+      have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
+      have h_program := Channels.programChannel_toRaw_ne_stateChannel (p := p)
+      have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
       unfold Operations.ExposedChannelsLawful
       intro exposed exposedMem
       simp only [expose, List.mem_append, List.mem_singleton] at exposedMem

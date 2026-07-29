@@ -88,13 +88,9 @@ private lemma one_hot3 {x o a : ZMod p}
     (hx : x = 0 ∨ x = 1) (ho : o = 0 ∨ o = 1) (ha : a = 0 ∨ a = 1)
     (hsum : (x + o + a) * (x + o + a - 1) = 0) :
     (x = 1 → o = 0 ∧ a = 0) ∧ (o = 1 → x = 0 ∧ a = 0) ∧ (a = 1 → x = 0 ∧ o = 0) := by
-  have hp : 2 ^ 17 < p := Fact.out
-  haveI : Fact (1 < p) := ⟨by omega⟩
-  have hne : ∀ k : ℕ, 0 < k → k < p → ((k : ℕ) : ZMod p) ≠ 0 := fun k hk hkp => by
-    rw [Ne, CharP.cast_eq_zero_iff (ZMod p) p]; intro hd
-    exact absurd (Nat.le_of_dvd hk hd) (by omega)
-  have h2 : (2 : ZMod p) ≠ 0 := by simpa using hne 2 (by norm_num) (by omega)
-  have h6 : (6 : ZMod p) ≠ 0 := by simpa using hne 6 (by norm_num) (by omega)
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h2 : (2 : ZMod p) ≠ 0 := by simp [← ZMod.val_eq_zero, val_2_zmod_p]
+  have h6 : (6 : ZMod p) ≠ 0 := by simp [← ZMod.val_eq_zero, val_6_zmod_p]
   rcases hx with rfl | rfl <;> rcases ho with rfl | rfl <;> rcases ha with rfl | rfl <;>
     refine ⟨fun h => ?_, fun h => ?_, fun h => ?_⟩ <;>
     first
@@ -107,11 +103,10 @@ private lemma one_hot3 {x o a : ZMod p}
 the operand-range part of the composed `BitwiseU16Operation.circuit`'s `Assumptions`. -/
 private lemma val_lt_three {x : ZMod p} (h : x = 0 ∨ x = 1 ∨ x = 2) : x.val < 3 := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have hp : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   rcases h with rfl | rfl | rfl
   · simp
   · rw [ZMod.val_one]; omega
-  · rw [show (2 : ZMod p) = ((2 : ℕ) : ZMod p) by norm_cast, ZMod.val_natCast_of_lt hp]; omega
+  · rw [val_2_zmod_p]; omega
 
 /-- On a real row, each of the eight bitwise-result bytes is a genuine byte (< 256) — from the structural
 `BitwiseU16Operation.Spec`'s per-opcode result-byte equality + `byteOp_lt256`, once the one-hot flags
@@ -131,19 +126,15 @@ private lemma resultWord_isU64 {inp : BitwiseU16Operation.Inputs (ZMod p)}
       exact byteOp_lt256 1 _ _ (hbnd i).1 (hbnd i).2
     · rw [show inp.cols.bitwise_operation.result[(i : ℕ)].val = _ from harm2 h i]
       exact byteOp_lt256 2 _ _ (hbnd i).1 (hbnd i).2
-  obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ :
-      inp.cols.bitwise_operation.result[0].val < 256 ∧ inp.cols.bitwise_operation.result[1].val < 256 ∧
-      inp.cols.bitwise_operation.result[2].val < 256 ∧ inp.cols.bitwise_operation.result[3].val < 256 ∧
-      inp.cols.bitwise_operation.result[4].val < 256 ∧ inp.cols.bitwise_operation.result[5].val < 256 ∧
-      inp.cols.bitwise_operation.result[6].val < 256 ∧ inp.cols.bitwise_operation.result[7].val < 256 :=
-    ⟨hr_lt 0, hr_lt 1, hr_lt 2, hr_lt 3, hr_lt 4, hr_lt 5, hr_lt 6, hr_lt 7⟩
+  have b : ∀ (i : ℕ) (hi : i < 8), inp.cols.bitwise_operation.result[i].val < 256 :=
+    fun i hi => hr_lt ⟨i, hi⟩
   refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
     simp only [BitwiseU16Operation.resultWord, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ]
-  · rw [val_lo_add_hi b0 b1]; omega
-  · rw [val_lo_add_hi b2 b3]; omega
-  · rw [val_lo_add_hi b4 b5]; omega
-  · rw [val_lo_add_hi b6 b7]; omega
+  · have h0 := b 0 (by omega); have h1 := b 1 (by omega); rw [val_lo_add_hi h0 h1]; omega
+  · have h0 := b 2 (by omega); have h1 := b 3 (by omega); rw [val_lo_add_hi h0 h1]; omega
+  · have h0 := b 4 (by omega); have h1 := b 5 (by omega); rw [val_lo_add_hi h0 h1]; omega
+  · have h0 := b 6 (by omega); have h1 := b 7 (by omega); rw [val_lo_add_hi h0 h1]; omega
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- Structural `toElements` projection: cell `8 + k` of a `BitwiseU16Operation` column struct (after the
@@ -161,10 +152,9 @@ private lemma toElements_result_byte (s : BitwiseU16Operation.Columns (ZMod p)) 
          ((Vector.getElem_append_left ?_).trans
            ((Vector.getElem_cast ?_).trans (Vector.getElem_append_left ?_)))) <;> decide)
 
-set_option maxHeartbeats 2000000 in
+-- Runs at the plain default: the former 2000000 ceiling was ~50x over; measured floor <= 40000.
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start [Spec]
-  haveI hF1 : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨ha, hb⟩ := h_assumptions
   obtain ⟨h_cpu, h_bw, _h_adapter, _h_regwrite, h_gate, _h_selector_bind,
     h_xor_bin, h_or_bin, h_and_bin, h_sum, _h_opa0⟩ := h_holds
@@ -220,9 +210,11 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
                   circuit_norm] at hisu ⊢
                 exact hisu), h_clk.at_four⟩
 
--- 32M: whole-chip completeness normalizes the flag-hinted witness stream (3 opcode flags + the
--- 8-fold byte-pair `BitwiseU16Operation` lookups) against the composed reader obligations at once.
-set_option maxHeartbeats 32000000 in
+-- Whole-chip completeness normalizes the flag-hinted witness stream (3 opcode flags + the 8-fold
+-- byte-pair `BitwiseU16Operation` lookups) against the composed reader obligations at once.
+-- Measured: the former 32000000 ceiling was ~32x over; floor (700000, 1000000], owned by the
+-- `key : ∀ k : Fin 8` witness-pin block.
+set_option maxHeartbeats 5000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -332,17 +324,15 @@ theorem completeness :
       exact toElements_result_byte _ k
     convert hisu using 2
     simp only [BitwiseU16Operation.resultWord, Inputs.op_b_val, Inputs.op_c_val]
-    set R := (BitwiseU16Operation.populate input_adapter_op_b_memory_prev_value
-        input_adapter_op_c_memory_prev_value
-        (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0)).bitwise_operation.result with hR
-    simp only [show env.get (i₀ + 3 + 4 + 4) = R[0] from key 0,
-               show env.get (i₀ + 3 + 4 + 4 + 1) = R[1] from key 1,
-               show env.get (i₀ + 3 + 4 + 4 + 2) = R[2] from key 2,
-               show env.get (i₀ + 3 + 4 + 4 + 3) = R[3] from key 3,
-               show env.get (i₀ + 3 + 4 + 4 + 4) = R[4] from key 4,
-               show env.get (i₀ + 3 + 4 + 4 + 5) = R[5] from key 5,
-               show env.get (i₀ + 3 + 4 + 4 + 6) = R[6] from key 6,
-               show env.get (i₀ + 3 + 4 + 4 + 7) = R[7] from key 7]
+    simp only [show env.get (i₀ + 3 + 4 + 4) = _ from key 0,
+               show env.get (i₀ + 3 + 4 + 4 + 1) = _ from key 1,
+               show env.get (i₀ + 3 + 4 + 4 + 2) = _ from key 2,
+               show env.get (i₀ + 3 + 4 + 4 + 3) = _ from key 3,
+               show env.get (i₀ + 3 + 4 + 4 + 4) = _ from key 4,
+               show env.get (i₀ + 3 + 4 + 4 + 5) = _ from key 5,
+               show env.get (i₀ + 3 + 4 + 4 + 6) = _ from key 6,
+               show env.get (i₀ + 3 + 4 + 4 + 7) = _ from key 7]
+    rfl
 
 /-- Exact State-channel pair emitted by the composed CPU-state reader. -/
 def exposedStateInteractions (input : Var Inputs (ZMod p)) :
@@ -611,8 +601,8 @@ theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ⟨stateChannel.toRaw, (exposedStateInteractions input).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
 
-set_option maxHeartbeats 4000000 in
-/-- The completed Bitwise circuit emits exactly the sixteen Byte interactions above. -/
+/-- The completed Bitwise circuit emits exactly the sixteen Byte interactions above.
+Runs at the plain default: the former 4000000 ceiling was ~100x over; measured floor <= 40000. -/
 theorem interactionsWith_byte_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith byteChannel.toRaw =
       (exposedByteInteractions input offset).map ChannelInteraction.toRaw := by
