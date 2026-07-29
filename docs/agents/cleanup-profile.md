@@ -763,10 +763,17 @@ Per gated group, stopping at the first failure:
 > regenerate-and-compare a tracked file (e.g. `scripts/axiom_probe.lean`, to prove the census is
 > unmoved) must back it up to the scratchpad and restore with `cp`, not `git checkout --`.
 >
-> **A `Faithful/`- or `Bridge.lean`-only group gates far cheaper than its file count suggests.** The
-> W5/r1 gate changed 30 files and rebuilt only **75 of 3610 jobs** (285s) — these layers have very
-> shallow downstream closures. Budget gate time by *downstream closure*, not by lines touched; the
-> same 30 files at `Math/` depth would have rebuilt ~240 modules.
+> **Budget gate time by downstream closure, not by lines touched or by pillar.** W5/r1 changed 30
+> `Faithful/`+`Bridge.lean` files and rebuilt **75 of 3610 jobs** (285s). W5/r2 changed 9
+> `Proofs/Chips/` files — predicted to be far more expensive because they are "deeper" — and rebuilt
+> **79 jobs** (384s), only 1.35×. Chip `Defs.lean` and `Evidence/` modules sit nearly as close to the
+> leaves as the anchor files: DivRem's `Evidence` family fans out to `Contracts` plus a handful of
+> `Soundness/` modules and stops. **`Proofs/Chips/` depth does not by itself imply a wide closure.**
+> The same 30 files at `Math/` depth would have rebuilt ~240 modules — that is where the cost lives.
+>
+> **A DivRem-touching round pays a fixed ~285s toll no matter what it edits.**
+> `Faithful.DivRemChip.Exact` alone is 7× the heaviest module either W5 round changed and ~74% of
+> r2's wall clock. When scheduling, treat it as a constant, not as attributable to the batch.
 > **Never kill `lean --server` or `lake serve` — but stale `lean --worker` processes from *exited*
 > agents are fair game.** The distinction matters and cost the campaign a session restart before it
 > was understood. The `lean-lsp` MCP server *is* `lean --server`/`lake serve`; killing those takes the
