@@ -317,5 +317,37 @@
 # `private`, none matches a `gen_axiom_probe.py` glob (Evidence/*.lean is not a probe target, and the
 # probe skips `private` regardless), and the probe regenerates byte-identical at 478 entries.
 # All ladders are recorded in the doc-comments at each site.
+# +-0 (2026-07-29, proof-cleanup W5/r3 — the round that CLOSES wave W5): the count is UNCHANGED at
+# 485. Both batches removed ZERO directives and only lowered values, so there is nothing to ratchet
+# — but the DECLARED-BUDGET ratchet was large and is recorded here because the site count alone
+# would read this round as zero-yield. Aggregate over the 4 sites: 204,000,000 -> 2,400,000 (85x).
+# By batch:
+#   * b7 — `Proofs/Chips/DivRemChip/Completeness/OwnComplete.lean`: 0 of 1 removed,
+#     64,000,000 -> 800,000 (80x). Floor bracket (100000, 200000] — under 2x headroom against the
+#     plain default, so this one is GENUINELY BINDING and is correct to keep. The headline is the
+#     controlled re-ladder: the file was golfed -322 lines (-39.4%, 817 -> 495) and the bracket did
+#     NOT move (FAIL 40000 / FAIL 100000 / PASS 200000, identical before and after). That confirms
+#     the cost is the unfolded 121-hole `refine` over `ownAsserts` — the same b6 finding above — and
+#     not the bullet tactics that were removed. Elaboration still improved 9.39s -> 7.26s, so real
+#     but non-binding work was retired.
+#   * b8 — `Proofs/Chips/MulChip/Formal.lean`: 0 of 3 removed, 140,000,000 -> 1,600,000 (87.5x),
+#     -14 lines. Floors: `soundness` (60000, 80000] and `completeness` (60000, 80000], both sized at
+#     400000; `circuit` (150000, 200000] -> 800000. `circuit` FAILS at 150000 against a 200000
+#     default — under 1.5x headroom, so removing it would have broken the build. This is the
+#     campaign's third under-provisioned site.
+# NEW DIAGNOSTIC (b8): classifying sites by the PHASE named in each timeout message separates three
+# ceilings inside ONE file. `soundness`/`completeness` time out at `whnf` (elaboration-bound,
+# foldable); `circuit` times out at «abstract nested proofs» — post-elaboration, and specifically
+# NOT «LCNF compiler». So MulChip/Formal.lean is neither term-intrinsic like
+# `MulOperation/RawSpec.full_product` nor codegen-bound like `Native/Operations/MulOperation/Defs.lean`,
+# and its three ceilings needed three different justifications. Read the phase name before
+# classifying a site.
+# The two added helpers — `DivRemChip.eval_getElem` (b7) and `MulChip.evalWord4_of_cells` (b8) — are
+# the only declarations added this round; both are `private`, neither matches a `gen_axiom_probe.py`
+# glob (the `Proofs/Chips/*/Formal.lean` regex is soundness|completeness|contractSoundness|
+# evidenceSoundness|circuit), and the probe regenerates byte-identical at 478 entries.
+# WAVE W5 TOTALS across its three rounds: -827 lines, 159 directives removed, ceiling trajectory
+# 644 -> 485. (r1 -155 / -147; r2 -336 / -12; r3 -336 / -0.)
+# All ladders are recorded in the doc-comments at each site.
 SP1Clean 485
 SP1CleanTest 16

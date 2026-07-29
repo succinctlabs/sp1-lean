@@ -56,7 +56,25 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
     input.adapter.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
-set_option maxHeartbeats 4000000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- Four consecutive evaluated witness cells assemble the 4-limb word `#v[v0, v1, v2, v3]`. Applied
+symbolically at the six sites in `soundness` that must identify the witnessed register-write word `a`
+with `MulOperation.aSelector` — the flag-weighted product slice — one per RV64 variant plus the
+`RegisterWrite` `isU64` obligation. -/
+private lemma evalWord4_of_cells {env : Environment (ZMod p)} {o : ℕ} {v0 v1 v2 v3 : ZMod p}
+    (h0 : env.get o = v0) (h1 : env.get (o + 1) = v1)
+    (h2 : env.get (o + 2) = v2) (h3 : env.get (o + 3) = v3) :
+    Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := o + i })
+      = #v[v0, v1, v2, v3] := by
+  apply Vector.ext; intro k hk
+  interval_cases k <;>
+    simp only [Vector.getElem_map, Vector.getElem_mapRange, Vector.getElem_mk,
+      List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ] <;>
+    assumption
+
+-- Measured (W5/b8): the former 4M was ~50x over; floor bracket (60k, 80k] after the six
+-- `aSelector` tails were factored through `evalWord4_of_cells` (it was (80k, 100k] before).
+set_option maxHeartbeats 400000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨h_cpu, h_mulop, ha0, ha1, ha2, ha3, gb_mul, gb_mulh, gb_mulhu, gb_mulhsu, gb_mulw,
@@ -65,6 +83,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have ha1_real (hr : input_is_real = 1) := sub_eq_zero.mp (by simpa only [hr, one_mul] using ha1)
   have ha2_real (hr : input_is_real = 1) := sub_eq_zero.mp (by simpa only [hr, one_mul] using ha2)
   have ha3_real (hr : input_is_real = 1) := sub_eq_zero.mp (by simpa only [hr, one_mul] using ha3)
+  -- On a real row the witnessed word `a` (cells `i₀+50..53`) *is* `MulOperation.aSelector` — the
+  -- flag-weighted product slice — spelled as the 4-limb literal. Shared by all six `resultWord` sites.
+  have hA (hr : input_is_real = 1) :=
+    evalWord4_of_cells (ha0_real hr) (ha1_real hr) (ha2_real hr) (ha3_real hr)
   have bmul := bool_of_mul_pred gb_mul
   have bmulh := bool_of_mul_pred gb_mulh
   have bmulhu := bool_of_mul_pred gb_mulhu
@@ -90,6 +112,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- the operation input (including `cols`) is inferred from `h_mulop`/`result_semantic`/the goal.
   have h_spec := h_mulop
     ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩
+  -- The operation's semantic readout, awaiting only `sum = 1`. Its conjuncts, in order:
+  -- `isU64 resultWord`, then the `MUL`, `MULHU`, `MULH`, `MULHSU`, `MULW` BitVec identities.
+  have hsem := MulOperation.result_semantic
+    ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec
   -- RegisterWrite owes `is_real = 1 → isU64 a`; on a real row `sum = 1` (via `h_rs`), so `a = resultWord`
   -- (`aSelector` linkage) is `isU64` from `result_semantic`.
   have h_a_isU64 : input_is_real = 1 →
@@ -97,17 +123,13 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     intro hr
     have hsum1 : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3) + env.get (i₀ + 4) = 1 :=
       h_rs ▸ hr
-    obtain ⟨hisU64, _, _, _, _, _⟩ := MulOperation.result_semantic
-      ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
     rw [show (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 50 + i }))
         = MulOperation.resultWord _ _ from ?_]
-    · exact hisU64
+    · exact (hsem hsum1).1
     · rw [← MulOperation.aSelector_eq_resultWord _ _ bmul bmulh bmulhu bmulhsu bmulw hsum1]
-      apply Vector.ext; intro k hk; interval_cases k <;>
-        simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
-          Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-        first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
+      simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
+        Vector.getElem_mapRange, Nat.reduceLT, dif_pos]
+      exact hA hr
   refine ⟨⟨h_rspec, h_bin, fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩,
       -- F-A4-01: the exported selector one-hot — the five boolean gates + `is_real = Σ flags`.
       fun hr => by simpa only [SelectorOneHot, selectors] using
@@ -117,69 +139,47 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     Or.inr ⟨h_bin, h_a_isU64, h_clk.at_four⟩⟩
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inl h1)
-    have hr : input_is_real = 1 := h_rs.trans hsum1
-    obtain ⟨_hisU64, hmul, _hmulhu, _hmulh, _hmulhsu, _hmulw⟩ :=
-      MulOperation.result_semantic ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
-    rw [rv64_mul_eq, ← hmul h1]; congr 1
+    rw [rv64_mul_eq, ← (hsem hsum1).2.1 h1]; congr 1
     rw [← MulOperation.aSelector_eq_resultWord _ _ bmul bmulh bmulhu bmulhsu bmulw hsum1]
-    apply Vector.ext; intro k hk; interval_cases k <;>
-      simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
-        Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-      first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
+    simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
+      Vector.getElem_mapRange, Nat.reduceLT, dif_pos]
+    exact hA (h_rs.trans hsum1)
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inl h1))
-    have hr : input_is_real = 1 := h_rs.trans hsum1
-    obtain ⟨_hisU64, _hmul, _hmulhu, hmulh, _hmulhsu, _hmulw⟩ :=
-      MulOperation.result_semantic ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
-    rw [rv64_mulh_eq, ← hmulh h1]; congr 1
+    rw [rv64_mulh_eq, ← (hsem hsum1).2.2.2.1 h1]; congr 1
     rw [← MulOperation.aSelector_eq_resultWord _ _ bmul bmulh bmulhu bmulhsu bmulw hsum1]
-    apply Vector.ext; intro k hk; interval_cases k <;>
-      simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
-        Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-      first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
+    simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
+      Vector.getElem_mapRange, Nat.reduceLT, dif_pos]
+    exact hA (h_rs.trans hsum1)
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inl h1)))
-    have hr : input_is_real = 1 := h_rs.trans hsum1
-    obtain ⟨_hisU64, _hmul, hmulhu, _hmulh, _hmulhsu, _hmulw⟩ :=
-      MulOperation.result_semantic ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
-    rw [rv64_mulhu_eq, ← hmulhu h1]; congr 1
+    rw [rv64_mulhu_eq, ← (hsem hsum1).2.2.1 h1]; congr 1
     rw [← MulOperation.aSelector_eq_resultWord _ _ bmul bmulh bmulhu bmulhsu bmulw hsum1]
-    apply Vector.ext; intro k hk; interval_cases k <;>
-      simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
-        Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-      first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
+    simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
+      Vector.getElem_mapRange, Nat.reduceLT, dif_pos]
+    exact hA (h_rs.trans hsum1)
   · intro h1
-    have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inr (Or.inl h1))))
-    have hr : input_is_real = 1 := h_rs.trans hsum1
-    obtain ⟨_hisU64, _hmul, _hmulhu, _hmulh, hmulhsu, _hmulw⟩ :=
-      MulOperation.result_semantic ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
-    rw [rv64_mulhsu_eq, ← hmulhsu h1]; congr 1
+    have hsum1 :=
+      MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inr (Or.inl h1))))
+    rw [rv64_mulhsu_eq, ← (hsem hsum1).2.2.2.2.1 h1]; congr 1
     rw [← MulOperation.aSelector_eq_resultWord _ _ bmul bmulh bmulhu bmulhsu bmulw hsum1]
-    apply Vector.ext; intro k hk; interval_cases k <;>
-      simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
-        Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-      first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
+    simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
+      Vector.getElem_mapRange, Nat.reduceLT, dif_pos]
+    exact hA (h_rs.trans hsum1)
   · intro h1
-    have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inr (Or.inr h1))))
-    have hr : input_is_real = 1 := h_rs.trans hsum1
-    obtain ⟨_hisU64, _hmul, _hmulhu, _hmulh, _hmulhsu, hmulw⟩ :=
-      MulOperation.result_semantic ⟨bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩ h_spec hsum1
-    rw [rv64_mulw_eq, ← hmulw h1]; congr 1
+    have hsum1 :=
+      MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inr (Or.inr h1))))
+    rw [rv64_mulw_eq, ← (hsem hsum1).2.2.2.2.2 h1]; congr 1
     rw [← MulOperation.aSelector_eq_resultWord _ _ bmul bmulh bmulhu bmulhsu bmulw hsum1]
-    apply Vector.ext; intro k hk; interval_cases k <;>
-      simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
-        Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, Nat.reduceLT, dif_pos] <;>
-      first | exact ha0_real hr | exact ha1_real hr | exact ha2_real hr | exact ha3_real hr
+    simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
+      Vector.getElem_mapRange, Nat.reduceLT, dif_pos]
+    exact hA (h_rs.trans hsum1)
 
--- 128M: whole-chip completeness must normalize the 54-cell witness stream (5 flags + the 45-cell
+-- Whole-chip completeness must normalize the 54-cell witness stream (5 flags + the 45-cell
 -- `MulOperation` populate + the 4-cell result) against every composed reader/operation obligation
--- in one `circuit_proof_start` pass — the largest single witness closure in the tree.
-set_option maxHeartbeats 128000000 in
+-- in one `circuit_proof_start` pass — the largest single witness closure in the tree, so the
+-- ceiling is genuine. Measured (W5/b8): the former 128M was ~1600x over; floor bracket (60k, 80k].
+set_option maxHeartbeats 400000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -264,11 +264,7 @@ theorem completeness :
       (env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3) + env.get (i₀ + 4))
       hf0' hf1' hf2' hf3' hf4' hsum01' using 2
     rfl
-    refine (ProvableType.ext_iff (α := Extracted.MulOperation) _ _).mpr (fun i hi => ?_)
-    refine Eq.trans ?_
-      ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 5) i hi).trans
-        (h_env_cols' i hi))
-    simp only [circuit_norm]; rfl
+    simpa only [circuit_norm] using hcols_eq
   · -- RegisterWrite's `isU64 value` (the op_a write push): on a real row the witnessed `a` equals the
     -- selected product slice `resultWord (populate …)`, whose `isU64` is `spec_populate`'s
     -- `result_semantic`.
@@ -300,11 +296,9 @@ theorem completeness :
           = env.get (i₀ + 5 + 16 + 16 + 4 + 4 + 1 + 1) := by
         rw [← hcols_eq]; simp only [circuit_norm]
       rw [← MulOperation.aSelector_eq_resultWord _ _ hf0' hf1' hf2' hf3' hf4' hsum1]
-      apply Vector.ext; intro k hk; interval_cases k <;>
-        simp only [MulOperation.aSelector, MulOperation.productVal, Vector.getElem_map,
-          Vector.getElem_mapRange, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, Nat.reduceLT, dif_pos, hprod, hpmsb] <;>
-        first | exact h_env_a 0 | exact h_env_a 1 | exact h_env_a 2 | exact h_env_a 3
+      simp only [MulOperation.aSelector, MulOperation.productVal, Nat.reduceLT, dif_pos,
+        hprod, hpmsb]
+      exact evalWord4_of_cells (h_env_a 0) (h_env_a 1) (h_env_a 2) (h_env_a 3)
 
 /-- Exact State-channel pair emitted by the composed CPU-state reader. -/
 def exposedStateInteractions (input : Var Inputs (ZMod p)) :
@@ -379,7 +373,9 @@ def exposedProgramInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
        #v[input.adapter.op_c, 0, 0, 0],
        input.adapter.op_a_0, 0, 0⟩ ]
 
-set_option maxHeartbeats 8000000 in
+-- The tightest site in this file: measured (W5/b8) floor bracket (150k, 200k] — under 1.5x
+-- headroom against the plain default — so the former 8M was only ~40x over, not removable.
+set_option maxHeartbeats 800000 in
 /-- The `Mul` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `mul`/`mulh`/`mulhu`/`mulhsu`/`mulw`
 semantic contract; output is the native `Columns` row. Soundness is proved; completeness is
 the explicitly disclosed 4.31 migration seam above. -/
@@ -410,33 +406,11 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       simp only [expose, exposedStateInteractions, exposedProgramInteractions,
         List.mem_append, List.mem_singleton] at exposedMem
       rcases exposedMem with (rfl | rfl) | rfl
-      · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
-          Readers.RTypeReader.circuit, Readers.RTypeReader.main,
-          Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
-          Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-          Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-          SP1Clean.MulOperation.circuit, SP1Clean.MulOperation.main,
-          SP1Clean.U16toU8OperationSafe.circuit, SP1Clean.U16toU8OperationSafe.main,
-          SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-          circuit_norm, FormalAssertion.toSubcircuit_interactions,
-          GeneralFormalCircuit.toSubcircuit_interactions]
-        simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
-          h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
-          if_true, List.nil_append]
-      · simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
-          Readers.RTypeReader.circuit, Readers.RTypeReader.main,
-          Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
-          Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-          Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
-          SP1Clean.MulOperation.circuit, SP1Clean.MulOperation.main,
-          SP1Clean.U16toU8OperationSafe.circuit, SP1Clean.U16toU8OperationSafe.main,
-          SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-          circuit_norm, FormalAssertion.toSubcircuit_interactions,
-          GeneralFormalCircuit.toSubcircuit_interactions]
-        simp [circuit_norm, Gadgets.Equality.main, exposedMemoryInteractions]
-      · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
-        -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
-        simp only [main, Circuit.operations, Circuit.bind_def,
+      -- Program branch first: compositional — the reader subcircuit keeps its fetch via the
+      -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel. The
+      -- State and Memory branches then share one descent through the composed children.
+      rotate_left 2
+      · simp only [main, Circuit.operations, Circuit.bind_def,
           Circuit.pure_def, witnessVectorNative, witnessNative, subcircuitWithAssertion,
           assertion, assertZero, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
@@ -454,7 +428,22 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
           not_false_eq_true, Operations.interactionsWith_assert,
           Operations.interactionsWith_nil, List.map_cons, List.map_nil, List.nil_append,
           Soundness.rTypeProgramMessage, exposedOpcode]
-        simp only [circuit_norm, List.nil_append] }
+        simp only [circuit_norm, List.nil_append]
+      all_goals
+        simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+          Readers.RTypeReader.circuit, Readers.RTypeReader.main,
+          Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
+          Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+          Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+          SP1Clean.MulOperation.circuit, SP1Clean.MulOperation.main,
+          SP1Clean.U16toU8OperationSafe.circuit, SP1Clean.U16toU8OperationSafe.main,
+          SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
+          circuit_norm, FormalAssertion.toSubcircuit_interactions,
+          GeneralFormalCircuit.toSubcircuit_interactions]
+      · simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+          h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+          if_true, List.nil_append]
+      · simp [circuit_norm, Gadgets.Equality.main, exposedMemoryInteractions] }
 
 /-- Folded circuit projections used by the whole-chip row codec. -/
 @[circuit_norm] theorem circuit_main_eq : (circuit (p := p)).main = main := rfl
@@ -469,26 +458,23 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
 /-- The completed Mul circuit exposes exactly the Memory interaction list above. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith memoryChannel.toRaw =
-      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
-    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
-    (by simp [circuit, expose])
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩ (by simp [circuit, expose])
 
 /-- The completed Mul circuit exposes exactly its State interaction pair. -/
 theorem interactionsWith_state_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith stateChannel.toRaw =
-      (exposedStateInteractions input).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
-    ⟨stateChannel.toRaw, (exposedStateInteractions input).map ChannelInteraction.toRaw⟩
-    (by simp [circuit, expose])
+      (exposedStateInteractions input).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨stateChannel.toRaw, (exposedStateInteractions input).map ChannelInteraction.toRaw⟩ (by simp [circuit, expose])
 
 /-- The completed Mul circuit exposes exactly its Program fetch. -/
 theorem interactionsWith_program_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith programChannel.toRaw =
-      (exposedProgramInteractions input offset).map ChannelInteraction.toRaw := by
-  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
-    ⟨programChannel.toRaw, (exposedProgramInteractions input offset).map
-      ChannelInteraction.toRaw⟩
+      (exposedProgramInteractions input offset).map ChannelInteraction.toRaw :=
+  circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨programChannel.toRaw, (exposedProgramInteractions input offset).map ChannelInteraction.toRaw⟩
     (by simp [circuit, expose])
 
 end SP1Clean.MulChip
