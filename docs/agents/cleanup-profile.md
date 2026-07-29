@@ -335,6 +335,12 @@ Per site:
 > reports a clean result for a site it never actually tested. Check placement before trusting a
 > measurement round.
 >
+> **Keep a recorded ladder to one line.** A removed ceiling should leave evidence of why removal was
+> safe — but "the former 4000000 ceiling was ~100× over; measured floor ≤40000" is the whole content.
+> Multi-line ladder transcripts belong in the campaign's perf log, not in the source. Several files
+> have grown +3 to +5 lines this way, and across ~200 remaining sites that compounds into a net
+> positive diff for a campaign whose point is reduction.
+>
 > **Never write the literal string `set_option maxHeartbeats` inside a comment or docstring.**
 > `scripts/check_heartbeats.sh` counts sites with a raw `grep -rc "set_option maxHeartbeats"` — it
 > does not parse Lean, so a comment mentioning the option scores as a live ceiling and silently
