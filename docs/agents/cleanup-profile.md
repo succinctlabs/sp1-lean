@@ -405,6 +405,15 @@ Per site:
 > Removal is unaffected: a site that clears ≤40000 against a 200000 default has ≥5× headroom either
 > way.
 >
+> **The heartbeat counter is cumulative from the declaration's start, so a ceiling only has
+> declaration granularity.** Writing `set_option maxHeartbeats 4000000 in` in *tactic* position does
+> **not** isolate that tactic: the wrapped line still fails with `(deterministic) timeout at isDefEq,
+> maximum number of heartbeats (40000) has been reached` — the enclosing declaration's budget is what
+> binds. So "pin the one expensive tactic high and ladder the rest" is not a usable measurement
+> strategy. To attribute cost *within* a declaration, substitute `sorry` for the other branches
+> instead. Caveat: a `sorry` left on disk can trip the harness's own guards mid-measurement, so
+> restore it before any other tool call.
+>
 > **Prefix scratchpad helper scripts with your batch id.** The scratchpad is shared across concurrent
 > workers. A W5 worker's `rung.py` was silently overwritten mid-batch by a sibling's same-named
 > script using a different sentinel convention, so its delete pass wrote `maxHeartbeats 0` — a
