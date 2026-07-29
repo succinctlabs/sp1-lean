@@ -506,7 +506,15 @@ wider than it first appears (`ChipOracle`'s eleven ran ≤500 to 30000, a 60× s
 > positions stayed fixed. Trust a signature position for attribution; treat a secondary in-body
 > position as a hint only, and re-run before concluding which declaration owns a budget.
 
-- **Where a site fails tells you its floor class.** Sites failing at their **signature** are the
+- **Where a site fails is an ATTRIBUTION tool, not a floor predictor.** It has now been wrong twice in
+  the same direction, so treat it narrowly: a failure position tells you *which declaration or tactic
+  owns the budget*, and nothing reliable about *how large* that budget is.
+  `Faithful/LtOperationUnsigned.ltUnsigned_constraints_faithful` failed at an in-body tactic position
+  (`itauto`) and floors at **~60000** — the highest floor measured anywhere in `Faithful/`, against a
+  heuristic that predicted hundreds-to-low-thousands. Always ladder; never infer a magnitude from a
+  position.
+
+  The original over-claim, kept for context: *sites failing at their **signature** are the
   high-floor ones; sites failing inside a **tactic line** floor in the hundreds-to-low-thousands and
   mask nothing. In `ChipOracle` this sorted all eleven correctly.
 - **The sibling screen is a reliable *ranker*, not a keep/remove oracle.** It ordered all eleven
