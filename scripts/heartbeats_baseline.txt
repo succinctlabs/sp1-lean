@@ -448,5 +448,32 @@
 #     b7 also DECLINED four `by exact` drops on opacity grounds (all in ShiftRightChip/Formal.lean), one
 #     of whose docstrings states it is "kept as its own opaque declaration to avoid a kernel proof-size
 #     cliff" — the correct call given the measured 260s -> >1230s regression recorded above.
-SP1Clean 370
+# -43 (2026-07-29, proof-cleanup W7): ratchet DOWN, no ceiling raised. 370 -> 327.
+#   * b1 — the Typed* grounding family (Soundness/Typed{Selectors,MemorySelectors,State,Program,Time,
+#     Memory,TimeContracts}.lean + RowSoundness.lean): 32 of 33 removed, declared budget
+#     86,000,000 -> 800,000 (107.5x), -379 lines. Eleven `local macro` tactic abbreviations replace the
+#     repeated selector/exposure/gating blocks. The sole survivor,
+#     RowSoundness.supportedChip_usesSupportedBusChannels, floored (200k, 400k] against a declared 2M;
+#     squeezing the bare `simp` inside its busRegistryCase macro to `simp only` moved the floor to
+#     (100k, 200k] and the file 8.28s -> 5.84s. Kept at 800000 = 4x the new bracket.
+#   * b2 — the Proofs/Chips/*/Contracts.lean family (16 files): 11 of 12 removed, declared budget
+#     27,000,000 -> 400,000 (67.5x), -83 lines. The survivor (MulChip) floors (40k, 100k] -> 400000.
+#   * b3 — the capstone audit surface (Soundness/{Decode,LocalExecution,ProviderBindings,SP1Ensemble,
+#     WitnessDecode}.lean + Model/Semantics/Decode.lean): 0 ceilings in its 11 audited files; -4 lines,
+#     5 files changed, 6 deliberately untouched.
+#   THE REFINED PREDICTOR HELD IN Soundness/ — its first measurement outside Faithful/ and the chip
+#   proofs, with no layer-specific correction. All 32 b1 removals are targeted `simp only`/`rw` bridges
+#   clearing <=40000, INCLUDING AddwChip.aluReaderConstraints, which explicitly names AddwChip.main in a
+#   14-lemma `simp only`. The single survivor is exactly the site running a bare `simp` over two
+#   unfolded circuit records inside a 25-way case split. Contact with an unfolded value is not the cost;
+#   reaching unification is.
+#   b2 USED THE PREDICTOR PROSPECTIVELY — it classified all 12 of its sites correctly before measuring,
+#   and its survivor is separated from two visually identical siblings (LtChip/BitwiseChip run the same
+#   controlExpressions_subset_constraints and clear 40000) purely by narrowing order.
+#   A uniform per-file ceiling count is usually a copied default — now confirmed a FOURTH time (11 of 12).
+#   NEW LANDMINE: `local macro` bodies resolve identifiers at the macro's DEFINITION site. b1's first
+#   placement preceded the constant it cited and all 25 call sites failed with "Unknown identifier
+#   `circuitMemorySelectorGated_of_main<hyg>`" — hygiene, not a typo. Place a macro AFTER the constants
+#   it references.
+SP1Clean 327
 SP1CleanTest 16
