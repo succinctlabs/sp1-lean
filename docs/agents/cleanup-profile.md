@@ -397,11 +397,18 @@ position (the shared `variable` line). That turns ownership separation from a se
 pass. Measured: `Faithful/ChipOracle.lean` settled **11 sites in 6 passes (0.55 passes/site)** against
 ~3.5 passes/site for the serial method.
 
-**The two-pass file protocol** — settles most files in two round-trips:
-1. **Pass A:** delete *every* ceiling in the file, elaborate. Whatever survives is done.
-2. **Pass B:** set all survivors to `40000`, elaborate. Whatever passes has ≥5× headroom at the plain
-   200k default and can be removed too.
-3. Only what fails B needs a staggered ladder.
+**The file protocol** — usually *one* round-trip after the control:
+
+Set **every** ceiling in the file to a distinct rung, all of them **≤ 40000**, and elaborate once.
+Everything that passes is removable: a site passing at ≤40000 *implies* it passes at the plain 200k
+default with ≥5× headroom, so there is nothing left to check. Only the sites that fail need a
+staggered follow-up, and those can again be batched by distinct rung.
+
+> Earlier guidance here described a two-pass form — delete-all, then 40000-all. **Pass A is redundant
+> whenever pass B passes in full**, since the ≤40000 result already subsumes it. Keep the delete-all
+> pass only as an optional cheap first shot on a file you expect to clear entirely. Measured:
+> `RTypeReader` used the full two-pass form (5 passes); five sibling files used the collapsed form and
+> took 2–3 each, settling 14 sites in 17 elaborations including controls.
 
 Gate pass B on **40000, not the plain default** — the floor distribution inside a single namespace is
 wider than it first appears (`ChipOracle`'s eleven ran ≤500 to 30000, a 60× spread).
