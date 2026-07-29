@@ -61,6 +61,11 @@ See [`agents/README.md`](agents/README.md) for the full index:
   platform-configuration delta and how to retire it.
 - [`agents/extraction.md`](agents/extraction.md) — Rust extraction and generated-artifact contract.
 - [`agents/mul-operation-learnings.md`](agents/mul-operation-learnings.md) — multiplication-specific proofs.
+- [`agents/cleanup-profile.md`](agents/cleanup-profile.md) — binding house rules for `/cleanup` and `/cleanup-all`.
+- [`agents/perf-findings.md`](agents/perf-findings.md) — the measured elaboration-budget record from the 2026-07
+  ceiling campaign (853 → 317 sites), including the table of surviving ceilings with their measured floors.
+- [`agents/cleanup-deferred.md`](agents/cleanup-deferred.md) — the owner-decision queue distilled from that
+  campaign: duplication deliberately not fixed, grouped by blocker, plus the queued-never-applied renames.
 
 Point-in-time generated records live in [`snapshots/`](snapshots/), notably the axiom census and compile
 profile. They should be regenerated before a release rather than treated as evergreen prose.

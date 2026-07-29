@@ -22,6 +22,9 @@ reader-facing docs one level up (start with [`../architecture.md`](../architectu
 - [sail-fork-delta.md](sail-fork-delta.md) — the exact three-line `sail-riscv-lean` platform-configuration
   delta (CLINT/signature/PMP off), its `rfl` disclosure lemmas, and the path to retiring the fork.
 - [extraction.md](extraction.md) — the constraint-extraction pipeline (`sp1-constraint-compiler` → `update_extracted.py` → Lean) and the DSL contract.
+- [cleanup-profile.md](cleanup-profile.md) — binding house rules for `/cleanup` and `/cleanup-all`; overrides the `mathlib-quality` plugin wherever they conflict.
+- [perf-findings.md](perf-findings.md) — the measured elaboration-budget record: the ceiling protocol, the folded-vs-unfolded predictor, the cause classes, and **the table of surviving ceilings with their measured floors** (incl. the five under-provisioned sites).
+- [cleanup-deferred.md](cleanup-deferred.md) — the owner-decision queue: duplication found and deliberately not fixed, grouped by blocker, with measured sizes; plus the 40-entry rename queue (never applied).
 Point-in-time snapshots (regenerate before release) live under [`../snapshots/`](../snapshots/):
 - [../snapshots/axiom-ledger.md](../snapshots/axiom-ledger.md) — the machine-checked `#print axioms` inventory per theorem.
 - [../snapshots/compile-profile.md](../snapshots/compile-profile.md) — per-module elaboration profile + worst offenders + common threads.

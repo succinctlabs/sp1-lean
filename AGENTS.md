@@ -426,6 +426,15 @@ after installing or toggling.
   corrupt the audit surface (it deletes every `maxHeartbeats`, unsqueezes `simp only`, splits `∧` statements,
   privatises single-file decls, rewrites `≥`→`≤`, and deletes "wrapper" lemmas). Read this file first; it
   overrides the plugin where they conflict.
+- `docs/agents/perf-findings.md` — the **measured** elaboration-budget record from the 2026-07 ceiling
+  campaign (heartbeat sites 853 → 317; hand-written 638 → 102): the ladder protocol, the folded-vs-unfolded
+  predictor, the cause classes with worked fixes, the measurement traps — and the table of **surviving
+  ceilings with their measured floors**, including the five under-provisioned sites. Read it before touching
+  any ceiling.
+- `docs/agents/cleanup-deferred.md` — the owner-decision queue from that campaign: every duplication found
+  and deliberately not fixed, grouped by blocker (shallow-file hoist · statement change · deletion ·
+  `Faithful/**` conservative-only · cross-module round), with measured sizes; the "deliberately NOT taken"
+  decisions; and the 40-entry rename queue, which is **queued, never applied**.
 - `docs/agents/porting-recipe.md` — step-by-step checklist to port a new chip from the Add/Bitwise template.
 - `docs/agents/extraction.md` — the constraint-extraction pipeline (compiler → Python → Lean DSL).
 - `docs/agents/mul-operation-learnings.md` — Mul-specific soundness/completeness pitfalls.
