@@ -390,6 +390,21 @@ Per site:
 > meaning family. The ALU role brackets above are an ALU fact, not a `Faithful/` fact. **Ask the fold
 > question first; use role only to break ties within one family.**
 >
+> **REFINED at n=44 — the fold question is NECESSARY BUT NOT SUFFICIENT.** In
+> `Faithful/DivRemChip/Exact.lean` *all 44* declarations mention an unfolded
+> `.operations`/`.asserts`/`.interactions` list, so read literally the predictor called ~44 binding
+> against an actual 5. What binds is not *touching* the unfolded list — it is **letting the list
+> reach a `congr` / `isDefEq` / unification step**. Sites that rewrite it with targeted `simp only`
+> over `rfl`-projection lemmas, never unifying against it, clear ≤40000 with the list right there in
+> the goal. Known survivor shapes: a long bare `congr 1` chain over a many-way `List.append`; a
+> whole-`main` `.operations` list carried through a `change`/`Forall` decomposition; `let ops :=
+> (…).operations` followed by bare (non-`only`) `simp`. **Screen on the unification step.**
+>
+> A cheap tell for locating it: **when the timeout's reported position walks along a tactic chain as
+> you raise the budget, that chain is the cost.** That is how the 20× bare `congr 1` chain in
+> `divRemRustAssertionsDecompose` was found — the position moved from `:1234` to `:1242` between the
+> 400k and 8M rungs.
+>
 > **The unifying cause, and it is Clean's own doctrine: does the proof ever hold an unfolded
 > generated Rust list in a goal?** That single question explains every result above. Jal/Jalr/UType
 > use the folded `native*Meaning`/`rust*Meaning` template — every heavy step hides behind a
