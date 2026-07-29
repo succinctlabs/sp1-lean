@@ -315,7 +315,6 @@ folded while structural consumers select the early reader boundary. -/
     (⟨6, higher_limb[3], 16 - bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
   return cols
 
-set_option maxHeartbeats 4000000 in
 /-- Compose the threaded `CPUState`/`ALUTypeReader` reader blocks and the **three** `U16MSBOperation`
 gadgets (`b_msb` on `op_b` limb 3 gated `is_sra` and limb 1 gated `is_sraw`; `srw_msb` on `a[1]` gated
 `is_srlw + is_sraw`), witness the shift column block, gate `is_real`, emit the ~58 inline shift
@@ -403,9 +402,7 @@ private theorem aluReader_mem_postWitness (input : Var Inputs (ZMod p))
       (postWitnessReaderInput input witnesses)⟩ ∈
         ((postWitness input witnesses).operations offset).subcircuits := by
   unfold postWitness
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
+  iterate 3 apply subcircuitMem_bind_right
   apply subcircuitMem_bind_left
   simp only [subcircuitWithAssertion, Circuit.operations,
     Operations.subcircuits_subcircuit, Operations.subcircuits_nil, List.mem_singleton,
@@ -457,7 +454,6 @@ private theorem constraints_generalFormalCircuit
     GeneralFormalCircuit.WithHint.toSubcircuit]
   rw [Operations.toNested_toFlat, Operations.constraints_toFlat]
 
-set_option maxHeartbeats 8000000 in
 private theorem postWitness_constraints_decompose
     (env : Environment (ZMod p)) (input : Var Inputs (ZMod p))
     (witnesses : WitnessVars (ZMod p)) (offset : ℕ) :
@@ -932,7 +928,6 @@ private def shiftRangeByteInteractionsRaw
     (byteChannel.pulledIf gate
       ⟨6, witnesses.higher_limb[3], 16 - bitShift, 0⟩).toRaw ]
 
-set_option maxHeartbeats 2000000 in
 private theorem postWitness_byteInteractions_eq
     (input : Var Inputs (ZMod p)) (witnesses : WitnessVars (ZMod p))
     (offset : ℕ) :
@@ -1126,7 +1121,6 @@ theorem interactionsWith_main_program_eq (input : Var Inputs (ZMod p)) (offset :
       (by change programChannel.toRaw ∉ []; exact List.not_mem_nil)
   rw [cpuNil, List.nil_append]
 
-set_option maxHeartbeats 1000000 in
 /-- The composed ALU reader occurs at the exact post-witness offset in the whole chip. -/
 theorem aluReader_mem_subcircuits (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ⟨offset + 37, Readers.ALUTypeReader.circuit.toSubcircuit (offset + 37)
@@ -1145,12 +1139,7 @@ private theorem selectorLink_mem_postWitness
           witnesses.flags[2] + witnesses.flags[3]) ∈
       ((postWitness input witnesses).operations offset).constraints := by
   unfold postWitness
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
+  iterate 6 apply constraintMem_bind_right
   apply constraintMem_bind_left
   simp only [assertZero, Circuit.operations, Operations.constraints_assert,
     Operations.constraints_nil, List.mem_singleton]
@@ -1160,13 +1149,7 @@ private theorem srlBool_mem_postWitness
     witnesses.flags[0] * (witnesses.flags[0] - 1) - 0 ∈
       ((postWitness input witnesses).operations offset).constraints := by
   unfold postWitness
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
+  iterate 7 apply constraintMem_bind_right
   apply constraintMem_bind_left
   exact equalityAssertionConstraint_mem
     (witnesses.flags[0] * (witnesses.flags[0] - 1))
@@ -1177,14 +1160,7 @@ private theorem sraBool_mem_postWitness
     witnesses.flags[1] * (witnesses.flags[1] - 1) - 0 ∈
       ((postWitness input witnesses).operations offset).constraints := by
   unfold postWitness
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
+  iterate 8 apply constraintMem_bind_right
   apply constraintMem_bind_left
   exact equalityAssertionConstraint_mem
     (witnesses.flags[1] * (witnesses.flags[1] - 1))
@@ -1195,15 +1171,7 @@ private theorem srlwBool_mem_postWitness
     witnesses.flags[2] * (witnesses.flags[2] - 1) - 0 ∈
       ((postWitness input witnesses).operations offset).constraints := by
   unfold postWitness
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
+  iterate 9 apply constraintMem_bind_right
   apply constraintMem_bind_left
   exact equalityAssertionConstraint_mem
     (witnesses.flags[2] * (witnesses.flags[2] - 1))
@@ -1214,16 +1182,7 @@ private theorem srawBool_mem_postWitness
     witnesses.flags[3] * (witnesses.flags[3] - 1) - 0 ∈
       ((postWitness input witnesses).operations offset).constraints := by
   unfold postWitness
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
+  iterate 10 apply constraintMem_bind_right
   apply constraintMem_bind_left
   exact equalityAssertionConstraint_mem
     (witnesses.flags[3] * (witnesses.flags[3] - 1))
@@ -1235,17 +1194,8 @@ private theorem core_mem_postWitness
       ((postWitness input witnesses).output offset)⟩ ∈
       ((postWitness input witnesses).operations offset).subcircuits := by
   unfold postWitness
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right_zero (hlen := equalityAssertionLocalLength_eq _ _ _)
-  apply subcircuitMem_bind_right_zero (hlen := equalityAssertionLocalLength_eq _ _ _)
-  apply subcircuitMem_bind_right_zero (hlen := equalityAssertionLocalLength_eq _ _ _)
-  apply subcircuitMem_bind_right_zero (hlen := equalityAssertionLocalLength_eq _ _ _)
+  iterate 7 apply subcircuitMem_bind_right
+  iterate 4 apply subcircuitMem_bind_right_zero (hlen := equalityAssertionLocalLength_eq _ _ _)
   apply subcircuitMem_bind_right_zero (hlen := by rfl)
   apply subcircuitMem_bind_left
   simp only [assertion, Circuit.operations, Operations.subcircuits_subcircuit,
@@ -1294,7 +1244,6 @@ private theorem constraints_main_bind_decompose
   rw [witnessConstraints, List.nil_append,
     witnessPrefixLocalLength_eq]
 
-set_option maxHeartbeats 8000000 in
 /-- Exact folded decomposition of every native ShiftRight assertion. The 37-cell witness generator
 stays opaque while the canonical readers, three MSB checks, selector gates, and folded 53-assert
 arithmetic tail remain visible as complete blocks. -/
@@ -1465,7 +1414,6 @@ theorem core_mem_subcircuits (input : Var Inputs (ZMod p)) (offset : ℕ) :
     coreInput, Nat.add_zero] using
     core_mem_postWitness input ((witnessPrefix input).output offset) (offset + 37)
 
-set_option maxHeartbeats 4000000 in
 @[implicit_reducible] private def derivedElaborated :
     ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit_with {
@@ -1786,7 +1734,7 @@ discharge their `RegisterWrite` requirement via `(isU64_sound …).1` without re
 def IsU64Spec (_ : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 1 → Word.isU64 cols.a
 
-set_option maxHeartbeats 16000000 in
+set_option maxHeartbeats 400000 in
 /-- **Result range-check (callable lemma).** On a variant-active row
 (`is_srl + is_sra + is_srlw + is_sraw = 1`, SP1's `is_real`) the committed result word `cols.a` is `U64`
 — the obligation the op_a write `RegisterWrite` push owes (W11 Option B memory flip). Packaged as a plain

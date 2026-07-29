@@ -274,7 +274,6 @@ while structural consumers select the early reader boundary. -/
     (⟨6, higher_limb[3], bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
   return cols
 
-set_option maxHeartbeats 4000000 in
 /-- Compose the threaded `CPUState`/`ALUTypeReader` reader blocks and the `U16MSBOperation` (`sllw_msb`)
 gadget as Clean sub-assertions, **witness** the shift column block honestly (the result `a`, the
 `c_bits`, the `v_*` powers, the `shift_u16` selector, the `lower/higher_limb`/`limb_result` words, the
@@ -417,7 +416,6 @@ private theorem constraints_generalFormalCircuit
     GeneralFormalCircuit.WithHint.toSubcircuit]
   rw [Operations.toNested_toFlat, Operations.constraints_toFlat]
 
-set_option maxHeartbeats 8000000 in
 private theorem postWitness_constraints_decompose
     (env : Environment (ZMod p)) (input : Var Inputs (ZMod p))
     (witnesses : WitnessVars (ZMod p)) (offset : ℕ) :
@@ -840,7 +838,6 @@ private def shiftRangeByteInteractionsRaw
     (byteChannel.pulledIf gate
       ⟨6, witnesses.higher_limb[3], bitShift, 0⟩).toRaw ]
 
-set_option maxHeartbeats 2000000 in
 private theorem postWitness_byteInteractions_eq
     (input : Var Inputs (ZMod p)) (witnesses : WitnessVars (ZMod p))
     (offset : ℕ) :
@@ -1028,7 +1025,6 @@ theorem interactionsWith_main_program_eq (input : Var Inputs (ZMod p)) (offset :
       (by change programChannel.toRaw ∉ []; exact List.not_mem_nil)
   rw [cpuNil, List.nil_append]
 
-set_option maxHeartbeats 1000000 in
 /-- The composed ALU reader occurs at the exact post-witness offset in the whole chip. -/
 theorem aluReader_mem_subcircuits (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ⟨offset + 33, Readers.ALUTypeReader.circuit.toSubcircuit (offset + 33)
@@ -1046,10 +1042,7 @@ private theorem selectorLink_mem_postWitness
         (witnesses.flags[0] + witnesses.flags[1]) ∈
       ((postWitness input witnesses).operations offset).constraints := by
   unfold postWitness
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
+  iterate 4 apply constraintMem_bind_right
   apply constraintMem_bind_left
   simp only [assertZero, Circuit.operations, Operations.constraints_assert,
     Operations.constraints_nil, List.mem_singleton]
@@ -1059,12 +1052,7 @@ private theorem sllBool_mem_postWitness
     witnesses.flags[0] * (witnesses.flags[0] - 1) - 0 ∈
       ((postWitness input witnesses).operations offset).constraints := by
   unfold postWitness
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
+  iterate 6 apply constraintMem_bind_right
   apply constraintMem_bind_left
   exact equalityAssertionConstraint_mem
     (witnesses.flags[0] * (witnesses.flags[0] - 1))
@@ -1075,13 +1063,7 @@ private theorem sllwBool_mem_postWitness
     witnesses.flags[1] * (witnesses.flags[1] - 1) - 0 ∈
       ((postWitness input witnesses).operations offset).constraints := by
   unfold postWitness
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
-  apply constraintMem_bind_right
+  iterate 7 apply constraintMem_bind_right
   apply constraintMem_bind_left
   exact equalityAssertionConstraint_mem
     (witnesses.flags[1] * (witnesses.flags[1] - 1))
@@ -1093,12 +1075,7 @@ private theorem core_mem_postWitness
       ((postWitness input witnesses).output offset)⟩ ∈
       ((postWitness input witnesses).operations offset).subcircuits := by
   unfold postWitness
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
-  apply subcircuitMem_bind_right
+  iterate 6 apply subcircuitMem_bind_right
   apply subcircuitMem_bind_right_zero (hlen := equalityAssertionLocalLength_eq _ _ _)
   apply subcircuitMem_bind_right_zero (hlen := equalityAssertionLocalLength_eq _ _ _)
   apply subcircuitMem_bind_left
@@ -1146,7 +1123,6 @@ private theorem constraints_main_bind_decompose
   rw [witnessConstraints, List.nil_append,
     witnessPrefixLocalLength_eq]
 
-set_option maxHeartbeats 8000000 in
 /-- Exact folded decomposition of every native ShiftLeft assertion.  This is the structural
 normalization boundary used by the whole-chip Rust faithfulness proof: the expensive 33-cell
 witness generator stays opaque, while the genuine Clean subcircuits and the five parent selector
@@ -1261,7 +1237,6 @@ theorem core_mem_subcircuits (input : Var Inputs (ZMod p)) (offset : ℕ) :
     coreInput, Nat.add_zero] using
     core_mem_postWitness input ((witnessPrefix input).output offset) (offset + 33)
 
-set_option maxHeartbeats 4000000 in
 @[implicit_reducible] private def derivedElaborated :
     ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit_with {

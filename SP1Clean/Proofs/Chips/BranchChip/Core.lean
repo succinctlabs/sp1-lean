@@ -16,7 +16,7 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 8000000 in
+set_option maxHeartbeats 400000 in
 theorem soundness :
     GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_early_struct
@@ -129,8 +129,8 @@ theorem soundness :
     have h1 := h_byte2 (by rw [hr1])
     have h2 := h_byte3 (by rw [hr1])
     simp only [byteChannel] at h0 h1 h2
-    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
-    have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := Nat.cast_ofNat
+    have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat
     rw [← c14] at h0
     rw [← c16] at h1 h2
     have r0 := (byteRowSpec_range _ SP1Clean.BranchChip.h14p).mp h0
@@ -233,7 +233,7 @@ theorem soundness :
         linear_combination h_isbr)
   · intro hr1
     change input_is_real = 1 at hr1
-    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := Nat.cast_ofNat
     have hguar := h_byte1 (by rw [hr1])
     simp only [byteChannel] at hguar
     rw [← c14] at hguar
@@ -298,21 +298,15 @@ theorem completeness :
         input_state_pc := by
     rw [← CircuitType.eval_var_fields]
     exact h_input.2.1.2.2.2
-  have ep0 :
-      Expression.eval env.toEnvironment input_var_state_pc[0] =
-        input_state_pc[0] := by
+  have ep : ∀ i (hi : i < 3),
+      Expression.eval env.toEnvironment input_var_state_pc[i] =
+        input_state_pc[i] := by
+    intro i hi
     rw [← hpc]
     simp only [Vector.getElem_map]
-  have ep1 :
-      Expression.eval env.toEnvironment input_var_state_pc[1] =
-        input_state_pc[1] := by
-    rw [← hpc]
-    simp only [Vector.getElem_map]
-  have ep2 :
-      Expression.eval env.toEnvironment input_var_state_pc[2] =
-        input_state_pc[2] := by
-    rw [← hpc]
-    simp only [Vector.getElem_map]
+  have ep0 := ep 0 (by omega)
+  have ep1 := ep 1 (by omega)
+  have ep2 := ep 2 (by omega)
   have ha1eq :
       (#v[Expression.eval env.toEnvironment input_var_state_pc[0],
           Expression.eval env.toEnvironment input_var_state_pc[1],
@@ -360,26 +354,16 @@ theorem completeness :
     intro i hi
     simp only [Vector.getElem_map]
     interval_cases i <;> rfl
-  have ec0 :
-      Expression.eval env.toEnvironment input_var_adapter_op_c_imm[0] =
-        input_adapter_op_c_imm[0] := by
+  have ec : ∀ i (hi : i < 4),
+      Expression.eval env.toEnvironment input_var_adapter_op_c_imm[i] =
+        input_adapter_op_c_imm[i] := by
+    intro i hi
     rw [← hcimm]
     simp only [Vector.getElem_map]
-  have ec1 :
-      Expression.eval env.toEnvironment input_var_adapter_op_c_imm[1] =
-        input_adapter_op_c_imm[1] := by
-    rw [← hcimm]
-    simp only [Vector.getElem_map]
-  have ec2 :
-      Expression.eval env.toEnvironment input_var_adapter_op_c_imm[2] =
-        input_adapter_op_c_imm[2] := by
-    rw [← hcimm]
-    simp only [Vector.getElem_map]
-  have ec3 :
-      Expression.eval env.toEnvironment input_var_adapter_op_c_imm[3] =
-        input_adapter_op_c_imm[3] := by
-    rw [← hcimm]
-    simp only [Vector.getElem_map]
+  have ec0 := ec 0 (by omega)
+  have ec1 := ec 1 (by omega)
+  have ec2 := ec 2 (by omega)
+  have ec3 := ec 3 (by omega)
   have hrs1eq :
       (#v[Expression.eval env.toEnvironment
             input_var_adapter_op_a_memory_prev_value[0],
@@ -860,8 +844,7 @@ theorem completeness :
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have hranges := h_ranges hr1
     rw [← he_br] at hranges
-    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by
-      norm_cast
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := Nat.cast_ofNat
     simp only [byteChannel, hnp0]
     rw [← c14]
     exact (byteRowSpec_range _ SP1Clean.BranchChip.h14p).mpr hranges.1
@@ -869,8 +852,7 @@ theorem completeness :
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have hranges := h_ranges hr1
     rw [← he_br] at hranges
-    have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by
-      norm_cast
+    have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat
     simp only [byteChannel, hnp1]
     rw [← c16]
     exact (byteRowSpec_range _ SP1Clean.sixteen_lt).mpr hranges.2.1
@@ -878,8 +860,7 @@ theorem completeness :
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have hranges := h_ranges hr1
     rw [← he_br] at hranges
-    have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by
-      norm_cast
+    have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat
     simp only [byteChannel, hnp2]
     rw [← c16]
     exact (byteRowSpec_range _ SP1Clean.sixteen_lt).mpr hranges.2.2

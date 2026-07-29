@@ -283,5 +283,39 @@
 #     adjusting — but that margin is why they are not tighter, and it should not be silently
 #     re-lowered by a later pass.
 # All ladders are recorded in the doc-comments at each former site.
-SP1Clean 497
+# -12 (2026-07-29, proof-cleanup W5/r2): ratchet DOWN, no ceiling raised. 12 directives deleted, 0
+# re-added; the count reconciles EXACTLY (497 - 12 = 485), the SIXTH consecutive round to confirm the
+# recorded number is honest and that no phantom has re-appeared. Only two of the round's nine files
+# had any ceiling left to remove, so the headline here is NOT the count — it is that the
+# folded-vs-unfolded predictor from W5/r1 held in BOTH directions, for the first time in the same
+# round.
+# By batch:
+#   * b5 — the shift/branch chip `Defs.lean`/`Core.lean` layer: 12 of 14 removed, declared budget
+#     78,000,000 -> 800,000 (97.5x). ShiftRightChip/Defs.lean 6 of 7, ShiftLeftChip/Defs.lean 6 of 6
+#     (that file now carries ZERO), BranchChip/Core.lean 0 of 1. The two survivors are
+#     `ShiftRightChip.resultA_isU64` — floor (39996, 100000] against a declared 16000000, roughly
+#     170x oversized — and `BranchChip.soundness`, floor (40000, 100000] against a declared 8000000.
+#     Both were sized at 400000.
+#   * b6 — the four DivRemChip/Evidence family cores plus two Completeness files: 0 of 4 removed.
+#     ALL FOUR ARE GENUINELY BINDING; they were ratcheted 64,000,000 -> 12,000,000 (5.3x) instead.
+#     Measured floors: `signed32Evidence` and `signed64Evidence` in (400000, 1000000], kept at
+#     4000000; `unsigned32Evidence` in (100000, 400000] and `unsigned64Evidence` in (40000, 400000],
+#     kept at 2000000. This is the CORRECT result, not a shortfall — the same batch produced the
+#     round's largest line reduction (-240 lines) and its four §4a `private lemma <family>_flags`
+#     extractions collapsed a 17-copy inline derivation.
+# THE PREDICTOR, confirmed in both directions:
+#   * b5's 12 removable sites all sit in proofs that keep the 33-cell witness generator OPAQUE behind
+#     an `@[circuit_norm] private def`. Its 2 survivors are exactly the two proofs still holding a
+#     big UNFOLDED value in a goal.
+#   * all 4 of b6's kept sites hold an unfolded generated Rust list — `simp only
+#     [DivRemCore.OwnAssertsHold, ownAsserts, ...]` plus a 121-way destructure — and three of the four
+#     fail at their SIGNATURE, the high-floor position. Per the predictor the fix would be to fold,
+#     but folding changes the shape of `DivRemCore.CoreSpec`, which is ON THE AUDIT SURFACE. That is
+#     an owner decision and was DELIBERATELY NOT TAKEN. These four are the campaign's clearest
+#     example of a ceiling that is correct to keep for a reason outside the proof.
+# The four added `<family>_flags` helpers are the only declarations added this round; all are
+# `private`, none matches a `gen_axiom_probe.py` glob (Evidence/*.lean is not a probe target, and the
+# probe skips `private` regardless), and the probe regenerates byte-identical at 478 entries.
+# All ladders are recorded in the doc-comments at each site.
+SP1Clean 485
 SP1CleanTest 16
