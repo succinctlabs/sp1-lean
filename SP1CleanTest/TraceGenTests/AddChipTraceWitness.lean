@@ -9,11 +9,10 @@ dumped event, `EventPopulate.rTypeEventInputs` mirrors the input-column extracti
 hand-written part of SP1's `generate_trace`), and `circuitTraceRow` derives the rest — the
 witnessed `add_operation.value` columns from `main`'s own `witnessVector` closure (which calls
 `AddOperation.populate`), and the 33-column Rust layout through the audited whole-row
-`addChipReconfigure` map — then zero
-padding rows mirror SP1's zero-fill. The anchor checks the derived matrix equals the dumped one
-cell-for-cell, covering witness formulas, environment wiring, emission order, the full native Add row
-column layout, and padding in a single `native_decide` (confined here per the WitnessTests
-convention; `circuitTraceRow` itself is axiom-clean). -/
+`addChipReconfigure` map — then zero padding rows mirror SP1's zero-fill. The anchor checks the
+derived matrix equals the dumped one cell-for-cell, covering witness formulas, environment wiring,
+emission order, the full native Add row column layout, and padding in a single `native_decide`
+(confined here per the WitnessTests convention; `circuitTraceRow` itself is axiom-clean). -/
 
 namespace SP1Clean.TraceGenTests
 

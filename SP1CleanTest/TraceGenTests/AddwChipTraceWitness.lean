@@ -7,10 +7,9 @@ import SP1CleanTest.TraceGenTests.AddwChipTraceVectors
 Same derivation as `AddChipTraceWitness`, on the immediate-capable adapter: the 36-column
 Rust `AddwCols` layout carries an `ALUTypeReader` (the `op_c` slot is a `Word` + access block +
 `imm_c` flag), mirrored by `EventPopulate.aluTypeEventInputs` / `aluTypeReaderPopulate`, and is
-reached through the audited whole-row `addwChipReconfigure` map from `main`'s native output
-struct. The dumped
-battery is register-`c` ADDW events (`op_c = [7, 0, 0, 0]`, the register-index word; the operand
-is the `op_c_memory.prev_value` read). The witnessed block is the W-result pair
+reached through the audited whole-row `addwChipReconfigure` map from `main`'s native output struct.
+The dumped battery is register-`c` ADDW events (`op_c = [7, 0, 0, 0]`, the register-index word; the
+operand is the `op_c_memory.prev_value` read). The witnessed block is the W-result pair
 (`AddwOperation.addwValueWitness` low limbs + `addwMsbWitness` sign bit); the anchor checks the
 derived matrix equals SP1's real `generate_trace` dump cell-for-cell (unmasked). -/
 
