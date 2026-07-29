@@ -405,6 +405,22 @@ Per site:
 > Removal is unaffected: a site that clears ≤40000 against a 200000 default has ≥5× headroom either
 > way.
 >
+> **Re-ladder after a heavy golf — it is the only way to tell whether you changed the cost or just
+> the line count.** `OwnComplete.lean` went 817 → 495 lines (−39%) and its floor bracket was
+> **identical before and after**: FAIL 40000 · FAIL 100000 · PASS 200000, both times. That is a
+> controlled result, and it is what confirms the folded-vs-unfolded predictor rather than merely
+> illustrating it — the 322 removed lines were all bullet tactics, while the real cost sat in the
+> 121-hole `refine` over an unfolded `ownAsserts`. Report the before/after bracket whenever a golf
+> exceeds ~20% of a ceilinged file; "the floor did not move" is a finding, not a null result.
+> (Elaboration still improved 9.39s → 7.26s, so cheap work was removed — just not the binding work.)
+>
+> **Watch for half-finished refactors; they are a reliable tell.** Three W5 files carried a hoist the
+> original author had started and abandoned — `unsigned64_word_gate` extracted in one of four
+> `Evidence/` files, `hgates` folded but its byte-identical `hword` twin left inline in
+> `OwnComplete.lean`. Where one instance of a repeated block is already named and the rest are not,
+> the extraction is known-safe and the remaining copies are pure debt. Finish it rather than
+> re-deriving whether it is sound.
+>
 > **The heartbeat counter is cumulative from the declaration's start, so a ceiling only has
 > declaration granularity.** Writing `set_option maxHeartbeats 4000000 in` in *tactic* position does
 > **not** isolate that tactic: the wrapped line still fails with `(deterministic) timeout at isDefEq,
