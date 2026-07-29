@@ -15,6 +15,12 @@ sixteen `BitwiseU16Operation` cells in Rust column order.
 Rust keeps the byte opcode as a field expression. The extracted oracle and native byte channel do
 the same; validity of that opcode is a byte-table fact rather than a lossy extraction-time enum
 decode.
+
+Heartbeat budget: eight of the eleven declared ceilings here were 25–200× over and
+were measured away (floors ≤40000). The three survivors are real:
+`toElements_bitwiseChipOperationOfLocals` fails at 800000, while
+`bitwise_chip_constraints_decompose` and `bitwiseChip_interactions_faithful` fail at
+150000 and 100000 respectively. Each is kept at roughly twice its measured floor.
 -/
 
 namespace SP1Clean.Faithful
@@ -117,7 +123,7 @@ def bitwiseChipColumnsOfInput {F : Type} (input : BitwiseChip.Inputs F)
   ⟨input.state, input.adapter, bitwiseChipOperationOfLocals locals,
     locals[0], locals[1], locals[2]⟩
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 2000000 in
 private theorem toElements_bitwiseChipOperationOfLocals {F : Type}
     (locals : Vector F 19) :
     toElements (bitwiseChipOperationOfLocals locals) =
@@ -127,7 +133,6 @@ private theorem toElements_bitwiseChipOperationOfLocals {F : Type}
         locals[15], locals[16], locals[17], locals[18]] := by
   rfl
 
-set_option maxHeartbeats 4000000 in
 private theorem getElem_toElements_bitwiseChipOperationOfLocals {F : Type}
     (locals : Vector F 19) (i : ℕ)
     (hi : i < size BitwiseU16Operation.Columns) :
@@ -250,7 +255,6 @@ theorem bitwiseChipColumnsOfInput_roundtrip {F : Type} [Add F]
   rw [ProvableStruct.eval_eq_eval]
   rfl
 
-set_option maxHeartbeats 2000000 in
 theorem eval_bitwiseChipDirectOutput
     (input : BitwiseChip.Inputs (ZMod p)) (locals : Vector (ZMod p) 19)
     (data : ProverData (ZMod p)) :
@@ -299,9 +303,8 @@ def bitwiseChipRowCodec :
     width_eq := by
       rw [bitwiseChipPhysicalRow, inputFirstRow_size, Air.Flat.Component.width,
         BitwiseChip.circuit_size_eq]
-    rowInput_eq := by
-      exact rowInput_inputFirstRow (BitwiseChip.circuit (p := p))
-        (bitwiseChipInput cols) (bitwiseChipLocals cols) data
+    rowInput_eq := rowInput_inputFirstRow (BitwiseChip.circuit (p := p))
+      (bitwiseChipInput cols) (bitwiseChipLocals cols) data
     rowOutput_eq := by
       change ProvableType.eval _ ((BitwiseChip.main _).output _) = _
       rw [BitwiseChip.elaborated.output_eq]
@@ -357,7 +360,6 @@ private def bitwise_chip_write_value (offset : ℕ) : Word (Expression (ZMod p))
     result[4] + result[5] * 256, result[6] + result[7] * 256]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 2000000 in
 private theorem extractedBitwiseU16AssertionList
     (b c : Word (ZMod p)) (cols : Extracted.BitwiseOracle.BitwiseU16Operation (ZMod p))
     (opcode isReal : ZMod p) :
@@ -367,7 +369,6 @@ private theorem extractedBitwiseU16AssertionList
     Extracted.BitwiseOracle.U16toU8OperationUnsafe.asserts,
     Extracted.BitwiseOracle.BitwiseOperation.asserts, List.nil_append]
 
-set_option maxHeartbeats 1000000 in
 private theorem nativeBitwiseU16AssertionList
     (env : Environment (ZMod p)) (input : Var BitwiseU16Operation.Inputs (ZMod p))
     (offset : ℕ) :
@@ -404,7 +405,7 @@ private theorem bitwiseU16Assertions
   simp only [List.Forall, eval_sub, Expression.eval, hreal]
   tauto
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 400000 in
 private theorem bitwise_chip_constraints_decompose
     (env : Environment (ZMod p)) (input : Var BitwiseChip.Inputs (ZMod p))
     (offset : ℕ) :
@@ -478,7 +479,6 @@ private theorem bitwise_chip_constraints_decompose
 private theorem forall_nil_iff {alpha : Type} (pred : alpha → Prop) :
     List.Forall pred [] ↔ True := Iff.rfl
 
-set_option maxHeartbeats 2000000 in
 theorem bitwiseChip_constraints_faithful
     (env : Environment (ZMod p)) (input : Var BitwiseChip.Inputs (ZMod p))
     (offset : ℕ) (cols : BitwiseChip.Columns (ZMod p))
@@ -716,7 +716,6 @@ theorem bitwiseChip_constraints_faithful
     · rw [← hopEval]
       exact hOpA0
 
-set_option maxHeartbeats 2000000 in
 private theorem bitwiseChipRowCodec_inputReal
     (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := bitwiseChipRowCodec.assignment cols data
@@ -764,7 +763,6 @@ private theorem bitwiseChipRowCodec_inputReal
   simpa only [Nat.add_zero] using (congrArg₂ (· + ·)
     (congrArg₂ (· + ·) hX hO) hA).symm
 
-set_option maxHeartbeats 2000000 in
 theorem bitwiseChip_constraints_constructive
     (rustCols : Extracted.BitwiseOracle.BitwiseCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := bitwiseChipRowCodec.assignment
@@ -791,8 +789,8 @@ theorem bitwiseChip_constraints_constructive
         Expression.eval assignment.environment
           (bitwise_chip_is_real
             (⟨BitwiseChip.circuit (p := p)⟩ :
-              Air.Flat.Component (ZMod p)).rowOffset) := by
-    exact bitwiseChipRowCodec_inputReal (p := p) cols data
+              Air.Flat.Component (ZMod p)).rowOffset) :=
+    bitwiseChipRowCodec_inputReal (p := p) cols data
   have hlegacy := bitwiseChip_constraints_faithful (p := p)
     assignment.environment
     (⟨BitwiseChip.circuit (p := p)⟩ :
@@ -814,7 +812,7 @@ theorem bitwiseChip_constraints_constructive
 
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
-set_option maxHeartbeats 8000000 in
+set_option maxHeartbeats 400000 in
 theorem bitwiseChip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var BitwiseChip.Inputs (ZMod p))
     (offset : ℕ) (cols : BitwiseChip.Columns (ZMod p))
@@ -1149,7 +1147,6 @@ theorem bitwiseChip_interactions_faithful
   rw [hS, hP]
   exact ((hB.append_left _).append hM).append_right _
 
-set_option maxHeartbeats 8000000 in
 theorem bitwiseChip_interactions_constructive
     (rustCols : Extracted.BitwiseOracle.BitwiseCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := bitwiseChipRowCodec.assignment

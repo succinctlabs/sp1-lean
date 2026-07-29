@@ -6,10 +6,11 @@ import SP1Clean.Proofs.Chips.JalChip.Formal
 
 `jalChip_faithful` compares the complete native Clean JAL circuit with the
 v6.3.1 Rust `JalOracle.JalColumns` assertion system and interaction multiset
-(after one explicit row reconfiguration) on real, `jal x0`, and padding rows.  Rust redundantly zeroes the first three link
-limbs at chip level in addition to the J-type adapter's four-limb zeroing;
-the assertion proof preserves that redundancy on the oracle side and proves
-it propositionally equivalent to the native composition.
+(after one explicit row reconfiguration) on real, `jal x0`, and padding rows.
+Rust redundantly zeroes the first three link limbs at chip level in addition to
+the J-type adapter's four-limb zeroing; the assertion proof preserves that
+redundancy on the oracle side and proves it propositionally equivalent to the
+native composition.
 
 The row codec preserves the Rust column layout as an input prefix followed by
 the four jump-target limbs and four link-address limbs.  State, Byte, Memory,
@@ -17,6 +18,9 @@ and Program accesses are compared at the complete chip boundary.  The Byte
 comparison is a permutation because the native subcircuit order places CPU
 checks first and alignment last, while the Rust AIR emits alignment before
 the CPU and destination-timestamp checks.
+
+Heartbeat budget: all six declared ceilings here were ~25× over and were measured away (every
+floor ≤40000), so this file now runs entirely on the plain default.
 -/
 
 namespace SP1Clean.Faithful
@@ -176,9 +180,8 @@ def jalChipRowCodec :
     width_eq := by
       rw [jalChipPhysicalRow, inputFirstRow_size,
         Air.Flat.Component.width, JalChip.circuit_size_eq]
-    rowInput_eq := by
-      exact rowInput_inputFirstRow (JalChip.circuit (p := p))
-        (jalChipInput cols) (jalChipLocals cols) data
+    rowInput_eq := rowInput_inputFirstRow (JalChip.circuit (p := p))
+      (jalChipInput cols) (jalChipLocals cols) data
     rowOutput_eq := by
       change ProvableType.eval _ ((JalChip.main _).output _) = _
       rw [JalChip.elaborated.output_eq]
@@ -253,7 +256,6 @@ private theorem varFields4 (offset : ℕ) :
   rfl
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem addAssertions
     (env : Environment (ZMod p))
     (input : Var AddOperation.Inputs (ZMod p)) (offset : ℕ)
@@ -281,8 +283,8 @@ private theorem equalityMappedAssertions
           (Operations.constraints
             ((Gadgets.Equality.main (M := field)
               (x, y)).operations offset))) ↔
-      Expression.eval env x = Expression.eval env y := by
-  exact CanonicalReader.equalityAssertions env x y offset
+      Expression.eval env x = Expression.eval env y :=
+  CanonicalReader.equalityAssertions env x y offset
 
 private def nativeCpuMeaning
     (env : Environment (ZMod p))
@@ -356,7 +358,6 @@ private def nativeMeaning
     Expression.eval env
       (input.is_real * (input.is_real - 1)) = 0
 
-set_option maxHeartbeats 1000000 in
 private theorem nativeConstraintsDecompose
     (env : Environment (ZMod p))
     (input : Var JalChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -510,7 +511,6 @@ private def rustMeaning
     cols.is_real * (cols.is_real - 1) = 0
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem rustAssertionsDecompose
     (env : Environment (ZMod p))
     (input : Var JalChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -554,7 +554,6 @@ private theorem cpuMeaningFaithful
   exact hCpu
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem jumpAddMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var JalChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -600,7 +599,6 @@ private theorem jumpAddMeaningFaithful
   exact hAdd
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem linkAddMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var JalChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -646,7 +644,6 @@ private theorem linkAddMeaningFaithful
   unfold rustLinkAddMeaning nativeLinkAddMeaning
   exact hAdd
 
-set_option maxHeartbeats 1000000 in
 private theorem jTypeMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var JalChip.Inputs (ZMod p)) (offset : ℕ) :

@@ -17,6 +17,11 @@ decomposition lemmas. This avoids the elaboration blow-up caused by unfolding ne
 matches all four buses exactly; its only permutations account for the native composition placing
 the two CPU byte checks before the three comparison checks and factoring the destination-register
 write after the ALU reader.
+
+Heartbeat budget: five of the six declared ceilings here were 5–50× over and were
+measured away (floors ≤40000). The survivor, on `ltChip_interactions_faithful`, is
+genuinely binding: it fails at 100000 and clears only at the plain default — the
+tightest ratio measured anywhere in `Faithful/`.
 -/
 
 namespace SP1Clean.Faithful
@@ -906,9 +911,8 @@ def ltChipRowCodec :
     width_eq := by
       rw [ltChipPhysicalRow, inputFirstRow_size, Air.Flat.Component.width,
         LtChip.circuit_size_eq]
-    rowInput_eq := by
-      exact rowInput_inputFirstRow (LtChip.circuit (p := p))
-        (ltChipInput cols) (ltChipLocals cols) data
+    rowInput_eq := rowInput_inputFirstRow (LtChip.circuit (p := p))
+      (ltChipInput cols) (ltChipLocals cols) data
     rowOutput_eq := by
       change ProvableType.eval _ ((LtChip.main _).output _) = _
       rw [LtChip.elaborated.output_eq]
@@ -964,7 +968,6 @@ private theorem eval_lt_chip_write_value
   rw [eval_vec4_literal]
   rfl
 
-set_option maxHeartbeats 2000000 in
 private theorem lt_chip_constraints_decompose
     (env : Environment (ZMod p)) (input : Var LtChip.Inputs (ZMod p))
     (offset : ℕ) :
@@ -1067,7 +1070,6 @@ private theorem ltCols_asserts_decompose
   rw [ltSigned_eta, cpuState_eta, aluType_eta, vec3_eta]
   simp only [zero_add]
 
-set_option maxHeartbeats 200000 in
 theorem ltChip_constraints_faithful
     (env : Environment (ZMod p)) (input : Var LtChip.Inputs (ZMod p))
     (offset : ℕ) (cols : LtChip.Columns (ZMod p))
@@ -1311,7 +1313,6 @@ theorem ltChip_constraints_faithful
     · rw [← hopEval]
       exact hOpA0
 
-set_option maxHeartbeats 200000 in
 private theorem ltChipRowCodec_inputReal
     (cols : LtChip.Columns (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := ltChipRowCodec.assignment cols data
@@ -1354,7 +1355,6 @@ private theorem ltChipRowCodec_inputReal
   simp only [ltChipInput] at hS hU
   simpa only [Nat.add_zero] using (congrArg₂ (· + ·) hS hU).symm
 
-set_option maxHeartbeats 200000 in
 theorem ltChip_constraints_constructive
     (rustCols : Extracted.LtOracle.LtCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := ltChipRowCodec.assignment
@@ -1778,7 +1778,6 @@ theorem ltChip_interactions_faithful
   rw [hS, hP]
   exact ((hB.append_left _).append hM).append_right _
 
-set_option maxHeartbeats 200000 in
 theorem ltChip_interactions_constructive
     (rustCols : Extracted.LtOracle.LtCols (ZMod p)) (data : ProverData (ZMod p)) :
     let assignment := ltChipRowCodec.assignment

@@ -16,6 +16,10 @@ systems behind folded boundaries. In particular, it includes Rust's
 as an assumption. State, Byte, Memory, and Program interactions are compared
 as exact trace-level access lists; the Memory and Program projections use the
 dual orientation built into `nativeAccesses`.
+
+Heartbeat budget: all six declared ceilings here were ~25× over and were
+measured away (every floor ≤40000), so this file now runs entirely on the
+plain default.
 -/
 
 namespace SP1Clean.Faithful
@@ -227,9 +231,8 @@ def uTypeChipRowCodec :
     width_eq := by
       rw [uTypeChipPhysicalRow, inputFirstRow_size,
         Air.Flat.Component.width, UTypeChip.circuit_size_eq]
-    rowInput_eq := by
-      exact rowInput_inputFirstRow (UTypeChip.circuit (p := p))
-        (uTypeChipInput cols) (uTypeChipLocals cols) data
+    rowInput_eq := rowInput_inputFirstRow (UTypeChip.circuit (p := p))
+      (uTypeChipInput cols) (uTypeChipLocals cols) data
     rowOutput_eq := by
       change ProvableType.eval _ ((UTypeChip.main _).output _) = _
       rw [UTypeChip.elaborated.output_eq]
@@ -311,7 +314,6 @@ private theorem varFields4 (offset : ℕ) :
   rfl
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem addOperationAssertions
     (env : Environment (ZMod p))
     (input : Var AddOperation.Inputs (ZMod p)) (offset : ℕ)
@@ -339,8 +341,8 @@ private theorem equalityMappedAssertions
           (Operations.constraints
             ((Gadgets.Equality.main (M := field)
               (x, y)).operations offset))) ↔
-      Expression.eval env x = Expression.eval env y := by
-  exact CanonicalReader.equalityAssertions env x y offset
+      Expression.eval env x = Expression.eval env y :=
+  CanonicalReader.equalityAssertions env x y offset
 
 private def uTypeNativeCpuMeaning
     (env : Environment (ZMod p))
@@ -423,7 +425,6 @@ private def uTypeAssertionMeaning
     uTypeNativeWriteMeaning env input offset ∧
     uTypeNativeScalarMeaning env input offset
 
-set_option maxHeartbeats 1000000 in
 private theorem uTypeChipConstraintsDecompose
     (env : Environment (ZMod p))
     (input : Var UTypeChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -662,7 +663,6 @@ private def uTypeRustAssertionMeaning
     uTypeRustScalarMeaning env input offset
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem uTypeRustAssertionsDecompose
     (env : Environment (ZMod p))
     (input : Var UTypeChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -707,7 +707,6 @@ private theorem uTypeCpuMeaningFaithful
   exact hCpu
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem uTypeAddMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var UTypeChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -775,7 +774,6 @@ private theorem uTypeAddMeaningFaithful
   unfold uTypeRustAddMeaning uTypeNativeAddMeaning
   exact hAdd
 
-set_option maxHeartbeats 1000000 in
 private theorem uTypeJTypeMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var UTypeChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -879,7 +877,6 @@ private theorem uTypeWriteMeaningTrue
   exact hWrite
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 private theorem uTypeScalarMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var UTypeChip.Inputs (ZMod p)) (offset : ℕ) :
