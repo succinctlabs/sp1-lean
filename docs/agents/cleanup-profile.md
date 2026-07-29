@@ -360,6 +360,16 @@ Per site:
 > counted at least one phantom.
 
 > **A declared ceiling's magnitude predicts nothing — in either direction.** `StoreByteChip.circuit`
+> **Five under-provisioned sites have now been found** (headroom <2× against the declared value):
+> `StoreByteChip.circuit`, `ltChip_interactions_faithful`, `divRemRustAssertionsDecompose` (declared
+> 64M, fails at 8M — but correctly sized, at exactly 4× its bracket), and
+> `mulOperation_assertions_{forward,backward}`. The last two are a distinct shape worth watching:
+> **declared at 100000, i.e. *below* the plain 200000 default**, with floors of (40k, 60k] and
+> (40k, 80k] — roughly 1.7× and 1.25× headroom. They cannot be removed and raising is prohibited, so
+> they stand as-is and are the declarations most likely to break on the next toolchain pin. A ceiling
+> below the default is a *tightening*, not a budget, and should be read as a deliberate signal.
+>
+> `StoreByteChip.circuit`
 > is declared 2M and *fails at 1,000,000*: under 2× headroom, the campaign's first genuinely
 > under-provisioned site. Its two siblings **in the same file** sit ~40× over their floors. So a
 > large number is not evidence of slack and a small number is not evidence of tightness; only a
