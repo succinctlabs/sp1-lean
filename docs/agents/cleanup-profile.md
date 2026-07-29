@@ -300,6 +300,7 @@ Verify with `lean_goal`, or a build, before removing:
 | `lake exe runLinter` | `lake lint` (driver `scripts/sp1Lint.lean`; needs a completed build first) |
 | — | `lake test` — the `SP1CleanTest` conformance anchors, the only `native_decide` |
 | — | `scripts/run_audit.sh` — zero proof deferrals + the axiom census |
+| — | `scripts/check_report_citations.sh` — **run separately; `run_audit.sh` does NOT invoke it** |
 | — | `scripts/check_no_native_decide.sh`, `scripts/check_no_skipkerneltc.sh`, `scripts/check_heartbeats.sh` |
 
 Two traps:
@@ -864,7 +865,15 @@ Per gated group, stopping at the first failure:
      extracted helper (§4a) — and for a helper, check it is `private` and does not match a probe glob.
 8. **Commit**, one per batch.
 
-At wave boundaries additionally: `lake lint`, `lake test`, `scripts/run_audit.sh`.
+At wave boundaries additionally: `lake lint`, `lake test`, `scripts/run_audit.sh`, and
+`scripts/check_report_citations.sh` — the last is **not** invoked by `run_audit.sh`, so run it
+yourself or the 15 hard-coded file+declaration citations go unchecked for the whole campaign.
+
+> **`run_audit.sh` rewrites `docs/snapshots/axiom-census.txt` as a side effect**, so it leaves the
+> tree dirty even on a pass. Inspect the delta before restoring: a *hygienic* change (the
+> auto-generated `bv_decide` `ax_N_M✝` index moving because a proof term changed) is not an axiom
+> change and no axiom entered or left a set. Restore via a scratchpad `cp` — `guardrails.sh` blocks
+> `git checkout --` — and land the refreshed snapshot once, at campaign end, not per wave.
 
 ---
 
