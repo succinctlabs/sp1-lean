@@ -12,7 +12,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 The `Inputs` structs and semantic `Spec`s for the register-adapter / state readers
 (`CPUState`, `RTypeReader`, `RegisterAccessCols`, `RegisterAccessTimestamp`). First file in the
-`Specs/` sequence (`Reader → Operation → Chip`); depends only on `Foundations/` + `Extracted/`.
+`Specs/` sequence (`Reader → Operation → Chip`); depends only on `Math/` + `Model/` + `Extracted/`.
 Each declaration keeps its original namespace, so the reader proof files resolve them unchanged
 after `import SP1Clean.FormalModel.Contracts.Readers`. -/
 

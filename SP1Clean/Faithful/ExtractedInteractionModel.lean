@@ -4,7 +4,7 @@ import SP1Clean.Model.ByteTable
 
 /-! # Syntactic projection of the EXTRACTED interaction ADT to `LookupAccess`
 
-The extracted-side counterpart of `AbstractInteraction.toAccess` (`Foundations/InteractionProjection.lean`).
+The extracted-side counterpart of `AbstractInteraction.toAccess` (`Model/InteractionProjection.lean`).
 The extracted `Interaction (ZMod p)` (the SP1-oracle bus vocabulary, `Extracted/ExtractionDSL.lean`)
 projected to the **same** `LookupAccess` tuple `(kind, table, argvals, signedmult)` that the Clean
 circuit's emitted interactions project to. Equality of the two `.map toAccess` lists is the *syntactic*
@@ -22,7 +22,7 @@ is_real⟩`). Same physical lookup, opposite source/sink convention — so the `
 `[opcode.val, a.val, b.val, c.val]` preserves Rust's raw field-valued opcode. The dynamic buses
 (State/Memory/Program) use the natural `Dir.sign`
 (`pushIf` send `+mult`, receive `-mult`) — byte is the sole *pull* bus
-(`Foundations/Channels.lean` `byteChannel` docstring), hence its hardcoded `-mult`. -/
+(`Model/Channels.lean` `byteChannel` docstring), hence its hardcoded `-mult`. -/
 
 namespace SP1Clean.Extracted
 

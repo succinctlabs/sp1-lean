@@ -17,7 +17,7 @@ The current closed capstone is:
 ```lean
 theorem supported_core_native_sound (model : Machine.SP1MachineModel)
     (ordinary : model.UsesOrdinarySchedule) :
-    WitnessRelation.Sound SupportedCoreNativeRelation
+    WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
       (SupportedCoreLocalExecutionRelation model)
 ```
 
@@ -108,7 +108,7 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The audit regenerates a 513-declaration `#print axioms` census and checks source deferrals, project
+The audit regenerates a 478-declaration `#print axioms` census and checks source deferrals, project
 axioms, forbidden kernel bypasses, main-library `native_decide`, and performance-budget drift.
 Sail-model platform hooks, selected generated `bv_decide` proof constants, and the trusted extraction
 toolchain are disclosed in the report.

@@ -17,7 +17,7 @@ import Mathlib.Data.Fin.VecNotation
 The `Inputs` structs, semantic `Spec`s, and the pure result helpers a `Spec` directly needs
 (`resultWord`, and Mul's `productVal`) for the witnessed operation gadgets. Second file in the
 `Specs/` sequence; the structural `RawSpec`s stay in the per-operation proof files. Depends only on
-`Foundations/` + `Extracted/` (+ `Specs.Reader` for sequencing). -/
+`Math/` + `Model/` + `Extracted/` (+ `Specs.Reader` for sequencing). -/
 
 namespace SP1Clean.U16MSBOperation
 

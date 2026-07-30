@@ -55,7 +55,7 @@ patches are separately hash-checked before generation.
 | Exact Rust AIR relation | `CoreAIR.Current.Relation` | complete 34/6-table list-level relation |
 | Exact Rust AIR-to-Sail | `sp1_air_sound_of_obligations` | conditional; bundle not instantiated |
 | Cross-shard execution | `SP1ExecutionRelation` | target relation specified; no soundness theorem yet |
-| Core verifier | `VerifierKnowledgeSound` composition API | cryptographic proof not implemented here |
+| Core verifier | `VerifierBoundary.PerfectExtraction` composition API | cryptographic proof not implemented here |
 | Whole-machine completeness | intended Clean witness generation | not yet declared |
 
 ## Closed capstone statement

@@ -126,7 +126,7 @@ does not hand-write an ISA model; it wraps the generated interpreter:
 ```lean
 -- SP1Clean/Model/Semantics/GuestProgram.lean
 def SailStep (s s' : SailState) : Prop :=
-  ∃ b, (try_step 0 false).run s = .ok b s'
+  ∃ b : Bool, (try_step 0 false).run s = .ok b s'
 ```
 
 `try_step` is the model's topmost entry point — interrupt dispatch, instruction fetch, decode,
@@ -166,15 +166,23 @@ invariants.)
 
 ### 3.3 What the Sail layer contributes to the trust base
 
-The generated model's *platform hooks* remain external axioms of the Lean environment — concretely
-the seven the supported slice touches: `plat_term_write`, the four LR/SC reservation operations
-(`load_reservation`, `match_reservation`, `valid_reservation`, `cancel_reservation`),
-`get_16_random_bits`, and `sys_enable_experimental_extensions` — disclosed per-theorem by the
-axiom census. (The Sail runtime's `print` is a total definition, not an axiom.)
-None is given a nontrivial axiomatized *property*; they are opaque effects the supported
-instruction slice does not semantically depend on. A handful of shift/multiply helper lemmas are
-discharged with `bv_decide` and carry Lean's standard SAT-checker constants. Everything else in
-the headline theorems' census is `propext`, `Classical.choice`, `Quot.sound`.
+The generated model's *platform hooks* remain external axioms of the Lean environment, disclosed
+per-theorem by the axiom census. Seven of them concern the supported slice's own effects:
+`plat_term_write`, the four LR/SC reservation operations (`load_reservation`, `match_reservation`,
+`valid_reservation`, `cancel_reservation`), `get_16_random_bits`, and
+`sys_enable_experimental_extensions`. (The Sail runtime's `print` is a total definition, not an
+axiom.) None is given a nontrivial axiomatized *property*; they are opaque effects the supported
+instruction slice does not semantically depend on.
+
+A theorem whose target is the *complete* generated interpreter inherits the whole hook surface of
+that target, including hooks the supported RV64IM path never executes, and the census discloses
+this rather than pruning it. Measured at this snapshot,
+`SP1Clean.Soundness.supported_core_native_sound` depends on 100 axioms: the three logical baseline
+constants (`propext`, `Classical.choice`, `Quot.sound`), the seven platform hooks above, 67
+`riscv_f*`/`riscv_i*`/`riscv_ui*` floating-point and integer-conversion hooks reached through
+`try_step`'s full instruction dispatch, and 23 generated `bv_decide` proof constants inherited from
+the shift/multiply/store bridge lemmas. See `docs/snapshots/axiom-ledger.md` for the per-class
+reading and `docs/snapshots/axiom-census.txt` for the raw entry.
 
 ## 4. Extraction and Rust faithfulness
 
@@ -185,7 +193,8 @@ drives SP1's own constraint compiler as a **trusted but heavily fenced oracle**:
 
 - `SP1_DIR` must be the audited *extraction overlay*: a checkout whose merge base with the
   semantic pin is exactly `a630089d9…`, whose committed delta over the **semantic AIR sources**
-  (the 25 chip files) is verified line-by-line to be reflection metadata only (`use sp1_derive` /
+  (the 25 chip files plus the shared memory-access columns carrier — the 26-entry
+  `EXTRACTOR_METADATA_FILES` set) is verified line-by-line to be reflection metadata only (`use sp1_derive` /
   `#[derive(...)`) — changes outside that surface are confined by an explicit allowlist to the
   exporter's own directories — and whose working tree carries exactly the two checked-in exporter
   patches (`scripts/extractor-patches/*.patch`), byte-hash-verified against the live diff. Every
@@ -200,8 +209,9 @@ drives SP1's own constraint compiler as a **trusted but heavily fenced oracle**:
   the semantic revision, overlay revision, and patch digest (the semantic revision additionally
   tied to `CoreProfile` by an `rfl` theorem; the other two enforced by the regeneration gates).
 - Regeneration is byte-idempotent: a full `EXTRACT_AIR_ONLY` run at the pinned overlay reproduces
-  all 62 generated AIR modules identically (re-verified at this snapshot; the separate
-  trace-battery pass is the disclosed §4.3 provenance gap).
+  all 59 generated AIR modules identically (every `.lean` file under `SP1Clean/Extracted/` except
+  the hand-written `ExtractionDSL.lean`; re-verified at this snapshot; the separate trace-battery
+  pass is the disclosed §4.3 provenance gap).
 
 The readable table profile is additionally hand-transcribed in
 `FormalModel/CoreProfile.lean` and proved to match the generated manifest by `decide`
@@ -552,8 +562,9 @@ discloses which of these each headline declaration actually touches.
   the recursion/verifier layer.
 
 Baseline logical axioms: `propext`, `Classical.choice`, `Quot.sound`; plus `bv_decide`'s checker
-constants on a few named shift/multiply lemmas. Zero `sorryAx`; zero project `axiom`
-declarations; both gated by CI with empty allowlists.
+constants on named shift, multiply, store, jump, and byte-gadget lemmas (23 of them reach the
+headline theorem, §3.3). Zero `sorryAx`; zero project `axiom` declarations; both gated by CI with
+empty allowlists.
 
 ## 11. Scope comparison: the Nethermind OpenVM verification
 

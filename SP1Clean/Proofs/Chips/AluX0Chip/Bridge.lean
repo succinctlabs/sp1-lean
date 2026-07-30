@@ -13,7 +13,7 @@ import RISCV.SailPureToInstructions
 **discarded**. So the chip emulation `sp1_aluX0` is opcode-**independent** — it advances `nextPC = pc + 4`
 and writes nothing (`sp1_loadX0`'s shape). The RISC-V Sail spec, by contrast, runs the real ALU instruction
 with `rd = x0`; but every `execute_<family>` ends in `wX_bits rd result`, and `run_wX_bits` collapses a
-write to `x0` (`rd = 0#5`) to a **no-op regardless of the result** (`Foundations/SailWrap.lean`). So
+write to `x0` (`rd = 0#5`) to a **no-op regardless of the result** (`Model/SailWrap.lean`). So
 `spec_aluX0_<op> ≡ sp1_aluX0` for **every** covered ALU opcode by the same move — no `execute_*_pure =
 RV64.*` result-correctness lemma is needed (the result is thrown away).
 

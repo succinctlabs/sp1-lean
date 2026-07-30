@@ -16,7 +16,7 @@ re-pointed at `Operations.interactionsWith <channel>` and the projections become
 (`interactionsWith_eq_of_mem_exposedChannels`). See `docs/bus-model.md`.
 
 This module carries the **State** bus and the **Byte** bus (SP1's preprocessed `ByteChip`,
-`Foundations/ByteTable.lean`), plus the **Program** and **Memory** channels. -/
+`Model/ByteTable.lean`), plus the **Program** and **Memory** channels. -/
 
 namespace SP1Clean.Channels
 

@@ -4,7 +4,7 @@ import SP1Clean.Model.InteractionBus
 
 Bundles each chip's per-row interaction contributions into a `Machine`, so SP1's cross-chip
 **Σsends = Σreceives** (the global LogUp balance over every chip's interactions on the shared buses)
-becomes *expressible*: `Machine.busBalance`. Built directly on `Foundations/InteractionBus.lean`'s
+becomes *expressible*: `Machine.busBalance`. Built directly on `Model/InteractionBus.lean`'s
 computable `List`/`ℤ` core (`aggregateChipRows`/`multiplicitySum`/`isConsistentBalanced`) — never through
 the `noncomputable` `Operations.interactionsWith` — so it stays axiom-clean and permutation-invariant.
 

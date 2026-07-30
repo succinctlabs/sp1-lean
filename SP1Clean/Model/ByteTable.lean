@@ -23,9 +23,9 @@ This module is the Lean analog of that preprocessed table, modelled on Clean's o
 (`Clean/Tables/Xor/ByteXorTable.lean`): a `Table` whose membership is a **defining `Contains`
 predicate**, not an enumeration of all `7 * 2^16` rows — so there is no `decide` over a giant table and
 the well-formedness obligations are two-line. The defining predicate is exactly SP1's per-opcode byte
-semantics, `ByteOpcode.constrain` (`Foundations/SP1Constraint.lean`), keyed by the opcode column. A
+semantics, `ByteOpcode.constrain` (`Model/SP1Constraint.lean`), keyed by the opcode column. A
 consuming circuit emits a lookup with `Circuit.lookup ByteTable ⟨opcode, a, b, c⟩` (the in-circuit half
-of `send_byte`); the matching Byte `Channel` (`Foundations/Channels.lean`) carries the multiplicity for
+of `send_byte`); the matching Byte `Channel` (`Model/Channels.lean`) carries the multiplicity for
 the trace-level multiset balance against the `ByteChip` receiver. -/
 
 namespace SP1Clean

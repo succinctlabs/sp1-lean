@@ -9,7 +9,7 @@ Program bus: every CPU row `send`s its fetched `(pc, opcode, operands)` tuple ga
 (`= is_real` on Add), the program chip *receives* each with a count multiplicity, and the LogUp argument
 balances them. Its preprocessed trace contains **only valid decoded ROM rows** — so the register-index
 bounds (`op_* < 32`), the pc bounds, and the opcode `trusted_instr` decode that the *sender* cannot prove
-locally (`Foundations/Channels.lean`'s `ProgramMsg.Spec` defers them as *received* facts) hold for every
+locally (`Model/BusMessages.lean`'s `ProgramMsg.Spec` defers them as *received* facts) hold for every
 real fetch, exactly what `Soundness/ProgramConsistency.lean`'s `TraceProgramLink` threads.
 
 This module models the receiver's side natively, the Program-bus sibling of `Chips/ByteChip.lean`: the
@@ -80,7 +80,7 @@ theorem programRow_eq_of_key {r1 r2 : ProgramRow (ZMod p)} (h : programRowKey r1
     ZMod.val_injective p himm⟩
 
 /-- The **rich ROM-membership predicate** SP1's program/decode chip establishes for every received row —
-the *received* facts `Foundations/Channels.lean`'s `ProgramMsg.Spec` defers: the register indices are
+the *received* facts `Model/BusMessages.lean`'s `ProgramMsg.Spec` defers: the register indices are
 `< 32` (5-bit, from instruction decode), the pc limbs are `< 2^16`, and `op_a_0` is boolean. Instantiating
 `programConsistent_of_balance` with this is what hands those bounds to every real instruction fetch. -/
 def ProgramRowSpec (row : ProgramRow (ZMod p)) : Prop :=

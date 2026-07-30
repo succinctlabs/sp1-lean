@@ -13,7 +13,7 @@ interactions (`Extracted/CPUState.lean`):
 - `send (.state clk_high (clk_low + clk_inc) next_pc) is_real`.
 
 Each row projects to a signed pair of `LookupAccess` contributions (`stateLookups`, receive negative /
-send positive, both `is_real`-gated) feeding `Foundations/InteractionBus.lean`, and to a `StateAccess`
+send positive, both `is_real`-gated) feeding `Model/InteractionBus.lean`, and to a `StateAccess`
 record whose adjacent-pair consistency is the **PC chain** `pcChainProp` (`a.next_pc = b.pc`, clock
 advances by the row's `clk_inc` — 8 for every current chip).
 

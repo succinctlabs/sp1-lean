@@ -10,6 +10,15 @@ Companion reading, in order: Clean's `doc/performance-problems.md` and `doc/prov
 (upstream authority), then `docs/agents/proof-patterns.md` (this repo's landmines and the
 "Golf & cleanup discipline" section), then `AGENTS.md`.
 
+> **This file is campaign-scoped.** The findings below that are *not* specific to a cleanup run — the
+> toolchain and tooling facts (`lake env lean` freshness, Lake's missing `-j`, the two `lean` process shapes,
+> `sample <pid>`, the audit-script quirks), the `by exact` opacity regression, the `local macro` traps, the
+> load-bearing-`have` and `Fact`/`NeZero` signature rules, the `ring`-in-a-`first`-ladder shadowing, the
+> `change`-across-two-constants `maxRecDepth` trap, and the elaboration-budget diagnosis rules — have been
+> migrated to `docs/agents/proof-patterns.md` (with `docs/agents/perf-findings.md` as the canonical
+> elaboration-budget record), which is the version a non-cleanup contributor should read. The copies kept
+> here are the *rule* form for a `/cleanup` worker; where they diverge, the global doc is the reference.
+
 ---
 
 ## 1. Why the stock rules are overridden

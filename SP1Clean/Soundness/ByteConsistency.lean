@@ -6,7 +6,7 @@ import SP1Clean.Proofs.Chips.ByteChip.Provider
 /-! # Trace-level Byte-bus consistency
 
 The trace-level meaning of the Byte interactions that `Readers/CPUState.lean` and
-`Readers/RTypeReader.lean` emit on `Foundations/Channels.lean`'s `byteChannel` (row emission → bus data →
+`Readers/RTypeReader.lean` emit on `Model/Channels.lean`'s `byteChannel` (row emission → bus data →
 trace consistency), the Byte-bus sibling of `Soundness/StateConsistency.lean`. Each row sends **eight**
 byte rows into the preprocessed `ByteChip` (SP1's `send_byte`), all gated by `is_real`:
 
@@ -15,7 +15,7 @@ byte rows into the preprocessed `ByteChip` (SP1's `send_byte`), all gated by `is
   the scaled timestamp high part — i.e. six from `RTypeReader`.
 
 Each row projects to eight signed `LookupAccess` sends (multiplicity `+is_real`, vacuous on padding —
-`byteLookups_padding`) feeding `Foundations/InteractionBus.lean`, and to the per-row validity predicate
+`byteLookups_padding`) feeding `Model/InteractionBus.lean`, and to the per-row validity predicate
 `byteAccessValid` (every sent row is a valid `ByteChip` row, `ByteRowSpec`).
 
 ## Honest scope

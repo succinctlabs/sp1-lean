@@ -22,7 +22,7 @@ The current semantic capstone is:
 ```lean
 theorem supported_core_native_sound (model : Machine.SP1MachineModel)
     (ordinary : model.UsesOrdinarySchedule) :
-    WitnessRelation.Sound SupportedCoreNativeRelation
+    WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
       (SupportedCoreLocalExecutionRelation model)
 ```
 

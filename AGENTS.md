@@ -87,6 +87,12 @@ remain reserved. See `docs/roadmap.md` and `docs/architecture.md`.
   finish or kill it** (`pkill -f "lake build"` / `pkill -f "lake env lean"`). Cap at **2–3 builds at once**.
   A `run_in_background` build can outlive its shell — check with `ps -ef | grep -E "lake|lean" | grep -v lsp`
   before spawning another. The lean LSP server (`uvx lean-lsp-mcp`) also keeps several GB warm.
+  **There is no `-j` option** in Lake 4.31 here (only `-J/--json`) — serialise by not running anything else.
+- **Process hygiene.** *LSP file workers* (`lean --worker …`, children of `lean --server`) leak and hold GB
+  after an agent exits; `pkill -f "lean --worker"` is the correct reaper. **Never kill `lean --server` /
+  `lake serve`** — that is the `lean-lsp` MCP server, and killing it drops the MCP connection for the whole
+  session. *Build workers* carry no `--worker` token, so use `ps -ef | grep tstack` for build liveness, and
+  `sample <pid>` (not RSS — a healthy run also plateaus at ~3.2 GB) to tell a hang from progress.
 - **Toolchain (4.31 migration in progress):** `lean-toolchain` and mathlib are `v4.31.0`; Clean,
   `sail-riscv-lean`, `riscv-lean`, and `lean-sail` are currently local sibling path dependencies while
   their 4.31 ports are tested. The generated Sail model has a known code-generation panic workaround,
@@ -353,6 +359,14 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
     proofs) and the auto-gen `linter.all false` — must stay.
 - Heavy `toBitVec64` rw chains are whnf-expensive — `set_option maxHeartbeats 2000000 in` (carry lemmas need up
   to `16000000`).
+- **Never write the heartbeat-option name into a Lean comment or docstring under `SP1Clean/` /
+  `SP1CleanTest/`.** `scripts/check_heartbeats.sh` counts sites with a raw `grep -rc` and does not parse Lean,
+  so a comment merely *mentioning* the option scores as a live ceiling and silently corrupts the ratchet
+  baseline. Record a measured ladder without the literal: "the former 8M ceiling was ~200× over".
+- **Dropping `by exact` on a `def`'s Prop-valued field can be load-bearing *opacity*.** A tactic block becomes
+  an opaque auxiliary proof constant; the bare term inlines and `isDefEqDelta` unfolds it into every consumer.
+  One such −1-line golf took a downstream module from **260s to >1230s**. A/B-time the *downstream* consumers,
+  not the edited file (`docs/agents/proof-patterns.md`).
 - **Never `set_option (debug.)skipKernelTC`.** It bypasses the kernel's type-check re-run — the trust anchor
   for an axiom-clean proof — so it is **CI-gated** (`scripts/check_no_skipkerneltc.sh`, run by the audit and a
   standalone CI `guards` job; any hit in `SP1Clean/**/*.lean` fails the build). If a goal blocks on a kernel
@@ -416,7 +430,10 @@ after installing or toggling.
 - `docs/roadmap.md` — the dependency order from exact system-table grounding through ArkLib and
   completeness.
 - `docs/release-audit.md` — the honest-claim / trust-boundary report (axiom census and zero-deferral gate;
-  regenerate with `scripts/run_audit.sh`).
+  regenerate with `scripts/run_audit.sh`). Two harness quirks: `run_audit.sh` **rewrites
+  `docs/snapshots/axiom-census.txt` even on a pass** (so it leaves the tree dirty — inspect the delta, a moved
+  auto-generated `bv_decide` `ax_N_M✝` index is hygienic), and it does **not** invoke
+  `scripts/check_report_citations.sh` — run that separately.
 - `docs/agents/lean-sail-notes.md` — the 4.31 environment, local dependency pins, Sail code-generation
   workaround, and the `lake update` trap.
 - `docs/agents/proof-patterns.md` — the witnessed-`FormalCircuit` soundness/completeness recipe + concrete

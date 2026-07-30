@@ -16,7 +16,7 @@ faithfulness: Rust's `send_byte` accepts an AIR expression, whereas Lean's gener
 `ByteOpcode.ofNat` maps every out-of-range value to `.Range`. The byte table gives a nonzero send
 its load-bearing per-row meaning by requiring that raw field element to be the index of some
 `ByteOpcode`; state/memory/program sends and all receives are per-row `True` (their meaning is the
-trace-level bus balance, `Foundations/InteractionBus.lean`). -/
+trace-level bus balance, `Model/InteractionBus.lean`). -/
 
 namespace SP1Clean.Extracted
 
@@ -97,7 +97,7 @@ def toProp {p : ℕ} [NeZero p] : Interaction (ZMod p) → Prop
   Iff.rfl
 
 /-- A `receive` of any interaction has trivial per-row meaning — its semantics are the trace-level
-multiset balance (`Foundations/InteractionBus.lean`), not a row predicate. -/
+multiset balance (`Model/InteractionBus.lean`), not a row predicate. -/
 @[simp] lemma toProp_receive {p : ℕ} [NeZero p] (i : AirInteraction (ZMod p)) (mult : ZMod p) :
     (⟨.receive, i, mult⟩ : Interaction (ZMod p)).toProp ↔ True := Iff.rfl
 

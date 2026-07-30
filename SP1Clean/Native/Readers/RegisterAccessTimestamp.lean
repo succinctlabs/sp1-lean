@@ -16,7 +16,7 @@ The genuinely-tiny (2-column) inner block of SP1's `RegisterAccessCols`
 
 SP1's `eval_register_access_*` emits, per operand, two byte-bus timestamp checks
 (`crates/core/machine/src/air/memory.rs`), modelled here as **`byteChannel.pull`s**
-(`Foundations/Channels.lean`, the faithful Clean `Channel` for SP1's `send_byte` into the preprocessed
+(`Model/Channels.lean`, the faithful Clean `Channel` for SP1's `send_byte` into the preprocessed
 `ByteChip`), both gated by `is_real`:
 
 - a 16-bit `Range` check on `diff_low_limb`, and
