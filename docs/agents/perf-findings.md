@@ -230,6 +230,15 @@ lines, and replacing each per-index family with one **quantified `simp only` rul
 
 ## 5. The sites that were KEPT — measured floors
 
+> ⚠ **§5 is the campaign-era record and it has drifted from the tree.** For a per-site,
+> reconciled, line-accurate answer use **[§5A](#5a-the-authoritative-floor-table--all-101-hand-written-sites)**,
+> which supersedes this section wherever they disagree; §5A's "reconciliation" subsection lists every
+> divergence found. Known stale here: the `divRemRustAssertionsDecompose` row (that ceiling was
+> **removed**), the two `shift*CoreAssertions` rows (re-measured and lowered to 240000), the "nine
+> Load/Store `soundness`" row (only five of the nine match it), the two
+> `Proofs/Operations/MulOperation/Formal.lean` brackets (swapped), and ~11 rows citing pre-drift line
+> numbers. Keep §5 for its *narrative* — which families were laddered together, and why.
+
 **This is the table to read before touching any surviving ceiling.** Everything here was laddered; the floor
 is the highest rung that *failed*, so the bracket is (fail, pass]. Sizing convention: ~4–5× the bracket top.
 
@@ -323,6 +332,269 @@ response is a *fold* (cause class 1d/1e), or an audited, deliberate raise — no
 sized all along. It is also the repo's single most expensive declaration — worth roughly half of
 `Faithful/DivRemChip/Exact.lean`'s ~260s — so folding it would move the whole build's critical path. See
 [`cleanup-deferred.md`](cleanup-deferred.md) for why it was not taken.
+
+---
+
+## 5A. The authoritative floor table — all 101 hand-written sites
+
+Built 2026-08-01 by reconciling three sources per site: §5 above, the one-line ladder comments in the
+source, and the `Wave:`-trailered commit bodies (`git log --grep '^Wave:'`). **Where they disagree this
+table is the answer and §5 is not.** Read the [reconciliation](#reconciliation--every-divergence-found)
+subsection before trusting any §5 row.
+
+Scope: the 101 elaboration-budget ceilings on **hand-written** code — everything under `SP1Clean/` and
+`SP1CleanTest/` *except* the auto-generated `SP1Clean/Extracted/**` (215 sites, uniform 8M) and
+`SP1CleanTest/**/Vectors/**` + `*TraceVectors.lean` (16 sites, uniform 4M). Paths below drop the
+`SP1Clean/` prefix. Line numbers are as of commit `cbfc8d43`.
+
+Column conventions:
+
+- **floor bracket** — `(lo, hi]` = highest rung that *failed*, lowest that *passed*. `≤ n` = a pass at
+  `n` with no recorded failing rung below it. `> n` = a fail at `n` with **no recorded passing rung**,
+  i.e. the top is unmeasured; those rows count as UNKNOWN for planning.
+- **source** — `§5` · `in-source` (the ladder comment above that declaration) · `git <sha>` ·
+  `derived` (computed from a ratio or a former value).
+- **confidence** — `measured` (a real ladder was run and recorded) · `derived` · `none`.
+
+### `Faithful/` (37 sites)
+
+`Faithful/**` is conservative-only, so most of these carry **no in-source note** — §5 (and the wave
+commits) are the only record. The three exceptions are marked.
+
+| file:line | declaration | declared | floor bracket | source | conf |
+|---|---|---:|---|---|---|
+| `Faithful/AddChip.lean:160` | `addcols_state_interactions_faithful_syntactic` | 250000 | (40000, 60000] | §5 | measured |
+| `Faithful/AddChip.lean:207` | `addcols_program_interactions_faithful_syntactic` | 250000 | (40000, 60000] | §5 | measured |
+| `Faithful/AddChip.lean:729` | `addChip_interactions_faithful` | 400000 | (60000, 100000] | §5 | measured |
+| `Faithful/AddiChip.lean:677` | `addiChip_interactions_faithful` | 400000 | (60000, 100000] | §5 | measured |
+| `Faithful/AddwChip.lean:224` | `addwcols_program_interactions_faithful_syntactic` | 250000 | (40000, 60000] | §5 | measured |
+| `Faithful/AddwChip.lean:274` | `addwcols_state_interactions_faithful_syntactic` | 250000 | (40000, 60000] | §5 | measured |
+| `Faithful/AddwChip.lean:957` | `addwChip_interactions_faithful` | 400000 | (60000, 100000] | §5 | measured |
+| `Faithful/AluX0.lean:208` | `aluX0Chip_constraints_faithful` | 2000000 | (250000, 500000] | §5 (cites `:211`) | measured |
+| `Faithful/AluX0.lean:328` | `aluX0Chip_interactions_faithful` | 400000 | (60000, 100000] | §5 (cites `:331`) | measured |
+| `Faithful/BitwiseChip.lean:126` | `toElements_bitwiseChipOperationOfLocals` | 2000000 | (800000, 1000000] | §5 | measured |
+| `Faithful/BitwiseChip.lean:408` | `bitwise_chip_constraints_decompose` | 400000 | (150000, 200000] | §5 | measured |
+| `Faithful/BitwiseChip.lean:815` | `bitwiseChip_interactions_faithful` | 400000 | (100000, 200000] | §5 | measured |
+| `Faithful/BranchChip.lean:536` | `branchNativeAssertionsDecompose` | 800000 | (100000, 200000] | §5 | measured |
+| `Faithful/BranchChip.lean:747` | `branchColumns_asserts_decompose` | 800000 | (100000, 200000] | §5 | measured |
+| `Faithful/BranchChip.lean:1061` | `branchTailMeaningFaithful` | 1600000 | (200000, 400000] | §5 | measured |
+| `Faithful/DivRemChip.lean:480` | `divRemComparisonBlocks_roundtrip` | 400000 | **> 40000, top UNKNOWN** | §5 + git `f6d3c773` | measured (lower only) |
+| `Faithful/DivRemChip.lean:529` | `divRemArithmeticBlocks_roundtrip` | 800000 | **> 40000, top UNKNOWN** | §5 + git `f6d3c773` | measured (lower only) |
+| `Faithful/DivRemChip.lean:592` | `divRemResultBlocks_roundtrip` | 400000 | **> 40000, top UNKNOWN** | §5 + git `f6d3c773` | measured (lower only) |
+| `Faithful/DivRemChip.lean:1122` | `divRemChip_lookups_empty` | 800000 | **> 40000, top UNKNOWN** | §5 + git `f6d3c773` | measured (lower only) |
+| `Faithful/DivRemChip/Exact.lean:1755` | `divRemCoreForallDecompose` | 400000 | (40000, 100000] | §5 | measured |
+| `Faithful/DivRemChip/Exact.lean:1790` | `divRemLowerBackward` | 400000 | (40000, 100000] | §5 | measured |
+| `Faithful/DivRemChip/Exact.lean:1862` | `divRemUpperBackward` | 400000 | (40000, 100000] | §5 | measured |
+| `Faithful/DivRemChip/Exact.lean:2197` | `divRemWholeAssertionsExact` | 800000 | (100000, 200000] | §5 | measured |
+| `Faithful/LtChip.lean:1477` | `ltChip_interactions_faithful` | **200000** | (100000, 200000] | §5 | measured |
+| `Faithful/LtOperationUnsigned.lean:30` | `ltUnsigned_constraints_faithful` | 400000 | (50000, 60000] | in-source **+** §5 (agree) | measured |
+| `Faithful/MulChip.lean:1091` | `mulOperation_assertions_forward` | **100000** | (40000, 60000] | §5 + git `5c71054d` | measured |
+| `Faithful/MulChip.lean:1517` | `mulOperation_assertions_backward` | **100000** | (40000, 80000] | §5 + git `5c71054d` | measured |
+| `Faithful/MulChip.lean:1715` | `mulChip_constraints_faithful` | 600000 | **> 40000, top UNKNOWN** | §5 + git `5c71054d` | measured (lower only) |
+| `Faithful/MulChip.lean:3186` | `mulChip_interactions_faithful` | 1000000 | **> 40000, top UNKNOWN** | §5 + git `5c71054d` | measured (lower only) |
+| `Faithful/ShiftLeftChip.lean:723` | `shiftLeftCoreAssertions` | 240000 | (40000, 60000] | in-source (git `46231bc8`) — **§5 stale** | measured |
+| `Faithful/ShiftRightChip.lean:849` | `shiftRightCoreAssertions` | 240000 | (40000, 60000] | in-source (git `46231bc8`) — **§5 stale** | measured |
+| `Faithful/SubChip.lean:159` | `subcols_state_interactions_faithful_syntactic` | 250000 | (40000, 60000] | §5 | measured |
+| `Faithful/SubChip.lean:206` | `subcols_program_interactions_faithful_syntactic` | 250000 | (40000, 60000] | §5 | measured |
+| `Faithful/SubChip.lean:726` | `subChip_interactions_faithful` | 400000 | (60000, 100000] | §5 | measured |
+| `Faithful/SubwChip.lean:215` | `subwcols_state_interactions_faithful_syntactic` | 250000 | (40000, 60000] | §5 | measured |
+| `Faithful/SubwChip.lean:278` | `subwcols_program_interactions_faithful_syntactic` | 250000 | (40000, 60000] | §5 | measured |
+| `Faithful/SubwChip.lean:829` | `subwChip_interactions_faithful` | 400000 | (60000, 100000] | §5 | measured |
+
+### `Native/` (8), `Model/` (2), `Soundness/` (1)
+
+| file:line | declaration | declared | floor bracket | source | conf |
+|---|---|---:|---|---|---|
+| `Native/Operations/AddrAddOperation/RawSpec.lean:132` | `carries_of_addrAddSemantics` | 400000 | (45000, 60000] | in-source + §5 (cites `:134`) | measured |
+| `Native/Operations/DivRemOperation/OwnAsserts.lean:20` | `ownAsserts` | 500000 | (40000, 100000] — **§5 says (40000, 50000]** | in-source (2026-07-27, later) | measured |
+| `Native/Operations/LtOperationUnsigned/RawSpec.lean:34` | `at_most_one` | 1000000 | **(400000, 500000]** | in-source (file docstring, names the decl) + §5 | measured |
+| `Native/Operations/MulOperation/Defs.lean:20` | `main` (`«LCNF compiler»`-bound) | 400000 | (40000, 60000] | in-source + §5 | measured |
+| `Native/Operations/MulOperation/RawSpec.lean:114` | `full_product` | 6000000 | **(1000000, 1200000]** — highest in the tree | in-source + §5 | measured |
+| `Native/Operations/MulOperation/RawSpec.lean:894` | `mulSemantics_of_raw` | 500000 | (60000, 100000] | in-source + §5 (cites `:904`) | measured |
+| `Native/Operations/SubOperation/RawSpec.lean:38` | `subSemantics_of_carries` | 400000 | (60000, 80000] | in-source + §5 | measured |
+| `Native/Operations/SubOperation/RawSpec.lean:90` | `carries_of_subSemantics` | 400000 | (40000, 60000] | in-source + §5 (cites `:91`) | measured |
+| `Model/SailDecode.lean:49` ⚑ **file-scoped** | whole file (owner: the branch-skip walk) | 400000 | (40000, 50000] | in-source + §5 | measured |
+| `Model/SailWrap.lean:316` | `rX_bits_eq_get_reg?` | 400000 | (50000, 100000] | in-source + §5 | measured |
+| `Soundness/RowSoundness.lean:61` | `supportedChip_usesSupportedBusChannels` | 800000 | (100000, 200000] | §5 + git `6a6d1017` | measured |
+
+### `Proofs/` (53 sites)
+
+| file:line | declaration | declared | floor bracket | source | conf |
+|---|---|---:|---|---|---|
+| `Proofs/Chips/BitwiseChip/Formal.lean:213` | `completeness` | 5000000 | (700000, 1000000] | in-source + §5 (cites `:217`) | measured |
+| `Proofs/Chips/BranchChip/Core.lean:19` | `soundness` | 400000 | (40000, 100000] | **git `502b925b` only** — absent from §5 and from the source | measured |
+| `Proofs/Chips/DivRemChip/Completeness/OwnComplete.lean:126` | `ownAsserts_complete` | 800000 | (100000, 200000] | §5 + git `bb3488d0` | measured |
+| `Proofs/Chips/DivRemChip/Defs.lean:1137` | `derivedElaborated` | 250000 | (39999, 50000] | **in-source only** — absent from §5 | measured |
+| `Proofs/Chips/DivRemChip/Evidence.lean:110` | `compareAssumptionsOfCore` | 400000 | (60000, 100000] | in-source + §5 | measured |
+| `Proofs/Chips/DivRemChip/Evidence/Signed32.lean:39` | `signed32Evidence` | 4000000 | (400000, 1000000] | in-source + §5 + git `2dd6af26` | measured |
+| `Proofs/Chips/DivRemChip/Evidence/Signed64.lean:39` | `signed64Evidence` | 4000000 | (400000, 1000000] | in-source + §5 + git `2dd6af26` | measured |
+| `Proofs/Chips/DivRemChip/Evidence/Unsigned32.lean:38` | `unsigned32Evidence` | 2000000 | (100000, 400000] | in-source + §5 + git `2dd6af26` | measured |
+| `Proofs/Chips/DivRemChip/Evidence/Unsigned64.lean:50` | `unsigned64Evidence` | 2000000 | (40000, 400000] | in-source + §5 + git `2dd6af26` | measured |
+| `Proofs/Chips/DivRemChip/Soundness.lean:292` | `euclid_identity_signed` | 500000 | (50000, 100000] | in-source + §5 | measured |
+| `Proofs/Chips/DivRemChip/Soundness.lean:596` | `euclid_identity_word_unsigned` | 400000 | (20000, 50000] | in-source + §5 | measured |
+| `Proofs/Chips/DivRemChip/Soundness.lean:678` | `euclid_identity_word_signed` | 500000 | (50000, 100000] | in-source + §5 | measured |
+| `Proofs/Chips/JalrChip/Formal.lean:63` | `soundness` | 8000000 | **(2000000, 4000000]** | in-source + §5 | measured |
+| `Proofs/Chips/JalrChip/Formal.lean:192` | `completeness` | 8000000 | **(2000000, 4000000]** | in-source + §5 (cites `:193`) | measured |
+| `Proofs/Chips/LoadByteChip/Formal.lean:34` | `soundness` | 2000000 | ≤ 400000 (§5: (300000, 400000]) | in-source (file-level, names both) + §5 | measured |
+| `Proofs/Chips/LoadByteChip/Formal.lean:170` | `completeness` | 1500000 | ≤ 300000 (§5: (150000, 300000]) | in-source (`:33`) + §5 | measured |
+| `Proofs/Chips/LoadDoubleChip/Formal.lean:26` | `soundness` | 1500000 | (150000, 300000] — **§5's uniform row is wrong here** | in-source (`:25`) | measured |
+| `Proofs/Chips/LoadDoubleChip/Formal.lean:90` | `completeness` | 1500000 | (150000, 300000] | in-source (`:25`) | measured |
+| `Proofs/Chips/LoadHalfChip/Formal.lean:50` | `soundness` | 2000000 | ≤ 400000 (§5: (300000, 400000]) | in-source (`:49`) + §5 | measured |
+| `Proofs/Chips/LoadHalfChip/Formal.lean:150` | `completeness` | 1500000 | ≤ 300000 (§5: (150000, 300000]) | in-source (`:49`) + §5 | measured |
+| `Proofs/Chips/LoadWordChip/Formal.lean:37` | `soundness` | 2000000 | ≤ 400000 (§5: (300000, 400000]) | in-source (`:36`) + §5 | measured |
+| `Proofs/Chips/LoadWordChip/Formal.lean:144` | `completeness` | 1500000 | ≤ 300000 (§5: (150000, 300000]) | in-source (`:36`) + §5 | measured |
+| `Proofs/Chips/LoadX0Chip/Formal.lean:24` | `soundness` | 2000000 | ≤ 400000 (§5: (300000, 400000]) | in-source (`:23`) + §5 | measured |
+| `Proofs/Chips/LoadX0Chip/Formal.lean:100` | `completeness` | 1500000 | ≤ 300000 (§5: (150000, 300000]) | in-source (`:23`) + §5 | measured |
+| `Proofs/Chips/LtChip/Formal.lean:157` | `soundness` | 500000 | (60000, 100000] | in-source + §5 | measured |
+| `Proofs/Chips/LtChip/Formal.lean:207` | `completeness` | 300000 | (45000, 60000] | in-source + §5 (cites `:208`) | measured |
+| `Proofs/Chips/MulChip/Contracts.lean:35` | `controlExpressions_subset_shallowConstraints` | 400000 | (40000, 100000] | in-source + §5 | measured |
+| `Proofs/Chips/MulChip/Formal.lean:77` | `soundness` | 400000 | (60000, 80000] | in-source + §5 + git `a1580968` | measured |
+| `Proofs/Chips/MulChip/Formal.lean:182` | `completeness` | 400000 | (60000, 80000] | in-source + §5 + git `a1580968` | measured |
+| `Proofs/Chips/MulChip/Formal.lean:378` | `circuit` | 800000 | (150000, 200000] | in-source + §5 + git `a1580968` | measured |
+| `Proofs/Chips/ShiftLeftChip/Soundness/Sll.lean:35` | `soundness` | 1600000 | (200000, 400000] | in-source + §5 + git `f722f6c1` | measured |
+| `Proofs/Chips/ShiftLeftChip/Soundness/Sllw.lean:38` | `soundness` | 800000 | (100000, 200000] | in-source + §5 + git `f722f6c1` | measured |
+| `Proofs/Chips/ShiftRightChip/Core.lean:1591` | `srlw_within_byte_shift` | 1600000 | (250000, 320000] | in-source + §5 | measured |
+| `Proofs/Chips/ShiftRightChip/Defs.lean:1735` | `resultA_isU64` | 400000 | (39996, 100000] | **git `502b925b` only** — absent from §5 and from the source | measured |
+| `Proofs/Chips/ShiftRightChip/Soundness/Sra.lean:29` | `soundness` | 1600000 | (200000, 400000] | §5 + git `f722f6c1` | measured |
+| `Proofs/Chips/ShiftRightChip/Soundness/Sraw.lean:29` | `soundness` | 1600000 | (200000, 400000] | §5 + git `f722f6c1` | measured |
+| `Proofs/Chips/ShiftRightChip/Soundness/Srl.lean:29` | `soundness` | 800000 | (100000, 200000] | §5 + git `f722f6c1` | measured |
+| `Proofs/Chips/ShiftRightChip/Soundness/Srlw.lean:29` | `soundness` | 800000 | (100000, 200000] | §5 + git `f722f6c1` | measured |
+| `Proofs/Chips/StoreByteChip/Formal.lean:25` | `soundness` | 2000000 | ≤ 400000 (§5: (300000, 400000]) | in-source (`:23`) + §5 | measured |
+| `Proofs/Chips/StoreByteChip/Formal.lean:130` | `completeness` | 1500000 | ≤ 300000 (§5: (150000, 300000]) | in-source (`:23`) + §5 | measured |
+| `Proofs/Chips/StoreByteChip/Formal.lean:252` | `circuit` | 2000000 | **(1000000, 2000000]** | in-source (`:24`) + §5 | measured |
+| `Proofs/Chips/StoreDoubleChip/Formal.lean:23` | `soundness` | 1500000 | (150000, 300000] — **§5's uniform row is wrong here** | in-source (`:22`) | measured |
+| `Proofs/Chips/StoreDoubleChip/Formal.lean:73` | `completeness` | 1500000 | (150000, 300000] | in-source (`:22`) | measured |
+| `Proofs/Chips/StoreHalfChip/Formal.lean:24` | `soundness` | 1500000 | (150000, 300000] — **§5's uniform row is wrong here** | in-source (`:23`) | measured |
+| `Proofs/Chips/StoreHalfChip/Formal.lean:105` | `completeness` | 1500000 | (150000, 300000] | in-source (`:23`) | measured |
+| `Proofs/Chips/StoreWordChip/Formal.lean:24` | `soundness` | 1500000 | (150000, 300000] — **§5's uniform row is wrong here** | in-source (`:23`) | measured |
+| `Proofs/Chips/StoreWordChip/Formal.lean:93` | `completeness` | 1500000 | (150000, 300000] | in-source (`:23`) | measured |
+| `Proofs/Chips/UTypeChip/Formal.lean:66` | `soundness` | 500000 | (40000, 100000] | in-source + §5 | measured |
+| `Proofs/Chips/UTypeChip/Formal.lean:139` | `completeness` | 500000 | (40000, 100000] | in-source + §5 | measured |
+| `Proofs/Operations/DivRemOperation/Core.lean:299` | `soundness` | 500000 | (80000, 100000] | §5 (cites `:301`); git `e3b924ec` fixes only "> 40000" | measured |
+| `Proofs/Operations/DivRemOperation/Core.lean:469` | `completeness` | 400000 | (60000, 80000] | §5 (cites `:471`); git `e3b924ec` fixes only "> 40000" | measured |
+| `Proofs/Operations/MulOperation/Formal.lean:98` | `soundness` | 1000000 | (100000, 200000] — **§5 has this pair swapped** | in-source | measured |
+| `Proofs/Operations/MulOperation/Formal.lean:602` | `completeness` | 1000000 | (100000, 150000] — **§5 has this pair swapped** | in-source | measured |
+
+### The three counts Phase 1 needs
+
+| bucket | count | meaning |
+|---|---:|---|
+| **floor top ≤ 200000** | **60** | candidate *pure deletions* — Lean's plain default is 200000 |
+| **floor top > 200000** | **35** | genuine; keep, and take them to Phase 3 cause work |
+| **UNKNOWN** | **6** | a fail rung but no recorded pass — must be measured before any decision |
+
+Per pillar: `Faithful/` 28 / 3 / 6 · `Proofs/` 23 / 30 / 0 · `Native/` 6 / 2 / 0 · `Model/` 2 / 0 / 0 ·
+`Soundness/` 1 / 0 / 0.
+
+**The 6 UNKNOWN sites** — all recorded as "> 40000, binds at `whnf`" with no passing rung ever laddered:
+
+- `Faithful/DivRemChip.lean:480` `divRemComparisonBlocks_roundtrip` (400000)
+- `Faithful/DivRemChip.lean:529` `divRemArithmeticBlocks_roundtrip` (800000)
+- `Faithful/DivRemChip.lean:592` `divRemResultBlocks_roundtrip` (400000)
+- `Faithful/DivRemChip.lean:1122` `divRemChip_lookups_empty` (800000)
+- `Faithful/MulChip.lean:1715` `mulChip_constraints_faithful` (600000)
+- `Faithful/MulChip.lean:3186` `mulChip_interactions_faithful` (1000000)
+
+Applying §5's own "size at ~4× the bracket top" convention *backwards* to their declared values would
+guess tops of 100000 / 200000 / 100000 / 200000 / 150000 / 250000. **That is a guess, not a floor** —
+those five files' declared values were also chosen partly from a sibling-screen ranking, and W6/b4
+records masking inside `Faithful/MulChip.lean` hiding a site at ≥25× over. Ladder them.
+
+### Deletion hazards inside the "≤ 200000" bucket
+
+Three shapes need care even though they qualify:
+
+1. **13 zero-margin sites** whose bracket top is *exactly* 200000, so deleting them leaves a 1× margin —
+   and §2's LSP caveat says those floors were measured **without** the pillar libs' `moreLeanArgs`:
+   `Faithful/BitwiseChip.lean:408,815` · `Faithful/BranchChip.lean:536,747` ·
+   `Faithful/DivRemChip/Exact.lean:2197` · `Faithful/LtChip.lean:1477` · `Soundness/RowSoundness.lean:61` ·
+   `Proofs/Chips/DivRemChip/Completeness/OwnComplete.lean:126` · `Proofs/Chips/MulChip/Formal.lean:378` ·
+   `Proofs/Chips/ShiftLeftChip/Soundness/Sllw.lean:38` ·
+   `Proofs/Chips/ShiftRightChip/Soundness/Srl.lean:29`, `Srlw.lean:29` ·
+   `Proofs/Operations/MulOperation/Formal.lean:98`. Re-ladder each under a real `lake build` before
+   deleting; do not trust the recorded pass rung at 1×.
+2. **Three stamps at or below the plain default**, where deleting *raises* the budget rather than
+   lowering it: `Faithful/MulChip.lean:1091` and `:1517` (both **100000**) and
+   `Faithful/LtChip.lean:1477` (**200000**, a literal no-op stamp). §5 is right that these are a
+   deliberate tightening signal, not a budget — deleting them is safe but discards the signal, so it is
+   an owner call, not a mechanical one.
+3. **One file-scoped stamp**: `Model/SailDecode.lean:49` has no `in`, so it covers all 57 declarations
+   in the file, and the recorded (40000, 50000] belongs to the whole-file walk. Its in-source note
+   argues for keeping a site here on purpose (the failure mode is a mid-cascade error, and cost scales
+   with the Sail decoder's branch count). Do not delete it on the arithmetic alone.
+
+Also mechanical, not a hazard: six sites carry a `maxRecDepth` directive on an adjacent line
+(`Faithful/BranchChip.lean:746,1060` · `Faithful/DivRemChip.lean:481,530,593` ·
+`Faithful/DivRemChip/Exact.lean:2198`). Delete only the budget line.
+
+### Reconciliation — every divergence found
+
+Nine classes, worst first. Everything here is a place a future maintainer would have trusted §5 and
+been wrong.
+
+1. **A removed ceiling still listed as a KEEP.** §5's first `Faithful/` row —
+   `DivRemChip/Exact.lean:1128` `divRemRustAssertionsDecompose`, "64M (unchanged, ~4×)" — was
+   **removed** in `46231bc8`; one `simp only [List.append_cancel_left_eq]` took the file 278s → 10s and
+   the true floor to (10000, 20000]. §5's §3/§5/§7 prose still cites it as "the repo's single most
+   expensive declaration". `Faithful/DivRemChip/Exact.lean` now has four sites, not five.
+2. **Two re-measured rows never updated.** §5 lists `shift{Right,Left}CoreAssertions` at declared 4M,
+   floor (40000, 100000], kept 400000. The same commit `46231bc8` squeezed their `simp`s to `simp only`,
+   narrowed both floors to **(40000, 60000]** and lowered both to **240000**. The in-source comments are
+   correct; §5 is a generation behind.
+3. **A uniform row that is wrong for four of its nine members.** §5 asserts "nine Load/Store
+   `Formal.lean` `soundness` | (300k, 400k] | 2000000". Only five match (LoadByte, LoadHalf, LoadWord,
+   LoadX0, StoreByte). `LoadDouble`, `StoreDouble`, `StoreHalf`, `StoreWord` are declared **1500000**
+   and their in-source note reads "both proofs in (150000, 300000]" — a different floor *and* a
+   different kept value. This is exactly the "a uniform value across a family is a copied default"
+   trap §7 warns about, reproduced inside the record of the fix.
+4. **A swapped pair.** §5's `Proofs/Operations/MulOperation/Formal.lean:100,607` row gives
+   "(100k, 150k] / (100k, 200k]". The in-source ladders say the opposite: `soundness` (line 98) "fails
+   at 100k, passes at the plain default" = (100000, 200000]; `completeness` (line 602) "fails at 100k,
+   passes at 150k" = (100000, 150000]. Both tops are ≤ 200000 so no Phase-1 decision changes, but the
+   attribution is inverted. In-source wins — it sits on the declaration.
+5. **A conflicting bracket.** `Native/Operations/DivRemOperation/OwnAsserts.lean:20` `ownAsserts`:
+   §5 says (40000, 50000]; the in-source ladder, dated 2026-07-27 and therefore later, records
+   `40000 FAILS / 100000 ok` = **(40000, 100000]** and is self-consistent with its own stated "500000
+   keeps ~5x margin". §5's 50000 is most likely transcribed from the adjacent `Model/SailDecode.lean`
+   row, which genuinely is (40000, 50000]. Taking the wider bracket costs nothing here (both tops are
+   ≤ 200000).
+6. **A wrong "declared before" value.** §5 puts
+   `DivRemChip/Completeness/OwnComplete.lean:126` at 16M before; `bb3488d0` records **64,000,000 →
+   800,000**. The floor (100000, 200000] is right.
+7. **Three sites §5 does not cover at all.** `Proofs/Chips/BranchChip/Core.lean:19` `soundness`
+   (40000, 100000] and `Proofs/Chips/ShiftRightChip/Defs.lean:1735` `resultA_isU64` (39996, 100000],
+   both recorded **only** in commit `502b925b`'s body; and `Proofs/Chips/DivRemChip/Defs.lean:1137`
+   `derivedElaborated` (39999, 50000], recorded **only** in-source. A grep of §5 for these would
+   return nothing and a reader would call them UNKNOWN.
+8. **Stale line numbers, 11 rows.** §5 cites `AluX0:211,331` (now 208, 328) · `MulChip:1716, 3203,
+   1092, 1518` (now 1715, 3186, 1091, 1517) · `MulOperation/RawSpec:904` (894) ·
+   `SubOperation/RawSpec:91` (90) · `AddrAddOperation/RawSpec:134` (132) ·
+   `BitwiseChip/Formal:217` (213) · `LtChip/Formal:208` (207) · `JalrChip/Formal:193` (192) ·
+   `DivRemOperation/Core:301,471` (299, 469) · `MulOperation/Formal:100,607` (98, 602) ·
+   `ShiftLeftChip:722` / `ShiftRightChip:848` (723, 849). Declarations all resolve; only the anchors
+   drifted.
+9. **Headline counts off by one.** §1 and §5's headings say 102 hand-written sites and 38 `Faithful/`
+   survivors. The tree has **101** and **37** (divergence 1). `scripts/heartbeats_baseline.txt` is the
+   live number; this file is not.
+
+Nothing in the reverse direction was found: every §5 row that is not listed above matches the tree, and
+no site exists that §5 claims does not.
+
+### Plausibility check — declared value vs recorded floor
+
+Nothing is left at a ≤ 40000 floor (that was the campaign's removal threshold), so the "4M stamp with a
+claimed tiny floor that nobody removed" shape does not occur. The over-provisioned tail is mild and
+almost all of it is documented as deliberate:
+
+- `Proofs/Chips/DivRemChip/Soundness.lean:596` — 400000 vs a (20000, 50000] top: **8×**, the widest
+  ratio in the tree, and the only one with no stated reason. Prime Phase-3 candidate.
+- `Model/SailDecode.lean:49` (8×), `Native/Operations/LtOperationUnsigned/RawSpec.lean:34` (in fact
+  ~2×, correctly sized), `Native/Operations/MulOperation/Defs.lean:20` (6.7×, justified: LCNF cost is
+  load-sensitive), `Faithful/LtOperationUnsigned.lean:30` (6.7×, justified in-source) — all carry an
+  explicit argument for the extra headroom.
+- The four UNKNOWN `Faithful/DivRemChip` roundtrips and two `Faithful/MulChip` anchors sit at
+  400000–1000000 against a floor known only to exceed 40000; if their true tops are near 40000 they are
+  10–25× over. This is the single largest block of unmeasured slack left.
 
 ---
 
@@ -440,3 +712,277 @@ No build failed and no error was raised; only the worker's own post-pass grep ca
 > does not parse Lean, so a comment mentioning the option scores as a live ceiling and silently corrupts the
 > ratchet. Phrase it as "the former 8M ceiling was ~170× over". Two workers hit this; one caught it, one did
 > not.
+
+---
+
+## 9. Diagnosing a site: the instrument (`diagnostics true`)
+
+Everything above answers *how much* a declaration costs. This section is about *why*. Clean's
+`doc/performance-problems.md` § "Measuring honestly" prescribes an instrument this project had never used
+— `set_option diagnostics true` — and the ceiling campaign ran entirely on ladder bisection instead.
+**Validated 2026-08-01 on Lean 4.31 against four sites whose cause was already known, then applied to two
+that were not.** Verdict: it works, it is cheap, and it discriminates three of our four cause classes.
+It does **not** subsume the ladder — the two answer different questions, see §9.5.
+
+### 9.1 The commands
+
+The runner. `lake env lean` does **not** apply the package's per-lib lean args, so pass them yourself or
+you are measuring a different configuration than `lake build` does (§6, and
+[`lake_env_lean_not_a_gate`]):
+
+```sh
+cd <repo root>
+lake env lean --tstack=400000 \
+  -DsynthInstance.maxHeartbeats=1000000 \
+  -Dlinter.style.lambdaSyntax=true -Dlinter.style.dollarSyntax=true \
+  -Dlinter.style.refine=true      -Dlinter.style.cases=true \
+  -Dlinter.style.induction=true   -Dlinter.style.admit=true \
+  -Dlinter.oldObtain=true         -Dlinter.style.cdot=true \
+  SP1Clean/<Path>/<File>.lean
+```
+
+The instrument itself is a scoped option on the declaration you are diagnosing:
+
+```lean
+set_option diagnostics true in     -- add this line, nothing else
+-- …the file's existing scoped budget directive, left exactly as it is…
+theorem soundness : … := by …
+```
+
+Order relative to the existing directive does not matter — tested in both positions, and interleaved with
+`maxRecDepth` / `linter.unusedSimpArgs` stamps. The option is scoped to the single next declaration, so a
+1000-line file reports only the site you marked.
+
+Two knobs worth knowing:
+
+- `set_option diagnostics.threshold <n> in` — **the default is 20**, so any counter below 21 is invisible.
+  A lemma that fires 4 times and a lemma that never fires look identical in this report. When the question
+  is *"did X fire at all?"* the report cannot answer it; drop the threshold to 1, or use the trace (§9.7).
+- `set_option trace.Meta.Tactic.simp.rewrite true in` — the full rewrite log (§9.7). Two orders of
+  magnitude more output; use it only after `diagnostics` has named a suspect.
+
+`#count_heartbeats` remains useless for this (§6) and nothing below changes that.
+
+### 9.2 What the output looks like here
+
+One marked declaration emits, in order: a `[simp] Diagnostics` block **per `simp` call** in the proof, then
+a `[<kind>] <declName>` term census, then a final `[diag] Diagnostics` block covering the whole declaration
+(elaboration counters, then `[kernel]` counters from the type-check re-run). Trimmed real output from
+`Proofs/Chips/LoadByteChip/Formal.lean` `soundness`:
+
+```
+[theorem] SP1Clean.LoadByteChip.soundness
+  [size] 169280
+  [occs] And ↦ 5570
+  [occs] Eq ↦ 4873
+  …
+[diag] Diagnostics
+  [reduction] unfolded declarations (max: 450604, num: 98):
+    [reduction] Nat.rec ↦ 450604
+    [reduction] List.rec ↦ 327222
+    [reduction] Vector.mapRange ↦ 323040
+    [reduction] List.concat ↦ 238275
+    [reduction] Array.push ↦ 164019
+    [reduction] Vector.push ↦ 150752
+    [reduction] Eq.rec ↦ 59095
+    [reduction] ProvableStruct.componentsFromElements ↦ 20640
+    [reduction] ProvableStruct.componentsToElements ↦ 17885
+    [reduction] varFromOffset ↦ 5155
+  [reduction] unfolded reducible declarations (max: 452349, num: 100):
+    [reduction] Nat.casesOn ↦ 452349
+    [reduction] Vector.toArray ↦ 373167
+    [reduction] Array.toList ↦ 372110
+    [reduction] List.toArray ↦ 191792
+  [def_eq] heuristic for solving `f a =?= f b` (max: 371, num: 22): …
+  [kernel] unfolded declarations (max: …): …
+```
+
+Four fields carry the signal:
+
+| field | reads as |
+|---|---|
+| `[reduction] unfolded declarations` | **whnf**. Clean's runaway signature (`Eq.rec`/`List.rec`/`Nat.rec`/`dite`/`Vector.append` in the tens of thousands) lives here, and the *named* SP1/Clean entries below the generic recursors say *which* value is being torn open. |
+| `[reduction] unfolded reducible declarations` | same, for `@[reducible]` defs and `casesOn`. `Vector.toArray`/`Array.toList`/`List.toArray` in the hundreds of thousands = a `Vector ↔ Array ↔ List` round-trip. |
+| `[simp] used / tried theorems` | per-`simp` census with success counts. `X ↦ n ❌️` = tried `n` times, never fired — the failed-match cost a `simp only` would delete. |
+| `[<kind>] <name> [size]/[occs]` | the produced **term**. `Mathlib.Tactic.Ring.Common.*` dominating `occs` means the cost is `ring` building a big term, not whnf. |
+
+### 9.3 It works on a **failing** declaration, and the profile is scale-invariant
+
+This was the operationally critical unknown — our targets are the ones that time out. Answer: the
+`[diag]` block is emitted **before** the error and is unaffected by it. Confirmed on a synthetic
+`whnf` timeout, a synthetic `maxRecDepth` overflow, and on a real site.
+
+Better than that: the *ranking* does not depend on the budget. `LoadByteChip.soundness`, run to completion
+vs. force-failed at a 40000 budget (add a second, lower scoped directive **below** the existing one — inner
+wins, so nothing on disk has to change):
+
+| counter | passes at 2M | fails at 40000 | ratio |
+|---|---:|---:|---:|
+| `Nat.rec` | 450604 | 42967 | 10.5× |
+| `List.rec` | 327222 | 30829 | 10.6× |
+| `Vector.mapRange` | 323040 | 29970 | 10.8× |
+| `List.concat` | 238275 | 22131 | 10.8× |
+| `Array.push` | 164019 | 15263 | 10.7× |
+| `Eq.rec` | 59095 | 6015 | 9.8× |
+
+Same top ten, same order, one uniform scale factor. **So diagnose at a LOW budget, not a raised one.**
+The loop is: add `diagnostics true` + a low scoped budget → read the ranking → fix → drop both and
+re-ladder. No need to raise anything, and the failing run is the faster of the two (11.9 s vs 20.9 s here).
+
+Caveat: force-failing a producer re-triggers the masking cascade of §6 — the dependents in the file report
+`(kernel) unknown constant`. That is expected and does not affect the `[diag]` block.
+
+### 9.4 What it discriminates — and what it does not
+
+Four controls, causes known in advance:
+
+| site | known cause | what the counters said | verdict |
+|---|---|---|---|
+| `Native/Operations/MulOperation/RawSpec.lean` `full_product` (floor (1M, 1.2M]) | term-intrinsic: 16-column `omega` telescope over `2^128` literals + a 256-monomial `ring` | `occs` = `Mathlib.Tactic.Ring.Common.*` (4211 + 1006 + 918 + …) on a `[size] 61385` term; reductions are `OfNat.ofNat ↦ 786960`, `HPow.hPow`/`Pow.pow ↦ 786952`, `Monoid.npow ↦ 393476`; `Lean.Omega.Coeffs.isZero ↦ 3924` | ✅ **confirmed and sharpened** — the `2^128` coefficients are literally being evaluated through `Monoid.npow`/`Nat.rec`; `ring` and `omega` are both visible and separable |
+| `Native/Operations/MulOperation/Defs.lean` `main` (codegen-bound) | `«LCNF compiler»`; elaborates fine at 40000, only code generation times out | max reduction counter `LT.lt ↦ 21950`; **no counter attributable to the compiler at all**. The only evidence is the error string: ``timeout at `«LCNF compiler»` `` | ❌ **does not discriminate — and actively misleads.** 21950 is "tens of thousands", i.e. a false positive against Clean's whnf heuristic, on a declaration whose elaboration is not the problem |
+| `Proofs/Chips/MulChip/Formal.lean` `soundness` (floor (60k, 80k]) | `circuit_proof_start` tower | `List.rec ↦ 15820`, `Eq.rec ↦ 14872`, `Nat.rec ↦ 13459`, then the named culprits `ProvableStruct.componentsToElements ↦ 4790`, `toElements ↦ 4196`, `Vector.mapRange ↦ 2520`; kernel `List.rec ↦ 46179` | ✅ correct class, and names the row-eval path |
+| `Faithful/DivRemChip.lean` `divRemComparisonBlocks_roundtrip` (`Vector`-append/`congr` tower) | expected `Vector.append`/`Eq.rec` in the tens of thousands | **not** those: `Nat.rec ↦ 95308`, `Nat.pred ↦ 93912`, `Nat.casesOn ↦ 190633`, plus the `DivRemChip.Columns.*` projections ~430 each and `Lean.Omega.*` all through the kernel counters | ✅ right class (runaway whnf), **wrong culprit guessed** — the cost is literal index arithmetic (`Nat.pred` chains from the `(by decide)`/`(by omega)` offset side conditions), not `Vector.append` |
+
+Read the last row twice. The instrument was right and the standing hypothesis was wrong; that is the whole
+argument for running it before writing a fix.
+
+So, per cause class (the §4 taxonomy):
+
+- **whnf-into-expensive-values** — discriminated, and usually names the value. Best case for the tool.
+- **`simp` set thrash** — discriminated precisely, with per-lemma success counts (§9.6).
+- **term-intrinsic arithmetic (`ring`/`omega`/`bv_decide`)** — discriminated: the tactic's own lemma
+  namespace dominates `occs`, and the reduction counters point at numeral evaluation rather than at a
+  project datatype.
+- **codegen (`«LCNF compiler»`)** — **not** discriminated. The counters are silent on it and can read as a
+  whnf blowup. The discriminator for this class is the *phase name in the error*, which the ladder already
+  gives you for free. Never diagnose a `def` on counters alone.
+
+### 9.5 Versus ladder bisection
+
+They answer different questions and neither replaces the other.
+
+| | ladder bisection | `diagnostics true` |
+|---|---|---|
+| answers | *how much* — the floor bracket, hence how much a directive is over | *why* — which reduction/lemma/tactic is spending it |
+| output | pass/fail per rung, plus the phase name and owning declaration | ranked counters |
+| runs needed | 3–5 re-elaborations (bisecting rungs) | **1** |
+| cost | 1 file elaboration per rung | 1 file elaboration + 2–30 % (measured below) |
+| tells you the declaration is over-provisioned | yes | no |
+| tells you what to change | no | usually |
+| works on codegen-bound sites | yes (phase name) | no |
+
+Measured overhead of adding the option, per whole-file elaboration:
+
+| file | site | baseline | with `diagnostics` |
+|---|---|---:|---:|
+| `Native/Operations/MulOperation/RawSpec.lean` | `full_product` | 39.2 s | 41.7 s (+6 %) |
+| `Native/Operations/MulOperation/Defs.lean` | `main` | 4.7 s | 4.8 s (+2 %) |
+| `Faithful/DivRemChip.lean` | `divRemComparisonBlocks_roundtrip` | 8.7 s | 9.6 s (+10 %) |
+| `Faithful/AddChip.lean` | `addcols_state_…_syntactic` | 5.4 s | 6.3 s (+17 %) |
+| `Proofs/Chips/LoadByteChip/Formal.lean` | `soundness` | 16.8 s | 20.9 s (+24 %) |
+| `Proofs/Chips/MulChip/Formal.lean` | `soundness` | 11.4 s | 14.8 s (+30 %) |
+
+**A diagnostic run costs about one ladder rung.** The practical order is therefore: ladder first to get the
+bracket (you need it anyway to size or delete the directive); if the floor is genuinely high, spend one
+more run on `diagnostics` before writing any fix.
+
+### 9.6 The two undiagnosed sites
+
+**(a) `Faithful/AddChip.lean` `addcols_state_interactions_faithful_syntactic`** — representative of the
+17-site `Faithful/` cluster that closes with a bare non-`only` `simp` over an unfolded native operations
+list plus an unfolded extracted oracle list. Named mechanism, and it is not the lists:
+
+```
+[simp] used theorems (max: 1216, num: 29):
+  nonempty_prop ↦ 1216 · isEmpty_Prop ↦ 608 · Decidable.not_not ↦ 456 · List.map_cons ↦ 342 …
+[simp] tried theorems (max: 1216, num: 61):
+  forall_const ↦ 1216 ❌️ · forall_eq ↦ 1216 ❌️ · implies_true ↦ 1216 ❌️
+  eq_iff_eq_cancel_left ↦ 608 ❌️ · forall_apply_eq_imp_iff ↦ 608 ❌️ · imp_self ↦ 608 ❌️
+  Finset.diag_mem_sym2_mem_iff ↦ 608 ❌️ · Module.isTorsionBySet_singleton_iff ↦ 608 ❌️
+  SetLike.forall_smul_mem_iff ↦ 608 ❌️ · Subgroup.forall_mem_sup ↦ 608 ❌️
+  Submodule.forall_mem_sup ↦ 608 ❌️ · Subsingleton.forall₂_iff ↦ 608 ❌️ …
+[diag] unfolded reducible declarations:
+  Channel.Guarantees ↦ 10108 · Ne ↦ 1976 · Channel.name ↦ 1710 · Module.IsTorsionBySet ↦ 608
+```
+
+`Channel.toRaw_ext_iff` fires 38 times, and the rewrite trace shows what each firing does: it tears the
+`RawChannel` record open into a conjunction whose third and fourth components are `HEq`s of the
+**`Guarantees`/`Requirements` predicate lambdas** —
+
+```
+byteChannel.toRaw = stateChannel.toRaw
+  ==>  byteChannel.name = stateChannel.name ∧ size ByteRow = size StateMsg ∧
+       ((fun mult message data => mult = -1 → byteChannel.Guarantees (fromElements message) data) ≍
+         fun mult message data => mult = -1 → stateChannel.Guarantees (fromElements message) data) ∧ …
+```
+
+simp then descends into those lambdas. Per firing that costs exactly 32 `nonempty_prop` + 16
+`isEmpty_Prop` + 12 `Decidable.not_not` rewrites of `Nonempty (mult = -1)` / `IsEmpty (mult = -1)`, and
+each of the 16 residual `∀`-shaped props draws mathlib's entire `∀ x ∈ S` discrimination bucket — ~20
+lemmas, every one of which fails. **38 firings → ≈2,300 rewrites and ≈12,000 failed matches, none of
+which touch the interaction lists the theorem is actually about.**
+
+Confirmed on a sibling: `Faithful/SubwChip.lean` `subwcols_state_interactions_faithful_syntactic` gives
+36 firings, `nonempty_prop ↦ 1152` (= 36×32), `isEmpty_Prop ↦ 576` (= 36×16),
+`Channel.Guarantees ↦ 9576`. The ratios are identical, so **one mechanism does explain the cluster.**
+
+The lever is to stop `Channel.toRaw_ext_iff` from ever firing. `Model/Channels.lean` already carries all
+twelve `@[circuit_norm]` name-based `<x>Channel_eq_<y>Channel_false` lemmas, whose whole purpose is to
+decide these comparisons on the `name` field — and the full rewrite trace of this declaration contains
+**zero** occurrences of any of them. They lose the match to `Channel.toRaw_ext_iff` every time. Making
+them win (priority) is a single-point change in one file that should reach all 17 sites. *Untested —
+Phase 1's job.*
+
+Tested and rejected here: `simp [-Channel.toRaw_ext_iff, …]` is a **no-op**, byte-identical counters. Lean
+warns why — `` `Channel.toRaw_ext_iff` does not have the `[simp]` attribute ``. It arrives via
+`circuit_norm`, and `simp [-X]` only removes from the default set. **`-X` cannot delete a lemma supplied
+by a custom simp set.**
+
+**(b) `Proofs/Chips/LoadByteChip/Formal.lean` `soundness`** — representative of the 18 Load/Store towers.
+Textbook runaway whnf, the largest counters measured anywhere in this tree (the block quoted in §9.2):
+`Nat.rec ↦ 450604`, `List.rec ↦ 327222`, `Vector.mapRange ↦ 323040`, `List.concat ↦ 238275`,
+`Array.push ↦ 164019`, `Vector.push ↦ 150752`, `Eq.rec ↦ 59095`; reducibles
+`Vector.toArray ↦ 373167` / `Array.toList ↦ 372110` / `List.toArray ↦ 191792`.
+
+The chain is legible end to end: `varFromOffset ↦ 5155` → `ProvableStruct.componentsFromElements ↦ 20640`
+/ `componentsToElements ↦ 17885` → `Vector.mapRange` → `Vector.push`/`Array.push` → `List.concat` →
+`Nat.rec`, with `Vector ↔ Array ↔ List` conversion at every step. The row's `varFromOffset` structure is
+being built cell-by-cell instead of being kept folded — exactly the value Clean's
+`doc/performance-problems.md` says to make opaque, and the counters name it. `Extracted.AddrAddOperation.casesOn ↦ 5091`
+and `Extracted.AddressOperation.addr_operation ↦ 795` corroborate §7's independent finding that
+`AddressOperation`-composing chips are the whnf-heavy ones. For contrast, `MulChip.soundness` — same
+tactic shape, floor (60k, 80k] — runs the same chain **30× smaller**.
+
+### 9.7 The rewrite trace: when it adds anything
+
+`set_option trace.Meta.Tactic.simp.rewrite true in` on the AddChip site produced **47,201 lines / 2.4 MB**
+and doubled the file's elaboration time (5.4 s → 11.9 s). Ranking the rules by frequency reproduces the
+`[simp] used theorems` census *exactly* and adds nothing:
+
+```sh
+grep -o "^\[Meta.Tactic.simp.rewrite\] [A-Za-z_.'₀-₉]*" out.txt \
+  | sed 's/^.*rewrite\] //' | sort | uniq -c | sort -rn | head
+```
+
+So `diagnostics` supersedes it for "which lemmas". The trace earns its cost for exactly two questions
+`diagnostics` cannot answer:
+
+1. **"what did this rewrite actually do?"** — the `==>` pairs. Both `Nonempty (mult = -1)` and the
+   `toRaw_ext_iff` record expansion quoted in §9.6 came from here; the counters alone would not have
+   identified the channel-record tear-open.
+2. **"did lemma X ever fire?"** — the trace is complete and unthresholded, while the `diagnostics` report
+   silently drops everything under 20 (§9.1). The "zero occurrences of any `_false` lemma" finding is a
+   trace result and could not have been read off the counters.
+
+Run it only after `diagnostics` has named a suspect, and always through a filter.
+
+### 9.8 Gotchas
+
+- **A high `[reduction]` counter is not proof of a whnf problem.** The codegen control sat at 21950 with
+  nothing wrong with its elaboration. Cross-check against the error's phase name before believing it.
+- **Counters are cumulative over the declaration**, exactly like the heartbeat counter (§6): they do not
+  attribute cost to one tactic line. The `[simp]` blocks *are* per-call and appear in source order, which
+  is the one place you get intra-declaration attribution for free.
+- **`diagnostics` on a `def` tells you about its elaboration, not its compilation.**
+- Everything in §6 still applies — a stale `.olean` under `lake env lean`, and masking at rungs where a
+  producer fails, both survive unchanged.
