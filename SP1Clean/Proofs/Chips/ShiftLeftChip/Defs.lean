@@ -1526,9 +1526,7 @@ lemma sllw_a_isU64 {a0 a1 a2 a3 s0 s1 s2 s3 cb4 lr0 lr1 msb : ZMod p}
     · rw [one_mul, show ((65535 : ZMod p)) = ((65535 : ℕ) : ZMod p) by push_cast; rfl,
         ZMod.val_natCast_of_lt (by omega)]; norm_num
   have hv2 : (2 : ZMod p).val = 2 := val_2_zmod_p
-  have hv3 : (3 : ZMod p).val = 3 := by
-    rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) from by push_cast; rfl]
-    exact ZMod.val_natCast_of_lt (by omega)
+  have hv3 : (3 : ZMod p).val = 3 := val_3_zmod_p
   have n1 : (1 : ZMod p) ≠ 0 := one_ne_zero
   have n2 : (2 : ZMod p) ≠ 0 := fun h => by rw [h, ZMod.val_zero] at hv2; omega
   have n3 : (3 : ZMod p) ≠ 0 := fun h => by rw [h, ZMod.val_zero] at hv3; omega

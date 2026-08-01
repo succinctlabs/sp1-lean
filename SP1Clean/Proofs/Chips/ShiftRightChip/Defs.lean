@@ -1690,9 +1690,7 @@ lemma srlw_sraw_a_isU64 {e13 cb4 a0 a1 a2 a3 su0 su1 su2 su3 lr0 lr1f bmsbFill s
   have ha3 : a3 = srwmsb * 65535 := sub_eq_zero.mp hw5
   have hp : 2 ^ 17 < p := Fact.out
   have hv2 : (2 : ZMod p).val = 2 := val_2_zmod_p
-  have hv3 : (3 : ZMod p).val = 3 := by
-    rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) from by push_cast; rfl]
-    exact ZMod.val_natCast_of_lt (by omega)
+  have hv3 : (3 : ZMod p).val = 3 := val_3_zmod_p
   have n2 : (2 : ZMod p) ≠ 0 := fun h => by rw [h, ZMod.val_zero] at hv2; omega
   have n3 : (3 : ZMod p) ≠ 0 := fun h => by rw [h, ZMod.val_zero] at hv3; omega
   have key : a0.val < 2 ^ 16 ∧ a1.val < 2 ^ 16 := by

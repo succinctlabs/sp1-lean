@@ -2176,15 +2176,9 @@ private theorem branchTailByte_faithful
           (AbstractInteraction.toAccess env)) =
       branchTailRustAccesses
         (branchChipRustColumns env input offset) := by
-  have h6 : (6 : ZMod p).val = 6 := by
-    exact ZMod.val_natCast_of_lt
-      (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
-  have h14 : (14 : ZMod p).val = 14 := by
-    exact ZMod.val_natCast_of_lt
-      (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
-  have h16 : (16 : ZMod p).val = 16 := by
-    exact ZMod.val_natCast_of_lt
-      (Nat.lt_trans (by norm_num) (Fact.out (p := 2 ^ 17 < p)))
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
+  have h14 : (14 : ZMod p).val = 14 := val_14_zmod_p
+  have h16 : (16 : ZMod p).val = 16 := val_16_zmod_p
   have hBytePull :
       ∀ (gate : Expression (ZMod p))
         (msg : ByteRow (Expression (ZMod p))),

@@ -148,6 +148,10 @@ lemma val_65536_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (65536 : ZMod p) ≠ 0 
 lemma val_4_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (4 : ZMod p) ≠ 0 := by
   simp [← ZMod.val_eq_zero, val_4_zmod_p]
 
+@[simp] lemma val_5_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
+    (5 : ZMod p).val = 5 :=
+  ZMod.val_natCast_of_lt (show (5 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
+
 @[simp] lemma val_6_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
     (6 : ZMod p).val = 6 :=
   ZMod.val_natCast_of_lt (show (6 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
@@ -170,6 +174,10 @@ lemma val_8_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (8 : ZMod p) ≠ 0 := by
 @[simp] lemma val_16_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
     (16 : ZMod p).val = 16 :=
   ZMod.val_natCast_of_lt (show (16 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
+
+@[simp] lemma val_29_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
+    (29 : ZMod p).val = 29 :=
+  ZMod.val_natCast_of_lt (show (29 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 @[simp] lemma val_32_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
     (32 : ZMod p).val = 32 :=
@@ -210,6 +218,11 @@ lemma val_lt_65536_of_mul_inv_four_lt [Fact p.Prime] [Fact (2 ^ 17 < p)] {x : ZM
     (h : (x * (4 : ZMod p)⁻¹).val < 2 ^ 14) : x.val < 2 ^ 16 := by
   have he := val_eq_mul_inv_four_mul_four h
   omega
+
+/-- `0xFF00`, the high-byte sign-extension fill the load chips write into limb 0. -/
+@[simp] lemma val_65280_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
+    (65280 : ZMod p).val = 65280 :=
+  ZMod.val_natCast_of_lt (show (65280 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
 
 @[simp] lemma val_65535_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
     (65535 : ZMod p).val = 65535 :=

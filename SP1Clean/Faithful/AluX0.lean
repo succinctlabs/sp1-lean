@@ -25,9 +25,7 @@ open scoped SP1Clean.ConstraintCoe
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 -- Perf: 4 of this file's 6 former 1M-4M heartbeat ceilings floored <=40000 and were removed.
 
-private lemma val_29'' [NeZero p] : (29 : ZMod p).val = 29 := by
-  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  exact ZMod.val_natCast_of_lt (show (29 : ℕ) < p by omega)
+private lemma val_29'' [NeZero p] : (29 : ZMod p).val = 29 := val_29_zmod_p
 
 /-- **Chip-level faithfulness anchor.** Under `is_real = 1`, SP1's generated `AluX0` chip constraint list
 holds iff: the two CPUState clock bounds; the `op_a_0 = 1` forcing (`rd = x0`); the four op_a **read**-zeroing
@@ -335,9 +333,7 @@ theorem aluX0Chip_interactions_faithful
     List.Perm (nativeAccesses env ((AluX0Chip.main input).operations offset))
       (aluX0ChipOracle.accesses cols) := by
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  have h6 : (6 : ZMod p).val = 6 := by
-    have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
   have hsign :
       -signedVal
           (Expression.eval env input.is_real -

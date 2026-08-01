@@ -68,9 +68,7 @@ theorem u16tou8safe_interactions_faithful_syntactic
         Extracted.Interaction.toAccess
       = (((SP1Clean.U16toU8OperationSafe.main input).operations offset).interactionsWith
           byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
-  have h3 : (3 : ZMod p).val = 3 := by
-    have h : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
+  have h3 : (3 : ZMod p).val = 3 := val_3_zmod_p
   have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
       AbstractInteraction.toAccess env ((pulledIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",

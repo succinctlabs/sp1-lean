@@ -19,8 +19,7 @@ the completeness direction: soundness uses the same trusted Byte table row to re
 `opcode.val < 29`. -/
 lemma byteRowSpec_ltu_29_iff {op : ZMod p} :
     ByteRowSpec (⟨(4 : ZMod p), 1, op, 29⟩ : ByteRow (ZMod p)) ↔ op.val < 29 := by
-  have h29 : (29 : ZMod p).val = 29 :=
-    ZMod.val_natCast_of_lt (show (29 : ℕ) < p by have := Fact.out (p := 2 ^ 17 < p); omega)
+  have h29 : (29 : ZMod p).val = 29 := val_29_zmod_p
   constructor
   · rintro ⟨byteOpcode, opcodeEq, constrained⟩
     have indexEq : byteOpcode.idx = 4 :=

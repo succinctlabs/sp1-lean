@@ -78,9 +78,7 @@ private lemma signExtend64_ofNat8_of_ge_128 [NeZero p] (b : ZMod p) (hb : b.val 
   rw [BitVec.toNat_ofNat, Word.toNat_def]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
   have hp : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  have h65535 : (65535 : ZMod p).val = 65535 := by
-    rw [show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) from by norm_cast, ZMod.val_natCast,
-      Nat.mod_eq_of_lt (by omega)]
+  have h65535 : (65535 : ZMod p).val = 65535 := val_65535_zmod_p
   have hsum : (b + 65280 : ZMod p).val = b.val + 65280 := by
     rw [show (65280 : ZMod p) = ((65280 : ℕ) : ZMod p) from by norm_cast,
       ZMod.val_add, ZMod.val_natCast, Nat.mod_eq_of_lt (show (65280 : ℕ) < p by omega),

@@ -563,12 +563,8 @@ private theorem addicols_byte_interactions_faithful_syntactic
       (((Extracted.AddiOracle.AddiCols.interactions (addiChipReconfigure cols)).map
         Extracted.Interaction.toAccess).filter
           (fun access => access.1 = InteractionKind.Byte)) := by
-  have h6 : (6 : ZMod p).val = 6 := by
-    have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
-  have h3 : (3 : ZMod p).val = 3 := by
-    have h : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
+  have h3 : (3 : ZMod p).val = 3 := val_3_zmod_p
   have hk : ∀ (g : Expression (ZMod p)) (row : ByteRow (Expression (ZMod p))),
       AbstractInteraction.toAccess env ((pulledIf (channel := byteChannel) g row).toRaw) =
         (InteractionKind.Byte, "SP1Byte",

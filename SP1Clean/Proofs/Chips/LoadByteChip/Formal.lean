@@ -27,9 +27,7 @@ private lemma sext_limb0_lt {b m : ZMod p} (hb : b.val < 256) (hm : m = 0 ∨ m 
   have hp65536 : (65536 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   rcases hm with h | h
   · rw [h, mul_zero, add_zero]; omega
-  · have h65280 : (65280 : ZMod p).val = 65280 := by
-      rw [show (65280 : ZMod p) = ((65280 : ℕ) : ZMod p) by norm_cast,
-        ZMod.val_natCast_of_lt (by omega)]
+  · have h65280 : (65280 : ZMod p).val = 65280 := val_65280_zmod_p
     rw [h, mul_one, ZMod.val_add, h65280, Nat.mod_eq_of_lt (by omega)]; omega
 
 -- Measured floors: soundness ≤ 400000, completeness ≤ 300000; the former 16M stamps were ~40x over.

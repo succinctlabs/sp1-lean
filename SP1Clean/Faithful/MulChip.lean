@@ -2459,26 +2459,10 @@ theorem mulOperation_interactions_exact
         Extracted.Interaction.toAccess =
       (((SP1Clean.MulOperation.main input).operations offset).interactionsWith
         byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
-  have h3 : (3 : ZMod p).val = 3 := by
-    have h : (3 : ℕ) < p := by
-      have := Fact.out (p := 2 ^ 24 < p)
-      omega
-    exact ZMod.val_natCast_of_lt h
-  have h5 : (5 : ZMod p).val = 5 := by
-    have h : (5 : ℕ) < p := by
-      have := Fact.out (p := 2 ^ 24 < p)
-      omega
-    exact ZMod.val_natCast_of_lt h
-  have h6 : (6 : ZMod p).val = 6 := by
-    have h : (6 : ℕ) < p := by
-      have := Fact.out (p := 2 ^ 24 < p)
-      omega
-    exact ZMod.val_natCast_of_lt h
-  have h16 : (16 : ZMod p).val = 16 := by
-    have h : (16 : ℕ) < p := by
-      have := Fact.out (p := 2 ^ 24 < p)
-      omega
-    exact ZMod.val_natCast_of_lt h
+  have h3 : (3 : ZMod p).val = 3 := val_3_zmod_p
+  have h5 : (5 : ZMod p).val = 5 := val_5_zmod_p
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
+  have h16 : (16 : ZMod p).val = 16 := val_16_zmod_p
   have hk :
       ∀ (g : Expression (ZMod p))
         (s : ByteRow (Expression (ZMod p))),

@@ -822,9 +822,7 @@ theorem bitwiseChip_interactions_faithful
     List.Perm (nativeAccesses env ((BitwiseChip.main input).operations offset))
       (bitwiseChipOracle.accesses cols) := by
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  have h6 : (6 : ZMod p).val = 6 := by
-    have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
   have hsign :
       -signedVal
           (Expression.eval env input.is_real -

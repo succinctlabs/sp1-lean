@@ -88,8 +88,7 @@ theorem sndPc_straightline (r : Trace.RowView (ZMod p))
     (h0 : (r.state.pc[0]).val < 2 ^ 16) :
     sndPcOf (stateAccess r) = rcvPcOf (stateAccess r) + 4#64 := by
   have hp : (2:ℕ) ^ 17 < p := Fact.out
-  have hv4 : (4 : ZMod p).val = 4 := by
-    simp only [ZMod.val_ofNat, Nat.mod_eq_of_lt (show 4 < p by omega)]
+  have hv4 : (4 : ZMod p).val = 4 := val_4_zmod_p
   have e0 : (r.state.pc[0] + 4 : ZMod p).val = (r.state.pc[0]).val + 4 := by
     rw [ZMod.val_add, hv4, Nat.mod_eq_of_lt (by omega)]
   simp only [sndPcOf, rcvPcOf, stateAccess, pcBitsOfVals, hstraight,

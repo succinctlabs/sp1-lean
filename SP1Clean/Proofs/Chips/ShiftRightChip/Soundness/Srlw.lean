@@ -208,9 +208,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       have hne2 : (2 : ZMod p) ≠ 0 := by
         intro h; have := val_2_zmod_p (p := p); rw [h, ZMod.val_zero] at this; exact absurd this (by norm_num)
       have hne3 : (3 : ZMod p) ≠ 0 := by
-        intro h; have h3 : (3 : ZMod p).val = 3 := by
-          rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) by push_cast; rfl]
-          exact ZMod.val_natCast_of_lt (by omega)
+        intro h; have h3 : (3 : ZMod p).val = 3 := val_3_zmod_p
         rw [h, ZMod.val_zero] at h3; exact absurd h3 (by norm_num)
       -- `ll2 = 0`.
       obtain ⟨-, h_ll2_0⟩ := ShiftRightMath.higher_lower_zero b_cb0 b_cb1 b_cb2 b_cb3

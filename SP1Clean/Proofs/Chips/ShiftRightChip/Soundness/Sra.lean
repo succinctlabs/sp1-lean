@@ -235,9 +235,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       have hne2 : (2 : ZMod p) ≠ 0 := by
         intro h; have := val_2_zmod_p (p := p); rw [h, ZMod.val_zero] at this; exact absurd this (by norm_num)
       have hne3 : (3 : ZMod p) ≠ 0 := by
-        intro h; have h3 : (3 : ZMod p).val = 3 := by
-          rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) by push_cast; rfl]
-          exact ZMod.val_natCast_of_lt (by omega)
+        intro h; have h3 : (3 : ZMod p).val = 3 := val_3_zmod_p
         rw [h, ZMod.val_zero] at h3; exact absurd h3 (by norm_num)
       -- Alias the shift-result columns.
       set su0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4) with hsu0_def
