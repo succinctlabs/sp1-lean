@@ -16,7 +16,7 @@ namespace SP1Clean.BitwiseSail
 
 open Sail LeanRV64D LeanRV64D.Functions
 
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+variable {p : ℕ} [Fact p.Prime]
 
 /-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail R-type op. -/
 noncomputable def spec_bitwise (rs2 rs1 rd : regidx) (op : rop) : SailM Unit := do
@@ -31,7 +31,6 @@ def sp1_bitwise (rd : regidx) (pc : BitVec 64) (a_val : Vector (ZMod p) 8) : Sai
   wX_bits rd (Word.toBitVec64 (BitwiseU16Operation.resultWord a_val))
 
 set_option linter.unusedSimpArgs false in
-omit [Fact (2 ^ 17 < p)] in
 /-- Native Sail equivalence: the chip's semantic `Spec` (`h_op`) plus the register/PC
 reads drive `spec_bitwise ≡ sp1_bitwise`, with no SP1Chips borrow. -/
 theorem correct_bitwise_native
@@ -57,7 +56,6 @@ noncomputable def spec_bitwise_imm (imm : BitVec 12) (rs1 rd : regidx) (op : iop
   pure ()
 
 set_option linter.unusedSimpArgs false in
-omit [Fact (2 ^ 17 < p)] in
 /-- Native Sail equivalence (ANDI): the chip's bitwise fact (`h_op`, with the immediate operand `op_c_val`
 bound to `sign_extend imm` via `h_dec`) drives `spec_bitwise_imm … ANDI ≡ sp1_bitwise`. The Sail `ANDI` arm
 `rX rs1 &&& immext` is the same body as `execute_RTYPE_pure … .AND`. -/
@@ -81,7 +79,6 @@ theorem correct_andi_native
   simp [SP1Clean.Advance.execute_ITYPE', SP1Clean.Advance.execute_ITYPE_pure, h_rs1, harm]
 
 set_option linter.unusedSimpArgs false in
-omit [Fact (2 ^ 17 < p)] in
 /-- Native Sail equivalence (ORI): `h_op` + reads drive `spec_bitwise_imm … ORI ≡ sp1_bitwise`. -/
 theorem correct_ori_native
     (op_b_val op_c_val : Word (ZMod p)) (a_val : Vector (ZMod p) 8)
@@ -103,7 +100,6 @@ theorem correct_ori_native
   simp [SP1Clean.Advance.execute_ITYPE', SP1Clean.Advance.execute_ITYPE_pure, h_rs1, harm]
 
 set_option linter.unusedSimpArgs false in
-omit [Fact (2 ^ 17 < p)] in
 /-- Native Sail equivalence (XORI): `h_op` + reads drive `spec_bitwise_imm … XORI ≡ sp1_bitwise`. -/
 theorem correct_xori_native
     (op_b_val op_c_val : Word (ZMod p)) (a_val : Vector (ZMod p) 8)
@@ -124,7 +120,6 @@ theorem correct_xori_native
     SP1Clean.TryStepReduction.run_bind_of_run' s _ _ () run_writeReg]
   simp [SP1Clean.Advance.execute_ITYPE', SP1Clean.Advance.execute_ITYPE_pure, h_rs1, harm]
 
-omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (AND): a real Bitwise chip row with `is_and = 1` reaches the Sail `AND`. -/
 theorem bitwise_chip_reaches_sail_and
     (input : BitwiseChip.Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))
@@ -140,7 +135,6 @@ theorem bitwise_chip_reaches_sail_and
     rop.AND h_pc h_rs1 h_rs2 ?_
   exact (h_chip.2.1 h_real).1 h_and
 
-omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (OR): a real Bitwise chip row with `is_or = 1` reaches the Sail `OR`. -/
 theorem bitwise_chip_reaches_sail_or
     (input : BitwiseChip.Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))
@@ -156,7 +150,6 @@ theorem bitwise_chip_reaches_sail_or
     rop.OR h_pc h_rs1 h_rs2 ?_
   exact (h_chip.2.1 h_real).2.1 h_or
 
-omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (XOR): a real Bitwise chip row with `is_xor = 1` reaches the Sail `XOR`. -/
 theorem bitwise_chip_reaches_sail_xor
     (input : BitwiseChip.Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))
@@ -172,7 +165,6 @@ theorem bitwise_chip_reaches_sail_xor
     rop.XOR h_pc h_rs1 h_rs2 ?_
   exact (h_chip.2.1 h_real).2.2 h_xor
 
-omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (ANDI): a real Bitwise chip row with `is_and = 1` whose `op_c` is the sign-extended
 immediate (`h_dec`) reaches the Sail `ANDI`. -/
 theorem bitwise_chip_reaches_sail_andi
@@ -189,7 +181,6 @@ theorem bitwise_chip_reaches_sail_andi
     rs1_idx rd_idx imm pc s h_pc h_rs1 h_dec ?_
   exact (h_chip.2.1 h_real).1 h_and
 
-omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (ORI): a real Bitwise chip row with `is_or = 1` and immediate `op_c` reaches the Sail `ORI`. -/
 theorem bitwise_chip_reaches_sail_ori
     (input : BitwiseChip.Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))
@@ -205,7 +196,6 @@ theorem bitwise_chip_reaches_sail_ori
     rs1_idx rd_idx imm pc s h_pc h_rs1 h_dec ?_
   exact (h_chip.2.1 h_real).2.1 h_or
 
-omit [Fact (2 ^ 17 < p)] in
 /-- End-to-end (XORI): a real Bitwise chip row with `is_xor = 1` and immediate `op_c` reaches the Sail `XORI`. -/
 theorem bitwise_chip_reaches_sail_xori
     (input : BitwiseChip.Inputs (ZMod p)) (cols : BitwiseChip.Columns (ZMod p)) (data : ProverData (ZMod p))

@@ -23,8 +23,6 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
 /-- Witness the addend (3 limbs = `is_auipc * pc`) and add result (4 limbs), then compose `CPUState`,
 `AddOperation` (gate `is_real - op_a_0`), and `JTypeReader`. Pin the addend per-limb with
 `addend[i] = is_auipc * pc[i]` gates. -/

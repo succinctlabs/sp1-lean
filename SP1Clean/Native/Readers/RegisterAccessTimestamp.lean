@@ -48,10 +48,6 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
--- `local` so this convenience instance does not leak into importing files (a global `NeZero p`
--- derived from `Fact (2^17 < p)` would make downstream `omit [Fact (2^17 < p)] in` clauses illegal).
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
 /-- The `cols` block (`prev_low`, `diff_low_limb`) is an **input** (the composing chip witnesses it);
 `main` witnesses nothing and imposes the two `is_real`-gated byte checks over `input.cols.*`: a 16-bit
 `Range` on `diff_low_limb` and a `U8Range` (`< 256`) on the scaled high part `(clk_target - prev_low - 1 -

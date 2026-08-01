@@ -10,7 +10,7 @@ pinned to `Expression` by per-binding ascriptions. -/
 
 namespace SP1Clean.DivRemChip
 
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
+variable {p : ℕ} [Fact p.Prime]
 
 set_option linter.unusedVariables false in
 -- Ladder-measured 2026-07-27 (lowering the real ceiling, re-elaborating each rung): 40000 FAILS
@@ -396,7 +396,6 @@ def ownAsserts {R : Type} [Add R] [Sub R] [Mul R] [Zero R] [One R]
   let E367 : R := (1 : R) - E366
   [E13, E15, E17, E19, E20, E21, E22, E23, E29, E35, E41, E47, E48, E49, E51, E54, E57, E59, E61, E64, E67, E69, E70, E71, E73, E76, E79, E81, E83, E86, E89, E91, E96, E99, E103, E105, E107, E109, E111, E113, E115, E117, E119, E154, E157, E160, E163, E167, E171, E175, E179, E184, E189, E194, E199, E204, E209, E214, E219, E225, E228, E230, E232, E234, E236, E238, E240, E242, E244, E247, E250, E253, E256, E259, E262, E265, E268, E270, E272, E274, E276, E278, E280, E282, E284, E286, E288, E299, E300, E301, E302, E305, E307, E309, E311, E313, E315, E317, E319, E321, E323, E325, E327, E329, E331, E333, E335, E337, E339, E341, E343, E345, E347, E349, E351, E353, E355, E357, E359, E367, cols.adapter.op_a_0]
 
-omit [Fact (2 ^ 24 < p)] in
 /-- `E355`, the chip selector's boolean gate, is part of the pure DivRem own-assertion list. -/
 theorem isReal_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_real * (cols.is_real - 1) ∈ ownAsserts cols := by
@@ -405,7 +404,6 @@ theorem isReal_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
-omit [Fact (2 ^ 24 < p)] in
 /-- The `is_div` selector's boolean gate is part of the pure DivRem own-assertion list. -/
 theorem isDiv_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_div * (cols.is_div - 1) ∈ ownAsserts cols := by
@@ -414,7 +412,6 @@ theorem isDiv_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
-omit [Fact (2 ^ 24 < p)] in
 /-- The `is_divu` selector's boolean gate is part of the pure DivRem own-assertion list. -/
 theorem isDivu_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_divu * (cols.is_divu - 1) ∈ ownAsserts cols := by
@@ -423,7 +420,6 @@ theorem isDivu_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
-omit [Fact (2 ^ 24 < p)] in
 /-- The `is_rem` selector's boolean gate is part of the pure DivRem own-assertion list. -/
 theorem isRem_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_rem * (cols.is_rem - 1) ∈ ownAsserts cols := by
@@ -432,7 +428,6 @@ theorem isRem_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
-omit [Fact (2 ^ 24 < p)] in
 /-- The `is_remu` selector's boolean gate is part of the pure DivRem own-assertion list. -/
 theorem isRemu_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_remu * (cols.is_remu - 1) ∈ ownAsserts cols := by
@@ -441,7 +436,6 @@ theorem isRemu_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
-omit [Fact (2 ^ 24 < p)] in
 /-- The `is_divw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
 theorem isDivw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_divw * (cols.is_divw - 1) ∈ ownAsserts cols := by
@@ -450,7 +444,6 @@ theorem isDivw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
-omit [Fact (2 ^ 24 < p)] in
 /-- The `is_remw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
 theorem isRemw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_remw * (cols.is_remw - 1) ∈ ownAsserts cols := by
@@ -459,7 +452,6 @@ theorem isRemw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
-omit [Fact (2 ^ 24 < p)] in
 /-- The `is_divuw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
 theorem isDivuw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_divuw * (cols.is_divuw - 1) ∈ ownAsserts cols := by
@@ -468,7 +460,6 @@ theorem isDivuw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
-omit [Fact (2 ^ 24 < p)] in
 /-- The `is_remuw` selector's boolean gate is part of the pure DivRem own-assertion list. -/
 theorem isRemuw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     cols.is_remuw * (cols.is_remuw - 1) ∈ ownAsserts cols := by
@@ -477,7 +468,6 @@ theorem isRemuw_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
-omit [Fact (2 ^ 24 < p)] in
 /-- `E343`, the `is_real_not_word` scalar's boolean gate, is part of the pure DivRem own-assertion
 list (the upper-Mul gate's binariness lever). -/
 theorem isRealNotWord_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
@@ -487,7 +477,6 @@ theorem isRealNotWord_gate_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
-omit [Fact (2 ^ 24 < p)] in
 /-- `E367`, the eight-flag one-hot sum, is part of the pure DivRem own-assertion list. -/
 theorem flagsSum_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     (1 : Expression (ZMod p)) - (cols.is_divu + cols.is_remu + cols.is_div + cols.is_rem +
@@ -497,7 +486,6 @@ theorem flagsSum_mem_ownAsserts (cols : Var Columns (ZMod p)) :
     | exact List.Mem.head _
     | apply List.Mem.tail
 
-omit [Fact (2 ^ 24 < p)] in
 /-- The physical non-`x0` routing assertion is the final entry of the pure DivRem own-assertion
 list.  Keeping this membership folded lets whole-chip grounding recover the route without
 unfolding the arithmetic evidence contract. -/

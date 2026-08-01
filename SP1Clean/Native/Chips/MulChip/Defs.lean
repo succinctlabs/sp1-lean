@@ -27,8 +27,6 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
-
 /-- The five honest variant flags (`is_mul`, `is_mulh`, `is_mulhu`, `is_mulhsu`, `is_mulw`) the
 prover supplies via the `"mul_flags"` hint key (one-hot for the active variant, all-zero on
 padding). Falls back to all-zero when the key is absent. -/

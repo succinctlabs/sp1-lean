@@ -21,7 +21,7 @@ This module carries the **State** bus and the **Byte** bus (SP1's preprocessed `
 namespace SP1Clean.Channels
 
 open Circuit
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+variable {p : ℕ} [Fact p.Prime]
 
 /-- The structural State interaction channel (SP1 `InteractionKind.State`).  Its local predicate is
 `True`: a row may emit its current/next `(clock, pc)` records, but reachability is not a fact that either
@@ -107,18 +107,18 @@ lemma interactionsWith_subcircuit_formal {F : Type} [FiniteField F] {Input Outpu
   rw [Operations.interactionsWith_subcircuit, FormalCircuit.toSubcircuit_interactions]
   rfl
 
-omit [Fact (2 ^ 17 < p)] in
 /-- Two channels with distinct `name`s have distinct `toRaw`s — as a `simp`-shaped `= False` so the
 `interactionsWith` per-op `if i.channel = channel` conditions for a *different* bus reduce to the `else`
 branch **without expanding the channel record** (which would break a child's bottom-up
-`interactionsWith_<chan>_eq` rfl-lemma matching). (`omit`s the `2^17` fact so it applies wherever
-`channelsLawful` does, e.g. under `Fact p.Prime` only.) -/
+`interactionsWith_<chan>_eq` rfl-lemma matching). (Carries no `2^17` magnitude fact — that variable is
+not in scope in this file — so it applies wherever `channelsLawful` does, e.g. under `Fact p.Prime`
+only.) -/
 private lemma toRaw_eq_false_of_name_ne {M1 M2 : TypeMap} [ProvableType M1] [ProvableType M2]
     {c1 : Channel (ZMod p) M1} {c2 : Channel (ZMod p) M2} (h : c1.name ≠ c2.name) :
     (c1.toRaw = c2.toRaw) = False :=
   eq_false fun he => h (by rw [← Channel.toRaw_name c1, ← Channel.toRaw_name c2, he])
 
-omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+omit [Fact p.Prime] in
 /-- Name-distinctness at the `RawChannel` layer. -/
 private lemma rawChannel_eq_false_of_name_ne {rc1 rc2 : RawChannel (ZMod p)}
     (h : rc1.name ≠ rc2.name) : (rc1 = rc2) = False :=
@@ -127,62 +127,50 @@ private lemma rawChannel_eq_false_of_name_ne {rc1 rc2 : RawChannel (ZMod p)}
 -- Per-pair `= False` instances (`@[circuit_norm]`) for every ordered pair of distinct buses a channel
 -- list or `interactionsWith` filter can compare — kept as pre-instantiated simp rules so the
 -- `if i.channel = channel` conditions reduce without record expansion.
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma byteChannel_eq_stateChannel_false :
     ((byteChannel (p := p)).toRaw = (stateChannel (p := p)).toRaw) = False :=
   rawChannel_eq_false_of_name_ne (by
     simp only [Channel.toRaw_name, byteChannel, stateChannel]; decide)
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma stateChannel_eq_byteChannel_false :
     ((stateChannel (p := p)).toRaw = (byteChannel (p := p)).toRaw) = False :=
   rawChannel_eq_false_of_name_ne (by
     simp only [Channel.toRaw_name, byteChannel, stateChannel]; decide)
 -- State vs Memory / Program — needed wherever a chip's `exposedChannels` filter must drop the
 -- memory/program interactions.
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma stateChannel_eq_memoryChannel_false :
     ((stateChannel (p := p)).toRaw = (memoryChannel (p := p)).toRaw) = False :=
   rawChannel_eq_false_of_name_ne (by
     simp only [Channel.toRaw_name, stateChannel, memoryChannel]; decide)
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma memoryChannel_eq_stateChannel_false :
     ((memoryChannel (p := p)).toRaw = (stateChannel (p := p)).toRaw) = False :=
   rawChannel_eq_false_of_name_ne (by
     simp only [Channel.toRaw_name, stateChannel, memoryChannel]; decide)
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma stateChannel_eq_programChannel_false :
     ((stateChannel (p := p)).toRaw = (programChannel (p := p)).toRaw) = False :=
   rawChannel_eq_false_of_name_ne (by
     simp only [Channel.toRaw_name, stateChannel, programChannel]; decide)
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma programChannel_eq_stateChannel_false :
     ((programChannel (p := p)).toRaw = (stateChannel (p := p)).toRaw) = False :=
   rawChannel_eq_false_of_name_ne (by
     simp only [Channel.toRaw_name, stateChannel, programChannel]; decide)
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma byteChannel_eq_memoryChannel_false :
     ((byteChannel (p := p)).toRaw = (memoryChannel (p := p)).toRaw) = False :=
   toRaw_eq_false_of_name_ne (by simp [byteChannel, memoryChannel])
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma byteChannel_eq_programChannel_false :
     ((byteChannel (p := p)).toRaw = (programChannel (p := p)).toRaw) = False :=
   rawChannel_eq_false_of_name_ne (by
     simp only [Channel.toRaw_name, byteChannel, programChannel]; decide)
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma programChannel_eq_memoryChannel_false :
     ((programChannel (p := p)).toRaw = (memoryChannel (p := p)).toRaw) = False :=
   rawChannel_eq_false_of_name_ne (by
     simp only [Channel.toRaw_name, programChannel, memoryChannel]; decide)
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma memoryChannel_eq_programChannel_false :
     ((memoryChannel (p := p)).toRaw = (programChannel (p := p)).toRaw) = False :=
   rawChannel_eq_false_of_name_ne (by
     simp only [Channel.toRaw_name, memoryChannel, programChannel]; decide)
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma memoryChannel_eq_byteChannel_false :
     ((memoryChannel (p := p)).toRaw = (byteChannel (p := p)).toRaw) = False :=
   toRaw_eq_false_of_name_ne (by simp [memoryChannel, byteChannel])
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma programChannel_eq_byteChannel_false :
     ((programChannel (p := p)).toRaw = (byteChannel (p := p)).toRaw) = False :=
   rawChannel_eq_false_of_name_ne (by
@@ -190,17 +178,14 @@ omit [Fact (2 ^ 17 < p)] in
 
 -- Reusable disequalities for the State exposure proofs.  Keeping these once at the channel boundary
 -- avoids every chip reopening the `RawChannel` record merely to filter its non-State interactions.
-omit [Fact (2 ^ 17 < p)] in
 lemma byteChannel_toRaw_ne_stateChannel :
     (byteChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw :=
   of_eq_false byteChannel_eq_stateChannel_false
 
-omit [Fact (2 ^ 17 < p)] in
 lemma programChannel_toRaw_ne_stateChannel :
     (programChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw :=
   of_eq_false programChannel_eq_stateChannel_false
 
-omit [Fact (2 ^ 17 < p)] in
 lemma memoryChannel_toRaw_ne_stateChannel :
     (memoryChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw :=
   of_eq_false memoryChannel_eq_stateChannel_false

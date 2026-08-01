@@ -22,8 +22,6 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
-
 set_option linter.unusedSectionVars false in
 private lemma evalSub (env : Environment (ZMod p)) (a b : Expression (ZMod p)) :
     Expression.eval env (a - b) = Expression.eval env a - Expression.eval env b := by

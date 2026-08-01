@@ -31,9 +31,6 @@ open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel Progr
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
--- `local` so this convenience instance does not leak into importing files.
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
 /-- Compose a `RegisterAccessCols` per operand (op_a/op_b gated `is_real`, op_c gated `is_real - imm_c`),
 impose the `op_a_0` binary + the `imm_c` immediate gates, the four op_a **read**-zeroing gates
 (`op_a_0 * op_a_memory.prev_value_i = 0`), and emit the Program (`is_trusted`) + Memory buses (op_a a read:

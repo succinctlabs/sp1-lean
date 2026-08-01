@@ -24,9 +24,8 @@ open SP1Clean
 open SP1Clean.Extracted
 open scoped SP1Clean.ConstraintCoe
 
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+variable {p : ℕ} [Fact p.Prime]
 
-omit [Fact (2 ^ 17 < p)] in
 /-- **Faithfulness anchor — assertion half.** SP1's `IsZeroOperation` `asserts` list holds iff the
 native gadget's `AssertSpec` holds. (No range bounds here, so `NeZero p` follows from primality
 alone.) -/
@@ -36,7 +35,6 @@ theorem isZero_asserts_faithful (a : ZMod p) (cols : Extracted.IsZeroOperation (
   simp only [Extracted.IsZeroOperation.asserts, List.Forall,
     SP1Clean.IsZeroOperation.AssertSpec, one_mul, bool_iff]
 
-omit [Fact (2 ^ 17 < p)] in
 /-- **Faithfulness anchor — interaction half.** `IsZeroOperation` emits no bus interactions, so its
 (empty) `interactions` list trivially holds, matching the trivial `InteractSpec`. -/
 theorem isZero_interactions_faithful (a : ZMod p) (cols : Extracted.IsZeroOperation (ZMod p)) :
@@ -45,7 +43,6 @@ theorem isZero_interactions_faithful (a : ZMod p) (cols : Extracted.IsZeroOperat
   simp only [Extracted.IsZeroOperation.interactions, List.Forall,
     SP1Clean.IsZeroOperation.InteractSpec]
 
-omit [Fact (2 ^ 17 < p)] in
 /-- Combined anchor (`asserts ∧ interactions ↔ RawSpec = AssertSpec`). Composed by
 `IsZeroWord`/`IsEqualWord`. -/
 theorem isZero_constraints_faithful (a : ZMod p) (cols : Extracted.IsZeroOperation (ZMod p)) :
@@ -56,7 +53,6 @@ theorem isZero_constraints_faithful (a : ZMod p) (cols : Extracted.IsZeroOperati
   simp only [SP1Clean.IsZeroOperation.InteractSpec, SP1Clean.IsZeroOperation.AssertSpec,
     SP1Clean.IsZeroOperation.RawSpec, and_true]
 
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] theorem eval_isZeroColumns
     (env : Environment (ZMod p))
     (cols : Extracted.IsZeroOperation (Expression (ZMod p))) :
@@ -80,7 +76,6 @@ private def isZeroAssertionExpressions
   let e8 := input.is_real * e7
   [e3, e6, e8]
 
-omit [Fact (2 ^ 17 < p)] in
 private theorem isZero_nativeAssertions
     (env : Environment (ZMod p))
     (input : Var SP1Clean.IsZeroOperation.Inputs (ZMod p))
@@ -95,7 +90,6 @@ private theorem isZero_nativeAssertions
   repeat' rw [CanonicalReader.equalityAssertionList]
   simp [isZeroAssertionExpressions, Expression.eval]
 
-omit [Fact (2 ^ 17 < p)] in
 /-- Folded normalization of the native assertion fragment to the exact generated Rust list.
 This is an implementation lemma for whole-chip `ChipFaithful` proofs, not an additional
 operation-level verification boundary. -/
@@ -119,7 +113,6 @@ theorem isZero_assertions_exact
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery
 
-omit [Fact (2 ^ 17 < p)] in
 /-- **Faithfulness anchor — interaction half, SYNTACTIC.** `IsZeroOperation` is a pure `assertZero` gadget:
 its `main` emits no byte interactions, matching SP1's empty extracted `interactions` list — both `toAccess`
 images are `[]`. -/

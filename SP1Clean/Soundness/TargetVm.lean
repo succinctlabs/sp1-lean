@@ -54,8 +54,6 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
-
 
 /-! ## The supported-core public values
 

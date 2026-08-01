@@ -187,7 +187,6 @@ end SP1Clean.AddrAddOperation
 namespace SP1Clean.AddressOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
 /-- The two operand words, the three witnessed offset bits, and the row selector passed by the
 composing load/store chip.  The selector is part of the operation input because upstream SP1 gates
@@ -324,7 +323,6 @@ end SP1Clean.AddressOperation
 namespace SP1Clean.AddOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
 /-- Proof-oriented local columns for the addition gadget. This shape is independent of SP1 Rust's
 `AddOperation` columns; the assembled chip faithfulness map is the only place that relates them. -/
@@ -354,7 +352,6 @@ end SP1Clean.AddOperation
 namespace SP1Clean.SubOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
 /-- Proof-oriented local columns for the subtraction gadget. The assembled chip faithfulness map is
 the only place that relates this shape to SP1 Rust's helper-operation columns. -/
@@ -383,7 +380,6 @@ end SP1Clean.SubOperation
 namespace SP1Clean.AddwOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
 /-- Proof-oriented local columns for the 32-bit add gadget: the two witnessed low result limbs
 plus the composed sign-bit block (the shared `Extracted.U16MSBOperation` struct, kept because the
@@ -414,7 +410,6 @@ end SP1Clean.AddwOperation
 namespace SP1Clean.SubwOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
 /-- Proof-oriented local columns for the 32-bit subtract gadget: the two witnessed low result limbs
 plus the composed sign-bit block (the shared `Extracted.U16MSBOperation` struct, kept because the
@@ -512,7 +507,6 @@ end SP1Clean.BitwiseOperation
 namespace SP1Clean.MulOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
-local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
 /-- The two operand words, the already-`populate`d column struct, the `is_real` gate, and the five
 variant selectors (the `eval` params verbatim, faithful to SP1's `MulOperation::eval`). The result

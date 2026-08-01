@@ -14,7 +14,9 @@ namespace SP1Clean.IsZeroWordOperation
 
 open Circuit
 
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+-- Nothing in the gadget itself needs a magnitude fact; it is reintroduced at the bottom for
+-- `circuit_localLength`, whose signature carries the binder.
+variable {p : ℕ} [Fact p.Prime]
 
 /-- `is_real` is binary (discharged by the composing op's gate). No operand precondition. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop := input.is_real = 0 ∨ input.is_real = 1
@@ -36,7 +38,6 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 1 →
       input.cols.result = input.cols.is_zero_first_half * input.cols.is_zero_second_half)
 
-omit [Fact (2 ^ 17 < p)] in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hs0, hs1, hs2, hs3, _hbreal, hbres, hf, hsec, hg⟩ := h_holds
@@ -51,7 +52,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   rw [hr1, one_mul] at hg
   exact eq_of_sub_eq_zero hg
 
-omit [Fact (2 ^ 17 < p)] in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hbres, hf, hsec, hS0, hS1, hS2, hS3, hg⟩ := h_spec
@@ -69,7 +69,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     · simp [h]
     · rw [h, one_mul, hg h]; simp
 
-omit [Fact (2 ^ 17 < p)] in
 /-- The populated `result` is boolean for **any** source word (a product of per-limb `0/1`
 indicators) — the ungated structural fact `spec_populate_offGate` needs. -/
 theorem populate_result_bool (w : Word (ZMod p)) :
@@ -78,7 +77,6 @@ theorem populate_result_bool (w : Word (ZMod p)) :
   by_cases h0 : w[0] = 0 <;> by_cases h1 : w[1] = 0 <;> by_cases h2 : w[2] = 0 <;>
     by_cases h3 : w[3] = 0 <;> simp [h0, h1, h2, h3]
 
-omit [Fact (2 ^ 17 < p)] in
 /-- The witnessed columns `populate a` satisfy the gadget `Spec` for any `is_real`. The composing op
 (`IsEqualWord`) / top-level chip uses this to discharge the `assertion IsZeroWordOperation.circuit`
 prover obligation. -/
@@ -88,7 +86,6 @@ theorem spec_populate (a : Word (ZMod p)) (is_real : ZMod p) :
     IsZeroOperation.spec_populate a[1] is_real, IsZeroOperation.spec_populate a[2] is_real,
     IsZeroOperation.spec_populate a[3] is_real, fun _ => rfl⟩
 
-omit [Fact (2 ^ 17 < p)] in
 /-- Semantic exposure: on a real row the `Spec` forces `result` to be the word zero-indicator. -/
 theorem result_semantic {input : Inputs (ZMod p)} (h : Spec input) (hr : input.is_real = 1) :
     input.cols.result =
@@ -96,7 +93,6 @@ theorem result_semantic {input : Inputs (ZMod p)} (h : Spec input) (hr : input.i
   obtain ⟨_, hf, hs, hS0, hS1, hS2, hS3, hg⟩ := h
   exact result_collapse (hS0 hr).1 (hS1 hr).1 (hS2 hr).1 (hS3 hr).1 hf hs (hg hr)
 
-omit [Fact (2 ^ 17 < p)] in
 /-- `Spec` with the gate off (`is_real = 0`) holds at the populate of **any** word `w` — not just
 the operand `a`. A composing chip can share one witnessed struct between two differently-gated
 assertions with different operand words (`DivRemChip`'s `is_overflow_b/c`: full-word @
@@ -111,7 +107,6 @@ theorem spec_populate_offGate (a w : Word (ZMod p)) {is_real : ZMod p} (hr : is_
     fun h1 => absurd (hr.symm.trans h1) zero_ne_one,
     fun h1 => absurd (hr.symm.trans h1) zero_ne_one⟩
 
-omit [Fact (2 ^ 17 < p)] in
 /-- `Spec` at the all-zero column struct with the gate off (`is_real = 0`) — the inactive-row
 discharge for composing chips whose populate leaves the struct zero. The operand is arbitrary. -/
 theorem spec_zero (a : Word (ZMod p)) {is_real : ZMod p} (hr : is_real = 0) :
@@ -131,8 +126,13 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     soundness := soundness,
     completeness := completeness }
 
+section LocalLength
+variable [Fact (2 ^ 17 < p)]
+
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
     circuit.localLength x = 0 := rfl
+
+end LocalLength
 
 end SP1Clean.IsZeroWordOperation

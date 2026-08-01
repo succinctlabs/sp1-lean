@@ -36,7 +36,6 @@ open SP1Clean.LookupAccessList (isConsistentBalanced aggregateChipRows)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 

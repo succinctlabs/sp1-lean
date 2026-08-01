@@ -47,9 +47,6 @@ open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel Progr
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
--- `local` so this convenience instance does not leak into importing files (see `RegisterAccessTimestamp`).
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
 /-- Component-wise evaluation of the canonical R-type reader row.  Kept beside the native reader so
 soundness and faithfulness clients share one folded evaluator boundary. -/
 @[circuit_norm] theorem eval_cols {F : Type} [FiniteField F]

@@ -11,8 +11,6 @@ open Circuit
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-local instance : NeZero p :=
-  ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 private theorem main_requirementsChannelsLawful
     (input_var : Var Inputs (ZMod p)) (i₀ : ℕ) :

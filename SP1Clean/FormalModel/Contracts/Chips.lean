@@ -131,7 +131,6 @@ end SP1Clean.AddiChip
 namespace SP1Clean.SubChip
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
 /-- Native Sub-chip row. The reader blocks reuse the project substrate; only the arithmetic block is
 owned by the local Lean gadget. `Faithful.SubChip.subChipReconfigure` is the sole bridge to Rust's

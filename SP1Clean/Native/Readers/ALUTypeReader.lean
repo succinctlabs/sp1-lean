@@ -38,9 +38,6 @@ open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel Progr
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
--- `local` so this convenience instance does not leak into importing files.
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
 /-- Component-wise evaluation of the ALU reader input bundle.  Keeping this folded projection next
 to the reader avoids repeatedly normalizing the derived `ProvableStruct` instance in whole-chip
 faithfulness proofs. -/

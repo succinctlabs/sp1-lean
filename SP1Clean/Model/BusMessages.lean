@@ -86,8 +86,6 @@ def MemoryMsg.ClkBound (msg : MemoryMsg (ZMod p)) : Prop :=
 
 section ClkBound
 
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
 /-- **The pusher's side of `MemoryMsg.ClkBound`**: the two `Readers.CPUState.Spec` clock byte bounds
 bound the row's recombined low clock plus any intra-row effect offset (`+1`/`+2`/`+3`/`+4`) by `2^24`.
 `clk_0_16` decodes as `8 s + 1` with `s < 2^13` (so `≤ 2^16 - 7`) and `clk_16_24 < 2^8`, giving
@@ -145,8 +143,6 @@ directories, so the `Readers.*` names resolve identically wherever the declarati
 namespace SP1Clean.Readers
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 /-- The clock discipline at **one already-shifted** access clock: the caller applied the effect offset
 before handing the clock over, so only the single 24-bit bound remains. `Readers.RegisterWrite` is the

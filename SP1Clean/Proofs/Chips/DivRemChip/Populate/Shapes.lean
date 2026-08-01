@@ -17,9 +17,6 @@ open Circuit
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
-local instance : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
-
 /-! ## The one-hot flag destructor -/
 
 set_option linter.unusedSectionVars false in

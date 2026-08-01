@@ -34,8 +34,6 @@ open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel Progr
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
 /-- Component-wise evaluation of the canonical I-type reader row.  This is the folded evaluator
 boundary used by chip-level grounding and faithfulness proofs. -/
 @[circuit_norm] theorem eval_cols {F : Type} [FiniteField F]

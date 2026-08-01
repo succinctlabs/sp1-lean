@@ -27,8 +27,6 @@ open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel Progr
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
 /-- Compose a `RegisterAccessCols` per operand (op_a read at `clk_low + 4`, op_b read at `clk_low + 3`)
 for the timestamp byte checks; impose the four read-zeroing gates (`op_a_0 * prev_value_i = 0`);
 emit the Program bus (`imm_c = 1`) and the four Memory **read** interactions. The Program guarantee

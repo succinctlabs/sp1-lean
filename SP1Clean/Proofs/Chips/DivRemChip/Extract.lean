@@ -308,8 +308,6 @@ lemma overflow_of_iseqword_word {b c : Word (ZMod p)}
       simp only [val_65535_zmod_p]; norm_num
   all_goals simp at hprod
 
-local instance : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
-
 /-- A 4-flag group sum is binary when the flags are binary and their `.val`s sum to `≤ 1` (the one-hot
 budget). Used to lift the per-flag one-hot to the variant selectors `E5`/`E6`/`E7`. -/
 lemma group_binary4 {a b c d : ZMod p} (ha : a = 0 ∨ a = 1) (hb : b = 0 ∨ b = 1)

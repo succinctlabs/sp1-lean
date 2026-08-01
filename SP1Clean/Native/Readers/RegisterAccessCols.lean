@@ -47,9 +47,6 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 namespace RegisterAccessCols
 
--- `local` so this convenience instance does not leak into importing files (see `RegisterAccessTimestamp`).
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
 /-- Witness the 4 `prev_value` columns (`0`) and compose the timestamp sub-circuit, returning the
 assembled `Extracted.RegisterAccessCols`. **SP1's register-access read range-checks no `prev_value`**
 (`crates/core/machine/src/air/memory.rs:122-166`: it only sends/receives the Memory interactions and the
