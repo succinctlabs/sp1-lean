@@ -533,7 +533,6 @@ private def branchNativeMeaning
         ((Readers.ITypeReaderImmutable.main
           (branchITypeInput input offset)).operations (offset + 20)))
 
-set_option maxHeartbeats 800000 in
 private theorem branchNativeAssertionsDecompose
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -744,7 +743,6 @@ private def branchRustTail
 
 omit [Fact (2 ^ 17 < p)] in
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 800000 in
 private theorem branchColumns_asserts_decompose
     (cols : BranchChip.Columns (ZMod p)) :
     Extracted.BranchOracle.BranchColumns.asserts (branchChipReconfigure cols) =

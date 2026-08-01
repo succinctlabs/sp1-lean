@@ -405,7 +405,6 @@ private theorem bitwiseU16Assertions
   simp only [List.Forall, eval_sub, Expression.eval, hreal]
   tauto
 
-set_option maxHeartbeats 400000 in
 private theorem bitwise_chip_constraints_decompose
     (env : Environment (ZMod p)) (input : Var BitwiseChip.Inputs (ZMod p))
     (offset : ℕ) :
@@ -812,7 +811,6 @@ theorem bitwiseChip_constraints_constructive
 
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
-set_option maxHeartbeats 400000 in
 theorem bitwiseChip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var BitwiseChip.Inputs (ZMod p))
     (offset : ℕ) (cols : BitwiseChip.Columns (ZMod p))

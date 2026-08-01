@@ -2191,7 +2191,6 @@ private theorem divRemOpA0OfOwn
   change Eval.eval env cols.adapter.op_a_0 = 0
   simpa only [ProvableType.eval_field] using hop
 
-set_option maxHeartbeats 800000 in
 set_option maxRecDepth 100000 in
 private theorem divRemWholeAssertionsExact
     (env : Environment (ZMod p))

@@ -33,9 +33,6 @@ def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZM
     (cols.is_sllw = 1 →
       Word.toBitVec64 cols.a = RV64.sllw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))
 
--- Genuinely binding (a `whnf`-bound elaboration tower): the former 4M ceiling was ~20× over, measured
--- floor bracket (100000, 200000]; sized at 4× the bracket top.
-set_option maxHeartbeats 800000 in
 /-- Soundness of the `sllw` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_early_struct

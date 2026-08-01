@@ -360,6 +360,38 @@ Scope: the 101 elaboration-budget ceilings on **hand-written** code — everythi
 > pre-deletion** and no longer resolve in the 27 files that lost a site; re-anchor by declaration
 > name. Ladder comments for the deleted sites were removed with them.
 
+> **Status — Phase 1 tranche B (2026-08-01): a further 20 deleted, 37 hand-written sites remain.**
+> Tranche B resolved the 22 sites tranche A held back, all re-measured under the real pillar
+> `moreLeanArgs` (not the LSP). Results, and the rows above they correct:
+> - **All 13 zero-margin sites pass at the plain default** and were deleted. The
+>   [hazard-1](#deletion-hazards-inside-the--200000-bucket) caution was sound to act on but the
+>   bracket tops all held; there is now no recorded case of a `≤ 200000` bracket top failing.
+> - **The 6 UNKNOWN rows are measured.** Five floor at or below the default and were deleted:
+>   `divRemComparisonBlocks_roundtrip` **(40000, 60000]**, `divRemResultBlocks_roundtrip`
+>   **(60000, 100000]**, `divRemArithmeticBlocks_roundtrip` **(100000, 200000]**,
+>   `divRemChip_lookups_empty` **(100000, 200000]**, `mulChip_constraints_faithful` **≤ 200000**.
+>   Their declared 400000–800000 values were 4–13× over, confirming the "single largest block of
+>   unmeasured slack" note in [Plausibility check](#plausibility-check--declared-value-vs-recorded-floor).
+>   The sixth, `mulChip_interactions_faithful`, is the **only** site in either tranche that genuinely
+>   exceeds the default: **(220000, 250000]**, ratcheted 1000000 → 300000. §5A's backwards-guess of
+>   250000 for it was right; the guesses for the other five were all too high.
+> - **The two 100000 stamps** in `Faithful/MulChip.lean` were deleted (owner call, per hazard 2).
+> - **The file-scoped `Model/SailDecode.lean` stamp was converted to a scoped one**, not deleted.
+>   ⚠ Hazard 3 says it "covers all 57 declarations in the file" — **the file has 3**, and only
+>   `decode_ADD_example` is budget-bound (the other two are one-line `simp only`s). Its floor
+>   (40000, 50000] re-confirmed; kept at 400000 for the reason its in-source note gives.
+> - §9's `Nat.pred`/`Nat.casesOn` finding **reproduces on a second member of the family**:
+>   `divRemArithmeticBlocks_roundtrip` gives `Nat.casesOn ↦ 138302`, `Nat.rec ↦ 69158`,
+>   `Nat.pred ↦ 68368`, `Eq.rec ↦ 22` — `Vector.append`/`Eq.rec` are absent, as §9 found.
+>   No fix was taken: with all four floors under the default the sites are simply gone.
+> - The mechanism for the one keep is §9.6(a)'s, scaled: `Channel.Guarantees ↦ 2268` /
+>   `Channel.name ↦ 433` with `nonempty_prop ↦ 273` / `isEmpty_Prop ↦ 136` and a
+>   `sub_self ↦ 330 ❌️` / `forall_const ↦ 273 ❌️` failed-match tail, over Mul's 45-column row eval
+>   (`Eq.rec ↦ 6096`, `List.rec ↦ 5102`, `ProvableStruct.componentsToElements ↦ 2395`).
+>
+> Baseline ratcheted 272 → 252. The 37 survivors are the 35 rows with floor top > 200000, plus
+> `mulChip_interactions_faithful` and the rescoped `SailDecode` site.
+
 Column conventions:
 
 - **floor bracket** — `(lo, hi]` = highest rung that *failed*, lowest that *passed*. `≤ n` = a pass at

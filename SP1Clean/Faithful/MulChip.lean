@@ -1088,7 +1088,6 @@ private theorem mulSignExtend_bool
       subst cSign
       simp
 
-set_option maxHeartbeats 100000 in
 set_option linter.unusedSimpArgs false in
 theorem mulOperation_assertions_forward
     (env : Environment (ZMod p))
@@ -1514,7 +1513,6 @@ local macro "close_mul_constraint" h:term : tactic =>
       List.getElem_cons_succ, eval_sub, eval_mul, eval_add,
       Expression.eval, sub_zero, zero_add] using $h)
 
-set_option maxHeartbeats 100000 in
 set_option linter.unusedSimpArgs false in
 theorem mulOperation_assertions_backward
     (env : Environment (ZMod p))
@@ -1712,7 +1710,6 @@ theorem mulOperation_assertions_backward
   · close_mul_constraint hp14
   · close_mul_constraint hp15
 
-set_option maxHeartbeats 600000 in
 private theorem mulChip_constraints_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
@@ -3183,7 +3180,11 @@ private theorem mulOperation_accesses_filter_byte
     Extracted.U16MSBOperation.interactions,
     Extracted.Interaction.toAccess]
 
-set_option maxHeartbeats 1000000 in
+-- The only anchor in this file that genuinely exceeds the plain default: measured floor bracket
+-- (220000, 250000], so the former 1M was ~4x over. The cost is the `Faithful/` channel-comparison
+-- mechanism (`Channel.toRaw_ext_iff` tearing each channel record open into `Guarantees`/`Requirements`
+-- lambda `HEq`s, which then draw mathlib's whole forall-bucket) on top of Mul's 45-column row eval.
+set_option maxHeartbeats 300000 in
 private theorem mulChip_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)

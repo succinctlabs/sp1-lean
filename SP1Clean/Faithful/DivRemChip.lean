@@ -477,7 +477,6 @@ private theorem divRemHeaderBlocks_roundtrip {F : Type}
   all_goals (congr 1; omega)
 
 set_option linter.unusedSimpArgs false in
-set_option maxHeartbeats 400000 in
 set_option maxRecDepth 100000 in
 private theorem divRemComparisonBlocks_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :
@@ -526,7 +525,6 @@ private theorem divRemComparisonBlocks_roundtrip {F : Type}
   all_goals (congr 1; omega)
 
 set_option linter.unusedSimpArgs false in
-set_option maxHeartbeats 800000 in
 set_option maxRecDepth 100000 in
 private theorem divRemArithmeticBlocks_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :
@@ -589,7 +587,6 @@ private theorem divRemArithmeticBlocks_roundtrip {F : Type}
     rfl
 
 set_option linter.unusedSimpArgs false in
-set_option maxHeartbeats 400000 in
 set_option maxRecDepth 100000 in
 private theorem divRemResultBlocks_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :
@@ -1119,7 +1116,6 @@ def divRemChipRowCodec :
         Air.Flat.Component.rowOffset_mk]
       exact eval_divRemChipDirectOutput (p := p) cols data }
 
-set_option maxHeartbeats 800000 in
 theorem divRemChip_lookups_empty :
     (⟨DivRemChip.circuit (p := p)⟩ :
       Air.Flat.Component (ZMod p)).operations.lookups = [] := by

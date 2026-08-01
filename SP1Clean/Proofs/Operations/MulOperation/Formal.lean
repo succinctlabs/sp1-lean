@@ -93,9 +93,6 @@ private lemma op5_iff_of_msb_eq {x lo msb : ZMod p}
 
 -- The gadget composes the 8×8 limb product's carry chain plus four sub-gadget boundaries;
 -- soundness normalizes all 45 witnessed columns' constraints in one `circuit_proof_start` pass.
--- Measured (W3/r1/b4): fails at 100k, passes at the plain default — the former 40M ceiling was
--- ~200-400× over.  Kept at ~5× the measured floor rather than removed.
-set_option maxHeartbeats 1000000 in
 set_option linter.unusedSimpArgs false in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start

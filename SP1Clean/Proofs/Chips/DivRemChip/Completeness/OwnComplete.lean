@@ -123,7 +123,6 @@ private lemma eval_getElem {n : ℕ} {env : Environment (ZMod p)}
     Expression.eval env (v[i]'hi) = w[i]'hi := by
   rw [← h, Vector.getElem_map]
 
-set_option maxHeartbeats 800000 in
 set_option linter.unusedVariables false in
 /-- Every own-assert (`ownAsserts colsV`) evaluates to `0` at the honest populate witnesses, given the
 per-column eval pins. -/

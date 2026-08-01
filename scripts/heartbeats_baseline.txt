@@ -521,5 +521,18 @@
 # default. Excluded from the tranche: the 13 zero-margin sites (bracket top exactly 200000), the
 # two sub-default 100000 stamps in Faithful/MulChip.lean, and the file-scoped Model/SailDecode.lean
 # stamp. 316 -> 272.
-SP1Clean 272
+# -20 (2026-08-01, heartbeat-P1 tranche B): ratchet DOWN, nothing raised. Resolved the 22 sites
+# tranche A deliberately held back. (1) All 13 zero-margin sites (bracket top exactly 200000) were
+# re-laddered under the real pillar moreLeanArgs and every one passes at the plain default --
+# deleted. (2) The 6 never-measured sites were laddered for the first time: 5 floor at or below the
+# default and were deleted (Faithful/DivRemChip divRemComparisonBlocks_roundtrip (40k, 60k],
+# divRemResultBlocks_roundtrip (60k, 100k], divRemArithmeticBlocks_roundtrip (100k, 200k],
+# divRemChip_lookups_empty (100k, 200k]; Faithful/MulChip mulChip_constraints_faithful <= 200k);
+# the sixth, Faithful/MulChip mulChip_interactions_faithful, genuinely binds at (220000, 250000]
+# and was ratcheted 1000000 -> 300000. (3) The two sub-default 100000 stamps in Faithful/MulChip
+# were deleted (owner-approved; deleting them raises the budget to the default). (4) The
+# file-scoped Model/SailDecode.lean stamp was converted to a scoped directive on its sole
+# budget-bound declaration, decode_ADD_example, value unchanged at 400000 -- a net-zero site count
+# but a strictly narrower scope. Hand-written sites 57 -> 37; SP1Clean 272 -> 252.
+SP1Clean 252
 SP1CleanTest 16

@@ -26,7 +26,6 @@ def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZM
 set_option linter.unusedVariables false in
 set_option linter.unusedTactic false in
 set_option linter.unreachableTactic false in
-set_option maxHeartbeats 800000 in
 /-- Soundness of the `srlw` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_early_struct

@@ -1474,7 +1474,6 @@ private theorem eval_lt_chip_c_msb
 
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
-set_option maxHeartbeats 200000 in
 theorem ltChip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var LtChip.Inputs (ZMod p))
     (offset : ℕ) (cols : LtChip.Columns (ZMod p))

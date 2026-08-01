@@ -368,9 +368,6 @@ def exposedProgramInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
        #v[input.adapter.op_c, 0, 0, 0],
        input.adapter.op_a_0, 0, 0⟩ ]
 
--- The tightest site in this file: measured (W5/b8) floor bracket (150k, 200k] — under 1.5x
--- headroom against the plain default — so the former 8M was only ~40x over, not removable.
-set_option maxHeartbeats 800000 in
 /-- The `Mul` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `mul`/`mulh`/`mulhu`/`mulhsu`/`mulw`
 semantic contract; output is the native `Columns` row. Soundness is proved; completeness is
 the explicitly disclosed 4.31 migration seam above. -/
