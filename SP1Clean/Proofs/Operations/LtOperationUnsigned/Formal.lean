@@ -91,7 +91,6 @@ them. **`ring1`, not `ring`** — `ring`'s `ring_nf` fallback never fails, so a 
 the non-equality goal and blocks the alternatives behind it. -/
 theorem sel_populate {b cc : Word (ZMod p)} :
     Selectors b cc (populate b cc) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Selectors, populate, comparisonLimbsWitness, flagsWitness, notEqInvWitness]
   by_cases h3 : b[3] = cc[3]
   · by_cases h2 : b[2] = cc[2]

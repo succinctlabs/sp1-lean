@@ -192,7 +192,6 @@ lemma val_8_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (8 : ZMod p) ≠ 0 := by
 two corollaries below (divisibility + the `< 2^16` bound). -/
 lemma val_eq_mul_inv_four_mul_four [Fact p.Prime] [Fact (2 ^ 17 < p)] {x : ZMod p}
     (h : (x * (4 : ZMod p)⁻¹).val < 2 ^ 14) : x.val = (x * (4 : ZMod p)⁻¹).val * 4 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have h41 : (4 : ZMod p)⁻¹ * 4 = 1 := inv_mul_cancel₀ val_4_ne_zero
   conv_lhs => rw [show x = (x * (4 : ZMod p)⁻¹) * 4 by rw [mul_assoc, h41, mul_one]]
@@ -242,7 +241,6 @@ lemma limb_lift [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (hprev : prev = 0 ∨ prev = 1) (hcc : cc = 0 ∨ cc = 1)
     (h : bb + vv + prev = aa + cc * 65536) :
     bb.val + vv.val + prev.val = aa.val + cc.val * 65536 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   apply_fun ZMod.val at h
   have hprev_lt : prev.val ≤ 1 := by

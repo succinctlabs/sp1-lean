@@ -177,7 +177,6 @@ theorem lb_chip_reaches_sail
       = (sp1_lb rd_idx pc (Word.toBitVec64
           #v[input.selected_byte + 65280 * input.msb, 65535 * input.msb, 65535 * input.msb,
             65535 * input.msb])).run s := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   have hext : extend_value is_unsigned (BitVec.ofNat 8 input.selected_byte.val)
       = Word.toBitVec64 #v[input.selected_byte + 65280 * input.msb, 65535 * input.msb,
           65535 * input.msb, 65535 * input.msb] := by
@@ -220,7 +219,6 @@ lemma loadByte_hval (input : Inputs (ZMod p)) (isU : Bool)
     Word.toBitVec64 (#v[input.selected_byte + 65280 * input.msb, 65535 * input.msb,
         65535 * input.msb, 65535 * input.msb] : Word (ZMod p))
       = extend_value isU (BitVec.ofNat 8 input.selected_byte.val) := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   rcases hcase with ⟨hlb, _, rfl⟩ | ⟨hlbu, _, rfl⟩
   · -- LB (signed)
     obtain ⟨hmsbbin, hmsbiff⟩ := h_lb_msb hlb

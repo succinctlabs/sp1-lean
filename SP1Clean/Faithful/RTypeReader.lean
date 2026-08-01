@@ -56,7 +56,6 @@ theorem rtypereader_constraints_faithful
         (cols.op_c_memory.access_timestamp.diff_low_limb.val < 2 ^ 16 ∧
           ((clk_low + 2 - cols.op_c_memory.access_timestamp.prev_low - 1
               - cols.op_c_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹).val < 2 ^ 8)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.RTypeReader.asserts, Extracted.RTypeReader.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_memory, Interaction.toProp_send_program,
@@ -101,7 +100,6 @@ theorem rtypereader_interactions_faithful
         (cols.op_c_memory.access_timestamp.diff_low_limb.val < 2 ^ 16 ∧
           ((clk_low + 2 - cols.op_c_memory.access_timestamp.prev_low - 1
               - cols.op_c_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹).val < 2 ^ 8)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.RTypeReader.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_memory, Interaction.toProp_send_program,
@@ -158,7 +156,6 @@ theorem rtypereader_memory_interactions_faithful_syntactic
       = ((((Extracted.RTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
           is_trusted).map Extracted.Interaction.toAccess).filter
             (fun a => a.1 = InteractionKind.Memory)).eraseIdx 1).map LookupAccessList.negMult := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have hrac := fun (n : ℕ) (inp : Var Readers.RegisterAccessCols.Inputs (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit memoryChannel.toRaw
@@ -208,7 +205,6 @@ theorem rtypereader_program_interactions_faithful_syntactic
       = (((Extracted.RTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
           is_trusted).map Extracted.Interaction.toAccess).filter
             (fun a => a.1 = InteractionKind.Program)).map LookupAccessList.negMult := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have hrac := fun (n : ℕ) (inp : Var Readers.RegisterAccessCols.Inputs (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit programChannel.toRaw
@@ -259,7 +255,6 @@ theorem rtypereader_byte_interactions_faithful_syntactic
         byteChannel.toRaw).map (AbstractInteraction.toAccess env)
       = ((Extracted.RTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
           is_trusted).map Extracted.Interaction.toAccess).filter (fun a => a.1 = InteractionKind.Byte) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
   have h3 : (3 : ZMod p).val = 3 := val_3_zmod_p
   have hbk := toAccess_pullIf_byte_forall env

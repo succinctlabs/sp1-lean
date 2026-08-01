@@ -33,7 +33,6 @@ theorem subwSemantics_of_carries {a b : Word (ZMod p)} {cols : Columns (ZMod p)}
   obtain ⟨hc0, hc1, hv0, hv1⟩ := h_raw
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   set c0 : ZMod p := (a[0] + 65535 - b[0] - cols.value[0] + 1) * (65536 : ZMod p)⁻¹ with hc0_def
@@ -76,7 +75,6 @@ theorem carries_of_subwSemantics {a b : Word (ZMod p)} {cols : Columns (ZMod p)}
     (hbv : Word.toBitVec64 (resultWord cols)
       = (BitVec.setWidth 32 (Word.toBitVec64 a - Word.toBitVec64 b)).signExtend 64) :
     RawSpec a b cols ∧ cols.msb.msb = if cols.value[1].val ≥ 32768 then 1 else 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
   obtain ⟨hv0, hv1, hm2, _⟩ := Word.lt_cases_of_isU64 hU

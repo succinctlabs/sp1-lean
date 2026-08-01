@@ -230,7 +230,6 @@ theorem lw_chip_reaches_sail
     (spec_lw imm rs1_idx rd_idx is_unsigned).run s
       = (sp1_lw rd_idx pc (Word.toBitVec64
           #v[input.selected_word[0], input.selected_word[1], 65535 * input.msb, 65535 * input.msb])).run s := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   -- the `extend_value` equation: sign-extend (LW) or zero-extend (LWU) the read = the written word.
   have hext : extend_value is_unsigned
       (BitVec.ofNat 8 (input.selected_word[1].val >>> 8) ++ BitVec.ofNat 8 input.selected_word[1].val ++
@@ -281,7 +280,6 @@ lemma loadWord_hval (input : Inputs (ZMod p)) (isU : Bool)
           ++ BitVec.ofNat 8 input.selected_word[1].val
           ++ BitVec.ofNat 8 (input.selected_word[0].val >>> 8)
           ++ BitVec.ofNat 8 input.selected_word[0].val) := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   rcases hcase with ⟨hlw, _, rfl⟩ | ⟨hlwu, hlw, rfl⟩
   · -- LW (signed)
     have hmsbeq := h_lw_msb hlw

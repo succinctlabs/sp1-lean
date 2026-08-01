@@ -114,7 +114,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 `AddwChip` uses this to discharge the `assertion AddwOperation.circuit` prover obligation. -/
 theorem spec_populate {a b : Word (ZMod p)} (ha : a.isU64) (hb : b.isU64) (is_real : ZMod p) :
     Spec (⟨a, b, populate a b, is_real⟩ : Inputs (ZMod p)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨ha0, ha1, _, _⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hb0, hb1, _, _⟩ := Word.lt_cases_of_isU64 hb

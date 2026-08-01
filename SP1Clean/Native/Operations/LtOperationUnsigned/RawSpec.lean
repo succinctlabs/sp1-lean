@@ -240,7 +240,6 @@ theorem flags_sum_zero_iff_eq {cols : Extracted.LtOperationUnsigned (ZMod p)}
   obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb
   obtain ⟨hd0, hd1, hd2, hd3⟩ := Word.lt_cases_of_isU64 hcc
   have h10 : (1 : ZMod p) ≠ 0 := by
-    haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   rcases at_most_one hf0 hf1 hf2 hf3 hsum with
     ⟨g0, g1, g2, g3⟩ | ⟨g3, g0, g1, g2⟩ | ⟨g2, g0, g1, g3⟩ | ⟨g1, g0, g2, g3⟩ | ⟨g0, g1, g2, g3⟩

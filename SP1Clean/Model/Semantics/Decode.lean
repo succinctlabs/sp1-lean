@@ -730,7 +730,6 @@ theorem instrToProgramRow_inv_itype {pc : Vector (ZMod p) 3} {i : instruction}
       row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
       ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   simp only [instrToProgramRow] at h
   split at h
@@ -775,7 +774,6 @@ theorem instrToProgramRow_inv_shiftitype {pc : Vector (ZMod p) 3} {i : instructi
       row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0] ∧
       row.op_c = bitVecToWord (shamt.setWidth 64) := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   simp only [instrToProgramRow] at h
   split at h
@@ -820,7 +818,6 @@ theorem instrToProgramRow_inv_shiftiwtype {pc : Vector (ZMod p) 3} {i : instruct
       row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0] ∧
       row.op_c = bitVecToWord (shamt.setWidth 64) := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   simp only [instrToProgramRow] at h
   split at h
@@ -869,7 +866,6 @@ theorem instrToProgramRow_inv_addiw {pc : Vector (ZMod p) 3} {i : instruction}
       row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
       ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   simp only [instrToProgramRow] at h
   split at h
@@ -911,7 +907,6 @@ theorem instrToProgramRow_inv_utype {pc : Vector (ZMod p) 3} {i : instruction}
     ∃ (imm : BitVec 20) (rd : regidx), i = .UTYPE (imm, rd, op) ∧
       row.op_a = regidxVal rd ∧ row.op_b = bitVecToWord ((imm.signExtend 64) <<< 12) := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   simp only [instrToProgramRow] at h
   split at h
@@ -1154,7 +1149,6 @@ theorem instrToProgramRow_inv_jal {pc : Vector (ZMod p) 3} {i : instruction}
       row.op_a = regidxVal rd ∧ row.op_b = bitVecToWord (imm.signExtend 64)
       ∧ row.op_c = #v[0, 0, 0, 0] := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   simp only [instrToProgramRow] at h
   split at h
@@ -1226,7 +1220,6 @@ theorem instrToProgramRow_inv_jalr {pc : Vector (ZMod p) 3} {i : instruction}
       row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
       ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   simp only [instrToProgramRow] at h
   split at h
@@ -1718,7 +1711,6 @@ theorem instrToProgramRow_inv_btype {pc : Vector (ZMod p) 3} {i : instruction}
       row.op_a = regidxVal rs1 ∧ row.op_b = #v[regidxVal rs2, 0, 0, 0]
       ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   simp only [instrToProgramRow] at h
   split at h
@@ -1791,7 +1783,6 @@ theorem instrToProgramRow_inv_load {pc : Vector (ZMod p) 3} {i : instruction}
       row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
       ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   simp only [instrToProgramRow] at h
   split at h
@@ -1910,7 +1901,6 @@ theorem instrToProgramRow_inv_load' {pc : Vector (ZMod p) 3} {i : instruction}
       row.op_a = regidxVal rd ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
       ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   have h0 : instrToProgramRow pc i = some row := instrToProgramRow'_some h
   simp only [instrToProgramRow] at h0
@@ -2052,7 +2042,6 @@ theorem instrToProgramRow_inv_store {pc : Vector (ZMod p) 3} {i : instruction}
       row.op_a = regidxVal rs2 ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
       ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   simp only [instrToProgramRow] at h
   split at h
@@ -2174,7 +2163,6 @@ theorem instrToProgramRow_inv_store' {pc : Vector (ZMod p) 3} {i : instruction}
       row.op_a = regidxVal rs2 ∧ row.op_b = #v[regidxVal rs1, 0, 0, 0]
       ∧ row.op_c = bitVecToWord (imm.signExtend 64) := by
   have honezero : (1 : ZMod p) ≠ 0 := by
-    have : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     exact one_ne_zero
   have h0 : instrToProgramRow pc i = some row := instrToProgramRow'_some h
   simp only [instrToProgramRow] at h0

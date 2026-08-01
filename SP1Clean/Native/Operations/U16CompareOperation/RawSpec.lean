@@ -22,7 +22,6 @@ theorem compare_of_raw {a b : ZMod p} {cols : Extracted.U16CompareOperation (ZMo
     cols.bit = if a.val < b.val then 1 else 0 := by
   obtain ⟨hbit, hlt⟩ := h_raw
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   set v := (a - b + cols.bit * 65536).val with hv_def
   have hcong : (v : ZMod p) = a - b + cols.bit * 65536 := by rw [hv_def, ZMod.natCast_zmod_val]
   have ea : ((a.val : ℕ) : ZMod p) = a := ZMod.natCast_zmod_val a

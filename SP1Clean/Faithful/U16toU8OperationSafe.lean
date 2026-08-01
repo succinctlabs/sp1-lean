@@ -32,7 +32,6 @@ theorem u16tou8safe_constraints_faithful (u16_values : Vector (ZMod p) 4)
     (List.Forall (· = 0) (Extracted.U16toU8OperationSafe.asserts u16_values cols 1) ∧
       List.Forall Interaction.toProp (Extracted.U16toU8OperationSafe.interactions u16_values cols 1)) ↔
       SP1Clean.U16toU8OperationSafe.RawSpec u16_values cols := by
-  haveI : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
   simp only [Extracted.U16toU8OperationSafe.asserts, Extracted.U16toU8OperationSafe.interactions,
     List.Forall, Interaction.toProp_send_byte, ByteOpcode.constrainField_three,
     ByteOpcode.constrain_U8Range,

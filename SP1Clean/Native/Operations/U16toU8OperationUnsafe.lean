@@ -52,7 +52,6 @@ set_option linter.unusedSectionVars false in
 
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h256 : (256 : ZMod p)⁻¹ * 256 = 1 := inv_mul_cancel₀ val_256_ne_zero
   refine ⟨?_, ?_, ?_, ?_⟩ <;> rw [mul_assoc, h256, mul_one] <;> ring
 

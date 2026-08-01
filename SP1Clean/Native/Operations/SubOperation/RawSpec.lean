@@ -46,7 +46,6 @@ theorem subSemantics_of_carries {a b value : Word (ZMod p)}
   refine ⟨h_isU64_v, ?_⟩
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   -- Keystone: rewrite the subtraction goal as an addition goal `value + b = a`.
@@ -95,7 +94,6 @@ theorem carries_of_subSemantics {a b value : Word (ZMod p)}
     (ha : a.isU64) (hb : b.isU64) (hv : value.isU64)
     (h_bv : value.toBitVec64 = a.toBitVec64 - b.toBitVec64) :
     RawSpec a b value := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb

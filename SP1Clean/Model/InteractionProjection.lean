@@ -38,7 +38,6 @@ omit [NeZero p] in
 /-- The `ZMod.val` of a binary `is_real` is `0` or `1`. -/
 lemma val_of_binary (hp : 2 < p) {is_real : ZMod p} (h : is_real = 0 ∨ is_real = 1) :
     is_real.val = 0 ∨ is_real.val = 1 := by
-  haveI : NeZero p := ⟨by omega⟩
   rcases h with h | h <;> subst h <;>
     simp [ZMod.val_one_eq_one_mod, Nat.mod_eq_of_lt (show 1 < p by omega)]
 
@@ -54,7 +53,6 @@ omit [NeZero p] in
 `-is_real` evaluates to `p - is_real.val`, whose centered representative is `-(is_real.val)`. -/
 lemma signedVal_neg_is_real (hp : 2 < p) {is_real : ZMod p} (h : is_real = 0 ∨ is_real = 1) :
     signedVal (- is_real) = -(is_real.val : ℤ) := by
-  haveI : NeZero p := ⟨by omega⟩
   rcases h with h | h <;> subst h
   · simp [signedVal, ZMod.val_zero]
   · haveI : Fact (1 < p) := ⟨by omega⟩
@@ -72,7 +70,6 @@ LogUp polarity flip (the faithfulness anchors carry `is_real`/`is_trusted` as fr
 binary `signedVal_neg_is_real` does not apply). -/
 lemma signedVal_neg [Fact p.Prime] (hp : 2 < p) (x : ZMod p) :
     signedVal (-x) = -signedVal x := by
-  haveI : NeZero p := ⟨by omega⟩
   have hpp : p.Prime := Fact.out
   have hodd : ¬ (2 ∣ p) := fun h2 => by
     rcases hpp.eq_one_or_self_of_dvd 2 h2 with h | h <;> omega

@@ -151,7 +151,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hdmod : (env.get i₀ + -env.get (i₀ + 4 + 4)).val % 4 = 0 :=
       val_mod_four_of_mul_inv_four_lt hlt
     have hlsble : (env.get (i₀ + 4 + 4)).val ≤ 1 := by
-      haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
       rcases h_lsb with h | h <;> rw [h] <;> simp [ZMod.val_one]
     -- load-bearing for the `ZMod.val_add_of_lt` side goal's `omega` (the magnitude of `p`).
     have hp : 2 ^ 17 < p := Fact.out

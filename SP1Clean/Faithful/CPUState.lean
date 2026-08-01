@@ -33,7 +33,6 @@ theorem cpustate_constraints_faithful
     (List.Forall (· = 0) (Extracted.CPUState.asserts cols next_pc clk_increment 1) ∧
       List.Forall Interaction.toProp (Extracted.CPUState.interactions cols next_pc clk_increment 1)) ↔
       ((cols.clk_0_16 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13 ∧ cols.clk_16_24.val < 2 ^ 8 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.CPUState.asserts, Extracted.CPUState.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_state, ByteOpcode.constrainField_six, ByteOpcode.constrainField_three,
@@ -56,7 +55,6 @@ theorem cpustate_interactions_faithful
     (cols : Extracted.CPUState (ZMod p)) (next_pc : Vector (ZMod p) 3) (clk_increment : ZMod p) :
     List.Forall Interaction.toProp (Extracted.CPUState.interactions cols next_pc clk_increment 1) ↔
       ((cols.clk_0_16 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13 ∧ cols.clk_16_24.val < 2 ^ 8 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.CPUState.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_state, ByteOpcode.constrainField_six, ByteOpcode.constrainField_three,
@@ -90,7 +88,6 @@ theorem cpustate_interactions_faithful_syntactic
         (AbstractInteraction.toAccess env))
       ((Extracted.CPUState.interactions cols next_pc clk_inc is_real).map
           Extracted.Interaction.toAccess) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h6 : (6 : ZMod p).val = 6 := by
     have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     exact ZMod.val_natCast_of_lt h
@@ -200,7 +197,6 @@ theorem cpustate_byte_interactions_faithful_syntactic
         (AbstractInteraction.toAccess env)
       = ((Extracted.CPUState.interactions cols next_pc clk_inc is_real).map
           Extracted.Interaction.toAccess).filter (fun a => a.1 = InteractionKind.Byte) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h6 : (6 : ZMod p).val = 6 := by
     have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     exact ZMod.val_natCast_of_lt h

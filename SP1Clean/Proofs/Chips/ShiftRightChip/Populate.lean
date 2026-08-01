@@ -118,7 +118,6 @@ contradiction kernel for the four-flag case bashes. -/
 private lemma numeral_ne_01 :
     ((2 : ZMod p) ≠ 0 ∧ (2 : ZMod p) ≠ 1) ∧ ((3 : ZMod p) ≠ 0 ∧ (3 : ZMod p) ≠ 1) ∧
     ((4 : ZMod p) ≠ 0 ∧ (4 : ZMod p) ≠ 1) := by
-  haveI : Fact (1 < p) := ⟨(Fact.out : p.Prime).one_lt⟩
   have key : ∀ {x : ZMod p} {n : ℕ}, x.val = n → 1 < n → x ≠ 0 ∧ x ≠ 1 := by
     intro x n hx hn
     refine ⟨fun h => ?_, fun h => ?_⟩ <;> rw [h] at hx

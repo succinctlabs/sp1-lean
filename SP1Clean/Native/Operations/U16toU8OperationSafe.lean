@@ -44,13 +44,11 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
 /-- The reassembly identity `low + (u - low) * 256⁻¹ * 256 = u`. -/
 lemma reassemble (u low : ZMod p) :
     u = low + (u - low) * (256 : ZMod p)⁻¹ * 256 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h256 : (256 : ZMod p)⁻¹ * 256 = 1 := inv_mul_cancel₀ val_256_ne_zero
   rw [mul_assoc, h256, mul_one]; ring
 
 private lemma byteComposeVal {x lo hi : ZMod p} (hlo : lo.val < 256) (hhi : hi.val < 256)
     (h : x = lo + hi * 256) : x.val = lo.val + hi.val * 256 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   subst x
   have hhi256 : (hi * 256 : ZMod p).val = hi.val * 256 := by
     rw [ZMod.val_mul, val_256_zmod_p, Nat.mod_eq_of_lt]
@@ -73,7 +71,6 @@ theorem isU64_of_decomp {u16_values : Word (ZMod p)}
 /-- The high byte `(u - (u.val % 256)) * 256⁻¹` of a 16-bit value is itself a byte. -/
 lemma high_byte_lt (u : ZMod p) (hu : u.val < 2 ^ 16) :
     ((u - ((u.val % 256 : ℕ) : ZMod p)) * (256 : ZMod p)⁻¹).val < 2 ^ 8 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   have key : ((u.val % 256 : ℕ) : ZMod p) + ((256 * (u.val / 256) : ℕ) : ZMod p) = u := by
     rw [← Nat.cast_add, show u.val % 256 + 256 * (u.val / 256) = u.val from by omega,

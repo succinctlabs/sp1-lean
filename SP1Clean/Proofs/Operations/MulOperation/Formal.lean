@@ -73,7 +73,6 @@ private lemma msb_eq_of_op5 {x lo msb : ZMod p}
     (hreass : x = lo + (x - lo) * 256⁻¹ * 256)
     (hbool : msb = 0 ∨ msb = 1) (hiff : msb = 1 ↔ 128 ≤ ((x - lo) * 256⁻¹).val) :
     msb = if x.val ≥ 32768 then 1 else 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hxval : x.val = lo.val + ((x - lo) * 256⁻¹).val * 256 := byte_compose_val hlo hhi hreass
   have key : (32768 ≤ x.val) ↔ (128 ≤ ((x - lo) * 256⁻¹).val) := by omega
   rcases hbool with h0 | h1
@@ -86,7 +85,6 @@ private lemma op5_iff_of_msb_eq {x lo msb : ZMod p}
     (hreass : x = lo + (x - lo) * 256⁻¹ * 256)
     (hmsb : msb = if x.val ≥ 32768 then 1 else 0) :
     (msb = 0 ∨ msb = 1) ∧ (msb = 1 ↔ 128 ≤ ((x - lo) * 256⁻¹).val) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hxval : x.val = lo.val + ((x - lo) * 256⁻¹).val * 256 := byte_compose_val hlo hhi hreass
   have key : (32768 ≤ x.val) ↔ (128 ≤ ((x - lo) * 256⁻¹).val) := by omega
   rw [hmsb]; split
@@ -321,7 +319,6 @@ lemma byteAt_extendedBytes_val (w : Word (ZMod p)) (lower : Extracted.U16toU8Ope
     (s : ZMod p) (hspec : U16toU8OperationSafe.DecompSpec w lower) (hs : s.val ≤ 1) (i : ℕ) :
     (byteAt (extendedBytes w lower s) i).val
       = extStream w[0].val w[1].val w[2].val w[3].val s.val i := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp : 2 ^ 24 < p := Fact.out
   have hsign : (s * 255).val = s.val * 255 := by
     have h255 : (s * 255 : ZMod p) = ((s.val * 255 : ℕ) : ZMod p) := by
@@ -372,7 +369,6 @@ lemma colSum_eq_cpNat (w w' : Word (ZMod p)) (lower lower' : Extracted.U16toU8Op
     colSum (extendedBytes w lower s) (extendedBytes w' lower' s') k
       = ((MulCarryChain.cpNat (extStream w[0].val w[1].val w[2].val w[3].val s.val)
             (extStream w'[0].val w'[1].val w'[2].val w'[3].val s'.val) k : ℕ) : ZMod p) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hsv : s.val ≤ 1 := by rcases hs with h | h <;> simp [h, ZMod.val_one, ZMod.val_zero]
   have hsv' : s'.val ≤ 1 := by rcases hs' with h | h <;> simp [h, ZMod.val_one, ZMod.val_zero]
   have hbb_lt := extendedBytes_byte_lt w lower s (fun i => (hspec i).1) (fun i => (hspec i).2.1) hs
@@ -415,7 +411,6 @@ theorem spec_populate {b c : Word (ZMod p)} (hb : b.isU64) (hc : c.isU64)
             is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw = 1) :
     Spec (⟨b, c, populate b c is_mulh is_mulhsu is_mulw,
       is_real, is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw⟩ : Inputs (ZMod p)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp : 2 ^ 24 < p := Fact.out
   have hp_lit : 16777216 < p := by
     have e : (2 : ℕ) ^ 24 = 16777216 := by norm_num

@@ -917,10 +917,29 @@ in `Proofs/Chips/ShiftLeftChip/Core.lean`.
   magnitude; grep shows one occurrence (its own line) yet `omega` consumes it implicitly.
 - `haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩` — supplies an instance to later
   `ZMod.val`/`omega` steps. There is **no** global `NeZero p` instance, *on purpose*: a `Fact (2^17 < p)`-derived
-  one would make the pervasive `omit [Fact (2^17 < p)] in` clauses illegal (`Model/ByteTable.lean:84`). A
-  `Fact p.Prime`-derived global instance *might* survive the `omit` pattern (it depends on primality, not the
-  magnitude) and eliminate most of the ~185 `haveI` copies — but it cuts against the documented local-instance
-  discipline and risks instance-resolution surprises, so it's an owner decision, not a drive-by change.
+  one would make the pervasive `omit [Fact (2^17 < p)] in` clauses illegal (`Model/ByteTable.lean:84`).
+
+> **The mechanism that decides this whole class, measured directly: `Fact p.Prime` synthesizes *both*
+> `NeZero p` and `Fact (1 < p)` as instances, while `Fact (2 ^ N < p)` synthesizes *neither*.** So the
+> `haveI : NeZero p := ⟨…⟩` idiom above is **redundant wherever `Fact p.Prime` is also in the variable
+> block** — which is everywhere in this tree, since that is the standard variable block. A sweep on this
+> basis removed **149 such locals across 68 files**, with only **3 keeps**.
+>
+> The 3 keeps are all one mechanism, and it is *not* about the proof: in each case the local is the **only
+> consumer of the `2 ^ N` instance**, so deleting it makes that section variable unused and the linter's
+> suggested `omit … in` fix would change the signature. Those are
+> `MulOperation/RawSpec.signExtend128_toNat` and `BranchChip/Decision.{zero_ne_one',val_of_bool}`. Keeping
+> the local is cheaper than a `set_option` line, so keep it.
+>
+> **Instrument caveat, learned the hard way: a `lake env lean` verdict taken while a `lake build` is in
+> flight can produce a spurious LIVE** — the build transiently removes a dependency's `.olean`, the
+> post-deletion run fails for an environmental reason, and the outputs differ. It cannot produce a
+> spurious DEAD (a baseline failure aborts the comparison), so the error is one-directional and safe, but
+> it will waste a re-run. Do not measure this class while a build is running.
+>
+> Stronger than diffing the printed signature: **require the probe's stdout *and* stderr to be
+> byte-identical** before and after deletion. That also catches a newly-emitted
+> `linter.unusedSectionVars` warning, which is the actual failure mode.
 
 > **Apparent dead `have`/`obtain` bindings are load-bearing far more often than not — verify by
 > elaboration, never by grep.** Two systematic sweeps produced **27** and **9** candidates whose names had

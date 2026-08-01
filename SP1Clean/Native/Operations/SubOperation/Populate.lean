@@ -42,7 +42,6 @@ timeout). Passes at 20000 and 10000, fails at 5000 (`whnf` at the signature), so
 over and was removed; the structurally identical `AddOperation.spec_populate` never carried one. -/
 theorem spec_populate {a b : Word (ZMod p)} (ha : a.isU64) (hb : b.isU64) (is_real : ZMod p) :
     Spec (⟨a, b, { value := populate a b }, is_real⟩ : Inputs (ZMod p)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb

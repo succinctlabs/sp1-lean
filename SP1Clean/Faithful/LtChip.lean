@@ -1483,7 +1483,6 @@ theorem ltChip_interactions_faithful
       Expression.eval env (lt_chip_is_real offset)) :
     List.Perm (nativeAccesses env ((LtChip.main input).operations offset))
       (ltChipOracle.accesses cols) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have h6 : (6 : ZMod p).val = 6 := by
     have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega

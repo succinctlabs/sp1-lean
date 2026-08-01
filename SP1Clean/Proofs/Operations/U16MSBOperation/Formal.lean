@@ -43,7 +43,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   obtain ⟨ha, hbin⟩ := h_assumptions
   obtain ⟨hmsbbool, hmsbeq⟩ := h_spec
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat

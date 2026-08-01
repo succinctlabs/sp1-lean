@@ -338,7 +338,6 @@ lemma col_lift (prodk cc col prev : ZMod p)
     (hcol : col.val < 2 ^ 21) (hprev : prev.val < 2 ^ 16)
     (h : prodk + cc * 256 = col + prev) :
     prodk.val + cc.val * 256 = col.val + prev.val := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp : 2 ^ 24 < p := Fact.out
   apply_fun ZMod.val at h
   have hcc256 : (cc * 256 : ZMod p).val = cc.val * 256 := by
@@ -366,7 +365,6 @@ lemma colSum_val (bb cc : Fin 16 → ZMod p)
     (hbb : ∀ i : Fin 16, (bb i).val < 256) (hcc : ∀ i : Fin 16, (cc i).val < 256) (k : ℕ) :
     (colSum bb cc k).val
       = ∑ i ∈ Finset.range 16, if i ≤ k then (byteAt bb i).val * (byteAt cc (k - i)).val else 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp : 2 ^ 24 < p := Fact.out
   have hbA : ∀ i, (byteAt bb i).val < 256 := byteAt_val_lt bb hbb
   have hcA : ∀ i, (byteAt cc i).val < 256 := byteAt_val_lt cc hcc
@@ -400,14 +398,12 @@ lemma colSum_val (bb cc : Fin 16 → ZMod p)
 
 /-- A `{0,1}` field element has `.val ∈ {0,1}`. -/
 lemma bool_val {x : ZMod p} (h : x = 0 ∨ x = 1) : x.val = 0 ∨ x.val = 1 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   rcases h with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
 
 /-- With exactly one of five booleans set and the first set, the other four are `0`. -/
 lemma rest_zero {a b c d e : ZMod p}
     (hb : b = 0 ∨ b = 1) (hc : c = 0 ∨ c = 1) (hd : d = 0 ∨ d = 1) (he : e = 0 ∨ e = 1)
     (ha1 : a = 1) (hsum : a + b + c + d + e = 1) : b = 0 ∧ c = 0 ∧ d = 0 ∧ e = 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp := Fact.out (p := 2 ^ 24 < p)
   have hbv := bool_val hb; have hcv := bool_val hc; have hdv := bool_val hd; have hev := bool_val he
   have hsum0 : b + c + d + e = 0 := by rw [ha1] at hsum; linear_combination hsum
@@ -471,7 +467,6 @@ lemma sum_eq_one {a b c d e : ZMod p}
     (hsum01 : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1)
     (hone : a = 1 ∨ b = 1 ∨ c = 1 ∨ d = 1 ∨ e = 1) :
     a + b + c + d + e = 1 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp := Fact.out (p := 2 ^ 24 < p)
   rcases hsum01 with h0 | h1
   · exfalso
@@ -522,7 +517,6 @@ lemma aSelector_eq_resultWord (input : Inputs (ZMod p)) (cols : Extracted.MulOpe
     (hsum : input.is_mul + input.is_mulh + input.is_mulhu + input.is_mulhsu + input.is_mulw = 1) :
     aSelector cols input.is_mul input.is_mulh input.is_mulhu input.is_mulhsu input.is_mulw
       = resultWord input cols := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have h01 : (0 : ZMod p) ≠ 1 := zero_ne_one
   unfold aSelector resultWord
   rcases hmul with h | h
@@ -558,7 +552,6 @@ lemma aSelector_eq_resultWord (input : Inputs (ZMod p)) (cols : Extracted.MulOpe
 /-- Compose a 16-bit limb from its two bytes at the `ℕ`-value level. -/
 lemma byte_compose_val {x lo hi : ZMod p} (hlo : lo.val < 256) (hhi : hi.val < 256)
     (h : x = lo + hi * 256) : x.val = lo.val + hi.val * 256 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp := Fact.out (p := 2 ^ 24 < p)
   subst h
   have hhi256 : (hi * 256 : ZMod p).val = hi.val * 256 := by
@@ -604,7 +597,6 @@ lemma extendedBytes_byte_lt (w : Word (ZMod p)) (lower : Extracted.U16toU8Operat
     (hhigh : ∀ i : Fin 4, ((w[i] - lower.low_bytes[i]) * 256⁻¹).val < 256)
     (hs : s = 0 ∨ s = 1) :
     ∀ i : Fin 16, (extendedBytes w lower s i).val < 256 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hsv : (s * 255).val < 256 := by
     rcases hs with h | h
     · rw [h, zero_mul, ZMod.val_zero]; norm_num
@@ -648,7 +640,6 @@ lemma colEq (cols : Extracted.MulOperation (ZMod p)) (bb cc : Fin 16 → ZMod p)
     (k : ℕ) (hk : k < 16) :
     (productVal cols k).val + (carryVal cols k).val * 256
       = (colSum bb cc k).val + (if k = 0 then 0 else (carryVal cols (k - 1)).val) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hc' : productVal cols k + carryVal cols k * 256
       = colSum bb cc k + (if k = 0 then 0 else carryVal cols (k - 1)) := by
     rw [h_chain k hk]; ring
@@ -803,7 +794,6 @@ set_option linter.unusedSectionVars false in
 /-- `BitVec.ofNat 128 (w.toNat)` is the 128-bit zero-extension `setWidth 128` of the word. -/
 lemma ofNat128_eq_setWidth (w : Word (ZMod p)) (hw : w.isU64) :
     BitVec.ofNat 128 (Word.toNat w) = (Word.toBitVec64 w).setWidth 128 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   apply BitVec.eq_of_toNat_eq
   rw [BitVec.toNat_ofNat, BitVec.toNat_setWidth, Word.toBitVec64_toNat hw]
 
@@ -923,7 +913,6 @@ theorem mulSemantics_of_raw {input : Inputs (ZMod p)} {cols : Extracted.MulOpera
     (hb_msb : cols.b_msb = if input.b[3].val ≥ 32768 then 1 else 0)
     (hc_msb : cols.c_msb = if input.c[3].val ≥ 32768 then 1 else 0)
     (h_raw : RawSpec input cols) : SemanticSpec input cols := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   obtain ⟨h_chain, h_pbyte, h_carry, h_bse, h_cse, h_bmsb, h_cmsb, h_bse01, h_cse01⟩ := h_raw
   set bb := extendedBytes input.b cols.b_lower_byte cols.b_sign_extend with hbb_def
   set cc := extendedBytes input.c cols.c_lower_byte cols.c_sign_extend with hcc_def

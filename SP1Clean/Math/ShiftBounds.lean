@@ -34,7 +34,6 @@ lemma N_lt_p {M N : ℕ} (h_MN : M * N = 65536) : N < p := by
 lemma mul_v_val {M N : ℕ} {a v : ZMod p} (h_MN : M * N = 65536)
     (h_v : v.val = M) (h_a : a.val < N) : (a * v).val = a.val * M := by
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   rw [ZMod.val_mul_of_lt, h_v]
   rw [h_v]; nlinarith [h_a, h_MN]
 
@@ -49,7 +48,6 @@ lemma lo_hi_val {M N : ℕ} {hl ll v : ZMod p} (h_MN : M * N = 65536)
     (h_v : v.val = M) (h_hl : hl.val < M) (h_ll : ll.val < N) :
     (hl + ll * v).val = hl.val + ll.val * M := by
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   have h_mul := mul_v_val h_MN h_v h_ll
   rw [ZMod.val_add_of_lt]
   · rw [h_mul]

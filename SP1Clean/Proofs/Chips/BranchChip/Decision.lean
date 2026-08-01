@@ -47,7 +47,6 @@ lemma one_hot6 {b0 b1 b2 b3 b4 b5 : ZMod p}
     (h3 : b3 = 0 ∨ b3 = 1) (h4 : b4 = 0 ∨ b4 = 1) (h5 : b5 = 0 ∨ b5 = 1)
     (hsum : (b0 + b1 + b2 + b3 + b4 + b5) * (b0 + b1 + b2 + b3 + b4 + b5 - 1) = 0) :
     b0.val + b1.val + b2.val + b3.val + b4.val + b5.val ≤ 1 := by
-  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : (7 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   set S := b0 + b1 + b2 + b3 + b4 + b5 with hS
   have v0 := bool_val_le h0; have v1 := bool_val_le h1; have v2 := bool_val_le h2
@@ -91,7 +90,6 @@ private lemma rest_zero {x y z w u v : ZMod p} (hx : x = 1)
     (hy : y = 0 ∨ y = 1) (hz : z = 0 ∨ z = 1) (hw : w = 0 ∨ w = 1)
     (hu : u = 0 ∨ u = 1) (hv : v = 0 ∨ v = 1) (hsum : x + y + z + w + u + v = 1) :
     y = 0 ∧ z = 0 ∧ w = 0 ∧ u = 0 ∧ v = 0 := by
-  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hle := one_hot6 (Or.inr hx) hy hz hw hu hv (by rw [hsum]; simp)
   have hxv : x.val = 1 := by rw [hx]; simp [ZMod.val_one]
   exact ⟨(ZMod.val_eq_zero _).mp (by omega), (ZMod.val_eq_zero _).mp (by omega),

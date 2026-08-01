@@ -1125,7 +1125,8 @@ private theorem divRemOracle_mulOperation_interactions_eq' {F : Type} [Field F] 
     divRemOracle_u16msb_interactions_eq]
 
 omit [Fact (2 ^ 24 < p)] in
-set_option maxHeartbeats 64000000 in
+-- The former 64M ceiling was ~3200x over: folding the twenty-way append peel into one
+-- `List.append_cancel_left_eq` rewrite drops the measured floor to (10000, 20000].
 set_option linter.unusedSimpArgs false in
 private theorem divRemRustAssertionsDecompose
     (cols : DivRemChip.Columns (ZMod p)) :
@@ -1224,26 +1225,7 @@ private theorem divRemRustAssertionsDecompose
   simp only [divRemMulEta, divRemCpuEta, divRemRTypeEta, divRemVec2Eta,
     divRemVec3Eta, divRemVec4Eta, divRemVec16Eta]
   simp only [List.append_assoc]
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
-  congr 1
+  simp only [List.append_cancel_left_eq]
   simp only [List.cons.injEq, true_and]
   norm_num
 

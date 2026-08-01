@@ -111,7 +111,6 @@ a genuine byte force `msb = 1 ↔ 128 ≤ b.val`. -/
 lemma byte_msb_iff {b msb : ZMod p} (hb : b.val < 2 ^ 8)
     (hbool : msb = 0 ∨ msb = 1) (hr : (2 * b - msb * 256).val < 2 ^ 8) :
     msb = 1 ↔ 128 ≤ b.val := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   rw [show (2 : ℕ) ^ 8 = 256 from by norm_num] at hb hr
   have h2 : (2 * b : ZMod p).val = 2 * b.val := by
@@ -137,7 +136,6 @@ lemma byte_msb_iff {b msb : ZMod p} (hb : b.val < 2 ^ 8)
 is itself a byte. Both branches reduce the field value to a `Nat.cast` of a `< 256` natural. -/
 lemma byte_msb_range {b : ZMod p} (hb : b.val < 2 ^ 8) :
     (2 * b - (if 128 ≤ b.val then 1 else 0) * 256).val < 2 ^ 8 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   rw [show (2 : ℕ) ^ 8 = 256 from by norm_num] at hb ⊢
   have hbc : ((b.val : ℕ) : ZMod p) = b := ZMod.natCast_zmod_val b
@@ -311,7 +309,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
   channelsWithRequirements := [byteChannel.toRaw]
   soundness := by
     circuit_proof_start [Gadgets.ToBits.rangeCheck, Gadgets.Xor.ByteXorTable]
-    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     obtain ⟨hb, hc, -, -, hxor⟩ := h_holds
     have hval2 : (2 : ZMod p).val = 2 := val_2_zmod_p
     refine ⟨⟨hb, hc⟩,
@@ -321,7 +318,6 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
   completeness := by
     circuit_proof_start [Gadgets.ToBits.rangeCheck, Gadgets.Xor.ByteXorTable]
     obtain ⟨hb, hc⟩ := h_assumptions
-    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     have hxlt : input_b.val ^^^ input_c.val < 256 := Nat.xor_lt_two_pow (n := 8) hb hc
     refine ⟨hb, hc, hb, hc, ?_⟩
     rw [h_env.1, ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]

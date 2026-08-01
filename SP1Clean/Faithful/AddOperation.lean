@@ -46,7 +46,6 @@ and `InteractSpec`) are faithful to SP1's operation constraints. -/
 theorem add_interactions_faithful (a b value : Word (ZMod p)) :
     List.Forall Interaction.toProp (Extracted.AddOperation.interactions a b ⟨value⟩ 1) ↔
       SP1Clean.AddOperation.InteractSpec value := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.AddOperation.interactions, List.Forall,
     Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_Range, val_16, one_ne_zero, ne_eq, not_false_eq_true, true_implies,
@@ -147,7 +146,6 @@ theorem add_interactions_faithful_syntactic
         Extracted.Interaction.toAccess
       = (((SP1Clean.AddOperation.main input).operations offset).interactionsWith
           byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
   have hk := toAccess_pullIf_byte_forall env
   -- RHS: recover the 4 byte pulls from `main`; LHS: expand the extracted list + projection.

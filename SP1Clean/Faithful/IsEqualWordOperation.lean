@@ -33,7 +33,6 @@ theorem isEqualWord_constraints_faithful (a b : Word (ZMod p))
     (List.Forall (· = 0) (Extracted.IsEqualWordOperation.asserts a b cols 1) ∧
       List.Forall Interaction.toProp (Extracted.IsEqualWordOperation.interactions a b cols 1)) ↔
       SP1Clean.IsEqualWordOperation.RawSpec a b cols := by
-  haveI : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
   simp only [Extracted.IsEqualWordOperation.asserts, Extracted.IsEqualWordOperation.interactions,
     Extracted.IsZeroWordOperation.asserts, Extracted.IsZeroWordOperation.interactions,
     Extracted.IsZeroOperation.asserts, Extracted.IsZeroOperation.interactions, one_mul,

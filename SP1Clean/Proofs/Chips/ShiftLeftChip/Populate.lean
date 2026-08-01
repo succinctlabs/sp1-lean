@@ -293,7 +293,6 @@ theorem limbResult_asserts (b : Word (ZMod p)) (c0 : ZMod p) :
 
 /-- `(2 : ZMod p)` is neither `0` nor `1` (so binary flags with a binary sum are one-hot). -/
 lemma two_ne_zero_one : (2 : ZMod p) ≠ 0 ∧ (2 : ZMod p) ≠ 1 := by
-  haveI : Fact (1 < p) := ⟨(Fact.out : p.Prime).one_lt⟩
   refine ⟨fun h => ?_, fun h => ?_⟩ <;>
     · have hv := congrArg ZMod.val h
       simp only [val_2_zmod_p, ZMod.val_zero, ZMod.val_one] at hv

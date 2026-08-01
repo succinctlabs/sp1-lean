@@ -88,7 +88,6 @@ private lemma one_hot3 {x o a : ZMod p}
     (hx : x = 0 ∨ x = 1) (ho : o = 0 ∨ o = 1) (ha : a = 0 ∨ a = 1)
     (hsum : (x + o + a) * (x + o + a - 1) = 0) :
     (x = 1 → o = 0 ∧ a = 0) ∧ (o = 1 → x = 0 ∧ a = 0) ∧ (a = 1 → x = 0 ∧ o = 0) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h2 : (2 : ZMod p) ≠ 0 := by simp [← ZMod.val_eq_zero, val_2_zmod_p]
   have h6 : (6 : ZMod p) ≠ 0 := by simp [← ZMod.val_eq_zero, val_6_zmod_p]
   rcases hx with rfl | rfl <;> rcases ho with rfl | rfl <;> rcases ha with rfl | rfl <;>
@@ -102,7 +101,6 @@ private lemma one_hot3 {x o a : ZMod p}
 /-- The byte opcode `is_xor·2 + is_or·1 + is_and·0` lands in `{0,1,2}` (one-hot), so its `val < 3` —
 the operand-range part of the composed `BitwiseU16Operation.circuit`'s `Assumptions`. -/
 private lemma val_lt_three {x : ZMod p} (h : x = 0 ∨ x = 1 ∨ x = 2) : x.val < 3 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rcases h with rfl | rfl | rfl
   · simp
   · rw [ZMod.val_one]; omega
@@ -116,7 +114,6 @@ private lemma resultWord_isU64 {inp : BitwiseU16Operation.Inputs (ZMod p)}
     (hir : inp.is_real = 1) (hs : BitwiseU16Operation.Spec inp)
     (hop : inp.opcode = 0 ∨ inp.opcode = 1 ∨ inp.opcode = 2) :
     Word.isU64 (BitwiseU16Operation.resultWord inp.cols.bitwise_operation.result) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨hbnd, harm0, harm1, harm2⟩ := hs hir
   have hr_lt : ∀ i : Fin 8, inp.cols.bitwise_operation.result[(i : ℕ)].val < 256 := fun i => by
     rcases hop with h | h | h
@@ -168,7 +165,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_or_bool := bool_of_mul_pred h_or_bin
   have h_and_bool := bool_of_mul_pred h_and_bin
   have hoh := one_hot3 h_xor_bool h_or_bool h_and_bool h_sum
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hop_cases : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0
       ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 1
       ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 2 := by
@@ -218,7 +214,6 @@ set_option maxHeartbeats 5000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨ha, hb, ha_prev, hbin, hf0, hf1, hf2, hsum, hone0, hone1, hone2, hop_a_0, himm, h_cpu,
     hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ := h_assumptions
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.

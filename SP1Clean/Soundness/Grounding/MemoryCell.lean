@@ -539,7 +539,6 @@ theorem patchedCellBytes_two
 field element. -/
 theorem byteQuotient_reassembles (u low : ZMod p) :
     u = low + (u - low) * (256 : ZMod p)⁻¹ * 256 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h256 : (256 : ZMod p)⁻¹ * 256 = 1 := inv_mul_cancel₀ val_256_ne_zero
   rw [mul_assoc, h256, mul_one]
   ring

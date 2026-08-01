@@ -47,7 +47,6 @@ theorem addrAddSemantics_of_carries {a b : Word (ZMod p)}
   obtain ⟨hc0, hc1, hc2, hc3, hv0, hv1, hv2⟩ := h_raw
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   simp only [Word.toNat_def]
@@ -87,7 +86,6 @@ theorem addrAddFits_of_carries {a b : Word (ZMod p)}
   obtain ⟨hc0, hc1, hc2, hc3, hv0, hv1, hv2⟩ := h_raw
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   set c0 : ZMod p := (a[0] + b[0] - cols.value[0]) * (65536 : ZMod p)⁻¹ with hc0_def
@@ -146,7 +144,6 @@ theorem carries_of_addrAddSemantics {a b : Word (ZMod p)}
     (h_val : cols.value[0].val + 65536 * cols.value[1].val + 65536 ^ 2 * cols.value[2].val =
       (Word.toNat a + Word.toNat b) % 2 ^ 48) :
     RawSpec a b cols := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
   set q0 : ℕ := (a[0].val + b[0].val) / 65536 with hq0_def

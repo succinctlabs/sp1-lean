@@ -973,7 +973,6 @@ private theorem mulFlags_all_zero
     (hmw : isMulw = 0 ∨ isMulw = 1)
     (hsum : isMul + isMulh + isMulhu + isMulhsu + isMulw = 0) :
     isMul = 0 ∧ isMulh = 0 ∧ isMulhu = 0 ∧ isMulhsu = 0 ∧ isMulw = 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp := Fact.out (p := 2 ^ 24 < p)
   have hmVal := MulOperation.bool_val hm
   have hmhVal := MulOperation.bool_val hmh

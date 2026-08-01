@@ -190,7 +190,6 @@ theorem lh_chip_reaches_sail
     (spec_lh imm rs1_idx rd_idx is_unsigned).run s
       = (sp1_lh rd_idx pc (Word.toBitVec64
           #v[input.selected_half, 65535 * input.msb, 65535 * input.msb, 65535 * input.msb])).run s := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   have hext : extend_value is_unsigned
       (BitVec.ofNat 8 (input.selected_half.val >>> 8) ++ BitVec.ofNat 8 input.selected_half.val)
       = Word.toBitVec64 #v[input.selected_half, 65535 * input.msb, 65535 * input.msb,
@@ -236,7 +235,6 @@ lemma loadHalf_hval (input : Inputs (ZMod p)) (isU : Bool)
         65535 * input.msb] : Word (ZMod p))
       = extend_value isU (BitVec.ofNat 8 (input.selected_half.val >>> 8)
           ++ BitVec.ofNat 8 input.selected_half.val) := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   rcases hcase with ⟨hlh, _, rfl⟩ | ⟨hlhu, _, rfl⟩
   · -- LH (signed)
     have hmsbeq := h_lh_msb hlh

@@ -61,7 +61,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   obtain ⟨hopcode, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hir, _, _⟩ := h_input
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   have ea : ∀ i (hi : i < 8), Expression.eval env.toEnvironment input_var_a[i] = input_a[i] := by
     intro i hi; rw [← hia]; simp only [Vector.getElem_map]
   have eb : ∀ i (hi : i < 8), Expression.eval env.toEnvironment input_var_b[i] = input_b[i] := by

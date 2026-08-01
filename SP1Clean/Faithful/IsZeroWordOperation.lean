@@ -35,7 +35,6 @@ theorem isZeroWord_constraints_faithful (a : Word (ZMod p))
     (List.Forall (· = 0) (Extracted.IsZeroWordOperation.asserts a cols 1) ∧
       List.Forall Interaction.toProp (Extracted.IsZeroWordOperation.interactions a cols 1)) ↔
       SP1Clean.IsZeroWordOperation.RawSpec a cols := by
-  haveI : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
   -- Split the four `IsZeroOperation` sub-lists at each `++` and collapse each to its `RawSpec` via
   -- the `IsZero` anchor (the design `RawSpec` references `IsZeroOperation.RawSpec` directly), leaving
   -- only the small own-tail. This keeps the `result * a` products opaque (no `mul_eq_zero` blowup).

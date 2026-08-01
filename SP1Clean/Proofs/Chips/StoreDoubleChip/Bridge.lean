@@ -59,7 +59,6 @@ theorem correct_store_double_native
     (_hstored : Word.isU64 stored) :
     (spec_sd imm rs1_idx rs2_idx).run s
       = (sp1_sd pc (reg_val + BitVec.signExtend 64 imm) stored).run s := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
     rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
@@ -149,7 +148,6 @@ theorem sd_chip_reaches_sail
     (spec_sd imm rs1_idx rs2_idx).run s
       = (sp1_sd pc (Word.toBitVec64 input.op_b_val + BitVec.signExtend 64 imm)
           input.adapter.op_a_memory.prev_value).run s := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   obtain ⟨h_b, h_c⟩ := h_assum
   have hfacts := AddressOperation.effectiveAddress_facts h_b h_c h_address
   unfold AddressOperation.effectiveAddress at hfacts

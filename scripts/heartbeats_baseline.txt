@@ -492,5 +492,28 @@
 #   produced zero errors, nothing could be hidden.
 #   NO RE-LADDER NEEDED despite a -508-line golf of the same file: full-file elaboration went
 #   31.1s -> 30.9s (no regression), and no ceilings remain in the file to re-measure.
-SP1Clean 317
+# -1 (2026-07-29, post-campaign owner-waiver batch): ratchet DOWN, no ceiling raised. A narrow,
+# owner-granted waiver of the Faithful/** conservative-only rule covered exactly three sites.
+#   * Faithful/DivRemChip/Exact.lean `divRemRustAssertionsDecompose` REMOVED its 64000000 override --
+#     ~3200x over its true floor of (10000, 20000]. The declaration peeled a twenty-way right-nested
+#     List.append with twenty consecutive bare `congr 1`, which the profiler attributed at 268s of the
+#     file's 278s (48.6s for the first, 24.4s x8, then a clean halving). One `simp only
+#     [List.append_cancel_left_eq]` -- a @[simp] lemma in Lean core -- peels the whole chain by
+#     syntactic rewriting, never letting the unfolded DivRemCols.asserts list reach a congr/isDefEq
+#     step. THE FILE WENT 278s -> 10s, and it was the build's critical path (74-86% of a wave gate's
+#     wall clock). This is Clean's whnf-into-expensive-values doctrine paying off at ~26x for one line.
+#   * Faithful/Shift{Right,Left}Chip.lean `shift*CoreAssertions` were KEPT, not removed. Squeezing
+#     their four bare `simp`s to `simp only` (verbatim, no added lemmas) narrowed both floors from
+#     (60000-80000, 100000] to (40000, 60000] and cut the declarations' cumulative simp time ~36%,
+#     but neither cleared 40000, so both went 400000 -> 240000 at 4x the new bracket. The residual is
+#     structural: each proves three separate properties by three separate circuit_norm unfoldings of
+#     the same 53-subcircuit `main`, and the budget is cumulative, so no single tactic binds.
+#   * A NEGATIVE result worth recording: replacing one of those `simp only`s with the term-mode route
+#     through the existing @[circuit_norm] rfl-lemmas FAILED at the declared 400000 with `timeout at
+#     whnf` -- term-mode elaboration unifies against `ops` and whnf's the 53-op chain, which the
+#     `simp only` never does. "Use the folded lemma" is not unconditional; it is the mirror image of
+#     the same doctrine. Reverted.
+# Signature multisets and full axiom closures were censused by a Lean metaprogram over all three
+# modules (555 declarations, private names de-mangled): byte-identical before and after.
+SP1Clean 316
 SP1CleanTest 16

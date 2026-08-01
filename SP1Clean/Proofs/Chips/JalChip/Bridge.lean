@@ -115,7 +115,6 @@ theorem correct_jal_native_x0
 /-- `Word.toBitVec64 #v[4,0,0,0] = 4#64`. -/
 theorem toBitVec64_four : Word.toBitVec64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) = 4#64 := by
   have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   apply BitVec.eq_of_toNat_eq
   rw [Word.toBitVec64_toNat (by
     refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>

@@ -1453,7 +1453,6 @@ lemma lr_val_lt {M N : ℕ} (hMN : M * N = 65536) {ll hl v : ZMod p}
     (hv : v.val = M) (hll : ll.val < N) (hhl : hl.val < M) :
     (ll * v + hl).val < 2 ^ 16 := by
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   have h_llv : (ll * v).val = ll.val * M := by
     rw [ZMod.val_mul_of_lt, hv]; rw [hv]; nlinarith [hll, hMN]
   have h_sum : (ll * v + hl).val = ll.val * M + hl.val := by
@@ -1520,7 +1519,6 @@ lemma sllw_a_isU64 {a0 a1 a2 a3 s0 s1 s2 s3 cb4 lr0 lr1 msb : ZMod p}
     (ha2 : a2 = msb * 65535) (ha3 : a3 = msb * 65535) :
     a0.val < 2 ^ 16 ∧ a1.val < 2 ^ 16 ∧ a2.val < 2 ^ 16 ∧ a3.val < 2 ^ 16 := by
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   have hz : (0 : ZMod p).val < 2 ^ 16 := by rw [ZMod.val_zero]; norm_num
   have hmsb_bound : (msb * 65535).val < 2 ^ 16 := by
     rcases hmsbb with h | h <;> rw [h]

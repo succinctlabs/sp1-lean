@@ -509,7 +509,6 @@ theorem typedMultiplicitySum_eq_zero_of_balanced
       signedVal interaction.mult = -1 ∨ signedVal interaction.mult = 0 ∨
         signedVal interaction.mult = 1) :
     ∀ msg, typedMultiplicitySum interactions msg = 0 := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).ne_zero⟩
   have lengthLt : interactions.length < p := by
     rcases balanced.1 with lengthLt | characteristicZero
     · simpa only [List.length_map, ZMod.ringChar_zmod_n] using lengthLt

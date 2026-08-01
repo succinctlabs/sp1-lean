@@ -332,8 +332,7 @@ theorem decodedInROM_addRow : decodedInROM addProgram (addRow (p := p)) := by
   -- so it hoists out of the `∀ s` verbatim; the projection is discharged on the *guarded* wrapper.
   refine ⟨0x003100B3#32,
     .RTYPE (regidx.Regidx 3#5, regidx.Regidx 2#5, regidx.Regidx 1#5, rop.ADD), ?_, ?_, ?_⟩
-  · haveI : Fact (1 < p) := ⟨(Fact.out : p.Prime).one_lt⟩
-    simp only [pcBitsOfRow, addRow, pcBitsOfVals, ZMod.val_zero, ZMod.val_one, addProgram,
+  · simp only [pcBitsOfRow, addRow, pcBitsOfVals, ZMod.val_zero, ZMod.val_one, addProgram,
       GuestProgram.fetchWord, List.find?_cons, List.find?_nil]
     norm_num
   · exact fun s hcfg => SP1Clean.SailDecode.decode_ADD_example s hcfg.init hcfg.priv

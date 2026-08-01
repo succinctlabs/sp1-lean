@@ -18,6 +18,30 @@ is in [`perf-findings.md`](perf-findings.md).
 
 ---
 
+## 0. Partially discharged — the redundant-instance class
+
+A post-marathon sweep removed **149 dead `Fact`/`NeZero` locals across 68 files** on this basis:
+**`Fact p.Prime` synthesizes both `NeZero p` and `Fact (1 < p)` as instances, while `Fact (2 ^ N < p)`
+synthesizes neither** (measured directly). The standard variable block carries `Fact p.Prime`
+everywhere, so the `haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩` idiom is
+redundant tree-wide. Only 3 sites were kept, all because the local is the sole consumer of the
+`2 ^ N` instance and the linter's `omit` fix would change a signature.
+
+**What remains in the same class, measured post-sweep** — no blocker, just unspent effort:
+
+| remaining | count | note |
+|---|---:|---|
+| single-line `haveI : NeZero p` / `Fact (1 < p)` | **85** | 66 are in 4 files skipped on cost: `ShiftRightChip/Core.lean` (32), `ShiftLeftChip/Core.lean` (28), `DivRemChip/Soundness.lean` (5), `Completeness/Driver.lean` (1). The two shift `Core` files are the heaviest elaborations in the tree; a 32-site bisect is ~35 full re-elaborations, and DivRem-class files must run solo (recorded OOM risk). 10 more are a two-line variant. |
+| `have hp : 2 ^ N < p := Fact.out` | **106** in 43 files | A *different* class — these feed a downstream bare `omega`, so expected yield is low but nonzero. Needs its own pass with the same byte-identical-output recipe. |
+| `local instance : NeZero p` / `Fact (1 < p)` **declarations** | **68** | Dead by the same argument, but these are *declarations* and §2.3 forbids deleting one. **Owner decision** — retiring them is the clean end-state of this class. |
+
+The recipe and driver tooling are documented in
+[`proof-patterns.md`](proof-patterns.md) § "Golf & cleanup discipline". Note the instrument caveat
+recorded there: **do not measure this class while a `lake build` is in flight** — it produces
+one-directional spurious LIVE verdicts.
+
+---
+
 ## 1. Blocked on a shallow shared file (`Math/` or `Model/`)
 
 The dominant class. In each case the fix is *one* new public declaration in a file at depth 0–2, plus a

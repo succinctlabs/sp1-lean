@@ -35,7 +35,6 @@ theorem ltUnsigned_constraints_faithful (b cc : Word (ZMod p))
     (List.Forall (· = 0) (Extracted.LtOperationUnsigned.asserts b cc cols 1) ∧
       List.Forall Interaction.toProp (Extracted.LtOperationUnsigned.interactions b cc cols 1)) ↔
       SP1Clean.LtOperationUnsigned.RawSpec b cc cols := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.LtOperationUnsigned.asserts, Extracted.LtOperationUnsigned.interactions,
     Extracted.U16CompareOperation.asserts, Extracted.U16CompareOperation.interactions,
     List.Forall, List.cons_append, List.nil_append,

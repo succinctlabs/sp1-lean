@@ -15,7 +15,6 @@ variable {p : ℕ}
 
 /-- A boolean field element has `val ≤ 1`. -/
 lemma bool_val_le [Fact p.Prime] {x : ZMod p} (h : x = 0 ∨ x = 1) : x.val ≤ 1 := by
-  haveI : Fact (1 < p) := ⟨(Fact.out : p.Prime).one_lt⟩
   rcases h with h | h <;> simp [h, ZMod.val_one]
 
 /-- A gated byte pull/push leaves an off-gate `Requirements` conjunct on a reader/operation/chip

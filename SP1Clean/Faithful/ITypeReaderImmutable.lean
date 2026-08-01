@@ -51,7 +51,6 @@ theorem itypereaderimmutable_constraints_faithful
         (cols.op_b_memory.access_timestamp.diff_low_limb.val < 2 ^ 16 ∧
           ((clk_low + 3 - cols.op_b_memory.access_timestamp.prev_low - 1
               - cols.op_b_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹).val < 2 ^ 8)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.ITypeReaderImmutable.asserts, Extracted.ITypeReaderImmutable.interactions,
     List.Forall, Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_memory, Interaction.toProp_send_program,

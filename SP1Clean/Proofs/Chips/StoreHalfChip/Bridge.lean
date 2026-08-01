@@ -117,7 +117,6 @@ theorem sh_chip_reaches_sail
     (spec_sh imm rs1_idx rs2_idx).run s
       = (sp1_sh pc (Word.toBitVec64 input.op_b_val + BitVec.signExtend 64 imm)
           (Sail.BitVec.extractLsb (Word.toBitVec64 input.adapter.op_a_memory.prev_value) 15 0)).run s := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   obtain ⟨h_b, h_c, _h_sv⟩ := h_assum
   have hfacts := AddressOperation.effectiveAddress_facts h_b h_c h_address
   unfold AddressOperation.effectiveAddress at hfacts

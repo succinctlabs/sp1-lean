@@ -33,7 +33,6 @@ alone.) -/
 theorem isZero_asserts_faithful (a : ZMod p) (cols : Extracted.IsZeroOperation (ZMod p)) :
     List.Forall (· = 0) (Extracted.IsZeroOperation.asserts a cols 1) ↔
       SP1Clean.IsZeroOperation.AssertSpec a cols := by
-  haveI : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
   simp only [Extracted.IsZeroOperation.asserts, List.Forall,
     SP1Clean.IsZeroOperation.AssertSpec, one_mul, bool_iff]
 

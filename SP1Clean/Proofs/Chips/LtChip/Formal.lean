@@ -182,7 +182,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       rcases h_slt_bool with h0 | h1
       · exact h0
       · exfalso
-        haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
         rw [h1, hsltu] at h_sum
         exact (show (2 : ZMod p) ≠ 0 by simp [← ZMod.val_eq_zero, val_2_zmod_p])
           (by linear_combination h_sum)

@@ -180,7 +180,6 @@ theorem completeness :
     hmux_pa, h_cpu, h_mem, h_it⟩ := h_assumptions
   obtain ⟨_, _, ⟨_, _, _, hmap_pc⟩, _, ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _⟩ := h_input
   simp only [isReal] at hbin
-  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   have h_msb_lt : input_msb.val < 256 := by

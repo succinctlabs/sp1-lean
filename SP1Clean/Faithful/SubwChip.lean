@@ -235,7 +235,6 @@ private theorem subwcols_state_interactions_faithful_syntactic
       = ((Extracted.SubwOracle.SubwCols.interactions (subwChipReconfigure cols)).map
           Extracted.Interaction.toAccess).filter
           (fun a => a.1 = InteractionKind.State) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hsk : ∀ (m : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
       AbstractInteraction.toAccess env ((stateChannel.pushedIf m s).toRaw) =
         (InteractionKind.State, "SP1State",
@@ -298,7 +297,6 @@ private theorem subwcols_program_interactions_faithful_syntactic
       = (((Extracted.SubwOracle.SubwCols.interactions (subwChipReconfigure cols)).map
           Extracted.Interaction.toAccess).filter
           (fun a => a.1 = InteractionKind.Program)).map LookupAccessList.negMult := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
     @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
@@ -375,7 +373,6 @@ private theorem subwcols_memory_interactions_faithful_syntactic
       (((Extracted.SubwOracle.SubwCols.interactions (subwChipReconfigure cols)).map
           Extracted.Interaction.toAccess).filter
           (fun a => a.1 = InteractionKind.Memory)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
     @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
@@ -440,7 +437,6 @@ private theorem subwcols_byte_interactions_faithful_syntactic
       (((Extracted.SubwOracle.SubwCols.interactions (subwChipReconfigure cols)).map
           Extracted.Interaction.toAccess).filter
           (fun a => a.1 = InteractionKind.Byte)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h6 : (6 : ZMod p).val = 6 := by
     have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     exact ZMod.val_natCast_of_lt h

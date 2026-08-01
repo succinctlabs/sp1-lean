@@ -67,7 +67,6 @@ theorem alux0cols_constraints_faithful
               ((cols.state.clk_0_16 + cols.state.clk_16_24 * 65536 + 2
                 - cols.adapter.op_c_memory.access_timestamp.prev_low - 1
                 - cols.adapter.op_c_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹).val < 256)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.AluX0Oracle.AluX0Cols.asserts,
     Extracted.AluX0Oracle.AluX0Cols.interactions]
   rw [Extracted.forall_append_pair]
@@ -335,7 +334,6 @@ theorem aluX0Chip_interactions_faithful
     (hbind : BindsChipOutput AluX0Chip.main env input offset cols) :
     List.Perm (nativeAccesses env ((AluX0Chip.main input).operations offset))
       (aluX0ChipOracle.accesses cols) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have h6 : (6 : ZMod p).val = 6 := by
     have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega

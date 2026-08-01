@@ -33,7 +33,6 @@ theorem u16compare_constraints_faithful (a b : ZMod p)
     (List.Forall (· = 0) (Extracted.U16CompareOperation.asserts a b cols 1) ∧
       List.Forall Interaction.toProp (Extracted.U16CompareOperation.interactions a b cols 1)) ↔
       SP1Clean.U16CompareOperation.RawSpec a b cols := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.U16CompareOperation.asserts, Extracted.U16CompareOperation.interactions,
     List.Forall, Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_Range, val_16, one_ne_zero, ne_eq, not_false_eq_true, true_implies,
@@ -98,7 +97,6 @@ theorem u16compare_interactions_faithful_syntactic
         Extracted.Interaction.toAccess
       = (((SP1Clean.U16CompareOperation.main input).operations offset).interactionsWith
           byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
   have hk := toAccess_pullIf_byte_forall env
   have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>

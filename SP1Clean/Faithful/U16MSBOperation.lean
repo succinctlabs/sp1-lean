@@ -38,7 +38,6 @@ theorem u16msb_constraints_faithful (a msb : ZMod p) :
     (List.Forall (· = 0) (Extracted.U16MSBOperation.asserts a ⟨msb⟩ 1) ∧
       List.Forall Interaction.toProp (Extracted.U16MSBOperation.interactions a ⟨msb⟩ 1)) ↔
       SP1Clean.U16MSBOperation.RawSpec a ⟨msb⟩ := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.U16MSBOperation.asserts, Extracted.U16MSBOperation.interactions, List.Forall,
     Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_Range, val_16, one_ne_zero, ne_eq, not_false_eq_true, true_implies,
@@ -101,7 +100,6 @@ theorem u16msb_interactions_faithful_syntactic
         Extracted.Interaction.toAccess
       = (((SP1Clean.U16MSBOperation.main input).operations offset).interactionsWith
           byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
   have hk := toAccess_pullIf_byte_forall env
   have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>

@@ -845,7 +845,8 @@ private theorem u16MSBAssertions
     eval_sub, Expression.eval, hreal, hmsbEval, hmsb]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 400000 in
+-- Measured floor bracket (40000, 60000] after the `simp only` narrowing; kept at ~4x.
+set_option maxHeartbeats 240000 in
 private theorem shiftRightCoreAssertions
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -857,7 +858,7 @@ private theorem shiftRightCoreAssertions
   let ops :=
     (ShiftRightCore.main (srCols input offset)).operations (offset + 37)
   have hlookups : ops.lookups = [] := by
-    simp [ops, ShiftRightCore.main, Gadgets.Equality.main, circuit_norm]
+    simp only [ops, ShiftRightCore.main, Gadgets.Equality.main, circuit_norm]
   have hconstraints :
       ops.ConstraintsHold env ↔
         List.Forall (· = 0) (nativeAssertZeros env ops) := by
@@ -878,8 +879,8 @@ private theorem shiftRightCoreAssertions
     have hguarantees : ops.FullGuarantees env := by
       have equalityInteractions (x y : Expression (ZMod p)) (n : ℕ) :
           ((Gadgets.Equality.main (M := field) (x, y)).operations n).interactions = [] := by
-        simp [Gadgets.Equality.main, circuit_norm]
-      simp [ops, Operations.FullGuarantees, ShiftRightCore.main,
+        simp only [Gadgets.Equality.main, circuit_norm]
+      simp only [ops, Operations.FullGuarantees, ShiftRightCore.main,
         FormalAssertion.toSubcircuit_interactions, equalityInteractions,
         circuit_norm]
     let colsValue := ProvableStruct.eval env (srCols input offset)
@@ -899,7 +900,7 @@ private theorem shiftRightCoreAssertions
     have huses :
         proverEnv.UsesLocalWitnesses (offset + 37) ops := by
       have hlen : ops.localLength = 0 := by
-        simp [ops, ShiftRightCore.main, circuit_norm]
+        simp only [ops, ShiftRightCore.main, circuit_norm]
       rw [ProverEnvironment.usesLocalWitnesses_iff_flat,
         ProverEnvironment.usesLocalWitnessesFlat_iff_extends]
       intro i

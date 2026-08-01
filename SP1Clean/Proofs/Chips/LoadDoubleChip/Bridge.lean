@@ -136,7 +136,6 @@ theorem correct_load_double_native
     (hmem₇ : s.mem[(reg_val + BitVec.signExtend 64 imm).toNat + 7]?
       = some (BitVec.ofNat 8 (loaded[3].val >>> 8))) :
     (spec_ld imm rs1_idx rd_idx).run s = (sp1_ld rd_idx pc loaded).run s := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   obtain ⟨h0, h1, h2, h3⟩ := Word.lt_cases_of_isU64 hloaded
   have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
@@ -271,7 +270,6 @@ theorem ld_chip_reaches_sail
       = some (BitVec.ofNat 8 (cols.memory_access.prev_value[3].val >>> 8))) :
     (spec_ld imm rs1_idx rd_idx).run s
       = (sp1_ld rd_idx pc cols.memory_access.prev_value).run s := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   obtain ⟨h_b, h_c, _h_pv_isu64⟩ := h_assum
   have h_address' := AddressOperation.effectiveAddress_facts h_b h_c h_address
   simp only [AddressOperation.effectiveAddress, ZMod.val_zero, zero_add] at h_address'
@@ -304,7 +302,6 @@ lemma loadDouble_hval (pv : Word (ZMod p)) (hpv : Word.isU64 pv) :
         BitVec.ofNat 8 (pv[2].val >>> 8) ++ BitVec.ofNat 8 pv[2].val ++
         BitVec.ofNat 8 (pv[1].val >>> 8) ++ BitVec.ofNat 8 pv[1].val ++
         BitVec.ofNat 8 (pv[0].val >>> 8) ++ BitVec.ofNat 8 pv[0].val) := by
-  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).pos.ne'⟩
   obtain ⟨h0, h1, h2, h3⟩ := Word.lt_cases_of_isU64 hpv
   have hconcat_toNat :
       (BitVec.ofNat 8 (pv[3].val >>> 8) ++ BitVec.ofNat 8 pv[3].val ++
