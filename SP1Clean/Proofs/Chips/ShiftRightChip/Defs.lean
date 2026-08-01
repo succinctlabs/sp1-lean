@@ -1732,7 +1732,6 @@ discharge their `RegisterWrite` requirement via `(isU64_sound …).1` without re
 def IsU64Spec (_ : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 1 → Word.isU64 cols.a
 
-set_option maxHeartbeats 400000 in
 /-- **Result range-check (callable lemma).** On a variant-active row
 (`is_srl + is_sra + is_srlw + is_sraw = 1`, SP1's `is_real`) the committed result word `cols.a` is `U64`
 — the obligation the op_a write `RegisterWrite` push owes (W11 Option B memory flip). Packaged as a plain

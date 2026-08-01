@@ -26,8 +26,6 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
--- The former 2M ceiling was ~33x over; measured floor in (50000, 60000], kept at 6.7x headroom.
-set_option maxHeartbeats 400000 in
 /-- **Faithfulness anchor.** SP1's `LtOperationUnsigned` constraint list holds iff the native
 gadget's `RawSpec` holds. -/
 theorem ltUnsigned_constraints_faithful (b cc : Word (ZMod p))

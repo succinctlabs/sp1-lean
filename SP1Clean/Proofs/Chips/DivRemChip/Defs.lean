@@ -1133,8 +1133,6 @@ private theorem constrainRow_localLength_eq (input : Var Inputs (ZMod p))
     Readers.RegisterWrite.circuit_localLength, DivRemCompare.circuit_localLength,
     DivRemCore.circuit_localLength, Nat.add_zero]
 
--- Genuine but formerly ~160× over-provisioned at 8M; measured floor in (39999, 50000].
-set_option maxHeartbeats 250000 in
 @[implicit_reducible] private def derivedElaborated :
     ElaboratedCircuit (ZMod p) Inputs Columns main := by
   elaborate_circuit_with {

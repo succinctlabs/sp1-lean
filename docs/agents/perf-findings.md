@@ -347,6 +347,19 @@ Scope: the 101 elaboration-budget ceilings on **hand-written** code — everythi
 `SP1CleanTest/**/Vectors/**` + `*TraceVectors.lean` (16 sites, uniform 4M). Paths below drop the
 `SP1Clean/` prefix. Line numbers are as of commit `cbfc8d43`.
 
+> **Status — Phase 1 tranche A (2026-08-01): 44 of these 101 sites are deleted, 57 remain.**
+> Tranche A removed every site whose floor bracket tops out at or below Lean's plain 200000 default
+> (the 60-site bucket below) *minus* the three excluded shapes in
+> [Deletion hazards](#deletion-hazards-inside-the--200000-bucket): the 13 zero-margin sites at exactly
+> 200000, the two sub-default 100000 stamps in `Faithful/MulChip.lean`, and the file-scoped
+> `Model/SailDecode.lean` stamp. The full `lake build SP1Clean` gate passed with **zero sites
+> restored** — every recorded floor in the deleted set held under the real pillar `moreLeanArgs`
+> build, which is the strongest confirmation this table's `≤ 200000` bracket tops have. Baseline
+> ratcheted 316 → 272. The 57 survivors are the 35 with floor top > 200000, the 6 UNKNOWN, and the 16
+> exclusions. **The rows below are retained as the measurement record, but their line numbers are
+> pre-deletion** and no longer resolve in the 27 files that lost a site; re-anchor by declaration
+> name. Ladder comments for the deleted sites were removed with them.
+
 Column conventions:
 
 - **floor bracket** — `(lo, hi]` = highest rung that *failed*, lowest that *passed*. `≤ n` = a pass at

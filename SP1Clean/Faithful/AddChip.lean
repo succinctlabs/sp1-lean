@@ -157,7 +157,6 @@ theorem addChip_lookups_empty :
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel StateMsg)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 250000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — State-bus interactions, SYNTACTIC.** The State interactions the
 whole `AddChip` row emits (recovered by descending the chip into its three composed sub-readers) project
@@ -204,7 +203,6 @@ private theorem addcols_state_interactions_faithful_syntactic
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     h_ir, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2]
 
-set_option maxHeartbeats 250000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Program-bus interaction, SYNTACTIC.** The single Program
 instruction-fetch the whole `AddChip` row emits (only the `RTypeReader` fragment emits Program) projects
@@ -726,7 +724,6 @@ theorem addChip_constraints_faithful
       simpa only [eval_mul, eval_sub, Expression.eval] using hGateN
     exact ⟨⟨⟨hAddG, hCpuG⟩, hRTypeG⟩, hGate, hOp, trivial⟩
 
-set_option maxHeartbeats 400000 in
 /-- **Complete interaction-system anchor for the native Add row.** Binding the circuit output supplies
 all column equalities needed by the detailed per-bus calculations above; the public conclusion compares
 the canonical four-bus multiset emitted by the native chip with SP1 Rust's complete extracted oracle. -/

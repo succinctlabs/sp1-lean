@@ -845,8 +845,6 @@ private theorem u16MSBAssertions
     eval_sub, Expression.eval, hreal, hmsbEval, hmsb]
 
 omit [Fact (2 ^ 17 < p)] in
--- Measured floor bracket (40000, 60000] after the `simp only` narrowing; kept at ~4x.
-set_option maxHeartbeats 240000 in
 private theorem shiftRightCoreAssertions
     (env : Environment (ZMod p))
     (input : Var ShiftRightChip.Inputs (ZMod p)) (offset : ℕ) :

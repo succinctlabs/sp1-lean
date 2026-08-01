@@ -13,11 +13,6 @@ namespace SP1Clean.DivRemChip
 variable {p : ℕ} [Fact p.Prime]
 
 set_option linter.unusedVariables false in
--- Ladder-measured 2026-07-27 (lowering the real ceiling, re-elaborating each rung): 40000 FAILS
--- (`isDefEq` / `synthesize pending MVars` timeout mid-chain), 100000 ok. The 368-`let` chain's
--- floor is genuinely > 40000; 500000 keeps ~5x margin. Was 8000000. The twelve membership
--- theorems below needed no override at all (all pass under 20000) and carry none.
-set_option maxHeartbeats 500000 in
 /-- SP1's `Columns.eval` own-constraint list (the `[E13…E367, adapter.op_a_0]` tail).
 
 **Generic over the carrier `R`** so the one chain serves both levels: the chip/`DivRemCore` `main`s

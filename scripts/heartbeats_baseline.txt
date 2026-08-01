@@ -515,5 +515,11 @@
 #     the same doctrine. Reverted.
 # Signature multisets and full axiom closures were censused by a Lean metaprogram over all three
 # modules (555 declarations, private names de-mangled): byte-identical before and after.
-SP1Clean 316
+# -44 (2026-08-01, heartbeat-P1 tranche A): ratchet DOWN, nothing raised. Deleted 44 hand-written
+# elaboration-budget directives whose measured floor bracket tops out at or below Lean's plain
+# 200000 default (docs/agents/perf-findings.md S5A), so the directive was redundant with the
+# default. Excluded from the tranche: the 13 zero-margin sites (bracket top exactly 200000), the
+# two sub-default 100000 stamps in Faithful/MulChip.lean, and the file-scoped Model/SailDecode.lean
+# stamp. 316 -> 272.
+SP1Clean 272
 SP1CleanTest 16

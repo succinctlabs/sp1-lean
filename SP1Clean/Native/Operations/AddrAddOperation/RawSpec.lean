@@ -126,10 +126,6 @@ theorem addrAddFits_of_carries {a b : Word (ZMod p)}
   rw [sumEq, Nat.add_mul_mod_self_right, Nat.mod_eq_of_lt (by omega)]
   exact lowLt
 
--- Measured floor (ladder search, 2026-07): passes at 60000, times out at 45000. 400000 keeps a ~7x
--- margin; the previous 16000000 was ~250x vestigial. The two theorems above needed no ceiling at
--- all (both elaborate under 15000).
-set_option maxHeartbeats 400000 in
 /-- Backward (completeness) core: a 3-limb result equal to `(a + b) mod 2^48` (with each limb in
 range), together with the address-fits side condition, witnesses the unique boolean carry chain.
 The low carries `c0, c1, c2` are pinned by the value equation; the high carry `c3 = (a[3]+b[3]+c2)·

@@ -106,8 +106,6 @@ theorem resultIsU64OfCore {cols : Columns (ZMod p)} (hcore : DivRemCore.CoreSpec
   rw [routedWord hcore hcase]
   cases case.output <;> assumption
 
--- Perf: the former 16M budget was ~160× over; measured floor bracket (60000, 100000].
-set_option maxHeartbeats 400000 in
 /-- The arithmetic core and the two committed source-register bounds discharge the comparison
 cluster's complete external contract. The only cross-cluster equation retained verbatim is the
 remainder-check gate equation; `DivRemCompare.soundness` combines it with the internally proved

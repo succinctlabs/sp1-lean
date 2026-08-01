@@ -1752,7 +1752,6 @@ private theorem divRemGlueExpressionsEval
   simp only [ProvableType.eval_field]
   rfl
 
-set_option maxHeartbeats 400000 in
 private theorem divRemCoreForallDecompose
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
@@ -1787,7 +1786,6 @@ private theorem divRemCoreForallDecompose
   simp only [List.forall_append]
   tauto
 
-set_option maxHeartbeats 400000 in
 private theorem divRemLowerBackward
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ)
@@ -1859,7 +1857,6 @@ private theorem divRemLowerBackward
     ProvableType.eval_field, ProvableType.getElem_eval_fields,
     Expression.eval] using hRust
 
-set_option maxHeartbeats 400000 in
 private theorem divRemUpperBackward
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ)

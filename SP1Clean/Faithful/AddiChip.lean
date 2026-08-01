@@ -674,7 +674,6 @@ private theorem addicols_interactions_faithful_syntactic
   rw [hState, hProgram']
   exact ((hByte.append_left _).append hMemory).append_right _
 
-set_option maxHeartbeats 400000 in
 theorem addiChip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var AddiChip.Inputs (ZMod p)) (offset : ℕ)
     (cols : AddiChip.Columns (ZMod p))

@@ -153,8 +153,6 @@ private lemma witness_bit_bool {b cc : Word (ZMod p)} {s r : ZMod p} (hr : r = 1
     (toElements (LtOperationSigned.populate b cc s r))[0]'hi = 1 := by
   rw [toElements_col0]; exact populate_bit_bool hr
 
--- Measured: the former 800000 ceiling was ~8x over; floor (60000, 100000].
-set_option maxHeartbeats 500000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start [Spec]
   obtain ⟨ha, hb⟩ := h_assumptions
@@ -203,8 +201,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 
 -- Whole-chip completeness normalizes the flag-hinted witness stream (SLT/SLTU flags + the
 -- signed/unsigned comparison gadget closures) against the composed reader obligations at once.
--- Measured: the former 32000000 ceiling was ~530x over; floor (45000, 60000].
-set_option maxHeartbeats 300000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start

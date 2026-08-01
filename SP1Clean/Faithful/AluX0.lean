@@ -325,7 +325,6 @@ theorem aluX0Chip_constraints_constructive
     (constraintsHold_iff_nativeAssertZeros (AluX0Chip.circuit (p := p))
       assignment.environment aluX0Chip_lookups_empty).symm
 
-set_option maxHeartbeats 400000 in
 theorem aluX0Chip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var AluX0Chip.Inputs (ZMod p))
     (offset : ℕ) (cols : AluX0Chip.Columns (ZMod p))

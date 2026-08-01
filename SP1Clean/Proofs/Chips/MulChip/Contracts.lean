@@ -30,9 +30,6 @@ private def controlExpressions (input : Var MulChip.Inputs (ZMod p)) (offset : â
     flags[4] * (flags[4] - 1), input.adapter.op_a_0,
     input.is_real - (flags[0] + flags[1] + flags[2] + flags[3] + flags[4]) ]
 
--- Genuinely binding (`whnf` at the signature): the former 4000000 was ~40x over; measured
--- floor in (40000, 100000], kept at 4x that bracket.
-set_option maxHeartbeats 400000 in
 /-- Each grounding control expression is a top-level assertion of the physical MUL circuit.  This
 membership statement is the only place the sequential `main` syntax is normalized. -/
 private theorem controlExpressions_subset_shallowConstraints

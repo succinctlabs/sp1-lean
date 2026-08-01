@@ -221,7 +221,6 @@ theorem addwChip_lookups_empty :
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel StateMsg)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 250000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — Program-bus interaction, SYNTACTIC.** The single Program fetch the
 whole `AddwChip` row emits (only the `ALUTypeReader` fragment emits Program) projects to the same arity-16
@@ -271,7 +270,6 @@ private theorem addwcols_program_interactions_faithful_syntactic
     Extracted.Interaction.toAccess, Extracted.Dir.sign, Opcode.ofNat, ConstraintCoe.coe_eq_val,
     h_ir, h_p0, h_p1, h_p2, h_oa, h_ob, h_oc0, h_oc1, h_oc2, h_oc3, h_oa0, h_imm]
 
-set_option maxHeartbeats 250000 in
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — State-bus interactions, SYNTACTIC.** The State interactions the
 whole `AddwChip` row emits (recovered by descending the chip into its three composed sub-readers) project
@@ -954,7 +952,6 @@ theorem addwChip_constraints_constructive
     (constraintsHold_iff_nativeAssertZeros (AddwChip.circuit (p := p))
       assignment.environment addwChip_lookups_empty).symm
 
-set_option maxHeartbeats 400000 in
 theorem addwChip_interactions_faithful
     (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ)
     (cols : AddwChip.Columns (ZMod p))

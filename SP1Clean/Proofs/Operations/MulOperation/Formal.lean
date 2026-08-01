@@ -597,9 +597,7 @@ theorem spec_populate {b c : Word (ZMod p)} (hb : b.isU64) (hc : c.isU64)
   exact (U16MSBOperation.spec_populate hpm_arg_lt 1).2 rfl
 
 -- Completeness re-runs the same 45-column carry-chain normalization as soundness above, with the
--- `populate` witness closure substituted cell-by-cell.  Measured (W3/r1/b4): fails at 100k, passes
--- at 150k — the former 40M ceiling was ~270× over.  Kept at ~5× the measured floor, not removed.
-set_option maxHeartbeats 1000000 in
+-- `populate` witness closure substituted cell-by-cell.
 set_option linter.unusedSimpArgs false in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start

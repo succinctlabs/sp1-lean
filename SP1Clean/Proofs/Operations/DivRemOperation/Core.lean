@@ -296,7 +296,6 @@ from their own safe byte-decomposition pulls, while the gate/flag facts come fro
 own-assert tail. No range fact has to be assumed by the parent chip. -/
 def Assumptions (_cols : DivRemChip.Columns (ZMod p)) : Prop := True
 
-set_option maxHeartbeats 500000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CoreSpec := by
   circuit_proof_start [CoreSpec]
   clear h_assumptions
@@ -466,7 +465,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions CoreSpec
         | trivial
         | (intro h1 h0; exact off_gate_vacuous bIr h1 h0)
 
-set_option maxHeartbeats 400000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions CoreSpec := by
   circuit_proof_start [CoreSpec]
   clear h_assumptions

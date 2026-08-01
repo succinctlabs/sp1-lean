@@ -62,8 +62,6 @@ lemma auipc_eq_add_lui (imm : BitVec 20) (pcv : BitVec 64) :
     RV64.auipc imm pcv = pcv + RV64.lui imm := by
   rw [RV64.auipc, RV64.lui]; exact BitVec.add_comm _ _
 
--- Measured: binding. Fails at 40000, passes at 100000; the former 2000000 was ~20x its floor.
-set_option maxHeartbeats 500000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨h_imm, h_pcU, h_dec⟩ := h_assumptions
@@ -135,8 +133,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
         simp only [Vector.getElem_mapRange, circuit_norm] <;> simp_all
 
--- Measured: binding, same band as `soundness` above (fails at 40000, passes at 100000).
-set_option maxHeartbeats 500000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start

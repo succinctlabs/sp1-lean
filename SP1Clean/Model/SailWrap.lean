@@ -305,15 +305,8 @@ end readReg
 
 section rX_bits
 
--- The only declaration in this file that exceeds the plain default budget: a 32-way `fin_cases`
--- peel of `rX_bits`/`rX`, each arm closed by a deep `simp` over the generated Sail definitions.
--- Measured 2026-07-27 (control at 1 heartbeat gave 57 real timeouts, so each rung is a genuine
--- re-elaboration): whole-file ladder 10M ok / 200k ok / 100k ok / 50k FAIL, the 50k failure a
--- `whnf` timeout on this signature with a `(kernel) unknown constant` cascade onto `run_rX_bits`
--- (masking — that lemma's own floor was read off the 100k rung, not the cascade). True floor
--- (50k, 100k], pinned at 4x the 100k pass rung. The former file-scoped 10000000 ceiling covered
--- all 57 declarations; every other one now runs at the plain default.
-set_option maxHeartbeats 400000 in
+-- A 32-way `fin_cases` peel of `rX_bits`/`rX`, each arm closed by a deep `simp` over the
+-- generated Sail definitions.
 lemma rX_bits_eq_get_reg? {s : SailState} :
   (rX_bits (regidx.Regidx idx)).run s = (s.get_reg? idx).toSailM.run s := by
   fin_cases idx <;>

@@ -885,13 +885,6 @@ lemma high_half_eq (cols : Extracted.MulOperation (ZMod p)) (bb cc : Fin 16 → 
   rw [Nat.mod_eq_of_lt hBlt, Nat.mod_eq_of_lt hClt]
   omega
 
--- Ladder-measured 2026-07-28, with `full_product` and `high_half_eq` pinned high (both mask this
--- theorem through `(kernel) unknown constant` when they fail): 200000 ok / 100000 ok / 60000 FAIL
--- (`synthesize pending MVars` at the MULHSU branch's `hSbb`, plus `whnf` at this signature) /
--- 40000 FAIL. True floor (60000, 100000] — the plain default leaves only 2-3.3x headroom, under
--- the removal threshold, so the site is kept. The former 1600000 value is lowered to 5x the
--- lowest passing rung.
-set_option maxHeartbeats 500000 in
 /-- Forward (soundness) core: the raw schoolbook form implies the per-variant semantic result.
 **All five conjuncts are proved here** — `MUL` (low-64, unsigned) via the native `low_half`
 reassembly, and the four high-half / `MULW` variants off further slices of the full 128-bit

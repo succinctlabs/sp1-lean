@@ -286,10 +286,6 @@ private lemma toNat_eq_toInt_add128 (x : BitVec 128) :
   · have h1 : ¬ x.toInt < 0 := by rw [BitVec.msb_eq_toInt] at hm; simpa using hm
     rw [if_neg h1, toInt_eq_toNat_sub128, if_neg hm]; ring
 
--- Ladder-measured 2026-07-27 (lowering the real ceiling, re-elaborating each rung): 20000 FAILS
--- (`whnf`/`isDefEq` timeout in the final `norm_num`/`omega` block), 50000 FAILS, 100000 ok. The
--- floor is genuinely > 50000, so this ceiling is binding; 500000 keeps ~5x margin. Was 8000000.
-set_option maxHeartbeats 500000 in
 /-- **Signed Euclidean identity from the carry chain.** The signed analogue of
 `euclid_identity_unsigned`: the eight carry-chain limb equations carry the `b_neg`/`rem_neg` sign fills
 on the high limbs (`b_neg = b.msb`, `rem_neg = remainder_comp.msb`), and the `c_times_quotient` limbs are
@@ -591,9 +587,6 @@ lemma extractLsb_lo_congr {w1 w2 : Word (ZMod p)} (hw1 : w1.isU64) (hw2 : w2.isU
   apply BitVec.eq_of_toNat_eq
   rw [extractLsb_lo_toNat hw1, extractLsb_lo_toNat hw2, h0, h1]
 
--- Ladder-measured 2026-07-27: 20000 FAILS (`whnf` timeout on the `Nat.mod_eq_of_lt`/`nlinarith`
--- product bound), 50000 ok. Floor in (20000, 50000]; 400000 keeps ~8x margin. Was 4000000.
-set_option maxHeartbeats 400000 in
 /-- **Unsigned word Euclidean identity (low product only).** For `DIVUW`/`REMUW` the operand/quotient/
 remainder columns are all zero-extended low-32 (`< 2^32`), so the *low* 64-bit product (`mul_lower`,
 `ctqlo = qc·c`) already captures the whole product. The four low carry-chain limb equations then pin the
@@ -673,9 +666,6 @@ private lemma toInt_mul64_of_bound {x y : BitVec 64}
   rw [BitVec.toInt_mul]
   apply Int.bmod_eq_of_le_mul_two <;> push_cast <;> omega
 
--- Ladder-measured 2026-07-27: 20000 FAILS, 50000 FAILS (`whnf`/`isDefEq` timeout on the `nlinarith`
--- product bound), 100000 ok. Floor in (50000, 100000]; 500000 keeps ~5x margin. Was 8000000.
-set_option maxHeartbeats 500000 in
 /-- **Signed word Euclidean identity (low product only).** The signed analogue of
 `euclid_identity_word_unsigned`: for `DIVW`/`REMW` the operand/quotient/remainder columns are all
 *sign-extended* low-32 (top two limbs the sign fill of bit 31), so the *low* 64-bit product

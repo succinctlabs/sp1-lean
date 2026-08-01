@@ -72,9 +72,6 @@ private lemma evalWord4_of_cells {env : Environment (ZMod p)} {o : ℕ} {v0 v1 v
       List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ] <;>
     assumption
 
--- Measured (W5/b8): the former 4M was ~50x over; floor bracket (60k, 80k] after the six
--- `aSelector` tails were factored through `evalWord4_of_cells` (it was (80k, 100k] before).
-set_option maxHeartbeats 400000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨h_cpu, h_mulop, ha0, ha1, ha2, ha3, gb_mul, gb_mulh, gb_mulhu, gb_mulhsu, gb_mulw,
@@ -177,9 +174,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 
 -- Whole-chip completeness must normalize the 54-cell witness stream (5 flags + the 45-cell
 -- `MulOperation` populate + the 4-cell result) against every composed reader/operation obligation
--- in one `circuit_proof_start` pass — the largest single witness closure in the tree, so the
--- ceiling is genuine. Measured (W5/b8): the former 128M was ~1600x over; floor bracket (60k, 80k].
-set_option maxHeartbeats 400000 in
+-- in one `circuit_proof_start` pass — the largest single witness closure in the tree.
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
