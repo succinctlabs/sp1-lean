@@ -35,8 +35,15 @@ private lemma signed64_flags {cols : Columns (ZMod p)} {case : Case}
     simp [Case.flag] at hdiv hrem hdivu hremu hdivw hremw hdivuw hremuw <;>
     simp [hdiv, hrem, hdivu, hremu, hdivw, hremw, hdivuw, hremuw]
 
--- The former 16M ceiling was ~16× over; measured floor bracket (400000, 1000000].
-set_option maxHeartbeats 4000000 in
+-- The 121-hypothesis `ownAsserts` tail is read through `.1`/`.2` projections instead of a
+-- 121-way `obtain` (Clean `doc/performance-problems.md` fix pattern 7), as are the 15-way
+-- `hcompare` and 13-way range destructurings: each component's `And.casesOn` motive
+-- re-abstracts this very large goal. That moved the measured floor from (400000, 1000000]
+-- to (250000, 300000]. The residue is the three-branch proof body itself, not the
+-- destructuring — extracting the componentwise `Vector.ext` sweep into its own lemma and
+-- widening the projection stride were both tried and neither moved a rung — so unlike the
+-- two unsigned siblings this one still needs a budget, now sized just over 2x its floor.
+set_option maxHeartbeats 600000 in
 /-- The folded DivRem row contracts imply explicit signed-64 evidence for either `DIV` or `REM`.
 The output-routing equality is deliberately left to the uniform row assembler. -/
 theorem signed64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {case : Case}
@@ -51,22 +58,209 @@ theorem signed64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {ca
       (Word.toBitVec64 cols.remainder) := by
   obtain ⟨hproduct, hown, _hselection, hrange⟩ := hcore
   simp only [DivRemCore.OwnAssertsHold, ownAsserts, List.forall_mem_cons] at hown
-  obtain ⟨e13, e15, e17, e19, e20, e21, e22, e23,
-    e29, e35, e41, e47, e48, e49, e51, e54,
-    e57, e59, e61, e64, e67, e69, e70, e71,
-    e73, e76, e79, e81, e83, e86, e89, e91,
-    e96, e99, e103, e105, e107, e109, e111, e113,
-    e115, e117, e119, e154, e157, e160, e163, e167,
-    e171, e175, e179, e184, e189, e194, e199, e204,
-    e209, e214, e219, e225, e228, e230, e232, e234,
-    e236, e238, e240, e242, e244, e247, e250, e253,
-    e256, e259, e262, e265, e268, e270, e272, e274,
-    e276, e278, e280, e282, e284, e286, e288, e299,
-    e300, e301, e302, e305, e307, e309, e311, e313,
-    e315, e317, e319, e321, e323, e325, e327, e329,
-    e331, e333, e335, e337, e339, e341, e343, e345,
-    e347, e349, e351, e353, e355, e357, e359, e367,
-    eopa0⟩ := hown
+  have e13 := hown.1
+  have hw1 := hown.2
+  have e15 := hw1.1
+  have hw2 := hw1.2
+  have e17 := hw2.1
+  have hw3 := hw2.2
+  have e19 := hw3.1
+  have hw4 := hw3.2
+  have e20 := hw4.1
+  have hw5 := hw4.2
+  have e21 := hw5.1
+  have hw6 := hw5.2
+  have e22 := hw6.1
+  have hw7 := hw6.2
+  have e23 := hw7.1
+  have hw8 := hw7.2
+  have e29 := hw8.1
+  have hw9 := hw8.2
+  have e35 := hw9.1
+  have hw10 := hw9.2
+  have e41 := hw10.1
+  have hw11 := hw10.2
+  have e47 := hw11.1
+  have hw12 := hw11.2
+  have e48 := hw12.1
+  have hw13 := hw12.2
+  have e49 := hw13.1
+  have hw14 := hw13.2
+  have hw15 := hw14.2
+  have hw16 := hw15.2
+  have hw17 := hw16.2
+  have e59 := hw17.1
+  have hw18 := hw17.2
+  have hw19 := hw18.2
+  have hw20 := hw19.2
+  have hw21 := hw20.2
+  have e69 := hw21.1
+  have hw22 := hw21.2
+  have e70 := hw22.1
+  have hw23 := hw22.2
+  have e71 := hw23.1
+  have hw24 := hw23.2
+  have hw25 := hw24.2
+  have hw26 := hw25.2
+  have hw27 := hw26.2
+  have e81 := hw27.1
+  have hw28 := hw27.2
+  have hw29 := hw28.2
+  have hw30 := hw29.2
+  have hw31 := hw30.2
+  have e91 := hw31.1
+  have hw32 := hw31.2
+  have e96 := hw32.1
+  have hw33 := hw32.2
+  have hw34 := hw33.2
+  have hw35 := hw34.2
+  have e105 := hw35.1
+  have hw36 := hw35.2
+  have e107 := hw36.1
+  have hw37 := hw36.2
+  have e109 := hw37.1
+  have hw38 := hw37.2
+  have e111 := hw38.1
+  have hw39 := hw38.2
+  have e113 := hw39.1
+  have hw40 := hw39.2
+  have e115 := hw40.1
+  have hw41 := hw40.2
+  have e117 := hw41.1
+  have hw42 := hw41.2
+  have e119 := hw42.1
+  have hw43 := hw42.2
+  have e154 := hw43.1
+  have hw44 := hw43.2
+  have e157 := hw44.1
+  have hw45 := hw44.2
+  have e160 := hw45.1
+  have hw46 := hw45.2
+  have e163 := hw46.1
+  have hw47 := hw46.2
+  have e167 := hw47.1
+  have hw48 := hw47.2
+  have e171 := hw48.1
+  have hw49 := hw48.2
+  have e175 := hw49.1
+  have hw50 := hw49.2
+  have e179 := hw50.1
+  have hw51 := hw50.2
+  have hw52 := hw51.2
+  have hw53 := hw52.2
+  have hw54 := hw53.2
+  have hw55 := hw54.2
+  have hw56 := hw55.2
+  have hw57 := hw56.2
+  have hw58 := hw57.2
+  have hw59 := hw58.2
+  have e225 := hw59.1
+  have hw60 := hw59.2
+  have e228 := hw60.1
+  have hw61 := hw60.2
+  have e230 := hw61.1
+  have hw62 := hw61.2
+  have e232 := hw62.1
+  have hw63 := hw62.2
+  have e234 := hw63.1
+  have hw64 := hw63.2
+  have e236 := hw64.1
+  have hw65 := hw64.2
+  have e238 := hw65.1
+  have hw66 := hw65.2
+  have e240 := hw66.1
+  have hw67 := hw66.2
+  have e242 := hw67.1
+  have hw68 := hw67.2
+  have e244 := hw68.1
+  have hw69 := hw68.2
+  have e247 := hw69.1
+  have hw70 := hw69.2
+  have e250 := hw70.1
+  have hw71 := hw70.2
+  have e253 := hw71.1
+  have hw72 := hw71.2
+  have e256 := hw72.1
+  have hw73 := hw72.2
+  have e259 := hw73.1
+  have hw74 := hw73.2
+  have e262 := hw74.1
+  have hw75 := hw74.2
+  have e265 := hw75.1
+  have hw76 := hw75.2
+  have e268 := hw76.1
+  have hw77 := hw76.2
+  have e270 := hw77.1
+  have hw78 := hw77.2
+  have e272 := hw78.1
+  have hw79 := hw78.2
+  have e274 := hw79.1
+  have hw80 := hw79.2
+  have e276 := hw80.1
+  have hw81 := hw80.2
+  have e278 := hw81.1
+  have hw82 := hw81.2
+  have e280 := hw82.1
+  have hw83 := hw82.2
+  have e282 := hw83.1
+  have hw84 := hw83.2
+  have e284 := hw84.1
+  have hw85 := hw84.2
+  have e286 := hw85.1
+  have hw86 := hw85.2
+  have e288 := hw86.1
+  have hw87 := hw86.2
+  have e299 := hw87.1
+  have hw88 := hw87.2
+  have e300 := hw88.1
+  have hw89 := hw88.2
+  have e301 := hw89.1
+  have hw90 := hw89.2
+  have e302 := hw90.1
+  have hw91 := hw90.2
+  have e305 := hw91.1
+  have hw92 := hw91.2
+  have e307 := hw92.1
+  have hw93 := hw92.2
+  have e309 := hw93.1
+  have hw94 := hw93.2
+  have e311 := hw94.1
+  have hw95 := hw94.2
+  have e313 := hw95.1
+  have hw96 := hw95.2
+  have e315 := hw96.1
+  have hw97 := hw96.2
+  have e317 := hw97.1
+  have hw98 := hw97.2
+  have e319 := hw98.1
+  have hw99 := hw98.2
+  have e321 := hw99.1
+  have hw100 := hw99.2
+  have e323 := hw100.1
+  have hw101 := hw100.2
+  have hw102 := hw101.2
+  have hw103 := hw102.2
+  have hw104 := hw103.2
+  have hw105 := hw104.2
+  have hw106 := hw105.2
+  have hw107 := hw106.2
+  have hw108 := hw107.2
+  have hw109 := hw108.2
+  have e341 := hw109.1
+  have hw110 := hw109.2
+  have hw111 := hw110.2
+  have e345 := hw111.1
+  have hw112 := hw111.2
+  have hw113 := hw112.2
+  have hw114 := hw113.2
+  have e351 := hw114.1
+  clear hown hw1 hw2 hw3 hw4 hw5 hw6 hw7 hw8 hw9 hw10 hw11 hw12 hw13 hw14 hw15 hw16 hw17 hw18 hw19
+    hw20 hw21 hw22 hw23 hw24 hw25 hw26 hw27 hw28 hw29 hw30 hw31 hw32 hw33 hw34 hw35 hw36 hw37
+    hw38 hw39 hw40 hw41 hw42 hw43 hw44 hw45 hw46 hw47 hw48 hw49 hw50 hw51 hw52 hw53 hw54 hw55
+    hw56 hw57 hw58 hw59 hw60 hw61 hw62 hw63 hw64 hw65 hw66 hw67 hw68 hw69 hw70 hw71 hw72 hw73
+    hw74 hw75 hw76 hw77 hw78 hw79 hw80 hw81 hw82 hw83 hw84 hw85 hw86 hw87 hw88 hw89 hw90 hw91
+    hw92 hw93 hw94 hw95 hw96 hw97 hw98 hw99 hw100 hw101 hw102 hw103 hw104 hw105 hw106 hw107
+    hw108 hw109 hw110 hw111 hw112 hw113 hw114
   obtain ⟨hfdivu, hfremu, hfdivw, hfremw, hfdivuw, hfremuw, hsigned64⟩ :=
     signed64_flags hselected hfamily
   have hword : cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw = 0 := by
@@ -99,8 +293,13 @@ theorem signed64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {ca
     apply Vector.ext; intro i hi; interval_cases i <;> assumption
   have hbU : Word.isU64 cols.b := hbEq ▸ hbReadU
   have hcU : Word.isU64 cols.c := hcEq ▸ hcReadU
-  obtain ⟨_r0, _r1, _r2, _r3, _r4, _r5, _r6, _r7,
-    habsCRange, habsRRange, hquotRange, hremRange, hctqRange⟩ := hrange hir
+  have hrng := hrange hir
+  have habsCRange := hrng.2.2.2.2.2.2.2.2.1
+  have habsRRange := hrng.2.2.2.2.2.2.2.2.2.1
+  have hquotRange := hrng.2.2.2.2.2.2.2.2.2.2.1
+  have hremRange := hrng.2.2.2.2.2.2.2.2.2.2.2.1
+  have hctqRange := hrng.2.2.2.2.2.2.2.2.2.2.2.2
+  clear hrng hrange
   have hquotU : Word.isU64 cols.quotient := Word.isU64_of_cases
     (hquotRange 0 (by norm_num)) (hquotRange 1 (by norm_num))
     (hquotRange 2 (by norm_num)) (hquotRange 3 (by norm_num))
@@ -132,8 +331,16 @@ theorem signed64Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {ca
     (habsRRange 0 (by norm_num)) (habsRRange 1 (by norm_num))
     (habsRRange 2 (by norm_num)) (habsRRange 3 (by norm_num))
   simp only [DivRemCompare.CompareSpec, DivRemCompare.Inputs.ofCols] at hcompare
-  obtain ⟨hovbFull, hovcFull, _hovbLow, _hovcLow, hisZero, haddC, haddR,
-    hltSpec, hmsbB3, hmsbC3, hmsbR3, _hmsbB1, _hmsbC1, _hmsbR1, _hmsbQ1⟩ := hcompare
+  have hovbFull := hcompare.1
+  have hovcFull := hcompare.2.1
+  have hisZero := hcompare.2.2.2.2.1
+  have haddC := hcompare.2.2.2.2.2.1
+  have haddR := hcompare.2.2.2.2.2.2.1
+  have hltSpec := hcompare.2.2.2.2.2.2.2.1
+  have hmsbB3 := hcompare.2.2.2.2.2.2.2.2.1
+  have hmsbC3 := hcompare.2.2.2.2.2.2.2.2.2.1
+  have hmsbR3 := hcompare.2.2.2.2.2.2.2.2.2.2.1
+  clear hcompare
   have hbpvEq : cols.adapter.op_b_memory.prev_value = cols.b := by
     rw [hadapter]
     exact hbEq.symm

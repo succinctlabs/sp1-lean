@@ -19,13 +19,23 @@ stored word's range follows from the immutable reader's source-register contract
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm
 
--- Measured floors: both proofs in (150000, 300000]; the declared stamps were 7-13x over.
-set_option maxHeartbeats 1500000 in
+-- Both proofs read `h_assumptions` / `h_holds` through `.1`/`.2` projections instead of a wide
+-- `obtain`: an `And.casesOn` motive re-abstracts the (very large) goal once per component, which is
+-- Clean's `doc/performance-problems.md` pattern 7. Both now clear Lean's plain default, so neither
+-- carries a scoped elaboration budget any more (they were stamped at 1.5M each).
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb⟩ := h_assumptions
-  obtain ⟨h_cpu, h_addr, h_mem, h_itype, h_gate⟩ := h_holds
+  have ha := h_assumptions.1
+  have hb := h_assumptions.2
+  have h_cpu := h_holds.1
+  have hh1 := h_holds.2
+  have h_addr := hh1.1
+  have hh2 := hh1.2
+  have h_mem := hh2.1
+  have hh3 := hh2.2
+  have h_itype := hh3.1
+  have h_gate := hh3.2
   have h_bin := bool_of_mul_pred h_gate
   -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
   -- channel's `MemoryMsg.ClkBound` guarantee — `MemoryAccess`'s RAM effect slot (`clk_low + 1`) and
@@ -70,12 +80,28 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_
     (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16
       ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16)
 
-set_option maxHeartbeats 1500000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_align, hbin, h_cpu, h_mem, h_it, hdec⟩ := h_assumptions
+  have ha := h_assumptions.1
+  have hp1 := h_assumptions.2
+  have hb := hp1.1
+  have hp2 := hp1.2
+  have hfit := hp2.1
+  have hp3 := hp2.2
+  have h_ge := hp3.1
+  have hp4 := hp3.2
+  have h_align := hp4.1
+  have hp5 := hp4.2
+  have hbin := hp5.1
+  have hp6 := hp5.2
+  have h_cpu := hp6.1
+  have hp7 := hp6.2
+  have h_mem := hp7.1
+  have hp8 := hp7.2
+  have h_it := hp8.1
+  have hdec := hp8.2
   -- G1: the *push*-side clock bounds, from the prover-supplied CPUState clock byte bounds.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   -- eval→value bridge for the nested `pc` vector the CPUState `Spec` references.

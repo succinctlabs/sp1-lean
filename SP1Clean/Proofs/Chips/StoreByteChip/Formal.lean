@@ -20,15 +20,48 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (input.is_real = 1 → Word.isU64 input.store_value)
 
--- Measured floors: soundness ≤ 400000, completeness ≤ 300000 (the 16M stamps were ~40x over); the
--- `circuit` budget below is genuine — it still fails at 1000000, so it stays as declared.
-set_option maxHeartbeats 2000000 in
+-- Both proofs read `h_assumptions` / `h_holds` / `h_input` through `.1`/`.2` projections instead of
+-- a wide `obtain`: an `And.casesOn` motive re-abstracts the (very large) goal once per component,
+-- which is Clean's `doc/performance-problems.md` pattern 7. Both now clear Lean's plain default, so
+-- neither carries a scoped elaboration budget any more (they were stamped at 2M / 1.5M, and 16M
+-- before that). The `circuit` budget below is genuine and unrelated — it is owned by the structural
+-- field tactics, not by any conjunction destructuring.
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, h_sv⟩ := h_assumptions
-  obtain ⟨h_cpu, h_addr, h_mem, h_itype, hreg_rcv, hmem_rcv, hsel0, hsel1, hsel2, hsel3,
-    hincr, hr0, hr1, hr2, hr3, h_gate⟩ := h_holds
+  have ha := h_assumptions.1
+  have hb := h_assumptions.2.1
+  have h_sv := h_assumptions.2.2
+  have h_cpu := h_holds.1
+  have hh1 := h_holds.2
+  have h_addr := hh1.1
+  have hh2 := hh1.2
+  have h_mem := hh2.1
+  have hh3 := hh2.2
+  have h_itype := hh3.1
+  have hh4 := hh3.2
+  have hreg_rcv := hh4.1
+  have hh5 := hh4.2
+  have hmem_rcv := hh5.1
+  have hh6 := hh5.2
+  have hsel0 := hh6.1
+  have hh7 := hh6.2
+  have hsel1 := hh7.1
+  have hh8 := hh7.2
+  have hsel2 := hh8.1
+  have hh9 := hh8.2
+  have hsel3 := hh9.1
+  have hh10 := hh9.2
+  have hincr := hh10.1
+  have hh11 := hh10.2
+  have hr0 := hh11.1
+  have hh12 := hh11.2
+  have hr1 := hh12.1
+  have hh13 := hh12.2
+  have hr2 := hh13.1
+  have hh14 := hh13.2
+  have hr3 := hh14.1
+  have h_gate := hh14.2
   have h_bin := bool_of_mul_pred h_gate
   -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
   -- channel's `MemoryMsg.ClkBound` guarantee — `MemoryAccess`'s RAM effect slot (`clk_low + 1`) and
@@ -36,8 +69,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- unification, so this line never names the destructured state columns.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   simp only [circuit_norm, byteChannel] at hreg_rcv hmem_rcv
-  obtain ⟨_, _, ⟨_, ⟨hmap_oap, _, _⟩, _, _, _, _⟩, ⟨hmap_pv, _, _, _, _, _⟩,
-    hmap_ob, _, _, _, _, hmap_sv⟩ := h_input
+  have hmap_oap := h_input.2.2.1.2.1.1
+  have hmap_pv := h_input.2.2.2.1.1
+  have hmap_ob := h_input.2.2.2.2.1
+  have hmap_sv := h_input.2.2.2.2.2.2.2.2.2
   have eoap0 : Expression.eval env input_var_adapter_op_a_memory_prev_value[0]
       = input_adapter_op_a_memory_prev_value[0] := by rw [← hmap_oap]; simp only [Vector.getElem_map]
   have eob : ∀ i (hi : i < 3), Expression.eval env input_var_offset_bit[i] = input_offset_bit[i] :=
@@ -127,19 +162,64 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_
       ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
     (input.is_real = 1 → Word.isU64 input.store_value)
 
-set_option maxHeartbeats 1500000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
-  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, hbin, hreg_pa, hreghi_pa, hmem_pa, hmemhi_pa,
-    ⟨hsel0, hsel1, hsel2, hsel3⟩, hincr_pa, ⟨hr0, hr1, hr2, hr3⟩, h_cpu, h_mem, h_it, hdec, h_sv⟩ :=
-    h_assumptions
+  have ha := h_assumptions.1
+  have hp1 := h_assumptions.2
+  have hb := hp1.1
+  have hp2 := hp1.2
+  have hfit := hp2.1
+  have hp3 := hp2.2
+  have h_ge := hp3.1
+  have hp4 := hp3.2
+  have h_off := hp4.1
+  have hp5 := hp4.2
+  have hob0 := hp5.1
+  have hp6 := hp5.2
+  have hob1 := hp6.1
+  have hp7 := hp6.2
+  have hob2 := hp7.1
+  have hp8 := hp7.2
+  have hbin := hp8.1
+  have hp9 := hp8.2
+  have hreg_pa := hp9.1
+  have hp10 := hp9.2
+  have hreghi_pa := hp10.1
+  have hp11 := hp10.2
+  have hmem_pa := hp11.1
+  have hp12 := hp11.2
+  have hmemhi_pa := hp12.1
+  have hp13 := hp12.2
+  have hsel0 := hp13.1.1
+  have hsel1 := hp13.1.2.1
+  have hsel2 := hp13.1.2.2.1
+  have hsel3 := hp13.1.2.2.2
+  have hp14 := hp13.2
+  have hincr_pa := hp14.1
+  have hp15 := hp14.2
+  have hr0 := hp15.1.1
+  have hr1 := hp15.1.2.1
+  have hr2 := hp15.1.2.2.1
+  have hr3 := hp15.1.2.2.2
+  have hp16 := hp15.2
+  have h_cpu := hp16.1
+  have hp17 := hp16.2
+  have h_mem := hp17.1
+  have hp18 := hp17.2
+  have h_it := hp18.1
+  have hp19 := hp18.2
+  have hdec := hp19.1
+  have h_sv := hp19.2
   -- G1: the *push*-side clock bounds, from the prover-supplied CPUState clock byte bounds.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
-  obtain ⟨_, ⟨_, _, _, hmap_pc⟩, ⟨_, ⟨hmap_oap, _, _⟩, _, _, _, _⟩,
-    ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _, hmap_sv⟩ := h_input
+  have hmap_pc := h_input.2.1.2.2.2
+  have hmap_oap := h_input.2.2.1.2.1.1
+  have hmap_pv := h_input.2.2.2.1.1
+  have hmap_ob := h_input.2.2.2.2.1
+  have hmap_sv := h_input.2.2.2.2.2.2.2.2.2
   have eoap0 : Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[0]
       = input_adapter_op_a_memory_prev_value[0] := by rw [← hmap_oap]; simp only [Vector.getElem_map]
   simp only [regHigh, memHigh] at hreghi_pa hmemhi_pa
@@ -249,6 +329,14 @@ theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
       exposedMemoryInteractions input offset := by
   simp [exposedMemoryInteractions]
 
+-- Genuine budget, and the tightest in the file: the measured floor is (1500000, 1750000], so the
+-- declared value has only ~1.14x headroom. It is owned entirely by `requirementsChannelsLawful`
+-- below (46 of this file's 54 s; stubbing that one field drops the file to 8.2 s), and within it by
+-- the single `main` entry in the `simp only` set — dropping `main` alone drops the file to 8.4 s.
+-- `grind` is free (removing it changes nothing) and `exposedChannels_eq` is ~1 s. The fix is not a
+-- smaller budget but a proof that never unfolds `main` under the whole `circuit_norm` set: see
+-- `JalrChip`'s three-part `refine` over `Operations.RequirementsChannelsLawful` with targeted
+-- structural simp sets, and `ShiftRightChip.requirementsChannelsLawful_main`.
 set_option maxHeartbeats 2000000 in
 /-- The `StoreByte` chip row as a `GeneralFormalCircuit`; output is the extracted `Columns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=

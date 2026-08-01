@@ -33,17 +33,49 @@ private lemma sel_lt_of_offset {s v v' o : ZMod p} (ho : o = 0 ∨ o = 1)
   · have hne : o ≠ 0 := by rw [h]; exact one_ne_zero
     rw [sub_eq_zero.mp ((mul_eq_zero.mp h1).resolve_right hne)]; exact hv'
 
--- Measured floors: soundness ≤ 400000, completeness ≤ 300000; the former 4M stamps were ~10x over.
-set_option maxHeartbeats 2000000 in
+-- Both proofs read `h_assumptions` / `h_holds` through `.1`/`.2` projections instead of a wide
+-- `obtain`: an `And.casesOn` motive re-abstracts the (very large) goal once per component, which is
+-- Clean's `doc/performance-problems.md` pattern 7. Neither proof carries an elaboration budget any
+-- more (they were stamped at 2000000 / 1500000, and 4M before that).
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   -- `op_b_val`/`op_c_imm` are reducible adapter projections (`adapter.op_b_memory.prev_value` /
   -- `adapter.op_c_imm`), not committed columns — unfold them to the destructured adapter binders.
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, h_pv_isu64⟩ := h_assumptions
-  obtain ⟨hpv0, hpv1, hpv2, hpv3⟩ := Word.lt_cases_of_isU64 h_pv_isu64
-  obtain ⟨h_cpu, h_addr, h_mem, h_msb, h_itype, _h_regwrite, hsel0, hsel1, hsel2, hsel3, h_op_a_0,
-    h_msbgate, h_lw_gate, h_lwu_gate, h_gate⟩ := h_holds
+  have ha := h_assumptions.1
+  have hb := h_assumptions.2.1
+  have h_pv_isu64 := h_assumptions.2.2
+  have hpv := Word.lt_cases_of_isU64 h_pv_isu64
+  have hpv0 := hpv.1
+  have hpv1 := hpv.2.1
+  have hpv2 := hpv.2.2.1
+  have hpv3 := hpv.2.2.2
+  have h_cpu := h_holds.1
+  have hh1 := h_holds.2
+  have h_addr := hh1.1
+  have hh2 := hh1.2
+  have h_mem := hh2.1
+  have hh3 := hh2.2
+  have h_msb := hh3.1
+  have hh4 := hh3.2
+  have h_itype := hh4.1
+  have hh5 := hh4.2.2
+  have hsel0 := hh5.1
+  have hh6 := hh5.2
+  have hsel1 := hh6.1
+  have hh7 := hh6.2
+  have hsel2 := hh7.1
+  have hh8 := hh7.2
+  have hsel3 := hh8.1
+  have hh9 := hh8.2
+  have h_op_a_0 := hh9.1
+  have hh10 := hh9.2
+  have h_msbgate := hh10.1
+  have hh11 := hh10.2
+  have h_lw_gate := hh11.1
+  have hh12 := hh11.2
+  have h_lwu_gate := hh12.1
+  have h_gate := hh12.2
   -- the proven `is_real`-binary gate discharges the readers'/`MemoryAccess`'s `Assumptions`.
   have h_bin := bool_of_mul_pred h_gate
   have h_lw_bin := bool_of_mul_pred h_lw_gate
@@ -141,15 +173,50 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_
         input.state.pc, input.is_lw * 31 + input.is_lwu * 34,
         input.selected_word[0], input.selected_word[1], 65535 * input.msb, 65535 * input.msb⟩
 
-set_option maxHeartbeats 1500000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_align, h_off, h_pv_isu64, h_lw_bin, h_lwu_bin, hbin, h_op_a_0,
-    ⟨hsel0, hsel1, hsel2, hsel3⟩, h_msbgate, h_msb_spec, h_cpu, h_mem, h_it⟩ :=
-    h_assumptions
-  obtain ⟨hpv0, hpv1, hpv2, hpv3⟩ := Word.lt_cases_of_isU64 h_pv_isu64
+  have ha := h_assumptions.1
+  have hp1 := h_assumptions.2
+  have hb := hp1.1
+  have hp2 := hp1.2
+  have hfit := hp2.1
+  have hp3 := hp2.2
+  have h_ge := hp3.1
+  have hp4 := hp3.2
+  have h_align := hp4.1
+  have hp5 := hp4.2
+  have h_off := hp5.1
+  have hp6 := hp5.2
+  have h_pv_isu64 := hp6.1
+  have hp7 := hp6.2
+  have h_lw_bin := hp7.1
+  have hp8 := hp7.2
+  have h_lwu_bin := hp8.1
+  have hp9 := hp8.2
+  have hbin := hp9.1
+  have hp10 := hp9.2
+  have h_op_a_0 := hp10.1
+  have hp11 := hp10.2
+  have hsel0 := hp11.1.1
+  have hsel1 := hp11.1.2.1
+  have hsel2 := hp11.1.2.2.1
+  have hsel3 := hp11.1.2.2.2
+  have hp12 := hp11.2
+  have h_msbgate := hp12.1
+  have hp13 := hp12.2
+  have h_msb_spec := hp13.1
+  have hp14 := hp13.2
+  have h_cpu := hp14.1
+  have hp15 := hp14.2
+  have h_mem := hp15.1
+  have h_it := hp15.2
+  have hpv := Word.lt_cases_of_isU64 h_pv_isu64
+  have hpv0 := hpv.1
+  have hpv1 := hpv.2.1
+  have hpv2 := hpv.2.2.1
+  have hpv3 := hpv.2.2.2
   simp only [isReal] at hbin
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu

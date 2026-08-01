@@ -20,14 +20,48 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     Word.isU64 input.memory_access.prev_value
 
--- Measured floors: soundness ≤ 400000, completeness ≤ 300000; the former 16M stamps were ~40x over.
-set_option maxHeartbeats 2000000 in
+-- Both proofs read `h_assumptions` / `h_holds` / `h_input` through `.1`/`.2` projections instead of
+-- a wide `obtain`: an `And.casesOn` motive re-abstracts the (very large) goal once per component,
+-- which is Clean's `doc/performance-problems.md` pattern 7. Neither proof carries an elaboration
+-- budget any more (they were stamped at 2000000 / 1500000, and 16M before that).
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, h_pv_isu64⟩ := h_assumptions
-  obtain ⟨h_cpu, h_addr, h_mem, h_itype, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5, h_b6, h_gate,
-    h_al2, h_al1, h_al0, h_oa1, h_oa2⟩ := h_holds
+  have ha := h_assumptions.1
+  have hb := h_assumptions.2.1
+  have h_pv_isu64 := h_assumptions.2.2
+  have h_cpu := h_holds.1
+  have hh1 := h_holds.2
+  have h_addr := hh1.1
+  have hh2 := hh1.2
+  have h_mem := hh2.1
+  have hh3 := hh2.2
+  have h_itype := hh3.1
+  have hh4 := hh3.2
+  have h_b0 := hh4.1
+  have hh5 := hh4.2
+  have h_b1 := hh5.1
+  have hh6 := hh5.2
+  have h_b2 := hh6.1
+  have hh7 := hh6.2
+  have h_b3 := hh7.1
+  have hh8 := hh7.2
+  have h_b4 := hh8.1
+  have hh9 := hh8.2
+  have h_b5 := hh9.1
+  have hh10 := hh9.2
+  have h_b6 := hh10.1
+  have hh11 := hh10.2
+  have h_gate := hh11.1
+  have hh12 := hh11.2
+  have h_al2 := hh12.1
+  have hh13 := hh12.2
+  have h_al1 := hh13.1
+  have hh14 := hh13.2
+  have h_al0 := hh14.1
+  have hh15 := hh14.2
+  have h_oa1 := hh15.1
+  have h_oa2 := hh15.2
   have h_bin := bool_of_mul_pred h_gate
   -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
   -- channel's `MemoryMsg.ClkBound` guarantee — `MemoryAccess`'s RAM effect slot (`clk_low + 1`) and
@@ -35,7 +69,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- seven-way selector sum `isReal`, which the named discipline carries as its `is_real` argument.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   -- eval→value bridge for the offset bits (the only nested vector field the gates reference in value form).
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, hmap_ob⟩ := h_input
+  have hmap_ob := h_input.2.2.2.2.2.2.2.2.2.2
   have eob : ∀ i (hi : i < 3), Expression.eval env input_var_offset_bit[i] = input_offset_bit[i] :=
     fun i hi => by rw [← hmap_ob]; simp only [Vector.getElem_map]
   have h_addr_as : AddressOperation.SoundnessAssumptions
@@ -97,18 +131,64 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_
       ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
         input.state.pc, opcodeVal input⟩
 
-set_option maxHeartbeats 1500000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   simp only [isReal, opcodeVal] at h_assumptions
-  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_pv_isu64, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5,
-    h_b6, hbin, h_al2, h_al1, h_al0, h_oa1, h_oa2, h_cpu, h_mem, h_it⟩ := h_assumptions
+  have ha := h_assumptions.1
+  have hp1 := h_assumptions.2
+  have hb := hp1.1
+  have hp2 := hp1.2
+  have hfit := hp2.1
+  have hp3 := hp2.2
+  have h_ge := hp3.1
+  have hp4 := hp3.2
+  have h_off := hp4.1
+  have hp5 := hp4.2
+  have hob0 := hp5.1
+  have hp6 := hp5.2
+  have hob1 := hp6.1
+  have hp7 := hp6.2
+  have hob2 := hp7.1
+  have hp8 := hp7.2
+  have h_pv_isu64 := hp8.1
+  have hp9 := hp8.2
+  have h_b0 := hp9.1
+  have hp10 := hp9.2
+  have h_b1 := hp10.1
+  have hp11 := hp10.2
+  have h_b2 := hp11.1
+  have hp12 := hp11.2
+  have h_b3 := hp12.1
+  have hp13 := hp12.2
+  have h_b4 := hp13.1
+  have hp14 := hp13.2
+  have h_b5 := hp14.1
+  have hp15 := hp14.2
+  have h_b6 := hp15.1
+  have hp16 := hp15.2
+  have hbin := hp16.1
+  have hp17 := hp16.2
+  have h_al2 := hp17.1
+  have hp18 := hp17.2
+  have h_al1 := hp18.1
+  have hp19 := hp18.2
+  have h_al0 := hp19.1
+  have hp20 := hp19.2
+  have h_oa1 := hp20.1
+  have hp21 := hp20.2
+  have h_oa2 := hp21.1
+  have hp22 := hp21.2
+  have h_cpu := hp22.1
+  have hp23 := hp22.2
+  have h_mem := hp23.1
+  have h_it := hp23.2
   -- G1: the *push*-side clock bounds, from the prover-supplied CPUState clock byte bounds.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   simp only [sub_eq_add_neg] at h_oa1 h_oa2
-  obtain ⟨_, _, _, _, _, _, _, ⟨_, _, _, hmap_pc⟩, _, _, hmap_ob⟩ := h_input
+  have hmap_pc := h_input.2.2.2.2.2.2.2.1.2.2.2
+  have hmap_ob := h_input.2.2.2.2.2.2.2.2.2.2
   have epc : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_state_pc[i]
       = input_state_pc[i] := fun i hi => by rw [← hmap_pc]; simp only [Vector.getElem_map]
   have eob : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_offset_bit[i]

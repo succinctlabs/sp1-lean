@@ -46,15 +46,47 @@ private lemma sel_lt_of_corners {s b0 b1 v0 v1 v2 v3 : ZMod p}
       ((mul_eq_zero.mp ((mul_eq_zero.mp h3).resolve_right (hn _ e1))).resolve_right (hn _ e0))]
     exact hv3
 
--- Measured floors: soundness ≤ 400000, completeness ≤ 300000; the former 16M stamps were ~40x over.
-set_option maxHeartbeats 2000000 in
+-- Both proofs read `h_assumptions` / `h_holds` through `.1`/`.2` projections instead of a wide
+-- `obtain`: an `And.casesOn` motive re-abstracts the (very large) goal once per component, which is
+-- Clean's `doc/performance-problems.md` pattern 7. Neither proof carries an elaboration budget any
+-- more (they were stamped at 2000000 / 1500000, and 16M before that).
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, h_pv_isu64⟩ := h_assumptions
-  obtain ⟨hpv0, hpv1, hpv2, hpv3⟩ := Word.lt_cases_of_isU64 h_pv_isu64
-  obtain ⟨h_cpu, h_addr, h_mem, h_msb, h_itype, _h_regwrite, hsel0, hsel1, hsel2, hsel3, h_op_a_0,
-    h_msbgate, h_lh_gate, h_lhu_gate, h_gate⟩ := h_holds
+  have ha := h_assumptions.1
+  have hb := h_assumptions.2.1
+  have h_pv_isu64 := h_assumptions.2.2
+  have hpv := Word.lt_cases_of_isU64 h_pv_isu64
+  have hpv0 := hpv.1
+  have hpv1 := hpv.2.1
+  have hpv2 := hpv.2.2.1
+  have hpv3 := hpv.2.2.2
+  have h_cpu := h_holds.1
+  have hh1 := h_holds.2
+  have h_addr := hh1.1
+  have hh2 := hh1.2
+  have h_mem := hh2.1
+  have hh3 := hh2.2
+  have h_msb := hh3.1
+  have hh4 := hh3.2
+  have h_itype := hh4.1
+  have hh5 := hh4.2.2
+  have hsel0 := hh5.1
+  have hh6 := hh5.2
+  have hsel1 := hh6.1
+  have hh7 := hh6.2
+  have hsel2 := hh7.1
+  have hh8 := hh7.2
+  have hsel3 := hh8.1
+  have hh9 := hh8.2
+  have h_op_a_0 := hh9.1
+  have hh10 := hh9.2
+  have h_msbgate := hh10.1
+  have hh11 := hh10.2
+  have h_lh_gate := hh11.1
+  have hh12 := hh11.2
+  have h_lhu_gate := hh12.1
+  have h_gate := hh12.2
   have h_bin := bool_of_mul_pred h_gate
   have h_lh_bin := bool_of_mul_pred h_lh_gate
   -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
@@ -147,14 +179,55 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_
         input.state.pc, input.is_lh * 30 + input.is_lhu * 33,
         input.selected_half, 65535 * input.msb, 65535 * input.msb, 65535 * input.msb⟩
 
-set_option maxHeartbeats 1500000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_align, hob0, hob1, h_off, hpv0, hpv1, hpv2, hpv3,
-    h_lh_bin, h_lhu_bin, hbin, h_op_a_0, ⟨hsel0, hsel1, hsel2, hsel3⟩, h_msbgate, h_msb_spec,
-    h_cpu, h_mem, h_it⟩ := h_assumptions
+  have ha := h_assumptions.1
+  have hp1 := h_assumptions.2
+  have hb := hp1.1
+  have hp2 := hp1.2
+  have hfit := hp2.1
+  have hp3 := hp2.2
+  have h_ge := hp3.1
+  have hp4 := hp3.2
+  have h_align := hp4.1
+  have hp5 := hp4.2
+  have hob0 := hp5.1
+  have hp6 := hp5.2
+  have hob1 := hp6.1
+  have hp7 := hp6.2
+  have h_off := hp7.1
+  have hp8 := hp7.2
+  have hpv0 := hp8.1
+  have hp9 := hp8.2
+  have hpv1 := hp9.1
+  have hp10 := hp9.2
+  have hpv2 := hp10.1
+  have hp11 := hp10.2
+  have hpv3 := hp11.1
+  have hp12 := hp11.2
+  have h_lh_bin := hp12.1
+  have hp13 := hp12.2
+  have h_lhu_bin := hp13.1
+  have hp14 := hp13.2
+  have hbin := hp14.1
+  have hp15 := hp14.2
+  have h_op_a_0 := hp15.1
+  have hp16 := hp15.2
+  have hsel0 := hp16.1.1
+  have hsel1 := hp16.1.2.1
+  have hsel2 := hp16.1.2.2.1
+  have hsel3 := hp16.1.2.2.2
+  have hp17 := hp16.2
+  have h_msbgate := hp17.1
+  have hp18 := hp17.2
+  have h_msb_spec := hp18.1
+  have hp19 := hp18.2
+  have h_cpu := hp19.1
+  have hp20 := hp19.2
+  have h_mem := hp20.1
+  have h_it := hp20.2
   simp only [isReal] at hbin
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
