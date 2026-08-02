@@ -16,7 +16,7 @@ open SP1Clean
 
 set_option linter.all false  -- auto-generated: skip linters
 
-set_option maxHeartbeats 4000000 in
+set_option maxHeartbeats 600000 in
 set_option maxRecDepth 64000 in
 /-- 528 conformance vectors for `MulOperation` (`(b_limbs, c_limbs, is_mulh, is_mulhsu, is_mulw, carry, product, b_lower_byte, c_lower_byte, b_msb, c_msb, product_msb, b_sign_extend, c_sign_extend)`). -/
 def MulOperationWitnessVectors : List (Vector ℕ 4 × Vector ℕ 4 × ℕ × ℕ × ℕ × Vector ℕ 16 × Vector ℕ 16 × Vector ℕ 4 × Vector ℕ 4 × ℕ × ℕ × ℕ × ℕ × ℕ) := [
