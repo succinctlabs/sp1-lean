@@ -16,25 +16,23 @@ Rust keeps the byte opcode as a field expression. The extracted oracle and nativ
 the same; validity of that opcode is a byte-table fact rather than a lossy extraction-time enum
 decode.
 
-Heartbeat budget: eight of the eleven declared ceilings here were 25–200× over and
-were measured away (floors ≤40000). The three survivors are real:
-`toElements_bitwiseChipOperationOfLocals` has measured floor bracket (900000, 1000000] and is now
-pinned at 1000000 (it used to declare twice that), while `bitwise_chip_constraints_decompose` and
-`bitwiseChip_interactions_faithful` fail at 150000 and 100000 respectively.
+Elaboration budget: all eleven ceilings this file once declared have been measured away; it now
+declares none, and runs entirely inside Lean's plain default. The two costliest declarations,
+`bitwise_chip_constraints_decompose` and `bitwiseChip_interactions_faithful`, have measured floors
+between 150000/100000 and that default, so they sit under it with only modest headroom.
 
-`toElements_bitwiseChipOperationOfLocals` is a bare `rfl`, and it is the highest-floor `rfl` in the
-tree. Diagnosed mechanism: a runaway whnf reducing `toElements` of a 3-component `ProvableStruct`
-to its flat 16-cell `Vector` normal form. At a 40000 probe the counters are `List.rec` 31227,
-`Eq.rec` 25849, `ProvableStruct.ProvableTypeList.rec` 18925, `ProvableStruct.componentsToElements`
-18924, `Nat.rec` 11579, `dite` 7018, `Decidable.rec` 7012 — i.e. ~420000 `componentsToElements`
-unfoldings at the real floor, for a struct with only three components. The cost is the
-`Vector.append` size arithmetic (`Eq.rec` casts, `dite` bounds checks) inside `Array.foldl`, not the
-struct shape. Measured and rejected as fixes: `Vector.ext` + `interval_cases i <;> rfl` (same
-bracket — still fails at 800000); `simp only [circuit_norm]`, which leaves the goal untouched
-because `circuit_norm` carries no `toElements`-of-a-`ProvableStruct`-literal rule at all; and a
-helper stated over opaque component vectors (Clean fix pattern 1), which is *not* a definitional
-equality — `toElements ⟨⟨b⟩, ⟨c⟩, ⟨r⟩⟩` does not reduce to `b ++ c ++ r`. Removing this cost needs
-a `toElements`/`componentsToElements` rewrite rule upstream in Clean; there is no local fix.
+The last of those ceilings, a ~50×-over one on this file's `toElements` codec lemma, was caused by
+the *spelling* of `bitwiseChipOperationOfLocals`, not by anything intrinsic. Building the operation columns as a
+`ProvableStruct` **literal** forced every consumer to whnf `toElements` of that literal down to its
+flat 16-cell `Vector` normal form — a runaway through `componentsToElements`/`Vector.append` size
+arithmetic (`Eq.rec` casts, `dite` bounds checks) inside `Array.foldl`. The house pattern, already
+used by `ltChipOperationOfLocals` (`Faithful/LtChip.lean`) and `mulChipOperationOfLocals`
+(`Faithful/MulChip.lean`), is to build the struct with `fromElements` of a `Vector.drop` slice:
+`ProvableType.toElements_fromElements` is `@[circuit_norm]` and discharges the codec in one rewrite,
+so the append normal form is never computed. The one place that genuinely needs `toElements` of an
+abstract struct (`bitwiseChipOperationOfLocals_roundtrip`) goes through the *syntactic* component
+decomposition `toElements_bitwiseU16Columns` — `simp only [ProvableType.toElements,
+ProvableStruct.toComponents]` — rather than through reduction.
 -/
 
 namespace SP1Clean.Faithful
@@ -125,27 +123,19 @@ def bitwiseChipPhysicalRow {F : Type} [Add F]
     (cols : BitwiseChip.Columns F) : Array F :=
   inputFirstRow (bitwiseChipInput cols) (bitwiseChipLocals cols)
 
+/-- The sixteen operation cells of the local block, read back as `BitwiseU16Operation.Columns`.
+Spelled with `fromElements` of a `Vector.drop` slice (the `ltChipOperationOfLocals` /
+`mulChipOperationOfLocals` house pattern) so the codec lemmas below reduce by
+`ProvableType.toElements_fromElements`; a `ProvableStruct` literal here would instead force each
+consumer to whnf `toElements` into its `Vector.append` normal form. -/
 def bitwiseChipOperationOfLocals {F : Type} (locals : Vector F 19) :
     BitwiseU16Operation.Columns F :=
-  ⟨⟨#v[locals[3], locals[4], locals[5], locals[6]]⟩,
-    ⟨#v[locals[7], locals[8], locals[9], locals[10]]⟩,
-    ⟨#v[locals[11], locals[12], locals[13], locals[14],
-        locals[15], locals[16], locals[17], locals[18]]⟩⟩
+  fromElements (Vector.cast (by rfl) (locals.drop 3))
 
 def bitwiseChipColumnsOfInput {F : Type} (input : BitwiseChip.Inputs F)
     (locals : Vector F 19) : BitwiseChip.Columns F :=
   ⟨input.state, input.adapter, bitwiseChipOperationOfLocals locals,
     locals[0], locals[1], locals[2]⟩
-
-set_option maxHeartbeats 1000000 in
-private theorem toElements_bitwiseChipOperationOfLocals {F : Type}
-    (locals : Vector F 19) :
-    toElements (bitwiseChipOperationOfLocals locals) =
-      #v[locals[3], locals[4], locals[5], locals[6],
-        locals[7], locals[8], locals[9], locals[10],
-        locals[11], locals[12], locals[13], locals[14],
-        locals[15], locals[16], locals[17], locals[18]] := by
-  rfl
 
 private theorem getElem_toElements_bitwiseChipOperationOfLocals {F : Type}
     (locals : Vector F 19) (i : ℕ)
@@ -155,45 +145,36 @@ private theorem getElem_toElements_bitwiseChipOperationOfLocals {F : Type}
         have hsize : size BitwiseU16Operation.Columns = 16 := rfl
         rw [hsize] at hi
         omega) := by
-  rw [toElements_bitwiseChipOperationOfLocals]
+  unfold bitwiseChipOperationOfLocals
+  rw [ProvableType.toElements_fromElements, Vector.getElem_cast, Vector.getElem_drop]
+
+/-- `toElements` of the three-component operation struct, decomposed *syntactically* into its
+component vectors. Proved by unfolding the `ProvableStruct` instance, never by reduction. -/
+private theorem toElements_bitwiseU16Columns {F : Type}
+    (x : BitwiseU16Operation.Columns F) :
+    toElements x = Vector.cast (by rfl)
+      (x.b_low_bytes.low_bytes ++ (x.c_low_bytes.low_bytes ++
+        (x.bitwise_operation.result ++ (#v[] : Vector F 0)))) := by
+  simp only [ProvableType.toElements, ProvableStruct.toComponents]
+  rfl
+
+private theorem bitwiseChipOperationOfLocals_roundtrip {F : Type}
+    (cols : BitwiseChip.Columns F) :
+    bitwiseChipOperationOfLocals (bitwiseChipLocals cols) = cols.bitwise_operation := by
+  refine (ProvableType.ext_iff (α := BitwiseU16Operation.Columns) _ _).mpr (fun i hi => ?_)
   have hsize : size BitwiseU16Operation.Columns = 16 := rfl
   rw [hsize] at hi
-  interval_cases i <;> rfl
+  unfold bitwiseChipOperationOfLocals
+  rw [ProvableType.toElements_fromElements, Vector.getElem_cast, Vector.getElem_drop,
+    toElements_bitwiseU16Columns, Vector.getElem_cast]
+  interval_cases i <;>
+    simp only [bitwiseChipLocals, Vector.getElem_append] <;> norm_num
 
 private theorem vec4_eta {F : Type} (value : Vector F 4) :
     #v[value[0], value[1], value[2], value[3]] = value := by
   apply Vector.ext
   intro i hi
   interval_cases i <;> rfl
-
-private theorem vec8_eta {F : Type} (value : Vector F 8) :
-    #v[value[0], value[1], value[2], value[3], value[4], value[5], value[6], value[7]]
-      = value := by
-  apply Vector.ext
-  intro i hi
-  interval_cases i <;> rfl
-
-private theorem bitwiseU16_eta {F : Type}
-    (cols : BitwiseU16Operation.Columns F) :
-    (⟨⟨#v[cols.b_low_bytes.low_bytes[0], cols.b_low_bytes.low_bytes[1],
-          cols.b_low_bytes.low_bytes[2], cols.b_low_bytes.low_bytes[3]]⟩,
-      ⟨#v[cols.c_low_bytes.low_bytes[0], cols.c_low_bytes.low_bytes[1],
-          cols.c_low_bytes.low_bytes[2], cols.c_low_bytes.low_bytes[3]]⟩,
-      ⟨#v[cols.bitwise_operation.result[0], cols.bitwise_operation.result[1],
-          cols.bitwise_operation.result[2], cols.bitwise_operation.result[3],
-          cols.bitwise_operation.result[4], cols.bitwise_operation.result[5],
-          cols.bitwise_operation.result[6], cols.bitwise_operation.result[7]]⟩⟩ :
-      BitwiseU16Operation.Columns F) = cols := by
-  cases cols with
-  | mk bLow cLow bitwise =>
-      cases bLow with
-      | mk bBytes =>
-          cases cLow with
-          | mk cBytes =>
-              cases bitwise with
-              | mk result =>
-                  simp only
-                  rw [vec4_eta, vec4_eta, vec8_eta]
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem extractedBitwiseU16Value_eq
@@ -213,26 +194,10 @@ private theorem extractedBitwiseU16Value_eq
 theorem bitwiseChipColumnsOfInput_roundtrip {F : Type} [Add F]
     (cols : BitwiseChip.Columns F) :
     bitwiseChipColumnsOfInput (bitwiseChipInput cols) (bitwiseChipLocals cols) = cols := by
-  cases cols with
-  | mk state adapter operation isXor isOr isAnd =>
-      cases operation with
-      | mk bLow cLow bitwise =>
-          cases bLow with
-          | mk bBytes =>
-              cases cLow with
-              | mk cBytes =>
-                  cases bitwise with
-                  | mk result =>
-                      change
-                        (⟨state, adapter,
-                          ⟨⟨#v[bBytes[0], bBytes[1], bBytes[2], bBytes[3]]⟩,
-                            ⟨#v[cBytes[0], cBytes[1], cBytes[2], cBytes[3]]⟩,
-                            ⟨#v[result[0], result[1], result[2], result[3],
-                                result[4], result[5], result[6], result[7]]⟩⟩,
-                          isXor, isOr, isAnd⟩ : BitwiseChip.Columns F) =
-                            ⟨state, adapter, ⟨⟨bBytes⟩, ⟨cBytes⟩, ⟨result⟩⟩,
-                              isXor, isOr, isAnd⟩
-                      rw [vec4_eta, vec4_eta, vec8_eta]
+  unfold bitwiseChipColumnsOfInput bitwiseChipInput
+  rw [BitwiseChip.Columns.mk.injEq]
+  exact ⟨rfl, rfl, bitwiseChipOperationOfLocals_roundtrip cols,
+    bitwiseChipLocals_zero cols, bitwiseChipLocals_one cols, bitwiseChipLocals_two cols⟩
 
 @[circuit_norm] theorem eval_extractedU16toU8Operation {F : Type} [FiniteField F]
     (env : Environment F) (cols : Extracted.U16toU8Operation (Expression F)) :

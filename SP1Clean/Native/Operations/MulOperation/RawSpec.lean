@@ -56,6 +56,11 @@ lemma hn8 : 2 ^ 8 < p := by
   have : (2 : ℕ) ^ 8 < 2 ^ 24 := by norm_num
   omega
 
+-- Ladder-measured 2026-08-01: floor (10000, 20000], so the plain default carries >=10x headroom and
+-- this declaration needs no budget. It reached that only after the same two fixes applied to its
+-- 16-column sibling `full_product` below — an opaque `obtain ⟨S, hS⟩` instead of `set … with hS`,
+-- and clearing the spent column equations `e0..e7` before the closing `omega`. See the long note
+-- above `full_product` for the measurements and for what is left. Do not reintroduce `set` here.
 /-- **Low-half schoolbook reassembly** (the MUL keystone). Given the first eight columns of the
 schoolbook product/carry chain over the eight operand bytes `b0..b7`, `c0..c7` (each column equation
 `p_k + k_k·256 = ∑_{i+j=k} b_i·c_j + (incoming carry)`), the eight low product bytes reassemble — mod
@@ -78,14 +83,15 @@ lemma low_half
     (p0 + p1*256 + p2*256^2 + p3*256^3 + p4*256^4 + p5*256^5 + p6*256^6 + p7*256^7) % 2^64
       = ((b0 + b1*256 + b2*256^2 + b3*256^3 + b4*256^4 + b5*256^5 + b6*256^6 + b7*256^7)
          * (c0 + c1*256 + c2*256^2 + c3*256^3 + c4*256^4 + c5*256^5 + c6*256^6 + c7*256^7)) % 2^64 := by
-  set S : ℕ := b0*c0
+  obtain ⟨S, hS⟩ : ∃ S : ℕ, S = b0*c0
     + (b0*c1 + b1*c0)*256
     + (b0*c2 + b1*c1 + b2*c0)*256^2
     + (b0*c3 + b1*c2 + b2*c1 + b3*c0)*256^3
     + (b0*c4 + b1*c3 + b2*c2 + b3*c1 + b4*c0)*256^4
     + (b0*c5 + b1*c4 + b2*c3 + b3*c2 + b4*c1 + b5*c0)*256^5
     + (b0*c6 + b1*c5 + b2*c4 + b3*c3 + b4*c2 + b5*c1 + b6*c0)*256^6
-    + (b0*c7 + b1*c6 + b2*c5 + b3*c4 + b4*c3 + b5*c2 + b6*c1 + b7*c0)*256^7 with hS
+    + (b0*c7 + b1*c6 + b2*c5 + b3*c4 + b4*c3 + b5*c2 + b6*c1 + b7*c0)*256^7
+    := ⟨_, rfl⟩
   have hLOW :
       (p0 + p1*256 + p2*256^2 + p3*256^3 + p4*256^4 + p5*256^5 + p6*256^6 + p7*256^7)
         + k7 * 2^64 = S := by rw [hS]; omega
@@ -100,26 +106,43 @@ lemma low_half
         + (b5*c7 + b6*c6 + b7*c5)*256^4
         + (b6*c7 + b7*c6)*256^5
         + (b7*c7)*256^6) := by rw [hS]; ring
+  clear hS e0 e1 e2 e3 e4 e5 e6 e7
   omega
 
--- Re-laddered 2026-08-01. The floor used to be (1000000, 1200000] — the highest anywhere in this
--- tree — and was recorded as irreducibly term-intrinsic. It was not: only *part* of it was.
--- Diagnostic counters showed `ring`/`omega` producing the term (`Mathlib.Tactic.Ring.Common.*`
--- dominating `occs` on a 61385-node term) but *also* `OfNat.ofNat` 786960 / `HPow.hPow` 786952 /
--- `Monoid.npow` 393476 — the literal `256^k` and `2^128` coefficients being re-evaluated hundreds
--- of thousands of times. The cause was the schoolbook sum being introduced with `set … with hS`:
--- `set` makes `S` a let-bound local that the elaborator zeta-unfolds (Clean's performance doc
--- rejects it for exactly this), and it leaves `hS` — the giant 16-column equation — in context, so
--- the closing `omega` re-ingested every monomial and every power a second time. Replacing it with
--- Clean fix pattern 4 (`obtain ⟨S, hS⟩ : ∃ S, S = … := ⟨_, rfl⟩`, a genuinely opaque local) and
--- clearing `hS` once `hLOW`/`hHIGH` are derived moves the floor to (200000, 400000] — a 3-6x drop,
--- and the declared budget from 6000000 to 500000 (12x). What remains *is* term-intrinsic: the
--- `ring` normalises a 256-monomial 16x16 convolution and the `omega` telescopes sixteen column
--- equations. (The 8-column sibling `low_half` does the same work at a quarter of the term size and
--- needs no budget at all — it also still uses `set`, so it is a candidate for the same treatment.)
--- Rungs after the fix: 50000 FAIL / 100000 FAIL / 200000 FAIL / 300000 FAIL / 400000 ok.
--- Do not raise this without re-running the ladder.
-set_option maxHeartbeats 500000 in
+-- Ceiling removed 2026-08-01, in two passes, and the note the first pass left here was wrong.
+--
+-- Pass 1 had cut the floor from (1000000, 1200000] to (300000, 400000] by replacing `set S := … with
+-- hS` (a let-bound local the elaborator zeta-unfolds — Clean's performance doc rejects it for exactly
+-- this) with Clean fix pattern 4, `obtain ⟨S, hS⟩ : ∃ S, S = … := ⟨_, rfl⟩`, a genuinely opaque local,
+-- plus `clear hS`. It then declared the residue "term-intrinsic". It was not.
+--
+-- Pass 2: `clear hS` dropped the schoolbook sum but left the sixteen column equations `e0..e15` in
+-- context, and they have done their whole job the moment `hLOW` is derived — the closing `omega`
+-- needs only `hLOW`, `hHIGH` and the goal. Each `eᵢ` carries up to sixteen monomials plus a `k*256`
+-- term, so that `omega` was re-ingesting ~200 surplus monomials and 16 surplus atoms on top of
+-- `hHIGH`'s 256-monomial RHS. Extending the clear to `clear hS e0 … e15` drops the floor to
+-- (120000, 150000] — under Lean's plain default, so this declaration now carries no budget at all.
+-- Measured with `#count_heartbeats`, total work for the declaration fell 593455 → 214983 (2.8x);
+-- the same treatment applied to the 8-column sibling `low_half` took it 50601 → 26990 (1.9x), floor
+-- (20000, 40000] → (10000, 20000]. Whole-file elaboration went 20.7s → 9.1s.
+--
+-- Caveat for whoever measures this next: 214983 is above the plain default. It fits because Lean
+-- elaborates the signature and the tactic body as separate tasks, each with its own budget; the
+-- body is the (120000, 150000] half. So the headroom here is ~1.3x, not the >=5x the rest of this
+-- file enjoys — thin, though heartbeats are deterministic, so this is a toolchain-bump risk, not a
+-- flakiness risk. Re-ladder after any Lean/Mathlib bump.
+--
+-- What is left really is term-intrinsic at this proof shape: `hHIGH`'s `ring` normalises a
+-- 256-monomial 16x16 convolution and `hLOW`'s `omega` telescopes sixteen column equations, and
+-- moving the clear earlier (before `hHIGH`) was measured to change nothing. Two routes remain if
+-- more margin is ever wanted. Cheap: lift `hLOW` and `hHIGH` to top-level `private` lemmas over
+-- their free `ℕ` variables — `hHIGH` is already a fully abstract `ring` identity over 32 variables
+-- with the proof accidentally wrapped around it — which does not reduce total work but gives each
+-- piece its own budget and makes `low_half` an instance of the same pair at n=8. Real: prove a
+-- general indexed mod-`2^(8n)` reassembly lemma in `Math/MulCarryChain.lean` (which today has
+-- `chainM`/`carry`/`product`/`recurrence_*`/`cpNat` but no reassembly lemma) and instantiate it at
+-- n=8 and n=16. Only the second would make "term-intrinsic" actually false; it is a development,
+-- not a tweak.
 /-- **Full-product schoolbook reassembly** (the high-half keystone). The 16-column
 mod-`2^128` analogue of `low_half`: given the sixteen schoolbook column equations over the
 sixteen sign/zero-extended operand bytes, the sixteen product bytes reassemble — mod `2^128` —
@@ -187,7 +210,7 @@ lemma full_product
         + (b13*c15 + b14*c14 + b15*c13)*256^12
         + (b14*c15 + b15*c14)*256^13
         + (b15*c15)*256^14) := by rw [hS]; ring
-  clear hS
+  clear hS e0 e1 e2 e3 e4 e5 e6 e7 e8 e9 e10 e11 e12 e13 e14 e15
   omega
 
 /-! ## Byte helpers for the schoolbook product

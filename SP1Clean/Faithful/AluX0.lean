@@ -23,7 +23,8 @@ open SP1Clean.Extracted
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
--- Perf: 4 of this file's 6 former 1M-4M heartbeat ceilings floored <=40000 and were removed.
+-- Perf: all 6 of this file's former 1M-4M heartbeat ceilings are gone. Five floored <=40000 on their
+-- own; the last one needed the `clear` fix stamped at `aluX0Chip_constraints_faithful` below.
 
 private lemma val_29'' [NeZero p] : (29 : ZMod p).val = 29 := val_29_zmod_p
 
@@ -205,20 +206,20 @@ private theorem aluX0_chip_constraints_decompose
     Readers.ALUTypeReaderImmutable.circuit, circuit_norm, List.map_append,
     List.forall_append, List.forall_cons]
 
--- Measured floor bracket (250000, 500000]; the former 2M was ~4-8x over and is now right-sized to
--- the next rung above the floor. Mechanism (diagnostic counters): a runaway whnf of the circuit
--- monad bind chain -- `bind` 146252 / `Circuit.bind` 146224 / `Prod.rec` 146224, with
--- `Readers.ALUTypeReaderImmutable.main` unfolded 6176x and `Readers.CPUState.main` 4132x -- charged
--- almost entirely to the closing `tauto`. Confirmed causally: stubbing that one `tauto` drops the
--- declaration below 100000 (whole-file 11s -> 4s). `tauto` splits a ~30-conjunct `And`-chain
--- `Iff` and settles each subgoal by `assumption`, so it `isDefEq`-compares atoms that still contain
--- `(Readers.CPUState.main …).operations offset`, re-unfolding the bind chain per comparison.
--- Tried and measured as no-ops: narrowing the non-`only` `dsimp` at `hCpu`; flipping `rw [hCpu]` to
--- `rw [← hCpu]` so both sides normalise to the cheap `.asserts` spelling; and Clean fix pattern 4
--- (`generalize` the expensive atom to an opaque local before `tauto`) -- all three leave the bracket
--- unchanged, because `kabstract` pays the same whnf that `tauto` does. A real fix has to replace
--- `tauto` with an explicit `Iff` construction over the conjunct list.
-set_option maxHeartbeats 500000 in
+-- Perf, resolved: this declaration formerly carried a 500k ceiling (2M before that). The cause was a
+-- runaway whnf of the circuit monad bind chain -- diagnostic counters showed `bind` 146252 /
+-- `Circuit.bind` 146224 / `Prod.rec` 146224, with `Readers.ALUTypeReaderImmutable.main` unfolded
+-- 6176x and `Readers.CPUState.main` 4132x -- charged almost entirely to the closing `tauto`, which
+-- splits a ~30-conjunct `And`-chain `Iff` and settles each subgoal by `assumption`.
+-- The fix is the one-line `clear` before `tauto`. An earlier pass recorded three routes as "measured
+-- no-ops" (narrowing the non-`only` `dsimp` at `hCpu`; flipping `rw [hCpu]` to `rw [← hCpu]` for the
+-- cheap `.asserts` spelling; `generalize`-ing the expensive atom). That note was wrong about *why*:
+-- all three targeted the GOAL, which the `rw` block above has already reduced to value level. The
+-- expensive circuit terms were never in the goal -- they were in the LOCAL CONTEXT, in the spent
+-- hypotheses `hReaderList`/`hCpu`/`hReader`, which `tauto` reverts and normalises along with
+-- everything else. Clearing them costs nothing and removes the whole cost: whole-file 10.8s -> 5.4s,
+-- and the declaration's measured floor bracket drops to (10000, 20000] -- 10x under Lean's plain
+-- default, so no ceiling is needed at all.
 theorem aluX0Chip_constraints_faithful
     (env : Environment (ZMod p)) (input : Var AluX0Chip.Inputs (ZMod p))
     (offset : ℕ) (cols : AluX0Chip.Columns (ZMod p))
@@ -300,6 +301,7 @@ theorem aluX0Chip_constraints_faithful
       have hopOne : Expression.eval env input.adapter.op_a_0 = 1 := hone
       rw [hopOne]
       simp
+  clear hReaderList hCpu hReader
   tauto
 
 theorem aluX0Chip_constraints_constructive

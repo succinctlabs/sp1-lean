@@ -58,13 +58,14 @@ theorem run_bind_ok_some {α β} (m : SailM (Option α)) (k : Option α → Sail
     EStateM.run (m >>= k) s = EStateM.run (k (some r)) s := by
   simp only [bind, EStateM.bind, EStateM.run] at h ⊢; rw [h]
 
--- The file's only budget-bound declaration; the former file-scoped stamp was converted to this
--- scoped one after re-measuring under the real build flags (40k FAILS with `timeout at transform`
--- inside the branch-skip walk's guard `simp` / 50k ok — floor bracket (40k, 50k]). Kept at 400k
--- rather than deleted: the plain default leaves only ~4x margin over a cost that scales with the
--- Sail decoder's branch count, and this walk's failure mode is a mid-cascade error, not a graceful
--- one. The other two declarations in this file are one-line `simp only`s and need no budget.
-set_option maxHeartbeats 400000 in
+-- Ladder-measured under the real build flags: 40k FAILS with `timeout at transform` inside the
+-- branch-skip walk's guard `simp`, 50k ok — floor bracket (40k, 50k]. The former 400k ceiling was
+-- ~8-10x over, and was kept on a *policy* rationale (the walk's failure mode is a mid-cascade error
+-- rather than a graceful one) rather than a measured one. That is not a reason to carry a budget:
+-- the plain default already clears the floor by ~4x. If a future per-opcode `decode_<OP>_example`
+-- genuinely exceeds it — the cost scales with the Sail decoder's branch count — stamp *that*
+-- declaration, measured, rather than pre-provisioning this one. The other two declarations in this
+-- file are one-line `simp only`s and need no budget.
 /-- **Worked example / proof-of-technique: the official Sail decoder on a concrete ADD.**
 `0x003100B3` = `ADD x1, x2, x3` (funct7=0, rs2=3, rs1=2, funct3=0, rd=1, opcode=0110011). Reduces the
 real `noncomputable` `ext_decode` to `RTYPE (x3, x2, x1, ADD)` under the `SailConfigured` residue
