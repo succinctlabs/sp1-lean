@@ -13,15 +13,18 @@ the *data*. Where the two disagree, the profile is the rule and this file is the
 
 ## 1. Headline
 
-| | before | after | delta |
+| | start | after the 2026-07 campaign | after the P4 follow-up |
 |---|---:|---:|---:|
-| All ceiling sites (`scripts/check_heartbeats.sh` baseline) | 853 | **317** | −536 (−63%) |
-| — of which auto-generated `Extracted/` (out of scope) | 215 | 215 | 0 |
-| **Hand-written ceilings** | **638** | **102** | **−536 (−84%)** |
+| All ceiling sites (`scripts/check_heartbeats.sh` baseline) | 853 | 317 | **220** |
+| — of which auto-generated `Extracted/` | 215 | 215 | 214 |
+| **Hand-written ceilings** | **638** | **102** | **5** (−99.2%) |
 
-The second row is the number that matters and it is easy to miss: **two thirds of the surviving 317 sites are
-in `SP1Clean/Extracted/`**, which is auto-generated and whose only lever is `update_extracted.py`. On the
-hand-written surface the campaign removed 84% of all ceilings.
+The second row is the number that matters and it is easy to miss: **almost every surviving site is in
+`SP1Clean/Extracted/`**, which is auto-generated and whose only lever is `update_extracted.py` — three lines
+of it, in fact, which apply a blanket unmeasured bump to every generated `@[irreducible] def`. The 2026-07
+campaign removed 84% of hand-written ceilings by *measuring* each one; the P4 follow-up
+(`git log --grep '^Wave: heartbeat-P4'`) removed 95% of what was left by *diagnosing and fixing the causes*,
+which is a different and much more productive exercise. Sections 10 and 11 are that follow-up's findings.
 
 Per pillar, hand-written:
 
@@ -229,6 +232,27 @@ lines, and replacing each per-index family with one **quantified `simp only` rul
 ---
 
 ## 5. The sites that were KEPT — measured floors
+
+> 🔴 **BOTH §5 AND §5A ARE NOW HISTORICAL.** They document the 101-site state as of 2026-08-01. The
+> follow-up campaign (`git log --grep '^Wave: heartbeat-P4'`) took that to **5**. Read §5/§5A for the
+> *method* and for the archaeology of a site's earlier brackets; read the table immediately below for
+> what is actually in the tree. Every site removed since is documented in its removing commit, and the
+> per-site mechanism write-ups live in §10 and §11.
+
+### 5-current. The surviving hand-written ceilings
+
+| site | declared | floor | mechanism |
+|---|---:|---|---|
+| `Proofs/Chips/StoreByteChip/Formal.lean` `circuit` | 2000000 | (1.5M, 1.75M] | Not a proof — a `def` whose `requirementsChannelsLawful` field carries `main` in its `simp only` set; dropping `main` takes the file 54.2s → 8.4s, so that token is the entire cost. `grind` in the same field is free (ablated). |
+| `Proofs/Chips/ShiftRightChip/Soundness/Sra.lean` | 1000000 | see source | Phase is `isDefEq`, top reduction counter ~13k against 382k for a real tower. Cost is ~130 `linear_combination`/`push_cast` branches of the sign-extension dispatch. Not a `circuit_proof_start` tower. |
+| `Proofs/Chips/ShiftRightChip/Soundness/Sraw.lean` | 1000000 | see source | Same shape as `Sra`. Their two siblings `Srl`/`Srlw` are already ceiling-free. |
+| `Proofs/Chips/DivRemChip/Evidence/Signed32.lean` | 800000 | (320k, 350k] | `Cases.Signed32Evidence` is an `inductive` with 3 constructors, so the proof splits the goal twice over a ~115-hypothesis context. The unsigned siblings are `structure`s, close flat, and are ceiling-free. |
+| `Proofs/Chips/DivRemChip/Evidence/Signed64.lean` | 600000 | (250k, 300k] | Same. |
+
+**Every one of these has a named mechanism.** That was the campaign's primary success criterion: no site
+kept merely because nobody understood it. Note that four separate sites reached this table with a
+mechanism *and* a "no fix exists" verdict, and all four verdicts turned out to be untested — see the
+`heartbeat-P4a` commit. Treat a surviving entry as "not yet fixed", not "unfixable".
 
 > ⚠ **§5 is the campaign-era record and it has drifted from the tree.** For a per-site,
 > reconciled, line-accurate answer use **[§5A](#5a-the-authoritative-floor-table--all-101-hand-written-sites)**,

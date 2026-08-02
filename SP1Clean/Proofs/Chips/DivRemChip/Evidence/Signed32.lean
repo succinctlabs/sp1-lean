@@ -17,11 +17,14 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 omit [Fact (2 ^ 24 < p)] in
 /-- Selecting a `DIVW`/`REMW` case pins every one of the eight case flags: the six other-family
 flags vanish and the two word-signed flags sum to one. Hoisting the eight-way case split out of
-`signed32Evidence` keeps it off that proof's 121-hypothesis assertion context. -/
+`signed32Evidence` keeps it off that proof's 121-hypothesis assertion context, and returning the
+three *derived* gate sums the row equations are actually rewritten by — rather than the eight raw
+flag values — keeps the `linear_combination` recombination off it too. -/
 private lemma signed32_flags {cols : Columns (ZMod p)} {case : Case}
     (hselected : Selected cols case) (hfamily : case.family = .signed32) :
-    cols.is_div = 0 ∧ cols.is_rem = 0 ∧ cols.is_divu = 0 ∧ cols.is_remu = 0 ∧
-      cols.is_divw + cols.is_remw = 1 ∧ cols.is_divuw = 0 ∧ cols.is_remuw = 0 := by
+    cols.is_divw + cols.is_remw = 1 ∧
+      cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw = 1 ∧
+      cols.is_div + cols.is_rem + cols.is_divw + cols.is_remw = 1 := by
   have hdiv := hselected.flag_eq .div
   have hrem := hselected.flag_eq .rem
   have hdivu := hselected.flag_eq .divu
@@ -33,17 +36,21 @@ private lemma signed32_flags {cols : Columns (ZMod p)} {case : Case}
   cases case <;>
     simp [Case.family] at hfamily <;>
     simp [Case.flag] at hdiv hrem hdivu hremu hdivw hremw hdivuw hremuw <;>
-    simp [hdiv, hrem, hdivu, hremu, hdivw, hremw, hdivuw, hremuw]
+    simp [hdiv, hrem, hdivw, hremw, hdivuw, hremuw]
 
 -- The 121-hypothesis `ownAsserts` tail is read through `.1`/`.2` projections instead of a
 -- 121-way `obtain` (Clean `doc/performance-problems.md` fix pattern 7), as are the 15-way
 -- `hcompare` and 13-way range destructurings: each component's `And.casesOn` motive
--- re-abstracts this very large goal. That moved the measured floor from (400000, 1000000]
--- to (320000, 350000]. The residue is the three-branch proof body itself, not the
--- destructuring — extracting the componentwise `Vector.ext` sweep into its own lemma and
--- widening the projection stride were both tried and neither moved a rung — so unlike the
--- two unsigned siblings this one still needs a budget, now sized just over 2x its floor.
-set_option maxHeartbeats 800000 in
+-- re-abstracts this very large goal. That was the first halving. An earlier note here called the
+-- remaining three-branch body irreducible; that was wrong. The former 800k ceiling came off
+-- entirely (measured 332,635 -> 169,718 heartbeats) by moving work *out of* the branch bodies
+-- rather than reorganising them in place: the two `Vector.ext` absolute-value sweeps, the
+-- remainder-magnitude bound and the `E225`/`E228` sign gates now live in
+-- `Evidence/SignedCommon.lean` stated over opaque arguments; `signed32_flags` returns the three
+-- derived gate sums the row equations are actually rewritten by instead of the eight raw flag
+-- values; and each `gate * (x - y) = 0` row constraint is discharged by the *term*
+-- `eq_of_gate_eq_one` rather than a `rw`/`linear_combination` pair that renormalises the whole
+-- context. This now runs on the default budget, with more headroom than `Unsigned64` (198,211).
 /-- The folded DivRem row contracts imply explicit signed-word evidence for either `DIVW` or `REMW`.
 The output-routing equality is deliberately left to the uniform row assembler. -/
 theorem signed32Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {case : Case}
@@ -249,18 +256,8 @@ theorem signed32Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {ca
     hw74 hw75 hw76 hw77 hw78 hw79 hw80 hw81 hw82 hw83 hw84 hw85 hw86 hw87 hw88 hw89 hw90 hw91
     hw92 hw93 hw94 hw95 hw96 hw97 hw98 hw99 hw100 hw101 hw102 hw103 hw104 hw105 hw106 hw107
     hw108 hw109 hw110 hw111 hw112 hw113 hw114
-  obtain ⟨hfdiv, hfrem, hfdivu, hfremu, hsigned32, hfdivuw, hfremuw⟩ :=
-    signed32_flags hselected hfamily
-  have hword : cols.is_divw + cols.is_remw + cols.is_divuw + cols.is_remuw = 1 := by
-    linear_combination hsigned32 + hfdivuw + hfremuw
-  have hsigned : cols.is_div + cols.is_rem + cols.is_divw + cols.is_remw = 1 := by
-    linear_combination hfdiv + hfrem + hsigned32
-  have hsigned64 : cols.is_div + cols.is_rem = 0 := by linear_combination hfdiv + hfrem
-  have hunsigned64 : cols.is_divu + cols.is_remu = 0 := by
-    linear_combination hfdivu + hfremu
+  obtain ⟨hsigned32, hword, hsigned⟩ := signed32_flags hselected hfamily
   have hir : cols.is_real = 1 := hinputReal.trans hreal
-  have hirnw : cols.is_real_not_word = 0 := by
-    rw [hword, hir] at e13; linear_combination e13
   simp only [DivRemCompare.CompareSpec, DivRemCompare.Inputs.ofCols] at hcompare
   have hovbLow := hcompare.2.2.1
   have hovcLow := hcompare.2.2.2.1
@@ -463,15 +460,11 @@ theorem signed32Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {ca
       rw [hov, hsigned] at e96; linear_combination -e96
     obtain ⟨hbMin, hcNegOne⟩ :=
       overflow_of_iseqword_word hbU hcU hword hovb hovc hovProduct
-    have hq0 : cols.quotient_comp[0] = cols.b[0] := by
-      rw [hov] at e105; linear_combination hqc0 + e105
-    have hq1 : cols.quotient_comp[1] = cols.b[1] := by
-      rw [hov] at e109; linear_combination hqc1 + e109
+    have hq0 : cols.quotient_comp[0] = cols.b[0] := hqc0.trans (eq_of_gate_eq_one hov e105)
+    have hq1 : cols.quotient_comp[1] = cols.b[1] := hqc1.trans (eq_of_gate_eq_one hov e109)
     have hqLowB := extractLsb_lo_congr hqcU hbU hq0 hq1
-    have hr0 : cols.remainder_comp[0] = 0 := by
-      rw [hov] at e107; linear_combination hrc0 + e107
-    have hr1 : cols.remainder_comp[1] = 0 := by
-      rw [hov] at e111; linear_combination hrc1 + e111
+    have hr0 : cols.remainder_comp[0] = 0 := hrc0.trans (eq_of_gate_eq_one hov e107)
+    have hr1 : cols.remainder_comp[1] = 0 := hrc1.trans (eq_of_gate_eq_one hov e111)
     have hrLowZero : BitVec.extractLsb 31 0 (Word.toBitVec64 cols.remainder_comp) = 0#32 := by
       apply BitVec.eq_of_toNat_eq
       rw [extractLsb_lo_toNat hrcU, hr0, hr1, BitVec.toNat_zero]
@@ -495,13 +488,10 @@ theorem signed32Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {ca
       have hcz2 : cols.c[2] = 0 := (ZMod.val_eq_zero _).mp (by omega)
       have hcz3 : cols.c[3] = 0 := (ZMod.val_eq_zero _).mp (by omega)
       rw [if_pos ⟨hcz0, hcz1, hcz2, hcz3⟩] at hzeroResult
-      rw [hzeroResult, one_mul] at e230 e232 e238 e240
-      have hq0 : cols.quotient_comp[0] = 65535 := by
-        rw [hqc0]
-        linear_combination e230
-      have hq1 : cols.quotient_comp[1] = 65535 := by
-        rw [hqc1]
-        linear_combination e232
+      have hq0 : cols.quotient_comp[0] = 65535 :=
+        hqc0.trans (eq_of_gate_eq_one hzeroResult e230)
+      have hq1 : cols.quotient_comp[1] = 65535 :=
+        hqc1.trans (eq_of_gate_eq_one hzeroResult e232)
       have hqLowNegOne : BitVec.extractLsb 31 0
           (Word.toBitVec64 cols.quotient_comp) = -1#32 := by
         apply BitVec.eq_of_toNat_eq
@@ -509,8 +499,8 @@ theorem signed32Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {ca
           BitVec.toNat_allOnes]
         simp only [val_65535_zmod_p]
         norm_num
-      have hr0 : cols.remainder_comp[0] = cols.b[0] := by linear_combination e238
-      have hr1 : cols.remainder_comp[1] = cols.b[1] := by linear_combination e240
+      have hr0 : cols.remainder_comp[0] = cols.b[0] := eq_of_gate_eq_one hzeroResult e238
+      have hr1 : cols.remainder_comp[1] = cols.b[1] := eq_of_gate_eq_one hzeroResult e240
       have hrLowB := extractLsb_lo_congr hrcU hbU hr0 hr1
       have hcLowZero : BitVec.extractLsb 31 0 (Word.toBitVec64 cols.c) = 0#32 := by
         apply BitVec.eq_of_toNat_eq
@@ -544,64 +534,10 @@ theorem signed32Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {ca
         refine if_congr ?_ rfl rfl
         rw [toBitVec64_msb_iff hrcU, hrf3]
         split <;> omega
-      have hcPos : cols.c_neg = 0 → cols.abs_c = cols.c := by
-        intro hn
-        apply Vector.ext; intro i hi; interval_cases i
-        · rw [hn] at e247
-          linear_combination e247
-        · rw [hn] at e253
-          linear_combination e253
-        · rw [hn] at e259
-          linear_combination e259
-        · rw [hn] at e265
-          linear_combination e265
-      have hcEvent : cols.abs_c_alu_event = cols.c_neg := by
-        rw [hir] at e286; linear_combination e286
-      have hcNegValue : cols.abs_c_alu_event = 1 →
-          cols.c_neg_operation.value = #v[0, 0, 0, 0] := by
-        intro he
-        apply Vector.ext; intro i hi; interval_cases i
-        all_goals simp only [Vector.getElem_mk, List.getElem_toArray,
-          List.getElem_cons_zero, List.getElem_cons_succ]
-        · rw [he] at e270
-          linear_combination -e270
-        · rw [he] at e272
-          linear_combination -e272
-        · rw [he] at e274
-          linear_combination -e274
-        · rw [he] at e276
-          linear_combination -e276
       obtain ⟨hcAbsPos, hcAbsNeg⟩ :=
-        signedAbsBehavior hcnegBit hcPos hcEvent hcNegValue haddC
-      have hrPos : cols.rem_neg = 0 → cols.abs_remainder = cols.remainder_comp := by
-        intro hn
-        apply Vector.ext; intro i hi; interval_cases i
-        · rw [hn] at e250
-          linear_combination e250
-        · rw [hn] at e256
-          linear_combination e256
-        · rw [hn] at e262
-          linear_combination e262
-        · rw [hn] at e268
-          linear_combination e268
-      have hrEvent : cols.abs_rem_alu_event = cols.rem_neg := by
-        rw [hir] at e288; linear_combination e288
-      have hrNegValue : cols.abs_rem_alu_event = 1 →
-          cols.rem_neg_operation.value = #v[0, 0, 0, 0] := by
-        intro he
-        apply Vector.ext; intro i hi; interval_cases i
-        all_goals simp only [Vector.getElem_mk, List.getElem_toArray,
-          List.getElem_cons_zero, List.getElem_cons_succ]
-        · rw [he] at e278
-          linear_combination -e278
-        · rw [he] at e280
-          linear_combination -e280
-        · rw [he] at e282
-          linear_combination -e282
-        · rw [he] at e284
-          linear_combination -e284
+        signedAbs_of_asserts hcnegBit hir e247 e253 e259 e265 e286 e270 e272 e274 e276 haddC
       obtain ⟨hrAbsPos, hrAbsNeg⟩ :=
-        signedAbsBehavior hrnegBit hrPos hrEvent hrNegValue haddR
+        signedAbs_of_asserts hrnegBit hir e250 e256 e262 e268 e288 e278 e280 e282 e284 haddR
       have hctqLoU : Word.isU64 (#v[cols.c_times_quotient[0], cols.c_times_quotient[1],
           cols.c_times_quotient[2], cols.c_times_quotient[3]] : Word (ZMod p)) :=
         Word.isU64_of_cases (hctqRange 0 (by norm_num)) (hctqRange 1 (by norm_num))
@@ -659,63 +595,20 @@ theorem signed32Evidence {input : Inputs (ZMod p)} {cols : Columns (ZMod p)} {ca
       have hid := euclid_identity_word_signed (carry := carryLo) hctqLoU hbU hcU hqcU hrcU
         hbf2 hbf3 hcf2 hcf3 hqf2 hqf3 hrf2 hrf3
         hcarry0' hcarry1' hcarry2' hcarry3' hchain0' hchain1' hchain2' hchain3' hlo
-      have hzeroResult := IsZeroWordOperation.result_semantic hisZero hir
       have hcnz : ¬ (cols.c[0] = 0 ∧ cols.c[1] = 0 ∧ cols.c[2] = 0 ∧ cols.c[3] = 0) := by
         rintro ⟨z0, z1, z2, z3⟩
         apply hcZero
         rw [Word.toNat_def, z0, z1, z2, z3]
         simp
-      rw [if_neg hcnz] at hzeroResult
-      have hrcm : cols.remainder_check_multiplicity = 1 := by
-        rw [hzeroResult, hir] at e305; linear_combination -e305
-      have hmax0 : cols.max_abs_c_or_1[0] = cols.abs_c[0] := by
-        rw [hzeroResult] at e299; linear_combination e299
-      have hmax1 : cols.max_abs_c_or_1[1] = cols.abs_c[1] := by
-        rw [hzeroResult] at e300; linear_combination e300
-      have hmax2 : cols.max_abs_c_or_1[2] = cols.abs_c[2] := by
-        rw [hzeroResult] at e301; linear_combination e301
-      have hmax3 : cols.max_abs_c_or_1[3] = cols.abs_c[3] := by
-        rw [hzeroResult] at e302; linear_combination e302
-      have hmaxEq : cols.max_abs_c_or_1 = cols.abs_c := by
-        apply Vector.ext; intro i hi; interval_cases i <;> assumption
-      have hmaxU : Word.isU64 cols.max_abs_c_or_1 := hmaxEq ▸ habsCU
-      have hbit := (LtOperationUnsigned.result_semantic habsRU hmaxU hrcm hltSpec).1
-      have hbit1 : cols.remainder_lt_operation.u16_compare_operation.bit = 1 := by
-        rw [hrcm] at e307; linear_combination -e307
-      rw [hbit1] at hbit
-      have hcmp : cols.abs_remainder.toNat < cols.abs_c.toNat := by
-        have hcmpMax : cols.abs_remainder.toNat < cols.max_abs_c_or_1.toNat := by
-          by_contra hnot
-          rw [if_neg hnot] at hbit
-          exact one_ne_zero hbit
-        simpa [hmaxEq] using hcmpMax
+      have hcmp := absRemainder_lt_absC hir hcnz habsRU habsCU hisZero hltSpec
+        e299 e300 e301 e302 e305 e307
       have hlt := hlt_signed_of_abs habsRU habsCU hrAbsPos hrAbsNeg hcAbsPos hcAbsNeg hcmp
       have hcBVNe : Word.toBitVec64 cols.c ≠ 0#64 := by
         intro hzero
         apply hcZero
         have hnat := congrArg BitVec.toNat hzero
         simpa [Word.toBitVec64_toNat hcU] using hnat
-      have hbnegBin := bool_of_mul_pred e345
-      have hrnegBin := bool_of_mul_pred e351
-      have hE225 : cols.rem_neg = 0 ∨ cols.b_neg = 1 := by
-        rcases hrnegBin with hr0 | hr1
-        · exact Or.inl hr0
-        · rcases hbnegBin with hb0 | hb1
-          · rw [hr1, hb0] at e225
-            norm_num at e225
-          · exact Or.inr hb1
-      have hE228 : Word.toBitVec64 cols.remainder = 0#64 ∨
-          cols.rem_neg = 1 ∨ cols.b_neg = 0 := by
-        rcases hrnegBin with hr0 | hr1
-        · rcases hbnegBin with hb0 | hb1
-          · exact Or.inr (Or.inr hb0)
-          · apply Or.inl
-            apply toBitVec64_eq_zero_of_limb_sum_eq_zero hremU
-            rw [hr0, hb1] at e228; linear_combination e228
-        · exact Or.inr (Or.inl hr1)
-      have hE228Comp : Word.toBitVec64 cols.remainder_comp = 0#64 ∨
-          cols.rem_neg = 1 ∨ cols.b_neg = 0 := by
-        simpa [hrcEq] using hE228
+      obtain ⟨hE225, hE228Comp⟩ := signGates_of_asserts hremU hrcEq e225 e228 e345 e351
       have hidentity : (Word.toBitVec64 cols.b).toInt =
           (Word.toBitVec64 cols.c).toInt * (Word.toBitVec64 cols.quotient_comp).toInt +
             (Word.toBitVec64 cols.remainder_comp).toInt := by
