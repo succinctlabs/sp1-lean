@@ -122,11 +122,13 @@ Large generated lists are split into opaque `assertsPartN`/`interactionsPartN` d
 concatenated in order. This is only a Lean elaboration boundary: it follows Clean's advice to keep
 expensive values folded and does not alter the extracted list.
 
-The pinned `Global` table is the sole exception to the ordinary heartbeat budget. One of its output
-terms has a dependency closure of roughly 1,300 shared IR bindings, so splitting the surrounding list
-cannot make that term smaller (and finer factoring duplicates the closure). Its generated module carries
-one module-local `set_option maxHeartbeats 1000000`, accounted for explicitly in
-`scripts/heartbeats_baseline.txt`; no other generated Core AIR module receives a heartbeat override.
+The pinned `Global` table is the sole Core AIR exception to the default elaboration budget. One of its
+output terms has a dependency closure of roughly 1,300 shared IR bindings, so splitting the surrounding
+list cannot make that term smaller (and finer factoring duplicates the closure). Its generated module
+therefore carries a module-local budget directive, named with its measured floor in
+`scripts/option_escapes_allowlist.txt`; no other generated Core AIR module receives one. If the emitter
+starts producing a module that needs a budget, right-size the emit in `update_extracted.py` — do not
+allowlist the output.
 
 ## The Lean side
 

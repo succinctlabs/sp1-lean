@@ -3,15 +3,13 @@
 #
 # Covers `set_option maxHeartbeats` and `set_option maxRecDepth` under `SP1Clean/` and `SP1CleanTest/`.
 #
-# This replaces the old count-ratchet (`check_heartbeats.sh`). A ratchet permits a new escape hatch as
-# long as an old one leaves; an allowlist does not. Every surviving site must be named in
-# `scripts/option_escapes_allowlist.txt` together with its measured floor bracket and the mechanism that
-# makes it irreducible. Anything else fails the build.
+# Hand-written Lean in this repo carries **zero** `maxHeartbeats`, matching upstream Clean, which has
+# none in 44,603 lines and enforces that in review. The allowlisted sites are generated definitions and
+# a small number of measured structural cases; each is named in `scripts/option_escapes_allowlist.txt`
+# with its floor bracket and mechanism. Anything else fails the build.
 #
-# Why an allowlist is defensible here: the 2026-07/08 campaign took hand-written `maxHeartbeats` from
-# 638 to ZERO by diagnosing and fixing causes, and the survivors are all *generated* definitions with
-# measured, understood mechanisms. Upstream Clean carries none in 44,603 lines and enforces that in
-# review; this is the closest equivalent for a tree that must also carry compiler-generated AIR.
+# This is a prohibition, not a budget. It does not count sites, and it does not permit a new escape
+# hatch in exchange for an old one — the failure mode a count baseline allows.
 #
 # Allowlist format (one entry per line, `#` comments and blank lines ignored):
 #
@@ -19,11 +17,14 @@
 #
 # The key is (option, path, value) and the count must match EXACTLY — so adding a second site with the
 # same value to an already-listed file fails, as does silently raising a listed value. Line numbers are
-# deliberately not part of the key: they drift, and a drifting key trains people to edit the allowlist.
+# deliberately not part of the key: they drift, and a drifting key trains people to edit the allowlist
+# instead of fixing the cause.
 #
-# Adding an entry requires a measured ladder recorded in the justification. Do not add one to make a
-# build pass: see `docs/agents/perf-findings.md` §12 (extract over opaque arguments; check what the
-# extraction can still see), which is how every removed site was removed.
+# **Adding an entry is a last resort, not a way to make a build pass.** The bar is in
+# `docs/agents/perf-findings.md` §7: a measured floor bracket, a named mechanism, at least one attempted
+# fix with its result, and a reason the cause cannot be moved. Start from §1 — extract over opaque
+# arguments, and check what the extraction can still see. If the site is generated, fix the emitter in
+# `update_extracted.py` rather than allowlisting its output.
 #
 # Mirrors scripts/check_no_native_decide.sh / check_no_skipkerneltc.sh: exit 0 = clean, 1 = violation.
 # Run from the repo root.
@@ -52,14 +53,16 @@ grep -vE '^\s*(#|$)' "$allow" | awk '{print $1, $2, $3, $4}' | sort > "$tmp_allo
 
 if ! diff -u "$tmp_allow" "$tmp_actual" > /tmp/.option_escapes_diff 2>&1; then
   echo "FAIL: elaboration-budget escape hatches do not match the allowlist." >&2
-  echo "      '-' = allowlisted but absent (ratchet DOWN — delete the allowlist entry)." >&2
+  echo "      '-' = allowlisted but absent — the site is gone; delete its allowlist entry." >&2
   echo "      '+' = present but NOT allowlisted (a new or raised ceiling — this is the failure)." >&2
   echo >&2
   sed -n '3,$p' /tmp/.option_escapes_diff >&2
   echo >&2
-  echo "      Fold the blowup instead of adding an entry — docs/agents/perf-findings.md §12:" >&2
+  echo "      Fix the cause instead of adding an entry — docs/agents/perf-findings.md §1:" >&2
   echo "      extract over OPAQUE arguments, and check what the extraction can still see." >&2
-  echo "      If a site is genuinely irreducible, add it to $allow WITH a measured ladder." >&2
+  echo "      Adding an allowlist entry is a LAST RESORT and has a bar (perf-findings.md §7):" >&2
+  echo "      a measured floor bracket, a named mechanism, an attempted fix with its result," >&2
+  echo "      and a reason the cause cannot be moved. Generated site? Fix update_extracted.py." >&2
   status=1
 fi
 

@@ -13,8 +13,9 @@ blocker determines who can act.
 Nothing here is a defect report. Everything here is intentional, and several items were reached
 independently by three or more batches and stopped at each time — see §7.
 
-Provenance: `git log --grep '^Wave:'` (108 commits with machine-parseable trailers). The measured perf record
-is in [`perf-findings.md`](perf-findings.md).
+Provenance: `git log --grep '^Wave:'` (108 commits with machine-parseable trailers). Elaboration-budget
+guidance — how to fold a blowup rather than reach for a directive — is in
+[`perf-findings.md`](perf-findings.md).
 
 ---
 
@@ -207,16 +208,15 @@ Everything below is real duplication or real cost that a normal golf would take.
 **Decision needed: a scoped, audited waiver — or an explicit "these stay as they are, forever".**
 Subtotal ≈ **−500 lines**, plus the tree's two largest remaining perf leads.
 
-### 4.1 ⚠ The two cheapest ceilings left in the pillar — a bare-`simp` squeeze
+### 4.1 ⚠ The two most expensive anchors in the pillar — a bare-`simp` squeeze
 `shiftRightCoreAssertions` (`Faithful/ShiftRightChip.lean:848`) and `shiftLeftCoreAssertions`
 (`Faithful/ShiftLeftChip.lean:722`) each bind `let ops := (…).operations` and then run **bare `simp`** over it
-three times. Both floor in (40k, 100k] and are kept at 400000. §2.6 *permits* `simp` → `simp only`; §2.8 blocks
-it here. These two would very likely clear ≤40000 and become removable. **This is the highest
-value-per-effort item in the whole queue.**
+three times, floors in (40k, 100k]. §2.6 *permits* `simp` → `simp only`; §2.8 blocks it here. Squeezing them
+would very likely take both to ≤40000. **This is the highest value-per-effort item in the whole queue.**
 
 ### 4.2 ⚠ `divRemRustAssertionsDecompose` — the tree's highest-value single perf target
-`Faithful/DivRemChip/Exact.lean:1128`. Measured floor **(8M, 16M]** against a declared 64M — correctly sized,
-and one of only three genuinely-binding sites campaign-wide with headroom under 5×. It holds the fully
+`Faithful/DivRemChip/Exact.lean:1128`. Measured floor **(8M, 16M]** — by a wide margin the most expensive
+declaration in the pillar, and the one whose cost is best understood. It holds the fully
 unfolded `Extracted.DivRemOracle.DivRemCols.asserts` list, rewrites ~80 reconfigure projections through it
 with five `simp only` blocks, then runs **twenty consecutive bare `congr 1`** steps to peel a 20-way
 `List.append` chain. Textbook cause class 1d.
@@ -238,7 +238,7 @@ floor bracket, consistent with being one proof written twice.
 `repeat first | rw [Vector.getElem_append_left …] | rw [Vector.getElem_append_right …]` ladder. The only
 per-site variation is the leading `simp only [divRemChipLocals, …]` and the closing
 `all_goals try rw [divRem_toElements_*]`.
-**Also the file's binding cost:** three of the four are its surviving ceilings (400000/800000/400000), all
+**Also the file's binding cost:** three of the four are its most expensive declarations, all
 failing at `whnf` on their signatures — so an extraction is a genuine perf lead, not only a line win.
 (The fourth, `divRemHeaderBlocks_roundtrip`, cleared 40000 and was removed: the header chunk's offsets all
 land in the first `Vector` append arm, so its `rw` ladder terminates early.)
@@ -248,7 +248,7 @@ land in the first `Vector` append arm, so its `rw` ladder terminates early.)
 (`:685-791`, ~35 lines each). Identical end to end; they differ only in the local offset (159 / 137 / 148),
 the `size` fact cited (both `= 11`), the `populatedRowAt_*_eq` lemma rewritten first, and the trailing summand
 in the `change`'s index expression. A helper over a loose `(offset : ℕ)` plus a `populatedRowAt` projection
-hypothesis retires two of the three. These carry **no** ceiling — a line-count lead only.
+hypothesis retires two of the three. These are cheap to elaborate — a line-count lead only.
 
 ### 4.6 The `*_eta` structure-eta family — 8 files, ≈ **−120 to −150**
 `vec3_eta` / `vec4_eta` / `vec16_eta` / `cpuState_eta` / `registerAccess_eta` / `rTypeReader_eta` appear as
@@ -341,14 +341,14 @@ byte-guarantee/`is_real` route; StoreDouble drops the prior-value block entirely
 *Decision:* worth ≈ −140 to an owner willing to accept the name-derivation machinery.
 > ⚠ 4.31: `String.take` returns a `String.Slice`, so `.toUpper` on it fails. Use `String.capitalize`.
 
-### 5.3 The 24 missing `channelsWith*_eq` rfl-lemmas *(perf: would retire a ceiling)*
+### 5.3 The 24 missing `channelsWith*_eq` rfl-lemmas *(perf lead)*
 `AGENTS.md`'s own recipe — "every circuit exposes its `channelsWith*` as `@[circuit_norm]` `rfl`-lemmas" — is
 honoured by ~20 `Native/Operations/*` gadgets and by `MulChip`, and by **no other chip**.
 Consequence: `Soundness/RowSoundness.lean:63 supportedChip_usesSupportedBusChannels` must feed each chip's
-whole `circuit` *and* `elaborated` record to `simp`, and is the only surviving ceiling in the `Typed*`
+whole `circuit` *and* `elaborated` record to `simp`, and is the most expensive declaration in the `Typed*`
 grounding family. Measured: squeezing `simp` → `simp only` already moved its floor (200k, 400k] → (100k, 200k]
 and the file 8.28s → 5.84s, so **the remaining cost is exactly the record unfolding**. Adding the 24 missing
-pairs in `Native/Chips/<Chip>/Defs.lean` should make the ceiling removable.
+pairs in `Native/Chips/<Chip>/Defs.lean` should take it comfortably under the default.
 *Related:* the same missing-rfl-lemma cause blocks Clean's `SoundEnsemble.addTable` autoParam defaults —
 giving each provider circuit a `channelsWith{Guarantees,Requirements}_eq` would let **all 11** hand-written
 `addTable` obligation arguments across `ByteChip/Ensemble.lean`, `MemoryProviderEnsemble.lean` and
@@ -399,13 +399,12 @@ These need no waiver. They are queued side-tasks.
 These are **decisions**, not omissions. Each was reached independently by three or more batches and stopped at
 each time. Re-litigating them costs a batch.
 
-- **Folding `DivRemCore.CoreSpec` / `ownAsserts`.** It would clear the DivRem `Evidence` ceilings —
+- **Folding `DivRemCore.CoreSpec` / `ownAsserts`.** It would cut the DivRem `Evidence` cost —
   `compareAssumptionsOfCore`'s cost is exactly the 121-way `obtain` over an unfolded
-  `DivRemCore.OwnAssertsHold`, floor (60k, 100k] against a declared 16M. But `CoreSpec` is a contract on the
-  **audit surface**, and folding it changes what that surface says. Confirmed four times; kept-and-lowered to
-  400000 instead.
+  `DivRemCore.OwnAssertsHold`, floor (60k, 100k]. But `CoreSpec` is a contract on the
+  **audit surface**, and folding it changes what that surface says. Confirmed four times; left as-is.
   > The sibling screen makes the diagnosis cheap and is worth recording: `routedWord`, *in the same file*,
-  > runs the identical 121-way destructure and carries **no** ceiling — because it stops there, while
+  > runs the identical 121-way destructure at a fraction of the cost — because it stops there, while
   > `compareAssumptionsOfCore` builds eleven `DivRemCompare.Assumptions` conjuncts on top of it. The
   > destructure alone is affordable; the destructure *plus* the downstream work is not.
 - **Trading `bv_decide` for line count.** It adds `Lean.ofReduceBool` / `Lean.trustCompiler` to lemmas that
@@ -465,7 +464,7 @@ Exactly **one** entry was ever applied — #14 below, as a user-approved excepti
 | 22 | `Faithful.alux0cols_constraints_faithful` | `…aluX0cols_…` | `Faithful/AluX0.lean` | low — lone all-lowercase spelling; **matches the `*faithful*` probe glob** |
 | 23 | `StoreByteChip.AdvanceReady` | `advanceReady` | `Proofs/Chips/StoreByteChip/Bridge.lean` | low — the `ChipKind` field is lowercase and `LoadX0Chip` agrees; 9 files disagree with 1. Pick one and sweep |
 | 24 | `StoreByteChip.extHashMap_get?_insert_self` | `…getElem?_…` | `Proofs/Chips/StoreByteChip/Bridge.lean` | low — the proof immediately rewrites to `getElem?`; `Store{Half,Word,Double}` cite it cross-file |
-| 25–26 | `Faithful.{lt,bitwise}_chip_constraints_decompose` | `…{lt,bitwise}Chip_…` | `Faithful/{Lt,Bitwise}Chip.lean` | low — each file mixes snake and camel for one chip prefix. #26 carries a live ceiling: re-ladder after any edit |
+| 25–26 | `Faithful.{lt,bitwise}_chip_constraints_decompose` | `…{lt,bitwise}Chip_…` | `Faithful/{Lt,Bitwise}Chip.lean` | low — each file mixes snake and camel for one chip prefix. #26 is elaboration-expensive: re-ladder after any edit |
 | 27 | `Faithful.jalChipConstraintsFaithful` | `…jalChip_constraints_faithful` | `Faithful/JalChip.lean` | **medium** — whole-family inconsistency, 15+ declarations across 3 files; matches the `*faithful*` probe glob, so `gen_axiom_probe.py` needs regenerating |
 | 28 | `Faithful.forallNilIff` | `forall_nil_iff` | `Faithful/JalChip.lean` | low — three private clones of one lemma under two names; the real fix is §4.7 |
 | 29 | `ShiftRightChip.resultA_isU64` | `sr_a_isU64` | `Proofs/Chips/ShiftRightChip/Defs.lean` | medium — the sibling names the identical role `sll_a_isU64` (its own docstring says it mirrors it); cited from four split `Soundness/<Op>.lean` files |

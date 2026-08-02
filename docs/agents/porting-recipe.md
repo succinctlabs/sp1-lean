@@ -68,9 +68,10 @@ entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` inste
   (<Op>Chip.circuit (p := p)).output input offset = <the elaborated.output struct> := rfl` (copy the RHS from
   the `elaborated` instance in `Defs`; for auto-elaborated chips extract it via `lean_goal` on the LHS). Then
   close any per-chip closed-form (`<op>Chip_memoryInteractionValues_eq`, the grounding contracts) with
-  `simp only [circuit_norm, …]` — never full `simp`, never `simp [circuit]`. **Never raise `maxHeartbeats`**:
-  a bump fails `scripts/check_heartbeats.sh` (CI). Fold instead — see `proof-patterns.md` §"maxHeartbeats: the
-  fold recipe + no-bump discipline". If the tag perturbs this chip's own proofs, drop `@[circuit_norm]` and
+  `simp only [circuit_norm, …]` — never full `simp`, never `simp [circuit]`. **Never add an
+  elaboration-budget directive**: `scripts/check_option_escapes.sh` (CI) fails on any `maxHeartbeats`/
+  `maxRecDepth` site that is not allowlisted. Fold instead — see `proof-patterns.md` §"Elaboration
+  budgets". If the tag perturbs this chip's own proofs, drop `@[circuit_norm]` and
   pass the plain lemma explicitly.
 - Mirror `Proofs/Chips/AddChip.lean` for a `FormalAssertion` gadget (reader composition + `witnessVector populate`
   + the `RTypeChipSpec` soundness recipe), or `Proofs/Chips/BitwiseChip.lean` for a witnessing `FormalCircuit`

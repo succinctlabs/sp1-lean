@@ -34,45 +34,46 @@ of its patterns each of our notes realizes, so a *new* blowup is anticipated rat
 | §"Bit-shift chip soundness" — factor `2^64` into an abstract-`BitVec` helper (`srl_toNat`/`sra_toNat`), never `skipKernelTC` | performance-problems item 9 ("kernel has no accelerated `Nat.pow`; factor arithmetic into a `private theorem` over abstract ℕ") |
 | Mul: keep `eval((output …) …)` an opaque atom (don't `simp [Expression.eval]`) | performance-problems items 1/4 (opaque values) |
 | §"`ElaboratedCircuit` field obligations: let the default tactics close them" | complements Clean `AGENTS.md` "pass `elaborated` as an **explicit field** for factored circuits (else `soundness` elaborates with metavariables)" + README roadmap (this automation is known-incomplete upstream) |
-| §"Compile-time / performance landmines" — "`maxHeartbeats` tightening is the wrong lever", "a bump in a simple proof is a code smell" | Clean's thrice-stated "**Never modify maxHeartbeats**" + performance-problems §"Measuring honestly" (`#count_heartbeats` lies; use `set_option maxHeartbeats <low>` / `diagnostics true` to find the true floor) |
+| §"Elaboration budgets" — the hand-written surface carries none; fold the blowup rather than raise a ceiling | Clean's thrice-stated "**Never modify maxHeartbeats**" + performance-problems §"Measuring honestly" (`#count_heartbeats` lies; lower the *real* ceiling, or use `diagnostics true`, to find the true floor) |
 | The 3 remaining gated completeness proofs (Branch/ShiftLeft/DivRem); ShiftRight is the validated repair | performance-problems §"Kernel size cliffs in completeness proofs": `circuit_proof_start_core` → per-component `dsimp only [main, circuit_norm] at h_env` → `.1`/`.2` → split into a (virtual, free) subcircuit when the parent cliffs |
 
-Two disagreements worth stating honestly (see also `docs/architecture.md` §"Relationship to Clean's `Air`
-layer"): (1) our large `maxHeartbeats` footprint splits into *term-intrinsic* cost (DivRem/Mul/carry chains
-— genuine 64-bit arithmetic at a scale Clean doesn't face) that legitimately needs a raised ceiling, and
-*maskable* blowups the opaqueness patterns above eliminate — treat every bump in a *simple* proof as class
-(2). (2) Clean's "don't hand-unpack `ConstraintsHold` into helper lemmas" rule targets *single-circuit*
+One disagreement worth stating honestly (see also `docs/architecture.md` §"Relationship to Clean's `Air`
+layer"): Clean's "don't hand-unpack `ConstraintsHold` into helper lemmas" rule targets *single-circuit*
 proofs; our `Soundness/` whole-machine layer legitimately reasons about the *ensemble*'s global balance,
 which is a different regime — but per-chip closed-form families (`<chip>_memoryInteractionValues_eq`) are
 closer to what Clean would fold into a bundled `Spec`/`exposedChannels` conjunct.
 
-## maxHeartbeats: the fold recipe + no-bump discipline
+## Elaboration budgets: this repo doesn't use them — fold the blowup
 
-**The invariant: don't raise a ceiling — fold the blowup.** `scripts/check_heartbeats.sh` (a CI `guards`
-gate + part of `run_audit.sh`) fails if the `set_option maxHeartbeats` count grows past
-`scripts/heartbeats_baseline.txt`. So a new blowup must be *folded*, not bumped. A genuinely term-intrinsic
-addition (the KEEP-set below) requires a conscious baseline bump in the same PR. This kept the capstone build
-fast; keep it that way. The current baseline is **SP1Clean 317 / SP1CleanTest 16**; two thirds of the
-SP1Clean sites sit in auto-generated `Extracted/` (whose only lever is `update_extracted.py`), leaving
-~102 hand-written ceilings. **The measured floor of every surviving hand-written ceiling is tabulated in
-[`perf-findings.md`](perf-findings.md) — the canonical elaboration-budget record — including the five that
-sit at under 2× headroom and are therefore the declarations most likely to break on the next toolchain or
-mathlib pin.** Read that table before touching any surviving ceiling.
+**Hand-written Lean here carries zero `set_option maxHeartbeats`**, matching upstream Clean (none in
+44,603 lines), and three `maxRecDepth` sites, each structural and measured. Every other surviving site is
+on a *generated* definition, where the only lever is `update_extracted.py`.
 
-> **The guard is a raw grep, so never write the option string into a Lean comment or docstring under
-> `SP1Clean/` or `SP1CleanTest/`.** `check_heartbeats.sh` counts sites with `grep -rc` over exactly those
-> two directories and does not parse Lean, so a comment *mentioning* the option scores as a live ceiling
-> and silently corrupts the ratchet. When recording a measured ladder in the source — which you should —
-> phrase it without the literal: *"the former 8M ceiling was ~170× over; measured floor bracket
-> (40000, 100000]"*. Keep such notes to **one line**; multi-line transcripts belong in `perf-findings.md`.
-> (`Proofs/Sail/Advance.lean` carries one pre-existing phantom instance, so the baseline has always counted
-> at least one non-ceiling.)
+`scripts/check_option_escapes.sh` (a CI `guards` gate + part of `run_audit.sh`) **prohibits** both options:
+any `maxHeartbeats`/`maxRecDepth` site not named in `scripts/option_escapes_allowlist.txt` fails the build.
+It is not a ratchet and not a budget — a ratchet permits a new hatch as long as an old one leaves; this does
+not. So when a proof blows its budget, the fix is to **fold the blowup**, using the recipes below.
+
+The allowlist is a **last resort, not an allowance**. The bar for an entry is
+[`perf-findings.md`](perf-findings.md) §7: a measured floor bracket, a named mechanism, at least one
+attempted fix with its result, and a reason the cause cannot be moved — every existing entry carries all
+four, recorded inline in the allowlist file. Start instead from that file's §1 "The rule": extract over
+OPAQUE arguments, and check what the extraction can still see. That one rule accounts for most sites that
+turn out to be fixable. If the site is *generated*, fix the emitter in `update_extracted.py` rather than
+allowlisting its output.
+
+> **The guard greps for the full `set_option <option>` phrase, so never write that phrase into a Lean
+> comment or docstring under `SP1Clean/` or `SP1CleanTest/`.** It does not parse Lean, so a comment quoting
+> a whole directive scores as a live site and fails the build. (The bare option name in prose is fine.)
+> When recording a measured ladder in the source — which you should — phrase it without the directive:
+> *"the former 8M ceiling was ~170× over; measured floor bracket (40000, 100000]"*. Keep such notes to
+> **one line**; multi-line transcripts belong in `perf-findings.md`.
 
 **1. `simp` → `simp only` — the biggest lever for chip/contract closers.** A full `simp [X.circuit, X.main,
 …, circuit_norm]` drags in the *entire default simpset* — that, not the `circuit`/`main` unfold, is the real
-cost that forced the per-chip ceilings. `simp only [<same args>, circuit_norm]` closes the identical goal
-cheaply (fits the 200k default). This single change removed all `TypedTimeContracts` (26→1) and `TypedState`
-(27→3) overrides. **Gotcha:** in the `firstStraightCPUTimeContract`-style closers, **keep `input, offset` in
+cost that pushes these closers past the default. `simp only [<same args>, circuit_norm]` closes the identical
+goal cheaply (fits the 200k default), and it is what keeps the whole `TypedTimeContracts` / `TypedState`
+family there. **Gotcha:** in the `firstStraightCPUTimeContract`-style closers, **keep `input, offset` in
 the args** — dropping them makes chips whose CPUState subcircuit is *not* the operations-list head (AluX0,
 and the `right/left/rfl`-navigated Jalr/Branch) time out. Where goal-1 membership isn't at the head, add the
 manual `right/…/left/rfl` navigation (see `TypedTimeContracts` Jalr/Branch).
@@ -100,9 +101,10 @@ input offset)`. If the `@[circuit_norm]` tag perturbs the chip's own soundness/c
 pass the plain lemma explicitly.
 
 **3. Measure floors by lowering the real ceiling — `#count_heartbeats` LIES.** It runs with an *unlimited*
-budget and under-reports (Clean's `doc/performance-problems.md` §"Measuring honestly"). A prior note here
-claimed `Sll.soundness = 72 heartbeats`; re-measured with `set_option maxHeartbeats <low>` it genuinely needs
-> 200k. Always lower the *actual* ceiling and rebuild to find a floor; never trust `#count_heartbeats`.
+budget and systematically under-reports (Clean's `doc/performance-problems.md` §"Measuring honestly"); a
+declaration it scores at tens of heartbeats can genuinely need hundreds of thousands. Always lower the
+*actual* ceiling and rebuild to find a floor; never trust `#count_heartbeats`. Remove the temporary
+directive before committing — the guard rejects it.
 
 **4. Diagnosing a budget-bound declaration — four facts that separate a measurement from a guess.**
 
@@ -135,24 +137,21 @@ claimed `Sll.soundness = 72 heartbeats`; re-measured with `set_option maxHeartbe
   `whnf` 7) bore almost no resemblance to the binding-rung distribution. Read it at the *lowest failing*
   rung, and never treat a rung-1 phase as the site's identity.
 - **A floor measured through the LSP is not a floor against the gate.** The `lean-lsp` server does not
-  apply the pillar libs' `moreLeanArgs` — the same reason `lake env lean` cannot certify a pass. So when
-  *keeping* a ceiling, size it at roughly **4× the measured bracket top**, not at the bare lowest passing
-  rung. Removal is unaffected: a site clearing 40000 against the plain 200000 default has ≥5× headroom
-  either way. Also: a failure *position* is an attribution tool and says nothing reliable about magnitude,
+  apply the pillar libs' `moreLeanArgs` — the same reason `lake env lean` cannot certify a pass. So on the
+  rare occasion an allowlist entry is warranted, size its value at roughly **2–4× the measured bracket top**,
+  not at the bare lowest passing rung. Removal is unaffected: a site clearing 40000 against the plain 200000
+  default has ≥5× headroom either way. Also: a failure *position* is an attribution tool and says nothing reliable about magnitude,
   and an **in-body** position is not even stable across runs (three identical invocations at one rung named
   three different owners, while the *signature* positions stayed fixed).
 
-**The KEEP-set — genuinely term-intrinsic; do NOT `simp→simp only`-sweep (tested, zero speedup).**
-`compile-profile.md:131` records the exact `simp→simp only` experiment on the DivRem/Mul family with **zero
-speedup** — the cost there is `nlinarith` / `linear_combination` / product-glue `simpa` / `omega` over big
-arithmetic / kernel `2^64`-whnf / kernel `decide`/`bv_decide` / term-size, none a default-simpset drag. Keep
-their ceilings: `Proofs/Operations/DivRemOperation/Core.lean`, `Native/…/DivRemOperation/OwnAsserts.lean`,
-`MulOperation/RawSpec.lean`, `Proofs/Chips/MulChip/Formal.lean` (128M completeness), `MulOperation/Formal.lean`,
-both Shift `Core.lean` `nlinarith` farms, the six Shift `Soundness/{Sll,Sllw,Sra,Sraw,Srl,Srlw}` conjuncts,
-`Math/Word.lean` `toBitVec64`, `Proofs/Sail/Advance.lean`. `Faithful/` (73) is anchor-safe but *not*
-mechanically safe (the full `simp` does real `List`/`Perm`/`decide` work + shapes residuals for downstream
-`rw`) — per-theorem only, low payoff. `Extracted/` (105 × flat 8M) is proof-obligation-free `@[irreducible]
-def` let-chains — the only lever is right-sizing the emit in `update_extracted.py`.
+**5. Where `simp → simp only` will NOT help.** On the DivRem/Mul/Shift arithmetic heavies the cost is
+`nlinarith` / `linear_combination` / product-glue `simpa` / `omega` over big arithmetic / kernel
+`2^64`-whnf / kernel `decide`/`bv_decide` / term size — none of it a default-simpset drag, and the measured
+sweep over that family produced **zero** speedup (`compile-profile.md:131`). Chase the term-intrinsic cost
+instead (the abstract-`BitVec` helpers and shared-tail dedup below). In `Faithful/`, the full `simp` is
+doing real `List`/`Perm`/`decide` work *and* shaping residuals for a downstream `rw`, so squeeze it
+per-theorem or not at all. In generated `Extracted/` modules the only lever is right-sizing the emit in
+`update_extracted.py`.
 
 ## The witnessed-`FormalCircuit` recipe
 
@@ -308,8 +307,9 @@ read into the chip asserts, so the chip is a skeleton (asserts + byte pulls in `
 `Native/Operations/ShiftRightMath.lean` (the `srl/sra/srlw/sraw_close_su16_*_case` lemmas + `is_mod_64`,
 `cancel_mul_65536`, the `srl_within_byte_shift*` division identities, a local `HWord`). Port landmines: the
 early lemmas rely on a section `variable [Fact (Nat.Prime p)] [Fact (2^17<p)]` + a `local instance : NeZero
-p`; file-level `set_option maxHeartbeats 100000000` + `linter.unusedVariables false`; sed range-extraction
-drops `section`/`end` markers and `/--` openers (strip/restore them).
+p`; the source file's blanket elaboration-budget directive and `linter.unusedVariables false` must **not** be
+carried over (fold instead — see §"Elaboration budgets"); sed range-extraction drops `section`/`end` markers
+and `/--` openers (strip/restore them).
 
 - **Completeness: preserve the visible flag gate, fold the arithmetic tail.** Clean's shallow channel-law
   discharge needs the combined shift-flag sum boolean constraint in the parent; hiding that constraint
@@ -449,8 +449,9 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   `Formal` + a 3.5 s `Decision`); cf. the `Math/ShiftBounds.lean` `nlinarith` dedup. The `id (ZMod p)`
   field-carrier landmine bites at the seam: `simp only [id_eq] at <gate-hyp>` to strip it before feeding the
   loose-`ZMod p` lemma (see the `id_eq` note above).
-- **`maxHeartbeats` floors.** `toBitVec64`/`asm8` rw chains are whnf-heavy: `set_option maxHeartbeats 2000000 in`
-  for soundness/completeness; the carry lemmas (`addSemantics_of_carries` etc.) need up to `16000000`.
+- **`toBitVec64`/`asm8` rw chains are whnf-heavy** — as are the carry lemmas (`addSemantics_of_carries` etc.).
+  They close at the default budget once the expensive value is opaque; if one blows up, fold it rather than
+  reaching for a budget directive (see §"Elaboration budgets").
 - **`omit [Fact (2^17 < p)] in` — and *any* `set_option … in` — goes *before* the doc-comment**, not between
   the doc-comment and the theorem. Put after a `/-- … -/` it is a parse error (`unexpected token
   'set_option'; expected 'lemma'`), and the second-order damage is worse than the error: a scripted pass over
@@ -541,8 +542,8 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   `Clean/Circuit/Basic.lean:218-249`), which close cheaply because they treat each `subcircuit` as a black box.
   Writing them explicitly as `simp +arith [circuit_norm, main, X.circuit, X.elaborated, …]` is what's slow: passing
   the subcircuits' `.circuit`/`.elaborated` forces `circuit_norm` to crack open their internals (the 22-col
-  `RTypeReader` witness especially), which is what made `AddChip`'s instance need `maxHeartbeats 16000000` and ~4
-  min. With the defaults it elaborates in **~1.7 s, no bump** (provide only `localLength _ := <concrete value>`).
+  `RTypeReader` witness especially), which is what pushed `AddChip`'s instance to ~4 min and far past the default
+  budget. With the defaults it elaborates in **~1.7 s** (provide only `localLength _ := <concrete value>`).
 - **In a composition soundness proof, `simp [circuit_norm] at <subcircuit-spec hyps>` BEFORE the final
   `refine`/`exact`.** A subcircuit's soundness hypothesis (e.g. `hclk13 : ((eval env (varFromOffset CPUState …))
   .clk_0_16 - 1) * 8⁻¹).val < 2^13`) is *defeq* to the goal conjunct but not syntactically equal; `exact ⟨…,
@@ -578,13 +579,14 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   which is exactly the eval'd gate) and puts it in the `Spec`. Drop it from the (soundness) `Assumptions`. Only
   *completeness* still needs it as a precondition — keep it in `ProverAssumptions` (the prover commits to a
   boolean selector). This is the point of `GeneralFormalCircuit`'s decoupled Assumptions/ProverAssumptions.
-- **A `maxHeartbeats` bump in a *simple* proof is a code smell, not a fix.** Genuine arithmetic (the
-  `toBitVec64`/`asm8`/carry-chain rw towers in `Native/Operations/`) legitimately needs `2_000_000`–`16_000_000`. But a
-  *structural/compositional* proof — a chip threading subcircuit Specs, an `ElaboratedCircuit` instance, a reader
-  range-check — that only passes with a bump is almost always brute-forcing a `whnf`/defeq blowup that a cheap
-  normalization removes. Before bumping such a proof, find the unnormalized term and fix it: prefer the default
-  obligations; `simp [circuit_norm] at <hyp>` to align forms before `exact`; witness via `fromElements #v[…]` so
-  `toElements` reduces (see above). `AddChip` went 16M-everywhere → **zero bumps** this way (243 s → 1.7 s).
+- **A proof that only passes with a raised budget is brute-forcing a blowup — find the unnormalized term.**
+  This is most obvious in a *structural/compositional* proof (a chip threading subcircuit Specs, an
+  `ElaboratedCircuit` instance, a reader range-check), but it holds for the arithmetic towers too: the
+  `toBitVec64`/`asm8`/carry-chain rw towers in `Native/Operations/` were once believed to need millions of
+  heartbeats and now close at the default. The moves that get you there: prefer the default field
+  obligations; `simp [circuit_norm] at <hyp>` to align forms before `exact`; witness via `fromElements #v[…]`
+  so `toElements` reduces (see above); and extract heavy work through a lemma over an **opaque** argument
+  (`perf-findings.md` §1 "The rule").
 
 ## Reader composition (nested-struct readers as composed `FormalCircuit`s)
 
@@ -752,9 +754,9 @@ always means a *local* regression against one of these.
   `unfoldDefinition`. Reverting that single hunk restored 260s. This is Clean's whnf-into-expensive-values
   doctrine arriving from an unexpected direction: on a field that any heavy module unfolds, the tactic block
   *is* the opaqueness barrier. Note also **why it hung instead of erroring** — the blown-up work landed
-  inside the one declaration still carrying a very large budget, enough to absorb roughly an hour of extra
-  `whnf`. **A high surviving ceiling silently converts a downstream regression from a loud error into a slow
-  build**, which is the argument for the ratchet beyond tidiness.
+  inside a declaration then carrying a very large budget, enough to absorb roughly an hour of extra `whnf`.
+  **A raised ceiling silently converts a downstream regression from a loud error into a slow build**, which
+  is the argument for the prohibition beyond tidiness.
 
 - **The `v[i]` index-bound tax — already fixed by the `decide` fast path.** Every `v[i]` elaborates
   an `i < n` bound side-goal; in Lean 4.28's Std the slice-support `get_elem_tactic_extensible` rule
@@ -805,17 +807,12 @@ always means a *local* regression against one of these.
   ~76 auto-gen modules carry it in their headers; keep it when regenerating (the linter passes over the
   monolithic generated terms were a measurable chunk of their cost).
 
-- **`maxHeartbeats` tightening is the *wrong* lever — don't chase the ceilings.** The heavy Shift/DivRem
+- **An elaboration budget is the *wrong* lever — chase the cost, not the number.** The heavy Shift/DivRem
   proofs are kernel / type-checking-bound; their real cost is term-intrinsic (the `2^64` reductions, the
-  product-glue `simpa`s) — chase *that* (the abstract-`BitVec` helpers + shared-tail dedup below), not the
-  `set_option` numbers. **Caveat — measure with a low ceiling, not `#count_heartbeats`.** An earlier note here
-  claimed `ShiftLeftChip/Soundness/Sll.soundness` "measures at 72 elaboration heartbeats"; that was a
-  `#count_heartbeats` figure, which runs with an *unlimited* budget and under-reports (Clean's
-  `doc/performance-problems.md` §"Measuring honestly"). Re-measured 2026-07-21 with `set_option maxHeartbeats
-  <low>`, `Sll.soundness` **times out at the 200k default** (`whnf`/`isDefEq`) — its elaboration floor is
-  genuinely > 200k, so its 4M ceiling is *binding* (do not drop it to default), even though a mid-range
-  ratchet buys no wall-clock. To find a true floor, always lower the real ceiling and rebuild; never trust
-  `#count_heartbeats`.
+  product-glue `simpa`s), so the fix is always the abstract-`BitVec` helpers + shared-tail dedup below.
+  Even where a floor genuinely sits above the 200k default, moving the number buys no wall-clock — only
+  folding the term does. And **measure with a low ceiling, not `#count_heartbeats`**, which runs with an
+  unlimited budget and under-reports (Clean's `doc/performance-problems.md` §"Measuring honestly").
 
 - **For many-case chips, extract semantic evidence instead of splitting full circuit soundness.** The old
   DivRem architecture proved nine `GeneralFormalCircuit.Soundness` theorems over the same enormous `main`
@@ -829,9 +826,8 @@ always means a *local* regression against one of these.
 
 ## Golf & cleanup discipline
 
-How to golf/clean a proof without breaking the repo's invariants (axiom-clean, 0-warning, no `info:`).
-Distilled from the 2026-06 (109 files, −591 lines) and 2026-07 (the ceiling ratchet) cleanup campaigns,
-axiom-cleanliness preserved throughout. The remaining deferred cleanup TODOs live under `docs/roadmap.md`
+How to golf/clean a proof without breaking the repo's invariants (axiom-clean, 0-warning, no `info:`,
+no elaboration-budget escape hatch). The remaining deferred cleanup TODOs live under `docs/roadmap.md`
 § "Cleanup / polish backlog"; the available cleanup skills are catalogued at the end of this section, and
 the binding house rules for `/cleanup` and `/cleanup-all` — which override the `mathlib-quality` plugin
 where they conflict — are in [`cleanup-profile.md`](cleanup-profile.md).
@@ -1022,7 +1018,7 @@ the source text, which is exactly what `scripts/gen_axiom_probe.py` (regex over 
 **Don't golf:**
 - **`Faithful/*` anchors** — conservative only (drop `by exact` / dead `let` / `from by`); never restructure
   proof terms or statement forms; they are *syntactic* faithfulness anchors.
-- **`Spec`/`Assumptions`/statement forms**, `set_option`/`maxHeartbeats`, `ElaboratedCircuit` field structure.
+- **`Spec`/`Assumptions`/statement forms**, `set_option` directives, `ElaboratedCircuit` field structure.
 - **Auto-gen** — `Extracted/`, `*Vectors.lean`, `Native/Operations/*/RawSpec`, etc.; banner-check the header.
 - **Narrative comments on kernel-sensitive Shift/DivRem files** — they document the `2^64` / `id (ZMod p)`
   landmines + proof roadmaps; they are the institutional memory of *why* the proof is shaped that way. (A

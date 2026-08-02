@@ -83,7 +83,7 @@ remain reserved. See `docs/roadmap.md` and `docs/architecture.md`.
   ⚠️ `lake env lean <file>` **exits 0 even on a Lean stack overflow**, and a stale cached olean can make
   downstream checks pass falsely — **always finish a phase with `lake build SP1Clean`**.
 - **Build concurrency.** Elaboration is heavy (full build is ~1800+ jobs across Clean + mathlib + Sail; the
-  `toBitVec64`/carry proofs run at high `maxHeartbeats`). Before starting a new build, **let the running one
+  `toBitVec64`/carry proofs are the slowest). Before starting a new build, **let the running one
   finish or kill it** (`pkill -f "lake build"` / `pkill -f "lake env lean"`). Cap at **2–3 builds at once**.
   A `run_in_background` build can outlive its shell — check with `ps -ef | grep -E "lake|lean" | grep -v lsp`
   before spawning another. The lean LSP server (`uvx lean-lsp-mcp`) also keeps several GB warm.
@@ -357,17 +357,19 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
   - The next-candidate linter (`longLine`) is tracked in `docs/roadmap.md` § "Cleanup / polish backlog"; the
     non-negotiable suppressions — `unusedSectionVars`/`unusedSimpArgs` (structurally necessary in circuit
     proofs) and the auto-gen `linter.all false` — must stay.
-- Heavy `toBitVec64` rw chains are whnf-expensive — `set_option maxHeartbeats 2000000 in` (carry lemmas need up
-  to `16000000`).
+- **This repo does not raise elaboration budgets.** Hand-written Lean carries **zero**
+  `set_option maxHeartbeats`, matching upstream Clean (none in 44,603 lines), and three measured structural
+  `maxRecDepth` sites; every other site is on a generated definition.
+  `scripts/check_option_escapes.sh` (the CI `guards` job + `run_audit.sh`) **prohibits** both options: any
+  site not named in `scripts/option_escapes_allowlist.txt` fails the build. It is not a ratchet and not a
+  budget — a ratchet permits a new hatch as long as an old one leaves; this does not. When a proof blows
+  up (heavy `toBitVec64`/carry rw chains are the usual suspects), **fold it** — `docs/agents/perf-findings.md`
+  §1 "The rule". The allowlist is a last resort with a four-part bar (§7), not an allowance.
 - **Never write the phrases `set_option maxHeartbeats` or `set_option maxRecDepth` into a Lean comment or
-  docstring under `SP1Clean/` / `SP1CleanTest/`.** `scripts/check_option_escapes.sh` counts sites with a raw
-  `grep -rc "set_option <opt>"` and does not parse Lean, so a comment quoting the full directive scores as a
-  live ceiling and silently corrupts the ratchet baseline. Record a measured ladder without it: "the former
-  8M ceiling was ~200× over".
-  *Precision note (verified 2026-08-02):* the guard matches the **full `set_option …` phrase**, not the bare
-  option name. Writing "the depth bump" or even "maxRecDepth" alone in prose is harmless. This bullet
-  previously claimed a comment "merely *mentioning* the option" would score, which is false and had us
-  contorting notes for no reason — but the narrower prohibition is real, so keep it.
+  docstring under `SP1Clean/` / `SP1CleanTest/`.** The guard greps for the **full `set_option …` phrase** and
+  does not parse Lean, so a comment quoting a whole directive scores as a live site and fails the build.
+  (The bare option name in prose is harmless — "the depth bump", or even "maxRecDepth" alone, is fine.)
+  Record a measured ladder without the directive: "the former 8M ceiling was ~200× over".
 - **Dropping `by exact` on a `def`'s Prop-valued field can be load-bearing *opacity*.** A tactic block becomes
   an opaque auxiliary proof constant; the bare term inlines and `isDefEqDelta` unfolds it into every consumer.
   One such −1-line golf took a downstream module from **260s to >1230s**. A/B-time the *downstream* consumers,
@@ -415,18 +417,17 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
   not a reason to hand-write the field. These lemmas also tidy `circuit_proof_start`; mind the soundness
   requirement-tail caveat. Full recipe: `docs/agents/proof-patterns.md` "ElaboratedCircuit field obligations".
 - **When a proof is slow, extract over *opaque* arguments — and check what the extraction can still see.**
-  Five separate ceilings fell to this one move (`docs/agents/perf-findings.md` §12): the cost was variously
-  in the local *context* rather than the goal, in a `have`'s *type* rather than its proof, in the *order* of
-  two tactic steps, in a struct *literal* where `fromElements` belonged, and in 24 rewrites each
-  renormalising a large context. In every case the fix was to interpose an opaque variable, never to make
-  the expensive step cheaper. Corollary: extracting a block into a `have` **inside the same proof** buys
-  nothing, because it keeps the whole context — a recorded "extraction moved nothing" negative result in
-  `DivRemChip/Evidence/` meant exactly that, and was misread as irreducibility for months.
-- **Ladder before you believe a cause you found by reading code.** Four structural hypotheses were promoted
-  on code-reading during the ceiling campaigns and all four were corrected by measurement — including two
-  that were *correct diagnoses of real phenomena that were not the cost*, and one that was upstream Clean's
-  own documented performance rule (measured delta: 0.008%). A mechanism can be genuine, verifiable, and
-  irrelevant. Details and the full list: `docs/agents/perf-findings.md` §12.
+  This is the single highest-yield move (`docs/agents/perf-findings.md` §1 "The rule"). The cost hides in
+  places the goal text does not show: in the local *context* rather than the goal, in a `have`'s *type*
+  rather than its proof, in the *order* of two tactic steps, in a struct *literal* where `fromElements`
+  belonged, in rewrites that each renormalise a large context. The fix is to interpose an opaque variable,
+  never to make the expensive step cheaper. Corollary: extracting a block into a `have` **inside the same
+  proof** buys nothing, because it keeps the whole context — so "extraction moved nothing" is not evidence
+  of irreducibility unless the extraction actually took the context away.
+- **Ladder before you believe a cause you found by reading code.** A structural hypothesis promoted on a
+  code-read predicts nothing until a measured ladder confirms it: a mechanism can be genuine, verifiable,
+  and irrelevant — including one that is upstream Clean's own documented performance rule (measured delta:
+  0.008%). Measure first. Details: `docs/agents/perf-findings.md` §1 "The rule".
 - Full landmine list + the witnessed-`FormalCircuit` recipe: `docs/agents/proof-patterns.md`.
 
 ## MCP servers
@@ -458,15 +459,14 @@ after installing or toggling.
   landmines + the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
 - `docs/agents/cleanup-profile.md` — **binding house rules for `/cleanup` and `/cleanup-all`.** The
   `mathlib-quality` plugin is written for mathlib and several of its hard gates would break this build or
-  corrupt the audit surface (it deletes every `maxHeartbeats`, unsqueezes `simp only`, splits `∧` statements,
+  corrupt the audit surface (it unsqueezes `simp only`, splits `∧` statements,
   privatises single-file decls, rewrites `≥`→`≤`, and deletes "wrapper" lemmas). Read this file first; it
   overrides the plugin where they conflict.
-- `docs/agents/perf-findings.md` — the **measured** elaboration-budget record from the 2026-07 ceiling
-  campaign (heartbeat sites 853 → 317; hand-written 638 → 102): the ladder protocol, the folded-vs-unfolded
-  predictor, the cause classes with worked fixes, the measurement traps — and the table of **surviving
-  ceilings with their measured floors**, including the five under-provisioned sites. Read it before touching
-  any ceiling.
-- `docs/agents/cleanup-deferred.md` — the owner-decision queue from that campaign: every duplication found
+- `docs/agents/perf-findings.md` — **how to avoid an elaboration budget.** §1 is the rule (extract over
+  opaque arguments; check what the extraction can still see), then the folded-vs-unfolded predictor, the
+  cause classes with worked fixes, the diagnostic instrument, the measurement traps, and §7's bar for the
+  rare site that may be allowlisted. Read it before diagnosing any slow or blowing-up declaration.
+- `docs/agents/cleanup-deferred.md` — the owner-decision queue: every duplication found
   and deliberately not fixed, grouped by blocker (shallow-file hoist · statement change · deletion ·
   `Faithful/**` conservative-only · cross-module round), with measured sizes; the "deliberately NOT taken"
   decisions; and the 40-entry rename queue, which is **queued, never applied**.

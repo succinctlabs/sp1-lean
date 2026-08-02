@@ -152,7 +152,7 @@ digest hashes a modeled output byte stream.
 - a zero-tolerance source proof-deferral scan;
 - a zero-tolerance project-axiom scan;
 - `skipKernelTC` and main-library `native_decide` guards;
-- a heartbeat-override ratchet; and
+- an elaboration-budget escape-hatch prohibition (allowlist-gated); and
 - a generated `#print axioms` census over the released theorem surface.
 
 Current classes in the census are:
@@ -229,5 +229,5 @@ The final command regenerates:
 - `docs/snapshots/axiom-census.txt`.
 
 An unknown declaration makes the probe fail. A new proof deferral, project axiom, forbidden kernel
-bypass, main-library `native_decide`, unexpected heartbeat-site increase, or `sorryAx` carrier makes the
-audit fail.
+bypass, main-library `native_decide`, non-allowlisted elaboration-budget directive, or `sorryAx` carrier
+makes the audit fail.

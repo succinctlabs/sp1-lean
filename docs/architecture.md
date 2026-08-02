@@ -260,14 +260,14 @@ forbids `skipKernelTC` and `native_decide`.
 
 Per-declaration elaboration-budget overrides are **prohibited by default**: `scripts/check_option_escapes.sh`
 fails the audit on any `maxHeartbeats`/`maxRecDepth` site not named in `scripts/option_escapes_allowlist.txt`,
-each entry of which carries a measured floor bracket and the mechanism that makes it irreducible. A count
-ratchet used to guard this; an allowlist replaced it, because a ratchet permits a new hatch as long as an
-old one leaves.
-The baseline is **2** sites in `SP1Clean/` — both generated, both measured — plus 16 in `SP1CleanTest/`
-(auto-generated `native_decide` vector batteries, not regenerable at the current extractor pin). The
-hand-written surface carries **zero**, matching upstream Clean, which has none in 44,603 lines.
-A raised ceiling is normally a masked `whnf` blowup, so the required fix is to fold the blowup. The measured record — which surviving overrides are term-intrinsic and what their
-measured floors are — is [`agents/perf-findings.md`](agents/perf-findings.md).
+each entry of which carries a measured floor bracket and the mechanism that makes it irreducible. It is a
+prohibition, not a budget: it does not count sites, and it does not permit a new escape hatch in exchange
+for an old one.
+
+Hand-written Lean carries **zero** `maxHeartbeats`, matching upstream Clean, which has none in 44,603
+lines; the allowlisted sites are generated definitions plus a small number of measured structural
+`maxRecDepth` cases. A blowup is normally a masked `whnf` cost, so the required fix is to fold it, not to
+raise a number: see [`agents/perf-findings.md`](agents/perf-findings.md).
 
 The project-specific patterns are in [`agents/proof-patterns.md`](agents/proof-patterns.md); Clean's own
 `doc/performance-problems.md`, `doc/proving-guide.md`, `AGENTS.md`, and `Clean/Air/README.md` remain the

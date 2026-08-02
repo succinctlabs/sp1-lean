@@ -221,5 +221,5 @@ Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistica
 Explicitly rejected, with reasons: a *global* eval-map `eX` lemma (saves ~1 line/helper while
 re-churning ~36 clean files at form-variation risk); a global `NeZero p` instance (would make the
 pervasive `omit [Fact (2 ^ 17 < p)] in` clauses illegal — an owner decision, not a drive-by);
-`maxHeartbeats` ratcheting as a speedup lever (the *wrong* lever — fold the blowup instead); and
+elaboration-budget directives as a speedup lever (the *wrong* lever — fold the blowup instead); and
 the `unusedArguments` / `docBlame` / `docBlameThm` / `tacticDocs` environment linters.

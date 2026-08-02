@@ -16,14 +16,14 @@ reader-facing docs one level up (start with [`../architecture.md`](../architectu
 ## Index
 
 - [porting-recipe.md](porting-recipe.md) — step-by-step checklist to port a new chip from the Add/Bitwise template: create the four artifacts, wire the root import, verify build + axioms.
-- [proof-patterns.md](proof-patterns.md) — the witnessed-`FormalCircuit` soundness/completeness skeleton; `ZMod p` / `Word` / `circuit_proof_start` landmines; `maxHeartbeats` floors; the `ElaboratedCircuit` field-obligation recipe; the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
+- [proof-patterns.md](proof-patterns.md) — the witnessed-`FormalCircuit` soundness/completeness skeleton; `ZMod p` / `Word` / `circuit_proof_start` landmines; the fold recipes that keep proofs inside the default elaboration budget; the `ElaboratedCircuit` field-obligation recipe; the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
 - [lean-sail-notes.md](lean-sail-notes.md) — the Lean 4.31 migration environment: local dependency pins,
   the Sail platform delta, and the `lake update` toolchain-bump trap.
 - [sail-fork-delta.md](sail-fork-delta.md) — the exact three-line `sail-riscv-lean` platform-configuration
   delta (CLINT/signature/PMP off), its `rfl` disclosure lemmas, and the path to retiring the fork.
 - [extraction.md](extraction.md) — the constraint-extraction pipeline (`sp1-constraint-compiler` → `update_extracted.py` → Lean) and the DSL contract.
 - [cleanup-profile.md](cleanup-profile.md) — binding house rules for `/cleanup` and `/cleanup-all`; overrides the `mathlib-quality` plugin wherever they conflict.
-- [perf-findings.md](perf-findings.md) — the measured elaboration-budget record: the ceiling protocol, the folded-vs-unfolded predictor, the cause classes, and **the table of surviving ceilings with their measured floors** (incl. the five under-provisioned sites).
+- [perf-findings.md](perf-findings.md) — how to avoid an elaboration budget: **the rule** (extract over opaque arguments), the folded-vs-unfolded predictor, the cause classes with their fixes, the diagnostic instrument and measurement traps, and the bar a site must clear before it may be allowlisted.
 - [cleanup-deferred.md](cleanup-deferred.md) — the owner-decision queue: duplication found and deliberately not fixed, grouped by blocker, with measured sizes; plus the 40-entry rename queue (never applied).
 Point-in-time snapshots (regenerate before release) live under [`../snapshots/`](../snapshots/):
 - [../snapshots/axiom-ledger.md](../snapshots/axiom-ledger.md) — the machine-checked `#print axioms` inventory per theorem.

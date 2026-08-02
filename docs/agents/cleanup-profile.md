@@ -25,8 +25,8 @@ Companion reading, in order: Clean's `doc/performance-problems.md` and `doc/prov
 
 | Stock rule | What it does here |
 |---|---|
-| Phase 3.5 / rule 3.7 — delete every `set_option maxHeartbeats`, "no exceptions" | **638** exist in `SP1Clean/`, ratcheted by `scripts/check_heartbeats.sh`. Deleting them fails the build and the guard. |
-| Rule 1.15 — unsqueeze terminal `simp only` → bare `simp` | Exact inverse of this repo's `maxHeartbeats` fold recipe; there is a tested KEEP-set (§5). |
+| Phase 3.5 / rule 3.7 — delete every `set_option maxHeartbeats`, "no exceptions" | **Already satisfied, and enforced.** Hand-written Lean carries none; `scripts/check_option_escapes.sh` fails the build on any `maxHeartbeats`/`maxRecDepth` site not on `scripts/option_escapes_allowlist.txt`. Narrow exception: the allowlisted sites are on *generated* definitions (fix the generator, not the file) plus three measured structural `maxRecDepth` cases. Do not delete an allowlisted site without also removing its allowlist entry. |
+| Rule 1.15 — unsqueeze terminal `simp only` → bare `simp` | Exact inverse of this repo's fold recipe: `simp only` is how proofs stay inside the default budget (§5). |
 | Item 12 (hard gate) — split `∧` statements into `foo_left`/`foo_right` | As stock, it *deletes* a theorem and mints new names. `scripts/gen_axiom_probe.py` resolves its probe targets by **regex over source text**. Adopted here only in additive form (§4). |
 | Item 11 — make single-file declarations `private` | `gen_axiom_probe.py` **skips `private` decls** → silently shrinks the axiom census. |
 | Item 19 (hard gate) — rewrite `≥`→`≤` in statements and hypotheses | Changes statement text. `Faithful/*` are *syntactic* faithfulness anchors. |
@@ -79,8 +79,8 @@ A violation is a defect: revert and re-dispatch.
    > vanishes inside a ~480s build. These files sit at a ~2.2s import floor, so real deltas are
    > compressed; validate your instrument on a known-regressing file before trusting a null result.
    >
-   > **Ordering:** run the omission pass *before* the ceiling pass. A defaulted `output_eq` can
-   > manufacture a fresh ceiling — on `LtChip` it would have re-created the exact 1M just removed.
+   > **Ordering:** run the omission pass *before* any performance pass. A defaulted `output_eq` can
+   > manufacture a fresh blowup that the guard will then reject.
    >
    > **Exception — Prop-valued fields are fair game.** A `Prop`-valued field of a `def`/`instance`
    > (`channelsLawful`, `localLength_eq`, `subcircuitsConsistent`, `output_eq`, and every
@@ -105,13 +105,15 @@ A violation is a defect: revert and re-dispatch.
    > gate builds are ~10 minutes.
 5. **Never introduce** `native_decide` into `SP1Clean/`, or `skipKernelTC` anywhere.
 6. **Never unsqueeze `simp only` → `simp`.** The permitted direction is `simp` → `simp only`, and
-   only outside the KEEP-set (§5).
+   only outside the families in §5 where it is known not to pay.
 7. **Never add mathlib copyright/authors headers.** **Never delete `/-! ## … -/` subsection
    dividers** — this repo uses them structurally inside large files.
 8. **`Faithful/**` and `Native/Operations/*/RawSpec.lean` are conservative-only.** Permitted: drop
    `by exact`, drop a dead `let`, `from by` → `by`. Never restructure proof terms or statement
    forms — they are *syntactic* faithfulness anchors.
-9. **Never raise a `maxHeartbeats` ceiling.** The performance track (§8) only lowers or removes.
+9. **Never add an elaboration-budget directive.** `scripts/check_option_escapes.sh` prohibits any
+   `maxHeartbeats`/`maxRecDepth` site not on `scripts/option_escapes_allowlist.txt`, so a new one is a
+   build failure, not a trade-off. The performance track (§8) fixes causes.
 10. **Never create a top-level `SP1Clean/*.lean` module.** The eight style linters live on the
     *pillar* libs in `lakefile.toml`; the umbrella `SP1Clean` lib carries no `moreLeanArgs`, so a
     module outside a pillar subdirectory would silently escape linting.
@@ -161,11 +163,10 @@ and the original name stays resolvable for `check_report_citations.sh` and the p
 > unfolds**, `by exact` must be treated as deliberate opacity. A/B-time the *downstream* consumers,
 > not just the edited file. Reverting the single hunk restored 260s; nothing else changed.
 >
-> **And the reason it hung instead of erroring:** the blown-up work landed inside
-> `divRemRustAssertionsDecompose`, the one survivor still carrying a **64M** budget — enough to
-> absorb roughly an hour of extra `whnf`. **A high surviving ceiling silently converts a downstream
-> regression from a loud error into a slow build.** This is an argument for the ratchet beyond
-> tidiness: every ceiling lowered makes the next regression louder.
+> **And the reason it hung instead of erroring:** the blown-up work landed inside a declaration then
+> carrying a very large budget — enough to absorb roughly an hour of extra `whnf`. **A raised ceiling
+> silently converts a downstream regression from a loud error into a slow build.** That is the argument
+> for the prohibition beyond tidiness: with no budgets in hand-written Lean, the next regression is loud.
 
 > ### Commented-out legacy proof bodies — the campaign's largest single-file win
 >
@@ -252,9 +253,9 @@ Rules for a new helper:
 
 ---
 
-## 5. The `simp` → `simp only` KEEP-set
+## 5. Where `simp` → `simp only` does not pay
 
-Tested during the 2026-06 campaign, zero speedup — **do not sweep these**:
+Measured at zero speedup — **do not sweep these**:
 
 ```
 SP1Clean/Proofs/Operations/DivRemOperation/Core.lean
@@ -373,7 +374,7 @@ Verify with `lean_goal`, or a build, before removing:
 | — | `lake test` — the `SP1CleanTest` conformance anchors, the only `native_decide` |
 | — | `scripts/run_audit.sh` — zero proof deferrals + the axiom census |
 | — | `scripts/check_report_citations.sh` — **run separately; `run_audit.sh` does NOT invoke it** |
-| — | `scripts/check_no_native_decide.sh`, `scripts/check_no_skipkerneltc.sh`, `scripts/check_heartbeats.sh` |
+| — | `scripts/check_no_native_decide.sh`, `scripts/check_no_skipkerneltc.sh`, `scripts/check_option_escapes.sh` |
 
 Two traps:
 
@@ -394,64 +395,44 @@ Two traps:
 
 ---
 
-## 8. Performance track — investigate, don't ratchet
+## 8. Performance track — fix the cause
 
-638 hand-written `maxHeartbeats` lines on a ladder already in use (200k → 128M), distributed
-`Faithful` 305, `Proofs` 232, `Native` 54, `Soundness` 43, `Model` 3, `Math` 1.
-
-**The lead worth chasing:** `Faithful/` holds 48% of the ceilings but only ~115s of elaboration
-across 50 files, and a median downstream closure of 2. Many of those 8M ceilings are vestigial —
-cheap and safe to lower.
+Hand-written Lean carries **zero** `set_option maxHeartbeats`, and `scripts/check_option_escapes.sh`
+prohibits adding one: any `maxHeartbeats`/`maxRecDepth` site not on `scripts/option_escapes_allowlist.txt`
+fails the build. So a `/cleanup` worker never has a number to lower — the work is diagnosing a slow or
+blowing-up declaration and folding it.
 
 Per site:
 
-1. **Diagnose before touching the number.** Clean's `doc/performance-problems.md` is the authority:
+1. **Diagnose before doing anything else.** Clean's `doc/performance-problems.md` is the authority:
    the whnf-into-expensive-values doctrine (make dangerous values opaque; cross spellings by
    syntactic rewriting, not unification), the nine fix patterns, the kernel-size-cliff completeness
    recipe (`circuit_proof_start_core`), and "keep hypothesis types folded". Then
-   `proof-patterns.md` § "maxHeartbeats: the fold recipe + no-bump discipline". **`#count_heartbeats`
-   lies** — measure from the build log.
-> **`set_option … in` must precede the docstring, not sit between it and the declaration.** Putting it
-> after a `/-- … -/` gives `unexpected token 'set_option'; expected 'lemma'` — and the real damage is
-> that a ladder pass then **silently skips that site's rung**, with no timeout appearing, so the pass
-> reports a clean result for a site it never actually tested. Check placement before trusting a
-> measurement round.
+   `proof-patterns.md` § "Elaboration budgets" and `perf-findings.md` §1 "The rule" (extract over
+   opaque arguments; check what the extraction can still see). **`#count_heartbeats` needs
+   `set_option Elab.async false`** — without it 4.31's async elaboration undercounts by roughly 4×;
+   with it, it gives exact per-declaration totals where a ladder gives only a bracket
+   (`perf-findings.md` §5).
+> **A temporary `set_option … in` used for measurement must precede the docstring, not sit between it
+> and the declaration.** Putting it after a `/-- … -/` gives `unexpected token 'set_option'; expected
+> 'lemma'` — and the real damage is that a ladder pass then **silently skips that site's rung**, with no
+> timeout appearing, so the pass reports a clean result for a site it never actually tested. Check
+> placement before trusting a measurement round, and delete the directive before committing.
 >
-> **Keep a recorded ladder to one line.** A removed ceiling should leave evidence of why removal was
-> safe — but "the former 4000000 ceiling was ~100× over; measured floor ≤40000" is the whole content.
-> Multi-line ladder transcripts belong in the campaign's perf log, not in the source. Several files
-> have grown +3 to +5 lines this way, and across ~200 remaining sites that compounds into a net
-> positive diff for a campaign whose point is reduction.
+> **Keep a recorded ladder to one line.** A fold should leave evidence of why it was safe — but "the
+> former 4M ceiling was ~100× over; measured floor ≤40000" is the whole content. Multi-line ladder
+> transcripts belong in `perf-findings.md`, not in the source.
 >
-> **Never write the literal string `set_option maxHeartbeats` inside a comment or docstring.**
-> `scripts/check_heartbeats.sh` counts sites with a raw `grep -rc "set_option maxHeartbeats"` — it
-> does not parse Lean, so a comment mentioning the option scores as a live ceiling and silently
-> corrupts the ratchet. When recording a measured ladder (which you should), phrase it without the
-> literal: "the former 8M ceiling was ~170× over". Two workers hit this; one caught it, one did not.
-> A pre-existing instance at `Proofs/Sail/Advance.lean:2325` means the 853 baseline has always
-> counted at least one phantom.
+> **Never write the phrase `set_option maxHeartbeats` (or `set_option maxRecDepth`) inside a comment or
+> docstring.** `check_option_escapes.sh` greps for that whole phrase and does not parse Lean, so a
+> comment quoting a directive scores as a live site and fails the build. The bare option name in prose is
+> fine. Phrase a recorded ladder without the directive: "the former 8M ceiling was ~170× over".
 
-> **A declared ceiling's magnitude predicts nothing — in either direction.** `StoreByteChip.circuit`
-> **Five under-provisioned sites have now been found** (headroom <2× against the declared value):
-> `StoreByteChip.circuit`, `ltChip_interactions_faithful`, `divRemRustAssertionsDecompose` (declared
-> 64M, fails at 8M — but correctly sized, at exactly 4× its bracket), and
-> `mulOperation_assertions_{forward,backward}`. The last two are a distinct shape worth watching:
-> **declared at 100000, i.e. *below* the plain 200000 default**, with floors of (40k, 60k] and
-> (40k, 80k] — roughly 1.7× and 1.25× headroom. They cannot be removed and raising is prohibited, so
-> they stand as-is and are the declarations most likely to break on the next toolchain pin. A ceiling
-> below the default is a *tightening*, not a budget, and should be read as a deliberate signal.
->
-> `StoreByteChip.circuit`
-> is declared 2M and *fails at 1,000,000*: under 2× headroom, the campaign's first genuinely
-> under-provisioned site. Its two siblings **in the same file** sit ~40× over their floors. So a
-> large number is not evidence of slack and a small number is not evidence of tightness; only a
-> measured ladder distinguishes them. Do not triage sites by declared value.
->
-> **"Kept" and "correctly sized" are different findings, and only a ladder separates them.** W4/b4
-> kept all 19 of its ceilings *and* found 18 of them oversized — it removed none while cutting the
-> aggregate declared budget 174M → 31.5M (5.5×). A batch that removes nothing has not necessarily
-> failed; report the ratchet separately from the removal count, or a real 5.5× win reads as a
-> zero-yield batch.
+> **A declared budget's magnitude predicts nothing — in either direction.** Sites have been found
+> declared at 64M yet failing at 8M, and declared *below* the 200000 default with floors just under it,
+> while siblings in the same file sat ~40× over. A large number is not evidence of slack and a small
+> number is not evidence of tightness; only a measured ladder distinguishes them. Never triage by
+> declared value, and never conclude a directive is load-bearing from reading the proof.
 >
 > **What predicts removability is the declaration's *role*, not its chip and not its file's family.**
 > Three W4/W5 batches over the *same nine Load/Store chips* settled this. At the
@@ -525,16 +506,15 @@ Per site:
 > `doc/performance-problems.md`'s whnf-into-expensive-values doctrine, measured. **The fix for a
 > binding site is therefore usually to fold, not to lower** — see cause class 1d.
 >
-> Two corollaries that break the sibling screen in both directions: a declared **200000** ceiling is
-> not automatically a no-op (`ltChip_interactions_faithful` fails at 100000 — it sits at the plain
-> default with *zero* headroom, the campaign's second under-provisioned site), and two **adjacent**
-> lemmas over the same 19-cell structure split >25× (`toElements_…` floors in (800k, 1M];
-> `getElem_toElements_…` clears 40000).
+> A corollary that breaks the sibling screen: two **adjacent** lemmas over the same 19-cell structure
+> can split >25× (`toElements_…` floors in (800k, 1M]; `getElem_toElements_…` clears 40000). Nor is a
+> declaration sitting at the plain default automatically cheap — some clear it with no headroom at all.
 >
 > **A floor measured through the LSP is not a floor against the gate.** The `lean-lsp` server does
 > not apply the pillar libs' `moreLeanArgs`, the same reason `lake env lean` cannot certify a pass
-> (§7). So when KEEPING a ceiling, set it at roughly **4× the measured floor bracket**, not at the
-> bare lowest passing rung — a 1× margin is measured under weaker options than the build will use.
+> (§7). So on the rare occasion a site earns an allowlist entry, size its value at roughly **2–4× the
+> measured floor bracket**, not at the bare lowest passing rung — a 1× margin is measured under weaker
+> options than the build will use.
 > Removal is unaffected: a site that clears ≤40000 against a 200000 default has ≥5× headroom either
 > way.
 >
@@ -550,8 +530,8 @@ Per site:
 >
 > `MulChip/Formal.lean` is the worked example: `soundness`/`completeness` are `whnf`-bound while
 > `circuit` is `«abstract nested proofs»`-bound, so the file is neither term-intrinsic like
-> `RawSpec.full_product` nor codegen-bound like `MulOperation/Defs.lean` — and its three ceilings
-> needed three different justifications despite sitting in one file.
+> `RawSpec.full_product` nor codegen-bound like `MulOperation/Defs.lean` — and its three expensive
+> declarations needed three different diagnoses despite sitting in one file.
 >
 > **Caveat, measured at n=56: the phase name MOVES WITH THE RUNG.** Two `Faithful/BranchChip.lean`
 > survivors reported different phases at the control rung than at the binding rung. So the phase is a
@@ -566,7 +546,7 @@ Per site:
 > controlled result, and it is what confirms the folded-vs-unfolded predictor rather than merely
 > illustrating it — the 322 removed lines were all bullet tactics, while the real cost sat in the
 > 121-hole `refine` over an unfolded `ownAsserts`. Report the before/after bracket whenever a golf
-> exceeds ~20% of a ceilinged file; "the floor did not move" is a finding, not a null result.
+> exceeds ~20% of an expensive file; "the floor did not move" is a finding, not a null result.
 > (Elaboration still improved 9.39s → 7.26s, so cheap work was removed — just not the binding work.)
 >
 > **Watch for half-finished refactors; they are a reliable tell.** Three W5 files carried a hoist the
@@ -591,151 +571,60 @@ Per site:
 > **valid but wrong** Lean option — instead of removing the lines. It failed no build and raised no
 > error; only the worker's own post-pass grep caught it. Use `w5b1_rung.py`, not `rung.py`.
 
-### Cause classes, most valuable first
+### Cause classes
 
-**1. Search duplication in a `first | … | …` ladder.** The largest single win of the campaign:
-`ShiftRightChip/Dispatch.lean` went **1591 → 861 lines (−730)** and shed all 12 of its ceilings.
-Each lemma did `rcases` into 16 goals `<;> first | exact close 0 65536 … | exact close 1 32768 … |`
-… `| 15 …`. `first` restarts the ladder for every goal, and the matching alternative sits at
-`bitreverse4(goal index)`, so ~8 alternatives per goal were elaborated *all the way through their
-`rw […]; push_cast; ring1` side conditions* and then discarded — ≈128 wasted `ring1` per lemma,
-≈1500 across the file. That was the entire ceiling. The fix is inside the proof bodies: `rcases …
-with rfl | rfl` (substituting makes the side-condition blocks uniform across all 16 cases), hoist the
-fixed arguments into one local `have key := fun …` instead of repeating them 16×, and replace the
-`first` ladder with **ordered bullets**, one per goal. Whenever you see `<;> first |` over many goals,
-suspect this before anything else.
+**The canonical list is [`perf-findings.md`](perf-findings.md) §3** — the `first | … | …` search
+ladder, permutative-`simp` term ordering over a dependent cast, `simp_all` under
+`circuit_proof_start`, `set` over a large term, spent hypotheses left in context, LCNF-compiler-bound
+sites, duplicated `.val`-bridge facts, repeated per-index bridge lemmas, and `congr` chains peeling a
+right-nested `List.append`. Read it there; each class comes with its fix. Do not re-derive a class
+here — record a genuinely new one in `perf-findings.md`.
 
-> **First check whether the ladder is just `assumption`.** If every alternative is a bare context
-> reference (`first | exact h0 | exact h1 | … | exact h15` over `interval_cases`-generated goals), the
-> whole thing collapses to plain **`assumption`** — one token, no restart-from-top duplication, and it
-> *removes* lines rather than adding them. This is strictly cheaper than the ordered-bullets rewrite
-> below, which costs roughly +14 lines per site. Measured on `MulOperation/Formal.lean`, where it also
-> retired two 211-codepoint lines and verified at a *lower* rung than the site needed pre-fix. Only
-> reach for ordered bullets when the alternatives are genuine tactic blocks with side conditions.
->
-> **Sorting the ladder does not help — only bullets do.** `ShiftRightChip/Core.lean`'s `cb_aux`
-> ladder was *already* in goal order (0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15 — which independently
-> confirms the bit-reversal permutation) and still paid the full 120 wasted alternatives, because
-> `first` restarts from the top for every goal regardless of ordering. Do not try the cheap fix.
->
-> **A `have key := fun … =>` binding has no expected type**, so named arguments like `(cb4 := cb4)`
-> become mandatory where `exact` did not need them. Giving `key` an explicit `∀` type avoids the trap
-> entirely, and is the better habit.
+Two `/cleanup`-specific notes that go with those fixes and are not in §3:
 
-**Reading a timeout's location.** A `(deterministic) timeout at whnf` is reported at **column 1 of a
-signature**, which is not necessarily the declaration you think failed. `ShiftRightChip/Core.lean`'s
-binding site was recorded once as `sra_close_su16_3_case` and is actually `srlw_within_byte_shift`;
-pinning that single lemma leaves ~42 of the file's 43 declarations clean at the plain default. Always
-confirm which declaration owns the reported line before concluding a whole file needs a budget — and
-prefer a **scoped `set_option … in` on the one lemma** over a file-scoped ceiling.
+- **When you replace a `first` ladder with ordered bullets, a `have key := fun … =>` binding has no
+  expected type**, so named arguments like `(cb4 := cb4)` become mandatory where `exact` did not need
+  them. Give `key` an explicit `∀` type and the trap disappears.
+- **Check whether a `set`'s binding is actually used** before assuming it is load-bearing. A dead
+  `with h` is common — downstream `show … = _ from key k` steps often read their RHS off some other
+  local entirely.
 
-Two refinements, both measured:
+(The sibling-analogue heuristic and the "a cause class rarely explains a whole file" rule now live in
+`perf-findings.md` §3 and §5 respectively.)
 
-- **At very low rungs the error is reported at the shared `variable` line**, which is useless for
-  attribution. Separate ownership by laddering the sites at *different* rungs until each failure
-  lands inside a declaration body.
-- **Re-ladder after fixing a cause — the owner moves.** `SailWrap.lean`'s ceiling was owned by two
-  lemmas before its `acLt` fix and by a completely different third lemma afterwards. A floor measured
-  before the fix tells you nothing about the file after it.
+> **Reading a timeout's location** (see `perf-findings.md` §5 for the general rule). Confirm which
+> declaration owns the reported line before concluding a whole file is the problem, and scope any
+> measurement directive to the one declaration rather than the file.
 
-**1b. Permutative-`simp` term ordering over a dependent cast.** A **permutative** `@[simp]` lemma
-(`a ∘ b = b ∘ a` shaped — here `Std.ExtDHashMap.insert_insert_comm` in `Math/Misc.lean`) makes `simp`
-decide the rewrite direction with `Lean.Meta.acLt`, whose cost scales with the size of the compared
-arguments. When one argument is a `▸` cast whose proof is a wide `match` (`reg_idx_must_64 idx ▸ val`,
-a 31-arm match), that comparison dominates everything. It presents as an opaque
-`(deterministic) timeout at «Lean.Meta.acLt»` **with no hint of which simp lemma is responsible** —
-the tactic looks innocent. Diagnostic: find a sibling lemma doing the same rewrite *without* the
-cast; if it passes at the default, the cast is the cost. Fix inside the proof body: `unfold`, then
-`generalize` the cast away, then run the original tactic. This was `Model/SailWrap.lean`'s entire
-ceiling, and the lemma is tagged globally, so the hazard reaches every `simp` over that head symbol.
-
-**1d. `simp_all` under `circuit_proof_start` — and the one place the sibling screen mis-predicts.**
-A single `simp_all` closing a small goal against the *entire* post-`circuit_proof_start` context can own
-a whole file's budget. `DivRemOperation/Compare.soundness` spent 4M on one `simp_all` closing a
-four-case numeral goal; narrowing it to `rcases … <;> rw [hrcmGate, hz, hv] <;> simp` took the floor
-from (40000, 100000] — a keep-and-lower — down past 40000, making the site removable.
-
-> **This is the known false negative for the sibling screen.** The *byte-identical* `simp_all` block in
-> that file's `completeness` cleared the same rung, because that proof destructures less context. So
-> two sites with identical tactic text can have very different floors, and an unceilinged sibling
-> running the same tactic is **not** evidence the ceilinged one is vestigial. When the suspect tactic
-> is context-sensitive (`simp_all`, `omega` over a large hypothesis set, `aesop`), measure rather than
-> screen.
->
-> **The high-yield instance: an inline obligation with no chip content.** In the load `Bridge.lean`
-> files, `advance_of_load_width{1,2,4}`'s `hpin` obligation was discharged inline as
-> `by intro w' u' h; simp only [loadOpcode] at h; cases u' <;> split_ifs … <;> simp_all [...]` — a
-> `simp_all` against the whole post-`obtain` `advance` context, twice per file across six places.
-> The obligation is a pure `loadOpcode` fact about loose `isU`; it never needed the context at all.
-> Extracting it as a `private lemma` (§4a) moved all three sites from **FAIL at 400000 to PASS at
-> ≤40000**, over 100×, and turned three "genuinely binding" ceilings into removable ones.
-> **`Model/Semantics/Decode.lean` already owned the exact `storeOpcode_pin_one` analogue — only
-> `loadOpcode` lacked one.** When an inline `by …` obligation mentions none of the surrounding
-> circuit's variables, that asymmetry *is* the cost; look for a proved sibling before measuring.
-
-**1e. A `set` over a large term is an `isDefEq` abstraction across the whole goal.**
-`set x := <big populate tower> with h` forces an abstraction pass over everything in scope, and on a
-witness-tower goal that alone can own the budget. `BitwiseChip.completeness` failed at 1M **at the
-`set` line**; deleting it took the same proof from FAIL@1M to PASS@1M — and the `with hR` binding was
-dead, with the downstream `show … = _ from key k` rules reading their RHS off `key` instead. Check
-whether a `set`'s binding is actually used before assuming it is load-bearing; a bare `set` for
-readability on a large term is a perf hazard.
-
-**1c. LCNF-compiler-bound, not elaboration-bound — check *which phase* times out.** A budget can be
-spent on **code generation** rather than on proving. `Native/Operations/MulOperation/Defs.lean`'s
-`def main` elaborates fine at 40000; the failure is `(deterministic) timeout at «LCNF compiler»`,
-reported at the `def main` line, over sixteen giant schoolbook product expressions. Two consequences:
-
-- **None of the fold recipes apply.** Opaque values, folded hypothesis types, `circuit_output_eq` —
-  all of them target elaboration, and there is no tactic here to fold. Do not burn passes on them.
-- **`noncomputable def` is *rejected*, not deferred.** It would remove the compiled body, and
-  `SP1CleanTest/TraceGenTests` derives whole-chip traces from the chips' own `main` witness closures
-  under `native_decide`. Dropping the code would plausibly break `lake test`.
-
-Such a site is **lowered, not removed**, and deliberately keeps more headroom than an elaboration-bound
-one (~6.7× rather than the usual ~5×), because code-generation cost is more load-sensitive. Read the
-phase name in the timeout before classifying anything.
-
-**2. A duplicated `.val`-bridge fact — a raised ceiling as proxy, not term-intrinsic cost.** Look for the repeated `have` before you touch the
-number. `ShiftLeftChip/Core.lean` carried 16 ceilings; its SLLW half was re-deriving `mul_v_val` /
-`hi_lo_val` / `mul_v_add_val` by hand while the SLL half *in the same file* already called them, and
-two residual `nlinarith` calls were re-proving `< 65536` limb bounds that
-`Math/ShiftBounds.lo_hi_lt` already proves once over loose variables. Fixing the
-duplication dropped 26 `nlinarith` to 3 and made **all 16 ceilings removable**. That is the
-difference between raising a budget and driving the proof to closure.
-
-**Screen on what `main` composes, not on which family the file belongs to.** This is the single most
-useful predictor found, and it corrects an assumption that held for most of the campaign. The
-`Proofs/Chips/*/Formal.lean` family is **not uniform**: the ALU chips went **8 of 11 removed**, every
-removal clearing ≤40000 on the first pass, while the jump/U-type chips in the same family went
-**0 for 4**. The discriminator is structural — `JalrChip` composes *two* witnessed `AddOperation`
-gadgets plus `ITypeReader` plus `RegisterWrite`, and `UTypeChip`'s `AddOperation` addend is itself
-witnessed. `JalrChip`'s two sites floor at **(2M, 4M]** against a declared 8M: about 2×, the
-tightest in the tree, and correctly sized all along.
+**Screen on what `main` composes, not on which family the file belongs to.** The
+`Proofs/Chips/*/Formal.lean` family is **not uniform**: its ALU chips clear ≤40000 on a first pass while
+its jump/U-type chips do not come close. The discriminator is structural — `JalrChip` composes *two*
+witnessed `AddOperation` gadgets plus `ITypeReader` plus `RegisterWrite`, and `UTypeChip`'s
+`AddOperation` addend is itself witnessed; `JalrChip`'s two sites floor at **(2M, 4M]**, among the
+highest in the tree.
 
 So: count the witnessed sub-gadgets `main` composes before predicting anything. A file in a
-"family that removes cleanly" can still be genuinely binding, and a whole wave's expectation should
+"family that folds cleanly" can still be genuinely expensive, and a whole round's expectation should
 not be set by its directory.
 
 **Lead with the sibling-comparison screen — it is nearly free, and it predicts *both* answers.**
 Before laddering anything, find a declaration in the same file (or its mirror file) that does the same
-kind of work and carries **no** ceiling, then ask whether it does *more* or *less* work than the
-ceilinged one. `MulOperation/RawSpec.lean` ran two screens that **split**, and both calls were right
-before a single rung: `full_product` vs the unceilinged `low_half` does 16 columns rather than 8
-(256 monomials vs 64, coefficients to `2^120` vs `2^56`) → predicted **real**, confirmed;
-`high_half_eq` vs the unceilinged `product_reassembly`, which does strictly *more* work → predicted
-**vestigial**, confirmed. So the screen is not merely a vestigial-detector; an unceilinged sibling
-doing *less* work is evidence the ceiling is genuine. Worked cases: `SailWrap`'s
+kind of work and is **cheap**, then ask whether it does *more* or *less* work than the expensive one.
+`MulOperation/RawSpec.lean` ran two screens that **split**, and both calls were right
+before a single rung: `full_product` vs the cheap `low_half` does 16 columns rather than 8
+(256 monomials vs 64, coefficients to `2^120` vs `2^56`) → predicted **irreducible**, confirmed;
+`high_half_eq` vs the cheap `product_reassembly`, which does strictly *more* work → predicted
+**foldable**, confirmed. So the screen is not merely a slack-detector; a cheap sibling
+doing *less* work is evidence the cost is real. Worked cases: `SailWrap`'s
 `Sail.writeReg_writeReg_comm` — same tactic, same hashmap comm step, no dependent cast — passes at the
 default and pinpointed the `acLt` cause; `Faithful/CPUState.lean`'s third interaction anchor does
-strictly *more* work than the two ceilinged ones (same `hbk`, same binding hypotheses, plus a 4-entry
-`List.Perm` instead of a filtered `=`) and has never carried a ceiling — which correctly predicted
-both floors at ≤2500 against a declared 1M.
+strictly *more* work than the two expensive ones (same `hbk`, same binding hypotheses, plus a 4-entry
+`List.Perm` instead of a filtered `=`) and is cheap — which correctly predicted both floors at ≤2500.
 
-**Declared magnitudes are uninformative.** Across ~100 measured sites the declared value has never
-correlated with the true floor: 16M families flooring at ≤40k, 8M at ≤20k, 1M at ≤1500, and the
-highest-floor file in a batch carrying the same number as the lowest. Treat the number as evidence of
-nothing but a copy-paste.
+**Where you do meet a declared budget — in a generated module, or an allowlist entry — its magnitude
+is uninformative.** Across ~100 measured sites the declared value never correlated with the true
+floor: 16M families flooring at ≤40k, 8M at ≤20k, 1M at ≤1500, and the highest-floor file in a batch
+carrying the same number as the lowest. Treat the number as evidence of nothing but a copy-paste.
 
 **Batch whole files, and use the rung itself as the label.** Separating ownership requires laddering
 sites at *distinct* rungs — but the timeout message **embeds the rung it hit**, so giving each
@@ -746,10 +635,11 @@ pass. Measured: `Faithful/ChipOracle.lean` settled **11 sites in 6 passes (0.55 
 
 **The file protocol** — usually *one* round-trip after the control:
 
-Set **every** ceiling in the file to a distinct rung, all of them **≤ 40000**, and elaborate once.
-Everything that passes is removable: a site passing at ≤40000 *implies* it passes at the plain 200k
-default with ≥5× headroom, so there is nothing left to check. Only the sites that fail need a
-staggered follow-up, and those can again be batched by distinct rung.
+Give **every** candidate declaration in the file a temporary scoped rung, all of them **≤ 40000**, and
+elaborate once. Everything that passes is settled: a site passing at ≤40000 *implies* it passes at the
+plain 200k default with ≥5× headroom, so there is nothing left to check. Only the sites that fail need
+a staggered follow-up, and those can again be batched by distinct rung. Delete every temporary
+directive before committing — the guard rejects them.
 
 > **Use distinct rungs at *one* magnitude — `40000, 39999, 39998, …` — not rungs spread across
 > decades.** The rung is only a *label* in this pass; spreading them across magnitudes conflates "which
@@ -757,12 +647,10 @@ staggered follow-up, and those can again be batched by distinct rung.
 > with unique labels answers the only question the pass poses — *does this site clear 40000?* — for
 > every site simultaneously. `Advance.lean` settled **34 sites in a single pass** this way.
 >
-> **Measure a file-scoped ceiling separately from the scoped `… in` ones.** A file-scoped
-> `set_option maxHeartbeats N` (no `in`) covers *every* declaration in the file, so it cannot take a
-> distinct rung alongside the scoped sites — doing so makes every unceilinged declaration fail at one
-> indistinguishable rung. Do the scoped sites first at uniform labels, then remove them and give the
-> file-scoped one the whole file at a single rung. `Advance.lean`'s file-scoped 4M turned out to be
-> owned by exactly one tactic call.
+> **A file-scoped directive cannot be laddered alongside scoped ones.** Written without `in`, it covers
+> *every* declaration in the file, so it cannot take a distinct rung — doing so makes every other
+> declaration fail at one indistinguishable rung. Do the scoped sites first at uniform labels, then
+> remove them and give the whole file a single rung.
 
 > Earlier guidance here described a two-pass form — delete-all, then 40000-all. **Pass A is redundant
 > whenever pass B passes in full**, since the ≤40000 result already subsumes it. Keep the delete-all
@@ -780,31 +668,23 @@ wider than it first appears (`ChipOracle`'s eleven ran ≤500 to 30000, a 60× s
 > positions stayed fixed. Trust a signature position for attribution; treat a secondary in-body
 > position as a hint only, and re-run before concluding which declaration owns a budget.
 
-- **Where a site fails is an ATTRIBUTION tool, not a floor predictor.** It has now been wrong twice in
-  the same direction, so treat it narrowly: a failure position tells you *which declaration or tactic
-  owns the budget*, and nothing reliable about *how large* that budget is.
-  `Faithful/LtOperationUnsigned.ltUnsigned_constraints_faithful` failed at an in-body tactic position
-  (`itauto`) and floors at **~60000** — the highest floor measured anywhere in `Faithful/`, against a
-  heuristic that predicted hundreds-to-low-thousands. Always ladder; never infer a magnitude from a
-  position.
+- **Where a site fails is an ATTRIBUTION tool, not a floor predictor.** It has been wrong in both
+  directions, so treat it narrowly: a failure position tells you *which declaration or tactic owns the
+  cost*, and nothing reliable about *how large* that cost is. A site failing inside a tactic line can
+  have the highest floor in its directory. Always ladder; never infer a magnitude from a position.
+- **The sibling screen is a reliable *ranker*, not a verdict.** It can order a namespace's sites by
+  floor with zero measurements — but the one it flags "plausibly irreducible" is routinely still tens
+  of times cheaper than it looks. Use it to prioritise and to predict *relative* cost; never to declare
+  a site irreducible without a ladder.
 
-  The original over-claim, kept for context: *sites failing at their **signature** are the
-  high-floor ones; sites failing inside a **tactic line** floor in the hundreds-to-low-thousands and
-  mask nothing. In `ChipOracle` this sorted all eleven correctly.
-- **The sibling screen is a reliable *ranker*, not a keep/remove oracle.** It ordered all eleven
-  `ChipOracle` sites by floor with zero measurements — but the group it flagged "plausibly genuine"
-  (the only one with no unceilinged comparable sibling) was still ~40× over-provisioned. Use it to
-  prioritise and to predict *relative* cost; never to decide removal without a ladder.
+2. **Classify the cause** against `perf-findings.md` §3, and record any class not already documented —
+   new ones are expected. This repo's other recurring shapes: unfolded expensive value (the
+   `circuit_output_eq` fold), unfolded hypothesis type, over-broad simp set, missing normalization
+   lemma, metavariable normalization at a decoded row, a `rfl`-check cliff.
+3. **Fix the cause, then confirm at the default.** The target is always the plain 200000 default; a
+   fix that only moves a bracket has not finished. Re-measure with no elaboration-time regression.
 
-2. **Classify the cause**, and record any cause not already documented — new ones are expected.
-   Known classes: unfolded expensive value (the `circuit_output_eq` fold), unfolded hypothesis type,
-   over-broad simp set, missing normalization lemma, metavariable normalization at a decoded row,
-   a `rfl`-check cliff.
-3. **Fix the cause, then lower the ceiling.** Try removal first, then the next lower rung. Keep the
-   lowest rung that compiles **with no elaboration-time regression**.
-
-**Two methodology rules, both learned the hard way in this campaign — a ladder search that skips
-either one produces wrong answers:**
+**Two methodology rules — a ladder search that skips either one produces wrong answers:**
 
 - **Always run a control at `maxHeartbeats 1`** and confirm it produces real timeout errors. Without
   it, a "pass" at a low rung may be a cached LSP result rather than a genuine re-elaboration, and you
@@ -814,23 +694,23 @@ either one produces wrong answers:**
   dependents' true floors are invisible and they read as "binding" when they may be hundreds of times
   over. Pin the producer high, ladder the dependents separately, then ladder the producer.
   `DivRemOperation/OwnAsserts.lean` is the worked case: `def ownAsserts` masked twelve
-  `*_mem_ownAsserts` theorems that all turned out to have floors ≤20k against a declared 8M.
-  A naive ladder **under-removes** here; it does not produce unsound results, just timid ones.
+  `*_mem_ownAsserts` theorems that all turned out to have floors ≤20k.
+  A naive ladder **under-reports** here; it does not produce unsound results, just timid ones.
   > **Masking is rung-dependent — never conclude "no masking" from one low rung.**
   > `MulOperation/RawSpec.full_product` masks or does not mask depending where you probe: at 200k/400k
   > it fails *inside* its tactic block, gets added `sorry`'d, and its dependents stay visible; at 1M
   > the failure moves to `whnf` at the **signature** and both dependents cascade to
   > `(kernel) unknown constant`. Check for masking at the rung you actually intend to use.
-4. **Budget.** Full ladder search only where the module elaborates <10s in isolation (79% of modules
-   are <3s). On the heavies, change a ceiling only when the golf pass already altered that proof,
+4. **Budget your own time.** Full ladder search only where the module elaborates <10s in isolation
+   (79% of modules are <3s). On the heavies, touch a proof only when the golf pass already altered it,
    and always in a solo batch.
 
 **`simp only` root-cause pass** (replacing the dropped rule 1.15): where a `simp only` carries a
-long explicit lemma list or sits next to a raised ceiling, classify it — over-broad simp set / a
+long explicit lemma list or sits in an expensive declaration, classify it — over-broad simp set / a
 lemma that should be `@[simp]` or `@[circuit_norm]` / a missing normalization lemma / a fold that
 should be a `rfl`-helper — and fix the cause when it is cheap and local. This repo's own precedent
 is that the right lever is usually a missing `@[circuit_norm]` `rfl`-lemma (`channelsWith*_eq`,
-`localLength_eq`, `circuit_output_eq`), not a bigger ceiling. Non-local findings go to
+`localLength_eq`, `circuit_output_eq`). Non-local findings go to
 `DEFERRED.md`.
 
 Findings are logged to `docs/agents/perf-findings.md`.
@@ -1026,7 +906,7 @@ Per gated group, stopping at the first failure:
    means run 1 never persisted that olean, so run 1 was **not** a pass. On heavy groups also compare
    run 1's wall clock to the recorded baseline — a **>1.5×** regression fails even when green.
 6. **Source guards** — `check_no_native_decide.sh`, `check_no_skipkerneltc.sh`,
-   `check_heartbeats.sh` (may only ratchet **down**).
+   `check_option_escapes.sh` (elaboration-budget directives are prohibited off the allowlist).
 > ### ⚠ `lake env lean` does NOT rebuild edited dependencies — it checks against stale oleans
 >
 > This is the campaign's preferred per-file verifier (it applies the pillar's `moreLeanArgs`, which
