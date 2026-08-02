@@ -329,15 +329,84 @@ theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (off
       exposedMemoryInteractions input offset := by
   simp [exposedMemoryInteractions]
 
--- Genuine budget, and the tightest in the file: the measured floor is (1500000, 1750000], so the
--- declared value has only ~1.14x headroom. It is owned entirely by `requirementsChannelsLawful`
--- below (46 of this file's 54 s; stubbing that one field drops the file to 8.2 s), and within it by
--- the single `main` entry in the `simp only` set — dropping `main` alone drops the file to 8.4 s.
--- `grind` is free (removing it changes nothing) and `exposedChannels_eq` is ~1 s. The fix is not a
--- smaller budget but a proof that never unfolds `main` under the whole `circuit_norm` set: see
--- `JalrChip`'s three-part `refine` over `Operations.RequirementsChannelsLawful` with targeted
--- structural simp sets, and `ShiftRightChip.requirementsChannelsLawful_main`.
-set_option maxHeartbeats 2000000 in
+/-- Clean's channel-requirement law for `main`, hoisted out of the `circuit` bundle.
+
+The `circuit` bundle used to carry a 2M ceiling (measured floor `(1500000, 1750000]`, ~1.14x
+headroom) owned entirely by this one field: its old proof was `simp only [circuit_norm, main, …]`,
+and letting the full `circuit_norm` set loose on the *unfolded* operation list cost 46 of the
+file's 54 s (dropping the single `main` token took the file to 8.4 s; `grind` was free).
+
+Proved here instead by `JalrChip`'s three-part `refine` over `Operations.RequirementsChannelsLawful`:
+`main` is still unfolded, but only against targeted structural lemma sets
+(`Circuit.bind_def` / `Operations.subcircuitChannelsWithRequirements_*` /
+`Operations.shallowChannels_*` / `Operations.shallowInteractions_*`) plus each child's
+`channelsWithRequirements_eq`. Measured cost: 16.6k heartbeats — a 12x margin under the default,
+and the file no longer needs any ceiling at all. -/
+private theorem requirementsChannelsLawful_main (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).RequirementsChannelsLawful
+      (elaborated (p := p)).channelsWithGuarantees
+      [stateChannel.toRaw, memoryChannel.toRaw] := by
+  have h_byte : (byteChannel (p := p)).toRaw ∈
+      (elaborated (p := p)).channelsWithGuarantees := by
+    simp only [circuit_norm]
+  dsimp only [Operations.RequirementsChannelsLawful]
+  refine ⟨?_, ?_, ?_⟩
+  · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+      subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
+      HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
+    simp only [Operations.subcircuitChannelsWithRequirements_append,
+      Operations.subcircuitChannelsWithRequirements_subcircuit,
+      Operations.subcircuitChannelsWithRequirements_assert,
+      Operations.subcircuitChannelsWithRequirements_interact,
+      Operations.subcircuitChannelsWithRequirements_nil,
+      GeneralFormalCircuit.toSubcircuit_channelsWithRequirements,
+      FormalAssertion.toSubcircuit_channelsWithRequirements,
+      Readers.CPUState.channelsWithRequirements_eq,
+      Readers.ITypeReaderImmutable.channelsWithRequirements_eq,
+      AddressOperation.circuit, Readers.MemoryAccess.circuit,
+      Gadgets.Equality.channelsWithRequirements_eq, List.nil_append, List.append_nil]
+    simp only [List.cons_append, List.nil_append, List.subset_def, List.mem_cons,
+      List.not_mem_nil, or_false]
+    tauto
+  · intro channel h_channel
+    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+      subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
+      HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
+      Operations.shallowChannels_append, Operations.shallowChannels_subcircuit,
+      Operations.shallowChannels_assert, Operations.shallowChannels_interact,
+      Operations.shallowChannels_nil, List.nil_append] at h_channel
+    simp only [ChannelInteraction.toRaw_channel, List.mem_append, List.mem_singleton,
+      List.not_mem_nil, or_false] at h_channel
+    rcases h_channel with rfl | rfl <;> exact Or.inl h_byte
+  · intro env h_constraints
+    have hshallow := h_constraints
+    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+      subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
+      HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
+      ConstraintsHold.Shallow, Operations.forAllNoOffset_append,
+      Operations.forAllNoOffset, true_and, and_true, eval_sub,
+      Expression.eval] at hshallow
+    have h_bool : Expression.eval env input.is_real = 0 ∨
+        Expression.eval env input.is_real = 1 := bool_of_mul_pred hshallow
+    have h_bool' : (ProvableStruct.eval env input).is_real = 0 ∨
+        (ProvableStruct.eval env input).is_real = 1 := by
+      simpa only [circuit_norm] using h_bool
+    rw [Operations.inChannelsOrRequirements_iff_forall_mem]
+    intro interaction h_interaction
+    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
+      subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
+      HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
+      Operations.shallowInteractions_append, Operations.shallowInteractions_subcircuit,
+      Operations.shallowInteractions_assert, Operations.shallowInteractions_interact,
+      Operations.shallowInteractions_nil, List.nil_append,
+      List.mem_append, List.mem_singleton, List.not_mem_nil, or_false] at h_interaction
+    rcases h_interaction with rfl | rfl <;>
+      right <;>
+      rw [ChannelInteraction.toRaw_requirements] <;>
+      intro h1 h0 <;>
+      simp only [circuit_norm] at h1 h0 <;>
+      exact off_gate_vacuous h_bool' h1 h0
+
 /-- The `StoreByte` chip row as a `GeneralFormalCircuit`; output is the extracted `Columns`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   -- `byteChannel` dropped (W11 Phase 0c): the two off-gate byte-pull `Requirements` (register/mem U8 pairs)
@@ -348,10 +417,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
     channelsWithRequirements :=
       [stateChannel.toRaw, memoryChannel.toRaw],
     soundness := soundness, completeness := completeness,
-    requirementsChannelsLawful := fun input_var i₀ => by
-      simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
-        AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit,
-        Readers.MemoryAccess.circuit]; grind,
+    requirementsChannelsLawful := requirementsChannelsLawful_main,
     exposedChannels := fun input offset =>
       expose stateChannel
         [ stateChannel.pulledIf input.is_real

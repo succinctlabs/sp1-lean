@@ -1212,3 +1212,48 @@ pattern-matches. Eight concrete-index defeq checks collapse to one at an opaque 
 the proof body alone with the type retained. If the second ablation does not move the bracket, no amount of
 work on the proof will help, and the fix has to change how the statement is *spelled*. This distinction is
 invisible to the phase name and to the counters, both of which just say "whnf".
+
+---
+
+## 12. The one rule that carried every fix: extract over **opaque** arguments
+
+Five sites were remediated in the P4 follow-up by five superficially different edits. They are the same
+edit. In each case a value that should have stayed abstract was reaching a step that had to unfold it, and
+the fix was to put an opaque variable between the two — never to make the expensive step cheaper.
+
+| site | where the cost actually was | the fix |
+|---|---|---|
+| `Faithful/AluX0` | the **context**, not the goal — the goal was already value-level after the `rw` block; `hReaderList` still mentioned `(…main …).operations offset`, and `tauto` reverts and normalises everything | `clear` the three spent circuit-valued hypotheses. Floor moved 25× |
+| `Faithful/BitwiseChip` | the **spelling of a definition** — a struct *literal* forced `toElements` through `componentsToElements` | build it with `fromElements` instead, so `toElements_fromElements` fires in one step |
+| `BitwiseChip.completeness` | a `have`'s **type**, not its proof — `(populate …).field[k]` in a statement forces whnf through a `let`-bundle, once per concrete `k` | restate over an opaque struct so the projection is inert; apply with no written-out type. 22× |
+| `JalrChip` | the **order** of two pipeline steps — `provable_struct_simp` ran after `main` had been unfolded into `h_holds` | hoist it above the unfold, so the fixpoint sees the folded context. 1000× on that step |
+| `DivRemChip/Evidence/Signed*` | 24 `rw [gate] at e; linear_combination e` pairs, each renormalising a ~115-hypothesis context | one 3-line opaque-argument lemma applied as a **term**. Beat both planned hoists combined |
+
+**The corollary that keeps being learned the expensive way:** extracting a block *within* the same proof
+buys nothing. The DivRem family had a recorded negative result — "extracting the componentwise `Vector.ext`
+sweep into its own lemma moved nothing" — which was used for months as evidence that the site was
+irreducible. It was extracted into a `have` inside the branch, so it kept the whole branch context. The same
+extraction to a lemma over opaque arguments is what paid.
+
+So when an extraction "doesn't help", check *what the extracted thing can still see* before concluding the
+cost is intrinsic.
+
+### And the meta-rule: a correlate found by reading code predicts nothing
+
+Four structural hypotheses were promoted during this campaign on the strength of code-reading, and all four
+were corrected or refuted by measurement:
+
+1. **Missing `channelsWithGuarantees_eq` rfl-lemmas force tower-unfolding.** Refuted — those proofs carry no
+   ceilings at all, and `MulChip` has the rfl-lemma *and* the ceiling.
+2. **`*_eq_*Channel_false` losing the match to `Channel.toRaw_ext_iff`.** Real mechanism, correctly
+   diagnosed — but it reaches **zero** of the sites that carry a ceiling. Promoted twice before that was
+   checked.
+3. **The `elaborated`-field correlate** (n=2, and upstream's own documented rule). Tested on Jalr:
+   **0.008% delta**, noise.
+4. **The 122 byte-identical duplicated lines in the DivRem signed pair** (verified by `diff`, so the
+   duplication was certainly real). Removing them got to 224836 against a 200000 target — not a fix. The
+   lever that closed it was a three-line lemma nobody had noticed.
+
+Note that #2 and #4 were *correct diagnoses of real phenomena* that simply were not the cost. That is the
+trap: a mechanism can be genuine, verifiable, and irrelevant. **Ladder before you believe it, including —
+especially — when you found it yourself.**

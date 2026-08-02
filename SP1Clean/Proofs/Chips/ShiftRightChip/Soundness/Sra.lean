@@ -23,16 +23,26 @@ def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZM
       Word.toBitVec64 cols.a = RV64.sra (Word.toBitVec64 input.adapter.op_c_memory.prev_value)
         (Word.toBitVec64 input.adapter.op_b_memory.prev_value))
 
--- Genuinely binding, but the former 1.6M ceiling was ~6x over: measured floor bracket
--- (220000, 250000]; sized at 4x the bracket top. Diffuse cost, not a whnf runaway -- the phase is
--- `isDefEq` and the top reduction counter is only ~13k (cf. the 382k of a real tower); it is the
--- ~130 `linear_combination`/`push_cast` branches of the sign-extension dispatch, each cheap.
--- Clean fix pattern 7 (projections instead of the wide `obtain`s) was tried and measured: the
--- bracket was byte-identical either way, so the destructuring is not the cost here.
+-- No ceiling: exact cost is 157885, i.e. 79% of the 200000 default, a 27% margin. The former 1M
+-- ceiling was ~6x over. Cost is diffuse (phase `isDefEq`, top reduction counter ~13k against the
+-- 382k of a real tower; no single tactic clears 60ms in the profiler), so the fix was not a hot
+-- spot but the *context* every diffuse step re-walks. Measured ablation of the 266289 baseline:
+-- opener 30k, rest of prologue 17k, `case spec` preamble 139k, sign-extension dispatch 80k -- so
+-- the previous note's "it is the ~130 dispatch branches" was wrong; the dispatch is a third of it,
+-- and half the file was `set`/`clear_value`, each of which walks the entire local context.
+-- Landed, with measured deltas: drop the 53 spent `_2` copies once `resultA_isU64` has consumed
+-- them (-25%); drop the never-cited `with h…_def` equations off 23 `set`s (-4%); clear each fact
+-- source as it is consumed, and hoist the `h_input` destructuring so its ~35 input binders go too
+-- (-11%); delete four dead `have`s. Net 266289 -> 157885.
+-- Measured and NOT taken: Clean fix pattern 7 (projections instead of the wide `obtain`s) leaves
+-- the bracket byte-identical; hoisting all 23 `set`s to one early block is a regression (183k);
+-- replacing the 24 unbounded `simp at hh` with one `simp only` union buys only 4k and costs 24
+-- two-line call sites. Declaration splitting is available but not needed: the two dispatch branches
+-- are 55k, so extracting both over the (already `clear_value`-opaque) column variables would cap
+-- the theorem near 103k -- worth doing only if a toolchain bump eats the present margin.
 set_option linter.unusedVariables false in
 set_option linter.unusedTactic false in
 set_option linter.unreachableTactic false in
-set_option maxHeartbeats 1000000 in
 /-- Soundness of the `sra` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_early_struct
@@ -52,6 +62,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     h_o8, h_o9, h_o10, h_o11, h_o12, h_o13, h_o14, h_o15,
     h_w0, h_w1, h_w2, h_w3, h_w4, h_w5,
     h_opa0⟩ := h_core'
+  clear h_core
   -- W11 Option B: the op_a write `RegisterWrite` push's `isU64 a` requirement, via the shared result
   -- range-check `resultA_isU64` applied to this row's destructured constraints.
   have h_obmap : Vector.map (Expression.eval env) input_var_adapter_op_b_memory_prev_value =
@@ -92,6 +103,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     h_smv2 h_o0_2 h_o1_2 h_o2_2 h_o3_2 h_o4_2 h_o5_2 h_o6_2 h_o7_2 h_o8_2 h_o9_2 h_o10_2 h_o11_2
     h_o12_2 h_o13_2 h_o14_2 h_o15_2 h_w0_2 h_w1_2 h_w2_2 h_w3_2 h_w4_2 h_w5_2 h_byte1 h_byte2_2
     h_byte3 h_byte4_2 h_byte5 h_byte6_2 h_byte7 h_byte8_2
+  -- Context hygiene, measured rather than cosmetic: `set`/`clear_value` walk the *whole* local
+  -- context, and these 53 copies are dead the instant `resultA_isU64` has consumed them. Dropping
+  -- them here is the single largest saving in this file.
+  clear h_srl_b2 h_sra_b2 h_srlw_b2 h_sraw_b2 h_sum_b2 h_b0_2 h_b1_2 h_b2_2 h_b3_2 h_b4_2
+  clear h_s0b2 h_s1w2 h_s1b2 h_s2w2 h_s2b2 h_s3w2 h_s3b2 h_onehot2 h_v01_2 h_v012_2 h_v0123_2
+  clear h_split2_2 h_lr0_2 h_lr1_2 h_lr2_2 h_lr3_2 h_smv2
+  clear h_o0_2 h_o1_2 h_o2_2 h_o3_2 h_o4_2 h_o5_2 h_o6_2 h_o7_2
+  clear h_o8_2 h_o9_2 h_o10_2 h_o11_2 h_o12_2 h_o13_2 h_o14_2 h_o15_2
+  clear h_w0_2 h_w1_2 h_w2_2 h_w3_2 h_w4_2 h_w5_2 h_byte2_2 h_byte4_2 h_byte6_2 h_byte8_2
   -- post-#398 the nine byte receives owe no padding requirement.
   -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
   -- channel's `MemoryMsg.ClkBound` guarantee for `ALUTypeReader`'s two read-back pushes
@@ -115,6 +135,40 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     fun h1 h0 => off_gate_vacuous (bool_of_mul_pred h_sum_b) h1 h0⟩
   case spec =>
       intro hreal hsra
+      -- Same discipline inside the conjunct: everything the `refine` above already consumed, the
+      -- `w`-column constraints (SRAW-only), and the input binders reachable only through `h_input`
+      -- -- hence the `h_input` destructuring is hoisted here from further down.
+      clear h_cpu h_msb2 h_msb3 h_alu h_regwrite h_realgate h_realeq hregW h_clk h_obmap
+      clear h_wimm h_s0b h_s1b h_s2b h_s3b h_msbz h_srwz h_opa0
+      clear h_w0 h_w1 h_w2 h_w3 h_w4 h_w5
+      clear hreal
+      obtain ⟨-, -, -, -, -, -, ⟨h_obmap, -, -⟩, -, ⟨h_ocmap, -, -⟩, -⟩ := h_input
+      clear input_is_real input_var_is_real input_adapter_op_a input_adapter_op_a_0
+      clear input_adapter_op_b input_adapter_op_c input_adapter_imm_c
+      clear input_var_state_clk_high
+      clear input_var_state_clk_16_24
+      clear input_var_state_clk_0_16
+      clear input_var_state_pc
+      clear input_state_clk_high input_state_clk_16_24 input_state_clk_0_16 input_state_pc
+      clear input_var_adapter_op_a
+      clear input_var_adapter_op_a_0
+      clear input_var_adapter_op_b
+      clear input_var_adapter_op_c
+      clear input_var_adapter_imm_c
+      clear input_var_adapter_op_a_memory_prev_value
+      clear input_adapter_op_a_memory_prev_value
+      clear input_var_adapter_op_a_memory_access_timestamp_prev_low
+      clear input_var_adapter_op_a_memory_access_timestamp_diff_low_limb
+      clear input_adapter_op_a_memory_access_timestamp_prev_low
+      clear input_adapter_op_a_memory_access_timestamp_diff_low_limb
+      clear input_var_adapter_op_b_memory_access_timestamp_prev_low
+      clear input_var_adapter_op_b_memory_access_timestamp_diff_low_limb
+      clear input_adapter_op_b_memory_access_timestamp_prev_low
+      clear input_adapter_op_b_memory_access_timestamp_diff_low_limb
+      clear input_var_adapter_op_c_memory_access_timestamp_prev_low
+      clear input_var_adapter_op_c_memory_access_timestamp_diff_low_limb
+      clear input_adapter_op_c_memory_access_timestamp_prev_low
+      clear input_adapter_op_c_memory_access_timestamp_diff_low_limb
       -- `is_sra = 1` forces the other three variant flags to 0 (single-op selection).
       obtain ⟨h_srl0, h_srlw0, h_sraw0⟩ :=
         single_flag hsra (bool_of_mul_pred h_srl_b) (bool_of_mul_pred h_srlw_b)
@@ -122,6 +176,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           (by rcases bool_of_mul_pred h_sum_b with h | h
               · exact Or.inl (by linear_combination h)
               · exact Or.inr (by linear_combination h))
+      clear h_srl_b h_srlw_b h_sraw_b h_sum_b
       -- Reduce the committed result column `cols.a` to its four `env.get`s.
       have hcolsa : (Vector.map (Expression.eval env)
             (Vector.mapRange 4 fun i => var { index := i₀ + i }) : Word (ZMod p))
@@ -131,20 +186,20 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         interval_cases i <;> rfl
       obtain ⟨h_rs1U, h_rs2U⟩ := h_assumptions
       -- Alias the committed columns (exact `env.get` index forms — Lean does not reduce the `i₀+4+1+…`).
-      set cb0 := env.get (i₀ + 4 + 1 + 1) with hcb0_def
-      set cb1 := env.get (i₀ + 4 + 1 + 1 + 1) with hcb1_def
-      set cb2 := env.get (i₀ + 4 + 1 + 1 + 2) with hcb2_def
-      set cb3 := env.get (i₀ + 4 + 1 + 1 + 3) with hcb3_def
-      set cb4 := env.get (i₀ + 4 + 1 + 1 + 4) with hcb4_def
-      set cb5 := env.get (i₀ + 4 + 1 + 1 + 5) with hcb5_def
-      set ll0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3) with hll0_def
-      set ll1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 1) with hll1_def
-      set ll2 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 2) with hll2_def
-      set ll3 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 3) with hll3_def
-      set hl0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4) with hhl0_def
-      set hl1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 1) with hhl1_def
-      set hl2 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 2) with hhl2_def
-      set hl3 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 3) with hhl3_def
+      set cb0 := env.get (i₀ + 4 + 1 + 1)
+      set cb1 := env.get (i₀ + 4 + 1 + 1 + 1)
+      set cb2 := env.get (i₀ + 4 + 1 + 1 + 2)
+      set cb3 := env.get (i₀ + 4 + 1 + 1 + 3)
+      set cb4 := env.get (i₀ + 4 + 1 + 1 + 4)
+      set cb5 := env.get (i₀ + 4 + 1 + 1 + 5)
+      set ll0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3)
+      set ll1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 1)
+      set ll2 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 2)
+      set ll3 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 3)
+      set hl0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4)
+      set hl1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 1)
+      set hl2 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 2)
+      set hl3 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 3)
       -- The variant flag-sum is 1 on the real SRL row, so the byte-pull guarantees fire.
       have hsum1 : env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4)
           + env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 4 + 1)
@@ -181,20 +236,17 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       have b_cb3 := bool_of_mul_pred h_b3
       have b_cb4 := bool_of_mul_pred h_b4
       have b_cb5 := bool_of_mul_pred h_b5
-      set v0123 := env.get (i₀ + 4 + 1 + 1 + 6 + 1) with hv0123_def
-      set v012 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 1) with hv012_def
-      set v01 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 2) with hv01_def
-      -- Forget the `let`-bodies (keep the `*_def` equations): `set`'s `let`-bindings otherwise wrap the
-      -- carrier as `id (ZMod p)`, which blocks `linear_combination`/`ring`'s instance synthesis.
+      clear h_b0 h_b1 h_b2 h_b3 h_b4 h_b5
+      clear h_byte1 h_byte2 h_byte3 h_byte4 h_byte5 h_byte6 h_byte7 h_byte8
+      set v0123 := env.get (i₀ + 4 + 1 + 1 + 6 + 1)
+      set v012 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 1)
+      set v01 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 2)
+      -- Forget the `let`-bodies: `set`'s `let`-bindings otherwise wrap the carrier as `id (ZMod p)`,
+      -- which blocks `linear_combination`/`ring`'s instance synthesis. The `with h…_def` equations
+      -- these `set`s used to name were never cited anywhere, and every entry they added to the context
+      -- was re-walked by each later `set`/`clear_value`, so they are gone.
       clear_value cb0 cb1 cb2 cb3 cb4 cb5 ll0 ll1 ll2 ll3 hl0 hl1 hl2 hl3 v0123 v012 v01
       -- Eval-of-input bridges for the `op_b`/`op_c` register reads (from `h_input`).
-      obtain ⟨-, -, -, -, -, -, ⟨h_obmap, -, -⟩, -, ⟨h_ocmap, -, -⟩, -⟩ := h_input
-      have hb0e : Expression.eval env input_var_adapter_op_b_memory_prev_value[0]
-          = input_adapter_op_b_memory_prev_value[0] := by rw [← h_obmap]; simp only [Vector.getElem_map]
-      have hb1e : Expression.eval env input_var_adapter_op_b_memory_prev_value[1]
-          = input_adapter_op_b_memory_prev_value[1] := by rw [← h_obmap]; simp only [Vector.getElem_map]
-      have hb2e : Expression.eval env input_var_adapter_op_b_memory_prev_value[2]
-          = input_adapter_op_b_memory_prev_value[2] := by rw [← h_obmap]; simp only [Vector.getElem_map]
       have hb3e : Expression.eval env input_var_adapter_op_b_memory_prev_value[3]
           = input_adapter_op_b_memory_prev_value[3] := by rw [← h_obmap]; simp only [Vector.getElem_map]
       have hc0e : Expression.eval env input_var_adapter_op_c_memory_prev_value[0]
@@ -207,6 +259,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         linear_combination h_v012
       have eq_v0123 : v0123 = v012 * ((1 + -cb3) * 255 + 1) := by
         linear_combination h_v0123
+      clear h_v01 h_v012 h_v0123
       -- The four limb-split decompositions `b_j * v0123 = hl_j * 65536 + ll_j * v0123` (limbs 2,3 de-gated
       -- by `e14 = is_srl + is_sra = 1`), bridged to the `((65536:ℕ):ZMod p)` form the close lemmas want.
       have h_b0_dec : input_adapter_op_b_memory_prev_value[0] * v0123
@@ -221,6 +274,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       have h_b3_dec : input_adapter_op_b_memory_prev_value[3] * v0123
           = hl3 * ((65536 : ℕ) : ZMod p) + ll3 * v0123 := by
         have h := h_split3; rw [h_srl0, hsra] at h; push_cast; linear_combination h
+      clear h_split0 h_split1 h_split2 h_split3
       -- Normalise the goal's shift count `c0.val % 64` to the `c_bits` sum (`is_mod_64`).
       have h_cbsum_lt := cbsum_val_lt_64 b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
       have h_c0mod : input_adapter_op_c_memory_prev_value[0].val % 64
@@ -233,26 +287,26 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           exact ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)
         rw [h10v, show (2 : ℕ) ^ 10 = 1024 by norm_num] at he
         simpa using he
+      clear h_byte0 hbyte_fact hsumneg
       -- Bridge the byte-pull range facts to the `srl_close_su16_*_case` exponent form.
       rw [cb4sum_natCast] at lt_ll0 lt_ll1 lt_ll2 lt_ll3
       simp only [sub_eq_add_neg] at lt_lh0 lt_lh1 lt_lh2 lt_lh3
       rw [cb4sum_sub_natCast] at lt_lh0 lt_lh1 lt_lh2 lt_lh3
-      have hp17 : 2 ^ 17 < p := Fact.out
       have hne2 : (2 : ZMod p) ≠ 0 := by
         intro h; have := val_2_zmod_p (p := p); rw [h, ZMod.val_zero] at this; exact absurd this (by norm_num)
       have hne3 : (3 : ZMod p) ≠ 0 := by
         intro h; have h3 : (3 : ZMod p).val = 3 := val_3_zmod_p
         rw [h, ZMod.val_zero] at h3; exact absurd h3 (by norm_num)
       -- Alias the shift-result columns.
-      set su0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4) with hsu0_def
-      set su1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 1) with hsu1_def
-      set su2 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 2) with hsu2_def
-      set su3 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 3) with hsu3_def
-      set lr0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4) with hlr0_def
-      set lr1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 1) with hlr1_def
-      set lr2 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 2) with hlr2_def
-      set lr3 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 3) with hlr3_def
-      set smv := env.get (i₀ + 4 + 1 + 1 + 6) with hsmv_def
+      set su0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4)
+      set su1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 1)
+      set su2 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 2)
+      set su3 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 4 + 3)
+      set lr0 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4)
+      set lr1 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 1)
+      set lr2 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 2)
+      set lr3 := env.get (i₀ + 4 + 1 + 1 + 6 + 1 + 3 + 4 + 4 + 3)
+      set smv := env.get (i₀ + 4 + 1 + 1 + 6)
       clear_value su0 su1 su2 su3 lr0 lr1 lr2 lr3 smv
       -- One-hot of the byte-shift selectors; the limb_result decompositions; `sra_msb_v0123 = 0`.
       have honehot1 : su0 + su1 + su2 + su3 = 1 := by
@@ -264,8 +318,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       have eq_lr2 : lr2 = hl2 + ll3 * v0123 := by
         linear_combination h_lr2
       have eq_lr3 : lr3 = hl3 := by linear_combination h_lr3
+      clear h_lr0 h_lr1 h_lr2 h_lr3 h_onehot
       have eq_smv : smv = env.get (i₀ + 4) * v0123 := by
         have hh := h_smv; linear_combination hh
+      clear h_smv
       -- `rs1` eta, so the goal's `rs1.toBitVec64` matches the close lemma's `#v[rs1[0],…]`.
       have hrs1eta : (input_adapter_op_b_memory_prev_value : Word (ZMod p))
           = #v[input_adapter_op_b_memory_prev_value[0], input_adapter_op_b_memory_prev_value[1],
@@ -276,6 +332,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           = if input_adapter_op_b_memory_prev_value[3].val ≥ 32768 then 1 else 0 := by
         have hsp := (h_msb1 ⟨fun _ => by rw [hb3e]; exact h_rs1U 3, bool_of_mul_pred h_sra_b⟩).2 hsra
         rwa [hb3e] at hsp
+      clear h_msb1 h_sra_b hb3e h_obmap
       have h_bvmsb : (Word.toBitVec64 input_adapter_op_b_memory_prev_value).msb
           = decide (input_adapter_op_b_memory_prev_value[3].val ≥ 32768) :=
         ShiftRightMath.toBitVec64_msb_eq_b3_ge h_rs1U

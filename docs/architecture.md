@@ -259,10 +259,12 @@ spellings through explicit rewrite lemmas rather than asking unification to unfo
 forbids `skipKernelTC` and `native_decide`.
 
 Per-declaration elaboration-budget overrides are ratcheted, not managed: `scripts/check_heartbeats.sh`
-fails the audit on any increase over `scripts/heartbeats_baseline.txt`. The current baseline is 317 sites
-in `SP1Clean/` and 16 in `SP1CleanTest/`; 215 of the 317 are in auto-generated `Extracted/`, leaving 102
-on the hand-written surface. A raised ceiling is normally a masked `whnf` blowup, so the required fix is
-to fold the blowup. The measured record — which surviving overrides are term-intrinsic and what their
+fails the audit on any increase over `scripts/heartbeats_baseline.txt`. The current baseline is 215 sites
+in `SP1Clean/` and 16 in `SP1CleanTest/` — and **all 231 are in auto-generated files**. The hand-written
+surface carries **zero** elaboration-budget overrides, matching upstream Clean, which has none in 44,603
+lines. Every remaining site is emitted by `update_extracted.py`, three lines of which apply a blanket
+unmeasured bump to each generated definition; that is the next target, not a proof-engineering problem.
+A raised ceiling is normally a masked `whnf` blowup, so the required fix is to fold the blowup. The measured record — which surviving overrides are term-intrinsic and what their
 measured floors are — is [`agents/perf-findings.md`](agents/perf-findings.md).
 
 The project-specific patterns are in [`agents/proof-patterns.md`](agents/proof-patterns.md); Clean's own

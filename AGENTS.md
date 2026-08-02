@@ -409,6 +409,19 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
   once in `Model/Channels.lean`. A missing default-tactic close means a missing `circuit_norm` lemma,
   not a reason to hand-write the field. These lemmas also tidy `circuit_proof_start`; mind the soundness
   requirement-tail caveat. Full recipe: `docs/agents/proof-patterns.md` "ElaboratedCircuit field obligations".
+- **When a proof is slow, extract over *opaque* arguments — and check what the extraction can still see.**
+  Five separate ceilings fell to this one move (`docs/agents/perf-findings.md` §12): the cost was variously
+  in the local *context* rather than the goal, in a `have`'s *type* rather than its proof, in the *order* of
+  two tactic steps, in a struct *literal* where `fromElements` belonged, and in 24 rewrites each
+  renormalising a large context. In every case the fix was to interpose an opaque variable, never to make
+  the expensive step cheaper. Corollary: extracting a block into a `have` **inside the same proof** buys
+  nothing, because it keeps the whole context — a recorded "extraction moved nothing" negative result in
+  `DivRemChip/Evidence/` meant exactly that, and was misread as irreducibility for months.
+- **Ladder before you believe a cause you found by reading code.** Four structural hypotheses were promoted
+  on code-reading during the ceiling campaigns and all four were corrected by measurement — including two
+  that were *correct diagnoses of real phenomena that were not the cost*, and one that was upstream Clean's
+  own documented performance rule (measured delta: 0.008%). A mechanism can be genuine, verifiable, and
+  irrelevant. Details and the full list: `docs/agents/perf-findings.md` §12.
 - Full landmine list + the witnessed-`FormalCircuit` recipe: `docs/agents/proof-patterns.md`.
 
 ## MCP servers
