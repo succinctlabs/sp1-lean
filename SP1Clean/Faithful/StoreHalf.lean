@@ -1571,7 +1571,6 @@ private theorem storeHalfPermFourBlocks {α : Type}
       (List.perm_append_comm (l₁ := c) (l₂ := d)).append_left (b ++ a)
   exact hab.trans hcd
 
-set_option maxRecDepth 2000 in
 private theorem storeHalfByteInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var StoreHalfChip.Inputs (ZMod p)) (offset : ℕ) :

@@ -1552,7 +1552,6 @@ private theorem storeWordPermFourBlocks {α : Type}
       (List.perm_append_comm (l₁ := c) (l₂ := d)).append_left (b ++ a)
   exact hab.trans hcd
 
-set_option maxRecDepth 2000 in
 private theorem storeWordByteInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var StoreWordChip.Inputs (ZMod p)) (offset : ℕ) :

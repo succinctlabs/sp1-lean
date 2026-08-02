@@ -70,11 +70,11 @@ echo "the sole sanctioned native_decide; adds Lean.ofReduceBool/trustCompiler, c
 grep -rn 'native_decide' SP1CleanTest --include='*.lean' | wc -l
 
 echo
-echo "== A2 maxHeartbeats no-increase guard (fold blowups, don't bump ceilings) =="
-if scripts/check_heartbeats.sh; then
-  echo "PASS: maxHeartbeats override count at/below baseline"
+echo "== A2 elaboration-budget escape-hatch gate (allowlist, not a budget) =="
+if scripts/check_option_escapes.sh; then
+  echo "PASS: every maxHeartbeats/maxRecDepth site is allowlisted with a measured ladder"
 else
-  echo "FAIL: maxHeartbeats overrides increased — fold instead of bumping (see above)"; fail=1
+  echo "FAIL: unlisted or raised elaboration-budget override — fold instead (see above)"; fail=1
 fi
 
 echo

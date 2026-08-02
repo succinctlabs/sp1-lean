@@ -641,9 +641,15 @@ def render(operation: str, import_modules: Sequence[str], body: str) -> str:
 # Adding an entry here requires a ladder, recorded in the comment beside it. Do not add one
 # speculatively: the whole point is that 213 of the previous 214 bought nothing.
 CONSTRAINT_HEARTBEAT_OVERRIDES: Dict[str, int] = {
-    # The single measured survivor. ~466-`let` chain, and it fails in `«LCNF simp»` — the CODE
-    # GENERATOR, not elaboration — which is why it is the only one: the elaborator handles every
-    # generated def at the default, and only codegen on the largest chip oracle does not.
+    # The single measured survivor. It fails in `«LCNF simp»` — the CODE GENERATOR, not elaboration —
+    # which is why it is the only one: the elaborator handles every generated def at the default, and
+    # only codegen on the largest chip oracle does not.
+    #
+    # ⚠ Do NOT size this by `let` count. An earlier revision of this comment called it a "~466-`let`
+    # chain"; it is **386**. The 466/468 figure belongs to `MulOperation.asserts` — a *different*
+    # definition in this same file, which carries no override and passes at the plain default. So the
+    # larger definition is the cheap one: `let` count does not predict this cost. The real
+    # discriminator is a single 13 KB line of twenty sub-calls, 45% of the definition's text.
     # Ladder: 200000 FAIL (`«LCNF simp»`) / 210000 ok → floor (200000, 210000], i.e. barely over the
     # default. Set to 400000 for ~2x margin because codegen cost is less predictable across toolchain
     # bumps than elaboration; the previous blanket value was 8000000, ~40x over.
@@ -722,6 +728,48 @@ def render_chip(chip: str, import_modules: Sequence[str], body: str) -> str:
     return _header(import_modules, doc) + "\n" + body + "\n\n" + FOOTER
 
 
+# Measured recursion-depth overrides for generated AIR definitions, keyed like
+# CONSTRAINT_HEARTBEAT_OVERRIDES as "<scope>:<innermost-namespace>.<def>". Default: NO override.
+#
+# `render_system_table` and `render_public_values` used to prefix EVERY generated def with
+# `maxRecDepth 100000` -- 50 sites, ~200x Lean's 512 default, unmeasured. Measured 2026-08-02 by
+# stripping all 50 and elaborating each generated module: **11 of the 12 files need nothing at all**,
+# including all 24 sites in `PublicValues.lean`. Only `Global`'s four `assertsPart*` definitions
+# recurse past the default, and their floor is (1200, 2000] -- not 100000.
+SYSTEM_RECDEPTH_OVERRIDES: Dict[str, int] = {
+    # The Poseidon-style accumulation chain; same definitions that force this file's heartbeat
+    # exception. Ladder: 800 FAIL / 1200 FAIL / 2000 ok -> floor (1200, 2000], set at ~2x.
+    # The file's other two defs (`asserts`, `interactions`) need nothing.
+    "system:Global:GlobalCols.assertsPart0": 4000,
+    "system:Global:GlobalCols.assertsPart1": 4000,
+    "system:Global:GlobalCols.assertsPart2": 4000,
+    "system:Global:GlobalCols.assertsPart3": 4000,
+}
+
+
+def _bump_recdepth(body: str, scope: str) -> str:
+    """Prefix a generated `@[irreducible] def` with a recursion-depth override only where one has
+    been measured to be necessary -- see `SYSTEM_RECDEPTH_OVERRIDES`. Mirrors
+    `_bump_constraints_heartbeats`, including the innermost-namespace keying (the module's outer
+    namespace comes from the header, which is prepended after this runs)."""
+    out: List[str] = []
+    stack: List[str] = []
+    for line in body.split("\n"):
+        opened = re.match(r"namespace\s+(\S+)", line)
+        if opened:
+            stack.append(opened.group(1))
+        elif re.match(r"end\s+\S+", line) and stack:
+            stack.pop()
+        if line.startswith("@[irreducible] def "):
+            name = line.split()[2]
+            qualified = f"{stack[-1]}.{name}" if stack else name
+            value = SYSTEM_RECDEPTH_OVERRIDES.get(f"{scope}:{qualified}")
+            if value is not None:
+                out.append(f"set_option maxRecDepth {value} in")
+        out.append(line)
+    return "\n".join(out)
+
+
 def render_system_table(
     table: str, import_modules: Sequence[str], body: str
 ) -> str:
@@ -731,10 +779,7 @@ def render_system_table(
     # override per data definition would hide a chunk-size regression from the repository's
     # no-new-heartbeat audit gate.
     body = _preserve_raw_byte_opcodes(body)
-    body = body.strip().replace(
-        "@[irreducible] def ",
-        "set_option maxRecDepth 100000 in\n@[irreducible] def ",
-    )
+    body = _bump_recdepth(body.strip(), f"system:{table}")
     body = _expand_large_derives(body)
     _sanity_gate(f"{table} (system table)", body)
     reused = ", ".join(import_modules) if import_modules else "no"
@@ -757,10 +802,7 @@ def render_system_table(
 def render_public_values(body: str) -> str:
     """Wrap `MachineRecord::eval_public_values`, the non-row AIR block in every Core shard."""
     body = _preserve_raw_byte_opcodes(body)
-    body = body.strip().replace(
-        "@[irreducible] def ",
-        "set_option maxRecDepth 100000 in\n@[irreducible] def ",
-    )
+    body = _bump_recdepth(body.strip(), "public_values")
     _sanity_gate("machine public values", body)
     doc = (
         "/-! # AUTO-GENERATED Core public-values AIR oracle — do not edit by hand.\n\n"

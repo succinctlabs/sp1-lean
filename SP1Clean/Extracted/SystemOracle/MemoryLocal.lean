@@ -19,7 +19,6 @@ deriving ProvableStruct
 
 namespace MemoryLocalCols
 
-set_option maxRecDepth 100000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (MemoryLocalCols F))
   (_preprocessed : (Vector F 0))
@@ -45,7 +44,6 @@ set_option maxRecDepth 100000 in
     E16,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (MemoryLocalCols F))
   (_preprocessed : (Vector F 0))

@@ -15,7 +15,6 @@ open SP1Clean
 
 namespace PublicValuesOracle
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart0 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -185,7 +184,6 @@ set_option maxRecDepth 100000 in
     E102,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart1 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -379,7 +377,6 @@ set_option maxRecDepth 100000 in
     E225,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart2 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -578,7 +575,6 @@ set_option maxRecDepth 100000 in
     E353,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart3 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -777,7 +773,6 @@ set_option maxRecDepth 100000 in
     E481,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart4 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -976,7 +971,6 @@ set_option maxRecDepth 100000 in
     E609,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart5 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -1175,7 +1169,6 @@ set_option maxRecDepth 100000 in
     E737,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart6 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -1374,7 +1367,6 @@ set_option maxRecDepth 100000 in
     E865,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart7 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -1573,7 +1565,6 @@ set_option maxRecDepth 100000 in
     E993,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart8 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -1772,7 +1763,6 @@ set_option maxRecDepth 100000 in
     E1121,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart9 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -1971,7 +1961,6 @@ set_option maxRecDepth 100000 in
     E1249,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart10 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -2170,7 +2159,6 @@ set_option maxRecDepth 100000 in
     E1377,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart11 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -2369,7 +2357,6 @@ set_option maxRecDepth 100000 in
     E1505,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart12 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -2568,7 +2555,6 @@ set_option maxRecDepth 100000 in
     E1633,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart13 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -2767,7 +2753,6 @@ set_option maxRecDepth 100000 in
     E1761,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart14 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -2966,7 +2951,6 @@ set_option maxRecDepth 100000 in
     E1889,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart15 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -3165,7 +3149,6 @@ set_option maxRecDepth 100000 in
     E2017,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart16 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -3364,7 +3347,6 @@ set_option maxRecDepth 100000 in
     E2145,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart17 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -3563,7 +3545,6 @@ set_option maxRecDepth 100000 in
     E2273,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart18 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -3764,7 +3745,6 @@ set_option maxRecDepth 100000 in
     E2403,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def assertsPart19 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
@@ -3900,13 +3880,11 @@ set_option maxRecDepth 100000 in
     E2489,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List F :=
   assertsPart0 publicValues ++ assertsPart1 publicValues ++ assertsPart2 publicValues ++ assertsPart3 publicValues ++ assertsPart4 publicValues ++ assertsPart5 publicValues ++ assertsPart6 publicValues ++ assertsPart7 publicValues ++ assertsPart8 publicValues ++ assertsPart9 publicValues ++ assertsPart10 publicValues ++ assertsPart11 publicValues ++ assertsPart12 publicValues ++ assertsPart13 publicValues ++ assertsPart14 publicValues ++ assertsPart15 publicValues ++ assertsPart16 publicValues ++ assertsPart17 publicValues ++ assertsPart18 publicValues ++ assertsPart19 publicValues
 
-set_option maxRecDepth 100000 in
 @[irreducible] def interactionsPart0 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List (Interaction F) :=
@@ -3989,7 +3967,6 @@ set_option maxRecDepth 100000 in
     ⟨.receive, (.raw .memoryGlobalFinalizeControl [publicValues[126], publicValues[98], publicValues[99], publicValues[100], 1]), 1⟩,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def interactionsPart1 {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List (Interaction F) :=
@@ -4000,7 +3977,6 @@ set_option maxRecDepth 100000 in
     ⟨.receive, (.raw .pageProtGlobalFinalizeControl [publicValues[128], publicValues[110], publicValues[111], publicValues[112], 1]), publicValues[151]⟩,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (publicValues : (Vector F 160))
   : List (Interaction F) :=

@@ -360,7 +360,7 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
 - Heavy `toBitVec64` rw chains are whnf-expensive — `set_option maxHeartbeats 2000000 in` (carry lemmas need up
   to `16000000`).
 - **Never write the phrases `set_option maxHeartbeats` or `set_option maxRecDepth` into a Lean comment or
-  docstring under `SP1Clean/` / `SP1CleanTest/`.** `scripts/check_heartbeats.sh` counts sites with a raw
+  docstring under `SP1Clean/` / `SP1CleanTest/`.** `scripts/check_option_escapes.sh` counts sites with a raw
   `grep -rc "set_option <opt>"` and does not parse Lean, so a comment quoting the full directive scores as a
   live ceiling and silently corrupts the ratchet baseline. Record a measured ladder without it: "the former
   8M ceiling was ~200× over".

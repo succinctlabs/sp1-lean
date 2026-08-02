@@ -19,7 +19,6 @@ deriving ProvableStruct
 
 namespace ByteCols
 
-set_option maxRecDepth 100000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_cols : (ByteCols F))
   (_preprocessed : (Vector F 7))
@@ -28,7 +27,6 @@ set_option maxRecDepth 100000 in
   [
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (ByteCols F))
   (preprocessed : (Vector F 7))

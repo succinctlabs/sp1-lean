@@ -18,8 +18,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /- `Assumptions` / `ProverAssumptions` are on the audit surface in
 `FormalModel/Contracts/ChipAssumptions.lean` (same `SP1Clean.AddwChip` namespace). -/
 
-set_option maxRecDepth 4000 in
--- Runs at the plain default: the former 2000000 ceiling was ~50x over; measured floor <= 40000.
+-- Runs at the plain defaults: the former 2000000 heartbeat ceiling was ~50x over (measured floor
+-- <= 40000), and the former 4000 recursion-depth ceiling was never needed at all.
 /-- W-instruction soundness (Option B memory flip). Landmines: use `.2.1`/`.2.2.1`/… projections on
 `h_holds` (never `obtain`/`rcases`), keep `Spec` opaque so `RV64.addw` stays out of `circuit_norm`; arith
 goes via `rv64_addw_eq` by hand. `op_b`'s `isU64` is **derived** from the `ALUTypeReader` reader `Spec`'s

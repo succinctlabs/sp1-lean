@@ -258,8 +258,11 @@ spellings through explicit rewrite lemmas rather than asking unification to unfo
 `circuit_proof_start_core` is used for completeness proofs near the kernel-size cliff. The main library
 forbids `skipKernelTC` and `native_decide`.
 
-Per-declaration elaboration-budget overrides are ratcheted, not managed: `scripts/check_heartbeats.sh`
-fails the audit on any increase over `scripts/heartbeats_baseline.txt`, and covers `maxRecDepth` too.
+Per-declaration elaboration-budget overrides are **prohibited by default**: `scripts/check_option_escapes.sh`
+fails the audit on any `maxHeartbeats`/`maxRecDepth` site not named in `scripts/option_escapes_allowlist.txt`,
+each entry of which carries a measured floor bracket and the mechanism that makes it irreducible. A count
+ratchet used to guard this; an allowlist replaced it, because a ratchet permits a new hatch as long as an
+old one leaves.
 The baseline is **2** sites in `SP1Clean/` — both generated, both measured — plus 16 in `SP1CleanTest/`
 (auto-generated `native_decide` vector batteries, not regenerable at the current extractor pin). The
 hand-written surface carries **zero**, matching upstream Clean, which has none in 44,603 lines.

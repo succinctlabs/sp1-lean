@@ -1742,7 +1742,6 @@ private theorem loadX0PermFourBlocks {α : Type}
   exact hab.trans (by
     simpa only [List.append_assoc] using hcd.append_left (b ++ a))
 
-set_option maxRecDepth 2000 in
 private theorem loadX0ByteInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var LoadX0Chip.Inputs (ZMod p)) (offset : ℕ) :

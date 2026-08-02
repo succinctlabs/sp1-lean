@@ -1882,7 +1882,6 @@ private theorem loadHalfPermFiveBlocks {α : Type}
         (b ++ d ++ a)
   exact (hab.trans hacd).trans hce
 
-set_option maxRecDepth 2000 in
 private theorem loadHalfByteInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var LoadHalfChip.Inputs (ZMod p)) (offset : ℕ) :

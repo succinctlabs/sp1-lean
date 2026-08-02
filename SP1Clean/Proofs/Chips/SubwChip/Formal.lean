@@ -15,8 +15,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /- `Assumptions` / `ProverAssumptions` are on the audit surface in
 `FormalModel/Contracts/ChipAssumptions.lean` (same `SP1Clean.SubwChip` namespace). -/
 
-set_option maxRecDepth 4000 in
--- Runs at the plain default: the former 2000000 ceiling was ~50x over; measured floor <= 40000.
+-- Runs at the plain defaults: the former 2000000 heartbeat ceiling was ~50x over (measured floor
+-- <= 40000), and the former 4000 recursion-depth ceiling was never needed at all.
 /-- W-instruction soundness. Landmines: (1) use `.2.1`/`.2.2.1`/`.2.2.2` projections on `h_holds`
 (never `obtain`/`rcases` — the nested `.msb.msb * 65535` sign-fill in the reader's bus emits forces
 deep `ProvableStruct` whnf via the case-motive and blows past 16M heartbeats); (2) the inlined `Spec`

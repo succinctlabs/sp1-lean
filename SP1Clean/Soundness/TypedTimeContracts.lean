@@ -81,10 +81,10 @@ theorem ShiftLeftChip.cpuStateTimeContract :
   firstStraightCPUTimeContract ShiftLeftChip.Inputs, ShiftLeftChip.circuit, ShiftLeftChip.main,
     ShiftLeftChip.rowView
 
--- `ShiftRightChip.main` is the longest operation list in the registry, and the `is_real`/flag-sum bind
--- added one more `assertZero` to it; unfolding that list in `simp` needs more than the default `simp`
--- recursion depth. Budget only — the proof is the same `firstStraightCPUTimeContract` expansion.
-set_option maxRecDepth 4000 in
+-- `ShiftRightChip.main` is the longest operation list in the registry, so this entry recurses deepest
+-- when `simp` unfolds that list — but it still runs at the plain default like its ~20 siblings.
+-- Measured bracket (128, 256], i.e. 2x headroom under the 512 default; the former 4000 ceiling was a
+-- never-measured budget, ~16x over.
 theorem ShiftRightChip.cpuStateTimeContract :
     CircuitCPUStateTimeContract (p := p) (ShiftRightChip.circuit (p := p))
       ShiftRightChip.rowView := by

@@ -13,18 +13,20 @@ the *data*. Where the two disagree, the profile is the rule and this file is the
 
 ## 1. Headline
 
-| | start | after the 2026-07 campaign | after the P4 follow-up |
+| | start | after the 2026-07 campaign | final |
 |---|---:|---:|---:|
-| All ceiling sites (`scripts/check_heartbeats.sh` baseline) | 853 | 317 | **220** |
-| — of which auto-generated `Extracted/` | 215 | 215 | 214 |
-| **Hand-written ceilings** | **638** | **102** | **5** (−99.2%) |
+| All `maxHeartbeats` sites | 853 | 317 | **3** |
+| **Hand-written `maxHeartbeats`** | **638** | **102** | **0** |
+| Hand-written `maxRecDepth` | 44 | 44 | **3** |
+| Generated `maxRecDepth` | 66 | 66 | **6** |
 
-The second row is the number that matters and it is easy to miss: **almost every surviving site is in
-`SP1Clean/Extracted/`**, which is auto-generated and whose only lever is `update_extracted.py` — three lines
-of it, in fact, which apply a blanket unmeasured bump to every generated `@[irreducible] def`. The 2026-07
-campaign removed 84% of hand-written ceilings by *measuring* each one; the P4 follow-up
-(`git log --grep '^Wave: heartbeat-P4'`) removed 95% of what was left by *diagnosing and fixing the causes*,
-which is a different and much more productive exercise. Sections 10 and 11 are that follow-up's findings.
+**Hand-written Lean in this repo now carries zero elaboration-budget overrides**, matching upstream Clean,
+which has none in 44,603 lines. All twelve surviving sites are on *generated* definitions or measured
+structural cases, and every one is named in `scripts/option_escapes_allowlist.txt` with its floor bracket
+and mechanism — enforced by `scripts/check_option_escapes.sh`, which fails on anything unlisted rather than
+merely counting. The 2026-07 campaign removed 84% of hand-written ceilings by *measuring* each one; the P4
+follow-up (`git log --grep '^Wave: heartbeat-P4'`) removed the rest by *diagnosing and fixing the causes* —
+a different and much more productive exercise. Sections 10, 11 and 12 are that follow-up's findings.
 
 Per pillar, hand-written:
 
@@ -239,20 +241,23 @@ lines, and replacing each per-index family with one **quantified `simp only` rul
 > what is actually in the tree. Every site removed since is documented in its removing commit, and the
 > per-site mechanism write-ups live in §10 and §11.
 
-### 5-current. The surviving hand-written ceilings
+### 5-current. The surviving ceilings
 
-| site | declared | floor | mechanism |
-|---|---:|---|---|
-| `Proofs/Chips/StoreByteChip/Formal.lean` `circuit` | 2000000 | (1.5M, 1.75M] | Not a proof — a `def` whose `requirementsChannelsLawful` field carries `main` in its `simp only` set; dropping `main` takes the file 54.2s → 8.4s, so that token is the entire cost. `grind` in the same field is free (ablated). |
-| `Proofs/Chips/ShiftRightChip/Soundness/Sra.lean` | 1000000 | see source | Phase is `isDefEq`, top reduction counter ~13k against 382k for a real tower. Cost is ~130 `linear_combination`/`push_cast` branches of the sign-extension dispatch. Not a `circuit_proof_start` tower. |
-| `Proofs/Chips/ShiftRightChip/Soundness/Sraw.lean` | 1000000 | see source | Same shape as `Sra`. Their two siblings `Srl`/`Srlw` are already ceiling-free. |
-| `Proofs/Chips/DivRemChip/Evidence/Signed32.lean` | 800000 | (320k, 350k] | `Cases.Signed32Evidence` is an `inductive` with 3 constructors, so the proof splits the goal twice over a ~115-hypothesis context. The unsigned siblings are `structure`s, close flat, and are ceiling-free. |
-| `Proofs/Chips/DivRemChip/Evidence/Signed64.lean` | 600000 | (250k, 300k] | Same. |
+**There are no hand-written ones left.** All twelve survivors are on generated definitions or are
+measured structural cases, and the authoritative list — with a floor bracket and a mechanism for each —
+is `scripts/option_escapes_allowlist.txt`, enforced by `scripts/check_option_escapes.sh`. Read that file
+rather than a table here, so the guard and the documentation cannot drift apart.
 
-**Every one of these has a named mechanism.** That was the campaign's primary success criterion: no site
-kept merely because nobody understood it. Note that four separate sites reached this table with a
-mechanism *and* a "no fix exists" verdict, and all four verdicts turned out to be untested — see the
-`heartbeat-P4a` commit. Treat a surviving entry as "not yet fixed", not "unfixable".
+Summary of the twelve: three `maxHeartbeats` (a generated chip-oracle definition that fails in
+**codegen** not elaboration; `Global`'s Poseidon closure; the largest conformance battery) and nine
+`maxRecDepth` (four on `Global`'s `assertsPart*`, three structural hand-written cases, two conformance
+batteries).
+
+**The one confirmed-irreducible verdict.** `Global`'s ceiling is the only claim of irreducibility in this
+tree that survived measurement: `assertsPart2` contains a *single* list entry whose transitive
+`let`-closure is **1239 bindings**, and the Rust emitter's chunker bottoms out there — chunking at one
+entry per part still leaves 1239. Four other "irreducible" verdicts this campaign inherited turned out to
+be untested; this one was not.
 
 > ⚠ **§5 is the campaign-era record and it has drifted from the tree.** For a per-site,
 > reconciled, line-accurate answer use **[§5A](#5a-the-authoritative-floor-table--all-101-hand-written-sites)**,

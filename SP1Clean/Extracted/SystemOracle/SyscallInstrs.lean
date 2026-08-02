@@ -22,7 +22,6 @@ deriving ProvableStruct
 
 namespace SyscallInstrsCols
 
-set_option maxRecDepth 100000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (SyscallInstrsCols F))
   (_preprocessed : (Vector F 0))
@@ -411,7 +410,6 @@ set_option maxRecDepth 100000 in
     E336,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (SyscallInstrsCols F))
   (_preprocessed : (Vector F 0))

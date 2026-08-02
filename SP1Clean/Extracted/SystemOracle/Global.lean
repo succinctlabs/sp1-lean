@@ -21,7 +21,7 @@ deriving ProvableStruct
 
 namespace GlobalCols
 
-set_option maxRecDepth 100000 in
+set_option maxRecDepth 4000 in
 @[irreducible] def assertsPart0 {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (GlobalCols F))
   (_preprocessed : (Vector F 0))
@@ -629,7 +629,7 @@ set_option maxRecDepth 100000 in
     E540,
   ]
 
-set_option maxRecDepth 100000 in
+set_option maxRecDepth 4000 in
 @[irreducible] def assertsPart1 {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (GlobalCols F))
   (_preprocessed : (Vector F 0))
@@ -1370,7 +1370,7 @@ set_option maxRecDepth 100000 in
     E1100,
   ]
 
-set_option maxRecDepth 100000 in
+set_option maxRecDepth 4000 in
 @[irreducible] def assertsPart2 {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (GlobalCols F))
   (_preprocessed : (Vector F 0))
@@ -3092,7 +3092,7 @@ set_option maxRecDepth 100000 in
     E2635,
   ]
 
-set_option maxRecDepth 100000 in
+set_option maxRecDepth 4000 in
 @[irreducible] def assertsPart3 {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (GlobalCols F))
   (_preprocessed : (Vector F 0))
@@ -4236,7 +4236,6 @@ set_option maxRecDepth 100000 in
     E3746,
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (GlobalCols F))
   (preprocessed : (Vector F 0))
@@ -4244,7 +4243,6 @@ set_option maxRecDepth 100000 in
   : List F :=
   assertsPart0 cols preprocessed publicValues ++ assertsPart1 cols preprocessed publicValues ++ assertsPart2 cols preprocessed publicValues ++ assertsPart3 cols preprocessed publicValues
 
-set_option maxRecDepth 100000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (GlobalCols F))
   (_preprocessed : (Vector F 0))

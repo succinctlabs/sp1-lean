@@ -1735,7 +1735,6 @@ private theorem loadBytePermFiveBlocks {α : Type}
   exact hab.trans (by
     simpa only [List.append_assoc] using hcde.append_left (b ++ a))
 
-set_option maxRecDepth 2000 in
 private theorem loadByteByteInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var LoadByteChip.Inputs (ZMod p)) (offset : ℕ) :

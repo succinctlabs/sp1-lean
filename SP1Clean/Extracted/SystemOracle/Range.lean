@@ -19,7 +19,6 @@ deriving ProvableStruct
 
 namespace RangeCols
 
-set_option maxRecDepth 100000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_cols : (RangeCols F))
   (_preprocessed : (Vector F 2))
@@ -28,7 +27,6 @@ set_option maxRecDepth 100000 in
   [
   ]
 
-set_option maxRecDepth 100000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (RangeCols F))
   (preprocessed : (Vector F 2))
