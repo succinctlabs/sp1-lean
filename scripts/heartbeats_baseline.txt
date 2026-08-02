@@ -536,3 +536,10 @@
 # but a strictly narrower scope. Hand-written sites 57 -> 37; SP1Clean 272 -> 252.
 SP1Clean 215
 SP1CleanTest 16
+# -- maxRecDepth (added 2026-08-02) --
+# The twin escape hatch, untracked until now. Baselined at its current value, NOT at a target: the
+# 2026-08 campaign took hand-written maxHeartbeats to ZERO while these sat untouched next to them,
+# because no guard ever asked. They ratchet down from here. Upstream Clean's maximum is 2048 and it
+# has none in a proof; ours run to 100000. See docs/agents/perf-findings.md.
+SP1Clean-recdepth 94
+SP1CleanTest-recdepth 16
