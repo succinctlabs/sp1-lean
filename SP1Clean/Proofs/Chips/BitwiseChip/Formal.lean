@@ -149,6 +149,26 @@ private lemma toElements_result_byte (s : BitwiseU16Operation.Columns (ZMod p)) 
          ((Vector.getElem_append_left ?_).trans
            ((Vector.getElem_cast ?_).trans (Vector.getElem_append_left ?_)))) <;> decide)
 
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- Witness-pin transport for the eight result bytes: from the 16 cell-level `toElements` pins to the
+per-byte projections of the column struct.
+
+Stating this over an **opaque** `s` is the load-bearing part. `BitwiseU16Operation.populate` is a
+`let`-bundle ending in `BitwiseOperation.populate (decompBytes …) (decompBytes …) opcode`, so writing
+`(populate b c opcode).bitwise_operation.result[k]` in a *type* makes the elaborator `whnf` straight
+through both `let`s, `decompBytes`, and the eight-fold `byteOp` result vector. With `s` abstract the
+projection is inert, and the completeness proof instantiates it by application (pattern-matching only,
+nothing unfolds). -/
+private theorem result_byte_pin {env : ProverEnvironment (ZMod p)} {i₀ : ℕ}
+    {s : BitwiseU16Operation.Columns (ZMod p)}
+    (h : ∀ j : Fin 16, env.get (i₀ + 3 + (j : ℕ))
+      = (toElements s)[(j : ℕ)]'(by
+          have : size BitwiseU16Operation.Columns = 16 := rfl; have := j.isLt; omega))
+    (k : Fin 8) :
+    env.get (i₀ + 3 + 4 + 4 + (k : ℕ)) = s.bitwise_operation.result[(k : ℕ)] := by
+  rw [show i₀ + 3 + 4 + 4 + (k : ℕ) = i₀ + 3 + (8 + (k : ℕ)) by ring]
+  exact (h ⟨8 + (k : ℕ), by omega⟩).trans (toElements_result_byte s k)
+
 -- Runs at the plain default: the former 2000000 ceiling was ~50x over; measured floor <= 40000.
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start [Spec]
@@ -208,9 +228,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 
 -- Whole-chip completeness normalizes the flag-hinted witness stream (3 opcode flags + the 8-fold
 -- byte-pair `BitwiseU16Operation` lookups) against the composed reader obligations at once.
--- Measured: the former 32000000 ceiling was ~32x over; floor (700000, 1000000], owned by the
--- `key : ∀ k : Fin 8` witness-pin block.
-set_option maxHeartbeats 5000000 in
+-- Ran at a 5M ceiling with a measured floor of (700000, 1000000]. Ablation confirmed the whole cost
+-- sat in the *type* of the old `key : ∀ k : Fin 8` witness-pin block: writing
+-- `(BitwiseU16Operation.populate …).bitwise_operation.result[k]` in a written-out `have` type drove
+-- `whnf` through `populate`'s `let`-bundle, `decompBytes`, and the eight-fold `byteOp` result vector.
+-- Hoisting that step into `result_byte_pin` — stated over an *opaque* column struct, so the
+-- instantiation here only pattern-matches — dropped the floor to (20000, 40000], the measured total
+-- from 900904 to 40145 (22x), and the whole file from 14.2s to 6.6s. It now runs at the plain
+-- default with no ceiling at all.
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
@@ -302,21 +327,19 @@ theorem completeness :
     intro hr
     have hisu := resultWord_isU64 hr
       (BitwiseU16Operation.spec_populate ha hb hop3 input_is_real) hop_cases
-    have key : ∀ k : Fin 8, env.get (i₀ + 3 + 4 + 4 + (k : ℕ))
-        = (BitwiseU16Operation.populate input_adapter_op_b_memory_prev_value
-            input_adapter_op_c_memory_prev_value
-            (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0)).bitwise_operation.result[(k : ℕ)] := by
-      intro k
-      have h : env.toEnvironment.get (i₀ + 3 + (8 + (k : ℕ)))
-          = (toElements (BitwiseU16Operation.populate
-              (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value)
-              (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value)
-              (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0)))[8 + (k : ℕ)]'(by
-          have : size BitwiseU16Operation.Columns = 16 := rfl; have := k.isLt; omega) :=
-        h_env_cols ⟨8 + (k : ℕ), by omega⟩
-      rw [hpvb, hpvc] at h
-      rw [show i₀ + 3 + 4 + 4 + (k : ℕ) = i₀ + 3 + (8 + (k : ℕ)) by ring, h]
-      exact toElements_result_byte _ k
+    -- Re-ascribe the witness-gen pins into the plain `toElements (populate …)` form (the cheap
+    -- `.native` eval-match, done once at an *opaque* index `j`), fold the operands, then transport to
+    -- the per-byte projections through `result_byte_pin` — whose `s` stays abstract, so `populate`
+    -- is never unfolded.
+    have hcols : ∀ j : Fin 16, env.get (i₀ + 3 + (j : ℕ))
+        = (toElements (BitwiseU16Operation.populate
+            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value)
+            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value)
+            (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0)))[(j : ℕ)]'(by
+          have : size BitwiseU16Operation.Columns = 16 := rfl; have := j.isLt; omega) :=
+      h_env_cols
+    rw [hpvb, hpvc] at hcols
+    have key := result_byte_pin hcols
     convert hisu using 2
     simp only [BitwiseU16Operation.resultWord, Inputs.op_b_val, Inputs.op_c_val]
     simp only [show env.get (i₀ + 3 + 4 + 4) = _ from key 0,

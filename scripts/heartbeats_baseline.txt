@@ -534,5 +534,5 @@
 # file-scoped Model/SailDecode.lean stamp was converted to a scoped directive on its sole
 # budget-bound declaration, decode_ADD_example, value unchanged at 400000 -- a net-zero site count
 # but a strictly narrower scope. Hand-written sites 57 -> 37; SP1Clean 272 -> 252.
-SP1Clean 223
+SP1Clean 220
 SP1CleanTest 16

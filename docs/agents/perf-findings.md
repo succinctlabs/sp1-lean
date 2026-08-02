@@ -877,6 +877,13 @@ re-ladder. No need to raise anything, and the failing run is the faster of the t
 Caveat: force-failing a producer re-triggers the masking cascade of §6 — the dependents in the file report
 `(kernel) unknown constant`. That is expected and does not affect the `[diag]` block.
 
+**Scale-invariance holds for ONE declaration across budgets — not for two variants at a shared cutoff.**
+The table above compares the *same* declaration at 2M and at 40000. It does **not** license comparing a
+before-fix and an after-fix variant at a budget neither one reaches: at a cutoff both variants fail at, each
+one's counters are truncated at wherever its own elaboration happened to be when the budget ran out, and the
+ratio between them measures nothing. If you want to know whether a fix worked, ladder it — the bracket is
+the answer. Use the counters to find the *mechanism*, not to score the fix.
+
 ### 9.4 What it discriminates — and what it does not
 
 Four controls, causes known in advance:
@@ -975,8 +982,15 @@ The lever is to stop `Channel.toRaw_ext_iff` from ever firing. `Model/Channels.l
 twelve `@[circuit_norm]` name-based `<x>Channel_eq_<y>Channel_false` lemmas, whose whole purpose is to
 decide these comparisons on the `name` field — and the full rewrite trace of this declaration contains
 **zero** occurrences of any of them. They lose the match to `Channel.toRaw_ext_iff` every time. Making
-them win (priority) is a single-point change in one file that should reach all 17 sites. *Untested —
-Phase 1's job.*
+them win (priority) is a single-point change in one file that should reach all 17 sites.
+
+⚠ **This hypothesis reaches zero of the sites that carry a directive.** It was promoted twice as the
+campaign's last big structural lever, on a conflation: the mechanism above was diagnosed on `AddChip`'s
+`*_state_interactions_faithful_syntactic`, and then attributed to the four stamped `Faithful/` sites, which
+are different declarations. Those four have no channel-comparison counters at all — no `Channel.Guarantees`,
+no `nonempty_prop`, no `toRaw_ext_iff`. The 17-site `*_syntactic` cluster is real and the diagnosis of it
+stands, but **no member of that cluster carries a directive**, so the payoff would be compile time, not the
+ratchet. Worth doing on its own merits; do not expect it to remove a ceiling.
 
 Tested and rejected here: `simp [-Channel.toRaw_ext_iff, …]` is a **no-op**, byte-identical counters. Lean
 warns why — `` `Channel.toRaw_ext_iff` does not have the `[simp]` attribute ``. It arrives via
@@ -1029,5 +1043,148 @@ Run it only after `diagnostics` has named a suspect, and always through a filter
   attribute cost to one tactic line. The `[simp]` blocks *are* per-call and appear in source order, which
   is the one place you get intra-declaration attribution for free.
 - **`diagnostics` on a `def` tells you about its elaboration, not its compilation.**
+- **The error's phase name is a hint, not a diagnosis — and it misleads whenever the tactic is a search
+  procedure.** `LtOperationUnsigned.at_most_one` reported `timeout at whnf` and was not a whnf runaway at
+  all: max counter 12592, and the cost was five `tauto` calls closing satisfiable flag patterns. Read the
+  phase name to *rank* hypotheses, then confirm against the counters. Where the phase name has held up it
+  has been genuinely informative — `whnf` sites respond to fix pattern 7, `isDefEq` and `elaborator` sites
+  do not — but a `tauto`/`grind`/`omega` closer voids the signal.
+- **`#count_heartbeats` needs `set_option Elab.async false`.** Under 4.31's async elaboration it silently
+  undercounts by roughly 4×. With the option set it is genuinely useful and gives *exact* totals where a
+  ladder gives only a bracket (measured on `MulOperation.full_product`: 593455 → 214983 across a fix, and
+  `low_half` 50601 → 26990). The older blanket note that it "lies because it runs with an unlimited budget"
+  is true of the budget but was over-generalised into "unusable".
+- **A declaration's total work can exceed the budget it passes at.** Lean elaborates the signature and the
+  tactic body as separate tasks with separate budgets. `full_product` totals 214983 against a 200000 default
+  it clears, because the body alone is the (120k, 150k] half. So a `#count_heartbeats` total above the
+  declared ceiling is not evidence of a miscount — check which half you are looking at before concluding
+  anything.
 - Everything in §6 still applies — a stale `.olean` under `lake env lean`, and masking at rungs where a
   producer fails, both survive unchanged.
+
+---
+
+## 10. The anatomy of `circuit_proof_start`, and when to stop using it
+
+The single most-cited cause in this tree is "the opener", and for a long time that was a black box. It
+isn't. `circuit_proof_start` is a fixed, **untunable** 13-step pipeline
+(`Clean/Utils/Tactics/CircuitProofStart.lean:117-163` in the upstream checkout). Knowing its shape tells you
+which sites it can be blamed for and what to do about them.
+
+**The core.** `circuit_proof_start_core` (`:167`) does exactly one thing: match the goal's head against the
+eight supported `Soundness`/`Completeness` forms, `unfold` that constant, and `intro` the fixed binder list
+(`i₀ env input_var input h_input h_assumptions h_holds`, or the completeness variant with `h_env`). No
+`simp`, no `dsimp`, no unfolding of `main`.
+
+**The full tactic** then adds ~15 further whole-context passes, of which two are the named hot spots:
+
+- step 4, `dsimp +instances only [main] at *` — unfolds the entire circuit into every hypothesis **and** the
+  goal. There are six `… at *` traversals in total.
+- step 8's `simp +instances only [circuit_norm, h_input] at h_env` — the one-shot cast that Clean's own
+  `doc/performance-problems.md:146-149` singles out as "the largest single cast".
+
+**Every step is wrapped in `try … catch _ => pure ()`.** The heartbeat counter is cumulative over the
+declaration, so once the budget is exhausted every remaining step fails instantly and is silently swallowed.
+The proof then fails somewhere unrelated, with a goal that looks like the opener half-ran — because it did.
+If a `circuit_proof_start` proof fails in a way that makes no sense, suspect budget exhaustion mid-pipeline
+before suspecting the tactic text.
+
+**The migration.** Clean's prescription for a heavy composition is to stop using the full tactic:
+`circuit_proof_start_core`, then reproduce by hand only the steps the body actually needs —
+`dsimp only [main, circuit_norm] at h_env` (definitional, castless), project components with `.1`/`.2`,
+`clear h_env`, and `simp only [circuit_norm, h_input, <child circuits>]` on each small component separately.
+
+We use the plain form **130×** and the binder-only `_core` form **11×**. The `_core` sites are not
+incidental: they are `ShiftLeftChip`, `ShiftRightChip`, `DivRemChip` and `BranchChip` — and none of those
+declarations carries a ceiling. `ShiftRightChip/Formal.lean:93-95` records the outcome in one line: *"The
+former 4M ceiling was ~100× over: the four per-conjunct proofs carry the cost in their own modules, so this
+assembly clears ≤40000 against the plain default."*
+
+The two levers compose and are separable:
+
+1. **Declaration splitting** resets the heartbeat counter (it is per-declaration) and gives each piece its
+   own kernel check. This is what the per-variant `Soundness/<Op>.lean` files buy.
+2. **`_core` + hand-sequenced casts** avoids the `at *` traversals entirely, so the *assembly* theorem stays
+   cheap enough to delegate with bare `exact`s.
+
+Local variants live in `SP1Clean/Proofs/CircuitProofStart.lean`, which already re-orders the pipeline for
+the Shift chips (`circuit_proof_start_early_struct` moves `provable_struct_simp` **before** `main`
+expansion). That file is the right home for further variants — prefer a named, documented variant over a
+bespoke tactic block copied between chips.
+
+### The `elaborated`-field correlate
+
+Clean's `AGENTS.md:139` states it plainly: passing `elaborated` as an explicit field is *"very important"*
+for performance, "otherwise `soundness` has to elaborate with metavariables since `elaborate` is not filled
+in at that time". Chips that write `instance elaborated … := by elaborate_circuit` leave the metadata to be
+recomputed; chips that pin `output` / `localLength` / `channelsWithGuarantees` / `channelsLawful` make it
+literal.
+
+At the point this was measured, **exactly two chips in the tree let the default tactic fire — and they were
+exactly the two sites where ablation attributed 100% of the cost to circuit elaboration.**
+
+❌ **Tested on JalrChip and refuted.** Pinning `output` / `localLength` / `channelsWithGuarantees` and
+forwarding `subcircuitsConsistent` / `channelsLawful` from a private `derivedElaborated` changed the measured
+totals from 2,967,014 / 2,988,116 to 2,966,790 / 2,987,857 — a **0.008% delta, i.e. noise** — for a change to
+what the instance definitionally *is*. It was reverted. Keep following the upstream rule when writing a new
+chip, because it costs nothing there; but **it is not a remediation lever for an existing ceiling**, and the
+n=2 correlation above was coincidence. This is the third structural hypothesis this campaign promoted on
+correlation and then lost to measurement (see also the `channelsWithGuarantees_eq` rfl-lemma theory and the
+`*_eq_*Channel_false` priority theory). The pattern is consistent enough to be a rule: **a correlate found by
+reading code predicts nothing until a ladder confirms it.**
+
+### What the Jalr cost actually was
+
+Per-step `#count_heartbeats` (under `Elab.async false`) put **98%** of `soundness`'s 2.97M budget units in a
+single step — `provable_struct_simp`, at 2,900,887,852 raw heartbeats. Both of the hot spots named in
+upstream's own doc were irrelevant here: `dsimp only [main] at *` cost ≈199 budget units, and the one-shot
+`simp … at h_env` was a **no-op** (soundness has no `h_env`).
+
+`provable_struct_simp` is expensive *only because of where it sits in the pipeline*: it runs its `simp … at *`
+fixpoint **after** `dsimp only [main] at *` has expanded the five-subcircuit tower into `h_holds` and the
+goal. Run against the still-folded context, the same fixpoint costs ≈2.2k budget units — a **1000× drop** —
+and destructures identically, because destructuring is driven by `h_input`/`h_assumptions`, not `h_holds`.
+
+That is exactly the reordering `SP1Clean/Proofs/CircuitProofStart.lean`'s `circuit_proof_start_early_struct`
+already performs, and it is very likely why the Shift chips have never needed a ceiling on these proofs.
+The one thing the hoist gives up: `provable_struct_simp`'s struct-eval set is deliberately **not** a
+`circuit_norm` subset (its `getElem` lemmas loop against `circuit_norm`'s element-map spelling), so it no
+longer reaches the unfolded `h_holds`. Restore it with a **scoped** `simp only [<structEvalSimpLemmas>] at
+h_holds ⊢` — adding those lemmas to a `circuit_norm` call instead loops, as Clean's own comment warns.
+
+Measured result on JalrChip: `soundness` 2,967,014 → 65,581 (45×), `completeness` 2,988,116 → 24,475 (122×),
+file 110.3s → 6.1s, both 8M ceilings deleted, proof bodies byte-identical.
+
+**Read the pipeline before blaming a step.** The cost was not in any step's own work; it was in the *order*
+of two steps, which no counter and no phase name reports.
+
+---
+
+## 11. The cost can be in a `have`'s **type**, not its proof — ablate both halves separately
+
+`BitwiseChip.completeness` carried a 5M ceiling that its own comment blamed on a `have key : ∀ k : Fin 8, …`
+witness-pin block. Replacing the block with `sorry` collapsed the floor from (700000, 1000000] to
+(20000, 40000], confirming the attribution at ~96% of the budget. But a **second, finer ablation** — sorry
+the proof body while keeping the written-out type — did not move the floor at all.
+
+**The entire cost was elaborating the statement.** Writing
+
+```lean
+have key : ∀ k : Fin 8, env.get (i₀ + 3 + 4 + 4 + (k : ℕ)) =
+  (BitwiseU16Operation.populate b c opcode).bitwise_operation.result[(k : ℕ)] := …
+```
+
+forces the elaborator to `whnf` through `populate`'s `let`-bundle, `decompBytes`, and the eight-fold `byteOp`
+result vector — once per concrete `k`. The tell that it is the *projection* and not the term: a sibling
+`have` in the same proof carries `toElements (populate …)` in its type and is cheap. It is
+`.field[getElem]` on the populate result that triggers the unfold.
+
+The fix is Clean's fix pattern 1 in its strict form: a `private theorem` over an **opaque** column struct
+`s`, so the projection is inert, applied at the use site with **no written-out type** so instantiation only
+pattern-matches. Eight concrete-index defeq checks collapse to one at an opaque index. Result: 900904 →
+40145 heartbeats (22×), file 14.2s → 6.3s, directive deleted.
+
+**Generalisable procedure.** When ablating a `have` block, ablate in two steps — first the whole block, then
+the proof body alone with the type retained. If the second ablation does not move the bracket, no amount of
+work on the proof will help, and the fix has to change how the statement is *spelled*. This distinction is
+invisible to the phase name and to the counters, both of which just say "whnf".

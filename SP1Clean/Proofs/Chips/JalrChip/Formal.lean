@@ -13,6 +13,68 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
+-- `jalr_proof_start` is `circuit_proof_start` with its `provable_struct_simp` step **hoisted above**
+-- the two `main`/`elaborated` unfolding steps.
+--
+-- Measured (2026-08-01): in the stock ordering `provable_struct_simp` runs its `simp … at *` fixpoint
+-- *after* `dsimp only [main] at *` has expanded JALR's five-subcircuit tower (CPUState + two
+-- `AddOperation`s + `ITypeReader` + `RegisterWrite`) into `h_holds` and the goal, and that one step
+-- alone accounted for 2.90M of `soundness`'s 2.97M budget units — 98%. Every other step of the
+-- thirteen is four orders of magnitude cheaper. Run on the still-folded context the same fixpoint costs
+-- 2.16M *raw* heartbeats (≈2.2k budget units), a 1000x drop, and it destructures exactly the same
+-- variables, because destructuring is driven by `h_input`/`h_assumptions`, not by `h_holds`.
+--
+-- The one thing the hoist gives up is that `provable_struct_simp`'s struct-eval set — which is
+-- deliberately *not* a subset of `circuit_norm` (its `getElem` lemmas loop against `circuit_norm`'s
+-- element-map spelling) — no longer reaches the unfolded `h_holds`. That is restored by the single
+-- scoped pass below, which mirrors Clean's `ProvableStructSimp.structEvalSimpLemmas` verbatim and is
+-- applied only `at h_holds ⊢` rather than `at *`. With that, both proof bodies go through byte for
+-- byte. Keep the list in sync with Clean if that set changes.
+--
+-- `hygiene false` is required: the step list names the hypotheses `circuit_proof_start_core`
+-- introduces (`h_input`, `h_holds`, `h_env`, …), exactly as Clean's own `circuit_proof_start` elab
+-- does via `mkIdent`; under hygiene a macro's occurrences would not refer to them.
+set_option hygiene false in
+local macro "jalr_proof_start" : tactic => `(tactic| (
+  circuit_proof_start_core
+  try simp +instances only [circuit_norm] at input_var
+  try simp +instances only [circuit_norm] at input
+  try simp +instances only [circuit_norm] at h_input
+  try dsimp only [Assumptions] at *
+  try dsimp only [Spec] at *
+  try dsimp only [ProverAssumptions] at *
+  try dsimp only [ProverSpec] at *
+  try dsimp only [ElaboratedCircuit.withData, ElaboratedCircuit.output]
+  try dsimp only [field, id_eq, CircuitType.var_of_provableType,
+    CircuitType.value_of_provableType, CircuitType.proverValue_of_provableType] at *
+  -- hoisted: runs while `h_holds` and the goal are still the folded `main` application
+  try provable_struct_simp
+  try dsimp +instances only [elaborated] at *
+  try dsimp +instances only [main] at *
+  -- the scoped replacement for what the hoist gave up (mirrors Clean's `structEvalSimpLemmas`)
+  try simp +instances only [ProvableStruct.eval_eq_eval, ProvableStruct.eval_eq_eval_prover,
+    ProvableStruct.eval_var_eq_eval, ProvableStruct.eval_var_eq_eval_prover,
+    ProvableStruct.eval_field_var_eq_eval, ProvableStruct.eval_field_var_eq_eval_prover,
+    ProvableStruct.structEvalLiteralProc, ProvableStruct.structEvalProjectionProc,
+    ProvableStruct.structEvalProjectionEvalProc, ProvableStruct.structEvalProjectionExpr,
+    ProvableStruct.structEqSplit, ProvableStruct.components,
+    ProvableType.eval_field, ProvableType.getElem_eval_fields,
+    ProvableType.getElem_eval_fields_prover, getElem_eval_vector,
+    CircuitType.eval_var_prover_to_verifier,
+    CircuitType.eval_var_field, CircuitType.eval_var_field_prover,
+    CircuitType.eval_expr, CircuitType.eval_expr_prover,
+    CircuitType.value_of_provableType, CircuitType.proverValue_of_provableType,
+    DerivedCircuitType.eval_verifier, DerivedCircuitType.eval_prover,
+    CircuitType.evalVerifier, CircuitType.evalProver] at h_holds ⊢
+  try simp +instances only [circuit_norm] at h_input
+  try simp +instances only [circuit_norm] at h_assumptions
+  try simp +instances only [circuit_norm, h_input] at h_holds
+  try simp +instances only [circuit_norm, h_input] at h_env
+  try simp +instances only [circuit_norm, h_input]
+  try simp +instances only [circuit_norm] at h_spec
+  try dsimp only [field, id_eq, CircuitType.var_of_provableType,
+    CircuitType.value_of_provableType, CircuitType.proverValue_of_provableType] at *))
+
 /-- Operands are 64-bit.  The pinned Rust padding gate and the
 `is_real`/`lsb` boolean gates are represented in `main`, so none is assumed at
 the verifier boundary. -/
@@ -58,21 +120,15 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
     input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
--- Measured: genuinely binding. Fails at 2000000, passes at 4000000 — the declared budget is only
--- ~2x the pass rung, the tightest ceiling measured in the tree. Do not lower.
--- Cause found by ablation (2026-08-01): replacing this proof's *entire body* with `sorry` leaves
--- `circuit_proof_start` alone still failing at 2000000 and passing at 4000000, and the whole file still
--- elaborating in 104s vs 104.6s unablated. So 100% of both the floor and the wall-clock is the opener
--- normalizing `main`'s five-subcircuit tower (CPUState + 2x AddOperation + ITypeReader + RegisterWrite)
--- over the nested `ITypeReader`/`RegisterAccessCols` `ProvableStruct`; the proof body is free.
--- Counters at a forced-low rung: List.rec 382088, Eq.rec 323406, ProvableTypeList.rec 233070,
--- componentsToElements 233010 — and no `Vector.mapRange` at all, unlike the Load/Store family.
--- Clean fix pattern 7 (projections instead of the wide `obtain`s below) was applied and measured: the
--- counters were byte-identical and the floor did not move, so it was reverted. Any real fix here has to
--- attack `circuit_proof_start`/`elaborate_circuit` on this chip, not the proof text.
-set_option maxHeartbeats 8000000 in
+-- No ceiling. The former 8M one was ~120x over: opener + body together measure 65,581 budget units,
+-- against the 200,000 default. The earlier ablation ("100% of the cost is the opener, the body is
+-- free") was right about *where* the cost sat but not about *which* step. Exact per-step counts
+-- (`#count_heartbeats` under `Elab.async false`) put 2.90M of the old 2.97M in
+-- `provable_struct_simp` alone, purely because the stock ordering runs its
+-- `at *` fixpoint after `main` has been unfolded into `h_holds` and the goal. `jalr_proof_start` hoists
+-- that step above the unfolding; the proof body below is unchanged.
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
-  circuit_proof_start
+  jalr_proof_start
   obtain ⟨h_imm, h_rs1U, h_pcU⟩ := h_assumptions
   obtain ⟨h_lsbgate, h_cpu, h_add1, h_av3, h_add2, h_oav3, h_it0,
     _h_regwrite, h_align, h_pad_gate, h_gate⟩ := h_holds
@@ -197,13 +253,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
         simp only [Vector.getElem_mapRange, circuit_norm] <;> simp_all
 
--- Measured: genuinely binding, same band as `soundness` above (fails at 2000000, passes at
--- 4000000). Do not lower. Same ablation verdict as `soundness`: with the body replaced by `sorry` the
--- opener alone still fails at Lean's plain default, so the cost is `circuit_proof_start`, not the body.
-set_option maxHeartbeats 8000000 in
+-- No ceiling (measures 24,475 budget units). Same mechanism and fix as `soundness` above: 2.98M of the
+-- old 2.99M budget units were the un-hoisted `provable_struct_simp`. Here the scoped struct-eval pass inside
+-- `jalr_proof_start` is a no-op (completeness has no `h_holds`); only the hoist matters.
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
-  circuit_proof_start
+  jalr_proof_start
   obtain ⟨h_imm, h_rs1U, h_pcU, h_oap, h_bin, h_op_a_0, h_cpu, h_rac_a, h_rac_b, h_jt3, h_lt3,
     h_align_pa, hdec, hprevclk⟩ := h_assumptions
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
