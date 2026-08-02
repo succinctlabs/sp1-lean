@@ -321,7 +321,6 @@ theorem decodedInROM_mul_hoist {prog : GuestProgram} {row : ProgramRow (ZMod p)}
   rw [hi, ← hi0] at hrun
   exact hrun
 
-set_option maxRecDepth 10000 in
 omit [Fact (2 ^ 24 < p)] in
 /-- **W3-A closed for a concrete instruction.** The committed `addRow` is the decode of `addProgram`'s
 ROM word at its pc, against the official Sail `ext_decode` — `decodedInROM` holds, axiom-clean modulo the

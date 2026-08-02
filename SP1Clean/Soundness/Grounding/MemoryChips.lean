@@ -4124,7 +4124,6 @@ def loadX0AddressInput (input : LoadX0Chip.Inputs (ZMod p)) :
     input.offset_bit[1], input.offset_bit[2], LoadX0Chip.isReal input⟩
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
-set_option maxRecDepth 10000 in
 private theorem loadX0ByteEvidence
     (input : LoadX0Chip.Inputs (ZMod p)) (state : SailState) (opcode : ZMod p)
     (opcodeEq : LoadX0Chip.opcodeVal input = opcode)
@@ -4154,7 +4153,6 @@ private theorem loadX0ByteEvidence
   exact ⟨opcodeEq, Nat.add_one_le_iff.mpr rawLt, low, byte, memory⟩
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
-set_option maxRecDepth 10000 in
 private theorem loadX0HalfEvidence
     (input : LoadX0Chip.Inputs (ZMod p)) (state : SailState) (opcode : ZMod p)
     (opcodeEq : LoadX0Chip.opcodeVal input = opcode)
@@ -4206,7 +4204,6 @@ private theorem loadX0HalfEvidence
   exact ⟨opcodeEq, alignment, high, low, byte₀, byte₁, memory₀, memory₁⟩
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
-set_option maxRecDepth 10000 in
 private theorem loadX0WordEvidence
     (input : LoadX0Chip.Inputs (ZMod p)) (state : SailState) (opcode : ZMod p)
     (opcodeEq : LoadX0Chip.opcodeVal input = opcode)
@@ -4270,7 +4267,6 @@ private theorem loadX0WordEvidence
     memory₀, memory₁, memory₂, memory₃⟩
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
-set_option maxRecDepth 10000 in
 private theorem loadX0DoubleEvidence
     (input : LoadX0Chip.Inputs (ZMod p)) (state : SailState) (opcode : ZMod p)
     (opcodeEq : LoadX0Chip.opcodeVal input = opcode)

@@ -338,7 +338,6 @@ private lemma mem_flatConstraints_of_assertion {Input : TypeMap} [ProvableType I
   rw [Operations.toNested_toFlat, Operations.constraints_toFlat]
   exact h
 
-set_option maxRecDepth 10000 in
 /-- The selector gate `is_real·(is_real−1)` (`E355`) sits in the `DivRemCore` cluster's own-assert
 tail — a shallow assert of the gadget's `main`, hence one of its deep constraints. -/
 private lemma divRemCore_isReal_gate_mem_constraints
@@ -348,7 +347,6 @@ private lemma divRemCore_isReal_gate_mem_constraints
   change cols.is_real * (cols.is_real - 1) ∈ DivRemChip.ownAsserts cols ++ _
   exact List.mem_append_left _ (DivRemChip.isReal_gate_mem_ownAsserts cols)
 
-set_option maxRecDepth 10000 in
 /-- The selector gate is a deep constraint of the chip `main`: its deep constraint list is
 `CPUState ++ (RTypeReader ++ (Compare ++ (Core ++ (RegisterWrite ++ []))))`, and the gate lives in
 the `DivRemCore` segment. Stated over an abstract `input` so the definitional peel never

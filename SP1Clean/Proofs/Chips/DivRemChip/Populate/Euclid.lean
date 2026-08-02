@@ -522,15 +522,14 @@ private lemma limb_field_hi {x r cyp z cy : ℕ} {Xf Rf CYPf Zf CYf : ZMod p}
 -- `Word.toNat (bComp B f) + (populateBNeg B f).val * (2^128 - 2^64)` divided by `2^80`/`2^96`/`2^112`.
 -- Against those opaque subterms `omega` hits `maxRecDepth`; over fresh `t`/`b` (with `interval_cases b`
 -- splitting the boolean) it discharges cleanly, so we factor the arithmetic into these three helpers.
-set_option maxRecDepth 10000 in
+-- Measured 2026-08: post-factoring the three helpers need no recursion budget at all — each clears
+-- Lean's plain 512 default; the former 10000 ceilings were residue from the pre-factoring shape.
 private lemma fill_digit_80 (t b : ℕ) (ht : t < 2 ^ 64) (hb : b ≤ 1) :
     b * 65535 = (t + b * (2 ^ 128 - 2 ^ 64)) / 2 ^ 80 % 2 ^ 16 := by interval_cases b <;> omega
 
-set_option maxRecDepth 10000 in
 private lemma fill_digit_96 (t b : ℕ) (ht : t < 2 ^ 64) (hb : b ≤ 1) :
     b * 65535 = (t + b * (2 ^ 128 - 2 ^ 64)) / 2 ^ 96 % 2 ^ 16 := by interval_cases b <;> omega
 
-set_option maxRecDepth 10000 in
 private lemma fill_digit_112 (t b : ℕ) (ht : t < 2 ^ 64) (hb : b ≤ 1) :
     b * 65535 = (t + b * (2 ^ 128 - 2 ^ 64)) / 2 ^ 112 % 2 ^ 16 := by interval_cases b <;> omega
 

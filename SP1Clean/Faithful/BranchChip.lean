@@ -741,8 +741,13 @@ private def branchRustTail
     fallGate * (fall2 * (fall2 - 1)),
     fallGate * (fall3 * (fall3 - 1)) ]
 
+-- The closing `ring_nf` normalizes the arithmetic inside a long right-nested list of assertions, so
+-- it recurses past the 512 default. Ladder-measured: 700 fails, 1000 ok -- floor bracket (700, 1000].
+-- The former 100000 stamp was ~100x over. (`ring_nf` is not redundant here, unlike the one that used
+-- to sit in `branchTailMeaningFaithful`: dropping it leaves the goal open.) The other two decompose
+-- lemmas in this file carried the same 100000 stamp and clear the plain default outright.
 omit [Fact (2 ^ 17 < p)] in
-set_option maxRecDepth 100000 in
+set_option maxRecDepth 1000 in
 private theorem branchColumns_asserts_decompose
     (cols : BranchChip.Columns (ZMod p)) :
     Extracted.BranchOracle.BranchColumns.asserts (branchChipReconfigure cols) =
@@ -786,7 +791,6 @@ private def branchRustInteractionTail
     ⟨.send, (.byte 6 cols.next_pc[2] 16 0), sum⟩ ]
 
 omit [Fact (2 ^ 17 < p)] in
-set_option maxRecDepth 100000 in
 private theorem branchColumns_interactions_decompose
     (cols : BranchChip.Columns (ZMod p)) :
     Extracted.BranchOracle.BranchColumns.interactions (branchChipReconfigure cols) =
@@ -1061,7 +1065,6 @@ private theorem branchLtMeaningFaithful
 -- runaway anywhere (top elaboration counter only 765). It was also redundant: `tauto` closes the
 -- goal on its own. Dropping it took the floor below 20000 -- >10x -- so the ceiling is gone.
 omit [Fact (2 ^ 17 < p)] in
-set_option maxRecDepth 100000 in
 private theorem branchTailMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)

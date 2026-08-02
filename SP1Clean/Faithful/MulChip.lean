@@ -2358,7 +2358,6 @@ private theorem eval_sub_mul_const
 open SP1Clean.Channels (byteChannel stateChannel memoryChannel programChannel)
 open SP1Clean.InteractionRecovery
 
-set_option maxRecDepth 100000 in
 theorem mulOperation_interactions_exact
     (env : Environment (ZMod p))
     (input : Var SP1Clean.MulOperation.Inputs (ZMod p)) (offset : ℕ)
@@ -3005,7 +3004,6 @@ private theorem mulChip_byte_interactions_decompose
   simp [Operations.interactionsWith, Readers.RegisterWrite.main,
     circuit_norm, Nat.add_assoc]
 
-set_option maxRecDepth 100000 in
 private theorem mulChip_operation_interactions_active
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)

@@ -541,5 +541,5 @@ SP1CleanTest 16
 # 2026-08 campaign took hand-written maxHeartbeats to ZERO while these sat untouched next to them,
 # because no guard ever asked. They ratchet down from here. Upstream Clean's maximum is 2048 and it
 # has none in a proof; ours run to 100000. See docs/agents/perf-findings.md.
-SP1Clean-recdepth 79
+SP1Clean-recdepth 65
 SP1CleanTest-recdepth 16

@@ -22,9 +22,12 @@ namespace SP1Clean.Soundness.Target
 
 open Sail LeanRV64D LeanRV64D.Functions SP1Clean.SailMem
 
-set_option maxRecDepth 100000
-
 -- All `Register` constructors are enumerable — derived so `Finset.univ` enumerates them.
+-- The derivation recurses once per `Register` constructor, so it just misses the 512 default;
+-- ladder-measured, 512 fails and 600 passes — floor bracket (512, 600], set here with slack.
+-- The former file-wide 100000 stamp was ~150x over and covered the whole file; nothing else here
+-- needs any budget.
+set_option maxRecDepth 800 in
 deriving instance Fintype for Register
 
 /-- Every register's value type is inhabited, so a register can be default-filled. -/

@@ -41,7 +41,6 @@ namespace SP1Clean.SailDecode
 
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option maxRecDepth 100000
 set_option linter.unusedSimpArgs false
 
 /-- Peel one **non-matching** decoder branch: if the guard block runs to `.ok none s` (guard false,
@@ -66,6 +65,12 @@ theorem run_bind_ok_some {α β} (m : SailM (Option α)) (k : Option α → Sail
 -- genuinely exceeds it — the cost scales with the Sail decoder's branch count — stamp *that*
 -- declaration, measured, rather than pre-provisioning this one. The other two declarations in this
 -- file are one-line `simp only`s and need no budget.
+--
+-- Recursion budget: the branch-skip `repeat` walk recurses once per skipped decoder branch, so it
+-- genuinely exceeds the 512 default. Ladder-measured: 1500 fails, 2000 ok — floor bracket (1500, 2000].
+-- The former file-wide 100000 stamp was ~50x over *and* covered the two `run_bind_ok_*` lemmas above,
+-- which clear the plain default; it is now scoped to this declaration alone.
+set_option maxRecDepth 2000 in
 /-- **Worked example / proof-of-technique: the official Sail decoder on a concrete ADD.**
 `0x003100B3` = `ADD x1, x2, x3` (funct7=0, rs2=3, rs1=2, funct3=0, rd=1, opcode=0110011). Reduces the
 real `noncomputable` `ext_decode` to `RTYPE (x3, x2, x1, ADD)` under the `SailConfigured` residue
