@@ -2076,7 +2076,6 @@ private theorem divRemEvalPopulatedIsReal
     DivRemChip.populatedRowAt_isReal_eq]
   simp only [ProvableType.eval_field]
 
-set_option maxRecDepth 100000 in
 private theorem divRemCpuAssertionsExact
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -2117,7 +2116,6 @@ private theorem divRemEvalOpcode
     DivRemChip.eval_divRemCols_isRemuw_verifier]
   simp only [ProvableType.eval_field, Expression.eval]
 
-set_option maxRecDepth 100000 in
 private theorem divRemReaderAssertionsExact
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -2191,7 +2189,6 @@ private theorem divRemOpA0OfOwn
   change Eval.eval env cols.adapter.op_a_0 = 0
   simpa only [ProvableType.eval_field] using hop
 
-set_option maxRecDepth 100000 in
 private theorem divRemWholeAssertionsExact
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
@@ -2556,7 +2553,6 @@ private theorem divRemRustInteractionsDecompose
   congr 1
 
 omit [Fact (2 ^ 24 < p)] in
-set_option maxRecDepth 100000 in
 open Classical in
 private theorem divRemFilterByte
     (ops : Operations (ZMod p)) :
@@ -2564,7 +2560,6 @@ private theorem divRemFilterByte
         (fun interaction => interaction.channel = byteChannel.toRaw) =
       Operations.interactionsWith byteChannel.toRaw ops := rfl
 
-set_option maxRecDepth 100000 in
 private theorem divRemNativeByteDecompose
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :
     let cols := DivRemChip.populatedRowAt input offset
@@ -2720,7 +2715,6 @@ private theorem divRemU16MSBInteractionsExact
   · rfl
   · simp only [eval_u16MSBColumns, ProvableType.eval_field]
 
-set_option maxRecDepth 100000 in
 private theorem divRemCompareInteractionsExact
     (env : Environment (ZMod p))
     (input : Var DivRemCompare.Inputs (ZMod p)) (offset : ℕ) :
@@ -2859,7 +2853,6 @@ private theorem divRemReaderByteInteractionsExact
   simpa only [divRemReaderInteractions, state, adapter, a, opcode,
     isReal] using h
 
-set_option maxRecDepth 100000 in
 private theorem divRemCoreByteDecompose
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
@@ -3008,7 +3001,6 @@ private theorem divRemEvalMulProductMsb
   rw [divRemEvalMulOperation, eval_u16MSBColumns]
   simp only [ProvableType.eval_field]
 
-set_option maxRecDepth 100000 in
 private theorem divRemMulInteractionsExact
     (env : Environment (ZMod p))
     (input : Var MulOperation.Inputs (ZMod p)) (offset : ℕ)
@@ -3085,7 +3077,6 @@ private theorem divRemMulInteractionsExact
     (hproduct 14 (by decide)) (hproduct 15 (by decide))
   simpa only [Extracted.MulOperation.interactions] using hExact
 
-set_option maxRecDepth 100000 in
 private theorem divRemLowerMulInteractionsActive
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
@@ -3122,7 +3113,6 @@ private theorem divRemLowerMulInteractionsActive
     simpa only [divRemLowerMulInteractions, input,
       divRemLowerMulInput, row, Expression.eval] using h
 
-set_option maxRecDepth 100000 in
 private theorem divRemUpperMulInteractionsActive
     (env : Environment (ZMod p))
     (cols : Var DivRemChip.Columns (ZMod p)) (offset : ℕ) :
@@ -3234,7 +3224,6 @@ private theorem divRemRustByteDecompose
   rw [divRemMulAccessesAllByte, divRemMulAccessesAllByte,
     divRemCompareAccessesAllByte, divRemDirectAccessesAllByte]
 
-set_option maxRecDepth 100000 in
 private theorem divRemByteInteractionsFaithful
     (env : Environment (ZMod p))
     (input : Var DivRemChip.Inputs (ZMod p)) (offset : ℕ) :

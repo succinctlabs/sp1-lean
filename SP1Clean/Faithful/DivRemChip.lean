@@ -428,8 +428,14 @@ private theorem divRemLocalBlock_eq_of_get {F : Type}
   rw [Vector.getElem_ofFn]
   exact hget i hi
 
+/-- `Vector` index congruence over opaque arguments. The block round-trips end on goals of the
+shape `v[bigOffsetArithmetic] = v[i]`; discharging those with `congr` makes the elaborator descend
+structurally through the index arithmetic, which is what drove this file's recursion budget. -/
+private theorem vector_getElem_congr_idx {α : Type} {n : ℕ} (v : Vector α n)
+    {a b : ℕ} (ha : a < n) (hb : b < n) (h : a = b) : v[a] = v[b] := by
+  subst h; rfl
+
 set_option linter.unusedSimpArgs false in
-set_option maxRecDepth 100000 in
 private theorem divRemHeaderBlocks_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :
     divRemLocalBlock (fields 8) (divRemChipLocals cols) 0 (by decide) =
@@ -474,10 +480,9 @@ private theorem divRemHeaderBlocks_roundtrip {F : Type}
       | (rw [Vector.getElem_append_right (by omega) (by omega)] <;>
           try simp only [Vector.getElem_cast])
   all_goals try rw [divRem_toElements_fields]
-  all_goals (congr 1; omega)
+  all_goals exact vector_getElem_congr_idx _ _ _ (by omega)
 
 set_option linter.unusedSimpArgs false in
-set_option maxRecDepth 100000 in
 private theorem divRemComparisonBlocks_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :
     divRemLocalBlock (fields 7) (divRemChipLocals cols) 114 (by decide) =
@@ -522,10 +527,9 @@ private theorem divRemComparisonBlocks_roundtrip {F : Type}
       | (rw [Vector.getElem_append_right (by omega) (by omega)] <;>
           try simp only [Vector.getElem_cast])
   all_goals try rw [divRem_toElements_fields]
-  all_goals (congr 1; omega)
+  all_goals exact vector_getElem_congr_idx _ _ _ (by omega)
 
 set_option linter.unusedSimpArgs false in
-set_option maxRecDepth 100000 in
 private theorem divRemArithmeticBlocks_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :
     divRemLocalBlock Word (divRemChipLocals cols) 170 (by decide) =
@@ -580,14 +584,13 @@ private theorem divRemArithmeticBlocks_roundtrip {F : Type}
   all_goals try rw [divRem_toElements_fields]
   all_goals try rw [divRem_toElements_field]
   all_goals try rw [divRem_toElements_addOperation]
-  all_goals try (congr 1 <;> omega)
-  all_goals
-    have hi_zero : i = 0 := by omega
-    subst i
-    rfl
+  all_goals try
+    (have hi_zero : i = 0 := by omega
+     subst i
+     rfl)
+  all_goals exact vector_getElem_congr_idx _ _ _ (by omega)
 
 set_option linter.unusedSimpArgs false in
-set_option maxRecDepth 100000 in
 private theorem divRemResultBlocks_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :
     divRemLocalBlock Word (divRemChipLocals cols) 205 (by decide) =
@@ -632,11 +635,11 @@ private theorem divRemResultBlocks_roundtrip {F : Type}
           try simp only [Vector.getElem_cast])
   all_goals try rw [divRem_toElements_fields]
   all_goals try rw [divRem_toElements_u16MSBOperation]
-  all_goals try (congr 1 <;> omega)
-  all_goals
-    have hi_zero : i = 0 := by omega
-    subst i
-    rfl
+  all_goals try
+    (have hi_zero : i = 0 := by omega
+     subst i
+     rfl)
+  all_goals exact vector_getElem_congr_idx _ _ _ (by omega)
 
 private theorem divRemColumnsOfInput_roundtrip {F : Type}
     (cols : DivRemChip.Columns F) :

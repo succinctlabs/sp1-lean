@@ -1107,11 +1107,22 @@ eight supported `Soundness`/`Completeness` forms, `unfold` that constant, and `i
 - step 8's `simp +instances only [circuit_norm, h_input] at h_env` — the one-shot cast that Clean's own
   `doc/performance-problems.md:146-149` singles out as "the largest single cast".
 
-**Every step is wrapped in `try … catch _ => pure ()`.** The heartbeat counter is cumulative over the
-declaration, so once the budget is exhausted every remaining step fails instantly and is silently swallowed.
-The proof then fails somewhere unrelated, with a goal that looks like the opener half-ran — because it did.
-If a `circuit_proof_start` proof fails in a way that makes no sense, suspect budget exhaustion mid-pipeline
-before suspecting the tactic text.
+**Every step is wrapped in `try … catch _ => pure ()`** — but ⚠ **this does NOT swallow budget errors, and
+an earlier revision of this section said it did.** Measured 2026-08-02 with a two-line probe: both a
+heartbeat timeout and a `maxRecDepth` overflow raised *inside* a `try` propagate out and fail the
+declaration. Lean treats them as unrecoverable, so `try`/`first` cannot insulate a tactic from a ceiling.
+
+Two consequences, both the opposite of what was written here before:
+
+- A `circuit_proof_start` that runs out of budget **hard-fails at the step that exhausts it**, and reports
+  that step's phase. It does not silently no-op the rest of the pipeline. The error location is meaningful.
+- When laddering, a `try`-wrapped tactic is **not** protected. A `first | cheap | expensive` fallback will
+  not rescue a proof from a depth ceiling — the depth error escapes the alternation. This bit us for real:
+  `Faithful/DivRemChip.lean`'s `all_goals try exact vector_getElem_congr_idx …` still hard-failed at the
+  `try` line, which is why that fix had to reorder the branches rather than add a fallback.
+
+The prior claim was inferred from reading `try … catch _ => pure ()` in Clean's source, never tested — the
+exact failure mode §12's meta-rule warns about, committed in this very document.
 
 **The migration.** Clean's prescription for a heavy composition is to stop using the full tactic:
 `circuit_proof_start_core`, then reproduce by hand only the steps the body actually needs —
