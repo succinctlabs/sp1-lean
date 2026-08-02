@@ -359,10 +359,15 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
     proofs) and the auto-gen `linter.all false` — must stay.
 - Heavy `toBitVec64` rw chains are whnf-expensive — `set_option maxHeartbeats 2000000 in` (carry lemmas need up
   to `16000000`).
-- **Never write the heartbeat-option name into a Lean comment or docstring under `SP1Clean/` /
-  `SP1CleanTest/`.** `scripts/check_heartbeats.sh` counts sites with a raw `grep -rc` and does not parse Lean,
-  so a comment merely *mentioning* the option scores as a live ceiling and silently corrupts the ratchet
-  baseline. Record a measured ladder without the literal: "the former 8M ceiling was ~200× over".
+- **Never write the phrases `set_option maxHeartbeats` or `set_option maxRecDepth` into a Lean comment or
+  docstring under `SP1Clean/` / `SP1CleanTest/`.** `scripts/check_heartbeats.sh` counts sites with a raw
+  `grep -rc "set_option <opt>"` and does not parse Lean, so a comment quoting the full directive scores as a
+  live ceiling and silently corrupts the ratchet baseline. Record a measured ladder without it: "the former
+  8M ceiling was ~200× over".
+  *Precision note (verified 2026-08-02):* the guard matches the **full `set_option …` phrase**, not the bare
+  option name. Writing "the depth bump" or even "maxRecDepth" alone in prose is harmless. This bullet
+  previously claimed a comment "merely *mentioning* the option" would score, which is false and had us
+  contorting notes for no reason — but the narrower prohibition is real, so keep it.
 - **Dropping `by exact` on a `def`'s Prop-valued field can be load-bearing *opacity*.** A tactic block becomes
   an opaque auxiliary proof constant; the bare term inlines and `isDefEqDelta` unfolds it into every consumer.
   One such −1-line golf took a downstream module from **260s to >1230s**. A/B-time the *downstream* consumers,
