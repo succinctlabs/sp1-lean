@@ -128,7 +128,6 @@ instance : ProvableStruct DivRemCols where
 
 namespace U16toU8OperationSafe
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_u16_values : (Vector F 4))
   (_cols : (U16toU8Operation F))
@@ -137,7 +136,6 @@ set_option maxHeartbeats 8000000 in
   [
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (u16_values : (Vector F 4))
   (cols : (U16toU8Operation F))
@@ -158,7 +156,6 @@ set_option maxHeartbeats 8000000 in
     ⟨.send, (.byte 3 0 cols.low_bytes[3] E7), is_real⟩,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def value {F : Type} [Field F] [CoeHead F ℕ]
   (u16_values : (Vector F 4))
   (cols : (U16toU8Operation F))
@@ -178,7 +175,6 @@ end U16toU8OperationSafe
 
 namespace U16MSBOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_a : F)
   (cols : (U16MSBOperation F))
@@ -193,7 +189,6 @@ set_option maxHeartbeats 8000000 in
     E3,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (a : F)
   (cols : (U16MSBOperation F))
@@ -210,7 +205,6 @@ end U16MSBOperation
 
 namespace MulOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (a_word : (Word F))
   (b_word : (Word F))
@@ -737,7 +731,6 @@ set_option maxHeartbeats 8000000 in
     E465,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (a_word : (Word F))
   (b_word : (Word F))
@@ -787,7 +780,6 @@ end MulOperation
 
 namespace IsZeroOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (a : F)
   (cols : (IsZeroOperation F))
@@ -808,7 +800,6 @@ set_option maxHeartbeats 8000000 in
     E8,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (_a : F)
   (_cols : (IsZeroOperation F))
@@ -821,7 +812,6 @@ end IsZeroOperation
 
 namespace IsZeroWordOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (a : (Word F))
   (cols : (IsZeroWordOperation F))
@@ -846,7 +836,6 @@ set_option maxHeartbeats 8000000 in
     E10,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (a : (Word F))
   (cols : (IsZeroWordOperation F))
@@ -859,7 +848,6 @@ end IsZeroWordOperation
 
 namespace IsEqualWordOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (a : (Word F))
   (b : (Word F))
@@ -876,7 +864,6 @@ set_option maxHeartbeats 8000000 in
     E1,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (a : (Word F))
   (b : (Word F))
@@ -894,7 +881,6 @@ end IsEqualWordOperation
 
 namespace AddOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (a : (Word F))
   (b : (Word F))
@@ -939,7 +925,6 @@ set_option maxHeartbeats 8000000 in
     E29,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (_a : (Word F))
   (_b : (Word F))
@@ -957,7 +942,6 @@ end AddOperation
 
 namespace U16CompareOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_a : F)
   (_b : F)
@@ -973,7 +957,6 @@ set_option maxHeartbeats 8000000 in
     E3,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (a : F)
   (b : F)
@@ -991,7 +974,6 @@ end U16CompareOperation
 
 namespace LtOperationUnsigned
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (b : (Word F))
   (cc : (Word F))
@@ -1069,7 +1051,6 @@ set_option maxHeartbeats 8000000 in
     E54,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (_b : (Word F))
   (_cc : (Word F))
@@ -1083,7 +1064,7 @@ end LtOperationUnsigned
 
 namespace DivRemCols
 
-set_option maxHeartbeats 8000000 in
+set_option maxHeartbeats 400000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (DivRemCols F))
   : List F :=
@@ -1597,7 +1578,6 @@ set_option maxHeartbeats 8000000 in
     cols.adapter.op_a_0,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (DivRemCols F))
   : List (Interaction F) :=

@@ -24,7 +24,6 @@ deriving ProvableStruct
 
 namespace CPUState
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_cols : (CPUState F))
   (_next_pc : (Vector F 3))
@@ -37,7 +36,6 @@ set_option maxHeartbeats 8000000 in
     E3,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (CPUState F))
   (next_pc : (Vector F 3))

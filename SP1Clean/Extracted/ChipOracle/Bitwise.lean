@@ -46,7 +46,6 @@ deriving ProvableStruct
 
 namespace U16toU8OperationUnsafe
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_u16_values : (Vector F 4))
   (_cols : (U16toU8Operation F))
@@ -54,7 +53,6 @@ set_option maxHeartbeats 8000000 in
   [
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (_u16_values : (Vector F 4))
   (_cols : (U16toU8Operation F))
@@ -62,7 +60,6 @@ set_option maxHeartbeats 8000000 in
   [
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def value {F : Type} [Field F] [CoeHead F ℕ]
   (u16_values : (Vector F 4))
   (cols : (U16toU8Operation F))
@@ -81,7 +78,6 @@ end U16toU8OperationUnsafe
 
 namespace BitwiseOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_a : (Vector F 8))
   (_b : (Vector F 8))
@@ -92,7 +88,6 @@ set_option maxHeartbeats 8000000 in
   [
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (a : (Vector F 8))
   (b : (Vector F 8))
@@ -115,7 +110,6 @@ end BitwiseOperation
 
 namespace BitwiseU16Operation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (b : (Word F))
   (cc : (Word F))
@@ -147,7 +141,6 @@ set_option maxHeartbeats 8000000 in
     E1,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (b : (Word F))
   (cc : (Word F))
@@ -176,7 +169,6 @@ set_option maxHeartbeats 8000000 in
   U16toU8OperationUnsafe.interactions #v[b[0], b[1], b[2], b[3]] { low_bytes := #v[cols.b_low_bytes.low_bytes[0], cols.b_low_bytes.low_bytes[1], cols.b_low_bytes.low_bytes[2], cols.b_low_bytes.low_bytes[3]] } ++ U16toU8OperationUnsafe.interactions #v[cc[0], cc[1], cc[2], cc[3]] { low_bytes := #v[cols.c_low_bytes.low_bytes[0], cols.c_low_bytes.low_bytes[1], cols.c_low_bytes.low_bytes[2], cols.c_low_bytes.low_bytes[3]] } ++ BitwiseOperation.interactions #v[E2, E3, E4, E5, E6, E7, E8, E9] #v[E10, E11, E12, E13, E14, E15, E16, E17] { result := #v[cols.bitwise_operation.result[0], cols.bitwise_operation.result[1], cols.bitwise_operation.result[2], cols.bitwise_operation.result[3], cols.bitwise_operation.result[4], cols.bitwise_operation.result[5], cols.bitwise_operation.result[6], cols.bitwise_operation.result[7]] } opcode is_real ++ [
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def value {F : Type} [Field F] [CoeHead F ℕ]
   (_b : (Word F))
   (_cc : (Word F))
@@ -198,7 +190,6 @@ end BitwiseU16Operation
 
 namespace BitwiseCols
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (BitwiseCols F))
   : List F :=
@@ -238,7 +229,6 @@ set_option maxHeartbeats 8000000 in
     cols.adapter.op_a_0,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (BitwiseCols F))
   : List (Interaction F) :=

@@ -41,7 +41,6 @@ deriving ProvableStruct
 
 namespace AddrAddOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (a : (Word F))
   (b : (Word F))
@@ -86,7 +85,6 @@ set_option maxHeartbeats 8000000 in
     E29,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (_a : (Word F))
   (_b : (Word F))
@@ -103,7 +101,6 @@ end AddrAddOperation
 
 namespace AddressOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (b : (Word F))
   (cc : (Word F))
@@ -132,7 +129,6 @@ set_option maxHeartbeats 8000000 in
     E10,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (b : (Word F))
   (cc : (Word F))
@@ -152,7 +148,6 @@ set_option maxHeartbeats 8000000 in
     ⟨.send, (.byte 6 E16 13 0), is_real⟩,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def value {F : Type} [Field F] [CoeHead F ℕ]
   (_b : (Word F))
   (_cc : (Word F))
@@ -173,7 +168,6 @@ end AddressOperation
 
 namespace LoadDoubleColumns
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (LoadDoubleColumns F))
   : List F :=
@@ -214,7 +208,6 @@ set_option maxHeartbeats 8000000 in
     cols.adapter.op_a_0,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (LoadDoubleColumns F))
   : List (Interaction F) :=

@@ -52,7 +52,6 @@ deriving ProvableStruct
 
 namespace U16MSBOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_a : F)
   (cols : (U16MSBOperation F))
@@ -67,7 +66,6 @@ set_option maxHeartbeats 8000000 in
     E3,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (a : F)
   (cols : (U16MSBOperation F))
@@ -84,7 +82,6 @@ end U16MSBOperation
 
 namespace U16CompareOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_a : F)
   (_b : F)
@@ -100,7 +97,6 @@ set_option maxHeartbeats 8000000 in
     E3,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (a : F)
   (b : F)
@@ -118,7 +114,6 @@ end U16CompareOperation
 
 namespace LtOperationUnsigned
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (b : (Word F))
   (cc : (Word F))
@@ -196,7 +191,6 @@ set_option maxHeartbeats 8000000 in
     E54,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (_b : (Word F))
   (_cc : (Word F))
@@ -210,7 +204,6 @@ end LtOperationUnsigned
 
 namespace LtOperationSigned
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (b : (Word F))
   (cc : (Word F))
@@ -244,7 +237,6 @@ set_option maxHeartbeats 8000000 in
     E9,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (b : (Word F))
   (cc : (Word F))
@@ -267,7 +259,6 @@ end LtOperationSigned
 
 namespace LtCols
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (LtCols F))
   : List F :=
@@ -292,7 +283,6 @@ set_option maxHeartbeats 8000000 in
     cols.adapter.op_a_0,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (LtCols F))
   : List (Interaction F) :=

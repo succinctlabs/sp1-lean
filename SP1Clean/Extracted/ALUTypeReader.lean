@@ -29,7 +29,6 @@ deriving ProvableStruct
 
 namespace ALUTypeReader
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_clk_high : F)
   (_clk_low : F)
@@ -84,7 +83,6 @@ set_option maxHeartbeats 8000000 in
     E43,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (clk_high : F)
   (clk_low : F)

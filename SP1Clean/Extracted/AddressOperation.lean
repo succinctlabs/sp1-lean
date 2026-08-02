@@ -23,7 +23,6 @@ deriving ProvableStruct
 
 namespace AddressOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (b : (Word F))
   (cc : (Word F))
@@ -52,7 +51,6 @@ set_option maxHeartbeats 8000000 in
     E10,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (b : (Word F))
   (cc : (Word F))
@@ -72,7 +70,6 @@ set_option maxHeartbeats 8000000 in
     ⟨.send, (.byte 6 E16 13 0), is_real⟩,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def value {F : Type} [Field F] [CoeHead F ℕ]
   (_b : (Word F))
   (_cc : (Word F))

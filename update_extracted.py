@@ -611,7 +611,7 @@ def render(operation: str, import_modules: Sequence[str], body: str) -> str:
     # Operations can be very large (MulOperation's ~460-`let` product chain exceeds 1M heartbeats),
     # so give them a generous limit.
     body = _preserve_raw_byte_opcodes(body)
-    body = _bump_constraints_heartbeats(body.strip(), 8000000)
+    body = _bump_constraints_heartbeats(body.strip(), f"operation:{operation}")
     body = _expand_large_derives(body)
     _sanity_gate(operation, body)
     reused = ", ".join(import_modules) if import_modules else "no"
@@ -626,13 +626,57 @@ def render(operation: str, import_modules: Sequence[str], body: str) -> str:
     return _header(import_modules, doc) + "\n" + body + "\n\n" + FOOTER
 
 
-def _bump_constraints_heartbeats(body: str, heartbeats: int = 1000000) -> str:
-    """Prefix **each** generated `@[irreducible] def` (`asserts` / `interactions` / `value`) with a
-    raised `maxHeartbeats`. Each def's `let` chain (with nested `#v[…][k]` projections through the
-    column structs) is whnf-expensive and exceeds the 200k default; the largest operations (e.g.
-    `MulOperation`, ~460 lets) exceed even 1M. Harmless where the default already suffices (Add/Sub)."""
-    needle = "@[irreducible] def "
-    return body.replace(needle, f"set_option maxHeartbeats {heartbeats} in\n{needle}")
+# Measured elaboration-budget overrides for generated definitions, keyed by
+# "<scope>:<name>:<namespace>.<def>". **Default is no override at all.**
+#
+# This used to be a blanket `maxHeartbeats 8000000` on *every* generated `@[irreducible] def` — 214
+# sites, none of them measured, on a population whose median `let`-chain is 8 long. The old docstring
+# conceded it was "harmless where the default already suffices (Add/Sub)".
+#
+# Measured 2026-08-02 by stripping all 214 and running a full `lake build`: exactly ONE generated
+# definition failed. Not the biggest ones either — `SystemOracle/Global.lean`'s four definitions run to
+# 1649/1111/668/535 lets under a plain file-level 1000000 and were never in this set at all, while a
+# *zero*-let `interactions` def was carrying 8000000.
+#
+# Adding an entry here requires a ladder, recorded in the comment beside it. Do not add one
+# speculatively: the whole point is that 213 of the previous 214 bought nothing.
+CONSTRAINT_HEARTBEAT_OVERRIDES: Dict[str, int] = {
+    # The single measured survivor. ~466-`let` chain, and it fails in `«LCNF simp»` — the CODE
+    # GENERATOR, not elaboration — which is why it is the only one: the elaborator handles every
+    # generated def at the default, and only codegen on the largest chip oracle does not.
+    # Ladder: 200000 FAIL (`«LCNF simp»`) / 210000 ok → floor (200000, 210000], i.e. barely over the
+    # default. Set to 400000 for ~2x margin because codegen cost is less predictable across toolchain
+    # bumps than elaboration; the previous blanket value was 8000000, ~40x over.
+    "chip_oracle:DivRem:DivRemCols.asserts": 400000,
+}
+
+
+def _bump_constraints_heartbeats(body: str, scope: str) -> str:
+    """Prefix a generated `@[irreducible] def` with an elaboration-budget override **only** where one
+    has been measured to be necessary — see `CONSTRAINT_HEARTBEAT_OVERRIDES`. Definitions absent from
+    that table (the overwhelming majority) are emitted with no override, matching Lean's default.
+
+    `scope` identifies the emitting renderer and subject, e.g. `"chip_oracle:DivRem"`; the table key
+    appends the **innermost** enclosing namespace and the definition name, so a bump lands on exactly
+    one definition rather than on every def in a module. The innermost component is used deliberately:
+    the module's outer `namespace SP1Clean.Extracted.<X>` is contributed by the header, which is
+    prepended *after* this runs, so a fully-qualified key would not match at generation time."""
+    out: List[str] = []
+    stack: List[str] = []
+    for line in body.split("\n"):
+        opened = re.match(r"namespace\s+(\S+)", line)
+        if opened:
+            stack.append(opened.group(1))
+        elif re.match(r"end\s+\S+", line) and stack:
+            stack.pop()
+        if line.startswith("@[irreducible] def "):
+            name = line.split()[2]
+            qualified = f"{stack[-1]}.{name}" if stack else name
+            value = CONSTRAINT_HEARTBEAT_OVERRIDES.get(f"{scope}:{qualified}")
+            if value is not None:
+                out.append(f"set_option maxHeartbeats {value} in")
+        out.append(line)
+    return "\n".join(out)
 
 
 def render_struct_carrier(carrier: str, donor: str, struct_names: Sequence[str],
@@ -663,7 +707,7 @@ def render_chip(chip: str, import_modules: Sequence[str], body: str) -> str:
     """Wrap a chip's compiler body in a module header that imports the reused operation
     column-struct modules."""
     body = _preserve_raw_byte_opcodes(body)
-    body = _bump_constraints_heartbeats(body.strip(), 8000000)
+    body = _bump_constraints_heartbeats(body.strip(), f"chip:{chip}")
     body = _expand_large_derives(body)
     _sanity_gate(f"{chip} (chip)", body)
     reused = ", ".join(import_modules) if import_modules else "no"
@@ -810,7 +854,7 @@ def render_chip_oracle(
             body,
         )
     body = _preserve_raw_byte_opcodes(body)
-    body = _bump_constraints_heartbeats(body.strip(), 8000000)
+    body = _bump_constraints_heartbeats(body.strip(), f"chip_oracle:{chip}")
     body = _expand_large_derives(body)
     _sanity_gate(f"{chip} (self-contained chip oracle)", body)
     helper_list = ", ".join(embedded_helpers) if embedded_helpers else "no private helpers"

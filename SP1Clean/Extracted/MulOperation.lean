@@ -32,7 +32,6 @@ deriving ProvableStruct
 
 namespace MulOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (a_word : (Word F))
   (b_word : (Word F))
@@ -559,7 +558,6 @@ set_option maxHeartbeats 8000000 in
     E465,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (a_word : (Word F))
   (b_word : (Word F))

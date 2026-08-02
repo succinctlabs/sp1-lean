@@ -33,7 +33,6 @@ deriving ProvableStruct
 
 namespace SubOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (a : (Word F))
   (b : (Word F))
@@ -86,7 +85,6 @@ set_option maxHeartbeats 8000000 in
     E37,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (_a : (Word F))
   (_b : (Word F))
@@ -104,7 +102,6 @@ end SubOperation
 
 namespace SubCols
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (SubCols F))
   : List F :=
@@ -118,7 +115,6 @@ set_option maxHeartbeats 8000000 in
     cols.adapter.op_a_0,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (cols : (SubCols F))
   : List (Interaction F) :=

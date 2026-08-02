@@ -18,7 +18,6 @@ open SP1Clean
 
 namespace U16toU8OperationSafe
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_u16_values : (Vector F 4))
   (_cols : (U16toU8Operation F))
@@ -27,7 +26,6 @@ set_option maxHeartbeats 8000000 in
   [
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (u16_values : (Vector F 4))
   (cols : (U16toU8Operation F))
@@ -48,7 +46,6 @@ set_option maxHeartbeats 8000000 in
     ⟨.send, (.byte 3 0 cols.low_bytes[3] E7), is_real⟩,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def value {F : Type} [Field F] [CoeHead F ℕ]
   (u16_values : (Vector F 4))
   (cols : (U16toU8Operation F))
