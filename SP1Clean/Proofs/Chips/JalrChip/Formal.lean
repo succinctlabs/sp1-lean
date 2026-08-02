@@ -60,6 +60,16 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
 
 -- Measured: genuinely binding. Fails at 2000000, passes at 4000000 — the declared budget is only
 -- ~2x the pass rung, the tightest ceiling measured in the tree. Do not lower.
+-- Cause found by ablation (2026-08-01): replacing this proof's *entire body* with `sorry` leaves
+-- `circuit_proof_start` alone still failing at 2000000 and passing at 4000000, and the whole file still
+-- elaborating in 104s vs 104.6s unablated. So 100% of both the floor and the wall-clock is the opener
+-- normalizing `main`'s five-subcircuit tower (CPUState + 2x AddOperation + ITypeReader + RegisterWrite)
+-- over the nested `ITypeReader`/`RegisterAccessCols` `ProvableStruct`; the proof body is free.
+-- Counters at a forced-low rung: List.rec 382088, Eq.rec 323406, ProvableTypeList.rec 233070,
+-- componentsToElements 233010 — and no `Vector.mapRange` at all, unlike the Load/Store family.
+-- Clean fix pattern 7 (projections instead of the wide `obtain`s below) was applied and measured: the
+-- counters were byte-identical and the floor did not move, so it was reverted. Any real fix here has to
+-- attack `circuit_proof_start`/`elaborate_circuit` on this chip, not the proof text.
 set_option maxHeartbeats 8000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
@@ -188,7 +198,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         simp only [Vector.getElem_mapRange, circuit_norm] <;> simp_all
 
 -- Measured: genuinely binding, same band as `soundness` above (fails at 2000000, passes at
--- 4000000). Do not lower.
+-- 4000000). Do not lower. Same ablation verdict as `soundness`: with the body replaced by `sorry` the
+-- opener alone still fails at Lean's plain default, so the cost is `circuit_proof_start`, not the body.
 set_option maxHeartbeats 8000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by

@@ -102,16 +102,24 @@ lemma low_half
         + (b7*c7)*256^6) := by rw [hS]; ring
   omega
 
--- Ladder-measured 2026-07-28, one clean LSP re-elaboration per rung (control at a 1-heartbeat
--- budget produced a real `elaborator` timeout, so every rung below is a genuine re-elaboration):
--- 200000 FAIL / 400000 FAIL / 1000000 FAIL / 1200000 ok / 2000000 ok / 4000000 ok.
--- True floor (1000000, 1200000] — genuinely binding, and the highest floor measured anywhere in
--- this tree. The cost is term-intrinsic, not a duplication proxy: the `omega` telescope runs over
--- sixteen column equations with `2^128`-sized literal coefficients, and the `ring` normalises a
--- 256-monomial 16x16 convolution. (The 8-column sibling `low_half` does the same work at a
--- quarter of the term size and needs no budget at all.) The former 16000000 value was ~13x over;
--- this is 5x the lowest passing rung. Do not raise it without re-running the ladder.
-set_option maxHeartbeats 6000000 in
+-- Re-laddered 2026-08-01. The floor used to be (1000000, 1200000] — the highest anywhere in this
+-- tree — and was recorded as irreducibly term-intrinsic. It was not: only *part* of it was.
+-- Diagnostic counters showed `ring`/`omega` producing the term (`Mathlib.Tactic.Ring.Common.*`
+-- dominating `occs` on a 61385-node term) but *also* `OfNat.ofNat` 786960 / `HPow.hPow` 786952 /
+-- `Monoid.npow` 393476 — the literal `256^k` and `2^128` coefficients being re-evaluated hundreds
+-- of thousands of times. The cause was the schoolbook sum being introduced with `set … with hS`:
+-- `set` makes `S` a let-bound local that the elaborator zeta-unfolds (Clean's performance doc
+-- rejects it for exactly this), and it leaves `hS` — the giant 16-column equation — in context, so
+-- the closing `omega` re-ingested every monomial and every power a second time. Replacing it with
+-- Clean fix pattern 4 (`obtain ⟨S, hS⟩ : ∃ S, S = … := ⟨_, rfl⟩`, a genuinely opaque local) and
+-- clearing `hS` once `hLOW`/`hHIGH` are derived moves the floor to (200000, 400000] — a 3-6x drop,
+-- and the declared budget from 6000000 to 500000 (12x). What remains *is* term-intrinsic: the
+-- `ring` normalises a 256-monomial 16x16 convolution and the `omega` telescopes sixteen column
+-- equations. (The 8-column sibling `low_half` does the same work at a quarter of the term size and
+-- needs no budget at all — it also still uses `set`, so it is a candidate for the same treatment.)
+-- Rungs after the fix: 50000 FAIL / 100000 FAIL / 200000 FAIL / 300000 FAIL / 400000 ok.
+-- Do not raise this without re-running the ladder.
+set_option maxHeartbeats 500000 in
 /-- **Full-product schoolbook reassembly** (the high-half keystone). The 16-column
 mod-`2^128` analogue of `low_half`: given the sixteen schoolbook column equations over the
 sixteen sign/zero-extended operand bytes, the sixteen product bytes reassemble — mod `2^128` —
@@ -140,7 +148,7 @@ lemma full_product
     (p0 + p1*256^1 + p2*256^2 + p3*256^3 + p4*256^4 + p5*256^5 + p6*256^6 + p7*256^7 + p8*256^8 + p9*256^9 + p10*256^10 + p11*256^11 + p12*256^12 + p13*256^13 + p14*256^14 + p15*256^15) % 2^128
       = ((b0 + b1*256^1 + b2*256^2 + b3*256^3 + b4*256^4 + b5*256^5 + b6*256^6 + b7*256^7 + b8*256^8 + b9*256^9 + b10*256^10 + b11*256^11 + b12*256^12 + b13*256^13 + b14*256^14 + b15*256^15)
          * (c0 + c1*256^1 + c2*256^2 + c3*256^3 + c4*256^4 + c5*256^5 + c6*256^6 + c7*256^7 + c8*256^8 + c9*256^9 + c10*256^10 + c11*256^11 + c12*256^12 + c13*256^13 + c14*256^14 + c15*256^15)) % 2^128 := by
-  set S : ℕ := (b0*c0)
+  obtain ⟨S, hS⟩ : ∃ S : ℕ, S = (b0*c0)
     + (b0*c1 + b1*c0)*256^1
     + (b0*c2 + b1*c1 + b2*c0)*256^2
     + (b0*c3 + b1*c2 + b2*c1 + b3*c0)*256^3
@@ -156,7 +164,7 @@ lemma full_product
     + (b0*c13 + b1*c12 + b2*c11 + b3*c10 + b4*c9 + b5*c8 + b6*c7 + b7*c6 + b8*c5 + b9*c4 + b10*c3 + b11*c2 + b12*c1 + b13*c0)*256^13
     + (b0*c14 + b1*c13 + b2*c12 + b3*c11 + b4*c10 + b5*c9 + b6*c8 + b7*c7 + b8*c6 + b9*c5 + b10*c4 + b11*c3 + b12*c2 + b13*c1 + b14*c0)*256^14
     + (b0*c15 + b1*c14 + b2*c13 + b3*c12 + b4*c11 + b5*c10 + b6*c9 + b7*c8 + b8*c7 + b9*c6 + b10*c5 + b11*c4 + b12*c3 + b13*c2 + b14*c1 + b15*c0)*256^15
-    with hS
+    := ⟨_, rfl⟩
   have hLOW :
       (p0 + p1*256^1 + p2*256^2 + p3*256^3 + p4*256^4 + p5*256^5 + p6*256^6 + p7*256^7 + p8*256^8 + p9*256^9 + p10*256^10 + p11*256^11 + p12*256^12 + p13*256^13 + p14*256^14 + p15*256^15)
         + k15 * 2^128 = S := by rw [hS]; omega
@@ -179,6 +187,7 @@ lemma full_product
         + (b13*c15 + b14*c14 + b15*c13)*256^12
         + (b14*c15 + b15*c14)*256^13
         + (b15*c15)*256^14) := by rw [hS]; ring
+  clear hS
   omega
 
 /-! ## Byte helpers for the schoolbook product

@@ -205,7 +205,20 @@ private theorem aluX0_chip_constraints_decompose
     Readers.ALUTypeReaderImmutable.circuit, circuit_norm, List.map_append,
     List.forall_append, List.forall_cons]
 
-set_option maxHeartbeats 2000000 in
+-- Measured floor bracket (250000, 500000]; the former 2M was ~4-8x over and is now right-sized to
+-- the next rung above the floor. Mechanism (diagnostic counters): a runaway whnf of the circuit
+-- monad bind chain -- `bind` 146252 / `Circuit.bind` 146224 / `Prod.rec` 146224, with
+-- `Readers.ALUTypeReaderImmutable.main` unfolded 6176x and `Readers.CPUState.main` 4132x -- charged
+-- almost entirely to the closing `tauto`. Confirmed causally: stubbing that one `tauto` drops the
+-- declaration below 100000 (whole-file 11s -> 4s). `tauto` splits a ~30-conjunct `And`-chain
+-- `Iff` and settles each subgoal by `assumption`, so it `isDefEq`-compares atoms that still contain
+-- `(Readers.CPUState.main …).operations offset`, re-unfolding the bind chain per comparison.
+-- Tried and measured as no-ops: narrowing the non-`only` `dsimp` at `hCpu`; flipping `rw [hCpu]` to
+-- `rw [← hCpu]` so both sides normalise to the cheap `.asserts` spelling; and Clean fix pattern 4
+-- (`generalize` the expensive atom to an opaque local before `tauto`) -- all three leave the bracket
+-- unchanged, because `kabstract` pays the same whnf that `tauto` does. A real fix has to replace
+-- `tauto` with an explicit `Iff` construction over the conjunct list.
+set_option maxHeartbeats 500000 in
 theorem aluX0Chip_constraints_faithful
     (env : Environment (ZMod p)) (input : Var AluX0Chip.Inputs (ZMod p))
     (offset : ℕ) (cols : AluX0Chip.Columns (ZMod p))

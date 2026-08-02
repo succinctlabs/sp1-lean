@@ -23,10 +23,16 @@ def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZM
       Word.toBitVec64 cols.a = RV64.sraw (Word.toBitVec64 input.adapter.op_c_memory.prev_value)
         (Word.toBitVec64 input.adapter.op_b_memory.prev_value))
 
+-- Genuinely binding, but the former 1.6M ceiling was ~6x over: measured floor bracket
+-- (220000, 250000]; sized at 4x the bracket top. Diffuse cost, not a whnf runaway -- the phase is
+-- `isDefEq` and the top reduction counter is only ~13k (cf. the 382k of a real tower); it is the
+-- ~130 `linear_combination`/`push_cast` branches of the sign-extension dispatch, each cheap.
+-- Clean fix pattern 7 (projections instead of the wide `obtain`s) was tried and measured: the
+-- bracket was byte-identical either way, so the destructuring is not the cost here.
 set_option linter.unusedVariables false in
 set_option linter.unusedTactic false in
 set_option linter.unreachableTactic false in
-set_option maxHeartbeats 1600000 in
+set_option maxHeartbeats 1000000 in
 /-- Soundness of the `sraw` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_early_struct

@@ -1054,9 +1054,14 @@ private theorem branchLtMeaningFaithful
   rw [← hExact]
   rfl
 
+-- Formerly carried a 1600000 ceiling against a measured floor of (200000, 400000]. The whole cost
+-- was the `ring_nf` that used to sit before the closing `tauto`: diagnostics put the failure inside
+-- `ring_nf` itself (it is simp-based, and its own `Mathlib.Tactic.RingNF.*` lemmas dominate the
+-- census -- `mul_assoc_rev` 142, `add_assoc_rev` 64, `mul_neg`/`add_neg` 22 each), with no whnf
+-- runaway anywhere (top elaboration counter only 765). It was also redundant: `tauto` closes the
+-- goal on its own. Dropping it took the floor below 20000 -- >10x -- so the ceiling is gone.
 omit [Fact (2 ^ 17 < p)] in
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 1600000 in
 private theorem branchTailMeaningFaithful
     (env : Environment (ZMod p))
     (input : Var BranchChip.Inputs (ZMod p)) (offset : ℕ)
@@ -1084,7 +1089,6 @@ private theorem branchTailMeaningFaithful
   rw [hinputReal]
   simp only [branchSum, branchFlag,
     Expression.eval, sub_self]
-  ring_nf
   tauto
 
 private theorem branchMeaningFaithful

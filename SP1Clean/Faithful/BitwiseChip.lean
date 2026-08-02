@@ -18,9 +18,23 @@ decode.
 
 Heartbeat budget: eight of the eleven declared ceilings here were 25–200× over and
 were measured away (floors ≤40000). The three survivors are real:
-`toElements_bitwiseChipOperationOfLocals` fails at 800000, while
-`bitwise_chip_constraints_decompose` and `bitwiseChip_interactions_faithful` fail at
-150000 and 100000 respectively. Each is kept at roughly twice its measured floor.
+`toElements_bitwiseChipOperationOfLocals` has measured floor bracket (900000, 1000000] and is now
+pinned at 1000000 (it used to declare twice that), while `bitwise_chip_constraints_decompose` and
+`bitwiseChip_interactions_faithful` fail at 150000 and 100000 respectively.
+
+`toElements_bitwiseChipOperationOfLocals` is a bare `rfl`, and it is the highest-floor `rfl` in the
+tree. Diagnosed mechanism: a runaway whnf reducing `toElements` of a 3-component `ProvableStruct`
+to its flat 16-cell `Vector` normal form. At a 40000 probe the counters are `List.rec` 31227,
+`Eq.rec` 25849, `ProvableStruct.ProvableTypeList.rec` 18925, `ProvableStruct.componentsToElements`
+18924, `Nat.rec` 11579, `dite` 7018, `Decidable.rec` 7012 — i.e. ~420000 `componentsToElements`
+unfoldings at the real floor, for a struct with only three components. The cost is the
+`Vector.append` size arithmetic (`Eq.rec` casts, `dite` bounds checks) inside `Array.foldl`, not the
+struct shape. Measured and rejected as fixes: `Vector.ext` + `interval_cases i <;> rfl` (same
+bracket — still fails at 800000); `simp only [circuit_norm]`, which leaves the goal untouched
+because `circuit_norm` carries no `toElements`-of-a-`ProvableStruct`-literal rule at all; and a
+helper stated over opaque component vectors (Clean fix pattern 1), which is *not* a definitional
+equality — `toElements ⟨⟨b⟩, ⟨c⟩, ⟨r⟩⟩` does not reduce to `b ++ c ++ r`. Removing this cost needs
+a `toElements`/`componentsToElements` rewrite rule upstream in Clean; there is no local fix.
 -/
 
 namespace SP1Clean.Faithful
@@ -123,7 +137,7 @@ def bitwiseChipColumnsOfInput {F : Type} (input : BitwiseChip.Inputs F)
   ⟨input.state, input.adapter, bitwiseChipOperationOfLocals locals,
     locals[0], locals[1], locals[2]⟩
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 1000000 in
 private theorem toElements_bitwiseChipOperationOfLocals {F : Type}
     (locals : Vector F 19) :
     toElements (bitwiseChipOperationOfLocals locals) =

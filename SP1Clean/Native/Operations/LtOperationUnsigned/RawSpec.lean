@@ -18,10 +18,12 @@ Soundness cores (`ltUnsigned_core`, `comparison_limbs_lt`, `flags_sum_zero_iff_e
 
 Measured elaboration floors (ladder against a 1-heartbeat control, `at_most_one` pinned high while
 its three consumers were laddered — it masks them with a kernel `unknown constant` cascade):
-`at_most_one` (400k, 500k] — **genuinely binding**, the only ceiling left in this file, and its
-declared 1000000 is only ~2x its floor, so it is kept as-is; `ltUnsigned_core` (30k, 35k];
-`flags_sum_zero_iff_eq` (20k, 25k]; `comparison_limbs_lt` (5k, 10k]. Those three former
-1000000-heartbeat ceilings were removed — the plain default carries >=5x headroom on each. -/
+`at_most_one` (10k, 20k]; `ltUnsigned_core` (30k, 35k]; `flags_sum_zero_iff_eq` (20k, 25k];
+`comparison_limbs_lt` (5k, 10k]. All four former 1000000-heartbeat ceilings are now removed — the
+plain default carries >=5x headroom on each. `at_most_one` used to floor at (400k, 500k] and was
+the file's last surviving ceiling; the entire cost was five `tauto` calls closing the five
+satisfiable flag patterns, and replacing them with explicit `Or.inl`/`Or.inr` introductions dropped
+its floor ~25-50x (whole-file elaboration 16s -> 3s). -/
 
 namespace SP1Clean.LtOperationUnsigned
 
@@ -31,10 +33,11 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 instance : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
-set_option maxHeartbeats 1000000 in
 /-- Four boolean flags whose field sum is `0` or `1` have **at most one** set: the assignment is
 one of the five all-but-one-zero patterns. The key step lifts the field sum-bound to `ℕ`
-(`f0.val + … + f3.val ≤ 1`, no wrap since the sum is `< 2^17 < p`), then `omega`/`tauto` decide. -/
+(`f0.val + … + f3.val ≤ 1`, no wrap since the sum is `< 2^17 < p`); the sixteen flag assignments
+then split into the five satisfiable patterns (closed by an explicit `Or` introduction) and eleven
+contradictory ones (closed by `omega` on the lifted bound). -/
 private lemma at_most_one {f0 f1 f2 f3 : ZMod p}
     (h0 : f0 = 0 ∨ f0 = 1) (h1 : f1 = 0 ∨ f1 = 1)
     (h2 : f2 = 0 ∨ f2 = 1) (h3 : f3 = 0 ∨ f3 = 1)
@@ -57,8 +60,12 @@ private lemma at_most_one {f0 f1 f2 f3 : ZMod p}
   rcases h0 with rfl | rfl <;> rcases h1 with rfl | rfl <;> rcases h2 with rfl | rfl <;>
     rcases h3 with rfl | rfl <;>
     first
+      | exact Or.inl ⟨rfl, rfl, rfl, rfl⟩
+      | exact Or.inr (Or.inl ⟨rfl, rfl, rfl, rfl⟩)
+      | exact Or.inr (Or.inr (Or.inl ⟨rfl, rfl, rfl, rfl⟩))
+      | exact Or.inr (Or.inr (Or.inr (Or.inl ⟨rfl, rfl, rfl, rfl⟩)))
+      | exact Or.inr (Or.inr (Or.inr (Or.inr ⟨rfl, rfl, rfl, rfl⟩)))
       | (exfalso; simp only [ZMod.val_zero, ZMod.val_one] at hle; omega)
-      | tauto
 
 /-- Literal meaning of SP1's `LtOperationUnsigned` constraint list at `is_real = 1`. -/
 def RawSpec (b cc : Word (ZMod p)) (cols : Extracted.LtOperationUnsigned (ZMod p)) : Prop :=

@@ -1580,15 +1580,15 @@ def toNat {p : ℕ} [NeZero p] (w : HWord (ZMod p)) : ℕ := w[0].val + w[1].val
 def toBitVec32 {p : ℕ} [NeZero p] (w : HWord (ZMod p)) : BitVec 32 := BitVec.ofNat 32 (toNat w)
 end HWord
 
--- The single declaration in this file that does not fit the default budget: the six `nlinarith`
--- byte-bound calls below are the whole cost. Measured, not guessed (control run at 1 heartbeat
--- gave 46 real timeouts, so every rung is a genuine re-elaboration): 250000 fails here
--- (`whnf` at the header, `isDefEq` at the `h_lhs1_lt` call) while 320000 passes, so the floor is
--- (250000, 320000]; 1600000 keeps a 5x margin. Every *other* declaration in the file — including
--- `sra_close_su16_3_case`, which the previous measurement mis-attributed as the binding site —
--- passes at the plain default once this one is pinned, which is why the ceiling is scoped to this
--- lemma rather than to the whole file. Do not raise it; fold the blowup instead.
-set_option maxHeartbeats 1600000 in
+-- This used to be the single declaration in the file that did not fit the default budget: measured
+-- floor (250000, 320000] against a declared 1600000. The earlier note named the cause correctly --
+-- the eleven `nlinarith` calls in the preamble -- but the fix was never applied: `Math/ShiftBounds`
+-- already proves every one of those goals once over abstract `ℕ` radices (Clean fix pattern 9), and
+-- this lemma was hand-rolling all of them inside a context carrying `ZMod p`, its instances and a
+-- dozen `have`s, so each `nlinarith` re-searched that whole context. Replacing them with the
+-- `ShiftBounds.{N_lt_p, N_pos, mul_v_val, mul_N_val, hi_lo_val, lo_hi_val, hi_lo_lt, lo_hi_lt,
+-- lt_65536_of_lt_M}` one-liners drops the floor below 10000 -- >25x -- so the ceiling is gone.
+-- (`sra_close_su16_3_case`, once mis-attributed as the binding site, was never the owner.)
 lemma srlw_within_byte_shift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (M N : ℕ) (h_MN : M * N = 65536) (h_M_pos : 0 < M)
     {b0 b1 ll0 ll1 hl0 hl1 v0123 : ZMod p}
@@ -1601,39 +1601,33 @@ lemma srlw_within_byte_shift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     = (HWord.toBitVec32 #v[b0, b1]).toNat / N := by
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
-  have h_N_lt_p : N < p := by nlinarith [h_MN]
+  have h_N_lt_p : N < p := ShiftBounds.N_lt_p h_MN
   have h_N_val : ((N : ℕ) : ZMod p).val = N := ZMod.val_natCast_of_lt h_N_lt_p
-  have h_NM : N * M = 65536 := by linarith [h_MN, Nat.mul_comm M N]
-  have h_N_pos : 0 < N := by nlinarith [h_MN, h_M_pos]
+  have h_NM : N * M = 65536 := by rw [Nat.mul_comm]; exact h_MN
+  have h_N_pos : 0 < N := ShiftBounds.N_pos h_MN
   -- val_mul bridges
-  have h_ll1_mul : (ll1 * v0123).val = ll1.val * M := by
-    rw [ZMod.val_mul_of_lt, h_v_val]; rw [h_v_val]; nlinarith [lt_ll1, h_MN]
-  have h_hl0_mul : (hl0 * ((N : ℕ) : ZMod p)).val = hl0.val * N := by
-    rw [ZMod.val_mul_of_lt, h_N_val]; rw [h_N_val]; nlinarith [lt_lh0, h_MN, h_NM]
-  have h_hl1_mul : (hl1 * ((N : ℕ) : ZMod p)).val = hl1.val * N := by
-    rw [ZMod.val_mul_of_lt, h_N_val]; rw [h_N_val]; nlinarith [lt_lh1, h_MN, h_NM]
+  have h_ll1_mul : (ll1 * v0123).val = ll1.val * M :=
+    ShiftBounds.mul_v_val h_MN h_v_val lt_ll1
+  have h_hl0_mul : (hl0 * ((N : ℕ) : ZMod p)).val = hl0.val * N :=
+    ShiftBounds.mul_N_val h_MN lt_lh0
+  have h_hl1_mul : (hl1 * ((N : ℕ) : ZMod p)).val = hl1.val * N :=
+    ShiftBounds.mul_N_val h_MN lt_lh1
   -- b_j.val = hl_j.val * N + ll_j.val
   have h_b0_val : b0.val = hl0.val * N + ll0.val := by
-    rw [h_b0, ZMod.val_add_of_lt]
-    · rw [h_hl0_mul]
-    · rw [h_hl0_mul]; nlinarith [lt_ll0, lt_lh0, h_MN, h_NM]
+    rw [h_b0]; exact ShiftBounds.hi_lo_val h_MN lt_lh0 lt_ll0
   have h_b1_val : b1.val = hl1.val * N + ll1.val := by
-    rw [h_b1, ZMod.val_add_of_lt]
-    · rw [h_hl1_mul]
-    · rw [h_hl1_mul]; nlinarith [lt_ll1, lt_lh1, h_MN, h_NM]
-  have h_compose0_val : (hl0 + ll1 * v0123).val = hl0.val + ll1.val * M := by
-    rw [ZMod.val_add_of_lt]
-    · rw [h_ll1_mul]
-    · rw [h_ll1_mul]; nlinarith [lt_lh0, lt_ll1, h_MN]
+    rw [h_b1]; exact ShiftBounds.hi_lo_val h_MN lt_lh1 lt_ll1
+  have h_compose0_val : (hl0 + ll1 * v0123).val = hl0.val + ll1.val * M :=
+    ShiftBounds.lo_hi_val h_MN h_v_val lt_lh0 lt_ll1
   unfold HWord.toBitVec32
   simp only [BitVec.toNat_ofNat, HWord.toNat, Vector.getElem_mk,
     List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
   rw [h_compose0_val, h_b0_val, h_b1_val]
   -- Per-byte bounds.
-  have h_b0_lt : hl0.val * N + ll0.val < 65536 := by nlinarith [lt_lh0, lt_ll0, h_MN]
-  have h_b1_lt : hl1.val * N + ll1.val < 65536 := by nlinarith [lt_lh1, lt_ll1, h_MN]
-  have h_lhs0_lt : hl0.val + ll1.val * M < 65536 := by nlinarith [lt_lh0, lt_ll1, h_MN]
-  have h_lhs1_lt : hl1.val < 65536 := by nlinarith [lt_lh1, h_MN]
+  have h_b0_lt : hl0.val * N + ll0.val < 65536 := ShiftBounds.hi_lo_lt h_MN lt_lh0 lt_ll0
+  have h_b1_lt : hl1.val * N + ll1.val < 65536 := ShiftBounds.hi_lo_lt h_MN lt_lh1 lt_ll1
+  have h_lhs0_lt : hl0.val + ll1.val * M < 65536 := ShiftBounds.lo_hi_lt h_MN lt_lh0 lt_ll1
+  have h_lhs1_lt : hl1.val < 65536 := ShiftBounds.lt_65536_of_lt_M h_MN lt_lh1
   -- Both sides fit in 2^32.
   have h_B_lt : (hl0.val * N + ll0.val) + (hl1.val * N + ll1.val) * 2 ^ 16 < 2 ^ 32 := by
     omega

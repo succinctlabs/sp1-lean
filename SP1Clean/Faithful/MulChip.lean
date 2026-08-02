@@ -3180,11 +3180,36 @@ private theorem mulOperation_accesses_filter_byte
     Extracted.U16MSBOperation.interactions,
     Extracted.Interaction.toAccess]
 
--- The only anchor in this file that genuinely exceeds the plain default: measured floor bracket
--- (220000, 250000], so the former 1M was ~4x over. The cost is the `Faithful/` channel-comparison
--- mechanism (`Channel.toRaw_ext_iff` tearing each channel record open into `Guarantees`/`Requirements`
--- lambda `HEq`s, which then draw mathlib's whole forall-bucket) on top of Mul's 45-column row eval.
-set_option maxHeartbeats 300000 in
+/-- No interaction of `MulChip.main` sits outside the chip's four declared buses. Proved through the
+elaborated circuit's `channels_subset` — deliberately **without unfolding `MulChip.main`**, which is
+what makes it cheap (see the note on `mulChip_interactions_faithful`). -/
+private theorem mulUnexpectedInteractions_empty
+    (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ) :
+    unexpectedInteractions ((MulChip.main input).operations offset) = [] := by
+  unfold unexpectedInteractions
+  apply List.filter_eq_nil_iff.mpr
+  intro interaction hmem hunexpected
+  have hchannel :
+      interaction.channel ∈ ((MulChip.main input).operations offset).channels := by
+    rw [Operations.channels]
+    exact List.mem_map.mpr ⟨interaction, hmem, rfl⟩
+  have hknown := (MulChip.circuit (p := p)).channels_subset input offset hchannel
+  simp only [MulChip.circuit,
+    FormalCircuitBase.channelsWithGuarantees_def,
+    FormalCircuitBase.channelsWithRequirements_def,
+    circuit_norm] at hknown
+  simp only [decide_eq_true_eq] at hunexpected
+  tauto
+
+-- Formerly the only anchor in this file exceeding the plain default (measured floor bracket
+-- (220000, 250000], declared 300000). The whole cost was one bare non-`only` `simp` discharging the
+-- `unexpectedInteractions … = []` side goal by unfolding `MulChip.main` and all eight subcircuit
+-- `main`/`circuit` bodies -- a textbook whnf-into-an-expensive-value: the diagnostic counters were
+-- the row-eval chain (`Eq.rec` 6006, `List.rec` 5102, `ProvableTypeList.rec` 2985,
+-- `componentsToElements` 2395, `Environment.get` 3959) and the failure phase was `isDefEq` *inside*
+-- that simp. Routing the side goal through `mulUnexpectedInteractions_empty`, which uses the
+-- elaborated circuit's `channels_subset` and never unfolds `main` (the pattern already used by
+-- Jal/Jalr/Branch/Load*/ShiftLeft), dropped the floor below 5000 -- >44x -- and the ceiling is gone.
 private theorem mulChip_interactions_faithful
     (env : Environment (ZMod p))
     (input : Var MulChip.Inputs (ZMod p)) (offset : ℕ)
@@ -3645,21 +3670,7 @@ private theorem mulChip_interactions_faithful
     have h := congrArg LookupAccessList.active hP
     rw [LookupAccessList.active_filter] at h
     exact List.Perm.of_eq h
-  have hUnexpected :
-      unexpectedInteractions ((MulChip.main input).operations offset) = [] := by
-    simp [unexpectedInteractions, MulChip.main,
-      Readers.CPUState.circuit, Readers.CPUState.main,
-      Readers.RTypeReader.circuit, Readers.RTypeReader.main,
-      Readers.RegisterWrite.circuit, Readers.RegisterWrite.main,
-      Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
-      Readers.RegisterAccessTimestamp.circuit,
-      Readers.RegisterAccessTimestamp.main,
-      SP1Clean.MulOperation.circuit, SP1Clean.MulOperation.main,
-      SP1Clean.U16toU8OperationSafe.circuit,
-      SP1Clean.U16toU8OperationSafe.main,
-      SP1Clean.U16MSBOperation.circuit, SP1Clean.U16MSBOperation.main,
-      Gadgets.Equality.main, FormalAssertion.toSubcircuit_interactions,
-      GeneralFormalCircuit.toSubcircuit_interactions, circuit_norm]
+  have hUnexpected := mulUnexpectedInteractions_empty (p := p) input offset
   simp only [nativeAccesses]
   rw [hUnexpected]
   simp only [List.map_nil, List.append_nil]
