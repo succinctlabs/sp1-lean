@@ -184,6 +184,13 @@ On an SP1 pin change:
 - treat a cluster, width, interaction-kind, or schedule change as an architecture change, not a
   mechanical version bump.
 
+On a Sail model re-pin: never hand-edit generated Lean. Update the pins in
+`scripts/sail-config/generate_lean_rv64d.sh`, run `--stock` until byte-identical against the new
+opencompl base, then `--sp1` and audit that the base diff is still exactly the six config-value
+sites; publish + tag + pin, and refresh the pin rows in `release-audit.md`. Full procedure:
+`docs/agents/sail-model-provenance.md` (expect `Model/SailMemory.lean` + `Proofs/Sail/` proof
+churn from the base move itself).
+
 ## Cleanup / polish backlog (non-blocking)
 
 Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistically. The
@@ -229,6 +236,12 @@ Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistica
   `Machine.SP1MachineModel.schedule` event model (or derive it as the ordinary-schedule instance),
   discharging the capstone's `UsesOrdinarySchedule` bridging hypothesis structurally. Real
   grounding-engine surgery; see `docs/architecture.md` § deliberate layering exceptions item 4.
+- **Fold more platform facts into the generation config** — `memory.regions`,
+  `htif_tohost_base`, and `memory.physaddr_bits` are also config-driven upstream, so the SP1 PMA
+  region (base `2^16`, size `2^48 − 2^16`) and HTIF-off could become *generated* values instead
+  of `SailConfigured` hypotheses, shrinking the boot-predicate trust surface. Deliberately
+  deferred: it perturbs generated output well beyond the six current sites (PMA/HTIF constants
+  feed many proofs) — a measured proof-churn event, not a config tweak.
 
 Explicitly rejected, with reasons: a *global* eval-map `eX` lemma (saves ~1 line/helper while
 re-churning ~36 clean files at form-variation risk); a global `NeZero p` instance (would make the

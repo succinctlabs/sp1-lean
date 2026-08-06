@@ -19,9 +19,10 @@ reader-facing docs one level up (start with [`../architecture.md`](../architectu
 - [proof-patterns.md](proof-patterns.md) — the witnessed-`FormalCircuit` soundness/completeness skeleton; `ZMod p` / `Word` / `circuit_proof_start` landmines; the fold recipes that keep proofs inside the default elaboration budget; the `ElaboratedCircuit` field-obligation recipe; the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
 - [lean-sail-notes.md](lean-sail-notes.md) — the Lean 4.32.2 dependency environment: the immutable git
   pins, the generated-model/runtime pairing rule, and the `lake update` toolchain-bump trap.
-- [sail-fork-delta.md](sail-fork-delta.md) — the exact six-value `sail-riscv-lean` platform-configuration
-  delta (CLINT/signature/PMP off), why it is load-bearing for the memory-bridge lemmas, its `rfl`
-  disclosure lemmas, and the path to retiring the fork.
+- [sail-model-provenance.md](sail-model-provenance.md) — the generated `Lean_RV64D` snapshot's
+  provenance: the four-key SP1 config and its six generated sites (CLINT/signature/PMP off), why it
+  is load-bearing for the memory-bridge lemmas, its `rfl` disclosure lemmas, the generation
+  pipeline, and the re-pinning procedure.
 - [extraction.md](extraction.md) — the constraint-extraction pipeline (`sp1-constraint-compiler` → `update_extracted.py` → Lean) and the DSL contract.
 - [cleanup-profile.md](cleanup-profile.md) — binding house rules for `/cleanup` and `/cleanup-all`; overrides the `mathlib-quality` plugin wherever they conflict.
 - [perf-findings.md](perf-findings.md) — how to avoid an elaboration budget: **the rule** (extract over opaque arguments), the folded-vs-unfolded predictor, the cause classes with their fixes, the diagnostic instrument and measurement traps, and the bar a site must clear before it may be allowlisted.

@@ -6,9 +6,11 @@ Notes on the shared Lean/Sail dependency graph.
 
 The toolchain is `leanprover/lean4:v4.32.2` and **every dependency is an immutable git pin** — there are
 no path dependencies, so a clean clone builds. The authoritative values live in `lakefile.toml` and
-`lake-manifest.json`; `docs/release-audit.md` records the audited snapshot. One is a fork:
-`Lean_RV64D` points at `succinctlabs/sail-riscv-lean`, carrying a six-value SP1 platform configuration
-over the upstream generated model — see [`sail-fork-delta.md`](sail-fork-delta.md).
+`lake-manifest.json`; `docs/release-audit.md` records the audited snapshot. `Lean_RV64D` points at
+`succinctlabs/sail-riscv-lean`, a **generated** snapshot — pinned Sail sources plus the checked-in
+SP1 platform config, regenerable and verifiable via `scripts/sail-config/generate_lean_rv64d.sh` —
+see [`sail-model-provenance.md`](sail-model-provenance.md). Re-pin by regenerating, never by
+hand-editing generated Lean.
 
 ### Two traps when re-pinning
 
