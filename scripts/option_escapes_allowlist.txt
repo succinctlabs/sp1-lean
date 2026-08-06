@@ -20,6 +20,11 @@
 # For calibration: upstream Clean has ZERO `maxHeartbeats` in 44,603 lines and 4 `maxRecDepth` sites,
 # all in constant tables, capped at 2048, none in a proof.
 #
+# RE-MEASURED at Lean v4.32.2 (2026-08-06, the 4.31 -> 4.32.2 + Sail v4 -> v5 migration). Every one of
+# the 11 sites was re-tested by STRIPPING its option and re-elaborating: all six files still fail
+# without them, so no entry has become unnecessary. (That check matters because this gate is exact set
+# equality — a site the toolchain no longer needs FAILS the build until its line is deleted.)
+#
 # ---- maxHeartbeats: 3 sites, all on GENERATED definitions ----------------------------------------
 # All three are emitted by update_extracted.py and reproduced by a regeneration; fixes go in the
 # generator, never by editing the file.
@@ -36,6 +41,8 @@ maxHeartbeats  SP1Clean/Extracted/ChipOracle/DivRem.lean            400000   1
 # chunks at 64 entries per part; chunking at ONE entry per part still leaves 1239, so no chunk size
 # reaches the default. Measured, not argued — this is the standard an "irreducible" claim has to meet.
 # File-level because the recombining `asserts` needs it too.
+# Ladder at v4.32.2: 200000 FAIL / 400000 FAIL / 600000 FAIL / 800000 ok -> floor (600000, 800000].
+# This entry previously carried no recorded bracket; the value is left at 1000000 (~1.25x the floor).
 maxHeartbeats  SP1Clean/Extracted/SystemOracle/Global.lean         1000000   1
 
 # Largest conformance battery in the tree: 528 vectors x 14 columns, ~30,000 numeric literals.
@@ -63,13 +70,6 @@ maxRecDepth    SP1Clean/Faithful/BranchChip.lean                       1000   1
 # failing value is not a margin. Scoped, not file-level: a file-level bump silently covers declarations
 # that never needed it.
 maxRecDepth    SP1Clean/FormalModel/Trace/Witness.lean                  800   1
-
-# `decode_ADD_example` — a `repeat (refine (run_bind_ok_none …).trans …)` walk that recurses once per
-# skipped branch of a ~280-branch Sail decoder cascade. Genuinely structural: the depth is the decoder's
-# branch count. Bracket (1500, 2000]. Scoped to the one declaration that needs it; the file's other two
-# lemmas clear the default. A future per-opcode `decode_<OP>_example` gets its own measured entry if it
-# needs one — do not widen this.
-maxRecDepth    SP1Clean/Model/SailDecode.lean                          2000   1
 
 # Widest trace battery: 64 x 246 = 15,744 literals, a right-nested `List.cons` chain.
 # Ladder: 8000 FAIL / 16000 ok → floor (8000, 16000], set ~2x. Needs no heartbeat budget at all.

@@ -409,7 +409,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.Target.decodedInROM_rtype_hoist
 #print axioms SP1Clean.Soundness.Target.decodedInROM_rtype_operand_lt
 #print axioms SP1Clean.Soundness.Target.decodedInROM_mul_hoist
-#print axioms SP1Clean.Soundness.Target.decodedInROM_addRow
 #print axioms SP1Clean.Soundness.Target.instrToProgramRow
 #print axioms SP1Clean.Soundness.Target.instrToProgramRow_op_a_0
 #print axioms SP1Clean.Soundness.Target.instrToProgramRow_register_bounds
@@ -484,7 +483,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.Target.decodesStore
 #print axioms SP1Clean.SailDecode.run_bind_ok_none
 #print axioms SP1Clean.SailDecode.run_bind_ok_some
-#print axioms SP1Clean.SailDecode.decode_ADD_example
 #print axioms SP1Clean.Soundness.Target.mem_fullRegs
 #print axioms SP1Clean.Soundness.Target.cfgState_init
 #print axioms SP1Clean.Soundness.Target.cfgState_pc

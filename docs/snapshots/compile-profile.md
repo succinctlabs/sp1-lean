@@ -1,5 +1,10 @@
 > **Point-in-time snapshot — regenerate before relying on it.**
 >
+> **STALE as of 2026-08-06:** every timing below was measured on Lean v4.31 with the Sail v4 model.
+> The repository has since migrated to v4.32.2 + Sail v5, which rewrote the whole `Model/SailMemory.lean`
+> memory-collapse layer and everything downstream of it. Treat these numbers as pre-migration history
+> until `scripts/profile_compile.sh` is re-run.
+>
 > **DivRem note (2026-07-14):** the nine per-op soundness modules and shared `Soundness/Tail.lean`
 > measured below were retired in favor of `FormalModel/Contracts/DivRem.lean` plus the lightweight
 > `Proofs/Chips/DivRemChip/Cases.lean` evidence layer. Their timings are historical evidence for that
