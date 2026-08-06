@@ -182,8 +182,14 @@ EOF
 
 # Compare against the committed snapshot, ignoring only the two `#`-comment header lines
 # (commit stamp + date). A pass leaves the tree untouched; a drift is a FAIL unless --update.
+# With --update the fresh census (and its current-commit stamp) is always installed — a
+# content-identical restamp is hygienic and records the verifying commit.
 if diff -q <(grep -v '^#' "$census") <(grep -v '^#' "$fresh") >/dev/null 2>&1; then
   echo "PASS: census matches the committed snapshot ($census)"
+  if [ "$update" -eq 1 ]; then
+    cp "$fresh" "$census"
+    echo "UPDATED: $census restamped from this run (content unchanged)"
+  fi
 else
   if [ "$update" -eq 1 ]; then
     cp "$fresh" "$census"
