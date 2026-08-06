@@ -17,7 +17,7 @@ Sail-step predicates so the audit surface is a single statement. -/
 open LeanRV64D.Defs
 namespace SP1Clean.Advance
 
-open SP1Clean Sail LeanRV64D LeanRV64D.Functions
+open SP1Clean Sail Sail.ConcurrencyInterfaceV1 LeanRV64D LeanRV64D.Functions
 open SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace
 open SP1Clean.TryStepReduction
 open SP1Clean.SailMem
@@ -302,7 +302,7 @@ theorem execute_UTYPE_reaches (imm : BitVec 20) (rd_idx : BitVec 5) (op : uop) (
   cases op
   · simp only [execute, execute_UTYPE, execute_UTYPE_pure, pure_bind]
     rw [run_bind_of_run' t _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]; rfl
-  · simp only [execute, execute_UTYPE, execute_UTYPE_pure, bind_assoc]
+  · simp only [execute, execute_UTYPE, execute_UTYPE_pure]
     rw [run_bind_of_run t _ pc harchpc, pure_bind,
       run_bind_of_run' t _ _ () (run_wX_bits (regidx.Regidx rd_idx) _)]; rfl
 

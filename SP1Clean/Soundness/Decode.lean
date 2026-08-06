@@ -144,6 +144,9 @@ theorem decode_targetBound (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p
   intro s0 path _h0 hw i hi s _href
   exact decode_bound prog h_link hw hi s
 
+-- Deliberately a `def`, not a `theorem`: this is an obligation BUNDLE whose fields downstream
+-- proofs project and unfold. `linter.defProp` (new in v4.32.2) cannot see that distinction.
+set_option linter.defProp false in
 /-- **`DecodeOperandsBound` is a valid `OperandsBound` for the target theorem.** Assemble a full
 `TargetObligations` for `OperandsBound := DecodeOperandsBound prog`: the `bound` field is discharged by
 `decode_targetBound` (from the threaded Program-bus consistency), and `lift`/`halt`/`halt_nonempty` are
@@ -321,19 +324,8 @@ theorem decodedInROM_mul_hoist {prog : GuestProgram} {row : ProgramRow (ZMod p)}
   rw [hi, ← hi0] at hrun
   exact hrun
 
-omit [Fact (2 ^ 24 < p)] in
-/-- **W3-A closed for a concrete instruction.** The committed `addRow` is the decode of `addProgram`'s
-ROM word at its pc, against the official Sail `ext_decode` — `decodedInROM` holds, axiom-clean modulo the
-Sail model's decoder axioms. -/
-theorem decodedInROM_addRow : decodedInROM addProgram (addRow (p := p)) := by
-  -- ∃I∀s shape (Move-2): the witness instruction is state-independent (a literal under `intro s hcfg`),
-  -- so it hoists out of the `∀ s` verbatim; the projection is discharged on the *guarded* wrapper.
-  refine ⟨0x003100B3#32,
-    .RTYPE (regidx.Regidx 3#5, regidx.Regidx 2#5, regidx.Regidx 1#5, rop.ADD), ?_, ?_, ?_⟩
-  · simp only [pcBitsOfRow, addRow, pcBitsOfVals, ZMod.val_zero, ZMod.val_one, addProgram,
-      GuestProgram.fetchWord, List.find?_cons, List.find?_nil]
-    norm_num
-  · exact fun s hcfg => SP1Clean.SailDecode.decode_ADD_example s hcfg.init hcfg.priv
-  · rw [instrToProgramRow'_rtype, instrToProgramRow_rtype]; rfl
+-- `decodedInROM_addRow` (the concrete W3-A ADD witness) was removed in the 4.32.2 / Sail-v5
+-- migration together with `SailDecode.decode_ADD_example`, which it consumed. See the retirement
+-- note in `Model/SailDecode.lean`.
 
 end SP1Clean.Soundness.Target

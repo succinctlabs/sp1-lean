@@ -96,11 +96,11 @@ abbrev SailInterface : PFunctor.{0, 0} := PFunctor.linear (Option SailState)
 semantic predicate (`SP1Halted`), not failure of the interpreter. -/
 noncomputable def sailMachine : PFunctor.DynSystem.Machine SailInterface where
   State := Option SailState
-  behavior := PFunctor.DynSystem.mk' id fun state _ => state.bind stepOnce
+  toDynSystem := PFunctor.DynSystem.mk' id fun state _ => state.bind stepOnce
 
 /-- The unique run selected by the unit direction at every step. -/
 noncomputable def sailRun {model : SP1MachineModel} (ctx : ExecutionCtx model) :
-    PFunctor.DynSystem.Run sailMachine.behavior where
+    PFunctor.DynSystem.Run sailMachine.toDynSystem where
   state := trajectory ctx.initial
   dir _ := PUnit.unit
   next_state _ := rfl

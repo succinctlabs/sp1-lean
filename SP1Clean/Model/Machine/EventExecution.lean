@@ -135,8 +135,11 @@ structure EventDirection (handler : SyscallHandler) (program : GuestProgram)
   valid : EventStep handler program source event target
 
 /-- Dependent interface whose directions at a state are exactly valid next steps from that state. -/
-def eventInterface (handler : SyscallHandler) (program : GuestProgram) : PFunctor :=
-  PFunctor.ofFn fun source : SailState => EventDirection handler program source
+-- PolyFun dropped `PFunctor.ofFn` (it was just the two-field constructor with `A` implicit);
+-- spell the positions/directions out directly.
+def eventInterface (handler : SyscallHandler) (program : GuestProgram) : PFunctor where
+  A := SailState
+  B := fun source => EventDirection handler program source
 
 /-- Nondeterministic eventful SP1 machine.  Nondeterminism is confined to the explicit syscall
 handler relation; ordinary Sail execution remains deterministic. -/

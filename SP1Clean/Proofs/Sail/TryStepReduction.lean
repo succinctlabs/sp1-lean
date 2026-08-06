@@ -21,7 +21,7 @@ This file is built bottom-up, one verified stage lemma at a time. -/
 open LeanRV64D.Defs
 namespace SP1Clean.TryStepReduction
 
-open Sail LeanRV64D LeanRV64D.Functions
+open Sail Sail.ConcurrencyInterfaceV1 LeanRV64D LeanRV64D.Functions
 open SP1Clean
 
 -- The `SailME`/`ExceptT`/`EStateM` monad-stack unfold `simp only` sets use situational subsets per peel
@@ -283,10 +283,15 @@ theorem RunPres.currentlyEnabled_S (s : SailState) (hs : s.isInitialized) :
 theorem RunPres.eip (s : SailState) (hs : s.isInitialized) :
     RunPres (external_interrupts_pending ()) s := by
   unfold external_interrupts_pending
+  -- `11d8fa21` re-nests this: the `currentlyEnabled Ext_S` guard is now its own bind, with the
+  -- `if … then readReg sig_seip else pure 0#1` bound separately after it (three binds, not two).
   exact RunPres.bind (RunPres.readReg s Register.sig_meip hs) (fun _ =>
-    RunPres.bind (RunPres.bind (RunPres.currentlyEnabled_S s hs)
-      (fun _ => RunPres.ite (RunPres.readReg s Register.sig_seip hs) (RunPres.pure _ s)))
-      (fun _ => RunPres.pure _ s))
+    RunPres.bind (RunPres.currentlyEnabled_S s hs) (fun _ =>
+      -- Lean 4.32 `do`-elaboration introduces a JOIN POINT: the continuation is pushed into both
+      -- arms (`if c then a >>= jp else b >>= jp`), so this is an `ite` of binds, not a bind of an `ite`.
+      RunPres.ite
+        (RunPres.bind (RunPres.readReg s Register.sig_seip hs) (fun _ => RunPres.pure _ s))
+        (RunPres.bind (RunPres.pure _ s) (fun _ => RunPres.pure _ s))))
 
 /-- `read_mip IncludePlatformInterrupts` is state-preserving (reads `mip`, ORs the platform sources). -/
 theorem RunPres.readMipIncl (s : SailState) (hs : s.isInitialized) :
@@ -309,14 +314,27 @@ theorem run_getPendingSet_machine_none (s : SailState) (hinit : s.isInitialized)
   unfold getPendingSet
   obtain ⟨ce, hce⟩ := RunPres.currentlyEnabled_S s hinit
   obtain ⟨mb, hmb⟩ := RunPres.readMipIncl s hinit
-  rw [run_bind_of_run s _ ce hce, run_readReg_bind_of_isInitialized s Register.mideleg hinit,
-    hmideleg]
-  simp only [beq_self_eq_true, Bool.or_true]
-  rw [run_bind_of_run s _ () (run_assert_true s _), run_bind_of_run s _ mb hmb]
-  simp only [run_readReg_bind_of_isInitialized s Register.mie hinit,
-    run_readReg_bind_of_isInitialized s Register.mideleg hinit,
-    run_readReg_bind_of_isInitialized s Register.mstatus hinit, pure_bind, hmie]
-  rfl
+  -- `11d8fa21` guards the `mideleg` read by `currentlyEnabled Ext_S` and drops the delegation
+  -- `assert`. Both branches deliver `zeros` — the taken one by `hmideleg`, the other literally — so
+  -- the rest of the reduction is unchanged.
+  -- Lean 4.32 pushes the continuation into both arms via a join point, so there is no
+  -- `(if … then … else …) >>= k` to peel; case-split on the guard first, then each arm is a plain
+  -- bind. Both arms deliver `zeros` — the taken one by `hmideleg`, the other literally.
+  rw [run_bind_of_run s _ ce hce]
+  cases ce with
+  | false =>
+    simp only [Bool.false_eq_true, if_false, pure_bind]
+    rw [run_bind_of_run s _ mb hmb]
+    simp only [run_readReg_bind_of_isInitialized s Register.mie hinit,
+      run_readReg_bind_of_isInitialized s Register.mstatus hinit, pure_bind, hmie]
+    rfl
+  | true =>
+    simp only [if_true]
+    rw [run_readReg_bind_of_isInitialized s Register.mideleg hinit, hmideleg,
+      run_bind_of_run s _ mb hmb]
+    simp only [run_readReg_bind_of_isInitialized s Register.mie hinit,
+      run_readReg_bind_of_isInitialized s Register.mstatus hinit, pure_bind, hmie]
+    rfl
 
 /-- **`dispatchInterrupt Machine = none`** (the `no_interrupt` field) from a quiescent-interrupt state. -/
 theorem run_dispatchInterrupt_machine_none (s : SailState) (hinit : s.isInitialized)

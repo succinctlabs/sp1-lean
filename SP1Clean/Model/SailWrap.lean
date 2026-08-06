@@ -11,6 +11,10 @@ ADD is definitional). -/
 
 open LeanRV64D.Defs
 open LeanRV64D.Functions
+-- lean-sail v5 moved the state/monad machinery under `Sail.ConcurrencyInterfaceV1`; the root
+-- `PreSail` namespace it leaves behind is empty, so an unqualified `PreSail.foo` resolves to
+-- nothing without this. See `docs/agents/sail-fork-delta.md`.
+open Sail.ConcurrencyInterfaceV1
 
 set_option linter.style.setOption false
 

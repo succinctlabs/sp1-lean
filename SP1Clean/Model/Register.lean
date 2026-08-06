@@ -5,7 +5,12 @@ import SP1Clean.Math.Misc
 set_option linter.unusedSimpArgs false
 
 open LeanRV64D.Defs
-@[simp] abbrev SailState := PreSail.SequentialState RegisterType Sail.trivialChoiceSource
+-- `SequentialState` and `trivialChoiceSource` both live in `Sail.ConcurrencyInterfaceV1` as of
+-- lean-sail v5 (v4 had them at `PreSail.` and `Sail.` respectively). Neither has a `LeanRV64D.*`
+-- shim in `SpecializationV1.lean`, so they are spelled out here.
+@[simp] abbrev SailState :=
+  Sail.ConcurrencyInterfaceV1.SequentialState RegisterType
+    Sail.ConcurrencyInterfaceV1.trivialChoiceSource
 
 /-- Every register has been initialized to some unspecified value. -/
 @[reducible] def SailState.isInitialized (s : SailState) : Prop :=
