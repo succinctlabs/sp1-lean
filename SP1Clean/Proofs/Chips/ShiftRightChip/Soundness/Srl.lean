@@ -85,6 +85,17 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     h_smv2 h_o0_2 h_o1_2 h_o2_2 h_o3_2 h_o4_2 h_o5_2 h_o6_2 h_o7_2 h_o8_2 h_o9_2 h_o10_2 h_o11_2
     h_o12_2 h_o13_2 h_o14_2 h_o15_2 h_w0_2 h_w1_2 h_w2_2 h_w3_2 h_w4_2 h_w5_2 h_byte1 h_byte2_2
     h_byte3 h_byte4_2 h_byte5 h_byte6_2 h_byte7 h_byte8_2
+  -- The 53 `_2` duplicates above exist only to hand `resultA_isU64` its `x + -y` argument forms; they
+  -- are spent the moment `hregW` is derived. Left in scope they are re-normalised by every
+  -- `rw … at`/`linear_combination`/`simp`/`interval_cases` in the ~280 lines of `case spec` below,
+  -- which is 80% of this declaration's heartbeat budget. Clearing them here is a context fold, not a
+  -- raised ceiling: measured 224,929 → 167,375 heartbeats, i.e. from 12.5% over the 200000 default to
+  -- 16% under it. (`perf-findings.md` §1: the cost was in the context, not the goal.)
+  clear h_srl_b2 h_sra_b2 h_srlw_b2 h_sraw_b2 h_sum_b2 h_b0_2 h_b1_2 h_b2_2 h_b3_2 h_b4_2
+    h_s0b2 h_s1w2 h_s1b2 h_s2w2 h_s2b2 h_s3w2 h_s3b2 h_onehot2 h_v01_2 h_v012_2 h_v0123_2
+    h_split2_2 h_lr0_2 h_lr1_2 h_lr2_2 h_lr3_2 h_smv2 h_o0_2 h_o1_2 h_o2_2 h_o3_2 h_o4_2
+    h_o5_2 h_o6_2 h_o7_2 h_o8_2 h_o9_2 h_o10_2 h_o11_2 h_o12_2 h_o13_2 h_o14_2 h_o15_2
+    h_w0_2 h_w1_2 h_w2_2 h_w3_2 h_w4_2 h_w5_2 h_byte2_2 h_byte4_2 h_byte6_2 h_byte8_2
   -- post-#398 the nine byte receives owe no padding requirement.
   -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
   -- channel's `MemoryMsg.ClkBound` guarantee for `ALUTypeReader`'s two read-back pushes

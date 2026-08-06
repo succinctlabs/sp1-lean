@@ -48,7 +48,9 @@ private lemma setWidth_signExtend_mul (x y : BitVec 64) :
     intro z
     rw [← BitVec.toNat_inj, BitVec.toNat_setWidth, BitVec.toNat_signExtend]
     have hz : z.toNat < 2 ^ 64 := z.isLt
-    rcases Bool.eq_false_or_eq_true z.msb with h | h <;> rw [h] <;> simp <;> omega
+    rcases Bool.eq_false_or_eq_true z.msb with h | h
+    · rw [h]; simp; omega
+    · rw [h]; simp
   rw [BitVec.setWidth_mul _ _ (by norm_num), hself, hself]
 
 /-- The 128-bit zero-extended product truncates to the wrapping 64-bit product. -/

@@ -305,6 +305,8 @@ theorem operand_c_isU64_of_memBalance [NeZero p] {rows : List (Trace.RowView (ZM
   (eventsAt_values_isU64 h (opCEvent r).addr.val _
     (mem_eventsAt_self (opCEvent_mem_memEventsFiltered hr h_real h_immc))).1
 
+-- Deliberately a `def`, not a `theorem`: an obligation BUNDLE that downstream proofs project.
+set_option linter.defProp false in
 /-- **W2/W1c: the operand-recovery hypotheses ride the constructed MemoryGlobalInit provider.** Assemble
 `MemBalanceHyps` at the W4a genesis contributions (`memGenesisContributions`) — so every operand fact
 above (`operand_{a,b,c}_isU64_of_memBalance`, `eventsAt_values_isU64`, the limb value chain) holds with

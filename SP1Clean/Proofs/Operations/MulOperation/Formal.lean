@@ -889,6 +889,11 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     requirementsChannelsLawful := main_requirementsChannelsLawful }
 
 set_option linter.unusedSectionVars false in
+/-- Since Lean 4.32, class projections through `ProvableType`-derived instances no longer whnf-reduce
+at `.reducible` transparency (Clean `088a9287`), so `circuit_norm` can no longer cross
+`circuit.Spec` ↔ `Spec` on its own. Supply the bridge as a rewrite. -/
+@[circuit_norm] lemma circuit_Spec_eq : (circuit (p := p)).Spec = Spec := rfl
+set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
     circuit.localLength x = 0 := rfl
 

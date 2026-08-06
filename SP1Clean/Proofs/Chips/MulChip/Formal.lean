@@ -258,7 +258,8 @@ theorem completeness :
       (env.get i₀) (env.get (i₀ + 1)) (env.get (i₀ + 2)) (env.get (i₀ + 3)) (env.get (i₀ + 4))
       (env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3) + env.get (i₀ + 4))
       hf0' hf1' hf2' hf3' hf4' hsum01' using 2
-    rfl
+    -- 4.32: `convert … using 2` now leaves only the `cols` equality. The former `rfl` step closed a
+    -- separate `circuit.Spec = Spec` goal that the congruence no longer emits (Clean `088a9287`).
     simpa only [circuit_norm] using hcols_eq
   · -- RegisterWrite's `isU64 value` (the op_a write push): on a real row the witnessed `a` equals the
     -- selected product slice `resultWord (populate …)`, whose `isU64` is `spec_populate`'s

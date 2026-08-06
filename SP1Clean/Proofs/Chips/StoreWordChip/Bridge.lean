@@ -15,7 +15,7 @@ emulation: write `nextPC = pc + 4` and the four little-endian bytes of `rs2[31:0
 open LeanRV64D.Defs
 namespace SP1Clean.StoreWordSail
 
-open Sail LeanRV64D LeanRV64D.Functions
+open Sail Sail.ConcurrencyInterfaceV1 LeanRV64D LeanRV64D.Functions
 open SP1Clean.SailMem
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -142,7 +142,7 @@ end SP1Clean.StoreWordSail
 namespace SP1Clean.StoreWordChip
 
 open SP1Clean.StoreWordSail
-open Sail LeanRV64D LeanRV64D.Functions
+open Sail Sail.ConcurrencyInterfaceV1 LeanRV64D LeanRV64D.Functions
 open SP1Clean.SailMem
 open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 

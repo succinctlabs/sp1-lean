@@ -258,7 +258,8 @@ theorem completeness :
     (cc := input_adapter_op_c_memory_prev_value) (is_signed := env.get i₀)
     (is_real := input_is_real)
     ha hb hf0' hbin hgate using 2
-  rfl
+  -- 4.32: `convert … using 2` now leaves only the `cols` equality. The former `rfl` step closed a
+  -- separate `circuit.Spec = Spec` goal that the congruence no longer emits (Clean `088a9287`).
   refine (ProvableType.ext_iff (α := Extracted.LtOperationSigned) _ _).mpr (fun i hi => ?_)
   -- Ascribe `h_env_cols`'s IR-native RHS into the plain `toElements (populate …)` form via a *definitional*
   -- `have` (the `.native` eval-match + beta is the CHEAP reduction; the expensive path is the eager

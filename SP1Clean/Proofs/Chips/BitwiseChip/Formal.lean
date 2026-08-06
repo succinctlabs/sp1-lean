@@ -305,7 +305,8 @@ theorem completeness :
       (c := input_adapter_op_c_memory_prev_value)
       (opcode := env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0) ha hb hop3 input_is_real
       using 2
-    rfl
+    -- 4.32: `convert … using 2` now leaves only the `cols` equality. The former `rfl` step closed a
+    -- separate `circuit.Spec = Spec` goal that the congruence no longer emits (Clean `088a9287`).
     refine (ProvableType.ext_iff (α := BitwiseU16Operation.Columns) _ _).mpr (fun i hi => ?_)
     -- Ascribe `h_env_cols`'s IR-native RHS into the plain `toElements (populate …)` form via a *definitional*
     -- `have` (the `.native` eval-match + beta is the CHEAP reduction; the expensive path is the eager

@@ -18,7 +18,7 @@ extend to `#v[selected_byte + 65280·msb, 65535·msb, 65535·msb, 65535·msb]` �
 open LeanRV64D.Defs
 namespace SP1Clean.LoadByteSail
 
-open Sail LeanRV64D LeanRV64D.Functions
+open Sail Sail.ConcurrencyInterfaceV1 LeanRV64D LeanRV64D.Functions
 open SP1Clean.SailMem
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -198,7 +198,7 @@ end SP1Clean.LoadByteSail
 namespace SP1Clean.LoadByteChip
 
 open SP1Clean.LoadByteSail
-open Sail LeanRV64D LeanRV64D.Functions
+open Sail Sail.ConcurrencyInterfaceV1 LeanRV64D LeanRV64D.Functions
 open SP1Clean.SailMem
 open SP1Clean SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Trace SP1Clean.Advance
 

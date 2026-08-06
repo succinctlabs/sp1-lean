@@ -236,7 +236,9 @@ private lemma setWidth_signExtend_self (x : BitVec 64) : (x.signExtend 128).setW
   apply BitVec.eq_of_toNat_eq
   rw [BitVec.toNat_setWidth, BitVec.toNat_signExtend]
   have hx : x.toNat < 2 ^ 64 := x.isLt
-  rcases Bool.eq_false_or_eq_true x.msb with h | h <;> rw [h] <;> simp <;> omega
+  rcases Bool.eq_false_or_eq_true x.msb with h | h
+  · rw [h]; simp; omega
+  · rw [h]; simp
 
 omit [Fact p.Prime] in
 /-- **Signed 128-bit product, low/high `toNat` split.** The chip's `MUL`/`MULH` result words `rwlo`/
