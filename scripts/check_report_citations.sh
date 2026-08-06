@@ -1,22 +1,28 @@
 #!/usr/bin/env bash
-# Check that every repo path cited in docs/verification-report.md exists, and that every
+# Check that every repo path cited in the reader-facing docs exists, and that every
 # backtick-quoted declaration name cited alongside a .lean path actually occurs in that file.
-# Part of the release-readiness harness; run from the repo root.
+# Part of the release-readiness harness (invoked by scripts/run_audit.sh and the CI `guards`
+# job); run from the repo root. Note this validates that citations RESOLVE — recorded pin
+# values are separately cross-checked by scripts/check_pins.sh.
 set -euo pipefail
 report="docs/verification-report.md"
 [ -f "$report" ] || { echo "FAIL: $report missing"; exit 1; }
 
 fail=0
 
-# 1. Every cited repo-relative path must exist.
-paths=$(grep -oE '`(SP1Clean|SP1CleanTest|docs|scripts)/[A-Za-z0-9_/.-]+`' "$report" | tr -d '`' | sort -u)
-while IFS= read -r p; do
-  [ -z "$p" ] && continue
-  if [ ! -e "$p" ]; then
-    echo "FAIL: cited path does not exist: $p"
-    fail=1
-  fi
-done <<< "$paths"
+# 1. Every repo-relative path cited in a reader-facing doc must exist.
+for doc in "$report" README.md docs/README.md docs/overview.md docs/architecture.md \
+           docs/release-audit.md docs/roadmap.md; do
+  [ -f "$doc" ] || { echo "FAIL: expected doc missing: $doc"; fail=1; continue; }
+  paths=$(grep -oE '`(SP1Clean|SP1CleanTest|docs|scripts)/[A-Za-z0-9_/.-]+`' "$doc" | tr -d '`' | sort -u || true)
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    if [ ! -e "$p" ]; then
+      echo "FAIL: $doc cites a path that does not exist: $p"
+      fail=1
+    fi
+  done <<< "$paths"
+done
 
 # 2. Key declarations quoted in the report must exist where the report says they do.
 check_decl() { # file decl
