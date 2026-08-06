@@ -1,5 +1,9 @@
 # Verification overview
 
+*Snapshot: 2026-08, branch `dtumad/v1.0-release`. Lean and mathlib v4.32.2; generated Sail model
+paired with lean-sail v5; SP1 semantic pin `v6.3.1-8-ga630089d9`. Recorded pins are
+machine-cross-checked by `scripts/check_pins.sh`; see `release-audit.md` for the full table.*
+
 This repository proves a substantial SP1 AIR-to-execution result, but it does not yet prove full
 upstream Core AIR soundness.
 
@@ -54,6 +58,14 @@ contract, and constructs a successful Sail chain. The resulting local segment:
 It does not say that the initial state is reachable from boot, that the final row halts, that shards
 compose, or that a cryptographic verifier accepted a proof. Those are deliberately separate claims.
 
+Two time views coexist under this statement by design. The general
+`Machine.SP1MachineModel.schedule` event model covers both the ordinary 8-tick and syscall 264-tick
+windows; the fixed eight-tick micro-time layer (`ordinaryClkInc`/`ramEffectOffset`/
+`regEffectOffset`, named for the Rust `CLK_INC` and `MemoryAccessPosition` constants they track) is
+the proved register/RAM interpretation the ordinary-row grounding engine consumes. The theorem's
+`UsesOrdinarySchedule` hypothesis is the explicit bridge; unifying the two models is roadmap work
+(`architecture.md` § deliberate layering exceptions).
+
 ## Current coverage
 
 | Layer | Current coverage | Status |
@@ -67,6 +79,7 @@ compose, or that a cryptographic verifier accepted a proof. Those are deliberate
 | Whole-chip Rust trace conformance | 10 chips | executable test evidence, not a theorem premise |
 | Exact upstream AIR to Sail | 34-table execution cluster | open bundle; conditional combinator only |
 | Cross-shard boot-to-halt execution | full shard ledger | relation specified; theorem not yet declared |
+| Cross-shard ledger predicate layer | `Contracts/PublicValues.lean` | reserved API, declared ahead of its consumer |
 | ArkLib verifier knowledge soundness | Core verifier | out of this workstream's current proof |
 
 The 25 instruction tables are Add, Addi, Addw, Sub, Subw, Bitwise, Lt, ShiftLeft, ShiftRight, Jal,
@@ -185,6 +198,12 @@ The semantic boundary and timestamp relations in `SupportedCoreNativeRelation` a
 not hidden axioms. Full upstream soundness requires deriving them from the exact system AIR and
 cryptographic binding relations.
 
+Three named link predicates (`TraceStateLink`, `TraceByteLink`, `TraceMemClkValid`) appear in the
+standalone per-bus consistency modules as their honestly-stated premises. They are **not** premises
+of `supported_core_native_sound`: the capstone's premise surface is exactly the three relation
+conjuncts above plus the `UsesOrdinarySchedule` schedule hypothesis, and no module on its proof
+path references the link predicates.
+
 ## Reproduce the current checkpoint
 
 ```bash
@@ -194,7 +213,12 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The audit regenerates the declaration list and raw `#print axioms` census. See
-[`release-audit.md`](release-audit.md) for the current machine-derived snapshot,
-[`architecture.md`](architecture.md) for module ownership, and [`roadmap.md`](roadmap.md) for the
-remaining dependency order.
+The audit regenerates the declaration list and raw `#print axioms` census and compares it against
+the committed snapshot (drift fails; `--update` rewrites deliberately). It also cross-checks every
+recorded pin and doc-cited count against the build graph.
+
+Where to go next: [`release-audit.md`](release-audit.md) for the machine-derived pins and census;
+[`verification-report.md`](verification-report.md) for the argued long-form report;
+[`architecture.md`](architecture.md) for module ownership and the deliberate layering exceptions;
+[`roadmap.md`](roadmap.md) for the remaining dependency order; [`README.md`](README.md) for the
+one-role-per-document map.

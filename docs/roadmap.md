@@ -217,6 +217,18 @@ Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistica
   namespace `SP1Extracted.*` so the stock `runLinter` excludes it by construction. Cost: ~87 module
   renames + import edits + `update_extracted.py` writer paths + lakefile globs. Not worth it for
   linting alone.
+- **Spec homing** — move the ten Native-resident chip contract blocks (`Inputs` + `Spec` +
+  `Assumptions` for AluX0 and the load/store chips; inventory table in `docs/architecture.md`
+  § deliberate layering exceptions) onto `FormalModel/Contracts/`. Chip `Spec`s are
+  perf-sensitive (folded-hypothesis doctrine) and the moves rebuild the heaviest proof families —
+  measure per chip, one at a time. Lt/Bitwise's split `Spec`s are deliberate and stay.
+- **Re-run `scripts/profile_compile.sh` on v4.32.2** — `docs/snapshots/compile-profile.md`
+  self-declares STALE (its timings are v4.31/Sail-v4). An overnight solo run refreshes it; until
+  then the banner stands.
+- **Unify the two time models** — retire the `MicroTime` compatibility layer into the
+  `Machine.SP1MachineModel.schedule` event model (or derive it as the ordinary-schedule instance),
+  discharging the capstone's `UsesOrdinarySchedule` bridging hypothesis structurally. Real
+  grounding-engine surgery; see `docs/architecture.md` § deliberate layering exceptions item 4.
 
 Explicitly rejected, with reasons: a *global* eval-map `eX` lemma (saves ~1 line/helper while
 re-churning ~36 clean files at form-variation risk); a global `NeZero p` instance (would make the

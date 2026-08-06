@@ -1,4 +1,4 @@
-# SP1Clean verification report
+# SP1 v1.0 release audit
 
 Snapshot date: 2026-08-06, re-audited on the Lean v4.31 -> v4.32.2 + Sail v4 -> v5 migration. The
 generated records in `docs/snapshots/` are authoritative for exact declaration dependencies; rerun the
@@ -153,12 +153,21 @@ digest hashes a modeled output byte stream.
 
 `scripts/run_audit.sh` performs:
 
-- dependency and SP1 pin reporting;
+- manifest-resolved pin reporting, gating any present `.lake` checkout against the manifest;
+- recorded-value cross-checks (`scripts/check_pins.sh`: lakefile ↔ manifest ↔ this report's pin
+  table ↔ `CoreProfile.sp1SemanticRevision` ↔ doc-cited census counts);
+- root-index completeness (`scripts/check_root_index.sh`) and doc-citation resolution
+  (`scripts/check_report_citations.sh`);
 - a zero-tolerance source proof-deferral scan;
 - a zero-tolerance project-axiom scan;
 - `skipKernelTC` and main-library `native_decide` guards;
 - an elaboration-budget escape-hatch prohibition (allowlist-gated); and
-- a generated `#print axioms` census over the released theorem surface.
+- a generated `#print axioms` census over the released theorem surface, diffed against the
+  committed `docs/snapshots/axiom-census.txt` — drift fails; only `--update` rewrites the
+  snapshot, so a passing run leaves the tree clean.
+
+CI runs the three cross-check gates in its fast `guards` job and the full harness in a dedicated
+`audit` job on the built oleans.
 
 Current classes in the census are:
 

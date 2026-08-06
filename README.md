@@ -115,17 +115,30 @@ toolchain are disclosed in the report.
 
 ## Documentation
 
-Start with:
+Each document has one role; start with the one that matches yours:
 
-1. [`docs/overview.md`](docs/overview.md) — current theorem, coverage, and limitations.
-2. [`docs/architecture.md`](docs/architecture.md) — proof and module structure.
-3. [`docs/release-audit.md`](docs/release-audit.md) — source pins, trust boundary, and audit result.
-4. [`docs/roadmap.md`](docs/roadmap.md) — the dependency-ordered path to full Core soundness.
-5. [`docs/goal-overview.md`](docs/goal-overview.md) — completed-state verifier and completeness goals.
+1. [`docs/overview.md`](docs/overview.md) — the ten-minute orientation: current theorem, coverage,
+   and limitations.
+2. [`docs/verification-report.md`](docs/verification-report.md) — the self-contained technical
+   report that argues and evidences each claim, for external reviewers.
+3. [`docs/architecture.md`](docs/architecture.md) — proof and module structure, design rules, and
+   the deliberate layering exceptions.
+4. [`docs/release-audit.md`](docs/release-audit.md) — machine-checked source pins, trust boundary,
+   and audit result.
+5. [`docs/roadmap.md`](docs/roadmap.md) — the dependency-ordered path to full Core soundness.
+6. [`docs/goal-overview.md`](docs/goal-overview.md) — completed-state verifier and completeness
+   goals (a contract, not current status).
 
 Clean's upstream proof and performance documentation is authoritative for circuit proof style. See
 [`AGENTS.md`](AGENTS.md) and [`docs/agents/proof-patterns.md`](docs/agents/proof-patterns.md) before
 changing nontrivial proofs.
+
+## License
+
+Dual-licensed under either of [Apache License 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT),
+at your option. Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this repository by you shall be dual-licensed as above, without any additional
+terms or conditions.
 
 ## Toolchain note
 

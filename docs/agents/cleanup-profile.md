@@ -25,7 +25,7 @@ Companion reading, in order: Clean's `doc/performance-problems.md` and `doc/prov
 
 | Stock rule | What it does here |
 |---|---|
-| Phase 3.5 / rule 3.7 — delete every `set_option maxHeartbeats`, "no exceptions" | **Already satisfied, and enforced.** Hand-written Lean carries none; `scripts/check_option_escapes.sh` fails the build on any `maxHeartbeats`/`maxRecDepth` site not on `scripts/option_escapes_allowlist.txt`. Narrow exception: the allowlisted sites are on *generated* definitions (fix the generator, not the file) plus three measured structural `maxRecDepth` cases. Do not delete an allowlisted site without also removing its allowlist entry. |
+| Phase 3.5 / rule 3.7 — delete every `set_option maxHeartbeats`, "no exceptions" | **Already satisfied, and enforced.** Hand-written Lean carries none; `scripts/check_option_escapes.sh` fails the build on any `maxHeartbeats`/`maxRecDepth` site not on `scripts/option_escapes_allowlist.txt`. Narrow exception: the allowlisted sites are on *generated* definitions (fix the generator, not the file) plus two measured structural `maxRecDepth` cases. Do not delete an allowlisted site without also removing its allowlist entry. |
 | Rule 1.15 — unsqueeze terminal `simp only` → bare `simp` | Exact inverse of this repo's fold recipe: `simp only` is how proofs stay inside the default budget (§5). |
 | Item 12 (hard gate) — split `∧` statements into `foo_left`/`foo_right` | As stock, it *deletes* a theorem and mints new names. `scripts/gen_axiom_probe.py` resolves its probe targets by **regex over source text**. Adopted here only in additive form (§4). |
 | Item 11 — make single-file declarations `private` | `gen_axiom_probe.py` **skips `private` decls** → silently shrinks the axiom census. |

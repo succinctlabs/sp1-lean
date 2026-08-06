@@ -476,6 +476,8 @@ Exactly **one** entry was ever applied — #14 below, as a user-approved excepti
 | 38 | `Soundness.{selectorVars,controlExpressions}` | `Soundness.MulChip.…` | `Proofs/Chips/MulChip/Contracts.lean` | low — Lt and Bitwise declare the same two privates chip-prefixed; no collision today only because all three are private and in different files |
 | 39 | `Soundness.{jal,uType}EqualityConstraint_mem` | one `Soundness.equalityConstraint_mem` | `Soundness/Grounding/JTypeChips.lean` | low — byte-identical private twins in **one** file; retirement needs a deletion (see §1.6) |
 | 40 | `Soundness.registerIndexCast` (private) + `itypeRegisterIndexCast` (private) | one public `registerIndexCast` in `GroundingAdapter` | `Soundness/GroundingAdapter.lean` | low — new-in-batch declarations, no probe glob, no external citation. Payload of §5.1 |
+| 41 | `E0`…`E10` numbered temporaries | semantic operand names | `Native/Operations/{IsZeroWordOperation,U16MSBOperation}/Defs.lean` | low — the hand-written mains mirror the extracted expression list's numbering instead of naming what each `let` binds; a readability rename inside perf-tuned circuit bodies (2026-08 release audit) |
+| 42 | `supportedPcBits` | fold into `Semantics.pcBits` | `FormalModel/Execution.lean` | low — a one-line alias, the third spelling of the same 3-limb recombination (with `Semantics.pcBits` and `StateMsg.pcBits`); repoint its call sites and delete (2026-08 release audit) |
 
 ---
 

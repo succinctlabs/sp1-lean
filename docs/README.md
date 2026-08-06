@@ -4,6 +4,19 @@ The top-level [`README.md`](../README.md) is the public entry point and [`AGENTS
 contributor brief loaded by coding agents. This directory separates current claims from historical design
 records so that an old audit packet is never mistaken for the present theorem boundary.
 
+Each document has **one role**, so none needs to repeat another:
+
+| Document | Role |
+|---|---|
+| [`README.md`](../README.md) | GitHub front door: the claim, the build, the doc map, the license |
+| [`overview.md`](overview.md) | ten-minute technical orientation — states, never argues |
+| [`verification-report.md`](verification-report.md) | the long-form external report — argues and evidences each claim |
+| [`release-audit.md`](release-audit.md) | machine-adjacent audit record: pins, gates, census |
+| [`architecture.md`](architecture.md) | module/pillar ownership, design rules, deliberate exceptions |
+| [`roadmap.md`](roadmap.md) | dependency-ordered future work + non-blocking backlog |
+| [`goal-overview.md`](goal-overview.md) | the completed-state contract (never current status) |
+| [`AGENTS.md`](../AGENTS.md) | contributor/agent discipline: build, proof style, tooling gates |
+
 > **Upstream authority: read Clean's own docs.** This project is built on the Clean DSL (upstream
 > <https://github.com/Verified-zkEVM/clean>; its docs are in the `doc/` folder, singular). Read them either
 > on GitHub or from the in-tree copy Lake installs under `.lake/packages/Clean/`, which is exactly the

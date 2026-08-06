@@ -32,8 +32,49 @@ No one of these objects is silently treated as another.
 | `Soundness/` | machine registry, typed decoding, grounding, and capstones |
 | `SP1CleanTest/` | compiler-trusted executable conformance tests, isolated from the main library |
 
-`SP1Clean.lean` imports the complete main proof library. The test library imports it in the opposite
-direction and is never part of the main theorem graph.
+`SP1Clean.lean` imports the complete main proof library (`scripts/check_root_index.sh` gates that it
+lists every module). The test library imports it in the opposite direction and is never part of the
+main theorem graph.
+
+## Deliberate layering exceptions
+
+Layering is by convention, and four exceptions to it are design decisions rather than drift. An
+auditor should expect exactly these:
+
+1. **Three chips keep `main` in `Proofs/`.** `DivRemChip`, `ShiftLeftChip`, and `ShiftRightChip`
+   define `main` + `elaborated` in `Proofs/Chips/<X>Chip/Defs.lean` rather than `Native/Chips/`,
+   because their mains are entangled with proof-layer decomposition modules (DivRem imports
+   `Proofs/Operations/DivRemOperation/{Compare,Core}` and its own `Populate`; the shifts import
+   their `Core`/`Populate`/`Dispatch`/`Math`/`Flags` families). Moving the file without moving the
+   decomposition would make `Native/` import `Proofs/` — worse than the exception. The public chip
+   boundary (one `main`, one `Spec`, `circuit` bundle) is unaffected.
+
+2. **Chip `Spec` locations.** The complete inventory:
+
+   | Location | Chips |
+   |---|---|
+   | `FormalModel/Contracts/Chips.lean` (13) | Add, Addi, Addw, Sub, Subw, Mul, UType, Jal, Jalr, Branch, DivRem, ShiftLeft, ShiftRight |
+   | `Native/Chips/<X>Chip/Defs.lean` (10) | AluX0, LoadByte, LoadHalf, LoadWord, LoadDouble, LoadX0, StoreByte, StoreHalf, StoreWord, StoreDouble |
+   | `Proofs/Chips/<X>Chip/Formal.lean` (2) | Lt, Bitwise (deliberately split `Spec`s) |
+
+   The memory/x0 chips' contract blocks (`Inputs` + `Spec`) are Native-resident; homing them onto
+   the Contracts surface is the "Spec homing" backlog item (`docs/roadmap.md`) — chip `Spec`s are
+   performance-sensitive (the folded-hypothesis doctrine), so the moves are deliberate, measured
+   work, not a rename sweep.
+
+3. **`Assumptions`/`ProverAssumptions` locations.** Six chips (Add, Addi, Addw, Sub, Subw, UType)
+   have theirs on `FormalModel/Contracts/ChipAssumptions.lean`; the rest stay in proof files for
+   one of the two structural reasons stated in that file's module docstring (hint/helper-dependent
+   preconditions, or a Native-resident contract block per item 2).
+
+4. **Two live time models.** The fixed eight-tick micro-time layer
+   (`Model/Semantics/MicroTime.lean` — `ordinaryClkInc`/`ramEffectOffset`/`regEffectOffset`, the
+   Rust `CLK_INC`/`MemoryAccessPosition` constants) coexists with the general
+   `Machine.SP1MachineModel.schedule` event model (`Model/Machine/Schedule.lean`). The capstone
+   bridges them through its `UsesOrdinarySchedule` hypothesis rather than by retiring either:
+   the schedule model is what the syscall (264-tick) rows need, while the micro-time layer is the
+   proved register/RAM interpretation the ordinary-row grounding engine consumes. Unifying them is
+   roadmap work, not release polish.
 
 ## One instruction chip
 

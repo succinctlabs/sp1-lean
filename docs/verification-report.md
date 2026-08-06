@@ -1,7 +1,8 @@
 # Formal Verification of SP1's Core RISC-V AIR in Lean — Technical Report
 
 *sp1-clean-native — a Clean-native, semantically-specified verification of SP1's RISC-V chips.*
-*Snapshot: 2026-07 (branch `dtumad/final-remediation`; SP1 semantic pin `v6.3.1-8-ga630089d9`).*
+*Snapshot: 2026-08 (branch `dtumad/v1.0-release`, Lean v4.32.2 + Sail v5; SP1 semantic pin
+`v6.3.1-8-ga630089d9`).*
 
 > **Line-number caveat.** Declarations are cited by name and file; line numbers appear only where
 > stable. All quoted signatures are mechanically checked against the tree at the snapshot commit
@@ -663,7 +664,7 @@ Stated plainly:
    layer can discharge C2 rather than assume it.
 4. **Completeness at the ensemble level is undeclared** (per-chip completeness is proved;
    Bitwise/Lt completeness witnesses currently cover register-register forms only).
-5. **Trusted surfaces T1–T4** (§10), including the temporary local dependency pins and the
+5. **Trusted surfaces T1–T4** (§10), including the pinned git dependency graph and the
    trace-battery provenance caveat (§4.3).
 6. The AIR models the *supervisor-mode* Core profile; user-mode/mprotect table variants,
    precompiles, and the memory-protection chips are out of scope.
@@ -688,4 +689,6 @@ generated Sail model is a fork — T4). Extraction
 regeneration requires the pinned sp1 extraction overlay (sp1's `dtumad/clean-native` branch tip
 plus the two checked-in patches) and a Rust toolchain — see `docs/agents/extraction.md`. The
 axiom census snapshot lives at `docs/snapshots/axiom-ledger.md`; regenerate before citing.
-Report quotes are checked by `scripts/check_report_citations.sh` (added with this report).
+Report quotes are checked by `scripts/check_report_citations.sh`, and recorded pin values by
+`scripts/check_pins.sh` — both run as gates inside `scripts/run_audit.sh` and in CI, so a stale
+citation or a drifted recorded pin fails the build rather than surviving in prose.
