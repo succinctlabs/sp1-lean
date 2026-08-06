@@ -5,7 +5,14 @@ import Mathlib.Data.Set.Basic
 AIR soundness is most naturally a refinement between two witness relations.  The left relation says
 that a public statement has a valid algebraic witness; the right says that it has a semantic
 execution witness.  Keeping both witnesses explicit avoids conflating an AIR theorem with a
-proof-system verifier theorem. -/
+proof-system verifier theorem.
+
+Part of this API is written for the ArkLib verifier layer rather than for in-tree consumers:
+the composition lemmas (`Sound.trans`, `FunctionalRefinement.trans`), the language algebra
+(`Sound.language_subset`, `Complete.language_subset`, `Correct.language_eq`,
+`language_eq_fst_image`), and the choice-based `Sound.extract`/`Sound.extract_valid` are
+deliberately declared ahead of that integration (`docs/roadmap.md`), so a reference census
+finding them unreferenced in-tree is expected. -/
 
 namespace SP1Clean.WitnessRelation
 

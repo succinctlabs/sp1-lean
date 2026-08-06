@@ -6,8 +6,26 @@ import SP1Clean.Math.Misc
 import SP1Clean.Model.Register
 set_option linter.unusedSimpArgs false
 
-/-! RTYPE/register subset used by the Add Sail bridge (no `pure_w`/`bv_to_w` shift machinery;
-ADD is definitional). -/
+/-! # The Sail-monad wrapper layer
+
+The general run-lemma substrate every chip Sail bridge elaborates against — not just the Add
+bridge it was first extracted for:
+
+- `toSailM` and the `run_dite`/`run_ite`/EStateM lemmas — evaluate the generated model's monadic
+  plumbing under `.run`.
+- `write_reg` / `write_reg'` — project-side register writes over the `SailState` register map,
+  with the self-overwrite and commutation lemmas (`write_reg'` is the `wX_bits`-shaped variant
+  that drops an `x0` write; `write_reg_eq_write_reg'` names the exact agreement condition).
+- The `run_readReg`/`run_writeReg` battery — evaluates the generated accessors against an
+  `isInitialized` state, including the insert/lookup interaction lemmas.
+- `rX_bits_eq_get_reg?` / `wX_bits_eq_write_reg'` / `run_rX_bits` / `run_wX_bits` — the bridges
+  from the generated model's register accessors to the project-side map operations.
+- `execute_RTYPE_pure`/`execute_RTYPE'` and `execute_RTYPEW_pure`/`execute_RTYPEW'` — pure twins
+  of the generated R-type executors plus their equivalence lemmas (no `pure_w`/`bv_to_w` shift
+  machinery; the shift chips carry their own reductions).
+- `jump_to_of_mod4_eq_zero` — the aligned control-flow commit used by the jump/branch bridges.
+- The file-scope `simp`/`local simp`/`grind` attribute blocks that make the generated helpers
+  reduce during bridge proofs. -/
 
 open LeanRV64D.Defs
 open LeanRV64D.Functions

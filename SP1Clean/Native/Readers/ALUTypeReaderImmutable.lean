@@ -21,7 +21,7 @@ The op_b/op_c reads and the `imm_c` immediate machinery (op_c gated `is_real - i
 
 A `FormalAssertion` (output `unit`) over the chip-owned `cols` adapter block, emitting the Program +
 Memory buses (`Guarantees := True`); faithfulness to SP1's generated constraint list is the chip's
-`Faithful/AluX0.lean` anchor (the reader's constraints are inlined there — `eval_op_a_immutable` is a
+`Faithful/AluX0Chip.lean` anchor (the reader's constraints are inlined there — `eval_op_a_immutable` is a
 plain method, not an `SP1Operation`). -/
 
 namespace SP1Clean.Readers.ALUTypeReaderImmutable

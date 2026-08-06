@@ -10,9 +10,11 @@ definitions here remain an explicitly scoped compatibility layer until timed gro
 - `clkNat` — the ℕ-decoded bus clock (`clk_high · 2^24 + clk_low`, the split every State/Memory message
   carries); `timeNat` projections for both message types.
 - **The ordinary window convention**: execution step `k` occupies `[c0 + 8k, c0 + 8(k+1))`
-  (`c0` = the committed genesis clock; every chip advances by `CLK_INC = 8`). Intra-row effect times:
-  a RAM write lands at offset `+1` (the `MemoryAccess` push offset), a register write at `+4` (the
-  op_a write offset); reads/read-backs at `+2`/`+3` observe pre-effect content.
+  (`c0` = the committed genesis clock; every chip advances by `ordinaryClkInc = CLK_INC = 8`).
+  Intra-row effect times: a RAM write lands at `ramEffectOffset = +1`, a register write at
+  `regEffectOffset = +4`; reads/read-backs at `+2`/`+3` observe pre-effect content. The constants
+  and their Rust provenance (`CLK_INC`, `MemoryAccessPosition`) are documented at their
+  definitions below.
 - `MemLoc` — the register-file/RAM split of the Memory bus's 3-limb address (registers are
   `addr0 < 32 ∧ addr1 = addr2 = 0`, the shape `MemoryMsg.Spec` names; RAM locations are SP1's
   canonical aligned 8-byte cells, not overlapping byte-addressed windows).
@@ -153,21 +155,51 @@ theorem chainState_of_sailChain {s0 s : SailState} :
     have hstep1 : Machine.stepOnce s = some s' := by unfold Machine.stepOnce; rw [hrun]
     rw [chainState_succ_front hstep1 n]; exact ih
 
-/-! ## The location content at a micro-time -/
+/-! ## The location content at a micro-time
 
-/-- **The intra-row effect convention, as a function.** `microValue s0 c0 loc τ`: the content of `loc`
-at micro-time `τ` on the trajectory from `s0` with genesis clock `c0`. Window `k = (τ − c0) / 8`,
-offset `δ = (τ − c0) % 8`; the window's step has taken effect at `loc` iff `τ` is at/after the
-location's effect offset (RAM `+1`, register `+4`). Pre-genesis times read the initial state. -/
+The window arithmetic below is SP1's, not ours. The three constants name the two Rust sources
+they must track (at the pinned semantic revision, `FormalModel/CoreProfile.lean`):
+
+- `crates/core/executor/src/lib.rs` — `pub const CLK_INC: u32 = 8`: every ordinary (non-syscall)
+  row advances the bus clock by eight, so execution step `k` occupies `[c0 + 8k, c0 + 8(k+1))`.
+- `crates/core/executor/src/events/memory.rs` — `enum MemoryAccessPosition { UntrustedInstruction
+  = 0, Memory = 1, C = 2, B = 3, A = 4 }`: the executor timestamps each access in a window at
+  `clk + position`. A RAM access therefore lands at offset `+1`; the operand reads (`C`, `B`)
+  observe at `+2`/`+3`; and the `op_a` register write lands at `+4`.
+
+`Machine.ordinarySchedule` (`Model/Machine/Schedule.lean`) carries the same numbers structurally
+as its `accesses` phase list; the timed grounding engine consumes them through that schedule, and
+`supported_core_native_sound`'s `UsesOrdinarySchedule` hypothesis is what pins a machine model to
+this window shape. `microValue` uses the constants directly in its window arithmetic. -/
+
+/-- SP1's ordinary clock increment (Rust `CLK_INC = 8`): the width of one ordinary execution
+window, and the modulus of the intra-window offset arithmetic below. Structurally this is
+`Machine.ordinarySchedule.duration`. -/
+abbrev ordinaryClkInc : ℕ := 8
+
+/-- The intra-window offset at which a RAM effect lands (Rust `MemoryAccessPosition::Memory = 1`).
+Register-operand reads at `+2`/`+3` (`C`/`B`) observe pre-effect RAM content. -/
+abbrev ramEffectOffset : ℕ := 1
+
+/-- The intra-window offset at which the `op_a` register write lands (Rust
+`MemoryAccessPosition::A = 4`). -/
+abbrev regEffectOffset : ℕ := 4
+
+/-- **The intra-row effect convention, as a function.** `microValue s0 c0 loc τ`: the content of
+`loc` at micro-time `τ` on the trajectory from `s0` with genesis clock `c0`. Window
+`k = (τ − c0) / ordinaryClkInc`, offset `δ = (τ − c0) % ordinaryClkInc`; the window's step has
+taken effect at `loc` iff `τ` is at/after the location's effect offset (`ramEffectOffset` /
+`regEffectOffset`, the Rust `MemoryAccessPosition` values). Pre-genesis times read the initial
+state. -/
 noncomputable def microValue (s0 : SailState) (c0 : ℕ) (loc : MemLoc) (τ : ℕ) : Option (BitVec 64) :=
   if τ < c0 then
     locContent s0 loc
   else
-    let k := (τ - c0) / 8
-    let δ := (τ - c0) % 8
+    let k := (τ - c0) / ordinaryClkInc
+    let δ := (τ - c0) % ordinaryClkInc
     let takePost : Bool := match loc with
-      | .reg _ => 4 ≤ δ
-      | .ram _ => 1 ≤ δ
+      | .reg _ => regEffectOffset ≤ δ
+      | .ram _ => ramEffectOffset ≤ δ
     (chainState s0 (if takePost then k + 1 else k)).bind (locContent · loc)
 
 end SP1Clean.Semantics

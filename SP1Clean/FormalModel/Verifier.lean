@@ -12,7 +12,10 @@ The eventual ArkLib module should instantiate its input relation with `WitnessRe
 post-compose ArkLib's straight-line extractor with the explicit map carried by
 `WitnessRelation.FunctionalRefinement`.  It should name the result `sp1_verifier_sound`; that name is
 intentionally not used for the AIR theorem.  Existential `WitnessRelation.Sound` remains useful as a
-propositional corollary, but it is not a sufficient extraction API. -/
+propositional corollary, but it is not a sufficient extraction API.
+
+Everything here (`PerfectExtraction` and its `refine`/`refineFunctional` lemmas) is reserved
+API for that ArkLib adapter — unreferenced in-tree by design until it exists. -/
 
 namespace SP1Clean.VerifierBoundary
 

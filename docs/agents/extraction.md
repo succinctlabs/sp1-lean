@@ -210,7 +210,7 @@ a chip-semantics change):
    chip's nested sub-structs, so the reuse/import wiring resolves). Sub-operation **methods** that are *not*
    `SP1Operation`s (e.g. `ALUTypeReader::eval_op_a_immutable`) are **inlined** in the chip's
    `asserts`/`interactions` rather than emitted as a `<Sub>.asserts` call — the `Faithful/<Chip>.lean` anchor
-   then discharges them directly (see `Faithful/AluX0.lean`).
+   then discharges them directly (see `Faithful/AluX0Chip.lean`).
 
 ## Generated helper factoring (sub-op `++`)
 

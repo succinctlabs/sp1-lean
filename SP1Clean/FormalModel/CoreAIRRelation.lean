@@ -11,7 +11,11 @@ of the upstream AIR instance.
 
 The active table list is witness data but must equal one of the two pinned Rust clusters.  This makes
 omitting a hard table, or quietly adding a helper table, a failed equality rather than an informal
-coverage claim. -/
+coverage claim.
+
+`Cluster.tables_nodup` and `TableRefinement.sound` are part of the reserved exact-AIR/ArkLib
+composition API: declared ahead of the `CoreAIRRefinementObligations` closure that will consume
+them, so they are expected to be unreferenced in-tree today. -/
 
 namespace SP1Clean.CoreAIR
 

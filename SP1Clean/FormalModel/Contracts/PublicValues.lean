@@ -6,7 +6,19 @@ This file deliberately separates the small State boundary consumed by the curren
 from SP1's real shard public-values record.  The latter mirrors
 `sp1_hypercube::air::PublicValues<[F; 4], [F; 3], [F; 4], F>`; keeping the distinction in the type
 names prevents a supported-core theorem from silently presenting itself as full SP1 AIR
-soundness. -/
+soundness.
+
+**Reserved cross-shard layer.**  Beyond the types the exact-AIR relation consumes today
+(`SP1PublicValues`, its `WellFormed` family, `SP1ShardStatement`), this file also carries the
+shard-ledger layer written ahead of its consumer: the continuity predicates
+(`ExecutionContinues`/`ExecutionContinuous`, `LedgerContinues`/`LedgerContinuous`), the
+boundary predicates (`InitialLedgerBoundary`, `FinalLedgerBoundary`,
+`HasUniqueFirstExecutionShard`), and the statement plumbing (`shardStatements`,
+`ConfigurationMatches`, `toBaseVector`, the `toNat`/`*Bits` decoders).  Their intended consumer
+is the boot-to-halt shard-composition theorem — the reserved `sp1_execution_sound` layer
+(`docs/roadmap.md`, after the exact-AIR bundle closes).  They are deliberately declared now so
+the cross-shard statement shape is fixed and auditable before that proof exists; a reference
+census will find them unreferenced in-tree, which is this design choice, not dead code. -/
 
 namespace SP1Clean
 

@@ -460,8 +460,8 @@ Exactly **one** entry was ever applied — #14 below, as a user-approved excepti
 | 18 | `Readers.CPUState.hn13` | `…two_pow_13_lt` | `Native/Readers/CPUState.lean` | low — byte-identical twin at `AddressOperation.hn13` |
 | 19 | `BranchChip.zero_ne_one'` | `zero_ne_one_zmod`, hoisted to `Math/Gate.lean` | `Proofs/Chips/BranchChip/Decision.lean` | low — rename and hoist are one decision (see §3.2) |
 | 20 | `BranchChip.val_of_bool` | `…val_eq_zero_or_one` | `Proofs/Chips/BranchChip/Decision.lean` | low — `of_bool` reads as a coercion *from* `Bool`; 10 call sites |
-| 21 | `Faithful.val_29''` | `…val_29_zmod_p` | `Faithful/AluX0.lean` | low — the `''` is a collision-avoidance artifact; real fix is the §1.7 hoist |
-| 22 | `Faithful.alux0cols_constraints_faithful` | `…aluX0cols_…` | `Faithful/AluX0.lean` | low — lone all-lowercase spelling; **matches the `*faithful*` probe glob** |
+| 21 | `Faithful.val_29''` | `…val_29_zmod_p` | `Faithful/AluX0Chip.lean` | low — the `''` is a collision-avoidance artifact; real fix is the §1.7 hoist |
+| 22 | `Faithful.alux0cols_constraints_faithful` | `…aluX0cols_…` | `Faithful/AluX0Chip.lean` | low — lone all-lowercase spelling; **matches the `*faithful*` probe glob** |
 | 23 | `StoreByteChip.AdvanceReady` | `advanceReady` | `Proofs/Chips/StoreByteChip/Bridge.lean` | low — the `ChipKind` field is lowercase and `LoadX0Chip` agrees; 9 files disagree with 1. Pick one and sweep |
 | 24 | `StoreByteChip.extHashMap_get?_insert_self` | `…getElem?_…` | `Proofs/Chips/StoreByteChip/Bridge.lean` | low — the proof immediately rewrites to `getElem?`; `Store{Half,Word,Double}` cite it cross-file |
 | 25–26 | `Faithful.{lt,bitwise}_chip_constraints_decompose` | `…{lt,bitwise}Chip_…` | `Faithful/{Lt,Bitwise}Chip.lean` | low — each file mixes snake and camel for one chip prefix. #26 is elaboration-expensive: re-ladder after any edit |

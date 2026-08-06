@@ -2,6 +2,26 @@ import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import LeanRV64D
 import SP1Clean.Math.Misc
+
+/-! # Sail machine state and register-index decoding
+
+The seam between the generated Sail model and this project's 5-bit register indices:
+
+- `SailState` — the concrete machine-state type every semantic statement ranges over: the
+  lean-sail v5 `Sail.ConcurrencyInterfaceV1.SequentialState` specialized to the generated
+  `RegisterType` with the trivial (deterministic) choice source. Neither component has a
+  `LeanRV64D.*` shim, so the specialization lives here.
+- `SailState.isInitialized` — every architectural register is present in the state's register
+  map (the boot predicate's shape for "the register file exists").
+- `reg_idx_to_Register` — the 5-bit operand index as a generated-model `Register`, total via a
+  catch-all arm that sends both `31#5` and `0#5` to `x31`. The `0#5` collapse is deliberate
+  slack, not an x0 semantics claim: rows with an `x0` operand take the dedicated x0 routes
+  (`AluX0Chip`, `LoadX0Chip`, and the Sail accessors' own x0 handling), and the
+  `regidxToRegister_eq_x31_iff`/`regidxToRegister_inj` lemma family keeps the collapse visible
+  to any proof that case-splits on indices.
+- The `@[simp]` battery (`regidxToRegister_eq_x*_iff`, `…_ofNat_*`, the `no_confusion`
+  non-collision lemmas) — closes the index-vs-register goals the chip Sail bridges generate. -/
+
 set_option linter.unusedSimpArgs false
 
 open LeanRV64D.Defs
