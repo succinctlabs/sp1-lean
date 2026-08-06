@@ -6,9 +6,8 @@ records so that an old audit packet is never mistaken for the present theorem bo
 
 > **Upstream authority: read Clean's own docs.** This project is built on the Clean DSL (upstream
 > <https://github.com/Verified-zkEVM/clean>; its docs are in the `doc/` folder, singular). Read them either
-> on GitHub or from the in-tree copy Lake installs under `.lake/packages/Clean/` (see
-> [`../AGENTS.md`](../AGENTS.md) for the "where to find them" note — including that the dependency is
-> temporarily a local path checkout during the 4.31 migration). For *how to write proofs and tame
+> on GitHub or from the in-tree copy Lake installs under `.lake/packages/Clean/`, which is exactly the
+> pinned revision (every dependency is an immutable git pin). For *how to write proofs and tame
 > elaboration*, Clean's docs are the authority — `doc/performance-problems.md`, `doc/proving-guide.md`,
 > `AGENTS.md`, and `Clean/Air/README.md` (the channel/ensemble/balance model our grounding engine builds
 > on). Our [`agents/proof-patterns.md`](agents/proof-patterns.md) records the SP1-specific instances.
@@ -56,9 +55,11 @@ See [`agents/README.md`](agents/README.md) for the full index:
 
 - [`agents/porting-recipe.md`](agents/porting-recipe.md) — chip-porting checklist.
 - [`agents/proof-patterns.md`](agents/proof-patterns.md) — circuit proof recipes and Lean/Clean landmines.
-- [`agents/lean-sail-notes.md`](agents/lean-sail-notes.md) — Lean 4.31 dependency and Sail environment.
-- [`agents/sail-fork-delta.md`](agents/sail-fork-delta.md) — the exact three-line `sail-riscv-lean`
-  platform-configuration delta and how to retire it.
+- [`agents/lean-sail-notes.md`](agents/lean-sail-notes.md) — Lean 4.32.2 dependency pins and Sail
+  environment, including the model/runtime pairing rule.
+- [`agents/sail-fork-delta.md`](agents/sail-fork-delta.md) — the exact six-value `sail-riscv-lean`
+  platform-configuration delta, why it is required for the memory-bridge lemmas to be true, and how to
+  retire it.
 - [`agents/extraction.md`](agents/extraction.md) — Rust extraction and generated-artifact contract.
 - [`agents/mul-operation-learnings.md`](agents/mul-operation-learnings.md) — multiplication-specific proofs.
 - [`agents/cleanup-profile.md`](agents/cleanup-profile.md) — binding house rules for `/cleanup` and `/cleanup-all`.

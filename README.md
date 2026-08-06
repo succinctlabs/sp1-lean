@@ -129,6 +129,8 @@ changing nontrivial proofs.
 
 ## Toolchain note
 
-Lean and mathlib are on 4.31. Clean, LeanRV64D, RISCV, and lean-sail are temporarily local path
-dependencies during migration. Restore immutable published git pins before a release, and do not run a
-bare `lake update`.
+Lean and mathlib are on **v4.32.2**, and every dependency is an immutable git pin, so a clean clone
+builds this project. One dependency is a fork: `sail-riscv-lean` carries a six-value SP1 platform
+configuration on top of the upstream generated model — see
+[`docs/agents/sail-fork-delta.md`](docs/agents/sail-fork-delta.md) for what it changes and why stock
+upstream is not usable. Do not run a bare `lake update`; update one `[[require]]` at a time.

@@ -1,7 +1,8 @@
 # SP1Clean verification report
 
-Snapshot date: 2026-07-27. The generated records in `docs/snapshots/` are authoritative for exact
-declaration dependencies; rerun the commands below before citing this report for another commit.
+Snapshot date: 2026-08-06, re-audited on the Lean v4.31 -> v4.32.2 + Sail v4 -> v5 migration. The
+generated records in `docs/snapshots/` are authoritative for exact declaration dependencies; rerun the
+commands below before citing this report for another commit.
 
 ## Executive assessment
 
@@ -24,19 +25,23 @@ No main-library proof is deferred. This audit found no `sorry`, `stop`, project 
 
 | Component | Audited value |
 |---|---|
-| Lean toolchain | `leanprover/lean4:v4.31.0` |
+| Lean toolchain | `leanprover/lean4:v4.32.2` |
 | SP1 semantic source | `a630089d9ff484ec6f2feade8d0afbb1447eed11` |
 | SP1 description | `v6.3.1-8-ga630089d9` |
 | SP1 extractor overlay | `69a8377c6e5550451f40c81fca17459687cd0a8f` |
 | Extractor patch digest | `a2c43cfab00280f5331a15ec251a8341a26ecf3baedcda22fec182915fbcf108` |
-| Clean checkout | `8e6ce748743fbce2a56e42d346e7054863c665da` |
-| LeanRV64D checkout | `793034f378c19c4374ab93755b785b9929db8ec1` |
-| RISCV checkout | `e65c352acd9e5a530fe80653d35073daa0994926` |
-| lean-sail checkout | `79b4d08505af29d88b3918f32d29840fae1fa191` |
-| PolyFun checkout | `502582b4bf51cddac166d3faed9ee2bfa5a2b7cc` |
+| mathlib pin | `905b95818eb32af7874a58b427f50c1711a5e96c` (tag `v4.32.2`) |
+| Clean pin | `0e53b9f2d05f06defa2aa0a859f549b611583f10` |
+| Lean_RV64D pin | `579d9de478de8dc20d2c999df9f646209e56eb96` |
+| RISCV pin | `d1d678c67f3039b5fb8a9c5aba76904c5793756b` |
+| lean-sail pin | `079463134b9c50450b8393e1566a09fc492a34d9` (tag `v5`) |
+| PolyFun pin | `d062ba2cbb3a50ba5b9f3ba349ca003e6c79630a` (upstream `main`) |
 
-The local path dependencies are migration checkouts. Reproducible immutable dependency pins remain a
-release requirement.
+Every dependency is an immutable git pin — `lake-manifest.json` records no `path` entries, so a clean
+clone reproduces this graph. `Lean_RV64D` is the one fork: `succinctlabs/sail-riscv-lean` carrying a
+six-value SP1 platform configuration over the opencompl generated base `11d8fa21`
+(`docs/agents/sail-fork-delta.md`). `RISCV` is pinned to the head of the open opencompl PR #59; repoint
+it to opencompl once that merges.
 
 The extractor overlay is a descendant of the semantic source with that source as its merge base. The
 diff under `crates/core/machine/src` changes only reflection imports/derives needed to expose row

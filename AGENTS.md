@@ -87,17 +87,21 @@ remain reserved. See `docs/roadmap.md` and `docs/architecture.md`.
   finish or kill it** (`pkill -f "lake build"` / `pkill -f "lake env lean"`). Cap at **2–3 builds at once**.
   A `run_in_background` build can outlive its shell — check with `ps -ef | grep -E "lake|lean" | grep -v lsp`
   before spawning another. The lean LSP server (`uvx lean-lsp-mcp`) also keeps several GB warm.
-  **There is no `-j` option** in Lake 4.31 here (only `-J/--json`) — serialise by not running anything else.
+  **There is no `-j` option** in Lake here (only `-J/--json`; re-verified at v4.32.2) — serialise by not
+  running anything else.
 - **Process hygiene.** *LSP file workers* (`lean --worker …`, children of `lean --server`) leak and hold GB
   after an agent exits; `pkill -f "lean --worker"` is the correct reaper. **Never kill `lean --server` /
   `lake serve`** — that is the `lean-lsp` MCP server, and killing it drops the MCP connection for the whole
   session. *Build workers* carry no `--worker` token, so use `ps -ef | grep tstack` for build liveness, and
   `sample <pid>` (not RSS — a healthy run also plateaus at ~3.2 GB) to tell a hang from progress.
-- **Toolchain (4.31 migration in progress):** `lean-toolchain` and mathlib are `v4.31.0`; Clean,
-  `sail-riscv-lean`, `riscv-lean`, and `lean-sail` are currently local sibling path dependencies while
-  their 4.31 ports are tested. The generated Sail model has a known code-generation panic workaround,
-  and the SP1 proof tree still has systematic channel/API regressions to repair. Before merge, restore
-  reproducible git pins. **Do not run bare `lake update`** (it may advance dependencies/toolchains).
+- **Toolchain:** `lean-toolchain` and mathlib are `v4.32.2`, and **every dependency is an immutable git
+  pin** — there are no path dependencies, so a clean clone builds. One is a fork: `Lean_RV64D` points at
+  `succinctlabs/sail-riscv-lean`, which carries a six-value SP1 platform configuration over the upstream
+  generated model (`docs/agents/sail-fork-delta.md`). **Do not run bare `lake update`** (it may advance
+  dependencies/toolchains) — update one `[[require]]` at a time.
+  ⚠ **The generated Sail model and the `lean-sail` runtime must move together.** A v4-generated
+  `LeanRV64D` snapshot against `lean-sail` v5 fails with `unknown namespace Sail.ConcurrencyInterfaceV2`;
+  pin both from the same pairing (`opencompl/riscv-lean` PR #59 is the reference).
   Read `docs/agents/lean-sail-notes.md` before touching any dependency.
 - Lake options already set in `lakefile.toml`: `--tstack=400000`, `synthInstance.maxHeartbeats = 1000000`.
 - There are no conventional unit tests in the main library; correctness lives in kernel-checked
@@ -280,11 +284,9 @@ feels ad-hoc, the general rule is in Clean's docs.
 *Where to find them.* Browse upstream at **<https://github.com/Verified-zkEVM/clean>** (the `doc/` folder +
 `Clean/Air/README.md` + the repo-root `AGENTS.md`), or read the copy Lake installs in-tree under
 **`.lake/packages/Clean/`** (e.g. `.lake/packages/Clean/doc/performance-problems.md`). Prefer these over any
-local checkout: the 4.31 migration *temporarily* wires Clean as a local **path** dependency, but that is a
-prototyping-only convenience — it must be restored to a pinned git dependency before any non-draft PR, and a
-local sibling path must never be baked into permanent docs. (Because the dep is currently an un-refreshed
-path checkout, `.lake/packages/Clean` can lag upstream `main`; if a doc named below is missing there, read
-it on GitHub.)
+local checkout: Clean is a pinned **git** dependency (`0e53b9f2`, v4.32.2), and a local sibling path must
+never be baked into permanent docs or into `lakefile.toml`. (The pin can still lag upstream `main`; if a doc
+named below is missing from `.lake/packages/Clean`, read it on GitHub.)
 
 Read, in priority order (paths relative to the Clean repo root — i.e. `.lake/packages/Clean/<path>` in-tree,
 or `<path>` on GitHub):
@@ -453,8 +455,8 @@ after installing or toggling.
   `docs/snapshots/axiom-census.txt` even on a pass** (so it leaves the tree dirty — inspect the delta, a moved
   auto-generated `bv_decide` `ax_N_M✝` index is hygienic), and it does **not** invoke
   `scripts/check_report_citations.sh` — run that separately.
-- `docs/agents/lean-sail-notes.md` — the 4.31 environment, local dependency pins, Sail code-generation
-  workaround, and the `lake update` trap.
+- `docs/agents/lean-sail-notes.md` — the v4.32.2 environment, the git dependency pins, the Sail
+  code-generation workaround, and the `lake update` trap.
 - `docs/agents/proof-patterns.md` — the witnessed-`FormalCircuit` soundness/completeness recipe + concrete
   landmines + the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
 - `docs/agents/cleanup-profile.md` — **binding house rules for `/cleanup` and `/cleanup-all`.** The

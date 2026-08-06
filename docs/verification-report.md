@@ -142,19 +142,34 @@ engine is anchored to the generated `ext_decode` (a `decodedInROM` fact yields
 `(ext_decode w).run s = .ok i s`), with per-class round-trip lemmas — so opcode/funct field
 extraction is the Sail model's, not a re-implementation.
 
-### 3.2 The fork delta: three configuration lines
+### 3.2 The fork delta: six configuration values
 
 SP1's runtime differs from a stock RV64 platform (no CLINT timer, no PMP, no test-signature
 region). Rather than assuming these away per-proof, the repository builds on a minimal fork of
-`sail-riscv-lean` whose **semantic delta is exactly three platform-configuration constants**
-(documented with the retirement path in `docs/agents/sail-fork-delta.md`, and *proved* as `rfl`
-lemmas in `SP1Clean/Model/SailMemory.lean`):
+`sail-riscv-lean` whose **semantic delta is exactly six platform-configuration values across three
+generated files** (documented with the retirement path in `docs/agents/sail-fork-delta.md`, and
+*disclosed* as `rfl` lemmas in `SP1Clean/Model/SailMemory.lean`):
 
 ```
-plat_have_clint = false     -- no core-local interruptor
-plat_have_sig   = false     -- no test-signature region
-sys_pmp_count   = 0         -- no PMP entries (unprotected M-mode)
+plat_have_clint       = false   -- no core-local interruptor
+plat_have_sig         = false   -- no test-signature region
+sys_pmp_count         = 0       -- no PMP entries (unprotected M-mode)
+sys_pmp_usable_count  = 0       -- must track sys_pmp_count
+clint_supported       = false   -- ValidateConfig's CLINT check
+sig_supported         = false   -- ValidateConfig's signature check
 ```
+
+The last three are not stylistic: upstream's own `ValidateConfig.check_pmp` rejects
+`sys_pmp_usable_count > sys_pmp_count`, and its CLINT/signature checks assert those windows lie
+within configured PMA memory, so flipping only the first three describes a configuration upstream
+itself considers invalid.
+
+The fork is **load-bearing, not a convenience**. SP1's address chips bound every access to
+`[2^16, 2^48)`, and the upstream CLINT window `[0x0200_0000, 0x020C_0000)` and signature window
+`[0x0C00_0000, 0x0C00_0020)` both lie inside it. With `plat_have_clint = true` a Sail access in the
+CLINT window routes to the device instead of RAM, which makes the memory-bridge lemmas **false as
+stated** — not merely unproved — and the disjointness hypothesis that would recover them is not
+derivable from SP1's AIR. Turning the devices off is what makes the existing statements true.
 
 The remaining platform configuration (machine privilege, disabled interrupts, HTIF off, the
 single SP1 PMA region, …) is packaged as the `SailConfigured` invariant carried through every
@@ -539,10 +554,11 @@ discloses which of these each headline declaration actually touches.
   property-free axioms.
 - **T3 — `native_decide` in the test library only.** The conformance anchors trust the Lean
   compiler; the main library is `native_decide`-free (CI-gated).
-- **T4 — Toolchain state (temporary).** At this snapshot the Clean/Sail dependencies are local
-  4.31-migration path checkouts; restoring reproducible git pins is a named release blocker
-  tracked outside this report. The `lake-manifest` pins recorded by the audit script are the
-  intended targets.
+- **T4 — The generated Sail model is a fork.** `Lean_RV64D` is pinned to
+  `succinctlabs/sail-riscv-lean`, an opencompl generated snapshot carrying the six-value SP1
+  platform configuration of §3.2. Every dependency is an immutable git pin, so the graph is
+  reproducible from a clean clone; the fork itself is the trust item, and its values are disclosed
+  as `rfl` lemmas.
 - **M1 — The semantic boundary binding.** Provider/boundary tables mean the selected program and
   initial state (`SP1SemanticBoundaryRelation`, §8.1). To be derived from the exact upstream
   system tables (the `executionCase` obligation).
@@ -667,7 +683,8 @@ lake lint                  # curated environment linters
 scripts/run_audit.sh       # pins + zero-deferral gates + per-theorem axiom census
 ```
 
-Toolchain: Lean `v4.31.0` / mathlib `v4.31.0` (dependency-pin caveat: T4). Extraction
+Toolchain: Lean `v4.32.2` / mathlib `v4.32.2`; every dependency is an immutable git pin (the
+generated Sail model is a fork — T4). Extraction
 regeneration requires the pinned sp1 extraction overlay (sp1's `dtumad/clean-native` branch tip
 plus the two checked-in patches) and a Rust toolchain — see `docs/agents/extraction.md`. The
 axiom census snapshot lives at `docs/snapshots/axiom-ledger.md`; regenerate before citing.

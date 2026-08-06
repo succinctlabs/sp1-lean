@@ -1,27 +1,32 @@
-# Lean 4.31 + Sail environment notes
+# Lean 4.32.2 + Sail environment notes
 
-These are the current migration notes for the shared Lean/Sail dependency graph.
+Notes on the shared Lean/Sail dependency graph.
 
-## Current local migration pins (2026-07-16)
+## Dependency pins
 
-- the root builds the entire dependency graph with `leanprover/lean4:v4.31.0`; root mathlib is `v4.31.0`;
-- Clean is local `../clean` at `8e6ce748` (`origin/bump-lean-4.31`);
-- `sail-riscv-lean`, `riscv-lean`, and `lean-sail` are local path dependencies while their 4.31
-  changes are validated under the root toolchain. Their standalone `lean-toolchain` files still say 4.30
-  and are part of the unpublished local migration delta; update and validate those before publishing pins;
-- PolyFun is pinned to PR #34 head `502582b4bf51cddac166d3faed9ee2bfa5a2b7cc` and is used only for
-  the native semantic-machine/run interface.
+The toolchain is `leanprover/lean4:v4.32.2` and **every dependency is an immutable git pin** — there are
+no path dependencies, so a clean clone builds. The authoritative values live in `lakefile.toml` and
+`lake-manifest.json`; `docs/release-audit.md` records the audited snapshot. One is a fork:
+`Lean_RV64D` points at `succinctlabs/sail-riscv-lean`, carrying a six-value SP1 platform configuration
+over the upstream generated model — see [`sail-fork-delta.md`](sail-fork-delta.md).
 
-Restore immutable git pins before merging the migration PR. Do not run bare `lake update`: it can
-rewrite all transitive pins and obscure which dependency introduced a toolchain change.
+### Two traps when re-pinning
 
-### Generated Sail 4.31 code-generation panic
+**A rev must be reachable from a branch or tag.** Lake clones `refs/heads/*` plus tags and then checks
+out, so a commit that lives only on `refs/pull/*` fails with `fatal: unable to read tree` on every
+machine without a warm `.lake` cache — and passes silently on the machine that has one. This is exactly
+how a dead PolyFun pin survived undetected: it resolved locally and broke every CI run.
 
-Lean 4.31 emits a large LCNF panic cascade for the generated `LeanRV64D/Defs.lean` when that file opens
-with `noncomputable section`, even though its declarations are computable. Removing the unnecessary
-section marker makes the complete generated file compile and code-generate cleanly; this is the local
-one-line Sail delta to upstream or regenerate, not a kernel bypass. Never use `skipKernelTC` as a
-workaround.
+**The generated Sail model and the `lean-sail` runtime must move together.** A v4-generated `LeanRV64D`
+snapshot against `lean-sail` v5 fails with `unknown namespace Sail.ConcurrencyInterfaceV2`. lean-sail v5
+also relocated the state/monad machinery under `Sail.ConcurrencyInterfaceV1` and left an **empty** root
+`PreSail` namespace behind, so `open PreSail` still succeeds while every `PreSail.foo` fails as *unknown
+identifier* — a confusing symptom for a namespace problem. Project files that reduce Sail terms carry an
+explicit `open Sail.ConcurrencyInterfaceV1`; prefer the `LeanRV64D.*` shims in `SpecializationV1.lean`
+where one exists.
+
+Do not run bare `lake update`: it can rewrite all transitive pins and obscure which dependency
+introduced a toolchain change. Update one `[[require]]` at a time.
 
 ## Historical reason for the independent tree
 
@@ -31,13 +36,12 @@ workaround.
 Lean 4.28 setup let us use Clean **main**, where the full feature set compiled: `FormalCircuit`, `GeneralFormalCircuit`
 (+ `ProverData`/`ProverHint`), `FormalAssertion`, `subcircuit`/`witnessVector`, `FormalTable`,
 `InductiveTable`, `Gadgets.ToBits.rangeCheck`, and `FemtoCairo`. That history no longer constrains the
-current 4.31 migration.
+current dependency graph.
 
 ## The `lake update` toolchain-bump trap
 
-`lake update` follows dependency manifests and can silently replace the reviewed local/pinned graph.
-During this migration, use explicit target builds under the root toolchain and update one dependency pin
-at a time.
+`lake update` follows dependency manifests and can silently replace the reviewed pinned graph. Use
+explicit target builds under the root toolchain and update one dependency pin at a time.
 
 ## The Clean-main ↔ Batteries import collision (RESOLVED upstream 2026-06-26)
 
@@ -68,11 +72,17 @@ pull a wider Mathlib import back in.
 
 ## Sail facts that survive (reusable)
 
-- `SailM` and `SailState` come from `LeanRV64D` (`SailState = PreSail.SequentialState RegisterType
-  Sail.trivialChoiceSource`). `Register` / `bitVecToRegidxVal` were ported into `Model/Register.lean`.
-- `readReg`/`writeReg` are `PreSail.readReg`/`PreSail.writeReg` (namespace **`PreSail`**, not `Sail`), tagged
-  `@[simp_sail]`. `Sail.run_readReg` will **not** fire — unfold `PreSail.readReg, PreSail.writeReg` in `simp`
-  instead (the `run_rX_bits`/`run_wX_bits` lemmas do fire).
+- `SailM` comes from `LeanRV64D`; `SailState` is defined in `Model/Register.lean` as
+  `Sail.ConcurrencyInterfaceV1.SequentialState RegisterType Sail.ConcurrencyInterfaceV1.trivialChoiceSource`.
+  (Under lean-sail v4 these were `PreSail.SequentialState` and `Sail.trivialChoiceSource`; neither has a
+  `LeanRV64D.*` shim, so both are spelled out.) `Register` / `bitVecToRegidxVal` were ported into the same
+  file.
+- `readReg`/`writeReg`/`assert` have `LeanRV64D.*` shims (`abbrev`s in `SpecializationV1.lean`) over
+  `Sail.ConcurrencyInterfaceV1.PreSail.*`; prefer the shim. `Sail.run_readReg` will **not** fire — unfold
+  `PreSail.readReg, PreSail.writeReg` in `simp` instead (the `run_rX_bits`/`run_wX_bits` lemmas do fire).
+  Note `SailME.run`/`SailME.throw` are `def` shims, not `abbrev`s, so substituting them is **not**
+  transparent — those sites keep the `PreSail.PreSailME.*` spelling under an
+  `open Sail.ConcurrencyInterfaceV1`.
 - For ADD, `execute_RTYPE_pure x y .ADD = x + y` definitionally (no `pure_w`/`bv_to_w` plumbing needed);
   `execute_RTYPE_pure x y rop.AND = x &&& y` (and OR/XOR) by `rfl`. The PC is modeled as `BitVec 64` (no limb
   arithmetic) in the bridges.
@@ -119,6 +129,13 @@ on `plat_clint_base`); **no `sorryAx`**.
 
 ## When the toolchain is next touched
 
-When changing a dependency, re-check the exact manifest revision, build the generated Sail model with
-code generation enabled, and confirm that all local siblings use 4.31. Finish with a full
-`lake build SP1Clean`; the single-file command can conceal stale oleans or stack-overflow exits.
+Update one `[[require]]` at a time and re-check the exact manifest revision each time. Confirm the new
+rev is reachable from a branch or tag, and that any `Lean_RV64D` move is paired with a compatible
+`lean-sail` (both traps above). Build the generated Sail model with code generation enabled.
+
+Finish with a full `lake build SP1Clean` — `lake env lean <file>` only sets the environment, exits 0 even
+on a stack overflow, and will happily check against a stale olean. After a dependency bump, **every**
+project olean is stale even if Lake has not yet rebuilt them; compare olean mtimes against the
+dependency's before trusting a partial error list.
+
+Never use `skipKernelTC` as a workaround for a kernel failure.
