@@ -14,7 +14,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 `MUL`/`MULH`/`MULHU`/`MULHSU`/`MULW`: witnesses the `MulOperation` column struct via
 `MulOperation.populate` and composes `MulOperation.circuit` (a `FormalAssertion`) as a Clean `assertion`,
 gated by the flag-sum `is_real = is_mul + … + is_mulw` (`alu/mul/mod.rs:234`). The semantic, flag-gated
-`Spec` (RV64 `mul`/`mulh`/`mulhu`/`mulhsu`/`mulw` identities on `cols.a`) is in `Specs/Chip.lean`.
+`Spec` (RV64 `mul`/`mulh`/`mulhu`/`mulhsu`/`mulw` identities on `cols.a`) is in `FormalModel/Contracts/Chips.lean`.
 
 The chip's own `AssertSpec` tail is the five variant-flag booleans, their sum-bound, and `op_a_0 = 0`;
 `InteractSpec` is `True` — all byte-range pulls live inside `MulOperation`. Carries `Fact (2^24 < p)`

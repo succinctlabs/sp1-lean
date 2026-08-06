@@ -18,7 +18,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 /-! # The `DivRem` chip row as a `GeneralFormalCircuit`
 
 `DIV`/`DIVU`/`REM`/`REMU`/`DIVW`/`REMW`/`DIVUW`/`REMUW`: flag-gated `Spec` (RV64 div/rem identities on
-`cols.a`) in `Specs/Chip.lean`; output is the extracted `Columns` (246 columns).
+`cols.a`) in `FormalModel/Contracts/Chips.lean`; output is the extracted `Columns` (246 columns).
 
 `main` witnesses the full row (unchanged witness stream, `localLength = 217`), composes the
 `CPUState`/`RTypeReader` readers, then asserts the complete constraint set through the two

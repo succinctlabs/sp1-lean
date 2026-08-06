@@ -23,7 +23,7 @@ the `limb_result` reassembly, and the four-variant output placement are inlined 
 the generated ShiftRight oracle (`Extracted/ChipOracle/ShiftRight.lean`).
 
 `AssertSpec` / `InteractSpec` capture the structural meaning of SP1's two extracted constraint lists;
-the semantic flag-gated RV64 `srl`/`sra`/`srlw`/`sraw` `Spec` is in `Specs/Chip.lean`.
+the semantic flag-gated RV64 `srl`/`sra`/`srlw`/`sraw` `Spec` is in `FormalModel/Contracts/Chips.lean`.
 `Faithful/ShiftRightChip.lean` anchors both structural specs.
 
 `main` composes the readers + three `U16MSBOperation` gadgets + the witnessed column block + the

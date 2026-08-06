@@ -20,7 +20,7 @@ encodings, the `shift_u16` byte-shift one-hot selector, the `lower_limb`/`higher
 the generated ShiftLeft oracle's `asserts`/`interactions` (`Extracted/ChipOracle/ShiftLeft.lean`) — no separate operation-level extraction.
 
 `AssertSpec` / `InteractSpec` capture the structural meaning of SP1's two extracted constraint lists;
-the semantic, flag-gated `Spec` (RV64 `sll`/`sllw` identity) is in `Specs/Chip.lean`.
+the semantic, flag-gated `Spec` (RV64 `sll`/`sllw` identity) is in `FormalModel/Contracts/Chips.lean`.
 `Faithful/ShiftLeftChip.lean` anchors both structural specs to SP1's extracted lists.
 
 `main` composes `CPUState`/`ALUTypeReader`/`U16MSBOperation` sub-circuits, witnesses the shift column

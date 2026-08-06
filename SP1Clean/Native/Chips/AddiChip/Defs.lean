@@ -14,7 +14,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 `ADDI`: the `AddOperation` gadget over an I-type adapter (second summand is the immediate `op_c_imm`,
 not a register read); reader is `Readers.ITypeReader.circuit` with opcode `1`.
 The `is_real`-gated semantic `Spec` (RV64 `add` identity on `cols.add_operation.value`) lives in
-`Specs/Chip.lean`; soundness and completeness are fully proven. -/
+`FormalModel/Contracts/Chips.lean`; soundness and completeness are fully proven. -/
 
 namespace SP1Clean.AddiChip
 

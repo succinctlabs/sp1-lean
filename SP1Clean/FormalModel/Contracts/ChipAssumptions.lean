@@ -8,10 +8,19 @@ here next to their `Spec`s (`Contracts/Chips.lean`) so the full per-chip contrac
 `circuit` bundle). Each declaration keeps its original `SP1Clean.<Op>Chip` namespace, so the chip's
 proof file resolves it unchanged after `import SP1Clean.FormalModel.Contracts.ChipAssumptions`.
 
-Covers the clean ALU chips whose contracts reference only the contract layer (operand `isU64`s, reader
-`Spec`s, `is_real`). The helper-dependent chips (Jal/Jalr/Branch/DivRem/ShiftLeft/ShiftRight) and the
-split-`Spec` chips (Lt/Bitwise) keep their `Assumptions` in their proof files (their preconditions
-reference `Defs`-layer / `populate` helpers that do not belong on the contract surface). -/
+Covers the chips whose contracts reference only the contract layer (operand `isU64`s, reader
+`Spec`s, `is_real`, and `Contracts/Chips.lean`-resident decode helpers): the five clean ALU chips
+plus UType. The rest keep their `Assumptions`/`ProverAssumptions` in their proof files, for one of
+two structural reasons (also recorded in `docs/architecture.md` § deliberate layering exceptions):
+
+- **hint/helper-dependent** — the `ProverAssumptions` references `Defs`-layer witness plumbing
+  that does not belong on the contract surface (`hintFlags` for Mul/Bitwise/Lt/Branch and the
+  shift/DivRem populate layers; Jal/Jalr's jump helpers). Lifting them would drag `Native`/proof
+  internals below the contract layer.
+- **Native-resident contract block** — the nine memory chips, AluX0, and LoadX0 define their
+  `Inputs` (and `Spec`) in `Native/Chips/<X>Chip/Defs.lean`, so their `Assumptions` cannot move
+  here without inverting the FormalModel → Native layering. They follow when the "Spec homing"
+  backlog item (`docs/roadmap.md`) moves those contract blocks onto this surface. -/
 
 namespace SP1Clean.AddChip
 
@@ -223,3 +232,47 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     input.adapter.op_c_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 end SP1Clean.SubwChip
+
+namespace SP1Clean.UTypeChip
+
+open Circuit
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Operands `isU64`; the decode fact `op_b_imm = RV64.lui (immOf adapter)` (the committed immediate
+is `sign_extend (imm << 12)`) is a trace/program-ROM guarantee. `is_real`/`is_auipc` booleanity and
+the padding convention `is_real = 0 → op_a_0 = 0` are proven from the pinned Rust AIR gates. -/
+def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+  Word.isU64 input.adapter.op_b_imm ∧
+  Word.isU64 (#v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0] : Word (ZMod p)) ∧
+  Word.toBitVec64 input.adapter.op_b_imm = RV64.lui (immOf input.adapter)
+
+/-- Honest prover-side row well-formedness. The immediate + program-counter words `isU64`, `is_real`/
+`is_auipc` binary, `op_a_0 = 0` (the `rd ≠ x0` rows completeness covers), the CPUState clock bounds + op_a
+register-access timestamp bounds, and the decode fact. -/
+def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
+    (_ : ProverHint (ZMod p)) : Prop :=
+  Word.isU64 input.adapter.op_b_imm ∧
+  Word.isU64 (#v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0] : Word (ZMod p)) ∧
+  -- (Option B pure-read JTypeReader) the op_a read-prior `isU64`, for the reader's op_a memory pull
+  -- completeness (its `Spec` now derives + owes the read-prior `isU64`).
+  (input.is_real = 1 → Word.isU64 input.adapter.op_a_memory.prev_value) ∧
+  (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (input.is_auipc = 0 ∨ input.is_auipc = 1) ∧
+  input.adapter.op_a_0 = 0 ∧
+  Readers.CPUState.Spec
+    { cols := input.state,
+      next_pc := #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
+      clk_inc := 8, is_real := input.is_real } ∧
+  Readers.RegisterAccessCols.Spec
+    ⟨input.adapter.op_a_memory, input.is_real,
+      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4⟩ ∧
+  Word.toBitVec64 input.adapter.op_b_imm = RV64.lui (immOf input.adapter) ∧
+  (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
+    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
+  -- G1: the pulled prior record's 24-bit access clock (`Channels.MemoryMsg.ClkBound`, the clock half of
+  -- the memory channel's `Guarantees`) — the `JTypeReader` op_a read-prior pull's completeness must
+  -- exhibit the guarantee it consumes. Soundness *derives* it there from the pull itself.
+  (input.is_real = 1 → input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24)
+
+end SP1Clean.UTypeChip

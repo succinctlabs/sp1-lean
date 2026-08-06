@@ -17,7 +17,7 @@ context — so the heavy one-hot case analysis is elaborated **once, in a small 
 under the giant `circuit_proof_start` chip goal. This is what lets `Formal.lean`'s soundness/completeness
 drop their `maxHeartbeats` ceilings.
 
-The flag↔index convention matches `Defs.lean`'s `main` and `Specs/Chip.lean`'s `Spec`:
+The flag↔index convention matches `Defs.lean`'s `main` and `FormalModel/Contracts/Chips.lean`'s `Spec`:
 `is_beq = b0, is_bne = b1, is_blt = b2, is_bge = b3, is_bltu = b4, is_bgeu = b5`; the signed-compare
 selector is `is_signed = is_blt + is_bge = b2 + b3`; `is_eq = 1 - sum` where `sum` is the four
 `u16_flags`; and
@@ -124,7 +124,7 @@ def branchDecision (b0 b1 b2 b3 b4 b5 bit sum : ZMod p) : ZMod p :=
 
 /-- **Soundness direction.** Given the in-circuit decision equation `br = branchDecision …`, the six
 binary opcode flags (one-hot, summing to `1`), the binary `br`, and the signed-compare couplings, derive
-the six per-opcode `br = 1 ↔ <RV64 condition>` biconditionals (verbatim `Specs/Chip.lean` Branch `Spec`
+the six per-opcode `br = 1 ↔ <RV64 condition>` biconditionals (verbatim `FormalModel/Contracts/Chips.lean` Branch `Spec`
 form). -/
 lemma branch_conditions_of_decision_eq {rs1 rs2 : Word (ZMod p)}
     (hrs1U : Word.isU64 rs1) (hrs2U : Word.isU64 rs2)

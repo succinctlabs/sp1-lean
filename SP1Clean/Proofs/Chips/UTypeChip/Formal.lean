@@ -1,12 +1,14 @@
 import SP1Clean.Native.Chips.UTypeChip.Defs
+import SP1Clean.FormalModel.Contracts.ChipAssumptions
 import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Math.EvalVec
 import Clean.Air.Circuit
 
-/-! # `SP1Clean.UTypeChip` — contract: `Assumptions` / soundness / completeness / `circuit`
+/-! # `SP1Clean.UTypeChip` — soundness / completeness / `circuit`
 
 The chip `Spec` (J-type reader sub-`Spec` + `is_real`/`is_auipc`-binary + `RV64.lui`/`RV64.auipc`
-identities) lives in `Specs/Chip.lean`. -/
+identities) lives in `FormalModel/Contracts/Chips.lean`; `Assumptions`/`ProverAssumptions` in
+`FormalModel/Contracts/ChipAssumptions.lean`. -/
 
 namespace SP1Clean.UTypeChip
 
@@ -16,42 +18,6 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
-/-- Operands `isU64`; the decode fact `op_b_imm = RV64.lui (immOf adapter)` (the committed immediate
-is `sign_extend (imm << 12)`) is a trace/program-ROM guarantee. `is_real`/`is_auipc` booleanity and
-the padding convention `is_real = 0 → op_a_0 = 0` are proven from the pinned Rust AIR gates. -/
-def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  Word.isU64 input.adapter.op_b_imm ∧
-  Word.isU64 (#v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0] : Word (ZMod p)) ∧
-  Word.toBitVec64 input.adapter.op_b_imm = RV64.lui (immOf input.adapter)
-
-/-- Honest prover-side row well-formedness. The immediate + program-counter words `isU64`, `is_real`/
-`is_auipc` binary, `op_a_0 = 0` (the `rd ≠ x0` rows completeness covers), the CPUState clock bounds + op_a
-register-access timestamp bounds, and the decode fact. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
-    (_ : ProverHint (ZMod p)) : Prop :=
-  Word.isU64 input.adapter.op_b_imm ∧
-  Word.isU64 (#v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0] : Word (ZMod p)) ∧
-  -- (Option B pure-read JTypeReader) the op_a read-prior `isU64`, for the reader's op_a memory pull
-  -- completeness (its `Spec` now derives + owes the read-prior `isU64`).
-  (input.is_real = 1 → Word.isU64 input.adapter.op_a_memory.prev_value) ∧
-  (input.is_real = 0 ∨ input.is_real = 1) ∧
-  (input.is_auipc = 0 ∨ input.is_auipc = 1) ∧
-  input.adapter.op_a_0 = 0 ∧
-  Readers.CPUState.Spec
-    { cols := input.state,
-      next_pc := #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
-      clk_inc := 8, is_real := input.is_real } ∧
-  Readers.RegisterAccessCols.Spec
-    ⟨input.adapter.op_a_memory, input.is_real,
-      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4⟩ ∧
-  Word.toBitVec64 input.adapter.op_b_imm = RV64.lui (immOf input.adapter) ∧
-  (input.is_real = 1 → input.adapter.op_a.val < 32 ∧ input.state.pc[0].val < 2 ^ 16 ∧
-    input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
-  -- G1: the pulled prior record's 24-bit access clock (`Channels.MemoryMsg.ClkBound`, the clock half of
-  -- the memory channel's `Guarantees`) — the `JTypeReader` op_a read-prior pull's completeness must
-  -- exhibit the guarantee it consumes. Soundness *derives* it there from the pull itself.
-  (input.is_real = 1 → input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24)
 
 /-- `Word.toBitVec64 #v[0,0,0,0] = 0`. -/
 lemma toBitVec64_zero_word : Word.toBitVec64 (#v[(0 : ZMod p), 0, 0, 0] : Word (ZMod p)) = 0 := by
