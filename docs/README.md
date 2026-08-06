@@ -70,9 +70,9 @@ See [`agents/README.md`](agents/README.md) for the full index:
 - [`agents/proof-patterns.md`](agents/proof-patterns.md) — circuit proof recipes and Lean/Clean landmines.
 - [`agents/lean-sail-notes.md`](agents/lean-sail-notes.md) — Lean 4.32.2 dependency pins and Sail
   environment, including the model/runtime pairing rule.
-- [`agents/sail-fork-delta.md`](agents/sail-fork-delta.md) — the exact six-value `sail-riscv-lean`
-  platform-configuration delta, why it is required for the memory-bridge lemmas to be true, and how to
-  retire it.
+- [`agents/sail-model-provenance.md`](agents/sail-model-provenance.md) — the generated
+  `Lean_RV64D` snapshot's provenance: the SP1 platform config, why it is required for the
+  memory-bridge lemmas to be true, and the regeneration pipeline.
 - [`agents/extraction.md`](agents/extraction.md) — Rust extraction and generated-artifact contract.
 - [`agents/mul-operation-learnings.md`](agents/mul-operation-learnings.md) — multiplication-specific proofs.
 - [`agents/cleanup-profile.md`](agents/cleanup-profile.md) — binding house rules for `/cleanup` and `/cleanup-all`.

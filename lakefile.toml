@@ -38,19 +38,23 @@ name = "Clean"
 git = "https://github.com/Verified-zkEVM/clean"
 rev = "0e53b9f2d05f06defa2aa0a859f549b611583f10"
 
-# Sail RV64 model. Package name is `Lean_RV64D` (opencompl upstream; the succinctlabs fork had renamed
-# it to `LeanRV64D`); it exposes the `LeanRV64D` library the project imports. Requiring by the real
-# package name dedups with riscv-lean's transitive `Lean_RV64D` requirement onto this one copy.
-# opencompl `11d8fa21` (the snapshot riscv-lean PR #59 pins, generated against lean-sail v5) plus
-# the six-value SP1 platform configuration — see docs/agents/sail-fork-delta.md. Stock upstream is
-# not usable: its CLINT and signature windows lie inside the address range SP1's chips bound accesses
-# to, which makes the memory-bridge lemmas false as stated, not merely unproved.
+# Sail RV64 model. Package name is `Lean_RV64D` (opencompl upstream naming); it exposes the
+# `LeanRV64D` library the project imports. Requiring by the real package name dedups with
+# riscv-lean's transitive `Lean_RV64D` requirement onto this one copy.
+# The pinned snapshot is GENERATED, not hand-edited: pinned rems-project/sail + riscv/sail-riscv
+# sources with the SP1 platform config `scripts/sail-config/sp1_rv64d_cfg.json` (regenerate and
+# verify with `scripts/sail-config/generate_lean_rv64d.sh`; provenance in the snapshot's commit
+# message and docs/agents/sail-model-provenance.md). It equals the opencompl base `11d8fa21` (the
+# snapshot riscv-lean PR #59 pins, generated against lean-sail v5) except the six platform-value
+# sites the config sets. Stock upstream is not usable: its CLINT and signature windows lie inside
+# the address range SP1's chips bound accesses to, which makes the memory-bridge lemmas false as
+# stated, not merely unproved.
 # NB the generated model and the Sail runtime must move together: a v4-generated snapshot against
 # Sail v5 fails with `unknown namespace Sail.ConcurrencyInterfaceV2`.
 [[require]]
 name = "Lean_RV64D"
 git = "https://github.com/succinctlabs/sail-riscv-lean"
-rev = "579d9de478de8dc20d2c999df9f646209e56eb96"
+rev = "df1acf579f8daf97c4dc3248565dec5a123079ef"
 
 # Lightweight ISA fns. Pinned to the succinctlabs fork head, which is the head of the open
 # opencompl/riscv-lean PR #59 ("chore: update to v4.32.2"); repoint to opencompl once that merges.

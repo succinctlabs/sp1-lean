@@ -143,7 +143,9 @@ terms or conditions.
 ## Toolchain note
 
 Lean and mathlib are on **v4.32.2**, and every dependency is an immutable git pin, so a clean clone
-builds this project. One dependency is a fork: `sail-riscv-lean` carries a six-value SP1 platform
-configuration on top of the upstream generated model — see
-[`docs/agents/sail-fork-delta.md`](docs/agents/sail-fork-delta.md) for what it changes and why stock
-upstream is not usable. Do not run a bare `lake update`; update one `[[require]]` at a time.
+builds this project. The generated Sail model (`sail-riscv-lean`) is pinned to a snapshot
+regenerated from pinned sources plus a checked-in SP1 platform configuration
+(`scripts/sail-config/`) — see
+[`docs/agents/sail-model-provenance.md`](docs/agents/sail-model-provenance.md) for what the config
+sets and why stock upstream is not usable. Do not run a bare `lake update`; update one
+`[[require]]` at a time.

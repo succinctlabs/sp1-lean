@@ -143,13 +143,15 @@ engine is anchored to the generated `ext_decode` (a `decodedInROM` fact yields
 `(ext_decode w).run s = .ok i s`), with per-class round-trip lemmas — so opcode/funct field
 extraction is the Sail model's, not a re-implementation.
 
-### 3.2 The fork delta: six configuration values
+### 3.2 The generated platform configuration: six value sites
 
 SP1's runtime differs from a stock RV64 platform (no CLINT timer, no PMP, no test-signature
-region). Rather than assuming these away per-proof, the repository builds on a minimal fork of
-`sail-riscv-lean` whose **semantic delta is exactly six platform-configuration values across three
-generated files** (documented with the retirement path in `docs/agents/sail-fork-delta.md`, and
-*disclosed* as `rfl` lemmas in `SP1Clean/Model/SailMemory.lean`):
+region). Rather than assuming these away per-proof, the repository builds on a `sail-riscv-lean`
+snapshot **generated from pinned Sail sources with a checked-in SP1 platform configuration**
+(`scripts/sail-config/`; provenance and pipeline in `docs/agents/sail-model-provenance.md`).
+The semantic delta from the stock generated model is **exactly six platform-value sites across
+three generated files** — the images of a four-key config — *disclosed* as `rfl` lemmas in
+`SP1Clean/Model/SailMemory.lean`:
 
 ```
 plat_have_clint       = false   -- no core-local interruptor
@@ -160,12 +162,13 @@ clint_supported       = false   -- ValidateConfig's CLINT check
 sig_supported         = false   -- ValidateConfig's signature check
 ```
 
-The last three are not stylistic: upstream's own `ValidateConfig.check_pmp` rejects
-`sys_pmp_usable_count > sys_pmp_count`, and its CLINT/signature checks assert those windows lie
-within configured PMA memory, so flipping only the first three describes a configuration upstream
-itself considers invalid.
+The six sites are the images of four config keys (`platform.clint.supported`,
+`platform.simple_interrupt_generator.supported`, `memory.pmp.count`, `memory.pmp.usable_count`),
+so the old hand-maintenance invariant — upstream's own `ValidateConfig.check_pmp` rejects
+`sys_pmp_usable_count > sys_pmp_count`, and its CLINT/signature checks constrain those windows —
+is enforced structurally by the generator reading each key everywhere it is consumed.
 
-The fork is **load-bearing, not a convenience**. SP1's address chips bound every access to
+The configuration is **load-bearing, not a convenience**. SP1's address chips bound every access to
 `[2^16, 2^48)`, and the upstream CLINT window `[0x0200_0000, 0x020C_0000)` and signature window
 `[0x0C00_0000, 0x0C00_0020)` both lie inside it. With `plat_have_clint = true` a Sail access in the
 CLINT window routes to the device instead of RAM, which makes the memory-bridge lemmas **false as
@@ -555,11 +558,13 @@ discloses which of these each headline declaration actually touches.
   property-free axioms.
 - **T3 — `native_decide` in the test library only.** The conformance anchors trust the Lean
   compiler; the main library is `native_decide`-free (CI-gated).
-- **T4 — The generated Sail model is a fork.** `Lean_RV64D` is pinned to
-  `succinctlabs/sail-riscv-lean`, an opencompl generated snapshot carrying the six-value SP1
-  platform configuration of §3.2. Every dependency is an immutable git pin, so the graph is
-  reproducible from a clean clone; the fork itself is the trust item, and its values are disclosed
-  as `rfl` lemmas.
+- **T4 — The generated Sail model's provenance.** `Lean_RV64D` is pinned to a snapshot on
+  `succinctlabs/sail-riscv-lean` regenerated from a pinned Sail compiler + pinned
+  `riscv/sail-riscv` sources with the checked-in SP1 config of §3.2
+  (`scripts/sail-config/generate_lean_rv64d.sh`; a stock-config run reproduces the opencompl
+  base byte-identically). The trust item is the generation pipeline — the Sail compiler's Lean
+  backend and the config — no longer a hand-maintained delta; the six configured values remain
+  disclosed as `rfl` lemmas, and every dependency stays an immutable git pin.
 - **M1 — The semantic boundary binding.** Provider/boundary tables mean the selected program and
   initial state (`SP1SemanticBoundaryRelation`, §8.1). To be derived from the exact upstream
   system tables (the `executionCase` obligation).
@@ -685,7 +690,7 @@ scripts/run_audit.sh       # pins + zero-deferral gates + per-theorem axiom cens
 ```
 
 Toolchain: Lean `v4.32.2` / mathlib `v4.32.2`; every dependency is an immutable git pin (the
-generated Sail model is a fork — T4). Extraction
+generated Sail model is config-generated from pinned sources — T4). Extraction
 regeneration requires the pinned sp1 extraction overlay (sp1's `dtumad/clean-native` branch tip
 plus the two checked-in patches) and a Rust toolchain — see `docs/agents/extraction.md`. The
 axiom census snapshot lives at `docs/snapshots/axiom-ledger.md`; regenerate before citing.

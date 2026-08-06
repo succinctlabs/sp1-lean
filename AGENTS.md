@@ -95,9 +95,10 @@ remain reserved. See `docs/roadmap.md` and `docs/architecture.md`.
   session. *Build workers* carry no `--worker` token, so use `ps -ef | grep tstack` for build liveness, and
   `sample <pid>` (not RSS — a healthy run also plateaus at ~3.2 GB) to tell a hang from progress.
 - **Toolchain:** `lean-toolchain` and mathlib are `v4.32.2`, and **every dependency is an immutable git
-  pin** — there are no path dependencies, so a clean clone builds. One is a fork: `Lean_RV64D` points at
-  `succinctlabs/sail-riscv-lean`, which carries a six-value SP1 platform configuration over the upstream
-  generated model (`docs/agents/sail-fork-delta.md`). **Do not run bare `lake update`** (it may advance
+  pin** — there are no path dependencies, so a clean clone builds. `Lean_RV64D` points at
+  `succinctlabs/sail-riscv-lean`, a **generated** snapshot: pinned Sail sources run against the
+  checked-in SP1 platform config, regenerable via `scripts/sail-config/generate_lean_rv64d.sh`
+  (`docs/agents/sail-model-provenance.md`). **Do not run bare `lake update`** (it may advance
   dependencies/toolchains) — update one `[[require]]` at a time.
   ⚠ **The generated Sail model and the `lean-sail` runtime must move together.** A v4-generated
   `LeanRV64D` snapshot against `lean-sail` v5 fails with `unknown namespace Sail.ConcurrencyInterfaceV2`;
@@ -484,9 +485,9 @@ after installing or toggling.
   `check_root_index.sh`, and `check_report_citations.sh` as gates, so none need a separate invocation.
 - `docs/agents/lean-sail-notes.md` — the v4.32.2 environment, the git dependency pins, the Sail
   code-generation workaround, and the `lake update` trap.
-- `docs/agents/sail-fork-delta.md` — the exact six-value `sail-riscv-lean` platform-configuration
-  delta, why stock upstream makes the memory-bridge lemmas false, and the config-based retirement
-  path.
+- `docs/agents/sail-model-provenance.md` — the generated `Lean_RV64D` snapshot's provenance: the
+  four-key SP1 config and its six generated sites, why stock upstream makes the memory-bridge
+  lemmas false, the regeneration pipeline, and the re-pinning procedure.
 - `docs/agents/proof-patterns.md` — the witnessed-`FormalCircuit` soundness/completeness recipe + concrete
   landmines + the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
 - `docs/agents/cleanup-profile.md` — **binding house rules for `/cleanup` and `/cleanup-all`.** The

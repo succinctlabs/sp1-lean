@@ -32,16 +32,22 @@ No main-library proof is deferred. This audit found no `sorry`, `stop`, project 
 | Extractor patch digest | `a2c43cfab00280f5331a15ec251a8341a26ecf3baedcda22fec182915fbcf108` |
 | mathlib pin | `905b95818eb32af7874a58b427f50c1711a5e96c` (tag `v4.32.2`) |
 | Clean pin | `0e53b9f2d05f06defa2aa0a859f549b611583f10` |
-| Lean_RV64D pin | `579d9de478de8dc20d2c999df9f646209e56eb96` |
+| Lean_RV64D pin | `df1acf579f8daf97c4dc3248565dec5a123079ef` |
+| Sail compiler source | `41694abd58b27b687af5db275810dfeb8a88cfc0` (rems-project/sail, `sail2`) |
+| sail-riscv model source | `61266bd4dede6c7dd6e903e52dc80bcbf644b1b8` (riscv/sail-riscv, `master`) |
+| SP1 Sail config | sha256 `6be6e6abe7389f7f7e67c4afe8583f769a6d252739672ed2b18224ef91e04621` (`scripts/sail-config/sp1_rv64d_cfg.json`) |
 | RISCV pin | `d1d678c67f3039b5fb8a9c5aba76904c5793756b` |
 | lean-sail pin | `079463134b9c50450b8393e1566a09fc492a34d9` (tag `v5`) |
 | PolyFun pin | `d062ba2cbb3a50ba5b9f3ba349ca003e6c79630a` (upstream `main`) |
 
 Every dependency is an immutable git pin — `lake-manifest.json` records no `path` entries, so a clean
-clone reproduces this graph. `Lean_RV64D` is the one fork: `succinctlabs/sail-riscv-lean` carrying a
-six-value SP1 platform configuration over the opencompl generated base `11d8fa21`
-(`docs/agents/sail-fork-delta.md`). `RISCV` is pinned to the head of the open opencompl PR #59; repoint
-it to opencompl once that merges.
+clone reproduces this graph. `Lean_RV64D` is pinned to a **generated** snapshot on
+`succinctlabs/sail-riscv-lean` (branch `sp1/config-generated-4.32.2`, tag `sp1-rv64d-v1.0`): the
+pinned Sail compiler + sail-riscv sources above run against the schema-shaped SP1 platform config,
+reproducible via `scripts/sail-config/generate_lean_rv64d.sh` (`docs/agents/sail-model-provenance.md`).
+It equals the opencompl base `11d8fa21` except the six platform-value sites the config sets; the
+snapshot's commit message carries the full provenance record. `RISCV` is pinned to the head of the
+open opencompl PR #59; repoint it to opencompl once that merges.
 
 The extractor overlay is a descendant of the semantic source with that source as its merge base. The
 diff under `crates/core/machine/src` changes only reflection imports/derives needed to expose row

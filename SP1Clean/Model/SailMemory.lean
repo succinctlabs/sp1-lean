@@ -47,13 +47,16 @@ attribute [local simp] LeanRV64D.Functions.xlen_bytes LeanRV64D.assert PreSail.a
 
 section isValidMemConfig
 
-/-- `plat_have_clint` is manually set in our fork of sail in the `PlatformConfig.lean` file. -/
+/-- `plat_have_clint` is set by the SP1 generation config (`platform.clint.supported = false`,
+`scripts/sail-config/sp1_rv64d_cfg.json`) into the generated `PlatformConfig.lean`. -/
 @[simp] lemma plat_have_clint_eq_false : plat_have_clint = false := rfl
 
-/-- `plat_have_sig` is manually set in our fork of sail in the `PlatformConfig.lean` file. -/
+/-- `plat_have_sig` is set by the SP1 generation config
+(`platform.simple_interrupt_generator.supported = false`) into the generated `PlatformConfig.lean`. -/
 @[simp] lemma plat_have_sig_eq_false : plat_have_sig = false := rfl
 
-/-- `sys_pmp_count` is manually set to zero in our fork in the `PmpRegs.lean` file. -/
+/-- `sys_pmp_count` is set by the SP1 generation config (`memory.pmp.count = 0`) into the
+generated `PmpRegs.lean`. -/
 @[simp] lemma sys_pmp_count_eq_zero : sys_pmp_count = 0 := rfl
 
 /-- Memory access setting for all of memory in our model. -/
@@ -638,9 +641,9 @@ what makes the loop's `offset * split_width = 0` index awkward otherwise. -/
 private lemma addInt_zero {n : ℕ} (x : BitVec n) : BitVec.addInt x 0 = x := by
   simp [BitVec.addInt]
 
-/-- SP1's fork sets `sys_pmp_count = 0`, and `pmpCheck` opens with `if sys_pmp_count == 0 then
-pure none` (`LeanRV64D/PmpControl.lean:314-316`), so the entire PMP walk is short-circuited and the
-loop body's per-access PMP check is discharged unconditionally. -/
+/-- SP1's generation config sets `sys_pmp_count = 0`, and `pmpCheck` opens with
+`if sys_pmp_count == 0 then pure none` (`LeanRV64D/PmpControl.lean:314-316`), so the entire PMP
+walk is short-circuited and the loop body's per-access PMP check is discharged unconditionally. -/
 private lemma run_pmpCheck_none (paddr : physaddr) (width : ℕ)
     (access : MemoryAccessType mem_payload) (priv : Privilege) (s : SailState) :
     (pmpCheck paddr width access priv).run s = .ok none s := by
