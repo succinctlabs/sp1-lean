@@ -25,44 +25,56 @@ testDriver = "SP1CleanTest"
 pp.unicode.fun = true
 synthInstance.maxHeartbeats = 1000000
 
-# LOCAL 4.31 MIGRATION (in progress) — deps repointed to editable sibling checkouts at Lean 4.31,
-# so Clean-API + Sail-generation breakage surfaces early against the real code. The proper published
-# pins (Clean SHA, succinctlabs Sail forks / opencompl + the 3-line platform delta per
-# docs/agents/sail-fork-delta.md) get restored before the PR merges. See docs/archive/clean-main-migration.md.
+# Every dependency is an immutable published pin, so a clean clone builds this project. Toolchain is
+# Lean v4.32.2 (see `lean-toolchain`); each pin below is at or compatible with it.
 [[require]]
 name = "mathlib"
 git = "https://github.com/leanprover-community/mathlib4"
-rev = "v4.31.0"
+rev = "v4.32.2"
 
-# Clean's 4.31 port (local ../clean, `origin/bump-lean-4.31`). The final pin is restored before merge.
+# Clean at v4.32.2 (`main`, post PR #443 "bump-lean-4.32.2").
 [[require]]
 name = "Clean"
-path = "../clean"
+git = "https://github.com/Verified-zkEVM/clean"
+rev = "0e53b9f2d05f06defa2aa0a859f549b611583f10"
 
-# Sail RV64 model tested with 4.31 (local ../sail-riscv-lean, opencompl main + the SP1 platform delta applied).
-# Package name is `Lean_RV64D` (opencompl upstream; the succinctlabs fork had renamed it to `LeanRV64D`);
-# it exposes the `LeanRV64D` library the project imports. Requiring by the real package name dedups with
-# riscv-lean's transitive `Lean_RV64D` git requirement onto this one local copy.
+# Sail RV64 model. Package name is `Lean_RV64D` (opencompl upstream; the succinctlabs fork had renamed
+# it to `LeanRV64D`); it exposes the `LeanRV64D` library the project imports. Requiring by the real
+# package name dedups with riscv-lean's transitive `Lean_RV64D` requirement onto this one copy.
+# opencompl `11d8fa21` (the snapshot riscv-lean PR #59 pins, generated against lean-sail v5) plus
+# the six-value SP1 platform configuration — see docs/agents/sail-fork-delta.md. Stock upstream is
+# not usable: its CLINT and signature windows lie inside the address range SP1's chips bound accesses
+# to, which makes the memory-bridge lemmas false as stated, not merely unproved.
+# NB the generated model and the Sail runtime must move together: a v4-generated snapshot against
+# Sail v5 fails with `unknown namespace Sail.ConcurrencyInterfaceV2`.
 [[require]]
 name = "Lean_RV64D"
-path = "../sail-riscv-lean"
+git = "https://github.com/succinctlabs/sail-riscv-lean"
+rev = "579d9de478de8dc20d2c999df9f646209e56eb96"
 
-# Lightweight ISA fns tested with 4.31 (local ../riscv-lean, opencompl main).
+# Lightweight ISA fns. Pinned to the succinctlabs fork head, which is the head of the open
+# opencompl/riscv-lean PR #59 ("chore: update to v4.32.2"); repoint to opencompl once that merges.
 [[require]]
 name = "RISCV"
-path = "../riscv-lean"
+git = "https://github.com/succinctlabs/riscv-lean"
+rev = "d1d678c67f3039b5fb8a9c5aba76904c5793756b"
 
-# lean-sail runtime tested with 4.31 (local ../lean-sail; the local IntRange port remains applied).
+# lean-sail runtime, upstream release tag `v5` — the revision riscv-lean PR #59 pins.
 [[require]]
 name = "Sail"
-path = "../lean-sail"
+git = "https://github.com/rems-project/lean-sail"
+rev = "079463134b9c50450b8393e1566a09fc492a34d9"
 
 # PolyFun supplies only the semantic `DynSystem.Machine`/`Run` packaging. Lenses and the broader
 # extensible-machine theory are not used; circuit construction and bus proofs remain independent.
+# Pinned to `main` (upstream carries the v4.32.2 bump since PR #106) — not a side branch and not a
+# fork. NB: a rev must be reachable from a branch or tag — lake clones `refs/heads/*` + tags and then
+# checks out, so a commit that lives only on `refs/pull/*` fails with `fatal: unable to read tree` on
+# every machine that lacks a warm cache. That is exactly how the previous pin (PR #34's head) broke.
 [[require]]
 name = "PolyFun"
 git = "https://github.com/Verified-zkEVM/PolyFun"
-rev = "502582b4bf51cddac166d3faed9ee2bfa5a2b7cc"
+rev = "d062ba2cbb3a50ba5b9f3ba349ca003e6c79630a"
 
 # The `lake lint` driver executable (see `lintDriver` above). A thin wrapper around the Batteries
 # `#lint` framework; `supportInterpreter` is required because the linters' `test` functions are run
