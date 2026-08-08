@@ -59,6 +59,13 @@ section isValidMemConfig
 generated `PmpRegs.lean`. -/
 @[simp] lemma sys_pmp_count_eq_zero : sys_pmp_count = 0 := rfl
 
+/-- `sys_pmp_usable_count` is set by the SP1 generation config (`memory.pmp.usable_count = 0`)
+into the generated `PmpRegs.lean`. Disclosure-only (deliberately not `@[simp]`: no proof
+consumes it — it pins the fourth top-level config value alongside the three lemmas above; the
+config's remaining two generated sites are `let`-bindings inside `ValidateConfig` and are not
+addressable as lemmas). -/
+lemma sys_pmp_usable_count_eq_zero : sys_pmp_usable_count = 0 := rfl
+
 /-- Memory access setting for all of memory in our model. -/
 @[reducible]
 def SP1_PMA : PMA where

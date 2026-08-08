@@ -174,8 +174,9 @@ Mirror-rust layout under `SP1Clean/`:
 - **`SP1CleanTest/`** (top-level, **not** under `SP1Clean/`) — the **test library**, the sole home of
   `native_decide` and the `lake test` target (`testDriver`). It imports the main `SP1Clean` library and
   is never imported by it, so the default `lake build SP1Clean` stays `native_decide`-free (enforced by
-  `scripts/check_no_native_decide.sh`; `native_decide` trusts the whole compiler, adding
-  `Lean.ofReduceBool`/`Lean.trustCompiler`). Two layers, namespaces preserved (`SP1Clean.WitnessTests` /
+  `scripts/check_no_native_decide.sh`; `native_decide` trusts the whole compiler — at v4.32.2 the census
+  shows this as generated `._native.native_decide.ax_*` constants, the successors of the named
+  `Lean.ofReduceBool`/`Lean.trustCompiler` axioms). Two layers, namespaces preserved (`SP1Clean.WitnessTests` /
   `SP1Clean.TraceGenTests`, decoupled from the new module paths):
   - `WitnessTests/` — the `<Op>Witness.lean` witness-generation conformance anchors +
     `WitnessConformance.lean` scaffold; auto-gen vectors under `WitnessTests/Vectors/`.
@@ -334,7 +335,9 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
    bridging helpers — they only exist when `main` and `Spec` were defined in mismatched forms; the fix is to
    align them.
 4. **Axiom-clean target.** After each artifact, check `#print axioms <decl>` (or the `lean_verify` MCP tool) is
-   only `[propext, Classical.choice, Quot.sound]` (bv_decide may add `Lean.ofReduceBool`/`trustCompiler`) — and
+   only `[propext, Classical.choice, Quot.sound]` (bv_decide may add generated
+   `._native.bv_decide.ax_*` constants — the v4.32.2 form of the former
+   `Lean.ofReduceBool`/`trustCompiler`) — and
    **no `sorryAx`**.
 
 ## Proof-style quick notes
@@ -399,7 +402,9 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
   silence the kernel. See `docs/agents/proof-patterns.md` §"Bit-shift chip soundness" (the `2^64` bullet) for
   the worked fix.
 - **Never `native_decide` in the main `SP1Clean/` library.** It discharges goals by running compiled code,
-  trusting the **whole compiler** (adds `Lean.ofReduceBool`/`Lean.trustCompiler`) — so headline soundness
+  trusting the **whole compiler** (surfaced in the census as generated
+  `._native.native_decide.ax_*` constants — formerly the named `Lean.ofReduceBool`/
+  `Lean.trustCompiler` axioms) — so headline soundness
   theorems would no longer be `[propext, Classical.choice, Quot.sound]`-clean. It is **CI-gated**
   (`scripts/check_no_native_decide.sh`, run by the audit + the `guards` job; any hit in `SP1Clean/**/*.lean`
   fails the build). Conformance checks that genuinely need it live in the separate top-level `SP1CleanTest`

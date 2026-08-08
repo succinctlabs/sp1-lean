@@ -126,7 +126,7 @@ alignment/fits/range facts as **hypotheses** (the `AddBridge` philosophy — the
 `correct_{load,store}_double_native` is `(spec).run s = (sp1).run s`. The `execute_STORE` Sail signature is
 `execute_STORE imm rs2 rs1 width` (**rs2 before rs1** — the stored-value register first). Axiom profile = the
 base trio + `LeanRV64D` platform constants (`{load,match}_reservation`, `plat_term_write`,
-`sys_enable_experimental_extensions`) + bv_decide's `Lean.ofReduceBool`/`Lean.trustCompiler` (a `native_decide`
+`sys_enable_experimental_extensions`) + bv_decide's generated `._native.bv_decide.ax_*` compiler-trust constants (a `native_decide`
 on `plat_clint_base`); **no `sorryAx`**.
 
 ## When the toolchain is next touched

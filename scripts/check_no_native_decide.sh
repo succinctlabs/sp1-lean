@@ -2,7 +2,8 @@
 # Gate: no `native_decide` anywhere in the main `SP1Clean/` library.
 #
 # `native_decide` discharges a goal by running compiled code, so it trusts the **entire Lean
-# compiler** (it adds the `Lean.ofReduceBool` / `Lean.trustCompiler` axioms) rather than just the
+# compiler** (surfaced in the census as generated `._native.native_decide.ax_*` compiler-trust
+# constants — formerly the named `Lean.ofReduceBool`/`Lean.trustCompiler` axioms) rather than just the
 # kernel — the same reason mathlib bans it from its main library. Every headline soundness theorem
 # here must stay `[propext, Classical.choice, Quot.sound]`-clean, so `native_decide` is confined to
 # the separate top-level `SP1CleanTest` test library (the witness/trace conformance anchors, run by
@@ -23,7 +24,7 @@ cd "$(dirname "$0")/.."
 
 if grep -rniE 'native_decide' SP1Clean --include='*.lean'; then
   echo "FAIL: native_decide found in SP1Clean/ (see lines above)." >&2
-  echo "      native_decide trusts the whole compiler (adds Lean.ofReduceBool) — it must not appear" >&2
+  echo "      native_decide trusts the whole compiler (generated ._native compiler-trust constants) — it must not appear" >&2
   echo "      in the main library. Move the check into the SP1CleanTest test library (run by" >&2
   echo "      'lake test'), or prove the goal in the kernel (decide / a real proof) instead." >&2
   exit 1

@@ -237,7 +237,7 @@ inside each gated `Spec` conjunct, recover `sum = 1` from the active flag via `s
 `aSelector_eq_resultWord` (collapse via `rest_zero`) then the five `rv64_mul*_eq` BitVec bridges. **Build
 trap:** `lake env lean MulChip` loads `MulOperation`'s *olean* — after editing `MulOperation` you must
 `lake build SP1Clean.Native.Operations.MulOperation` before checking `MulChip`, else stale signatures
-cause spurious mismatches. `bv_decide` in the bridges adds `Lean.ofReduceBool`/`trustCompiler` (accepted).
+cause spurious mismatches. `bv_decide` in the bridges adds generated `._native.bv_decide.ax_*` compiler-trust constants (accepted).
 
 ## Tooling notes
 

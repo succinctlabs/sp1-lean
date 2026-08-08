@@ -120,7 +120,7 @@ entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` inste
 - `lake build SP1Clean` → **0 errors / 0 warnings** (see build-concurrency rules in AGENTS.md; kill stale
   builds first).
 - Axiom-check every headline theorem (`lean_verify` or `#print axioms`): only
-  `[propext, Classical.choice, Quot.sound]` (+ `Lean.ofReduceBool`/`trustCompiler` if `bv_decide` was used),
+  `[propext, Classical.choice, Quot.sound]` (+ generated `._native.bv_decide.ax_*` constants if `bv_decide` was used),
   **no `sorryAx`**.
 
 ## Scope notes

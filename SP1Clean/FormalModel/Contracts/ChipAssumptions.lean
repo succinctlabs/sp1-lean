@@ -17,10 +17,11 @@ two structural reasons (also recorded in `docs/architecture.md` § deliberate la
   that does not belong on the contract surface (`hintFlags` for Mul/Bitwise/Lt/Branch and the
   shift/DivRem populate layers; Jal/Jalr's jump helpers). Lifting them would drag `Native`/proof
   internals below the contract layer.
-- **Native-resident contract block** — the nine memory chips, AluX0, and LoadX0 define their
-  `Inputs` (and `Spec`) in `Native/Chips/<X>Chip/Defs.lean`, so their `Assumptions` cannot move
-  here without inverting the FormalModel → Native layering. They follow when the "Spec homing"
-  backlog item (`docs/roadmap.md`) moves those contract blocks onto this surface. -/
+- **Native-resident contract block** — the nine memory chips (the five loads, LoadX0 among
+  them, and the four stores) and AluX0 define their `Inputs` (and `Spec`) in
+  `Native/Chips/<X>Chip/Defs.lean`, so their `Assumptions` cannot move here without inverting
+  the FormalModel → Native layering. They follow when the "Spec homing" backlog item
+  (`docs/roadmap.md`) moves those contract blocks onto this surface. -/
 
 namespace SP1Clean.AddChip
 

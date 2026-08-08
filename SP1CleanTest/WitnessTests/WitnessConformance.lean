@@ -18,8 +18,9 @@ This is a *conformance* tie, not an all-inputs proof: `populate` is native imper
 cannot be symbolically extracted like `eval`, so we pin agreement on a fixed input battery (edge
 cases + a seeded LCG). It is a completeness/liveness property — it catches silent drift between the
 Lean witness and SP1's trace generator; soundness lives entirely on the constraint side. Each anchor
-proves its `…Conforms`-fold `= true` by `native_decide`, which adds `Lean.ofReduceBool` /
-`Lean.trustCompiler` — deliberately confined to these files so the gadget soundness theorems stay
+proves its `…Conforms`-fold `= true` by `native_decide`, which adds generated
+`._native.native_decide.ax_*` compiler-trust constants — deliberately confined to these files so
+the gadget soundness theorems stay
 `[propext, Classical.choice, Quot.sound]`. Corrupting any vector fails the build. -/
 
 namespace SP1Clean.WitnessTests

@@ -25,7 +25,10 @@ stated** — not merely unproved. Recovering them would need a disjointness hypo
 AIR does not derive, i.e. a new trust assumption. Turning the devices off is what makes the
 existing statements true.
 
-The values are disclosed to the audit surface as `rfl` lemmas in `Model/SailMemory.lean`.
+The four top-level generated values (`plat_have_clint`, `plat_have_sig`, `sys_pmp_count`,
+`sys_pmp_usable_count`) are disclosed to the audit surface as `rfl` lemmas in
+`Model/SailMemory.lean`; the other two generated sites are `let`-bindings inside
+`ValidateConfig` (config validation only) and are not addressable as lemmas.
 
 ## The configuration (four keys → six generated sites)
 

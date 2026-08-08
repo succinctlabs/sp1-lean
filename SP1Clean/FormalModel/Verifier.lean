@@ -57,7 +57,8 @@ theorem PerfectExtraction.refineFunctional {Statement Certificate Witness₁ Wit
 
 /-! ## ArkLib instantiation target
 
-Once ArkLib is on Lean 4.31 and the full AIR relation exists, the proof-system theorem should be an
+Once ArkLib is available on this repository's toolchain (ArkLib releases track Lean versions and
+may lag ours by one) and the full AIR relation exists, the proof-system theorem should be an
 ArkLib theorem of the following form (names abbreviated only for its oracle/protocol parameters):
 
 ```lean

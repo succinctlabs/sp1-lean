@@ -5,8 +5,9 @@
 `v6.3.1-8-ga630089d9`).*
 
 > **Line-number caveat.** Declarations are cited by name and file; line numbers appear only where
-> stable. All quoted signatures are mechanically checked against the tree at the snapshot commit
-> (see §13). If a quote and the tree ever disagree, the tree is authoritative.
+> stable. Every cited path and every cited declaration *name* is mechanically checked against the
+> tree at the snapshot commit (see §13); quoted signature *text* is checked by review, not by
+> machine. If a quote and the tree ever disagree, the tree is authoritative.
 
 ## 1. Executive summary
 
@@ -112,9 +113,14 @@ Two design decisions distinguish this from transcription-style verifications:
    the Rust-equivalence claim total rather than per-recognized-fragment.
 2. **Specs are semantic, not structural.** A chip's `Spec` states what a row *means* — e.g. for
    Add, `is_real = 1 → toBitVec64 value = RV64.add (toBitVec64 op_c) (toBitVec64 op_b)` — never a
-   restatement of its constraint list. The field is generic over primes `p > 2^17`
-   (`p > 2^24` where Mul's column-sum bounds require it); SP1's KoalaBear
-   (`p = 2^31 − 2^24 + 1`) satisfies both, and the conformance layer runs at exactly that field.
+   restatement of its constraint list. The field is generic over primes, at three thresholds:
+   `p > 2^17` for the chip layer, `p > 2^24` where Mul's column-sum bounds require it, and
+   `p > 2^25` for the timed-grounding layer and the `supported_core_native_sound` capstone
+   (`Fact (2 ^ 25 < p)` in `SP1Clean/Soundness/AIR.lean`; this is SP1's own memory-argument
+   requirement — upstream `memory.rs` asks for a field larger than `2 · 2^24`, see the module
+   docstring of `SP1Clean/Soundness/TimeExtraction.lean`). SP1's KoalaBear
+   (`p = 2^31 − 2^24 + 1`) satisfies all three, and the conformance layer runs at exactly that
+   field.
 
 ## 3. The Sail foundation
 
@@ -150,16 +156,18 @@ region). Rather than assuming these away per-proof, the repository builds on a `
 snapshot **generated from pinned Sail sources with a checked-in SP1 platform configuration**
 (`scripts/sail-config/`; provenance and pipeline in `docs/agents/sail-model-provenance.md`).
 The semantic delta from the stock generated model is **exactly six platform-value sites across
-three generated files** — the images of a four-key config — *disclosed* as `rfl` lemmas in
-`SP1Clean/Model/SailMemory.lean`:
+three generated files** — the images of a four-key config. The four top-level values are
+*disclosed* as `rfl` lemmas in `SP1Clean/Model/SailMemory.lean`; the remaining two sites are
+`let`-bindings inside the generated `ValidateConfig` check (configuration validation only, not
+on the execution path), visible in the generated source but not addressable as Lean lemmas:
 
 ```
-plat_have_clint       = false   -- no core-local interruptor
-plat_have_sig         = false   -- no test-signature region
-sys_pmp_count         = 0       -- no PMP entries (unprotected M-mode)
-sys_pmp_usable_count  = 0       -- must track sys_pmp_count
-clint_supported       = false   -- ValidateConfig's CLINT check
-sig_supported         = false   -- ValidateConfig's signature check
+plat_have_clint       = false   -- no core-local interruptor        (rfl lemma)
+plat_have_sig         = false   -- no test-signature region         (rfl lemma)
+sys_pmp_count         = 0       -- no PMP entries (unprotected M-mode) (rfl lemma)
+sys_pmp_usable_count  = 0       -- must track sys_pmp_count         (rfl lemma)
+clint_supported       = false   -- ValidateConfig's CLINT check     (let-site in ValidateConfig)
+sig_supported         = false   -- ValidateConfig's signature check (let-site in ValidateConfig)
 ```
 
 The six sites are the images of four config keys (`platform.clint.supported`,
@@ -530,9 +538,11 @@ SP1's own field (KoalaBear, `p = 2130706433`):
   the shifts) take a per-event hint that was verified to be the dumped executor opcode — an input
   to the run, structurally incapable of laundering expected outputs into agreement.
 
-These anchors are the project's only `native_decide` uses (they trust the Lean compiler, adding
-`Lean.ofReduceBool`/`trustCompiler`), quarantined by a CI guard that forbids `native_decide` in
-the main library, and disclosed per-anchor in the axiom census. What conformance establishes:
+These anchors are the project's only `native_decide` uses (they trust the Lean compiler —
+surfaced in the census as generated per-declaration `._native.native_decide.ax_*` constants,
+the v4.32.2 form of the former named `Lean.ofReduceBool`/`Lean.trustCompiler` axioms),
+quarantined by a CI guard that forbids `native_decide` in the main library, and disclosed
+per-anchor in the test-scope axiom census. What conformance establishes:
 populate fidelity and non-vacuity evidence on real prover data. What it does not: proof. The two
 layers are complementary by construction. (Provenance caveat for the trace batteries: §4.3.)
 
@@ -563,8 +573,9 @@ discloses which of these each headline declaration actually touches.
   `riscv/sail-riscv` sources with the checked-in SP1 config of §3.2
   (`scripts/sail-config/generate_lean_rv64d.sh`; a stock-config run reproduces the opencompl
   base byte-identically). The trust item is the generation pipeline — the Sail compiler's Lean
-  backend and the config — no longer a hand-maintained delta; the six configured values remain
-  disclosed as `rfl` lemmas, and every dependency stays an immutable git pin.
+  backend and the config — no longer a hand-maintained delta; the four top-level configured
+  values remain disclosed as `rfl` lemmas (the two `ValidateConfig`-internal sites are visible
+  in the generated source, §3.2), and every dependency stays an immutable git pin.
 - **M1 — The semantic boundary binding.** Provider/boundary tables mean the selected program and
   initial state (`SP1SemanticBoundaryRelation`, §8.1). To be derived from the exact upstream
   system tables (the `executionCase` obligation).
@@ -694,6 +705,8 @@ generated Sail model is config-generated from pinned sources — T4). Extraction
 regeneration requires the pinned sp1 extraction overlay (sp1's `dtumad/clean-native` branch tip
 plus the two checked-in patches) and a Rust toolchain — see `docs/agents/extraction.md`. The
 axiom census snapshot lives at `docs/snapshots/axiom-ledger.md`; regenerate before citing.
-Report quotes are checked by `scripts/check_report_citations.sh`, and recorded pin values by
-`scripts/check_pins.sh` — both run as gates inside `scripts/run_audit.sh` and in CI, so a stale
-citation or a drifted recorded pin fails the build rather than surviving in prose.
+Report citations — every cited repo path and cited declaration name — are checked by
+`scripts/check_report_citations.sh`, and recorded pin values by `scripts/check_pins.sh` — both
+run as gates inside `scripts/run_audit.sh` and in CI, so a stale citation or a drifted recorded
+pin fails the build rather than surviving in prose. (Quoted signature *text* is not
+machine-compared; the tree is authoritative.)

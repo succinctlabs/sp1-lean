@@ -135,7 +135,7 @@ else
   echo "FAIL: native_decide in SP1Clean/ (see above)"; fail=1
 fi
 echo "native_decide occurrences in SP1CleanTest/ (disclosed — the witness/trace conformance battery,"
-echo "the sole sanctioned native_decide; adds Lean.ofReduceBool/trustCompiler, confined off the main library):"
+echo "the sole sanctioned native_decide; trusts the compiler via generated ._native.native_decide.ax_* constants, confined off the main library):"
 grep -rn 'native_decide' SP1CleanTest --include='*.lean' | wc -l
 
 echo

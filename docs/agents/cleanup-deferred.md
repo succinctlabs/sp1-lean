@@ -407,7 +407,7 @@ each time. Re-litigating them costs a batch.
   > runs the identical 121-way destructure at a fraction of the cost — because it stops there, while
   > `compareAssumptionsOfCore` builds eleven `DivRemCompare.Assumptions` conjuncts on top of it. The
   > destructure alone is affordable; the destructure *plus* the downstream work is not.
-- **Trading `bv_decide` for line count.** It adds `Lean.ofReduceBool` / `Lean.trustCompiler` to lemmas that
+- **Trading `bv_decide` for line count.** It adds generated `._native.bv_decide.ax_*` compiler-trust constants to lemmas that
   are currently `[propext, Classical.choice, Quot.sound]`-clean and sit on the audit surface. Declined once
   explicitly on `rv64_subw_eq`. The line saving is never worth widening the trust base of a released theorem.
 - **`Soundness/SupportedMachine.lean` stays byte-identical.** It is a 25-entry descriptor table plus

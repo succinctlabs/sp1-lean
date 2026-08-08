@@ -15,8 +15,9 @@ This layer is self-contained — it does not depend on `WitnessTests/` (the olde
 field-generic over `ZMod p`; conformance is checked at SP1's **concrete field** (KoalaBear), where
 SP1's prover actually runs, so this file discharges the chips' `Fact` assumptions once at that
 prime. As in `WitnessTests/`, the anchors are *conformance* ties on a fixed dumped battery, not
-all-inputs proofs: they prove their matrix equality by `native_decide` (adding `Lean.ofReduceBool`
-/ `Lean.trustCompiler`, deliberately confined to the anchor files), and corrupting any dumped cell
+all-inputs proofs: they prove their matrix equality by `native_decide` (adding generated
+`._native.native_decide.ax_*` compiler-trust constants, deliberately confined to the anchor
+files), and corrupting any dumped cell
 fails the build. The generic generators stay axiom-clean. -/
 
 namespace SP1Clean.TraceGenTests

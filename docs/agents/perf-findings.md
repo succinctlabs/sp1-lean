@@ -2,7 +2,9 @@
 
 **This repo does not raise elaboration budgets.** Hand-written Lean carries zero
 `set_option maxHeartbeats`, matching upstream Clean, which has none in 44,603 lines and enforces that in
-review. Three hand-written `maxRecDepth` sites remain, all structural and measured.
+review. Two hand-written `maxRecDepth` sites remain (`Faithful/BranchChip.lean`,
+`FormalModel/Trace/Witness.lean`), both structural and measured; the allowlist's other
+`maxRecDepth` entries sit on generated definitions and generated test batteries.
 
 `scripts/check_option_escapes.sh` enforces this: any `maxHeartbeats` or `maxRecDepth` site under
 `SP1Clean/` or `SP1CleanTest/` that is not named in `scripts/option_escapes_allowlist.txt` fails the build.
