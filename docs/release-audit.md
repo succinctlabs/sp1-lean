@@ -168,12 +168,15 @@ digest hashes a modeled output byte stream.
 - a zero-tolerance project-axiom scan;
 - `skipKernelTC` and main-library `native_decide` guards;
 - an elaboration-budget escape-hatch prohibition (allowlist-gated); and
-- a generated `#print axioms` census over the released theorem surface, diffed against the
-  committed `docs/snapshots/axiom-census.txt` — drift fails; only `--update` rewrites the
-  snapshot, so a passing run leaves the tree clean.
+- a generated `#print axioms` census over the released theorem surface, split by library and
+  diffed against the committed `docs/snapshots/axiom-census.txt` (main) and
+  `docs/snapshots/axiom-census-test.txt` (test anchors) — drift fails; only `--update` rewrites
+  the snapshots, so a passing run leaves the tree clean.
 
-CI runs the three cross-check gates in its fast `guards` job and the full harness in a dedicated
-`audit` job on the built oleans.
+CI runs the three cross-check gates in its fast `guards` job, the harness's main scope
+(`--main-only`) in a dedicated `audit` job on the built `SP1Clean` oleans, and the test-scope
+census (`--test-only`) in the `test` job right after `lake test` produces the `SP1CleanTest`
+oleans that probe needs.
 
 Current classes in the census are:
 
@@ -245,8 +248,8 @@ scripts/run_audit.sh
 
 The final command regenerates:
 
-- `scripts/axiom_probe.lean`; and
-- `docs/snapshots/axiom-census.txt`.
+- `scripts/axiom_probe.lean` and `scripts/axiom_probe_test.lean`; and
+- `docs/snapshots/axiom-census.txt` and `docs/snapshots/axiom-census-test.txt`.
 
 An unknown declaration makes the probe fail. A new proof deferral, project axiom, forbidden kernel
 bypass, main-library `native_decide`, non-allowlisted elaboration-budget directive, or `sorryAx` carrier

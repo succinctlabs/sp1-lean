@@ -478,11 +478,15 @@ after installing or toggling.
   doc-comments cite its section numbers. Read its banner before citing.
 - `docs/proposals/consolidation-progress.md` — the consolidation checkpoint board.
 - `docs/release-audit.md` — the honest-claim / trust-boundary report (axiom census and zero-deferral gate;
-  regenerate with `scripts/run_audit.sh`). The harness leaves the tree **clean on a pass**: it diffs the
-  fresh census against the committed `docs/snapshots/axiom-census.txt` and fails on drift; only an explicit
-  `scripts/run_audit.sh --update` rewrites the snapshot (inspect and commit the delta — a moved
-  auto-generated `bv_decide` `ax_N_M✝` index is hygienic). It also runs `check_pins.sh`,
-  `check_root_index.sh`, and `check_report_citations.sh` as gates, so none need a separate invocation.
+  regenerate with `scripts/run_audit.sh`). The census is **split by library**: the main scope diffs
+  `docs/snapshots/axiom-census.txt` (needs the `SP1Clean` oleans; CI `audit` job runs
+  `--main-only`), the test scope diffs `docs/snapshots/axiom-census-test.txt` (needs `lake test`
+  first; CI `test` job runs `--test-only`); the no-flag default runs both. The harness leaves the
+  tree **clean on a pass**: it diffs each fresh census against its committed snapshot and fails on
+  drift; only an explicit `scripts/run_audit.sh --update` rewrites the snapshot(s) for the scope(s)
+  run (inspect and commit the delta — a moved auto-generated `bv_decide` `ax_N_M✝` index is
+  hygienic). It also runs `check_pins.sh`, `check_root_index.sh`, and `check_report_citations.sh`
+  as gates, so none need a separate invocation.
 - `docs/agents/lean-sail-notes.md` — the v4.32.2 environment, the git dependency pins, the Sail
   code-generation workaround, and the `lake update` trap.
 - `docs/agents/sail-model-provenance.md` — the generated `Lean_RV64D` snapshot's provenance: the
