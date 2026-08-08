@@ -698,6 +698,12 @@ Stated plainly:
    trace-battery provenance caveat (§4.3).
 6. The AIR models the *supervisor-mode* Core profile; user-mode/mprotect table variants,
    precompiles, and the memory-protection chips are out of scope.
+7. **Trap and exception executions are unrepresentable.** Taken jumps/branches to misaligned
+   targets and misaligned memory accesses are unsatisfiable in the AIR (each chip forces the
+   alignment its width requires, matching SP1's own executor), so every produced Sail segment
+   is trap-free — the theorems never speak about trapping executions. Relatedly, jump/branch
+   targets live in SP1's 3-limb PC space: a wraparound target at or above 2^48 is unsatisfiable
+   in-circuit (a completeness restriction, not a soundness gap — no false row is provable).
 
 This report describes the state of an ongoing verification, not an audit certificate. Findings
 of the 2026-07 release-readiness audit — including everything disclosed above — were logged with

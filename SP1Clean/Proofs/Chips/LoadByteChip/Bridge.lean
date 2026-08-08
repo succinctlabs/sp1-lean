@@ -261,7 +261,10 @@ def ramAccessView (inp : Inputs (ZMod p)) (cols : LoadByteChip.Columns (ZMod p))
 
 /-- **LoadByte's `advanceReady` bundle**: the routing (`op_a ≠ 0` — x0 destinations route to LoadX0), the
 low-pc-limb bound, the LB/LBU one-hot, the address bounds, and the **memory byte-read binding** (the load's
-non-standard precondition, phrased in the ITypeReader columns `op_b_memory.prev_value`/`op_c_imm`). -/
+non-standard precondition, phrased in the ITypeReader columns `op_b_memory.prev_value`/`op_c_imm`).
+These are *premises here*, not assumptions of the final theorem: their discharge from the chip
+`Spec` plus the grounded RAM cell (incl. the 8-case lane-selection closure
+`loadByte_selectedMemoryByte`) is in `Soundness/ChipContracts.lean` / `Grounding/MemoryChips.lean`. -/
 def AdvanceReady (inp : Inputs (ZMod p)) (_cols : LoadByteChip.Columns (ZMod p))
     (_prog : GuestProgram) (s : SailState) : Prop :=
   inp.adapter.op_a ≠ 0 ∧

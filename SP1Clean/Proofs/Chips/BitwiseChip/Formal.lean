@@ -60,9 +60,11 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
 
 /-- Proven `is_real`-binary + `is_real`/flag-gated RV64 identity on the result word + the **flag structure**
 (each of `is_and`/`is_or`/`is_xor` is boolean, and they are mutually exclusive one-hot) — the last conjunct is
-what the Phase-4 `advance` dispatch needs to route a real row to its single operation (the "at least one flag
-set" it combines with comes from the program-bus decode, since the constraints tie the flag *sum* to `{0,1}`
-but not to `is_real`). Vacuous on padding. Cross-row bus guarantees live at the trace level. -/
+what the Phase-4 `advance` dispatch needs to route a real row to its single operation. The "at least one
+flag set on a real row" fact is also circuit-forced: `main` asserts `is_real − (is_xor + is_or + is_and) = 0`
+(`Native/Chips/BitwiseChip/Defs.lean`), and `BitwiseChip.Contracts.selectorActive_of_mainConstraints`
+derives the active selector from that physical constraint. Vacuous on padding. Cross-row bus guarantees
+live at the trace level. -/
 def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   (input.is_real = 1 →
