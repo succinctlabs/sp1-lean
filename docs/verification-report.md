@@ -12,9 +12,11 @@
 ## 1. Executive summary
 
 This repository contains a machine-checked verification, in the Lean 4 proof assistant, that
-**SP1's Core RISC-V AIR constraint system soundly implements the official RISC-V instruction-set
-semantics**, for the 25 instruction chips of SP1 v6.3.1's supported Core profile, against the
-Sail-generated RV64 model. The verification is built on the public
+**each of the 25 instruction chips of SP1 v6.3.1's supported Core profile soundly implements the
+official RISC-V instruction-set semantics** — proven against the Sail-generated RV64 model and
+composed into a machine-level soundness theorem over a native 36-table ensemble with explicitly
+disclosed boundary premises (§8; the exact-upstream refinement boundary is §8.3). The
+verification is built on the public
 [Clean](https://github.com/Verified-zkEVM/clean) zkVM DSL and is structured so that every claim is
 either a kernel-checked theorem, a mechanically enforced pin, or an explicitly named open
 obligation.
@@ -31,14 +33,15 @@ The deliverables:
 - **D3 — Whole-chip Rust faithfulness.** For each chip, a `ChipFaithful` theorem proves the
   hand-built native circuit's complete constraint system is *bidirectionally equivalent* to the
   complete `assertZero` list and interaction multiset extracted from SP1's Rust `Air::eval` by a
-  pin-checked exporter (§4).
+  pin-checked exporter (interaction equality on accepted rows, as a multiset permutation; §4).
 - **D4 — Machine-checked bus grounding.** The meaning of the inter-chip buses (state, program,
   memory, byte) is *derived* inside Lean from Clean's proved balance theorem plus per-chip
-  lemmas — there are no paper-justified bus axioms (§6).
+  lemmas and the named boundary premises of §8.1 — there are no paper-justified bus axioms (§6).
 - **D5 — The headline theorem.** `supported_core_native_sound`
   (`SP1Clean/Soundness/AIR.lean`): every constraint-satisfying, channel-balanced witness of the
   36-table ensemble, with explicit boundary and timestamp premises, yields a genuine finite run
-  of the official Sail RV64 interpreter between the public program-counter/clock endpoints (§8).
+  of the official (SP1-configured, §3.2) Sail RV64 interpreter between the public
+  program-counter/clock endpoints (§8).
 - **D6 — Conformance testing against the real prover.** A quarantined `native_decide` test
   library checks native witness generation and whole-chip trace generation cell-for-cell against
   batteries dumped from SP1's actual Rust prover at SP1's field (§9).
@@ -188,8 +191,8 @@ single SP1 PMA region, …) is packaged as the `SailConfigured` invariant carrie
 execution statement, and `SailCodeMemoryCompatible` is the explicitly disclosed contract that
 SP1's immutable program table and Sail's unified instruction/data memory agree on the code
 region. (Compare Nethermind's A1–A4 assumptions for OpenVM, §11 — the same platform-shaping
-concerns, handled there as per-proof hypotheses, here as a pinned three-line fork plus named
-invariants.)
+concerns, handled there as per-proof hypotheses, here as a pinned config-generated snapshot plus
+named invariants.)
 
 ### 3.3 What the Sail layer contributes to the trust base
 
@@ -467,8 +470,11 @@ def SupportedCoreNativeRelation :
   no existential slips).
 - `SP1SemanticBoundaryRelation`: there is an initial Sail state bound to the committed program
   and the provider tables' boundary facts (`RomLoaded`, `SailConfigured`, initial PC/clock,
-  provider bounds). This is an explicit companion *premise* — provider tables mean what they say —
-  not something derivable from balance alone.
+  provider bounds, the per-location init/finalize *uniqueness* facts, and the
+  `SailCodeMemoryCompatible` code-memory contract — 11 fields in all,
+  `InitialBoundaryFacts` in `SP1Clean/Soundness/ProviderBindings.lean`). This is an explicit
+  companion *premise* — provider tables mean what they say — not something derivable from
+  balance alone.
 - `SupportedCoreMemoryTimestampRangeRelation`: the pulled memory timestamps respect the physical
   `< 2^24` bound — the premise that prevents timestamp wraparound at the field characteristic.
 
@@ -577,8 +583,11 @@ discloses which of these each headline declaration actually touches.
   values remain disclosed as `rfl` lemmas (the two `ValidateConfig`-internal sites are visible
   in the generated source, §3.2), and every dependency stays an immutable git pin.
 - **M1 — The semantic boundary binding.** Provider/boundary tables mean the selected program and
-  initial state (`SP1SemanticBoundaryRelation`, §8.1). To be derived from the exact upstream
-  system tables (the `executionCase` obligation).
+  initial state (`SP1SemanticBoundaryRelation`, §8.1). Its provider-content facts are to be
+  derived from the exact upstream system tables (the `executionCase` obligation); the bundle
+  also carries program/platform contracts (`SailConfigured`, `SailCodeMemoryCompatible`,
+  program well-formedness) that remain application-level premises, like C-class items — no
+  system-table derivation discharges them.
 - **M2 — The memory-timestamp range bound.** Pulled high timestamps < 2^24
   (`SupportedCoreMemoryTimestampRangeRelation`) — prevents wrap at the characteristic; to be
   derived from the upstream range constraints in the same obligation closure.
@@ -619,8 +628,8 @@ beyond the report compared here.
 | Target | OpenVM, RV32IM, 45 opcodes | SP1 v6.3.1 Core, RV64IM slice, 25 chips (~50 opcodes incl. W-variants and x0 paths) |
 | ISA reference | Lean RISC-V spec (RV32 instantiation), per-opcode `execute_*` clauses | Same Sail lineage, RV64 generated model, full-interpreter `try_step` step relation |
 | Circuit side | Transpiled/extracted constraints are the proof object; AIR columns hand-transcribed with "eyeball correspondence" macros | Independent hand-built Clean circuits; extracted lists are a *comparison target*; whole-chip bidirectional `ChipFaithful` + interaction-multiset permutation |
-| Bus semantics | `BusEntry` classes: well-formedness assumed on read / asserted on write; bus *axioms* (pc bounds, timestamp bounds) justified **on paper** (their §E1–E12, §M1–M6) | Channel guarantees are row-local facts backed by receiver circuits; all read-side meaning derived in-kernel from Clean's balance theorem + timestamp rank (§6); zero paper bus axioms |
-| Consistency | Rising-bus theorem: execution/memory bus entries can be reordered chronologically, conditional on balance hypotheses; per-opcode row-local equivalence theorems | One glued theorem: balanced constrained witness → existence of a Sail interpreter run with matching public endpoints (§8.2); per-chip statements are internal lemmas of it |
+| Bus semantics | `BusEntry` classes: well-formedness assumed on read / asserted on write; bus *axioms* (pc bounds, timestamp bounds) justified **on paper** (their §E1–E12, §M1–M6) | Channel guarantees are row-local facts backed by receiver circuits; read-side meaning derived in-kernel from Clean's balance theorem + timestamp rank plus the named boundary premises of §8.1 (§6); zero paper bus axioms |
+| Consistency | Rising-bus theorem: execution/memory bus entries can be reordered chronologically, conditional on balance hypotheses; per-opcode row-local equivalence theorems | One glued theorem: balanced constrained witness + the disclosed boundary/timestamp premises (§8.1) → existence of a Sail interpreter run with matching public endpoints (§8.2); per-chip statements are internal lemmas of it |
 | Prover conformance | none against the real prover/witness generator (their CI gates — an axiom-hygiene scan, an in-build `collectAxioms` audit, and an independent re-export comparator — police the *axiom footprint*, not prover-trace conformance) | `native_decide` witness + whole-trace batteries vs the real prover at SP1's field (§9) |
 | Crypto trust | Lookup argument + proof system assumed (their I1 = lookup/bus argument, I2 = proof system; their I3/I4 cover spec faithfulness and Lean's kernel) | Same boundary, expressed as named relations/obligations (C1–C3) with an ArkLib-shaped target signature |
 | Claim discipline | Per-opcode theorems + consistency lemmas | Reserved-name policy: headline names undeclared until unconditional (§8.3) |
@@ -651,9 +660,11 @@ The essential difference is where the bus argument lives. Both projects face the
 question — *why do reads see the right values?* Nethermind answers it with a well-structured
 paper argument justifying bus axioms their per-opcode proofs consume. This project's answer is a
 Lean derivation: the only bus facts any proof consumes are row-local guarantees enforced by an
-in-ensemble receiver, and everything global is a theorem downstream of channel balance. The cost
-of that choice is the large grounding layer of §6–7; the benefit is that the paper step — the
-usual home of subtle gaps — is inside the kernel.
+in-ensemble receiver, and everything global is either a theorem downstream of channel balance
+or a **named premise of the capstone relation** (the §8.1 boundary/uniqueness facts, M1) — never
+a paper argument living outside the statement. The cost of that choice is the large grounding
+layer of §6–7; the benefit is that the paper step — the usual home of subtle gaps — is either
+inside the kernel or visible in the theorem's own hypotheses.
 
 ## 12. Limitations, open obligations, and the path forward
 
@@ -661,9 +672,12 @@ Stated plainly:
 
 1. **Shard-local, existential conclusion.** One shard segment; boot reachability and cross-shard
    stitching are specified but unproven (§7.3). No machine-model instance is constructed yet.
-2. **Two semantic premises** (M1, M2) await derivation from the exact upstream system tables —
-   the `CoreAIRRefinementObligations.executionCase` closure, the single genuinely open
-   mathematical obligation of the AIR layer.
+2. **Two semantic premises** (M1, M2): their provider-content and range facts await derivation
+   from the exact upstream system tables — the `CoreAIRRefinementObligations.executionCase`
+   closure, the substantive open mathematical obligation of the AIR layer (the bundle's
+   remaining fields are smaller but equally undischarged, §8.3). M1 additionally carries
+   program/platform contracts (`SailConfigured`, `SailCodeMemoryCompatible`,
+   program well-formedness) that are application-level premises no system table will discharge.
 3. **No cryptographic claim.** Nothing here says anything about STARK soundness, FRI, LogUp/GKR,
    or Fiat–Shamir. The planned final form is probabilistic and lives in the ArkLib/VCVio
    integration: an executable `verifyCore` agreeing with the pinned Rust verifier, ArkLib

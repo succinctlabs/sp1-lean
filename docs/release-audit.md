@@ -89,12 +89,15 @@ and produces:
 a successful shard-local Sail execution
 of the statement's program
 between the public PC and clock endpoints
-using exactly the active decoded rows
+(constructed by the proof from exactly the active decoded rows)
 ```
 
-The theorem does not consume boot or halt hypotheses and does not conclude either fact. It also does
-not derive its provider/boundary premises from the exact upstream system tables. Those scope
-restrictions are in the relation definitions, rather than prose assumptions.
+The exported target relation states only the program/endpoint facts; the row-exactness fact lives
+in the intermediate `supported_core_witness_grounding` theorem and is discarded by the final
+existential. The theorem does not consume boot or halt hypotheses and does not conclude either
+fact. It also does not derive its provider/boundary premises from the exact upstream system
+tables. The endpoint/program scope restrictions are in the relation definitions, rather than
+prose assumptions.
 
 ## Faithfulness audit
 
@@ -147,8 +150,10 @@ The report distinguishes three statements:
 2. every COMMIT row that occurs contains the correct digest word; and
 3. all eight COMMIT rows occur.
 
-AIR provides the second statement. Program correctness of the standard halt wrapper provides the
-third. The verification key prevents program substitution only after its program binding is proved.
+The AIR layer is responsible for the second statement (the obligations bundle's
+`publicCommitOperand`/`deferredCommitOperand` fields — stated, not yet discharged). Program
+correctness of the standard halt wrapper provides the third. The verification key prevents
+program substitution only after its program binding is proved.
 
 The base shard and execution relations therefore require no wrapper assumption.
 `SP1CommitCoveredExecutionRelation` is an optional strengthening derived from

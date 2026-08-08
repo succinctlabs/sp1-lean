@@ -38,7 +38,8 @@ Its source relation has three visible parts:
    - all four Clean channels balance.
 2. `SP1SemanticBoundaryRelation`
    - the program is well formed and bound to the shared prover data;
-   - a concrete initial Sail state has the public PC and clock;
+   - a concrete initial Sail state has the public PC, and the committed prover data carries the
+     public initial clock;
    - ROM is loaded, the Sail configuration is valid, and code memory is compatible;
    - Program-provider rows describe that program; and
    - Memory-init and Memory-finalize provider rows have the required meaning and per-location
@@ -53,7 +54,9 @@ contract, and constructs a successful Sail chain. The resulting local segment:
 
 - uses the statement's program;
 - starts and ends at the public PC and clock boundaries; and
-- consists of exactly the active physical instruction rows.
+- is constructed by the proof from exactly the active physical instruction rows (the exported
+  relation states the endpoint facts; row exactness lives in the intermediate grounding
+  theorem).
 
 It does not say that the initial state is reachable from boot, that the final row halts, that shards
 compose, or that a cryptographic verifier accepted a proof. Those are deliberately separate claims.
