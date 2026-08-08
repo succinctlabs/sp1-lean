@@ -750,7 +750,7 @@ theorem DecodedInstructionRow.stateInteractions_eq_of_mem
         (statePushMessage (decoded.toChipRow data))] :=
   decoded.stateInteractions_eq data (decoded.stateEmissionShape_of_mem tables decodedMem)
 
-/-- The eleven provider/boundary tables contribute no State interactions.  This follows from their
+/-- The thirteen provider/boundary tables contribute no State interactions.  This follows from their
 declared circuit channels, so it is independent of their physical row contents. -/
 theorem witness_providerStateInteractions_eq_nil
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :

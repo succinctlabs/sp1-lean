@@ -14,7 +14,7 @@
 This repository contains a machine-checked verification, in the Lean 4 proof assistant, that
 **each of the 25 instruction chips of SP1 v6.3.1's supported Core profile soundly implements the
 official RISC-V instruction-set semantics** — proven against the Sail-generated RV64 model and
-composed into a machine-level soundness theorem over a native 36-table ensemble with explicitly
+composed into a machine-level soundness theorem over a native 38-table ensemble with explicitly
 disclosed boundary premises (§8; the exact-upstream refinement boundary is §8.3). The
 verification is built on the public
 [Clean](https://github.com/Verified-zkEVM/clean) zkVM DSL and is structured so that every claim is
@@ -25,7 +25,7 @@ The deliverables:
 
 - **D1 — Native chip formalization.** All 25 supported instruction chips (the RV64IM ALU,
   control-flow, and memory core) are implemented as Clean `GeneralFormalCircuit`s with semantic
-  specifications, plus 11 provider/boundary tables, forming the 36-table `sp1Ensemble`
+  specifications, plus 13 provider/boundary tables, forming the 38-table `sp1Ensemble`
   (`SP1Clean/Soundness/SP1Ensemble.lean`).
 - **D2 — Per-chip soundness, completeness, and ISA refinement.** Every chip carries closed
   soundness *and* completeness proofs against a semantic `Spec`, and a Sail bridge (`advance`)
@@ -39,7 +39,7 @@ The deliverables:
   lemmas and the named boundary premises of §8.1 — there are no paper-justified bus axioms (§6).
 - **D5 — The headline theorem.** `supported_core_native_sound`
   (`SP1Clean/Soundness/AIR.lean`): every constraint-satisfying, channel-balanced witness of the
-  36-table ensemble, with explicit boundary and timestamp premises, yields a genuine finite run
+  38-table ensemble, with explicit boundary and timestamp premises, yields a genuine finite run
   of the official (SP1-configured, §3.2) Sail RV64 interpreter between the public
   program-counter/clock endpoints (§8).
 - **D6 — Conformance testing against the real prover.** A quarantined `native_decide` test
@@ -378,7 +378,7 @@ receiving table enforces (`Model/Channels.lean`):
 | State | `True` | the state bus has no row-local receiver checks |
 | Program | `RowSpec` (register indices < 32, pc limb bound, boolean `op_a_0`) | the preprocessed program table |
 | Memory | `isU64 ∧ ClkBound` (value limbs are u16s; access timestamp < 2^24) | the memory-access columns' range checks |
-| Byte | `ByteRowSpec` (the AND/OR/XOR/U8Range/LTU/MSB table clauses + width-8/13/16 range rows) | the preprocessed byte table and range table |
+| Byte | `ByteRowSpec` (the AND/OR/XOR/U8Range/LTU/MSB table clauses + width-8/13/14/16 range rows) | the preprocessed byte table and range table |
 
 Crucially, channels do **not** assert reachability or execution semantics. A guarantee like
 `ClkBound` is backed row-by-row by an actual receiver circuit in the ensemble (the byte/range
@@ -481,7 +481,7 @@ def SupportedCoreNativeRelation :
 ```
 
 - `SupportedCoreEnsembleRelation`: the public input matches, **all** row constraints hold over
-  **all** 36 tables (+ the state-boundary verifier), and **all** channels balance — verified for
+  **all** 38 tables (+ the state-boundary verifier), and **all** channels balance — verified for
   this report quantifier-by-quantifier down into Clean's `FlatEnsemble` (∀-tables, ∀-rows;
   no existential slips).
 - `SP1SemanticBoundaryRelation`: there is an initial Sail state bound to the committed program

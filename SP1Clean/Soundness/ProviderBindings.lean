@@ -24,10 +24,10 @@ open SP1Clean.Execution
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-/-- The provider-table indices in the stable 25-chip + 11-provider witness layout. -/
-def programProviderIndex : ℕ := 33
-def memoryInitProviderIndex : ℕ := 34
-def memoryFinalizeProviderIndex : ℕ := 35
+/-- The provider-table indices in the stable 25-chip + 13-provider witness layout. -/
+def programProviderIndex : ℕ := 35
+def memoryInitProviderIndex : ℕ := 36
+def memoryFinalizeProviderIndex : ℕ := 37
 
 /-- The fixed SP1 ensemble layout always contains its Program-provider table. -/
 theorem programProviderIndex_lt_tablesLength
@@ -74,7 +74,7 @@ theorem memoryInitProviderTable_component
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
     (memoryInitProviderTable witness).component = ⟨MemoryProviderChip.circuit⟩ := by
   unfold memoryInitProviderTable
-  have aligned := witness.same_circuits 34 (by
+  have aligned := witness.same_circuits 36 (by
     simp [sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length])
   exact aligned.symm.trans (by rfl)
 
@@ -136,7 +136,7 @@ theorem memoryFinalizeProviderTable_component
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
     (memoryFinalizeProviderTable witness).component = ⟨MemoryFinalizeChip.circuit⟩ := by
   unfold memoryFinalizeProviderTable
-  have aligned := witness.same_circuits 35 (by
+  have aligned := witness.same_circuits 37 (by
     simp [sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length])
   exact aligned.symm.trans (by rfl)
 

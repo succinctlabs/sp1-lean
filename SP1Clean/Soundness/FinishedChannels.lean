@@ -10,7 +10,7 @@ pull guarantees hold.  These are precisely the lookup-shaped structural predicat
 The engine is Clean's `guarantees_of_requirements_append` (`Clean/Air/OrderedChannel.lean`), applied
 per channel to the partition *consumers* (`verifierTable :: witness.tables.take 25` — the boundary
 verifier plus the 25 chips, none of which lists byte/program in its `channelsWithRequirements`) vs
-*providers* (`witness.tables.drop 25` — the 11 boundary/provider tables, whose pushes prove their
+*providers* (`witness.tables.drop 25` — the 13 boundary/provider tables, whose pushes prove their
 channel `Requirements` in-circuit from constraints alone, via `Table.weakSoundness` with trivial
 `Assumptions` and empty `channelsWithGuarantees`; `MemoryFinalizeChip` instead has empty
 `channelsWithRequirements`, so its requirements are vacuous). The provider tables' own byte/program
@@ -62,7 +62,7 @@ private lemma sp1Tables_cwr_subset : ∀ c ∈ sp1Tables (p := p),
     tauto
   rcases hshape with hshape | hshape <;> rw [hshape] at hchannel <;> simp_all
 
-/-- The 11 provider tables' (guarantee, requirement) channel pairs, pinned by one `rfl`: the 8 byte
+/-- The 13 provider tables' (guarantee, requirement) channel pairs, pinned by one `rfl`: the 10 byte
 providers push-prove byte, the program provider push-proves program, the memory boundary provider
 push-proves memory, and the finalize table pulls memory owing nothing. -/
 private lemma providers_channels_eq :
@@ -70,7 +70,8 @@ private lemma providers_channels_eq :
       (fun c => (c.circuit.channelsWithGuarantees, c.circuit.channelsWithRequirements)) =
     [([], [byteChannel.toRaw]), ([], [byteChannel.toRaw]), ([], [byteChannel.toRaw]),
      ([], [byteChannel.toRaw]), ([], [byteChannel.toRaw]), ([], [byteChannel.toRaw]),
-     ([], [byteChannel.toRaw]), ([], [byteChannel.toRaw]), ([], [programChannel.toRaw]),
+     ([], [byteChannel.toRaw]), ([], [byteChannel.toRaw]), ([], [byteChannel.toRaw]),
+     ([], [byteChannel.toRaw]), ([], [programChannel.toRaw]),
      ([], [memoryChannel.toRaw]), ([memoryChannel.toRaw], [])] := rfl
 
 /-- Every provider circuit's `Assumptions` is the structure default `fun _ _ => True`. -/
@@ -79,11 +80,11 @@ private lemma providers_assumptions :
   simp only [sp1ProviderTables, List.forall_mem_cons]
   exact ⟨fun _ => trivial, fun _ => trivial, fun _ => trivial, fun _ => trivial, fun _ => trivial,
     fun _ => trivial, fun _ => trivial, fun _ => trivial, fun _ => trivial, fun _ => trivial,
-    fun _ => trivial, List.forall_mem_nil _⟩
+    fun _ => trivial, fun _ => trivial, fun _ => trivial, List.forall_mem_nil _⟩
 
 /-! ## Positional component identification
 
-`witness.tables_map_component` pins the 36 abstract witness tables to the concrete
+`witness.tables_map_component` pins the 38 abstract witness tables to the concrete
 `sp1Tables ++ sp1ProviderTables`; `take 25`/`drop 25` splits it into the chip and provider blocks. -/
 
 private lemma mem_take25_component (witness : EnsembleWitness (sp1Ensemble (p := p))) :
@@ -103,7 +104,7 @@ private lemma mem_drop25_component (witness : EnsembleWitness (sp1Ensemble (p :=
 /-! ## The provider tables prove their requirements in-circuit -/
 
 /-- **Every provider table proves its `ChannelRequirements` on every channel from its constraints
-alone.** The 10 pushers have trivial `Assumptions` and empty `channelsWithGuarantees`, so
+alone.** The 12 pushers have trivial `Assumptions` and empty `channelsWithGuarantees`, so
 `Table.weakSoundness` yields their full `Requirements`; `MemoryFinalizeChip` has empty
 `channelsWithRequirements`, so `Table.requirements_of_not_mem_of_constraints` applies. -/
 private lemma provider_requirements (witness : EnsembleWitness (sp1Ensemble (p := p)))

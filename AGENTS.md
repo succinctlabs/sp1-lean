@@ -191,7 +191,7 @@ Mirror-rust layout under `SP1Clean/`:
   `ChipRow.lean` (the `ChipKind` structure-of-functions — each chip registers one `kind`, carrying a
   `name` = its SP1 `MachineAir::name`) + `ChipRegistry.lean` (`allChipKinds`); the gated execution capstone
   `GatedVm/` (the legacy-but-proved Eulerian-trail machinery) + `SP1Ensemble.lean` (`sp1Ensemble` — a
-  plain Clean `Ensemble`, 25 chips + 11 boundary/provider tables); the timed/ranked grounding engine;
+  plain Clean `Ensemble`, 25 chips + 13 boundary/provider tables); the timed/ranked grounding engine;
   `WitnessDecode.lean` (the deterministic typed row decoder), `LocalExecution.lean` (grounded ordered
   rows → a genuine shard-local Sail chain), and `AIR.lean` (the honest native witness relation plus
   proved `supported_core_witness_grounding` and `supported_core_native_sound`); the

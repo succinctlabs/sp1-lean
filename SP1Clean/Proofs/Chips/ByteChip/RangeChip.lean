@@ -12,8 +12,9 @@ SP1's `RangeChip` (`crates/core/machine/src/range/{air,columns}.rs`) is a **prep
 all `(a, bits)` with `a < 2^bits`, `bits ≤ 16` (`RangePreprocessedCols { a, bits }`). Its AIR is a single
 `receive_byte(ByteOpcode::Range(6), a, bits, 0, mult)` — on the Byte bus that *receive* is a **push** of
 the valid range row `⟨6, a, bits, 0⟩`, balanced against the consumers' pulls. SP1's consumers pull this
-form for `bits ∈ {8, 13, 16}` (CPUState's `clk_0_16` 13-bit check, RegisterAccessTimestamp's `< 2^16` /
-`< 2^8` timestamp checks, AddOperation's limb checks).
+form for `bits ∈ {8, 13, 14, 16}` (CPUState's `clk_0_16` 13-bit check, RegisterAccessTimestamp's `< 2^16`
+/ `< 2^8` timestamp checks, AddOperation's limb checks, and the Jal/Jalr/Branch chips' 14-bit `next_pc`
+low-limb alignment checks `pc0/4 < 2^14`).
 
 Clean has no "trusted preprocessed table" primitive for channels, so a finished-`byteChannel` **provider
 must re-prove each pushed row valid in-circuit** — the `ByteRowSpec` membership predicate
@@ -27,9 +28,10 @@ SP1's `bits` is a runtime column (`≤ 16`), so a fixed `Gadgets.ToBits.rangeChe
 apply to the genuinely variable-width row. This module builds the **fixed-width family**: a provider
 `circuit n hn` parameterized by a *compile-time* width `n` (with `2^n < p`). For each fixed `n` it is a
 faithful `RangeChip` provider — it pushes exactly SP1's `⟨6, a, (n : F), 0⟩` rows for `a < 2^n`. The
-named instantiations `circuit8`/`circuit13`/`circuit16` cover **every** width SP1's machine actually
-pulls. The genuinely variable-`bits` provider (one circuit serving all widths at once) is a separate,
-harder construction left to a follow-up.
+named instantiations `circuit8`/`circuit13`/`circuit14`/`circuit16` cover **every** width SP1's machine
+actually pulls (8 and 16 from the readers/AddOperation, 13 from CPUState, 14 from the Jal/Jalr/Branch
+`next_pc` checks). The genuinely variable-`bits` provider (one circuit serving all widths at once) is a
+separate, harder construction left to a follow-up.
 
 Sibling: `Proofs/Chips/ByteChip/ByteChip.lean` (the `ByteChip` provider, opcodes 0..5 over `(b,c)`). -/
 
@@ -92,6 +94,10 @@ def circuit8 : GeneralFormalCircuit (ZMod p) Inputs unit := circuit 8 (two_pow_l
 
 /-- The 13-bit `Range` provider (`< 2^13`) — CPUState's shifted `clk_0_16` check. -/
 def circuit13 : GeneralFormalCircuit (ZMod p) Inputs unit := circuit 13 (two_pow_lt (by norm_num))
+
+/-- The 14-bit `Range` provider (`< 2^14`) — the Jal/Jalr/Branch chips' `next_pc` low-limb
+alignment checks (`pc0/4 < 2^14`). -/
+def circuit14 : GeneralFormalCircuit (ZMod p) Inputs unit := circuit 14 (two_pow_lt (by norm_num))
 
 /-- The 16-bit `Range` provider (`< 2^16`) — RegisterAccessTimestamp's `< 2^16` / AddOperation limbs. -/
 def circuit16 : GeneralFormalCircuit (ZMod p) Inputs unit := circuit 16 (two_pow_lt (by norm_num))

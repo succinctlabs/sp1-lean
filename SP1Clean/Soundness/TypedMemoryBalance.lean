@@ -4,10 +4,10 @@ import SP1Clean.Soundness.ProviderBindings
 /-! # The per-`MemLoc` Memory-channel balance
 
 The Memory analogue of the State-axis balance chain in `TypedState`.  Where the State boundary is one
-public verifier pair and the eleven providers contribute nothing, the Memory channel is the mirror
-image: the boundary **verifier** contributes nothing, and the eleven providers contribute through the
-two dedicated memory-boundary tables — the init provider (a per-address genesis *push*, index 34) and
-the finalize provider (a per-address final *pull*, index 35).  The other nine byte/range/program
+public verifier pair and the thirteen providers contribute nothing, the Memory channel is the mirror
+image: the boundary **verifier** contributes nothing, and the thirteen providers contribute through the
+two dedicated memory-boundary tables — the init provider (a per-address genesis *push*, index 36) and
+the finalize provider (a per-address final *pull*, index 37).  The other eleven byte/range/program
 providers do not declare the Memory channel and so emit nothing on it.
 
 Unlike State/Program, the decoded instruction rows' Memory interactions are **not** reduced to a fixed
@@ -94,15 +94,15 @@ theorem witness_verifierMemoryInteractions_eq_nil
   change memoryChannel.toRaw ∉ [stateChannel.toRaw]
   simp [Channels.memoryChannel_eq_stateChannel_false]
 
-/-! ## The nine non-memory providers contribute nothing to the Memory channel -/
+/-! ## The eleven non-memory providers contribute nothing to the Memory channel -/
 
-/-- Every provider-table position except the two dedicated memory boundary tables (init at 34,
-finalize at 35) has no Memory-channel interactions.  Positional, mirroring
-`witness_nonProgramProviderTable_programInteractions_eq_nil`: the eight byte/range providers declare
+/-- Every provider-table position except the two dedicated memory boundary tables (init at 36,
+finalize at 37) has no Memory-channel interactions.  Positional, mirroring
+`witness_nonProgramProviderTable_programInteractions_eq_nil`: the ten byte/range providers declare
 only the Byte channel and the program provider only the Program channel. -/
 theorem witness_nonMemoryProviderTable_memoryInteractions_eq_nil
     (witness : EnsembleWitness (sp1Ensemble (p := p))) (i : ℕ)
-    (lower : 25 ≤ i) (upper : i < 36) (witnessBound : i < witness.tables.length)
+    (lower : 25 ≤ i) (upper : i < 38) (witnessBound : i < witness.tables.length)
     (notInit : i ≠ memoryInitProviderIndex) (notFinalize : i ≠ memoryFinalizeProviderIndex) :
     typedTableInteractionsWith witness.tables[i] memoryChannel = [] := by
   apply List.map_eq_nil_iff.mp
@@ -140,7 +140,7 @@ theorem witness_providerMemoryInteractions_eq
     (witness.tables.drop 25).flatMap (typedTableInteractionsWith · memoryChannel) =
       typedTableInteractionsWith (memoryInitProviderTable witness) memoryChannel ++
         typedTableInteractionsWith (memoryFinalizeProviderTable witness) memoryChannel := by
-  have tablesLength : witness.tables.length = 36 := by
+  have tablesLength : witness.tables.length = 38 := by
     rw [← witness.same_length]
     rfl
   rw [List.drop_eq_getElem_cons (i := 25) (by omega),
@@ -154,9 +154,11 @@ theorem witness_providerMemoryInteractions_eq
     List.drop_eq_getElem_cons (i := 33) (by omega),
     List.drop_eq_getElem_cons (i := 34) (by omega),
     List.drop_eq_getElem_cons (i := 35) (by omega),
+    List.drop_eq_getElem_cons (i := 36) (by omega),
+    List.drop_eq_getElem_cons (i := 37) (by omega),
     List.drop_eq_nil_of_le (by omega)]
   simp only [List.flatMap_cons, List.flatMap_nil, List.append_nil]
-  have nil : ∀ (i : ℕ) (_ : 25 ≤ i) (_ : i < 34) (bound : i < witness.tables.length),
+  have nil : ∀ (i : ℕ) (_ : 25 ≤ i) (_ : i < 36) (bound : i < witness.tables.length),
       typedTableInteractionsWith witness.tables[i] memoryChannel = [] :=
     fun i lower upper bound =>
       witness_nonMemoryProviderTable_memoryInteractions_eq_nil witness i lower (by omega) bound
@@ -166,7 +168,8 @@ theorem witness_providerMemoryInteractions_eq
     nil 27 (by omega) (by omega) (by omega), nil 28 (by omega) (by omega) (by omega),
     nil 29 (by omega) (by omega) (by omega), nil 30 (by omega) (by omega) (by omega),
     nil 31 (by omega) (by omega) (by omega), nil 32 (by omega) (by omega) (by omega),
-    nil 33 (by omega) (by omega) (by omega)]
+    nil 33 (by omega) (by omega) (by omega), nil 34 (by omega) (by omega) (by omega),
+    nil 35 (by omega) (by omega) (by omega)]
   simp only [List.nil_append]
   rfl
 

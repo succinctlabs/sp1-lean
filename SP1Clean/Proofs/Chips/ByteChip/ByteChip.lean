@@ -33,7 +33,8 @@ and whose soundness discharges the push's `Requirements` (`ByteRowSpec` of the p
 `events/byte.rs`):
 - `U8Range(3)` → `⟨3, 0, b, c⟩` (`byteRowSpec_u8range_pair`),
 - `AND(0)/OR(1)/XOR(2)` → `⟨op, r, b, c⟩` (`byteRowSpec_byteOp`),
-- `MSB(5)` → `⟨5, msb, b, 0⟩` (`byteRowSpec_msb`).
+- `MSB(5)` → `⟨5, msb, b, 0⟩` (`byteRowSpec_msb`),
+- `LTU(4)` → `⟨4, ltu, b, c⟩` (`byteRowSpec_ltu`).
 
 Each opcode lives in its own sub-namespace so its `main`/`Spec`/`circuit` stay independent. The
 `RangeChip` (opcode 6, variable width) is a separate, harder chip and is *not* built here. -/
@@ -323,5 +324,104 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
     rw [h_env.1, ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]
 
 end XorByte
+
+/-! ## op 4 — `LTU`: push `⟨4, ltu, b, c⟩`, `ltu` = the boolean unsigned comparison `b <u c`
+
+Mirrors the `MSB` derivation trick at byte width: `ltu` boolean and `b - c + ltu*256` a genuine byte
+(`rangeCheck 8`) force `ltu` to be the comparison bit (`ltu = 1 ↔ b.val < c.val`). The machine's
+consumer is the AluX0 chip's `opcode < 29` check (its pull `⟨4, 1, opcode, 29⟩`). -/
+
+namespace Ltu
+
+/-- The two operand bytes — `⟨4, ltu, b, c⟩`'s `b`/`c` slots (the `ltu` bit is derived). -/
+structure Inputs (F : Type) where
+  b : F
+  c : F
+deriving ProvableStruct
+
+/-- The 8-bit unsigned-comparison core (byte analog of `MSB.byte_msb_iff`): `ltu` boolean and
+`b - c + ltu * 256` a genuine byte force `ltu = 1 ↔ b.val < c.val`. -/
+lemma byte_ltu_iff {b c ltu : ZMod p} (hb : b.val < 2 ^ 8) (hc : c.val < 2 ^ 8)
+    (hbool : ltu = 0 ∨ ltu = 1) (hr : (b - c + ltu * 256).val < 2 ^ 8) :
+    ltu = 1 ↔ b.val < c.val := by
+  have hp : 2 ^ 17 < p := Fact.out
+  rw [show (2 : ℕ) ^ 8 = 256 from by norm_num] at hb hc hr
+  rcases hbool with h0 | h1
+  · subst h0
+    simp only [zero_mul, add_zero] at hr
+    have hge : c.val ≤ b.val := by
+      have hsum : (b - c : ZMod p) + c = b := by ring
+      have hval := ZMod.val_add_of_lt (show (b - c : ZMod p).val + c.val < p by omega)
+      rw [hsum] at hval
+      omega
+    exact ⟨fun h => absurd h zero_ne_one, fun h => absurd h (by omega)⟩
+  · subst h1
+    simp only [one_mul] at hr
+    have hlt : b.val < c.val := by
+      have hsum : (b - c + 256 : ZMod p) + c = b + 256 := by ring
+      have hval := ZMod.val_add_of_lt (show (b - c + 256 : ZMod p).val + c.val < p by omega)
+      have hb256 : (b + 256 : ZMod p).val = b.val + 256 := by
+        rw [ZMod.val_add_of_lt (by rw [val_256_zmod_p]; omega), val_256_zmod_p]
+      rw [hsum, hb256] at hval
+      omega
+    exact ⟨fun _ => hlt, fun _ => rfl⟩
+
+/-- The completeness range fact: for bytes `b`, `c`, the value `b - c + ltu*256` (with `ltu` the
+comparison bit) is itself a byte. Both branches reduce the field value to a `Nat.cast` of a `< 256`
+natural (mirror of `MSB.byte_msb_range`). -/
+lemma byte_ltu_range {b c : ZMod p} (hb : b.val < 2 ^ 8) (hc : c.val < 2 ^ 8) :
+    (b - c + (if b.val < c.val then 1 else 0) * 256).val < 2 ^ 8 := by
+  have hp : 2 ^ 17 < p := Fact.out
+  rw [show (2 : ℕ) ^ 8 = 256 from by norm_num] at hb hc ⊢
+  have hbc : ((b.val : ℕ) : ZMod p) = b := ZMod.natCast_zmod_val b
+  have hcc : ((c.val : ℕ) : ZMod p) = c := ZMod.natCast_zmod_val c
+  split
+  · rename_i hlt
+    rw [one_mul]
+    have hcast : ((b.val + 256 - c.val : ℕ) : ZMod p) = b - c + 256 := by
+      rw [Nat.cast_sub (by omega : c.val ≤ b.val + 256)]; push_cast; rw [hbc, hcc]; ring
+    rw [← hcast, ZMod.val_natCast_of_lt (by omega)]; omega
+  · rename_i hge
+    rw [zero_mul, add_zero]
+    have hcast : ((b.val - c.val : ℕ) : ZMod p) = b - c := by
+      rw [Nat.cast_sub (by omega : c.val ≤ b.val), hbc, hcc]
+    rw [← hcast, ZMod.val_natCast_of_lt (by omega)]; omega
+
+/-- Range-checks `b` and `c` as bytes, witnesses the comparison bit `ltu`, asserts `ltu` boolean and
+`b - c + ltu * 256` a byte (forcing `ltu` to be the unsigned comparison `b <u c`), and pushes the
+`LTU` row `⟨4, ltu, b, c⟩`. -/
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  let b := input.b
+  let c := input.c
+  assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) b
+  assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) c
+  let ltu ← witnessField (.ite (.flt (.expr b) (.expr c)) 1 0)
+  assertion assertBool ltu
+  assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) (b - c + ltu * 256)
+  let m ← witnessField 1
+  byteChannel.pushIf m (⟨4, ltu, b, c⟩ : ByteRow (Expression (ZMod p)))
+
+/-- The `LTU` provider: pushes `⟨4, ltu, b, c⟩` where `ltu` is the in-circuit-derived comparison bit
+of the bytes `b`, `c`. `Spec` is the two byte bounds; soundness derives the `ltu` boolean and the
+`ltu = 1 ↔ b.val < c.val` relation and discharges the push's `ByteRowSpec` via `byteRowSpec_ltu`. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
+  main
+  Spec input _ _ := input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8
+  ProverAssumptions input _ _ := input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8
+  channelsWithRequirements := [byteChannel.toRaw]
+  soundness := by
+    circuit_proof_start [Gadgets.ToBits.rangeCheck]
+    obtain ⟨hb, hc, hbool, hr⟩ := h_holds
+    refine ⟨⟨hb, hc⟩, fun _ _ =>
+      (byteRowSpec_ltu _ _ _).mpr ⟨⟨?_, hb, hc⟩, hbool, byte_ltu_iff hb hc hbool hr⟩⟩
+    rcases hbool with h | h <;> rw [h] <;> simp [ZMod.val_zero, ZMod.val_one]
+  completeness := by
+    circuit_proof_start [Gadgets.ToBits.rangeCheck]
+    obtain ⟨hltu, -⟩ := h_env
+    refine ⟨h_assumptions.1, h_assumptions.2, ?_, ?_⟩
+    · rw [hltu]; split <;> simp [IsBool]
+    · rw [hltu]; exact byte_ltu_range h_assumptions.1 h_assumptions.2
+
+end Ltu
 
 end SP1Clean.ByteChip

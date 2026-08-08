@@ -14,7 +14,7 @@ import SP1Clean.Soundness.ChipContracts
 
 This module is the naming boundary the old trail capstone lacked:
 
-* `SupportedCoreEnsembleRelation` is exactly the algebra checked by the 36-table Clean ensemble;
+* `SupportedCoreEnsembleRelation` is exactly the algebra checked by the 38-table Clean ensemble;
 * `SP1SemanticBoundaryRelation` separately binds its preprocessed/provider rows to the committed
   program and a concrete local initial Sail state;
 * `SupportedCoreMemoryTimestampRangeRelation` exposes the one physical range premise used by the

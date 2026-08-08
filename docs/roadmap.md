@@ -12,7 +12,7 @@ Completed:
 - 25 Sail bridges and `ChipKind.advance` registrations;
 - 25 whole-chip `ChipFaithful` proofs;
 - deterministic typed row decoding and exhaustive ranked State ordering;
-- Program and Memory timed grounding for the native 36-table ensemble;
+- Program and Memory timed grounding for the native 38-table ensemble;
 - `supported_core_native_sound`;
 - exact list-level 34-table execution and 6-table memory-boundary relations;
 - honest COMMIT-row versus wrapper-coverage separation; and
@@ -211,7 +211,7 @@ Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistica
 
 - **One-instruction end-to-end instance** (2026-08 audit recommendation): a hand-built
   single-Add-instruction witness — real ROM byte in `mem`, one instruction row, a whole
-  36-table `EnsembleWitness` with proved `Constraints ∧ BalancedChannels`, and a constructed
+  38-table `EnsembleWitness` with proved `Constraints ∧ BalancedChannels`, and a constructed
   `InitialBoundaryFacts` exhibiting all 11 fields simultaneously. This is the cheapest strong
   evidence for *joint* satisfiability of the capstone premise bundle (in particular
   `memoryProvider` content vs `romLoaded`/`codeMemoryCompatible` at overlapping addresses —

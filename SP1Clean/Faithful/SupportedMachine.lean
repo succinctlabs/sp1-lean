@@ -34,7 +34,7 @@ to the stable 25-entry `supportedChips` registry. Thus adding, removing, or reor
 instruction table requires updating the faithfulness coverage certificate in the same change.
 
 The certificate covers whole-chip assertions and active interaction multisets. It does not claim that
-the 11 native provider tables equal upstream Core AIR tables; exact upstream table coverage lives in
+the 13 native provider tables equal upstream Core AIR tables; exact upstream table coverage lives in
 `Faithful/CoreAIR.lean`. -/
 
 namespace SP1Clean.Faithful
