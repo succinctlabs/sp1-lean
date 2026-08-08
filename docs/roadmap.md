@@ -50,12 +50,23 @@ valid native witness, with assertion and bus-balance transport proved once at th
 Prove the semantic facts currently supplied to `SupportedCoreNativeRelation` from the exact upstream
 tables:
 
-- Program: the committed ROM and decoded Program-provider messages;
+- Program: the decoded Program-provider messages. Note the exact upstream Program table carries
+  an *empty* assert list — its whole semantic content is the preprocessed commitment — so this
+  discharge routes through the C1 `PreprocessedBinding` plus a (still unbuilt) correspondence
+  between the committed decoded-operand encoding and the native `GuestProgram`/`ext_decode`
+  decode, not through table constraints;
 - Byte and Range: lookup-provider coverage;
 - MemoryLocal and MemoryBump: per-location access order and timestamp differences;
 - StateBump: State ordering across sparse clock ranges;
 - Global: the public boundary and cumulative interaction facts;
-- MemoryGlobalInit/Finalize: initial/final memory values and per-location uniqueness; and
+- MemoryGlobalInit/Finalize: initial/final memory values and per-location uniqueness. Two
+  qualifications from the 2026-08 audit: (a) value-truth at addresses the program image/ROM also
+  pins is constrained by *no* Core system table — upstream it comes from the verifying key's
+  `initial_global_cumulative_sum` binding, i.e. the C1/C3 layer; (b) the uniqueness premises are
+  stated per 8-byte `locOf` cell while the upstream control chain (indexed control messages +
+  `prev_addr < addr` + PublicValues endpoint anchors) orders exact byte addresses with no
+  alignment constraint, so the discharge additionally needs an alignment/consumability argument
+  or a per-address premise restatement; and
 - SyscallCore/SyscallInstrs: raw syscall transcript consistency.
 
 This work should target the existing `InitialBoundaryFacts`,
@@ -197,6 +208,15 @@ Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistica
 *how-to-golf-safely* rules live in `docs/agents/cleanup-profile.md` (the binding house rules for
 `/cleanup` and `/cleanup-all`) and `docs/agents/proof-patterns.md` § "Golf & cleanup discipline"
 + § "Compile-time / performance landmines".
+
+- **One-instruction end-to-end instance** (2026-08 audit recommendation): a hand-built
+  single-Add-instruction witness — real ROM byte in `mem`, one instruction row, a whole
+  36-table `EnsembleWitness` with proved `Constraints ∧ BalancedChannels`, and a constructed
+  `InitialBoundaryFacts` exhibiting all 11 fields simultaneously. This is the cheapest strong
+  evidence for *joint* satisfiability of the capstone premise bundle (in particular
+  `memoryProvider` content vs `romLoaded`/`codeMemoryCompatible` at overlapping addresses —
+  a cross-field tension no current anchor exercises; today only `isInitialState_nonvacuous`
+  witnesses the empty program) and would validate the §2 closure story empirically.
 
 - **`linter.style.longLine`** — the one remaining syntactic linter not yet enabled (the last
   candidate noted in AGENTS.md § Linters). Current fallout, lines over 100 **codepoints** in

@@ -123,7 +123,9 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_c_val
 
 /-- Prover-side row well-formedness: operand `isU64`s, the op_a read-prior `isU64`, `is_real` binary,
-`op_a_0 = 0`, `imm_c = 0` (register-register op), CPUState clock bounds, and three timestamp `Spec`s (op_c
+`op_a_0 = 0`, `imm_c = 0` (this completeness witness covers the register-register ADDW form;
+honest ADDIW rows carry `imm_c = 1` and are covered by soundness and the bridge's `advance_of_addiw`
+dispatch, but not by this completeness theorem), CPUState clock bounds, and three timestamp `Spec`s (op_c
 gated by `is_real - imm_c`). -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=

@@ -350,6 +350,22 @@ bug). Circuit-independent lemmas (`Proofs/Chips/DivRemChip/Cases.lean`) take evi
 result; the one heavy arithmetic seam is the whole-chip `evidenceSoundness` theorem deriving the
 evidence from circuit facts plus two disclosed operand-range assumptions.
 
+### 5.3 What the per-chip audit surface is
+
+A reader auditing a chip should read its `Spec` **together with its named closure lemmas** —
+the `Spec` alone is deliberately not the whole per-chip surface. Three recurring patterns from
+the 2026-08 adversarial review: the memory chips' `Spec`s state the lane-selection polynomials
+whose *meaning* ("selected byte = byte `ea mod 8` of the pulled doubleword") is proved by the
+grounding closure lemmas (e.g. `loadByte_selectedMemoryByte`, `loadHalf_selectedBytes`, the
+`store*Chip_storeFacts` family in `SP1Clean/Soundness/Grounding/MemoryChips.lean`); the
+selector-driven chips' (shifts, Lt, Bitwise) `Spec`s are flag-conditional, with the
+"`is_real = 1` forces an active selector" link recovered from the physical constraints by
+`selectorActive_of_mainConstraints`-style lemmas in their `Contracts.lean` files; and the
+immediate-row `prev_value = op_c` bindings live in reader constraints consumed via each chip's
+`advanceReady` discharge in `SP1Clean/Soundness/ChipContracts.lean`. All are kernel-checked and
+consumed by the registered `advance` chain — the point is only that the audit surface includes
+them.
+
 ## 6. Buses and machine-checked grounding
 
 ### 6.1 Channels carry what SP1 constrains — nothing more
@@ -552,10 +568,21 @@ per-anchor in the test-scope axiom census. What conformance establishes:
 populate fidelity and non-vacuity evidence on real prover data. What it does not: proof. The two
 layers are complementary by construction. (Provenance caveat for the trace batteries: §4.3.)
 
-Additionally, `SP1CleanTest/NonVacuity.lean` witnesses the satisfiability of every non-trivial
-chip `Assumptions` (all 20 chips whose assumptions are not literally `True`, instantiated at
-SP1's field with the gated store conjuncts exercised on real rows) — closing the "could a chip's
-assumptions be unsatisfiable?" vacuity question at the chip level.
+Additionally, two satisfiability batteries close the chip-level vacuity questions:
+
+- `SP1CleanTest/NonVacuity.lean` witnesses the satisfiability of every non-trivial chip
+  `Assumptions` (all 20 chips whose assumptions are not literally `True`) — mostly at padding
+  rows, so it rules out contradictory *preconditions* only.
+- `SP1CleanTest/NonVacuityReal.lean` goes further: for **every one of the 25 instruction
+  chips**, a named, census-visible theorem exhibits a concrete `is_real = 1` row with
+  non-degenerate operands satisfying the chip's **complete flattened constraint system**
+  (every subcircuit `assertZero`, evaluated at SP1's KoalaBear field with the witness values
+  produced by the chip's own `main` witness closures), with Lt/Bitwise/UType exercising both
+  variants or outcomes and a guard theorem that every checked assertion system is nonempty.
+  Channel interactions are outside any single-row statement (they are globally
+  balance-checked); the rows follow the dumped Rust traces' clock discipline. This closes the
+  "could a chip's constraint system be unsatisfiable on the rows that matter?" question — the
+  failure mode where a soundness theorem is true only vacuously.
 
 ## 10. Trust base
 
@@ -633,7 +660,7 @@ beyond the report compared here.
 | Prover conformance | none against the real prover/witness generator (their CI gates — an axiom-hygiene scan, an in-build `collectAxioms` audit, and an independent re-export comparator — police the *axiom footprint*, not prover-trace conformance) | `native_decide` witness + whole-trace batteries vs the real prover at SP1's field (§9) |
 | Crypto trust | Lookup argument + proof system assumed (their I1 = lookup/bus argument, I2 = proof system; their I3/I4 cover spec faithfulness and Lean's kernel) | Same boundary, expressed as named relations/obligations (C1–C3) with an ArkLib-shaped target signature |
 | Claim discipline | Per-opcode theorems + consistency lemmas | Reserved-name policy: headline names undeclared until unconditional (§8.3) |
-| Their broader coverage | Immediate-variant opcodes verified as first-class; RV32 spec assumptions (S1–S4, A1–A4) documented per-proof | Immediate variants fold into base chips (as SP1 itself does); completeness witnesses currently cover register-register forms only for Bitwise/Lt (disclosed) |
+| Their broader coverage | Immediate-variant opcodes verified as first-class; RV32 spec assumptions (S1–S4, A1–A4) documented per-proof | Immediate variants fold into base chips (as SP1 itself does); completeness witnesses currently cover register-register forms only for Bitwise/Lt/Addw (ADDIW) and rd ≠ x0 rows for UType — soundness and the Sail advance cover all variants (disclosed, §12.4) |
 
 **A third reference point: StarkWare's S-two AIR verification.** The other closely comparable
 effort is StarkWare/CMU's Lean 4 verification of the S-two Cairo-AIR (Avigad, Ganor, Goldberg,
@@ -692,8 +719,11 @@ Stated plainly:
    intermediate abstraction our C2 obligation names (multiset balance ⇒ field-level LogUp
    soundness with an error bound), and their lemmas are a candidate model for how the ArkLib
    layer can discharge C2 rather than assume it.
-4. **Completeness at the ensemble level is undeclared** (per-chip completeness is proved;
-   Bitwise/Lt completeness witnesses currently cover register-register forms only).
+4. **Completeness at the ensemble level is undeclared** (per-chip completeness is proved; the
+   Bitwise, Lt, and Addw completeness witnesses currently cover register-register forms only —
+   so ANDI/ORI/XORI/SLTI/SLTIU/ADDIW rows are covered by soundness and the Sail bridges but
+   not by those chips' completeness theorems — and UType's completeness covers rd ≠ x0 rows,
+   as its `ProverAssumptions` docstring discloses).
 5. **Trusted surfaces T1–T4** (§10), including the pinned git dependency graph and the
    trace-battery provenance caveat (§4.3).
 6. The AIR models the *supervisor-mode* Core profile; user-mode/mprotect table variants,

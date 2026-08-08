@@ -203,7 +203,8 @@ Mirror-rust layout under `SP1Clean/`:
   carrier transports), and `TimeExtraction.lean` (the `pull_lt_push` payoff from the memory-channel
   `ClkBound`); and the typed interaction/Memory bridge (`TypedInteractions.lean`, `TypedMemory.lean`;
   exact evaluated chip pulls → timed facts/live operands); and the
-  auditable instruction-coverage layer — `Opcode.lean` + `Coverage.lean` (the `Opcode → chip → Sail`
+  auditable instruction-coverage layer — `Coverage.lean` (+ the opcode enum itself at
+  `Model/Opcode.lean`, namespace `SP1Clean.Soundness` per the decoupling rule) (the `Opcode → chip → Sail`
   routing table mirroring SP1's `tracing.rs`/`RiscvAir`). The former `InstructionTrace.lean` name-only
   row-routing shadow and `Completeness.lean` routing scaffold were retired in favor of witness decoding,
   timed grounding, and the relation-level completeness boundary in `AIR.lean`. The bespoke

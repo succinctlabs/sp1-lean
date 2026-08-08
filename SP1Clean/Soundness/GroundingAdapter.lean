@@ -88,8 +88,9 @@ def MemoryPullsBound (rf : Semantics.RowFacts p) (state : SailState) : Prop :=
 
 /-- The physical high timestamp component of every pulled Memory record is a genuine 24-bit
 integer. SP1's generic RAM `MemoryAccess` underflow argument needs this range premise when
-`compare_low = 1`; its local AIR range-checks the difference limbs but does not independently
-range-check both compared high components.
+`compare_low = 0` (the high-limb comparison branch; the `compare_low = 1` branch consumes the
+bus guarantee `MemoryMsg.ClkBound` instead); its local AIR range-checks the difference limbs but
+does not independently range-check both compared high components.
 
 This predicate is deliberately separate from semantic pull currency and from `MemoryMsg.ClkBound`
 (which bounds the low component). The current native capstone receives it through an explicit
