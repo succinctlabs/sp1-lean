@@ -151,14 +151,19 @@ The report distinguishes three statements:
 3. all eight COMMIT rows occur.
 
 The AIR layer is responsible for the second statement (the obligations bundle's
-`publicCommitOperand`/`deferredCommitOperand` fields — stated, not yet discharged). Program
-correctness of the standard halt wrapper provides the third. The verification key prevents
-program substitution only after its program binding is proved.
+`publicCommitOperand`/`deferredCommitOperand` fields — stated, not yet discharged). It also supplies
+the one-way row-to-flag implications and the public-values transition laws. Together with recursion's
+ledger continuity, `finalCommitRowsMatch_of_execution` proves that every existing row is tied to the
+terminal digest; it never infers row existence from a flag. Program correctness of the standard halt
+wrapper provides the third statement. The verification key prevents program substitution only after
+its program binding is proved.
 
 The base shard and execution relations therefore require no wrapper assumption.
 `SP1CommitCoveredExecutionRelation` is an optional strengthening derived from
-`UsesStandardHaltWrapper` or `OutputSafeVerifyingKey`. Neither condition currently proves that the
-digest hashes a modeled output byte stream.
+`UsesStandardHaltWrapper` or `CommitCoveringVerifyingKey`.
+`completeCommitDigestMatches_of_coveredExecution` proves all eight covered rows match the terminal
+digest. Neither program condition currently proves that the digest hashes a modeled output byte
+stream.
 
 ## Proof and axiom audit
 

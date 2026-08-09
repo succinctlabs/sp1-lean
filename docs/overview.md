@@ -169,15 +169,21 @@ converse that a rolling flag implies such a row exists.
 Accordingly:
 
 - `CommitRowsMatch` is an AIR-level, per-existing-row property;
+- `CommitRowsSetFlags` records the AIR-proved direction from an existing row to its shard flag;
+- `CommitTransitionValid` records the public-values AIR laws that preserve a digest once the rolling
+  flag is set;
 - `CompleteCommitCoverage` means that all eight public digest indices occur across the whole
   execution;
 - `UsesStandardHaltWrapper` is the program-level condition that supplies that coverage; and
-- `OutputSafeVerifyingKey` packages the condition for every program admitted by a verification key.
+- `CommitCoveringVerifyingKey` packages that coverage condition for every program admitted by a
+  verification key.
 
 The base execution relation does not assume wrapper use. The optional
-`SP1CommitCoveredExecutionRelation` adds coverage only when one of those program contracts is supplied.
-The model does not yet connect output bytes to the wrapper's hash computation, so complete COMMIT-event
-coverage is not full guest-public-output authentication.
+`SP1CommitCoveredExecutionRelation` adds coverage only when one of those program contracts is
+supplied. `completeCommitDigestMatches_of_coveredExecution` combines coverage with row-to-flag,
+intra-shard digest freezing, and cross-shard ledger continuity, proving that every one of the eight
+rows carries its word of the terminal committed digest. The model does not yet connect output bytes
+to the wrapper's hash computation, so this is still not full guest-public-output authentication.
 
 ## Trust and assumptions
 

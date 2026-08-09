@@ -83,7 +83,9 @@ The current `_of_obligations` declarations become internal assembly lemmas once
 - 8 ticks for ordinary instructions and 264 ticks for raw syscall events;
 - ordered State and Memory behavior derived from the system AIR;
 - correct public-value endpoints; and
-- correctness of every COMMIT/COMMIT_DEFERRED row that exists.
+- correctness of every COMMIT/COMMIT_DEFERRED row that exists, including the one-way fact that such
+  a row sets its shard's rolling flag; and
+- the exact public-values transition laws that freeze a digest after its rolling flag is set.
 
 The proof should reuse:
 
@@ -108,8 +110,10 @@ Shard soundness is not a halting theorem. A separate `sp1_execution_sound` shoul
 
 The base execution theorem should remain independent of public-output wrapper behavior. If an
 application wants all eight COMMIT indices, it should additionally prove
-`OutputSafeVerifyingKey` or `UsesStandardHaltWrapper` for the exact committed program. A later,
-stronger output theorem must also model output bytes and the wrapper's hashing behavior.
+`CommitCoveringVerifyingKey` or `UsesStandardHaltWrapper` for the exact committed program. Combined
+with ledger continuity, `completeCommitDigestMatches_of_coveredExecution` then ties all eight rows to
+the terminal committed digest. A later, stronger output theorem must also model output bytes and the
+wrapper's hashing behavior.
 
 ## Final verifier theorem
 

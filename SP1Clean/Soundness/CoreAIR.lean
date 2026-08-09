@@ -16,9 +16,11 @@ The decoder is a total function of the statement and AIR witness, so the eventua
 used directly as ArkLib's post-extraction map.  AIR validity authenticates already-decoded data; it
 does not choose it.
 
-The shard theorem proves only the forward AIR fact: every COMMIT row that exists has the correct
-digest operand.  Complete eight-row coverage is a separate whole-execution contract of the pinned
-program's standard halt wrapper; no rolling commit flag is treated as row provenance here. -/
+The shard theorem proves only forward AIR facts: every COMMIT row that exists has the correct
+digest operand and sets the corresponding rolling flag.  Exact public-value transition laws record
+how a set flag freezes the digest in later shards.  Complete eight-row coverage is still a separate
+whole-execution contract of the pinned program's standard halt wrapper; the rolling flag is never
+used as a converse claim that rows exist. -/
 
 namespace SP1Clean.Soundness
 
@@ -78,6 +80,19 @@ structure CoreAIRRefinementObligations {Digest : Type}
         event.IsCanonicalCode Machine.commitDeferredSyscallId →
         event.arg1.toNat = index →
         (event.arg2.toNat : ZMod p) = statement.publicValues.deferred_proofs_digest[index]
+  publicCommitSetsFlag : ∀ statement witness,
+    CoreAIR.Current.Relation binds .execution statement witness →
+      ∀ event ∈ CoreAIR.Current.syscallEvents witness,
+        event.IsCanonicalCode Machine.commitSyscallId →
+          statement.publicValues.commit_syscall = 1
+  deferredCommitSetsFlag : ∀ statement witness,
+    CoreAIR.Current.Relation binds .execution statement witness →
+      ∀ event ∈ CoreAIR.Current.syscallEvents witness,
+        event.IsCanonicalCode Machine.commitDeferredSyscallId →
+          statement.publicValues.commit_deferred_syscall = 1
+  commitTransition : ∀ statement witness,
+    CoreAIR.Current.Relation binds .execution statement witness →
+      statement.publicValues.CommitTransitionValid
   boundaryCase : ∀ statement witness,
     CoreAIR.Current.Relation binds .execution statement witness →
       statement.publicValues.is_execution_shard = 0 →
@@ -118,6 +133,27 @@ theorem commitRowsMatch {Digest : Type}
   · intro event eventMem index canonical indexEq
     rw [transcript] at eventMem
     exact proofs.deferredCommitOperand statement witness valid event eventMem index canonical indexEq
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Package the two AIR-forced row-to-flag implications.  These are deliberately one-way: a set
+rolling flag does not imply that this shard contains any COMMIT row. -/
+theorem commitRowsSetFlags {Digest : Type}
+    {binds : CoreAIR.Current.PreprocessedBinding p Digest}
+    {handler : Machine.SyscallHandler} {programBinding : ProgramBinding p Digest}
+    (proofs : CoreAIRRefinementObligations binds handler programBinding)
+    (statement : SP1ShardStatement (ZMod p) Digest)
+    (witness : CoreAIR.Witness (CoreAIR.Current.Row p))
+    (valid : CoreAIR.Current.Relation binds .execution statement witness) :
+    CoreAIR.CommitRowsSetFlags statement.publicValues
+      (proofs.decode statement witness).syscallEvents := by
+  have transcript := proofs.syscallTranscript statement witness valid
+  constructor
+  · intro event eventMem canonical
+    rw [transcript] at eventMem
+    exact proofs.publicCommitSetsFlag statement witness valid event eventMem canonical
+  · intro event eventMem canonical
+    rw [transcript] at eventMem
+    exact proofs.deferredCommitSetsFlag statement witness valid event eventMem canonical
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Assemble the explicit boundary/execution proof fields into the public shard-case proposition. -/
@@ -164,6 +200,8 @@ def sp1_air_refinement_of_obligations {Digest : Type}
       entryPoint := proofs.entryPoint statement witness valid
       firstExecutionShard := proofs.firstExecutionShard statement witness valid
       commitRows := proofs.commitRowsMatch statement witness valid
+      commitRowsSetFlags := proofs.commitRowsSetFlags statement witness valid
+      commitTransition := proofs.commitTransition statement witness valid
       shardCase := proofs.shardCase statement witness valid }
 
 omit [Fact (2 ^ 17 < p)] in

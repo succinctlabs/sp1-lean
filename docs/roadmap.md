@@ -139,9 +139,11 @@ complete machine state.
 Public-output coverage remains an optional strengthening:
 
 1. prove `UsesStandardHaltWrapper` for the exact committed standard guest, or
-   `OutputSafeVerifyingKey` for the verification key;
-2. derive all-eight `CompleteCommitCoverage`; and
-3. add output-byte and hashing semantics before calling the result full public-output authentication.
+   `CommitCoveringVerifyingKey` for the verification key;
+2. derive all-eight `CompleteCommitCoverage`;
+3. use the row-to-flag and rolling-digest continuity theorems to derive
+   `CompleteCommitDigestMatches` for the terminal public digest; and
+4. add output-byte and hashing semantics before calling the result full public-output authentication.
 
 Add deferred-COMMIT coverage only if a downstream theorem needs it.
 

@@ -312,6 +312,39 @@ def SP1VectorZero {p n : ℕ} (values : Vector (ZMod p) n) : Prop :=
 def SP1WordDigestZero {p : ℕ} (digest : Vector (SP1Word32 (ZMod p)) 8) : Prop :=
   ∀ word ∈ digest.toList, SP1VectorZero word
 
+/-- Exact intra-shard transition laws for the public-output digest and rolling COMMIT flag.  These
+are consequences of the machine-level public-values AIR; importantly, they permit an unbacked
+`0 → 1` flag transition and therefore assert no syscall-row existence. -/
+structure SP1PublicValues.PublicCommitTransitionValid {p : ℕ}
+    (publicValues : SP1PublicValues (ZMod p)) : Prop where
+  monotone : publicValues.prev_commit_syscall = 1 → publicValues.commit_syscall = 1
+  nonExecutionStable : publicValues.is_execution_shard = 0 →
+    publicValues.prev_commit_syscall = publicValues.commit_syscall ∧
+      publicValues.prev_committed_value_digest = publicValues.committed_value_digest
+  nonzeroDigestStable : ¬ SP1WordDigestZero publicValues.prev_committed_value_digest →
+    publicValues.prev_committed_value_digest = publicValues.committed_value_digest
+  committedStable : publicValues.prev_commit_syscall = 1 →
+    publicValues.prev_committed_value_digest = publicValues.committed_value_digest
+
+/-- Deferred-proof counterpart of `PublicCommitTransitionValid`. -/
+structure SP1PublicValues.DeferredCommitTransitionValid {p : ℕ}
+    (publicValues : SP1PublicValues (ZMod p)) : Prop where
+  monotone : publicValues.prev_commit_deferred_syscall = 1 →
+    publicValues.commit_deferred_syscall = 1
+  nonExecutionStable : publicValues.is_execution_shard = 0 →
+    publicValues.prev_commit_deferred_syscall = publicValues.commit_deferred_syscall ∧
+      publicValues.prev_deferred_proofs_digest = publicValues.deferred_proofs_digest
+  nonzeroDigestStable : ¬ SP1VectorZero publicValues.prev_deferred_proofs_digest →
+    publicValues.prev_deferred_proofs_digest = publicValues.deferred_proofs_digest
+  committedStable : publicValues.prev_commit_deferred_syscall = 1 →
+    publicValues.prev_deferred_proofs_digest = publicValues.deferred_proofs_digest
+
+/-- All intra-shard rolling COMMIT transition laws enforced by the public-values AIR. -/
+structure SP1PublicValues.CommitTransitionValid {p : ℕ}
+    (publicValues : SP1PublicValues (ZMod p)) : Prop where
+  publicCommit : publicValues.PublicCommitTransitionValid
+  deferredCommit : publicValues.DeferredCommitTransitionValid
+
 /-- Every equality checked between two consecutive core-shard public records by recursion's
 compression loop.  Per-shard cumulative sums are deliberately absent: recursion combines them with
 septic-curve addition rather than carrying one into the next record. -/
@@ -391,6 +424,40 @@ theorem SP1PublicValues.executionContinuous_of_ledgerContinuous
       | cons next tail =>
           obtain ⟨-, -, pc, timestamp, -, -, -, -, exitCode, -, -, -⟩ := continuous.1
           exact ⟨⟨pc, timestamp, exitCode⟩, ih continuous.2⟩
+
+/-- Once the rolling COMMIT flag is set, ledger continuity and the public-values AIR transition
+laws force that shard's committed digest to equal the terminal digest.  This theorem uses no
+converse from a flag to syscall-row existence. -/
+theorem SP1PublicValues.committedDigest_eq_last_of_flag
+    {first : SP1PublicValues (ZMod p)} {rest : List (SP1PublicValues (ZMod p))}
+    {final : SP1PublicValues (ZMod p)}
+    (last : (first :: rest).getLast? = some final)
+    (continuous : LedgerContinuous (first :: rest))
+    (transitions : ∀ publicValues ∈ first :: rest,
+      publicValues.CommitTransitionValid)
+    (committed : first.commit_syscall = 1) :
+    first.committed_value_digest = final.committed_value_digest := by
+  induction rest generalizing first with
+  | nil =>
+      simp at last
+      subst final
+      rfl
+  | cons next tail ih =>
+      obtain ⟨digest, -, -, -, -, -, -, -, -, flag, -, -⟩ := continuous.1
+      have nextTransition := (transitions next (by simp)).publicCommit
+      have nextPrev : next.prev_commit_syscall = 1 := by
+        rw [← flag]
+        exact committed
+      calc
+        first.committed_value_digest = next.prev_committed_value_digest := digest
+        _ = next.committed_value_digest := nextTransition.committedStable nextPrev
+        _ = final.committed_value_digest := by
+          apply ih
+          · simpa using last
+          · exact continuous.2
+          · intro publicValues member
+            exact transitions publicValues (by simp [member])
+          · exact nextTransition.monotone nextPrev
 
 /-- Range and Boolean hygiene common to the full upstream public-input AIR.  Digest and septic-curve
 relations are intentionally separate semantic integrity predicates; this definition only prevents

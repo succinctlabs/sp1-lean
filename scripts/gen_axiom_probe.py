@@ -45,8 +45,10 @@ TARGETS = [
      r"theorem\s+(completeness)\b"),
     # DivRem's isolated, circuit-independent contract and evidence layer is a first-class audit
     # surface: probe every named theorem rather than only the admitted whole-chip extraction seam.
-    ("SP1Clean/FormalModel/Contracts/DivRem.lean", r"(?:theorem|lemma)\s+(\w+)\b"),
-    ("SP1Clean/Proofs/Chips/DivRemChip/Cases.lean", r"(?:theorem|lemma)\s+(\w+)\b"),
+    # Dotted capture: `theorem Unsigned64Evidence.total` must probe the theorem, not collapse to
+    # the (already-probed) structure name at the first `.`.
+    ("SP1Clean/FormalModel/Contracts/DivRem.lean", r"(?:theorem|lemma)\s+([\w.]+)\b"),
+    ("SP1Clean/Proofs/Chips/DivRemChip/Cases.lean", r"(?:theorem|lemma)\s+([\w.]+)\b"),
     ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"theorem\s+(correct_\w+|\w*reaches_sail\w*)\b"),
     ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"def\s+(kind)\b"),
     ("SP1Clean/Faithful/*.lean", r"(?:theorem|def)\s+(\w*faithful\w*)\b"),
@@ -89,12 +91,15 @@ TARGETS = [
     ("SP1Clean/Faithful/CoreAIR.lean", r"theorem\s+(system_isCurrent)\b"),
     ("SP1Clean/Soundness/CoreAIR.lean",
      r"(?:theorem|def)\s+(sp1_air_refinement_of_obligations|sp1_air_sound_of_obligations)\b"),
-    # The base execution relation deliberately excludes COMMIT-row existence.  Probe the two
-    # optional program-contract strengthenings separately so a future output theorem cannot hide an
-    # admission behind wrapper or verifying-key terminology.
+    # The base execution relation deliberately excludes COMMIT-row existence. Probe the persistence,
+    # terminal-digest, and optional program-contract theorems separately so a future output theorem
+    # cannot hide an admission behind wrapper or verifying-key terminology.
+    ("SP1Clean/FormalModel/Contracts/PublicValues.lean",
+     r"theorem\s+(SP1PublicValues\.committedDigest_eq_last_of_flag)\b"),
     ("SP1Clean/FormalModel/Execution.lean",
-     r"theorem\s+(commitCovered_of_standardWrapper|"
-     r"commitCovered_of_outputSafeVerifyingKey)\b"),
+     r"theorem\s+(finalCommitRowsMatch_of_layout|finalCommitRowsMatch_of_execution|"
+     r"completeCommitDigestMatches_of_coveredExecution|commitCovered_of_standardWrapper|"
+     r"commitCovered_of_commitCoveringVerifyingKey)\b"),
     ("SP1Clean/Soundness/TimedGrounding.lean", r"theorem\s+(walk)\b"),
     ("SP1Clean/Soundness/FinishedChannels.lean", r"theorem\s+(sp1_finishedChannel_guarantees)\b"),
     ("SP1Clean/Soundness/ChipRegistry.lean", r"(?:theorem|def)\s+(allChipKinds\w*)\b"),
