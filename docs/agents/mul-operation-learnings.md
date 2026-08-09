@@ -148,7 +148,8 @@ U16MSBOperation.circuit`. Key technical facts:
 - **Elaborated-field simp set.** Keep `U16MSBOperation.circuit` in `localLength_eq` /
   `subcircuitsConsistent`; use `simp only` (not `simp`) for `channelsLawful`, including
   `Gadgets.ToBits.rangeCheck` to reduce the 32 rangeCheck subcircuits'
-  `channelsWithRequirements field unit = []`. Set `maxHeartbeats 40000000` on the instance. Declare
+  `channelsWithRequirements field unit = []`. (The instance originally needed a 40M-heartbeat ceiling;
+  it now elaborates within the default budget, and the escape-hatch gate forbids adding one.) Declare
   `channelsWith{Guarantees,Requirements} := [byteChannel.toRaw]` + the three `@[circuit_norm]` rfl-lemmas.
 - **Soundness channel-requirement tail.** `circuit_proof_start` collapses each MSB's `[] ∨ Assumptions`
   disjunct; `and_intros` splits into `(is_real = 1 → bound)` + `is_real ∈ {0,1}`:
@@ -168,7 +169,7 @@ After `circuit_proof_start`, `h_env` exposes everything: the carry/product witne
 env.get (i₀+i) = …`), the **gated U16toU8 Specs** (`U16toU8.Assumptions → Spec`, dischargeable), the
 three msb witnesses (`= populate_msb …`), and the signs witnesses.
 
-Two **crux bridge lemmas** (the conceptual core, both in `MulOperation.lean` before `completeness`):
+Two **crux bridge lemmas** (the conceptual core, both in `Proofs/Operations/MulOperation/Formal.lean` before `completeness`):
 - `byteAt_extendedBytes_val`: `(byteAt (extendedBytes w lower s) i).val = extStream w[*].val s.val i`.
   Landmines: give the `byte_compose_val` facts **explicit `w[j]` types** (the U16toU8 `Spec` phrases
   them via `⟨w⟩.u16_values[j]`, a *distinct* `omega` atom from `w[j]`); and use `show <component>.val =
@@ -245,6 +246,8 @@ cause spurious mismatches. `bv_decide` in the bridges adds generated `._native.b
   `product_reassembly`, `extendedBytes_toNat`, `high_half_eq`, the inline `main` columns, the
   57-component `h_holds` destructure, the 16 chain bullets — is best emitted by a small script rather than
   hand-typed; the schoolbook convolutions are otherwise transcription-error-prone.
-- **Heartbeats:** the Mul soundness needs `set_option maxHeartbeats 40000000` (the cost is the per-`k`
-  `interval_cases` over the huge `cols`, not the arithmetic). `circuit_norm` on many large hypotheses
-  is the thing to avoid.
+- **Heartbeats (historical):** the first Mul soundness proof needed a 40M-heartbeat ceiling (the cost
+  was the per-`k` `interval_cases` over the huge `cols`, not the arithmetic). The current proof stays
+  within the default budget — hand-written Lean here carries zero `maxHeartbeats`, and the
+  escape-hatch gate (`scripts/check_option_escapes.sh`) forbids adding one; fold the blowup instead
+  (`perf-findings.md` §1). `circuit_norm` on many large hypotheses is the thing to avoid.

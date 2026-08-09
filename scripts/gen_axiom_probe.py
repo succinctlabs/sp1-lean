@@ -88,6 +88,10 @@ TARGETS = [
      r"theorem\s+(checkedIn_semanticRevision|coreCluster_matchesExtracted|"
      r"coreClusterShapes_matchExtracted|memoryBoundaryCluster_matchesExtracted|"
      r"memoryBoundaryClusterShapes_matchExtracted|publicValuesWidth_matchesExtracted)\b"),
+    # The opcode-alphabet cross-check: the hand-maintained `Model/Opcode.lean` mirror against the
+    # extracted `Opcode` enum discriminant table (trust-gap F8 closure).
+    ("SP1Clean/FormalModel/OpcodeTable.lean",
+     r"theorem\s+(opcodeTable_matchesExtracted)\b"),
     ("SP1Clean/Faithful/CoreAIR.lean", r"theorem\s+(system_isCurrent)\b"),
     ("SP1Clean/Soundness/CoreAIR.lean",
      r"(?:theorem|def)\s+(sp1_air_refinement_of_obligations|sp1_air_sound_of_obligations)\b"),

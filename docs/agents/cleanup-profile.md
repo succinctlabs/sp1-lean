@@ -857,7 +857,7 @@ Per gated group, stopping at the first failure:
 4. **Log assertions** — zero `error:`, zero `warning:`, zero `info:`. Stronger and cheaper than three
    greps: filter out `✔ Built` / completion / timing lines and assert the **remainder is empty**. On a
    green tree this build emits no non-checkmark output at all, so any residue is a finding.
-> **`scripts/guardrails.sh` blocks `git checkout --`** as a destructive command. A gate that needs to
+> **The lean4-skills plugin's `guardrails.sh` hook blocks `git checkout --`** as a destructive command. A gate that needs to
 > regenerate-and-compare a tracked file (e.g. `scripts/axiom_probe.lean`, to prove the census is
 > unmoved) must back it up to the scratchpad and restore with `cp`, not `git checkout --`.
 >

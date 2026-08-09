@@ -238,8 +238,15 @@ drives SP1's own constraint compiler as a **trusted but heavily fenced oracle**:
   the 160-cell public-values block) before anything regenerates; `Extracted/Provenance.lean` pins
   the semantic revision, overlay revision, and patch digest (the semantic revision additionally
   tied to `CoreProfile` by an `rfl` theorem; the other two enforced by the regeneration gates).
+- The instruction alphabet is extracted unconditionally too: `Extracted/OpcodeTable.lean` is the
+  `Opcode` enum's variant-name → `#[repr(u8)]`-discriminant table (the value each chip commits on
+  the Program bus), parsed textually out of `crates/core/executor/src/opcode.rs` **at the semantic
+  pin via `git show`** (fail-closed on shape drift, independent of the overlay's patch state).
+  The hand-maintained mirror `SP1Clean/Model/Opcode.lean` is cross-checked against it by the
+  kernel-`decide` theorem `opcodeTable_matchesExtracted`
+  (`SP1Clean/FormalModel/OpcodeTable.lean`), replacing what was previously a hand-verification.
 - Regeneration is byte-idempotent: a full `EXTRACT_AIR_ONLY` run at the pinned overlay reproduces
-  all 59 generated AIR modules identically (every `.lean` file under `SP1Clean/Extracted/` except
+  all 60 generated AIR modules identically (every `.lean` file under `SP1Clean/Extracted/` except
   the hand-written `ExtractionDSL.lean`; re-verified at this snapshot; the separate trace-battery
   pass is the disclosed §4.3 provenance gap).
 
@@ -593,7 +600,12 @@ discloses which of these each headline declaration actually touches.
 
 - **T1 — The constraint exporter.** SP1's constraint compiler, run at the pin-checked overlay, is
   trusted to print the constraint/interaction lists its `air.eval` recorded. Mitigations: §4.1's
-  fail-closed fencing, §4.3's manual re-derivation, and the independent conformance layer.
+  fail-closed fencing, §4.3's manual re-derivation, and the independent conformance layer. The
+  opcode-alphabet leg of this trust is now machine-checked rather than hand-verified: the
+  extracted `Opcode` discriminant table (§4.1) is compared against the hand-maintained
+  `Model/Opcode.lean` mirror by `opcodeTable_matchesExtracted`
+  (`SP1Clean/FormalModel/OpcodeTable.lean`), leaving only the text-level parse of `opcode.rs`
+  inside the T1 boundary.
   (Note: the exporter tooling lives on sp1's `dtumad/clean-native` branch, not upstream `main`;
   upstreaming/committing the remaining tooling is follow-up work bundled with the pin
   restoration.)
@@ -692,6 +704,31 @@ or a **named premise of the capstone relation** (the §8.1 boundary/uniqueness f
 a paper argument living outside the statement. The cost of that choice is the large grounding
 layer of §6–7; the benefit is that the paper step — the usual home of subtle gaps — is either
 inside the kernel or visible in the theorem's own hypotheses.
+
+### 11.1 Findings of the public review of the predecessor effort, and their status here
+
+The direct predecessor of this work — the 2025 chip-level verification of SP1's AIR in the same
+repository lineage — was publicly reviewed by the Ethereum Foundation's zkEVM team in May 2026.
+That review's findings are the natural checklist for this rebuild. Each finding is listed with
+the mechanism in this tree that addresses it; every citation below is machine-checked by
+`scripts/check_report_citations.sh`.
+
+| Predecessor finding (May 2026 review) | Status in this tree |
+|---|---|
+| JALR's theorem assumed `(rs1+imm) % 4 = 0`, omitting the architectural `& ~1` LSB clear | The mask is a *proven Spec conjunct*: `toBitVec64 nextPcWord = ~~~1#64 &&& toBitVec64 value` (`SP1Clean/FormalModel/Contracts/Chips.lean`, the Jalr `Spec`), derived from the constraint system in `JalrChip.soundness` and consumed against the generated `execute_JALR` (which jumps to `BitVec.update target 0 0#1`) by `jalr_chip_reaches_sail` (`SP1Clean/Proofs/Chips/JalrChip/Bridge.lean`). The unconditional limb-to-word lift is `Word.toBitVec64_toNat_mod_four` (`SP1Clean/Math/Word.lean`); alignment implies trap-free retirement via `jump_to_of_mod4_eq_zero` (`SP1Clean/Model/SailWrap.lean`). |
+| LH/LHU/LW/LWU theorems proved the wrong (byte-width) specification; several loads unproved or `sorry`-dependent | All five load chips carry closed per-width soundness, completeness, Sail bridges, and whole-chip faithfulness. Width and lane selection are kernel-checked: e.g. `loadHalf_selectedBytes` binds *both* little-endian bytes at `ea`/`ea+1` against the width-2 Sail read, and `loadByte_selectedMemoryByte` closes all eight lane cases (`SP1Clean/Soundness/Grounding/MemoryChips.lean`); sign/zero-extension per variant is constraint-forced (§5.3). Zero `sorry` anywhere is CI-gated. |
+| SLTI's theorem was vacuously true (contradictory hypotheses) | Selector flags are circuit-constrained one-hot (never assumptions); `LtChip.Assumptions` is two operand-range facts only. Beyond structure, `SP1CleanTest/NonVacuityReal.lean` exhibits concrete satisfying `is_real = 1` rows for **every** chip's complete flattened constraint system — for Lt, both a true and a false comparison — as named, census-visible theorems (§9). |
+| LUI and AUIPC had no theorem at all | `UTypeChip` has the full stack: `soundness`/`completeness`/`circuit` (axiom-clean), the bridge family through the registered `advance` (`SP1Clean/Proofs/Chips/UTypeChip/Bridge.lean`), and whole-chip Rust faithfulness `uTypeChip_faithful` (`SP1Clean/Faithful/UTypeChip.lean`) — including RV64 LUI's *sign*-extension and AUIPC's full-width carry. |
+| Four project axioms, including "memory protection disabled" assumed as an axiom | Zero project `axiom` declarations in the main library (CI-gated); zero `sorryAx` across the 520-declaration census. Platform shaping is not assumed per-proof: the Sail model is *generated* with SP1's platform configuration (§3.2), and the supervisor-only scope is a stated structural restriction (§12.6), not an axiom. |
+| Version pinning and reproducible extraction were absent | Every dependency is an immutable git pin cross-checked by `scripts/check_pins.sh`; extraction is a pin-and-patch-hash-gated pipeline (§4.1) with byte-idempotency; the audit harness (§13) regenerates the census and fails on drift. |
+| Recommendation: independent adversarial review before public claims | The 2026-07 and 2026-08 release-readiness campaigns (this report's §12 discloses their durable findings) ran blind-derivation adversarial reviews of all 25 chip Specs against the generated Sail model, per-claim validation against upstream sources, and a full file-by-file documentation sweep. |
+
+The review also found the predecessor's public claim of 62 verified opcodes overstated (~51
+complete at the time). This tree's coverage accounting is machine-checked instead of narrated:
+50 covered opcodes / 3 uncovered (ECALL/EBREAK/UNIMP, routed to system tables) partitioned by
+`decide` in `SP1Clean/Soundness/Coverage.lean`, with the 25-chip ↔ opcode routing mirroring
+SP1's own dispatch (immediate variants fold into base chips exactly as SP1's transpiler folds
+them; the mapping is the `supportedChips` table in `SP1Clean/Soundness/SupportedMachine.lean`).
 
 ## 12. Limitations, open obligations, and the path forward
 

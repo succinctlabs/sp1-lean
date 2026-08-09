@@ -347,6 +347,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.CoreProfile.memoryBoundaryCluster_matchesExtracted
 #print axioms SP1Clean.CoreProfile.memoryBoundaryClusterShapes_matchExtracted
 #print axioms SP1Clean.CoreProfile.publicValuesWidth_matchesExtracted
+#print axioms SP1Clean.CoreProfile.opcodeTable_matchesExtracted
 #print axioms SP1Clean.CoreAIR.Current.system_isCurrent
 #print axioms SP1Clean.Soundness.sp1_air_refinement_of_obligations
 #print axioms SP1Clean.Soundness.sp1_air_sound_of_obligations

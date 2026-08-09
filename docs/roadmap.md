@@ -52,7 +52,8 @@ tables:
 
 - Program: the decoded Program-provider messages. Note the exact upstream Program table carries
   an *empty* assert list — its whole semantic content is the preprocessed commitment — so this
-  discharge routes through the C1 `PreprocessedBinding` plus a (still unbuilt) correspondence
+  discharge routes through the C1 `PreprocessedBinding` (C1–C3 are the named cryptographic trust
+  boundaries of `docs/verification-report.md`) plus a (still unbuilt) correspondence
   between the committed decoded-operand encoding and the native `GuestProgram`/`ext_decode`
   decode, not through table constraints;
 - Byte and Range: lookup-provider coverage;

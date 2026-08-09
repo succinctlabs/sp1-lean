@@ -15,6 +15,11 @@ Each document has **one role**, so none needs to repeat another:
 | [`architecture.md`](architecture.md) | module/pillar ownership, design rules, deliberate exceptions |
 | [`roadmap.md`](roadmap.md) | dependency-ordered future work + non-blocking backlog |
 | [`goal-overview.md`](goal-overview.md) | the completed-state contract (never current status) |
+| [`chip-standardization.md`](chip-standardization.md) | the completed 25/25 `ChipKind.advance` interface record |
+| [`bus-model.md`](bus-model.md) | **HISTORICAL** pre-consolidation bus model, kept only for the section numbers source doc-comments cite |
+| [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) | compact checkpoint board for the architecture-consolidation work |
+| [`snapshots/`](snapshots/) | point-in-time generated records: [`axiom-ledger.md`](snapshots/axiom-ledger.md) (per-theorem axiom inventory) and [`compile-profile.md`](snapshots/compile-profile.md) (**STALE** as stamped — pre-migration timings) |
+| [`agents/`](agents/README.md) | contributor/agent how-to family — per-file index in [`agents/README.md`](agents/README.md) |
 | [`AGENTS.md`](../AGENTS.md) | contributor/agent discipline: build, proof style, tooling gates |
 
 > **Upstream authority: read Clean's own docs.** This project is built on the Clean DSL (upstream
@@ -45,7 +50,8 @@ Each document has **one role**, so none needs to repeat another:
 
 - [`overview.md`](overview.md) — honest current overview; it distinguishes the supported-native theorem,
   the conditional exact-upstream `_of_obligations` composition boundary, and the still-open
-  execution/ArkLib layers. Its §4 is the current statement of the channel/bus model.
+  execution/ArkLib layers. The current statement of the channel/bus model is
+  [`architecture.md`](architecture.md) § "Structural buses and semantic grounding".
 - [`architecture.md`](architecture.md) — detailed architecture and migration status.
 - [`release-audit.md`](release-audit.md) — authoritative current proof and trust audit. Regenerate its raw
   census with `scripts/run_audit.sh` before citing numbers.

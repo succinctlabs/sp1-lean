@@ -18,6 +18,7 @@ This is the current checkpoint for the July 2026 consolidation proposal. The det
 - The exact 34-table execution and 6-table memory-boundary relations are present and pin-guarded.
 - COMMIT-row correctness is separated from program-level all-eight-row coverage.
 - The audit requires zero proof deferrals and zero `sorryAx` carriers.
+- Every dependency is an immutable published git pin (no path dependencies remain).
 
 ## Current public theorem boundary
 
@@ -46,8 +47,8 @@ The conditional declarations are named `sp1_air_refinement_of_obligations` and
 3. Prove mixed ordinary/syscall event ordering and concrete handler contracts.
 4. Instantiate `CoreAIRRefinementObligations`.
 5. Retire operation-level faithfulness and witness artifacts when no generated oracle or test imports
-   them.
-6. Restore immutable published dependency pins before release.
+   them (the 2026-07 retirement sweep verified every survivor has at least two live importers, so the
+   current set is deliberate shared substrate, not pending debt).
 
 No broader circuit architecture change is currently justified. The next work should extend the exact
 system-table adapter and reuse the existing native capstone.

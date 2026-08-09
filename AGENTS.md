@@ -516,7 +516,7 @@ after installing or toggling.
 - `docs/agents/cleanup-deferred.md` — the owner-decision queue: every duplication found
   and deliberately not fixed, grouped by blocker (shallow-file hoist · statement change · deletion ·
   `Faithful/**` conservative-only · cross-module round), with measured sizes; the "deliberately NOT taken"
-  decisions; and the 40-entry rename queue, which is **queued, never applied**.
+  decisions; and the 42-entry rename queue, which is **queued, never applied**.
 - `docs/agents/porting-recipe.md` — step-by-step checklist to port a new chip from the Add/Bitwise template.
 - `docs/agents/extraction.md` — the constraint-extraction pipeline (compiler → Python → Lean DSL).
 - `docs/agents/mul-operation-learnings.md` — Mul-specific soundness/completeness pitfalls.

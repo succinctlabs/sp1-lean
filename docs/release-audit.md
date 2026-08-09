@@ -114,7 +114,8 @@ proved on every locally accepted row, modulo permutation and zero-multiplicity e
 
 The system tables are handled differently: their complete generated lists are used directly in the
 exact relation. They do not yet have native semantic-table faithfulness theorems, because the native
-ensemble uses a smaller proof-oriented provider interface. Connecting those two interfaces is the
+ensemble uses a smaller proof-oriented provider interface (13 provider/boundary tables alongside the
+25 instruction chips — a 38-table Clean ensemble). Connecting those two interfaces is the
 remaining exact Core refinement task.
 
 ## Exact AIR coverage
@@ -179,7 +180,8 @@ stream.
 - a zero-tolerance project-axiom scan;
 - `skipKernelTC` and main-library `native_decide` guards;
 - an elaboration-budget escape-hatch prohibition (allowlist-gated); and
-- a generated `#print axioms` census over the released theorem surface, split by library and
+- a generated `#print axioms` census over the released theorem surface — currently 521 probed
+  declarations, split 466 (main library) plus 55 (test anchors) — split by library and
   diffed against the committed `docs/snapshots/axiom-census.txt` (main) and
   `docs/snapshots/axiom-census-test.txt` (test anchors) — drift fails; only `--update` rewrites
   the snapshots, so a passing run leaves the tree clean.
@@ -223,6 +225,7 @@ They check witness and complete-trace conformance and are not imported by the so
 | Exact natural balance | execution needs a real multiset, not modular equality | extract with LogUp/GKR soundness and bounds |
 | Shard ledger cryptography | cumulative sums and deferred proofs are recursive-proof facts | prove in recursion/verifier layer |
 | Standard halt wrapper | needed only for all-eight COMMIT coverage | prove from exact committed ROM |
+| Hand-mirrored opcode enum/routing | `SP1Clean/Model/Opcode.lean` re-declares SP1's `Opcode` variants and `#[repr(u8)]` discriminants, and `SP1Clean/Soundness/Coverage.lean` mirrors the `tracing.rs` routing, by hand — an interim hand-verified trust item | replace with a generated, pin-checked opcode-table artifact (in flight) |
 
 These are theorem inputs or tool/model trust boundaries, not undisclosed Lean axioms.
 

@@ -51,7 +51,7 @@ maxHeartbeats  SP1Clean/Extracted/SystemOracle/Global.lean         1000000   1
 # is NOT a predictor — larger batteries than this one need nothing.
 maxHeartbeats  SP1CleanTest/WitnessTests/Vectors/MulOperation.lean  600000   1
 
-# ---- maxRecDepth: 9 sites (Lean's default is 512) ------------------------------------------------
+# ---- maxRecDepth: 8 sites (Lean's default is 512) ------------------------------------------------
 
 # Global's four `assertsPart*` definitions — the same Poseidon chain as the heartbeat entry above.
 # Ladder: 800 FAIL / 1200 FAIL / 2000 ok → floor (1200, 2000], set ~2x. The file's other two defs need
