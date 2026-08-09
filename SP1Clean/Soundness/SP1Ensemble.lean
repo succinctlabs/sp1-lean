@@ -312,9 +312,10 @@ theorem typedInteractions_balanced
   exact balanced channel.toRaw channelMem
 
 /-- **The balanced State-trail intermediate spec.** Over the public initial/final state, there is a heterogeneous trace
-whose every real row reaches its RISC-V Sail spec and whose `current → next` transitions compose into a
-valid execution trail from the public `pc_start` to the public `next_pc` — i.e. a `GatedExecution`
-between the public endpoints. -/
+whose `current → next` transitions compose into a
+valid execution trail from the public `pc_start` to the public `next_pc` — i.e. a (trail-only)
+`GatedExecution` between the public endpoints. (The former "every real row reaches its Sail spec"
+conjunct was retired with the `GatedExecution` trail-only cutover.) -/
 def balancedStateTrailSpec : SP1PublicIO (ZMod p) → Prop := fun pi =>
   ∃ rows : List (ChipRow p), GatedExecution rows (initEntryOf pi) (finalEntryOf pi)
 

@@ -48,8 +48,9 @@ project to the **same** `LookupAccess` list — the four `U8Range` pair pulls `�
 is the first **witnessed-value** anchor: the four low bytes are `witnessVector` outputs, so after descent
 they are `Expression.var ⟨offset+k⟩` (not an `input.<field>`); the binding hypotheses
 `h_lb*` realise those witnessed columns as the oracle's `cols.low_bytes[k]` (the env-at-offset = the
-output struct). The template for every remaining witnessed op/chip anchor (Address/BitwiseU16/LtSigned,
-AddChip byte/memory, the whole chip rollout). The gate is the constant `1`, so this is stated at the
+output struct). This was the template the later witnessed op/chip anchors followed
+(Address/BitwiseU16/LtSigned, the chip byte/memory anchors — the whole-chip rollout is complete).
+The gate is the constant `1`, so this is stated at the
 oracle's `is_real = 1`. -/
 theorem u16tou8safe_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var SP1Clean.U16toU8OperationSafe.Inputs (ZMod p))

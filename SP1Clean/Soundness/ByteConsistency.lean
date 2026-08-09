@@ -21,9 +21,10 @@ Each row projects to eight signed `LookupAccess` sends (multiplicity `+is_real`,
 ## Honest scope
 
 `byteRows`, `byteLookups`, `byteAccessValid`, the aggregator, and `byteLookups_padding` are proven. The
-link **multiset-balance ⟹ `byteAccessValid`** needs the provider side — a native `ByteChip` that pushes
-the table with count multiplicities — absent here, exactly as `StateConsistency`'s receiving `ProgramChip`
-is absent. It is threaded as `TraceByteLink`: an honest assumption, not a `sorry`/axiom. This is a weaker
+link **multiset-balance ⟹ `byteAccessValid`** is likewise discharged: the native `ByteChip` provider
+(`Proofs/Chips/ByteChip/Provider.lean`, imported here) pushes the table, and
+`byteAccessValid_of_balance` below reduces the named `TraceByteLink` interface predicate to bus
+balance + that provider — it is no longer a threaded assumption. This is a weaker
 per-row membership claim than State's cross-row PC chain — there is no inter-row reasoning. -/
 
 namespace SP1Clean.Soundness
@@ -113,7 +114,7 @@ theorem byteLookups_padding (r : Trace.RowView (ZMod p)) (h : r.is_real = 0) :
 open SP1Clean.ByteChip (ByteProvider byteRowKey byteRowSpec_of_provider)
 
 /-- **`TraceByteLink` discharged down to bus balance.** Given a native `ByteProvider` (SP1's preprocessed
-`ByteChip` — it carries only valid byte rows, `Chips/ByteChip.lean`) and a *balanced* Byte bus (the
+`ByteChip` — it carries only valid byte rows, `Proofs/Chips/ByteChip/Provider.lean`) and a *balanced* Byte bus (the
 LogUp/GKR fact, the lone remaining threaded assumption), every real row's sent byte rows are valid
 (`byteAccessValid`). The argument: a real send has multiplicity `is_real.val = 1 > 0`; on a balanced bus
 the provider must cancel it (`provider_touches_pos_send`), so it carries an entry at that key; the provider

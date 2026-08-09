@@ -24,7 +24,7 @@ supports; the figures below cover their union.
 - No project `axiom` declarations occur in `SP1Clean/`.
 - No probed declaration carries `sorryAx`.
 - `skipKernelTC` and `native_decide` are absent from the main library.
-- 51 textual `native_decide` uses are isolated in `SP1CleanTest/` (the witness/trace conformance batteries plus the `NonVacuity.lean` chip-assumptions witnesses).
+- 86 textual `native_decide` uses are isolated in `SP1CleanTest/` (the witness/trace conformance batteries, the `NonVacuity.lean` chip-assumptions witnesses, and the `NonVacuityReal.lean` real-row satisfiability battery).
 
 There is no direct-admission allowlist and no transitive `sorryAx` carrier allowlist. Both sets are
 empty.

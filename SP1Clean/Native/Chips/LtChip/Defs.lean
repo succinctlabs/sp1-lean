@@ -85,7 +85,8 @@ def hintFlags (h : ProverHint (ZMod p)) : Vector (ZMod p) 2 :=
 two variant flags `is_slt`/`is_sltu`, compose the witnessed `LtOperationSigned` gadget (`subcircuit`, the
 `is_signed := is_slt` mode selector), and `Readers.ALUTypeReader.circuit` (opcode `is_slt·9 + is_sltu·10`;
 the `rd` write value is `[bit, 0, 0, 0]` from the gadget's compare bit), gate `is_real`, emit the two flag
-booleans + their sum-bound (`AssertSpec`, needed by soundness to force `is_slt = 0` in the `SLTU` branch),
+booleans + their sum-bound (soundness uses the emitted sum-bound constraint to force `is_slt = 0` in
+the `SLTU` branch; the `AssertSpec` record above is reference-only, unconsumed by the proofs),
 and assemble the native `Columns` struct. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
@@ -137,7 +138,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   -- witnesses the two flags (2) + the `LtOperationSigned` block (1 + 1 + 8 = 10); the readers/write are
   -- `assertion`s (`localLength 0`) over the threaded `state`/`adapter` inputs. 2 + 10 = 12.
   localLength _ := 12
-  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
+  -- `programChannel` joins the structural `RowSpec` propagated from `ALUTypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]

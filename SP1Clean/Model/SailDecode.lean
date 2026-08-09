@@ -24,13 +24,14 @@ branch. Each branch's discharge is a *small* `simp` (one guard block), so no exp
 `cur_privilege` then `get_xLPE` (privilege-dependent CSRs). Its guard is false for a base-ISA encoding,
 but the monadic *computation* still reads those CSRs, so the reduction needs `s.isInitialized` (CSRs
 present) **and** `cur_privilege = Machine` (so the `match cur_privilege` resolves) — i.e. exactly the
-`SailConfigured` "machine mode" residue. `decode_ADD_example` below proves the reduction for a concrete
-ADD against the real decoder, axiom-clean modulo the Sail model's own axioms.
+`SailConfigured` "machine mode" residue. (`decode_ADD_example`, which proved the reduction for a
+concrete ADD against the real decoder, was removed in the 4.32.2 / Sail-v5 migration — see the
+retirement note at the end of this file.)
 
 **Scope note (concrete is enough).** The decode reduction is only ever applied to *concrete* instruction
 words: in the non-vacuity witness (a concrete `GuestProgram`), `RomLoaded` ties the fetched word to a
 concrete `prog.rom` entry, so both the W3 `decodedInROM` discharge and the W7 decode stage decode
-concrete words — the `decode_ADD_example` recipe (re-run per opcode with the matching literal +
+concrete words — the retired `decode_ADD_example`'s recipe (re-run per opcode with the matching literal +
 instruction) covers them. A *symbolic*-register `ext_decode_RTYPE` would need `bv_decide` per cascade
 branch (the `decide := true` discharger cannot rule out a branch when the register fields are symbolic),
 which is costly and unnecessary for this scope, so it is deliberately not pursued; the general `∀ prog`
@@ -66,8 +67,8 @@ non-vacuity paragraph cites `isInitialState_nonvacuous`, a different witness). T
 byte-identical across the model bump, so this is a proof-cost decision, not a semantic one.
 
 What was lost: the only end-to-end demonstration that `decodedInROM` is satisfiable against the real
-generated Sail decoder. `run_bind_ok_none`/`run_bind_ok_some` above are retained — they have external
-consumers and are the reusable half of the recipe, so a future per-opcode example can be rebuilt on
-them. -/
+generated Sail decoder. `run_bind_ok_none`/`run_bind_ok_some` above are retained — they currently
+have no consumers outside this file, but they are the reusable half of the recipe, so a future
+per-opcode example can be rebuilt on them. -/
 
 end SP1Clean.SailDecode

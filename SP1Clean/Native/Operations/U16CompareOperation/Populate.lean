@@ -4,7 +4,7 @@ import SP1Clean.FormalModel.Contracts.Operations
 
 The witness assignment `populate_bit` (the strict-less-than indicator the composing operation threads
 in), its booleanness lemma `populate_bit_bool`, and `spec_populate` (the witnessed `bit` satisfies the
-gadget `Spec`). The elaborated `eval` circuit is the auto-generated sibling `Extracted` module; the
+gadget `Spec`). The elaborated `eval` circuit is hand-maintained in the sibling `Defs.lean`; the
 arithmetic core is in `RawSpec`; the `FormalAssertion` contract in `Formal`. -/
 
 namespace SP1Clean.U16CompareOperation

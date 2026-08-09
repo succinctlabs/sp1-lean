@@ -19,9 +19,9 @@ sub-circuits' own `Spec`s plus the proven `is_real`-binary fact and the `is_real
 the buses' cross-row meaning (PC chain, memory permutation) lives at the trace level in
 `Soundness/{State,Program,Memory}Consistency.lean`.
 
-Deferred: the readers witness their column blocks with padding-safe values, so completeness covers
-padding-shaped rows; threading real clocks/timestamps from the trace/Sail layer is a separate step that
-the `is_real` gating already makes compatible with `is_real = 0` padding.
+The readers are zero-witness input-takers (`FormalAssertion`s over threaded column blocks), so
+completeness covers padding-shaped rows through the `is_real` gating; real clocks/timestamps are
+supplied by the trace/grounding layer, not witnessed here.
 
 (`main` + `ElaboratedCircuit` here; `Assumptions`/`Spec`/soundness/completeness/`circuit` in `Formal`,
 the Sail bridge in `Bridge`.) -/
@@ -64,8 +64,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   -- makes the native verifier enforce the same routing fact.
   input.adapter.op_a_0 === 0
   -- The `is_real` boolean gate is kept **inline** (`assertZero`, not `=== 0` which composes the deep
-  -- Equality subcircuit) so it is visible to `ConstraintsHold.Shallow` — required for the chip to be a
-  -- `VmTables` table (`tables_channel`'s `enabled` booleanity reads the shallow constraints). W11.
+  -- Equality subcircuit) so it is visible to `ConstraintsHold.Shallow` as a chip-owned constraint.
+  -- (The Clean `VmTables` re-base that motivated this was investigated and deferred — roadmap W11.)
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.is_real, input.state, input.adapter, ⟨value⟩⟩
 

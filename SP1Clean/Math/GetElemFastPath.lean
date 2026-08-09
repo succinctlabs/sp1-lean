@@ -3,8 +3,10 @@ import Clean.Circuit.Basic
 /-! # `v[i]` index-bound fast path
 
 Every `v[i]` elaborates its bound side-goal (`i < n`) with `get_elem_tactic` =
-`first | done | assumption | get_elem_tactic_extensible | fail`. In Lean 4.28's Std, the
-slice-support `macro_rules` for `get_elem_tactic_extensible` (tried first — `macro_rules`
+`first | done | assumption | get_elem_tactic_extensible | fail`. In core Std (first
+measured at Lean 4.28; verified still present at v4.32.2 in
+`Init/Data/Range/Polymorphic/GetElemTactic.lean`), the range-support `macro_rules` for
+`get_elem_tactic_extensible` (tried first — `macro_rules`
 run in reverse registration order) opens with nine `try rw [Std.R??.mem_iff] at *` passes,
 a `dsimp … at *`, and a slice `simp` — ~11 full-context traversals per index. Inside a chip
 soundness proof (40+ hypotheses carrying whole-circuit terms) that is **~0.34s for `1 < 4`**,

@@ -123,14 +123,14 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   channelsLawful := by
     simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit,
       Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
-  -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks are threaded
+  -- only the `AddressOperation` subcircuit witnesses (its 4 cells); the other blocks are threaded
   -- inputs and the gate witnesses nothing.
   localLength _ := 3 + 1
   output input i0 :=
     ⟨input.state, input.adapter,
       ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
       input.memory_access, input.is_real⟩
-  -- `programChannel` joins the byte guarantee propagated up from `ITypeReaderImmutable`'s program **pull** (W11 flip).
+  -- `programChannel` joins the structural `RowSpec` propagated from `ITypeReaderImmutable`'s program **pull** (W11 flip).
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- Folded completed-row layout used by the whole-chip Rust AIR codec. -/

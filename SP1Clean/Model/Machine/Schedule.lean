@@ -52,7 +52,8 @@ structure SchedulePoint where
   phase : ℕ
 deriving DecidableEq, Repr
 
-/-- Lexicographic order used by the generic grounding/frontier layer. -/
+/-- Lexicographic order intended for a generalized grounding/frontier layer — currently
+unconsumed outside this file (the timed grounding engine orders by clock alone). -/
 def SchedulePoint.Before (a b : SchedulePoint) : Prop :=
   a.clock < b.clock ∨
     (a.clock = b.clock ∧

@@ -5,7 +5,8 @@ import Mathlib.Tactic.NormNum.Prime
 
 Each `WitnessTests/<Op>Witness.lean` checks that the native Lean witness function — the one the gadget's
 `main` actually uses — reproduces, on every vector dumped from SP1's **real** `<Op>::populate`
-(`WitnessTests/<Op>WitnessVectors.lean`), the exact column values `populate` wrote.
+(`WitnessTests/Vectors/<Op>.lean`; the namespace is `<Op>WitnessVectors`), the exact column values
+`populate` wrote.
 
 The witness functions are field-generic over `ZMod p` (uniform with the chips); conformance is
 checked here at SP1's **concrete field** (KoalaBear), which is where SP1's prover actually runs — so

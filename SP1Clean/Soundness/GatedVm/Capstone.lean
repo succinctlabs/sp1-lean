@@ -5,12 +5,13 @@ import SP1Clean.Soundness.GatedVm.StateBridge
 
 > **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
 
-The whole-machine result, assembled from the two axiom-clean halves built in `SailDispatch.lean`
-(`chipRows_step_sound`) and `StateBridge.lean` (`state_trail_of_balance`):
+The trail half of the whole-machine result, built on `StateBridge.lean`'s
+`state_trail_of_balance`:
 
-  per-row chip `Spec`s  +  gated state-bus balance  ⟹  every real instruction is RISC-V-Sail-correct
-                                                       ∧  ∃ an execution trail `pc_start → … → next_pc`
+  gated state-bus balance  ⟹  ∃ an execution trail `pc_start → … → next_pc`
 
+(the per-row Sail-correctness conjunct was retired from this structure — instruction semantics now
+route through the timed-grounding engine and the chip `advance` lemmas, not this legacy path).
 The transition path is forced by the gated state-bus balance *alone* (the Eulerian `exists_trail`),
 with **no** clock-injectivity, clock-advance, or memory side conditions.
 
@@ -26,10 +27,11 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- A gated whole-program execution certificate over a heterogeneous trace: every real row is
-RISC-V-Sail-correct, and the rows' `current → next` transitions compose (by balance) into a path from
+/-- A gated whole-program execution certificate over a heterogeneous trace: the rows'
+`current → next` transitions compose (by balance) into a path from
 the public initial state key `initEntry` to the public final state key `finalEntry`. The trail's rows
-are a sub-multiset of the trace's real rows (`trail_rows_real`). -/
+are a sub-multiset of the trace's real rows (`trail_rows_real`). (Trail-only: the former per-row
+Sail-correctness conjunct is retired from this structure.) -/
 structure GatedExecution (rows : List (ChipRow p)) (initEntry finalEntry : List ℕ) : Prop where
   /-- The committed `pc_start`/`next_pc` are the endpoints of a valid transition trail of real rows. -/
   trail : ∃ path : List (Trace.RowView (ZMod p)),

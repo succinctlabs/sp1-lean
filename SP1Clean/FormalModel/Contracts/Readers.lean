@@ -10,9 +10,11 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # Consolidated specs — reader circuits
 
-The `Inputs` structs and semantic `Spec`s for the register-adapter / state readers
-(`CPUState`, `RTypeReader`, `RegisterAccessCols`, `RegisterAccessTimestamp`). First file in the
-`Specs/` sequence (`Reader → Operation → Chip`); depends only on `Math/` + `Model/` + `Extracted/`.
+The `Inputs` structs and semantic `Spec`s for the nine register-adapter / state reader families
+(`CPUState`, `RegisterAccessTimestamp`, `RegisterAccessCols`, `RTypeReader`, `ALUTypeReader`,
+`ALUTypeReaderImmutable`, `ITypeReader`, `ITypeReaderImmutable`, `JTypeReader`). First file in the
+`FormalModel/Contracts/` sequence (`Readers.lean → Operations.lean → Chips.lean`); depends only on
+`Math/` + `Model/` + `Extracted/`.
 Each declaration keeps its original namespace, so the reader proof files resolve them unchanged
 after `import SP1Clean.FormalModel.Contracts.Readers`. -/
 

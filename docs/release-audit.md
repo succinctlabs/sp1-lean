@@ -152,7 +152,8 @@ The report distinguishes three statements:
 
 The AIR layer is responsible for the second statement (the obligations bundle's
 `publicCommitOperand`/`deferredCommitOperand` fields — stated, not yet discharged). It also supplies
-the one-way row-to-flag implications and the public-values transition laws. Together with recursion's
+the one-way row-to-flag implications and the public-values transition laws (all three, like the
+operand fields, are stated obligations — not yet discharged from the exact tables). Together with recursion's
 ledger continuity, `finalCommitRowsMatch_of_execution` proves that every existing row is tied to the
 terminal digest; it never infers row existence from a flag. Program correctness of the standard halt
 wrapper provides the third statement. The verification key prevents program substitution only after
@@ -204,7 +205,9 @@ theorem whose target is the complete generated interpreter inherits dependencies
 its reduction lemmas. The raw census discloses this boundary instead of describing the headline theorem
 as depending only on three logical axioms.
 
-There are 51 textual `native_decide` occurrences in the test library (the conformance batteries plus the `NonVacuity.lean` chip-assumptions witnesses) and none in the main library.
+There are 86 textual `native_decide` occurrences in the test library (the conformance batteries,
+the `NonVacuity.lean` chip-assumptions witnesses, and the `NonVacuityReal.lean` real-row
+satisfiability battery) and none in the main library.
 They check witness and complete-trace conformance and are not imported by the soundness theorem.
 
 ## Trusted or externally assumed components

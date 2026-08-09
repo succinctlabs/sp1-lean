@@ -4,8 +4,9 @@ import SP1Clean.Proofs.Chips.DivRemChip.Math
 /-! # `DivRemChip` — isolated arithmetic case proofs
 
 This is the lightweight proof layer between SP1's row constraints and the public `DivRemContract`.
-It deliberately imports neither the chip circuit nor Clean's circuit elaborator.  A future
-constraint proof should extract one of the evidence predicates below from a real row; the theorems
+It deliberately imports neither the chip circuit nor Clean's circuit elaborator.  The whole-chip
+constraint proof (`evidenceSoundness`, `Formal.lean`) extracts one of the evidence predicates below
+from a real row; the theorems
 in this file then establish the ISA result without seeing column offsets, subcircuit witnesses, or
 interaction requirements.
 

@@ -29,8 +29,8 @@ The cluster witnesses nothing — every column it constrains is a field of the i
 * `U16MSBOperation` ×7 — the `b`/`c`/`remainder` high-u16 sign bits (@ `is_real_not_word`) and the
   `b`/`c`/`remainder`/`quotient` low-half sign bits (@ `e2`).
 
-The assertion arguments are verbatim from `Proofs/Chips/DivRemChip/Defs.lean` `main` (lines
-296–309, 337–338, 356–357, 376–382), with each witnessed local replaced by the corresponding
+The assertion arguments are verbatim from the corresponding assertion blocks of
+`Proofs/Chips/DivRemChip/Defs.lean` `main`, with each witnessed local replaced by the corresponding
 `DivRemChip.Columns` field per the chip's cols assembly. The semantic contract is
 `DivRemCompare.CompareSpec` (`FormalModel/Contracts/DivRem.lean`); the `FormalAssertion` bundle is
 `Proofs/Operations/DivRemOperation/Compare.lean`. -/

@@ -184,8 +184,9 @@ lemma toAccess_pushIf_state (env : Environment (ZMod p)) (mult : Expression (ZMo
 omit [NeZero p] in
 /-- **Kernel of the State "received = projection" (gated VM pull).** The `pullIf`/`stateChannel`/`StateMsg`
 analog of `toAccess_pushIf_state` — the W11 form, after `CPUState` switched its `receive_state` from
-`emit (-is_real)` to `Channel.pullIf is_real` (so each chip can `expose` the `[pulledIf, pushedIf]` pair for
-Clean's `VmTables`). Its signed multiplicity is `signedVal (eval env (-gate))`; `toAccess` ignores
+`emit (-is_real)` to `Channel.pullIf is_real` (each chip `expose`s the `[pulledIf, pushedIf]` pair;
+the Clean `VmTables` re-base that motivated the shape was investigated and deferred — roadmap
+W11). Its signed multiplicity is `signedVal (eval env (-gate))`; `toAccess` ignores
 `assumeGuarantees`, so the projected `LookupAccess` is identical to the old `pushIf (-is_real)` form. -/
 lemma toAccess_pullIf_state (env : Environment (ZMod p)) (gate : Expression (ZMod p))
     (msg : StateMsg (Expression (ZMod p))) :

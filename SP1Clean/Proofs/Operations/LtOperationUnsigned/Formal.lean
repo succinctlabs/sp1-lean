@@ -12,8 +12,9 @@ selectors, limb extractions, and non-equality witness, plus the composed `U16Com
 and gated order). The semantic readout (`bit = unsigned-less-than`, `Σflags = 0 ↔ equal`) is exposed by
 `result_semantic`, routing through the `RawSpec` cores in `RawSpec.lean`.
 
-`Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle: the `Extracted`
-`main` imports `U16CompareOperation.Formal` for `.circuit`. -/
+`Spec`/`spec_populate` live here (not in `FormalModel/Contracts/Operations.lean`) to avoid an import
+cycle: the hand-maintained `main` (`Native/Operations/LtOperationUnsigned/Defs.lean`) imports
+`U16CompareOperation.Formal` for `.circuit`. -/
 
 namespace SP1Clean.LtOperationUnsigned
 

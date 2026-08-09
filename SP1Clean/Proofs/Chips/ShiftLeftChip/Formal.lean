@@ -352,7 +352,7 @@ private theorem main_exposedChannelsLawful (input : Var Inputs (ZMod p)) (offset
 
 /-- The `ShiftLeft` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `sll`/`sllw` semantic contract;
 output is the native `Columns` row struct. Soundness is proved (assembled from the two per-op
-`Soundness/<Op>.lean` files); the explicitly deferred completeness seam is recorded above. -/
+`Soundness/<Op>.lean` files); completeness is proved above (the former deferred seam is closed). -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
@@ -365,8 +365,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
     requirementsChannelsLawful := fun input_var i₀ =>
       requirementsChannelsLawful_main input_var i₀,
     -- W11 (A2): the State pair + Memory closed form + Program fetch, via `stateExposure` above;
-    -- lawfulness is the standalone `main_exposedChannelsLawful` (also the axiom-clean seam for
-    -- `interactionsWith_memory_eq` below while the completeness seam is open).
+    -- lawfulness is the standalone `main_exposedChannelsLawful` (which also backs
+    -- `interactionsWith_memory_eq` below directly).
     exposedChannels := stateExposure,
     exposedChannels_eq := main_exposedChannelsLawful }
 
@@ -382,8 +382,8 @@ proof-bearing `GeneralFormalCircuit` bundle. -/
   rw [GeneralFormalCircuit.size_eq, circuit_localLength_eq]
 
 /-- The completed ShiftLeft circuit exposes exactly the Memory interaction list above.  Stated via
-the exposure-lawfulness theorem directly (not through `circuit`) so it stays axiom-clean while the
-completeness seam is open. -/
+the exposure-lawfulness theorem directly (not through `circuit`), keeping it independent of the
+proof-bearing bundle. -/
 theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     ((main input).operations offset).interactionsWith memoryChannel.toRaw =
       (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by

@@ -125,8 +125,10 @@ theorem advance (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) (data : Prover
   exact advance_of_rtype rop.ADD hcfg hrom hpcread hvalb hdecrom hop rfl rfl hnonX0 hpc0 rfl hval
 
 /-- **Add's `ChipKind` registration** — enters Add rows into the heterogeneous trace and the soundness
-capstone. `advance`/`advanceReady` route to `AddChip.advance`, which uses the local
-`add_chip_reaches_sail` helper to discharge the uniform `try_step` effect. -/
+capstone. `advance`/`advanceReady` route to `AddChip.advance`, which discharges the uniform
+`try_step` effect via the generic `advance_of_rtype` plus the `rv64add_eq_execute_RTYPE_pure`
+value bridge (`add_chip_reaches_sail` is the statement-anchor bridge lemma; the `advance` path does
+not consume it). -/
 def kind : Soundness.ChipKind p where
   name := "Add"
   Inputs := AddChip.Inputs

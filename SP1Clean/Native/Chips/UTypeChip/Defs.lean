@@ -14,7 +14,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 Witnesses the addend (`is_auipc · pc`, 0 for LUI) and the add result; composes `CPUState` (straight-line
 `next_pc = pc + 4`), `AddOperation` (gate `is_real - op_a_0`), and `JTypeReader` (opcode
 `is_auipc·48 + (1-is_auipc)·49`). The addend is pinned per-limb by `addend[i] = is_auipc * pc[i]`.
-Implements SP1's `UType` `air.rs:eval`. -/
+Implements SP1's `UType` `eval` (`crates/core/machine/src/utype/mod.rs`). -/
 
 namespace SP1Clean.UTypeChip
 
@@ -65,7 +65,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   -- boolean without assuming a prover-side padding convention.
   assertZero ((input.is_real - 1) * input.adapter.op_a_0)
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
-  -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
+  -- `ConstraintsHold.Shallow` as a chip-owned constraint (the `VmTables` re-base that motivated
+  -- this was investigated and deferred — roadmap W11).
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.is_real, input.state, input.adapter, addend, ⟨add_value⟩, input.is_auipc⟩
 

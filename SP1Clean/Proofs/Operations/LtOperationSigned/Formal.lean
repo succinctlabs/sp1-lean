@@ -16,8 +16,9 @@ adjusted words). The semantic readout (`bit = signed/unsigned-less-than`) is exp
 `result_semantic`, routing through `LtOperationUnsigned.result_semantic` and the sign-bias keystones in
 `RawSpec.lean`.
 
-`Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle: the `Extracted`
-`main` imports `U16MSBOperation.Formal`/`LtOperationUnsigned.Formal` for `.circuit`. -/
+`Spec`/`spec_populate` live here (not in `FormalModel/Contracts/Operations.lean`) to avoid an import
+cycle: the hand-maintained `main` (`Native/Operations/LtOperationSigned/Defs.lean`) imports
+`U16MSBOperation.Formal`/`LtOperationUnsigned.Formal` for `.circuit`. -/
 
 namespace SP1Clean.LtOperationSigned
 

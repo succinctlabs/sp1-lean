@@ -21,8 +21,9 @@ Wiring is per-reader-shape, not per-chip: `rowWiring_rtype` below discharges the
 any R-type-adapter row from a handful of in-circuit numeric facts (the CPUState clock byte bounds,
 the reader's `op_a < 32` decode bound, the write value's range check, and the chip's exact
 consumed/produced Memory lists).  Add is the concrete anchor: its exact Memory emissions are
-evaluated from `AddChip.exposedMemoryInteractions`, and `addRow_engineFacts` runs a genuine decoded
-Add row end-to-end through the adapter. -/
+evaluated from `AddChip.exposedMemoryInteractions`. (The former Add-specific `addRow_engineFacts`
+end-to-end validation instance was retired with the D0 conditional-feed refactor; the generic
+`ChipGroundingContracts.engineFacts` supersedes it.) -/
 
 open LeanRV64D.Defs
 
@@ -1469,9 +1470,10 @@ end RTypeInteractionShape
 /-! ## The Add anchor
 
 Add validates the whole pipeline: its exact Memory emissions are evaluated once from the circuit's
-public exposed list (`AddChip.exposedMemoryInteractions`), the numeric wiring inputs are extracted
-from the finished Byte channel, the chip `Spec`, and the row's own push `Requirements`, and
-`addRow_engineFacts` produces both engine records for a genuine decoded Add row. -/
+public exposed list (`AddChip.exposedMemoryInteractions`), and the numeric wiring inputs are extracted
+from the finished Byte channel, the chip `Spec`, and the row's own push `Requirements`. (The former
+Add-specific `addRow_engineFacts` end-to-end instance was retired with the D0 conditional-feed
+refactor — see the note further below; `ChipGroundingContracts.engineFacts` supersedes it.) -/
 
 section AddAnchor
 
@@ -1518,8 +1520,9 @@ omit [Fact (2 ^ 25 < p)] in
 /-- Add's circuit output as its explicit (structural) row — a `rfl` reduction of `circuit.output` over an
 **opaque** `input`.  Applying it at a concrete decoded row is a symbolic rewrite, so the memory closed-form
 below closes via `simp only [circuit_norm, …]` **without** unfolding the composed `main`/`circuit` at the
-concrete row (the `whnf`-into-concrete blowup that used to force a raised ceiling — see
-`../clean/doc/performance-problems.md` §"Keep hypothesis types folded"). -/
+concrete row (the `whnf`-into-concrete blowup that used to force a raised ceiling — see Clean's
+`doc/performance-problems.md` §"Keep hypothesis types folded", in-tree at
+`.lake/packages/Clean/doc/performance-problems.md`). -/
 theorem addChip_circuit_output_eq (input : Var AddChip.Inputs (ZMod p)) (offset : ℕ) :
     (AddChip.circuit (p := p)).output input offset =
       (⟨input.is_real, input.state, input.adapter,

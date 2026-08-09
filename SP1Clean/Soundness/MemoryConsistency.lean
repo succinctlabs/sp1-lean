@@ -10,17 +10,20 @@ import Clean.Utils.OfflineMemory
 
 The trace-level meaning of the `.memory` interactions that `Readers/RTypeReader.lean` + the chip emit
 (sibling of `Soundness/StateConsistency.lean`). SP1's `RTypeReader::eval` emits, per row, two `.memory`
-interactions per register operand (`Extracted/RTypeReader.lean:90-101`): a `send` of the prior-state
+interactions per register operand (the `interactions` list of `Extracted/RTypeReader.lean`): a `send`
+of the prior-state
 value at the previous timestamp and a `receive` of the new-state value at the current timestamp — for
 `op_a` the new value is the `rd` **write**; for `op_b`/`op_c` the new value equals the prior (a
-**read**). All six are `is_real`-gated.
+**read**). All six are `is_real`-gated. (The native circuit emits the same physical lookups with the
+W11 polarity flip — read-priors as pulls, write/read-backs as pushes; see `memoryReadLookups`.)
 
 Each row projects to six signed `LookupAccess` contributions (`memoryLookups`, send `+is_real`, receive
 `−is_real`) feeding the multiset bus, and to a list of `MemEvent`s. The memory-bus consistency is the
 **offline-memory** property: every read returns the value of the most-recent write at that address
-(timestamp-ordered). That property is order-sensitive — not implied by multiset balance alone — so the
-link is threaded as `TraceMemoryLink`. The per-row projection and `memoryLookups_padding` are proven;
-together with the (provable) balance side they constitute full memory soundness. -/
+(timestamp-ordered). That property is order-sensitive — not implied by multiset balance alone; it is
+derived by the timed grounding engine (`Soundness/TypedMemory.lean` / `TimeExtraction.lean`, the
+memory-clock discipline), and `TraceMemoryLink` below is kept as a named interface alias of
+`TraceMemoryValid`. The per-row projection and `memoryLookups_padding` are proven here. -/
 
 namespace SP1Clean.Soundness
 
@@ -46,7 +49,8 @@ def rowClkLow (r : Trace.RowView (ZMod p)) : ZMod p :=
 /-- The six signed Memory-bus contributions a row emits — per operand a `send` of the prior value at the
 previous timestamp (`+is_real`) and a `receive` of the new value at `clk_low + offset` (`−is_real`). For
 `op_a` the received value is the `rd` write; for `op_b`/`op_c` it is the read-back prior value. 9-tuple
-entries match `Extracted/RTypeReader.lean:90-101`. On padding rows both signs vanish
+entries match the `.memory` entries of `Extracted/RTypeReader.lean`'s `interactions` list. On padding
+rows both signs vanish
 (`memoryLookups_padding`). -/
 def memoryLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
   let chk := r.state.clk_high

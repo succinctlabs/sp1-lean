@@ -124,7 +124,7 @@ Mirror-rust layout under `SP1Clean/`:
   the **semantic-execution substrate** `Semantics/` — `GuestProgram.lean` (the `GuestProgram` +
   `IsInitialState`/`SailStep`/`SailChain`/`SP1Halted` Sail execution model), `ProgramCommitment.lean`
   (`progOf : ProverData → GuestProgram`, the committed program), `MicroTime.lean` (bus-clock ↔ step
-  correspondence, `MemLoc`, `chainState`, `microValue`), and `Truth.lean` (`StateTruth`/`MemTruth`/
+  correspondence, `MemLoc`, `chainState`, `microValue`), and `Truth.lean` (`LocalStateTruth`/`LocalMemTruth`/
   `ProgTruth`, the global execution predicates derived by grounding, not channel payloads). (`Math` +
   `Model` are the former `Foundations/`, split by SP1-dependence.) `Model/Machine/{Schedule,Syscall,
   EventExecution}.lean` gives the row-dependent 8/264-tick event semantics and explicit SP1 host-handler
@@ -142,14 +142,17 @@ Mirror-rust layout under `SP1Clean/`:
   `Operations.lean`, `Chips.lean`, plus focused rich contracts such as `DivRem.lean`) and the lifted chip `Assumptions`/`ProverAssumptions`
   (`ChipAssumptions.lean` — Add/Addi/Addw/Sub/Subw/UType; the two-reason keep-list taxonomy for the
   other chips is stated in that file's module docstring). `ProverSpec` is uniformly
-  `fun _ _ _ => True` (inline in each `circuit` bundle). `Trace/Witness.lean` holds the witness-table
-  scaffolding; the guest-program execution model (`GuestProgram`, `IsInitialState`, `SailStep`/`SailChain`,
+  `fun _ _ _ => True` (inline in each `circuit` bundle). `Trace/Witness.lean` holds the non-vacuity
+  witness (a concrete configured Sail state proving `IsInitialState` satisfiable);
+  the guest-program execution model (`GuestProgram`, `IsInitialState`, `SailStep`/`SailChain`,
   `SP1Halted`, `exitOf`) lives in `Model/Semantics/GuestProgram.lean`. Relation-level AIR/verifier
   contracts live in `Relations.lean`, `CoreProfile.lean`, `CoreAIRRelation.lean`, `Execution.lean`, and
   `Verifier.lean`; `ChipRow`-dependent decode,
   routing, and grounding arguments remain naturally in `Soundness/`.
 - **`Native/`** — the "implemented native in Lean" pillar (circuit construction): `Native/Chips/<Op>Chip/Defs.lean`
-  (each chip's `main` + `ElaboratedCircuit`), `Native/Operations/<Op>/{Populate,RawSpec}.lean` (witness +
+  (each chip's `main` + `ElaboratedCircuit` — 22 of the 25 chips; the ShiftLeft/ShiftRight/DivRem
+  `main`s live in `Proofs/Chips/<X>Chip/Defs.lean`, the documented proof-decomposition exception),
+  `Native/Operations/<Op>/{Populate,RawSpec}.lean` (witness +
   native arithmetic core) + flat ops (`BitwiseU16Operation.lean`, `AddressOperation.lean`, …), and
   `Native/Readers/*.lean` (the register/state reader circuits — their `Spec`s are in
   `FormalModel/Contracts/Readers.lean`; the readers' local `SpecD`/`AssumptionsD`/`ProverAssumptionsD`
@@ -274,7 +277,7 @@ SP1-specific trail machinery (see roadmap W11).
 multiplicities that SP1 actually constrains; they do not assert reachability. `VmChannel` and the earlier
 semantic-channel spike were retired. State has local guarantee `True`, Program carries `RowSpec`, Memory
 carries `isU64 ∧ ClkBound` (value + a bounded 24-bit access timestamp), and Byte carries `ByteRowSpec`.
-`StateTruth`/`ProgTruth` are conclusions of the timed
+`LocalStateTruth`/`ProgTruth` are conclusions of the timed
 grounding engine from bus balance, boundary/provider facts, program commitment, strict schedule rank, and
 the 25 chip `advance` lemmas. No chip `ProverAssumptions` threads either global truth. The current capstone
 layers distinguish native supported-machine refinement, extracted AIR faithfulness, full SP1 AIR
@@ -414,10 +417,11 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
   `inv_mul_cancel₀` / a `bool_of_mul_pred`-style lemma instead.
 - `Word` is an `abbrev` for `Vector` — `w.toBitVec64` dot-notation fails; write `Word.toBitVec64 w`.
 - **The Sail `-i` token — space your negations.** Sail declares GLOBAL `infixl:65 " +i "/" -i "/" *i "/" ^i "`
-  (`Sail/Sail.lean`, integer ops, used 1300+× in the generated LeanRV64D model so they can't be scoped). Now
-  that `Model/Channels.lean` imports Sail-carrying `Truth` (the semantic-channels flip), all four tokens are
-  active in **every** circuit-proof file, and the lexer greedily tokenizes `<op>i` inside `-input_is_real` /
-  `i₀+i` as the operator → `unexpected token '-i'; expected term`. So keep a space (or parens) whenever an
+  (`Sail/Sail.lean`, integer ops, used 1300+× in the generated LeanRV64D model so they can't be scoped). The
+  four tokens are active in every file that transitively imports the generated Sail model — the whole
+  bridge/Soundness/semantics side, and any proof file that reaches `Model/Semantics/` or `Model/SailWrap.lean` —
+  and there the lexer greedily tokenizes `<op>i` inside `-input_is_real` /
+  `i₀+i` as the operator → `unexpected token '-i'; expected term`. So keep the habit everywhere: a space (or parens) whenever an
   operator is immediately followed by an `i`: **`- input_is_real`** / `-(input_is_real)` (never `-input_is_real`),
   **`i₀ + i`** (never `i₀+i`), `2 ^ i`, `x * input`. (The space *before* the operator is untouched and still
   distinguishes binary-op from unary/application, so this is semantically null. The spaced Sail operator

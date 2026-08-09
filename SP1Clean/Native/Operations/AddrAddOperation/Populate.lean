@@ -6,8 +6,9 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 /-! # `AddrAddOperation` — `populate` (the witness generator)
 
 SP1's `AddrAddOperation::populate` ported natively; `spec_populate` proves the result satisfies `Spec`.
-No conformance anchor (the Rust `witness_vectors` binary has no AddrAdd dispatch).
-Circuit in `Extracted`, arithmetic core in `RawSpec`, `FormalAssertion` in `Formal`. -/
+Witness-conformance anchor: `SP1CleanTest/WitnessTests/AddrAddOperationWitness.lean`.
+Circuit hand-maintained in the sibling `Defs.lean`, arithmetic core in `RawSpec`,
+`FormalAssertion` in `Formal`. -/
 
 namespace SP1Clean.AddrAddOperation
 

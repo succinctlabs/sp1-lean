@@ -386,8 +386,9 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         intro h1 h0
         simp only [circuit_norm] at h1 h0
         exact off_gate_vacuous h_bool' h1 h0,
-    -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair so the chip is a
-    -- `VmTables` table. Unlike straight-line ALU chips, `next_pc` is the **witnessed** jump target
+    -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair as chip-owned
+    -- interactions (the Clean `VmTables` re-base that motivated the shape was investigated and deferred
+    -- — roadmap W11). Unlike straight-line ALU chips, `next_pc` is the **witnessed** jump target
     -- `add_value[0..2]` (cells `offset+0..2`) the chip feeds the composed `CPUState`.
     exposedChannels := fun input offset =>
       expose stateChannel (exposedStateInteractions input offset) ++

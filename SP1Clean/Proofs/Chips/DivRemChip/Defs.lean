@@ -28,8 +28,9 @@ whole-row `FormalAssertion` gadgets over the assembled `Columns`:
 `DivRemCore.circuit` (the two `c·quotient` `MulOperation` products, the eight product-glue asserts,
 the chip's own assertZero tail `ownAsserts`, and the 32-pull byte-range tail), followed by the op_a
 `RegisterWrite` push. The public contract and its isolated family-evidence layer are in
-`FormalModel/Contracts/DivRem.lean` and `Cases.lean`; whole-chip evidence extraction and
-completeness are explicit deferred seams in `Formal.lean`/`Completeness/Driver.lean`. -/
+`FormalModel/Contracts/DivRem.lean` and `Cases.lean`; the whole-chip evidence extraction and
+completeness are **proved** — the heavy proofs are deliberately isolated in
+`Formal.lean` (`evidenceSoundness`) and `Completeness/Driver.lean` (`completeness`). -/
 
 namespace SP1Clean.DivRemChip
 

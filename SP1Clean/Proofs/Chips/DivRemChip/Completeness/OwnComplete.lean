@@ -12,8 +12,8 @@ import SP1Clean.Proofs.Chips.DivRemChip.Populate.Signs
 The honest `Populate` witnesses satisfy every one of the chip's ~121 own `assertZero` constraints
 (`ownAsserts`, the `[E13…E367, op_a_0]` list). This is the substance of the `case own` hole in
 `Formal.lean`'s `completeness`; it is split out here (mirroring the `Soundness/<Op>.lean` split) so the
-heavy arithmetic compiles in its own file under its own heartbeat budget, off the 256M-heartbeat
-`completeness` theorem.
+heavy arithmetic compiles in its own file, off the `completeness` theorem (whose former 256M
+heartbeat ceiling was removed — zero heartbeat options remain in `Proofs/Chips`).
 
 The lemma is stated env-parametrically over an abstract column var-struct `colsV`, taking the
 per-column **eval pins** (`Expression.eval env colsV.<field> = <populate value>`) as hypotheses — the

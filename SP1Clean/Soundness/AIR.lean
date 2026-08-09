@@ -165,7 +165,7 @@ structure SupportedCoreGrounding
 
 /-- The committed-decode field of every statically grounded ordered row is already discharged.
 This theorem deliberately sits beside the remaining grounding seam: Program truth comes entirely
-from the exact chip pulls, Clean balance, the canonical table-33 provider, and the statement binding;
+from the exact chip pulls, Clean balance, the canonical table-35 provider, and the statement binding;
 it is not an assumption of the timed State/Memory induction. -/
 theorem supportedCore_orderedRows_programDecoded
     (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)

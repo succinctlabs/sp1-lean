@@ -44,7 +44,9 @@ discharged by `native_decide` (sanctioned in this test library only), lifted to 
 
 `is_real = 1` is visible by construction: the event-built input lists start with the literal `1`
 (`rTypeEventInputs` / `aluTypeEventInputs`, see `rTypeEventInputs_is_real` /
-`aluTypeEventInputs_is_real` below), and struct-built inputs set `is_real := 1` explicitly.
+`aluTypeEventInputs_is_real` below), and struct-built inputs set `is_real := 1` explicitly
+(except the four load chips, which carry no `is_real` column — there the variant flag set to `1`
+is the realness gate).
 Operand non-degeneracy is stated per theorem. Where cheap, a companion theorem also pins the
 Spec-level result computed by the row (e.g. the Lt compare bit on a true and a false comparison).
 -/

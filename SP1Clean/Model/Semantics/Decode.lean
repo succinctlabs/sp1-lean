@@ -7,8 +7,9 @@ import SP1Clean.Math.Word
 /-! # Decode core — LeanRV64D `instruction` → committed Program-bus columns (`Model/Semantics/`)
 
 The decode projection `instrToProgramRow` and the ROM-membership predicate `decodedInROM`, relocated
-DOWN to `Model/Semantics/` (from `Soundness/Decode.lean`) so the Program channel's semantic
-guarantee `ProgTruth` (`Model/Semantics/Truth.lean`) can reference `decodedInROM`. Built on the
+DOWN to `Model/Semantics/` (from `Soundness/Decode.lean`) so the Program-bus execution truth
+`ProgTruth` (`Model/Semantics/Truth.lean` — a grounding conclusion, not a channel guarantee) can
+reference `decodedInROM`. Built on the
 official `ext_decode`/`encdec_backwards` decoder so fetch-decode coherence with `try_step` holds by
 construction. The `RowView`/`TargetObligations`-coupled theorems (`DecodeOperandsBound`,
 `decode_bound`, …) stay in `Soundness/Decode.lean`, which imports this core. Namespace
@@ -110,8 +111,8 @@ def mulOpToOpcode (m : mul_op) : Opcode :=
 /-- Project a decoded LeanRV64D `instruction` (at a given pc) to the committed Program-bus row.
 R-type: `RTYPE (rs2, rs1, rd, op)` (the LeanRV64D tuple order, matching
 `AddSail.spec_add`/`execute_RTYPE`) maps to `op_a := rd`, `op_b := #v[rs1,0,0,0]`, `op_c :=
-#v[rs2,0,0,0]`, `imm_b = imm_c = 0`, `op_a_0 := (rd == x0)`. Other opcode families are `none` here
-(slice 2). -/
+#v[rs2,0,0,0]`, `imm_b = imm_c = 0`, `op_a_0 := (rd == x0)`; the other supported instruction
+families follow the same shape, arm by arm below. Unsupported instruction families are `none`. -/
 def instrToProgramRow (pc : Vector (ZMod p) 3) : instruction → Option (ProgramRow (ZMod p))
   | .RTYPE (rs2, rs1, rd, op) =>
       some { pc0 := pc[0], pc1 := pc[1], pc2 := pc[2],
@@ -592,7 +593,8 @@ not ∀s∃i) over the **guarded** projection `instrToProgramRow'`. Fixing `I` a
 states is what lets every `decodes<T>` consumer invert *once* (no cross-state `regidx_bv_inj`
 pinning), and the guarded projection is what lets the MUL/LOAD/STORE consumers drop their `hpin`
 side-conditions. This strengthens the predicate; it is a sound, derivable strengthening (see
-`decodedInROM_*_hoist` below — ∃I∀s follows from the weak guarded ∀s form for real decodes). -/
+`decodedInROM_*_hoist` in `Soundness/Decode.lean` — ∃I∀s follows from the weak guarded ∀s form for
+real decodes). -/
 def decodedInROM (prog : GuestProgram) (row : ProgramRow (ZMod p)) : Prop :=
   ∃ (w : BitVec 32) (I : instruction),
     prog.fetchWord (pcBitsOfRow row) = some w ∧
@@ -941,10 +943,10 @@ theorem instrToProgramRow_inv_utype {pc : Vector (ZMod p) 3} {i : instruction}
 /-- **The ∀-configured-state `RTYPE(op)` decode from a row's `ProgTruth` membership.** From
 `decodedInROM prog row` on a row whose committed opcode is `op`'s and whose `imm_c = 0`, the fetched
 ROM word `w` decodes — **in every configured Sail state** — to `RTYPE (rs2, rs1, rd, op)` with the
-register indices pinned to the row's committed operand columns. A configured witness `s0`
-instantiates the `decodedInROM` body; `regidx_bv_inj` pins the (per-state existential) decode to the
-single instruction the row's columns determine, lifting it to the uniform ∀-state form the Phase-4
-`advance` consumes. Generic over `op` via `instrToProgramRow_inv_rtype` — **the whole R-type
+register indices pinned to the row's committed operand columns. The ∃I∀s `decodedInROM` body
+already fixes one instruction across all configured states, so the committed columns pin it by the
+one-shot inversion `instrToProgramRow_inv_rtype` (no per-state pinning needed), yielding the
+uniform ∀-state form the Phase-4 `advance` consumes. Generic over `op` — **the whole R-type
 family's decode producer**. -/
 theorem decodesRType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : rop)
     (h : decodedInROM prog row)
@@ -965,8 +967,8 @@ theorem decodesRType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : rop
 /-- **The ∀-configured-state RTYPEW decode producer** — the `execute_RTYPEW` twin of
 `decodesRType`. From the Program-bus `decodedInROM` + the committed `(opcode, imm_c=0)`, recover the
 fetched word `w` and the register indices `rs2/rs1/rd`, with the decode `ext_decode w =
-RTYPEW(rs2,rs1,rd,op)` holding in **every** configured state (the register indices pinned by
-`regidx_bv_inj`). What `advance_of_rtypew` consumes. -/
+RTYPEW(rs2,rs1,rd,op)` holding in **every** configured state (via the one-shot
+`instrToProgramRow_inv_rtypew` inversion). What `advance_of_rtypew` consumes. -/
 theorem decodesRTypew {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : ropw)
     (h : decodedInROM prog row)
     (hop : row.opcode = ((ropwToOpcode op).toNat : ZMod p)) (himm : row.imm_c = 0) :
@@ -1011,8 +1013,8 @@ theorem sext12_inj {a b : BitVec 12} (h : a.signExtend 64 = b.signExtend 64) : a
   rw [← h12 a, ← h12 b, h]
 
 /-- **The ∀-configured-state `ITYPE(op)` decode from a row's `ProgTruth` membership.** The
-I-type twin of `decodesRType`: the register indices are pinned by `regidx_bv_inj`, and the immediate
-`imm` by the `op_c` column via `toBitVec64_bitVecToWord` + `sext12_inj`. The Phase-4 I-type
+I-type twin of `decodesRType`: the register indices and the sign-extended immediate in the `op_c`
+column are recovered by the one-shot `instrToProgramRow_inv_itype` inversion. The Phase-4 I-type
 `advance`'s decode producer. -/
 theorem decodesIType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : iop)
     (h : decodedInROM prog row)
@@ -1066,8 +1068,8 @@ theorem decodesShiftIWType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op
 
 /-- **The ∀-configured-state ADDIW decode producer** — the `.ADDIW` twin of `decodesIType`, keyed on
 the committed `(opcode = ADDW, imm_c = 1)`. Recovers `w` + `imm/rs1/rd` with the decode holding in
-every configured state (register indices pinned by `regidx_bv_inj`, the immediate by `sext12_inj` on
-the `op_c` column). What `advance_of_addiw` consumes. -/
+every configured state (via the one-shot `instrToProgramRow_inv_addiw` inversion).
+What `advance_of_addiw` consumes. -/
 theorem decodesADDIW {prog : GuestProgram} {row : ProgramRow (ZMod p)}
     (h : decodedInROM prog row)
     (hop : row.opcode = ((Opcode.ADDW).toNat : ZMod p)) (himm : row.imm_c = 1) :
@@ -1118,8 +1120,8 @@ theorem sext20shl12_word_inj (a b : BitVec 20)
 
 /-- **The ∀-configured-state U-type decode producer** — the `.UTYPE` twin of `decodesIType`,
 keyed on the committed `(opcode ∈ {LUI,AUIPC}, imm_c = 1)`. Recovers `w` + `imm/rd` with the decode
-holding in every configured state (register `rd` pinned by `regidx_bv_inj`, the 20-bit immediate by
-`sext20shl12_word_inj` on the `op_b` column). Returns `op_b = bitVecToWord ((imm.signExtend 64) <<<
+holding in every configured state (via the one-shot `instrToProgramRow_inv_utype` inversion).
+Returns `op_b = bitVecToWord ((imm.signExtend 64) <<<
 12)` — which the chip's `immOf` inverts. What `advance_of_utype` consumes. -/
 theorem decodesUType {prog : GuestProgram} {row : ProgramRow (ZMod p)} (op : uop)
     (h : decodedInROM prog row)
@@ -1189,7 +1191,7 @@ theorem sext21_inj {a b : BitVec 21} (h : a.signExtend 64 = b.signExtend 64) : a
 
 /-- **The ∀-configured-state JAL decode producer** — the `.JAL` twin of `decodesADDIW`, keyed on
 the committed `(opcode = JAL, imm_c = 1)`. Recovers `w` + `imm/rd` with the decode holding in every
-configured state (`rd` by `regidx_bv_inj`, the 21-bit offset by `sext21_inj` on `op_b`). What
+configured state (via the one-shot `instrToProgramRow_inv_jal` inversion). What
 `advance_of_jal` consumes. -/
 theorem decodesJal {prog : GuestProgram} {row : ProgramRow (ZMod p)}
     (h : decodedInROM prog row)
@@ -1249,8 +1251,9 @@ theorem instrToProgramRow_inv_jalr {pc : Vector (ZMod p) 3} {i : instruction}
     exact absurd (opcodeCast_inj hop) (by decide)
 
 /-- **The ∀-configured-state JALR decode producer** — the `.JALR` twin of `decodesADDIW`, keyed on
-`(opcode = JALR, imm_c = 1)`. Recovers `w` + `imm/rs1/rd` (`rs1` in `op_b`, the 12-bit immediate in
-`op_c` pinned by `sext12_inj`). What `advance_of_jalr` consumes. -/
+`(opcode = JALR, imm_c = 1)`. Recovers `w` + `imm/rs1/rd` (`rs1` in `op_b`, the sign-extended
+12-bit immediate in `op_c`; the one-shot `instrToProgramRow_inv_jalr` inversion). What
+`advance_of_jalr` consumes. -/
 theorem decodesJalr {prog : GuestProgram} {row : ProgramRow (ZMod p)}
     (h : decodedInROM prog row)
     (hop : row.opcode = ((Opcode.JALR).toNat : ZMod p)) (himm : row.imm_c = 1) :
@@ -1486,7 +1489,9 @@ theorem decodesRemw {prog : GuestProgram} {row : ProgramRow (ZMod p)} (isU : Boo
 Unlike DIV/REM (opcode ↔ signedness is injective), `mulOpToOpcode` is **not** injective at the MUL
 opcode (`.Low, _, _ => .MUL`, four preimages) nor at MULHSU (two). So `instrToProgramRow_inv_mul`
 takes an explicit `hpin` pinning the `mul_op` from the opcode — provable (`by decide`) only for MULH
-and MULHU. MUL and MULHSU remain decoder seams (would need `ext_decode` output-determinism). -/
+and MULHU. For MUL and MULHSU the seam is closed by the Move-1 **guarded** inversion below
+(`instrToProgramRow_inv_mul'`, no `hpin`): the guarded projection supplies the record's canonicity
+and `mulOp_canonical_inj` finishes. -/
 
 /-- The MUL/MULH/MULHU/MULHSU decode inversion (R-type shape, opcode `mulOpToOpcode op`, imm_c = 0),
 generic over `op : mul_op` with the opcode-pin `hpin` (the `storeOpcode_pin_one` move: the split
@@ -1744,8 +1749,8 @@ theorem instrToProgramRow_inv_btype {pc : Vector (ZMod p) 3} {i : instruction}
 
 /-- **The ∀-configured-state BTYPE decode producer** — the `.BTYPE` twin of `decodesJalr`, keyed
 on the committed `(opcode ∈ {BEQ..BGEU}, imm_c = 1)`. Recovers `w` + `imm/rs2/rs1` with the decode
-holding in every configured state (`rs1` from `op_a` and `rs2` from `op_b` pinned by
-`regidx_bv_inj`, the 13-bit offset by `sext13_inj` on `op_c`). What `BranchChip.advance`
+holding in every configured state (`rs1` from `op_a`, `rs2` from `op_b`, the sign-extended 13-bit
+offset from `op_c`; the one-shot `instrToProgramRow_inv_btype` inversion). What `BranchChip.advance`
 consumes. -/
 theorem decodesBType {prog : GuestProgram} {row : ProgramChip.ProgramRow (ZMod p)} (op : bop)
     (h : decodedInROM prog row)
@@ -1863,8 +1868,8 @@ theorem loadOpcode_inj_on_valid (w w' : word_width) (u u' : Bool)
 /-- **The ∀-configured-state LOAD decode producer** — the `.LOAD` twin of `decodesJalr`, keyed
 on the committed `(opcode = loadOpcode width isU, imm_c = 1)` + the width-specific injectivity
 `hpin`. Recovers `w` + `imm/rs1/rd` with the decode holding in every configured state (`rs1`/`rd`
-pinned by `regidx_bv_inj`, the 12-bit offset by `sext12_inj` on `op_c`). What
-`advance_of_load_width1` consumes. -/
+and the sign-extended 12-bit offset in `op_c`; the one-shot `instrToProgramRow_inv_load`
+inversion). What `advance_of_load_width1` consumes. -/
 theorem decodesLoad {prog : GuestProgram} {row : ProgramRow (ZMod p)}
     (width : word_width) (isU : Bool)
     (hpin : ∀ (w' : word_width) (u' : Bool),
@@ -1964,8 +1969,9 @@ theorem decodesLoad' {prog : GuestProgram} {row : ProgramRow (ZMod p)}
 
 /-! ## STORE decode inversion + producer (SC Phase 4 · Phase 3b) -/
 
--- impossible forward reference. Both are general `storeOpcode` facts and belong beside
--- `storeOpcode`.
+-- The two `storeOpcode` lemmas below are kept in this section (with the STORE inversion that
+-- consumes them) rather than beside the early `storeOpcode` definition, where citing the STORE
+-- machinery would be an impossible forward reference. Both are general `storeOpcode` facts.
 
 /-- `(storeOpcode 1).toNat = 36` (SB). Proven via `beq_self_eq_true` (NOT `rfl`/`decide`) so the
 kernel never deep-reduces the `word_width = Int` comparison; the `SB.toNat = 36` tail is a small
@@ -2110,9 +2116,9 @@ theorem storeOpcode_pin_eight (w' : word_width) (hw' : storeWidthOK w' = true)
 
 /-- **The ∀-configured-state STORE decode producer** — the `.STORE` twin of `decodesBType`,
 keyed on `(opcode = storeOpcode width, imm_c = 1)`. Recovers `w` + `imm/rs2/rs1` with the decode
-holding in every configured state (`rs2` from `op_a`, `rs1` from `op_b` pinned by `regidx_bv_inj`;
-the 12-bit offset by `sext12_inj` on `op_c`; the width by the caller's `hpin`). What
-`StoreByteChip.advance` consumes. -/
+holding in every configured state (`rs2` from `op_a`, `rs1` from `op_b`, the sign-extended 12-bit
+offset from `op_c`; the one-shot `instrToProgramRow_inv_store` inversion; the width by the
+caller's `hpin`). What `StoreByteChip.advance` consumes. -/
 theorem decodesStore {prog : GuestProgram} {row : ProgramChip.ProgramRow (ZMod p)}
     (width : word_width)
     (h : decodedInROM prog row)

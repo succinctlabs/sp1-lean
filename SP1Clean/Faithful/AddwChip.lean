@@ -483,8 +483,8 @@ private theorem addwcols_byte_interactions_faithful_syntactic
 the interactions the row emits on its four buses — `State`, `Byte`, `Memory`, `Program` — taken together
 are a `List.Perm` of SP1's *entire* extracted `AddwCols.interactions` oracle (projected to `LookupAccess`).
 Assembled from the four per-channel anchors via `perm_filter_by_kind` (which decomposes the oracle image
-into its four `InteractionKind` blocks) + `List.Perm.append` (Byte is the only `Perm`; State/Memory/Program
-are `=`). No semantics, no channel filter — the complete emitted-interaction list vs the complete oracle.
+into its four `InteractionKind` blocks) + `List.Perm.append` (Byte and Memory are genuine `Perm`s;
+State/Program are `=`). No semantics, no channel filter — the complete emitted-interaction list vs the complete oracle.
 This closes out `AddwChip`'s four-artifact chain at the syntactic-interaction level. -/
 private theorem addwcols_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var AddwChip.Inputs (ZMod p)) (offset : ℕ)

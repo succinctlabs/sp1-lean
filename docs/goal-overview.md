@@ -82,7 +82,7 @@ The current `_of_obligations` declarations become internal assembly lemmas once
 - an execution shard whose decoded ordinary rows are exact Sail steps;
 - 8 ticks for ordinary instructions and 264 ticks for raw syscall events;
 - ordered State and Memory behavior derived from the system AIR;
-- correct public-value endpoints; and
+- correct public-value endpoints;
 - correctness of every COMMIT/COMMIT_DEFERRED row that exists, including the one-way fact that such
   a row sets its shard's rolling flag; and
 - the exact public-values transition laws that freeze a digest after its rolling flag is set.

@@ -7,7 +7,10 @@ set_option linter.unusedSimpArgs false
 /-!
 # Misc lemmas used in verification
 
-Lemmas about nat and ZMod that don't belong in a specific file.
+General-purpose lemmas and instances that don't belong in a specific file: kernel-safe
+`Int.toNat`/`%` normalization, `Std.ExtDHashMap` insert algebra, `Fin` no-zero-divisors over a
+prime, a `Fintype (BitVec n)` instance, and the `LawfulMonadStateOf` instances for the state
+monads the Sail model runs in.
 -/
 
 section grind
@@ -21,7 +24,8 @@ namespace Int
 -- Kernel-rfl-safe normalization for `((↑b : ℤ) % ↑n).toNat = b % n`. The
 -- kernel's defeq check on this shape unfolds `2^N` definitionally and blows
 -- the stack once `N ≥ 15`; routing through `Int.toNat_emod` + `Int.toNat_natCast`
--- keeps the proof term shallow. See `docs/agents/proof-patterns.md` for the full story.
+-- keeps the proof term shallow. The kernel-deep-recursion pattern (and its opaque-variable
+-- fix) is catalogued in `docs/agents/proof-patterns.md`.
 lemma toNat_natCast_emod_natCast (b n : ℕ) :
     ((b : ℤ) % (n : ℤ)).toNat = b % n := by
   rw [Int.toNat_emod (by positivity) (by positivity), Int.toNat_natCast, Int.toNat_natCast]

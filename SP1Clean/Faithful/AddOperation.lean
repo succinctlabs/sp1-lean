@@ -154,9 +154,8 @@ theorem add_interactions_faithful_syntactic
     Extracted.Interaction.toAccess_byte, h_ir, h_v0, h_v1, h_v2, h_v3, h6]
 
 /-- **Faithfulness anchor — combined.** The two-list pair form of `add_asserts_faithful` /
-`add_interactions_faithful`, for composing `AddOperation` as a fragment inside a chip-level anchor
-via the `faithful_chip` macro. Legacy `toProp` form — retained as the compat bridge for
-`AddiChip`/`JalChip`/`JalrChip`/`UTypeChip`; the canonical interaction anchor is
+`add_interactions_faithful`. Legacy `toProp` form — this module's only live external consumer is
+`Faithful/DivRemChip/Exact.lean`; the canonical interaction anchor is
 `add_interactions_faithful_syntactic`. -/
 theorem add_constraints_faithful (a b value : Word (ZMod p)) :
     (List.Forall (· = 0) (Extracted.AddOperation.asserts a b ⟨value⟩ 1) ∧

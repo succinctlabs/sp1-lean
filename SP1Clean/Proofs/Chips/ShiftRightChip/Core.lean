@@ -21,8 +21,9 @@ open SP1Clean.ShiftBounds
 -- the SRA/SRLW dispatch chains are the heaviest users left.
 -- This file carries NO file-scoped heartbeat ceiling: it runs at the plain default. The former 2M
 -- file ceiling was re-measured per Clean's `doc/performance-problems.md` §"Measuring honestly" and
--- turned out to be held up by exactly one lemma, `srlw_within_byte_shift`, which now carries its
--- own scoped budget (see the note there). The 16-way `c_bits` dispatches in `limb_result_lt`,
+-- turned out to be held up by exactly one lemma, `srlw_within_byte_shift` — whose own scoped
+-- ceiling was later removed too (see the note there; the allowlist carries no entry for this
+-- file). The 16-way `c_bits` dispatches in `limb_result_lt`,
 -- `sign_fill_lt`, and `higher_lower_zero` are ordered bullets, not `first` ladders, precisely so
 -- they do not re-elaborate every earlier alternative's `ring1` side conditions per goal.
 -- Some ported close-lemma signatures keep hypotheses (e.g. `h_v_val`) for interface uniformity

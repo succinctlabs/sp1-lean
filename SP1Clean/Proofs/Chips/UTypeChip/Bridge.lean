@@ -239,8 +239,9 @@ theorem advance (inp : Inputs (ZMod p)) (cols : UTypeChip.Columns (ZMod p)) (dat
         hpc0 rfl hnowrite hnomem
 
 /-- U-type's `ChipKind` registration. `view` threads straight-line `next_pc`, J-type adapter, opcode
-`is_auipc·48 + (1-is_auipc)·49`; `advance` dispatches the LUI/AUIPC cases through the corresponding local
-Sail bridge helpers. -/
+`is_auipc·48 + (1-is_auipc)·49`; `advance` dispatches the LUI/AUIPC cases through
+`advance_of_utype`/`advance_of_utype_x0` + `immOf_bind` (the `utype_chip_reaches_sail_*` lemmas are
+retained as local bridge helpers, not consumed by the `advance` path). -/
 def kind : Soundness.ChipKind p where
   name := "UType"
   Inputs := UTypeChip.Inputs

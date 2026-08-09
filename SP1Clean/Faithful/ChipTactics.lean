@@ -6,12 +6,14 @@ import SP1Clean.Faithful.CPUState
 
 /-! # Shared chip-faithfulness scaffolding
 
-Two pieces shared across the per-chip `Faithful/*Chip.lean` anchors:
+Shared across the per-chip `Faithful/*Chip.lean` anchors:
 
-* `val_16` / `bool_iff` — field-arithmetic helpers every operation-level anchor needs.
-* `faithful_chip` — the chip-level proof macro. Every `*cols_constraints_faithful` for the
-  `<op> ++ CPUState ++ <reader>` layout is identical modulo five identifiers; `cpustate_constraints_faithful`
-  is baked in.
+* `val_16` / `bool_iff` — field-arithmetic helpers every operation-level anchor needs;
+* `toAccess_pullIf_byte_forall` — the ∀-form byte-pull `toAccess` kernel the interaction anchors
+  `simp` with;
+* `faithful_chip` — the legacy chip-level proof macro for the old `<op> ++ CPUState ++ <reader>`
+  `*cols_constraints_faithful` layout (`cpustate_constraints_faithful` baked in). Currently it has
+  no invocations — the whole-chip oracle anchors superseded it.
 
 This module lives in `Faithful/` (not the foundational `Math/` + `Model/` layer) because the
 `faithful_chip` macro hard-references `SP1Clean.Extracted.forall_append_pair` and

@@ -150,7 +150,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   -- `c_low_bytes` 4 + `bitwise_operation.result` 8 = 16); `BitwiseU16Operation`, the two readers and
   -- `RegisterWrite` are `assertion`s (`localLength 0`). 3 + 16 = 19.
   localLength _ := 19
-  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
+  -- `programChannel` joins the structural `RowSpec` propagated from `ALUTypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]

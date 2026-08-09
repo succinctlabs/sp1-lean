@@ -6,7 +6,7 @@ import SP1Clean.Native.Operations.BitwiseOperation.RawSpec
 
 The witness assignment `populate` (the eight result bytes — the per-byte `byteOp opcode` of the operand
 bytes, threaded in by a composing operation) and `spec_populate` (the witnessed result satisfies the
-gadget `Spec`). The elaborated `eval` circuit is the auto-generated sibling `Extracted` module; the
+gadget `Spec`). The elaborated `eval` circuit is hand-maintained in the sibling `Defs.lean`; the
 arithmetic core is in `RawSpec`; the `FormalAssertion` contract in `Formal`. -/
 
 namespace SP1Clean.BitwiseOperation

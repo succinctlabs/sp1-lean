@@ -18,9 +18,10 @@ actually pulls) and then `addFinishedChannel byteChannel`. Each provider has `by
 cleanly (the `OrderedChannel` obligation is vacuous — no table guarantees `byteChannel` yet; the
 consumers join after).
 
-Generic over `PublicIO`: the providers don't touch the public input, so the capstone (Phase 5) instantiates
-this at `SP1PublicIO` and continues chaining (`|>.addTable <program> |>.addFinishedChannel programChannel
-|> …`) into the plain `Ensemble` capstone. `LTU` (op 4) is pulled by the AluX0 chip's `opcode < 29` check
+Generic over `PublicIO`: the providers don't touch the public input. Note the capstone
+(`Soundness/SP1Ensemble.lean`) composes the provider tables into its plain `Ensemble` directly and
+does **not** consume this `SoundEnsemble` wrapper — this module is the matching provider
+demonstrator, like its Program/Memory siblings. `LTU` (op 4) is pulled by the AluX0 chip's `opcode < 29` check
 and width 14 by the Jal/Jalr/Branch `next_pc` alignment checks, so both providers are built; the only
 remaining unbuilt form is the genuinely variable-`bits` `RangeChip` (one circuit serving all widths at
 once), which no consumer needs — every machine pull uses a fixed compile-time width. -/
@@ -34,8 +35,8 @@ open Air.Flat
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The Byte-bus provider segment: add the ten built byte providers, then **finish `byteChannel`**.
-Generic over `PublicIO` (the verifier stays `.empty`; `PublicIO` is only the ensemble's IO type), so the
-capstone chains the remaining buses + the State `VmTables` onto it. -/
+Generic over `PublicIO` (the verifier stays `.empty`; `PublicIO` is only the ensemble's IO type), so
+further buses and tables can chain onto it. -/
 def byteProviderEnsemble (PublicIO : TypeMap) [ProvableType PublicIO] :
     SoundEnsemble (ZMod p) PublicIO :=
   SoundEnsemble.empty (ZMod p) PublicIO

@@ -29,21 +29,17 @@ The chain mirrors, lemma for lemma:
 * `realDecodedMemory_perm` ← `realDecodedStateMessages_perm`.
 
 The final `realDecodedMemory_perlocBalance` is the raw per-location multiset balance the timed
-grounding walk (`TimedGrounding.walk`) consumes.  Two honest seams are deliberately left open for the
-capstone/B5 assembly and flagged in the module below:
+grounding walk (`TimedGrounding.walk`) consumes.  The two seams once flagged here are now **both
+closed**:
 
-1. **Binary multiplicities are a hypothesis.** `producedMessages_perm_consumedMessages` needs every
-   Memory interaction's signed multiplicity in `{-1, 0, 1}`.  For the *providers* this is the boolean
-   witnessed `m` (`m*(m-1) = 0`); for the *chips* it is `±is_real`/`±is_real·(1-imm)`, binary via
-   `witness_decodedInstructionRows_selectorBinary`.  Deriving the chip half needs the per-chip Memory
-   emission shapes (the sweep this workstream defers), so it is taken as a premise `memBinary`, to be
-   discharged by the `ChipGroundingContracts` bundle exactly as State discharges its `binary` premise.
-2. **Symmetric (both-providers-both-sides) form.** The balance keeps `producedMessages` and
-   `consumedMessages` of *both* boundary tables on *both* sides, rather than the asymmetric
-   `init-produced ++ rows` / `finalize-consumed ++ rows`.  Collapsing to the asymmetric frontier form
-   needs the provider *purity* facts (init only pushes, finalize only pulls) plus the
-   `MemoryInitProviderUnique` per-location uniqueness — the `optMS (live)`/`optMS (finM)` frontier-Option
-   packaging, which is B5's job.
+1. **Binary multiplicities** — the intermediate lemmas still take a `memBinary` premise, but it is
+   discharged in this same file by `witness_memoryMultiplicityBinary` (§"Witness-level structural
+   Memory obligations"): the providers' boolean witnessed `m` (`m*(m-1) = 0`) plus the registry-wide
+   selector-gating theorem for the instruction rows.
+2. **Symmetric (both-providers-both-sides) form** — the collapse to the asymmetric frontier form
+   (provider purity + `MemoryInitProviderUnique`/`MemoryFinalizeProviderUnique` uniqueness, the
+   `optMS (live)`/`optMS (finM)` frontier-Option packaging) landed in `Soundness/MemoryFrontier.lean`
+   (`memoryFrontierBalance`).
 -/
 
 namespace SP1Clean.Soundness
@@ -232,8 +228,9 @@ binary Memory multiplicities, the produced Memory messages (every decoded row's 
 the two boundary tables' pushes) are a permutation of the consumed Memory messages (every decoded row's
 read-priors plus the two boundary tables' pulls).
 
-`memBinary` is the honest deferred seam (see the module doc): it is the Memory analogue of the State
-`binary` premise, to be discharged per chip/provider by the `ChipGroundingContracts` bundle. -/
+`memBinary` is the Memory analogue of the State `binary` premise; it is discharged below by
+`witness_memoryMultiplicityBinary` (physical constraints alone), so it is a threaded intermediate
+hypothesis here, not an open seam. -/
 theorem realDecodedMemory_perm
     (witness : EnsembleWitness (sp1Ensemble (p := p)))
     (balanced : witness.BalancedChannels)

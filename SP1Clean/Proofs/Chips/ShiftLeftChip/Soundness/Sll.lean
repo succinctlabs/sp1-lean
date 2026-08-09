@@ -20,7 +20,7 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 /-- `RV64.sll` as a shift by the low six bits of the shift source. Lifted to a top-level lemma so the
 `BitVec`/`2 ^ 64` reduction is kernel-checked once here rather than inline in `soundness` — avoids the
-`2 ^ N` deep-recursion landmine (see `docs/PROOF_PATTERNS.md`). -/
+`2 ^ N` deep-recursion landmine (see `docs/agents/proof-patterns.md`). -/
 lemma sll_rv64_eq (c b : BitVec 64) : RV64.sll c b = b <<< (c.toNat % 64) := by
   simp only [RV64.sll]; rw [BitVec.shiftLeft_eq']; congr 1
 

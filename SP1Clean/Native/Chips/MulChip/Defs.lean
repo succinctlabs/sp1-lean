@@ -125,7 +125,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
     ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
      input.adapter.op_a, a, input.is_real⟩
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
-  -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
+  -- `ConstraintsHold.Shallow` as a chip-owned constraint (the `VmTables` re-base that motivated
+  -- this was investigated and deferred — roadmap W11).
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.state, input.adapter, a, cols, is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw⟩
 

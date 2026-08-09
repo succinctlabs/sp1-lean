@@ -40,7 +40,8 @@ Both functions search the one `SupportedMachine.supportedChips` descriptor: `rou
 human-readable name and `routeOf` its actual `ChipKind p`. -/
 
 /-- The instruction → chip-**name** routing: the decidable projection of SP1's `tracing.rs` opcode dispatch,
-keyed on `(opcode, rd == x0)`. `none` = uncovered (DivRem family, system traps). ALU ops with `rd == x0`
+keyed on `(opcode, rd == x0)`. `none` = uncovered (the system traps ECALL/EBREAK/UNIMP only — the
+DivRem family routes). ALU ops with `rd == x0`
 route to `AluX0` (the result-discarding fast path), exactly as SP1's `tracing.rs`. -/
 def routeName (op : Opcode) (rdIsX0 : Bool) : Option String :=
   (routeChip (p := p) op rdIsX0).map (·.kind.name)

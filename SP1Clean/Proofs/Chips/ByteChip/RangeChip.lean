@@ -57,7 +57,7 @@ lemma two_pow_lt {n : ℕ} (h : n ≤ 16) : (2 : ℕ) ^ n < p := by
   omega
 
 /-- The committed value `a` — the `a` slot of SP1's `RangeChip` send `⟨6, a, bits, 0⟩`. The bit-width
-`bits` is the compile-time parameter `n`; instantiated at the widths consumers pull (8, 13, 16). -/
+`bits` is the compile-time parameter `n`; instantiated at the widths consumers pull (8, 13, 14, 16). -/
 structure Inputs (F : Type) where
   a : F
 deriving ProvableStruct

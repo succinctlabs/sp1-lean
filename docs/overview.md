@@ -140,6 +140,7 @@ cluster to an eventful Sail shard:
 - verification-key/program binding and entry point;
 - first-execution-shard facts;
 - syscall transcript decoding and per-existing-row digest operands;
+- the one-way row-to-flag implications and the public-values COMMIT transition laws;
 - the non-execution boundary case; and
 - the execution case, including system-table grounding into an exact event trace.
 
@@ -169,7 +170,8 @@ converse that a rolling flag implies such a row exists.
 Accordingly:
 
 - `CommitRowsMatch` is an AIR-level, per-existing-row property;
-- `CommitRowsSetFlags` records the AIR-proved direction from an existing row to its shard flag;
+- `CommitRowsSetFlags` records the AIR-forced direction from an existing row to its shard flag
+  (an obligations-bundle field — stated, not yet discharged from the exact tables);
 - `CommitTransitionValid` records the public-values AIR laws that preserve a digest once the rolling
   flag is set;
 - `CompleteCommitCoverage` means that all eight public digest indices occur across the whole

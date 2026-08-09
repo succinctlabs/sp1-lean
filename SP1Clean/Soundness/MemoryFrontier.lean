@@ -25,10 +25,10 @@ different workstream (all flagged in the theorem doc-strings):
 * **Genesis uniqueness** (`MemoryInitProviderUnique`, `ProviderBindings.lean`) — at most one active
   init push per location.  **This is where the init `Option` (`memoryInitFrontier`) becomes
   well-defined, and where P0.1 is consumed** (`optMS_memoryInitFrontier`).
-* **Final uniqueness** (`MemoryFinalizeProviderUnique`, new here) — the finalize analogue.  It is
-  *not* in the current `InitialBoundaryFacts`, so it is added as a definition and taken as a premise;
-  it should join `InitialBoundaryFacts` (or be discharged by the extracted-AIR layer) exactly as the
-  init uniqueness is.
+* **Final uniqueness** (`MemoryFinalizeProviderUnique`) — the finalize analogue.  It now lives in
+  `Soundness/ProviderBindings.lean` and, like the init uniqueness, is a field of
+  `InitialBoundaryFacts` (joined 2026-07-20); its eventual discharge routes through the
+  extracted-AIR layer exactly as the init uniqueness does.
 * **Padding rows emit no active Memory** (`paddingEmpty`) — a non-active row (`is_real ≠ 1`) contributes
   nil produced/consumed Memory messages, reconciling B4's `decodedInstructionRows` (all rows) with the
   walk's `realDecodedInstructionRows` (active rows).  This is the per-chip Memory emission fact the

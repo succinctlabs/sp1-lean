@@ -141,7 +141,8 @@ grows the proof *term* deep enough that the whole-`advance` kernel type-check hi
 detected` (a C-stack overflow — `--tstack` is the elaborator stack, not the kernel's). Factoring the three
 leaf reductions into these tiny, separately-checked lemmas keeps each `have` a shallow constant application,
 so the composed `advance` term stays under the kernel's recursion limit. Each is proven once here; the
-`StoreByte` `advance` only *applies* them. (Store{Half,Word,Double} will reuse the same three helpers.) -/
+`StoreByte` `advance` only *applies* them. (The helpers are `private`, so Store{Half,Word,Double}
+declare their own copies — it is the pattern, not the declarations, that is reused.) -/
 
 private theorem extractLsb'_0_8_eq (v : BitVec 64) :
     v.extractLsb' 0 8 = Sail.BitVec.extractLsb v 7 0 := by

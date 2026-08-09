@@ -15,7 +15,7 @@ the soundness/completeness proofs, and the bundled `circuit`.
 Whole-chip conformance is the single explicit `contractSoundness` seam below. The previous monolithic
 per-op circuit proofs were retired; their reusable arithmetic was retained in `Math.lean`, `Soundness.lean`,
 and `Assembly.lean`, while `Cases.lean` is now the isolated proof-development interface. Completeness
-remains independently deferred in `Completeness/Driver.lean`. -/
+is proved in `Completeness/Driver.lean` (relocated there for proof isolation, not deferred). -/
 
 namespace SP1Clean.DivRemChip
 
