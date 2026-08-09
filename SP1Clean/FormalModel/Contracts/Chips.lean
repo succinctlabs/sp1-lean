@@ -939,8 +939,8 @@ def nextPcWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
 /-- Semantic contract for the JALR row, composed from the I-type reader sub-`Spec` plus the
 `is_real`-gated jump/link semantics. On a real row: the jump target `add_operation.value = rs1 + op_c_imm`
 (`op_c_imm` is the sign-extended 12-bit immediate — the `BitVec 12` ↔ word relation is a received decode
-fact, supplied at the Sail bridge), the `lsb` witness is binary, and — when `rd ≠ x0` (`op_a_0 = 0`) — the
-link-address write `op_a_operation.value = pc + 4`. The committed next_pc is the LSB-cleared
+fact, supplied at the Sail bridge) and — when `rd ≠ x0` (`op_a_0 = 0`) — the link-address write
+`op_a_operation.value = pc + 4`. The committed next_pc is the LSB-cleared
 `nextPcWord`. The final conjunct records that this cleared low limb (`add_operation.value[0] - lsb`)
 is divisible by 4 — i.e. the jump target is 4-byte aligned — forced by the in-circuit alignment
 `Range` byte-lookup (`(value[0] - lsb) · 4⁻¹ < 2^14`); the Sail bridge lifts it to the whole word.
@@ -956,7 +956,6 @@ def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZM
       wv0 := cols.op_a_operation.value[0], wv1 := cols.op_a_operation.value[1],
       wv2 := cols.op_a_operation.value[2], wv3 := cols.op_a_operation.value[3] } ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
-  (cols.lsb = 0 ∨ cols.lsb = 1) ∧
   (input.is_real = 1 →
     Word.toBitVec64 cols.add_operation.value
       = Word.toBitVec64 (rs1Word cols) + Word.toBitVec64 cols.adapter.op_c_imm) ∧

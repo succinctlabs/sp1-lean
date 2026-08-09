@@ -119,6 +119,138 @@ theorem Signed32Evidence.sound {rs1 rs2 : BitVec 64} {quotient remainder : BitVe
   | overflow hb hc hq hr =>
       simpa [PairSpec, Family.result] using divw_remw_overflow hb hc hq hr
 
+/-! ## Family totality
+
+The four evidence predicates are not vacuous refinements: for **every** operand pair the canonical
+ISA outputs (`Family.result`) are certified by one of the explicit branches.  Each proof
+case-splits divisor-zero / overflow / normal and reuses the `Math.lean` closing lemmas, so the
+totality claim is a standalone kernel theorem rather than audit prose. -/
+
+/-- Truncated remainder carries the dividend's sign (nonpositive side; the nonnegative side is
+`Int.tmod_nonneg`). -/
+private lemma tmod_nonpos {a : ℤ} (b : ℤ) (ha : a ≤ 0) : a.tmod b ≤ 0 := by
+  have h1 : (-a).tmod b = -(a.tmod b) := Int.neg_tmod a b
+  have h2 : 0 ≤ (-a).tmod b := Int.tmod_nonneg b (by omega)
+  omega
+
+/-- The four `normal`-branch fields hold at the machine results `b.sdiv c` / `b.srem c` whenever
+the divisor is nonzero and the operands are not the lone `intMin / -1` overflow pair
+(width-generic: used at 64 for `DIV`/`REM` and at 32 for `DIVW`/`REMW`). -/
+private lemma sdiv_srem_evidence {w : ℕ} {b c : BitVec w} (hc0 : c ≠ 0#w)
+    (hov : ¬(b = BitVec.intMin w ∧ c = -1#w)) :
+    b.toInt = c.toInt * (b.sdiv c).toInt + (b.srem c).toInt ∧
+    (b.srem c).toInt.natAbs < c.toInt.natAbs ∧
+    (0 ≤ b.toInt → 0 ≤ (b.srem c).toInt) ∧
+    (b.toInt ≤ 0 → (b.srem c).toInt ≤ 0) := by
+  have hcz : c.toInt ≠ 0 := fun h => hc0 (BitVec.eq_of_toInt_eq (by rw [h]; simp))
+  have htdiv : (b.sdiv c).toInt = b.toInt.tdiv c.toInt :=
+    BitVec.toInt_sdiv_of_ne_or_ne b c (not_and_or.mp hov)
+  refine ⟨?_, ?_, fun h => ?_, fun h => ?_⟩
+  · rw [htdiv, BitVec.toInt_srem]
+    exact (Int.mul_tdiv_add_tmod _ _).symm
+  · rw [BitVec.toInt_srem, Int.natAbs_tmod]
+    exact Nat.mod_lt _ (Int.natAbs_pos.mpr hcz)
+  · rw [BitVec.toInt_srem]
+    exact Int.tmod_nonneg _ h
+  · rw [BitVec.toInt_srem]
+    exact tmod_nonpos _ h
+
+/-- **Totality of the unsigned 64-bit evidence**: every operand pair certifies the canonical
+`DIVU`/`REMU` outputs. -/
+theorem Unsigned64Evidence.total (rs1 rs2 : BitVec 64) :
+    Unsigned64Evidence rs1 rs2 (Family.unsigned64.result .quotient rs1 rs2)
+      (Family.unsigned64.result .remainder rs1 rs2) := by
+  simp only [Family.result, RV64.divu, RV64.remu]
+  by_cases hc0 : rs2 = 0#64
+  · subst hc0
+    refine ⟨by simp, fun h => by simp at h, fun _ => ⟨?_, by simp⟩⟩
+    rw [if_pos rfl]
+    show (-1#64).toNat = 2 ^ 64 - 1
+    rw [BitVec.neg_one_eq_allOnes, BitVec.toNat_allOnes]
+  · have hcz : rs2.toNat ≠ 0 := fun h => hc0 (BitVec.eq_of_toNat_eq (by simp [h]))
+    rw [if_neg hc0]
+    refine ⟨?_, fun _ => ?_, fun h => absurd h hcz⟩
+    · rw [BitVec.udiv_eq, BitVec.umod_eq, BitVec.toNat_udiv, BitVec.toNat_umod]
+      exact (Nat.div_add_mod rs1.toNat rs2.toNat).symm
+    · rw [BitVec.umod_eq, BitVec.toNat_umod]
+      exact Nat.mod_lt _ (Nat.pos_of_ne_zero hcz)
+
+/-- **Totality of the signed 64-bit evidence**: every operand pair certifies the canonical
+`DIV`/`REM` outputs through exactly one of the three explicit branches. -/
+theorem Signed64Evidence.total (rs1 rs2 : BitVec 64) :
+    Signed64Evidence rs1 rs2 (Family.signed64.result .quotient rs1 rs2)
+      (Family.signed64.result .remainder rs1 rs2) := by
+  simp only [Family.result]
+  by_cases hc0 : rs2 = 0#64
+  · exact .divisorZero hc0 (div_rem_divzero hc0 rfl rfl).1.symm
+      (div_rem_divzero hc0 rfl rfl).2.symm
+  · by_cases hov : rs1 = BitVec.intMin 64 ∧ rs2 = -1#64
+    · exact .overflow hov.1 hov.2 (div_rem_overflow hov.1 hov.2 rfl rfl).1.symm
+        (div_rem_overflow hov.1 hov.2 rfl rfl).2.symm
+    · obtain ⟨hid, hlt, hpos, hneg⟩ := sdiv_srem_evidence hc0 hov
+      have hpair := div_rem_of_identity hc0 hid hlt hpos hneg
+      exact hpair.1 ▸ hpair.2 ▸ .normal hc0 hid hlt hpos hneg
+
+/-- **Totality of the unsigned low-32 evidence**: every operand pair certifies the canonical
+`DIVUW`/`REMUW` outputs through their native 32-bit witnesses. -/
+theorem Unsigned32Evidence.total (rs1 rs2 : BitVec 64) :
+    ∃ quotient32 remainder32 : BitVec 32,
+      Family.unsigned32.result .quotient rs1 rs2 = BitVec.signExtend 64 quotient32 ∧
+      Family.unsigned32.result .remainder rs1 rs2 = BitVec.signExtend 64 remainder32 ∧
+      Unsigned32Evidence rs1 rs2 quotient32 remainder32 := by
+  simp only [Family.result]
+  by_cases hc0 : (BitVec.extractLsb 31 0 rs2).toNat = 0
+  · have hid : (BitVec.extractLsb 31 0 rs1).toNat =
+        (BitVec.extractLsb 31 0 rs2).toNat * (-1#32).toNat +
+          (BitVec.extractLsb 31 0 rs1).toNat := by
+      rw [hc0, Nat.zero_mul, Nat.zero_add]
+    have hzero : (BitVec.extractLsb 31 0 rs2).toNat = 0 →
+        (-1#32 : BitVec 32).toNat = 2 ^ 32 - 1 ∧
+          (BitVec.extractLsb 31 0 rs1).toNat = (BitVec.extractLsb 31 0 rs1).toNat :=
+      fun _ => ⟨by rw [BitVec.neg_one_eq_allOnes, BitVec.toNat_allOnes], rfl⟩
+    exact ⟨-1#32, BitVec.extractLsb 31 0 rs1,
+      (divuw_remuw_of_identity hid (fun h => absurd hc0 h) hzero).1.symm,
+      (divuw_remuw_of_identity hid (fun h => absurd hc0 h) hzero).2.symm,
+      ⟨hid, fun h => absurd hc0 h, hzero⟩⟩
+  · have hid : (BitVec.extractLsb 31 0 rs1).toNat =
+        (BitVec.extractLsb 31 0 rs2).toNat *
+            ((BitVec.extractLsb 31 0 rs1).udiv (BitVec.extractLsb 31 0 rs2)).toNat +
+          ((BitVec.extractLsb 31 0 rs1).umod (BitVec.extractLsb 31 0 rs2)).toNat := by
+      rw [BitVec.udiv_eq, BitVec.umod_eq, BitVec.toNat_udiv, BitVec.toNat_umod]
+      exact (Nat.div_add_mod _ _).symm
+    have hlt : (BitVec.extractLsb 31 0 rs2).toNat ≠ 0 →
+        ((BitVec.extractLsb 31 0 rs1).umod (BitVec.extractLsb 31 0 rs2)).toNat <
+          (BitVec.extractLsb 31 0 rs2).toNat := fun _ => by
+      rw [BitVec.umod_eq, BitVec.toNat_umod]
+      exact Nat.mod_lt _ (Nat.pos_of_ne_zero hc0)
+    exact ⟨_, _, (divuw_remuw_of_identity hid hlt (fun h => absurd h hc0)).1.symm,
+      (divuw_remuw_of_identity hid hlt (fun h => absurd h hc0)).2.symm,
+      ⟨hid, hlt, fun h => absurd h hc0⟩⟩
+
+/-- **Totality of the signed low-32 evidence**: every operand pair certifies the canonical
+`DIVW`/`REMW` outputs through their native 32-bit witnesses, by exactly one of the three explicit
+branches. -/
+theorem Signed32Evidence.total (rs1 rs2 : BitVec 64) :
+    ∃ quotient32 remainder32 : BitVec 32,
+      Family.signed32.result .quotient rs1 rs2 = BitVec.signExtend 64 quotient32 ∧
+      Family.signed32.result .remainder rs1 rs2 = BitVec.signExtend 64 remainder32 ∧
+      Signed32Evidence rs1 rs2 quotient32 remainder32 := by
+  simp only [Family.result]
+  by_cases hc0 : BitVec.extractLsb 31 0 rs2 = 0#32
+  · exact ⟨-1#32, BitVec.extractLsb 31 0 rs1,
+      (divw_remw_divzero hc0 rfl rfl).1.symm, (divw_remw_divzero hc0 rfl rfl).2.symm,
+      .divisorZero hc0 rfl rfl⟩
+  · by_cases hov : BitVec.extractLsb 31 0 rs1 = BitVec.intMin 32 ∧
+        BitVec.extractLsb 31 0 rs2 = -1#32
+    · exact ⟨BitVec.extractLsb 31 0 rs1, 0#32,
+        (divw_remw_overflow hov.1 hov.2 rfl rfl).1.symm,
+        (divw_remw_overflow hov.1 hov.2 rfl rfl).2.symm,
+        .overflow hov.1 hov.2 rfl rfl⟩
+    · obtain ⟨hid, hlt, hpos, hneg⟩ := sdiv_srem_evidence hc0 hov
+      exact ⟨_, _, (divw_remw_of_identity hc0 hid hlt hpos hneg).1.symm,
+        (divw_remw_of_identity hc0 hid hlt hpos hneg).2.symm,
+        .normal hc0 hid hlt hpos hneg⟩
+
 /-! ## Uniform family and row routing -/
 
 /-- Uniform evidence consumed by the chip integration proof.  Word variants retain their native

@@ -181,7 +181,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
-  refine ⟨⟨h_it, h_bin, h_lsb, ?_, ?_, ?_, ?_⟩,
+  refine ⟨⟨h_it, h_bin, ?_, ?_, ?_, ?_⟩,
     Or.inr ⟨h_bin, h_bin, h_clk⟩,
     Or.inr ⟨h_bin, ?_, h_clk.at_four⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
