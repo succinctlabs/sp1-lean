@@ -38,7 +38,7 @@ is trivial. -/
 def InteractSpec (_cols : Columns (ZMod p)) : Prop := True
 
 /-- Compose the `CPUState`/`AddOperation`/`ITypeReader` sub-circuits, witness the ALU result word via
-`AddOperation.populate`, gate `is_real`, and assemble the native `Columns` struct. The `ITypeReader`
+`AddOperation.populateIR` (the exportable witness IR; `populate` remains its value-level anchor), gate `is_real`, and assemble the native `Columns` struct. The `ITypeReader`
 carries opcode `1` and the four `op_a_write_value` limbs. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit

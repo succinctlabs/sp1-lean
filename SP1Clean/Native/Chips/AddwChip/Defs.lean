@@ -30,8 +30,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Compose the `CPUState`/`AddwOperation`/`ALUTypeReader` column blocks as Clean subcircuits/assertions
 and assemble the native `Columns` struct. The chip witnesses the result low limbs + sign bit via the
-operation's `populate` (`addwValueWitness`/`addwMsbWitness`), then composes the demoted `AddwOperation`
-gadget as a Clean `assertion`. The `ALUTypeReader`'s four `op_a_write_value` limbs are the
+operation's witness IR (`valueIR`/`msbIR`, whose value-level anchors are `addwValueWitness`/
+`addwMsbWitness`), then composes the demoted `AddwOperation` gadget as a Clean `assertion`. The `ALUTypeReader`'s four `op_a_write_value` limbs are the
 **sign-extended** W result `[value[0], value[1], msb·65535, msb·65535]`; the Program-bus opcode is
 `19`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do

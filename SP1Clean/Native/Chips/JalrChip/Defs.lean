@@ -49,7 +49,7 @@ def lsbBit (input : Inputs (ZMod p)) : ZMod p :=
   (((jumpTargetWord input)[0].val % 2 : ℕ) : ZMod p)
 
 /-- Witness the two add results (`add_operation.value` = `rs1 + imm`, `op_a_operation.value` = `pc + 4`)
-and the `lsb` scalar via `populate`, then compose as Clean `assertion`s. `CPUState` is fed the LSB-cleared
+and the `lsb` scalar via the witness IR, then compose as Clean `assertion`s. `CPUState` is fed the LSB-cleared
 `next_pc`; the link add's gate is `is_real - op_a_0`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let add_value ← witnessVectorIR 4 (AddOperation.populateIR

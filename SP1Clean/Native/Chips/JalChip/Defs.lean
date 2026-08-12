@@ -30,7 +30,7 @@ omit [Fact p.Prime] in
 lemma h14p : (14 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 
 /-- Witness the two add results (`add_operation.value` = jump target, `op_a_operation.value` = link
-address) via `AddOperation.populate`, then compose as Clean `assertion`s. The `CPUState` reader is fed
+address) via `AddOperation.populateIR`, then compose as Clean `assertion`s. The `CPUState` reader is fed
 the data-dependent `next_pc = add_operation.value`; the link add's gate is `is_real - op_a_0`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let add_value ← witnessVectorIR 4 (AddOperation.populateIR

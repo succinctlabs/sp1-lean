@@ -36,7 +36,7 @@ struct. The `RTypeReader`'s four `op_a_write_value` limbs are the **sign-extende
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  -- The chip witnesses the result low limbs + sign bit via the operation's `populate`, then composes the
+  -- The chip witnesses the result low limbs + sign bit via the operation's witness IR, then composes the
   -- demoted `SubwOperation` gadget as a Clean `assertion`.
   let value ← witnessVectorIR 2 (SubwOperation.valueIR input.op_b_val input.op_c_val)
   let msb ← witnessVectorIR 1 (SubwOperation.msbIR input.op_b_val input.op_c_val)
