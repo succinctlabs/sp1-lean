@@ -10,17 +10,20 @@ import Clean.Utils.OfflineMemory
 
 The trace-level meaning of the `.memory` interactions that `Readers/RTypeReader.lean` + the chip emit
 (sibling of `Soundness/StateConsistency.lean`). SP1's `RTypeReader::eval` emits, per row, two `.memory`
-interactions per register operand (`Extracted/RTypeReader.lean:90-101`): a `send` of the prior-state
+interactions per register operand (the `interactions` list of `Extracted/RTypeReader.lean`): a `send`
+of the prior-state
 value at the previous timestamp and a `receive` of the new-state value at the current timestamp — for
 `op_a` the new value is the `rd` **write**; for `op_b`/`op_c` the new value equals the prior (a
-**read**). All six are `is_real`-gated.
+**read**). All six are `is_real`-gated. (The native circuit emits the same physical lookups with the
+W11 polarity flip — read-priors as pulls, write/read-backs as pushes; see `memoryReadLookups`.)
 
 Each row projects to six signed `LookupAccess` contributions (`memoryLookups`, send `+is_real`, receive
 `−is_real`) feeding the multiset bus, and to a list of `MemEvent`s. The memory-bus consistency is the
 **offline-memory** property: every read returns the value of the most-recent write at that address
-(timestamp-ordered). That property is order-sensitive — not implied by multiset balance alone — so the
-link is threaded as `TraceMemoryLink`. The per-row projection and `memoryLookups_padding` are proven;
-together with the (provable) balance side they constitute full memory soundness. -/
+(timestamp-ordered). That property is order-sensitive — not implied by multiset balance alone; it is
+derived by the timed grounding engine (`Soundness/TypedMemory.lean` / `TimeExtraction.lean`, the
+memory-clock discipline), and `TraceMemoryLink` below is kept as a named interface alias of
+`TraceMemoryValid`. The per-row projection and `memoryLookups_padding` are proven here. -/
 
 namespace SP1Clean.Soundness
 
@@ -38,7 +41,7 @@ private theorem valCast_pos_aux [NeZero p] {x : ZMod p} (hx : x ≠ 0) : 0 < (x.
   have : x.val ≠ 0 := fun hv => hx (ZMod.val_injective p (by rw [ZMod.val_zero]; exact hv))
   omega
 
-/-- The recombined low clock for a row (`clk_0_16 + clk_16_24 * 2^16`), matching `Extracted/AddChip`'s
+/-- The recombined low clock for a row (`clk_0_16 + clk_16_24 * 2^16`), matching the Add Rust oracle's
 CS2 `clk_low` argument. -/
 def rowClkLow (r : Trace.RowView (ZMod p)) : ZMod p :=
   r.state.clk_0_16 + r.state.clk_16_24 * 65536
@@ -46,7 +49,8 @@ def rowClkLow (r : Trace.RowView (ZMod p)) : ZMod p :=
 /-- The six signed Memory-bus contributions a row emits — per operand a `send` of the prior value at the
 previous timestamp (`+is_real`) and a `receive` of the new value at `clk_low + offset` (`−is_real`). For
 `op_a` the received value is the `rd` write; for `op_b`/`op_c` it is the read-back prior value. 9-tuple
-entries match `Extracted/RTypeReader.lean:90-101`. On padding rows both signs vanish
+entries match the `.memory` entries of `Extracted/RTypeReader.lean`'s `interactions` list. On padding
+rows both signs vanish
 (`memoryLookups_padding`). -/
 def memoryLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
   let chk := r.state.clk_high
@@ -68,7 +72,7 @@ def memoryLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
     (.Memory, "SP1Memory",
       [chk.val, (cl + 4).val, a.op_a.val, 0, 0,
         r.rdWrite[0].val, r.rdWrite[1].val,
-        r.rdWrite[2].val, r.rdWrite[3].val], -ir),
+        r.rdWrite[2].val, r.rdWrite[3].val], - ir),
     -- op_b: read prior (send), read-back prior (receive); gated by `is_real * (1 - imm_b)`, address its low limb
     (.Memory, "SP1Memory",
       [chk.val, a.op_b_memory.access_timestamp.prev_low.val, a.op_b[0].val, 0, 0,
@@ -77,7 +81,7 @@ def memoryLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
     (.Memory, "SP1Memory",
       [chk.val, (cl + 3).val, a.op_b[0].val, 0, 0,
         a.op_b_memory.prev_value[0].val, a.op_b_memory.prev_value[1].val,
-        a.op_b_memory.prev_value[2].val, a.op_b_memory.prev_value[3].val], -ibr),
+        a.op_b_memory.prev_value[2].val, a.op_b_memory.prev_value[3].val], - ibr),
     -- op_c: read prior (send), read-back prior (receive); gated by `is_real * (1 - imm_c)`, address its low limb
     (.Memory, "SP1Memory",
       [chk.val, a.op_c_memory.access_timestamp.prev_low.val, a.op_c[0].val, 0, 0,
@@ -86,7 +90,7 @@ def memoryLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
     (.Memory, "SP1Memory",
       [chk.val, (cl + 2).val, a.op_c[0].val, 0, 0,
         a.op_c_memory.prev_value[0].val, a.op_c_memory.prev_value[1].val,
-        a.op_c_memory.prev_value[2].val, a.op_c_memory.prev_value[3].val], -icr) ]
+        a.op_c_memory.prev_value[2].val, a.op_c_memory.prev_value[3].val], - icr) ]
 
 /-- A single register-access event. Mirrors the vendored `MemoryAccess` tuple `(timestamp, addr,
 readValue, writeValue)`: `addr`, timestamp `clk` (compared via `.val`, since `ZMod p` has no canonical
@@ -150,19 +154,59 @@ signed contributions have multiplicity `±0`. The emission is `is_real`-gated, m
 `send/receive … is_real`. -/
 theorem memoryLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_real = 0) :
     ∀ k, multiplicitySum (memoryLookups r) k = 0 := by
-  have hz : (r.is_real.val : ℤ) = 0 := by simp only [h, ZMod.val_zero, Nat.cast_zero]
   -- With the multiplicative gate `is_real * (1 - imm)`, `is_real = 0` zeroes op_b/op_c regardless of imm.
-  have hzb : ((r.is_real * (1 - r.adapter.imm_b)).val : ℤ) = 0 := by
-    simp only [h, zero_mul, ZMod.val_zero, Nat.cast_zero]
-  have hzc : ((r.is_real * (1 - r.adapter.imm_c)).val : ℤ) = 0 := by
-    simp only [h, zero_mul, ZMod.val_zero, Nat.cast_zero]
   intro k
-  simp only [memoryLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, hz, hzb, hzc, neg_zero,
-    ite_self, add_zero]
+  simp only [memoryLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, h, zero_mul,
+    ZMod.val_zero, Nat.cast_zero, neg_zero, ite_self, add_zero]
 
 open Circuit SP1Clean.InteractionRecovery
 open SP1Clean.Channels (memoryChannel MemoryMsg)
 
+/-- The **five** Memory-bus contributions `Readers/RTypeReader.main` actually emits after the W11 polarity
+flip: per operand the read-prior *pull* (`−is_real` — the chip *derives* `MemoryMsg.isU64` of the operand's
+prior value) and the op_b/op_c read-back *pushes* (`+is_real`). The op_a (`rd`) **write** push is factored
+out into `Readers/RegisterWrite` (composed by the chip after its operation), so it is absent here. These are
+`memoryLookups`'s five *read* entries (all but the op_a write, `memoryLookups` entry 1) with flipped signs —
+the pull/push polarity; on a register row (`imm_b = imm_c = 0`, where `memoryLookups` gates op_b/op_c by
+plain `±is_real`) they carry identical keys. Both feed the same `multiplicitySum` bus, so the offline-memory
+model (`isConsistentOnline_of_memBalance`) — stated over `memoryLookups`, balance being `negMult`-invariant
+— is unaffected. -/
+def memoryReadLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
+  let chk := r.state.clk_high
+  let cl := rowClkLow r
+  let ir := (r.is_real.val : ℤ)
+  let a := r.adapter
+  [ -- op_a: read-prior pull
+    (.Memory, "SP1Memory",
+      [chk.val, a.op_a_memory.access_timestamp.prev_low.val, a.op_a.val, 0, 0,
+        a.op_a_memory.prev_value[0].val, a.op_a_memory.prev_value[1].val,
+        a.op_a_memory.prev_value[2].val, a.op_a_memory.prev_value[3].val], - ir),
+    -- op_b: read-prior pull, read-back push
+    (.Memory, "SP1Memory",
+      [chk.val, a.op_b_memory.access_timestamp.prev_low.val, a.op_b[0].val, 0, 0,
+        a.op_b_memory.prev_value[0].val, a.op_b_memory.prev_value[1].val,
+        a.op_b_memory.prev_value[2].val, a.op_b_memory.prev_value[3].val], - ir),
+    (.Memory, "SP1Memory",
+      [chk.val, (cl + 3).val, a.op_b[0].val, 0, 0,
+        a.op_b_memory.prev_value[0].val, a.op_b_memory.prev_value[1].val,
+        a.op_b_memory.prev_value[2].val, a.op_b_memory.prev_value[3].val], ir),
+    -- op_c: read-prior pull, read-back push
+    (.Memory, "SP1Memory",
+      [chk.val, a.op_c_memory.access_timestamp.prev_low.val, a.op_c[0].val, 0, 0,
+        a.op_c_memory.prev_value[0].val, a.op_c_memory.prev_value[1].val,
+        a.op_c_memory.prev_value[2].val, a.op_c_memory.prev_value[3].val], - ir),
+    (.Memory, "SP1Memory",
+      [chk.val, (cl + 2).val, a.op_c[0].val, 0, 0,
+        a.op_c_memory.prev_value[0].val, a.op_c_memory.prev_value[1].val,
+        a.op_c_memory.prev_value[2].val, a.op_c_memory.prev_value[3].val], ir) ]
+
+/-- **Projection = emission (register reads).** The reader's read-only projection `memoryReadLookups` equals
+the `Memory`-filtered, `toAccess`-imaged interactions the native `Readers/RTypeReader` block emits — the
+register analogue of `memAccessLookups_eq_emitted`. The three `RegisterAccessCols` sub-assertions emit only
+`byteChannel`, the program pull is a different channel, and the `op_a_0` gates emit nothing, leaving exactly
+the five read pulls/pushes: op_a/b/c read-prior *pulls* (`−is_real`, `toAccess_pullIf_memory`) and op_b/c
+read-back *pushes* (`+is_real`, `toAccess_pushIf_memory`). The op_a *write* push lives in
+`Readers/RegisterWrite`, so it is not among the reader's emissions. -/
 theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment (ZMod p)) (offset : ℕ)
     [Fact p.Prime] [Fact (2 ^ 17 < p)]
     (input : Var Readers.RTypeReader.Inputs (ZMod p))
@@ -172,13 +216,7 @@ theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment
     (h_cl : Expression.eval env input.clk_low = rowClkLow r)
     (h_oa : Expression.eval env input.cols.op_a = r.adapter.op_a)
     (h_ob : Expression.eval env input.cols.op_b = r.adapter.op_b[0])
-    (h_immb : r.adapter.imm_b = 0)
     (h_oc : Expression.eval env input.cols.op_c = r.adapter.op_c[0])
-    (h_imm : r.adapter.imm_c = 0)
-    (h_wv0 : Expression.eval env input.wv0 = r.rdWrite[0])
-    (h_wv1 : Expression.eval env input.wv1 = r.rdWrite[1])
-    (h_wv2 : Expression.eval env input.wv2 = r.rdWrite[2])
-    (h_wv3 : Expression.eval env input.wv3 = r.rdWrite[3])
     (h_pl_a : Expression.eval env input.cols.op_a_memory.access_timestamp.prev_low =
       r.adapter.op_a_memory.access_timestamp.prev_low)
     (h_pv_a0 : Expression.eval env input.cols.op_a_memory.prev_value[0] =
@@ -209,7 +247,7 @@ theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment
       r.adapter.op_c_memory.prev_value[2])
     (h_pv_c3 : Expression.eval env input.cols.op_c_memory.prev_value[3] =
       r.adapter.op_c_memory.prev_value[3]) :
-    memoryLookups r =
+    memoryReadLookups r =
       (((Readers.RTypeReader.main input).operations offset).interactionsWith
           memoryChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   have hp2 : 2 < p := two_lt_p_aux
@@ -219,15 +257,17 @@ theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit memoryChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
       (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) memoryChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) memoryChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.programChannel_eq_memoryChannel_false, if_false]
-  simp only [toAccess_pushIf_memory]
+  -- W11 flip: the read-priors are now `pull`s (`toAccess_pullIf_memory`, mult `signedVal (-is_real)`), the
+  -- read-backs `push`es (`toAccess_pushIf_memory`, mult `signedVal is_real`) — matching `memoryReadLookups`.
+  simp only [toAccess_pushIf_memory, toAccess_pullIf_memory]
   simp [circuit_norm, signedVal_is_real hp2 h_real, signedVal_neg_is_real hp2 h_real,
-    memoryLookups, rowClkLow, h_ir, h_ch, h_cl, h_oa, h_ob, h_immb, h_oc, h_imm, sub_zero, mul_one,
-    h_wv0, h_wv1, h_wv2, h_wv3,
+    memoryReadLookups, rowClkLow, h_ir, h_ch, h_cl, h_oa, h_ob, h_oc,
     h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3, h_pl_b, h_pv_b0, h_pv_b1, h_pv_b2, h_pv_b3,
     h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3]
 
@@ -245,10 +285,11 @@ which carries no memory-access columns); they compose with the per-row register 
 load/store row's full Memory-bus contribution. The model itself needs no change — exactly the Phase-F
 claim that real-address read/write events plug into the existing offline memory. -/
 
-/-- The two signed Memory-bus contributions the `MemoryAccess` block emits at a **real 3-limb address**:
-a `send` of the prior word at the previous timestamp (`+is_real`) and a `receive` of `new_value` at the
-current timestamp `(clk_high, clk_low + 1)` (`−is_real`). Matches `Readers/MemoryAccess.lean:93-100`. On
-padding rows both vanish (`memAccessLookups_padding`). -/
+/-- The two signed Memory-bus contributions the `MemoryAccess` block emits at a **real 3-limb address**
+(W11 polarity flip): a `pull` of the prior word at the previous timestamp (`−is_real` — the chip *derives*
+`MemoryMsg.isU64 prev_value`) and a `push` of `new_value` at the current timestamp `(clk_high, clk_low + 1)`
+(`+is_real` — the chip *proves* `isU64 new_value`). Matches `Readers/MemoryAccess.lean:99-108`. On padding
+rows both vanish (`memAccessLookups_padding`). -/
 def memAccessLookups (mem : Extracted.MemoryAccessCols (ZMod p))
     (clk_high clk_low addr0 addr1 addr2 : ZMod p) (new_value : Word (ZMod p)) (is_real : ZMod p) :
     LookupAccessList :=
@@ -257,10 +298,10 @@ def memAccessLookups (mem : Extracted.MemoryAccessCols (ZMod p))
   [ (.Memory, "SP1Memory",
       [ts.prev_high.val, ts.prev_low.val, addr0.val, addr1.val, addr2.val,
         mem.prev_value[0].val, mem.prev_value[1].val, mem.prev_value[2].val,
-        mem.prev_value[3].val], ir),
+        mem.prev_value[3].val], - ir),
     (.Memory, "SP1Memory",
       [clk_high.val, (clk_low + 1).val, addr0.val, addr1.val, addr2.val,
-        new_value[0].val, new_value[1].val, new_value[2].val, new_value[3].val], -ir) ]
+        new_value[0].val, new_value[1].val, new_value[2].val, new_value[3].val], ir) ]
 
 /-- The single offline-memory event a memory access contributes at the **real** recombined 48-bit
 address (`addr0 + addr1·2^16 + addr2·2^32`), at the current timestamp `clk_low + 1`: value `new_value`
@@ -285,10 +326,9 @@ theorem memAccessLookups_padding [NeZero p] (mem : Extracted.MemoryAccessCols (Z
     (h : is_real = 0) :
     ∀ k, multiplicitySum
         (memAccessLookups mem clk_high clk_low addr0 addr1 addr2 new_value is_real) k = 0 := by
-  have hz : (is_real.val : ℤ) = 0 := by simp only [h, ZMod.val_zero, Nat.cast_zero]
   intro k
-  simp only [memAccessLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, hz, neg_zero,
-    ite_self, add_zero]
+  simp only [memAccessLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, h, ZMod.val_zero,
+    Nat.cast_zero, neg_zero, ite_self, add_zero]
 
 /-- **Projection = emission (memory access).** The real-address projection `memAccessLookups` equals the
 `Memory`-filtered, `toAccess`-imaged interactions the native `Readers/MemoryAccess` block emits — the
@@ -321,14 +361,15 @@ theorem memAccessLookups_eq_emitted (env : Environment (ZMod p)) (offset : ℕ)
       (((Readers.MemoryAccess.main input).operations offset).interactionsWith
           memoryChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   have hp2 : 2 < p := two_lt_p_aux
-  -- the three `=== 0` timestamp gates compile to `Gadgets.Equality.circuit id` subcircuits, which emit
+  -- the three `=== 0` timestamp gates compile to `Gadgets.Equality.circuit field` subcircuits, which emit
   -- nothing on `memoryChannel`; the two `byteChannel.pullIf`s are filtered by channel-distinctness.
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) memoryChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) memoryChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [Readers.MemoryAccess.main, circuit_norm, heq,
     SP1Clean.Channels.byteChannel_eq_memoryChannel_false, if_false]
-  simp only [toAccess_pushIf_memory]
+  simp only [toAccess_pushIf_memory, toAccess_pullIf_memory]
   simp [circuit_norm, signedVal_is_real hp2 h_real, signedVal_neg_is_real hp2 h_real,
     memAccessLookups, h_ir, h_ch, h_cl, h_a0, h_a1, h_a2, h_ph, h_pl,
     h_pv0, h_pv1, h_pv2, h_pv3, h_nv0, h_nv1, h_nv2, h_nv3]
@@ -380,23 +421,15 @@ structure TraceMemClkValid (rows : List (Trace.RowView (ZMod p))) : Prop where
 hypothesis the vendored closure (`isConsistentOnline_iff_isConsistentOffline`) requires. -/
 theorem memAccessList_isTimestampSorted (rows : List (Trace.RowView (ZMod p)))
     (h : TraceMemClkValid rows) : (memAccessList rows).isTimestampSorted := by
-  change List.Pairwise timestamp_ordering (rows.reverse.flatMap _)
-  rw [List.pairwise_flatMap]
-  refine ⟨?_, h.inter_row_sorted⟩
-  intro r hr
-  rw [List.mem_reverse] at hr
-  exact h.intra_row_sorted r hr
+  rw [MemoryAccessList.isTimestampSorted, memAccessList, List.pairwise_flatMap]
+  exact ⟨fun r hr => h.intra_row_sorted r (List.mem_reverse.mp hr), h.inter_row_sorted⟩
 
 /-- **No-duplicate-timestamps discharge.** Under `TraceMemClkValid`, the encoded access list has no
 repeated timestamps — the closure's second hypothesis. -/
 theorem memAccessList_Notimestampdup (rows : List (Trace.RowView (ZMod p)))
     (h : TraceMemClkValid rows) : (memAccessList rows).Notimestampdup := by
-  have h_sorted := memAccessList_isTimestampSorted rows h
-  change List.Pairwise MemoryAccessList.timestamps_neq _
-  apply List.Pairwise.imp ?_ h_sorted
-  intro x y hxy
-  obtain ⟨t2, _, _, _⟩ := x
-  obtain ⟨t1, _, _, _⟩ := y
+  refine List.Pairwise.imp ?_ (memAccessList_isTimestampSorted rows h)
+  rintro ⟨t2, _, _, _⟩ ⟨t1, _, _, _⟩ hxy
   simp only [timestamp_ordering] at hxy
   simp only [MemoryAccessList.timestamps_neq]
   omega
@@ -427,7 +460,7 @@ theorem rowMemEventsGated_sublist (r : Trace.RowView (ZMod p)) :
     repeat' first
       | exact List.Sublist.refl _
       | exact List.nil_sublist _
-      | apply List.Sublist.cons₂
+      | apply List.Sublist.cons_cons
       | apply List.Sublist.cons
 
 /-- Generic: a per-element sublist of the bodies lifts to a sublist of the `flatMap`s. -/
@@ -476,14 +509,14 @@ def eventsAt (rows : List (Trace.RowView (ZMod p))) (addr : ℕ) : List (MemEven
 (`∈ memEventsFiltered`). Shared by the single-address chain proof and the `isU64` recovery. -/
 theorem mem_memEventsFiltered_of_mem_eventsAt {rows : List (Trace.RowView (ZMod p))}
     {addr : ℕ} {e : MemEvent (ZMod p)} (he : e ∈ eventsAt rows addr) :
-    e ∈ memEventsFiltered rows := by
-  rw [eventsAt] at he; exact List.mem_of_mem_filter he
+    e ∈ memEventsFiltered rows :=
+  List.mem_of_mem_filter he
 
 /-- Membership in `eventsAt rows addr` pins the event's address (`.val`). -/
 theorem addr_of_mem_eventsAt {rows : List (Trace.RowView (ZMod p))}
     {addr : ℕ} {e : MemEvent (ZMod p)} (he : e ∈ eventsAt rows addr) :
     e.addr.val = addr := by
-  rw [eventsAt] at he; have := (List.mem_filter.mp he).2; simpa using this
+  simpa using (List.mem_filter.mp he).2
 
 /-- The vendored `filterAddress` of the filtered access list is `eventsAt` mapped through `toAccess` —
 the bridge that lets the per-address single-address proof work at the event level (where `prevTs` lives).
@@ -645,10 +678,7 @@ theorem mem_neg_entry_is_recv [NeZero p] (r : Trace.RowView (ZMod p)) (hwf : Mem
   · -- op_b receive
     simp only [multOf] at hneg
     have hisreal : r.is_real ≠ 0 := fun h0 => by simp [h0] at hneg
-    have himmb : r.adapter.imm_b = 0 := by
-      rcases hwfb with h | h
-      · exact h
-      · simp [h] at hneg
+    have himmb : r.adapter.imm_b = 0 := hwfb.resolve_right fun h => by simp [h] at hneg
     refine ⟨opBEvent r, ?_, ?_⟩
     · rw [rowMemEventsGated, if_neg hisreal, if_pos himmb]
       exact List.mem_cons.mpr (Or.inr (List.mem_append.mpr (Or.inl (List.mem_cons.mpr (Or.inl rfl)))))
@@ -658,10 +688,7 @@ theorem mem_neg_entry_is_recv [NeZero p] (r : Trace.RowView (ZMod p)) (hwf : Mem
   · -- op_c receive
     simp only [multOf] at hneg
     have hisreal : r.is_real ≠ 0 := fun h0 => by simp [h0] at hneg
-    have himmc : r.adapter.imm_c = 0 := by
-      rcases hwfc with h | h
-      · exact h
-      · simp [h] at hneg
+    have himmc : r.adapter.imm_c = 0 := hwfc.resolve_right fun h => by simp [h] at hneg
     refine ⟨opCEvent r, ?_, ?_⟩
     · rw [rowMemEventsGated, if_neg hisreal, if_pos himmc]
       exact List.mem_cons.mpr (Or.inr (List.mem_append.mpr (Or.inr (List.mem_cons.mpr (Or.inl rfl)))))
@@ -710,16 +737,14 @@ theorem isConsistentSingleAddress_of_chain :
     intro h_sorted h_adj h_gen
     cases rest with
     | nil =>
-      have hz : wordToNat e.prevValue = 0 := h_gen (by simp)
-      simpa [MemEvent.toAccess, MemoryAccessList.isConsistentSingleAddress] using hz
+      simpa [MemEvent.toAccess, MemoryAccessList.isConsistentSingleAddress] using h_gen (by simp)
     | cons e' rest' =>
-      have hR : wordToNat e.prevValue = wordToNat e'.value := (List.isChain_cons_cons.mp h_adj).1
       have hrec := ih (List.Pairwise.of_cons h_sorted) (List.isChain_cons_cons.mp h_adj).2 (by
         intro _
         have hg := h_gen (by simp)
         rwa [List.getLast_cons (by simp)] at hg)
       simp only [List.map_cons, MemoryAccessList.isConsistentSingleAddress, MemEvent.toAccess]
-      exact ⟨hR, hrec⟩
+      exact ⟨(List.isChain_cons_cons.mp h_adj).1, hrec⟩
 
 /-- **Timestamp injectivity of filtered events.** Two filtered events with equal low clock are equal
 (from `Notimestampdup`: the mapped access list has pairwise-distinct timestamps). The Memory analogue of
@@ -760,8 +785,7 @@ theorem getLast_clk_le {events : List (MemEvent (ZMod p))}
       (by rw [List.length_map]; omega) (by rw [List.length_map]; omega) (by omega)
     simp only [List.getElem_map, MemEvent.toAccess, timestamp_ordering] at hp
     rw [← hgi]; omega
-  · have hieq : i = events.length - 1 := by omega
-    subst hieq
+  · obtain rfl : i = events.length - 1 := by omega
     exact le_of_eq (by rw [← hgi])
 
 /-- **Provider-is-genesis (honest residual).** A `memProv` boundary entry sitting at an event's send key
@@ -785,10 +809,9 @@ theorem isConsistentSingleAddress_of_balance [NeZero p] (rows : List (Trace.RowV
     (h_bal : isConsistentBalanced (aggregateChipRows rows memoryLookups ++ memProv))
     (h_sorted : MemoryAccessList.isTimestampSorted ((eventsAt rows addr).map MemEvent.toAccess)) :
     MemoryAccessList.isConsistentSingleAddress ((eventsAt rows addr).map MemEvent.toAccess) h_sorted := by
-  have hsub : ∀ {e}, e ∈ eventsAt rows addr → e ∈ memEventsFiltered rows := by
-    intro e he; exact mem_memEventsFiltered_of_mem_eventsAt he
-  have haddr : ∀ {e}, e ∈ eventsAt rows addr → e.addr.val = addr := by
-    intro e he; exact addr_of_mem_eventsAt he
+  have hsub : ∀ {e}, e ∈ eventsAt rows addr → e ∈ memEventsFiltered rows :=
+    mem_memEventsFiltered_of_mem_eventsAt
+  have haddr : ∀ {e}, e ∈ eventsAt rows addr → e.addr.val = addr := addr_of_mem_eventsAt
   refine isConsistentSingleAddress_of_chain (eventsAt rows addr) h_sorted ?_ ?_
   · -- adjacency: each read equals the next (earlier) write
     rw [List.isChain_iff_getElem]

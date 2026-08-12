@@ -11,9 +11,12 @@ List (Interaction F)` (bus sends/receives) — mirroring Clean's own `Operations
 is **no** `SP1Constraints` wrapper struct: the two lists are independent functions, composed by plain
 `List.append` (`Sub0.asserts … ++ Sub1.asserts … ++ [own…]`).
 
-Byte sends keep their **load-bearing** per-row meaning (range / AND·OR·XOR via `ByteOpcode.constrain`,
-which lives in `Foundations/SP1Constraint.lean`); state/memory/program sends and all receives are
-per-row `True` (their meaning is the trace-level bus balance, `Foundations/InteractionBus.lean`). -/
+Byte sends preserve the upstream opcode as a **raw field element**. This matters for exact whole-AIR
+faithfulness: Rust's `send_byte` accepts an AIR expression, whereas Lean's generated
+`ByteOpcode.ofNat` maps every out-of-range value to `.Range`. The byte table gives a nonzero send
+its load-bearing per-row meaning by requiring that raw field element to be the index of some
+`ByteOpcode`; state/memory/program sends and all receives are per-row `True` (their meaning is the
+trace-level bus balance, `Model/InteractionBus.lean`). -/
 
 namespace SP1Clean.Extracted
 
@@ -31,15 +34,48 @@ extracted chip column operations (`CPUState`, `RTypeReader`); their arities matc
 `docs/architecture.md` — so `Interaction.toProp` maps them to `True` below; they are present so the
 extracted modules elaborate faithfully in structure. -/
 
+/-- Exact interaction-kind vocabulary of the pinned upstream machine.  The four established Clean
+channels retain their typed constructors below; system/precompile tables use `AirInteraction.raw`
+until their own typed channel adapters land.  Keeping the complete discriminator here prevents the
+extractor from silently dropping an unfamiliar interaction. -/
+inductive AirInteractionKind where
+  | memory
+  | program
+  | byte
+  | state
+  | syscall
+  | global
+  | shaExtend
+  | shaCompress
+  | keccak
+  | globalAccumulation
+  | memoryGlobalInitControl
+  | memoryGlobalFinalizeControl
+  | instructionFetch
+  | instructionDecode
+  | pageProt
+  | pageProtAccess
+  | pageProtGlobalInitControl
+  | pageProtGlobalFinalizeControl
+  deriving DecidableEq, Repr
+
 inductive AirInteraction (F : Type) where
-  | byte (op : ByteOpcode) (a b c : F)
+  /-- The exact upstream byte-bus tuple. In particular `opcode` is not decoded to `ByteOpcode`
+  here: decoding would lose adversarial field values before row constraints are checked. -/
+  | byte (opcode a b c : F)
   | state (a b c d e : F)
   | memory (a b c d e f g h i : F)
   | program (a b c : F) (op : Opcode) (d e f g h i j k l m n o : F)
+  /-- Arity-preserving fallback for an upstream bus that does not yet have a typed Clean channel.
+  Its semantics is still the exact cross-table multiset balance in the full AIR relation. -/
+  | raw (kind : AirInteractionKind) (values : List F)
   deriving DecidableEq
 
-inductive Dir | send | receive
-  deriving DecidableEq
+/-! `send`/`receive` are the upstream local-scope cases used by every interaction at the current
+pin.  Keeping separate global variants preserves the full upstream discriminator without changing
+the constructor shape of the already-audited local anchor lists. -/
+inductive Dir | send | receive | sendGlobal | receiveGlobal
+  deriving DecidableEq, Repr
 
 structure Interaction (F : Type) where
   dir : Dir
@@ -50,16 +86,18 @@ structure Interaction (F : Type) where
 namespace Interaction
 
 def toProp {p : ℕ} [NeZero p] : Interaction (ZMod p) → Prop
-  | ⟨.send, .byte op a b c, mult⟩ => mult ≠ 0 → op.constrain a b c
+  | ⟨.send, .byte opcode a b c, mult⟩ =>
+      mult ≠ 0 → ByteOpcode.constrainField opcode a b c
   | _ => True
 
 @[simp] lemma toProp_send_byte {p : ℕ} [NeZero p]
-    (op : ByteOpcode) (a b c mult : ZMod p) :
-    (⟨.send, .byte op a b c, mult⟩ : Interaction (ZMod p)).toProp ↔ (mult ≠ 0 → op.constrain a b c) :=
+    (opcode a b c mult : ZMod p) :
+    (⟨.send, .byte opcode a b c, mult⟩ : Interaction (ZMod p)).toProp ↔
+      (mult ≠ 0 → ByteOpcode.constrainField opcode a b c) :=
   Iff.rfl
 
 /-- A `receive` of any interaction has trivial per-row meaning — its semantics are the trace-level
-multiset balance (`Foundations/InteractionBus.lean`), not a row predicate. -/
+multiset balance (`Model/InteractionBus.lean`), not a row predicate. -/
 @[simp] lemma toProp_receive {p : ℕ} [NeZero p] (i : AirInteraction (ZMod p)) (mult : ZMod p) :
     (⟨.receive, i, mult⟩ : Interaction (ZMod p)).toProp ↔ True := Iff.rfl
 
@@ -79,6 +117,11 @@ the trace-level instruction-fetch membership, `Soundness/ProgramConsistency.lean
     (a b c : ZMod p) (op : Opcode) (d e f g h i j k l m n o mult : ZMod p) :
     (⟨.send, .program a b c op d e f g h i j k l m n o, mult⟩ : Interaction (ZMod p)).toProp ↔ True :=
   Iff.rfl
+
+/-- System-table interactions are interpreted globally, not as a local row predicate. -/
+@[simp] lemma toProp_send_raw {p : ℕ} [NeZero p]
+    (kind : AirInteractionKind) (values : List (ZMod p)) (mult : ZMod p) :
+    (⟨.send, .raw kind values, mult⟩ : Interaction (ZMod p)).toProp ↔ True := Iff.rfl
 
 end Interaction
 

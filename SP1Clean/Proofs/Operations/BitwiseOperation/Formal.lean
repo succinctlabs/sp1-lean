@@ -1,5 +1,6 @@
 import SP1Clean.Native.Operations.BitwiseOperation.RawSpec
 import SP1Clean.Native.Operations.BitwiseOperation.Populate
+import SP1Clean.Native.Operations.BitwiseOperation.Defs
 
 /-! # `BitwiseOperation` — the `FormalAssertion` (soundness / completeness / contract)
 
@@ -22,10 +23,9 @@ composing operation feed free byte columns without range-checking them itself. -
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   input.opcode.val < 3 ∧ (input.is_real = 0 ∨ input.is_real = 1)
 
-set_option maxHeartbeats 2000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨hopcode, _hbin⟩ := h_assumptions
+  obtain ⟨hopcode, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hir, _, _⟩ := h_input
   have ea : ∀ i (hi : i < 8), Expression.eval env input_var_a[i] = input_a[i] := by
     intro i hi; rw [← hia]; simp only [Vector.getElem_map]
@@ -35,37 +35,32 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       Expression.eval env input_var_cols_result[i] = input_cols_result[i] := by
     intro i hi; rw [← hir]; simp only [Vector.getElem_map]
   simp only [circuit_norm, byteChannel, ea, eb, er] at h_holds ⊢
-  obtain ⟨hg0, hg1, hg2, hg3, hg4, hg5, hg6, hg7⟩ := h_holds
-  -- post-#398 the byte receives owe no padding requirement, so the goal is exactly `Spec`.
-  intro h1
-  have hneg : -input_is_real = -1 := by rw [h1]
-  have R0 := hg0 hneg; have R1 := hg1 hneg; have R2 := hg2 hneg; have R3 := hg3 hneg
-  have R4 := hg4 hneg; have R5 := hg5 hneg; have R6 := hg6 hneg; have R7 := hg7 hneg
+  obtain ⟨hg0, hg1, hg2, hg3, hg4, hg5, hg6, hg7, _hbool⟩ := h_holds
+  -- The eight trailing conjuncts are the byte pulls' own `Requirements` — vacuous off-gate.
+  refine ⟨fun h1 => ?_, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0, fun h1 h0 => off_gate_vacuous hbin h1 h0,
+    fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
+  have hneg : - input_is_real = -1 := by rw [h1]
   -- The byte table guarantees each fired send's operands are bytes and `result = byteOp`.
   have H : ∀ i : Fin 8,
       (input_cols_result[(i : ℕ)].val < 256 ∧ input_a[(i : ℕ)].val < 256 ∧ input_b[(i : ℕ)].val < 256) ∧
         input_cols_result[(i : ℕ)].val
           = byteOp input_opcode.val input_a[(i : ℕ)].val input_b[(i : ℕ)].val := by
+    have B := fun {r a b : ZMod p} => (byteRowSpec_byteOp (p := p) r a b hopcode).mp
     intro i
     fin_cases i
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R0
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R1
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R2
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R3
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R4
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R5
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R6
-    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R7
+    exacts [B (hg0 hneg), B (hg1 hneg), B (hg2 hneg), B (hg3 hneg),
+      B (hg4 hneg), B (hg5 hneg), B (hg6 hneg), B (hg7 hneg)]
   exact ⟨fun i => ⟨(H i).1.2.1, (H i).1.2.2⟩,
     bitwise_of_byteOp (a := input_a) (b := input_b) (fun i => (H i).2)⟩
 
-set_option maxHeartbeats 2000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hopcode, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hir, _, _⟩ := h_input
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   have ea : ∀ i (hi : i < 8), Expression.eval env.toEnvironment input_var_a[i] = input_a[i] := by
     intro i hi; rw [← hia]; simp only [Vector.getElem_map]
   have eb : ∀ i (hi : i < 8), Expression.eval env.toEnvironment input_var_b[i] = input_b[i] := by
@@ -88,16 +83,11 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     exact (byteRowSpec_byteOp _ _ _ hopcode).mpr
       ⟨⟨by rw [hres]; exact byteOp_lt256 _ _ _ hb.1 hb.2, hb.1, hb.2⟩, hres⟩
   simp only [circuit_norm, byteChannel, ea, eb, er]
-  refine ⟨fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, fun hneg => ?_,
-    fun hneg => ?_, fun hneg => ?_, fun hneg => ?_, fun hneg => ?_⟩
-  · exact key (neg_inj.mp hneg) 0
-  · exact key (neg_inj.mp hneg) 1
-  · exact key (neg_inj.mp hneg) 2
-  · exact key (neg_inj.mp hneg) 3
-  · exact key (neg_inj.mp hneg) 4
-  · exact key (neg_inj.mp hneg) 5
-  · exact key (neg_inj.mp hneg) 6
-  · exact key (neg_inj.mp hneg) 7
+  refine ⟨fun hn => key (neg_inj.mp hn) 0, fun hn => key (neg_inj.mp hn) 1,
+    fun hn => key (neg_inj.mp hn) 2, fun hn => key (neg_inj.mp hn) 3,
+    fun hn => key (neg_inj.mp hn) 4, fun hn => key (neg_inj.mp hn) 5,
+    fun hn => key (neg_inj.mp hn) 6, fun hn => key (neg_inj.mp hn) 7, ?_⟩
+  rcases hbin with h | h <;> rw [h] <;> simp
 
 /-- The `BitwiseOperation` gadget as a Clean-native `FormalAssertion`: `is_real`- and opcode-gated
 semantic spec, byte-bus AND/OR/XOR pulls, witnessing nothing. -/
@@ -106,7 +96,10 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Assumptions := Assumptions,
     Spec := Spec,
     soundness := soundness,
-    completeness := completeness }
+    completeness := completeness,
+    channelsWithRequirements := [],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel]; grind }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

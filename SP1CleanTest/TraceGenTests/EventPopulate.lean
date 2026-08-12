@@ -29,7 +29,7 @@ checkout):
   copies the `op_c` Word into `op_c_memory.prev_value` and zeroes both timestamp columns; on
   register rows it populates the access block from the read record.
 
-Flattening order matches the `ProvableStruct` derivations field-for-field (`Specs/Chip.lean`
+Flattening order matches the `ProvableStruct` derivations field-for-field (`FormalModel/Contracts/Chips.lean`
 `Inputs` = `is_real ++ state ++ adapter`; `Extracted/CPUState.lean`; `Extracted/RTypeReader.lean`;
 `Extracted/ALUTypeReader.lean`), which in turn mirror SP1's `repr(C)` column structs. Everything is
 computable and axiom-clean. -/

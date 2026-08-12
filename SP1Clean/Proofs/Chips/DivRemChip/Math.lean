@@ -24,6 +24,14 @@ lemma toNat_lt_2_64 {w : Word (ZMod p)} (hw : w.isU64) : w.toNat < 2 ^ 64 := by
   obtain ⟨h0, h1, h2, h3⟩ := Word.lt_cases_of_isU64 hw
   rw [Word.toNat_def]; omega
 
+/-- Euclidean-division uniqueness over `ℕ`: `b = c·q + r` with `r < c` pins `q`/`r` to `b / c` and
+`b % c`. Shared by `divu_remu_spec` (on the `ℕ` operands) and `udiv_umod_bitvec` (on their
+`toNat`). -/
+private lemma div_mod_of_euclid {b c q r : ℕ} (hcpos : 0 < c) (hid : b = c * q + r) (hlt : r < c) :
+    q = b / c ∧ r = b % c :=
+  ⟨by rw [hid, Nat.mul_add_div hcpos, Nat.div_eq_of_lt hlt]; omega,
+   by rw [hid, Nat.mul_add_mod, Nat.mod_eq_of_lt hlt]⟩
+
 /-- **Unsigned divide/remainder core (over `ℕ`).** Given the Euclidean identity `b = c·q + r`, the
 remainder range `r < c` (when `c ≠ 0`), and SP1's divide-by-zero convention (`c = 0` forces the
 quotient to all-ones `2^64 - 1` and the remainder to `b`), the 64-bit quotient is `RV64.divu` and the
@@ -44,27 +52,14 @@ theorem divu_remu_spec {b c q r : ℕ}
   · subst hc0
     obtain ⟨hqv, hrv⟩ := hzero rfl
     rw [show BitVec.ofNat 64 0 = 0#64 from rfl, if_pos rfl]
-    refine ⟨by subst hqv; rfl, ?_⟩
     subst hrv
-    apply BitVec.eq_of_toNat_eq
-    simp [BitVec.umod, hbt, hct]
-  · have hcne : BitVec.ofNat 64 c ≠ 0#64 := by
-      intro h; apply hc0
-      have := congrArg BitVec.toNat h
-      rw [hct] at this; simpa using this
+    exact ⟨by subst hqv; rfl, BitVec.eq_of_toNat_eq (by simp [BitVec.umod, hbt, hct])⟩
+  · have hcne : BitVec.ofNat 64 c ≠ 0#64 := fun h => hc0 (by rw [← hct, h]; simp)
     rw [if_neg hcne]
-    have hcpos : 0 < c := Nat.pos_of_ne_zero hc0
-    have hqdiv : q = b / c := by
-      rw [hid, Nat.mul_add_div hcpos, Nat.div_eq_of_lt (hlt hc0)]; omega
-    have hrmod : r = b % c := by
-      rw [hid, Nat.mul_add_mod, Nat.mod_eq_of_lt (hlt hc0)]
-    refine ⟨?_, ?_⟩
-    · apply BitVec.eq_of_toNat_eq
-      rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hq, hqdiv]
-      simp [BitVec.udiv, hbt, hct]
-    · apply BitVec.eq_of_toNat_eq
-      rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hr, hrmod]
-      simp [BitVec.umod, hbt, hct]
+    obtain ⟨hqdiv, hrmod⟩ := div_mod_of_euclid (Nat.pos_of_ne_zero hc0) hid (hlt hc0)
+    refine ⟨BitVec.eq_of_toNat_eq ?_, BitVec.eq_of_toNat_eq ?_⟩
+    · rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hq, hqdiv]; simp [BitVec.udiv, hbt, hct]
+    · rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hr, hrmod]; simp [BitVec.umod, hbt, hct]
 
 /-- **Unsigned divide/remainder core (over `Word`).** The `divu_remu_spec` bridge phrased on the chip's
 `Word` columns: the quotient column's `toBitVec64` is `RV64.divu` and the remainder column's is
@@ -137,6 +132,13 @@ theorem div_rem_divzero {b c quotient remainder : BitVec 64}
   subst hc hq hr
   exact ⟨by unfold RV64.div; rw [if_pos rfl], by unfold RV64.rem; rw [BitVec.srem_zero]⟩
 
+/-- `-1` divides everything, so a signed remainder by `-1` is `0`. The width hypothesis
+`(-1#w).toInt = -1` is `by decide` at each concrete width. Shared by the 64-bit and 32-bit
+signed-overflow arms. -/
+private lemma srem_neg_one_eq_zero {w : ℕ} (h : (-1#w : BitVec w).toInt = -1) (x : BitVec w) :
+    x.srem (-1#w) = 0#w :=
+  BitVec.srem_zero_of_dvd (by rw [h]; exact neg_dvd.mpr (one_dvd _))
+
 /-- **Signed overflow** (`b = i64::MIN`, `c = -1`). SP1's `is_overflow` branch forces the quotient to
 the dividend and the remainder to `0`; that matches `RV64.div` (`i64::MIN.sdiv (-1) = i64::MIN`) and
 `RV64.rem` (`-1` divides everything, so the remainder is `0`). -/
@@ -146,9 +148,7 @@ theorem div_rem_overflow {b c quotient remainder : BitVec 64}
   subst hc hq hr hb
   refine ⟨by unfold RV64.div; rw [if_neg (by decide), BitVec.intMin_sdiv_neg_one], ?_⟩
   unfold RV64.rem
-  refine (BitVec.srem_zero_of_dvd ?_).symm
-  rw [show ((-1#64 : BitVec 64)).toInt = -1 from by decide]
-  exact neg_dvd.mpr (one_dvd _)
+  exact (srem_neg_one_eq_zero (by decide) _).symm
 
 /-! ## Word variants `DIVW`/`REMW`/`DIVUW`/`REMUW`
 
@@ -177,11 +177,7 @@ theorem udiv_umod_bitvec {w : ℕ} {b c q r : BitVec w}
     · rw [hrv, hc0]; simp [BitVec.umod]
   · have hcz : c.toNat ≠ 0 := fun h => hc0 (BitVec.eq_of_toNat_eq (by rw [h]; simp))
     rw [if_neg hc0]
-    have hcpos : 0 < c.toNat := Nat.pos_of_ne_zero hcz
-    have hqdiv : q.toNat = b.toNat / c.toNat := by
-      rw [hid, Nat.mul_add_div hcpos, Nat.div_eq_of_lt (hlt hcz)]; omega
-    have hrmod : r.toNat = b.toNat % c.toNat := by
-      rw [hid, Nat.mul_add_mod, Nat.mod_eq_of_lt (hlt hcz)]
+    obtain ⟨hqdiv, hrmod⟩ := div_mod_of_euclid (Nat.pos_of_ne_zero hcz) hid (hlt hcz)
     exact ⟨BitVec.eq_of_toNat_eq (by rw [hqdiv]; simp [BitVec.udiv]),
            BitVec.eq_of_toNat_eq (by rw [hrmod]; simp [BitVec.umod])⟩
 
@@ -228,10 +224,7 @@ theorem divw_remw_overflow {b c : BitVec 64} {q32 r32 : BitVec 32}
     (hq : q32 = BitVec.extractLsb 31 0 b) (hr : r32 = 0#32) :
     BitVec.signExtend 64 q32 = RV64.divw c b ∧ BitVec.signExtend 64 r32 = RV64.remw c b := by
   subst hq hr
-  refine ⟨?_, ?_⟩
-  · simp only [RV64.divw]; rw [hb, hc, if_neg (by decide), BitVec.intMin_sdiv_neg_one]
-  · simp only [RV64.remw]; rw [hc]
-    refine congrArg _ (BitVec.srem_zero_of_dvd ?_).symm
-    rw [show ((-1#32 : BitVec 32)).toInt = -1 from by decide]; exact neg_dvd.mpr (one_dvd _)
+  exact ⟨by simp only [RV64.divw]; rw [hb, hc, if_neg (by decide), BitVec.intMin_sdiv_neg_one],
+         by simp only [RV64.remw]; rw [hc, srem_neg_one_eq_zero (by decide)]⟩
 
 end SP1Clean.DivRemChip

@@ -1,0 +1,52 @@
+import SP1Clean.Math.Word
+import SP1Clean.Model.Channels
+import SP1Clean.Model.ByteTable
+import SP1Clean.FormalModel.Contracts.Operations
+import Clean.Circuit.Basic
+import Clean.Circuit.Subcircuit
+import Clean.Circuit.Channel
+import Clean.Gadgets.Equality
+import Clean.Utils.Tactics.ProvableStructDeriving
+
+/-! # `U16MSBOperation` native circuit
+
+The proof-oriented Clean implementation. Rust extraction supplies only the independent row,
+assertion-list, and interaction-list anchors used at whole-chip faithfulness boundaries. -/
+
+namespace SP1Clean.U16MSBOperation
+
+open Circuit
+open SP1Clean.Channels (byteChannel)
+open SP1Clean.Extracted
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  let a := input.a
+  let cols := input.cols
+  let is_real := input.is_real
+  let E0 := is_real - 1
+  let E1 := is_real * E0
+  let E2 := cols.msb - 1
+  let E3 := cols.msb * E2
+  let E4 := 2 * a
+  let E5 := cols.msb * 65536
+  let E6 := E4 - E5
+  byteChannel.pullIf is_real (⟨6, E6, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  assertZero E1
+  E3 === 0
+
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main := by
+  elaborate_circuit_with {
+    channelsWithGuarantees := [byteChannel.toRaw]
+  }
+
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma channelsWithGuarantees_eq :
+    ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
+      = [byteChannel.toRaw] := rfl
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
+    (elaborated (p := p)).localLength x = 0 := rfl
+
+end SP1Clean.U16MSBOperation

@@ -1,11 +1,11 @@
 import SP1Clean.Math.Word
-import SP1Clean.Extracted.AddwOperation
+import SP1Clean.FormalModel.Contracts.Operations
 
 /-! # `AddwOperation` — `populate` (the witness generator)
 
 SP1's `AddwOperation::populate` ported natively: the low two u16 limbs of `(a+b) mod 2^32`
 (`addwValueWitness`) and bit 15 of the high result limb (`addwMsbWitness`, via the nested
-`U16MSBOperation::populate_msb`), packaged into the `Extracted.AddwOperation` column struct. The
+`U16MSBOperation::populate_msb`), packaged into the native `Columns` struct. The
 composing `AddwChip` witnesses the columns with this. `spec_populate` lives in `Formal` (it references
 `Spec`, which — to avoid an import cycle through the composed `U16MSBOperation.Formal` — also lives in
 `Formal`). Only `a[0..1]`/`b[0..1]` are read; the high limbs are ignored, matching ADDW. -/
@@ -28,7 +28,7 @@ def addwMsbWitness (a b : Word (ZMod p)) : ZMod p :=
 
 /-- The witnessed column struct: the two low result limbs `value` and the sign bit `msb`. The
 composing `AddwChip` witnesses the columns with this. -/
-def populate (a b : Word (ZMod p)) : Extracted.AddwOperation (ZMod p) :=
+def populate (a b : Word (ZMod p)) : Columns (ZMod p) :=
   ⟨addwValueWitness a b, ⟨addwMsbWitness a b⟩⟩
 
 end SP1Clean.AddwOperation

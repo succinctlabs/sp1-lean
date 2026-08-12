@@ -1,6 +1,5 @@
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.Math.Word
-import SP1Clean.Extracted.AddwOperation
 import Mathlib.Tactic.LinearCombination
 import Mathlib.Tactic.IntervalCases
 
@@ -16,16 +15,15 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The carry-bool + low-limb-range form of the two-limb add chain, against the witnessed
 low limbs `cols.value[0]`, `cols.value[1]`. -/
-def RawSpec (a b : Word (ZMod p)) (cols : Extracted.AddwOperation (ZMod p)) : Prop :=
+def RawSpec (a b : Word (ZMod p)) (cols : Columns (ZMod p)) : Prop :=
   let c0 : ZMod p := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
   let c1 : ZMod p := (a[1] + b[1] - cols.value[1] + c0) * 65536⁻¹
   (c0 = 0 ∨ c0 = 1) ∧ (c1 = 0 ∨ c1 = 1) ∧
   cols.value[0].val < 65536 ∧ cols.value[1].val < 65536
 
-set_option maxHeartbeats 16000000 in
 /-- Forward (soundness) core: the two-limb carry chain + the sign bit imply the reconstructed
 result is a 64-bit value equal to the sign extension of the low-32 add. -/
-theorem addwSemantics_of_carries {a b : Word (ZMod p)} {cols : Extracted.AddwOperation (ZMod p)}
+theorem addwSemantics_of_carries {a b : Word (ZMod p)} {cols : Columns (ZMod p)}
     (ha : a.isU64) (hb : b.isU64) (h_raw : RawSpec a b cols)
     (h_msb : cols.msb.msb = if cols.value[1].val ≥ 32768 then 1 else 0) :
     (resultWord cols).isU64 ∧
@@ -34,7 +32,6 @@ theorem addwSemantics_of_carries {a b : Word (ZMod p)} {cols : Extracted.AddwOpe
   obtain ⟨hc0, hc1, hv0, hv1⟩ := h_raw
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   set c0 : ZMod p := (a[0] + b[0] - cols.value[0]) * (65536 : ZMod p)⁻¹ with hc0_def
@@ -63,18 +60,16 @@ theorem addwSemantics_of_carries {a b : Word (ZMod p)} {cols : Extracted.AddwOpe
     (BitVec.setWidth 32 (Word.toBitVec64 a + Word.toBitVec64 b)) cols.msb.msb
     hv0 hv1 h_msb rfl rfl hX
 
-set_option maxHeartbeats 16000000 in
 /-- Backward (completeness) core — the converse of `addwSemantics_of_carries`: a 64-bit value equal to
 the sign extension of the low-32 add witnesses the unique boolean carry chain + ranges **and** the sign
 bit. Needed because `AddwOperation` is a `FormalAssertion` (its completeness must reconstruct the U16MSB
 sub-assertion's `Spec` from the semantic add Spec). -/
-theorem carries_of_addwSemantics {a b : Word (ZMod p)} {cols : Extracted.AddwOperation (ZMod p)}
+theorem carries_of_addwSemantics {a b : Word (ZMod p)} {cols : Columns (ZMod p)}
     (ha : a.isU64) (hb : b.isU64)
     (hU : (resultWord cols).isU64)
     (hbv : Word.toBitVec64 (resultWord cols)
       = (BitVec.setWidth 32 (Word.toBitVec64 a + Word.toBitVec64 b)).signExtend 64) :
     RawSpec a b cols ∧ cols.msb.msb = if cols.value[1].val ≥ 32768 then 1 else 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
   obtain ⟨hv0, hv1, hm2, _⟩ := Word.lt_cases_of_isU64 hU

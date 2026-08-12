@@ -13,7 +13,7 @@ interactions (`Extracted/CPUState.lean`):
 - `send (.state clk_high (clk_low + clk_inc) next_pc) is_real`.
 
 Each row projects to a signed pair of `LookupAccess` contributions (`stateLookups`, receive negative /
-send positive, both `is_real`-gated) feeding `Foundations/InteractionBus.lean`, and to a `StateAccess`
+send positive, both `is_real`-gated) feeding `Model/InteractionBus.lean`, and to a `StateAccess`
 record whose adjacent-pair consistency is the **PC chain** `pcChainProp` (`a.next_pc = b.pc`, clock
 advances by the row's `clk_inc` — 8 for every current chip).
 
@@ -21,9 +21,9 @@ advances by the row's `clk_inc` — 8 for every current chip).
 
 `pcChainProp`, the projections, the aggregator, `aggregateStateAccesses_pcChain`, and the padding-row
 gating witness `stateLookups_padding` are proven. The link
-**multiset-balance ⟹ `pcChainProp`** needs whole-trace clock-injectivity reasoning and is threaded as
-`TraceStateLink`: an honest assumption, not a `sorry`/axiom; deriving it natively is the marked next
-step. -/
+**multiset-balance ⟹ `pcChainProp`** is likewise proven: `pcChain_of_balance_and_clkInj` below
+discharges the named `TraceStateLink` interface predicate from the balanced State bus + clock
+injectivity + the clock-advance side condition — it is no longer a threaded assumption. -/
 
 namespace SP1Clean.Soundness
 
@@ -125,16 +125,13 @@ theorem traceStateValid_of_stateLink (rows : List (Trace.RowView (ZMod p)))
 its signed contributions have multiplicity 0. The emission is genuinely `is_real`-gated, matching SP1's
 `send/receive … is_real`. -/
 theorem stateLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_real = 0) :
-    ∀ k, multiplicitySum (stateLookups r) k = 0 := by
-  have hz : ((stateAccess r).is_real.val : ℤ) = 0 := by
-    simp only [stateAccess, h, ZMod.val_zero, Nat.cast_zero]
-  intro k
-  simp only [stateLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, hz, neg_zero,
-    ite_self, add_zero]
+    ∀ k, multiplicitySum (stateLookups r) k = 0 := fun _ => by
+  simp only [stateLookups, stateAccess, multiplicitySum_cons, multiplicitySum_nil, multOf, h,
+    ZMod.val_zero, Nat.cast_zero, neg_zero, ite_self, add_zero]
 
 /-- **Gated multiplicities are `{-1, 0, 1}`.** For a binary `is_real` row, both `stateLookups`
 contributions carry multiplicity `±is_real.val ∈ {-1, 0, 1}` — the multiplicity bound the field → ℤ
-balance translation (`isConsistentBalanced_of_intCast_zero`, `GatedVm/BalanceMod.lean`) consumes. -/
+balance translation (`isConsistentBalanced_of_intCast_zero`, `Model/BalanceBridge.lean`) consumes. -/
 theorem stateLookups_mult_binary (hp : 2 < p) (r : Trace.RowView (ZMod p))
     (h_real : r.is_real = 0 ∨ r.is_real = 1) :
     ∀ a ∈ stateLookups r, multOf a = -1 ∨ multOf a = 0 ∨ multOf a = 1 := by
@@ -188,10 +185,8 @@ theorem state_successor_of_balance [NeZero p]
     refine ⟨hbne, ZMod.val_injective p hch, ZMod.val_injective p hcl, ?_⟩
     apply Vector.ext; intro i hi
     rcases i with _ | _ | _ | i
-    · exact ZMod.val_injective p hp0
-    · exact ZMod.val_injective p hp1
-    · exact ZMod.val_injective p hp2
-    · exact absurd hi (by omega)
+    exacts [ZMod.val_injective p hp0, ZMod.val_injective p hp1, ZMod.val_injective p hp2,
+      absurd hi (by omega)]
   · -- the send of `b`: its multiplicity is `+is_real.val ≥ 0`, contradicting `multOf bacc < 0`
     simp only [multOf] at hbacc_neg
     exact absurd hbacc_neg (not_lt.mpr (by positivity))
@@ -261,8 +256,7 @@ theorem clkInjective_getElem {rows : List (Trace.RowView (ZMod p))}
     (h_clk : (stateAccess rows[i]).clk_high * (2 ^ 24 : ZMod p) + (stateAccess rows[i]).clk_low =
         (stateAccess rows[j]).clk_high * (2 ^ 24 : ZMod p) + (stateAccess rows[j]).clk_low) :
     i = j := by
-  have hlen : (aggregateStateAccesses rows).length = rows.length := by
-    simp [aggregateStateAccesses]
+  have hlen : (aggregateStateAccesses rows).length = rows.length := by simp [aggregateStateAccesses]
   have key := h_inj ⟨i, by rw [hlen]; exact hi⟩ ⟨j, by rw [hlen]; exact hj⟩
   simp only [aggregateStateAccesses, List.get_eq_getElem, List.getElem_map] at key
   exact congrArg Fin.val (key h_clk)
@@ -294,8 +288,7 @@ theorem state_adjacent_pc_handoff [NeZero p]
   have h_eq : (stateAccess b').clk_high * (2 ^ 24 : ZMod p) + (stateAccess b').clk_low =
       (stateAccess (rows[i + 1]'hi1)).clk_high * (2 ^ 24 : ZMod p) +
         (stateAccess (rows[i + 1]'hi1)).clk_low := by
-    have hch : (stateAccess b').clk_high = (stateAccess (rows[i]'hi)).clk_high := by
-      simp only [stateAccess]; exact hb'_ch
+    have hch : (stateAccess b').clk_high = (stateAccess (rows[i]'hi)).clk_high := hb'_ch
     rw [hch, hb'_cl, ← h_clkadv, add_assoc]
   -- pin b' to the adjacent row index
   obtain ⟨k, hk, hk_eq⟩ := List.getElem_of_mem hb'_mem
@@ -365,15 +358,8 @@ theorem stateLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
   -- `byteChannel.toRaw ≠ stateChannel.toRaw` distinctness lemma filters out the byte pulls).
   simp only [Readers.CPUState.main, circuit_norm,
     Channels.byteChannel_eq_stateChannel_false, if_false]
-  -- `hk` is the gated kernel `toAccess_pushIf_state`; it `rw`s against the recovered interactions.
-  have hk : ∀ (m : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pushIf (channel := stateChannel) m s).toRaw) =
-        (InteractionKind.State, "SP1State",
-          [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
-           (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
-           (Expression.eval env s.pc2).val], signedVal (Expression.eval env m)) :=
-    fun m s => toAccess_pushIf_state env m s
-  simp only [hk]
+  -- Project the recovered State pull/push directly into trace-level accesses.
+  simp only [toAccess_pushIf_state, toAccess_pullIf_state]
   -- `cols`/`next_pc`/`clk_inc` are reader *inputs*; their evals are pinned by the binding hypotheses
   -- (`h_*`/`h_np*`/`h_clk`); `circuit_norm` distributes `eval` over the `clk_low` sum (+ `clk_inc`).
   simp only [circuit_norm, stateLookups, stateAccess, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2,
@@ -381,6 +367,8 @@ theorem stateLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
   -- only the multiplicities differ: `signedVal (∓eval is_real)` vs `∓is_real.val`. `h_ir` ties the eval to
   -- `r.is_real`; the `signedVal` lemmas evaluate the centered representative on the gate.
   have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  rw [h_ir, signedVal_neg_is_real hp2 h_real, signedVal_is_real hp2 h_real]
+  have h_ir' : (ProvableStruct.eval env input_var).is_real = r.is_real := by
+    simpa only [circuit_norm] using h_ir
+  rw [h_ir', signedVal_neg_is_real hp2 h_real, signedVal_is_real hp2 h_real]
 
 end SP1Clean.Soundness

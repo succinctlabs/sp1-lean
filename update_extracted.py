@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
 
-"""Regenerate `SP1Clean/Extracted/<Operation>.lean` and `…/<Chip>Chip.lean` from the
-upstream sp1-constraint-compiler — with **auto-derived** sub-struct reuse.
+"""Regenerate whole-chip Rust AIR oracles and transitional helper modules from the upstream
+`sp1-constraint-compiler`.
 
-Adapted from sp1-lean's `update_constraints.py`. The upstream compiler emits field-generic,
-clean-native-ready Lean directly — both the operation/chip **column struct** and the
-**`constraints` def** (`{F : Type} [Field F] [CoeHead F ℕ]`, `Word F`, `SP1ConstraintList F`,
-`.send (.byte (ByteOpcode.ofNat n) …) mult`). This script runs the compiler, sandwiches its
-output between a fixed clean-native header (imports + `namespace SP1Clean.Extracted` +
-`open SP1Clean`) and footer, and writes the whole file.
+Adapted from sp1-lean's `update_constraints.py`. The upstream compiler emits field-generic Lean
+directly: an operation/table **column struct** plus ordered **`asserts` and `interactions` lists**
+(`{F : Type} [Field F] [CoeHead F ℕ]`). This script runs the compiler, sandwiches its output
+between a fixed header/footer, and writes the whole file. It never emits an executable Clean
+`Circuit`; native circuits are deliberately hand-maintained proof objects under `Native/`.
+
+The stable target is `Extracted/ChipOracle/<Chip>.lean`: one chip-specific namespace containing the
+complete Rust row shape, helper definitions used by the emitted expression, `asserts`, and
+`interactions`. Canonical reader structs are reused from their generated modules; chip-private
+arithmetic structs/functions remain namespaced inside that chip oracle and are not public
+operation-level faithfulness boundaries. All 25 supported chips are migrated to this form;
+`OPERATIONS` and `WITNESS_OPERATIONS` persist as deliberate shared substrate (canonical reader
+modules + statement targets that multiple chip anchors reference). Native Clean circuits are
+hand-maintained under `Native/`; this generator deliberately emits no circuit implementation.
 
 **Why auto-derive?** Each `Extracted/` file must own exactly one column struct; a module that
 composes sub-operations imports their already-generated modules (`--reuse-struct <Name>`)
@@ -21,16 +29,16 @@ instead of re-emitting them. Rather than hand-maintain a per-entry reuse list, t
      are passed as `--reuse-struct` and their owners are imported. The compiler re-runs and the
      file is written.
 
-So **adding a chip is one line** in `CHIPS` (and any new sub-ops in `OPERATIONS`); the reuse
-wiring is computed. The shared `SP1Constraint`/`ByteOpcode`/`Opcode` datatype lives in
-`SP1Clean/Foundations/SP1Constraint.lean` (already models every emitted opcode +
-interaction); the faithfulness anchors that tie each generated `constraints` to the native
-gadget's spec live in `SP1Clean/Faithful/`.
+The shared interaction vocabulary lives in `SP1Clean/Extracted/ExtractionDSL.lean`; whole-chip
+faithfulness anchors live in `SP1Clean/Faithful/`.
 
-Usage: `SP1_DIR=/path/to/sp1 python3 update_extracted.py`
-(default `SP1_DIR` is `../sp1`, a sibling checkout of the sp1 repo).
+Usage: `SP1_DIR=/path/to/audited-extractor-overlay python3 update_extracted.py`.
+`SP1_DIR` must be the pinned extraction-only overlay; its merge base is the unmodified semantic SP1
+revision recorded below.  The ordinary sibling `../sp1` may remain checked out at that semantic
+revision and is never modified by this script.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -57,16 +65,16 @@ OPERATIONS: List[str] = [
     "LtOperationUnsigned", "LtOperationSigned",
 ]
 
-# Operation modules with a witness-vector dumper in the `witness_vectors` binary → an extra
-# `WitnessTests/<name>WitnessVectors.lean` (conformance vectors from SP1's real `populate`) plus a
-# `WitnessTests/<name>Witness.lean` anchor (hand-written). An op here MUST also be in `OPERATIONS`.
-# Tying `populate` is a *completeness/conformance* property: it cannot be symbolically extracted
-# like `eval` (native imperative code, data-dependent control flow), so we dump real-`populate`
-# outputs on a fixed input battery and `#guard` the Lean witness reproduces them. Grow as the
-# binary's per-op dispatch grows (Add first, then Sub/Bitwise, then Mul/Lt).
+# Stable recognition set used when `EXTRACT_ONLY` narrows the modules regenerated in one run. A
+# selected system table may still call a previously generated helper that is not itself being
+# rewritten in that run.
+KNOWN_OPERATIONS = frozenset(OPERATIONS)
+
+# Operation-level witness batteries. New conformance coverage belongs in `TRACE_CHIPS`, which
+# compares complete rows produced by the chip circuit with Rust `generate_trace`; the entries here
+# back the remaining operation-level `WitnessTests` anchors (shared substrate — shrink only when an
+# anchor is actually retired). An op here MUST also be in `OPERATIONS`.
 WITNESS_OPERATIONS: List[str] = [
-    "AddOperation",
-    "SubOperation",
     "LtOperationUnsigned",
     "IsZeroOperation",
     "IsZeroWordOperation",
@@ -85,8 +93,6 @@ WITNESS_OPERATIONS: List[str] = [
 # (JSON array → `Vector ℕ <len>`) or a bare `ℕ` (JSON int — e.g. a field-inverse column). Keys like
 # `inputs`/`output`/`events` are intentionally omitted (not part of the witness conformance check).
 WITNESS_SCHEMA: Dict[str, List[str]] = {
-    "AddOperation": ["a_limbs", "b_limbs", "value"],
-    "SubOperation": ["a_limbs", "b_limbs", "value"],
     "LtOperationUnsigned": ["b_limbs", "cc_limbs", "comparison_limbs", "u16_flags", "not_eq_inv"],
     "IsZeroOperation": ["a_field", "inverse", "result"],
     "IsZeroWordOperation": ["a_limbs", "inv", "lresult", "first_half", "second_half", "result"],
@@ -154,41 +160,6 @@ TRACE_EVENT_TYPES: Dict[str, Tuple[str, str]] = {
     "ALUTypeOp": ("AluTypeOpEventRec", "ALUTypeRecord"),
 }
 
-# Operation modules emitted ALSO as the Clean-native **circuit form** (`Inputs` + `main` +
-# `ElaboratedCircuit`) → an extra `Extracted/<name>Circuit.lean`. Only pure-assertion, byte-bus
-# **leaf** operations (Rust `eval` returns `Shape::Unit`, composes no sub-ops) qualify: the emitted
-# `main` IS the extracted artifact, so the gadget's soundness/completeness are faithful **by
-# construction** (no separate `asserts`/`interactions` bridge — the bridge stays only as a helper for
-# the not-yet-migrated chip-level faithfulness). An op here MUST also be in `OPERATIONS`. Grow as
-# more byte-bus leaves migrate.
-CIRCUIT_OPERATIONS: List[str] = [
-    "AddOperation",
-    "SubOperation",
-    "U16CompareOperation",
-    "U16MSBOperation",
-    "BitwiseOperation",
-    # Composition chain (`IsEqualWord` composes `IsZeroWord` composes `IsZeroOperation`): each emits
-    # `assertion <sub>.circuit ⟨…⟩` for its sub-operation (the first composed circuit-form ops).
-    "IsZeroOperation",
-    "IsZeroWordOperation",
-    "IsEqualWordOperation",
-    # Word add/sub W-variants: each composes `U16MSBOperation.circuit` (`assertion`) on the high result
-    # limb + two byte-bus range pulls + two gated carries (same composed circuit-form as the chain above).
-    "AddwOperation",
-    "SubwOperation",
-    # 48-bit (3-limb) address add: `Add`-shaped but the high carry runs against `0` and only the three
-    # low limbs are byte-bus range-pulled (the result keeps 48 bits).
-    "AddrAddOperation",
-    # Unsigned word less-than: composes `U16CompareOperation.circuit` (`assertion`) on the
-    # most-significant differing limb pair; the flag/limb-selection constraints carry no byte pulls of
-    # their own (all byte-bus activity lives inside the composed `U16CompareOperation`).
-    "LtOperationUnsigned",
-    # Signed/unsigned word less-than: composes two `U16MSBOperation.circuit` (`assertion`, gated by
-    # `is_signed`) on the high limbs + one `LtOperationUnsigned.circuit` (`assertion`, free `is_real`) on
-    # the sign-adjusted words; the own tail is the five selector/gate asserts, no byte pulls of its own.
-    "LtOperationSigned",
-]
-
 # Chip modules → `Extracted/<chip>Chip.lean` (column struct `<chip>Cols` + composed constraints).
 CHIPS: List[str] = [
     "Add", "Addi", "Addw", "Sub", "Subw", "Bitwise", "Lt", "Mul", "DivRem", "AluX0",
@@ -196,6 +167,71 @@ CHIPS: List[str] = [
     "LoadByte", "LoadHalf", "LoadWord", "LoadDouble", "LoadX0",
     "StoreByte", "StoreHalf", "StoreWord", "StoreDouble",
 ]
+
+# Non-instruction tables in the two pinned trusted Core clusters. These are extracted as exact flat
+# rows under `Extracted/SystemOracle/`: unlike proof-oriented native gadgets, the flat row is merely
+# a faithful name for every upstream column index and carries no claimed semantic decomposition.
+SYSTEM_TABLES: List[str] = [
+    "Program", "Byte", "Range", "SyscallCore", "SyscallInstrs", "MemoryBump",
+    "StateBump", "MemoryLocal", "Global", "MemoryGlobalInit", "MemoryGlobalFinalize",
+]
+
+# Exact trusted clusters selected for the current theorem.  These names are checked against the
+# manifest emitted by `RiscvAir::machine()` on every regeneration; they are not inferred from the
+# Python extraction registry, which would allow two stale lists to agree with each other.
+BASELINE_CORE_CLUSTER: Tuple[str, ...] = (
+    "Program", "Byte", "Range", "SyscallCore", "DivRem", "Add", "Addi", "Addw",
+    "Sub", "Subw", "Bitwise", "Mul", "ShiftRight", "ShiftLeft", "Lt", "AluX0",
+    "LoadByte", "LoadHalf", "LoadWord", "LoadDouble", "LoadX0", "StoreByte",
+    "StoreHalf", "StoreWord", "StoreDouble", "UType", "Branch", "Jal", "Jalr",
+    "SyscallInstrs", "MemoryBump", "StateBump", "MemoryLocal", "Global",
+)
+MEMORY_BOUNDARY_CLUSTER: Tuple[str, ...] = (
+    "Program", "Byte", "Range", "MemoryGlobalInit", "MemoryGlobalFinalize", "Global",
+)
+
+# Chips with a chip-namespaced oracle under `Extracted/ChipOracle/<Chip>.lean`. Canonical
+# reader structs and their generated `asserts`/`interactions` functions are reused, while
+# chip-private arithmetic structs and functions stay in the oracle.
+# The 2026-07 migration is complete: every entry of `CHIPS` is here, and no legacy
+# `Extracted/<Chip>Chip.lean` files remain (a `CHIPS` entry missing from this set fails the run).
+CHIP_ORACLES: Set[str] = {
+    "Add", "Sub", "Subw", "Mul", "DivRem", "Addi", "Jalr", "Jal", "UType", "Addw",
+    "Bitwise", "Lt", "ShiftLeft", "ShiftRight", "AluX0", "Branch", "LoadByte", "LoadHalf",
+    "LoadWord", "LoadDouble", "LoadX0", "StoreByte", "StoreHalf", "StoreWord",
+    "StoreDouble",
+}
+
+# Stable generated reader substrate shared by native chip rows and whole-chip Rust oracles. Reusing
+# these types avoids creating a fresh CPU/register-reader hierarchy per oracle while keeping Rust
+# arithmetic operation structs chip-private. Extend this set when a new canonical reader lands.
+CHIP_ORACLE_SHARED_STRUCTS: Set[str] = {
+    "CPUState", "RTypeReader", "ITypeReader", "JTypeReader", "ALUTypeReader",
+    "RegisterAccessCols", "RegisterAccessTimestamp",
+    # The memory-access blocks nested in every load/store row, owned by the `MemoryAccess`
+    # struct-carrier module (see `STRUCT_CARRIERS`).
+    "MemoryAccessCols", "MemoryAccessTimestamp",
+    # `ITypeReaderImmutable` operates on the `ITypeReader` row and so owns no struct of its own;
+    # it is listed here for reader-roster uniformity (a no-op for struct reuse) and does its real
+    # work via `CHIP_ORACLE_IMPORTED_HELPERS` below.
+    "ITypeReaderImmutable",
+}
+
+# Generated helpers whose canonical operation/reader module is imported by every chip oracle that
+# calls them. Do not embed a second namespace containing byte-for-byte duplicate functions. Keep this
+# explicit: sharing a row struct alone does not imply that every Rust helper using it has a stable,
+# reusable generated definition.
+CHIP_ORACLE_IMPORTED_HELPERS: Set[str] = {
+    "CPUState", "RTypeReader", "ITypeReader", "JTypeReader", "ALUTypeReader",
+    "ITypeReaderImmutable",
+}
+
+# Helpers needed while rendering a self-contained chip oracle but no longer emitted as standalone
+# verification artifacts. They remain in `OPERATIONS` solely so the discovery pass can embed their
+# generated definitions inside the owning chip namespace.
+CHIP_ONLY_HELPERS: Set[str] = {
+    "SubOperation", "SubwOperation", "AddwOperation", "BitwiseOperation", "BitwiseU16Operation",
+}
 
 # Explicit struct→owning-module overrides, ONLY for cases the default rules can't infer:
 #   * struct name ≠ its owning module's name, or
@@ -214,16 +250,88 @@ STRUCT_OWNERSHIP: Dict[str, str] = {
     "RegisterAccessTimestamp": "RTypeReader",
     # The memory-access column structs (`MemoryAccessCols`/`MemoryAccessTimestamp`) are nested only
     # in the Load/Store chip column structs (no standalone operation emits them), so they have no
-    # natural operation owner — the collision handler in `resolve_ownership` assigns them to the
-    # first emitting chip (LoadByte) and the rest import that chip module.
+    # natural operation owner. They used to fall to the first-emitting chip (LoadByte), but a chip
+    # oracle cannot be a struct definition site (every load/store eventually migrates), so they are
+    # owned by the dedicated struct-carrier module `MemoryAccess` (see `STRUCT_CARRIERS`).
+    "MemoryAccessCols": "MemoryAccess",
+    "MemoryAccessTimestamp": "MemoryAccess",
+}
+
+# Struct-carrier modules: canonical definition sites for structs with no operation owner whose
+# definition must outlive the chip files that emit them. Each entry maps a carrier module name to
+# `(donor, struct names in emission order)`: the carrier file is rendered by carving those struct
+# declarations byte-for-byte out of the donor chip's no-reuse discovery body (so the definitions
+# remain compiler-derived, never hand-written). The carrier is written only on runs that discover
+# the donor. `STRUCT_OWNERSHIP` must point each carried struct at its carrier module.
+STRUCT_CARRIERS: Dict[str, Tuple[str, Tuple[str, ...]]] = {
+    "MemoryAccess": ("LoadByte", ("MemoryAccessTimestamp", "MemoryAccessCols")),
 }
 
 DEFAULT_SP1_DIR = "../sp1"
-# The SP1 commit the checked-in `Extracted/`/`WitnessTests/` files were generated from
-# (`dtumad/clean-native`, v6.2.2-20-g9d249b8d4). `main()` refuses to extract from a different
-# checkout unless `SP1_ALLOW_UNPINNED=1` is set — bump this constant together with the
-# regenerated files so the extraction provenance is always recorded in-repo.
-SP1_PINNED_COMMIT = "9d249b8d4fb7d00156bf77f5d295d1dbcaaf4136"
+# Exact unmodified SP1 source whose AIR semantics are being formalized.
+SP1_SEMANTIC_COMMIT = "a630089d9ff484ec6f2feade8d0afbb1447eed11"
+# Audited extraction-only overlay used to generate the checked-in artifacts. Its merge base is
+# `SP1_SEMANTIC_COMMIT`; runtime chip-source changes are restricted to reflection/`IntoShape`
+# metadata and are checked below. A full 25-chip AIR-only regeneration was byte-for-byte identical
+# to the previous v6.2.2 artifacts before this pin was advanced.
+SP1_PINNED_COMMIT = "69a8377c6e5550451f40c81fca17459687cd0a8f"
+
+# The committed exporter still contained a transitional direct-to-Clean-circuit backend and lacked
+# flat system rows, complete interaction kinds, machine-level public-value extraction, and a
+# machine-shape manifest. The two reviewable patches apply in order; the combined diff digest must
+# match the extractor worktree byte-for-byte.
+EXTRACTOR_COMPONENT_PATCHES: Tuple[Tuple[str, str], ...] = (
+    (os.path.join("scripts", "extractor-patches", "core-air-lists.patch"),
+     "73ab50273532362ba88330c9046a95c0812b03c9fd2c2c0cd30850672f52cf8d"),
+    (os.path.join("scripts", "extractor-patches", "core-air-manifest.patch"),
+     "bb62d4cfcaea5f0d8abf96e794522f48c688fe27e609e60082e9de0aba824e52"),
+)
+EXTRACTOR_PATCH_SHA256 = "a2c43cfab00280f5331a15ec251a8341a26ecf3baedcda22fec182915fbcf108"
+EXTRACTOR_PATCHED_FILES: Tuple[str, ...] = (
+    "crates/core/compiler/src/main.rs",
+    "crates/hypercube/src/ir/ast.rs",
+    "crates/hypercube/src/ir/expr.rs",
+    "crates/hypercube/src/ir/lean.rs",
+)
+
+# The only semantic-tree files the extractor overlay may touch. The checker below additionally
+# verifies that every changed line in these files is an import or derive-attribute change.
+EXTRACTOR_METADATA_FILES: Set[str] = {
+    "crates/core/machine/src/alu/add_sub/add.rs",
+    "crates/core/machine/src/alu/add_sub/addi.rs",
+    "crates/core/machine/src/alu/add_sub/addw.rs",
+    "crates/core/machine/src/alu/add_sub/sub.rs",
+    "crates/core/machine/src/alu/add_sub/subw.rs",
+    "crates/core/machine/src/alu/alu_x0.rs",
+    "crates/core/machine/src/alu/bitwise/mod.rs",
+    "crates/core/machine/src/alu/divrem/mod.rs",
+    "crates/core/machine/src/alu/lt/mod.rs",
+    "crates/core/machine/src/alu/mul/mod.rs",
+    "crates/core/machine/src/alu/sll/mod.rs",
+    "crates/core/machine/src/alu/sr/mod.rs",
+    "crates/core/machine/src/control_flow/branch/columns.rs",
+    "crates/core/machine/src/control_flow/jal/columns.rs",
+    "crates/core/machine/src/control_flow/jalr/columns.rs",
+    "crates/core/machine/src/memory/consistency/columns.rs",
+    "crates/core/machine/src/memory/instructions/load/load_byte.rs",
+    "crates/core/machine/src/memory/instructions/load/load_double.rs",
+    "crates/core/machine/src/memory/instructions/load/load_half.rs",
+    "crates/core/machine/src/memory/instructions/load/load_word.rs",
+    "crates/core/machine/src/memory/instructions/load/load_x0.rs",
+    "crates/core/machine/src/memory/instructions/store/store_byte.rs",
+    "crates/core/machine/src/memory/instructions/store/store_double.rs",
+    "crates/core/machine/src/memory/instructions/store/store_half.rs",
+    "crates/core/machine/src/memory/instructions/store/store_word.rs",
+    "crates/core/machine/src/utype/mod.rs",
+}
+EXTRACTOR_ONLY_PREFIXES: Tuple[str, ...] = (
+    "crates/core/compiler/",
+    "crates/hypercube/src/ir/",
+)
+EXTRACTOR_ONLY_FILES: Set[str] = {
+    "Cargo.lock",
+    "crates/derive/src/into_shape.rs",
+}
 EXTRACTED_DIR = os.path.join("SP1Clean", "Extracted")
 # The witness/trace conformance vectors are test-only data: they live in the top-level
 # `SP1CleanTest` test library (built by `lake test`), not the main `SP1Clean` library — which is
@@ -244,6 +352,9 @@ FOOTER = "end SP1Clean.Extracted\n"
 LINTERS_OFF = "set_option linter.all false  -- auto-generated: skip linters"
 
 _STRUCT_RE = re.compile(r"^\s*structure\s+([A-Za-z_][A-Za-z0-9_]*)\b", re.MULTILINE)
+_BYTE_OPCODE_RE = re.compile(
+    r"\.byte \(ByteOpcode\.ofNat ([A-Za-z_][A-Za-z0-9_]*|[0-9]+)\)"
+)
 
 
 # ── Compiler driver ─────────────────────────────────────────────────────────────────────────
@@ -252,31 +363,66 @@ def run_constraint_compiler(
     sp1_dir: str,
     chip: str = None,
     operation: str = None,
+    public_values: bool = False,
     reuse: Sequence[str] = (),
-    fmt: str = "lean",
 ) -> str:
     """Run the sp1-constraint-compiler and return its stdout. Pass `operation` to extract an
-    operation standalone (searched across all chips), or `chip` to extract a chip. `fmt` selects the
-    output format — `lean` (the two-list `asserts`/`interactions` form) or `lean-circuit` (the
-    `Inputs` + `main` + `ElaboratedCircuit` form, operation-only)."""
+    operation standalone (searched across all chips), `chip` to extract a table, or
+    `public_values=True` for `MachineRecord::eval_public_values`. Exactly one target may be selected.
+    The only emitted Lean artifact is the two-list `asserts`/`interactions` anchor form."""
+    if sum((chip is not None, operation is not None, public_values)) != 1:
+        raise ValueError("select exactly one of chip, operation, or public_values")
     cmd = ["cargo", "run", "-q", "-p", "sp1-constraint-compiler", "--bin", "sp1-constraint-compiler",
-           "--", "--format", fmt]
+           "--", "--format", "lean"]
     if chip is not None:
         cmd += ["--chip", chip]
     if operation is not None:
         cmd += ["--operation", operation]
+    if public_values:
+        cmd += ["--public-values"]
     for name in reuse:
         cmd += ["--reuse-struct", name]
     result = subprocess.run(cmd, cwd=sp1_dir, capture_output=True, text=True)
     if result.returncode != 0:
-        target = operation if operation is not None else f"{chip} (chip)"
+        target = ("public values" if public_values else
+                  operation if operation is not None else f"{chip} (table)")
         raise RuntimeError(f"compiler failed for {target}:\n{result.stderr}")
     return result.stdout
+
+
+def run_profile_manifest(sp1_dir: str) -> dict:
+    """Read the machine cluster and row-width manifest from `RiscvAir::machine()` itself."""
+    cmd = ["cargo", "run", "-q", "-p", "sp1-constraint-compiler", "--bin",
+           "sp1-constraint-compiler", "--", "--profile-manifest"]
+    result = subprocess.run(cmd, cwd=sp1_dir, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"profile-manifest extraction failed:\n{result.stderr}")
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"profile-manifest output is not JSON:\n{result.stdout}") from error
 
 
 def _emitted_structs(body: str) -> List[str]:
     """The column-struct names a compiler fragment emits (in source order)."""
     return _STRUCT_RE.findall(body)
+
+
+def _preserve_raw_byte_opcodes(body: str) -> str:
+    """Keep the byte interaction's opcode as the raw field expression emitted by Rust.
+
+    The pinned compiler's Lean printer historically wrapped this value in
+    `ByteOpcode.ofNat`. Lean's enum decoder maps every out-of-range value to `.Range`, so that
+    wrapper is not an injective representation of the upstream AIR tuple. The semantic Rust AIR
+    and Clean's byte channel both carry the raw field value. Strip only the printer wrapper here
+    and fail loudly if a future printer emits a shape this reviewed rewrite does not recognize.
+    """
+    body = _BYTE_OPCODE_RE.sub(r".byte \1", body)
+    if "ByteOpcode.ofNat" in body:
+        raise ValueError(
+            "unrecognized ByteOpcode.ofNat in compiler output; update the raw-opcode rewrite"
+        )
+    return body
 
 
 # ── Ownership resolution ────────────────────────────────────────────────────────────────────
@@ -285,7 +431,7 @@ def _default_owner(struct: str) -> str:
     """Owner of a struct under the default rules (no `STRUCT_OWNERSHIP` entry)."""
     if struct in OPERATIONS:
         return struct
-    if struct.endswith("Cols") and struct[:-len("Cols")] in CHIPS:
+    if struct.endswith("Cols") and struct[:-len("Cols")] in [*CHIPS, *SYSTEM_TABLES]:
         return struct[:-len("Cols")]
     return None
 
@@ -312,14 +458,24 @@ def resolve_ownership(emitted: Dict[str, List[str]]) -> Dict[str, str]:
             # no standalone operation). Make the first emitter — in registry order, operations
             # before chips — the canonical owner; the others skip it and import that module. This
             # keeps exactly one definition (no duplicate `structure` across the shared namespace).
-            order = {name: i for i, name in enumerate([*OPERATIONS, *CHIPS])}
+            order = {
+                name: i for i, name in enumerate([*OPERATIONS, *CHIPS, *SYSTEM_TABLES])
+            }
             owner[struct] = min(emitters, key=lambda m: order.get(m, len(order)))
     return owner
 
 
 def _import_module(owner: str) -> str:
-    """The `Extracted.<…>` module file name for an owner — a chip owner lives in `<chip>Chip`."""
-    return f"{owner}Chip" if owner in CHIPS else owner
+    """The `Extracted.<…>` module file name for an owner. A chip cannot be an importable struct
+    definition site (the legacy flat `<Chip>Chip.lean` modules were retired with the whole-chip
+    oracle migration), so a chip owner is a registry error — add a `STRUCT_OWNERSHIP` or
+    `STRUCT_CARRIERS` entry for the struct instead."""
+    if owner in CHIPS:
+        raise ValueError(
+            f"struct owner {owner} is a chip; chips no longer own importable structs")
+    if owner in SYSTEM_TABLES:
+        return f"SystemOracle.{owner}"
+    return owner
 
 
 _CALL_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\.(?:asserts|interactions|value)\b")
@@ -352,7 +508,7 @@ def reuse_for(
             skips.append(struct)
             add_import(_import_module(o))
     for called in _CALL_RE.findall(body):
-        if called in OPERATIONS:
+        if called in KNOWN_OPERATIONS:
             add_import(called)
     return skips, imports
 
@@ -457,162 +613,328 @@ def _header(import_modules: Sequence[str], doc: str) -> str:
 
 def render(operation: str, import_modules: Sequence[str], body: str) -> str:
     """Wrap an operation's compiler body in the clean-native module header/footer."""
-    # Operations can be very large (MulOperation's ~460-`let` product chain exceeds 1M heartbeats),
-    # so give them a generous limit.
-    body = _bump_constraints_heartbeats(body.strip(), 8000000)
+    body = _preserve_raw_byte_opcodes(body)
+    body = _bump_constraints_heartbeats(body.strip(), f"operation:{operation}")
     body = _expand_large_derives(body)
     _sanity_gate(operation, body)
-    reused = ", ".join(import_modules) if import_modules else "no"
+    reused = (f"reusing the {', '.join(import_modules)} column-struct module(s), imported above"
+              if import_modules else "reusing no column-struct modules")
     doc = (
         f"/-! # AUTO-GENERATED — do not edit by hand.\n\n"
         f"Generated by `update_extracted.py` from the `sp1-constraint-compiler`\n"
         f"(`--operation {operation} --format lean`). Contains SP1's `{operation}` operation\n"
-        f"constraints (reusing the {reused} column-struct module(s), imported above). Regenerate\n"
+        f"constraints ({reused}). Regenerate\n"
         f"with `SP1_DIR=… python3 update_extracted.py`; the faithfulness anchor lives under\n"
         f"`SP1Clean/Faithful/`. -/"
     )
     return _header(import_modules, doc) + "\n" + body + "\n\n" + FOOTER
 
 
-# Ops whose `channelsLawful` the Clean default tactic cannot close (composed sub-assertion channel
-# lists need unfolding); the normalizer injects the override since the emitter never produces one.
-CHANNELS_LAWFUL_OVERRIDES: Dict[str, str] = {
-    "LtOperationSigned":
-        "  channelsLawful := by\n"
-        "    simp [circuit_norm, main, LtOperationUnsigned.circuit, U16MSBOperation.circuit]\n",
+# Measured elaboration-budget overrides for generated definitions, keyed by
+# "<scope>:<name>:<namespace>.<def>". **Default is no override at all.**
+#
+# Essentially no generated definition needs one: the elaborator handles the entire emitted AIR at Lean's
+# plain default, across chip oracles, system tables and public values alike. **Never emit a blanket
+# bump.** If a definition genuinely fails, ladder it and add one entry here with the bracket recorded
+# beside it.
+#
+# Size is not a predictor and must not be used as one. The four largest generated definitions in the
+# tree (1649/1111/668/535 `let`s) are not in this table, and a *zero*-`let` `interactions` definition
+# does not need an override either. Measure the definition that fails; do not extrapolate from its
+# neighbours.
+#
+# To re-derive this table from scratch: strip every override, run a full `lake build`, and add back only
+# what fails — iterating, because a heartbeat failure can mask a recursion failure in the same file.
+CONSTRAINT_HEARTBEAT_OVERRIDES: Dict[str, int] = {
+    # The single measured survivor. It fails in `«LCNF simp»` — the CODE GENERATOR, not elaboration —
+    # which is why it is the only one: the elaborator handles every generated def at the default, and
+    # only codegen on the largest chip oracle does not.
+    #
+    # ⚠ Do NOT size this by `let` count. An earlier revision of this comment called it a "~466-`let`
+    # chain"; it is **386**. The 466/468 figure belongs to `MulOperation.asserts` — a *different*
+    # definition in this same file, which carries no override and passes at the plain default. So the
+    # larger definition is the cheap one: `let` count does not predict this cost. The real
+    # discriminator is a single 13 KB line of twenty sub-calls, 45% of the definition's text.
+    # Ladder: 200000 FAIL (`«LCNF simp»`) / 210000 ok → floor (200000, 210000], i.e. barely over the
+    # default. Set to 400000 for ~2x margin because codegen cost is less predictable across toolchain
+    # bumps than elaboration; the previous blanket value was 8000000, ~40x over.
+    "chip_oracle:DivRem:DivRemCols.asserts": 400000,
 }
 
 
-def _normalize_circuit_api(operation: str, body: str) -> str:
-    """Post-process the compiler's circuit-form output onto the pinned Clean API (closes the
-    release-audit TB-9 reproducibility gap). The `sp1-constraint-compiler` at the SP1 pin emits
+def _bump_constraints_heartbeats(body: str, scope: str) -> str:
+    """Prefix a generated `@[irreducible] def` with an elaboration-budget override **only** where one
+    has been measured to be necessary — see `CONSTRAINT_HEARTBEAT_OVERRIDES`. Definitions absent from
+    that table (the overwhelming majority) are emitted with no override, matching Lean's default.
 
-    1. an `ElaboratedCircuit` instance with `name`/`main` **fields** — an API from a transient window
-       of Clean main (`60665ed0`, later reworked); the pinned Clean (PR #398 head) takes `main` as a
-       class *parameter* and has no `name` field;
-    2. `channelsWith*_eq` rfl-lemmas in bare `(ElaboratedCircuit.<field> Inputs unit : …)` form, which
-       does not elaborate against the parameterized instance; and
-    3. the pre-#398 custom gating names (`byteChannel.gatedReceive`/`byteChannel.toRawGated`), which
-       the W9 migration replaced with the upstream primitives (`pullIf` / gated `toRaw`).
-    """
-    body = body.replace(
-        "instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where\n"
-        f"  name := \"SP1CleanNative.{operation}\"\n"
-        "  main := main\n",
-        "instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where\n"
-        + CHANNELS_LAWFUL_OVERRIDES.get(operation, ""))
-    for which in ("channelsWithGuarantees", "channelsWithRequirements"):
-        body = body.replace(
-            f"    (ElaboratedCircuit.{which} Inputs unit : List (RawChannel (ZMod p)))",
-            f"    ((elaborated (p := p)).{which} : List (RawChannel (ZMod p)))")
-    body = body.replace("byteChannel.gatedReceive", "byteChannel.pullIf")
-    body = body.replace("byteChannel.toRawGated", "byteChannel.toRaw")
-    # A bare numeral seeding an accumulator chain (`let E16 := 0 + cols…`) fails to elaborate (the
-    # `0`'s type can't be synthesized bottom-up inside the un-ascribed `let`); pin it explicitly.
-    body = body.replace(":= 0 + ", ":= (0 : Expression (ZMod p)) + ")
-    return body
+    `scope` identifies the emitting renderer and subject, e.g. `"chip_oracle:DivRem"`; the table key
+    appends the **innermost** enclosing namespace and the definition name, so a bump lands on exactly
+    one definition rather than on every def in a module. The innermost component is used deliberately:
+    the module's outer `namespace SP1Clean.Extracted.<X>` is contributed by the header, which is
+    prepended *after* this runs, so a fully-qualified key would not match at generation time."""
+    out: List[str] = []
+    stack: List[str] = []
+    for line in body.split("\n"):
+        opened = re.match(r"namespace\s+(\S+)", line)
+        if opened:
+            stack.append(opened.group(1))
+        elif re.match(r"end\s+\S+", line) and stack:
+            stack.pop()
+        if line.startswith("@[irreducible] def "):
+            name = line.split()[2]
+            qualified = f"{stack[-1]}.{name}" if stack else name
+            value = CONSTRAINT_HEARTBEAT_OVERRIDES.get(f"{scope}:{qualified}")
+            if value is not None:
+                out.append(f"set_option maxHeartbeats {value} in")
+        out.append(line)
+    return "\n".join(out)
 
 
-def render_circuit(operation: str, body: str) -> str:
-    """Wrap an operation's `--format lean-circuit` body (the `Inputs` + `main` + `ElaboratedCircuit`)
-    in the clean-native circuit-module header/footer. Written to `Operations/<op>/Extracted.lean` (the
-    auto-generated member of the op's four-file directory). It imports the op's already-extracted column
-    struct (`Extracted.<op>`, the nested `cols` field type) plus the byte/channel foundations and
-    Clean's circuit machinery, opens `Extracted` so the bare `cols` struct type resolves, and binds
-    the `variable {p}` field block the `main`/`ElaboratedCircuit` need. The `namespace
-    SP1Clean.<op>` is independent of the file path, so this body is location-agnostic."""
-    body = _normalize_circuit_api(operation, body.strip())
-    doc = (
-        f"/-! # AUTO-GENERATED circuit form — do not edit by hand.\n\n"
-        f"SP1's `{operation}::eval` as a Clean `Circuit`: the `Inputs` struct (the `eval` params\n"
-        f"verbatim — the column struct nested as `cols`), the `main` do-block, and the\n"
-        f"`ElaboratedCircuit` instance + `@[circuit_norm]` rfl-lemmas. Generated by\n"
-        f"`update_extracted.py` from the `sp1-constraint-compiler` (`--operation {operation} --format\n"
-        f"lean-circuit`). This *is* the faithful artifact the gadget's soundness/completeness run\n"
-        f"against — no separate `asserts`/`interactions` bridge. Regenerate with\n"
-        f"`SP1_DIR=… python3 update_extracted.py`. -/"
-    )
-    # A composed op's `main` calls `assertion <Sub>.circuit ⟨…⟩`; import each such sub-op's `Formal`
-    # module (where `<Sub>.circuit : FormalAssertion` lives). Leaf ops have none.
-    sub_circuits = sorted(set(re.findall(r"assertion\s+([A-Za-z_][A-Za-z0-9_]*)\.circuit", body)))
-    # Byte-channel propagation: the compiler sets `channelsWith* := []` from the op's *own* byte pulls
-    # only — it does not aggregate a composed sub-op's bus. So an op with no own pulls that composes a
-    # bus-carrying sub (e.g. `LtOperationUnsigned` composing `U16CompareOperation`) is emitted with an
-    # empty channel list, and Clean's `channelsLawful` then fails (the sub's `byteChannel` pull is live
-    # in `main` but undeclared). Detect a bus-carrying sub from its already-emitted `Extracted.lean` and
-    # promote the parent's channel lists + rfl-lemmas to `[byteChannel.toRaw]`.
-    if "byteChannel.toRaw" not in body:
-        for s in sub_circuits:
-            sub_path = os.path.join("SP1Clean", "Extracted", "Circuit", f"{s}.lean")
-            try:
-                with open(sub_path, encoding="utf-8") as f:
-                    sub_text = f.read()
-                if "byteChannel.toRaw" in sub_text:
-                    body = (body
-                            .replace("channelsWithGuarantees := []",
-                                     "channelsWithGuarantees := [byteChannel.toRaw]")
-                            .replace("channelsWithRequirements := []",
-                                     "channelsWithRequirements := [byteChannel.toRaw]")
-                            .replace("= [] := rfl", "= [byteChannel.toRaw] := rfl"))
-                    break
-            except FileNotFoundError:
-                pass
-    sub_imports = "".join(
-        f"import SP1Clean.Proofs.Operations.{s}.Formal\n" for s in sub_circuits
-    )
-    header = (
-        "import SP1Clean.Math.Word\n"
-        "import SP1Clean.Model.Channels\n"
-        "import SP1Clean.Model.ByteTable\n"
-        f"import SP1Clean.Extracted.{operation}\n"
-        + sub_imports
-        + "import Clean.Circuit.Basic\n"
-        "import Clean.Circuit.Subcircuit\n"
-        "import Clean.Circuit.Channel\n"
-        "import Clean.Gadgets.Equality\n"
-        "import Clean.Utils.Tactics.ProvableStructDeriving\n\n"
-        + doc + "\n\n"
-        + LINTERS_OFF + "\n\n"
-        + f"namespace SP1Clean.{operation}\n\n"
-        + "open Circuit\n"
-        + "open SP1Clean.Channels (byteChannel)\n"
-        + "open SP1Clean.Extracted\n\n"
-        + "variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]\n"
-    )
-    return header + "\n" + body + "\n\n" + f"end SP1Clean.{operation}\n"
-
-
-def _bump_constraints_heartbeats(body: str, heartbeats: int = 1000000) -> str:
-    """Prefix **each** generated `@[irreducible] def` (`asserts` / `interactions` / `value`) with a
-    raised `maxHeartbeats`. Each def's `let` chain (with nested `#v[…][k]` projections through the
-    column structs) is whnf-expensive and exceeds the 200k default; the largest operations (e.g.
-    `MulOperation`, ~460 lets) exceed even 1M. Harmless where the default already suffices (Add/Sub)."""
-    needle = "@[irreducible] def "
-    return body.replace(needle, f"set_option maxHeartbeats {heartbeats} in\n{needle}")
-
-
-def render_chip(chip: str, import_modules: Sequence[str], body: str) -> str:
-    """Wrap a chip's compiler body in a module header that imports the reused operation
-    column-struct modules."""
-    body = _bump_constraints_heartbeats(body.strip(), 8000000)
-    body = _expand_large_derives(body)
-    _sanity_gate(f"{chip} (chip)", body)
-    reused = ", ".join(import_modules) if import_modules else "no"
+def render_struct_carrier(carrier: str, donor: str, struct_names: Sequence[str],
+                          donor_body: str) -> str:
+    """Render a struct-carrier module (see `STRUCT_CARRIERS`): the named struct declarations are
+    carved byte-for-byte out of the donor chip's no-reuse discovery body, so the canonical
+    definitions stay compiler-derived while outliving the donor's legacy chip file."""
+    blocks: Dict[str, str] = {
+        match.group(1): match.group(0) for match in _DERIVE_STRUCT_RE.finditer(donor_body)
+    }
+    missing = [name for name in struct_names if name not in blocks]
+    if missing:
+        raise ValueError(
+            f"struct carrier {carrier}: donor {donor} discovery body does not declare {missing}")
+    body = "\n\n".join(_expand_large_derives(blocks[name]) for name in struct_names)
+    struct_list = ", ".join(f"`{name}`" for name in struct_names)
     doc = (
         f"/-! # AUTO-GENERATED — do not edit by hand.\n\n"
-        f"Generated by `update_extracted.py` from the `sp1-constraint-compiler`\n"
-        f"(`--chip {chip} --format lean --reuse-struct …`). Contains SP1's `{chip}` chip column\n"
-        f"struct plus the chip's composed-operation constraints, reusing the {reused}\n"
-        f"column-struct module(s) (imported above, not re-emitted). Regenerate with\n"
+        f"Struct-carrier module: the canonical definition site for {struct_list}.\n"
+        f"Carved by `update_extracted.py` out of the `sp1-constraint-compiler --chip {donor}`\n"
+        f"discovery output (no standalone operation emits these structs; every load/store chip\n"
+        f"row nests them). Regenerate with `SP1_DIR=… python3 update_extracted.py`. -/"
+    )
+    return _header([], doc) + "\n" + body + "\n\n" + FOOTER
+
+
+# Measured recursion-depth overrides for generated AIR definitions, keyed like
+# CONSTRAINT_HEARTBEAT_OVERRIDES as "<scope>:<innermost-namespace>.<def>". Default: NO override.
+#
+# `render_system_table` and `render_public_values` emit an override only where this table names one.
+# **Never emit a blanket bump.** Eleven of the twelve generated system-oracle modules need nothing at
+# all, `PublicValues.lean` included; only `Global`'s four `assertsPart*` definitions recurse past Lean's
+# 512 default, and their floor is (1200, 2000].
+SYSTEM_RECDEPTH_OVERRIDES: Dict[str, int] = {
+    # The Poseidon-style accumulation chain; same definitions that force this file's heartbeat
+    # exception. Ladder: 800 FAIL / 1200 FAIL / 2000 ok -> floor (1200, 2000], set at ~2x.
+    # The file's other two defs (`asserts`, `interactions`) need nothing.
+    "system:Global:GlobalCols.assertsPart0": 4000,
+    "system:Global:GlobalCols.assertsPart1": 4000,
+    "system:Global:GlobalCols.assertsPart2": 4000,
+    "system:Global:GlobalCols.assertsPart3": 4000,
+}
+
+
+def _bump_recdepth(body: str, scope: str) -> str:
+    """Prefix a generated `@[irreducible] def` with a recursion-depth override only where one has
+    been measured to be necessary -- see `SYSTEM_RECDEPTH_OVERRIDES`. Mirrors
+    `_bump_constraints_heartbeats`, including the innermost-namespace keying (the module's outer
+    namespace comes from the header, which is prepended after this runs)."""
+    out: List[str] = []
+    stack: List[str] = []
+    for line in body.split("\n"):
+        opened = re.match(r"namespace\s+(\S+)", line)
+        if opened:
+            stack.append(opened.group(1))
+        elif re.match(r"end\s+\S+", line) and stack:
+            stack.pop()
+        if line.startswith("@[irreducible] def "):
+            name = line.split()[2]
+            qualified = f"{stack[-1]}.{name}" if stack else name
+            value = SYSTEM_RECDEPTH_OVERRIDES.get(f"{scope}:{qualified}")
+            if value is not None:
+                out.append(f"set_option maxRecDepth {value} in")
+        out.append(line)
+    return "\n".join(out)
+
+
+def render_system_table(
+    table: str, import_modules: Sequence[str], body: str
+) -> str:
+    """Wrap a non-instruction table's exact flat-row assertion and interaction lists."""
+    # The list-only backend already chunks large AIR bodies into irreducible parts.  Keep only the
+    # recursion allowance needed to elaborate the generated `let` chains; adding one heartbeat
+    # override per data definition would hide a chunk-size regression from the repository's
+    # no-new-heartbeat audit gate.
+    body = _preserve_raw_byte_opcodes(body)
+    body = _bump_recdepth(body.strip(), f"system:{table}")
+    body = _expand_large_derives(body)
+    _sanity_gate(f"{table} (system table)", body)
+    reused = (f"Reuses the {', '.join(import_modules)} helper module(s)."
+              if import_modules else "Reuses no helper modules.")
+    doc = (
+        f"/-! # AUTO-GENERATED system-table Rust AIR oracle — do not edit by hand.\n\n"
+        f"Generated by `update_extracted.py` from `sp1-constraint-compiler --chip {table} "
+        f"--format lean`. Contains every `{table}` main-trace column in upstream index order, "
+        f"the complete per-row `assertZero` list, and the complete interaction list. The flat "
+        f"vector deliberately avoids inventing semantic field names in the extraction layer; "
+        f"audited adapters may name selected indices above this anchor. {reused} -/"
+    )
+    # `Global` contains a Poseidon-style algebraic closure in which a single output depends on
+    # roughly 1,300 shared bindings.  Entry-list chunking cannot make that one term smaller (and
+    # finer chunks only duplicate it), so this is the sole new term-intrinsic heartbeat exception.
+    intrinsic_limit = "set_option maxHeartbeats 1000000\n\n" if table == "Global" else ""
+    return _header(import_modules, doc) + "\n" + intrinsic_limit + body + "\n\n" + FOOTER
+
+
+def render_public_values(body: str) -> str:
+    """Wrap `MachineRecord::eval_public_values`, the non-row AIR block in every Core shard."""
+    body = _preserve_raw_byte_opcodes(body)
+    body = _bump_recdepth(body.strip(), "public_values")
+    _sanity_gate("machine public values", body)
+    doc = (
+        "/-! # AUTO-GENERATED Core public-values AIR oracle — do not edit by hand.\n\n"
+        "Generated from the pinned `ExecutionRecord::eval_public_values` through the list-only "
+        "constraint compiler mode. This is the complete machine-level assertion and interaction "
+        "block; it is not attached to a table row and takes the exact 160-element public-values "
+        "vector directly. -/"
+    )
+    return _header([], doc) + "\n" + body + "\n\n" + FOOTER
+
+
+def _chip_helper_order(chip: str, chip_body: str, discovery: Dict[str, str]) -> List[str]:
+    """Dependency-first order of generated helper definitions called by one chip expression."""
+    ordered: List[str] = []
+    visiting: Set[str] = set()
+    done: Set[str] = set()
+
+    def visit(name: str) -> None:
+        if name in done:
+            return
+        if name in visiting:
+            raise ValueError(f"cyclic generated helper dependency while rendering {chip}: {name}")
+        if name not in discovery:
+            raise ValueError(
+                f"self-contained oracle for {chip} calls {name}, but its operation body was not "
+                "discovered (include it in OPERATIONS/EXTRACT_ONLY)")
+        visiting.add(name)
+        for dep in _CALL_RE.findall(discovery[name]):
+            if dep != name and dep in discovery:
+                visit(dep)
+            elif dep != name and dep[:1].isupper():
+                raise ValueError(
+                    f"self-contained oracle for {chip} needs generated helper {dep}, but its body "
+                    "was not discovered (include it in OPERATIONS/EXTRACT_ONLY)")
+        visiting.remove(name)
+        done.add(name)
+        ordered.append(name)
+
+    for helper in _CALL_RE.findall(chip_body):
+        if helper in discovery:
+            visit(helper)
+        elif helper[:1].isupper():
+            raise ValueError(
+                f"self-contained oracle for {chip} calls {helper}, but its operation body was not "
+                "discovered (include it in OPERATIONS/EXTRACT_ONLY)")
+    return ordered
+
+
+def _without_generated_structures(body: str) -> str:
+    """Drop struct declarations from a helper body; the chip's no-reuse row shape owns them."""
+    return _DERIVE_STRUCT_RE.sub("", body).strip()
+
+
+def _prune_transitive_imports(
+    imports: Sequence[str], module_imports: Dict[str, Sequence[str]]
+) -> List[str]:
+    """Drop imports that another import already provides transitively (Lean imports are transitive).
+
+    E.g. a load/store oracle reuses `RegisterAccessCols` (owned by `RTypeReader`) through its
+    `ITypeReader` row, but the generated `ITypeReader` module itself imports `RTypeReader`, so a
+    direct `RTypeReader` import would be redundant. Only modules whose own import lists this run
+    discovered (`module_imports`) provide anything; an unknown module provides nothing, so its
+    dependents' imports are conservatively kept."""
+    def closure(module: str, seen: Set[str]) -> Set[str]:
+        for dep in module_imports.get(module, ()):
+            if dep not in seen:
+                seen.add(dep)
+                closure(dep, seen)
+        return seen
+
+    provided: Set[str] = set()
+    for module in imports:
+        provided |= closure(module, set())
+    return [module for module in imports if module not in provided]
+
+
+def render_chip_oracle(
+    chip: str, chip_body: str, discovery: Dict[str, str], import_modules: Sequence[str],
+    module_imports: Dict[str, Sequence[str]],
+) -> str:
+    """Render one chip-namespaced Rust AIR oracle.
+
+    The compiler fragment reuses canonical reader structs but deliberately calls helper definitions
+    such as `AddOperation.asserts`. Embed chip-private helpers dependency-first into the same namespace,
+    stripping their duplicate structs. Calls to canonical generated reader helpers are qualified back
+    to their imported module instead of embedding a duplicate namespace. This keeps Rust's generated
+    factoring available to Lean reduction without making operation modules part of the chip's theorem
+    surface or cloning the shared reader substrate.
+    """
+    # SP1's Rust column structs are named `<Chip>Cols` for most chips but `<Chip>Columns` for the
+    # control-flow/U-type chips (Jal/Jalr/UType); accept whichever the compiler emitted.
+    markers = (f"namespace {chip}Cols", f"namespace {chip}Columns")
+    marker = next((m for m in markers if m in chip_body), None)
+    if marker is None:
+        raise ValueError(f"compiler output for {chip} missing one of `{markers}`")
+    before, found, after = chip_body.partition(marker)
+    helpers = _chip_helper_order(chip, chip_body, discovery)
+    embedded_helpers = [h for h in helpers if h not in CHIP_ORACLE_IMPORTED_HELPERS]
+    shared_helpers = [h for h in helpers if h in CHIP_ORACLE_IMPORTED_HELPERS]
+    # An imported helper's module is usually already present via shared-struct ownership (CPUState,
+    # the reader modules). A helper that owns no struct — `ITypeReaderImmutable` operates on the
+    # `ITypeReader` row — must still be imported so its qualified `asserts`/`interactions` calls
+    # resolve; without this the oracle would reference an unimported module (or silently re-embed).
+    import_modules = list(import_modules) + [
+        h for h in shared_helpers if h not in import_modules
+    ]
+    import_modules = _prune_transitive_imports(import_modules, module_imports)
+    helper_defs = "\n\n".join(
+        _without_generated_structures(discovery[h]) for h in embedded_helpers
+    )
+    body = before.rstrip() + "\n\n" + helper_defs + "\n\n" + marker + after
+    for helper in sorted(CHIP_ORACLE_IMPORTED_HELPERS):
+        body = re.sub(
+            rf"(?<![A-Za-z0-9_.]){re.escape(helper)}\.(asserts|interactions)\b",
+            rf"SP1Clean.Extracted.{helper}.\1",
+            body,
+        )
+    body = _preserve_raw_byte_opcodes(body)
+    body = _bump_constraints_heartbeats(body.strip(), f"chip_oracle:{chip}")
+    body = _expand_large_derives(body)
+    _sanity_gate(f"{chip} (self-contained chip oracle)", body)
+    helper_list = ", ".join(embedded_helpers) if embedded_helpers else "no private helpers"
+    imported_list = ", ".join(import_modules) if import_modules else "no shared modules"
+    doc = (
+        f"/-! # AUTO-GENERATED whole-chip Rust AIR oracle — do not edit by hand.\n\n"
+        f"Generated by `update_extracted.py` from `sp1-constraint-compiler --chip {chip} --format lean`.\n"
+        f"Contains the complete Rust `{chip}` row shape, `assertZero` list, and interaction list,\n"
+        f"reusing the canonical generated struct/reader modules imported above ({imported_list}).\n"
+        f"The compiler's chip-private helper definitions ({helper_list}) are embedded in this namespace\n"
+        f"rather than imported as operation-level verification artifacts. Regenerate with\n"
         f"`SP1_DIR=… python3 update_extracted.py`. -/"
     )
-    return _header(import_modules, doc) + "\n" + body + "\n\n" + FOOTER
+    return (
+        COMMON_IMPORTS + "\n"
+        + "".join(f"import SP1Clean.Extracted.{m}\n" for m in import_modules)
+        + "\n" + doc + "\n\n" + LINTERS_OFF + "\n\n"
+        + f"namespace SP1Clean.Extracted.{chip}Oracle\n"
+        + "open SP1Clean\n\n" + body + "\n\n"
+        + f"end SP1Clean.Extracted.{chip}Oracle\n"
+    )
 
 
 # ── Witness-vector pass ───────────────────────────────────────────────────────────────────────
 # The completeness/conformance companion to the constraint pass: dump SP1's real `populate`
 # outputs on a fixed input battery (via the `witness_vectors` binary) and render them as Lean data
-# the `WitnessTests/<Op>Witness.lean` anchor `#guard`s the native `witness` function against.
+# the `WitnessTests/<Op>Witness.lean` `native_decide` conformance theorems check the native
+# `witness` function against.
 
 def run_witness_vectors(sp1_dir: str, operation: str) -> dict:
     """Run the `witness_vectors` binary for one operation and return its parsed JSON."""
@@ -637,6 +959,40 @@ def _lean_elem_type(val) -> str:
 def _lean_elem(val) -> str:
     """Render one schema column value: a JSON array → `#v[…]`, a JSON int → its literal."""
     return _vec_lean(val) if isinstance(val, list) else str(val)
+
+
+# Measured per-battery option overrides for the generated conformance-vector files. Default: NOTHING.
+#
+# The two writers below emit an override only where this table names one. **Never emit a blanket bump.**
+# Nineteen of the twenty-one generated batteries need nothing at all.
+#
+# Battery size does not predict the need: a 396-vector, 49 KB battery elaborates at the plain defaults
+# while a 47-vector, 2.4 KB one is 20x smaller and would not. Measure the battery that fails.
+#
+# ⚠ The two options mask each other -- a battery's recursion need can be hidden behind its heartbeat
+# failure and surface only once that is satisfied. Ladder one option at a time and re-run to a fixpoint.
+VECTOR_OPTION_OVERRIDES: Dict[str, Dict[str, int]] = {
+    # 528 vectors x 14 columns, ~30,000 numeric literals: the largest battery in the tree.
+    # Ladder: heartbeats 250000 FAIL / 300000 ok -> floor (250000, 300000].
+    #         recursion   16000 FAIL /  32000 ok -> floor (16000, 32000]. Both set at ~2x.
+    "witness:MulOperation": {"heartbeats": 600000, "recdepth": 64000},
+    # 64 x 246 = 15,744 literals: the widest trace battery. Needs no heartbeat budget at all.
+    # Ladder: recursion 8000 FAIL / 16000 ok -> floor (8000, 16000], set at ~2x.
+    "trace:DivRem": {"recdepth": 32000},
+}
+
+
+def _vector_options(key: str) -> str:
+    """Emit the measured option overrides for one generated vector battery, or the empty string.
+
+    Absence is the default and the common case: 19 of the 21 batteries need neither directive."""
+    over = VECTOR_OPTION_OVERRIDES.get(key, {})
+    out = ""
+    if "heartbeats" in over:
+        out += f"set_option maxHeartbeats {over['heartbeats']} in\n"
+    if "recdepth" in over:
+        out += f"set_option maxRecDepth {over['recdepth']} in\n"
+    return out
 
 
 def render_witness_vectors(operation: str, data: dict) -> str:
@@ -668,8 +1024,7 @@ def render_witness_vectors(operation: str, data: dict) -> str:
         + doc + "\n\n"
         + "namespace SP1Clean.WitnessTests\nopen SP1Clean\n\n"
         + LINTERS_OFF + "\n\n"
-        + "set_option maxHeartbeats 4000000 in\n"
-        + "set_option maxRecDepth 64000 in\n"
+        + _vector_options(f"witness:{operation}")
         + f"/-- {len(vectors)} conformance vectors for `{operation}` (`{tuple_desc}`). -/\n"
         + f"def {operation}WitnessVectors : List ({prod_type}) := [\n"
         + body + "\n]\n\n"
@@ -725,8 +1080,7 @@ def render_trace_vectors(chip: str, width: int, kind: str, data: dict) -> str:
         + "\n".join(event_rows) + "\n]\n\n"
         + f"/-- The padded trace height SP1 chose (`next_multiple_of_32`). -/\n"
         + f"def {chip}ChipTraceHeight : ℕ := {data['height']}\n\n"
-        + "set_option maxHeartbeats 4000000 in\n"
-        + "set_option maxRecDepth 64000 in\n"
+        + _vector_options(f"trace:{chip}")
         + f"/-- SP1's real `generate_trace` output: {data['height']} × {width}, canonical values. -/\n"
         + f"def {chip}ChipTraceRows : List (Vector ℕ {width}) := [\n"
         + "\n".join(matrix_rows) + "\n]\n\n"
@@ -741,9 +1095,299 @@ def _write(out_path: str, content: str) -> None:
     print(f"  ✓ Wrote {out_path}")
 
 
+def render_provenance() -> str:
+    """Render the single source of truth for checked-in extraction provenance."""
+    return (
+        "/-! # AUTO-GENERATED extraction provenance — do not edit by hand.\n\n"
+        "The semantic revision is unmodified upstream SP1. The extractor revision is an audited\n"
+        "descendant whose machine-source diff is reflection metadata only; exporter implementation\n"
+        "changes live outside the AIR definitions. Regenerate with `update_extracted.py`. -/\n\n"
+        "namespace SP1Clean.Extracted\n\n"
+        "/-- Exact two-revision boundary behind every checked-in extracted artifact. -/\n"
+        "structure ExtractionProvenance where\n"
+        "  semanticRevision : String\n"
+        "  extractorRevision : String\n"
+        "  extractorPatchSha256 : String\n"
+        "deriving DecidableEq, Repr\n\n"
+        "/-- Provenance validated by the generator before it writes any AIR artifact. -/\n"
+        "def checkedInProvenance : ExtractionProvenance where\n"
+        f"  semanticRevision := \"{SP1_SEMANTIC_COMMIT}\"\n"
+        f"  extractorRevision := \"{SP1_PINNED_COMMIT}\"\n"
+        f"  extractorPatchSha256 := \"{EXTRACTOR_PATCH_SHA256}\"\n\n"
+        "end SP1Clean.Extracted\n"
+    )
+
+
+# ── Opcode-table pass ───────────────────────────────────────────────────────────────────────
+# The instruction-alphabet anchor: SP1's `Opcode` enum (variant name → `#[repr(u8)]`
+# discriminant) is the value every chip commits on the Program bus, and
+# `SP1Clean/Model/Opcode.lean` hand-mirrors it. Extracting the table makes that mirror
+# machine-checked (`opcodeTable_matchesExtracted`, `SP1Clean/FormalModel/OpcodeTable.lean`)
+# instead of hand-verified. Like the manifest writers this is a text-level parse, not a compiler
+# run — and it reads the file at `SP1_SEMANTIC_COMMIT` via `git show`, so it is independent of the
+# overlay worktree's patch state and reproducible at the pin.
+
+_OPCODE_VARIANT_RE = re.compile(r"^\s{4}([A-Z][A-Za-z0-9_]*)\s*=\s*(\d+),\s*$")
+
+
+def read_opcode_table(sp1_dir: str) -> List[Tuple[str, int]]:
+    """Parse the `pub enum Opcode` block of `crates/core/executor/src/opcode.rs` at the pinned
+    semantic revision into ordered `(variant name, discriminant)` pairs. Fails loudly on any
+    shape drift (missing enum, missing `#[repr(u8)]`, no variants, or non-consecutive
+    discriminants)."""
+    source = _git_output(
+        sp1_dir, ["show", f"{SP1_SEMANTIC_COMMIT}:crates/core/executor/src/opcode.rs"])
+    marker = "pub enum Opcode {"
+    start = source.find(marker)
+    if start == -1:
+        raise SystemExit("opcode.rs: `pub enum Opcode {` not found — update the opcode parser")
+    if not source[:start].rstrip().endswith("#[repr(u8)]"):
+        raise SystemExit("opcode.rs: `#[repr(u8)]` no longer directly precedes `pub enum Opcode` "
+                         "— the discriminant table would not be the committed u8 value")
+    end = source.find("\n}", start)
+    if end == -1:
+        raise SystemExit("opcode.rs: unterminated `pub enum Opcode` block")
+    entries = [
+        (match.group(1), int(match.group(2)))
+        for line in source[start + len(marker):end].splitlines()
+        if (match := _OPCODE_VARIANT_RE.match(line))
+    ]
+    if not entries:
+        raise SystemExit("opcode.rs: no `NAME = N,` variants parsed — update the opcode parser")
+    if [value for _, value in entries] != list(range(len(entries))):
+        raise SystemExit(f"opcode.rs: discriminants are not consecutive from 0: {entries}")
+    return entries
+
+
+def render_opcode_table(entries: Sequence[Tuple[str, int]]) -> str:
+    """Render the extracted `Opcode` discriminant table as `Extracted/OpcodeTable.lean`."""
+    rows = "\n".join(f'  ⟨"{name}", {value}⟩,' for name, value in entries)
+    return (
+        "import SP1Clean.Extracted.Provenance\n\n"
+        "/-! # AUTO-GENERATED SP1 `Opcode` discriminant table — do not edit by hand.\n\n"
+        "Parsed by `update_extracted.py` out of `crates/core/executor/src/opcode.rs` at the pinned\n"
+        "semantic revision (`checkedInProvenance.semanticRevision`, read via `git show`): the\n"
+        "variant name → `#[repr(u8)]` discriminant table, i.e. the opcode value each chip commits\n"
+        "on the Program bus. The hand-maintained mirror (`SP1Clean/Model/Opcode.lean`) is\n"
+        "cross-checked against this table by `opcodeTable_matchesExtracted`\n"
+        "(`SP1Clean/FormalModel/OpcodeTable.lean`). -/\n\n"
+        + LINTERS_OFF + "\n\n"
+        + "namespace SP1Clean.Extracted\n\n"
+        + "/-- One SP1 `Opcode` enum row: variant name and `#[repr(u8)]` discriminant. -/\n"
+        + "structure OpcodeRow where\n"
+        + "  name : String\n"
+        + "  discriminant : Nat\n"
+        + "deriving DecidableEq, Repr\n\n"
+        + f"/-- The exact `Opcode` table at `checkedInProvenance.semanticRevision`: "
+        + f"{len(entries)} variants,\ndiscriminants `0..{len(entries) - 1}` in declaration "
+        + "order. -/\n"
+        + "def currentOpcodeTable : List OpcodeRow := [\n"
+        + rows + "\n]\n\n"
+        + "end SP1Clean.Extracted\n"
+    )
+
+
+def _manifest_cluster(manifest: dict, expected_names: Sequence[str], label: str) -> List[dict]:
+    """Select one exact machine cluster and reject malformed/ambiguous manifest data."""
+    clusters = manifest.get("clusters")
+    if not isinstance(clusters, list):
+        raise RuntimeError("profile manifest has no `clusters` list")
+    expected = set(expected_names)
+    matches: List[List[dict]] = []
+    for cluster in clusters:
+        if not isinstance(cluster, list) or any(not isinstance(entry, dict) for entry in cluster):
+            raise RuntimeError("profile manifest contains a malformed cluster")
+        names = [entry.get("name") for entry in cluster]
+        if len(names) != len(set(names)):
+            raise RuntimeError(f"profile manifest cluster contains duplicate names: {names}")
+        if set(names) == expected:
+            matches.append(cluster)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"expected exactly one {label} cluster with {sorted(expected)}, found {len(matches)}")
+    selected = matches[0]
+    for entry in selected:
+        if not isinstance(entry.get("name"), str):
+            raise RuntimeError(f"{label} cluster has a non-string name: {entry}")
+        for width_key in ("main_width", "preprocessed_width"):
+            width = entry.get(width_key)
+            if not isinstance(width, int) or width < 0:
+                raise RuntimeError(f"{label} cluster has invalid {width_key}: {entry}")
+    return selected
+
+
+def validate_profile_manifest(manifest: dict) -> Tuple[List[dict], List[dict]]:
+    """Validate the public width and locate both exact theorem clusters."""
+    if manifest.get("num_public_values") != 160:
+        raise RuntimeError(
+            "RiscvAir public-value width changed: expected 160, got "
+            f"{manifest.get('num_public_values')}")
+    core = _manifest_cluster(manifest, BASELINE_CORE_CLUSTER, "baseline Core")
+    memory = _manifest_cluster(manifest, MEMORY_BOUNDARY_CLUSTER, "memory-boundary")
+
+    seen: Dict[str, Tuple[int, int]] = {}
+    for entry in [*core, *memory]:
+        shape = (entry["main_width"], entry["preprocessed_width"])
+        previous = seen.setdefault(entry["name"], shape)
+        if previous != shape:
+            raise RuntimeError(
+                f"table {entry['name']} has inconsistent shapes {previous} and {shape}")
+    return core, memory
+
+
+def render_core_air_manifest(core: Sequence[dict], memory: Sequence[dict]) -> str:
+    """Render the exact cluster membership and row widths obtained from Rust."""
+    def render_cluster(entries: Sequence[dict]) -> str:
+        rows = [
+            f'  ⟨"{entry["name"]}", {entry["main_width"]}, '
+            f'{entry["preprocessed_width"]}⟩,'
+            for entry in entries
+        ]
+        return "[\n" + "\n".join(rows) + "\n]"
+
+    return (
+        "import SP1Clean.Extracted.Provenance\n\n"
+        "/-! # AUTO-GENERATED Core AIR machine manifest — do not edit by hand.\n\n"
+        "Generated directly from `RiscvAir::machine().shape().chip_clusters` by the pinned\n"
+        "list-only extractor. Each entry records the runtime `MachineAir::name`, main width, and\n"
+        "preprocessed width. Regeneration fails unless the two theorem clusters occur exactly once\n"
+        "and the public-value width remains 160. -/\n\n"
+        "set_option linter.all false  -- auto-generated: skip linters\n\n"
+        "namespace SP1Clean.Extracted\n\n"
+        "structure CoreAIRTableShape where\n"
+        "  name : String\n"
+        "  mainWidth : Nat\n"
+        "  preprocessedWidth : Nat\n"
+        "deriving DecidableEq, Repr\n\n"
+        "/-- Exact baseline trusted Core cluster at `checkedInProvenance`. -/\n"
+        "def currentCoreCluster : List CoreAIRTableShape := "
+        + render_cluster(core)
+        + "\n\n"
+        "/-- Exact trusted memory-boundary cluster at `checkedInProvenance`. -/\n"
+        "def currentMemoryBoundaryCluster : List CoreAIRTableShape := "
+        + render_cluster(memory)
+        + "\n\n"
+        "/-- `RiscvAir::machine().num_pv_elts()` at the extraction revision. -/\n"
+        "def currentCorePublicValuesWidth : Nat := 160\n\n"
+        "end SP1Clean.Extracted\n"
+    )
+
+
+def _git_output(sp1_dir: str, args: Sequence[str]) -> str:
+    result = subprocess.run(
+        ["git", "-C", sp1_dir, *args], capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"git {' '.join(args)} failed in extractor checkout {sp1_dir}:\n{result.stderr}"
+        )
+    return result.stdout.strip()
+
+
+def verify_extractor_overlay(sp1_dir: str, actual: str) -> None:
+    """Check that the pinned exporter is based on the exact semantic revision and that its only
+    machine-source edits are non-operational reflection metadata."""
+    merge_base = _git_output(sp1_dir, ["merge-base", SP1_SEMANTIC_COMMIT, actual])
+    if merge_base != SP1_SEMANTIC_COMMIT:
+        raise SystemExit(
+            f"extractor {actual} is not based directly on semantic revision "
+            f"{SP1_SEMANTIC_COMMIT} (merge base {merge_base})"
+        )
+
+    changed_text = _git_output(
+        sp1_dir, ["diff", "--name-only", f"{SP1_SEMANTIC_COMMIT}..{actual}"]
+    )
+    changed = set(changed_text.splitlines()) if changed_text else set()
+    allowed = EXTRACTOR_ONLY_FILES | EXTRACTOR_METADATA_FILES
+    unexpected = sorted(
+        path for path in changed
+        if path not in allowed and not path.startswith(EXTRACTOR_ONLY_PREFIXES)
+    )
+    if unexpected:
+        raise SystemExit(
+            "extractor overlay changes files outside the audited exporter surface:\n  "
+            + "\n  ".join(unexpected)
+        )
+
+    for path in sorted(changed & EXTRACTOR_METADATA_FILES):
+        diff = _git_output(
+            sp1_dir,
+            ["diff", "--unified=0", f"{SP1_SEMANTIC_COMMIT}..{actual}", "--", path],
+        )
+        changed_lines = [
+            line for line in diff.splitlines()
+            if (line.startswith("+") or line.startswith("-"))
+            and not line.startswith("+++") and not line.startswith("---")
+        ]
+        bad_lines = [
+            line for line in changed_lines
+            if not line[1:].lstrip().startswith(("use sp1_derive", "#[derive("))
+        ]
+        if bad_lines:
+            raise SystemExit(
+                f"extractor overlay changes runtime source in {path}:\n  "
+                + "\n  ".join(bad_lines)
+            )
+
+    print(
+        f"Verified extractor overlay {actual}: semantic base {SP1_SEMANTIC_COMMIT}, "
+        f"{len(changed)} audited file(s), runtime AIR source unchanged"
+    )
+
+
+def verify_extractor_patch(sp1_dir: str) -> None:
+    """Require the extractor worktree to carry exactly the checked-in list-only patch set.
+
+    A merely dirty exporter is not provenance. Requiring byte equality with the checked-in patch
+    makes the four uncommitted compiler/IR edits explicit, reviewable, and reproducible while the
+    corresponding Rust change awaits an upstream commit.
+    """
+    for patch_path, expected_hash in EXTRACTOR_COMPONENT_PATCHES:
+        with open(patch_path, "rb") as patch_file:
+            actual_hash = hashlib.sha256(patch_file.read()).hexdigest()
+        if actual_hash != expected_hash:
+            raise SystemExit(
+                f"extractor component patch {patch_path} has digest {actual_hash}, expected "
+                f"{expected_hash}; update the audited patch set deliberately")
+
+    status = subprocess.run(
+        ["git", "-C", sp1_dir, "status", "--porcelain=v1", "--untracked-files=all"],
+        capture_output=True,
+        text=True,
+    )
+    if status.returncode != 0:
+        raise SystemExit(f"git status failed in extractor checkout {sp1_dir}:\n{status.stderr}")
+    expected_status = [f" M {path}" for path in EXTRACTOR_PATCHED_FILES]
+    actual_status = status.stdout.splitlines()
+    if actual_status != expected_status:
+        raise SystemExit(
+            "extractor worktree is not the exact audited list-only patch; expected:\n  "
+            + "\n  ".join(expected_status)
+            + "\nactual:\n  "
+            + ("\n  ".join(actual_status) if actual_status else "<clean worktree>")
+        )
+
+    diff = subprocess.run(
+        ["git", "-C", sp1_dir, "diff", "--binary", "HEAD", "--",
+         *EXTRACTOR_PATCHED_FILES],
+        capture_output=True,
+    )
+    if diff.returncode != 0:
+        raise SystemExit(f"git diff failed in extractor checkout {sp1_dir}")
+    actual_diff_hash = hashlib.sha256(diff.stdout).hexdigest()
+    if actual_diff_hash != EXTRACTOR_PATCH_SHA256:
+        raise SystemExit(
+            "extractor worktree touches the expected files but its combined byte-level diff has "
+            f"digest {actual_diff_hash}, expected {EXTRACTOR_PATCH_SHA256}"
+        )
+    print(f"Verified exact list-only extractor patch set {EXTRACTOR_PATCH_SHA256}")
+
+
 # ── Orchestration ───────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    global OPERATIONS, CHIPS, SYSTEM_TABLES, WITNESS_OPERATIONS, TRACE_CHIPS
+
     sp1_dir = os.environ.get("SP1_DIR", DEFAULT_SP1_DIR)
 
     head = subprocess.run(["git", "-C", sp1_dir, "rev-parse", "HEAD"],
@@ -758,7 +1402,38 @@ def main() -> None:
         else:
             raise SystemExit(f"{msg} Set SP1_ALLOW_UNPINNED=1 to extract anyway.")
 
+    verify_extractor_overlay(sp1_dir, actual)
+    verify_extractor_patch(sp1_dir)
+
     os.makedirs(EXTRACTED_DIR, exist_ok=True)
+
+    # Profile extraction is unconditional, including `EXTRACT_ONLY` runs.  Otherwise a focused
+    # regeneration could refresh row lists while retaining stale machine-shape metadata.
+    try:
+        profile_manifest = run_profile_manifest(sp1_dir)
+        core_manifest, memory_manifest = validate_profile_manifest(profile_manifest)
+        profile_output = render_core_air_manifest(core_manifest, memory_manifest)
+    except Exception as error:  # noqa: BLE001
+        raise SystemExit(f"Required Core AIR profile extraction failed: {error}") from error
+
+    # The opcode discriminant table is likewise unconditional: it is cheap (a `git show` + text
+    # parse, no cargo run) and pins the instruction alphabet the Model-layer mirror is checked
+    # against.
+    try:
+        opcode_output = render_opcode_table(read_opcode_table(sp1_dir))
+    except Exception as error:  # noqa: BLE001
+        raise SystemExit(f"Required opcode-table extraction failed: {error}") from error
+
+    # `EXTRACT_AIR_ONLY=1` runs the complete symbolic AIR extraction while skipping the independent
+    # witness/trace batteries. This is the conservative first
+    # phase of a Rust-pin migration: compare every row shape/assertion/interaction artifact before
+    # allowing populate/conformance churn to obscure the diff.
+    if os.environ.get("EXTRACT_AIR_ONLY") == "1":
+        WITNESS_OPERATIONS = []
+        TRACE_CHIPS = {}
+        print("EXTRACT_AIR_ONLY → skipping witness and trace-vector passes")
+
+    extract_public_values = True
 
     # `EXTRACT_ONLY=Name1,Name2,…` restricts this run to a subset of OPERATIONS/CHIPS/
     # WITNESS_OPERATIONS (a closed composition group) — used to regenerate just the files that
@@ -767,15 +1442,15 @@ def main() -> None:
     only = os.environ.get("EXTRACT_ONLY")
     if only:
         wanted = {name.strip() for name in only.split(",") if name.strip()}
-        global OPERATIONS, CHIPS, WITNESS_OPERATIONS, CIRCUIT_OPERATIONS, TRACE_CHIPS
         OPERATIONS = [o for o in OPERATIONS if o in wanted]
         CHIPS = [c for c in CHIPS if c in wanted]
+        SYSTEM_TABLES = [table for table in SYSTEM_TABLES if table in wanted]
+        extract_public_values = "PublicValues" in wanted
         WITNESS_OPERATIONS = [o for o in WITNESS_OPERATIONS if o in wanted]
-        CIRCUIT_OPERATIONS = [o for o in CIRCUIT_OPERATIONS if o in wanted]
         TRACE_CHIPS = {c: w for c, w in TRACE_CHIPS.items() if f"{c}Trace" in wanted}
         print(f"EXTRACT_ONLY → operations={OPERATIONS}, chips={CHIPS}, "
-              f"witness={WITNESS_OPERATIONS}, circuit={CIRCUIT_OPERATIONS}, "
-              f"trace={list(TRACE_CHIPS)}")
+              f"system={SYSTEM_TABLES}, publicValues={extract_public_values}, "
+              f"witness={WITNESS_OPERATIONS}, trace={list(TRACE_CHIPS)}")
 
     # 1. Discovery pass: which structs does each module emit with no reuse? Tolerate per-target
     #    compiler failures (e.g. a chip whose `<Chip>Cols` shape isn't yet composed in the
@@ -784,6 +1459,7 @@ def main() -> None:
     discovery: Dict[str, str] = {}   # module → no-reuse body (successful targets only)
     emitted: Dict[str, List[str]] = {}
     skipped: Dict[str, str] = {}     # module → first-line reason
+    required_failures: List[str] = []
     for op in OPERATIONS:
         print(f"  · {op}")
         try:
@@ -800,13 +1476,81 @@ def main() -> None:
         except Exception as e:  # noqa: BLE001
             skipped[chip] = str(e).splitlines()[-1] if str(e).strip() else "compiler error"
             print(f"    ✗ skipped: {skipped[chip]}")
+            if chip in CHIP_ORACLES:
+                required_failures.append(f"chip oracle discovery {chip}: {skipped[chip]}")
+    for table in SYSTEM_TABLES:
+        print(f"  · {table} (system table)")
+        try:
+            discovery[table] = run_constraint_compiler(sp1_dir, chip=table)
+            emitted[table] = _emitted_structs(discovery[table])
+        except Exception as e:  # noqa: BLE001
+            skipped[table] = str(e).splitlines()[-1] if str(e).strip() else "compiler error"
+            print(f"    ✗ required system table failed: {skipped[table]}")
+            required_failures.append(f"system-table discovery {table}: {skipped[table]}")
+
+    public_body = None
+    if extract_public_values:
+        print("  · machine public values")
+        try:
+            public_body = run_constraint_compiler(sp1_dir, public_values=True)
+        except Exception as e:  # noqa: BLE001
+            reason = str(e).splitlines()[-1] if str(e).strip() else "compiler error"
+            print(f"    ✗ required public-values block failed: {reason}")
+            required_failures.append(f"public-values discovery: {reason}")
 
     owner = resolve_ownership(emitted)
     print(f"Resolved ownership for {len(owner)} structs.")
 
+    # Each generated operation module's own header imports — feeds the chip oracles'
+    # transitive-import pruning (`_prune_transitive_imports`).
+    operation_imports: Dict[str, Sequence[str]] = {
+        op: reuse_for(op, emitted[op], owner, discovery[op])[1]
+        for op in OPERATIONS if op in emitted
+    }
+
+    # Render every newly required system artifact before writing anything. This prevents a partial
+    # regeneration from being mistaken for a complete Core AIR extraction.
+    system_outputs: Dict[str, str] = {}
+    for table in SYSTEM_TABLES:
+        if table not in emitted:
+            continue
+        try:
+            skips, imports = reuse_for(table, emitted[table], owner, discovery[table])
+            body = (run_constraint_compiler(sp1_dir, chip=table, reuse=skips)
+                    if skips else discovery[table])
+            system_outputs[table] = render_system_table(table, imports, body)
+        except Exception as e:  # noqa: BLE001
+            required_failures.append(f"system-table render {table}: {e}")
+
+    public_output = None
+    if public_body is not None:
+        try:
+            public_output = render_public_values(public_body)
+        except Exception as e:  # noqa: BLE001
+            required_failures.append(f"public-values render: {e}")
+
+    if required_failures:
+        details = "\n".join(f"   - {failure}" for failure in required_failures)
+        raise SystemExit(
+            "\nRequired extraction artifacts failed before any file was written:\n" + details)
+
     # 2. Emit pass: re-run with the derived reuse, then render + write (successful targets only).
-    written = 0
-    for op in [o for o in OPERATIONS if o in emitted]:
+    _write(os.path.join(EXTRACTED_DIR, "Provenance.lean"), render_provenance())
+    _write(os.path.join(EXTRACTED_DIR, "CoreAIRManifest.lean"), profile_output)
+    _write(os.path.join(EXTRACTED_DIR, "OpcodeTable.lean"), opcode_output)
+    written = 3
+    for carrier, (carrier_donor, carrier_structs) in STRUCT_CARRIERS.items():
+        if carrier_donor not in discovery:
+            continue
+        print(f"Processing struct carrier {carrier}")
+        try:
+            _write(os.path.join(EXTRACTED_DIR, f"{carrier}.lean"),
+                   render_struct_carrier(carrier, carrier_donor, carrier_structs,
+                                         discovery[carrier_donor]))
+            written += 1
+        except Exception as e:  # noqa: BLE001
+            raise SystemExit(f"struct-carrier render {carrier} failed: {e}")
+    for op in [o for o in OPERATIONS if o in emitted and o not in CHIP_ONLY_HELPERS]:
         print(f"Processing {op}")
         try:
             skips, imports = reuse_for(op, emitted[op], owner, discovery[op])
@@ -819,16 +1563,42 @@ def main() -> None:
     for chip in [c for c in CHIPS if c in emitted]:
         print(f"Processing chip {chip}")
         try:
-            skips, imports = reuse_for(chip, emitted[chip], owner, discovery[chip])
-            body = run_constraint_compiler(sp1_dir, chip=chip, reuse=skips) if skips else discovery[chip]
-            _write(os.path.join(EXTRACTED_DIR, f"{chip}Chip.lean"), render_chip(chip, imports, body))
+            if chip not in CHIP_ORACLES:
+                raise ValueError(
+                    "not in CHIP_ORACLES — the legacy flat `Extracted/<Chip>Chip.lean` form was "
+                    "retired with the 2026-07 whole-chip oracle migration; register the chip as "
+                    "an oracle instead")
+            oracle_reuse = [
+                struct for struct in emitted[chip]
+                if struct in CHIP_ORACLE_SHARED_STRUCTS
+            ]
+            oracle_imports: List[str] = []
+            for struct in oracle_reuse:
+                imported = _import_module(owner[struct])
+                if imported not in oracle_imports:
+                    oracle_imports.append(imported)
+            oracle_body = (run_constraint_compiler(sp1_dir, chip=chip, reuse=oracle_reuse)
+                           if oracle_reuse else discovery[chip])
+            _write(os.path.join(EXTRACTED_DIR, "ChipOracle", f"{chip}.lean"),
+                   render_chip_oracle(chip, oracle_body, discovery, oracle_imports,
+                                      operation_imports))
             written += 1
         except Exception as e:  # noqa: BLE001 — best-effort, continue with the rest
             print(f"  ✗ Error: {e}")
+            required_failures.append(f"chip oracle render {chip}: {e}")
 
-    # 2b. Witness-vector pass: dump real-`populate` conformance vectors for the ops that have a
-    #     dumper in the `witness_vectors` binary. Best-effort per op (an op without a dumper just
-    #     skips), so the constraint pass above is never blocked by this companion pass.
+    for table, output in system_outputs.items():
+        print(f"Processing system table {table}")
+        _write(os.path.join(EXTRACTED_DIR, "SystemOracle", f"{table}.lean"), output)
+        written += 1
+
+    if public_output is not None:
+        print("Processing machine public values")
+        _write(os.path.join(EXTRACTED_DIR, "SystemOracle", "PublicValues.lean"), public_output)
+        written += 1
+
+    # 2b. Transitional operation witness-vector pass. New conformance batteries belong in the
+    #     whole-chip pass below; this list only supports unmigrated consumers.
     for op in WITNESS_OPERATIONS:
         print(f"Processing witness vectors for {op}")
         try:
@@ -840,7 +1610,8 @@ def main() -> None:
             print(f"  ✗ Error: {e}")
 
     # 2d. Whole-trace pass: dump the real-`generate_trace` conformance battery for the chips in
-    #     `TRACE_CHIPS` (the `--chip` mode of the same binary). Best-effort per chip. Under
+    #     `TRACE_CHIPS` (the `--chip` mode of the same binary). A requested trace failure is fatal:
+    #     silently retaining stale vectors would undermine the extraction/conformance boundary. Under
     #     `EXTRACT_ONLY`, select these with `<Chip>Trace` (e.g. `AddTrace`) so they don't collide
     #     with the `CHIPS` constraint-extraction entries of the same name.
     for chip, (width, kind) in TRACE_CHIPS.items():
@@ -852,22 +1623,7 @@ def main() -> None:
             written += 1
         except Exception as e:  # noqa: BLE001 — best-effort, continue with the rest
             print(f"  ✗ Error: {e}")
-
-    # 2c. Circuit-form pass: emit `Operations/<op>/Extracted.lean` (the `Inputs` + `main` +
-    #     `ElaboratedCircuit`) for the byte-bus, pure-assertion leaf operations — the auto-generated
-    #     member of the op's four-file directory (alongside the hand-written `Populate`/`RawSpec`/
-    #     `Formal`). The nested `cols` column struct still comes from the op's shared
-    #     `Extracted/<op>.lean` (imported), so this pass relies on the constraint pass above having
-    #     written it. Best-effort per op.
-    for op in CIRCUIT_OPERATIONS:
-        print(f"Processing circuit form for {op}")
-        try:
-            body = run_constraint_compiler(sp1_dir, operation=op, fmt="lean-circuit")
-            _write(os.path.join("SP1Clean", "Extracted", "Circuit", f"{op}.lean"),
-                   render_circuit(op, body))
-            written += 1
-        except Exception as e:  # noqa: BLE001 — best-effort, continue with the rest
-            print(f"  ✗ Error: {e}")
+            required_failures.append(f"whole-trace extraction {chip}: {e}")
 
     # 3. Summary — what got written and which targets the compiler can't yet emit.
     print(f"\n== Wrote {written} module(s) to {EXTRACTED_DIR} ==")
@@ -875,6 +1631,9 @@ def main() -> None:
         print(f"== {len(skipped)} target(s) skipped (compiler can't emit yet): ==")
         for name, reason in skipped.items():
             print(f"   - {name}: {reason}")
+    if required_failures:
+        details = "\n".join(f"   - {failure}" for failure in required_failures)
+        raise SystemExit(f"\nRequired extraction artifacts failed; no successful regeneration claim:\n{details}")
 
 
 if __name__ == "__main__":

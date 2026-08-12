@@ -1,0 +1,68 @@
+import SP1Clean.Math.Word
+import SP1Clean.Model.Channels
+import SP1Clean.Model.ByteTable
+import SP1Clean.FormalModel.Contracts.Operations
+import SP1Clean.Proofs.Operations.U16MSBOperation.Formal
+import Clean.Circuit.Basic
+import Clean.Circuit.Subcircuit
+import Clean.Circuit.Channel
+import Clean.Gadgets.Equality
+import Clean.Utils.Tactics.ProvableStructDeriving
+
+/-! # `SubwOperation` native circuit
+
+The proof-oriented Clean implementation, composed with the native MSB gadget. -/
+
+namespace SP1Clean.SubwOperation
+
+open Circuit
+open SP1Clean.Channels (byteChannel)
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  let a := input.a
+  let b := input.b
+  let cols := input.cols
+  let is_real := input.is_real
+  let E0 := is_real - 1
+  let E1 := is_real * E0
+  let E2 := a[0] + 65536
+  let E3 := E2 - 1
+  let E4 := E3 - b[0]
+  let E5 := E4 - cols.value[0]
+  let E6 := E5 + 1
+  let E7 := E6 * ((65536 : ZMod p)⁻¹)
+  let E8 := E7 - 1
+  let E9 := E7 * E8
+  let E10 := is_real * E9
+  let E11 := a[1] + 65536
+  let E12 := E11 - 1
+  let E13 := E12 - b[1]
+  let E14 := E13 - cols.value[1]
+  let E15 := E14 + E7
+  let E16 := E15 * ((65536 : ZMod p)⁻¹)
+  let E17 := E16 - 1
+  let E18 := E16 * E17
+  let E19 := is_real * E18
+  assertion U16MSBOperation.circuit ⟨cols.value[1], { msb := cols.msb.msb }, is_real⟩
+  byteChannel.pullIf is_real (⟨6, cols.value[0], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.value[1], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  assertZero E1
+  E10 === 0
+  E19 === 0
+
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main := by
+  elaborate_circuit_with {
+    channelsWithGuarantees := [byteChannel.toRaw]
+  }
+
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma channelsWithGuarantees_eq :
+    ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
+      = [byteChannel.toRaw] := rfl
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
+    (elaborated (p := p)).localLength x = 0 := rfl
+
+end SP1Clean.SubwOperation

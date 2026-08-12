@@ -11,10 +11,6 @@ namespace SP1Clean.U16CompareOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-omit [Fact p.Prime] in
-/-- `16 < p`, so the `Range` byte-row width column `16` round-trips through `byteRowSpec_range`. -/
-lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-
 /-- The literal meaning of SP1's `U16CompareOperation` constraint list at `is_real = 1`: `bit` is
 boolean and `(a - b) + bit * 2^16` is a genuine 16-bit value. -/
 def RawSpec (a b : ZMod p) (cols : Extracted.U16CompareOperation (ZMod p)) : Prop :=
@@ -26,7 +22,6 @@ theorem compare_of_raw {a b : ZMod p} {cols : Extracted.U16CompareOperation (ZMo
     cols.bit = if a.val < b.val then 1 else 0 := by
   obtain ⟨hbit, hlt⟩ := h_raw
   have hp : 2 ^ 17 < p := Fact.out
-  haveI : NeZero p := ⟨by omega⟩
   set v := (a - b + cols.bit * 65536).val with hv_def
   have hcong : (v : ZMod p) = a - b + cols.bit * 65536 := by rw [hv_def, ZMod.natCast_zmod_val]
   have ea : ((a.val : ℕ) : ZMod p) = a := ZMod.natCast_zmod_val a

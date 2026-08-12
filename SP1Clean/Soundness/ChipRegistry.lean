@@ -1,43 +1,18 @@
-import SP1Clean.Soundness.ChipRow
-import SP1Clean.Proofs.Chips.AddChip.Bridge
-import SP1Clean.Proofs.Chips.AddiChip.Bridge
-import SP1Clean.Proofs.Chips.AddwChip.Bridge
-import SP1Clean.Proofs.Chips.SubChip.Bridge
-import SP1Clean.Proofs.Chips.SubwChip.Bridge
-import SP1Clean.Proofs.Chips.BitwiseChip.Bridge
-import SP1Clean.Proofs.Chips.LtChip.Bridge
-import SP1Clean.Proofs.Chips.ShiftLeftChip.Bridge
-import SP1Clean.Proofs.Chips.ShiftRightChip.Bridge
-import SP1Clean.Proofs.Chips.JalChip.Bridge
-import SP1Clean.Proofs.Chips.JalrChip.Bridge
-import SP1Clean.Proofs.Chips.BranchChip.Bridge
-import SP1Clean.Proofs.Chips.UTypeChip.Bridge
-import SP1Clean.Proofs.Chips.LoadByteChip.Bridge
-import SP1Clean.Proofs.Chips.LoadHalfChip.Bridge
-import SP1Clean.Proofs.Chips.LoadWordChip.Bridge
-import SP1Clean.Proofs.Chips.LoadDoubleChip.Bridge
-import SP1Clean.Proofs.Chips.LoadX0Chip.Bridge
-import SP1Clean.Proofs.Chips.StoreByteChip.Bridge
-import SP1Clean.Proofs.Chips.StoreHalfChip.Bridge
-import SP1Clean.Proofs.Chips.StoreWordChip.Bridge
-import SP1Clean.Proofs.Chips.StoreDoubleChip.Bridge
-import SP1Clean.Proofs.Chips.MulChip.Bridge
-import SP1Clean.Proofs.Chips.DivRemChip.Bridge
-import SP1Clean.Proofs.Chips.AluX0Chip.Bridge
+import SP1Clean.Soundness.SupportedMachine
 
 /-! # `ChipRegistry` — the auditable list of every capstone-wired chip
 
-A single bottom-level hub gathering every chip that has a capstone-integration `Soundness.ChipKind`
+A projection of `SupportedMachine.supportedChips`, gathering every chip that has a capstone-integration `Soundness.ChipKind`
 (defined next to its Sail bridge in `Chips/<Op>Chip/Bridge.lean`). `ChipKind p` is one type — the
 per-chip heterogeneity (its `Inputs`/`Cols` `TypeMap`s) lives *inside* each value — so `List (ChipKind p)`
-type-checks and `allChipKinds` is the one grep-able enumeration of the wired set.
+type-checks and `allChipKinds` is the semantic projection of the one grep-able descriptor.
 
-This file is an enumeration / re-export hub, **not** a dispatch mechanism: the capstone dispatches each
-row generically via `r.kind.reaches_sail`. The registry exists for **auditability** — one entry ⇔ one
+This file is a compatibility projection / re-export hub, **not** a dispatch mechanism: the capstone dispatches each
+row generically via `r.kind.advance`. The registry exists for **auditability** — one entry ⇔ one
 wired chip — and gives a single import that pulls in every `kind`.
 
 The instruction → chip → Sail **routing/identity** home is `Soundness/Coverage.lean` (the `Opcode` →
-`ChipKind` table mirroring SP1's `tracing.rs`); it is tied back to this registry by
+`ChipKind` table mirroring SP1's `tracing.rs`); both are derived from `supportedChips`, with
 `coverage_kinds_eq_registry : coverage.map (·.kind) = allChipKinds`.
 
 ## Wired (25)
@@ -54,27 +29,31 @@ The instruction → chip → Sail **routing/identity** home is `Soundness/Covera
 registry and everything downstream (`sp1Tables`, the capstone, `Coverage`) are stated under
 `[Fact (2 ^ 24 < p)]` with a local `Fact (2 ^ 17 < p)` derived from it; KoalaBear (p ≈ 2³¹) satisfies it.
 
-`DivRem` soundness is axiom-clean; only its `completeness` carries a `sorry`. -/
+Every chip's `circuit` is axiom-clean in both directions (soundness and completeness): the census in
+`docs/snapshots/axiom-ledger.md` and the zero-deferral gate in `scripts/run_audit.sh` certify no
+`sorryAx` anywhere in the released set. -/
 
 namespace SP1Clean.Soundness
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨lt_of_le_of_lt (by norm_num) (Fact.out (p := 2 ^ 24 < p))⟩
 
-/-- Every chip with a capstone-integration `ChipKind`. **Auditable:** one entry ⇔ one wired chip; to wire a
-new chip, define its `kind` in its `Bridge.lean` and add it here. (Not a dispatch table — the capstone
-dispatches generically per row; this is the enumeration the all-chips trace draws from.) -/
+/-- Every chip with a capstone-integration `ChipKind`.  To wire a new chip, define its `kind` beside its
+Sail bridge and add one complete entry to `supportedChips`; do not add another independent list here. -/
 def allChipKinds : List (ChipKind p) :=
-  [ AddChip.kind, AddiChip.kind, AddwChip.kind, SubChip.kind, SubwChip.kind,
-    BitwiseChip.kind, LtChip.kind, ShiftLeftChip.kind, ShiftRightChip.kind,
-    JalChip.kind, JalrChip.kind, BranchChip.kind, UTypeChip.kind,
-    LoadByteChip.kind, LoadHalfChip.kind, LoadWordChip.kind, LoadDoubleChip.kind, LoadX0Chip.kind,
-    StoreByteChip.kind, StoreHalfChip.kind, StoreWordChip.kind, StoreDoubleChip.kind,
-    MulChip.kind, DivRemChip.kind, AluX0Chip.kind ]
+  (supportedChips (p := p)).map (·.kind)
 
 /-- Regression guard: the wired-chip count is exactly 25. If a `kind` is added to / removed from
 `allChipKinds` without updating this, the `rfl` breaks — keeping the audit count honest. -/
 theorem allChipKinds_length : (allChipKinds (p := p)).length = 25 := rfl
+
+/-- **Full advance coverage (SC Phase 4, complete).** Every registered chip carries a populated
+`advance` field (`isSome`) — the 25/25 milestone: MUL/MULHSU (via the Move-2 guarded `inv_mul'`) and the
+four width-8 seam chips (Load/StoreDouble, LoadX0, Mul) are all migrated. This is the fact the dispatcher's
+`h_migrated` coverage residual reduces to: at a real trace row whose `kind ∈ allChipKinds`,
+`kind.advance.isSome` holds, so `chipRows_advance_sound` can fire that chip's `advance` generically. -/
+theorem allChipKinds_migrated : ∀ k ∈ allChipKinds (p := p), k.advance.isSome = true := by
+  intro k hk
+  fin_cases hk <;> rfl
 
 end SP1Clean.Soundness

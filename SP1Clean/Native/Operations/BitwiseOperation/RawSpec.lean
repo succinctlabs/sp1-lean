@@ -1,6 +1,6 @@
 import SP1Clean.Math.Word
 import SP1Clean.Math.Bitwise
-import SP1Clean.Extracted.BitwiseOperation
+import SP1Clean.FormalModel.Contracts.Operations
 
 /-! # `BitwiseOperation` — the arithmetic core (`AssertSpec` / `InteractSpec` + the byteOp lemma)
 
@@ -15,12 +15,12 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- **Assertion half** — trivial: `BitwiseOperation` emits no algebraic `asserts` (every byte fact
 comes from the byte bus). -/
 def AssertSpec (_a _b : Vector (ZMod p) 8) (_opcode : ZMod p)
-    (_cols : Extracted.BitwiseOperation (ZMod p)) : Prop := True
+    (_cols : Columns (ZMod p)) : Prop := True
 
 /-- **Interaction half** — the literal meaning of SP1's `BitwiseOperation` `interactions` list at
 `is_real = 1`: each result byte is the per-byte `byteOp opcode` of the operand bytes. -/
 def InteractSpec (a b : Vector (ZMod p) 8) (opcode : ZMod p)
-    (cols : Extracted.BitwiseOperation (ZMod p)) : Prop :=
+    (cols : Columns (ZMod p)) : Prop :=
   ((cols.result[0].val < 256 ∧ a[0].val < 256 ∧ b[0].val < 256) ∧ cols.result[0].val = byteOp opcode.val a[0].val b[0].val) ∧
   ((cols.result[1].val < 256 ∧ a[1].val < 256 ∧ b[1].val < 256) ∧ cols.result[1].val = byteOp opcode.val a[1].val b[1].val) ∧
   ((cols.result[2].val < 256 ∧ a[2].val < 256 ∧ b[2].val < 256) ∧ cols.result[2].val = byteOp opcode.val a[2].val b[2].val) ∧
@@ -40,15 +40,15 @@ theorem bitwise_of_byteOp {a b : Vector (ZMod p) 8} {opcode : ZMod p} {result : 
   have hp : 2 ^ 17 < p := Fact.out
   refine ⟨fun hop i => ?_, fun hop i => ?_, fun hop i => ?_⟩
   · have hov : opcode.val = 0 := by
-      rw [hop, show ((0 : ZMod p)) = ((0 : ℕ) : ZMod p) from by norm_cast]
+      rw [hop, show ((0 : ZMod p)) = ((0 : ℕ) : ZMod p) by norm_cast]
       exact ZMod.val_natCast_of_lt (by omega)
     rw [h_byteOp i, hov, byteOp_zero]
   · have hov : opcode.val = 1 := by
-      rw [hop, show ((1 : ZMod p)) = ((1 : ℕ) : ZMod p) from by norm_cast]
+      rw [hop, show ((1 : ZMod p)) = ((1 : ℕ) : ZMod p) by norm_cast]
       exact ZMod.val_natCast_of_lt (by omega)
     rw [h_byteOp i, hov, byteOp_one]
   · have hov : opcode.val = 2 := by
-      rw [hop, show ((2 : ZMod p)) = ((2 : ℕ) : ZMod p) from by norm_cast]
+      rw [hop, show ((2 : ZMod p)) = ((2 : ℕ) : ZMod p) by norm_cast]
       exact ZMod.val_natCast_of_lt (by omega)
     rw [h_byteOp i, hov, byteOp_two]
 

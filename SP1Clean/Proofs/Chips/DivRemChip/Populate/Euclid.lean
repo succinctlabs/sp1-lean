@@ -31,7 +31,6 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
-local instance : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-! ## §0 Shared helpers -/
 
@@ -140,6 +139,13 @@ private lemma extNat_int32 (v : BitVec 32) {fv : ℕ} (hf : fv = if v.msb then 1
   · rw [if_pos hm] at hI hse ⊢; rw [if_pos hm, hse]; push_cast; omega
   · rw [if_neg hm] at hI hse ⊢; rw [if_neg hm, hse]; push_cast; omega
 
+set_option linter.unusedSectionVars false in
+/-- The low-32 truncation of a committed u64 word reads off its two low limbs. -/
+private lemma setWidth32_toNat {B : Word (ZMod p)} (hB : B.isU64) :
+    ((Word.toBitVec64 B).setWidth 32).toNat = B[0].val + B[1].val * 2 ^ 16 := by
+  obtain ⟨h0, h1, h2, h3⟩ := Word.lt_cases_of_isU64 hB
+  rw [BitVec.toNat_setWidth, Word.toBitVec64_toNat hB, Word.toNat_def]; omega
+
 /-- Truncating a sign-extended 32-bit value back to 32 bits recovers its `toNat`. -/
 private lemma sext64_toNat_mod32 (y : BitVec 32) :
     (y.signExtend 64).toNat % 2 ^ 32 = y.toNat := by
@@ -234,138 +240,88 @@ private lemma residue_field_coreS {x r cyp res cy : ℕ} {Xf Rf CYPf CYf : ZMod 
   push_cast at hc
   linear_combination hc
 
+/-- The carry split shared by all eight chain-residue identities: the residue is the `2 ^ 16`
+remainder of the step sum and the carry its `2 ^ 16` quotient. -/
+private lemma residue_carry_split {s res cy : ℕ} (hres : res = s % 2 ^ 16)
+    (hcy : cy = s / 2 ^ 16) : s = res + cy * 65536 := by omega
+
 /-- E123's value form: the step-0 byte-pull operand is the cast of `chainResidueNat 0`. -/
 lemma chain_residue_field_0 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
     (populateCtq B C f)[0] + (populateRemComp B C f)[0] - (populateCarry B C f)[0] * 65536
-      = ((chainResidueNat B C f 0 : ℕ) : ZMod p) := by
-  have hN : ctqLimbNat B C f 0 + remAddendNat B C f 0
-      = chainResidueNat B C f 0 + carryNat B C f 0 * 65536 := by
-    have h1 : chainResidueNat B C f 0
-        = (ctqLimbNat B C f 0 + remAddendNat B C f 0) % 2 ^ 16 := by
-      simp [chainResidueNat]
-    have h2 : carryNat B C f 0 = (ctqLimbNat B C f 0 + remAddendNat B C f 0) / 2 ^ 16 := rfl
-    omega
-  exact residue_field_core0 (populateCtq_cast B C f 0 (by norm_num))
-    (populateRemComp_cast B C f 0 (by norm_num)) (populateCarry_cast B C f 0 (by norm_num)) hN
+      = ((chainResidueNat B C f 0 : ℕ) : ZMod p) :=
+  residue_field_core0 (populateCtq_cast B C f 0 (by norm_num))
+    (populateRemComp_cast B C f 0 (by norm_num)) (populateCarry_cast B C f 0 (by norm_num))
+    (residue_carry_split (by simp [chainResidueNat]) rfl)
 
 /-- E127's value form (step 1, incoming carry `carry[0]`). -/
 lemma chain_residue_field_1 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
     (populateCtq B C f)[1] + (populateRemComp B C f)[1] - (populateCarry B C f)[1] * 65536
       + (populateCarry B C f)[0]
-      = ((chainResidueNat B C f 1 : ℕ) : ZMod p) := by
-  have hN : ctqLimbNat B C f 1 + remAddendNat B C f 1 + carryNat B C f 0
-      = chainResidueNat B C f 1 + carryNat B C f 1 * 65536 := by
-    have h1 : chainResidueNat B C f 1
-        = (ctqLimbNat B C f 1 + remAddendNat B C f 1 + carryNat B C f 0) % 2 ^ 16 := by
-      simp [chainResidueNat]
-    have h2 : carryNat B C f 1
-        = (ctqLimbNat B C f 1 + remAddendNat B C f 1 + carryNat B C f 0) / 2 ^ 16 := rfl
-    omega
-  exact residue_field_coreS (populateCtq_cast B C f 1 (by norm_num))
+      = ((chainResidueNat B C f 1 : ℕ) : ZMod p) :=
+  residue_field_coreS (populateCtq_cast B C f 1 (by norm_num))
     (populateRemComp_cast B C f 1 (by norm_num)) (populateCarry_cast B C f 0 (by norm_num))
-    (populateCarry_cast B C f 1 (by norm_num)) hN
+    (populateCarry_cast B C f 1 (by norm_num))
+    (residue_carry_split (by simp [chainResidueNat]) rfl)
 
 /-- E131's value form (step 2). -/
 lemma chain_residue_field_2 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
     (populateCtq B C f)[2] + (populateRemComp B C f)[2] - (populateCarry B C f)[2] * 65536
       + (populateCarry B C f)[1]
-      = ((chainResidueNat B C f 2 : ℕ) : ZMod p) := by
-  have hN : ctqLimbNat B C f 2 + remAddendNat B C f 2 + carryNat B C f 1
-      = chainResidueNat B C f 2 + carryNat B C f 2 * 65536 := by
-    have h1 : chainResidueNat B C f 2
-        = (ctqLimbNat B C f 2 + remAddendNat B C f 2 + carryNat B C f 1) % 2 ^ 16 := by
-      simp [chainResidueNat]
-    have h2 : carryNat B C f 2
-        = (ctqLimbNat B C f 2 + remAddendNat B C f 2 + carryNat B C f 1) / 2 ^ 16 := rfl
-    omega
-  exact residue_field_coreS (populateCtq_cast B C f 2 (by norm_num))
+      = ((chainResidueNat B C f 2 : ℕ) : ZMod p) :=
+  residue_field_coreS (populateCtq_cast B C f 2 (by norm_num))
     (populateRemComp_cast B C f 2 (by norm_num)) (populateCarry_cast B C f 1 (by norm_num))
-    (populateCarry_cast B C f 2 (by norm_num)) hN
+    (populateCarry_cast B C f 2 (by norm_num))
+    (residue_carry_split (by simp [chainResidueNat]) rfl)
 
 /-- E135's value form (step 3). -/
 lemma chain_residue_field_3 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
     (populateCtq B C f)[3] + (populateRemComp B C f)[3] - (populateCarry B C f)[3] * 65536
       + (populateCarry B C f)[2]
-      = ((chainResidueNat B C f 3 : ℕ) : ZMod p) := by
-  have hN : ctqLimbNat B C f 3 + remAddendNat B C f 3 + carryNat B C f 2
-      = chainResidueNat B C f 3 + carryNat B C f 3 * 65536 := by
-    have h1 : chainResidueNat B C f 3
-        = (ctqLimbNat B C f 3 + remAddendNat B C f 3 + carryNat B C f 2) % 2 ^ 16 := by
-      simp [chainResidueNat]
-    have h2 : carryNat B C f 3
-        = (ctqLimbNat B C f 3 + remAddendNat B C f 3 + carryNat B C f 2) / 2 ^ 16 := rfl
-    omega
-  exact residue_field_coreS (populateCtq_cast B C f 3 (by norm_num))
+      = ((chainResidueNat B C f 3 : ℕ) : ZMod p) :=
+  residue_field_coreS (populateCtq_cast B C f 3 (by norm_num))
     (populateRemComp_cast B C f 3 (by norm_num)) (populateCarry_cast B C f 2 (by norm_num))
-    (populateCarry_cast B C f 3 (by norm_num)) hN
+    (populateCarry_cast B C f 3 (by norm_num))
+    (residue_carry_split (by simp [chainResidueNat]) rfl)
 
 /-- E139's value form (step 4, the `rem_neg · 65535` sign-fill addend). -/
 lemma chain_residue_field_4 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
     (populateCtq B C f)[4] + populateRemNeg B C f * 65535 - (populateCarry B C f)[4] * 65536
       + (populateCarry B C f)[3]
-      = ((chainResidueNat B C f 4 : ℕ) : ZMod p) := by
-  have hN : ctqLimbNat B C f 4 + remAddendNat B C f 4 + carryNat B C f 3
-      = chainResidueNat B C f 4 + carryNat B C f 4 * 65536 := by
-    have h1 : chainResidueNat B C f 4
-        = (ctqLimbNat B C f 4 + remAddendNat B C f 4 + carryNat B C f 3) % 2 ^ 16 := by
-      simp [chainResidueNat]
-    have h2 : carryNat B C f 4
-        = (ctqLimbNat B C f 4 + remAddendNat B C f 4 + carryNat B C f 3) / 2 ^ 16 := rfl
-    omega
-  exact residue_field_coreS (populateCtq_cast B C f 4 (by norm_num))
+      = ((chainResidueNat B C f 4 : ℕ) : ZMod p) :=
+  residue_field_coreS (populateCtq_cast B C f 4 (by norm_num))
     (remNeg_fill_cast B C f (by norm_num)) (populateCarry_cast B C f 3 (by norm_num))
-    (populateCarry_cast B C f 4 (by norm_num)) hN
+    (populateCarry_cast B C f 4 (by norm_num))
+    (residue_carry_split (by simp [chainResidueNat]) rfl)
 
 /-- E143's value form (step 5). -/
 lemma chain_residue_field_5 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
     (populateCtq B C f)[5] + populateRemNeg B C f * 65535 - (populateCarry B C f)[5] * 65536
       + (populateCarry B C f)[4]
-      = ((chainResidueNat B C f 5 : ℕ) : ZMod p) := by
-  have hN : ctqLimbNat B C f 5 + remAddendNat B C f 5 + carryNat B C f 4
-      = chainResidueNat B C f 5 + carryNat B C f 5 * 65536 := by
-    have h1 : chainResidueNat B C f 5
-        = (ctqLimbNat B C f 5 + remAddendNat B C f 5 + carryNat B C f 4) % 2 ^ 16 := by
-      simp [chainResidueNat]
-    have h2 : carryNat B C f 5
-        = (ctqLimbNat B C f 5 + remAddendNat B C f 5 + carryNat B C f 4) / 2 ^ 16 := rfl
-    omega
-  exact residue_field_coreS (populateCtq_cast B C f 5 (by norm_num))
+      = ((chainResidueNat B C f 5 : ℕ) : ZMod p) :=
+  residue_field_coreS (populateCtq_cast B C f 5 (by norm_num))
     (remNeg_fill_cast B C f (by norm_num)) (populateCarry_cast B C f 4 (by norm_num))
-    (populateCarry_cast B C f 5 (by norm_num)) hN
+    (populateCarry_cast B C f 5 (by norm_num))
+    (residue_carry_split (by simp [chainResidueNat]) rfl)
 
 /-- E147's value form (step 6). -/
 lemma chain_residue_field_6 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
     (populateCtq B C f)[6] + populateRemNeg B C f * 65535 - (populateCarry B C f)[6] * 65536
       + (populateCarry B C f)[5]
-      = ((chainResidueNat B C f 6 : ℕ) : ZMod p) := by
-  have hN : ctqLimbNat B C f 6 + remAddendNat B C f 6 + carryNat B C f 5
-      = chainResidueNat B C f 6 + carryNat B C f 6 * 65536 := by
-    have h1 : chainResidueNat B C f 6
-        = (ctqLimbNat B C f 6 + remAddendNat B C f 6 + carryNat B C f 5) % 2 ^ 16 := by
-      simp [chainResidueNat]
-    have h2 : carryNat B C f 6
-        = (ctqLimbNat B C f 6 + remAddendNat B C f 6 + carryNat B C f 5) / 2 ^ 16 := rfl
-    omega
-  exact residue_field_coreS (populateCtq_cast B C f 6 (by norm_num))
+      = ((chainResidueNat B C f 6 : ℕ) : ZMod p) :=
+  residue_field_coreS (populateCtq_cast B C f 6 (by norm_num))
     (remNeg_fill_cast B C f (by norm_num)) (populateCarry_cast B C f 5 (by norm_num))
-    (populateCarry_cast B C f 6 (by norm_num)) hN
+    (populateCarry_cast B C f 6 (by norm_num))
+    (residue_carry_split (by simp [chainResidueNat]) rfl)
 
 /-- E151's value form (step 7, the top byte pull). -/
 lemma chain_residue_field_7 (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
     (populateCtq B C f)[7] + populateRemNeg B C f * 65535 - (populateCarry B C f)[7] * 65536
       + (populateCarry B C f)[6]
-      = ((chainResidueNat B C f 7 : ℕ) : ZMod p) := by
-  have hN : ctqLimbNat B C f 7 + remAddendNat B C f 7 + carryNat B C f 6
-      = chainResidueNat B C f 7 + carryNat B C f 7 * 65536 := by
-    have h1 : chainResidueNat B C f 7
-        = (ctqLimbNat B C f 7 + remAddendNat B C f 7 + carryNat B C f 6) % 2 ^ 16 := by
-      simp [chainResidueNat]
-    have h2 : carryNat B C f 7
-        = (ctqLimbNat B C f 7 + remAddendNat B C f 7 + carryNat B C f 6) / 2 ^ 16 := rfl
-    omega
-  exact residue_field_coreS (populateCtq_cast B C f 7 (by norm_num))
+      = ((chainResidueNat B C f 7 : ℕ) : ZMod p) :=
+  residue_field_coreS (populateCtq_cast B C f 7 (by norm_num))
     (remNeg_fill_cast B C f (by norm_num)) (populateCarry_cast B C f 6 (by norm_num))
-    (populateCarry_cast B C f 7 (by norm_num)) hN
+    (populateCarry_cast B C f 7 (by norm_num))
+    (residue_carry_split (by simp [chainResidueNat]) rfl)
 
 /-! ## §2 The master Euclidean limb identities
 
@@ -385,7 +341,34 @@ def bExtNat (B : Word (ZMod p)) (f : Vector (ZMod p) 8) : ℕ :=
   Word.toNat (bComp B f) + (populateBNeg B f).val * (2 ^ 128 - 2 ^ 64)
 
 set_option linter.unusedSectionVars false in
-set_option maxHeartbeats 400000 in
+/-- The extended remainder in terms of the raw `remainder_comp` bit-vector. -/
+private lemma remExtNat_eq (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
+    remExtNat B C f
+      = (remCompBits B C f).toNat + (populateRemNeg B C f).val * (2 ^ 128 - 2 ^ 64) := by
+  have hrcv : Word.toNat (populateRemComp B C f) = (remCompBits B C f).toNat :=
+    toNat_wordOfBits _
+  simp only [remExtNat, hrcv]
+
+/-- The extended remainder fits in 128 bits: a u64 `remainder_comp` under a boolean sign fill. -/
+private lemma remExtNat_lt (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
+    (hsig : f[0] + f[2] + f[4] + f[5] = 0 ∨ f[0] + f[2] + f[4] + f[5] = 1) :
+    remExtNat B C f < 2 ^ 128 := by
+  have h1 : Word.toNat (populateRemComp B C f) < 2 ^ 64 :=
+    toNat_lt_2_64 (populateRemComp_isU64 B C f)
+  have h2 : (populateRemNeg B C f).val ≤ 1 := by
+    rcases populateRemNeg_bool B C hsig with h | h <;> rw [h] <;> simp [ZMod.val_one]
+  simp only [remExtNat]; omega
+
+/-- As `remExtNat_lt`, for the extended operand `b`. -/
+private lemma bExtNat_lt {B : Word (ZMod p)} (hB : B.isU64) {f : Vector (ZMod p) 8}
+    (hsig : f[0] + f[2] + f[4] + f[5] = 0 ∨ f[0] + f[2] + f[4] + f[5] = 1) :
+    bExtNat B f < 2 ^ 128 := by
+  have h1 : Word.toNat (bComp B f) < 2 ^ 64 := toNat_lt_2_64 (bComp_isU64 hB f)
+  have h2 : (populateBNeg B f).val ≤ 1 := by
+    rcases populateBNeg_bool hB hsig with h | h <;> rw [h] <;> simp [ZMod.val_one]
+  simp only [bExtNat]; omega
+
+set_option linter.unusedSectionVars false in
 /-- Low 64-bit digit reconstruction of `X` (helper for `chain_limbs_of_sum`). -/
 private lemma chain_recon_lo (X : ℕ) :
     X % 2 ^ 64 = X % 2 ^ 16 + X / 2 ^ 16 % 2 ^ 16 * 2 ^ 16
@@ -393,7 +376,6 @@ private lemma chain_recon_lo (X : ℕ) :
   omega
 
 set_option linter.unusedSectionVars false in
-set_option maxHeartbeats 400000 in
 /-- The carry out of the low 64 bits in closed form — keeps the high-limb omegas shallow
 (no deep nested carry chain). -/
 private lemma chain_carry_lo {X r0 r1 r2 r3 cy0 cy1 cy2 cy3 : ℕ}
@@ -406,7 +388,6 @@ private lemma chain_carry_lo {X r0 r1 r2 r3 cy0 cy1 cy2 cy3 : ℕ}
   omega
 
 set_option linter.unusedSectionVars false in
-set_option maxHeartbeats 400000 in
 /-- The two equation-form half-sum constraints, derived from the 128-bit aggregate. The
 equation form (`= Z%2^64 + cy3·2^64`) is what keeps each per-limb omega shallow. -/
 private lemma chain_half_constraints {X Z k r0 r1 r2 r3 r4 r5 r6 r7 cy3 : ℕ}
@@ -420,7 +401,6 @@ private lemma chain_half_constraints {X Z k r0 r1 r2 r3 r4 r5 r6 r7 cy3 : ℕ}
   exact ⟨by omega, by omega⟩
 
 set_option linter.unusedSectionVars false in
-set_option maxHeartbeats 400000 in
 /-- Low ripple: the four low chain limb equations from the low half-sum constraint. -/
 private lemma chain_low_limbs {X Z r0 r1 r2 r3 cy0 cy1 cy2 cy3 : ℕ}
     (hcy0 : cy0 = (X % 2 ^ 16 + r0) / 2 ^ 16)
@@ -436,7 +416,6 @@ private lemma chain_low_limbs {X Z r0 r1 r2 r3 cy0 cy1 cy2 cy3 : ℕ}
   refine ⟨?_, ?_, ?_, ?_⟩ <;> omega
 
 set_option linter.unusedSectionVars false in
-set_option maxHeartbeats 400000 in
 /-- High ripple: the four high chain limb equations from the high half-sum constraint, with the
 incoming carry `cy3` taken as a flat atom. -/
 private lemma chain_high_limbs {X Z k r4 r5 r6 r7 cy3 cy4 cy5 cy6 cy7 : ℕ}
@@ -539,7 +518,21 @@ private lemma limb_field_hi {x r cyp z cy : ℕ} {Xf Rf CYPf Zf CYf : ZMod p}
   push_cast at hc
   linear_combination -hc
 
-set_option maxHeartbeats 1000000 in
+-- 4.30: the `hz5`/`hz6`/`hz7` extended-digit extractions run `omega` on the aggregate
+-- `Word.toNat (bComp B f) + (populateBNeg B f).val * (2^128 - 2^64)` divided by `2^80`/`2^96`/`2^112`.
+-- Against those opaque subterms `omega` hits `maxRecDepth`; over fresh `t`/`b` (with `interval_cases b`
+-- splitting the boolean) it discharges cleanly, so we factor the arithmetic into these three helpers.
+-- Measured 2026-08: post-factoring the three helpers need no recursion budget at all — each clears
+-- Lean's plain 512 default; the former 10000 ceilings were residue from the pre-factoring shape.
+private lemma fill_digit_80 (t b : ℕ) (ht : t < 2 ^ 64) (hb : b ≤ 1) :
+    b * 65535 = (t + b * (2 ^ 128 - 2 ^ 64)) / 2 ^ 80 % 2 ^ 16 := by interval_cases b <;> omega
+
+private lemma fill_digit_96 (t b : ℕ) (ht : t < 2 ^ 64) (hb : b ≤ 1) :
+    b * 65535 = (t + b * (2 ^ 128 - 2 ^ 64)) / 2 ^ 96 % 2 ^ 16 := by interval_cases b <;> omega
+
+private lemma fill_digit_112 (t b : ℕ) (ht : t < 2 ^ 64) (hb : b ≤ 1) :
+    b * 65535 = (t + b * (2 ^ 128 - 2 ^ 64)) / 2 ^ 112 % 2 ^ 16 := by interval_cases b <;> omega
+
 /-- **Aggregate → limb equations.** Any class that proves the 128-bit aggregate congruence
 `ctqProd + remExtNat = bExtNat + 2^128·k` gets the eight field limb equations: digit-extract
 with `chain_limbs_of_sum`, then cast each digit equation. -/
@@ -552,11 +545,9 @@ private lemma euclid_limbs_of_agg {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
   obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 (bComp_isU64 hB f)
   have hbnv : (populateBNeg B f).val ≤ 1 := by
     rcases populateBNeg_bool hB hsig with h | h <;> rw [h] <;> simp [ZMod.val_one]
-  have hrnv : (populateRemNeg B C f).val ≤ 1 := by
-    rcases populateRemNeg_bool B C hsig with h | h <;> rw [h] <;> simp [ZMod.val_one]
   have hXlt : (ctqProd B C f).toNat < 2 ^ 128 := (ctqProd B C f).isLt
-  have hZlt : bExtNat B f < 2 ^ 128 := by
-    simp only [bExtNat, Word.toNat_def]; omega
+  have hZlt : bExtNat B f < 2 ^ 128 := bExtNat_lt hB hsig
+  have hc : Word.toNat (bComp B f) < 2 ^ 64 := toNat_lt_2_64 (bComp_isU64 hB f)
   -- the committed-operand digits of `bExtNat`
   have hz0 : ((bComp B f)[0]).val = bExtNat B f % 2 ^ 16 := by
     simp only [bExtNat, Word.toNat_def]; omega
@@ -569,20 +560,11 @@ private lemma euclid_limbs_of_agg {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
   have hz4 : (populateBNeg B f).val * 65535 = bExtNat B f / 2 ^ 64 % 2 ^ 16 := by
     simp only [bExtNat, Word.toNat_def]; omega
   have hz5 : (populateBNeg B f).val * 65535 = bExtNat B f / 2 ^ 80 % 2 ^ 16 := by
-    have hc : Word.toNat (bComp B f) < 2 ^ 64 := toNat_lt_2_64 (bComp_isU64 hB f)
-    simp only [bExtNat]
-    rcases (by omega : (populateBNeg B f).val = 0 ∨ (populateBNeg B f).val = 1) with h | h <;>
-      rw [h] <;> omega
+    simp only [bExtNat]; exact fill_digit_80 _ _ hc hbnv
   have hz6 : (populateBNeg B f).val * 65535 = bExtNat B f / 2 ^ 96 % 2 ^ 16 := by
-    have hc : Word.toNat (bComp B f) < 2 ^ 64 := toNat_lt_2_64 (bComp_isU64 hB f)
-    simp only [bExtNat]
-    rcases (by omega : (populateBNeg B f).val = 0 ∨ (populateBNeg B f).val = 1) with h | h <;>
-      rw [h] <;> omega
+    simp only [bExtNat]; exact fill_digit_96 _ _ hc hbnv
   have hz7 : (populateBNeg B f).val * 65535 = bExtNat B f / 2 ^ 112 % 2 ^ 16 := by
-    have hc : Word.toNat (bComp B f) < 2 ^ 64 := toNat_lt_2_64 (bComp_isU64 hB f)
-    simp only [bExtNat]
-    rcases (by omega : (populateBNeg B f).val = 0 ∨ (populateBNeg B f).val = 1) with h | h <;>
-      rw [h] <;> omega
+    simp only [bExtNat]; exact fill_digit_112 _ _ hc hbnv
   -- the product digits
   have hx0 : ctqLimbNat B C f 0 = (ctqProd B C f).toNat % 2 ^ 16 := by
     norm_num [ctqLimbNat]
@@ -692,7 +674,6 @@ private lemma signed_agg {A R Z : ℕ} {b1 b2 b3 : Bool}
   · exact ⟨0, by omega⟩
   · exact ⟨1, by omega⟩
 
-set_option maxHeartbeats 800000 in
 /-- Signed 64-bit class core (`div`/`rem`), from the reduced flag sums. -/
 private lemma euclid_limbs_s64_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
     (hB : B.isU64)
@@ -750,10 +731,7 @@ private lemma euclid_limbs_s64_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8
   have hRdef_of : ∀ y : BitVec 64, remBits B C f = y →
       remExtNat B C f = y.toNat + (if y.msb then 1 else 0) * (2 ^ 128 - 2 ^ 64) := by
     intro y hy
-    have hrcv : Word.toNat (populateRemComp B C f) = (remCompBits B C f).toNat :=
-      toNat_wordOfBits _
-    simp only [remExtNat]
-    rw [hrcv, hrcb, hrn, hy, val_ite01]
+    rw [remExtNat_eq, hrcb, hrn, hy, val_ite01]
   by_cases hc0 : Word.toBitVec64 C = 0
   · -- divisor zero: `X = 0`, `R = Z`, `k = 0`
     have hX0 : (ctqProd B C f).toNat = 0 := by
@@ -801,22 +779,10 @@ private lemma euclid_limbs_s64_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8
             - (if (Word.toBitVec64 B).msb then (2 : ℤ) ^ 128 else 0)) := by
       rw [hXint, hRint, hZint]
       linear_combination -hident
-    have hXlt := (ctqProd B C f).isLt
-    have hRlt : remExtNat B C f < 2 ^ 128 := by
-      have h1 : Word.toNat (populateRemComp B C f) < 2 ^ 64 :=
-        toNat_lt_2_64 (populateRemComp_isU64 B C f)
-      have h2 : (populateRemNeg B C f).val ≤ 1 := by
-        rcases populateRemNeg_bool B C (Or.inr hsig) with h | h <;> rw [h] <;>
-          simp [ZMod.val_one]
-      simp only [remExtNat]; omega
-    have hZlt : bExtNat B f < 2 ^ 128 := by
-      have h1 : Word.toNat (bComp B f) < 2 ^ 64 := toNat_lt_2_64 (bComp_isU64 hB f)
-      have h2 : (populateBNeg B f).val ≤ 1 := by
-        rcases populateBNeg_bool hB (Or.inr hsig) with h | h <;> rw [h] <;> simp [ZMod.val_one]
-      simp only [bExtNat]; omega
-    exact euclid_limbs_of_agg hB (Or.inr hsig) (signed_agg hXlt hRlt hZlt hcomb)
+    exact euclid_limbs_of_agg hB (Or.inr hsig)
+      (signed_agg (ctqProd B C f).isLt (remExtNat_lt B C (Or.inr hsig))
+        (bExtNat_lt hB (Or.inr hsig)) hcomb)
 
-set_option maxHeartbeats 800000 in
 /-- Unsigned 64-bit class core (`divu`/`remu`): `k = 0`, pure `Nat.div_add_mod`. -/
 private lemma euclid_limbs_u64_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
     (hB : B.isU64)
@@ -854,10 +820,7 @@ private lemma euclid_limbs_u64_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8
     rw [hbc, ← Word.toBitVec64_toNat hB, hbn0, ZMod.val_zero]
     omega
   have hRn : remExtNat B C f = (remBits B C f).toNat := by
-    have hrcv : Word.toNat (populateRemComp B C f) = (remCompBits B C f).toNat :=
-      toNat_wordOfBits _
-    simp only [remExtNat]
-    rw [hrcv, hrcb, hrn0, ZMod.val_zero]
+    rw [remExtNat_eq, hrcb, hrn0, ZMod.val_zero]
     omega
   have hXn : (ctqProd B C f).toNat
       = (quotBits B C f).toNat * (Word.toBitVec64 C).toNat := by
@@ -886,7 +849,6 @@ private lemma euclid_limbs_u64_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8
           (Word.toBitVec64 C).toNat]
     exact Nat.div_add_mod _ _
 
-set_option maxHeartbeats 1600000 in
 /-- Signed word class core (`divw`/`remw`): the 32-bit signed identity, transported through the
 sign extensions. -/
 private lemma euclid_limbs_sW_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
@@ -931,10 +893,8 @@ private lemma euclid_limbs_sW_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
   have hqcv : Word.toBitVec64 (populateQuotComp B C f) = quotCompBits B C f :=
     wordOfBits_toBitVec64 _
   -- low-32 values of the raw reads
-  have hb32 : ((Word.toBitVec64 B).setWidth 32).toNat = B[0].val + B[1].val * 2 ^ 16 := by
-    rw [BitVec.toNat_setWidth, Word.toBitVec64_toNat hB, Word.toNat_def]; omega
-  have hc32 : ((Word.toBitVec64 C).setWidth 32).toNat = C[0].val + C[1].val * 2 ^ 16 := by
-    rw [BitVec.toNat_setWidth, Word.toBitVec64_toNat hC, Word.toNat_def]; omega
+  have hb32 := setWidth32_toNat hB
+  have hc32 := setWidth32_toNat hC
   -- the committed operands are sign extensions of the low-32 reads
   have hbcbv : Word.toBitVec64 (bComp B f)
       = ((Word.toBitVec64 B).setWidth 32).signExtend 64 := by
@@ -989,10 +949,7 @@ private lemma euclid_limbs_sW_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
       remExtNat B C f
         = (y.signExtend 64).toNat + (if y.msb then 1 else 0) * (2 ^ 128 - 2 ^ 64) := by
     intro y hy
-    have hrcv : Word.toNat (populateRemComp B C f) = (remCompBits B C f).toNat :=
-      toNat_wordOfBits _
-    simp only [remExtNat]
-    rw [hrcv, hrcb, hy, hrn_of y hy, val_ite01]
+    rw [remExtNat_eq, hrcb, hy, hrn_of y hy, val_ite01]
   have hZint : (bExtNat B f : ℤ) = ((Word.toBitVec64 B).setWidth 32).toInt
       + (if ((Word.toBitVec64 B).setWidth 32).msb then (2 : ℤ) ^ 128 else 0) := by
     rw [hZdef]
@@ -1048,22 +1005,10 @@ private lemma euclid_limbs_sW_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
             - (if ((Word.toBitVec64 B).setWidth 32).msb then (2 : ℤ) ^ 128 else 0)) := by
       rw [hXint, hRint, hZint]
       linear_combination -hident
-    have hXlt := (ctqProd B C f).isLt
-    have hRlt : remExtNat B C f < 2 ^ 128 := by
-      have h1 : Word.toNat (populateRemComp B C f) < 2 ^ 64 :=
-        toNat_lt_2_64 (populateRemComp_isU64 B C f)
-      have h2 : (populateRemNeg B C f).val ≤ 1 := by
-        rcases populateRemNeg_bool B C (Or.inr hsig) with h | h <;> rw [h] <;>
-          simp [ZMod.val_one]
-      simp only [remExtNat]; omega
-    have hZlt : bExtNat B f < 2 ^ 128 := by
-      have h1 : Word.toNat (bComp B f) < 2 ^ 64 := toNat_lt_2_64 (bComp_isU64 hB f)
-      have h2 : (populateBNeg B f).val ≤ 1 := by
-        rcases populateBNeg_bool hB (Or.inr hsig) with h | h <;> rw [h] <;> simp [ZMod.val_one]
-      simp only [bExtNat]; omega
-    exact euclid_limbs_of_agg hB (Or.inr hsig) (signed_agg hXlt hRlt hZlt hcomb)
+    exact euclid_limbs_of_agg hB (Or.inr hsig)
+      (signed_agg (ctqProd B C f).isLt (remExtNat_lt B C (Or.inr hsig))
+        (bExtNat_lt hB (Or.inr hsig)) hcomb)
 
-set_option maxHeartbeats 800000 in
 /-- Unsigned word class core (`divuw`/`remuw`): zero-extended truncations, `k = 0`. -/
 private lemma euclid_limbs_uW_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
     (hB : B.isU64) (hC : C.isU64)
@@ -1099,10 +1044,8 @@ private lemma euclid_limbs_uW_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
     simp only [ctqProd]; rw [if_neg hnsig]
   have hbn0 : populateBNeg B f = 0 := by rw [populateBNeg_def, hsig0, zero_mul]
   have hrn0 : populateRemNeg B C f = 0 := by rw [populateRemNeg_def, hsig0, zero_mul]
-  have hb32 : ((Word.toBitVec64 B).setWidth 32).toNat = B[0].val + B[1].val * 2 ^ 16 := by
-    rw [BitVec.toNat_setWidth, Word.toBitVec64_toNat hB, Word.toNat_def]; omega
-  have hc32 : ((Word.toBitVec64 C).setWidth 32).toNat = C[0].val + C[1].val * 2 ^ 16 := by
-    rw [BitVec.toNat_setWidth, Word.toBitVec64_toNat hC, Word.toNat_def]; omega
+  have hb32 := setWidth32_toNat hB
+  have hc32 := setWidth32_toNat hC
   have hccn : (Word.toBitVec64 (cComp C f)).toNat
       = ((Word.toBitVec64 C).setWidth 32).toNat := by
     rw [Word.toBitVec64_toNat (cComp_isU64 hC f), hcc, Word.toNat_def, hc32]
@@ -1116,10 +1059,7 @@ private lemma euclid_limbs_uW_core {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
       List.getElem_cons_succ, ZMod.val_zero]
     omega
   have hRn : remExtNat B C f = (remBits B C f).toNat % 2 ^ 32 := by
-    have hrcv : Word.toNat (populateRemComp B C f) = (remCompBits B C f).toNat :=
-      toNat_wordOfBits _
-    simp only [remExtNat]
-    rw [hrcv, hrcb, BitVec.toNat_setWidth_of_le (by norm_num), BitVec.toNat_setWidth,
+    rw [remExtNat_eq, hrcb, BitVec.toNat_setWidth_of_le (by norm_num), BitVec.toNat_setWidth,
         hrn0, ZMod.val_zero]
     omega
   have hqcn : (Word.toBitVec64 (populateQuotComp B C f)).toNat
@@ -1179,11 +1119,8 @@ theorem euclid_limbs_s64 {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
     (hnotmin : ¬(Word.toBitVec64 B = BitVec.intMin 64
         ∧ Word.toBitVec64 C = BitVec.allOnes 64)) :
     EuclidLimbEqs B C f := by
-  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩
+  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with h | h | h | h | h | h | h | h
+  all_goals obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ := h
   all_goals first
     | (rw [h0, h2, add_zero] at hcls
        exact absurd hcls (Ne.symm one_ne_zero))
@@ -1199,11 +1136,8 @@ theorem euclid_limbs_u64 {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
     (hsum : f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] = 1)
     (hcls : f[1] + f[3] = 1) :
     EuclidLimbEqs B C f := by
-  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩
+  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with h | h | h | h | h | h | h | h
+  all_goals obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ := h
   all_goals first
     | (rw [h1, h3, add_zero] at hcls
        exact absurd hcls (Ne.symm one_ne_zero))
@@ -1221,11 +1155,8 @@ theorem euclid_limbs_sW {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
     (hnotmin : ¬((Word.toBitVec64 B).setWidth 32 = BitVec.intMin 32
         ∧ (Word.toBitVec64 C).setWidth 32 = BitVec.allOnes 32)) :
     EuclidLimbEqs B C f := by
-  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩
+  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with h | h | h | h | h | h | h | h
+  all_goals obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ := h
   all_goals first
     | (rw [h4, h5, add_zero] at hcls
        exact absurd hcls (Ne.symm one_ne_zero))
@@ -1241,11 +1172,8 @@ theorem euclid_limbs_uW {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
     (hsum : f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] = 1)
     (hcls : f[6] + f[7] = 1) :
     EuclidLimbEqs B C f := by
-  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ |
-    ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ | ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩
+  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with h | h | h | h | h | h | h | h
+  all_goals obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ := h
   all_goals first
     | (rw [h6, h7, add_zero] at hcls
        exact absurd hcls (Ne.symm one_ne_zero))

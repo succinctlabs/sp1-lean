@@ -1,4 +1,4 @@
-import SP1Clean.Native.Chips.LtChip.Defs
+import SP1Clean.Faithful.LtChip
 import SP1CleanTest.TraceGenTests.TraceGenerator
 import SP1CleanTest.TraceGenTests.LtChipTraceVectors
 
@@ -6,10 +6,12 @@ import SP1CleanTest.TraceGenTests.LtChipTraceVectors
 
 Every row is rebuilt from `LtChip.main`'s own witness closures (the `"lt_flags"` hint flags and
 the `LtOperationSigned` column block via `LtOperationSigned.populate` at `is_signed = is_slt`)
-plus the output-struct layout, with `ltHint` building the per-event flag `ProverHint` from the
+plus the output-struct layout (reaching the Rust 44-column `LtCols` order through the audited
+whole-row `ltChipReconfigure` map), with `ltHint` building the per-event flag `ProverHint` from the
 dumped executor opcode (SLT = 9, SLTU = 10). The battery cycles **both variants**, immediate-`c`
 rows only (on register-`c` rows the chip's compare operand `adapter.op_c` is the register-index
-word rather than the read value — a documented adapter-projection scope gap, independent of the
+word rather than the read value — a disclosed adapter-projection scope gap, this docstring being
+the disclosure; independent of the
 flags), and the comparison is **unmasked** (all 44 columns). -/
 
 namespace SP1Clean.TraceGenTests
@@ -27,8 +29,8 @@ hint from the event's opcode), zero padding to SP1's height. -/
 def ltChipDerivedTrace : List (List (ZMod SP1Prime)) :=
   generateTrace
     (fun e =>
-      circuitTraceRow LtChip.Inputs (LtChip.main (p := SP1Prime))
-        (aluTypeOpEventInputs e) (ltHint e.opcode))
+      circuitTraceRowMapped LtChip.Inputs (LtChip.main (p := SP1Prime))
+        Faithful.ltChipReconfigure (aluTypeOpEventInputs e) (ltHint e.opcode))
     LtChipTraceEvents LtChipTraceHeight 44
 
 theorem ltchip_trace_conforms :

@@ -1,11 +1,11 @@
 import SP1Clean.Math.Word
-import SP1Clean.Extracted.SubwOperation
+import SP1Clean.FormalModel.Contracts.Operations
 
 /-! # `SubwOperation` — `populate` (the witness generator, borrow-form analog of `AddwOperation`)
 
 SP1's `SubwOperation::populate` ported natively: the low two u16 limbs of `(a-b) mod 2^32` in
 two's-complement borrow form (`subwValueWitness`, carry init `1`, complement `65535 - b[i]`) and bit 15
-of the high result limb (`subwMsbWitness`), packaged into the `Extracted.SubwOperation` column struct.
+of the high result limb (`subwMsbWitness`), packaged into the native `Columns` struct.
 The composing `SubwChip` witnesses the columns with this; `spec_populate` lives in `Formal`. -/
 
 namespace SP1Clean.SubwOperation
@@ -24,7 +24,7 @@ def subwMsbWitness (a b : Word (ZMod p)) : ZMod p :=
   (((subwValueWitness a b)[1].val / 32768 : ℕ) : ZMod p)
 
 /-- The witnessed column struct: the two low result limbs `value` and the sign bit `msb`. -/
-def populate (a b : Word (ZMod p)) : Extracted.SubwOperation (ZMod p) :=
+def populate (a b : Word (ZMod p)) : Columns (ZMod p) :=
   ⟨subwValueWitness a b, ⟨subwMsbWitness a b⟩⟩
 
 end SP1Clean.SubwOperation

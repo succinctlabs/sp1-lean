@@ -1,5 +1,6 @@
 import SP1Clean.Native.Operations.U16MSBOperation.RawSpec
 import SP1Clean.Native.Operations.U16MSBOperation.Populate
+import SP1Clean.Native.Operations.U16MSBOperation.Defs
 
 /-! # `U16MSBOperation` — the `FormalAssertion` (soundness / completeness / contract)
 
@@ -7,8 +8,8 @@ SP1's `U16MSBOperation::eval_msb` as a Clean `FormalAssertion`: the `Assumptions
 soundness/completeness proofs (routing through `RawSpec`'s `msb_of_raw`), the `spec_populate`
 reconstruction lemma the composing operation uses, and the bundled `circuit`. The semantic `Spec`
 carries `msb`'s booleanness **unconditionally** (SP1's `eval_msb` asserts it ungated) plus the
-`is_real`-gated high-bit equation. The arithmetic core lives in `RawSpec`, the elaborated circuit in
-`Extracted`, the `populate_msb` witness in `Populate`. -/
+`is_real`-gated high-bit equation. The arithmetic core lives in `RawSpec`, the native circuit in
+`Defs`, and the `populate_msb` witness in `Populate`. -/
 
 namespace SP1Clean.U16MSBOperation
 
@@ -24,30 +25,27 @@ equation is vacuous). -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (input.is_real = 1 → input.a.val < 2 ^ 16) ∧ (input.is_real = 0 ∨ input.is_real = 1)
 
-set_option maxHeartbeats 2000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨ha, _hbin⟩ := h_assumptions
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
+  obtain ⟨ha, hbin⟩ := h_assumptions
+  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat
   simp only [circuit_norm, byteChannel] at h_holds ⊢
   obtain ⟨hr, _hbool, hgc⟩ := h_holds
-  refine ⟨bool_of_mul_pred hgc, ?_⟩
+  refine ⟨⟨bool_of_mul_pred hgc, ?_⟩, fun h1 h0 => off_gate_vacuous hbin h1 h0⟩
   intro hr1eq
-  have hneg : -input_is_real = -1 := by rw [hr1eq]
+  have hneg : - input_is_real = -1 := by rw [hr1eq]
   have R := hr hneg
   rw [← c16] at R
   refine msb_of_raw (ha hr1eq) ?_
-  simp only [RawSpec, sub_eq_add_neg]
-  exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ h16p).mp R⟩
+  simp only [RawSpec]
+  exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ sixteen_lt).mp R⟩
 
-set_option maxHeartbeats 2000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨ha, hbin⟩ := h_assumptions
   obtain ⟨hmsbbool, hmsbeq⟩ := h_spec
-  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
+  have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := Nat.cast_ofNat
   simp only [circuit_norm, byteChannel]
   refine ⟨?_, ?_, ?_⟩
   · intro hneg
@@ -58,14 +56,14 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       rw [two_mul, ZMod.val_add_of_lt (by omega)]; omega
     have hmsb := hmsbeq hr1
     rw [← c16]
-    apply (byteRowSpec_range _ h16p).mpr
+    apply (byteRowSpec_range _ sixteen_lt).mpr
     rw [hmsb]
     by_cases hge : input_a.val ≥ 32768
     · rw [if_pos hge, one_mul]
-      have hsub : (2 * input_a + -65536 : ZMod p) = (((2 * input_a.val - 65536 : ℕ) : ZMod p)) := by
-        rw [Nat.cast_sub (by omega)]; push_cast; rw [hin_cast]; ring
+      have hsub : (2 * input_a - 65536 : ZMod p) = (((2 * input_a.val - 65536 : ℕ) : ZMod p)) := by
+        rw [Nat.cast_sub (by omega)]; push_cast; rw [hin_cast]
       rw [hsub, ZMod.val_natCast_of_lt (by omega)]; omega
-    · rw [if_neg hge, zero_mul, neg_zero, add_zero, h2]; omega
+    · rw [if_neg hge, zero_mul, sub_zero, h2]; omega
   · rcases hbin with h | h <;> rw [h] <;> simp
   · rcases hmsbbool with h | h <;> rw [h] <;> simp
 
@@ -75,7 +73,14 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Assumptions := Assumptions,
     Spec := Spec,
     soundness := soundness,
-    completeness := completeness }
+    completeness := completeness,
+    channelsWithRequirements := [],
+    requirementsChannelsLawful := fun input_var i₀ => by
+      simp only [circuit_norm, main, byteChannel]; grind }
+
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma channelsWithRequirements_eq :
+    (circuit (p := p)).channelsWithRequirements = [] := rfl
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

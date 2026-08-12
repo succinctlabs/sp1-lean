@@ -1,4 +1,5 @@
 import SP1Clean.Native.Chips.LoadX0Chip.Defs
+import Clean.Air.Circuit
 
 /-! # `SP1Clean.LoadX0Chip` — `Assumptions` / soundness / completeness / `circuit`
 
@@ -8,70 +9,100 @@ in `Defs`; Sail bridge in `Bridge`.) -/
 namespace SP1Clean.LoadX0Chip
 
 open Circuit
-open Extracted (LoadX0Columns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Operands are 64-bit values; the load targets a non-reserved, in-range address. The offset bits are
-bits 0–2 of the address and boolean (alignment per width is enforced in-circuit by the alignment gates,
-not assumed). -/
+/-- The register/immediate operands and RAM word are genuine 64-bit values. Address validity,
+non-reservation, and exact offset decomposition follow from `AddressOperation`; per-width alignment
+is enforced by this chip's own selector-gated constraints. -/
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
-    (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
-    2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
-    input.offset_bit[0].val + 2 * input.offset_bit[1].val + 4 * input.offset_bit[2].val
-      = (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 ∧
-    (input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1) ∧
-    (input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1) ∧
-    (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1)
+    Word.isU64 input.memory_access.prev_value
 
-set_option maxHeartbeats 16000000 in
+-- Both proofs read `h_assumptions` / `h_holds` / `h_input` through `.1`/`.2` projections instead of
+-- a wide `obtain`: an `And.casesOn` motive re-abstracts the (very large) goal once per component,
+-- which is Clean's `doc/performance-problems.md` pattern 7. Neither proof carries an elaboration
+-- budget any more (they were stamped at 2000000 / 1500000, and 16M before that).
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
-  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2⟩ := h_assumptions
-  obtain ⟨_h_cpu, h_addr, h_mem, h_itype, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5, h_b6, h_gate,
-    h_al2, h_al1, h_al0, h_oa1, h_oa2⟩ := h_holds
+  have ha := h_assumptions.1
+  have hb := h_assumptions.2.1
+  have h_pv_isu64 := h_assumptions.2.2
+  have h_cpu := h_holds.1
+  have hh1 := h_holds.2
+  have h_addr := hh1.1
+  have hh2 := hh1.2
+  have h_mem := hh2.1
+  have hh3 := hh2.2
+  have h_itype := hh3.1
+  have hh4 := hh3.2
+  have h_b0 := hh4.1
+  have hh5 := hh4.2
+  have h_b1 := hh5.1
+  have hh6 := hh5.2
+  have h_b2 := hh6.1
+  have hh7 := hh6.2
+  have h_b3 := hh7.1
+  have hh8 := hh7.2
+  have h_b4 := hh8.1
+  have hh9 := hh8.2
+  have h_b5 := hh9.1
+  have hh10 := hh9.2
+  have h_b6 := hh10.1
+  have hh11 := hh10.2
+  have h_gate := hh11.1
+  have hh12 := hh11.2
+  have h_al2 := hh12.1
+  have hh13 := hh12.2
+  have h_al1 := hh13.1
+  have hh14 := hh13.2
+  have h_al0 := hh14.1
+  have hh15 := hh14.2
+  have h_oa1 := hh15.1
+  have h_oa2 := hh15.2
   have h_bin := bool_of_mul_pred h_gate
+  -- G1: the CPUState sub-`Spec`'s two clock byte bounds discharge the *push* side of the memory
+  -- channel's `MemoryMsg.ClkBound` guarantee — `MemoryAccess`'s RAM effect slot (`clk_low + 1`) and
+  -- `ITypeReaderImmutable`'s two read-back pushes (`clk_low + 4` / `+ 3`). The gate is LoadX0's
+  -- seven-way selector sum `isReal`, which the named discipline carries as its `is_real` argument.
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
   -- eval→value bridge for the offset bits (the only nested vector field the gates reference in value form).
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, hmap_ob⟩ := h_input
+  have hmap_ob := h_input.2.2.2.2.2.2.2.2.2.2
   have eob : ∀ i (hi : i < 3), Expression.eval env input_var_offset_bit[i] = input_offset_bit[i] :=
     fun i hi => by rw [← hmap_ob]; simp only [Vector.getElem_map]
-  -- the `AddressOperation` Assumptions (eval form).
-  have hob0' : Expression.eval env input_var_offset_bit[0] = 0
-      ∨ Expression.eval env input_var_offset_bit[0] = 1 := by rw [eob 0 (by omega)]; exact hob0
-  have hob1' : Expression.eval env input_var_offset_bit[1] = 0
-      ∨ Expression.eval env input_var_offset_bit[1] = 1 := by rw [eob 1 (by omega)]; exact hob1
-  have hob2' : Expression.eval env input_var_offset_bit[2] = 0
-      ∨ Expression.eval env input_var_offset_bit[2] = 1 := by rw [eob 2 (by omega)]; exact hob2
-  have h_off' : (Expression.eval env input_var_offset_bit[0]).val
-        + 2 * (Expression.eval env input_var_offset_bit[1]).val
-        + 4 * (Expression.eval env input_var_offset_bit[2]).val
-      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
-    rw [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)]; exact h_off
-  have h_addr_as : AddressOperation.circuit.Assumptions
+  have h_addr_as : AddressOperation.SoundnessAssumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, Expression.eval env input_var_offset_bit[0],
-          Expression.eval env input_var_offset_bit[1], Expression.eval env input_var_offset_bit[2]⟩
+          Expression.eval env input_var_offset_bit[1], Expression.eval env input_var_offset_bit[2],
+          input_is_lb + input_is_lbu + input_is_lh + input_is_lhu + input_is_lw +
+            input_is_lwu + input_is_ld⟩
         : AddressOperation.Inputs (ZMod p)) :=
-    ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
+    ⟨ha, hb, h_bin⟩
+  simp only [AddressOperation.circuit] at h_addr
   have h_addr_spec := h_addr h_addr_as
-  simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_addr_spec
-  have h_it := h_itype h_bin
+  simp only [circuit_norm, eob] at h_addr_spec
+  have h_it := h_itype ⟨h_bin, h_bin, h_clk⟩
   -- the alignment gates, in value form.
-  simp only [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)] at h_al0 h_al1 h_al2
-  simp only [← sub_eq_add_neg] at h_oa1 h_oa2
+  simp only [eob] at h_al0 h_al1 h_al2
   simp only [isReal, opcodeVal]
-  refine ⟨⟨h_addr_spec, h_mem h_bin, h_it,
+  refine ⟨⟨h_addr_spec,
+      h_mem ⟨h_bin, fun _ => h_pv_isu64,
+        h_clk⟩, h_it,
       bool_of_mul_pred h_b0, bool_of_mul_pred h_b1, bool_of_mul_pred h_b2, bool_of_mul_pred h_b3,
       bool_of_mul_pred h_b4, bool_of_mul_pred h_b5, bool_of_mul_pred h_b6,
       h_bin, h_al2, h_al1, h_al0, h_oa1, h_oa2⟩, ?_⟩
-  -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`).
-  exact ⟨Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
+  -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`); `MemoryAccess`'s
+  -- read push owes `isU64 prev_value` (chip assumption; a read pins `new_value = prev_value`) and the
+  -- `ClkBound` of its `clk_low + 1` push clock.
+  exact ⟨Or.inr h_addr_as,
+    Or.inr ⟨h_bin, fun _ => h_pv_isu64,
+      h_clk⟩,
+    ⟨h_bin, h_bin, h_clk⟩⟩
 
 /-- Prover-side row well-formedness: operand `isU64`s + address facts + selector binaries + alignment
 equations + the `op_a_0` forcing facts + the reader/CPUState/MemoryAccess `Spec`s. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
+def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
     2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
@@ -80,6 +111,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : P
     (input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1) ∧
     (input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1) ∧
     (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1) ∧
+    Word.isU64 input.memory_access.prev_value ∧
     (input.is_lb = 0 ∨ input.is_lb = 1) ∧ (input.is_lbu = 0 ∨ input.is_lbu = 1) ∧
     (input.is_lh = 0 ∨ input.is_lh = 1) ∧ (input.is_lhu = 0 ∨ input.is_lhu = 1) ∧
     (input.is_lw = 0 ∨ input.is_lw = 1) ∧ (input.is_lwu = 0 ∨ input.is_lwu = 1) ∧
@@ -99,43 +131,82 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : P
       ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
         input.state.pc, opcodeVal input⟩
 
-set_option maxHeartbeats 16000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   simp only [isReal, opcodeVal] at h_assumptions
-  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5, h_b6, hbin,
-    h_al2, h_al1, h_al0, h_oa1, h_oa2, h_cpu, h_mem, h_it⟩ := h_assumptions
+  have ha := h_assumptions.1
+  have hp1 := h_assumptions.2
+  have hb := hp1.1
+  have hp2 := hp1.2
+  have hfit := hp2.1
+  have hp3 := hp2.2
+  have h_ge := hp3.1
+  have hp4 := hp3.2
+  have h_off := hp4.1
+  have hp5 := hp4.2
+  have hob0 := hp5.1
+  have hp6 := hp5.2
+  have hob1 := hp6.1
+  have hp7 := hp6.2
+  have hob2 := hp7.1
+  have hp8 := hp7.2
+  have h_pv_isu64 := hp8.1
+  have hp9 := hp8.2
+  have h_b0 := hp9.1
+  have hp10 := hp9.2
+  have h_b1 := hp10.1
+  have hp11 := hp10.2
+  have h_b2 := hp11.1
+  have hp12 := hp11.2
+  have h_b3 := hp12.1
+  have hp13 := hp12.2
+  have h_b4 := hp13.1
+  have hp14 := hp13.2
+  have h_b5 := hp14.1
+  have hp15 := hp14.2
+  have h_b6 := hp15.1
+  have hp16 := hp15.2
+  have hbin := hp16.1
+  have hp17 := hp16.2
+  have h_al2 := hp17.1
+  have hp18 := hp17.2
+  have h_al1 := hp18.1
+  have hp19 := hp18.2
+  have h_al0 := hp19.1
+  have hp20 := hp19.2
+  have h_oa1 := hp20.1
+  have hp21 := hp20.2
+  have h_oa2 := hp21.1
+  have hp22 := hp21.2
+  have h_cpu := hp22.1
+  have hp23 := hp22.2
+  have h_mem := hp23.1
+  have h_it := hp23.2
+  -- G1: the *push*-side clock bounds, from the prover-supplied CPUState clock byte bounds.
+  have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   simp only [sub_eq_add_neg] at h_oa1 h_oa2
-  obtain ⟨_, _, _, _, _, _, _, ⟨_, _, _, hmap_pc⟩, _, _, hmap_ob⟩ := h_input
+  have hmap_pc := h_input.2.2.2.2.2.2.2.1.2.2.2
+  have hmap_ob := h_input.2.2.2.2.2.2.2.2.2.2
   have epc : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_state_pc[i]
       = input_state_pc[i] := fun i hi => by rw [← hmap_pc]; simp only [Vector.getElem_map]
   have eob : ∀ i (hi : i < 3), Expression.eval env.toEnvironment input_var_offset_bit[i]
       = input_offset_bit[i] := fun i hi => by rw [← hmap_ob]; simp only [Vector.getElem_map]
-  have hob0' : Expression.eval env.toEnvironment input_var_offset_bit[0] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[0] = 1 := by rw [eob 0 (by omega)]; exact hob0
-  have hob1' : Expression.eval env.toEnvironment input_var_offset_bit[1] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[1] = 1 := by rw [eob 1 (by omega)]; exact hob1
-  have hob2' : Expression.eval env.toEnvironment input_var_offset_bit[2] = 0
-      ∨ Expression.eval env.toEnvironment input_var_offset_bit[2] = 1 := by rw [eob 2 (by omega)]; exact hob2
-  have h_off' : (Expression.eval env.toEnvironment input_var_offset_bit[0]).val
-        + 2 * (Expression.eval env.toEnvironment input_var_offset_bit[1]).val
-        + 4 * (Expression.eval env.toEnvironment input_var_offset_bit[2]).val
-      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
-    rw [eob 0 (by omega), eob 1 (by omega), eob 2 (by omega)]; exact h_off
-  have h_addr_as : AddressOperation.circuit.Assumptions
+  have h_addr_as : AddressOperation.Assumptions
       (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, Expression.eval env.toEnvironment input_var_offset_bit[0],
           Expression.eval env.toEnvironment input_var_offset_bit[1],
-          Expression.eval env.toEnvironment input_var_offset_bit[2]⟩ : AddressOperation.Inputs (ZMod p)) :=
-    ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
+          Expression.eval env.toEnvironment input_var_offset_bit[2],
+          input_is_lb + input_is_lbu + input_is_lh + input_is_lhu + input_is_lw +
+            input_is_lwu + input_is_ld⟩ : AddressOperation.Inputs (ZMod p)) := by
+    simp only [eob]; exact ⟨ha, hb, hbin, hfit, hob0, hob1, hob2, h_ge, h_off⟩
   refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩,
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact hbin
-  · simp only [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; exact h_cpu
-  · exact hbin
+  · simp only [epc]; exact h_cpu
+  · exact ⟨hbin, fun _ => h_pv_isu64, h_clk⟩
   · exact h_mem
-  · exact hbin
+  · exact ⟨hbin, hbin, h_clk⟩
   · exact h_it
   · rcases h_b0 with h | h <;> rw [h] <;> simp
   · rcases h_b1 with h | h <;> rw [h] <;> simp
@@ -145,17 +216,166 @@ theorem completeness :
   · rcases h_b5 with h | h <;> rw [h] <;> simp
   · rcases h_b6 with h | h <;> rw [h] <;> simp
   · rcases hbin with h | h <;> rw [h] <;> simp
-  · simp only [eob 2 (by omega)]; exact h_al2
-  · simp only [eob 1 (by omega)]; exact h_al1
-  · simp only [eob 0 (by omega)]; exact h_al0
-  · exact h_oa1
-  · exact h_oa2
+  · simp only [eob]; exact h_al2
+  · simp only [eob]; exact h_al1
+  · simp only [eob]; exact h_al0
+  · linear_combination h_oa1
+  · linear_combination h_oa2
 
-/-- The `LoadX0` chip row as a `GeneralFormalCircuit`; output is the extracted `LoadX0Columns`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadX0Columns :=
+/-- LoadX0's exact Memory-channel interaction list — the RAM-access family shape with the
+**immutable** I-type adapter: the composed `MemoryAccess` RAM pull/push pair at the computed 48-bit
+address (`var ⟨offset..offset+2⟩` are the `AddressOperation` sub-circuit's witnessed address limbs),
+then `ITypeReaderImmutable`'s two register **read** pairs — op_a (`x0`, read-back at clk+4) and op_b
+(rs1, read-back at clk+3).  No `RegisterWrite`: the loaded value is discarded (`rd = x0`), so every
+register push is a read-back of the pulled `prev_value`.  The gate is the umbrella seven-flag
+selector sum.  Keeping this list beside `circuit` makes Clean's exposure interface the single
+structural source consumed by both faithfulness and semantic grounding. -/
+def exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    List (ChannelInteraction (memoryChannel (p := p))) :=
+  [ memoryChannel.pulledIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+        + input.is_lw + input.is_lwu + input.is_ld)
+      ⟨input.memory_access.access_timestamp.prev_high,
+       input.memory_access.access_timestamp.prev_low,
+       var { index := offset } - (4 : Expression (ZMod p)) * input.offset_bit[2] -
+         (2 : Expression (ZMod p)) * input.offset_bit[1] - input.offset_bit[0],
+       var { index := offset + 1 }, var { index := offset + 2 },
+       input.memory_access.prev_value⟩,
+    memoryChannel.pushedIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+        + input.is_lw + input.is_lwu + input.is_ld)
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 1,
+       var { index := offset } - (4 : Expression (ZMod p)) * input.offset_bit[2] -
+         (2 : Expression (ZMod p)) * input.offset_bit[1] - input.offset_bit[0],
+       var { index := offset + 1 }, var { index := offset + 2 },
+       input.memory_access.prev_value⟩,
+    memoryChannel.pulledIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+        + input.is_lw + input.is_lwu + input.is_ld)
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pushedIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+        + input.is_lw + input.is_lwu + input.is_ld)
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩,
+    memoryChannel.pulledIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+        + input.is_lw + input.is_lwu + input.is_ld)
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩,
+    memoryChannel.pushedIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+        + input.is_lw + input.is_lwu + input.is_ld)
+      ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩ ]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact RAM-access pull occupies its declared slot in LoadX0's exposed Memory list. -/
+theorem ramPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+        + input.is_lw + input.is_lwu + input.is_ld)
+      ⟨input.memory_access.access_timestamp.prev_high,
+       input.memory_access.access_timestamp.prev_low,
+       var { index := offset } - (4 : Expression (ZMod p)) * input.offset_bit[2] -
+         (2 : Expression (ZMod p)) * input.offset_bit[1] - input.offset_bit[0],
+       var { index := offset + 1 }, var { index := offset + 2 },
+       input.memory_access.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-A (`x0` read) pull occupies its declared slot in LoadX0's exposed Memory
+list. -/
+theorem opAPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+        + input.is_lw + input.is_lwu + input.is_ld)
+      ⟨input.state.clk_high, input.adapter.op_a_memory.access_timestamp.prev_low,
+       input.adapter.op_a, 0, 0, input.adapter.op_a_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The exact source-B pull occupies its declared slot in LoadX0's exposed Memory list. -/
+theorem opBPull_mem_exposedMemoryInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    memoryChannel.pulledIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+        + input.is_lw + input.is_lwu + input.is_ld)
+      ⟨input.state.clk_high, input.adapter.op_b_memory.access_timestamp.prev_low,
+       input.adapter.op_b, 0, 0, input.adapter.op_b_memory.prev_value⟩ ∈
+      exposedMemoryInteractions input offset := by
+  simp [exposedMemoryInteractions]
+
+/-- The `LoadX0` chip row as a `GeneralFormalCircuit`; output is the extracted `Columns`. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
-    soundness := soundness, completeness := completeness }
+    channelsWithRequirements :=
+      [stateChannel.toRaw, memoryChannel.toRaw],
+    soundness := soundness, completeness := completeness,
+    -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8); the
+    -- enabled flag is the **derived** umbrella selector sum (SP1's `is_real`, all seven load opcodes).
+    exposedChannels := fun input offset =>
+      expose stateChannel
+        [ stateChannel.pulledIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+              + input.is_lw + input.is_lwu + input.is_ld)
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536,
+             input.state.pc[0], input.state.pc[1], input.state.pc[2]⟩,
+          stateChannel.pushedIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+              + input.is_lw + input.is_lwu + input.is_ld)
+            ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 8,
+             input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]⟩ ] ++
+      expose memoryChannel (exposedMemoryInteractions input offset) ++
+      -- The Program-bus instruction fetch (descended from the composed `ITypeReaderImmutable`,
+      -- gate = the umbrella load-selector sum, opcode = the matching weighted flag sum), consumed
+      -- by `Soundness/TypedProgram.lean`.
+      expose programChannel
+        [ programChannel.pulledIf (input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
+              + input.is_lw + input.is_lwu + input.is_ld)
+            ⟨input.state.pc[0], input.state.pc[1], input.state.pc[2],
+             29 * input.is_lb + 32 * input.is_lbu + 30 * input.is_lh + 33 * input.is_lhu +
+               31 * input.is_lw + 34 * input.is_lwu + 35 * input.is_ld,
+             input.adapter.op_a, #v[input.adapter.op_b, 0, 0, 0], input.adapter.op_c_imm,
+             input.adapter.op_a_0, 0, 1⟩ ],
+    exposedChannels_eq := by
+      intro input offset
+      have h_byte := Channels.byteChannel_toRaw_ne_stateChannel (p := p)
+      have h_program := Channels.programChannel_toRaw_ne_stateChannel (p := p)
+      have h_memory := Channels.memoryChannel_toRaw_ne_stateChannel (p := p)
+      unfold Operations.ExposedChannelsLawful
+      intro exposed exposedMem
+      simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
+      rcases exposedMem with (rfl | rfl) | rfl
+      all_goals
+        simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
+          AddressOperation.circuit, AddressOperation.main,
+          AddrAddOperation.circuit, AddrAddOperation.main,
+          Readers.MemoryAccess.circuit, Readers.MemoryAccess.main,
+          Readers.ITypeReaderImmutable.circuit, Readers.ITypeReaderImmutable.main,
+          Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
+          Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
+          circuit_norm, FormalAssertion.toSubcircuit_interactions,
+          GeneralFormalCircuit.toSubcircuit_interactions]
+      · simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+          h_byte, h_program, h_memory, decide_false, decide_true, Bool.false_eq_true,
+          if_true, List.nil_append]
+      · simp [circuit_norm, Gadgets.Equality.main, exposedMemoryInteractions]
+      · simp only [circuit_norm, Gadgets.Equality.main, List.filter_cons, List.filter_nil,
+          Channels.byteChannel_eq_programChannel_false,
+          Channels.stateChannel_eq_programChannel_false,
+          Channels.memoryChannel_eq_programChannel_false,
+          decide_false, decide_true, Bool.false_eq_true, if_true, List.nil_append] }
+
+/-- Folded circuit projections used by the whole-chip row codec. -/
+@[circuit_norm] theorem circuit_main_eq : (circuit (p := p)).main = main := rfl
+
+@[circuit_norm] theorem circuit_localLength_eq (input : Var Inputs (ZMod p)) :
+    (circuit (p := p)).localLength input = 4 := rfl
+
+@[circuit_norm] theorem circuit_size_eq :
+    (circuit (p := p)).size = size Inputs + 4 := by
+  rw [GeneralFormalCircuit.size_eq, circuit_localLength_eq]
+
+/-- The completed LoadX0 circuit exposes exactly the Memory interaction list above. -/
+theorem interactionsWith_memory_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((main input).operations offset).interactionsWith memoryChannel.toRaw =
+      (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw := by
+  exact circuit.interactionsWith_eq_of_mem_exposedChannels input offset
+    ⟨memoryChannel.toRaw, (exposedMemoryInteractions input offset).map ChannelInteraction.toRaw⟩
+    (by simp [circuit, expose])
 
 end SP1Clean.LoadX0Chip

@@ -1,6 +1,6 @@
 import SP1Clean.Native.Operations.LtOperationSigned.RawSpec
 import SP1Clean.Native.Operations.LtOperationSigned.Populate
-import SP1Clean.Extracted.Circuit.LtOperationSigned
+import SP1Clean.Native.Operations.LtOperationSigned.Defs
 import SP1Clean.Proofs.Operations.LtOperationUnsigned.Formal
 import SP1Clean.Proofs.Operations.U16MSBOperation.Formal
 
@@ -16,8 +16,9 @@ adjusted words). The semantic readout (`bit = signed/unsigned-less-than`) is exp
 `result_semantic`, routing through `LtOperationUnsigned.result_semantic` and the sign-bias keystones in
 `RawSpec.lean`.
 
-`Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle: the `Extracted`
-`main` imports `U16MSBOperation.Formal`/`LtOperationUnsigned.Formal` for `.circuit`. -/
+`Spec`/`spec_populate` live here (not in `FormalModel/Contracts/Operations.lean`) to avoid an import
+cycle: the hand-maintained `main` (`Native/Operations/LtOperationSigned/Defs.lean`) imports
+`U16MSBOperation.Formal`/`LtOperationUnsigned.Formal` for `.circuit`. -/
 
 namespace SP1Clean.LtOperationSigned
 
@@ -62,12 +63,30 @@ private lemma vec4_eta {α : Type} (v : Vector α 4) : #v[v[0], v[1], v[2], v[3]
 private lemma vec2_eta {α : Type} (v : Vector α 2) : #v[v[0], v[1]] = v := by
   apply Vector.ext; intro i hi; interval_cases i <;> rfl
 
+set_option linter.unusedSectionVars false in
 /-- `(0 : ZMod p) ≠ 1`. -/
-private lemma zero_ne_one' : (0 : ZMod p) ≠ 1 := by
-  intro h; haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have := congrArg ZMod.val h; rw [ZMod.val_zero, ZMod.val_one] at this; exact absurd this (by norm_num)
+private lemma zero_ne_one' : (0 : ZMod p) ≠ 1 := zero_ne_one
 
-set_option maxHeartbeats 800000 in
+/-- The sign-adjusted top limb `x + s·2^15 - 2^16·m` is 16-bit on both branches of the binary `s`:
+at `s = 0` the `(s-1)·m` gate forces `m = 0` and it is `x` itself; at `s = 1` it is `adj_limb`. -/
+private lemma adj_top {x m s : ZMod p} (hx : x.val < 2 ^ 16) (hs : s = 0 ∨ s = 1)
+    (hg : (s - 1) * m = 0) (hm : s = 1 → m = if x.val ≥ 32768 then 1 else 0) :
+    (x + s * 32768 - 65536 * m).val < 2 ^ 16 := by
+  rcases hs with h | h
+  · rw [h] at hg
+    have hm0 : m = 0 := by simpa using hg
+    rw [h, hm0]; simpa using hx
+  · rw [h, one_mul, hm h]; simpa using (adj_limb hx).2
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Replacing a 64-bit word's top limb by any 16-bit value (here the sign-adjusted limb of
+`adj_top`) leaves it 64-bit — the three low limbs are untouched. -/
+private lemma isU64_top {b : Word (ZMod p)} {t : ZMod p} (hb : Word.isU64 b)
+    (ht : t.val < 2 ^ 16) : Word.isU64 #v[b[0], b[1], b[2], t] := by
+  obtain ⟨h0, h1, h2, -⟩ := Word.lt_cases_of_isU64 hb
+  exact Word.isU64_of_cases (by simpa using h0) (by simpa using h1) (by simpa using h2)
+    (by simpa using ht)
+
 /-- Semantic readout (consumed by `LtChip`/`BranchChip` soundness): on a real row the compare `bit`
 is the signed (`is_signed = 1`, via `toInt`) / unsigned (`is_signed = 0`, via `toNat`) less-than
 indicator, and on the unsigned branch the flags sum to `0` exactly when the words are equal. -/
@@ -89,8 +108,8 @@ theorem result_semantic {input : Inputs (ZMod p)}
        input.cols.result.u16_flags[0] + input.cols.result.u16_flags[1]
           + input.cols.result.u16_flags[2] + input.cols.result.u16_flags[3] = 1)) := by
   obtain ⟨his, _hirb, _hbmb, _hcmb, _hg5, hg7, hg9, hbm_eq, hcm_eq, h_uns⟩ := hs
-  obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb
-  obtain ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64 hcc
+  obtain ⟨-, -, -, hb3⟩ := Word.lt_cases_of_isU64 hb
+  obtain ⟨-, -, -, hc3⟩ := Word.lt_cases_of_isU64 hcc
   have h01 : (0 : ZMod p) ≠ 1 := zero_ne_one'
   rcases his with hs0 | hs1
   · -- `is_signed = 0`: `bm = cm = 0`, the unsigned compare on the unbiased words.
@@ -98,17 +117,13 @@ theorem result_semantic {input : Inputs (ZMod p)}
     have hcm0 : input.cols.c_msb.msb = 0 := by rw [hs0] at hg9; linear_combination -hg9
     rw [hs0, hbm0, hcm0] at h_uns
     simp only [zero_mul, mul_zero, sub_zero, add_zero] at h_uns
-    have hbU64 : Word.isU64 #v[input.b[0], input.b[1], input.b[2], input.b[3]] :=
-      Word.isU64_of_cases (by simpa using hb0) (by simpa using hb1) (by simpa using hb2)
-        (by simpa using hb3)
-    have hcU64 : Word.isU64 #v[input.cc[0], input.cc[1], input.cc[2], input.cc[3]] :=
-      Word.isU64_of_cases (by simpa using hc0) (by simpa using hc1) (by simpa using hc2)
-        (by simpa using hc3)
-    have hbit := LtOperationUnsigned.result_semantic hbU64 hcU64 hir h_uns
+    have hbit := LtOperationUnsigned.result_semantic (isU64_top hb hb3) (isU64_top hcc hc3)
+      hir h_uns
     refine ⟨?_, fun _ => ?_, fun _ => ?_⟩
     · rw [hbit.1]
       simp only [hs0, if_neg h01, Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
         List.getElem_cons_zero, List.getElem_cons_succ]
+      rfl
     · rw [toBitVec64_eq_iff hb hcc]
       have key := hbit.2
       simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
@@ -124,20 +139,12 @@ theorem result_semantic {input : Inputs (ZMod p)}
       rw [hbm]; exact (adj_limb hb3).2
     have hcU : (input.cc[3] + 32768 - 65536 * input.cols.c_msb.msb).val < 2 ^ 16 := by
       rw [hcm]; exact (adj_limb hc3).2
-    have hbU64 : Word.isU64
-        #v[input.b[0], input.b[1], input.b[2], input.b[3] + 32768 - 65536 * input.cols.b_msb.msb] :=
-      Word.isU64_of_cases (by simpa using hb0) (by simpa using hb1) (by simpa using hb2)
-        (by simpa using hbU)
-    have hcU64 : Word.isU64
-        #v[input.cc[0], input.cc[1], input.cc[2], input.cc[3] + 32768 - 65536 * input.cols.c_msb.msb] :=
-      Word.isU64_of_cases (by simpa using hc0) (by simpa using hc1) (by simpa using hc2)
-        (by simpa using hcU)
-    have hbit := LtOperationUnsigned.result_semantic hbU64 hcU64 hir h_uns
+    have hbit := LtOperationUnsigned.result_semantic (isU64_top hb hbU) (isU64_top hcc hcU)
+      hir h_uns
     refine ⟨?_, fun h => absurd (h ▸ hs1) h01, fun h => absurd (h ▸ hs1) h01⟩
     rw [hbit.1]
     simp only [hs1, ↓reduceIte, toInt_compare_of_bias hb hcc hbm hcm]
 
-set_option maxHeartbeats 1000000 in
 /-- The witnessed columns `populate b cc is_signed is_real` satisfy the gadget `Spec`. The composing
 chip uses this to discharge the `assertion LtOperationSigned.circuit` obligation. -/
 theorem spec_populate {b cc : Word (ZMod p)} {is_signed is_real : ZMod p}
@@ -145,9 +152,8 @@ theorem spec_populate {b cc : Word (ZMod p)} {is_signed is_real : ZMod p}
     (hs_bin : is_signed = 0 ∨ is_signed = 1) (hr_bin : is_real = 0 ∨ is_real = 1)
     (h_gate : (is_real - 1) * is_signed = 0) :
     Spec (⟨b, cc, populate b cc is_signed is_real, is_signed, is_real⟩ : Inputs (ZMod p)) := by
-  obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb
-  obtain ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64 hcc
-  have h01 : (0 : ZMod p) ≠ 1 := zero_ne_one'
+  obtain ⟨-, -, -, hb3⟩ := Word.lt_cases_of_isU64 hb
+  obtain ⟨-, -, -, hc3⟩ := Word.lt_cases_of_isU64 hcc
   have hpmb : U16MSBOperation.populate_msb b[3] = if b[3].val ≥ 32768 then 1 else 0 :=
     (U16MSBOperation.spec_populate (by simpa using hb3) 1).2 rfl
   have hpmc : U16MSBOperation.populate_msb cc[3] = if cc[3].val ≥ 32768 then 1 else 0 :=
@@ -182,7 +188,6 @@ theorem spec_populate {b cc : Word (ZMod p)} {is_signed is_real : ZMod p}
       -- all-zero unsigned columns satisfy `LtOperationUnsigned.Spec` at `is_real = 0`
       simp [LtOperationUnsigned.Spec]
 
-set_option maxHeartbeats 4000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hb_u64, hcc_u64, hir_bin, his_bin⟩ := h_assumptions
@@ -197,10 +202,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have ecl : ∀ i (hi : i < 2), Expression.eval env input_var_cols_result_comparison_limbs[i]
       = input_cols_result_comparison_limbs[i] := by
     intro i hi; rw [← hcl]; simp only [Vector.getElem_map]
-  obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb_u64
-  obtain ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64 hcc_u64
+  obtain ⟨-, -, -, hb3⟩ := Word.lt_cases_of_isU64 hb_u64
+  obtain ⟨-, -, -, hc3⟩ := Word.lt_cases_of_isU64 hcc_u64
   obtain ⟨h_msb_b, h_msb_c, h_lt, _, _, hE5, hE7, hE9⟩ := h_holds
-  simp only [id_eq, eb, ec, ef, ecl, vec4_eta, vec2_eta, ← sub_eq_add_neg]
+  simp only [eb, ec, ef, ecl, vec4_eta, vec2_eta]
     at h_msb_b h_msb_c h_lt hE5 hE7 hE9 ⊢
   -- the two `U16MSBOperation` sub-assertion `Assumptions` (16-bit operands, `is_signed` binary).
   have hAb : U16MSBOperation.circuit.Assumptions
@@ -212,34 +217,25 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   -- defeq-reduced forms (the sub `Spec`'s `{…}.cols.msb` / `{…}.a.val` projections reduce).
   have hbm_bool' : input_cols_b_msb_msb = 0 ∨ input_cols_b_msb_msb = 1 := hbm_bool
   have hcm_bool' : input_cols_c_msb_msb = 0 ∨ input_cols_c_msb_msb = 1 := hcm_bool
-  have hbm_eq' : input_is_signed = 1 → input_cols_b_msb_msb = if input_b[3].val ≥ 32768 then 1 else 0 := hbm_eq
-  have hcm_eq' : input_is_signed = 1 → input_cols_c_msb_msb = if input_cc[3].val ≥ 32768 then 1 else 0 := hcm_eq
+  have hbm_eq' : input_is_signed = 1 →
+      input_cols_b_msb_msb = if input_b[3].val ≥ 32768 then 1 else 0 := hbm_eq
+  have hcm_eq' : input_is_signed = 1 →
+      input_cols_c_msb_msb = if input_cc[3].val ≥ 32768 then 1 else 0 := hcm_eq
   -- the `LtOperationUnsigned` sub-assertion `Assumptions` (the sign-adjusted words are 16-bit).
-  have hbtop : (input_b[3] + input_is_signed * 32768 - 65536 * input_cols_b_msb_msb).val < 2 ^ 16 := by
-    rcases his_bin with h | h
-    · have h7 := hE7; rw [h] at h7
-      have hbm0 : input_cols_b_msb_msb = 0 := by simpa using h7
-      rw [h, hbm0]; simpa using hb3
-    · rw [h, one_mul, hbm_eq' h]; simpa using (adj_limb hb3).2
-  have hctop : (input_cc[3] + input_is_signed * 32768 - 65536 * input_cols_c_msb_msb).val < 2 ^ 16 := by
-    rcases his_bin with h | h
-    · have h9 := hE9; rw [h] at h9
-      have hcm0 : input_cols_c_msb_msb = 0 := by simpa using h9
-      rw [h, hcm0]; simpa using hc3
-    · rw [h, one_mul, hcm_eq' h]; simpa using (adj_limb hc3).2
+  have hbtop := adj_top hb3 his_bin hE7 hbm_eq'
+  have hctop := adj_top hc3 his_bin hE9 hcm_eq'
   have hAlt : LtOperationUnsigned.circuit.Assumptions
-      ⟨#v[input_b[0], input_b[1], input_b[2], input_b[3] + input_is_signed * 32768 - 65536 * input_cols_b_msb_msb],
-       #v[input_cc[0], input_cc[1], input_cc[2], input_cc[3] + input_is_signed * 32768 - 65536 * input_cols_c_msb_msb],
+      ⟨#v[input_b[0], input_b[1], input_b[2],
+         input_b[3] + input_is_signed * 32768 - 65536 * input_cols_b_msb_msb],
+       #v[input_cc[0], input_cc[1], input_cc[2],
+         input_cc[3] + input_is_signed * 32768 - 65536 * input_cols_c_msb_msb],
        ⟨⟨input_cols_result_u16_compare_operation_bit⟩, input_cols_result_u16_flags,
          input_cols_result_not_eq_inv, input_cols_result_comparison_limbs⟩, input_is_real⟩ :=
-    ⟨fun _ => ⟨Word.isU64_of_cases (by simpa using hb0) (by simpa using hb1) (by simpa using hb2)
-        (by simpa using hbtop),
-      Word.isU64_of_cases (by simpa using hc0) (by simpa using hc1) (by simpa using hc2)
-        (by simpa using hctop)⟩, hir_bin⟩
-  exact ⟨⟨his_bin, hir_bin, hbm_bool', hcm_bool', hE5, hE7, hE9, hbm_eq', hcm_eq', h_lt hAlt⟩,
-    Or.inr hAb, Or.inr hAc, Or.inr hAlt⟩
+    ⟨fun _ => ⟨isU64_top hb_u64 hbtop, isU64_top hcc_u64 hctop⟩, hir_bin⟩
+  -- All three children expose their empty requirement lists canonically; their assumptions remain
+  -- useful local inputs to the semantic lemmas but do not leak into the parent soundness contract.
+  exact ⟨his_bin, hir_bin, hbm_bool', hcm_bool', hE5, hE7, hE9, hbm_eq', hcm_eq', h_lt hAlt⟩
 
-set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hb_u64, hcc_u64, hir_bin, his_bin⟩ := h_assumptions
@@ -256,27 +252,15 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       Expression.eval env.toEnvironment input_var_cols_result_comparison_limbs[i]
         = input_cols_result_comparison_limbs[i] := by
     intro i hi; rw [← hcl]; simp only [Vector.getElem_map]
-  obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb_u64
-  obtain ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64 hcc_u64
-  have hbtop : (input_b[3] + input_is_signed * 32768 - 65536 * input_cols_b_msb_msb).val < 2 ^ 16 := by
-    rcases his_bin with h | h
-    · have h7 := hg7; rw [h] at h7
-      have hbm0 : input_cols_b_msb_msb = 0 := by simpa using h7
-      rw [h, hbm0]; simpa using hb3
-    · rw [h, one_mul, hbm_eq h]; simpa using (adj_limb hb3).2
-  have hctop : (input_cc[3] + input_is_signed * 32768 - 65536 * input_cols_c_msb_msb).val < 2 ^ 16 := by
-    rcases his_bin with h | h
-    · have h9 := hg9; rw [h] at h9
-      have hcm0 : input_cols_c_msb_msb = 0 := by simpa using h9
-      rw [h, hcm0]; simpa using hc3
-    · rw [h, one_mul, hcm_eq h]; simpa using (adj_limb hc3).2
-  simp only [id_eq, eb, ec, ef, ecl, vec4_eta, vec2_eta, ← sub_eq_add_neg]
+  obtain ⟨-, -, -, hb3⟩ := Word.lt_cases_of_isU64 hb_u64
+  obtain ⟨-, -, -, hc3⟩ := Word.lt_cases_of_isU64 hcc_u64
+  have hbtop := adj_top hb3 his_bin hg7 hbm_eq
+  have hctop := adj_top hc3 his_bin hg9 hcm_eq
+  simp only [eb, ec, ef, ecl, vec4_eta, vec2_eta]
   refine ⟨⟨⟨fun _ => hb3, his_bin⟩, hbm_bool, hbm_eq⟩,
     ⟨⟨fun _ => hc3, his_bin⟩, hcm_bool, hcm_eq⟩,
-    ⟨⟨fun _ => ⟨Word.isU64_of_cases (by simpa using hb0) (by simpa using hb1) (by simpa using hb2)
-        (by simpa using hbtop),
-      Word.isU64_of_cases (by simpa using hc0) (by simpa using hc1) (by simpa using hc2)
-        (by simpa using hctop)⟩, hir_bin⟩, h_uns_spec⟩, ?_, ?_, ?_, ?_, ?_⟩
+    ⟨⟨fun _ => ⟨isU64_top hb_u64 hbtop, isU64_top hcc_u64 hctop⟩, hir_bin⟩, h_uns_spec⟩,
+    ?_, ?_, ?_, ?_, ?_⟩
   · rcases his_bin with h | h <;> rw [h] <;> simp
   · rcases hir_bin with h | h <;> rw [h] <;> simp
   · exact hg5
@@ -290,10 +274,19 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Assumptions := Assumptions,
     Spec := Spec,
     soundness := soundness,
-    completeness := completeness }
+    completeness := completeness,
+    channelsWithRequirements := [] }
 
+set_option linter.unusedSectionVars false in
+/-- Since Lean 4.32, class projections through `ProvableType`-derived instances no longer whnf-reduce
+at `.reducible` transparency (Clean `088a9287`), so `circuit_norm` can no longer cross
+`circuit.Spec` ↔ `Spec` on its own. Supply the bridge as a rewrite. -/
+@[circuit_norm] lemma circuit_Spec_eq : (circuit (p := p)).Spec = Spec := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
     circuit.localLength x = 0 := rfl
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma channelsWithRequirements_eq :
+    circuit.channelsWithRequirements = ([] : List (RawChannel (ZMod p))) := rfl
 
 end SP1Clean.LtOperationSigned

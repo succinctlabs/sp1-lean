@@ -34,7 +34,6 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 2000000 in
 /-- **Faithfulness anchor (RTypeReader fragment).** Under `is_real = is_trusted = 1`, SP1's generated
 `RTypeReader` constraint list holds iff the four `op_a_0` zeroing equations and the three operands'
 timestamp byte bounds hold. The `.program`/`.memory` interactions contribute `True` (their meaning is
@@ -57,11 +56,11 @@ theorem rtypereader_constraints_faithful
         (cols.op_c_memory.access_timestamp.diff_low_limb.val < 2 ^ 16 ∧
           ((clk_low + 2 - cols.op_c_memory.access_timestamp.prev_low - 1
               - cols.op_c_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹).val < 2 ^ 8)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.RTypeReader.asserts, Extracted.RTypeReader.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_memory, Interaction.toProp_send_program,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.constrain_Range,
+    ByteOpcode.constrainField_six, ByteOpcode.constrainField_three,
+    ByteOpcode.constrain_Range,
     ByteOpcode.constrain_U8Range, val_16, ZMod.val_zero, one_ne_zero, ne_eq, not_false_eq_true,
     true_implies, sub_self, mul_zero, sub_zero, Nat.ofNat_pos, true_and, and_true,
     show (2 : ℕ) ^ 8 = 256 by norm_num, show (2 : ℕ) ^ 16 = 65536 by norm_num]
@@ -83,7 +82,6 @@ theorem rtypereader_asserts_faithful
   simp only [Extracted.RTypeReader.asserts, List.Forall, sub_self, mul_zero, sub_zero,
     true_and, and_true]
 
-set_option maxHeartbeats 2000000 in
 /-- **RTypeReader fragment — interaction half.** Under `is_real = is_trusted = 1`, SP1's generated
 `RTypeReader` `interactions` list holds iff the three operands' timestamp byte bounds. The
 `.program`/`.memory` interactions contribute `True`; the bounds come from the per-operand byte
@@ -102,11 +100,11 @@ theorem rtypereader_interactions_faithful
         (cols.op_c_memory.access_timestamp.diff_low_limb.val < 2 ^ 16 ∧
           ((clk_low + 2 - cols.op_c_memory.access_timestamp.prev_low - 1
               - cols.op_c_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹).val < 2 ^ 8)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.RTypeReader.interactions, List.Forall,
     Interaction.toProp_send_byte, Interaction.toProp_receive,
     Interaction.toProp_send_memory, Interaction.toProp_send_program,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.constrain_Range,
+    ByteOpcode.constrainField_six, ByteOpcode.constrainField_three,
+    ByteOpcode.constrain_Range,
     ByteOpcode.constrain_U8Range, val_16, ZMod.val_zero, one_ne_zero, ne_eq, not_false_eq_true,
     true_implies, Nat.ofNat_pos, true_and, and_true,
     show (2 : ℕ) ^ 8 = 256 by norm_num, show (2 : ℕ) ^ 16 = 65536 by norm_num]
@@ -115,14 +113,15 @@ theorem rtypereader_interactions_faithful
 open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel ProgramMsg)
 open SP1Clean.InteractionRecovery
 
-set_option maxHeartbeats 1000000 in
-/-- **Faithfulness anchor (RTypeReader fragment) — Memory-bus interactions, SYNTACTIC.** The six Memory
-interactions the reader actually emits (`interactionsWith memoryChannel`) project to the same
-`LookupAccess` list as the Memory entries of SP1's extracted `RTypeReader.interactions` oracle (the
-`.filter`-to-`.Memory` of its `toAccess`-image). Per-channel the circuit and oracle emit in the same
-`op_a, op_b, op_c` (send-prev, receive-new) order, so this is a clean `=` — no `Perm`. Exercises the
-`.memory` arm of `Extracted.Interaction.toAccess` and its `.send`/`.receive` `Dir.sign` (the reader emits
-the receive with `mult -is_real`, the oracle as `.receive … is_real`; both project to `signedVal (-is_real)`). -/
+/-- **Faithfulness anchor (RTypeReader fragment) — Memory-bus interactions, SYNTACTIC.** Option B: the
+reader is now a **pure read** — its op_a (`rd`) **write** is factored out into `RegisterWrite` (composed by
+the chip). So the **five** Memory interactions the reader actually emits (`interactionsWith memoryChannel`:
+op_a read, op_b read+write, op_c read+write) project to the same `LookupAccess` list as the Memory entries
+of SP1's extracted `RTypeReader.interactions` oracle **with the op_a write dropped** (`.eraseIdx 1` — the
+op_a write is Memory-index 1). The relocated op_a write is recovered at the chip level by `RegisterWrite`'s
+own emit, so the *combined* chip Memory block is a `List.Perm` of the full oracle (`Faithful/AddChip.lean`). Same
+`op_a(read), op_b, op_c` order, so a clean `=` after the erase. Exercises the `.memory` arm of
+`Extracted.Interaction.toAccess` and its `.send`/`.receive` `Dir.sign`. -/
 theorem rtypereader_memory_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var Readers.RTypeReader.Inputs (ZMod p)) (offset : ℕ)
     (clk_high clk_low : ZMod p) (pc : Vector (ZMod p) 3) (opcode : ZMod p)
@@ -133,10 +132,7 @@ theorem rtypereader_memory_interactions_faithful_syntactic
     (h_oa : Expression.eval env input.cols.op_a = cols.op_a)
     (h_ob : Expression.eval env input.cols.op_b = cols.op_b)
     (h_oc : Expression.eval env input.cols.op_c = cols.op_c)
-    (h_wv0 : Expression.eval env input.wv0 = op_a_write_value[0])
-    (h_wv1 : Expression.eval env input.wv1 = op_a_write_value[1])
-    (h_wv2 : Expression.eval env input.wv2 = op_a_write_value[2])
-    (h_wv3 : Expression.eval env input.wv3 = op_a_write_value[3])
+    -- (Option B) the op_a write left the reader, so the `op_a_write_value` eval-bridges `h_wv*` are gone.
     (h_pl_a : Expression.eval env input.cols.op_a_memory.access_timestamp.prev_low =
       cols.op_a_memory.access_timestamp.prev_low)
     (h_pv_a0 : Expression.eval env input.cols.op_a_memory.prev_value[0] = cols.op_a_memory.prev_value[0])
@@ -157,29 +153,35 @@ theorem rtypereader_memory_interactions_faithful_syntactic
     (h_pv_c3 : Expression.eval env input.cols.op_c_memory.prev_value[3] = cols.op_c_memory.prev_value[3]) :
     (((Readers.RTypeReader.main input).operations offset).interactionsWith
         memoryChannel.toRaw).map (AbstractInteraction.toAccess env)
-      = ((Extracted.RTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
-          is_trusted).map Extracted.Interaction.toAccess).filter (fun a => a.1 = InteractionKind.Memory) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+      = ((((Extracted.RTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
+          is_trusted).map Extracted.Interaction.toAccess).filter
+            (fun a => a.1 = InteractionKind.Memory)).eraseIdx 1).map LookupAccessList.negMult := by
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have hrac := fun (n : ℕ) (inp : Var Readers.RegisterAccessCols.Inputs (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit memoryChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
       (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) memoryChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) memoryChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.programChannel_eq_memoryChannel_false, if_false]
-  simp only [toAccess_pushIf_memory]
+  -- W11 memory flip: reads are `pullIf` (mult `-is_real`), the op_b/op_c read-backs `pushIf` (mult `is_real`);
+  -- the op_a write `pushIf` is GONE (factored to `RegisterWrite`), so the oracle's op_a write (Memory-index 1)
+  -- is `eraseIdx 1`'d off the RHS, and the whole list is `negMult`-bridged (our pull/push polarity is the
+  -- negation of SP1's send/receive — same up-to-sign bridge as the Program bus).
+  simp only [toAccess_pushIf_memory, toAccess_pullIf_memory]
   -- RHS: unfold the oracle + projection, drop the byte/program entries (`.1 ≠ .Memory`) from the filter.
   simp only [Extracted.RTypeReader.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign, List.filter_cons]
-  -- both sides are now the same six `.Memory` accesses; bind the evals and reduce the constants.
-  simp [circuit_norm, h_ir, h_ch, h_cl, h_oa, h_ob, h_oc,
-    h_wv0, h_wv1, h_wv2, h_wv3, h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3,
+  -- both sides are now the same five `.Memory` accesses (modulo `negMult`); bind the evals + sign bridge.
+  simp [circuit_norm, LookupAccessList.negMult, signedVal_neg hp2,
+    h_ir, h_ch, h_cl, h_oa, h_ob, h_oc,
+    h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3,
     h_pl_b, h_pv_b0, h_pv_b1, h_pv_b2, h_pv_b3,
     h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3]
 
-set_option maxHeartbeats 1000000 in
 /-- **Faithfulness anchor (RTypeReader fragment) — Program-bus interaction, SYNTACTIC.** The single
 Program instruction-fetch the reader emits projects to the same arity-16 `LookupAccess` as the Program
 entry of SP1's extracted oracle. Exercises the `.program` arm of `Extracted.Interaction.toAccess`,
@@ -200,25 +202,32 @@ theorem rtypereader_program_interactions_faithful_syntactic
     (h_oa0 : Expression.eval env input.cols.op_a_0 = cols.op_a_0) :
     (((Readers.RTypeReader.main input).operations offset).interactionsWith
         programChannel.toRaw).map (AbstractInteraction.toAccess env)
-      = ((Extracted.RTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
-          is_trusted).map Extracted.Interaction.toAccess).filter (fun a => a.1 = InteractionKind.Program) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+      = (((Extracted.RTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
+          is_trusted).map Extracted.Interaction.toAccess).filter
+            (fun a => a.1 = InteractionKind.Program)).map LookupAccessList.negMult := by
+  have hp2 : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have hrac := fun (n : ℕ) (inp : Var Readers.RegisterAccessCols.Inputs (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit programChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
       (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) programChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) programChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
-  simp only [toAccess_pushIf_program]
+  -- SC Phase 2a: `programChannel` is a `Channel` — `circuit_norm` recovers the program pull in the raw
+  -- `ChannelInteraction.toRaw` form, so unfold the kernel's `pulledIf`/`toRaw` to match it (cf. the
+  -- `StateConsistency` state-kernel pattern), then rewrite.
+  have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
+    toAccess_pullIf_program env g m
+  simp only [hk]
   simp only [Extracted.RTypeReader.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign, List.filter_cons]
-  simp [circuit_norm, Opcode.ofNat, ConstraintCoe.coe_eq_val,
+  simp [circuit_norm, Opcode.ofNat, ConstraintCoe.coe_eq_val, LookupAccessList.negMult,
+    signedVal_neg hp2,
     h_it, h_p0, h_p1, h_p2, h_oc, h_oa, h_ob, h_oct, h_oa0]
 
-set_option maxHeartbeats 1000000 in
 /-- **Faithfulness anchor (RTypeReader fragment) — Byte-bus interactions, SYNTACTIC.** The six timestamp
 byte checks the reader emits — recovered **through two nested subcircuit levels** (`RTypeReader →
 RegisterAccessCols → RegisterAccessTimestamp`) — project to the same `LookupAccess` list as the Byte
@@ -246,23 +255,13 @@ theorem rtypereader_byte_interactions_faithful_syntactic
         byteChannel.toRaw).map (AbstractInteraction.toAccess env)
       = ((Extracted.RTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
           is_trusted).map Extracted.Interaction.toAccess).filter (fun a => a.1 = InteractionKind.Byte) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h6 : (6 : ZMod p).val = 6 := by
-    have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
-  have h3 : (3 : ZMod p).val = 3 := by
-    have h : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
-  have hbk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
-        (InteractionKind.Byte, "SP1Byte",
-          [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
-           (Expression.eval env s.b).val, (Expression.eval env s.c).val],
-          signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_pullIf_byte env g s
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
+  have h3 : (3 : ZMod p).val = 3 := val_3_zmod_p
+  have hbk := toAccess_pullIf_byte_forall env
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   -- descend through the two nested `FormalAssertion` sub-readers (`RegisterAccessCols →
   -- RegisterAccessTimestamp`) to surface the byte emits (Clean's general `interactionsWith_subcircuit`
   -- only exposes the flat `.ops.toFlat`; `FormalAssertion.toSubcircuit_interactions` rewrites that back to
@@ -273,8 +272,7 @@ theorem rtypereader_byte_interactions_faithful_syntactic
   -- the six byte pulls have surfaced (in filter-`if` form); reduce the filters, map via the byte kernel,
   -- unfold the oracle + its `.Byte` filter, and bind the evals.
   simp [circuit_norm, hbk, Gadgets.Equality.main, Extracted.RTypeReader.interactions,
-    Extracted.Interaction.toAccess, Extracted.Dir.sign,
-    ByteOpcode.ofNat_six, ByteOpcode.ofNat_three, ByteOpcode.idx, h6, h3,
-    h_ir, h_cl, h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c, sub_eq_add_neg]
+    Extracted.Interaction.toAccess, Extracted.Dir.sign, h6, h3,
+    h_ir, h_cl, h_pl_a, h_dl_a, h_pl_b, h_dl_b, h_pl_c, h_dl_c]
 
 end SP1Clean.Faithful

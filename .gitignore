@@ -5,3 +5,4 @@ scratch/
 .lake/*
 .claude/*
 __pycache__/
+local-review/

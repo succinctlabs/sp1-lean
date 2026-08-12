@@ -4,7 +4,6 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ITypeReaderImmutable
 import SP1Clean.Native.Readers.MemoryAccess
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.LoadX0Chip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -27,15 +26,36 @@ written). The opcode fed to the reader is the weighted selector sum
 
 The chip `Spec` is the composition of the sub-circuits' own `Spec`s + the proven selector binaries / the
 `is_real`-binary fact + the three per-width alignment equations + the two `op_a_0` forcing gates (which
-pin `op_a_0 = is_real`, i.e. `op_a = x0` on real rows). Output is the extracted `LoadX0Columns`. -/
+pin `op_a_0 = is_real`, i.e. `op_a = x0` on real rows). Output is the extracted `Columns`. -/
 
 namespace SP1Clean.LoadX0Chip
 
 open Circuit
-open Extracted (LoadX0Columns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Native LoadX0-chip row (Rust field order). A bespoke reader-only row: the `ITypeReader` block is
+read through both `ITypeReader` and `ITypeReaderImmutable` assertion families, there is no value
+logic, and the seven per-width selectors replace a single `is_real`. The reader and memory blocks
+reuse the project substrate (`Extracted.AddressOperation` is still a standalone generated module;
+`Extracted.MemoryAccessCols` lives in the generated `MemoryAccess` struct carrier).
+`Faithful.LoadX0Chip.loadX0ChipReconfigure` is the sole bridge to Rust's separately generated
+whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ITypeReader F
+  address_operation : Extracted.AddressOperation F
+  memory_access : Extracted.MemoryAccessCols F
+  offset_bit : Vector F 3
+  is_lb : F
+  is_lbu : F
+  is_lh : F
+  is_lhu : F
+  is_lw : F
+  is_lwu : F
+  is_ld : F
+deriving ProvableStruct
 
 /-- The operand reads + threaded reader column blocks. `op_b_val` is the rs1 base-address value (the
 `op_b` register read), `op_c_imm` the sign-extended immediate; the seven selectors flag the active load
@@ -59,6 +79,22 @@ deriving ProvableStruct
 @[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
 @[reducible] def Inputs.op_c_imm {F} (i : Inputs F) : Word F := i.adapter.op_c_imm
 
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_lb := Eval.eval env input.is_lb
+         is_lbu := Eval.eval env input.is_lbu
+         is_lh := Eval.eval env input.is_lh
+         is_lhu := Eval.eval env input.is_lhu
+         is_lw := Eval.eval env input.is_lw
+         is_lwu := Eval.eval env input.is_lwu
+         is_ld := Eval.eval env input.is_ld
+         state := Eval.eval env input.state
+         adapter := Eval.eval env input.adapter
+         memory_access := Eval.eval env input.memory_access
+         offset_bit := Eval.eval env input.offset_bit } : Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]; rfl
+
 
 /-- The recombined low clock `clk_0_16 + clk_16_24 · 2^16` (matching SP1's `clk_low`). -/
 @[reducible] def clkLow (state : Extracted.CPUState (ZMod p)) : ZMod p :=
@@ -73,27 +109,36 @@ deriving ProvableStruct
   29 * input.is_lb + 32 * input.is_lbu + 30 * input.is_lh + 33 * input.is_lhu
     + 31 * input.is_lw + 34 * input.is_lwu + 35 * input.is_ld
 
-/-- Compose the four column blocks as Clean sub-circuits and assemble the extracted `LoadX0Columns`.
+/-- Compose the four column blocks as Clean sub-circuits and assemble the extracted `Columns`.
 `CPUState` advances pc by 4 / clk by 8; `AddressOperation` computes `rs1 + imm` (with the three real
 offset bits); `MemoryAccess` is a read (`new_value = prev_value`) at the 48-bit address;
 `ITypeReaderImmutable` reads op_a / op_b (opcode the weighted selector sum). The seven selector binaries,
 the `is_real` binary, the three per-width alignment gates, and the two `op_a_0` forcing gates are imposed
 directly. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadX0Columns (ZMod p)) := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let is_real := input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
     + input.is_lw + input.is_lwu + input.is_ld
   let opcode := 29 * input.is_lb + 32 * input.is_lbu + 30 * input.is_lh + 33 * input.is_lhu
     + 31 * input.is_lw + 34 * input.is_lwu + 35 * input.is_ld
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, is_real⟩
-  let addr_op ← subcircuit AddressOperation.circuit
-    ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1], input.offset_bit[2]⟩
-  assertion Readers.MemoryAccess.circuit
+  let addr_op ← AddressOperation.circuit
+    ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1],
+      input.offset_bit[2], is_real⟩
+  let address := AddressOperation.alignedValue
+    ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1],
+      input.offset_bit[2], is_real⟩
+    addr_op
+  -- `MemoryAccess` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
+  -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.MemoryAccess.circuit
     ⟨input.memory_access, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
-      addr_op.addr_operation.value[0], addr_op.addr_operation.value[1], addr_op.addr_operation.value[2],
+      address[0], address[1], address[2],
       input.memory_access.prev_value, is_real⟩
-  assertion Readers.ITypeReaderImmutable.circuit
+  -- `ITypeReaderImmutable` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`,
+  -- discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.ITypeReaderImmutable.circuit
     ⟨input.adapter, is_real, is_real, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
       input.state.pc, opcode⟩
@@ -104,7 +149,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadX0Columns (ZM
   input.is_lw * (input.is_lw - 1) === 0
   input.is_lwu * (input.is_lwu - 1) === 0
   input.is_ld * (input.is_ld - 1) === 0
-  is_real * (is_real - 1) === 0
+  assertZero (is_real * (is_real - 1))
   input.is_ld * input.offset_bit[2] === 0
   (input.is_lw + input.is_lwu + input.is_ld) * input.offset_bit[1] === 0
   (input.is_lh + input.is_lhu + input.is_lw + input.is_lwu + input.is_ld) * input.offset_bit[0] === 0
@@ -113,34 +158,63 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadX0Columns (ZM
   return ⟨input.state, input.adapter, addr_op, input.memory_access, input.offset_bit,
     input.is_lb, input.is_lbu, input.is_lh, input.is_lhu, input.is_lw, input.is_lwu, input.is_ld⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadX0Columns main where
-  channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
-  -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks are threaded
-  -- inputs and the gates witness nothing.
-  localLength _ := 3 + 1
-  localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
-  output input i0 :=
-    ⟨input.state, input.adapter,
-      ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
-      input.memory_access, input.offset_bit,
-      input.is_lb, input.is_lbu, input.is_lh, input.is_lhu, input.is_lw, input.is_lwu, input.is_ld⟩
-  output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
-  channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements :=
-    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
+/-- Derive the four address witness cells and the complete four-channel interface from `main`. -/
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
+  elaborate_circuit
+
+/-- Folded completed-row layout used by the whole-chip Rust AIR codec. -/
+@[circuit_norm] lemma directOutput_eq
+    (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter,
+        ⟨varFromOffset Extracted.AddrAddOperation offset, var ⟨offset + 3⟩⟩,
+        input.memory_access, input.offset_bit, input.is_lb, input.is_lbu,
+        input.is_lh, input.is_lhu, input.is_lw, input.is_lwu, input.is_ld⟩ :
+        Var Columns (ZMod p)) := rfl
+
+/-- Component-wise evaluation of a completed LoadX0 row. -/
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Columns (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state
+         adapter := Eval.eval env cols.adapter
+         address_operation := Eval.eval env cols.address_operation
+         memory_access := Eval.eval env cols.memory_access
+         offset_bit := Eval.eval env cols.offset_bit
+         is_lb := Eval.eval env cols.is_lb
+         is_lbu := Eval.eval env cols.is_lbu
+         is_lh := Eval.eval env cols.is_lh
+         is_lhu := Eval.eval env cols.is_lhu
+         is_lw := Eval.eval env cols.is_lw
+         is_lwu := Eval.eval env cols.is_lwu
+         is_ld := Eval.eval env cols.is_ld } :
+        Columns F) := by
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity,
 the `MemoryAccess` timestamp monotonicity (a read), the `ITypeReaderImmutable` adapter facts (op_a/op_b
 reads + the `op_a_0` read-zeroing — the loaded word is discarded), the seven selector binaries, the
 `is_real`-binary fact, the three per-width alignment equations, and the two `op_a_0` forcing gates. -/
-def Spec (input : Inputs (ZMod p)) (cols : LoadX0Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  AddressOperation.Spec
-    ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1], input.offset_bit[2]⟩
+def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+  AddressOperation.RowSpec
+    ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1],
+      input.offset_bit[2], isReal input⟩
     cols.address_operation ∧
   Readers.MemoryAccess.Spec
     ⟨input.memory_access, input.state.clk_high, clkLow input.state,
-      cols.address_operation.addr_operation.value[0], cols.address_operation.addr_operation.value[1],
-      cols.address_operation.addr_operation.value[2], input.memory_access.prev_value, isReal input⟩ ∧
+      (AddressOperation.alignedValue
+        ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1],
+          input.offset_bit[2], isReal input⟩
+        cols.address_operation)[0],
+      (AddressOperation.alignedValue
+        ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1],
+          input.offset_bit[2], isReal input⟩
+        cols.address_operation)[1],
+      (AddressOperation.alignedValue
+        ⟨input.op_b_val, input.op_c_imm, input.offset_bit[0], input.offset_bit[1],
+          input.offset_bit[2], isReal input⟩
+        cols.address_operation)[2],
+      input.memory_access.prev_value, isReal input⟩ ∧
   Readers.ITypeReaderImmutable.Spec
     ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
       input.state.pc, opcodeVal input⟩ ∧

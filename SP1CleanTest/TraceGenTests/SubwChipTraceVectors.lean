@@ -66,8 +66,6 @@ def SubwChipTraceEvents : List AluEventRec := [
 /-- The padded trace height SP1 chose (`next_multiple_of_32`). -/
 def SubwChipTraceHeight : ℕ := 64
 
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 64000 in
 /-- SP1's real `generate_trace` output: 64 × 32, canonical values. -/
 def SubwChipTraceRows : List (Vector ℕ 32) := [
   #v[0, 0, 9, 4096, 0, 0, 5, 0, 0, 0, 0, 1, 11, 0, 6, 0, 0, 0, 0, 1, 10, 7, 65535, 65535, 65535, 32767, 1, 9, 1, 0, 0, 1],

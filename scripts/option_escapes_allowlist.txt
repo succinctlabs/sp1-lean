@@ -1,0 +1,81 @@
+# Allowlist for elaboration-budget escape hatches — enforced by scripts/check_option_escapes.sh.
+#
+# Format:  <option>  <path>  <value>  <count>   # justification
+#
+# The key is (option, path, value) and the count must match EXACTLY. Any site not listed here fails
+# the build; so does raising a listed value, or adding a second site at the same value to a listed
+# file. This is a PROHIBITION with named exceptions, not a budget.
+#
+# ⚠ THIS LIST IS A LAST RESORT. It is not a place to record that something is slow. Hand-written Lean
+# in this repo carries ZERO `maxHeartbeats`; every entry below is a generated definition or a measured
+# structural case, and each states its floor bracket and its mechanism.
+#
+# Before adding an entry, read docs/agents/perf-findings.md §1 — extract over OPAQUE arguments, and
+# check what the extraction can still see. Then meet the bar in §7: a measured floor bracket from a
+# real ladder, a named mechanism, at least one attempted fix with its measured result, and a reason the
+# cause cannot be moved (not merely that a first attempt did not move it). If the site is generated,
+# fix the emitter in `update_extracted.py` instead — its blanket emission has repeatedly proven one to
+# two orders of magnitude over what any definition actually needed.
+#
+# For calibration: upstream Clean has ZERO `maxHeartbeats` in 44,603 lines and 4 `maxRecDepth` sites,
+# all in constant tables, capped at 2048, none in a proof.
+#
+# RE-MEASURED at Lean v4.32.2 (2026-08-06, the 4.31 -> 4.32.2 + Sail v4 -> v5 migration). Every one of
+# the 11 sites was re-tested by STRIPPING its option and re-elaborating: all six files still fail
+# without them, so no entry has become unnecessary. (That check matters because this gate is exact set
+# equality — a site the toolchain no longer needs FAILS the build until its line is deleted.)
+#
+# ---- maxHeartbeats: 3 sites, all on GENERATED definitions ----------------------------------------
+# All three are emitted by update_extracted.py and reproduced by a regeneration; fixes go in the
+# generator, never by editing the file.
+
+# The only generated AIR definition that needs any budget. Fails in `«LCNF simp»` — the CODE GENERATOR,
+# not elaboration; the elaborator handles every generated def at the plain default. Ladder: 200000 FAIL
+# / 210000 ok → floor (200000, 210000], barely over the default; set ~2x because codegen cost tracks
+# toolchain changes less predictably than elaboration. Removable only via `noncomputable`, which
+# cascades into hand-written Faithful/ files; that trade is deliberately declined.
+maxHeartbeats  SP1Clean/Extracted/ChipOracle/DivRem.lean            400000   1
+
+# The one genuinely irreducible site in this tree. `assertsPart2` contains a SINGLE list entry whose
+# transitive `let`-closure is 1239 bindings (a Poseidon-style accumulation chain). The Rust emitter
+# chunks at 64 entries per part; chunking at ONE entry per part still leaves 1239, so no chunk size
+# reaches the default. Measured, not argued — this is the standard an "irreducible" claim has to meet.
+# File-level because the recombining `asserts` needs it too.
+# Ladder at v4.32.2: 200000 FAIL / 400000 FAIL / 600000 FAIL / 800000 ok -> floor (600000, 800000].
+# This entry previously carried no recorded bracket; the value is left at 1000000 (~1.25x the floor).
+maxHeartbeats  SP1Clean/Extracted/SystemOracle/Global.lean         1000000   1
+
+# Largest conformance battery in the tree: 528 vectors x 14 columns, ~30,000 numeric literals.
+# Ladder: 250000 FAIL / 300000 ok → floor (250000, 300000], set ~2x. Nineteen of the twenty-one
+# generated batteries need nothing at all; this one and DivRem's trace are the exceptions. Battery size
+# is NOT a predictor — larger batteries than this one need nothing.
+maxHeartbeats  SP1CleanTest/WitnessTests/Vectors/MulOperation.lean  600000   1
+
+# ---- maxRecDepth: 8 sites (Lean's default is 512) ------------------------------------------------
+
+# Global's four `assertsPart*` definitions — the same Poseidon chain as the heartbeat entry above.
+# Ladder: 800 FAIL / 1200 FAIL / 2000 ok → floor (1200, 2000], set ~2x. The file's other two defs need
+# nothing, and 11 of the 12 generated system-oracle modules need nothing at all — including every
+# definition in PublicValues.lean. Generated size does not imply a need.
+maxRecDepth    SP1Clean/Extracted/SystemOracle/Global.lean             4000   4
+
+# `branchColumns_asserts_decompose` — a load-bearing closing `ring_nf` over a long right-nested list of
+# ~24 assertion terms. Ladder-measured (700, 1000]. A sibling in the same file has the identical shape
+# with a REDUNDANT `ring_nf` and needs nothing: check whether the `ring_nf` is load-bearing before
+# assuming a sibling needs the same treatment.
+maxRecDepth    SP1Clean/Faithful/BranchChip.lean                       1000   1
+
+# `deriving instance Fintype for Register` — recurses once per constructor and just misses the default.
+# Bracket (512, 600], the narrowest in the tree; set to 800 rather than 600 because 17% over a measured
+# failing value is not a margin. Scoped, not file-level: a file-level bump silently covers declarations
+# that never needed it.
+maxRecDepth    SP1Clean/FormalModel/Trace/Witness.lean                  800   1
+
+# Widest trace battery: 64 x 246 = 15,744 literals, a right-nested `List.cons` chain.
+# Ladder: 8000 FAIL / 16000 ok → floor (8000, 16000], set ~2x. Needs no heartbeat budget at all.
+maxRecDepth    SP1CleanTest/TraceGenTests/DivRemChipTraceVectors.lean 32000   1
+
+# Same battery as the MulOperation heartbeat entry. Its recursion need is MASKED by the heartbeat
+# failure and surfaces only once that is satisfied — ladder one option at a time, to a fixpoint.
+# Ladder: 16000 FAIL / 32000 ok → floor (16000, 32000], set ~2x.
+maxRecDepth    SP1CleanTest/WitnessTests/Vectors/MulOperation.lean     64000   1

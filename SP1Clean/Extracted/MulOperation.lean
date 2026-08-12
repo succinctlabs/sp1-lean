@@ -32,7 +32,6 @@ deriving ProvableStruct
 
 namespace MulOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (a_word : (Word F))
   (b_word : (Word F))
@@ -559,7 +558,6 @@ set_option maxHeartbeats 8000000 in
     E465,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (a_word : (Word F))
   (b_word : (Word F))
@@ -577,32 +575,32 @@ set_option maxHeartbeats 8000000 in
   let __call1_v := U16toU8OperationSafe.value #v[c_word[0], c_word[1], c_word[2], c_word[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } is_real
   let E15 := __call1_v[7]
   U16toU8OperationSafe.interactions #v[b_word[0], b_word[1], b_word[2], b_word[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } is_real ++ U16toU8OperationSafe.interactions #v[c_word[0], c_word[1], c_word[2], c_word[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } is_real ++ U16MSBOperation.interactions a_word[1] { msb := cols.product_msb.msb } is_mulw ++ [
-    ⟨.send, (.byte (ByteOpcode.ofNat 5) cols.b_msb E7 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 5) cols.c_msb E15 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[0] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[1] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[2] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[3] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[4] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[5] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[6] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[7] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[8] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[9] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[10] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[11] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[12] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[13] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[14] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.carry[15] 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.product[0] cols.product[1]), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.product[2] cols.product[3]), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.product[4] cols.product[5]), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.product[6] cols.product[7]), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.product[8] cols.product[9]), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.product[10] cols.product[11]), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.product[12] cols.product[13]), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 cols.product[14] cols.product[15]), is_real⟩,
+    ⟨.send, (.byte 5 cols.b_msb E7 0), is_real⟩,
+    ⟨.send, (.byte 5 cols.c_msb E15 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[0] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[1] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[2] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[3] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[4] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[5] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[6] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[7] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[8] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[9] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[10] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[11] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[12] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[13] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[14] 16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.carry[15] 16 0), is_real⟩,
+    ⟨.send, (.byte 3 0 cols.product[0] cols.product[1]), is_real⟩,
+    ⟨.send, (.byte 3 0 cols.product[2] cols.product[3]), is_real⟩,
+    ⟨.send, (.byte 3 0 cols.product[4] cols.product[5]), is_real⟩,
+    ⟨.send, (.byte 3 0 cols.product[6] cols.product[7]), is_real⟩,
+    ⟨.send, (.byte 3 0 cols.product[8] cols.product[9]), is_real⟩,
+    ⟨.send, (.byte 3 0 cols.product[10] cols.product[11]), is_real⟩,
+    ⟨.send, (.byte 3 0 cols.product[12] cols.product[13]), is_real⟩,
+    ⟨.send, (.byte 3 0 cols.product[14] cols.product[15]), is_real⟩,
   ]
 
 end MulOperation

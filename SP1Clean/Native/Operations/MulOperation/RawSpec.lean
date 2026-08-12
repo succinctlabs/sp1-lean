@@ -33,9 +33,6 @@ open SP1Clean.Channels (byteChannel)
 -- shared `Word`/`Gadgets` lemmas keep firing.
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-instance : Fact (2 ^ 17 < p) :=
-  ⟨by have h := Fact.out (p := 2 ^ 24 < p); have : (2 : ℕ) ^ 17 < 2 ^ 24 := by norm_num
-      omega⟩
 
 instance : Fact (p > 2) :=
   ⟨by have h := Fact.out (p := 2 ^ 24 < p); have : (2 : ℕ) < 2 ^ 24 := by norm_num
@@ -59,6 +56,11 @@ lemma hn8 : 2 ^ 8 < p := by
   have : (2 : ℕ) ^ 8 < 2 ^ 24 := by norm_num
   omega
 
+-- Ladder-measured 2026-08-01: floor (10000, 20000], so the plain default carries >=10x headroom and
+-- this declaration needs no budget. It reached that only after the same two fixes applied to its
+-- 16-column sibling `full_product` below — an opaque `obtain ⟨S, hS⟩` instead of `set … with hS`,
+-- and clearing the spent column equations `e0..e7` before the closing `omega`. See the long note
+-- above `full_product` for the measurements and for what is left. Do not reintroduce `set` here.
 /-- **Low-half schoolbook reassembly** (the MUL keystone). Given the first eight columns of the
 schoolbook product/carry chain over the eight operand bytes `b0..b7`, `c0..c7` (each column equation
 `p_k + k_k·256 = ∑_{i+j=k} b_i·c_j + (incoming carry)`), the eight low product bytes reassemble — mod
@@ -81,14 +83,15 @@ lemma low_half
     (p0 + p1*256 + p2*256^2 + p3*256^3 + p4*256^4 + p5*256^5 + p6*256^6 + p7*256^7) % 2^64
       = ((b0 + b1*256 + b2*256^2 + b3*256^3 + b4*256^4 + b5*256^5 + b6*256^6 + b7*256^7)
          * (c0 + c1*256 + c2*256^2 + c3*256^3 + c4*256^4 + c5*256^5 + c6*256^6 + c7*256^7)) % 2^64 := by
-  set S : ℕ := b0*c0
+  obtain ⟨S, hS⟩ : ∃ S : ℕ, S = b0*c0
     + (b0*c1 + b1*c0)*256
     + (b0*c2 + b1*c1 + b2*c0)*256^2
     + (b0*c3 + b1*c2 + b2*c1 + b3*c0)*256^3
     + (b0*c4 + b1*c3 + b2*c2 + b3*c1 + b4*c0)*256^4
     + (b0*c5 + b1*c4 + b2*c3 + b3*c2 + b4*c1 + b5*c0)*256^5
     + (b0*c6 + b1*c5 + b2*c4 + b3*c3 + b4*c2 + b5*c1 + b6*c0)*256^6
-    + (b0*c7 + b1*c6 + b2*c5 + b3*c4 + b4*c3 + b5*c2 + b6*c1 + b7*c0)*256^7 with hS
+    + (b0*c7 + b1*c6 + b2*c5 + b3*c4 + b4*c3 + b5*c2 + b6*c1 + b7*c0)*256^7
+    := ⟨_, rfl⟩
   have hLOW :
       (p0 + p1*256 + p2*256^2 + p3*256^3 + p4*256^4 + p5*256^5 + p6*256^6 + p7*256^7)
         + k7 * 2^64 = S := by rw [hS]; omega
@@ -103,9 +106,43 @@ lemma low_half
         + (b5*c7 + b6*c6 + b7*c5)*256^4
         + (b6*c7 + b7*c6)*256^5
         + (b7*c7)*256^6) := by rw [hS]; ring
+  clear hS e0 e1 e2 e3 e4 e5 e6 e7
   omega
 
-set_option maxHeartbeats 16000000 in
+-- Ceiling removed 2026-08-01, in two passes, and the note the first pass left here was wrong.
+--
+-- Pass 1 had cut the floor from (1000000, 1200000] to (300000, 400000] by replacing `set S := … with
+-- hS` (a let-bound local the elaborator zeta-unfolds — Clean's performance doc rejects it for exactly
+-- this) with Clean fix pattern 4, `obtain ⟨S, hS⟩ : ∃ S, S = … := ⟨_, rfl⟩`, a genuinely opaque local,
+-- plus `clear hS`. It then declared the residue "term-intrinsic". It was not.
+--
+-- Pass 2: `clear hS` dropped the schoolbook sum but left the sixteen column equations `e0..e15` in
+-- context, and they have done their whole job the moment `hLOW` is derived — the closing `omega`
+-- needs only `hLOW`, `hHIGH` and the goal. Each `eᵢ` carries up to sixteen monomials plus a `k*256`
+-- term, so that `omega` was re-ingesting ~200 surplus monomials and 16 surplus atoms on top of
+-- `hHIGH`'s 256-monomial RHS. Extending the clear to `clear hS e0 … e15` drops the floor to
+-- (120000, 150000] — under Lean's plain default, so this declaration now carries no budget at all.
+-- Measured with `#count_heartbeats`, total work for the declaration fell 593455 → 214983 (2.8x);
+-- the same treatment applied to the 8-column sibling `low_half` took it 50601 → 26990 (1.9x), floor
+-- (20000, 40000] → (10000, 20000]. Whole-file elaboration went 20.7s → 9.1s.
+--
+-- Caveat for whoever measures this next: 214983 is above the plain default. It fits because Lean
+-- elaborates the signature and the tactic body as separate tasks, each with its own budget; the
+-- body is the (120000, 150000] half. So the headroom here is ~1.3x, not the >=5x the rest of this
+-- file enjoys — thin, though heartbeats are deterministic, so this is a toolchain-bump risk, not a
+-- flakiness risk. Re-ladder after any Lean/Mathlib bump.
+--
+-- What is left really is term-intrinsic at this proof shape: `hHIGH`'s `ring` normalises a
+-- 256-monomial 16x16 convolution and `hLOW`'s `omega` telescopes sixteen column equations, and
+-- moving the clear earlier (before `hHIGH`) was measured to change nothing. Two routes remain if
+-- more margin is ever wanted. Cheap: lift `hLOW` and `hHIGH` to top-level `private` lemmas over
+-- their free `ℕ` variables — `hHIGH` is already a fully abstract `ring` identity over 32 variables
+-- with the proof accidentally wrapped around it — which does not reduce total work but gives each
+-- piece its own budget and makes `low_half` an instance of the same pair at n=8. Real: prove a
+-- general indexed mod-`2^(8n)` reassembly lemma in `Math/MulCarryChain.lean` (which today has
+-- `chainM`/`carry`/`product`/`recurrence_*`/`cpNat` but no reassembly lemma) and instantiate it at
+-- n=8 and n=16. Only the second would make "term-intrinsic" actually false; it is a development,
+-- not a tweak.
 /-- **Full-product schoolbook reassembly** (the high-half keystone). The 16-column
 mod-`2^128` analogue of `low_half`: given the sixteen schoolbook column equations over the
 sixteen sign/zero-extended operand bytes, the sixteen product bytes reassemble — mod `2^128` —
@@ -134,7 +171,7 @@ lemma full_product
     (p0 + p1*256^1 + p2*256^2 + p3*256^3 + p4*256^4 + p5*256^5 + p6*256^6 + p7*256^7 + p8*256^8 + p9*256^9 + p10*256^10 + p11*256^11 + p12*256^12 + p13*256^13 + p14*256^14 + p15*256^15) % 2^128
       = ((b0 + b1*256^1 + b2*256^2 + b3*256^3 + b4*256^4 + b5*256^5 + b6*256^6 + b7*256^7 + b8*256^8 + b9*256^9 + b10*256^10 + b11*256^11 + b12*256^12 + b13*256^13 + b14*256^14 + b15*256^15)
          * (c0 + c1*256^1 + c2*256^2 + c3*256^3 + c4*256^4 + c5*256^5 + c6*256^6 + c7*256^7 + c8*256^8 + c9*256^9 + c10*256^10 + c11*256^11 + c12*256^12 + c13*256^13 + c14*256^14 + c15*256^15)) % 2^128 := by
-  set S : ℕ := (b0*c0)
+  obtain ⟨S, hS⟩ : ∃ S : ℕ, S = (b0*c0)
     + (b0*c1 + b1*c0)*256^1
     + (b0*c2 + b1*c1 + b2*c0)*256^2
     + (b0*c3 + b1*c2 + b2*c1 + b3*c0)*256^3
@@ -150,7 +187,7 @@ lemma full_product
     + (b0*c13 + b1*c12 + b2*c11 + b3*c10 + b4*c9 + b5*c8 + b6*c7 + b7*c6 + b8*c5 + b9*c4 + b10*c3 + b11*c2 + b12*c1 + b13*c0)*256^13
     + (b0*c14 + b1*c13 + b2*c12 + b3*c11 + b4*c10 + b5*c9 + b6*c8 + b7*c7 + b8*c6 + b9*c5 + b10*c4 + b11*c3 + b12*c2 + b13*c1 + b14*c0)*256^14
     + (b0*c15 + b1*c14 + b2*c13 + b3*c12 + b4*c11 + b5*c10 + b6*c9 + b7*c8 + b8*c7 + b9*c6 + b10*c5 + b11*c4 + b12*c3 + b13*c2 + b14*c1 + b15*c0)*256^15
-    with hS
+    := ⟨_, rfl⟩
   have hLOW :
       (p0 + p1*256^1 + p2*256^2 + p3*256^3 + p4*256^4 + p5*256^5 + p6*256^6 + p7*256^7 + p8*256^8 + p9*256^9 + p10*256^10 + p11*256^11 + p12*256^12 + p13*256^13 + p14*256^14 + p15*256^15)
         + k15 * 2^128 = S := by rw [hS]; omega
@@ -173,6 +210,7 @@ lemma full_product
         + (b13*c15 + b14*c14 + b15*c13)*256^12
         + (b14*c15 + b15*c14)*256^13
         + (b15*c15)*256^14) := by rw [hS]; ring
+  clear hS e0 e1 e2 e3 e4 e5 e6 e7 e8 e9 e10 e11 e12 e13 e14 e15
   omega
 
 /-! ## Byte helpers for the schoolbook product
@@ -212,7 +250,10 @@ goals in `soundness`/`completeness` — where it is applied by `rw [colSum_k]` a
 `byteAt`/`extendedBytes` reduction — keeps the heavy `Finset` expansion out of those proofs. -/
 
 section ColSumExpand
-omit [Fact p.Prime] [Fact (2 ^ 24 < p)]
+
+-- The `colSum_k` convolution identities are field-numeral-agnostic; the `2^24 < p` bound
+-- (auto-included from the file `variable` block) is unused here (4.30 `unusedSectionVars`).
+omit [Fact (2 ^ 24 < p)]
 
 lemma colSum_0 (bb cc : Fin 16 → ZMod p) :
     colSum bb cc 0 = byteAt bb 0 * byteAt cc 0 := by
@@ -329,7 +370,6 @@ lemma col_lift (prodk cc col prev : ZMod p)
     (hcol : col.val < 2 ^ 21) (hprev : prev.val < 2 ^ 16)
     (h : prodk + cc * 256 = col + prev) :
     prodk.val + cc.val * 256 = col.val + prev.val := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp : 2 ^ 24 < p := Fact.out
   apply_fun ZMod.val at h
   have hcc256 : (cc * 256 : ZMod p).val = cc.val * 256 := by
@@ -341,7 +381,7 @@ lemma col_lift (prodk cc col prev : ZMod p)
   rw [hL, hR] at h
   exact h
 
-omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
+omit [Fact (2 ^ 24 < p)] in
 /-- A `byteAt` read of a function whose `Fin 16` values are bytes is itself a byte. -/
 lemma byteAt_val_lt (f : Fin 16 → ZMod p) (hf : ∀ i : Fin 16, (f i).val < 256) (i : ℕ) :
     (byteAt f i).val < 256 := by
@@ -357,7 +397,6 @@ lemma colSum_val (bb cc : Fin 16 → ZMod p)
     (hbb : ∀ i : Fin 16, (bb i).val < 256) (hcc : ∀ i : Fin 16, (cc i).val < 256) (k : ℕ) :
     (colSum bb cc k).val
       = ∑ i ∈ Finset.range 16, if i ≤ k then (byteAt bb i).val * (byteAt cc (k - i)).val else 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp : 2 ^ 24 < p := Fact.out
   have hbA : ∀ i, (byteAt bb i).val < 256 := byteAt_val_lt bb hbb
   have hcA : ∀ i, (byteAt cc i).val < 256 := byteAt_val_lt cc hcc
@@ -391,14 +430,12 @@ lemma colSum_val (bb cc : Fin 16 → ZMod p)
 
 /-- A `{0,1}` field element has `.val ∈ {0,1}`. -/
 lemma bool_val {x : ZMod p} (h : x = 0 ∨ x = 1) : x.val = 0 ∨ x.val = 1 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   rcases h with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
 
 /-- With exactly one of five booleans set and the first set, the other four are `0`. -/
 lemma rest_zero {a b c d e : ZMod p}
     (hb : b = 0 ∨ b = 1) (hc : c = 0 ∨ c = 1) (hd : d = 0 ∨ d = 1) (he : e = 0 ∨ e = 1)
     (ha1 : a = 1) (hsum : a + b + c + d + e = 1) : b = 0 ∧ c = 0 ∧ d = 0 ∧ e = 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp := Fact.out (p := 2 ^ 24 < p)
   have hbv := bool_val hb; have hcv := bool_val hc; have hdv := bool_val hd; have hev := bool_val he
   have hsum0 : b + c + d + e = 0 := by rw [ha1] at hsum; linear_combination hsum
@@ -412,6 +449,47 @@ lemma rest_zero {a b c d e : ZMod p}
   exact ⟨(ZMod.val_eq_zero b).mp (by omega), (ZMod.val_eq_zero c).mp (by omega),
          (ZMod.val_eq_zero d).mp (by omega), (ZMod.val_eq_zero e).mp (by omega)⟩
 
+/-- Five boolean selectors summing to one form exactly one of the five one-hot vectors.  This is
+the dispatch form consumed by the MUL chip's Sail bridge; it is derived from the same boolean and
+sum facts used by the arithmetic operation, with `rest_zero` providing the no-wrap argument. -/
+lemma oneHot_of_sum_one {a b c d e : ZMod p}
+    (ha : a = 0 ∨ a = 1) (hb : b = 0 ∨ b = 1) (hc : c = 0 ∨ c = 1)
+    (hd : d = 0 ∨ d = 1) (he : e = 0 ∨ e = 1)
+    (hsum : a + b + c + d + e = 1) :
+    (a = 1 ∧ b = 0 ∧ c = 0 ∧ d = 0 ∧ e = 0) ∨
+    (b = 1 ∧ a = 0 ∧ c = 0 ∧ d = 0 ∧ e = 0) ∨
+    (c = 1 ∧ a = 0 ∧ b = 0 ∧ d = 0 ∧ e = 0) ∨
+    (d = 1 ∧ a = 0 ∧ b = 0 ∧ c = 0 ∧ e = 0) ∨
+    (e = 1 ∧ a = 0 ∧ b = 0 ∧ c = 0 ∧ d = 0) := by
+  have active : a = 1 ∨ b = 1 ∨ c = 1 ∨ d = 1 ∨ e = 1 := by
+    rcases ha with ha0 | ha1
+    · rcases hb with hb0 | hb1
+      · rcases hc with hc0 | hc1
+        · rcases hd with hd0 | hd1
+          · rcases he with he0 | he1
+            · exfalso
+              simp [ha0, hb0, hc0, hd0, he0] at hsum
+            · exact Or.inr (Or.inr (Or.inr (Or.inr he1)))
+          · exact Or.inr (Or.inr (Or.inr (Or.inl hd1)))
+        · exact Or.inr (Or.inr (Or.inl hc1))
+      · exact Or.inr (Or.inl hb1)
+    · exact Or.inl ha1
+  rcases active with ha1 | hb1 | hc1 | hd1 | he1
+  · obtain ⟨hb0, hc0, hd0, he0⟩ := rest_zero hb hc hd he ha1 hsum
+    exact Or.inl ⟨ha1, hb0, hc0, hd0, he0⟩
+  · have reordered : b + a + c + d + e = 1 := by linear_combination hsum
+    obtain ⟨ha0, hc0, hd0, he0⟩ := rest_zero ha hc hd he hb1 reordered
+    exact Or.inr (Or.inl ⟨hb1, ha0, hc0, hd0, he0⟩)
+  · have reordered : c + a + b + d + e = 1 := by linear_combination hsum
+    obtain ⟨ha0, hb0, hd0, he0⟩ := rest_zero ha hb hd he hc1 reordered
+    exact Or.inr (Or.inr (Or.inl ⟨hc1, ha0, hb0, hd0, he0⟩))
+  · have reordered : d + a + b + c + e = 1 := by linear_combination hsum
+    obtain ⟨ha0, hb0, hc0, he0⟩ := rest_zero ha hb hc he hd1 reordered
+    exact Or.inr (Or.inr (Or.inr (Or.inl ⟨hd1, ha0, hb0, hc0, he0⟩)))
+  · have reordered : e + a + b + c + d = 1 := by linear_combination hsum
+    obtain ⟨ha0, hb0, hc0, hd0⟩ := rest_zero ha hb hc hd he1 reordered
+    exact Or.inr (Or.inr (Or.inr (Or.inr ⟨he1, ha0, hb0, hc0, hd0⟩)))
+
 /-- With five booleans whose sum is `{0,1}`-bounded and at least one set, the sum is exactly `1`. (The
 chip's `is_real = 1` row commits one active variant flag; this turns the sum-bound gate into `sum = 1`,
 the hypothesis `aSelector_eq_resultWord`/`rest_zero` need.) -/
@@ -421,7 +499,6 @@ lemma sum_eq_one {a b c d e : ZMod p}
     (hsum01 : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1)
     (hone : a = 1 ∨ b = 1 ∨ c = 1 ∨ d = 1 ∨ e = 1) :
     a + b + c + d + e = 1 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp := Fact.out (p := 2 ^ 24 < p)
   rcases hsum01 with h0 | h1
   · exfalso
@@ -472,7 +549,6 @@ lemma aSelector_eq_resultWord (input : Inputs (ZMod p)) (cols : Extracted.MulOpe
     (hsum : input.is_mul + input.is_mulh + input.is_mulhu + input.is_mulhsu + input.is_mulw = 1) :
     aSelector cols input.is_mul input.is_mulh input.is_mulhu input.is_mulhsu input.is_mulw
       = resultWord input cols := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have h01 : (0 : ZMod p) ≠ 1 := zero_ne_one
   unfold aSelector resultWord
   rcases hmul with h | h
@@ -508,7 +584,6 @@ lemma aSelector_eq_resultWord (input : Inputs (ZMod p)) (cols : Extracted.MulOpe
 /-- Compose a 16-bit limb from its two bytes at the `ℕ`-value level. -/
 lemma byte_compose_val {x lo hi : ZMod p} (hlo : lo.val < 256) (hhi : hi.val < 256)
     (h : x = lo + hi * 256) : x.val = lo.val + hi.val * 256 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hp := Fact.out (p := 2 ^ 24 < p)
   subst h
   have hhi256 : (hi * 256 : ZMod p).val = hi.val * 256 := by
@@ -554,7 +629,6 @@ lemma extendedBytes_byte_lt (w : Word (ZMod p)) (lower : Extracted.U16toU8Operat
     (hhigh : ∀ i : Fin 4, ((w[i] - lower.low_bytes[i]) * 256⁻¹).val < 256)
     (hs : s = 0 ∨ s = 1) :
     ∀ i : Fin 16, (extendedBytes w lower s i).val < 256 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hsv : (s * 255).val < 256 := by
     rcases hs with h | h
     · rw [h, zero_mul, ZMod.val_zero]; norm_num
@@ -598,7 +672,6 @@ lemma colEq (cols : Extracted.MulOperation (ZMod p)) (bb cc : Fin 16 → ZMod p)
     (k : ℕ) (hk : k < 16) :
     (productVal cols k).val + (carryVal cols k).val * 256
       = (colSum bb cc k).val + (if k = 0 then 0 else (carryVal cols (k - 1)).val) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   have hc' : productVal cols k + carryVal cols k * 256
       = colSum bb cc k + (if k = 0 then 0 else carryVal cols (k - 1)) := by
     rw [h_chain k hk]; ring
@@ -753,7 +826,6 @@ set_option linter.unusedSectionVars false in
 /-- `BitVec.ofNat 128 (w.toNat)` is the 128-bit zero-extension `setWidth 128` of the word. -/
 lemma ofNat128_eq_setWidth (w : Word (ZMod p)) (hw : w.isU64) :
     BitVec.ofNat 128 (Word.toNat w) = (Word.toBitVec64 w).setWidth 128 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   apply BitVec.eq_of_toNat_eq
   rw [BitVec.toNat_ofNat, BitVec.toNat_setWidth, Word.toBitVec64_toNat hw]
 
@@ -780,7 +852,10 @@ lemma signExtend128_toNat (w : Word (ZMod p)) (hw : w.isU64) :
   · rw [if_pos hm, if_pos (hmsb_iff.mp hm)]
   · rw [if_neg hm, if_neg (fun hc => hm (hmsb_iff.mpr hc))]
 
-set_option maxHeartbeats 8000000 in
+-- Ladder-measured 2026-07-28 (same control run as `full_product`, with that lemma pinned high so
+-- its failures could not mask this one): 200000 ok / 40000 ok / 20000 FAIL (`whnf` at this
+-- signature). True floor (20000, 40000], so the plain default carries >=5x headroom and the former
+-- 8000000 ceiling was ~200-400x over. Ceiling removed; do not reinstate without a measurement.
 /-- The high-64 slice (`MULH*` family) of the witnessed product equals bits 64..127 of the
 128-bit product of the two extended operand values `Bext`, `Cext`. -/
 lemma high_half_eq (cols : Extracted.MulOperation (ZMod p)) (bb cc : Fin 16 → ZMod p)
@@ -842,12 +917,12 @@ lemma high_half_eq (cols : Extracted.MulOperation (ZMod p)) (bb cc : Fin 16 → 
   rw [Nat.mod_eq_of_lt hBlt, Nat.mod_eq_of_lt hClt]
   omega
 
-set_option maxHeartbeats 1600000 in
 /-- Forward (soundness) core: the raw schoolbook form implies the per-variant semantic result.
-The `MUL` (low-64, unsigned) conjunct is proved end-to-end here via the native `low_half` reassembly;
-the four high-half / `MULW` conjuncts are scoped sorries (they read further slices off the *full*
-128-bit `product_reassembly`, deferred to a later pass). The `U16toU8`/`U16MSB` sub-op `Spec`s are
-threaded in (they are discharged by the composed subcircuits in `soundness`). -/
+**All five conjuncts are proved here** — `MUL` (low-64, unsigned) via the native `low_half`
+reassembly, and the four high-half / `MULW` variants off further slices of the full 128-bit
+`product_reassembly`. The `U16toU8`/`U16MSB` sub-op `Spec`s are threaded in (they are discharged by
+the composed subcircuits in `soundness`). This theorem is `[propext, Classical.choice, Quot.sound]`;
+it carries no `sorryAx` and no `bv_decide` axiom. -/
 theorem mulSemantics_of_raw {input : Inputs (ZMod p)} {cols : Extracted.MulOperation (ZMod p)}
     (hbU : Word.isU64 input.b) (hcU : Word.isU64 input.c)
     (hmul_b : input.is_mul = 0 ∨ input.is_mul = 1) (hmh_b : input.is_mulh = 0 ∨ input.is_mulh = 1)
@@ -863,7 +938,6 @@ theorem mulSemantics_of_raw {input : Inputs (ZMod p)} {cols : Extracted.MulOpera
     (hb_msb : cols.b_msb = if input.b[3].val ≥ 32768 then 1 else 0)
     (hc_msb : cols.c_msb = if input.c[3].val ≥ 32768 then 1 else 0)
     (h_raw : RawSpec input cols) : SemanticSpec input cols := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   obtain ⟨h_chain, h_pbyte, h_carry, h_bse, h_cse, h_bmsb, h_cmsb, h_bse01, h_cse01⟩ := h_raw
   set bb := extendedBytes input.b cols.b_lower_byte cols.b_sign_extend with hbb_def
   set cc := extendedBytes input.c cols.c_lower_byte cols.c_sign_extend with hcc_def
@@ -1043,8 +1117,8 @@ theorem mulSemantics_of_raw {input : Inputs (ZMod p)} {cols : Extracted.MulOpera
       congr 1
       rw [hbse_eq, hb_msb]
       split_ifs with hge
-      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) from by norm_cast,
-            ZMod.val_natCast_of_lt (show (255:ℕ) < p from by have := Fact.out (p := 2 ^ 24 < p); omega)]
+      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) by norm_cast,
+            ZMod.val_natCast_of_lt (show (255:ℕ) < p by have := Fact.out (p := 2 ^ 24 < p); omega)]
         norm_num
       · simp
     have hScc : (byteAt cc 0).val + (byteAt cc 1).val*256^1 + (byteAt cc 2).val*256^2 + (byteAt cc 3).val*256^3 + (byteAt cc 4).val*256^4 + (byteAt cc 5).val*256^5 + (byteAt cc 6).val*256^6 + (byteAt cc 7).val*256^7 + (byteAt cc 8).val*256^8 + (byteAt cc 9).val*256^9 + (byteAt cc 10).val*256^10 + (byteAt cc 11).val*256^11 + (byteAt cc 12).val*256^12 + (byteAt cc 13).val*256^13 + (byteAt cc 14).val*256^14 + (byteAt cc 15).val*256^15 = ((Word.toBitVec64 input.c).signExtend 128).toNat := by
@@ -1052,8 +1126,8 @@ theorem mulSemantics_of_raw {input : Inputs (ZMod p)} {cols : Extracted.MulOpera
       congr 1
       rw [hcse_eq, hc_msb]
       split_ifs with hge
-      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) from by norm_cast,
-            ZMod.val_natCast_of_lt (show (255:ℕ) < p from by have := Fact.out (p := 2 ^ 24 < p); omega)]
+      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) by norm_cast,
+            ZMod.val_natCast_of_lt (show (255:ℕ) < p by have := Fact.out (p := 2 ^ 24 < p); omega)]
         norm_num
       · simp
     rw [hrw, ← ofNat128_signExtend input.b, ← ofNat128_signExtend input.c]
@@ -1073,8 +1147,8 @@ theorem mulSemantics_of_raw {input : Inputs (ZMod p)} {cols : Extracted.MulOpera
       congr 1
       rw [hbse_eq, hb_msb]
       split_ifs with hge
-      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) from by norm_cast,
-            ZMod.val_natCast_of_lt (show (255:ℕ) < p from by have := Fact.out (p := 2 ^ 24 < p); omega)]
+      · rw [one_mul, show (255 : ZMod p) = ((255 : ℕ) : ZMod p) by norm_cast,
+            ZMod.val_natCast_of_lt (show (255:ℕ) < p by have := Fact.out (p := 2 ^ 24 < p); omega)]
         norm_num
       · simp
     have hScc : (byteAt cc 0).val + (byteAt cc 1).val*256^1 + (byteAt cc 2).val*256^2 + (byteAt cc 3).val*256^3 + (byteAt cc 4).val*256^4 + (byteAt cc 5).val*256^5 + (byteAt cc 6).val*256^6 + (byteAt cc 7).val*256^7 + (byteAt cc 8).val*256^8 + (byteAt cc 9).val*256^9 + (byteAt cc 10).val*256^10 + (byteAt cc 11).val*256^11 + (byteAt cc 12).val*256^12 + (byteAt cc 13).val*256^13 + (byteAt cc 14).val*256^14 + (byteAt cc 15).val*256^15 = Word.toNat input.c := by

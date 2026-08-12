@@ -1,6 +1,6 @@
 import SP1Clean.Native.Operations.IsEqualWordOperation.RawSpec
 import SP1Clean.Native.Operations.IsEqualWordOperation.Populate
-import SP1Clean.Extracted.Circuit.IsEqualWordOperation
+import SP1Clean.Native.Operations.IsEqualWordOperation.Defs
 
 /-! # `IsEqualWordOperation` — the `FormalAssertion` (Spec / soundness / completeness / contract)
 
@@ -9,14 +9,16 @@ as a true Clean `assertion` on the limb-wise difference `a - b`. Its faithful `S
 `IsZeroWordOperation.Spec` on that difference (referenced by direct field application); the semantic
 `is_diff_zero.result = (a = b)` is recovered by `result_semantic`.
 
-`Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle: this op tops the
-`IsEqualWord → IsZeroWord → IsZero` composition chain. -/
+`Spec`/`spec_populate` live here (not in `FormalModel/Contracts/Operations.lean`) to avoid an import
+cycle: this op tops the `IsEqualWord → IsZeroWord → IsZero` composition chain. -/
 
 namespace SP1Clean.IsEqualWordOperation
 
 open Circuit
 
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+-- Nothing in the gadget itself needs a magnitude fact; it is reintroduced at the bottom for
+-- `circuit_localLength`, whose signature carries the binder.
+variable {p : ℕ} [Fact p.Prime]
 
 /-- The limb-wise difference word `a - b` (as the operand the sub-operation runs on). -/
 def diff (input : Inputs (ZMod p)) : Word (ZMod p) :=
@@ -31,35 +33,31 @@ def Assumptions (input : Inputs (ZMod p)) : Prop := input.is_real = 0 ∨ input.
 def Spec (input : Inputs (ZMod p)) : Prop :=
   IsZeroWordOperation.Spec ⟨diff input, input.cols.is_diff_zero, input.is_real⟩
 
-omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hsub, _hbool⟩ := h_holds
   obtain ⟨hia, hib, -⟩ := h_input
   have S := hsub h_assumptions
+  change IsZeroWordOperation.Spec _ at S
   refine ⟨?_, Or.inl rfl⟩
   simpa only [diff, ← hia, ← hib, Vector.getElem_map, sub_eq_add_neg] using S
 
-omit [Fact (2 ^ 17 < p)] in
-set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hia, hib, -⟩ := h_input
   refine ⟨⟨h_assumptions, ?_⟩, ?_⟩
   · have hs := h_spec
-    simp only [diff, sub_eq_add_neg] at hs
+    simp only [diff] at hs
+    change IsZeroWordOperation.Spec _
     simpa only [← hia, ← hib, Vector.getElem_map] using hs
   · rcases h_assumptions with h | h <;> simp [h]
 
-omit [Fact (2 ^ 17 < p)] in
 /-- The witnessed columns `populate a b` satisfy the gadget `Spec` for any `is_real` — it delegates to
 `IsZeroWordOperation.spec_populate` on the difference word. -/
 theorem spec_populate (a b : Word (ZMod p)) (is_real : ZMod p) :
     Spec (⟨a, b, populate a b, is_real⟩ : Inputs (ZMod p)) :=
   IsZeroWordOperation.spec_populate _ is_real
 
-omit [Fact (2 ^ 17 < p)] in
 /-- Semantic exposure: on a real row the `Spec` forces `is_diff_zero.result` to be the equality
 indicator of `a` and `b`. -/
 theorem result_semantic {input : Inputs (ZMod p)} (h : Spec input) (hr : input.is_real = 1) :
@@ -71,7 +69,6 @@ theorem result_semantic {input : Inputs (ZMod p)} (h : Spec input) (hr : input.i
     List.getElem_cons_succ, sub_eq_zero] at hz
   exact hz
 
-omit [Fact (2 ^ 17 < p)] in
 /-- `Spec` at the all-zero column struct with the gate off (`is_real = 0`) — the inactive-row
 discharge for composing chips whose populate leaves the struct zero (`DivRemChip`'s
 `is_overflow_b`/`is_overflow_c` on padding rows). The operands are arbitrary. -/
@@ -79,7 +76,6 @@ theorem spec_zero (a b : Word (ZMod p)) {is_real : ZMod p} (hr : is_real = 0) :
     Spec (⟨a, b, ⟨IsZeroWordOperation.zeroCols⟩, is_real⟩ : Inputs (ZMod p)) :=
   IsZeroWordOperation.spec_zero _ hr
 
-omit [Fact (2 ^ 17 < p)] in
 /-- `Spec` with the gate off (`is_real = 0`) holds at the populate of **any** word pair — the
 shared-struct discharge for a composing chip whose one witnessed struct serves two
 differently-gated assertions with different operand words (`DivRemChip`'s `is_overflow_b/c`:
@@ -96,8 +92,13 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     soundness := soundness,
     completeness := completeness }
 
+section LocalLength
+variable [Fact (2 ^ 17 < p)]
+
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
     circuit.localLength x = 0 := rfl
+
+end LocalLength
 
 end SP1Clean.IsEqualWordOperation

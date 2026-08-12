@@ -1,13 +1,14 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Proofs.Operations.U16MSBOperation.Formal
-import SP1Clean.Extracted.Circuit.U16MSBOperation
+import SP1Clean.Native.Operations.U16MSBOperation.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
 import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.U16MSBOperation
 import SP1Clean.Faithful.ChipTactics
+import SP1Clean.Faithful.ChipOracle
 
 /-! # Faithfulness anchor — `U16MSBOperation` constraints ↔ native `RawSpec`
 
@@ -37,12 +38,49 @@ theorem u16msb_constraints_faithful (a msb : ZMod p) :
     (List.Forall (· = 0) (Extracted.U16MSBOperation.asserts a ⟨msb⟩ 1) ∧
       List.Forall Interaction.toProp (Extracted.U16MSBOperation.interactions a ⟨msb⟩ 1)) ↔
       SP1Clean.U16MSBOperation.RawSpec a ⟨msb⟩ := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [Extracted.U16MSBOperation.asserts, Extracted.U16MSBOperation.interactions, List.Forall,
-    Interaction.toProp_send_byte, ByteOpcode.ofNat_six,
+    Interaction.toProp_send_byte, ByteOpcode.constrainField_six,
     ByteOpcode.constrain_Range, val_16, one_ne_zero, ne_eq, not_false_eq_true, true_implies,
     SP1Clean.U16MSBOperation.RawSpec, one_mul, sub_self, mul_zero, true_and, and_true,
     bool_iff, two_mul]
+
+@[circuit_norm] theorem eval_u16MSBColumns
+    {F : Type} [FiniteField F] (env : Environment F)
+    (cols : Extracted.U16MSBOperation (Expression F)) :
+    Eval.eval env cols =
+      ({ msb := Eval.eval env cols.msb } :
+        Extracted.U16MSBOperation F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Folded normalization of the native MSB fragment to the exact generated Rust assertion list. -/
+theorem u16msb_assertions_exact
+    (env : Environment (ZMod p))
+    (input : Var SP1Clean.U16MSBOperation.Inputs (ZMod p))
+    (offset : ℕ) :
+    nativeAssertZeros env
+        ((SP1Clean.U16MSBOperation.main input).operations offset) =
+      Extracted.U16MSBOperation.asserts
+        (Expression.eval env input.a)
+        (Eval.eval env input.cols)
+        (Expression.eval env input.is_real) := by
+  simp [nativeAssertZeros, SP1Clean.U16MSBOperation.main,
+    Gadgets.Equality.main, Extracted.U16MSBOperation.asserts,
+    circuit_norm]
+  have heval (value : Expression (ZMod p)) :
+      Expression.eval env (toElements (M := field) value)[0] =
+        Expression.eval env value := rfl
+  simp_rw [heval]
+  have hinput : Eval.eval env input =
+      ({ a := Eval.eval env input.a, cols := Eval.eval env input.cols,
+         is_real := Eval.eval env input.is_real } :
+        SP1Clean.U16MSBOperation.Inputs (ZMod p)) := by
+    rw [ProvableStruct.eval_eq_eval]
+    rfl
+  rw [← ProvableStruct.eval_eq_eval, hinput, eval_u16MSBColumns]
+  simp only [eval_sub, Expression.eval, sub_zero,
+    ProvableType.eval_field]
 
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery
@@ -62,23 +100,14 @@ theorem u16msb_interactions_faithful_syntactic
         Extracted.Interaction.toAccess
       = (((SP1Clean.U16MSBOperation.main input).operations offset).interactionsWith
           byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h6 : (6 : ZMod p).val = 6 := by
-    have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt h
-  have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
-        (InteractionKind.Byte, "SP1Byte",
-          [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
-           (Expression.eval env s.b).val, (Expression.eval env s.c).val],
-          signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_pullIf_byte env g s
-  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
-      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have h6 : (6 : ZMod p).val = 6 := val_6_zmod_p
+  have hk := toAccess_pullIf_byte_forall env
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair field field) (ZMod p)) =>
+    @filter_interactions_formalAssertion_eq_nil (ZMod p) _ (ProvablePair field field)
+      ProvablePair.instance (Gadgets.Equality.circuit field) byteChannel.toRaw n inp
+      List.not_mem_nil List.not_mem_nil
   simp only [SP1Clean.U16MSBOperation.main, circuit_norm, hk, heq,
     Extracted.U16MSBOperation.interactions, List.map_cons, List.map_nil,
-    Extracted.Interaction.toAccess_byte, ByteOpcode.ofNat_six, ByteOpcode.idx,
-    h_ir, h_a, h_msb, h6, sub_eq_add_neg]
+    Extracted.Interaction.toAccess_byte, h_ir, h_a, h_msb, h6]
 
 end SP1Clean.Faithful

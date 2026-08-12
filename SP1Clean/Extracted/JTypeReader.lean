@@ -26,7 +26,6 @@ deriving ProvableStruct
 
 namespace JTypeReader
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_clk_high : F)
   (_clk_low : F)
@@ -58,7 +57,6 @@ set_option maxHeartbeats 8000000 in
     E12,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (clk_high : F)
   (clk_low : F)
@@ -76,8 +74,8 @@ set_option maxHeartbeats 8000000 in
   let E16 : F := E15 * ((65536 : F)⁻¹)
   [
     ⟨.send, (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a cols.op_b_imm[0] cols.op_b_imm[1] cols.op_b_imm[2] cols.op_b_imm[3] cols.op_c_imm[0] cols.op_c_imm[1] cols.op_c_imm[2] cols.op_c_imm[3] cols.op_a_0 1 1), is_trusted⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.op_a_memory.access_timestamp.diff_low_limb 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 E16 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.op_a_memory.access_timestamp.diff_low_limb 16 0), is_real⟩,
+    ⟨.send, (.byte 3 0 E16 0), is_real⟩,
     ⟨.send, (.memory clk_high cols.op_a_memory.access_timestamp.prev_low cols.op_a 0 0 cols.op_a_memory.prev_value[0] cols.op_a_memory.prev_value[1] cols.op_a_memory.prev_value[2] cols.op_a_memory.prev_value[3]), is_real⟩,
     ⟨.receive, (.memory clk_high E10 cols.op_a 0 0 op_a_write_value[0] op_a_write_value[1] op_a_write_value[2] op_a_write_value[3]), is_real⟩,
   ]

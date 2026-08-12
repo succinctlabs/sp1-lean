@@ -3,7 +3,6 @@ import SP1Clean.Math.Bitwise
 import SP1Clean.Proofs.Operations.BitwiseOperation.Formal
 import SP1Clean.Native.Operations.BitwiseOperation.Populate
 import SP1Clean.Native.Operations.U16toU8OperationSafe
-import SP1Clean.Extracted.BitwiseU16Operation
 import SP1Clean.Extracted.U16toU8OperationUnsafe
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
@@ -19,7 +18,13 @@ pulls). Here that is a `FormalAssertion` that **composes `BitwiseOperation.circu
 decompositions plus the `is_real` binary gate — witnessing nothing (the `b_low_bytes`/`c_low_bytes`/
 `bitwise_operation.result` columns are chip-owned inputs). The structural `Spec` *is* the composed
 `BitwiseOperation.Spec`; the whole-word readout (`toBitVec64 (resultWord …) = b op c`) is derived by
-`result_semantic`, which the `BitwiseChip` soundness consumes. -/
+`result_semantic`, which the `BitwiseChip` soundness consumes.
+
+Measured elaboration floors (ladder against a 1-heartbeat control, the four sites laddered at
+different rungs to separate ownership — at the control rung all four report at the shared
+`variable` line): `result_semantic` (15k, 20k], `spec_populate` (10k, 15k], `soundness` (5k, 10k],
+`completeness` <=5k. All four formerly carried a 4000000-heartbeat ceiling — 200-800x over — and
+now run at the plain default with >=10x headroom. -/
 
 namespace SP1Clean.BitwiseU16Operation
 
@@ -28,12 +33,22 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- Proof-oriented local columns for the composed u16 bitwise gadget: the two low-byte decomposition
+blocks (the shared `Extracted.U16toU8Operation` struct, kept because the decomposition is the shared
+generated substrate) plus the native `BitwiseOperation.Columns` result block. The assembled chip
+faithfulness map is the only place that relates this shape to SP1 Rust's helper-operation columns. -/
+structure Columns (F : Type) where
+  b_low_bytes : Extracted.U16toU8Operation F
+  c_low_bytes : Extracted.U16toU8Operation F
+  bitwise_operation : BitwiseOperation.Columns F
+deriving ProvableStruct
+
 /-- The two operand words, the (chip-owned) decomposition + result column struct, the opcode selector
 (AND=0, OR=1, XOR=2), and the `is_real` gate — SP1's `eval` params verbatim. -/
 structure Inputs (F : Type) where
   b : fields 4 F
   c : fields 4 F
-  cols : Extracted.BitwiseU16Operation F
+  cols : Columns F
   opcode : F
   is_real : F
 deriving ProvableStruct
@@ -70,14 +85,12 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
 /-- The reassembly identity `low + (w − low)·256⁻¹·256 = w`. -/
 lemma reassemble (w low : ZMod p) :
     w = low + (w - low) * (256 : ZMod p)⁻¹ * 256 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rw [mul_assoc, inv_mul_cancel₀ val_256_ne_zero, mul_one]; ring
 
 /-- A limb's value splits as its low byte plus 256× its high byte, given both are bytes. -/
 lemma limb_split {w low : ZMod p} (hlo : low.val < 256)
     (hhi : ((w - low) * (256 : ZMod p)⁻¹).val < 256) :
     w.val = low.val + ((w - low) * (256 : ZMod p)⁻¹).val * 256 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   conv_lhs => rw [reassemble w low]
   exact val_lo_add_hi hlo hhi
 
@@ -93,7 +106,6 @@ lemma decomp_limb_split {w : Word (ZMod p)} {low : Extracted.U16toU8Operation (Z
         List.getElem_cons_succ] at hlo hhi ⊢
       exact limb_split hlo hhi
 
-set_option maxHeartbeats 4000000 in
 /-- **Whole-word readout.** From the structural `Spec` on a real row, the reassembled result word is
 the AND/OR/XOR (as 64-bit values) of the two operands. The `BitwiseChip` soundness consumes this. -/
 theorem result_semantic (input : Inputs (ZMod p))
@@ -107,7 +119,6 @@ theorem result_semantic (input : Inputs (ZMod p))
     (input.opcode = 2 →
       Word.toBitVec64 (resultWord input.cols.bitwise_operation.result)
         = Word.toBitVec64 input.b ^^^ Word.toBitVec64 input.c) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   set b := input.b with hb_def
   set c := input.c with hc_def
   set lb := input.cols.b_low_bytes with hlb_def
@@ -163,7 +174,7 @@ theorem result_semantic (input : Inputs (ZMod p))
 
 /-- The decomposition + result columns for `populate`: the low bytes are `w[i] % 256`, the result bytes
 are the per-byte `byteOp opcode` of the decomposed operand bytes (mirroring SP1's `populate`). -/
-def populate (b c : Word (ZMod p)) (opcode : ZMod p) : Extracted.BitwiseU16Operation (ZMod p) :=
+def populate (b c : Word (ZMod p)) (opcode : ZMod p) : Columns (ZMod p) :=
   let lb : Extracted.U16toU8Operation (ZMod p) :=
     ⟨#v[((b[0].val % 256 : ℕ) : ZMod p), ((b[1].val % 256 : ℕ) : ZMod p),
         ((b[2].val % 256 : ℕ) : ZMod p), ((b[3].val % 256 : ℕ) : ZMod p)]⟩
@@ -172,7 +183,6 @@ def populate (b c : Word (ZMod p)) (opcode : ZMod p) : Extracted.BitwiseU16Opera
         ((c[2].val % 256 : ℕ) : ZMod p), ((c[3].val % 256 : ℕ) : ZMod p)]⟩
   ⟨lb, lc, BitwiseOperation.populate (decompBytes b lb) (decompBytes c lc) opcode⟩
 
-set_option maxHeartbeats 4000000 in
 /-- The witnessed columns `populate b c opcode` satisfy the gadget `Spec` for any `is_real`, given the
 operands are 64-bit and the opcode is AND/OR/XOR: the populated low bytes (`w[i] % 256`) and the derived
 high bytes are genuine bytes, so the composed `BitwiseOperation.spec_populate` applies. The composing
@@ -180,7 +190,6 @@ high bytes are genuine bytes, so the composed `BitwiseOperation.spec_populate` a
 theorem spec_populate {b c : Word (ZMod p)} (hb : Word.isU64 b) (hc : Word.isU64 c)
     {opcode : ZMod p} (hop : opcode.val < 3) (is_real : ZMod p) :
     Spec (⟨b, c, populate b c opcode, opcode, is_real⟩ : Inputs (ZMod p)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp256 : (256 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have e8 : (2 : ℕ) ^ 8 = 256 := by norm_num
   have e16 : (2 : ℕ) ^ 16 = 65536 := by norm_num
@@ -224,7 +233,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements := [byteChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
@@ -232,15 +240,9 @@ set_option linter.unusedSectionVars false in
       = [byteChannel.toRaw] := rfl
 
 set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma channelsWithRequirements_eq :
-    ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRaw] := rfl
-
-set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
 
-set_option maxHeartbeats 4000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨_hb, _hc, hop, hbin⟩ := h_assumptions
@@ -259,10 +261,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     fun k _ => by rw [← hilc]; simp only [Vector.getElem_map]
   obtain ⟨_h_gate, h_bw⟩ := h_holds
   have h_spec := h_bw ⟨hop, hbin⟩
+  change BitwiseOperation.Spec _ at h_spec
   refine ⟨?_, Or.inr ⟨hop, hbin⟩⟩
   simpa only [decompBytes, eb, ec, elb, elc, ← sub_eq_add_neg] using h_spec
 
-set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨_hb, _hc, hop, hbin⟩ := h_assumptions
@@ -281,7 +283,8 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     fun k _ => by rw [← hilc]; simp only [Vector.getElem_map]
   refine ⟨?_, ⟨hop, hbin⟩, ?_⟩
   · rcases hbin with h | h <;> rw [h] <;> simp
-  · simpa only [decompBytes, eb, ec, elb, elc, ← sub_eq_add_neg] using h_spec
+  · change BitwiseOperation.Spec _
+    simpa only [decompBytes, eb, ec, elb, elc, ← sub_eq_add_neg] using h_spec
 
 /-- SP1's `BitwiseU16Operation::eval` as a Clean-native `FormalAssertion`: the `is_real` binary gate
 plus the composed `BitwiseOperation` on the two `U16toU8` byte decompositions, witnessing nothing. -/
@@ -290,10 +293,17 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Assumptions := Assumptions,
     Spec := Spec,
     soundness := soundness,
-    completeness := completeness }
+    completeness := completeness,
+    channelsWithRequirements := [] }
 
+set_option linter.unusedSectionVars false in
+/-- Since Lean 4.32, class projections through `ProvableType`-derived instances no longer whnf-reduce
+at `.reducible` transparency (Clean `088a9287`), so `circuit_norm` can no longer cross
+`circuit.Spec` ↔ `Spec` on its own. Supply the bridge as a rewrite. -/
+@[circuit_norm] lemma circuit_Spec_eq : (circuit (p := p)).Spec = Spec := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
     circuit.localLength x = 0 := rfl
 
 end SP1Clean.BitwiseU16Operation
+

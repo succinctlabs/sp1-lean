@@ -15,22 +15,16 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 instance : Fact (p > 2) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
-omit [Fact p.Prime] in
-/-- `16 < p`, so the `Range` byte-row width column `16` round-trips through `byteRowSpec_range`. -/
-lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-
 /-- The booleanness + range form of the msb constraint (the literal meaning of the extracted
 constraint list at `is_real = 1`), stated against the result column `cols.msb`. The range term
 `2 * a - cols.msb * 65536` is `2*a - msb*2^16` (the auto-generated `main`'s normal form). -/
 def RawSpec (a : ZMod p) (cols : Extracted.U16MSBOperation (ZMod p)) : Prop :=
   (cols.msb = 0 ∨ cols.msb = 1) ∧ (2 * a - cols.msb * 65536).val < 2 ^ 16
 
-set_option maxHeartbeats 2000000 in
 /-- Forward (soundness) core: booleanness + range force `msb` to be the high bit of `a`. -/
 theorem msb_of_raw {a : ZMod p} {cols : Extracted.U16MSBOperation (ZMod p)}
     (ha : a.val < 2 ^ 16) (h_raw : RawSpec a cols) :
     cols.msb = if a.val ≥ 32768 then 1 else 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨hbool, hr⟩ := h_raw
   have h2 : (2 * a : ZMod p).val = 2 * a.val := by

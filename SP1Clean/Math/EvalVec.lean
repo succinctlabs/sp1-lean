@@ -6,9 +6,10 @@ import Mathlib.Tactic.IntervalCases
 
 The constraint extractor writes a witness hint's `populate` operands as an explicit length-4 vector
 literal `#v[eval e v[0], eval e v[1], eval e v[2], eval e v[3]]`, whereas `h_input` provides them in
-`Vector.map (eval e) v` form. This one lemma bridges the two; it recurs across the Mul / Lt / Bitwise
-/ ShiftLeft / ShiftRight chip `Formal` proofs and the DivRem completeness `Driver`, so it lives here
-in `Math` rather than being re-declared per file. Generic over a prime field `ZMod p`
+`Vector.map (eval e) v` form. This one lemma bridges the two; it recurs across more than a dozen
+chip `Formal` proofs (Add/Addi/Addw/Sub/Subw, Mul/Lt/Bitwise, ShiftLeft/ShiftRight, Jal/Jalr,
+UType), `AddressOperation`, and the DivRem completeness `Driver`, so it
+lives here in `Math` rather than being re-declared per file. Generic over a prime field `ZMod p`
 (`Expression.eval` needs the `Field` instance, which the primality `Fact` supplies). -/
 
 namespace SP1Clean

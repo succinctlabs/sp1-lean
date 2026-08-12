@@ -1,0 +1,126 @@
+import SP1Clean.Soundness.TimedGrounding
+
+/-! # The aligned `RowFacts` carrier (Phase B1)
+
+The timed grounding walk consumes `RowOK` — a *positional* `Forall₂ TouchOK memPulls memPushes` — so
+it must be fed a carrier whose pulls are paired, in order, with the same-location pushes at those
+pushes' micro-times.  `DecodedInstructionRow.ordinaryRowFacts` is not that carrier: its pulls are in
+emitted order, all tagged with the window-start read time.  `Soundness/TimedGrounding.lean`'s
+`AlignsWith` + the three carrier transports reconcile the two; this module supplies the *constructor*
+those transports and the walk consume.
+
+`alignedOf r_ord touches` rebuilds the ordinary row's pull/push lists from a `touches` list whose
+`i`-th entry is `(aligned-pull-with-time, the produced push it pairs with)`.  A per-chip (or
+per-reader-family) instance supplies `touches` — the produced list in order, each pull the
+same-location prior at the push's micro-time — and the per-touch `TouchOK`; `AlignsWith` and `RowOK`
+then follow generically here.
+
+The constructor is location-generic; register-only callers retain a compatibility wrapper while
+load/store rows use the RAM read window directly. -/
+
+open SP1Clean.Soundness.TimedGrounding
+open SP1Clean.Semantics
+open SP1Clean.Channels (StateMsg MemoryMsg)
+
+namespace SP1Clean.Soundness.TimedGrounding
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- The aligned carrier: same state edge and fetch as the ordinary row; pull/push lists read off the
+touch list (`memPulls` = the aligned priors with their read micro-times, `memPushes` = the produced
+pushes, in `touches` order). -/
+def alignedOf (r_ord : RowFacts p) (touches : List (Touch p)) : RowFacts p :=
+  { statePull := r_ord.statePull
+    statePush := r_ord.statePush
+    fetch := r_ord.fetch
+    memPulls := touches.map Prod.fst
+    memPushes := touches.map Prod.snd }
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- `(L.map fst).zip (L.map snd) = L` for a list of pairs. -/
+private lemma zip_map_fst_snd (L : List (Touch p)) :
+    (L.map Prod.fst).zip (L.map Prod.snd) = L := by
+  simp [List.zip_map']
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- `Forall₂ (TouchOK t)` over the split lists reduces to a per-entry membership fact. -/
+private lemma forall₂_touchOK_map {t : ℕ} (L : List (Touch p))
+    (h : ∀ tc ∈ L, TouchOK t tc.1 tc.2) :
+    List.Forall₂ (TouchOK t) (L.map Prod.fst) (L.map Prod.snd) :=
+  List.forall₂_map_left_iff.mpr (List.forall₂_map_right_iff.mpr (List.forall₂_same.mpr h))
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- The aligned carrier's per-key touches are exactly the touch list filtered at the key. -/
+theorem rowTouchesAt_alignedOf (r_ord : RowFacts p) (touches : List (Touch p)) (loc : MemLoc) :
+    rowTouchesAt (alignedOf r_ord touches) loc =
+      touches.filter (fun pq => MemoryMsg.locOf pq.2 = loc) := by
+  simp only [rowTouchesAt, alignedOf, zip_map_fst_snd]
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- **Generic `AlignsWith` for the aligned constructor.**  The instance supplies the two message
+permutations, the ordinary read-time convention, and a same-message aligned pull inside the
+location-dependent pre-effect window. -/
+theorem alignsWith_alignedOf_general (r_ord : RowFacts p) (touches : List (Touch p))
+    (hpush : (touches.map Prod.snd).Perm r_ord.memPushes)
+    (hpull : ((touches.map Prod.fst).map Prod.fst).Perm (r_ord.memPulls.map Prod.fst))
+    (hordTime : ∀ mp ∈ r_ord.memPulls, mp.2 = StateMsg.timeNat r_ord.statePull)
+    (hmatch : ∀ mp ∈ r_ord.memPulls, ∃ tc ∈ touches, tc.1.1 = mp.1 ∧
+      StateMsg.timeNat r_ord.statePull ≤ tc.1.2 ∧
+      tc.1.2 ≤ StateMsg.timeNat r_ord.statePull + readWindow (MemoryMsg.locOf mp.1)) :
+    AlignsWith (alignedOf r_ord touches) r_ord where
+  statePull := rfl
+  statePush := rfl
+  pushes := hpush
+  pulls := hpull
+  ordTime := hordTime
+  match_ := by
+    intro mp hmp
+    obtain ⟨tc, htc, hmsg, hlo, hhi⟩ := hmatch mp hmp
+    exact ⟨tc.1, List.mem_map_of_mem htc, hmsg, hlo, hhi⟩
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- Register-only compatibility wrapper for the existing grounding families. -/
+theorem alignsWith_alignedOf (r_ord : RowFacts p) (touches : List (Touch p))
+    (hpush : (touches.map Prod.snd).Perm r_ord.memPushes)
+    (hpull : ((touches.map Prod.fst).map Prod.fst).Perm (r_ord.memPulls.map Prod.fst))
+    (hreg : ∀ mp ∈ r_ord.memPulls, ∃ i : BitVec 5, MemoryMsg.locOf mp.1 = MemLoc.reg i)
+    (hordTime : ∀ mp ∈ r_ord.memPulls, mp.2 = StateMsg.timeNat r_ord.statePull)
+    (hmatch : ∀ mp ∈ r_ord.memPulls, ∃ tc ∈ touches, tc.1.1 = mp.1 ∧
+      StateMsg.timeNat r_ord.statePull ≤ tc.1.2 ∧
+      tc.1.2 < StateMsg.timeNat r_ord.statePull + 4) :
+    AlignsWith (alignedOf r_ord touches) r_ord := by
+  refine alignsWith_alignedOf_general r_ord touches hpush hpull hordTime ?_
+  intro mp hmp
+  obtain ⟨i, hloc⟩ := hreg mp hmp
+  obtain ⟨tc, htc, hmsg, hlo, hhi⟩ := hmatch mp hmp
+  exact ⟨tc, htc, hmsg, hlo, by rw [hloc, readWindow_reg]; omega⟩
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- **Generic `RowOK` for the aligned constructor.**  From the per-touch `TouchOK`, the `+8` clock
+step, the mod-8 window alignment, per-key push-time strict monotonicity, the per-push `ClkBound`, and
+the currency-free **conditional** `slot` fact (`hslot`: given the pulled record's `ClkBound`, the
+`prev_clk < access_clk` order — the 1f break; the walk discharges the antecedent from the balance). -/
+theorem rowOK_alignedOf (initialClock : ℕ) (r_ord : RowFacts p) (touches : List (Touch p))
+    (htime8 : StateMsg.timeNat r_ord.statePush = StateMsg.timeNat r_ord.statePull + 8)
+    (halign8 : StateMsg.timeNat r_ord.statePull % 8 = initialClock % 8)
+    (htouch : ∀ tc ∈ touches, TouchOK (StateMsg.timeNat r_ord.statePull) tc.1 tc.2)
+    (hchain : ∀ loc : MemLoc, List.IsChain
+      (fun a b : Touch p => MemoryMsg.timeNat a.2 < MemoryMsg.timeNat b.2)
+      (touches.filter (fun pq => MemoryMsg.locOf pq.2 = loc)))
+    (hpushClk : ∀ tc ∈ touches, SP1Clean.Channels.MemoryMsg.ClkBound tc.2)
+    (hslot : ∀ tc ∈ touches, SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
+      MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) :
+    RowOK initialClock (alignedOf r_ord touches) where
+  time8 := htime8
+  align8 := halign8
+  touches := forall₂_touchOK_map touches htouch
+  chain_mono := by simpa only [rowTouchesAt_alignedOf] using hchain
+  pushClkBound := by
+    intro m hm; obtain ⟨tc, htc, rfl⟩ := List.mem_map.mp hm; exact hpushClk tc htc
+  slotOfClkBound := by
+    intro pq hpq hclk
+    simp only [alignedOf] at hpq
+    rw [zip_map_fst_snd touches] at hpq
+    exact hslot pq hpq hclk
+
+end SP1Clean.Soundness.TimedGrounding

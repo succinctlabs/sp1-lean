@@ -3,7 +3,6 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReaderImmutable
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
-import SP1Clean.Extracted.AluX0Chip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -15,12 +14,11 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 Fast path for ALU instructions writing to `x0` (result discarded). Validates program/register accesses
 and advances state only; a single dynamic `opcode` column (range-checked `< 29`) covers every ALU opcode.
 Composes `CPUState` and `ALUTypeReaderImmutable` (op_a reads writing 0 to `x0`, op_c gated by
-`is_real - imm_c`), plus the LTU byte-range send and `op_a_0 = is_real` forcing gates. -/
+`is_real - imm_c`), plus the LTU byte-range **pull** and `op_a_0 = is_real` forcing gates. -/
 
 namespace SP1Clean.AluX0Chip
 
 open Circuit
-open Extracted (AluX0Cols)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -45,45 +43,78 @@ deriving ProvableStruct
 /-- The committed ALU opcode fed to the reader's Program bus (a single dynamic column). -/
 @[reducible] def opcodeVal (input : Inputs (ZMod p)) : ZMod p := input.opcode
 
+/-- Native AluX0-chip row (Rust field order). All four blocks reuse the project substrate;
+`Faithful.aluX0ChipReconfigure` is the sole bridge to Rust's separately generated whole-chip row. -/
+structure Columns (F : Type) where
+  state : Extracted.CPUState F
+  adapter : Extracted.ALUTypeReader F
+  opcode : F
+  is_real : F
+deriving ProvableStruct
+
 /-- Compose the `CPUState` reader (pc+4 / clk+8), the LTU `opcode < 29` range check, and the
 `ALUTypeReaderImmutable` adapter (op_a/op_b/op_c reads, op_c gated by `is_real - imm_c`), then impose the
 `is_real` binary gate and the two `op_a_0` forcing gates (`op_a = x0` on real rows). The opcode fed to the
-reader is the committed `opcode` column. Assembles the extracted `AluX0Cols`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AluX0Cols (ZMod p)) := do
-  assertion Readers.CPUState.circuit
+reader is the committed `opcode` column. Assembles the native `Columns` row. -/
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   byteChannel.pullIf input.is_real (⟨4, 1, input.opcode, 29⟩ : ByteRow (Expression (ZMod p)))
-  assertion Readers.ALUTypeReaderImmutable.circuit
+  -- `ALUTypeReaderImmutable` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC
+  -- `CoeFun` (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.ALUTypeReaderImmutable.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, input.opcode⟩
-  input.is_real * (input.is_real - 1) === 0
+  assertZero (input.is_real * (input.is_real - 1))
   input.is_real * (input.adapter.op_a_0 - 1) === 0
   (input.is_real - 1) * input.adapter.op_a_0 === 0
   return ⟨input.state, input.adapter, input.opcode, input.is_real⟩
 
-set_option maxHeartbeats 4000000 in
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs AluX0Cols main where
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   -- Nothing is witnessed: the state/adapter/opcode/is_real are threaded inputs, the readers are
-  -- `FormalAssertion`s (localLength 0), and the LTU send + gates witness nothing.
+  -- `FormalAssertion`s (localLength 0), and the LTU pull + gates witness nothing.
   localLength _ := 0
-  localLength_eq := by intro input n; simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
   output input _ := ⟨input.state, input.adapter, input.opcode, input.is_real⟩
-  output_eq := by intro input n; simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
-  channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements :=
-    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
-  channelsLawful := by simp [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
+  -- `programChannel` joins the structural `RowSpec` propagated from `ALUTypeReaderImmutable`'s program
+  -- **pull** (W11 flip): the reader pulls the instruction fetch as a guarantee, which propagates here.
+  channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
+  channelsLawful := by
+    simp only [circuit_norm, main, Readers.CPUState.circuit,
+      Readers.ALUTypeReaderImmutable.circuit]
+
+/-- The completed AluX0 row is exactly its threaded input; the chip has no local witness cells. -/
+@[circuit_norm] theorem directOutput_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.state, input.adapter, input.opcode, input.is_real⟩ :
+        Var Columns (ZMod p)) := rfl
+
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ state := Eval.eval env input.state, adapter := Eval.eval env input.adapter,
+         opcode := Eval.eval env input.opcode, is_real := Eval.eval env input.is_real } :
+        Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]; rfl
+
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Columns (Expression F)) :
+    Eval.eval env cols =
+      ({ state := Eval.eval env cols.state, adapter := Eval.eval env cols.adapter,
+         opcode := Eval.eval env cols.opcode, is_real := Eval.eval env cols.is_real } :
+        Columns F) := by
+  rw [ProvableStruct.eval_eq_eval]; rfl
 
 /-- Semantic contract, composed from the sub-circuit `Spec`s. The `ALUTypeReaderImmutable` adapter facts
 (op_a/op_b/op_c reads + the `op_a_0` read-zeroing — the discarded write), the `is_real`-binary fact, and the
 two `op_a_0` forcing gates (which pin `op_a = x0` on real rows). The CPUState advance is threaded but, like
 `LoadX0`, not surfaced in the contract (the Sail bridge derives the `pc + 4` step itself). -/
-def Spec (input : Inputs (ZMod p)) (_cols : AluX0Cols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+def Spec (input : Inputs (ZMod p)) (_cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.ALUTypeReaderImmutable.Spec
     ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
       input.state.pc, opcodeVal input⟩ ∧
   (isReal input = 0 ∨ isReal input = 1) ∧
   isReal input * (input.adapter.op_a_0 - 1) = 0 ∧
-  (isReal input - 1) * input.adapter.op_a_0 = 0
+  (isReal input - 1) * input.adapter.op_a_0 = 0 ∧
+  (isReal input = 1 → input.opcode.val < 29)
 
 end SP1Clean.AluX0Chip

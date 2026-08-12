@@ -29,7 +29,6 @@ deriving ProvableStruct
 
 namespace ALUTypeReader
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (_clk_high : F)
   (_clk_low : F)
@@ -84,7 +83,6 @@ set_option maxHeartbeats 8000000 in
     E43,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (clk_high : F)
   (clk_low : F)
@@ -114,16 +112,16 @@ set_option maxHeartbeats 8000000 in
   let E35 : F := E34 * ((65536 : F)⁻¹)
   [
     ⟨.send, (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a E5 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] cols.op_a_0 0 cols.imm_c), is_trusted⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.op_a_memory.access_timestamp.diff_low_limb 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 E20 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.op_a_memory.access_timestamp.diff_low_limb 16 0), is_real⟩,
+    ⟨.send, (.byte 3 0 E20 0), is_real⟩,
     ⟨.send, (.memory clk_high cols.op_a_memory.access_timestamp.prev_low cols.op_a 0 0 cols.op_a_memory.prev_value[0] cols.op_a_memory.prev_value[1] cols.op_a_memory.prev_value[2] cols.op_a_memory.prev_value[3]), is_real⟩,
     ⟨.receive, (.memory clk_high E14 cols.op_a 0 0 op_a_write_value[0] op_a_write_value[1] op_a_write_value[2] op_a_write_value[3]), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.op_b_memory.access_timestamp.diff_low_limb 16 0), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 E27 0), is_real⟩,
+    ⟨.send, (.byte 6 cols.op_b_memory.access_timestamp.diff_low_limb 16 0), is_real⟩,
+    ⟨.send, (.byte 3 0 E27 0), is_real⟩,
     ⟨.send, (.memory clk_high cols.op_b_memory.access_timestamp.prev_low cols.op_b 0 0 cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1] cols.op_b_memory.prev_value[2] cols.op_b_memory.prev_value[3]), is_real⟩,
     ⟨.receive, (.memory clk_high E21 cols.op_b 0 0 cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1] cols.op_b_memory.prev_value[2] cols.op_b_memory.prev_value[3]), is_real⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 6) cols.op_c_memory.access_timestamp.diff_low_limb 16 0), E29⟩,
-    ⟨.send, (.byte (ByteOpcode.ofNat 3) 0 E35 0), E29⟩,
+    ⟨.send, (.byte 6 cols.op_c_memory.access_timestamp.diff_low_limb 16 0), E29⟩,
+    ⟨.send, (.byte 3 0 E35 0), E29⟩,
     ⟨.send, (.memory clk_high cols.op_c_memory.access_timestamp.prev_low cols.op_c[0] 0 0 cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1] cols.op_c_memory.prev_value[2] cols.op_c_memory.prev_value[3]), E29⟩,
     ⟨.receive, (.memory clk_high E28 cols.op_c[0] 0 0 cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1] cols.op_c_memory.prev_value[2] cols.op_c_memory.prev_value[3]), E29⟩,
   ]

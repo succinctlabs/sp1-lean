@@ -23,7 +23,6 @@ deriving ProvableStruct
 
 namespace IsEqualWordOperation
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def asserts {F : Type} [Field F] [CoeHead F ℕ]
   (a : (Word F))
   (b : (Word F))
@@ -40,7 +39,6 @@ set_option maxHeartbeats 8000000 in
     E1,
   ]
 
-set_option maxHeartbeats 8000000 in
 @[irreducible] def interactions {F : Type} [Field F] [CoeHead F ℕ]
   (a : (Word F))
   (b : (Word F))

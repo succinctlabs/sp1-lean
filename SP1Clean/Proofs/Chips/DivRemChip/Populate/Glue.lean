@@ -1,4 +1,6 @@
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Bounds
+import SP1Clean.Proofs.Chips.DivRemChip.Populate.Shapes
+import SP1Clean.Proofs.Operations.MulOperation.Formal
 
 /-! # `DivRemChip` populate value bundles — the `c_times_quotient` ↔ `MulOperation` glue
 
@@ -14,7 +16,6 @@ open Circuit
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 set_option linter.unusedSectionVars false in
@@ -47,7 +48,9 @@ private lemma setWidth_signExtend_mul (x y : BitVec 64) :
     intro z
     rw [← BitVec.toNat_inj, BitVec.toNat_setWidth, BitVec.toNat_signExtend]
     have hz : z.toNat < 2 ^ 64 := z.isLt
-    rcases Bool.eq_false_or_eq_true z.msb with h | h <;> rw [h] <;> simp <;> omega
+    rcases Bool.eq_false_or_eq_true z.msb with h | h
+    · rw [h]; simp; omega
+    · rw [h]; simp
   rw [BitVec.setWidth_mul _ _ (by norm_num), hself, hself]
 
 /-- The 128-bit zero-extended product truncates to the wrapping 64-bit product. -/
@@ -111,5 +114,151 @@ lemma ctqHi_eq (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
         List.getElem_cons_succ]
       apply ZMod.val_injective
       rw [populateCtq_val B C f _ (by norm_num), hval _ (by norm_num), ctqLimbNat]
+
+/-- On a real row, each low `c_times_quotient` limb is the corresponding pair of bytes in the
+lower-product witness.  Kept opaque so the whole-chip completeness proof does not accumulate the
+semantic Mul argument and its populated record in its proof term. -/
+lemma populateMulLower_product_pair (B C : Word (ZMod p)) (f : Vector (ZMod p) 8)
+    (ir : ZMod p) (hcU : Word.isU64 C) :
+    ir = 1 → ∀ (k : ℕ) (hk : k < 4),
+      (populateCtq B C f)[k]'(by omega)
+        = (populateMulLower ir B C f).product[2 * k]'(by omega)
+          + (populateMulLower ir B C f).product[2 * k + 1]'(by omega) * 256 := by
+  intro h1 k hk
+  rw [populateMulLower, if_pos h1]
+  have hloU : Word.isU64 (#v[(populateCtq B C f)[0], (populateCtq B C f)[1],
+      (populateCtq B C f)[2], (populateCtq B C f)[3]] : Word (ZMod p)) := by
+    apply Word.isU64_of_cases <;>
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] <;>
+      exact populateCtq_val_lt B C f _ (by norm_num)
+  have hsem := MulOperation.semantic_populate (populateQuotComp_isU64 B C f)
+    (cComp_isU64 hcU f) 1 0 0 0 0 (Or.inr rfl) (Or.inl rfl) (Or.inl rfl) (Or.inl rfl)
+    (Or.inl rfl) (Or.inr (by norm_num))
+  obtain ⟨hru, hmul, -, -, -, -⟩ := hsem
+  have hword := word_eq_of_toBitVec64_eq hloU hru (by
+    rw [ctqLo_eq, wordOfBits_toBitVec64]
+    exact (hmul rfl).symm)
+  simp [MulOperation.resultWord, MulOperation.productVal] at hword
+  obtain ⟨w0, w1, w2, w3⟩ := hword
+  interval_cases k <;> assumption
+
+/-- On a real division row, each high `c_times_quotient` limb is the corresponding pair of bytes in
+the upper-product witness.  The one-hot flag facts choose the signed or unsigned Mul semantics. -/
+lemma populateMulUpper_product_pair (B C : Word (ZMod p)) (f : Vector (ZMod p) 8)
+    (ir : ZMod p) (hcU : Word.isU64 C)
+    (hf0 : f[0] = 0 ∨ f[0] = 1) (hf1 : f[1] = 0 ∨ f[1] = 1)
+    (hf2 : f[2] = 0 ∨ f[2] = 1) (hf3 : f[3] = 0 ∨ f[3] = 1)
+    (hf4 : f[4] = 0 ∨ f[4] = 1) (hf5 : f[5] = 0 ∨ f[5] = 1)
+    (hf6 : f[6] = 0 ∨ f[6] = 1) (hf7 : f[7] = 0 ∨ f[7] = 1)
+    (hsum : f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] = 1) :
+    ir = 1 → f[0] + f[1] + f[2] + f[3] = 1 → ∀ (k : ℕ) (hk : k < 4),
+      (populateCtq B C f)[4 + k]'(by omega)
+        = (populateMulUpper ir B C f).product[8 + 2 * k]'(by omega)
+          + (populateMulUpper ir B C f).product[8 + 2 * k + 1]'(by omega) * 256 := by
+  intro h1 hg k hk
+  rw [populateMulUpper, if_pos ⟨h1, hg⟩]
+  have hhiU : Word.isU64 (#v[(populateCtq B C f)[4], (populateCtq B C f)[5],
+      (populateCtq B C f)[6], (populateCtq B C f)[7]] : Word (ZMod p)) := by
+    apply Word.isU64_of_cases <;>
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] <;>
+      exact populateCtq_val_lt B C f _ (by norm_num)
+  have hsigned : f[0] + f[2] = 1 → f[0] + f[2] + f[4] + f[5] = 1 →
+      (populateCtq B C f)[4 + k]'(by omega)
+        = (MulOperation.populate (populateQuotComp B C f) (cComp C f)
+            (f[0] + f[2]) 0 0).product[8 + 2 * k]'(by omega)
+          + (MulOperation.populate (populateQuotComp B C f) (cComp C f)
+              (f[0] + f[2]) 0 0).product[8 + 2 * k + 1]'(by omega) * 256 := by
+    intro hs hsg
+    rw [hs]
+    have hsem := MulOperation.semantic_populate (populateQuotComp_isU64 B C f)
+      (cComp_isU64 hcU f) 0 1 0 0 0 (Or.inl rfl) (Or.inr rfl) (Or.inl rfl) (Or.inl rfl)
+      (Or.inl rfl) (Or.inr (by norm_num))
+    obtain ⟨hru, -, -, hmulh, -, -⟩ := hsem
+    have hword := word_eq_of_toBitVec64_eq hhiU hru (by
+      rw [ctqHi_eq, wordOfBits_toBitVec64]
+      refine Eq.trans ?_ (hmulh rfl).symm
+      simp [ctqProd, hsg])
+    simp [MulOperation.resultWord, MulOperation.productVal] at hword
+    obtain ⟨w0, w1, w2, w3⟩ := hword
+    interval_cases k <;> assumption
+  have hunsigned : f[0] + f[2] = 0 → f[0] + f[2] + f[4] + f[5] = 0 →
+      (populateCtq B C f)[4 + k]'(by omega)
+        = (MulOperation.populate (populateQuotComp B C f) (cComp C f)
+            (f[0] + f[2]) 0 0).product[8 + 2 * k]'(by omega)
+          + (MulOperation.populate (populateQuotComp B C f) (cComp C f)
+              (f[0] + f[2]) 0 0).product[8 + 2 * k + 1]'(by omega) * 256 := by
+    intro hs hsg
+    rw [hs]
+    have hsem := MulOperation.semantic_populate (populateQuotComp_isU64 B C f)
+      (cComp_isU64 hcU f) 0 0 1 0 0 (Or.inl rfl) (Or.inl rfl) (Or.inr rfl) (Or.inl rfl)
+      (Or.inl rfl) (Or.inr (by norm_num))
+    obtain ⟨hru, -, hmulhu, -, -, -⟩ := hsem
+    have hword := word_eq_of_toBitVec64_eq hhiU hru (by
+      rw [ctqHi_eq, wordOfBits_toBitVec64]
+      refine Eq.trans ?_ (hmulhu rfl).symm
+      simp [ctqProd, hsg])
+    simp [MulOperation.resultWord, MulOperation.productVal] at hword
+    obtain ⟨w0, w1, w2, w3⟩ := hword
+    interval_cases k <;> assumption
+  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with
+      h | h | h | h | h | h | h | h
+  all_goals obtain ⟨g0, g1, g2, g3, g4, g5, g6, g7⟩ := h
+  · exact hsigned (by rw [g0, g2]; norm_num) (by rw [g0, g2, g4, g5]; norm_num)
+  · exact hunsigned (by rw [g0, g2]; norm_num) (by rw [g0, g2, g4, g5]; norm_num)
+  · exact hsigned (by rw [g0, g2]; norm_num) (by rw [g0, g2, g4, g5]; norm_num)
+  · exact hunsigned (by rw [g0, g2]; norm_num) (by rw [g0, g2, g4, g5]; norm_num)
+  all_goals
+    rw [g0, g1, g2, g3] at hg
+    norm_num at hg
+
+/-- Every committed product limb is zero on SP1's canonical DivRem padding template. -/
+lemma populateCtq_padding (k : ℕ) (hk : k < 8) :
+    (populateCtq (#v[0, 0, 0, 0] : Word (ZMod p)) #v[1, 0, 0, 0]
+      #v[0, 1, 0, 0, 0, 0, 0, 0])[k]'hk = 0 := by
+  have hb0 : Word.toBitVec64 (#v[0, 0, 0, 0] : Word (ZMod p)) = 0 := by
+    simp [Word.toBitVec64, Word.toNat]
+  have hc1 : Word.toBitVec64 (#v[1, 0, 0, 0] : Word (ZMod p)) = 1 := by
+    simp [Word.toBitVec64, Word.toNat, ZMod.val_one]
+  have hqb : quotBits (#v[0, 0, 0, 0] : Word (ZMod p)) #v[1, 0, 0, 0]
+      #v[0, 1, 0, 0, 0, 0, 0, 0] = 0 := by
+    simp only [quotBits, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ]
+    rw [hb0, hc1, if_neg (by norm_num), if_neg (by norm_num), if_neg (by norm_num),
+      if_neg (by decide)]
+    decide
+  have hqc : populateQuotComp (#v[0, 0, 0, 0] : Word (ZMod p)) #v[1, 0, 0, 0]
+      #v[0, 1, 0, 0, 0, 0, 0, 0] = wordOfBits 0 := by
+    simp only [populateQuotComp, quotCompBits, Vector.getElem_mk, List.getElem_toArray,
+      List.getElem_cons_zero, List.getElem_cons_succ]
+    rw [if_neg (by norm_num), hqb]
+  have hprod : ctqProd (#v[0, 0, 0, 0] : Word (ZMod p)) #v[1, 0, 0, 0]
+      #v[0, 1, 0, 0, 0, 0, 0, 0] = 0 := by
+    simp only [ctqProd, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ]
+    rw [if_neg (by norm_num), hqc, wordOfBits_toBitVec64]
+    simp
+  simp [populateCtq, ctqLimbNat, hprod]
+
+/-- Equality-oriented wrapper for applying `populateCtq_padding` without unfolding the large
+populate term in a parent theorem. -/
+lemma populateCtq_padding_of_eq {B C : Word (ZMod p)} {f : Vector (ZMod p) 8}
+    (hB : B = #v[0, 0, 0, 0]) (hC : C = #v[1, 0, 0, 0])
+    (hf : f = #v[0, 1, 0, 0, 0, 0, 0, 0]) (k : ℕ) (hk : k < 8) :
+    (populateCtq B C f)[k]'hk = 0 := by
+  subst B C f
+  exact populateCtq_padding k hk
+
+/-- Program-row form of the padding lemma, consuming the canonical padding-template contract in
+one opaque application. -/
+lemma populateCtq_padding_of_template {ir : ZMod p} {B C : Word (ZMod p)}
+    {f : Vector (ZMod p) 8}
+    (hpad : ir = 0 → B = #v[0, 0, 0, 0] ∧ C = #v[1, 0, 0, 0] ∧
+      f = #v[0, 1, 0, 0, 0, 0, 0, 0]) :
+    ir = 0 → ∀ (k : ℕ) (hk : k < 8), (populateCtq B C f)[k]'hk = 0 := by
+  intro h0 k hk
+  obtain ⟨hB, hC, hf⟩ := hpad h0
+  exact populateCtq_padding_of_eq hB hC hf k hk
 
 end SP1Clean.DivRemChip

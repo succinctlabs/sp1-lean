@@ -8,7 +8,7 @@ Witness-generation conformance vectors for SP1's `SubwOperation`, dumped from th
 imperative code and cannot be symbolically extracted; these vectors instead tie the Lean
 witness function to the Rust source by **conformance** (agreement on the sampled inputs —
 edge cases + a seeded LCG — not an all-inputs proof). Each entry is `(a_limbs, b_limbs, value, msb)`. The
-check lives in `SP1Clean/WitnessTests/SubwOperationWitness.lean`. Regenerate with
+check lives in `SP1CleanTest/WitnessTests/SubwOperationWitness.lean`. Regenerate with
 `SP1_DIR=… python3 update_extracted.py`. -/
 
 namespace SP1Clean.WitnessTests
@@ -16,8 +16,6 @@ open SP1Clean
 
 set_option linter.all false  -- auto-generated: skip linters
 
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 64000 in
 /-- 132 conformance vectors for `SubwOperation` (`(a_limbs, b_limbs, value, msb)`). -/
 def SubwOperationWitnessVectors : List (Vector ℕ 4 × Vector ℕ 4 × Vector ℕ 2 × ℕ) := [
   (#v[0, 0, 0, 0], #v[0, 0, 0, 0], #v[0, 0], 0),

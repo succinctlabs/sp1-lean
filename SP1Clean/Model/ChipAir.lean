@@ -4,7 +4,7 @@ import SP1Clean.Model.InteractionBus
 
 Bundles each chip's per-row interaction contributions into a `Machine`, so SP1's cross-chip
 **Σsends = Σreceives** (the global LogUp balance over every chip's interactions on the shared buses)
-becomes *expressible*: `Machine.busBalance`. Built directly on `Foundations/InteractionBus.lean`'s
+becomes *expressible*: `Machine.busBalance`. Built directly on `Model/InteractionBus.lean`'s
 computable `List`/`ℤ` core (`aggregateChipRows`/`multiplicitySum`/`isConsistentBalanced`) — never through
 the `noncomputable` `Operations.interactionsWith` — so it stays axiom-clean and permutation-invariant.
 
@@ -48,7 +48,7 @@ theorem busAggregate_cons (c : ChipAir Row) (m : Machine Row) (rowsOf : ChipAir 
     Machine.busAggregate (c :: m) rowsOf =
       (if c.included then aggregateChipRows (rowsOf c) c.perRow else [])
         ++ Machine.busAggregate m rowsOf := by
-  simp [Machine.busAggregate]
+  simp only [Machine.busAggregate, List.flatMap_cons]
 
 /-- **Per-chip decomposition of the bus balance.** Each key's machine-wide signed multiplicity is the sum
 of the per-chip multiplicities — so "the machine balances" is exactly "the per-chip sends and receives
@@ -60,6 +60,7 @@ theorem multiplicitySum_busAggregate_cons (c : ChipAir Row) (m : Machine Row)
       (if c.included then multiplicitySum (aggregateChipRows (rowsOf c) c.perRow) k else 0) +
         multiplicitySum (Machine.busAggregate m rowsOf) k := by
   rw [busAggregate_cons, multiplicitySum_append]
-  by_cases h : c.included <;> simp [h, multiplicitySum_nil]
+  by_cases h : c.included <;>
+    simp only [h, if_true, Bool.false_eq_true, if_false, multiplicitySum_nil]
 
 end SP1Clean

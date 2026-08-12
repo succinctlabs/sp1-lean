@@ -1,4 +1,14 @@
 > **Point-in-time snapshot — regenerate before relying on it.**
+>
+> **STALE as of 2026-08-06:** every timing below was measured on Lean v4.31 with the Sail v4 model.
+> The repository has since migrated to v4.32.2 + Sail v5, which rewrote the whole `Model/SailMemory.lean`
+> memory-collapse layer and everything downstream of it. Treat these numbers as pre-migration history
+> until `scripts/profile_compile.sh` is re-run.
+>
+> **DivRem note (2026-07-14):** the nine per-op soundness modules and shared `Soundness/Tail.lean`
+> measured below were retired in favor of `FormalModel/Contracts/DivRem.lean` plus the lightweight
+> `Proofs/Chips/DivRemChip/Cases.lean` evidence layer. Their timings are historical evidence for that
+> architectural decision, not the current module graph.
 
 # Compile-time profile — SP1Clean
 
@@ -11,7 +21,7 @@ log — they are now clean isolated numbers).
 The durable proof-engineering lessons that came out of profiling (the `v[i]` fast path,
 `circuit_proof_start` is not the bottleneck, the `localLength_eq` `rfl` cost, the shared-tail dedup
 pattern) live in `docs/agents/proof-patterns.md` § "Compile-time / performance landmines". An older
-pre-refactor baseline is archived under `docs/snapshots/profile-baseline-2026-06-10/`.
+pre-refactor baseline (2026-06-10 profiling bundle) was removed from the tree; see git history.
 
 ## How to re-run
 

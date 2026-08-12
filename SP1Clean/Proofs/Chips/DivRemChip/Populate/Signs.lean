@@ -26,7 +26,6 @@ open Circuit
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-! ## Small field constants -/
@@ -133,10 +132,7 @@ lemma ovbWitness_result_bool (ir : ZMod p) (B : Word (ZMod p)) (f : Vector (ZMod
       ∨ (ovbWitness ir B f).is_diff_zero.result = 1 := by
   unfold ovbWitness
   split
-  · split <;>
-      (rw [isEqualWord_populate_result]; split
-       · exact Or.inr rfl
-       · exact Or.inl rfl)
+  · split <;> (rw [isEqualWord_populate_result]; split <;> simp)
   · exact Or.inl rfl
 
 /-- The witnessed `is_overflow_c` result is boolean. -/
@@ -145,10 +141,7 @@ lemma ovcWitness_result_bool (ir : ZMod p) (C : Word (ZMod p)) (f : Vector (ZMod
       ∨ (ovcWitness ir C f).is_diff_zero.result = 1 := by
   unfold ovcWitness
   split
-  · split <;>
-      (rw [isEqualWord_populate_result]; split
-       · exact Or.inr rfl
-       · exact Or.inl rfl)
+  · split <;> (rw [isEqualWord_populate_result]; split <;> simp)
   · exact Or.inl rfl
 
 /-- The populated `is_overflow` cell is boolean given the signed-class flag sum is. -/
@@ -449,6 +442,27 @@ lemma sig_bool_of_class {f : Vector (ZMod p) 8} (hclass : FlagClasses f) :
   · right; rw [h0, h2, zero_add, zero_add]; exact hcl
   · left; exact hcl
 
+/-- If the gated populated remainder-negation cell is one, the unsigned-word flags are absent.
+This is the exact flag fact needed to identify `remainder_comp` with `remainder` in the Add
+subcircuit completeness case. -/
+lemma flags67_eq_zero_of_remNeg_mul_eq_one (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
+    (ir : ZMod p)
+    (hf0 : f[0] = 0 ∨ f[0] = 1) (hf1 : f[1] = 0 ∨ f[1] = 1)
+    (hf2 : f[2] = 0 ∨ f[2] = 1) (hf3 : f[3] = 0 ∨ f[3] = 1)
+    (hf4 : f[4] = 0 ∨ f[4] = 1) (hf5 : f[5] = 0 ∨ f[5] = 1)
+    (hf6 : f[6] = 0 ∨ f[6] = 1) (hf7 : f[7] = 0 ∨ f[7] = 1)
+    (hsum : f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] = 1)
+    (hneg : populateRemNeg B C f * ir = 1) : f[6] + f[7] = 0 := by
+  have hneg' := hneg
+  rw [populateRemNeg_def] at hneg'
+  rcases flags_cases hf0 hf1 hf2 hf3 hf4 hf5 hf6 hf7 hsum with h | h | h | h | h | h | h | h
+  all_goals obtain ⟨g0, -, g2, -, g4, g5, g6, g7⟩ := h
+  all_goals first
+    | (rw [g6, g7]; norm_num; done)
+    | (rw [g0, g2, g4, g5] at hneg'
+       simp only [add_zero, zero_mul] at hneg'
+       exact absurd hneg' zero_ne_one)
+
 /-- `rem_neg = 0` on the unsigned classes. -/
 lemma populateRemNeg_zero_of_unsigned (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
     (h : f[0] + f[2] + f[4] + f[5] = 0) : populateRemNeg B C f = 0 := by
@@ -469,6 +483,36 @@ lemma populateCNeg_zero_of_unsigned (C : Word (ZMod p)) {f : Vector (ZMod p) 8}
   unfold populateCNeg
   rw [h, zero_mul]
 
+/-- On the signed 64-bit class the sign cells read limb 3 of the remainder / of the dividend. -/
+private lemma signCells_s64 (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
+    (hcl : f[0] + f[2] = 1) (h4 : f[4] = 0) (h5 : f[5] = 0) (h6 : f[6] = 0) (h7 : f[7] = 0) :
+    populateRemNeg B C f = U16MSBOperation.populate_msb (populateRemainder B C f)[3]
+      ∧ populateBNeg B f = U16MSBOperation.populate_msb B[3] := by
+  have hsig : f[0] + f[2] + f[4] + f[5] = 1 := by
+    rw [h4, h5, add_zero, add_zero]; exact hcl
+  have hWne : ¬(f[4] + f[5] + f[6] + f[7] = 1) := by
+    rw [h4, h5, h6, h7, add_zero, add_zero, add_zero]; exact zero_ne_one
+  constructor
+  · unfold populateRemNeg remMsbCell
+    rw [hsig, one_mul, if_neg hWne]
+  · unfold populateBNeg bMsbCell
+    rw [hsig, one_mul, if_neg hWne]
+
+/-- As `signCells_s64`, on the signed word class: the sign cells read limb 1. -/
+private lemma signCells_sW (B C : Word (ZMod p)) {f : Vector (ZMod p) 8}
+    (hcl : f[4] + f[5] = 1) (h0 : f[0] = 0) (h2 : f[2] = 0) (h6 : f[6] = 0) (h7 : f[7] = 0) :
+    populateRemNeg B C f = U16MSBOperation.populate_msb (populateRemainder B C f)[1]
+      ∧ populateBNeg B f = U16MSBOperation.populate_msb B[1] := by
+  have hsig : f[0] + f[2] + f[4] + f[5] = 1 := by
+    rw [h0, h2, zero_add, zero_add]; exact hcl
+  have hW : f[4] + f[5] + f[6] + f[7] = 1 := by
+    rw [h6, h7, add_zero, add_zero]; exact hcl
+  constructor
+  · unfold populateRemNeg remMsbCell
+    rw [hsig, one_mul, if_pos hW]
+  · unfold populateBNeg bMsbCell
+    rw [hsig, one_mul, if_pos hW]
+
 /-- **E225 at the populate** (implication form): a negative populated remainder forces a negative
 dividend — truncated remainders carry the dividend's sign. -/
 lemma remNeg_imp_bNeg {B C : Word (ZMod p)} (hB : B.isU64) {f : Vector (ZMod p) 8}
@@ -479,17 +523,7 @@ lemma remNeg_imp_bNeg {B C : Word (ZMod p)} (hB : B.isU64) {f : Vector (ZMod p) 
   obtain ⟨_, hR1, _, hR3⟩ := Word.lt_cases_of_isU64 (populateRemainder_isU64 B C f)
   rcases hclass with ⟨hcl, h4, h5, h6, h7⟩ | ⟨hcl, h0, h2, h6, h7⟩ | hcl
   · -- signed 64-bit class
-    have hsig : f[0] + f[2] + f[4] + f[5] = 1 := by
-      rw [h4, h5, add_zero, add_zero]; exact hcl
-    have hWne : ¬(f[4] + f[5] + f[6] + f[7] = 1) := by
-      rw [h4, h5, h6, h7, add_zero, add_zero, add_zero]; exact zero_ne_one
-    have hrneg : populateRemNeg B C f
-        = U16MSBOperation.populate_msb (populateRemainder B C f)[3] := by
-      unfold populateRemNeg remMsbCell
-      rw [hsig, one_mul, if_neg hWne]
-    have hbneg : populateBNeg B f = U16MSBOperation.populate_msb B[3] := by
-      unfold populateBNeg bMsbCell
-      rw [hsig, one_mul, if_neg hWne]
+    obtain ⟨hrneg, hbneg⟩ := signCells_s64 B C hcl h4 h5 h6 h7
     rw [hrneg] at hrn
     rw [hbneg]
     have hTB : Word.toBitVec64 (populateRemainder B C f) = remBits B C f := by
@@ -515,17 +549,7 @@ lemma remNeg_imp_bNeg {B C : Word (ZMod p)} (hB : B.isU64) {f : Vector (ZMod p) 
           exact absurd hrmsb Bool.false_ne_true
     exact (populate_msb_eq_one_iff hB3).mpr ((toBitVec64_msb_iff hB).mp hbmsb)
   · -- signed word class
-    have hsig : f[0] + f[2] + f[4] + f[5] = 1 := by
-      rw [h0, h2, zero_add, zero_add]; exact hcl
-    have hW : f[4] + f[5] + f[6] + f[7] = 1 := by
-      rw [h6, h7, add_zero, add_zero]; exact hcl
-    have hrneg : populateRemNeg B C f
-        = U16MSBOperation.populate_msb (populateRemainder B C f)[1] := by
-      unfold populateRemNeg remMsbCell
-      rw [hsig, one_mul, if_pos hW]
-    have hbneg : populateBNeg B f = U16MSBOperation.populate_msb B[1] := by
-      unfold populateBNeg bMsbCell
-      rw [hsig, one_mul, if_pos hW]
+    obtain ⟨hrneg, hbneg⟩ := signCells_sW B C hcl h0 h2 h6 h7
     rw [hrneg] at hrn
     rw [hbneg]
     have hr1 : 32768 ≤ (remBits B C f).toNat / 2 ^ 16 % 2 ^ 16 := by
@@ -580,17 +604,7 @@ lemma rem_nonzero_nonneg_imp_bNonneg {B C : Word (ZMod p)} (hB : B.isU64)
   obtain ⟨_, hR1, _, hR3⟩ := Word.lt_cases_of_isU64 (populateRemainder_isU64 B C f)
   rcases hclass with ⟨hcl, h4, h5, h6, h7⟩ | ⟨hcl, h0, h2, h6, h7⟩ | hcl
   · -- signed 64-bit class
-    have hsig : f[0] + f[2] + f[4] + f[5] = 1 := by
-      rw [h4, h5, add_zero, add_zero]; exact hcl
-    have hWne : ¬(f[4] + f[5] + f[6] + f[7] = 1) := by
-      rw [h4, h5, h6, h7, add_zero, add_zero, add_zero]; exact zero_ne_one
-    have hrneg : populateRemNeg B C f
-        = U16MSBOperation.populate_msb (populateRemainder B C f)[3] := by
-      unfold populateRemNeg remMsbCell
-      rw [hsig, one_mul, if_neg hWne]
-    have hbneg : populateBNeg B f = U16MSBOperation.populate_msb B[3] := by
-      unfold populateBNeg bMsbCell
-      rw [hsig, one_mul, if_neg hWne]
+    obtain ⟨hrneg, hbneg⟩ := signCells_s64 B C hcl h4 h5 h6 h7
     rcases U16MSBOperation.populate_msb_bool hB3 with hb | hb
     · rw [hbneg, hb, mul_zero]
     rcases U16MSBOperation.populate_msb_bool hR3 with hr | hr
@@ -633,17 +647,7 @@ lemma rem_nonzero_nonneg_imp_bNonneg {B C : Word (ZMod p)} (hB : B.isU64)
         List.getElem_cons_succ, add_zero, zero_mul]
     · rw [hrneg, hr, sub_self, mul_zero, zero_mul]
   · -- signed word class
-    have hsig : f[0] + f[2] + f[4] + f[5] = 1 := by
-      rw [h0, h2, zero_add, zero_add]; exact hcl
-    have hW : f[4] + f[5] + f[6] + f[7] = 1 := by
-      rw [h6, h7, add_zero, add_zero]; exact hcl
-    have hrneg : populateRemNeg B C f
-        = U16MSBOperation.populate_msb (populateRemainder B C f)[1] := by
-      unfold populateRemNeg remMsbCell
-      rw [hsig, one_mul, if_pos hW]
-    have hbneg : populateBNeg B f = U16MSBOperation.populate_msb B[1] := by
-      unfold populateBNeg bMsbCell
-      rw [hsig, one_mul, if_pos hW]
+    obtain ⟨hrneg, hbneg⟩ := signCells_sW B C hcl h0 h2 h6 h7
     rcases U16MSBOperation.populate_msb_bool hB1 with hb | hb
     · rw [hbneg, hb, mul_zero]
     rcases U16MSBOperation.populate_msb_bool hR1 with hr | hr

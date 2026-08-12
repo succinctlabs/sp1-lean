@@ -7,7 +7,7 @@ import SP1Clean.Extracted.IsZeroWordOperation
 The literal `is_real = 1` meaning of SP1's `IsZeroWordOperation` `asserts` list (`RawSpec`, composing
 the four per-limb `IsZeroOperation.RawSpec`s plus the half-product gluings), the AND-tree collapse
 lemma `result_collapse`, and the native soundness core `isZeroWord_of_raw` the gadget routes through.
-The auto-generated circuit (`Inputs`/`main`/`elaborated`) lives in the sibling `Extracted` module; the
+The hand-maintained native circuit (`Inputs`/`main`/`elaborated`) lives in `Defs`; the
 `populate` witness in `Populate`; the `FormalAssertion` contract (Spec/soundness/completeness/`circuit`)
 in `Formal`.
 

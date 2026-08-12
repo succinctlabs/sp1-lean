@@ -2,7 +2,6 @@ import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.Math.Word
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
-import SP1Clean.Extracted.AddOperation
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -11,8 +10,8 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # `AddOperation` — `populate` (the witness generator)
 
-SP1's `AddOperation::populate` ported natively; `spec_populate` proves the result satisfies `Spec`.
-Circuit in `Extracted`, arithmetic core in `RawSpec`, `FormalAssertion` in `Formal`. -/
+The familiar limb-wise population algorithm, implemented locally; `spec_populate` proves the result
+satisfies `Spec`. It complements the Rust implementation but is not required to share its data shape. -/
 
 namespace SP1Clean.AddOperation
 
@@ -23,12 +22,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 instance : Fact (p > 2) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
-omit [Fact p.Prime] in
-/-- `16 < p`, so the `Range` byte-row width column `16` round-trips through `byteRowSpec_range`. -/
-lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-
-/-- Native port of SP1's `AddOperation::populate`: the four base-2^16 limbs of `(a + b) mod 2^64`.
-Conformance to SP1's Rust `populate` checked by `WitnessTests/AddOperationWitness.lean`. -/
+/-- The four base-2^16 limbs of `(a + b) mod 2^64`. Chip-level populate/trace conformance checks the
+assembled row against Rust; there is intentionally no operation-level extraction boundary. -/
 def populate (a b : Word (ZMod p)) : Word (ZMod p) :=
   let s0 := a[0].val + b[0].val
   let s1 := a[1].val + b[1].val + s0 / 65536
@@ -41,7 +36,6 @@ def populate (a b : Word (ZMod p)) : Word (ZMod p) :=
 so it holds unconditionally). The composing chip uses this to discharge its assertion obligation. -/
 theorem spec_populate {a b : Word (ZMod p)} (ha : a.isU64) (hb : b.isU64) (is_real : ZMod p) :
     Spec (⟨a, b, { value := populate a b }, is_real⟩ : Inputs (ZMod p)) := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb

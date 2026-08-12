@@ -4,6 +4,7 @@ import SP1Clean.Math.Bitwise
 import SP1Clean.Extracted.U16toU8OperationUnsafe
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
+import Clean.Utils.Tactics
 import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # `U16toU8OperationUnsafe` as a Clean-native `FormalAssertion`
@@ -40,15 +41,10 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
   channelsWithGuarantees := []
-  channelsWithRequirements := []
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p))) = [] := rfl
-
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma channelsWithRequirements_eq :
-    ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p))) = [] := rfl
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
@@ -56,7 +52,6 @@ set_option linter.unusedSectionVars false in
 
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h256 : (256 : ZMod p)⁻¹ * 256 = 1 := inv_mul_cancel₀ val_256_ne_zero
   refine ⟨?_, ?_, ?_, ?_⟩ <;> rw [mul_assoc, h256, mul_one] <;> ring
 

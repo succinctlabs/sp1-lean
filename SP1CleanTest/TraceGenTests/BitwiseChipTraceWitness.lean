@@ -1,4 +1,4 @@
-import SP1Clean.Native.Chips.BitwiseChip.Defs
+import SP1Clean.Faithful.BitwiseChip
 import SP1CleanTest.TraceGenTests.TraceGenerator
 import SP1CleanTest.TraceGenTests.BitwiseChipTraceVectors
 
@@ -6,7 +6,8 @@ import SP1CleanTest.TraceGenTests.BitwiseChipTraceVectors
 
 Every row is rebuilt from `BitwiseChip.main`'s own witness closures (the `"bitwise_flags"` hint
 flags and the 16-column `BitwiseU16Operation` struct via `BitwiseU16Operation.populate` at the
-flag-weighted byte opcode) plus the output-struct layout, with `bitwiseHint` building the
+flag-weighted byte opcode) plus the output-struct layout (reaching the Rust 51-column `BitwiseCols`
+order through the audited whole-row `bitwiseChipReconfigure` map), with `bitwiseHint` building the
 per-event flag `ProverHint` from the dumped executor opcode (XOR = 3, OR = 4, AND = 5 — the same
 discriminants the circuit's reader opcode expression uses). The battery cycles **all three
 variants** (register-`c`) and the comparison is **unmasked** (all 51 columns) — closing the
@@ -28,8 +29,8 @@ hint from the event's opcode), zero padding to SP1's height. -/
 def bitwiseChipDerivedTrace : List (List (ZMod SP1Prime)) :=
   generateTrace
     (fun e =>
-      circuitTraceRow BitwiseChip.Inputs (BitwiseChip.main (p := SP1Prime))
-        (aluTypeOpEventInputs e) (bitwiseHint e.opcode))
+      circuitTraceRowMapped BitwiseChip.Inputs (BitwiseChip.main (p := SP1Prime))
+        Faithful.bitwiseChipReconfigure (aluTypeOpEventInputs e) (bitwiseHint e.opcode))
     BitwiseChipTraceEvents BitwiseChipTraceHeight 51
 
 theorem bitwisechip_trace_conforms :

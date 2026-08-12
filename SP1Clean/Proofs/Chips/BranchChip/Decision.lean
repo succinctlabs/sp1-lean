@@ -1,4 +1,4 @@
-import SP1Clean.Math.Word
+import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Math.Gate
 
 /-! # `SP1Clean.BranchChip` — the six-way decision dispatch (shared field lemmas)
@@ -17,7 +17,7 @@ context — so the heavy one-hot case analysis is elaborated **once, in a small 
 under the giant `circuit_proof_start` chip goal. This is what lets `Formal.lean`'s soundness/completeness
 drop their `maxHeartbeats` ceilings.
 
-The flag↔index convention matches `Defs.lean`'s `main` and `Specs/Chip.lean`'s `Spec`:
+The flag↔index convention matches `Defs.lean`'s `main` and `FormalModel/Contracts/Chips.lean`'s `Spec`:
 `is_beq = b0, is_bne = b1, is_blt = b2, is_bge = b3, is_bltu = b4, is_bgeu = b5`; the signed-compare
 selector is `is_signed = is_blt + is_bge = b2 + b3`; `is_eq = 1 - sum` where `sum` is the four
 `u16_flags`; and
@@ -45,14 +45,12 @@ values is `≤ 1`. -/
 lemma one_hot6 {b0 b1 b2 b3 b4 b5 : ZMod p}
     (h0 : b0 = 0 ∨ b0 = 1) (h1 : b1 = 0 ∨ b1 = 1) (h2 : b2 = 0 ∨ b2 = 1)
     (h3 : b3 = 0 ∨ b3 = 1) (h4 : b4 = 0 ∨ b4 = 1) (h5 : b5 = 0 ∨ b5 = 1)
-    (hsum : (b0 + b1 + b2 + b3 + b4 + b5) * (b0 + b1 + b2 + b3 + b4 + b5 + -1) = 0) :
+    (hsum : (b0 + b1 + b2 + b3 + b4 + b5) * (b0 + b1 + b2 + b3 + b4 + b5 - 1) = 0) :
     b0.val + b1.val + b2.val + b3.val + b4.val + b5.val ≤ 1 := by
-  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : (7 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   set S := b0 + b1 + b2 + b3 + b4 + b5 with hS
-  have hvals := And.intro (val_of_bool h0) (And.intro (val_of_bool h1) (And.intro (val_of_bool h2)
-    (And.intro (val_of_bool h3) (And.intro (val_of_bool h4) (val_of_bool h5)))))
-  obtain ⟨v0, v1, v2, v3, v4, v5⟩ := hvals
+  have v0 := bool_val_le h0; have v1 := bool_val_le h1; have v2 := bool_val_le h2
+  have v3 := bool_val_le h3; have v4 := bool_val_le h4; have v5 := bool_val_le h5
   have hScast : S = ((b0.val + b1.val + b2.val + b3.val + b4.val + b5.val : ℕ) : ZMod p) := by
     rw [hS]; push_cast [ZMod.natCast_zmod_val]; ring
   have hSval : S.val = b0.val + b1.val + b2.val + b3.val + b4.val + b5.val := by
@@ -63,25 +61,56 @@ lemma one_hot6 {b0 b1 b2 b3 b4 b5 : ZMod p}
     · right; rw [h, ZMod.val_one]
   omega
 
+/-- Six binary flags whose field sum is one form the exact disjunction used by the Branch
+semantic contract.  Keeping the finite case split here prevents the whole-chip soundness proof
+from elaborating it under the full circuit context. -/
+lemma flagsOneHot_of_sum_one {b0 b1 b2 b3 b4 b5 : ZMod p}
+    (h0 : b0 = 0 ∨ b0 = 1) (h1 : b1 = 0 ∨ b1 = 1) (h2 : b2 = 0 ∨ b2 = 1)
+    (h3 : b3 = 0 ∨ b3 = 1) (h4 : b4 = 0 ∨ b4 = 1) (h5 : b5 = 0 ∨ b5 = 1)
+    (hsum : b0 + b1 + b2 + b3 + b4 + b5 = 1) :
+    (b0 = 1 ∧ b1 = 0 ∧ b2 = 0 ∧ b3 = 0 ∧ b4 = 0 ∧ b5 = 0) ∨
+      (b1 = 1 ∧ b0 = 0 ∧ b2 = 0 ∧ b3 = 0 ∧ b4 = 0 ∧ b5 = 0) ∨
+      (b2 = 1 ∧ b0 = 0 ∧ b1 = 0 ∧ b3 = 0 ∧ b4 = 0 ∧ b5 = 0) ∨
+      (b3 = 1 ∧ b0 = 0 ∧ b1 = 0 ∧ b2 = 0 ∧ b4 = 0 ∧ b5 = 0) ∨
+      (b4 = 1 ∧ b0 = 0 ∧ b1 = 0 ∧ b2 = 0 ∧ b3 = 0 ∧ b5 = 0) ∨
+      (b5 = 1 ∧ b0 = 0 ∧ b1 = 0 ∧ b2 = 0 ∧ b3 = 0 ∧ b4 = 0) := by
+  have atMost := one_hot6 h0 h1 h2 h3 h4 h5 (by rw [hsum]; simp)
+  rcases h0 with rfl | rfl <;> rcases h1 with rfl | rfl <;>
+    rcases h2 with rfl | rfl <;> rcases h3 with rfl | rfl <;>
+    rcases h4 with rfl | rfl <;> rcases h5 with rfl | rfl
+  all_goals
+    simp only [ZMod.val_zero, ZMod.val_one] at atMost
+    first | omega | simp at hsum ⊢
+
+/-- **One-hot, resolved.** If the binary flag `x` is set and the six binary flags sum to `1`, the
+other five are zero. This is the per-branch specialisation both dispatch lemmas below need; the
+argument order is permuted at each call site, with the sum hypothesis carried by
+`linear_combination`. -/
+private lemma rest_zero {x y z w u v : ZMod p} (hx : x = 1)
+    (hy : y = 0 ∨ y = 1) (hz : z = 0 ∨ z = 1) (hw : w = 0 ∨ w = 1)
+    (hu : u = 0 ∨ u = 1) (hv : v = 0 ∨ v = 1) (hsum : x + y + z + w + u + v = 1) :
+    y = 0 ∧ z = 0 ∧ w = 0 ∧ u = 0 ∧ v = 0 := by
+  have hle := one_hot6 (Or.inr hx) hy hz hw hu hv (by rw [hsum]; simp)
+  have hxv : x.val = 1 := by rw [hx]; simp [ZMod.val_one]
+  exact ⟨(ZMod.val_eq_zero _).mp (by omega), (ZMod.val_eq_zero _).mp (by omega),
+    (ZMod.val_eq_zero _).mp (by omega), (ZMod.val_eq_zero _).mp (by omega),
+    (ZMod.val_eq_zero _).mp (by omega)⟩
+
 omit [Fact (2 ^ 17 < p)] in
 /-- A binary `x` with `x = 1 ↔ ¬ P` (where `bit = if P then 1 else 0`) is `1 - bit`. -/
 private lemma bool_eq_one_sub_ite {x bit : ZMod p} (hx : x = 0 ∨ x = 1) {P : Prop} [Decidable P]
     (hbit : bit = if P then 1 else 0) (h : x = 1 ↔ ¬ P) : x = 1 - bit := by
   by_cases hP : P
-  · rw [hbit, if_pos hP]; rcases hx with hx | hx
-    · rw [hx]; simp
-    · exact absurd (h.mp hx) (by simp [hP])
+  · rw [hbit, if_pos hP, sub_self]; exact hx.resolve_right fun h1 => h.mp h1 hP
   · rw [hbit, if_neg hP, sub_zero]; exact h.mpr hP
 
 omit [Fact (2 ^ 17 < p)] in
 /-- A binary `x` with `x = 1 ↔ y ≠ 0` (for binary `y`) equals `y`. -/
 private lemma bool_eq_of_iff_ne {x y : ZMod p} (hx : x = 0 ∨ x = 1) (hy : y = 0 ∨ y = 1)
     (h : x = 1 ↔ y ≠ 0) : x = y := by
-  rcases hy with hy | hy
-  · rw [hy]; rcases hx with hx | hx
-    · exact hx
-    · exact absurd (h.mp hx) (by rw [hy]; simp)
-  · rw [hy]; exact h.mpr (by rw [hy]; exact one_ne_zero)
+  rcases hy with rfl | rfl
+  · exact hx.resolve_right fun h1 => h.mp h1 rfl
+  · exact h.mpr one_ne_zero
 
 /-! ## The six-way decision dispatch
 
@@ -95,7 +124,7 @@ def branchDecision (b0 b1 b2 b3 b4 b5 bit sum : ZMod p) : ZMod p :=
 
 /-- **Soundness direction.** Given the in-circuit decision equation `br = branchDecision …`, the six
 binary opcode flags (one-hot, summing to `1`), the binary `br`, and the signed-compare couplings, derive
-the six per-opcode `br = 1 ↔ <RV64 condition>` biconditionals (verbatim `Specs/Chip.lean` Branch `Spec`
+the six per-opcode `br = 1 ↔ <RV64 condition>` biconditionals (verbatim `FormalModel/Contracts/Chips.lean` Branch `Spec`
 form). -/
 lemma branch_conditions_of_decision_eq {rs1 rs2 : Word (ZMod p)}
     (hrs1U : Word.isU64 rs1) (hrs2U : Word.isU64 rs2)
@@ -115,19 +144,9 @@ lemma branch_conditions_of_decision_eq {rs1 rs2 : Word (ZMod p)}
       ∧ (b4 = 1 → (br = 1 ↔ (Word.toBitVec64 rs1).ult (Word.toBitVec64 rs2) = true))
       ∧ (b5 = 1 → (br = 1 ↔ (Word.toBitVec64 rs1).ult (Word.toBitVec64 rs2) = false)) := by
   simp only [branchDecision] at hbrdec
-  have hgate : (b0 + b1 + b2 + b3 + b4 + b5) * (b0 + b1 + b2 + b3 + b4 + b5 + -1) = 0 := by
-    rw [hone]; ring
-  have h_onehot := one_hot6 hb0 hb1 hb2 hb3 hb4 hb5 hgate
-  have b0v := val_of_bool hb0; have b1v := val_of_bool hb1; have b2v := val_of_bool hb2
-  have b3v := val_of_bool hb3; have b4v := val_of_bool hb4; have b5v := val_of_bool hb5
-  have zero_of : ∀ x : ZMod p, (x = 0 ∨ x = 1) → x.val = 0 → x = 0 := fun x _ hv =>
-    (ZMod.val_eq_zero x).mp hv
   refine ⟨fun hf => ?_, fun hf => ?_, fun hf => ?_, fun hf => ?_, fun hf => ?_, fun hf => ?_⟩
   · -- BEQ: other five flags zero; `br = 1 - sum`; `is_signed = 0`.
-    have v1 : b0.val = 1 := by rw [hf]; simp [ZMod.val_one]
-    have e1 := zero_of _ hb1 (by omega); have e2 := zero_of _ hb2 (by omega)
-    have e3 := zero_of _ hb3 (by omega); have e4 := zero_of _ hb4 (by omega)
-    have e5 := zero_of _ hb5 (by omega)
+    obtain ⟨e1, e2, e3, e4, e5⟩ := rest_zero hf hb1 hb2 hb3 hb4 hb5 hone
     have hsig0 : b2 + b3 = 0 := by rw [e2, e3]; simp
     rw [hf, e1, e2, e3, e4, e5] at hbrdec
     refine Iff.trans ?_ (h_eqf hsig0)
@@ -135,10 +154,7 @@ lemma branch_conditions_of_decision_eq {rs1 rs2 : Word (ZMod p)}
     · intro hib; linear_combination hbrdec - hib
     · intro hF; linear_combination hbrdec - hF
   · -- BNE: `br = sum-indicator`; binary; `br = 1 ↔ sum ≠ 0 ↔ rs1 ≠ rs2`.
-    have v1 : b1.val = 1 := by rw [hf]; simp [ZMod.val_one]
-    have e0 := zero_of _ hb0 (by omega); have e2 := zero_of _ hb2 (by omega)
-    have e3 := zero_of _ hb3 (by omega); have e4 := zero_of _ hb4 (by omega)
-    have e5 := zero_of _ hb5 (by omega)
+    obtain ⟨e0, e2, e3, e4, e5⟩ := rest_zero hf hb0 hb2 hb3 hb4 hb5 (by linear_combination hone)
     have hsig0 : b2 + b3 = 0 := by rw [e2, e3]; simp
     rw [hf, e0, e2, e3, e4, e5] at hbrdec
     refine Iff.trans ?_ (not_congr (h_eqf hsig0))
@@ -148,20 +164,14 @@ lemma branch_conditions_of_decision_eq {rs1 rs2 : Word (ZMod p)}
       · exact absurd (by linear_combination -hbrdec + h0) hF
       · exact h1
   · -- BLT: `br = bit`; `is_signed = 1`; `br = 1 ↔ rs1 <ₛ rs2`.
-    have v1 : b2.val = 1 := by rw [hf]; simp [ZMod.val_one]
-    have e0 := zero_of _ hb0 (by omega); have e1 := zero_of _ hb1 (by omega)
-    have e3 := zero_of _ hb3 (by omega); have e4 := zero_of _ hb4 (by omega)
-    have e5 := zero_of _ hb5 (by omega)
+    obtain ⟨e0, e1, e3, e4, e5⟩ := rest_zero hf hb0 hb1 hb3 hb4 hb5 (by linear_combination hone)
     have hsig1 : b2 + b3 = 1 := by rw [hf, e3]; simp
     rw [hf, e0, e1, e3, e4, e5] at hbrdec
     simp only [if_pos hsig1] at h_bit
     rw [slt_true_iff]
     exact eq_one_iff_of_ite (x := br) (by linear_combination hbrdec + h_bit)
   · -- BGE: `br = 1 - bit`; `is_signed = 1`; `br = 1 ↔ ¬ rs1 <ₛ rs2`.
-    have v1 : b3.val = 1 := by rw [hf]; simp [ZMod.val_one]
-    have e0 := zero_of _ hb0 (by omega); have e1 := zero_of _ hb1 (by omega)
-    have e2 := zero_of _ hb2 (by omega); have e4 := zero_of _ hb4 (by omega)
-    have e5 := zero_of _ hb5 (by omega)
+    obtain ⟨e0, e1, e2, e4, e5⟩ := rest_zero hf hb0 hb1 hb2 hb4 hb5 (by linear_combination hone)
     have hsig1 : b2 + b3 = 1 := by rw [hf, e2]; simp
     rw [hf, e0, e1, e2, e4, e5] at hbrdec
     simp only [if_pos hsig1] at h_bit
@@ -170,20 +180,14 @@ lemma branch_conditions_of_decision_eq {rs1 rs2 : Word (ZMod p)}
     refine eq_one_iff_of_one_sub_ite (x := br) ?_
     linear_combination hbrdec
   · -- BLTU: `br = bit`; `is_signed = 0`; `br = 1 ↔ rs1 <ᵤ rs2`.
-    have v1 : b4.val = 1 := by rw [hf]; simp [ZMod.val_one]
-    have e0 := zero_of _ hb0 (by omega); have e1 := zero_of _ hb1 (by omega)
-    have e2 := zero_of _ hb2 (by omega); have e3 := zero_of _ hb3 (by omega)
-    have e5 := zero_of _ hb5 (by omega)
+    obtain ⟨e0, e1, e2, e3, e5⟩ := rest_zero hf hb0 hb1 hb2 hb3 hb5 (by linear_combination hone)
     have hsig0 : ¬ (b2 + b3 = 1) := by rw [e2, e3, add_zero]; exact zero_ne_one'
     rw [hf, e0, e1, e2, e3, e5] at hbrdec
     simp only [if_neg hsig0] at h_bit
     rw [ult_true_iff, Word.toBitVec64_toNat hrs1U, Word.toBitVec64_toNat hrs2U]
     exact eq_one_iff_of_ite (x := br) (by linear_combination hbrdec + h_bit)
   · -- BGEU: `br = 1 - bit`; `is_signed = 0`; `br = 1 ↔ ¬ rs1 <ᵤ rs2`.
-    have v1 : b5.val = 1 := by rw [hf]; simp [ZMod.val_one]
-    have e0 := zero_of _ hb0 (by omega); have e1 := zero_of _ hb1 (by omega)
-    have e2 := zero_of _ hb2 (by omega); have e3 := zero_of _ hb3 (by omega)
-    have e4 := zero_of _ hb4 (by omega)
+    obtain ⟨e0, e1, e2, e3, e4⟩ := rest_zero hf hb0 hb1 hb2 hb3 hb4 (by linear_combination hone)
     have hsig0 : ¬ (b2 + b3 = 1) := by rw [e2, e3, add_zero]; exact zero_ne_one'
     rw [hf, e0, e1, e2, e3, e4] at hbrdec
     simp only [if_neg hsig0] at h_bit
@@ -214,89 +218,42 @@ lemma branch_decision_eq_of_conditions {rs1 rs2 : Word (ZMod p)}
     (hd5 : b5 = 1 → (br = 1 ↔ (Word.toBitVec64 rs1).ult (Word.toBitVec64 rs2) = false)) :
     br = branchDecision b0 b1 b2 b3 b4 b5 bit sum := by
   simp only [branchDecision]
-  have hgate : (b0 + b1 + b2 + b3 + b4 + b5) * (b0 + b1 + b2 + b3 + b4 + b5 + -1) = 0 := by
-    rw [hone]; ring
-  have h_onehot := one_hot6 hb0 hb1 hb2 hb3 hb4 hb5 hgate
-  have b0v := val_of_bool hb0; have b1v := val_of_bool hb1; have b2v := val_of_bool hb2
-  have b3v := val_of_bool hb3; have b4v := val_of_bool hb4; have b5v := val_of_bool hb5
-  have zero_of : ∀ x : ZMod p, x.val = 0 → x = 0 := fun x hv => (ZMod.val_eq_zero x).mp hv
-  rcases hb0 with hf0 | hf0
-  · rcases hb1 with hf1 | hf1
-    · rcases hb2 with hf2 | hf2
-      · rcases hb3 with hf3 | hf3
-        · rcases hb4 with hf4 | hf4
-          · rcases hb5 with hf5 | hf5
-            · -- all flags zero: contradicts `Σ = 1`.
-              rw [hf0, hf1, hf2, hf3, hf4, hf5] at hone; simp at hone
-            · -- BGEU (`b5 = 1`): `br = 1 - bit`, `is_signed = 0`.
-              have v1 : b5.val = 1 := by rw [hf5]; simp [ZMod.val_one]
-              have e0 := zero_of _ (show b0.val = 0 by omega)
-              have e1 := zero_of _ (show b1.val = 0 by omega)
-              have e2 := zero_of _ (show b2.val = 0 by omega)
-              have e3 := zero_of _ (show b3.val = 0 by omega)
-              have e4 := zero_of _ (show b4.val = 0 by omega)
-              have hsigne : ¬ (b2 + b3 = 1) := by rw [e2, e3, add_zero]; exact zero_ne_one'
-              simp only [eq_false hsigne] at h_bit
-              have hiff := (hd5 hf5).trans (ult_false_iff _ _)
-              rw [Word.toBitVec64_toNat hrs1U, Word.toBitVec64_toNat hrs2U] at hiff
-              rw [e0, e1, e2, e3, e4, hf5]
-              linear_combination bool_eq_one_sub_ite hbr h_bit hiff
-          · -- BLTU (`b4 = 1`): `br = bit`, `is_signed = 0`.
-            have v1 : b4.val = 1 := by rw [hf4]; simp [ZMod.val_one]
-            have e0 := zero_of _ (show b0.val = 0 by omega)
-            have e1 := zero_of _ (show b1.val = 0 by omega)
-            have e2 := zero_of _ (show b2.val = 0 by omega)
-            have e3 := zero_of _ (show b3.val = 0 by omega)
-            have e5 := zero_of _ (show b5.val = 0 by omega)
-            have hsigne : ¬ (b2 + b3 = 1) := by rw [e2, e3, add_zero]; exact zero_ne_one'
-            simp only [eq_false hsigne] at h_bit
-            have hiff := (hd4 hf4).trans (ult_true_iff _ _)
-            rw [Word.toBitVec64_toNat hrs1U, Word.toBitVec64_toNat hrs2U] at hiff
-            rw [e0, e1, e2, e3, hf4, e5]
-            linear_combination (bool_eq_ite_of_iff hbr hiff).trans h_bit.symm
-        · -- BGE (`b3 = 1`): `br = 1 - bit`, `is_signed = 1`.
-          have v1 : b3.val = 1 := by rw [hf3]; simp [ZMod.val_one]
-          have e0 := zero_of _ (show b0.val = 0 by omega)
-          have e1 := zero_of _ (show b1.val = 0 by omega)
-          have e2 := zero_of _ (show b2.val = 0 by omega)
-          have e4 := zero_of _ (show b4.val = 0 by omega)
-          have e5 := zero_of _ (show b5.val = 0 by omega)
-          have hsig1 : b2 + b3 = 1 := by rw [e2, hf3, zero_add]
-          simp only [eq_true hsig1] at h_bit
-          rw [e0, e1, e2, hf3, e4, e5]
-          linear_combination bool_eq_one_sub_ite hbr h_bit ((hd3 hf3).trans (slt_false_iff _ _))
-      · -- BLT (`b2 = 1`): `br = bit`, `is_signed = 1`.
-        have v1 : b2.val = 1 := by rw [hf2]; simp [ZMod.val_one]
-        have e0 := zero_of _ (show b0.val = 0 by omega)
-        have e1 := zero_of _ (show b1.val = 0 by omega)
-        have e3 := zero_of _ (show b3.val = 0 by omega)
-        have e4 := zero_of _ (show b4.val = 0 by omega)
-        have e5 := zero_of _ (show b5.val = 0 by omega)
-        have hsig1 : b2 + b3 = 1 := by rw [hf2, e3, add_zero]
-        simp only [eq_true hsig1] at h_bit
-        have hbreq := (bool_eq_ite_of_iff hbr ((hd2 hf2).trans (slt_true_iff _ _))).trans h_bit.symm
-        rw [e0, e1, hf2, e3, e4, e5]
-        linear_combination hbreq
-    · -- BNE (`b1 = 1`): `br = sum-indicator`, `is_signed = 0`.
-      have v1 : b1.val = 1 := by rw [hf1]; simp [ZMod.val_one]
-      have e0 := zero_of _ (show b0.val = 0 by omega)
-      have e2 := zero_of _ (show b2.val = 0 by omega)
-      have e3 := zero_of _ (show b3.val = 0 by omega)
-      have e4 := zero_of _ (show b4.val = 0 by omega)
-      have e5 := zero_of _ (show b5.val = 0 by omega)
-      have hsig0 : b2 + b3 = 0 := by rw [e2, e3]; simp
-      rw [e0, hf1, e2, e3, e4, e5]
-      linear_combination bool_eq_of_iff_ne hbr (h_eqbin hsig0)
-        ((hd1 hf1).trans (not_congr (h_eqf hsig0)).symm)
+  rcases flagsOneHot_of_sum_one hb0 hb1 hb2 hb3 hb4 hb5 hone with
+    ⟨hf0, e1, e2, e3, e4, e5⟩ | ⟨hf1, e0, e2, e3, e4, e5⟩ | ⟨hf2, e0, e1, e3, e4, e5⟩ |
+      ⟨hf3, e0, e1, e2, e4, e5⟩ | ⟨hf4, e0, e1, e2, e3, e5⟩ | ⟨hf5, e0, e1, e2, e3, e4⟩
   · -- BEQ (`b0 = 1`): `br = 1 - sum-indicator`, `is_signed = 0`.
-    have v1 : b0.val = 1 := by rw [hf0]; simp [ZMod.val_one]
-    have e1 := zero_of _ (show b1.val = 0 by omega)
-    have e2 := zero_of _ (show b2.val = 0 by omega)
-    have e3 := zero_of _ (show b3.val = 0 by omega)
-    have e4 := zero_of _ (show b4.val = 0 by omega)
-    have e5 := zero_of _ (show b5.val = 0 by omega)
     have hsig0 : b2 + b3 = 0 := by rw [e2, e3]; simp
     rw [hf0, e1, e2, e3, e4, e5]
     linear_combination bool_eq_one_sub hbr (h_eqbin hsig0) ((hd0 hf0).trans (h_eqf hsig0).symm)
+  · -- BNE (`b1 = 1`): `br = sum-indicator`, `is_signed = 0`.
+    have hsig0 : b2 + b3 = 0 := by rw [e2, e3]; simp
+    rw [e0, hf1, e2, e3, e4, e5]
+    linear_combination bool_eq_of_iff_ne hbr (h_eqbin hsig0)
+      ((hd1 hf1).trans (not_congr (h_eqf hsig0)).symm)
+  · -- BLT (`b2 = 1`): `br = bit`, `is_signed = 1`.
+    have hsig1 : b2 + b3 = 1 := by rw [hf2, e3, add_zero]
+    simp only [eq_true hsig1] at h_bit
+    have hbreq := (bool_eq_ite_of_iff hbr ((hd2 hf2).trans (slt_true_iff _ _))).trans h_bit.symm
+    rw [e0, e1, hf2, e3, e4, e5]
+    linear_combination hbreq
+  · -- BGE (`b3 = 1`): `br = 1 - bit`, `is_signed = 1`.
+    have hsig1 : b2 + b3 = 1 := by rw [e2, hf3, zero_add]
+    simp only [eq_true hsig1] at h_bit
+    rw [e0, e1, e2, hf3, e4, e5]
+    linear_combination bool_eq_one_sub_ite hbr h_bit ((hd3 hf3).trans (slt_false_iff _ _))
+  · -- BLTU (`b4 = 1`): `br = bit`, `is_signed = 0`.
+    have hsigne : ¬ (b2 + b3 = 1) := by rw [e2, e3, add_zero]; exact zero_ne_one'
+    simp only [eq_false hsigne] at h_bit
+    have hiff := (hd4 hf4).trans (ult_true_iff _ _)
+    rw [Word.toBitVec64_toNat hrs1U, Word.toBitVec64_toNat hrs2U] at hiff
+    rw [e0, e1, e2, e3, hf4, e5]
+    linear_combination (bool_eq_ite_of_iff hbr hiff).trans h_bit.symm
+  · -- BGEU (`b5 = 1`): `br = 1 - bit`, `is_signed = 0`.
+    have hsigne : ¬ (b2 + b3 = 1) := by rw [e2, e3, add_zero]; exact zero_ne_one'
+    simp only [eq_false hsigne] at h_bit
+    have hiff := (hd5 hf5).trans (ult_false_iff _ _)
+    rw [Word.toBitVec64_toNat hrs1U, Word.toBitVec64_toNat hrs2U] at hiff
+    rw [e0, e1, e2, e3, e4, hf5]
+    linear_combination bool_eq_one_sub_ite hbr h_bit hiff
 
 end SP1Clean.BranchChip

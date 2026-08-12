@@ -8,7 +8,7 @@ Witness-generation conformance vectors for SP1's `IsZeroOperation`, dumped from 
 imperative code and cannot be symbolically extracted; these vectors instead tie the Lean
 witness function to the Rust source by **conformance** (agreement on the sampled inputs —
 edge cases + a seeded LCG — not an all-inputs proof). Each entry is `(a_field, inverse, result)`. The
-check lives in `SP1Clean/WitnessTests/IsZeroOperationWitness.lean`. Regenerate with
+check lives in `SP1CleanTest/WitnessTests/IsZeroOperationWitness.lean`. Regenerate with
 `SP1_DIR=… python3 update_extracted.py`. -/
 
 namespace SP1Clean.WitnessTests
@@ -16,8 +16,6 @@ open SP1Clean
 
 set_option linter.all false  -- auto-generated: skip linters
 
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 64000 in
 /-- 47 conformance vectors for `IsZeroOperation` (`(a_field, inverse, result)`). -/
 def IsZeroOperationWitnessVectors : List (ℕ × ℕ × ℕ) := [
   (0, 0, 1),

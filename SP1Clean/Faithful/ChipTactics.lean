@@ -6,17 +6,19 @@ import SP1Clean.Faithful.CPUState
 
 /-! # Shared chip-faithfulness scaffolding
 
-Two pieces shared across the per-chip `Faithful/*Chip.lean` anchors:
+Shared across the per-chip `Faithful/*Chip.lean` anchors:
 
-* `val_16` / `bool_iff` — field-arithmetic helpers every operation-level anchor needs.
-* `faithful_chip` — the chip-level proof macro. Every `*cols_constraints_faithful` for the
-  `<op> ++ CPUState ++ <reader>` layout is identical modulo five identifiers; `cpustate_constraints_faithful`
-  is baked in.
+* `val_16` / `bool_iff` — field-arithmetic helpers every operation-level anchor needs;
+* `toAccess_pullIf_byte_forall` — the ∀-form byte-pull `toAccess` kernel the interaction anchors
+  `simp` with;
+* `faithful_chip` — the legacy chip-level proof macro for the old `<op> ++ CPUState ++ <reader>`
+  `*cols_constraints_faithful` layout (`cpustate_constraints_faithful` baked in). Currently it has
+  no invocations — the whole-chip oracle anchors superseded it.
 
-This module lives in `Faithful/` (not `Foundations/`) because the `faithful_chip` macro hard-references
-`SP1Clean.Extracted.forall_append_pair` and `SP1Clean.Faithful.cpustate_constraints_faithful` by
-definition-site resolution — both `import`s above are load-bearing. Establish `NeZero p` in the caller
-before invoking the macro. -/
+This module lives in `Faithful/` (not the foundational `Math/` + `Model/` layer) because the
+`faithful_chip` macro hard-references `SP1Clean.Extracted.forall_append_pair` and
+`SP1Clean.Faithful.cpustate_constraints_faithful` by definition-site resolution — both `import`s
+above are load-bearing. Establish `NeZero p` in the caller before invoking the macro. -/
 
 namespace SP1Clean.Faithful
 
@@ -29,10 +31,27 @@ lemma val_16 [NeZero p] : (16 : ZMod p).val = 16 := val_16_zmod_p
 omit [Fact (2 ^ 17 < p)] in
 /-- Carry-bool bridge: `x*(x-1)=0 ↔ x∈{0,1}` (field; `→` via the `mul_eq_zero`-free
 `bool_of_mul_pred`). -/
-lemma bool_iff {x : ZMod p} : x * (x - 1) = 0 ↔ (x = 0 ∨ x = 1) := by
-  rw [sub_eq_add_neg]
-  exact ⟨SP1Clean.bool_of_mul_pred,
+lemma bool_iff {x : ZMod p} : x * (x - 1) = 0 ↔ (x = 0 ∨ x = 1) :=
+  ⟨SP1Clean.bool_of_mul_pred,
     fun h => by rcases h with h | h <;> rw [h] <;> ring⟩
+
+omit [Fact (2 ^ 17 < p)] in
+open SP1Clean.Channels (byteChannel) in
+/-- **Byte-pull `toAccess` kernel, ∀-form.** The `∀ g s`-quantified spelling of
+`SP1Clean.toAccess_pullIf_byte`: the `toAccess`-image of a gated byte *pull* is the `byteSend`-style
+`LookupAccess`. Every interaction anchor over the Byte bus needs it in exactly this shape as a
+`simp only` rewrite, and thirteen of them wrote the eta-expanded `have hk : ∀ g s, …` block out by
+hand; each becomes `have hk := toAccess_pullIf_byte_forall env`. The two `Faithful/CPUState.lean`
+copies are the exception — this module *imports* that one (`faithful_chip` cites
+`cpustate_constraints_faithful`), so they cannot cite it back. -/
+lemma toAccess_pullIf_byte_forall (env : Environment (ZMod p)) :
+    ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
+      AbstractInteraction.toAccess env ((pulledIf (channel := byteChannel) g s).toRaw) =
+        (InteractionKind.Byte, "SP1Byte",
+          [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
+           (Expression.eval env s.b).val, (Expression.eval env s.c).val],
+          signedVal (Expression.eval env (-g))) :=
+  fun g s => toAccess_pullIf_byte env g s
 
 /-- **Chip-level faithfulness anchor skeleton.** Discharges a `*cols_constraints_faithful` goal whose
 constraint list is `<op-fragment> ++ CPUState ++ <reader> ++ [binary gate, op_a_0 = 0]`.
