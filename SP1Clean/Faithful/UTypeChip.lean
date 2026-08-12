@@ -437,7 +437,7 @@ private theorem uTypeChipConstraintsDecompose
     uTypeNativeWriteMeaning uTypeNativeScalarMeaning
   simp only [nativeAssertZeros, UTypeChip.main,
     Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, subcircuitWithAssertion, assertion,
+    witnessVector, witnessVectorIR, subcircuitWithAssertion, assertion,
     assertZero, HasAssertEq.assert_eq, Expression.assertEquals,
     Operations.localLength]
   simp only [Operations.constraints_append,

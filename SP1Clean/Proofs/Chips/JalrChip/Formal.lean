@@ -313,17 +313,22 @@ theorem completeness :
           Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
           Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]]
           input_adapter_op_c_imm := by
+    rw [← AddOperation.populateIR_eval env input_var_adapter_op_b_memory_prev_value
+      input_var_adapter_op_c_imm _ _ rfl hcimm_eq hrs1U h_imm]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    simp only [he_av ⟨i, hi⟩, hcimm_eq]
+    exact he_av ⟨i, hi⟩
   have hval2 : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + 4 + i}) : Word (ZMod p))
       = AddOperation.populate #v[Expression.eval env.toEnvironment input_var_state_pc[0],
           Expression.eval env.toEnvironment input_var_state_pc[1],
           Expression.eval env.toEnvironment input_var_state_pc[2], 0] #v[4, 0, 0, 0] := by
+    rw [← AddOperation.populateIR_eval env
+      #v[input_var_state_pc[0], input_var_state_pc[1], input_var_state_pc[2], 0]
+      #v[4, 0, 0, 0] _ _ (by simp [circuit_norm]) (by simp [circuit_norm]) (hpceq ▸ h_pcU) h4U]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    rw [he_oav ⟨i, hi⟩]
+    exact he_oav ⟨i, hi⟩
   have hav0 : env.get i₀
       = (AddOperation.populate #v[input_adapter_op_b_memory_prev_value[0],
           input_adapter_op_b_memory_prev_value[1], input_adapter_op_b_memory_prev_value[2],
@@ -341,9 +346,25 @@ theorem completeness :
           #v[4, 0, 0, 0])[3] := by
     have := congrArg (·[3]) hval2
     simpa only [Vector.getElem_map, Vector.getElem_mapRange, hpceq, circuit_norm] using this
+  -- The lsb witness is u64-sorted, so its evaluation carries a `% 2 ^ 64` truncation. Binarity
+  -- survives it untouched; the two places that need the *value* strip it via `hlsb_val` below.
   have hlsb_bin : env.get (i₀ + 4 + 4) = 0 ∨ env.get (i₀ + 4 + 4) = 1 := by
     rw [he_lsb]
-    rcases Nat.mod_two_eq_zero_or_one (env.get i₀).val with h | h <;> rw [h] <;> simp
+    rcases Nat.mod_two_eq_zero_or_one ((env.get i₀).val % 2 ^ 64) with h | h <;> rw [h] <;> simp
+  -- On a real row the add result is a `Word`, so its low limb is far below `2 ^ 64` and the
+  -- truncation is the identity.
+  have hlsb_val : input_is_real = 1 →
+      env.get (i₀ + 4 + 4) = (((env.get i₀).val % 2 : ℕ) : ZMod p) := by
+    intro hr1
+    have hisu : Word.isU64 (AddOperation.populate
+        #v[input_adapter_op_b_memory_prev_value[0], input_adapter_op_b_memory_prev_value[1],
+           input_adapter_op_b_memory_prev_value[2], input_adapter_op_b_memory_prev_value[3]]
+        input_adapter_op_c_imm) :=
+      hrs1eq ▸ (AddOperation.spec_populate hrs1U h_imm input_is_real hr1).1
+    have h0 := (Word.lt_cases_of_isU64 hisu).1
+    rw [he_lsb, hav0]
+    congr 1
+    omega
   have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
@@ -365,7 +386,7 @@ theorem completeness :
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := Nat.cast_ofNat
-    simp only [byteChannel, hav0, he_lsb]
+    simp only [byteChannel, hlsb_val hr1, hav0]
     rw [← c14]
     exact (byteRowSpec_range _ h14p).mpr (h_align_pa hr1)
   · rw [h_op_a_0]
@@ -502,7 +523,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       dsimp only [Operations.RequirementsChannelsLawful]
       refine ⟨?_, ?_, ?_⟩
       · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+          witnessVectorIR, witnessField,
           subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
         simp only [Operations.subcircuitChannelsWithRequirements_append,
@@ -520,7 +541,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         tauto
       · intro channel h_channel
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+          witnessVectorIR, witnessField,
           subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
           Operations.shallowChannels_append, Operations.shallowChannels_witness,
@@ -533,7 +554,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       · intro env h_constraints
         have hshallow := h_constraints
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+          witnessVectorIR, witnessField,
           subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
           ConstraintsHold.Shallow, Operations.forAllNoOffset_append,
@@ -549,7 +570,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         rw [Operations.inChannelsOrRequirements_iff_forall_mem]
         intro interaction h_interaction
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+          witnessVectorIR, witnessField,
           subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
           Operations.shallowInteractions_append, Operations.shallowInteractions_witness,
@@ -581,7 +602,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         List.mem_append, List.mem_singleton] at exposedMem
       rcases exposedMem with (rfl | rfl) | rfl
       · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVectorIR, witnessField, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
           Readers.CPUState.interactionsWith_state_subcircuit,
@@ -605,9 +626,9 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         -- `RegisterWrite` its write push via the reader-local `_subcircuit` lemmas; every other
         -- child is nil.
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVectorIR, witnessField, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
-        simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+        simp only [Operations.interactionsWith_witness,
           Soundness.iTypeReader_memoryInteractions_subcircuit,
           Soundness.registerWrite_memoryInteractions_subcircuit,
           InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
@@ -629,7 +650,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVectorIR, witnessField, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
           InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
@@ -845,7 +866,7 @@ private theorem jalrByteInteractions_exact
       (Gadgets.Equality.circuit field) byteChannel.toRaw n inp ops
       List.not_mem_nil List.not_mem_nil
   simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+    witnessVectorIR, witnessField,
     subcircuitWithAssertion, assertion, assertZero,
     HasAssertEq.assert_eq, Expression.assertEquals,
     Operations.localLength]

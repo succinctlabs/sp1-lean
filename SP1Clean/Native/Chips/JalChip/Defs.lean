@@ -5,6 +5,7 @@ import SP1Clean.Native.Readers.JTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
+import SP1Clean.Native.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -32,15 +33,12 @@ lemma h14p : (14 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 address) via `AddOperation.populate`, then compose as Clean `assertion`s. The `CPUState` reader is fed
 the data-dependent `next_pc = add_operation.value`; the link add's gate is `is_real - op_a_0`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
-  let add_value ← witnessVectorNative 4 (fun env =>
-    AddOperation.populate
-      #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
-      #v[env input.adapter.op_b_imm[0], env input.adapter.op_b_imm[1],
-         env input.adapter.op_b_imm[2], env input.adapter.op_b_imm[3]])
-  let op_a_value ← witnessVectorNative 4 (fun env =>
-    AddOperation.populate
-      #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
-      #v[4, 0, 0, 0])
+  let add_value ← witnessVectorIR 4 (AddOperation.populateIR
+    #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
+    input.adapter.op_b_imm)
+  let op_a_value ← witnessVectorIR 4 (AddOperation.populateIR
+    #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
+    #v[4, 0, 0, 0])
   let pcWordV : Word (Expression (ZMod p)) :=
     #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
   let _ ← Readers.CPUState.circuit

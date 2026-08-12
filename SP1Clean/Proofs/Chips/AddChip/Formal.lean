@@ -195,7 +195,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns where
     · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
       -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
       simp only [main, Circuit.operations, Circuit.bind_def,
-        Circuit.pure_def, witnessIR, subcircuitWithAssertion, assertion, assertZero,
+        Circuit.pure_def, witnessVectorIR, subcircuitWithAssertion, assertion, assertZero,
         HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
       simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
         InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,

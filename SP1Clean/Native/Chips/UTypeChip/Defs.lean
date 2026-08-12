@@ -4,6 +4,7 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.JTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
+import SP1Clean.Native.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -27,17 +28,17 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 `AddOperation` (gate `is_real - op_a_0`), and `JTypeReader`. Pin the addend per-limb with
 `addend[i] = is_auipc * pc[i]` gates. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
-  let addend ← witnessVectorNative 3 (fun env =>
-    #v[env input.is_auipc * env input.state.pc[0],
-       env input.is_auipc * env input.state.pc[1],
-       env input.is_auipc * env input.state.pc[2]])
-  let add_value ← witnessVectorNative 4 (fun env =>
-    AddOperation.populate
-      #v[env input.is_auipc * env input.state.pc[0],
-         env input.is_auipc * env input.state.pc[1],
-         env input.is_auipc * env input.state.pc[2], 0]
-      #v[env input.adapter.op_b_imm[0], env input.adapter.op_b_imm[1],
-         env input.adapter.op_b_imm[2], env input.adapter.op_b_imm[3]])
+  -- The addend is pure field arithmetic over the input row, so it needs no `populate` companion:
+  -- the three products go straight into the witness IR as literal expressions.
+  let addend ← witnessVector 3 (.lit
+    #v[input.is_auipc * input.state.pc[0],
+       input.is_auipc * input.state.pc[1],
+       input.is_auipc * input.state.pc[2]])
+  let add_value ← witnessVectorIR 4 (AddOperation.populateIR
+    #v[input.is_auipc * input.state.pc[0],
+       input.is_auipc * input.state.pc[1],
+       input.is_auipc * input.state.pc[2], 0]
+    input.adapter.op_b_imm)
   let addendV : Word (Expression (ZMod p)) := #v[addend[0], addend[1], addend[2], 0]
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩

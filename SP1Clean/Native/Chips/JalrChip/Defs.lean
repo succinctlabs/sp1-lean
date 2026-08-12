@@ -5,6 +5,7 @@ import SP1Clean.Native.Readers.ITypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
+import SP1Clean.Native.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -51,17 +52,14 @@ def lsbBit (input : Inputs (ZMod p)) : ZMod p :=
 and the `lsb` scalar via `populate`, then compose as Clean `assertion`s. `CPUState` is fed the LSB-cleared
 `next_pc`; the link add's gate is `is_real - op_a_0`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
-  let add_value ← witnessVectorNative 4 (fun env =>
-    AddOperation.populate
-      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
-         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
-      #v[env input.adapter.op_c_imm[0], env input.adapter.op_c_imm[1],
-         env input.adapter.op_c_imm[2], env input.adapter.op_c_imm[3]])
-  let op_a_value ← witnessVectorNative 4 (fun env =>
-    AddOperation.populate
-      #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
-      #v[4, 0, 0, 0])
-  let lsb ← witnessNative (var := Expression) (fun env => (((env add_value[0]).val % 2 : ℕ) : ZMod p))
+  let add_value ← witnessVectorIR 4 (AddOperation.populateIR
+    input.adapter.op_b_memory.prev_value input.adapter.op_c_imm)
+  let op_a_value ← witnessVectorIR 4 (AddOperation.populateIR
+    #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
+    #v[4, 0, 0, 0])
+  -- The one witness here that reads an *earlier witnessed cell* rather than an input column:
+  -- `add_value[0]` sits below this offset, so honest witness generation still sees it.
+  let lsb ← witnessField ((add_value[0].val % 2).toField)
   let rs1WordV : Word (Expression (ZMod p)) :=
     #v[input.adapter.op_b_memory.prev_value[0], input.adapter.op_b_memory.prev_value[1],
        input.adapter.op_b_memory.prev_value[2], input.adapter.op_b_memory.prev_value[3]]

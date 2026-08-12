@@ -369,7 +369,7 @@ private theorem nativeConstraintsDecompose
     nativeLinkAddMeaning nativeJTypeMeaning nativeWriteMeaning
   simp only [nativeAssertZeros, JalChip.main,
     Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, subcircuitWithAssertion, assertion,
+    witnessVectorIR, subcircuitWithAssertion, assertion,
     assertZero, HasAssertEq.assert_eq, Expression.assertEquals,
     Channel.pullIf, Operations.localLength]
   simp only [Operations.constraints_append,

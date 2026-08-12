@@ -84,16 +84,15 @@ theorem completeness :
         (Vector.mapRange 2 fun i => var { index := i₀ + i }) : Vector (ZMod p) 2)
       = AddwOperation.addwValueWitness input_adapter_op_b_memory_prev_value
           input_adapter_op_c_memory_prev_value := by
+    rw [← AddwOperation.valueIR_eval env _ _ _ _ hbeq hceq ha hb]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    rw [h_env_val ⟨i, hi⟩]
-    simp only [Inputs.op_b_val, Inputs.op_c_val]
-    simp only [hbeq, hceq]
+    exact h_env_val ⟨i, hi⟩
   have hmsbeq : env.get (i₀ + 2) = AddwOperation.addwMsbWitness input_adapter_op_b_memory_prev_value
       input_adapter_op_c_memory_prev_value := by
-    rw [h_env_msb]
-    simp only [Inputs.op_b_val, Inputs.op_c_val]
-    rw [hbeq, hceq]
+    rw [h_env_msb ⟨0, by omega⟩,
+      AddwOperation.msbIR_eval env _ _ _ _ hbeq hceq ha hb]
+    rfl
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨ha, hb, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin, h_clk⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
@@ -229,7 +228,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def,
-          Circuit.pure_def, witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          Circuit.pure_def, witnessVectorIR, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
           InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
