@@ -233,8 +233,8 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The audit regenerates the declaration list and raw `#print axioms` census — currently 521 probed
-declarations, split 466 (main `SP1Clean` library) plus 55 (`SP1CleanTest` anchors) — and compares it
+The audit regenerates the declaration list and raw `#print axioms` census — currently 524 probed
+declarations, split 466 (main `SP1Clean` library) plus 58 (`SP1CleanTest` anchors) — and compares it
 against the committed snapshot (drift fails; `--update` rewrites deliberately). It also cross-checks
 every recorded pin and doc-cited count against the build graph.
 

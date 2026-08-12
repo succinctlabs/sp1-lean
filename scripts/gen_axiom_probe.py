@@ -12,8 +12,8 @@ oleans its build target produces (the CI `audit` job builds only `SP1Clean`; the
 job additionally builds `SP1CleanTest` via `lake test`):
 
 - `scripts/axiom_probe.lean` — the main library (`import SP1Clean` only);
-- `scripts/axiom_probe_test.lean` — the `SP1CleanTest` conformance anchors (the
-  native_decide quarantine), importing each test module explicitly.
+- `scripts/axiom_probe_test.lean` — the `SP1CleanTest` conformance and executable
+  audit anchors (the native_decide quarantine), importing each test module explicitly.
 
 Usage: `python3 scripts/gen_axiom_probe.py` (from the repo root); then
 `lake env lean scripts/axiom_probe.lean` / `... scripts/axiom_probe_test.lean`
@@ -64,6 +64,11 @@ TARGETS = [
     # companions + the nonempty-assert-list guard) is census-visible so its native_decide trust is
     # disclosed per-declaration like the conformance anchors.
     ("SP1CleanTest/NonVacuityReal.lean", r"theorem\s+(\w+)\b"),
+    # The independent-audit joint-premise regression freezes both the full native constraint
+    # check and the exact evaluated bus footprint. Keep its native_decide trust visible alongside
+    # the older conformance and per-row satisfiability batteries.
+    ("SP1CleanTest/Audit/*.lean",
+     r"theorem\s+(constraints_hold|interactions_exact|program_projection)\b"),
     # The abstract walk/trail core (relocated from GatedVm/Chain.lean; live — used by AIR +
     # RankedGrounding).
     ("SP1Clean/Soundness/Walk.lean", r"theorem\s+(exists_trail)\b"),

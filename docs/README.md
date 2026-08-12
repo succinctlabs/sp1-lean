@@ -12,6 +12,7 @@ Each document has **one role**, so none needs to repeat another:
 | [`overview.md`](overview.md) | ten-minute technical orientation — states, never argues |
 | [`verification-report.md`](verification-report.md) | the long-form external report — argues and evidences each claim |
 | [`release-audit.md`](release-audit.md) | machine-adjacent audit record: pins, gates, census |
+| [`audits/2026-08-independent-semantic-audit.md`](audits/2026-08-independent-semantic-audit.md) | point-in-time independent second opinion on semantic foundations and ArkLib/VCVio readiness |
 | [`architecture.md`](architecture.md) | module/pillar ownership, design rules, deliberate exceptions |
 | [`roadmap.md`](roadmap.md) | dependency-ordered future work + non-blocking backlog |
 | [`goal-overview.md`](goal-overview.md) | the completed-state contract (never current status) |
@@ -41,9 +42,11 @@ Each document has **one role**, so none needs to repeat another:
    decode, ranked/timed grounding, and theorem layering.
 4. [`release-audit.md`](release-audit.md) — machine-derived pins, trust boundary, direct-deferral inventory,
    and `#print axioms` census.
-5. [`roadmap.md`](roadmap.md) — dependency-ordered work toward native AIR, full upstream AIR, execution, and
+5. [`audits/2026-08-independent-semantic-audit.md`](audits/2026-08-independent-semantic-audit.md) —
+   independent review of semantic boundaries, joint non-vacuity, and verifier-integration readiness.
+6. [`roadmap.md`](roadmap.md) — dependency-ordered work toward native AIR, full upstream AIR, execution, and
    verifier soundness.
-6. [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) — compact current checkpoint
+7. [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) — compact current checkpoint
    board for the architecture-consolidation work.
 
 ## Current reader-facing docs
@@ -55,6 +58,8 @@ Each document has **one role**, so none needs to repeat another:
 - [`architecture.md`](architecture.md) — detailed architecture and migration status.
 - [`release-audit.md`](release-audit.md) — authoritative current proof and trust audit. Regenerate its raw
   census with `scripts/run_audit.sh` before citing numbers.
+- [`audits/2026-08-independent-semantic-audit.md`](audits/2026-08-independent-semantic-audit.md) — a
+  point-in-time second opinion; its findings refine the roadmap but do not override current theorem types.
 - [`roadmap.md`](roadmap.md) — live dependency graph from exact system-table grounding through ArkLib
   integration and witness-generation completeness.
 - [`chip-standardization.md`](chip-standardization.md) — the completed 25/25 `ChipKind.advance` interface

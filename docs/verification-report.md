@@ -626,7 +626,9 @@ discloses which of these each headline declaration actually touches.
   derived from the exact upstream system tables (the `executionCase` obligation); the bundle
   also carries program/platform contracts (`SailConfigured`, `SailCodeMemoryCompatible`,
   program well-formedness) that remain application-level premises, like C-class items — no
-  system-table derivation discharges them.
+  system-table derivation discharges them. A future unqualified exact-AIR theorem must keep those
+  contracts visible as named parameters or a source-relation restriction; packaging their proofs
+  inside `CoreAIRRefinementObligations` does not make them AIR consequences.
 - **M2 — The memory-timestamp range bound.** Pulled high timestamps < 2^24
   (`SupportedCoreMemoryTimestampRangeRelation`) — prevents wrap at the characteristic; to be
   derived from the upstream range constraints in the same obligation closure.
@@ -741,7 +743,8 @@ Stated plainly:
    closure, the substantive open mathematical obligation of the AIR layer (the bundle's
    remaining fields are smaller but equally undischarged, §8.3). M1 additionally carries
    program/platform contracts (`SailConfigured`, `SailCodeMemoryCompatible`,
-   program well-formedness) that are application-level premises no system table will discharge.
+   program well-formedness) that are application-level premises no system table will discharge;
+   they must remain explicit in the final public theorem type.
 3. **No cryptographic claim.** Nothing here says anything about STARK soundness, FRI, LogUp/GKR,
    or Fiat–Shamir. The planned final form is probabilistic and lives in the ArkLib/VCVio
    integration: an executable `verifyCore` agreeing with the pinned Rust verifier, ArkLib
