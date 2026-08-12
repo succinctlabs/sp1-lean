@@ -83,6 +83,23 @@ theorem populateIR_eval (env : ProverEnvironment (ZMod p))
     hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
     hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega)]
 
+omit [Fact (2 ^ 17 < p)] in
+/-- Environment-locality of the witness IR: it reads the environment only through the operand
+expressions, so two environments agreeing there produce the same witnesses. This is the
+`ComputableWitnesses` counterpart of the semantic `populateIR_eval` (and needs no bounds — it is a
+congruence, not an evaluation). -/
+theorem populateIR_congr (env env' : ProverEnvironment (ZMod p))
+    (a b : Word (Expression (ZMod p)))
+    (hA : ∀ (i : ℕ) (_ : i < 4),
+      Expression.eval env.toEnvironment a[i] = Expression.eval env'.toEnvironment a[i])
+    (hB : ∀ (i : ℕ) (_ : i < 4),
+      Expression.eval env.toEnvironment b[i] = Expression.eval env'.toEnvironment b[i]) :
+    (populateIR a b).eval env = (populateIR a b).eval env' := by
+  simp [populateIR, populateProgram, circuit_norm,
+    Witgen.WitgenIR.eval, Witgen.evalSteps, Witgen.VExpr.eval,
+    hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
+    hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega)]
+
 /-- `populate a b` satisfies the gadget `Spec` for any `is_real` (the conclusion is `is_real = 1`-gated,
 so it holds unconditionally). The composing chip uses this to discharge its assertion obligation. -/
 theorem spec_populate {a b : Word (ZMod p)} (ha : a.isU64) (hb : b.isU64) (is_real : ZMod p) :

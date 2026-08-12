@@ -1,6 +1,8 @@
 import SP1Clean.Proofs.Chips.AddChip.Bridge
 import SP1Clean.Native.Chips.AddChip.Defs
 import SP1Clean.Proofs.Chips.AddChip.Formal
+import SP1Clean.Proofs.Chips.AddChip.Witgen
+import SP1Clean.Proofs.WitgenBridge
 import SP1Clean.Native.Chips.AddiChip.Defs
 import SP1Clean.Proofs.Chips.AddiChip.Formal
 import SP1Clean.Proofs.Chips.AddiChip.Bridge
