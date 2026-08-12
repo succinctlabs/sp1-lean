@@ -139,6 +139,11 @@ echo "the sole sanctioned native_decide; trusts the compiler via generated ._nat
 grep -rn 'native_decide' SP1CleanTest --include='*.lean' | wc -l
 
 echo
+echo "== A2 witness-generation escape-hatch census (report-only during the witgen cutover) =="
+# Flip to `--enforce` at cutover completion (wave W7) — then a hit fails the audit.
+scripts/check_no_witness_native.sh | tail -1
+
+echo
 echo "== A2 elaboration-budget escape-hatch gate (allowlist, not a budget) =="
 if scripts/check_option_escapes.sh; then
   echo "PASS: every maxHeartbeats/maxRecDepth site is allowlisted with a measured ladder"
