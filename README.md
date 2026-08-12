@@ -109,7 +109,7 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The audit regenerates a 521-declaration `#print axioms` census and checks source deferrals, project
+The audit regenerates a 524-declaration `#print axioms` census and checks source deferrals, project
 axioms, forbidden kernel bypasses, main-library `native_decide`, and performance-budget drift.
 Sail-model platform hooks, selected generated `bv_decide` proof constants, and the trusted extraction
 toolchain are disclosed in the report.

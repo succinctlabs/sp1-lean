@@ -8,7 +8,8 @@ execution witness.  Keeping both witnesses explicit avoids conflating an AIR the
 proof-system verifier theorem.
 
 Part of this API is written for the ArkLib verifier layer rather than for in-tree consumers:
-the composition lemmas (`Sound.trans`, `FunctionalRefinement.trans`), the language algebra
+the composition lemmas (`Sound.trans`, `FunctionalRefinement.trans`), the functional target
+preimage, the language algebra
 (`Sound.language_subset`, `Complete.language_subset`, `Correct.language_eq`,
 `language_eq_fst_image`), and the choice-based `Sound.extract`/`Sound.extract_valid` are
 deliberately declared ahead of that integration (`docs/roadmap.md`), so a reference census
@@ -72,6 +73,31 @@ theorem FunctionalRefinement.sound {Public : Type u} {AIRWitness : Type v}
     (refinement : FunctionalRefinement air execution) : Sound air execution :=
   fun statement airWitness valid =>
     ⟨refinement.map statement airWitness, refinement.map_valid statement airWitness valid⟩
+
+/-- Pull the semantic target relation back along a constructive refinement map, while retaining the
+original AIR-witness type.
+
+This is the correct relation shape for ArkLib's current straight-line knowledge-soundness API. That
+API uses its input-witness type both for the extractor result and for the malicious prover's private
+input, so changing the witness type is not mere post-composition. Widening the AIR relation to this
+preimage leaves the knowledge game and extractor type unchanged; the extracted AIR witness can then
+be mapped deterministically to the semantic witness. -/
+def FunctionalRefinement.targetPreimage {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} {air : Relation Public AIRWitness}
+    {execution : Relation Public ExecutionWitness}
+    (refinement : FunctionalRefinement air execution) : Relation Public AIRWitness :=
+  fun statement airWitness =>
+    execution statement (refinement.map statement airWitness)
+
+/-- Every source-valid AIR witness belongs to the semantic target's preimage. This is the exact set
+inclusion consumed by ArkLib's relation-monotonicity adapter, with no change to the knowledge error. -/
+theorem FunctionalRefinement.source_subset_targetPreimage
+    {Public : Type u} {AIRWitness : Type v} {ExecutionWitness : Type w}
+    {air : Relation Public AIRWitness} {execution : Relation Public ExecutionWitness}
+    (refinement : FunctionalRefinement air execution) :
+    asSet air ⊆ asSet refinement.targetPreimage :=
+  fun ⟨statement, airWitness⟩ valid =>
+    refinement.map_valid statement airWitness valid
 
 /-- Constructive refinements compose without introducing a choice axiom. -/
 def FunctionalRefinement.trans {Public : Type u} {Witness₁ : Type v} {Witness₂ : Type w}

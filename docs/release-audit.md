@@ -180,8 +180,8 @@ stream.
 - a zero-tolerance project-axiom scan;
 - `skipKernelTC` and main-library `native_decide` guards;
 - an elaboration-budget escape-hatch prohibition (allowlist-gated); and
-- a generated `#print axioms` census over the released theorem surface — currently 521 probed
-  declarations, split 466 (main library) plus 55 (test anchors) — split by library and
+- a generated `#print axioms` census over the released theorem surface — currently 524 probed
+  declarations, split 466 (main library) plus 58 (test anchors) — split by library and
   diffed against the committed `docs/snapshots/axiom-census.txt` (main) and
   `docs/snapshots/axiom-census-test.txt` (test anchors) — drift fails; only `--update` rewrites
   the snapshots, so a passing run leaves the tree clean.
@@ -207,9 +207,10 @@ theorem whose target is the complete generated interpreter inherits dependencies
 its reduction lemmas. The raw census discloses this boundary instead of describing the headline theorem
 as depending only on three logical axioms.
 
-There are 86 textual `native_decide` occurrences in the test library (the conformance batteries,
-the `NonVacuity.lean` chip-assumptions witnesses, and the `NonVacuityReal.lean` real-row
-satisfiability battery) and none in the main library.
+There are 88 textual `native_decide` occurrences in the test library (the conformance batteries,
+the `NonVacuity.lean` chip-assumptions witnesses, the `NonVacuityReal.lean` real-row
+satisfiability battery, and the independent-audit joint-premise regression) and none in the main
+library.
 They check witness and complete-trace conformance and are not imported by the soundness theorem.
 
 ## Trusted or externally assumed components

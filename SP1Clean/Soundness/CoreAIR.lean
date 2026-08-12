@@ -16,6 +16,11 @@ The decoder is a total function of the statement and AIR witness, so the eventua
 used directly as ArkLib's post-extraction map.  AIR validity authenticates already-decoded data; it
 does not choose it.
 
+This bundle is a composition record, not evidence that every field is an AIR consequence. A future
+closed constructor must keep application-level loader/platform/handler contracts as explicit public
+parameters or source restrictions; only the system-table facts should be advertised as derived from
+`CoreAIR.Current.Relation`.
+
 The shard theorem proves only forward AIR facts: every COMMIT row that exists has the correct
 digest operand and sets the corresponding rolling flag.  Exact public-value transition laws record
 how a set flag freezes the digest in later shards.  Complete eight-row coverage is still a separate

@@ -100,7 +100,10 @@ operand of a row that exists.
 ### 4. Construct the exact refinement bundle
 
 Instantiate every field of `CoreAIRRefinementObligations` from the preceding theorems and narrowly
-stated external contracts. Then publish:
+stated external contracts. Keep those two sources visibly separate: AIR-derived table facts belong in
+the exact refinement, while loader/platform/handler/code-memory contracts must remain an explicit
+public theorem parameter or source-relation restriction. They must not disappear inside an
+unqualified “AIR-only” bundle. Then publish:
 
 ```lean
 sp1_air_refinement
