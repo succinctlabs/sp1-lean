@@ -130,8 +130,9 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
     -- `programChannel` dropped (W11 flip — now pulled via `RTypeReader`, a guarantee not a requirement).
     channelsWithRequirements :=
       [stateChannel.toRaw, memoryChannel.toRaw],
-    -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8) so the
-    -- chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone State pull+push.
+    -- A2: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8) as
+    -- chip-owned interactions (the Clean `VmTables` re-base that motivated the shape was investigated
+    -- and deferred — roadmap W11); descends to the composed `CPUState` subcircuit's lone State pull+push.
     exposedChannels := fun input offset =>
       expose stateChannel
         [ stateChannel.pulledIf input.is_real

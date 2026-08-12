@@ -173,15 +173,16 @@ def targetObligations_of_decode (prog : GuestProgram) (pi : SP1TargetPublicIO (Z
   halt_nonempty := h_halt_nonempty
   halt := h_halt
 
-/-! ## W3-A end-to-end: `decodedInROM` for a concrete instruction, via the real Sail decoder
+/-! ## W3-A end-to-end: the concrete-instruction decode witness (proof retired)
 
-The decode chain closed against the official decoder: a one-instruction guest program (ADD at pc 0),
-the committed Program-bus row it decodes to, and a proof that `decodedInROM` holds — composing
-`SailDecode.decode_ADD_example` (the `ext_decode` reduction) with `instrToProgramRow_rtype` (the
-projection to committed columns). The `SailConfigured s` precondition of `decodedInROM` supplies exactly
-the `isInitialized` + machine-mode residue the decode reduction consumes. This is the per-concrete-word
-shape `decode_bound_of_balance` consumes (`∀ row ∈ rom, decodedInROM prog row`) — for a fixed program
-each row is discharged this way. -/
+A one-instruction guest program (ADD at pc `0x10000`) and the committed Program-bus row it decodes
+to. The end-to-end `decodedInROM` proof for this pair (`decodedInROM_addRow`, composing
+`SailDecode.decode_ADD_example` — the `ext_decode` reduction — with `instrToProgramRow_rtype`) was
+**removed in the 4.32.2 / Sail-v5 migration**; see the retirement notes below and in
+`Model/SailDecode.lean`. The data definitions (`addProgram`/`addRow`) are retained but currently
+have no in-tree consumers (their sole consumer was the removed proof): they exhibit the
+per-concrete-word shape `decode_bound_of_balance` consumes (`∀ row ∈ rom, decodedInROM prog row`),
+and a future per-opcode example can be rebuilt on them. -/
 
 /-- A one-instruction guest program: `ADD x1, x2, x3` (`0x003100B3`) at pc `0x10000` — the base of the SP1
 code window `[2^16, 2^48)`, so it satisfies `rom_in_window`; the word's low two bits are `0b11`

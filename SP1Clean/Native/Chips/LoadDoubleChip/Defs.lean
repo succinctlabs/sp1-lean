@@ -113,14 +113,14 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   channelsLawful := by
     simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit,
       Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit]
-  -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks are threaded
+  -- only the `AddressOperation` subcircuit witnesses (its 4 cells); the other blocks are threaded
   -- inputs and the gates witness nothing.
   localLength _ := 3 + 1
   output input i0 :=
     ⟨input.state, input.adapter,
       ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
       input.memory_access, input.is_real⟩
-  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip);
+  -- `programChannel` joins the structural `RowSpec` propagated from `ITypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `MemoryAccess`'s read pulls + `RegisterWrite`'s op_a write push (W11 memory flip).
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 

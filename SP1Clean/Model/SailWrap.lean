@@ -497,7 +497,7 @@ end RTYPEW
 
 section jump
 
-/-- In sail-v4, `jump_to target` runs:
+/-- In the pinned generated Sail model, `jump_to target` runs:
   1. an extension hook `ext_control_check_pc target` (constant `none`),
   2. an `assert` that `target` bit 0 is `0`,
   3. an `if (bit_to_bool (target bit 1)) && (not (← currentlyEnabled Ext_Zca))` guard, else

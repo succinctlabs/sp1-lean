@@ -79,8 +79,8 @@ Gating is **multiplicity-gated** (`Channel.pullIf`, mult `-is_real`), faithful t
 `send_byte(op, value, w, 0, is_real)`: the value is passed **raw** (no `is_real * value` fold) and padding
 (`mult = 0`) drops out of the LogUp sum entirely (`mult / fingerprint(values)` with `mult = 0`), owing
 nothing — post-#398 a receive owes no `Requirements` at all (`docs/bus-model.md` §7). The provider side is
-`Chips/ByteChip.lean` (pushes the table, proves each row); until it lands the pull's justification is
-threaded as `Soundness/ByteConsistency.lean`'s `TraceByteLink`. Pulled by
+`Proofs/Chips/ByteChip/` (pushes the table, proves each row); with it landed, the pull's justification
+is discharged from bus balance (`Soundness/ByteConsistency.lean`'s `byteAccessValid_of_balance`). Pulled by
 `Readers/{CPUState,RegisterAccessTimestamp,RegisterAccessCols,RTypeReader}.lean`. -/
 def byteChannel : Channel (ZMod p) ByteRow where
   name := "SP1Byte"

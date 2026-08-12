@@ -85,10 +85,10 @@ theorem traceProgramLink_of_validRom_and_balance
   programConsistent_of_balance rows (romContributions rom mult) ProgramRowSpec
     (programProvider_of_validRom rom mult h_valid) h_bal
 
-/-! ## A worked instance — a two-row ROM, end-to-end
+/-! ## A worked instance — a one-row ROM, end-to-end
 
-A concrete program ROM with two validly-decoded rows; `programProvider_of_validRom` turns it into a
-`ProgramProvider` with zero side conditions beyond the two rows' `ProgramRowSpec`s, demonstrating the
+A concrete program ROM with one validly-decoded row; `programProvider_of_validRom` turns it into a
+`ProgramProvider` with zero side conditions beyond the row's `ProgramRowSpec`, demonstrating the
 construction is inhabited (not vacuous). -/
 
 /-- A validly-decoded R-type ROM row `add x1, x2, x3` at pc 0: indices `< 32`, pc limbs `< 2^16`,

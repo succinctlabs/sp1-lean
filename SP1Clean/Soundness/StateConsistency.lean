@@ -21,9 +21,9 @@ advances by the row's `clk_inc` — 8 for every current chip).
 
 `pcChainProp`, the projections, the aggregator, `aggregateStateAccesses_pcChain`, and the padding-row
 gating witness `stateLookups_padding` are proven. The link
-**multiset-balance ⟹ `pcChainProp`** needs whole-trace clock-injectivity reasoning and is threaded as
-`TraceStateLink`: an honest assumption, not a `sorry`/axiom; deriving it natively is the marked next
-step. -/
+**multiset-balance ⟹ `pcChainProp`** is likewise proven: `pcChain_of_balance_and_clkInj` below
+discharges the named `TraceStateLink` interface predicate from the balanced State bus + clock
+injectivity + the clock-advance side condition — it is no longer a threaded assumption. -/
 
 namespace SP1Clean.Soundness
 

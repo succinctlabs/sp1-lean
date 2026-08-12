@@ -28,8 +28,8 @@ constrains is a field of the input `cols` — so its `localLength` is `0`. It ca
   The word-gated `remainder[1]`/`quotient[1]` pulls belong to the two corresponding
   `U16MSBOperation` subcircuits in `DivRemCompare`; they are not duplicated here.
 
-The emission order and every argument are verbatim from `Proofs/Chips/DivRemChip/Defs.lean` `main`
-(lines 258–282, 406–456), with each witnessed local replaced by the corresponding `DivRemChip.Columns`
+The emission order and every argument are verbatim from the corresponding emission blocks of
+`Proofs/Chips/DivRemChip/Defs.lean` `main`, with each witnessed local replaced by the corresponding `DivRemChip.Columns`
 field per the chip's cols assembly. The semantic contract is `DivRemCore.CoreSpec`
 (`FormalModel/Contracts/DivRem.lean`); the `FormalAssertion` bundle is
 `Proofs/Operations/DivRemOperation/Core.lean`. -/

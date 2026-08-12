@@ -12,7 +12,7 @@ import Clean.Air.FlatEnsemble
 
 /-! # The supported native SP1 machine as a plain Clean `Ensemble`
 
-This module packages the 25 supported instruction tables and 11 native provider/boundary tables over
+This module packages the 25 supported instruction tables and 13 native provider/boundary tables over
 the four SP1 buses, together with the pull-final/push-init State verifier. It also proves the
 physical-table alignment and typed-interaction partition used by the timed grounding capstone in
 `Soundness/AIR.lean`.
@@ -156,20 +156,20 @@ def sp1Tables : List (Component (ZMod p)) :=
 come from the same entries, so semantic and circuit wiring cannot drift as independent lists. -/
 theorem sp1Tables_length : (sp1Tables (p := p)).length = 25 := rfl
 
-/-- The 11 in-circuit boundary/provider tables: the 8 byte providers (the five `ByteChip` opcode
-tables + the three range tables), the program-ROM provider, and the two memory boundary tables
+/-- The 13 in-circuit boundary/provider tables: the 10 byte providers (the six `ByteChip` opcode
+tables + the four range tables), the program-ROM provider, and the two memory boundary tables
 (init-push + finalize-pull, W11 Phase 4). Every one proves its pushes' channel `Guarantees`
 in-circuit (`channelsWithGuarantees = []` for the pushers — providers assume nothing), which is what
 grounds the chips' byte/program/memory pulls at the capstone. -/
 def sp1ProviderTables : List (Component (ZMod p)) :=
   [⟨ByteChip.U8Range.circuit⟩, ⟨ByteChip.MSB.circuit⟩, ⟨ByteChip.AndByte.circuit⟩,
-   ⟨ByteChip.OrByte.circuit⟩, ⟨ByteChip.XorByte.circuit⟩,
-   ⟨RangeChip.circuit8⟩, ⟨RangeChip.circuit13⟩, ⟨RangeChip.circuit16⟩,
+   ⟨ByteChip.OrByte.circuit⟩, ⟨ByteChip.XorByte.circuit⟩, ⟨ByteChip.Ltu.circuit⟩,
+   ⟨RangeChip.circuit8⟩, ⟨RangeChip.circuit13⟩, ⟨RangeChip.circuit14⟩, ⟨RangeChip.circuit16⟩,
    ⟨ProgramProviderChip.circuit⟩,
    ⟨MemoryProviderChip.circuit⟩, ⟨MemoryFinalizeChip.circuit⟩]
 
-/-- Regression guard: the boundary/provider table count (8 byte + program + 2 memory). -/
-theorem sp1ProviderTables_length : (sp1ProviderTables (p := p)).length = 11 := rfl
+/-- Regression guard: the boundary/provider table count (10 byte + program + 2 memory). -/
+theorem sp1ProviderTables_length : (sp1ProviderTables (p := p)).length = 13 := rfl
 
 /-- Boundary/provider circuits do not declare the State channel.  The public State verifier is the
 sole non-instruction contributor to that channel. -/
@@ -180,12 +180,13 @@ theorem sp1ProviderTables_stateChannel_not_mem :
   fin_cases componentMem <;>
     simp [GeneralFormalCircuit.channels, ByteChip.U8Range.circuit, ByteChip.MSB.circuit,
       ByteChip.AndByte.circuit, ByteChip.OrByte.circuit, ByteChip.XorByte.circuit,
-      RangeChip.circuit8, RangeChip.circuit13, RangeChip.circuit16,
+      ByteChip.Ltu.circuit,
+      RangeChip.circuit8, RangeChip.circuit13, RangeChip.circuit14, RangeChip.circuit16,
       RangeChip.circuit,
       ProgramProviderChip.circuit, MemoryProviderChip.circuit, MemoryFinalizeChip.circuit,
       circuit_norm]
 
-/-- **The SP1 machine as a plain Clean `Ensemble`**: the 25 chips + the 11 boundary/provider tables,
+/-- **The SP1 machine as a plain Clean `Ensemble`**: the 25 chips + the 13 boundary/provider tables,
 the four gated buses (State first — the trail's main channel), and the pull-final/push-init boundary
 verifier. Its `Statement` (per-table constraints + per-channel balance) is everything the capstone
 consumes; the per-channel soundness facts are proven separately (see the module doc). -/
@@ -218,7 +219,7 @@ theorem witness_instructionTables_aligned
       (witness.tables.take 25) := by
   unfold InstructionTablesAligned
   rw [List.forall₂_iff_get]
-  have tablesLength : witness.tables.length = 36 := by
+  have tablesLength : witness.tables.length = 38 := by
     rw [← witness.same_length]
     rfl
   constructor
@@ -248,7 +249,7 @@ theorem witness_instructionTables_aligned
 
 /-- Every canonical decoded instruction row satisfies the constraints of its exact physical Clean
 table row.  This is the common starting point for row-local AIR facts; downstream proofs never need
-to reopen `same_circuits` or reason positionally about the 36-table witness again. -/
+to reopen `same_circuits` or reason positionally about the 38-table witness again. -/
 theorem decodedInstructionRow_constraints
     (witness : EnsembleWitness (sp1Ensemble (p := p)))
     (constraints : witness.Constraints) (decoded : DecodedInstructionRow p)
@@ -262,7 +263,7 @@ theorem decodedInstructionRow_constraints
       (witness.mem_allTables_of_mem_tables (List.mem_of_mem_take tableMem))
   · exact decodedMem
 
-/-- Every physical table after the stable 25-chip prefix is one of the eleven declared provider or
+/-- Every physical table after the stable 25-chip prefix is one of the thirteen declared provider or
 boundary components. -/
 theorem witness_providerTable_component_mem
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
@@ -285,7 +286,7 @@ theorem decodedWitnessInstructionInteractionsWith_eq_tables
     (witness_instructionTables_aligned witness)
 
 /-- Exact typed partition of the ensemble interaction list into verifier boundary, decoded
-instruction rows, and the eleven provider/boundary tables. -/
+instruction rows, and the thirteen provider/boundary tables. -/
 theorem typedEnsembleInteractionsWith_partition
     {Message : TypeMap} [ProvableType Message]
     (witness : EnsembleWitness (sp1Ensemble (p := p)))
@@ -311,9 +312,10 @@ theorem typedInteractions_balanced
   exact balanced channel.toRaw channelMem
 
 /-- **The balanced State-trail intermediate spec.** Over the public initial/final state, there is a heterogeneous trace
-whose every real row reaches its RISC-V Sail spec and whose `current → next` transitions compose into a
-valid execution trail from the public `pc_start` to the public `next_pc` — i.e. a `GatedExecution`
-between the public endpoints. -/
+whose `current → next` transitions compose into a
+valid execution trail from the public `pc_start` to the public `next_pc` — i.e. a (trail-only)
+`GatedExecution` between the public endpoints. (The former "every real row reaches its Sail spec"
+conjunct was retired with the `GatedExecution` trail-only cutover.) -/
 def balancedStateTrailSpec : SP1PublicIO (ZMod p) → Prop := fun pi =>
   ∃ rows : List (ChipRow p), GatedExecution rows (initEntryOf pi) (finalEntryOf pi)
 
@@ -327,7 +329,7 @@ statement; its semantic contents belong to the stronger witness relations in `So
 /-- Facts needed to adapt a deterministically decoded witness to the frozen Eulerian trail:
 
 * `rows`/`data` — the heterogeneous trace decoded from the witness's 25 **chip** tables
-  (`same_circuits` + `valueFromOffset`) and the shared prover data; the 11 boundary/provider tables
+  (`same_circuits` + `valueFromOffset`) and the shared prover data; the 13 boundary/provider tables
   (`sp1ProviderTables`) decode to no `ChipRow` and emit no State interactions;
 * `spec_holds` — every decoded row satisfies its semantic chip contract;
 * `is_real_binary` — binary gating, from each chip's `is_real · (is_real − 1) = 0` constraint;

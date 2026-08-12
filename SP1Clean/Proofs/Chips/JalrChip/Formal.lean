@@ -181,7 +181,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
-  refine ⟨⟨h_it, h_bin, h_lsb, ?_, ?_, ?_, ?_⟩,
+  refine ⟨⟨h_it, h_bin, ?_, ?_, ?_, ?_⟩,
     Or.inr ⟨h_bin, h_bin, h_clk⟩,
     Or.inr ⟨h_bin, ?_, h_clk.at_four⟩,
     fun h1 h0 => off_gate_vacuous h_bin h1 h0⟩
@@ -563,8 +563,9 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         intro h1 h0
         simp only [circuit_norm] at h1 h0
         exact off_gate_vacuous h_bool' h1 h0,
-    -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair so the chip is a
-    -- `VmTables` table. `next_pc` is the **witnessed** LSB-cleared jump target the chip feeds `CPUState`:
+    -- W11: expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair as chip-owned
+    -- interactions (the Clean `VmTables` re-base that motivated the shape was investigated and deferred
+    -- — roadmap W11). `next_pc` is the **witnessed** LSB-cleared jump target the chip feeds `CPUState`:
     -- low limb `add_value[0] - lsb` (cells `offset+0` minus `offset+8`), high limbs `add_value[1..2]`.
     exposedChannels := fun input offset =>
       expose stateChannel (exposedStateInteractions input offset) ++

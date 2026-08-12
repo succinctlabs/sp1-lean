@@ -181,47 +181,33 @@ theorem run_hart_active_eq_of_ready (s : SailState) (w : BitVec 32) (I : instruc
   refine congrArg (EStateM.run · s) (bind_congr fun _ => bind_congr fun _ => bind_congr fun a => ?_)
   cases a <;> simp only [run_SailME_liftM_bind, run_SailME_pure, pure_bind, bind_assoc]
 
-/-! ## Remaining ladder (the composition + the two substantive stages)
+/-! ## The rest of the ladder (all landed in this file; composed in `Proofs/Sail/Advance.lean`)
 
-Stage 3 (`run_hart_active_eq_of_ready`, above) is **landed** — the reduction of `run_hart_active` to the
+Stage 3 (`run_hart_active_eq_of_ready`, above) reduces `run_hart_active` to the
 execute stage `writeReg nextPC (PC+4); execute I; Step_Execute (…)`, threading all five
 `StraightLineReady` fields (`priv`/`no_interrupt`/`fetched`/`no_landing_pad`/`init`) + `hdec` for
-`ext_decode w = I`, is axiom-clean (only the accepted Sail platform trust base). The rest of
-`tryStep_eq_of_ready` (the ADD-family `try_step 0 false → spec_add`-shaped reduction) still needs:
+`ext_decode w = I`, axiom-clean (only the accepted Sail platform trust base). The remaining stages
+also landed below:
 
-- **Stage 4 — the `try_step` wrapper** (`Step.lean:400`): compose Stage 3 with the outer frame —
-  `ext_pre_step_hook` (no-op, `@[simp]` above); the `minstret_increment := should_inc_minstret (←
-  readReg cur_privilege)` write (an unobservable-frame `writeReg`, mirror the spike's `FrameFact`); the
-  `hart_state = HART_ACTIVE ()` dispatch (`h.active`); the result-dispatch (the `Step_Execute
-  (Retire_Success (), _)` case is `assert (hart_is_active …)`, true by `hart_is_active_active`); and
-  `tick_pc ()` (`tick_pc_eq`) committing `PC ← nextPC`, with the minstret/rvfi bookkeeping dead
-  (`get_config_rvfi = false`) or unobservable. Composes Stage 3 — no new deep Sail reduction.
-- **Stages 2'/3' — discharge the two deep `StraightLineReady` fields** (currently assumptions, so the
-  named-hypothesis fallback holds with no sorry):
-  - **`no_interrupt`** (`dispatchInterrupt Machine = none`, `SysControl.lean:593`): deeper than a bare
-    `mip &&& mie` check — it calls `getPendingSet` (an `assert (currentlyEnabled Ext_S || mideleg = 0)` +
-    `read_mip IncludePlatformInterrupts` + `pending_{m,s} := mip_bits &&& mie &&& (~)mideleg` + the
-    `mstatus` MIE/SIE bits), then `findPendingInterrupt`. `= none` needs the state fact that `read_mip`
-    (register mip PLUS platform interrupt sources MTIP/MSIP/MEIP) masked by `mie` is `0` — a genuine
-    no-pending-interrupt precondition, discharged by reducing `read_mip`/`getPendingSet` under a
-    quiescent-interrupt state. Bounded but a real sub-lemma (readReg toolkit + the `read_mip` reduction).
-  - **`fetched`** (`fetch () = F_Base w`, `Fetch.lean:227`, THE wall): with `get_config_rvfi = false`
-    (done), `ext_fetch_check_pc = none`, PC 4-aligned (bit0 = bit1 = 0), `Ext_Ziccif`/`Ext_Zca` enabled,
-    `fetch` reduces to `fetch_bytes PC PC 4` → `translateAddr` (identity under Bare/machine-mode) +
-    `mem_read (InstructionFetch …)` → `F_Base w` where `w` is the `RomLoaded` word. Reuse
-    `Model/SailMemory.lean`'s `run_mem_read_*`/`run_vmem_read_of_width_4'` (built for the Load path —
-    adapt to `InstructionFetch`).
+- **Stage 2'** — `no_interrupt` (`dispatchInterrupt Machine = none`): discharged by the
+  `RunPres` toolkit + the `read_mip`/`getPendingSet` reduction under a quiescent-interrupt state
+  (`run_dispatchInterrupt_machine_none`).
+- **Stage 4 preamble** — the `minstret_increment`-write frame and the outer `try_step` wrapper
+  pieces (`ext_pre_step_hook` no-op, the `hart_state = HART_ACTIVE ()` dispatch,
+  `tick_pc ()` committing `PC ← nextPC`, rvfi bookkeeping dead under `get_config_rvfi = false`).
+- The **fetch** reduction (`fetch () = F_Base w` under `RomLoaded` + PC alignment +
+  `Ext_Ziccif`/`Ext_Zca`) reuses `Model/SailMemory.lean`'s `run_mem_read_*` machinery adapted to
+  `InstructionFetch`.
 
-The `hdec : ext_decode w = I` argument is caller-supplied by `decodedInROM.decodes` (NOT computed) — the
-per-family (3b) application threads it from `ProgTruth`; the execute stage then composes with the already-
+The `hdec : ext_decode w = I` argument is caller-supplied by `decodedInROM.decodes` (NOT computed) —
+the per-family application threads it from `ProgTruth`; the execute stage then composes with the
 proven `execute_<FAM>` bridges (`correct_<op>_native`).
 
 `StraightLineReady s` bundles the state facts: `hart_state = HART_ACTIVE ()`, `mip &&& mie = 0`,
 `elp ≠ LP_EXPECTED`, `ext_fetch_check_pc = none`, PC 4-aligned, `Ext_Ziccif`/`Ext_Zca` — threaded from
-`RefinesAt` + `SailConfigured` (which is strengthened to entail them). The composition
-`tryStep_eq_of_ready : StraightLineReady s → RomLoaded prog s → fetchWord (PC) = some w → decodes w I →
-(try_step 0 false).run s = (writeReg nextPC (PC+4) >>= fun _ => execute I >>= fun _ => tick_pc ()).run s`
-is the Phase-3a deliverable that Phase-4 `advance` composes with `correct_<op>_native`. -/
+`RefinesAt` + `SailConfigured` (which is strengthened to entail them). There is no single
+`tryStep_eq_of_ready` theorem: the whole-`try_step` composition lives in `Proofs/Sail/Advance.lean`
+as `sailStep_of_ladder`, which the Phase-4 `advance` lemmas compose with `correct_<op>_native`. -/
 
 /-! ## Stage 2' — discharging `no_interrupt` (`dispatchInterrupt Machine = none`)
 

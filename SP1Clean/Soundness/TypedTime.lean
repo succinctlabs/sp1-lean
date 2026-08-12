@@ -201,18 +201,15 @@ Byte pulls (no Memory), so the bounds follow from the finished Byte channel alon
 grounding-time memory pull currency.  Two pulls: a 16-bit `Range` on `diff_low_limb` and a `U8Range` on
 the scaled high part `(clk_target - prev_low - 1 - diff) * 65536⁻¹`.
 
-**Refactor status (rowAligned-upfront, in progress).**  This leaf is step 1 of making
+**Refactor status (rowAligned-upfront, LANDED).**  This leaf was step 1 of making
 `Soundness/ChipContracts.lean`'s `rowAligned` field derivable from `byteG` + `decodedInROM` instead of the
-grounding-time chip `Spec` (so the walk's per-row `RowOK` is available before grounding).  What remains is the
-NAVIGATION: from a chip row's whole-circuit `byteG`, reach each of the three nested `RegisterAccessTimestamp`
-subcircuits and apply this leaf, then relate the reader's input columns to the row `view` (a
-`CPUStateTimeBinding`-style binding) and wrap as the three `RegisterAccessCols.Spec`s.  The clean multi-level
-*structured* descent does not chain (a subcircuit's `.ops` is `NestedOperations`, and the bridge
-`channelGuarantees_toFlat` is over `Operations`); the working route is a direct extraction from the
-recursively-flattened interaction list (`circuit_norm`'s `toFlat_subcircuit`/`interactions_subcircuit`), i.e.
-this leaf's byte-pull pattern applied to all six register pulls at the flattened level.  Then
-`addChip_rowAligned`/`rowAligned_rtype` drop their `spec`/`openInputs` argument in favour of `byteG` +
-`decodedInROM_rtype_operand_lt` (`Soundness/Decode.lean`, the decode-intrinsic `op_a/op_b/op_c < 32`). -/
+grounding-time chip `Spec` (so the walk's per-row `RowOK` is available before grounding).  The
+navigation it anticipated landed as the `rowAligned_*_of_shape` family
+(`Soundness/GroundingAdapter.lean`): a direct extraction from the recursively-flattened interaction
+list (`circuit_norm`'s `toFlat_subcircuit`/`interactions_subcircuit`) — this leaf's byte-pull pattern
+applied to the register pulls at the flattened level — combined with
+`decodedInROM_rtype_operand_lt` (`Soundness/Decode.lean`, the decode-intrinsic `op_a/op_b/op_c < 32`),
+discharging every registered chip's `rowAligned` field. -/
 theorem Readers.RegisterAccessTimestamp.bounds_of_byteGuarantees
     (input : Var Readers.RegisterAccessTimestamp.Inputs (ZMod p)) (offset : ℕ)
     (env : Environment (ZMod p))

@@ -23,17 +23,16 @@ SP1's `eval_register_access_*` emits, per operand, two byte-bus timestamp checks
 - a `U8Range` (`< 256`) check on the scaled high part
   `(clk_target - prev_low - 1 - diff_low_limb) * 65536⁻¹`.
 
-Each is a `byteChannel.pull ⟨op, is_real·value, width, 0⟩`: a pull (multiplicity `-1`) hands soundness
-the channel's `Guarantees = ByteRowSpec` of the message *for free* (the in-circuit byte-op correctness),
-which the proof projects through `byteRowSpec_range`/`byteRowSpec_u8range_pair`. Gating stays in the message
-(`is_real·value`): on `is_real = 1` the real bound, on `is_real = 0` the vacuous zero-row. Because a pull
-can't carry a gated multiplicity (Clean fires `Guarantees` only at `mult = -1`), the byte-op correctness
-is *assumed* from the channel — discharged at the ensemble/balance level (the absent `ByteChip`
-provider), threaded as `Soundness/ByteConsistency.lean`'s `TraceByteLink`, exactly as the State bus
-threads `TraceStateLink`. See `docs/bus-model.md` §5.
+Each is a `byteChannel.pullIf` (multiplicity `-is_real`, **raw** value — post-#398 a receive owes no
+`Requirements`): on a real row it hands soundness the channel's `Guarantees = ByteRowSpec` of the
+message (the in-circuit byte-op correctness), which the proof projects through
+`byteRowSpec_range`/`byteRowSpec_u8range_pair`; on padding (`mult = 0`) it owes and receives nothing.
+The guarantee is backed at the ensemble/balance level by the landed `ByteChip` provider
+(`Proofs/Chips/ByteChip/`, discharged via `Soundness/ByteConsistency.lean`'s
+`byteAccessValid_of_balance`). Background: `docs/bus-model.md` §5 (HISTORICAL — read its banner).
 
 `clk_target` is the operand's access clock (`clk_low + 4/3/2` for op_a/op_b/op_c) — a cross-block
-input. The witnessed columns are computed from it (`prev_low := clk_target - 1`, `diff := 0`, so the
+input. The chip-witnessed columns are computed from it (`prev_low := clk_target - 1`, `diff := 0`, so the
 scaled numerator is `0`), which makes completeness hold for every `clk_target`. The `.memory`
 interactions are off-chip membership (trace-level, `Soundness/MemoryConsistency.lean`), so this
 sub-circuit emits no lookup for them. `Readers/RegisterAccessCols.lean` wraps this with `prev_value`

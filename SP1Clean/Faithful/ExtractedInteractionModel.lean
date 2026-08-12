@@ -15,7 +15,7 @@ non-byte interaction to `True` and reasons about `op.constrain`/`< 65536`).
 ## Sign convention (the one modeling gap the syntactic comparison surfaces)
 
 Clean models the byte lookup as a **pull** — `byteChannel.pullIf is_real` → `pullIf`, with
-multiplicity `-is_real` on `byteChannel.toRaw` (`Operations/AddOperation/Extracted.lean`). SP1's
+multiplicity `-is_real` on `byteChannel.toRaw` (`Native/Operations/AddOperation/Defs.lean`). SP1's
 `send_byte` is the dual **source** endpoint (`Extracted/AddOperation.lean`: `⟨.send, .byte 6 v 16 0,
 is_real⟩`). Same physical lookup, opposite source/sink convention — so the `.byte` arm records the
 **sink** sign `signedVal (-mult)`, matching Clean's pull, while the message tuple

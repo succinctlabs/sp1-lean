@@ -47,7 +47,8 @@ grounded Program decode.  It is never an independent assembly hypothesis.
   disjunct needs per-access micro-times (`+3`/`+2`), not the uniform window start.  Choosing the
   aligned `RowFacts` carrier (and transporting `Grounded` across it) is arc-B assembly work; the
   `TypedMemory` module doc already anticipates replacing the ordinary carrier.
-* `TouchOK.pull_lt_push` (the SP1 `prev_clk < access_clk` bound) is **not a purely local
+* the SP1 `prev_clk < access_clk` bound (formerly the `TouchOK.pull_lt_push` field; now the
+  walk-rederived slot order) is **not a purely local
   fact**: the in-circuit `RegisterAccessTimestamp` diff decomposition proves it only given a
   range bound on the pulled record's own time, which is supplied by the balance chain forcing
   (the matched frontier push was range-checked by its writer), not by this row's constraints.
@@ -264,7 +265,7 @@ structure ChipGroundingContracts (chip : SupportedChip p) : Prop where
               MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2)
 
 /-- **The engine-feed consumer**: any decoded row of a contracted chip produces both timed-engine
-records — the chip-generic form of `addRow_engineFacts`.  `decode` remains the Program-grounding
+records — the chip-generic successor of the retired Add-specific `addRow_engineFacts`.  `decode` remains the Program-grounding
 residual; the bundle derives the routing guard from it and the physical row constraints. -/
 theorem ChipGroundingContracts.engineFacts
     {chip : SupportedChip p} (contracts : ChipGroundingContracts chip)

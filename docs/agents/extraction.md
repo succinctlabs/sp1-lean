@@ -14,6 +14,7 @@ files.
 
 ```
 RiscvAir::machine() ───────────────→ Extracted/CoreAIRManifest.lean
+executor opcode.rs (semantic pin) ─→ Extracted/OpcodeTable.lean
 Air::eval / eval_public_values ────→ Extracted/{ChipOracle,SystemOracle}/...
           (audited Rust overlay)      (rows + ordered asserts/interactions only)
 
@@ -39,9 +40,23 @@ The generator verifies that the overlay's merge base is semantic revision
 `a630089d9ff484ec6f2feade8d0afbb1447eed11` (`v6.3.1-8-ga630089d9`), that runtime-source changes are
 reflection metadata only, and that the dirty exporter diff is byte-identical to the checked-in
 list-only patches. `CHIPS` and `SYSTEM_TABLES` select AIR anchors; `TRACE_CHIPS` selects whole-chip
-populate batteries. `OPERATIONS` and `WITNESS_OPERATIONS` are transitional registries. There is no
+populate batteries. `OPERATIONS` and `WITNESS_OPERATIONS` are the shared-substrate registries (the
+canonical reader modules + statement targets multiple chip anchors reference; the whole-chip
+migration is complete, so they shrink only when an anchor is actually retired). There is no
 circuit-output registry or circuit emitter. The output is deterministic, so a full regeneration at
 the audited overlay leaves all pre-existing anchors byte-identical.
+
+**Opcode table.** The `Opcode` enum's variant-name → `#[repr(u8)]`-discriminant table — the opcode
+value every chip commits on the Program bus — is extracted unconditionally as
+`SP1Clean/Extracted/OpcodeTable.lean` by a text-level parse (like the manifest writers, no cargo
+run) of `crates/core/executor/src/opcode.rs` **at `SP1_SEMANTIC_COMMIT` via `git show`**, so it is
+independent of the overlay worktree's patch state and reproducible at the pin. The parse fails
+closed on shape drift (missing `pub enum Opcode` block or `#[repr(u8)]` attribute, no variants,
+non-consecutive discriminants). The hand-maintained mirror `SP1Clean/Model/Opcode.lean` is
+cross-checked against the extracted table by the kernel-`decide` theorem
+`opcodeTable_matchesExtracted` (`SP1Clean/FormalModel/OpcodeTable.lean`): variant names (via the
+adjacent `Opcode.name` string table — a derived `Repr` does not kernel-reduce), discriminants,
+count, and order, so any mirror drift fails the build.
 
 Profile extraction is unconditional, even under `EXTRACT_ONLY`: regeneration fails before writing AIR
 files unless the baseline 34-table execution cluster, the 6-table memory-boundary cluster, every main
@@ -89,6 +104,15 @@ and (b) the two **uncommitted** patch files `scripts/extractor-patches/core-air-
 `core-air-manifest.patch` (touching exactly `main.rs`, `ir/ast.rs`, `ir/expr.rs`, `ir/lean.rs`;
 byte-hash-checked against the live worktree diff). `Extracted/Provenance.lean` records the
 semantic revision, overlay revision, and combined diff hash. The relevant changes are:
+
+**Overlay-retirement path (upstream PR).** The complete review surface — the committed
+overlay delta plus both patches — has been rebased into a reviewable five-commit series on the
+sibling semantic checkout (`../sp1`, branch `dtumad/lean-constraint-extraction`, based on a recent
+upstream `main`; the two patch files are the series' last two commits, byte-identical to the
+checked-in `scripts/extractor-patches/*.patch`). Once that lands upstream, `SP1_PINNED_COMMIT` can
+advance to an upstream commit and the uncommitted-patch mechanism retires. **Until that merge, the
+pins, patches, and `Extracted/Provenance.lean` here stay exactly as they are** — the branch is a
+forward path, not current provenance.
 
 - **Field-generic, not `Fin KB`** *(overlay committed delta)*. Every Lean-emission site writes the
   type token `F` instead of the concrete `Fin KB`:
@@ -226,10 +250,19 @@ exactly one struct. This factoring must remain invisible at the public proof bou
 anchor may split/unfold the generated append chain as a local calculation, but it concludes with one
 complete chip assertion/interactions theorem.
 
+Two header details of the generated chip oracles: the module-doc reuse list names **every**
+imported shared module (readers *and* struct carriers such as `MemoryAccess`), and imports that
+another import already provides transitively are pruned (`_prune_transitive_imports` — e.g. a
+load/store oracle reaches `RegisterAccessCols` through `ITypeReader`, whose module itself imports
+`RTypeReader`, so no direct `RTypeReader` import is emitted).
+
 ## Future work
 
 - Extend whole-trace conformance from the current 10 chips to all 25 already-proved whole-chip
   `ChipFaithful` anchors.
 - Extend canonical generated reader reuse as each new chip oracle lands, while keeping chip-private
   Rust arithmetic helpers embedded as implementation details.
-- Remove `WITNESS_OPERATIONS` and the remaining operation-list modules once their chip consumers migrate.
+- Retire an entry of `WITNESS_OPERATIONS` / the operation-list modules whenever its last consuming
+  anchor is retired (they are deliberate shared substrate, not migration debt — see `AGENTS.md`).
+- Land the upstream sp1 PR from the rebased series (see "Overlay-retirement path" above), then
+  advance `SP1_PINNED_COMMIT` to the upstream commit and delete the patch mechanism.

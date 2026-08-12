@@ -124,7 +124,7 @@ Mirror-rust layout under `SP1Clean/`:
   the **semantic-execution substrate** `Semantics/` — `GuestProgram.lean` (the `GuestProgram` +
   `IsInitialState`/`SailStep`/`SailChain`/`SP1Halted` Sail execution model), `ProgramCommitment.lean`
   (`progOf : ProverData → GuestProgram`, the committed program), `MicroTime.lean` (bus-clock ↔ step
-  correspondence, `MemLoc`, `chainState`, `microValue`), and `Truth.lean` (`StateTruth`/`MemTruth`/
+  correspondence, `MemLoc`, `chainState`, `microValue`), and `Truth.lean` (`LocalStateTruth`/`LocalMemTruth`/
   `ProgTruth`, the global execution predicates derived by grounding, not channel payloads). (`Math` +
   `Model` are the former `Foundations/`, split by SP1-dependence.) `Model/Machine/{Schedule,Syscall,
   EventExecution}.lean` gives the row-dependent 8/264-tick event semantics and explicit SP1 host-handler
@@ -142,14 +142,17 @@ Mirror-rust layout under `SP1Clean/`:
   `Operations.lean`, `Chips.lean`, plus focused rich contracts such as `DivRem.lean`) and the lifted chip `Assumptions`/`ProverAssumptions`
   (`ChipAssumptions.lean` — Add/Addi/Addw/Sub/Subw/UType; the two-reason keep-list taxonomy for the
   other chips is stated in that file's module docstring). `ProverSpec` is uniformly
-  `fun _ _ _ => True` (inline in each `circuit` bundle). `Trace/Witness.lean` holds the witness-table
-  scaffolding; the guest-program execution model (`GuestProgram`, `IsInitialState`, `SailStep`/`SailChain`,
+  `fun _ _ _ => True` (inline in each `circuit` bundle). `Trace/Witness.lean` holds the non-vacuity
+  witness (a concrete configured Sail state proving `IsInitialState` satisfiable);
+  the guest-program execution model (`GuestProgram`, `IsInitialState`, `SailStep`/`SailChain`,
   `SP1Halted`, `exitOf`) lives in `Model/Semantics/GuestProgram.lean`. Relation-level AIR/verifier
   contracts live in `Relations.lean`, `CoreProfile.lean`, `CoreAIRRelation.lean`, `Execution.lean`, and
   `Verifier.lean`; `ChipRow`-dependent decode,
   routing, and grounding arguments remain naturally in `Soundness/`.
 - **`Native/`** — the "implemented native in Lean" pillar (circuit construction): `Native/Chips/<Op>Chip/Defs.lean`
-  (each chip's `main` + `ElaboratedCircuit`), `Native/Operations/<Op>/{Populate,RawSpec}.lean` (witness +
+  (each chip's `main` + `ElaboratedCircuit` — 22 of the 25 chips; the ShiftLeft/ShiftRight/DivRem
+  `main`s live in `Proofs/Chips/<X>Chip/Defs.lean`, the documented proof-decomposition exception),
+  `Native/Operations/<Op>/{Populate,RawSpec}.lean` (witness +
   native arithmetic core) + flat ops (`BitwiseU16Operation.lean`, `AddressOperation.lean`, …), and
   `Native/Readers/*.lean` (the register/state reader circuits — their `Spec`s are in
   `FormalModel/Contracts/Readers.lean`; the readers' local `SpecD`/`AssumptionsD`/`ProverAssumptionsD`
@@ -174,8 +177,9 @@ Mirror-rust layout under `SP1Clean/`:
 - **`SP1CleanTest/`** (top-level, **not** under `SP1Clean/`) — the **test library**, the sole home of
   `native_decide` and the `lake test` target (`testDriver`). It imports the main `SP1Clean` library and
   is never imported by it, so the default `lake build SP1Clean` stays `native_decide`-free (enforced by
-  `scripts/check_no_native_decide.sh`; `native_decide` trusts the whole compiler, adding
-  `Lean.ofReduceBool`/`Lean.trustCompiler`). Two layers, namespaces preserved (`SP1Clean.WitnessTests` /
+  `scripts/check_no_native_decide.sh`; `native_decide` trusts the whole compiler — at v4.32.2 the census
+  shows this as generated `._native.native_decide.ax_*` constants, the successors of the named
+  `Lean.ofReduceBool`/`Lean.trustCompiler` axioms). Two layers, namespaces preserved (`SP1Clean.WitnessTests` /
   `SP1Clean.TraceGenTests`, decoupled from the new module paths):
   - `WitnessTests/` — the `<Op>Witness.lean` witness-generation conformance anchors +
     `WitnessConformance.lean` scaffold; auto-gen vectors under `WitnessTests/Vectors/`.
@@ -190,7 +194,7 @@ Mirror-rust layout under `SP1Clean/`:
   `ChipRow.lean` (the `ChipKind` structure-of-functions — each chip registers one `kind`, carrying a
   `name` = its SP1 `MachineAir::name`) + `ChipRegistry.lean` (`allChipKinds`); the gated execution capstone
   `GatedVm/` (the legacy-but-proved Eulerian-trail machinery) + `SP1Ensemble.lean` (`sp1Ensemble` — a
-  plain Clean `Ensemble`, 25 chips + 11 boundary/provider tables); the timed/ranked grounding engine;
+  plain Clean `Ensemble`, 25 chips + 13 boundary/provider tables); the timed/ranked grounding engine;
   `WitnessDecode.lean` (the deterministic typed row decoder), `LocalExecution.lean` (grounded ordered
   rows → a genuine shard-local Sail chain), and `AIR.lean` (the honest native witness relation plus
   proved `supported_core_witness_grounding` and `supported_core_native_sound`); the
@@ -202,7 +206,8 @@ Mirror-rust layout under `SP1Clean/`:
   carrier transports), and `TimeExtraction.lean` (the `pull_lt_push` payoff from the memory-channel
   `ClkBound`); and the typed interaction/Memory bridge (`TypedInteractions.lean`, `TypedMemory.lean`;
   exact evaluated chip pulls → timed facts/live operands); and the
-  auditable instruction-coverage layer — `Opcode.lean` + `Coverage.lean` (the `Opcode → chip → Sail`
+  auditable instruction-coverage layer — `Coverage.lean` (+ the opcode enum itself at
+  `Model/Opcode.lean`, namespace `SP1Clean.Soundness` per the decoupling rule) (the `Opcode → chip → Sail`
   routing table mirroring SP1's `tracing.rs`/`RiscvAir`). The former `InstructionTrace.lean` name-only
   row-routing shadow and `Completeness.lean` routing scaffold were retired in favor of witness decoding,
   timed grounding, and the relation-level completeness boundary in `AIR.lean`. The bespoke
@@ -272,7 +277,7 @@ SP1-specific trail machinery (see roadmap W11).
 multiplicities that SP1 actually constrains; they do not assert reachability. `VmChannel` and the earlier
 semantic-channel spike were retired. State has local guarantee `True`, Program carries `RowSpec`, Memory
 carries `isU64 ∧ ClkBound` (value + a bounded 24-bit access timestamp), and Byte carries `ByteRowSpec`.
-`StateTruth`/`ProgTruth` are conclusions of the timed
+`LocalStateTruth`/`ProgTruth` are conclusions of the timed
 grounding engine from bus balance, boundary/provider facts, program commitment, strict schedule rank, and
 the 25 chip `advance` lemmas. No chip `ProverAssumptions` threads either global truth. The current capstone
 layers distinguish native supported-machine refinement, extracted AIR faithfulness, full SP1 AIR
@@ -334,7 +339,9 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
    bridging helpers — they only exist when `main` and `Spec` were defined in mismatched forms; the fix is to
    align them.
 4. **Axiom-clean target.** After each artifact, check `#print axioms <decl>` (or the `lean_verify` MCP tool) is
-   only `[propext, Classical.choice, Quot.sound]` (bv_decide may add `Lean.ofReduceBool`/`trustCompiler`) — and
+   only `[propext, Classical.choice, Quot.sound]` (bv_decide may add generated
+   `._native.bv_decide.ax_*` constants — the v4.32.2 form of the former
+   `Lean.ofReduceBool`/`trustCompiler`) — and
    **no `sorryAx`**.
 
 ## Proof-style quick notes
@@ -399,7 +406,9 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
   silence the kernel. See `docs/agents/proof-patterns.md` §"Bit-shift chip soundness" (the `2^64` bullet) for
   the worked fix.
 - **Never `native_decide` in the main `SP1Clean/` library.** It discharges goals by running compiled code,
-  trusting the **whole compiler** (adds `Lean.ofReduceBool`/`Lean.trustCompiler`) — so headline soundness
+  trusting the **whole compiler** (surfaced in the census as generated
+  `._native.native_decide.ax_*` constants — formerly the named `Lean.ofReduceBool`/
+  `Lean.trustCompiler` axioms) — so headline soundness
   theorems would no longer be `[propext, Classical.choice, Quot.sound]`-clean. It is **CI-gated**
   (`scripts/check_no_native_decide.sh`, run by the audit + the `guards` job; any hit in `SP1Clean/**/*.lean`
   fails the build). Conformance checks that genuinely need it live in the separate top-level `SP1CleanTest`
@@ -408,10 +417,11 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
   `inv_mul_cancel₀` / a `bool_of_mul_pred`-style lemma instead.
 - `Word` is an `abbrev` for `Vector` — `w.toBitVec64` dot-notation fails; write `Word.toBitVec64 w`.
 - **The Sail `-i` token — space your negations.** Sail declares GLOBAL `infixl:65 " +i "/" -i "/" *i "/" ^i "`
-  (`Sail/Sail.lean`, integer ops, used 1300+× in the generated LeanRV64D model so they can't be scoped). Now
-  that `Model/Channels.lean` imports Sail-carrying `Truth` (the semantic-channels flip), all four tokens are
-  active in **every** circuit-proof file, and the lexer greedily tokenizes `<op>i` inside `-input_is_real` /
-  `i₀+i` as the operator → `unexpected token '-i'; expected term`. So keep a space (or parens) whenever an
+  (`Sail/Sail.lean`, integer ops, used 1300+× in the generated LeanRV64D model so they can't be scoped). The
+  four tokens are active in every file that transitively imports the generated Sail model — the whole
+  bridge/Soundness/semantics side, and any proof file that reaches `Model/Semantics/` or `Model/SailWrap.lean` —
+  and there the lexer greedily tokenizes `<op>i` inside `-input_is_real` /
+  `i₀+i` as the operator → `unexpected token '-i'; expected term`. So keep the habit everywhere: a space (or parens) whenever an
   operator is immediately followed by an `i`: **`- input_is_real`** / `-(input_is_real)` (never `-input_is_real`),
   **`i₀ + i`** (never `i₀+i`), `2 ^ i`, `x * input`. (The space *before* the operator is untouched and still
   distinguishes binary-op from unary/application, so this is semantically null. The spaced Sail operator
@@ -478,11 +488,15 @@ after installing or toggling.
   doc-comments cite its section numbers. Read its banner before citing.
 - `docs/proposals/consolidation-progress.md` — the consolidation checkpoint board.
 - `docs/release-audit.md` — the honest-claim / trust-boundary report (axiom census and zero-deferral gate;
-  regenerate with `scripts/run_audit.sh`). The harness leaves the tree **clean on a pass**: it diffs the
-  fresh census against the committed `docs/snapshots/axiom-census.txt` and fails on drift; only an explicit
-  `scripts/run_audit.sh --update` rewrites the snapshot (inspect and commit the delta — a moved
-  auto-generated `bv_decide` `ax_N_M✝` index is hygienic). It also runs `check_pins.sh`,
-  `check_root_index.sh`, and `check_report_citations.sh` as gates, so none need a separate invocation.
+  regenerate with `scripts/run_audit.sh`). The census is **split by library**: the main scope diffs
+  `docs/snapshots/axiom-census.txt` (needs the `SP1Clean` oleans; CI `audit` job runs
+  `--main-only`), the test scope diffs `docs/snapshots/axiom-census-test.txt` (needs `lake test`
+  first; CI `test` job runs `--test-only`); the no-flag default runs both. The harness leaves the
+  tree **clean on a pass**: it diffs each fresh census against its committed snapshot and fails on
+  drift; only an explicit `scripts/run_audit.sh --update` rewrites the snapshot(s) for the scope(s)
+  run (inspect and commit the delta — a moved auto-generated `bv_decide` `ax_N_M✝` index is
+  hygienic). It also runs `check_pins.sh`, `check_root_index.sh`, and `check_report_citations.sh`
+  as gates, so none need a separate invocation.
 - `docs/agents/lean-sail-notes.md` — the v4.32.2 environment, the git dependency pins, the Sail
   code-generation workaround, and the `lake update` trap.
 - `docs/agents/sail-model-provenance.md` — the generated `Lean_RV64D` snapshot's provenance: the
@@ -502,7 +516,7 @@ after installing or toggling.
 - `docs/agents/cleanup-deferred.md` — the owner-decision queue: every duplication found
   and deliberately not fixed, grouped by blocker (shallow-file hoist · statement change · deletion ·
   `Faithful/**` conservative-only · cross-module round), with measured sizes; the "deliberately NOT taken"
-  decisions; and the 40-entry rename queue, which is **queued, never applied**.
+  decisions; and the 42-entry rename queue, which is **queued, never applied**.
 - `docs/agents/porting-recipe.md` — step-by-step checklist to port a new chip from the Add/Bitwise template.
 - `docs/agents/extraction.md` — the constraint-extraction pipeline (compiler → Python → Lean DSL).
 - `docs/agents/mul-operation-learnings.md` — Mul-specific soundness/completeness pitfalls.

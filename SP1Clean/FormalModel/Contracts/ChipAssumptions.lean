@@ -17,10 +17,11 @@ two structural reasons (also recorded in `docs/architecture.md` § deliberate la
   that does not belong on the contract surface (`hintFlags` for Mul/Bitwise/Lt/Branch and the
   shift/DivRem populate layers; Jal/Jalr's jump helpers). Lifting them would drag `Native`/proof
   internals below the contract layer.
-- **Native-resident contract block** — the nine memory chips, AluX0, and LoadX0 define their
-  `Inputs` (and `Spec`) in `Native/Chips/<X>Chip/Defs.lean`, so their `Assumptions` cannot move
-  here without inverting the FormalModel → Native layering. They follow when the "Spec homing"
-  backlog item (`docs/roadmap.md`) moves those contract blocks onto this surface. -/
+- **Native-resident contract block** — the nine memory chips (the five loads, LoadX0 among
+  them, and the four stores) and AluX0 define their `Inputs` (and `Spec`) in
+  `Native/Chips/<X>Chip/Defs.lean`, so their `Assumptions` cannot move here without inverting
+  the FormalModel → Native layering. They follow when the "Spec homing" backlog item
+  (`docs/roadmap.md`) moves those contract blocks onto this surface. -/
 
 namespace SP1Clean.AddChip
 
@@ -122,7 +123,9 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_c_val
 
 /-- Prover-side row well-formedness: operand `isU64`s, the op_a read-prior `isU64`, `is_real` binary,
-`op_a_0 = 0`, `imm_c = 0` (register-register op), CPUState clock bounds, and three timestamp `Spec`s (op_c
+`op_a_0 = 0`, `imm_c = 0` (this completeness witness covers the register-register ADDW form;
+honest ADDIW rows carry `imm_c = 1` and are covered by soundness and the bridge's `advance_of_addiw`
+dispatch, but not by this completeness theorem), CPUState clock bounds, and three timestamp `Spec`s (op_c
 gated by `is_real - imm_c`). -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=

@@ -4,10 +4,10 @@ import SP1Clean.Soundness.ProviderBindings
 /-! # The per-`MemLoc` Memory-channel balance
 
 The Memory analogue of the State-axis balance chain in `TypedState`.  Where the State boundary is one
-public verifier pair and the eleven providers contribute nothing, the Memory channel is the mirror
-image: the boundary **verifier** contributes nothing, and the eleven providers contribute through the
-two dedicated memory-boundary tables — the init provider (a per-address genesis *push*, index 34) and
-the finalize provider (a per-address final *pull*, index 35).  The other nine byte/range/program
+public verifier pair and the thirteen providers contribute nothing, the Memory channel is the mirror
+image: the boundary **verifier** contributes nothing, and the thirteen providers contribute through the
+two dedicated memory-boundary tables — the init provider (a per-address genesis *push*, index 36) and
+the finalize provider (a per-address final *pull*, index 37).  The other eleven byte/range/program
 providers do not declare the Memory channel and so emit nothing on it.
 
 Unlike State/Program, the decoded instruction rows' Memory interactions are **not** reduced to a fixed
@@ -29,21 +29,17 @@ The chain mirrors, lemma for lemma:
 * `realDecodedMemory_perm` ← `realDecodedStateMessages_perm`.
 
 The final `realDecodedMemory_perlocBalance` is the raw per-location multiset balance the timed
-grounding walk (`TimedGrounding.walk`) consumes.  Two honest seams are deliberately left open for the
-capstone/B5 assembly and flagged in the module below:
+grounding walk (`TimedGrounding.walk`) consumes.  The two seams once flagged here are now **both
+closed**:
 
-1. **Binary multiplicities are a hypothesis.** `producedMessages_perm_consumedMessages` needs every
-   Memory interaction's signed multiplicity in `{-1, 0, 1}`.  For the *providers* this is the boolean
-   witnessed `m` (`m*(m-1) = 0`); for the *chips* it is `±is_real`/`±is_real·(1-imm)`, binary via
-   `witness_decodedInstructionRows_selectorBinary`.  Deriving the chip half needs the per-chip Memory
-   emission shapes (the sweep this workstream defers), so it is taken as a premise `memBinary`, to be
-   discharged by the `ChipGroundingContracts` bundle exactly as State discharges its `binary` premise.
-2. **Symmetric (both-providers-both-sides) form.** The balance keeps `producedMessages` and
-   `consumedMessages` of *both* boundary tables on *both* sides, rather than the asymmetric
-   `init-produced ++ rows` / `finalize-consumed ++ rows`.  Collapsing to the asymmetric frontier form
-   needs the provider *purity* facts (init only pushes, finalize only pulls) plus the
-   `MemoryInitProviderUnique` per-location uniqueness — the `optMS (live)`/`optMS (finM)` frontier-Option
-   packaging, which is B5's job.
+1. **Binary multiplicities** — the intermediate lemmas still take a `memBinary` premise, but it is
+   discharged in this same file by `witness_memoryMultiplicityBinary` (§"Witness-level structural
+   Memory obligations"): the providers' boolean witnessed `m` (`m*(m-1) = 0`) plus the registry-wide
+   selector-gating theorem for the instruction rows.
+2. **Symmetric (both-providers-both-sides) form** — the collapse to the asymmetric frontier form
+   (provider purity + `MemoryInitProviderUnique`/`MemoryFinalizeProviderUnique` uniqueness, the
+   `optMS (live)`/`optMS (finM)` frontier-Option packaging) landed in `Soundness/MemoryFrontier.lean`
+   (`memoryFrontierBalance`).
 -/
 
 namespace SP1Clean.Soundness
@@ -94,15 +90,15 @@ theorem witness_verifierMemoryInteractions_eq_nil
   change memoryChannel.toRaw ∉ [stateChannel.toRaw]
   simp [Channels.memoryChannel_eq_stateChannel_false]
 
-/-! ## The nine non-memory providers contribute nothing to the Memory channel -/
+/-! ## The eleven non-memory providers contribute nothing to the Memory channel -/
 
-/-- Every provider-table position except the two dedicated memory boundary tables (init at 34,
-finalize at 35) has no Memory-channel interactions.  Positional, mirroring
-`witness_nonProgramProviderTable_programInteractions_eq_nil`: the eight byte/range providers declare
+/-- Every provider-table position except the two dedicated memory boundary tables (init at 36,
+finalize at 37) has no Memory-channel interactions.  Positional, mirroring
+`witness_nonProgramProviderTable_programInteractions_eq_nil`: the ten byte/range providers declare
 only the Byte channel and the program provider only the Program channel. -/
 theorem witness_nonMemoryProviderTable_memoryInteractions_eq_nil
     (witness : EnsembleWitness (sp1Ensemble (p := p))) (i : ℕ)
-    (lower : 25 ≤ i) (upper : i < 36) (witnessBound : i < witness.tables.length)
+    (lower : 25 ≤ i) (upper : i < 38) (witnessBound : i < witness.tables.length)
     (notInit : i ≠ memoryInitProviderIndex) (notFinalize : i ≠ memoryFinalizeProviderIndex) :
     typedTableInteractionsWith witness.tables[i] memoryChannel = [] := by
   apply List.map_eq_nil_iff.mp
@@ -140,7 +136,7 @@ theorem witness_providerMemoryInteractions_eq
     (witness.tables.drop 25).flatMap (typedTableInteractionsWith · memoryChannel) =
       typedTableInteractionsWith (memoryInitProviderTable witness) memoryChannel ++
         typedTableInteractionsWith (memoryFinalizeProviderTable witness) memoryChannel := by
-  have tablesLength : witness.tables.length = 36 := by
+  have tablesLength : witness.tables.length = 38 := by
     rw [← witness.same_length]
     rfl
   rw [List.drop_eq_getElem_cons (i := 25) (by omega),
@@ -154,9 +150,11 @@ theorem witness_providerMemoryInteractions_eq
     List.drop_eq_getElem_cons (i := 33) (by omega),
     List.drop_eq_getElem_cons (i := 34) (by omega),
     List.drop_eq_getElem_cons (i := 35) (by omega),
+    List.drop_eq_getElem_cons (i := 36) (by omega),
+    List.drop_eq_getElem_cons (i := 37) (by omega),
     List.drop_eq_nil_of_le (by omega)]
   simp only [List.flatMap_cons, List.flatMap_nil, List.append_nil]
-  have nil : ∀ (i : ℕ) (_ : 25 ≤ i) (_ : i < 34) (bound : i < witness.tables.length),
+  have nil : ∀ (i : ℕ) (_ : 25 ≤ i) (_ : i < 36) (bound : i < witness.tables.length),
       typedTableInteractionsWith witness.tables[i] memoryChannel = [] :=
     fun i lower upper bound =>
       witness_nonMemoryProviderTable_memoryInteractions_eq_nil witness i lower (by omega) bound
@@ -166,7 +164,8 @@ theorem witness_providerMemoryInteractions_eq
     nil 27 (by omega) (by omega) (by omega), nil 28 (by omega) (by omega) (by omega),
     nil 29 (by omega) (by omega) (by omega), nil 30 (by omega) (by omega) (by omega),
     nil 31 (by omega) (by omega) (by omega), nil 32 (by omega) (by omega) (by omega),
-    nil 33 (by omega) (by omega) (by omega)]
+    nil 33 (by omega) (by omega) (by omega), nil 34 (by omega) (by omega) (by omega),
+    nil 35 (by omega) (by omega) (by omega)]
   simp only [List.nil_append]
   rfl
 
@@ -229,8 +228,9 @@ binary Memory multiplicities, the produced Memory messages (every decoded row's 
 the two boundary tables' pushes) are a permutation of the consumed Memory messages (every decoded row's
 read-priors plus the two boundary tables' pulls).
 
-`memBinary` is the honest deferred seam (see the module doc): it is the Memory analogue of the State
-`binary` premise, to be discharged per chip/provider by the `ChipGroundingContracts` bundle. -/
+`memBinary` is the Memory analogue of the State `binary` premise; it is discharged below by
+`witness_memoryMultiplicityBinary` (physical constraints alone), so it is a threaded intermediate
+hypothesis here, not an open seam. -/
 theorem realDecodedMemory_perm
     (witness : EnsembleWitness (sp1Ensemble (p := p)))
     (balanced : witness.BalancedChannels)

@@ -120,14 +120,21 @@ jobs:
           use-github-cache: "true"
       - name: Conformance tests (lake test)
         run: lake test
+      # The test-scope axiom census (scripts/axiom_probe_test.lean) elaborates against the
+      # SP1CleanTest oleans that `lake test` just built — the only job where they exist. The
+      # main-scope census runs in the `audit` job, which builds only the default SP1Clean target.
+      - name: Test-library axiom census (scripts/run_audit.sh --test-only)
+        run: scripts/run_audit.sh --test-only
 
   audit:
-    # The release audit harness (`scripts/run_audit.sh`): pin cross-checks, the zero-tolerance
-    # proof-deferral and project-axiom scans, the source-policy guards, and the authoritative
-    # `#print axioms` census over the released theorem surface, gated against the committed
-    # `docs/snapshots/axiom-census.txt` (a drift fails; `--update` is a local, deliberate act).
-    # `needs: build` for the same commit-keyed `.lake` cache reuse as `lint`/`test` — the census
-    # probe elaborates against the built oleans.
+    # The release audit harness (`scripts/run_audit.sh --main-only`): pin cross-checks, the
+    # zero-tolerance proof-deferral and project-axiom scans, the source-policy guards, and the
+    # authoritative `#print axioms` census over the released main-library theorem surface, gated
+    # against the committed `docs/snapshots/axiom-census.txt` (a drift fails; `--update` is a
+    # local, deliberate act). `--main-only` because this job builds only the default `SP1Clean`
+    # target — the test-scope census runs in the `test` job, whose `lake test` produces the
+    # `SP1CleanTest` oleans that probe needs. `needs: build` for the same commit-keyed `.lake`
+    # cache reuse as `lint`/`test` — the census probe elaborates against the built oleans.
     needs: build
     runs-on:
       [
@@ -146,5 +153,5 @@ jobs:
           test: "false"
           lint: "false"
           use-github-cache: "true"
-      - name: Release audit (scripts/run_audit.sh)
-        run: scripts/run_audit.sh
+      - name: Release audit, main scope (scripts/run_audit.sh --main-only)
+        run: scripts/run_audit.sh --main-only

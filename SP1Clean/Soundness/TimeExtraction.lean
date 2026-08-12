@@ -151,7 +151,9 @@ theorem memoryTimeNat_lt_of_activeTimestampBounds (prior pushed : MemoryMsg (ZMo
   omega
 
 /-- **The payoff, at the bus layer**: a pulled prior Memory record strictly predates the record the
-row pushes for the same access — `Soundness/TouchChains.lean`'s `TouchOK.pull_lt_push`.
+row pushes for the same access — the `prev_clk < access_clk` slot order the timed grounding engine
+consumes (`RowOK.slotOfClkBound`, `Soundness/TimedGrounding.lean`; formerly the `TouchOK.pull_lt_push`
+field).
 
 Both messages carry the row's own `clk_high` (SP1's register-access variant of the timestamp check
 asserts the high limbs are equal, `eval_register_access_timestamp`), so the comparison reduces to the
@@ -179,7 +181,8 @@ omit [Fact (2 ^ 17 < p)] in
 matches it by *pattern* on the shared head symbol — no `whnf` into the eval-struct.  All spelling
 reconciliation happens on the three **scalar** bridges (`sameHigh`/`priorLow`/`targetClk`), which cross
 the decoder↔circuit spelling cheaply, instead of unifying the whole `access_timestamp` struct.  This is
-what lets `addChip_rowAligned` build the `prev_clk < access_clk` order straight from the chip `Spec`
+what lets the `rowAligned` derivations (`rowAligned_rtype_of_shape` and family,
+`Soundness/GroundingAdapter.lean`) build the `prev_clk < access_clk` order straight from the chip `Spec`
 without the metavariable-normalization blowup. -/
 theorem memoryTimeNat_lt_of_registerAccessCols (prior pushed : MemoryMsg (ZMod p))
     (accessCols : Extracted.RegisterAccessCols (ZMod p)) (is_real clk_target : ZMod p)

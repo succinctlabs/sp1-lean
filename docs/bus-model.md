@@ -4,7 +4,8 @@
 > the transitional two-mechanism world (in-circuit channels + the `*Lookups` ℤ-shadows) and the
 > `VmChannel`-decoupled `Guarantees`/`Owed` split. It is kept because source doc-comments cite its
 > section numbers for design rationale. The **authoritative** post-consolidation bus description is
-> [`overview.md`](overview.md) §4 (the four plain coupled `Channel`s + the hygiene-guarantee rule);
+> [`architecture.md`](architecture.md) § "Structural buses and semantic grounding" (the four plain
+> coupled `Channel`s + the hygiene-guarantee rule);
 > the migration that superseded this file is the 2026-07 architecture-consolidation proposal
 > (removed from the tree; see git history)
 > §3.5. Kept for the design rationale in §5 below; do not cite §0's "current status" as current.

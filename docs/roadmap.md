@@ -12,7 +12,7 @@ Completed:
 - 25 Sail bridges and `ChipKind.advance` registrations;
 - 25 whole-chip `ChipFaithful` proofs;
 - deterministic typed row decoding and exhaustive ranked State ordering;
-- Program and Memory timed grounding for the native 36-table ensemble;
+- Program and Memory timed grounding for the native 38-table ensemble;
 - `supported_core_native_sound`;
 - exact list-level 34-table execution and 6-table memory-boundary relations;
 - honest COMMIT-row versus wrapper-coverage separation; and
@@ -50,12 +50,24 @@ valid native witness, with assertion and bus-balance transport proved once at th
 Prove the semantic facts currently supplied to `SupportedCoreNativeRelation` from the exact upstream
 tables:
 
-- Program: the committed ROM and decoded Program-provider messages;
+- Program: the decoded Program-provider messages. Note the exact upstream Program table carries
+  an *empty* assert list — its whole semantic content is the preprocessed commitment — so this
+  discharge routes through the C1 `PreprocessedBinding` (C1–C3 are the named cryptographic trust
+  boundaries of `docs/verification-report.md`) plus a (still unbuilt) correspondence
+  between the committed decoded-operand encoding and the native `GuestProgram`/`ext_decode`
+  decode, not through table constraints;
 - Byte and Range: lookup-provider coverage;
 - MemoryLocal and MemoryBump: per-location access order and timestamp differences;
 - StateBump: State ordering across sparse clock ranges;
 - Global: the public boundary and cumulative interaction facts;
-- MemoryGlobalInit/Finalize: initial/final memory values and per-location uniqueness; and
+- MemoryGlobalInit/Finalize: initial/final memory values and per-location uniqueness. Two
+  qualifications from the 2026-08 audit: (a) value-truth at addresses the program image/ROM also
+  pins is constrained by *no* Core system table — upstream it comes from the verifying key's
+  `initial_global_cumulative_sum` binding, i.e. the C1/C3 layer; (b) the uniqueness premises are
+  stated per 8-byte `locOf` cell while the upstream control chain (indexed control messages +
+  `prev_addr < addr` + PublicValues endpoint anchors) orders exact byte addresses with no
+  alignment constraint, so the discharge additionally needs an alignment/consumability argument
+  or a per-address premise restatement; and
 - SyscallCore/SyscallInstrs: raw syscall transcript consistency.
 
 This work should target the existing `InitialBoundaryFacts`,
@@ -88,7 +100,10 @@ operand of a row that exists.
 ### 4. Construct the exact refinement bundle
 
 Instantiate every field of `CoreAIRRefinementObligations` from the preceding theorems and narrowly
-stated external contracts. Then publish:
+stated external contracts. Keep those two sources visibly separate: AIR-derived table facts belong in
+the exact refinement, while loader/platform/handler/code-memory contracts must remain an explicit
+public theorem parameter or source-relation restriction. They must not disappear inside an
+unqualified “AIR-only” bundle. Then publish:
 
 ```lean
 sp1_air_refinement
@@ -128,9 +143,11 @@ complete machine state.
 Public-output coverage remains an optional strengthening:
 
 1. prove `UsesStandardHaltWrapper` for the exact committed standard guest, or
-   `OutputSafeVerifyingKey` for the verification key;
-2. derive all-eight `CompleteCommitCoverage`; and
-3. add output-byte and hashing semantics before calling the result full public-output authentication.
+   `CommitCoveringVerifyingKey` for the verification key;
+2. derive all-eight `CompleteCommitCoverage`;
+3. use the row-to-flag and rolling-digest continuity theorems to derive
+   `CompleteCommitDigestMatches` for the terminal public digest; and
+4. add output-byte and hashing semantics before calling the result full public-output authentication.
 
 Add deferred-COMMIT coverage only if a downstream theorem needs it.
 
@@ -197,6 +214,15 @@ Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistica
 *how-to-golf-safely* rules live in `docs/agents/cleanup-profile.md` (the binding house rules for
 `/cleanup` and `/cleanup-all`) and `docs/agents/proof-patterns.md` § "Golf & cleanup discipline"
 + § "Compile-time / performance landmines".
+
+- **One-instruction end-to-end instance** (2026-08 audit recommendation): a hand-built
+  single-Add-instruction witness — real ROM byte in `mem`, one instruction row, a whole
+  38-table `EnsembleWitness` with proved `Constraints ∧ BalancedChannels`, and a constructed
+  `InitialBoundaryFacts` exhibiting all 11 fields simultaneously. This is the cheapest strong
+  evidence for *joint* satisfiability of the capstone premise bundle (in particular
+  `memoryProvider` content vs `romLoaded`/`codeMemoryCompatible` at overlapping addresses —
+  a cross-field tension no current anchor exercises; today only `isInitialState_nonvacuous`
+  witnesses the empty program) and would validate the §2 closure story empirically.
 
 - **`linter.style.longLine`** — the one remaining syntactic linter not yet enabled (the last
   candidate noted in AGENTS.md § Linters). Current fallout, lines over 100 **codepoints** in

@@ -5,7 +5,7 @@ import SP1Clean.Soundness.StateConsistency
 
 > **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
 
-Connects the abstract balance⇒trail core (`GatedVm.exists_trail` in `Chain.lean`) to SP1's concrete
+Connects the abstract balance⇒trail core (`GatedVm.exists_trail` in `Soundness/Walk.lean`) to SP1's concrete
 state bus (`Soundness/StateConsistency.lean`). Each real row is the directed edge
 `receiveKey → sendKey` (its current state → next state); the verifier boundary contributes a genesis
 production of the public initial key and a finalization consumption of the public final key. We show

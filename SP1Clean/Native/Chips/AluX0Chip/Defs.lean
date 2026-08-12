@@ -14,7 +14,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 Fast path for ALU instructions writing to `x0` (result discarded). Validates program/register accesses
 and advances state only; a single dynamic `opcode` column (range-checked `< 29`) covers every ALU opcode.
 Composes `CPUState` and `ALUTypeReaderImmutable` (op_a reads writing 0 to `x0`, op_c gated by
-`is_real - imm_c`), plus the LTU byte-range send and `op_a_0 = is_real` forcing gates. -/
+`is_real - imm_c`), plus the LTU byte-range **pull** and `op_a_0 = is_real` forcing gates. -/
 
 namespace SP1Clean.AluX0Chip
 
@@ -72,10 +72,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   -- Nothing is witnessed: the state/adapter/opcode/is_real are threaded inputs, the readers are
-  -- `FormalAssertion`s (localLength 0), and the LTU send + gates witness nothing.
+  -- `FormalAssertion`s (localLength 0), and the LTU pull + gates witness nothing.
   localLength _ := 0
   output input _ := ⟨input.state, input.adapter, input.opcode, input.is_real⟩
-  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReaderImmutable`'s program
+  -- `programChannel` joins the structural `RowSpec` propagated from `ALUTypeReaderImmutable`'s program
   -- **pull** (W11 flip): the reader pulls the instruction fetch as a guarantee, which propagates here.
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
   channelsLawful := by

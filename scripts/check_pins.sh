@@ -5,7 +5,8 @@
 #   3. the SP1 semantic revision quoted in README/report against the single authoritative
 #      source, `SP1Clean.FormalModel.CoreProfile.sp1SemanticRevision` (itself `rfl`-checked
 #      against the extracted provenance);
-#   4. the census declaration count cited in docs against `scripts/axiom_probe.lean`.
+#   4. the census declaration count cited in docs against the generated probes
+#      (`scripts/axiom_probe.lean` + `scripts/axiom_probe_test.lean`).
 #
 # This is the gate whose absence let a wrong recorded PolyFun pin survive the 2026-08
 # migration: `check_report_citations.sh` validates that cited paths resolve, not that
@@ -95,8 +96,11 @@ for path in ("README.md", "docs/verification-report.md", "docs/overview.md"):
         if quoted not in known:
             err(f"{path} quotes commit `{quoted}` which matches no recorded pin")
 
-# -- 4. census declaration count cited in docs vs the generated probe -------------------
-probe_count = sum(1 for line in open("scripts/axiom_probe.lean")
+# -- 4. census declaration count cited in docs vs the generated probes ------------------
+# The census is split into a main-library probe and a test-library probe (see
+# scripts/gen_axiom_probe.py); the cited figure is their sum.
+probe_count = sum(1 for probe in ("scripts/axiom_probe.lean", "scripts/axiom_probe_test.lean")
+                  for line in open(probe)
                   if line.startswith("#print axioms "))
 for path, pattern in (("README.md", r"(\d+)-declaration"),
                       ("docs/snapshots/axiom-ledger.md", r"(\d+) released declarations are probed")):

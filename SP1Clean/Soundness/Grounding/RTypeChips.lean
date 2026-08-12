@@ -5,8 +5,9 @@ import SP1Clean.Proofs.Chips.DivRemChip.Contracts
 /-! # Canonical R-type grounding instances
 
 Chip-specific structural facts for register-register chips sharing the six-message `RTypeReader`
-Memory shape.  The family constructor and Add/Sub validation anchors remain in
-`GroundingAdapter`; this module extends the family without making that central adapter normalize
+Memory shape.  The family constructor (`RTypeChipGroundingData.toContracts`) lives in
+`Soundness/ChipContracts.lean`, and the Add anchor material in `Soundness/GroundingAdapter.lean`;
+this module extends the family without making those central modules normalize
 every concrete chip circuit.
 -/
 

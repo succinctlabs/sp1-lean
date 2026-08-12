@@ -37,8 +37,7 @@ of its patterns each of our notes realizes, so a *new* blowup is anticipated rat
 | §"Elaboration budgets" — the hand-written surface carries none; fold the blowup rather than raise a ceiling | Clean's thrice-stated "**Never modify maxHeartbeats**" + performance-problems §"Measuring honestly" (`#count_heartbeats` lies; lower the *real* ceiling, or use `diagnostics true`, to find the true floor) |
 | The 3 remaining gated completeness proofs (Branch/ShiftLeft/DivRem); ShiftRight is the validated repair | performance-problems §"Kernel size cliffs in completeness proofs": `circuit_proof_start_core` → per-component `dsimp only [main, circuit_norm] at h_env` → `.1`/`.2` → split into a (virtual, free) subcircuit when the parent cliffs |
 
-One disagreement worth stating honestly (see also `docs/architecture.md` §"Relationship to Clean's `Air`
-layer"): Clean's "don't hand-unpack `ConstraintsHold` into helper lemmas" rule targets *single-circuit*
+One disagreement worth stating honestly: Clean's "don't hand-unpack `ConstraintsHold` into helper lemmas" rule targets *single-circuit*
 proofs; our `Soundness/` whole-machine layer legitimately reasons about the *ensemble*'s global balance,
 which is a different regime — but per-chip closed-form families (`<chip>_memoryInteractionValues_eq`) are
 closer to what Clean would fold into a bundled `Spec`/`exposedChannels` conjunct.
@@ -46,7 +45,8 @@ closer to what Clean would fold into a bundled `Spec`/`exposedChannels` conjunct
 ## Elaboration budgets: this repo doesn't use them — fold the blowup
 
 **Hand-written Lean here carries zero `set_option maxHeartbeats`**, matching upstream Clean (none in
-44,603 lines), and three `maxRecDepth` sites, each structural and measured. Every other surviving site is
+44,603 lines), and two `maxRecDepth` sites (`Faithful/BranchChip.lean`, `FormalModel/Trace/Witness.lean`),
+each structural and measured. Every other surviving site is
 on a *generated* definition, where the only lever is `update_extracted.py`.
 
 `scripts/check_option_escapes.sh` (a CI `guards` gate + part of `run_audit.sh`) **prohibits** both options:
@@ -263,7 +263,7 @@ witnessing. Template: `Native/Operations/{AddOperation,SubOperation,AddwOperatio
 - **Soundness**: byte ranges from the pull `Guarantees` (`byteRowSpec_range`), carry-bools from the gated
   asserts (`bool_of_mul_pred`), fed to `<sem>_of_<raw>`; plus a byte *padding requirement* per receive
   (`intro h; rw [gate_zero_of_ne hbin h, zero_mul, ← c16]; exact (byteRowSpec_range 0 h16p).mpr (by simp)`).
-- **Chip side** (`Proofs/Chips/AddChip.lean`): `let value ← witnessVector n (fun env => <Op>.populate …)`;
+- **Chip side** (`Proofs/Chips/AddChip/Formal.lean`): `let value ← witnessVector n (fun env => <Op>.populate …)`;
   `assertion <Op>.circuit ⟨…, value, is_real⟩`. Soundness feeds the op's `Assumptions`
   (`(h_op ⟨ha,hb,h_bin⟩ hr).2`); the channel tail gains `Or.inr ⟨ha, hb, h_bin⟩`. Completeness reconstructs
   per-limb `#v[eval input_var[i]]_i = input_word` (`Vector.ext; interval_cases i`), then `rw [hval]; exact
@@ -550,7 +550,7 @@ and `/--` openers (strip/restore them).
   hclk13, …⟩` makes the elaborator bridge that gap by raw `whnf` (slow → wants a heartbeat bump). A cheap
   `simp [circuit_norm] at hclk13 hclk8` normalizes both to `env.get …` first, so `refine ⟨…, hclk13, hclk8⟩`
   matches by `rfl`. Same root cause as the `simp only`/`whnf` finding above — pushing unnormalized terms into a
-  defeq check. See `Proofs/Chips/AddChip.lean`.
+  defeq check. See `Proofs/Chips/AddChip/Formal.lean`.
 - **Compose a chip `Spec` from its sub-circuits' `Spec`s (direct sub-calls), don't restate them inline.**
   Mirror sp1-lean's `SP1Chips` `allHold_constraints_iff` shape: the chip `Spec` is a conjunction of
   `<Reader>.Spec <reader-input-rebuilt-from-cols> cols.<block>` sub-calls (ungated — the readers' range checks
@@ -559,7 +559,7 @@ and `/--` openers (strip/restore them).
   conjunct *directly* (no per-bound `circuit_norm`), which is both cleaner and far cheaper than inlining the
   reader's bounds (an inlined "wide" spec is what historically timed out). Reconstruct the reader's cross-block
   inputs from the chip columns in the `Spec` (e.g. `clk_low := cols.state.clk_0_16 + cols.state.clk_16_24*65536`,
-  `wv* := cols.add_operation.value[i]`). See `Proofs/Chips/AddChip.lean`.
+  `wv* := cols.add_operation.value[i]`). See `Proofs/Chips/AddChip/Formal.lean`.
 - **Gate a reader's byte/range checks by `is_real` so padding rows are vacuous — range-check `is_real * value`.**
   SP1 sends each byte lookup with multiplicity `is_real`, so on padding (`is_real = 0`) the check isn't
   enforced and a real zero-padding row (all columns 0) is accepted. We don't model the byte bus (we use
@@ -615,7 +615,7 @@ plain `circuit_proof_start`.
   composition → `(deterministic) timeout at whnf (200000 heartbeats)`, which then cascades to `Unknown
   identifier 'elaborated'` at `def circuit := { elaborated with … }`. Omit it: the default `output :=
   (main).output offset` is the assembled struct of sub-circuit outputs and `output_eq` is `rfl` with no
-  unfolding (`Native/Readers/RegisterAccessCols.lean`, `Native/Readers/RTypeReader.lean`, `Proofs/Chips/AddChip.lean`). Set
+  unfolding (`Native/Readers/RegisterAccessCols.lean`, `Native/Readers/RTypeReader.lean`, `Proofs/Chips/AddChip/Formal.lean`). Set
   `output` explicitly **only** for a *leaf* circuit whose `main` has no sub-circuits — there `varFromOffset`
   is right and cheap (`Native/Readers/RegisterAccessTimestamp.lean`).
 - **Emit a struct-input-projected byte check as an inline `Circuit.lookup ByteTable ⟨…⟩`, not a
@@ -734,7 +734,7 @@ first
   | exact ⟨trivial, Or.inl rfl, Or.inl rfl⟩
   | (refine ⟨?_, ?_, ?_⟩ <;> first | trivial | exact Or.inl rfl | exact Or.inr h_as | exact Or.inr trivial)
 ```
-See `Proofs/Chips/AddChip.lean` and `Native/Readers/RegisterAccessCols.lean` for the worked examples.
+See `Proofs/Chips/AddChip/Formal.lean` and `Native/Readers/RegisterAccessCols.lean` for the worked examples.
 
 ## Compile-time / performance landmines
 

@@ -23,7 +23,8 @@ algebra lives in those dep lemmas.
 
 The chip `Spec` sources operands from **inputs** `op_b_val` (rs1) / `op_c_val` (rs2), matching
 the RV64 signature `f rs2_val rs1_val`. `advance` is the five-way flag-dispatched transition.
-`Mul` carries `Fact (2 ^ 24 < p)`; the bridge derives `Fact (2 ^ 17 < p)` locally. -/
+`Mul` carries `Fact (2 ^ 24 < p)`; `Fact (2 ^ 17 < p)` follows via the global
+`instFact_2_17_of_2_24` instance (`Math/Word.lean`). -/
 
 open LeanRV64D.Defs
 namespace SP1Clean.MulSail

@@ -6,7 +6,8 @@ import SP1Clean.Native.Operations.IsZeroOperation.Defs
 
 SP1's `IsZeroOperation::eval` as a Clean `FormalAssertion`. The semantic `Spec` is `is_real`-gated:
 `result` is the zero indicator, and off zero `inverse = a⁻¹`. `Spec`/`spec_populate` live here (not
-in `Specs.Operation`) to avoid an import cycle through `IsZeroWordOperation.Extracted`. -/
+in `FormalModel/Contracts/Operations.lean`) to avoid an import cycle through the composing
+`IsZeroWordOperation`'s hand-maintained `Native/Operations/IsZeroWordOperation/Defs.lean`. -/
 
 namespace SP1Clean.IsZeroOperation
 

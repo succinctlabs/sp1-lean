@@ -26,7 +26,7 @@ reader-facing docs one level up (start with [`../architecture.md`](../architectu
 - [extraction.md](extraction.md) — the constraint-extraction pipeline (`sp1-constraint-compiler` → `update_extracted.py` → Lean) and the DSL contract.
 - [cleanup-profile.md](cleanup-profile.md) — binding house rules for `/cleanup` and `/cleanup-all`; overrides the `mathlib-quality` plugin wherever they conflict.
 - [perf-findings.md](perf-findings.md) — how to avoid an elaboration budget: **the rule** (extract over opaque arguments), the folded-vs-unfolded predictor, the cause classes with their fixes, the diagnostic instrument and measurement traps, and the bar a site must clear before it may be allowlisted.
-- [cleanup-deferred.md](cleanup-deferred.md) — the owner-decision queue: duplication found and deliberately not fixed, grouped by blocker, with measured sizes; plus the 40-entry rename queue (never applied).
+- [cleanup-deferred.md](cleanup-deferred.md) — the owner-decision queue: duplication found and deliberately not fixed, grouped by blocker, with measured sizes; plus the 42-entry rename queue (never applied).
 Point-in-time snapshots (regenerate before release) live under [`../snapshots/`](../snapshots/):
 - [../snapshots/axiom-ledger.md](../snapshots/axiom-ledger.md) — the machine-checked `#print axioms` inventory per theorem.
 - [../snapshots/compile-profile.md](../snapshots/compile-profile.md) — per-module elaboration profile + worst offenders + common threads.

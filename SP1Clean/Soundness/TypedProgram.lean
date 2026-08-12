@@ -822,7 +822,7 @@ interactions.  This is positional on purpose: it connects the stable witness ind
 `ProgramProviderBound` to the exact Clean ensemble layout. -/
 theorem witness_nonProgramProviderTable_programInteractions_eq_nil
     (witness : EnsembleWitness (sp1Ensemble (p := p))) (i : ℕ)
-    (lower : 25 ≤ i) (upper : i < 36) (witnessBound : i < witness.tables.length)
+    (lower : 25 ≤ i) (upper : i < 38) (witnessBound : i < witness.tables.length)
     (notProgram : i ≠ programProviderIndex) :
     typedTableInteractionsWith witness.tables[i] programChannel = [] := by
   apply List.map_eq_nil_iff.mp
@@ -860,12 +860,12 @@ theorem witness_providerProgramInteractions_eq
     (witness.tables.drop 25).flatMap
         (typedTableInteractionsWith · programChannel) =
       typedTableInteractionsWith table programChannel := by
-  have tablesLength : witness.tables.length = 36 := by
+  have tablesLength : witness.tables.length = 38 := by
     rw [← witness.same_length]
     rfl
-  have tableAt33 := tableAt
-  change witness.tables[33]? = some table at tableAt33
-  obtain ⟨_, tableEq33⟩ := List.getElem?_eq_some_iff.mp tableAt33
+  have tableAt35 := tableAt
+  change witness.tables[35]? = some table at tableAt35
+  obtain ⟨_, tableEq35⟩ := List.getElem?_eq_some_iff.mp tableAt35
   subst table
   rw [List.drop_eq_getElem_cons (i := 25) (by omega),
     List.drop_eq_getElem_cons (i := 26) (by omega),
@@ -878,6 +878,8 @@ theorem witness_providerProgramInteractions_eq
     List.drop_eq_getElem_cons (i := 33) (by omega),
     List.drop_eq_getElem_cons (i := 34) (by omega),
     List.drop_eq_getElem_cons (i := 35) (by omega),
+    List.drop_eq_getElem_cons (i := 36) (by omega),
+    List.drop_eq_getElem_cons (i := 37) (by omega),
     List.drop_eq_nil_of_le (by omega)]
   simp only [List.flatMap_cons, List.flatMap_nil, List.append_nil]
   rw [witness_nonProgramProviderTable_programInteractions_eq_nil witness 25 (by omega)
@@ -896,9 +898,13 @@ theorem witness_providerProgramInteractions_eq
       (by omega) (by omega) (by simp [programProviderIndex]),
     witness_nonProgramProviderTable_programInteractions_eq_nil witness 32 (by omega)
       (by omega) (by omega) (by simp [programProviderIndex]),
+    witness_nonProgramProviderTable_programInteractions_eq_nil witness 33 (by omega)
+      (by omega) (by omega) (by simp [programProviderIndex]),
     witness_nonProgramProviderTable_programInteractions_eq_nil witness 34 (by omega)
       (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 35 (by omega)
+    witness_nonProgramProviderTable_programInteractions_eq_nil witness 36 (by omega)
+      (by omega) (by omega) (by simp [programProviderIndex]),
+    witness_nonProgramProviderTable_programInteractions_eq_nil witness 37 (by omega)
       (by omega) (by omega) (by simp [programProviderIndex])]
   simp
 

@@ -7,7 +7,7 @@ import Mathlib.Tactic.IntervalCases
 The structural carry-bool + limb-range form `RawSpec`, and the two native carry-chain theorems
 (`addSemantics_of_carries` / `carries_of_addSemantics`) the gadget's soundness/completeness route
 through. Uses only the local `limb_lift`/`val_65536_*` foundations. The `FormalAssertion` contract
-lives in the sibling `Formal` module; `Operations/AddOperation.lean` re-exports all three. -/
+lives in `Proofs/Operations/AddOperation/Formal.lean`. -/
 
 namespace SP1Clean.AddOperation
 

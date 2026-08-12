@@ -11,16 +11,19 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 /-! # Native `MemoryAccess` primitive — one true-address memory read/write as a Clean `GeneralFormalCircuit`
 
 SP1's `eval_memory_access_read` / `eval_memory_access_write` + `eval_memory_access_timestamp`
-(`crates/core/machine/src/air/memory.rs`), mirrored in the `memory_access` fragment of every
-`Extracted/{Load,Store}*Chip.lean`. The Memory bus operates at a *real* 48-bit address (`addr0/1/2 ≠
-register-index shape`); the read/write distinction is carried by the `new_value` parameter
-(read: `new = prev_value`; write: `new = store_value`).
+(`crates/core/machine/src/air/memory.rs`), mirrored in the `memory_access` fragment of the
+`Extracted/ChipOracle/{Load,Store}*.lean` oracles. The Memory bus operates at a *real* 48-bit address
+(`addr0/1/2 ≠ register-index shape`); the read/write distinction is carried by the `new_value`
+parameter (read: `new = prev_value`; write: `new = store_value`).
 
 Per real row it imposes the **48-bit timestamp monotonicity** machinery — `compare_low` selects whether the
 high clock limbs match (then compare the low limbs) or differ (compare the high limbs); the gap
 `selected_cur − selected_prev − 1` is a 24-bit value `diff_low + diff_high·2^16` (range-checked 16 + 8 on the
-Byte bus) — and emits the two Memory interactions: a **send** of the prior value at the previous timestamp
-(`+is_real`) and a **receive** of `new_value` at the current timestamp `(clk_high, clk_low + 1)` (`−is_real`).
+Byte bus) — and emits the two Memory interactions. **W11 polarity flip:** the prior value at the
+previous timestamp is a `pullIf` (mult `−is_real`, deriving its `isU64 ∧ ClkBound`), and `new_value`
+at the current timestamp `(clk_high, clk_low + 1)` is a `pushIf` (`+is_real`, proving the guarantee) —
+SP1's Rust *sends* the prior (`+`) and *receives* the new (`−`), matched up to the per-channel
+multiplicity negation bridged in the Faithful anchors.
 The bus's cross-row meaning (offline-memory, last-write-wins) is the trace level
 (`Soundness/MemoryConsistency.lean`); this primitive supplies the per-row monotonicity + emission. -/
 

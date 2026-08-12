@@ -89,12 +89,15 @@ and produces:
 a successful shard-local Sail execution
 of the statement's program
 between the public PC and clock endpoints
-using exactly the active decoded rows
+(constructed by the proof from exactly the active decoded rows)
 ```
 
-The theorem does not consume boot or halt hypotheses and does not conclude either fact. It also does
-not derive its provider/boundary premises from the exact upstream system tables. Those scope
-restrictions are in the relation definitions, rather than prose assumptions.
+The exported target relation states only the program/endpoint facts; the row-exactness fact lives
+in the intermediate `supported_core_witness_grounding` theorem and is discarded by the final
+existential. The theorem does not consume boot or halt hypotheses and does not conclude either
+fact. It also does not derive its provider/boundary premises from the exact upstream system
+tables. The endpoint/program scope restrictions are in the relation definitions, rather than
+prose assumptions.
 
 ## Faithfulness audit
 
@@ -111,7 +114,8 @@ proved on every locally accepted row, modulo permutation and zero-multiplicity e
 
 The system tables are handled differently: their complete generated lists are used directly in the
 exact relation. They do not yet have native semantic-table faithfulness theorems, because the native
-ensemble uses a smaller proof-oriented provider interface. Connecting those two interfaces is the
+ensemble uses a smaller proof-oriented provider interface (13 provider/boundary tables alongside the
+25 instruction chips — a 38-table Clean ensemble). Connecting those two interfaces is the
 remaining exact Core refinement task.
 
 ## Exact AIR coverage
@@ -147,13 +151,21 @@ The report distinguishes three statements:
 2. every COMMIT row that occurs contains the correct digest word; and
 3. all eight COMMIT rows occur.
 
-AIR provides the second statement. Program correctness of the standard halt wrapper provides the
-third. The verification key prevents program substitution only after its program binding is proved.
+The AIR layer is responsible for the second statement (the obligations bundle's
+`publicCommitOperand`/`deferredCommitOperand` fields — stated, not yet discharged). It also supplies
+the one-way row-to-flag implications and the public-values transition laws (all three, like the
+operand fields, are stated obligations — not yet discharged from the exact tables). Together with recursion's
+ledger continuity, `finalCommitRowsMatch_of_execution` proves that every existing row is tied to the
+terminal digest; it never infers row existence from a flag. Program correctness of the standard halt
+wrapper provides the third statement. The verification key prevents program substitution only after
+its program binding is proved.
 
 The base shard and execution relations therefore require no wrapper assumption.
 `SP1CommitCoveredExecutionRelation` is an optional strengthening derived from
-`UsesStandardHaltWrapper` or `OutputSafeVerifyingKey`. Neither condition currently proves that the
-digest hashes a modeled output byte stream.
+`UsesStandardHaltWrapper` or `CommitCoveringVerifyingKey`.
+`completeCommitDigestMatches_of_coveredExecution` proves all eight covered rows match the terminal
+digest. Neither program condition currently proves that the digest hashes a modeled output byte
+stream.
 
 ## Proof and axiom audit
 
@@ -168,12 +180,16 @@ digest hashes a modeled output byte stream.
 - a zero-tolerance project-axiom scan;
 - `skipKernelTC` and main-library `native_decide` guards;
 - an elaboration-budget escape-hatch prohibition (allowlist-gated); and
-- a generated `#print axioms` census over the released theorem surface, diffed against the
-  committed `docs/snapshots/axiom-census.txt` — drift fails; only `--update` rewrites the
-  snapshot, so a passing run leaves the tree clean.
+- a generated `#print axioms` census over the released theorem surface — currently 524 probed
+  declarations, split 466 (main library) plus 58 (test anchors) — split by library and
+  diffed against the committed `docs/snapshots/axiom-census.txt` (main) and
+  `docs/snapshots/axiom-census-test.txt` (test anchors) — drift fails; only `--update` rewrites
+  the snapshots, so a passing run leaves the tree clean.
 
-CI runs the three cross-check gates in its fast `guards` job and the full harness in a dedicated
-`audit` job on the built oleans.
+CI runs the three cross-check gates in its fast `guards` job, the harness's main scope
+(`--main-only`) in a dedicated `audit` job on the built `SP1Clean` oleans, and the test-scope
+census (`--test-only`) in the `test` job right after `lake test` produces the `SP1CleanTest`
+oleans that probe needs.
 
 Current classes in the census are:
 
@@ -191,7 +207,10 @@ theorem whose target is the complete generated interpreter inherits dependencies
 its reduction lemmas. The raw census discloses this boundary instead of describing the headline theorem
 as depending only on three logical axioms.
 
-There are 51 textual `native_decide` occurrences in the test library (the conformance batteries plus the `NonVacuity.lean` chip-assumptions witnesses) and none in the main library.
+There are 88 textual `native_decide` occurrences in the test library (the conformance batteries,
+the `NonVacuity.lean` chip-assumptions witnesses, the `NonVacuityReal.lean` real-row
+satisfiability battery, and the independent-audit joint-premise regression) and none in the main
+library.
 They check witness and complete-trace conformance and are not imported by the soundness theorem.
 
 ## Trusted or externally assumed components
@@ -207,6 +226,7 @@ They check witness and complete-trace conformance and are not imported by the so
 | Exact natural balance | execution needs a real multiset, not modular equality | extract with LogUp/GKR soundness and bounds |
 | Shard ledger cryptography | cumulative sums and deferred proofs are recursive-proof facts | prove in recursion/verifier layer |
 | Standard halt wrapper | needed only for all-eight COMMIT coverage | prove from exact committed ROM |
+| Hand-mirrored opcode enum/routing | `SP1Clean/Model/Opcode.lean` re-declares SP1's `Opcode` variants and `#[repr(u8)]` discriminants, and `SP1Clean/Soundness/Coverage.lean` mirrors the `tracing.rs` routing, by hand — an interim hand-verified trust item | replace with a generated, pin-checked opcode-table artifact (in flight) |
 
 These are theorem inputs or tool/model trust boundaries, not undisclosed Lean axioms.
 
@@ -245,8 +265,8 @@ scripts/run_audit.sh
 
 The final command regenerates:
 
-- `scripts/axiom_probe.lean`; and
-- `docs/snapshots/axiom-census.txt`.
+- `scripts/axiom_probe.lean` and `scripts/axiom_probe_test.lean`; and
+- `docs/snapshots/axiom-census.txt` and `docs/snapshots/axiom-census-test.txt`.
 
 An unknown declaration makes the probe fail. A new proof deferral, project axiom, forbidden kernel
 bypass, main-library `native_decide`, non-allowlisted elaboration-budget directive, or `sorryAx` carrier

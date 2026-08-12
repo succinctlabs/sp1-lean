@@ -8,7 +8,8 @@ The syscall AIR constrains every COMMIT row that exists, but intentionally does 
 standard halt wrapper and belongs at the composed-execution boundary, across all shards.  This file
 therefore separates two predicates:
 
-* `CommitRowsMatch`: per-shard correctness of every existing COMMIT/COMMIT_DEFERRED row, proved from AIR;
+* `CommitRowsMatch`: per-shard operand correctness of every existing COMMIT/COMMIT_DEFERRED row;
+* `CommitRowsSetFlags`: the AIR-forced direction from each existing row to its rolling flag;
 * `CompleteCommitCoverage`: all eight public COMMIT indices occur in a whole-execution transcript,
   supplied by an explicit standard-wrapper contract.
 
@@ -49,6 +50,25 @@ def DeferredCommitRowsMatch {p : ℕ} (publicValues : SP1PublicValues (ZMod p))
   ∀ event ∈ events, ∀ index : Fin 8,
     event.IsCanonicalCode commitDeferredSyscallId → event.arg1.toNat = index →
       (event.arg2.toNat : ZMod p) = publicValues.deferred_proofs_digest[index]
+
+/-- Every existing canonical COMMIT row forces the shard's public rolling flag.  This is the
+direction proved by `SyscallInstrs`; it deliberately says nothing about row existence. -/
+def PublicCommitRowsSetFlag {p : ℕ} (publicValues : SP1PublicValues (ZMod p))
+    (events : List CoreSyscallEvent) : Prop :=
+  ∀ event ∈ events,
+    event.IsCanonicalCode commitSyscallId → publicValues.commit_syscall = 1
+
+/-- Existing canonical COMMIT_DEFERRED rows force the corresponding rolling flag. -/
+def DeferredCommitRowsSetFlag {p : ℕ} (publicValues : SP1PublicValues (ZMod p))
+    (events : List CoreSyscallEvent) : Prop :=
+  ∀ event ∈ events,
+    event.IsCanonicalCode commitDeferredSyscallId → publicValues.commit_deferred_syscall = 1
+
+/-- Both AIR-forced row-to-flag implications, with no converse or coverage claim. -/
+structure CommitRowsSetFlags {p : ℕ} (publicValues : SP1PublicValues (ZMod p))
+    (events : List CoreSyscallEvent) : Prop where
+  publicCommit : PublicCommitRowsSetFlag publicValues events
+  deferredCommit : DeferredCommitRowsSetFlag publicValues events
 
 /-- Per-shard AIR conclusion for commit syscalls: every existing row is correct.  Coverage is the
 separate whole-execution `CompleteCommitCoverage` contract. -/

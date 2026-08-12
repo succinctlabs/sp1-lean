@@ -14,7 +14,7 @@ import SP1Clean.Soundness.ChipContracts
 
 This module is the naming boundary the old trail capstone lacked:
 
-* `SupportedCoreEnsembleRelation` is exactly the algebra checked by the 36-table Clean ensemble;
+* `SupportedCoreEnsembleRelation` is exactly the algebra checked by the 38-table Clean ensemble;
 * `SP1SemanticBoundaryRelation` separately binds its preprocessed/provider rows to the committed
   program and a concrete local initial Sail state;
 * `SupportedCoreMemoryTimestampRangeRelation` exposes the one physical range premise used by the
@@ -165,7 +165,7 @@ structure SupportedCoreGrounding
 
 /-- The committed-decode field of every statically grounded ordered row is already discharged.
 This theorem deliberately sits beside the remaining grounding seam: Program truth comes entirely
-from the exact chip pulls, Clean balance, the canonical table-33 provider, and the statement binding;
+from the exact chip pulls, Clean balance, the canonical table-35 provider, and the statement binding;
 it is not an assumption of the timed State/Memory induction. -/
 theorem supportedCore_orderedRows_programDecoded
     (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)

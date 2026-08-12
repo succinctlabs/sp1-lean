@@ -8,8 +8,8 @@ import SP1Clean.Proofs.Sail.Advance
 
 `correct_bitwise_native` proves the RISC-V Sail R-type bitwise execution agrees with the SP1 chip
 emulation given the semantic fact and register/PC reads. `SailWrap.execute_RTYPE_pure` already
-maps `.AND/.OR/.XOR → &&&/|||/^^^`. Three `bitwise_chip_reaches_sail_*` end-to-end lemmas
-compose `BitwiseChip.Spec`'s opcode-gated conjuncts into the bridge. -/
+maps `.AND/.OR/.XOR → &&&/|||/^^^`. Six `bitwise_chip_reaches_sail_*` end-to-end lemmas
+(register + immediate forms) compose `BitwiseChip.Spec`'s opcode-gated conjuncts into the bridge. -/
 
 open LeanRV64D.Defs
 namespace SP1Clean.BitwiseSail

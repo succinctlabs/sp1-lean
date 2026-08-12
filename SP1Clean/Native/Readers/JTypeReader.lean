@@ -69,7 +69,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   output _ _ := ()
   -- `byteChannel` (composed `RegisterAccessCols` checks) + `programChannel` (W11 program flip — now
   -- **pulled**) + `memoryChannel` (W11 memory flip — the op_a read-prior `pullIf` derives `MemoryMsg.isU64`,
-  -- so it joins `channelsWithGuarantees`; its write `pushIf` keeps it in `channelsWithRequirements`).
+  -- so it joins `channelsWithGuarantees`). This reader has **no** memory push (the op_a write is
+  -- factored into `Readers/RegisterWrite`); `memoryChannel` stays declared in the bundle's
+  -- `channelsWithRequirements` below.
   channelsWithGuarantees := [byteChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
   channelsLawful := by
     dsimp only [ElaboratedCircuit.ChannelsLawful]

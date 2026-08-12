@@ -9,8 +9,8 @@ as a true Clean `assertion` on the limb-wise difference `a - b`. Its faithful `S
 `IsZeroWordOperation.Spec` on that difference (referenced by direct field application); the semantic
 `is_diff_zero.result = (a = b)` is recovered by `result_semantic`.
 
-`Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle: this op tops the
-`IsEqualWord → IsZeroWord → IsZero` composition chain. -/
+`Spec`/`spec_populate` live here (not in `FormalModel/Contracts/Operations.lean`) to avoid an import
+cycle: this op tops the `IsEqualWord → IsZeroWord → IsZero` composition chain. -/
 
 namespace SP1Clean.IsEqualWordOperation
 

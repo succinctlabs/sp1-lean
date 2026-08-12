@@ -4,7 +4,7 @@ import SP1Clean.FormalModel.Contracts.Operations
 
 The witness assignment `populate_msb` (the high bit of `a`, threaded in by the composing operation),
 and `spec_populate` (the witnessed `msb` satisfies the gadget `Spec`). The elaborated `eval` circuit
-is the auto-generated sibling `Extracted` module; the arithmetic core is in `RawSpec`; the
+is hand-maintained in the sibling `Defs.lean`; the arithmetic core is in `RawSpec`; the
 `FormalAssertion` contract in `Formal`. -/
 
 namespace SP1Clean.U16MSBOperation

@@ -152,7 +152,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
   channelsLawful := by simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
-  -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks/gates witness nothing.
+  -- only the `AddressOperation` subcircuit witnesses (its 4 cells); the other blocks/gates witness nothing.
   localLength _ := 3 + 1
   localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
   output input i0 :=
@@ -161,7 +161,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
       input.memory_access, input.offset_bit, input.selected_word, ⟨input.msb⟩,
       input.is_lw, input.is_lwu⟩
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, Readers.RegisterWrite.circuit, U16MSBOperation.circuit]
-  -- `programChannel` joins the byte guarantee propagated up from `ITypeReader`'s program **pull** (W11 flip);
+  -- `programChannel` joins the structural `RowSpec` propagated from `ITypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `MemoryAccess`'s read pulls + `RegisterWrite`'s op_a write push (W11 memory flip).
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 

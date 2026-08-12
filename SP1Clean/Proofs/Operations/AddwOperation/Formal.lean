@@ -7,7 +7,7 @@ import SP1Clean.Native.Operations.AddwOperation.Defs
 SP1's `AddwOperation::eval` as a Clean `FormalAssertion`. Composes `U16MSBOperation` on the high
 result limb `value[1]`, pulls two limb ranges from the byte bus, asserts the two gated carries.
 Soundness routes through `addwSemantics_of_carries`; completeness through `carries_of_addwSemantics`.
-`Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle. -/
+`Spec`/`spec_populate` live here (not in `FormalModel/Contracts/Operations.lean`) to avoid an import cycle. -/
 
 namespace SP1Clean.AddwOperation
 

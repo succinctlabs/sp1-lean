@@ -16,8 +16,9 @@ variable {p : ℕ}
 /-- The `Mul`/`DivRem`/capstone strong field bound subsumes the project-standard `2^17` bound. -/
 instance instFact_2_17_of_2_24 [Fact (2 ^ 24 < p)] : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
-/-- The engine's machine-level bound (SP-3: state axis `2^24+256`, memory axis `2^25+2^17`) subsumes
-the strong chip bound. Dormant until the engine (proposal step S4) consumes it. -/
+/-- The engine's machine-level bound (state axis `2^24+256`, memory axis `2^25+2^17`) subsumes
+the strong chip bound. Consumed by the timed grounding engine and the capstone layer, which
+carry `Fact (2 ^ 25 < p)`. -/
 instance instFact_2_24_of_2_25 [Fact (2 ^ 25 < p)] : Fact (2 ^ 24 < p) := ⟨by have := Fact.out (p := 2 ^ 25 < p); omega⟩
 
 -- Project-wide `circuit_norm` augmentation. These four pure, terminating projections recur inline in

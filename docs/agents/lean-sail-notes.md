@@ -114,10 +114,10 @@ sets transfer almost verbatim. What's there:
 - **Write** — `run_vmem_write_of_width_8` (8-byte write produces the post-state with eight `mem.insert`s of
   `BitVec.ofNat 8 (data.toNat >>> 8·k)`), with `run_checked/run_mem_write_value_eight_bytes_of_isInitialized`.
 
-Fork adaptations (vs sp1-lean): this `LeanRV64D` reads `htif`/`mstatus` via `s.regs.get?` directly, so the
+Generated-model adaptations (vs sp1-lean): this `LeanRV64D` reads `htif`/`mstatus` via `s.regs.get?` directly, so the
 proofs use `Std.ExtDHashMap.get?_eq_some_get`/`effectivePrivilege` + an `extractLsb … = 0#1` MPRV bridge
 instead of sp1-lean's `run_readReg_of_isInitialized`; `run_vmem_write_of_width_8` needs an extra
-`rw [show extractLsb data 63 0 = data]` before `conv_lhs => rw [h]` (the fork's `vmem_write_addr`
+`rw [show extractLsb data 63 0 = data]` before `conv_lhs => rw [h]` (the generated model's `vmem_write_addr`
 re-extracts the data argument). The target lakefile does not disable `linter.unusedSimpArgs`, so the ported
 simp lists were trimmed.
 
@@ -126,7 +126,7 @@ alignment/fits/range facts as **hypotheses** (the `AddBridge` philosophy — the
 `correct_{load,store}_double_native` is `(spec).run s = (sp1).run s`. The `execute_STORE` Sail signature is
 `execute_STORE imm rs2 rs1 width` (**rs2 before rs1** — the stored-value register first). Axiom profile = the
 base trio + `LeanRV64D` platform constants (`{load,match}_reservation`, `plat_term_write`,
-`sys_enable_experimental_extensions`) + bv_decide's `Lean.ofReduceBool`/`Lean.trustCompiler` (a `native_decide`
+`sys_enable_experimental_extensions`) + bv_decide's generated `._native.bv_decide.ax_*` compiler-trust constants (a `native_decide`
 on `plat_clint_base`); **no `sorryAx`**.
 
 ## When the toolchain is next touched

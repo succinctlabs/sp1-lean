@@ -101,20 +101,20 @@ theorem jalr_chip_reaches_sail
     (spec_jalr imm (.Regidx rs1) (.Regidx rd)).run s
       = (sp1_jalr (.Regidx rd) (JalrChip.nextPcWord cols) cols.op_a_operation.value).run s := by
   have h_jump : Word.toBitVec64 cols.add_operation.value = rs1_val + sign_extend (m := 64) imm := by
-    rw [h_chip.2.2.2.1 h_real, h_rs1v, h_dec]
+    rw [h_chip.2.2.1 h_real, h_rs1v, h_dec]
   have h_link : Word.toBitVec64 cols.op_a_operation.value = pc + 4#64 := by
-    rw [h_chip.2.2.2.2.1 h_real h_op_a_0, h_pcw, JalSail.toBitVec64_four]
+    rw [h_chip.2.2.2.1 h_real h_op_a_0, h_pcw, JalSail.toBitVec64_four]
   -- The LSB-clearing relation is now a verified `Spec` conjunct (the in-circuit binary `lsb` gate + the
   -- `÷4` byte-range), not an assumed precondition; unfold the Sail `BitVec.update` to its `~~~1#64 &&&` form.
   have h_lsbclear' : Word.toBitVec64 (JalrChip.nextPcWord cols)
       = BitVec.update (rs1_val + sign_extend (m := 64) imm) 0 0#1 := by
-    rw [h_chip.2.2.2.2.2.2 h_real, h_jump]
+    rw [h_chip.2.2.2.2.2 h_real, h_jump]
     simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
   -- 4-byte alignment is now a verified `Spec` conjunct (the in-circuit `÷4` range check), not an
   -- assumed precondition: lift the cleared low-limb divisibility to the committed `next_pc` word.
   have h_align : (Word.toBitVec64 (JalrChip.nextPcWord cols)).toNat % 4 = 0 := by
     rw [Word.toBitVec64_toNat_mod_four]
-    exact h_chip.2.2.2.2.2.1 h_real
+    exact h_chip.2.2.2.2.1 h_real
   exact correct_jalr_native cols.adapter.op_c_imm (JalrChip.nextPcWord cols) cols.op_a_operation.value
     rd rs1 imm pc rs1_val s hs hconfig h_pc h_rs1 h_lsbclear' h_link h_align
 
@@ -180,7 +180,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : JalrChip.Columns (ZMod p)) (data
       = Word.toBitVec64 cols.adapter.op_b_memory.prev_value := rfl
   have halign : (sndPcOf (stateAccess r)).toNat % 4 = 0 := by
     rw [hsnd_eq, Word.toBitVec64_toNat_mod_four]
-    exact hspec.2.2.2.2.2.1 hreal'
+    exact hspec.2.2.2.2.1 hreal'
   have hsnd : ∀ imm : BitVec 12, r.adapter.op_c = bitVecToWord (imm.signExtend 64) →
       sndPcOf (stateAccess r) =
         BitVec.update (Word.toBitVec64 r.adapter.op_b_memory.prev_value
@@ -192,8 +192,8 @@ theorem advance (inp : Inputs (ZMod p)) (cols : JalrChip.Columns (ZMod p)) (data
       exact toBitVec64_bitVecToWord _
     have h_jump : Word.toBitVec64 cols.add_operation.value
         = Word.toBitVec64 cols.adapter.op_b_memory.prev_value + sign_extend (m := 64) imm := by
-      rw [hspec.2.2.2.1 hreal', hr1, h_dec]
-    rw [vopbm, hsnd_eq, hspec.2.2.2.2.2.2 hreal', h_jump]
+      rw [hspec.2.2.1 hreal', hr1, h_dec]
+    rw [vopbm, hsnd_eq, hspec.2.2.2.2.2 hreal', h_jump]
     simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
   have opAFlag : cols.adapter.op_a_0 = 0 ∨ cols.adapter.op_a_0 = 1 :=
     hspec.1.2.1 hreal'
@@ -210,7 +210,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : JalrChip.Columns (ZMod p)) (data
       simp only [commitEq, Trace.CommitEffect.regWrite]
     refine advance_of_jalr hcfg hrom hpcread hvalb hdecrom hop himmb himmc hnonX0
       halign hsnd ?_ (hwrites := hwrites) (hnomem := hnomem)
-    rw [vrd, hspec.2.2.2.2.1 hreal' hopa0, hpcw, JalSail.toBitVec64_four]
+    rw [vrd, hspec.2.2.2.1 hreal' hopa0, hpcw, JalSail.toBitVec64_four]
   · have hopaZero : r.adapter.op_a = 0 := by
       apply hdecrom.op_a_eq_zero_of_op_a_0_eq_one
       simpa only [programAccess, ProgramAccess.toRow] using vopa0.trans hopa1

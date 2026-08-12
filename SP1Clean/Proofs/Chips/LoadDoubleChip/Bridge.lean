@@ -95,8 +95,11 @@ private lemma byteConcat8_toNat_eq_Word_toNat [NeZero p]
   have : 2 ^ 48 = 281474976710656 := by norm_num
   omega
 
-/-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `LD`
-(unsigned, full 64-bit word). -/
+/-- The RISC-V spec: advance `nextPC ← PC + 4`, then execute the Sail `LD` (full 64-bit word).
+The `is_unsigned := true` parameter is decoder-unreachable (`valid_load_encdec` forbids
+`(8, true)`; funct3 `011` decodes to `false`) and inert at width 8 — extension is the identity —
+and this helper is off the `kind.advance` proof path, which uses the decoder-canonical
+`loadOpcode 8 false`. -/
 noncomputable def spec_ld (imm : BitVec 12) (rs1 rd : BitVec 5) : SailM ExecutionResult := do
   LeanRV64D.writeReg Register.nextPC ((← LeanRV64D.readReg Register.PC) + 4#64)
   execute_LOAD imm (.Regidx rs1) (.Regidx rd) (is_unsigned := true) (width := 8)

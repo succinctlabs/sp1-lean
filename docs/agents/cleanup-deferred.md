@@ -407,7 +407,7 @@ each time. Re-litigating them costs a batch.
   > runs the identical 121-way destructure at a fraction of the cost — because it stops there, while
   > `compareAssumptionsOfCore` builds eleven `DivRemCompare.Assumptions` conjuncts on top of it. The
   > destructure alone is affordable; the destructure *plus* the downstream work is not.
-- **Trading `bv_decide` for line count.** It adds `Lean.ofReduceBool` / `Lean.trustCompiler` to lemmas that
+- **Trading `bv_decide` for line count.** It adds generated `._native.bv_decide.ax_*` compiler-trust constants to lemmas that
   are currently `[propext, Classical.choice, Quot.sound]`-clean and sit on the audit surface. Declined once
   explicitly on `rv64_subw_eq`. The line saving is never worth widening the trust base of a released theorem.
 - **`Soundness/SupportedMachine.lean` stays byte-identical.** It is a 25-entry descriptor table plus
@@ -430,7 +430,7 @@ each time. Re-litigating them costs a batch.
 
 ---
 
-## 8. The rename queue — **40 candidates, none applied**
+## 8. The rename queue — **42 candidates, none applied**
 
 Profile §11: renames are **queued, never applied**, and queueing is the *terminal* state — a pass, not a
 deferral. Renaming here is high-blast-radius: `scripts/nolints.json` is keyed by fully-qualified name;
@@ -494,3 +494,13 @@ Exactly **one** entry was ever applied — #14 below, as a user-approved excepti
 - **`git grep <thing> main` answers "did this exist before the *branch*", not "did the marathon introduce
   this".** `dtumad/proof-cleanup` diverged from `main` long before the campaign and carries substantial
   unrelated work. Use `git grep <thing> <pre-batch-sha>` or `git log -S … main..HEAD`.
+
+---
+
+## 10. 2026-08 release-campaign addendum
+
+The 2026-08 release-audit sweep re-walked this queue. Its statement-change (S2) and deletion-queue
+findings are **not** duplicated here: they live in the release campaign's ledger, pending owner
+decision, and will be folded back into the sections above (or closed) once ruled on. Until then this
+file's sections remain the authoritative record of the 2026-07 marathon's deferrals; the only 2026-08
+additions made directly here are rename-queue entries 41–42 (§8), tagged "(2026-08 release audit)".

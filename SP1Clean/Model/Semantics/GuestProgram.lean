@@ -10,7 +10,7 @@ The "general trace arguments and guest programs" the auditor reads to know *what
 state to *load* it (`IsInitialState`), the real multi-step chain over the **official** LeanRV64D
 interpreter (`SailStep`/`SailChain` on `try_step`), and the halting condition (`SP1Halted`). These
 statements depend only on the Sail `SailState` model (`Model/`), so they live in the `Model/Semantics/`
-substrate. `StateTruth`/`ProgTruth` are built atop them in `Model/Semantics/Truth.lean` as conclusions of
+substrate. `LocalStateTruth`/`ProgTruth` are built atop them in `Model/Semantics/Truth.lean` as conclusions of
 the global grounding engine; they are deliberately not row-local channel guarantees.
 
 The trace **arguments** that consume them — `TargetObligations`, `WalkOf`, `RefinesAt`, `RowEffect`, and

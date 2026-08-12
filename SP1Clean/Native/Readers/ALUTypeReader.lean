@@ -10,7 +10,7 @@ import Clean.Circuit.Channel
 import Clean.Gadgets.Equality
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # Native `ALUTypeReader` reader — the ALU register-adapter (immediate-capable op_c) as a `FormalAssertion`
+/-! # Native `ALUTypeReader` reader — the ALU register-adapter (immediate-capable op_c) as a `GeneralFormalCircuit`
 
 The ALU-type sibling of `Readers/RTypeReader.lean`, for the ALU chips whose `op_c` may be an **immediate**
 (`Addw`, `Lt`, `Bitwise`, `ShiftLeft`, `ShiftRight`). SP1's `ALUTypeReader::eval`
@@ -23,11 +23,12 @@ The ALU-type sibling of `Readers/RTypeReader.lean`, for the ALU chips whose `op_
 - the op_c register byte/memory interactions are gated by **`is_real - imm_c`** (no register read for an
   immediate), and that multiplicity is itself asserted boolean.
 
-Like `RTypeReader`, it is a `FormalAssertion` (output `unit`) over the **chip-owned** `cols` adapter block:
+Like `RTypeReader`, it is a `GeneralFormalCircuit` (output `unit`) over the **chip-owned** `cols` adapter block:
 it composes a `RegisterAccessCols.circuit` per operand for the timestamp byte checks (op_a/op_b gated
 `is_real`, op_c gated `is_real - imm_c`), imposes the `op_a_0` binary + zeroing gates and the immediate
-gates, and emits the Program + Memory buses (their per-row meaning is the trace-level multiset balance, so
-`Guarantees := True`). The cross-block values (`clk_low`, the four `op_a_write_value` limbs `wv*`) stay
+gates, and pulls/pushes the Program + Memory buses (deriving the structural `RowSpec` and
+`isU64 ∧ ClkBound` guarantees from its pulls — the W11 polarity flips). The cross-block values
+(`clk_low`, the four `op_a_write_value` limbs `wv*`) stay
 inputs; the `is_real` binary gate stays on the chip. Faithfulness to SP1's generated constraint list is the
 separate `Faithful/ALUTypeReader.lean` anchor. -/
 

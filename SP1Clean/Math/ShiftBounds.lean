@@ -3,10 +3,10 @@ import Mathlib.Tactic
 
 /-! # Shared `.val`-bridge and bound lemmas for the shift within-byte proofs
 
-Common to `srl_within_byte_shift*` (`Chips/ShiftRightChip/Core.lean`) and
-`sll_within_byte_shift*` (`Chips/ShiftLeftChip/Core.lean`). Proving each fact once collapses
+Common to `srl_within_byte_shift*` (`Proofs/Chips/ShiftRightChip/Core.lean`) and
+`sll_within_byte_shift*` (`Proofs/Chips/ShiftLeftChip/Core.lean`). Proving each fact once collapses
 the ~100 `nlinarith` call sites to `exact`/one-liners (compile-time win; see
-`docs/agents/compile-profile.md` thread B).
+`docs/snapshots/compile-profile.md` thread B).
 
 Every lemma is generic over byte-decomposition radices `M`, `N` with `M * N = 65536`. -/
 

@@ -10,7 +10,7 @@ import Clean.Circuit.Channel
 import Clean.Gadgets.Equality
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # Native `RTypeReader` reader — the register-adapter per-row checks as a Clean `FormalCircuit`
+/-! # Native `RTypeReader` reader — the register-adapter per-row checks as a Clean `GeneralFormalCircuit`
 
 The second real reader (sibling of `Readers/CPUState.lean`). SP1's `RTypeReader::eval`
 (`crates/core/machine/src/adapter/register/r_type.rs`, mirrored in `Extracted/RTypeReader.lean`) emits
@@ -30,15 +30,14 @@ so this reader emits no Clean lookup for them. The genuine per-row constraints i
   `circuit_proof_start` blow-up: each sub-circuit is a `circuit_norm` black box, à la KeccakRound); and
 - the four `op_a_0 * op_a_write_value[i] = 0` gates (the `rd = x0` zeroing rule).
 
-It is a `FormalCircuit` whose **output is the `Extracted.RTypeReader` column struct** (mirroring
-`AddOperation`/`CPUState`): the reader witnesses the four scalar columns (`op_a`, `op_a_0`, `op_b`,
-`op_c`) and composes a `RegisterAccessCols.circuit` per operand for the six register-access columns,
-returning the assembled struct so the chip composes it as a true `subcircuit` and reads the `adapter`
-block straight out of the output. The cross-block inputs: `clk_low` (the recombined low clock, from the
+It is a **zero-witness** `GeneralFormalCircuit` (`Unit` output): the chip threads the whole
+`Extracted.RTypeReader` column struct in as the `cols` input, and the reader composes a
+`RegisterAccessCols.circuit` per operand over the six register-access columns — every sub-circuit a
+true Clean `subcircuit` boundary. The cross-block inputs: `clk_low` (the recombined low clock, from the
 CPUState block) and the four `op_a_write_value` limbs (`wv0..wv3`, the ALU result, for the `op_a_0`
 zeroing gates). Each operand's `RegisterAccessCols.circuit` receives its access clock
-`clk_low + 4/3/2` and witnesses its timestamps from it, which is what makes completeness hold for any
-`clk_low`. The `is_real` binary gate stays on the chip. -/
+`clk_low + 4/3/2`; the chip's witness closure computes the timestamp columns from it, which is what
+makes completeness hold for any `clk_low`. The `is_real` binary gate stays on the chip. -/
 
 namespace SP1Clean.Readers.RTypeReader
 

@@ -153,7 +153,7 @@ pin or registry changes.
 The registry drives the Clean table list, typed row decoder, opcode coverage, Sail dispatch, and
 faithfulness coverage. Its order is a witness-format decision.
 
-`SP1Ensemble.lean` adds 11 proof-oriented provider/boundary tables to form a 36-table Clean ensemble.
+`SP1Ensemble.lean` adds 13 proof-oriented provider/boundary tables to form a 38-table Clean ensemble.
 These provider circuits are not asserted to be the exact upstream Core system tables. They are the
 small native interface used to prove the instruction execution theorem.
 

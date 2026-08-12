@@ -12,9 +12,15 @@ Each document has **one role**, so none needs to repeat another:
 | [`overview.md`](overview.md) | ten-minute technical orientation — states, never argues |
 | [`verification-report.md`](verification-report.md) | the long-form external report — argues and evidences each claim |
 | [`release-audit.md`](release-audit.md) | machine-adjacent audit record: pins, gates, census |
+| [`audits/2026-08-independent-semantic-audit.md`](audits/2026-08-independent-semantic-audit.md) | point-in-time independent second opinion on semantic foundations and ArkLib/VCVio readiness |
 | [`architecture.md`](architecture.md) | module/pillar ownership, design rules, deliberate exceptions |
 | [`roadmap.md`](roadmap.md) | dependency-ordered future work + non-blocking backlog |
 | [`goal-overview.md`](goal-overview.md) | the completed-state contract (never current status) |
+| [`chip-standardization.md`](chip-standardization.md) | the completed 25/25 `ChipKind.advance` interface record |
+| [`bus-model.md`](bus-model.md) | **HISTORICAL** pre-consolidation bus model, kept only for the section numbers source doc-comments cite |
+| [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) | compact checkpoint board for the architecture-consolidation work |
+| [`snapshots/`](snapshots/) | point-in-time generated records: [`axiom-ledger.md`](snapshots/axiom-ledger.md) (per-theorem axiom inventory) and [`compile-profile.md`](snapshots/compile-profile.md) (**STALE** as stamped — pre-migration timings) |
+| [`agents/`](agents/README.md) | contributor/agent how-to family — per-file index in [`agents/README.md`](agents/README.md) |
 | [`AGENTS.md`](../AGENTS.md) | contributor/agent discipline: build, proof style, tooling gates |
 
 > **Upstream authority: read Clean's own docs.** This project is built on the Clean DSL (upstream
@@ -36,19 +42,24 @@ Each document has **one role**, so none needs to repeat another:
    decode, ranked/timed grounding, and theorem layering.
 4. [`release-audit.md`](release-audit.md) — machine-derived pins, trust boundary, direct-deferral inventory,
    and `#print axioms` census.
-5. [`roadmap.md`](roadmap.md) — dependency-ordered work toward native AIR, full upstream AIR, execution, and
+5. [`audits/2026-08-independent-semantic-audit.md`](audits/2026-08-independent-semantic-audit.md) —
+   independent review of semantic boundaries, joint non-vacuity, and verifier-integration readiness.
+6. [`roadmap.md`](roadmap.md) — dependency-ordered work toward native AIR, full upstream AIR, execution, and
    verifier soundness.
-6. [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) — compact current checkpoint
+7. [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) — compact current checkpoint
    board for the architecture-consolidation work.
 
 ## Current reader-facing docs
 
 - [`overview.md`](overview.md) — honest current overview; it distinguishes the supported-native theorem,
   the conditional exact-upstream `_of_obligations` composition boundary, and the still-open
-  execution/ArkLib layers. Its §4 is the current statement of the channel/bus model.
+  execution/ArkLib layers. The current statement of the channel/bus model is
+  [`architecture.md`](architecture.md) § "Structural buses and semantic grounding".
 - [`architecture.md`](architecture.md) — detailed architecture and migration status.
 - [`release-audit.md`](release-audit.md) — authoritative current proof and trust audit. Regenerate its raw
   census with `scripts/run_audit.sh` before citing numbers.
+- [`audits/2026-08-independent-semantic-audit.md`](audits/2026-08-independent-semantic-audit.md) — a
+  point-in-time second opinion; its findings refine the roadmap but do not override current theorem types.
 - [`roadmap.md`](roadmap.md) — live dependency graph from exact system-table grounding through ArkLib
   integration and witness-generation completeness.
 - [`chip-standardization.md`](chip-standardization.md) — the completed 25/25 `ChipKind.advance` interface

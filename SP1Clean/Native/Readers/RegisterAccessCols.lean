@@ -9,7 +9,7 @@ import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # Native register-access reader — one operand's columns as composed Clean `FormalCircuit`s
+/-! # Native register-access reader — one operand's columns as composed Clean `FormalAssertion`s
 
 The per-operand register-access block that `Readers/RTypeReader.lean` composes **three times** (rs1
 read / rs2 read / rd write). Factoring it out is the idiomatic fix for the `circuit_proof_start`
@@ -26,15 +26,15 @@ what defeated a single inline witness, so we mirror the nesting with **two compo
   tiny (2-column) inner block that carries SP1's two byte-bus timestamp checks
   (`crates/core/machine/src/air/memory.rs`) as **inline `ByteTable` lookups** (SP1's `send_byte` into
   the preprocessed `ByteChip`), both gated by `is_real`.
-- `RegisterAccessCols.circuit` (here) — witnesses the 4 `prev_value` columns and composes the
-  timestamp sub-circuit, returning the assembled `Extracted.RegisterAccessCols`. Because the timestamp
-  is a sub-circuit *output* (an opaque `varFromOffset`), no nested struct literal is ever witnessed, so
+- `RegisterAccessCols.circuit` (here) — a **zero-witness input-taker**: the chip threads the
+  `prev_value` + nested timestamp block in as the `cols` input, and this reader composes the
+  timestamp sub-circuit on it. No nested struct literal is ever witnessed here, so
   `circuit_norm` stays cheap.
 
 `clk_target` is the operand's access clock (`clk_low + 4/3/2` for op_a/op_b/op_c) — a cross-block
-input, like `RTypeReader`'s `clk_low`. The witnessed timestamp columns are computed from it
-(`prev_low := clk_target - 1`, `diff := 0`, so the scaled numerator is `0`), which is what makes
-completeness hold for every `clk_target`. The `.memory` interactions themselves are off-chip
+input, like `RTypeReader`'s `clk_low`. The composing chip's witness closure computes the timestamp
+columns from it (`prev_low := clk_target - 1`, `diff := 0`, so the scaled numerator is `0`), which
+is what makes completeness hold for every `clk_target`. The `.memory` interactions themselves are off-chip
 membership (their meaning is the trace-level memory bus, `Soundness/MemoryConsistency.lean`), so these
 sub-circuits emit no lookup for them. -/
 

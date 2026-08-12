@@ -10,7 +10,8 @@ plus the output-struct layout (reaching the Rust 44-column `LtCols` order throug
 whole-row `ltChipReconfigure` map), with `ltHint` building the per-event flag `ProverHint` from the
 dumped executor opcode (SLT = 9, SLTU = 10). The battery cycles **both variants**, immediate-`c`
 rows only (on register-`c` rows the chip's compare operand `adapter.op_c` is the register-index
-word rather than the read value — a documented adapter-projection scope gap, independent of the
+word rather than the read value — a disclosed adapter-projection scope gap, this docstring being
+the disclosure; independent of the
 flags), and the comparison is **unmasked** (all 44 columns). -/
 
 namespace SP1Clean.TraceGenTests

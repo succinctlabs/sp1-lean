@@ -399,8 +399,8 @@ private theorem subcols_byte_interactions_faithful_syntactic
 the interactions the row emits on its four buses — `State`, `Byte`, `Memory`, `Program` — taken together
 are a `List.Perm` of SP1's *entire* extracted `SubCols.interactions` oracle (projected to `LookupAccess`).
 Assembled from the four per-channel anchors via `perm_filter_by_kind` (which decomposes the oracle image
-into its four `InteractionKind` blocks) + `List.Perm.append` (Byte is the only `Perm`; State/Memory/Program
-are `=`). No semantics, no channel filter — the complete emitted-interaction list vs the complete oracle.
+into its four `InteractionKind` blocks) + `List.Perm.append` (Byte and Memory are genuine `Perm`s;
+State/Program are `=`). No semantics, no channel filter — the complete emitted-interaction list vs the complete oracle.
 This closes out `SubChip`'s four-artifact chain at the syntactic-interaction level. -/
 private theorem subcols_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var SubChip.Inputs (ZMod p)) (offset : ℕ)

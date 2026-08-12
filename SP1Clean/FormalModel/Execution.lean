@@ -14,7 +14,11 @@ different public statement: a machine verifying key plus the full shard public-v
 program is then private data bound by the verifying key's preprocessed commitment.
 
 Neither relation equates a shard endpoint with halting.  Halting is a property of the composed
-execution theorem, after shard continuity and the recursion completion checks have been proved. -/
+execution theorem, after shard continuity and the recursion completion checks have been proved.
+
+Like its `Relations`/`CoreProfile`/`CoreAIRRelation`/`Verifier` siblings, part of this module is
+reserved relation-level API for the exact-AIR/ArkLib composition — declared ahead of the consumer
+that will instantiate it, so some declarations are expected to be unreferenced in-tree today. -/
 
 open LeanRV64D.Defs
 
@@ -197,6 +201,8 @@ structure SP1CoreShardExecutionValid {p : ℕ} {Digest : Type}
       statement.publicValues.initial_timestamp.toNat = 1 ∧
       statement.publicValues.is_execution_shard = 1
   commitRows : CoreAIR.CommitRowsMatch statement.publicValues witness.syscallEvents
+  commitRowsSetFlags : CoreAIR.CommitRowsSetFlags statement.publicValues witness.syscallEvents
+  commitTransition : statement.publicValues.CommitTransitionValid
   shardCase : SP1CoreShardCase handler statement witness
 
 /-- Full semantic target for a baseline Core AIR shard.
@@ -246,6 +252,25 @@ def CompleteDeferredCommitCoverage
     (segments : List (Option Machine.EventExecutionTrace)) : Prop :=
   CoreAIR.CompleteDeferredCommitCoverage (executionSyscallEvents segments)
 
+/-- Every canonical COMMIT row in the composed transcript carries the terminal public digest word
+for its index.  Unlike coverage, this predicate constrains rows that exist but creates none. -/
+def FinalCommitRowsMatch {p : ℕ} (finalPublicValues : SP1PublicValues (ZMod p))
+    (segments : List (Option Machine.EventExecutionTrace)) : Prop :=
+  ∀ event ∈ executionSyscallEvents segments, ∀ index : Fin 8,
+    event.IsCanonicalCode Machine.commitSyscallId → event.arg1.toNat = index →
+      event.arg2 = BitVec.ofNat 64
+        (finalPublicValues.committed_value_digest[index].toNat)
+
+/-- All eight terminal public-digest words occur as canonical COMMIT rows with the exact value.
+This is the honest composed claim obtained by combining program-level coverage with AIR row
+correctness and authenticated rolling-digest continuity. -/
+def CompleteCommitDigestMatches {p : ℕ} (finalPublicValues : SP1PublicValues (ZMod p))
+    (segments : List (Option Machine.EventExecutionTrace)) : Prop :=
+  ∀ index : Fin 8, ∃ event ∈ executionSyscallEvents segments,
+    event.IsCanonicalCode Machine.commitSyscallId ∧ event.arg1.toNat = index ∧
+      event.arg2 = BitVec.ofNat 64
+        (finalPublicValues.committed_value_digest[index].toNat)
+
 /-- Full-state alignment of consecutive shard segments.
 
 Public values authenticate PC and clock continuity, but those two fields alone do not authenticate
@@ -261,6 +286,7 @@ def EventShardLayout {p : ℕ} (handler : Machine.SyscallHandler) (program : Gue
         publicValues.pc_start = publicValues.next_pc ∧
         publicValues.initial_timestamp = publicValues.last_timestamp ∧
         CoreAIR.CommitRowsMatch publicValues [] ∧
+        CoreAIR.CommitRowsSetFlags publicValues [] ∧
         EventShardLayout handler program publicRest segmentRest source target
   | publicValues :: publicRest, some execution :: segmentRest, source, target =>
       publicValues.is_execution_shard = 1 ∧
@@ -271,8 +297,87 @@ def EventShardLayout {p : ℕ} (handler : Machine.SyscallHandler) (program : Gue
           publicValues.initial_timestamp.toNat publicValues.pcStartBits
           publicValues.last_timestamp.toNat publicValues.nextPcBits program execution ∧
         CoreAIR.CommitRowsMatch publicValues execution.syscallEvents ∧
+        CoreAIR.CommitRowsSetFlags publicValues execution.syscallEvents ∧
         EventShardLayout handler program publicRest segmentRest execution.finalState target
   | _, _, _, _ => False
+
+@[simp]
+theorem executionSyscallEvents_cons_none
+    (segments : List (Option Machine.EventExecutionTrace)) :
+    executionSyscallEvents (none :: segments) = executionSyscallEvents segments := by
+  simp [executionSyscallEvents, executionTraces]
+
+@[simp]
+theorem executionSyscallEvents_cons_some (execution : Machine.EventExecutionTrace)
+    (segments : List (Option Machine.EventExecutionTrace)) :
+    executionSyscallEvents (some execution :: segments) =
+      execution.syscallEvents ++ executionSyscallEvents segments := by
+  simp [executionSyscallEvents, executionTraces]
+
+/-- Per-shard COMMIT operand facts lift to the terminal digest.  A row first sets its own shard's
+rolling flag; the authenticated ledger and exact public-values transition laws then preserve that
+digest through every later shard. -/
+theorem finalCommitRowsMatch_of_layout {p : ℕ}
+    {handler : Machine.SyscallHandler} {program : GuestProgram}
+    {publicValues : List (SP1PublicValues (ZMod p))}
+    {segments : List (Option Machine.EventExecutionTrace)}
+    {initial finalState : SailState} {finalPublicValues : SP1PublicValues (ZMod p)}
+    (layout : EventShardLayout handler program publicValues segments initial finalState)
+    (last : publicValues.getLast? = some finalPublicValues)
+    (continuous : SP1PublicValues.LedgerContinuous publicValues)
+    (transitions : ∀ values ∈ publicValues, values.CommitTransitionValid) :
+    FinalCommitRowsMatch finalPublicValues segments := by
+  induction publicValues generalizing segments initial with
+  | nil => simp at last
+  | cons values rest ih =>
+      cases segments with
+      | nil => simp [EventShardLayout] at layout
+      | cons segment segmentRest =>
+          cases segment with
+          | none =>
+              obtain ⟨_, _, _, _, _, tailLayout⟩ := layout
+              have tailMatches : FinalCommitRowsMatch finalPublicValues segmentRest := by
+                cases rest with
+                | nil =>
+                    cases segmentRest with
+                    | nil => simp [FinalCommitRowsMatch, executionSyscallEvents, executionTraces]
+                    | cons next tail => simp [EventShardLayout] at tailLayout
+                | cons next tail =>
+                    apply ih tailLayout
+                    · simpa using last
+                    · exact continuous.2
+                    · intro later member
+                      exact transitions later (by simp [member])
+              simpa [FinalCommitRowsMatch] using tailMatches
+          | some execution =>
+              obtain ⟨_, _, _, _, _, rowsMatch, rowsSetFlags, tailLayout⟩ := layout
+              have tailMatches : FinalCommitRowsMatch finalPublicValues segmentRest := by
+                cases rest with
+                | nil =>
+                    cases segmentRest with
+                    | nil => simp [FinalCommitRowsMatch, executionSyscallEvents, executionTraces]
+                    | cons next tail => simp [EventShardLayout] at tailLayout
+                | cons next tail =>
+                    apply ih tailLayout
+                    · simpa using last
+                    · exact continuous.2
+                    · intro later member
+                      exact transitions later (by simp [member])
+              intro event member index canonical indexEq
+              rw [executionSyscallEvents_cons_some] at member
+              rcases List.mem_append.mp member with current | later
+              · have committed := rowsSetFlags.publicCommit event current canonical
+                have digestEq := SP1PublicValues.committedDigest_eq_last_of_flag
+                  last continuous transitions committed
+                have wordEq := congrArg (fun digest => digest[index]) digestEq
+                calc
+                  event.arg2 = BitVec.ofNat 64
+                      (values.committed_value_digest[index].toNat) :=
+                    rowsMatch.1 event current index canonical indexEq
+                  _ = BitVec.ofNat 64
+                      (finalPublicValues.committed_value_digest[index].toNat) := by
+                    rw [wordEq]
+              · exact tailMatches event later index canonical indexEq
 
 /-- The last execution shard, ignoring any trailing boundary-only shards, ends in the canonical Rust
 HALT syscall and exposes its pre-HALT state. -/
@@ -323,6 +428,7 @@ def SP1ExecutionRelation {p : ℕ} {Digest : Type}
     statement.verifyingKey.WellFormed layout ∧
     (∀ publicValues ∈ statement.shards,
       publicValues.WellFormed layout ∧
+        publicValues.CommitTransitionValid ∧
         (SP1ShardStatement.mk statement.verifyingKey publicValues).ConfigurationMatches ∧
         (publicValues.is_first_execution_shard = 1 →
           publicValues.is_execution_shard = 1 ∧
@@ -344,6 +450,28 @@ def SP1ExecutionRelation {p : ℕ} {Digest : Type}
         deferredAuthenticated finalPublicValues.deferred_proofs_digest ∧
         finalPublicValues.exitCodeBits = witness.exitCode
 
+/-- Every canonical COMMIT row recovered from a valid composed execution is tied to the terminal
+public digest.  This is the cross-shard provenance theorem: row-to-flag comes from the syscall AIR,
+while flag/digest persistence comes from the public-values AIR and authenticated ledger. -/
+theorem finalCommitRowsMatch_of_execution {p : ℕ} {Digest : Type}
+    {layout : SP1PublicValuesLayout} {model : Machine.SP1MachineModel}
+    {handler : Machine.SyscallHandler} {programBinding : ProgramBinding p Digest}
+    {globalBalance : GlobalCumulativeBalance p}
+    {deferredAuthenticated : DeferredDigestAuthenticated p}
+    {statement : SP1ExecutionStatement (ZMod p) Digest} {witness : SP1ExecutionWitness}
+    (valid : SP1ExecutionRelation layout model handler programBinding globalBalance
+      deferredAuthenticated statement witness) :
+    ∃ finalPublicValues,
+      statement.shards.getLast? = some finalPublicValues ∧
+        FinalCommitRowsMatch finalPublicValues witness.segments := by
+  obtain ⟨_, perShard, _, _, _, _, authenticatedLedger, _, shardLayout, _,
+    finalPublicValues, last, _, _⟩ := valid
+  obtain ⟨_, _, _, _, _, _, _, continuous, _⟩ := authenticatedLedger
+  refine ⟨finalPublicValues, last,
+    finalCommitRowsMatch_of_layout shardLayout last continuous ?_⟩
+  intro values member
+  exact (perShard values member).2.1
+
 /-- Optional strengthening for claims that need every committed-digest word to occur in the syscall
 transcript.  This is only COMMIT-event coverage: output bytes and the wrapper's hashing behavior are not
 yet modeled, so it must not be described as full guest-public-output authentication. -/
@@ -358,10 +486,31 @@ def SP1CommitCoveredExecutionRelation {p : ℕ} {Digest : Type}
         deferredAuthenticated statement witness ∧
       CompleteCommitCoverage witness.segments
 
-/-- A verifying-key-specific contract asserting that every program admitted by the binding relation
-uses the standard halt wrapper.  It can be proved from the exact committed ROM, or retained as an
-explicit application-level hypothesis until program correctness is formalized. -/
-def OutputSafeVerifyingKey {p : ℕ} {Digest : Type} (handler : Machine.SyscallHandler)
+/-- Complete wrapper coverage plus the base execution theorem supplies all eight canonical COMMIT
+rows, each carrying the corresponding word of the terminal committed-value digest. -/
+theorem completeCommitDigestMatches_of_coveredExecution {p : ℕ} {Digest : Type}
+    {layout : SP1PublicValuesLayout} {model : Machine.SP1MachineModel}
+    {handler : Machine.SyscallHandler} {programBinding : ProgramBinding p Digest}
+    {globalBalance : GlobalCumulativeBalance p}
+    {deferredAuthenticated : DeferredDigestAuthenticated p}
+    {statement : SP1ExecutionStatement (ZMod p) Digest} {witness : SP1ExecutionWitness}
+    (valid : SP1CommitCoveredExecutionRelation layout model handler programBinding globalBalance
+      deferredAuthenticated statement witness) :
+    ∃ finalPublicValues,
+      statement.shards.getLast? = some finalPublicValues ∧
+        CompleteCommitDigestMatches finalPublicValues witness.segments := by
+  obtain ⟨finalPublicValues, last, rowsMatch⟩ :=
+    finalCommitRowsMatch_of_execution valid.1
+  refine ⟨finalPublicValues, last, ?_⟩
+  intro index
+  obtain ⟨event, member, canonical, indexEq⟩ := valid.2 index
+  exact ⟨event, member, canonical, indexEq,
+    rowsMatch event member index canonical indexEq⟩
+
+/-- A verifying-key-specific coverage contract asserting that every program admitted by the binding
+relation uses the standard halt wrapper.  It can be proved from the exact committed ROM, or retained
+as an explicit application-level hypothesis until program correctness is formalized. -/
+def CommitCoveringVerifyingKey {p : ℕ} {Digest : Type} (handler : Machine.SyscallHandler)
     (programBinding : ProgramBinding p Digest)
     (verifyingKey : SP1MachineVerifyingKey (ZMod p) Digest) : Prop :=
   ∀ program, programBinding verifyingKey program →
@@ -383,9 +532,9 @@ theorem commitCovered_of_standardWrapper {p : ℕ} {Digest : Type}
   have ⟨_, _, _, _, _, _, _, _, shardLayout, halts, _⟩ := valid
   exact ⟨valid, wrapper shardLayout halts⟩
 
-/-- A verification key satisfying the application-level output-safety contract supplies the wrapper
+/-- A verification key satisfying the application-level coverage contract supplies the wrapper
 hypothesis for whichever bound program appears in the recovered execution. -/
-theorem commitCovered_of_outputSafeVerifyingKey {p : ℕ} {Digest : Type}
+theorem commitCovered_of_commitCoveringVerifyingKey {p : ℕ} {Digest : Type}
     {layout : SP1PublicValuesLayout} {model : Machine.SP1MachineModel}
     {handler : Machine.SyscallHandler} {programBinding : ProgramBinding p Digest}
     {globalBalance : GlobalCumulativeBalance p}
@@ -393,10 +542,11 @@ theorem commitCovered_of_outputSafeVerifyingKey {p : ℕ} {Digest : Type}
     {statement : SP1ExecutionStatement (ZMod p) Digest} {witness : SP1ExecutionWitness}
     (valid : SP1ExecutionRelation layout model handler programBinding globalBalance
       deferredAuthenticated statement witness)
-    (outputSafe : OutputSafeVerifyingKey handler programBinding statement.verifyingKey) :
+    (commitCovering : CommitCoveringVerifyingKey
+      handler programBinding statement.verifyingKey) :
     SP1CommitCoveredExecutionRelation layout model handler programBinding globalBalance
       deferredAuthenticated statement witness :=
   commitCovered_of_standardWrapper valid
-    (outputSafe witness.program valid.2.2.2.1)
+    (commitCovering witness.program valid.2.2.2.1)
 
 end SP1Clean.Execution

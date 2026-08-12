@@ -34,11 +34,14 @@ Its source relation has three visible parts:
 
 1. `SupportedCoreEnsembleRelation`
    - the witness public input equals the statement;
-   - every native Clean table constraint holds; and
+   - every native Clean table constraint holds — the ensemble has 38 tables: the 25 instruction
+     chips plus 13 provider/boundary tables (ten byte/range lookup providers, the program-ROM
+     provider, and the two memory init/finalize boundary tables); and
    - all four Clean channels balance.
 2. `SP1SemanticBoundaryRelation`
    - the program is well formed and bound to the shared prover data;
-   - a concrete initial Sail state has the public PC and clock;
+   - a concrete initial Sail state has the public PC, and the committed prover data carries the
+     public initial clock;
    - ROM is loaded, the Sail configuration is valid, and code memory is compatible;
    - Program-provider rows describe that program; and
    - Memory-init and Memory-finalize provider rows have the required meaning and per-location
@@ -53,7 +56,9 @@ contract, and constructs a successful Sail chain. The resulting local segment:
 
 - uses the statement's program;
 - starts and ends at the public PC and clock boundaries; and
-- consists of exactly the active physical instruction rows.
+- is constructed by the proof from exactly the active physical instruction rows (the exported
+  relation states the endpoint facts; row exactness lives in the intermediate grounding
+  theorem).
 
 It does not say that the initial state is reachable from boot, that the final row halts, that shards
 compose, or that a cryptographic verifier accepted a proof. Those are deliberately separate claims.
@@ -70,7 +75,7 @@ the proved register/RAM interpretation the ordinary-row grounding engine consume
 
 | Layer | Current coverage | Status |
 |---|---:|---|
-| Native instruction circuits | 25 / 25 supported tables | soundness and completeness proved |
+| Native instruction circuits | 25 / 25 supported tables | soundness and completeness proved (completeness-witness scope disclosed below) |
 | Sail instruction bridges | 25 / 25 supported tables | proved |
 | Whole-chip Rust AIR faithfulness | 25 / 25 supported instruction tables | proved |
 | Grounding contracts used by the native capstone | 25 / 25 descriptors | proved |
@@ -87,6 +92,11 @@ Jalr, Branch, UType, five load tables, four store tables, Mul, DivRem, and AluX0
 `supportedChipFaithfulness_upstream` proves that the proof-bearing faithfulness index is a permutation
 of the exact `CoreProfile.instructionTables` list. It also tracks the physical order of the native
 `supportedChips` registry.
+
+One completeness-scope disclosure: the Bitwise, Lt, and Addw completeness witnesses currently cover
+the register-register instruction forms (the immediate variants are covered by soundness and the
+Sail bridges, not by those chips' completeness theorems), and UType's completeness covers `rd ≠ x0`
+rows. Soundness and the `advance` bridges cover all variants.
 
 `ChipFaithful` is a whole-row statement. For every adversarial Rust row it proves equivalence between:
 
@@ -137,6 +147,7 @@ cluster to an eventful Sail shard:
 - verification-key/program binding and entry point;
 - first-execution-shard facts;
 - syscall transcript decoding and per-existing-row digest operands;
+- the one-way row-to-flag implications and the public-values COMMIT transition laws;
 - the non-execution boundary case; and
 - the execution case, including system-table grounding into an exact event trace.
 
@@ -166,15 +177,22 @@ converse that a rolling flag implies such a row exists.
 Accordingly:
 
 - `CommitRowsMatch` is an AIR-level, per-existing-row property;
+- `CommitRowsSetFlags` records the AIR-forced direction from an existing row to its shard flag
+  (an obligations-bundle field — stated, not yet discharged from the exact tables);
+- `CommitTransitionValid` records the public-values AIR laws that preserve a digest once the rolling
+  flag is set;
 - `CompleteCommitCoverage` means that all eight public digest indices occur across the whole
   execution;
 - `UsesStandardHaltWrapper` is the program-level condition that supplies that coverage; and
-- `OutputSafeVerifyingKey` packages the condition for every program admitted by a verification key.
+- `CommitCoveringVerifyingKey` packages that coverage condition for every program admitted by a
+  verification key.
 
 The base execution relation does not assume wrapper use. The optional
-`SP1CommitCoveredExecutionRelation` adds coverage only when one of those program contracts is supplied.
-The model does not yet connect output bytes to the wrapper's hash computation, so complete COMMIT-event
-coverage is not full guest-public-output authentication.
+`SP1CommitCoveredExecutionRelation` adds coverage only when one of those program contracts is
+supplied. `completeCommitDigestMatches_of_coveredExecution` combines coverage with row-to-flag,
+intra-shard digest freezing, and cross-shard ledger continuity, proving that every one of the eight
+rows carries its word of the terminal committed digest. The model does not yet connect output bytes
+to the wrapper's hash computation, so this is still not full guest-public-output authentication.
 
 ## Trust and assumptions
 
@@ -189,8 +207,10 @@ The audit separates proof incompleteness from external trust:
 - The SP1 constraint compiler and extraction overlay are trusted, pin-checked source-to-list tools.
   Generated outputs are not treated as self-authenticating; whole-chip `ChipFaithful` proofs compare
   them with the native circuits.
-- `native_decide` is forbidden in `SP1Clean/`. It appears only in `SP1CleanTest/` for executable witness
-  and trace conformance, where compiler trust is explicitly accepted.
+- `native_decide` is forbidden in `SP1Clean/`. It appears only in `SP1CleanTest/`, where compiler
+  trust is explicitly accepted: the executable witness and trace conformance batteries plus the
+  real-row satisfiability battery (`SP1CleanTest/NonVacuityReal.lean`, a concrete satisfying
+  `is_real = 1` row for every instruction chip's complete constraint system).
 - Cryptographic commitments, PCS opening, LogUp/GKR, Fiat--Shamir, and verifier extraction remain the
   responsibility of the later ArkLib layer.
 
@@ -213,9 +233,10 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The audit regenerates the declaration list and raw `#print axioms` census and compares it against
-the committed snapshot (drift fails; `--update` rewrites deliberately). It also cross-checks every
-recorded pin and doc-cited count against the build graph.
+The audit regenerates the declaration list and raw `#print axioms` census — currently 524 probed
+declarations, split 466 (main `SP1Clean` library) plus 58 (`SP1CleanTest` anchors) — and compares it
+against the committed snapshot (drift fails; `--update` rewrites deliberately). It also cross-checks
+every recorded pin and doc-cited count against the build graph.
 
 Where to go next: [`release-audit.md`](release-audit.md) for the machine-derived pins and census;
 [`verification-report.md`](verification-report.md) for the argued long-form report;

@@ -12,7 +12,8 @@ definitions here remain an explicitly scoped compatibility layer until timed gro
 - **The ordinary window convention**: execution step `k` occupies `[c0 + 8k, c0 + 8(k+1))`
   (`c0` = the committed genesis clock; every chip advances by `ordinaryClkInc = CLK_INC = 8`).
   Intra-row effect times: a RAM write lands at `ramEffectOffset = +1`, a register write at
-  `regEffectOffset = +4`; reads/read-backs at `+2`/`+3` observe pre-effect content. The constants
+  `regEffectOffset = +4`; reads/read-backs at `+2`/`+3` observe pre-effect **register** content but
+  post-effect **RAM** content (the RAM effect at `+1` has already landed). The constants
   and their Rust provenance (`CLK_INC`, `MemoryAccessPosition`) are documented at their
   definitions below.
 - `MemLoc` — the register-file/RAM split of the Memory bus's 3-limb address (registers are
@@ -168,7 +169,8 @@ they must track (at the pinned semantic revision, `FormalModel/CoreProfile.lean`
   observe at `+2`/`+3`; and the `op_a` register write lands at `+4`.
 
 `Machine.ordinarySchedule` (`Model/Machine/Schedule.lean`) carries the same numbers structurally
-as its `accesses` phase list; the timed grounding engine consumes them through that schedule, and
+as its `accesses` phase list; the timed grounding engine consumes only the schedule's `duration`
+(the `accesses` phase list is descriptive), and
 `supported_core_native_sound`'s `UsesOrdinarySchedule` hypothesis is what pins a machine model to
 this window shape. `microValue` uses the constants directly in its window arithmetic. -/
 
@@ -178,7 +180,8 @@ window, and the modulus of the intra-window offset arithmetic below. Structurall
 abbrev ordinaryClkInc : ℕ := 8
 
 /-- The intra-window offset at which a RAM effect lands (Rust `MemoryAccessPosition::Memory = 1`).
-Register-operand reads at `+2`/`+3` (`C`/`B`) observe pre-effect RAM content. -/
+Register-operand reads at `+2`/`+3` (`C`/`B`) come *after* it, so they observe **post-effect** RAM
+content (register content stays pre-effect there — the register write lands at `+4`). -/
 abbrev ramEffectOffset : ℕ := 1
 
 /-- The intra-window offset at which the `op_a` register write lands (Rust

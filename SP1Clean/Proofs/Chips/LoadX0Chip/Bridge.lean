@@ -46,6 +46,8 @@ noncomputable def spec_loadX0_lh  (imm : BitVec 12) (rs1 rd : BitVec 5) := specX
 noncomputable def spec_loadX0_lhu (imm : BitVec 12) (rs1 rd : BitVec 5) := specX0 true  2 imm rs1 rd
 noncomputable def spec_loadX0_lw  (imm : BitVec 12) (rs1 rd : BitVec 5) := specX0 false 4 imm rs1 rd
 noncomputable def spec_loadX0_lwu (imm : BitVec 12) (rs1 rd : BitVec 5) := specX0 true  4 imm rs1 rd
+-- (`true` at width 8 is decoder-unreachable — `valid_load_encdec` forbids `(8, true)` — and
+-- inert: extension is the identity at 64 bits. The `kind.advance` path uses `loadOpcode 8 false`.)
 noncomputable def spec_loadX0_ld  (imm : BitVec 12) (rs1 rd : BitVec 5) := specX0 true  8 imm rs1 rd
 
 /-- Shared post-`nextPC`-write state bookkeeping: `isInitialized` / `isValidMemConfig` / the `rs1`

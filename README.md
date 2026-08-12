@@ -82,10 +82,11 @@ At machine level, State, Program, Memory, and Byte are ordinary structural Clean
 execution meaning is derived by deterministic typed decoding, ranked State ordering, Program
 commitment, and timed per-location Memory grounding. It is not smuggled into channel guarantees.
 
-COMMIT-row correctness and row existence are also kept separate. AIR proves that every canonical row
-that exists carries the correct digest word. Complete eight-row coverage is an optional program-level
-contract of the verification-key-bound standard halt wrapper; output-byte and hashing semantics are not
-yet modeled.
+COMMIT-row correctness and row existence are also kept separate. The AIR layer's obligations
+bundle requires that every canonical row that exists carries the correct digest word (stated as
+the `publicCommitOperand` obligation, not yet discharged). Complete eight-row coverage is an
+optional program-level contract of the verification-key-bound standard halt wrapper; output-byte
+and hashing semantics are not yet modeled.
 
 ## Repository layout
 
@@ -108,7 +109,7 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The audit regenerates a 476-declaration `#print axioms` census and checks source deferrals, project
+The audit regenerates a 524-declaration `#print axioms` census and checks source deferrals, project
 axioms, forbidden kernel bypasses, main-library `native_decide`, and performance-budget drift.
 Sail-model platform hooks, selected generated `bv_decide` proof constants, and the trusted extraction
 toolchain are disclosed in the report.

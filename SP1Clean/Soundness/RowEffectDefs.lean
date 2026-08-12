@@ -5,7 +5,11 @@ import SP1Clean.Model.Semantics.Decode
 
 /-! # The refinement invariant and per-row effect (`RowView`-level, below `ChipRow`)
 
-> **FROZEN (consolidation step 0, 2026-07-09).** Legacy soundness path — scheduled for deletion at the cutover (proposal §5.6). Do NOT add new lemmas against this module; new soundness work targets the timed-grounding engine (proposal §3.2).
+> **NOTE.** The definitions in this module (`RefinesAt`/`RowEffect`/`ValueOperandsBound`/`replayVal`/
+> `rcvPcOf`/`sndPcOf`) are **permanent, live-path interface** — the `ChipKind.advance` field and the
+> timed-grounding engine state their obligations against them. Only their legacy `TargetVm.lean`
+> walk consumers (`WalkOf`/`TargetObligations`/`chain_to_refines`) are the frozen path; do not add
+> new lemmas against *those* — new soundness work targets the timed-grounding engine.
 
 The Sail-refinement layer of the target theorem, factored **out of `Soundness/TargetVm.lean`** so it sits
 **below `Soundness/ChipRow.lean`**: `RefinesAt`/`RowEffect`/`replayVal`/`rcvPcOf`/`sndPcOf` are all stated

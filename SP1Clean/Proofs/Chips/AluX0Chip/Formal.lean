@@ -235,7 +235,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       simp only [circuit_norm, main, byteChannel, stateChannel, memoryChannel, programChannel,
         Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]; grind,
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
-    -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
+    -- as chip-owned interactions (the Clean `VmTables` re-base that motivated the shape was investigated
+    -- and deferred — roadmap W11); descends to the composed `CPUState` subcircuit's lone pull+push.
     -- The chip's own LTU byte-pull and the reader's pulls are on byteChannel/programChannel/memoryChannel,
     -- filtered out by `interactionsWith stateChannel`.
     exposedChannels := fun input offset =>

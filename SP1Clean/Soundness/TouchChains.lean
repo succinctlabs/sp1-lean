@@ -17,7 +17,9 @@ this module carries no field assumptions. Contents:
 * `Touch`/`TouchOK` — one positionally paired (pull, push) touch and its in-circuit per-slot facts.
   Per SP-6 deviations D4/D5, `TouchOK` certifies **no** chain links and no pre-row head-pull bound:
   the head-pull identification and the intra-row links are *derived* from balance. `pull_before`
-  (`pull.time < t`) is replaced by the honest `prev_clk < access_clk` bound `pull_lt_push`, and the
+  (`pull.time < t`) is gone; the honest `prev_clk < access_clk` order is not a `TouchOK` field
+  either — it is carried separately by `RowOK.slotOfClkBound` and rederived inside the walk from
+  the per-key balance (the 1f currency break). The
   read-back branch of `push_kind` pins the pushed record at the read micro-time (`timeNat q = mp.2`,
   what SP1's memory argument actually does) — the production value-layer fact that makes
   reads-after-write structurally impossible (see `readback_of_succ`);

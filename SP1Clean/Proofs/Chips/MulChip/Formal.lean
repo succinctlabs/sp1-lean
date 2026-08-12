@@ -370,8 +370,8 @@ def exposedProgramInteractions (input : Var Inputs (ZMod p)) (offset : ℕ) :
        input.adapter.op_a_0, 0, 0⟩ ]
 
 /-- The `Mul` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `mul`/`mulh`/`mulhu`/`mulhsu`/`mulw`
-semantic contract; output is the native `Columns` row. Soundness is proved; completeness is
-the explicitly disclosed 4.31 migration seam above. -/
+semantic contract; output is the native `Columns` row. Soundness and completeness are both proved
+above (the former 4.31-migration completeness seam is closed). -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
   { main, elaborated,
     -- `programChannel` dropped (W11 flip — now pulled via `RTypeReader`, a guarantee not a requirement).
@@ -381,7 +381,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
     soundness := soundness, completeness := completeness,
     -- W11 (A2): expose the State-bus `[pulledIf is_real cur, pushedIf is_real next]` pair (pc+4, clk+8)
-    -- so the chip is a `VmTables` table; descends to the composed `CPUState` subcircuit's lone pull+push.
+    -- as chip-owned interactions (the Clean `VmTables` re-base that motivated the shape was investigated
+    -- and deferred — roadmap W11); descends to the composed `CPUState` subcircuit's lone pull+push.
     exposedChannels := fun input offset =>
       expose stateChannel (exposedStateInteractions input) ++
       expose memoryChannel (exposedMemoryInteractions input offset) ++

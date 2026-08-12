@@ -119,7 +119,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
     ⟨input.state, input.adapter,
       ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
       input.memory_access, input.offset_bit, input.store_value, input.is_real⟩
-  -- `programChannel` joins the byte guarantee propagated up from `ITypeReaderImmutable`'s program **pull** (W11 flip).
+  -- `programChannel` joins the structural `RowSpec` propagated from `ITypeReaderImmutable`'s program **pull** (W11 flip).
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]
 
 /-- Folded completed-row layout used by the whole-chip Rust AIR codec. -/

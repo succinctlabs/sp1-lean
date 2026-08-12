@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate `scripts/axiom_probe.lean`: one `#print axioms` line per headline declaration.
+"""Generate the axiom-census probes: one `#print axioms` line per headline declaration.
 
 Scans the SP1Clean tree for the released theorem set (chip soundness/completeness, Sail
 bridges + `kind` registrations, faithfulness anchors, witness-conformance anchors, the
@@ -7,15 +7,25 @@ GatedVm/capstone layer, and the coverage guards), resolving each declaration's f
 qualified name by tracking `namespace`/`end` blocks. The probe is self-checking: a wrong
 FQN fails to elaborate, so a green probe run certifies the census covers real declarations.
 
+Two probe files are emitted, one per library, so each elaborates against exactly the
+oleans its build target produces (the CI `audit` job builds only `SP1Clean`; the `test`
+job additionally builds `SP1CleanTest` via `lake test`):
+
+- `scripts/axiom_probe.lean` — the main library (`import SP1Clean` only);
+- `scripts/axiom_probe_test.lean` — the `SP1CleanTest` conformance and executable
+  audit anchors (the native_decide quarantine), importing each test module explicitly.
+
 Usage: `python3 scripts/gen_axiom_probe.py` (from the repo root); then
-`lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`).
+`lake env lean scripts/axiom_probe.lean` / `... scripts/axiom_probe_test.lean`
+(see `scripts/run_audit.sh`).
 """
 
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "scripts" / "axiom_probe.lean"
+OUT_MAIN = ROOT / "scripts" / "axiom_probe.lean"
+OUT_TEST = ROOT / "scripts" / "axiom_probe_test.lean"
 
 # (glob, declaration-name regex) → collect matching theorems/defs with their namespace.
 TARGETS = [
@@ -35,8 +45,10 @@ TARGETS = [
      r"theorem\s+(completeness)\b"),
     # DivRem's isolated, circuit-independent contract and evidence layer is a first-class audit
     # surface: probe every named theorem rather than only the admitted whole-chip extraction seam.
-    ("SP1Clean/FormalModel/Contracts/DivRem.lean", r"(?:theorem|lemma)\s+(\w+)\b"),
-    ("SP1Clean/Proofs/Chips/DivRemChip/Cases.lean", r"(?:theorem|lemma)\s+(\w+)\b"),
+    # Dotted capture: `theorem Unsigned64Evidence.total` must probe the theorem, not collapse to
+    # the (already-probed) structure name at the first `.`.
+    ("SP1Clean/FormalModel/Contracts/DivRem.lean", r"(?:theorem|lemma)\s+([\w.]+)\b"),
+    ("SP1Clean/Proofs/Chips/DivRemChip/Cases.lean", r"(?:theorem|lemma)\s+([\w.]+)\b"),
     ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"theorem\s+(correct_\w+|\w*reaches_sail\w*)\b"),
     ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"def\s+(kind)\b"),
     ("SP1Clean/Faithful/*.lean", r"(?:theorem|def)\s+(\w*faithful\w*)\b"),
@@ -45,9 +57,18 @@ TARGETS = [
     ("SP1Clean/Faithful/SupportedMachine.lean",
      r"(?:theorem|def)\s+(supportedChipFaithfulness\w*)\b"),
     # The witness/trace conformance anchors now live in the separate `SP1CleanTest` test library (the
-    # native_decide quarantine); the census still probes them to disclose their ofReduceBool axioms.
+    # native_decide quarantine); the census still probes them to disclose their compiler-trust axioms.
     ("SP1CleanTest/WitnessTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
     ("SP1CleanTest/TraceGenTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
+    # The real-row satisfiability battery: every named anchor (28 per-chip rows + the Spec-level
+    # companions + the nonempty-assert-list guard) is census-visible so its native_decide trust is
+    # disclosed per-declaration like the conformance anchors.
+    ("SP1CleanTest/NonVacuityReal.lean", r"theorem\s+(\w+)\b"),
+    # The independent-audit joint-premise regression freezes both the full native constraint
+    # check and the exact evaluated bus footprint. Keep its native_decide trust visible alongside
+    # the older conformance and per-row satisfiability batteries.
+    ("SP1CleanTest/Audit/*.lean",
+     r"theorem\s+(constraints_hold|interactions_exact|program_projection)\b"),
     # The abstract walk/trail core (relocated from GatedVm/Chain.lean; live — used by AIR +
     # RankedGrounding).
     ("SP1Clean/Soundness/Walk.lean", r"theorem\s+(exists_trail)\b"),
@@ -72,15 +93,22 @@ TARGETS = [
      r"theorem\s+(checkedIn_semanticRevision|coreCluster_matchesExtracted|"
      r"coreClusterShapes_matchExtracted|memoryBoundaryCluster_matchesExtracted|"
      r"memoryBoundaryClusterShapes_matchExtracted|publicValuesWidth_matchesExtracted)\b"),
+    # The opcode-alphabet cross-check: the hand-maintained `Model/Opcode.lean` mirror against the
+    # extracted `Opcode` enum discriminant table (trust-gap F8 closure).
+    ("SP1Clean/FormalModel/OpcodeTable.lean",
+     r"theorem\s+(opcodeTable_matchesExtracted)\b"),
     ("SP1Clean/Faithful/CoreAIR.lean", r"theorem\s+(system_isCurrent)\b"),
     ("SP1Clean/Soundness/CoreAIR.lean",
      r"(?:theorem|def)\s+(sp1_air_refinement_of_obligations|sp1_air_sound_of_obligations)\b"),
-    # The base execution relation deliberately excludes COMMIT-row existence.  Probe the two
-    # optional program-contract strengthenings separately so a future output theorem cannot hide an
-    # admission behind wrapper or verifying-key terminology.
+    # The base execution relation deliberately excludes COMMIT-row existence. Probe the persistence,
+    # terminal-digest, and optional program-contract theorems separately so a future output theorem
+    # cannot hide an admission behind wrapper or verifying-key terminology.
+    ("SP1Clean/FormalModel/Contracts/PublicValues.lean",
+     r"theorem\s+(SP1PublicValues\.committedDigest_eq_last_of_flag)\b"),
     ("SP1Clean/FormalModel/Execution.lean",
-     r"theorem\s+(commitCovered_of_standardWrapper|"
-     r"commitCovered_of_outputSafeVerifyingKey)\b"),
+     r"theorem\s+(finalCommitRowsMatch_of_layout|finalCommitRowsMatch_of_execution|"
+     r"completeCommitDigestMatches_of_coveredExecution|commitCovered_of_standardWrapper|"
+     r"commitCovered_of_commitCoveringVerifyingKey)\b"),
     ("SP1Clean/Soundness/TimedGrounding.lean", r"theorem\s+(walk)\b"),
     ("SP1Clean/Soundness/FinishedChannels.lean", r"theorem\s+(sp1_finishedChannel_guarantees)\b"),
     ("SP1Clean/Soundness/ChipRegistry.lean", r"(?:theorem|def)\s+(allChipKinds\w*)\b"),
@@ -148,8 +176,9 @@ def fqns_in(path: Path, decl_re: re.Pattern) -> list[str]:
 
 
 def main() -> None:
-    fqns: list[str] = []
-    extra_imports: list[str] = []  # modules outside the `SP1Clean` umbrella (e.g. `SP1CleanTest.*`)
+    main_fqns: list[str] = []
+    test_fqns: list[str] = []
+    test_imports: list[str] = []  # `SP1CleanTest.*` modules, imported explicitly in the test probe
     seen_imports: set[str] = set()
     for glob, pattern in TARGETS:
         decl_re = re.compile(pattern)
@@ -157,32 +186,50 @@ def main() -> None:
             found = fqns_in(path, decl_re)
             if not found:
                 continue
-            fqns.extend(found)
             # `import SP1Clean` (the umbrella) covers every main-library declaration, but NOT the
             # `SP1CleanTest` conformance anchors (that test library is not imported by the umbrella —
-            # it is the native_decide quarantine). Import each such module explicitly so its FQNs
-            # resolve in the probe.
+            # it is the native_decide quarantine). Those go to the separate test probe, importing
+            # each module explicitly so its FQNs resolve there.
             rel = path.relative_to(ROOT)
             if rel.parts[0] != "SP1Clean":
+                test_fqns.extend(found)
                 mod = ".".join(rel.with_suffix("").parts)
                 if mod not in seen_imports:
                     seen_imports.add(mod)
-                    extra_imports.append(mod)
-    # dedupe, keep order
-    seen, ordered = set(), []
-    for f in fqns:
-        if f not in seen:
-            seen.add(f)
-            ordered.append(f)
-    lines = ["import SP1Clean"]
-    lines += [f"import {m}" for m in extra_imports]
+                    test_imports.append(mod)
+            else:
+                main_fqns.extend(found)
+
+    def dedupe(fqns: list[str]) -> list[str]:
+        seen, ordered = set(), []
+        for f in fqns:
+            if f not in seen:
+                seen.add(f)
+                ordered.append(f)
+        return ordered
+
+    main_ordered = dedupe(main_fqns)
+    lines = ["import SP1Clean",
+             "",
+             "/-! Auto-generated by `scripts/gen_axiom_probe.py` — do not edit by hand.",
+             "Main-library census probe (elaborates against the `SP1Clean` oleans only).",
+             "Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -/",
+             ""]
+    lines += [f"#print axioms {f}" for f in main_ordered]
+    OUT_MAIN.write_text("\n".join(lines) + "\n")
+    print(f"wrote {OUT_MAIN.relative_to(ROOT)} with {len(main_ordered)} probes")
+
+    test_ordered = dedupe(test_fqns)
+    lines = [f"import {m}" for m in test_imports]
     lines += ["",
               "/-! Auto-generated by `scripts/gen_axiom_probe.py` — do not edit by hand.",
-              "Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -/",
+              "Test-library census probe (the `SP1CleanTest` conformance anchors; requires the",
+              "test-library oleans — run `lake test` first).",
+              "Run via `lake env lean scripts/axiom_probe_test.lean` (see `scripts/run_audit.sh`). -/",
               ""]
-    lines += [f"#print axioms {f}" for f in ordered]
-    OUT.write_text("\n".join(lines) + "\n")
-    print(f"wrote {OUT.relative_to(ROOT)} with {len(ordered)} probes")
+    lines += [f"#print axioms {f}" for f in test_ordered]
+    OUT_TEST.write_text("\n".join(lines) + "\n")
+    print(f"wrote {OUT_TEST.relative_to(ROOT)} with {len(test_ordered)} probes")
 
 
 if __name__ == "__main__":

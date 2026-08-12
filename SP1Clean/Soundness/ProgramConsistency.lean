@@ -9,15 +9,18 @@ import SP1Clean.Model.InteractionRecovery
 
 The trace-level meaning of the `.program` interaction that `Readers/RTypeReader.lean` + the chip
 commit (sibling of `Soundness/StateConsistency.lean` for the State bus). SP1's `RTypeReader::eval`
-emits one `send (.program …) is_trusted` per row (`Extracted/RTypeReader.lean:82`) — the
-instruction fetch — gated, on the Add chip, by `is_real` (`is_trusted = is_real`).
+emits one `send (.program …) is_trusted` per row (the first entry of `Extracted/RTypeReader.lean`'s
+`interactions` list) — the
+instruction fetch — gated, on the Add chip, by `is_real` (`is_trusted = is_real`). (The native
+circuit's fetch is a **pull** after the W11 program-bus polarity flip; balance is invariant under the
+per-channel sign flip.)
 
 We project each row to a single signed `LookupAccess` contribution (`Row.programLookups`, `+is_real`)
 feeding the multiset bus of `Model/InteractionBus.lean`, and to a `ProgramAccess` record. The
 program-bus consistency is **membership**: every real row's fetched `(pc, opcode, operands)` tuple lies
-in the committed program ROM. That ROM is the off-chip `ProgramChip`'s receive side, not modelled here,
-so — exactly as the State bus threads `TraceStateLink` — the membership link is threaded as
-`TraceProgramLink`. The per-row projection and the padding-gating lemma `programLookups_padding`
+in the committed program ROM. The membership link `TraceProgramLink` is **discharged down to bus
+balance** below (`programConsistent_of_balance`, against a native `ProgramProvider`) — no
+longer a threaded assumption. The per-row projection and the padding-gating lemma `programLookups_padding`
 (padding rows contribute 0 to every program-bus key) are proven natively. -/
 
 namespace SP1Clean.Soundness
@@ -110,7 +113,7 @@ theorem programLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is
     ZMod.val_zero, Nat.cast_zero, neg_zero, ite_self, add_zero]
 
 /-- **`TraceProgramLink` discharged down to bus balance.** Given a native `ProgramProvider` (SP1's
-preprocessed program/decode chip — it carries only validly-decoded ROM rows, `Chips/ProgramChip.lean`)
+preprocessed program/decode chip — it carries only validly-decoded ROM rows, `Model/ProgramChip.lean`)
 and a *balanced* Program bus (the LogUp/GKR fact, the lone remaining threaded assumption), every real
 row's fetched instruction is an `inROM`-valid row. The argument mirrors `byteAccessValid_of_balance`: a
 real send has multiplicity `is_real.val > 0`; on a balanced bus the provider must cancel it

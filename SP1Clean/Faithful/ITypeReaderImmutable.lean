@@ -10,8 +10,10 @@ import SP1Clean.Faithful.ChipTactics
 
 /-! # Faithfulness anchor — SP1's `ITypeReaderImmutable` constraint fragment ↔ the native reader spec
 
-Sibling of `Faithful/ITypeReader.lean`, for the **immutable** I-type register-adapter fragment used by
-stores (op_a = rs2 *read*, op_b = rs1 read, op_c an immediate). SP1's generated
+The reader-fragment anchor for the **immutable** I-type register-adapter used by
+stores (op_a = rs2 *read*, op_b = rs1 read, op_c an immediate) — a sibling of the
+`Faithful/RTypeReader.lean`/`Faithful/ALUTypeReader.lean` reader anchors (there is no separate
+`ITypeReader` anchor; the mutable I-type fragment is covered through the chip anchors). SP1's generated
 `ITypeReaderImmutable.constraints` (`Extracted/ITypeReaderImmutable.lean`) is `ITypeReader` with op_a a
 read: the four `op_a_0` zeroing gates pin the **read** value of `x0` to `0`
 (`op_a_0 * op_a_memory.prev_value[i] = 0`), and the op_a memory `.receive` carries `prev_value`

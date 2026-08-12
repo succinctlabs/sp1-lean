@@ -89,8 +89,9 @@ registry-wide `ChipGroundingContracts` instances supply every chip's operand and
 The `advance` proof establishes semantic conformance of the native chip. It does not by itself prove that
 the native chip is SP1's Rust AIR. The independent whole-chip `ChipFaithful` layer compares the complete
 assertion system and all four interaction multisets through one explicit row reconfiguration. All 25
-supported instruction chips now have that final anchor; remaining operation/fragment anchors are
-transitional implementation evidence.
+supported instruction chips now have that final anchor; the remaining per-operation/reader anchors
+are deliberate shared substrate — canonical statements the chip anchors cite through namespace
+bridges — not migration debt.
 
 ## References
 

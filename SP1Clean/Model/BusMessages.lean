@@ -6,10 +6,12 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 The `ProvableStruct` message tuples of SP1's dynamic buses — State, Memory, Program — plus the
 **structural** (program-independent, execution-independent) per-row predicates over them
-(`Spec`/`isU64`/`RowSpec`). Extracted from `Model/Channels.lean` so this layer sits *below* the
-semantic-execution predicates (`Model/Semantics/Truth.lean` — `StateTruth`/`MemTruth`/`ProgTruth`),
-which need these message types: with the messages here, `Truth` imports this file (not `Channels`), and
-`Channels` can then wire the semantic predicates into the channel `Guarantees` without an import cycle.
+(`Spec`/`isU64`/`RowSpec`). Extracted from `Model/Channels.lean` so this layer sits *below* both the
+channel definitions and the semantic-execution predicates (`Model/Semantics/Truth.lean`), which need
+these message types: `Truth` imports this file (not `Channels`), and `Channels` stays free of any
+Sail/semantics import. The channel `Guarantees` themselves are purely structural (State `True`,
+Memory `isU64 ∧ ClkBound`, Program `RowSpec`, Byte `ByteRowSpec`); the semantic truths are derived
+globally by the timed grounding engine, never carried as channel guarantees.
 
 Namespace is `SP1Clean.Channels` (unchanged), so every `Channels.StateMsg`/`.MemoryMsg.isU64`/… name
 resolves exactly as before — this is a pure relocation. The channel *definitions* stay in
@@ -80,7 +82,9 @@ exactly the same missing piece — `crates/core/machine/src/air/memory.rs`'s
 `current_comp_val, prev_comp_value` are range-checked to be `< 2^24` and as long as we're working in a
 field larger than `2 * 2^24`" — and neither range check is local to the accessing row. Carrying the
 bound on the bus is what makes it a genuine received fact: a chip that **pulls** a prior record gets
-it for free, which is what discharges `Soundness/TouchChains.lean`'s `TouchOK.pull_lt_push`. -/
+it for free, which is what lets the timed grounding walk establish the `prev_clk < access_clk`
+slot order (`RowOK.slotOfClkBound`, `Soundness/TimedGrounding.lean`; formerly the
+`TouchOK.pull_lt_push` field). -/
 def MemoryMsg.ClkBound (msg : MemoryMsg (ZMod p)) : Prop :=
   msg.clk_low.val < 2 ^ 24
 

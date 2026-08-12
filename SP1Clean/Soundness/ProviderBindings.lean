@@ -24,10 +24,10 @@ open SP1Clean.Execution
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-/-- The provider-table indices in the stable 25-chip + 11-provider witness layout. -/
-def programProviderIndex : ℕ := 33
-def memoryInitProviderIndex : ℕ := 34
-def memoryFinalizeProviderIndex : ℕ := 35
+/-- The provider-table indices in the stable 25-chip + 13-provider witness layout. -/
+def programProviderIndex : ℕ := 35
+def memoryInitProviderIndex : ℕ := 36
+def memoryFinalizeProviderIndex : ℕ := 37
 
 /-- The fixed SP1 ensemble layout always contains its Program-provider table. -/
 theorem programProviderIndex_lt_tablesLength
@@ -74,7 +74,7 @@ theorem memoryInitProviderTable_component
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
     (memoryInitProviderTable witness).component = ⟨MemoryProviderChip.circuit⟩ := by
   unfold memoryInitProviderTable
-  have aligned := witness.same_circuits 34 (by
+  have aligned := witness.same_circuits 36 (by
     simp [sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length])
   exact aligned.symm.trans (by rfl)
 
@@ -136,7 +136,7 @@ theorem memoryFinalizeProviderTable_component
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
     (memoryFinalizeProviderTable witness).component = ⟨MemoryFinalizeChip.circuit⟩ := by
   unfold memoryFinalizeProviderTable
-  have aligned := witness.same_circuits 35 (by
+  have aligned := witness.same_circuits 37 (by
     simp [sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length])
   exact aligned.symm.trans (by rfl)
 
@@ -205,10 +205,17 @@ noncomputable def MemoryInitProviderBound
 /-- At most one active Memory-init contribution per register or aligned 64-bit RAM cell.  Clean
 channel balance alone cannot force this: two genesis records at one location would let a later pull
 match a stale genesis twin instead of the live frontier record, so per-location uniqueness is part of
-the honest non-execution companion relation the timed grounding engine consumes.  Upstream this is
-SP1's global-interaction uniqueness argument over the memory-init table; it is bound here as a named
-boundary fact, to be discharged by the extracted-AIR layer rather than re-derived from the per-row
-`WordRangeCheck` constraints (which cannot see across rows). -/
+the honest non-execution companion relation the timed grounding engine consumes.  Upstream the
+mechanism is the MemoryGlobal control chain: each row receives/sends an indexed control message,
+asserts `prev_addr < addr` via `LtOperationUnsigned` on comparison rows, and the chain endpoints
+are anchored by the PublicValues table (`previous_init_addr`/`last_init_addr`) — strictly
+increasing exact addresses give per-address uniqueness (the septic-curve Global chip realizes the
+cross-shard bus, idealized here as exact balance).  Note the granularity gap for the eventual
+discharge: this premise is per `locOf` (8-byte RAM cell), while the upstream chain orders exact
+byte addresses with no alignment constraint — closing it needs an alignment/consumability
+argument or a per-address restatement.  Bound here as a named boundary fact, to be discharged by
+the extracted-AIR layer rather than re-derived from the per-row `WordRangeCheck` constraints
+(which cannot see across rows). -/
 noncomputable def MemoryInitProviderUnique
     (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop :=
   (typedTableInteractionsWith (memoryInitProviderTable witness) memoryChannel).Pairwise

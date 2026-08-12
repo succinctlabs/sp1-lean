@@ -29,8 +29,9 @@ open SP1Clean.Commit (progOf initClkNat)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- State truth relative to the fixed loader and schedule of an `SP1MachineModel`.  This is the
-canonical predicate for the new AIR capstone. -/
+/-- State truth relative to the fixed loader and schedule of an `SP1MachineModel`.  Forward-looking:
+currently unconsumed — the capstone layer grounds through `LocalStateTruth` below; this
+model-parameterized form is reserved for the generalized (non-ordinary-schedule) grounding. -/
 noncomputable def ExecutionStateTruth (model : SP1Clean.Machine.SP1MachineModel)
     (m : StateMsg (ZMod p)) (data : ProverData (ZMod p)) : Prop :=
   ∃ ctx : SP1Clean.Machine.ExecutionCtx model, ctx.program = progOf data ∧
@@ -65,8 +66,9 @@ the execution's value at that time (`LocalValueAt`).
 
 The two row-local hygiene conjuncts come first, in the memory channel's own `Guarantees` order
 (`isU64 ∧ ClkBound`), because that is exactly the pair a puller receives back out of grounding
-(`Soundness/TypedMemory.lean`'s `memoryChannelGuarantees_of_grounded`) and exactly what
-`Soundness/TouchChains.lean`'s `TouchOK.pull_lt_push` consumes; the semantic conjunct stays last so
+(`Soundness/TypedMemory.lean`'s `memoryChannelGuarantees_of_grounded`) and exactly what the walk's
+`prev_clk < access_clk` slot order consumes (`RowOK.slotOfClkBound`, formerly the
+`TouchOK.pull_lt_push` field); the semantic conjunct stays last so
 the common `.1` projection (value hygiene) is unchanged. -/
 def LocalMemTruth (initial : SailState) (initialClock : ℕ)
     (message : MemoryMsg (ZMod p)) : Prop :=

@@ -6,7 +6,7 @@ import SP1Clean.Native.Operations.SubwOperation.Defs
 
 SP1's `SubwOperation::eval` as a Clean `FormalAssertion`. Composes `U16MSBOperation` on the high
 result limb, pulls two limb ranges from the byte bus, asserts the two gated borrows. `Spec`/
-`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle. -/
+`spec_populate` live here (not in `FormalModel/Contracts/Operations.lean`) to avoid an import cycle. -/
 
 namespace SP1Clean.SubwOperation
 
@@ -17,7 +17,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Close a gated carry assert `x * (x + -1) = 0` from a carry-bool `c = 0 ∨ c = 1` and `x = c`
-(by `ring`). Bridges the auto-extracted `main`'s `65536 + -1` borrow spelling to `RawSpec`'s `65535`. -/
+(by `ring`). Bridges the hand-maintained `main`'s (`Native/Operations/SubwOperation/Defs.lean`)
+`65536 + -1` borrow spelling to `RawSpec`'s `65535`. -/
 private lemma carry_zero {x c : ZMod p} (h : c = 0 ∨ c = 1) (hxc : x = c) : x * (x - 1) = 0 := by
   rw [hxc]; rcases h with h | h <;> rw [h] <;> ring
 

@@ -23,8 +23,8 @@ the message (`ZMod.val` + `Array.toList` injectivity), so each `LookupKey`'s ℤ
 `BalancedInteractions` ⇒ native `isConsistentBalanced` over any access list that permutes to the
 `Interaction.toAccess`-image with `{-1, 0, 1}` multiplicities — is
 `isConsistentBalanced_of_balancedInteractions` (the roadmap-W1a core). The remaining input — the
-witness ↔ access-list correspondence itself — is the decode seam (`SP1WitnessDecode`,
-`Soundness/SP1Ensemble.lean`). -/
+witness ↔ access-list correspondence itself — is the decode seam
+(`Soundness/WitnessDecode.lean`). -/
 
 namespace SP1Clean.LookupAccessList
 

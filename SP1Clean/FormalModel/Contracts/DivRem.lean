@@ -385,7 +385,9 @@ bundle into `CoreSpec`'s explicit conjuncts. -/
 def OwnAssertsHold {p : ℕ} (cols : DivRemChip.Columns (ZMod p)) : Prop :=
   ∀ x ∈ DivRemChip.ownAsserts cols, x = 0
 
-/- The semantic evidence certified by the DivRem row's **product/own-assert/byte-range assertion
+/- **Overview of `ProductSpec` and its evidence cluster** (the `ProductSpec` definition follows
+below, after its two `@[irreducible]` placement leaf contracts). The semantic evidence certified by
+the DivRem row's **product/own-assert/byte-range assertion
 cluster** (`Native/Operations/DivRemOperation/Core.lean`), `DivRemCompare.CompareSpec`'s structural
 twin:
 

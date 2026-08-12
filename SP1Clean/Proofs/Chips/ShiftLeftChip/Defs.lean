@@ -231,7 +231,8 @@ while structural consumers select the early reader boundary. -/
     ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
      input.adapter.op_a, a, gate⟩
   -- `is_real` boolean gate emitted **inline** (`assertZero`, not `=== 0`) so the `enabled = is_real`
-  -- selector is visible to `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table.
+  -- selector is visible to `ConstraintsHold.Shallow` as a chip-owned constraint (the `VmTables`
+  -- re-base that motivated this was investigated and deferred — roadmap W11).
   assertZero (input.is_real * (input.is_real - 1))
   -- Lean-only glue identifying the public selector with SP1's variant sum. This is a parent-level
   -- structural assertion, not an independent proof boundary, and is flat-identical to `=== 0`.

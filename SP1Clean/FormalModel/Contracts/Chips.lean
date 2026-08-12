@@ -8,13 +8,15 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 /-! # Consolidated specs — chip rows, stated against the RV64 ISA functions
 
 The `Inputs` structs and semantic `Spec`s for the chip rows (`GeneralFormalCircuit`s). Final file in
-the `Specs/` sequence (`Reader → Operation → Chip`).
+the `FormalModel/Contracts/` sequence (`Readers.lean → Operations.lean → Chips.lean`).
 
 Unlike the operation gadgets — whose `Spec`s are spelled out as `BitVec` equations — each **chip**
-states its headline meaning in terms of the corresponding **RV64 ISA function** from
-`RISCV/Instructions.lean` (`RV64.add`/`RV64.sub`/`RV64.addw`/`RV64.subw`/`RV64.and`/`RV64.or`/
-`RV64.xor`), since the opcode is statically known per chip. The operand order matches the RV64
-signature `f rs2_val rs1_val` with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`.
+states its headline meaning in terms of the corresponding **RV64 ISA functions** from
+`RISCV/Instructions.lean` (`RV64.add`/`RV64.sub`/`RV64.addw`/`RV64.subw`, the `RV64.mul*` family,
+the shift family `RV64.sll*`/`RV64.srl*`/`RV64.sra*`, `RV64.and`/`RV64.or`/`RV64.xor`,
+`RV64.lui`/`RV64.auipc`, …). Where a chip serves several opcodes (Bitwise, Mul, DivRem, the
+shifts), its `Spec` selects the ISA function by the row's flag columns. The operand order matches
+the RV64 signature `f rs2_val rs1_val` with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`.
 
 For ADD/SUB/AND/OR/XOR the RV64 function is *definitionally* the `BitVec` op (`add rs2 rs1 := rs1 +
 rs2`), so the chip soundness proofs carry over unchanged. For the W-instructions ADDW/SUBW the RV64
@@ -27,7 +29,7 @@ namespace SP1Clean.AddChip
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Native Add-chip row.  Its arithmetic block follows the local Lean gadget, not Rust's
-`AddOperation` type.  `Faithful.AddChip.reconfigure` is the explicit whole-chip bridge to the
+`AddOperation` type.  `Faithful.addChipReconfigure` is the explicit whole-chip bridge to the
 extracted `AddCols` oracle.  The reader blocks remain layout-compatible while that migration proceeds. -/
 structure Columns (F : Type) where
   is_real : F
@@ -133,7 +135,7 @@ namespace SP1Clean.SubChip
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Native Sub-chip row. The reader blocks reuse the project substrate; only the arithmetic block is
-owned by the local Lean gadget. `Faithful.SubChip.subChipReconfigure` is the sole bridge to Rust's
+owned by the local Lean gadget. `Faithful.subChipReconfigure` is the sole bridge to Rust's
 separately generated whole-chip row. -/
 structure Columns (F : Type) where
   is_real : F
@@ -188,7 +190,7 @@ lemma rv64_addw_eq (x y : BitVec 64) :
 
 /-- Native ADDW-chip row. The reader blocks reuse the project substrate; only the arithmetic block is
 owned by the local Lean gadget (two witnessed low limbs + the composed sign-bit block).
-`Faithful.AddwChip.addwChipReconfigure` is the sole bridge to Rust's separately generated whole-chip
+`Faithful.addwChipReconfigure` is the sole bridge to Rust's separately generated whole-chip
 row. -/
 structure Columns (F : Type) where
   is_real : F
@@ -254,7 +256,7 @@ lemma rv64_subw_eq (x y : BitVec 64) :
 
 /-- Native SUBW-chip row. The reader blocks reuse the project substrate; only the arithmetic block is
 owned by the local Lean gadget (two witnessed low limbs + the composed sign-bit block).
-`Faithful.SubwChip.subwChipReconfigure` is the sole bridge to Rust's separately generated whole-chip
+`Faithful.subwChipReconfigure` is the sole bridge to Rust's separately generated whole-chip
 row. -/
 structure Columns (F : Type) where
   is_real : F
@@ -939,9 +941,9 @@ def nextPcWord (cols : Columns (ZMod p)) : Word (ZMod p) :=
 /-- Semantic contract for the JALR row, composed from the I-type reader sub-`Spec` plus the
 `is_real`-gated jump/link semantics. On a real row: the jump target `add_operation.value = rs1 + op_c_imm`
 (`op_c_imm` is the sign-extended 12-bit immediate — the `BitVec 12` ↔ word relation is a received decode
-fact, supplied at the Sail bridge), the `lsb` witness is binary, and — when `rd ≠ x0` (`op_a_0 = 0`) — the
-link-address write `op_a_operation.value = pc + 4`. The committed next_pc is the LSB-cleared
-`nextPcWord`. The final conjunct records that this cleared low limb (`add_operation.value[0] - lsb`)
+fact, supplied at the Sail bridge) and — when `rd ≠ x0` (`op_a_0 = 0`) — the link-address write
+`op_a_operation.value = pc + 4`. The committed next_pc is the LSB-cleared
+`nextPcWord`. The penultimate conjunct records that this cleared low limb (`add_operation.value[0] - lsb`)
 is divisible by 4 — i.e. the jump target is 4-byte aligned — forced by the in-circuit alignment
 `Range` byte-lookup (`(value[0] - lsb) · 4⁻¹ < 2^14`); the Sail bridge lifts it to the whole word.
 The final conjunct exposes the **LSB-clearing relation** itself — the committed `nextPcWord` is the
@@ -956,7 +958,6 @@ def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZM
       wv0 := cols.op_a_operation.value[0], wv1 := cols.op_a_operation.value[1],
       wv2 := cols.op_a_operation.value[2], wv3 := cols.op_a_operation.value[3] } ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
-  (cols.lsb = 0 ∨ cols.lsb = 1) ∧
   (input.is_real = 1 →
     Word.toBitVec64 cols.add_operation.value
       = Word.toBitVec64 (rs1Word cols) + Word.toBitVec64 cols.adapter.op_c_imm) ∧
@@ -975,7 +976,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Native Branch-chip row (Rust field order). The reader blocks and the compare block reuse the
 project substrate (`Extracted.LtOperationSigned` is still a standalone generated module — the Lt
-chip composes the same gadget family). `Faithful.BranchChip.branchChipReconfigure` is the sole
+chip composes the same gadget family). `Faithful.branchChipReconfigure` is the sole
 bridge to Rust's separately generated whole-chip row. -/
 structure Columns (F : Type) where
   state : Extracted.CPUState F

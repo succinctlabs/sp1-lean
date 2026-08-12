@@ -8,7 +8,7 @@ SP1's `IsZeroWordOperation::eval` as a Clean `FormalAssertion`. Composes `IsZero
 limb; the `Spec` references the four per-limb `IsZeroOperation.Spec`s by direct field application
 plus the ungated booleanness/half-product clauses and the gated AND-tree. `spec_populate` lets the
 composing operation discharge its `assertion`-side obligation; `result_semantic` exposes the semantic
-readout. `Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle. -/
+readout. `Spec`/`spec_populate` live here (not in `FormalModel/Contracts/Operations.lean`) to avoid an import cycle. -/
 
 namespace SP1Clean.IsZeroWordOperation
 

@@ -14,7 +14,8 @@ lemma proves the `Spec` at the *populate value* of those columns.
 
 These helpers do exactly the cols-block → populate bridge, stated env-parametrically over an
 **abstract** `cols` struct (so the helper carries no giant term and type-checks in its own file off
-the 256M-heartbeat `completeness` theorem — mirroring `ownAsserts_complete`). The `completeness`
+the `completeness` theorem, whose former 256M heartbeat ceiling was removed — zero heartbeat
+options remain in `Proofs/Chips`; mirroring `ownAsserts_complete`). The `completeness`
 glue supplies the two pins (`hcell` from `getElem_toElements_eval_varFromOffset`, `hpop` from the
 witness-hint `h_env_*`) and the chosen `spec_*` lemma (`hSpec`); the helper rewrites `cols` to the
 populate value and discharges by `hSpec`. This replaces the old slow `convert <SubOp>.spec_* using 2`

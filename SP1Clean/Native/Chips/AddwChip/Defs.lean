@@ -62,7 +62,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   -- chip-owned `op_a_0 = 0` assertion in the native verifier as well.
   input.adapter.op_a_0 === 0
   -- Inline `assertZero` (not `=== 0`) so the `is_real` booleanity is visible to
-  -- `ConstraintsHold.Shallow` — required for the chip to be a `VmTables` table (A2).
+  -- `ConstraintsHold.Shallow` as a chip-owned constraint (the `VmTables` re-base that motivated
+  -- this was investigated and deferred — roadmap W11).
   assertZero (input.is_real * (input.is_real - 1))
   return ⟨input.is_real, input.state, input.adapter, ⟨value, ⟨msb[0]⟩⟩⟩
 
@@ -76,7 +77,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
       Readers.CPUState.circuit, Readers.RegisterWrite.circuit]
   -- 2 result limbs + 1 sign bit; readers are `assertion`s (`localLength 0`).
   localLength _ := 3
-  -- `programChannel` joins the byte guarantee propagated up from `ALUTypeReader`'s program **pull** (W11 flip);
+  -- `programChannel` joins the structural `RowSpec` propagated from `ALUTypeReader`'s program **pull** (W11 flip);
   -- `memoryChannel` joins from `ALUTypeReader`'s memory read **pulls** (W11 memory flip). The `RegisterWrite`
   -- op_a write push owes a memory requirement (declared in `circuit.channelsWithRequirements`), not a guarantee.
   channelsWithGuarantees := [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw]

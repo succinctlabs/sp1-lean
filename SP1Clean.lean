@@ -171,6 +171,7 @@ import SP1Clean.Extracted.CPUState
 import SP1Clean.Extracted.ExtractionDSL
 import SP1Clean.Extracted.Provenance
 import SP1Clean.Extracted.CoreAIRManifest
+import SP1Clean.Extracted.OpcodeTable
 import SP1Clean.Extracted.SystemOracle.Program
 import SP1Clean.Extracted.SystemOracle.Byte
 import SP1Clean.Extracted.SystemOracle.Range
@@ -410,6 +411,7 @@ import SP1Clean.FormalModel.Contracts.DivRemColumns
 import SP1Clean.FormalModel.Contracts.PublicValues
 import SP1Clean.FormalModel.Contracts.CoreAIR
 import SP1Clean.FormalModel.CoreProfile
+import SP1Clean.FormalModel.OpcodeTable
 import SP1Clean.FormalModel.CoreAIRRelation
 import SP1Clean.FormalModel.Relations
 import SP1Clean.FormalModel.Execution

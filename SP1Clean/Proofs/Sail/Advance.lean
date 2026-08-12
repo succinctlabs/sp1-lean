@@ -11,7 +11,7 @@ into each chip's Sail-step obligation (`TargetObligations.lift`, `Soundness/Targ
 `RefinesAt → OperandsBound → ∃ s', SailStep s s' ∧ RowEffect prog row s s'`.
 
 The load-bearing goal is **uniformity**: one `sp1Effect` (a function of the committed `RowView`), one
-generic `advance_of_regWrite` proof, and thin per-chip adapters — replacing the 25 bespoke per-chip
+generic `advance_write_core` proof, and thin per-chip adapters — replacing the 25 bespoke per-chip
 Sail-step predicates so the audit surface is a single statement. -/
 
 open LeanRV64D.Defs
@@ -774,7 +774,7 @@ theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s
 the Program-bus fetch truth (`decodedInROM`), the opcode/imm column shape, the routing fact `op_a ≠ 0`,
 the low-pc-limb bound, and the `Spec`-derived write value `hval`, one real `try_step` produces the row's
 committed `RowEffect`. Absorbs the whole per-chip plumbing — the ∀-state decode (`decodesRType`), the fetch
-(`fetchReady_of_romLoaded`), and the two register reads — over `advance_of_regWrite`, so each chip's adapter
+(`fetchReady_of_romLoaded`), and the two register reads — over `advance_write_core`, so each chip's adapter
 only unpacks its own `Spec` for `hval`/`hpc0` and supplies the column-shape facts by `rfl`. **The only
 per-chip-varying inputs are `op` and `hval`.** -/
 theorem advance_of_rtype {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState} (op : rop)

@@ -18,8 +18,10 @@ Reserved keys (arities pinned by the decoders below):
 - `"sp1.image"`, arity 4 — one byte per row: `[a0, a1, a2, byte]` (48-bit address limbs, one byte);
 - `"sp1.init_clk"`, arity 2 — the genesis clock `[clk_high, clk_low]`.
 
-`progOf` is **total** via sanitization — duplicate ROM addresses are dropped (keep-first) and
-misaligned addresses removed, so `GuestProgram.rom_nodup`/`rom_aligned` hold by construction and a
+`progOf` is **total** via sanitization — duplicate ROM addresses are dropped (keep-first),
+misaligned addresses removed, out-of-window addresses removed, and compressed (non-full-width)
+entries removed, so all four `GuestProgram` guards
+(`rom_nodup`/`rom_aligned`/`rom_in_window`/`rom_full_width`) hold by construction and a
 malicious `data` still decodes to *some* well-formed program (the guarantees are then statements about
 that program). Headline AIR relations additionally require `StatementFor`: the raw representation must
 be canonical, so sanitization/truncation cannot hide malformed committed data, and `progOf data` equals

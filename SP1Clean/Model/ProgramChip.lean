@@ -12,7 +12,8 @@ bounds (`op_* < 32`), the pc bounds, and the opcode `trusted_instr` decode that 
 locally (`Model/BusMessages.lean`'s `ProgramMsg.Spec` defers them as *received* facts) hold for every
 real fetch, exactly what `Soundness/ProgramConsistency.lean`'s `TraceProgramLink` threads.
 
-This module models the receiver's side natively, the Program-bus sibling of `Chips/ByteChip.lean`: the
+This module models the receiver's side natively, the Program-bus sibling of
+`Proofs/Chips/ByteChip/Provider.lean`: the
 receiver is characterized by a membership **predicate** (`inROM`), not the ROM enumeration. A
 `ProgramProvider inROM` is any contribution list whose every entry sits at the key of some `inROM`-valid
 program row. The key fact that makes the membership transfer work is that the Program-bus key is the *full*
@@ -92,7 +93,7 @@ def ProgramRowSpec (row : ProgramRow (ZMod p)) : Prop :=
 some `inROM`-valid program row. This is the native, predicate-characterized content of SP1's preprocessed
 program/decode chip — its trace carries *only* validly-decoded ROM rows. Generic over the membership
 predicate `inROM` (instantiated with `ProgramRowSpec` to deliver the rich received facts), exactly as
-`Chips/ByteChip.lean`'s `ByteProvider` is characterized by `ByteRowSpec`. -/
+`Proofs/Chips/ByteChip/Provider.lean`'s `ByteProvider` is characterized by `ByteRowSpec`. -/
 def ProgramProvider (inROM : ProgramRow (ZMod p) → Prop) (prov : LookupAccessList) : Prop :=
   ∀ b ∈ prov, ∃ row : ProgramRow (ZMod p), inROM row ∧ keyOf b = programRowKey row
 

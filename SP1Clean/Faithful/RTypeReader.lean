@@ -119,7 +119,7 @@ the chip). So the **five** Memory interactions the reader actually emits (`inter
 op_a read, op_b read+write, op_c read+write) project to the same `LookupAccess` list as the Memory entries
 of SP1's extracted `RTypeReader.interactions` oracle **with the op_a write dropped** (`.eraseIdx 1` — the
 op_a write is Memory-index 1). The relocated op_a write is recovered at the chip level by `RegisterWrite`'s
-own emit, so the *combined* chip Memory block still equals the full oracle (`Faithful/AddChip.lean`). Same
+own emit, so the *combined* chip Memory block is a `List.Perm` of the full oracle (`Faithful/AddChip.lean`). Same
 `op_a(read), op_b, op_c` order, so a clean `=` after the erase. Exercises the `.memory` arm of
 `Extracted.Interaction.toAccess` and its `.send`/`.receive` `Dir.sign`. -/
 theorem rtypereader_memory_interactions_faithful_syntactic
