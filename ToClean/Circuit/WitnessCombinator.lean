@@ -19,12 +19,14 @@ Clean offers two vector-shaped witness entry points, and neither is quite what a
 the witgen cutover a payload swap for the structural layer — `.witness m (.native f)` becomes
 `.witness m (.ir …)`, and every offset computation downstream is unchanged.
 
-It is a candidate for upstream Clean (as the `WitgenIR`-taking generalisation of `witnessVector`),
-and carries no witness semantics of its own. -/
+## Upstream
 
-namespace SP1Clean
+Destined for `Clean/Circuit/Basic.lean`, beside `Circuit.witnessVector`, of which this is the
+`WitgenIR`-taking generalisation. It carries no witness semantics of its own — `witnessVector m out`
+is exactly `witnessVectorIR m (.ir [] out)` — so the merge is additive. Declared here in the
+namespace it would occupy upstream, so acceptance is a deletion plus dropping the import. -/
 
-open Circuit
+namespace Circuit
 
 variable {F : Type} [FiniteField F]
 
@@ -45,4 +47,8 @@ instance {k : ℕ} : ExplicitCircuits (F := F) (witnessVectorIR k) where
 
 attribute [explicit_circuit_no_unfold] witnessVectorIR
 
-end SP1Clean
+end Circuit
+
+-- Mirrors Clean's own `export Circuit (witnessVar witnessField witnessVector …)`, so call sites
+-- write `witnessVectorIR` unqualified exactly as they write `witnessVector`.
+export Circuit (witnessVectorIR)

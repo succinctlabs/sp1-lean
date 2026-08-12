@@ -5,7 +5,7 @@ import SP1Clean.Native.Readers.ITypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
-import SP1Clean.Native.WitnessCombinator
+import ToClean.Circuit.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel

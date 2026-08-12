@@ -1,5 +1,8 @@
 name = "sp1-clean-native"
-defaultTargets = ["SP1Clean"]
+# All three hand-written libraries build by default: the upstream-destined `ToClean`/`ToMathlib`
+# roots are listed explicitly so every module in those trees is compiled (and linted) even
+# before an `SP1Clean` module happens to import it.
+defaultTargets = ["SP1Clean", "ToClean", "ToMathlib"]
 
 moreLeanArgs = ["--tstack=400000"]
 
@@ -88,6 +91,31 @@ name = "sp1Lint"
 srcDir = "scripts"
 supportInterpreter = true
 
+# Upstream-destined libraries, at the BOTTOM of the import DAG: `ToMathlib` imports only Mathlib;
+# `ToClean` imports Clean (and may import `ToMathlib`); NEITHER may import `SP1Clean`. That rule is
+# what keeps them genuinely contributable — and what makes the terminal step of an accepted upstream
+# PR a plain deletion plus a repoint of the importers to `Mathlib.*`/`Clean.*`. Both carry the same
+# eight-flag linter set as the core pillars: material heading upstream gets no relaxation.
+# Root indices `ToMathlib.lean`/`ToClean.lean` are hand-maintained (this project has no `mk_all`),
+# and `scripts/check_root_index.sh` gates all three trees.
+[[lean_lib]]
+name = "ToMathlib"
+moreLeanArgs = [
+  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
+  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
+  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
+  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
+]
+
+[[lean_lib]]
+name = "ToClean"
+moreLeanArgs = [
+  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
+  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
+  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
+  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
+]
+
 # Umbrella library — root module `SP1Clean.lean` imports every module; `lake build` (the default
 # target) builds everything through it. Package-level `moreLeanArgs`/`[leanOptions]` above apply to
 # all libraries, so the layer libraries below inherit `--tstack`/heartbeats with no duplication.
@@ -106,7 +134,8 @@ name = "SP1Clean"
 # violations. `linter.style.longLine` is the remaining candidate (real fallout, concentrated in
 # Native/FormalModel) — see `docs/roadmap.md` § "Cleanup / polish backlog". The auto-gen `SP1Extracted` library is
 # deliberately left OUT (it carries per-file `set_option linter.all false` instead), as are the
-# auto-gen `*Vectors` modules inside `SP1CleanTest` (same per-file suppression). KEEP THE SIX COPIES IN SYNC.
+# auto-gen `*Vectors` modules inside `SP1CleanTest` (same per-file suppression). The two
+# upstream-destined libraries above carry the same set. KEEP THE EIGHT COPIES IN SYNC.
 [[lean_lib]]
 name = "SP1Math"
 globs = ["SP1Clean.Math.+"]

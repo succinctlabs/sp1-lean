@@ -1,7 +1,7 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import LeanRV64D
-import SP1Clean.Math.Misc
+import ToMathlib.General
 
 /-! # Sail machine state and register-index decoding
 

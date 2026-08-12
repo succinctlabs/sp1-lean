@@ -30,7 +30,7 @@ fi
 
 PATTERN='witnessNative|witnessVectorNative|UnconstrainedNative|UnconstrainedDepNative|nativeValue|WitgenIR\.native|\.native[[:space:]]+fun|\.native[[:space:]]*\('
 
-HITS=$(grep -rnE "$PATTERN" SP1Clean --include='*.lean' || true)
+HITS=$(grep -rnE "$PATTERN" SP1Clean ToClean --include='*.lean' 2>/dev/null || true)
 
 if [[ -z "$HITS" ]]; then
   echo "check_no_witness_native: clean (0 escape-hatch witness sites in SP1Clean/)."

@@ -1,28 +1,28 @@
 import Clean.Circuit.WitnessGeneration
 import Clean.Circuit.Subcircuit
 
-/-! # The witgen bridge: honest witness generation for chip rows
+/-! # Composition lemmas for `ComputableWitnesses`
 
-Phase 0 of the completeness programme. A chip's `completeness` field says "*any* environment
-consistent with my witness generators satisfies my constraints"; it never exhibits such an
-environment. Clean's array-backed interpreter `Circuit.witgen` does exhibit one, and
-`Circuit.witgen_usesLocalWitnesses` proves it honest — but only for circuits satisfying
-`Circuit.ComputableWitnesses`, i.e. whose generators read the environment strictly below the row's
-starting offset.
+A circuit's `completeness` field says "*any* environment consistent with my witness generators
+satisfies my constraints"; it never exhibits such an environment. Clean's array-backed interpreter
+`Circuit.witgen` does exhibit one, and `Circuit.witgen_usesLocalWitnesses` proves it honest — but
+only for circuits satisfying `Circuit.ComputableWitnesses`, i.e. whose generators read the
+environment strictly below the circuit's starting offset.
 
-This module holds the shared machinery for discharging that obligation chip by chip. The only real
-content per chip is its own witness payload; every composed reader and arithmetic gadget is
-zero-witness, and `forAll_witnessCongr_of_localLength_zero` dispatches those without unfolding them
-(which matters: unfolding the reader subcircuits is exactly the elaboration blow-up the repo's
-folding doctrine exists to avoid).
+Clean supplies `FormalCircuitBase.compose_computableWitnesses` for children that *carry* a
+`ComputableWitnesses` field, but a `FormalAssertion` or `GeneralFormalCircuit` child carries no such
+field. The lemmas here close that hole for the common case — a child that witnesses **no cells at
+all** satisfies any witness-congruence condition vacuously, and can therefore be dispatched by its
+`localLength` alone, with no unfolding of its operations. Unfolding composed children is precisely
+the elaboration blow-up that makes these proofs intractable at scale, so avoiding it is the point.
 
-**Scope note.** `ProverEnvironment.fromArray` hard-codes empty committed `ProverData`
-(`Clean/Circuit/WitnessGeneration.lean`, which defers the data-carrying variant to "a later phase").
-SP1's chips read no `env.data`, so their honesty proofs are unaffected; transferring the resulting
-`ConstraintsHold` to a *table* environment (`Environment.fromArray row data`, which carries real
-data) is the step that wants Clean's data-carrying `witgen`, and is drafted as an upstream patch. -/
+## Upstream
 
-namespace SP1Clean.Witgen
+Destined for `Clean/Circuit/Subcircuit.lean`, beside `compose_computableWitnesses`. Clean has
+exactly one `ComputableWitnesses` instance in tree (`Gadgets/Addition8/Addition8FullCarry.lean`),
+which has no subcircuits and so never needs this; any composed circuit does. -/
+
+namespace FlatOperation
 
 open Circuit
 
@@ -40,8 +40,8 @@ The two premise families `P`/`Q` are left abstract so the statement matches
 then a closed input-agreement premise) without naming it. -/
 theorem forAll_witnessCongr_of_localLength_zero {env env' : ProverEnvironment F}
     {P : ℕ → Prop} {Q : Prop} :
-    ∀ (ops : List (FlatOperation F)) (n : ℕ), FlatOperation.localLength ops = 0 →
-      FlatOperation.forAll n
+    ∀ (ops : List (FlatOperation F)) (n : ℕ), localLength ops = 0 →
+      forAll n
         { witness := fun offset _ compute => P offset → Q → compute.eval env = compute.eval env' }
         ops := by
   intro ops
@@ -51,7 +51,7 @@ theorem forAll_witnessCongr_of_localLength_zero {env env' : ProverEnvironment F}
     intro n h
     cases op with
     | witness m c =>
-      simp only [FlatOperation.localLength, Nat.add_eq_zero_iff] at h
+      simp only [localLength, Nat.add_eq_zero_iff] at h
       obtain ⟨hm, hops⟩ := h
       subst hm
       refine ⟨fun _ _ => ?_, ih _ hops⟩
@@ -65,9 +65,9 @@ theorem forAll_witnessCongr_of_localLength_zero {env env' : ProverEnvironment F}
 computes from the child's own `localLength_eq`) instead of unfolding its operations. -/
 theorem forAll_witnessCongr_of_subcircuit {env env' : ProverEnvironment F}
     {P : ℕ → Prop} {Q : Prop} {m : ℕ} (s : Subcircuit F m) (n : ℕ) (h : s.localLength = 0) :
-    FlatOperation.forAll n
+    forAll n
       { witness := fun offset _ compute => P offset → Q → compute.eval env = compute.eval env' }
       s.ops.toFlat :=
   forAll_witnessCongr_of_localLength_zero _ _ (by rw [← s.localLength_eq, h])
 
-end SP1Clean.Witgen
+end FlatOperation

@@ -5,12 +5,22 @@ import Std.Data.ExtHashMap
 set_option linter.unusedSimpArgs false
 
 /-!
-# Misc lemmas used in verification
+# Lemmas to be ported to Mathlib
 
-General-purpose lemmas and instances that don't belong in a specific file: kernel-safe
-`Int.toNat`/`%` normalization, `Std.ExtDHashMap` insert algebra, `Fin` no-zero-divisors over a
-prime, a `Fintype (BitVec n)` instance, and the `LawfulMonadStateOf` instances for the state
-monads the Sail model runs in.
+The catch-all of the `ToMathlib/` tree: general-purpose lemmas and instances that belong in Mathlib
+rather than in this project, but have no home there yet. Nothing here mentions Clean or SP1, and by
+the tree's import rule nothing here may import project code.
+
+Current contents: kernel-safe `Int.toNat`/`%` normalization (the plain shape blows the kernel's
+stack once `2 ^ N` unfolds definitionally for `N ≥ 15`), `Std.ExtDHashMap` insert algebra, `Fin`
+no-zero-divisors over a prime, a `Fintype (BitVec n)` instance, and `LawfulMonadStateOf` instances
+for `StateT`/`StateCpsT`/`EStateM`/`ReaderT`.
+
+The gap against upstream: Mathlib has `Int.toNat_emod`-style lemmas but not the `natCast` composite
+this project needs; the `ExtDHashMap` insert lemmas post-date the container's Mathlib coverage; and
+the `LawfulMonadStateOf` instances exist for some transformers upstream but not for the whole set
+the Sail model runs in. Each is a candidate PR on its own; when one lands, delete the declaration
+here and let the importer pick up the Mathlib name.
 -/
 
 section grind

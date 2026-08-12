@@ -22,7 +22,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-if grep -rniE 'native_decide' SP1Clean --include='*.lean'; then
+if grep -rniE 'native_decide' SP1Clean ToClean ToMathlib --include='*.lean' 2>/dev/null; then
   echo "FAIL: native_decide found in SP1Clean/ (see lines above)." >&2
   echo "      native_decide trusts the whole compiler (generated ._native compiler-trust constants) — it must not appear" >&2
   echo "      in the main library. Move the check into the SP1CleanTest test library (run by" >&2

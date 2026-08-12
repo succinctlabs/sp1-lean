@@ -1,5 +1,5 @@
 import SP1Clean.Proofs.Chips.AddChip.Formal
-import SP1Clean.Proofs.WitgenBridge
+import ToClean.Circuit.WitgenBridge
 
 /-! # `SP1Clean.AddChip` — honest witness generation (`ComputableWitnesses`)
 
@@ -26,7 +26,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- Add's row has computable witnesses: every witnessed cell is a function of the input row alone.
 
 The proof is the shape every ported chip repeats. `circuit_norm` reduces the composed operation list
-to its single witness obligation; `Witgen.forAll_witnessCongr_of_subcircuit` dispatches the five
+to its single witness obligation; `FlatOperation.forAll_witnessCongr_of_subcircuit` dispatches the five
 zero-witness subcircuits by their cell count, without unfolding them; and `populateIR_congr`
 discharges the one real obligation from the input-agreement hypothesis that
 `FormalCircuitBase.ComputableWitnesses` supplies at each witness step.
@@ -37,12 +37,12 @@ hypothesis arrives in), while the chip's own component-evaluation lemmas are key
 theorem computableWitnesses : (circuit (p := p)).base.ComputableWitnesses := by
   intro n input env env'
   simp only [circuit, main, circuit_norm, Operations.forAllFlat, Operations.forAll]
-  refine ⟨Witgen.forAll_witnessCongr_of_subcircuit _ _ ?_,
+  refine ⟨FlatOperation.forAll_witnessCongr_of_subcircuit _ _ ?_,
     fun _ h_input => ?_,
-    Witgen.forAll_witnessCongr_of_subcircuit _ _ ?_,
-    Witgen.forAll_witnessCongr_of_subcircuit _ _ ?_,
-    Witgen.forAll_witnessCongr_of_subcircuit _ _ ?_,
-    Witgen.forAll_witnessCongr_of_subcircuit _ _ ?_⟩
+    FlatOperation.forAll_witnessCongr_of_subcircuit _ _ ?_,
+    FlatOperation.forAll_witnessCongr_of_subcircuit _ _ ?_,
+    FlatOperation.forAll_witnessCongr_of_subcircuit _ _ ?_,
+    FlatOperation.forAll_witnessCongr_of_subcircuit _ _ ?_⟩
   · simp [circuit_norm]
   · have key_b : ∀ e : Environment (ZMod p),
         (ProvableStruct.eval e input).adapter.op_b_memory.prev_value

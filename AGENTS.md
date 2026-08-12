@@ -236,6 +236,19 @@ the `testDriver` → `lake test`) holds the witness/trace conformance anchors; i
 imports within one package; the auto-gen guard is the `Extracted/` + `SP1CleanTest/**/Vectors`/`*TraceVectors`
 "do not hand-edit" headers + the sole writer `update_extracted.py`.
 
+- **`ToClean/`** and **`ToMathlib/`** (top-level, own `lean_lib`s, in `defaultTargets`) — the
+  **upstream-destined** libraries, modelled on VCVio's `ToMathlib/`. `ToClean` holds material bound
+  for the Clean DSL; `ToMathlib` holds material bound for Mathlib. **Import rule (load-bearing):
+  `ToMathlib` imports only Mathlib; `ToClean` imports Clean (and may import `ToMathlib`); NEITHER
+  may import `SP1Clean`.** That is what keeps them genuinely contributable and makes the terminal
+  step of an accepted PR a plain deletion plus a repoint of importers to `Clean.*`/`Mathlib.*`.
+  Declare things in the namespace they would occupy **upstream** (e.g. `witnessVectorIR` lives in
+  `namespace Circuit` with a matching `export`, beside Clean's own `witnessVector`), so acceptance
+  changes no call site. Each file's docstring must state the **gap against upstream** — what exists
+  there, what is missing, and why — because that text becomes the PR description. Both libraries
+  carry the same eight `-D linter.*` flags as the core pillars (material heading upstream gets no
+  relaxation), are covered by every source guard, and are gated by `scripts/check_root_index.sh`.
+
 **Restructure status (updated 2026-07-27; whole-chip oracle migration completed the same day).**
 Landed in the 2026-07 release-readiness campaign: the full 25-chip `Extracted/ChipOracle/`
 migration (native rows everywhere, zero legacy chip files, the `MemoryAccess` struct carrier, the
