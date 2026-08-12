@@ -40,26 +40,18 @@ The exportable form of the two witness functions (see `AddOperation/Populate.lea
 `msbIR` re-derives the high limb rather than reading the witnessed cell, exactly as
 `addwMsbWitness` re-derives it from `addwValueWitness`. -/
 
-/-- The shared carry chain: the two low base-2^16 limbs of `(a + b) mod 2^32`, as `letU` steps. -/
-def valueProgram (a b : Word (Expression (ZMod p))) : Witgen.M (ZMod p) (VExpr (ZMod p) 2) := do
-  let s0 ← letU (a[0].val + b[0].val)
-  let s1 ← letU (a[1].val + b[1].val + s0 / 65536)
-  return .lit #v[(s0 % 65536).toField, (s1 % 65536).toField]
+/-- The two low base-2^16 limbs of the W result, as inline witness IR (running sums are ordinary
+Lean `let`s — see `AddOperation.populateIR`). -/
+def valueIR (a b : Word (Expression (ZMod p))) : WitgenIR (ZMod p) 2 :=
+  let s0 : U64Expr (ZMod p) := a[0].val + b[0].val
+  let s1 : U64Expr (ZMod p) := a[1].val + b[1].val + s0 / 65536
+  .ofFExprs #v[(s0 % 65536).toField, (s1 % 65536).toField]
 
 /-- Bit 15 of the high result limb, re-derived from the same carry chain. -/
-def msbProgram (a b : Word (Expression (ZMod p))) : Witgen.M (ZMod p) (VExpr (ZMod p) 1) := do
-  let s0 ← letU (a[0].val + b[0].val)
-  let s1 ← letU (a[1].val + b[1].val + s0 / 65536)
-  return .lit #v[(s1 % 65536 / 32768).toField]
-
-/-- The assembled (exportable) witness IR for the two low limbs. Plain def, not `@[circuit_norm]` —
-the chip-proof boundary stays folded here; cross it with `valueIR_eval` only. -/
-def valueIR (a b : Word (Expression (ZMod p))) : WitgenIR (ZMod p) 2 :=
-  (valueProgram a b).toIR
-
-/-- The assembled (exportable) witness IR for the sign bit. -/
 def msbIR (a b : Word (Expression (ZMod p))) : WitgenIR (ZMod p) 1 :=
-  (msbProgram a b).toIR
+  let s0 : U64Expr (ZMod p) := a[0].val + b[0].val
+  let s1 : U64Expr (ZMod p) := a[1].val + b[1].val + s0 / 65536
+  .ofFExprs #v[(s1 % 65536 / 32768).toField]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Evaluating the value IR is exactly `addwValueWitness` on the evaluated operand words. -/
@@ -77,9 +69,10 @@ theorem valueIR_eval (env : ProverEnvironment (ZMod p))
     intro i h; rw [← hva]; interval_cases i <;> simp
   have hB : ∀ (i : ℕ) (h : i < 4), Expression.eval env.toEnvironment b[i] = vb[i] := by
     intro i h; rw [← hvb]; interval_cases i <;> simp
-  simp [valueIR, valueProgram, addwValueWitness, circuit_norm,
-    Witgen.WitgenIR.eval, Witgen.evalSteps, Witgen.VExpr.eval, FiniteField.fromNat,
-    hA 0 (by omega), hA 1 (by omega), hB 0 (by omega), hB 1 (by omega)]
+  apply Vector.ext; intro i hi
+  interval_cases i <;>
+    simp only [valueIR, addwValueWitness, circuit_norm, FiniteField.fromNat,
+      hA 0 (by omega), hA 1 (by omega), hB 0 (by omega), hB 1 (by omega)]
 
 /-- Evaluating the msb IR is exactly `addwMsbWitness` on the evaluated operand words.
 
@@ -102,9 +95,11 @@ theorem msbIR_eval (env : ProverEnvironment (ZMod p))
     intro i h; rw [← hva]; interval_cases i <;> simp
   have hB : ∀ (i : ℕ) (h : i < 4), Expression.eval env.toEnvironment b[i] = vb[i] := by
     intro i h; rw [← hvb]; interval_cases i <;> simp
-  simp [msbIR, msbProgram, addwMsbWitness, addwValueWitness, circuit_norm,
-    Witgen.WitgenIR.eval, Witgen.evalSteps, Witgen.VExpr.eval, FiniteField.fromNat, hmod,
-    hA 0 (by omega), hA 1 (by omega), hB 0 (by omega), hB 1 (by omega)]
+  apply Vector.ext; intro i hi
+  interval_cases i
+  simp only [msbIR, addwMsbWitness, addwValueWitness, circuit_norm, FiniteField.fromNat,
+      ZMod.val_natCast, hmod,
+      hA 0 (by omega), hA 1 (by omega), hB 0 (by omega), hB 1 (by omega)]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Environment-locality of the value IR (the `ComputableWitnesses` counterpart of `valueIR_eval`). -/
@@ -115,9 +110,10 @@ theorem valueIR_congr (env env' : ProverEnvironment (ZMod p))
     (hB : ∀ (i : ℕ) (_ : i < 4),
       Expression.eval env.toEnvironment b[i] = Expression.eval env'.toEnvironment b[i]) :
     (valueIR a b).eval env = (valueIR a b).eval env' := by
-  simp [valueIR, valueProgram, circuit_norm,
-    Witgen.WitgenIR.eval, Witgen.evalSteps, Witgen.VExpr.eval,
-    hA 0 (by omega), hA 1 (by omega), hB 0 (by omega), hB 1 (by omega)]
+  apply Vector.ext; intro i hi
+  interval_cases i <;>
+    simp only [valueIR, circuit_norm, -Witgen.u64Wrap,
+      hA 0 (by omega), hA 1 (by omega), hB 0 (by omega), hB 1 (by omega)]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Environment-locality of the msb IR. -/
@@ -128,8 +124,9 @@ theorem msbIR_congr (env env' : ProverEnvironment (ZMod p))
     (hB : ∀ (i : ℕ) (_ : i < 4),
       Expression.eval env.toEnvironment b[i] = Expression.eval env'.toEnvironment b[i]) :
     (msbIR a b).eval env = (msbIR a b).eval env' := by
-  simp [msbIR, msbProgram, circuit_norm,
-    Witgen.WitgenIR.eval, Witgen.evalSteps, Witgen.VExpr.eval,
-    hA 0 (by omega), hA 1 (by omega), hB 0 (by omega), hB 1 (by omega)]
+  apply Vector.ext; intro i hi
+  interval_cases i
+  simp only [msbIR, circuit_norm, -Witgen.u64Wrap,
+      hA 0 (by omega), hA 1 (by omega), hB 0 (by omega), hB 1 (by omega)]
 
 end SP1Clean.AddwOperation

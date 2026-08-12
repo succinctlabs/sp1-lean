@@ -16,8 +16,8 @@ satisfies `Spec`. It complements the Rust implementation but is not required to 
 Two forms of the same algorithm live here:
 * `populate` — the pure value-level function (the semantic anchor; `spec_populate` and the
   `SP1CleanTest` Rust-conformance battery are stated against it, unchanged);
-* `populateProgram`/`populateIR` — the **exportable witness-IR** form consumed by the chip `main`
-  (`witnessIR`), mirroring `populate` line-for-line in Clean's `Witgen.M` builder. `populateIR_eval`
+* `populateIR` — the **exportable witness-IR** form consumed by the chip `main`
+  (`witnessVectorIR`), mirroring `populate` line-for-line as inline `FExpr`s. `populateIR_eval`
   ties the two, so chip completeness proofs rewrite the witness obligation to `populate` exactly as
   they did against the retired `witnessVectorNative` closure.
 
@@ -44,20 +44,19 @@ def populate (a b : Word (ZMod p)) : Word (ZMod p) :=
      ((s2 % 65536 : ℕ) : ZMod p), ((s3 % 65536 : ℕ) : ZMod p)]
 
 /-- The witness-IR form of `populate`, over the chip's input *expressions*: the four base-2^16 limbs
-of `(a + b) mod 2^64`, with the running sums shared as `letU` steps (u64-sorted — every intermediate
-is `< 2^17`, far from the `2^64` wrap). -/
-def populateProgram (a b : Word (Expression (ZMod p))) : Witgen.M (ZMod p) (VExpr (ZMod p) 4) := do
-  let s0 ← letU (a[0].val + b[0].val)
-  let s1 ← letU (a[1].val + b[1].val + s0 / 65536)
-  let s2 ← letU (a[2].val + b[2].val + s1 / 65536)
-  let s3 ← letU (a[3].val + b[3].val + s2 / 65536)
-  return .lit #v[(s0 % 65536).toField, (s1 % 65536).toField,
-                 (s2 % 65536).toField, (s3 % 65536).toField]
+of `(a + b) mod 2^64`. Every intermediate is `< 2^17`, far from the u64 wrap.
 
-/-- The assembled (exportable) witness IR for the Add limbs. Plain def, not `@[circuit_norm]` —
-the chip-proof boundary stays folded here; cross it with `populateIR_eval` only. -/
+The running sums are ordinary Lean `let`s, so they inline into each output expression rather than
+becoming shared `letU` steps. That keeps the IR a plain `ofFExprs` — no locals array — which is what
+makes `populateIR_eval` a `simp only`. The cost is that the exported term repeats carry subterms
+(`O(n²)` nodes, i.e. ten for four limbs); `letU` sharing is the alternative if that ever matters. -/
 def populateIR (a b : Word (Expression (ZMod p))) : WitgenIR (ZMod p) 4 :=
-  (populateProgram a b).toIR
+  let s0 : U64Expr (ZMod p) := a[0].val + b[0].val
+  let s1 : U64Expr (ZMod p) := a[1].val + b[1].val + s0 / 65536
+  let s2 : U64Expr (ZMod p) := a[2].val + b[2].val + s1 / 65536
+  let s3 : U64Expr (ZMod p) := a[3].val + b[3].val + s2 / 65536
+  .ofFExprs #v[(s0 % 65536).toField, (s1 % 65536).toField,
+               (s2 % 65536).toField, (s3 % 65536).toField]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Evaluating the witness IR is exactly `populate` on the evaluated operand words (stated with the
@@ -78,10 +77,11 @@ theorem populateIR_eval (env : ProverEnvironment (ZMod p))
     intro i h; rw [← hva]; interval_cases i <;> simp
   have hB : ∀ (i : ℕ) (h : i < 4), Expression.eval env.toEnvironment b[i] = vb[i] := by
     intro i h; rw [← hvb]; interval_cases i <;> simp
-  simp [populateIR, populateProgram, populate, circuit_norm,
-    Witgen.WitgenIR.eval, Witgen.evalSteps, Witgen.VExpr.eval, FiniteField.fromNat,
-    hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
-    hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega)]
+  apply Vector.ext; intro i hi
+  interval_cases i <;>
+    simp only [populateIR, populate, circuit_norm, FiniteField.fromNat,
+      hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
+      hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega)]
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Environment-locality of the witness IR: it reads the environment only through the operand
@@ -95,10 +95,13 @@ theorem populateIR_congr (env env' : ProverEnvironment (ZMod p))
     (hB : ∀ (i : ℕ) (_ : i < 4),
       Expression.eval env.toEnvironment b[i] = Expression.eval env'.toEnvironment b[i]) :
     (populateIR a b).eval env = (populateIR a b).eval env' := by
-  simp [populateIR, populateProgram, circuit_norm,
-    Witgen.WitgenIR.eval, Witgen.evalSteps, Witgen.VExpr.eval,
-    hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
-    hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega)]
+  apply Vector.ext; intro i hi
+  -- No arithmetic here: both sides differ only in the operand evaluations, so unfold the IR
+  -- evaluator alone (naming `circuit_norm` would fire `u64Wrap`'s `omega` with no bounds in scope).
+  interval_cases i <;>
+    simp only [populateIR, circuit_norm, -Witgen.u64Wrap,
+      hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
+      hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega)]
 
 /-- `populate a b` satisfies the gadget `Spec` for any `is_real` (the conclusion is `is_real = 1`-gated,
 so it holds unconditionally). The composing chip uses this to discharge its assertion obligation. -/
