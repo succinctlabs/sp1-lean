@@ -65,17 +65,19 @@ theorem completeness :
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have hbeq := (vec4_eval env.toEnvironment input_var_adapter_op_b_memory_prev_value).trans hob
   have hceq := (vec4_eval env.toEnvironment input_var_adapter_op_c_memory_prev_value).trans hoc
-  -- The witnessed `value` is `populate op_b op_c` (`h_env` per-limb).
+  -- The witnessed `value` is `populate op_b op_c`: `h_env` pins each limb to the (folded)
+  -- `populateIR` evaluation, and `populateIR_eval` crosses that boundary to `populate`.
   have hval : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + i}) : Word (ZMod p))
       = AddOperation.populate input_adapter_op_b_memory_prev_value input_adapter_op_c_memory_prev_value := by
+    rw [← AddOperation.populateIR_eval env _ _ _ _ hbeq hceq ha hb]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     -- `h_env` now bundles the GFC `CPUState` obligation (`.1`, since it too is a GFC subcircuit now),
-    -- the chip's `value` witness-gen equations (`.2.1`), and the `RTypeReader` obligation (`.2.2`).
-    rw [h_env.2.1 ⟨i, hi⟩]
-    simp only [Inputs.op_b_val, Inputs.op_c_val]
-    simp only [hbeq, hceq]
+    -- the chip's `value` witness-gen equations (`.2.1`), and the `RTypeReader` obligation (`.2.2`);
+    -- `exact` crosses the (definitional) struct-projection gap between the destructured names and
+    -- the `Inputs.op_b_val`/`op_c_val` spellings inside the folded `populateIR` obligation.
+    exact h_env.2.1 ⟨i, hi⟩
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin, h_clk⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
@@ -193,7 +195,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns where
     · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
       -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
       simp only [main, Circuit.operations, Circuit.bind_def,
-        Circuit.pure_def, witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+        Circuit.pure_def, witnessIR, subcircuitWithAssertion, assertion, assertZero,
         HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
       simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
         InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
