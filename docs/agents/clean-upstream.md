@@ -57,6 +57,11 @@ back to `Verified-zkEVM/clean` and this file becomes a historical record.
 | Branch | Change | PR | Status |
 |---|---|---|---|
 | `agreesbelow-data-hint` | U1 — `AgreesBelow` constrains `data`/`hint` | *not yet filed* | in `sp1-integration` |
+| `u64wrap-prefilter` | U3 — two `u64Wrap` screens | — | **not merged**; pushed as a record of a rejected approach (see U3) |
+
+A branch reaching `sp1-integration` means it earned its way there: Clean's own suite green *and* a
+measured effect on local chip work. `u64wrap-prefilter` cleared the first bar and failed the second,
+so it stays out. Keeping it pushed is cheaper than re-deriving why it does not work.
 
 ## The queue
 
@@ -141,33 +146,48 @@ What survives is U4: the *hoist* is real and measured, and it is the whole of wh
 `jalr_proof_start` buys. Residual upstream contribution, additive and non-blocking: let Clean's own
 `simpPass` take a location, so the set is reachable without an out-of-tree elab.
 
-### U3 · `u64Wrap` should fail cheaply
+### U3 · `u64Wrap` is expensive on the *successful* path — **screens tried and rejected**
 
 `Clean/Circuit/WitnessIR.lean:252`, registered as `simproc u64Wrap` and tagged `@[circuit_norm]`
-globally. On any `n % 2^64` or `n % 64` it runs full `omega` against all local hypotheses; on failure
-it returns `.continue` and the cost is discarded. In a *congruence* goal there are no bounds at all,
-so every `%` subterm pays a complete failing `omega`.
+globally. On any `n % 2^64` or `n % 64` it invokes `omega` to decide whether the wrap is vacuous.
 
-**Measured**: ≥32×; still failing at eight times the default heartbeat budget; passing at a quarter of
-the default with the simproc disabled.
+**Measured 2026-08-13** on `AddOperation.populateIR_congr` (the tree's five `-Witgen.u64Wrap` sites
+are all this shape): the `simp` takes **118 s** with the simproc enabled — it needs a 4M-heartbeat
+budget to finish at all — against **1.9 s** for the whole module with it disabled. Roughly **60×**,
+and the profile is *diffuse*: no single entry above threshold, i.e. many small operations rather than
+one hot spot.
 
-> **Sizing correction.** The filter I first specified — bail when no local hypothesis mentions a free
-> variable of the operand — is probably *low-yield*. In both real Clean consumers
-> (`Gadgets/And/And8.lean:110`, `Gadgets/SHA256/Add32.lean:326`) the operand's free variables (`env`,
-> or a field element `x`) appear in nearly every hypothesis, so the guard is satisfied trivially. The
-> discriminating version is: bail unless some hypothesis is an **arithmetic comparison at `ℕ`/`Int`**
-> whose fvar set meets the operand's. Two hard constraints: `Add32.lean:326` cites `Witgen.u64Wrap`
-> **by name** in a `simp only` set, so the registration cannot be renamed; and over-pruning fails
-> *silently* — a proof stops closing, far from the edit. **Add a regression example to
-> `Clean/Utils/Test/TestU64Wrap.lean` in the `And8` shape** (bound stated over a field element's
-> `.val`, not a `ℕ` variable) **before** touching the simproc. Orthogonal cheap win: when `n` is a
-> closed literal, decide `n < m` directly instead of invoking `omega`.
+> **Two screens were implemented, measured, and abandoned.** Both are on the fork branch
+> `u64wrap-prefilter` (`b04a0e8c`), which is deliberately **not** merged into `sp1-integration`.
+>
+> 1. *Filter omega's input* to the hypotheses it can consume (comparisons/equations at `ℕ`/`ℤ`).
+>    Clean's suite stayed green; our proof still timed out at 200k.
+> 2. *Skip the call entirely* when neither `n`'s own shape nor any readable hypothesis could bound
+>    it. Also green upstream, also no effect on our proof.
+>
+> The reason both failed is the reason the entry above was wrong: **these omega calls succeed.** The
+> operands are structurally bounded (`(… % 65536) % 2^64`), so omega discharges them, and the cost is
+> the *volume of successful calls*, not wasted failures. A screen cannot help with work that is being
+> done on purpose.
+>
+> An earlier version of the first screen also skipped the call when no hypothesis looked useful, on
+> the theory that a bound must come from a hypothesis. That is false and Clean's suite said so at
+> once — Ch32, Maj32 and Add32 broke, because omega derives bounds from term structure
+> (`x % k < k`, `UInt64.toNat x < 2 ^ 64`, `Fin.val i < n`) with an empty context.
 
-Precedent for the style exists — `u64WrapSimproc` already has four syntactic bails, and
-`evalProjectionSimproc` / `evalStructLiteralSimproc` are built the same way. What is new is
-consulting `getLocalHyps` for a pre-decision; call that out in the PR.
+So the useful change, if anyone wants it, is **not** a screen: it is a small syntactic bound computer
+that discharges the common shapes (`a % k`, `UInt64.toNat`, and `+`/`*`/`/` over them) with a fixed
+lemma set and never reaches `omega`. That is a real piece of meta-programming, ~60–100 lines with
+proof construction, and it should not start without a measurement showing the bound computer covers
+the shapes that dominate — the three wrong hypotheses above are what guessing costs here.
 
-Size **S** (1 file, 1 decl, 0 call sites). Blocks nothing once F1c retires our five disable sites.
+Two constraints for whoever takes it: `Add32.lean:326` names `Witgen.u64Wrap` in a `simp only` set,
+so the registration cannot be renamed; and over-pruning fails *silently*, so add a regression example
+to `Clean/Utils/Test/TestU64Wrap.lean` in the `And8` shape (bound over a field element's `.val`,
+not a `ℕ` variable) first.
+
+**Priority: low.** It blocks no chip work — the five sites work today with `-Witgen.u64Wrap`, and F1c
+removes them.
 
 ### U4 · `circuit_proof_start` step order should be tunable
 
