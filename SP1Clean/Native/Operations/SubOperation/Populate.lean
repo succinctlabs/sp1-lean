@@ -85,6 +85,29 @@ theorem populateIR_eval (env : ProverEnvironment (ZMod p))
       hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega),
       val_complement hb0, val_complement hb1, val_complement hb2, val_complement hb3]
 
+omit [Fact (2 ^ 17 < p)] in
+/-- Environment-locality of the witness IR: it reads the environment only through the operand
+expressions, so two environments agreeing there produce the same witnesses. This is the
+`ComputableWitnesses` counterpart of the semantic `populateIR_eval` (and needs no bounds — it is a
+congruence, not an evaluation).
+
+The two's-complement limbs need no separate hypothesis: `65535 - b[i]` is built from `b[i]` by
+`Expression` arithmetic, so rewriting with `hB` reaches inside it. -/
+theorem populateIR_congr (env env' : ProverEnvironment (ZMod p))
+    (a b : Word (Expression (ZMod p)))
+    (hA : ∀ (i : ℕ) (_ : i < 4),
+      Expression.eval env.toEnvironment a[i] = Expression.eval env'.toEnvironment a[i])
+    (hB : ∀ (i : ℕ) (_ : i < 4),
+      Expression.eval env.toEnvironment b[i] = Expression.eval env'.toEnvironment b[i]) :
+    (populateIR a b).eval env = (populateIR a b).eval env' := by
+  apply Vector.ext; intro i hi
+  -- No arithmetic here: both sides differ only in the operand evaluations, so unfold the IR
+  -- evaluator alone (naming `circuit_norm` would fire `u64Wrap`'s `omega` with no bounds in scope).
+  interval_cases i <;>
+    simp only [populateIR, circuit_norm, -Witgen.u64Wrap,
+      hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
+      hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega)]
+
 /-- `populate a b` satisfies the gadget `Spec` for any `is_real`. The composing chip uses this to
 discharge its assertion obligation.
 

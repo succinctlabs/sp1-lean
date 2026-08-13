@@ -137,6 +137,7 @@ import SP1Clean.Proofs.Chips.SubChip.Bridge
 import SP1Clean.Native.Chips.SubChip.Defs
 import SP1Clean.Proofs.Chips.SubChip.Formal
 import SP1Clean.Proofs.Chips.SubChip.Contracts
+import SP1Clean.Proofs.Chips.SubChip.Witgen
 import SP1Clean.Proofs.Chips.SubwChip.Bridge
 import SP1Clean.Native.Chips.SubwChip.Defs
 import SP1Clean.Proofs.Chips.SubwChip.Formal

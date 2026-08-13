@@ -93,4 +93,31 @@ unfolding the full composed `main`. -/
     (Eval.eval env input).adapter = Eval.eval env input.adapter := by
   rw [eval_inputs]
 
+/-! ### Operand words, in `circuit_norm`'s own orientation
+
+The `eval_*` lemmas above push evaluation *down* into components, which is the opposite of
+`circuit_norm`'s normal form (it pulls projections *up* out of `eval`), so they are inert under it.
+These two state the operand words the other way round — projection outside, right-hand side inert —
+which is directly usable by any proof holding struct-level input agreement, chiefly
+`ComputableWitnesses`. Vector operands only; a scalar field is already in normal form and restating
+one loops. See `AddChip/Defs.lean` for the full rationale. -/
+
+@[circuit_norm] theorem eval_opBVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_b_val
+      = Vector.map (Expression.eval env) input.op_b_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_b_val, eval_inputs, Readers.RTypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_c_val
+      = Vector.map (Expression.eval env) input.op_c_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_c_val, eval_inputs, Readers.RTypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
+
 end SP1Clean.SubChip

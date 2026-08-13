@@ -45,21 +45,47 @@ concrete list — verified on `AddOperation.populateIR`:
 
 * `hcells` is **vacuous** for any program without a `VExpr.envRange` node: `envIndices` computes to
   `[]`, so `simp only [WitgenIR.envIndices, VExpr.envIndices, List.not_mem_nil] at hi` closes it.
-* `hexprs` needs the read set unfolded. Two things block a naive `simp only`: a gadget's running
-  sums are ordinary Lean `let`s, so the `WitgenIR.exprs` match cannot reduce until they are
-  zeta-reduced (plain `simp only [<gadget>.populateIR]` does this, `unfold` does not); and
-  `VExpr.exprs (.lit es)` leaves `FExpr.exprsList es.toList`, which needs `Vector.toList_mk`. With
-  `[<gadget>.populateIR, WitgenIR.ofFExprs, WitgenIR.exprs, VExpr.exprs, FExpr.exprsList,
-  FExpr.exprs, U64Expr.exprs, Vector.toList_mk, List.flatMap_nil, List.nil_append, List.append_nil]`
-  the set reduces to a literal `[a[0]] ++ [b[0]] ++ [a[1]] ++ …` of operand expressions, and
-  membership becomes a disjunction the input-agreement hypothesis discharges directly.
+* `hexprs` needs the read set unfolded. Three things block a naive `simp only`, none visible from
+  the goal text: a gadget's running sums are ordinary Lean `let`s, so the `WitgenIR.exprs` match
+  cannot reduce until they are zeta-reduced (plain `simp only [<gadget>.populateIR]` does this,
+  `unfold` does **not**); `VExpr.exprs (.lit es)` leaves `FExpr.exprsList es.toList`, needing
+  `Vector.toList_mk`; and arithmetic written with operator sugar (`x / 65536`) is `HDiv` at
+  `U64Expr × ℕ`, not the `U64Expr.div` constructor, so `U64Expr.exprs` cannot match it until
+  Clean's `U64Expr.{add,div,mod,hDiv,hMod}_def` rfl-lemmas fire.
 
-That simp set is **gadget-independent** apart from the `populateIR` name — it unfolds the read-set
-collectors, not the arithmetic — which is the sense in which this lemma is one congruence for every
-gadget rather than one per gadget.
+The whole verified set, for a gadget in `populateIR`-with-carry-chain shape:
 
-Note the whole route avoids `circuit_norm`, and therefore avoids the `u64Wrap` trap described above:
-the `% 65536` truncations sit inside `U64Expr`, not as `ℕ` `HMod`, so nothing invites `omega`. -/
+```lean
+simp only [<gadget>.populateIR, WitgenIR.ofFExprs, WitgenIR.exprs, VExpr.exprs,
+  FExpr.exprsList, FExpr.exprs, U64Expr.exprs, Vector.toList_mk, List.flatMap_nil,
+  List.nil_append, List.append_nil, List.mem_append, List.mem_cons, List.not_mem_nil,
+  or_false, false_or, U64Expr.hDiv_def, U64Expr.hMod_def, U64Expr.add_def,
+  U64Expr.div_def, U64Expr.mod_def, or_assoc] at he
+rcases he with rfl|rfl|… <;> first | exact hA _ (by omega) | exact hB _ (by omega)
+```
+
+Everything but the gadget name is fixed — it unfolds the read-set collectors, not the arithmetic —
+which is the sense in which this is one congruence for every gadget rather than one per gadget.
+
+## Is it worth using? Measured head to head, on Add
+
+Not yet, for gadgets this simple. Against `AddOperation.populateIR_congr`'s existing proof:
+
+| | lines | cost |
+|---|---|---|
+| bespoke (`Vector.ext` + `interval_cases` + `simp only [circuit_norm, -Witgen.u64Wrap, …]`) | ~6 | 1.9 s for the module |
+| via `eval_congr` | ~9 | 2.1 s |
+
+so the generic route is slightly longer and no faster, and its `rcases` arity (20 disjuncts for a
+4-limb carry chain) is gadget-specific, which is exactly the per-gadget coupling it set out to
+remove. The bespoke lemmas therefore stay for now.
+
+Two things would flip that. First, robustness: this route never touches `circuit_norm`, so it cannot
+walk into the `u64Wrap` cost described above, whereas the bespoke proofs depend on remembering
+`-Witgen.u64Wrap` — and forgetting it costs 118 s and a 4M-heartbeat budget on Add alone. Second,
+reach: a witness that reads `dataGet`/`hintGet` has no bespoke route at all, since simping its body
+cannot relate two environments with unrelated committed data. That is the case this lemma exists
+for, and the one the cutover's hint-driven chips will meet. -/
 
 namespace Witgen
 
