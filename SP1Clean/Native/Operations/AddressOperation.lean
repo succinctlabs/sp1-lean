@@ -5,6 +5,7 @@ import SP1Clean.Model.ByteTable
 import SP1Clean.Model.Channels
 import SP1Clean.Proofs.Operations.AddrAddOperation.Formal
 import SP1Clean.Extracted.AddressOperation
+import ToClean.Circuit.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -184,13 +185,14 @@ the offset booleans, the top-two-limb inverse gate, and the low-3-bits offset ra
 
 def main (input : Var Inputs (ZMod p)) :
     Circuit (ZMod p) (Var Extracted.AddressOperation (ZMod p)) := do
-  let value ← witnessVectorNative 3 (fun env =>
-    AddrAddOperation.populate
-      #v[env input.b[0], env input.b[1], env input.b[2], env input.b[3]]
-      #v[env input.cc[0], env input.cc[1], env input.cc[2], env input.cc[3]])
+  let value ← witnessVectorIR 3 (AddrAddOperation.populateIR input.b input.cc)
   assertion AddrAddOperation.circuit ⟨input.b, input.cc, ⟨value⟩, input.is_real⟩
-  let inv ← witnessVectorNative 1 (fun env =>
-    #v[env input.is_real * (env value[1] + env value[2])⁻¹])
+  -- The inverse gate, on the IR: `is_real * (value[1] + value[2])⁻¹`, with `0⁻¹ = 0` — which is
+  -- exactly `FExpr.inv`'s convention, so the padding row (`is_real = 0`) needs no special case.
+  -- `value` here is the *previous* witness's output, i.e. variables at strictly lower offsets, which
+  -- is what an `.expr` leaf is for and what keeps the row's witnesses computable.
+  let inv ← witnessVectorIR 1 (.ofFExprs
+    #v[.mul (.expr input.is_real) (.inv (.add (.expr value[1]) (.expr value[2])))])
   assertZero (input.is_real * (input.is_real - 1))
   input.offset_bit0 * (input.offset_bit0 - 1) === 0
   input.offset_bit1 * (input.offset_bit1 - 1) === 0
@@ -282,19 +284,24 @@ theorem completeness :
       Expression.eval env.toEnvironment input_var_cc[2],
       Expression.eval env.toEnvironment input_var_cc[3]] : Word (ZMod p)) = input_cc := by
     rw [← hci]; exact vec4_eval _ _
+  -- The witness obligation is now stated against the exportable IR, so cross to `populate` once via
+  -- `populateIR_eval` (rewriting the `populate` side, which is the syntactic one) and read the
+  -- witnessed cells off `h_value` directly.
+  have hIR := AddrAddOperation.populateIR_eval env input_var_b input_var_cc _ _ hbeq hceq hb hcc
   have hval : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 3 fun i => var {index := i₀ + i}) : Vector (ZMod p) 3)
       = AddrAddOperation.populate input_b input_cc := by
+    rw [← hIR]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    have h := h_value ⟨i, hi⟩; simp only [hbeq, hceq] at h; exact h
+    exact h_value ⟨i, hi⟩
   -- the witnessed limbs equal `populate`'s, so the gadget `Spec` (sum + limb ranges) talks about them.
   have he0 : env.get i₀ = (AddrAddOperation.populate input_b input_cc)[0] := by
-    have h := h_value ⟨0, by omega⟩; simp only [hbeq, hceq] at h; simpa using h
+    rw [← hIR]; simpa using h_value ⟨0, by omega⟩
   have he1 : env.get (i₀ + 1) = (AddrAddOperation.populate input_b input_cc)[1] := by
-    have h := h_value ⟨1, by omega⟩; simp only [hbeq, hceq] at h; simpa using h
+    rw [← hIR]; simpa using h_value ⟨1, by omega⟩
   have he2 : env.get (i₀ + 2) = (AddrAddOperation.populate input_b input_cc)[2] := by
-    have h := h_value ⟨2, by omega⟩; simp only [hbeq, hceq] at h; simpa using h
+    rw [← hIR]; simpa using h_value ⟨2, by omega⟩
   -- the gadget `Spec` (sum + limb ranges) for the witnessed value, on the `is_real = 1` row.
   have h_aa := (AddrAddOperation.spec_populate hb hcc hfit (1 : ZMod p)) rfl
   simp only [circuit_norm] at h_aa
