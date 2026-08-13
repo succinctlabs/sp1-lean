@@ -114,7 +114,7 @@ Mirror-rust layout under `SP1Clean/`:
 
 - **`Math/`** — general math, no SP1/Sail deps: `Word.lean` (`Word`, `toBitVec64`, `isU64`, `val_65536_*`,
   `limb_lift`), `Bitwise.lean` (`byteOp`, `reassemble_byteOp`, …), `Misc.lean`, `MulCarryChain.lean`,
-  `HWord.lean`, `GetElemFastPath.lean` (the upstreaming candidate).
+  `HWord.lean`. (`GetElemFastPath.lean` moved out to `ToClean/Tactic/`; its upstream is Lean core/Std.)
 - **`Model/`** — the SP1 substrate (Sail + buses): `Register.lean`, `SailWrap.lean`, `SailMemory.lean`,
   `BusMessages.lean` (the State/Memory/Program message structs + their structural per-row predicates —
   incl. `MemoryMsg.ClkBound` and the reader-level `Readers.ClkDiscipline`, the memory-clock discipline),
@@ -314,9 +314,17 @@ feels ad-hoc, the general rule is in Clean's docs.
 *Where to find them.* Browse upstream at **<https://github.com/Verified-zkEVM/clean>** (the `doc/` folder +
 `Clean/Air/README.md` + the repo-root `AGENTS.md`), or read the copy Lake installs in-tree under
 **`.lake/packages/Clean/`** (e.g. `.lake/packages/Clean/doc/performance-problems.md`). Prefer these over any
-local checkout: Clean is a pinned **git** dependency (`0e53b9f2`, v4.32.2), and a local sibling path must
-never be baked into permanent docs or into `lakefile.toml`. (The pin can still lag upstream `main`; if a doc
-named below is missing from `.lake/packages/Clean`, read it on GitHub.)
+local checkout: Clean is a pinned **git** dependency, and a local sibling path must never be baked into
+permanent docs or into `lakefile.toml`. (The pin can still lag upstream `main`; if a doc named below is
+missing from `.lake/packages/Clean`, read it on GitHub.)
+
+⚠ **The Clean pin is currently a fork** — `dtumad/clean` branch `sp1-integration` (`8301b77a`), whose base
+is upstream `0e53b9f2` (v4.32.2). The **standing split**: a change that MODIFIES an existing Clean
+declaration goes in the fork, one branch per upstream PR, because downstream Clean theorems refer to
+Clean's declaration and not ours — that is why it cannot be shimmed in `ToClean/`. A **pure addition**
+stays in `ToClean/` (no pin bump; acceptance is a plain deletion + repoint). Fork state, the PR queue, and
+the exit condition are in `docs/agents/clean-upstream.md`; the trust consequence is disclosed in
+`docs/release-audit.md`. Re-pin to upstream as each PR merges.
 
 Read, in priority order (paths relative to the Clean repo root — i.e. `.lake/packages/Clean/<path>` in-tree,
 or `<path>` on GitHub):
@@ -512,6 +520,9 @@ after installing or toggling.
   as gates, so none need a separate invocation.
 - `docs/agents/lean-sail-notes.md` — the v4.32.2 environment, the git dependency pins, the Sail
   code-generation workaround, and the `lake update` trap.
+- `docs/agents/clean-upstream.md` — **the Clean pin is currently a fork.** Its state and exit
+  condition, the modification-vs-addition split rule (what may go in the fork versus `ToClean/`),
+  and the upstream PR queue with the measurement behind each entry.
 - `docs/agents/sail-model-provenance.md` — the generated `Lean_RV64D` snapshot's provenance: the
   four-key SP1 config and its six generated sites, why stock upstream makes the memory-bridge
   lemmas false, the regeneration pipeline, and the re-pinning procedure.

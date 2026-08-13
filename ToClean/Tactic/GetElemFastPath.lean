@@ -19,6 +19,20 @@ it is tried *first* among the extensible rules — but still after `done`/`assum
 preserves the proof-term-is-the-hypothesis behavior unification relies on (Lean #6999 note).
 `decide` is context-blind: literal bounds (`1 < 4`, the overwhelmingly common case here)
 close by kernel `Nat.decLt` reduction in ~26 heartbeats with no extra axioms; non-literal
-bounds fail in ~300 heartbeats and fall through to the standard rules. -/
+bounds fail in ~300 heartbeats and fall through to the standard rules.
+
+## Upstream — note this one is **not** Clean
+
+Unlike everything else in `ToClean/`, this file's upstream is **Lean core/Std**
+(`Init/Data/Range/Polymorphic/GetElemTactic.lean`): Clean neither defines nor touches
+`get_elem_tactic_extensible`, and the cost measured above is paid by every Lean project with
+`have`-dense proofs over indexed vectors, not just by circuit work. The gap is that Std's
+range-support rule is registered unconditionally and does its ~11 full-context traversals even for
+a closed literal bound, where a `decide` would settle it in ~26 heartbeats; a cheap literal fast
+path belongs in front of it upstream.
+
+It lives here rather than in a third top-level library because 24 lines do not justify one, and
+because its placement is load-bearing: the rule must sit **above** Std's in the import graph, which
+`ToClean` (imported by everything, importing only Clean and Mathlib) reliably provides. -/
 
 macro_rules | `(tactic| get_elem_tactic_extensible) => `(tactic| decide)

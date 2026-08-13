@@ -35,11 +35,20 @@ name = "mathlib"
 git = "https://github.com/leanprover-community/mathlib4"
 rev = "v4.32.2"
 
-# Clean at v4.32.2 (`main`, post PR #443 "bump-lean-4.32.2").
+# Clean, pinned to a FORK — the one dependency here that is not upstream. Base is upstream
+# `0e53b9f2` (v4.32.2 `main`, post PR #443 "bump-lean-4.32.2"); the fork's `sp1-integration` branch
+# carries changes that MODIFY existing Clean declarations and therefore cannot live in our additive
+# `ToClean` library, because downstream Clean theorems refer to Clean's declaration, not ours.
+# Delta at this pin — one change, `agreesbelow-data-hint`:
+#   f5ae8e17  `ProverEnvironment.AgreesBelow` constrains `data`/`hint`, not just `get`
+#   8301b77a  `Clean/Examples/DataWitness.lean`, the worked example + falseness witness
+# Rationale, the PR queue, and the exit condition are in `docs/agents/clean-upstream.md`; the trust
+# consequence is disclosed in `docs/release-audit.md`. **Re-pin to upstream when the PR merges.**
+# NB `sp1-integration` must keep this rev reachable (see the PolyFun note below) — never force-push it.
 [[require]]
 name = "Clean"
-git = "https://github.com/Verified-zkEVM/clean"
-rev = "0e53b9f2d05f06defa2aa0a859f549b611583f10"
+git = "https://github.com/dtumad/clean"
+rev = "8301b77ac14f3463c7c1b016915b13e32328f7b6"
 
 # Sail RV64 model. Package name is `Lean_RV64D` (opencompl upstream naming); it exposes the
 # `LeanRV64D` library the project imports. Requiring by the real package name dedups with

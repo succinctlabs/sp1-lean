@@ -761,7 +761,7 @@ always means a *local* regression against one of these.
 - **The `v[i]` index-bound tax — already fixed by the `decide` fast path.** Every `v[i]` elaborates
   an `i < n` bound side-goal; in Lean 4.28's Std the slice-support `get_elem_tactic_extensible` rule
   does ~11 full-context traversals (`rw … at *`, `dsimp … at *`, a slice `simp`) per index — ~0.34s
-  for `1 < 4` inside a hypothesis-heavy soundness proof, paid in every `have` type. `Math/GetElemFastPath.lean`
+  for `1 < 4` inside a hypothesis-heavy soundness proof, paid in every `have` type. `ToClean/Tactic/GetElemFastPath.lean`
   registers one `macro_rules | get_elem_tactic_extensible => decide` line *above* Std's (so it's tried
   first among the extensible rules, still after `done`/`assumption`): literal bounds close by kernel
   `Nat.decLt` in ~26 heartbeats, non-literals fall through. This single line halved the swept set when

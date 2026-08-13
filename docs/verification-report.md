@@ -621,6 +621,19 @@ discloses which of these each headline declaration actually touches.
   backend and the config — no longer a hand-maintained delta; the four top-level configured
   values remain disclosed as `rfl` lemmas (the two `ValidateConfig`-internal sites are visible
   in the generated source, §3.2), and every dependency stays an immutable git pin.
+- **T5 — The Clean DSL is pinned to a fork.** Every circuit here is built on Clean, and that
+  dependency is currently `dtumad/clean` (branch `sp1-integration`), not upstream
+  `Verified-zkEVM/clean`. The base is the previous upstream pin; the delta is a single change plus a
+  worked example: `ProverEnvironment.AgreesBelow` is strengthened to constrain a prover
+  environment's committed `data` and `hint`, not only its witness cells. The change is a bug fix —
+  the example file's `not_computable_from_cells_alone` proves the prior obligation was *false* for
+  any witness generator reading committed data — and it cannot be shimmed downstream, since Clean's
+  own honest-witness-generation theorem refers to Clean's definition. `AgreesBelow` occurs in
+  hypothesis position everywhere but one discharge site, so no Clean conclusion is weakened and the
+  two theorems concluding with it become strictly stronger. It is upstream-destined with an open PR;
+  the pin returns to upstream on merge. Full disclosure, including the standing rule for what may
+  live in the fork versus this project's additive `ToClean/` library, is in
+  `docs/agents/clean-upstream.md`; the pin table is in `docs/release-audit.md`.
 - **M1 — The semantic boundary binding.** Provider/boundary tables mean the selected program and
   initial state (`SP1SemanticBoundaryRelation`, §8.1). Its provider-content facts are to be
   derived from the exact upstream system tables (the `executionCase` obligation); the bundle
@@ -764,8 +777,8 @@ Stated plainly:
    so ANDI/ORI/XORI/SLTI/SLTIU/ADDIW rows are covered by soundness and the Sail bridges but
    not by those chips' completeness theorems — and UType's completeness covers rd ≠ x0 rows,
    as its `ProverAssumptions` docstring discloses).
-5. **Trusted surfaces T1–T4** (§10), including the pinned git dependency graph and the
-   trace-battery provenance caveat (§4.3).
+5. **Trusted surfaces T1–T5** (§10), including the pinned git dependency graph — in which the
+   Clean DSL is currently a fork (T5) — and the trace-battery provenance caveat (§4.3).
 6. The AIR models the *supervisor-mode* Core profile; user-mode/mprotect table variants,
    precompiles, and the memory-protection chips are out of scope.
 7. **Trap and exception executions are unrepresentable.** Taken jumps/branches to misaligned

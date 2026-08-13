@@ -81,6 +81,8 @@ See [`agents/README.md`](agents/README.md) for the full index:
 - [`agents/proof-patterns.md`](agents/proof-patterns.md) — circuit proof recipes and Lean/Clean landmines.
 - [`agents/lean-sail-notes.md`](agents/lean-sail-notes.md) — Lean 4.32.2 dependency pins and Sail
   environment, including the model/runtime pairing rule.
+- [`agents/clean-upstream.md`](agents/clean-upstream.md) — the Clean pin is currently a **fork**: its
+  state and exit condition, the modification-vs-addition split rule, and the upstream PR queue.
 - [`agents/sail-model-provenance.md`](agents/sail-model-provenance.md) — the generated
   `Lean_RV64D` snapshot's provenance: the SP1 platform config, why it is required for the
   memory-bridge lemmas to be true, and the regeneration pipeline.

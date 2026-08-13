@@ -24,12 +24,17 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 -- 2.16M *raw* heartbeats (≈2.2k budget units), a 1000x drop, and it destructures exactly the same
 -- variables, because destructuring is driven by `h_input`/`h_assumptions`, not by `h_holds`.
 --
--- The one thing the hoist gives up is that `provable_struct_simp`'s struct-eval set — which is
+-- The apparent cost of the hoist is that `provable_struct_simp`'s struct-eval set — which is
 -- deliberately *not* a subset of `circuit_norm` (its `getElem` lemmas loop against `circuit_norm`'s
--- element-map spelling) — no longer reaches the unfolded `h_holds`. That is restored by the single
--- scoped pass below, which mirrors Clean's `ProvableStructSimp.structEvalSimpLemmas` verbatim and is
--- applied only `at h_holds ⊢` rather than `at *`. With that, both proof bodies go through byte for
--- byte. Keep the list in sync with Clean if that set changes.
+-- element-map spelling) — no longer reaches the unfolded `h_holds`. This macro therefore used to
+-- carry a scoped replacement pass: Clean's 27 `structEvalSimpLemmas` transcribed by hand, applied
+-- `at h_holds ⊢`, under a comment asking the reader to keep the copy in sync with Clean.
+--
+-- Measured 2026-08-13, when replacing that copy with a tactic reading Clean's list directly: the
+-- pass is **dead**. `simp` reports "made no progress" in `soundness`, and `completeness` has no
+-- `h_holds` at all (its own note below already said the macro is a no-op there) — the enclosing
+-- `try` had been swallowing both. Both proofs elaborate identically without it (5.3s vs 5.4s), so
+-- the step is deleted rather than reworded. The hoist is the whole of what this macro buys.
 --
 -- `hygiene false` is required: the step list names the hypotheses `circuit_proof_start_core`
 -- introduces (`h_input`, `h_holds`, `h_env`, …), exactly as Clean's own `circuit_proof_start` elab
@@ -51,21 +56,7 @@ local macro "jalr_proof_start" : tactic => `(tactic| (
   try provable_struct_simp
   try dsimp +instances only [elaborated] at *
   try dsimp +instances only [main] at *
-  -- the scoped replacement for what the hoist gave up (mirrors Clean's `structEvalSimpLemmas`)
-  try simp +instances only [ProvableStruct.eval_eq_eval, ProvableStruct.eval_eq_eval_prover,
-    ProvableStruct.eval_var_eq_eval, ProvableStruct.eval_var_eq_eval_prover,
-    ProvableStruct.eval_field_var_eq_eval, ProvableStruct.eval_field_var_eq_eval_prover,
-    ProvableStruct.structEvalLiteralProc, ProvableStruct.structEvalProjectionProc,
-    ProvableStruct.structEvalProjectionEvalProc, ProvableStruct.structEvalProjectionExpr,
-    ProvableStruct.structEqSplit, ProvableStruct.components,
-    ProvableType.eval_field, ProvableType.getElem_eval_fields,
-    ProvableType.getElem_eval_fields_prover, getElem_eval_vector,
-    CircuitType.eval_var_prover_to_verifier,
-    CircuitType.eval_var_field, CircuitType.eval_var_field_prover,
-    CircuitType.eval_expr, CircuitType.eval_expr_prover,
-    CircuitType.value_of_provableType, CircuitType.proverValue_of_provableType,
-    DerivedCircuitType.eval_verifier, DerivedCircuitType.eval_prover,
-    CircuitType.evalVerifier, CircuitType.evalProver] at h_holds ⊢
+  -- (a scoped struct-eval pass used to sit here; measured dead — see the note above)
   try simp +instances only [circuit_norm] at h_input
   try simp +instances only [circuit_norm] at h_assumptions
   try simp +instances only [circuit_norm, h_input] at h_holds

@@ -19,6 +19,9 @@ reader-facing docs one level up (start with [`../architecture.md`](../architectu
 - [proof-patterns.md](proof-patterns.md) — the witnessed-`FormalCircuit` soundness/completeness skeleton; `ZMod p` / `Word` / `circuit_proof_start` landmines; the fold recipes that keep proofs inside the default elaboration budget; the `ElaboratedCircuit` field-obligation recipe; the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
 - [lean-sail-notes.md](lean-sail-notes.md) — the Lean 4.32.2 dependency environment: the immutable git
   pins, the generated-model/runtime pairing rule, and the `lake update` toolchain-bump trap.
+- [clean-upstream.md](clean-upstream.md) — **the Clean pin is currently a fork.** Its state and exit
+  condition, the rule for what may go in the fork versus `ToClean/` (modification vs addition), and the
+  upstream PR queue with the measurement behind each entry.
 - [sail-model-provenance.md](sail-model-provenance.md) — the generated `Lean_RV64D` snapshot's
   provenance: the four-key SP1 config and its six generated sites (CLINT/signature/PMP off), why it
   is load-bearing for the memory-bridge lemmas, its `rfl` disclosure lemmas, the generation

@@ -31,7 +31,7 @@ No main-library proof is deferred. This audit found no `sorry`, `stop`, project 
 | SP1 extractor overlay | `69a8377c6e5550451f40c81fca17459687cd0a8f` |
 | Extractor patch digest | `a2c43cfab00280f5331a15ec251a8341a26ecf3baedcda22fec182915fbcf108` |
 | mathlib pin | `905b95818eb32af7874a58b427f50c1711a5e96c` (tag `v4.32.2`) |
-| Clean pin | `0e53b9f2d05f06defa2aa0a859f549b611583f10` |
+| Clean pin | `8301b77ac14f3463c7c1b016915b13e32328f7b6` (**fork** — see below) |
 | Lean_RV64D pin | `df1acf579f8daf97c4dc3248565dec5a123079ef` |
 | Sail compiler source | `41694abd58b27b687af5db275810dfeb8a88cfc0` (rems-project/sail, `sail2`) |
 | sail-riscv model source | `61266bd4dede6c7dd6e903e52dc80bcbf644b1b8` (riscv/sail-riscv, `master`) |
@@ -48,6 +48,32 @@ reproducible via `scripts/sail-config/generate_lean_rv64d.sh` (`docs/agents/sail
 It equals the opencompl base `11d8fa21` except the six platform-value sites the config sets; the
 snapshot's commit message carries the full provenance record. `RISCV` is pinned to the head of the
 open opencompl PR #59; repoint it to opencompl once that merges.
+
+**`Clean` is pinned to a fork, and that is a change to the trust base.** The DSL every circuit in
+this project is built on is no longer upstream `Verified-zkEVM/clean` but `dtumad/clean`, branch
+`sp1-integration`. The base is upstream `0e53b9f2` (the previous pin); the delta is one change,
+two commits:
+
+| Commit | What it changes |
+|---|---|
+| `f5ae8e17` | `ProverEnvironment.AgreesBelow` gains `∧ env.data = env'.data ∧ env.hint = env'.hint`, plus three accessors and `agreesBelow_rfl` |
+| `8301b77a` | Adds `Clean/Examples/DataWitness.lean` — a worked example, no change to any existing declaration |
+
+`AgreesBelow` sits in *hypothesis* position everywhere except one discharge site, so the change
+weakens every obligation that mentions it and strengthens the two theorems that conclude with it
+(`Circuit.proverEnvironment_usesLocalWitnesses`, `Circuit.witgen_usesLocalWitnesses`); no Clean
+conclusion is weakened. The reason it cannot live in this repo's additive `ToClean` library is that
+Clean's own `witgen_usesLocalWitnesses` refers to Clean's `AgreesBelow`, not ours — a local copy with
+the stronger hypothesis yields a *weaker* obligation and would not feed it.
+
+The change is a bug fix rather than an ergonomics request: `not_computable_from_cells_alone` in the
+example file proves that the previous obligation was **false** for any witness program reading
+`FExpr.dataGet`, not merely hard to discharge.
+
+**Exit condition: re-pin to upstream as soon as the PR merges.** Until then this fork is the one
+dependency in the table that is not upstream, and the axiom census is unaffected by it (verified: the
+census is unchanged across the re-pin). Fork state, the PR queue, and the standing rule for what may
+go in the fork versus `ToClean/` are recorded in `docs/agents/clean-upstream.md`.
 
 The extractor overlay is a descendant of the semantic source with that source as its merge base. The
 diff under `crates/core/machine/src` changes only reflection imports/derives needed to expose row
