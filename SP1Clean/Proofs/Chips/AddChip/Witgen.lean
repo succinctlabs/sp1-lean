@@ -12,10 +12,15 @@ generator *built* satisfies my constraints".
 
 Provable only because the row is on the exportable witness IR: the witness payload is
 `AddOperation.populateIR` over the input expressions alone, and `populateIR_congr` is its
-environment-locality statement (the counterpart of the semantic `populateIR_eval`). A chip still
-reading `ProverHint` inside a witness closure could not satisfy Clean's `ComputableWitnesses` at
-all — `ProverEnvironment.AgreesBelow` does not constrain `hint` — which is one reason the
-hint-driven chips move to typed `Unconstrained*` inputs during the cutover. -/
+environment-locality statement (the counterpart of the semantic `populateIR_eval`).
+
+A chip still reading `ProverHint` inside a `.native` witness closure could not satisfy
+`ComputableWitnesses` at all, because a Lean closure has no read set to reason about — which is one
+reason the hint-driven chips move to typed `Unconstrained*` inputs during the cutover. (That used to
+be true for a stronger reason: `ProverEnvironment.AgreesBelow` did not constrain `hint`, so *even*
+the IR's `FExpr.hintGet` node was unprovable. Fixed upstream — `AgreesBelow` now carries `data` and
+`hint` — so the remaining argument is about `.native` closures, not about hints per se, and the
+W4 pilot chooses between the two hint encodings on their merits.) -/
 
 namespace SP1Clean.AddChip
 

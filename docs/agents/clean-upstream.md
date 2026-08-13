@@ -79,8 +79,16 @@ Non-breaking: `AgreesBelow` is in hypothesis position everywhere except one disc
 The PR argument is `not_computable_from_cells_alone` in `Clean/Examples/DataWitness.lean`: it proves
 the old obligation was false, which makes this a bug fix rather than an ergonomics request.
 
-**Payoff here**: makes `WitgenIR.eval_congr` applicable at a chip's obligation for the first time,
-retiring five bespoke per-gadget congruence lemmas and all five `-Witgen.u64Wrap` disable sites.
+**Payoff here, verified 2026-08-13**: `WitgenIR.eval_congr` now applies at a gadget's obligation.
+Checked end to end against `AddOperation.populateIR` — the lemma unifies (`ofFExprs` unfolds to
+`.ir [] (.lit …)`), `AgreesBelow.data_eq`/`.hint_eq` supply the two new premises, the `hcells`
+premise is vacuous because the program has no `envRange` node, and the syntactic read set reduces to
+a literal list of operand expressions. The recipe, including the two things that block a naive
+`simp only` (gadget `let`s must be zeta-reduced; `VExpr.exprs (.lit es)` needs `Vector.toList_mk`),
+is in `ToClean/Circuit/WitgenCongr.lean`'s "How to apply it" section.
+
+Still to cash: retire the five bespoke per-gadget congruence lemmas onto it, which also removes the
+last five `-Witgen.u64Wrap` disable sites in the tree.
 
 ### U2 · The struct-eval set at a chosen location — **reclassified: an addition, in `ToClean/`**
 

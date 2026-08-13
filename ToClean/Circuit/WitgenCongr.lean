@@ -31,26 +31,35 @@ Destined for Clean, beside `Clean/Circuit/WitnessIR.lean`'s evaluator or
 a bespoke `simp_all` that works only because that gadget has no subcircuits and flat field inputs;
 any composed circuit needs this.
 
-## Applicability today — read this before reaching for `WitgenIR.eval_congr`
+## How to apply it at a chip's `ComputableWitnesses` obligation
 
 The capstone takes `env.data = env'.data` and `env.hint = env'.hint` as premises, because
-`dataGet`/`hintGet` genuinely depend on them. **Clean's `FormalCircuitBase.ComputableWitnesses`
-does not supply either**: it quantifies over arbitrary `env`/`env'` related only by
-`ProverEnvironment.AgreesBelow`, which constrains `get` alone. So this lemma is not yet applicable
-at a chip's `ComputableWitnesses` obligation, even for a program that reads neither. Until that is
-resolved, gadgets keep their own small congruence lemmas (`AddOperation.populateIR_congr` and
-friends), which are provable exactly because their programs are `data`/`hint`-free.
+`dataGet`/`hintGet` genuinely depend on them. Those premises used to be unavailable: Clean's
+`AgreesBelow` constrained `get` alone, so this lemma could not be applied at a chip's obligation even
+for a program reading neither. That is fixed upstream (`AgreesBelow` now carries both conjuncts —
+the change is *weakening*, so no existing instance broke), and the obligation's own hypothesis
+supplies them through `AgreesBelow.data_eq` and `.hint_eq`.
 
-Two ways to close the gap, either of which makes this lemma the single congruence for every gadget:
+The remaining two premises are discharged by computing the program's read set, which reduces to a
+concrete list — verified on `AddOperation.populateIR`:
 
-* **Upstream (preferred).** Add the two conjuncts to `AgreesBelow`. It is small and non-breaking —
-  it *weakens* every obligation, so existing instances stay true, and the new components are `rfl`
-  at both use sites, since `ProverEnvironment.fromList` and `.fromArray` carry constant `data`/`hint`
-  for every accumulator value.
-* **Local refinement.** Add a `metaKeys` collector alongside `exprs` (empty exactly when the program
-  contains no `dataGet`/`hintGet`) and thread `metaKeys = []` through the mutual congruence,
-  discharging those two cases by contradiction. This drops both premises for meta-free programs at
-  the cost of one more collector and a hypothesis in each of the 32 cases. -/
+* `hcells` is **vacuous** for any program without a `VExpr.envRange` node: `envIndices` computes to
+  `[]`, so `simp only [WitgenIR.envIndices, VExpr.envIndices, List.not_mem_nil] at hi` closes it.
+* `hexprs` needs the read set unfolded. Two things block a naive `simp only`: a gadget's running
+  sums are ordinary Lean `let`s, so the `WitgenIR.exprs` match cannot reduce until they are
+  zeta-reduced (plain `simp only [<gadget>.populateIR]` does this, `unfold` does not); and
+  `VExpr.exprs (.lit es)` leaves `FExpr.exprsList es.toList`, which needs `Vector.toList_mk`. With
+  `[<gadget>.populateIR, WitgenIR.ofFExprs, WitgenIR.exprs, VExpr.exprs, FExpr.exprsList,
+  FExpr.exprs, U64Expr.exprs, Vector.toList_mk, List.flatMap_nil, List.nil_append, List.append_nil]`
+  the set reduces to a literal `[a[0]] ++ [b[0]] ++ [a[1]] ++ …` of operand expressions, and
+  membership becomes a disjunction the input-agreement hypothesis discharges directly.
+
+That simp set is **gadget-independent** apart from the `populateIR` name — it unfolds the read-set
+collectors, not the arithmetic — which is the sense in which this lemma is one congruence for every
+gadget rather than one per gadget.
+
+Note the whole route avoids `circuit_norm`, and therefore avoids the `u64Wrap` trap described above:
+the `% 65536` truncations sit inside `U64Expr`, not as `ℕ` `HMod`, so nothing invites `omega`. -/
 
 namespace Witgen
 
