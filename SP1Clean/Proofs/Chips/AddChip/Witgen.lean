@@ -44,37 +44,15 @@ theorem computableWitnesses : (circuit (p := p)).base.ComputableWitnesses := by
     FlatOperation.forAll_witnessCongr_of_subcircuit _ _ ?_,
     FlatOperation.forAll_witnessCongr_of_subcircuit _ _ ?_⟩
   · simp [circuit_norm]
-  · have key_b : ∀ e : Environment (ZMod p),
-        (ProvableStruct.eval e input).adapter.op_b_memory.prev_value
-          = Vector.map (Expression.eval e) input.adapter.op_b_memory.prev_value := by
-      intro e
-      rw [← ProvableStruct.eval_eq_eval]
-      simp only [eval_inputs, Readers.RTypeReader.eval_cols,
-        Readers.RTypeReader.eval_registerAccessCols]
-      exact ProvableType.eval_fields e _
-    have key_c : ∀ e : Environment (ZMod p),
-        (ProvableStruct.eval e input).adapter.op_c_memory.prev_value
-          = Vector.map (Expression.eval e) input.adapter.op_c_memory.prev_value := by
-      intro e
-      rw [← ProvableStruct.eval_eq_eval]
-      simp only [eval_inputs, Readers.RTypeReader.eval_cols,
-        Readers.RTypeReader.eval_registerAccessCols]
-      exact ProvableType.eval_fields e _
+  · -- `eval_opBVal`/`eval_opCVal` are stated in `circuit_norm`'s own orientation, so the
+    -- struct-level input agreement projects straight onto the operand words.
     refine AddOperation.populateIR_congr env env' _ _ (fun i hi => ?_) (fun i hi => ?_)
-    · have hv : Vector.map (Expression.eval env.toEnvironment)
-            input.adapter.op_b_memory.prev_value
-          = Vector.map (Expression.eval env'.toEnvironment)
-            input.adapter.op_b_memory.prev_value := by
-        rw [← key_b env.toEnvironment, ← key_b env'.toEnvironment, h_input]
-      simpa [Inputs.op_b_val, Vector.getElem_map] using
-        congrArg (fun v : Word (ZMod p) => v[i]) hv
-    · have hv : Vector.map (Expression.eval env.toEnvironment)
-            input.adapter.op_c_memory.prev_value
-          = Vector.map (Expression.eval env'.toEnvironment)
-            input.adapter.op_c_memory.prev_value := by
-        rw [← key_c env.toEnvironment, ← key_c env'.toEnvironment, h_input]
-      simpa [Inputs.op_c_val, Vector.getElem_map] using
-        congrArg (fun v : Word (ZMod p) => v[i]) hv
+    · have hv := congrArg (fun r : Inputs (ZMod p) => r.op_b_val) h_input
+      simp only [eval_opBVal] at hv
+      simpa [Vector.getElem_map] using congrArg (fun v : Word (ZMod p) => v[i]) hv
+    · have hv := congrArg (fun r : Inputs (ZMod p) => r.op_c_val) h_input
+      simp only [eval_opCVal] at hv
+      simpa [Vector.getElem_map] using congrArg (fun v : Word (ZMod p) => v[i]) hv
   · simp [circuit_norm]
   · simp [circuit_norm]
   · simp [circuit_norm]

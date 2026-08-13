@@ -31,12 +31,26 @@ Destined for Clean, beside `Clean/Circuit/WitnessIR.lean`'s evaluator or
 a bespoke `simp_all` that works only because that gadget has no subcircuits and flat field inputs;
 any composed circuit needs this.
 
-Note the `data`/`hint` premises: `ProverEnvironment.AgreesBelow` constrains only `get`, so a witness
-reading `dataGet`/`hintGet` cannot satisfy `ComputableWitnesses` as Clean currently states it. Adding
-those two conjuncts to `AgreesBelow` upstream is a small non-breaking change (it *weakens* every
-obligation, and both `ProverEnvironment.fromList` and `.fromArray` carry constant `data`/`hint`, so
-the new components are `rfl` at every use site) — and it is what makes those two constructors
-provable here rather than fatal. -/
+## Applicability today — read this before reaching for `WitgenIR.eval_congr`
+
+The capstone takes `env.data = env'.data` and `env.hint = env'.hint` as premises, because
+`dataGet`/`hintGet` genuinely depend on them. **Clean's `FormalCircuitBase.ComputableWitnesses`
+does not supply either**: it quantifies over arbitrary `env`/`env'` related only by
+`ProverEnvironment.AgreesBelow`, which constrains `get` alone. So this lemma is not yet applicable
+at a chip's `ComputableWitnesses` obligation, even for a program that reads neither. Until that is
+resolved, gadgets keep their own small congruence lemmas (`AddOperation.populateIR_congr` and
+friends), which are provable exactly because their programs are `data`/`hint`-free.
+
+Two ways to close the gap, either of which makes this lemma the single congruence for every gadget:
+
+* **Upstream (preferred).** Add the two conjuncts to `AgreesBelow`. It is small and non-breaking —
+  it *weakens* every obligation, so existing instances stay true, and the new components are `rfl`
+  at both use sites, since `ProverEnvironment.fromList` and `.fromArray` carry constant `data`/`hint`
+  for every accumulator value.
+* **Local refinement.** Add a `metaKeys` collector alongside `exprs` (empty exactly when the program
+  contains no `dataGet`/`hintGet`) and thread `metaKeys = []` through the mutual congruence,
+  discharging those two cases by contradiction. This drops both premises for meta-free programs at
+  the cost of one more collector and a hypothesis in each of the 32 cases. -/
 
 namespace Witgen
 

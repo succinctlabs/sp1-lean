@@ -118,4 +118,38 @@ boundary: consumers rewrite this lemma instead of asking unification to unfold t
     (Eval.eval env input).adapter = Eval.eval env input.adapter := by
   rw [eval_inputs]
 
+/-! ### Operand words, in `circuit_norm`'s own orientation
+
+The `eval_*` lemmas above push evaluation *down* into components. `circuit_norm`'s normal form goes
+the other way — it pulls projections *up* out of `eval` (`ProvableStruct.eval_eq_eval` is `↓ high`,
+and `Clean/Circuit/StructEvalSimprocs.lean`'s lift simprocs rewrite `eval env (s.f)` to
+`(eval env s).f`). Two opposite orientations of one equation cannot both live in a confluent simp
+set, so the lemmas above are inert under `circuit_norm` and a proof that needs them must first undo
+the normalisation with `rw [← ProvableStruct.eval_eq_eval]`.
+
+These two state the operand words in `circuit_norm`'s orientation instead: the projection is already
+on the outside, and the right-hand side is inert (`Expression.eval env` appears unapplied, so no lift
+simproc fires). That makes them safe to tag and directly usable by any proof that has struct-level
+input agreement in hand — chiefly `ComputableWitnesses`, whose hypothesis arrives in exactly that
+form. Only *vector*-valued operands need this; a scalar field is already in normal form as
+`(ProvableStruct.eval env cols).f`, and restating one would loop against the lift simproc. -/
+
+@[circuit_norm] theorem eval_opBVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_b_val
+      = Vector.map (Expression.eval env) input.op_b_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_b_val, eval_inputs, Readers.RTypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_c_val
+      = Vector.map (Expression.eval env) input.op_c_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_c_val, eval_inputs, Readers.RTypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
+
 end SP1Clean.AddChip
