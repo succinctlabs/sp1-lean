@@ -1032,7 +1032,7 @@ private theorem uTypeColumnsInteractionsDecompose
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private theorem uTypeStateInteractionsFaithful
     (env : Environment (ZMod p))

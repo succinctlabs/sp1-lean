@@ -1,6 +1,6 @@
 import SP1Clean.Native.Chips.UTypeChip.Defs
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Math.EvalVec
 import Clean.Air.Circuit
 

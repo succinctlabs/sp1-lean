@@ -1166,7 +1166,7 @@ theorem storeHalfChipConstraintsConstructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private def storeHalfStateInteractions
     (input : Var StoreHalfChip.Inputs (ZMod p)) :

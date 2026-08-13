@@ -1147,7 +1147,7 @@ theorem storeWordChipConstraintsConstructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private def storeWordStateInteractions
     (input : Var StoreWordChip.Inputs (ZMod p)) :

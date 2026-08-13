@@ -4,7 +4,7 @@ import SP1Clean.Native.Operations.LtOperationUnsigned.RawSpec
 import SP1Clean.Native.Operations.LtOperationUnsigned.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Faithful.U16CompareOperation
 import SP1Clean.Extracted.LtOperationUnsigned
@@ -283,7 +283,7 @@ theorem ltUnsigned_assertions_exact
   rw [ha, hb, hcols, hreal]
 
 open SP1Clean.Channels (byteChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 /-- **Faithfulness anchor — interaction half, SYNTACTIC (op-level COMPOSITION).** `LtOperationUnsigned`
 emits its single byte interaction only through the composed `U16CompareOperation` subcircuit (its own

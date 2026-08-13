@@ -1404,7 +1404,7 @@ theorem loadWordChipConstraintsConstructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private def loadWordStateInteractions
     (input : Var LoadWordChip.Inputs (ZMod p)) :

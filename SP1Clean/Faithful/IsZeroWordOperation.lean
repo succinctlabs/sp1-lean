@@ -4,7 +4,7 @@ import SP1Clean.Native.Operations.IsZeroWordOperation.RawSpec
 import SP1Clean.Native.Operations.IsZeroWordOperation.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.IsZeroWordOperation
 import SP1Clean.Faithful.IsZeroOperation
@@ -162,7 +162,7 @@ theorem isZeroWord_assertions_exact
   simp only [eval_sub, Expression.eval]
 
 open SP1Clean.Channels (byteChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 omit [Fact (2 ^ 17 < p)] in
 /-- **Faithfulness anchor — interaction half, SYNTACTIC.** `IsZeroWordOperation` composes four

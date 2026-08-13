@@ -256,11 +256,9 @@ import SP1Clean.Model.BusMessages
 import SP1Clean.Model.ByteTable
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ChipAir
-import SP1Clean.Math.GetElemFastPath
 import SP1Clean.Math.HWord
 import SP1Clean.Model.InteractionBus
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Math.MulCarryChain
 import SP1Clean.Math.ShiftBounds
 import SP1Clean.Model.Register

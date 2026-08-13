@@ -2,7 +2,7 @@ import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Native.Readers.ITypeReaderImmutable
 import SP1Clean.Extracted.ITypeReaderImmutable
@@ -64,7 +64,7 @@ theorem itypereaderimmutable_constraints_faithful
   tauto
 
 open SP1Clean.Channels (byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 /-- Exact Memory-bus projection for the immutable I-type reader. Both operands are reads, so the
 native pull/push pairs cover the complete four-entry Rust Memory block; `nativeAccesses` dualizes

@@ -1409,7 +1409,7 @@ theorem loadHalfChipConstraintsConstructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private def loadHalfStateInteractions
     (input : Var LoadHalfChip.Inputs (ZMod p)) :

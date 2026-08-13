@@ -2,7 +2,7 @@ import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Extracted.ALUTypeReader
@@ -74,7 +74,7 @@ theorem alutypereader_constraints_faithful
   tauto
 
 open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel ProgramMsg)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 /-- **Faithfulness anchor (ALUTypeReader fragment) — Program-bus interaction, SYNTACTIC.** Sibling of
 `rtypereader_program_…`: the single Program fetch projects to the same arity-16 `LookupAccess` as the

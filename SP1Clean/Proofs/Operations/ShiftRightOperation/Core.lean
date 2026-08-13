@@ -1,5 +1,5 @@
 import SP1Clean.Native.Operations.ShiftRightOperation.Core
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import Clean.Utils.Tactics
 
 /-! # `ShiftRightCore` — proof boundary for the inline ShiftRight assertions

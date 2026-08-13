@@ -1286,7 +1286,7 @@ theorem loadByteChipConstraintsConstructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private def loadByteStateInteractions
     (input : Var LoadByteChip.Inputs (ZMod p)) :

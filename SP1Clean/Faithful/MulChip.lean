@@ -2356,7 +2356,7 @@ private theorem eval_sub_mul_const
   simp only [eval_sub, Expression.eval, hx, hy]
 
 open SP1Clean.Channels (byteChannel stateChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 theorem mulOperation_interactions_exact
     (env : Environment (ZMod p))

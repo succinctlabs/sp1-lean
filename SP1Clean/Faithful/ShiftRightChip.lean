@@ -1560,7 +1560,7 @@ theorem shiftRightChip_constraints_constructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem shiftRightRealEval

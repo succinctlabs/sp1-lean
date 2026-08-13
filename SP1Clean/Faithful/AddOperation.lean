@@ -4,7 +4,7 @@ import SP1Clean.Native.Operations.AddOperation.RawSpec
 import SP1Clean.Native.Operations.AddOperation.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Faithful.ChipTactics
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.AddOperation
@@ -121,7 +121,7 @@ theorem add_assertions_exact
     add_zero]
 
 open SP1Clean.Channels (byteChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 /-- **Faithfulness anchor — interaction half, SYNTACTIC** (the canonical replacement for the `toProp`
 `add_interactions_faithful`). Instead of an *interpreter* mapping a byte send to `mult ≠ 0 →

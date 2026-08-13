@@ -1299,7 +1299,7 @@ theorem loadX0ChipConstraintsConstructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private def loadX0StateInteractions
     (input : Var LoadX0Chip.Inputs (ZMod p)) :

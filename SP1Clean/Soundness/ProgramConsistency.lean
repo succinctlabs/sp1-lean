@@ -3,7 +3,7 @@ import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Model.InteractionBus
 import SP1Clean.Model.ProgramChip
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 
 /-! # Trace-level Program-bus (instruction-fetch) consistency
 
@@ -161,7 +161,7 @@ theorem programConsistent_of_balance [NeZero p]
 
 /-! ## emitted = projection (Program bus) -/
 
-open Circuit SP1Clean.InteractionRecovery
+open Circuit InteractionRecovery
 open SP1Clean.Channels (programChannel ProgramMsg)
 
 /-- **emitted = projection for the Program bus.** The hand-written `programLookups r` equals the

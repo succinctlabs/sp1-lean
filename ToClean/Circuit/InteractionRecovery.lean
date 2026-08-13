@@ -15,7 +15,7 @@ and `Subcircuit.ChannelsLawful` (available via every `ElaboratedCircuit`'s
 interaction — the filter is empty and the subcircuit drops out.
 `interactionsWith_formalSubcircuit_eq_nil` packages exactly that, per `FormalCircuit`. -/
 
-namespace SP1Clean.InteractionRecovery
+namespace InteractionRecovery
 
 open Circuit Operations
 
@@ -212,4 +212,4 @@ lemma interactionsWith_main_snd_eq_nil {Input Output : TypeMap}
     interactionsWith channel (circuit.main input offset).2 = [] :=
   interactionsWith_main_eq_nil circuit channel input offset h
 
-end SP1Clean.InteractionRecovery
+end InteractionRecovery

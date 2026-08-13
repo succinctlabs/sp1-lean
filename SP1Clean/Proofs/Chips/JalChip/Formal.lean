@@ -1,5 +1,5 @@
 import SP1Clean.Native.Chips.JalChip.Defs
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Math.EvalVec
 import Clean.Air.Circuit
 

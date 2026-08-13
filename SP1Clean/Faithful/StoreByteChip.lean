@@ -1222,7 +1222,7 @@ theorem storeByteChipConstraintsConstructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private def storeByteStateInteractions
     (input : Var StoreByteChip.Inputs (ZMod p)) :

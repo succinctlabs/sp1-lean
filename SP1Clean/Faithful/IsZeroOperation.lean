@@ -4,7 +4,7 @@ import SP1Clean.Native.Operations.IsZeroOperation.RawSpec
 import SP1Clean.Native.Operations.IsZeroOperation.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.IsZeroOperation
 import SP1Clean.Faithful.ChipTactics
@@ -111,7 +111,7 @@ theorem isZero_assertions_exact
   simp only [Expression.eval]
 
 open SP1Clean.Channels (byteChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 /-- **Faithfulness anchor — interaction half, SYNTACTIC.** `IsZeroOperation` is a pure `assertZero` gadget:
 its `main` emits no byte interactions, matching SP1's empty extracted `interactions` list — both `toAccess`
