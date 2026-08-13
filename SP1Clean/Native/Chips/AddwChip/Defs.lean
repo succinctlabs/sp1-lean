@@ -104,4 +104,29 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
     (Eval.eval env input).adapter = Eval.eval env input.adapter := by
   rw [eval_inputs]
 
+/-! ### Operand words, in `circuit_norm`'s own orientation
+
+Projection outside `eval`, inert right-hand side — the form `ComputableWitnesses` hands over, and the
+opposite orientation from the `eval_*` lemmas above (which are inert under `circuit_norm`). Vector
+operands only; see `AddChip/Defs.lean` for the rationale. Addw's adapter is the ALU-type reader, so
+both operands are register reads. -/
+
+@[circuit_norm] theorem eval_opBVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_b_val
+      = Vector.map (Expression.eval env) input.op_b_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_b_val, eval_inputs, Readers.ALUTypeReader.eval_cols,
+    Readers.ALUTypeReader.eval_accessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_c_val
+      = Vector.map (Expression.eval env) input.op_c_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_c_val, eval_inputs, Readers.ALUTypeReader.eval_cols,
+    Readers.ALUTypeReader.eval_accessCols]
+  exact ProvableType.eval_fields env _
+
 end SP1Clean.AddwChip

@@ -6,10 +6,12 @@ import SP1Clean.Native.Chips.AddiChip.Defs
 import SP1Clean.Proofs.Chips.AddiChip.Formal
 import SP1Clean.Proofs.Chips.AddiChip.Bridge
 import SP1Clean.Proofs.Chips.AddiChip.Contracts
+import SP1Clean.Proofs.Chips.AddiChip.Witgen
 import SP1Clean.Proofs.Chips.AddwChip.Bridge
 import SP1Clean.Native.Chips.AddwChip.Defs
 import SP1Clean.Proofs.Chips.AddwChip.Formal
 import SP1Clean.Proofs.Chips.AddwChip.Contracts
+import SP1Clean.Proofs.Chips.AddwChip.Witgen
 import SP1Clean.Proofs.Chips.BitwiseChip.Bridge
 import SP1Clean.Native.Chips.BitwiseChip.Defs
 import SP1Clean.Proofs.Chips.BitwiseChip.Formal
@@ -58,9 +60,11 @@ import SP1Clean.Proofs.Chips.DivRemChip.Evidence.Unsigned64
 import SP1Clean.Proofs.Chips.JalChip.Bridge
 import SP1Clean.Native.Chips.JalChip.Defs
 import SP1Clean.Proofs.Chips.JalChip.Formal
+import SP1Clean.Proofs.Chips.JalChip.Witgen
 import SP1Clean.Proofs.Chips.JalrChip.Bridge
 import SP1Clean.Native.Chips.JalrChip.Defs
 import SP1Clean.Proofs.Chips.JalrChip.Formal
+import SP1Clean.Proofs.Chips.JalrChip.Witgen
 import SP1Clean.Proofs.Chips.LoadByteChip.Bridge
 import SP1Clean.Native.Chips.LoadByteChip.Defs
 import SP1Clean.Proofs.Chips.LoadByteChip.Formal
@@ -142,9 +146,11 @@ import SP1Clean.Proofs.Chips.SubwChip.Bridge
 import SP1Clean.Native.Chips.SubwChip.Defs
 import SP1Clean.Proofs.Chips.SubwChip.Formal
 import SP1Clean.Proofs.Chips.SubwChip.Contracts
+import SP1Clean.Proofs.Chips.SubwChip.Witgen
 import SP1Clean.Proofs.Chips.UTypeChip.Bridge
 import SP1Clean.Native.Chips.UTypeChip.Defs
 import SP1Clean.Proofs.Chips.UTypeChip.Formal
+import SP1Clean.Proofs.Chips.UTypeChip.Witgen
 import SP1Clean.Extracted.ALUTypeReader
 import SP1Clean.Extracted.ChipOracle.AluX0
 import SP1Clean.Extracted.ChipOracle.Add
