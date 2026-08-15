@@ -248,9 +248,12 @@ theorem completeness :
   -- `h_env` now bundles the chip's flag/`bw_cols` witness-gen equations with the GFC `ALUTypeReader`
   -- subcircuit's completeness obligation (SC Phase 2pre) — discard the trailing reader obligation.
   obtain ⟨-, h_env_flags, h_env_cols, -⟩ := h_env
-  have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
-  have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using h_env_flags 1
-  have hflag2 : env.get (i₀ + 2) = (hintFlags env.hint)[2] := by simpa using h_env_flags 2
+  have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by
+    rw [← hintFlags_eval_ir env]; simpa using h_env_flags 0
+  have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by
+    rw [← hintFlags_eval_ir env]; simpa using h_env_flags 1
+  have hflag2 : env.get (i₀ + 2) = (hintFlags env.hint)[2] := by
+    rw [← hintFlags_eval_ir env]; simpa using h_env_flags 2
   have hf0' : env.get i₀ = 0 ∨ env.get i₀ = 1 := by rw [hflag0]; exact hf0
   have hf1' : env.get (i₀ + 1) = 0 ∨ env.get (i₀ + 1) = 1 := by rw [hflag1]; exact hf1
   have hf2' : env.get (i₀ + 2) = 0 ∨ env.get (i₀ + 2) = 1 := by rw [hflag2]; exact hf2
@@ -268,7 +271,31 @@ theorem completeness :
       = input_adapter_op_b_memory_prev_value := h_input.2.2.2.2.2.2.1.1
   have hpvc : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value
       = input_adapter_op_c_memory_prev_value := h_input.2.2.2.2.2.2.2.2.1.1
-  simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval] at h_env_cols
+  simp only [Inputs.op_b_val, Inputs.op_c_val] at h_env_cols
+  -- The witness stream is the `populateFE` IR; `populateFE_eval_cell` evaluates each pinned cell to
+  -- the value-level `populate` at the evaluated operands (the operands folded through `vec4_eval` +
+  -- `h_input`, the opcode expression evaluated to its `env.get` form).
+  have hopc : Expression.eval env.toEnvironment
+      (var { index := i₀ } * 2 + var { index := i₀ + 1 } * 1 + var { index := i₀ + 2 } * 0)
+      = env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 := by
+    simp [circuit_norm]
+  have hcolsPop : ∀ j : Fin 16, env.get (i₀ + 3 + (j : ℕ))
+      = (toElements (BitwiseU16Operation.populate input_adapter_op_b_memory_prev_value
+          input_adapter_op_c_memory_prev_value
+          (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0)))[(j : ℕ)]'(by
+        have : size BitwiseU16Operation.Columns = 16 := rfl
+        have := j.isLt
+        omega) := by
+    intro j
+    refine (h_env_cols j).trans ?_
+    have hcell := BitwiseU16Operation.populateFE_eval_cell env
+      input_var_adapter_op_b_memory_prev_value input_var_adapter_op_c_memory_prev_value
+      (var { index := i₀ } * 2 + var { index := i₀ + 1 } * 1 + var { index := i₀ + 2 } * 0)
+      input_adapter_op_b_memory_prev_value input_adapter_op_c_memory_prev_value
+      ((vec4_eval env.toEnvironment _).trans hpvb) ((vec4_eval env.toEnvironment _).trans hpvc)
+      ha hb (j : ℕ) j.isLt
+    rw [hopc] at hcell
+    exact hcell
   have hop_cases : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0
       ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 1
       ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 2 := by
@@ -309,20 +336,12 @@ theorem completeness :
       using 2
     -- 4.32: `convert … using 2` now leaves only the `cols` equality. The former `rfl` step closed a
     -- separate `circuit.Spec = Spec` goal that the congruence no longer emits (Clean `088a9287`).
+    -- Per cell: the varFromOffset read is the pinned witness cell (`hcolsPop`), already in the
+    -- value-level `populate` form.
     refine (ProvableType.ext_iff (α := BitwiseU16Operation.Columns) _ _).mpr (fun i hi => ?_)
-    -- Ascribe `h_env_cols`'s IR-native RHS into the plain `toElements (populate …)` form via a *definitional*
-    -- `have` (the `.native` eval-match + beta is the CHEAP reduction; the expensive path is the eager
-    -- `Eq.trans` isDefEq against `toElements (populate op_prev …)`, whose `combinedSize'` tower + the
-    -- *propositional* `map eval ≡ op_prev` gap blow past 32M heartbeats in Clean 4.30). Then `hpvb`/`hpvc`
-    -- fold the operands so the composite RHS matches the goal RHS syntactically.
-    have hc : env.toEnvironment.get (i₀ + 3 + i)
-        = (toElements (BitwiseU16Operation.populate
-            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value)
-            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value)
-            (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0)))[i]'hi := h_env_cols ⟨i, hi⟩
-    rw [hpvb, hpvc] at hc
     refine Eq.trans ?_
-      ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 3) i hi).trans hc)
+      ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 3) i hi).trans
+        (hcolsPop ⟨i, hi⟩))
     simp only [circuit_norm]; rfl
   · -- RegisterWrite's `isU64 value` (the op_a write push): the witnessed result word's `isU64` from
     -- `resultWord_isU64` at the `populate`d columns (`spec_populate`), bridged to the chip's explicit
@@ -330,19 +349,9 @@ theorem completeness :
     intro hr
     have hisu := resultWord_isU64 hr
       (BitwiseU16Operation.spec_populate ha hb hop3 input_is_real) hop_cases
-    -- Re-ascribe the witness-gen pins into the plain `toElements (populate …)` form (the cheap
-    -- `.native` eval-match, done once at an *opaque* index `j`), fold the operands, then transport to
-    -- the per-byte projections through `result_byte_pin` — whose `s` stays abstract, so `populate`
-    -- is never unfolded.
-    have hcols : ∀ j : Fin 16, env.get (i₀ + 3 + (j : ℕ))
-        = (toElements (BitwiseU16Operation.populate
-            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value)
-            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value)
-            (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0)))[(j : ℕ)]'(by
-          have : size BitwiseU16Operation.Columns = 16 := rfl; have := j.isLt; omega) :=
-      h_env_cols
-    rw [hpvb, hpvc] at hcols
-    have key := result_byte_pin hcols
+    -- Transport the value-level pins (`hcolsPop`) to the per-byte projections through
+    -- `result_byte_pin` — whose `s` stays abstract, so `populate` is never unfolded.
+    have key := result_byte_pin hcolsPop
     convert hisu using 2
     simp only [BitwiseU16Operation.resultWord, Inputs.op_b_val, Inputs.op_c_val]
     simp only [show env.get (i₀ + 3 + 4 + 4) = _ from key 0,
@@ -586,9 +595,9 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def,
-          Circuit.pure_def, witnessVectorNative, witnessNative, subcircuitWithAssertion, assertion,
+          Circuit.pure_def, subcircuitWithAssertion, assertion,
           assertZero, HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
-        simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+        simp only [Operations.interactionsWith_append,
           InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
           InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
           Soundness.aluTypeReader_programInteractions_subcircuit,

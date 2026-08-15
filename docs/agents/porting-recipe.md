@@ -127,6 +127,65 @@ entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` inste
   `[propext, Classical.choice, Quot.sound]` (+ generated `._native.bv_decide.ax_*` constants if `bv_decide` was used),
   **no `sorryAx`**.
 
+## The witness-IR port (the escape-hatch cutover recipe)
+
+Every chip's witnesses live on Clean's **exportable witness IR** — `witnessVectorIR m (.ir …)` /
+`witness (populateFE …)` — never on the `.native` Lean-closure escape hatch
+(`scripts/check_no_witness_native.sh` gates this). Porting a witness site, distilled from the
+Add (vector) and Bitwise (struct + first `hintGet`) pilots:
+
+1. **Operation layer** (`Native/Operations/<Op>/Populate.lean` or the flat operation file). Keep
+   `populate` (the value-level semantic anchor) untouched, and add its IR twin beside it —
+   `populateIR : … → WitgenIR (ZMod p) m` built with `.ofFExprs` for vector shapes
+   (`AddOperation.populateIR` is the frozen pattern), or `populateFE : … → Columns (FExpr (ZMod p))`
+   for struct shapes (`BitwiseU16Operation.populateFE`). Deliberately **not** `@[circuit_norm]`
+   (the opacity doctrine): only the lemmas below cross the boundary. `U64Expr` has no `sub` — spell
+   `2^(16-s)` as `65536 >>> s` (`Nat.two_pow_shiftRight` closes the ℕ side) — and field-side
+   `(w − low)·256⁻¹` high bytes become u64-sort `val / 256` (equal on bounded limbs;
+   `decomp_high_eq`-style bridge in the eval lemma).
+2. **The eval lemma** (`populateIR_eval` / `populateFE_eval`): evaluating the IR equals `populate`
+   on the evaluated operands, stated with the operand words **abstracted** in the
+   `#v[…]`-of-`Expression.eval` orientation and `isU64` bounds (they keep the u64 sort from
+   wrapping). Struct shapes also want the elementwise `populateFE_eval_cell` corollary — the exact
+   per-cell form the completeness seam's witness obligations arrive in — built on per-cell
+   `toElements` navigators stated over an *opaque* struct (never `whnf` through the
+   `combinedSize'` tower on a compound literal).
+3. **The congr lemma** (`populateIR_congr` / `populateFE_congr` + its raw-payload
+   `populateFE_congr_flat` form for struct shapes): environment-locality, no bounds, with
+   `-Witgen.u64Wrap` in the simp set (naming `circuit_norm` fires `u64Wrap`'s `omega` with no
+   bounds in scope).
+4. **The fold rule** (the pilot's hard-won budget lesson): `u64Wrap`'s `omega` takes the *whole
+   local context* as facts, so sixteen per-cell simp cases inside one fat-context theorem blow the
+   declaration budget where six per-shape helpers over abstract values (`lowByteFE_eval`,
+   `byteOpFE_eval_lo/hi`, …) plus term-mode assembly stay cheap. Extract helpers with minimal
+   contexts; assemble cases by `exact`-chains through the navigators.
+5. **Hint flags** read through `FExpr.hintGet` via the shared `hintFlagsIR`
+   (`Native/Witgen/HintFlags.lean`): swap `witnessVectorNative n (fun env => hintFlags env.hint)`
+   for `witnessVectorIR n (.ofFExprs (hintFlagsIR (ZMod p) "<key>" n))`, and add the chip's
+   `hintFlags_eval_ir` bridge (in the `Witgen.eval (M := fields n)` normal form;
+   `(default : Vector (ZMod p) n) = #v[0, …]` is `rfl`).
+6. **Chip `main` swap**: `witnessVectorNative m closure` → `witnessVectorIR m payload` (cell count
+   stays literal — nothing structural moves); struct `witnessNative (var := Var C) closure` →
+   `witness (var := Var C) (populateFE …)`. Imports: `ToClean.Circuit.WitnessCombinator` +
+   `SP1Clean.Native.Witgen.HintFlags`.
+7. **Completeness rewire** (`Formal.lean`): flag cells via
+   `rw [← hintFlags_eval_ir env]; simpa using h_env_flags k`; struct cells via one value-level
+   pins `have` (`hcolsPop`) built from `populateFE_eval_cell` + the opcode-expression evaluation
+   (`hopc`, a small `simp [circuit_norm]`) + `vec4_eval`-fed operand equations — both the
+   spec-`convert` block and the per-byte pin transport consume it, and `populate` never unfolds.
+8. **The CW file** (`Proofs/Chips/<X>Chip/Witgen.lean`, cloned from `BitwiseChip/Witgen.lean` for
+   hint chips or `AddChip/Witgen.lean` for pure ones): one `refine ⟨…⟩` slot per subcircuit,
+   witness, and `===`-gate (plain `assertZero`s contribute **no** conjunct); zero-witness slots
+   close by `FlatOperation.forAll_witnessCongr_of_subcircuit _ _ (by simp [circuit_norm])`; the
+   flags slot is `hintFlagsIR_congr env env' h_agree.hint_eq _ _`; the gadget slot is the
+   `_congr`/`_flat` lemma fed by `eval_opBVal`-style operand projections (add them to the chip
+   `Defs.lean` if missing — the `circuit_norm`-orientation block from `AddChip/Defs.lean`) and, for
+   same-row earlier cells (the opcode built from flag cells), `h_agree.get_eq (by omega)`.
+9. **Last step**: the `#assert_exportable` line in `SP1CleanTest/Exportable.lean` with the
+   `#guard_msgs`-pinned cell count, the root-index import for the new `Witgen.lean`, and the
+   standing gates — the chip's **trace anchor must pass unmodified** (the `native_decide`
+   byte-for-byte re-derivation through the new IR path is the semantic gate on the whole swap).
+
 ## Scope notes
 
 - Register/memory reads and the PC next-state are **native readers** now: the chip composes

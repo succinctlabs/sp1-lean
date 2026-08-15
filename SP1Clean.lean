@@ -16,6 +16,7 @@ import SP1Clean.Proofs.Chips.BitwiseChip.Bridge
 import SP1Clean.Native.Chips.BitwiseChip.Defs
 import SP1Clean.Proofs.Chips.BitwiseChip.Formal
 import SP1Clean.Proofs.Chips.BitwiseChip.Contracts
+import SP1Clean.Proofs.Chips.BitwiseChip.Witgen
 import SP1Clean.Proofs.Chips.BranchChip.Bridge
 import SP1Clean.Proofs.Chips.BranchChip.Decision
 import SP1Clean.Native.Chips.BranchChip.Defs
