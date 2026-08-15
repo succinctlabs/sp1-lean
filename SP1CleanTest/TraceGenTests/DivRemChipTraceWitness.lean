@@ -25,11 +25,15 @@ namespace SP1Clean.TraceGenTests
 
 open SP1Clean
 
-/-- Per-event flag hint: the `"div_rem_flags"` one-hot from the dumped executor opcode. -/
+/-- Per-event flag hint: the `"div_rem_flags"` one-hot from the dumped executor opcode.
+
+Seven slots, not eight — `is_divu` (opcode 16) is *derived* by `Populate.hintFlags` as
+`1 - Σ(these seven)`, so that a missing key reads as SP1's `is_divu = 1` padding template with no
+special case. Slot order `[div, rem, remu, divw, remw, divuw, remuw]`. -/
 def divRemHint (op : ℕ) : ProverHint (ZMod SP1Prime) := fun key n =>
   match key, n with
-  | "div_rem_flags", 8 =>
-    #[#v[if op = 15 then 1 else 0, if op = 16 then 1 else 0, if op = 17 then 1 else 0,
+  | "div_rem_flags", 7 =>
+    #[#v[if op = 15 then 1 else 0, if op = 17 then 1 else 0,
          if op = 18 then 1 else 0, if op = 25 then 1 else 0, if op = 27 then 1 else 0,
          if op = 26 then 1 else 0, if op = 28 then 1 else 0]]
   | _, _ => #[]

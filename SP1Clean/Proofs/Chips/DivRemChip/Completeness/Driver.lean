@@ -75,15 +75,16 @@ theorem completeness :
   have hf5 := h_assumptions.2.2.2.2.2.2.2.2.2.1
   have hf6 := h_assumptions.2.2.2.2.2.2.2.2.2.2.1
   have hf7 := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.1
-  have hsum := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.1
-  have hpad := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.1
-  have hop_a_0 := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
-  have h_cpu := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
-  have hrac_a := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
-  have hrac_b := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
-  have hrac_c := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
-  have hdec := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
-  have hprevclk := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2
+  -- the one-hot sum is now an identity (derived `is_divu` slot), not an assumption
+  have hsum := hintFlags_sum_eq_one (p := p) env.hint
+  have hpad := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hop_a_0 := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have h_cpu := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hrac_a := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hrac_b := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hrac_c := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hdec := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
+  have hprevclk := h_assumptions.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2
   clear h_assumptions
   have h_env_flags := h_env.1
   have h_env_qc := h_env.2.1

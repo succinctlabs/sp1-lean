@@ -436,12 +436,15 @@ def divRemDivuEvent : AluEventRec :=
   { clk := 9, pc := 4096, a := 14, b := 100, c := 7, opA := 7, opB := 5, opC := 6,
     tsA := 13, prevTsA := 0, prevA := 0, tsB := 12, prevTsB := 0, tsC := 11, prevTsC := 0 }
 
-/-- The honest `"div_rem_flags"` one-hot prover hint (slot order
-`[div, divu, rem, remu, divw, remw, divuw, remuw]`), from the executor opcode. -/
+/-- The honest `"div_rem_flags"` one-hot prover hint, from the executor opcode.
+
+Seven slots, order `[div, rem, remu, divw, remw, divuw, remuw]`: `is_divu` is *derived* by
+`Populate.hintFlags` as `1 - Σ(these)`, so a missing key reads as SP1's `is_divu = 1` padding
+template with no special case. -/
 def divRemFlagsHint (op : ℕ) : ProverHint (ZMod SP1Prime) := fun key n =>
   match key, n with
-  | "div_rem_flags", 8 =>
-    #[#v[if op = 15 then 1 else 0, if op = 16 then 1 else 0, if op = 17 then 1 else 0,
+  | "div_rem_flags", 7 =>
+    #[#v[if op = 15 then 1 else 0, if op = 17 then 1 else 0,
          if op = 18 then 1 else 0, if op = 25 then 1 else 0, if op = 27 then 1 else 0,
          if op = 26 then 1 else 0, if op = 28 then 1 else 0]]
   | _, _ => #[]
