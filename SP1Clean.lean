@@ -359,6 +359,7 @@ import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Native.Readers.RegisterAccessCols
 import SP1Clean.Native.Readers.RegisterAccessTimestamp
 import SP1Clean.Native.Readers.RegisterWrite
+import SP1Clean.Native.Witgen.HintFlags
 import SP1Clean.Soundness.ByteConsistency
 import SP1Clean.Soundness.ChipRegistry
 import SP1Clean.Soundness.ChipRow

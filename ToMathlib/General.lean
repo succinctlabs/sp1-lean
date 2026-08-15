@@ -12,9 +12,9 @@ rather than in this project, but have no home there yet. Nothing here mentions C
 the tree's import rule nothing here may import project code.
 
 Current contents: kernel-safe `Int.toNat`/`%` normalization (the plain shape blows the kernel's
-stack once `2 ^ N` unfolds definitionally for `N ≥ 15`), `Std.ExtDHashMap` insert algebra, `Fin`
-no-zero-divisors over a prime, a `Fintype (BitVec n)` instance, and `LawfulMonadStateOf` instances
-for `StateT`/`StateCpsT`/`EStateM`/`ReaderT`.
+stack once `2 ^ N` unfolds definitionally for `N ≥ 15`), the `2 ^ n >>> k` shift-right closed form,
+`Std.ExtDHashMap` insert algebra, `Fin` no-zero-divisors over a prime, a `Fintype (BitVec n)`
+instance, and `LawfulMonadStateOf` instances for `StateT`/`StateCpsT`/`EStateM`/`ReaderT`.
 
 The gap against upstream: Mathlib has `Int.toNat_emod`-style lemmas but not the `natCast` composite
 this project needs; the `ExtDHashMap` insert lemmas post-date the container's Mathlib coverage; and
@@ -46,6 +46,16 @@ lemma toNat_natCast_emod_pow_two (b k : ℕ) :
   exact toNat_natCast_emod_natCast _ _
 
 end Int
+
+namespace Nat
+
+-- Mathlib has `Nat.shiftRight_eq_div_pow` and `Nat.pow_div` but not their one-step composite,
+-- which turns a shifted power-of-two constant (the only subtraction-free spelling of `2 ^ (n - k)`
+-- available in subtraction-less expression languages) back into the subtracted-exponent form.
+theorem two_pow_shiftRight {n k : ℕ} (h : k ≤ n) : 2 ^ n >>> k = 2 ^ (n - k) := by
+  rw [Nat.shiftRight_eq_div_pow, Nat.pow_div h Nat.zero_lt_two]
+
+end Nat
 
 @[simp] lemma Std.ExtDHashMap.insert_inj' {α β}
     [BEq α] [LawfulBEq α]
