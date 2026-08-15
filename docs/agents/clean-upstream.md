@@ -225,24 +225,42 @@ Clean has already scheduled this in a source comment (`WitnessGeneration.lean:20
 waiting consumers (`Examples/DataWitness.lean`, `Examples/FemtoCairo`). **Send it alone** — it is the
 only queued change that rewrites load-bearing proofs, and mixing it makes fallout hard to attribute.
 
-### U6 · `U64Expr` lacks signed division
+### U6 · `U64Expr` lacks signed division — **WITHDRAWN: the premise was false**
 
-The u64 sort has unsigned `div`/`mod` but no `sdiv`/`srem`, so DivRem's populate cannot be expressed
-and that chip stays on the `.native` escape hatch. Blocks cutover wave **W6**.
+This entry said the missing `sdiv`/`srem` meant "DivRem's populate cannot be expressed and that chip
+stays on the `.native` escape hatch. Blocks cutover wave **W6**." That is wrong, and it is worth
+saying why, because the entry would otherwise send someone to build an upstream feature we do not
+need.
 
-Plumbing is **S**: exactly two matchers to extend (`U64Expr.eval` at `WitnessIR.lean:171`,
-`U64Expr.toJson` at `WitnessExport.lean:78`), no `deriving` clauses, 0 call sites broken, and the
-existing `#witgen_json` goldens do not change (a missing arm is a *compile* error, not a silent diff).
+**Signed division *is* the sign/magnitude construction over the unsigned ops the sort already has.**
+Lean core defines it that way — `BitVec.sdiv` is a four-case match on the operand msbs, each arm
+`udiv` applied to `.neg`-normalized operands, with `BitVec.sdiv_eq`/`srem_eq` as the equation
+theorems. This repo had already proved half the reduction before the entry was written:
 
-> **The real cost is semantic, not structural.** There is no `Int` normalization set analogous to the
-> `UInt64.toNat_*` block at `WitnessIR.lean:211-217`, and `u64Wrap` only knows `ℕ` moduli, so every
-> proof touching a signed op lands in unnormalized territory. The rounding convention must match Rust
-> `i64` (`tdiv`, truncating toward zero) and `i64::MIN / -1` *panics* in Rust — a divergence hazard for
-> the differential test. `BitVec.sdiv` returns 0 on a zero divisor while RISC-V `DIV` wants −1, so a
-> gadget must wrap an `.ite`; and 64-bit sdiv **cannot** express `DIVW`/`REMW`. Finally, this is a
-> wire-format change: bump `("version", 1)` at `WitnessExport.lean:169`.
+```lean
+-- SP1Clean/Proofs/Chips/DivRemChip/Populate/Abs.lean, srem_eq_bvAbs
+private lemma srem_eq_bvAbs {w : ℕ} (x y : BitVec w) :
+    x.srem y = if x.msb = true then -((bvAbs x) % (bvAbs y)) else (bvAbs x) % (bvAbs y)
+```
 
-Size **S** plumbing, **M** usable.
+The `sdiv` twin is the same three lines with the sign as the *xor* of the two msbs. Negation is one
+node (`x * (2^64 - 1)`, since every u64 op wraps), and the chip already commits the magnitudes and
+signs as columns (`populateAbsC`, `populateBNeg`, …) — so this is the arithmetization SP1 itself
+uses, not a reformulation invented to dodge the gap.
+
+Three of the entry's own caveats invert under that encoding. `i64::MIN / -1` needs no special case
+(`bvAbs intMin = intMin`, `bvAbs (-1) = 1`, negate → `intMin`, which is Rust's `wrapping_div`) — and
+there is no signed primitive left to diverge on. The divide-by-zero `.ite` was already an outer
+branch in the populate, before any `sdiv`. And the "no `Int` normalization set" objection is the
+strongest argument *for* the magnitude form: it keeps everything in `ℕ`, where `u64Wrap` and `omega`
+already work.
+
+**Adding `sdiv`/`srem` upstream would not have unblocked DivRem** — the actual costs (the hint
+encoding, now fixed; and the sheer volume against a ~14,000-line proof stack) are untouched by it,
+and it would additionally have forced a wire-format version bump.
+
+Kept as a record rather than deleted: the useful lesson is that a "missing primitive" ticket should
+first check whether the primitive is *definitionally* the ops already present.
 
 ### U7 · `<Sub>.circuit.localLength` is syntactically distinct from `elaborated.localLength`
 
