@@ -23,7 +23,7 @@ private theorem main_requirementsChannelsLawful
   dsimp only [Operations.RequirementsChannelsLawful]
   refine ⟨?_, ?_, ?_⟩
   · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
+      witnessVectorIR, witnessField, Witnessable.witness, witnessIR,
       subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
       HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
     simp only [Operations.subcircuitChannelsWithRequirements_append,
@@ -40,8 +40,7 @@ private theorem main_requirementsChannelsLawful
     simp only [List.subset_def, List.mem_cons, List.not_mem_nil, or_false]
     tauto
   · intro channel h_channel
-    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def, witnessVectorNative,
-      CircuitNormalization.witnessNative_apply_eq, subcircuitWithAssertion, assertion, assertZero,
+    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def, witnessVectorIR, witnessField, Witnessable.witness, witnessIR, subcircuitWithAssertion, assertion, assertZero,
       Channel.pullIf, HasAssertEq.assert_eq, Expression.assertEquals,
       Operations.localLength] at h_channel
     simp only [Operations.shallowChannels_append, Operations.shallowChannels_witness,
@@ -53,8 +52,7 @@ private theorem main_requirementsChannelsLawful
     subst channel
     exact Or.inl h_byte
   · intro env h_constraints
-    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def, witnessVectorNative,
-      CircuitNormalization.witnessNative_apply_eq, subcircuitWithAssertion, assertion, assertZero,
+    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def, witnessVectorIR, witnessField, Witnessable.witness, witnessIR, subcircuitWithAssertion, assertion, assertZero,
       Channel.pullIf, HasAssertEq.assert_eq, Expression.assertEquals,
       Operations.localLength] at h_constraints
     simp only [ConstraintsHold.Shallow, Operations.forAllNoOffset_append,
@@ -73,8 +71,7 @@ private theorem main_requirementsChannelsLawful
       simpa only [circuit_norm] using h_bool
     rw [Operations.inChannelsOrRequirements_iff_forall_mem]
     intro interaction h_interaction
-    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def, witnessVectorNative,
-      CircuitNormalization.witnessNative_apply_eq, subcircuitWithAssertion, assertion, assertZero,
+    simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def, witnessVectorIR, witnessField, Witnessable.witness, witnessIR, subcircuitWithAssertion, assertion, assertZero,
       Channel.pullIf, HasAssertEq.assert_eq, Expression.assertEquals,
       Operations.localLength] at h_interaction
     simp only [Operations.shallowInteractions_append, Operations.shallowInteractions_witness,
@@ -161,7 +158,7 @@ private theorem main_exposedChannelsLawful
     List.mem_append, List.mem_singleton] at exposedMem
   rcases exposedMem with (rfl | rfl) | rfl
   · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
+      witnessVectorIR, witnessField, Witnessable.witness, witnessIR,
       subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
       HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
     simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
@@ -179,7 +176,7 @@ private theorem main_exposedChannelsLawful
       Gadgets.Equality.main, circuit_norm, List.filter_nil, List.nil_append]
     simp only [Channels.byteChannel_eq_stateChannel_false, if_false, List.append_nil]
   · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
+      witnessVectorIR, witnessField, Witnessable.witness, witnessIR,
       subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
       HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
     simp only [Operations.interactionsWith_witness,
@@ -199,7 +196,7 @@ private theorem main_exposedChannelsLawful
       exposedMemoryInteractions, List.map_cons, List.map_nil]
     rfl
   · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
+      witnessVectorIR, witnessField, Witnessable.witness, witnessIR,
       subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
       HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
     simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,

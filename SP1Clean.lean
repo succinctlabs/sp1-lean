@@ -22,6 +22,7 @@ import SP1Clean.Proofs.Chips.BranchChip.Decision
 import SP1Clean.Native.Chips.BranchChip.Defs
 import SP1Clean.Proofs.Chips.BranchChip.Formal
 import SP1Clean.Proofs.Chips.BranchChip.Contracts
+import SP1Clean.Proofs.Chips.BranchChip.Witgen
 import SP1Clean.Proofs.Chips.BranchChip.Core
 import SP1Clean.Proofs.Chips.ByteChip.Provider
 import SP1Clean.Proofs.Chips.DivRemChip.Assembly
