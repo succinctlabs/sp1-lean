@@ -211,8 +211,10 @@ theorem completeness :
   -- `h_env` now bundles the CPUState GFC obligation (SC Phase 2c, prepended) + the chip's flag/`lt_cols`
   -- witness-gen equations + the GFC `ALUTypeReader` subcircuit's completeness obligation — discard both ends.
   obtain ⟨-, h_env_flags, h_env_cols, -⟩ := h_env
-  have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
-  have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using h_env_flags 1
+  have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by
+    rw [← hintFlags_eval_ir env]; simpa using h_env_flags 0
+  have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by
+    rw [← hintFlags_eval_ir env]; simpa using h_env_flags 1
   have hf0' : env.get i₀ = 0 ∨ env.get i₀ = 1 := by rw [hflag0]; exact hf0
   have hf1' : env.get (i₀ + 1) = 0 ∨ env.get (i₀ + 1) = 1 := by rw [hflag1]; exact hf1
   have hsum01' : env.get i₀ + env.get (i₀ + 1) = 0 ∨ env.get i₀ + env.get (i₀ + 1) = 1 := by
@@ -228,6 +230,27 @@ theorem completeness :
   have hpvc : Vector.map (Expression.eval env.toEnvironment)
       input_var_adapter_op_c_memory_prev_value = input_adapter_op_c_memory_prev_value :=
     h_input.2.2.2.2.2.2.2.2.1.1
+  -- The witness stream is the `populateFE` IR; `populateFE_eval_cell` evaluates each pinned cell
+  -- to the value-level `populate` (operands folded through `vec4_eval` + `h_input`, the `is_slt`
+  -- cell and `is_real` input evaluated to their value forms).
+  have hsig : Expression.eval env.toEnvironment (var { index := i₀ } : Expression (ZMod p))
+      = env.get i₀ := by simp [circuit_norm]
+  have hcolsPop : ∀ j : Fin 10, env.get (i₀ + 2 + (j : ℕ))
+      = (toElements (LtOperationSigned.populate input_adapter_op_b_memory_prev_value
+          input_adapter_op_c_memory_prev_value (env.get i₀) input_is_real))[(j : ℕ)]'(by
+        have : size Extracted.LtOperationSigned = 10 := rfl
+        have := j.isLt
+        omega) := by
+    intro j
+    refine (h_env_cols j).trans ?_
+    have hcell := LtOperationSigned.populateFE_eval_cell env
+      input_var_adapter_op_b_memory_prev_value input_var_adapter_op_c_memory_prev_value
+      (var { index := i₀ }) input_var_is_real
+      input_adapter_op_b_memory_prev_value input_adapter_op_c_memory_prev_value
+      ((vec4_eval env.toEnvironment _).trans hpvb) ((vec4_eval env.toEnvironment _).trans hpvc)
+      ha hb (j : ℕ) j.isLt
+    rw [hsig, h_input.1] at hcell
+    exact hcell
   refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨ha, hb, hbin, hf0'⟩, ?_⟩,
     ⟨⟨hbin, hbin, h_clk⟩,
@@ -261,25 +284,11 @@ theorem completeness :
   -- 4.32: `convert … using 2` now leaves only the `cols` equality. The former `rfl` step closed a
   -- separate `circuit.Spec = Spec` goal that the congruence no longer emits (Clean `088a9287`).
   refine (ProvableType.ext_iff (α := Extracted.LtOperationSigned) _ _).mpr (fun i hi => ?_)
-  -- Ascribe `h_env_cols`'s IR-native RHS into the plain `toElements (populate …)` form via a *definitional*
-  -- `have` (the `.native` eval-match + beta is the CHEAP reduction; the expensive path is the eager
-  -- `Eq.trans` isDefEq against `toElements (populate …)` with FOLDED operands, whose `combinedSize'` tower
-  -- + the *propositional* `map eval ≡ op_prev` gap blow past 32M heartbeats in Clean 4.30). Then
-  -- `vec4_eval`/`hpvb`/`hpvc`/`h_input.1` fold the operands so the composite RHS matches the goal RHS.
-  have hc : env.get (i₀ + 2 + i)
-      = (toElements (LtOperationSigned.populate
-          #v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
-             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
-             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
-             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]]
-          #v[Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[0],
-             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[1],
-             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[2],
-             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[3]]
-          (env.get i₀) (Expression.eval env.toEnvironment input_var_is_real)))[i]'hi := h_env_cols ⟨i, hi⟩
-  rw [vec4_eval, vec4_eval, hpvb, hpvc, h_input.1] at hc
+  -- Per cell: the varFromOffset read is the pinned witness cell (`hcolsPop`), already in the
+  -- value-level `populate` form.
   refine Eq.trans ?_
-    ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 2) i hi).trans hc)
+    ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 2) i hi).trans
+      (hcolsPop ⟨i, hi⟩))
   simp only [circuit_norm]; rfl
   -- RegisterWrite's `isU64 #v[bit, 0, 0, 0]` (the op_a write push): the upper three limbs are literal
   -- `0`; the witnessed compare `bit` `env`-evaluates (via the same ascription trick, index `0`) to the
@@ -287,18 +296,9 @@ theorem completeness :
   simp [circuit_norm]
   intro hr
   have hc0 : env.get (i₀ + 2)
-      = (toElements (LtOperationSigned.populate
-          #v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
-             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
-             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
-             Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]]
-          #v[Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[0],
-             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[1],
-             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[2],
-             Expression.eval env.toEnvironment input_var_adapter_op_c_memory_prev_value[3]]
-          (env.get i₀) (Expression.eval env.toEnvironment input_var_is_real)))[0]'(by
-            have : size Extracted.LtOperationSigned = 10 := rfl; omega) := h_env_cols 0
-  rw [vec4_eval, vec4_eval, hpvb, hpvc, h_input.1] at hc0
+      = (toElements (LtOperationSigned.populate input_adapter_op_b_memory_prev_value
+          input_adapter_op_c_memory_prev_value (env.get i₀) input_is_real))[0]'(by
+            have : size Extracted.LtOperationSigned = 10 := rfl; omega) := hcolsPop 0
   refine isU64_bitWord ?_
   rw [hc0]
   exact witness_bit_bool hr _
@@ -490,9 +490,9 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def,
-          Circuit.pure_def, witnessVectorNative, witnessNative, subcircuitWithAssertion, assertion,
+          Circuit.pure_def, subcircuitWithAssertion, assertion,
           assertZero, HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
-        simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+        simp only [Operations.interactionsWith_append,
           InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,
           InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
           Soundness.aluTypeReader_programInteractions_subcircuit,

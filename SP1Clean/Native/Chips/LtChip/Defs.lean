@@ -1,6 +1,8 @@
 import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Proofs.Operations.LtOperationSigned.Formal
 import SP1Clean.Native.Operations.LtOperationSigned.Populate
+import SP1Clean.Native.Witgen.HintFlags
+import ToClean.Circuit.WitnessCombinator
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
@@ -81,6 +83,20 @@ hint key (one-hot for the active variant, all-zero on padding). -/
 def hintFlags (h : ProverHint (ZMod p)) : Vector (ZMod p) 2 :=
   ((h "lt_flags" 2)[0]?).getD #v[0, 0]
 
+omit [Fact (2 ^ 17 < p)] in
+/-- The accessor is literally the `hintFlagsIR` evaluation (`hintGet`'s zero default IS the
+`.getD #v[0, 0]` fallback), in the `Witgen.eval` normal form the completeness seam's witness
+obligations arrive in. -/
+lemma hintFlags_eval_ir (env : ProverEnvironment (ZMod p)) :
+    Witgen.eval (M := fields 2) { env := env } (hintFlagsIR (ZMod p) "lt_flags" 2)
+      = hintFlags env.hint := by
+  have hdefault : (default : Vector (ZMod p) 2) = #v[0, 0] := rfl
+  rw [hintFlags, ← hdefault]
+  apply Vector.ext
+  intro i hi
+  rw [Witgen.eval_fields', Vector.getElem_map]
+  interval_cases i <;> simp only [hintFlagsIR, Vector.getElem_ofFn, circuit_norm]
+
 /-- Compose `Readers.CPUState.circuit` (forms `next_pc = [pc[0]+4, …]`, `clk_inc = 8`), **witness** the
 two variant flags `is_slt`/`is_sltu`, compose the witnessed `LtOperationSigned` gadget (`subcircuit`, the
 `is_signed := is_slt` mode selector), and `Readers.ALUTypeReader.circuit` (opcode `is_slt·9 + is_sltu·10`;
@@ -91,16 +107,14 @@ and assemble the native `Columns` struct. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let flags ← witnessVectorNative 2 (fun env => hintFlags env.hint)
+  let flags ← witnessVectorIR 2 (.ofFExprs (hintFlagsIR (ZMod p) "lt_flags" 2))
   let is_slt := flags[0]; let is_sltu := flags[1]
   -- The chip witnesses the `LtOperationSigned` column struct (the unsigned compare block + the two
-  -- sign-bit columns) via `populate`, then composes `LtOperationSigned.circuit` as a Clean `assertion`
+  -- sign-bit columns) via the witness-IR twin `populateFE` (`populateFE_eval` ties it to
+  -- `populate`), then composes `LtOperationSigned.circuit` as a Clean `assertion`
   -- (it is a `FormalAssertion`, witnessing nothing of its own; `is_signed := is_slt`).
-  let lt_cols ← witnessNative (var := Var Extracted.LtOperationSigned) (fun env =>
-    LtOperationSigned.populate
-      #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
-      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]
-      (env is_slt) (env input.is_real))
+  let lt_cols ← witness (var := Var Extracted.LtOperationSigned)
+    (LtOperationSigned.populateFE input.op_b_val input.op_c_val is_slt input.is_real)
   assertion LtOperationSigned.circuit ⟨input.op_b_val, input.op_c_val, lt_cols, is_slt, input.is_real⟩
   -- `ALUTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
   -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
@@ -174,5 +188,26 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
     (Eval.eval env input).is_real = Expression.eval env input.is_real := by
   simpa only [CircuitType.eval_expr] using
     congrArg (fun value : Inputs F => value.is_real) (eval_inputs env input)
+
+/-! ### Operand words, in `circuit_norm`'s own orientation (the `AddChip/Defs.lean` pattern) —
+the `ComputableWitnesses` proof projects the struct-level input agreement onto these. -/
+
+@[circuit_norm] theorem eval_opBVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_b_val
+      = Vector.map (Expression.eval env) input.op_b_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_b_val, eval_inputs, Readers.ALUTypeReader.eval_cols,
+    Readers.ALUTypeReader.eval_accessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_c_val
+      = Vector.map (Expression.eval env) input.op_c_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_c_val, eval_inputs, Readers.ALUTypeReader.eval_cols,
+    Readers.ALUTypeReader.eval_accessCols]
+  exact ProvableType.eval_fields env _
 
 end SP1Clean.LtChip

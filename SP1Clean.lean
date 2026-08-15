@@ -90,6 +90,7 @@ import SP1Clean.Proofs.Chips.LtChip.Bridge
 import SP1Clean.Native.Chips.LtChip.Defs
 import SP1Clean.Proofs.Chips.LtChip.Formal
 import SP1Clean.Proofs.Chips.LtChip.Contracts
+import SP1Clean.Proofs.Chips.LtChip.Witgen
 import SP1Clean.Proofs.Chips.MemoryProvider
 import SP1Clean.Proofs.Chips.MulChip.Bridge
 import SP1Clean.Native.Chips.MulChip.Defs
