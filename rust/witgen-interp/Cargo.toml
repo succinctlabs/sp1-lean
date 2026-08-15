@@ -1,0 +1,9 @@
+[package]
+name = "witgen-interp"
+version = "0.1.0"
+edition = "2021"
+description = "Reference interpreter for the Lean-exported witness-generation IR (see docs/witgen-wire-format.md)"
+
+# Deliberately dependency-light: the crate consumes only the wire format, never SP1 types.
+# serde/serde_json land with the parser (wave D4).
+[dependencies]
