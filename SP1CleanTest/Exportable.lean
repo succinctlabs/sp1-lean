@@ -19,7 +19,10 @@ remaining waves, and each would fail today:
 
 * `Lt`, `Bitwise`, `Mul`, `Branch` read `ProverHint` through a Lean closure;
 * `ShiftLeft`, `ShiftRight` build a raw `.witness n (.native …)` prefix;
-* `DivRem` additionally needs signed division in the u64 sort, which the IR does not have.
+* `DivRem` reads its flag hint through a closure and is simply the largest port (30 sites, 217
+  cells); its signed division is the sign/magnitude construction over the unsigned ops the IR
+  already has (`srem_eq_bvAbs` proved half the reduction — see the withdrawn U6 entry in
+  `docs/agents/clean-upstream.md`).
 
 The nine memory chips appear here without ever having been converted individually: their only
 witnesses come from the `AddressOperation` subcircuit, so converting that one operation cleared all

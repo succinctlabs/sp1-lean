@@ -8,9 +8,11 @@
 # `#assert_exportable`/`#witgen_json`, so the witness generator can never be serialized for a proving
 # backend. The witgen-cutover campaign removes every such site; this gate keeps them out afterwards.
 #
-# Scope is `SP1Clean/**/*.lean` only — `SP1CleanTest/`, `docs/`, and `scripts/` legitimately mention
-# the tokens (conformance harness plumbing, prose, this script). The grep is token-targeted: a bare
-# `\.native` would false-positive on "Clean-native" prose in doc-comments.
+# Scope is `SP1Clean/**/*.lean` and `ToClean/**/*.lean` — the main library plus the
+# upstream-destined additions, both of which must stay exportable. `SP1CleanTest/`, `docs/`, and
+# `scripts/` legitimately mention the tokens (conformance harness plumbing, prose, this script).
+# The grep is token-targeted: a bare `\.native` would false-positive on "Clean-native" prose in
+# doc-comments.
 #
 # Modes:
 #   default    — report-only: prints any hits and the running total, always exits 0.
@@ -33,19 +35,19 @@ PATTERN='witnessNative|witnessVectorNative|UnconstrainedNative|UnconstrainedDepN
 HITS=$(grep -rnE "$PATTERN" SP1Clean ToClean --include='*.lean' 2>/dev/null || true)
 
 if [[ -z "$HITS" ]]; then
-  echo "check_no_witness_native: clean (0 escape-hatch witness sites in SP1Clean/)."
+  echo "check_no_witness_native: clean (0 escape-hatch witness sites in SP1Clean/ + ToClean/)."
   exit 0
 fi
 
 COUNT=$(printf '%s\n' "$HITS" | wc -l | tr -d ' ')
 printf '%s\n' "$HITS"
 if [[ "$ENFORCE" == "1" ]]; then
-  echo "FAIL: $COUNT witness-generation escape-hatch site(s) found in SP1Clean/ (see lines above)." >&2
+  echo "FAIL: $COUNT witness-generation escape-hatch site(s) found in SP1Clean/ + ToClean/ (see lines above)." >&2
   echo "      The main library must stay on the exportable witness IR: witness / witnessProgram /" >&2
   echo "      witnessVectorProgram / witnessField / witnessVector with '.ir' payloads, and typed" >&2
   echo "      'Unconstrained*' (non-Native) hint inputs. Port the site per the recipe in" >&2
   echo "      docs/agents/porting-recipe.md instead of reintroducing a closure." >&2
   exit 1
 fi
-echo "check_no_witness_native (report-only): $COUNT escape-hatch witness site(s) remain in SP1Clean/."
+echo "check_no_witness_native (report-only): $COUNT escape-hatch witness site(s) remain in SP1Clean/ + ToClean/."
 exit 0

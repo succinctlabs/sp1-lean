@@ -6,8 +6,8 @@ import SP1CleanTest.TraceGenTests.SubChipTraceVectors
 
 The `AddChipTraceWitness` derivation on the SUB clone: for every dumped event,
 `EventPopulate.rTypeEventInputs` mirrors the input-column extraction, and `circuitTraceRow`
-derives the rest — the witnessed `sub_operation.value` columns from `main`'s own `witnessVector`
-closure (which calls `SubOperation.populate`, the wrapping `rs1 - rs2`), and the 33-column Rust row
+derives the rest — the witnessed `sub_operation.value` columns by evaluating `main`'s own
+witness-IR program (`SubOperation.populateIR`, the wrapping `rs1 - rs2`), and the 33-column Rust row
 layout through the audited whole-row `subChipReconfigure` map — then zero padding rows mirror SP1's
 zero-fill. The anchor checks the derived matrix equals the dumped one cell-for-cell (unmasked). -/
 

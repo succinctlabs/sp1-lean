@@ -37,8 +37,8 @@ def witnessVectorIR (m : ℕ) (ir : Witgen.WitgenIR F m) : Circuit F (Vector (Ex
   fun offset => (varFromOffset (fields m) offset, [.witness m ir])
 
 /-- Explicit operations/length/output, so `elaborate_circuit` and the structural simp sets see this
-combinator exactly as they saw `witnessVectorNative` — with the cell count literal. Mirrors Clean's
-own instance for `witnessVector`. -/
+combinator exactly as they saw the retired native-closure combinator — with the cell count literal.
+Mirrors Clean's own instance for `witnessVector`. -/
 instance {k : ℕ} : ExplicitCircuits (F := F) (witnessVectorIR k) where
   output _ n := varFromOffset (fields k) n
   localLength _ _ := k

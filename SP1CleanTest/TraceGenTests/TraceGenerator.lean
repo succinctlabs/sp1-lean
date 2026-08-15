@@ -67,10 +67,4 @@ def generateTrace {α : Type} (rowGen : α → List F) (events : List α) (heigh
     (padRow : List F := List.replicate width 0) : List (List F) :=
   events.map rowGen ++ List.replicate (height - events.length) padRow
 
-/-- Project a row onto the kept `[lo, hi)` column ranges. Historically used by masked anchors
-(chips whose variant flags were witnessed as constant zeros); all current anchors compare
-unmasked, but the projector is kept for scoping future partial coverage. -/
-def keepCols {α : Type} (keep : List (ℕ × ℕ)) (row : List α) : List α :=
-  keep.flatMap fun (lo, hi) => (row.drop lo).take (hi - lo)
-
 end SP1Clean.TraceGenTests

@@ -7,8 +7,8 @@ import SP1CleanTest.TraceGenTests.AddChipTraceVectors
 `addChipDerivedTrace` rebuilds SP1's `AddChip` trace **from the chip's own circuit**: for every
 dumped event, `EventPopulate.rTypeEventInputs` mirrors the input-column extraction (the only
 hand-written part of SP1's `generate_trace`), and `circuitTraceRow` derives the rest — the
-witnessed `add_operation.value` columns from `main`'s own `witnessVector` closure (which calls
-`AddOperation.populate`), and the 33-column Rust layout through the audited whole-row
+witnessed `add_operation.value` columns by evaluating `main`'s own witness-IR program
+(`AddOperation.populateIR`, tied to `populate` by `populateIR_eval`), and the 33-column Rust layout through the audited whole-row
 `addChipReconfigure` map — then zero padding rows mirror SP1's zero-fill. The anchor checks the
 derived matrix equals the dumped one cell-for-cell, covering witness formulas, environment wiring,
 emission order, the full native Add row column layout, and padding in a single `native_decide`
