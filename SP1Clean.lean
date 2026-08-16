@@ -114,6 +114,7 @@ import SP1Clean.Proofs.Chips.ShiftLeftChip.Soundness.Sll
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Soundness.Sllw
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Formal
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Contracts
+import SP1Clean.Proofs.Chips.ShiftLeftChip.Witgen
 import SP1Clean.Native.Operations.ShiftRightOperation.Core
 import SP1Clean.Proofs.Operations.ShiftRightOperation.Core
 import SP1Clean.Proofs.Chips.ShiftRightChip.Bridge
