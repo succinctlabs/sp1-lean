@@ -130,6 +130,7 @@ import SP1Clean.Proofs.Chips.ShiftRightChip.Soundness.Srlw
 import SP1Clean.Proofs.Chips.ShiftRightChip.Soundness.Sraw
 import SP1Clean.Proofs.Chips.ShiftRightChip.Formal
 import SP1Clean.Proofs.Chips.ShiftRightChip.Contracts
+import SP1Clean.Proofs.Chips.ShiftRightChip.Witgen
 import SP1Clean.Proofs.Chips.StoreByteChip.Bridge
 import SP1Clean.Native.Chips.StoreByteChip.Defs
 import SP1Clean.Proofs.Chips.StoreByteChip.Formal

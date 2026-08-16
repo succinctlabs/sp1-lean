@@ -17,7 +17,6 @@ its `main` is closure-free, so adding a line is the last step of converting a ch
 loudly if a conversion regresses. The chips *not* listed are not an oversight — they are the
 remaining waves, and each would fail today:
 
-* `ShiftRight` builds a raw `.witness n (.native …)` prefix;
 * `DivRem` reads its flag hint through a closure and is simply the largest port (30 sites, 217
   cells); its signed division is the sign/magnitude construction over the unsigned ops the IR
   already has (`srem_eq_bvAbs` proved half the reduction — see the withdrawn U6 entry in
@@ -116,6 +115,9 @@ instance instFact2pow24SP1Prime : Fact (2 ^ 24 < SP1Prime) := ⟨by norm_num [SP
 /-- info: exportable ✓ (33 witness cells) -/
 #guard_msgs in
 #assert_exportable (ShiftLeftChip.circuit (p := SP1Prime))
+/-- info: exportable ✓ (37 witness cells) -/
+#guard_msgs in
+#assert_exportable (ShiftRightChip.circuit (p := SP1Prime))
 
 /-! ## Chips that witness nothing at all -/
 

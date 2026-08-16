@@ -166,11 +166,68 @@ theorem completeness :
     rw [ProvableType.getElem_eval_fields, hpc]
   simp only [circuit_norm] at h_env_a h_env_bmsb h_env_srwmsb h_env_cb h_env_sram h_env_v
   simp only [circuit_norm] at h_env_lo h_env_hi h_env_lr h_env_s h_env_fl
-  simp only [vec4_eval, hbpv_map, ec0] at h_env_a h_env_bmsb h_env_srwmsb h_env_cb h_env_sram h_env_v
-  simp only [vec4_eval, hbpv_map, ec0] at h_env_lo h_env_hi h_env_lr h_env_s
   set B := input_adapter_op_b_memory_prev_value with hB
   set c0 := input_adapter_op_c_memory_prev_value[0] with hc0
   set F := hintFlags env.hint with hF
+  -- Flag facts for the family eval lemmas (the placement block below re-derives its own copies
+  -- over the `set` aliases).
+  have hsum01e : F[0] + F[1] + F[2]
+        + F[3] = 0
+      ∨ F[0] + F[1] + F[2]
+        + F[3] = 1 := by
+    rw [← hsum]; exact hbin
+  obtain ⟨hoe0, hoe1, -, -⟩ := one_hot_resolve F hf0 hf1 hf2 hf3 hsum01e
+  have he14e : F[0] + F[1] = 0
+      ∨ F[0] + F[1] = 1 := by
+    rcases hf0 with h0 | h0
+    · rcases hf1 with h1 | h1
+      · left; rw [h0, h1, add_zero]
+      · right; rw [h0, h1, zero_add]
+    · obtain ⟨h1z, -, -⟩ := hoe0 h0
+      right; rw [h0, h1z, add_zero]
+  have honee : F[1] = 1 → F[3] = 0 :=
+    fun h => (hoe1 h).2.2
+  obtain ⟨hc0v, -, -, -⟩ := Word.lt_cases_of_isU64 hcU
+  -- The witness stream is the exportable IR; the family eval lemmas rewrite each pinned
+  -- obligation to the value-level witness functions.
+  have hAIRa := populateAIR_eval env input_var_adapter_op_b_memory_prev_value
+    input_var_adapter_op_c_memory_prev_value[0] B
+    c0 heb ec0 hbU hc0v hf0 hf1 hf2 hf3 he14e honee hsum01e
+  have hIRbm := bMsbIR_eval env input_var_adapter_op_b_memory_prev_value
+    B heb hbU
+  have hIRsw := srwMsbIR_eval env input_var_adapter_op_b_memory_prev_value
+    input_var_adapter_op_c_memory_prev_value[0] B
+    c0 heb ec0 hbU hc0v hf0 hf1 hf2 hf3 he14e honee hsum01e
+  have hIRcb := ShiftLeftChip.cBitsIR_eval env input_var_adapter_op_c_memory_prev_value[0]
+    c0 ec0 hc0v
+  have hIRsram := sraMsbV0123IR_eval env input_var_adapter_op_b_memory_prev_value
+    input_var_adapter_op_c_memory_prev_value[0] B
+    c0 heb ec0 hbU hc0v
+  have hIRv := vPowersInvIR_eval env input_var_adapter_op_c_memory_prev_value[0]
+    c0 ec0 hc0v
+  have hIRlo := lowerLimbIR_eval env input_var_adapter_op_b_memory_prev_value
+    input_var_adapter_op_c_memory_prev_value[0] B
+    c0 heb ec0 hbU hc0v he14e
+  have hIRhi := higherLimbIR_eval env input_var_adapter_op_b_memory_prev_value
+    input_var_adapter_op_c_memory_prev_value[0] B
+    c0 heb ec0 hbU hc0v he14e
+  have hIRlr := limbResultIR_eval env input_var_adapter_op_b_memory_prev_value
+    input_var_adapter_op_c_memory_prev_value[0] B
+    c0 heb ec0 hbU hc0v he14e
+  have hIRs := shiftU16IR_eval env input_var_adapter_op_c_memory_prev_value[0]
+    c0 ec0 hc0v
+  have hIRfl := flagsIR_eval env input_var_adapter_imm_c
+  simp only [hAIRa] at h_env_a
+  simp only [hIRbm] at h_env_bmsb
+  simp only [hIRsw] at h_env_srwmsb
+  simp only [hIRcb] at h_env_cb
+  simp only [hIRsram] at h_env_sram
+  simp only [hIRv] at h_env_v
+  simp only [hIRlo] at h_env_lo
+  simp only [hIRhi] at h_env_hi
+  simp only [hIRlr] at h_env_lr
+  simp only [hIRs] at h_env_s
+  simp only [hIRfl, himm_eval] at h_env_fl
   have hA0 : env.get i₀ = (populateA B c0 F)[0] := by simpa using h_env_a 0
   have hA1 : env.get (i₀ + 1) = (populateA B c0 F)[1] := by simpa using h_env_a 1
   have hA2 : env.get (i₀ + 2) = (populateA B c0 F)[2] := by simpa using h_env_a 2
