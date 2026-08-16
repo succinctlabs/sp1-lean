@@ -130,6 +130,15 @@ private lemma bvAbs_umod_lt {w : ℕ} {a d : BitVec w} (hd : d.toNat ≠ 0)
   rw [bvAbs_toNat, hm, if_neg Bool.false_ne_true, hum]
   omega
 
+/-- Core's four-case `sdiv`, repackaged on the magnitudes: the msb-XOR chooses the result's
+sign, the inner division is always `|x| / |y|` (the A7 witness-IR reduction's signed-division
+seam, the `srem_eq_bvAbs` twin). -/
+lemma sdiv_eq_bvAbs {w : ℕ} (x y : BitVec w) :
+    x.sdiv y = if x.msb ≠ y.msb then -((bvAbs x) / (bvAbs y)) else (bvAbs x) / (bvAbs y) := by
+  rw [BitVec.sdiv_eq]
+  unfold bvAbs
+  cases hmx : x.msb <;> cases hmy : y.msb <;> simp
+
 /-- Core's four-case `srem`, repackaged on the magnitudes: the dividend's sign chooses the
 result's sign, the inner division is always `|x| % |y|`. -/
 private lemma srem_eq_bvAbs {w : ℕ} (x y : BitVec w) :
