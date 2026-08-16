@@ -423,7 +423,7 @@ private theorem mul_chip_constraints_decompose
         Expression.eval env (input.is_real * (input.is_real - 1)) = 0) := by
   simp only [nativeAssertZeros, MulChip.main,
     Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
+    witnessVectorIR, Witnessable.witness, witnessIR,
     subcircuitWithAssertion, assertion, assertZero,
     Operations.localLength]
   simp only [Operations.constraints_append,
@@ -433,7 +433,6 @@ private theorem mul_chip_constraints_decompose
     constraints_toSubcircuit_formalAssertion,
     GeneralFormalCircuit.toSubcircuit_localLength,
     FormalAssertion.toSubcircuit_localLength,
-    CircuitNormalization.witnessNative_localLength_eq,
     Readers.CPUState.circuit_localLength,
     MulOperation.circuit_localLength,
     Readers.RTypeReader.circuit_localLength,

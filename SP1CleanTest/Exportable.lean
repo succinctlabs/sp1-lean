@@ -17,7 +17,6 @@ its `main` is closure-free, so adding a line is the last step of converting a ch
 loudly if a conversion regresses. The chips *not* listed are not an oversight — they are the
 remaining waves, and each would fail today:
 
-* `Mul` reads `ProverHint` through a Lean closure;
 * `ShiftLeft`, `ShiftRight` build a raw `.witness n (.native …)` prefix;
 * `DivRem` reads its flag hint through a closure and is simply the largest port (30 sites, 217
   cells); its signed division is the sign/magnitude construction over the unsigned ops the IR
@@ -41,6 +40,7 @@ abbrev SP1Prime : ℕ := 2130706433
 
 instance instFactSP1Prime : Fact (Nat.Prime SP1Prime) := ⟨by native_decide⟩
 instance instFact2pow17SP1Prime : Fact (2 ^ 17 < SP1Prime) := ⟨by norm_num [SP1Prime]⟩
+instance instFact2pow24SP1Prime : Fact (2 ^ 24 < SP1Prime) := ⟨by norm_num [SP1Prime]⟩
 
 /-! ## ALU and control flow (waves W1–W2) -/
 
@@ -110,6 +110,9 @@ instance instFact2pow17SP1Prime : Fact (2 ^ 17 < SP1Prime) := ⟨by norm_num [SP
 /-- info: exportable ✓ (20 witness cells) -/
 #guard_msgs in
 #assert_exportable (BranchChip.circuit (p := SP1Prime))
+/-- info: exportable ✓ (54 witness cells) -/
+#guard_msgs in
+#assert_exportable (MulChip.circuit (p := SP1Prime))
 
 /-! ## Chips that witness nothing at all -/
 

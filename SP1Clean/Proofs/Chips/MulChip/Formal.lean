@@ -186,11 +186,16 @@ theorem completeness :
   -- `h_env` bundles the CPUState GFC obligation (discarded), the flags/`cols`/`a` witness-gen
   -- equations, and the trailing `RTypeReader` GFC obligation (discarded).
   obtain ⟨-, h_env_flags, h_env_cols, h_env_a, -⟩ := h_env
-  have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
-  have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using h_env_flags 1
-  have hflag2 : env.get (i₀ + 2) = (hintFlags env.hint)[2] := by simpa using h_env_flags 2
-  have hflag3 : env.get (i₀ + 3) = (hintFlags env.hint)[3] := by simpa using h_env_flags 3
-  have hflag4 : env.get (i₀ + 4) = (hintFlags env.hint)[4] := by simpa using h_env_flags 4
+  have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by
+    rw [← hintFlags_eval_ir env]; simpa using h_env_flags 0
+  have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by
+    rw [← hintFlags_eval_ir env]; simpa using h_env_flags 1
+  have hflag2 : env.get (i₀ + 2) = (hintFlags env.hint)[2] := by
+    rw [← hintFlags_eval_ir env]; simpa using h_env_flags 2
+  have hflag3 : env.get (i₀ + 3) = (hintFlags env.hint)[3] := by
+    rw [← hintFlags_eval_ir env]; simpa using h_env_flags 3
+  have hflag4 : env.get (i₀ + 4) = (hintFlags env.hint)[4] := by
+    rw [← hintFlags_eval_ir env]; simpa using h_env_flags 4
   have hf0' : env.get i₀ = 0 ∨ env.get i₀ = 1 := by rw [hflag0]; exact hf0
   have hf1' : env.get (i₀ + 1) = 0 ∨ env.get (i₀ + 1) = 1 := by rw [hflag1]; exact hf1
   have hf2' : env.get (i₀ + 2) = 0 ∨ env.get (i₀ + 2) = 1 := by rw [hflag2]; exact hf2
@@ -210,23 +215,50 @@ theorem completeness :
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have hbool : ∀ x : ZMod p, x = 0 ∨ x = 1 → x * (x - 1) = 0 := by
     rintro x (h | h) <;> rw [h] <;> simp
-  -- fold the witness hint's `populate` operands to the evaluated input words
-  simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval] at h_env_cols
-  -- Ascribe `h_env_cols`'s IR-native RHS into the plain `toElements (populate …)` form via a
-  -- *definitional* `have` (the CHEAP reduction), then fold the prev-value operands via `hob`/`hoc` —
-  -- the 4.31 `combinedSize'`/`nativeValue` fix (`docs/proposals/consolidation-progress.md`, "PATTERN
-  -- FULLY PROVEN"). One reusable per-index fact serves both the `Spec` conversion below and the
-  -- `RegisterWrite` `isU64` bullet's `product`/`product_msb` reads.
+  -- One-hot bound for the two signed-variant flags (`is_mulh`/`is_mulhsu`): the five-flag sum is
+  -- `{0,1}`-bounded, so their `val`-sum is at most one (the `populateFE_eval` sign-selector premise).
+  have hsum13 : (env.get (i₀ + 1)).val + (env.get (i₀ + 3)).val ≤ 1 := by
+    have hp := Fact.out (p := 2 ^ 24 < p)
+    have v0 : (env.get i₀).val ≤ 1 := by rcases hf0' with h | h <;> simp [h, ZMod.val_one]
+    have v1 : (env.get (i₀ + 1)).val ≤ 1 := by rcases hf1' with h | h <;> simp [h, ZMod.val_one]
+    have v2 : (env.get (i₀ + 2)).val ≤ 1 := by rcases hf2' with h | h <;> simp [h, ZMod.val_one]
+    have v3 : (env.get (i₀ + 3)).val ≤ 1 := by rcases hf3' with h | h <;> simp [h, ZMod.val_one]
+    have v4 : (env.get (i₀ + 4)).val ≤ 1 := by rcases hf4' with h | h <;> simp [h, ZMod.val_one]
+    have hcast : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3)
+        + env.get (i₀ + 4)
+        = (((env.get i₀).val + (env.get (i₀ + 1)).val + (env.get (i₀ + 2)).val
+            + (env.get (i₀ + 3)).val + (env.get (i₀ + 4)).val : ℕ) : ZMod p) := by
+      push_cast [ZMod.natCast_zmod_val]; ring
+    have hlt : (env.get i₀).val + (env.get (i₀ + 1)).val + (env.get (i₀ + 2)).val
+        + (env.get (i₀ + 3)).val + (env.get (i₀ + 4)).val < p := by omega
+    rcases hsum01' with h | h
+    · rw [hcast] at h
+      have hv := congrArg ZMod.val h
+      rw [ZMod.val_natCast_of_lt hlt, ZMod.val_zero] at hv
+      omega
+    · rw [hcast] at h
+      have hv := congrArg ZMod.val h
+      rw [ZMod.val_natCast_of_lt hlt, ZMod.val_one] at hv
+      omega
+  -- fold the witness stream's `populateFE` operands to the evaluated input words
+  simp only [Inputs.op_b_val, Inputs.op_c_val] at h_env_cols
+  -- The witness stream is the `populateFE` IR; `populateFE_eval_cell` evaluates each pinned cell to
+  -- the value-level `populate` at the evaluated operands. One reusable per-index fact serves both
+  -- the `Spec` conversion below and the `RegisterWrite` `isU64` bullet's `product`/`product_msb`
+  -- reads.
   have h_env_cols' : ∀ (i : ℕ) (hi : i < 45), env.toEnvironment.get (i₀ + 5 + i)
       = (toElements (MulOperation.populate input_adapter_op_b_memory_prev_value
           input_adapter_op_c_memory_prev_value
           (env.get (i₀ + 1)) (env.get (i₀ + 3)) (env.get (i₀ + 4))))[i]'hi := fun i hi => by
-    have hc : env.toEnvironment.get (i₀ + 5 + i)
-        = (toElements (MulOperation.populate
-            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value)
-            (Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value)
-            (env.get (i₀ + 1)) (env.get (i₀ + 3)) (env.get (i₀ + 4))))[i]'hi := h_env_cols ⟨i, hi⟩
-    rwa [hob, hoc] at hc
+    refine (h_env_cols ⟨i, hi⟩).trans ?_
+    have hcell := MulOperation.populateFE_eval_cell env
+      input_var_adapter_op_b_memory_prev_value input_var_adapter_op_c_memory_prev_value
+      (var { index := i₀ + 1 }) (var { index := i₀ + 3 }) (var { index := i₀ + 4 })
+      input_adapter_op_b_memory_prev_value input_adapter_op_c_memory_prev_value
+      (env.get (i₀ + 1)) (env.get (i₀ + 3)) (env.get (i₀ + 4))
+      ((vec4_eval env.toEnvironment _).trans hob) ((vec4_eval env.toEnvironment _).trans hoc)
+      rfl rfl rfl hbU hcU hf1' hf3' hsum13 i hi
+    exact hcell
   -- The full witnessed-`cols` struct equals `populate …` (per-cell, via `getElem_toElements_eval_
   -- varFromOffset` + `h_env_cols'`) — reused both by the `Spec` conversion below and by the
   -- `RegisterWrite` `isU64` bullet's `product`/`product_msb` field reads (sidesteps any manual
@@ -239,10 +271,10 @@ theorem completeness :
       (getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 5) i hi).trans (h_env_cols' i hi))
   refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨hsum01', hmw', hf0', hf1', hf2', hf3', hf4', hsum01'⟩, ?_⟩,
-    by rw [sub_eq_zero.mpr (by simpa using h_env_a 0), mul_zero],
-    by rw [sub_eq_zero.mpr (by simpa using h_env_a 1), mul_zero],
-    by rw [sub_eq_zero.mpr (by simpa using h_env_a 2), mul_zero],
-    by rw [sub_eq_zero.mpr (by simpa using h_env_a 3), mul_zero],
+    by rw [sub_eq_zero.mpr (by simpa [circuit_norm] using h_env_a 0), mul_zero],
+    by rw [sub_eq_zero.mpr (by simpa [circuit_norm] using h_env_a 1), mul_zero],
+    by rw [sub_eq_zero.mpr (by simpa [circuit_norm] using h_env_a 2), mul_zero],
+    by rw [sub_eq_zero.mpr (by simpa [circuit_norm] using h_env_a 3), mul_zero],
     hbool _ hf0', hbool _ hf1', hbool _ hf2', hbool _ hf3', hbool _ hf4', hbool _ hsum01',
     hop_a_0,
     ⟨⟨hbin, hbin, h_clk⟩,
@@ -405,7 +437,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       -- State and Memory branches then share one descent through the composed children.
       rotate_left 2
       · simp only [main, Circuit.operations, Circuit.bind_def,
-          Circuit.pure_def, witnessVectorNative, witnessNative, subcircuitWithAssertion,
+          Circuit.pure_def, witnessVectorIR, Witnessable.witness, witnessIR,
+          subcircuitWithAssertion,
           assertion, assertZero, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
           InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
@@ -422,7 +455,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
           not_false_eq_true, Operations.interactionsWith_assert,
           Operations.interactionsWith_nil, List.map_cons, List.map_nil, List.nil_append,
           Soundness.rTypeProgramMessage, exposedOpcode]
-        simp only [circuit_norm, List.nil_append]
+        simp only [circuit_norm]
       all_goals
         simp only [main, Readers.CPUState.circuit, Readers.CPUState.main,
           Readers.RTypeReader.circuit, Readers.RTypeReader.main,

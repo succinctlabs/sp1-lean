@@ -1,5 +1,7 @@
 import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Native.Operations.MulOperation
+import SP1Clean.Native.Witgen.HintFlags
+import ToClean.Circuit.WitnessCombinator
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
@@ -33,6 +35,19 @@ padding). Falls back to all-zero when the key is absent. -/
 def hintFlags (h : ProverHint (ZMod p)) : Vector (ZMod p) 5 :=
   ((h "mul_flags" 5)[0]?).getD #v[0, 0, 0, 0, 0]
 
+omit [Fact (2 ^ 24 < p)] in
+/-- The flag accessor is literally the `hintFlagsIR` evaluation (`hintGet`'s zero default IS the
+`.getD` fallback), in the `Witgen.eval` normal form the completeness seam arrives in. -/
+lemma hintFlags_eval_ir (env : ProverEnvironment (ZMod p)) :
+    Witgen.eval (M := fields 5) { env := env } (hintFlagsIR (ZMod p) "mul_flags" 5)
+      = hintFlags env.hint := by
+  have hdefault : (default : Vector (ZMod p) 5) = #v[0, 0, 0, 0, 0] := rfl
+  rw [hintFlags, ← hdefault]
+  apply Vector.ext
+  intro i hi
+  rw [Witgen.eval_fields', Vector.getElem_map]
+  interval_cases i <;> simp only [hintFlagsIR, Vector.getElem_ofFn, circuit_norm]
+
 /-- The literal meaning of SP1's `MulCols.asserts` own (inline) assertZero tail
 (`Extracted/ChipOracle/Mul.lean` `E5,E7,E9,E11,E13,E15,op_a_0`): the five variant-flag booleans (in SP1's
 extraction order), the flag-sum boolean, and `op_a_0 = 0`. The schoolbook arithmetic belongs to
@@ -58,17 +73,15 @@ Witnesses result word `a` and the five variant flags; gates `is_real`; assembles
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let flags ← witnessVectorNative 5 (fun env => hintFlags env.hint)
+  let flags ← witnessVectorIR 5 (.ofFExprs (hintFlagsIR (ZMod p) "mul_flags" 5))
   let is_mul := flags[0]; let is_mulh := flags[1]; let is_mulhu := flags[2]
   let is_mulhsu := flags[3]; let is_mulw := flags[4]
-  -- The chip witnesses the `MulOperation` column struct via `populate` (conformance-checked in
+  -- The chip witnesses the `MulOperation` column struct via the exportable IR twin `populateFE`
+  -- (evaluating to `populate` — `MulOperation.populateFE_eval`; conformance-checked in
   -- `WitnessTests/MulOperationWitness.lean`), then composes `MulOperation.circuit` as a Clean
   -- `assertion`. `populate` takes `(b, c, is_mulh, is_mulhsu, is_mulw)`.
-  let cols ← witnessNative (var := Var Extracted.MulOperation) (fun env =>
-    MulOperation.populate
-      #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
-      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]
-      (env is_mulh) (env is_mulhsu) (env is_mulw))
+  let cols ← witness (var := Var Extracted.MulOperation)
+    (MulOperation.populateFE input.op_b_val input.op_c_val is_mulh is_mulhsu is_mulw)
   -- Gate `MulOperation` by the flag-sum (`alu/mul/mod.rs:234`): `is_mulw = 1 → sum = 1`.
   assertion MulOperation.circuit
     ⟨input.op_b_val, input.op_c_val, cols, is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw,
@@ -90,7 +103,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   let s3 : Expression (ZMod p) := is_mul * (cols.product[6] + cols.product[7] * c256)
     + (is_mulh + is_mulhu + is_mulhsu) * (cols.product[14] + cols.product[15] * c256)
     + is_mulw * (cols.product_msb.msb * c65535)
-  let a ← witnessVectorNative 4 (fun env => #v[env s0, env s1, env s2, env s3])
+  let a ← witnessVectorIR 4 (.ofExprs #v[s0, s1, s2, s3])
   -- Rust gates each result-placement equation by an opcode selector.  Since `is_real` is the
   -- one-hot selector sum, gating the four combined equations by `is_real` is extensionally
   -- equivalent on active rows and, critically, leaves `a` unconstrained on padding rows just as
@@ -211,5 +224,26 @@ def rTypeReaderInput (input : Var Inputs (ZMod p)) (offset : ℕ) :
          is_mulw := Eval.eval env cols.is_mulw } :
         Columns F) := by
   rw [ProvableStruct.eval_eq_eval]; rfl
+
+/-! ### Operand words, in `circuit_norm`'s own orientation (the `AddChip/Defs.lean` pattern) —
+the `ComputableWitnesses` proof projects the struct-level input agreement onto these. -/
+
+@[circuit_norm] theorem eval_opBVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_b_val
+      = Vector.map (Expression.eval env) input.op_b_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_b_val, eval_inputs, Readers.RTypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_c_val
+      = Vector.map (Expression.eval env) input.op_c_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_c_val, eval_inputs, Readers.RTypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
 
 end SP1Clean.MulChip

@@ -98,6 +98,7 @@ import SP1Clean.Native.Chips.MulChip.Defs
 import SP1Clean.Proofs.Chips.MulChip.Formal
 import SP1Clean.Proofs.Chips.MulChip.Contracts
 import SP1Clean.Proofs.Chips.MulChip.Structural
+import SP1Clean.Proofs.Chips.MulChip.Witgen
 import SP1Clean.Proofs.Chips.AluX0Chip.Bridge
 import SP1Clean.Native.Chips.AluX0Chip.Defs
 import SP1Clean.Proofs.Chips.AluX0Chip.Formal

@@ -181,7 +181,18 @@ Add (vector) and Bitwise (struct + first `hintGet`) pilots:
    `_congr`/`_flat` lemma fed by `eval_opBVal`-style operand projections (add them to the chip
    `Defs.lean` if missing — the `circuit_norm`-orientation block from `AddChip/Defs.lean`) and, for
    same-row earlier cells (the opcode built from flag cells), `h_agree.get_eq (by omega)`.
-9. **Last step**: the `#assert_exportable` line in `SP1CleanTest/Exportable.lean` with the
+9. **Deep-arithmetic towers** (the Mul lessons — the 45-cell schoolbook chain): mirror a value-level
+   *recursion* (`MulCarryChain.chainM`) with an authoring-time IR recursion (`chainF`) of the same
+   shape, so the eval lemma is one induction (with the chain bound threaded as a *scoped* hypothesis
+   `∀ i ≤ n, cp i ≤ cpBound` — the global form is false past limb 15); `omega` cannot multiply
+   variable bounds, so feed products explicitly via `Nat.mul_le_mul`. In the assembly, never let
+   `exact` unify through `Vector.ofFn` at a literal index (a whnf-through-recursion timeout) —
+   rewrite the cell with the navigator, then `simp only [populateFE, populate, Vector.getElem_ofFn]`
+   and close with the prebuilt per-cell fact. A `.ofExprs` site (Mul's result word — witnessed
+   *expressions* over earlier same-row cells) needs no bespoke congr: in CW, `apply Vector.ext` then
+   `simp only [Witgen.WitgenIR.getElem_eval_ofExprs]` per cell and chain `h_agree.get_eq (by omega)`
+   rewrites, one per distinct cell read.
+10. **Last step**: the `#assert_exportable` line in `SP1CleanTest/Exportable.lean` with the
    `#guard_msgs`-pinned cell count, the root-index import for the new `Witgen.lean`, and the
    standing gates — the chip's **trace anchor must pass unmodified** (the `native_decide`
    byte-for-byte re-derivation through the new IR path is the semantic gate on the whole swap).

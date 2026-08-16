@@ -310,7 +310,7 @@ theorem MulChip.mainSelectorBinary :
   have gateMem : input.is_real * (input.is_real - 1) ∈
       ((MulChip.main input).operations offset).shallowConstraints := by
     simp only [MulChip.main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+      subcircuitWithAssertion, assertion, assertZero,
       Operations.localLength, Operations.shallowConstraints, List.mem_cons, List.not_mem_nil,
       or_false, circuit_norm]
   have gateZero :=
