@@ -87,4 +87,43 @@ theorem iteFE_congr (ctx ctx' : Ctx F) (c : BExpr F) (x y : M (FExpr F))
     Witgen.eval ctx (iteFE c x y) = Witgen.eval ctx' (iteFE c x y) := by
   rw [eval_iteFE, eval_iteFE, hc, hx, hy]
 
+/-! ### Congruence transport between the flattened site and the struct payload
+
+`ComputableWitnesses` obligations arrive at the flattened `WitgenIR.ofFExprs` level while the
+struct combinators above conclude at the `Witgen.eval` level; these three bridges move
+congruences between the two without ever unfolding a `toElements` tower. -/
+
+/-- Cell-level congruence from a site-level `ofFExprs` congruence. -/
+theorem cell_congr_of_ofFExprs_congr {n : ℕ} {v : Vector (FExpr F) n}
+    {env env' : ProverEnvironment F}
+    (h : (WitgenIR.ofFExprs v).eval env = (WitgenIR.ofFExprs v).eval env')
+    (i : ℕ) (hi : i < n) :
+    v[i].eval { env := env } = v[i].eval { env := env' } := by
+  rw [← WitgenIR.getElem_eval_ofFExprs v env i hi,
+    ← WitgenIR.getElem_eval_ofFExprs v env' i hi, h]
+
+/-- Struct-level congruence from the flattened site congruence. -/
+theorem structEval_congr_of_ofFExprs_congr {x : M (FExpr F)}
+    {env env' : ProverEnvironment F}
+    (h : (WitgenIR.ofFExprs (toElements x)).eval env
+      = (WitgenIR.ofFExprs (toElements x)).eval env') :
+    Witgen.eval { env := env } x = Witgen.eval { env := env' } x := by
+  rw [← ProvableType.fromElements_toElements (Witgen.eval { env := env } x),
+    ← ProvableType.fromElements_toElements (Witgen.eval { env := env' } x)]
+  refine congrArg fromElements (Vector.ext fun i hi => ?_)
+  rw [← getElem_eval_toElements { env := env } x i hi,
+    ← getElem_eval_toElements { env := env' } x i hi]
+  exact cell_congr_of_ofFExprs_congr h i hi
+
+/-- Flattened site congruence from the struct-level congruence. -/
+theorem ofFExprs_congr_of_structEval_congr {x : M (FExpr F)}
+    {env env' : ProverEnvironment F}
+    (h : Witgen.eval { env := env } x = Witgen.eval { env := env' } x) :
+    (WitgenIR.ofFExprs (toElements x)).eval env
+      = (WitgenIR.ofFExprs (toElements x)).eval env' := by
+  refine Vector.ext fun i hi => ?_
+  rw [WitgenIR.getElem_eval_ofFExprs _ _ i hi, WitgenIR.getElem_eval_ofFExprs _ _ i hi,
+    getElem_eval_toElements { env := env } x i hi,
+    getElem_eval_toElements { env := env' } x i hi, h]
+
 end Witgen

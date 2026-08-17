@@ -629,6 +629,104 @@ theorem quotMsbCongr :
       circuit_norm, -Witgen.u64Wrap, hB0, hB1, hB2, hB3, hC0, hC1, hC2, hC3, hir, hhint]
 
 omit [Fact (2 ^ 24 < p)] in
+include hB hC hir hhint in
+/-- Environment-locality of the `c_times_quotient_lower` struct site (compositional: the gate
+condition plus the flat `MulOperation` battery, transported through the A7c bridges). -/
+theorem mulLowerCongr :
+    (Witgen.WitgenIR.ofFExprs (toElements (mulLowerFE ir B C))).eval env
+      = (Witgen.WitgenIR.ofFExprs (toElements (mulLowerFE ir B C))).eval env' := by
+  have hq := Witgen.cell_congr_of_ofFExprs_congr
+    (quotCompCongr env env' B C ir hB hC hir hhint)
+  have hc := Witgen.cell_congr_of_ofFExprs_congr (cCongr env env' B C ir hB hC hir hhint)
+  refine Witgen.ofFExprs_congr_of_structEval_congr
+    (Witgen.gateFE_congr _ _ _ _ ?_ (Witgen.structEval_congr_of_ofFExprs_congr
+      (MulOperation.populateFEW_congr_flat env env' _ _ _ _ _ hq hc ?_ ?_ ?_))) <;>
+  (simp only [circuit_norm, -Witgen.u64Wrap, hir]; all_goals exact decide_eq_decide.mpr Iff.rfl)
+
+omit [Fact (2 ^ 24 < p)] in
+include hB hC hir hhint in
+/-- Environment-locality of the `c_times_quotient_upper` struct site. -/
+theorem mulUpperCongr :
+    (Witgen.WitgenIR.ofFExprs (toElements (mulUpperFE ir B C))).eval env
+      = (Witgen.WitgenIR.ofFExprs (toElements (mulUpperFE ir B C))).eval env' := by
+  have hq := Witgen.cell_congr_of_ofFExprs_congr
+    (quotCompCongr env env' B C ir hB hC hir hhint)
+  have hc := Witgen.cell_congr_of_ofFExprs_congr (cCongr env env' B C ir hB hC hir hhint)
+  refine Witgen.ofFExprs_congr_of_structEval_congr
+    (Witgen.gateFE_congr _ _ _ _ ?_ (Witgen.structEval_congr_of_ofFExprs_congr
+      (MulOperation.populateFEW_congr_flat env env' _ _ _ _ _ hq hc ?_ ?_ ?_))) <;>
+  (simp only [longSumF, flagF, hintF, circuit_norm, -Witgen.u64Wrap, hir, hhint]
+   all_goals (congr 1; exact decide_eq_decide.mpr Iff.rfl))
+
+omit [Fact (2 ^ 24 < p)] in
+include hB hir hhint in
+/-- Environment-locality of the flattened `is_overflow_b` struct site. -/
+theorem ovbCongr :
+    (Witgen.WitgenIR.ofFExprs ((toElements (ovbFE ir B)).cast
+        (show size Extracted.IsEqualWordOperation = 11 from rfl))).eval env
+      = (Witgen.WitgenIR.ofFExprs ((toElements (ovbFE ir B)).cast
+        (show size Extracted.IsEqualWordOperation = 11 from rfl))).eval env' := by
+  have hB0 := hB 0 (by omega); have hB1 := hB 1 (by omega)
+  have hB2 := hB 2 (by omega); have hB3 := hB 3 (by omega)
+  have hstruct : Witgen.eval { env := env } (ovbFE ir B)
+      = Witgen.eval { env := env' } (ovbFE ir B) := by
+    refine Witgen.gateFE_congr _ _ _ _ ?_ (Witgen.iteFE_congr _ _ _ _ _ ?_
+      (IsEqualWordOperation.populateFE_congr env env' _ _
+        (by intro i hi; interval_cases i <;>
+          simp only [circuit_norm, -Witgen.u64Wrap, hB0, hB1])
+        (by intro i hi; interval_cases i <;>
+          simp only [circuit_norm, -Witgen.u64Wrap]))
+      (IsEqualWordOperation.populateFE_congr env env' _ _
+        (by intro i hi; interval_cases i <;>
+          simp only [circuit_norm, -Witgen.u64Wrap, hB0, hB1, hB2, hB3])
+        (by intro i hi; interval_cases i <;>
+          simp only [circuit_norm, -Witgen.u64Wrap]))) <;>
+    (simp only [wSumF, flagF, hintF, circuit_norm, -Witgen.u64Wrap, hir, hhint]; all_goals exact decide_eq_decide.mpr Iff.rfl)
+  apply Vector.ext
+  intro i hi
+  have hsz : i < size Extracted.IsEqualWordOperation := by
+    have h : size Extracted.IsEqualWordOperation = 11 := rfl
+    omega
+  simp only [Witgen.WitgenIR.getElem_eval_ofFExprs, Vector.getElem_cast]
+  exact (Witgen.getElem_eval_toElements _ _ i hsz).trans
+    ((congrArg (fun s => (toElements s)[i]'hsz) hstruct).trans
+      (Witgen.getElem_eval_toElements _ _ i hsz).symm)
+
+omit [Fact (2 ^ 24 < p)] in
+include hC hir hhint in
+/-- Environment-locality of the flattened `is_overflow_c` struct site. -/
+theorem ovcCongr :
+    (Witgen.WitgenIR.ofFExprs ((toElements (ovcFE ir C)).cast
+        (show size Extracted.IsEqualWordOperation = 11 from rfl))).eval env
+      = (Witgen.WitgenIR.ofFExprs ((toElements (ovcFE ir C)).cast
+        (show size Extracted.IsEqualWordOperation = 11 from rfl))).eval env' := by
+  have hC0 := hC 0 (by omega); have hC1 := hC 1 (by omega)
+  have hC2 := hC 2 (by omega); have hC3 := hC 3 (by omega)
+  have hstruct : Witgen.eval { env := env } (ovcFE ir C)
+      = Witgen.eval { env := env' } (ovcFE ir C) := by
+    refine Witgen.gateFE_congr _ _ _ _ ?_ (Witgen.iteFE_congr _ _ _ _ _ ?_
+      (IsEqualWordOperation.populateFE_congr env env' _ _
+        (by intro i hi; interval_cases i <;>
+          simp only [circuit_norm, -Witgen.u64Wrap, hC0, hC1])
+        (by intro i hi; interval_cases i <;>
+          simp only [circuit_norm, -Witgen.u64Wrap]))
+      (IsEqualWordOperation.populateFE_congr env env' _ _
+        (by intro i hi; interval_cases i <;>
+          simp only [circuit_norm, -Witgen.u64Wrap, hC0, hC1, hC2, hC3])
+        (by intro i hi; interval_cases i <;>
+          simp only [circuit_norm, -Witgen.u64Wrap]))) <;>
+    (simp only [wSumF, flagF, hintF, circuit_norm, -Witgen.u64Wrap, hir, hhint]; all_goals exact decide_eq_decide.mpr Iff.rfl)
+  apply Vector.ext
+  intro i hi
+  have hsz : i < size Extracted.IsEqualWordOperation := by
+    have h : size Extracted.IsEqualWordOperation = 11 := rfl
+    omega
+  simp only [Witgen.WitgenIR.getElem_eval_ofFExprs, Vector.getElem_cast]
+  exact (Witgen.getElem_eval_toElements _ _ i hsz).trans
+    ((congrArg (fun s => (toElements s)[i]'hsz) hstruct).trans
+      (Witgen.getElem_eval_toElements _ _ i hsz).symm)
+
+omit [Fact (2 ^ 24 < p)] in
 include hB hC hhint in
 /-- Environment-locality of the committed-operand product arguments (the `carry` chain's two
 `u64` inputs, congruence-instantiated once). -/
