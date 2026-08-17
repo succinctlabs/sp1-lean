@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 description = "Reference interpreter for the Lean-exported witness-generation IR (see docs/witgen-wire-format.md)"
 
-# Deliberately dependency-light: the crate consumes only the wire format, never SP1 types.
-# serde/serde_json land with the parser (wave D4).
+# Deliberately dependency-light: the crate consumes only the wire format, never SP1
+# types. serde_json is used at the Value level only (the wire's type tags collide
+# across expression sorts, so parsing is sort-directed by hand — no derive).
 [dependencies]
+serde_json = "1"

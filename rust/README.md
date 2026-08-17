@@ -24,14 +24,23 @@ not a trusted component — its value is demonstrating that the exported artifac
 sufficient to reproduce SP1's real traces, which is the load-bearing step toward SP1
 consuming the verified witness generators directly (see `docs/rust-integration-memo.md`).
 
-## Building
+## Building and running
 
-Plain cargo, no workspace:
+Plain cargo, no workspace. The full battery (unit tests for every documented semantics
+trap + the differential over all committed fixtures):
 
 ```
 cd rust/witgen-interp && cargo test
 ```
 
-`scripts/run_interp_diff.sh` wraps the differential run against the checked-in exports and
-fixtures. Cargo is deliberately **not** part of the Lean CI; run the script manually after
-regenerating exports or fixtures.
+Or from the repo root, the differential alone (575 fixture rows across 25 chips):
+
+```
+scripts/run_interp_diff.sh                    # against the committed export/
+scripts/run_interp_diff.sh --regen            # re-verify the export first (needs lake build SP1CleanTest)
+scripts/run_interp_diff.sh --chip Add --verbose   # one chip, per-op cell values
+```
+
+A mismatch fails loudly with the chip, fixture row, cell index, and the witness
+operation that produced the cell. Cargo is deliberately **not** part of the Lean CI;
+run the script manually after regenerating exports or fixtures.
