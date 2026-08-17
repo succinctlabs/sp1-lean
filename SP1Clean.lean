@@ -43,6 +43,7 @@ import SP1Clean.Proofs.Chips.DivRemChip.Soundness
 import SP1Clean.Proofs.Chips.DivRemChip.Populate
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Abs
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Bounds
+import SP1Clean.Proofs.Chips.DivRemChip.Populate.Congr
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Euclid
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.FE
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Glue
