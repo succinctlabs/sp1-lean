@@ -101,8 +101,9 @@ pub enum Step {
     U64(U64Expr),
 }
 
-/// One flattened operation. Only `Witness` is evaluated; the rest are carried so the
-/// artifact describes the whole chip.
+/// One flattened operation. `Witness` drives witness generation; `Assert` (the
+/// constraint `expr = 0`) and `Interact` are carried with their bodies so a consumer
+/// can check constraints and derive bus/lookup multiplicities from the same artifact.
 #[derive(Debug, Clone)]
 pub enum Op {
     Witness {
@@ -110,9 +111,13 @@ pub enum Op {
         steps: Vec<Step>,
         output: VExpr,
     },
-    Assert,
+    Assert(Expr),
     Lookup,
-    Interact,
+    Interact {
+        channel: String,
+        multiplicity: Expr,
+        message: Vec<Expr>,
+    },
 }
 
 /// A parsed `<Chip>.witgen.json` payload.
@@ -408,15 +413,66 @@ pub fn parse_program(v: &Value) -> PResult<Program> {
                 steps,
                 output,
             });
-        } else if om.contains_key("assert") {
-            ops.push(Op::Assert);
+        } else if let Some(av) = om.get("assert") {
+            ops.push(Op::Assert(parse_expr(av, &format!("{path}.assert"))?));
         } else if om.contains_key("lookup") {
             ops.push(Op::Lookup);
-        } else if om.contains_key("interact") {
-            ops.push(Op::Interact);
+        } else if let Some(iv) = om.get("interact") {
+            let im = obj(iv, &format!("{path}.interact"))?;
+            let channel = get(im, "channel", &format!("{path}.interact"))?
+                .as_str()
+                .ok_or_else(|| format!("{path}.interact.channel: expected string"))?
+                .to_string();
+            let multiplicity = parse_expr(
+                get(im, "multiplicity", &format!("{path}.interact"))?,
+                &format!("{path}.interact.multiplicity"),
+            )?;
+            let msg_v = get(im, "message", &format!("{path}.interact"))?
+                .as_array()
+                .ok_or_else(|| format!("{path}.interact.message: expected array"))?;
+            let mut message = Vec::with_capacity(msg_v.len());
+            for (j, e) in msg_v.iter().enumerate() {
+                message.push(parse_expr(e, &format!("{path}.interact.message[{j}]"))?);
+            }
+            ops.push(Op::Interact {
+                channel,
+                multiplicity,
+                message,
+            });
         } else {
             return Err(format!("{path}: unknown operation form"));
         }
     }
     Ok(Program { local_length, ops })
+}
+
+/// A parsed `<Chip>.rowmap.json`: the complete symbolic Rust row (the circuit output
+/// pushed through the audited native→Rust layout map), one `Expression` per column.
+#[derive(Debug, Clone)]
+pub struct RowMap {
+    pub rust_width: usize,
+    pub row: Vec<Expr>,
+}
+
+pub fn parse_row_map(v: &Value) -> PResult<RowMap> {
+    let m = obj(v, "$")?;
+    let version = num(get(m, "wireVersion", "$")?, "$.wireVersion")?;
+    if version != 1 {
+        return Err(format!("$.wireVersion: unsupported wire version {version}"));
+    }
+    let rust_width = idx(get(m, "rustWidth", "$")?, "$.rustWidth")?;
+    let row_v = get(m, "row", "$")?
+        .as_array()
+        .ok_or_else(|| "$.row: expected array".to_string())?;
+    if row_v.len() != rust_width {
+        return Err(format!(
+            "$.row: length {} != rustWidth {rust_width}",
+            row_v.len()
+        ));
+    }
+    let mut row = Vec::with_capacity(row_v.len());
+    for (i, e) in row_v.iter().enumerate() {
+        row.push(parse_expr(e, &format!("row[{i}]"))?);
+    }
+    Ok(RowMap { rust_width, row })
 }

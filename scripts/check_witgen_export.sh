@@ -56,10 +56,12 @@ if not os.path.isdir(d):
 files = sorted(os.listdir(d))
 payloads = [f for f in files if f.endswith(".witgen.json")]
 manifests = [f for f in files if f.endswith(".manifest.json")]
+rowmaps = [f for f in files if f.endswith(".rowmap.json")]
 if len(payloads) != 25: err(f"expected 25 *.witgen.json, found {len(payloads)}")
 if len(manifests) != 25: err(f"expected 25 *.manifest.json, found {len(manifests)}")
+if len(rowmaps) != 25: err(f"expected 25 *.rowmap.json, found {len(rowmaps)}")
 if "index.json" not in files: err("index.json missing")
-extras = set(files) - set(payloads) - set(manifests) - {"index.json"}
+extras = set(files) - set(payloads) - set(manifests) - set(rowmaps) - {"index.json"}
 if extras: err(f"unexpected files: {sorted(extras)}")
 def load(name):
     path = os.path.join(d, name)
@@ -69,7 +71,7 @@ def load(name):
         return json.loads(raw)
     except Exception as e:
         err(f"{name}: parse error: {e}"); return None
-data = {name: load(name) for name in payloads + manifests + (["index.json"] if "index.json" in files else [])}
+data = {name: load(name) for name in payloads + manifests + rowmaps + (["index.json"] if "index.json" in files else [])}
 for p in payloads:
     stem = p[:-len(".witgen.json")]
     pj = data.get(p); mj = data.get(f"{stem}.manifest.json")
@@ -83,6 +85,15 @@ for p in payloads:
     if mj.get("witgenFile") != p: err(f"{stem}.manifest.json: witgenFile mismatch")
     if mj.get("localLength") != pj.get("localLength"):
         err(f"{stem}: manifest localLength {mj.get('localLength')} != payload {pj.get('localLength')}")
+for f in rowmaps:
+    stem = f[:-len(".rowmap.json")]
+    rj = data.get(f)
+    if rj is None: continue
+    if rj.get("wireVersion") != 1: err(f"{f}: wireVersion != 1")
+    if rj.get("name") != stem: err(f"{f}: name != file stem")
+    row = rj.get("row")
+    if not isinstance(row, list) or rj.get("rustWidth") != len(row):
+        err(f"{f}: rustWidth != len(row)")
 idx = data.get("index.json")
 if idx is not None:
     if idx.get("wireVersion") != 1: err("index.json: wireVersion != 1")

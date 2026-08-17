@@ -185,6 +185,26 @@ lake build SP1CleanTest.Exportable
 scripts/check_witgen_export.sh --regen --update   # inspect and commit the delta
 ```
 
+## Row maps (`export/witgen/<Chip>.rowmap.json`)
+
+The payload generates witness *cells*; a full trace **row** is the circuit's output
+struct pushed through the audited native→Rust layout map (`ChipFaithful`'s
+`reconfigure`). Those maps are fully polymorphic struct re-wirings, so applying them at
+the `Expression` level yields the complete symbolic Rust row, exported per chip as:
+
+```json
+{"wireVersion": 1, "name": "Add", "rustWidth": 33,
+ "row": [{"type": "var", "index": 1}, ..., <Expression>]}
+```
+
+one `Expression` (over absolute cell indices) per Rust column. Evaluating `row` after
+the witgen pass reproduces the chip's SP1 trace row exactly — the reference interpreter
+does this and checks it against every fixture `expectedRow`. With the payload's
+`assert` operations (each the constraint `expr = 0`, checkable on the completed cells)
+and `interact` operations (bus multiplicities/messages, evaluable per row for
+dependency accounting), the three artifacts together contain everything needed to
+generate and self-check complete SP1 trace rows.
+
 ## Differential fixtures (`export/testdata/<Chip>.trace.json`)
 
 The same writer's `--testdata` mode produces per-chip differential fixtures for external

@@ -3,16 +3,64 @@
 //! `expectedWitness`. Mismatch reports name the chip, row, cell, and the witness
 //! operation that produced the cell.
 
-use crate::eval::{witgen, OpSpan, Tables};
+use crate::eval::{eval_expr, witgen, Ctx, OpSpan, Tables};
 use crate::field::Field;
-use crate::wire::{parse_program, Program};
+use crate::wire::{parse_program, parse_row_map, Op, Program, RowMap};
 use serde_json::Value;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 pub struct ChipReport {
     pub chip: String,
     pub rows: usize,
+    /// Rows carrying `anchored: true` (SP1-derived), on which constraints were checked.
+    pub anchored_rows: usize,
+    /// Rows whose full Rust row (`expectedRow`) was reconstructed and compared.
+    pub row_checked: usize,
+    /// `assert` operations in the payload (each checked = 0 on every anchored row).
+    pub constraint_ops: usize,
+    /// Total interaction sends (nonzero multiplicity) per channel over anchored rows.
+    pub interaction_sends: BTreeMap<String, u64>,
     pub failures: Vec<String>,
+}
+
+/// Public JSON reader for sibling modules (the bench path).
+pub fn read_json_pub(path: &Path) -> Result<Value, String> {
+    read_json(path)
+}
+
+/// The pre-parsed `(inputs, hints)` of every fixture row (the bench path).
+pub fn fixture_rows<F: Field>(
+    export_dir: &Path,
+    chip: &str,
+) -> Result<Vec<(Vec<F>, Tables<F>)>, String> {
+    let fixture = read_json(
+        &export_dir
+            .join("testdata")
+            .join(format!("{chip}.trace.json")),
+    )?;
+    let rows = fixture
+        .get("rows")
+        .and_then(|r| r.as_array())
+        .ok_or_else(|| format!("{chip}.trace.json: missing rows"))?;
+    let mut out = Vec::with_capacity(rows.len());
+    for (row_i, row) in rows.iter().enumerate() {
+        let r = row
+            .as_object()
+            .ok_or_else(|| format!("{chip} row {row_i}: expected object"))?;
+        let inputs: Vec<F> = parse_values(
+            r.get("inputs")
+                .ok_or_else(|| format!("{chip} row {row_i}: missing inputs"))?,
+            &format!("{chip} row {row_i} inputs"),
+        )?;
+        let hints: Tables<F> = parse_hints(
+            r.get("hints")
+                .ok_or_else(|| format!("{chip} row {row_i}: missing hints"))?,
+            &format!("{chip} row {row_i} hints"),
+        )?;
+        out.push((inputs, hints));
+    }
+    Ok(out)
 }
 
 fn read_json(path: &Path) -> Result<Value, String> {
@@ -84,6 +132,16 @@ pub fn run_chip<F: Field>(
             .join(format!("{chip}.witgen.json")),
     )?;
     let program: Program = parse_program(&payload)?;
+    let row_map: RowMap = parse_row_map(&read_json(
+        &export_dir
+            .join("witgen")
+            .join(format!("{chip}.rowmap.json")),
+    )?)?;
+    let constraint_ops = program
+        .ops
+        .iter()
+        .filter(|op| matches!(op, Op::Assert(_)))
+        .count();
     let fixture = read_json(
         &export_dir
             .join("testdata")
@@ -126,6 +184,9 @@ pub fn run_chip<F: Field>(
 
     let data = Tables::default();
     let mut failures = Vec::new();
+    let mut anchored_rows = 0usize;
+    let mut row_checked = 0usize;
+    let mut interaction_sends: BTreeMap<String, u64> = BTreeMap::new();
     for (row_i, row) in rows.iter().enumerate() {
         let r = row
             .as_object()
@@ -198,10 +259,78 @@ pub fn run_chip<F: Field>(
                 ));
             }
         }
+
+        let ctx = Ctx {
+            cells: &cells,
+            locals: &[],
+            idx: 0,
+            hints: &hints,
+            data: &data,
+        };
+
+        // Full-row reconstruction: evaluate the symbolic Rust row over the completed
+        // cells and compare against SP1's dumped row where the fixture carries it.
+        if let Some(er) = r.get("expectedRow").and_then(|e| e.as_array()) {
+            let expected_row: Vec<u64> = er
+                .iter()
+                .enumerate()
+                .map(|(i, x)| num_field(x, &format!("{chip} row {row_i} expectedRow[{i}]")))
+                .collect::<Result<_, _>>()?;
+            if expected_row.len() != row_map.rust_width {
+                failures.push(format!(
+                    "{chip} row {row_i} ({kind}): expectedRow length {} != rustWidth {}",
+                    expected_row.len(),
+                    row_map.rust_width
+                ));
+            } else {
+                row_checked += 1;
+                for (col, (rexpr, e)) in row_map.row.iter().zip(expected_row.iter()).enumerate() {
+                    let g = eval_expr(ctx, rexpr).val();
+                    if g != *e {
+                        failures.push(format!(
+                            "{chip} row {row_i} ({kind}): rust row column {col} expected {e} got {g}"
+                        ));
+                    }
+                }
+            }
+        }
+
+        // On SP1-anchored rows the constraints must hold: every `assert` expression
+        // evaluates to 0; interaction sends (nonzero multiplicity) are counted.
+        let anchored = r.get("anchored").and_then(|a| a.as_bool()).unwrap_or(false);
+        if anchored {
+            anchored_rows += 1;
+            for (op_i, op) in program.ops.iter().enumerate() {
+                match op {
+                    Op::Assert(e) => {
+                        let v = eval_expr(ctx, e).val();
+                        if v != 0 {
+                            failures.push(format!(
+                                "{chip} row {row_i} ({kind}): constraint operations[{op_i}] evaluates to {v} (expected 0)"
+                            ));
+                        }
+                    }
+                    Op::Interact {
+                        channel,
+                        multiplicity,
+                        ..
+                    } => {
+                        if eval_expr(ctx, multiplicity).val() != 0 {
+                            *interaction_sends.entry(channel.clone()).or_insert(0) += 1;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
     Ok(ChipReport {
         chip: chip.to_string(),
         rows: rows.len(),
+        anchored_rows,
+        row_checked,
+        constraint_ops,
+        interaction_sends,
         failures,
     })
 }

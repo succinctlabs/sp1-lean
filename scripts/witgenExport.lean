@@ -104,6 +104,60 @@ def entries : List Entry := [
   entry "DivRem" "SP1Clean.DivRemChip.circuit" (DivRemChip.circuit (p := SP1Prime)),
   entry "AluX0" "SP1Clean.AluX0Chip.circuit" (AluX0Chip.circuit (p := SP1Prime))]
 
+/-! ## Row maps
+
+The wire payload carries witness programs; a full trace **row** is the circuit's output
+struct (native layout) pushed through the audited native→Rust `reconfigure` map. The
+reconfigure functions are fully polymorphic struct re-wirings, so applying them at
+`Expression` yields the complete symbolic Rust row — `rustWidth` expressions over the
+absolute cell indices — serializable with the existing `Expression` encoding. With it,
+an external evaluator reproduces entire SP1 trace rows, not just witness cells. -/
+
+/-- The symbolic Rust row of a chip: the circuit output at input offset `size Input`,
+reconfigured to the Rust layout at the `Expression` level. -/
+def rowMapOf {Input Output RustOutput : TypeMap} [ProvableType Input]
+    [ProvableType Output] [ProvableType RustOutput]
+    (c : GeneralFormalCircuit Fp Input Output)
+    (reconfigure : Output (Expression Fp) → RustOutput (Expression Fp)) :
+    List (Expression Fp) :=
+  (toElements (reconfigure ((c.main (varFromOffset Input 0)).output (size Input)))).toList
+
+/-- The 25 chips' symbolic Rust rows (`Faithful.<chip>Reconfigure`, the `ChipFaithful`
+whole-row maps). -/
+def rowMaps : List (String × List (Expression Fp)) := [
+  ("Add", rowMapOf (AddChip.circuit (p := SP1Prime)) Faithful.addChipReconfigure),
+  ("Addi", rowMapOf (AddiChip.circuit (p := SP1Prime)) Faithful.addiChipReconfigure),
+  ("Addw", rowMapOf (AddwChip.circuit (p := SP1Prime)) Faithful.addwChipReconfigure),
+  ("Sub", rowMapOf (SubChip.circuit (p := SP1Prime)) Faithful.subChipReconfigure),
+  ("Subw", rowMapOf (SubwChip.circuit (p := SP1Prime)) Faithful.subwChipReconfigure),
+  ("Bitwise", rowMapOf (BitwiseChip.circuit (p := SP1Prime)) Faithful.bitwiseChipReconfigure),
+  ("Lt", rowMapOf (LtChip.circuit (p := SP1Prime)) Faithful.ltChipReconfigure),
+  ("ShiftLeft",
+    rowMapOf (ShiftLeftChip.circuit (p := SP1Prime)) Faithful.shiftLeftChipReconfigure),
+  ("ShiftRight",
+    rowMapOf (ShiftRightChip.circuit (p := SP1Prime)) Faithful.shiftRightChipReconfigure),
+  ("Jal", rowMapOf (JalChip.circuit (p := SP1Prime)) Faithful.jalChipReconfigure),
+  ("Jalr", rowMapOf (JalrChip.circuit (p := SP1Prime)) Faithful.jalrChipReconfigure),
+  ("Branch", rowMapOf (BranchChip.circuit (p := SP1Prime)) Faithful.branchChipReconfigure),
+  ("UType", rowMapOf (UTypeChip.circuit (p := SP1Prime)) Faithful.uTypeChipReconfigure),
+  ("LoadByte", rowMapOf (LoadByteChip.circuit (p := SP1Prime)) Faithful.loadByteChipReconfigure),
+  ("LoadHalf", rowMapOf (LoadHalfChip.circuit (p := SP1Prime)) Faithful.loadHalfChipReconfigure),
+  ("LoadWord", rowMapOf (LoadWordChip.circuit (p := SP1Prime)) Faithful.loadWordChipReconfigure),
+  ("LoadDouble",
+    rowMapOf (LoadDoubleChip.circuit (p := SP1Prime)) Faithful.loadDoubleChipReconfigure),
+  ("LoadX0", rowMapOf (LoadX0Chip.circuit (p := SP1Prime)) Faithful.loadX0ChipReconfigure),
+  ("StoreByte",
+    rowMapOf (StoreByteChip.circuit (p := SP1Prime)) Faithful.storeByteChipReconfigure),
+  ("StoreHalf",
+    rowMapOf (StoreHalfChip.circuit (p := SP1Prime)) Faithful.storeHalfChipReconfigure),
+  ("StoreWord",
+    rowMapOf (StoreWordChip.circuit (p := SP1Prime)) Faithful.storeWordChipReconfigure),
+  ("StoreDouble",
+    rowMapOf (StoreDoubleChip.circuit (p := SP1Prime)) Faithful.storeDoubleChipReconfigure),
+  ("Mul", rowMapOf (MulChip.circuit (p := SP1Prime)) Faithful.mulChipReconfigure),
+  ("DivRem", rowMapOf (DivRemChip.circuit (p := SP1Prime)) Faithful.divRemChipReconfigure),
+  ("AluX0", rowMapOf (AluX0Chip.circuit (p := SP1Prime)) Faithful.aluX0ChipReconfigure)]
+
 /-! ## Manifest derivation
 
 The manifest's hint/data schema is derived from the *serialized* payload (a JSON walk for
@@ -440,6 +494,15 @@ def run : IO Unit := do
   let mut indexRows : Array Json := #[]
   for (e, _) in selected do
     indexRows := indexRows.push (← exportChip out e)
+    if let some dir := out then
+      match rowMaps.find? (·.1 == e.name) with
+      | some (_, row) =>
+        writeJson (dir / s!"{e.name}.rowmap.json") <| Json.mkObj [
+          ("wireVersion", toJson (1 : Nat)),
+          ("name", Json.str e.name),
+          ("rustWidth", toJson row.length),
+          ("row", toJson row)]
+      | none => throw (IO.userError s!"{e.name}: no row map registered")
   -- Never write a partial index: only the full, unfiltered run produces `index.json`.
   if chipFilter.isNone then
     if let some dir := out then
