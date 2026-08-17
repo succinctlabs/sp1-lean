@@ -1153,4 +1153,674 @@ def zeroCols : Extracted.MulOperation (ZMod p) :=
     b_msb := 0, c_msb := 0, product_msb := ⟨0⟩,
     b_sign_extend := 0, c_sign_extend := 0 }
 
+section StructFW
+
+/-! ### FExpr-word twins (`populateFEW`)
+
+The same witness-IR layer over **computed** operand words — `Vector (FExpr) 4` cells rather than
+input `Expression`s — for composing chips whose Mul structs multiply witnessed intermediate words
+(`DivRemChip`'s `c_times_quotient` structs of `quotient_comp × c`). Text-parallel to the
+`Expression` layer above; the stream/chain/carry lemmas in between are stream-abstract and shared.
+-/
+
+/-- The 16-entry sign/zero-extended byte stream of a word, as u64-sorted IR (the `extStream`
+twin): eight operand bytes (`lᵢ % 256`, `lᵢ / 256`) then eight sign-fill bytes (`sgn · 255`). -/
+def streamFW (w : Vector (Witgen.FExpr (ZMod p)) 4) (sgn : Witgen.U64Expr (ZMod p)) (i : ℕ) :
+    Witgen.U64Expr (ZMod p) :=
+  [w[0].val % 256, w[0].val / 256, w[1].val % 256, w[1].val / 256,
+   w[2].val % 256, w[2].val / 256, w[3].val % 256, w[3].val / 256,
+   sgn * 255, sgn * 255, sgn * 255, sgn * 255,
+   sgn * 255, sgn * 255, sgn * 255, sgn * 255].getD i 0
+
+/-- The `b`-operand sign selector (`(is_mulh.val + is_mulhsu.val) · msb`), u64-sorted. -/
+def bsgnFW (is_mulh is_mulhsu b3 : Witgen.FExpr (ZMod p)) : Witgen.U64Expr (ZMod p) :=
+  (Witgen.U64Expr.val is_mulh + Witgen.U64Expr.val is_mulhsu)
+    * (Witgen.U64Expr.val b3 / 32768 % 2)
+
+/-- The `c`-operand sign selector (`is_mulh.val · msb`), u64-sorted. -/
+def csgnFW (is_mulh c3 : Witgen.FExpr (ZMod p)) : Witgen.U64Expr (ZMod p) :=
+  Witgen.U64Expr.val is_mulh * (Witgen.U64Expr.val c3 / 32768 % 2)
+
+/-- The witness-IR twin of `populate`, over the chip's input expressions (`is_mulh`/`is_mulhsu`/
+`is_mulw` are the chip's witnessed flag cells). -/
+def populateFEW (b c : Vector (Witgen.FExpr (ZMod p)) 4) (is_mulh is_mulhsu is_mulw : Witgen.FExpr (ZMod p)) :
+    Extracted.MulOperation (Witgen.FExpr (ZMod p)) :=
+  let bS := streamFW b (bsgnFW is_mulh is_mulhsu b[3])
+  let cS := streamFW c (csgnFW is_mulh c[3])
+  { carry := Vector.ofFn fun k : Fin 16 => carryF bS cS k.val,
+    product := Vector.ofFn fun k : Fin 16 => productF bS cS k.val,
+    b_lower_byte := ⟨#v[(b[0].val % 256).toField, (b[1].val % 256).toField,
+                        (b[2].val % 256).toField, (b[3].val % 256).toField]⟩,
+    c_lower_byte := ⟨#v[(c[0].val % 256).toField, (c[1].val % 256).toField,
+                        (c[2].val % 256).toField, (c[3].val % 256).toField]⟩,
+    b_msb := U16MSBOperation.populate_msbF b[3],
+    c_msb := U16MSBOperation.populate_msbF c[3],
+    product_msb := ⟨.ite (is_mulw =? (1 : ZMod p))
+      (U16MSBOperation.populate_msbF
+        (productF bS cS 2 + productF bS cS 3 * (256 : Witgen.FExpr (ZMod p))))
+      0⟩,
+    b_sign_extend := (is_mulh + is_mulhsu) * U16MSBOperation.populate_msbF b[3],
+    c_sign_extend := is_mulh * U16MSBOperation.populate_msbF c[3] }
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Evaluating the stream twin is `extStream` at the evaluated limbs (per index; indices past the
+sixteen entries default to `0` on both sides). The limb bounds keep the u64-sorted `val`s from
+wrapping, and `sgn ≤ 1` keeps the sign-fill bytes at `≤ 255`. -/
+private lemma streamFW_eval (ctx : Witgen.Ctx (ZMod p))
+    (w : Vector (Witgen.FExpr (ZMod p)) 4) (sgn : Witgen.U64Expr (ZMod p)) (vw : Word (ZMod p))
+    (sgnv : ℕ)
+    (hW : ∀ (i : ℕ) (_ : i < 4), Witgen.FExpr.eval ctx w[i] = vw[i])
+    (hU : ∀ (i : ℕ) (_ : i < 4), vw[i].val < 2 ^ 16)
+    (hsgn : ((sgn.eval ctx)).toNat = sgnv) (hs1 : sgnv ≤ 1) :
+    ∀ i : ℕ, ((streamFW w sgn i).eval ctx).toNat
+      = extStream vw[0].val vw[1].val vw[2].val vw[3].val sgnv i := by
+  have h0 := hW 0 (by omega); have h1 := hW 1 (by omega)
+  have h2 := hW 2 (by omega); have h3 := hW 3 (by omega)
+  have u0 := hU 0 (by omega); have u1 := hU 1 (by omega)
+  have u2 := hU 2 (by omega); have u3 := hU 3 (by omega)
+  intro i
+  rcases Nat.lt_or_ge i 16 with hlt | hge
+  · interval_cases i <;>
+      simp only [streamFW, extStream, List.getD, List.getElem?_cons_zero, List.getElem?_cons_succ,
+        Option.getD_some, circuit_norm, h0, h1, h2, h3, hsgn]
+  · have hs : streamFW w sgn i = 0 := by
+      simp only [streamFW]
+      rw [List.getD_eq_default]
+      simp
+      omega
+    have he : extStream vw[0].val vw[1].val vw[2].val vw[3].val sgnv i = 0 := by
+      simp only [extStream]
+      rw [List.getD_eq_default]
+      simp
+      omega
+    rw [hs, he]
+    simp [circuit_norm]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Evaluating the `b` sign selector is `populate`'s `bsgn` (the flag binarities keep the u64
+`val`s from wrapping and give `bsgn ≤ 1`; the limb bound feeds the msb split). -/
+private lemma bsgnFW_eval (ctx : Witgen.Ctx (ZMod p)) (is_mulh is_mulhsu b3 : Witgen.FExpr (ZMod p))
+    (vh vhsu v3 : ZMod p)
+    (hh : Witgen.FExpr.eval ctx is_mulh = vh)
+    (hhsu : Witgen.FExpr.eval ctx is_mulhsu = vhsu)
+    (h3 : Witgen.FExpr.eval ctx b3 = v3)
+    (hhb : vh = 0 ∨ vh = 1) (hhsub : vhsu = 0 ∨ vhsu = 1) (h3b : v3.val < 65536) :
+    ((bsgnFW is_mulh is_mulhsu b3).eval ctx).toNat
+      = (vh.val + vhsu.val) * (v3.val / 32768 % 2) := by
+  have hh1 : vh.val ≤ 1 := by
+    rcases hhb with h | h <;> subst h
+    · simp
+    · rw [ZMod.val_one_eq_one_mod]
+      exact Nat.mod_le _ _
+  have hhsu1 : vhsu.val ≤ 1 := by
+    rcases hhsub with h | h <;> subst h
+    · simp
+    · rw [ZMod.val_one_eq_one_mod]
+      exact Nat.mod_le _ _
+  simp only [bsgnFW, Witgen.U64Expr.add_def, Witgen.U64Expr.mul_def,
+    Witgen.U64Expr.div_def, Witgen.U64Expr.mod_def, Witgen.U64Expr.eval,
+    UInt64.toNat_add, UInt64.toNat_mul, UInt64.toNat_div, UInt64.toNat_mod,
+    UInt64.toNat_ofNat', UInt64.toNat_ofNat, hh, hhsu, h3, FiniteField.val_F]
+  have e1 : vh.val % 2 ^ 64 = vh.val := Nat.mod_eq_of_lt (by omega)
+  have e2 : vhsu.val % 2 ^ 64 = vhsu.val := Nat.mod_eq_of_lt (by omega)
+  have e3 : v3.val % 2 ^ 64 = v3.val := Nat.mod_eq_of_lt (by omega)
+  have e4 : (32768 : ℕ) % 2 ^ 64 = 32768 := Nat.mod_eq_of_lt (by norm_num)
+  have e5 : (2 : ℕ) % 2 ^ 64 = 2 := Nat.mod_eq_of_lt (by norm_num)
+  rw [e1, e2, e3, e4, e5, Nat.mod_eq_of_lt (show vh.val + vhsu.val < 2 ^ 64 by omega)]
+  have hm : v3.val / 32768 % 2 ≤ 1 := Nat.le_of_lt_succ (Nat.mod_lt _ (by omega))
+  exact Nat.mod_eq_of_lt (by
+    have := Nat.mul_le_mul (show vh.val + vhsu.val ≤ 2 by omega) hm
+    omega)
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Evaluating the `c` sign selector is `populate`'s `csgn`. -/
+private lemma csgnFW_eval (ctx : Witgen.Ctx (ZMod p)) (is_mulh c3 : Witgen.FExpr (ZMod p))
+    (vh v3 : ZMod p)
+    (hh : Witgen.FExpr.eval ctx is_mulh = vh)
+    (h3 : Witgen.FExpr.eval ctx c3 = v3)
+    (hhb : vh = 0 ∨ vh = 1) (h3b : v3.val < 65536) :
+    ((csgnFW is_mulh c3).eval ctx).toNat = vh.val * (v3.val / 32768 % 2) := by
+  have hh1 : vh.val ≤ 1 := by
+    rcases hhb with h | h <;> subst h
+    · simp
+    · rw [ZMod.val_one_eq_one_mod]
+      exact Nat.mod_le _ _
+  simp only [csgnFW, Witgen.U64Expr.mul_def,
+    Witgen.U64Expr.div_def, Witgen.U64Expr.mod_def, Witgen.U64Expr.eval,
+    UInt64.toNat_mul, UInt64.toNat_div, UInt64.toNat_mod,
+    UInt64.toNat_ofNat', UInt64.toNat_ofNat, hh, h3, FiniteField.val_F]
+  have e1 : vh.val % 2 ^ 64 = vh.val := Nat.mod_eq_of_lt (by omega)
+  have e3 : v3.val % 2 ^ 64 = v3.val := Nat.mod_eq_of_lt (by omega)
+  have e4 : (32768 : ℕ) % 2 ^ 64 = 32768 := Nat.mod_eq_of_lt (by norm_num)
+  have e5 : (2 : ℕ) % 2 ^ 64 = 2 := Nat.mod_eq_of_lt (by norm_num)
+  rw [e1, e3, e4, e5]
+  have hm : v3.val / 32768 % 2 ≤ 1 := Nat.le_of_lt_succ (Nat.mod_lt _ (by omega))
+  exact Nat.mod_eq_of_lt (by
+    have := Nat.mul_le_mul hh1 hm
+    omega)
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Evaluating a low-byte cell (`(e.val % 256).toField`) is the witnessed byte cast. -/
+private lemma lowByteFW_eval (env : ProverEnvironment (ZMod p))
+    (e : Witgen.FExpr (ZMod p)) (v : ZMod p)
+    (he : Witgen.FExpr.eval { env := env } e = v) (hv : v.val < 2 ^ 16) :
+    Witgen.FExpr.eval { env := env } ((e.val % 256).toField) = ((v.val % 256 : ℕ) : ZMod p) := by
+  simp only [circuit_norm, he]
+
+/-- Whole-struct evaluation: the witness IR evaluates to `populate` (with the evaluated words and
+flags abstracted). The `isU64` bounds keep the u64-sorted byte streams from wrapping; the flag
+binarities plus the one-hot sum bound keep the sign selectors binary (SP1's `is_mulh`/`is_mulhsu`
+are mutually exclusive opcode flags). -/
+theorem populateFEWW_eval (env : ProverEnvironment (ZMod p))
+    (b c : Vector (Witgen.FExpr (ZMod p)) 4) (is_mulh is_mulhsu is_mulw : Witgen.FExpr (ZMod p))
+    (vb vc : Word (ZMod p)) (vh vhsu vw : ZMod p)
+    (hvb : #v[Witgen.FExpr.eval { env := env } b[0], Witgen.FExpr.eval { env := env } b[1],
+              Witgen.FExpr.eval { env := env } b[2], Witgen.FExpr.eval { env := env } b[3]] = vb)
+    (hvc : #v[Witgen.FExpr.eval { env := env } c[0], Witgen.FExpr.eval { env := env } c[1],
+              Witgen.FExpr.eval { env := env } c[2], Witgen.FExpr.eval { env := env } c[3]] = vc)
+    (hh : Witgen.FExpr.eval { env := env } is_mulh = vh)
+    (hhsu : Witgen.FExpr.eval { env := env } is_mulhsu = vhsu)
+    (hw : Witgen.FExpr.eval { env := env } is_mulw = vw)
+    (hb : vb.isU64) (hc : vc.isU64)
+    (hhb : vh = 0 ∨ vh = 1) (hhsub : vhsu = 0 ∨ vhsu = 1)
+    (hsum : vh.val + vhsu.val ≤ 1) :
+    Witgen.eval { env := env } (populateFEW b c is_mulh is_mulhsu is_mulw)
+      = populate vb vc vh vhsu vw := by
+  obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb
+  obtain ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64 hc
+  have hB : ∀ (i : ℕ) (h : i < 4), Witgen.FExpr.eval { env := env } b[i] = vb[i] := by
+    intro i h; rw [← hvb]; interval_cases i <;> simp
+  have hC : ∀ (i : ℕ) (h : i < 4), Witgen.FExpr.eval { env := env } c[i] = vc[i] := by
+    intro i h; rw [← hvc]; interval_cases i <;> simp
+  have hbU : ∀ (i : ℕ) (_ : i < 4), vb[i].val < 2 ^ 16 := by
+    intro i hi; interval_cases i; exacts [hb0, hb1, hb2, hb3]
+  have hcU : ∀ (i : ℕ) (_ : i < 4), vc[i].val < 2 ^ 16 := by
+    intro i hi; interval_cases i; exacts [hc0, hc1, hc2, hc3]
+  -- the two sign-selector values and their binarity
+  have hbsgn := bsgnFW_eval { env := env } is_mulh is_mulhsu b[3] vh vhsu vb[3]
+    hh hhsu (hB 3 (by omega)) hhb hhsub hb3
+  have hcsgn := csgnFW_eval { env := env } is_mulh c[3] vh vc[3]
+    hh (hC 3 (by omega)) hhb hc3
+  have hbsgnb : ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) ≤ 1 := by
+    have hm : vb[3].val / 32768 % 2 ≤ 1 := Nat.le_of_lt_succ (Nat.mod_lt _ (by omega))
+    simpa using Nat.mul_le_mul hsum hm
+  have hcsgnb : (vh.val * (vc[3].val / 32768 % 2)) ≤ 1 := by
+    have hm : vc[3].val / 32768 % 2 ≤ 1 := Nat.le_of_lt_succ (Nat.mod_lt _ (by omega))
+    have h1 : vh.val ≤ 1 := le_trans (Nat.le_add_right _ _) hsum
+    simpa using Nat.mul_le_mul h1 hm
+  -- the evaluated byte streams and their byte bounds
+  have hbS := streamFW_eval { env := env } b (bsgnFW is_mulh is_mulhsu b[3]) vb
+    ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) hB hbU hbsgn hbsgnb
+  have hcS := streamFW_eval { env := env } c (csgnFW is_mulh c[3]) vc
+    (vh.val * (vc[3].val / 32768 % 2)) hC hcU hcsgn hcsgnb
+  have hbb := extStream_le hb0 hb1 hb2 hb3 hbsgnb
+  have hcb := extStream_le hc0 hc1 hc2 hc3 hcsgnb
+  -- the schoolbook cells
+  have hcar : ∀ (k : ℕ), k < 16 →
+      Witgen.FExpr.eval { env := env } (carryF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) k)
+        = ((schoolCarry vb[0].val vb[1].val vb[2].val vb[3].val vc[0].val vc[1].val vc[2].val vc[3].val ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) (vh.val * (vc[3].val / 32768 % 2)) k : ℕ) : ZMod p) :=
+    fun k hk => carryF_eval { env := env } _ _ _ _ hbS hcS hbb hcb k hk
+  have hprod : ∀ (k : ℕ), k < 16 →
+      Witgen.FExpr.eval { env := env } (productF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) k)
+        = ((schoolProduct vb[0].val vb[1].val vb[2].val vb[3].val vc[0].val vc[1].val vc[2].val vc[3].val ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) (vh.val * (vc[3].val / 32768 % 2)) k : ℕ) : ZMod p) :=
+    fun k hk => productF_eval { env := env } _ _ _ _ hbS hcS hbb hcb k hk
+  -- the three MSB / sign-extend cells
+  have hexprB3 : Witgen.FExpr.eval { env := env } b[3] = vb[3] := by
+    simp only [circuit_norm, hB 3 (by omega)]
+  have hexprC3 : Witgen.FExpr.eval { env := env } c[3] = vc[3] := by
+    simp only [circuit_norm, hC 3 (by omega)]
+  have hbmsb : Witgen.FExpr.eval { env := env } (U16MSBOperation.populate_msbF b[3])
+      = U16MSBOperation.populate_msb vb[3] := by
+    rw [U16MSBOperation.populate_msbF_eval { env := env } _ (by rw [hexprB3]; exact hb3),
+      hexprB3]
+  have hcmsb : Witgen.FExpr.eval { env := env } (U16MSBOperation.populate_msbF c[3])
+      = U16MSBOperation.populate_msb vc[3] := by
+    rw [U16MSBOperation.populate_msbF_eval { env := env } _ (by rw [hexprC3]; exact hc3),
+      hexprC3]
+  have hbse : Witgen.FExpr.eval { env := env }
+      ((is_mulh + is_mulhsu)
+        * U16MSBOperation.populate_msbF b[3])
+      = (vh + vhsu) * U16MSBOperation.populate_msb vb[3] := by
+    simp only [circuit_norm, hh, hhsu, hbmsb]
+  have hcse : Witgen.FExpr.eval { env := env }
+      (is_mulh * U16MSBOperation.populate_msbF c[3])
+      = vh * U16MSBOperation.populate_msb vc[3] := by
+    simp only [circuit_norm, hh, hcmsb]
+  -- the gated product-MSB cell
+  have hsp2b : schoolProduct vb[0].val vb[1].val vb[2].val vb[3].val vc[0].val vc[1].val vc[2].val vc[3].val ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) (vh.val * (vc[3].val / 32768 % 2)) 2 ≤ 255 := Nat.le_of_lt_succ (Nat.mod_lt _ (by omega))
+  have hsp3b : schoolProduct vb[0].val vb[1].val vb[2].val vb[3].val vc[0].val vc[1].val vc[2].val vc[3].val ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) (vh.val * (vc[3].val / 32768 % 2)) 3 ≤ 255 := Nat.le_of_lt_succ (Nat.mod_lt _ (by omega))
+  have hp23 : Witgen.FExpr.eval { env := env }
+      (productF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) 2 + productF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) 3 * (256 : Witgen.FExpr (ZMod p)))
+      = ((schoolProduct vb[0].val vb[1].val vb[2].val vb[3].val vc[0].val vc[1].val vc[2].val vc[3].val ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) (vh.val * (vc[3].val / 32768 % 2)) 2 + schoolProduct vb[0].val vb[1].val vb[2].val vb[3].val vc[0].val vc[1].val vc[2].val vc[3].val ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) (vh.val * (vc[3].val / 32768 % 2)) 3 * 256 : ℕ) : ZMod p) := by
+    simp only [circuit_norm, hprod 2 (by omega), hprod 3 (by omega)]
+    push_cast
+    ring
+  have hvalb : (((schoolProduct vb[0].val vb[1].val vb[2].val vb[3].val vc[0].val vc[1].val vc[2].val vc[3].val ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) (vh.val * (vc[3].val / 32768 % 2)) 2 + schoolProduct vb[0].val vb[1].val vb[2].val vb[3].val vc[0].val vc[1].val vc[2].val vc[3].val ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) (vh.val * (vc[3].val / 32768 % 2)) 3 * 256 : ℕ) : ZMod p)).val < 2 ^ 16 := by
+    rw [ZMod.val_natCast_of_lt (by have hp : 2 ^ 24 < p := Fact.out; omega)]
+    omega
+  have hpm : Witgen.FExpr.eval { env := env }
+      (U16MSBOperation.populate_msbF
+        (productF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) 2 + productF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) 3 * (256 : Witgen.FExpr (ZMod p))))
+      = U16MSBOperation.populate_msb
+          (((schoolProduct vb[0].val vb[1].val vb[2].val vb[3].val vc[0].val vc[1].val vc[2].val vc[3].val ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) (vh.val * (vc[3].val / 32768 % 2)) 2 + schoolProduct vb[0].val vb[1].val vb[2].val vb[3].val vc[0].val vc[1].val vc[2].val vc[3].val ((vh.val + vhsu.val) * (vb[3].val / 32768 % 2)) (vh.val * (vc[3].val / 32768 % 2)) 3 * 256 : ℕ) : ZMod p)) := by
+    rw [U16MSBOperation.populate_msbF_eval { env := env } _ (by rw [hp23]; exact hvalb), hp23]
+  -- cell-by-cell assembly
+  refine (ProvableType.ext_iff _ _).mpr fun i hi => ?_
+  have hi45 : i < 45 := by
+    have hsz : size Extracted.MulOperation = 45 := rfl
+    omega
+  rw [show (Witgen.eval { env := env } (populateFEW b c is_mulh is_mulhsu is_mulw) :
+          Extracted.MulOperation (ZMod p))
+        = fromElements ((toElements (populateFEW b c is_mulh is_mulhsu is_mulw)).map
+            (Witgen.FExpr.eval { env := env })) from rfl,
+    ProvableType.toElements_fromElements, Vector.getElem_map]
+  interval_cases i
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 0 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 0 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 0 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 1 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 1 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 1 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 2 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 2 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 2 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 3 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 3 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 3 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 4 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 4 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 4 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 5 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 5 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 5 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 6 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 6 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 6 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 7 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 7 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 7 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 8 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 8 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 8 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 9 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 9 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 9 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 10 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 10 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 10 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 11 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 11 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 11 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 12 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 12 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 12 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 13 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 13 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 13 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 14 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 14 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 14 (by omega)
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 15 (by omega),
+      toElements_cell_carry (populate vb vc vh vhsu vw) 15 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hcar 15 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 0 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 0 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 0 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 1 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 1 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 1 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 2 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 2 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 2 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 3 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 3 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 3 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 4 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 4 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 4 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 5 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 5 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 5 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 6 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 6 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 6 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 7 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 7 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 7 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 8 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 8 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 8 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 9 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 9 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 9 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 10 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 10 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 10 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 11 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 11 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 11 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 12 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 12 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 12 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 13 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 13 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 13 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 14 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 14 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 14 (by omega)
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 15 (by omega),
+      toElements_cell_product (populate vb vc vh vhsu vw) 15 (by omega)]
+    simp only [populateFEW, populate, Vector.getElem_ofFn]
+    exact hprod 15 (by omega)
+  · exact ((congrArg _ (toElements_cell_bLower _ 0 (by omega))).trans
+      (lowByteFW_eval env b[0] vb[0] (hB 0 (by omega)) hb0)).trans
+      (toElements_cell_bLower _ 0 (by omega)).symm
+  · exact ((congrArg _ (toElements_cell_bLower _ 1 (by omega))).trans
+      (lowByteFW_eval env b[1] vb[1] (hB 1 (by omega)) hb1)).trans
+      (toElements_cell_bLower _ 1 (by omega)).symm
+  · exact ((congrArg _ (toElements_cell_bLower _ 2 (by omega))).trans
+      (lowByteFW_eval env b[2] vb[2] (hB 2 (by omega)) hb2)).trans
+      (toElements_cell_bLower _ 2 (by omega)).symm
+  · exact ((congrArg _ (toElements_cell_bLower _ 3 (by omega))).trans
+      (lowByteFW_eval env b[3] vb[3] (hB 3 (by omega)) hb3)).trans
+      (toElements_cell_bLower _ 3 (by omega)).symm
+  · exact ((congrArg _ (toElements_cell_cLower _ 0 (by omega))).trans
+      (lowByteFW_eval env c[0] vc[0] (hC 0 (by omega)) hc0)).trans
+      (toElements_cell_cLower _ 0 (by omega)).symm
+  · exact ((congrArg _ (toElements_cell_cLower _ 1 (by omega))).trans
+      (lowByteFW_eval env c[1] vc[1] (hC 1 (by omega)) hc1)).trans
+      (toElements_cell_cLower _ 1 (by omega)).symm
+  · exact ((congrArg _ (toElements_cell_cLower _ 2 (by omega))).trans
+      (lowByteFW_eval env c[2] vc[2] (hC 2 (by omega)) hc2)).trans
+      (toElements_cell_cLower _ 2 (by omega)).symm
+  · exact ((congrArg _ (toElements_cell_cLower _ 3 (by omega))).trans
+      (lowByteFW_eval env c[3] vc[3] (hC 3 (by omega)) hc3)).trans
+      (toElements_cell_cLower _ 3 (by omega)).symm
+  · exact ((congrArg _ (toElements_cell_bMsb _)).trans hbmsb).trans
+      (toElements_cell_bMsb _).symm
+  · exact ((congrArg _ (toElements_cell_cMsb _)).trans hcmsb).trans
+      (toElements_cell_cMsb _).symm
+  · refine ((congrArg _ (toElements_cell_productMsb _)).trans ?_).trans
+      (toElements_cell_productMsb _).symm
+    by_cases hvw : vw = 1
+    · simp [populateFEW, populate, circuit_norm, Vector.getElem_ofFn, hw, hvw]
+      exact hpm.trans (congrArg U16MSBOperation.populate_msb (by push_cast; ring))
+    · simp [populateFEW, populate, circuit_norm, hw, hvw]
+  · exact ((congrArg _ (toElements_cell_bSignExtend _)).trans hbse).trans
+      (toElements_cell_bSignExtend _).symm
+  · exact ((congrArg _ (toElements_cell_cSignExtend _)).trans hcse).trans
+      (toElements_cell_cSignExtend _).symm
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Congruence for a low-byte cell. -/
+private lemma lowByteFW_congr (env env' : ProverEnvironment (ZMod p))
+    (e : Witgen.FExpr (ZMod p))
+    (he : Witgen.FExpr.eval { env := env } e = Witgen.FExpr.eval { env := env' } e) :
+    Witgen.FExpr.eval { env := env } ((e.val % 256).toField)
+      = Witgen.FExpr.eval { env := env' } ((e.val % 256).toField) := by
+  simp only [circuit_norm, -Witgen.u64Wrap, he]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Congruence for the byte stream. -/
+private lemma streamFW_congr (ctx ctx' : Witgen.Ctx (ZMod p))
+    (w : Vector (Witgen.FExpr (ZMod p)) 4) (sgn : Witgen.U64Expr (ZMod p))
+    (hW : ∀ (i : ℕ) (_ : i < 4), Witgen.FExpr.eval ctx w[i]
+      = Witgen.FExpr.eval ctx' w[i])
+    (hsgn : sgn.eval ctx = sgn.eval ctx') :
+    ∀ i : ℕ, (streamFW w sgn i).eval ctx = (streamFW w sgn i).eval ctx' := by
+  have h0 := hW 0 (by omega); have h1 := hW 1 (by omega)
+  have h2 := hW 2 (by omega); have h3 := hW 3 (by omega)
+  intro i
+  rcases Nat.lt_or_ge i 16 with hlt | hge
+  · interval_cases i <;>
+      simp only [streamFW, List.getD, List.getElem?_cons_zero, List.getElem?_cons_succ,
+        Option.getD_some, circuit_norm, -Witgen.u64Wrap, h0, h1, h2, h3, hsgn]
+  · have hs : streamFW w sgn i = 0 := by
+      simp only [streamFW]
+      rw [List.getD_eq_default]
+      simp
+      omega
+    rw [hs]
+    rfl
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Congruence for the `b` sign selector. -/
+private lemma bsgnFW_congr (ctx ctx' : Witgen.Ctx (ZMod p))
+    (is_mulh is_mulhsu b3 : Witgen.FExpr (ZMod p))
+    (hh : Witgen.FExpr.eval ctx is_mulh
+      = Witgen.FExpr.eval ctx' is_mulh)
+    (hhsu : Witgen.FExpr.eval ctx is_mulhsu
+      = Witgen.FExpr.eval ctx' is_mulhsu)
+    (h3 : Witgen.FExpr.eval ctx b3
+      = Witgen.FExpr.eval ctx' b3) :
+    (bsgnFW is_mulh is_mulhsu b3).eval ctx = (bsgnFW is_mulh is_mulhsu b3).eval ctx' := by
+  simp only [bsgnFW, circuit_norm, -Witgen.u64Wrap, hh, hhsu, h3]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Congruence for the `c` sign selector. -/
+private lemma csgnFW_congr (ctx ctx' : Witgen.Ctx (ZMod p))
+    (is_mulh c3 : Witgen.FExpr (ZMod p))
+    (hh : Witgen.FExpr.eval ctx is_mulh
+      = Witgen.FExpr.eval ctx' is_mulh)
+    (h3 : Witgen.FExpr.eval ctx c3
+      = Witgen.FExpr.eval ctx' c3) :
+    (csgnFW is_mulh c3).eval ctx = (csgnFW is_mulh c3).eval ctx' := by
+  simp only [csgnFW, circuit_norm, -Witgen.u64Wrap, hh, h3]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Environment-locality of the whole witness payload (the `ComputableWitnesses` counterpart of
+`populateFEWW_eval` — a congruence, so it needs no bounds). -/
+theorem populateFEW_congr_flat (env env' : ProverEnvironment (ZMod p))
+    (b c : Vector (Witgen.FExpr (ZMod p)) 4) (is_mulh is_mulhsu is_mulw : Witgen.FExpr (ZMod p))
+    (hB : ∀ (i : ℕ) (_ : i < 4),
+      Witgen.FExpr.eval { env := env } b[i] = Witgen.FExpr.eval { env := env' } b[i])
+    (hC : ∀ (i : ℕ) (_ : i < 4),
+      Witgen.FExpr.eval { env := env } c[i] = Witgen.FExpr.eval { env := env' } c[i])
+    (hH : Witgen.FExpr.eval { env := env } is_mulh
+      = Witgen.FExpr.eval { env := env' } is_mulh)
+    (hHSU : Witgen.FExpr.eval { env := env } is_mulhsu
+      = Witgen.FExpr.eval { env := env' } is_mulhsu)
+    (hW : Witgen.FExpr.eval { env := env } is_mulw
+      = Witgen.FExpr.eval { env := env' } is_mulw) :
+    (Witgen.WitgenIR.ofFExprs (toElements (populateFEW b c is_mulh is_mulhsu is_mulw))).eval env
+      = (Witgen.WitgenIR.ofFExprs
+          (toElements (populateFEW b c is_mulh is_mulhsu is_mulw))).eval env' := by
+  have hbsgnC := bsgnFW_congr { env := env } { env := env' } is_mulh is_mulhsu b[3]
+    hH hHSU (hB 3 (by omega))
+  have hcsgnC := csgnFW_congr { env := env } { env := env' } is_mulh c[3]
+    hH (hC 3 (by omega))
+  have hbSC := streamFW_congr { env := env } { env := env' } b
+    (bsgnFW is_mulh is_mulhsu b[3]) hB hbsgnC
+  have hcSC := streamFW_congr { env := env } { env := env' } c
+    (csgnFW is_mulh c[3]) hC hcsgnC
+  have hcarC : ∀ k : ℕ, Witgen.FExpr.eval { env := env } (carryF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) k)
+      = Witgen.FExpr.eval { env := env' } (carryF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) k) :=
+    carryF_congr { env := env } { env := env' } _ _ hbSC hcSC
+  have hprodC : ∀ k : ℕ, Witgen.FExpr.eval { env := env } (productF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) k)
+      = Witgen.FExpr.eval { env := env' } (productF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) k) :=
+    productF_congr { env := env } { env := env' } _ _ hbSC hcSC
+  have hmsbBC := U16MSBOperation.populate_msbF_congr { env := env } { env := env' }
+    b[3] (by simpa [circuit_norm] using hB 3 (by omega))
+  have hmsbCC := U16MSBOperation.populate_msbF_congr { env := env } { env := env' }
+    c[3] (by simpa [circuit_norm] using hC 3 (by omega))
+  have hpmC := U16MSBOperation.populate_msbF_congr { env := env } { env := env' }
+    (productF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) 2 + productF (streamFW b (bsgnFW is_mulh is_mulhsu b[3])) (streamFW c (csgnFW is_mulh c[3])) 3 * (256 : Witgen.FExpr (ZMod p)))
+    (by simp only [circuit_norm, -Witgen.u64Wrap, hprodC 2, hprodC 3])
+  rw [ofFExprs_eval_eq, ofFExprs_eval_eq]
+  refine congrArg toElements ?_
+  refine (ProvableType.ext_iff _ _).mpr fun i hi => ?_
+  have hi45 : i < 45 := by
+    have hsz : size Extracted.MulOperation = 45 := rfl
+    omega
+  rw [show (Witgen.eval { env := env } (populateFEW b c is_mulh is_mulhsu is_mulw) :
+          Extracted.MulOperation (ZMod p))
+        = fromElements ((toElements (populateFEW b c is_mulh is_mulhsu is_mulw)).map
+            (Witgen.FExpr.eval { env := env })) from rfl,
+    show (Witgen.eval { env := env' } (populateFEW b c is_mulh is_mulhsu is_mulw) :
+          Extracted.MulOperation (ZMod p))
+        = fromElements ((toElements (populateFEW b c is_mulh is_mulhsu is_mulw)).map
+            (Witgen.FExpr.eval { env := env' })) from rfl,
+    ProvableType.toElements_fromElements, ProvableType.toElements_fromElements,
+    Vector.getElem_map, Vector.getElem_map]
+  interval_cases i
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 0 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 0
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 1 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 1
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 2 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 2
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 3 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 3
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 4 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 4
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 5 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 5
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 6 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 6
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 7 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 7
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 8 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 8
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 9 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 9
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 10 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 10
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 11 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 11
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 12 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 12
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 13 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 13
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 14 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 14
+  · rw [toElements_cell_carry (populateFEW b c is_mulh is_mulhsu is_mulw) 15 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hcarC 15
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 0 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 0
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 1 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 1
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 2 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 2
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 3 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 3
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 4 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 4
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 5 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 5
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 6 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 6
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 7 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 7
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 8 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 8
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 9 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 9
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 10 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 10
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 11 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 11
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 12 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 12
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 13 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 13
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 14 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 14
+  · rw [toElements_cell_product (populateFEW b c is_mulh is_mulhsu is_mulw) 15 (by omega)]
+    simp only [populateFEW, Vector.getElem_ofFn]
+    exact hprodC 15
+  · rw [toElements_cell_bLower (populateFEW b c is_mulh is_mulhsu is_mulw) 0 (by omega)]
+    exact lowByteFW_congr env env' b[0] (hB 0 (by omega))
+  · rw [toElements_cell_bLower (populateFEW b c is_mulh is_mulhsu is_mulw) 1 (by omega)]
+    exact lowByteFW_congr env env' b[1] (hB 1 (by omega))
+  · rw [toElements_cell_bLower (populateFEW b c is_mulh is_mulhsu is_mulw) 2 (by omega)]
+    exact lowByteFW_congr env env' b[2] (hB 2 (by omega))
+  · rw [toElements_cell_bLower (populateFEW b c is_mulh is_mulhsu is_mulw) 3 (by omega)]
+    exact lowByteFW_congr env env' b[3] (hB 3 (by omega))
+  · rw [toElements_cell_cLower (populateFEW b c is_mulh is_mulhsu is_mulw) 0 (by omega)]
+    exact lowByteFW_congr env env' c[0] (hC 0 (by omega))
+  · rw [toElements_cell_cLower (populateFEW b c is_mulh is_mulhsu is_mulw) 1 (by omega)]
+    exact lowByteFW_congr env env' c[1] (hC 1 (by omega))
+  · rw [toElements_cell_cLower (populateFEW b c is_mulh is_mulhsu is_mulw) 2 (by omega)]
+    exact lowByteFW_congr env env' c[2] (hC 2 (by omega))
+  · rw [toElements_cell_cLower (populateFEW b c is_mulh is_mulhsu is_mulw) 3 (by omega)]
+    exact lowByteFW_congr env env' c[3] (hC 3 (by omega))
+  · rw [toElements_cell_bMsb (populateFEW b c is_mulh is_mulhsu is_mulw)]
+    exact hmsbBC
+  · rw [toElements_cell_cMsb (populateFEW b c is_mulh is_mulhsu is_mulw)]
+    exact hmsbCC
+  · rw [toElements_cell_productMsb (populateFEW b c is_mulh is_mulhsu is_mulw)]
+    simp only [populateFEW, circuit_norm, -Witgen.u64Wrap, hW]
+    split_ifs
+    · exact hpmC
+    · rfl
+  · rw [toElements_cell_bSignExtend (populateFEW b c is_mulh is_mulhsu is_mulw)]
+    simp only [populateFEW, circuit_norm, -Witgen.u64Wrap, hH, hHSU, hmsbBC]
+  · rw [toElements_cell_cSignExtend (populateFEW b c is_mulh is_mulhsu is_mulw)]
+    simp only [populateFEW, circuit_norm, -Witgen.u64Wrap, hH, hmsbCC]
+
+
+end StructFW
+
 end SP1Clean.MulOperation

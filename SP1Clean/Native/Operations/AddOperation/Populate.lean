@@ -126,4 +126,51 @@ theorem spec_populate {a b : Word (ZMod p)} (ha : a.isU64) (hb : b.isU64) (is_re
       ZMod.val_natCast_of_lt (by omega), ZMod.val_natCast_of_lt (by omega)]
   omega
 
+section FW
+
+/-- The four sum limbs over **computed** operand words (`Vector (FExpr) 4` cells) — the
+FExpr-word twin of `populateIR`'s cells, for gated composition (`DivRemChip`'s negation words).
+Returned as raw cells so composing sites can gate each limb. -/
+def populateFW (a b : Vector (Witgen.FExpr (ZMod p)) 4) : Vector (Witgen.FExpr (ZMod p)) 4 :=
+  let s0 : U64Expr (ZMod p) := a[0].val + b[0].val
+  let s1 : U64Expr (ZMod p) := a[1].val + b[1].val + s0 / 65536
+  let s2 : U64Expr (ZMod p) := a[2].val + b[2].val + s1 / 65536
+  let s3 : U64Expr (ZMod p) := a[3].val + b[3].val + s2 / 65536
+  #v[(s0 % 65536).toField, (s1 % 65536).toField,
+     (s2 % 65536).toField, (s3 % 65536).toField]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Evaluating a sum limb is the corresponding `populate` limb. -/
+theorem populateFW_eval (env : ProverEnvironment (ZMod p))
+    (a b : Vector (Witgen.FExpr (ZMod p)) 4) (va vb : Word (ZMod p))
+    (hA : ∀ (i : ℕ) (_ : i < 4), Witgen.FExpr.eval { env := env } a[i] = va[i])
+    (hB : ∀ (i : ℕ) (_ : i < 4), Witgen.FExpr.eval { env := env } b[i] = vb[i])
+    (ha : va.isU64) (hb : vb.isU64) (i : ℕ) (hi : i < 4) :
+    ((populateFW a b)[i]).eval { env := env } = (populate va vb)[i] := by
+  obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
+  obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb
+  interval_cases i <;>
+    simp only [populateFW, populate, circuit_norm, FiniteField.fromNat,
+      hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
+      hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega),
+      Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Environment-locality of the sum limbs. -/
+theorem populateFW_congr (env env' : ProverEnvironment (ZMod p))
+    (a b : Vector (Witgen.FExpr (ZMod p)) 4)
+    (hA : ∀ (i : ℕ) (_ : i < 4),
+      Witgen.FExpr.eval { env := env } a[i] = Witgen.FExpr.eval { env := env' } a[i])
+    (hB : ∀ (i : ℕ) (_ : i < 4),
+      Witgen.FExpr.eval { env := env } b[i] = Witgen.FExpr.eval { env := env' } b[i])
+    (i : ℕ) (hi : i < 4) :
+    ((populateFW a b)[i]).eval { env := env } = ((populateFW a b)[i]).eval { env := env' } := by
+  interval_cases i <;>
+    simp only [populateFW, circuit_norm, -Witgen.u64Wrap,
+      hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
+      hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega),
+      Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
+
+end FW
+
 end SP1Clean.AddOperation

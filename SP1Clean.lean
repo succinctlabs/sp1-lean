@@ -44,7 +44,11 @@ import SP1Clean.Proofs.Chips.DivRemChip.Populate
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Abs
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Bounds
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Euclid
+import SP1Clean.Proofs.Chips.DivRemChip.Populate.FE
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Glue
+import SP1Clean.Proofs.Chips.DivRemChip.Populate.IR
+import SP1Clean.Proofs.Chips.DivRemChip.Populate.IRCtq
+import SP1Clean.Proofs.Chips.DivRemChip.Populate.IRWord
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Shapes
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Signs
 import SP1Clean.Proofs.Chips.DivRemChip.Completeness.BytePulls
