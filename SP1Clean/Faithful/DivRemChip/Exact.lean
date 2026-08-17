@@ -83,8 +83,7 @@ private theorem divRemNativeDecompose
   rw [hpopulateLength]
   simp only [DivRemChip.populateRow,
     Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative,
-    CircuitNormalization.witnessNative_apply_eq,
+    witnessVectorIR, Witnessable.witness_provable, witnessIR,
     Operations.localLength, Operations.constraints_append,
     Operations.constraints_witness, Operations.constraints_nil,
     List.map_nil, List.nil_append]
@@ -2586,8 +2585,7 @@ private theorem divRemNativeByteDecompose
   rw [hpopulateLength]
   simp only [DivRemChip.populateRow,
     Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative,
-    CircuitNormalization.witnessNative_apply_eq,
+    witnessVectorIR, Witnessable.witness_provable, witnessIR,
     Operations.localLength, Operations.interactionsWith_append,
     Operations.interactionsWith_witness,
     Operations.interactionsWith_nil, List.nil_append]

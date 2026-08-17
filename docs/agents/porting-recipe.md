@@ -197,6 +197,34 @@ Add (vector) and Bitwise (struct + first `hintGet`) pilots:
    standing gates — the chip's **trace anchor must pass unmodified** (the `native_decide`
    byte-for-byte re-derivation through the new IR path is the semantic gate on the whole swap).
 
+**DivRem-scale lessons (the 30-site terminal port).** Binding rules learned closing the largest
+chip, in force for any future site of comparable depth:
+
+- *Structural simps take `Witnessable.witness_provable`, never the bare `Witnessable.witness`
+  projection* — simp cannot unfold a class projection on a named instance (Clean's own
+  `Basic.lean` note), and one dead token turned a 39s output lemma into a >10-minute hang. The
+  whole `populateRow`-output lemma is just `simp only [circuit_norm, populateRow, populatedRowAt]`
+  (the bespoke unfold list was both slower and wrong).
+- *Congr lemmas obey a phase-order rule*: the operand/hint leaf facts must sit **in the same
+  `simp only` that unfolds the payload** — once the push forms an `if` whose baked `Decidable`
+  instance contains the leaf, no later pass reaches it. An unsolved same-tree congr usually means
+  one sub-`def` is missing from the unfold list (diff the two sides modulo `env`/`env'` renaming
+  to find the residual); `interval_cases i` is needed exactly at literal-`#v` payload indexing;
+  variable-`k` dispatch (`if k < 4`) goes compositional (`split_ifs` helpers), literal-`k` needs
+  `reduceDIte` **plus** `Nat.reduceLT`. Struct-read cells keep the struct folded and close by
+  `if_congr` + `exact` chains through an explicitly instantiated `Witgen.getElem_eval_toElements`
+  (its `size` side-condition is not simp-dischargeable, and the struct-eval terms match only up
+  to instance paths).
+- *Completeness pins bridge through instantiated site evals*: one block of named-argument
+  `have eX := <site>FE_eval (env := env) (vB := B) … (hWB := hbpvE) …` facts (element facts
+  `hbpvE` from `rw [← hbpv, Vector.getElem_map]`), then each pin is
+  `simp only [circuit_norm, …, eX, hFlags] at h` — `circuit_norm` is required (it reduces the
+  reconstructed-input struct-literal projections inside `h`). Literal-index `h_env` applications
+  must be `⟨k, by omega⟩` (`Fin.instOfNat`'s coercion resists the `Fin.val` lemmas). Struct pins
+  never simp the big hypothesis: `dsimp only [] at h` (proj-of-mk), then `refine h.trans ?_` and
+  an `exact` chain through `getElem_eval_ofFExprs` / `Vector.getElem_cast _` /
+  `getElem_eval_toElements` / `congrArg` of the struct eval.
+
 ## Scope notes
 
 - Register/memory reads and the PC next-state are **native readers** now: the chip composes

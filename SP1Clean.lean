@@ -40,6 +40,7 @@ import SP1Clean.Native.Operations.DivRemOperation.Core
 import SP1Clean.Proofs.Operations.DivRemOperation.Compare
 import SP1Clean.Proofs.Operations.DivRemOperation.Core
 import SP1Clean.Proofs.Chips.DivRemChip.Soundness
+import SP1Clean.Proofs.Chips.DivRemChip.Witgen
 import SP1Clean.Proofs.Chips.DivRemChip.Populate
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Abs
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Bounds

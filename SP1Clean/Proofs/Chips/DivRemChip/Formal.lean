@@ -205,8 +205,7 @@ theorem evidenceSoundness :
       ((populateRow input_var >>= constrainRow input_var).operations i₀)
     simp only [Operations.Requirements, Circuit.bind_forAllNoOffset]
     refine ⟨?_, ?_⟩
-    · simp only [populateRow, Circuit.bind_forAllNoOffset, witnessVectorNative,
-        CircuitNormalization.witnessNative_apply_eq, Circuit.pure_def, Circuit.operations,
+    · simp only [populateRow, Circuit.bind_forAllNoOffset, witnessVectorIR, Witnessable.witness_provable, witnessIR, Circuit.pure_def, Circuit.operations,
         Operations.forAllNoOffset, and_true]
     · simp only [constrainRow, Circuit.bind_forAllNoOffset, subcircuitWithAssertion,
         assertion, Circuit.pure_def, Circuit.operations, Operations.forAllNoOffset,
@@ -240,13 +239,14 @@ theorem contractSoundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumpt
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec :=
   contractSoundness
 
+omit [Fact (2 ^ 24 < p)] in
 /-- The witness-only prefix has no interactions on any channel.  This is the sole structural
 normalization of the 217-cell witness program used below; clients rewrite this folded theorem. -/
 private theorem populateRow_interactionsWith_eq_nil (channel : RawChannel (ZMod p))
     (input : Var Inputs (ZMod p)) (offset : ℕ) :
     Operations.interactionsWith channel ((populateRow input).operations offset) = [] := by
   simp only [populateRow, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, CircuitNormalization.witnessNative_apply_eq, Operations.localLength,
+    witnessVectorIR, Witnessable.witness_provable, witnessIR, Operations.localLength,
     Operations.interactionsWith_append, Operations.interactionsWith_witness,
     Operations.interactionsWith_nil, List.nil_append]
 
@@ -471,12 +471,13 @@ private theorem main_exposedChannelsLawful (input : Var Inputs (ZMod p)) (offset
     subst exposed
     exact main_interactionsWith_memory input offset
 
+omit [Fact (2 ^ 24 < p)] in
 /-- The witness-only prefix contains no child circuit and hence declares no child requirements. -/
 private theorem populateRow_subcircuitRequirements_eq_nil (input : Var Inputs (ZMod p))
     (offset : ℕ) :
     Operations.subcircuitChannelsWithRequirements ((populateRow input).operations offset) = [] := by
   simp only [populateRow, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, CircuitNormalization.witnessNative_apply_eq, Operations.localLength,
+    witnessVectorIR, Witnessable.witness_provable, witnessIR, Operations.localLength,
     Operations.subcircuitChannelsWithRequirements_append,
     Operations.subcircuitChannelsWithRequirements_witness,
     Operations.subcircuitChannelsWithRequirements_nil, List.nil_append]
@@ -498,11 +499,12 @@ private theorem constrainRow_subcircuitRequirements_eq (input : Var Inputs (ZMod
     Readers.RegisterWrite.circuit, List.nil_append, List.append_nil]
   rfl
 
+omit [Fact (2 ^ 24 < p)] in
 /-- Neither half emits a shallow interaction; all channel traffic belongs to composed children. -/
 private theorem populateRow_shallowChannels_eq_nil (input : Var Inputs (ZMod p)) (offset : ℕ) :
     Operations.shallowChannels ((populateRow input).operations offset) = [] := by
   simp only [populateRow, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, CircuitNormalization.witnessNative_apply_eq, Operations.localLength,
+    witnessVectorIR, Witnessable.witness_provable, witnessIR, Operations.localLength,
     Operations.shallowChannels_append, Operations.shallowChannels_witness,
     Operations.shallowChannels_nil, List.nil_append]
 
@@ -513,10 +515,11 @@ private theorem constrainRow_shallowChannels_eq_nil (input : Var Inputs (ZMod p)
     subcircuitWithAssertion, assertion, Operations.localLength, Operations.shallowChannels_append,
     Operations.shallowChannels_subcircuit, Operations.shallowChannels_nil, List.nil_append]
 
+omit [Fact (2 ^ 24 < p)] in
 private theorem populateRow_shallowInteractions_eq_nil (input : Var Inputs (ZMod p)) (offset : ℕ) :
     Operations.shallowInteractions ((populateRow input).operations offset) = [] := by
   simp only [populateRow, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, CircuitNormalization.witnessNative_apply_eq, Operations.localLength,
+    witnessVectorIR, Witnessable.witness_provable, witnessIR, Operations.localLength,
     Operations.shallowInteractions_append, Operations.shallowInteractions_witness,
     Operations.shallowInteractions_nil, List.nil_append]
 

@@ -12,15 +12,10 @@ success it prints the circuit's witness cell count.
 That makes this file the thing that keeps "we removed the closures" honest. `scripts/check_no_witness_native.sh`
 greps for the tokens; this evaluates the circuits.
 
-**Coverage is the converted set, and grows one wave at a time.** A chip is listed here exactly when
-its `main` is closure-free, so adding a line is the last step of converting a chip and the line fails
-loudly if a conversion regresses. The chips *not* listed are not an oversight — they are the
-remaining waves, and each would fail today:
-
-* `DivRem` reads its flag hint through a closure and is simply the largest port (30 sites, 217
-  cells); its signed division is the sign/magnitude construction over the unsigned ops the IR
-  already has (`srem_eq_bvAbs` proved half the reduction — see the withdrawn U6 entry in
-  `docs/agents/clean-upstream.md`).
+**Coverage is the converted set.** A chip is listed here exactly when its `main` is
+closure-free, so adding a line is the last step of converting a chip and the line fails
+loudly if a conversion regresses. With the DivRem port (the terminal wave: 30 sites, 217
+cells) every registered chip is listed.
 
 The nine memory chips appear here without ever having been converted individually: their only
 witnesses come from the `AddressOperation` subcircuit, so converting that one operation cleared all
@@ -118,6 +113,9 @@ instance instFact2pow24SP1Prime : Fact (2 ^ 24 < SP1Prime) := ⟨by norm_num [SP
 /-- info: exportable ✓ (37 witness cells) -/
 #guard_msgs in
 #assert_exportable (ShiftRightChip.circuit (p := SP1Prime))
+/-- info: exportable ✓ (217 witness cells) -/
+#guard_msgs in
+#assert_exportable (DivRemChip.circuit (p := SP1Prime))
 
 /-! ## Chips that witness nothing at all -/
 
