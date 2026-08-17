@@ -922,4 +922,355 @@ theorem bitFE_eval (ir : Expression (ZMod p)) (vir : ZMod p)
 
 end LtSites
 
+/-! ## The gated `MulOperation` product structs -/
+
+section MulSites
+
+/-- The `c_times_quotient_lower` struct payload (real rows only). -/
+def mulLowerFE (ir : Expression (ZMod p)) (B C : Word (Expression (ZMod p))) :
+    Extracted.MulOperation (Witgen.FExpr (ZMod p)) :=
+  Witgen.gateFE ((Witgen.FExpr.expr ir) =? (1 : ZMod p))
+    (MulOperation.populateFEW (quotCompFE B C) (compF C) 0 0 0)
+
+/-- The `c_times_quotient_upper` struct payload (64-bit variants of real rows only; the signed
+pair runs the `is_mulh` stream). -/
+def mulUpperFE (ir : Expression (ZMod p)) (B C : Word (Expression (ZMod p))) :
+    Extracted.MulOperation (Witgen.FExpr (ZMod p)) :=
+  Witgen.gateFE (((Witgen.FExpr.expr ir) =? (1 : ZMod p)).and
+      ((longSumF (p := p)) =? (1 : ZMod p)))
+    (MulOperation.populateFEW (quotCompFE B C) (compF C) (flagF 0 + flagF 2) 0 0)
+
+variable (env : ProverEnvironment (ZMod p))
+variable (B C : Word (Expression (ZMod p))) (vB vC : Word (ZMod p))
+  (hWB : ∀ (i : ℕ) (_ : i < 4), Expression.eval env.toEnvironment B[i] = vB[i])
+  (hWC : ∀ (i : ℕ) (_ : i < 4), Expression.eval env.toEnvironment C[i] = vC[i])
+  (hUB : vB.isU64) (hUC : vC.isU64)
+
+include hWB hWC hUB hUC in
+/-- The evaluated operand words of the product payloads, in `populateFEW_eval`'s shape. -/
+private theorem mulOperandEvals :
+    (#v[Witgen.FExpr.eval { env := env } (quotCompFE B C)[0],
+        Witgen.FExpr.eval { env := env } (quotCompFE B C)[1],
+        Witgen.FExpr.eval { env := env } (quotCompFE B C)[2],
+        Witgen.FExpr.eval { env := env } (quotCompFE B C)[3]]
+      = populateQuotComp vB vC (hintFlags env.hint)) ∧
+    (#v[Witgen.FExpr.eval { env := env } (compF C)[0],
+        Witgen.FExpr.eval { env := env } (compF C)[1],
+        Witgen.FExpr.eval { env := env } (compF C)[2],
+        Witgen.FExpr.eval { env := env } (compF C)[3]]
+      = cComp vC (hintFlags env.hint)) := by
+  constructor <;>
+    (apply Vector.ext
+     intro k hk
+     interval_cases k) <;>
+    first
+      | exact quotCompFE_eval env B C vB vC hWB hWC hUB hUC 0 (by omega)
+      | exact quotCompFE_eval env B C vB vC hWB hWC hUB hUC 1 (by omega)
+      | exact quotCompFE_eval env B C vB vC hWB hWC hUB hUC 2 (by omega)
+      | exact quotCompFE_eval env B C vB vC hWB hWC hUB hUC 3 (by omega)
+      | exact compF_eval env C vC hWC hUC 0 (by omega)
+      | exact compF_eval env C vC hWC hUC 1 (by omega)
+      | exact compF_eval env C vC hWC hUC 2 (by omega)
+      | exact compF_eval env C vC hWC hUC 3 (by omega)
+
+include hWB hWC hUB hUC in
+/-- Evaluating the lower product payload is `populateMulLower`. -/
+theorem mulLowerFE_eval (ir : Expression (ZMod p)) (vir : ZMod p)
+    (hir : Expression.eval env.toEnvironment ir = vir) :
+    Witgen.eval { env := env } (mulLowerFE ir B C)
+      = populateMulLower vir vB vC (hintFlags env.hint) := by
+  obtain ⟨hqw, hcw⟩ := mulOperandEvals env B C vB vC hWB hWC hUB hUC
+  have hinner := MulOperation.populateFEWW_eval env (quotCompFE B C) (compF C) 0 0 0
+    (populateQuotComp vB vC (hintFlags env.hint)) (cComp vC (hintFlags env.hint)) 0 0 0
+    hqw hcw rfl rfl rfl (populateQuotComp_isU64 vB vC _) (cComp_isU64 hUC _)
+    (Or.inl rfl) (Or.inl rfl) (by simp)
+  rw [mulLowerFE, Witgen.eval_gateFE]
+  simp only [populateMulLower]
+  by_cases h1 : vir = 1
+  · rw [if_pos (feq_true env _ _ _ hir h1), if_pos h1, hinner]
+  · rw [if_neg (feq_false env _ _ _ hir h1), if_neg h1, MulOperation.fromElements_zero]
+
+include hWB hWC hUB hUC in
+/-- Evaluating the upper product payload is `populateMulUpper` (under the flag binarities the
+contract provides — the signed selector `f[0] + f[2]` must be binary). -/
+theorem mulUpperFE_eval (ir : Expression (ZMod p)) (vir : ZMod p)
+    (hir : Expression.eval env.toEnvironment ir = vir)
+    (hf02 : (hintFlags env.hint)[0] + (hintFlags env.hint)[2] = 0
+      ∨ (hintFlags env.hint)[0] + (hintFlags env.hint)[2] = 1) :
+    Witgen.eval { env := env } (mulUpperFE ir B C)
+      = populateMulUpper vir vB vC (hintFlags env.hint) := by
+  obtain ⟨hqw, hcw⟩ := mulOperandEvals env B C vB vC hWB hWC hUB hUC
+  have hh : Witgen.FExpr.eval { env := env }
+      ((flagF 0 : Witgen.FExpr (ZMod p)) + flagF 2)
+      = (hintFlags env.hint)[0] + (hintFlags env.hint)[2] := by
+    simp only [circuit_norm, flagF_eval env 0 (by omega), flagF_eval env 2 (by omega)]
+  have hsumv : ((hintFlags env.hint)[0] + (hintFlags env.hint)[2]).val + (0 : ZMod p).val ≤ 1 := by
+    rcases hf02 with h | h
+    · simp [h]
+    · simp [h, ZMod.val_one]
+  have hinner := MulOperation.populateFEWW_eval env (quotCompFE B C) (compF C)
+    ((flagF 0 : Witgen.FExpr (ZMod p)) + flagF 2) 0 0
+    (populateQuotComp vB vC (hintFlags env.hint)) (cComp vC (hintFlags env.hint))
+    ((hintFlags env.hint)[0] + (hintFlags env.hint)[2]) 0 0
+    hqw hcw hh rfl rfl (populateQuotComp_isU64 vB vC _) (cComp_isU64 hUC _)
+    hf02 (Or.inl rfl) hsumv
+  have hband : ((Witgen.BExpr.and ((Witgen.FExpr.expr ir) =? (1 : ZMod p))
+      ((longSumF (p := p)) =? (1 : ZMod p))).eval { env := env })
+      = ((((Witgen.FExpr.expr ir) =? (1 : ZMod p)).eval { env := env })
+        && (((longSumF (p := p)) =? (1 : ZMod p)).eval { env := env })) := rfl
+  rw [mulUpperFE, Witgen.eval_gateFE]
+  simp only [populateMulUpper]
+  by_cases h1 : vir = 1
+  · by_cases h2 : (hintFlags env.hint)[0] + (hintFlags env.hint)[1]
+        + (hintFlags env.hint)[2] + (hintFlags env.hint)[3] = 1
+    · rw [if_pos (by
+          rw [hband, feq_true env _ _ _ hir h1, feq_true env _ _ _ (longSumF_eval env) h2]
+          rfl),
+        if_pos ⟨h1, h2⟩, hinner]
+    · rw [if_neg (by
+          rw [hband]
+          intro hb
+          simp only [Bool.and_eq_true] at hb
+          exact feq_false env _ _ _ (longSumF_eval env) h2 hb.2),
+        if_neg (by intro h; exact h2 h.2), MulOperation.fromElements_zero]
+  · rw [if_neg (by
+        rw [hband]
+        intro hb
+        simp only [Bool.and_eq_true] at hb
+        exact feq_false env _ _ _ hir h1 hb.1),
+      if_neg (by intro h; exact h1 h.1), MulOperation.fromElements_zero]
+
+end MulSites
+
+/-! ## The gated overflow struct payloads -/
+
+section OvSites
+
+/-- The `is_overflow_b` struct payload (real rows; word-truncated on the W classes). -/
+def ovbFE (ir : Expression (ZMod p)) (B : Word (Expression (ZMod p))) :
+    Extracted.IsEqualWordOperation (Witgen.FExpr (ZMod p)) :=
+  Witgen.gateFE ((Witgen.FExpr.expr ir) =? (1 : ZMod p))
+    (Witgen.iteFE ((wSumF (p := p)) =? (1 : ZMod p))
+      (IsEqualWordOperation.populateFE
+        (#v[.expr B[0], .expr B[1], 0, 0]) (#v[0, .const 32768, 0, 0]))
+      (IsEqualWordOperation.populateFE
+        (#v[.expr B[0], .expr B[1], .expr B[2], .expr B[3]]) (#v[0, 0, 0, .const 32768])))
+
+/-- The `is_overflow_c` struct payload. -/
+def ovcFE (ir : Expression (ZMod p)) (C : Word (Expression (ZMod p))) :
+    Extracted.IsEqualWordOperation (Witgen.FExpr (ZMod p)) :=
+  Witgen.gateFE ((Witgen.FExpr.expr ir) =? (1 : ZMod p))
+    (Witgen.iteFE ((wSumF (p := p)) =? (1 : ZMod p))
+      (IsEqualWordOperation.populateFE
+        (#v[.expr C[0], .expr C[1], 0, 0]) (#v[.const 65535, .const 65535, 0, 0]))
+      (IsEqualWordOperation.populateFE
+        (#v[.expr C[0], .expr C[1], .expr C[2], .expr C[3]])
+        (#v[.const 65535, .const 65535, .const 65535, .const 65535])))
+
+variable (env : ProverEnvironment (ZMod p))
+variable (B C : Word (Expression (ZMod p))) (vB vC : Word (ZMod p))
+  (hWB : ∀ (i : ℕ) (_ : i < 4), Expression.eval env.toEnvironment B[i] = vB[i])
+  (hWC : ∀ (i : ℕ) (_ : i < 4), Expression.eval env.toEnvironment C[i] = vC[i])
+
+omit [Fact (2 ^ 24 < p)] in
+include hWB in
+/-- Evaluating the `is_overflow_b` payload is `ovbWitness`. -/
+theorem ovbFE_eval (ir : Expression (ZMod p)) (vir : ZMod p)
+    (hir : Expression.eval env.toEnvironment ir = vir) :
+    Witgen.eval { env := env } (ovbFE ir B) = ovbWitness vir vB (hintFlags env.hint) := by
+  have htrunc := IsEqualWordOperation.populateFE_eval env
+    (#v[.expr B[0], .expr B[1], 0, 0]) (#v[0, .const 32768, 0, 0])
+    (va := #v[vB[0], vB[1], 0, 0]) (vb := #v[0, 32768, 0, 0])
+    (by intro k hk; interval_cases k <;>
+          simp [circuit_norm, hWB 0 (by omega), hWB 1 (by omega)])
+    (by intro k hk; interval_cases k <;> simp [circuit_norm])
+  have hfull := IsEqualWordOperation.populateFE_eval env
+    (#v[.expr B[0], .expr B[1], .expr B[2], .expr B[3]]) (#v[0, 0, 0, .const 32768])
+    (va := vB) (vb := #v[0, 0, 0, 32768])
+    (by intro k hk; interval_cases k <;>
+          simp [circuit_norm, hWB 0 (by omega), hWB 1 (by omega), hWB 2 (by omega),
+            hWB 3 (by omega)])
+    (by intro k hk; interval_cases k <;> simp [circuit_norm])
+  rw [ovbFE, Witgen.eval_gateFE, Witgen.eval_iteFE]
+  simp only [ovbWitness]
+  by_cases h1 : vir = 1
+  · rw [if_pos (feq_true env _ _ _ hir h1), if_pos h1]
+    by_cases h2 : (hintFlags env.hint)[4] + (hintFlags env.hint)[5]
+        + (hintFlags env.hint)[6] + (hintFlags env.hint)[7] = 1
+    · rw [if_pos (feq_true env _ _ _ (wSumF_eval env) h2), if_pos h2, htrunc]
+    · rw [if_neg (feq_false env _ _ _ (wSumF_eval env) h2), if_neg h2, hfull]
+  · rw [if_neg (feq_false env _ _ _ hir h1), if_neg h1,
+      IsEqualWordOperation.fromElements_zero]
+
+omit [Fact (2 ^ 24 < p)] in
+include hWC in
+/-- Evaluating the `is_overflow_c` payload is `ovcWitness`. -/
+theorem ovcFE_eval (ir : Expression (ZMod p)) (vir : ZMod p)
+    (hir : Expression.eval env.toEnvironment ir = vir) :
+    Witgen.eval { env := env } (ovcFE ir C) = ovcWitness vir vC (hintFlags env.hint) := by
+  have htrunc := IsEqualWordOperation.populateFE_eval env
+    (#v[.expr C[0], .expr C[1], 0, 0]) (#v[.const 65535, .const 65535, 0, 0])
+    (va := #v[vC[0], vC[1], 0, 0]) (vb := #v[65535, 65535, 0, 0])
+    (by intro k hk; interval_cases k <;>
+          simp [circuit_norm, hWC 0 (by omega), hWC 1 (by omega)])
+    (by intro k hk; interval_cases k <;> simp [circuit_norm])
+  have hfull := IsEqualWordOperation.populateFE_eval env
+    (#v[.expr C[0], .expr C[1], .expr C[2], .expr C[3]])
+    (#v[.const 65535, .const 65535, .const 65535, .const 65535])
+    (va := vC) (vb := #v[65535, 65535, 65535, 65535])
+    (by intro k hk; interval_cases k <;>
+          simp [circuit_norm, hWC 0 (by omega), hWC 1 (by omega), hWC 2 (by omega),
+            hWC 3 (by omega)])
+    (by intro k hk; interval_cases k <;> simp [circuit_norm])
+  rw [ovcFE, Witgen.eval_gateFE, Witgen.eval_iteFE]
+  simp only [ovcWitness]
+  by_cases h1 : vir = 1
+  · rw [if_pos (feq_true env _ _ _ hir h1), if_pos h1]
+    by_cases h2 : (hintFlags env.hint)[4] + (hintFlags env.hint)[5]
+        + (hintFlags env.hint)[6] + (hintFlags env.hint)[7] = 1
+    · rw [if_pos (feq_true env _ _ _ (wSumF_eval env) h2), if_pos h2, htrunc]
+    · rw [if_neg (feq_false env _ _ _ (wSumF_eval env) h2), if_neg h2, hfull]
+  · rw [if_neg (feq_false env _ _ _ hir h1), if_neg h1,
+      IsEqualWordOperation.fromElements_zero]
+
+end OvSites
+
+/-! ## The carry chain -/
+
+section CarrySite
+
+/-- Addend limb `k` of `remainder` in the carry chain (`remAddendNat`'s IR twin: the committed
+`remainder_comp` limb below the word, the sign fill above). -/
+def remAddendU (B C : Word (Expression (ZMod p))) (k : ℕ) : Witgen.U64Expr (ZMod p) :=
+  if h : k < 4 then Witgen.U64Expr.val ((remCompFE B C)[k]'h)
+  else Witgen.U64Expr.val (remNegFE B C) * 65535
+
+/-- The carry recursion of `c_times_quotient + remainder` (`carryNat`'s IR twin; authoring-time
+recursion producing a closed term at each concrete limb). -/
+def carryChainU (B C : Word (Expression (ZMod p))) : ℕ → Witgen.U64Expr (ZMod p)
+  | 0 => (ctqLimbU (quotCompBitsU (wordU B) (wordU C)) (compU (wordU C)) 0
+      + remAddendU B C 0) / 65536
+  | n + 1 => (ctqLimbU (quotCompBitsU (wordU B) (wordU C)) (compU (wordU C)) (n + 1)
+      + remAddendU B C (n + 1) + carryChainU B C n) / 65536
+
+/-- The committed `carry` block (8 boolean carries). -/
+def carryFE (B C : Word (Expression (ZMod p))) : Vector (Witgen.FExpr (ZMod p)) 8 :=
+  Vector.ofFn fun k => (carryChainU B C k.val).toField
+
+variable (env : ProverEnvironment (ZMod p))
+variable (B C : Word (Expression (ZMod p))) (vB vC : Word (ZMod p))
+  (hWB : ∀ (i : ℕ) (_ : i < 4), Expression.eval env.toEnvironment B[i] = vB[i])
+  (hWC : ∀ (i : ℕ) (_ : i < 4), Expression.eval env.toEnvironment C[i] = vC[i])
+  (hUB : vB.isU64) (hUC : vC.isU64)
+
+include hWB hWC hUB hUC in
+/-- Evaluating an addend limb is `remAddendNat` — under the flag binarities the contract
+provides (a dishonest non-binary flag could push the sign fill past the u64 `val`
+truncation), with the ≤ `2^18` bound for the chain's wrap-freeness. -/
+private theorem remAddendU_toNat
+    (hf : ∀ (k : ℕ) (_ : k < 8), (hintFlags env.hint)[k] = 0 ∨ (hintFlags env.hint)[k] = 1)
+    (k : ℕ) (hk : k < 8) :
+    ((remAddendU B C k).eval { env := env }).toNat
+      = remAddendNat vB vC (hintFlags env.hint) k
+      ∧ remAddendNat vB vC (hintFlags env.hint) k < 2 ^ 18 := by
+  have hrn := remNegFE_eval env B C vB vC hWB hWC hUB hUC
+  have hval_add : ∀ a b : ZMod p, (a + b).val ≤ a.val + b.val := fun a b =>
+    (ZMod.val_add a b) ▸ Nat.mod_le _ _
+  have hval_mul : ∀ a b : ZMod p, (a * b).val ≤ a.val * b.val := fun a b =>
+    (ZMod.val_mul a b) ▸ Nat.mod_le _ _
+  have hbin1 : ∀ x : ZMod p, x = 0 ∨ x = 1 → x.val ≤ 1 := by
+    rintro x (rfl | rfl)
+    · simp
+    · rw [ZMod.val_one]
+  have hrnval : (populateRemNeg vB vC (hintFlags env.hint)).val ≤ 4 := by
+    have hmsb := hbin1 _ (remMsbCell_bool vB vC (hintFlags env.hint))
+    have h0 := hbin1 _ (hf 0 (by omega)); have h2 := hbin1 _ (hf 2 (by omega))
+    have h4 := hbin1 _ (hf 4 (by omega)); have h5 := hbin1 _ (hf 5 (by omega))
+    rw [populateRemNeg]
+    calc ((((hintFlags env.hint)[0] + (hintFlags env.hint)[2] + (hintFlags env.hint)[4]
+            + (hintFlags env.hint)[5])) * remMsbCell vB vC (hintFlags env.hint)).val
+        ≤ ((hintFlags env.hint)[0] + (hintFlags env.hint)[2] + (hintFlags env.hint)[4]
+            + (hintFlags env.hint)[5]).val * (remMsbCell vB vC (hintFlags env.hint)).val :=
+          hval_mul _ _
+      _ ≤ 4 := by
+          have hs1 := hval_add ((hintFlags env.hint)[0] + (hintFlags env.hint)[2]
+            + (hintFlags env.hint)[4]) (hintFlags env.hint)[5]
+          have hs2 := hval_add ((hintFlags env.hint)[0] + (hintFlags env.hint)[2])
+            (hintFlags env.hint)[4]
+          have hs3 := hval_add (hintFlags env.hint)[0] (hintFlags env.hint)[2]
+          have := Nat.mul_le_mul (show ((hintFlags env.hint)[0] + (hintFlags env.hint)[2]
+            + (hintFlags env.hint)[4] + (hintFlags env.hint)[5]).val ≤ 4 from by omega) hmsb
+          omega
+  rcases Nat.lt_or_ge k 4 with hk4 | hk4
+  · obtain ⟨w0, w1, w2, w3⟩ :=
+      Word.lt_cases_of_isU64 (populateRemComp_isU64 vB vC (hintFlags env.hint))
+    have hrc0 := remCompFE_eval env B C vB vC hWB hWC hUB hUC 0 (by omega)
+    have hrc1 := remCompFE_eval env B C vB vC hWB hWC hUB hUC 1 (by omega)
+    have hrc2 := remCompFE_eval env B C vB vC hWB hWC hUB hUC 2 (by omega)
+    have hrc3 := remCompFE_eval env B C vB vC hWB hWC hUB hUC 3 (by omega)
+    rw [remAddendU, dif_pos hk4, remAddendNat, dif_pos hk4]
+    refine ⟨?_, by interval_cases k <;> omega⟩
+    interval_cases k <;>
+      simp only [circuit_norm, hrc0, hrc1, hrc2, hrc3]
+  · rw [remAddendU, dif_neg (by omega), remAddendNat, dif_neg (by omega)]
+    refine ⟨?_, by
+      have := Nat.mul_le_mul hrnval (le_refl 65535)
+      omega⟩
+    simp only [circuit_norm, hrn]
+
+include hWB hWC hUB hUC in
+/-- Evaluating the carry recursion is `carryNat`, with the ≤ `5` bound riding in the motive so
+the u64 wrap never trips (each step is `(< 2^16) + (< 2^18) + (≤ 5)` over `2^16`). -/
+private theorem carryChainU_toNat
+    (hf : ∀ (k : ℕ) (_ : k < 8), (hintFlags env.hint)[k] = 0 ∨ (hintFlags env.hint)[k] = 1) :
+    ∀ n, n < 8 → (((carryChainU B C n).eval { env := env }).toNat
+        = carryNat vB vC (hintFlags env.hint) n
+      ∧ carryNat vB vC (hintFlags env.hint) n ≤ 5) := by
+  have hq : ((Witgen.U64Expr.eval { env := env }
+      (quotCompBitsU (wordU B) (wordU C))).toNat)
+      = (Word.toBitVec64 (populateQuotComp vB vC (hintFlags env.hint))).toNat := by
+    rw [quotCompBitsU_toNat env B C vB vC hWB hWC hUB hUC, populateQuotComp,
+      wordOfBits_toBitVec64]
+  have hc : ((Witgen.U64Expr.eval { env := env } (compU (wordU C))).toNat)
+      = (Word.toBitVec64 (cComp vC (hintFlags env.hint))).toNat :=
+    compU_toNat env (wordU C) (wordU_toNat env C vC hWC hUC) hUC
+  have hctqlt : ∀ k, ctqLimbNat vB vC (hintFlags env.hint) k < 2 ^ 16 := fun k =>
+    Nat.mod_lt _ (by norm_num)
+  intro n
+  induction n with
+  | zero =>
+    intro _
+    have hl := ctqLimbU_toNat env _ _ vB vC hq hc 0 (by omega)
+    obtain ⟨hra, hrab⟩ := remAddendU_toNat env B C vB vC hWB hWC hUB hUC hf 0 (by omega)
+    have hb1 := hctqlt 0
+    constructor
+    · simp only [carryChainU, carryNat, circuit_norm, hl, hra]
+      omega
+    · rw [carryNat]
+      omega
+  | succ n ih =>
+    intro hn
+    obtain ⟨ih1, ih2⟩ := ih (by omega)
+    have hl := ctqLimbU_toNat env _ _ vB vC hq hc (n + 1) (by omega)
+    obtain ⟨hra, hrab⟩ := remAddendU_toNat env B C vB vC hWB hWC hUB hUC hf (n + 1) (by omega)
+    have hb1 := hctqlt (n + 1)
+    constructor
+    · simp only [carryChainU, carryNat, circuit_norm, hl, hra, ih1]
+      omega
+    · rw [carryNat]
+      omega
+
+include hWB hWC hUB hUC in
+/-- Evaluating a carry cell is the corresponding `populateCarry` cell. -/
+theorem carryFE_eval
+    (hf : ∀ (k : ℕ) (_ : k < 8), (hintFlags env.hint)[k] = 0 ∨ (hintFlags env.hint)[k] = 1)
+    (k : ℕ) (hk : k < 8) :
+    ((carryFE B C)[k]).eval { env := env }
+      = (populateCarry vB vC (hintFlags env.hint))[k] := by
+  have h := (carryChainU_toNat env B C vB vC hWB hWC hUB hUC hf k hk).1
+  simp only [carryFE, populateCarry, circuit_norm, Vector.getElem_ofFn,
+    FiniteField.fromNat, h]
+
+end CarrySite
+
 end SP1Clean.DivRemChip
