@@ -16,6 +16,7 @@ Each document has **one role**, so none needs to repeat another:
 | [`architecture.md`](architecture.md) | module/pillar ownership, design rules, deliberate exceptions |
 | [`roadmap.md`](roadmap.md) | dependency-ordered future work + non-blocking backlog |
 | [`goal-overview.md`](goal-overview.md) | the completed-state contract (never current status) |
+| [`witgen-wire-format.md`](witgen-wire-format.md) | the `version: 1` witness-export wire format the `export/witgen/` artifacts and the Rust interpreter share |
 | [`chip-standardization.md`](chip-standardization.md) | the completed 25/25 `ChipKind.advance` interface record |
 | [`bus-model.md`](bus-model.md) | **HISTORICAL** pre-consolidation bus model, kept only for the section numbers source doc-comments cite |
 | [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) | compact checkpoint board for the architecture-consolidation work |
