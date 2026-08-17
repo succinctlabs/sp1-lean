@@ -213,6 +213,15 @@ private lemma toElements_cell_10 {F : Type} (s : Extracted.IsZeroWordOperation F
           ((Vector.getElem_append_right ?_ ?_).trans
             ((Vector.getElem_append_right ?_ ?_).trans (Vector.getElem_append_left ?_)))))) <;> decide
 
+set_option linter.unusedSectionVars false in
+/-- The result field is flattened cell `10` (the public face of the navigator family, for
+composing chips that read the result cell of a struct payload). -/
+lemma result_eq_toElements {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    s.result = (toElements s)[10]'(by
+      have h : size Extracted.IsZeroWordOperation = 11 := rfl
+      omega) :=
+  (toElements_cell_10 s).symm
+
 omit [Fact (2 ^ 17 < p)] in
 /-- Every flattened cell of the zero struct is zero (the gated-composition else-branch fact). -/
 lemma zc_cell (i : ℕ) (hi : i < size Extracted.IsZeroWordOperation) :

@@ -88,15 +88,26 @@ end FE
 
 section Flatten
 
-omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+set_option linter.unusedSectionVars false in
 /-- The single-field wrapper flattens to its field's flattening (kills the nested `toElements`
 tower: one rewrite lands in `IsZeroWordOperation`, whose navigators finish). -/
-lemma toElements_mk (s : Extracted.IsZeroWordOperation (ZMod p)) :
-    toElements (⟨s⟩ : Extracted.IsEqualWordOperation (ZMod p))
+lemma toElements_mk {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    toElements (⟨s⟩ : Extracted.IsEqualWordOperation F)
       = (toElements s).cast (by rfl) := by
   ext i hi
   simp only [circuit_norm, explicit_provable_type]
   exact (Vector.getElem_append_left hi).trans (Vector.getElem_cast _)
+
+set_option linter.unusedSectionVars false in
+/-- The nested result field is flattened cell `10` (for composing chips that read the
+overflow-result cell of a struct payload). -/
+lemma result_eq_toElements {F : Type} (s : Extracted.IsEqualWordOperation F) :
+    s.is_diff_zero.result = (toElements s)[10]'(by
+      have h : size Extracted.IsEqualWordOperation = 11 := rfl
+      omega) := by
+  obtain ⟨z⟩ := s
+  rw [toElements_mk, Vector.getElem_cast]
+  exact IsZeroWordOperation.result_eq_toElements z
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Every flattened cell of the zero struct is zero. -/
