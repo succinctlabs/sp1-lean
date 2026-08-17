@@ -1,6 +1,16 @@
 import SP1CleanTest.Exportable
+import SP1CleanTest.TraceGenTests.AddChipTraceWitness
+import SP1CleanTest.TraceGenTests.SubChipTraceWitness
+import SP1CleanTest.TraceGenTests.SubwChipTraceWitness
+import SP1CleanTest.TraceGenTests.AddwChipTraceWitness
+import SP1CleanTest.TraceGenTests.MulChipTraceWitness
+import SP1CleanTest.TraceGenTests.DivRemChipTraceWitness
+import SP1CleanTest.TraceGenTests.BitwiseChipTraceWitness
+import SP1CleanTest.TraceGenTests.LtChipTraceWitness
+import SP1CleanTest.TraceGenTests.ShiftLeftChipTraceWitness
+import SP1CleanTest.TraceGenTests.ShiftRightChipTraceWitness
 
-/-! # `witgenExport` — the witness-IR export driver (wave D2)
+/-! # `witgenExport` — the witness-IR export driver (waves D2/D4a)
 
 Serializes every registered chip's witness-generation programs (plus its complete
 assert/lookup/interact list) in Clean's `version: 1` witgen wire format, the payload the
@@ -10,12 +20,21 @@ chip name, hint schema) and a top-level `index.json`.
 
 Run from the repo root against built oleans:
 
-    lake build SP1CleanTest.Exportable
-    WITGEN_ARGS="[--out DIR] [--chip NAME] [--stdout]" lake env lean scripts/witgenExport.lean
+    lake build SP1CleanTest
+    WITGEN_ARGS="[--out DIR] [--chip NAME] [--stdout] [--testdata]" \
+      lake env lean scripts/witgenExport.lean
 
 Defaults: `--out export` (writing `export/witgen/`). `--chip NAME` restricts to one chip
 and skips `index.json` (never a partial index); `--stdout` prints the payload instead of
-writing files.
+writing files. `--testdata` writes `export/testdata/<Chip>.trace.json` differential
+fixtures instead: for the ten trace-anchored chips, one row per SP1-dumped event
+(inputs via the `EventPopulate` flatteners, hints via the per-chip builders,
+`expectedRow` copied from the dumped SP1 rows whose equality with the circuit-derived
+rows is pinned by the `native_decide` anchors) plus an honest padding row; for all 25
+chips, deterministic seeded synthetic rows. `expectedWitness` is always the Lean
+reference evaluation (`FlatOperation.witgen`) over the **shared** operation list — the
+same programs the wire carries, and `WitgenIR.eval_share` proves sharing changes no
+evaluation.
 
 This is deliberately an interpreted script, not a `lean_exe`: elaborating the file runs
 the trailing `#eval` against the already-built oleans (the same path as
@@ -208,25 +227,218 @@ def exportChip (out : Option System.FilePath) (e : Entry) : IO Json := do
     ("inputWidth", toJson e.inputWidth),
     ("localLength", toJson localLength)]
 
+/-! ## Test-data fixtures (`--testdata`)
+
+Differential fixtures for `rust/witgen-interp`: per row, the seeded input cells, the
+hint tables, and the expected witness cells from the Lean reference evaluation
+(`FlatOperation.witgen`) over the **shared** flat operations — the same programs the
+wire carries (`WitgenIR.eval_share` proves sharing preserves evaluation). Rows carry
+honest provenance: `"event"` rows come from SP1-dumped executor events whose full-row
+equality with the circuit derivation is pinned by a `native_decide` trace anchor
+(`expectedRow` is copied from the dumped SP1 rows verbatim); `"padding"` rows are
+SP1-anchored only for the chips whose padding SP1 *derives* (ShiftLeft/ShiftRight/
+DivRem — the rest zero-fill without running populate, so their zero-input padding row
+is a plain differential vector); `"synthetic"` rows are deterministic seeded vectors
+(witness generation is total, so every input is valid). -/
+
+section Testdata
+open SP1Clean.TraceGenTests
+
+/-- Deterministic value stream (a 64-bit LCG; committed fixtures must be byte-stable,
+so no runtime randomness). -/
+def lcgStream (seed : ℕ) : ℕ → ℕ
+  | 0 => (seed * 6364136223846793005 + 1442695040888963407) % (2 ^ 64)
+  | j + 1 => (lcgStream seed j * 6364136223846793005 + 1442695040888963407) % (2 ^ 64)
+
+/-- Seeded input row (values reduced into the field by the cast). -/
+def synInputs (width seed : ℕ) : List Fp :=
+  (List.range width).map fun j => ((lcgStream seed j : ℕ) : Fp)
+
+/-- Seeded hint tables from the payload-derived schema: one row per declared table,
+0/1-valued (the hint tables in these chips carry selector flags). -/
+def synHint (uses : List TableUse) (seed : ℕ) : ProverHint Fp := fun key n =>
+  if uses.any fun u => u.table == key && u.width == n then
+    #[Vector.ofFn fun i : Fin n => ((lcgStream seed i.val % 2 : ℕ) : Fp)]
+  else #[]
+
+/-- Serialize the declared hint tables as read from a `ProverHint`. -/
+def serializeHints (uses : List TableUse) (h : ProverHint Fp) : Json :=
+  Json.mkObj <| uses.map fun u =>
+    (u.table, Json.mkObj [
+      ("width", toJson u.width),
+      ("rows", toJson ((h u.table u.width).toList.map fun v => v.toList.map ZMod.val))])
+
+/-- The Lean reference witness evaluation over the shared flat operations. -/
+def expectedWitnessOf (flatShared : List (FlatOperation Fp)) (hint : ProverHint Fp)
+    (inputs : List Fp) : List ℕ :=
+  ((FlatOperation.witgen hint flatShared inputs.toArray).toList.drop inputs.length).map
+    ZMod.val
+
+def rowJson (kind : String) (anchored : Bool) (seed : Option ℕ) (inputs : List Fp)
+    (hints : Json) (expectedWitness : List ℕ) (expectedRow : Option (List ℕ)) : Json :=
+  Json.mkObj <| [("kind", Json.str kind), ("anchored", toJson anchored)]
+    ++ (seed.map fun s => [("seed", toJson s)]).getD []
+    ++ [("inputs", toJson (inputs.map ZMod.val)), ("hints", hints),
+        ("expectedWitness", toJson expectedWitness)]
+    ++ (expectedRow.map fun r => [("expectedRow", toJson r)]).getD []
+
+/-- One trace-anchored chip's event data, pre-flattened to `(inputs, hint)` pairs. -/
+structure AnchoredData where
+  inputsHints : List (List Fp × ProverHint Fp)
+  /-- The dumped SP1 rows, one per event (`<Chip>ChipTraceRows` truncated). -/
+  expectedRows : List (List ℕ)
+  padInputs : List Fp
+  /-- Whether SP1 *derives* its padding rows by populate (ShiftLeft/ShiftRight/DivRem);
+  the zero-fill chips write literal zero rows without running populate. -/
+  padAnchored : Bool
+  padExpectedRow : Option (List ℕ)
+  /-- The `native_decide` anchor pinning derived rows == dumped rows. -/
+  thm : String
+
+/-- The ten trace-anchored chips (the whole-trace conformance battery). -/
+def anchoredData : List (String × AnchoredData) := [
+  ("Add", {
+    inputsHints := AddChipTraceEvents.map fun e => (rTypeEventInputs e, ProverHint.empty _),
+    expectedRows := (AddChipTraceRows.take AddChipTraceEvents.length).map (·.toList),
+    padInputs := List.replicate 29 0, padAnchored := false, padExpectedRow := none,
+    thm := "SP1Clean.TraceGenTests.addchip_trace_conforms" }),
+  ("Sub", {
+    inputsHints := SubChipTraceEvents.map fun e => (rTypeEventInputs e, ProverHint.empty _),
+    expectedRows := (SubChipTraceRows.take SubChipTraceEvents.length).map (·.toList),
+    padInputs := List.replicate 29 0, padAnchored := false, padExpectedRow := none,
+    thm := "SP1Clean.TraceGenTests.subchip_trace_conforms" }),
+  ("Subw", {
+    inputsHints := SubwChipTraceEvents.map fun e => (rTypeEventInputs e, ProverHint.empty _),
+    expectedRows := (SubwChipTraceRows.take SubwChipTraceEvents.length).map (·.toList),
+    padInputs := List.replicate 29 0, padAnchored := false, padExpectedRow := none,
+    thm := "SP1Clean.TraceGenTests.subwchip_trace_conforms" }),
+  ("Addw", {
+    inputsHints := AddwChipTraceEvents.map fun e => (aluTypeEventInputs e, ProverHint.empty _),
+    expectedRows := (AddwChipTraceRows.take AddwChipTraceEvents.length).map (·.toList),
+    padInputs := List.replicate 33 0, padAnchored := false, padExpectedRow := none,
+    thm := "SP1Clean.TraceGenTests.addwchip_trace_conforms" }),
+  ("Mul", {
+    inputsHints := MulChipTraceEvents.map fun e => (rTypeOpEventInputs e, mulHint e.opcode),
+    expectedRows := (MulChipTraceRows.take MulChipTraceEvents.length).map (·.toList),
+    padInputs := List.replicate 29 0, padAnchored := false, padExpectedRow := none,
+    thm := "SP1Clean.TraceGenTests.mulchip_trace_conforms" }),
+  ("DivRem", {
+    inputsHints := DivRemChipTraceEvents.map fun e =>
+      (rTypeOpEventInputs e, divRemHint e.opcode),
+    expectedRows := (DivRemChipTraceRows.take DivRemChipTraceEvents.length).map (·.toList),
+    padInputs := divRemPadInputs, padAnchored := true,
+    padExpectedRow :=
+      (DivRemChipTraceRows.drop DivRemChipTraceEvents.length).head?.map (·.toList),
+    thm := "SP1Clean.TraceGenTests.divremchip_trace_conforms" }),
+  ("Bitwise", {
+    inputsHints := BitwiseChipTraceEvents.map fun e =>
+      (aluTypeOpEventInputs e, bitwiseHint e.opcode),
+    expectedRows := (BitwiseChipTraceRows.take BitwiseChipTraceEvents.length).map (·.toList),
+    padInputs := List.replicate 33 0, padAnchored := false, padExpectedRow := none,
+    thm := "SP1Clean.TraceGenTests.bitwisechip_trace_conforms" }),
+  ("Lt", {
+    inputsHints := LtChipTraceEvents.map fun e => (aluTypeOpEventInputs e, ltHint e.opcode),
+    expectedRows := (LtChipTraceRows.take LtChipTraceEvents.length).map (·.toList),
+    padInputs := List.replicate 33 0, padAnchored := false, padExpectedRow := none,
+    thm := "SP1Clean.TraceGenTests.ltchip_trace_conforms" }),
+  ("ShiftLeft", {
+    inputsHints := ShiftLeftChipTraceEvents.map fun e =>
+      (aluTypeOpEventInputs e, shiftLeftHint e.opcode),
+    expectedRows :=
+      (ShiftLeftChipTraceRows.take ShiftLeftChipTraceEvents.length).map (·.toList),
+    padInputs := List.replicate 33 0, padAnchored := true,
+    padExpectedRow :=
+      (ShiftLeftChipTraceRows.drop ShiftLeftChipTraceEvents.length).head?.map (·.toList),
+    thm := "SP1Clean.TraceGenTests.shiftleftchip_trace_conforms" }),
+  ("ShiftRight", {
+    inputsHints := ShiftRightChipTraceEvents.map fun e =>
+      (aluTypeOpEventInputs e, shiftRightHint e.opcode),
+    expectedRows :=
+      (ShiftRightChipTraceRows.take ShiftRightChipTraceEvents.length).map (·.toList),
+    padInputs := List.replicate 33 0, padAnchored := true,
+    padExpectedRow :=
+      (ShiftRightChipTraceRows.drop ShiftRightChipTraceEvents.length).head?.map (·.toList),
+    thm := "SP1Clean.TraceGenTests.shiftrightchip_trace_conforms" })]
+
+/-- Write one chip's differential fixture. `idx` is the chip's position in the full
+registry (stable seeds even under `--chip` filtering). -/
+def writeTestdataChip (dir : System.FilePath) (idx : ℕ) (e : Entry) : IO Unit := do
+  let t0 ← IO.monoMsNow
+  let payload ← match e.ops.witgenJsonShared? with
+    | .ok j => pure j
+    | .error msg => throw (IO.userError s!"{e.name}: {msg}")
+  let uses := aggregate ((collectGets payload).filter (·.isHint))
+  let flatShared := e.ops.toFlat.map .share
+  let empty : ProverHint Fp := ProverHint.empty Fp
+  let mut rows : Array Json := #[]
+  let mut provenance : List (String × Json) := []
+  match anchoredData.find? (·.1 == e.name) with
+  | some (_, a) =>
+    unless a.inputsHints.all (·.1.length == e.inputWidth) do
+      throw (IO.userError s!"{e.name}: event inputs drifted from inputWidth {e.inputWidth}")
+    unless a.inputsHints.length == a.expectedRows.length do
+      throw (IO.userError s!"{e.name}: event/row count mismatch")
+    for (ih, row) in a.inputsHints.zip a.expectedRows do
+      rows := rows.push (rowJson "event" true none ih.1 (serializeHints uses ih.2)
+        (expectedWitnessOf flatShared ih.2 ih.1) (some row))
+    rows := rows.push (rowJson "padding" a.padAnchored none a.padInputs
+      (serializeHints uses empty) (expectedWitnessOf flatShared empty a.padInputs)
+      a.padExpectedRow)
+    provenance := provenance ++ [("events", Json.str
+      s!"SP1 generate_trace dump; full-row equality pinned by {a.thm} (native_decide)")]
+  | none => pure ()
+  let zero := List.replicate e.inputWidth (0 : Fp)
+  rows := rows.push (rowJson "synthetic" false (some 0) zero (serializeHints uses empty)
+    (expectedWitnessOf flatShared empty zero) none)
+  for s in [1, 2, 3, 4] do
+    let seed := (idx + 1) * 1009 + s
+    let inputs := synInputs e.inputWidth seed
+    let hint := synHint uses (seed * 7919)
+    rows := rows.push (rowJson "synthetic" false (some seed) inputs
+      (serializeHints uses hint) (expectedWitnessOf flatShared hint inputs) none)
+  provenance := provenance ++ [("synthetic", Json.str
+    "deterministic seeded inputs; expectedWitness is the Lean reference evaluation \
+    (FlatOperation.witgen) over the shared operations — WitgenIR.eval_share proves \
+    sharing preserves evaluation")]
+  writeJson (dir / s!"{e.name}.trace.json") <| Json.mkObj [
+    ("wireVersion", toJson (1 : Nat)),
+    ("chip", Json.str e.name),
+    ("field", fieldJson),
+    ("inputWidth", toJson e.inputWidth),
+    ("localLength", toJson (FlatOperation.localLengthFold flatShared)),
+    ("provenance", Json.mkObj provenance),
+    ("rows", Json.arr rows)]
+  IO.eprintln s!"{e.name}: testdata {(← IO.monoMsNow) - t0} ms, {rows.size} rows"
+
+end Testdata
+
 def run : IO Unit := do
   let args := ((← IO.getEnv "WITGEN_ARGS").getD "").splitOn " " |>.filter (· != "")
   let chipFilter := (args.dropWhile (· != "--chip")).drop 1 |>.head?
   let toStdout := args.contains "--stdout"
+  let testdata := args.contains "--testdata"
   let outRoot := (args.dropWhile (· != "--out")).drop 1 |>.head?.getD "export"
   let regNames := (Soundness.supportedChips (p := SP1Prime)).map (·.kind.name)
   unless entries.map (·.name) == regNames do
     throw (IO.userError s!"chip list drifted from supportedChips:\n  \
       script:   {entries.map (·.name)}\n  registry: {regNames}")
-  let selected := entries.filter fun e => chipFilter.all (· == e.name)
+  let selected := entries.zipIdx.filter fun (e, _) => chipFilter.all (· == e.name)
   if selected.isEmpty then
     throw (IO.userError s!"no chip named {chipFilter.getD "?"}; known: {entries.map (·.name)}")
+  let t0 ← IO.monoMsNow
+  if testdata then
+    let dir : System.FilePath := System.FilePath.mk outRoot / "testdata"
+    IO.FS.createDirAll dir
+    for (e, idx) in selected do
+      writeTestdataChip dir idx e
+    IO.eprintln s!"total: {selected.length} chips (testdata), {(← IO.monoMsNow) - t0} ms"
+    return
   let out ← if toStdout then pure none else do
     let dir : System.FilePath := System.FilePath.mk outRoot / "witgen"
     IO.FS.createDirAll dir
     pure (some dir)
-  let t0 ← IO.monoMsNow
   let mut indexRows : Array Json := #[]
-  for e in selected do
+  for (e, _) in selected do
     indexRows := indexRows.push (← exportChip out e)
   -- Never write a partial index: only the full, unfiltered run produces `index.json`.
   if chipFilter.isNone then

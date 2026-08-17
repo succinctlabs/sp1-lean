@@ -7,20 +7,25 @@
 # is its only writer. This gate keeps the committed tree well-formed and internally
 # consistent, and (in `--regen` mode) byte-identical to a fresh export.
 #
+# The committed `export/testdata/` tree (25 `<Chip>.trace.json` differential fixtures —
+# the same writer, `--testdata` mode) is validated alongside: parseable, 25 files,
+# per-row input widths match the manifest `inputWidth` and witness lengths match
+# `localLength`.
+#
 # Modes:
 #   default          structural validation only (no Lean toolchain needed): every file
 #                    parses, wireVersion == 1, 25 payload/manifest pairs + index,
 #                    manifest localLength matches its payload, file stems match names,
-#                    index rows match the manifests, files end in a newline. Enforcing
-#                    from day one — committed artifacts must always parse. Exit 1 on
-#                    any failure.
-#   --regen          additionally regenerate into a temp dir with
-#                    `scripts/witgenExport.lean` (needs `lake build
-#                    SP1CleanTest.Exportable` first) and require a byte-identical tree.
-#                    Validates the FRESH output structurally before diffing, because
-#                    `lake env lean` exits 0 on a Lean stack overflow.
-#   --regen --update install the fresh export over `export/witgen/` instead of failing
-#                    on drift (inspect and commit the delta).
+#                    index rows match the manifests, files end in a newline; testdata
+#                    fixtures consistent with the manifests. Enforcing from day one —
+#                    committed artifacts must always parse. Exit 1 on any failure.
+#   --regen          additionally regenerate both trees into a temp dir with
+#                    `scripts/witgenExport.lean` (needs `lake build SP1CleanTest`
+#                    first) and require byte-identical trees. Validates the FRESH
+#                    output structurally before diffing, because `lake env lean`
+#                    exits 0 on a Lean stack overflow.
+#   --regen --update install the fresh export over `export/` instead of failing on
+#                    drift (inspect and commit the delta).
 #
 # Callers: `scripts/run_audit.sh` (A0 hygiene block) and
 # `.github/workflows/lean_action_ci.yml` (the `guards` job runs the structural mode;
@@ -99,9 +104,61 @@ print(f"check_witgen_export: {d} structurally clean (25 payloads + 25 manifests 
 EOF
 }
 
+validate_testdata() {
+  python3 - "$1" "$2" <<'EOF'
+import json, sys, os
+td, wg = sys.argv[1], sys.argv[2]
+fail = []
+def err(msg): fail.append(msg)
+if not os.path.isdir(td):
+    print(f"FAIL: {td} does not exist", file=sys.stderr); sys.exit(1)
+files = sorted(os.listdir(td))
+fixtures = [f for f in files if f.endswith(".trace.json")]
+if len(fixtures) != 25: err(f"expected 25 *.trace.json, found {len(fixtures)}")
+extras = set(files) - set(fixtures)
+if extras: err(f"unexpected files: {sorted(extras)}")
+for f in fixtures:
+    stem = f[:-len(".trace.json")]
+    raw = open(os.path.join(td, f), "rb").read()
+    if not raw.endswith(b"\n"): err(f"{f}: missing trailing newline")
+    try:
+        d = json.loads(raw)
+    except Exception as e:
+        err(f"{f}: parse error: {e}"); continue
+    if d.get("wireVersion") != 1: err(f"{f}: wireVersion != 1")
+    if d.get("chip") != stem: err(f"{f}: chip != file stem")
+    try:
+        m = json.load(open(os.path.join(wg, f"{stem}.manifest.json")))
+    except Exception:
+        err(f"{f}: no matching manifest"); continue
+    if d.get("inputWidth") != m.get("inputWidth"):
+        err(f"{f}: inputWidth {d.get('inputWidth')} != manifest {m.get('inputWidth')}")
+    if d.get("localLength") != m.get("localLength"):
+        err(f"{f}: localLength {d.get('localLength')} != manifest {m.get('localLength')}")
+    rows = d.get("rows") or []
+    if not rows: err(f"{f}: no rows")
+    for i, r in enumerate(rows):
+        if len(r.get("inputs", [])) != m.get("inputWidth"):
+            err(f"{f} row {i}: inputs length != inputWidth"); break
+        if len(r.get("expectedWitness", [])) != m.get("localLength"):
+            err(f"{f} row {i}: expectedWitness length != localLength"); break
+        if r.get("kind") not in ("event", "padding", "synthetic"):
+            err(f"{f} row {i}: bad kind {r.get('kind')}"); break
+if fail:
+    for m in fail: print(f"FAIL: {m}", file=sys.stderr)
+    sys.exit(1)
+print(f"check_witgen_export: {td} structurally clean (25 fixtures, rows consistent with manifests).")
+EOF
+}
+
 if ! validate "export/witgen"; then
   echo "FAIL: committed export/witgen is not structurally clean; regenerate with" >&2
   echo "  WITGEN_ARGS= lake env lean scripts/witgenExport.lean" >&2
+  exit 1
+fi
+if ! validate_testdata "export/testdata" "export/witgen"; then
+  echo "FAIL: committed export/testdata is not structurally clean; regenerate with" >&2
+  echo "  WITGEN_ARGS=--testdata lake env lean scripts/witgenExport.lean" >&2
   exit 1
 fi
 
@@ -109,8 +166,8 @@ if [[ "$REGEN" == "0" ]]; then
   exit 0
 fi
 
-if [[ ! -f .lake/build/lib/lean/SP1CleanTest/Exportable.olean ]]; then
-  echo "FAIL(--regen): SP1CleanTest.Exportable oleans missing. Run: lake build SP1CleanTest.Exportable" >&2
+if [[ ! -f .lake/build/lib/lean/SP1CleanTest/TraceGenTests/AddChipTraceWitness.olean ]]; then
+  echo "FAIL(--regen): SP1CleanTest oleans missing. Run: lake build SP1CleanTest" >&2
   exit 1
 fi
 
@@ -120,24 +177,34 @@ if ! WITGEN_ARGS="--out $tmp" lake env lean scripts/witgenExport.lean >/dev/null
   echo "FAIL(--regen): exporter run failed" >&2
   exit 1
 fi
-# Validate the FRESH tree first — `lake env lean` exits 0 on stack overflow, so the
-# exit code above proves nothing by itself.
+if ! WITGEN_ARGS="--testdata --out $tmp" lake env lean scripts/witgenExport.lean >/dev/null; then
+  echo "FAIL(--regen): exporter testdata run failed" >&2
+  exit 1
+fi
+# Validate the FRESH trees first — `lake env lean` exits 0 on stack overflow, so the
+# exit codes above prove nothing by themselves.
 if ! validate "$tmp/witgen"; then
   echo "FAIL(--regen): fresh export is not structurally clean (exporter bug or partial run)" >&2
   exit 1
 fi
-if diff -rq "export/witgen" "$tmp/witgen" >/dev/null; then
+if ! validate_testdata "$tmp/testdata" "$tmp/witgen"; then
+  echo "FAIL(--regen): fresh testdata is not structurally clean (exporter bug or partial run)" >&2
+  exit 1
+fi
+if diff -rq "export/witgen" "$tmp/witgen" >/dev/null \
+    && diff -rq "export/testdata" "$tmp/testdata" >/dev/null; then
   echo "check_witgen_export (--regen): committed export matches a fresh regeneration byte-for-byte."
   exit 0
 fi
 if [[ "$UPDATE" == "1" ]]; then
-  rm -rf export/witgen
+  rm -rf export/witgen export/testdata
   mkdir -p export
   cp -R "$tmp/witgen" export/witgen
+  cp -R "$tmp/testdata" export/testdata
   echo "check_witgen_export (--regen --update): installed the fresh export (inspect and commit the delta)."
   exit 0
 fi
 echo "FAIL(--regen): committed export drifted from a fresh regeneration:" >&2
-diff -rq "export/witgen" "$tmp/witgen" | head -20 >&2
+{ diff -rq "export/witgen" "$tmp/witgen"; diff -rq "export/testdata" "$tmp/testdata"; } | head -20 >&2
 echo "(inspect the drift; if intended, rerun with --regen --update and commit)" >&2
 exit 1
