@@ -86,19 +86,6 @@ theorem circuitInteractionsWith_bind {F α β} [FiniteField F]
   rw [Operations.interactionsWith_append]
   rfl
 
-theorem witnessVectorNative_localLength {F} [FiniteField F] (length : ℕ)
-    (compute : ProverEnvironment F → Vector F length) (offset : ℕ) :
-    (witnessVectorNative length compute).localLength offset = length := by
-  simp only [circuit_norm]
-
-theorem witnessNative_localLength {F value var} [FiniteField F] [ProvableType value]
-    [inst : Witnessable F value var] (compute : ProverEnvironment F → value F) (offset : ℕ) :
-    (witnessNative (var := var) compute).localLength offset = size value := by
-  simp only [witnessNative]
-  rw [inst.witnessIR_def, Circuit.localLength, eqRec_eq_cast,
-    cast_apply (by rw [inst.var_eq]), snd_cast (by rw [inst.var_eq])]
-  rfl
-
 theorem assertion_localLength {F Input} [FiniteField F] [ProvableType Input]
     (circuit : FormalAssertion F Input) (input : Var Input F) (offset : ℕ) :
     (assertion circuit input).localLength offset = circuit.localLength input := by
@@ -109,21 +96,6 @@ theorem generalAssertion_localLength {F Input Output} [FiniteField F]
     (circuit : GeneralFormalCircuit F Input Output) (input : Var Input F) (offset : ℕ) :
     (subcircuitWithAssertion circuit input).localLength offset = circuit.localLength input := by
   simp only [circuit_norm]
-
-theorem circuitInteractionsWith_witnessVectorNative {F} [FiniteField F]
-    (channel : RawChannel F) (length : ℕ)
-    (compute : ProverEnvironment F → Vector F length) (offset : ℕ) :
-    circuitInteractionsWith channel (witnessVectorNative length compute) offset = [] := by
-  simp [circuitInteractionsWith, circuit_norm]
-
-theorem circuitInteractionsWith_witnessNative {F value var} [FiniteField F]
-    [ProvableType value] [inst : Witnessable F value var]
-    (channel : RawChannel F) (compute : ProverEnvironment F → value F) (offset : ℕ) :
-    circuitInteractionsWith channel (witnessNative (var := var) compute) offset = [] := by
-  simp only [circuitInteractionsWith, witnessNative]
-  rw [inst.witnessIR_def, Circuit.operations, eqRec_eq_cast,
-    cast_apply (by rw [inst.var_eq]), snd_cast (by rw [inst.var_eq])]
-  rfl
 
 theorem circuitInteractionsWith_assertion_eq_nil {F Input} [FiniteField F]
     [ProvableType Input] (channel : RawChannel F) (circuit : FormalAssertion F Input)

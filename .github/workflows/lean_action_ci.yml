@@ -21,7 +21,7 @@ jobs:
       - name: Elaboration-budget escape hatches confined to the measured allowlist
         run: scripts/check_option_escapes.sh
       - name: Witness-generation escape hatches (report-only until the witgen cutover completes)
-        run: scripts/check_no_witness_native.sh
+        run: scripts/check_no_witness_native.sh --enforce
       - name: Recorded pins match the build graph
         run: scripts/check_pins.sh
       - name: Root index imports every module

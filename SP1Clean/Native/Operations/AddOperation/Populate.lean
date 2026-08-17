@@ -19,7 +19,7 @@ Two forms of the same algorithm live here:
 * `populateIR` — the **exportable witness-IR** form consumed by the chip `main`
   (`witnessVectorIR`), mirroring `populate` line-for-line as inline `FExpr`s. `populateIR_eval`
   ties the two, so chip completeness proofs rewrite the witness obligation to `populate` exactly as
-  they did against the retired `witnessVectorNative` closure.
+  they did against the retired native-closure combinator.
 
 `populateIR` is deliberately **not** `@[circuit_norm]`: chip proofs keep their witness obligation
 folded at this boundary (the repo's opacity doctrine), and only `populateIR_eval` crosses it. -/

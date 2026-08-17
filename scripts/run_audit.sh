@@ -141,7 +141,7 @@ grep -rn 'native_decide' SP1CleanTest --include='*.lean' | wc -l
 echo
 echo "== A2 witness-generation escape-hatch census (report-only during the witgen cutover) =="
 # Flip to `--enforce` at cutover completion (wave W7) — then a hit fails the audit.
-scripts/check_no_witness_native.sh | tail -1
+scripts/check_no_witness_native.sh --enforce | tail -1
 
 echo
 echo "== A2 elaboration-budget escape-hatch gate (allowlist, not a budget) =="

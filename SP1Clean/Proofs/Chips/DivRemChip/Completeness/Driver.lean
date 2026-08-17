@@ -416,7 +416,7 @@ theorem completeness :
     have h := h_env_f ⟨i, hi⟩
     simp only [circuit_norm, Nat.add_zero, eLTF i hi, hFlags] at h; exact h
   -- the two Mul struct blocks, as quantified toElements pins + fromElements struct pins
-  -- `hMULLO`/`hMULHI`: same nativeValue-blowup as the Bitwise `hc` bridge (`docs/agents/proof-patterns.md`)
+  -- `hMULLO`/`hMULHI`: never simp the big hypothesis — dsimp the projections, then trans/exact
   -- — `exact h` after folding needs the *expensive* `combinedSize'`-based isDefEq against
   -- `(toElements (populateMulLower/Upper …))[i]` for the 45-element `MulOperation` struct. Bridge via a
   -- definitional `have` ascribed at `h_env_mullo`'s own (unfolded) type, fold the operands via the cheap
