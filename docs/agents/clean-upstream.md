@@ -40,7 +40,7 @@ this category: upstreaming them is courtesy, not a blocker, and they stay local.
 |---|---|
 | Fork | `https://github.com/dtumad/clean` |
 | Pinned branch | `sp1-integration` — the merge of every open PR branch; this is what `lakefile.toml` pins |
-| Pinned rev | `8301b77ac14f3463c7c1b016915b13e32328f7b6` |
+| Pinned rev | `2dad7788d58b09eabeb3898506e4cb896e5d3e9d` |
 | Upstream base | `0e53b9f2` (v4.32.2 `main`, post PR #443) |
 | Toolchain | `leanprover/lean4:v4.32.2` — identical to ours |
 
@@ -57,6 +57,7 @@ back to `Verified-zkEVM/clean` and this file becomes a historical record.
 | Branch | Change | PR | Status |
 |---|---|---|---|
 | `agreesbelow-data-hint` | U1 — `AgreesBelow` constrains `data`/`hint` | *not yet filed* | in `sp1-integration` |
+| `witgen-share` | U11 — `WitgenIR.share` subterm sharing + proven `eval_share` (the wire format has `steps`/`localVar` sharing but nothing produced it; without the pass, SP1's DivRem witness programs serialize to 1.22 GB — 1.04 MB with it). Adjacent upstream context: issue #404 (the requested Rust interpreter needs shared programs to evaluate at sane cost) | *not yet filed* | in `sp1-integration` |
 | `u64wrap-prefilter` | U3 — two `u64Wrap` screens | — | **not merged**; pushed as a record of a rejected approach (see U3) |
 
 A branch reaching `sp1-integration` means it earned its way there: Clean's own suite green *and* a

@@ -20,8 +20,10 @@ jobs:
         run: scripts/check_no_native_decide.sh
       - name: Elaboration-budget escape hatches confined to the measured allowlist
         run: scripts/check_option_escapes.sh
-      - name: Witness-generation escape hatches (report-only until the witgen cutover completes)
+      - name: Witness-generation escape hatches (enforced — the witgen cutover is complete)
         run: scripts/check_no_witness_native.sh --enforce
+      - name: Committed witgen export is structurally clean
+        run: scripts/check_witgen_export.sh
       - name: Recorded pins match the build graph
         run: scripts/check_pins.sh
       - name: Root index imports every module
@@ -122,6 +124,11 @@ jobs:
           use-github-cache: "true"
       - name: Conformance tests (lake test)
         run: lake test
+      # The committed export/witgen goldens must match a fresh regeneration byte-for-byte.
+      # This runs here (not in `guards`) because the exporter needs the SP1CleanTest oleans
+      # that `lake test` just built — golden drift on a Clean pin bump is caught automatically.
+      - name: Witgen export matches a fresh regeneration
+        run: scripts/check_witgen_export.sh --regen
       # The test-scope axiom census (scripts/axiom_probe_test.lean) elaborates against the
       # SP1CleanTest oleans that `lake test` just built — the only job where they exist. The
       # main-scope census runs in the `audit` job, which builds only the default SP1Clean target.

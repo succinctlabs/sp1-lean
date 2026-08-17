@@ -31,7 +31,7 @@ No main-library proof is deferred. This audit found no `sorry`, `stop`, project 
 | SP1 extractor overlay | `69a8377c6e5550451f40c81fca17459687cd0a8f` |
 | Extractor patch digest | `a2c43cfab00280f5331a15ec251a8341a26ecf3baedcda22fec182915fbcf108` |
 | mathlib pin | `905b95818eb32af7874a58b427f50c1711a5e96c` (tag `v4.32.2`) |
-| Clean pin | `8301b77ac14f3463c7c1b016915b13e32328f7b6` (**fork** — see below) |
+| Clean pin | `2dad7788d58b09eabeb3898506e4cb896e5d3e9d` (**fork** — see below) |
 | Lean_RV64D pin | `df1acf579f8daf97c4dc3248565dec5a123079ef` |
 | Sail compiler source | `41694abd58b27b687af5db275810dfeb8a88cfc0` (rems-project/sail, `sail2`) |
 | sail-riscv model source | `61266bd4dede6c7dd6e903e52dc80bcbf644b1b8` (riscv/sail-riscv, `master`) |
@@ -51,13 +51,20 @@ open opencompl PR #59; repoint it to opencompl once that merges.
 
 **`Clean` is pinned to a fork, and that is a change to the trust base.** The DSL every circuit in
 this project is built on is no longer upstream `Verified-zkEVM/clean` but `dtumad/clean`, branch
-`sp1-integration`. The base is upstream `0e53b9f2` (the previous pin); the delta is one change,
-two commits:
+`sp1-integration`. The base is upstream `0e53b9f2` (the previous pin); the delta is two changes,
+one branch per upstream PR:
 
-| Commit | What it changes |
-|---|---|
-| `f5ae8e17` | `ProverEnvironment.AgreesBelow` gains `∧ env.data = env'.data ∧ env.hint = env'.hint`, plus three accessors and `agreesBelow_rfl` |
-| `8301b77a` | Adds `Clean/Examples/DataWitness.lean` — a worked example, no change to any existing declaration |
+| Commit | Branch | What it changes |
+|---|---|---|
+| `f5ae8e17` | `agreesbelow-data-hint` | `ProverEnvironment.AgreesBelow` gains `∧ env.data = env'.data ∧ env.hint = env'.hint`, plus three accessors and `agreesBelow_rfl` |
+| `8301b77a` | `agreesbelow-data-hint` | Adds `Clean/Examples/DataWitness.lean` — a worked example, no change to any existing declaration |
+| `410ffba8` | `witgen-share` | Adds `Clean/Circuit/WitnessShare.lean` (`WitgenIR.share`, subterm sharing into let-steps) and the `Operations.witgenJsonShared?` serializer entry — pure additions plus one refactor of `witgenJson?` through a shared `witgenJsonList?` with identical output |
+| `4a9c2c7b` | `witgen-share` | Proves `WitgenIR.eval_share` (`ir.share.eval env = ir.eval env`, axiom-clean) — the sharing pass is a proven transformation |
+
+The `witgen-share` change exists because the wire format serializes expression *trees*: without
+sharing, this repo's DivRem witness programs serialize to 1.22 GB (two single programs at 552 MB);
+with the pass applied at serialization the committed payload is 1.04 MB, and an external
+interpreter's evaluation cost drops proportionally.
 
 `AgreesBelow` sits in *hypothesis* position everywhere except one discharge site, so the change
 weakens every obligation that mentions it and strengthens the two theorems that conclude with it

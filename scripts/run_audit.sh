@@ -139,9 +139,19 @@ echo "the sole sanctioned native_decide; trusts the compiler via generated ._nat
 grep -rn 'native_decide' SP1CleanTest --include='*.lean' | wc -l
 
 echo
-echo "== A2 witness-generation escape-hatch census (report-only during the witgen cutover) =="
-# Flip to `--enforce` at cutover completion (wave W7) — then a hit fails the audit.
+echo "== A2 witness-generation escape-hatch gate (enforced — the witgen cutover is complete) =="
 scripts/check_no_witness_native.sh --enforce | tail -1
+
+echo
+echo "== A2 witgen export structural (gate) =="
+# The committed export/witgen tree (the wire-format artifact the Rust interpreter consumes)
+# must always be well-formed; byte-identity against a fresh regeneration is checked in the
+# CI `test` job (`check_witgen_export.sh --regen`), where the SP1CleanTest oleans are warm.
+if scripts/check_witgen_export.sh; then
+  :
+else
+  echo "FAIL: the committed export/witgen tree is not structurally clean (see above)"; fail=1
+fi
 
 echo
 echo "== A2 elaboration-budget escape-hatch gate (allowlist, not a budget) =="

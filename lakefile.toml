@@ -39,16 +39,22 @@ rev = "v4.32.2"
 # `0e53b9f2` (v4.32.2 `main`, post PR #443 "bump-lean-4.32.2"); the fork's `sp1-integration` branch
 # carries changes that MODIFY existing Clean declarations and therefore cannot live in our additive
 # `ToClean` library, because downstream Clean theorems refer to Clean's declaration, not ours.
-# Delta at this pin — one change, `agreesbelow-data-hint`:
-#   f5ae8e17  `ProverEnvironment.AgreesBelow` constrains `data`/`hint`, not just `get`
-#   8301b77a  `Clean/Examples/DataWitness.lean`, the worked example + falseness witness
+# Delta at this pin — two changes, one branch per upstream PR:
+#   `agreesbelow-data-hint`:
+#     f5ae8e17  `ProverEnvironment.AgreesBelow` constrains `data`/`hint`, not just `get`
+#     8301b77a  `Clean/Examples/DataWitness.lean`, the worked example + falseness witness
+#   `witgen-share`:
+#     410ffba8  `WitgenIR.share` subterm sharing into let-steps + `Operations.witgenJsonShared?`
+#               (without it, tree-expanding serialization makes SP1's DivRem witgen payload 1.22 GB)
+#     4a9c2c7b  the eval-preservation proof `WitgenIR.eval_share` (axiom-clean), making the pass a
+#               proven transformation the serializer applies unconditionally
 # Rationale, the PR queue, and the exit condition are in `docs/agents/clean-upstream.md`; the trust
-# consequence is disclosed in `docs/release-audit.md`. **Re-pin to upstream when the PR merges.**
+# consequence is disclosed in `docs/release-audit.md`. **Re-pin to upstream as the PRs merge.**
 # NB `sp1-integration` must keep this rev reachable (see the PolyFun note below) — never force-push it.
 [[require]]
 name = "Clean"
 git = "https://github.com/dtumad/clean"
-rev = "8301b77ac14f3463c7c1b016915b13e32328f7b6"
+rev = "2dad7788d58b09eabeb3898506e4cb896e5d3e9d"
 
 # Sail RV64 model. Package name is `Lean_RV64D` (opencompl upstream naming); it exposes the
 # `LeanRV64D` library the project imports. Requiring by the real package name dedups with
