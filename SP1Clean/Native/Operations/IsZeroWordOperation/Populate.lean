@@ -86,4 +86,163 @@ theorem populateFE_congr (env env' : ProverEnvironment (ZMod p))
 
 end FE
 
+section Navigators
+
+/-! Per-cell `toElements` projections over an *opaque* struct (the `MulOperation` navigator
+technique): destructure, then literal-index `getElem` append chains — never `whnf` through the
+`combinedSize'` tower on a compound literal. Cell order: `is_zero_limb_k ↦ {2k, 2k+1}`
+(inverse, result), `is_zero_first_half ↦ 8`, `is_zero_second_half ↦ 9`, `result ↦ 10`.
+Their one consumer is the flattened zero-struct fact `zc_cell` below (the gated-composition
+else-branch); per-cell *evaluation* facts need no navigators — `Witgen.getElem_eval_toElements`
+collapses them generically. -/
+
+set_option linter.unusedSectionVars false in
+/-- Cell `0` is `is_zero_limb_0.inverse`. -/
+private lemma toElements_cell_0 {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    (toElements s)[0]'(by have h : size Extracted.IsZeroWordOperation = 11 := rfl; omega)
+      = s.is_zero_limb_0.inverse := by
+  obtain ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, fh, sh, r⟩ := s
+  simp only [circuit_norm, explicit_provable_type]
+  exact Vector.getElem_append_left (by decide)
+
+set_option linter.unusedSectionVars false in
+/-- Cell `1` is `is_zero_limb_0.result`. -/
+private lemma toElements_cell_1 {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    (toElements s)[1]'(by have h : size Extracted.IsZeroWordOperation = 11 := rfl; omega)
+      = s.is_zero_limb_0.result := by
+  obtain ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, fh, sh, r⟩ := s
+  simp only [circuit_norm, explicit_provable_type]
+  exact Vector.getElem_append_left (by decide)
+
+set_option linter.unusedSectionVars false in
+/-- Cell `2` is `is_zero_limb_1.inverse`. -/
+private lemma toElements_cell_2 {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    (toElements s)[2]'(by have h : size Extracted.IsZeroWordOperation = 11 := rfl; omega)
+      = s.is_zero_limb_1.inverse := by
+  obtain ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, fh, sh, r⟩ := s
+  simp only [circuit_norm, explicit_provable_type]
+  refine (Vector.getElem_append_right ?_ ?_).trans (Vector.getElem_append_left ?_) <;> decide
+
+set_option linter.unusedSectionVars false in
+/-- Cell `3` is `is_zero_limb_1.result`. -/
+private lemma toElements_cell_3 {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    (toElements s)[3]'(by have h : size Extracted.IsZeroWordOperation = 11 := rfl; omega)
+      = s.is_zero_limb_1.result := by
+  obtain ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, fh, sh, r⟩ := s
+  simp only [circuit_norm, explicit_provable_type]
+  refine (Vector.getElem_append_right ?_ ?_).trans (Vector.getElem_append_left ?_) <;> decide
+
+set_option linter.unusedSectionVars false in
+/-- Cell `4` is `is_zero_limb_2.inverse`. -/
+private lemma toElements_cell_4 {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    (toElements s)[4]'(by have h : size Extracted.IsZeroWordOperation = 11 := rfl; omega)
+      = s.is_zero_limb_2.inverse := by
+  obtain ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, fh, sh, r⟩ := s
+  simp only [circuit_norm, explicit_provable_type]
+  refine (Vector.getElem_append_right ?_ ?_).trans
+    ((Vector.getElem_append_right ?_ ?_).trans (Vector.getElem_append_left ?_)) <;> decide
+
+set_option linter.unusedSectionVars false in
+/-- Cell `5` is `is_zero_limb_2.result`. -/
+private lemma toElements_cell_5 {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    (toElements s)[5]'(by have h : size Extracted.IsZeroWordOperation = 11 := rfl; omega)
+      = s.is_zero_limb_2.result := by
+  obtain ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, fh, sh, r⟩ := s
+  simp only [circuit_norm, explicit_provable_type]
+  refine (Vector.getElem_append_right ?_ ?_).trans
+    ((Vector.getElem_append_right ?_ ?_).trans (Vector.getElem_append_left ?_)) <;> decide
+
+set_option linter.unusedSectionVars false in
+/-- Cell `6` is `is_zero_limb_3.inverse`. -/
+private lemma toElements_cell_6 {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    (toElements s)[6]'(by have h : size Extracted.IsZeroWordOperation = 11 := rfl; omega)
+      = s.is_zero_limb_3.inverse := by
+  obtain ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, fh, sh, r⟩ := s
+  simp only [circuit_norm, explicit_provable_type]
+  refine (Vector.getElem_append_right ?_ ?_).trans
+    ((Vector.getElem_append_right ?_ ?_).trans
+      ((Vector.getElem_append_right ?_ ?_).trans (Vector.getElem_append_left ?_))) <;> decide
+
+set_option linter.unusedSectionVars false in
+/-- Cell `7` is `is_zero_limb_3.result`. -/
+private lemma toElements_cell_7 {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    (toElements s)[7]'(by have h : size Extracted.IsZeroWordOperation = 11 := rfl; omega)
+      = s.is_zero_limb_3.result := by
+  obtain ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, fh, sh, r⟩ := s
+  simp only [circuit_norm, explicit_provable_type]
+  refine (Vector.getElem_append_right ?_ ?_).trans
+    ((Vector.getElem_append_right ?_ ?_).trans
+      ((Vector.getElem_append_right ?_ ?_).trans (Vector.getElem_append_left ?_))) <;> decide
+
+set_option linter.unusedSectionVars false in
+/-- Cell `8` is `is_zero_first_half`. -/
+private lemma toElements_cell_8 {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    (toElements s)[8]'(by have h : size Extracted.IsZeroWordOperation = 11 := rfl; omega)
+      = s.is_zero_first_half := by
+  obtain ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, fh, sh, r⟩ := s
+  simp only [circuit_norm, explicit_provable_type]
+  refine (Vector.getElem_append_right ?_ ?_).trans
+    ((Vector.getElem_append_right ?_ ?_).trans
+      ((Vector.getElem_append_right ?_ ?_).trans
+        ((Vector.getElem_append_right ?_ ?_).trans (Vector.getElem_append_left ?_)))) <;> decide
+
+set_option linter.unusedSectionVars false in
+/-- Cell `9` is `is_zero_second_half`. -/
+private lemma toElements_cell_9 {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    (toElements s)[9]'(by have h : size Extracted.IsZeroWordOperation = 11 := rfl; omega)
+      = s.is_zero_second_half := by
+  obtain ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, fh, sh, r⟩ := s
+  simp only [circuit_norm, explicit_provable_type]
+  refine (Vector.getElem_append_right ?_ ?_).trans
+    ((Vector.getElem_append_right ?_ ?_).trans
+      ((Vector.getElem_append_right ?_ ?_).trans
+        ((Vector.getElem_append_right ?_ ?_).trans
+          ((Vector.getElem_append_right ?_ ?_).trans (Vector.getElem_append_left ?_))))) <;> decide
+
+set_option linter.unusedSectionVars false in
+/-- Cell `10` is `result`. -/
+private lemma toElements_cell_10 {F : Type} (s : Extracted.IsZeroWordOperation F) :
+    (toElements s)[10]'(by have h : size Extracted.IsZeroWordOperation = 11 := rfl; omega)
+      = s.result := by
+  obtain ⟨⟨i0, r0⟩, ⟨i1, r1⟩, ⟨i2, r2⟩, ⟨i3, r3⟩, fh, sh, r⟩ := s
+  simp only [circuit_norm, explicit_provable_type]
+  refine (Vector.getElem_append_right ?_ ?_).trans
+    ((Vector.getElem_append_right ?_ ?_).trans
+      ((Vector.getElem_append_right ?_ ?_).trans
+        ((Vector.getElem_append_right ?_ ?_).trans
+          ((Vector.getElem_append_right ?_ ?_).trans
+            ((Vector.getElem_append_right ?_ ?_).trans (Vector.getElem_append_left ?_)))))) <;> decide
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Every flattened cell of the zero struct is zero (the gated-composition else-branch fact). -/
+lemma zc_cell (i : ℕ) (hi : i < size Extracted.IsZeroWordOperation) :
+    (toElements (zeroCols : Extracted.IsZeroWordOperation (ZMod p)))[i] = 0 := by
+  have hi' : i < 11 := hi
+  interval_cases i
+  · rw [toElements_cell_0]; rfl
+  · rw [toElements_cell_1]; rfl
+  · rw [toElements_cell_2]; rfl
+  · rw [toElements_cell_3]; rfl
+  · rw [toElements_cell_4]; rfl
+  · rw [toElements_cell_5]; rfl
+  · rw [toElements_cell_6]; rfl
+  · rw [toElements_cell_7]; rfl
+  · rw [toElements_cell_8]; rfl
+  · rw [toElements_cell_9]; rfl
+  · rw [toElements_cell_10]; rfl
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The flattened zero struct, as a `fromElements` of zeros (the shape `Witgen.eval_gateFE`'s
+else branch produces). -/
+lemma fromElements_zero :
+    (fromElements (Vector.replicate (size Extracted.IsZeroWordOperation) 0)
+      : Extracted.IsZeroWordOperation (ZMod p)) = zeroCols := by
+  rw [ProvableType.ext_iff]
+  intro i hi
+  rw [ProvableType.toElements_fromElements, Vector.getElem_replicate]
+  exact (zc_cell i hi).symm
+
+end Navigators
+
+
 end SP1Clean.IsZeroWordOperation

@@ -1823,4 +1823,48 @@ theorem populateFEW_congr_flat (env env' : ProverEnvironment (ZMod p))
 
 end StructFW
 
+section ZeroFlatten
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Every flattened cell of `zeroCols` is zero (the gated-composition else-branch fact, via the
+navigator family above). -/
+lemma zc_cell (i : ℕ) (hi : i < size Extracted.MulOperation) :
+    (toElements (zeroCols : Extracted.MulOperation (ZMod p)))[i] = 0 := by
+  have hi' : i < 45 := hi
+  rcases Nat.lt_or_ge i 16 with h16 | h16
+  · rw [toElements_cell_carry (zeroCols : Extracted.MulOperation (ZMod p)) i h16]
+    simp [zeroCols]
+  rcases Nat.lt_or_ge i 32 with h32 | h32
+  · obtain ⟨j, rfl⟩ : ∃ j, i = 16 + j := ⟨i - 16, by omega⟩
+    rw [toElements_cell_product (zeroCols : Extracted.MulOperation (ZMod p)) j (by omega)]
+    simp [zeroCols]
+  rcases Nat.lt_or_ge i 36 with h36 | h36
+  · obtain ⟨j, rfl⟩ : ∃ j, i = 32 + j := ⟨i - 32, by omega⟩
+    rw [toElements_cell_bLower (zeroCols : Extracted.MulOperation (ZMod p)) j (by omega)]
+    simp [zeroCols]
+  rcases Nat.lt_or_ge i 40 with h40 | h40
+  · obtain ⟨j, rfl⟩ : ∃ j, i = 36 + j := ⟨i - 36, by omega⟩
+    rw [toElements_cell_cLower (zeroCols : Extracted.MulOperation (ZMod p)) j (by omega)]
+    simp [zeroCols]
+  interval_cases i
+  · rw [toElements_cell_bMsb]; rfl
+  · rw [toElements_cell_cMsb]; rfl
+  · rw [toElements_cell_productMsb]; rfl
+  · rw [toElements_cell_bSignExtend]; rfl
+  · rw [toElements_cell_cSignExtend]; rfl
+
+omit [Fact (2 ^ 24 < p)] in
+/-- The flattened zero struct, as a `fromElements` of zeros (the shape `Witgen.eval_gateFE`'s
+else branch produces). -/
+lemma fromElements_zero :
+    (fromElements (Vector.replicate (size Extracted.MulOperation) 0)
+      : Extracted.MulOperation (ZMod p)) = zeroCols := by
+  rw [ProvableType.ext_iff]
+  intro i hi
+  rw [ProvableType.toElements_fromElements, Vector.getElem_replicate]
+  exact (zc_cell i hi).symm
+
+end ZeroFlatten
+
+
 end SP1Clean.MulOperation

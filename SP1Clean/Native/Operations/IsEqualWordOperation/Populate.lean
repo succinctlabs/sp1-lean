@@ -86,4 +86,37 @@ theorem populateFE_congr (env env' : ProverEnvironment (ZMod p))
 
 end FE
 
+section Flatten
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- The single-field wrapper flattens to its field's flattening (kills the nested `toElements`
+tower: one rewrite lands in `IsZeroWordOperation`, whose navigators finish). -/
+lemma toElements_mk (s : Extracted.IsZeroWordOperation (ZMod p)) :
+    toElements (⟨s⟩ : Extracted.IsEqualWordOperation (ZMod p))
+      = (toElements s).cast (by rfl) := by
+  ext i hi
+  simp only [circuit_norm, explicit_provable_type]
+  exact (Vector.getElem_append_left hi).trans (Vector.getElem_cast _)
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Every flattened cell of the zero struct is zero. -/
+lemma zc_cell (i : ℕ) (hi : i < size Extracted.IsEqualWordOperation) :
+    (toElements (⟨IsZeroWordOperation.zeroCols⟩ :
+        Extracted.IsEqualWordOperation (ZMod p)))[i] = 0 := by
+  rw [toElements_mk, Vector.getElem_cast, IsZeroWordOperation.zc_cell]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The flattened zero struct, as a `fromElements` of zeros (the shape `Witgen.eval_gateFE`'s
+else branch produces). -/
+lemma fromElements_zero :
+    (fromElements (Vector.replicate (size Extracted.IsEqualWordOperation) 0)
+      : Extracted.IsEqualWordOperation (ZMod p)) = ⟨IsZeroWordOperation.zeroCols⟩ := by
+  rw [ProvableType.ext_iff]
+  intro i hi
+  rw [ProvableType.toElements_fromElements, Vector.getElem_replicate]
+  exact (zc_cell i hi).symm
+
+end Flatten
+
+
 end SP1Clean.IsEqualWordOperation
