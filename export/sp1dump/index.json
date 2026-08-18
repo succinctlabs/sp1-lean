@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "sp1Commit": "de017f47596b4b7ca847ade857ded8c690b3835e",
+  "chips": [
+    "Add",
+    "Addi",
+    "Addw",
+    "AluX0",
+    "Bitwise",
+    "Branch",
+    "DivRem",
+    "Jal",
+    "Jalr",
+    "LoadByte",
+    "LoadDouble",
+    "LoadHalf",
+    "LoadWord",
+    "LoadX0",
+    "Lt",
+    "Mul",
+    "ShiftLeft",
+    "ShiftRight",
+    "StoreByte",
+    "StoreDouble",
+    "StoreHalf",
+    "StoreWord",
+    "Sub",
+    "Subw",
+    "UType"
+  ]
+}

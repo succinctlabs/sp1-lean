@@ -96,6 +96,20 @@ for path in ("README.md", "docs/verification-report.md", "docs/overview.md"):
         if quoted not in known:
             err(f"{path} quotes commit `{quoted}` which matches no recorded pin")
 
+# -- 3b. the committed SP1 trace dumps vs the extraction pin ----------------------------
+# `export/sp1dump/index.json` records the sp1 commit its dumps were generated at
+# (`scripts/update_sp1_dumps.sh` is the sole writer); it must be the same extraction
+# pin `update_extracted.py` enforces, or the dumps and the extracted AIR describe
+# different Rust trees.
+pinned = re.search(r'SP1_PINNED_COMMIT = "([0-9a-f]{40})"', open("update_extracted.py").read())
+if not pinned:
+    err("SP1_PINNED_COMMIT not found in update_extracted.py")
+else:
+    dump_index = json.load(open("export/sp1dump/index.json"))
+    if dump_index.get("sp1Commit") != pinned.group(1):
+        err(f"export/sp1dump/index.json sp1Commit {dump_index.get('sp1Commit')} != "
+            f"update_extracted.py SP1_PINNED_COMMIT {pinned.group(1)}")
+
 # -- 4. census declaration count cited in docs vs the generated probes ------------------
 # The census is split into a main-library probe and a test-library probe (see
 # scripts/gen_axiom_probe.py); the cited figure is their sum.

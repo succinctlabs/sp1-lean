@@ -12,6 +12,12 @@
 # per-row input widths match the manifest `inputWidth` and witness lengths match
 # `localLength`.
 #
+# The committed `export/sp1dump/` tree (25 `<Chip>.dump.json` SP1 trace dumps +
+# `index.json`; sole writer `scripts/update_sp1_dumps.sh`) is validated structurally
+# too: parseable, 25 dumps, rows match the declared width x height, index consistent.
+# Its `sp1Commit` pin is cross-checked by `scripts/check_pins.sh`, and byte-level
+# reproducibility by `update_sp1_dumps.sh --check` (needs the pinned sp1 checkout).
+#
 # Modes:
 #   default          structural validation only (no Lean toolchain needed): every file
 #                    parses, wireVersion == 1, 25 payload/manifest pairs + index,
@@ -162,6 +168,47 @@ print(f"check_witgen_export: {td} structurally clean (25 fixtures, rows consiste
 EOF
 }
 
+validate_sp1dump() {
+  python3 - "$1" <<'EOF'
+import json, sys, os
+sd = sys.argv[1]
+fail = []
+def err(msg): fail.append(msg)
+if not os.path.isdir(sd):
+    print(f"FAIL: {sd} does not exist", file=sys.stderr); sys.exit(1)
+files = sorted(os.listdir(sd))
+dumps = [f for f in files if f.endswith(".dump.json")]
+if len(dumps) != 25: err(f"expected 25 *.dump.json, found {len(dumps)}")
+if set(files) - set(dumps) != {"index.json"}:
+    err(f"unexpected files: {sorted(set(files) - set(dumps) - {'index.json'})}")
+try:
+    index = json.load(open(os.path.join(sd, "index.json")))
+    if index.get("schemaVersion") != 1: err("index.json: schemaVersion != 1")
+    if index.get("chips") != sorted(f[:-len(".dump.json")] for f in dumps):
+        err("index.json: chips list != dump file stems")
+except Exception as e:
+    err(f"index.json: parse error: {e}")
+for f in dumps:
+    stem = f[:-len(".dump.json")]
+    raw = open(os.path.join(sd, f), "rb").read()
+    if not raw.endswith(b"\n"): err(f"{f}: missing trailing newline")
+    try:
+        d = json.loads(raw)
+    except Exception as e:
+        err(f"{f}: parse error: {e}"); continue
+    if d.get("schemaVersion") != 1: err(f"{f}: schemaVersion != 1")
+    if d.get("chip") != stem: err(f"{f}: chip != file stem")
+    rows = d.get("rows") or []
+    if len(rows) != d.get("height"): err(f"{f}: rows != height"); continue
+    if any(len(r) != d.get("width") for r in rows): err(f"{f}: a row's length != width")
+    if not d.get("events"): err(f"{f}: no events")
+if fail:
+    for m in fail: print(f"FAIL: {m}", file=sys.stderr)
+    sys.exit(1)
+print(f"check_witgen_export: {sd} structurally clean (25 dumps, rows match width x height).")
+EOF
+}
+
 if ! validate "export/witgen"; then
   echo "FAIL: committed export/witgen is not structurally clean; regenerate with" >&2
   echo "  WITGEN_ARGS= lake env lean scripts/witgenExport.lean" >&2
@@ -170,6 +217,11 @@ fi
 if ! validate_testdata "export/testdata" "export/witgen"; then
   echo "FAIL: committed export/testdata is not structurally clean; regenerate with" >&2
   echo "  WITGEN_ARGS=--testdata lake env lean scripts/witgenExport.lean" >&2
+  exit 1
+fi
+if ! validate_sp1dump "export/sp1dump"; then
+  echo "FAIL: committed export/sp1dump is not structurally clean; regenerate with" >&2
+  echo "  SP1_DIR=../sp1 scripts/update_sp1_dumps.sh" >&2
   exit 1
 fi
 
