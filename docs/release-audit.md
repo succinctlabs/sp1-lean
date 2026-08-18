@@ -26,10 +26,9 @@ No main-library proof is deferred. This audit found no `sorry`, `stop`, project 
 | Component | Audited value |
 |---|---|
 | Lean toolchain | `leanprover/lean4:v4.32.2` |
-| SP1 semantic source | `a630089d9ff484ec6f2feade8d0afbb1447eed11` |
-| SP1 description | `v6.3.1-8-ga630089d9` |
-| SP1 extractor overlay | `69a8377c6e5550451f40c81fca17459687cd0a8f` |
-| Extractor patch digest | `a2c43cfab00280f5331a15ec251a8341a26ecf3baedcda22fec182915fbcf108` |
+| SP1 semantic source | `f66b4bff51d0ccff51d152e0f7f66b2ffedf3529` |
+| SP1 description | `v6.4.0` |
+| SP1 extraction branch | `de017f47596b4b7ca847ade857ded8c690b3835e` (`dtumad/lean-extraction`, `v6.4.0-5-gde017f475`) |
 | mathlib pin | `905b95818eb32af7874a58b427f50c1711a5e96c` (tag `v4.32.2`) |
 | Clean pin | `2dad7788d58b09eabeb3898506e4cb896e5d3e9d` (**fork** — see below) |
 | Lean_RV64D pin | `df1acf579f8daf97c4dc3248565dec5a123079ef` |
@@ -82,10 +81,12 @@ dependency in the table that is not upstream, and the axiom census is unaffected
 census is unchanged across the re-pin). Fork state, the PR queue, and the standing rule for what may
 go in the fork versus `ToClean/` are recorded in `docs/agents/clean-upstream.md`.
 
-The extractor overlay is a descendant of the semantic source with that source as its merge base. The
+The extraction branch is a descendant of the semantic source with that source as its merge base, and
+every extraction change is an ordinary commit on it — there is no uncommitted-patch mechanism. The
 diff under `crates/core/machine/src` changes only reflection imports/derives needed to expose row
-shapes; it does not change an AIR equation or trace-population function. Exporter changes and dirty
-patches are separately hash-checked before generation.
+shapes; it does not change an AIR equation or trace-population function. The generator verifies the
+merge base, the changed-file allowlist, the derive-only machine diff, and a clean worktree before it
+writes any artifact.
 
 ## Verification stack and status
 

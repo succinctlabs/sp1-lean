@@ -20,7 +20,7 @@ RV64.*` result-correctness lemma is needed (the result is thrown away).
 The bridge dispatches through the verification-key-bound Program row, rather than duplicating Rust's
 dynamic-opcode table as a Lean disjunction. The chip's byte lookup proves `opcode < 29`; the Program
 projection then identifies one of the official Core ALU instruction families, including every immediate
-and word-immediate form supported by SP1 v6.3.1. Source-register facts are needed only so the Sail reads
+and word-immediate form supported by SP1 v6.4.0. Source-register facts are needed only so the Sail reads
 succeed; their values are discarded. -/
 
 open LeanRV64D.Defs
@@ -280,7 +280,7 @@ theorem advance (inp : Inputs (ZMod p)) (cols : AluX0Chip.Columns (ZMod p)) (dat
     hopa0 hpc0 rfl rfl rfl
 
 /-- `AluX0`'s `ChipKind` registration. `view.wr` is the zero word (`x0` discards the result).
-`advance` covers the complete v6.3.1 Core ALU range through the committed Program projection; source
+`advance` covers the complete v6.4.0 Core ALU range through the committed Program projection; source
 register facts are needed only to make the corresponding Sail reads succeed. -/
 def kind : Soundness.ChipKind p where
   name := "AluX0"

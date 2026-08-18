@@ -9,8 +9,8 @@ Formal verification of SP1 Hypercube zkVM arithmetization
 ## What this repository proves
 
 This is a Clean-native Lean 4 verification of SP1's Core RISC-V AIR, anchored to the unmodified Rust
-source at `a630089d9ff484ec6f2feade8d0afbb1447eed11`
-(`v6.3.1-8-ga630089d9`).
+source at `f66b4bff51d0ccff51d152e0f7f66b2ffedf3529`
+(`v6.4.0`).
 
 The current closed capstone is:
 

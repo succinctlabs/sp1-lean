@@ -6,7 +6,7 @@ import SP1Clean.Native.Operations.AddOperation.RawSpec
 /-! # Exact Branch circuit proof
 
 Soundness and honest-witness completeness for the native Branch circuit whose local columns,
-constraints, and interactions match pinned SP1 v6.3.1.
+constraints, and interactions match pinned SP1 v6.4.0.
 -/
 
 namespace SP1Clean.BranchChip

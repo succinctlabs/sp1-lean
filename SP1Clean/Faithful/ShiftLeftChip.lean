@@ -5,7 +5,7 @@ import SP1Clean.Proofs.Chips.ShiftLeftChip.Formal
 /-! # Whole-chip faithfulness — ShiftLeft
 
 This module compares the complete native Clean ShiftLeft row with the complete constraint and
-interaction system extracted from SP1 v6.3.1's `ShiftLeftChip`. The comparison is whole-chip:
+interaction system extracted from SP1 v6.4.0's `ShiftLeftChip`. The comparison is whole-chip:
 the native proof-oriented decomposition may differ from Rust's internal operation layout, while the
 decoded row, all `assertZero`s, and the full bus-interaction multiset agree exactly.
 -/

@@ -11,7 +11,7 @@ import SP1Clean.Proofs.Chips.DivRemChip.Formal
 # Exact whole-chip faithfulness for SP1 `DivRem`
 
 This file relates the proof-oriented native Clean `DivRemChip` row to the complete generated
-row-level oracle for pinned SP1 v6.3.1.
+row-level oracle for pinned SP1 v6.4.0.
 
 The native circuit uses an input-first physical row, whereas Rust's `DivRemCols` follows the
 `#[repr(C)]` column order.  The four folded local chunks and explicit readback proof below give

@@ -148,7 +148,7 @@ theorem SailChain.snoc : ∀ {n : ℕ} {a b : SailState}, SailChain n a b →
 /-- Compatibility contract between SP1's immutable trusted-program fetch and the official Sail
 interpreter's unified instruction/data memory.
 
-In SP1 v6.3.1, trusted instruction fetch reads `Program.instructions`, while ordinary loads and
+In SP1 v6.4.0, trusted instruction fetch reads `Program.instructions`, while ordinary loads and
 stores read and write the separate Memory state. The ELF loader initially places executable bytes
 in that Memory image too, but a later data store does not change the instruction selected by the
 Program table. Unmodified Sail instead fetches from the same mutable byte map used by data accesses.

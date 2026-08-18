@@ -23,7 +23,7 @@ Conditional control flow (opcodes 40–45: BEQ/BNE/BLT/BGE/BLTU/BGEU): `next_pc`
 SP1's eight inline gated carry equations for the two possible PC additions exactly. `AddOperation`
 is used only as proof-oriented witness-generation mathematics; it is not a Branch AIR subcircuit and
 does not contribute interactions. The six opcode flags sum to `is_real` (one-hot); the branch opcode
-is threaded via `ProverHint`. Implements pinned SP1 v6.3.1's `Branch` `air.rs::eval`. -/
+is threaded via `ProverHint`. Implements pinned SP1 v6.4.0's `Branch` `air.rs::eval`. -/
 
 namespace SP1Clean.BranchChip
 

@@ -7,7 +7,7 @@ import SP1Clean.Faithful.U16MSBOperation
 /-!
 # Complete whole-chip DivRem faithfulness
 
-This module proves that the native Clean DivRem chip and the complete pinned SP1 v6.3.1
+This module proves that the native Clean DivRem chip and the complete pinned SP1 v6.4.0
 `DivRemCols` AIR have extensionally equivalent row assertions and active interaction multisets.
 The proof is deliberately decomposed into folded arithmetic, reader, and bus blocks so verifier-side
 normalization never unfolds the complete 246-column specification in a parent proof.

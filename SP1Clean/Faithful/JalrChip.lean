@@ -5,7 +5,7 @@ import SP1Clean.Proofs.Chips.JalrChip.Formal
 /-! # Whole-chip faithfulness — native Jalr row ↔ pinned SP1 Rust AIR
 
 `jalrChip_faithful` compares the complete native Clean JALR circuit with the
-v6.3.1 Rust `JalrOracle.JalrColumns` assertion system and interaction multiset
+v6.4.0 Rust `JalrOracle.JalrColumns` assertion system and interaction multiset
 (after one explicit row reconfiguration) on real, `jalr x0`, and padding rows.
 Rust redundantly zeroes the first three link limbs at chip level in addition to
 the I-type adapter's four-limb zeroing; the assertion proof preserves that

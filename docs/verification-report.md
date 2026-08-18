@@ -2,7 +2,7 @@
 
 *sp1-clean-native — a Clean-native, semantically-specified verification of SP1's RISC-V chips.*
 *Snapshot: 2026-08 (branch `dtumad/v1.0-release`, Lean v4.32.2 + Sail v5; SP1 semantic pin
-`v6.3.1-8-ga630089d9`).*
+`v6.4.0`).*
 
 > **Line-number caveat.** Declarations are cited by name and file; line numbers appear only where
 > stable. Every cited path and every cited declaration *name* is mechanically checked against the
@@ -12,7 +12,7 @@
 ## 1. Executive summary
 
 This repository contains a machine-checked verification, in the Lean 4 proof assistant, that
-**each of the 25 instruction chips of SP1 v6.3.1's supported Core profile soundly implements the
+**each of the 25 instruction chips of SP1 v6.4.0's supported Core profile soundly implements the
 official RISC-V instruction-set semantics** — proven against the Sail-generated RV64 model and
 composed into a machine-level soundness theorem over a native 38-table ensemble with explicitly
 disclosed boundary premises (§8; the exact-upstream refinement boundary is §8.3). The
@@ -75,7 +75,7 @@ the next CPU state). The verifier checks each table's polynomial constraints plu
 bus balance.
 
 The verification target is SP1 at semantic revision
-`a630089d9ff484ec6f2feade8d0afbb1447eed11` (`v6.3.1-8-ga630089d9`), pinned in
+`f66b4bff51d0ccff51d152e0f7f66b2ffedf3529` (`v6.4.0`), pinned in
 `SP1Clean/FormalModel/CoreProfile.lean` (`sp1SemanticRevision`) and enforced end-to-end by the
 extraction pipeline (§4). The supported profile is the exact 25-instruction-table slice of
 upstream `RiscvAir::machine()`:
@@ -221,27 +221,28 @@ reading and `docs/snapshots/axiom-census.txt` for the raw entry.
 The "what does SP1 actually constrain" side enters Lean through `update_extracted.py`, which
 drives SP1's own constraint compiler as a **trusted but heavily fenced oracle**:
 
-- `SP1_DIR` must be the audited *extraction overlay*: a checkout whose merge base with the
-  semantic pin is exactly `a630089d9…`, whose committed delta over the **semantic AIR sources**
-  (the 25 chip files plus the shared memory-access columns carrier — the 26-entry
-  `EXTRACTOR_METADATA_FILES` set) is verified line-by-line to be reflection metadata only (`use sp1_derive` /
-  `#[derive(...)`) — changes outside that surface are confined by an explicit allowlist to the
-  exporter's own directories — and whose working tree carries exactly the two checked-in exporter
-  patches (`scripts/extractor-patches/*.patch`), byte-hash-verified against the live diff. Every
-  gate is fail-closed (`SystemExit` before any file is written).
+- `SP1_DIR` must be the audited *extraction branch*: a checkout whose merge base with the
+  semantic pin is exactly `f66b4bff5…` (the v6.4.0 tag), whose committed delta over the
+  **semantic AIR sources** (the 25 chip files plus the shared memory-access columns carrier — the
+  26-entry `EXTRACTOR_METADATA_FILES` set) is verified line-by-line to be reflection metadata only
+  (`use sp1_derive` / `#[derive(...)`) — changes outside that surface are confined by an explicit
+  allowlist to the exporter's own directories — and whose working tree is **clean**: every
+  extraction change is an ordinary commit on the pinned branch, with no uncommitted-patch
+  mechanism. Every gate is fail-closed (`SystemExit` before any file is written).
 - The exporter emits, per table, the complete column structure, the ordered `assertZero` list,
   and the ordered interaction list — **never a Clean circuit**, so extraction cannot manufacture
-  the proof's other side. The patches were audited hunk-by-hunk: they operate strictly on the
-  symbolic IR *after* `air.eval` and only render what the unmodified evaluator recorded.
+  the proof's other side. The exporter commits were audited hunk-by-hunk: they operate strictly
+  on the symbolic IR *after* `air.eval` and only render what the unmodified evaluator recorded.
 - A machine-shape manifest is extracted unconditionally and compared against the audited profile
   (34-table execution cluster, 6-table memory-boundary cluster, every main/preprocessed width,
   the 160-cell public-values block) before anything regenerates; `Extracted/Provenance.lean` pins
-  the semantic revision, overlay revision, and patch digest (the semantic revision additionally
-  tied to `CoreProfile` by an `rfl` theorem; the other two enforced by the regeneration gates).
+  the semantic revision and the extraction-branch revision (the semantic revision additionally
+  tied to `CoreProfile` by an `rfl` theorem; the branch revision enforced by the regeneration
+  gates).
 - The instruction alphabet is extracted unconditionally too: `Extracted/OpcodeTable.lean` is the
   `Opcode` enum's variant-name → `#[repr(u8)]`-discriminant table (the value each chip commits on
   the Program bus), parsed textually out of `crates/core/executor/src/opcode.rs` **at the semantic
-  pin via `git show`** (fail-closed on shape drift, independent of the overlay's patch state).
+  pin via `git show`** (fail-closed on shape drift, independent of the exporter commits).
   The hand-maintained mirror `SP1Clean/Model/Opcode.lean` is cross-checked against it by the
   kernel-`decide` theorem `opcodeTable_matchesExtracted`
   (`SP1Clean/FormalModel/OpcodeTable.lean`), replacing what was previously a hand-verification.
@@ -287,7 +288,7 @@ certificates in the same change.
 ### 4.3 The residual extraction trust and its mitigations
 
 `ChipFaithful` compares native circuits against *extracted* lists; the step from Rust source to
-extracted list is the trusted oracle. Three mitigations bound it: the fail-closed pin/patch/shape
+extracted list is the trusted oracle. Three mitigations bound it: the fail-closed pin/branch/shape
 fencing above; a manual spot re-derivation (for this report, the Add oracle was re-derived
 symbol-by-symbol from `operations/add.rs` + `add.rs` — the 4-limb carry chain in its
 `2^16`-inverse form, both `is_real` booleanity asserts, and the `(Range, value[i], 16, 0)` byte
@@ -606,9 +607,8 @@ discloses which of these each headline declaration actually touches.
   `Model/Opcode.lean` mirror by `opcodeTable_matchesExtracted`
   (`SP1Clean/FormalModel/OpcodeTable.lean`), leaving only the text-level parse of `opcode.rs`
   inside the T1 boundary.
-  (Note: the exporter tooling lives on sp1's `dtumad/clean-native` branch, not upstream `main`;
-  upstreaming/committing the remaining tooling is follow-up work bundled with the pin
-  restoration.)
+  (Note: the exporter tooling lives on sp1's pinned `dtumad/lean-extraction` branch, not
+  upstream `main`; landing that series upstream is the standing follow-up.)
 - **T2 — The Sail platform hooks.** The generated model's external operations (§3.3) — opaque,
   property-free axioms.
 - **T3 — `native_decide` in the test library only.** The conformance anchors trust the Lean
@@ -679,7 +679,7 @@ beyond the report compared here.
 
 | Dimension | Nethermind / OpenVM | This work / SP1 |
 |---|---|---|
-| Target | OpenVM, RV32IM, 45 opcodes | SP1 v6.3.1 Core, RV64IM slice, 25 chips (~50 opcodes incl. W-variants and x0 paths) |
+| Target | OpenVM, RV32IM, 45 opcodes | SP1 v6.4.0 Core, RV64IM slice, 25 chips (~50 opcodes incl. W-variants and x0 paths) |
 | ISA reference | Lean RISC-V spec (RV32 instantiation), per-opcode `execute_*` clauses | Same Sail lineage, RV64 generated model, full-interpreter `try_step` step relation |
 | Circuit side | Transpiled/extracted constraints are the proof object; AIR columns hand-transcribed with "eyeball correspondence" macros | Independent hand-built Clean circuits; extracted lists are a *comparison target*; whole-chip bidirectional `ChipFaithful` + interaction-multiset permutation |
 | Bus semantics | `BusEntry` classes: well-formedness assumed on read / asserted on write; bus *axioms* (pc bounds, timestamp bounds) justified **on paper** (their §E1–E12, §M1–M6) | Channel guarantees are row-local facts backed by receiver circuits; read-side meaning derived in-kernel from Clean's balance theorem + timestamp rank plus the named boundary premises of §8.1 (§6); zero paper bus axioms |
@@ -735,7 +735,7 @@ the mechanism in this tree that addresses it; every citation below is machine-ch
 | SLTI's theorem was vacuously true (contradictory hypotheses) | Selector flags are circuit-constrained one-hot (never assumptions); `LtChip.Assumptions` is two operand-range facts only. Beyond structure, `SP1CleanTest/NonVacuityReal.lean` exhibits concrete satisfying `is_real = 1` rows for **every** chip's complete flattened constraint system — for Lt, both a true and a false comparison — as named, census-visible theorems (§9). |
 | LUI and AUIPC had no theorem at all | `UTypeChip` has the full stack: `soundness`/`completeness`/`circuit` (axiom-clean), the bridge family through the registered `advance` (`SP1Clean/Proofs/Chips/UTypeChip/Bridge.lean`), and whole-chip Rust faithfulness `uTypeChip_faithful` (`SP1Clean/Faithful/UTypeChip.lean`) — including RV64 LUI's *sign*-extension and AUIPC's full-width carry. |
 | Four project axioms, including "memory protection disabled" assumed as an axiom | Zero project `axiom` declarations in the main library (CI-gated); zero `sorryAx` across the 520-declaration census. Platform shaping is not assumed per-proof: the Sail model is *generated* with SP1's platform configuration (§3.2), and the supervisor-only scope is a stated structural restriction (§12.6), not an axiom. |
-| Version pinning and reproducible extraction were absent | Every dependency is an immutable git pin cross-checked by `scripts/check_pins.sh`; extraction is a pin-and-patch-hash-gated pipeline (§4.1) with byte-idempotency; the audit harness (§13) regenerates the census and fails on drift. |
+| Version pinning and reproducible extraction were absent | Every dependency is an immutable git pin cross-checked by `scripts/check_pins.sh`; extraction is a pin-gated, fail-closed pipeline (§4.1) with byte-idempotency; the audit harness (§13) regenerates the census and fails on drift. |
 | Recommendation: independent adversarial review before public claims | The 2026-07 and 2026-08 release-readiness campaigns (this report's §12 discloses their durable findings) ran blind-derivation adversarial reviews of all 25 chip Specs against the generated Sail model, per-claim validation against upstream sources, and a full file-by-file documentation sweep. |
 
 The review also found the predecessor's public claim of 62 verified opcodes overstated (~51
@@ -805,8 +805,8 @@ scripts/run_audit.sh       # pins + zero-deferral gates + per-theorem axiom cens
 
 Toolchain: Lean `v4.32.2` / mathlib `v4.32.2`; every dependency is an immutable git pin (the
 generated Sail model is config-generated from pinned sources — T4). Extraction
-regeneration requires the pinned sp1 extraction overlay (sp1's `dtumad/clean-native` branch tip
-plus the two checked-in patches) and a Rust toolchain — see `docs/agents/extraction.md`. The
+regeneration requires a clean checkout of the pinned sp1 extraction branch
+(`dtumad/lean-extraction`) and a Rust toolchain — see `docs/agents/extraction.md`. The
 axiom census snapshot lives at `docs/snapshots/axiom-ledger.md`; regenerate before citing.
 Report citations — every cited repo path and cited declaration name — are checked by
 `scripts/check_report_citations.sh`, and recorded pin values by `scripts/check_pins.sh` — both

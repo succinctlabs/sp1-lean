@@ -6,7 +6,7 @@ import SP1Clean.Proofs.Chips.LoadHalfChip.Formal
 # Exact whole-chip faithfulness for SP1 `LoadHalf`
 
 This file relates the native Clean `LoadHalfChip` row to the complete generated row-level oracle
-for pinned SP1 v6.3.1. The `ChipFaithful` theorem at the bottom covers every `assertZero`
+for pinned SP1 v6.4.0. The `ChipFaithful` theorem at the bottom covers every `assertZero`
 expression and the entire interaction multiset, including inactive rows.
 -/
 

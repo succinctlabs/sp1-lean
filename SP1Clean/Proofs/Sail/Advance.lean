@@ -3758,7 +3758,7 @@ theorem advance_of_alu_x0_mulw {prog : GuestProgram} {r : Trace.RowView (ZMod p)
       rwa [if_pos rfl] at this)
     hstraight hpc0 hnowrite hnomem
 
-/-- **Complete v6.3.1 AluX0 dispatch.**  The Byte-table range fact identifies SP1's dynamic
+/-- **Complete v6.4.0 AluX0 dispatch.**  The Byte-table range fact identifies SP1's dynamic
 opcode as an ALU opcode, while the verification-key-bound Program row identifies the actual Sail
 instruction constructor.  Dispatching on that constructor covers both register and immediate
 forms without a second, manually synchronized `(opcode, imm_c)` enumeration. -/

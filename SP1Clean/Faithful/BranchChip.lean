@@ -9,7 +9,7 @@ import SP1Clean.Proofs.Chips.BranchChip.Formal
 # Exact whole-chip faithfulness for SP1 `Branch`
 
 This file relates the native Clean Branch row to the complete generated row-level oracle for
-pinned SP1 v6.3.1. The public `ChipFaithful` theorem covers every assertion and the complete active
+pinned SP1 v6.4.0. The public `ChipFaithful` theorem covers every assertion and the complete active
 interaction multiset across State, Byte, Memory, and Program.
 -/
 

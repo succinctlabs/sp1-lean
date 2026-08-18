@@ -32,13 +32,12 @@ instead of re-emitting them. Rather than hand-maintain a per-entry reuse list, t
 The shared interaction vocabulary lives in `SP1Clean/Extracted/ExtractionDSL.lean`; whole-chip
 faithfulness anchors live in `SP1Clean/Faithful/`.
 
-Usage: `SP1_DIR=/path/to/audited-extractor-overlay python3 update_extracted.py`.
-`SP1_DIR` must be the pinned extraction-only overlay; its merge base is the unmodified semantic SP1
-revision recorded below.  The ordinary sibling `../sp1` may remain checked out at that semantic
-revision and is never modified by this script.
+Usage: `SP1_DIR=/path/to/extraction-branch-checkout python3 update_extracted.py`.
+`SP1_DIR` must be a clean checkout of the pinned extraction branch; its merge base is the
+unmodified semantic SP1 revision recorded below, and every extraction change is an ordinary
+commit on it.  The checkout is never modified by this script.
 """
 
-import hashlib
 import json
 import os
 import re
@@ -268,31 +267,16 @@ STRUCT_CARRIERS: Dict[str, Tuple[str, Tuple[str, ...]]] = {
 }
 
 DEFAULT_SP1_DIR = "../sp1"
-# Exact unmodified SP1 source whose AIR semantics are being formalized.
-SP1_SEMANTIC_COMMIT = "a630089d9ff484ec6f2feade8d0afbb1447eed11"
-# Audited extraction-only overlay used to generate the checked-in artifacts. Its merge base is
-# `SP1_SEMANTIC_COMMIT`; runtime chip-source changes are restricted to reflection/`IntoShape`
-# metadata and are checked below. A full 25-chip AIR-only regeneration was byte-for-byte identical
-# to the previous v6.2.2 artifacts before this pin was advanced.
-SP1_PINNED_COMMIT = "69a8377c6e5550451f40c81fca17459687cd0a8f"
-
-# The committed exporter still contained a transitional direct-to-Clean-circuit backend and lacked
-# flat system rows, complete interaction kinds, machine-level public-value extraction, and a
-# machine-shape manifest. The two reviewable patches apply in order; the combined diff digest must
-# match the extractor worktree byte-for-byte.
-EXTRACTOR_COMPONENT_PATCHES: Tuple[Tuple[str, str], ...] = (
-    (os.path.join("scripts", "extractor-patches", "core-air-lists.patch"),
-     "73ab50273532362ba88330c9046a95c0812b03c9fd2c2c0cd30850672f52cf8d"),
-    (os.path.join("scripts", "extractor-patches", "core-air-manifest.patch"),
-     "bb62d4cfcaea5f0d8abf96e794522f48c688fe27e609e60082e9de0aba824e52"),
-)
-EXTRACTOR_PATCH_SHA256 = "a2c43cfab00280f5331a15ec251a8341a26ecf3baedcda22fec182915fbcf108"
-EXTRACTOR_PATCHED_FILES: Tuple[str, ...] = (
-    "crates/core/compiler/src/main.rs",
-    "crates/hypercube/src/ir/ast.rs",
-    "crates/hypercube/src/ir/expr.rs",
-    "crates/hypercube/src/ir/lean.rs",
-)
+# Exact unmodified SP1 source whose AIR semantics are being formalized: the v6.4.0 release tag.
+SP1_SEMANTIC_COMMIT = "f66b4bff51d0ccff51d152e0f7f66b2ffedf3529"
+# Audited extraction branch used to generate the checked-in artifacts
+# (`dtumad/lean-extraction`, based directly on the semantic tag). Every extraction change is an
+# ordinary commit on this branch — there is no uncommitted-patch mechanism; runtime chip-source
+# changes are restricted to reflection/`IntoShape` metadata and are checked below. The v6.3.1→
+# v6.4.0 semantic delta touches three `core/executor` plumbing files only (errors/opts/cow) and
+# no chip, compiler, or hypercube source; the AIR regeneration at this pin was byte-for-byte
+# identical to the previous artifacts modulo the provenance strings.
+SP1_PINNED_COMMIT = "de017f47596b4b7ca847ade857ded8c690b3835e"
 
 # The only semantic-tree files the extractor overlay may touch. The checker below additionally
 # verifies that every changed line in these files is an import or derive-attribute change.
@@ -1107,13 +1091,11 @@ def render_provenance() -> str:
         "structure ExtractionProvenance where\n"
         "  semanticRevision : String\n"
         "  extractorRevision : String\n"
-        "  extractorPatchSha256 : String\n"
         "deriving DecidableEq, Repr\n\n"
         "/-- Provenance validated by the generator before it writes any AIR artifact. -/\n"
         "def checkedInProvenance : ExtractionProvenance where\n"
         f"  semanticRevision := \"{SP1_SEMANTIC_COMMIT}\"\n"
-        f"  extractorRevision := \"{SP1_PINNED_COMMIT}\"\n"
-        f"  extractorPatchSha256 := \"{EXTRACTOR_PATCH_SHA256}\"\n\n"
+        f"  extractorRevision := \"{SP1_PINNED_COMMIT}\"\n\n"
         "end SP1Clean.Extracted\n"
     )
 
@@ -1125,7 +1107,7 @@ def render_provenance() -> str:
 # machine-checked (`opcodeTable_matchesExtracted`, `SP1Clean/FormalModel/OpcodeTable.lean`)
 # instead of hand-verified. Like the manifest writers this is a text-level parse, not a compiler
 # run — and it reads the file at `SP1_SEMANTIC_COMMIT` via `git show`, so it is independent of the
-# overlay worktree's patch state and reproducible at the pin.
+# checkout's working state and reproducible at the pin.
 
 _OPCODE_VARIANT_RE = re.compile(r"^\s{4}([A-Z][A-Za-z0-9_]*)\s*=\s*(\d+),\s*$")
 
@@ -1335,52 +1317,24 @@ def verify_extractor_overlay(sp1_dir: str, actual: str) -> None:
     )
 
 
-def verify_extractor_patch(sp1_dir: str) -> None:
-    """Require the extractor worktree to carry exactly the checked-in list-only patch set.
-
-    A merely dirty exporter is not provenance. Requiring byte equality with the checked-in patch
-    makes the four uncommitted compiler/IR edits explicit, reviewable, and reproducible while the
-    corresponding Rust change awaits an upstream commit.
-    """
-    for patch_path, expected_hash in EXTRACTOR_COMPONENT_PATCHES:
-        with open(patch_path, "rb") as patch_file:
-            actual_hash = hashlib.sha256(patch_file.read()).hexdigest()
-        if actual_hash != expected_hash:
-            raise SystemExit(
-                f"extractor component patch {patch_path} has digest {actual_hash}, expected "
-                f"{expected_hash}; update the audited patch set deliberately")
-
+def verify_extractor_clean(sp1_dir: str) -> None:
+    """Require the extraction checkout to be clean: every extraction change is an ordinary commit
+    on the pinned branch, so a dirty worktree means the artifacts would not be reproducible from
+    the pin."""
     status = subprocess.run(
-        ["git", "-C", sp1_dir, "status", "--porcelain=v1", "--untracked-files=all"],
+        ["git", "-C", sp1_dir, "status", "--porcelain=v1"],
         capture_output=True,
         text=True,
     )
     if status.returncode != 0:
         raise SystemExit(f"git status failed in extractor checkout {sp1_dir}:\n{status.stderr}")
-    expected_status = [f" M {path}" for path in EXTRACTOR_PATCHED_FILES]
-    actual_status = status.stdout.splitlines()
-    if actual_status != expected_status:
+    dirty = [line for line in status.stdout.splitlines() if not line.startswith("??")]
+    if dirty:
         raise SystemExit(
-            "extractor worktree is not the exact audited list-only patch; expected:\n  "
-            + "\n  ".join(expected_status)
-            + "\nactual:\n  "
-            + ("\n  ".join(actual_status) if actual_status else "<clean worktree>")
+            "extraction checkout has uncommitted changes (the pin covers commits only):\n  "
+            + "\n  ".join(dirty)
         )
-
-    diff = subprocess.run(
-        ["git", "-C", sp1_dir, "diff", "--binary", "HEAD", "--",
-         *EXTRACTOR_PATCHED_FILES],
-        capture_output=True,
-    )
-    if diff.returncode != 0:
-        raise SystemExit(f"git diff failed in extractor checkout {sp1_dir}")
-    actual_diff_hash = hashlib.sha256(diff.stdout).hexdigest()
-    if actual_diff_hash != EXTRACTOR_PATCH_SHA256:
-        raise SystemExit(
-            "extractor worktree touches the expected files but its combined byte-level diff has "
-            f"digest {actual_diff_hash}, expected {EXTRACTOR_PATCH_SHA256}"
-        )
-    print(f"Verified exact list-only extractor patch set {EXTRACTOR_PATCH_SHA256}")
+    print("Verified extraction checkout is clean at the pin")
 
 
 # ── Orchestration ───────────────────────────────────────────────────────────────────────────
@@ -1403,7 +1357,7 @@ def main() -> None:
             raise SystemExit(f"{msg} Set SP1_ALLOW_UNPINNED=1 to extract anyway.")
 
     verify_extractor_overlay(sp1_dir, actual)
-    verify_extractor_patch(sp1_dir)
+    verify_extractor_clean(sp1_dir)
 
     os.makedirs(EXTRACTED_DIR, exist_ok=True)
 

@@ -50,7 +50,7 @@ there is no all-zero state to represent.
 What it buys is that **the absent key now reads as the padding template rather than needing a
 special case**. SP1's padded `DivRem` rows are `0 / 1` `DIVU` rows, not all-zero (the trace filler
 sets `is_divu = 1`, `op_c = Word(1)`, `abs_c[0] = c[0] = max_abs_c_or_1[0] = 1` — unchanged from
-v6.3.1 through v6.4.0), and with this encoding an absent key gives seven zeros, hence
+v6.4.0 through v6.4.0), and with this encoding an absent key gives seven zeros, hence
 `is_divu = 1 - 0 = 1`: exactly that template, for free. Under the old eight-slot encoding the
 template had to be spelled as a non-zero `getD` default, which is the one thing Clean's witness IR
 cannot reproduce — its `hintGet` reads a missing row as *zeros*. So this is what lets the chip move

@@ -37,9 +37,9 @@ platform hooks are separately disclosed by the axiom census.
 `update_extracted.py` does invoke SP1's constraint compiler and witness-dump tooling as a trusted,
 pin-checked Rust oracle; generated outputs are never treated as self-authenticating.
 
-The unmodified SP1 Rust semantic source lives in a sibling `sp1` checkout. Regeneration points `SP1_DIR`
-at the separately hash-checked extraction overlay described in `docs/agents/extraction.md`; do not modify
-the semantic checkout merely to run the exporter. The 4.29 `sp1-lean` repo is a read-only reference for porting (a sibling
+The SP1 Rust source lives in a sibling `sp1` checkout. Regeneration points `SP1_DIR` at a clean
+checkout of the pinned extraction branch described in `docs/agents/extraction.md` (a committed
+descendant of the unmodified semantic tag; no uncommitted-patch mechanism). The 4.29 `sp1-lean` repo is a read-only reference for porting (a sibling
 `sp1-lean` checkout); its arithmetic/Sail proofs are the thing we re-derive natively here, not import.
 
 ### Larger verified-verifier program
@@ -60,7 +60,7 @@ These layers are parallel workstreams and may be owned by different developers. 
 Plonk, and Groth16 are separate verifier targets; pin **Core** first. Parsing may initially be delegated
 to a canonical Rust exporter so it does not obscure the verifier/refinement boundary.
 
-**This workstream's current priority:** instantiate the exact v6.3.1 Core AIR refinement bundle. Native
+**This workstream's current priority:** instantiate the exact v6.4.0 Core AIR refinement bundle. Native
 timed grounding, every one of the 25 chip contracts, and `supported_core_native_sound` are closed. The
 34-table execution and 6-table memory-boundary relations exist, but full upstream soundness remains open
 until the six Core system tables derive the native boundary/timestamp facts and
@@ -212,7 +212,7 @@ Mirror-rust layout under `SP1Clean/`:
   row-routing shadow and `Completeness.lean` routing scaffold were retired in favor of witness decoding,
   timed grounding, and the relation-level completeness boundary in `AIR.lean`. The bespoke
   `MachineSoundness`/`MachineConsistency` `TraceValid` capstone was retired 2026-06-05.
-  `Soundness/CoreAIR.lean` is the exact v6.3.1 deterministic boundary: its `_of_obligations`
+  `Soundness/CoreAIR.lean` is the exact v6.4.0 deterministic boundary: its `_of_obligations`
   combinators consume the `.execution` cluster only and expose the unclosed field-by-field proof bundle.
   `TargetVm.lean` retains the proved conditional trail-to-Sail walk; it is an intermediate lemma, not
   the headline zkVM theorem. Audit harness: `scripts/run_audit.sh`
@@ -263,7 +263,7 @@ the ALU chips' `Assumptions`/`ProverAssumptions`), the `Native/`+`Proofs/` five-
 `Chips`/`Operations`/`Readers`/`WitnessTests`, and all six per-pillar layer libraries. Every registered
 chip soundness/completeness theorem, DivRem evidence theorem, structural circuit law, grounding
 contract, and whole-chip faithfulness proof is closed. `scripts/run_audit.sh` gates zero proof
-deferrals. The exact v6.3.1 Core relation and conditional `_of_obligations` combinators are landed;
+deferrals. The exact v6.4.0 Core relation and conditional `_of_obligations` combinators are landed;
 their explicit refinement bundle is not yet instantiated. The obsolete nine DivRem per-op soundness files and
 their shared tail were retired in favor of the four-family evidence contract. A large proof-cleanup
 campaign (2026-06-22 / 06-23) golfed ~109

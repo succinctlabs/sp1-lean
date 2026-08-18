@@ -16,7 +16,7 @@ files.
 RiscvAir::machine() ───────────────→ Extracted/CoreAIRManifest.lean
 executor opcode.rs (semantic pin) ─→ Extracted/OpcodeTable.lean
 Air::eval / eval_public_values ────→ Extracted/{ChipOracle,SystemOracle}/...
-          (audited Rust overlay)      (rows + ordered asserts/interactions only)
+        (audited extraction branch)   (rows + ordered asserts/interactions only)
 
 Native/ hand-written Clean circuits ─→ Faithful/<Chip>.lean (`ChipFaithful`)
 Rust generate_trace ────────────────→ SP1CleanTest/TraceGenTests/*Vectors.lean
@@ -25,32 +25,28 @@ Rust generate_trace ────────────────→ SP1Clean
 Run it:
 
 ```sh
-SP1_DIR=/path/to/audited-extractor-overlay EXTRACT_AIR_ONLY=1 python3 update_extracted.py
+SP1_DIR=/path/to/extraction-branch-checkout EXTRACT_AIR_ONLY=1 python3 update_extracted.py
 ```
 
-`SP1_DIR` must point at the exact extraction overlay checked by `SP1_PINNED_COMMIT` and the two patch
-digests in `update_extracted.py`; the ordinary sibling `../sp1` remains the unmodified semantic source.
-(A convenient overlay setup is a `git worktree` of the semantic checkout at the pinned overlay commit
-with the two `scripts/extractor-patches/*.patch` files `git apply`'d.) Note one operational wrinkle:
-each run's `cargo` invocation rewrites the overlay's `Cargo.lock` (a newer cargo re-normalizes one
-`slop-algebra` entry), which the strict worktree check then rejects on the *next* run — restore or
-stash the overlay's `Cargo.lock` before every invocation (`git -C $SP1_DIR stash push -- Cargo.lock`).
-`cargo --locked` does not work here (the pinned lockfile predates the running cargo's normalization).
-The generator verifies that the overlay's merge base is semantic revision
-`a630089d9ff484ec6f2feade8d0afbb1447eed11` (`v6.3.1-8-ga630089d9`), that runtime-source changes are
-reflection metadata only, and that the dirty exporter diff is byte-identical to the checked-in
-list-only patches. `CHIPS` and `SYSTEM_TABLES` select AIR anchors; `TRACE_CHIPS` selects whole-chip
+`SP1_DIR` must point at a **clean** checkout of the extraction branch pinned by `SP1_PINNED_COMMIT`
+(`dtumad/lean-extraction` on `succinctlabs/sp1`, based directly on the v6.4.0 semantic tag) — every
+extraction change is an ordinary commit on that branch; there is no uncommitted-patch mechanism. The
+ordinary sibling `../sp1` checked out at that branch serves as both semantic source and extractor.
+The generator verifies that the checkout's merge base with semantic revision
+`f66b4bff51d0ccff51d152e0f7f66b2ffedf3529` (`v6.4.0`) is the semantic revision itself, that
+machine-source changes are reflection metadata only against an explicit file allowlist, and that the
+worktree is clean. `CHIPS` and `SYSTEM_TABLES` select AIR anchors; `TRACE_CHIPS` selects whole-chip
 populate batteries. `OPERATIONS` and `WITNESS_OPERATIONS` are the shared-substrate registries (the
 canonical reader modules + statement targets multiple chip anchors reference; the whole-chip
 migration is complete, so they shrink only when an anchor is actually retired). There is no
 circuit-output registry or circuit emitter. The output is deterministic, so a full regeneration at
-the audited overlay leaves all pre-existing anchors byte-identical.
+the audited pin leaves all pre-existing anchors byte-identical.
 
 **Opcode table.** The `Opcode` enum's variant-name → `#[repr(u8)]`-discriminant table — the opcode
 value every chip commits on the Program bus — is extracted unconditionally as
 `SP1Clean/Extracted/OpcodeTable.lean` by a text-level parse (like the manifest writers, no cargo
 run) of `crates/core/executor/src/opcode.rs` **at `SP1_SEMANTIC_COMMIT` via `git show`**, so it is
-independent of the overlay worktree's patch state and reproducible at the pin. The parse fails
+independent of the checkout's working state and reproducible at the pin. The parse fails
 closed on shape drift (missing `pub enum Opcode` block or `#[repr(u8)]` attribute, no variants,
 non-consecutive discriminants). The hand-maintained mirror `SP1Clean/Model/Opcode.lean` is
 cross-checked against the extracted table by the kernel-`decide` theorem
@@ -95,26 +91,18 @@ an emission detail; a chip anchor may unfold them locally. Canonical generated r
 chip-private arithmetic helpers are embedded in the chip namespace. The goal is not to make any of
 those Rust helpers match Lean gadgets.
 
-### Audited Rust overlay
+### Audited Rust extraction branch
 
-The extraction backend is not part of the semantic SP1 pin yet. Its exact review surface has two
-layers: (a) the overlay's **committed** delta over the semantic revision (the field-generic
-emission + reflection derives — verified reflection/emission-only by `verify_extractor_overlay`),
-and (b) the two **uncommitted** patch files `scripts/extractor-patches/core-air-lists.patch` /
-`core-air-manifest.patch` (touching exactly `main.rs`, `ir/ast.rs`, `ir/expr.rs`, `ir/lean.rs`;
-byte-hash-checked against the live worktree diff). `Extracted/Provenance.lean` records the
-semantic revision, overlay revision, and combined diff hash. The relevant changes are:
+The extraction backend is not part of the semantic SP1 pin yet. Its exact review surface is the
+**committed** delta of the pinned branch over the semantic revision (`f66b4bff5..de017f475`,
+`dtumad/lean-extraction` on `succinctlabs/sp1`): the reflection derives on the 26 machine files
+(verified derive-line-only by `verify_extractor_overlay`), the field-generic Lean emission in the
+hypercube IR, the whole-chip extraction modes in `main.rs`, and the `chip_traces` dump binary.
+`Extracted/Provenance.lean` records the semantic revision and the branch revision. The series is
+authored at upstream-PR quality; once it lands upstream, `SP1_PINNED_COMMIT` advances to an
+upstream commit. The relevant changes are:
 
-**Overlay-retirement path (upstream PR).** The complete review surface — the committed
-overlay delta plus both patches — has been rebased into a reviewable five-commit series on the
-sibling semantic checkout (`../sp1`, branch `dtumad/lean-constraint-extraction`, based on a recent
-upstream `main`; the two patch files are the series' last two commits, byte-identical to the
-checked-in `scripts/extractor-patches/*.patch`). Once that lands upstream, `SP1_PINNED_COMMIT` can
-advance to an upstream commit and the uncommitted-patch mechanism retires. **Until that merge, the
-pins, patches, and `Extracted/Provenance.lean` here stay exactly as they are** — the branch is a
-forward path, not current provenance.
-
-- **Field-generic, not `Fin KB`** *(overlay committed delta)*. Every Lean-emission site writes the
+- **Field-generic, not `Fin KB`**. Every Lean-emission site writes the
   type token `F` instead of the concrete `Fin KB`:
   `crates/hypercube/src/ir/ast.rs` (let-step + call-output types),
   `expr.rs` / `var.rs` (`(… : F)⁻¹` inverse constants),
@@ -139,8 +127,8 @@ forward path, not current provenance.
 - **Machine manifest.** A separate mode reads `RiscvAir::machine().shape().chip_clusters` directly and
   reports runtime table names and widths. Python compares that output to the theorem profile before
   writing anything.
-- **No circuit backend.** The transitional Rust-to-Clean-circuit format was deleted from the audited
-  patch. The extractor cannot manufacture a second implementation of a native gadget.
+- **No circuit backend.** The transitional Rust-to-Clean-circuit format does not exist on the
+  extraction branch. The extractor cannot manufacture a second implementation of a native gadget.
 
 Large generated lists are split into opaque `assertsPartN`/`interactionsPartN` definitions and then
 concatenated in order. This is only a Lean elaboration boundary: it follows Clean's advice to keep
@@ -180,15 +168,17 @@ allowlist the output.
 - **`SP1CleanTest/TraceGenTests/`** — compares rows generated from the native circuit with whole traces
   dumped by Rust.
 
-  > **Trace-battery provenance caveat (release-readiness audit F-R-01).** The whole-trace dumper
-  > (`witness_vectors --chip`) that produced the 10 `*ChipTraceVectors.lean` batteries is **not
-  > present at the pinned extractor overlay** (`witness_vectors.rs` there supports `--operation`
-  > only), nor at any commit in the sp1 history — the batteries were dumped from then-uncommitted
-  > tooling. The AIR anchors are unaffected (`EXTRACT_AIR_ONLY=1` reproduces all generated AIR
-  > modules byte-identically at the pin), and the batteries' *content* is independently validated by
-  > the `native_decide` anchors against the native circuits' own trace generation — but a full
-  > (non-AIR-only) regeneration currently fails at the pin. Follow-up: reconstruct the `--chip` mode
-  > as a third checked-in extractor patch and re-dump to confirm byte-identity.
+  > **Trace-battery provenance caveat (release-readiness audit F-R-01, dissolving).** The dumper
+  > that produced the legacy 10 `*ChipTraceVectors.lean` batteries never existed at any pinned
+  > revision — the batteries were dumped from then-uncommitted tooling. The AIR anchors are
+  > unaffected (`EXTRACT_AIR_ONLY=1` reproduces all generated AIR modules byte-identically at the
+  > pin), and the batteries' *content* is independently validated by the `native_decide` anchors
+  > against the native circuits' own trace generation. The pinned extraction branch now carries a
+  > committed successor dumper (`crates/core/compiler/src/bin/chip_traces.rs`); the legacy
+  > batteries and their `witness_vectors` machinery retire in favor of dump-anchored fixtures
+  > (`export/sp1dump/` + the generation-time gate) as that migration lands. Until then the
+  > witness/trace-vector passes still reference the retired `witness_vectors` binary, so only
+  > `EXTRACT_AIR_ONLY=1` regeneration runs at the pin (the batteries are frozen, not regenerable).
 
 ## Legacy operation-list outputs (retirement path)
 
@@ -264,5 +254,5 @@ load/store oracle reaches `RegisterAccessCols` through `ITypeReader`, whose modu
   Rust arithmetic helpers embedded as implementation details.
 - Retire an entry of `WITNESS_OPERATIONS` / the operation-list modules whenever its last consuming
   anchor is retired (they are deliberate shared substrate, not migration debt — see `AGENTS.md`).
-- Land the upstream sp1 PR from the rebased series (see "Overlay-retirement path" above), then
-  advance `SP1_PINNED_COMMIT` to the upstream commit and delete the patch mechanism.
+- Land the upstream sp1 PR from the pinned branch series (`dtumad/lean-extraction`), then advance
+  `SP1_PINNED_COMMIT` to the upstream commit.

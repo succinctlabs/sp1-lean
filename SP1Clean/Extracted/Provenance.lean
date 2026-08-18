@@ -10,13 +10,11 @@ namespace SP1Clean.Extracted
 structure ExtractionProvenance where
   semanticRevision : String
   extractorRevision : String
-  extractorPatchSha256 : String
 deriving DecidableEq, Repr
 
 /-- Provenance validated by the generator before it writes any AIR artifact. -/
 def checkedInProvenance : ExtractionProvenance where
-  semanticRevision := "a630089d9ff484ec6f2feade8d0afbb1447eed11"
-  extractorRevision := "69a8377c6e5550451f40c81fca17459687cd0a8f"
-  extractorPatchSha256 := "a2c43cfab00280f5331a15ec251a8341a26ecf3baedcda22fec182915fbcf108"
+  semanticRevision := "f66b4bff51d0ccff51d152e0f7f66b2ffedf3529"
+  extractorRevision := "de017f47596b4b7ca847ade857ded8c690b3835e"
 
 end SP1Clean.Extracted

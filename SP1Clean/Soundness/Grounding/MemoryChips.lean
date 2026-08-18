@@ -4744,7 +4744,7 @@ theorem storeByteAdvanceReady_of_decoded
   exact h
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
-/-- The two high v6.3.1 SB offset bits select one prior 16-bit cell limb. The four
+/-- The two high v6.4.0 SB offset bits select one prior 16-bit cell limb. The four
 read-modify-write equations add the byte-sized increment to exactly that limb. -/
 theorem StoreByteChip.limbFacts
     (input : StoreByteChip.Inputs (ZMod p))
@@ -4837,7 +4837,7 @@ theorem StoreByteChip.limbFacts
       all_goals exact rmw3.trans (add_comm _ _)
 
 omit [Fact (2 ^ 25 < p)] in
-/-- The v6.3.1 SB byte selectors and read-modify-write equations describe exactly one
+/-- The v6.4.0 SB byte selectors and read-modify-write equations describe exactly one
 byte replacement in the authenticated aligned cell. -/
 theorem StoreByteChip.mergeFacts
     (input : StoreByteChip.Inputs (ZMod p))
@@ -5930,7 +5930,7 @@ theorem storeHalfAdvanceReady_of_decoded
   exact h
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
-/-- The two v6.3.1 SH selector bits identify one 16-bit cell limb, and the four read-modify-write
+/-- The two v6.4.0 SH selector bits identify one 16-bit cell limb, and the four read-modify-write
 equations replace exactly that limb with rs2's low limb. -/
 theorem StoreHalfChip.mergeFacts
     (input : StoreHalfChip.Inputs (ZMod p))
@@ -6910,7 +6910,7 @@ theorem StoreWordChip.storeValue_isU64_of_constraints
 
 omit [Fact (2 ^ 25 < p)] in
 /-- StoreWord's semantic row writes the low four source bytes into the selected half of the
-authenticated RAM cell. The two cases are exactly the v6.3.1 AIR's `offset_bit`-selected
+authenticated RAM cell. The two cases are exactly the v6.4.0 AIR's `offset_bit`-selected
 read-modify-write equations. -/
 theorem storeWordChip_storeFacts
     (input : StoreWordChip.Inputs (ZMod p))

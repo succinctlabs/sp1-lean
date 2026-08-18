@@ -1,7 +1,7 @@
 # Verification overview
 
 *Snapshot: 2026-08, branch `dtumad/v1.0-release`. Lean and mathlib v4.32.2; generated Sail model
-paired with lean-sail v5; SP1 semantic pin `v6.3.1-8-ga630089d9`. Recorded pins are
+paired with lean-sail v5; SP1 semantic pin `v6.4.0`. Recorded pins are
 machine-cross-checked by `scripts/check_pins.sh`; see `release-audit.md` for the full table.*
 
 This repository proves a substantial SP1 AIR-to-execution result, but it does not yet prove full
@@ -10,7 +10,7 @@ upstream Core AIR soundness.
 The closed capstone is `supported_core_native_sound`. It says that a satisfying, balanced witness for
 the 25-chip native Clean machine, together with explicit program/boundary and memory-timestamp
 relations, determines a genuine shard-local execution of the generated RISC-V Sail model. The exact
-v6.3.1 upstream AIR is separately represented by complete extracted assertion and interaction lists.
+v6.4.0 upstream AIR is separately represented by complete extracted assertion and interaction lists.
 All 25 native instruction chips are now proved faithful to their corresponding upstream tables. The
 remaining top-level work is to derive the native theorem's semantic boundary facts from the upstream
 Core system tables and then instantiate the exact-AIR refinement bundle.
@@ -112,13 +112,13 @@ factored differently; they are not separate public proof boundaries.
 The semantic Rust source is pinned to:
 
 ```text
-a630089d9ff484ec6f2feade8d0afbb1447eed11
-v6.3.1-8-ga630089d9
+f66b4bff51d0ccff51d152e0f7f66b2ffedf3529
+v6.4.0
 ```
 
-The list-only extractor uses a separately pinned descendant. Its machine-source delta from the
-semantic revision consists only of reflection derives/imports; exporter changes are hash-checked
-outside the AIR definitions. The generated manifest fixes table membership, row widths, preprocessed
+The list-only extractor uses a separately pinned descendant branch (every extraction change an
+ordinary commit on it). Its machine-source delta from the semantic revision consists only of
+reflection derives/imports; exporter changes live outside the AIR definitions. The generated manifest fixes table membership, row widths, preprocessed
 widths, and the 160-cell public-values width.
 
 `CoreAIR.Current.Relation` contains:
