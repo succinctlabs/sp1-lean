@@ -1,14 +1,5 @@
 import SP1CleanTest.Exportable
-import SP1CleanTest.TraceGenTests.AddChipTraceWitness
-import SP1CleanTest.TraceGenTests.SubChipTraceWitness
-import SP1CleanTest.TraceGenTests.SubwChipTraceWitness
-import SP1CleanTest.TraceGenTests.AddwChipTraceWitness
-import SP1CleanTest.TraceGenTests.MulChipTraceWitness
-import SP1CleanTest.TraceGenTests.DivRemChipTraceWitness
-import SP1CleanTest.TraceGenTests.BitwiseChipTraceWitness
-import SP1CleanTest.TraceGenTests.LtChipTraceWitness
-import SP1CleanTest.TraceGenTests.ShiftLeftChipTraceWitness
-import SP1CleanTest.TraceGenTests.ShiftRightChipTraceWitness
+import SP1CleanTest.TraceGenTests.TraceGenerator
 
 /-! # `witgenExport` — the witness-IR export driver (waves D2/D4a)
 
@@ -27,13 +18,14 @@ Run from the repo root against built oleans:
 Defaults: `--out export` (writing `export/witgen/`). `--chip NAME` restricts to one chip
 and skips `index.json` (never a partial index); `--stdout` prints the payload instead of
 writing files. `--testdata` writes `export/testdata/<Chip>.trace.json` differential
-fixtures instead: for the ten trace-anchored chips, one row per SP1-dumped event
-(inputs via the `EventPopulate` flatteners, hints via the per-chip builders,
-`expectedRow` copied from the dumped SP1 rows whose equality with the circuit-derived
-rows is pinned by the `native_decide` anchors) plus an honest padding row; for all 25
-chips, deterministic seeded synthetic rows. `expectedWitness` is always the Lean
-reference evaluation (`FlatOperation.witgen`) over the **shared** operation list — the
-same programs the wire carries, and `WitgenIR.eval_share` proves sharing changes no
+fixtures instead, anchored for **all 25 chips** to the committed SP1 trace dumps
+(`export/sp1dump/`, always read from the repo tree): one `"event"` row per dumped
+executor event with inputs recovered through the symbolic row map and hints from the
+event's opcode, **each recomputed and gated cell-for-cell against the dumped
+`generate_trace` row before anything is written**, plus an honest padding row and
+deterministic seeded synthetic rows. `expectedWitness` is always the Lean reference
+evaluation (`FlatOperation.witgen`) over the **shared** operation list — the same
+programs the wire carries, and `WitgenIR.eval_share` proves sharing changes no
 evaluation.
 
 This is deliberately an interpreted script, not a `lean_exe`: elaborating the file runs
@@ -283,17 +275,32 @@ def exportChip (out : Option System.FilePath) (e : Entry) : IO Json := do
 
 /-! ## Test-data fixtures (`--testdata`)
 
-Differential fixtures for `rust/witgen-interp`: per row, the seeded input cells, the
-hint tables, and the expected witness cells from the Lean reference evaluation
-(`FlatOperation.witgen`) over the **shared** flat operations — the same programs the
-wire carries (`WitgenIR.eval_share` proves sharing preserves evaluation). Rows carry
-honest provenance: `"event"` rows come from SP1-dumped executor events whose full-row
-equality with the circuit derivation is pinned by a `native_decide` trace anchor
-(`expectedRow` is copied from the dumped SP1 rows verbatim); `"padding"` rows are
-SP1-anchored only for the chips whose padding SP1 *derives* (ShiftLeft/ShiftRight/
-DivRem — the rest zero-fill without running populate, so their zero-input padding row
-is a plain differential vector); `"synthetic"` rows are deterministic seeded vectors
-(witness generation is total, so every input is valid). -/
+Differential fixtures for `rust/witgen-interp`, anchored to the committed SP1 trace
+dumps (`export/sp1dump/<Chip>.dump.json`, sole writer `scripts/update_sp1_dumps.sh`,
+produced by the `chip_traces` binary committed at the pinned extraction branch). Per
+chip:
+
+- `"event"` rows — one per dumped executor event. Inputs are recovered from the dumped
+  row itself through the symbolic row map (every native input cell is a bare `var`
+  column of the Rust row, except `is_real` on the six flag-hinted chips, where it is
+  `1` on event rows); hint tables come from the event's opcode discriminant. **The
+  generation-time gate:** every event row is recomputed — `FlatOperation.witgen` over
+  the shared operations, then the symbolic row map evaluated at the resulting cells —
+  and must equal the dumped SP1 row cell-for-cell, or the exporter throws with
+  chip/row/column detail and writes nothing.
+- the padding row — inputs recovered from the dumped padding row (all-zero except
+  SP1's nonzero pad templates, e.g. DivRem's `c = 1`). Chips whose padding SP1
+  *derives* by populate (ShiftLeft/ShiftRight/DivRem) are gated against the dump too
+  (`anchored: true`); the zero-fill chips' dumped padding is asserted all-zero and
+  their padding fixture row is a plain differential vector.
+- `"synthetic"` rows — deterministic seeded vectors (witness generation is total, so
+  every input is valid).
+
+A per-chip spot check pins the gate's Expression-level row evaluation to the
+value-level `circuitTraceRowMapped` path (the audited `ChipFaithful` reconfigure at
+field values) on event row 0. `expectedWitness` is always the Lean reference
+evaluation over the shared flat operations — the same programs the wire carries
+(`WitgenIR.eval_share` proves sharing preserves evaluation). -/
 
 section Testdata
 open SP1Clean.TraceGenTests
@@ -336,87 +343,213 @@ def rowJson (kind : String) (anchored : Bool) (seed : Option ℕ) (inputs : List
         ("expectedWitness", toJson expectedWitness)]
     ++ (expectedRow.map fun r => [("expectedRow", toJson r)]).getD []
 
-/-- One trace-anchored chip's event data, pre-flattened to `(inputs, hint)` pairs. -/
-structure AnchoredData where
-  inputsHints : List (List Fp × ProverHint Fp)
-  /-- The dumped SP1 rows, one per event (`<Chip>ChipTraceRows` truncated). -/
-  expectedRows : List (List ℕ)
-  padInputs : List Fp
-  /-- Whether SP1 *derives* its padding rows by populate (ShiftLeft/ShiftRight/DivRem);
-  the zero-fill chips write literal zero rows without running populate. -/
-  padAnchored : Bool
-  padExpectedRow : Option (List ℕ)
-  /-- The `native_decide` anchor pinning derived rows == dumped rows. -/
-  thm : String
+/-! ### SP1 dumps, input recovery, and the generation-time gate -/
 
-/-- The ten trace-anchored chips (the whole-trace conformance battery). -/
-def anchoredData : List (String × AnchoredData) := [
-  ("Add", {
-    inputsHints := AddChipTraceEvents.map fun e => (rTypeEventInputs e, ProverHint.empty _),
-    expectedRows := (AddChipTraceRows.take AddChipTraceEvents.length).map (·.toList),
-    padInputs := List.replicate 29 0, padAnchored := false, padExpectedRow := none,
-    thm := "SP1Clean.TraceGenTests.addchip_trace_conforms" }),
-  ("Sub", {
-    inputsHints := SubChipTraceEvents.map fun e => (rTypeEventInputs e, ProverHint.empty _),
-    expectedRows := (SubChipTraceRows.take SubChipTraceEvents.length).map (·.toList),
-    padInputs := List.replicate 29 0, padAnchored := false, padExpectedRow := none,
-    thm := "SP1Clean.TraceGenTests.subchip_trace_conforms" }),
-  ("Subw", {
-    inputsHints := SubwChipTraceEvents.map fun e => (rTypeEventInputs e, ProverHint.empty _),
-    expectedRows := (SubwChipTraceRows.take SubwChipTraceEvents.length).map (·.toList),
-    padInputs := List.replicate 29 0, padAnchored := false, padExpectedRow := none,
-    thm := "SP1Clean.TraceGenTests.subwchip_trace_conforms" }),
-  ("Addw", {
-    inputsHints := AddwChipTraceEvents.map fun e => (aluTypeEventInputs e, ProverHint.empty _),
-    expectedRows := (AddwChipTraceRows.take AddwChipTraceEvents.length).map (·.toList),
-    padInputs := List.replicate 33 0, padAnchored := false, padExpectedRow := none,
-    thm := "SP1Clean.TraceGenTests.addwchip_trace_conforms" }),
-  ("Mul", {
-    inputsHints := MulChipTraceEvents.map fun e => (rTypeOpEventInputs e, mulHint e.opcode),
-    expectedRows := (MulChipTraceRows.take MulChipTraceEvents.length).map (·.toList),
-    padInputs := List.replicate 29 0, padAnchored := false, padExpectedRow := none,
-    thm := "SP1Clean.TraceGenTests.mulchip_trace_conforms" }),
-  ("DivRem", {
-    inputsHints := DivRemChipTraceEvents.map fun e =>
-      (rTypeOpEventInputs e, divRemHint e.opcode),
-    expectedRows := (DivRemChipTraceRows.take DivRemChipTraceEvents.length).map (·.toList),
-    padInputs := divRemPadInputs, padAnchored := true,
-    padExpectedRow :=
-      (DivRemChipTraceRows.drop DivRemChipTraceEvents.length).head?.map (·.toList),
-    thm := "SP1Clean.TraceGenTests.divremchip_trace_conforms" }),
-  ("Bitwise", {
-    inputsHints := BitwiseChipTraceEvents.map fun e =>
-      (aluTypeOpEventInputs e, bitwiseHint e.opcode),
-    expectedRows := (BitwiseChipTraceRows.take BitwiseChipTraceEvents.length).map (·.toList),
-    padInputs := List.replicate 33 0, padAnchored := false, padExpectedRow := none,
-    thm := "SP1Clean.TraceGenTests.bitwisechip_trace_conforms" }),
-  ("Lt", {
-    inputsHints := LtChipTraceEvents.map fun e => (aluTypeOpEventInputs e, ltHint e.opcode),
-    expectedRows := (LtChipTraceRows.take LtChipTraceEvents.length).map (·.toList),
-    padInputs := List.replicate 33 0, padAnchored := false, padExpectedRow := none,
-    thm := "SP1Clean.TraceGenTests.ltchip_trace_conforms" }),
-  ("ShiftLeft", {
-    inputsHints := ShiftLeftChipTraceEvents.map fun e =>
-      (aluTypeOpEventInputs e, shiftLeftHint e.opcode),
-    expectedRows :=
-      (ShiftLeftChipTraceRows.take ShiftLeftChipTraceEvents.length).map (·.toList),
-    padInputs := List.replicate 33 0, padAnchored := true,
-    padExpectedRow :=
-      (ShiftLeftChipTraceRows.drop ShiftLeftChipTraceEvents.length).head?.map (·.toList),
-    thm := "SP1Clean.TraceGenTests.shiftleftchip_trace_conforms" }),
-  ("ShiftRight", {
-    inputsHints := ShiftRightChipTraceEvents.map fun e =>
-      (aluTypeOpEventInputs e, shiftRightHint e.opcode),
-    expectedRows :=
-      (ShiftRightChipTraceRows.take ShiftRightChipTraceEvents.length).map (·.toList),
-    padInputs := List.replicate 33 0, padAnchored := true,
-    padExpectedRow :=
-      (ShiftRightChipTraceRows.drop ShiftRightChipTraceEvents.length).head?.map (·.toList),
-    thm := "SP1Clean.TraceGenTests.shiftrightchip_trace_conforms" })]
+/-- One parsed dump event: the opcode discriminant plus the two operand values —
+everything the hint builders need (inputs are recovered from the rows, not the
+events). -/
+structure DumpEvent where
+  opcode : Nat
+  a : Nat
+  b : Nat
 
-/-- Write one chip's differential fixture. `idx` is the chip's position in the full
-registry (stable seeds even under `--chip` filtering). -/
-def writeTestdataChip (dir : System.FilePath) (idx : ℕ) (e : Entry) : IO Unit := do
+/-- One parsed SP1 chip dump: the events and the full padded `generate_trace`
+matrix. -/
+structure Dump where
+  events : List DumpEvent
+  rows : List (List Nat)
+  width : Nat
+  height : Nat
+
+/-- Parse and shape-check `<Chip>.dump.json`. -/
+def dumpOf (chip : String) (j : Json) : Except String Dump := do
+  let nat (k : String) : Except String Nat :=
+    match (j.getObjVal? k).toOption.bind (·.getNat?.toOption) with
+    | some n => .ok n
+    | none => .error s!"{chip}.dump.json: missing or non-numeric '{k}'"
+  unless (← nat "schemaVersion") == 1 do throw s!"{chip}.dump.json: schemaVersion != 1"
+  unless (j.getObjVal? "chip").toOption.bind (·.getStr?.toOption) == some chip do
+    throw s!"{chip}.dump.json: chip name mismatch"
+  let width ← nat "width"
+  let height ← nat "height"
+  let eventsJ ← match (j.getObjVal? "events").toOption.bind (·.getArr?.toOption) with
+    | some a => pure a
+    | none => .error s!"{chip}.dump.json: missing events array"
+  let events ← eventsJ.toList.mapM fun e => do
+    let evNat (k : String) : Except String Nat :=
+      match (e.getObjVal? k).toOption.bind (·.getNat?.toOption) with
+      | some n => .ok n
+      | none => .error s!"{chip}.dump.json: event missing '{k}'"
+    let opcode ← match ((e.getObjVal? "opcode").toOption.bind fun o =>
+        (o.getObjVal? "discriminant").toOption).bind (·.getNat?.toOption) with
+      | some d => Except.ok d
+      | none => Except.error s!"{chip}.dump.json: event without opcode discriminant"
+    return DumpEvent.mk opcode (← evNat "a") (← evNat "b")
+  let rowsJ ← match (j.getObjVal? "rows").toOption.bind (·.getArr?.toOption) with
+    | some a => pure a
+    | none => .error s!"{chip}.dump.json: missing rows array"
+  let rows ← rowsJ.toList.mapM fun r =>
+    match r.getArr?.toOption with
+    | some cells => cells.toList.mapM fun c =>
+        match c.getNat?.toOption with
+        | some n => Except.ok n
+        | none => Except.error s!"{chip}.dump.json: non-numeric row cell"
+    | none => .error s!"{chip}.dump.json: non-array row"
+  unless rows.length == height do throw s!"{chip}.dump.json: rows != height"
+  unless rows.all (·.length == width) do throw s!"{chip}.dump.json: a row's length != width"
+  unless !events.isEmpty do throw s!"{chip}.dump.json: no events"
+  unless events.length < height do throw s!"{chip}.dump.json: no padding row"
+  return ⟨events, rows, width, height⟩
+
+/-- The six chips whose `is_real` input (native input cell 0) is not a bare column of
+the Rust row — it gates flag-hinted populate paths instead. On their event rows
+`is_real = 1`, on padding rows `0`. Verified over all 25 committed row maps: these are
+exactly the chips with any non-bare-`var` input cell, and only cell 0 is affected. -/
+def isRealHintedChips : List String :=
+  ["Bitwise", "Branch", "Lt", "Mul", "ShiftLeft", "ShiftRight"]
+
+/-- Input-recovery table from the symbolic row map: input `i` reads Rust column `j`
+iff `rowMap[j] = var i` (`none` = the `is_real` exception). Fails closed on any other
+uncovered input cell, so row-map drift breaks the build rather than the fixtures. -/
+def inversionOf (chip : String) (inputWidth : Nat) (rowMap : List (Expression Fp)) :
+    Except String (List (Option Nat)) :=
+  (List.range inputWidth).mapM fun i =>
+    match rowMap.zipIdx.find? fun (ex, _) =>
+        match ex with
+        | .var v => v.index == i
+        | _ => false with
+    | some (_, j) => .ok (some j)
+    | none =>
+      if i == 0 && isRealHintedChips.contains chip then .ok none
+      else .error s!"{chip}: input cell {i} is not a bare row column (row map drifted)"
+
+/-- Recover the native input cells from a dumped Rust row (`isReal` fills the
+non-bare `is_real` slot: `1` on event rows, `0` on padding rows). -/
+def invertInputs (inv : List (Option Nat)) (isReal : Fp) (row : List Nat) : List Fp :=
+  inv.map fun
+    | some j => ((row.getD j 0 : ℕ) : Fp)
+    | none => isReal
+
+/-- Signed view of a u64 value (two's complement). -/
+def i64Of (n : Nat) : Int := if n < 2 ^ 63 then (n : Int) else (n : Int) - 2 ^ 64
+
+/-- SP1's branch-taken derivation, mirroring `branch/trace.rs` exactly: BEQ `a == b`,
+BNE `!=`, BLT/BGE signed less-than and its negation, BLTU/BGEU unsigned. -/
+def branchTaken (op a b : Nat) : Bool :=
+  match op with
+  | 40 => a == b
+  | 41 => a != b
+  | 42 => decide (i64Of a < i64Of b)
+  | 43 => decide (i64Of b ≤ i64Of a)
+  | 44 => decide (a < b)
+  | 45 => decide (b ≤ a)
+  | _ => false
+
+/-- Per-chip flag hints from the dumped event (opcode discriminant = the executor
+`Opcode` `#[repr(u8)]` values; Branch additionally derives its `is_branching` bit
+from the operand values, mirroring SP1's own populate). The tables are the ones the
+payloads' `hintGet`s declare; chips without hint tables read the empty hint. -/
+def hintFor (chip : String) (ev : DumpEvent) : ProverHint Fp := fun key n =>
+  let op := ev.opcode
+  match chip, key, n with
+  | "Mul", "mul_flags", 5 =>
+    #[#v[if op = 11 then 1 else 0, if op = 12 then 1 else 0, if op = 13 then 1 else 0,
+         if op = 14 then 1 else 0, if op = 24 then 1 else 0]]
+  | "DivRem", "div_rem_flags", 7 =>
+    #[#v[if op = 15 then 1 else 0, if op = 17 then 1 else 0,
+         if op = 18 then 1 else 0, if op = 25 then 1 else 0, if op = 27 then 1 else 0,
+         if op = 26 then 1 else 0, if op = 28 then 1 else 0]]
+  | "Bitwise", "bitwise_flags", 3 =>
+    #[#v[if op = 3 then 1 else 0, if op = 4 then 1 else 0, if op = 5 then 1 else 0]]
+  | "Lt", "lt_flags", 2 => #[#v[if op = 9 then 1 else 0, if op = 10 then 1 else 0]]
+  | "ShiftLeft", "shift_left_flags", 2 =>
+    #[#v[if op = 6 then 1 else 0, if op = 21 then 1 else 0]]
+  | "ShiftRight", "shift_right_flags", 4 =>
+    #[#v[if op = 7 then 1 else 0, if op = 8 then 1 else 0,
+         if op = 22 then 1 else 0, if op = 23 then 1 else 0]]
+  | "Branch", "branch_flags", 6 =>
+    #[#v[if op = 40 then 1 else 0, if op = 41 then 1 else 0, if op = 42 then 1 else 0,
+         if op = 43 then 1 else 0, if op = 44 then 1 else 0, if op = 45 then 1 else 0]]
+  | "Branch", "branch_branching", 1 =>
+    #[#v[if branchTaken op ev.a ev.b then 1 else 0]]
+  | _, _, _ => #[]
+
+/-- The chips whose padding rows SP1 *derives* by running populate on the pad template
+(nonzero `padded_row_template`); the rest zero-fill without running populate. -/
+def derivedPadChips : List String := ["ShiftLeft", "ShiftRight", "DivRem"]
+
+/-- Evaluate the symbolic Rust row at the generated witness cells (canonical values).
+The environment is exactly the one witness generation itself evaluates against
+(`Circuit.witgen_proverEnvironment`). -/
+def rowValsOf (rowMap : List (Expression Fp)) (cells : Array Fp) : List Nat :=
+  let env := (ProverEnvironment.fromArray cells (ProverHint.empty Fp)).toEnvironment
+  rowMap.map fun ex => (Expression.eval env ex).val
+
+/-- First differing column of two equal-length rows, as `(column, lean, sp1)`. -/
+def firstMismatch (lean sp1 : List Nat) : Option (Nat × Nat × Nat) :=
+  (lean.zip sp1).zipIdx.findSome? fun ((l, s), j) =>
+    if l != s then some (j, l, s) else none
+
+/-- The value-level spot-check generators: `circuitTraceRowMapped` through the audited
+`ChipFaithful` reconfigure maps at field values. Run on event row 0 of every chip, this
+pins the gate's Expression-level row evaluation to the value-level populate path. -/
+def spotChecks : List (String × (List Fp → ProverHint Fp → List Fp)) := [
+  ("Add", fun i h => circuitTraceRowMapped _
+    (AddChip.circuit (p := SP1Prime)).main Faithful.addChipReconfigure i h),
+  ("Addi", fun i h => circuitTraceRowMapped _
+    (AddiChip.circuit (p := SP1Prime)).main Faithful.addiChipReconfigure i h),
+  ("Addw", fun i h => circuitTraceRowMapped _
+    (AddwChip.circuit (p := SP1Prime)).main Faithful.addwChipReconfigure i h),
+  ("Sub", fun i h => circuitTraceRowMapped _
+    (SubChip.circuit (p := SP1Prime)).main Faithful.subChipReconfigure i h),
+  ("Subw", fun i h => circuitTraceRowMapped _
+    (SubwChip.circuit (p := SP1Prime)).main Faithful.subwChipReconfigure i h),
+  ("Bitwise", fun i h => circuitTraceRowMapped _
+    (BitwiseChip.circuit (p := SP1Prime)).main Faithful.bitwiseChipReconfigure i h),
+  ("Lt", fun i h => circuitTraceRowMapped _
+    (LtChip.circuit (p := SP1Prime)).main Faithful.ltChipReconfigure i h),
+  ("ShiftLeft", fun i h => circuitTraceRowMapped _
+    (ShiftLeftChip.circuit (p := SP1Prime)).main Faithful.shiftLeftChipReconfigure i h),
+  ("ShiftRight", fun i h => circuitTraceRowMapped _
+    (ShiftRightChip.circuit (p := SP1Prime)).main Faithful.shiftRightChipReconfigure i h),
+  ("Jal", fun i h => circuitTraceRowMapped _
+    (JalChip.circuit (p := SP1Prime)).main Faithful.jalChipReconfigure i h),
+  ("Jalr", fun i h => circuitTraceRowMapped _
+    (JalrChip.circuit (p := SP1Prime)).main Faithful.jalrChipReconfigure i h),
+  ("Branch", fun i h => circuitTraceRowMapped _
+    (BranchChip.circuit (p := SP1Prime)).main Faithful.branchChipReconfigure i h),
+  ("UType", fun i h => circuitTraceRowMapped _
+    (UTypeChip.circuit (p := SP1Prime)).main Faithful.uTypeChipReconfigure i h),
+  ("LoadByte", fun i h => circuitTraceRowMapped _
+    (LoadByteChip.circuit (p := SP1Prime)).main Faithful.loadByteChipReconfigure i h),
+  ("LoadHalf", fun i h => circuitTraceRowMapped _
+    (LoadHalfChip.circuit (p := SP1Prime)).main Faithful.loadHalfChipReconfigure i h),
+  ("LoadWord", fun i h => circuitTraceRowMapped _
+    (LoadWordChip.circuit (p := SP1Prime)).main Faithful.loadWordChipReconfigure i h),
+  ("LoadDouble", fun i h => circuitTraceRowMapped _
+    (LoadDoubleChip.circuit (p := SP1Prime)).main Faithful.loadDoubleChipReconfigure i h),
+  ("LoadX0", fun i h => circuitTraceRowMapped _
+    (LoadX0Chip.circuit (p := SP1Prime)).main Faithful.loadX0ChipReconfigure i h),
+  ("StoreByte", fun i h => circuitTraceRowMapped _
+    (StoreByteChip.circuit (p := SP1Prime)).main Faithful.storeByteChipReconfigure i h),
+  ("StoreHalf", fun i h => circuitTraceRowMapped _
+    (StoreHalfChip.circuit (p := SP1Prime)).main Faithful.storeHalfChipReconfigure i h),
+  ("StoreWord", fun i h => circuitTraceRowMapped _
+    (StoreWordChip.circuit (p := SP1Prime)).main Faithful.storeWordChipReconfigure i h),
+  ("StoreDouble", fun i h => circuitTraceRowMapped _
+    (StoreDoubleChip.circuit (p := SP1Prime)).main Faithful.storeDoubleChipReconfigure i h),
+  ("Mul", fun i h => circuitTraceRowMapped _
+    (MulChip.circuit (p := SP1Prime)).main Faithful.mulChipReconfigure i h),
+  ("DivRem", fun i h => circuitTraceRowMapped _
+    (DivRemChip.circuit (p := SP1Prime)).main Faithful.divRemChipReconfigure i h),
+  ("AluX0", fun i h => circuitTraceRowMapped _
+    (AluX0Chip.circuit (p := SP1Prime)).main Faithful.aluX0ChipReconfigure i h)]
+
+/-- Write one chip's differential fixture from its committed SP1 dump, running the
+generation-time gate first. `idx` is the chip's position in the full registry (stable
+seeds even under `--chip` filtering). -/
+def writeTestdataChip (dumpDir dir : System.FilePath) (sp1Commit : String) (idx : ℕ)
+    (e : Entry) : IO Unit := do
   let t0 ← IO.monoMsNow
   let payload ← match e.ops.witgenJsonShared? with
     | .ok j => pure j
@@ -424,23 +557,67 @@ def writeTestdataChip (dir : System.FilePath) (idx : ℕ) (e : Entry) : IO Unit 
   let uses := aggregate ((collectGets payload).filter (·.isHint))
   let flatShared := e.ops.toFlat.map .share
   let empty : ProverHint Fp := ProverHint.empty Fp
+  -- The SP1 dump, the symbolic row map, and the input-recovery table.
+  let dump ← match Json.parse (← IO.FS.readFile (dumpDir / s!"{e.name}.dump.json"))
+      >>= dumpOf e.name with
+    | .ok d => pure d
+    | .error msg => throw (IO.userError msg)
+  let rowMap ← match rowMaps.find? (·.1 == e.name) with
+    | some (_, m) => pure m
+    | none => throw (IO.userError s!"{e.name}: no row map registered")
+  unless rowMap.length == dump.width do
+    throw (IO.userError
+      s!"{e.name}: row map width {rowMap.length} != dump width {dump.width}")
+  let inv ← match inversionOf e.name e.inputWidth rowMap with
+    | .ok i => pure i
+    | .error msg => throw (IO.userError msg)
   let mut rows : Array Json := #[]
-  let mut provenance : List (String × Json) := []
-  match anchoredData.find? (·.1 == e.name) with
-  | some (_, a) =>
-    unless a.inputsHints.all (·.1.length == e.inputWidth) do
-      throw (IO.userError s!"{e.name}: event inputs drifted from inputWidth {e.inputWidth}")
-    unless a.inputsHints.length == a.expectedRows.length do
-      throw (IO.userError s!"{e.name}: event/row count mismatch")
-    for (ih, row) in a.inputsHints.zip a.expectedRows do
-      rows := rows.push (rowJson "event" true none ih.1 (serializeHints uses ih.2)
-        (expectedWitnessOf flatShared ih.2 ih.1) (some row))
-    rows := rows.push (rowJson "padding" a.padAnchored none a.padInputs
-      (serializeHints uses empty) (expectedWitnessOf flatShared empty a.padInputs)
-      a.padExpectedRow)
-    provenance := provenance ++ [("events", Json.str
-      s!"SP1 generate_trace dump; full-row equality pinned by {a.thm} (native_decide)")]
-  | none => pure ()
+  -- Event rows: recover inputs, recompute, gate cell-for-cell against the dump.
+  for (ev, k) in dump.events.zipIdx do
+    let sp1Row := dump.rows.getD k []
+    let inputs := invertInputs inv 1 sp1Row
+    let hint := hintFor e.name ev
+    let cells := FlatOperation.witgen hint flatShared inputs.toArray
+    if let some (j, l, s) := firstMismatch (rowValsOf rowMap cells) sp1Row then
+      throw (IO.userError s!"{e.name}: GATE FAILED at event row {k} column {j}: \
+        recomputed {l} != SP1 {s} (opcode {ev.opcode})")
+    rows := rows.push (rowJson "event" true none inputs (serializeHints uses hint)
+      ((cells.toList.drop inputs.length).map ZMod.val) (some sp1Row))
+  -- The value-level spot check on event row 0.
+  let spot ← match spotChecks.find? (·.1 == e.name) with
+    | some (_, f) => pure f
+    | none => throw (IO.userError s!"{e.name}: no spot check registered")
+  let row0 := dump.rows.getD 0 []
+  let spotRow := spot (invertInputs inv 1 row0)
+    (hintFor e.name (dump.events.getD 0 ⟨0, 0, 0⟩))
+  unless spotRow.map ZMod.val == row0 do
+    throw (IO.userError
+      s!"{e.name}: circuitTraceRowMapped spot check diverged from the dump on event row 0")
+  -- The padding row: recovered inputs; gated for the derived-pad chips, asserted
+  -- all-zero for the zero-fill chips. SP1 pads with one repeated template row.
+  let padSp1 := dump.rows.getD dump.events.length []
+  unless (dump.rows.drop dump.events.length).all (· == padSp1) do
+    throw (IO.userError s!"{e.name}: padding rows are not uniform in the dump")
+  let padInputs := invertInputs inv 0 padSp1
+  let padWitness := expectedWitnessOf flatShared empty padInputs
+  if derivedPadChips.contains e.name then
+    let padCells := FlatOperation.witgen empty flatShared padInputs.toArray
+    if let some (j, l, s) := firstMismatch (rowValsOf rowMap padCells) padSp1 then
+      throw (IO.userError s!"{e.name}: GATE FAILED at the padding row, column {j}: \
+        recomputed {l} != SP1 {s}")
+    rows := rows.push (rowJson "padding" true none padInputs (serializeHints uses empty)
+      padWitness (some padSp1))
+  else
+    unless padSp1.all (· == 0) do
+      throw (IO.userError s!"{e.name}: zero-fill padding row is not all-zero in the dump")
+    rows := rows.push (rowJson "padding" false none padInputs (serializeHints uses empty)
+      padWitness none)
+  let mut provenance : List (String × Json) := [("events", Json.str
+    s!"SP1 chip_traces dump export/sp1dump/{e.name}.dump.json (sp1Commit {sp1Commit}); \
+    inputs recovered through the symbolic row map; every event row and every derived \
+    padding row recomputed via FlatOperation.witgen + row-map evaluation and matched \
+    cell-for-cell at generation time (fail-closed), with a value-level \
+    circuitTraceRowMapped spot check on event row 0")]
   let zero := List.replicate e.inputWidth (0 : Fp)
   rows := rows.push (rowJson "synthetic" false (some 0) zero (serializeHints uses empty)
     (expectedWitnessOf flatShared empty zero) none)
@@ -481,10 +658,16 @@ def run : IO Unit := do
     throw (IO.userError s!"no chip named {chipFilter.getD "?"}; known: {entries.map (·.name)}")
   let t0 ← IO.monoMsNow
   if testdata then
+    -- Dumps are an input, always read from the committed tree (never from --out).
+    let dumpDir : System.FilePath := System.FilePath.mk "export" / "sp1dump"
+    let sp1Commit ← match Json.parse (← IO.FS.readFile (dumpDir / "index.json"))
+        >>= (·.getObjVal? "sp1Commit") with
+      | .ok (Json.str c) => pure c
+      | _ => throw (IO.userError "export/sp1dump/index.json: missing sp1Commit")
     let dir : System.FilePath := System.FilePath.mk outRoot / "testdata"
     IO.FS.createDirAll dir
     for (e, idx) in selected do
-      writeTestdataChip dir idx e
+      writeTestdataChip dumpDir dir sp1Commit idx e
     IO.eprintln s!"total: {selected.length} chips (testdata), {(← IO.monoMsNow) - t0} ms"
     return
   let out ← if toStdout then pure none else do

@@ -60,7 +60,12 @@ theorem computableWitnesses : (circuit (p := p)).base.ComputableWitnesses := by
         = Expression.eval env'.toEnvironment input.is_auipc := by
       have hv := congrArg (fun r : Inputs (ZMod p) => r.is_auipc) h_input
       simpa [eval_inputs] using hv
-    refine AddOperation.populateIR_congr env env' _ _ (fun i hi => ?_) (fun i hi => ?_)
+    have hoa0 : Expression.eval env.toEnvironment input.adapter.op_a_0
+        = Expression.eval env'.toEnvironment input.adapter.op_a_0 := by
+      have hv := congrArg (fun r : Inputs (ZMod p) => r.adapter.op_a_0) h_input
+      simpa only [eval_opA0] using hv
+    refine AddOperation.populateIRGated_congr env env' _ _ _ hoa0
+      (fun i hi => ?_) (fun i hi => ?_)
     · interval_cases i <;>
         simp [Expression.eval, hsel, hpc 0 (by omega), hpc 1 (by omega), hpc 2 (by omega)]
     · have hv := congrArg (fun r : Inputs (ZMod p) => r.adapter.op_b_imm) h_input

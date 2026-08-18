@@ -177,9 +177,10 @@ theorem completeness :
       = AddOperation.populate #v[Expression.eval env.toEnvironment input_var_state_pc[0],
           Expression.eval env.toEnvironment input_var_state_pc[1],
           Expression.eval env.toEnvironment input_var_state_pc[2], 0] #v[4, 0, 0, 0] := by
-    rw [← AddOperation.populateIR_eval env
+    rw [← AddOperation.populateIRGated_eval_off env input_var_adapter_op_a_0
       #v[input_var_state_pc[0], input_var_state_pc[1], input_var_state_pc[2], 0]
-      #v[4, 0, 0, 0] _ _ (by simp [circuit_norm]) (by simp [circuit_norm]) ha1U h4U]
+      #v[4, 0, 0, 0] _ _ (by simp [circuit_norm]) (by simp [circuit_norm]) ha1U h4U
+      (h_input.2.2.2.2.1.trans h_op_a_0)]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     exact he_oav ⟨i, hi⟩

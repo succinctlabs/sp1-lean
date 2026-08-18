@@ -36,7 +36,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   let add_value ← witnessVectorIR 4 (AddOperation.populateIR
     #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
     input.adapter.op_b_imm)
-  let op_a_value ← witnessVectorIR 4 (AddOperation.populateIR
+  -- SP1 populates the link word only when `rd ≠ x0` (`jal/trace.rs`: `if !event.op_a_0`);
+  -- the gated IR zeroes these cells on `op_a_0` rows so the derived trace matches byte-for-byte.
+  let op_a_value ← witnessVectorIR 4 (AddOperation.populateIRGated input.adapter.op_a_0
     #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
     #v[4, 0, 0, 0])
   let pcWordV : Word (Expression (ZMod p)) :=
@@ -130,5 +132,13 @@ constant limbs need nothing at all. -/
   rw [← ProvableStruct.eval_eq_eval]
   simp only [eval_inputs, Readers.JTypeReader.eval_cols]
   exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opA0 {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_a_0
+      = Expression.eval env input.adapter.op_a_0 := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.JTypeReader.eval_cols]
+  exact ProvableType.eval_field env _
 
 end SP1Clean.JalChip

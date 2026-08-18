@@ -34,7 +34,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
     #v[input.is_auipc * input.state.pc[0],
        input.is_auipc * input.state.pc[1],
        input.is_auipc * input.state.pc[2]])
-  let add_value ← witnessVectorIR 4 (AddOperation.populateIR
+  -- SP1 populates the result word only when `rd ≠ x0` (`utype/mod.rs`:
+  -- `if record.op_a != 0 { add_operation.populate(..) }`); the gated IR zeroes these
+  -- cells on `op_a_0` rows so the derived trace matches byte-for-byte.
+  let add_value ← witnessVectorIR 4 (AddOperation.populateIRGated input.adapter.op_a_0
     #v[input.is_auipc * input.state.pc[0],
        input.is_auipc * input.state.pc[1],
        input.is_auipc * input.state.pc[2], 0]
@@ -127,5 +130,13 @@ counter for AUIPC), so the pieces to project are the program counter and the J-t
   rw [← ProvableStruct.eval_eq_eval]
   simp only [eval_inputs, Readers.JTypeReader.eval_cols]
   exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opA0 {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_a_0
+      = Expression.eval env input.adapter.op_a_0 := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.JTypeReader.eval_cols]
+  exact ProvableType.eval_field env _
 
 end SP1Clean.UTypeChip

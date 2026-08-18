@@ -3205,7 +3205,7 @@
  {"synthetic":
   "deterministic seeded inputs; expectedWitness is the Lean reference evaluation (FlatOperation.witgen) over the shared operations — WitgenIR.eval_share proves sharing preserves evaluation",
   "events":
-  "SP1 generate_trace dump; full-row equality pinned by SP1Clean.TraceGenTests.subchip_trace_conforms (native_decide)"},
+  "SP1 chip_traces dump export/sp1dump/Sub.dump.json (sp1Commit de017f47596b4b7ca847ade857ded8c690b3835e); inputs recovered through the symbolic row map; every event row and every derived padding row recomputed via FlatOperation.witgen + row-map evaluation and matched cell-for-cell at generation time (fail-closed), with a value-level circuitTraceRowMapped spot check on event row 0"},
  "localLength": 4,
  "inputWidth": 29,
  "field": {"name": "KoalaBear", "modulus": 2130706433},

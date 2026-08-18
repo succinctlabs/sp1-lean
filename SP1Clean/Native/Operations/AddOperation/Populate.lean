@@ -103,6 +103,79 @@ theorem populateIR_congr (env env' : ProverEnvironment (ZMod p))
       hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
       hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega)]
 
+/-- The conditionally-populated variant used for `op_a`-gated adds: the limbs of
+`populate a b` when the `op_a_0` gate expression evaluates to `0`, and zeros when it
+does not — mirroring SP1's populate exactly (`jal`/`jalr` `trace.rs`:
+`if !event.op_a_0 { op_a_operation.populate(..) }`; `utype` `mod.rs`:
+`if record.op_a != 0 { add_operation.populate(..) }`). The chip-level asserts stay
+gated by `is_real - op_a_0`, so both the gated and unconditional witnesses satisfy
+the AIR; this one matches SP1's trace bytes cell-for-cell. -/
+def populateIRGated (op_a_0 : Expression (ZMod p)) (a b : Word (Expression (ZMod p))) :
+    WitgenIR (ZMod p) 4 :=
+  let s0 : U64Expr (ZMod p) := a[0].val + b[0].val
+  let s1 : U64Expr (ZMod p) := a[1].val + b[1].val + s0 / 65536
+  let s2 : U64Expr (ZMod p) := a[2].val + b[2].val + s1 / 65536
+  let s3 : U64Expr (ZMod p) := a[3].val + b[3].val + s2 / 65536
+  let gate : BExpr (ZMod p) := .feq (.expr op_a_0) (.const 0)
+  .ofFExprs #v[.ite gate (s0 % 65536).toField (.const 0),
+               .ite gate (s1 % 65536).toField (.const 0),
+               .ite gate (s2 % 65536).toField (.const 0),
+               .ite gate (s3 % 65536).toField (.const 0)]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- With the gate off (`op_a_0 = 0`), the gated IR evaluates exactly like
+`populateIR` — to `populate` on the evaluated operand words. -/
+theorem populateIRGated_eval_off (env : ProverEnvironment (ZMod p))
+    (g : Expression (ZMod p)) (a b : Word (Expression (ZMod p))) (va vb : Word (ZMod p))
+    (hva : #v[Expression.eval env.toEnvironment a[0], Expression.eval env.toEnvironment a[1],
+              Expression.eval env.toEnvironment a[2], Expression.eval env.toEnvironment a[3]] = va)
+    (hvb : #v[Expression.eval env.toEnvironment b[0], Expression.eval env.toEnvironment b[1],
+              Expression.eval env.toEnvironment b[2], Expression.eval env.toEnvironment b[3]] = vb)
+    (ha : va.isU64) (hb : vb.isU64)
+    (hg : Expression.eval env.toEnvironment g = 0) :
+    (populateIRGated g a b).eval env = populate va vb := by
+  obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
+  obtain ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64 hb
+  have hA : ∀ (i : ℕ) (h : i < 4), Expression.eval env.toEnvironment a[i] = va[i] := by
+    intro i h; rw [← hva]; interval_cases i <;> simp
+  have hB : ∀ (i : ℕ) (h : i < 4), Expression.eval env.toEnvironment b[i] = vb[i] := by
+    intro i h; rw [← hvb]; interval_cases i <;> simp
+  apply Vector.ext; intro i hi
+  interval_cases i <;>
+    simp only [populateIRGated, populate, circuit_norm, FiniteField.fromNat, hg,
+      hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
+      hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega),
+      decide_true, if_true]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- With the gate on (`op_a_0 ≠ 0`, i.e. the `rd = x0` row), every gated limb is
+zero — SP1 skips the populate entirely. -/
+theorem populateIRGated_eval_on (env : ProverEnvironment (ZMod p))
+    (g : Expression (ZMod p)) (a b : Word (Expression (ZMod p)))
+    (hg : Expression.eval env.toEnvironment g ≠ 0) :
+    (populateIRGated g a b).eval env = #v[0, 0, 0, 0] := by
+  apply Vector.ext; intro i hi
+  interval_cases i <;>
+    simp only [populateIRGated, circuit_norm, -Witgen.u64Wrap, hg,
+      decide_false, if_false, Bool.false_eq_true]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Environment-locality of the gated witness IR (the `ComputableWitnesses`
+counterpart): agreement on the gate and operand expressions transfers evaluation. -/
+theorem populateIRGated_congr (env env' : ProverEnvironment (ZMod p))
+    (g : Expression (ZMod p)) (a b : Word (Expression (ZMod p)))
+    (hG : Expression.eval env.toEnvironment g = Expression.eval env'.toEnvironment g)
+    (hA : ∀ (i : ℕ) (_ : i < 4),
+      Expression.eval env.toEnvironment a[i] = Expression.eval env'.toEnvironment a[i])
+    (hB : ∀ (i : ℕ) (_ : i < 4),
+      Expression.eval env.toEnvironment b[i] = Expression.eval env'.toEnvironment b[i]) :
+    (populateIRGated g a b).eval env = (populateIRGated g a b).eval env' := by
+  apply Vector.ext; intro i hi
+  interval_cases i <;>
+    simp only [populateIRGated, circuit_norm, -Witgen.u64Wrap, hG,
+      hA 0 (by omega), hA 1 (by omega), hA 2 (by omega), hA 3 (by omega),
+      hB 0 (by omega), hB 1 (by omega), hB 2 (by omega), hB 3 (by omega)]
+
 /-- `populate a b` satisfies the gadget `Spec` for any `is_real` (the conclusion is `is_real = 1`-gated,
 so it holds unconditionally). The composing chip uses this to discharge its assertion obligation. -/
 theorem spec_populate {a b : Word (ZMod p)} (ha : a.isU64) (hb : b.isU64) (is_real : ZMod p) :

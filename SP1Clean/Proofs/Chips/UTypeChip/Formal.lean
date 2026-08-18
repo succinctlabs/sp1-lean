@@ -106,7 +106,7 @@ theorem completeness :
     h_assumptions
   -- G1: the *push* side clock bound, from the prover-supplied CPUState clock byte bounds.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
-  obtain ⟨_, ⟨_, _, _, hpc⟩, ⟨_, _, _, hob, _⟩, hiau⟩ := h_input
+  obtain ⟨_, ⟨_, _, _, hpc⟩, ⟨_, _, h_a0, hob, _⟩, hiau⟩ := h_input
   -- `h_env` now bundles the addend/add-result witness equations with the GFC `JTypeReader` subcircuit's
   -- completeness obligation (SC Phase 2pre); the witness equations are `he_addend`/`he_addval`.
   obtain ⟨he_addend, he_addval, -, _⟩ := h_env
@@ -143,10 +143,11 @@ theorem completeness :
           input_adapter_op_b_imm := by
     -- The addend operand of the witness IR is the *input* product `is_auipc * pc`; `hAeq` is what
     -- identifies it with the addend cells this statement is phrased in.
-    rw [← AddOperation.populateIR_eval env
+    rw [← AddOperation.populateIRGated_eval_off env input_var_adapter_op_a_0
       #v[input_var_is_auipc * input_var_state_pc[0], input_var_is_auipc * input_var_state_pc[1],
          input_var_is_auipc * input_var_state_pc[2], 0]
-      input_var_adapter_op_b_imm _ _ (by simpa [circuit_norm, hiau] using hAeq) hbeq hA_U h_imm]
+      input_var_adapter_op_b_imm _ _ (by simpa [circuit_norm, hiau] using hAeq) hbeq hA_U h_imm
+      (h_a0.trans h_op0)]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     exact he_addval ⟨i, hi⟩

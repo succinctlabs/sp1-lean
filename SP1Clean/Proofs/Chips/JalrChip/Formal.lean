@@ -267,7 +267,7 @@ theorem completeness :
   -- subcircuit's completeness obligation (4th conjunct, discarded — the reader slot is discharged below).
   obtain ⟨he_av, he_oav, he_lsb, -, _⟩ := h_env
   obtain ⟨_h_ir, ⟨_h_clkh, _h_clk1, _h_clk0, hpc⟩, _h_a, ⟨_h_amem_pv, _h_amem_pl, _h_amem_dl⟩,
-    _h_a0, _h_b, ⟨h_bmem_pv, _h_bmem_pl, _h_bmem_dl⟩, hcimm⟩ := h_input
+    h_a0, _h_b, ⟨h_bmem_pv, _h_bmem_pl, _h_bmem_dl⟩, hcimm⟩ := h_input
   have erb : ∀ i (hi : i < 4),
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[i]
       = input_adapter_op_b_memory_prev_value[i] :=
@@ -314,9 +314,10 @@ theorem completeness :
       = AddOperation.populate #v[Expression.eval env.toEnvironment input_var_state_pc[0],
           Expression.eval env.toEnvironment input_var_state_pc[1],
           Expression.eval env.toEnvironment input_var_state_pc[2], 0] #v[4, 0, 0, 0] := by
-    rw [← AddOperation.populateIR_eval env
+    rw [← AddOperation.populateIRGated_eval_off env input_var_adapter_op_a_0
       #v[input_var_state_pc[0], input_var_state_pc[1], input_var_state_pc[2], 0]
-      #v[4, 0, 0, 0] _ _ (by simp [circuit_norm]) (by simp [circuit_norm]) (hpceq ▸ h_pcU) h4U]
+      #v[4, 0, 0, 0] _ _ (by simp [circuit_norm]) (by simp [circuit_norm]) (hpceq ▸ h_pcU) h4U
+      (h_a0.trans h_op_a_0)]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     exact he_oav ⟨i, hi⟩

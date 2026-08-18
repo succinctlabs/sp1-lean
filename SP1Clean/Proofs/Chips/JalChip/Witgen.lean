@@ -42,7 +42,7 @@ theorem computableWitnesses : (circuit (p := p)).base.ComputableWitnesses := by
     · have hv := congrArg (fun r : Inputs (ZMod p) => r.adapter.op_b_imm) h_input
       simp only [eval_opBImm] at hv
       simpa [Vector.getElem_map] using congrArg (fun v : Word (ZMod p) => v[i]) hv
-  · -- the link value: `pc ++ 0` plus the literal 4, whose limbs are constants
+  · -- the link value: `pc ++ 0` plus the literal 4 (constant limbs), gated on `op_a_0`
     have hpc : ∀ (j : ℕ) (hj : j < 3),
         Expression.eval env.toEnvironment input.state.pc[j]
           = Expression.eval env'.toEnvironment input.state.pc[j] := by
@@ -50,7 +50,12 @@ theorem computableWitnesses : (circuit (p := p)).base.ComputableWitnesses := by
       have hv := congrArg (fun r : Inputs (ZMod p) => r.state.pc) h_input
       simp only [eval_statePc] at hv
       simpa [Vector.getElem_map] using congrArg (fun v : Vector (ZMod p) 3 => v[j]) hv
-    refine AddOperation.populateIR_congr env env' _ _ (fun i hi => ?_) (fun i hi => ?_)
+    have hoa0 : Expression.eval env.toEnvironment input.adapter.op_a_0
+        = Expression.eval env'.toEnvironment input.adapter.op_a_0 := by
+      have hv := congrArg (fun r : Inputs (ZMod p) => r.adapter.op_a_0) h_input
+      simpa only [eval_opA0] using hv
+    refine AddOperation.populateIRGated_congr env env' _ _ _ hoa0
+      (fun i hi => ?_) (fun i hi => ?_)
     · interval_cases i <;>
         simp [Expression.eval, hpc 0 (by omega), hpc 1 (by omega), hpc 2 (by omega)]
     · interval_cases i <;> simp [Expression.eval]

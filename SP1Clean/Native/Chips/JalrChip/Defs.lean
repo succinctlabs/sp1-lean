@@ -57,7 +57,9 @@ and the `lsb` scalar via the witness IR, then compose as Clean `assertion`s. `CP
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let add_value ← witnessVectorIR 4 (AddOperation.populateIR
     input.adapter.op_b_memory.prev_value input.adapter.op_c_imm)
-  let op_a_value ← witnessVectorIR 4 (AddOperation.populateIR
+  -- SP1 populates the link word only when `rd ≠ x0` (`jalr/trace.rs`: `if !event.op_a_0`);
+  -- the gated IR zeroes these cells on `op_a_0` rows so the derived trace matches byte-for-byte.
+  let op_a_value ← witnessVectorIR 4 (AddOperation.populateIRGated input.adapter.op_a_0
     #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
     #v[4, 0, 0, 0])
   -- The one witness here that reads an *earlier witnessed cell* rather than an input column:
@@ -158,6 +160,14 @@ to an immediate (I-type, like Addi), while the link value adds the program count
   rw [← ProvableStruct.eval_eq_eval]
   simp only [eval_inputs, Readers.ITypeReader.eval_cols]
   exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opA0 {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_a_0
+      = Expression.eval env input.adapter.op_a_0 := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.ITypeReader.eval_cols]
+  exact ProvableType.eval_field env _
 
 @[circuit_norm] theorem eval_statePc {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :

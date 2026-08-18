@@ -214,7 +214,8 @@ interpreters:
 {
   "wireVersion": 1, "chip": "DivRem", "field": {...},
   "inputWidth": 29, "localLength": 217,
-  "provenance": {"events": "...names the native_decide anchor...", "synthetic": "..."},
+  "provenance": {"events": "...names the SP1 dump and the generation-time gate...",
+                 "synthetic": "..."},
   "rows": [
     {"kind": "event", "anchored": true, "inputs": [...29 values...],
      "hints": {"div_rem_flags": {"width": 7, "rows": [[1,0,0,0,0,0,0]]}},
@@ -232,23 +233,30 @@ The contract per row: seed the cell array with `inputs`, supply `hints`, run the
 witness operations; the appended cells must equal `expectedWitness` (canonical values).
 Row provenance is honest:
 
-- `"event"` (`anchored: true`) — the inputs come from executor events dumped from SP1's
-  real prover, and `expectedRow` is the corresponding row of SP1's real `generate_trace`
-  output, copied verbatim; the `provenance.events` string names the `native_decide`
-  anchor theorem pinning "circuit-derived row == dumped row" for the whole trace.
-  Present for the ten trace-anchored chips (Add, Sub, Subw, Addw, Mul, DivRem, Bitwise,
-  Lt, ShiftLeft, ShiftRight). `expectedRow` is informational for a witness interpreter
-  (reconstructing full rows additionally needs the output-struct layout, which the wire
-  format does not carry).
-- `"padding"` — the empty-hint row. `anchored: true` only where SP1 *derives* its
-  padding rows by running populate (ShiftLeft, ShiftRight, and DivRem — whose
-  `expectedRow` is SP1's non-zero "0 divided by 1" template, reproduced from the absent
-  hint key); the remaining chips zero-fill their padding without running populate, so
-  their zero-input padding row is a plain differential vector (`anchored: false`).
+- `"event"` (`anchored: true`) — one row per executor event of the committed SP1 trace
+  dump (`export/sp1dump/<Chip>.dump.json`, produced by the `chip_traces` binary at the
+  pinned extraction branch; the `provenance.events` string names the dump file and its
+  `sp1Commit`). The inputs are recovered from the dumped row itself through the
+  symbolic row map (every native input cell is a bare `var` column of the Rust row,
+  except `is_real` on the six flag-hinted chips — Bitwise, Branch, Lt, Mul, ShiftLeft,
+  ShiftRight — which is `1` on event rows); the hint tables are derived from the
+  event's opcode discriminant (Branch additionally derives its `branch_branching` bit
+  from the operand values, mirroring SP1's own populate). `expectedRow` is the dumped
+  SP1 `generate_trace` row verbatim. **The generation-time gate**: before anything is
+  written, the exporter recomputes every event row — `FlatOperation.witgen` over the
+  shared operations, then the symbolic row map evaluated at the resulting cells — and
+  requires cell-for-cell equality with the dump, plus a value-level
+  `circuitTraceRowMapped` spot check on event row 0. Present for **all 25 chips**.
+- `"padding"` — the empty-hint row, inputs recovered from the dumped padding row.
+  `anchored: true` only where SP1 *derives* its padding rows by running populate
+  (ShiftLeft, ShiftRight, and DivRem — whose `expectedRow` is SP1's non-zero
+  "0 divided by 1" template, reproduced from the absent hint key); these are gated
+  like event rows. The remaining chips zero-fill their padding without running
+  populate — the exporter asserts their dumped padding is all-zero and emits the row
+  as a plain differential vector (`anchored: false`).
 - `"synthetic"` (`anchored: false`) — deterministic seeded inputs (witness generation
-  is total, so every input is valid), with 0/1-valued seeded hint rows for the declared
-  tables. All 25 chips carry these; for the fifteen chips without a trace battery they
-  are the whole fixture.
+  is total, so every input is valid), with 0/1-valued seeded hint rows for the
+  declared tables. All 25 chips carry these.
 
 `expectedWitness` is always the Lean reference evaluation (`FlatOperation.witgen`) over
 the **shared** operation list — the same programs the wire carries
