@@ -9,6 +9,7 @@
 //! program) makes a prover fail, never a false proof verify — this crate is a
 //! conformance oracle, not a trusted component.
 
+pub mod check;
 pub mod eval;
 pub mod field;
 pub mod fixtures;

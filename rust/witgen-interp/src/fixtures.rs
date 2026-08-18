@@ -3,7 +3,8 @@
 //! `expectedWitness`. Mismatch reports name the chip, row, cell, and the witness
 //! operation that produced the cell.
 
-use crate::eval::{eval_expr, witgen, Ctx, OpSpan, Tables};
+use crate::check::check_row;
+use crate::eval::{OpSpan, Tables};
 use crate::field::Field;
 use crate::wire::{parse_program, parse_row_map, Op, Program, RowMap};
 use serde_json::Value;
@@ -29,11 +30,11 @@ pub fn read_json_pub(path: &Path) -> Result<Value, String> {
     read_json(path)
 }
 
+/// One pre-parsed fixture row: `(inputs, hints)`.
+pub type FixtureRow<F> = (Vec<F>, Tables<F>);
+
 /// The pre-parsed `(inputs, hints)` of every fixture row (the bench path).
-pub fn fixture_rows<F: Field>(
-    export_dir: &Path,
-    chip: &str,
-) -> Result<Vec<(Vec<F>, Tables<F>)>, String> {
+pub fn fixture_rows<F: Field>(export_dir: &Path, chip: &str) -> Result<Vec<FixtureRow<F>>, String> {
     let fixture = read_json(
         &export_dir
             .join("testdata")
@@ -182,7 +183,6 @@ pub fn run_chip<F: Field>(
         .and_then(|r| r.as_array())
         .ok_or_else(|| format!("{chip}.trace.json: missing rows"))?;
 
-    let data = Tables::default();
     let mut failures = Vec::new();
     let mut anchored_rows = 0usize;
     let mut row_checked = 0usize;
@@ -217,16 +217,18 @@ pub fn run_chip<F: Field>(
             .map(|(i, x)| num_field(x, &format!("{chip} row {row_i} expectedWitness[{i}]")))
             .collect::<Result<_, _>>()?;
 
-        let (cells, spans) = match witgen(&program, &inputs, &hints, &data) {
+        // The shared per-row core (also used by the SP1-side conformance test):
+        // witness generation, full-row reconstruction, constraints, and sends.
+        let rc = match check_row(&program, &row_map, &inputs, &hints) {
             Ok(out) => out,
             Err(e) => {
                 failures.push(format!("{chip} row {row_i} ({kind}): {e}"));
                 continue;
             }
         };
-        let got: Vec<u64> = cells[inputs.len()..].iter().map(|x| x.val()).collect();
+        let got: Vec<u64> = rc.cells[inputs.len()..].iter().map(|x| x.val()).collect();
         if verbose {
-            for s in &spans {
+            for s in &rc.spans {
                 let vals: Vec<u64> =
                     got[s.start - inputs.len()..s.start - inputs.len() + s.len].to_vec();
                 println!(
@@ -245,7 +247,7 @@ pub fn run_chip<F: Field>(
         }
         for (cell, (g, e)) in got.iter().zip(expected.iter()).enumerate() {
             if g != e {
-                let origin = span_of(&spans, cell + inputs.len())
+                let origin = span_of(&rc.spans, cell + inputs.len())
                     .map(|s| {
                         format!(
                             "witness op #{}, local cell {}",
@@ -260,16 +262,7 @@ pub fn run_chip<F: Field>(
             }
         }
 
-        let ctx = Ctx {
-            cells: &cells,
-            locals: &[],
-            idx: 0,
-            hints: &hints,
-            data: &data,
-        };
-
-        // Full-row reconstruction: evaluate the symbolic Rust row over the completed
-        // cells and compare against SP1's dumped row where the fixture carries it.
+        // Full-row comparison against SP1's dumped row where the fixture carries it.
         if let Some(er) = r.get("expectedRow").and_then(|e| e.as_array()) {
             let expected_row: Vec<u64> = er
                 .iter()
@@ -284,8 +277,13 @@ pub fn run_chip<F: Field>(
                 ));
             } else {
                 row_checked += 1;
-                for (col, (rexpr, e)) in row_map.row.iter().zip(expected_row.iter()).enumerate() {
-                    let g = eval_expr(ctx, rexpr).val();
+                for (col, (g, e)) in rc
+                    .rust_row
+                    .iter()
+                    .map(|x| x.val())
+                    .zip(expected_row.iter())
+                    .enumerate()
+                {
                     if g != *e {
                         failures.push(format!(
                             "{chip} row {row_i} ({kind}): rust row column {col} expected {e} got {g}"
@@ -295,32 +293,17 @@ pub fn run_chip<F: Field>(
             }
         }
 
-        // On SP1-anchored rows the constraints must hold: every `assert` expression
-        // evaluates to 0; interaction sends (nonzero multiplicity) are counted.
+        // On SP1-anchored rows the constraints must hold; sends are counted there.
         let anchored = r.get("anchored").and_then(|a| a.as_bool()).unwrap_or(false);
         if anchored {
             anchored_rows += 1;
-            for (op_i, op) in program.ops.iter().enumerate() {
-                match op {
-                    Op::Assert(e) => {
-                        let v = eval_expr(ctx, e).val();
-                        if v != 0 {
-                            failures.push(format!(
-                                "{chip} row {row_i} ({kind}): constraint operations[{op_i}] evaluates to {v} (expected 0)"
-                            ));
-                        }
-                    }
-                    Op::Interact {
-                        channel,
-                        multiplicity,
-                        ..
-                    } => {
-                        if eval_expr(ctx, multiplicity).val() != 0 {
-                            *interaction_sends.entry(channel.clone()).or_insert(0) += 1;
-                        }
-                    }
-                    _ => {}
-                }
+            for (op_i, v) in &rc.constraint_failures {
+                failures.push(format!(
+                    "{chip} row {row_i} ({kind}): constraint operations[{op_i}] evaluates to {v} (expected 0)"
+                ));
+            }
+            for channel in &rc.sends {
+                *interaction_sends.entry(channel.clone()).or_insert(0) += 1;
             }
         }
     }
