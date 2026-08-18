@@ -57,7 +57,7 @@ back to `Verified-zkEVM/clean` and this file becomes a historical record.
 | Branch | Change | PR | Status |
 |---|---|---|---|
 | `agreesbelow-data-hint` | U1 — `AgreesBelow` constrains `data`/`hint` | *not yet filed* | in `sp1-integration` |
-| `witgen-share` | U11 — `WitgenIR.share` subterm sharing + proven `eval_share` (the wire format has `steps`/`localVar` sharing but nothing produced it; without the pass, SP1's DivRem witness programs serialize to 1.22 GB — 1.04 MB with it). Adjacent upstream context: issue #404 (the requested Rust interpreter needs shared programs to evaluate at sane cost) | *not yet filed* | in `sp1-integration` |
+| `witgen-share` | U11 — `WitgenIR.share` subterm sharing + proven `eval_share` (the wire format has `steps`/`localVar` sharing but nothing produced it; without the pass, SP1's DivRem witness programs serialize to 1.22 GB — 1.04 MB with it), plus the two PR riders: the scoped `Hashable` instance and `doc/witgen-wire-format.md`. Adjacent upstream context: issue #404 (the requested Rust interpreter needs shared programs to evaluate at sane cost) | *prepared, not filed — drafts in `upstream-drafts.md`* | first 2 commits in `sp1-integration`; riders on the branch only |
 | `u64wrap-prefilter` | U3 — two `u64Wrap` screens | — | **not merged**; pushed as a record of a rejected approach (see U3) |
 
 A branch reaching `sp1-integration` means it earned its way there: Clean's own suite green *and* a
@@ -322,14 +322,17 @@ new entry point `Operations.witgenJsonShared?`). The proof caught a real bug dur
 shared `.letU .idx` step substituted into `mapRange` bodies would re-bind `idx`, so `shareU`
 rewrites `.idx → .const 0` in shared positions.
 
-Two riders belong in the same PR: a field-element `Hashable` instance (today each consumer must
-supply `⟨fun x => hash x.val⟩` — `scripts/witgenExport.lean:55` — before `witgenJsonShared?` is
-callable), and `doc/witgen-wire-format.md` (adapted from this repo's copy — upstream has no wire
-format spec at all; `doc/witgen-authoring.md` covers only the authoring surface). Adjacent upstream
-context: issue #404 (the requested Rust interpreter needs shared programs to evaluate at sane
-cost); our `rust/witgen-interp` is a working reference implementation of the format and is on offer
-there. **This is the single Clean-side prerequisite for the exported artifacts to be producible
-from stock upstream Clean** — U1 is orthogonal to the exporter path.
+Both PR riders are **on the branch** (2026-08-18): `86f35a74` adds the scoped
+`Witgen.instHashableOfVal` canonical-value `Hashable` instance (so `witgenJsonShared?` is callable
+stock — until the re-pin, `scripts/witgenExport.lean:55` keeps its local copy), and `d8a2dc36` adds
+`doc/witgen-wire-format.md` (adapted from this repo's spec — upstream has no wire format spec at
+all; `doc/witgen-authoring.md` covers only the authoring surface, and its dangling
+`witgen-ir-plan.md` pointer is fixed in the same commit). Ready-to-file issue/PR texts:
+`upstream-drafts.md` (posting is owner-gated). Adjacent upstream context: issue #404 (the requested
+Rust interpreter needs shared programs to evaluate at sane cost); our `rust/witgen-interp` is a
+working reference implementation of the format and is on offer there. **This is the single
+Clean-side prerequisite for the exported artifacts to be producible from stock upstream Clean** —
+U1 is orthogonal to the exporter path.
 
 ## Design discussion, not a patch
 

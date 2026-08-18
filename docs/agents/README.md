@@ -22,6 +22,8 @@ reader-facing docs one level up (start with [`../architecture.md`](../architectu
 - [clean-upstream.md](clean-upstream.md) — **the Clean pin is currently a fork.** Its state and exit
   condition, the rule for what may go in the fork versus `ToClean/` (modification vs addition), and the
   upstream PR queue with the measurement behind each entry.
+- [upstream-drafts.md](upstream-drafts.md) — ready-to-file Clean issue/PR texts for the queue
+  (U11 first). **Prepared only — posting requires the owner's explicit approval.**
 - [sail-model-provenance.md](sail-model-provenance.md) — the generated `Lean_RV64D` snapshot's
   provenance: the four-key SP1 config and its six generated sites (CLINT/signature/PMP off), why it
   is load-bearing for the memory-bridge lemmas, its `rfl` disclosure lemmas, the generation
