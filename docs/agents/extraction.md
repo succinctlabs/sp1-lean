@@ -97,7 +97,7 @@ those Rust helpers match Lean gadgets.
 ### Audited Rust extraction branch
 
 The extraction backend is not part of the semantic SP1 pin yet. Its exact review surface is the
-**committed** delta of the pinned branch over the semantic revision (`f66b4bff5..2b7ce1442`,
+**committed** delta of the pinned branch over the semantic revision (`f66b4bff5..b5616f908`,
 `dtumad/lean-extraction` on `succinctlabs/sp1`): the reflection derives on the 26 machine files
 (verified derive-line-only by `verify_extractor_overlay`), the field-generic Lean emission in the
 hypercube IR, the whole-chip extraction modes in `main.rs`, and the `chip_traces` dump binary.
@@ -256,8 +256,11 @@ load/store oracle reaches `RegisterAccessCols` through `ITypeReader`, whose modu
   anchor is retired (they are deliberate shared substrate, not migration debt — see `AGENTS.md`).
 - Land the upstream sp1 PR from the pinned branch series (`dtumad/lean-extraction`), then advance
   `SP1_PINNED_COMMIT` to the upstream commit. The series now carries its own value proposition
-  beyond extraction: `crates/core/compiler/tests/witgen_conformance.rs` checks SP1's live
-  `generate_trace` against the vendored formally-verified witness generators on every
-  `cargo test --workspace` run (see `docs/rust-integration-memo.md`). Once that test runs in
-  authoritative SP1 CI, this repo's committed `export/sp1dump/` tree and its dump-anchored gate
-  input become retirable (the gated seam-A retirement).
+  beyond extraction: `crates/core/compiler/conformance-check/` checks SP1's live
+  `generate_trace` against the vendored formally-verified witness generators (see
+  `docs/rust-integration-memo.md`). It is deliberately a **standalone opt-in package with zero
+  CI footprint** for now — its own cargo workspace, excluded from SP1's, driven only by
+  `scripts/run_sp1_conformance.sh` here — so nothing in SP1's `cargo build`/`cargo test
+  --workspace` builds or runs it. Promoting it into SP1 CI is a later hardening step; only once
+  it runs in authoritative SP1 CI do this repo's committed `export/sp1dump/` tree and its
+  dump-anchored gate input become retirable (the gated seam-A retirement).

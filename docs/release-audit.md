@@ -28,7 +28,7 @@ No main-library proof is deferred. This audit found no `sorry`, `stop`, project 
 | Lean toolchain | `leanprover/lean4:v4.32.2` |
 | SP1 semantic source | `f66b4bff51d0ccff51d152e0f7f66b2ffedf3529` |
 | SP1 description | `v6.4.0` |
-| SP1 extraction branch | `2b7ce14421535303659c1799f4af284eb8d72cee` (`dtumad/lean-extraction`, `v6.4.0-9-g2b7ce1442`) |
+| SP1 extraction branch | `b5616f908c393d6050970630871f69afe233a21c` (`dtumad/lean-extraction`, `v6.4.0-10-gb5616f908`) |
 | mathlib pin | `905b95818eb32af7874a58b427f50c1711a5e96c` (tag `v4.32.2`) |
 | Clean pin | `2dad7788d58b09eabeb3898506e4cb896e5d3e9d` (**fork** — see below) |
 | Lean_RV64D pin | `df1acf579f8daf97c4dc3248565dec5a123079ef` |

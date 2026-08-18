@@ -190,7 +190,7 @@ SP1_SEMANTIC_COMMIT = "f66b4bff51d0ccff51d152e0f7f66b2ffedf3529"
 # identical to the previous artifacts modulo the provenance strings. The 2026-08-18 advance
 # (conformance library + vendored interpreter/artifacts + the in-repo witgen conformance test)
 # left the dumper output byte-identical.
-SP1_PINNED_COMMIT = "2b7ce14421535303659c1799f4af284eb8d72cee"
+SP1_PINNED_COMMIT = "b5616f908c393d6050970630871f69afe233a21c"
 
 # The only semantic-tree files the extractor overlay may touch. The checker below additionally
 # verifies that every changed line in these files is an import or derive-attribute change.

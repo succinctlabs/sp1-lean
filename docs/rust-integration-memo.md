@@ -63,11 +63,11 @@ the completeness theorems reason about (`populateIR_eval` ties the IR to the val
 `populate`, which `spec_populate` ties to the chip's semantic spec; `Circuit.witgen` provably
 builds the environment the proofs quantify over).
 
-## 4. The proposal: invert the comparison — run it in SP1's CI
+## 4. The proposal: invert the comparison — check the artifacts against the prover, in Rust
 
 Today's flow pulls SP1 data into `sp1-lean`. The better long-term shape is the reverse: the
-exported artifacts are vendored into the SP1 tree, and a Rust test **inside SP1's workspace**
-checks them against the live prover on every PR:
+exported artifacts are vendored into the SP1 tree, and a Rust check **inside the SP1 tree**
+runs them against the live prover:
 
 ```
 per chip:
@@ -80,14 +80,29 @@ per chip:
   assert  check.constraint_failures.is_empty()
 ```
 
-`witgen-interp` already provides `check_row` and `derive_inputs` as pure library functions
-(`rust/witgen-interp/src/check.rs`) — the SP1-side test and `sp1-lean`'s own differential share
-one implementation. The remaining SP1-side work is small: expose the battery builders as a
-library module, vendor the crate and the ~2.5 MB of artifacts, and write the ~250-line test.
+`witgen-interp` provides `check_row` and `derive_inputs` as pure library functions
+(`rust/witgen-interp/src/check.rs`) — the SP1-side check and `sp1-lean`'s own differential share
+one implementation.
 
-What each side gains:
+This check **exists today** on the pinned extraction branch, deliberately staged with **zero CI
+footprint**: `crates/core/compiler/conformance-check/` is a standalone opt-in package (its own
+cargo workspace, excluded from SP1's, alongside the vendored interpreter and the ~2.5 MB of
+artifacts), so nothing in SP1's `cargo build` or `cargo test --workspace` builds or runs it. It
+runs only when invoked —
 
-- **SP1** gains a CI test that its trace generation matches a formally verified generator —
+```
+cargo run --release --manifest-path crates/core/compiler/conformance-check/Cargo.toml
+```
+
+— or via `sp1-lean`'s driver `scripts/run_sp1_conformance.sh` (which fences the pin and the
+artifact byte-identity first). All 25 chips pass in ~11 s; exit code 1 on any mismatch keeps it
+script- and CI-ready.
+
+Promoting the check into SP1's CI is a deliberate **later hardening step** — the artifact-sync
+protocol (who refreshes on which side of a chip change, and how staleness is surfaced without
+blocking unrelated PRs) should be agreed first. Once promoted, what each side gains:
+
+- **SP1** gains a CI check that its trace generation matches a formally verified generator —
   drift in a `populate`, a column layout, or an AIR constraint is caught on the PR that
   introduces it, with a named chip/row/column.
 - **sp1-lean** retires the committed-dump machinery and its refresh ritual; the claim upgrades
