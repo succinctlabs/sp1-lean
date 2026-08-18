@@ -229,7 +229,7 @@ if [[ "$REGEN" == "0" ]]; then
   exit 0
 fi
 
-if [[ ! -f .lake/build/lib/lean/SP1CleanTest/TraceGenTests/AddChipTraceWitness.olean ]]; then
+if [[ ! -f .lake/build/lib/lean/SP1CleanTest/Exportable.olean ]]; then
   echo "FAIL(--regen): SP1CleanTest oleans missing. Run: lake build SP1CleanTest" >&2
   exit 1
 fi

@@ -1,24 +1,3 @@
-import SP1CleanTest.WitnessTests.AddrAddOperationWitness
-import SP1CleanTest.WitnessTests.AddwOperationWitness
-import SP1CleanTest.WitnessTests.BitwiseOperationWitness
-import SP1CleanTest.WitnessTests.IsEqualWordOperationWitness
-import SP1CleanTest.WitnessTests.IsZeroOperationWitness
-import SP1CleanTest.WitnessTests.IsZeroWordOperationWitness
-import SP1CleanTest.WitnessTests.LtOperationUnsignedWitness
-import SP1CleanTest.WitnessTests.MulOperationWitness
-import SP1CleanTest.WitnessTests.SubwOperationWitness
-import SP1CleanTest.WitnessTests.U16CompareOperationWitness
-import SP1CleanTest.WitnessTests.U16MSBOperationWitness
-import SP1CleanTest.TraceGenTests.AddChipTraceWitness
-import SP1CleanTest.TraceGenTests.AddwChipTraceWitness
-import SP1CleanTest.TraceGenTests.BitwiseChipTraceWitness
-import SP1CleanTest.TraceGenTests.DivRemChipTraceWitness
-import SP1CleanTest.TraceGenTests.LtChipTraceWitness
-import SP1CleanTest.TraceGenTests.MulChipTraceWitness
-import SP1CleanTest.TraceGenTests.ShiftLeftChipTraceWitness
-import SP1CleanTest.TraceGenTests.ShiftRightChipTraceWitness
-import SP1CleanTest.TraceGenTests.SubChipTraceWitness
-import SP1CleanTest.TraceGenTests.SubwChipTraceWitness
 import SP1CleanTest.NonVacuityReal
 import SP1CleanTest.Audit.OneAddNativePremises
 
@@ -27,27 +6,6 @@ Test-library census probe (the `SP1CleanTest` conformance anchors; requires the
 test-library oleans — run `lake test` first).
 Run via `lake env lean scripts/axiom_probe_test.lean` (see `scripts/run_audit.sh`). -/
 
-#print axioms SP1Clean.WitnessTests.addrAdd_conforms
-#print axioms SP1Clean.WitnessTests.addw_conforms
-#print axioms SP1Clean.WitnessTests.bitwise_conforms
-#print axioms SP1Clean.WitnessTests.isEqualWord_conforms
-#print axioms SP1Clean.WitnessTests.isZero_conforms
-#print axioms SP1Clean.WitnessTests.isZeroWord_conforms
-#print axioms SP1Clean.WitnessTests.ltUnsigned_conforms
-#print axioms SP1Clean.WitnessTests.mul_populate_conforms
-#print axioms SP1Clean.WitnessTests.subw_conforms
-#print axioms SP1Clean.WitnessTests.u16Compare_conforms
-#print axioms SP1Clean.WitnessTests.u16MSB_conforms
-#print axioms SP1Clean.TraceGenTests.addchip_trace_conforms
-#print axioms SP1Clean.TraceGenTests.addwchip_trace_conforms
-#print axioms SP1Clean.TraceGenTests.bitwisechip_trace_conforms
-#print axioms SP1Clean.TraceGenTests.divremchip_trace_conforms
-#print axioms SP1Clean.TraceGenTests.ltchip_trace_conforms
-#print axioms SP1Clean.TraceGenTests.mulchip_trace_conforms
-#print axioms SP1Clean.TraceGenTests.shiftleftchip_trace_conforms
-#print axioms SP1Clean.TraceGenTests.shiftrightchip_trace_conforms
-#print axioms SP1Clean.TraceGenTests.subchip_trace_conforms
-#print axioms SP1Clean.TraceGenTests.subwchip_trace_conforms
 #print axioms SP1Clean.NonVacuityRealTests.constraintsHold_of_check
 #print axioms SP1Clean.NonVacuityRealTests.rTypeEventInputs_is_real
 #print axioms SP1Clean.NonVacuityRealTests.aluTypeEventInputs_is_real

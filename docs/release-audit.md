@@ -214,8 +214,8 @@ stream.
 - a zero-tolerance project-axiom scan;
 - `skipKernelTC` and main-library `native_decide` guards;
 - an elaboration-budget escape-hatch prohibition (allowlist-gated); and
-- a generated `#print axioms` census over the released theorem surface — currently 524 probed
-  declarations, split 466 (main library) plus 58 (test anchors) — split by library and
+- a generated `#print axioms` census over the released theorem surface — currently 503 probed
+  declarations, split 466 (main library) plus 37 (test anchors) — split by library and
   diffed against the committed `docs/snapshots/axiom-census.txt` (main) and
   `docs/snapshots/axiom-census-test.txt` (test anchors) — drift fails; only `--update` rewrites
   the snapshots, so a passing run leaves the tree clean.
@@ -241,11 +241,14 @@ theorem whose target is the complete generated interpreter inherits dependencies
 its reduction lemmas. The raw census discloses this boundary instead of describing the headline theorem
 as depending only on three logical axioms.
 
-There are 88 textual `native_decide` occurrences in the test library (the conformance batteries,
-the `NonVacuity.lean` chip-assumptions witnesses, the `NonVacuityReal.lean` real-row
-satisfiability battery, and the independent-audit joint-premise regression) and none in the main
-library.
-They check witness and complete-trace conformance and are not imported by the soundness theorem.
+The test library's `native_decide` occurrences (the exportability battery's prime instance, the
+`NonVacuity.lean` chip-assumptions witnesses, the `NonVacuityReal.lean` real-row satisfiability
+battery, and the independent-audit joint-premise regression) are confined there; none are in the
+main library, and none are imported by the soundness theorem. Trace conformance against SP1's
+real prover no longer uses `native_decide` at all: it is the dump-anchored pipeline — committed
+`chip_traces` dumps at the extraction pin (`export/sp1dump/`, byte-reproducible), the fail-closed
+generation-time gate in `scripts/witgenExport.lean --testdata` (every event row of all 25 chips
+recomputed and matched cell-for-cell), and the independent Rust interpreter differential.
 
 ## Trusted or externally assumed components
 

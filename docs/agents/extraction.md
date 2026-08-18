@@ -19,13 +19,15 @@ Air::eval / eval_public_values ────→ Extracted/{ChipOracle,SystemOracl
         (audited extraction branch)   (rows + ordered asserts/interactions only)
 
 Native/ hand-written Clean circuits ─→ Faithful/<Chip>.lean (`ChipFaithful`)
-Rust generate_trace ────────────────→ SP1CleanTest/TraceGenTests/*Vectors.lean
+Rust chip_traces (same pin) ────────→ export/sp1dump/<Chip>.dump.json
+                                       (events + full generate_trace rows;
+                                        sole writer scripts/update_sp1_dumps.sh)
 ```
 
 Run it:
 
 ```sh
-SP1_DIR=/path/to/extraction-branch-checkout EXTRACT_AIR_ONLY=1 python3 update_extracted.py
+SP1_DIR=/path/to/extraction-branch-checkout python3 update_extracted.py
 ```
 
 `SP1_DIR` must point at a **clean** checkout of the extraction branch pinned by `SP1_PINNED_COMMIT`
@@ -35,12 +37,14 @@ ordinary sibling `../sp1` checked out at that branch serves as both semantic sou
 The generator verifies that the checkout's merge base with semantic revision
 `f66b4bff51d0ccff51d152e0f7f66b2ffedf3529` (`v6.4.0`) is the semantic revision itself, that
 machine-source changes are reflection metadata only against an explicit file allowlist, and that the
-worktree is clean. `CHIPS` and `SYSTEM_TABLES` select AIR anchors; `TRACE_CHIPS` selects whole-chip
-populate batteries. `OPERATIONS` and `WITNESS_OPERATIONS` are the shared-substrate registries (the
-canonical reader modules + statement targets multiple chip anchors reference; the whole-chip
-migration is complete, so they shrink only when an anchor is actually retired). There is no
-circuit-output registry or circuit emitter. The output is deterministic, so a full regeneration at
-the audited pin leaves all pre-existing anchors byte-identical.
+worktree is clean. `CHIPS` and `SYSTEM_TABLES` select AIR anchors; `OPERATIONS` is the
+shared-substrate registry (the canonical reader modules + statement targets multiple chip anchors
+reference; the whole-chip migration is complete, so it shrinks only when an anchor is actually
+retired). This script emits **AIR artifacts only** — trace conformance lives in the dump-anchored
+pipeline (`scripts/update_sp1_dumps.sh` + `scripts/witgenExport.lean --testdata` + the Rust
+differential), not here. There is no circuit-output registry or circuit emitter. The output is
+deterministic, so a full regeneration at the audited pin leaves all pre-existing anchors
+byte-identical.
 
 **Opcode table.** The `Opcode` enum's variant-name → `#[repr(u8)]`-discriminant table — the opcode
 value every chip commits on the Program bus — is extracted unconditionally as
@@ -57,9 +61,8 @@ count, and order, so any mirror drift fails the build.
 Profile extraction is unconditional, even under `EXTRACT_ONLY`: regeneration fails before writing AIR
 files unless the baseline 34-table execution cluster, the 6-table memory-boundary cluster, every main
 and preprocessed width, and the 160-cell public-value width match the audited manifest exactly. Requested
-system tables, public values, self-contained chip oracles, and whole-chip traces are hard requirements;
-the script exits nonzero rather than retaining a stale artifact. `EXTRACT_AIR_ONLY=1` intentionally skips
-the independent witness/trace batteries during a conservative Rust-pin audit.
+system tables, public values, and self-contained chip oracles are hard requirements; the script exits
+nonzero rather than retaining a stale artifact.
 
 ## What the rust backend emits
 
@@ -165,20 +168,16 @@ allowlist the output.
 - **`Faithful/ChipOracle.lean` + `Faithful/<Chip>.lean`** — define the native→Rust row reconfiguration
   and prove `ChipFaithful`. The assertion theorem compares the complete evaluated Clean assertion list;
   the interaction theorem compares the complete projected four-bus multiset.
-- **`SP1CleanTest/TraceGenTests/`** — compares rows generated from the native circuit with whole traces
-  dumped by Rust.
-
-  > **Trace-battery provenance caveat (release-readiness audit F-R-01, dissolving).** The dumper
-  > that produced the legacy 10 `*ChipTraceVectors.lean` batteries never existed at any pinned
-  > revision — the batteries were dumped from then-uncommitted tooling. The AIR anchors are
-  > unaffected (`EXTRACT_AIR_ONLY=1` reproduces all generated AIR modules byte-identically at the
-  > pin), and the batteries' *content* is independently validated by the `native_decide` anchors
-  > against the native circuits' own trace generation. The pinned extraction branch now carries a
-  > committed successor dumper (`crates/core/compiler/src/bin/chip_traces.rs`); the legacy
-  > batteries and their `witness_vectors` machinery retire in favor of dump-anchored fixtures
-  > (`export/sp1dump/` + the generation-time gate) as that migration lands. Until then the
-  > witness/trace-vector passes still reference the retired `witness_vectors` binary, so only
-  > `EXTRACT_AIR_ONLY=1` regeneration runs at the pin (the batteries are frozen, not regenerable).
+- **`export/sp1dump/` + the generation-time gate** — the dump-anchored trace-conformance pipeline
+  (successor of the retired `native_decide` vector batteries, 2026-08). `chip_traces` (a committed
+  binary at the extraction pin) dumps deterministic per-chip event batteries plus the full padded
+  `generate_trace` matrix; `scripts/witgenExport.lean --testdata` recovers the native inputs from
+  the dumped rows through the symbolic row maps, recomputes every event row via
+  `FlatOperation.witgen` + row-map evaluation, and **fails closed on any cell mismatch** before
+  writing the `export/testdata/` differential fixtures the Rust reference interpreter re-checks.
+  This resolves the release-readiness audit finding F-R-01 (the legacy batteries' dumper never
+  existed at any pinned revision): the dumper is now an ordinary commit at the pin, the dumps are
+  reproducible byte-for-byte (`update_sp1_dumps.sh --check`), and the comparison re-runs in CI.
 
 ## Legacy operation-list outputs (retirement path)
 
@@ -248,11 +247,11 @@ load/store oracle reaches `RegisterAccessCols` through `ITypeReader`, whose modu
 
 ## Future work
 
-- Extend whole-trace conformance from the current 10 chips to all 25 already-proved whole-chip
-  `ChipFaithful` anchors.
+- Add `--elf` real-program dumps (the mode is implemented in `chip_traces`; committing dumps and
+  fixture rows from a real guest execution is deferred follow-up).
 - Extend canonical generated reader reuse as each new chip oracle lands, while keeping chip-private
   Rust arithmetic helpers embedded as implementation details.
-- Retire an entry of `WITNESS_OPERATIONS` / the operation-list modules whenever its last consuming
+- Retire an entry of `OPERATIONS` / the operation-list modules whenever its last consuming
   anchor is retired (they are deliberate shared substrate, not migration debt — see `AGENTS.md`).
 - Land the upstream sp1 PR from the pinned branch series (`dtumad/lean-extraction`), then advance
   `SP1_PINNED_COMMIT` to the upstream commit.

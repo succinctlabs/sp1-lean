@@ -208,14 +208,15 @@ moreLeanArgs = [
   "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
 ]
 
-# The test pillar (the `lake test` driver, see `testDriver` above) — the witness-generation and
-# whole-trace conformance anchors (`SP1CleanTest.{WitnessTests,TraceGenTests}.*`), which import the
-# main `SP1Clean` library and check it against batteries dumped from SP1's real Rust prover. This is
-# the ONLY library that may use `native_decide`; it is NOT imported by the umbrella `SP1Clean`, so the
-# default `lake build` stays `native_decide`-free. Same syntactic linter set as the core pillars; the
-# auto-gen `SP1CleanTest.WitnessTests.Vectors.*` / `*TraceVectors` modules self-suppress with their own
-# `set_option linter.all false`. (The `lake lint` env-linter pass skips this lib too — `sp1Lint` keeps
-# only `SP1Clean`-prefixed declarations, and `SP1CleanTest` is not such a prefix.)
+# The test pillar (the `lake test` driver, see `testDriver` above) — the exportability battery,
+# the non-vacuity/real-row satisfiability anchors, and the circuit-as-trace-generator substrate
+# (`SP1CleanTest.{Exportable,NonVacuity,NonVacuityReal,Audit,TraceGenTests}.*`), which import the
+# main `SP1Clean` library. This is the ONLY library that may use `native_decide`; it is NOT
+# imported by the umbrella `SP1Clean`, so the default `lake build` stays `native_decide`-free.
+# Same syntactic linter set as the core pillars. (The `lake lint` env-linter pass skips this lib
+# too — `sp1Lint` keeps only `SP1Clean`-prefixed declarations, and `SP1CleanTest` is not such a
+# prefix.) Trace conformance against SP1's real prover lives in the dump-anchored pipeline
+# (`export/sp1dump/` + the `--testdata` generation-time gate + the Rust differential).
 [[lean_lib]]
 name = "SP1CleanTest"
 globs = ["SP1CleanTest.+"]

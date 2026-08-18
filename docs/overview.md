@@ -81,7 +81,7 @@ the proved register/RAM interpretation the ordinary-row grounding engine consume
 | Grounding contracts used by the native capstone | 25 / 25 descriptors | proved |
 | Exact upstream execution cluster | 34 tables | complete list-level relation present |
 | Exact upstream memory-boundary cluster | 6 tables | complete list-level relation present |
-| Whole-chip Rust trace conformance | 10 chips | executable test evidence, not a theorem premise |
+| Whole-chip Rust trace conformance (dump-anchored gate) | 25 chips | executable test evidence, not a theorem premise |
 | Exact upstream AIR to Sail | 34-table execution cluster | open bundle; conditional combinator only |
 | Cross-shard boot-to-halt execution | full shard ledger | relation specified; theorem not yet declared |
 | Cross-shard ledger predicate layer | `Contracts/PublicValues.lean` | reserved API, declared ahead of its consumer |
@@ -204,12 +204,13 @@ The audit separates proof incompleteness from external trust:
 - The official generated Sail target contains platform hooks for reservation, floating-point, random,
   and termination behavior. A theorem stated over that target inherits those hooks even when the
   supported RV64IM path does not execute them.
-- The SP1 constraint compiler and extraction overlay are trusted, pin-checked source-to-list tools.
-  Generated outputs are not treated as self-authenticating; whole-chip `ChipFaithful` proofs compare
-  them with the native circuits.
+- The SP1 constraint compiler and trace dumper are trusted, pin-checked source-to-artifact tools
+  (one committed extraction branch). Generated outputs are not treated as self-authenticating;
+  whole-chip `ChipFaithful` proofs compare the AIR lists with the native circuits, and the
+  dump-anchored generation-time gate recomputes every dumped trace row cell-for-cell.
 - `native_decide` is forbidden in `SP1Clean/`. It appears only in `SP1CleanTest/`, where compiler
-  trust is explicitly accepted: the executable witness and trace conformance batteries plus the
-  real-row satisfiability battery (`SP1CleanTest/NonVacuityReal.lean`, a concrete satisfying
+  trust is explicitly accepted: the exportability battery and the satisfiability anchors,
+  including the real-row battery (`SP1CleanTest/NonVacuityReal.lean`, a concrete satisfying
   `is_real = 1` row for every instruction chip's complete constraint system).
 - Cryptographic commitments, PCS opening, LogUp/GKR, Fiat--Shamir, and verifier extraction remain the
   responsibility of the later ArkLib layer.
@@ -233,8 +234,8 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The audit regenerates the declaration list and raw `#print axioms` census — currently 524 probed
-declarations, split 466 (main `SP1Clean` library) plus 58 (`SP1CleanTest` anchors) — and compares it
+The audit regenerates the declaration list and raw `#print axioms` census — currently 503 probed
+declarations, split 466 (main `SP1Clean` library) plus 37 (`SP1CleanTest` anchors) — and compares it
 against the committed snapshot (drift fails; `--update` rewrites deliberately). It also cross-checks
 every recorded pin and doc-cited count against the build graph.
 

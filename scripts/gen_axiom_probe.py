@@ -56,10 +56,6 @@ TARGETS = [
      r"(?:theorem|def)\s+(\w*faithful\w*)\b"),
     ("SP1Clean/Faithful/SupportedMachine.lean",
      r"(?:theorem|def)\s+(supportedChipFaithfulness\w*)\b"),
-    # The witness/trace conformance anchors now live in the separate `SP1CleanTest` test library (the
-    # native_decide quarantine); the census still probes them to disclose their compiler-trust axioms.
-    ("SP1CleanTest/WitnessTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
-    ("SP1CleanTest/TraceGenTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
     # The real-row satisfiability battery: every named anchor (28 per-chip rows + the Spec-level
     # companions + the nonempty-assert-list guard) is census-visible so its native_decide trust is
     # disclosed per-declaration like the conformance anchors.

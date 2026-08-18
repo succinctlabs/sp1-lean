@@ -45,11 +45,6 @@ maxHeartbeats  SP1Clean/Extracted/ChipOracle/DivRem.lean            400000   1
 # This entry previously carried no recorded bracket; the value is left at 1000000 (~1.25x the floor).
 maxHeartbeats  SP1Clean/Extracted/SystemOracle/Global.lean         1000000   1
 
-# Largest conformance battery in the tree: 528 vectors x 14 columns, ~30,000 numeric literals.
-# Ladder: 250000 FAIL / 300000 ok → floor (250000, 300000], set ~2x. Nineteen of the twenty-one
-# generated batteries need nothing at all; this one and DivRem's trace are the exceptions. Battery size
-# is NOT a predictor — larger batteries than this one need nothing.
-maxHeartbeats  SP1CleanTest/WitnessTests/Vectors/MulOperation.lean  600000   1
 
 # ---- maxRecDepth: 8 sites (Lean's default is 512) ------------------------------------------------
 
@@ -71,11 +66,4 @@ maxRecDepth    SP1Clean/Faithful/BranchChip.lean                       1000   1
 # that never needed it.
 maxRecDepth    SP1Clean/FormalModel/Trace/Witness.lean                  800   1
 
-# Widest trace battery: 64 x 246 = 15,744 literals, a right-nested `List.cons` chain.
-# Ladder: 8000 FAIL / 16000 ok → floor (8000, 16000], set ~2x. Needs no heartbeat budget at all.
-maxRecDepth    SP1CleanTest/TraceGenTests/DivRemChipTraceVectors.lean 32000   1
 
-# Same battery as the MulOperation heartbeat entry. Its recursion need is MASKED by the heartbeat
-# failure and surfaces only once that is satisfied — ladder one option at a time, to a fixpoint.
-# Ladder: 16000 FAIL / 32000 ok → floor (16000, 32000], set ~2x.
-maxRecDepth    SP1CleanTest/WitnessTests/Vectors/MulOperation.lean     64000   1

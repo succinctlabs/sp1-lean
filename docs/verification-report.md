@@ -246,10 +246,11 @@ drives SP1's own constraint compiler as a **trusted but heavily fenced oracle**:
   The hand-maintained mirror `SP1Clean/Model/Opcode.lean` is cross-checked against it by the
   kernel-`decide` theorem `opcodeTable_matchesExtracted`
   (`SP1Clean/FormalModel/OpcodeTable.lean`), replacing what was previously a hand-verification.
-- Regeneration is byte-idempotent: a full `EXTRACT_AIR_ONLY` run at the pinned overlay reproduces
-  all 60 generated AIR modules identically (every `.lean` file under `SP1Clean/Extracted/` except
-  the hand-written `ExtractionDSL.lean`; re-verified at this snapshot; the separate trace-battery
-  pass is the disclosed §4.3 provenance gap).
+- Regeneration is byte-idempotent: a full run at the pinned extraction branch reproduces all 60
+  generated AIR modules identically (every `.lean` file under `SP1Clean/Extracted/` except the
+  hand-written `ExtractionDSL.lean`; re-verified at this snapshot). The SP1 trace dumps behind the
+  conformance layer (§9) are reproducible the same way (`scripts/update_sp1_dumps.sh --check`,
+  byte-identity at the same pin).
 
 The readable table profile is additionally hand-transcribed in
 `FormalModel/CoreProfile.lean` and proved to match the generated manifest by `decide`
@@ -295,12 +296,12 @@ symbol-by-symbol from `operations/add.rs` + `add.rs` — the 4-limb carry chain 
 sends match exactly); and the independent trace-conformance layer (§9), which exercises the same
 rows against the real prover's output rather than the exporter's.
 
-One provenance gap is disclosed rather than closed: the whole-trace dumper that produced the
-trace-conformance vector batteries is not part of the pinned overlay (audit finding F-R-01;
-details in `docs/agents/extraction.md` and the archived findings log, git history at
-`14c926bd`); the batteries' content is still independently
-validated cell-for-cell by `native_decide` against the native circuits' own trace generation, and
-reconstruction of the dumper as a third checked-in patch is filed follow-up work.
+The formerly disclosed provenance gap here is closed: audit finding F-R-01 observed that the
+dumper behind the original trace-conformance batteries existed at no pinned revision. The
+successor pipeline (§9) dumps from `chip_traces`, an ordinary committed binary at the pinned
+extraction branch; the committed dumps are reproducible byte-for-byte at the pin
+(`scripts/update_sp1_dumps.sh --check`), and their `sp1Commit` is cross-checked against the
+extraction pin by `scripts/check_pins.sh`.
 
 ## 5. Chip contracts: one worked example
 
@@ -552,29 +553,38 @@ headline names are not spent early.
 ## 9. Conformance testing against the real prover
 
 Kernel-checked theorems establish soundness; they cannot establish that the formalized constraint
-system is the one the *shipping prover* satisfies, nor that witness generation is live. A separate
-test library (`SP1CleanTest/`, never imported by the main library) closes that gap empirically at
-SP1's own field (KoalaBear, `p = 2130706433`):
+system is the one the *shipping prover* satisfies, nor that witness generation is live. A
+dump-anchored conformance pipeline closes that gap empirically at SP1's own field (KoalaBear,
+`p = 2130706433`), for **all 25 instruction chips**:
 
-- **Witness conformance** (11 operation anchors): the native Lean witness functions reproduce,
-  on every vector dumped from SP1's real `populate`, the exact column values Rust wrote.
-- **Whole-chip trace conformance** (10 chips today; extending it to all 25 is documented
-  follow-up work in `docs/agents/extraction.md`): the chip's
-  *own* `main` acts as a trace generator — witness columns from its witness closures, layout from
-  its output struct — and the resulting full padded matrix is checked **cell-for-cell** by
-  `native_decide` against a matrix dumped from SP1's real `MachineAir::generate_trace`. For
-  migrated chips the check runs through the faithfulness `reconfigure` map, so it also audits the
-  native→Rust row correspondence on real data. Selector-driven chips (Mul, DivRem, Bitwise, Lt,
-  the shifts) take a per-event hint that was verified to be the dumped executor opcode — an input
-  to the run, structurally incapable of laundering expected outputs into agreement.
+- **Committed SP1 trace dumps** (`export/sp1dump/`, 25 files): deterministic per-chip executor
+  event batteries plus the **full padded `MachineAir::generate_trace` matrix**, produced by
+  `chip_traces` — an ordinary committed binary at the pinned extraction branch — and
+  byte-reproducible at the pin (`scripts/update_sp1_dumps.sh --check`; the recorded `sp1Commit`
+  is cross-checked against the extraction pin by `scripts/check_pins.sh`).
+- **The generation-time gate** (`scripts/witgenExport.lean --testdata`, re-run in CI): for every
+  dumped event row, the native inputs are recovered from the dumped row itself through the
+  audited symbolic row map, the chip's *own* witness programs are executed
+  (`FlatOperation.witgen` over the exported shared operations), the symbolic row map is evaluated
+  at the resulting cells, and the reconstructed row must equal SP1's dumped row
+  **cell-for-cell** — the exporter fails closed on any mismatch and writes nothing. The
+  derived padding rows (ShiftLeft/ShiftRight/DivRem) are gated the same way; a value-level
+  `circuitTraceRowMapped` spot check pins the symbolic path to the audited `ChipFaithful`
+  `reconfigure` map at field values on every chip. Selector-driven chips take per-event hints
+  derived from the dumped executor opcode (Branch's taken-bit from the dumped operands, mirroring
+  SP1's own populate) — inputs to the run, structurally incapable of laundering expected outputs
+  into agreement.
+- **An independent Rust reference interpreter** (`rust/witgen-interp`, ~857 fixture rows) re-runs
+  the same witness programs from the wire format alone, reconstructs every anchored full SP1 row,
+  and additionally checks **every extracted AIR constraint evaluates to zero** on it.
 
-These anchors are the project's only `native_decide` uses (they trust the Lean compiler —
-surfaced in the census as generated per-declaration `._native.native_decide.ax_*` constants,
-the v4.32.2 form of the former named `Lean.ofReduceBool`/`Lean.trustCompiler` axioms),
-quarantined by a CI guard that forbids `native_decide` in the main library, and disclosed
-per-anchor in the test-scope axiom census. What conformance establishes:
+The remaining `native_decide` uses live in the separate test library (`SP1CleanTest/`, never
+imported by the main library — a CI guard forbids `native_decide` there): the exportability
+battery and the satisfiability anchors below, each disclosed per-declaration in the test-scope
+axiom census (surfaced as generated `._native.native_decide.ax_*` constants, the v4.32.2 form of
+the former named `Lean.ofReduceBool`/`Lean.trustCompiler` axioms). What conformance establishes:
 populate fidelity and non-vacuity evidence on real prover data. What it does not: proof. The two
-layers are complementary by construction. (Provenance caveat for the trace batteries: §4.3.)
+layers are complementary by construction.
 
 Additionally, two satisfiability batteries close the chip-level vacuity questions:
 

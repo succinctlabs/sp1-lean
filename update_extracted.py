@@ -14,9 +14,11 @@ complete Rust row shape, helper definitions used by the emitted expression, `ass
 `interactions`. Canonical reader structs are reused from their generated modules; chip-private
 arithmetic structs/functions remain namespaced inside that chip oracle and are not public
 operation-level faithfulness boundaries. All 25 supported chips are migrated to this form;
-`OPERATIONS` and `WITNESS_OPERATIONS` persist as deliberate shared substrate (canonical reader
-modules + statement targets that multiple chip anchors reference). Native Clean circuits are
-hand-maintained under `Native/`; this generator deliberately emits no circuit implementation.
+`OPERATIONS` persists as deliberate shared substrate (canonical reader modules + statement
+targets that multiple chip anchors reference). Native Clean circuits are hand-maintained under
+`Native/`; this generator deliberately emits no circuit implementation. Trace conformance lives
+in the dump-anchored pipeline (`scripts/update_sp1_dumps.sh` + `scripts/witgenExport.lean
+--testdata`), not here — this script emits AIR artifacts only.
 
 **Why auto-derive?** Each `Extracted/` file must own exactly one column struct; a module that
 composes sub-operations imports their already-generated modules (`--reuse-struct <Name>`)
@@ -68,96 +70,6 @@ OPERATIONS: List[str] = [
 # selected system table may still call a previously generated helper that is not itself being
 # rewritten in that run.
 KNOWN_OPERATIONS = frozenset(OPERATIONS)
-
-# Operation-level witness batteries. New conformance coverage belongs in `TRACE_CHIPS`, which
-# compares complete rows produced by the chip circuit with Rust `generate_trace`; the entries here
-# back the remaining operation-level `WitnessTests` anchors (shared substrate — shrink only when an
-# anchor is actually retired). An op here MUST also be in `OPERATIONS`.
-WITNESS_OPERATIONS: List[str] = [
-    "LtOperationUnsigned",
-    "IsZeroOperation",
-    "IsZeroWordOperation",
-    "AddwOperation",
-    "SubwOperation",
-    "U16MSBOperation",
-    "U16CompareOperation",
-    "AddrAddOperation",
-    "BitwiseOperation",
-    "IsEqualWordOperation",
-    "MulOperation",
-]
-
-# Per-op ordered list of the JSON keys that form the conformance tuple emitted to Lean (the operand
-# columns + the witnessed columns to check). Each key's value is auto-rendered as a `#v[…]` literal
-# (JSON array → `Vector ℕ <len>`) or a bare `ℕ` (JSON int — e.g. a field-inverse column). Keys like
-# `inputs`/`output`/`events` are intentionally omitted (not part of the witness conformance check).
-WITNESS_SCHEMA: Dict[str, List[str]] = {
-    "LtOperationUnsigned": ["b_limbs", "cc_limbs", "comparison_limbs", "u16_flags", "not_eq_inv"],
-    "IsZeroOperation": ["a_field", "inverse", "result"],
-    "IsZeroWordOperation": ["a_limbs", "inv", "lresult", "first_half", "second_half", "result"],
-    "AddwOperation": ["a_limbs", "b_limbs", "value", "msb"],
-    "SubwOperation": ["a_limbs", "b_limbs", "value", "msb"],
-    "U16MSBOperation": ["a", "msb"],
-    "U16CompareOperation": ["b", "c", "bit"],
-    "AddrAddOperation": ["a_limbs", "b_limbs", "value"],
-    "BitwiseOperation": ["b_bytes", "c_bytes", "opcode", "result"],
-    "IsEqualWordOperation": ["a_limbs", "b_limbs", "inv", "lresult", "first_half", "second_half", "result"],
-    "MulOperation": ["b_limbs", "c_limbs", "is_mulh", "is_mulhsu", "is_mulw", "carry", "product",
-                     "b_lower_byte", "c_lower_byte", "b_msb", "c_msb", "product_msb",
-                     "b_sign_extend", "c_sign_extend"],
-}
-
-# Chips with a **whole-trace** dumper in the `witness_vectors` binary (`--chip <name>`) → an extra
-# `SP1CleanTest/TraceGenTests/<name>ChipTraceVectors.lean` (the event battery + the full padded matrix from
-# SP1's real `generate_trace`) plus a hand-written `SP1CleanTest/TraceGenTests/<name>ChipTraceWitness.lean`
-# anchor that re-derives every row from the chip's own circuit (`TraceGenerator.lean` +
-# `EventPopulate.lean`) and checks the matrices match. Value = (expected row width — a layout-drift
-# tripwire; the dumper also asserts it, reader kind — picks the dumped record type and the Lean
-# event mirror: "RType" → `AluEventRec`, "ALUType" → `AluTypeEventRec`; the `*Op` variants append
-# the executor opcode discriminant — `AluEventOpRec` / `AluTypeOpEventRec` — for the hint-driven
-# chips whose Lean anchors build the per-event flag `ProverHint` from it).
-TRACE_CHIPS: Dict[str, Tuple[int, str]] = {
-    "Add": (33, "RType"),
-    "Sub": (33, "RType"),
-    "Subw": (32, "RType"),
-    "Mul": (82, "RTypeOp"),
-    "DivRem": (246, "RTypeOp"),
-    "Addw": (36, "ALUType"),
-    "Bitwise": (51, "ALUTypeOp"),
-    "Lt": (44, "ALUTypeOp"),
-    "ShiftLeft": (65, "ALUTypeOp"),
-    "ShiftRight": (69, "ALUTypeOp"),
-}
-
-# Ordered JSON keys of one dumped event, per reader kind = the field order of Lean's
-# `AluEventRec` / `AluTypeEventRec` / `AluEventOpRec` / `AluTypeOpEventRec`
-# (`SP1CleanTest/TraceGenTests/EventPopulate.lean`).
-TRACE_EVENT_KEYS: Dict[str, List[str]] = {
-    "RType": [
-        "clk", "pc", "a", "b", "c", "opA", "opB", "opC",
-        "tsA", "prevTsA", "prevA", "tsB", "prevTsB", "tsC", "prevTsC",
-    ],
-    "ALUType": [
-        "clk", "pc", "a", "b", "c", "opA", "opB", "opC", "immC",
-        "tsA", "prevTsA", "prevA", "tsB", "prevTsB", "tsC", "prevTsC",
-    ],
-    "RTypeOp": [
-        "clk", "pc", "a", "b", "c", "opA", "opB", "opC",
-        "tsA", "prevTsA", "prevA", "tsB", "prevTsB", "tsC", "prevTsC", "opcode",
-    ],
-    "ALUTypeOp": [
-        "clk", "pc", "a", "b", "c", "opA", "opB", "opC", "immC",
-        "tsA", "prevTsA", "prevA", "tsB", "prevTsB", "tsC", "prevTsC", "opcode",
-    ],
-}
-
-# Reader kind → (Lean event mirror struct, dumped Rust record type for the doc string).
-TRACE_EVENT_TYPES: Dict[str, Tuple[str, str]] = {
-    "RType": ("AluEventRec", "RTypeRecord"),
-    "ALUType": ("AluTypeEventRec", "ALUTypeRecord"),
-    "RTypeOp": ("AluEventOpRec", "RTypeRecord"),
-    "ALUTypeOp": ("AluTypeOpEventRec", "ALUTypeRecord"),
-}
 
 # Chip modules → `Extracted/<chip>Chip.lean` (column struct `<chip>Cols` + composed constraints).
 CHIPS: List[str] = [
@@ -317,12 +229,6 @@ EXTRACTOR_ONLY_FILES: Set[str] = {
     "crates/derive/src/into_shape.rs",
 }
 EXTRACTED_DIR = os.path.join("SP1Clean", "Extracted")
-# The witness/trace conformance vectors are test-only data: they live in the top-level
-# `SP1CleanTest` test library (built by `lake test`), not the main `SP1Clean` library — which is
-# gated `native_decide`-free (the anchors that consume these vectors are the only `native_decide`).
-WITNESS_DIR = os.path.join("SP1CleanTest", "WitnessTests", "Vectors")
-TRACEGEN_DIR = os.path.join("SP1CleanTest", "TraceGenTests")
-
 COMMON_IMPORTS = """import SP1Clean.Math.Word
 import SP1Clean.Extracted.ExtractionDSL
 import Clean.Utils.Tactics.ProvableStructDeriving"""
@@ -914,164 +820,6 @@ def render_chip_oracle(
     )
 
 
-# ── Witness-vector pass ───────────────────────────────────────────────────────────────────────
-# The completeness/conformance companion to the constraint pass: dump SP1's real `populate`
-# outputs on a fixed input battery (via the `witness_vectors` binary) and render them as Lean data
-# the `WitnessTests/<Op>Witness.lean` `native_decide` conformance theorems check the native
-# `witness` function against.
-
-def run_witness_vectors(sp1_dir: str, operation: str) -> dict:
-    """Run the `witness_vectors` binary for one operation and return its parsed JSON."""
-    cmd = ["cargo", "run", "-q", "-p", "sp1-constraint-compiler", "--bin", "witness_vectors",
-           "--", "--operation", operation]
-    result = subprocess.run(cmd, cwd=sp1_dir, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"witness_vectors failed for {operation}:\n{result.stderr}")
-    return json.loads(result.stdout)
-
-
-def _vec_lean(xs: Sequence[int]) -> str:
-    """Render a list of ints as a Clean `#v[...]` vector literal."""
-    return "#v[" + ", ".join(str(x) for x in xs) + "]"
-
-
-def _lean_elem_type(val) -> str:
-    """The Lean type of one schema column: a JSON array → `Vector ℕ <len>`, a JSON int → `ℕ`."""
-    return f"Vector ℕ {len(val)}" if isinstance(val, list) else "ℕ"
-
-
-def _lean_elem(val) -> str:
-    """Render one schema column value: a JSON array → `#v[…]`, a JSON int → its literal."""
-    return _vec_lean(val) if isinstance(val, list) else str(val)
-
-
-# Measured per-battery option overrides for the generated conformance-vector files. Default: NOTHING.
-#
-# The two writers below emit an override only where this table names one. **Never emit a blanket bump.**
-# Nineteen of the twenty-one generated batteries need nothing at all.
-#
-# Battery size does not predict the need: a 396-vector, 49 KB battery elaborates at the plain defaults
-# while a 47-vector, 2.4 KB one is 20x smaller and would not. Measure the battery that fails.
-#
-# ⚠ The two options mask each other -- a battery's recursion need can be hidden behind its heartbeat
-# failure and surface only once that is satisfied. Ladder one option at a time and re-run to a fixpoint.
-VECTOR_OPTION_OVERRIDES: Dict[str, Dict[str, int]] = {
-    # 528 vectors x 14 columns, ~30,000 numeric literals: the largest battery in the tree.
-    # Ladder: heartbeats 250000 FAIL / 300000 ok -> floor (250000, 300000].
-    #         recursion   16000 FAIL /  32000 ok -> floor (16000, 32000]. Both set at ~2x.
-    "witness:MulOperation": {"heartbeats": 600000, "recdepth": 64000},
-    # 64 x 246 = 15,744 literals: the widest trace battery. Needs no heartbeat budget at all.
-    # Ladder: recursion 8000 FAIL / 16000 ok -> floor (8000, 16000], set at ~2x.
-    "trace:DivRem": {"recdepth": 32000},
-}
-
-
-def _vector_options(key: str) -> str:
-    """Emit the measured option overrides for one generated vector battery, or the empty string.
-
-    Absence is the default and the common case: 19 of the 21 batteries need neither directive."""
-    over = VECTOR_OPTION_OVERRIDES.get(key, {})
-    out = ""
-    if "heartbeats" in over:
-        out += f"set_option maxHeartbeats {over['heartbeats']} in\n"
-    if "recdepth" in over:
-        out += f"set_option maxRecDepth {over['recdepth']} in\n"
-    return out
-
-
-def render_witness_vectors(operation: str, data: dict) -> str:
-    """Render an operation's witness-conformance vectors as a Lean `def` of tuples, one column per
-    `WITNESS_SCHEMA[operation]` key (auto-typed `Vector ℕ n` / `ℕ` from the dumped JSON)."""
-    keys = WITNESS_SCHEMA[operation]
-    vectors = data["vectors"]
-    first = vectors[0]
-    prod_type = " × ".join(_lean_elem_type(first[k]) for k in keys)
-    tuple_desc = "(" + ", ".join(keys) + ")"
-    rows = [
-        "  (" + ", ".join(_lean_elem(v[k]) for k in keys) + "),"
-        for v in vectors
-    ]
-    body = "\n".join(rows)
-    doc = (
-        f"/-! # AUTO-GENERATED — do not edit by hand.\n\n"
-        f"Witness-generation conformance vectors for SP1's `{operation}`, dumped from the **real**\n"
-        f"`{operation}::populate` by `update_extracted.py` (the `witness_vectors` binary,\n"
-        f"`--operation {operation}`). Unlike the constraint (`eval`) extraction, `populate` is native\n"
-        f"imperative code and cannot be symbolically extracted; these vectors instead tie the Lean\n"
-        f"witness function to the Rust source by **conformance** (agreement on the sampled inputs —\n"
-        f"edge cases + a seeded LCG — not an all-inputs proof). Each entry is `{tuple_desc}`. The\n"
-        f"check lives in `SP1CleanTest/WitnessTests/{operation}Witness.lean`. Regenerate with\n"
-        f"`SP1_DIR=… python3 update_extracted.py`. -/"
-    )
-    return (
-        "import SP1Clean.Math.Word\n\n"
-        + doc + "\n\n"
-        + "namespace SP1Clean.WitnessTests\nopen SP1Clean\n\n"
-        + LINTERS_OFF + "\n\n"
-        + _vector_options(f"witness:{operation}")
-        + f"/-- {len(vectors)} conformance vectors for `{operation}` (`{tuple_desc}`). -/\n"
-        + f"def {operation}WitnessVectors : List ({prod_type}) := [\n"
-        + body + "\n]\n\n"
-        + "end SP1Clean.WitnessTests\n"
-    )
-
-
-def run_trace_vectors(sp1_dir: str, chip: str) -> dict:
-    """Run the `witness_vectors` binary in `--chip` (whole-trace) mode and return its JSON."""
-    cmd = ["cargo", "run", "-q", "-p", "sp1-constraint-compiler", "--bin", "witness_vectors",
-           "--", "--chip", chip]
-    result = subprocess.run(cmd, cwd=sp1_dir, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"witness_vectors --chip failed for {chip}:\n{result.stderr}")
-    return json.loads(result.stdout)
-
-
-def render_trace_vectors(chip: str, width: int, kind: str, data: dict) -> str:
-    """Render one chip's whole-trace conformance battery: the event list (as `AluEventRec` /
-    `AluTypeEventRec` anonymous-constructor literals, field order = `TRACE_EVENT_KEYS[kind]`), the
-    padded height, and the full row-major matrix from SP1's real `generate_trace` (canonical ℕ per
-    cell)."""
-    if data["width"] != width:
-        raise RuntimeError(f"{chip}: dumped width {data['width']} != expected {width}")
-    rows = data["rows"]
-    if data["height"] != len(rows) or any(len(r) != width for r in rows):
-        raise RuntimeError(f"{chip}: dumped matrix shape is inconsistent")
-    events = data["events"]
-    event_keys = TRACE_EVENT_KEYS[kind]
-    event_type, record_type = TRACE_EVENT_TYPES[kind]
-    event_rows = [
-        "  ⟨" + ", ".join(str(e[k]) for k in event_keys) + "⟩,"
-        for e in events
-    ]
-    matrix_rows = ["  " + _vec_lean(r) + "," for r in rows]
-    doc = (
-        f"/-! # AUTO-GENERATED — do not edit by hand.\n\n"
-        f"Whole-trace conformance battery for SP1's `{chip}Chip`, dumped from the **real**\n"
-        f"`MachineAir::generate_trace` by `update_extracted.py` (the `witness_vectors` binary,\n"
-        f"`--chip {chip}`): the deterministic event battery and the full padded {width}-column\n"
-        f"row-major matrix (including SP1's zero padding rows). The anchor\n"
-        f"`SP1CleanTest/TraceGenTests/{chip}ChipTraceWitness.lean` re-derives every row from the\n"
-        f"chip's own circuit (`TraceGenerator.lean`) and checks the matrices match. Regenerate\n"
-        f"with `SP1_DIR=… python3 update_extracted.py`. -/"
-    )
-    return (
-        "import SP1CleanTest.TraceGenTests.EventPopulate\n\n"
-        + doc + "\n\n"
-        + "namespace SP1Clean.TraceGenTests\nopen SP1Clean\n\n"
-        + LINTERS_OFF + "\n\n"
-        + f"/-- The {len(events)} dumped `(AluEvent, {record_type})` battery rows. -/\n"
-        + f"def {chip}ChipTraceEvents : List {event_type} := [\n"
-        + "\n".join(event_rows) + "\n]\n\n"
-        + f"/-- The padded trace height SP1 chose (`next_multiple_of_32`). -/\n"
-        + f"def {chip}ChipTraceHeight : ℕ := {data['height']}\n\n"
-        + _vector_options(f"trace:{chip}")
-        + f"/-- SP1's real `generate_trace` output: {data['height']} × {width}, canonical values. -/\n"
-        + f"def {chip}ChipTraceRows : List (Vector ℕ {width}) := [\n"
-        + "\n".join(matrix_rows) + "\n]\n\n"
-        + "end SP1Clean.TraceGenTests\n"
-    )
-
-
 def _write(out_path: str, content: str) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
@@ -1340,7 +1088,7 @@ def verify_extractor_clean(sp1_dir: str) -> None:
 # ── Orchestration ───────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    global OPERATIONS, CHIPS, SYSTEM_TABLES, WITNESS_OPERATIONS, TRACE_CHIPS
+    global OPERATIONS, CHIPS, SYSTEM_TABLES
 
     sp1_dir = os.environ.get("SP1_DIR", DEFAULT_SP1_DIR)
 
@@ -1378,19 +1126,10 @@ def main() -> None:
     except Exception as error:  # noqa: BLE001
         raise SystemExit(f"Required opcode-table extraction failed: {error}") from error
 
-    # `EXTRACT_AIR_ONLY=1` runs the complete symbolic AIR extraction while skipping the independent
-    # witness/trace batteries. This is the conservative first
-    # phase of a Rust-pin migration: compare every row shape/assertion/interaction artifact before
-    # allowing populate/conformance churn to obscure the diff.
-    if os.environ.get("EXTRACT_AIR_ONLY") == "1":
-        WITNESS_OPERATIONS = []
-        TRACE_CHIPS = {}
-        print("EXTRACT_AIR_ONLY → skipping witness and trace-vector passes")
-
     extract_public_values = True
 
     # `EXTRACT_ONLY=Name1,Name2,…` restricts this run to a subset of OPERATIONS/CHIPS/
-    # WITNESS_OPERATIONS (a closed composition group) — used to regenerate just the files that
+    # SYSTEM_TABLES (a closed composition group) — used to regenerate just the files that
     # changed without rewriting every module. Reuse wiring stays correct as long as the subset is
     # closed under sub-operation composition (e.g. `Add` needs `AddOperation,CPUState,RTypeReader`).
     only = os.environ.get("EXTRACT_ONLY")
@@ -1400,11 +1139,8 @@ def main() -> None:
         CHIPS = [c for c in CHIPS if c in wanted]
         SYSTEM_TABLES = [table for table in SYSTEM_TABLES if table in wanted]
         extract_public_values = "PublicValues" in wanted
-        WITNESS_OPERATIONS = [o for o in WITNESS_OPERATIONS if o in wanted]
-        TRACE_CHIPS = {c: w for c, w in TRACE_CHIPS.items() if f"{c}Trace" in wanted}
         print(f"EXTRACT_ONLY → operations={OPERATIONS}, chips={CHIPS}, "
-              f"system={SYSTEM_TABLES}, publicValues={extract_public_values}, "
-              f"witness={WITNESS_OPERATIONS}, trace={list(TRACE_CHIPS)}")
+              f"system={SYSTEM_TABLES}, publicValues={extract_public_values}")
 
     # 1. Discovery pass: which structs does each module emit with no reuse? Tolerate per-target
     #    compiler failures (e.g. a chip whose `<Chip>Cols` shape isn't yet composed in the
@@ -1550,34 +1286,6 @@ def main() -> None:
         print("Processing machine public values")
         _write(os.path.join(EXTRACTED_DIR, "SystemOracle", "PublicValues.lean"), public_output)
         written += 1
-
-    # 2b. Transitional operation witness-vector pass. New conformance batteries belong in the
-    #     whole-chip pass below; this list only supports unmigrated consumers.
-    for op in WITNESS_OPERATIONS:
-        print(f"Processing witness vectors for {op}")
-        try:
-            data = run_witness_vectors(sp1_dir, op)
-            _write(os.path.join(WITNESS_DIR, f"{op}.lean"),
-                   render_witness_vectors(op, data))
-            written += 1
-        except Exception as e:  # noqa: BLE001 — best-effort, continue with the rest
-            print(f"  ✗ Error: {e}")
-
-    # 2d. Whole-trace pass: dump the real-`generate_trace` conformance battery for the chips in
-    #     `TRACE_CHIPS` (the `--chip` mode of the same binary). A requested trace failure is fatal:
-    #     silently retaining stale vectors would undermine the extraction/conformance boundary. Under
-    #     `EXTRACT_ONLY`, select these with `<Chip>Trace` (e.g. `AddTrace`) so they don't collide
-    #     with the `CHIPS` constraint-extraction entries of the same name.
-    for chip, (width, kind) in TRACE_CHIPS.items():
-        print(f"Processing trace vectors for {chip}Chip")
-        try:
-            data = run_trace_vectors(sp1_dir, chip)
-            _write(os.path.join(TRACEGEN_DIR, f"{chip}ChipTraceVectors.lean"),
-                   render_trace_vectors(chip, width, kind, data))
-            written += 1
-        except Exception as e:  # noqa: BLE001 — best-effort, continue with the rest
-            print(f"  ✗ Error: {e}")
-            required_failures.append(f"whole-trace extraction {chip}: {e}")
 
     # 3. Summary — what got written and which targets the compiler can't yet emit.
     print(f"\n== Wrote {written} module(s) to {EXTRACTED_DIR} ==")

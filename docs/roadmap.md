@@ -195,7 +195,7 @@ On an SP1 pin change:
 - compare the unmodified Rust machine source first;
 - regenerate the runtime table/width/public-value manifest;
 - re-audit first/last/transition selector use;
-- regenerate every list anchor and conformance vector;
+- regenerate every list anchor, the SP1 trace dumps, and the gated fixtures;
 - update both semantic and extractor provenance;
 - prove the 25-table coverage permutation again; and
 - treat a cluster, width, interaction-kind, or schedule change as an architecture change, not a
