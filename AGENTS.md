@@ -301,7 +301,7 @@ carries `isU64 ∧ ClkBound` (value + a bounded 24-bit access timestamp), and By
 grounding engine from bus balance, boundary/provider facts, program commitment, strict schedule rank, and
 the 25 chip `advance` lemmas. No chip `ProverAssumptions` threads either global truth. The current capstone
 layers distinguish native supported-machine refinement, extracted AIR faithfulness, full SP1 AIR
-soundness, and the eventual ArkLib verifier theorem; see `docs/roadmap.md` W12.
+soundness, and the eventual ArkLib verifier theorem; see `docs/roadmap.md` (P0–P2).
 The memory-bus closed forms, `GroundingAdapter`, all 25 `ChipGroundingContracts`, aligned-carrier
 transports, RAM/same-location grounding, and per-position assumptions/readiness are proved. Remaining
 work is to derive this native relation's semantic boundary and timestamp premises from the exact

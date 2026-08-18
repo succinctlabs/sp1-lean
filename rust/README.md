@@ -9,12 +9,14 @@ overlay, or on the Lean toolchain — only on the wire format documented in
 
 - **`witgen-interp/`** — the reference interpreter for the exported witness IR. Reads a
   circuit's `export/witgen/<Chip>.witgen.json` (the serialized witness programs plus the
-  constraint/interaction list), the chip's manifest (`<Chip>.manifest.json` — input layout,
-  hint schema, pad-row policy), and a trace fixture (`export/testdata/<Chip>.trace.json` —
-  real events and golden rows dumped from SP1's own `generate_trace`), and checks that
-  evaluating the witness programs on each row's input prefix reproduces the golden witness
-  cells. A wrong interpreter, a wrong manifest, or a wrong exported program all fail the
-  differential run loudly.
+  constraint/interaction list), the chip's symbolic row map (`<Chip>.rowmap.json`), and a
+  trace fixture (`export/testdata/<Chip>.trace.json` — SP1-anchored event rows plus
+  synthetic rows, written by the fail-closed generation-time gate). For every row it
+  re-runs the witness programs on the input prefix and checks the witness cells; for every
+  SP1-anchored row it additionally reconstructs the **full Rust trace row** through the row
+  map, matches it against SP1's real `generate_trace` output verbatim, and checks that
+  every extracted AIR constraint evaluates to zero on it. A wrong interpreter, a wrong row
+  map, or a wrong exported program all fail the differential run loudly.
 
 ## Relationship to the trust story
 
@@ -33,7 +35,8 @@ trap + the differential over all committed fixtures):
 cd rust/witgen-interp && cargo test
 ```
 
-Or from the repo root, the differential alone (575 fixture rows across 25 chips):
+Or from the repo root, the differential alone (~857 fixture rows across all 25 chips, 706
+of them SP1-anchored):
 
 ```
 scripts/run_interp_diff.sh                    # against the committed export/

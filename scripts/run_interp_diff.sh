@@ -4,8 +4,10 @@
 # Runs the Rust reference interpreter (`rust/witgen-interp`) over the committed
 # `export/` artifacts: every fixture row under `export/testdata/` must reproduce its
 # `expectedWitness` cells exactly (the Lean reference evaluation over the shared
-# operation list; the ten trace-anchored chips' event rows additionally carry SP1's
-# real `generate_trace` rows, so agreement inherits the SP1 anchor by transitivity).
+# operation list). All 25 chips carry SP1-anchored event rows (inputs recovered from
+# SP1's real `generate_trace` rows by the generation-time gate): on those the
+# interpreter additionally reconstructs the full Rust row through the row map,
+# matches it verbatim, and checks every extracted AIR constraint evaluates to zero.
 #
 # Cargo is deliberately NOT part of the Lean CI (see rust/README.md); run this
 # manually after touching the exporter, the fixtures, or the interpreter.

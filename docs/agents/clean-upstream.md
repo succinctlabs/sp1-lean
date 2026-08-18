@@ -304,6 +304,33 @@ If a combinator does turn out to be right, the minimal upstream shape is to inli
 `inferInstanceAs` delegation at `Explicit.lean:361-363`), replaced by a 5-line explicit instance
 modelled on `witnessVector`'s at `Explicit.lean:343`.
 
+### U11 · `WitgenIR.share` — subterm sharing for serialized witness programs — **landed in the fork**
+
+The wire format has always had `steps`/`localVar` sharing, but nothing produced it: the serializer
+walked the authored expression trees verbatim, and production-scale programs re-expand every shared
+subterm. At SP1 scale that is fatal — DivRem's two heaviest witness ops serialized to 552 MB each,
+1.22 GB for the chip; with the pass the same chip is **1.04 MB** (1143×), Mul 1.86 MB → 201 KB, and
+the whole 25-chip export is ~2.3 MB, byte-stable.
+
+Branch `witgen-share`: **2 commits off the upstream base `0e53b9f2`, no AgreesBelow contamination**
+(`410ffba8` the pass, `4a9c2c7b` the proof). Footprint: `Clean/Circuit/WitnessShare.lean` (new,
++2173 — hand-written mutual `beq`/`hashCode`, an untrusted-cache intern that re-verifies every hit
+against the steps array so the proof never reasons about `HashMap` internals, and the kernel-checked
+`WitgenIR.eval_share` at `[propext, Classical.choice, Quot.sound]`) and
+`Clean/Circuit/WitnessExport.lean` (+29/−6: `witgenJsonList?` factoring, `FlatOperation.share`, the
+new entry point `Operations.witgenJsonShared?`). The proof caught a real bug during development: a
+shared `.letU .idx` step substituted into `mapRange` bodies would re-bind `idx`, so `shareU`
+rewrites `.idx → .const 0` in shared positions.
+
+Two riders belong in the same PR: a field-element `Hashable` instance (today each consumer must
+supply `⟨fun x => hash x.val⟩` — `scripts/witgenExport.lean:55` — before `witgenJsonShared?` is
+callable), and `doc/witgen-wire-format.md` (adapted from this repo's copy — upstream has no wire
+format spec at all; `doc/witgen-authoring.md` covers only the authoring surface). Adjacent upstream
+context: issue #404 (the requested Rust interpreter needs shared programs to evaluate at sane
+cost); our `rust/witgen-interp` is a working reference implementation of the format and is on offer
+there. **This is the single Clean-side prerequisite for the exported artifacts to be producible
+from stock upstream Clean** — U1 is orthogonal to the exporter path.
+
 ## Design discussion, not a patch
 
 **`circuit_norm`'s struct-eval orientation.** Clean's normal form pulls projections *up* out of `eval`

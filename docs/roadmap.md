@@ -167,17 +167,24 @@ Compressed, Plonk, and Groth16 are separate targets. Do not broaden the Core the
 
 ## P3: extractable witness generation and completeness
 
-Use Clean's witness-generation IR to replace sampled conformance with proved construction:
+All 25 instruction chips generate their witnesses through Clean's exportable witness IR, and the
+connection to SP1's Rust `generate_trace` exists today at **conformance strength**: the exported
+wire-format programs + symbolic row maps (`export/witgen/`), the committed SP1 trace dumps
+(`export/sp1dump/`), the fail-closed generation-time gate (`scripts/witgenExport.lean --testdata` —
+every event row of every chip recomputed and matched cell-for-cell against SP1's real prover
+output), and the independent Rust reference-interpreter differential (`rust/witgen-interp`, which
+also reconstructs the full Rust rows and checks all extracted constraints on them).
+
+The remaining P3 target is upgrading that sampled conformance to **proved construction**:
 
 - generate every native instruction and provider row from supported execution events;
 - prove row constraints and all channel balances;
-- reconfigure the native trace to the exact upstream trace;
-- connect the construction to SP1's Rust `generate_trace`; and
+- reconfigure the native trace to the exact upstream trace; and
 - prove proof-system completeness separately.
 
 The source relation must express supported, trace-generatable executions and concrete syscall handler
-behavior. Existing `SP1CleanTest` batteries remain regression tests during this work but are not a
-substitute for the theorem.
+behavior. The conformance pipeline remains the empirical regression layer during this work but is not
+a substitute for the theorem.
 
 ## Maintenance gates
 
