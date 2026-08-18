@@ -187,8 +187,10 @@ SP1_SEMANTIC_COMMIT = "f66b4bff51d0ccff51d152e0f7f66b2ffedf3529"
 # changes are restricted to reflection/`IntoShape` metadata and are checked below. The v6.3.1→
 # v6.4.0 semantic delta touches three `core/executor` plumbing files only (errors/opts/cow) and
 # no chip, compiler, or hypercube source; the AIR regeneration at this pin was byte-for-byte
-# identical to the previous artifacts modulo the provenance strings.
-SP1_PINNED_COMMIT = "de017f47596b4b7ca847ade857ded8c690b3835e"
+# identical to the previous artifacts modulo the provenance strings. The 2026-08-18 advance
+# (conformance library + vendored interpreter/artifacts + the in-repo witgen conformance test)
+# left the dumper output byte-identical.
+SP1_PINNED_COMMIT = "2b7ce14421535303659c1799f4af284eb8d72cee"
 
 # The only semantic-tree files the extractor overlay may touch. The checker below additionally
 # verifies that every changed line in these files is an import or derive-attribute change.
@@ -225,6 +227,8 @@ EXTRACTOR_ONLY_PREFIXES: Tuple[str, ...] = (
     "crates/hypercube/src/ir/",
 )
 EXTRACTOR_ONLY_FILES: Set[str] = {
+    # The workspace manifest gains the vendored witgen-interp member; the lockfile follows.
+    "Cargo.toml",
     "Cargo.lock",
     "crates/derive/src/into_shape.rs",
 }

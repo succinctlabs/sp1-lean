@@ -15,6 +15,6 @@ deriving DecidableEq, Repr
 /-- Provenance validated by the generator before it writes any AIR artifact. -/
 def checkedInProvenance : ExtractionProvenance where
   semanticRevision := "f66b4bff51d0ccff51d152e0f7f66b2ffedf3529"
-  extractorRevision := "de017f47596b4b7ca847ade857ded8c690b3835e"
+  extractorRevision := "2b7ce14421535303659c1799f4af284eb8d72cee"
 
 end SP1Clean.Extracted
