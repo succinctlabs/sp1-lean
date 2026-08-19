@@ -2,6 +2,8 @@
 # Gate: every recorded pin value must match reality. Cross-checks, in order:
 #   1. `lakefile.toml` `[[require]]` revs against `lake-manifest.json` (resolved graph);
 #   2. the pin table in `docs/release-audit.md` against the manifest + `lean-toolchain`;
+#  2b. the Sail generation pins + config hash in `scripts/sail-config/` against that same
+#      table (they are generator inputs, so the build graph does not constrain them);
 #   3. the SP1 semantic revision quoted in README/report against the single authoritative
 #      source, `SP1Clean.FormalModel.CoreProfile.sp1SemanticRevision` (itself `rfl`-checked
 #      against the extracted provenance);
@@ -16,7 +18,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 python3 - <<'EOF'
-import json, re, sys
+import hashlib, json, re, sys
 
 fail = 0
 def err(msg):
@@ -84,6 +86,38 @@ for label, expected in expected_rows.items():
         err(f"docs/release-audit.md pin table has no row '| {label} |'")
     elif recorded != expected:
         err(f"docs/release-audit.md row '{label}' records `{recorded}` but the source of truth is `{expected}`")
+
+# -- 2b. the Sail generation pins, which live in a script rather than the build graph ----
+# `SAIL_SHA` / `SAIL_RISCV_SHA` / the config hash are inputs to the GENERATED `Lean_RV64D`
+# snapshot, so nothing in the manifest constrains them: without this check all three can
+# drift from the table with the build fully green.
+gen = open("scripts/sail-config/generate_lean_rv64d.sh").read()
+def script_pin(name):
+    m = re.search(rf"^{name}=([0-9a-f]{{40}})\b", gen, re.M)
+    if not m:
+        err(f"scripts/sail-config/generate_lean_rv64d.sh has no {name}=<40-hex> constant")
+        return None
+    return m.group(1)
+
+for label, value in (("Sail compiler source", script_pin("SAIL_SHA")),
+                     ("sail-riscv model source", script_pin("SAIL_RISCV_SHA"))):
+    if value is None:
+        continue
+    recorded = table_value(label)
+    if recorded is None:
+        err(f"docs/release-audit.md pin table has no row '| {label} |'")
+    elif recorded != value:
+        err(f"docs/release-audit.md row '{label}' records `{recorded}` but "
+            f"generate_lean_rv64d.sh pins `{value}`")
+
+cfg_path = "scripts/sail-config/sp1_rv64d_cfg.json"
+cfg_sha = hashlib.sha256(open(cfg_path, "rb").read()).hexdigest()
+m = re.search(r"^\| SP1 Sail config \| sha256 `([0-9a-f]{64})`", audit, re.M)
+if not m:
+    err("docs/release-audit.md pin table has no row '| SP1 Sail config | sha256 `<64-hex>`'")
+elif m.group(1) != cfg_sha:
+    err(f"docs/release-audit.md records SP1 Sail config sha256 `{m.group(1)}` "
+        f"but {cfg_path} hashes to `{cfg_sha}`")
 
 # -- 3. the semantic hash quoted outside the table --------------------------------------
 for path in ("README.md", "docs/verification-report.md", "docs/overview.md"):
