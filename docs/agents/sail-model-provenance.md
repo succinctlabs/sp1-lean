@@ -55,6 +55,32 @@ of which any proof reaches. It is kept because upstream's own `check_pmp` reject
 `usable_count > count`, so shipping `count = 0` with `usable_count = 16` would be a config the
 model itself reports invalid.
 
+**Cost of dropping the two PMP keys, measured 2026-08-19 — much lower than estimated.** The
+worry was that reproving `run_pmpCheck_none` against a stock 16-entry PMP needs a 16-iteration
+`SailME` peel, which would press the file's heartbeat budget (measured floor `(10k, 20k]`) under a
+regime that forbids raising it. **It does not.** `pmpCheck`'s `for i in [0:15:1]i` elaborates to
+`IntRange.forIn'` (`.lake/packages/Sail/Sail/IntRange.lean`), which is **well-founded** recursion
+and therefore carries a generated `IntRange.forIn'.loop.induct`. So the loop is discharged by an
+invariant proved *once by functional induction* — O(1) in the trip count, indifferent to whether
+the bound is 0 or 15 — rather than unrolled. Prototyped against the **current** model (no
+regeneration, no pin bump: the lemmas never mention `sys_pmp_count`):
+
+- `run_loop_const` — if every iteration yields with the state untouched, the whole loop is a no-op.
+- `run_ME_loop_const` — the same in `SailME`, the monad `pmpCheck` uses, in the
+  `EStateM.run (ExceptT.run …)` idiom of the file's existing `run_ME_*` toolkit.
+- `run_pmpMatchAddr_zero` — an all-zero cfg entry takes `pmpMatchAddr`'s `.OFF` arm
+  (`PmpControl.lean:294`), so it is `PMP_NoMatch` with the state untouched, uniformly in `i`.
+
+~40 lines total, **~2s to elaborate, all axiom-clean**, nothing near the budget. The remaining work
+is mechanical: a `pmp_off` field beside `htif_disabled` in `Model/Semantics/GuestProgram.lean` and
+on `isValidMemConfig`, one extra `by rwa [key …]` line at each of ~10 chip `Bridge.lean` sites
+(template: `Proofs/Chips/StoreByteChip/Bridge.lean:55-69`), the concrete witness in
+`FormalModel/Trace/Witness.lean` (pattern at `:164`), and a regeneration + snapshot republish +
+pin bump. Note this **relocates** the assumption rather than removing it: 2 config keys / 4
+generated sites and a 7th `isValidMemConfig` field, instead of 4 keys / 6 sites and 6 fields. The
+gain is that it becomes a hypothesis visible in Lean rather than a JSON key feeding a code
+generator.
+
 The four top-level generated values (`plat_have_clint`, `plat_have_sig`, `sys_pmp_count`,
 `sys_pmp_usable_count`) are disclosed to the audit surface as `rfl` lemmas in
 `Model/SailMemory.lean`; the other two generated sites are `let`-bindings inside
