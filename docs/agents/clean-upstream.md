@@ -18,11 +18,13 @@ one — so the shim would not feed the theorem it exists to feed.
 
 **Pure addition → `ToClean/`.** No pin bump, and acceptance upstream is a plain deletion plus a
 repoint of importers to `Clean.*`. Current residents: `Circuit/WitgenBridge` (the zero-witness
-`ComputableWitnesses` composition lemmas), `Circuit/WitgenCongr` (`WitgenIR.eval_congr`),
-`Circuit/InteractionRecovery`, `Circuit/WitnessCombinator` (`witnessVectorIR` — but see U10), and
-`Tactic/GetElemFastPath` (whose upstream is Std, not Clean — see the last section). Everything here
-must have live importers; an upstream-destined addition with no call site belongs in this document
-as a snippet, not in the build (see U2).
+`ComputableWitnesses` composition lemmas), `Circuit/WitgenEval` (struct-level `Witgen.eval`
+collapse + the `gateFE`/`iteFE` gate combinators), `Circuit/InteractionRecovery`,
+`Circuit/WitnessCombinator` (`witnessVectorIR` — but see U10), and `Tactic/GetElemFastPath` (whose
+upstream is Std, not Clean — see the last section). Everything here must have live importers; an
+upstream-destined addition with no call site belongs in this document as a snippet, not in the
+build (see U2). **`Circuit/WitgenCongr` was deleted under exactly that rule on 2026-08-19** — see
+"Clean's direction" below.
 
 **Before queueing anything as a fork change, check that what you need to reach is actually private.**
 U2 was queued as a modification and turned out to be an addition, because the data it needs is a
@@ -56,7 +58,7 @@ back to `Verified-zkEVM/clean` and this file becomes a historical record.
 
 | Branch | Change | PR | Status |
 |---|---|---|---|
-| `agreesbelow-data-hint` | U1 — `AgreesBelow` constrains `data`/`hint` | *not yet filed* | in `sp1-integration` |
+| `agreesbelow-data-hint` | U1 — `AgreesBelow` constrains `data`/`hint` | **[#450](https://github.com/Verified-zkEVM/clean/pull/450) — open, approved 2026-08-14, pending merge** | in `sp1-integration` |
 | `witgen-share` | U11 — `WitgenIR.share` subterm sharing + proven `eval_share` (the wire format has `steps`/`localVar` sharing but nothing produced it; without the pass, SP1's DivRem witness programs serialize to 1.22 GB — 1.04 MB with it), plus the two PR riders: the scoped `Hashable` instance and `doc/witgen-wire-format.md`. Adjacent upstream context: issue #404 (the requested Rust interpreter needs shared programs to evaluate at sane cost) | *prepared, not filed — drafts in `upstream-drafts.md`* | first 2 commits in `sp1-integration`; riders on the branch only |
 | `u64wrap-prefilter` | U3 — two `u64Wrap` screens | — | **not merged**; pushed as a record of a rejected approach (see U3) |
 
@@ -64,13 +66,81 @@ A branch reaching `sp1-integration` means it earned its way there: Clean's own s
 measured effect on local chip work. `u64wrap-prefilter` cleared the first bar and failed the second,
 so it stays out. Keeping it pushed is cheaper than re-deriving why it does not work.
 
+## Clean's direction (investigated 2026-08-19) — what we file and what we hold
+
+Before filing anything upstream we read the maintainer's in-flight work end-to-end, because a
+contribution that upstream plans to delete is worse than no contribution. Findings, with the
+evidence, because every queue decision below now depends on them:
+
+**Clean is not abandoning the witness IR. It is abandoning the JSON *runtime interpreter*.**
+PR #446 (branch `agent/fixed-columns-prover-data`, the live head; #445 is its frozen base) deletes
+`backends/plonky3/src/{clean_ast,clean_air,check_constraints,lookup,…}.rs` (−10,301) and the
+Lean-spawning harness including `tests/helpers/lean_runner.rs` — the exact file issue #404 tells an
+implementer to imitate — and drops `serde` from the backend. But `Clean/Circuit/WitnessExport.lean`
+**survives and is maintained in lockstep** (+4/−0, keeping `FExpr.toJson` total over new
+constructors), with its golden test still gated in CI. The stated policy, from
+`doc/plonky3-polished-demo-requirements.md`: *"JSON may remain as an optional diagnostic or
+build-time manifest, but it must not be the runtime constraint evaluator."*
+
+**Their codegen makes subterm sharing more valuable, not less.** `Clean/Air/Extraction/`
+{`IR`,`Lower`,`Rust`}`.lean` **reuses `Clean/Circuit/WitnessIR.lean` directly** — there is no
+second IR; `Extraction.WitnessBlock` wraps `Witgen.Step`/`VExpr` plus a decidable well-formedness
+proof. `Rust.lean`'s `stepsToRust` emits each step **one-for-one** as `let local_N: F = …;` and
+inlines every other node as a tree, and `Lower.lean`'s `lowerWitness` is a verbatim passthrough:
+**there is no CSE, hash-consing, or dedup anywhere in the pipeline** (both files read end-to-end;
+the two checked-in generated `.rs` artifacts contain zero `let local_`). Sharing today is a manual
+authoring decision, and `doc/witgen-authoring.md` records the open problem — sharing behind an
+opaque program prefix — closing with *"If a use case ever genuinely needs sharing behind an opaque
+prefix, that's the signal to add a locals-boundedness lawfulness class to `Witgen.M`."* A
+**post-hoc** pass carrying `eval_share` sidesteps that problem entirely (it runs after all proofs
+are done, so it needs no lawfulness class and no `circuit_norm` handle), and SP1's DivRem is that
+use case.
+
+**Consequences, applied:**
+
+| payload | verdict |
+|---|---|
+| `WitgenIR.share` + `eval_share` (U11) | **File — after rebasing onto their live line**, reframed from "shrinks the JSON" to "shrinks and speeds up the generated Rust". Serialization-agnostic: shared steps become `let` bindings in generated Rust exactly as they become `steps` in JSON. |
+| `doc/witgen-wire-format.md` (U11 rider) | **Hold — stays ours.** Upstreaming it would promote a now-consumer-less debug printer to a specified, versioned external interface, in the direction they just walked away from. It documents *our* contract; it stays in `docs/`. |
+| `rust/witgen-interp` as an answer to #404 | **Hold — stays ours.** #404 is stale-open (0 comments since 2026-06-11) and its concrete instructions reference files #446 deletes. The copy-of-record is the SP1-vendored copy; SP1 will never link Clean's generated Plonky3 Rust. |
+| `Circuit/WitgenEval` | **Split.** `toElements_eval`, `getElem_eval_toElements`, and the three congr bridges are superseded by #448's `Witgen.WitgenIR.eval_ofCompositeFExpr`, `getElem_eval_ofCompositeFExpr`, and `eval_ofCompositeFExpr_eq_iff`. **`gateFE`/`iteFE` and their four eval/congr lemmas have no upstream counterpart** (the IR has cell-level `.ite` only, while gated column population is a universal prover idiom) — that half stays file-able, after #426. |
+| `Circuit/WitgenBridge` | **Never file; retire at the pin bump.** Its stated reason to exist — "a `FormalAssertion` or `GeneralFormalCircuit` child carries no `ComputableWitnesses` field" — is *falsified* by #426, which puts the field on `FormalCircuitBase` and supplies the composition lemmas. It has 15 live call sites today, so it stays in the build until we migrate. |
+| `Circuit/WitgenCongr` | **Deleted 2026-08-19.** Not duplicated upstream, but architecturally competing with the maintainer's 1068-line `computable_witnesses` tactic — and it had **zero call sites in our own tree**, violating the residency rule above. Its content (read-set collectors `FExpr.exprs`/`U64Expr.exprs`/`BExpr.exprs`/`Step.exprs`/`VExpr.exprs`/`envIndices`, the `CtxAgree` relation, and the capstone `WitgenIR.eval_congr`) is recoverable from git history at `73fab103`. **Follow-up at the next re-pin: check whether Clean's `computable_witnesses` tactic discharges what our five bespoke per-gadget congruence lemmas do — and with them the last five `-Witgen.u64Wrap` disable sites.** |
+| `Circuit/WitnessCombinator` (U10) | **Don't file the combinator — file the one-attribute ask.** See U10. |
+
+**The migration this schedules.** When #426/#448/#451 land, the next Clean pin bump is a real
+piece of work, not a version string: `WitgenIR.ofFExprs` is renamed to `ofCompositeFExpr` (breaking
+`Circuit/WitgenEval`), `FormalCircuitBase` gains a `computableWitnesses` field discharged by an
+autoparam tactic (every chip's bundle), the free-standing
+`FormalCircuitBase.compose_computableWitnesses` and `Circuit.subcircuit_computableWitnesses` are
+deleted (breaking `Circuit/WitgenBridge`'s 15 call sites), and #451 changes the struct/vector
+`eval` normal form by discriminating *literal* from *opaque* subjects. Budget for all 25
+`Proofs/Chips/*/Witgen.lean` plus the two ToClean files. Nothing here blocks us today — the pin is
+stable — but it is scheduled work, and letting the fork drift further raises its cost.
+
+**#451 is upstream's answer to our own recorded design discussion** (see "Design discussion, not a
+patch" below): rather than picking an orientation for `eval_eq_eval`, they discriminate literal
+from opaque subjects so both orientations coexist confluently. Our 303-occurrence
+`← ProvableStruct.eval_eq_eval` census is therefore *input to #451*, not a fresh problem report.
+
 ## The queue
 
 Ordered by leverage, not by size. Each entry records what it unblocks and the measurement behind it,
 because two of them looked obvious on a code read and turned out to need a different fix than the one
 I first specified — see the "sizing correction" notes.
 
-### U1 · `ProverEnvironment.AgreesBelow` should constrain `data` and `hint` — **landed in the fork**
+### U1 · `ProverEnvironment.AgreesBelow` should constrain `data` and `hint` — **FILED: PR #450, approved, pending merge**
+
+> **Status (2026-08-19).** `Verified-zkEVM/clean#450` is OPEN, **approved by mitschabaude on
+> 2026-08-14**, `mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`, and still unmerged. The
+> maintainer's comment: *"yes this is needed and #426 which should land soon also has this change."*
+> Two things to carry into any nudge: (1) **the conjunct order differs** — #426 has
+> `hint ∧ data`, #450 has `data ∧ hint`, so whichever merges second rebases by swapping two
+> conjuncts (and deciding whether to keep #450's `.get_eq`/`.data_eq`/`.hint_eq` accessors and
+> `agreesBelow_rfl`, which #426 does not add); (2) **`Clean/Examples/DataWitness.lean` is unique to
+> #450** — #426's 80 files do not include it, and it carries `not_computable_from_cells_alone`, the
+> in-tree *proof* that the old obligation was false rather than merely awkward. #426 also unfolds
+> `AgreesBelow` under `circuit_norm`/`grind`, which #450 deliberately does not.
 
 `Clean/Circuit/Basic.lean:424`. A `ProverEnvironment` has three channels a witness generator can
 read: cells (`get`), committed data (`data`, via `FExpr.dataGet`) and prover hints (`hint`, via
@@ -304,6 +374,17 @@ If a combinator does turn out to be right, the minimal upstream shape is to inli
 `inferInstanceAs` delegation at `Explicit.lean:361-363`), replaced by a 5-line explicit instance
 modelled on `witnessVector`'s at `Explicit.lean:343`.
 
+> **Sizing correction (2026-08-19): the lemma already exists upstream — with the wrong attribute.**
+> PR #426's branch carries `@[grind norm] theorem size_fields (n : ℕ) : size (fields n) = n := rfl`
+> in `Clean/Circuit/Provable.lean` (absent from `main`). `@[grind norm]` fires inside `grind` —
+> which is what their `computable_witnesses` tactic uses — and **not** under
+> `simp only [circuit_norm]`, which is precisely where our structural anchors stall. So the ask
+> shrinks from "upstream a combinator" to "**also tag it `@[simp, circuit_norm]`**", and if that
+> lands, `ToClean/Circuit/WitnessCombinator.lean` is *deleted*, not upstreamed. The house rule
+> still applies before filing even that: reproduce one stall and name the tactic that fails to
+> unfold `size`, because `size` is already `@[circuit_norm]` and it is not yet established that our
+> stalls were ever attributable to this lemma's absence rather than to narrower `simp only` lists.
+
 ### U11 · `WitgenIR.share` — subterm sharing for serialized witness programs — **landed in the fork**
 
 The wire format has always had `steps`/`localVar` sharing, but nothing produced it: the serializer
@@ -328,11 +409,39 @@ stock — until the re-pin, `scripts/witgenExport.lean:55` keeps its local copy)
 `doc/witgen-wire-format.md` (adapted from this repo's spec — upstream has no wire format spec at
 all; `doc/witgen-authoring.md` covers only the authoring surface, and its dangling
 `witgen-ir-plan.md` pointer is fixed in the same commit). Ready-to-file issue/PR texts:
-`upstream-drafts.md` (posting is owner-gated). Adjacent upstream context: issue #404 (the requested
-Rust interpreter needs shared programs to evaluate at sane cost); our `rust/witgen-interp` is a
-working reference implementation of the format and is on offer there. **This is the single
-Clean-side prerequisite for the exported artifacts to be producible from stock upstream Clean** —
-U1 is orthogonal to the exporter path.
+`upstream-drafts.md` (posting is owner-gated). **This is the single Clean-side prerequisite for the
+exported artifacts to be producible from stock upstream Clean** — U1 is orthogonal to the exporter
+path.
+
+> **Re-scoped 2026-08-19, after reading upstream's live line** (see "Clean's direction" above).
+> Three changes to how this gets filed:
+>
+> 1. **The framing moves from JSON size to generated-Rust size and speed.** #446 retires the JSON
+>    *interpreter*, but their codegen renders each `Witgen.Step` one-for-one as `let local_N: F = …`
+>    and does **no CSE at all** — so the pass buys them exactly what it buys us, on the path they
+>    are actually building. The `doc/witgen-wire-format.md` rider is dropped from the PR (it stays
+>    ours), and the #404 interpreter offer is withdrawn.
+> 2. **The rebase target is their live branch, not `main`.** Stacking on feature bases is
+>    idiomatic there (several merged PRs target `halo2-clean-2` / `agent/*`), and rebasing onto
+>    `agent/fixed-columns-prover-data` is what demonstrates the pass against the IR they now have.
+> 3. **The rebase debt is real and is the work**, not a formality:
+>    - three new `FExpr` constructors — `.index`, `.listGetAtIndex`, `.proverInputGet` — need
+>      `shareF`/`remapF` cases, `beq`/`hashCode` arms, and matching spec cases;
+>    - `evalSteps` gains `idx` and `proverInput` parameters, threading through the ~8 step lemmas
+>      and `eval_share`;
+>    - **the `idx` question must be answered, not papered over.** Our `shareU` rewrites
+>      `.idx → .const 0` in shared positions, justified because every position the traversal
+>      reaches evaluates at `idx = 0`. #446 adds `RowProgram`, whose steps evaluate at
+>      `idx := row`, and `.index`/`.listGetAtIndex` are idx-dependent for the same reason. The
+>      premise survives for `WitgenIR` (`witnessBlockToRust` still passes `"0u64"`) but not for row
+>      programs. Either intern only idx-independent subterms or thread the index — and if row
+>      programs prove deep, ship the pass *restricted to `WitgenIR`* with the restriction stated
+>      and proved, rather than an unsound generalization.
+>
+> The strongest available demo is wiring `share` into `Lower.lean`'s `lowerWitness` before its
+> existing `witnessProgramWellFormed` check — which then simply re-runs on the shared program, so
+> the integration costs no new proof obligation — and showing the generated-Rust delta on a
+> duplication-heavy gadget from their own tree.
 
 ## Design discussion, not a patch
 
@@ -343,6 +452,15 @@ orientations of one equation cannot both live in a confluent simp set. The evide
 **303 occurrences of `← ProvableStruct.eval_eq_eval` / `← ProvableType.getElem_eval_fields` across 33
 files**, all manually undoing the chosen normal form. That number is worth showing Clean's maintainers,
 but it is a conversation to open, not a patch to send.
+
+> **Upstream got there first, and with a better answer (2026-08-19).** Draft PR #451 ("Confluent
+> vector/struct eval layer — discriminated literal/atom simprocs", updated 08-16) replaces the
+> unconditional `eval_vector`/`eval_fields` membership in `circuit_norm` with a *discriminated*
+> design: `vectorEvalLiteral` handles constructed subjects (inward), `vectorAtomLift` handles
+> opaque-rooted subjects (outward). So the two orientations do not have to fight for one simp set —
+> they apply to syntactically disjoint subject classes. Our census is therefore **corpus evidence
+> for #451**, not a new problem statement; the useful contribution is which orientation consumers
+> actually reach for, on 303 real sites.
 
 ## Not a Clean matter
 

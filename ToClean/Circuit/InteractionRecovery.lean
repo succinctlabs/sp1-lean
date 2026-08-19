@@ -13,7 +13,25 @@ and `Subcircuit.ChannelsLawful` (available via every `ElaboratedCircuit`'s
 `subcircuitChannelsLawful`) records that a subcircuit's flat channels are ⊆ its declared
 `channelsWith{Guarantees,Requirements}`. So a channel outside both declared lists matches no flat
 interaction — the filter is empty and the subcircuit drops out.
-`interactionsWith_formalSubcircuit_eq_nil` packages exactly that, per `FormalCircuit`. -/
+`interactionsWith_formalSubcircuit_eq_nil` packages exactly that, per `FormalCircuit`.
+
+## Upstream
+
+Destined for `Clean/Circuit/Subcircuit.lean`, beside `interactionsWith_subcircuit` and
+`Subcircuit.ChannelsLawful` — the two facts this file composes.
+
+What exists upstream: `interactionsWith_subcircuit` (a subcircuit's interactions on a channel are
+the filtered flattened list) and `Subcircuit.ChannelsLawful` (flat channels ⊆ the declared
+interface). What is missing: the *corollary* that the two together make the list `[]` whenever the
+channel is outside the declared interface. Every multi-bus project needs it — the moment a circuit
+composes a subcircuit that touches a different bus, recovering "emitted = projection" on the
+original bus requires exactly this step — but nothing upstream states it, so each consumer proves
+it inline. The four wrapper kinds (`FormalCircuit`, `FormalAssertion`, `GeneralFormalCircuit`,
+`GeneralFormalCircuit.WithHint`) each need their own restatement because the `Subcircuit` is built
+by a different constructor in each case; that repetition is the file's bulk and would be the same
+upstream.
+
+Acceptance is a plain deletion here plus a repoint of importers to `Clean.*`. -/
 
 namespace InteractionRecovery
 

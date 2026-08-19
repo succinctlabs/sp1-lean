@@ -26,6 +26,20 @@ not a trusted component — its value is demonstrating that the exported artifac
 sufficient to reproduce SP1's real traces, which is the load-bearing step toward SP1
 consuming the verified witness generators directly (see `docs/rust-integration-memo.md`).
 
+## Where the copy-of-record lives
+
+There are two byte-identical copies of `witgen-interp/src/`: this one and the vendored copy at
+`crates/core/compiler/witgen-interp/` in the pinned SP1 extraction branch. **This one is the
+development source; the SP1 copy is the copy-of-record for the SP1-side conformance check**, which
+must be able to run with no dependency on this repo. Changes are made here and re-vendored.
+
+Upstream Clean was a third candidate home — its issue #404 asks for exactly this interpreter — but
+that ask is superseded: Clean's live branch compiles the witness IR to Rust source instead of
+interpreting serialized JSON, and deletes the JSON-consuming backend outright. Contributing the
+interpreter there would hand them something they are in the middle of removing, so it stays ours.
+The reasoning and evidence are recorded in `docs/agents/clean-upstream.md`
+("Clean's direction (2026-08)").
+
 ## Building and running
 
 Plain cargo, no workspace. The full battery (unit tests for every documented semantics

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # vendor_witgen_artifacts.sh — sync the witness-generation export into the SP1 tree.
 #
-# The SP1-side conformance test (`crates/core/compiler/tests/witgen_conformance.rs`)
+# The SP1-side conformance check (`crates/core/compiler/conformance-check/`)
 # checks the vendored artifacts against the live prover's `generate_trace` output, so
 # the vendored tree must be an exact copy of this repo's committed `export/witgen/`
 # (25 `<Chip>.witgen.json` + 25 `<Chip>.rowmap.json` + 25 `<Chip>.manifest.json` +
