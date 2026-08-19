@@ -5,7 +5,8 @@
 hand-edited fork**: the pinned Sail compiler run over the pinned `riscv/sail-riscv` sources with
 the SP1 platform configuration `scripts/sail-config/sp1_rv64d_cfg.json`. It equals the opencompl
 daily snapshot **`11d8fa21`** everywhere except the six platform-value sites the config sets.
-The maintained object is therefore a four-key config delta plus four pins — not patched Lean.
+The maintained object is therefore a four-key config delta plus the five pins recorded in
+`scripts/sail-config/generate_lean_rv64d.sh` — not patched Lean.
 
 The full provenance record (compiler SHA, model SHA, config hash, invocation, environment,
 verification) lives in the snapshot's own commit message; the pins are also recorded in
@@ -39,8 +40,8 @@ CLINT-enabled model would be verifying a different machine.
 `pmpMatchAddr` returns `PMP_NoMatch` for every entry and the M-mode tail yields `none` — the same
 answer. So every downstream conclusion stays **true**; only the helper needs restating, with
 `priv := Machine`, a `pmpcfg_n = 0` field added to `isValidMemConfig` (one register of type
-`Vector (BitVec 8) 64`, so one hypothesis), and a 16-iteration `SailME` loop peel. Estimated a few
-hundred lines and a heartbeat-heavy peel — and it is the same *kind* of unconstrained-boot-register
+`Vector (BitVec 8) 64`, so one hypothesis), and a loop invariant over the 16 entries — measured
+below at ~40 lines, not the peel first feared. It is the same *kind* of unconstrained-boot-register
 assumption `isValidMemConfig` already carries for `mstatus.MPRV`, `mseccfg` and
 `htif_tohost_base`, not a new class of trust. There is also a faithfulness leg (stock defines 16
 `pmpcfg*`/`pmpaddr*` CSRs, so a guest `csrw pmpcfg0` would succeed there and trap here), but SP1
