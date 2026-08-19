@@ -245,6 +245,43 @@ another import already provides transitively are pruned (`_prune_transitive_impo
 load/store oracle reaches `RegisterAccessCols` through `ITypeReader`, whose module itself imports
 `RTypeReader`, so no direct `RTypeReader` import is emitted).
 
+## Upstream architecture drift (measured 2026-08-19) — why the pin stays at v6.4.0
+
+SP1's internal line has **replaced the global-accumulation memory-consistency architecture with a
+Merkle-tree one** since our semantic pin. Measured between `v6.4.0` and
+`succinctlabs/sp1-private@main` (`ed1198bd`, 64 commits ahead, 0 behind):
+
+- **`RiscvAir` chips** — removed: `Global`, `MemoryGlobalInit`, `MemoryGlobalFinal`,
+  `PageProtGlobalInit`, `PageProtGlobalFinal`, `SyscallCore`, `SyscallCoreUser`,
+  `SyscallPrecompile`, `SyscallPrecompileUser`. Added: `MerkleTreeTraversal`, `LeafHash`,
+  `LeafHashControl`, `HintReadControl`, `HintRead`.
+- **`InteractionKind`** — removed: `Global`, `GlobalAccumulation`, `MemoryGlobalInitControl`,
+  `MemoryGlobalFinalizeControl`, `PageProtGlobalInitControl`, `PageProtGlobalFinalizeControl`.
+  Added: `MerkleTreeTraversal`, `LeafHash`, `HintRead`.
+
+**What carries over:** all **25 instruction chips** — no file under `alu/`, `control_flow/`,
+`memory/instructions/`, or `utype/` differs — together with the four buses they use (Memory,
+Program, Byte, State). That is the entire native-chip layer: the `GeneralFormalCircuit`s, the
+`ChipFaithful` anchors, the `advance`/Sail bridges, and the grounding contracts.
+
+**What does not:** the 6-table memory-boundary cluster and the syscall system tables — i.e.
+`Extracted/SystemOracle/{Global,MemoryGlobalInit,MemoryGlobalFinalize,SyscallCore,…}`,
+`Extracted/CoreAIRManifest.lean`, and the `FormalModel/CoreProfile.lean` table enum. **The open P1
+item — deriving the native boundary/timestamp facts from the six Core system tables — therefore
+targets a design that upstream is already replacing.** That does not invalidate anything proved
+(our claims are pinned to v6.4.0, a released public tag, and remain true of it), but it changes
+what the next increment should aim at, and it is why a re-pin is a scoped project rather than a
+version bump: re-extract the system/boundary tables, re-derive the memory-boundary relation, and
+re-audit the profile.
+
+Evidence for the mechanics: rebasing the extraction series onto `private/main` applies **textually
+clean** (5 commits, no conflicts) but fails to build with six `E0599`s in the interaction-kind →
+Lean-name mapping in `crates/hypercube/src/ir/lean.rs`. That fix is mechanical; the AIR change
+behind it is not.
+
+**Decision: stay pinned at `v6.4.0`.** It is public, released, externally reproducible, and it is
+in `sp1-private`'s own history — so a branch based on it is still a legitimate PR base there.
+
 ## Future work
 
 - Add `--elf` real-program dumps (`chip_traces --elf` now covers all 25 chip families; committing

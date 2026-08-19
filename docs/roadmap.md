@@ -47,6 +47,20 @@ valid native witness, with assertion and bus-balance transport proved once at th
 
 ### 2. Ground preprocessed and system tables
 
+> **Upstream drift, measured 2026-08-19 — read before sequencing this.** SP1's internal line has
+> replaced the global-accumulation memory architecture with a Merkle-tree one: relative to our
+> `v6.4.0` pin, `RiscvAir` drops `Global`, `MemoryGlobalInit`, `MemoryGlobalFinal`,
+> `PageProtGlobalInit`, `PageProtGlobalFinal` and all four `Syscall*` tables, and gains
+> `MerkleTreeTraversal`, `LeafHash`, `LeafHashControl`, `HintRead`, `HintReadControl`; six
+> `InteractionKind` variants go with them. **The 25 instruction chips and their four buses are
+> untouched**, so P0 §1 and everything under it is unaffected. But several bullets below —
+> `Global`'s boundary/cumulative facts, the syscall tables, and the page-prot boundary — are
+> grounding work aimed at tables that upstream is retiring. Sequence accordingly: prefer the
+> bullets that survive the redesign (Program/Byte/Range/MemoryLocal/MemoryBump/StateBump), and
+> treat the `Global`/syscall/page-prot grounding as pinned-to-v6.4.0 work that a future re-pin
+> will re-derive rather than reuse. Details and evidence:
+> `docs/agents/extraction.md` § "Upstream architecture drift".
+
 Prove the semantic facts currently supplied to `SupportedCoreNativeRelation` from the exact upstream
 tables:
 
