@@ -166,25 +166,51 @@ CMake Error at model/CMakeLists.txt:303 (add_custom_command):
     …/model/Lean_RV64D/LeanRV64D.lean.rule
 ```
 
-### If upstream ships #1879 as-is, three ways out (in cost order)
+### Additive vs substitutive — the actual difference between the two PRs
 
-1. **Post-generation rename, scripted** — generate with `CUSTOM_LEAN_ARCH=SP1`, then have
-   `generate_lean_rv64d.sh` rename the tree back (`Lean_SP1/` → `Lean_RV64D/`, `LeanSP1` →
-   `LeanRV64D` in the generated sources and lakefile) before publishing. This is not the
-   hand-editing this document exists to forbid: it is total, deterministic, and **the existing
-   gates verify it** — under `--stock` the renamed tree must come out byte-identical to the
-   opencompl base, which is exactly a proof that the rename is content-neutral. Nothing else in
-   this repo or in `riscv-lean` changes. ~10 lines in a script we already own.
-2. **Ask for the upstream tweak** (relax the guard when the custom family replaces the default, or
-   add a `CUSTOM_LEAN_OUTPUT`). Cheapest of all if accepted — nobody pays anything.
-3. **Rename our architecture to `Lean_SP1`/`LeanSP1`.** The 161 generated files are free (the
-   generator emits the new name consistently), and our own 586 references across 64 files are a
-   mechanical sed plus a full rebuild. The real cost is `riscv-lean`: its sources name `LeanRV64D`
-   in 4 files / 118 refs (`Skeleton`, `SailToRV64`, `SailPureToInstructions`, `SailPure`) and its
-   lakefile requires the package by that name, so we would have to fork it permanently — upstream
-   opencompl will not import an SP1-specific model. Today that fork is disposable chores, pinned at
-   opencompl PR #59 and slated for deletion when #59 merges. Option 3 is worth taking only if we
-   want the `SP1` name for its own sake.
+`riscv-lean` is not being inflexible; it consumes the *stock* model under the name upstream derives
+for it (`arch = rv64d` → `string(TOUPPER)` → `Lean_RV64D` / `LeanRV64D`), and `open
+LeanRV64D.Functions` / `LeanRV64D.readReg` follow from that. The unusual party is us: we do not
+want a *new* model, we want the *same* model *differently configured*, dropped in under the same
+name so every consumer picks it up unchanged. **The package name is the substitution seam.**
+
+- **#1879 is additive** — "build a custom Lean model *alongside* the standard ones". Its
+  `FATAL_ERROR` is not an oversight, it enforces that worldview; the collision test above shows it
+  is guarding something real.
+- **#1861 is substitutive** — the override *replaces* the default arch list, so nothing collides,
+  and the arch name comes from the config file's stem.
+
+There is no way to express substitution inside #1879's model. So we express it *outside* CMake.
+
+### The plan: consume #1879 as shipped, substitute after generation
+
+**Chosen approach** (2026-08-19). When #1879 lands, `generate_lean_rv64d.sh` generates with
+`-DCUSTOM_LEAN_ARCH=SP1 -DCUSTOM_LEAN_CONFIG=<abs path to sp1_rv64d_cfg.json>` and then renames the
+emitted tree back — `Lean_SP1/` → `Lean_RV64D/`, `LeanSP1.lean` → `LeanRV64D.lean`, and
+`Lean_SP1`/`LeanSP1` → `Lean_RV64D`/`LeanRV64D` in every file including the generated lakefile.
+Nothing else changes: not `riscv-lean`, not our 586 references, not the published package name.
+
+This is **not** the hand-editing this document exists to forbid. It is total, deterministic,
+scripted, and *verified*:
+
+- **Measured on the real snapshot** (171 files, 166 mentioning the name): renaming
+  `RV64D → SP1` leaves **zero** residual `RV64D` strings and zero residual paths, and renaming back
+  reproduces the tree **byte-identically**. The name is cleanly separable from the content.
+- The `--stock` leg does not even need the rename — it keeps using upstream's own untouched
+  `generated_lean_rv64d` target — so byte-identity against the opencompl base still gates the
+  pipeline exactly as today, and the `--sp1` leg's "exactly six sites differ" audit is unchanged.
+
+It is also a net *improvement* on the status quo: it retires the `cp $CFG` + hash-guard hack, which
+mutates the stock config in place and needs a checksum to prove cmake did not regenerate it
+mid-build.
+
+**The alternative we are not taking**: renaming our architecture to `Lean_SP1` outright. The 161
+generated files would be free (the generator emits the new name consistently) and our own 586
+references across 64 files are a mechanical sed — but `riscv-lean` names `LeanRV64D` in 4 of its
+own files (118 refs: `Skeleton`, `SailToRV64`, `SailPureToInstructions`, `SailPure`) and requires
+the package by that name, so we would have to fork it **permanently**; opencompl will not import an
+SP1-specific model. That fork is currently disposable chores, pinned at opencompl PR #59 and slated
+for deletion when #59 merges. Only worth it if we ever want the `SP1` name for its own sake.
 
 The sibling `succinctlabs/riscv-lean` fork is only toolchain/dependency chores; it is pinned at
 `d1d678c6`, the head of the open opencompl PR #59 ("chore: update to v4.32.2"). Repoint

@@ -101,44 +101,39 @@ lemmas — they default. Full detail in `clean-upstream.md` § U11.
 
 ## Draft 3 — reply on riscv/sail-riscv #1861 ("would #1879 do what you want?")
 
-Answering @pmundkur's 2026-08-18 question. Verdict: **almost, but not as written** — #1879 gives
-the same capability under a naming scheme that cannot produce the one package name we need. Full
-reasoning and the verification in `sail-model-provenance.md`; both PRs are open and unmerged, so
-nothing is blocked either way.
+Answering @pmundkur's 2026-08-18 question. Verdict: **yes, with a local rename on our side** — we
+consume #1879 as shipped and do the substitution outside CMake, rather than ask upstream to model
+our case. Reasoning, the collision test, and the round-trip measurement are in
+`sail-model-provenance.md` § "additive vs substitutive". Neither PR is merged, so nothing is
+blocked either way.
 
-> Thanks — #1879 is a nicer refactor than mine, and I'd be glad to close this in its favour. It
-> doesn't quite cover our case as written, for one reason:
+> Thanks for the pointer — yes, #1879 works for us, and it's a nicer refactor than mine. I'm happy
+> to close this one in its favour.
 >
-> `add_lean_targets` derives both the output directory and the module name from `CUSTOM_LEAN_ARCH`
-> (`-o "Lean_${arch_uppercase}"`), and the guard forbids the only value that works for us:
+> For the record, since it may come up again: what we need is slightly unusual. We're not adding a
+> new architecture; we're building the *same* `rv64d` model under a different platform config (four
+> keys — CLINT and the simple interrupt generator off, PMP count zero) and substituting it for the
+> stock one, so that downstream consumers pick it up unchanged. Since Lake identifies packages by
+> name and `riscv-lean` requires `Lean_RV64D`, the package name is the substitution seam, and
+> `CUSTOM_LEAN_ARCH` necessarily renames it. (The case-sensitive guard does let `RV64D` through, but
+> then the default family's rule collides — `Attempt to add a custom rule to output
+> .../Lean_RV64D/LeanRV64D.lean.rule` — so that's not a way in, and the guard is doing its job.)
 >
-> ```cmake
-> if ((${CUSTOM_LEAN_ARCH} STREQUAL "rv32d") OR (${CUSTOM_LEAN_ARCH} STREQUAL "rv64d"))
->     message(FATAL_ERROR ...)
-> ```
+> That's fine: we can rename the emitted tree back on our side after generation. I checked it's
+> clean — on our 171-file snapshot the rename leaves no residue in either direction and round-trips
+> byte-identically, so it doesn't weaken the check we use to show our model differs from stock only
+> at the config-driven sites. No changes needed in #1879 for our sake.
 >
-> We need the generated package to stay `Lean_RV64D` / `LeanRV64D`. It isn't cosmetic: Lake dedups
-> dependencies by package name, and `riscv-lean` transitively requires a package literally named
-> `Lean_RV64D`. If our config-generated copy is named anything else, Lake satisfies that other
-> requirement from upstream's floating default model *as well*, and the build ends up with two
-> incompatible copies of the model namespace — one of them the stock configuration our config
-> exists to change. (It would also rename ~1000 identifiers across the 161 generated files and
-> break the byte-identity check we use to show the delta is four config keys rather than hand
-> edits.)
+> Two small things worth fixing there anyway, both independent of us:
 >
-> Two ways to cover it, either fine by me:
-> - let a custom config **replace** the `rv32d`/`rv64d` family rather than adding to it — that's
->   what this PR does by taking the arch name from the config file's stem; or
-> - decouple output name from arch name (a `CUSTOM_LEAN_OUTPUT`, say), so
->   `-DCUSTOM_LEAN_ARCH=SP1 -DCUSTOM_LEAN_OUTPUT=Lean_RV64D` is expressible.
->
-> Two smaller notes on #1879 while it's open:
 > - `set(CACHE{VAR} …)` was added in CMake 4.2, but the project baseline is 3.20 and CI runs 3.20.0
->   and 4.1.2. On those it sets ordinary variables named `CACHE{CUSTOM_LEAN_ARCH}` rather than cache
->   entries, so `CUSTOM_LEAN_ARCH` has no default and `-DCUSTOM_LEAN_CONFIG=…` alone fails to
->   configure on the `STREQUAL` line. CI is green because no job exercises the custom path.
-> - This PR also adds `${config_file}` to `DEPENDS` for the SMT/rmem/Rocq rules (the Lean rules
->   already had it); worth carrying over so a config edit doesn't leave stale formal output.
+>   and 4.1.2. On those it should set ordinary variables named `CACHE{CUSTOM_LEAN_ARCH}` rather than
+>   cache entries, leaving `CUSTOM_LEAN_ARCH` with no default, so `-DCUSTOM_LEAN_CONFIG=…` on its
+>   own would fail to configure on the `STREQUAL` line. CI stays green because no job exercises the
+>   custom path. (I could only test on 4.3.2, where it's fine.)
+> - This PR also adds `${config_file}` to `DEPENDS` for the SMT/rmem/Rocq rules — the Lean rules
+>   already had it — so editing a config doesn't leave stale formal output. Worth carrying over,
+>   and I'm happy to send it as a standalone one-liner if that's easier than keeping this open.
 
 ## Held deliberately (recorded so it is a decision, not an oversight)
 
