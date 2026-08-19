@@ -15,10 +15,7 @@ rider is withdrawn, and the #404 interpreter offer is withdrawn.
 
 ---
 
-## Draft 1 — comment on PR #450 (nudge) — **STILL UNPOSTED**
-
-> Attempted 2026-08-19; `gh pr comment` is blocked by the local permission classifier. The text
-> below is final — it needs the owner to paste it, or a permission rule for `gh pr comment`.
+## Draft 1 — comment on PR #450 (nudge) — **POSTED 2026-08-19**
 
 > This is approved and mergeable; happy to rebase whenever it is convenient.
 >
@@ -99,41 +96,15 @@ lemmas — they default. Full detail in `clean-upstream.md` § U11.
 
 ---
 
-## Draft 3 — reply on riscv/sail-riscv #1861 ("would #1879 do what you want?")
+## Draft 3 — riscv/sail-riscv #1861 / #1885 — **DONE 2026-08-19**
 
-Answering @pmundkur's 2026-08-18 question. Verdict: **yes, with a local rename on our side** — we
-consume #1879 as shipped and do the substitution outside CMake, rather than ask upstream to model
-our case. Reasoning, the collision test, and the round-trip measurement are in
-`sail-model-provenance.md` § "additive vs substitutive". Neither PR is merged, so nothing is
-blocked either way.
-
-> Thanks for the pointer — yes, #1879 works for us, and it's a nicer refactor than mine. I'm happy
-> to close this one in its favour.
->
-> For the record, since it may come up again: what we need is slightly unusual. We're not adding a
-> new architecture; we're building the *same* `rv64d` model under a different platform config (four
-> keys — CLINT and the simple interrupt generator off, PMP count zero) and substituting it for the
-> stock one, so that downstream consumers pick it up unchanged. Since Lake identifies packages by
-> name and `riscv-lean` requires `Lean_RV64D`, the package name is the substitution seam, and
-> `CUSTOM_LEAN_ARCH` necessarily renames it. (The case-sensitive guard does let `RV64D` through, but
-> then the default family's rule collides — `Attempt to add a custom rule to output
-> .../Lean_RV64D/LeanRV64D.lean.rule` — so that's not a way in, and the guard is doing its job.)
->
-> That's fine: we can rename the emitted tree back on our side after generation. I checked it's
-> clean — on our 171-file snapshot the rename leaves no residue in either direction and round-trips
-> byte-identically, so it doesn't weaken the check we use to show our model differs from stock only
-> at the config-driven sites. No changes needed in #1879 for our sake.
->
-> Two small things worth fixing there anyway, both independent of us:
->
-> - `set(CACHE{VAR} …)` was added in CMake 4.2, but the project baseline is 3.20 and CI runs 3.20.0
->   and 4.1.2. On those it should set ordinary variables named `CACHE{CUSTOM_LEAN_ARCH}` rather than
->   cache entries, leaving `CUSTOM_LEAN_ARCH` with no default, so `-DCUSTOM_LEAN_CONFIG=…` on its
->   own would fail to configure on the `STREQUAL` line. CI stays green because no job exercises the
->   custom path. (I could only test on 4.3.2, where it's fine.)
-> - This PR also adds `${config_file}` to `DEPENDS` for the SMT/rmem/Rocq rules — the Lean rules
->   already had it — so editing a config doesn't leave stale formal output. Worth carrying over,
->   and I'm happy to send it as a standalone one-liner if that's easier than keeping this open.
+Answered @pmundkur's "would #1879 do what you want?" by rewriting #1861 rather than closing it.
+#1879 is additive (a custom model *alongside* `rv32d`/`rv64d`, named by `CUSTOM_LEAN_ARCH`); we need
+substitution, because Lake dedups by package name and `riscv-lean` requires `Lean_RV64D`. Rather
+than rename locally, #1861 now carries the ~10-line per-arch `SAIL_FORMAL_CONFIG_<ARCH>` override
+that sits in the default loop and composes with #1879 either way; the `${config_file}` `DEPENDS`
+additions split out as #1885. Both filed, comment posted. Reasoning and the local verification are
+in `sail-model-provenance.md`.
 
 ## Held deliberately (recorded so it is a decision, not an oversight)
 

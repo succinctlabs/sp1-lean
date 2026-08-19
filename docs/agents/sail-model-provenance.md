@@ -119,10 +119,11 @@ symbolically-reduced generated internals, independently of the config:
    `plat_{me,mi}deleg_delegatable_bits` from all-ones to masks. `try_step`, `fetch`,
    `ext_decode`, and the `execute_*` functions were unchanged.
 
-An upstream `SAIL_FORMAL_CONFIG` CMake option (riscv/sail-riscv PR #1861) will replace the
-script's config-overwrite step with a plain `-D` flag when it lands. Both it and the competing
-#1879 are **open and unmerged**; upstream `master` (`8f91355e`, 2026-08-14) has neither, so the
-`cp $CFG` + hash-guard pipeline stays as documented and nothing here is blocked on either.
+An upstream CMake option will replace the script's config-overwrite step with a plain `-D` flag
+when it lands: **riscv/sail-riscv [#1861](https://github.com/riscv/sail-riscv/pull/1861)**, since
+2026-08-19 reduced to a per-arch `SAIL_FORMAL_CONFIG_<ARCH>` override (see below). It and the
+related #1879 are **open and unmerged**; upstream `master` (`8f91355e`, 2026-08-14) has neither, so
+the `cp $CFG` + hash-guard pipeline stays as documented and nothing here is blocked on either.
 
 **Why the generated package must keep the name `Lean_RV64D` / `LeanRV64D`** (checked 2026-08-19,
 prompted by pmundkur asking on #1861 whether #1879 covers our use case). #1879 — "Refactor cmake
@@ -182,35 +183,48 @@ name so every consumer picks it up unchanged. **The package name is the substitu
 
 There is no way to express substitution inside #1879's model. So we express it *outside* CMake.
 
-### The plan: consume #1879 as shipped, substitute after generation
+### The plan: get the substitution knob upstream, then delete the config hack
 
-**Chosen approach** (2026-08-19). When #1879 lands, `generate_lean_rv64d.sh` generates with
-`-DCUSTOM_LEAN_ARCH=SP1 -DCUSTOM_LEAN_CONFIG=<abs path to sp1_rv64d_cfg.json>` and then renames the
-emitted tree back — `Lean_SP1/` → `Lean_RV64D/`, `LeanSP1.lean` → `LeanRV64D.lean`, and
-`Lean_SP1`/`LeanSP1` → `Lean_RV64D`/`LeanRV64D` in every file including the generated lakefile.
-Nothing else changes: not `riscv-lean`, not our 586 references, not the published package name.
+**Chosen approach** (2026-08-19, revised the same day). Rather than absorb the renaming locally, ask
+for the ~10 lines upstream that make it unnecessary. #1861 was rewritten to exactly that and the
+`DEPENDS` half split out as [#1885](https://github.com/riscv/sail-riscv/pull/1885):
 
-This is **not** the hand-editing this document exists to forbid. It is total, deterministic,
-scripted, and *verified*:
+```cmake
+    string(TOUPPER ${arch} arch_uc)
+    set(SAIL_FORMAL_CONFIG_${arch_uc} "" CACHE FILEPATH
+        "Configuration JSON the ${arch} formal backends are generated from instead of the default.")
+    if (SAIL_FORMAL_CONFIG_${arch_uc})
+        set(config_file "${SAIL_FORMAL_CONFIG_${arch_uc}}")
+        message(STATUS "Formal backends: ${arch} uses ${config_file}")
+    endif()
+```
 
-- **Measured on the real snapshot** (171 files, 166 mentioning the name): renaming
-  `RV64D → SP1` leaves **zero** residual `RV64D` strings and zero residual paths, and renaming back
-  reproduces the tree **byte-identically**. The name is cleanly separable from the content.
-- The `--stock` leg does not even need the rename — it keeps using upstream's own untouched
-  `generated_lean_rv64d` target — so byte-identity against the opencompl base still gates the
-  pipeline exactly as today, and the `--sp1` leg's "exactly six sites differ" audit is unchanged.
+It sits in the default `foreach (xlen …)` loop, which already funnels every formal backend through
+one `config_file`, so it covers SMT/rmem/Rocq/Lean/Lem at once, adds no targets, renames nothing,
+and is **inert unless set** — so it applies to `master` as-is *and* unchanged on top of #1879's
+refactor. **Verified locally at master `8f91355e`**: configuring without the flag leaves the build
+rules unchanged; with it, the `generated_lean_rv64d` rule becomes
+`sail … --config /abs/path/to/config.json --lean … -o Lean_RV64D` — our config, upstream's name,
+upstream's target.
 
-It is also a net *improvement* on the status quo: it retires the `cp $CFG` + hash-guard hack, which
-mutates the stock config in place and needs a checksum to prove cmake did not regenerate it
-mid-build.
+When it lands, `--sp1` becomes one `-D` flag and the `cp` + `H0`/`H1` hash guard are deleted
+outright: `OUT`, the target name, the output path and the published package name are all unchanged,
+so there is no rename step and no downstream churn. **Expect one objection** — substitution means an
+artifact labelled `rv64d` need not come from the stock `rv64d` config, which is presumably why
+#1879 guards the standard names. It is opt-in behind an explicit `-D` and logged at configure time.
 
-**The alternative we are not taking**: renaming our architecture to `Lean_SP1` outright. The 161
+**The alternatives we are not taking.** *Renaming our architecture to `Lean_SP1`* — the 161
 generated files would be free (the generator emits the new name consistently) and our own 586
-references across 64 files are a mechanical sed — but `riscv-lean` names `LeanRV64D` in 4 of its
-own files (118 refs: `Skeleton`, `SailToRV64`, `SailPureToInstructions`, `SailPure`) and requires
-the package by that name, so we would have to fork it **permanently**; opencompl will not import an
+references across 64 files are a mechanical sed, but `riscv-lean` names `LeanRV64D` in 4 of its own
+files (118 refs: `Skeleton`, `SailToRV64`, `SailPureToInstructions`, `SailPure`) and requires the
+package by that name, so we would have to fork it **permanently**; opencompl will not import an
 SP1-specific model. That fork is currently disposable chores, pinned at opencompl PR #59 and slated
-for deletion when #59 merges. Only worth it if we ever want the `SP1` name for its own sake.
+for deletion when #59 merges. *Generating as `SP1` and renaming the emitted tree back* — measured
+and it works (on the real 171-file snapshot the rename leaves zero residue in either direction and
+round-trips byte-identically), but a find-and-replace across generated output is a maintenance
+hazard we would own forever, and it weakens the "generated, never hand-edited" provenance story.
+Both stay on the shelf in case upstream declines substitution outright; the fallback of first
+resort is simply keeping the `cp` + hash guard, which works.
 
 The sibling `succinctlabs/riscv-lean` fork is only toolchain/dependency chores; it is pinned at
 `d1d678c6`, the head of the open opencompl PR #59 ("chore: update to v4.32.2"). Repoint
