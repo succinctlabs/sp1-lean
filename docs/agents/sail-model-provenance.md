@@ -13,17 +13,45 @@ verification) lives in the snapshot's own commit message; the pins are also reco
 
 ## Why the SP1 configuration is required
 
-Not for convenience — for soundness of the statements. SP1's address chips bound every memory
-access to `[2^16, 2^48)`. Two upstream device windows lie **inside** that range:
+The two **platform-device** keys are required for soundness of the statements; the two **PMP**
+keys are not, and the distinction is worth stating precisely (audited 2026-08-19).
 
-- CLINT: `[0x0200_0000, 0x020C_0000)`
-- signature: `[0x0C00_0000, 0x0C00_0020)`
+**CLINT and the interrupt generator — soundness- and faithfulness-necessary.** SP1's address
+chips bound every memory access to `[2^16, 2^48)`, and two upstream device windows lie **inside**
+that range: CLINT at `[0x0200_0000, 0x020C_0000)` and the simple interrupt generator at
+`[0x0C00_0000, 0x0C00_0020)`. With the devices enabled, a Sail access in either window routes to
+the device rather than to RAM, and `run_within_mmio_readable_mmio` /
+`run_within_mmio_writable_mmio` (`Model/SailMemory.lean`) are then **false as stated** — they
+quantify over `reg_val`, `offset` and `width` with no range side-condition and conclude
+`.ok false s`, so `reg_val := 0x0200_0000` refutes them. Not merely unproved. Their fan-out is
+not confined to the memory chips: through `run_checked_mem_read_four_bytes_fetch_of_isInitialized`
+they reach the **instruction-fetch** reduction and hence every chip's `advance` obligation, all 25,
+up to `Soundness/AdvanceDispatch.lean`'s `chipRows_advance_sound`. Recovering them would need a
+per-access disjointness hypothesis that SP1's AIR does not derive — a new trust assumption — and
+would exclude guest programs that legitimately touch those addresses. Independently, SP1
+implements neither device: `clint`, `mtimecmp`, `pmpcfg` and `pmpaddr` appear **nowhere** in its
+Rust tree, and its only `Interrupt` type is a synchronous trap code. Verifying against a
+CLINT-enabled model would be verifying a different machine.
 
-With `plat_have_clint = true`, a Sail access in the CLINT window is routed to the device rather
-than to RAM, so the memory-bridge lemmas in `SP1Clean/Model/SailMemory.lean` are **false as
-stated** — not merely unproved. Recovering them would need a disjointness hypothesis that SP1's
-AIR does not derive, i.e. a new trust assumption. Turning the devices off is what makes the
-existing statements true.
+**`memory.pmp.count = 0` — provability, not soundness.** It is consumed by exactly one lemma,
+`run_pmpCheck_none` (`Model/SailMemory.lean`), at three call sites, all of which instantiate
+`priv := Privilege.Machine`. Under stock (`sys_pmp_count = 16`) with all `pmpcfg` entries OFF,
+`pmpMatchAddr` returns `PMP_NoMatch` for every entry and the M-mode tail yields `none` — the same
+answer. So every downstream conclusion stays **true**; only the helper needs restating, with
+`priv := Machine`, a `pmpcfg_n = 0` field added to `isValidMemConfig` (one register of type
+`Vector (BitVec 8) 64`, so one hypothesis), and a 16-iteration `SailME` loop peel. Estimated a few
+hundred lines and a heartbeat-heavy peel — and it is the same *kind* of unconstrained-boot-register
+assumption `isValidMemConfig` already carries for `mstatus.MPRV`, `mseccfg` and
+`htif_tohost_base`, not a new class of trust. There is also a faithfulness leg (stock defines 16
+`pmpcfg*`/`pmpaddr*` CSRs, so a guest `csrw pmpcfg0` would succeed there and trap here), but SP1
+implements no CSR instructions and no current proof covers one, so that leg is unexercised.
+
+**`memory.pmp.usable_count = 0` — no proof consumes it.** Its disclosure lemma
+`sys_pmp_usable_count_eq_zero` is deliberately not `@[simp]` and has zero uses outside its own
+declaration; its consumers in the model are the CSR-write paths and the config validator, neither
+of which any proof reaches. It is kept because upstream's own `check_pmp` rejects
+`usable_count > count`, so shipping `count = 0` with `usable_count = 16` would be a config the
+model itself reports invalid.
 
 The four top-level generated values (`plat_have_clint`, `plat_have_sig`, `sys_pmp_count`,
 `sys_pmp_usable_count`) are disclosed to the audit surface as `rfl` lemmas in
@@ -46,11 +74,11 @@ numbers drift on every regeneration):
 | Generated site | Config key | Stock → SP1 | Meaning |
 |---|---|---|---|
 | `PlatformConfig.lean` `plat_have_clint` | `platform.clint.supported` | `true → false` | CLINT (core-local interrupt timer) off — SP1 has no timer device |
-| `PlatformConfig.lean` `plat_have_sig` | `platform.simple_interrupt_generator.supported` | `true → false` | Signature output off — SP1 has no test-signature region |
+| `PlatformConfig.lean` `plat_have_sig` | `platform.simple_interrupt_generator.supported` | `true → false` | The MMIO device that injects external interrupts, off — SP1 has no such device and no external interrupts. (`sig` is *simple interrupt generator*, not "signature": `sig_load` returns a version word, `sig_store` sets the external-interrupt-pending bits) |
 | `PmpRegs.lean` `sys_pmp_count` | `memory.pmp.count` | `16 → 0` | No PMP entries — SP1 runs unprotected M-mode. The declared Sail type is `{0, 16, 64}`; 0 is a sanctioned value |
 | `PmpRegs.lean` `sys_pmp_usable_count` | `memory.pmp.usable_count` | `16 → 0` | Upstream's `check_pmp` rejects `usable_count > count`, so the pair moves together |
 | `ValidateConfig.lean` `clint_supported` | `platform.clint.supported` (re-read) | `true → false` | Config validator's CLINT check |
-| `ValidateConfig.lean` `sig_supported` | `platform.simple_interrupt_generator.supported` (re-read) | `true → false` | Config validator's signature check |
+| `ValidateConfig.lean` `sig_supported` | `platform.simple_interrupt_generator.supported` (re-read) | `true → false` | Config validator's interrupt-generator check |
 
 Because the six sites are images of four config keys, the old hand-maintenance invariant ("all
 six must move together or the platform is incoherent") is now structural: the generator reads
