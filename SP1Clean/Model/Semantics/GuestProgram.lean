@@ -95,12 +95,14 @@ structure SailConfigured (s : SailState) : Prop where
   mseccfg_pmm : BitVec.ofNat 2 ((s.regs.get Register.mseccfg (init _)).toNat >>> 32) = 0#2
   /-- No HTIF tohost device. -/
   htif_disabled : s.regs.get Register.htif_tohost_base (init _) = none
+  /-- Every PMP entry is OFF — SP1 implements no CSR instructions, so none can ever be installed. -/
+  pmp_off : s.regs.get Register.pmpcfg_n (init _) = Vector.replicate 64 0#8
   /-- The single fixed SP1 PMA region (bare translation) — the fetch/load address decode. -/
   pma_regions : s.regs.get Register.pma_regions (init _) = [SailMem.SP1_PMA_Region]
 
 /-- The SP1 memory configuration (`isValidMemConfig`) the low-level fetch/load/store lemmas consume,
-reconstructed from the flattened `SailConfigured` fields (`h_cur_privilege` derives from `priv`; the other
-four are the inlined memory-config fields — the flatten deduped the `cur_privilege` fact). -/
+reconstructed from the flattened `SailConfigured` fields (`h_cur_privilege` derives from `priv`; the
+other five are the inlined memory-config fields — the flatten deduped the `cur_privilege` fact). -/
 theorem SailConfigured.toValidMemConfig {s : SailState} (cfg : SailConfigured s) :
     SailMem.SailState.isValidMemConfig s cfg.init where
   h_cur_privilege := by
@@ -110,6 +112,7 @@ theorem SailConfigured.toValidMemConfig {s : SailState} (cfg : SailConfigured s)
   h_mseccfg_pmm := cfg.mseccfg_pmm
   h_htif_disabled := cfg.htif_disabled
   h_pma_regions := cfg.pma_regions
+  h_pmp_off := cfg.pmp_off
 
 /-- A Sail state that "loads" the guest program: a *relation*, not a constructed state, so everything
 the execution doesn't touch stays quantified. ELF ingestion (W6b) produces a `GuestProgram` and a

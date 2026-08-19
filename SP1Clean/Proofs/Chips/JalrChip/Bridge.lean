@@ -64,7 +64,8 @@ theorem correct_jalr_native
       h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_mseccfg_disabled
       h_mseccfg_pmm := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_mseccfg_pmm
       h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_htif_disabled
-      h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_pma_regions }
+      h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_pma_regions
+      h_pmp_off := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_pmp_off }
   have hupd : EStateM.run (update_elp_state (.Regidx rs1)) sp = .ok () sp :=
     update_elp_state_of_isInitialized _ sp hsp_init hsp_config
   have hsp_rs1 : SailState.get_reg? sp rs1 = some rs1_val := by

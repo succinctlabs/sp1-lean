@@ -109,6 +109,12 @@ structure SailState.isValidMemConfig (s : SailState) (hs : SailState.isInitializ
   h_mseccfg_pmm : BitVec.ofNat 2 ((s.regs.get Register.mseccfg (hs _)).toNat >>> 32) = 0#2
   h_htif_disabled : s.regs.get Register.htif_tohost_base (hs _) = none
   h_pma_regions : s.regs.get Register.pma_regions (hs _) = [SP1_PMA_Region]
+  /-- Every PMP entry is OFF. SP1 has no PMP: it implements no CSR instructions at all (its
+  disassembler maps every `process_csrr*` to `Instruction::unimp()`), so nothing can ever install
+  an entry. This is the same kind of unconstrained-boot-register assumption as `h_mprv_disabled`
+  and `h_mseccfg_disabled` above, and it is what lets `run_pmpCheck_none` hold against the stock
+  16-entry PMP rather than requiring the generation config to set `sys_pmp_count = 0`. -/
+  h_pmp_off : s.regs.get Register.pmpcfg_n (hs _) = Vector.replicate 64 0#8
 
 end isValidMemConfig
 

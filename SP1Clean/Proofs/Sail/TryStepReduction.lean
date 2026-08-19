@@ -362,15 +362,15 @@ theorem run_dispatchInterrupt_machine_none_writeMinstret (s : SailState) (hinit 
   · rwa [get_writeMinstret_ne (by decide) s v (hinit _)]
   · rwa [get_writeMinstret_ne (by decide) s v (hinit _)]
 
-/-- `isValidMemConfig` survives the `minstret_increment` write (all five config registers are disjoint). -/
+/-- `isValidMemConfig` survives the `minstret_increment` write (all six config registers are disjoint). -/
 theorem isValidMemConfig_writeMinstret (s : SailState) (hinit : s.isInitialized)
     (hconfig : SailMem.SailState.isValidMemConfig s hinit) (v : RegisterType Register.minstret_increment) :
     SailMem.SailState.isValidMemConfig {s with regs := s.regs.insert Register.minstret_increment v}
       (SailState.isInitialized_insert s hinit _ _) := by
-  obtain ⟨h_cur, h_mprv, h_mseccfg, h_mseccfgpmm, h_htif, h_pma⟩ := hconfig
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+  obtain ⟨h_cur, h_mprv, h_mseccfg, h_mseccfgpmm, h_htif, h_pma, h_pmp⟩ := hconfig
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     rw [get_writeMinstret_ne (by decide) s v (hinit _)]
-  exacts [h_cur, h_mprv, h_mseccfg, h_mseccfgpmm, h_htif, h_pma]
+  exacts [h_cur, h_mprv, h_mseccfg, h_mseccfgpmm, h_htif, h_pma, h_pmp]
 
 /-- **`fetch () = F_Base w` survives the `minstret_increment` write** — the `fetched` field re-derives on
 the post-write state (Stage 3' is precondition-parameterized: `mem`/`PC`/config all frame-stable, the

@@ -163,6 +163,10 @@ theorem isInitialState_nonvacuous : ∃ s0, IsInitialState emptyProgram s0 :=
          htif_disabled := by
            rw [cfgState_get_other 0 Register.htif_tohost_base (by decide) (by decide) (by decide)]
            exact (by decide : (default : RegisterType Register.htif_tohost_base) = none)
+         pmp_off := by
+           rw [cfgState_get_other 0 Register.pmpcfg_n (by decide) (by decide) (by decide)]
+           exact (by decide :
+             (default : RegisterType Register.pmpcfg_n) = Vector.replicate 64 0#8)
          pma_regions := cfgState_pma 0 _ } }⟩
 
 end SP1Clean.Soundness.Target
