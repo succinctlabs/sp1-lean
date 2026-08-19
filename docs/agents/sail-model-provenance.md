@@ -148,10 +148,43 @@ evidence for "four config keys, not patched Lean".
 
 So the ask upstream is narrow: let a custom config **replace** the `rv64d` family (as #1861 does
 by deriving the arch from the config stem), or decouple output name from arch name with a third
-variable. #1879 also uses `set(CACHE{VAR} …)`, added in **CMake 4.2**, while the repo's baseline
-is 3.20 and its own CI runs 3.20.0 / 4.1.2 — on those, `CUSTOM_LEAN_ARCH` gets no default and a
-config-only invocation is a configure-time parse error; CI is green only because no job exercises
-the custom path.
+variable. #1879 also uses `set(CACHE{VAR} …)`, added in **CMake 4.2** (confirmed in
+`cmake --help-command set`), while the repo's baseline is 3.20 and its own CI runs 3.20.0 / 4.1.2 —
+on those, `CUSTOM_LEAN_ARCH` gets no default and a config-only invocation should fail to configure
+on the `STREQUAL` line; CI is green only because no job exercises the custom path. (Inferred from
+the docs — only CMake 4.3.2 was available locally, where the custom path configures fine.)
+
+**The case-sensitivity loophole does not work — tested.** The guard is `STREQUAL "rv64d"`, which is
+case-sensitive, so `-DCUSTOM_LEAN_ARCH=RV64D` passes it and `TOUPPER` still yields the wanted
+`Lean_RV64D`. But the default `foreach (xlen IN ITEMS 32 64)` loop is unconditional and already
+claims that output. Configuring #1879's head (`e37a7ad4`) with
+`-DCUSTOM_LEAN_ARCH=RV64D -DCUSTOM_LEAN_CONFIG=…` fails with four errors, the first being
+
+```
+CMake Error at model/CMakeLists.txt:303 (add_custom_command):
+  Attempt to add a custom rule to output
+    …/model/Lean_RV64D/LeanRV64D.lean.rule
+```
+
+### If upstream ships #1879 as-is, three ways out (in cost order)
+
+1. **Post-generation rename, scripted** — generate with `CUSTOM_LEAN_ARCH=SP1`, then have
+   `generate_lean_rv64d.sh` rename the tree back (`Lean_SP1/` → `Lean_RV64D/`, `LeanSP1` →
+   `LeanRV64D` in the generated sources and lakefile) before publishing. This is not the
+   hand-editing this document exists to forbid: it is total, deterministic, and **the existing
+   gates verify it** — under `--stock` the renamed tree must come out byte-identical to the
+   opencompl base, which is exactly a proof that the rename is content-neutral. Nothing else in
+   this repo or in `riscv-lean` changes. ~10 lines in a script we already own.
+2. **Ask for the upstream tweak** (relax the guard when the custom family replaces the default, or
+   add a `CUSTOM_LEAN_OUTPUT`). Cheapest of all if accepted — nobody pays anything.
+3. **Rename our architecture to `Lean_SP1`/`LeanSP1`.** The 161 generated files are free (the
+   generator emits the new name consistently), and our own 586 references across 64 files are a
+   mechanical sed plus a full rebuild. The real cost is `riscv-lean`: its sources name `LeanRV64D`
+   in 4 files / 118 refs (`Skeleton`, `SailToRV64`, `SailPureToInstructions`, `SailPure`) and its
+   lakefile requires the package by that name, so we would have to fork it permanently — upstream
+   opencompl will not import an SP1-specific model. Today that fork is disposable chores, pinned at
+   opencompl PR #59 and slated for deletion when #59 merges. Option 3 is worth taking only if we
+   want the `SP1` name for its own sake.
 
 The sibling `succinctlabs/riscv-lean` fork is only toolchain/dependency chores; it is pinned at
 `d1d678c6`, the head of the open opencompl PR #59 ("chore: update to v4.32.2"). Repoint
