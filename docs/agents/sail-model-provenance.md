@@ -44,7 +44,9 @@ hundred lines and a heartbeat-heavy peel — and it is the same *kind* of uncons
 assumption `isValidMemConfig` already carries for `mstatus.MPRV`, `mseccfg` and
 `htif_tohost_base`, not a new class of trust. There is also a faithfulness leg (stock defines 16
 `pmpcfg*`/`pmpaddr*` CSRs, so a guest `csrw pmpcfg0` would succeed there and trap here), but SP1
-implements no CSR instructions and no current proof covers one, so that leg is unexercised.
+implements no CSR instructions — its disassembler maps every `process_csrr*` to
+`Instruction::unimp()` (`crates/core/executor/src/disassembler/rrs.rs`) — and no current proof
+covers one, so that leg is unexercised.
 
 **`memory.pmp.usable_count = 0` — no proof consumes it.** Its disclosure lemma
 `sys_pmp_usable_count_eq_zero` is deliberately not `@[simp]` and has zero uses outside its own
