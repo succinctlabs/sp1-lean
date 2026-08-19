@@ -1,8 +1,9 @@
 # Upstream drafts — prepared, NOT posted
 
-**Standing rule: nothing here gets filed without the owner's explicit approval.** Filing state and
-the queue live in `clean-upstream.md`; the reasoning behind *what* we file lives in its
-"Clean's direction (2026-08)" section, which this file assumes.
+**Standing rule: nothing here gets filed without the owner's explicit approval.** Mostly Clean:
+filing state and the queue live in `clean-upstream.md`, and the reasoning behind *what* we file
+lives in its "Clean's direction (2026-08)" section, which this file assumes. Draft 3 is
+`riscv/sail-riscv`, whose technical basis is in `sail-model-provenance.md` instead.
 
 **What changed on 2026-08-19.** The U1/`AgreesBelow` drafts that used to live here are gone: that
 PR is **filed as [#450](https://github.com/Verified-zkEVM/clean/pull/450), approved, and pending
@@ -14,7 +15,10 @@ rider is withdrawn, and the #404 interpreter offer is withdrawn.
 
 ---
 
-## Draft 1 — comment on PR #450 (nudge)
+## Draft 1 — comment on PR #450 (nudge) — **STILL UNPOSTED**
+
+> Attempted 2026-08-19; `gh pr comment` is blocked by the local permission classifier. The text
+> below is final — it needs the owner to paste it, or a permission rule for `gh pr comment`.
 
 > This is approved and mergeable; happy to rebase whenever it is convenient.
 >
@@ -32,15 +36,19 @@ rider is withdrawn, and the #404 interpreter offer is withdrawn.
 
 ---
 
-## Draft 2 — PR: `WitgenIR.share` (subterm sharing), rebased onto the codegen line
+## Draft 2 — PR: `WitgenIR.share` (subterm sharing) — **FILED as [#453](https://github.com/Verified-zkEVM/clean/pull/453)**
 
-**Target:** `dtumad/clean:witgen-share-rebased` → `Verified-zkEVM/clean:agent/fixed-columns-prover-data`
-(re-target `main` if #446 lands first). **Draft.** Record the exact base sha in the body.
+**Filed 2026-08-19 as a draft**, `dtumad/clean:witgen-sharing-pass` →
+`Verified-zkEVM/clean:agent/fixed-columns-prover-data` @ `89e9abec`, title *"Witgen: proven
+subterm-sharing pass for witness programs"*. Six commits: the four original ones, plus the
+new-constructor adaptation and `shareIfSmaller` + the `Lower.lean` wiring.
 
-**Title:** `Witgen IR: intern shared subterms as let-steps, with proven eval-preservation`
+The filed body differs from the sketch below in one substantive way, and the outcome section of
+`clean-upstream.md` § U11 explains why: measuring the demo showed unconditional sharing *inflates*
+Clean's own circuits, so the PR ships the never-worse gate `shareIfSmaller` and leads with the
+measurement instead of hiding it. Keep the sketch for the reasoning; the filed text is the record.
 
-**Body sketch** (final text written when the rebase is done, since the numbers below must be
-regenerated against their IR):
+**Original body sketch** (superseded):
 
 > Witness programs are authored as deeply shared Lean terms, but nothing in the pipeline preserves
 > that sharing: `Lower.lean` passes `steps`/`output` through verbatim and `Rust.lean` prints every
@@ -82,13 +90,55 @@ regenerated against their IR):
 > ("the signal to add a locals-boundedness lawfulness class"): a post-hoc pass sidesteps that
 > entirely, since it runs after the proofs are done.
 
-**Rebase work this PR requires** (tracked in `clean-upstream.md` U11): the three new `FExpr`
-constructors (`.index`, `.listGetAtIndex`, `.proverInputGet`) through `shareF`/`remapF`/`beq`/
-`hashCode` and their spec cases; `evalSteps`'s new `idx`/`proverInput` parameters through the step
-lemmas and `eval_share`; and a sound answer to the `idx` question for `RowProgram`s (whose steps
-evaluate at `idx := row`, unlike `WitgenIR`'s `idx = 0`).
+**Rebase work this PR required** — done, 2026-08-19: the three new `FExpr` constructors
+(`.index`, `.listGetAtIndex`, `.proverInputGet`) through `shareF`/`remapF`/`beq`/`hashCode`/
+`scoped` and their five spec sites; the `idx` question answered by freezing the two
+index-dependent nodes at the step context's `idx = 0` and **declining to claim `RowProgram`**,
+whose steps evaluate at `idx := row`. `evalSteps`'s new parameters needed no changes to the step
+lemmas — they default. Full detail in `clean-upstream.md` § U11.
 
 ---
+
+## Draft 3 — reply on riscv/sail-riscv #1861 ("would #1879 do what you want?")
+
+Answering @pmundkur's 2026-08-18 question. Verdict: **almost, but not as written** — #1879 gives
+the same capability under a naming scheme that cannot produce the one package name we need. Full
+reasoning and the verification in `sail-model-provenance.md`; both PRs are open and unmerged, so
+nothing is blocked either way.
+
+> Thanks — #1879 is a nicer refactor than mine, and I'd be glad to close this in its favour. It
+> doesn't quite cover our case as written, for one reason:
+>
+> `add_lean_targets` derives both the output directory and the module name from `CUSTOM_LEAN_ARCH`
+> (`-o "Lean_${arch_uppercase}"`), and the guard forbids the only value that works for us:
+>
+> ```cmake
+> if ((${CUSTOM_LEAN_ARCH} STREQUAL "rv32d") OR (${CUSTOM_LEAN_ARCH} STREQUAL "rv64d"))
+>     message(FATAL_ERROR ...)
+> ```
+>
+> We need the generated package to stay `Lean_RV64D` / `LeanRV64D`. It isn't cosmetic: Lake dedups
+> dependencies by package name, and `riscv-lean` transitively requires a package literally named
+> `Lean_RV64D`. If our config-generated copy is named anything else, Lake satisfies that other
+> requirement from upstream's floating default model *as well*, and the build ends up with two
+> incompatible copies of the model namespace — one of them the stock configuration our config
+> exists to change. (It would also rename ~1000 identifiers across the 161 generated files and
+> break the byte-identity check we use to show the delta is four config keys rather than hand
+> edits.)
+>
+> Two ways to cover it, either fine by me:
+> - let a custom config **replace** the `rv32d`/`rv64d` family rather than adding to it — that's
+>   what this PR does by taking the arch name from the config file's stem; or
+> - decouple output name from arch name (a `CUSTOM_LEAN_OUTPUT`, say), so
+>   `-DCUSTOM_LEAN_ARCH=SP1 -DCUSTOM_LEAN_OUTPUT=Lean_RV64D` is expressible.
+>
+> Two smaller notes on #1879 while it's open:
+> - `set(CACHE{VAR} …)` was added in CMake 4.2, but the project baseline is 3.20 and CI runs 3.20.0
+>   and 4.1.2. On those it sets ordinary variables named `CACHE{CUSTOM_LEAN_ARCH}` rather than cache
+>   entries, so `CUSTOM_LEAN_ARCH` has no default and `-DCUSTOM_LEAN_CONFIG=…` alone fails to
+>   configure on the `STREQUAL` line. CI is green because no job exercises the custom path.
+> - This PR also adds `${config_file}` to `DEPENDS` for the SMT/rmem/Rocq rules (the Lean rules
+>   already had it); worth carrying over so a config edit doesn't leave stale formal output.
 
 ## Held deliberately (recorded so it is a decision, not an oversight)
 

@@ -59,7 +59,7 @@ back to `Verified-zkEVM/clean` and this file becomes a historical record.
 | Branch | Change | PR | Status |
 |---|---|---|---|
 | `agreesbelow-data-hint` | U1 — `AgreesBelow` constrains `data`/`hint` | **[#450](https://github.com/Verified-zkEVM/clean/pull/450) — open, approved 2026-08-14, pending merge** | in `sp1-integration` |
-| `witgen-share` | U11 — `WitgenIR.share` subterm sharing + proven `eval_share` (the wire format has `steps`/`localVar` sharing but nothing produced it; without the pass, SP1's DivRem witness programs serialize to 1.22 GB — 1.04 MB with it), plus the two PR riders: the scoped `Hashable` instance and `doc/witgen-wire-format.md`. Adjacent upstream context: issue #404 (the requested Rust interpreter needs shared programs to evaluate at sane cost) | *prepared, not filed — drafts in `upstream-drafts.md`* | first 2 commits in `sp1-integration`; riders on the branch only |
+| `witgen-share` | U11 — `WitgenIR.share` subterm sharing + proven `eval_share` (the wire format has `steps`/`localVar` sharing but nothing produced it; without the pass, SP1's DivRem witness programs serialize to 1.22 GB — 1.04 MB with it), plus the two PR riders: the scoped `Hashable` instance and `doc/witgen-wire-format.md`. Adjacent upstream context: issue #404 (the requested Rust interpreter needs shared programs to evaluate at sane cost) | **FILED: draft [#453](https://github.com/Verified-zkEVM/clean/pull/453)**, rebased onto `agent/fixed-columns-prover-data` @ `89e9abec` and gated by `shareIfSmaller` (see U11) | first 2 commits in `sp1-integration`; riders on the branch only |
 | `u64wrap-prefilter` | U3 — two `u64Wrap` screens | — | **not merged**; pushed as a record of a rejected approach (see U3) |
 
 A branch reaching `sp1-integration` means it earned its way there: Clean's own suite green *and* a
@@ -100,7 +100,7 @@ use case.
 
 | payload | verdict |
 |---|---|
-| `WitgenIR.share` + `eval_share` (U11) | **File — after rebasing onto their live line**, reframed from "shrinks the JSON" to "shrinks and speeds up the generated Rust". Serialization-agnostic: shared steps become `let` bindings in generated Rust exactly as they become `steps` in JSON. |
+| `WitgenIR.share` + `eval_share` (U11) | **FILED (#453)** after rebasing onto their live line. Reframed once more by measurement: it is a safety net for *generated* programs, and a proven no-op on the circuits Clean authors by hand. Serialization-agnostic: shared steps become `let` bindings in generated Rust exactly as they become `steps` in JSON. |
 | `doc/witgen-wire-format.md` (U11 rider) | **Hold — stays ours.** Upstreaming it would promote a now-consumer-less debug printer to a specified, versioned external interface, in the direction they just walked away from. It documents *our* contract; it stays in `docs/`. |
 | `rust/witgen-interp` as an answer to #404 | **Hold — stays ours.** #404 is stale-open (0 comments since 2026-06-11) and its concrete instructions reference files #446 deletes. The copy-of-record is the SP1-vendored copy; SP1 will never link Clean's generated Plonky3 Rust. |
 | `Circuit/WitgenEval` | **Split.** `toElements_eval`, `getElem_eval_toElements`, and the three congr bridges are superseded by #448's `Witgen.WitgenIR.eval_ofCompositeFExpr`, `getElem_eval_ofCompositeFExpr`, and `eval_ofCompositeFExpr_eq_iff`. **`gateFE`/`iteFE` and their four eval/congr lemmas have no upstream counterpart** (the IR has cell-level `.ite` only, while gated column population is a universal prover idiom) — that half stays file-able, after #426. |
@@ -442,6 +442,39 @@ path.
 > existing `witnessProgramWellFormed` check — which then simply re-runs on the shared program, so
 > the integration costs no new proof obligation — and showing the generated-Rust delta on a
 > duplication-heavy gadget from their own tree.
+
+> **FILED 2026-08-19 as [#453](https://github.com/Verified-zkEVM/clean/pull/453) (draft)**, from
+> `dtumad/clean:witgen-sharing-pass` onto `agent/fixed-columns-prover-data` @ `89e9abec`. The rebase
+> was textually clean; the work was the ten `Missing cases` the three new `FExpr` constructors
+> opened across `shareF`/`remapF`/`hashCode`/`scoped`/`beq`/`beq_eq`/`scoped_mono`/
+> `eval_congr_locals`/`shareF_spec`/`remapF_scoped`/`remapF_spec`. `eval_share` is still
+> `[propext, Classical.choice, Quot.sound]` on the new base, and the full `lake build` is green
+> (1859 jobs).
+>
+> **The `idx` question, answered.** `.index` and `.listGetAtIndex` are frozen at the step context's
+> `idx = 0` (`FiniteField.fromNat 0 = 0` is `@[simp, circuit_norm]`; `.listGetAtIndex xs` is
+> definitionally `evalList _ 0 xs` there, i.e. `.listGet xs (.const 0)`), which is exactly the
+> pre-existing treatment of `shareU`'s `.idx`, and is forced by the same mechanism: `oldRefF`/
+> `oldRefU` substitute whole expressions into `mapRange` bodies, which re-bind the index.
+> `.proverInputGet` is index-independent and interns normally. **`RowProgram` is deliberately not
+> claimed** — its steps evaluate at `idx := row`, so sharing one would need the index in the
+> interning key. The PR states the restriction rather than generalizing it.
+>
+> **The measurement changed the design.** Wired into `lowerWitness`, unconditional sharing made
+> `export_femtocairo_flat_air_rust` **larger** (46,812 → 48,832 bytes). Cause, measured over their
+> gadgets: Clean's hand-authored programs have essentially no recoverable duplication, because
+> `witnessProgram`/`←` already hoists what is worth hoisting. `Keccak256.Permutation` 272,736 →
+> 596,970 nodes (162,180 single-use hoists, +2 nodes each); `Xor64` 49 → 145; `IsZeroField` 16 → 24.
+> So the PR adds `WitgenIR.shareIfSmaller` — keep the rebuilt program only when it is syntactically
+> smaller — with `eval_shareIfSmaller` closing on either branch (`eval_share`, or `rfl`). Both
+> `export_*_rust` outputs are then **byte-identical** to pre-PR. The honest pitch upstream is a
+> safety net for *generated* witness programs, not an improvement to the circuits they author.
+> The finer per-subterm policy (hoist iff used ≥ 2×) is blocked by `OkF.atom`: the pass would have
+> to return non-atomic terms, which is what makes `remapF`'s index-independence argument work. That
+> is recorded in the source as a follow-up.
+>
+> Still unposted: the #450 nudge in `upstream-drafts.md` (Draft 1) — `gh pr comment` is blocked by
+> the local permission classifier, so it needs the owner to post it.
 
 ## Design discussion, not a patch
 

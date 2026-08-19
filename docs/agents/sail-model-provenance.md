@@ -120,7 +120,38 @@ symbolically-reduced generated internals, independently of the config:
    `ext_decode`, and the `execute_*` functions were unchanged.
 
 An upstream `SAIL_FORMAL_CONFIG` CMake option (riscv/sail-riscv PR #1861) will replace the
-script's config-overwrite step with a plain `-D` flag when it lands.
+script's config-overwrite step with a plain `-D` flag when it lands. Both it and the competing
+#1879 are **open and unmerged**; upstream `master` (`8f91355e`, 2026-08-14) has neither, so the
+`cp $CFG` + hash-guard pipeline stays as documented and nothing here is blocked on either.
+
+**Why the generated package must keep the name `Lean_RV64D` / `LeanRV64D`** (checked 2026-08-19,
+prompted by pmundkur asking on #1861 whether #1879 covers our use case). #1879 — "Refactor cmake
+build to enable custom Lean builds", a Lean-only alternative that hoists the per-backend blocks
+into `add_{rocq,lean,lem}_targets` functions and adds `CUSTOM_LEAN_CONFIG` + `CUSTOM_LEAN_ARCH` —
+derives both the output directory and the module name from `CUSTOM_LEAN_ARCH`
+(`string(TOUPPER …)`, `-o "Lean_${arch_uppercase}"`) **and forbids the only value we can use**:
+
+```cmake
+if ((${CUSTOM_LEAN_ARCH} STREQUAL "rv32d") OR (${CUSTOM_LEAN_ARCH} STREQUAL "rv64d"))
+    message(FATAL_ERROR "The value of CUSTOM_LEAN_ARCH (...) cannot be 'rv32d' or 'rv64d'.")
+```
+
+Any other value renames the package. That is not cosmetic: `.lake/packages/RISCV/lakefile.toml`
+(the `riscv-lean` dependency) transitively requires package **`Lean_RV64D`** from
+`opencompl/sail-riscv-lean` at floating `rev = "main"`, and our root `lakefile.toml` requires it
+by that same real package name precisely so Lake **dedups onto our one configured copy**. Rename
+ours to `Lean_SP1` and Lake satisfies `Lean_RV64D` from opencompl `main` *as well* — two
+incompatible copies of the model namespace, one of them the stock CLINT-enabled build this
+config exists to disable. Renaming would also touch 994 `LeanRV64D` occurrences across the 161
+generated files and destroy the `--stock` / `--sp1` byte-identity gates below, which are the
+evidence for "four config keys, not patched Lean".
+
+So the ask upstream is narrow: let a custom config **replace** the `rv64d` family (as #1861 does
+by deriving the arch from the config stem), or decouple output name from arch name with a third
+variable. #1879 also uses `set(CACHE{VAR} …)`, added in **CMake 4.2**, while the repo's baseline
+is 3.20 and its own CI runs 3.20.0 / 4.1.2 — on those, `CUSTOM_LEAN_ARCH` gets no default and a
+config-only invocation is a configure-time parse error; CI is green only because no job exercises
+the custom path.
 
 The sibling `succinctlabs/riscv-lean` fork is only toolchain/dependency chores; it is pinned at
 `d1d678c6`, the head of the open opencompl PR #59 ("chore: update to v4.32.2"). Repoint
