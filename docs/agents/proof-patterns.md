@@ -1109,8 +1109,8 @@ emit exactly `ByteConsistency.byteRows`'s 8 checks, which is what makes byte `eq
 core (never `noncomputable interactionsWith`). `multiplicitySum_busAggregate_cons` decomposes a machine's
 per-key sum into per-chip sums. (The bespoke per-bus `ChipAir`s + `Machine` that drove the retired
 `TraceValid` capstone lived in `Soundness/MachineConsistency.lean`, removed 2026-06-05; the surviving
-statement-layer infra is `Model/ChipAir.lean`, and the live cross-chip argument is the gated
-`Soundness/GatedVm/` path.) **Gotcha:** `Machine` is an `abbrev` for `List`, so `m.busAggregate`
+statement-layer infra is `Model/ChipAir.lean`, and the live cross-chip argument is the timed-grounding
+capstone, `Soundness/AIR.lean`.) **Gotcha:** `Machine` is an `abbrev` for `List`, so `m.busAggregate`
 dot-notation resolves to `List.busAggregate` — call `Machine.busAggregate m` explicitly. Statement layer
 only: it makes Σsends = Σreceives expressible; it does not derive the per-bus meaning (those stay threaded).
 

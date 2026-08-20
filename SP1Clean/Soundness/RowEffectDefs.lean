@@ -5,20 +5,18 @@ import SP1Clean.Model.Semantics.Decode
 
 /-! # The refinement invariant and per-row effect (`RowView`-level, below `ChipRow`)
 
-> **NOTE.** The definitions in this module (`RefinesAt`/`RowEffect`/`ValueOperandsBound`/`replayVal`/
-> `rcvPcOf`/`sndPcOf`) are **permanent, live-path interface** — the `ChipKind.advance` field and the
-> timed-grounding engine state their obligations against them. Only their legacy `TargetVm.lean`
-> walk consumers (`WalkOf`/`TargetObligations`/`chain_to_refines`) are the frozen path; do not add
-> new lemmas against *those* — new soundness work targets the timed-grounding engine.
+The definitions in this module (`RefinesAt`/`RowEffect`/`ValueOperandsBound`/`replayVal`/
+`rcvPcOf`/`sndPcOf`) are **permanent, live-path interface** — the `ChipKind.advance` field and the
+timed-grounding engine state their obligations against them.
 
-The Sail-refinement layer of the target theorem, factored **out of `Soundness/TargetVm.lean`** so it sits
-**below `Soundness/ChipRow.lean`**: `RefinesAt`/`RowEffect`/`replayVal`/`rcvPcOf`/`sndPcOf` are all stated
-over the chip-agnostic `Trace.RowView` (never `ChipRow`), so a `ChipKind.advance` field can reference
-`RowEffect`/`SailStep` without the `ChipRow → TargetVm → SP1Ensemble → ChipRegistry → ChipRow` import cycle.
-`SailStep`/`RomLoaded`/`SailConfigured` already live in `Model/`. The `WalkOf`/`TargetObligations`/
-`chain_to_refines` machinery — which *does* reference `ChipRow` — stays in `TargetVm.lean`, which imports
-this file. Namespace `SP1Clean.Soundness.Target` is unchanged (decoupled from path), so every
-`RefinesAt`/`RowEffect`/`rcvPcOf`/… reference resolves as before. -/
+`RefinesAt`/`RowEffect`/`replayVal`/`rcvPcOf`/`sndPcOf` are all stated over the chip-agnostic
+`Trace.RowView` (never `ChipRow`), so a `ChipKind.advance` field can reference `RowEffect`/`SailStep`
+without an import cycle through the registry. `SailStep`/`RomLoaded`/`SailConfigured` already live in
+`Model/`. (Their frozen Eulerian-walk consumers — `WalkOf`/`TargetObligations` in the former
+`TargetVm.lean` — were retired 2026-08 with the rest of the legacy path; the live consumers are the
+grounding contracts, `Soundness/GroundingAdapter.lean` / `Soundness/ChipContracts.lean`.) Namespace
+`SP1Clean.Soundness.Target` is unchanged (decoupled from path), so every `RefinesAt`/`RowEffect`/
+`rcvPcOf`/… reference resolves as before. -/
 
 open LeanRV64D.Defs
 namespace SP1Clean.Soundness.Target

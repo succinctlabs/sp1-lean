@@ -3,7 +3,7 @@
 
 Scans the SP1Clean tree for the released theorem set (chip soundness/completeness, Sail
 bridges + `kind` registrations, faithfulness anchors, witness-conformance anchors, the
-GatedVm/capstone layer, and the coverage guards), resolving each declaration's fully
+timed-grounding capstone layer, and the coverage guards), resolving each declaration's fully
 qualified name by tracking `namespace`/`end` blocks. The probe is self-checking: a wrong
 FQN fails to elaborate, so a green probe run certifies the census covers real declarations.
 
@@ -65,13 +65,9 @@ TARGETS = [
     # the older conformance and per-row satisfiability batteries.
     ("SP1CleanTest/Audit/*.lean",
      r"theorem\s+(constraints_hold|interactions_exact|program_projection)\b"),
-    # The abstract walk/trail core (relocated from GatedVm/Chain.lean; live — used by AIR +
-    # RankedGrounding).
+    # The abstract walk/trail core (live — used by AIR + RankedGrounding).
     ("SP1Clean/Soundness/Walk.lean", r"theorem\s+(exists_trail)\b"),
-    ("SP1Clean/Soundness/GatedVm/*.lean",
-     r"theorem\s+(chipRows_step_sound|state_trail_of_balance|"
-     r"gatedExecution_of_specs_and_balance)\b"),
-    # The field⇒ℤ balance bridge (formerly GatedVm/BalanceMod.lean, relocated in W11 Phase 5).
+    # The field⇒ℤ balance bridge (relocated in W11 Phase 5).
     ("SP1Clean/Model/BalanceBridge.lean",
      r"theorem\s+(isConsistentBalanced_of_intCast_zero|intCast_multiplicitySum_map_toAccess|"
      r"isConsistentBalanced_of_balancedInteractions)\b"),
@@ -111,10 +107,8 @@ TARGETS = [
     ("SP1Clean/Soundness/Coverage.lean",
      r"theorem\s+(coverage_kinds_eq_registry|coverage_length|covered_iff_routed|"
      r"wired_subset_reachable|reachable_subset_wired|routeOf_reaches_sail)\b"),
-    ("SP1Clean/Soundness/TargetVm.lean", r"theorem\s+(sp1_target\w*)\b"),
     ("SP1Clean/Soundness/Decode.lean",
-     r"(?:theorem|def)\s+(decode_\w+|instrToProgramRow_\w+|DecodeOperandsBound|decodedInROM[\w.]*|"
-     r"decodedInROMg|sailConfigured_nonempty|targetObligations_of_decode)\b"),
+     r"(?:theorem|def)\s+(decodedInROM[\w.]*|sailConfigured_nonempty)\b"),
     # C1/Move-2: the decode projection, guards, ∃I∀s `decodedInROM`, its accessor, the 16 collapsed
     # `decodes<T>` producers, and the `instrToProgramRow(_inv)_*` inversions all live here (Model layer).
     ("SP1Clean/Model/Semantics/Decode.lean",

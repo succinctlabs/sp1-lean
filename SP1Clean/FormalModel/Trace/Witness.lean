@@ -2,8 +2,9 @@ import SP1Clean.Model.Semantics.GuestProgram
 
 /-! # W6b — the non-vacuity witness: `IsInitialState` is satisfiable
 
-The target theorem (`Soundness/TargetVm.lean`) is `∀ s0, IsInitialState prog s0 → …`; a vacuous
-`IsInitialState` would make it trivially true. This file exhibits a concrete configured, fully-initialized
+The capstone's boundary bundle (`InitialBoundaryFacts`, `Soundness/ProviderBindings.lean`) demands an
+initial Sail state that loads the program and is configured; a vacuous `IsInitialState` would make every
+such hypothesis unsatisfiable-vacuous. This file exhibits a concrete configured, fully-initialized
 Sail state and a guest program it loads, proving `IsInitialState` is **satisfiable** (axiom-clean).
 
 The reusable machinery is `configuredState pc` — a state with **every** register present

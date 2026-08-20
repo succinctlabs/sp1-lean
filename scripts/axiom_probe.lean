@@ -314,8 +314,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_names
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_upstream
 #print axioms SP1Clean.Soundness.Walk.exists_trail
-#print axioms SP1Clean.Soundness.gatedExecution_of_specs_and_balance
-#print axioms SP1Clean.Soundness.state_trail_of_balance
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_intCast_zero
 #print axioms SP1Clean.LookupAccessList.intCast_multiplicitySum_map_toAccess
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_balancedInteractions
@@ -331,10 +329,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.sp1ProviderTables_length
 #print axioms SP1Clean.Soundness.sp1ProviderTables_stateChannel_not_mem
 #print axioms SP1Clean.Soundness.sp1Ensemble
-#print axioms SP1Clean.Soundness.balancedStateTrailSpec
-#print axioms SP1Clean.Soundness.sp1_state_balance_of_balancedInteractions
-#print axioms SP1Clean.Soundness.sp1_gatedExecution_prereqs
-#print axioms SP1Clean.Soundness.balanced_state_trail_of_decoded_rows_sound
 #print axioms SP1Clean.Soundness.supportedCore_groundingObligations_of_constraints
 #print axioms SP1Clean.Soundness.statePullAlign8_of_decodedStateWalk
 #print axioms SP1Clean.Soundness.supportedCore_orderedRows_dynamic_of_obligations
@@ -367,13 +361,6 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.wired_subset_reachable
 #print axioms SP1Clean.Soundness.coverage_kinds_eq_registry
 #print axioms SP1Clean.Soundness.coverage_length
-#print axioms SP1Clean.Soundness.Target.sp1_target_execution
-#print axioms SP1Clean.Soundness.Target.DecodeOperandsBound
-#print axioms SP1Clean.Soundness.Target.decode_bound
-#print axioms SP1Clean.Soundness.Target.decode_bound_of_balance
-#print axioms SP1Clean.Soundness.Target.decode_targetBound_of_balance
-#print axioms SP1Clean.Soundness.Target.decode_targetBound
-#print axioms SP1Clean.Soundness.Target.targetObligations_of_decode
 #print axioms SP1Clean.Soundness.Target.decodedInROMg
 #print axioms SP1Clean.Soundness.Target.sailConfigured_nonempty
 #print axioms SP1Clean.Soundness.Target.decodedInROM_rtype_hoist

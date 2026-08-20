@@ -379,10 +379,7 @@ import SP1Clean.Soundness.SupportedMachine
 import SP1Clean.Soundness.Coverage
 import SP1Clean.Soundness.Decode
 
-import SP1Clean.Soundness.GatedVm.Capstone
 import SP1Clean.Soundness.Walk
-import SP1Clean.Soundness.GatedVm.SailDispatch
-import SP1Clean.Soundness.GatedVm.StateBridge
 import SP1Clean.Soundness.MemoryConsistency
 import SP1Clean.Soundness.MemoryGlobal
 import SP1Clean.Soundness.MemoryIsU64
@@ -420,8 +417,6 @@ import SP1Clean.Soundness.AIR
 import SP1Clean.Soundness.CoreAIR
 import SP1Clean.Soundness.FinishedChannels
 import SP1Clean.Soundness.StateConsistency
-import SP1Clean.Soundness.TargetVm
-import SP1Clean.Soundness.AdvanceDispatch
 import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
 import SP1Clean.FormalModel.Contracts.DivRem

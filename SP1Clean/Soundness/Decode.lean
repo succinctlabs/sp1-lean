@@ -1,177 +1,39 @@
-import SP1Clean.Soundness.TargetVm
-import SP1Clean.Soundness.ProgramConsistency
-import SP1Clean.Soundness.ProgramProviderSpike
 import SP1Clean.Model.Opcode
 import SP1Clean.Model.SailDecode
 import SP1Clean.Model.Semantics.Decode
 import SP1Clean.FormalModel.Trace.Witness
 
-/-! # W3 — the decode half of `OperandsBound` (trusted Program path)
+/-! # Decode-witness substrate: the ∀s → ∃I∀s hoists and the concrete-program shapes
 
-The decode component of the target theorem's `OperandsBound` (`Soundness/TargetVm.lean`): each real
-row's committed Program-bus operand columns are the **decode of the instruction word at its pc**, built
-on the official LeanRV64D decoder (`ext_decode`/`encdec_backwards`) so fetch-decode coherence with
-`try_step` holds by construction.
+Evidence layer for the Program-channel decode facts (`decodedInROM`, `Model/Semantics/Decode.lean`):
 
-* `instrToProgramRow` projects a decoded LeanRV64D `instruction` to the committed Program-bus column
-  shape (`ProgramChip.ProgramRow`), mirroring `Channels.ProgramMsg` / `ProgramConsistency.programAccess`
-  (R-type arm first; the other opcode families follow the same convention).
-* `DecodeOperandsBound prog` is the concrete decode conjunct of `OperandsBound`.
-* `decodedInROM prog` is the "committed program table = decode of the guest ROM" membership predicate —
-  the trusted-path instantiation of `ProgramConsistency.inROM` connecting the *encoded* `GuestProgram.rom`
-  to the *decoded* committed columns.
-* `decode_bound` derives `DecodeOperandsBound` for every real walk row from the (threaded) Program-bus
-  consistency `TraceProgramValid rows (decodedInROM prog)` — the decode half of `TargetObligations.bound`.
+* `decodedInROMg` is the weak ∀s form over the *guarded* projection — what a decode step naturally
+  yields; the hoist lemmas (`decodedInROM_rtype_hoist`, `decodedInROM_mul_hoist`) prove the
+  strengthened ∃I∀s `decodedInROM` is derivable from it, so strengthening the trusted
+  Program-channel guarantee costs no fundamental obligation beyond a mechanical per-family lift.
+* `decodedInROM_rtype_operand_lt` recovers the 5-bit source-register bounds from the instruction
+  encoding — the decode-intrinsic provenance of `rowAligned_rtype`'s operand-bound hypotheses
+  (`Soundness/GroundingAdapter.lean`).
+* `addProgram`/`addRow` exhibit the concrete one-instruction shape a per-family decode witness
+  proves `decodedInROM` for (the end-to-end ADD witness was retired in the 4.32.2 / Sail-v5
+  migration — see `Model/SailDecode.lean`; restoring one witness per instruction family is
+  tracked roadmap work).
 
-The full discharge of the threaded consistency from bus balance (a `ProgramProvider (decodedInROM prog)`
-via `programConsistent_of_balance`) and the W7 `try_step` decode-stage reduction that *consumes* this
-predicate are tracked separately (roadmap W3 discharge / W7). -/
+The frozen Eulerian-walk consumers that used to live here (`DecodeOperandsBound`, `decode_bound`,
+the `TargetObligations` wiring) were retired with `Soundness/TargetVm.lean` (2026-08): the live
+capstone derives the program-decode truth globally in `supportedCore_orderedRows_programDecoded`
+(`Soundness/AIR.lean`) and consumes these hoists through the grounding contracts. -/
 
 open LeanRV64D.Defs
 namespace SP1Clean.Soundness.Target
 
 open Sail LeanRV64D LeanRV64D.Functions
 open SP1Clean.ProgramChip (ProgramRow)
-open SP1Clean.LookupAccessList (isConsistentBalanced aggregateChipRows)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
-
-/-! ## The decode conjunct of `OperandsBound` and the program-ROM membership -/
-
-/-- **The decode component of `OperandsBound`.** In a configured state, the word fetched at the row's pc
-decodes (via the official `ext_decode`) to an instruction whose projection equals the row's committed
-Program-bus columns. Built on `ext_decode` so a W7 `try_step` decode-stage reduction sees the same
-function. -/
-def DecodeOperandsBound (prog : GuestProgram) (r : Trace.RowView (ZMod p)) (s : SailState) : Prop :=
-  SailConfigured s → ∀ w, prog.fetchWord (rcvPcOf (stateAccess r)) = some w →
-    ∃ i s', (ext_decode w).run s = .ok i s' ∧
-      instrToProgramRow r.state.pc i = some (programAccess r).toRow
-
-
-/-! ## The decode half of `TargetObligations.bound` -/
-
-/-- **The decode half of `TargetObligations.bound`.** Every real walk row satisfies the decode conjunct
-of `OperandsBound`, derived from the (threaded) Program-bus consistency that the committed program table
-is the decode of the guest ROM (`decodedInROM`). The `WalkOf` trail consists of real rows
-(`trail_rows_real`), each a row of the trace, so program consistency hands it its `decodedInROM` fact —
-which is exactly `DecodeOperandsBound` at the row's pc. -/
-theorem decode_bound (prog : GuestProgram) {pi : SP1PublicIO (ZMod p)}
-    {rows : List (ChipRow p)} {path : List (Trace.RowView (ZMod p))}
-    (h_link : TraceProgramValid (rows.map ChipRow.view) (decodedInROM prog))
-    (hw : WalkOf pi rows path) {i : ℕ} (hi : i < path.length) (s : SailState) :
-    DecodeOperandsBound prog (path[i]'hi) s := by
-  intro hcfg w hfetch
-  set r := path[i]'hi
-  have hmem : r ∈ realRowEdges (rows.map ChipRow.view) :=
-    Multiset.mem_of_le hw.2 (Multiset.mem_coe.mpr (List.getElem_mem hi))
-  rw [realRowEdges, Multiset.mem_filter] at hmem
-  obtain ⟨hr_coe, h_real⟩ := hmem
-  have ha_mem : programAccess r ∈ aggregateProgramAccesses (rows.map ChipRow.view) := by
-    simp only [aggregateProgramAccesses]; exact List.mem_map_of_mem (Multiset.mem_coe.mp hr_coe)
-  have h_real' : (programAccess r).is_real ≠ 0 := by
-    simpa only [programAccess, stateAccess] using h_real
-  obtain ⟨w₀, I, hfetch₀, hrun, hrow⟩ := h_link.rom_holds (programAccess r) ha_mem h_real'
-  have hpc : pcBitsOfRow (programAccess r).toRow = rcvPcOf (stateAccess r) := by
-    simp only [pcBitsOfRow, rcvPcOf, programAccess, ProgramAccess.toRow, stateAccess]
-  rw [hpc, hfetch] at hfetch₀
-  obtain rfl : w = w₀ := Option.some.inj hfetch₀
-  have hpcvec : rowPcVec (programAccess r).toRow = r.state.pc := by
-    simp only [rowPcVec, programAccess, ProgramAccess.toRow]
-    ext j hj
-    interval_cases j <;> simp
-  -- ∃I∀s (Move-2): `I` is fixed, `hrun s hcfg` runs the decode at `s`, and the guarded projection
-  -- `hrow` yields the unguarded `instrToProgramRow` `DecodeOperandsBound` wants (via `_some`).
-  have hrow' : instrToProgramRow (rowPcVec (programAccess r).toRow) I = some (programAccess r).toRow :=
-    instrToProgramRow'_some hrow
-  rw [hpcvec] at hrow'
-  exact ⟨I, s, hrun s hcfg, hrow'⟩
-
-/-! ## The balance-level decode discharge (removing the threaded link) — W3 deliverable B -/
-
-/-- **The decode half of `bound`, from Program-bus balance — no threaded link.** Given a decoded program
-ROM (`rom`, each row the decode of the guest ROM, `decodedInROM`) and a balanced Program bus, every real
-walk row satisfies `DecodeOperandsBound`. Composes the constructed provider (`programProvider_of_valid` at
-`P := decodedInROM prog`) with `programConsistent_of_balance` (which discharges the membership link
-`decode_bound` threads as `h_link`). So the residuals are exactly (a) the per-instruction `decodedInROM`
-facts — W3 deliverable A, the `ext_decode` reduction shared with W7 — and (b) the lone LogUp/GKR
-`isConsistentBalanced` fact, matching how `traceProgramLink_of_validRom_and_balance` discharges the
-`ProgramRowSpec` link. -/
-theorem decode_bound_of_balance (prog : GuestProgram) {pi : SP1PublicIO (ZMod p)}
-    {rows : List (ChipRow p)} {path : List (Trace.RowView (ZMod p))}
-    (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)
-    (h_decoded : ∀ row ∈ rom, decodedInROM prog row)
-    (h_bal : isConsistentBalanced
-      (aggregateChipRows (rows.map ChipRow.view) programLookups ++ romContributions rom mult))
-    (hw : WalkOf pi rows path) {i : ℕ} (hi : i < path.length) (s : SailState) :
-    DecodeOperandsBound prog (path[i]'hi) s :=
-  decode_bound prog
-    (traceProgramValid_of_programLink _ _
-      (programConsistent_of_balance _ (romContributions rom mult) (decodedInROM prog)
-        (programProvider_of_valid rom mult h_decoded) h_bal))
-    hw hi s
-
-/-- **The `TargetObligations.bound`-shaped decode statement, discharged from Program-bus balance.** The
-balance-level twin of `decode_targetBound`: the `bound` field for `OperandsBound := DecodeOperandsBound prog`
-with the threaded `h_link` replaced by the decoded ROM + balance. Feed this as the `bound` field when
-assembling `TargetObligations` at the W3-discharged decode predicate. -/
-theorem decode_targetBound_of_balance (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p))
-    (rows : List (ChipRow p))
-    (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)
-    (h_decoded : ∀ row ∈ rom, decodedInROM prog row)
-    (h_bal : isConsistentBalanced
-      (aggregateChipRows (rows.map ChipRow.view) programLookups ++ romContributions rom mult)) :
-    ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
-      ∀ i (hi : i < path.length) s, RefinesAt prog s0 path i s →
-        DecodeOperandsBound prog (path[i]'hi) s := by
-  intro s0 path _h0 hw i hi s _href
-  exact decode_bound_of_balance prog rom mult h_decoded h_bal hw hi s
-
-/-! ## Wiring the decode predicate into `TargetObligations` -/
-
-/-- **The `TargetObligations.bound` field, discharged by decode.** Exactly the shape of the `bound`
-field of `TargetVm.TargetObligations` instantiated at `OperandsBound := DecodeOperandsBound prog`,
-proved from the threaded Program-bus consistency via `decode_bound`. This is the decode seam closed at
-the obligation level. -/
-theorem decode_targetBound (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p))
-    (rows : List (ChipRow p))
-    (h_link : TraceProgramValid (rows.map ChipRow.view) (decodedInROM prog)) :
-    ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
-      ∀ i (hi : i < path.length) s, RefinesAt prog s0 path i s →
-        DecodeOperandsBound prog (path[i]'hi) s := by
-  intro s0 path _h0 hw i hi s _href
-  exact decode_bound prog h_link hw hi s
-
--- Deliberately a `def`, not a `theorem`: this is an obligation BUNDLE whose fields downstream
--- proofs project and unfold. `linter.defProp` (new in v4.32.2) cannot see that distinction.
-set_option linter.defProp false in
-/-- **`DecodeOperandsBound` is a valid `OperandsBound` for the target theorem.** Assemble a full
-`TargetObligations` for `OperandsBound := DecodeOperandsBound prog`: the `bound` field is discharged by
-`decode_targetBound` (from the threaded Program-bus consistency), and `lift`/`halt`/`halt_nonempty` are
-taken as the remaining named seams (W7 step-lift, W5 ECALL/HALT). Feeding the result into
-`Target.sp1_target_execution` yields the machine-level theorem with the *concrete* decode-derived
-`OperandsBound`, with exactly the W7/W5 obligations open. -/
-def targetObligations_of_decode (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p))
-    (rows : List (ChipRow p))
-    (h_link : TraceProgramValid (rows.map ChipRow.view) (decodedInROM prog))
-    (h_lift : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
-      ∀ i (hi : i + 1 < path.length) s,
-        RefinesAt prog s0 path i s → DecodeOperandsBound prog (path[i]'(by omega)) s →
-        ∃ s', SailStep s s' ∧ RowEffect prog (path[i]'(by omega)) s s')
-    (h_halt_nonempty : ∀ path, WalkOf pi.toLegacy rows path → path ≠ [])
-    (h_halt : ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
-      ∀ (hne : path ≠ []) s,
-        RefinesAt prog s0 path (path.length - 1) s →
-        DecodeOperandsBound prog (path[path.length - 1]'(by
-          have := List.length_pos_of_ne_nil hne; omega)) s →
-        SP1Halted prog (exitOf pi.exit_code) s) :
-    TargetObligations prog pi rows (DecodeOperandsBound prog) where
-  bound := decode_targetBound prog pi rows h_link
-  lift := h_lift
-  halt_nonempty := h_halt_nonempty
-  halt := h_halt
 
 /-! ## W3-A end-to-end: the concrete-instruction decode witness (proof retired)
 
@@ -181,8 +43,8 @@ to. The end-to-end `decodedInROM` proof for this pair (`decodedInROM_addRow`, co
 **removed in the 4.32.2 / Sail-v5 migration**; see the retirement notes below and in
 `Model/SailDecode.lean`. The data definitions (`addProgram`/`addRow`) are retained but currently
 have no in-tree consumers (their sole consumer was the removed proof): they exhibit the
-per-concrete-word shape `decode_bound_of_balance` consumes (`∀ row ∈ rom, decodedInROM prog row`),
-and a future per-opcode example can be rebuilt on them. -/
+per-concrete-word shape a decode witness proves (`decodedInROM prog addRow`), and a future
+per-family example can be rebuilt on them. -/
 
 /-- A one-instruction guest program: `ADD x1, x2, x3` (`0x003100B3`) at pc `0x10000` — the base of the SP1
 code window `[2^16, 2^48)`, so it satisfies `rom_in_window`; the word's low two bits are `0b11`

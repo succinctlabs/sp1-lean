@@ -13,10 +13,10 @@ statements depend only on the Sail `SailState` model (`Model/`), so they live in
 substrate. `LocalStateTruth`/`ProgTruth` are built atop them in `Model/Semantics/Truth.lean` as conclusions of
 the global grounding engine; they are deliberately not row-local channel guarantees.
 
-The trace **arguments** that consume them — `TargetObligations`, `WalkOf`, `RefinesAt`, `RowEffect`, and
-the target theorem `sp1_target_execution` — reference `ChipRow`/`StateAccess` (the Soundness-layer trace
-machinery), so they cannot move below `Soundness` and stay in `Soundness/TargetVm.lean`. (Namespace is
-kept `SP1Clean.Soundness.Target` so `TargetVm` resolves these unchanged after importing this file.) -/
+The trace **arguments** that consume them — `RefinesAt`, `RowEffect`, and the per-chip `ChipKind.advance`
+obligations — reference the Soundness-layer trace machinery (`Trace.RowView`), so they cannot move below
+`Soundness` and live in `Soundness/RowEffectDefs.lean`. (Namespace is kept `SP1Clean.Soundness.Target`
+so those consumers resolve these unchanged after importing this file.) -/
 
 open LeanRV64D.Defs
 namespace SP1Clean.Soundness.Target

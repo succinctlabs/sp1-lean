@@ -198,9 +198,9 @@ Mirror-rust layout under `SP1Clean/`:
   (`check_witgen_export.sh --regen` in the test job).
 - **`Soundness/`** — the whole-machine layer: per-bus `{State,Byte,Program,Memory}Consistency.lean`;
   `ChipRow.lean` (the `ChipKind` structure-of-functions — each chip registers one `kind`, carrying a
-  `name` = its SP1 `MachineAir::name`) + `ChipRegistry.lean` (`allChipKinds`); the gated execution capstone
-  `GatedVm/` (the legacy-but-proved Eulerian-trail machinery) + `SP1Ensemble.lean` (`sp1Ensemble` — a
-  plain Clean `Ensemble`, 25 chips + 13 boundary/provider tables); the timed/ranked grounding engine;
+  `name` = its SP1 `MachineAir::name`) + `ChipRegistry.lean` (`allChipKinds`); `SP1Ensemble.lean`
+  (`sp1Ensemble` — a plain Clean `Ensemble`, 25 chips + 13 boundary/provider tables); the timed/ranked
+  grounding engine;
   `WitnessDecode.lean` (the deterministic typed row decoder), `LocalExecution.lean` (grounded ordered
   rows → a genuine shard-local Sail chain), and `AIR.lean` (the honest native witness relation plus
   proved `supported_core_witness_grounding` and `supported_core_native_sound`); the
@@ -220,8 +220,10 @@ Mirror-rust layout under `SP1Clean/`:
   `MachineSoundness`/`MachineConsistency` `TraceValid` capstone was retired 2026-06-05.
   `Soundness/CoreAIR.lean` is the exact v6.4.0 deterministic boundary: its `_of_obligations`
   combinators consume the `.execution` cluster only and expose the unclosed field-by-field proof bundle.
-  `TargetVm.lean` retains the proved conditional trail-to-Sail walk; it is an intermediate lemma, not
-  the headline zkVM theorem. Audit harness: `scripts/run_audit.sh`
+  The frozen Eulerian-path interface (`GatedVm/`, `TargetVm.lean`, `AdvanceDispatch.lean`, the
+  `Soundness/Decode.lean` walk half) was deleted 2026-08 — its scheduled post-seam retirement; the
+  live-path survivors are `Walk.lean`'s graph core, `RowEffectDefs.lean`'s `RefinesAt`/`RowEffect`
+  interface, and `Soundness/Decode.lean`'s hoist/evidence half. Audit harness: `scripts/run_audit.sh`
   (pins + sorry gates + the `#print axioms` census via `scripts/gen_axiom_probe.py`).
 - `Soundness/RowView.lean` (the reader-agnostic `RowView`/`AdapterView` row-view infra the bus layer reads —
   formerly the top-level `Trace.lean`). The design rationale for the whole-chip semantic boundary is in
@@ -286,11 +288,11 @@ Native-resident pending the "Spec homing" backlog item (see the ChipAssumptions 
 `docs/architecture.md` § deliberate layering exceptions). The same pass renamed the ten suffix-less
 `Faithful/` anchors to `<X>Chip.lean`, named the micro-time window constants with their Rust provenance,
 and completed the root index (now gated by `scripts/check_root_index.sh`). The trace *arguments*
-(TargetObligations / target theorem / routing / Emits) are `ChipRow`-dependent
-and so remain in `Soundness/` — their natural layer — rather than being forced below it.
-The bespoke `Soundness/GatedVm/` → Clean `VmTables` migration (roadmap W11) was investigated and **deferred**
-— Clean's VM engine yields verifier-guarantees with no explicit execution walk, while SP1's spec is a
-balance-derived `GatedExecution` with an Eulerian trail, so re-basing adds obligations without removing the
+(`RefinesAt`/`RowEffect`/routing) are `ChipRow`/`RowView`-dependent and so remain in `Soundness/` —
+their natural layer — rather than being forced below it.
+A bespoke-trail → Clean `VmTables` migration (roadmap W11) was investigated and **rejected**
+— Clean's VM engine yields verifier-guarantees with no explicit execution walk, while the SP1 argument
+needs a balance-derived ordered trail, so re-basing adds obligations without removing the
 SP1-specific trail machinery (see roadmap W11).
 
 **Structural-bus grounding program (closed for the native slice, 2026-07).** Channels communicate the field tuples and

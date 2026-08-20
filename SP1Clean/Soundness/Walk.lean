@@ -111,14 +111,4 @@ theorem exists_trail (edge : α → V × V) (E : Multiset α) :
 
 end Walk
 
-/-! Legacy-name compatibility for the frozen Eulerian path (`GatedVm/{StateBridge,Capstone}.lean`,
-`TargetVm.lean`): the graph core moved to `Soundness.Walk`, and these aliases keep the frozen files
-compiling untouched until their scheduled post-seam deletion. Do not use in new code — write
-`Walk.<name>`. -/
-namespace GatedVm
-
-export Walk (outdeg indeg Balanced IsWalk card_filter_erase balanced_erase exists_trail)
-
-end GatedVm
-
 end SP1Clean.Soundness

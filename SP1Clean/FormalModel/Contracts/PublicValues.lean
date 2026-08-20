@@ -40,48 +40,9 @@ deriving ProvableStruct
 abbrev SP1PublicIO := SP1StateBoundary
 
 /-- Exact public-values type of the supported-core prefix theorem.  Naming the prefix explicitly
-prevents callers from importing the terminal-only `exit_code` below into a statement that the
-current Clean ensemble does not constrain. -/
+records that the current Clean ensemble constrains only the State-bus boundary — no exit code,
+digest, or other terminal field (those belong to the full 160-cell layout below). -/
 abbrev SupportedCorePrefixPublicValues := SP1StateBoundary
-
-/-- Legacy terminal-state scaffold: State endpoints plus an exit code.  The current Clean ensemble
-only receives `toStateBoundary`, so this type must not be used by `supported_core_air_sound`.  It is
-retained solely for the older target-execution theorem, whose separate halt premise constrains the
-exit code. -/
-structure SupportedCorePublicValues (F : Type) where
-  init_clk_high : F
-  init_clk_low : F
-  init_pc0 : F
-  init_pc1 : F
-  init_pc2 : F
-  final_clk_high : F
-  final_clk_low : F
-  final_pc0 : F
-  final_pc1 : F
-  final_pc2 : F
-  exit_code : F
-deriving ProvableStruct
-
-/-- Forget the exit code and retain the State-bus boundary consumed by the current ensemble. -/
-def SupportedCorePublicValues.toStateBoundary {F : Type} (pv : SupportedCorePublicValues F) :
-    SP1StateBoundary F :=
-  { init_clk_high := pv.init_clk_high
-    init_clk_low := pv.init_clk_low
-    init_pc0 := pv.init_pc0
-    init_pc1 := pv.init_pc1
-    init_pc2 := pv.init_pc2
-    final_clk_high := pv.final_clk_high
-    final_clk_low := pv.final_clk_low
-    final_pc0 := pv.final_pc0
-    final_pc1 := pv.final_pc1
-    final_pc2 := pv.final_pc2 }
-
-/-- Compatibility name for the legacy target-execution scaffold. -/
-abbrev SP1TargetPublicIO := SupportedCorePublicValues
-
-/-- Compatibility projection for the legacy target-execution scaffold. -/
-abbrev SP1TargetPublicIO.toLegacy {F : Type} (pv : SP1TargetPublicIO F) : SP1PublicIO F :=
-  pv.toStateBoundary
 
 /-! ## The real SP1 shard public-values layout
 

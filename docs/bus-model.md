@@ -37,8 +37,9 @@ It is retained for archaeology and is not authoritative for the current implemen
     (`ByteChip` non-`Range` ⊕ `RangeChip` opcode-6), both via `receive_byte` — there is **no** separate
     `Range` `InteractionKind`. Modeled as `ByteOpRowSpec`/`RangeRowSpec` + `byteProvider_of_split`.
   - **Machine closure** (bespoke `Soundness/MachineConsistency.lean`'s `traceLinks_of_machineBalance`
-    was retired with the bespoke `TraceValid` capstone; the gated capstone `Soundness/GatedVm/` derives
-    the execution trail from the State-bus balance alone). The
+    was retired with the bespoke `TraceValid` capstone; the gated capstone `Soundness/GatedVm/` that
+    derived the execution trail from State-bus balance alone was itself deleted 2026-08 — the live
+    trail is the ranked/timed grounding engine). The
     lone residual is `isConsistentBalanced` (the LogUp/GKR fact Clean can't model). Memory stays threaded
     (`TraceMemoryLink`, order-sensitive offline-memory) and State (`TraceStateLink`, whole-trace clock
     injectivity) — both genuinely not balance-derivable (= the §6 deferred math).

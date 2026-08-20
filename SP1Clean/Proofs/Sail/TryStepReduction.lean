@@ -6,7 +6,7 @@ import SP1Clean.Model.Semantics.GuestProgram
 
 Reduces the official Sail `try_step 0 false` step function, over a straight-line-ready machine-mode state,
 to the execute-stage dispatch — so a chip's `advance` obligation (`∃ s', SailStep s s' ∧ RowEffect …`,
-`Soundness/TargetVm.lean`) factors as `tryStepReduction ∘ opcode-inversion ∘ correct_<op>_native`.
+`Soundness/ChipRow.lean`) factors as `tryStepReduction ∘ opcode-inversion ∘ correct_<op>_native`.
 
 `try_step` (`LeanRV64D/…/Step.lean:400`) is a large `SailM` body: pre-hook → `writeReg minstret_increment`
 → `readReg hart_state` dispatch → `run_hart_active` (`:315`: `dispatchInterrupt` → `fetch` → `ext_decode`

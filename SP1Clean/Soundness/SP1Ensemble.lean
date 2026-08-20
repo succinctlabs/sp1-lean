@@ -1,5 +1,4 @@
 import SP1Clean.Soundness.WitnessDecode
-import SP1Clean.Soundness.GatedVm.Capstone
 import SP1Clean.Model.BalanceBridge
 import SP1Clean.Model.InteractionProjection
 import SP1Clean.Proofs.Chips.ByteChip.ByteChip
@@ -51,28 +50,20 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 `SP1PublicIO` carries the two State-bus endpoints — the verifier-committed initial `(clk, pc)` and final
 `(clk, pc)`. The layout mirrors `Channels.StateMsg` (arity 5: `clk_high, clk_low, pc0, pc1, pc2`) at each
-end, so the boundary keys are a direct `.val` projection (`initEntryOf`/`finalEntryOf`). `clk_low` is the
-pre-folded low clock (`clk_0_16 + clk_16_24 * 65536`). The structure itself lives on the formal-model
-audit surface in `FormalModel/Contracts/PublicValues.lean`. -/
-
-/-- The State-bus key of the public **initial** state — the `.val` list matching `Channels.StateMsg`'s
-`toElements` order, i.e. the genesis key the boundary verifier produces under `toAccess`. -/
-def initEntryOf (pi : SP1PublicIO (ZMod p)) : List ℕ :=
-  [pi.init_clk_high.val, pi.init_clk_low.val, pi.init_pc0.val, pi.init_pc1.val, pi.init_pc2.val]
-
-/-- The State-bus key of the public **final** state. -/
-def finalEntryOf (pi : SP1PublicIO (ZMod p)) : List ℕ :=
-  [pi.final_clk_high.val, pi.final_clk_low.val, pi.final_pc0.val, pi.final_pc1.val, pi.final_pc2.val]
+end. `clk_low` is the pre-folded low clock (`clk_0_16 + clk_16_24 * 65536`). The structure itself lives
+on the formal-model audit surface in `FormalModel/Contracts/PublicValues.lean`; the typed boundary
+messages the capstone consumes are `initialBoundaryStateMessage`/`finalBoundaryStateMessage`
+(`Soundness/TypedState.lean`). -/
 
 /-! ## The boundary verifier
 
 `sp1StateVerifier` is the genesis/finalization circuit: a true `pull` of the public **final** state
 followed by a true `push` of the public **initial** state (SP1's bus-enforced boundary, `../sp1
-record.rs eval_state` `send_state(.,pc_start,1)` + `receive_state(.,next_pc,1)`). Under `toAccess`
-these are exactly the `[+1 init, -1 final]` boundary entries `gatedExecution_of_specs_and_balance`'s
-`h_bal` assumes (the decode-seam `List.Perm` absorbs the pull-first ordering). The pull/push shape is
-Clean-idiomatic — it exposes the loop-closing `[pulled final, pushed init]` pair. No witness cells
-(`localLength = 0`); the `Spec` is `True` (the meaning is carried by the trace-level balance). -/
+record.rs eval_state` `send_state(.,pc_start,1)` + `receive_state(.,next_pc,1)`). These are exactly
+the `[+1 init, -1 final]` boundary contributions the trail engine's endpoint balance consumes
+(`TypedState.realDecodedStateMessages_perm`). The pull/push shape is Clean-idiomatic — it exposes the
+loop-closing `[pulled final, pushed init]` pair. No witness cells (`localLength = 0`); the `Spec` is
+`True` (the meaning is carried by the trace-level balance). -/
 @[circuit_norm]
 def sp1StateVerifierMain (pi : Var SP1PublicIO (ZMod p)) : Circuit (ZMod p) Unit := do
   Channels.stateChannel.pull
@@ -310,116 +301,5 @@ theorem typedInteractions_balanced
       ((typedEnsembleInteractionsWith witness channel).map TypedInteraction.raw) := by
   rw [typedEnsembleInteractionsWith_raw, ← EnsembleWitness.interactionsWith_allTablesWitness]
   exact balanced channel.toRaw channelMem
-
-/-- **The balanced State-trail intermediate spec.** Over the public initial/final state, there is a heterogeneous trace
-whose `current → next` transitions compose into a
-valid execution trail from the public `pc_start` to the public `next_pc` — i.e. a (trail-only)
-`GatedExecution` between the public endpoints. (The former "every real row reaches its Sail spec"
-conjunct was retired with the `GatedExecution` trail-only cutover.) -/
-def balancedStateTrailSpec : SP1PublicIO (ZMod p) → Prop := fun pi =>
-  ∃ rows : List (ChipRow p), GatedExecution rows (initEntryOf pi) (finalEntryOf pi)
-
-/-! ## Frozen Eulerian-path compatibility
-
-The timed-grounding capstone no longer uses this section. It remains as a small compatibility adapter:
-given an explicit `DecodedRowsSound` certificate, Clean State balance yields the older
-`GatedExecution` trail. The certificate is deliberately not claimed to follow from the raw ensemble
-statement; its semantic contents belong to the stronger witness relations in `Soundness/AIR.lean`. -/
-
-/-- Facts needed to adapt a deterministically decoded witness to the frozen Eulerian trail:
-
-* `rows`/`data` — the heterogeneous trace decoded from the witness's 25 **chip** tables
-  (`same_circuits` + `valueFromOffset`) and the shared prover data; the 13 boundary/provider tables
-  (`sp1ProviderTables`) decode to no `ChipRow` and emit no State interactions;
-* `spec_holds` — every decoded row satisfies its semantic chip contract;
-* `is_real_binary` — binary gating, from each chip's `is_real · (is_real − 1) = 0` constraint;
-* `state_accesses_perm` — the **decode correspondence** the proven balance translation consumes: the
-  native State-bus access list (the per-row `stateLookups` aggregate plus the public `±1` boundary) is
-  a permutation of the `Interaction.toAccess`-image of the witness's Clean-side State-channel
-  interactions. Per row this is `stateLookups_eq_emitted` (`Soundness/StateConsistency.lean`) lifted
-  over the table flatMap, plus the verifier's boundary pull/push (`sp1StateVerifierMain` — under
-  `toAccess` exactly the `(final, -1)`/`(init, +1)` entries); a permutation because the witness lists
-  the verifier's interactions first.
-
-This witness-dependent certificate is an explicit premise, not an `Assumptions := True` consequence
-of the raw ensemble. -/
-structure DecodedRowsSound (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop where
-  spec_holds : ∀ r ∈ decodedChipRows witness.data witness.tables, r.chipSpec witness.data
-  is_real_binary : ∀ r ∈ (decodedChipRows witness.data witness.tables).map ChipRow.view,
-    r.is_real = 0 ∨ r.is_real = 1
-  state_accesses_perm :
-      (aggregateChipRows ((decodedChipRows witness.data witness.tables).map ChipRow.view) stateLookups
-        ++ [(InteractionKind.State, "SP1State", initEntryOf witness.publicInput, (1 : ℤ)),
-            (InteractionKind.State, "SP1State", finalEntryOf witness.publicInput, (-1 : ℤ))]).Perm
-        ((witness.interactionsWith Channels.stateChannel.toRaw).map Interaction.toAccess)
-
-/-- **W1a, proven: Clean State-channel balance ⇒ native gated State-bus balance.** From Clean's
-`BalancedInteractions` over the (single-channel) State interactions — one instantiation of
-`witness.BalancedChannels` — and the decode correspondence (`DecodedRowsSound.state_accesses_perm`),
-conclude the native `isConsistentBalanced` of the decoded access list: exactly the `h_bal` hypothesis
-of `gatedExecution_of_specs_and_balance`. The field → ℤ core is
-`isConsistentBalanced_of_balancedInteractions` (`Model/BalanceBridge.lean`); the `{-1, 0, 1}`
-multiplicity bound is native — `±is_real.val` with `is_real` binary (`stateLookups_mult_binary`) plus
-the constant-`±1` boundary. Axiom-clean (clean-3). -/
-theorem sp1_state_balance_of_balancedInteractions
-    (pi : SP1PublicIO (ZMod p)) (rows : List (ChipRow p))
-    (hbin : ∀ r ∈ rows.map ChipRow.view, r.is_real = 0 ∨ r.is_real = 1)
-    (interactions : List (Interaction (ZMod p)))
-    (h_channel : ∀ i ∈ interactions, i.channel = Channels.stateChannel.toRaw)
-    (h_balanced : BalancedInteractions interactions)
-    (h_perm : (aggregateChipRows (rows.map ChipRow.view) stateLookups
-        ++ [(InteractionKind.State, "SP1State", initEntryOf pi, (1 : ℤ)),
-            (InteractionKind.State, "SP1State", finalEntryOf pi, (-1 : ℤ))]).Perm
-        (interactions.map Interaction.toAccess)) :
-    isConsistentBalanced (aggregateChipRows (rows.map ChipRow.view) stateLookups
-        ++ [(InteractionKind.State, "SP1State", initEntryOf pi, (1 : ℤ)),
-            (InteractionKind.State, "SP1State", finalEntryOf pi, (-1 : ℤ))]) := by
-  refine isConsistentBalanced_of_balancedInteractions _ interactions
-    Channels.stateChannel.toRaw h_channel h_perm h_balanced ?_
-  intro a ha
-  rcases List.mem_append.mp ha with ha | ha
-  · -- chip-row contributions carry `±is_real.val` with `is_real` binary
-    obtain ⟨v, hv, hav⟩ := List.mem_flatMap.mp ha
-    have hp : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    exact stateLookups_mult_binary hp v (hbin v hv) a hav
-  · -- the two constant-`±1` boundary entries
-    simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
-    rcases ha with rfl | rfl <;> simp [multOf]
-
-/-- Assemble an explicit decoded-row certificate and Clean State balance into the three premises of
-the frozen `gatedExecution_of_specs_and_balance` theorem. -/
-theorem sp1_gatedExecution_prereqs (witness : EnsembleWitness (sp1Ensemble (p := p)))
-    (decodedSound : DecodedRowsSound witness) (hB : witness.BalancedChannels) :
-    ∃ (rows : List (ChipRow p)) (data : ProverData (ZMod p)),
-      (∀ r ∈ rows, r.chipSpec data) ∧
-      (∀ r ∈ rows.map ChipRow.view, r.is_real = 0 ∨ r.is_real = 1) ∧
-      isConsistentBalanced (aggregateChipRows (rows.map ChipRow.view) stateLookups
-        ++ [(InteractionKind.State, "SP1State", initEntryOf witness.publicInput, (1 : ℤ)),
-            (InteractionKind.State, "SP1State", finalEntryOf witness.publicInput, (-1 : ℤ))]) := by
-  let rows := decodedChipRows witness.data witness.tables
-  obtain ⟨h_spec, hbin, h_corr⟩ := decodedSound
-  -- instantiate the balanced channels at the State channel (the ensemble channel-list head)
-  have h_balanced : BalancedInteractions
-      (witness.interactionsWith Channels.stateChannel.toRaw) := by
-    rw [← EnsembleWitness.interactionsWith_allTablesWitness]
-    exact hB Channels.stateChannel.toRaw (List.mem_cons_self ..)
-  exact ⟨rows, witness.data, h_spec, hbin,
-    sp1_state_balance_of_balancedInteractions witness.publicInput rows hbin _
-      (fun i hi => EnsembleWitness.channel_eq_of_mem_interactionsWith hi) h_balanced h_corr⟩
-
-/-- The frozen Eulerian-path compatibility result, with its semantic decode facts explicit.
-
-This is intentionally not an `Ensemble.Soundness` theorem: `DecodedRowsSound` is witness-dependent
-and does not follow from the raw ensemble algebra without the semantic provider/timestamp premises
-used by the current timed-grounding capstone. -/
-theorem balanced_state_trail_of_decoded_rows_sound
-    (witness : EnsembleWitness (sp1Ensemble (p := p)))
-    (decodedSound : DecodedRowsSound witness) (balanced : witness.BalancedChannels) :
-    balancedStateTrailSpec witness.publicInput := by
-  obtain ⟨rows, data, spec, binary, stateBalance⟩ :=
-    sp1_gatedExecution_prereqs witness decodedSound balanced
-  exact ⟨rows, gatedExecution_of_specs_and_balance rows data
-    (initEntryOf witness.publicInput) (finalEntryOf witness.publicInput)
-    spec binary stateBalance⟩
 
 end SP1Clean.Soundness

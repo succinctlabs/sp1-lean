@@ -27,8 +27,8 @@ This file recovers the bound non-circularly by chaining through the per-address 
 The structural induction along the per-address decreasing-timestamp event list (`isU64_of_limbChain`,
 assembled in `eventsAt_values_isU64`) gives every bus-backed access `isU64` read *and* written words;
 the headline `operand_{a,b,c}_isU64_of_memBalance` family projects that back to a real row's operands.
-This is W1c: the recovery feeding `sp1_gatedExecution_prereqs` part (c); the wiring into the capstone
-waits on W1b's row decode. -/
+This is the W1c operand-range recovery from the balanced bus (historical machinery; the live capstone
+derives operand bounds through the typed memory layer, `Soundness/TypedMemory.lean`). -/
 
 namespace SP1Clean.Soundness
 
@@ -276,8 +276,8 @@ theorem opCEvent_mem_memEventsFiltered {rows : List (Trace.RowView (ZMod p))}
 
 /-- **W1c headline (`op_a`).** On the balanced Memory bus, a real row's `op_a` operand —
 `op_a_memory.prev_value`, the prior value of `x[rd]` the chip reads — is `isU64`: each limb a genuine
-16-bit value. The recovery of the chip `Assumptions`' operand range facts from the bus, feeding
-`sp1_gatedExecution_prereqs` part (c); the wiring into the capstone rides W1b's row decode. -/
+16-bit value. The recovery of the chip `Assumptions`' operand range facts from the bus (historical W1c
+machinery; the live capstone derives these bounds through the typed memory layer). -/
 theorem operand_a_isU64_of_memBalance [NeZero p] {rows : List (Trace.RowView (ZMod p))}
     {memProv : LookupAccessList} (h : MemBalanceHyps rows memProv)
     {r : Trace.RowView (ZMod p)} (hr : r ∈ rows) (h_real : r.is_real ≠ 0) :

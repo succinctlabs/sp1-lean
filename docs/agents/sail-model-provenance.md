@@ -27,7 +27,7 @@ quantify over `reg_val`, `offset` and `width` with no range side-condition and c
 `.ok false s`, so `reg_val := 0x0200_0000` refutes them. Not merely unproved. Their fan-out is
 not confined to the memory chips: through `run_checked_mem_read_four_bytes_fetch_of_isInitialized`
 they reach the **instruction-fetch** reduction and hence every chip's `advance` obligation, all 25,
-up to `Soundness/AdvanceDispatch.lean`'s `chipRows_advance_sound`. Recovering them would need a
+up to the grounding engine that fires them (`RowWiring.advance_at`). Recovering them would need a
 per-access disjointness hypothesis that SP1's AIR does not derive — a new trust assumption — and
 would exclude guest programs that legitimately touch those addresses. Independently, SP1
 implements neither device: `clint`, `mtimecmp`, `pmpcfg` and `pmpaddr` appear **nowhere** in its
@@ -110,7 +110,7 @@ SHA, sail-riscv SHA, the opencompl base snapshot, the published SP1 snapshot) an
 - `--stock` — regenerate with the stock config and diff against the opencompl base. **Expected:
   byte-identical.** This is the pin-verification run; it also proves the generator's output is
   OS-independent (verified macOS vs the nightly's ubuntu, 2026-08-06).
-- `--sp1` — regenerate with the SP1 config; diff vs the base must show exactly the six sites,
+- `--sp1` — regenerate with the SP1 config; diff vs the base must show exactly the four sites,
   and diff vs the published SP1 snapshot must be identical (the script's exit gate).
 
 Publishing a new snapshot is deliberate and manual: branch the fork repo from the target
@@ -144,7 +144,7 @@ symbolically-reduced generated internals, independently of the config:
    pairing (opencompl's nightly clones both at head; recover its inputs by commit-time window if
    needed — that is how the current pins were discovered).
 2. `--stock` until byte-identical vs the new base; then `--make-config` (the stock config may
-   have gained keys) and `--sp1`; audit that the base diff is still exactly the six sites.
+   have gained keys) and `--sp1`; audit that the base diff is still exactly the four sites.
 3. Publish + tag + pin as above, and refresh the pin table in `docs/release-audit.md`.
 4. Expect churn in `Model/SailMemory.lean` and the `Proofs/Sail/` decode-reduction lemmas that
    pattern-match generated internals. The `11d8fa21` base carried a substantial such event: 158

@@ -7,7 +7,7 @@ import RISCV.SailToRV64
 /-! # Phase 4 — the uniform per-chip `advance` (Sail-step obligation)
 
 The generic composition wiring the Phase-3 `try_step` reduction ladder (`Proofs/Sail/TryStepReduction.lean`)
-into each chip's Sail-step obligation (`TargetObligations.lift`, `Soundness/TargetVm.lean`):
+into each chip's Sail-step obligation (`ChipKind.advance`, `Soundness/ChipRow.lean`):
 `RefinesAt → OperandsBound → ∃ s', SailStep s s' ∧ RowEffect prog row s s'`.
 
 The load-bearing goal is **uniformity**: one `sp1Effect` (a function of the committed `RowView`), one
