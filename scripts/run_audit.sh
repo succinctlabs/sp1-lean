@@ -172,6 +172,26 @@ python3 scripts/gen_axiom_probe.py || { echo "FAIL: probe generation"; exit 1; }
 # the tree untouched; a drift is a FAIL unless --update. With --update the fresh census (and
 # its current-commit stamp) is always installed — a content-identical restamp is hygienic and
 # records the verifying commit.
+#
+# Stamp integrity (external report F16): --update refuses to stamp from a dirty working tree —
+# a stamp names a commit, and a census generated over uncommitted changes would attribute the
+# wrong tree. (The generated snapshots themselves are exempt from the dirtiness check, so an
+# --update run that only rewrites them is fine.) On a content pass whose committed stamp is not
+# an ancestor of HEAD (a squash-merge artifact), print an explanatory NOTE rather than fail:
+# the content check above is the real gate, and this run just re-verified it at HEAD.
+census_stamp_guard() {
+  if [ "$update" -eq 1 ]; then
+    local dirty
+    dirty=$(git status --porcelain=v1 -- . ':!docs/snapshots' ':!scripts/axiom_probe.lean' \
+      ':!scripts/axiom_probe_test.lean' | grep -v '^??' || true)
+    if [ -n "$dirty" ]; then
+      echo "FAIL: --update refuses to stamp a census from a dirty working tree:"
+      echo "$dirty" | head -10
+      echo "(commit the changes first — the stamp must name the tree the census describes)"
+      exit 1
+    fi
+  fi
+}
 census_scope() {
   local scope="$1" probe="$2" census="$3"
   echo
@@ -244,6 +264,12 @@ EOF
   fi
   if diff -q <(grep -v '^#' "$census") <(grep -v '^#' "$fresh") >/dev/null 2>&1; then
     echo "PASS: census matches the committed snapshot ($census)"
+    local stamped
+    stamped=$(sed -n 's/^# sp1-lean \([0-9a-f]\{40\}\).*/\1/p' "$census" | head -1)
+    if [ -n "$stamped" ] && ! git merge-base --is-ancestor "$stamped" HEAD 2>/dev/null; then
+      echo "NOTE: the committed stamp $stamped is not an ancestor of HEAD (squash-merge"
+      echo "      artifact); the content was re-verified current at HEAD by this run."
+    fi
     if [ "$update" -eq 1 ]; then
       cp "$fresh" "$census"
       echo "UPDATED: $census restamped from this run (content unchanged)"
@@ -262,6 +288,7 @@ EOF
   rm -f "$fresh"
 }
 
+census_stamp_guard
 if [ "$run_main" -eq 1 ]; then
   census_scope "main" scripts/axiom_probe.lean docs/snapshots/axiom-census.txt
 fi

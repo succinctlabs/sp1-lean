@@ -1089,6 +1089,28 @@ def verify_extractor_clean(sp1_dir: str) -> None:
     print("Verified extraction checkout is clean at the pin")
 
 
+def verify_no_mprotect(sp1_dir: str) -> None:
+    """Pin the extraction profile: the `#[cfg(feature = "mprotect")]` assertions are deliberately
+    outside the extracted lists (the trusted, non-mprotect build is what SP1 proves in production),
+    and that exclusion must be an asserted property of the cargo feature resolution, not an
+    accident of default features (external report F17)."""
+    tree = subprocess.run(
+        ["cargo", "tree", "-e", "features", "-p", "sp1-constraint-compiler", "--prefix", "none"],
+        capture_output=True,
+        text=True,
+        cwd=sp1_dir,
+    )
+    if tree.returncode != 0:
+        raise SystemExit(f"cargo tree failed in extractor checkout {sp1_dir}:\n{tree.stderr}")
+    hits = [line for line in tree.stdout.splitlines() if "mprotect" in line]
+    if hits:
+        raise SystemExit(
+            "the extraction build enables the mprotect feature; the extracted assertion lists "
+            "would silently cover a different profile:\n  " + "\n  ".join(sorted(set(hits)))
+        )
+    print("Verified extraction profile excludes the mprotect feature")
+
+
 # ── Orchestration ───────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -1110,6 +1132,7 @@ def main() -> None:
 
     verify_extractor_overlay(sp1_dir, actual)
     verify_extractor_clean(sp1_dir)
+    verify_no_mprotect(sp1_dir)
 
     os.makedirs(EXTRACTED_DIR, exist_ok=True)
 
