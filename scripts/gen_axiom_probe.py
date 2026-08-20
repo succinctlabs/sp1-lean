@@ -64,7 +64,8 @@ TARGETS = [
     # check and the exact evaluated bus footprint. Keep its native_decide trust visible alongside
     # the older conformance and per-row satisfiability batteries.
     ("SP1CleanTest/Audit/*.lean",
-     r"theorem\s+(constraints_hold|interactions_exact|program_projection)\b"),
+     r"theorem\s+(constraints_hold|interactions_exact|program_projection|"
+     r"supportedCoreNativeRelation_nonvacuous)\b"),
     # The abstract walk/trail core (live — used by AIR + RankedGrounding).
     ("SP1Clean/Soundness/Walk.lean", r"theorem\s+(exists_trail)\b"),
     # The field⇒ℤ balance bridge (relocated in W11 Phase 5).
