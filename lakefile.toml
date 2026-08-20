@@ -72,7 +72,7 @@ rev = "2dad7788d58b09eabeb3898506e4cb896e5d3e9d"
 [[require]]
 name = "Lean_RV64D"
 git = "https://github.com/succinctlabs/sail-riscv-lean"
-rev = "df1acf579f8daf97c4dc3248565dec5a123079ef"
+rev = "befc6976ef53c592b637dc897f61b4e71467c239"
 
 # Lightweight ISA fns. Pinned to the succinctlabs fork head, which is the head of the open
 # opencompl/riscv-lean PR #59 ("chore: update to v4.32.2"); repoint to opencompl once that merges.

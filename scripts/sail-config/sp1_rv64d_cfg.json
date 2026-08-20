@@ -444,12 +444,12 @@
     },
     "physaddr_bits": 56,
     "pmp": {
-      "count": 0,
+      "count": 16,
       "grain": 0,
       "na4_supported": true,
       "napot_supported": true,
       "tor_supported": true,
-      "usable_count": 0
+      "usable_count": 16
     },
     "regions": [
       {

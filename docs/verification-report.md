@@ -158,8 +158,8 @@ SP1's runtime differs from a stock RV64 platform (no CLINT timer, no PMP, no ext
 device). Rather than assuming these away per-proof, the repository builds on a `sail-riscv-lean`
 snapshot **generated from pinned Sail sources with a checked-in SP1 platform configuration**
 (`scripts/sail-config/`; provenance and pipeline in `docs/agents/sail-model-provenance.md`).
-The semantic delta from the stock generated model is **exactly six platform-value sites across
-three generated files** — the images of a four-key config. The four top-level values are
+The semantic delta from the stock generated model is **exactly four platform-value sites across
+two generated files** — the images of a two-key config. The two top-level values are
 *disclosed* as `rfl` lemmas in `SP1Clean/Model/SailMemory.lean`; the remaining two sites are
 `let`-bindings inside the generated `ValidateConfig` check (configuration validation only, not
 on the execution path), visible in the generated source but not addressable as Lean lemmas:
@@ -167,17 +167,16 @@ on the execution path), visible in the generated source but not addressable as L
 ```
 plat_have_clint       = false   -- no core-local interruptor        (rfl lemma)
 plat_have_sig         = false   -- no interrupt-generator device    (rfl lemma)
-sys_pmp_count         = 0       -- no PMP entries (unprotected M-mode) (rfl lemma)
-sys_pmp_usable_count  = 0       -- must track sys_pmp_count         (rfl lemma)
 clint_supported       = false   -- ValidateConfig's CLINT check     (let-site in ValidateConfig)
 sig_supported         = false   -- ValidateConfig's SIG check       (let-site in ValidateConfig)
 ```
 
-The six sites are the images of four config keys (`platform.clint.supported`,
-`platform.simple_interrupt_generator.supported`, `memory.pmp.count`, `memory.pmp.usable_count`),
-so the old hand-maintenance invariant — upstream's own `ValidateConfig.check_pmp` rejects
-`sys_pmp_usable_count > sys_pmp_count`, and its CLINT/SIG checks constrain those windows —
-is enforced structurally by the generator reading each key everywhere it is consumed.
+The four sites are the images of two config keys (`platform.clint.supported`,
+`platform.simple_interrupt_generator.supported`), and the generator reads each key everywhere it is
+consumed. PMP is deliberately **not** configured: the model keeps upstream's 16 entries, and
+"every entry is OFF" is carried as the state hypothesis `isValidMemConfig.h_pmp_off` instead —
+visible in Lean rather than in the generation config. Nothing can falsify it, because SP1
+implements no CSR instructions (its disassembler maps every `csrr*` to `unimp`).
 
 The **two device keys are load-bearing, not a convenience**; the two PMP keys are weaker, and the
 report states the difference rather than averaging over it (audited 2026-08-19). SP1's address
@@ -191,12 +190,11 @@ reduction, so it reaches every chip's `advance` obligation, not only the memory 
 implements neither device (`clint`/`mtimecmp`/`pmpcfg`/`pmpaddr` appear nowhere in its Rust tree),
 so this is faithfulness as much as provability.
 
-`sys_pmp_count = 0` is weaker: it is consumed by one helper (`run_pmpCheck_none`) at three sites,
-all at machine privilege, where a stock 16-entry all-OFF PMP would return the same answer. Every
-downstream conclusion stays true against stock; only that helper would need restating, with a
-`pmpcfg_n = 0` field on `isValidMemConfig` and a 16-iteration loop peel. `sys_pmp_usable_count = 0`
-has **no** proof consumer at all (its `rfl` lemma is disclosure-only, deliberately not `@[simp]`);
-it is kept because upstream's own `check_pmp` rejects `usable_count > count`.
+The PMP keys were **dropped** on this basis (2026-08-19): a stock 16-entry all-OFF PMP returns the
+same answer at machine privilege, so every downstream conclusion held against stock. `run_pmpCheck_none`
+was restated over the `h_pmp_off` hypothesis and reproved — the entry walk is discharged by an
+invariant proved once by functional induction over `IntRange.forIn'`'s own well-founded measure, so
+it is independent of the entry count.
 
 The remaining platform configuration (machine privilege, disabled interrupts, HTIF off, the
 single SP1 PMA region, …) is packaged as the `SailConfigured` invariant carried through every

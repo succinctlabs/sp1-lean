@@ -2,8 +2,5 @@
   "platform": {
     "clint": { "supported": false },
     "simple_interrupt_generator": { "supported": false }
-  },
-  "memory": {
-    "pmp": { "count": 0, "usable_count": 0 }
   }
 }

@@ -531,7 +531,7 @@ after installing or toggling.
   condition, the modification-vs-addition split rule (what may go in the fork versus `ToClean/`),
   and the upstream PR queue with the measurement behind each entry.
 - `docs/agents/sail-model-provenance.md` — the generated `Lean_RV64D` snapshot's provenance: the
-  four-key SP1 config and its six generated sites, why stock upstream makes the memory-bridge
+  two-key SP1 config and its four generated sites, why stock upstream makes the memory-bridge
   lemmas false, the regeneration pipeline, and the re-pinning procedure.
 - `docs/agents/proof-patterns.md` — the witnessed-`FormalCircuit` soundness/completeness recipe + concrete
   landmines + the **Golf & cleanup discipline** section (how to golf/clean proofs safely).

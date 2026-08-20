@@ -1,11 +1,11 @@
 # Sail model provenance — the generated `Lean_RV64D` snapshot and its config
 
-`Lean_RV64D` is pinned to `succinctlabs/sail-riscv-lean@df1acf57` (branch
-`sp1/config-generated-4.32.2`, tag `sp1-rv64d-v1.0`). The snapshot is **generator output, not a
+`Lean_RV64D` is pinned to `succinctlabs/sail-riscv-lean@befc6976` (branch
+`sp1/config-generated-4.32.2`). The snapshot is **generator output, not a
 hand-edited fork**: the pinned Sail compiler run over the pinned `riscv/sail-riscv` sources with
 the SP1 platform configuration `scripts/sail-config/sp1_rv64d_cfg.json`. It equals the opencompl
-daily snapshot **`11d8fa21`** everywhere except the six platform-value sites the config sets.
-The maintained object is therefore a four-key config delta plus the five pins recorded in
+daily snapshot **`11d8fa21`** everywhere except the four platform-value sites the config sets.
+The maintained object is therefore a **two-key** config delta plus the five pins recorded in
 `scripts/sail-config/generate_lean_rv64d.sh` — not patched Lean.
 
 The full provenance record (compiler SHA, model SHA, config hash, invocation, environment,
@@ -34,82 +34,61 @@ implements neither device: `clint`, `mtimecmp`, `pmpcfg` and `pmpaddr` appear **
 Rust tree, and its only `Interrupt` type is a synchronous trap code. Verifying against a
 CLINT-enabled model would be verifying a different machine.
 
-**`memory.pmp.count = 0` — provability, not soundness.** It is consumed by exactly one lemma,
-`run_pmpCheck_none` (`Model/SailMemory.lean`), at three call sites, all of which instantiate
-`priv := Privilege.Machine`. Under stock (`sys_pmp_count = 16`) with all `pmpcfg` entries OFF,
-`pmpMatchAddr` returns `PMP_NoMatch` for every entry and the M-mode tail yields `none` — the same
-answer. So every downstream conclusion stays **true**; only the helper needs restating, with
-`priv := Machine`, a `pmpcfg_n = 0` field added to `isValidMemConfig` (one register of type
-`Vector (BitVec 8) 64`, so one hypothesis), and a loop invariant over the 16 entries — measured
-below at ~40 lines, not the peel first feared. It is the same *kind* of unconstrained-boot-register
-assumption `isValidMemConfig` already carries for `mstatus.MPRV`, `mseccfg` and
-`htif_tohost_base`, not a new class of trust. There is also a faithfulness leg (stock defines 16
-`pmpcfg*`/`pmpaddr*` CSRs, so a guest `csrw pmpcfg0` would succeed there and trap here), but SP1
-implements no CSR instructions — its disassembler maps every `process_csrr*` to
-`Instruction::unimp()` (`crates/core/executor/src/disassembler/rrs.rs`) — and no current proof
-covers one, so that leg is unexercised.
+**The PMP keys were dropped on 2026-08-19 — PMP-off is now a state hypothesis.** The audit found
+they were not load-bearing the way the device keys are. `sys_pmp_count = 0` was consumed by exactly
+one lemma, `run_pmpCheck_none`, at three call sites, all at machine privilege — and under stock
+(`sys_pmp_count = 16`) with every `pmpcfg` entry OFF, `pmpMatchAddr` returns `PMP_NoMatch` for each
+entry and the M-mode tail yields `none`, i.e. **the same answer**. `sys_pmp_usable_count = 0` had no
+proof consumer at all; it existed only because upstream's `check_pmp` rejects `usable_count > count`,
+so the two moved together.
 
-**`memory.pmp.usable_count = 0` — no proof consumes it.** Its disclosure lemma
-`sys_pmp_usable_count_eq_zero` is deliberately not `@[simp]` and has zero uses outside its own
-declaration; its consumers in the model are the CSR-write paths and the config validator, neither
-of which any proof reaches. It is kept because upstream's own `check_pmp` rejects
-`usable_count > count`, so shipping `count = 0` with `usable_count = 16` would be a config the
-model itself reports invalid.
+So the model now carries upstream's stock 16 entries, and "every PMP entry is OFF" is the hypothesis
+`isValidMemConfig.h_pmp_off` (sourced from `SailConfigured.pmp_off`, beside `htif_disabled`).
+Nothing can falsify it: SP1 implements no CSR instructions at all — its disassembler maps every
+`process_csrr*` to `Instruction::unimp()` (`crates/core/executor/src/disassembler/rrs.rs`) — so no
+entry can ever be installed. It joins `mstatus.MPRV`, `mseccfg` and `htif_tohost_base` as the same
+kind of unconstrained-boot-register assumption, not a new class of trust.
 
-**Cost of dropping the two PMP keys, measured 2026-08-19 — much lower than estimated.** The
-worry was that reproving `run_pmpCheck_none` against a stock 16-entry PMP needs a 16-iteration
-`SailME` peel, which would press the file's heartbeat budget (measured floor `(10k, 20k]`) under a
-regime that forbids raising it. **It does not.** `pmpCheck`'s `for i in [0:15:1]i` elaborates to
-`IntRange.forIn'` (`.lake/packages/Sail/Sail/IntRange.lean`), which is **well-founded** recursion
-and therefore carries a generated `IntRange.forIn'.loop.induct`. So the loop is discharged by an
-invariant proved *once by functional induction* — O(1) in the trip count, indifferent to whether
-the bound is 0 or 15 — rather than unrolled. Prototyped against the **current** model (no
-regeneration, no pin bump: the lemmas never mention `sys_pmp_count`):
+**Be precise about what this bought.** It *relocated* an assumption, it did not remove one: the
+config shrank from four keys / six sites to two / four, and `isValidMemConfig` grew a seventh field.
+The gain is auditability — PMP-off is now visible in Lean, in the execution model, rather than in a
+JSON file feeding a code generator.
 
-- `run_loop_const` — if every iteration yields with the state untouched, the whole loop is a no-op.
-- `run_ME_loop_const` — the same in `SailME`, the monad `pmpCheck` uses, in the
-  `EStateM.run (ExceptT.run …)` idiom of the file's existing `run_ME_*` toolkit.
-- `run_pmpMatchAddr_zero` — an all-zero cfg entry takes `pmpMatchAddr`'s `.OFF` arm
-  (`PmpControl.lean:294`), so it is `PMP_NoMatch` with the state untouched, uniformly in `i`.
+**The proof turned out cheap, contrary to the first estimate.** The worry was that reproving
+`run_pmpCheck_none` against 16 entries needed a 16-iteration `SailME` peel that would press the
+file's heartbeat budget. It does not: `pmpCheck`'s `for i in [0:15:1]i` elaborates to
+`IntRange.forIn'` (`.lake/packages/Sail/Sail/IntRange.lean`), which is **well-founded** recursion and
+so carries a generated `IntRange.forIn'.loop.induct`. The walk is discharged by `run_ME_loop_const`,
+an invariant proved **once by functional induction** — O(1) in the trip count, indifferent to whether
+the bound is 0 or 15. The supporting facts are small: `run_pmpMatchAddr_zero` (an all-zero cfg entry
+takes the `.OFF` arm), `run_pmpReadAddrReg` (it only reads registers, so it preserves the state), and
+`getElem!_replicate_zero` (any index of an all-zero vector is `0#8`, including out of range where
+`getElem!` returns the default). No budget escape was needed anywhere.
 
-~40 lines total, **~2s to elaborate, all axiom-clean**, nothing near the budget. The remaining work
-is mechanical: a `pmp_off` field beside `htif_disabled` in `Model/Semantics/GuestProgram.lean` and
-on `isValidMemConfig`, one extra `by rwa [key …]` line at each of ~10 chip `Bridge.lean` sites
-(template: `Proofs/Chips/StoreByteChip/Bridge.lean:55-69`), the concrete witness in
-`FormalModel/Trace/Witness.lean` (pattern at `:164`), and a regeneration + snapshot republish +
-pin bump. Note this **relocates** the assumption rather than removing it: 2 config keys / 4
-generated sites and a 7th `isValidMemConfig` field, instead of 4 keys / 6 sites and 6 fields. The
-gain is that it becomes a hypothesis visible in Lean rather than a JSON key feeding a code
-generator.
-
-The four top-level generated values (`plat_have_clint`, `plat_have_sig`, `sys_pmp_count`,
-`sys_pmp_usable_count`) are disclosed to the audit surface as `rfl` lemmas in
+The two top-level generated values (`plat_have_clint`, `plat_have_sig`) are disclosed to the audit surface as `rfl` lemmas in
 `Model/SailMemory.lean`; the other two generated sites are `let`-bindings inside
 `ValidateConfig` (config validation only) and are not addressable as lemmas.
 
-## The configuration (four keys → six generated sites)
+## The configuration (two keys → four generated sites)
 
 `scripts/sail-config/sp1-overlay.json` is the whole semantic delta from the stock rv64d config:
 
 ```json
 { "platform": { "clint":                      { "supported": false },
-                "simple_interrupt_generator": { "supported": false } },
-  "memory":   { "pmp": { "count": 0, "usable_count": 0 } } }
+                "simple_interrupt_generator": { "supported": false } } }
 ```
 
-The generator constant-folds these into six definition sites (match on the `def` name — line
+The generator constant-folds these into four definition sites (match on the `def` name — line
 numbers drift on every regeneration):
 
 | Generated site | Config key | Stock → SP1 | Meaning |
 |---|---|---|---|
 | `PlatformConfig.lean` `plat_have_clint` | `platform.clint.supported` | `true → false` | CLINT (core-local interrupt timer) off — SP1 has no timer device |
 | `PlatformConfig.lean` `plat_have_sig` | `platform.simple_interrupt_generator.supported` | `true → false` | The MMIO device that injects external interrupts, off — SP1 has no such device and no external interrupts. (`sig` is *simple interrupt generator*, not "signature": `sig_load` returns a version word, `sig_store` sets the external-interrupt-pending bits) |
-| `PmpRegs.lean` `sys_pmp_count` | `memory.pmp.count` | `16 → 0` | No PMP entries — SP1 runs unprotected M-mode. The declared Sail type is `{0, 16, 64}`; 0 is a sanctioned value |
-| `PmpRegs.lean` `sys_pmp_usable_count` | `memory.pmp.usable_count` | `16 → 0` | Upstream's `check_pmp` rejects `usable_count > count`, so the pair moves together |
 | `ValidateConfig.lean` `clint_supported` | `platform.clint.supported` (re-read) | `true → false` | Config validator's CLINT check |
 | `ValidateConfig.lean` `sig_supported` | `platform.simple_interrupt_generator.supported` (re-read) | `true → false` | Config validator's interrupt-generator check |
 
-Because the six sites are images of four config keys, the old hand-maintenance invariant ("all
+Because the four sites are images of two config keys, the old hand-maintenance invariant ("all
 six must move together or the platform is incoherent") is now structural: the generator reads
 each key everywhere it is consumed.
 

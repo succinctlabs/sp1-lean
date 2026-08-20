@@ -31,10 +31,10 @@ No main-library proof is deferred. This audit found no `sorry`, `stop`, project 
 | SP1 extraction branch | `b5616f908c393d6050970630871f69afe233a21c` (`dtumad/lean-extraction`, `v6.4.0-10-gb5616f908`) |
 | mathlib pin | `905b95818eb32af7874a58b427f50c1711a5e96c` (tag `v4.32.2`) |
 | Clean pin | `2dad7788d58b09eabeb3898506e4cb896e5d3e9d` (**fork** — see below) |
-| Lean_RV64D pin | `df1acf579f8daf97c4dc3248565dec5a123079ef` |
+| Lean_RV64D pin | `befc6976ef53c592b637dc897f61b4e71467c239` |
 | Sail compiler source | `41694abd58b27b687af5db275810dfeb8a88cfc0` (rems-project/sail, `sail2`) |
 | sail-riscv model source | `61266bd4dede6c7dd6e903e52dc80bcbf644b1b8` (riscv/sail-riscv, `master`) |
-| SP1 Sail config | sha256 `6be6e6abe7389f7f7e67c4afe8583f769a6d252739672ed2b18224ef91e04621` (`scripts/sail-config/sp1_rv64d_cfg.json`) |
+| SP1 Sail config | sha256 `41311181e4cad458c21b01a0160a0087b407ee15e616243013169d52d3c1a854` (`scripts/sail-config/sp1_rv64d_cfg.json`) |
 | RISCV pin | `d1d678c67f3039b5fb8a9c5aba76904c5793756b` |
 | lean-sail pin | `079463134b9c50450b8393e1566a09fc492a34d9` (tag `v5`) |
 | PolyFun pin | `d062ba2cbb3a50ba5b9f3ba349ca003e6c79630a` (upstream `main`) |
