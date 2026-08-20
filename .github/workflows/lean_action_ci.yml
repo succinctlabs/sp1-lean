@@ -95,8 +95,9 @@ jobs:
         run: lake lint
 
   test:
-    # Conformance tests (`lake test` → the `SP1CleanTest` testDriver: the witness-generation and
-    # whole-trace `native_decide` anchors checked against batteries dumped from SP1's real Rust prover).
+    # Conformance tests (`lake test` → the `SP1CleanTest` testDriver: the exportability battery and
+    # the non-vacuity/real-row satisfiability anchors; whole-trace conformance itself is the separate
+    # dump-anchored pipeline re-run below via `check_witgen_export.sh --regen`).
     # These live in their own library — the ONLY place `native_decide` is allowed — so they are gated
     # here, separately from the `native_decide`-free main build. Split into its own job (in parallel with
     # `lint`) so the trusted-compiler checks are clearly independent in the checks list. `needs: build`

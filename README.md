@@ -46,9 +46,13 @@ The repository also contains a complete list-level model of the pinned upstream 
 - the 160-cell public-value block; and
 - a preprocessed-commitment and exact natural interaction-balance relation.
 
-That exact upstream relation has not yet been connected all the way to Sail. The remaining work is to
-derive the native theorem's program/provider, memory-uniqueness, timestamp, and syscall facts from the
-six Core system tables.
+That exact upstream relation has not yet been connected all the way to Sail. The remaining work has
+two halves: **transport the 25 instruction tables** — construct a valid native witness from a valid
+extracted witness through the whole-chip `ChipFaithful` codecs (today the Rust-faithfulness theorems
+and the Sail-soundness capstone are two theorem families that share an endpoint but are not composed
+inside Lean; `Faithful/` is not in the capstone's import closure) — and **derive the native
+theorem's program/provider, memory-uniqueness, timestamp, and syscall facts** from the Core system
+tables.
 
 The available exact-AIR declarations are deliberately conditional:
 
@@ -109,7 +113,7 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The audit regenerates a 503-declaration `#print axioms` census and checks source deferrals, project
+The audit regenerates a 490-declaration `#print axioms` census and checks source deferrals, project
 axioms, forbidden kernel bypasses, main-library `native_decide`, and performance-budget drift.
 Sail-model platform hooks, selected generated `bv_decide` proof constants, and the trusted extraction
 toolchain are disclosed in the report.

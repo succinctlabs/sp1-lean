@@ -106,6 +106,38 @@ that sits in the default loop and composes with #1879 either way; the `${config_
 additions split out as #1885. Both filed, comment posted. Reasoning and the local verification are
 in `sail-model-provenance.md`.
 
+## Draft 4 — SP1 upstream: `#[repr(C)]` on `RegisterAccessCols` — **PREPARED, owner-gated**
+
+External PR110 report, Finding 6 (confirmed independently 2026-08-20: of 133 `AlignedBorrow`
+structs across `crates/core/machine` + `crates/hypercube`, exactly one lacks `#[repr(C)]`).
+`AlignedBorrow` generates an `unsafe` `align_to::<Self>()` reinterpretation of a raw row slice;
+without `#[repr(C)]` the field order is compiler-chosen, so the cast relies on unspecified layout.
+Currently benign (rustc does not reorder these two same-alignment fields, and the name-keyed
+`IntoShape`/`StructReflection` paths are order-independent), but it is a real hygiene defect and a
+hazard for any positional trace consumer. Target: upstream `succinctlabs/sp1` dev line (the
+extraction branch inherits it on merge — do NOT commit it to `dtumad/lean-extraction` separately;
+that would churn `SP1_PINNED_COMMIT` for no verification gain).
+
+Patch (one line, `crates/core/machine/src/memory/consistency/columns.rs`):
+
+```rust
+ #[derive(
+     AlignedBorrow, StructReflection, Default, Debug, Clone, Copy, Serialize, Deserialize, IntoShape,
+ )]
++#[repr(C)]
+ pub struct RegisterAccessCols<T> {
+     pub prev_value: Word<T>,
+     pub access_timestamp: RegisterAccessTimestamp<T>,
+ }
+```
+
+Optional rider: a repo test asserting every `AlignedBorrow` struct carries `#[repr(C)]` (a
+source-scan unit test beside the derive, or the derive itself emitting a compile error when the
+attribute is absent — the derive-side check is the robust form and is a ~5-line change in
+`sp1-derive`).
+
+---
+
 ## Held deliberately (recorded so it is a decision, not an oversight)
 
 - **`doc/witgen-wire-format.md`** — stays in this repo. Upstream keeps `WitnessExport.lean` as a

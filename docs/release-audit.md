@@ -41,10 +41,12 @@ No main-library proof is deferred. This audit found no `sorry`, `stop`, project 
 
 Every dependency is an immutable git pin — `lake-manifest.json` records no `path` entries, so a clean
 clone reproduces this graph. `Lean_RV64D` is pinned to a **generated** snapshot on
-`succinctlabs/sail-riscv-lean` (branch `sp1/config-generated-4.32.2`, tag `sp1-rv64d-v1.0`): the
+`succinctlabs/sail-riscv-lean` (branch `sp1/config-generated-4.32.2`; the `sp1-rv64d-v1.0` tag marks
+the earlier four-key snapshot and deliberately was not moved): the
 pinned Sail compiler + sail-riscv sources above run against the schema-shaped SP1 platform config,
 reproducible via `scripts/sail-config/generate_lean_rv64d.sh` (`docs/agents/sail-model-provenance.md`).
-It equals the opencompl base `11d8fa21` except the six platform-value sites the config sets; the
+It equals the opencompl base `11d8fa21` except the four platform-value sites the two-key config sets
+(PMP-off moved to a Lean-side hypothesis, 2026-08); the
 snapshot's commit message carries the full provenance record. `RISCV` is pinned to the head of the
 open opencompl PR #59; repoint it to opencompl once that merges.
 
@@ -214,8 +216,8 @@ stream.
 - a zero-tolerance project-axiom scan;
 - `skipKernelTC` and main-library `native_decide` guards;
 - an elaboration-budget escape-hatch prohibition (allowlist-gated); and
-- a generated `#print axioms` census over the released theorem surface — currently 503 probed
-  declarations, split 466 (main library) plus 37 (test anchors) — split by library and
+- a generated `#print axioms` census over the released theorem surface — currently 490 probed
+  declarations, split 453 (main library) plus 37 (test anchors) — split by library and
   diffed against the committed `docs/snapshots/axiom-census.txt` (main) and
   `docs/snapshots/axiom-census-test.txt` (test anchors) — drift fails; only `--update` rewrites
   the snapshots, so a passing run leaves the tree clean.
@@ -256,6 +258,8 @@ recomputed and matched cell-for-cell), and the independent Rust interpreter diff
 |---|---|---|
 | SP1 constraint compiler/exporter | translates Rust AIR expressions to Lean lists | pin/diff/hash checks plus independent `ChipFaithful` proofs |
 | Generated Sail platform hooks | official model leaves platform operations external | narrow the model interface or prove concrete platform refinements |
+| Two-key generated Sail config | `clint`/`simple_interrupt_generator` disabled at four generated value sites — devices SP1 does not implement, whose stock defaults make the memory-bridge lemmas false as stated | stays config-generated; the generation pins and config hash are gated by `check_pins.sh` |
+| `SailConfigured` platform state | the theorems' initial-state hypotheses select SP1's platform on the Lean side: machine mode, no enabled interrupts, `MPRV`/`mseccfg`/PMM off, no HTIF, PMP all-OFF (`h_pmp_off`), and the single RWX PMA region `[2^16, 2^48)` | discharge per-field from SP1's boot/ELF-load contract; the PMA window and PMP-off are the platform selection itself (verification-report §3.2) |
 | Native semantic boundary relation | native provider tables must mean the selected program/state | derive from exact Program/Memory/Global system tables |
 | Timestamp high bound | prevents wrap in MemoryAccess ordering | derive from exact public timestamp/range and memory permutation |
 | `SyscallHandler` | Sail does not implement SP1 host syscalls | prove concrete handlers for claimed syscalls |

@@ -42,9 +42,10 @@ The deliverables:
   38-table ensemble, with explicit boundary and timestamp premises, yields a genuine finite run
   of the official (SP1-configured, §3.2) Sail RV64 interpreter between the public
   program-counter/clock endpoints (§8).
-- **D6 — Conformance testing against the real prover.** A quarantined `native_decide` test
-  library checks native witness generation and whole-chip trace generation cell-for-cell against
-  batteries dumped from SP1's actual Rust prover at SP1's field (§9).
+- **D6 — Conformance testing against the real prover.** A dump-anchored pipeline reconstructs
+  every event row of all 25 chips from the circuits' own witness generators and matches it
+  cell-for-cell against full trace matrices dumped from SP1's actual Rust prover at SP1's field,
+  with an independent Rust interpreter differential on top (§9).
 - **D7 — A reproducible audit harness.** One script (`scripts/run_audit.sh`) re-derives the
   dependency pins, gates zero proof deferrals with an empty allowlist, and regenerates a
   per-theorem `#print axioms` census (§13).
@@ -152,7 +153,7 @@ engine is anchored to the generated `ext_decode` (a `decodedInROM` fact yields
 `(ext_decode w).run s = .ok i s`), with per-class round-trip lemmas — so opcode/funct field
 extraction is the Sail model's, not a re-implementation.
 
-### 3.2 The generated platform configuration: six value sites
+### 3.2 The generated platform configuration: two keys, four value sites
 
 SP1's runtime differs from a stock RV64 platform (no CLINT timer, no PMP, no external-interrupt
 device). Rather than assuming these away per-proof, the repository builds on a `sail-riscv-lean`
@@ -643,16 +644,18 @@ discloses which of these each headline declaration actually touches.
   in the generated source, §3.2), and every dependency stays an immutable git pin.
 - **T5 — The Clean DSL is pinned to a fork.** Every circuit here is built on Clean, and that
   dependency is currently `dtumad/clean` (branch `sp1-integration`), not upstream
-  `Verified-zkEVM/clean`. The base is the previous upstream pin; the delta is a single change plus a
-  worked example: `ProverEnvironment.AgreesBelow` is strengthened to constrain a prover
-  environment's committed `data` and `hint`, not only its witness cells. The change is a bug fix —
-  the example file's `not_computable_from_cells_alone` proves the prior obligation was *false* for
-  any witness generator reading committed data — and it cannot be shimmed downstream, since Clean's
-  own honest-witness-generation theorem refers to Clean's definition. `AgreesBelow` occurs in
+  `Verified-zkEVM/clean`. The base is the previous upstream pin; the delta is two upstream-destined
+  branches, both with open PRs, and the pin returns to upstream as they merge. (1) `AgreesBelow`:
+  `ProverEnvironment.AgreesBelow` is strengthened to constrain a prover environment's committed
+  `data` and `hint`, not only its witness cells. The change is a bug fix — the example file's
+  `not_computable_from_cells_alone` proves the prior obligation was *false* for any witness
+  generator reading committed data — and it cannot be shimmed downstream, since Clean's own
+  honest-witness-generation theorem refers to Clean's definition. `AgreesBelow` occurs in
   hypothesis position everywhere but one discharge site, so no Clean conclusion is weakened and the
-  two theorems concluding with it become strictly stronger. It is upstream-destined with an open PR;
-  the pin returns to upstream on merge. Full disclosure, including the standing rule for what may
-  live in the fork versus this project's additive `ToClean/` library, is in
+  two theorems concluding with it become strictly stronger. (2) `witgen-share`: the proven
+  subterm-sharing pass for witness programs (`WitgenIR.share` + the kernel-checked `eval_share`),
+  which the committed witness-export goldens depend on. Full disclosure, including the standing
+  rule for what may live in the fork versus this project's additive `ToClean/` library, is in
   `docs/agents/clean-upstream.md`; the pin table is in `docs/release-audit.md`.
 - **M1 — The semantic boundary binding.** Provider/boundary tables mean the selected program and
   initial state (`SP1SemanticBoundaryRelation`, §8.1). Its provider-content facts are to be
@@ -704,7 +707,7 @@ beyond the report compared here.
 | Circuit side | Transpiled/extracted constraints are the proof object; AIR columns hand-transcribed with "eyeball correspondence" macros | Independent hand-built Clean circuits; extracted lists are a *comparison target*; whole-chip bidirectional `ChipFaithful` + interaction-multiset permutation |
 | Bus semantics | `BusEntry` classes: well-formedness assumed on read / asserted on write; bus *axioms* (pc bounds, timestamp bounds) justified **on paper** (their §E1–E12, §M1–M6) | Channel guarantees are row-local facts backed by receiver circuits; read-side meaning derived in-kernel from Clean's balance theorem + timestamp rank plus the named boundary premises of §8.1 (§6); zero paper bus axioms |
 | Consistency | Rising-bus theorem: execution/memory bus entries can be reordered chronologically, conditional on balance hypotheses; per-opcode row-local equivalence theorems | One glued theorem: balanced constrained witness + the disclosed boundary/timestamp premises (§8.1) → existence of a Sail interpreter run with matching public endpoints (§8.2); per-chip statements are internal lemmas of it |
-| Prover conformance | none against the real prover/witness generator (their CI gates — an axiom-hygiene scan, an in-build `collectAxioms` audit, and an independent re-export comparator — police the *axiom footprint*, not prover-trace conformance) | `native_decide` witness + whole-trace batteries vs the real prover at SP1's field (§9) |
+| Prover conformance | none against the real prover/witness generator (their CI gates — an axiom-hygiene scan, an in-build `collectAxioms` audit, and an independent re-export comparator — police the *axiom footprint*, not prover-trace conformance) | dump-anchored cell-for-cell reconstruction of all 25 chips' traces vs the real prover at SP1's field, plus a Rust interpreter differential (§9) |
 | Crypto trust | Lookup argument + proof system assumed (their I1 = lookup/bus argument, I2 = proof system; their I3/I4 cover spec faithfulness and Lean's kernel) | Same boundary, expressed as named relations/obligations (C1–C3) with an ArkLib-shaped target signature |
 | Claim discipline | Per-opcode theorems + consistency lemmas | Reserved-name policy: headline names undeclared until unconditional (§8.3) |
 | Their broader coverage | Immediate-variant opcodes verified as first-class; RV32 spec assumptions (S1–S4, A1–A4) documented per-proof | Immediate variants fold into base chips (as SP1 itself does); completeness witnesses currently cover register-register forms only for Bitwise/Lt/Addw (ADDIW) and rd ≠ x0 rows for UType — soundness and the Sail advance cover all variants (disclosed, §12.4) |

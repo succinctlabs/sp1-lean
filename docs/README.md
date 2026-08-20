@@ -13,6 +13,7 @@ Each document has **one role**, so none needs to repeat another:
 | [`verification-report.md`](verification-report.md) | the long-form external report — argues and evidences each claim |
 | [`release-audit.md`](release-audit.md) | machine-adjacent audit record: pins, gates, census |
 | [`audits/2026-08-independent-semantic-audit.md`](audits/2026-08-independent-semantic-audit.md) | point-in-time independent second opinion on semantic foundations and ArkLib/VCVio readiness |
+| [`audits/2026-08-pr110-external-report-disposition.md`](audits/2026-08-pr110-external-report-disposition.md) | finding-by-finding disposition of the external adversarial PR #110 report, updated per campaign wave |
 | [`architecture.md`](architecture.md) | module/pillar ownership, design rules, deliberate exceptions |
 | [`roadmap.md`](roadmap.md) | dependency-ordered future work + non-blocking backlog |
 | [`goal-overview.md`](goal-overview.md) | the completed-state contract (never current status) |

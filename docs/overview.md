@@ -217,7 +217,12 @@ The audit separates proof incompleteness from external trust:
 
 The semantic boundary and timestamp relations in `SupportedCoreNativeRelation` are theorem premises,
 not hidden axioms. Full upstream soundness requires deriving them from the exact system AIR and
-cryptographic binding relations.
+cryptographic binding relations. The single most load-bearing semantic premise deserves naming here:
+`SailCodeMemoryCompatible` — every store on the run preserves the program's ROM bytes. SP1 fetches
+instructions from an immutable program table while unmodified Sail fetches from the same mutable
+memory that stores write to; for a guest that overwrites its own code the two genuinely diverge, and
+the theorem simply does not apply. Self-modifying programs are excluded by assumption, not proved
+impossible.
 
 Three named link predicates (`TraceStateLink`, `TraceByteLink`, `TraceMemClkValid`) appear in the
 standalone per-bus consistency modules as their honestly-stated premises. They are **not** premises
@@ -234,8 +239,8 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The audit regenerates the declaration list and raw `#print axioms` census — currently 503 probed
-declarations, split 466 (main `SP1Clean` library) plus 37 (`SP1CleanTest` anchors) — and compares it
+The audit regenerates the declaration list and raw `#print axioms` census — currently 490 probed
+declarations, split 453 (main `SP1Clean` library) plus 37 (`SP1CleanTest` anchors) — and compares it
 against the committed snapshot (drift fails; `--update` rewrites deliberately). It also cross-checks
 every recorded pin and doc-cited count against the build graph.
 
