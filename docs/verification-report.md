@@ -468,13 +468,15 @@ The capstone quantifies over a `Machine.SP1MachineModel` (scheduling + boot pack
 by `UsesOrdinarySchedule` (ordinary instructions take the 8-tick schedule). Only the schedule
 field is consumed by the shard-local theorem; boot reachability is deliberately deferred to a
 later anchor. Two honest notes: (i) no `SP1MachineModel` instance is currently constructed
-in-repo, so the theorem is a parametric conditional not yet exercised end-to-end — the
-configured-state core is already witnessed (`isInitialState_nonvacuous`,
-`FormalModel/Trace/Witness.lean`), but the model's total boot-loader field (ROM+image loading for
-arbitrary well-formed programs) is filed follow-up work, and an empty-shard witness of the full
-native relation was assessed feasible but is not yet constructed (audit findings
-F-A8-04/F-A9-02); (ii) the shard-local initial state comes from the boundary binding, not from
-`model.boot`.
+in-repo, so the theorem is a parametric conditional — the configured-state core is witnessed
+(`isInitialState_nonvacuous`, `FormalModel/Trace/Witness.lean`), and the **full hypothesis
+bundle is now jointly witnessed**: `SP1CleanTest/Audit/JointNonVacuity.lean` proves
+`SupportedCoreNativeRelation` outright at SP1's prime for a minimal one-instruction statement (a
+`JAL x0, 0` self-jump; the empty program is *unsatisfiable* — `WellFormed` demands a fetchable
+entry word — so the witness carries a real ROM row, and its `SailCodeMemoryCompatible` field is
+proved through the actual jal `advance` machinery rather than vacuously); the model's total
+boot-loader field (ROM+image loading for arbitrary well-formed programs) remains filed follow-up
+work; (ii) the shard-local initial state comes from the boundary binding, not from `model.boot`.
 
 ### 7.3 What is *not* claimed at this layer
 
@@ -597,7 +599,8 @@ the former named `Lean.ofReduceBool`/`Lean.trustCompiler` axioms). What conforma
 populate fidelity and non-vacuity evidence on real prover data. What it does not: proof. The two
 layers are complementary by construction.
 
-Additionally, two satisfiability batteries close the chip-level vacuity questions:
+Additionally, the satisfiability layer closes the vacuity questions at three levels — per-chip
+rows, per-family decode facts, and the joint hypothesis bundle:
 
 - `SP1CleanTest/NonVacuity.lean` witnesses the satisfiability of every non-trivial chip
   `Assumptions` (all 20 chips whose assumptions are not literally `True`) — mostly at padding
@@ -612,6 +615,23 @@ Additionally, two satisfiability batteries close the chip-level vacuity question
   balance-checked); the rows follow the dumped Rust traces' clock discipline. This closes the
   "could a chip's constraint system be unsatisfiable on the rows that matter?" question — the
   failure mode where a soundness theorem is true only vacuously.
+- The **per-family decode witnesses** (main library, axiom-clean at the default budgets):
+  `Model/SailDecode.lean` reduces the real generated `ext_decode` on one concrete word per
+  `instrToProgramRow` family — all 18 families — and `Soundness/Decode.lean` composes each into
+  an end-to-end `decodedInROM` example on a concrete one-instruction program. A mis-transcribed
+  projection arm now fails a named theorem instead of making the capstone silently vacuous for
+  its rows. Restoring this evidence surfaced a live instance of exactly that hazard: the
+  decoder's MUL/DIV arms test `misa.M`, which `SailConfigured` did not pin, so `decodedInROM`
+  was unsatisfiable for all 13 M-extension opcodes until the `misa_m` field was added
+  (2026-08-20). The per-family hoist lemmas (`decodedInROM_<family>_hoist`, all 18) additionally
+  prove the strengthened ∃-instruction form derivable from the weak ∀-state one.
+- The **joint anchor** (`SP1CleanTest/Audit/JointNonVacuity.lean`): a fully proved witness of
+  the entire `SupportedCoreNativeRelation` at SP1's prime — a one-`JAL` statement with equal
+  boundary endpoints, the 38-table witness with zero-row chip/provider tables, canonical
+  committed prover data, and every `InitialBoundaryFacts` field discharged, including a real
+  (non-vacuous) `SailCodeMemoryCompatible` proof via the jal step machinery. The capstone
+  applied to it yields the zero-step execution; a satisfying *non-empty* shard witness is the
+  machine-completeness work and is deliberately out of this anchor's scope.
 
 ## 10. Trust base
 

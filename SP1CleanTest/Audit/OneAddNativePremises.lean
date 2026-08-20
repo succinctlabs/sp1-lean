@@ -7,10 +7,12 @@ representative program counters predate the committed guest-program window. This
 the retained `ADD x1, x2, x3` example at `0x10000`, proves the full native Add circuit constraints,
 and freezes the complete evaluated interaction list across all four buses.
 
-This deliberately does **not** claim a witness of `SupportedCoreNativeRelation`. Closing that joint
-claim additionally requires the Program provider's `decodedInROM` fact, whose concrete
-`LeanRV64D.ext_decode` witness was retired during the Sail-v5 migration. The exact interaction list
-below makes the remaining provider/boundary work visible without disguising that decode seam.
+This anchor's scope is the one-ADD row's own constraints and interactions. The joint satisfiability
+of `SupportedCoreNativeRelation` is witnessed separately (`Audit/JointNonVacuity.lean`, the empty
+shard), and the per-family `decodedInROM` satisfiability — whose concrete `LeanRV64D.ext_decode`
+witness was retired during the Sail-v5 migration and restored 2026-08 at full family coverage — by
+the 18 examples in `Soundness/Decode.lean` on top of `Model/SailDecode.lean`'s decode battery. The
+exact interaction list below makes the provider/boundary content of a real row visible.
 -/
 
 namespace SP1Clean.Audit.OneAddNativePremises

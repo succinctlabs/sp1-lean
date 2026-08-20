@@ -36,6 +36,12 @@ instance instFact2pow17SP1Prime : Fact (2 ^ 17 < SP1Prime) := ⟨by norm_num [SP
 (`2^24 = 16777216 < SP1Prime`). -/
 instance instFact2pow24SP1Prime : Fact (2 ^ 24 < SP1Prime) := ⟨by norm_num [SP1Prime]⟩
 
+/-- The AIR-relation layer (`Soundness/AIR.lean`) states `SupportedCoreNativeRelation` and the
+capstone under `Fact (2 ^ 25 < p)`; discharged at KoalaBear (`2^25 = 33554432 < SP1Prime`) so the
+capstone's hypothesis bundle is instantiable at the real prime (exercised by
+`SP1CleanTest/Audit/JointNonVacuity.lean`). -/
+instance instFact2pow25SP1Prime : Fact (2 ^ 25 < SP1Prime) := ⟨by norm_num [SP1Prime]⟩
+
 /-- Cast a single ℕ (a dumped canonical field value) into SP1's field. -/
 def toField (n : ℕ) : ZMod SP1Prime := (n : ZMod SP1Prime)
 
