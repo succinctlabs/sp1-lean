@@ -97,6 +97,12 @@ structure SailConfigured (s : SailState) : Prop where
   htif_disabled : s.regs.get Register.htif_tohost_base (init _) = none
   /-- Every PMP entry is OFF — SP1 implements no CSR instructions, so none can ever be installed. -/
   pmp_off : s.regs.get Register.pmpcfg_n (init _) = Vector.replicate 64 0#8
+  /-- `misa.M = 1` — the M extension is enabled at boot (and `misa` is boot-stable: SP1 implements
+  no CSR writes). The generated decoder's MUL/DIV arms guard on `currentlyEnabled Ext_M`, which
+  tests exactly this bit, so without the pin `decodedInROM` is unsatisfiable for every M-family
+  row — the silent-vacuity hazard the external PR110 report's Finding 3 warns about, found real
+  for this family and closed by this field (2026-08-20). -/
+  misa_m : _get_Misa_M (s.regs.get Register.misa (init _)) = 1#1
   /-- The single fixed SP1 PMA region (bare translation) — the fetch/load address decode. -/
   pma_regions : s.regs.get Register.pma_regions (init _) = [SailMem.SP1_PMA_Region]
 

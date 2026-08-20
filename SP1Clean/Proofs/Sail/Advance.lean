@@ -584,6 +584,7 @@ theorem SailConfigured.writeMinstret {s : SailState} (cfg : SailConfigured s) (b
   mseccfg_pmm := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.mseccfg_pmm
   htif_disabled := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.htif_disabled
   pmp_off := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.pmp_off
+  misa_m := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.misa_m
   pma_regions := by rw [get_writeMinstret_ne (by decide) s b (cfg.init _)]; exact cfg.pma_regions
 
 /-- **Register read-back.** The value `wX_bits`/`execute` writes to a non-`x0` register `rd` reads back
@@ -617,7 +618,8 @@ with `s` on the nine config registers is itself `SailConfigured` — the `RowEff
 theorem SailConfigured.congr {sf s : SailState} (cfg : SailConfigured s) (hinit : sf.isInitialized)
     (hf : ∀ R : Register, R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus
       ∨ R = Register.mideleg ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base
-      ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n → sf.regs.get? R = s.regs.get? R) :
+      ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n ∨ R = Register.misa →
+      sf.regs.get? R = s.regs.get? R) :
     SailConfigured sf := by
   have hget : ∀ (R : Register) (hsf : R ∈ sf.regs), sf.regs.get? R = s.regs.get? R →
       sf.regs.get R hsf = s.regs.get R (cfg.init R) := by
@@ -636,6 +638,7 @@ theorem SailConfigured.congr {sf s : SailState} (cfg : SailConfigured s) (hinit 
       mseccfg_pmm := by rw [hget Register.mseccfg (hinit _) (hf _ (by tauto))]; exact cfg.mseccfg_pmm
       htif_disabled := by rw [hget Register.htif_tohost_base (hinit _) (hf _ (by tauto))]; exact cfg.htif_disabled
       pmp_off := by rw [hget Register.pmpcfg_n (hinit _) (hf _ (by tauto))]; exact cfg.pmp_off
+      misa_m := by rw [hget Register.misa (hinit _) (hf _ (by tauto))]; exact cfg.misa_m
       pma_regions := by rw [hget Register.pma_regions (hinit _) (hf _ (by tauto))]; exact cfg.pma_regions }
 
 /-- **The shared straight-line register-writing core.** Instruction-agnostic: the execute stage writes
@@ -673,9 +676,9 @@ theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s
   have hrdreg : ∀ R : Register,
       (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
         ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base
-        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n)
+        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n ∨ R = Register.misa)
       → R ≠ reg_idx_to_Register rd := by
-    rintro R (rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl) <;>
+    rintro R (rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl) <;>
       (unfold reg_idx_to_Register; split <;> decide)
   obtain ⟨b, hb⟩ : ∃ b, (should_inc_minstret Privilege.Machine).run s = .ok b s :=
     ⟨_, run_should_inc_minstret s cfg.init _⟩
@@ -728,12 +731,12 @@ theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s
   have hcfg_frame : ∀ R : Register,
       (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
         ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base
-        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n)
+        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n ∨ R = Register.misa)
       → s_final.regs.get? R = s.regs.get? R := fun R hR => by
-    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
-      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide) (hrdreg R hR)]
+    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
+      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide) (hrdreg R hR)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hs''_def, hsa_def, hs'_def]
   refine ⟨s_final, ⟨false, hrun⟩,
     { pc := ?_, regs := ?_,
@@ -1166,9 +1169,9 @@ theorem advance_jump_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
   have hrdreg : ∀ R : Register,
       (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
         ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base
-        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n)
+        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n ∨ R = Register.misa)
       → R ≠ reg_idx_to_Register rd := by
-    rintro R (rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl) <;>
+    rintro R (rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl) <;>
       (unfold reg_idx_to_Register; split <;> decide)
   obtain ⟨b, hb⟩ : ∃ b, (should_inc_minstret Privilege.Machine).run s = .ok b s :=
     ⟨_, run_should_inc_minstret s cfg.init _⟩
@@ -1200,7 +1203,7 @@ theorem advance_jump_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
   have hcfg_sa : SailConfigured s_a :=
     SailConfigured.congr (SailConfigured.writeMinstret cfg b) hinit_sa (fun R hR => by
       rw [hsa_def, Std.ExtDHashMap.get?_insert,
-          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
+          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hnpc_sa hinit_sa hcfg_sa
   set s'' := ({s_a with regs := ((s_a.regs.insert Register.nextPC target).insert
     (reg_idx_to_Register rd) (bitVecToRegidxVal rd link))}) with hs''_def
@@ -1229,12 +1232,12 @@ theorem advance_jump_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
   have hcfg_frame : ∀ R : Register,
       (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
         ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base
-        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n)
+        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n ∨ R = Register.misa)
       → s_final.regs.get? R = s.regs.get? R := fun R hR => by
-    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
-      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide) (hrdreg R hR)]
+    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
+      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide) (hrdreg R hR)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hs''_def, hsa_def, hs'_def]
   refine ⟨s_final, ⟨false, hrun⟩,
     { pc := ?_, regs := ?_,
@@ -1835,7 +1838,7 @@ theorem advance_of_ctrl {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
   have hcfg_sa : SailConfigured s_a :=
     SailConfigured.congr (SailConfigured.writeMinstret cfg b) hinit_sa (fun R hR => by
       rw [hsa_def, Std.ExtDHashMap.get?_insert,
-          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
+          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hnpc_sa hinit_sa hcfg_sa
   set s'' := ({s_a with regs := s_a.regs.insert Register.nextPC target}) with hs''_def
   have hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
@@ -1860,12 +1863,12 @@ theorem advance_of_ctrl {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
   have hcfg_frame : ∀ R : Register,
       (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
         ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base
-        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n)
+        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n ∨ R = Register.misa)
       → s_final.regs.get? R = s.regs.get? R := fun R hR => by
-    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
-      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
+    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
+      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hs''_def, hsa_def, hs'_def]
   refine ⟨s_final, ⟨false, hrun⟩,
     { pc := ?_, regs := ?_,
@@ -2054,9 +2057,9 @@ theorem advance_load_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
   have hrdreg : ∀ R : Register,
       (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
         ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base
-        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n)
+        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n ∨ R = Register.misa)
       → R ≠ reg_idx_to_Register rd := by
-    rintro R (rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl) <;>
+    rintro R (rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl) <;>
       (unfold reg_idx_to_Register; split <;> decide)
   obtain ⟨b, hb⟩ : ∃ b, (should_inc_minstret Privilege.Machine).run s = .ok b s :=
     ⟨_, run_should_inc_minstret s cfg.init _⟩
@@ -2081,7 +2084,7 @@ theorem advance_load_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
   have hcfg_sa : SailConfigured s_a :=
     SailConfigured.congr (SailConfigured.writeMinstret cfg b) hinit_sa (fun R hR => by
       rw [hsa_def, Std.ExtDHashMap.get?_insert,
-          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
+          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hmem_sa hinit_sa hcfg_sa
   set s'' := ({s_a with regs := s_a.regs.insert (reg_idx_to_Register rd) (bitVecToRegidxVal rd value)})
     with hs''_def
@@ -2108,12 +2111,12 @@ theorem advance_load_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
   have hcfg_frame : ∀ R : Register,
       (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
         ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base
-        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n)
+        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n ∨ R = Register.misa)
       → s_final.regs.get? R = s.regs.get? R := fun R hR => by
-    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
-      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide) (hrdreg R hR)]
+    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
+      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide) (hrdreg R hR)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hs''_def, hsa_def, hs'_def]
   refine ⟨s_final, ⟨false, hrun⟩,
     { pc := ?_, regs := ?_,
@@ -2385,7 +2388,7 @@ theorem advance_of_store {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
   have hcfg_sa : SailConfigured s_a :=
     SailConfigured.congr (SailConfigured.writeMinstret cfg b) hinit_sa (fun R hR => by
       rw [hsa_def, Std.ExtDHashMap.get?_insert,
-          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
+          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hinit_sa hcfg_sa
   set s'' := ({s_a with mem := writeMem s_a.mem}) with hs''_def
   have hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
@@ -2411,12 +2414,12 @@ theorem advance_of_store {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
   have hcfg_frame : ∀ R : Register,
       (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
         ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base
-        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n)
+        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n ∨ R = Register.misa)
       → s_final.regs.get? R = s.regs.get? R := fun R hR => by
-    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
-      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
+    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
+      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
   have hmem_fin : s_final.mem = writeMem s.mem := by rw [hmemf, hs''_def]
   refine ⟨s_final, ⟨false, hrun⟩,
     { pc := ?_, regs := ?_,
@@ -2842,7 +2845,7 @@ theorem advance_load_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} 
   have hcfg_sa : SailConfigured s_a :=
     SailConfigured.congr (SailConfigured.writeMinstret cfg b) hinit_sa (fun R hR => by
       rw [hsa_def, Std.ExtDHashMap.get?_insert,
-          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
+          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hmem_sa hinit_sa hcfg_sa
   have hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
     rw [Sail.run_readReg, cfg.priv]
@@ -2863,12 +2866,12 @@ theorem advance_load_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} 
   have hcfg_frame : ∀ R : Register,
       (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
         ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base
-        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n)
+        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n ∨ R = Register.misa)
       → s_final.regs.get? R = s.regs.get? R := fun R hR => by
-    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
-      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
+    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
+      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hmem_sa]
   refine ⟨s_final, ⟨false, hrun⟩,
     { pc := ?_, regs := ?_,
@@ -3229,7 +3232,7 @@ theorem advance_alu_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {
   have hcfg_sa : SailConfigured s_a :=
     SailConfigured.congr (SailConfigured.writeMinstret cfg b) hinit_sa (fun R hR => by
       rw [hsa_def, Std.ExtDHashMap.get?_insert,
-          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
+          dif_neg (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)])
   have hexec_sa := hexec s_a hframe_sa hpcf_sa hinit_sa hcfg_sa
   have hcp : (LeanRV64D.readReg Register.cur_privilege).run s = .ok Privilege.Machine s := by
     rw [Sail.run_readReg, cfg.priv]
@@ -3250,12 +3253,12 @@ theorem advance_alu_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {
   have hcfg_frame : ∀ R : Register,
       (R = Register.cur_privilege ∨ R = Register.hart_state ∨ R = Register.mstatus ∨ R = Register.mideleg
         ∨ R = Register.elp ∨ R = Register.mseccfg ∨ R = Register.htif_tohost_base
-        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n)
+        ∨ R = Register.pma_regions ∨ R = Register.pmpcfg_n ∨ R = Register.misa)
       → s_final.regs.get? R = s.regs.get? R := fun R hR => by
-    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
-      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
-      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
+    rw [hframef R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide),
+      hframe_s R (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)
+      (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hmem_sa]
   refine ⟨s_final, ⟨false, hrun⟩,
     { pc := ?_, regs := ?_,
