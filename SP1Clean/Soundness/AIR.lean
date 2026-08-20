@@ -162,6 +162,24 @@ structure SupportedCoreGrounding
     Semantics.clkNat statement.publicValues.init_clk_high statement.publicValues.init_clk_low +
         8 * orderedRows.length =
       Semantics.clkNat statement.publicValues.final_clk_high statement.publicValues.final_clk_low
+  /-- The public **final** State message is semantically true: a real Sail chain from `initial`
+  reaches a state at exactly the committed final clock whose PC is the committed final pc, with the
+  ROM still loaded and the platform configuration intact.  This is `TimedGrounding.walk`'s second
+  conclusion, previously proved and discarded (external report, Finding 4); the ROM/configuration
+  persistence at the endpoint is what a cross-shard composition step consumes. -/
+  finalStateTruth :
+    Semantics.LocalStateTruth statement.program initial (Commit.initClkNat witness.data)
+      (finalBoundaryStateMessage statement.publicValues)
+  /-- Every memory-finalize provider record is true of the constructed run: some record at the same
+  location with the same value and a no-later timestamp is genuinely the content of that location at
+  its time (`TimedGrounding.walk`'s third conclusion, previously discarded — Finding 4).  Stated in
+  the ∃-witness form deliberately: once the ensemble gains MemoryBump timestamp-refresh rows, the
+  walk concludes truth for the *refresh-eliminated* record (same location and value, earlier time),
+  and this statement absorbs that without changing shape.  Today the witness is the record itself. -/
+  memoryFinalizeTruth : ∀ loc m, memoryFinalizeFrontier witness loc = some m →
+    ∃ m', Semantics.MemoryMsg.locOf m' = Semantics.MemoryMsg.locOf m ∧
+      m'.value = m.value ∧ Semantics.MemoryMsg.timeNat m' ≤ Semantics.MemoryMsg.timeNat m ∧
+      Semantics.LocalMemTruth initial (Commit.initClkNat witness.data) m'
 
 /-- The committed-decode field of every statically grounded ordered row is already discharged.
 This theorem deliberately sits beside the remaining grounding seam: Program truth comes entirely
@@ -387,10 +405,16 @@ theorem supportedCore_orderedRows_dynamic_of_obligations
     (stateWalk : Walk.IsWalk (decodedStateEdge witness.data)
       (initialBoundaryStateMessage statement.publicValues)
       (finalBoundaryStateMessage statement.publicValues) orderedRows) :
-    ∀ done decoded suffix, orderedRows = done ++ decoded :: suffix →
+    (∀ done decoded suffix, orderedRows = done ++ decoded :: suffix →
       ∀ state, Target.SailChain done.length initial state →
         DynamicGroundedRow witness.data statement.program
-          (decoded.toChipRow witness.data) state := by
+          (decoded.toChipRow witness.data) state) ∧
+      Semantics.LocalStateTruth statement.program initial (Commit.initClkNat witness.data)
+        (finalBoundaryStateMessage statement.publicValues) ∧
+      (∀ loc m, memoryFinalizeFrontier witness loc = some m →
+        ∃ m', Semantics.MemoryMsg.locOf m' = Semantics.MemoryMsg.locOf m ∧
+          m'.value = m.value ∧ Semantics.MemoryMsg.timeNat m' ≤ Semantics.MemoryMsg.timeNat m ∧
+          Semantics.LocalMemTruth initial (Commit.initClkNat witness.data) m') := by
   classical
   have sourceFacts : ∀ decoded ∈ orderedRows,
       decoded ∈ decodedInstructionRows (p := p) witness.tables ∧
@@ -550,6 +574,7 @@ theorem supportedCore_orderedRows_dynamic_of_obligations
     (initialBoundaryStateMessage statement.publicValues) (memoryInitFrontier witness)
     (by simp only [List.length_map]) stepFacts frameFacts rowOK boundary.localStateTruth
     liveAtHead stateBalance memoryBalance
+  refine ⟨?_, walked.2.1, fun loc m finEq => ⟨m, rfl, rfl, Nat.le_refl _, walked.2.2 loc m finEq⟩⟩
   intro done decoded suffix rowsEq state chain
   have decodedMem : decoded ∈ orderedRows := by
     rw [rowsEq]
@@ -590,10 +615,16 @@ theorem supportedCore_orderedRows_dynamic
     (stateWalk : Walk.IsWalk (decodedStateEdge witness.data)
       (initialBoundaryStateMessage statement.publicValues)
       (finalBoundaryStateMessage statement.publicValues) orderedRows) :
-    ∀ done decoded suffix, orderedRows = done ++ decoded :: suffix →
+    (∀ done decoded suffix, orderedRows = done ++ decoded :: suffix →
       ∀ state, Target.SailChain done.length initial state →
         DynamicGroundedRow witness.data statement.program
-          (decoded.toChipRow witness.data) state := by
+          (decoded.toChipRow witness.data) state) ∧
+      Semantics.LocalStateTruth statement.program initial (Commit.initClkNat witness.data)
+        (finalBoundaryStateMessage statement.publicValues) ∧
+      (∀ loc m, memoryFinalizeFrontier witness loc = some m →
+        ∃ m', Semantics.MemoryMsg.locOf m' = Semantics.MemoryMsg.locOf m ∧
+          m'.value = m.value ∧ Semantics.MemoryMsg.timeNat m' ≤ Semantics.MemoryMsg.timeNat m ∧
+          Semantics.LocalMemTruth initial (Commit.initClkNat witness.data) m') := by
   exact supportedCore_orderedRows_dynamic_of_obligations statement witness initial constraints balanced
     boundary memoryTimestampRange (supportedCore_groundingObligations_of_constraints witness constraints)
     orderedRows exhaustive stateWalk
@@ -620,15 +651,16 @@ theorem supported_core_witness_grounding
   have exhaustive : orderedRows.Perm
       (realDecodedInstructionRows witness.data witness.tables) :=
     Multiset.coe_eq_coe.mp exhaustiveMultiset
-  refine ⟨orderedRows, exhaustive, ?_, ?_, ?_⟩
+  have dyn := supportedCore_orderedRows_dynamic statement witness initial constraints balanced
+    boundary memoryTimestampRange orderedRows exhaustive stateWalk
+  refine ⟨orderedRows, exhaustive, ?_, ?_, ?_, dyn.2.1, dyn.2.2⟩
   · simpa [initialBoundaryStateMessage, finalBoundaryStateMessage,
       Semantics.StateMsg.pcBits, supportedPcBits] using
       pcWalk_of_decodedStateWalk witness.data stateWalk
   · exact {
       static := supportedCore_orderedRows_static statement witness constraints balanced boundary
         orderedRows exhaustive
-      dynamic := supportedCore_orderedRows_dynamic statement witness initial constraints balanced
-        boundary memoryTimestampRange orderedRows exhaustive stateWalk }
+      dynamic := dyn.1 }
   · have clockCount := clockCount_of_decodedStateWalk witness.data stateWalk
       (fun decoded decodedMem =>
         witness_realDecodedInstructionRows_timeStep witness constraints balanced decoded
@@ -653,7 +685,7 @@ theorem supported_core_native_sound (model : Machine.SP1MachineModel)
   intro statement witness valid
   obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩,
     memoryTimestampRange⟩ := valid
-  obtain ⟨rows, -, walk, grounded, clockCount⟩ :=
+  obtain ⟨rows, -, walk, grounded, clockCount, -, -⟩ :=
     supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
       boundary memoryTimestampRange
   apply groundedRows_localExecution model statement witness.data initial
