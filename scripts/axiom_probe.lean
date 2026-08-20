@@ -320,6 +320,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_names
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_upstream
 #print axioms SP1Clean.Soundness.Walk.exists_trail
+#print axioms SP1Clean.Soundness.GoodnessFilter.endpointBalanced_of_cancel_loops
+#print axioms SP1Clean.Soundness.GoodnessFilter.good_of_endpointBalanced
+#print axioms SP1Clean.Soundness.RefreshElimination.eliminate
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_intCast_zero
 #print axioms SP1Clean.LookupAccessList.intCast_multiplicitySum_map_toAccess
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_balancedInteractions
