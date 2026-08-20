@@ -216,8 +216,8 @@ stream.
 - a zero-tolerance project-axiom scan;
 - `skipKernelTC` and main-library `native_decide` guards;
 - an elaboration-budget escape-hatch prohibition (allowlist-gated); and
-- a generated `#print axioms` census over the released theorem surface — currently 544 probed
-  declarations, split 506 (main library) plus 38 (test anchors) — split by library and
+- a generated `#print axioms` census over the released theorem surface — currently 550 probed
+  declarations, split 512 (main library) plus 38 (test anchors) — split by library and
   diffed against the committed `docs/snapshots/axiom-census.txt` (main) and
   `docs/snapshots/axiom-census-test.txt` (test anchors) — drift fails; only `--update` rewrites
   the snapshots, so a passing run leaves the tree clean.
