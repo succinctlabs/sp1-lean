@@ -68,6 +68,11 @@ TARGETS = [
      r"supportedCoreNativeRelation_nonvacuous)\b"),
     # The abstract walk/trail core (live — used by AIR + RankedGrounding).
     ("SP1Clean/Soundness/Walk.lean", r"theorem\s+(exists_trail)\b"),
+    # The W3 generic engines: the goodness filter + self-loop cancellation (StateBump) and the
+    # refresh elimination (MemoryBump). Keystones probed like Walk's `exists_trail`.
+    ("SP1Clean/Soundness/GoodnessFilter.lean",
+     r"theorem\s+(endpointBalanced_of_cancel_loops|good_of_endpointBalanced)\b"),
+    ("SP1Clean/Soundness/RefreshElimination.lean", r"theorem\s+(eliminate)\b"),
     # The field⇒ℤ balance bridge (relocated in W11 Phase 5).
     ("SP1Clean/Model/BalanceBridge.lean",
      r"theorem\s+(isConsistentBalanced_of_intCast_zero|intCast_multiplicitySum_map_toAccess|"
