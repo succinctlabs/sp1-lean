@@ -87,8 +87,8 @@ theorem witness_verifierMemoryInteractions_eq_nil
   apply List.map_eq_nil_iff.mp
   rw [typedTableInteractionsWith_raw]
   apply Table.interactionsWith_nil_of_channel_not_mem
-  change memoryChannel.toRaw ∉ [stateChannel.toRaw]
-  simp [Channels.memoryChannel_eq_stateChannel_false]
+  change memoryChannel.toRaw ∉ [stateChannel.toRaw, Channels.byteChannel.toRaw]
+  simp [Channels.memoryChannel_eq_stateChannel_false, Channels.memoryChannel_eq_byteChannel_false]
 
 /-! ## The eleven non-memory providers contribute nothing to the Memory channel -/
 

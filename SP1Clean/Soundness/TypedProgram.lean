@@ -786,8 +786,8 @@ theorem witness_verifierProgramInteractions_eq_nil
   apply List.map_eq_nil_iff.mp
   rw [typedTableInteractionsWith_raw]
   apply Table.interactionsWith_nil_of_channel_not_mem
-  change programChannel.toRaw ∉ [stateChannel.toRaw]
-  simp [Channels.programChannel_eq_stateChannel_false]
+  change programChannel.toRaw ∉ [stateChannel.toRaw, Channels.byteChannel.toRaw]
+  simp [Channels.programChannel_eq_stateChannel_false, Channels.programChannel_eq_byteChannel_false]
 
 /-- Every provider-table position except the committed Program provider has no Program-channel
 interactions.  This is positional on purpose: it connects the stable witness index used by

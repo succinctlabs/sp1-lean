@@ -62,61 +62,135 @@ followed by a true `push` of the public **initial** state (SP1's bus-enforced bo
 record.rs eval_state` `send_state(.,pc_start,1)` + `receive_state(.,next_pc,1)`). These are exactly
 the `[+1 init, -1 final]` boundary contributions the trail engine's endpoint balance consumes
 (`TypedState.realDecodedStateMessages_perm`). The pull/push shape is Clean-idiomatic — it exposes the
-loop-closing `[pulled final, pushed init]` pair. No witness cells (`localLength = 0`); the `Spec` is
-`True` (the meaning is carried by the trace-level balance). -/
+loop-closing `[pulled final, pushed init]` pair. No witness cells (`localLength = 0`).
+
+**W3 D5-A**: the row also pulls the twelve byte range checks over the split-limb public boundary —
+per end, the two 16-bit `Range` checks (`clk_0_16`, `clk_32_48`), the `U8Range` pair
+(`clk_16_24`, `clk_24_32`), and the three 16-bit pc checks — so `Spec` is now
+`SP1StateBoundary.LimbBounds`: every committed limb's canonicity is proved in-circuit, which is the
+goodness-filter base case (the pushed initial State message is canonical by construction, with no
+`InitialBoundaryFacts` premise). The pulls are ungated (the boundary row is always live, gate `1`),
+matching the always-on State pair. -/
 @[circuit_norm]
 def sp1StateVerifierMain (pi : Var SP1PublicIO (ZMod p)) : Circuit (ZMod p) Unit := do
   Channels.stateChannel.pull
     ⟨pi.final_clk_high, pi.final_clk_low, pi.final_pc0, pi.final_pc1, pi.final_pc2⟩
   Channels.stateChannel.push
     ⟨pi.init_clk_high, pi.init_clk_low, pi.init_pc0, pi.init_pc1, pi.init_pc2⟩
+  Channels.byteChannel.pull
+    (⟨6, pi.init_clk_0_16, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  Channels.byteChannel.pull
+    (⟨6, pi.init_clk_32_48, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  Channels.byteChannel.pull
+    (⟨3, 0, pi.init_clk_16_24, pi.init_clk_24_32⟩ : ByteRow (Expression (ZMod p)))
+  Channels.byteChannel.pull
+    (⟨6, pi.init_pc0, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  Channels.byteChannel.pull
+    (⟨6, pi.init_pc1, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  Channels.byteChannel.pull
+    (⟨6, pi.init_pc2, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  Channels.byteChannel.pull
+    (⟨6, pi.final_clk_0_16, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  Channels.byteChannel.pull
+    (⟨6, pi.final_clk_32_48, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  Channels.byteChannel.pull
+    (⟨3, 0, pi.final_clk_16_24, pi.final_clk_24_32⟩ : ByteRow (Expression (ZMod p)))
+  Channels.byteChannel.pull
+    (⟨6, pi.final_pc0, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  Channels.byteChannel.pull
+    (⟨6, pi.final_pc1, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  Channels.byteChannel.pull
+    (⟨6, pi.final_pc2, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
 
 instance sp1StateVerifierElaborated :
     ElaboratedCircuit (ZMod p) SP1PublicIO unit sp1StateVerifierMain where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := [Channels.stateChannel.toRaw]
-  channelsLawful := by simp [circuit_norm, sp1StateVerifierMain, Channels.stateChannel]
+  channelsWithGuarantees := [Channels.stateChannel.toRaw, Channels.byteChannel.toRaw]
+  channelsLawful := by
+    simp [circuit_norm, sp1StateVerifierMain, Channels.stateChannel, Channels.byteChannel]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma sp1StateVerifier_channelsWithGuarantees_eq :
     ((sp1StateVerifierElaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [Channels.stateChannel.toRaw] :=
+      = [Channels.stateChannel.toRaw, Channels.byteChannel.toRaw] :=
   rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma sp1StateVerifier_localLength_eq (x : Var SP1PublicIO (ZMod p)) :
     (sp1StateVerifierElaborated (p := p)).localLength x = 0 := rfl
 
+omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
+/-- `16 < p` for the byte-table width-column round-trip. -/
+private lemma h16p' [Fact (2 ^ 17 < p)] : (16 : ℕ) < p := by
+  have := Fact.out (p := 2 ^ 17 < p); omega
+
 theorem sp1StateVerifier_soundness :
     GeneralFormalCircuit.Soundness (Output := unit) (ZMod p) sp1StateVerifierMain
-      (fun _ _ => True) (fun _ _ _ => True) := by
+      (fun _ _ => True) (fun pi _ _ => pi.LimbBounds) := by
   circuit_proof_start
-  simp [circuit_norm, Channels.stateChannel]
+  haveI : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+  simp only [circuit_norm, SP1StateBoundary.LimbBounds, Channels.stateChannel,
+    Channels.byteChannel] at h_holds ⊢
+  obtain ⟨i016, i3248, ipair, ipc0, ipc1, ipc2, f016, f3248, fpair, fpc0, fpc1, fpc2⟩ := h_holds
+  exact ⟨(byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact i016),
+    ((byteRowSpec_u8range_pair _ _).mp ipair).1,
+    ((byteRowSpec_u8range_pair _ _).mp ipair).2,
+    (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact i3248),
+    (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact ipc0),
+    (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact ipc1),
+    (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact ipc2),
+    (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact f016),
+    ((byteRowSpec_u8range_pair _ _).mp fpair).1,
+    ((byteRowSpec_u8range_pair _ _).mp fpair).2,
+    (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact f3248),
+    (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact fpc0),
+    (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact fpc1),
+    (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact fpc2)⟩
 
-/-- The structural boundary circuit needs no semantic prover assumption. -/
-def sp1StateVerifierProverAssumptions (_pi : SP1PublicIO (ZMod p))
-    (_data : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop := True
+/-- The boundary row's prover obligation: the committed limbs really are in range (the honest
+public values are produced limb-wise from genuine 48-bit clocks and pcs). -/
+def sp1StateVerifierProverAssumptions (pi : SP1PublicIO (ZMod p))
+    (_data : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop := pi.LimbBounds
 
-set_option linter.unusedSectionVars false in
 theorem sp1StateVerifier_completeness :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) sp1StateVerifierMain
       sp1StateVerifierProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  simp [circuit_norm, Channels.stateChannel]
+  haveI : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+  simp only [sp1StateVerifierProverAssumptions, SP1StateBoundary.LimbBounds] at h_assumptions
+  obtain ⟨i016, i1624, i2432, i3248, ipc0, ipc1, ipc2,
+    f016, f1624, f2432, f3248, fpc0, fpc1, fpc2⟩ := h_assumptions
+  simp only [circuit_norm, Channels.stateChannel, Channels.byteChannel]
+  exact ⟨(byteRowSpec_range _ h16p').mpr i016,
+    (byteRowSpec_range _ h16p').mpr i3248,
+    (byteRowSpec_u8range_pair _ _).mpr ⟨i1624, i2432⟩,
+    (byteRowSpec_range _ h16p').mpr ipc0,
+    (byteRowSpec_range _ h16p').mpr ipc1,
+    (byteRowSpec_range _ h16p').mpr ipc2,
+    (byteRowSpec_range _ h16p').mpr f016,
+    (byteRowSpec_range _ h16p').mpr f3248,
+    (byteRowSpec_u8range_pair _ _).mpr ⟨f1624, f2432⟩,
+    (byteRowSpec_range _ h16p').mpr fpc0,
+    (byteRowSpec_range _ h16p').mpr fpc1,
+    (byteRowSpec_range _ h16p').mpr fpc2⟩
 
 /-- The SP1 boundary verifier as a `GeneralFormalCircuit`: pulls the public final state, pushes the
-public initial state, and exposes the loop-closing structural State pair. -/
+public initial state, range-checks every committed limb on the Byte bus (`Spec = LimbBounds`), and
+exposes the loop-closing structural State pair. -/
 def sp1StateVerifier : GeneralFormalCircuit (ZMod p) SP1PublicIO unit where
   main := sp1StateVerifierMain
   elaborated := sp1StateVerifierElaborated
   Assumptions := fun _ _ => True
-  Spec := fun _ _ _ => True
+  Spec := fun pi _ _ => pi.LimbBounds
   ProverAssumptions := sp1StateVerifierProverAssumptions
   soundness := sp1StateVerifier_soundness
   completeness := sp1StateVerifier_completeness
   channelsWithRequirements := []
   requirementsChannelsLawful := fun pi offset => by
-    simp only [circuit_norm, sp1StateVerifierMain, Channels.stateChannel]
+    simp only [circuit_norm, sp1StateVerifierMain, Channels.stateChannel, Channels.byteChannel]
+    intro channel h
+    rcases h with h | h | h
+    exacts [Or.inl h, Or.inl h, Or.inr h]
   exposedChannels := fun pi _ =>
     expose Channels.stateChannel
       [ Channels.stateChannel.pulled ⟨pi.final_clk_high, pi.final_clk_low, pi.final_pc0, pi.final_pc1, pi.final_pc2⟩,
@@ -124,7 +198,8 @@ def sp1StateVerifier : GeneralFormalCircuit (ZMod p) SP1PublicIO unit where
   exposedChannels_eq := by
     intro pi offset
     rw [Operations.exposedChannelsLawful_expose]
-    simp only [sp1StateVerifierMain, circuit_norm]
+    simp only [sp1StateVerifierMain, circuit_norm,
+      Channels.byteChannel_eq_stateChannel_false, if_false]
 
 omit [Fact (2 ^ 24 < p)] in
 /-- The verifier's exact syntactic State pair, exposed without unfolding its formal-circuit record. -/
