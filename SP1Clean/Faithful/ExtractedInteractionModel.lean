@@ -18,11 +18,15 @@ Clean models the byte lookup as a **pull** — `byteChannel.pullIf is_real` → 
 multiplicity `-is_real` on `byteChannel.toRaw` (`Native/Operations/AddOperation/Defs.lean`). SP1's
 `send_byte` is the dual **source** endpoint (`Extracted/AddOperation.lean`: `⟨.send, .byte 6 v 16 0,
 is_real⟩`). Same physical lookup, opposite source/sink convention — so the `.byte` arm records the
-**sink** sign `signedVal (-mult)`, matching Clean's pull, while the message tuple
-`[opcode.val, a.val, b.val, c.val]` preserves Rust's raw field-valued opcode. The dynamic buses
-(State/Memory/Program) use the natural `Dir.sign`
-(`pushIf` send `+mult`, receive `-mult`) — byte is the sole *pull* bus
-(`Model/Channels.lean` `byteChannel` docstring), hence its hardcoded `-mult`. -/
+**negated** direction sign `signedVal (-(dir.sign mult))`: the whole byte channel is sign-flipped
+relative to the extracted vocabulary, uniformly for both directions (a chip's `.send` lands as the
+native pull `-mult`; a provider table's `.receive` lands as the native push `+mult`). The message
+tuple `[opcode.val, a.val, b.val, c.val]` preserves Rust's raw field-valued opcode. The dynamic
+buses (State/Memory/Program) use the natural `Dir.sign` (`pushIf` send `+mult`, receive `-mult`) —
+byte is the sole *pull* bus (`Model/Channels.lean` `byteChannel` docstring), hence its flip. (An
+earlier revision hardcoded `-mult` ignoring the direction — correct for every chip interaction,
+which only ever sends byte, but sign-wrong for the upstream Byte/Range provider tables' `.receive`s;
+fixed 2026-08, external report F18.) -/
 
 namespace SP1Clean.Extracted
 
@@ -61,8 +65,8 @@ def AirInteractionKind.lookupName : AirInteractionKind → String
   | .pageProtGlobalFinalizeControl => "page-prot-global-finalize-control"
 
 /-- Project one extracted interaction to its legacy `LookupAccess` compatibility representation.
-The `.byte` arm uses the sink sign `signedVal (-mult)` (Clean's pull convention); the dynamic buses
-use `Dir.sign`.
+The `.byte` arm negates the direction sign (`signedVal (-(dir.sign mult))` — Clean's pull-bus
+convention, applied uniformly to sends and receives); the dynamic buses use the plain `Dir.sign`.
 
 `LookupAccess` predates the full Core AIR and has only four coarse kinds. A raw system bus therefore
 uses a reserved `"SP1Raw/<kind>"` table name (which preserves its exact discriminator and cannot
@@ -73,7 +77,7 @@ def Interaction.toAccess (intr : Interaction (ZMod p)) : LookupAccess :=
   match intr.payload with
   | .byte opcode a b c =>
       (InteractionKind.Byte, "SP1Byte",
-        [opcode.val, a.val, b.val, c.val], signedVal (- intr.mult))
+        [opcode.val, a.val, b.val, c.val], signedVal (- intr.dir.sign intr.mult))
   | .state a b c d e =>
       (InteractionKind.State, "SP1State",
         [a.val, b.val, c.val, d.val, e.val], signedVal (intr.dir.sign intr.mult))
@@ -90,12 +94,23 @@ def Interaction.toAccess (intr : Interaction (ZMod p)) : LookupAccess :=
       (InteractionKind.State, "SP1Raw/" ++ kind.lookupName, values.map ZMod.val,
         signedVal (intr.dir.sign intr.mult))
 
-/-- The `.byte` arm of `Interaction.toAccess` as a `rfl`-`simp` lemma (independent of the `Dir`, which
-the byte arm ignores — it records the sink sign `-mult`). Drives the syntactic faithfulness proofs. -/
-@[simp] lemma Interaction.toAccess_byte (opcode a b c mult : ZMod p) (d : Dir) :
-    (⟨d, .byte opcode a b c, mult⟩ : Interaction (ZMod p)).toAccess
+/-- The `.byte` arm of `Interaction.toAccess` at a `.send` — the form every chip interaction takes
+(chips only ever send byte), recording the native pull sign `-mult`. Drives the syntactic
+faithfulness proofs. The dual `.receive` form is `Interaction.toAccess_byte_receive`. -/
+@[simp] lemma Interaction.toAccess_byte (opcode a b c mult : ZMod p) :
+    (⟨.send, .byte opcode a b c, mult⟩ : Interaction (ZMod p)).toAccess
       = (InteractionKind.Byte, "SP1Byte",
         [opcode.val, a.val, b.val, c.val], signedVal (-mult)) :=
   rfl
+
+/-- The `.byte` arm of `Interaction.toAccess` at a `.receive` — the provider-table form (the
+upstream Byte/Range tables receive the lookups), recording the native push sign `+mult`. -/
+@[simp] lemma Interaction.toAccess_byte_receive (opcode a b c mult : ZMod p) :
+    (⟨.receive, .byte opcode a b c, mult⟩ : Interaction (ZMod p)).toAccess
+      = (InteractionKind.Byte, "SP1Byte",
+        [opcode.val, a.val, b.val, c.val], signedVal mult) :=
+  congrArg
+    (fun m => (InteractionKind.Byte, "SP1Byte", [opcode.val, a.val, b.val, c.val], signedVal m))
+    (neg_neg mult)
 
 end SP1Clean.Extracted

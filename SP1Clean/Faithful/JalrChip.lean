@@ -982,7 +982,7 @@ private theorem byteInteractionsFaithful
     ← ProvableType.getElem_eval_fields,
     Vector.getElem_mapRange, ProvableType.eval_field,
     Expression.eval, h6, h3,
-    Extracted.Interaction.toAccess, Nat.add_assoc]
+    Extracted.Interaction.toAccess, Extracted.Dir.sign, Nat.add_assoc]
   simp only [← ProvableStruct.eval_eq_eval,
     JalrChip.eval_inputs, eval_cpuState, evalITypeReader,
     eval_registerAccessCols,

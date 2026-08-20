@@ -2194,7 +2194,7 @@ private theorem branchTailByte_faithful
   simp only [branchRustInteractionTail]
   rw [branchRustColumns_nextPc, branchRustColumns_sum]
   simp [branchTailByteInteractions,
-    hBytePull, Extracted.Interaction.toAccess, branchNextPc,
+    hBytePull, Extracted.Interaction.toAccess, Extracted.Dir.sign, branchNextPc,
     ← ProvableType.getElem_eval_fields,
     Expression.eval, hinputReal, h6, h14, h16]
 
