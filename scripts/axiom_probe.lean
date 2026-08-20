@@ -48,6 +48,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.LtChip.soundness
 #print axioms SP1Clean.LtChip.completeness
 #print axioms SP1Clean.LtChip.circuit
+#print axioms SP1Clean.MemoryBumpChip.soundness
+#print axioms SP1Clean.MemoryBumpChip.completeness
+#print axioms SP1Clean.MemoryBumpChip.circuit
 #print axioms SP1Clean.MulChip.soundness
 #print axioms SP1Clean.MulChip.completeness
 #print axioms SP1Clean.MulChip.circuit
@@ -57,6 +60,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.ShiftRightChip.soundness
 #print axioms SP1Clean.ShiftRightChip.completeness
 #print axioms SP1Clean.ShiftRightChip.circuit
+#print axioms SP1Clean.StateBumpChip.soundness
+#print axioms SP1Clean.StateBumpChip.completeness
+#print axioms SP1Clean.StateBumpChip.circuit
 #print axioms SP1Clean.StoreByteChip.soundness
 #print axioms SP1Clean.StoreByteChip.completeness
 #print axioms SP1Clean.StoreByteChip.circuit
