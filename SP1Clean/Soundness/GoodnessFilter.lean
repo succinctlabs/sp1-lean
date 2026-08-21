@@ -52,6 +52,16 @@ theorem endpointBalanced_of_cancel_loops (edges loops : Multiset Edge) (edge : E
     simpa only [Multiset.cons_add] using balanced
   exact add_right_cancel shifted
 
+/-- **Vertex transport.** An endpoint balance maps through any vertex function — the step that
+carries the raw State balance onto its canonicalized image before the self-loops cancel. -/
+theorem endpointBalanced_map {Vertex' : Type _} (f : Vertex → Vertex')
+    (edges : Multiset Edge) (edge : Edge → Vertex × Vertex) (initial final : Vertex)
+    (balanced : EndpointBalanced edges edge initial final) :
+    EndpointBalanced edges (fun e => (f (edge e).1, f (edge e).2)) (f initial) (f final) := by
+  unfold EndpointBalanced at balanced ⊢
+  have mapped := congrArg (Multiset.map f) balanced
+  simpa only [Multiset.map_cons, Multiset.map_map, Function.comp_def] using mapped
+
 section Filter
 
 variable (edge : Edge → Vertex × Vertex) (Good : Vertex → Prop) (rank : Vertex → ℕ)
