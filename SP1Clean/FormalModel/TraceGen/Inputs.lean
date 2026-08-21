@@ -298,6 +298,9 @@ lemma aluTypeReaderCols_op_b_memory (e : ALUTypeEvent) :
     (aluTypeReaderCols (p := p) e).op_b_memory
       = registerAccessCols e.b e.prevTsB (e.clk + 3) := rfl
 
+lemma aluTypeReaderCols_op_c (e : ALUTypeEvent) :
+    (aluTypeReaderCols (p := p) e).op_c = wordOfNat e.opC := rfl
+
 lemma aluTypeReaderCols_op_c_memory (e : ALUTypeEvent) :
     (aluTypeReaderCols (p := p) e).op_c_memory = aluTypeOpCCols e := rfl
 
@@ -385,6 +388,34 @@ def JTypeEvent.toUTypeInputs (e : JTypeEvent) : UTypeChip.Inputs (ZMod p) where
   state := cpuStateCols e.clk e.pc
   adapter := jTypeReaderCols e
   is_auipc := if e.opcode = 48 then 1 else 0
+
+/-- The `Jal` chip's committed input row for one event — a **real** row (`is_real = 1`). Same three
+fields as `UType`'s, minus the variant selector: the two chips share the whole `JTypeReader` block
+and differ only in what the immediates mean. -/
+def JTypeEvent.toJalInputs (e : JTypeEvent) : JalChip.Inputs (ZMod p) where
+  is_real := 1
+  state := cpuStateCols e.clk e.pc
+  adapter := jTypeReaderCols e
+
+lemma JTypeEvent.toJalInputs_state (e : JTypeEvent) :
+    (e.toJalInputs (p := p)).state = cpuStateCols e.clk e.pc := rfl
+
+lemma JTypeEvent.toJalInputs_adapter (e : JTypeEvent) :
+    (e.toJalInputs (p := p)).adapter = jTypeReaderCols e := rfl
+
+/-- The `Jalr` chip's committed input row for one event — a **real** row (`is_real = 1`). The
+`ITypeReader` block is the very one `Addi` and the memory chips build; `Jalr`'s jump base is the
+`op_b` register read carried inside it. -/
+def ITypeEvent.toJalrInputs (e : ITypeEvent) : JalrChip.Inputs (ZMod p) where
+  is_real := 1
+  state := cpuStateCols e.clk e.pc
+  adapter := iTypeReaderCols e
+
+lemma ITypeEvent.toJalrInputs_state (e : ITypeEvent) :
+    (e.toJalrInputs (p := p)).state = cpuStateCols e.clk e.pc := rfl
+
+lemma ITypeEvent.toJalrInputs_adapter (e : ITypeEvent) :
+    (e.toJalrInputs (p := p)).adapter = iTypeReaderCols e := rfl
 
 lemma JTypeEvent.toUTypeInputs_is_auipc (e : JTypeEvent) :
     (e.toUTypeInputs (p := p)).is_auipc = if e.opcode = 48 then 1 else 0 := rfl
@@ -479,6 +510,21 @@ def addwPaddingInputs : AddwChip.Inputs (ZMod p) where
   is_real := 0
   state := zeroCPUStateCols
   adapter := zeroALUTypeReaderCols
+
+/-- The `Jal` chip's padding row: every column zero, `is_real = 0`. The two `value[3] = 0` conjuncts
+the chip carries **ungated** hold on it, since a zero row's two `AddOperation` results are `0 + 0`
+and `0 + 4`. -/
+def jalPaddingInputs : JalChip.Inputs (ZMod p) where
+  is_real := 0
+  state := zeroCPUStateCols
+  adapter := zeroJTypeReaderCols
+
+/-- The `Jalr` chip's padding row: every column zero, `is_real = 0` (same two ungated
+`value[3] = 0` conjuncts as `Jal`). -/
+def jalrPaddingInputs : JalrChip.Inputs (ZMod p) where
+  is_real := 0
+  state := zeroCPUStateCols
+  adapter := zeroITypeReaderCols
 
 /-- The `UType` chip's padding row: every column zero, `is_real = 0` (so `is_auipc = 0`, the LUI
 form — and the decode relation the chip's `ProverAssumptions` carries **ungated** holds on it,

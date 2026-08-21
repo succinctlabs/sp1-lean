@@ -72,10 +72,12 @@ import SP1Clean.Proofs.Chips.JalChip.Bridge
 import SP1Clean.Native.Chips.JalChip.Defs
 import SP1Clean.Proofs.Chips.JalChip.Formal
 import SP1Clean.Proofs.Chips.JalChip.Witgen
+import SP1Clean.Proofs.Chips.JalChip.Complete
 import SP1Clean.Proofs.Chips.JalrChip.Bridge
 import SP1Clean.Native.Chips.JalrChip.Defs
 import SP1Clean.Proofs.Chips.JalrChip.Formal
 import SP1Clean.Proofs.Chips.JalrChip.Witgen
+import SP1Clean.Proofs.Chips.JalrChip.Complete
 import SP1Clean.Proofs.Chips.LoadByteChip.Bridge
 import SP1Clean.Native.Chips.LoadByteChip.Defs
 import SP1Clean.Proofs.Chips.LoadByteChip.Formal
@@ -121,6 +123,8 @@ import SP1Clean.Proofs.Chips.MulChip.Witgen
 import SP1Clean.Proofs.Chips.AluX0Chip.Bridge
 import SP1Clean.Native.Chips.AluX0Chip.Defs
 import SP1Clean.Proofs.Chips.AluX0Chip.Formal
+import SP1Clean.Proofs.Chips.AluX0Chip.Witgen
+import SP1Clean.Proofs.Chips.AluX0Chip.Complete
 import SP1Clean.Model.ProgramChip
 import SP1Clean.Native.Operations.ShiftLeftOperation.Core
 import SP1Clean.Proofs.Operations.ShiftLeftOperation.Core
@@ -464,6 +468,7 @@ import SP1Clean.FormalModel.TraceGen.Events
 import SP1Clean.FormalModel.TraceGen.Inputs
 import SP1Clean.FormalModel.TraceGen.Readers
 import SP1Clean.FormalModel.TraceGen.Memory
+import SP1Clean.FormalModel.TraceGen.Arith
 import SP1Clean.Soundness.RowView
 import SP1Clean.Proofs.Chips.ByteChip.RangeChip
 import SP1Clean.Proofs.Chips.ByteChip.ByteChip

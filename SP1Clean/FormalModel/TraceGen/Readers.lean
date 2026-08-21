@@ -318,6 +318,13 @@ lemma aluTypeReaderCols_op_a_0_eq_zero {e : ALUTypeEvent} (h : e.opA ≠ 0) :
     (aluTypeReaderCols (p := p) e).op_a_0 = 0 := by
   rw [aluTypeReaderCols_op_a_0, if_neg h]
 
+omit [Fact (2 ^ 24 < p)] in
+/-- A built ALU-type block's `op_a_0` flag is `1` exactly when the destination **is** `x0` — the
+routing condition of the `AluX0` chip. -/
+lemma aluTypeReaderCols_op_a_0_eq_one {e : ALUTypeEvent} (h : e.opA = 0) :
+    (aluTypeReaderCols (p := p) e).op_a_0 = 1 := by
+  rw [aluTypeReaderCols_op_a_0, if_pos h]
+
 /-- The value a built ALU-type `op_c` block commits is a u64 in **both** row forms — the `rs2`
 read value on a register row, the copied immediate word on an immediate row. Both are built by
 `wordOfNat`, so neither owes the event a limb bound. -/
@@ -339,6 +346,79 @@ lemma aluTypeOpCCols_prevLow_val_lt (e : ALUTypeEvent) :
   split
   · simp
   · exact registerAccessCols_prevLow_val_lt _ _ _
+
+omit [Fact (2 ^ 24 < p)] in
+/-- The built word of `0` is the zero word — RISC-V's `x0` read value, in committed form. -/
+lemma wordOfNat_zero_eq : wordOfNat (p := p) 0 = (#v[0, 0, 0, 0] : Word (ZMod p)) := by
+  simp [wordOfNat]
+
+/-- **The immutable ALU-type adapter's contract on a built row.** The sibling of
+`iTypeReaderImmutable_spec` for the reader `AluX0` composes: `op_a` is a discarded source **read**,
+so the four `op_a_0` gates pin the *read* value rather than a write value, and the `op_c` slot keeps
+the ALU family's two forms.
+
+Stated at the real row's `is_real = 1`, because three of the conjuncts mention it non-vacuously (the
+`imm_c` padding gate, the `is_real - imm_c` access multiplicity, and the `op_c` access gate); the
+padding row is discharged separately by the chip. `hzero` is the `x0`-reads-as-zero fact — a fact
+about the machine, not the builder — and is exactly what makes the `op_a_0 = 1` branch of the gates
+hold. -/
+theorem aluTypeReaderImmutable_spec {e : ALUTypeEvent} (hclk : e.clk % 8 = 1) (hopA : e.opA < 32)
+    (hzero : e.opA = 0 → e.prevA = 0) (himmC : e.immC = 0 ∨ e.immC = 1)
+    (hprevTsA : e.prevTsA < e.clk + 4) (hprevTsB : e.prevTsB < e.clk + 3)
+    (hprevTsC : e.immC = 0 → e.prevTsC < e.clk + 2) (is_trusted clk_high opcode : ZMod p) :
+    Readers.ALUTypeReaderImmutable.Spec
+      { cols := aluTypeReaderCols (p := p) e, is_real := 1, is_trusted := is_trusted,
+        clk_high := clk_high,
+        clk_low := (cpuStateCols (p := p) e.clk e.pc).clk_0_16
+          + (cpuStateCols (p := p) e.clk e.pc).clk_16_24 * 65536,
+        pc := (cpuStateCols (p := p) e.clk e.pc).pc, opcode := opcode } := by
+  have hp : 2 ^ 24 < p := Fact.out
+  -- the flag is binary either way, and on the `x0` branch the read value is the zero word
+  have hbin : (aluTypeReaderCols (p := p) e).op_a_0 = 0
+      ∨ (aluTypeReaderCols (p := p) e).op_a_0 = 1 := by
+    by_cases hA : e.opA = 0
+    · exact Or.inr (aluTypeReaderCols_op_a_0_eq_one hA)
+    · exact Or.inl (aluTypeReaderCols_op_a_0_eq_zero hA)
+  have hgate : ∀ i (hi : i < 4), (aluTypeReaderCols (p := p) e).op_a_0
+      * (aluTypeReaderCols (p := p) e).op_a_memory.prev_value[i] = 0 := by
+    intro i hi
+    by_cases hA : e.opA = 0
+    · rw [aluTypeReaderCols_op_a_memory, registerAccessCols_prev_value, hzero hA,
+        wordOfNat_zero_eq]
+      have : (#v[0, 0, 0, 0] : Word (ZMod p))[i] = 0 := by interval_cases i <;> rfl
+      rw [this, mul_zero]
+    · rw [aluTypeReaderCols_op_a_0_eq_zero hA, zero_mul]
+  -- the immediate-consistency gates: on an immediate row the `op_c` block's committed value *is*
+  -- the committed `op_c` word (`ALUTypeReader::populate` copies it); on a register row it is 0
+  have himmGate : ∀ i (hi : i < 4), (aluTypeReaderCols (p := p) e).imm_c
+      * ((aluTypeReaderCols (p := p) e).op_c_memory.prev_value[i]
+        - (aluTypeReaderCols (p := p) e).op_c[i]) = 0 := by
+    intro i hi
+    rcases himmC with h | h
+    · rw [aluTypeReaderCols_imm_c, h, Nat.cast_zero, zero_mul]
+    · rw [aluTypeReaderCols_op_c_memory, aluTypeReaderCols_op_c, aluTypeOpCCols, if_pos h,
+        sub_self, mul_zero]
+  refine ⟨⟨hgate 0 (by omega), hgate 1 (by omega), hgate 2 (by omega), hgate 3 (by omega)⟩,
+    hbin, by rw [sub_self, zero_mul], ?_,
+    ⟨himmGate 0 (by omega), himmGate 1 (by omega), himmGate 2 (by omega), himmGate 3 (by omega)⟩,
+    registerAccessCols_spec_opA hclk hprevTsA, registerAccessCols_spec_opB hclk hprevTsB, ?_,
+    fun _ => ⟨aluTypeReaderCols_op_a_val_lt hopA, (cpuStateCols_pc_val_lt e.clk e.pc).1,
+      (cpuStateCols_pc_val_lt e.clk e.pc).2.1, (cpuStateCols_pc_val_lt e.clk e.pc).2.2⟩,
+    fun _ => ⟨wordOfNat_isU64 _, wordOfNat_isU64 _, registerAccessCols_prevLow_val_lt _ _ _,
+      registerAccessCols_prevLow_val_lt _ _ _⟩,
+    fun _ => ⟨aluTypeOpCCols_prev_value_isU64 e, aluTypeOpCCols_prevLow_val_lt e⟩⟩
+  · -- the `op_c` access multiplicity `is_real - imm_c` is the flag's complement, hence binary
+    rcases himmC with h | h
+    · exact Or.inr (by rw [aluTypeReaderCols_imm_c, h, Nat.cast_zero, sub_zero])
+    · exact Or.inl (by rw [aluTypeReaderCols_imm_c, h, Nat.cast_one, sub_self])
+  · -- the `op_c` register access: present (and the shared corollary) on a register row, gated off
+    -- on an immediate row, where `ALUTypeReader::populate` zeroes both timestamp columns
+    rcases himmC with h | h
+    · rw [aluTypeReaderCols_op_c_memory, aluTypeOpCCols_of_reg h]
+      exact registerAccessCols_spec_opC hclk (hprevTsC h)
+    · intro hgateOn
+      rw [aluTypeReaderCols_imm_c, h, Nat.cast_one, sub_self] at hgateOn
+      exact absurd hgateOn zero_ne_one
 
 omit [Fact p.Prime] in
 /-- The committed destination-register index of a built J-type block is `< 32`. -/
@@ -483,5 +563,54 @@ lemma cpuStateCols_pcWord_isU64 (clk pc : ℕ) :
   · exact h1
   · exact h2
   · norm_num
+
+omit [Fact (2 ^ 24 < p)] in
+/-- **The program counter as a built word.** The three committed `pc` limbs padded with a zero high
+limb *are* `wordOfNat pc` — the high limb of a 48-bit address is zero, so the padding is not an
+approximation. This is what lets the jump chips (`Jal`, `Jalr`) reduce their `AddOperation` operands
+to the shared builder. -/
+lemma cpuStateCols_pcWord_eq {clk pc : ℕ} (h : pc < 2 ^ 48) :
+    (#v[(cpuStateCols (p := p) clk pc).pc[0], (cpuStateCols (p := p) clk pc).pc[1],
+      (cpuStateCols (p := p) clk pc).pc[2], 0] : Word (ZMod p)) = wordOfNat pc := by
+  simp only [cpuStateCols_pc_zero, cpuStateCols_pc_one, cpuStateCols_pc_two, wordOfNat,
+    Nat.shiftRight_eq_div_pow]
+  refine Vector.ext (fun i hi => ?_)
+  interval_cases i
+  · rfl
+  · rfl
+  · rfl
+  · rw [show pc / 2 ^ 48 % 2 ^ 16 = 0 from by omega]
+    simp
+
+omit [Fact p.Prime] in
+/-- The value a built word's low limb commits, as an `ℕ`. -/
+lemma wordOfNat_zero_val (n : ℕ) : ((wordOfNat (p := p) n)[0]).val = n % 2 ^ 16 := by
+  have hp : 2 ^ 24 < p := Fact.out
+  rw [wordOfNat_zero, ZMod.val_natCast_of_lt (by omega)]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- A 48-bit value's built word has a zero high limb — the `value[3] = 0` conjunct the jump chips'
+`AddOperation` results owe (their targets are program counters, and SP1 commits a pc as three u16
+limbs). -/
+lemma wordOfNat_three_eq_zero {n : ℕ} (h : n < 2 ^ 48) : (wordOfNat (p := p) n)[3] = 0 := by
+  rw [wordOfNat_three, show n / 2 ^ 48 % 2 ^ 16 = 0 from by omega, Nat.cast_zero]
+
+/-- **The 4-byte alignment range check.** A 4-aligned value's built low limb divided by four is a
+14-bit quantity — the byte-bus `Range(value[0] / 4, 14)` pull the jump chips emit. The content is
+exactly the alignment: a u16 limb is `< 2 ^ 16` regardless, so it is the divisibility that makes the
+quotient exact. `sub` is the low bit a `JALR` target has cleared before the check (`0` for `JAL`).
+-/
+lemma wordOfNat_div_four_val_lt {n sub : ℕ} (hsub : sub ≤ n % 2 ^ 16) (h : (n - sub) % 4 = 0) :
+    (((wordOfNat (p := p) n)[0] - ((sub : ℕ) : ZMod p)) * (4 : ZMod p)⁻¹).val < 2 ^ 14 := by
+  have hp : 2 ^ 24 < p := Fact.out
+  obtain ⟨k, hk, hklt⟩ : ∃ k, n % 2 ^ 16 - sub = 4 * k ∧ k < 2 ^ 14 :=
+    ⟨(n % 2 ^ 16 - sub) / 4, by omega, by omega⟩
+  rw [wordOfNat_zero, show ((n % 2 ^ 16 : ℕ) : ZMod p) - ((sub : ℕ) : ZMod p)
+      = ((n % 2 ^ 16 - sub : ℕ) : ZMod p) from by
+    rw [Nat.cast_sub (by omega)], hk]
+  push_cast
+  rw [show (4 : ZMod p) * (k : ZMod p) = (k : ZMod p) * 4 from by ring, mul_assoc,
+    mul_inv_cancel₀ (val_4_ne_zero (p := p)), mul_one, ZMod.val_natCast_of_lt (by omega)]
+  exact hklt
 
 end SP1Clean.TraceGen

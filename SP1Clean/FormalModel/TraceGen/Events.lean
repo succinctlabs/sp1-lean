@@ -362,6 +362,58 @@ structure WellFormed (e : ALUTypeEvent) : Prop where
   `clk + 2`). -/
   prevTsC_reg : e.immC = 0 → e.prevTsC < e.clk + 2
 
+/--
+**The `x0`-destination form.** SP1 routes an ALU instruction whose destination register is `x0` to
+the separate `AluX0` chip, which validates the operand reads and advances the state but **discards**
+the result. The event is the same `ALUTypeEvent`; three facts change, and the first two are the
+routing condition itself:
+
+* the destination **is** `x0` (`WellFormed` demands it is not), so the row's `op_a_0` flag is `1`
+  and the adapter is the *immutable* one — `op_a` is a discarded source read, not a write;
+* the value that register held is `0` — RISC-V's `x0` reads as zero, which is precisely what the
+  immutable adapter's four `op_a_0 · prev_value_i = 0` gates record (the same fact
+  `MemoryEvent.WellFormedX0.prevA_eq_zero` states for the `x0` **load** rows); and
+* the opcode discriminant is an **ALU** opcode, `< 29`. `AluX0` serves every ALU opcode at once
+  through a single dynamic `opcode` column, range-checked by an LTU byte pull against
+  `Opcode::LB = 29` — the first non-ALU discriminant (`crates/core/executor/src/opcode.rs`). So
+  this is the other half of the routing condition: *which* instructions reach this chip.
+
+Everything else — the clock discipline, the pc and `rs1` bounds, the `imm_c` flag, the `op_c`
+operand bounds in both row forms, the three operand `< 2^64` bounds, and the three timestamp
+orderings — is repeated from `WellFormed` rather than gated on a flag the record does not carry,
+exactly as `MemoryEvent.WellFormedX0` repeats its I-type half.
+-/
+structure WellFormedX0 (e : ALUTypeEvent) : Prop where
+  /-- The clock is `≡ 1 (mod 8)`: the executor's `CLK_INC = 8` discipline, starting at 1. -/
+  clk_mod : e.clk % 8 = 1
+  /-- The program counter is a 48-bit address. -/
+  pc_lt : e.pc < 2 ^ 48
+  /-- `rd` **is** `x0` — the routing condition that puts the event on this chip. -/
+  opA_eq_zero : e.opA = 0
+  /-- `rs1` is an architectural register index. -/
+  opB_lt : e.opB < 32
+  /-- The opcode discriminant is an ALU opcode — the other half of the routing condition. -/
+  opcode_lt : e.opcode < 29
+  /-- `imm_c` is a flag. -/
+  immC_bool : e.immC = 0 ∨ e.immC = 1
+  /-- The `op_c` operand fits the committed four-limb word, in either form. -/
+  opC_lt : e.opC < 2 ^ 64
+  /-- On a register row, `rs2` is an architectural register index. -/
+  opC_reg : e.immC = 0 → e.opC < 32
+  /-- `rs1`'s content is a 64-bit value. -/
+  b_lt : e.b < 2 ^ 64
+  /-- `rs2`'s content is a 64-bit value. -/
+  c_lt : e.c < 2 ^ 64
+  /-- `x0` reads as zero. -/
+  prevA_eq_zero : e.prevA = 0
+  /-- `x0`'s previous access is strictly before this row's read of it (at `clk + 4`). -/
+  prevTsA_lt : e.prevTsA < e.clk + 4
+  /-- `rs1`'s previous access is strictly before this row's read of it (at `clk + 3`). -/
+  prevTsB_lt : e.prevTsB < e.clk + 3
+  /-- On a register row, `rs2`'s previous access is strictly before this row's read of it (at
+  `clk + 2`). -/
+  prevTsC_reg : e.immC = 0 → e.prevTsC < e.clk + 2
+
 end ALUTypeEvent
 
 /-! ## The J-type family
@@ -461,6 +513,57 @@ def luiImmNat (imm : ℕ) : ℕ :=
 adapter and its `op_b` is a jump offset, not a shifted U-immediate. -/
 def JTypeEvent.UTypeImm (e : JTypeEvent) : Prop :=
   ∃ imm < 2 ^ 20, e.immB = luiImmNat imm
+
+/-! ## The jump targets
+
+The two jump chips compute their `next_pc` rather than reading it: `Jal` jumps to `pc + op_b`,
+`Jalr` to `(rs1 + op_c) & ~1`. Both then commit that target as a program counter — three u16 limbs
+plus a `Range(target[0] / 4, 14)` byte pull — and both write the link address `pc + 4` to `rd`.
+So each owes three plain-`ℕ` facts about *where the jump lands*, and none of them is a fact the
+shared adapter record can carry: `JTypeEvent`/`ITypeEvent` are used by chips (`UType`, `Addi`, the
+nine memory chips) for which "the `op_b` slot plus the pc is a 4-aligned address" is simply false.
+They are stated here, beside `UTypeImm`, for the same reason it is. -/
+
+/-- The address a `JAL` row jumps to: `pc + op_b`, truncated to 64 bits — SP1's executor's
+`pc.wrapping_add(imm_b)`, and what the chip's `AddOperation` computes from the committed pc word and
+`op_b_imm`. -/
+def JTypeEvent.jalTarget (e : JTypeEvent) : ℕ := (e.pc + e.immB) % 2 ^ 64
+
+/--
+**A `JAL` row's jump and link addresses.** The three facts SP1's `Jal` AIR records about them:
+
+* `target_lt` — the jump target is a 48-bit address. SP1 commits a program counter as three u16
+  limbs, so the chip asserts `add_operation.value[3] = 0`; an executor that jumped outside the
+  48-bit address space would have no row to write.
+* `target_aligned` — the jump target is 4-byte aligned. SP1 implements RV64IM *without* the
+  compressed extension, so every instruction is four bytes and RISC-V raises an
+  instruction-address-misaligned exception on any other target — which traps rather than emitting a
+  row. This is exactly the content of the chip's `Range(add_operation.value[0] / 4, 14)` byte pull.
+* `link_lt` — the link address `pc + 4` is a 48-bit address too (`op_a_operation.value[3] = 0`);
+  it is the address the jump returns to, hence itself a program counter.
+-/
+def JTypeEvent.JalTargets (e : JTypeEvent) : Prop :=
+  e.jalTarget < 2 ^ 48 ∧ e.jalTarget % 4 = 0 ∧ e.pc + 4 < 2 ^ 48
+
+/-- The **uncleared** address a `JALR` row computes: `rs1 + op_c`, truncated to 64 bits. The row
+jumps to this value with its low bit cleared (`next_pc = target - target % 2`, SP1's `& !1`), but
+the AIR's `AddOperation` and its `value[3] = 0` gate see the raw sum, so the event's fact is stated
+about it. -/
+def ITypeEvent.jalrTarget (e : ITypeEvent) : ℕ := (e.b + e.imm) % 2 ^ 64
+
+/--
+**A `JALR` row's jump and link addresses.** The `JAL` facts, with the alignment taken *after* the
+low bit is cleared — which is the whole difference between the two chips:
+
+* `target_lt` — the raw sum `rs1 + op_c` is a 48-bit value (`add_operation.value[3] = 0`).
+* `target_aligned` — the **cleared** target `rs1 + op_c` with bit 0 removed is 4-byte aligned. That
+  is RISC-V's rule for `JALR` (the LSB is cleared by the instruction, and the result must still be
+  instruction-aligned or the access traps), and it is exactly the content of the chip's
+  `Range((add_operation.value[0] - lsb) / 4, 14)` byte pull.
+* `link_lt` — the link address `pc + 4` is a 48-bit address (`op_a_operation.value[3] = 0`).
+-/
+def ITypeEvent.JalrTargets (e : ITypeEvent) : Prop :=
+  e.jalrTarget < 2 ^ 48 ∧ (e.jalrTarget - e.jalrTarget % 2) % 4 = 0 ∧ e.pc + 4 < 2 ^ 48
 
 /-! ## The memory family
 

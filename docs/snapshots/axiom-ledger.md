@@ -11,7 +11,7 @@ supports; the figures below cover their union.
 
 ## Result
 
-- 600 released declarations are probed (562 main + 38 test: the 34 real-row satisfiability
+- 609 released declarations are probed (571 main + 38 test: the 34 real-row satisfiability
   anchors of `SP1CleanTest/NonVacuityReal.lean`, the two executable plus one definitional
   anchor of `SP1CleanTest/Audit/OneAddNativePremises.lean`, and the joint non-vacuity anchor
   of `SP1CleanTest/Audit/JointNonVacuity.lean`; the 21 legacy `native_decide`
@@ -25,8 +25,10 @@ supports; the figures below cover their union.
   W4 completeness rollout adds three probes per chip carried through the trace-generation chain —
   `proverAssumptions_of_event`, `traceTable_constraints`, `traceTable_guarantees` — for `Add`
   (the pilot), tranche 1's `Sub`/`Subw`/`Addi`/`Addw`/`UType`, tranche 2's five loads
-  (`LoadByte`/`LoadHalf`/`LoadWord`/`LoadDouble`/`LoadX0`) and tranche 3's four stores
-  (`StoreByte`/`StoreHalf`/`StoreWord`/`StoreDouble`)).
+  (`LoadByte`/`LoadHalf`/`LoadWord`/`LoadDouble`/`LoadX0`), tranche 3's four stores
+  (`StoreByte`/`StoreHalf`/`StoreWord`/`StoreDouble`) and tranche 4's two jumps plus the
+  `x0` ALU router (`Jal`/`Jalr`/`AluX0`) — the last of the chips whose honest-prover contract is
+  independent of the `ProverHint`).
   The earlier 476 count fell from 478 because `SailDecode.decode_ADD_example`
   and its sole consumer `Soundness.Target.decodedInROM_addRow` were retired during the toolchain
   migration (see the retirement note in `SP1Clean/Model/SailDecode.lean`).

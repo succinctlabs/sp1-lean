@@ -330,6 +330,15 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.AddwChip.proverAssumptions_of_event
 #print axioms SP1Clean.AddwChip.traceTable_constraints
 #print axioms SP1Clean.AddwChip.traceTable_guarantees
+#print axioms SP1Clean.AluX0Chip.proverAssumptions_of_event
+#print axioms SP1Clean.AluX0Chip.traceTable_constraints
+#print axioms SP1Clean.AluX0Chip.traceTable_guarantees
+#print axioms SP1Clean.JalChip.proverAssumptions_of_event
+#print axioms SP1Clean.JalChip.traceTable_constraints
+#print axioms SP1Clean.JalChip.traceTable_guarantees
+#print axioms SP1Clean.JalrChip.proverAssumptions_of_event
+#print axioms SP1Clean.JalrChip.traceTable_constraints
+#print axioms SP1Clean.JalrChip.traceTable_guarantees
 #print axioms SP1Clean.LoadByteChip.proverAssumptions_of_event
 #print axioms SP1Clean.LoadByteChip.traceTable_constraints
 #print axioms SP1Clean.LoadByteChip.traceTable_guarantees
