@@ -21,9 +21,9 @@ theorem supported_core_native_sound (model : Machine.SP1MachineModel)
       (SupportedCoreLocalExecutionRelation model)
 ```
 
-It proves that a valid, balanced witness for the 25-chip native Clean machine, with explicit
-program/provider and timestamp bindings, yields a genuine shard-local execution of the generated
-RISC-V Sail model between the public PC and clock endpoints.
+It proves that a valid, balanced witness for the 25-chip native Clean machine, with an explicit
+program/provider binding, yields a genuine shard-local execution of the generated RISC-V Sail model
+between the public PC and clock endpoints.
 
 All 25 supported instruction chips have:
 
@@ -51,7 +51,7 @@ two halves: **transport the 25 instruction tables** — construct a valid native
 extracted witness through the whole-chip `ChipFaithful` codecs (today the Rust-faithfulness theorems
 and the Sail-soundness capstone are two theorem families that share an endpoint but are not composed
 inside Lean; `Faithful/` is not in the capstone's import closure) — and **derive the native
-theorem's program/provider, memory-uniqueness, timestamp, and syscall facts** from the Core system
+theorem's program/provider, memory-uniqueness, and syscall facts** from the Core system
 tables.
 
 The available exact-AIR declarations are deliberately conditional:

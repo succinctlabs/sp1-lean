@@ -109,8 +109,8 @@ byte-bus `LTU` fact); and the `eval_memory_access_timestamp` comparison evidence
 boolean, the high limbs equal when it selects the low comparison, and the selected refreshed limb
 exceeding the selected pulled limb by exactly `1 + diff` with `diff` range-checked to 24 bits. The
 ℕ-level lexicographic increase `(prev_high, prev_low) < (clk_high', clk_low')` follows only once the
-pulled `prev_high` is known 24-bit — the global fact W3 derives at the trail
-(`MemoryPullTimestampHighBound`), not a row-local claim. -/
+pulled `prev_high` is known 24-bit — the global fact W3 derives at the trail from the per-location
+Memory balance (`pushGood`/`pullGood` in `Soundness/AIR.lean`), not a row-local claim. -/
 def Spec (r : Inputs (ZMod p)) : Prop :=
   (r.is_real = 0 ∨ r.is_real = 1) ∧
   (r.is_real = 1 →

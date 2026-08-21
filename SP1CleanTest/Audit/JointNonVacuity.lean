@@ -7,8 +7,8 @@ import SP1CleanTest.TraceGenTests.Conformance
 /-! # Joint non-vacuity: the capstone's hypothesis bundle is satisfiable
 
 The external PR110 report's Finding 3 asks whether the capstone's **full** hypothesis bundle —
-`SupportedCoreNativeRelation` (constraints ∧ four-bus balance ∧ the semantic boundary binding ∧ the
-memory-timestamp range companion) — is **jointly** satisfiable, or whether some conjunction of
+`SupportedCoreNativeRelation` (constraints ∧ four-bus balance ∧ the semantic boundary binding) — is
+**jointly** satisfiable, or whether some conjunction of
 boundary fields is silently contradictory.  This file exhibits a fully proved witness at the
 concrete prime (KoalaBear, `SP1Prime`): the **boundary-only shard** — all 25 instruction tables and
 11 of the 13 boundary/provider tables have zero rows, and the boundary verifier row carries a
@@ -298,18 +298,6 @@ theorem jointTables_table_nil_of_ne (i : ℕ) (hi : i < jointTables.length)
     simp only [jointTables, List.getElem_set_ne (Ne.symm h34), List.getElem_set_ne (Ne.symm h25)]
     exact List.getElem_mem _
   exact emptyTables_table_eq_nil _ hmem
-
-/-- The 25-chip instruction prefix of the joint shard is all-empty (the byte providers sit at
-positions 25 and 34, past the prefix). -/
-theorem jointTables_take25_table_nil : ∀ t ∈ jointTables.take 25, t.table = [] := by
-  have htake : jointTables.take 25 = emptyTables.take 25 := by
-    rw [jointTables, List.take_set, List.take_set,
-      List.set_eq_of_length_le
-        (by rw [List.length_set, List.length_take, emptyTables_length]; omega),
-      List.set_eq_of_length_le (by rw [List.length_take, emptyTables_length]; omega)]
-  rw [htake]
-  intro t ht
-  exact emptyTables_table_eq_nil t (List.mem_of_mem_take ht)
 
 /-! ## Conjunct 1a: constraints
 
@@ -883,53 +871,19 @@ theorem anchorBoundaryFacts : InitialBoundaryFacts stmt jointWitness anchorState
   memoryProviderUnique := jointWitness_memoryInitProviderUnique
   memoryFinalizeProviderUnique := jointWitness_memoryFinalizeProviderUnique
 
-/-! ## Conjunct 3: the memory-timestamp range companion (vacuous over zero instruction rows) -/
-
-/-- Decoding pairs of chips with zero-row tables yields no rows. -/
-theorem decodeInstructionTables_eq_nil {chips : List (SupportedChip SP1Prime)}
-    {tables : List (Table (ZMod SP1Prime))} (h : ∀ t ∈ tables, t.table = []) :
-    decodeInstructionTables chips tables = [] := by
-  induction chips generalizing tables with
-  | nil => cases tables <;> rfl
-  | cons chip chips ih =>
-    cases tables with
-    | nil => rfl
-    | cons t ts =>
-      show t.table.map _ ++ decodeInstructionTables chips ts = []
-      rw [h t List.mem_cons_self]
-      simp only [List.map_nil, List.nil_append]
-      exact ih fun t' ht' => h t' (List.mem_cons_of_mem _ ht')
-
-theorem jointWitness_realDecodedInstructionRows_nil :
-    realDecodedInstructionRows anchorData jointWitness.tables = [] := by
-  show (decodeInstructionTables (supportedChips (p := SP1Prime))
-    (jointTables.take 25)).filter _ = []
-  rw [decodeInstructionTables_eq_nil jointTables_take25_table_nil]
-  rfl
-
-theorem jointWitness_memoryTimestampRange :
-    SupportedCoreMemoryTimestampRangeRelation (p := SP1Prime) stmt jointWitness := by
-  -- One conjunct since W3 closed the MemoryBump scope restriction: the capstone no longer asks the
-  -- shard's refresh table to be inactive, so only the pulled-timestamp range companion remains —
-  -- vacuous here because the boundary-only shard decodes no instruction row.
-  intro decoded mem
-  rw [show jointWitness.data = anchorData from rfl,
-    jointWitness_realDecodedInstructionRows_nil] at mem
-  exact absurd mem (List.not_mem_nil)
-
 /-! ## The joint witness -/
 
 /-- **Joint non-vacuity of the capstone's hypothesis bundle.**  The boundary-only shard with equal
 public State endpoints satisfies the complete `SupportedCoreNativeRelation` at the concrete prime:
 the raw ensemble relation (constraints + four-bus balance, the Byte bus balanced by the two honest
-provider tables), the semantic boundary binding (with the committed one-instruction program and the
-concrete configured initial state), and the memory-timestamp range companion.  Applying
-`supported_core_native_sound` to this witness yields the honest 0-step local Sail execution between
-the equal endpoints. -/
+provider tables) and the semantic boundary binding (with the committed one-instruction program and
+the concrete configured initial state).  Those two conjuncts are the whole relation — the memory
+pull-timestamp range fact that used to ride along as a third companion is now derived inside the
+capstone from the per-location Memory balance.  Applying `supported_core_native_sound` to this
+witness yields the honest 0-step local Sail execution between the equal endpoints. -/
 theorem supportedCoreNativeRelation_nonvacuous :
     SupportedCoreNativeRelation (p := SP1Prime) stmt jointWitness :=
   ⟨⟨rfl, jointWitness_constraints, jointWitness_balanced⟩,
-   ⟨anchorState, anchorBoundaryFacts⟩,
-   jointWitness_memoryTimestampRange⟩
+   ⟨anchorState, anchorBoundaryFacts⟩⟩
 
 end SP1Clean.Audit.JointNonVacuity

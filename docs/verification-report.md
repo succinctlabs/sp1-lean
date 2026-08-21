@@ -36,10 +36,10 @@ The deliverables:
   pin-checked exporter (interaction equality on accepted rows, as a multiset permutation; §4).
 - **D4 — Machine-checked bus grounding.** The meaning of the inter-chip buses (state, program,
   memory, byte) is *derived* inside Lean from Clean's proved balance theorem plus per-chip
-  lemmas and the named boundary premises of §8.1 — there are no paper-justified bus axioms (§6).
+  lemmas and the named boundary premise of §8.1 — there are no paper-justified bus axioms (§6).
 - **D5 — The headline theorem.** `supported_core_native_sound`
   (`SP1Clean/Soundness/AIR.lean`): every constraint-satisfying, channel-balanced witness of the
-  38-table ensemble, with explicit boundary and timestamp premises, yields a genuine finite run
+  38-table ensemble, with an explicit boundary premise, yields a genuine finite run
   of the official (SP1-configured, §3.2) Sail RV64 interpreter between the public
   program-counter/clock endpoints (§8).
 - **D6 — Conformance testing against the real prover.** A dump-anchored pipeline reconstructs
@@ -52,9 +52,9 @@ The deliverables:
 
 **The honest claim boundary, up front.** The proved statement is *existential and shard-local*:
 it produces a Sail execution segment for one shard, whose initial state is characterized by the
-provider-table binding rather than tied to an ELF-loaded boot state, and it consumes two
-explicitly disclosed semantic premises (the provider/program binding and a physical
-memory-timestamp range bound) that are not yet derived from the exact upstream system tables. The
+provider-table binding rather than tied to an ELF-loaded boot state, and it consumes one
+explicitly disclosed semantic premise (the provider/program binding) that is not yet derived from
+the exact upstream system tables. The
 repository deliberately *reserves* — declares nothing under — the names `sp1_air_sound`,
 `sp1_execution_sound`, and `sp1_verifier_sound`: the exact-upstream refinement exists only as an
 honestly conditional combinator (`sp1_air_sound_of_obligations`) over a named, currently
@@ -498,8 +498,7 @@ def SupportedCoreNativeRelation :
     WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
   fun statement witness =>
     SupportedCoreEnsembleRelation statement witness ∧
-      SP1SemanticBoundaryRelation statement witness ∧
-        SupportedCoreMemoryTimestampRangeRelation statement witness
+      SP1SemanticBoundaryRelation statement witness
 ```
 
 - `SupportedCoreEnsembleRelation`: the public input matches, **all** row constraints hold over
@@ -513,8 +512,20 @@ def SupportedCoreNativeRelation :
   `InitialBoundaryFacts` in `SP1Clean/Soundness/ProviderBindings.lean`). This is an explicit
   companion *premise* — provider tables mean what they say — not something derivable from
   balance alone.
-- `SupportedCoreMemoryTimestampRangeRelation`: the pulled memory timestamps respect the physical
-  `< 2^24` bound — the premise that prevents timestamp wraparound at the field characteristic.
+
+There is no third conjunct. The physical `< 2^24` bound on each pulled memory timestamp — the fact
+that prevents timestamp wraparound at the field characteristic, and which SP1's generic
+`MemoryAccess` underflow argument needs on the high-limb comparison branch — used to be a third
+companion relation (`SupportedCoreMemoryTimestampRangeRelation`), because the per-chip
+aligned-carrier contract took it as a premise and therefore had to know it *before* producing the
+touch lists the memory balance is assembled from. Relocating it to the per-touch antecedent of that
+contract's slot conjunct broke the cycle. The capstone now derives it: every record on the produced
+side of the widened per-location Memory balance carries both timestamp facts — the genesis frontier
+from the init provider's `assertZero clk_high`/`assertZero clk_low`, each instruction row's pushes
+from its `TouchOK` window under the verifier row's range-checked `< 2^48` shard-time ceiling, and
+each MemoryBump refresh push from that chip's in-circuit range checks — so by balance every pulled
+record carries them too (`pushGood`/`pullGood` in
+`supportedCore_orderedRows_dynamic_of_obligations`, `SP1Clean/Soundness/AIR.lean`).
 
 ### 8.2 The theorem
 
@@ -685,9 +696,10 @@ discloses which of these each headline declaration actually touches.
   system-table derivation discharges them. A future unqualified exact-AIR theorem must keep those
   contracts visible as named parameters or a source-relation restriction; packaging their proofs
   inside `CoreAIRRefinementObligations` does not make them AIR consequences.
-- **M2 — The memory-timestamp range bound.** Pulled high timestamps < 2^24
-  (`SupportedCoreMemoryTimestampRangeRelation`) — prevents wrap at the characteristic; to be
-  derived from the upstream range constraints in the same obligation closure.
+- **M2 — The memory-timestamp range bound — DISCHARGED, no longer a premise.** Pulled high
+  timestamps < 2^24 (prevents wrap at the characteristic) is now derived inside the capstone from
+  the per-location Memory balance rather than assumed as a companion relation (§8.1). It is listed
+  here only so readers of earlier versions of this report can see where it went.
 - **M3 — The syscall handler.** SP1 host-syscall behavior is confined behind the
   `SyscallHandler` interface; its faithfulness to SP1's host is out of scope.
 - **M4 — The machine model.** The capstone is parametric over `SP1MachineModel` +
@@ -725,8 +737,8 @@ beyond the report compared here.
 | Target | OpenVM, RV32IM, 45 opcodes | SP1 v6.4.0 Core, RV64IM slice, 25 chips (~50 opcodes incl. W-variants and x0 paths) |
 | ISA reference | Lean RISC-V spec (RV32 instantiation), per-opcode `execute_*` clauses | Same Sail lineage, RV64 generated model, full-interpreter `try_step` step relation |
 | Circuit side | Transpiled/extracted constraints are the proof object; AIR columns hand-transcribed with "eyeball correspondence" macros | Independent hand-built Clean circuits; extracted lists are a *comparison target*; whole-chip bidirectional `ChipFaithful` + interaction-multiset permutation |
-| Bus semantics | `BusEntry` classes: well-formedness assumed on read / asserted on write; bus *axioms* (pc bounds, timestamp bounds) justified **on paper** (their §E1–E12, §M1–M6) | Channel guarantees are row-local facts backed by receiver circuits; read-side meaning derived in-kernel from Clean's balance theorem + timestamp rank plus the named boundary premises of §8.1 (§6); zero paper bus axioms |
-| Consistency | Rising-bus theorem: execution/memory bus entries can be reordered chronologically, conditional on balance hypotheses; per-opcode row-local equivalence theorems | One glued theorem: balanced constrained witness + the disclosed boundary/timestamp premises (§8.1) → existence of a Sail interpreter run with matching public endpoints (§8.2); per-chip statements are internal lemmas of it |
+| Bus semantics | `BusEntry` classes: well-formedness assumed on read / asserted on write; bus *axioms* (pc bounds, timestamp bounds) justified **on paper** (their §E1–E12, §M1–M6) | Channel guarantees are row-local facts backed by receiver circuits; read-side meaning derived in-kernel from Clean's balance theorem + timestamp rank plus the named boundary premise of §8.1 (§6); zero paper bus axioms |
+| Consistency | Rising-bus theorem: execution/memory bus entries can be reordered chronologically, conditional on balance hypotheses; per-opcode row-local equivalence theorems | One glued theorem: balanced constrained witness + the disclosed boundary premise (§8.1) → existence of a Sail interpreter run with matching public endpoints (§8.2); the pulled-timestamp range fact is derived from the memory balance, not assumed; per-chip statements are internal lemmas of it |
 | Prover conformance | none against the real prover/witness generator (their CI gates — an axiom-hygiene scan, an in-build `collectAxioms` audit, and an independent re-export comparator — police the *axiom footprint*, not prover-trace conformance) | dump-anchored cell-for-cell reconstruction of all 25 chips' traces vs the real prover at SP1's field, plus a Rust interpreter differential (§9) |
 | Crypto trust | Lookup argument + proof system assumed (their I1 = lookup/bus argument, I2 = proof system; their I3/I4 cover spec faithfulness and Lean's kernel) | Same boundary, expressed as named relations/obligations (C1–C3) with an ArkLib-shaped target signature |
 | Claim discipline | Per-opcode theorems + consistency lemmas | Reserved-name policy: headline names undeclared until unconditional (§8.3) |
@@ -794,7 +806,7 @@ Stated plainly:
 
 1. **Shard-local, existential conclusion.** One shard segment; boot reachability and cross-shard
    stitching are specified but unproven (§7.3). No machine-model instance is constructed yet.
-2. **Two semantic premises** (M1, M2): their provider-content and range facts await derivation
+2. **One semantic premise** (M1): its provider-content facts await derivation
    from the exact upstream system tables — the `CoreAIRRefinementObligations.executionCase`
    closure, the substantive open mathematical obligation of the AIR layer (the bundle's
    remaining fields are smaller but equally undischarged, §8.3). M1 additionally carries

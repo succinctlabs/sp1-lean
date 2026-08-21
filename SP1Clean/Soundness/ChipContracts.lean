@@ -243,7 +243,13 @@ structure ChipGroundingContracts (chip : SupportedChip p) : Prop where
   feed `rowOK_alignedOf`.  Register-index bounds come from Program decoding; timestamp bounds come
   from the finished Byte guarantees.  This field deliberately has no
   `DecodedRowOpenSoundnessInputs`: `RowOK` is an input to the grounding walk, so it cannot depend on
-  the Memory truth that the walk itself produces. -/
+  the Memory truth that the walk itself produces.
+
+  The slot conjunct is **doubly conditional**: it assumes both timestamp facts of the *pulled*
+  record — the low-limb bus guarantee `MemoryMsg.ClkBound` and the genuine 24-bit high limb.  That
+  keeps the physical range fact out of this field's premises, which is what breaks the dependency
+  cycle: the per-row touch lists must exist before the capstone's per-location memory balance can
+  derive either fact, and the capstone discharges both antecedents from that balance. -/
   rowAligned : ∀ (witness : EnsembleWitness (sp1Ensemble (p := p))),
     witness.Constraints → witness.BalancedChannels →
     ∀ decoded : DecodedInstructionRow p, decoded.chip = chip →
@@ -251,7 +257,6 @@ structure ChipGroundingContracts (chip : SupportedChip p) : Prop where
       (decoded.toChipRow witness.data).is_real = 1 →
       ∀ (program : GuestProgram),
         decodedInROM program (programAccess (decoded.toChipRow witness.data).view).toRow →
-        MemoryPullTimestampHighBound (decoded.ordinaryRowFacts witness.data) →
         ∃ touches : List (Touch p),
           AlignsWith (alignedOf (decoded.ordinaryRowFacts witness.data) touches)
               (decoded.ordinaryRowFacts witness.data) ∧
@@ -263,7 +268,8 @@ structure ChipGroundingContracts (chip : SupportedChip p) : Prop where
               (touches.filter (fun pq => MemoryMsg.locOf pq.2 = loc))) ∧
             (∀ tc ∈ touches, SP1Clean.Channels.MemoryMsg.ClkBound tc.2) ∧
             (∀ tc ∈ touches, SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-              MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2)
+              (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+                MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2)
 
 /-- **The engine-feed consumer**: any decoded row of a contracted chip produces both timed-engine
 records — the chip-generic successor of the retired Add-specific `addRow_engineFacts`.  `decode` remains the Program-grounding
@@ -535,7 +541,7 @@ theorem RTypeChipGroundingData.toContracts {chip : SupportedChip p}
   routing := data.routing
   readiness := data.readiness
   rowAligned := by
-    intro witness constraints balanced decoded hchip decodedMem real program decode _timestampHigh
+    intro witness constraints balanced decoded hchip decodedMem real program decode
     refine ⟨rtypeTouches (decoded.toChipRow witness.data).view
       (decoded.ordinaryRowFacts witness.data), ?_⟩
     have byteG := decodedInstructionRow_byteGuarantees witness constraints balanced decoded
@@ -621,7 +627,7 @@ theorem ITypeChipGroundingData.toContracts {chip : SupportedChip p}
   routing := data.routing
   readiness := data.readiness
   rowAligned := by
-    intro witness constraints balanced decoded hchip decodedMem real program decode _timestampHigh
+    intro witness constraints balanced decoded hchip decodedMem real program decode
     refine ⟨itypeTouches (decoded.toChipRow witness.data).view
       (decoded.ordinaryRowFacts witness.data), ?_⟩
     have byteG := decodedInstructionRow_byteGuarantees witness constraints balanced decoded
@@ -713,7 +719,7 @@ theorem ALUTypeChipGroundingData.toContracts {chip : SupportedChip p}
   routing := data.routing
   readiness := data.readiness
   rowAligned := by
-    intro witness constraints balanced decoded hchip decodedMem real program decode _timestampHigh
+    intro witness constraints balanced decoded hchip decodedMem real program decode
     have rowConstraints :=
       decodedInstructionRow_constraints witness constraints decoded decodedMem
     have byteG := decodedInstructionRow_byteGuarantees witness constraints balanced decoded
@@ -806,7 +812,7 @@ theorem ImmutableALUTypeChipGroundingData.toContracts {chip : SupportedChip p}
   routing := data.routing
   readiness := data.readiness
   rowAligned := by
-    intro witness constraints balanced decoded hchip decodedMem real program decode _timestampHigh
+    intro witness constraints balanced decoded hchip decodedMem real program decode
     have byteG := decodedInstructionRow_byteGuarantees witness constraints balanced decoded
       decodedMem
     have bounds := data.viewClockBounds decoded witness.data hchip byteG real
@@ -829,8 +835,9 @@ theorem ImmutableALUTypeChipGroundingData.toContracts {chip : SupportedChip p}
           (decoded.toChipRow witness.data).view
           (decoded.ordinaryRowFacts witness.data),
           SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
-        intro tc htc hclk
+            (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+              MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
+        intro tc htc hclk _
         simp only [immutableRtypeTouches, List.mem_cons, List.not_mem_nil,
           or_false] at htc
         rcases htc with rfl | rfl | rfl
@@ -860,8 +867,9 @@ theorem ImmutableALUTypeChipGroundingData.toContracts {chip : SupportedChip p}
           (decoded.toChipRow witness.data).view
           (decoded.ordinaryRowFacts witness.data),
           SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
-        intro tc htc hclk
+            (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+              MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
+        intro tc htc hclk _
         simp only [immutableItypeTouches, List.mem_cons, List.not_mem_nil,
           or_false] at htc
         rcases htc with rfl | rfl
@@ -964,7 +972,7 @@ theorem JTypeChipGroundingData.toContracts {chip : SupportedChip p}
   routing := data.routing
   readiness := data.readiness
   rowAligned := by
-    intro witness constraints balanced decoded hchip decodedMem real program decode _timestampHigh
+    intro witness constraints balanced decoded hchip decodedMem real program decode
     refine ⟨jtypeTouches (decoded.toChipRow witness.data).view
       (decoded.ordinaryRowFacts witness.data), ?_⟩
     have byteG := decodedInstructionRow_byteGuarantees witness constraints balanced decoded
@@ -1060,7 +1068,7 @@ theorem ConditionalITypeChipGroundingData.toContracts {chip : SupportedChip p}
   routing := data.routing
   readiness := data.readiness
   rowAligned := by
-    intro witness constraints balanced decoded hchip decodedMem real program decode _timestampHigh
+    intro witness constraints balanced decoded hchip decodedMem real program decode
     refine ⟨itypeTouches (decoded.toChipRow witness.data).view
       (decoded.ordinaryRowFacts witness.data), ?_⟩
     have byteG := decodedInstructionRow_byteGuarantees witness constraints balanced decoded
@@ -1126,7 +1134,7 @@ theorem ImmutableITypeChipGroundingData.toContracts {chip : SupportedChip p}
   routing := data.routing
   readiness := data.readiness
   rowAligned := by
-    intro witness constraints balanced decoded hchip decodedMem real program decode _timestampHigh
+    intro witness constraints balanced decoded hchip decodedMem real program decode
     refine ⟨immutableItypeTouches (decoded.toChipRow witness.data).view
       (decoded.ordinaryRowFacts witness.data), ?_⟩
     have byteG := decodedInstructionRow_byteGuarantees witness constraints balanced decoded
@@ -1233,7 +1241,7 @@ theorem LoadMemoryChipGroundingData.toContracts {chip : SupportedChip p}
       data.routingFlag witness constraints decoded hchip decodedMem real
   readiness := data.readiness
   rowAligned := by
-    intro witness constraints balanced decoded hchip decodedMem real program decode timestampHigh
+    intro witness constraints balanced decoded hchip decodedMem real program decode
     refine ⟨ramItypeTouches (decoded.toChipRow witness.data).view
       (memoryShape.access decoded witness.data)
       (decoded.ordinaryRowFacts witness.data)
@@ -1246,10 +1254,8 @@ theorem LoadMemoryChipGroundingData.toContracts {chip : SupportedChip p}
     have timestamps :=
       data.timestampBounds decoded witness.data hchip rowConstraints byteG real
     have isRam := data.isRam decoded witness.data hchip rowConstraints real
-    have ramHigh := ramPrevHigh_lt_of_loadShape memoryShape decoded witness.data
-      hchip real timestampHigh
     exact rowAligned_loadRam_of_shape memoryShape decoded witness.data hchip real bounds
-      timestamps isRam ramHigh decode.register_bounds.1
+      timestamps isRam decode.register_bounds.1
       (decode.register_bounds.2.1 (data.imm_b_eq decoded witness.data hchip))
 
 end LoadMemoryContracts
@@ -1335,7 +1341,7 @@ theorem ImmutableLoadMemoryChipGroundingData.toContracts {chip : SupportedChip p
       data.routingFlag witness constraints decoded hchip decodedMem real
   readiness := data.readiness
   rowAligned := by
-    intro witness constraints balanced decoded hchip decodedMem real program decode timestampHigh
+    intro witness constraints balanced decoded hchip decodedMem real program decode
     refine ⟨ramItypeTouches (decoded.toChipRow witness.data).view
       (memoryShape.access decoded witness.data)
       (decoded.ordinaryRowFacts witness.data)
@@ -1350,10 +1356,8 @@ theorem ImmutableLoadMemoryChipGroundingData.toContracts {chip : SupportedChip p
     have timestamps :=
       data.timestampBounds decoded witness.data hchip rowConstraints byteG real
     have isRam := data.isRam decoded witness.data hchip rowConstraints real
-    have ramHigh := ramPrevHigh_lt_of_immutableRamShape memoryShape decoded witness.data
-      hchip real timestampHigh
     exact rowAligned_immutableRam_of_shape memoryShape decoded witness.data hchip real
-      bounds timestamps isRam ramHigh decode.register_bounds.1
+      bounds timestamps isRam decode.register_bounds.1
       (decode.register_bounds.2.1
         (by simpa only [programAccess, ProgramAccess.toRow] using
           data.imm_b_eq decoded witness.data hchip))
@@ -1457,7 +1461,7 @@ theorem StoreMemoryChipGroundingData.toContracts {chip : SupportedChip p}
     trivial
   readiness := data.readiness
   rowAligned := by
-    intro witness constraints balanced decoded hchip decodedMem real program decode timestampHigh
+    intro witness constraints balanced decoded hchip decodedMem real program decode
     refine ⟨ramItypeTouches (decoded.toChipRow witness.data).view
       (memoryShape.access decoded witness.data)
       (decoded.ordinaryRowFacts witness.data)
@@ -1472,10 +1476,8 @@ theorem StoreMemoryChipGroundingData.toContracts {chip : SupportedChip p}
     have timestamps :=
       data.timestampBounds decoded witness.data hchip rowConstraints byteG real
     have isRam := data.isRam decoded witness.data hchip rowConstraints real
-    have ramHigh := ramPrevHigh_lt_of_immutableRamShape memoryShape decoded witness.data
-      hchip real timestampHigh
     exact rowAligned_immutableRam_of_shape memoryShape decoded witness.data hchip real
-      bounds timestamps isRam ramHigh decode.register_bounds.1
+      bounds timestamps isRam decode.register_bounds.1
       (decode.register_bounds.2.1
         (by simpa only [programAccess, ProgramAccess.toRow] using
           data.imm_b_eq decoded witness.data hchip))

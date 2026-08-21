@@ -778,7 +778,8 @@ theorem rowAligned_aluType_of_shape {chip : SupportedChip p}
           (touches.filter (fun pq => MemoryMsg.locOf pq.2 = loc))) ∧
         (∀ tc ∈ touches, SP1Clean.Channels.MemoryMsg.ClkBound tc.2) ∧
         (∀ tc ∈ touches, SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
+          (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   rcases immBinary with register | immediate
   · refine ⟨rtypeTouches (decoded.toChipRow data).view (decoded.ordinaryRowFacts data), ?_⟩
     have consumed := consumedMemoryMessages_eq_of_aluType_register shape decoded data hchip
@@ -790,8 +791,9 @@ theorem rowAligned_aluType_of_shape {chip : SupportedChip p}
     have slots : ∀ tc ∈ rtypeTouches (decoded.toChipRow data).view
         (decoded.ordinaryRowFacts data),
         SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
-      intro tc htc hclk
+          (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
+      intro tc htc hclk _
       simp only [rtypeTouches, List.mem_cons, List.not_mem_nil, or_false] at htc
       rcases htc with rfl | rfl | rfl
       · exact TimeExtraction.memoryTimeNat_lt_of_activeTimestampBounds
@@ -814,8 +816,9 @@ theorem rowAligned_aluType_of_shape {chip : SupportedChip p}
     have slots : ∀ tc ∈ itypeTouches (decoded.toChipRow data).view
         (decoded.ordinaryRowFacts data),
         SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
-      intro tc htc hclk
+          (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
+      intro tc htc hclk _
       simp only [itypeTouches, List.mem_cons, List.not_mem_nil, or_false] at htc
       rcases htc with rfl | rfl
       · exact TimeExtraction.memoryTimeNat_lt_of_activeTimestampBounds

@@ -115,9 +115,13 @@ native public-input equality
 + four-channel balance
 + committed Program and provider/boundary semantics
 + Memory provider uniqueness
-+ pulled high-timestamp range
 + an ordinary 8-tick machine schedule
 ```
+
+It does **not** consume a pulled-timestamp range premise: the `< 2^24` bound on every pulled
+Memory record's high clock limb is derived inside the capstone from the per-location Memory
+balance (`pushGood`/`pullGood` in `SP1Clean/Soundness/AIR.lean`), so `SupportedCoreNativeRelation`
+is exactly the ensemble relation plus the semantic boundary binding.
 
 and produces:
 
@@ -261,7 +265,6 @@ recomputed and matched cell-for-cell), and the independent Rust interpreter diff
 | Two-key generated Sail config | `clint`/`simple_interrupt_generator` disabled at four generated value sites — devices SP1 does not implement, whose stock defaults make the memory-bridge lemmas false as stated | stays config-generated; the generation pins and config hash are gated by `check_pins.sh` |
 | `SailConfigured` platform state | the theorems' initial-state hypotheses select SP1's platform on the Lean side: machine mode, no enabled interrupts, `MPRV`/`mseccfg`/PMM off, no HTIF, PMP all-OFF (`h_pmp_off`), and the single RWX PMA region `[2^16, 2^48)` | discharge per-field from SP1's boot/ELF-load contract; the PMA window and PMP-off are the platform selection itself (verification-report §3.2) |
 | Native semantic boundary relation | native provider tables must mean the selected program/state | derive from exact Program/Memory/Global system tables |
-| Timestamp high bound | prevents wrap in MemoryAccess ordering | derive from exact public timestamp/range and memory permutation |
 | `SyscallHandler` | Sail does not implement SP1 host syscalls | prove concrete handlers for claimed syscalls |
 | Preprocessed commitment | verifying key must bind the Program/provider trace | discharge in PCS/ArkLib layer |
 | Exact natural balance | execution needs a real multiset, not modular equality | extract with LogUp/GKR soundness and bounds |
@@ -285,7 +288,8 @@ exact instruction tables
 Specifically:
 
 - transport all 25 exact instruction traces through the coverage certificate;
-- derive native provider, memory uniqueness, and timestamp facts from the system tables;
+- derive native provider and memory-uniqueness facts from the system tables (the pulled-timestamp
+  high bound is already derived natively, from the per-location Memory balance);
 - prove the mixed ordinary/syscall schedule and exact syscall transcript;
 - instantiate `CoreAIRRefinementObligations`;
 - compose authenticated shards from boot to HALT; and

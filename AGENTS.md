@@ -64,7 +64,7 @@ to a canonical Rust exporter so it does not obscure the verifier/refinement boun
 **This workstream's current priority:** instantiate the exact v6.4.0 Core AIR refinement bundle. Native
 timed grounding, every one of the 25 chip contracts, and `supported_core_native_sound` are closed. The
 34-table execution and 6-table memory-boundary relations exist, but full upstream soundness remains open
-until the six Core system tables derive the native boundary/timestamp facts and
+until the six Core system tables derive the native boundary facts and
 `CoreAIRRefinementObligations` has a closed construction. Until then only
 `sp1_air_refinement_of_obligations`/`sp1_air_sound_of_obligations` are declared; the unqualified names
 remain reserved. See `docs/roadmap.md` and `docs/architecture.md`.
@@ -307,8 +307,13 @@ layers distinguish native supported-machine refinement, extracted AIR faithfulne
 soundness, and the eventual ArkLib verifier theorem; see `docs/roadmap.md` (P0–P2).
 The memory-bus closed forms, `GroundingAdapter`, all 25 `ChipGroundingContracts`, aligned-carrier
 transports, RAM/same-location grounding, and per-position assumptions/readiness are proved. Remaining
-work is to derive this native relation's semantic boundary and timestamp premises from the exact
-upstream system tables.
+work is to derive this native relation's semantic boundary premise from the exact upstream system
+tables. `SupportedCoreNativeRelation` is exactly **two** conjuncts — the ensemble algebra and that
+boundary binding. The former third conjunct (`SupportedCoreMemoryTimestampRangeRelation`, the
+pulled-record `clk_high < 2 ^ 24` bound) was deleted in the 2026-08 W3 wave: it is now derived from
+the produced side of the capstone's own per-location Memory balance, unblocked by moving the bound
+out of `ChipGroundingContracts.rowAligned`'s premises and into the per-touch antecedent of its slot
+conjunct.
 
 Everything is **field-generic** over a prime field — the standard variable block is:
 ```lean

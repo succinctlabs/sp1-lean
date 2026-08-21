@@ -186,12 +186,17 @@ by `supported_core_witness_grounding` and consumed by `supported_core_native_sou
 The source relation keeps non-algebraic facts visible:
 
 - the program and initial state are bound to provider rows;
-- memory-provider rows are unique per location;
-- code memory is compatible with the Sail execution model; and
-- pulled high timestamps satisfy the physical range bound.
+- memory-provider rows are unique per location; and
+- code memory is compatible with the Sail execution model.
 
 These are not Lean axioms. They are explicit relation conjuncts that the exact upstream system-table
 proof must eventually derive.
+
+The physical range bound on pulled high timestamps is deliberately *not* on that list. It used to be
+a third relation conjunct, because `ChipGroundingContracts.rowAligned` took it as a premise and so
+could not produce the touch lists the memory balance is built from until it was already known.
+Moving it into the per-touch antecedent of that field's slot conjunct broke the cycle, and the
+capstone now derives it from the produced side of its own per-location Memory balance.
 
 ## Exact upstream Core AIR
 
@@ -240,7 +245,7 @@ exact instruction rows
   ── 25 ChipFaithful proofs ──→ native instruction constraints/interactions
 
 exact system rows
-  ── system grounding ────────→ native provider, boundary, timestamp, and syscall facts
+  ── system grounding ────────→ native provider, boundary, and syscall facts
 
 both
   ── supported_core_native_sound + event assembly

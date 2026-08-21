@@ -30,7 +30,7 @@ theorem supported_core_native_sound (model : Machine.SP1MachineModel)
       (SupportedCoreLocalExecutionRelation model)
 ```
 
-Its source relation has three visible parts:
+Its source relation has two visible parts:
 
 1. `SupportedCoreEnsembleRelation`
    - the witness public input equals the statement;
@@ -46,9 +46,13 @@ Its source relation has three visible parts:
    - Program-provider rows describe that program; and
    - Memory-init and Memory-finalize provider rows have the required meaning and per-location
      uniqueness.
-3. `SupportedCoreMemoryTimestampRangeRelation`
-   - the high component of each pulled memory timestamp is below the 24-bit physical bound needed by
-     SP1's timestamp-difference argument.
+
+Those two conjuncts are the whole hypothesis. In particular the 24-bit range fact on each pulled
+memory timestamp — needed by SP1's timestamp-difference argument, and formerly a third companion
+relation — is now *derived* inside the proof from the per-location Memory balance: every record on
+the produced side of that balance carries the bound (the boundary provider pins both init clock
+limbs to zero, instruction rows inherit it from the range-checked public shard-time ceiling, and
+MemoryBump rows range-check it in-circuit), so every pulled record does too.
 
 From those facts the proof deterministically decodes the physical rows, obtains an exhaustive
 State-bus order, grounds Program and Memory accesses at every position, applies the registered chip
@@ -215,9 +219,9 @@ The audit separates proof incompleteness from external trust:
 - Cryptographic commitments, PCS opening, LogUp/GKR, Fiat--Shamir, and verifier extraction remain the
   responsibility of the later ArkLib layer.
 
-The semantic boundary and timestamp relations in `SupportedCoreNativeRelation` are theorem premises,
-not hidden axioms. Full upstream soundness requires deriving them from the exact system AIR and
-cryptographic binding relations. The single most load-bearing semantic premise deserves naming here:
+The semantic boundary relation in `SupportedCoreNativeRelation` is a theorem premise, not a hidden
+axiom. Full upstream soundness requires deriving it from the exact system AIR and cryptographic
+binding relations. The single most load-bearing semantic premise deserves naming here:
 `SailCodeMemoryCompatible` — every store on the run preserves the program's ROM bytes. SP1 fetches
 instructions from an immutable program table while unmodified Sail fetches from the same mutable
 memory that stores write to; for a guest that overwrites its own code the two genuinely diverge, and
@@ -226,7 +230,7 @@ impossible.
 
 Three named link predicates (`TraceStateLink`, `TraceByteLink`, `TraceMemClkValid`) appear in the
 standalone per-bus consistency modules as their honestly-stated premises. They are **not** premises
-of `supported_core_native_sound`: the capstone's premise surface is exactly the three relation
+of `supported_core_native_sound`: the capstone's premise surface is exactly the two relation
 conjuncts above plus the `UsesOrdinarySchedule` schedule hypothesis, and no module on its proof
 path references the link predicates.
 

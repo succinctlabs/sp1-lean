@@ -84,9 +84,11 @@ tables:
   or a per-address premise restatement; and
 - SyscallCore/SyscallInstrs: raw syscall transcript consistency.
 
-This work should target the existing `InitialBoundaryFacts`,
-`SupportedCoreMemoryTimestampRangeRelation`, and event structures. Extend those contracts only when the
-exact upstream AIR proves a materially stronger fact that is needed by correctness.
+This work should target the existing `InitialBoundaryFacts` and event structures. Extend those
+contracts only when the exact upstream AIR proves a materially stronger fact that is needed by
+correctness. The pulled-timestamp `< 2^24` range fact is **not** on this list any more: it is
+derived natively from the per-location Memory balance (`SP1Clean/Soundness/AIR.lean`), so the
+upstream discharge inherits it rather than having to reprove it.
 
 The main correctness risks to audit are:
 

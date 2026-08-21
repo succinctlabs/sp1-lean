@@ -54,11 +54,12 @@ def main (input : Var MemoryMsg (ZMod p)) : Circuit (ZMod p) Unit := do
   -- gate is a faithfulness improvement, not an extra restriction. A shallow `assertZero` (no witness
   -- columns), so `localLength` is unchanged.
   assertZero input.clk_low
-  -- W3 (external report Finding 2 / the timestamp-premise derivation): the boundary clock's **high**
-  -- limb is pinned to `0` as well — again exactly SP1's memory-init interaction (`Expr::zero()` for
-  -- both `(clk_high, clk_low)`). This is what lets the trail derive every memory pull's `clk_high`
-  -- bound from push-side facts alone (init `= 0`, instruction rows' state goodness, bump rows'
-  -- range checks) and delete the capstone's `MemoryPullTimestampHighBound` premise.
+  -- W3 (external report Findings 2 and 8.2): the boundary clock's **high** limb is pinned to `0` as
+  -- well — again exactly SP1's memory-init interaction (`Expr::zero()` for both
+  -- `(clk_high, clk_low)`). This is what lets the trail derive every memory pull's `clk_high` bound
+  -- from push-side facts alone (init `= 0`, instruction rows' state goodness, bump rows' range
+  -- checks); that derivation is `pushGood`/`pullGood` in `Soundness/AIR.lean`, and it is why the
+  -- capstone carries no explicit memory-timestamp-range premise.
   assertZero input.clk_high
   let m ← witnessField 1
   assertZero (m * (m - 1))

@@ -275,7 +275,8 @@ theorem rowAligned_jtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
       (∀ tc ∈ jtypeTouches view rf, SP1Clean.Channels.MemoryMsg.ClkBound tc.2) ∧
       (∀ tc ∈ jtypeTouches view rf,
         SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
+          (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   have indexEq : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
       view.adapter.op_a := by
     rw [BitVec.toNat_ofNat,
@@ -335,7 +336,7 @@ theorem rowAligned_jtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
     subst tc
     exact Channels.MemoryMsg.clkBound_of_cpuState_bounds _ _ _ 4 val_4_zmod_p
       (by omega) bounds.clk0 bounds.clk1
-  · intro tc tcMem pullBound
+  · intro tc tcMem pullBound _
     simp only [jtypeTouches, List.mem_singleton] at tcMem
     subst tc
     exact hslot pullBound
@@ -467,7 +468,8 @@ theorem rowAligned_jtype_of_shape {chip : SupportedChip p}
       (∀ tc ∈ jtypeTouches (decoded.toChipRow data).view
           (decoded.ordinaryRowFacts data),
         SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
+          (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   have consumed := consumedMemoryMessages_eq_of_jtypeShape shape decoded data hchip real
   have produced := producedMemoryMessages_eq_of_jtypeShape shape decoded data hchip real
   have slot : SP1Clean.Channels.MemoryMsg.ClkBound

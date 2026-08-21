@@ -87,19 +87,6 @@ def MemoryPullsBound (rf : Semantics.RowFacts p) (state : SailState) : Prop :=
   ∀ mp ∈ rf.memPulls,
     locContent state (MemoryMsg.locOf mp.1) = some (Word.toBitVec64 mp.1.value)
 
-/-- The physical high timestamp component of every pulled Memory record is a genuine 24-bit
-integer. SP1's generic RAM `MemoryAccess` underflow argument needs this range premise when
-`compare_low = 0` (the high-limb comparison branch; the `compare_low = 1` branch consumes the
-bus guarantee `MemoryMsg.ClkBound` instead); its local AIR range-checks the difference limbs but
-does not independently range-check both compared high components.
-
-This predicate is deliberately separate from semantic pull currency and from `MemoryMsg.ClkBound`
-(which bounds the low component). The current native capstone receives it through an explicit
-witness-wide companion relation; a future exact extracted-AIR proof may discharge that relation
-from the public timestamp range checks and Memory permutation. -/
-def MemoryPullTimestampHighBound (rf : Semantics.RowFacts p) : Prop :=
-  ∀ mp ∈ rf.memPulls, mp.1.clk_high.val < 2 ^ 24
-
 /-- **The per-row message ↔ view correspondence** consumed by the adapter.  `view` is the row view
 the chip's `advance` payload speaks about; `rf` is the row's semantic bus record.  All time facts
 are already ℕ-decoded (the field → ℕ step is the wiring producer's obligation, from the CPUState
@@ -1048,7 +1035,8 @@ theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
        rtypeReadBackMessage view (view.adapter.op_c[0]) view.adapter.op_c_memory 2,
        rtypeWriteMessage view])
     (hslots : ∀ tc ∈ rtypeTouches view rf, SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-      MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) :
+      (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+        MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) :
     AlignsWith (alignedOf rf (rtypeTouches view rf)) rf ∧
       (∀ tc ∈ rtypeTouches view rf,
         TouchOK (StateMsg.timeNat rf.statePull) tc.1 tc.2) ∧
@@ -1057,7 +1045,8 @@ theorem rowAligned_rtype {view : Trace.RowView (ZMod p)} {rf : Semantics.RowFact
         ((rtypeTouches view rf).filter (fun pq => MemoryMsg.locOf pq.2 = loc))) ∧
       (∀ tc ∈ rtypeTouches view rf, SP1Clean.Channels.MemoryMsg.ClkBound tc.2) ∧
       (∀ tc ∈ rtypeTouches view rf, SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-        MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
+        (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   -- Register-index → location facts (used everywhere).
   have hlocPriorA := locOf_rtypePriorMessage view _ view.adapter.op_a_memory opa_lt
   have hlocPriorB := locOf_rtypePriorMessage view _ view.adapter.op_b_memory opb_lt
@@ -1188,7 +1177,8 @@ theorem rowAligned_immutableRtype {view : Trace.RowView (ZMod p)}
        rtypeReadBackMessage view view.adapter.op_c[0] view.adapter.op_c_memory 2])
     (hslots : ∀ tc ∈ immutableRtypeTouches view rf,
       SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-        MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) :
+        (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) :
     AlignsWith (alignedOf rf (immutableRtypeTouches view rf)) rf ∧
       (∀ tc ∈ immutableRtypeTouches view rf,
         TouchOK (StateMsg.timeNat rf.statePull) tc.1 tc.2) ∧
@@ -1200,7 +1190,8 @@ theorem rowAligned_immutableRtype {view : Trace.RowView (ZMod p)}
         SP1Clean.Channels.MemoryMsg.ClkBound tc.2) ∧
       (∀ tc ∈ immutableRtypeTouches view rf,
         SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
+          (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   have hlocPriorA := locOf_rtypePriorMessage view _ view.adapter.op_a_memory opa_lt
   have hlocPriorB := locOf_rtypePriorMessage view _ view.adapter.op_b_memory opb_lt
   have hlocPriorC := locOf_rtypePriorMessage view _ view.adapter.op_c_memory opc_lt
@@ -1981,7 +1972,8 @@ theorem rowAligned_rtype_of_shape {chip : SupportedChip p}
         SP1Clean.Channels.MemoryMsg.ClkBound tc.2) ∧
       (∀ tc ∈ rtypeTouches (decoded.toChipRow data).view (decoded.ordinaryRowFacts data),
         SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-        MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
+        (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   have consumed_eq := consumedMemoryMessages_eq_of_rtypeShape shape decoded data hchip real
   have produced_eq := producedMemoryMessages_eq_of_rtypeShape shape decoded data hchip real
   obtain ⟨hts_a, hts_b, hts_c⟩ := timestampBounds
@@ -1989,8 +1981,9 @@ theorem rowAligned_rtype_of_shape {chip : SupportedChip p}
   -- record's received `ClkBound`; neither side assumes the conclusion of the grounding walk.
   have hslots : ∀ tc ∈ rtypeTouches (decoded.toChipRow data).view (decoded.ordinaryRowFacts data),
       SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-      MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
-    intro tc htc hclk
+      (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+        MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
+    intro tc htc hclk _
     simp only [rtypeTouches, List.mem_cons, List.not_mem_nil, or_false] at htc
     rcases htc with rfl | rfl | rfl
     · exact TimeExtraction.memoryTimeNat_lt_of_activeTimestampBounds

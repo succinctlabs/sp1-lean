@@ -18,8 +18,6 @@ This module is the naming boundary the old trail capstone lacked:
 * `SupportedCoreEnsembleRelation` is exactly the algebra checked by the 38-table Clean ensemble;
 * `SP1SemanticBoundaryRelation` separately binds its preprocessed/provider rows to the committed
   program and a concrete local initial Sail state;
-* `SupportedCoreMemoryTimestampRangeRelation` exposes the one physical range premise used by the
-  generic RAM-access underflow argument;
 * `SupportedCoreNativeRelation` is their conjunction; and
 * `SupportedCoreLocalExecutionRelation` is the finite official-Sail target for that slice.
 
@@ -111,35 +109,23 @@ def SP1SemanticBoundaryRelation :
     WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
   SemanticBoundaryBinding
 
-/-- The explicit physical range premise needed by SP1's generic RAM access-timestamp comparison.
-The local `MemoryAccess` AIR constrains the selected difference to two byte-range-checked limbs, but
-its Rust soundness argument additionally requires both compared components to be `< 2^24`. Low
-components already carry `MemoryMsg.ClkBound`; this companion supplies the pulled high component.
+/-- The honest native relation used by semantic soundness. Provider truth is an explicit companion
+predicate, not an implication smuggled out of raw interaction balance.
 
-This is intentionally a witness relation rather than an unconditional axiom or an ordering
-assumption. The load/store contracts still derive strict order from the actual AIR equations. The
-eventual exact extracted-AIR layer should prove this relation from SP1's public timestamp range
-checks plus Memory permutation, or continue to disclose it as an external verifier premise.
-
-This is now the **only** Memory-side premise of the capstone: the MemoryBump scope restriction that
-travelled beside it (`realMemoryBumpRows witness = []`) was discharged in W3 by running
-`RefreshElimination.eliminate` on the widened per-location balance and re-feeding the walk the
-refresh-free carrier `RefreshWiring.exists_refreshFreeTouchLists` produces. -/
-def SupportedCoreMemoryTimestampRangeRelation :
-    WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
-  fun _statement witness =>
-    ∀ decoded ∈ realDecodedInstructionRows witness.data witness.tables,
-      MemoryPullTimestampHighBound (decoded.ordinaryRowFacts witness.data)
-
-/-- The honest native relation used by semantic soundness. Provider truth and the RAM timestamp
-range fact are explicit companion predicates, not implications smuggled out of raw interaction
-balance. -/
+There is deliberately **no** third conjunct. The physical range premise SP1's generic RAM
+access-timestamp comparison needs — a genuine 24-bit high limb on every pulled Memory record — used
+to travel here as `SupportedCoreMemoryTimestampRangeRelation`, because the per-chip aligned-carrier
+contract demanded it before producing the touch lists that the capstone's per-location memory
+balance is built from. Moving that demand into the per-touch antecedent of the contract's slot
+conjunct broke the cycle: `supportedCore_orderedRows_dynamic_of_obligations` now *derives* both
+timestamp facts for every pulled record from the produced side of the widened balance
+(`pushGood`/`pullGood`), so the capstone's remaining premises are exactly the ensemble algebra and
+the semantic boundary binding. -/
 def SupportedCoreNativeRelation :
     WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
   fun statement witness =>
     SupportedCoreEnsembleRelation statement witness ∧
-      SP1SemanticBoundaryRelation statement witness ∧
-        SupportedCoreMemoryTimestampRangeRelation statement witness
+      SP1SemanticBoundaryRelation statement witness
 
 /-! ## Native grounding and the local-execution capstone -/
 
@@ -431,8 +417,6 @@ theorem supportedCore_orderedRows_dynamic_of_obligations
     (initial : SailState) (publicInputEq : witness.publicInput = statement.publicValues)
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
     (boundary : InitialBoundaryFacts statement witness initial)
-    (memoryTimestampRange :
-      SupportedCoreMemoryTimestampRangeRelation statement witness)
     (obligations : SupportedCoreGroundingObligations witness)
     (orderedRows : List (DecodedInstructionRow p))
     (exhaustive : orderedRows.Perm
@@ -482,13 +466,13 @@ theorem supportedCore_orderedRows_dynamic_of_obligations
           (touches.filter (fun pq => Semantics.MemoryMsg.locOf pq.2 = loc))) ∧
         (∀ tc ∈ touches, Channels.MemoryMsg.ClkBound tc.2) ∧
         (∀ tc ∈ touches, Channels.MemoryMsg.ClkBound (tc : TimedGrounding.Touch p).1.1 →
-          Semantics.MemoryMsg.timeNat (tc : TimedGrounding.Touch p).1.1 <
-            Semantics.MemoryMsg.timeNat tc.2) := by
+          (tc : TimedGrounding.Touch p).1.1.clk_high.val < 2 ^ 24 →
+            Semantics.MemoryMsg.timeNat (tc : TimedGrounding.Touch p).1.1 <
+              Semantics.MemoryMsg.timeNat tc.2) := by
     intro decoded decodedMem
     exact (contractAt decoded decodedMem).rowAligned witness constraints balanced decoded rfl
       (sourceFacts decoded decodedMem).1 (sourceFacts decoded decodedMem).2 statement.program
       (decodeAt decoded decodedMem)
-      (memoryTimestampRange decoded (exhaustive.mem_iff.mp decodedMem))
   let touchesOf : DecodedInstructionRow p → List (TimedGrounding.Touch p) := fun decoded =>
     if decodedMem : decoded ∈ orderedRows then Classical.choose (alignedExists decoded decodedMem)
     else []
@@ -507,8 +491,9 @@ theorem supportedCore_orderedRows_dynamic_of_obligations
         (∀ tc ∈ touchesOf decoded, Channels.MemoryMsg.ClkBound tc.2) ∧
         (∀ tc ∈ touchesOf decoded,
           Channels.MemoryMsg.ClkBound (tc : TimedGrounding.Touch p).1.1 →
-            Semantics.MemoryMsg.timeNat (tc : TimedGrounding.Touch p).1.1 <
-              Semantics.MemoryMsg.timeNat tc.2) := by
+            (tc : TimedGrounding.Touch p).1.1.clk_high.val < 2 ^ 24 →
+              Semantics.MemoryMsg.timeNat (tc : TimedGrounding.Touch p).1.1 <
+                Semantics.MemoryMsg.timeNat tc.2) := by
     intro decoded decodedMem
     simp only [touchesOf, dif_pos decodedMem]
     exact Classical.choose_spec (alignedExists decoded decodedMem)
@@ -811,6 +796,7 @@ theorem supportedCore_orderedRows_dynamic_of_obligations
         initialBoundaryStateMessage, Semantics.StateMsg.timeNat] using aligned
     · intro tc touchMem
       exact evidence.2.2.2.2 tc touchMem (alignedPullGood q.1 decodedMem tc touchMem).1
+        (alignedPullGood q.1 decodedMem tc touchMem).2
   have stateBalance :
       initialBoundaryStateMessage statement.publicValues ::ₘ
           (↑((pairs.map walkRow).map (·.statePush)) :
@@ -890,8 +876,6 @@ theorem supportedCore_orderedRows_dynamic
     (initial : SailState) (publicInputEq : witness.publicInput = statement.publicValues)
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
     (boundary : InitialBoundaryFacts statement witness initial)
-    (memoryTimestampRange :
-      SupportedCoreMemoryTimestampRangeRelation statement witness)
     (orderedRows : List (DecodedInstructionRow p))
     (exhaustive : orderedRows.Perm
       (realDecodedInstructionRows witness.data witness.tables))
@@ -911,7 +895,7 @@ theorem supportedCore_orderedRows_dynamic
           m'.value = m.value ∧ Semantics.MemoryMsg.timeNat m' ≤ Semantics.MemoryMsg.timeNat m ∧
           Semantics.LocalMemTruth initial (Commit.initClkNat witness.data) m') := by
   exact supportedCore_orderedRows_dynamic_of_obligations statement witness initial publicInputEq
-    constraints balanced boundary memoryTimestampRange
+    constraints balanced boundary
     (supportedCore_groundingObligations_of_constraints witness constraints)
     orderedRows exhaustive stateWalk
 
@@ -927,9 +911,7 @@ theorem supported_core_witness_grounding
     (initial : SailState)
     (publicInputEq : witness.publicInput = statement.publicValues)
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
-    (boundary : InitialBoundaryFacts statement witness initial)
-    (memoryTimestampRange :
-      SupportedCoreMemoryTimestampRangeRelation statement witness) :
+    (boundary : InitialBoundaryFacts statement witness initial) :
     ∃ orderedRows, SupportedCoreGrounding statement witness initial orderedRows := by
   obtain ⟨orderedRows, stateWalk, exhaustiveMultiset⟩ :=
     witness_realDecodedState_canonExhaustiveTrail witness constraints balanced
@@ -939,7 +921,7 @@ theorem supported_core_witness_grounding
     Multiset.coe_eq_coe.mp exhaustiveMultiset
   have goodness := (witness_stateEdges_goodness witness constraints balanced).1
   have dyn := supportedCore_orderedRows_dynamic statement witness initial publicInputEq constraints
-    balanced boundary memoryTimestampRange orderedRows exhaustive stateWalk
+    balanced boundary orderedRows exhaustive stateWalk
   refine ⟨orderedRows, exhaustive, ?_, ?_, ?_, dyn.2.1, dyn.2.2⟩
   · simpa [initialBoundaryStateMessage, finalBoundaryStateMessage,
       Semantics.StateMsg.pcBits, supportedPcBits] using
@@ -964,21 +946,20 @@ theorem supported_core_witness_grounding
     exact clockCount
 
 /-- **Supported native-Clean soundness.** A satisfying, channel-balanced witness whose provider
-tables are semantically bound and whose memory timestamps satisfy the
-`SupportedCoreMemoryTimestampRangeRelation` bound (the third conjunct of
-`SupportedCoreNativeRelation`) produces a genuine local official-Sail execution between its public
-endpoints.  This deliberately concludes a shard-local segment; boot reachability is supplied later by
-`supportedCoreLocalExecution_anchors` when consecutive shards are composed. -/
+tables are semantically bound produces a genuine local official-Sail execution between its public
+endpoints.  Those two conjuncts are the *whole* premise: the RAM access-timestamp range fact the
+generic underflow argument needs is derived inside the capstone from the per-location Memory
+balance, not assumed here.  This deliberately concludes a shard-local segment; boot reachability is
+supplied later by `supportedCoreLocalExecution_anchors` when consecutive shards are composed. -/
 theorem supported_core_native_sound (model : Machine.SP1MachineModel)
     (ordinary : model.UsesOrdinarySchedule) :
     WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
       (SupportedCoreLocalExecutionRelation model) := by
   intro statement witness valid
-  obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩,
-    memoryTimestampRange⟩ := valid
+  obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩⟩ := valid
   obtain ⟨rows, -, walk, grounded, clockCount, -, -⟩ :=
     supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
-      boundary memoryTimestampRange
+      boundary
   apply groundedRows_localExecution model statement witness.data initial
     (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data) rows
     boundary.programWellFormed boundary.initialPc boundary.romLoaded boundary.configured

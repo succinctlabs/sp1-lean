@@ -638,7 +638,8 @@ theorem rowAligned_immutableItype {view : Trace.RowView (ZMod p)}
        rtypeReadBackMessage view view.adapter.op_b[0] view.adapter.op_b_memory 3])
     (hslots : ∀ tc ∈ immutableItypeTouches view rf,
       SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-        MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) :
+        (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) :
     AlignsWith (alignedOf rf (immutableItypeTouches view rf)) rf ∧
       (∀ tc ∈ immutableItypeTouches view rf,
         TouchOK (StateMsg.timeNat rf.statePull) tc.1 tc.2) ∧
@@ -650,7 +651,8 @@ theorem rowAligned_immutableItype {view : Trace.RowView (ZMod p)}
         SP1Clean.Channels.MemoryMsg.ClkBound tc.2) ∧
       (∀ tc ∈ immutableItypeTouches view rf,
         SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
+          (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   have hidxA := controlRegisterIndexCast view.adapter.op_a opa_lt
   have hidxB := controlRegisterIndexCast view.adapter.op_b[0] opb_lt
   have hlocPriorA : MemoryMsg.locOf
@@ -783,7 +785,8 @@ theorem rowAligned_immutableItype_of_shape {chip : SupportedChip p}
       (∀ tc ∈ immutableItypeTouches (decoded.toChipRow data).view
           (decoded.ordinaryRowFacts data),
         SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
+          (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   have consumed :=
     consumedMemoryMessages_eq_of_immutableItypeShape shape decoded data hchip real
   have produced :=
@@ -792,8 +795,9 @@ theorem rowAligned_immutableItype_of_shape {chip : SupportedChip p}
   have hslots : ∀ tc ∈ immutableItypeTouches (decoded.toChipRow data).view
       (decoded.ordinaryRowFacts data),
       SP1Clean.Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-        MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
-    intro tc htc hclk
+        (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
+    intro tc htc hclk _
     simp only [immutableItypeTouches, List.mem_cons, List.not_mem_nil, or_false] at htc
     rcases htc with rfl | rfl
     · exact TimeExtraction.memoryTimeNat_lt_of_activeTimestampBounds
