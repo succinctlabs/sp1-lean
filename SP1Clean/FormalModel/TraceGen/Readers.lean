@@ -265,6 +265,16 @@ lemma wordOfNat_toNat (n : ℕ) : Word.toNat (wordOfNat (p := p) n) = n % 2 ^ 64
     hval _ (Nat.mod_lt _ (by norm_num)), hval _ (Nat.mod_lt _ (by norm_num))]
   omega
 
+/-- **The 64-bit value a built word means.** `toBitVec64` is `BitVec.ofNat 64 ∘ toNat`, and a built
+word's `toNat` is the argument's low 64 bits, which `BitVec.ofNat` would have taken anyway. This is
+what lets a chip contract phrased over `BitVec 64` — the `Branch` chip's six comparison clauses, for
+instance — be discharged from the plain-`ℕ` operand the event carries. -/
+lemma toBitVec64_wordOfNat (n : ℕ) :
+    Word.toBitVec64 (wordOfNat (p := p) n) = BitVec.ofNat 64 n := by
+  rw [Word.toBitVec64, wordOfNat_toNat]
+  rw [← BitVec.toNat_inj]
+  simp [Nat.mod_mod_of_dvd]
+
 /-! ## The `RTypeReader` block -/
 
 omit [Fact p.Prime] in

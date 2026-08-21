@@ -11,7 +11,7 @@ supports; the figures below cover their union.
 
 ## Result
 
-- 609 released declarations are probed (571 main + 38 test: the 34 real-row satisfiability
+- 624 released declarations are probed (586 main + 38 test: the 34 real-row satisfiability
   anchors of `SP1CleanTest/NonVacuityReal.lean`, the two executable plus one definitional
   anchor of `SP1CleanTest/Audit/OneAddNativePremises.lean`, and the joint non-vacuity anchor
   of `SP1CleanTest/Audit/JointNonVacuity.lean`; the 21 legacy `native_decide`
@@ -28,7 +28,13 @@ supports; the figures below cover their union.
   (`LoadByte`/`LoadHalf`/`LoadWord`/`LoadDouble`/`LoadX0`), tranche 3's four stores
   (`StoreByte`/`StoreHalf`/`StoreWord`/`StoreDouble`) and tranche 4's two jumps plus the
   `x0` ALU router (`Jal`/`Jalr`/`AluX0`) — the last of the chips whose honest-prover contract is
-  independent of the `ProverHint`).
+  independent of the `ProverHint`; and tranche 5's five **hint-driven** chips (`Bitwise`, `Lt`,
+  `Branch`, `ShiftLeft`, `ShiftRight`), reached by generalising `Air.Flat.Table.build` to a
+  per-row hint (`Table.buildHinted`, `ToClean/Air/TableBuild.lean`) — a table stores no hint
+  field, so the hint enters only through the row builder, and the single-hint form survives as
+  its constant-hint special case. Each of those five rows is built with the variant selectors of
+  its **own** event's opcode discriminant, and `Branch` additionally with its own taken/not-taken
+  decision; all five have satisfiable padding rows, which a table-level hint made impossible).
   The earlier 476 count fell from 478 because `SailDecode.decode_ADD_example`
   and its sole consumer `Soundness.Target.decodedInROM_addRow` were retired during the toolchain
   migration (see the retirement note in `SP1Clean/Model/SailDecode.lean`).

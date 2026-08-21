@@ -332,6 +332,53 @@ lemma jTypeReaderCols_op_a_memory (e : JTypeEvent) :
 lemma jTypeReaderCols_op_b_imm (e : JTypeEvent) :
     (jTypeReaderCols (p := p) e).op_b_imm = wordOfNat e.immB := rfl
 
+/-! ## The prover hint
+
+A multi-opcode chip does not commit its variant selectors as `Inputs` columns: the native circuit
+**witnesses** them from a string-keyed `ProverHint` table (`Native/Witgen/HintFlags.lean`), and the
+chip's `ProverAssumptions` pins them against the row's own `is_real` — e.g. Bitwise's
+`is_real = f[0] + f[1] + f[2]`. So the hint is part of what a builder produces for a row, exactly
+as the input columns are, and it is **per row**: a table-level hint could not carry both a real
+row's one-hot flags and a padding row's zeros (`ToClean/Air/TableBuild.lean`, `Table.buildHinted`).
+
+`hintAdd`/`flagHint` are the builder side of that. They are stated at an arbitrary read width `n`
+because `ProverHint` is dependently typed (`String → (n : ℕ) → Array (Vector F n)`) while each chip
+reads its own key at one fixed width; reading at the width the vector was built at returns the
+vector (`flagHint_apply`). -/
+
+/-- Extend a prover hint with one more key: `key` reads back the flag vector `v` (at the width `v`
+was built at — see `flagHint_apply`), every other key falls through to `h`. -/
+def hintAdd {m : ℕ} (key : String) (v : Vector (ZMod p) m) (h : ProverHint (ZMod p)) :
+    ProverHint (ZMod p) :=
+  fun k n => if k = key then #[Vector.ofFn fun i : Fin n => v[i.val]?.getD 0] else h k n
+
+/-- The single-key prover hint of a built row: row 0 of table `key` is the flag vector `v`, and
+every other key is absent (SP1's padding-row convention — an absent key reads as all-zero). -/
+def flagHint {m : ℕ} (key : String) (v : Vector (ZMod p) m) : ProverHint (ZMod p) :=
+  hintAdd key v (ProverHint.empty (ZMod p))
+
+/-- Reading a `hintAdd` key back at the width its vector was built at returns that vector — the
+form every chip's `hintFlags` accessor is in. -/
+lemma hintAdd_apply {m : ℕ} (key : String) (v : Vector (ZMod p) m) (h : ProverHint (ZMod p)) :
+    ((hintAdd key v h key m)[0]?).getD default = v := by
+  simp only [hintAdd]
+  exact Vector.ext fun i hi => by simp
+
+/-- `flagHint_apply` — the `flagHint` case of `hintAdd_apply`. -/
+lemma flagHint_apply {m : ℕ} (key : String) (v : Vector (ZMod p) m) :
+    ((flagHint key v key m)[0]?).getD default = v :=
+  hintAdd_apply key v _
+
+/-- A key the hint does not carry reads as the empty table — so a chip accessor's `.getD` fallback
+fires, which is SP1's all-zero padding-row convention. -/
+lemma flagHint_apply_of_ne {m : ℕ} {key key' : String} (v : Vector (ZMod p) m) (n : ℕ)
+    (h : key' ≠ key) : flagHint key v key' n = #[] := by
+  simp only [flagHint, hintAdd, if_neg h]
+  rfl
+
+/-- The empty hint reads as the empty table at every key — the padding row's hint. -/
+lemma empty_apply (key : String) (n : ℕ) : ProverHint.empty (ZMod p) key n = #[] := rfl
+
 /-! ## Per-chip assembly
 
 One `def` per chip. The chip's `Inputs` is the `is_real` selector plus the shared `state` and

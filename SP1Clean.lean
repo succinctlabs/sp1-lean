@@ -20,6 +20,7 @@ import SP1Clean.Native.Chips.BitwiseChip.Defs
 import SP1Clean.Proofs.Chips.BitwiseChip.Formal
 import SP1Clean.Proofs.Chips.BitwiseChip.Contracts
 import SP1Clean.Proofs.Chips.BitwiseChip.Witgen
+import SP1Clean.Proofs.Chips.BitwiseChip.Complete
 import SP1Clean.Proofs.Chips.BranchChip.Bridge
 import SP1Clean.Proofs.Chips.BranchChip.Decision
 import SP1Clean.Native.Chips.BranchChip.Defs
@@ -27,6 +28,7 @@ import SP1Clean.Proofs.Chips.BranchChip.Formal
 import SP1Clean.Proofs.Chips.BranchChip.Contracts
 import SP1Clean.Proofs.Chips.BranchChip.Witgen
 import SP1Clean.Proofs.Chips.BranchChip.Core
+import SP1Clean.Proofs.Chips.BranchChip.Complete
 import SP1Clean.Proofs.Chips.ByteChip.Provider
 import SP1Clean.Proofs.Chips.DivRemChip.Assembly
 import SP1Clean.Proofs.Chips.DivRemChip.Cases
@@ -113,6 +115,7 @@ import SP1Clean.Native.Chips.LtChip.Defs
 import SP1Clean.Proofs.Chips.LtChip.Formal
 import SP1Clean.Proofs.Chips.LtChip.Contracts
 import SP1Clean.Proofs.Chips.LtChip.Witgen
+import SP1Clean.Proofs.Chips.LtChip.Complete
 import SP1Clean.Proofs.Chips.MemoryProvider
 import SP1Clean.Proofs.Chips.MulChip.Bridge
 import SP1Clean.Native.Chips.MulChip.Defs
@@ -138,6 +141,7 @@ import SP1Clean.Proofs.Chips.ShiftLeftChip.Soundness.Sllw
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Formal
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Contracts
 import SP1Clean.Proofs.Chips.ShiftLeftChip.Witgen
+import SP1Clean.Proofs.Chips.ShiftLeftChip.Complete
 import SP1Clean.Native.Operations.ShiftRightOperation.Core
 import SP1Clean.Proofs.Operations.ShiftRightOperation.Core
 import SP1Clean.Proofs.Chips.ShiftRightChip.Bridge
@@ -154,6 +158,7 @@ import SP1Clean.Proofs.Chips.ShiftRightChip.Soundness.Sraw
 import SP1Clean.Proofs.Chips.ShiftRightChip.Formal
 import SP1Clean.Proofs.Chips.ShiftRightChip.Contracts
 import SP1Clean.Proofs.Chips.ShiftRightChip.Witgen
+import SP1Clean.Proofs.Chips.ShiftRightChip.Complete
 import SP1Clean.Proofs.Chips.StoreByteChip.Bridge
 import SP1Clean.Native.Chips.StoreByteChip.Defs
 import SP1Clean.Proofs.Chips.StoreByteChip.Formal

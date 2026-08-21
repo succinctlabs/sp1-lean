@@ -414,6 +414,38 @@ structure WellFormedX0 (e : ALUTypeEvent) : Prop where
   `clk + 2`). -/
   prevTsC_reg : e.immC = 0 → e.prevTsC < e.clk + 2
 
+/-! ### The multi-opcode ALU chips' routing conditions
+
+`Bitwise` and `Lt` each serve several opcodes at once through **witnessed variant selectors**, and
+their AIR pins the selector sum to the row's `is_real` (`is_real - (is_xor + is_or + is_and) = 0`,
+`is_real - (is_slt + is_sltu) = 0`). So on a real row exactly one selector is set, and *which* one
+is a fact about the event's opcode — the chip's routing condition, in the same sense as
+`MemoryEvent.IsLoad`. An ALU event with any other opcode simply has no row on the chip.
+
+The discriminants are the executor's (`crates/core/executor/src/opcode.rs`), and each is also
+readable off the chip's own `cpu_opcode` expression: Bitwise threads
+`is_xor·3 + is_or·4 + is_and·5` and Lt threads `is_slt·9 + is_sltu·10` into their reader. -/
+
+/-- **Which bitwise instruction.** `Opcode::{XOR, OR, AND} = 3, 4, 5` — the `Bitwise` chip's
+routing condition. -/
+def IsBitwise (e : ALUTypeEvent) : Prop :=
+  e.opcode = 3 ∨ e.opcode = 4 ∨ e.opcode = 5
+
+/-- **Which set-less-than instruction.** `Opcode::{SLT, SLTU} = 9, 10` — the `Lt` chip's routing
+condition. -/
+def IsLt (e : ALUTypeEvent) : Prop :=
+  e.opcode = 9 ∨ e.opcode = 10
+
+/-- **Which left shift.** `Opcode::{SLL, SLLW} = 6, 21` — the `ShiftLeft` chip's routing condition
+(its reader opcode is `is_sll·6 + is_sllw·21`). -/
+def IsShiftLeft (e : ALUTypeEvent) : Prop :=
+  e.opcode = 6 ∨ e.opcode = 21
+
+/-- **Which right shift.** `Opcode::{SRL, SRA, SRLW, SRAW} = 7, 8, 22, 23` — the `ShiftRight` chip's
+routing condition (its reader opcode is `is_srl·7 + is_sra·8 + is_srlw·22 + is_sraw·23`). -/
+def IsShiftRight (e : ALUTypeEvent) : Prop :=
+  e.opcode = 7 ∨ e.opcode = 8 ∨ e.opcode = 22 ∨ e.opcode = 23
+
 end ALUTypeEvent
 
 /-! ## The J-type family
@@ -564,6 +596,127 @@ low bit is cleared — which is the whole difference between the two chips:
 -/
 def ITypeEvent.JalrTargets (e : ITypeEvent) : Prop :=
   e.jalrTarget < 2 ^ 48 ∧ (e.jalrTarget - e.jalrTarget % 2) % 4 = 0 ∧ e.pc + 4 < 2 ^ 48
+
+/-! ## The branch family
+
+`Extracted.ITypeReader` once more — the same committed block `Addi`, `Jalr` and the nine memory
+chips read — but through the **immutable** adapter, and with *both* register slots as source reads:
+SP1's `Branch` row has `op_a = rs1`, `op_b = rs2`, and `op_c` the sign-extended branch offset. A
+branch performs no destination write at all, and its `next_pc` is data-dependent.
+
+**Why the family needs its own well-formedness.** `ITypeEvent.WellFormed.opA_ne_zero` is the *write*
+families' routing condition — SP1 sends an `rd = x0` ALU instruction or load to a separate chip —
+and it is simply false here: `beq x0, x1, L`, comparing a register against zero, is one of the most
+common instructions there is. Reusing `WellFormed` would silently exclude every branch whose first
+source is `x0`, exactly as reusing it for the stores would have excluded every `sd x0, …`
+(`MemoryEvent.WellFormedStore`, the same finding). What `WellFormedBranch` states in its place is
+what `x0` *means* — it reads as zero — which is what the immutable adapter's four
+`op_a_0 · prev_value_i = 0` gates need.
+
+**Field meanings on a branch row**, fixed by that adapter (the record is shared, so the reading is
+per-chip, not per-record): `opA`/`prevA` are the **rs1** index and the value read from it,
+`opB`/`b` are the **rs2** index and its value, and `imm` is the sign-extended branch offset. -/
+
+/--
+**What makes an event a real branch trace event.** The `ITypeEvent` conjuncts a branch actually
+owes, restated flat (the differing one is a field of the shared `ITypeEvent.WellFormed`, not
+something that can be overridden — the same reason `WellFormedStore` restates them):
+
+* `clk_mod` — the executor's `CLK_INC = 8` discipline, starting at 1.
+* `pc_lt` — the program counter is a 48-bit address.
+* `opA_lt` / `opB_lt` — `rs1` and `rs2` are architectural register indices.
+* `imm_lt` — the decoded branch offset is a 64-bit value (the decoder sign-extends it).
+* `prevA_lt` / `b_lt` — the two register contents are 64-bit values.
+* `prevA_x0` — `x0` reads as zero: if `rs1` *is* `x0`, the value read from it is `0`. This replaces
+  `WellFormed`'s `opA_ne_zero`, which is a load/ALU routing condition, not a branch fact.
+* `prevTsA_lt` / `prevTsB_lt` — timestamps strictly increase, so each register's previous access is
+  strictly earlier than this row's read of it (`op_a` at `clk + 4`, `op_b` at `clk + 3`).
+
+Nothing here about `rs2 = x0`: the `op_b` slot has no zeroing flag in the adapter, so there is no
+gate to satisfy.
+-/
+structure ITypeEvent.WellFormedBranch (e : ITypeEvent) : Prop where
+  /-- The clock is `≡ 1 (mod 8)`: the executor's `CLK_INC = 8` discipline, starting at 1. -/
+  clk_mod : e.clk % 8 = 1
+  /-- The program counter is a 48-bit address. -/
+  pc_lt : e.pc < 2 ^ 48
+  /-- `rs1` is an architectural register index. -/
+  opA_lt : e.opA < 32
+  /-- `rs2` is an architectural register index. -/
+  opB_lt : e.opB < 32
+  /-- The decoded branch offset is a 64-bit value. -/
+  imm_lt : e.imm < 2 ^ 64
+  /-- `rs1`'s content is a 64-bit value. -/
+  prevA_lt : e.prevA < 2 ^ 64
+  /-- `rs2`'s content is a 64-bit value. -/
+  b_lt : e.b < 2 ^ 64
+  /-- `x0` reads as zero: if the compared register *is* `x0`, the value read from it is `0`. -/
+  prevA_x0 : e.opA = 0 → e.prevA = 0
+  /-- `rs1`'s previous access is strictly before this row's read of it (at `clk + 4`). -/
+  prevTsA_lt : e.prevTsA < e.clk + 4
+  /-- `rs2`'s previous access is strictly before this row's read of it (at `clk + 3`). -/
+  prevTsB_lt : e.prevTsB < e.clk + 3
+
+/-- **Which branch instruction.** SP1's `Branch` chip serves all six at once
+(`Opcode::{BEQ, BNE, BLT, BGE, BLTU, BGEU} = 40 … 45`), committing one selector per variant with
+`is_real = Σ is_b*`; so this is its **routing** condition, the sibling of `MemoryEvent.IsLoad`. The
+same numbers are what the chip's `branchOpcode = Σ is_b* · k` sends to the Program bus. -/
+def ITypeEvent.IsBranch (e : ITypeEvent) : Prop :=
+  e.opcode = 40 ∨ e.opcode = 41 ∨ e.opcode = 42 ∨ e.opcode = 43 ∨ e.opcode = 44 ∨ e.opcode = 45
+
+/-- The `rs1` operand of a branch row as a 64-bit value — the `op_a` source read (`prevA`). -/
+def ITypeEvent.rs1BV (e : ITypeEvent) : BitVec 64 := BitVec.ofNat 64 e.prevA
+
+/-- The `rs2` operand of a branch row as a 64-bit value — the `op_b` source read (`b`). -/
+def ITypeEvent.rs2BV (e : ITypeEvent) : BitVec 64 := BitVec.ofNat 64 e.b
+
+/-- **Whether SP1's executor took this branch**: the RV64 comparison the event's opcode names, on
+its two operand values. This is the one fact in this file phrased over `BitVec 64` rather than `ℕ`,
+because half of the six comparisons are *signed* — and it is still executor data, not a column: it
+is what `Executor::execute_branch` computes before it decides the next `pc`.
+
+The chip does not commit this either; it is prover-side data, threaded through the
+`"branch_branching"` hint key, which is why the row's hint is built per row from the event. -/
+def ITypeEvent.branchTaken (e : ITypeEvent) : Bool :=
+  if e.opcode = 40 then e.rs1BV = e.rs2BV
+  else if e.opcode = 41 then e.rs1BV ≠ e.rs2BV
+  else if e.opcode = 42 then e.rs1BV.slt e.rs2BV
+  else if e.opcode = 43 then !e.rs1BV.slt e.rs2BV
+  else if e.opcode = 44 then e.rs1BV.ult e.rs2BV
+  else if e.opcode = 45 then !e.rs1BV.ult e.rs2BV
+  else false
+
+/-- The address a taken branch jumps to: `pc + imm`, truncated to 64 bits — SP1's executor's
+`pc.wrapping_add(imm)`, and what the chip's taken-side carry chain computes from the committed pc
+limbs and `op_c_imm`. -/
+def ITypeEvent.branchTarget (e : ITypeEvent) : ℕ := (e.pc + e.imm) % 2 ^ 64
+
+/-- The address the row actually continues at: the target when the branch is taken, the
+fall-through `pc + 4` when it is not. This is the value the chip commits as `next_pc`. -/
+def ITypeEvent.branchNextPc (e : ITypeEvent) : ℕ :=
+  if e.branchTaken then e.branchTarget else (e.pc + 4) % 2 ^ 64
+
+/--
+**A branch row's two candidate addresses.** The three facts SP1's `Branch` AIR records about them:
+
+* `target_lt` — the taken target is a 48-bit address. The chip runs the taken-side carry chain on
+  *every* real row (the selection happens afterwards) and gates its high limb to zero, so this is
+  owed whether or not the branch is taken; a program whose branch offset pointed outside the 48-bit
+  address space would have no row to write.
+* `link_lt` — the fall-through `pc + 4` is a 48-bit address too, for the same reason on the other
+  carry chain.
+* `next_aligned` — the address the row **continues at** is 4-byte aligned. Gated on the decision
+  because that is exactly how the AIR gates it: the `Range(next_pc[0] / 4, 14)` byte pull is on the
+  *selected* `next_pc`, so the unselected candidate owes no alignment. SP1 implements RV64IM without
+  the compressed extension, so every instruction is four bytes and RISC-V traps a misaligned
+  instruction address rather than emitting a row.
+
+Separate from `WellFormedBranch` for the same reason `JTypeEvent.JalTargets` is separate from
+`JTypeEvent.WellFormed`: these are facts about *where the executor went*, false for the other users
+of the shared `ITypeEvent` record (an `Addi` sum is an arbitrary 64-bit value).
+-/
+def ITypeEvent.BranchTargets (e : ITypeEvent) : Prop :=
+  e.branchTarget < 2 ^ 48 ∧ e.pc + 4 < 2 ^ 48 ∧ e.branchNextPc % 4 = 0
 
 /-! ## The memory family
 
