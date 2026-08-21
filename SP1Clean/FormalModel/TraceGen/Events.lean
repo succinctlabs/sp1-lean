@@ -485,6 +485,13 @@ The word is the full 8-byte cell even for a sub-word load: SP1's memory bus is w
 the sub-word behaviour (`offset_bit` selection and sign extension) is in-circuit, computed from
 this cell and the address. `Inputs.lean` and the per-chip builders perform that selection, so the
 record carries no `selected_*` field — those are *derived*, exactly like an ALU row's result.
+
+**The record needs no separate "stored word" field.** A store's `op_a` is `rs2`, and the immutable
+adapter reads it: the row's `op_a_memory.prev_value` *is* the value read from `rs2`, which is the
+value being stored. So the store family's stored word is the inherited `prevA` — the same field the
+loads use for the value the `op_a` write displaces, and the same field `WellFormedX0` uses for the
+`x0` read value. Which of the two meanings applies is fixed by which adapter the chip composes
+(`ITypeReader` for a write, `ITypeReaderImmutable` for a read), not by the record.
 -/
 structure MemoryEvent extends ITypeEvent where
   /-- The 64-bit word the addressed (8-byte-aligned) RAM cell held before this row's access
@@ -576,6 +583,61 @@ structure WellFormedX0 (e : MemoryEvent) : Prop where
   /-- `x0` reads as zero. -/
   prevA_eq_zero : e.prevA = 0
   /-- `x0`'s previous access is strictly before this row's read of it (at `clk + 4`). -/
+  prevTsA_lt : e.prevTsA < e.clk + 4
+  /-- `rs1`'s previous access is strictly before this row's read of it (at `clk + 3`). -/
+  prevTsB_lt : e.prevTsB < e.clk + 3
+  /-- The execution clock is a 48-bit value. -/
+  clk_lt : e.clk < 2 ^ 48
+  /-- The effective address is a 48-bit address. -/
+  addr_lt : e.addr < 2 ^ 48
+  /-- The address is above the reserved low 64 KiB. -/
+  addr_ge : 2 ^ 16 ≤ e.addr
+  /-- The addressed cell holds a 64-bit value. -/
+  prevMem_lt : e.prevMem < 2 ^ 64
+  /-- The cell's previous access is strictly before this row's, at `clk + 1`. -/
+  prevTsMem_lt : e.prevTsMem < e.clk + 1
+
+/--
+**What makes an event a real *store* trace event.** The store family reads the same
+`Extracted.ITypeReader` columns as the loads, but through the **immutable** adapter: `op_a` is the
+`rs2` **source read** whose value is written to RAM, not a destination write. Exactly one conjunct
+of `WellFormed` therefore has to change, and it is the one that is a *load* fact:
+
+* `WellFormed.opA_ne_zero` says the destination is not `x0`. That is the load family's **routing**
+  condition — SP1 sends an `rd = x0` load to the `LoadX0` chip. There is no `StoreX0` chip
+  (`Soundness/Coverage.lean`: `routeName .SB true = some "StoreByte"`, "stores ignore rd"), and
+  `sd x0, off(rs1)` — storing zero — is a legal and common instruction, so a store event may
+  perfectly well have `op_a = x0`. This record therefore **permits** it, and instead records what
+  `x0` means: it reads as zero. That is precisely what the immutable adapter's four
+  `op_a_0 · prev_value_i = 0` gates need, and it is the same fact `WellFormedX0.prevA_eq_zero`
+  states for the `x0` load rows (there unconditionally, since there `op_a` *is* `x0`).
+
+Everything else is `WellFormed` verbatim — the `CLK_INC = 8` clock discipline, the pc and register
+index bounds, the 64-bit operand bounds, the two register timestamp orderings, and all five RAM
+facts — restated flat for the same reason `WellFormedX0` restates them: the differing conjunct is a
+field of the shared `ITypeEvent.WellFormed`, not something that can be overridden.
+
+As for `WellFormed`, width **alignment** is not here: it is per-instruction (`Aligned`), because
+`SB` requires none while `SH`/`SW`/`SD` require 2/4/8.
+-/
+structure WellFormedStore (e : MemoryEvent) : Prop where
+  /-- The clock is `≡ 1 (mod 8)`: the executor's `CLK_INC = 8` discipline, starting at 1. -/
+  clk_mod : e.clk % 8 = 1
+  /-- The program counter is a 48-bit address. -/
+  pc_lt : e.pc < 2 ^ 48
+  /-- `rs2` is an architectural register index. -/
+  opA_lt : e.opA < 32
+  /-- `rs1` is an architectural register index. -/
+  opB_lt : e.opB < 32
+  /-- The decoded immediate is a 64-bit value. -/
+  imm_lt : e.imm < 2 ^ 64
+  /-- `rs1`'s content is a 64-bit value. -/
+  b_lt : e.b < 2 ^ 64
+  /-- `rs2`'s content — the word this row stores — is a 64-bit value. -/
+  prevA_lt : e.prevA < 2 ^ 64
+  /-- `x0` reads as zero: if the stored register *is* `x0`, the value read from it is `0`. -/
+  prevA_x0 : e.opA = 0 → e.prevA = 0
+  /-- `rs2`'s previous access is strictly before this row's read of it (at `clk + 4`). -/
   prevTsA_lt : e.prevTsA < e.clk + 4
   /-- `rs1`'s previous access is strictly before this row's read of it (at `clk + 3`). -/
   prevTsB_lt : e.prevTsB < e.clk + 3

@@ -398,14 +398,56 @@ lemma iTypeReaderCols_op_a_0_eq_one {e : ITypeEvent} (h : e.opA = 0) :
     (iTypeReaderCols (p := p) e).op_a_0 = 1 := by
   rw [iTypeReaderCols_op_a_0, if_pos h]
 
-/-- **The immutable I-type adapter's contract on an `x0`-destination row.** The sibling of
-`iTypeReader_spec` for the reader the `x0` chips compose: `op_a` is a source **read**, so the four
-`op_a_0` gates pin the read value rather than a write value — and they hold because `x0` reads as
-zero, which is exactly what `hprevA` records. Everything else is the same discharge.
+/-- **The immutable I-type adapter's contract on a built row.** The sibling of `iTypeReader_spec`
+for the reader the `x0` and store chips compose: `op_a` is a source **read**, so the four `op_a_0`
+gates pin the *read* value rather than a write value.
 
-Stated at the `x0` row (`hA`) rather than at a general one: the four gates are `op_a_0 · v_i = 0`
-with `op_a_0 = 1` here, so the *only* way to satisfy them is the zero read, and that is a fact
-about `x0`, not about the builder. -/
+That is the only difference, and it is why the hypothesis here is `hzero` rather than
+`WellFormed`'s `opA_ne_zero`. The gates are `op_a_0 · v_i = 0`; on an `op_a ≠ x0` row the flag is
+`0` and they are vacuous, while on an `op_a = x0` row the flag is `1` and the *only* way to satisfy
+them is the zero read — which is RISC-V's rule that `x0` reads as zero, a fact about the machine,
+not about the builder. Both branches are proved, so this one lemma serves the `x0` load rows (where
+`op_a` is always `x0`) and the store rows (where `rs2` may or may not be). -/
+theorem iTypeReaderImmutable_spec {e : ITypeEvent} (hclk : e.clk % 8 = 1) (hopA : e.opA < 32)
+    (hzero : e.opA = 0 → e.prevA = 0) (hprevTsA : e.prevTsA < e.clk + 4)
+    (hprevTsB : e.prevTsB < e.clk + 3) (is_real is_trusted clk_high opcode : ZMod p) :
+    Readers.ITypeReaderImmutable.Spec
+      { cols := iTypeReaderCols (p := p) e, is_real := is_real, is_trusted := is_trusted,
+        clk_high := clk_high,
+        clk_low := (cpuStateCols (p := p) e.clk e.pc).clk_0_16
+          + (cpuStateCols (p := p) e.clk e.pc).clk_16_24 * 65536,
+        pc := (cpuStateCols (p := p) e.clk e.pc).pc, opcode := opcode } := by
+  have hp : 2 ^ 24 < p := Fact.out
+  -- the flag is binary either way, and on the `x0` branch the read value is the zero word
+  have hbin : (iTypeReaderCols (p := p) e).op_a_0 = 0 ∨ (iTypeReaderCols (p := p) e).op_a_0 = 1 := by
+    by_cases hA : e.opA = 0
+    · exact Or.inr (iTypeReaderCols_op_a_0_eq_one hA)
+    · exact Or.inl (iTypeReaderCols_op_a_0_eq_zero hA)
+  have hgate : ∀ i (hi : i < 4), (iTypeReaderCols (p := p) e).op_a_0
+      * (iTypeReaderCols (p := p) e).op_a_memory.prev_value[i] = 0 := by
+    intro i hi
+    by_cases hA : e.opA = 0
+    · rw [iTypeReaderCols_op_a_memory, registerAccessCols_prev_value, hzero hA]
+      have : (wordOfNat (p := p) 0)[i] = 0 := by
+        interval_cases i
+        · rw [wordOfNat_zero]; simp
+        · rw [wordOfNat_one]; simp
+        · rw [wordOfNat_two]; simp
+        · rw [wordOfNat_three]; simp
+      rw [this, mul_zero]
+    · rw [iTypeReaderCols_op_a_0_eq_zero hA, zero_mul]
+  refine ⟨⟨hgate 0 (by omega), hgate 1 (by omega), hgate 2 (by omega), hgate 3 (by omega)⟩,
+    fun _ => hbin, ?_, ?_, fun _ => ?_, fun _ => ?_⟩
+  · exact registerAccessCols_spec_opA hclk hprevTsA
+  · exact registerAccessCols_spec_opB hclk hprevTsB
+  · exact ⟨iTypeReaderCols_op_a_val_lt hopA, (cpuStateCols_pc_val_lt e.clk e.pc).1,
+      (cpuStateCols_pc_val_lt e.clk e.pc).2.1, (cpuStateCols_pc_val_lt e.clk e.pc).2.2⟩
+  · exact ⟨wordOfNat_isU64 _, wordOfNat_isU64 _, registerAccessCols_prevLow_val_lt _ _ _,
+      registerAccessCols_prevLow_val_lt _ _ _⟩
+
+/-- **The immutable I-type adapter's contract on an `x0`-destination row** — the `LoadX0` form of
+`iTypeReaderImmutable_spec`, where the routing condition `hA` fixes the register index and the read
+value is unconditionally zero. -/
 theorem iTypeReaderImmutable_spec_x0 {e : ITypeEvent} (hclk : e.clk % 8 = 1) (hA : e.opA = 0)
     (hprevA : e.prevA = 0) (hprevTsA : e.prevTsA < e.clk + 4) (hprevTsB : e.prevTsB < e.clk + 3)
     (is_real is_trusted clk_high opcode : ZMod p) :
@@ -414,32 +456,9 @@ theorem iTypeReaderImmutable_spec_x0 {e : ITypeEvent} (hclk : e.clk % 8 = 1) (hA
         clk_high := clk_high,
         clk_low := (cpuStateCols (p := p) e.clk e.pc).clk_0_16
           + (cpuStateCols (p := p) e.clk e.pc).clk_16_24 * 65536,
-        pc := (cpuStateCols (p := p) e.clk e.pc).pc, opcode := opcode } := by
-  have hp : 2 ^ 24 < p := Fact.out
-  have hone : (iTypeReaderCols (p := p) e).op_a_0 = 1 := iTypeReaderCols_op_a_0_eq_one hA
-  refine ⟨⟨?_, ?_, ?_, ?_⟩, fun _ => Or.inr hone, ?_, ?_, fun _ => ?_, fun _ => ?_⟩
-  · show (iTypeReaderCols (p := p) e).op_a_0
-      * (iTypeReaderCols (p := p) e).op_a_memory.prev_value[0] = 0
-    rw [iTypeReaderCols_op_a_memory, registerAccessCols_prev_value, wordOfNat_zero, hprevA]
-    simp
-  · show (iTypeReaderCols (p := p) e).op_a_0
-      * (iTypeReaderCols (p := p) e).op_a_memory.prev_value[1] = 0
-    rw [iTypeReaderCols_op_a_memory, registerAccessCols_prev_value, wordOfNat_one, hprevA]
-    simp
-  · show (iTypeReaderCols (p := p) e).op_a_0
-      * (iTypeReaderCols (p := p) e).op_a_memory.prev_value[2] = 0
-    rw [iTypeReaderCols_op_a_memory, registerAccessCols_prev_value, wordOfNat_two, hprevA]
-    simp
-  · show (iTypeReaderCols (p := p) e).op_a_0
-      * (iTypeReaderCols (p := p) e).op_a_memory.prev_value[3] = 0
-    rw [iTypeReaderCols_op_a_memory, registerAccessCols_prev_value, wordOfNat_three, hprevA]
-    simp
-  · exact registerAccessCols_spec_opA hclk hprevTsA
-  · exact registerAccessCols_spec_opB hclk hprevTsB
-  · exact ⟨iTypeReaderCols_op_a_val_lt (by omega), (cpuStateCols_pc_val_lt e.clk e.pc).1,
-      (cpuStateCols_pc_val_lt e.clk e.pc).2.1, (cpuStateCols_pc_val_lt e.clk e.pc).2.2⟩
-  · exact ⟨wordOfNat_isU64 _, wordOfNat_isU64 _, registerAccessCols_prevLow_val_lt _ _ _,
-      registerAccessCols_prevLow_val_lt _ _ _⟩
+        pc := (cpuStateCols (p := p) e.clk e.pc).pc, opcode := opcode } :=
+  iTypeReaderImmutable_spec hclk (by omega) (fun _ => hprevA) hprevTsA hprevTsB
+    is_real is_trusted clk_high opcode
 
 /-- The effective address the `AddressOperation` gadget sees — the `ℕ` sum of the two committed
 operand words, truncated to 64 bits — is the event's own `addr`. The two words are `wordOfNat` of

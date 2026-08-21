@@ -74,6 +74,104 @@ theorem memLimb_cases (mem addr : ℕ) :
   · exact Or.inr (Or.inr (Or.inl ⟨by simp [hI], by simp [hI], by simp [hI]⟩))
   · exact Or.inr (Or.inr (Or.inr ⟨by simp [hI], by simp [hI], by simp [hI]⟩))
 
+/-! ## Sub-word store merge
+
+A sub-word **store** writes the very limb the matching load reads — SP1's memory bus is
+word-granular, so `SB`/`SH` are read-modify-writes of the whole 8-byte cell: the address-selected
+u16 limb takes a new value and the other three keep the value the cell already held. Only the new
+limb's *content* differs between the two (a half-word store puts `rs2`'s low limb there whole; a
+byte store replaces one of its two bytes), so the merged word and its case analysis are shared. -/
+
+/-- The RAM word a sub-word store writes: the cell `mem` with its address-selected u16 limb
+replaced by `v`. This is the `store_value` column SP1's `event_to_row` computes. -/
+def storeLimb (mem v addr : ℕ) : Word (ZMod p) :=
+  #v[if memLimbIndex addr = 0 then ((v : ℕ) : ZMod p) else ((mem % 2 ^ 16 : ℕ) : ZMod p),
+     if memLimbIndex addr = 1 then ((v : ℕ) : ZMod p) else ((mem / 2 ^ 16 % 2 ^ 16 : ℕ) : ZMod p),
+     if memLimbIndex addr = 2 then ((v : ℕ) : ZMod p) else ((mem / 2 ^ 32 % 2 ^ 16 : ℕ) : ZMod p),
+     if memLimbIndex addr = 3 then ((v : ℕ) : ZMod p) else ((mem / 2 ^ 48 % 2 ^ 16 : ℕ) : ZMod p)]
+
+-- The four limb projections as `rfl`-lemmas, deliberately not `@[simp]` — as for `wordOfNat`, the
+-- merge gates cite one of these rather than normalizing the word.
+omit [Fact (2 ^ 24 < p)] in
+lemma storeLimb_zero (mem v addr : ℕ) :
+    (storeLimb (p := p) mem v addr)[0]
+      = if memLimbIndex addr = 0 then ((v : ℕ) : ZMod p)
+        else ((mem % 2 ^ 16 : ℕ) : ZMod p) := rfl
+
+omit [Fact (2 ^ 24 < p)] in
+lemma storeLimb_one (mem v addr : ℕ) :
+    (storeLimb (p := p) mem v addr)[1]
+      = if memLimbIndex addr = 1 then ((v : ℕ) : ZMod p)
+        else ((mem / 2 ^ 16 % 2 ^ 16 : ℕ) : ZMod p) := rfl
+
+omit [Fact (2 ^ 24 < p)] in
+lemma storeLimb_two (mem v addr : ℕ) :
+    (storeLimb (p := p) mem v addr)[2]
+      = if memLimbIndex addr = 2 then ((v : ℕ) : ZMod p)
+        else ((mem / 2 ^ 32 % 2 ^ 16 : ℕ) : ZMod p) := rfl
+
+omit [Fact (2 ^ 24 < p)] in
+lemma storeLimb_three (mem v addr : ℕ) :
+    (storeLimb (p := p) mem v addr)[3]
+      = if memLimbIndex addr = 3 then ((v : ℕ) : ZMod p)
+        else ((mem / 2 ^ 48 % 2 ^ 16 : ℕ) : ZMod p) := rfl
+
+/-- The merged word is a valid u64 as soon as the new limb is a u16 — the other three limbs are
+residues by construction, exactly as for `wordOfNat`. -/
+lemma storeLimb_isU64 {v : ℕ} (mem addr : ℕ) (hv : v < 2 ^ 16) :
+    Word.isU64 (storeLimb (p := p) mem v addr) := by
+  have hp : 2 ^ 24 < p := Fact.out
+  refine Word.isU64_of_cases ?_ ?_ ?_ ?_
+  · rw [storeLimb_zero]; split <;> (rw [ZMod.val_natCast_of_lt (by omega)]; omega)
+  · rw [storeLimb_one]; split <;> (rw [ZMod.val_natCast_of_lt (by omega)]; omega)
+  · rw [storeLimb_two]; split <;> (rw [ZMod.val_natCast_of_lt (by omega)]; omega)
+  · rw [storeLimb_three]; split <;> (rw [ZMod.val_natCast_of_lt (by omega)]; omega)
+
+omit [Fact (2 ^ 24 < p)] in
+/-- **The four-way store merge.** The companion of `memLimb_cases`: in each of the four address
+cases the two committed offset bits are the case's own constants, the *old* selected limb is the
+corresponding limb of the built RAM word (which is what a byte store's `mem_limb` selection gates
+need), and the merged word is that word with the selected limb replaced by `v` and the other three
+untouched (which is what every sub-word store's four read-modify-write gates need). -/
+theorem storeLimb_cases (mem v addr : ℕ) :
+    (((memLimbIndex addr % 2 : ℕ) : ZMod p) = 0 ∧ ((memLimbIndex addr / 2 : ℕ) : ZMod p) = 0
+        ∧ ((memLimb mem addr : ℕ) : ZMod p) = (wordOfNat (p := p) mem)[0]
+        ∧ (storeLimb (p := p) mem v addr)[0] = ((v : ℕ) : ZMod p)
+        ∧ (storeLimb (p := p) mem v addr)[1] = (wordOfNat (p := p) mem)[1]
+        ∧ (storeLimb (p := p) mem v addr)[2] = (wordOfNat (p := p) mem)[2]
+        ∧ (storeLimb (p := p) mem v addr)[3] = (wordOfNat (p := p) mem)[3])
+      ∨ (((memLimbIndex addr % 2 : ℕ) : ZMod p) = 1 ∧ ((memLimbIndex addr / 2 : ℕ) : ZMod p) = 0
+        ∧ ((memLimb mem addr : ℕ) : ZMod p) = (wordOfNat (p := p) mem)[1]
+        ∧ (storeLimb (p := p) mem v addr)[0] = (wordOfNat (p := p) mem)[0]
+        ∧ (storeLimb (p := p) mem v addr)[1] = ((v : ℕ) : ZMod p)
+        ∧ (storeLimb (p := p) mem v addr)[2] = (wordOfNat (p := p) mem)[2]
+        ∧ (storeLimb (p := p) mem v addr)[3] = (wordOfNat (p := p) mem)[3])
+      ∨ (((memLimbIndex addr % 2 : ℕ) : ZMod p) = 0 ∧ ((memLimbIndex addr / 2 : ℕ) : ZMod p) = 1
+        ∧ ((memLimb mem addr : ℕ) : ZMod p) = (wordOfNat (p := p) mem)[2]
+        ∧ (storeLimb (p := p) mem v addr)[0] = (wordOfNat (p := p) mem)[0]
+        ∧ (storeLimb (p := p) mem v addr)[1] = (wordOfNat (p := p) mem)[1]
+        ∧ (storeLimb (p := p) mem v addr)[2] = ((v : ℕ) : ZMod p)
+        ∧ (storeLimb (p := p) mem v addr)[3] = (wordOfNat (p := p) mem)[3])
+      ∨ (((memLimbIndex addr % 2 : ℕ) : ZMod p) = 1 ∧ ((memLimbIndex addr / 2 : ℕ) : ZMod p) = 1
+        ∧ ((memLimb mem addr : ℕ) : ZMod p) = (wordOfNat (p := p) mem)[3]
+        ∧ (storeLimb (p := p) mem v addr)[0] = (wordOfNat (p := p) mem)[0]
+        ∧ (storeLimb (p := p) mem v addr)[1] = (wordOfNat (p := p) mem)[1]
+        ∧ (storeLimb (p := p) mem v addr)[2] = (wordOfNat (p := p) mem)[2]
+        ∧ (storeLimb (p := p) mem v addr)[3] = ((v : ℕ) : ZMod p)) := by
+  have h4 : memLimbIndex addr = 0 ∨ memLimbIndex addr = 1 ∨ memLimbIndex addr = 2
+      ∨ memLimbIndex addr = 3 := by have := memLimbIndex_lt addr; omega
+  rw [memLimb, storeLimb_zero, storeLimb_one, storeLimb_two, storeLimb_three,
+    wordOfNat_zero, wordOfNat_one, wordOfNat_two, wordOfNat_three]
+  rcases h4 with hI | hI | hI | hI
+  · exact Or.inl ⟨by simp [hI], by simp [hI], by simp [hI], by simp [hI], by simp [hI],
+      by simp [hI], by simp [hI]⟩
+  · exact Or.inr (Or.inl ⟨by simp [hI], by simp [hI], by simp [hI], by simp [hI], by simp [hI],
+      by simp [hI], by simp [hI]⟩)
+  · exact Or.inr (Or.inr (Or.inl ⟨by simp [hI], by simp [hI], by simp [hI], by simp [hI],
+      by simp [hI], by simp [hI], by simp [hI]⟩))
+  · exact Or.inr (Or.inr (Or.inr ⟨by simp [hI], by simp [hI], by simp [hI], by simp [hI],
+      by simp [hI], by simp [hI], by simp [hI]⟩))
+
 /-- **The RAM access block's contract.** From the clock discipline, the 48-bit clock bound, and
 "the cell's previous access is strictly earlier", the built block satisfies
 `Readers.MemoryAccess.Spec` at the built state block's clock limbs. The address and `new_value`
