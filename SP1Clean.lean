@@ -499,3 +499,6 @@ import SP1Clean.Soundness.StatePcClass
 import SP1Clean.Soundness.TouchChains
 import SP1Clean.Soundness.TimedGrounding
 import SP1Clean.Soundness.AlignedCarrier
+import SP1Clean.Proofs.Completeness.ProviderWitgen
+import SP1Clean.Proofs.Completeness.Providers
+import SP1Clean.Proofs.Completeness.Ledger

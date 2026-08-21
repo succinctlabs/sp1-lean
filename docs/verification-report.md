@@ -844,7 +844,19 @@ Stated plainly:
      the gate, not the circuit. `LoadByteChip`'s completeness theorems are consequently scoped to
      LB rows and say so at their definitions. Nothing unsound follows: soundness is unaffected, and
      the LBU rows a real prover emits are still covered by the soundness direction.
-4. **No cryptographic claim.** Nothing here says anything about STARK soundness, FRI, LogUp/GKR,
+4. **Provider tables are per-occurrence and cannot be padded through the builder.** Every
+   byte/range/program/memory provider generates its LogUp multiplicity with `witnessField 1` — a
+   *constant* witness IR — so a row produced by `Air.Flat.Component.buildRow` always carries
+   multiplicity exactly `1`. Two consequences, both recorded at
+   `SP1Clean/Proofs/Completeness/Providers.lean`: an aggregated provider row (one row carrying a
+   count `m`) is not reachable through the builder at all, so the built tables are one row per
+   consumer pull; and a "padding" provider row still *pushes* its message at multiplicity `1`, so it
+   is not bus-neutral. Upstream SP1 pads these tables with a witnessed multiplicity column set to
+   zero, which these circuits have no generator for. Nothing unsound follows — the verifier admits
+   any multiplicity the constraints allow, and the memory boundary tables even gate theirs boolean —
+   but a shard assembly must build provider tables at exactly the occurrence count. (Clean's flat-AIR
+   `Table` imposes no power-of-two height, so the present model needs no padding.)
+5. **No cryptographic claim.** Nothing here says anything about STARK soundness, FRI, LogUp/GKR,
    or Fiat–Shamir. The planned final form is probabilistic and lives in the ArkLib/VCVio
    integration: an executable `verifyCore` agreeing with the pinned Rust verifier, ArkLib
    knowledge soundness extracting a full AIR witness with an explicit error bound, and
@@ -858,16 +870,16 @@ Stated plainly:
    intermediate abstraction our C2 obligation names (multiset balance ⇒ field-level LogUp
    soundness with an error bound), and their lemmas are a candidate model for how the ArkLib
    layer can discharge C2 rather than assume it.
-5. **Completeness at the ensemble level is undeclared** (per-chip completeness is proved; the
+6. **Completeness at the ensemble level is undeclared** (per-chip completeness is proved; the
    Bitwise, Lt, and Addw completeness witnesses currently cover register-register forms only —
    so ANDI/ORI/XORI/SLTI/SLTIU/ADDIW rows are covered by soundness and the Sail bridges but
    not by those chips' completeness theorems — and UType's completeness covers rd ≠ x0 rows,
    as its `ProverAssumptions` docstring discloses).
-6. **Trusted surfaces T1–T5** (§10), including the pinned git dependency graph — in which the
+7. **Trusted surfaces T1–T5** (§10), including the pinned git dependency graph — in which the
    Clean DSL is currently a fork (T5) — and the trace-battery provenance caveat (§4.3).
-6. The AIR models the *supervisor-mode* Core profile; user-mode/mprotect table variants,
+8. The AIR models the *supervisor-mode* Core profile; user-mode/mprotect table variants,
    precompiles, and the memory-protection chips are out of scope.
-7. **Trap and exception executions are unrepresentable.** Taken jumps/branches to misaligned
+9. **Trap and exception executions are unrepresentable.** Taken jumps/branches to misaligned
    targets and misaligned memory accesses are unsatisfiable in the AIR (each chip forces the
    alignment its width requires, matching SP1's own executor), so every produced Sail segment
    is trap-free — the theorems never speak about trapping executions. Relatedly, jump/branch

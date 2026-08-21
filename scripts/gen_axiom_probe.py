@@ -66,6 +66,13 @@ TARGETS = [
     ("SP1CleanTest/Audit/*.lean",
      r"theorem\s+(constraints_hold|interactions_exact|program_projection|"
      r"supportedCoreNativeRelation_nonvacuous)\b"),
+    # The W4 completeness layer's provider/ledger half: the built provider and verifier tables'
+    # constraint theorems, and the generic push/pull balance bridge the W5 assembly consumes.
+    ("SP1Clean/Proofs/Completeness/Providers.lean",
+     r"theorem\s+(traceTable_constraints)\b"),
+    ("SP1Clean/Proofs/Completeness/Ledger.lean",
+     r"theorem\s+(balancedInteractions_of_signed_perm|balancedInteractions_of_flatMap_perm|"
+     r"balanceOf_eq_pushed_sub_pulled)\b"),
     # The W4 completeness layer: each chip's trace-table constraint/guarantee theorems and its
     # event-to-prover-assumptions discharge. Probed from the pilot onward so the rollout cannot
     # silently introduce a compiler-trusted or deferred step.
