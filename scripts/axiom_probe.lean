@@ -321,6 +321,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_length
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_names
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_upstream
+#print axioms SP1Clean.AddChip.proverAssumptions_of_event
+#print axioms SP1Clean.AddChip.traceTable_constraints
+#print axioms SP1Clean.AddChip.traceTable_guarantees
 #print axioms SP1Clean.Soundness.Walk.exists_trail
 #print axioms SP1Clean.Soundness.GoodnessFilter.endpointBalanced_of_cancel_loops
 #print axioms SP1Clean.Soundness.GoodnessFilter.good_of_endpointBalanced
