@@ -165,6 +165,30 @@ structure WellFormed (e : RTypeEvent) : Prop where
   /-- `rs2`'s previous access is strictly before this row's read of it (at `clk + 2`). -/
   prevTsC_lt : e.prevTsC < e.clk + 2
 
+/-! ### The multi-opcode R-type chips' routing conditions
+
+`Mul` and `DivRem` are the two R-type chips that serve several opcodes at once through
+**witnessed variant selectors** (a `ProverHint` key, not committed input columns), exactly as
+`Bitwise`/`Lt`/the shifts do on the ALU-type side. So each owes a **routing** condition saying
+which instructions reach it — an R-type event with any other opcode simply has no row on the chip
+— and the discriminants are the executor's (`crates/core/executor/src/opcode.rs`), the same
+numbers each chip threads into its reader as the `cpu_opcode` it checks against the Program-bus
+fetch. -/
+
+/-- **Which multiply instruction.** `Opcode::{MUL, MULH, MULHU, MULHSU, MULW} = 11, 12, 13, 14,
+24` — the `Mul` chip's routing condition (its reader opcode is
+`is_mul·11 + is_mulh·12 + is_mulhu·13 + is_mulhsu·14 + is_mulw·24`). -/
+def IsMul (e : RTypeEvent) : Prop :=
+  e.opcode = 11 ∨ e.opcode = 12 ∨ e.opcode = 13 ∨ e.opcode = 14 ∨ e.opcode = 24
+
+/-- **Which divide/remainder instruction.** `Opcode::{DIV, DIVU, REM, REMU} = 15, 16, 17, 18` and
+their word forms `{DIVW, DIVUW, REMW, REMUW} = 25, 26, 27, 28` — the `DivRem` chip's routing
+condition (its reader opcode is `DivRemContract.encodedOpcode`, the same eight numbers weighted by
+the eight committed selectors). -/
+def IsDivRem (e : RTypeEvent) : Prop :=
+  e.opcode = 15 ∨ e.opcode = 16 ∨ e.opcode = 17 ∨ e.opcode = 18 ∨
+    e.opcode = 25 ∨ e.opcode = 26 ∨ e.opcode = 27 ∨ e.opcode = 28
+
 end RTypeEvent
 
 /-! ## The I-type family

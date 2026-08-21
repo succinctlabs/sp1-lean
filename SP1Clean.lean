@@ -64,6 +64,7 @@ import SP1Clean.Proofs.Chips.DivRemChip.Completeness.CoreComplete
 import SP1Clean.Proofs.Chips.DivRemChip.Completeness.Driver
 import SP1Clean.Proofs.Chips.DivRemChip.Completeness.OwnComplete
 import SP1Clean.Proofs.Chips.DivRemChip.Completeness.SubSpecs
+import SP1Clean.Proofs.Chips.DivRemChip.Complete
 import SP1Clean.Proofs.Chips.DivRemChip.Evidence
 import SP1Clean.Proofs.Chips.DivRemChip.Evidence.SignedCommon
 import SP1Clean.Proofs.Chips.DivRemChip.Evidence.Signed32
@@ -123,6 +124,7 @@ import SP1Clean.Proofs.Chips.MulChip.Formal
 import SP1Clean.Proofs.Chips.MulChip.Contracts
 import SP1Clean.Proofs.Chips.MulChip.Structural
 import SP1Clean.Proofs.Chips.MulChip.Witgen
+import SP1Clean.Proofs.Chips.MulChip.Complete
 import SP1Clean.Proofs.Chips.AluX0Chip.Bridge
 import SP1Clean.Native.Chips.AluX0Chip.Defs
 import SP1Clean.Proofs.Chips.AluX0Chip.Formal

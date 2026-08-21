@@ -11,7 +11,7 @@ supports; the figures below cover their union.
 
 ## Result
 
-- 624 released declarations are probed (586 main + 38 test: the 34 real-row satisfiability
+- 630 released declarations are probed (592 main + 38 test: the 34 real-row satisfiability
   anchors of `SP1CleanTest/NonVacuityReal.lean`, the two executable plus one definitional
   anchor of `SP1CleanTest/Audit/OneAddNativePremises.lean`, and the joint non-vacuity anchor
   of `SP1CleanTest/Audit/JointNonVacuity.lean`; the 21 legacy `native_decide`
@@ -34,7 +34,19 @@ supports; the figures below cover their union.
   field, so the hint enters only through the row builder, and the single-hint form survives as
   its constant-hint special case. Each of those five rows is built with the variant selectors of
   its **own** event's opcode discriminant, and `Branch` additionally with its own taken/not-taken
-  decision; all five have satisfiable padding rows, which a table-level hint made impossible).
+  decision; all five have satisfiable padding rows, which a table-level hint made impossible; and
+  tranche 6's `Mul` and `DivRem`, which **complete the rollout at 25/25**. `Mul` is `Add`'s
+  contract plus a five-flag block (`MUL`/`MULH`/`MULHU`/`MULHSU`/`MULW` = `11`/`12`/`13`/`14`/`24`),
+  and is the only chip of the layer whose table theorems inherit `bv_decide` proof constants —
+  `MulChip.rv64_mulh_eq`/`rv64_mulhsu_eq`/`high64_mul`, already disclosed for the chip's own
+  soundness, reached here through its completeness field. `DivRem` is the same shape with eight
+  flags, of which only seven are hinted: the chip derives `is_divu` as `1 - Σ`, which makes the
+  one-hot sum an identity (`Populate.hintFlags_sum_eq_one`) rather than a prover assumption, and
+  makes an absent key read back as SP1's padding template. That template is the other thing
+  `DivRem` alone carries: its padded rows are not zero rows but the concrete "0 divided by 1"
+  `DIVU` row (`alu/divrem/mod.rs:549-569`), since the chip cannot witness a division by zero, and
+  its `ProverAssumptions` pins exactly that — so `divRemPaddingInputs` builds it, `op_c` read value
+  and all).
   The earlier 476 count fell from 478 because `SailDecode.decode_ADD_example`
   and its sole consumer `Soundness.Target.decodedInROM_addRow` were retired during the toolchain
   migration (see the retirement note in `SP1Clean/Model/SailDecode.lean`).

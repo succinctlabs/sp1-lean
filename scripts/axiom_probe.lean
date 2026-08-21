@@ -339,6 +339,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.BranchChip.proverAssumptions_of_event
 #print axioms SP1Clean.BranchChip.traceTable_constraints
 #print axioms SP1Clean.BranchChip.traceTable_guarantees
+#print axioms SP1Clean.DivRemChip.proverAssumptions_of_event
+#print axioms SP1Clean.DivRemChip.traceTable_constraints
+#print axioms SP1Clean.DivRemChip.traceTable_guarantees
 #print axioms SP1Clean.JalChip.proverAssumptions_of_event
 #print axioms SP1Clean.JalChip.traceTable_constraints
 #print axioms SP1Clean.JalChip.traceTable_guarantees
@@ -363,6 +366,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.LtChip.proverAssumptions_of_event
 #print axioms SP1Clean.LtChip.traceTable_constraints
 #print axioms SP1Clean.LtChip.traceTable_guarantees
+#print axioms SP1Clean.MulChip.proverAssumptions_of_event
+#print axioms SP1Clean.MulChip.traceTable_constraints
+#print axioms SP1Clean.MulChip.traceTable_guarantees
 #print axioms SP1Clean.ShiftLeftChip.proverAssumptions_of_event
 #print axioms SP1Clean.ShiftLeftChip.traceTable_constraints
 #print axioms SP1Clean.ShiftLeftChip.traceTable_guarantees
