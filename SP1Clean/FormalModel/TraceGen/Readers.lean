@@ -240,6 +240,31 @@ theorem registerAccessCols_prevLow_val_lt (value prevTs currTs : ℕ) :
   rw [registerAccessCols_prev_low, ZMod.val_natCast_of_lt (by omega)]
   exact h
 
+omit [Fact (2 ^ 24 < p)] in
+/-- The chip-side spelling of the recombined low clock — `clk_0_16 + clk_16_24 · 2^16` over the
+built state block — is the cast of the `ℕ` residue `clk % 2^24`. The `k = 0` companion of
+`clkTarget_eq`, which the memory family needs on its own (the RAM access clock is formed *inside*
+`MemoryAccess`, from an unshifted `clk_low`). -/
+theorem clkLow_eq (clk pc : ℕ) :
+    (cpuStateCols (p := p) clk pc).clk_0_16 + (cpuStateCols (p := p) clk pc).clk_16_24 * 65536
+      = ((clk % 2 ^ 24 : ℕ) : ZMod p) := by
+  rw [cpuStateCols_clk_0_16, cpuStateCols_clk_16_24, clk_split clk]
+  push_cast
+  ring
+
+/-- The `ℕ` value a built word reassembles to: the argument's low 64 bits. The builder commits
+residues, so nothing is assumed — and for an event field the trace already bounds by `2 ^ 64` the
+`% 2 ^ 64` is the identity. -/
+lemma wordOfNat_toNat (n : ℕ) : Word.toNat (wordOfNat (p := p) n) = n % 2 ^ 64 := by
+  have hp : 2 ^ 24 < p := Fact.out
+  have hval : ∀ m : ℕ, m < 2 ^ 16 → ((m : ZMod p)).val = m := fun m hm =>
+    ZMod.val_natCast_of_lt (by omega)
+  simp only [Word.toNat_def, wordOfNat, Vector.getElem_mk, List.getElem_toArray,
+    List.getElem_cons_zero, List.getElem_cons_succ]
+  rw [hval _ (Nat.mod_lt _ (by norm_num)), hval _ (Nat.mod_lt _ (by norm_num)),
+    hval _ (Nat.mod_lt _ (by norm_num)), hval _ (Nat.mod_lt _ (by norm_num))]
+  omega
+
 /-! ## The `RTypeReader` block -/
 
 omit [Fact p.Prime] in
@@ -328,6 +353,102 @@ omit [Fact (2 ^ 24 < p)] in
 lemma jTypeReaderCols_op_a_0_eq_zero {e : JTypeEvent} (h : e.opA ≠ 0) :
     (jTypeReaderCols (p := p) e).op_a_0 = 0 := by
   rw [jTypeReaderCols_op_a_0, if_neg h]
+
+/-! ## The `ITypeReader` block, whole
+
+`Addi` needed only the two `RegisterAccessCols` corollaries out of the I-type adapter's contract,
+because its `ProverAssumptions` lists the adapter's conjuncts one by one. The memory chips ask for
+`Readers.ITypeReader.Spec` itself, so here it is in one piece — every conjunct from the same event
+facts, with `is_real`, `is_trusted`, `clk_high`, `opcode` and the four write-value limbs left
+arbitrary (the reader's contract constrains none of them, and each chip supplies a different
+extended loaded word). -/
+
+/-- **The I-type adapter's contract on a built row.** From `ITypeEvent.WellFormed` alone: the four
+`op_a_0` zeroing gates and the `op_a_0` binary fact hold because `rd ≠ x0` makes the flag `0`; the
+two `RegisterAccessCols` contracts are the shared corollaries at offsets `4` / `3`; the decode
+bounds are the index and pc-limb bounds of the builder; and the `is_real` bundle is the two
+committed words' `isU64` plus the two previous-access clocks' 24-bit bounds. -/
+theorem iTypeReader_spec {e : ITypeEvent} (h : e.WellFormed)
+    (is_real is_trusted clk_high opcode wv0 wv1 wv2 wv3 : ZMod p) :
+    Readers.ITypeReader.Spec
+      { cols := iTypeReaderCols (p := p) e, is_real := is_real, is_trusted := is_trusted,
+        clk_high := clk_high,
+        clk_low := (cpuStateCols (p := p) e.clk e.pc).clk_0_16
+          + (cpuStateCols (p := p) e.clk e.pc).clk_16_24 * 65536,
+        pc := (cpuStateCols (p := p) e.clk e.pc).pc, opcode := opcode,
+        wv0 := wv0, wv1 := wv1, wv2 := wv2, wv3 := wv3 } := by
+  have hzero : (iTypeReaderCols (p := p) e).op_a_0 = 0 :=
+    iTypeReaderCols_op_a_0_eq_zero h.opA_ne_zero
+  refine ⟨⟨?_, ?_, ?_, ?_⟩, fun _ => Or.inl hzero, ?_, ?_, fun _ => ?_, fun _ => ?_⟩
+  · rw [hzero, zero_mul]
+  · rw [hzero, zero_mul]
+  · rw [hzero, zero_mul]
+  · rw [hzero, zero_mul]
+  · exact registerAccessCols_spec_opA h.clk_mod h.prevTsA_lt
+  · exact registerAccessCols_spec_opB h.clk_mod h.prevTsB_lt
+  · exact ⟨iTypeReaderCols_op_a_val_lt h.opA_lt, (cpuStateCols_pc_val_lt e.clk e.pc).1,
+      (cpuStateCols_pc_val_lt e.clk e.pc).2.1, (cpuStateCols_pc_val_lt e.clk e.pc).2.2⟩
+  · exact ⟨wordOfNat_isU64 _, wordOfNat_isU64 _, registerAccessCols_prevLow_val_lt _ _ _,
+      registerAccessCols_prevLow_val_lt _ _ _⟩
+
+omit [Fact (2 ^ 24 < p)] in
+/-- A built I-type block's `op_a_0` flag is `1` exactly when the destination **is** `x0` — the
+routing condition of the `AluX0`/`LoadX0`/`StoreX0` chips. -/
+lemma iTypeReaderCols_op_a_0_eq_one {e : ITypeEvent} (h : e.opA = 0) :
+    (iTypeReaderCols (p := p) e).op_a_0 = 1 := by
+  rw [iTypeReaderCols_op_a_0, if_pos h]
+
+/-- **The immutable I-type adapter's contract on an `x0`-destination row.** The sibling of
+`iTypeReader_spec` for the reader the `x0` chips compose: `op_a` is a source **read**, so the four
+`op_a_0` gates pin the read value rather than a write value — and they hold because `x0` reads as
+zero, which is exactly what `hprevA` records. Everything else is the same discharge.
+
+Stated at the `x0` row (`hA`) rather than at a general one: the four gates are `op_a_0 · v_i = 0`
+with `op_a_0 = 1` here, so the *only* way to satisfy them is the zero read, and that is a fact
+about `x0`, not about the builder. -/
+theorem iTypeReaderImmutable_spec_x0 {e : ITypeEvent} (hclk : e.clk % 8 = 1) (hA : e.opA = 0)
+    (hprevA : e.prevA = 0) (hprevTsA : e.prevTsA < e.clk + 4) (hprevTsB : e.prevTsB < e.clk + 3)
+    (is_real is_trusted clk_high opcode : ZMod p) :
+    Readers.ITypeReaderImmutable.Spec
+      { cols := iTypeReaderCols (p := p) e, is_real := is_real, is_trusted := is_trusted,
+        clk_high := clk_high,
+        clk_low := (cpuStateCols (p := p) e.clk e.pc).clk_0_16
+          + (cpuStateCols (p := p) e.clk e.pc).clk_16_24 * 65536,
+        pc := (cpuStateCols (p := p) e.clk e.pc).pc, opcode := opcode } := by
+  have hp : 2 ^ 24 < p := Fact.out
+  have hone : (iTypeReaderCols (p := p) e).op_a_0 = 1 := iTypeReaderCols_op_a_0_eq_one hA
+  refine ⟨⟨?_, ?_, ?_, ?_⟩, fun _ => Or.inr hone, ?_, ?_, fun _ => ?_, fun _ => ?_⟩
+  · show (iTypeReaderCols (p := p) e).op_a_0
+      * (iTypeReaderCols (p := p) e).op_a_memory.prev_value[0] = 0
+    rw [iTypeReaderCols_op_a_memory, registerAccessCols_prev_value, wordOfNat_zero, hprevA]
+    simp
+  · show (iTypeReaderCols (p := p) e).op_a_0
+      * (iTypeReaderCols (p := p) e).op_a_memory.prev_value[1] = 0
+    rw [iTypeReaderCols_op_a_memory, registerAccessCols_prev_value, wordOfNat_one, hprevA]
+    simp
+  · show (iTypeReaderCols (p := p) e).op_a_0
+      * (iTypeReaderCols (p := p) e).op_a_memory.prev_value[2] = 0
+    rw [iTypeReaderCols_op_a_memory, registerAccessCols_prev_value, wordOfNat_two, hprevA]
+    simp
+  · show (iTypeReaderCols (p := p) e).op_a_0
+      * (iTypeReaderCols (p := p) e).op_a_memory.prev_value[3] = 0
+    rw [iTypeReaderCols_op_a_memory, registerAccessCols_prev_value, wordOfNat_three, hprevA]
+    simp
+  · exact registerAccessCols_spec_opA hclk hprevTsA
+  · exact registerAccessCols_spec_opB hclk hprevTsB
+  · exact ⟨iTypeReaderCols_op_a_val_lt (by omega), (cpuStateCols_pc_val_lt e.clk e.pc).1,
+      (cpuStateCols_pc_val_lt e.clk e.pc).2.1, (cpuStateCols_pc_val_lt e.clk e.pc).2.2⟩
+  · exact ⟨wordOfNat_isU64 _, wordOfNat_isU64 _, registerAccessCols_prevLow_val_lt _ _ _,
+      registerAccessCols_prevLow_val_lt _ _ _⟩
+
+/-- The effective address the `AddressOperation` gadget sees — the `ℕ` sum of the two committed
+operand words, truncated to 64 bits — is the event's own `addr`. The two words are `wordOfNat` of
+`ℕ` fields the event already bounds by `2 ^ 64`, so nothing is lost. -/
+theorem addr_eq {e : MemoryEvent} (hb : e.b < 2 ^ 64) (himm : e.imm < 2 ^ 64) :
+    (Word.toNat (iTypeReaderCols (p := p) e.toITypeEvent).op_b_memory.prev_value
+        + Word.toNat (iTypeReaderCols (p := p) e.toITypeEvent).op_c_imm) % 2 ^ 64 = e.addr := by
+  rw [iTypeReaderCols_op_b_memory, registerAccessCols_prev_value, iTypeReaderCols_op_c_imm,
+    wordOfNat_toNat, wordOfNat_toNat, Nat.mod_eq_of_lt hb, Nat.mod_eq_of_lt himm, MemoryEvent.addr]
 
 /-- **The program counter as a word.** The three committed `pc` limbs padded with a zero high limb
 form a u64 — the shape `UType` (and `Jal`) feed to their `AddOperation` as the `pc + imm` operand.

@@ -462,4 +462,155 @@ adapter and its `op_b` is a jump offset, not a shifted U-immediate. -/
 def JTypeEvent.UTypeImm (e : JTypeEvent) : Prop :=
   ∃ imm < 2 ^ 20, e.immB = luiImmNat imm
 
+/-! ## The memory family
+
+The nine memory chips (`Load{Byte,Half,Word,Double}`, `LoadX0`, `Store{Byte,Half,Word,Double}`)
+read the very same `Extracted.ITypeReader` adapter as `Addi` — `op_a`, `op_b` a register, `op_c` a
+decoded immediate — and make **one access no register-adapter row makes**: an access to a RAM word
+at the effective address `rs1 + imm`, timestamped at `MemoryAccessPosition::Memory = 1`.
+
+That extra access is why the family gets its own record rather than two more fields on
+`ITypeEvent`. An `Addi` row makes no RAM access, so a RAM cell's prior value and prior access
+timestamp would be fields with no execution meaning on the record's existing user, and the address
+conjuncts below are *false* for it (an `Addi` sum is an arbitrary 64-bit value, not a mapped
+48-bit address). `MemoryEvent` therefore **extends** `ITypeEvent`: the adapter half is literally
+the same record, built by the same `iTypeReaderCols`, and only the RAM half is new. -/
+
+/--
+One executed **memory instruction** (an `ITypeRecord` plus its RAM `MemoryRecordEnum`): the I-type
+half verbatim, plus the 64-bit word the addressed RAM cell held before this row and the timestamp
+of that cell's previous access.
+
+The word is the full 8-byte cell even for a sub-word load: SP1's memory bus is word-granular, and
+the sub-word behaviour (`offset_bit` selection and sign extension) is in-circuit, computed from
+this cell and the address. `Inputs.lean` and the per-chip builders perform that selection, so the
+record carries no `selected_*` field — those are *derived*, exactly like an ALU row's result.
+-/
+structure MemoryEvent extends ITypeEvent where
+  /-- The 64-bit word the addressed (8-byte-aligned) RAM cell held before this row's access
+  (`MemoryRecordEnum::previous_record().value`). -/
+  prevMem : ℕ
+  /-- The timestamp of the previous access to that RAM cell
+  (`MemoryRecordEnum::previous_record().timestamp`). -/
+  prevTsMem : ℕ
+
+namespace MemoryEvent
+
+/-- The effective address: `rs1 + signExtend(imm)`, truncated to 64 bits — what SP1's executor
+forms before it looks the cell up (`b.wrapping_add(c)`). The chips see it through the
+`AddressOperation` gadget as `(Word.toNat op_b_val + Word.toNat op_c_imm) % 2 ^ 64`, which
+`TraceGen.addr_eq` identifies with this. -/
+def addr (e : MemoryEvent) : ℕ := (e.b + e.imm) % 2 ^ 64
+
+/--
+**What makes an event a real memory trace event.** The I-type conjuncts verbatim, plus five facts
+about the RAM access. Every one is a fact about SP1's *execution*; none is a fact about a circuit.
+
+* `toITypeWellFormed` — the I-type half (`ITypeEvent.WellFormed`): the `CLK_INC = 8` clock
+  discipline, the pc and register-index bounds, `rd ≠ x0`, the 64-bit operand bounds, and the two
+  register timestamp orderings.
+* `clk_lt` — the execution clock is a 48-bit value. Two `populate` narrowings depend on this and
+  on nothing else: `CPUState::populate` commits `(clk >> 24) as u32`, and — the one this family
+  needs — `MemoryAccessTimestamp::populate_timestamp` commits the **cross-window** gap
+  `current_high - prev_high - 1` as a 16-bit + `u8` limb pair, which is non-truncating exactly
+  while `clk >> 24` is a 24-bit quantity. The register adapters owe no such conjunct because
+  `RegisterAccessTimestamp::populate_timestamp` never compares high limbs: it zeroes `prev_low`
+  across a window boundary instead. At `CLK_INC = 8` the bound is `2 ^ 45` executed instructions.
+* `addr_lt` — the effective address is a 48-bit address: SP1's guest address space is 48-bit and
+  the Memory bus keys on three u16 limbs.
+* `addr_ge` — the address is above the reserved low 64 KiB. SP1's loader never maps that region
+  and an access into it traps rather than producing a memory event, so a real row's address is
+  `≥ 2 ^ 16`. (This is the fact `AddressOperation`'s `top_two_limb_inv` gate records: the inverse
+  of `value[1] + value[2]` exists exactly when the address is not in the first page.)
+* `prevMem_lt` — a RAM cell holds a 64-bit value.
+* `prevTsMem_lt` — timestamps strictly increase, so the cell's previous access is strictly earlier
+  than this row's, which happens at `MemoryAccessPosition::Memory = 1`, i.e. at `clk + 1`. SP1's
+  own `populate_timestamp` asserts exactly this (`assert!(prev_timestamp < current_timestamp)`).
+
+Not present, deliberately: nothing about limbs, timestamp differences, `compare_low`, the selected
+sub-word, or the sign bit. All of those are computed by the builder — `Readers.lean` derives the
+`MemoryAccess` contract from the five facts above, and each chip's `Complete.lean` derives its own
+width's selection from the address and the cell. Nor is width **alignment** here: it is per-chip
+(`Aligned` below), not per-family.
+-/
+structure WellFormed (e : MemoryEvent) : Prop where
+  /-- The I-type half of the event is well-formed. -/
+  toITypeWellFormed : e.toITypeEvent.WellFormed
+  /-- The execution clock is a 48-bit value. -/
+  clk_lt : e.clk < 2 ^ 48
+  /-- The effective address is a 48-bit address. -/
+  addr_lt : e.addr < 2 ^ 48
+  /-- The address is above the reserved low 64 KiB. -/
+  addr_ge : 2 ^ 16 ≤ e.addr
+  /-- The addressed cell holds a 64-bit value. -/
+  prevMem_lt : e.prevMem < 2 ^ 64
+  /-- The cell's previous access is strictly before this row's, at `clk + 1`. -/
+  prevTsMem_lt : e.prevTsMem < e.clk + 1
+
+/--
+**The `x0`-destination form.** SP1 routes a load whose destination register is `x0` to the separate
+`LoadX0` chip, whose row sets `op_a_0 = 1` and *discards* the loaded value. The event is the same
+record; exactly two facts change, and both are the routing condition itself:
+
+* the destination **is** `x0` (`MemoryEvent.WellFormed` demands it is not), and
+* the value that register held is `0` — RISC-V's `x0` reads as zero, which is precisely what the
+  immutable adapter's four `op_a_0 · prev_value_i = 0` gates record.
+
+Everything else — the clock discipline, the pc and `rs1` bounds, the immediate and operand bounds,
+the two register timestamps, and all five RAM facts — is repeated from `WellFormed` rather than
+gated on a flag the record does not carry.
+-/
+structure WellFormedX0 (e : MemoryEvent) : Prop where
+  /-- The clock is `≡ 1 (mod 8)`: the executor's `CLK_INC = 8` discipline, starting at 1. -/
+  clk_mod : e.clk % 8 = 1
+  /-- The program counter is a 48-bit address. -/
+  pc_lt : e.pc < 2 ^ 48
+  /-- `rd` **is** `x0` — the routing condition that puts the event on this chip. -/
+  opA_eq_zero : e.opA = 0
+  /-- `rs1` is an architectural register index. -/
+  opB_lt : e.opB < 32
+  /-- The decoded immediate is a 64-bit value. -/
+  imm_lt : e.imm < 2 ^ 64
+  /-- `rs1`'s content is a 64-bit value. -/
+  b_lt : e.b < 2 ^ 64
+  /-- `x0` reads as zero. -/
+  prevA_eq_zero : e.prevA = 0
+  /-- `x0`'s previous access is strictly before this row's read of it (at `clk + 4`). -/
+  prevTsA_lt : e.prevTsA < e.clk + 4
+  /-- `rs1`'s previous access is strictly before this row's read of it (at `clk + 3`). -/
+  prevTsB_lt : e.prevTsB < e.clk + 3
+  /-- The execution clock is a 48-bit value. -/
+  clk_lt : e.clk < 2 ^ 48
+  /-- The effective address is a 48-bit address. -/
+  addr_lt : e.addr < 2 ^ 48
+  /-- The address is above the reserved low 64 KiB. -/
+  addr_ge : 2 ^ 16 ≤ e.addr
+  /-- The addressed cell holds a 64-bit value. -/
+  prevMem_lt : e.prevMem < 2 ^ 64
+  /-- The cell's previous access is strictly before this row's, at `clk + 1`. -/
+  prevTsMem_lt : e.prevTsMem < e.clk + 1
+
+/--
+**Which load, and the alignment it requires.** The `LoadX0` chip serves all seven load opcodes at
+once (`Opcode::{LB,LH,LW,LD,LBU,LHU,LWU}` = `29,30,31,35,32,33,34`), committing one selector per
+variant, and its AIR gates the address's low bits per variant: `LD` forces all three offset bits to
+zero, `LW`/`LWU` the low two, `LH`/`LHU` the lowest, and `LB`/`LBU` none. So the event needs both
+halves of that fact — *which* of the seven it is, and the alignment RISC-V requires of it — and
+they are naturally one predicate. (The single-variant chips take the alignment alone, as
+`Aligned`; there the opcode is fixed by the chip.) -/
+def IsLoad (e : MemoryEvent) : Prop :=
+  (e.opcode = 29 ∨ e.opcode = 32)
+    ∨ ((e.opcode = 30 ∨ e.opcode = 33) ∧ e.addr % 2 = 0)
+    ∨ ((e.opcode = 31 ∨ e.opcode = 34) ∧ e.addr % 4 = 0)
+    ∨ (e.opcode = 35 ∧ e.addr % 8 = 0)
+
+/-- **The row's width alignment.** `LW`/`LWU` are 4-byte aligned, `LH`/`LHU` 2-byte, `LD` 8-byte,
+`LB`/`LBU` not at all — so this is a fact about the *instruction*, not about the family, and is
+stated separately for the same reason `JTypeEvent.UTypeImm` is: `MemoryEvent.WellFormed` is shared
+by chips for which it is false. RISC-V requires naturally-aligned accesses and SP1's executor traps
+a misaligned one instead of emitting a row, so a real row of a given width satisfies it. -/
+def Aligned (e : MemoryEvent) (width : ℕ) : Prop := e.addr % width = 0
+
+end MemoryEvent
+
 end SP1Clean.TraceGen

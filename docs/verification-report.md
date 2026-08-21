@@ -824,7 +824,27 @@ Stated plainly:
    program/platform contracts (`SailConfigured`, `SailCodeMemoryCompatible`,
    program well-formedness) that are application-level premises no system table will discharge;
    they must remain explicit in the final public theorem type.
-3. **No cryptographic claim.** Nothing here says anything about STARK soundness, FRI, LogUp/GKR,
+3. **Two completeness-contract defects found by the W4 rollout, reported not patched.** Carrying
+   chips through the trace-generation layer exercises each chip's `ProverAssumptions` against rows a
+   real prover emits, and that surfaced two places where the *stated* prover-side contract is
+   stronger than the circuit needs — so the affected completeness statements are narrower than they
+   look:
+   - **The memory family has no satisfiable zero-padding row.** `AddressOperation.Assumptions`
+     states `2^16 ≤ (op_b + op_c_imm) % 2^48` (the address is above the reserved low 64 KiB)
+     *ungated*, and all five load and four store `ProverAssumptions` inherit it. SP1 pads these
+     tables with literal zero bytes, and the AIR itself is satisfied on such a row, but `2^16 ≤ 0`
+     is not — so the built trace tables for these chips carry event rows only, with no padding
+     statement. The fix is to gate four conjuncts on `is_real`, which reopens
+     `AddressOperation.completeness` and nine chip completeness proofs.
+   - **`LoadByteChip`'s `ProverAssumptions` is unsatisfiable for LBU rows loading a byte ≥ 128.**
+     It states `msb = 1 ↔ 128 ≤ selected_byte.val` ungated while the circuit forces
+     `is_lbu · msb = 0`; the two are contradictory exactly on those rows. SP1's own populate gates
+     the assignment (`msb = byte >>> 7` on LB, `0` on LBU) and the chip's *soundness* derives the
+     equivalence only under `is_lb = 1` — it is the `ProverAssumptions` statement that is missing
+     the gate, not the circuit. `LoadByteChip`'s completeness theorems are consequently scoped to
+     LB rows and say so at their definitions. Nothing unsound follows: soundness is unaffected, and
+     the LBU rows a real prover emits are still covered by the soundness direction.
+4. **No cryptographic claim.** Nothing here says anything about STARK soundness, FRI, LogUp/GKR,
    or Fiat–Shamir. The planned final form is probabilistic and lives in the ArkLib/VCVio
    integration: an executable `verifyCore` agreeing with the pinned Rust verifier, ArkLib
    knowledge soundness extracting a full AIR witness with an explicit error bound, and
@@ -838,12 +858,12 @@ Stated plainly:
    intermediate abstraction our C2 obligation names (multiset balance ⇒ field-level LogUp
    soundness with an error bound), and their lemmas are a candidate model for how the ArkLib
    layer can discharge C2 rather than assume it.
-4. **Completeness at the ensemble level is undeclared** (per-chip completeness is proved; the
+5. **Completeness at the ensemble level is undeclared** (per-chip completeness is proved; the
    Bitwise, Lt, and Addw completeness witnesses currently cover register-register forms only —
    so ANDI/ORI/XORI/SLTI/SLTIU/ADDIW rows are covered by soundness and the Sail bridges but
    not by those chips' completeness theorems — and UType's completeness covers rd ≠ x0 rows,
    as its `ProverAssumptions` docstring discloses).
-5. **Trusted surfaces T1–T5** (§10), including the pinned git dependency graph — in which the
+6. **Trusted surfaces T1–T5** (§10), including the pinned git dependency graph — in which the
    Clean DSL is currently a fork (T5) — and the trace-battery provenance caveat (§4.3).
 6. The AIR models the *supervisor-mode* Core profile; user-mode/mprotect table variants,
    precompiles, and the memory-protection chips are out of scope.

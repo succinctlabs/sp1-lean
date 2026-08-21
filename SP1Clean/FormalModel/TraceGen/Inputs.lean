@@ -1,5 +1,6 @@
 import SP1Clean.FormalModel.TraceGen.Events
 import SP1Clean.FormalModel.Contracts.Chips
+import SP1Clean.Extracted.MemoryAccess
 
 /-! # Trace generation — events to typed chip inputs
 
@@ -56,6 +57,21 @@ that file is imported by essentially the whole project.) -/
 def wordOfNat (n : ℕ) : Word (ZMod p) :=
   #v[((n % 2 ^ 16 : ℕ) : ZMod p), ((n / 2 ^ 16 % 2 ^ 16 : ℕ) : ZMod p),
      ((n / 2 ^ 32 % 2 ^ 16 : ℕ) : ZMod p), ((n / 2 ^ 48 % 2 ^ 16 : ℕ) : ZMod p)]
+
+-- The four limb projections, as `rfl`-lemmas. Deliberately not `@[simp]`, for the same reason the
+-- block projections below are not: the memory chips read individual RAM limbs out of a built word
+-- (the sub-word selection gates), and they should do so by citing one of these rather than by
+-- normalizing the word.
+lemma wordOfNat_zero (n : ℕ) : (wordOfNat (p := p) n)[0] = ((n % 2 ^ 16 : ℕ) : ZMod p) := rfl
+
+lemma wordOfNat_one (n : ℕ) :
+    (wordOfNat (p := p) n)[1] = ((n / 2 ^ 16 % 2 ^ 16 : ℕ) : ZMod p) := rfl
+
+lemma wordOfNat_two (n : ℕ) :
+    (wordOfNat (p := p) n)[2] = ((n / 2 ^ 32 % 2 ^ 16 : ℕ) : ZMod p) := rfl
+
+lemma wordOfNat_three (n : ℕ) :
+    (wordOfNat (p := p) n)[3] = ((n / 2 ^ 48 % 2 ^ 16 : ℕ) : ZMod p) := rfl
 
 /-- SP1's `CPUState::populate`: the clock as `clk_high`/`clk_16_24`/`clk_0_16` and the program
 counter as three u16 limbs. -/
@@ -118,6 +134,69 @@ lemma registerAccessCols_prev_low (value prevTs currTs : ℕ) :
 lemma registerAccessCols_diff_low_limb (value prevTs currTs : ℕ) :
     (registerAccessCols (p := p) value prevTs currTs).access_timestamp.diff_low_limb
       = ((diffLowOf prevTs currTs : ℕ) : ZMod p) := rfl
+
+/-! ## The RAM access block
+
+`MemoryAccessCols::populate` (same file as `RegisterAccessCols::populate`) differs from the
+register block in exactly one way, and it is the interesting one: a RAM access commits **both**
+halves of the previous timestamp (`prev_high` and `prev_low`) and a `compare_low` flag saying which
+half the monotonicity argument compares, where a register access commits only `prev_low` and zeroes
+it across a window boundary. That is why the memory family's event owes a bound on the clock and
+the register families do not — the cross-window branch really does subtract high limbs. -/
+
+/-- SP1's `populate_timestamp` comparison selector: `1` when the previous access happened in the
+same 24-bit clock window as this one (so the *low* halves are compared), `0` when it did not (so
+the *high* halves are). -/
+def memCompareLow (prevTs currTs : ℕ) : ℕ :=
+  if prevTs >>> 24 = currTs >>> 24 then 1 else 0
+
+/-- SP1's `populate_timestamp` gap `current_time_value - prev_time_value - 1`, at whichever of the
+two comparison halves `memCompareLow` selects. Committed as the limb pair
+`diff_low_limb + diff_high_limb · 2^16`. -/
+def memDiffOf (prevTs currTs : ℕ) : ℕ :=
+  if prevTs >>> 24 = currTs >>> 24 then currTs % 2 ^ 24 - prevTs % 2 ^ 24 - 1
+  else currTs >>> 24 - prevTs >>> 24 - 1
+
+/-- SP1's `MemoryAccessCols::populate`: the cell's previous value as a committed word, the previous
+access's two clock halves, the comparison selector, and the gap's two limbs. `currTs` is this row's
+RAM access clock (`clk + 1`, `MemoryAccessPosition::Memory = 1`). -/
+def memoryAccessCols (value prevTs currTs : ℕ) : Extracted.MemoryAccessCols (ZMod p) where
+  prev_value := wordOfNat value
+  access_timestamp :=
+    { prev_high := ((prevTs >>> 24 : ℕ) : ZMod p)
+      prev_low := ((prevTs % 2 ^ 24 : ℕ) : ZMod p)
+      compare_low := ((memCompareLow prevTs currTs : ℕ) : ZMod p)
+      diff_low_limb := ((memDiffOf prevTs currTs % 2 ^ 16 : ℕ) : ZMod p)
+      diff_high_limb := ((memDiffOf prevTs currTs / 2 ^ 16 : ℕ) : ZMod p) }
+
+lemma memoryAccessCols_prev_value (value prevTs currTs : ℕ) :
+    (memoryAccessCols (p := p) value prevTs currTs).prev_value = wordOfNat value := rfl
+
+lemma memoryAccessCols_prev_high (value prevTs currTs : ℕ) :
+    (memoryAccessCols (p := p) value prevTs currTs).access_timestamp.prev_high
+      = ((prevTs >>> 24 : ℕ) : ZMod p) := rfl
+
+lemma memoryAccessCols_prev_low (value prevTs currTs : ℕ) :
+    (memoryAccessCols (p := p) value prevTs currTs).access_timestamp.prev_low
+      = ((prevTs % 2 ^ 24 : ℕ) : ZMod p) := rfl
+
+lemma memoryAccessCols_compare_low (value prevTs currTs : ℕ) :
+    (memoryAccessCols (p := p) value prevTs currTs).access_timestamp.compare_low
+      = ((memCompareLow prevTs currTs : ℕ) : ZMod p) := rfl
+
+lemma memoryAccessCols_diff_low_limb (value prevTs currTs : ℕ) :
+    (memoryAccessCols (p := p) value prevTs currTs).access_timestamp.diff_low_limb
+      = ((memDiffOf prevTs currTs % 2 ^ 16 : ℕ) : ZMod p) := rfl
+
+lemma memoryAccessCols_diff_high_limb (value prevTs currTs : ℕ) :
+    (memoryAccessCols (p := p) value prevTs currTs).access_timestamp.diff_high_limb
+      = ((memDiffOf prevTs currTs / 2 ^ 16 : ℕ) : ZMod p) := rfl
+
+/-- The all-zero RAM access block of a padding row. -/
+def zeroMemoryAccessCols : Extracted.MemoryAccessCols (ZMod p) where
+  prev_value := #v[0, 0, 0, 0]
+  access_timestamp :=
+    { prev_high := 0, prev_low := 0, compare_low := 0, diff_low_limb := 0, diff_high_limb := 0 }
 
 /-- SP1's `RTypeReader::populate`: the three register indices, their access blocks at the
 `MemoryAccessPosition` offsets `A = 4` / `B = 3` / `C = 2`, and the `rd = x0` flag. -/
