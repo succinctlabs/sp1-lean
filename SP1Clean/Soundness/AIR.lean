@@ -9,6 +9,7 @@ import SP1Clean.Soundness.RowSoundness
 import SP1Clean.Soundness.TypedProgram
 import SP1Clean.Soundness.TypedTimeContracts
 import SP1Clean.Soundness.ChipContracts
+import SP1Clean.Soundness.RefreshWiring
 
 /-! # AIR witness relations and the semantic capstone
 
@@ -110,32 +111,6 @@ def SP1SemanticBoundaryRelation :
     WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
   SemanticBoundaryBinding
 
-/-- **The MemoryBump scope restriction of the native capstone (W3, explicitly disclosed).**
-
-SP1's MemoryBump table *refreshes* a register record — pull it at its old timestamp, push the same
-value at a strictly later canonical one — so that a record untouched for `≥ 2^24` ticks stays
-reachable by the accessing rows' bounded-difference timestamp checks.  The per-location Memory
-balance therefore carries those extra pull/push pairs
-(`ChipContracts.memoryBalance_of_alignsWith`), while `TimedGrounding.walk` consumes the
-**refresh-free** balance.
-
-Closing that gap in general means running the proved generic engine
-`RefreshElimination.eliminate` (with the proved per-row inputs
-`ChipContracts.memoryBump_producedMessages_eq` / `memoryBump_consumedMessages_eq` /
-`memoryBump_isRefresh`) and re-feeding the walk a carrier whose affected pulls are rewritten to
-their value-equal pre-refresh ancestors — for which
-`TimedGrounding.ValueAligned` and `weakGrounded_ordinary_of_valueAligned` are already proved.  The
-missing piece is the *list-level* redistribution of the eliminated multiset back onto individual
-rows; until it lands, this relation restricts the native capstone to shards whose MemoryBump table
-carries **no active row**, in which case the bump contributions to the balance are literally empty
-and no rewriting is needed.
-
-This is a scope restriction on the witness, not a vacuous hypothesis: every shard short enough that
-no register record needs a timestamp refresh (an all-padding MemoryBump table) satisfies it. -/
-def SupportedCoreNoMemoryRefreshRelation :
-    WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
-  fun _statement witness => realMemoryBumpRows witness = []
-
 /-- The explicit physical range premise needed by SP1's generic RAM access-timestamp comparison.
 The local `MemoryAccess` AIR constrains the selected difference to two byte-range-checked limbs, but
 its Rust soundness argument additionally requires both compared components to be `< 2^24`. Low
@@ -146,16 +121,15 @@ assumption. The load/store contracts still derive strict order from the actual A
 eventual exact extracted-AIR layer should prove this relation from SP1's public timestamp range
 checks plus Memory permutation, or continue to disclose it as an external verifier premise.
 
-⚠ **It also carries the second, separately documented Memory-side premise**
-`SupportedCoreNoMemoryRefreshRelation` — read that definition before citing this one.  Both are
-Memory-timestamp premises of the same argument, so they travel together through
-`SupportedCoreNativeRelation`; neither is derived from the AIR today. -/
+This is now the **only** Memory-side premise of the capstone: the MemoryBump scope restriction that
+travelled beside it (`realMemoryBumpRows witness = []`) was discharged in W3 by running
+`RefreshElimination.eliminate` on the widened per-location balance and re-feeding the walk the
+refresh-free carrier `RefreshWiring.exists_refreshFreeTouchLists` produces. -/
 def SupportedCoreMemoryTimestampRangeRelation :
     WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
-  fun statement witness =>
-    (∀ decoded ∈ realDecodedInstructionRows witness.data witness.tables,
-      MemoryPullTimestampHighBound (decoded.ordinaryRowFacts witness.data)) ∧
-    SupportedCoreNoMemoryRefreshRelation statement witness
+  fun _statement witness =>
+    ∀ decoded ∈ realDecodedInstructionRows witness.data witness.tables,
+      MemoryPullTimestampHighBound (decoded.ordinaryRowFacts witness.data)
 
 /-- The honest native relation used by semantic soundness. Provider truth and the RAM timestamp
 range fact are explicit companion predicates, not implications smuggled out of raw interaction
@@ -205,9 +179,10 @@ structure SupportedCoreGrounding
   /-- Every memory-finalize provider record is true of the constructed run: some record at the same
   location with the same value and a no-later timestamp is genuinely the content of that location at
   its time (`TimedGrounding.walk`'s third conclusion, previously discarded — Finding 4).  Stated in
-  the ∃-witness form deliberately: once the ensemble gains MemoryBump timestamp-refresh rows, the
-  walk concludes truth for the *refresh-eliminated* record (same location and value, earlier time),
-  and this statement absorbs that without changing shape.  Today the witness is the record itself. -/
+  the ∃-witness form deliberately: with MemoryBump timestamp-refresh rows in the ensemble the walk
+  concludes truth for the *refresh-eliminated* record (same location and value, earlier time), and
+  this statement absorbs that without changing shape.  On a shard with no active refresh row the
+  witness is the record itself. -/
   memoryFinalizeTruth : ∀ loc m, memoryFinalizeFrontier witness loc = some m →
     ∃ m', Semantics.MemoryMsg.locOf m' = Semantics.MemoryMsg.locOf m ∧
       m'.value = m.value ∧ Semantics.MemoryMsg.timeNat m' ≤ Semantics.MemoryMsg.timeNat m ∧
@@ -444,10 +419,16 @@ pull to its value-equal pre-refresh ancestor), canonicalizes the carrier's State
 seven explicit inputs of `TimedGrounding.walk`, transports its result back to the ordinary
 physical-row carrier at value level, and invokes the chip's retained Clean soundness/Sail bridge.
 What remains after this theorem is the finite `SupportedCoreGroundingObligations` rollout, not
-another semantic premise. -/
+another semantic premise.
+
+`publicInputEq` is what identifies the walked State endpoints with the *verifier row's* public
+values, whose limbs `witness_publicInput_limbBounds` range-checks: that is where the `< 2 ^ 48`
+shard-time ceiling comes from, and hence every pushed Memory record's genuine 24-bit `clk_high` —
+one of the two facts `memoryBump_isRefresh` consumes.  Its only caller,
+`supported_core_witness_grounding`, already carries the same hypothesis. -/
 theorem supportedCore_orderedRows_dynamic_of_obligations
     (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
-    (initial : SailState)
+    (initial : SailState) (publicInputEq : witness.publicInput = statement.publicValues)
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
     (boundary : InitialBoundaryFacts statement witness initial)
     (memoryTimestampRange :
@@ -507,7 +488,7 @@ theorem supportedCore_orderedRows_dynamic_of_obligations
     exact (contractAt decoded decodedMem).rowAligned witness constraints balanced decoded rfl
       (sourceFacts decoded decodedMem).1 (sourceFacts decoded decodedMem).2 statement.program
       (decodeAt decoded decodedMem)
-      (memoryTimestampRange.1 decoded (exhaustive.mem_iff.mp decodedMem))
+      (memoryTimestampRange decoded (exhaustive.mem_iff.mp decodedMem))
   let touchesOf : DecodedInstructionRow p → List (TimedGrounding.Touch p) := fun decoded =>
     if decodedMem : decoded ∈ orderedRows then Classical.choose (alignedExists decoded decodedMem)
     else []
@@ -573,31 +554,220 @@ theorem supportedCore_orderedRows_dynamic_of_obligations
     intro d hd
     rw [canonTimePull d hd, canonTimePush d hd]
     exact timeStep d hd
-  -- The carrier actually fed to the walk: the aligned row with its State edge re-spelled in the
-  -- canonical limbs the trail walks.  Everything on the memory side is untouched.
-  let walkRow : DecodedInstructionRow p → Semantics.RowFacts p := fun decoded =>
-    TimedGrounding.stateRespell (alignedRow decoded)
-      (canonState (decodedStateEdge witness.data decoded).1)
-      (canonState (decodedStateEdge witness.data decoded).2)
-  have rowOK : ∀ row ∈ orderedRows.map alignedRow,
-      TimedGrounding.RowOK (Commit.initClkNat witness.data) row := by
+  -- The public boundary clock limbs are range-checked by the verifier row, so the whole shard sits
+  -- below `2 ^ 48`.  That ceiling turns a pushed record's `TouchOK` window bound into a genuine
+  -- 24-bit `clk_high`, which is one of the two facts the MemoryBump refresh evidence consumes.
+  have limbBounds : SP1StateBoundary.LimbBounds statement.publicValues := by
+    rw [← publicInputEq]
+    exact witness_publicInput_limbBounds witness constraints balanced
+  have initTimeLt : Semantics.StateMsg.timeNat
+      (initialBoundaryStateMessage statement.publicValues) < 2 ^ 48 :=
+    clkNat_lt_of_limbs (initialBoundaryStateMessage_bounds _ limbBounds).1
+      (initialBoundaryStateMessage_bounds _ limbBounds).2.1
+  have finalTimeLt : Semantics.StateMsg.timeNat
+      (finalBoundaryStateMessage statement.publicValues) < 2 ^ 48 :=
+    clkNat_lt_of_limbs (finalBoundaryStateMessage_bounds _ limbBounds).1
+      (finalBoundaryStateMessage_bounds _ limbBounds).2.1
+  have clockCount := clockCount_of_stateWalk _ stateWalk timeStepCanon
+  have rowWindowLt : ∀ decoded ∈ orderedRows,
+      Semantics.StateMsg.timeNat (decoded.ordinaryRowFacts witness.data).statePull + 8 ≤
+        Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues) := by
+    intro decoded decodedMem
+    obtain ⟨done, suffix, rowsEq⟩ := List.append_of_mem decodedMem
+    have position := statePullTime_of_stateWalk _ stateWalk timeStepCanon done decoded suffix
+      rowsEq
+    rw [canonTimePull decoded decodedMem] at position
+    have hpos : Semantics.StateMsg.timeNat (decoded.ordinaryRowFacts witness.data).statePull =
+      Semantics.StateMsg.timeNat (initialBoundaryStateMessage statement.publicValues) +
+        8 * done.length := position
+    have hlen : done.length + 1 ≤ orderedRows.length := by
+      rw [rowsEq, List.length_append, List.length_cons]
+      omega
+    omega
+  have liveAtHead : TimedGrounding.LiveOK initial (Commit.initClkNat witness.data)
+      (Semantics.StateMsg.timeNat (initialBoundaryStateMessage statement.publicValues))
+      (memoryInitFrontier witness) := by
+    have headTime : Semantics.StateMsg.timeNat
+        (initialBoundaryStateMessage statement.publicValues) = Commit.initClkNat witness.data := by
+      simpa only [initialBoundaryStateMessage, Semantics.StateMsg.timeNat] using
+        boundary.initialClock.symm
+    rw [headTime]
+    exact memoryInit_liveOK constraints boundary
+  -- The widened per-location Memory balance: the aligned rows' touches against the two boundary
+  -- frontiers, plus the MemoryBump table's own refresh pairs.
+  have widened := memoryBalance_of_alignsWith witness balanced
+    obligations.memoryMultiplicityBinary
+    (initPure witness constraints) (finPure witness constraints) boundary.memoryProviderUnique
+    boundary.memoryFinalizeProviderUnique obligations.paddingMemoryEmpty orderedRows exhaustive
+    alignedRow aligns
+  have pushGood : ∀ loc : Semantics.MemLoc, ∀ m ∈
+      TimedGrounding.optMS (memoryInitFrontier witness loc) +
+          TimedGrounding.pushesAt (orderedRows.map alignedRow) loc +
+        Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+          (↑(producedMessages (typedTableInteractionsWith (memoryBumpTable witness)
+            Channels.memoryChannel)) : Multiset (Channels.MemoryMsg (ZMod p))),
+      Channels.MemoryMsg.ClkBound m ∧ m.clk_high.val < 2 ^ 24 := by
+    intro loc m memberM
+    rcases Multiset.mem_add.mp memberM with frontierOrRow | bumpPush
+    · rcases Multiset.mem_add.mp frontierOrRow with genesis | rowPush
+      · -- the genesis frontier record: its bus guarantee and its `≤ initClk` boundary time
+        obtain ⟨-, memTruth, -, htime⟩ :=
+          liveAtHead loc m (TimedGrounding.mem_optMS.mp genesis)
+        exact ⟨memTruth.2.1, clkHigh_lt_of_timeNat_le htime initTimeLt⟩
+      · -- one instruction row's own push: its reader's `clk_low` range check and the `t + 4` window
+        obtain ⟨r, rowMem, pushMem, -⟩ := mem_pushesAt.mp rowPush
+        obtain ⟨decoded, decodedMem, rfl⟩ := List.mem_map.mp rowMem
+        have pushMem' : m ∈ (touchesOf decoded).map Prod.snd := pushMem
+        obtain ⟨tc, touchMem, rfl⟩ := List.mem_map.mp pushMem'
+        have evidence := touchesOf_spec decoded decodedMem
+        refine ⟨evidence.2.2.2.1 tc touchMem, clkHigh_lt_of_timeNat_le ?_ finalTimeLt⟩
+        have windowHi := (evidence.2.1 tc touchMem).push_hi
+        have windowLt := rowWindowLt decoded decodedMem
+        omega
+    · -- one MemoryBump row's refreshed push: range-checked in-circuit
+      rw [Multiset.mem_filter, Multiset.mem_coe,
+        memoryBump_producedMessages_eq witness constraints] at bumpPush
+      obtain ⟨row, rowMem, rfl⟩ := List.mem_map.mp bumpPush.1
+      exact memoryBump_pushedMessage_clkFacts witness constraints balanced row rowMem
+  have pullGood : ∀ loc : Semantics.MemLoc, ∀ m ∈
+      TimedGrounding.optMS (memoryFinalizeFrontier witness loc) +
+          TimedGrounding.pullsAt (orderedRows.map alignedRow) loc +
+        Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+          (↑(consumedMessages (typedTableInteractionsWith (memoryBumpTable witness)
+            Channels.memoryChannel)) : Multiset (Channels.MemoryMsg (ZMod p))),
+      Channels.MemoryMsg.ClkBound m ∧ m.clk_high.val < 2 ^ 24 :=
+    fun loc => forall_mem_of_balance (widened loc) (pushGood loc)
+  have alignedPullGood : ∀ decoded ∈ orderedRows, ∀ tc ∈ touchesOf decoded,
+      Channels.MemoryMsg.ClkBound (tc : TimedGrounding.Touch p).1.1 ∧
+        (tc : TimedGrounding.Touch p).1.1.clk_high.val < 2 ^ 24 := by
+    intro decoded decodedMem tc touchMem
+    refine pullGood _ _ (Multiset.mem_add.mpr (Or.inl (Multiset.mem_add.mpr (Or.inr
+      (mem_pullsAt.mpr ⟨⟨alignedRow decoded, List.mem_map_of_mem decodedMem, tc.1, ?_, rfl⟩,
+        rfl⟩)))))
+    exact List.mem_map_of_mem touchMem
+  have ordinaryPullGood : ∀ decoded ∈ orderedRows,
+      ∀ mp ∈ (decoded.ordinaryRowFacts witness.data).memPulls,
+        Channels.MemoryMsg.ClkBound (mp : Channels.MemoryMsg (ZMod p) × ℕ).1 := by
+    intro decoded decodedMem mp pullMem
+    obtain ⟨mp', alignedMem, priorEq⟩ := List.mem_map.mp
+      ((aligns decoded decodedMem).pulls.mem_iff.mpr (List.mem_map_of_mem pullMem))
+    exact (pullGood (Semantics.MemoryMsg.locOf mp.1) mp.1 (Multiset.mem_add.mpr (Or.inl
+      (Multiset.mem_add.mpr (Or.inr (mem_pullsAt.mpr
+        ⟨⟨alignedRow decoded, List.mem_map_of_mem decodedMem, mp', alignedMem, priorEq⟩,
+          rfl⟩)))))).1
+  -- Every active MemoryBump row is a genuine refresh: its pulled record's two timestamp facts come
+  -- from the produced side of the very balance the row contributes to.
+  have bumpRefresh : ∀ row ∈ realMemoryBumpRows witness,
+      RefreshElimination.IsRefresh
+        (fun m : Channels.MemoryMsg (ZMod p) => (Semantics.MemoryMsg.locOf m, m.value))
+        Semantics.MemoryMsg.timeNat
+        (MemoryBumpChip.pulledMessage (memoryBumpRow (memoryBumpTable witness) row),
+          MemoryBumpChip.pushedMessage (memoryBumpRow (memoryBumpTable witness) row)) := by
     intro row rowMem
-    obtain ⟨decoded, decodedMem, rfl⟩ := List.mem_map.mp rowMem
-    have evidence := touchesOf_spec decoded decodedMem
-    apply TimedGrounding.rowOK_alignedOf (Commit.initClkNat witness.data)
-      (decoded.ordinaryRowFacts witness.data) (touchesOf decoded)
-    · simpa only [TimedGrounding.alignedOf, DecodedInstructionRow.ordinaryRowFacts_statePull,
-        DecodedInstructionRow.ordinaryRowFacts_statePush, decodedStateEdge] using
-        timeStep decoded decodedMem
-    · have aligned := statePullAlign8_of_stateWalk _ stateWalk timeStepCanon decoded decodedMem
-      rw [canonTimePull decoded decodedMem] at aligned
-      rw [boundary.initialClock]
-      simpa only [TimedGrounding.alignedOf, DecodedInstructionRow.ordinaryRowFacts_statePull,
-        decodedStateEdge, initialBoundaryStateMessage, Semantics.StateMsg.timeNat] using aligned
-    · exact evidence.2.1
-    · exact evidence.2.2.1
-    · exact evidence.2.2.2.1
-    · exact evidence.2.2.2.2
+    have pulledMem : MemoryBumpChip.pulledMessage (memoryBumpRow (memoryBumpTable witness) row) ∈
+        Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = Semantics.MemoryMsg.locOf
+            (MemoryBumpChip.pulledMessage (memoryBumpRow (memoryBumpTable witness) row)))
+          (↑(consumedMessages (typedTableInteractionsWith (memoryBumpTable witness)
+            Channels.memoryChannel)) : Multiset (Channels.MemoryMsg (ZMod p))) := by
+      rw [Multiset.mem_filter, Multiset.mem_coe,
+        memoryBump_consumedMessages_eq witness constraints]
+      exact ⟨List.mem_map_of_mem rowMem, rfl⟩
+    have good := pullGood _ _ (Multiset.mem_add.mpr (Or.inr pulledMem))
+    exact memoryBump_isRefresh witness constraints balanced row rowMem good.1 good.2
+  -- The refresh pairs as one list, and its two projections against the bump table's messages.
+  set bump : List (Channels.MemoryMsg (ZMod p) × Channels.MemoryMsg (ZMod p)) :=
+    (realMemoryBumpRows witness).map (fun row =>
+      (MemoryBumpChip.pulledMessage (memoryBumpRow (memoryBumpTable witness) row),
+        MemoryBumpChip.pushedMessage (memoryBumpRow (memoryBumpTable witness) row))) with bumpDef
+  have bumpSnd : bump.map Prod.snd =
+      producedMessages (typedTableInteractionsWith (memoryBumpTable witness)
+        Channels.memoryChannel) := by
+    rw [memoryBump_producedMessages_eq witness constraints, bumpDef, List.map_map]
+    rfl
+  have bumpFst : bump.map Prod.fst =
+      consumedMessages (typedTableInteractionsWith (memoryBumpTable witness)
+        Channels.memoryChannel) := by
+    rw [memoryBump_consumedMessages_eq witness constraints, bumpDef, List.map_map]
+    rfl
+  have bumpRefresh' : ∀ b ∈ bump, RefreshElimination.IsRefresh
+      (fun m : Channels.MemoryMsg (ZMod p) => (Semantics.MemoryMsg.locOf m, m.value))
+      Semantics.MemoryMsg.timeNat b := by
+    intro b memberB
+    rw [bumpDef] at memberB
+    obtain ⟨row, rowMem, rfl⟩ := List.mem_map.mp memberB
+    exact bumpRefresh row rowMem
+  have bumpLoc : ∀ b ∈ bump, Semantics.MemoryMsg.locOf
+      (b : Channels.MemoryMsg (ZMod p) × Channels.MemoryMsg (ZMod p)).1 =
+        Semantics.MemoryMsg.locOf b.2 :=
+    fun b memberB => congrArg Prod.fst (bumpRefresh' b memberB).1
+  -- The widened balance in the per-location touch-pair form both generic engines speak.
+  have touchBalance : ∀ loc : Semantics.MemLoc,
+      TimedGrounding.optMS (memoryInitFrontier witness loc) +
+          (touchPairsAt (orderedRows.map touchesOf) loc).map Prod.snd +
+          Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+            (↑(bump.map Prod.snd) : Multiset (Channels.MemoryMsg (ZMod p))) =
+        TimedGrounding.optMS (memoryFinalizeFrontier witness loc) +
+          (touchPairsAt (orderedRows.map touchesOf) loc).map Prod.fst +
+          Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+            (↑(bump.map Prod.fst) : Multiset (Channels.MemoryMsg (ZMod p))) := by
+    intro loc
+    have alignedPushEq : ∀ decoded ∈ orderedRows,
+        (alignedRow decoded).memPushes = (touchesOf decoded).map Prod.snd := fun _ _ => rfl
+    have alignedPullEq : ∀ decoded ∈ orderedRows,
+        (alignedRow decoded).memPulls = (touchesOf decoded).map Prod.fst := fun _ _ => rfl
+    have pushBridge := pushesAt_of_touchLists orderedRows alignedRow touchesOf alignedPushEq loc
+    have pullBridge := pullsAt_of_touchLists orderedRows alignedRow touchesOf alignedPullEq
+      (fun d hd tc htc => ((touchesOf_spec d hd).2.1 tc htc).loc_eq) loc
+    rw [bumpSnd, bumpFst, ← pushBridge, ← pullBridge]
+    exact widened loc
+  -- Eliminate the refresh pairs and realize the rewritten pulls row by row.
+  obtain ⟨ts', finalFrontier, rewritten, refreshFreeBalance, finalRewrite⟩ :=
+    exists_refreshFreeTouchLists
+      (fun m : Channels.MemoryMsg (ZMod p) => (Semantics.MemoryMsg.locOf m, m.value))
+      Semantics.MemoryMsg.timeNat (orderedRows.map touchesOf) (memoryInitFrontier witness)
+      (memoryFinalizeFrontier witness) bump bumpRefresh' bumpLoc touchBalance
+  have lengthEq : orderedRows.length = ts'.length := by
+    have := rewritten.length_eq
+    rwa [List.length_map] at this
+  set pairs : List (DecodedInstructionRow p × List (TimedGrounding.Touch p)) :=
+    orderedRows.zip ts' with pairsDef
+  have pairsFst : pairs.map Prod.fst = orderedRows := List.map_fst_zip (le_of_eq lengthEq)
+  have pairsSnd : pairs.map Prod.snd = ts' := List.map_snd_zip (le_of_eq lengthEq.symm)
+  have pairFacts : ∀ q ∈ pairs, q.1 ∈ orderedRows ∧
+      List.Forall₂ PullRewrite (touchesOf q.1) q.2 := by
+    intro q memberQ
+    refine ⟨pairsFst ▸ List.mem_map_of_mem memberQ, ?_⟩
+    have zipMem : ((touchesOf q.1, q.2) :
+        List (TimedGrounding.Touch p) × List (TimedGrounding.Touch p)) ∈
+        (orderedRows.map touchesOf).zip ts' := by
+      rw [List.zip_map_left, ← pairsDef]
+      exact List.mem_map_of_mem memberQ
+    exact (List.forall₂_zip rewritten zipMem).imp fun _ _ h => pullRewrite_of_touchRewrite h
+  have rewrittenLoc : ∀ q ∈ pairs, ∀ tc ∈ q.2,
+      Semantics.MemoryMsg.locOf (tc : TimedGrounding.Touch p).2 =
+        Semantics.MemoryMsg.locOf (tc : TimedGrounding.Touch p).1.1 := by
+    intro q memberQ tc touchMem
+    obtain ⟨rowMem, rewrite⟩ := pairFacts q memberQ
+    obtain ⟨tc₀, touchMem₀, hread, hpush, hloc, -, -⟩ :=
+      TimedGrounding.forall₂_exists_left rewrite tc touchMem
+    rw [hpush, hloc]
+    exact ((touchesOf_spec q.1 rowMem).2.1 tc₀ touchMem₀).loc_eq
+  -- The carrier actually fed to the walk: the rewritten touches, with the State edge re-spelled in
+  -- the canonical limbs the trail walks.
+  set walkRow : DecodedInstructionRow p × List (TimedGrounding.Touch p) → Semantics.RowFacts p :=
+    fun q => TimedGrounding.stateRespell
+      (TimedGrounding.alignedOf (q.1.ordinaryRowFacts witness.data) q.2)
+      (canonState (decodedStateEdge witness.data q.1).1)
+      (canonState (decodedStateEdge witness.data q.1).2) with walkRowDef
+  have valueAligned : ∀ q ∈ pairs,
+      TimedGrounding.ValueAligned (walkRow q) (q.1.ordinaryRowFacts witness.data) := by
+    intro q memberQ
+    obtain ⟨rowMem, rewrite⟩ := pairFacts q memberQ
+    exact valueAligned_stateRespell
+      (valueAligned_alignedOf_pullRewrite _ _ _ rewrite ((touchesOf_spec q.1 rowMem).1)
+        (ordinaryPullGood q.1 rowMem))
+      (canonTimePull q.1 rowMem) (canonPcPull q.1 rowMem) (canonTimePush q.1 rowMem)
+      (canonPcPush q.1 rowMem)
   have engineFacts : ∀ decoded ∈ orderedRows,
       Semantics.LocalStepFact statement.program initial (Commit.initClkNat witness.data)
           (decoded.ordinaryRowFacts witness.data) ∧
@@ -608,122 +778,106 @@ theorem supportedCore_orderedRows_dynamic_of_obligations
       (sourceFacts decoded decodedMem).1 (sourceFacts decoded decodedMem).2 statement.program
       (decodeAt decoded decodedMem) initial (Commit.initClkNat witness.data)
       boundary.codeMemoryCompatible
-  have stepFacts : ∀ row ∈ orderedRows.map walkRow,
+  have stepFacts : ∀ row ∈ pairs.map walkRow,
       Semantics.LocalStepFact statement.program initial (Commit.initClkNat witness.data) row := by
     intro row rowMem
-    obtain ⟨decoded, decodedMem, rfl⟩ := List.mem_map.mp rowMem
-    exact TimedGrounding.localStepFact_stateRespell (canonTimePull decoded decodedMem)
-      (canonPcPull decoded decodedMem) (canonTimePush decoded decodedMem)
-      (canonPcPush decoded decodedMem)
-      (TimedGrounding.localStepFact_align_of_ordinary (aligns decoded decodedMem)
-        (engineFacts decoded decodedMem).1)
-  have frameFacts : ∀ row ∈ orderedRows.map walkRow,
+    obtain ⟨q, memberQ, rfl⟩ := List.mem_map.mp rowMem
+    exact TimedGrounding.localStepFact_valueAligned_of_ordinary (valueAligned q memberQ)
+      (engineFacts q.1 (pairFacts q memberQ).1).1
+  have frameFacts : ∀ row ∈ pairs.map walkRow,
       TimedGrounding.FrameFact statement.program initial (Commit.initClkNat witness.data) row := by
     intro row rowMem
-    obtain ⟨decoded, decodedMem, rfl⟩ := List.mem_map.mp rowMem
-    exact TimedGrounding.frameFact_stateRespell (canonTimePull decoded decodedMem)
-      (canonPcPull decoded decodedMem) (canonTimePush decoded decodedMem)
-      (TimedGrounding.frameFact_align_of_ordinary (aligns decoded decodedMem)
-        (engineFacts decoded decodedMem).2)
-  have rowOKcanon : ∀ row ∈ orderedRows.map walkRow,
+    obtain ⟨q, memberQ, rfl⟩ := List.mem_map.mp rowMem
+    exact TimedGrounding.frameFact_valueAligned_of_ordinary (valueAligned q memberQ)
+      (engineFacts q.1 (pairFacts q memberQ).1).2
+  have rowOK : ∀ row ∈ pairs.map walkRow,
       TimedGrounding.RowOK (Commit.initClkNat witness.data) row := by
     intro row rowMem
-    obtain ⟨decoded, decodedMem, rfl⟩ := List.mem_map.mp rowMem
-    exact TimedGrounding.rowOK_stateRespell (canonTimePull decoded decodedMem)
-      (canonTimePush decoded decodedMem) (rowOK _ (List.mem_map_of_mem decodedMem))
+    obtain ⟨q, memberQ, rfl⟩ := List.mem_map.mp rowMem
+    obtain ⟨decodedMem, rewrite⟩ := pairFacts q memberQ
+    have evidence := touchesOf_spec q.1 decodedMem
+    refine TimedGrounding.rowOK_stateRespell (canonTimePull q.1 decodedMem)
+      (canonTimePush q.1 decodedMem) ?_
+    refine rowOK_alignedOf_pullRewrite (Commit.initClkNat witness.data)
+      (q.1.ordinaryRowFacts witness.data) (touchesOf q.1) q.2 rewrite ?_ ?_ evidence.2.1
+      evidence.2.2.1 evidence.2.2.2.1 ?_
+    · simpa only [DecodedInstructionRow.ordinaryRowFacts_statePull,
+        DecodedInstructionRow.ordinaryRowFacts_statePush, decodedStateEdge] using
+        timeStep q.1 decodedMem
+    · have aligned := statePullAlign8_of_stateWalk _ stateWalk timeStepCanon q.1 decodedMem
+      rw [canonTimePull q.1 decodedMem] at aligned
+      rw [boundary.initialClock]
+      simpa only [DecodedInstructionRow.ordinaryRowFacts_statePull, decodedStateEdge,
+        initialBoundaryStateMessage, Semantics.StateMsg.timeNat] using aligned
+    · intro tc touchMem
+      exact evidence.2.2.2.2 tc touchMem (alignedPullGood q.1 decodedMem tc touchMem).1
   have stateBalance :
       initialBoundaryStateMessage statement.publicValues ::ₘ
-          (↑((orderedRows.map walkRow).map (·.statePush)) :
+          (↑((pairs.map walkRow).map (·.statePush)) :
             Multiset (Channels.StateMsg (ZMod p))) =
         finalBoundaryStateMessage statement.publicValues ::ₘ
-          ↑((orderedRows.map walkRow).map (·.statePull)) := by
-    have pushMap : (orderedRows.map walkRow).map (·.statePush) =
+          ↑((pairs.map walkRow).map (·.statePull)) := by
+    have pushMap : (pairs.map walkRow).map (·.statePush) =
         orderedRows.map (fun decoded =>
           (canonState (decodedStateEdge witness.data decoded).1,
            canonState (decodedStateEdge witness.data decoded).2).2) := by
-      simp only [List.map_map]
-      apply List.map_congr_left
-      intro decoded decodedMem
+      rw [← pairsFst, List.map_map, List.map_map]
       rfl
-    have pullMap : (orderedRows.map walkRow).map (·.statePull) =
+    have pullMap : (pairs.map walkRow).map (·.statePull) =
         orderedRows.map (fun decoded =>
           (canonState (decodedStateEdge witness.data decoded).1,
            canonState (decodedStateEdge witness.data decoded).2).1) := by
-      simp only [List.map_map]
-      apply List.map_congr_left
-      intro decoded decodedMem
+      rw [← pairsFst, List.map_map, List.map_map]
       rfl
     rw [pushMap, pullMap]
     exact endpointBalance_of_stateWalk _ stateWalk
   have memoryBalance : ∀ loc : Semantics.MemLoc,
       TimedGrounding.optMS (memoryInitFrontier witness loc) +
-          TimedGrounding.pushesAt (orderedRows.map walkRow) loc =
-        TimedGrounding.optMS (memoryFinalizeFrontier witness loc) +
-          TimedGrounding.pullsAt (orderedRows.map walkRow) loc := by
+          TimedGrounding.pushesAt (pairs.map walkRow) loc =
+        TimedGrounding.optMS (finalFrontier loc) +
+          TimedGrounding.pullsAt (pairs.map walkRow) loc := by
     intro loc
-    have widened := memoryBalance_of_alignsWith witness balanced
-      obligations.memoryMultiplicityBinary
-      (initPure witness constraints) (finPure witness constraints) boundary.memoryProviderUnique
-      boundary.memoryFinalizeProviderUnique obligations.paddingMemoryEmpty orderedRows exhaustive
-      alignedRow aligns loc
-    -- The MemoryBump contributions are the active bump rows' refreshed pushes and old-record
-    -- pulls; under the disclosed `SupportedCoreNoMemoryRefreshRelation` scope restriction there are
-    -- no active bump rows, so both filtered multisets are empty and the widened balance is already
-    -- the refresh-free one the walk consumes.
-    rw [memoryBump_producedMessages_eq witness constraints,
-      memoryBump_consumedMessages_eq witness constraints,
-      show realMemoryBumpRows witness = [] from memoryTimestampRange.2] at widened
-    simp only [List.map_nil, Multiset.coe_nil, Multiset.filter_zero, add_zero] at widened
-    -- Re-spelling the State edge leaves every memory projection untouched.
-    have hpush : TimedGrounding.pushesAt (orderedRows.map walkRow) loc =
-        TimedGrounding.pushesAt (orderedRows.map alignedRow) loc := by
-      simp only [TimedGrounding.pushesAt, List.map_map]
-      exact congrArg List.sum (List.map_congr_left fun decoded _ => rfl)
-    have hpull : TimedGrounding.pullsAt (orderedRows.map walkRow) loc =
-        TimedGrounding.pullsAt (orderedRows.map alignedRow) loc := by
-      simp only [TimedGrounding.pullsAt, List.map_map]
-      exact congrArg List.sum (List.map_congr_left fun decoded _ => rfl)
-    rw [hpush, hpull]
-    exact widened
-  have liveAtHead : TimedGrounding.LiveOK initial (Commit.initClkNat witness.data)
-      (Semantics.StateMsg.timeNat (initialBoundaryStateMessage statement.publicValues))
-      (memoryInitFrontier witness) := by
-    have headTime : Semantics.StateMsg.timeNat
-        (initialBoundaryStateMessage statement.publicValues) = Commit.initClkNat witness.data := by
-      simpa only [initialBoundaryStateMessage, Semantics.StateMsg.timeNat] using
-        boundary.initialClock.symm
-    rw [headTime]
-    exact memoryInit_liveOK constraints boundary
+    have walkPushEq : ∀ q ∈ pairs, (walkRow q).memPushes = (Prod.snd q).map Prod.snd :=
+      fun _ _ => rfl
+    have walkPullEq : ∀ q ∈ pairs, (walkRow q).memPulls = (Prod.snd q).map Prod.fst :=
+      fun _ _ => rfl
+    have pushBridge := pushesAt_of_touchLists pairs walkRow Prod.snd walkPushEq loc
+    have pullBridge := pullsAt_of_touchLists pairs walkRow Prod.snd walkPullEq rewrittenLoc loc
+    rw [pushBridge, pullBridge, pairsSnd]
+    exact refreshFreeBalance loc
   have walked := TimedGrounding.walk statement.program initial (Commit.initClkNat witness.data)
-    (finalBoundaryStateMessage statement.publicValues) (memoryFinalizeFrontier witness)
-    orderedRows.length (orderedRows.map walkRow)
+    (finalBoundaryStateMessage statement.publicValues) finalFrontier
+    (pairs.map walkRow).length (pairs.map walkRow)
     (initialBoundaryStateMessage statement.publicValues) (memoryInitFrontier witness)
-    (by simp only [List.length_map]) stepFacts frameFacts rowOKcanon boundary.localStateTruth
+    rfl stepFacts frameFacts rowOK boundary.localStateTruth
     liveAtHead stateBalance memoryBalance
-  refine ⟨?_, walked.2.1, fun loc m finEq => ⟨m, rfl, rfl, Nat.le_refl _, walked.2.2 loc m finEq⟩⟩
-  intro done decoded suffix rowsEq state chain
-  have decodedMem : decoded ∈ orderedRows := by
-    rw [rowsEq]
-    exact List.mem_append_right done List.mem_cons_self
-  have groundedAligned : TimedGrounding.Grounded statement.program initial
-      (Commit.initClkNat witness.data) (alignedRow decoded) :=
-    TimedGrounding.grounded_of_stateRespell (canonTimePull decoded decodedMem)
-      (canonPcPull decoded decodedMem)
-      (walked.1 (walkRow decoded) (List.mem_map_of_mem decodedMem))
-  have groundedOrdinary := TimedGrounding.grounded_ordinary_of_aligned
-    (aligns decoded decodedMem) groundedAligned
-  have rowTimeRaw := statePullTime_of_stateWalk _ stateWalk timeStepCanon done decoded
-    suffix rowsEq
-  rw [canonTimePull decoded decodedMem] at rowTimeRaw
-  have rowTime : Semantics.StateMsg.timeNat
-      (statePullMessage (decoded.toChipRow witness.data)) =
-        Commit.initClkNat witness.data + 8 * done.length := by
-    rw [boundary.initialClock]
-    simpa only [decodedStateEdge, initialBoundaryStateMessage, Semantics.StateMsg.timeNat] using rowTimeRaw
-  exact decoded.dynamicGrounded_of_contracts witness constraints balanced
-    (sourceFacts decoded decodedMem).1 (contractAt decoded decodedMem) statement.program initial state
-    (Commit.initClkNat witness.data) done.length (decodeAt decoded decodedMem) groundedOrdinary chain
-    (sourceFacts decoded decodedMem).2 rowTime
+  refine ⟨?_, walked.2.1, fun loc m finEq => ?_⟩
+  · intro done decoded suffix rowsEq state chain
+    have decodedMem : decoded ∈ orderedRows := by
+      rw [rowsEq]
+      exact List.mem_append_right done List.mem_cons_self
+    obtain ⟨q, memberQ, rfl⟩ : ∃ q ∈ pairs, q.1 = decoded := by
+      obtain ⟨q, memberQ, hq⟩ := List.mem_map.mp (pairsFst ▸ decodedMem :
+        decoded ∈ pairs.map Prod.fst)
+      exact ⟨q, memberQ, hq⟩
+    have weak := TimedGrounding.weakGrounded_ordinary_of_valueAligned (valueAligned q memberQ)
+      (walked.1 (walkRow q) (List.mem_map_of_mem memberQ))
+    have rowTimeRaw := statePullTime_of_stateWalk _ stateWalk timeStepCanon done q.1
+      suffix rowsEq
+    rw [canonTimePull q.1 decodedMem] at rowTimeRaw
+    have rowTime : Semantics.StateMsg.timeNat
+        (statePullMessage (q.1.toChipRow witness.data)) =
+          Commit.initClkNat witness.data + 8 * done.length := by
+      rw [boundary.initialClock]
+      simpa only [decodedStateEdge, initialBoundaryStateMessage, Semantics.StateMsg.timeNat] using
+        rowTimeRaw
+    exact q.1.dynamicGrounded_of_weakCurrency witness constraints balanced
+      (sourceFacts q.1 decodedMem).1 (contractAt q.1 decodedMem) statement.program initial state
+      (Commit.initClkNat witness.data) done.length (decodeAt q.1 decodedMem) weak.2 chain
+      (sourceFacts q.1 decodedMem).2 rowTime
+  · obtain ⟨m', frontierEq, valueEq, timeLe⟩ := finalRewrite loc m finEq
+    exact ⟨m', congrArg Prod.fst valueEq, congrArg Prod.snd valueEq, timeLe,
+      walked.2.2 loc m' frontierEq⟩
 
 /-- Dynamic grounding over the exact ordered physical rows.
 
@@ -733,7 +887,7 @@ this theorem.  The timed walk and physical-row bridge are fully proved by
 finite `supportedCore_groundingObligations_of_constraints` rollout above. -/
 theorem supportedCore_orderedRows_dynamic
     (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
-    (initial : SailState)
+    (initial : SailState) (publicInputEq : witness.publicInput = statement.publicValues)
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
     (boundary : InitialBoundaryFacts statement witness initial)
     (memoryTimestampRange :
@@ -756,8 +910,9 @@ theorem supportedCore_orderedRows_dynamic
         ∃ m', Semantics.MemoryMsg.locOf m' = Semantics.MemoryMsg.locOf m ∧
           m'.value = m.value ∧ Semantics.MemoryMsg.timeNat m' ≤ Semantics.MemoryMsg.timeNat m ∧
           Semantics.LocalMemTruth initial (Commit.initClkNat witness.data) m') := by
-  exact supportedCore_orderedRows_dynamic_of_obligations statement witness initial constraints balanced
-    boundary memoryTimestampRange (supportedCore_groundingObligations_of_constraints witness constraints)
+  exact supportedCore_orderedRows_dynamic_of_obligations statement witness initial publicInputEq
+    constraints balanced boundary memoryTimestampRange
+    (supportedCore_groundingObligations_of_constraints witness constraints)
     orderedRows exhaustive stateWalk
 
 /-- The sole semantic grounding seam for the supported native slice.
@@ -783,8 +938,8 @@ theorem supported_core_witness_grounding
       (realDecodedInstructionRows witness.data witness.tables) :=
     Multiset.coe_eq_coe.mp exhaustiveMultiset
   have goodness := (witness_stateEdges_goodness witness constraints balanced).1
-  have dyn := supportedCore_orderedRows_dynamic statement witness initial constraints balanced
-    boundary memoryTimestampRange orderedRows exhaustive stateWalk
+  have dyn := supportedCore_orderedRows_dynamic statement witness initial publicInputEq constraints
+    balanced boundary memoryTimestampRange orderedRows exhaustive stateWalk
   refine ⟨orderedRows, exhaustive, ?_, ?_, ?_, dyn.2.1, dyn.2.2⟩
   · simpa [initialBoundaryStateMessage, finalBoundaryStateMessage,
       Semantics.StateMsg.pcBits, supportedPcBits] using

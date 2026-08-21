@@ -199,7 +199,8 @@ Mirror-rust layout under `SP1Clean/`:
 - **`Soundness/`** — the whole-machine layer: per-bus `{State,Byte,Program,Memory}Consistency.lean`;
   `ChipRow.lean` (the `ChipKind` structure-of-functions — each chip registers one `kind`, carrying a
   `name` = its SP1 `MachineAir::name`) + `ChipRegistry.lean` (`allChipKinds`); `SP1Ensemble.lean`
-  (`sp1Ensemble` — a plain Clean `Ensemble`, 25 chips + 13 boundary/provider tables); the timed/ranked
+  (`sp1Ensemble` — a plain Clean `Ensemble`, 25 chips + 15 boundary/provider tables, the last two
+  being the W3 system tables StateBump (position 39) and MemoryBump (38)); the timed/ranked
   grounding engine;
   `WitnessDecode.lean` (the deterministic typed row decoder), `LocalExecution.lean` (grounded ordered
   rows → a genuine shard-local Sail chain), and `AIR.lean` (the honest native witness relation plus

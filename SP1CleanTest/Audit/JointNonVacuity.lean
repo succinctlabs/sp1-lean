@@ -909,19 +909,13 @@ theorem jointWitness_realDecodedInstructionRows_nil :
 
 theorem jointWitness_memoryTimestampRange :
     SupportedCoreMemoryTimestampRangeRelation (p := SP1Prime) stmt jointWitness := by
-  refine ⟨?_, ?_⟩
-  · intro decoded mem
-    rw [show jointWitness.data = anchorData from rfl,
-      jointWitness_realDecodedInstructionRows_nil] at mem
-    exact absurd mem (List.not_mem_nil)
-  · -- The joint shard's MemoryBump table (stable position 38) carries no rows at all, so it
-    -- trivially carries no *active* refresh row: the W3 scope restriction is satisfied, not
-    -- dodged (the anchor still exhibits a genuine witness of the whole relation).
-    show realMemoryBumpRows jointWitness = []
-    rw [realMemoryBumpRows,
-      show (memoryBumpTable jointWitness).table = [] from
-        jointTables_table_nil_of_ne 38 (by rw [jointTables_length]; omega) (by omega) (by omega)]
-    rfl
+  -- One conjunct since W3 closed the MemoryBump scope restriction: the capstone no longer asks the
+  -- shard's refresh table to be inactive, so only the pulled-timestamp range companion remains —
+  -- vacuous here because the boundary-only shard decodes no instruction row.
+  intro decoded mem
+  rw [show jointWitness.data = anchorData from rfl,
+    jointWitness_realDecodedInstructionRows_nil] at mem
+  exact absurd mem (List.not_mem_nil)
 
 /-! ## The joint witness -/
 
