@@ -66,6 +66,26 @@ theorem timeNat_canonState [Fact (2 ^ 25 < p)] {m : StateMsg (ZMod p)}
   rw [ZMod.val_natCast_of_lt hdiv, ZMod.val_natCast_of_lt hmod]
   omega
 
+/-- On a message with genuine 16-bit *upper* pc limbs the re-limbing preserves the 64-bit pc image:
+the three canonical limb values recombine to exactly `StateMsg.pcVal m`, and each canonical limb
+value stays below `p` — `pc0` needs no bound of its own because the top-limb quotient
+`pcVal / 2^32` stays below `p` once `pc1`/`pc2` are 16-bit (`pcVal < p + 2^48 < p · 2^32`).  This
+is the pc companion of `timeNat_canonState`, consumed by the capstone's `PcWalk` transport. -/
+theorem pcBits_canonState [Fact (2 ^ 25 < p)] {m : StateMsg (ZMod p)}
+    (hpc1 : m.pc1.val < 2 ^ 16) (hpc2 : m.pc2.val < 2 ^ 16) :
+    Semantics.StateMsg.pcBits (canonState m) = Semantics.StateMsg.pcBits m := by
+  have hp := Fact.out (p := 2 ^ 25 < p)
+  have hpc0 : m.pc0.val < p := ZMod.val_lt _
+  have hval : StateMsg.pcVal m = m.pc0.val + m.pc1.val * 2 ^ 16 + m.pc2.val * 2 ^ 32 := rfl
+  simp only [Semantics.StateMsg.pcBits, Semantics.pcBits, canonState]
+  set v := StateMsg.pcVal m with hv
+  have h0 : v % 2 ^ 16 < p := lt_trans (Nat.mod_lt _ (by norm_num)) (by omega)
+  have h1 : v / 2 ^ 16 % 2 ^ 16 < p := lt_trans (Nat.mod_lt _ (by norm_num)) (by omega)
+  have h2 : v / 2 ^ 32 < p := by omega
+  rw [ZMod.val_natCast_of_lt h0, ZMod.val_natCast_of_lt h1, ZMod.val_natCast_of_lt h2]
+  congr 1
+  omega
+
 /-- The canonical clock limbs really are canonical: the low limb of any canonicalized message is a
 genuine 24-bit value. -/
 theorem canonState_clk_low_lt [Fact (2 ^ 25 < p)] (m : StateMsg (ZMod p)) :
@@ -74,6 +94,33 @@ theorem canonState_clk_low_lt [Fact (2 ^ 25 < p)] (m : StateMsg (ZMod p)) :
   exact lt_of_le_of_lt
     (le_of_eq (ZMod.val_natCast_of_lt (lt_trans (Nat.mod_lt _ (by norm_num)) (by omega))))
     (Nat.mod_lt _ (by norm_num))
+
+/-- A State message already in canonical limbs is a fixed point of the re-limbing: on genuine
+24-bit clock limbs and 16-bit pc limbs the div/mod recomputation returns exactly the original
+field elements.  This is what identifies the (canonical-by-construction) boundary verifier's
+endpoints with their canonicalized images.  Only the three *lower*-limb bounds are consumed: each
+div/mod identity recovers a limb from the bounds of the limbs below it, and the top limbs
+(`clk_high`, `pc2`) round-trip through `ZMod.val` unconditionally. -/
+theorem canonState_eq_self {m : StateMsg (ZMod p)}
+    (hclkLow : m.clk_low.val < 2 ^ 24)
+    (hpc0 : m.pc0.val < 2 ^ 16) (hpc1 : m.pc1.val < 2 ^ 16) :
+    canonState m = m := by
+  have htime : Semantics.StateMsg.timeNat m = m.clk_high.val * 2 ^ 24 + m.clk_low.val := rfl
+  have hpc : StateMsg.pcVal m = m.pc0.val + m.pc1.val * 2 ^ 16 + m.pc2.val * 2 ^ 32 := rfl
+  have h1 : ((Semantics.StateMsg.timeNat m / 2 ^ 24 : ℕ) : ZMod p) = m.clk_high := by
+    rw [show Semantics.StateMsg.timeNat m / 2 ^ 24 = m.clk_high.val by omega,
+      ZMod.natCast_zmod_val]
+  have h2 : ((Semantics.StateMsg.timeNat m % 2 ^ 24 : ℕ) : ZMod p) = m.clk_low := by
+    rw [show Semantics.StateMsg.timeNat m % 2 ^ 24 = m.clk_low.val by omega,
+      ZMod.natCast_zmod_val]
+  have h3 : ((StateMsg.pcVal m % 2 ^ 16 : ℕ) : ZMod p) = m.pc0 := by
+    rw [show StateMsg.pcVal m % 2 ^ 16 = m.pc0.val by omega, ZMod.natCast_zmod_val]
+  have h4 : ((StateMsg.pcVal m / 2 ^ 16 % 2 ^ 16 : ℕ) : ZMod p) = m.pc1 := by
+    rw [show StateMsg.pcVal m / 2 ^ 16 % 2 ^ 16 = m.pc1.val by omega, ZMod.natCast_zmod_val]
+  have h5 : ((StateMsg.pcVal m / 2 ^ 32 : ℕ) : ZMod p) = m.pc2 := by
+    rw [show StateMsg.pcVal m / 2 ^ 32 = m.pc2.val by omega, ZMod.natCast_zmod_val]
+  show (⟨_, _, _, _, _⟩ : StateMsg (ZMod p)) = m
+  rw [h1, h2, h3, h4, h5]
 
 section StateBump
 
@@ -93,7 +140,7 @@ private lemma binary_val {b : ZMod p} (h : b = 0 ∨ b = 1) :
 omit [Fact (2 ^ 17 < p)] in
 /-- Recombination lift: `(x + y * k).val = x.val + y.val * k` once the ℕ result fits below `p`,
 for a constant `k` given by its value equation. -/
-private lemma val_recombine {x y kz : ZMod p} {k : ℕ} (hkz : kz.val = k)
+lemma val_recombine {x y kz : ZMod p} {k : ℕ} (hkz : kz.val = k)
     (hlt : x.val + y.val * k < p) : (x + y * kz).val = x.val + y.val * k := by
   have hmul : (y * kz).val = y.val * k := by
     rw [ZMod.val_mul_of_lt (by rw [hkz]; omega), hkz]
@@ -173,6 +220,40 @@ theorem stateBump_canon_eq [Fact (2 ^ 25 < p)] {r : Inputs (ZMod p)}
       = r.next_pc0.val + r.next_pc1.val * 2 ^ 16 + r.next_pc2.val * 2 ^ 32
     omega
   exact canonState_congr htime hpc
+
+/-- `stateBump_canon_eq` with its goodness hypotheses restated on the *pulled message's* fields.
+The two spellings are definitionally equal, but crossing them at a decoded `valueFromOffset` row
+would ask the unifier to normalize the row decoder; taking the message-level form here, over an
+abstract `r`, performs the crossing once where `r` is opaque
+(`docs/agents/perf-findings.md` §1). -/
+theorem stateBump_canon_eq_of_pulled_good [Fact (2 ^ 25 < p)] {r : Inputs (ZMod p)}
+    (hspec : Spec r) (hreal : r.is_real = 1)
+    (hgood_clk : (StateBumpChip.pulledMessage r).clk_high.val < 2 ^ 24)
+    (hgood_pc1 : (StateBumpChip.pulledMessage r).pc1.val < 2 ^ 16)
+    (hgood_pc2 : (StateBumpChip.pulledMessage r).pc2.val < 2 ^ 16) :
+    canonState (StateBumpChip.pulledMessage r) = canonState (StateBumpChip.pushedMessage r) :=
+  stateBump_canon_eq hspec hreal hgood_clk hgood_pc1 hgood_pc2
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The pushed message of a real StateBump row is good by construction: its re-limbed `clk_high`
+is a genuine 24-bit value and its upper pc limbs are 16-bit — the `Spec`'s in-circuit range
+checks, hoisted onto the message projections.  These are the goodness filter's consumer-target
+facts for the bump edges in both passes. -/
+theorem stateBump_pushedMessage_good [Fact (2 ^ 25 < p)] {r : Inputs (ZMod p)}
+    (hspec : Spec r) (hreal : r.is_real = 1) :
+    (StateBumpChip.pushedMessage r).clk_high.val < 2 ^ 24 ∧
+      (StateBumpChip.pushedMessage r).pc1.val < 2 ^ 16 ∧
+      (StateBumpChip.pushedMessage r).pc2.val < 2 ^ 16 := by
+  have hp25 := Fact.out (p := 2 ^ 25 < p)
+  obtain ⟨-, -, -, hgated⟩ := hspec
+  obtain ⟨-, -, h2432, h3248, -, hpc1, hpc2, -, -⟩ := hgated hreal
+  refine ⟨?_, hpc1, hpc2⟩
+  have v256 : ((256 : ZMod p)).val = 256 := by
+    rw [show ((256 : ZMod p)) = ((256 : ℕ) : ZMod p) by norm_cast,
+      ZMod.val_natCast_of_lt (by omega)]
+  show (r.next_clk_24_32 + r.next_clk_32_48 * 256).val < 2 ^ 24
+  rw [val_recombine v256 (by omega)]
+  omega
 
 end StateBump
 

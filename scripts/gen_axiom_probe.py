@@ -80,7 +80,7 @@ TARGETS = [
     ("SP1Clean/Soundness/SP1Ensemble.lean",
      r"(?:theorem|def)\s+((?:sp1|balanced)\w*)\b"),
     ("SP1Clean/Soundness/AIR.lean",
-     r"theorem\s+(statePullAlign8_of_decodedStateWalk|"
+     r"theorem\s+(statePullAlign8_of_stateWalk|"
      r"supportedCore_groundingObligations_of_constraints|"
      r"supportedCore_orderedRows_dynamic_of_obligations|"
      r"supportedCore_orderedRows_dynamic|supported_core_witness_grounding|"

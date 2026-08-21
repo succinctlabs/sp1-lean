@@ -6,6 +6,8 @@ import SP1Clean.Proofs.Chips.ByteChip.RangeChip
 import SP1Clean.Proofs.Chips.ProgramProviderChip
 import SP1Clean.Proofs.Chips.MemoryProviderChip
 import SP1Clean.Proofs.Chips.MemoryFinalizeChip
+import SP1Clean.Proofs.Chips.StateBumpChip.Formal
+import SP1Clean.Proofs.Chips.MemoryBumpChip.Formal
 import SP1Clean.FormalModel.Contracts.PublicValues
 import Clean.Air.FlatEnsemble
 
@@ -222,25 +224,30 @@ def sp1Tables : List (Component (ZMod p)) :=
 come from the same entries, so semantic and circuit wiring cannot drift as independent lists. -/
 theorem sp1Tables_length : (sp1Tables (p := p)).length = 25 := rfl
 
-/-- The 13 in-circuit boundary/provider tables: the 10 byte providers (the six `ByteChip` opcode
-tables + the four range tables), the program-ROM provider, and the two memory boundary tables
-(init-push + finalize-pull, W11 Phase 4). Every one proves its pushes' channel `Guarantees`
-in-circuit (`channelsWithGuarantees = []` for the pushers — providers assume nothing), which is what
-grounds the chips' byte/program/memory pulls at the capstone. -/
+/-- The 15 in-circuit boundary/provider tables: the 10 byte providers (the six `ByteChip` opcode
+tables + the four range tables), the program-ROM provider, the two memory boundary tables
+(init-push + finalize-pull, W11 Phase 4), and — W3, external report Finding 2 — the two SP1 system
+tables StateBump (position 38: the clock/pc re-limbing rows that lift the ~2^21-row shard cap and
+the 64 KiB pc-boundary restriction) and MemoryBump (position 39: the register-record timestamp
+refreshes). Every pusher proves its pushes' channel `Guarantees` in-circuit, which is what grounds
+the chips' byte/program/memory pulls at the capstone. -/
 def sp1ProviderTables : List (Component (ZMod p)) :=
   [⟨ByteChip.U8Range.circuit⟩, ⟨ByteChip.MSB.circuit⟩, ⟨ByteChip.AndByte.circuit⟩,
    ⟨ByteChip.OrByte.circuit⟩, ⟨ByteChip.XorByte.circuit⟩, ⟨ByteChip.Ltu.circuit⟩,
    ⟨RangeChip.circuit8⟩, ⟨RangeChip.circuit13⟩, ⟨RangeChip.circuit14⟩, ⟨RangeChip.circuit16⟩,
    ⟨ProgramProviderChip.circuit⟩,
-   ⟨MemoryProviderChip.circuit⟩, ⟨MemoryFinalizeChip.circuit⟩]
+   ⟨MemoryProviderChip.circuit⟩, ⟨MemoryFinalizeChip.circuit⟩,
+   ⟨MemoryBumpChip.circuit⟩, ⟨StateBumpChip.circuit⟩]
 
-/-- Regression guard: the boundary/provider table count (10 byte + program + 2 memory). -/
-theorem sp1ProviderTables_length : (sp1ProviderTables (p := p)).length = 13 := rfl
+/-- Regression guard: the boundary/provider table count (10 byte + program + 2 memory + 2 bump). -/
+theorem sp1ProviderTables_length : (sp1ProviderTables (p := p)).length = 15 := rfl
 
-/-- Boundary/provider circuits do not declare the State channel.  The public State verifier is the
-sole non-instruction contributor to that channel. -/
+/-- Every boundary/provider circuit except the last — the StateBump table at position 39 — stays
+off the State channel; StateBump is, by design, the sole provider-segment State contributor.
+Stated over the `take 14` prefix so the typed State decomposition can split the provider tail into
+a nil prefix and the bump table. -/
 theorem sp1ProviderTables_stateChannel_not_mem :
-    ∀ component ∈ sp1ProviderTables (p := p),
+    ∀ component ∈ (sp1ProviderTables (p := p)).take 14,
       Channels.stateChannel.toRaw ∉ component.circuit.channels := by
   intro component componentMem
   fin_cases componentMem <;>
@@ -250,7 +257,7 @@ theorem sp1ProviderTables_stateChannel_not_mem :
       RangeChip.circuit8, RangeChip.circuit13, RangeChip.circuit14, RangeChip.circuit16,
       RangeChip.circuit,
       ProgramProviderChip.circuit, MemoryProviderChip.circuit, MemoryFinalizeChip.circuit,
-      circuit_norm]
+      MemoryBumpChip.circuit, circuit_norm]
 
 /-- **The SP1 machine as a plain Clean `Ensemble`**: the 25 chips + the 13 boundary/provider tables,
 the four gated buses (State first — the trail's main channel), and the pull-final/push-init boundary
@@ -285,7 +292,7 @@ theorem witness_instructionTables_aligned
       (witness.tables.take 25) := by
   unfold InstructionTablesAligned
   rw [List.forall₂_iff_get]
-  have tablesLength : witness.tables.length = 38 := by
+  have tablesLength : witness.tables.length = 40 := by
     rw [← witness.same_length]
     rfl
   constructor

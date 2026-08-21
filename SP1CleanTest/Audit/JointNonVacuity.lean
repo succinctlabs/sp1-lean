@@ -178,7 +178,7 @@ theorem emptyTables_data : ∀ t ∈ emptyTables, t.data = anchorData := by
   obtain ⟨c, -, rfl⟩ := List.mem_map.mp ht
   rfl
 
-theorem emptyTables_length : emptyTables.length = 38 := by
+theorem emptyTables_length : emptyTables.length = 40 := by
   simp only [emptyTables, List.length_map, sp1Ensemble_tables, List.length_append]
   rfl
 
@@ -216,7 +216,7 @@ theorem mem_jointTables {t : Table (ZMod SP1Prime)} (ht : t ∈ jointTables) :
     exacts [Or.inl h, Or.inr (Or.inl rfl)]
   · exact Or.inr (Or.inr rfl)
 
-theorem jointTables_length : jointTables.length = 38 := by
+theorem jointTables_length : jointTables.length = 40 := by
   simp only [jointTables, List.length_set]
   exact emptyTables_length
 
@@ -909,10 +909,19 @@ theorem jointWitness_realDecodedInstructionRows_nil :
 
 theorem jointWitness_memoryTimestampRange :
     SupportedCoreMemoryTimestampRangeRelation (p := SP1Prime) stmt jointWitness := by
-  intro decoded mem
-  rw [show jointWitness.data = anchorData from rfl,
-    jointWitness_realDecodedInstructionRows_nil] at mem
-  exact absurd mem (List.not_mem_nil)
+  refine ⟨?_, ?_⟩
+  · intro decoded mem
+    rw [show jointWitness.data = anchorData from rfl,
+      jointWitness_realDecodedInstructionRows_nil] at mem
+    exact absurd mem (List.not_mem_nil)
+  · -- The joint shard's MemoryBump table (stable position 38) carries no rows at all, so it
+    -- trivially carries no *active* refresh row: the W3 scope restriction is satisfied, not
+    -- dodged (the anchor still exhibits a genuine witness of the whole relation).
+    show realMemoryBumpRows jointWitness = []
+    rw [realMemoryBumpRows,
+      show (memoryBumpTable jointWitness).table = [] from
+        jointTables_table_nil_of_ne 38 (by rw [jointTables_length]; omega) (by omega) (by omega)]
+    rfl
 
 /-! ## The joint witness -/
 

@@ -62,6 +62,16 @@ theorem endpointBalanced_map {Vertex' : Type _} (f : Vertex → Vertex')
   have mapped := congrArg (Multiset.map f) balanced
   simpa only [Multiset.map_cons, Multiset.map_map, Function.comp_def] using mapped
 
+/-- **Edge-label transport.** An endpoint balance over mapped edge labels is a balance over the
+original labels with the composed edge map — the step that carries the canonicalized pair balance
+back onto the decoded instruction rows that denote those pairs. -/
+theorem endpointBalanced_of_map {Edge' : Type*} (g : Edge' → Edge)
+    (edges : Multiset Edge') (edge : Edge → Vertex × Vertex) (initial final : Vertex)
+    (balanced : EndpointBalanced (edges.map g) edge initial final) :
+    EndpointBalanced edges (fun e => edge (g e)) initial final := by
+  unfold EndpointBalanced at balanced ⊢
+  simpa only [Multiset.map_map, Function.comp_def] using balanced
+
 section Filter
 
 variable (edge : Edge → Vertex × Vertex) (Good : Vertex → Prop) (rank : Vertex → ℕ)

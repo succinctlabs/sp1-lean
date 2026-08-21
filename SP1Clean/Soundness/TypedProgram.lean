@@ -794,7 +794,7 @@ interactions.  This is positional on purpose: it connects the stable witness ind
 `ProgramProviderBound` to the exact Clean ensemble layout. -/
 theorem witness_nonProgramProviderTable_programInteractions_eq_nil
     (witness : EnsembleWitness (sp1Ensemble (p := p))) (i : ℕ)
-    (lower : 25 ≤ i) (upper : i < 38) (witnessBound : i < witness.tables.length)
+    (lower : 25 ≤ i) (upper : i < 40) (witnessBound : i < witness.tables.length)
     (notProgram : i ≠ programProviderIndex) :
     typedTableInteractionsWith witness.tables[i] programChannel = [] := by
   apply List.map_eq_nil_iff.mp
@@ -822,6 +822,15 @@ theorem witness_nonProgramProviderTable_programInteractions_eq_nil
      simp [Channels.programChannel_eq_byteChannel_false])
   | (change programChannel.toRaw ∉ [memoryChannel.toRaw];
      simp [Channels.programChannel_eq_memoryChannel_false])
+  | (change programChannel.toRaw ∉
+       [(byteChannel (p := p)).toRaw, (memoryChannel (p := p)).toRaw,
+        (memoryChannel (p := p)).toRaw];
+     simp [Channels.programChannel_eq_byteChannel_false,
+       Channels.programChannel_eq_memoryChannel_false])
+  | (change programChannel.toRaw ∉
+       [(byteChannel (p := p)).toRaw, (Channels.stateChannel (p := p)).toRaw];
+     simp [Channels.programChannel_eq_byteChannel_false,
+       Channels.programChannel_eq_stateChannel_false])
 
 /-- The whole provider suffix's Program interactions are exactly those of the physical table at the
 stable Program-provider index.  No semantic property is used here; this is a structural consequence
@@ -832,7 +841,7 @@ theorem witness_providerProgramInteractions_eq
     (witness.tables.drop 25).flatMap
         (typedTableInteractionsWith · programChannel) =
       typedTableInteractionsWith table programChannel := by
-  have tablesLength : witness.tables.length = 38 := by
+  have tablesLength : witness.tables.length = 40 := by
     rw [← witness.same_length]
     rfl
   have tableAt35 := tableAt
@@ -852,6 +861,8 @@ theorem witness_providerProgramInteractions_eq
     List.drop_eq_getElem_cons (i := 35) (by omega),
     List.drop_eq_getElem_cons (i := 36) (by omega),
     List.drop_eq_getElem_cons (i := 37) (by omega),
+    List.drop_eq_getElem_cons (i := 38) (by omega),
+    List.drop_eq_getElem_cons (i := 39) (by omega),
     List.drop_eq_nil_of_le (by omega)]
   simp only [List.flatMap_cons, List.flatMap_nil, List.append_nil]
   rw [witness_nonProgramProviderTable_programInteractions_eq_nil witness 25 (by omega)
@@ -877,6 +888,10 @@ theorem witness_providerProgramInteractions_eq
     witness_nonProgramProviderTable_programInteractions_eq_nil witness 36 (by omega)
       (by omega) (by omega) (by simp [programProviderIndex]),
     witness_nonProgramProviderTable_programInteractions_eq_nil witness 37 (by omega)
+      (by omega) (by omega) (by simp [programProviderIndex]),
+    witness_nonProgramProviderTable_programInteractions_eq_nil witness 38 (by omega)
+      (by omega) (by omega) (by simp [programProviderIndex]),
+    witness_nonProgramProviderTable_programInteractions_eq_nil witness 39 (by omega)
       (by omega) (by omega) (by simp [programProviderIndex])]
   simp
 

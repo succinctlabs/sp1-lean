@@ -450,6 +450,8 @@ import SP1Clean.Soundness.RankedGrounding
 import SP1Clean.Soundness.GoodnessFilter
 import SP1Clean.Soundness.RefreshElimination
 import SP1Clean.Soundness.StateCanon
+import SP1Clean.Soundness.BumpDecode
+import SP1Clean.Soundness.StatePcClass
 import SP1Clean.Soundness.TouchChains
 import SP1Clean.Soundness.TimedGrounding
 import SP1Clean.Soundness.AlignedCarrier

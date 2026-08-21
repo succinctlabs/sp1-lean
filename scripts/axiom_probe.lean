@@ -339,7 +339,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.sp1ProviderTables_stateChannel_not_mem
 #print axioms SP1Clean.Soundness.sp1Ensemble
 #print axioms SP1Clean.Soundness.supportedCore_groundingObligations_of_constraints
-#print axioms SP1Clean.Soundness.statePullAlign8_of_decodedStateWalk
+#print axioms SP1Clean.Soundness.statePullAlign8_of_stateWalk
 #print axioms SP1Clean.Soundness.supportedCore_orderedRows_dynamic_of_obligations
 #print axioms SP1Clean.Soundness.supportedCore_orderedRows_dynamic
 #print axioms SP1Clean.Soundness.supported_core_witness_grounding
