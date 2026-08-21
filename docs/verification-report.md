@@ -45,7 +45,18 @@ The deliverables:
 - **D6 — Conformance testing against the real prover.** A dump-anchored pipeline reconstructs
   every event row of all 25 chips from the circuits' own witness generators and matches it
   cell-for-cell against full trace matrices dumped from SP1's actual Rust prover at SP1's field,
-  with an independent Rust interpreter differential on top (§9).
+  with an independent Rust interpreter differential on top (§9). **Scope of that claim:** it is a
+  *row/witness-generation* agreement, not a claim that every dumped row is a decoded-program
+  execution row. The W4 completeness rollout surfaced a concrete instance: `export/sp1dump/
+  UType.dump.json` contains rows whose `op_b` is `imm << 12` *without* the 64-bit sign extension
+  (e.g. `0xFFFFF000`). Such a row cannot come from a decoded instruction — SP1's own
+  `Instruction::encode` asserts `validate_sign_extension(op_b >> 12, 20)` on the UType branch — and
+  it does not satisfy `UTypeChip.ProverAssumptions`' decode conjunct
+  (`toBitVec64 op_b_imm = RV64.lui (immOf adapter)`). This is consistent rather than contradictory:
+  SP1's UType AIR genuinely does not constrain the high limbs, and the chip's contract already
+  labels that relation a trace/program-ROM guarantee rather than an in-circuit one. The practical
+  consequence is that such synthetic rows sit inside the row-level conformance claim and outside
+  the semantic one.
 - **D7 — A reproducible audit harness.** One script (`scripts/run_audit.sh`) re-derives the
   dependency pins, gates zero proof deferrals with an empty allowlist, and regenerates a
   per-theorem `#print axioms` census (§13).
@@ -789,7 +800,7 @@ the mechanism in this tree that addresses it; every citation below is machine-ch
 | LH/LHU/LW/LWU theorems proved the wrong (byte-width) specification; several loads unproved or `sorry`-dependent | All five load chips carry closed per-width soundness, completeness, Sail bridges, and whole-chip faithfulness. Width and lane selection are kernel-checked: e.g. `loadHalf_selectedBytes` binds *both* little-endian bytes at `ea`/`ea+1` against the width-2 Sail read, and `loadByte_selectedMemoryByte` closes all eight lane cases (`SP1Clean/Soundness/Grounding/MemoryChips.lean`); sign/zero-extension per variant is constraint-forced (§5.3). Zero `sorry` anywhere is CI-gated. |
 | SLTI's theorem was vacuously true (contradictory hypotheses) | Selector flags are circuit-constrained one-hot (never assumptions); `LtChip.Assumptions` is two operand-range facts only. Beyond structure, `SP1CleanTest/NonVacuityReal.lean` exhibits concrete satisfying `is_real = 1` rows for **every** chip's complete flattened constraint system — for Lt, both a true and a false comparison — as named, census-visible theorems (§9). |
 | LUI and AUIPC had no theorem at all | `UTypeChip` has the full stack: `soundness`/`completeness`/`circuit` (axiom-clean), the bridge family through the registered `advance` (`SP1Clean/Proofs/Chips/UTypeChip/Bridge.lean`), and whole-chip Rust faithfulness `uTypeChip_faithful` (`SP1Clean/Faithful/UTypeChip.lean`) — including RV64 LUI's *sign*-extension and AUIPC's full-width carry. |
-| Four project axioms, including "memory protection disabled" assumed as an axiom | Zero project `axiom` declarations in the main library (CI-gated); zero `sorryAx` across the 520-declaration census. Platform shaping is not assumed per-proof: the Sail model is *generated* with SP1's platform configuration (§3.2), and the supervisor-only scope is a stated structural restriction (§12.6), not an axiom. |
+| Four project axioms, including "memory protection disabled" assumed as an axiom | Zero project `axiom` declarations in the main library (CI-gated); zero `sorryAx` across the 535-declaration census. Platform shaping is not assumed per-proof: the Sail model is *generated* with SP1's platform configuration (§3.2), and the supervisor-only scope is a stated structural restriction (§12.6), not an axiom. |
 | Version pinning and reproducible extraction were absent | Every dependency is an immutable git pin cross-checked by `scripts/check_pins.sh`; extraction is a pin-gated, fail-closed pipeline (§4.1) with byte-idempotency; the audit harness (§13) regenerates the census and fails on drift. |
 | Recommendation: independent adversarial review before public claims | The 2026-07 and 2026-08 release-readiness campaigns (this report's §12 discloses their durable findings) ran blind-derivation adversarial reviews of all 25 chip Specs against the generated Sail model, per-claim validation against upstream sources, and a full file-by-file documentation sweep. |
 

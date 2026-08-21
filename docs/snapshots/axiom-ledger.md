@@ -11,7 +11,7 @@ supports; the figures below cover their union.
 
 ## Result
 
-- 558 released declarations are probed (520 main + 38 test: the 34 real-row satisfiability
+- 573 released declarations are probed (535 main + 38 test: the 34 real-row satisfiability
   anchors of `SP1CleanTest/NonVacuityReal.lean`, the two executable plus one definitional
   anchor of `SP1CleanTest/Audit/OneAddNativePremises.lean`, and the joint non-vacuity anchor
   of `SP1CleanTest/Audit/JointNonVacuity.lean`; the 21 legacy `native_decide`
@@ -21,7 +21,10 @@ supports; the figures below cover their union.
   `FamilyEvidence.total` theorems, plus dotted-name probes the generator previously collapsed;
   the opcode-alphabet cross-check `opcodeTable_matchesExtracted` joined the main scope with the
   extracted `Opcode` discriminant table; the 2026-08-21 pair `stateBumpChip_faithful` /
-  `memoryBumpChip_faithful` are the two W3 system tables' whole-table Rust-oracle anchors).
+  `memoryBumpChip_faithful` are the two W3 system tables' whole-table Rust-oracle anchors; the
+  W4 completeness rollout adds three probes per chip carried through the trace-generation chain —
+  `proverAssumptions_of_event`, `traceTable_constraints`, `traceTable_guarantees` — for `Add`
+  (the pilot) plus tranche 1's `Sub`/`Subw`/`Addi`/`Addw`/`UType`).
   The earlier 476 count fell from 478 because `SailDecode.decode_ADD_example`
   and its sole consumer `Soundness.Target.decodedInROM_addRow` were retired during the toolchain
   migration (see the retirement note in `SP1Clean/Model/SailDecode.lean`).

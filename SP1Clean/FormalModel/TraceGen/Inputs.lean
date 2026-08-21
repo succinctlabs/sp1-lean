@@ -16,7 +16,12 @@ paths relative to the sibling `sp1` checkout):
 - `rTypeReaderCols` ← `RTypeReader::populate` (`crates/core/machine/src/adapter/register/
   r_type.rs`): the three indices, the three access blocks — `op_a` a **write** (whose
   `prev_value` is the displaced content), `op_b`/`op_c` **reads** (whose `prev_value` is the value
-  read) — and the `op_a_0` flag.
+  read) — and the `op_a_0` flag;
+- `iTypeReaderCols` / `aluTypeReaderCols` / `jTypeReaderCols` ← the sibling `populate`s in
+  `i_type.rs` / `alu_type.rs` / `j_type.rs`: the same `op_a` write block throughout, with the
+  `op_c` slot replaced by a committed immediate word (`ITypeReader`, `JTypeReader`) or by a word
+  *plus* an access block selected by `imm_c` (`ALUTypeReader`), and with `op_b` dropped entirely
+  in the J-type case.
 
 Everything here is a plain total function: no `Classical.choice`, no hint, no environment. The
 *typed* output is the point — `SP1CleanTest/TraceGenTests/EventPopulate.lean` mirrors the same
@@ -24,9 +29,9 @@ populate functions as flat `List F` cell lists for the test library's compiled-e
 conformance battery, which cannot carry a proof obligation; these typed blocks are what the
 reader-contract lemmas of `Readers.lean` are stated over.
 
-The per-chip assembly at the bottom is deliberately trivial (three fields): the two adapter
-blocks, which is where all the content lives, are shared by the whole family, so rolling a new
-R-type chip into this layer costs one `def` here and one `ProverAssumptions` lemma in its
+The per-chip assembly at the bottom is deliberately trivial (three or four fields): the two
+adapter blocks, which is where all the content lives, are shared by the whole family, so rolling a
+new chip into this layer costs one `def` here and one `ProverAssumptions` lemma in its
 `Complete.lean`.
 
 **Field bound.** This layer carries `Fact (2 ^ 24 < p)` (which supplies the project-standard
@@ -141,10 +146,114 @@ lemma rTypeReaderCols_op_b_memory (e : RTypeEvent) :
 lemma rTypeReaderCols_op_c_memory (e : RTypeEvent) :
     (rTypeReaderCols (p := p) e).op_c_memory = registerAccessCols e.c e.prevTsC (e.clk + 2) := rfl
 
+/-! ## The `ITypeReader` block -/
+
+/-- SP1's `ITypeReader::populate`: the two register indices and their access blocks at the
+`MemoryAccessPosition` offsets `A = 4` / `B = 3`, the `rd = x0` flag, and the decoded immediate as
+a committed word (`self.op_c_imm = Word::from(record.op_c)`) — no `op_c` register access. -/
+def iTypeReaderCols (e : ITypeEvent) : Extracted.ITypeReader (ZMod p) where
+  op_a := ((e.opA : ℕ) : ZMod p)
+  op_a_memory := registerAccessCols e.prevA e.prevTsA (e.clk + 4)
+  op_a_0 := if e.opA = 0 then 1 else 0
+  op_b := ((e.opB : ℕ) : ZMod p)
+  op_b_memory := registerAccessCols e.b e.prevTsB (e.clk + 3)
+  op_c_imm := wordOfNat e.imm
+
+lemma iTypeReaderCols_op_a (e : ITypeEvent) :
+    (iTypeReaderCols (p := p) e).op_a = ((e.opA : ℕ) : ZMod p) := rfl
+
+lemma iTypeReaderCols_op_a_0 (e : ITypeEvent) :
+    (iTypeReaderCols (p := p) e).op_a_0 = if e.opA = 0 then 1 else 0 := rfl
+
+lemma iTypeReaderCols_op_a_memory (e : ITypeEvent) :
+    (iTypeReaderCols (p := p) e).op_a_memory
+      = registerAccessCols e.prevA e.prevTsA (e.clk + 4) := rfl
+
+lemma iTypeReaderCols_op_b_memory (e : ITypeEvent) :
+    (iTypeReaderCols (p := p) e).op_b_memory = registerAccessCols e.b e.prevTsB (e.clk + 3) := rfl
+
+lemma iTypeReaderCols_op_c_imm (e : ITypeEvent) :
+    (iTypeReaderCols (p := p) e).op_c_imm = wordOfNat e.imm := rfl
+
+/-! ## The `ALUTypeReader` block -/
+
+/-- SP1's `ALUTypeReader::populate` for the `op_c` slot — the one **row-dependent** block in this
+file. On an immediate row (`imm_c = 1`) the populate copies the committed `op_c` word into
+`prev_value` and zeroes both timestamp columns; on a register row it fills the block from the
+`rs2` read record at `MemoryAccessPosition::C = 2`, exactly as the R-type adapter does. -/
+def aluTypeOpCCols (e : ALUTypeEvent) : Extracted.RegisterAccessCols (ZMod p) :=
+  if e.immC = 1 then
+    { prev_value := wordOfNat e.opC, access_timestamp := { prev_low := 0, diff_low_limb := 0 } }
+  else registerAccessCols e.c e.prevTsC (e.clk + 2)
+
+/-- On a register row the `op_c` block is the ordinary `rs2` read block, so every R-type lemma
+about `registerAccessCols` applies to it verbatim. -/
+lemma aluTypeOpCCols_of_reg {e : ALUTypeEvent} (h : e.immC = 0) :
+    aluTypeOpCCols (p := p) e = registerAccessCols e.c e.prevTsC (e.clk + 2) := by
+  rw [aluTypeOpCCols, if_neg (by omega)]
+
+/-- SP1's `ALUTypeReader::populate`: as the R-type block, but the `op_c` slot is the committed
+word `Word::from(record.op_c)` plus the row-dependent access block above, and the row commits the
+`imm_c` flag. -/
+def aluTypeReaderCols (e : ALUTypeEvent) : Extracted.ALUTypeReader (ZMod p) where
+  op_a := ((e.opA : ℕ) : ZMod p)
+  op_a_memory := registerAccessCols e.prevA e.prevTsA (e.clk + 4)
+  op_a_0 := if e.opA = 0 then 1 else 0
+  op_b := ((e.opB : ℕ) : ZMod p)
+  op_b_memory := registerAccessCols e.b e.prevTsB (e.clk + 3)
+  op_c := wordOfNat e.opC
+  op_c_memory := aluTypeOpCCols e
+  imm_c := ((e.immC : ℕ) : ZMod p)
+
+lemma aluTypeReaderCols_op_a (e : ALUTypeEvent) :
+    (aluTypeReaderCols (p := p) e).op_a = ((e.opA : ℕ) : ZMod p) := rfl
+
+lemma aluTypeReaderCols_op_a_0 (e : ALUTypeEvent) :
+    (aluTypeReaderCols (p := p) e).op_a_0 = if e.opA = 0 then 1 else 0 := rfl
+
+lemma aluTypeReaderCols_op_a_memory (e : ALUTypeEvent) :
+    (aluTypeReaderCols (p := p) e).op_a_memory
+      = registerAccessCols e.prevA e.prevTsA (e.clk + 4) := rfl
+
+lemma aluTypeReaderCols_op_b_memory (e : ALUTypeEvent) :
+    (aluTypeReaderCols (p := p) e).op_b_memory
+      = registerAccessCols e.b e.prevTsB (e.clk + 3) := rfl
+
+lemma aluTypeReaderCols_op_c_memory (e : ALUTypeEvent) :
+    (aluTypeReaderCols (p := p) e).op_c_memory = aluTypeOpCCols e := rfl
+
+lemma aluTypeReaderCols_imm_c (e : ALUTypeEvent) :
+    (aluTypeReaderCols (p := p) e).imm_c = ((e.immC : ℕ) : ZMod p) := rfl
+
+/-! ## The `JTypeReader` block -/
+
+/-- SP1's `JTypeReader::populate`: the destination index, its write access block at
+`MemoryAccessPosition::A = 4`, the `rd = x0` flag, and the two decoded immediates as committed
+words — a J-type row makes no other register access. -/
+def jTypeReaderCols (e : JTypeEvent) : Extracted.JTypeReader (ZMod p) where
+  op_a := ((e.opA : ℕ) : ZMod p)
+  op_a_memory := registerAccessCols e.prevA e.prevTsA (e.clk + 4)
+  op_a_0 := if e.opA = 0 then 1 else 0
+  op_b_imm := wordOfNat e.immB
+  op_c_imm := wordOfNat e.immC
+
+lemma jTypeReaderCols_op_a (e : JTypeEvent) :
+    (jTypeReaderCols (p := p) e).op_a = ((e.opA : ℕ) : ZMod p) := rfl
+
+lemma jTypeReaderCols_op_a_0 (e : JTypeEvent) :
+    (jTypeReaderCols (p := p) e).op_a_0 = if e.opA = 0 then 1 else 0 := rfl
+
+lemma jTypeReaderCols_op_a_memory (e : JTypeEvent) :
+    (jTypeReaderCols (p := p) e).op_a_memory
+      = registerAccessCols e.prevA e.prevTsA (e.clk + 4) := rfl
+
+lemma jTypeReaderCols_op_b_imm (e : JTypeEvent) :
+    (jTypeReaderCols (p := p) e).op_b_imm = wordOfNat e.immB := rfl
+
 /-! ## Per-chip assembly
 
-One `def` per chip of the family. The chip's `Inputs` is the `is_real` selector plus the two
-shared blocks, so there is nothing chip-specific to build. -/
+One `def` per chip. The chip's `Inputs` is the `is_real` selector plus the shared `state` and
+adapter blocks (and, for `UType`, the variant flag), so there is nothing chip-specific to build. -/
 
 /-- The `Add` chip's committed input row for one event — a **real** row (`is_real = 1`). -/
 def RTypeEvent.toAddInputs (e : RTypeEvent) : AddChip.Inputs (ZMod p) where
@@ -160,6 +269,49 @@ lemma RTypeEvent.toAddInputs_state (e : RTypeEvent) :
 
 lemma RTypeEvent.toAddInputs_adapter (e : RTypeEvent) :
     (e.toAddInputs (p := p)).adapter = rTypeReaderCols e := rfl
+
+/-- The `Sub` chip's committed input row for one event — a **real** row (`is_real = 1`). -/
+def RTypeEvent.toSubInputs (e : RTypeEvent) : SubChip.Inputs (ZMod p) where
+  is_real := 1
+  state := cpuStateCols e.clk e.pc
+  adapter := rTypeReaderCols e
+
+/-- The `Subw` chip's committed input row for one event — a **real** row (`is_real = 1`). -/
+def RTypeEvent.toSubwInputs (e : RTypeEvent) : SubwChip.Inputs (ZMod p) where
+  is_real := 1
+  state := cpuStateCols e.clk e.pc
+  adapter := rTypeReaderCols e
+
+/-- The `Addi` chip's committed input row for one event — a **real** row (`is_real = 1`). -/
+def ITypeEvent.toAddiInputs (e : ITypeEvent) : AddiChip.Inputs (ZMod p) where
+  is_real := 1
+  state := cpuStateCols e.clk e.pc
+  adapter := iTypeReaderCols e
+
+/-- The `Addw` chip's committed input row for one event — a **real** row (`is_real = 1`). -/
+def ALUTypeEvent.toAddwInputs (e : ALUTypeEvent) : AddwChip.Inputs (ZMod p) where
+  is_real := 1
+  state := cpuStateCols e.clk e.pc
+  adapter := aluTypeReaderCols e
+
+lemma ALUTypeEvent.toAddwInputs_adapter (e : ALUTypeEvent) :
+    (e.toAddwInputs (p := p)).adapter = aluTypeReaderCols e := rfl
+
+/-- The `UType` chip's committed input row for one event — a **real** row (`is_real = 1`). The
+extra committed column beyond the two shared blocks is the variant selector, read off the event's
+own opcode discriminant (`Opcode::AUIPC = 48`, `Opcode::LUI = 49`; the chip's `Spec` recombines it
+as `is_auipc * 48 + (1 - is_auipc) * 49`). -/
+def JTypeEvent.toUTypeInputs (e : JTypeEvent) : UTypeChip.Inputs (ZMod p) where
+  is_real := 1
+  state := cpuStateCols e.clk e.pc
+  adapter := jTypeReaderCols e
+  is_auipc := if e.opcode = 48 then 1 else 0
+
+lemma JTypeEvent.toUTypeInputs_is_auipc (e : JTypeEvent) :
+    (e.toUTypeInputs (p := p)).is_auipc = if e.opcode = 48 then 1 else 0 := rfl
+
+lemma JTypeEvent.toUTypeInputs_adapter (e : JTypeEvent) :
+    (e.toUTypeInputs (p := p)).adapter = jTypeReaderCols e := rfl
 
 /-! ## Padding
 
@@ -183,10 +335,79 @@ def zeroRTypeReaderCols : Extracted.RTypeReader (ZMod p) where
   op_c := 0
   op_c_memory := zeroAccessCols
 
+/-- The all-zero I-type adapter block of a padding row. -/
+def zeroITypeReaderCols : Extracted.ITypeReader (ZMod p) where
+  op_a := 0
+  op_a_memory := zeroAccessCols
+  op_a_0 := 0
+  op_b := 0
+  op_b_memory := zeroAccessCols
+  op_c_imm := #v[0, 0, 0, 0]
+
+/-- The all-zero ALU-type adapter block of a padding row. -/
+def zeroALUTypeReaderCols : Extracted.ALUTypeReader (ZMod p) where
+  op_a := 0
+  op_a_memory := zeroAccessCols
+  op_a_0 := 0
+  op_b := 0
+  op_b_memory := zeroAccessCols
+  op_c := #v[0, 0, 0, 0]
+  op_c_memory := zeroAccessCols
+  imm_c := 0
+
+/-- The all-zero J-type adapter block of a padding row. -/
+def zeroJTypeReaderCols : Extracted.JTypeReader (ZMod p) where
+  op_a := 0
+  op_a_memory := zeroAccessCols
+  op_a_0 := 0
+  op_b_imm := #v[0, 0, 0, 0]
+  op_c_imm := #v[0, 0, 0, 0]
+
+/-- The all-zero `CPUState` block of a padding row. -/
+def zeroCPUStateCols : Extracted.CPUState (ZMod p) where
+  clk_high := 0
+  clk_16_24 := 0
+  clk_0_16 := 0
+  pc := #v[0, 0, 0]
+
 /-- The `Add` chip's padding row: every column zero, `is_real = 0`. -/
 def addPaddingInputs : AddChip.Inputs (ZMod p) where
   is_real := 0
-  state := { clk_high := 0, clk_16_24 := 0, clk_0_16 := 0, pc := #v[0, 0, 0] }
+  state := zeroCPUStateCols
   adapter := zeroRTypeReaderCols
+
+/-- The `Sub` chip's padding row: every column zero, `is_real = 0`. -/
+def subPaddingInputs : SubChip.Inputs (ZMod p) where
+  is_real := 0
+  state := zeroCPUStateCols
+  adapter := zeroRTypeReaderCols
+
+/-- The `Subw` chip's padding row: every column zero, `is_real = 0`. -/
+def subwPaddingInputs : SubwChip.Inputs (ZMod p) where
+  is_real := 0
+  state := zeroCPUStateCols
+  adapter := zeroRTypeReaderCols
+
+/-- The `Addi` chip's padding row: every column zero, `is_real = 0`. -/
+def addiPaddingInputs : AddiChip.Inputs (ZMod p) where
+  is_real := 0
+  state := zeroCPUStateCols
+  adapter := zeroITypeReaderCols
+
+/-- The `Addw` chip's padding row: every column zero, `is_real = 0` (and `imm_c = 0`, the
+register-row form the chip's `ProverAssumptions` asks for). -/
+def addwPaddingInputs : AddwChip.Inputs (ZMod p) where
+  is_real := 0
+  state := zeroCPUStateCols
+  adapter := zeroALUTypeReaderCols
+
+/-- The `UType` chip's padding row: every column zero, `is_real = 0` (so `is_auipc = 0`, the LUI
+form — and the decode relation the chip's `ProverAssumptions` carries **ungated** holds on it,
+since `RV64.lui 0 = 0` is the zero word's value). -/
+def uTypePaddingInputs : UTypeChip.Inputs (ZMod p) where
+  is_real := 0
+  state := zeroCPUStateCols
+  adapter := zeroJTypeReaderCols
+  is_auipc := 0
 
 end SP1Clean.TraceGen

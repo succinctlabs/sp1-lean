@@ -257,4 +257,91 @@ lemma rTypeReaderCols_op_a_0_eq_zero {e : RTypeEvent} (h : e.opA ≠ 0) :
     (rTypeReaderCols (p := p) e).op_a_0 = 0 := by
   rw [rTypeReaderCols_op_a_0, if_neg h]
 
+/-! ## The sibling adapter blocks
+
+The `op_a` half of every adapter is the same block — a destination index, its write access block,
+and the `rd = x0` flag — so each family gets the same pair of one-line decode lemmas. The families
+differ only in the `op_c` slot, which is where `ALUTypeReader` needs two extra lemmas (its `op_c`
+block is row-dependent) and `ITypeReader`/`JTypeReader` need none (their `op_c` is a committed
+immediate word, whose `isU64` is `wordOfNat_isU64`). -/
+
+omit [Fact p.Prime] in
+/-- The committed destination-register index of a built I-type block is `< 32`. -/
+lemma iTypeReaderCols_op_a_val_lt {e : ITypeEvent} (h : e.opA < 32) :
+    ((iTypeReaderCols (p := p) e).op_a).val < 32 := by
+  have hp : 2 ^ 24 < p := Fact.out
+  rw [iTypeReaderCols_op_a, ZMod.val_natCast_of_lt (by omega)]
+  exact h
+
+omit [Fact (2 ^ 24 < p)] in
+/-- A built I-type block's `op_a_0` flag is `0` exactly when the destination is not `x0`. -/
+lemma iTypeReaderCols_op_a_0_eq_zero {e : ITypeEvent} (h : e.opA ≠ 0) :
+    (iTypeReaderCols (p := p) e).op_a_0 = 0 := by
+  rw [iTypeReaderCols_op_a_0, if_neg h]
+
+omit [Fact p.Prime] in
+/-- The committed destination-register index of a built ALU-type block is `< 32`. -/
+lemma aluTypeReaderCols_op_a_val_lt {e : ALUTypeEvent} (h : e.opA < 32) :
+    ((aluTypeReaderCols (p := p) e).op_a).val < 32 := by
+  have hp : 2 ^ 24 < p := Fact.out
+  rw [aluTypeReaderCols_op_a, ZMod.val_natCast_of_lt (by omega)]
+  exact h
+
+omit [Fact (2 ^ 24 < p)] in
+/-- A built ALU-type block's `op_a_0` flag is `0` exactly when the destination is not `x0`. -/
+lemma aluTypeReaderCols_op_a_0_eq_zero {e : ALUTypeEvent} (h : e.opA ≠ 0) :
+    (aluTypeReaderCols (p := p) e).op_a_0 = 0 := by
+  rw [aluTypeReaderCols_op_a_0, if_neg h]
+
+/-- The value a built ALU-type `op_c` block commits is a u64 in **both** row forms — the `rs2`
+read value on a register row, the copied immediate word on an immediate row. Both are built by
+`wordOfNat`, so neither owes the event a limb bound. -/
+lemma aluTypeOpCCols_prev_value_isU64 (e : ALUTypeEvent) :
+    Word.isU64 (aluTypeOpCCols (p := p) e).prev_value := by
+  rw [aluTypeOpCCols]
+  split
+  · exact wordOfNat_isU64 _
+  · rw [registerAccessCols_prev_value]
+    exact wordOfNat_isU64 _
+
+omit [Fact p.Prime] in
+/-- A built ALU-type `op_c` block's committed previous-access clock is a 24-bit value in both row
+forms: the `prevLowOf` residue on a register row, the literal `0` an immediate row is populated
+with. -/
+lemma aluTypeOpCCols_prevLow_val_lt (e : ALUTypeEvent) :
+    ((aluTypeOpCCols (p := p) e).access_timestamp.prev_low).val < 2 ^ 24 := by
+  rw [aluTypeOpCCols]
+  split
+  · simp
+  · exact registerAccessCols_prevLow_val_lt _ _ _
+
+omit [Fact p.Prime] in
+/-- The committed destination-register index of a built J-type block is `< 32`. -/
+lemma jTypeReaderCols_op_a_val_lt {e : JTypeEvent} (h : e.opA < 32) :
+    ((jTypeReaderCols (p := p) e).op_a).val < 32 := by
+  have hp : 2 ^ 24 < p := Fact.out
+  rw [jTypeReaderCols_op_a, ZMod.val_natCast_of_lt (by omega)]
+  exact h
+
+omit [Fact (2 ^ 24 < p)] in
+/-- A built J-type block's `op_a_0` flag is `0` exactly when the destination is not `x0`. -/
+lemma jTypeReaderCols_op_a_0_eq_zero {e : JTypeEvent} (h : e.opA ≠ 0) :
+    (jTypeReaderCols (p := p) e).op_a_0 = 0 := by
+  rw [jTypeReaderCols_op_a_0, if_neg h]
+
+/-- **The program counter as a word.** The three committed `pc` limbs padded with a zero high limb
+form a u64 — the shape `UType` (and `Jal`) feed to their `AddOperation` as the `pc + imm` operand.
+Derived from the limb split, like `cpuStateCols_pc_val_lt`, so no event conjunct is spent on it. -/
+lemma cpuStateCols_pcWord_isU64 (clk pc : ℕ) :
+    Word.isU64 (#v[(cpuStateCols (p := p) clk pc).pc[0], (cpuStateCols (p := p) clk pc).pc[1],
+      (cpuStateCols (p := p) clk pc).pc[2], 0] : Word (ZMod p)) := by
+  obtain ⟨h0, h1, h2⟩ := cpuStateCols_pc_val_lt (p := p) clk pc
+  refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ, ZMod.val_zero]
+  · exact h0
+  · exact h1
+  · exact h2
+  · norm_num
+
 end SP1Clean.TraceGen

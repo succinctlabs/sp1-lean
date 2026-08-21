@@ -1,6 +1,6 @@
 import SP1Clean.Math.Word
 
-/-! # Trace generation — the semantic event of the R-type ALU family
+/-! # Trace generation — the semantic events of the register-adapter families
 
 The completeness direction of the AIR needs a *source of rows*: a real SP1 execution produces a
 list of instruction events, SP1's `generate_trace` turns each into a row, and the AIR is supposed
@@ -18,13 +18,26 @@ blocks it builds.
 
 The register-adapter families — not the chips — determine what an event must carry. `RTypeEvent`
 is the `Extracted.RTypeReader` family: three register operands, `op_a` written, `op_b`/`op_c`
-read. That is the shape of the **R-type ALU chips** (`Add`, `Sub`, `Mul`, `Bitwise`, `Lt`,
-`DivRem`, `ShiftLeft`, `ShiftRight`, and the `W`-variants that read the R-type adapter), which is
-why the record — and every lemma stated over the blocks built from it — is shared, and only the
-final three-line assembly into a particular chip's `Inputs` is per-chip. The sibling adapters
-(`ITypeReader`, `ALUTypeReader`, `JTypeReader`) get sibling records as their chips are rolled out;
-they differ only in the `op_c` slot (an immediate rather than a register read) and in how many
-register accesses the row makes.
+read. That is the shape of the **R-type ALU chips** (`Add`, `Sub`, `Subw`, `Mul`, `DivRem`), which
+is why the record — and every lemma stated over the blocks built from it — is shared, and only
+the final three-line assembly into a particular chip's `Inputs` is per-chip.
+
+The three sibling adapters get sibling records here, one per family, differing only in the `op_c`
+slot and in how many register accesses the row makes:
+
+| record | chips of the family | `op_c` slot | register accesses |
+| --- | --- | --- | --- |
+| `RTypeEvent` | Add, Sub, Subw, Mul, DivRem | `rs2` register read | 3 |
+| `ITypeEvent` | Addi, Branch, Jalr, the 9 memory chips | 64-bit immediate | 2 |
+| `ALUTypeEvent` | Addw, Bitwise, Lt, ShiftLeft, ShiftRight | either, per `imm_c` | 2 or 3 |
+| `JTypeEvent` | Jal, UType | 64-bit immediate | 1 |
+
+`ALUTypeEvent` is the only one whose row shape is *row-dependent*: SP1's `ALUTypeRecord` carries
+`c : Option<MemoryRecordEnum>`, and `ALUTypeReader::populate` either fills the `op_c` access block
+from that record (register row, `imm_c = 0`) or copies the immediate into `prev_value` and zeroes
+both timestamp columns (immediate row, `imm_c = 1`). Its `WellFormed` therefore has two conjuncts
+gated on `immC = 0` — the only gated conjuncts in this file, and each is gated exactly because the
+fact it states is about a register access that an immediate row does not make.
 
 ## What the record deliberately does *not* carry
 
@@ -153,5 +166,300 @@ structure WellFormed (e : RTypeEvent) : Prop where
   prevTsC_lt : e.prevTsC < e.clk + 2
 
 end RTypeEvent
+
+/-! ## The I-type family
+
+`Extracted.ITypeReader`: `op_a` written, `op_b` read, and `op_c` a **decoded immediate** rather
+than a register — so an I-type row makes only two register accesses, at `MemoryAccessPosition`
+offsets `A = 4` and `B = 3`. -/
+
+/--
+One executed **I-type instruction** (`ITypeRecord`): the CPU state, the decoded opcode, the two
+register indices, the 64-bit immediate, the `rs1` value, the value `rd` currently holds, and the
+two previous-access timestamps.
+
+Same shape as `RTypeEvent` with the `op_c` register triple (`opC`, `c`, `prevTsC`) replaced by the
+single field `imm`. Serves `Addi` today; `Branch`, `Jalr` and the nine memory chips read the same
+adapter.
+-/
+structure ITypeEvent where
+  /-- The row's CPU clock (`clk`); the bus messages use its low 24 bits. -/
+  clk : ℕ
+  /-- The program counter this instruction was fetched from (48 bits, three u16 limbs). -/
+  pc : ℕ
+  /-- The executor's opcode discriminant. The input columns are opcode-independent (the opcode
+  reaches the AIR through the Program-bus fetch), so the builder ignores it; it is carried for the
+  multi-opcode chips of this family (`Branch`, the loads and stores). -/
+  opcode : ℕ
+  /-- The destination register index `rd` (`op_a`). -/
+  opA : ℕ
+  /-- The source register index `rs1` (`op_b`). -/
+  opB : ℕ
+  /-- The decoded immediate (`ITypeRecord::op_c`, a `u64` — already sign-extended by the decoder).
+  It is committed as the four-limb word `op_c_imm`, and is *not* a register read. -/
+  imm : ℕ
+  /-- The value read from `rs1`. -/
+  b : ℕ
+  /-- The value `rd` held before this instruction overwrote it. -/
+  prevA : ℕ
+  /-- The timestamp of the previous access to `rd`. -/
+  prevTsA : ℕ
+  /-- The timestamp of the previous access to `rs1`. -/
+  prevTsB : ℕ
+
+namespace ITypeEvent
+
+/--
+**What makes an event a real I-type trace event.** As `RTypeEvent.WellFormed`, minus the three
+`op_c` register conjuncts and plus `imm_lt`; every conjunct is a fact about SP1's *execution*.
+
+The conjuncts, and the trace fact each encodes:
+
+* `clk_mod` — the executor's `CLK_INC = 8` discipline, starting at 1.
+* `pc_lt` — the program counter is a 48-bit address.
+* `opA_lt` / `opB_lt` — register indices name one of the 32 architectural registers.
+* `opA_ne_zero` — the destination is not `x0` (those rows are routed to a separate chip).
+* `imm_lt` — the decoded immediate is a 64-bit value; SP1's decoder sign-extends it to `u64`
+  before it reaches the record, so the committed word is the immediate, untruncated.
+* `b_lt` / `prevA_lt` — register contents are 64-bit values.
+* `prevTsA_lt` / `prevTsB_lt` — timestamps strictly increase, so each register's previous access
+  is strictly earlier than this row's access to it (`op_a` written at `clk + 4`, `op_b` read at
+  `clk + 3`).
+
+Nothing about limbs, differences, or ranges of derived columns, and no clock-window conjunct: as
+for `RTypeEvent`, those are consequences of the builder and of `clk_mod` (`clk_window_of_mod`).
+-/
+structure WellFormed (e : ITypeEvent) : Prop where
+  /-- The clock is `≡ 1 (mod 8)`: the executor's `CLK_INC = 8` discipline, starting at 1. -/
+  clk_mod : e.clk % 8 = 1
+  /-- The program counter is a 48-bit address. -/
+  pc_lt : e.pc < 2 ^ 48
+  /-- `rd` is an architectural register index. -/
+  opA_lt : e.opA < 32
+  /-- `rs1` is an architectural register index. -/
+  opB_lt : e.opB < 32
+  /-- `rd ≠ x0` — the `rd = x0` form is executed by a separate chip. -/
+  opA_ne_zero : e.opA ≠ 0
+  /-- The decoded immediate is a 64-bit value. -/
+  imm_lt : e.imm < 2 ^ 64
+  /-- `rs1`'s content is a 64-bit value. -/
+  b_lt : e.b < 2 ^ 64
+  /-- `rd`'s displaced content is a 64-bit value. -/
+  prevA_lt : e.prevA < 2 ^ 64
+  /-- `rd`'s previous access is strictly before this row's write of it (at `clk + 4`). -/
+  prevTsA_lt : e.prevTsA < e.clk + 4
+  /-- `rs1`'s previous access is strictly before this row's read of it (at `clk + 3`). -/
+  prevTsB_lt : e.prevTsB < e.clk + 3
+
+end ITypeEvent
+
+/-! ## The ALU-type family
+
+`Extracted.ALUTypeReader`: the immediate-capable ALU adapter. `op_a` is written and `op_b` read as
+always, but the `op_c` slot is a **four-limb word plus its own access block**, and the committed
+`imm_c` flag says which of the two forms the row is in. -/
+
+/--
+One executed **ALU-type instruction** (`ALUTypeRecord`): as `RTypeEvent`, plus the `imm_c` flag
+that distinguishes the register-register form from the immediate-`c` form.
+
+`opC` carries whichever the row is in: on a register row (`immC = 0`) it is the `rs2` **index** and
+`c` is the value read from it; on an immediate row (`immC = 1`) it is the decoded 64-bit
+**immediate**, the row makes no `op_c` access, and `c` / `prevTsC` are unused. That is exactly
+`ALUTypeRecord`'s `op_c : u64` together with `c : Option<MemoryRecordEnum>`.
+-/
+structure ALUTypeEvent where
+  /-- The row's CPU clock (`clk`); the bus messages use its low 24 bits. -/
+  clk : ℕ
+  /-- The program counter this instruction was fetched from (48 bits, three u16 limbs). -/
+  pc : ℕ
+  /-- The executor's opcode discriminant — ignored by the builder (the input columns are
+  opcode-independent), carried for the multi-opcode chips of this family (`Bitwise`, `Lt`, the
+  shifts). -/
+  opcode : ℕ
+  /-- The destination register index `rd` (`op_a`). -/
+  opA : ℕ
+  /-- The first source register index `rs1` (`op_b`). -/
+  opB : ℕ
+  /-- The `op_c` operand: the `rs2` register **index** on a register row (`immC = 0`), the decoded
+  64-bit **immediate** on an immediate row (`immC = 1`). Committed as a four-limb word either way
+  (`ALUTypeReader::populate`'s `self.op_c = Word::from(record.op_c)`). -/
+  opC : ℕ
+  /-- `1` on an immediate-`c` row (`ALUTypeRecord::c.is_none()`), `0` on a register row. -/
+  immC : ℕ
+  /-- The value read from `rs1`. -/
+  b : ℕ
+  /-- The value read from `rs2` on a register row (unused on an immediate row). -/
+  c : ℕ
+  /-- The value `rd` held before this instruction overwrote it. -/
+  prevA : ℕ
+  /-- The timestamp of the previous access to `rd`. -/
+  prevTsA : ℕ
+  /-- The timestamp of the previous access to `rs1`. -/
+  prevTsB : ℕ
+  /-- The timestamp of the previous access to `rs2` (unused on an immediate row). -/
+  prevTsC : ℕ
+
+namespace ALUTypeEvent
+
+/--
+**What makes an event a real ALU-type trace event.** As `RTypeEvent.WellFormed`, plus `immC_bool`,
+and with the two `op_c`-*register* conjuncts gated on `immC = 0` — an immediate row makes no
+`op_c` register access, so there is no index to bound and no previous access to order.
+
+The conjuncts, and the trace fact each encodes:
+
+* `clk_mod` — the executor's `CLK_INC = 8` discipline, starting at 1.
+* `pc_lt` — the program counter is a 48-bit address.
+* `opA_lt` / `opB_lt` — register indices name one of the 32 architectural registers.
+* `opA_ne_zero` — the destination is not `x0` (those rows are routed to `AluX0`).
+* `immC_bool` — `imm_c` is a flag: `ALUTypeReader::populate` sets it from
+  `record.c.is_none()`.
+* `opC_lt` — the `op_c` operand fits the committed four-limb word, in **either** form (a register
+  index trivially, a decoded immediate because the decoder produced a `u64`).
+* `opC_reg` — on a **register** row the `op_c` operand is an architectural register index. This is
+  the faithfulness half for `opC`: the memory access the reader emits uses `op_c[0]` as its
+  register address.
+* `b_lt` / `c_lt` / `prevA_lt` — register contents are 64-bit values.
+* `prevTsA_lt` / `prevTsB_lt` — timestamps strictly increase, so `rd`'s and `rs1`'s previous
+  accesses are strictly before this row's (at `clk + 4` / `clk + 3`).
+* `prevTsC_reg` — on a **register** row, likewise for `rs2` (read at `clk + 2`). Gated: on an
+  immediate row `ALUTypeReader::populate` never calls `populate_timestamp` for the `op_c` slot —
+  it zeroes both timestamp columns — and the reader's `op_c` guarantee is gated off by
+  `is_real - imm_c`, so there is no ordering fact to state.
+
+As for `RTypeEvent`: no limb, difference, or range conjuncts (all derived in `Readers.lean`), and
+no clock-window conjunct (a consequence of `clk_mod`).
+-/
+structure WellFormed (e : ALUTypeEvent) : Prop where
+  /-- The clock is `≡ 1 (mod 8)`: the executor's `CLK_INC = 8` discipline, starting at 1. -/
+  clk_mod : e.clk % 8 = 1
+  /-- The program counter is a 48-bit address. -/
+  pc_lt : e.pc < 2 ^ 48
+  /-- `rd` is an architectural register index. -/
+  opA_lt : e.opA < 32
+  /-- `rs1` is an architectural register index. -/
+  opB_lt : e.opB < 32
+  /-- `rd ≠ x0` — the `rd = x0` form of an ALU instruction is executed by the `AluX0` chip. -/
+  opA_ne_zero : e.opA ≠ 0
+  /-- `imm_c` is a flag. -/
+  immC_bool : e.immC = 0 ∨ e.immC = 1
+  /-- The `op_c` operand fits the committed four-limb word, in either form. -/
+  opC_lt : e.opC < 2 ^ 64
+  /-- On a register row, `rs2` is an architectural register index. -/
+  opC_reg : e.immC = 0 → e.opC < 32
+  /-- `rs1`'s content is a 64-bit value. -/
+  b_lt : e.b < 2 ^ 64
+  /-- `rs2`'s content is a 64-bit value. -/
+  c_lt : e.c < 2 ^ 64
+  /-- `rd`'s displaced content is a 64-bit value. -/
+  prevA_lt : e.prevA < 2 ^ 64
+  /-- `rd`'s previous access is strictly before this row's write of it (at `clk + 4`). -/
+  prevTsA_lt : e.prevTsA < e.clk + 4
+  /-- `rs1`'s previous access is strictly before this row's read of it (at `clk + 3`). -/
+  prevTsB_lt : e.prevTsB < e.clk + 3
+  /-- On a register row, `rs2`'s previous access is strictly before this row's read of it (at
+  `clk + 2`). -/
+  prevTsC_reg : e.immC = 0 → e.prevTsC < e.clk + 2
+
+end ALUTypeEvent
+
+/-! ## The J-type family
+
+`Extracted.JTypeReader`: `op_a` written, and **both** `op_b` and `op_c` decoded immediates — so a
+J-type row makes a single register access, the `op_a` write at `MemoryAccessPosition::A = 4`. -/
+
+/--
+One executed **J-type instruction** (`JTypeRecord`): the CPU state, the decoded opcode, the
+destination register index, the two decoded 64-bit immediates, the value `rd` currently holds, and
+the timestamp of `rd`'s previous access.
+
+The two immediates are opcode-specific — for `Jal` they are the jump offset and the link value,
+for `UType` `op_b` is the U-type immediate `sign_extend(imm << 12)` and `op_c` is zero — so this
+record bounds them and nothing more; a chip that needs the *shape* of its immediate states it
+separately (see `JTypeEvent.UTypeImm`).
+-/
+structure JTypeEvent where
+  /-- The row's CPU clock (`clk`); the bus messages use its low 24 bits. -/
+  clk : ℕ
+  /-- The program counter this instruction was fetched from (48 bits, three u16 limbs). -/
+  pc : ℕ
+  /-- The executor's opcode discriminant. The `UType` chip's `is_auipc` selector is built from it
+  (`AUIPC = 48`, `LUI = 49`); the input columns are otherwise opcode-independent. -/
+  opcode : ℕ
+  /-- The destination register index `rd` (`op_a`). -/
+  opA : ℕ
+  /-- The decoded `op_b` immediate (`JTypeRecord::op_b`, a `u64`), committed as `op_b_imm`. -/
+  immB : ℕ
+  /-- The decoded `op_c` immediate (`JTypeRecord::op_c`, a `u64`), committed as `op_c_imm`. -/
+  immC : ℕ
+  /-- The value `rd` held before this instruction overwrote it. -/
+  prevA : ℕ
+  /-- The timestamp of the previous access to `rd`. -/
+  prevTsA : ℕ
+
+namespace JTypeEvent
+
+/--
+**What makes an event a real J-type trace event.** The shortest of the four: one register access,
+two immediates.
+
+The conjuncts, and the trace fact each encodes:
+
+* `clk_mod` — the executor's `CLK_INC = 8` discipline, starting at 1.
+* `pc_lt` — the program counter is a 48-bit address.
+* `opA_lt` — `rd` names one of the 32 architectural registers.
+* `opA_ne_zero` — the destination is not `x0`. (`UType` rows with `rd = x0` are real, and the
+  chip's AIR handles them through `op_a_0 = 1`; this layer's completeness theorem covers the
+  `rd ≠ x0` rows, exactly as the chip's `ProverAssumptions` asks with `op_a_0 = 0`.)
+* `immB_lt` / `immC_lt` — the decoded immediates are 64-bit values, so the committed words are
+  them, untruncated.
+* `prevA_lt` — `rd`'s displaced content is a 64-bit value.
+* `prevTsA_lt` — timestamps strictly increase, so `rd`'s previous access is strictly before this
+  row's write of it (at `clk + 4`).
+-/
+structure WellFormed (e : JTypeEvent) : Prop where
+  /-- The clock is `≡ 1 (mod 8)`: the executor's `CLK_INC = 8` discipline, starting at 1. -/
+  clk_mod : e.clk % 8 = 1
+  /-- The program counter is a 48-bit address. -/
+  pc_lt : e.pc < 2 ^ 48
+  /-- `rd` is an architectural register index. -/
+  opA_lt : e.opA < 32
+  /-- `rd ≠ x0` — the rows this layer's completeness theorem covers. -/
+  opA_ne_zero : e.opA ≠ 0
+  /-- The decoded `op_b` immediate is a 64-bit value. -/
+  immB_lt : e.immB < 2 ^ 64
+  /-- The decoded `op_c` immediate is a 64-bit value. -/
+  immC_lt : e.immC < 2 ^ 64
+  /-- `rd`'s displaced content is a 64-bit value. -/
+  prevA_lt : e.prevA < 2 ^ 64
+  /-- `rd`'s previous access is strictly before this row's write of it (at `clk + 4`). -/
+  prevTsA_lt : e.prevTsA < e.clk + 4
+
+end JTypeEvent
+
+/-! ## The U-type immediate
+
+`JTypeEvent.WellFormed` bounds the two immediates but says nothing about their *shape*, because
+the two chips of the family decode them differently. `UType` is the one that needs the shape: its
+`ProverAssumptions` carries the decode relation `toBitVec64 op_b_imm = RV64.lui (immOf adapter)`,
+which is false for an arbitrary 64-bit `op_b`. The fact that makes it true is a plain-`ℕ`
+statement about the executor's own decoder, so it is stated here rather than assumed in the
+circuit layer. -/
+
+/-- The 64-bit value SP1's decoder puts in a U-type row's `op_b`: the 20-bit U-immediate shifted
+left by 12 and **sign-extended** to 64 bits. This is what `Instruction::encode` re-derives and
+checks on the way back out (`OPCODE_AUIPC | OPCODE_LUI`: `sign_extended_imm = op_b >> 12`, plus
+the `u64::MAX - 2^52 + 1` correction when `op_b ≥ 2^32`, then
+`validate_sign_extension(sign_extended_imm, 20)`), so a U-type `op_b` that is *not* of this shape
+does not round-trip through the encoder and cannot come from a decoded program. -/
+def luiImmNat (imm : ℕ) : ℕ :=
+  if imm < 2 ^ 19 then imm * 4096 else imm * 4096 + (2 ^ 64 - 2 ^ 32)
+
+/-- **The U-type row's decode shape.** The event's `op_b` immediate is `luiImmNat` of a genuine
+20-bit U-immediate. Separate from `WellFormed` because it is *not* a J-type fact: `Jal` shares the
+adapter and its `op_b` is a jump offset, not a shifted U-immediate. -/
+def JTypeEvent.UTypeImm (e : JTypeEvent) : Prop :=
+  ∃ imm < 2 ^ 20, e.immB = luiImmNat imm
 
 end SP1Clean.TraceGen
