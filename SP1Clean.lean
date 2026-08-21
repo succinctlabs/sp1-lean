@@ -253,10 +253,12 @@ import SP1Clean.Faithful.LoadWordChip
 import SP1Clean.Faithful.LoadX0Chip
 import SP1Clean.Faithful.LtChip
 import SP1Clean.Faithful.LtOperationUnsigned
+import SP1Clean.Faithful.MemoryBumpChip
 import SP1Clean.Faithful.MulChip
 import SP1Clean.Faithful.RTypeReader
 import SP1Clean.Faithful.ShiftLeftChip
 import SP1Clean.Faithful.ShiftRightChip
+import SP1Clean.Faithful.StateBumpChip
 import SP1Clean.Faithful.StoreByteChip
 import SP1Clean.Faithful.StoreDoubleChip
 import SP1Clean.Faithful.StoreHalfChip

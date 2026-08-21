@@ -11,7 +11,7 @@ supports; the figures below cover their union.
 
 ## Result
 
-- 553 released declarations are probed (515 main + 38 test: the 34 real-row satisfiability
+- 555 released declarations are probed (517 main + 38 test: the 34 real-row satisfiability
   anchors of `SP1CleanTest/NonVacuityReal.lean`, the two executable plus one definitional
   anchor of `SP1CleanTest/Audit/OneAddNativePremises.lean`, and the joint non-vacuity anchor
   of `SP1CleanTest/Audit/JointNonVacuity.lean`; the 21 legacy `native_decide`
@@ -20,7 +20,8 @@ supports; the figures below cover their union.
   2026-08-09 main-scope growth adds the COMMIT digest-persistence layer and the DivRem
   `FamilyEvidence.total` theorems, plus dotted-name probes the generator previously collapsed;
   the opcode-alphabet cross-check `opcodeTable_matchesExtracted` joined the main scope with the
-  extracted `Opcode` discriminant table).
+  extracted `Opcode` discriminant table; the 2026-08-21 pair `stateBumpChip_faithful` /
+  `memoryBumpChip_faithful` are the two W3 system tables' whole-table Rust-oracle anchors).
   The earlier 476 count fell from 478 because `SailDecode.decode_ADD_example`
   and its sole consumer `Soundness.Target.decodedInROM_addRow` were retired during the toolchain
   migration (see the retirement note in `SP1Clean/Model/SailDecode.lean`).

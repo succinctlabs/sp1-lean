@@ -141,6 +141,14 @@ disappear by checking only the four expected buses.
 its table tags are exactly the 25 upstream instruction tables. This is the coverage tripwire for future
 pin or registry changes.
 
+The two W3 system tables carry the same whole-table comparison in `Faithful/StateBumpChip.lean` and
+`Faithful/MemoryBumpChip.lean`, against `Extracted/SystemOracle/{StateBump,MemoryBump}.lean`. Both are
+flat own-assert tables with `localLength = 0`, so their native row is the chip `Inputs` and the row
+codec is the input-first physical row; the `ChipFaithful` structure itself is keyed on a circuit's
+*output* type map, which for these tables is `unit`, so each anchor states that structure's two
+clauses directly against `⟨StateBumpChip.circuit⟩` / `⟨MemoryBumpChip.circuit⟩`. They are not part of
+the 25-entry instruction coverage certificate.
+
 ## The native supported machine
 
 `Soundness/SupportedMachine.lean` is the single instruction registry. Each of its 25 entries carries:

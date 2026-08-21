@@ -284,6 +284,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.ltChip_faithful
 #print axioms SP1Clean.Faithful.ltUnsigned_constraints_faithful
 #print axioms SP1Clean.Faithful.ltUnsigned_interactions_faithful_syntactic
+#print axioms SP1Clean.Faithful.memoryBumpChip_faithful
 #print axioms SP1Clean.Faithful.mulChip_faithful
 #print axioms SP1Clean.Faithful.rtypereader_constraints_faithful
 #print axioms SP1Clean.Faithful.rtypereader_asserts_faithful
@@ -297,6 +298,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.shiftRightChip_constraints_faithful
 #print axioms SP1Clean.Faithful.shiftRightChip_interactions_faithful
 #print axioms SP1Clean.Faithful.shiftRightChip_faithful
+#print axioms SP1Clean.Faithful.stateBumpChip_faithful
 #print axioms SP1Clean.Faithful.storeByteChip_faithful
 #print axioms SP1Clean.Faithful.storeDoubleChip_faithful
 #print axioms SP1Clean.Faithful.storeHalfChip_faithful
