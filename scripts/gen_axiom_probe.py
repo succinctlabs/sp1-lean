@@ -66,6 +66,11 @@ TARGETS = [
     ("SP1CleanTest/Audit/*.lean",
      r"theorem\s+(constraints_hold|interactions_exact|program_projection|"
      r"supportedCoreNativeRelation_nonvacuous)\b"),
+    # The W4 completeness layer: each chip's trace-table constraint/guarantee theorems and its
+    # event-to-prover-assumptions discharge. Probed from the pilot onward so the rollout cannot
+    # silently introduce a compiler-trusted or deferred step.
+    ("SP1Clean/Proofs/Chips/*/Complete.lean",
+     r"theorem\s+(traceTable_constraints|traceTable_guarantees|proverAssumptions_of_event)\b"),
     # The abstract walk/trail core (live — used by AIR + RankedGrounding).
     ("SP1Clean/Soundness/Walk.lean", r"theorem\s+(exists_trail)\b"),
     # The W3 generic engines: the goodness filter + self-loop cancellation (StateBump) and the

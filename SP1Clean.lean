@@ -2,6 +2,7 @@ import SP1Clean.Proofs.Chips.AddChip.Bridge
 import SP1Clean.Native.Chips.AddChip.Defs
 import SP1Clean.Proofs.Chips.AddChip.Formal
 import SP1Clean.Proofs.Chips.AddChip.Witgen
+import SP1Clean.Proofs.Chips.AddChip.Complete
 import SP1Clean.Native.Chips.AddiChip.Defs
 import SP1Clean.Proofs.Chips.AddiChip.Formal
 import SP1Clean.Proofs.Chips.AddiChip.Bridge
@@ -435,6 +436,9 @@ import SP1Clean.FormalModel.Verifier
 import SP1Clean.FormalModel.Trace.Witness
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.FormalModel.Contracts.Readers
+import SP1Clean.FormalModel.TraceGen.Events
+import SP1Clean.FormalModel.TraceGen.Inputs
+import SP1Clean.FormalModel.TraceGen.Readers
 import SP1Clean.Soundness.RowView
 import SP1Clean.Proofs.Chips.ByteChip.RangeChip
 import SP1Clean.Proofs.Chips.ByteChip.ByteChip
