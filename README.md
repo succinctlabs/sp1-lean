@@ -36,6 +36,12 @@ The proof-bearing coverage certificate is tied to the exact upstream 25-table in
 The main library has no `sorry`, `stop`, project `axiom`, `sorryAx`, `skipKernelTC`, or
 `native_decide`.
 
+The converse direction is proved too: `supported_core_native_complete` constructs an accepted AIR
+witness — all forty tables plus the verifier row, every witnessed cell computed by the circuits' own
+generators — from a well-formed, bus-balanced generated trace. What it does *not* prove is that
+every supported Sail execution yields such a trace; that is the trace generator's own correctness
+and is unproved. See the verification report, §7.4.
+
 ## What is not yet proved
 
 The repository also contains a complete list-level model of the pinned upstream Core AIR:
@@ -113,7 +119,7 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The audit regenerates a 650-declaration `#print axioms` census and checks source deferrals, project
+The audit regenerates a 652-declaration `#print axioms` census and checks source deferrals, project
 axioms, forbidden kernel bypasses, main-library `native_decide`, and performance-budget drift.
 Sail-model platform hooks, selected generated `bv_decide` proof constants, and the trusted extraction
 toolchain are disclosed in the report.

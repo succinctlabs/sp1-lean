@@ -65,7 +65,8 @@ TARGETS = [
     # the older conformance and per-row satisfiability batteries.
     ("SP1CleanTest/Audit/*.lean",
      r"theorem\s+(constraints_hold|interactions_exact|program_projection|"
-     r"supportedCoreNativeRelation_nonvacuous)\b"),
+     r"supportedCoreNativeRelation_nonvacuous|traceGeneratableRelation_nonvacuous|"
+     r"anchorTrace_yields_airWitness)\b"),
     # The W4 completeness layer's provider/ledger half: the built provider and verifier tables'
     # constraint theorems, and the generic push/pull balance bridge the W5 assembly consumes.
     ("SP1Clean/Proofs/Completeness/Providers.lean",

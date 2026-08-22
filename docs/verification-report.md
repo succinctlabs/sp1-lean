@@ -494,10 +494,40 @@ work; (ii) the shard-local initial state comes from the boundary binding, not fr
 No cross-shard stitching (the relation exists — `SP1ExecutionRelation`, with full-state
 continuity between consecutive execution shards, last-shard canonical-halt, and ledger
 authentication fields — but its soundness theorem is intentionally not declared). No syscall
-host-behavior semantics beyond the `SyscallHandler` interface. No boot/ELF-loading claim. No
-completeness claim at the capstone (per-chip completeness is proved; the ensemble-level
-completeness statement is deliberately left undeclared rather than stated in a false-if-broader
-form — the boundary comment in `Soundness/AIR.lean` documents the intended shape).
+host-behavior semantics beyond the `SyscallHandler` interface. No boot/ELF-loading claim.
+
+Machine-level completeness *is* now declared, in the form described in §7.4 — but note what it
+does not say: it does not claim that every supported Sail execution produces a well-formed
+balanced trace. That step is the trace generator's own correctness and is unproved.
+
+### 7.4 Machine-level completeness
+
+`supported_core_native_complete` (`SP1Clean/Soundness/AIRCompleteness.lean`) is the converse of
+the capstone: every well-formed, balanced, boundary-bound *generated trace* has an AIR witness
+the verifier accepts. It targets `SupportedCoreNativeRelation` itself — nothing is weakened on
+the AIR side — and supplies the witness: forty built tables plus the verifier's boundary row,
+with every witnessed cell computed by the circuits' own witness generators rather than chosen to
+satisfy a constraint.
+
+The execution side (`SupportedCoreTraceGeneratableExecutionRelation`) asks for three things. Two
+are combinatorial properties of the emitted trace, which a real generator gets by construction:
+every occurrence routed to a table belongs there (`WellFormed`), and the four buses' pushed and
+pulled message multisets agree with signed multiplicities below the field characteristic
+(`Balanced`). The third is `SemanticBoundaryBinding`, literally the same companion predicate the
+soundness direction consumes, so the two directions speak about one boundary object rather than
+two paraphrases.
+
+Everything downstream of those hypotheses is derived. `Constraints` for all forty-one tables —
+every `assertZero` of every flattened chip circuit, on every generated row — is the join of the
+twenty-five per-chip and sixteen provider/verifier `traceTable_constraints` theorems, so the
+arithmetic content is the chips' own completeness proofs. `BalancedChannels` is the W4 ledger
+bridge applied per channel.
+
+The hypothesis bundle is witnessed, not merely stated: `SP1CleanTest/Audit/TraceNonVacuity.lean`
+exhibits a boundary-only generated shard satisfying the relation in full at SP1's prime — the
+generated twin of the soundness-side joint anchor, and the concrete face of the provider
+multiplicity finding in §12, since cancelling a pull seen four times takes four built rows where
+the hand-built anchor used one row of multiplicity four.
 
 ## 8. The headline theorem and the conditional exact-AIR layer
 
@@ -653,7 +683,11 @@ rows, per-family decode facts, and the joint hypothesis bundle:
   committed prover data, and every `InitialBoundaryFacts` field discharged, including a real
   (non-vacuous) `SailCodeMemoryCompatible` proof via the jal step machinery. The capstone
   applied to it yields the zero-step execution; a satisfying *non-empty* shard witness is the
-  machine-completeness work and is deliberately out of this anchor's scope.
+  trace-generator work and is deliberately out of this anchor's scope.
+- The **generated twin** (`SP1CleanTest/Audit/TraceNonVacuity.lean`): the same boundary-only
+  shard, but assembled through the completeness layer's builders rather than written by hand,
+  witnessing `SupportedCoreTraceGeneratableExecutionRelation` — so the machine-completeness
+  theorem of §7.4 is not vacuously true of an unsatisfiable relation.
 
 ## 10. Trust base
 
@@ -870,7 +904,9 @@ Stated plainly:
    intermediate abstraction our C2 obligation names (multiset balance ⇒ field-level LogUp
    soundness with an error bound), and their lemmas are a candidate model for how the ArkLib
    layer can discharge C2 rather than assume it.
-6. **Completeness at the ensemble level is undeclared** (per-chip completeness is proved; the
+6. **Machine-level completeness is relative to the trace generator** (§7.4): it constructs an
+   accepted AIR witness from a well-formed balanced trace, but the step from a Sail execution to
+   such a trace is unproved. Per-chip coverage is also narrower than soundness — the
    Bitwise, Lt, and Addw completeness witnesses currently cover register-register forms only —
    so ANDI/ORI/XORI/SLTI/SLTIU/ADDIW rows are covered by soundness and the Sail bridges but
    not by those chips' completeness theorems — and UType's completeness covers rd ≠ x0 rows,

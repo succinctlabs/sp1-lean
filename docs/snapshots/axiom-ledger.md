@@ -11,7 +11,7 @@ supports; the figures below cover their union.
 
 ## Result
 
-- 650 released declarations are probed (612 main + 38 test: the 34 real-row satisfiability
+- 652 released declarations are probed (612 main + 40 test: the 34 real-row satisfiability
   anchors of `SP1CleanTest/NonVacuityReal.lean`, the two executable plus one definitional
   anchor of `SP1CleanTest/Audit/OneAddNativePremises.lean`, and the joint non-vacuity anchor
   of `SP1CleanTest/Audit/JointNonVacuity.lean`; the 21 legacy `native_decide`
