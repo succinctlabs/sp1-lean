@@ -14,7 +14,7 @@
 This repository contains a machine-checked verification, in the Lean 4 proof assistant, that
 **each of the 25 instruction chips of SP1 v6.4.0's supported Core profile soundly implements the
 official RISC-V instruction-set semantics** — proven against the Sail-generated RV64 model and
-composed into a machine-level soundness theorem over a native 38-table ensemble with explicitly
+composed into a machine-level soundness theorem over a native 40-table ensemble with explicitly
 disclosed boundary premises (§8; the exact-upstream refinement boundary is §8.3). The
 verification is built on the public
 [Clean](https://github.com/Verified-zkEVM/clean) zkVM DSL and is structured so that every claim is
@@ -25,7 +25,7 @@ The deliverables:
 
 - **D1 — Native chip formalization.** All 25 supported instruction chips (the RV64IM ALU,
   control-flow, and memory core) are implemented as Clean `GeneralFormalCircuit`s with semantic
-  specifications, plus 13 provider/boundary tables, forming the 38-table `sp1Ensemble`
+  specifications, plus 15 provider/boundary tables, forming the 40-table `sp1Ensemble`
   (`SP1Clean/Soundness/SP1Ensemble.lean`).
 - **D2 — Per-chip soundness, completeness, and ISA refinement.** Every chip carries closed
   soundness *and* completeness proofs against a semantic `Spec`, and a Sail bridge (`advance`)
@@ -39,7 +39,7 @@ The deliverables:
   lemmas and the named boundary premise of §8.1 — there are no paper-justified bus axioms (§6).
 - **D5 — The headline theorem.** `supported_core_native_sound`
   (`SP1Clean/Soundness/AIR.lean`): every constraint-satisfying, channel-balanced witness of the
-  38-table ensemble, with an explicit boundary premise, yields a genuine finite run
+  40-table ensemble, with an explicit boundary premise, yields a genuine finite run
   of the official (SP1-configured, §3.2) Sail RV64 interpreter between the public
   program-counter/clock endpoints (§8).
 - **D6 — Conformance testing against the real prover.** A dump-anchored pipeline reconstructs
@@ -60,12 +60,27 @@ The deliverables:
 - **D7 — A reproducible audit harness.** One script (`scripts/run_audit.sh`) re-derives the
   dependency pins, gates zero proof deferrals with an empty allowlist, and regenerates a
   per-theorem `#print axioms` census (§13).
+- **D8 — Machine-level completeness.** `supported_core_native_complete`
+  (`SP1Clean/Soundness/AIRCompleteness.lean`) is D5's converse: a well-formed, bus-balanced
+  generated trace yields an AIR witness the verifier accepts — all 40 tables plus the boundary row,
+  every witnessed cell computed by the circuits' own generators rather than chosen to satisfy a
+  constraint. It targets the same relation D5 consumes, with nothing weakened on the AIR side, and
+  its hypothesis is witnessed at SP1's prime. It is completeness *relative to* a correct generator:
+  it does not claim every supported Sail execution produces such a trace (§7.4).
+- **D9 — Extracted-to-native transport, instruction segment.** `SP1Clean/Faithful/Transport/`
+  composes D3 with the native side, which the 2026-08 external audit found were never joined inside
+  Lean: from a witness the pinned upstream Core AIR accepts, it constructs 25 native Clean tables
+  satisfying their whole circuits' constraint systems — tables that are definitionally
+  `sp1Ensemble`'s instruction segment — and carries the extracted ℕ-exact bus balance into the
+  native signed-ℤ dialect. The provider, memory-boundary and system-table segments and the ensemble
+  assembly are not built, so the exact-upstream refinement (§8.3) is still conditional (§12).
 
 **The honest claim boundary, up front.** The proved statement is *existential and shard-local*:
 it produces a Sail execution segment for one shard, whose initial state is characterized by the
 provider-table binding rather than tied to an ELF-loaded boot state, and it consumes one
 explicitly disclosed semantic premise (the provider/program binding) that is not yet derived from
-the exact upstream system tables. The
+the exact upstream system tables. D8's completeness is relative to an unverified trace generator,
+and D9's transport reaches the instruction segment only — neither closes that premise. The
 repository deliberately *reserves* — declares nothing under — the names `sp1_air_sound`,
 `sp1_execution_sound`, and `sp1_verifier_sound`: the exact-upstream refinement exists only as an
 honestly conditional combinator (`sp1_air_sound_of_obligations`) over a named, currently
@@ -126,6 +141,16 @@ Two design decisions distinguish this from transcription-style verifications:
    theorem (§4.3), which compares *complete* assertion systems and interaction multisets. This
    keeps proof-oriented circuit engineering (subcircuit reuse, witness design) free, while making
    the Rust-equivalence claim total rather than per-recognized-fragment.
+
+   **One carve-out, and it matters for how much `ChipFaithful` is worth per chip.** For four
+   operations the native own-assert lists are token-for-token transcriptions of the generated
+   lists (Addw, Subw, and LtU's own-asserts; DivRem's own-assert tail). Where a list was
+   transcribed, the faithfulness theorem is a *pin-drift tripwire* — it will catch the extracted
+   list changing out from under us — but it is not independent cross-validation of that list,
+   because both sides descend from the same text. Soundness content is unaffected either way: the
+   semantic `Spec` is still proved from the list, so a transcribed list that were wrong would fail
+   to prove the ISA property rather than pass silently. The distinction is about what the
+   *faithfulness* theorem adds, not about what is proved.
 2. **Specs are semantic, not structural.** A chip's `Spec` states what a row *means* — e.g. for
    Add, `is_real = 1 → toBitVec64 value = RV64.add (toBitVec64 op_c) (toBitVec64 op_b)` — never a
    restatement of its constraint list. The field is generic over primes, at three thresholds:
@@ -517,6 +542,15 @@ pulled message multisets agree with signed multiplicities below the field charac
 soundness direction consumes, so the two directions speak about one boundary object rather than
 two paraphrases.
 
+**One asymmetry with the soundness side, stated plainly.** §8's soundness theorem covers shards of
+any size because W3 added the StateBump and MemoryBump tables and lifted the ~2²¹-row cap. The
+completeness side does not yet *produce* the rows that make a large shard witnessable:
+`SupportedCoreTraceWitness` carries `stateBumpRows` and `memoryBumpRows` as row lists whose only
+requirement is the two chips' `Spec`, so the relation **assumes** those rows rather than
+constructing them at clock/pc window crossings. A generator that emits them is future work; until
+then the completeness statement is weaker than the soundness statement in exactly this respect,
+and it is `WellFormed` — not a size restriction — that carries the assumption.
+
 Everything downstream of those hypotheses is derived. `Constraints` for all forty-one tables —
 every `assertZero` of every flattened chip circuit, on every generated row — is the join of the
 twenty-five per-chip and sixteen provider/verifier `traceTable_constraints` theorems, so the
@@ -543,7 +577,7 @@ def SupportedCoreNativeRelation :
 ```
 
 - `SupportedCoreEnsembleRelation`: the public input matches, **all** row constraints hold over
-  **all** 38 tables (+ the state-boundary verifier), and **all** channels balance — verified for
+  **all** 40 tables (+ the state-boundary verifier), and **all** channels balance — verified for
   this report quantifier-by-quantifier down into Clean's `FlatEnsemble` (∀-tables, ∀-rows;
   no existential slips).
 - `SP1SemanticBoundaryRelation`: there is an initial Sail state bound to the committed program
@@ -679,7 +713,7 @@ rows, per-family decode facts, and the joint hypothesis bundle:
   prove the strengthened ∃-instruction form derivable from the weak ∀-state one.
 - The **joint anchor** (`SP1CleanTest/Audit/JointNonVacuity.lean`): a fully proved witness of
   the entire `SupportedCoreNativeRelation` at SP1's prime — a one-`JAL` statement with equal
-  boundary endpoints, the 38-table witness with zero-row chip/provider tables, canonical
+  boundary endpoints, the 40-table witness with zero-row chip/provider tables, canonical
   committed prover data, and every `InitialBoundaryFacts` field discharged, including a real
   (non-vacuous) `SailCodeMemoryCompatible` proof via the jal step machinery. The capstone
   applied to it yields the zero-step execution; a satisfying *non-empty* shard witness is the
@@ -695,6 +729,18 @@ Everything the results depend on beyond the Lean kernel, numbered for reference.
 **M** = model premises (semantic hypotheses of the proved theorems), **C** = cryptographic layers
 (future work, no claim made here). The per-theorem axiom census (`docs/snapshots/axiom-ledger.md`)
 discloses which of these each headline declaration actually touches.
+
+**What "axiom-clean" means here.** The phrase is used throughout this repository to mean the three
+standard Lean axioms — `propext`, `Classical.choice`, `Quot.sound` — and nothing project-specific.
+It does **not** mean a declaration's `#print axioms` output is three names long. Any theorem whose
+statement reaches the Sail model also carries that model's platform hooks (T2), and a few carry
+`bv_decide`'s generated constants; the capstone's census entry lists around a hundred names for
+that reason. The useful split is by kind rather than by count: the Sail externs are *data-valued*
+opaque operations — a proof may not assume anything about what they return, so they weaken the
+model, not the logic — whereas a *Prop-valued* project axiom would be an unproved assumption and
+there are none. Chip-level and AIR-level theorems that do not mention Sail are genuinely on the
+three (for instance the transport layer's `transportTable_constraints` and the balance bridge's
+`signedSum_eq_zero`).
 
 - **T1 — The constraint exporter.** SP1's constraint compiler, run at the pin-checked overlay, is
   trusted to print the constraint/interaction lists its `air.eval` recorded. Mitigations: §4.1's

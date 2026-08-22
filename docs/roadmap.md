@@ -12,7 +12,7 @@ Completed:
 - 25 Sail bridges and `ChipKind.advance` registrations;
 - 25 whole-chip `ChipFaithful` proofs;
 - deterministic typed row decoding and exhaustive ranked State ordering;
-- Program and Memory timed grounding for the native 38-table ensemble;
+- Program and Memory timed grounding for the native 40-table ensemble;
 - `supported_core_native_sound`;
 - exact list-level 34-table execution and 6-table memory-boundary relations;
 - honest COMMIT-row versus wrapper-coverage separation; and
@@ -44,6 +44,22 @@ creates an explicit coverage failure. Do not write 25 unrelated top-level dispat
 
 Deliverable: a theorem that projects the exact 25 instruction tables into the instruction part of a
 valid native witness, with assertion and bus-balance transport proved once at the registry layer.
+
+**Status (2026-08-21): substantially delivered; the assertion half is done, the balance half is
+bridged but not finished.** `SP1Clean/Faithful/Transport/` proves the transport once over an
+arbitrary codec/oracle/`ChipFaithful` triple — no chip is named, so the 25 instantiations cannot
+drift apart — and `extracted_instructionTables_constraints` runs it against the real extracted
+relation: a witness the pinned Core AIR accepts yields 25 native Clean tables satisfying their whole
+circuits' constraint systems. `transported_map_component` shows those tables *are* `sp1Tables`, by
+`rfl`. The per-table active-interaction permutation is proved. `Transport/Balance.lean` carries the
+extracted ℕ-exact balance to a zero signed-ℤ sum per payload under an explicit `SmallMultiplicities`
+premise (`ZMod.val` and the centred `signedVal` diverge above `p / 2`; this is the multiplicity bound
+the interaction-argument extractor must supply anyway).
+
+Still open here: the payload→key injectivity step that turns that into Clean's per-key statement,
+and the registry-driven dispatch — the current instantiation is 25 generated citations of the
+generic theorems rather than a fold over `supportedChipFaithfulness`, so adding a Core table does
+not yet create an automatic coverage failure.
 
 ### 2. Ground preprocessed and system tables
 
@@ -202,6 +218,26 @@ The source relation must express supported, trace-generatable executions and con
 behavior. The conformance pipeline remains the empirical regression layer during this work but is not
 a substitute for the theorem.
 
+**Status (2026-08-21): the first two bullets are done for a generated trace.** W4 built the
+completeness substrate (`ToClean/Air/TableBuild.lean`) and completeness tables for all 25 chips plus
+the 15 providers and the verifier row; W5's `supported_core_native_complete`
+(`SP1Clean/Soundness/AIRCompleteness.lean`) turns a well-formed, bus-balanced generated trace into
+an accepted `EnsembleWitness`, targeting `SupportedCoreNativeRelation` itself with nothing weakened
+on the AIR side, and its hypothesis is witnessed at SP1's prime
+(`SP1CleanTest/Audit/TraceNonVacuity.lean`).
+
+What that does **not** yet say, and what P3 still means:
+
+- **The generator is not verified.** Nothing proves every supported Sail execution yields a
+  well-formed balanced trace; the theorem is completeness *relative to* a correct generator.
+- **Bump rows are assumed, not emitted.** The trace record carries StateBump/MemoryBump rows
+  satisfying the chips' `Spec` rather than generating them at window crossings — the very rows that
+  make shards above ~2²¹ rows witnessable on the soundness side.
+- **Four per-chip caps remain**: Bitwise/Lt/Addw require `imm_c = 0` and UType requires
+  `op_a_0 = 0`, so immediate ALU rows and `lui x0` are outside those chips' completeness statements.
+- The third and fourth bullets above (reconfiguration to the exact upstream trace, proof-system
+  completeness) are untouched.
+
 ## Maintenance gates
 
 Every phase ends with:
@@ -240,7 +276,7 @@ Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistica
 
 - **One-instruction end-to-end instance** (2026-08 audit recommendation): a hand-built
   single-Add-instruction witness — real ROM byte in `mem`, one instruction row, a whole
-  38-table `EnsembleWitness` with proved `Constraints ∧ BalancedChannels`, and a constructed
+  40-table `EnsembleWitness` with proved `Constraints ∧ BalancedChannels`, and a constructed
   `InitialBoundaryFacts` exhibiting all 11 fields simultaneously. This is the cheapest strong
   evidence for *joint* satisfiability of the capstone premise bundle (in particular
   `memoryProvider` content vs `romLoaded`/`codeMemoryCompatible` at overlapping addresses —

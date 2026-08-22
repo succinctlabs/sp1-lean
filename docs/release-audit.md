@@ -153,10 +153,12 @@ the two systems agree on traces produced by the honest witness generator. Intera
 proved on every locally accepted row, modulo permutation and zero-multiplicity entries.
 
 The system tables are handled differently: their complete generated lists are used directly in the
-exact relation. They do not yet have native semantic-table faithfulness theorems, because the native
-ensemble uses a smaller proof-oriented provider interface (13 provider/boundary tables alongside the
-25 instruction chips — a 38-table Clean ensemble). Connecting those two interfaces is the
-remaining exact Core refinement task.
+exact relation. Two of them — StateBump and MemoryBump — gained native chips and Rust-faithfulness
+anchors in the 2026-08 audit response (`SP1Clean/Faithful/{StateBump,MemoryBump}Chip.lean`); the
+rest do not have native semantic-table faithfulness theorems, because the native ensemble uses a
+smaller proof-oriented provider interface (15 provider/boundary tables alongside the 25 instruction
+chips — a 40-table Clean ensemble). Connecting those two interfaces is the remaining exact Core
+refinement task.
 
 ## Exact AIR coverage
 

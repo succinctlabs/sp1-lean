@@ -29,6 +29,22 @@ Nothing here mentions a chip. `transportTable` and its three theorems are stated
 instantiates them by supplying its own anchor — no per-chip proof, and no opportunity for
 twenty-five copies to drift.
 
+## Why the codec's codimension-1 image needs no repair
+
+The external report's Finding 11 observes that for the six flag-hinted chips the faithfulness
+codec covers only a codimension-1 slice of the native row space: `deconfigure` sets `is_real` to
+the sum of the one-hot operation flags, so no native row whose `is_real` disagrees with its flag
+sum is in the codec's image.
+
+That is the right shape for every theorem stated here, and the reason is directional. Transport
+runs extracted → native: it *starts* from a Rust row and *constructs* the native row through
+`deconfigure`, so the constructed row satisfies the flag-sum relation by definition and the slice
+is not a restriction on anything — it is where the construction lands. An image-forcing lemma
+(every native solution equals `deconfigure` of some Rust row) would be needed only for a
+native → Rust direction quantified over arbitrary native solutions, and no theorem in this
+repository states that direction. `ChipFaithful.constraints` is an `↔` at a *given* row, not a
+surjectivity claim, so it does not need one either.
+
 ## Scope
 
 This is the table-level half. The ensemble-level transport — assembling twenty-five transported

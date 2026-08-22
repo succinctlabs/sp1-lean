@@ -34,9 +34,10 @@ Its source relation has two visible parts:
 
 1. `SupportedCoreEnsembleRelation`
    - the witness public input equals the statement;
-   - every native Clean table constraint holds — the ensemble has 38 tables: the 25 instruction
-     chips plus 13 provider/boundary tables (ten byte/range lookup providers, the program-ROM
-     provider, and the two memory init/finalize boundary tables); and
+   - every native Clean table constraint holds — the ensemble has 40 tables: the 25 instruction
+     chips plus 15 provider/boundary tables (ten byte/range lookup providers, the program-ROM
+     provider, the two memory init/finalize boundary tables, and the two SP1 system tables
+     StateBump and MemoryBump); and
    - all four Clean channels balance.
 2. `SP1SemanticBoundaryRelation`
    - the program is well formed and bound to the shared prover data;
