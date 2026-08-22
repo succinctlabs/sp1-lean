@@ -63,6 +63,10 @@ TARGETS = [
      r"theorem\s+(transportTable_constraints|transportTable_accesses_perm|transportTable_spec)\b"),
     ("SP1Clean/Faithful/Transport/Ensemble.lean",
      r"theorem\s+(transported_map_component|transported_constraints)\b"),
+    ("SP1Clean/Faithful/Transport/Extracted.lean",
+     r"theorem\s+(extractedInstructionRows_valid|extracted_instructionTables_constraints)\b"),
+    ("SP1Clean/Faithful/Transport/Balance.lean",
+     r"theorem\s+(signedSum_eq_sent_sub_received|signedSum_eq_zero)\b"),
     ("SP1Clean/Soundness/CoreAIRSyscallFree.lean",
      r"theorem\s+(publicCommitOperand|deferredCommitOperand|publicCommitSetsFlag|"
      r"deferredCommitSetsFlag|syscallTranscript)\b"),

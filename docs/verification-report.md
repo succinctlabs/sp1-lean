@@ -911,15 +911,27 @@ Stated plainly:
    so ANDI/ORI/XORI/SLTI/SLTIU/ADDIW rows are covered by soundness and the Sail bridges but
    not by those chips' completeness theorems — and UType's completeness covers rd ≠ x0 rows,
    as its `ProverAssumptions` docstring discloses).
-7. **The extracted-to-native transport is table-level, not ensemble-level.**
+7. **The extracted-to-native transport covers the instruction segment, not the whole ensemble.**
    `SP1Clean/Faithful/Transport/` composes each chip's whole-chip faithfulness anchor with the
-   native side — a valid extracted table transports to a native table satisfying the whole native
-   circuit's constraint system, and (given the honest-prover assumptions and channel guarantees
-   Clean's soundness statement carries) its rows satisfy the chip's semantic contract. The
-   twenty-five transported tables are definitionally the ensemble's instruction tables. Not built:
-   the provider, memory-boundary and system-table segments, and the transport of the four channel
-   balances. Consequently `CoreAIRRefinementObligations.executionCase` — the field carrying the
-   actual refinement — remains open, and the unqualified `sp1_air_refinement` / `sp1_air_sound`
+   native side, and does so against the *real* extracted relation:
+   `extracted_instructionTables_constraints` takes a witness the pinned upstream Core AIR accepts
+   and yields twenty-five native Clean tables satisfying their whole circuits' constraint systems —
+   tables that are definitionally `sp1Ensemble`'s own instruction segment. The link is definitional
+   rather than translated: `CoreAIR.Current.assertions … .add row` *is* `addChipOracle.assertZeros
+   row.main`. Given the honest-prover assumptions and channel guarantees Clean's soundness statement
+   carries, those rows also satisfy the chips' semantic contracts.
+
+   The bus-balance half is bridged but not completed: `Transport/Balance.lean` proves the extracted
+   AIR's ℕ-exact `sentCount = receivedCount` yields a zero *signed ℤ* sum per payload — the dialect
+   the native balance is stated in — under an explicit `SmallMultiplicities` premise. That premise
+   is unavoidable, not bookkeeping: `ZMod.val` and the centered `signedVal` diverge above `p / 2`,
+   so it is the trace/multiplicity bound the interaction-argument extractor must supply alongside
+   the equality. It holds amply for SP1's own traces (chip multiplicities are `0` or `1`).
+
+   Not built: the provider, memory-boundary and system-table segments; the payload-to-key injectivity
+   step that turns the balance bridge into Clean's per-key statement; and the assembly into an
+   `EnsembleWitness`. Consequently `CoreAIRRefinementObligations.executionCase` — the field carrying
+   the actual refinement — remains open, and the unqualified `sp1_air_refinement` / `sp1_air_sound`
    names stay reserved. Under an explicit syscall-free restriction
    (`Soundness/CoreAIRSyscallFree.lean`) four of the bundle's fifteen fields are discharged and a
    fifth is reduced to a decoder property.
