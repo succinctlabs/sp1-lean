@@ -82,14 +82,15 @@ fi
 
 echo
 echo "== A1 recorded-pin cross-checks (gate) =="
-pin_args=()
 if [ "$update" -eq 1 ]; then
   # A clean census update must be able to replace an intentionally stale raw snapshot after the
   # generated probe set grows. The authoritative ledger still has to match the probes here; only
   # the raw-snapshot count check is deferred to A3, which rewrites and validates both files.
-  pin_args=(--census-update)
+  pin_check=(scripts/check_pins.sh --census-update)
+else
+  pin_check=(scripts/check_pins.sh)
 fi
-if scripts/check_pins.sh "${pin_args[@]}"; then
+if "${pin_check[@]}"; then
   :
 else
   echo "FAIL: a recorded pin value disagrees with the build graph (see above)"; fail=1
