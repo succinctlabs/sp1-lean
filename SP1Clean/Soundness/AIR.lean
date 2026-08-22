@@ -15,7 +15,7 @@ import SP1Clean.Soundness.RefreshWiring
 
 This module is the naming boundary the old trail capstone lacked:
 
-* `SupportedCoreEnsembleRelation` is exactly the algebra checked by the 38-table Clean ensemble;
+* `SupportedCoreEnsembleRelation` is exactly the algebra checked by the 53-table Clean ensemble;
 * `SP1SemanticBoundaryRelation` separately binds its preprocessed/provider rows to the committed
   program and a concrete local initial Sail state;
 * `SupportedCoreNativeRelation` is their conjunction; and
@@ -176,7 +176,8 @@ structure SupportedCoreGrounding
 
 /-- The committed-decode field of every statically grounded ordered row is already discharged.
 This theorem deliberately sits beside the remaining grounding seam: Program truth comes entirely
-from the exact chip pulls, Clean balance, the canonical table-35 provider, and the statement binding;
+from the exact chip pulls, Clean balance, the canonical Program provider at position 48, and the
+statement binding;
 it is not an assumption of the timed State/Memory induction. -/
 theorem supportedCore_orderedRows_programDecoded
     (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
@@ -945,6 +946,23 @@ theorem supported_core_witness_grounding
       at clockCount
     exact clockCount
 
+/-- Export the complete semantic grounding certificate from the honest native relation.
+
+Unlike the local-execution soundness projection below, this theorem retains the initial boundary
+facts together with the grounding record's final-State and memory-finalize truths.  It is therefore
+the reusable native endpoint for shard composition and for later exact-Core/ArkLib transport: callers
+do not have to reopen the relation or reconstruct facts that the timed grounding walk already proved. -/
+theorem supported_core_native_grounding
+    (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
+    (valid : SupportedCoreNativeRelation statement witness) :
+    ∃ initial orderedRows, InitialBoundaryFacts statement witness initial ∧
+      SupportedCoreGrounding statement witness initial orderedRows := by
+  obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩⟩ := valid
+  obtain ⟨orderedRows, grounding⟩ :=
+    supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
+      boundary
+  exact ⟨initial, orderedRows, boundary, grounding⟩
+
 /-- **Supported native-Clean soundness.** A satisfying, channel-balanced witness whose provider
 tables are semantically bound produces a genuine local official-Sail execution between its public
 endpoints.  Those two conjuncts are the *whole* premise: the RAM access-timestamp range fact the
@@ -956,36 +974,27 @@ theorem supported_core_native_sound (model : Machine.SP1MachineModel)
     WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
       (SupportedCoreLocalExecutionRelation model) := by
   intro statement witness valid
-  obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩⟩ := valid
-  obtain ⟨rows, -, walk, grounded, clockCount, -, -⟩ :=
-    supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
-      boundary
+  obtain ⟨initial, rows, boundary, grounding⟩ :=
+    supported_core_native_grounding statement witness valid
   apply groundedRows_localExecution model statement witness.data initial
     (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data) rows
     boundary.programWellFormed boundary.initialPc boundary.romLoaded boundary.configured
-    boundary.codeMemoryCompatible walk grounded
+    boundary.codeMemoryCompatible grounding.walk grounding.grounded
   rw [Machine.localExecutionClock_eq_ordinary ordinary]
-  exact clockCount
+  exact grounding.clockCount
 
 /-! ## Completeness boundary
 
 Whole-machine completeness is intentionally not inferred from the `completeness` field embedded in
-each `GeneralFormalCircuit`.  The real converse must start from a *supported, trace-generatable*
-semantic execution, construct all table witnesses, and prove the four global channel balances.  Its
-eventual shape is:
-
-```lean
-theorem supported_core_native_complete :
-    WitnessRelation.Complete SupportedCoreNativeRelation
-      SupportedCoreTraceGeneratableExecutionRelation := by
-  -- proof deferred
-```
-
-`SupportedCoreTraceGeneratableExecutionRelation` must include decoded-opcode support, canonical witness
-generation inputs, memory initialization, and provider-table obligations; using the broader
-`SupportedCoreLocalExecutionRelation` would make the claim false for unsupported Sail executions.  No
-placeholder theorem is declared until that relation and trace generator are verified.  This does not
-require changing Clean's `GeneralFormalCircuit` representation. -/
+each `GeneralFormalCircuit`. `Soundness/AIRCompleteness.lean` proves
+`supported_core_native_complete` for `SupportedCoreTraceGeneratableExecutionRelation`: a canonical
+trace record whose per-table routing facts, canonical nonnegative provider-count encodings, four
+exact centered-integer channel balances, public equality, and semantic boundary binding are
+supplied. It constructs every physical table row with the circuits' own witness generators. This is
+generator-relative AIR assembly completeness, not yet the stronger theorem that every supported
+Sail execution produces such a trace; the latter still requires a verified Sail-execution-to-trace
+generator. Using the broader `SupportedCoreLocalExecutionRelation` directly would be false for
+unsupported Sail executions. -/
 
 /-! ## Full extracted target
 

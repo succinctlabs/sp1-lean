@@ -29,9 +29,9 @@ import ToClean.Air.EnsembleBuild
 /-! # Assembling one shard's AIR witness from a generated trace
 
 The join of the two completeness layers below it: the twenty-five per-chip
-`Proofs/Chips/<Chip>/Complete.lean` files and the fifteen provider tables plus verifier row of
+`Proofs/Chips/<Chip>/Complete.lean` files and the 28 provider tables plus verifier row of
 `Proofs/Completeness/Providers.lean`. Each of those says *one* table built from semantic
-occurrences satisfies its constraints and channel guarantees. This file says the forty of them,
+occurrences satisfies its constraints and channel guarantees. This file says the 53 of them,
 assembled in the ensemble's own order with one shared committed `ProverData`, form a Clean
 `EnsembleWitness` for `sp1Ensemble` — and that its `Constraints` hold.
 
@@ -44,15 +44,14 @@ lists, the shared committed prover data and hint, and the shard's public clock/p
 a *flat data record*, not an execution: whether the events describe a real Sail chain is stated by
 the relation in `Soundness/AIRCompleteness.lean`, not here.
 
-## Two honest asymmetries, both inherited
+## Two explicit construction choices
 
-* **The memory family takes no padding.** `LoadByteChip`…`StoreDoubleChip` have no satisfiable
-  zero row (their address gadget forces a real address), so their tables are built at exactly the
-  event count. Every other instruction chip carries an explicit padding height.
-* **Provider tables are built at exactly the occurrence count.** Every provider generates its
-  multiplicity with a *constant* witness IR, so a built row always pushes at multiplicity one;
-  there is no bus-neutral padding row to append. See the limitations section of
-  `docs/verification-report.md`.
+* **The memory-family trace API remains event-only.** Its shared address contract now admits the
+  literal zero row when `is_real = 0`, but these nine builders do not yet take a padding-height
+  parameter. Their tables are therefore still built at exactly the event count.
+* **Provider multiplicity is part of each semantic entry.** Byte/Range/Program entries may be
+  unit-count occurrences, aggregated equal keys, or zero-count padding; memory-boundary entries
+  carry an explicit boolean selector. No local witness silently replaces the generator's choice.
 
 ## Where the layering lands
 
@@ -78,7 +77,7 @@ local instance traceAssemblyFieldBound : Fact (2 ^ 24 < p) := ⟨by have := Fact
 **One shard's generated trace**, table by table, in `sp1Ensemble`'s own order.
 
 The twenty-five instruction fields carry execution events (the typed records of
-`FormalModel/TraceGen/Events.lean`); the fifteen provider fields carry occurrences — what some
+`FormalModel/TraceGen/Events.lean`); the provider fields carry occurrences — what some
 chip's byte/range/program/memory pull asked the provider to justify. `data` is the one committed
 `ProverData` every table shares (Clean's `EnsembleWitness.same_data`), `hint` the prover hint the
 unhinted tables witness at, and the four naturals are the shard's public clock and pc endpoints.
@@ -111,8 +110,10 @@ structure SupportedCoreTraceWitness (p : ℕ) [Fact p.Prime] [Fact (2 ^ 25 < p)]
   branchPadding : ℕ
   uTypeEvents : List JTypeEvent
   uTypePadding : ℕ
-  /-- The nine memory-family tables take no padding height: their rows have no satisfiable zero
-  row, so a generated table is exactly as tall as its event list. -/
+  /-- The nine memory-family table builders currently take no padding height, so a generated table
+  is exactly as tall as its event list. Their shared address subcontracts now admit zero padding;
+  a full memory-chip zero-row inhabitance theorem remains outside this assembly layer. Threading
+  a height through this trace record is a separate builder/API step. -/
   loadByteEvents : List MemoryEvent
   loadHalfEvents : List MemoryEvent
   loadWordEvents : List MemoryEvent
@@ -128,17 +129,15 @@ structure SupportedCoreTraceWitness (p : ℕ) [Fact p.Prime] [Fact (2 ^ 25 < p)]
   divRemPadding : ℕ
   aluX0Events : List ALUTypeEvent
   aluX0Padding : ℕ
-  -- Provider and boundary tables, positions 25–39.
+  -- Provider and boundary tables, positions 25–52.
   u8RangeEntries : List ByteEntry
   msbEntries : List ByteEntry
   andByteEntries : List ByteEntry
   orByteEntries : List ByteEntry
   xorByteEntries : List ByteEntry
   ltuEntries : List ByteEntry
-  range8Entries : List RangeEntry
-  range13Entries : List RangeEntry
-  range14Entries : List RangeEntry
-  range16Entries : List RangeEntry
+  /-- Range-provider occurrences indexed by the complete preprocessed width profile `0, …, 16`. -/
+  rangeEntries : RangeChip.Width → List RangeEntry
   romEntries : List RomEntry
   memoryInitEntries : List MemRecordEntry
   memoryFinalizeEntries : List MemRecordEntry
@@ -169,18 +168,18 @@ chip, a byte-sized operand pair to a byte provider.
 structure WellFormed : Prop where
   add : ∀ e ∈ trace.addEvents, e.WellFormed
   addi : ∀ e ∈ trace.addiEvents, e.WellFormed
-  addw : ∀ e ∈ trace.addwEvents, e.WellFormed ∧ e.immC = 0
+  addw : ∀ e ∈ trace.addwEvents, e.WellFormed
   sub : ∀ e ∈ trace.subEvents, e.WellFormed
   subw : ∀ e ∈ trace.subwEvents, e.WellFormed
-  bitwise : ∀ e ∈ trace.bitwiseEvents, e.WellFormed ∧ e.IsBitwise ∧ e.immC = 0
-  lt : ∀ e ∈ trace.ltEvents, e.WellFormed ∧ e.IsLt ∧ e.immC = 0
-  shiftLeft : ∀ e ∈ trace.shiftLeftEvents, e.WellFormed ∧ e.IsShiftLeft ∧ e.immC = 0
-  shiftRight : ∀ e ∈ trace.shiftRightEvents, e.WellFormed ∧ e.IsShiftRight ∧ e.immC = 0
-  jal : ∀ e ∈ trace.jalEvents, e.WellFormed ∧ e.JalTargets
+  bitwise : ∀ e ∈ trace.bitwiseEvents, e.WellFormed ∧ e.IsBitwise
+  lt : ∀ e ∈ trace.ltEvents, e.WellFormed ∧ e.IsLt
+  shiftLeft : ∀ e ∈ trace.shiftLeftEvents, e.WellFormed ∧ e.IsShiftLeft
+  shiftRight : ∀ e ∈ trace.shiftRightEvents, e.WellFormed ∧ e.IsShiftRight
+  jal : ∀ e ∈ trace.jalEvents, e.WellFormedJal ∧ e.JalTargets
   jalr : ∀ e ∈ trace.jalrEvents, e.WellFormed ∧ e.JalrTargets
   branch : ∀ e ∈ trace.branchEvents, e.WellFormedBranch ∧ e.IsBranch ∧ e.BranchTargets
-  uType : ∀ e ∈ trace.uTypeEvents, e.WellFormed ∧ e.UTypeImm
-  loadByte : ∀ e ∈ trace.loadByteEvents, e.WellFormed ∧ e.opcode = 29
+  uType : ∀ e ∈ trace.uTypeEvents, e.WellFormedUType ∧ e.UTypeImm
+  loadByte : ∀ e ∈ trace.loadByteEvents, e.WellFormed ∧ (e.opcode = 29 ∨ e.opcode = 32)
   loadHalf : ∀ e ∈ trace.loadHalfEvents, e.WellFormed ∧ e.Aligned 2
   loadWord : ∀ e ∈ trace.loadWordEvents, e.WellFormed ∧ e.Aligned 4
   loadDouble : ∀ e ∈ trace.loadDoubleEvents, e.WellFormed ∧ e.Aligned 8
@@ -198,16 +197,13 @@ structure WellFormed : Prop where
   orByte : ∀ e ∈ trace.orByteEntries, e.WellFormed
   xorByte : ∀ e ∈ trace.xorByteEntries, e.WellFormed
   ltu : ∀ e ∈ trace.ltuEntries, e.WellFormed
-  range8 : ∀ e ∈ trace.range8Entries, e.WellFormed 8
-  range13 : ∀ e ∈ trace.range13Entries, e.WellFormed 13
-  range14 : ∀ e ∈ trace.range14Entries, e.WellFormed 14
-  range16 : ∀ e ∈ trace.range16Entries, e.WellFormed 16
+  range : ∀ width e, e ∈ trace.rangeEntries width → e.WellFormed width.val
   rom : ∀ e ∈ trace.romEntries, e.WellFormed
   memoryInit : ∀ e ∈ trace.memoryInitEntries, e.WellFormedInit
   memoryBump : ∀ r ∈ trace.memoryBumpRows, MemoryBumpChip.Spec r
   stateBump : ∀ r ∈ trace.stateBumpRows, StateBumpChip.Spec r
 
-/-! ## The forty tables -/
+/-! ## The 53 tables -/
 
 /-- The shard's public boundary row: the four endpoints, limbed exactly as the verifier reads
 them. -/
@@ -215,14 +211,19 @@ def publicValues : SP1PublicIO (ZMod p) :=
   boundaryInputs trace.initClk trace.initPc trace.finalClk trace.finalPc
 
 /--
-**The forty built tables**, in `sp1Ensemble.tables` order: the twenty-five instruction chips of
-`sp1Tables`, then the fifteen entries of `sp1ProviderTables`.
+**The 53 built tables**, in `sp1Ensemble.tables` order: the twenty-five instruction chips of
+`sp1Tables`, then the 28 entries of `sp1ProviderTables`.
 
-Nine of them go through `Table.buildHinted` rather than `Table.build` — the chips whose witness
+Seven of them go through `Table.buildHinted` rather than `Table.build` — the chips whose witness
 generation reads a per-row prover hint (the flag one-hots of Bitwise/Lt/the shifts/Mul/DivRem, the
 comparison selector of Branch). Their builders pair each event with the hint that event's own row
 is witnessed at; everything else shares the trace's single `hint`.
 -/
+def rangeTables : List (Table (ZMod p)) :=
+  RangeChip.allWidths.map fun width =>
+    Table.build (RangeChip.componentFor width)
+      (RangeChip.traceInputs (trace.rangeEntries width)) trace.data trace.hint
+
 def tables : List (Table (ZMod p)) :=
   [ Table.build AddChip.component (AddChip.traceInputs trace.addEvents trace.addPadding)
       trace.data trace.hint,
@@ -285,16 +286,8 @@ def tables : List (Table (ZMod p)) :=
     Table.build ByteChip.XorByte.component (ByteChip.XorByte.traceInputs trace.xorByteEntries)
       trace.data trace.hint,
     Table.build ByteChip.Ltu.component (ByteChip.Ltu.traceInputs trace.ltuEntries)
-      trace.data trace.hint,
-    Table.build (RangeChip.component 8 (RangeChip.two_pow_lt (by norm_num)))
-      (RangeChip.traceInputs trace.range8Entries) trace.data trace.hint,
-    Table.build (RangeChip.component 13 (RangeChip.two_pow_lt (by norm_num)))
-      (RangeChip.traceInputs trace.range13Entries) trace.data trace.hint,
-    Table.build (RangeChip.component 14 (RangeChip.two_pow_lt (by norm_num)))
-      (RangeChip.traceInputs trace.range14Entries) trace.data trace.hint,
-    Table.build (RangeChip.component 16 (RangeChip.two_pow_lt (by norm_num)))
-      (RangeChip.traceInputs trace.range16Entries) trace.data trace.hint,
-    Table.build ProgramProviderChip.component
+      trace.data trace.hint
+    ] ++ trace.rangeTables ++ [Table.build ProgramProviderChip.component
       (ProgramProviderChip.traceInputs trace.romEntries) trace.data trace.hint,
     Table.build MemoryProviderChip.component
       (MemoryProviderChip.traceInputs trace.memoryInitEntries) trace.data trace.hint,
@@ -308,19 +301,34 @@ def tables : List (Table (ZMod p)) :=
 `sp1ProviderTables` build, and `Table.build`/`Table.buildHinted` record the component they were
 given. -/
 theorem tables_map_component :
-    (trace.tables.map (·.component)) = (sp1Ensemble (p := p)).tables := rfl
+    (trace.tables.map (·.component)) = (sp1Ensemble (p := p)).tables := by
+  have instructionComponents :
+      (trace.tables.take instructionTableCount).map (·.component) = sp1Tables := rfl
+  have providerComponents :
+      (trace.tables.drop instructionTableCount).map (·.component) = sp1ProviderTables := rfl
+  rw [sp1Ensemble_tables, ← instructionComponents, ← providerComponents,
+    ← List.map_append, List.take_append_drop]
 
 /-- Every assembled table carries the trace's shared committed prover data — Clean's
 `EnsembleWitness.same_data`. -/
 theorem tables_data : ∀ table ∈ trace.tables, table.data = trace.data := by
   intro table hmem
-  simp only [tables, List.mem_cons, List.not_mem_nil, or_false] at hmem
-  rcases hmem with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h |
-    h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h <;> rw [h] <;> rfl
+  rw [tables] at hmem
+  rcases List.mem_append.mp hmem with prefixOrRangeMem | tailMem
+  rcases List.mem_append.mp prefixOrRangeMem with prefixMem | rangeMem
+  · simp only [List.mem_cons, List.not_mem_nil, or_false] at prefixMem
+    rcases prefixMem with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h |
+      h | h | h | h | h | h | h | h | h | h | h | h | h <;> rw [h] <;> rfl
+  · simp only [rangeTables] at rangeMem
+    obtain ⟨width, _, tableEq⟩ := List.mem_map.mp rangeMem
+    subst table
+    rfl
+  · simp only [List.mem_cons, List.not_mem_nil, or_false] at tailMem
+    rcases tailMem with h | h | h | h | h <;> rw [h] <;> rfl
 
 /-! ## The assembled witness -/
 
-/-- **The shard's AIR witness.** The forty built tables in ensemble order, the shared committed
+/-- **The shard's AIR witness.** The 53 built tables in ensemble order, the shared committed
 prover data, and the public boundary row the verifier checks. -/
 def witness : EnsembleWitness (sp1Ensemble (p := p)) :=
   EnsembleWitness.ofTables _ trace.tables trace.data trace.publicValues
@@ -342,7 +350,7 @@ theorem witness_verifierTable :
 /--
 **The assembled witness satisfies the ensemble's constraint system.**
 
-Every one of the forty-one tables — twenty-five instruction chips, fifteen provider/boundary
+Every one of the 54 tables — twenty-five instruction chips, 28 provider/boundary
 tables, and the verifier row — has every `assertZero` of its whole flattened circuit evaluate to
 zero on every generated row, and no static lookup left unchecked. Each conjunct is one citation of
 the corresponding `traceTable_constraints`, so the arithmetic content (gadget carries, byte
@@ -351,52 +359,60 @@ decompositions, division evidence, the reader glue) is exactly the content those
 theorem witness_constraints (wf : trace.WellFormed) : trace.witness.Constraints := by
   have hall : trace.witness.allTables = trace.witness.verifierTable :: trace.tables := rfl
   rw [EnsembleWitness.Constraints, hall]
-  simp only [tables, List.forall_mem_cons]
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
-    ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, nofun⟩
+  intro table tableMem
+  rcases List.mem_cons.mp tableMem with rfl | tableMem
   · rw [witness_verifierTable]
     exact verifierTable_constraints _ _ _ fun _ hpi => by
       rw [List.mem_singleton.mp hpi]; exact boundaryInputs_limbBounds _ _ _ _
-  · exact AddChip.traceTable_constraints _ _ _ _ wf.add
-  · exact AddiChip.traceTable_constraints _ _ _ _ wf.addi
-  · exact AddwChip.traceTable_constraints _ _ _ _ wf.addw
-  · exact SubChip.traceTable_constraints _ _ _ _ wf.sub
-  · exact SubwChip.traceTable_constraints _ _ _ _ wf.subw
-  · exact BitwiseChip.traceTable_constraints _ _ _ wf.bitwise
-  · exact LtChip.traceTable_constraints _ _ _ wf.lt
-  · exact ShiftLeftChip.traceTable_constraints _ _ _ wf.shiftLeft
-  · exact ShiftRightChip.traceTable_constraints _ _ _ wf.shiftRight
-  · exact JalChip.traceTable_constraints _ _ _ _ wf.jal
-  · exact JalrChip.traceTable_constraints _ _ _ _ wf.jalr
-  · exact BranchChip.traceTable_constraints _ _ _ wf.branch
-  · exact UTypeChip.traceTable_constraints _ _ _ _ wf.uType
-  · exact LoadByteChip.traceTable_constraints _ _ _ wf.loadByte
-  · exact LoadHalfChip.traceTable_constraints _ _ _ wf.loadHalf
-  · exact LoadWordChip.traceTable_constraints _ _ _ wf.loadWord
-  · exact LoadDoubleChip.traceTable_constraints _ _ _ wf.loadDouble
-  · exact LoadX0Chip.traceTable_constraints _ _ _ wf.loadX0
-  · exact StoreByteChip.traceTable_constraints _ _ _ wf.storeByte
-  · exact StoreHalfChip.traceTable_constraints _ _ _ wf.storeHalf
-  · exact StoreWordChip.traceTable_constraints _ _ _ wf.storeWord
-  · exact StoreDoubleChip.traceTable_constraints _ _ _ wf.storeDouble
-  · exact MulChip.traceTable_constraints _ _ _ wf.mul
-  · exact DivRemChip.traceTable_constraints _ _ _ wf.divRem
-  · exact AluX0Chip.traceTable_constraints _ _ _ _ wf.aluX0
-  · exact ByteChip.U8Range.traceTable_constraints _ _ _ wf.u8Range
-  · exact ByteChip.MSB.traceTable_constraints _ _ _ wf.msb
-  · exact ByteChip.AndByte.traceTable_constraints _ _ _ wf.andByte
-  · exact ByteChip.OrByte.traceTable_constraints _ _ _ wf.orByte
-  · exact ByteChip.XorByte.traceTable_constraints _ _ _ wf.xorByte
-  · exact ByteChip.Ltu.traceTable_constraints _ _ _ wf.ltu
-  · exact RangeChip.traceTable_constraints _ (by norm_num) _ _ _ wf.range8
-  · exact RangeChip.traceTable_constraints _ (by norm_num) _ _ _ wf.range13
-  · exact RangeChip.traceTable_constraints _ (by norm_num) _ _ _ wf.range14
-  · exact RangeChip.traceTable_constraints _ (by norm_num) _ _ _ wf.range16
-  · exact ProgramProviderChip.traceTable_constraints _ _ _ wf.rom
-  · exact MemoryProviderChip.traceTable_constraints _ _ _ wf.memoryInit
-  · exact MemoryFinalizeChip.traceTable_constraints _ _ _
-  · exact MemoryBumpChip.traceTable_constraints _ _ _ wf.memoryBump
-  · exact StateBumpChip.traceTable_constraints _ _ _ wf.stateBump
+  · rw [tables] at tableMem
+    rcases List.mem_append.mp tableMem with prefixOrRangeMem | tailMem
+    rcases List.mem_append.mp prefixOrRangeMem with prefixMem | rangeMem
+    · simp only [List.mem_cons, List.not_mem_nil, or_false] at prefixMem
+      rcases prefixMem with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h |
+        h | h | h | h | h | h | h | h | h | h | h | h | h | h
+      · subst table; exact AddChip.traceTable_constraints _ _ _ _ wf.add
+      · subst table; exact AddiChip.traceTable_constraints _ _ _ _ wf.addi
+      · subst table; exact AddwChip.traceTable_constraints _ _ _ _ wf.addw
+      · subst table; exact SubChip.traceTable_constraints _ _ _ _ wf.sub
+      · subst table; exact SubwChip.traceTable_constraints _ _ _ _ wf.subw
+      · subst table; exact BitwiseChip.traceTable_constraints _ _ _ wf.bitwise
+      · subst table; exact LtChip.traceTable_constraints _ _ _ wf.lt
+      · subst table; exact ShiftLeftChip.traceTable_constraints _ _ _ wf.shiftLeft
+      · subst table; exact ShiftRightChip.traceTable_constraints _ _ _ wf.shiftRight
+      · subst table; exact JalChip.traceTable_constraints _ _ _ _ wf.jal
+      · subst table; exact JalrChip.traceTable_constraints _ _ _ _ wf.jalr
+      · subst table; exact BranchChip.traceTable_constraints _ _ _ wf.branch
+      · subst table; exact UTypeChip.traceTable_constraints _ _ _ _ wf.uType
+      · subst table; exact LoadByteChip.traceTable_constraints _ _ _ wf.loadByte
+      · subst table; exact LoadHalfChip.traceTable_constraints _ _ _ wf.loadHalf
+      · subst table; exact LoadWordChip.traceTable_constraints _ _ _ wf.loadWord
+      · subst table; exact LoadDoubleChip.traceTable_constraints _ _ _ wf.loadDouble
+      · subst table; exact LoadX0Chip.traceTable_constraints _ _ _ wf.loadX0
+      · subst table; exact StoreByteChip.traceTable_constraints _ _ _ wf.storeByte
+      · subst table; exact StoreHalfChip.traceTable_constraints _ _ _ wf.storeHalf
+      · subst table; exact StoreWordChip.traceTable_constraints _ _ _ wf.storeWord
+      · subst table; exact StoreDoubleChip.traceTable_constraints _ _ _ wf.storeDouble
+      · subst table; exact MulChip.traceTable_constraints _ _ _ wf.mul
+      · subst table; exact DivRemChip.traceTable_constraints _ _ _ wf.divRem
+      · subst table; exact AluX0Chip.traceTable_constraints _ _ _ _ wf.aluX0
+      · subst table; exact ByteChip.U8Range.traceTable_constraints _ _ _ wf.u8Range
+      · subst table; exact ByteChip.MSB.traceTable_constraints _ _ _ wf.msb
+      · subst table; exact ByteChip.AndByte.traceTable_constraints _ _ _ wf.andByte
+      · subst table; exact ByteChip.OrByte.traceTable_constraints _ _ _ wf.orByte
+      · subst table; exact ByteChip.XorByte.traceTable_constraints _ _ _ wf.xorByte
+      · subst table; exact ByteChip.Ltu.traceTable_constraints _ _ _ wf.ltu
+    · simp only [rangeTables] at rangeMem
+      obtain ⟨width, _, tableEq⟩ := List.mem_map.mp rangeMem
+      subst table
+      exact RangeChip.traceTable_constraints _ (Nat.le_of_lt_succ width.isLt) _ _ _
+        (wf.range width)
+    · simp only [List.mem_cons, List.not_mem_nil, or_false] at tailMem
+      rcases tailMem with h | h | h | h | h
+      · subst table; exact ProgramProviderChip.traceTable_constraints _ _ _ wf.rom
+      · subst table; exact MemoryProviderChip.traceTable_constraints _ _ _ wf.memoryInit
+      · subst table; exact MemoryFinalizeChip.traceTable_constraints _ _ _
+      · subst table; exact MemoryBumpChip.traceTable_constraints _ _ _ wf.memoryBump
+      · subst table; exact StateBumpChip.traceTable_constraints _ _ _ wf.stateBump
 
 end SupportedCoreTraceWitness
 

@@ -24,12 +24,13 @@ twenty-five copies of one three-line argument rather than twenty-five separate p
 ## Scope
 
 Instruction segment only. The provider, memory-boundary and system-table segments of the extracted
-cluster do not map row-for-row onto native tables — SP1 has one byte-lookup table where the native
-ensemble has six opcode tables plus four range widths, and the native memory boundary is fed by the
-*memory-boundary* cluster rather than the execution one — so those need redistribution arguments
-rather than this file's definitional read-off. Likewise the four channel balances, which need the
-extracted `Balance.Valid` transported through the per-table access permutations. See
-`docs/roadmap.md`.
+cluster do not map row-for-row onto native tables — SP1 has one Byte and one Range table where the
+native ensemble has six opcode tables plus seventeen fixed-width Range tables, and the native memory
+boundary is fed by the *memory-boundary* cluster rather than the execution one — so those need
+redistribution arguments rather than this file's definitional read-off. The reduced native slice also
+has a different consumer universe: Byte/Program balance is reconstructed from its literal consumer
+ledger, while State/Memory translation remains explicit. Exact `Balance.Valid` transport is reusable
+evidence, not a direct four-channel equality for the native ensemble. See `docs/roadmap.md`.
 -/
 
 namespace SP1Clean.Faithful.Transport
@@ -204,8 +205,8 @@ native chip circuit, and by `transported_map_component` those tables are positio
 ensemble's instruction tables. This is the composition the external PR #110 report's Finding 1
 found missing, stated against the real extracted relation.
 
-What it is not yet: a whole `EnsembleWitness`. That needs the other fifteen tables and the four
-channel balances.
+What it is not yet: a whole `EnsembleWitness`. That needs the other twenty-eight tables, an explicit
+demand-oriented preprocessing inventory, and the four channel balances.
 -/
 theorem extracted_instructionTables_constraints
     {binds : SP1Clean.CoreAIR.Current.PreprocessedBinding p Digest}

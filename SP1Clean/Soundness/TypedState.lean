@@ -751,14 +751,14 @@ theorem DecodedInstructionRow.stateInteractions_eq_of_mem
         (statePushMessage (decoded.toChipRow data))] :=
   decoded.stateInteractions_eq data (decoded.stateEmissionShape_of_mem tables decodedMem)
 
-/-- The fourteen state-silent provider/boundary tables — the thirteen pre-W3 providers plus the
-MemoryBump table at position 38 — contribute no State interactions.  This follows from their
+/-- The 27 state-silent provider/boundary tables — the 26 non-bump providers plus the
+MemoryBump table at position 51 — contribute no State interactions.  This follows from their
 declared circuit channels, so it is independent of their physical row contents.  The StateBump
-table at position 39 is deliberately excluded: it is the sole provider-segment State contributor,
+table at position 52 is deliberately excluded: it is the sole provider-segment State contributor,
 and its per-row pull/push pairs join the typed State decomposition explicitly (W3). -/
 theorem witness_providerStateInteractions_eq_nil
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
-    ((witness.tables.drop 25).take 14).flatMap
+    ((witness.tables.drop instructionTableCount).take stateSilentProviderTableCount).flatMap
         (typedTableInteractionsWith · stateChannel) = [] := by
   rw [List.flatMap_eq_nil_iff]
   intro table tableMem
@@ -889,10 +889,19 @@ theorem typedEnsembleStateInteractions_eq
             (StateBumpChip.pushedMessage (stateBumpRow (stateBumpTable witness) row))]) := by
   rw [typedEnsembleInteractionsWith_partition, witness_verifierStateInteractions_eq,
     decodedWitnessStateInteractions_eq]
-  rw [show witness.tables.drop 25 = (witness.tables.drop 25).take 14 ++
-      witness.tables.drop 39 from tables_drop25_split witness]
-  rw [List.flatMap_append, witness_providerStateInteractions_eq_nil, List.nil_append,
-    tables_drop39, List.flatMap_cons, List.flatMap_nil, List.append_nil,
+  rw [show witness.tables.drop 25 =
+      (witness.tables.drop 25).take 27 ++ witness.tables.drop 52 from by
+    simpa [instructionTableCount, stateSilentProviderTableCount, stateBumpIndex] using
+      tables_drop25_split witness]
+  have providerNil : ((witness.tables.drop 25).take 27).flatMap
+      (typedTableInteractionsWith · stateChannel) = [] := by
+    simpa [instructionTableCount, stateSilentProviderTableCount] using
+      witness_providerStateInteractions_eq_nil witness
+  have stateTail : witness.tables.drop 52 = [stateBumpTable witness] := by
+    simpa [stateBumpIndex, instructionTableCount, stateSilentProviderTableCount] using
+      tables_drop_stateBumpIndex witness
+  rw [List.flatMap_append, providerNil, List.nil_append, stateTail, List.flatMap_cons,
+    List.flatMap_nil, List.append_nil,
     stateBumpTable_typedState]
 
 /-- Produced messages of flattened StateBump pairs are precisely the canonically re-limbed pushed

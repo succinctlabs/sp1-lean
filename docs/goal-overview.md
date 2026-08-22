@@ -57,6 +57,17 @@ The extracted fact must cover:
 - transcript, LogUp/GKR, zero-check, PCS, commitment, and Fiat--Shamir assumptions; and
 - all trace-size and multiplicity bounds used to rule out modular wraparound.
 
+Those exact multiplicities belong to the full exact cluster. The native postprocessor must not copy
+them into its smaller consumer universe: it recounts Byte/Range/Program demand from the actual native
+interaction skeleton. The raw exact Byte/Range/Program assertion lists are empty;
+`CoreAIR.PreprocessedBinding` only records the named matrix/PCS-opening premise, to be discharged by
+ArkLib. `PreprocessedProviderContract` is the explicit caller premise for row-local semantics; it supplies
+neither projected-key uniqueness nor native-demand coverage.
+The integration layer must construct a caller-supplied
+`CanonicalPreprocessedInventory` whose selected carriers are source-backed by their matching exact
+matrix/Range-width block and whose projected keys are explicitly `Nodup`; zero-demand raw keys may
+be omitted. Nonzero-demand coverage, nonpositivity, and canonical capacity remain explicit premises.
+
 The deterministic postprocessor should be the closed future declaration:
 
 ```lean

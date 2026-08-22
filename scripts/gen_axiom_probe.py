@@ -27,6 +27,74 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT_MAIN = ROOT / "scripts" / "axiom_probe.lean"
 OUT_TEST = ROOT / "scripts" / "axiom_probe_test.lean"
 
+# Exact-transport headlines are deliberately one target per declaration.  Do not fold these into
+# an alternation: target validation is per tuple, so a grouped regex would let one surviving theorem
+# hide a renamed or deleted sibling.  This list is the fail-closed inventory for the source-backed
+# preprocessing boundary, exact integer-balance transport, and the native-artifact capstones.
+EXACT_REQUIRED_THEOREMS = [
+    # Exact relation -> collision-free projected ledger.
+    ("SP1Clean/Faithful/Transport/ExactBalance.lean", "exactPayloadKey_injective"),
+    ("SP1Clean/Faithful/Transport/ExactBalance.lean", "projectedInteractions_balanced"),
+    ("SP1Clean/Faithful/Transport/ExactBalance.lean", "projectedActiveInteractions_balanced"),
+    ("SP1Clean/Faithful/Transport/ExactBalance.lean", "exactRelation_projectedInteractions_balanced"),
+    ("SP1Clean/Faithful/Transport/ExactBalance.lean",
+     "exactRelation_projectedActiveInteractions_balanced"),
+    # Source-backed canonical preprocessing inventory and its literal Clean ledger.
+    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean",
+     "inventoryPreprocessedKeys_eq_inventoryRows"),
+    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean",
+     "inventoryPreprocessedKeys_nodup"),
+    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean", "canonicalByteRows_mem_source"),
+    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean", "canonicalRangeRows_mem_source"),
+    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean", "canonicalProgramRows_mem_source"),
+    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean",
+     "extractedPreprocessedProviderTables_constraints"),
+    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean",
+     "extractedPreprocessedProviderTables_cleanAccesses"),
+    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean",
+     "skeleton_append_recountedPreprocessedProviderAccesses_balanced"),
+    # Boundary/system providers and the exact provider segment.
+    ("SP1Clean/Faithful/Transport/MemoryBoundary.lean", "memoryGlobalInitMultiplicity_bool"),
+    ("SP1Clean/Faithful/Transport/MemoryBoundary.lean", "memoryGlobalFinalizeMultiplicity_bool"),
+    ("SP1Clean/Faithful/Transport/MemoryBoundary.lean",
+     "memoryBoundaryProviderContract_of_relation"),
+    ("SP1Clean/Faithful/Transport/MemoryBoundary.lean",
+     "extractedMemoryBoundaryTables_constraints"),
+    ("SP1Clean/Faithful/Transport/MemoryBoundary.lean",
+     "extractedMemoryBoundaryTables_activeAccesses"),
+    ("SP1Clean/Faithful/Transport/SystemTables.lean", "extractedBumpTables_constraints"),
+    ("SP1Clean/Faithful/Transport/SystemTables.lean", "extractedBumpTables_accesses"),
+    ("SP1Clean/Faithful/Transport/ProviderSegment.lean", "exactProviderTables_components"),
+    ("SP1Clean/Faithful/Transport/ProviderSegment.lean", "exactProviderTables_constraints"),
+    ("SP1Clean/Faithful/Transport/ProviderSegment.lean", "exactProviderTableBundle_constraints"),
+    ("SP1Clean/Faithful/Transport/ProviderSegment.lean", "exactProviderTables_cleanAccesses"),
+    # Complete native table assembly, literal-ledger recount, and public semantic capstones.
+    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeBoundary_init_u8Pair"),
+    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeBoundary_final_u8Pair"),
+    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeBoundary_limbBounds"),
+    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeTables_components"),
+    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeTableBundle_components"),
+    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeTables_constraints"),
+    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeEnsembleWitness_verifierTable"),
+    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeEnsembleWitness_constraints"),
+    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean",
+     "exactNativeAllCleanAccesses_eq_interactions"),
+    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeAllCleanAccesses_perm"),
+    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean",
+     "exactNativeAllCleanAccesses_preprocessedBalance"),
+    ("SP1Clean/Faithful/Transport/CoreArtifact.lean",
+     "exactNativeEnsembleWitness_preprocessedIntegerBalance"),
+    ("SP1Clean/Faithful/Transport/CoreArtifact.lean", "exactNativeEnsembleWitness_balancedChannels"),
+    ("SP1Clean/Faithful/Transport/CoreArtifact.lean",
+     "exactNativeArtifact_supportedCoreNativeRelation"),
+    ("SP1Clean/Faithful/Transport/CoreArtifact.lean", "exactNativeArtifact_localExecution"),
+]
+
+EXACT_REQUIRED_TARGETS = [
+    (path, rf"theorem\s+({re.escape(name)})\b")
+    for path, name in EXACT_REQUIRED_THEOREMS
+]
+
 # (glob, declaration-name regex) → collect matching theorems/defs with their namespace.
 TARGETS = [
     ("SP1Clean/Proofs/Chips/*/Formal.lean",
@@ -55,18 +123,27 @@ TARGETS = [
     ("SP1Clean/Faithful/DivRemChip/Exact.lean",
      r"(?:theorem|def)\s+(\w*faithful\w*)\b"),
     ("SP1Clean/Faithful/SupportedMachine.lean",
-     r"(?:theorem|def)\s+(supportedChipFaithfulness\w*)\b"),
-    # W6: the transport layer — the generic per-table transport and its twenty-five
-    # instantiations, plus the identity that makes the transported tables the ensemble's own.
+     r"(?:theorem|def)\s+(supportedChipFaithfulness\w*|"
+     r"instructionOracleMainWidth|instructionOracleMainWidth_isSome_iff|"
+     r"supportedInstructionMainWidths)\b"),
+    # W6: the transport layer — the generic per-table transport and all three public theorem
+    # families for each of its twenty-five instantiations, plus the aggregate identity that makes
+    # the transported tables the ensemble's own.
     # These are the declarations that put `Faithful/` inside a live import closure.
     ("SP1Clean/Faithful/Transport/Table.lean",
-     r"theorem\s+(transportTable_constraints|transportTable_accesses_perm|transportTable_spec)\b"),
+     r"theorem\s+(buildRow_input_get|eval_var_buildRow_input_get|signedVal_eq_zero_iff|"
+     r"transportTable_constraints|"
+     r"transportTable_accesses_perm|transportTable_spec)\b"),
+    ("SP1Clean/Faithful/Transport/Chips.lean",
+     r"theorem\s+(\w+Chip_transportTable_(?:constraints|accesses|spec))\b"),
     ("SP1Clean/Faithful/Transport/Ensemble.lean",
-     r"theorem\s+(transported_map_component|transported_constraints)\b"),
+     r"theorem\s+(transported_map_component|transportedInstructionActiveAccesses_perm|"
+     r"transported_constraints)\b"),
     ("SP1Clean/Faithful/Transport/Extracted.lean",
      r"theorem\s+(extractedInstructionRows_valid|extracted_instructionTables_constraints)\b"),
     ("SP1Clean/Faithful/Transport/Balance.lean",
      r"theorem\s+(signedSum_eq_sent_sub_received|signedSum_eq_zero)\b"),
+    *EXACT_REQUIRED_TARGETS,
     ("SP1Clean/Soundness/CoreAIRSyscallFree.lean",
      r"theorem\s+(publicCommitOperand|deferredCommitOperand|publicCommitSetsFlag|"
      r"deferredCommitSetsFlag|syscallTranscript)\b"),
@@ -74,28 +151,44 @@ TARGETS = [
     # companions + the nonempty-assert-list guard) is census-visible so its native_decide trust is
     # disclosed per-declaration like the conformance anchors.
     ("SP1CleanTest/NonVacuityReal.lean", r"theorem\s+(\w+)\b"),
-    # The independent-audit joint-premise regression freezes both the full native constraint
-    # check and the exact evaluated bus footprint. Keep its native_decide trust visible alongside
-    # the older conformance and per-row satisfiability batteries.
+    # Independent audit regressions freeze the full native constraint checks and exact evaluated
+    # bus footprints.  The active-trace declarations additionally keep the generated one-row trace,
+    # its particular native witness, and the official-Sail consequence census-visible end to end.
     ("SP1CleanTest/Audit/*.lean",
      r"theorem\s+(constraints_hold|interactions_exact|program_projection|"
+     r"bytePaddingTable_constraints|bytePaddingTable_busNeutral|"
+     r"byteAggregateTable_constraints|byteAggregateTable_preservesMultiplicity|"
+     r"rangeAggregateTable_constraints|rangeAggregateTable_preservesMultiplicity|"
+     r"programAggregateTable_constraints|programAggregateTable_preservesMultiplicity|"
+     r"byteAggregateTable_accesses|byteAggregateLedger_accesses|"
+     r"byteAggregate_signedVal|byteAggregateLedger_integerBalanced|"
+     r"byteAggregateLedger_balancedInteractions|"
+     r"memoryInitTable_constraints|memoryInitTable_booleanBranches|"
+     r"memoryFinalizeTable_constraints|memoryFinalizeTable_booleanBranches|"
      r"supportedCoreNativeRelation_nonvacuous|traceGeneratableRelation_nonvacuous|"
-     r"anchorTrace_yields_airWitness)\b"),
+     r"anchorTrace_yields_airWitness|activeTrace_traceGeneratable|activeTrace_nativeRelation|"
+     r"verifierBytePulls_asymmetricClockOrder|"
+     r"active_instruction_count|active_decoded_instruction_row_count|"
+     r"active_real_decoded_instruction_row_count|"
+     r"activeTrace_yields_airWitness|activeTrace_yields_localExecution)\b"),
     # The W4 completeness layer's provider/ledger half: the built provider and verifier tables'
     # constraint theorems, and the generic push/pull balance bridge the W5 assembly consumes.
     ("SP1Clean/Proofs/Completeness/Providers.lean",
-     r"theorem\s+(traceTable_constraints)\b"),
+     r"(?:theorem|lemma)\s+(traceTable_constraints|"
+     r"ByteEntry\.signedVal_multiplicity|RangeEntry\.signedVal_multiplicity|"
+     r"RomEntry\.signedVal_multiplicity)\b"),
     ("SP1Clean/Proofs/Completeness/Ledger.lean",
      r"theorem\s+(balancedInteractions_of_signed_perm|balancedInteractions_of_flatMap_perm|"
      r"balanceOf_eq_pushed_sub_pulled)\b"),
     # W5: the machine-level assembly and its completeness capstone. The assembly's constraint
-    # theorem is the join of all forty-one tables' own theorems, so a regression anywhere in the
+    # theorem is the join of all 54 tables' own theorems (53 ensemble tables plus verifier), so a
+    # regression anywhere in the
     # completeness layer surfaces here first.
     ("SP1Clean/Proofs/Completeness/Assembly.lean",
      r"theorem\s+(witness_constraints|tables_map_component)\b"),
     ("SP1Clean/Soundness/AIRCompleteness.lean",
      r"theorem\s+(supported_core_native_complete|sp1Ensemble_statement_of_traceGeneratable|"
-     r"witness_balancedChannels)\b"),
+     r"balancedOn_of_signed_perm|witness_balancedChannels)\b"),
     # The W4 completeness layer: each chip's trace-table constraint/guarantee theorems and its
     # event-to-prover-assumptions discharge. Probed from the pilot onward so the rollout cannot
     # silently introduce a compiler-trusted or deferred step.
@@ -111,7 +204,11 @@ TARGETS = [
     # The field⇒ℤ balance bridge (relocated in W11 Phase 5).
     ("SP1Clean/Model/BalanceBridge.lean",
      r"theorem\s+(isConsistentBalanced_of_intCast_zero|intCast_multiplicitySum_map_toAccess|"
-     r"isConsistentBalanced_of_balancedInteractions)\b"),
+     r"intCast_multiplicitySum_map_toAccess_eq_balanceOf|"
+     r"isConsistentBalanced_of_balancedInteractions|"
+     r"balancedInteractions_of_isConsistentBalanced)\b"),
+    ("SP1Clean/Model/InteractionProjection.lean",
+     r"lemma\s+(signedVal_natCast_of_twice_le)\b"),
     ("SP1Clean/Soundness/SP1Ensemble.lean",
      r"(?:theorem|def)\s+((?:sp1|balanced)\w*)\b"),
     ("SP1Clean/Soundness/AIR.lean",
@@ -119,8 +216,8 @@ TARGETS = [
      r"supportedCore_groundingObligations_of_constraints|"
      r"supportedCore_orderedRows_dynamic_of_obligations|"
      r"supportedCore_orderedRows_dynamic|supported_core_witness_grounding|"
-     r"supported_core_native_sound)\b"),
-    # Exact v6.3.1 table/profile guards and the public ArkLib-facing Core AIR capstone.  These are
+     r"supported_core_native_grounding|supported_core_native_sound)\b"),
+    # Exact v6.4.0 table/profile guards and the public ArkLib-facing Core AIR capstone.  These are
     # release headlines: adding a new capstone file must not silently leave it outside the census.
     ("SP1Clean/FormalModel/CoreProfile.lean",
      r"theorem\s+(checkedIn_semanticRevision|coreCluster_matchesExtracted|"
@@ -166,9 +263,6 @@ TARGETS = [
     ("SP1Clean/Soundness/MemoryIsU64.lean",
      r"(?:theorem|def)\s+(memBalanceHyps_of_genesis|memBalanceHyps_of_boundary|"
      r"operand_\w+_isU64_of_memBalance)\b"),
-    ("SP1Clean/Soundness/ValueBound.lean",
-     r"(?:theorem|def|lemma)\s+(value_targetBound|operandsBound_full_targetBound|targetObligations_full|"
-     r"ValueOperandsBound|walk_clk_monotone|sndClk_eq_rcvClk)\b"),
 ]
 
 NS_RE = re.compile(r"^namespace\s+([\w.]+)")
@@ -211,12 +305,15 @@ def main() -> None:
     test_fqns: list[str] = []
     test_imports: list[str] = []  # `SP1CleanTest.*` modules, imported explicitly in the test probe
     seen_imports: set[str] = set()
+    missing_targets: list[tuple[str, str]] = []
     for glob, pattern in TARGETS:
         decl_re = re.compile(pattern)
+        target_count = 0
         for path in sorted(ROOT.glob(glob)):
             found = fqns_in(path, decl_re)
             if not found:
                 continue
+            target_count += len(found)
             # `import SP1Clean` (the umbrella) covers every main-library declaration, but NOT the
             # `SP1CleanTest` conformance anchors (that test library is not imported by the umbrella —
             # it is the native_decide quarantine). Those go to the separate test probe, importing
@@ -230,6 +327,14 @@ def main() -> None:
                     test_imports.append(mod)
             else:
                 main_fqns.extend(found)
+        if target_count == 0:
+            missing_targets.append((glob, pattern))
+
+    if missing_targets:
+        print("FAIL: axiom-census target(s) matched no declarations:")
+        for glob, pattern in missing_targets:
+            print(f"  {glob}: {pattern}")
+        raise SystemExit(1)
 
     def dedupe(fqns: list[str]) -> list[str]:
         seen, ordered = set(), []

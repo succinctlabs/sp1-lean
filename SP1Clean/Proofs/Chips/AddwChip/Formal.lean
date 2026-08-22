@@ -68,8 +68,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ :=
-    h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hop_a_0, himm, himm_copy, h_cpu, hrac_a, hrac_b, hrac_c,
+    hdec, hprevclk⟩ := h_assumptions
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   -- `op_c_memory` is grouped since `imm_c` is the final field of the ALU adapter block.
@@ -93,15 +93,29 @@ theorem completeness :
     rw [h_env_msb ⟨0, by omega⟩,
       AddwOperation.msbIR_eval env _ _ _ _ hbeq hceq ha hb]
     rfl
+  have himm_pad : (input_is_real - 1) * input_adapter_imm_c = 0 := by
+    rcases himm with h0 | ⟨hr, h1⟩
+    · rw [h0, mul_zero]
+    · rw [hr, h1]
+      simp
+  have hcbin : input_is_real - input_adapter_imm_c = 0 ∨
+      input_is_real - input_adapter_imm_c = 1 := by
+    rcases himm with h0 | ⟨hr, h1⟩
+    · rw [h0, sub_zero]
+      exact hbin
+    · rw [hr, h1]
+      simp
+  have hreal_of_c (hc : input_is_real - input_adapter_imm_c = 1) : input_is_real = 1 := by
+    rcases himm with h0 | ⟨hr, h1⟩
+    · rwa [h0, sub_zero] at hc
+    · exact hr
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨ha, hb, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin, h_clk⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
-      by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
-      ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
+      himm_pad, hcbin, himm_copy,
       hrac_a, hrac_b, hrac_c, hdec,
       (fun hr => ⟨ha_prev hr, ha, (hprevclk hr).1, (hprevclk hr).2.1⟩),
-      -- op_c's guarantee is gated by `is_real - imm_c`; `imm_c = 0` reduces that to `is_real = 1`.
-      fun hc => ⟨hb, (hprevclk (by rwa [himm, sub_zero] at hc)).2.2⟩⟩⟩,
+      fun hc => ⟨hb, (hprevclk (hreal_of_c hc)).2.2⟩⟩⟩,
     ⟨⟨hbin, ?_, h_clk.at_four⟩, trivial⟩, hop_a_0, ?_⟩
   · rw [hval, hmsbeq]; exact AddwOperation.spec_populate ha hb input_is_real
   · -- RegisterWrite's `isU64 value` (the op_a write push): the witnessed result word's `isU64` from

@@ -12,9 +12,9 @@ built per row from **this event's own opcode discriminant**
 must be per row.
 
 `ALUTypeEvent.IsShiftRight` is the chip's **routing** condition; padding is satisfiable (the empty
-hint reads all four flags as `0`, matching `is_real = 0`); and, as for `ShiftLeft`, the chip's
-inline `imm_c` machinery is discharged by `0`-multiplications on the register rows this theorem
-covers, with the immediate `SRLI`/`SRAI`/`SRLIW`/`SRAIW` rows left to soundness and the bridge. -/
+hint reads all four flags as `0`, matching `is_real = 0`); and the shared two-form reader lemmas
+discharge the chip's inline `imm_c` machinery for both register rows and immediate
+`SRLI`/`SRAI`/`SRLIW`/`SRAIW` rows. -/
 
 namespace SP1Clean.TraceGen
 
@@ -85,17 +85,15 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 /-! ## The chip's honest-prover contract on a built row -/
 
 /--
-**A well-formed register-row `ShiftRight` trace event builds a row the honest prover can complete,
-at the hint the same event builds.** Every conjunct of `ShiftRightChip.ProverAssumptions` follows
-from `ALUTypeEvent.WellFormed`, the routing condition `hop : e.IsShiftRight`, and
-`himm : e.immC = 0`.
+**A well-formed `ShiftRight` trace event builds a row the honest prover can complete, at the hint the
+same event builds.** Every conjunct of `ShiftRightChip.ProverAssumptions` follows from
+`ALUTypeEvent.WellFormed` and the routing condition `hop : e.IsShiftRight`; both register and
+immediate operand forms are admitted.
 -/
 theorem proverAssumptions_of_event {e : ALUTypeEvent} (h : e.WellFormed) (hop : e.IsShiftRight)
-    (himm : e.immC = 0) (data : ProverData (ZMod p)) :
+    (data : ProverData (ZMod p)) :
     ProverAssumptions (e.toShiftRightInputs (p := p)) data e.toShiftRightHint := by
   obtain ⟨hf0, hf1, hf2, hf3, hsum⟩ := shiftRightFlags_spec (p := p) hop
-  have himm0 : (e.toShiftRightInputs (p := p)).adapter.imm_c = 0 := by
-    rw [ALUTypeEvent.toShiftRightInputs_adapter, aluTypeReaderCols_imm_c, himm, Nat.cast_zero]
   simp only [ProverAssumptions, hintFlags_toShiftRightHint]
   refine ⟨?_, ?_, ?_, ?_, hf0, hf1, hf2, hf3, hsum.symm, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
     ?_⟩
@@ -108,20 +106,24 @@ theorem proverAssumptions_of_event {e : ALUTypeEvent} (h : e.WellFormed) (hop : 
   · exact Or.inr rfl
   -- `rd ≠ x0`, so the `op_a_0` zeroing flag is off
   · exact aluTypeReaderCols_op_a_0_eq_zero h.opA_ne_zero
-  -- the three `imm_c` conjuncts, all `0`-multiplications on a register row
-  · rw [himm0, mul_zero]
-  · rw [himm0, sub_zero]
-    exact Or.inr rfl
-  · exact ⟨by rw [himm0, zero_mul], by rw [himm0, zero_mul], by rw [himm0, zero_mul],
-      by rw [himm0, zero_mul]⟩
+  -- the three `imm_c` conjuncts for the exact register/immediate split
+  · rw [show (e.toShiftRightInputs (p := p)).is_real = 1 from rfl, sub_self, zero_mul]
+  · rcases aluTypeReaderCols_imm_c_bool (p := p) h.immC_bool with h0 | h1
+    · exact Or.inr (by
+        rw [show (e.toShiftRightInputs (p := p)).is_real = 1 from rfl,
+          ALUTypeEvent.toShiftRightInputs_adapter, h0, sub_zero])
+    · exact Or.inl (by
+        rw [show (e.toShiftRightInputs (p := p)).is_real = 1 from rfl,
+          ALUTypeEvent.toShiftRightInputs_adapter, h1, sub_self])
+  · rw [ALUTypeEvent.toShiftRightInputs_adapter]
+    exact aluTypeReaderCols_imm_copy (p := p) h.immC_bool
   -- the shared reader contracts: the state block, then the two unconditional register accesses
   · exact cpuState_spec e.clk e.pc h.clk_mod _ _ _
   · exact registerAccessCols_spec_opA h.clk_mod h.prevTsA_lt
   · exact registerAccessCols_spec_opB h.clk_mod h.prevTsB_lt
-  -- the `op_c` access: on a register row the block is the ordinary `rs2` read block
-  · rw [ALUTypeEvent.toShiftRightInputs_adapter, aluTypeReaderCols_op_c_memory,
-      aluTypeOpCCols_of_reg himm]
-    exact registerAccessCols_spec_opC h.clk_mod (h.prevTsC_reg himm)
+  -- the `op_c` access: an ordinary `rs2` read or the vacuous immediate block
+  · rw [ALUTypeEvent.toShiftRightInputs_adapter, aluTypeReaderCols_op_c_memory]
+    exact aluTypeOpCCols_spec h.clk_mod h.immC_bool h.prevTsC_reg
   -- the decode bounds the Program-bus fetch carries
   · exact fun _ => ⟨aluTypeReaderCols_op_a_val_lt h.opA_lt, (cpuStateCols_pc_val_lt e.clk e.pc).1,
       (cpuStateCols_pc_val_lt e.clk e.pc).2.1, (cpuStateCols_pc_val_lt e.clk e.pc).2.2⟩
@@ -170,22 +172,22 @@ def traceInputs (events : List ALUTypeEvent) (padding : ℕ) :
   events.map (fun e => (e.toShiftRightInputs, e.toShiftRightHint))
     ++ List.replicate padding (shiftRightPaddingInputs, ProverHint.empty (ZMod p))
 
-/-- Every row of a built trace — event row or padding row — satisfies the chip's honest-prover
-contract at its own hint, provided every event is a register-register right shift. -/
+/-- Every row of a built trace — register shift, immediate shift, or padding — satisfies the chip's
+honest-prover contract at its own hint. -/
 theorem proverAssumptions_of_mem_traceInputs {events : List ALUTypeEvent} {padding : ℕ}
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.IsShiftRight ∧ e.immC = 0) (data : ProverData (ZMod p)) :
+    (h : ∀ e ∈ events, e.WellFormed ∧ e.IsShiftRight) (data : ProverData (ZMod p)) :
     ∀ input ∈ traceInputs (p := p) events padding, ProverAssumptions input.1 data input.2 := by
   intro input hin
   rcases List.mem_append.mp hin with hin | hin
   · obtain ⟨e, he, rfl⟩ := List.mem_map.mp hin
-    exact proverAssumptions_of_event (h e he).1 (h e he).2.1 (h e he).2.2 data
+    exact proverAssumptions_of_event (h e he).1 (h e he).2 data
   · rw [List.eq_of_mem_replicate hin]
     exact proverAssumptions_padding data
 
 /-- **A real trace builds a valid ShiftRight table.** Every `assertZero` of the whole flattened chip
 circuit evaluates to zero on every built row, and no static lookup is left unchecked. -/
 theorem traceTable_constraints (events : List ALUTypeEvent) (padding : ℕ)
-    (data : ProverData (ZMod p)) (h : ∀ e ∈ events, e.WellFormed ∧ e.IsShiftRight ∧ e.immC = 0) :
+    (data : ProverData (ZMod p)) (h : ∀ e ∈ events, e.WellFormed ∧ e.IsShiftRight) :
     (Air.Flat.Table.buildHinted (component (p := p)) (traceInputs events padding) data).Constraints :=
   Air.Flat.Table.buildHinted_constraints _ _ _ computableWitnesses
     (proverAssumptions_of_mem_traceInputs h data)
@@ -193,7 +195,7 @@ theorem traceTable_constraints (events : List ALUTypeEvent) (padding : ℕ)
 /-- The same table satisfies its **channel guarantees** — every message it pushes onto the State,
 Memory, Program and Byte channels carries the payload its channel promises. -/
 theorem traceTable_guarantees (events : List ALUTypeEvent) (padding : ℕ)
-    (data : ProverData (ZMod p)) (h : ∀ e ∈ events, e.WellFormed ∧ e.IsShiftRight ∧ e.immC = 0) :
+    (data : ProverData (ZMod p)) (h : ∀ e ∈ events, e.WellFormed ∧ e.IsShiftRight) :
     (Air.Flat.Table.buildHinted (component (p := p)) (traceInputs events padding) data).Guarantees :=
   Air.Flat.Table.buildHinted_guarantees _ _ _ computableWitnesses
     (proverAssumptions_of_mem_traceInputs h data)

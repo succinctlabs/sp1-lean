@@ -7,12 +7,12 @@ import SP1Clean.Proofs.Chips.StateBumpChip.Formal
 import SP1Clean.Proofs.Chips.MemoryBumpChip.Formal
 import ToClean.Gadgets.ComputableWitnesses
 
-/-! # Honest witness generation for the fifteen provider/boundary tables
+/-! # Honest witness generation for the provider/boundary tables
 
 The `ComputableWitnesses` half of the completeness chain, for the provider segment of
-`sp1ProviderTables` (`Soundness/SP1Ensemble.lean`): the six `ByteChip` opcode providers, the four
-fixed-width `RangeChip` providers, the Program-ROM provider, the two memory boundary tables, and the
-two W3 system tables. The instruction chips' counterparts are the twenty-five
+`sp1ProviderTables` (`Soundness/SP1Ensemble.lean`): the six `ByteChip` opcode providers, all
+seventeen fixed-width `RangeChip` providers, the Program-ROM provider, the two memory boundary
+tables, and the two W3 system tables. The instruction chips' counterparts are the twenty-five
 `Proofs/Chips/<Chip>/Witgen.lean` files; this is the same statement for the tables on the other side
 of every bus.
 
@@ -21,8 +21,9 @@ Three shapes, in increasing order of work:
 * **No cells at all.** `StateBump` and `MemoryBump` are flat own-assert tables: every column is an
   input, `localLength = 0`, and `FlatOperation.forAll_witnessCongr_of_localLength_zero` closes the
   whole obligation without looking at a single operation.
-* **One constant cell.** `MemoryFinalize` witnesses only its multiplicity, at the literal `1`; a
-  constant witness IR is environment-independent, so `circuit_norm` discharges it outright.
+* **No local cells.** `MemoryFinalize` reads its boolean multiplicity from the row input, so its
+  witness-congruence obligation is vacuous too. This makes both active rows and zero padding rows
+  reachable through `Table.build`.
 * **Bit decompositions.** Everything that proves a range bound in-circuit composes
   `Gadgets.ToBits.rangeCheck`, which does declare cells (the bits). Those are dispatched by the
   gadget's own `ComputableWitnesses` (`ToClean/Gadgets/ComputableWitnesses.lean`) through
@@ -35,13 +36,12 @@ witnessed one step earlier. That is what the `AgreesBelow` premise of
 `forAll_witnessCongr_of_assertionSubcircuit` is for — the parent's own environment agreement at the
 child's starting offset covers those cells, so they need no extra hypothesis.
 
-**Multiplicity.** Every provider witnesses its LogUp multiplicity as the literal `1`
-(`witnessField 1`). A built provider row is therefore a **per-occurrence** row — one table row per
-consumer pull — rather than an aggregated row carrying a count. That is a property of the circuits
-as they stand, not a modelling choice made here: `UsesLocalWitnesses` pins the cell to the generator's
-value, so a built row cannot carry any other multiplicity. Aggregation, if it is ever wanted, is a
-transport question on the assembled table (`m` rows at multiplicity `1` versus one row at `m`),
-not a question about `Table.build`. -/
+**Multiplicity.** Provider multiplicities are explicit input columns, never synthesized local
+witnesses. Byte, Range, and Program rows may therefore carry zero (padding), one (per occurrence),
+or an aggregate field count. Memory init/finalize keep their upstream boolean selector gate; their
+honest input builders expose both `0` and `1`. `ComputableWitnesses` consequently proves only the
+derived cells (bit decompositions and byte-operation results), not a hidden policy about table-row
+multiplicity. -/
 
 namespace SP1Clean
 
@@ -61,7 +61,7 @@ local instance : Fact (p > 512) := ⟨by have := Fact.out (p := 2 ^ 17 < p); ome
 namespace U8Range
 
 /-- The `U8Range` provider has computable witnesses: two bit decompositions over the two input
-cells, then the constant multiplicity. -/
+cells. Its multiplicity is an input, not a local witness. -/
 theorem computableWitnesses : (circuit (p := p)).base.ComputableWitnesses := by
   intro k input env env'
   simp only [circuit, main, circuit_norm, Operations.forAllFlat]
@@ -217,7 +217,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : Fact (p > 2) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 /-- The fixed-width `Range` provider has computable witnesses, at every width: one bit
-decomposition over the single input cell, then the constant multiplicity. -/
+decomposition over the single input cell. -/
 theorem computableWitnesses (n : ℕ) (hn : 2 ^ n < p) :
     (circuit n hn (p := p)).base.ComputableWitnesses := by
   intro k input env env'
@@ -226,14 +226,10 @@ theorem computableWitnesses (n : ℕ) (hn : 2 ^ n < p) :
     (Gadgets.ToBits.rangeCheck_computableWitnesses n hn)
     fun _ h => by simpa [circuit_norm] using congrArg Inputs.a h
 
-theorem computableWitnesses8 : (circuit8 (p := p)).base.ComputableWitnesses :=
-  computableWitnesses _ _
-theorem computableWitnesses13 : (circuit13 (p := p)).base.ComputableWitnesses :=
-  computableWitnesses _ _
-theorem computableWitnesses14 : (circuit14 (p := p)).base.ComputableWitnesses :=
-  computableWitnesses _ _
-theorem computableWitnesses16 : (circuit16 (p := p)).base.ComputableWitnesses :=
-  computableWitnesses _ _
+/-- Computable witnesses for every member of the complete `0, …, 16` fixed-width profile. -/
+theorem computableWitnessesFor (width : Width) :
+    (circuitFor width (p := p)).base.ComputableWitnesses :=
+  computableWitnesses width.val _
 
 end RangeChip
 
@@ -246,22 +242,22 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : Fact (p > 2) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 /-- The Program-ROM provider has computable witnesses: four bit decompositions over four input
-cells, a zero-witness boolean gate, then the constant multiplicity. -/
+cells. Its boolean decode gate and explicit multiplicity declare no cells. -/
 theorem computableWitnesses : (circuit (p := p)).base.ComputableWitnesses := by
   intro k input env env'
   simp only [circuit, main, circuit_norm, Operations.forAllFlat]
   exact ⟨FlatOperation.forAll_witnessCongr_of_assertionSubcircuit _ _ (by omega)
       (Gadgets.ToBits.rangeCheck_computableWitnesses _ _)
-      (fun _ h => by simpa [circuit_norm] using congrArg Channels.ProgramMsg.op_a h),
+      (fun _ h => by simpa [circuit_norm] using congrArg Inputs.op_a h),
     FlatOperation.forAll_witnessCongr_of_assertionSubcircuit _ _ (by omega)
       (Gadgets.ToBits.rangeCheck_computableWitnesses _ _)
-      (fun _ h => by simpa [circuit_norm] using congrArg Channels.ProgramMsg.pc0 h),
+      (fun _ h => by simpa [circuit_norm] using congrArg Inputs.pc0 h),
     FlatOperation.forAll_witnessCongr_of_assertionSubcircuit _ _ (by omega)
       (Gadgets.ToBits.rangeCheck_computableWitnesses _ _)
-      (fun _ h => by simpa [circuit_norm] using congrArg Channels.ProgramMsg.pc1 h),
+      (fun _ h => by simpa [circuit_norm] using congrArg Inputs.pc1 h),
     FlatOperation.forAll_witnessCongr_of_assertionSubcircuit _ _ (by omega)
       (Gadgets.ToBits.rangeCheck_computableWitnesses _ _)
-      (fun _ h => by simpa [circuit_norm] using congrArg Channels.ProgramMsg.pc2 h),
+      (fun _ h => by simpa [circuit_norm] using congrArg Inputs.pc2 h),
     FlatOperation.forAll_witnessCongr_of_subcircuit _ _ (by simp [circuit_norm])⟩
 
 end ProgramProviderChip
@@ -298,13 +294,13 @@ namespace MemoryProviderChip
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The memory-init provider has computable witnesses: the whole-`Word` range check's bit
-decompositions, then the constant multiplicity. -/
+decompositions. The boolean multiplicity is an explicit input. -/
 theorem computableWitnesses : (circuit (p := p)).base.ComputableWitnesses := by
   intro k input env env'
   simp only [circuit, main, circuit_norm, Operations.forAllFlat]
   exact FlatOperation.forAll_witnessCongr_of_assertionSubcircuit _ _ (by omega)
     WordRangeCheck.computableWitnesses
-    fun _ h => by with_unfolding_all exact congrArg Channels.MemoryMsg.value h
+    fun _ h => by with_unfolding_all exact congrArg Inputs.value h
 
 end MemoryProviderChip
 
@@ -313,11 +309,11 @@ namespace MemoryFinalizeChip
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- The memory-finalize table has computable witnesses: its only cell is the constant
-multiplicity. -/
+/-- The memory-finalize table has computable witnesses vacuously: it declares no local cells. -/
 theorem computableWitnesses : (circuit (p := p)).base.ComputableWitnesses := by
   intro k input env env'
-  simp only [circuit, main, circuit_norm, Operations.forAllFlat]
+  exact Operations.forAllFlat_witnessCongr_of_localLength_zero _ _
+    (by simp [circuit, main, circuit_norm])
 
 end MemoryFinalizeChip
 

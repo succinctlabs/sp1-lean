@@ -572,9 +572,10 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
     -- `byteChannel` dropped from `channelsWithRequirements` (W11): the core's 32 byte pulls are gated
     -- by the shallow `is_real` gate `E355`; the word-gated pulls live in `DivRemCompare`'s
     -- `U16MSBOperation` subcircuits. Their `Requirements` are discharged locally via
-    -- `off_gate_vacuous`, so
-    -- `byteChannel` can later be *finished* in a Clean `SoundEnsemble`. The gate is already shallow (emitted
-    -- via `assertZeros (ownAsserts cols)`), so `main` is unchanged.
+    -- `off_gate_vacuous`, so this circuit needs no `byteChannel` entry in
+    -- `channelsWithRequirements`; the assembled provider ledger handles the active multiplicities
+    -- globally. The gate is already shallow (emitted via `assertZeros (ownAsserts cols)`), so `main`
+    -- is unchanged.
     -- (W11 flip) `programChannel` also dropped: `RTypeReader` now **pulls** the program fetch (a
     -- guarantee, not a requirement) with its off-gate `Requirements` discharged inside the reader, so the
     -- chip owes no program requirement and `programChannel` moves to `channelsWithGuarantees` (`Defs`).

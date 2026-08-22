@@ -20,8 +20,9 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 `isU64` (op_a memory pull) and the op_c read-prior `isU64` (the `is_real - imm_c`-gated op_c memory pull —
 distinct from `op_c_val = adapter.op_c` since `Lt`'s adapter is immediate-capable), `is_real` binary, the
 honest `"lt_flags"` hint (each flag binary, the sum = `is_real`, `is_slt` only on real rows), `op_a_0 = 0`,
-`imm_c = 0` (register-register rows), CPUState clock bounds, three timestamp `Spec`s
-(op_c gated by `is_real - imm_c`), and the three pulled prior records' 24-bit access clocks. -/
+and the exact ALU-row form invariant `imm_c = 0 ∨ (is_real = 1 ∧ imm_c = 1)`. The four immediate-copy
+gates constructively tie immediate rows' synthetic op_c block to the committed operand. The remainder is
+the CPUState clock bounds, three timestamp `Spec`s (op_c gated by `is_real - imm_c`), and access clocks. -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
@@ -32,7 +33,16 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   (f[0] = 0 ∨ f[0] = 1) ∧ (f[1] = 0 ∨ f[1] = 1) ∧
   input.is_real = f[0] + f[1] ∧
   (f[0] = 1 → input.is_real = 1) ∧
-  input.adapter.op_a_0 = 0 ∧ input.adapter.imm_c = 0 ∧
+  input.adapter.op_a_0 = 0 ∧
+  (input.adapter.imm_c = 0 ∨ (input.is_real = 1 ∧ input.adapter.imm_c = 1)) ∧
+  (input.adapter.imm_c *
+      (input.adapter.op_c_memory.prev_value[0] - input.adapter.op_c[0]) = 0 ∧
+    input.adapter.imm_c *
+      (input.adapter.op_c_memory.prev_value[1] - input.adapter.op_c[1]) = 0 ∧
+    input.adapter.imm_c *
+      (input.adapter.op_c_memory.prev_value[2] - input.adapter.op_c[2]) = 0 ∧
+    input.adapter.imm_c *
+      (input.adapter.op_c_memory.prev_value[3] - input.adapter.op_c[3]) = 0) ∧
   Readers.CPUState.Spec
     { cols := input.state, next_pc := #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
       clk_inc := 8, is_real := input.is_real } ∧
@@ -47,9 +57,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- G1: the three pulled prior records' 24-bit access clocks (`Channels.MemoryMsg.ClkBound`, the clock
   -- half of the memory channel's `Guarantees`). A pull's completeness must exhibit the guarantee it
-  -- consumes; in a real trace each prior access sits at a genuine `< 2^24` timestamp. Gated on plain
-  -- `is_real` (with `imm_c = 0` above, op_c's `is_real - imm_c` gate reduces to it). Soundness does
-  -- *not* assume these — they are derived there from the pulls themselves.
+  -- consumes; in a real trace each prior access sits at a genuine `< 2^24` timestamp. The op_c
+  -- component is harmlessly stronger than its access gate on immediate rows (the honest builder puts
+  -- literal zero there). Soundness does *not* assume these — they are derived from the pulls.
   (input.is_real = 1 →
     input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
     input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
@@ -204,8 +214,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hc_prev, hbin, hf0, hf1, hsum, hslt_real, hop_a_0, himm, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hc_prev, hbin, hf0, hf1, hsum, hslt_real, hop_a_0, himm,
+    himm_copy, h_cpu, hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ := h_assumptions
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   -- `h_env` now bundles the CPUState GFC obligation (SC Phase 2c, prepended) + the chip's flag/`lt_cols`
@@ -251,16 +261,30 @@ theorem completeness :
       ha hb (j : ℕ) j.isLt
     rw [hsig, h_input.1] at hcell
     exact hcell
+  have himm_pad : (input_is_real - 1) * input_adapter_imm_c = 0 := by
+    rcases himm with h0 | ⟨hr, h1⟩
+    · rw [h0, mul_zero]
+    · rw [hr, h1]
+      simp
+  have hcbin : input_is_real - input_adapter_imm_c = 0 ∨
+      input_is_real - input_adapter_imm_c = 1 := by
+    rcases himm with h0 | ⟨hr, h1⟩
+    · rw [h0, sub_zero]
+      exact hbin
+    · rw [hr, h1]
+      simp
+  have hreal_of_c (hc : input_is_real - input_adapter_imm_c = 1) : input_is_real = 1 := by
+    rcases himm with h0 | ⟨hr, h1⟩
+    · rwa [h0, sub_zero] at hc
+    · exact hr
   refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨ha, hb, hbin, hf0'⟩, ?_⟩,
     ⟨⟨hbin, hbin, h_clk⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
-      by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
-      ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
+      himm_pad, hcbin, himm_copy,
       hrac_a, hrac_b, hrac_c, hdec,
       (fun hr => ⟨ha_prev hr, ha, (hprevclk hr).1, (hprevclk hr).2.1⟩),
-      -- op_c's guarantee is gated by `is_real - imm_c`; `imm_c = 0` reduces that to `is_real = 1`.
-      fun hc => ⟨hc_prev hc, (hprevclk (by rwa [himm, sub_zero] at hc)).2.2⟩⟩⟩,
+      fun hc => ⟨hc_prev hc, (hprevclk (hreal_of_c hc)).2.2⟩⟩⟩,
     ⟨⟨hbin, ?_, h_clk.at_four⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     by rw [hflag0, hflag1, ← hsum]; exact sub_self _,

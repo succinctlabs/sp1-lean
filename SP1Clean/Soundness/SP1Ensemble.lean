@@ -13,7 +13,7 @@ import Clean.Air.FlatEnsemble
 
 /-! # The supported native SP1 machine as a plain Clean `Ensemble`
 
-This module packages the 25 supported instruction tables and 13 native provider/boundary tables over
+This module packages the 25 supported instruction tables and 28 native provider/boundary tables over
 the four SP1 buses, together with the pull-final/push-init State verifier. It also proves the
 physical-table alignment and typed-interaction partition used by the timed grounding capstone in
 `Soundness/AIR.lean`.
@@ -68,7 +68,8 @@ loop-closing `[pulled final, pushed init]` pair. No witness cells (`localLength 
 
 **W3 D5-A**: the row also pulls the twelve byte range checks over the split-limb public boundary —
 per end, the two 16-bit `Range` checks (`clk_0_16`, `clk_32_48`), the `U8Range` pair
-(`clk_16_24`, `clk_24_32`), and the three 16-bit pc checks — so `Spec` is now
+(`clk_24_32`, `clk_16_24`) in the exact public-value interaction's operand order, and the three
+16-bit pc checks — so `Spec` is now
 `SP1StateBoundary.LimbBounds`: every committed limb's canonicity is proved in-circuit, which is the
 goodness-filter base case (the pushed initial State message is canonical by construction, with no
 `InitialBoundaryFacts` premise). The pulls are ungated (the boundary row is always live, gate `1`),
@@ -84,7 +85,7 @@ def sp1StateVerifierMain (pi : Var SP1PublicIO (ZMod p)) : Circuit (ZMod p) Unit
   Channels.byteChannel.pull
     (⟨6, pi.init_clk_32_48, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   Channels.byteChannel.pull
-    (⟨3, 0, pi.init_clk_16_24, pi.init_clk_24_32⟩ : ByteRow (Expression (ZMod p)))
+    (⟨3, 0, pi.init_clk_24_32, pi.init_clk_16_24⟩ : ByteRow (Expression (ZMod p)))
   Channels.byteChannel.pull
     (⟨6, pi.init_pc0, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   Channels.byteChannel.pull
@@ -96,7 +97,7 @@ def sp1StateVerifierMain (pi : Var SP1PublicIO (ZMod p)) : Circuit (ZMod p) Unit
   Channels.byteChannel.pull
     (⟨6, pi.final_clk_32_48, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   Channels.byteChannel.pull
-    (⟨3, 0, pi.final_clk_16_24, pi.final_clk_24_32⟩ : ByteRow (Expression (ZMod p)))
+    (⟨3, 0, pi.final_clk_24_32, pi.final_clk_16_24⟩ : ByteRow (Expression (ZMod p)))
   Channels.byteChannel.pull
     (⟨6, pi.final_pc0, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   Channels.byteChannel.pull
@@ -135,15 +136,15 @@ theorem sp1StateVerifier_soundness :
     Channels.byteChannel] at h_holds ⊢
   obtain ⟨i016, i3248, ipair, ipc0, ipc1, ipc2, f016, f3248, fpair, fpc0, fpc1, fpc2⟩ := h_holds
   exact ⟨(byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact i016),
-    ((byteRowSpec_u8range_pair _ _).mp ipair).1,
     ((byteRowSpec_u8range_pair _ _).mp ipair).2,
+    ((byteRowSpec_u8range_pair _ _).mp ipair).1,
     (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact i3248),
     (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact ipc0),
     (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact ipc1),
     (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact ipc2),
     (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact f016),
-    ((byteRowSpec_u8range_pair _ _).mp fpair).1,
     ((byteRowSpec_u8range_pair _ _).mp fpair).2,
+    ((byteRowSpec_u8range_pair _ _).mp fpair).1,
     (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact f3248),
     (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact fpc0),
     (byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact fpc1),
@@ -165,13 +166,13 @@ theorem sp1StateVerifier_completeness :
   simp only [circuit_norm, Channels.stateChannel, Channels.byteChannel]
   exact ⟨(byteRowSpec_range _ h16p').mpr i016,
     (byteRowSpec_range _ h16p').mpr i3248,
-    (byteRowSpec_u8range_pair _ _).mpr ⟨i1624, i2432⟩,
+    (byteRowSpec_u8range_pair _ _).mpr ⟨i2432, i1624⟩,
     (byteRowSpec_range _ h16p').mpr ipc0,
     (byteRowSpec_range _ h16p').mpr ipc1,
     (byteRowSpec_range _ h16p').mpr ipc2,
     (byteRowSpec_range _ h16p').mpr f016,
     (byteRowSpec_range _ h16p').mpr f3248,
-    (byteRowSpec_u8range_pair _ _).mpr ⟨f1624, f2432⟩,
+    (byteRowSpec_u8range_pair _ _).mpr ⟨f2432, f1624⟩,
     (byteRowSpec_range _ h16p').mpr fpc0,
     (byteRowSpec_range _ h16p').mpr fpc1,
     (byteRowSpec_range _ h16p').mpr fpc2⟩
@@ -220,46 +221,63 @@ theorem sp1StateVerifierMain_stateInteractions (pi : Var SP1PublicIO (ZMod p)) (
 def sp1Tables : List (Component (ZMod p)) :=
   (supportedChips (p := p)).map (·.table)
 
+/-- Stable cardinalities used by positional decoder and provider-partition proofs. -/
+def instructionTableCount : ℕ := 25
+def byteProviderTableCount : ℕ := 6
+def rangeProviderTableCount : ℕ := 17
+def preprocessedProviderTableCount : ℕ := 24
+def nonBumpProviderTableCount : ℕ := 26
+def stateSilentProviderTableCount : ℕ := 27
+def providerTableCount : ℕ := 28
+def ensembleTableCount : ℕ := 53
+
 /-- Regression guard for the descriptor's Clean-table projection.  `sp1Tables` and `allChipKinds` now
 come from the same entries, so semantic and circuit wiring cannot drift as independent lists. -/
 theorem sp1Tables_length : (sp1Tables (p := p)).length = 25 := rfl
 
-/-- The 15 in-circuit boundary/provider tables: the 10 byte providers (the six `ByteChip` opcode
-tables + the four range tables), the program-ROM provider, the two memory boundary tables
+/-- The complete fixed-width realization of SP1's preprocessed Range table, ordered by width
+`0, …, 16`. -/
+def sp1RangeProviderTables : List (Component (ZMod p)) :=
+  RangeChip.allWidths.map fun width => ⟨RangeChip.circuitFor width⟩
+
+theorem sp1RangeProviderTables_length : (sp1RangeProviderTables (p := p)).length = 17 := by
+  simp [sp1RangeProviderTables, RangeChip.allWidths]
+
+/-- The 28 in-circuit boundary/provider tables: six `ByteChip` opcode tables, the complete
+17-member fixed-width Range family, the program-ROM provider, the two memory boundary tables
 (init-push + finalize-pull, W11 Phase 4), and — W3, external report Finding 2 — the two SP1 system
-tables StateBump (position 38: the clock/pc re-limbing rows that lift the ~2^21-row shard cap and
-the 64 KiB pc-boundary restriction) and MemoryBump (position 39: the register-record timestamp
-refreshes). Every pusher proves its pushes' channel `Guarantees` in-circuit, which is what grounds
+tables MemoryBump (position 51: the register-record timestamp refreshes) and StateBump (position
+52: the clock/pc re-limbing rows that lift the ~2^21-row shard cap and the 64 KiB pc-boundary
+restriction). Every pusher proves its pushes' channel `Guarantees` in-circuit, which is what grounds
 the chips' byte/program/memory pulls at the capstone. -/
 def sp1ProviderTables : List (Component (ZMod p)) :=
   [⟨ByteChip.U8Range.circuit⟩, ⟨ByteChip.MSB.circuit⟩, ⟨ByteChip.AndByte.circuit⟩,
-   ⟨ByteChip.OrByte.circuit⟩, ⟨ByteChip.XorByte.circuit⟩, ⟨ByteChip.Ltu.circuit⟩,
-   ⟨RangeChip.circuit8⟩, ⟨RangeChip.circuit13⟩, ⟨RangeChip.circuit14⟩, ⟨RangeChip.circuit16⟩,
-   ⟨ProgramProviderChip.circuit⟩,
+   ⟨ByteChip.OrByte.circuit⟩, ⟨ByteChip.XorByte.circuit⟩, ⟨ByteChip.Ltu.circuit⟩
+   ] ++ sp1RangeProviderTables ++ [⟨ProgramProviderChip.circuit⟩,
    ⟨MemoryProviderChip.circuit⟩, ⟨MemoryFinalizeChip.circuit⟩,
    ⟨MemoryBumpChip.circuit⟩, ⟨StateBumpChip.circuit⟩]
 
-/-- Regression guard: the boundary/provider table count (10 byte + program + 2 memory + 2 bump). -/
-theorem sp1ProviderTables_length : (sp1ProviderTables (p := p)).length = 15 := rfl
+/-- Regression guard: the boundary/provider table count (6 byte + 17 range + program + 2 memory +
+2 bump). -/
+theorem sp1ProviderTables_length : (sp1ProviderTables (p := p)).length = 28 := by
+  simp [sp1ProviderTables, sp1RangeProviderTables_length]
 
-/-- Every boundary/provider circuit except the last — the StateBump table at position 39 — stays
+/-- Every boundary/provider circuit except the last — the StateBump table at position 52 — stays
 off the State channel; StateBump is, by design, the sole provider-segment State contributor.
-Stated over the `take 14` prefix so the typed State decomposition can split the provider tail into
+Stated over the `take 27` prefix so the typed State decomposition can split the provider tail into
 a nil prefix and the bump table. -/
 theorem sp1ProviderTables_stateChannel_not_mem :
-    ∀ component ∈ (sp1ProviderTables (p := p)).take 14,
+    ∀ component ∈ (sp1ProviderTables (p := p)).take stateSilentProviderTableCount,
       Channels.stateChannel.toRaw ∉ component.circuit.channels := by
   intro component componentMem
   fin_cases componentMem <;>
     simp [GeneralFormalCircuit.channels, ByteChip.U8Range.circuit, ByteChip.MSB.circuit,
       ByteChip.AndByte.circuit, ByteChip.OrByte.circuit, ByteChip.XorByte.circuit,
-      ByteChip.Ltu.circuit,
-      RangeChip.circuit8, RangeChip.circuit13, RangeChip.circuit14, RangeChip.circuit16,
-      RangeChip.circuit,
+      ByteChip.Ltu.circuit, RangeChip.circuitFor, RangeChip.circuit,
       ProgramProviderChip.circuit, MemoryProviderChip.circuit, MemoryFinalizeChip.circuit,
       MemoryBumpChip.circuit, circuit_norm]
 
-/-- **The SP1 machine as a plain Clean `Ensemble`**: the 25 chips + the 13 boundary/provider tables,
+/-- **The SP1 machine as a plain Clean `Ensemble`**: the 25 chips + the 28 boundary/provider tables,
 the four gated buses (State first — the trail's main channel), and the pull-final/push-init boundary
 verifier. Its `Statement` (per-table constraints + per-channel balance) is everything the capstone
 consumes; the per-channel soundness facts are proven separately (see the module doc). -/
@@ -292,9 +310,10 @@ theorem witness_instructionTables_aligned
       (witness.tables.take 25) := by
   unfold InstructionTablesAligned
   rw [List.forall₂_iff_get]
-  have tablesLength : witness.tables.length = 40 := by
+  have tablesLength : witness.tables.length = 53 := by
     rw [← witness.same_length]
-    rfl
+    simp [sp1Ensemble_tables, sp1Tables_length,
+      sp1ProviderTables_length]
   constructor
   · simp [supportedChips_length, tablesLength]
   · intro i chipBound tableBound
@@ -322,7 +341,7 @@ theorem witness_instructionTables_aligned
 
 /-- Every canonical decoded instruction row satisfies the constraints of its exact physical Clean
 table row.  This is the common starting point for row-local AIR facts; downstream proofs never need
-to reopen `same_circuits` or reason positionally about the 38-table witness again. -/
+to reopen `same_circuits` or reason positionally about the 53-table witness again. -/
 theorem decodedInstructionRow_constraints
     (witness : EnsembleWitness (sp1Ensemble (p := p)))
     (constraints : witness.Constraints) (decoded : DecodedInstructionRow p)
@@ -336,7 +355,7 @@ theorem decodedInstructionRow_constraints
       (witness.mem_allTables_of_mem_tables (List.mem_of_mem_take tableMem))
   · exact decodedMem
 
-/-- Every physical table after the stable 25-chip prefix is one of the thirteen declared provider or
+/-- Every physical table after the stable 25-chip prefix is one of the 28 declared provider or
 boundary components. -/
 theorem witness_providerTable_component_mem
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
@@ -359,7 +378,7 @@ theorem decodedWitnessInstructionInteractionsWith_eq_tables
     (witness_instructionTables_aligned witness)
 
 /-- Exact typed partition of the ensemble interaction list into verifier boundary, decoded
-instruction rows, and the thirteen provider/boundary tables. -/
+instruction rows, and the 28 provider/boundary tables. -/
 theorem typedEnsembleInteractionsWith_partition
     {Message : TypeMap} [ProvableType Message]
     (witness : EnsembleWitness (sp1Ensemble (p := p)))

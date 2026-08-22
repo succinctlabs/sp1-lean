@@ -99,8 +99,12 @@ those Rust helpers match Lean gadgets.
 The extraction backend is not part of the semantic SP1 pin yet. Its exact review surface is the
 **committed** delta of the pinned branch over the semantic revision (`f66b4bff5..b5616f908`,
 `dtumad/lean-extraction` on `succinctlabs/sp1`): the reflection derives on the 26 machine files
-(verified derive-line-only by `verify_extractor_overlay`), the field-generic Lean emission in the
-hypercube IR, the whole-chip extraction modes in `main.rs`, and the `chip_traces` dump binary.
+(verified derive/import-line-only by `verify_extraction_branch_delta`), the field-generic Lean
+emission and expression representation in the hypercube IR, `IntoShape`'s mode-aware column
+projection, the whole-chip extraction modes in `main.rs`, and the `chip_traces` dump binary. The
+first surface is mechanically restricted metadata. The latter surfaces are trusted extractor/
+shape/tooling code accepted at the exact pinned commit; the allowlist does not prove them
+semantically inert.
 `Extracted/Provenance.lean` records the semantic revision and the branch revision. The series is
 authored at upstream-PR quality; once it lands upstream, `SP1_PINNED_COMMIT` advances to an
 upstream commit. The relevant changes are:

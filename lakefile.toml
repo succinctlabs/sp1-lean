@@ -63,8 +63,9 @@ rev = "2dad7788d58b09eabeb3898506e4cb896e5d3e9d"
 # sources with the SP1 platform config `scripts/sail-config/sp1_rv64d_cfg.json` (regenerate and
 # verify with `scripts/sail-config/generate_lean_rv64d.sh`; provenance in the snapshot's commit
 # message and docs/agents/sail-model-provenance.md). It equals the opencompl base `11d8fa21` (the
-# snapshot riscv-lean PR #59 pins, generated against lean-sail v5) except the six platform-value
-# sites the config sets. Stock upstream is not usable: its CLINT and signature windows lie inside
+# snapshot riscv-lean PR #59 pins, generated against lean-sail v5) except the four generated
+# platform-value sites controlled by two config keys. Stock upstream is not usable: its CLINT and
+# signature windows lie inside
 # the address range SP1's chips bound accesses to, which makes the memory-bridge lemmas false as
 # stated, not merely unproved.
 # NB the generated model and the Sail runtime must move together: a v4-generated snapshot against

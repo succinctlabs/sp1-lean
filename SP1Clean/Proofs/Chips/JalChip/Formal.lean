@@ -34,8 +34,8 @@ def linkTargetWord (input : Inputs (ZMod p)) : Word (ZMod p) :=
 
 /-- Honest prover-side row well-formedness: operand `isU64`s, `is_real` binary, CPUState clock bounds,
 op_a register-access timestamp bounds, `value[3] = 0` for both add results, and the `is_real`-gated
-4-byte alignment check (`jump_target[0] / 4 < 2^14`). Covers `rd ≠ x0` rows (`op_a_0 = 0`); soundness
-handles both the `op_a_0 = 0` and `op_a_0 = 1` (jal x0) cases. -/
+4-byte alignment check (`jump_target[0] / 4 < 2^14`). The destination flag is exact: padding has
+`op_a_0 = 0`, while a real row may select either an ordinary write (`0`) or `jal x0` (`1`). -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.adapter.op_b_imm ∧
@@ -44,7 +44,8 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   -- completeness (its `Spec` now derives + owes the read-prior `isU64`).
   (input.is_real = 1 → Word.isU64 input.adapter.op_a_memory.prev_value) ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
-  input.adapter.op_a_0 = 0 ∧
+  (input.adapter.op_a_0 = 0 ∨
+    (input.is_real = 1 ∧ input.adapter.op_a_0 = 1)) ∧
   Readers.CPUState.Spec
     { cols := input.state, next_pc := input.state.pc, clk_inc := 8, is_real := input.is_real } ∧
   Readers.RegisterAccessCols.Spec
@@ -172,7 +173,8 @@ theorem completeness :
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     exact he_av ⟨i, hi⟩
-  have hval2 : (Vector.map (Expression.eval env.toEnvironment)
+  have hval2_off (hop0 : input_adapter_op_a_0 = 0) :
+      (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + 4 + i}) : Word (ZMod p))
       = AddOperation.populate #v[Expression.eval env.toEnvironment input_var_state_pc[0],
           Expression.eval env.toEnvironment input_var_state_pc[1],
@@ -180,7 +182,17 @@ theorem completeness :
     rw [← AddOperation.populateIRGated_eval_off env input_var_adapter_op_a_0
       #v[input_var_state_pc[0], input_var_state_pc[1], input_var_state_pc[2], 0]
       #v[4, 0, 0, 0] _ _ (by simp [circuit_norm]) (by simp [circuit_norm]) ha1U h4U
-      (h_input.2.2.2.2.1.trans h_op_a_0)]
+      (h_input.2.2.2.2.1.trans hop0)]
+    apply Vector.ext; intro i hi
+    simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+    exact he_oav ⟨i, hi⟩
+  have hval2_on (hop1 : input_adapter_op_a_0 = 1) :
+      (Vector.map (Expression.eval env.toEnvironment)
+        (Vector.mapRange 4 fun i => var {index := i₀ + 4 + i}) : Word (ZMod p))
+        = #v[0, 0, 0, 0] := by
+    rw [← AddOperation.populateIRGated_eval_on env input_var_adapter_op_a_0
+      #v[input_var_state_pc[0], input_var_state_pc[1], input_var_state_pc[2], 0]
+      #v[4, 0, 0, 0] (by rw [h_input.2.2.2.2.1, hop1]; exact one_ne_zero)]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     exact he_oav ⟨i, hi⟩
@@ -194,36 +206,62 @@ theorem completeness :
           input_adapter_op_b_imm)[3] := by
     have := congrArg (·[3]) hval1
     simpa only [Vector.getElem_map, Vector.getElem_mapRange, ha1eq, circuit_norm] using this
-  have hoav3 : env.get (i₀ + 4 + 3)
-      = (AddOperation.populate #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0]
-          #v[4, 0, 0, 0])[3] := by
-    have := congrArg (·[3]) hval2
-    simpa only [Vector.getElem_map, Vector.getElem_mapRange, ha1eq, circuit_norm] using this
-  -- link gate `is_real - op_a_0` reduces to `is_real` when `op_a_0 = 0`.
   have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
-    rw [h_op_a_0]; simpa using h_bin
-  have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
+    rcases h_op_a_0 with h0 | ⟨hr, h1⟩
+    · rw [h0, sub_zero]
+      exact h_bin
+    · rw [hr, h1]
+      simp
+  have h_op0_bin : input_adapter_op_a_0 = 0 ∨ input_adapter_op_a_0 = 1 := by
+    rcases h_op_a_0 with h0 | ⟨_, h1⟩
+    · exact Or.inl h0
+    · exact Or.inr h1
+  have h_op0_pad : (input_is_real - 1) * input_adapter_op_a_0 = 0 := by
+    rcases h_op_a_0 with h0 | ⟨hr, h1⟩
+    · rw [h0, mul_zero]
+    · rw [hr, h1]
+      simp
+  have hz (i : Fin 4) : input_adapter_op_a_0 * env.get (i₀ + 4 + (i : ℕ)) = 0 := by
+    rcases h_op_a_0 with h0 | ⟨_, h1⟩
+    · rw [h0, zero_mul]
+    · have hi := congrArg (fun v : Word (ZMod p) => v[(i : ℕ)]) (hval2_on h1)
+      simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm] at hi
+      rw [h1, one_mul, hi]
+      fin_cases i <;> rfl
   refine ⟨⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
-    ⟨⟨h_bin, h_bin⟩, ⟨⟨hz _, hz _, hz _, hz _⟩, (fun _ => Or.inl h_op_a_0), h_rac, hdec,
+    ⟨⟨h_bin, h_bin⟩, ⟨⟨hz 0, hz 1, hz 2, hz 3⟩, (fun _ => h_op0_bin), h_rac, hdec,
       fun hr => ⟨h_oap hr, hprevclk hr⟩⟩⟩,
     ⟨⟨h_bin, ?_, h_clk.at_four⟩, trivial⟩, ?_, ?_, ?_⟩
   · rw [hval1]; exact AddOperation.spec_populate ha1U h_imm input_is_real
   · rw [hav3]; exact h_jt3
-  · rw [hval2]; exact AddOperation.spec_populate ha1U h4U (input_is_real - input_adapter_op_a_0)
-  · rw [hoav3]; exact h_lt3
-  · -- RegisterWrite op_a write push: `isU64` of the link value `pc + 4` (completeness covers `op_a_0 = 0`).
+  · rcases h_op_a_0 with h0 | ⟨hr, h1⟩
+    · rw [hval2_off h0]
+      exact AddOperation.spec_populate ha1U h4U (input_is_real - input_adapter_op_a_0)
+    · intro hgate
+      rw [hr, h1, sub_self] at hgate
+      exact absurd hgate zero_ne_one
+  · rcases h_op_a_0 with h0 | ⟨_, h1⟩
+    · have hoav3 := congrArg (·[3]) (hval2_off h0)
+      simp only [Vector.getElem_map, Vector.getElem_mapRange, ha1eq, circuit_norm] at hoav3
+      rw [hoav3]
+      exact h_lt3
+    · have hoav3 := congrArg (·[3]) (hval2_on h1)
+      simpa only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm] using hoav3
+  · -- RegisterWrite emits the populated link for an ordinary destination and zero for x0.
     intro hr
-    rw [hval2]
-    exact (AddOperation.spec_populate ha1U h4U (input_is_real - input_adapter_op_a_0)
-      (by rw [h_op_a_0]; simpa using hr)).1
+    rcases h_op_a_0 with h0 | ⟨_, h1⟩
+    · rw [hval2_off h0]
+      exact (AddOperation.spec_populate ha1U h4U (input_is_real - input_adapter_op_a_0)
+        (by rw [h0]; simpa using hr)).1
+    · rw [hval2_on h1]
+      exact Word.isU64_of_cases (by simp) (by simp) (by simp) (by simp)
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := Nat.cast_ofNat
     simp only [byteChannel, hav0]
     rw [← c14]
     exact (byteRowSpec_range _ h14p).mpr (h_align_pa hr1)
-  · rw [h_op_a_0]
-    simp
+  · exact h_op0_pad
   · rcases h_bin with h | h <;> rw [h] <;> simp
 
 /-- Exact State-channel pair emitted by the composed CPU-state reader.  Unlike

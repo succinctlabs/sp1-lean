@@ -794,16 +794,18 @@ interactions.  This is positional on purpose: it connects the stable witness ind
 `ProgramProviderBound` to the exact Clean ensemble layout. -/
 theorem witness_nonProgramProviderTable_programInteractions_eq_nil
     (witness : EnsembleWitness (sp1Ensemble (p := p))) (i : ℕ)
-    (lower : 25 ≤ i) (upper : i < 40) (witnessBound : i < witness.tables.length)
+    (lower : instructionTableCount ≤ i) (upper : i < ensembleTableCount)
+    (witnessBound : i < witness.tables.length)
     (notProgram : i ≠ programProviderIndex) :
     typedTableInteractionsWith witness.tables[i] programChannel = [] := by
+  change 25 ≤ i at lower
+  change i < 53 at upper
   apply List.map_eq_nil_iff.mp
   rw [typedTableInteractionsWith_raw]
   apply Table.interactionsWith_nil_of_channel_not_mem
   have ensembleBound : i < (sp1Ensemble (p := p)).tables.length := by
-    simp only [sp1Ensemble_tables, List.length_append, sp1Tables_length,
-      sp1ProviderTables_length]
-    omega
+    rw [witness.same_length]
+    exact witnessBound
   have componentEq := witness.same_circuits i ensembleBound
   have providerBound : i - 25 < (sp1ProviderTables (p := p)).length := by
     simp only [sp1ProviderTables_length]
@@ -841,59 +843,21 @@ theorem witness_providerProgramInteractions_eq
     (witness.tables.drop 25).flatMap
         (typedTableInteractionsWith · programChannel) =
       typedTableInteractionsWith table programChannel := by
-  have tablesLength : witness.tables.length = 40 := by
+  have tablesLength : witness.tables.length = 53 := by
     rw [← witness.same_length]
-    rfl
-  have tableAt35 := tableAt
-  change witness.tables[35]? = some table at tableAt35
-  obtain ⟨_, tableEq35⟩ := List.getElem?_eq_some_iff.mp tableAt35
+    simp [sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length]
+  obtain ⟨_, tableEq⟩ := List.getElem?_eq_some_iff.mp tableAt
   subst table
-  rw [List.drop_eq_getElem_cons (i := 25) (by omega),
-    List.drop_eq_getElem_cons (i := 26) (by omega),
-    List.drop_eq_getElem_cons (i := 27) (by omega),
-    List.drop_eq_getElem_cons (i := 28) (by omega),
-    List.drop_eq_getElem_cons (i := 29) (by omega),
-    List.drop_eq_getElem_cons (i := 30) (by omega),
-    List.drop_eq_getElem_cons (i := 31) (by omega),
-    List.drop_eq_getElem_cons (i := 32) (by omega),
-    List.drop_eq_getElem_cons (i := 33) (by omega),
-    List.drop_eq_getElem_cons (i := 34) (by omega),
-    List.drop_eq_getElem_cons (i := 35) (by omega),
-    List.drop_eq_getElem_cons (i := 36) (by omega),
-    List.drop_eq_getElem_cons (i := 37) (by omega),
-    List.drop_eq_getElem_cons (i := 38) (by omega),
-    List.drop_eq_getElem_cons (i := 39) (by omega),
-    List.drop_eq_nil_of_le (by omega)]
+  have interactionsAtOther (i : ℕ) (lower : instructionTableCount ≤ i)
+      (upper : i < ensembleTableCount) (bound : i < witness.tables.length)
+      (notProgram : i ≠ programProviderIndex) :
+      typedTableInteractionsWith witness.tables[i] programChannel = [] :=
+    witness_nonProgramProviderTable_programInteractions_eq_nil witness i lower upper bound notProgram
+  repeat rw [List.drop_eq_getElem_cons (by omega)]
+  rw [List.drop_eq_nil_of_le (by omega)]
   simp only [List.flatMap_cons, List.flatMap_nil, List.append_nil]
-  rw [witness_nonProgramProviderTable_programInteractions_eq_nil witness 25 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 26 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 27 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 28 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 29 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 30 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 31 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 32 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 33 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 34 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 36 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 37 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 38 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex]),
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness 39 (by omega)
-      (by omega) (by omega) (by simp [programProviderIndex])]
-  simp
+  simp [interactionsAtOther, instructionTableCount, ensembleTableCount,
+    programProviderIndex, byteProviderTableCount, rangeProviderTableCount]
 
 /-- The decoded instruction prefix's Program interactions are exactly one semantic gated pull per
 physical row. -/

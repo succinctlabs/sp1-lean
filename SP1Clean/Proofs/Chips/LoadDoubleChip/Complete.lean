@@ -5,7 +5,7 @@ import ToClean.Air.TableBuild
 /-! # `SP1Clean.LoadDoubleChip` — from trace events to a valid AIR table
 
 `LD` through the trace-generation chain (see `LoadWordChip/Complete.lean` for the memory-family
-programme note, including **why there is no padding row**). The shortest chip of the family: an
+programme and padding-contract note). The shortest chip of the family: an
 8-byte load selects nothing and extends nothing, so the row's only committed columns beyond the
 three shared blocks are the single `is_real` selector. Every one of the eleven conjuncts is a
 citation. -/
@@ -50,7 +50,8 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormed) (halign 
     memoryAccess_spec hi.clk_mod h.clk_lt h.prevTsMem_lt,
     iTypeReader_spec hi _ _ _ _ _ _ _ _⟩
   · rw [haddr64]; exact h.addr_lt
-  · rw [haddr48]; exact h.addr_ge
+  · intro _
+    rw [haddr48]; exact h.addr_ge
   · rw [haddr48]; exact halign
 
 /-! ## The built table -/
@@ -60,8 +61,7 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormed) (halign 
 A plain `def`, deliberately not an `abbrev` (see `AddChip.component` for the measurement). -/
 def component : Air.Flat.Component (ZMod p) := ⟨circuit⟩
 
-/-- The rows a trace builds: one input row per event. **No padding tail** — see
-`LoadWordChip/Complete.lean`. -/
+/-- The event rows, before ensemble-level zero padding (see `LoadWordChip/Complete.lean`). -/
 def traceInputs (events : List MemoryEvent) : List (Inputs (ZMod p)) :=
   events.map MemoryEvent.toLoadDoubleInputs
 

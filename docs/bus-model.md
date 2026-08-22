@@ -24,6 +24,14 @@ arithmetic**, relates it to the upstream SP1 Rust source (the `sp1` checkout at 
 
 This section records the pre-consolidation state; the design narrative below (§5) explains the rationale.
 It is retained for archaeology and is not authoritative for the current implementation.
+In particular, the historical Range-split TODO below is closed in the live machine: the native
+provider suffix has separate Byte-op tables and one Range provider for every width `0..16`; exact
+transport recounts their multiplicities from the actual native consumer interaction ledger under a
+caller-supplied, matching-block source-backed `CanonicalPreprocessedInventory`. The raw exact
+Byte/Range/Program assertion lists are empty: `CoreAIR.PreprocessedBinding` only records the named
+matrix/PCS-opening premise, to be discharged by ArkLib, while row-local meaning is the explicit
+`PreprocessedProviderContract` caller premise. Raw preprocessing alone supplies neither projected-key
+uniqueness nor provider construction.
 
 - **Receiver chips + cross-chip closure (axiom-clean).** The three "secondary divergences" of
   §1 are addressed:

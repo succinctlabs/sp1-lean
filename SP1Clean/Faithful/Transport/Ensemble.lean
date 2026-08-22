@@ -13,15 +13,16 @@ That identity is one `rfl`: `transportTable` records the component it was handed
 faithfulness anchors and the soundness capstone are no longer two families that merely share an
 endpoint — a module importing both now proves something about both.
 
-## What remains for a whole-ensemble transport
+## Scope: the instruction segment
 
-Three segments, none of them instruction chips: the ten byte and range providers plus the Program
-ROM (transportable by aggregation, since a provider's constraints never read its multiplicity
-cell), the two memory boundary tables (from the extracted memory-boundary cluster), and the two W3
-system tables — whose anchors are *not* `ChipFaithful` structures but bespoke conjunctions over an
-input-keyed environment, so the generic transport does not reach them without their own codec.
-Then the four channel balances transport from the extracted AIR's own ℕ-exact balance through the
-per-table access permutations proved here. See `docs/roadmap.md`.
+This module deliberately stops at the twenty-five instruction chips.  Six Byte tables, all
+seventeen fixed-width Range tables, Program ROM, two memory-boundary tables, and two W3 bump tables
+need redistribution rather than this row-for-row `ChipFaithful` transport;
+`ProviderSegment.lean` constructs that 28-table tail and `CoreEnsemble.lean` appends it here.  The
+active-access theorem below likewise names only this instruction segment. Native consumer recounting
+later derives Byte/Program balance; State/Memory balance and semantic boundary binding remain explicit
+in `CoreArtifact.lean`'s global contract. No declaration here claims a full exact-cluster ledger
+equality.
 -/
 
 set_option autoImplicit false
@@ -167,6 +168,125 @@ structure Valid : Prop where
   mul : ∀ rustCols ∈ rows.mul, List.Forall (· = 0) (mulChipOracle.assertZeros rustCols)
   divRem : ∀ rustCols ∈ rows.divRem, List.Forall (· = 0) (divRemChipOracle.assertZeros rustCols)
   aluX0 : ∀ rustCols ∈ rows.aluX0, List.Forall (· = 0) (aluX0ChipOracle.assertZeros rustCols)
+
+/-- The extracted instruction segment's active interaction ledger, concatenated in the exact
+`supportedChips` order fixed by `transported`.  This is deliberately only the twenty-five
+instruction tables: it includes no preprocessed provider, memory-boundary, MemoryBump, or
+StateBump access, and therefore is not a name for the full Core cluster ledger. -/
+def extractedInstructionActiveAccesses : LookupAccessList :=
+  [ rows.add.flatMap fun rustCols =>
+      LookupAccessList.active (addChipOracle.rustAccesses rustCols),
+    rows.addi.flatMap fun rustCols =>
+      LookupAccessList.active (addiChipOracle.rustAccesses rustCols),
+    rows.addw.flatMap fun rustCols =>
+      LookupAccessList.active (addwChipOracle.rustAccesses rustCols),
+    rows.sub.flatMap fun rustCols =>
+      LookupAccessList.active (subChipOracle.rustAccesses rustCols),
+    rows.subw.flatMap fun rustCols =>
+      LookupAccessList.active (subwChipOracle.rustAccesses rustCols),
+    rows.bitwise.flatMap fun rustCols =>
+      LookupAccessList.active (bitwiseChipOracle.rustAccesses rustCols),
+    rows.lt.flatMap fun rustCols =>
+      LookupAccessList.active (ltChipOracle.rustAccesses rustCols),
+    rows.shiftLeft.flatMap fun rustCols =>
+      LookupAccessList.active (shiftLeftChipOracle.rustAccesses rustCols),
+    rows.shiftRight.flatMap fun rustCols =>
+      LookupAccessList.active (shiftRightChipOracle.rustAccesses rustCols),
+    rows.jal.flatMap fun rustCols =>
+      LookupAccessList.active (jalChipOracle.rustAccesses rustCols),
+    rows.jalr.flatMap fun rustCols =>
+      LookupAccessList.active (jalrChipOracle.rustAccesses rustCols),
+    rows.branch.flatMap fun rustCols =>
+      LookupAccessList.active (branchChipOracle.rustAccesses rustCols),
+    rows.uType.flatMap fun rustCols =>
+      LookupAccessList.active (uTypeChipOracle.rustAccesses rustCols),
+    rows.loadByte.flatMap fun rustCols =>
+      LookupAccessList.active (loadByteChipOracle.rustAccesses rustCols),
+    rows.loadHalf.flatMap fun rustCols =>
+      LookupAccessList.active (loadHalfChipOracle.rustAccesses rustCols),
+    rows.loadWord.flatMap fun rustCols =>
+      LookupAccessList.active (loadWordChipOracle.rustAccesses rustCols),
+    rows.loadDouble.flatMap fun rustCols =>
+      LookupAccessList.active (loadDoubleChipOracle.rustAccesses rustCols),
+    rows.loadX0.flatMap fun rustCols =>
+      LookupAccessList.active (loadX0ChipOracle.rustAccesses rustCols),
+    rows.storeByte.flatMap fun rustCols =>
+      LookupAccessList.active (storeByteChipOracle.rustAccesses rustCols),
+    rows.storeHalf.flatMap fun rustCols =>
+      LookupAccessList.active (storeHalfChipOracle.rustAccesses rustCols),
+    rows.storeWord.flatMap fun rustCols =>
+      LookupAccessList.active (storeWordChipOracle.rustAccesses rustCols),
+    rows.storeDouble.flatMap fun rustCols =>
+      LookupAccessList.active (storeDoubleChipOracle.rustAccesses rustCols),
+    rows.mul.flatMap fun rustCols =>
+      LookupAccessList.active (mulChipOracle.rustAccesses rustCols),
+    rows.divRem.flatMap fun rustCols =>
+      LookupAccessList.active (divRemChipOracle.rustAccesses rustCols),
+    rows.aluX0.flatMap fun rustCols =>
+      LookupAccessList.active (aluX0ChipOracle.rustAccesses rustCols) ].flatten
+
+/-- The native active interaction ledger of the twenty-five transported instruction tables.
+The definition goes through the stable whole-table projection `tableNativeAccesses`; the outer
+`active` erases exactly the multiplicity-zero padding before any later channel partition.  As with
+`extractedInstructionActiveAccesses`, this is an instruction-segment ledger, not the full native
+ensemble's access list. -/
+noncomputable def transportedInstructionActiveAccesses : LookupAccessList :=
+  ((transported rows data).map fun table =>
+    LookupAccessList.active (tableNativeAccesses table)).flatten
+
+/-- **The complete active instruction ledger transports as a multiset.**  A valid extracted
+instruction segment has, up to emission order, exactly the active accesses of its twenty-five
+native transported tables.  The proof is the mechanical append of the twenty-five whole-chip
+access transports; it neither mentions nor assumes anything about provider, boundary, or system
+tables, and makes no equality claim about the full exact Core cluster ledger. -/
+theorem transportedInstructionActiveAccesses_perm (valid : rows.Valid) :
+    List.Perm (transportedInstructionActiveAccesses rows data)
+      (extractedInstructionActiveAccesses rows) := by
+  unfold transportedInstructionActiveAccesses extractedInstructionActiveAccesses
+  apply List.Perm.flatten_congr
+  unfold transported
+  simp only [List.map_cons, List.map_nil]
+  refine .cons (transportTable_activeAccesses_perm addChip_faithful rows.add data valid.add) ?_
+  refine .cons (transportTable_activeAccesses_perm addiChip_faithful rows.addi data valid.addi) ?_
+  refine .cons (transportTable_activeAccesses_perm addwChip_faithful rows.addw data valid.addw) ?_
+  refine .cons (transportTable_activeAccesses_perm subChip_faithful rows.sub data valid.sub) ?_
+  refine .cons (transportTable_activeAccesses_perm subwChip_faithful rows.subw data valid.subw) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm bitwiseChip_faithful rows.bitwise data valid.bitwise) ?_
+  refine .cons (transportTable_activeAccesses_perm ltChip_faithful rows.lt data valid.lt) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm shiftLeftChip_faithful rows.shiftLeft data valid.shiftLeft) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm shiftRightChip_faithful rows.shiftRight data valid.shiftRight) ?_
+  refine .cons (transportTable_activeAccesses_perm jalChip_faithful rows.jal data valid.jal) ?_
+  refine .cons (transportTable_activeAccesses_perm jalrChip_faithful rows.jalr data valid.jalr) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm branchChip_faithful rows.branch data valid.branch) ?_
+  refine .cons (transportTable_activeAccesses_perm uTypeChip_faithful rows.uType data valid.uType) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm loadByteChip_faithful rows.loadByte data valid.loadByte) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm loadHalfChip_faithful rows.loadHalf data valid.loadHalf) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm loadWordChip_faithful rows.loadWord data valid.loadWord) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm loadDoubleChip_faithful rows.loadDouble data valid.loadDouble) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm loadX0Chip_faithful rows.loadX0 data valid.loadX0) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm storeByteChip_faithful rows.storeByte data valid.storeByte) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm storeHalfChip_faithful rows.storeHalf data valid.storeHalf) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm storeWordChip_faithful rows.storeWord data valid.storeWord) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm storeDoubleChip_faithful rows.storeDouble data
+      valid.storeDouble) ?_
+  refine .cons (transportTable_activeAccesses_perm mulChip_faithful rows.mul data valid.mul) ?_
+  refine .cons
+    (transportTable_activeAccesses_perm divRemChip_faithful rows.divRem data valid.divRem) ?_
+  refine .cons (transportTable_activeAccesses_perm aluX0Chip_faithful rows.aluX0 data valid.aluX0) ?_
+  exact .nil
 
 /--
 **A valid extracted instruction segment transports to a constraint-satisfying native one.**

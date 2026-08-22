@@ -5,7 +5,7 @@ import ToClean.Air.TableBuild
 /-! # `SP1Clean.StoreDoubleChip` — from trace events to a valid AIR table
 
 `SD` through the trace-generation chain (see `StoreWordChip/Complete.lean` for the store family's
-programme note, including the `op_a`-is-a-read discipline and **why there is no padding row**).
+programme, the `op_a`-is-a-read discipline, and the padding-contract note).
 
 The shortest chip of the family, and the one that shows what the store family really is: the RAM
 write is the whole 8-byte `rs2` word, so there is no `store_value` column and no merge — the
@@ -58,7 +58,8 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormedStore) (ha
       (cpuStateCols_pc_val_lt e.clk e.pc).2.1, (cpuStateCols_pc_val_lt e.clk e.pc).2.2⟩⟩
   -- the address fits in 48 bits, is above the reserved page, and is 8-byte aligned
   · rw [haddr64]; exact h.addr_lt
-  · rw [haddr48]; exact h.addr_ge
+  · intro _
+    rw [haddr48]; exact h.addr_ge
   · rw [haddr48]; exact halign
 
 /-! ## The built table -/
@@ -68,8 +69,7 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormedStore) (ha
 A plain `def`, deliberately not an `abbrev` (see `AddChip.component` for the measurement). -/
 def component : Air.Flat.Component (ZMod p) := ⟨circuit⟩
 
-/-- The rows a trace builds: one input row per event. **No padding tail** — see
-`StoreWordChip/Complete.lean`. -/
+/-- The event rows, before ensemble-level zero padding (see `StoreWordChip/Complete.lean`). -/
 def traceInputs (events : List MemoryEvent) : List (Inputs (ZMod p)) :=
   events.map MemoryEvent.toStoreDoubleInputs
 

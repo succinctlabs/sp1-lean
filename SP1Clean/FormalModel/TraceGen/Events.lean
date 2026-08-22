@@ -517,9 +517,9 @@ The conjuncts, and the trace fact each encodes:
 * `clk_mod` — the executor's `CLK_INC = 8` discipline, starting at 1.
 * `pc_lt` — the program counter is a 48-bit address.
 * `opA_lt` — `rd` names one of the 32 architectural registers.
-* `opA_ne_zero` — the destination is not `x0`. (`UType` rows with `rd = x0` are real, and the
-  chip's AIR handles them through `op_a_0 = 1`; this layer's completeness theorem covers the
-  `rd ≠ x0` rows, exactly as the chip's `ProverAssumptions` asks with `op_a_0 = 0`.)
+* `opA_ne_zero` — the destination is not `x0`. This original shared boundary describes the
+  destination-writing route; JAL and UType now expose their wider `WellFormedJal` /
+  `WellFormedUType` boundaries for the real `op_a_0 = 1` rows as well.
 * `immB_lt` / `immC_lt` — the decoded immediates are 64-bit values, so the committed words are
   them, untruncated.
 * `prevA_lt` — `rd`'s displaced content is a 64-bit value.
@@ -533,7 +533,7 @@ structure WellFormed (e : JTypeEvent) : Prop where
   pc_lt : e.pc < 2 ^ 48
   /-- `rd` is an architectural register index. -/
   opA_lt : e.opA < 32
-  /-- `rd ≠ x0` — the rows this layer's completeness theorem covers. -/
+  /-- `rd ≠ x0` — the original destination-writing J-family route. -/
   opA_ne_zero : e.opA ≠ 0
   /-- The decoded `op_b` immediate is a 64-bit value. -/
   immB_lt : e.immB < 2 ^ 64
@@ -543,6 +543,99 @@ structure WellFormed (e : JTypeEvent) : Prop where
   prevA_lt : e.prevA < 2 ^ 64
   /-- `rd`'s previous access is strictly before this row's write of it (at `clk + 4`). -/
   prevTsA_lt : e.prevTsA < e.clk + 4
+
+end JTypeEvent
+
+/-! ## The JAL event boundary
+
+`JTypeEvent.WellFormed` was introduced for the destination-writing (`rd ≠ x0`) trace path.  The
+upstream JAL chip also executes `jal x0, imm`: its register-write gate is off, but its J-type reader
+still emits the prior/current x0 memory records and proves that the discarded value is zero.  Keep
+that wider routing boundary explicit, as for `WellFormedUType`, rather than weakening the meaning of
+the older predicate in place. -/
+
+namespace JTypeEvent
+
+/-- Well-formed execution data for a JAL row, including the `rd = x0` form.  The extra x0 premise
+is the architectural zero-register fact required by the J-type reader's zeroing constraints. -/
+structure WellFormedJal (e : JTypeEvent) : Prop where
+  /-- The executor's `CLK_INC = 8` discipline. -/
+  clk_mod : e.clk % 8 = 1
+  /-- The program counter fits the committed three-limb address. -/
+  pc_lt : e.pc < 2 ^ 48
+  /-- `rd` names an architectural register, including x0. -/
+  opA_lt : e.opA < 32
+  /-- The decoded JAL offset is a 64-bit word. -/
+  immB_lt : e.immB < 2 ^ 64
+  /-- The second J-type immediate slot is a 64-bit word. -/
+  immC_lt : e.immC < 2 ^ 64
+  /-- The displaced destination value is 64-bit. -/
+  prevA_lt : e.prevA < 2 ^ 64
+  /-- x0's prior value is the architectural zero word. -/
+  prevA_eq_zero : e.opA = 0 → e.prevA = 0
+  /-- The destination's prior access precedes this row's access at `clk + 4`. -/
+  prevTsA_lt : e.prevTsA < e.clk + 4
+
+/-- Every older non-x0 J event satisfies the JAL-specific event boundary. -/
+theorem WellFormed.toWellFormedJal {e : JTypeEvent} (h : e.WellFormed) : e.WellFormedJal where
+  clk_mod := h.clk_mod
+  pc_lt := h.pc_lt
+  opA_lt := h.opA_lt
+  immB_lt := h.immB_lt
+  immC_lt := h.immC_lt
+  prevA_lt := h.prevA_lt
+  prevA_eq_zero hzero := absurd hzero h.opA_ne_zero
+  prevTsA_lt := h.prevTsA_lt
+
+end JTypeEvent
+
+/-! ## The U-type event boundary
+
+`JTypeEvent.WellFormed` is the older non-x0 J-family boundary. UType's upstream chip also accepts
+LUI/AUIPC with `rd = x0`: it sets `op_a_0`, skips the arithmetic populate, and writes the zero word.
+That is a different routing boundary, not an exception to hide in a completeness proof, so it has
+its own event predicate. -/
+
+namespace JTypeEvent
+
+/-- The two executor opcodes served by the UType chip (`AUIPC = 48`, `LUI = 49`). -/
+def IsUType (e : JTypeEvent) : Prop := e.opcode = 48 ∨ e.opcode = 49
+
+/-- Well-formed execution data for a UType row, including the `rd = x0` form. The x0 branch records
+the architectural zero-register fact used by the global memory argument; local row population also
+zeros the gated result cells. -/
+structure WellFormedUType (e : JTypeEvent) : Prop where
+  /-- The executor's `CLK_INC = 8` discipline. -/
+  clk_mod : e.clk % 8 = 1
+  /-- The program counter fits the committed three-limb address. -/
+  pc_lt : e.pc < 2 ^ 48
+  /-- `rd` names an architectural register, including x0. -/
+  opA_lt : e.opA < 32
+  /-- The row is routed to AUIPC or LUI. -/
+  isUType : e.IsUType
+  /-- The decoded U-immediate word is 64-bit. -/
+  immB_lt : e.immB < 2 ^ 64
+  /-- The second decoded immediate word is 64-bit. -/
+  immC_lt : e.immC < 2 ^ 64
+  /-- The displaced destination value is 64-bit. -/
+  prevA_lt : e.prevA < 2 ^ 64
+  /-- x0's prior value is the architectural zero word. -/
+  prevA_eq_zero : e.opA = 0 → e.prevA = 0
+  /-- The destination's prior access precedes this row's write at `clk + 4`. -/
+  prevTsA_lt : e.prevTsA < e.clk + 4
+
+/-- Every generic non-x0 J event routed to UType satisfies the UType-specific event boundary. -/
+theorem WellFormed.toWellFormedUType {e : JTypeEvent} (h : e.WellFormed) (hop : e.IsUType) :
+    e.WellFormedUType where
+  clk_mod := h.clk_mod
+  pc_lt := h.pc_lt
+  opA_lt := h.opA_lt
+  isUType := hop
+  immB_lt := h.immB_lt
+  immC_lt := h.immC_lt
+  prevA_lt := h.prevA_lt
+  prevA_eq_zero hzero := absurd hzero h.opA_ne_zero
+  prevTsA_lt := h.prevTsA_lt
 
 end JTypeEvent
 

@@ -24,17 +24,19 @@ open SP1Clean.Execution
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-/-- The provider-table indices in the stable 25-chip + 13-provider witness layout. -/
-def programProviderIndex : ℕ := 35
-def memoryInitProviderIndex : ℕ := 36
-def memoryFinalizeProviderIndex : ℕ := 37
+/-- The provider-table indices in the stable 25-chip + 28-provider witness layout. -/
+def programProviderIndex : ℕ :=
+  instructionTableCount + byteProviderTableCount + rangeProviderTableCount
+def memoryInitProviderIndex : ℕ := programProviderIndex + 1
+def memoryFinalizeProviderIndex : ℕ := programProviderIndex + 2
 
 /-- The fixed SP1 ensemble layout always contains its Program-provider table. -/
 theorem programProviderIndex_lt_tablesLength
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
     programProviderIndex < witness.tables.length := by
   rw [← witness.same_length]
-  simp [programProviderIndex, sp1Ensemble_tables, sp1Tables_length,
+  simp [programProviderIndex, instructionTableCount, byteProviderTableCount,
+    rangeProviderTableCount, sp1Ensemble_tables, sp1Tables_length,
     sp1ProviderTables_length]
 
 /-- The fixed SP1 ensemble layout always contains its Memory-init provider table. -/
@@ -42,7 +44,8 @@ theorem memoryInitProviderIndex_lt_tablesLength
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
     memoryInitProviderIndex < witness.tables.length := by
   rw [← witness.same_length]
-  simp [memoryInitProviderIndex, sp1Ensemble_tables, sp1Tables_length,
+  simp [memoryInitProviderIndex, programProviderIndex, instructionTableCount,
+    byteProviderTableCount, rangeProviderTableCount, sp1Ensemble_tables, sp1Tables_length,
     sp1ProviderTables_length]
 
 /-- The physical Program-provider table selected by the stable ensemble layout. -/
@@ -74,8 +77,10 @@ theorem memoryInitProviderTable_component
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
     (memoryInitProviderTable witness).component = ⟨MemoryProviderChip.circuit⟩ := by
   unfold memoryInitProviderTable
-  have aligned := witness.same_circuits 36 (by
-    simp [sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length])
+  have aligned := witness.same_circuits memoryInitProviderIndex (by
+    simp [memoryInitProviderIndex, programProviderIndex, instructionTableCount,
+      byteProviderTableCount, rangeProviderTableCount, sp1Ensemble_tables,
+      sp1Tables_length, sp1ProviderTables_length])
   exact aligned.symm.trans (by rfl)
 
 /-- The stable Memory-init table uses the ensemble's shared prover data. -/
@@ -116,7 +121,8 @@ theorem memoryFinalizeProviderIndex_lt_tablesLength
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
     memoryFinalizeProviderIndex < witness.tables.length := by
   rw [← witness.same_length]
-  simp [memoryFinalizeProviderIndex, sp1Ensemble_tables, sp1Tables_length,
+  simp [memoryFinalizeProviderIndex, programProviderIndex, instructionTableCount,
+    byteProviderTableCount, rangeProviderTableCount, sp1Ensemble_tables, sp1Tables_length,
     sp1ProviderTables_length]
 
 /-- The physical Memory-finalize provider table selected by the stable ensemble layout. -/
@@ -136,8 +142,10 @@ theorem memoryFinalizeProviderTable_component
     (witness : EnsembleWitness (sp1Ensemble (p := p))) :
     (memoryFinalizeProviderTable witness).component = ⟨MemoryFinalizeChip.circuit⟩ := by
   unfold memoryFinalizeProviderTable
-  have aligned := witness.same_circuits 37 (by
-    simp [sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length])
+  have aligned := witness.same_circuits memoryFinalizeProviderIndex (by
+    simp [memoryFinalizeProviderIndex, programProviderIndex, instructionTableCount,
+      byteProviderTableCount, rangeProviderTableCount, sp1Ensemble_tables,
+      sp1Tables_length, sp1ProviderTables_length])
   exact aligned.symm.trans (by rfl)
 
 /-- The stable Memory-finalize table uses the ensemble's shared prover data. -/

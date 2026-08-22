@@ -27,9 +27,10 @@ three the chip serves: `ALUTypeEvent.IsBitwise` (`Opcode::{XOR, OR, AND} = 3, 4,
 reads all three flags as `0`, and `0 = 0 + 0 + 0` holds — so this chip gets a genuine
 `proverAssumptions_padding`, exactly like the single-variant chips.
 
-**The register-row hypothesis.** As for `Addw`, the chip's `ProverAssumptions` asks for `imm_c = 0`:
-this theorem is the completeness witness for the register-register forms. Honest `ANDI`/`ORI`/`XORI`
-rows carry `imm_c = 1` and are covered by soundness and by the bridge, not here.
+**Both ALU row forms.** As for `Addw`, the chip's prover contract now admits the exact register/immediate
+split. Honest `ANDI`/`ORI`/`XORI` rows carry `imm_c = 1`; the shared builder proves their immediate-copy
+gates and the vacuous op_c timestamp block, so they pass through the same table theorem as the
+register-register forms.
 
 Beyond the seven flag conjuncts — all discharged by the one `bitwiseFlags_spec` case split — every
 bullet is `Addw`'s, cited unchanged. -/
@@ -113,20 +114,20 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 /-! ## The chip's honest-prover contract on a built row -/
 
 /--
-**A well-formed register-row `Bitwise` trace event builds a row the honest prover can complete, at
+**A well-formed `Bitwise` trace event builds a row the honest prover can complete, at
 the hint the same event builds.** Every conjunct of `BitwiseChip.ProverAssumptions` follows from
-`ALUTypeEvent.WellFormed`, the routing condition `hop : e.IsBitwise`, and `himm : e.immC = 0`.
+`ALUTypeEvent.WellFormed` and the routing condition `hop : e.IsBitwise`.
 
 The `data` is arbitrary — the chip's prover contract does not read it — but the **hint is not**: it
 is `e.toBitwiseHint`, the flags of this event's own opcode.
 -/
 theorem proverAssumptions_of_event {e : ALUTypeEvent} (h : e.WellFormed) (hop : e.IsBitwise)
-    (himm : e.immC = 0) (data : ProverData (ZMod p)) :
+    (data : ProverData (ZMod p)) :
     ProverAssumptions (e.toBitwiseInputs (p := p)) data e.toBitwiseHint := by
   obtain ⟨hf0, hf1, hf2, hsum, hone0, hone1, hone2⟩ := bitwiseFlags_spec (p := p) hop
   simp only [ProverAssumptions, hintFlags_toBitwiseHint]
-  refine ⟨?_, ?_, ?_, ?_, hf0, hf1, hf2, hsum.symm, hone0, hone1, hone2, ?_, ?_, ?_, ?_, ?_, ?_,
-    ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, hf0, hf1, hf2, hsum.symm, hone0, hone1, hone2, ?_, ?_, ?_, ?_,
+    ?_, ?_, ?_, ?_, ?_⟩
   -- the `rs1` read, then the `op_c` block's committed value — a u64 in *either* row form
   · exact wordOfNat_isU64 _
   · exact aluTypeOpCCols_prev_value_isU64 e
@@ -136,16 +137,18 @@ theorem proverAssumptions_of_event {e : ALUTypeEvent} (h : e.WellFormed) (hop : 
   · exact Or.inr rfl
   -- `rd ≠ x0`, so the `op_a_0` zeroing flag is off
   · exact aluTypeReaderCols_op_a_0_eq_zero h.opA_ne_zero
-  -- the register-register form: the committed `imm_c` flag is the event's, hence `0`
-  · rw [ALUTypeEvent.toBitwiseInputs_adapter, aluTypeReaderCols_imm_c, himm, Nat.cast_zero]
+  -- exact register/immediate row form, with padding excluded by this real-row builder
+  · rcases aluTypeReaderCols_imm_c_bool (p := p) h.immC_bool with h0 | h1
+    · exact Or.inl h0
+    · exact Or.inr ⟨rfl, h1⟩
+  · exact aluTypeReaderCols_imm_copy (p := p) h.immC_bool
   -- the shared reader contracts: the state block, then the two unconditional register accesses
   · exact cpuState_spec e.clk e.pc h.clk_mod _ _ _
   · exact registerAccessCols_spec_opA h.clk_mod h.prevTsA_lt
   · exact registerAccessCols_spec_opB h.clk_mod h.prevTsB_lt
-  -- the `op_c` access: on a register row the block is the ordinary `rs2` read block
-  · rw [ALUTypeEvent.toBitwiseInputs_adapter, aluTypeReaderCols_op_c_memory,
-      aluTypeOpCCols_of_reg himm]
-    exact registerAccessCols_spec_opC h.clk_mod (h.prevTsC_reg himm)
+  -- the `op_c` access: an ordinary register read or the vacuous immediate block
+  · rw [ALUTypeEvent.toBitwiseInputs_adapter, aluTypeReaderCols_op_c_memory]
+    exact aluTypeOpCCols_spec h.clk_mod h.immC_bool h.prevTsC_reg
   -- the decode bounds the Program-bus fetch carries
   · exact fun _ => ⟨aluTypeReaderCols_op_a_val_lt h.opA_lt, (cpuStateCols_pc_val_lt e.clk e.pc).1,
       (cpuStateCols_pc_val_lt e.clk e.pc).2.1, (cpuStateCols_pc_val_lt e.clk e.pc).2.2⟩
@@ -164,7 +167,8 @@ theorem proverAssumptions_padding (data : ProverData (ZMod p)) :
   simp only [ProverAssumptions, hintFlags_empty]
   refine ⟨hzero, hzero, fun hr => absurd hr hne, Or.inl rfl, Or.inl rfl, Or.inl rfl, Or.inl rfl,
     by simp [bitwisePaddingInputs], fun hr => absurd hr hne, fun hr => absurd hr hne, fun hr => absurd hr hne,
-    rfl, rfl, fun hr => absurd hr hne, fun hr => absurd hr hne, fun hr => absurd hr hne, ?_,
+    rfl, Or.inl rfl, by simp [bitwisePaddingInputs, zeroALUTypeReaderCols],
+    fun hr => absurd hr hne, fun hr => absurd hr hne, fun hr => absurd hr hne, ?_,
     fun hr => absurd hr hne, fun hr => absurd hr hne⟩
   intro hr
   have h0 : (0 : ZMod p) = 1 := by rw [← sub_zero (0 : ZMod p)]; exact hr
@@ -185,14 +189,14 @@ def traceInputs (events : List ALUTypeEvent) (padding : ℕ) :
     ++ List.replicate padding (bitwisePaddingInputs, ProverHint.empty (ZMod p))
 
 /-- Every row of a built trace — event row or padding row — satisfies the chip's honest-prover
-contract at its own hint, provided every event is a register-register bitwise instruction. -/
+contract at its own hint, for register and immediate bitwise instructions alike. -/
 theorem proverAssumptions_of_mem_traceInputs {events : List ALUTypeEvent} {padding : ℕ}
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.IsBitwise ∧ e.immC = 0) (data : ProverData (ZMod p)) :
+    (h : ∀ e ∈ events, e.WellFormed ∧ e.IsBitwise) (data : ProverData (ZMod p)) :
     ∀ input ∈ traceInputs (p := p) events padding, ProverAssumptions input.1 data input.2 := by
   intro input hin
   rcases List.mem_append.mp hin with hin | hin
   · obtain ⟨e, he, rfl⟩ := List.mem_map.mp hin
-    exact proverAssumptions_of_event (h e he).1 (h e he).2.1 (h e he).2.2 data
+    exact proverAssumptions_of_event (h e he).1 (h e he).2 data
   · rw [List.eq_of_mem_replicate hin]
     exact proverAssumptions_padding data
 
@@ -200,7 +204,7 @@ theorem proverAssumptions_of_mem_traceInputs {events : List ALUTypeEvent} {paddi
 circuit evaluates to zero on every built row, and no static lookup is left unchecked. -/
 theorem traceTable_constraints (events : List ALUTypeEvent) (padding : ℕ)
     (data : ProverData (ZMod p))
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.IsBitwise ∧ e.immC = 0) :
+    (h : ∀ e ∈ events, e.WellFormed ∧ e.IsBitwise) :
     (Air.Flat.Table.buildHinted (component (p := p)) (traceInputs events padding) data).Constraints :=
   Air.Flat.Table.buildHinted_constraints _ _ _ computableWitnesses
     (proverAssumptions_of_mem_traceInputs h data)
@@ -209,7 +213,7 @@ theorem traceTable_constraints (events : List ALUTypeEvent) (padding : ℕ)
 Memory, Program and Byte channels carries the payload its channel promises. -/
 theorem traceTable_guarantees (events : List ALUTypeEvent) (padding : ℕ)
     (data : ProverData (ZMod p))
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.IsBitwise ∧ e.immC = 0) :
+    (h : ∀ e ∈ events, e.WellFormed ∧ e.IsBitwise) :
     (Air.Flat.Table.buildHinted (component (p := p)) (traceInputs events padding) data).Guarantees :=
   Air.Flat.Table.buildHinted_guarantees _ _ _ computableWitnesses
     (proverAssumptions_of_mem_traceInputs h data)

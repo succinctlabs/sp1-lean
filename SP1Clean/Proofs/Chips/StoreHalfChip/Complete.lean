@@ -5,7 +5,7 @@ import ToClean.Air.TableBuild
 /-! # `SP1Clean.StoreHalfChip` — from trace events to a valid AIR table
 
 `SH` through the trace-generation chain (see `StoreWordChip/Complete.lean` for the store family's
-programme note, including the `op_a`-is-a-read discipline and **why there is no padding row**).
+programme, the `op_a`-is-a-read discipline, and the padding-contract note).
 
 The only thing new against StoreWord is the width of the merge. A half-word store overwrites one of
 the RAM cell's **four** u16 limbs, so the row commits two offset bits (address bits 1 and 2) and the
@@ -90,7 +90,8 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormedStore) (ha
     fun _ => storeLimb_isU64 _ _ (by omega)⟩
   -- the address fits in 48 bits, is above the reserved page, and is 2-byte aligned
   · rw [haddr64]; exact h.addr_lt
-  · rw [haddr48]; exact h.addr_ge
+  · intro _
+    rw [haddr48]; exact h.addr_ge
   · rw [haddr48]; exact halign'
   -- the two offset bits are binary, and decompose the address's low three bits
   · show ((memLimbIndex e.addr % 2 : ℕ) : ZMod p) = 0 ∨ ((memLimbIndex e.addr % 2 : ℕ) : ZMod p) = 1
@@ -138,8 +139,7 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormedStore) (ha
 A plain `def`, deliberately not an `abbrev` (see `AddChip.component` for the measurement). -/
 def component : Air.Flat.Component (ZMod p) := ⟨circuit⟩
 
-/-- The rows a trace builds: one input row per event. **No padding tail** — see
-`StoreWordChip/Complete.lean`. -/
+/-- The event rows, before ensemble-level zero padding (see `StoreWordChip/Complete.lean`). -/
 def traceInputs (events : List MemoryEvent) : List (Inputs (ZMod p)) :=
   events.map MemoryEvent.toStoreHalfInputs
 

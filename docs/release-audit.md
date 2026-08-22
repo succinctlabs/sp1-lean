@@ -12,11 +12,14 @@ instruction tables. Every registered chip has:
 - native Clean soundness and completeness;
 - a bridge to the generated RISC-V Sail semantics;
 - a whole-chip proof against the complete extracted Rust assertion system; and
-- a whole-chip proof against the complete active Rust interaction multiset.
+- a whole-chip proof against the complete active Rust interaction multiset on every locally
+  accepted reconstructed row in the codec image, modulo permutation and zero-multiplicity entries.
 
 The repository does not yet have a closed theorem from the exact 34-table upstream Core relation to
-Sail. The remaining gap is system-table semantics and exact-to-native assembly, represented by the
-uninstantiated `CoreAIRRefinementObligations` structure. The available
+Sail. Local exact-to-native assembly is now proved. The remaining gap is deriving the explicit
+global balance/count, preprocessing and program authentication, memory-boundary semantics, and
+application-level semantic binding needed to instantiate the unclosed
+`CoreAIRRefinementObligations` structure. The available
 `sp1_air_*_of_obligations` declarations are conditional composition lemmas.
 
 No main-library proof is deferred. This audit found no `sorry`, `stop`, project `axiom`, or `sorryAx`.
@@ -88,7 +91,9 @@ every extraction change is an ordinary commit on it — there is no uncommitted-
 diff under `crates/core/machine/src` changes only reflection imports/derives needed to expose row
 shapes; it does not change an AIR equation or trace-population function. The generator verifies the
 merge base, the changed-file allowlist, the derive-only machine diff, and a clean worktree before it
-writes any artifact.
+writes any artifact. Changes to `IntoShape`, the constraint compiler, and the symbolic IR are a
+separate pinned trusted-extractor surface: their paths are fail-closed by the allowlist and their
+bytes by the exact commit, but the gate does not label them semantically inert.
 
 ## Verification stack and status
 
@@ -103,7 +108,13 @@ writes any artifact.
 | Exact Rust AIR-to-Sail | `sp1_air_sound_of_obligations` | conditional; bundle not instantiated |
 | Cross-shard execution | `SP1ExecutionRelation` | target relation specified; no soundness theorem yet |
 | Core verifier | `VerifierBoundary.PerfectExtraction` composition API | cryptographic proof not implemented here |
-| Whole-machine completeness | intended Clean witness generation | not yet declared |
+| Native witness assembly | `supported_core_native_complete` | closed relative to a supplied well-formed, balanced trace |
+| Semantic whole-machine completeness | supported Sail execution → trace generation | open; no theorem declared |
+
+`supported_core_native_complete` is generator-relative assembly completeness: it computes all native
+physical rows with the circuits' witness generators once the trace-level routing, provider capacity,
+integer balance, public equality, and boundary contracts are supplied. It does not prove that every
+supported Sail execution produces such a trace; that semantic Sail→trace generator remains open.
 
 ## Closed capstone statement
 
@@ -148,17 +159,39 @@ The exact instruction profile contains 25 tables. `Faithful/SupportedMachine.lea
 - its table-name order equals the native registry's physical order; and
 - its table tags are a permutation of `CoreProfile.instructionTables`.
 
-Each `ChipFaithful` proposition is bidirectional for local assertions. It is not merely a claim that
-the two systems agree on traces produced by the honest witness generator. Interaction equality is
-proved on every locally accepted row, modulo permutation and zero-multiplicity entries.
+Each `ChipFaithful` proposition is bidirectional for local assertions **after** an arbitrary
+extracted Rust row is decoded and reconstructed as its canonical native physical row. It is not
+merely a claim about rows produced by the honest witness generator, but it also does not quantify
+over every possible physical native assignment outside that codec image. Interaction equality is
+proved on every locally accepted reconstructed row, modulo permutation and zero-multiplicity
+entries.
 
 The system tables are handled differently: their complete generated lists are used directly in the
-exact relation. Two of them — StateBump and MemoryBump — gained native chips and Rust-faithfulness
-anchors in the 2026-08 audit response (`SP1Clean/Faithful/{StateBump,MemoryBump}Chip.lean`); the
-rest do not have native semantic-table faithfulness theorems, because the native ensemble uses a
-smaller proof-oriented provider interface (15 provider/boundary tables alongside the 25 instruction
-chips — a 40-table Clean ensemble). Connecting those two interfaces is the remaining exact Core
-refinement task.
+exact relation. StateBump and MemoryBump retain native chips and whole-table faithfulness anchors.
+The rest do not acquire artificial row-wise native counterparts, because the native ensemble uses a
+proof-oriented provider interface (28 provider/boundary tables alongside the 25 instruction chips —
+a 53-table Clean ensemble). The provider family contains six Byte-op tables, all 17 Range widths
+`0..16`, Program, MemoryInit, MemoryFinalize, MemoryBump, and StateBump; the complete Range family
+closes the provider side of honest shift-row lookups. `SP1Clean/Faithful/Transport/{PreprocessedProviders,
+MemoryBoundary,SystemTables,ProviderSegment,CoreEnsemble}.lean` now constructively connects the two
+local interfaces under a caller-supplied `CanonicalPreprocessedInventory` and proves all 53 native
+tables plus the verifier row satisfy their constraints.
+Byte/Range/Program counts are recounted from the actual Clean interaction ledger of the verifier,
+25 transported instruction tables, MemoryInit/MemoryFinalize, and both bumps rather than copied from
+the larger exact cluster. The raw exact Byte/Range/Program assertion lists are empty.
+`CoreAIR.PreprocessedBinding` only records the named matrix/PCS-opening premise, to be discharged by
+ArkLib; it proves neither row-local meaning nor provider selection. `PreprocessedProviderContract`
+is the explicit caller premise for row-local semantics. Source main
+multiplicities are not reused and raw projected keys are not assumed unique. The caller-supplied
+`CanonicalPreprocessedInventory` selects carriers backed by the matching source matrix/Range-width
+block and explicitly carries projected-key `Nodup`; zero-demand raw keys may be omitted. The recount
+contract separately states nonzero Byte/Program-key coverage, skeleton nonpositivity, and canonical
+capacity. `freshRowsByKey` is only declarative/regression support. PCS/program identity,
+State/Memory balance, and semantic binding remain separate and explicit. The recount derives Byte
+(including Range) and Program
+integer balance; the global contract retains all-channel count bounds and State/Memory integer
+balance. The remaining exact Core refinement task is global across those contracts and the named
+public-range and Global→Memory transformations.
 
 ## Exact AIR coverage
 
@@ -215,18 +248,18 @@ stream.
 
 - manifest-resolved pin reporting, gating any present `.lake` checkout against the manifest;
 - recorded-value cross-checks (`scripts/check_pins.sh`: lakefile ↔ manifest ↔ this report's pin
-  table ↔ `CoreProfile.sp1SemanticRevision` ↔ doc-cited census counts);
+  table ↔ `CoreProfile.sp1SemanticRevision` ↔ the authoritative census ledger and raw snapshots);
 - root-index completeness (`scripts/check_root_index.sh`) and doc-citation resolution
   (`scripts/check_report_citations.sh`);
 - a zero-tolerance source proof-deferral scan;
 - a zero-tolerance project-axiom scan;
 - `skipKernelTC` and main-library `native_decide` guards;
 - an elaboration-budget escape-hatch prohibition (allowlist-gated); and
-- a generated `#print axioms` census over the released theorem surface — currently 553 probed
-  declarations, split 515 (main library) plus 38 (test anchors) — split by library and
+- a generated `#print axioms` census over the released theorem surface, split by library and
   diffed against the committed `docs/snapshots/axiom-census.txt` (main) and
   `docs/snapshots/axiom-census-test.txt` (test anchors) — drift fails; only `--update` rewrites
-  the snapshots, so a passing run leaves the tree clean.
+  the snapshots, so a passing run leaves the tree clean. The mechanically checked main/test counts
+  and total live only in `docs/snapshots/axiom-ledger.md`.
 
 CI runs the three cross-check gates in its fast `guards` job, the harness's main scope
 (`--main-only`) in a dedicated `audit` job on the built `SP1Clean` oleans, and the test-scope
@@ -272,7 +305,7 @@ recomputed and matched cell-for-cell), and the independent Rust interpreter diff
 | Exact natural balance | execution needs a real multiset, not modular equality | extract with LogUp/GKR soundness and bounds |
 | Shard ledger cryptography | cumulative sums and deferred proofs are recursive-proof facts | prove in recursion/verifier layer |
 | Standard halt wrapper | needed only for all-eight COMMIT coverage | prove from exact committed ROM |
-| Hand-mirrored opcode enum/routing | `SP1Clean/Model/Opcode.lean` re-declares SP1's `Opcode` variants and `#[repr(u8)]` discriminants, and `SP1Clean/Soundness/Coverage.lean` mirrors the `tracing.rs` routing, by hand — an interim hand-verified trust item | replace with a generated, pin-checked opcode-table artifact (in flight) |
+| Opcode enum and routing source mirror | `SP1Clean/Model/Opcode.lean`'s 53 names/discriminants are kernel-checked against the generated, pin-checked `Extracted/OpcodeTable.lean` artifact by `opcodeTable_matchesExtracted`; the single `supportedChips` descriptor still mirrors `tracing.rs`'s opcode→chip dispatch by hand, while the coverage proofs tie that descriptor to the 25-chip registry and exhaust the extracted opcode alphabet | extract the routing dispatch itself on a future SP1 pin; until then review the one descriptor against `tracing.rs` |
 
 These are theorem inputs or tool/model trust boundaries, not undisclosed Lean axioms.
 
@@ -289,9 +322,11 @@ exact instruction tables
 
 Specifically:
 
-- transport all 25 exact instruction traces through the coverage certificate;
-- derive native provider and memory-uniqueness facts from the system tables (the pulled-timestamp
-  high bound is already derived natively, from the per-location Memory balance);
+- discharge `ExactNativeGlobalContract` from the exact interaction argument: all-channel count
+  bounds, State/Memory integer balance, and the semantic program/boundary binding;
+- authenticate and construct the source-backed preprocessing inventory, and close the named
+  Range13→Range16 and raw-Global→typed-Memory transformations (the 25 instruction tables and
+  complete 28-table provider/system tail are already constructed under those explicit contracts);
 - prove the mixed ordinary/syscall schedule and exact syscall transcript;
 - instantiate `CoreAIRRefinementObligations`;
 - compose authenticated shards from boot to HALT; and
@@ -310,10 +345,12 @@ lake lint
 scripts/run_audit.sh
 ```
 
-The final command regenerates:
+The final command regenerates the two probe sources and validates their output against the committed
+census snapshots:
 
-- `scripts/axiom_probe.lean` and `scripts/axiom_probe_test.lean`; and
-- `docs/snapshots/axiom-census.txt` and `docs/snapshots/axiom-census-test.txt`.
+- `scripts/axiom_probe.lean` and `scripts/axiom_probe_test.lean` are always regenerated;
+- `docs/snapshots/axiom-census.txt` and `docs/snapshots/axiom-census-test.txt` are read-only in the
+  normal audit and are rewritten only by `scripts/run_audit.sh --update` from a clean committed tree.
 
 An unknown declaration makes the probe fail. A new proof deferral, project axiom, forbidden kernel
 bypass, main-library `native_decide`, non-allowlisted elaboration-budget directive, or `sorryAx` carrier

@@ -240,7 +240,8 @@ the two Memory-bus interactions at a real 48-bit address, parameterised by the w
 def circuit : GeneralFormalCircuit (ZMod p) Inputs unit :=
   -- `byteChannel` dropped (W11 Phase 0c): the off-gate byte-pull `Requirements` are now discharged by the
   -- inline `is_real` boolean gate in `main`, so only the Memory bus stays in `channelsWithRequirements`
-  -- (it carries the real send/receive emits); `byteChannel` moves to a Clean `SoundEnsemble` provider later.
+  -- (it carries the real send/receive emits). Byte soundness is recovered globally from the plain
+  -- `sp1Ensemble` balance against its complete provider family.
   { main, elaborated,
     Assumptions := AssumptionsD, Spec := SpecD,
     ProverAssumptions := ProverAssumptionsD, ProverSpec := fun _ _ _ => True,

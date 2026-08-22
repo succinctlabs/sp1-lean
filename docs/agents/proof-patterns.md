@@ -1025,9 +1025,9 @@ the source text, which is exactly what `scripts/gen_axiom_probe.py` (regex over 
   blanket comment-strip on `ShiftLeftChip/Soundness/Sll` was reverted for exactly this.)
 
 **Verify every batch:** `lake build SP1Clean` clean (0 warn, no `info:`), then
-`scripts/run_audit.sh` (zero proof deferrals and no unexpected axiom-census change) — and separately
-`scripts/check_report_citations.sh`, which `run_audit.sh` does **not** invoke (see "Build & verification
-gotchas"). On heavy files watch the per-file elaboration time in the build log and **revert on regression**.
+`scripts/run_audit.sh` (zero proof deferrals, citation checks, and no unexpected axiom-census
+change). `scripts/check_report_citations.sh` remains useful as a faster standalone documentation
+check. On heavy files watch the per-file elaboration time in the build log and **revert on regression**.
 
 > **Never *infer* an axiom change from the tactics you removed — measure both versions.** A report that
 > replacing some `omega` calls in `FormalModel/Contracts/Chips.lean` had dropped `Classical.choice` was
@@ -1157,13 +1157,12 @@ only: it makes Σsends = Σreceives expressible; it does not derive the per-bus 
   indistinguishable from stuck. A stack sample discriminates immediately — `Lean_Meta_isDefEqDelta` /
   `whnfImp` / `unfoldDefinition` / `reduceRec` is a delta-unfolding blowup, not progress. It is cheap; reach
   for it before killing or before waiting longer.
-- **Audit-harness quirks.** `scripts/run_audit.sh` **rewrites `docs/snapshots/axiom-census.txt` as a side
-  effect, even on a pass**, so it leaves the tree dirty; inspect the delta before restoring, because an
-  auto-generated `bv_decide` `ax_N_M✝` index moving *because a proof term changed* is **hygienic** — no axiom
-  entered or left a set. Restore with a scratchpad `cp`, not `git checkout --` (the agent harness's guardrail
-  script blocks that as destructive). And `run_audit.sh` does **not** invoke
-  `scripts/check_report_citations.sh` — run it yourself, or its 16 hard-coded file+declaration citations go
-  unchecked.
+- **Audit-harness behavior.** A normal `scripts/run_audit.sh` regenerates the probe sources, validates
+  them against the committed raw censuses, invokes the report-citation gate, and leaves a passing tree
+  unchanged. Only `scripts/run_audit.sh --update` rewrites the census snapshots, and it refuses to stamp
+  them unless every non-census input is already committed. Inspect an intended update before committing:
+  an auto-generated `bv_decide` `ax_N_M✝` index moving *because a proof term changed* is hygienic — no
+  axiom entered or left a set.
 - Work one file and one build at a time; avoid batching many edit + LSP calls in a single turn.
 - **LSP times out on a big chip file → introspect via a scratch `import`.** `lean_goal` on a 600+-line chip
   (e.g. `ShiftLeftChip.lean`'s completeness) times out because it re-elaborates the whole file. Instead write

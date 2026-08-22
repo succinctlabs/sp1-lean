@@ -84,19 +84,21 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 /-! ## The chip's honest-prover contract on a built row -/
 
 /--
-**A well-formed register-row `Lt` trace event builds a row the honest prover can complete, at the
+**A well-formed `Lt` trace event builds a row the honest prover can complete, at the
 hint the same event builds.** Every conjunct of `LtChip.ProverAssumptions` follows from
-`ALUTypeEvent.WellFormed`, the routing condition `hop : e.IsLt`, and `himm : e.immC = 0`.
+`ALUTypeEvent.WellFormed` and the routing condition `hop : e.IsLt`; both register and immediate
+operand forms are admitted.
 
 The `data` is arbitrary; the **hint is not** — it is `e.toLtHint`, the flags of this event's own
 opcode.
 -/
 theorem proverAssumptions_of_event {e : ALUTypeEvent} (h : e.WellFormed) (hop : e.IsLt)
-    (himm : e.immC = 0) (data : ProverData (ZMod p)) :
+    (data : ProverData (ZMod p)) :
     ProverAssumptions (e.toLtInputs (p := p)) data e.toLtHint := by
   obtain ⟨hf0, hf1, hsum⟩ := ltFlags_spec (p := p) hop
   simp only [ProverAssumptions, hintFlags_toLtHint]
-  refine ⟨?_, ?_, ?_, ?_, ?_, hf0, hf1, hsum.symm, fun _ => rfl, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, hf0, hf1, hsum.symm, fun _ => rfl, ?_, ?_, ?_, ?_, ?_, ?_,
+    ?_, ?_, ?_⟩
   -- the `rs1` read, then the `op_c` block's committed value — a u64 in *either* row form
   · exact wordOfNat_isU64 _
   · exact aluTypeOpCCols_prev_value_isU64 e
@@ -107,15 +109,18 @@ theorem proverAssumptions_of_event {e : ALUTypeEvent} (h : e.WellFormed) (hop : 
   · exact Or.inr rfl
   -- `rd ≠ x0`, so the `op_a_0` zeroing flag is off
   · exact aluTypeReaderCols_op_a_0_eq_zero h.opA_ne_zero
-  -- the register-register form: the committed `imm_c` flag is the event's, hence `0`
-  · rw [ALUTypeEvent.toLtInputs_adapter, aluTypeReaderCols_imm_c, himm, Nat.cast_zero]
+  -- exact register/immediate row form, with padding excluded by this real-row builder
+  · rcases aluTypeReaderCols_imm_c_bool (p := p) h.immC_bool with h0 | h1
+    · exact Or.inl h0
+    · exact Or.inr ⟨rfl, h1⟩
+  · exact aluTypeReaderCols_imm_copy (p := p) h.immC_bool
   -- the shared reader contracts: the state block, then the two unconditional register accesses
   · exact cpuState_spec e.clk e.pc h.clk_mod _ _ _
   · exact registerAccessCols_spec_opA h.clk_mod h.prevTsA_lt
   · exact registerAccessCols_spec_opB h.clk_mod h.prevTsB_lt
-  -- the `op_c` access: on a register row the block is the ordinary `rs2` read block
-  · rw [ALUTypeEvent.toLtInputs_adapter, aluTypeReaderCols_op_c_memory, aluTypeOpCCols_of_reg himm]
-    exact registerAccessCols_spec_opC h.clk_mod (h.prevTsC_reg himm)
+  -- the `op_c` access: an ordinary register read or the vacuous immediate block
+  · rw [ALUTypeEvent.toLtInputs_adapter, aluTypeReaderCols_op_c_memory]
+    exact aluTypeOpCCols_spec h.clk_mod h.immC_bool h.prevTsC_reg
   -- the decode bounds the Program-bus fetch carries
   · exact fun _ => ⟨aluTypeReaderCols_op_a_val_lt h.opA_lt, (cpuStateCols_pc_val_lt e.clk e.pc).1,
       (cpuStateCols_pc_val_lt e.clk e.pc).2.1, (cpuStateCols_pc_val_lt e.clk e.pc).2.2⟩
@@ -132,7 +137,8 @@ theorem proverAssumptions_padding (data : ProverData (ZMod p)) :
   have hne : ¬((0 : ZMod p) = 1) := zero_ne_one
   simp only [ProverAssumptions, ltHintFlags_empty]
   refine ⟨hzero, hzero, fun hr => absurd hr hne, ?_, Or.inl rfl, Or.inl rfl, Or.inl rfl,
-    by simp [ltPaddingInputs], fun hr => absurd hr hne, rfl, rfl, fun hr => absurd hr hne,
+    by simp [ltPaddingInputs], fun hr => absurd hr hne, rfl, Or.inl rfl,
+    by simp [ltPaddingInputs, zeroALUTypeReaderCols], fun hr => absurd hr hne,
     fun hr => absurd hr hne, fun hr => absurd hr hne, ?_, fun hr => absurd hr hne,
     fun hr => absurd hr hne⟩ <;>
     · intro hr
@@ -154,21 +160,21 @@ def traceInputs (events : List ALUTypeEvent) (padding : ℕ) :
     ++ List.replicate padding (ltPaddingInputs, ProverHint.empty (ZMod p))
 
 /-- Every row of a built trace — event row or padding row — satisfies the chip's honest-prover
-contract at its own hint, provided every event is a register-register set-less-than. -/
+contract at its own hint, for register and immediate set-less-than instructions alike. -/
 theorem proverAssumptions_of_mem_traceInputs {events : List ALUTypeEvent} {padding : ℕ}
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.IsLt ∧ e.immC = 0) (data : ProverData (ZMod p)) :
+    (h : ∀ e ∈ events, e.WellFormed ∧ e.IsLt) (data : ProverData (ZMod p)) :
     ∀ input ∈ traceInputs (p := p) events padding, ProverAssumptions input.1 data input.2 := by
   intro input hin
   rcases List.mem_append.mp hin with hin | hin
   · obtain ⟨e, he, rfl⟩ := List.mem_map.mp hin
-    exact proverAssumptions_of_event (h e he).1 (h e he).2.1 (h e he).2.2 data
+    exact proverAssumptions_of_event (h e he).1 (h e he).2 data
   · rw [List.eq_of_mem_replicate hin]
     exact proverAssumptions_padding data
 
 /-- **A real trace builds a valid Lt table.** Every `assertZero` of the whole flattened chip circuit
 evaluates to zero on every built row, and no static lookup is left unchecked. -/
 theorem traceTable_constraints (events : List ALUTypeEvent) (padding : ℕ)
-    (data : ProverData (ZMod p)) (h : ∀ e ∈ events, e.WellFormed ∧ e.IsLt ∧ e.immC = 0) :
+    (data : ProverData (ZMod p)) (h : ∀ e ∈ events, e.WellFormed ∧ e.IsLt) :
     (Air.Flat.Table.buildHinted (component (p := p)) (traceInputs events padding) data).Constraints :=
   Air.Flat.Table.buildHinted_constraints _ _ _ computableWitnesses
     (proverAssumptions_of_mem_traceInputs h data)
@@ -176,7 +182,7 @@ theorem traceTable_constraints (events : List ALUTypeEvent) (padding : ℕ)
 /-- The same table satisfies its **channel guarantees** — every message it pushes onto the State,
 Memory, Program and Byte channels carries the payload its channel promises. -/
 theorem traceTable_guarantees (events : List ALUTypeEvent) (padding : ℕ)
-    (data : ProverData (ZMod p)) (h : ∀ e ∈ events, e.WellFormed ∧ e.IsLt ∧ e.immC = 0) :
+    (data : ProverData (ZMod p)) (h : ∀ e ∈ events, e.WellFormed ∧ e.IsLt) :
     (Air.Flat.Table.buildHinted (component (p := p)) (traceInputs events padding) data).Guarantees :=
   Air.Flat.Table.buildHinted_guarantees _ _ _ computableWitnesses
     (proverAssumptions_of_mem_traceInputs h data)

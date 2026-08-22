@@ -33,9 +33,10 @@ This is the small audit index for the native instruction slice. Each entry carri
 to the stable 25-entry `supportedChips` registry. Thus adding, removing, or reordering a supported
 instruction table requires updating the faithfulness coverage certificate in the same change.
 
-The certificate covers whole-chip assertions and active interaction multisets. It does not claim that
-the 13 native provider tables equal upstream Core AIR tables; exact upstream table coverage lives in
-`Faithful/CoreAIR.lean`. -/
+The certificate covers whole-chip assertions and active interaction multisets. It does not identify
+the 28 proof-oriented native provider/system tables row-for-row with upstream's differently shaped
+Core AIR tables. Exact upstream table coverage lives in `Faithful/CoreAIR.lean`; the explicit
+redistribution and consumer-recount boundary lives in `Faithful/Transport/`. -/
 
 namespace SP1Clean.Faithful
 
@@ -43,6 +44,56 @@ open SP1Clean.Soundness
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
+
+/-! ## Extracted column-width guard
+
+The machine manifest records Rust's `mainWidth`, while each generated whole-chip oracle separately
+declares the nested column structure consumed by its faithfulness codec.  The following option-valued
+index ties those two generated surfaces together for every supported instruction table.  Returning
+`none` outside the instruction profile makes omission visible rather than silently reusing the
+manifest value. -/
+
+/-- Physical field count of the generated Rust column structure for each supported instruction AIR. -/
+def instructionOracleMainWidth : CoreProfile.Table → Option ℕ
+  | .add => some (size Extracted.AddOracle.AddCols)
+  | .addi => some (size Extracted.AddiOracle.AddiCols)
+  | .addw => some (size Extracted.AddwOracle.AddwCols)
+  | .sub => some (size Extracted.SubOracle.SubCols)
+  | .subw => some (size Extracted.SubwOracle.SubwCols)
+  | .bitwise => some (size Extracted.BitwiseOracle.BitwiseCols)
+  | .lt => some (size Extracted.LtOracle.LtCols)
+  | .shiftLeft => some (size Extracted.ShiftLeftOracle.ShiftLeftCols)
+  | .shiftRight => some (size Extracted.ShiftRightOracle.ShiftRightCols)
+  | .jal => some (size Extracted.JalOracle.JalColumns)
+  | .jalr => some (size Extracted.JalrOracle.JalrColumns)
+  | .branch => some (size Extracted.BranchOracle.BranchColumns)
+  | .uType => some (size Extracted.UTypeOracle.UTypeColumns)
+  | .loadByte => some (size Extracted.LoadByteOracle.LoadByteColumns)
+  | .loadHalf => some (size Extracted.LoadHalfOracle.LoadHalfColumns)
+  | .loadWord => some (size Extracted.LoadWordOracle.LoadWordColumns)
+  | .loadDouble => some (size Extracted.LoadDoubleOracle.LoadDoubleColumns)
+  | .loadX0 => some (size Extracted.LoadX0Oracle.LoadX0Columns)
+  | .storeByte => some (size Extracted.StoreByteOracle.StoreByteColumns)
+  | .storeHalf => some (size Extracted.StoreHalfOracle.StoreHalfColumns)
+  | .storeWord => some (size Extracted.StoreWordOracle.StoreWordColumns)
+  | .storeDouble => some (size Extracted.StoreDoubleOracle.StoreDoubleColumns)
+  | .mul => some (size Extracted.MulOracle.MulCols)
+  | .divRem => some (size Extracted.DivRemOracle.DivRemCols)
+  | .aluX0 => some (size Extracted.AluX0Oracle.AluX0Cols)
+  | _ => none
+
+/-- The width index is defined on exactly the supported instruction profile.  This converse guard
+prevents a future system-table arm from being added without an explicit profile decision. -/
+theorem instructionOracleMainWidth_isSome_iff (table : CoreProfile.Table) :
+    (instructionOracleMainWidth table).isSome ↔ table ∈ CoreProfile.instructionTables := by
+  cases table <;> decide
+
+/-- Every table in the exact supported instruction profile has a generated Rust column structure,
+and its kernel-computed field count equals the independently extracted `MachineAir::main_width`. -/
+theorem supportedInstructionMainWidths :
+    ∀ table ∈ CoreProfile.instructionTables,
+      instructionOracleMainWidth table = some table.mainWidth := by
+  decide
 
 /-- The exact whole-chip faithfulness proposition each supported instruction table must carry.
 

@@ -28,7 +28,7 @@ No one of these objects is silently treated as another.
 | `FormalModel/` | semantic contracts and public witness relations |
 | `Native/` | independent Clean circuits and witness-producing gadgets |
 | `Proofs/` | circuit soundness/completeness and Sail bridges |
-| `Faithful/` | native-row ↔ Rust-row whole-chip comparisons |
+| `Faithful/` | whole-chip comparisons on canonical native rows reconstructed from extracted Rust rows |
 | `Soundness/` | machine registry, typed decoding, grounding, and capstones |
 | `SP1CleanTest/` | compiler-trusted executable conformance tests, isolated from the main library |
 
@@ -161,10 +161,38 @@ the 25-entry instruction coverage certificate.
 The registry drives the Clean table list, typed row decoder, opcode coverage, Sail dispatch, and
 faithfulness coverage. Its order is a witness-format decision.
 
-`SP1Ensemble.lean` adds 15 proof-oriented provider/boundary tables to form a 40-table Clean ensemble
-(the last two are the W3 system tables: MemoryBump at position 38, StateBump at 39).
-These provider circuits are not asserted to be the exact upstream Core system tables. They are the
-small native interface used to prove the instruction execution theorem.
+`SP1Ensemble.lean` adds 28 proof-oriented provider/boundary tables to form a 53-table Clean ensemble:
+six Byte-op providers at positions 25–30, one fixed Range provider for every width `0..16` at
+31–47, Program at 48, MemoryInit/MemoryFinalize at 49/50, and the W3 system tables MemoryBump and
+StateBump at 51/52. The complete Range family is semantic, not padding: shift consumers emit widths
+outside the former `8/13/14/16` subset, so that subset could not balance an honest shift trace.
+These provider circuits are not asserted to be row-wise copies of the exact upstream Core system
+tables. They are the small native interface used to prove the instruction execution theorem;
+`Faithful/Transport/ProviderSegment.lean` consumes a caller-supplied, source-backed
+`CanonicalPreprocessedInventory` together with the exact memory-boundary and bump rows, and
+`CoreEnsemble.lean` proves the complete 53-table local constraint system.
+
+The redistribution does not copy Byte/Range/Program multiplicities from the exact 34-table
+execution cluster. That cluster counts system/public consumers that the native 53-table slice does
+not contain. Instead, transport projects the actual Clean interactions of the verifier, 25
+transported instruction tables, MemoryInit/MemoryFinalize, MemoryBump, and StateBump — every native
+table except the three preprocessing-provider families — into a skeleton ledger and recounts it.
+The raw exact Byte/Range/Program assertion lists are empty. `CoreAIR.PreprocessedBinding` only
+records the named matrix/PCS-opening premise, to be discharged by ArkLib; it proves neither
+row-local meaning nor provider selection. `PreprocessedProviderContract` is the explicit caller
+premise for that meaning; neither raw
+projected-key uniqueness nor native-demand coverage follows from it. The
+Type-valued `CanonicalPreprocessedInventory` is a caller-supplied, demand-oriented selection already
+partitioned by destination provider. Each selected carrier is backed by its matching exact source
+matrix, with Range backed by the matching width block, and projected-key `Nodup` is an explicit field
+of that selected inventory rather than a property of the raw matrices. It may omit raw keys whose
+native demand is zero. The recount contract separately requires coverage of every nonzero
+Byte/Program skeleton key, nonpositive skeleton sums at selected keys, and `2 * count ≤ p`.
+`freshRowsByKey` is a declarative specification and small-regression helper only; it is not used to
+materialize or deduplicate the real preprocessing universe. PCS/program identity, State and Memory
+balance, and the semantic boundary remain explicit contracts.
+The recount discharges Byte (including Range) and Program integer balance; the downstream global
+contract retains all-channel interaction-count bounds and State/Memory integer balance.
 
 ## Structural buses and semantic grounding
 
@@ -191,14 +219,18 @@ The whole-machine proof derives meaning in this order:
 The generic timed engine and every one of the 25 registry contracts are proved. The result is packaged
 by `supported_core_witness_grounding` and consumed by `supported_core_native_sound`.
 
-The source relation keeps non-algebraic facts visible:
+The source relation keeps non-algebraic facts visible. The exact AIR/PCS integration must derive the
+authenticated provider contents, their uniqueness, and their binding to the committed program and
+memory boundary. Separate application contracts must supply the loader and platform facts that are
+not consequences of the table AIR itself:
 
 - the program and initial state are bound to provider rows;
 - memory-provider rows are unique per location; and
 - code memory is compatible with the Sail execution model.
 
-These are not Lean axioms. They are explicit relation conjuncts that the exact upstream system-table
-proof must eventually derive.
+These are not Lean axioms. They are explicit relation conjuncts, deliberately split between facts
+the exact proof artifact must authenticate and facts the SP1 loader/platform integration must
+establish.
 
 The physical range bound on pulled high timestamps is deliberately *not* on that list. It used to be
 a third relation conjunct, because `ChipGroundingContracts.rowAligned` took it as a premise and so
@@ -303,8 +335,10 @@ supported semantic execution
 ```
 
 The source must be restricted to supported, trace-generatable executions. Clean's exportable witness
-generation is the intended implementation vehicle. No placeholder whole-machine completeness theorem
-is declared today.
+generation is the intended implementation vehicle. The current
+`supported_core_native_complete` theorem proves the final native assembly arrow **from an already
+well-formed, balanced trace**; it does not implement either preceding semantic-generation arrow, so
+no whole-machine semantic completeness theorem is declared today.
 
 ## Performance discipline
 

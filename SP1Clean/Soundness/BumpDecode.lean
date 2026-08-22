@@ -4,7 +4,7 @@ import SP1Clean.Soundness.StateCanon
 
 /-! # Typed decoders for the two bump system tables (W3 D6, external report Finding 2)
 
-The BumpDecode layer: the StateBump table (stable position 39) and MemoryBump table (position 38)
+The BumpDecode layer: the StateBump table (stable position 52) and MemoryBump table (position 51)
 decoded row-by-row into their chip `Inputs`, with each table's channel contribution enumerated as
 the per-row semantic pull/push pairs — the exact analogue, for the two provider-segment system
 tables, of `DecodedInstructionRow.stateInteractions_eq` for the 25 instruction chips.
@@ -25,21 +25,23 @@ open Circuit
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-/-- The MemoryBump table's stable position in the 40-table layout. -/
-def memoryBumpIndex : ℕ := 38
+/-- The MemoryBump table's stable position in the 53-table layout. -/
+def memoryBumpIndex : ℕ := instructionTableCount + nonBumpProviderTableCount
 
-/-- The StateBump table's stable position in the 40-table layout. -/
-def stateBumpIndex : ℕ := 39
+/-- The StateBump table's stable position in the 53-table layout. -/
+def stateBumpIndex : ℕ := instructionTableCount + stateSilentProviderTableCount
 
 theorem memoryBumpIndex_lt_tablesLength (witness : EnsembleWitness (sp1Ensemble (p := p))) :
     memoryBumpIndex < witness.tables.length := by
   rw [← witness.same_length]
-  simp [memoryBumpIndex, sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length]
+  simp [memoryBumpIndex, instructionTableCount, nonBumpProviderTableCount,
+    sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length]
 
 theorem stateBumpIndex_lt_tablesLength (witness : EnsembleWitness (sp1Ensemble (p := p))) :
     stateBumpIndex < witness.tables.length := by
   rw [← witness.same_length]
-  simp [stateBumpIndex, sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length]
+  simp [stateBumpIndex, instructionTableCount, stateSilentProviderTableCount,
+    sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length]
 
 /-- The physical MemoryBump table selected by the stable ensemble layout. -/
 noncomputable def memoryBumpTable
@@ -57,7 +59,8 @@ theorem memoryBumpTable_component
     (memoryBumpTable witness).component = ⟨MemoryBumpChip.circuit⟩ := by
   unfold memoryBumpTable
   have aligned := witness.same_circuits memoryBumpIndex (by
-    simp [memoryBumpIndex, sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length])
+    simp [memoryBumpIndex, instructionTableCount, nonBumpProviderTableCount,
+      sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length])
   exact aligned.symm.trans (by rfl)
 
 /-- The stable StateBump position carries the StateBump circuit. -/
@@ -66,7 +69,8 @@ theorem stateBumpTable_component
     (stateBumpTable witness).component = ⟨StateBumpChip.circuit⟩ := by
   unfold stateBumpTable
   have aligned := witness.same_circuits stateBumpIndex (by
-    simp [stateBumpIndex, sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length])
+    simp [stateBumpIndex, instructionTableCount, stateSilentProviderTableCount,
+      sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length])
   exact aligned.symm.trans (by rfl)
 
 /-- The bump tables use the ensemble's shared prover data. -/
@@ -91,20 +95,25 @@ def MemoryBumpChip.pushedMessage (r : MemoryBumpChip.Inputs (ZMod p)) : MemoryMs
     r.addr, 0, 0, r.access.prev_value⟩
 
 /-- The provider tail beyond the state-silent prefix is exactly the StateBump singleton. -/
-theorem tables_drop39 (witness : EnsembleWitness (sp1Ensemble (p := p))) :
-    witness.tables.drop 39 = [stateBumpTable witness] := by
-  have hlen : witness.tables.length = 40 := by
+theorem tables_drop_stateBumpIndex (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    witness.tables.drop stateBumpIndex = [stateBumpTable witness] := by
+  have hlen : witness.tables.length = 53 := by
     rw [← witness.same_length]
-    rfl
+    simp [sp1Ensemble_tables, sp1Tables_length,
+      sp1ProviderTables_length]
+  simp only [stateBumpIndex, instructionTableCount, stateSilentProviderTableCount]
   rw [List.drop_eq_getElem_cons (by omega), List.drop_eq_nil_of_le (by omega)]
   rfl
 
-/-- The provider tail splits into its fourteen state-silent tables and the StateBump singleton. -/
+/-- The provider tail splits into its 27 state-silent tables and the StateBump singleton. -/
 theorem tables_drop25_split (witness : EnsembleWitness (sp1Ensemble (p := p))) :
-    witness.tables.drop 25 =
-      (witness.tables.drop 25).take 14 ++ witness.tables.drop 39 := by
-  rw [show witness.tables.drop 39 = (witness.tables.drop 25).drop 14 from by
-      rw [List.drop_drop], List.take_append_drop]
+    witness.tables.drop instructionTableCount =
+      (witness.tables.drop instructionTableCount).take stateSilentProviderTableCount ++
+        witness.tables.drop stateBumpIndex := by
+  rw [show witness.tables.drop stateBumpIndex =
+      (witness.tables.drop instructionTableCount).drop stateSilentProviderTableCount from by
+      rw [List.drop_drop]
+      rfl, List.take_append_drop]
 
 /-! ## Row decoders
 

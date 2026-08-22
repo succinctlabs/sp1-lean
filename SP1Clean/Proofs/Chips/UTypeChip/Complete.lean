@@ -14,7 +14,10 @@ Two things are genuinely new here, and both are about the immediate.
 1. **`is_auipc` is built, not assumed.** The event carries the executor's opcode discriminant, and
    the builder reads the selector off it (`Opcode::AUIPC = 48`), so its booleanity is a property of
    the builder — one `split`, no event conjunct.
-2. **The decode relation is proved, not assumed.** `UTypeChip.ProverAssumptions` carries
+2. **The destination-zero form is generated.** UType has its own event boundary because, unlike
+   the generic J/Jal path, LUI/AUIPC may target x0. The builder commits `op_a_0 = 1`, skips the
+   result populate, and emits a zero result word exactly as SP1 does.
+3. **The decode relation is proved, not assumed.** `UTypeChip.ProverAssumptions` carries
    `toBitVec64 op_b_imm = RV64.lui (immOf adapter)`, which is *false* for an arbitrary 64-bit
    `op_b` and so cannot be a consequence of `JTypeEvent.WellFormed` (its sibling `Jal` puts a jump
    offset in the same slot). What makes it true is a plain-`ℕ` fact about SP1's decoder —
@@ -24,8 +27,8 @@ Two things are genuinely new here, and both are about the immediate.
    into a theorem about the builder: the committed limbs of `luiImmNat imm` *are* the sign-extended
    shifted immediate, and `immOf` recovers `imm` from them exactly.
 
-So nine of the eleven bullets are single citations; the two that are not are the `is_auipc` split
-and the decode relation.
+The opcode routing, destination form, `is_auipc` split, and decode relation are all properties of
+the UType-specific event boundary and builder, rather than residual table assumptions.
 -/
 
 namespace SP1Clean.UTypeChip
@@ -115,13 +118,14 @@ theorem immOf_jTypeReaderCols {e : JTypeEvent} {imm : ℕ} (h : imm < 2 ^ 20)
 /--
 **A well-formed, U-decoded trace event builds a row the honest prover can complete.** Every
 conjunct of `UTypeChip.ProverAssumptions` at the built input row follows from
-`JTypeEvent.WellFormed` together with `hdec : e.UTypeImm`, with no residual side condition.
+`JTypeEvent.WellFormedUType` together with `hdec : e.UTypeImm`, including `rd = x0`, with no
+residual side condition.
 
 `hdec` is the one thing the J-type record cannot supply — see the module docstring.
 
 The `data` and `hint` are arbitrary: `UType`'s prover contract reads neither.
 -/
-theorem proverAssumptions_of_event {e : JTypeEvent} (h : e.WellFormed) (hdec : e.UTypeImm)
+theorem proverAssumptions_of_event {e : JTypeEvent} (h : e.WellFormedUType) (hdec : e.UTypeImm)
     (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p)) :
     ProverAssumptions (e.toUTypeInputs (p := p)) data hint := by
   obtain ⟨imm, himm, he⟩ := hdec
@@ -138,8 +142,10 @@ theorem proverAssumptions_of_event {e : JTypeEvent} (h : e.WellFormed) (hdec : e
     split
     · exact Or.inr rfl
     · exact Or.inl rfl
-  -- `rd ≠ x0`, so the `op_a_0` zeroing flag is off
-  · exact jTypeReaderCols_op_a_0_eq_zero h.opA_ne_zero
+  -- exact destination form: ordinary write, or a real x0 row with the zeroing flag on
+  · by_cases hzero : e.opA = 0
+    · exact Or.inr ⟨rfl, jTypeReaderCols_op_a_0_eq_one hzero⟩
+    · exact Or.inl (jTypeReaderCols_op_a_0_eq_zero hzero)
   -- the shared reader contracts: the state block, then the single register access
   · exact cpuState_spec e.clk e.pc h.clk_mod _ _ _
   · exact registerAccessCols_spec_opA h.clk_mod h.prevTsA_lt
@@ -170,7 +176,7 @@ theorem proverAssumptions_padding (data : ProverData (ZMod p)) (hint : ProverHin
       = RV64.lui (immOf (zeroJTypeReaderCols (p := p))) := by
     rw [himmOf, ← hword]
     exact toBitVec64_luiImmNat (p := p) (by norm_num)
-  exact ⟨hzero, hzero, fun hr => absurd hr hne, Or.inl rfl, Or.inl rfl, rfl,
+  exact ⟨hzero, hzero, fun hr => absurd hr hne, Or.inl rfl, Or.inl rfl, Or.inl rfl,
     fun hr => absurd hr hne, fun hr => absurd hr hne, hlui, fun hr => absurd hr hne,
     fun hr => absurd hr hne⟩
 
@@ -188,7 +194,7 @@ def traceInputs (events : List JTypeEvent) (padding : ℕ) : List (Inputs (ZMod 
 /-- Every row of a built trace — event row or padding row — satisfies the chip's honest-prover
 contract. -/
 theorem proverAssumptions_of_mem_traceInputs {events : List JTypeEvent} {padding : ℕ}
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.UTypeImm) (data : ProverData (ZMod p))
+    (h : ∀ e ∈ events, e.WellFormedUType ∧ e.UTypeImm) (data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) :
     ∀ input ∈ traceInputs (p := p) events padding, ProverAssumptions input data hint := by
   intro input hin
@@ -202,7 +208,7 @@ theorem proverAssumptions_of_mem_traceInputs {events : List JTypeEvent} {padding
 circuit evaluates to zero on every built row, and no static lookup is left unchecked. -/
 theorem traceTable_constraints (events : List JTypeEvent) (padding : ℕ)
     (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p))
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.UTypeImm) :
+    (h : ∀ e ∈ events, e.WellFormedUType ∧ e.UTypeImm) :
     (Air.Flat.Table.build (component (p := p)) (traceInputs events padding) data
       hint).Constraints :=
   Air.Flat.Table.build_constraints _ _ _ _ computableWitnesses
@@ -212,7 +218,7 @@ theorem traceTable_constraints (events : List JTypeEvent) (padding : ℕ)
 Memory, Program and Byte channels carries the payload its channel promises. -/
 theorem traceTable_guarantees (events : List JTypeEvent) (padding : ℕ)
     (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p))
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.UTypeImm) :
+    (h : ∀ e ∈ events, e.WellFormedUType ∧ e.UTypeImm) :
     (Air.Flat.Table.build (component (p := p)) (traceInputs events padding) data
       hint).Guarantees :=
   Air.Flat.Table.build_guarantees _ _ _ _ computableWitnesses

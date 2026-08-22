@@ -93,9 +93,8 @@ six must move together or the platform is incoherent") is now structural: the ge
 each key everywhere it is consumed.
 
 Downstream consumers, unmodified and listed for review: `Platform.lean` guards on
-`plat_have_clint`; `SysControl.lean` / `PmpControl.lean` guard on `sys_pmp_count`;
-`plat_sig_base` / `plat_sig_size` sit next to `plat_have_sig` in `PlatformConfig.lean`;
-`ValidateConfig.lean` consumes all six.
+`plat_have_clint`; `plat_have_sig` gates the simple interrupt generator; and
+`ValidateConfig.lean` re-reads both keys. The generated delta is therefore four sites total.
 
 ## The pipeline
 

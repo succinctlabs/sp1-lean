@@ -199,8 +199,25 @@ Mirror-rust layout under `SP1Clean/`:
 - **`Soundness/`** — the whole-machine layer: per-bus `{State,Byte,Program,Memory}Consistency.lean`;
   `ChipRow.lean` (the `ChipKind` structure-of-functions — each chip registers one `kind`, carrying a
   `name` = its SP1 `MachineAir::name`) + `ChipRegistry.lean` (`allChipKinds`); `SP1Ensemble.lean`
-  (`sp1Ensemble` — a plain Clean `Ensemble`, 25 chips + 15 boundary/provider tables, the last two
-  being the W3 system tables StateBump (position 39) and MemoryBump (38)); the timed/ranked
+  (`sp1Ensemble` — a plain Clean `Ensemble`, 25 chips + 28 boundary/provider tables: six Byte
+  providers at positions 25–30, all 17 fixed Range widths `0..16` at 31–47, Program at 48, Memory
+  init/final at 49/50, and the W3 system tables MemoryBump (51) and StateBump (52)); the full native
+  ensemble therefore has 53 tables,
+  plus the separate state-boundary verifier. Exact transport recounts Byte/Range/Program
+  multiplicities from the actual Clean interaction ledger of every non-preprocessing native table;
+  it does not copy the full exact cluster's multiplicities. The raw exact Byte/Range/Program
+  assertion lists are empty: `CoreAIR.PreprocessedBinding` only records the named matrix/PCS-opening
+  premise, to be discharged by ArkLib; it proves neither row-local meaning nor provider selection.
+  `PreprocessedProviderContract` is the
+  explicit caller-supplied per-row local-semantics premise. A caller-supplied
+  `CanonicalPreprocessedInventory` selects carriers
+  source-backed by their matching exact matrix/Range-width block and separately supplies projected-key
+  `Nodup`; zero-demand raw keys may be omitted. The recount contract states nonzero-demand
+  Byte/Program coverage, nonpositivity, and canonical capacity. `freshRowsByKey` is a
+  declarative/regression helper, not the construction path. PCS/program identity, State/Memory
+  balance, and semantic binding stay separate and explicit. The recount derives Byte (including
+  Range) and Program integer balance; the global contract retains all-channel count bounds and
+  State/Memory integer balance. The timed/ranked
   grounding engine;
   `WitnessDecode.lean` (the deterministic typed row decoder), `LocalExecution.lean` (grounded ordered
   rows → a genuine shard-local Sail chain), and `AIR.lean` (the honest native witness relation plus
@@ -333,7 +350,8 @@ local checkout: Clean is a pinned **git** dependency, and a local sibling path m
 permanent docs or into `lakefile.toml`. (The pin can still lag upstream `main`; if a doc named below is
 missing from `.lake/packages/Clean`, read it on GitHub.)
 
-⚠ **The Clean pin is currently a fork** — `dtumad/clean` branch `sp1-integration` (`8301b77a`), whose base
+⚠ **The Clean pin is currently a fork** — `dtumad/clean` branch `sp1-integration`
+(`2dad7788d58b09eabeb3898506e4cb896e5d3e9d`), whose base
 is upstream `0e53b9f2` (v4.32.2). The **standing split**: a change that MODIFIES an existing Clean
 declaration goes in the fork, one branch per upstream PR, because downstream Clean theorems refer to
 Clean's declaration and not ours — that is why it cannot be shimmed in `ToClean/`. A **pure addition**

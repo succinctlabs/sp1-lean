@@ -11,7 +11,7 @@ MemoryMsg.ClkBound` guarantee from
 the bus balance against this provider — the guarantee becomes a verifier obligation backed by an in-circuit
 provider, not the `assumeGuarantees` hand-wave the `pullIf` carries in isolation.
 
-This mirrors `ProgramProviderEnsemble`/`ByteChip/Ensemble.lean`: `memoryChannel.Guarantees` is
+This parallels `ProgramProviderEnsemble`: `memoryChannel.Guarantees` is
 `MemoryMsg.isU64 ∧ MemoryMsg.ClkBound`, which is **row-local** (the provider pins its pushed clock to
 `0`, so `ClkBound` holds by construction), so the channel finishes against the single
 generic `MemoryProviderChip.circuit` (the table of all valid value words).

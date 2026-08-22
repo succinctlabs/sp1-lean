@@ -274,7 +274,14 @@ import SP1Clean.Faithful.Transport.Table
 import SP1Clean.Faithful.Transport.Chips
 import SP1Clean.Faithful.Transport.Ensemble
 import SP1Clean.Faithful.Transport.Balance
+import SP1Clean.Faithful.Transport.ExactBalance
 import SP1Clean.Faithful.Transport.Extracted
+import SP1Clean.Faithful.Transport.PreprocessedProviders
+import SP1Clean.Faithful.Transport.MemoryBoundary
+import SP1Clean.Faithful.Transport.SystemTables
+import SP1Clean.Faithful.Transport.ProviderSegment
+import SP1Clean.Faithful.Transport.CoreEnsemble
+import SP1Clean.Faithful.Transport.CoreArtifact
 import SP1Clean.Faithful.ChipTactics
 import SP1Clean.Faithful.DivRemChip
 import SP1Clean.Faithful.DivRemChip.Exact
@@ -486,7 +493,6 @@ import SP1Clean.FormalModel.TraceGen.Arith
 import SP1Clean.Soundness.RowView
 import SP1Clean.Proofs.Chips.ByteChip.RangeChip
 import SP1Clean.Proofs.Chips.ByteChip.ByteChip
-import SP1Clean.Proofs.Chips.ByteChip.Ensemble
 import SP1Clean.Proofs.Chips.ProgramProviderChip
 import SP1Clean.Proofs.Chips.ProgramProviderEnsemble
 import SP1Clean.Proofs.Chips.MemoryProviderChip

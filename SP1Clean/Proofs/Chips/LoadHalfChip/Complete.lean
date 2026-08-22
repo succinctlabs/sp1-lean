@@ -5,7 +5,7 @@ import ToClean.Air.TableBuild
 /-! # `SP1Clean.LoadHalfChip` — from trace events to a valid AIR table
 
 `LH`/`LHU` through the trace-generation chain (see `LoadWordChip/Complete.lean` for the
-memory-family programme note, including **why there is no padding row**).
+memory-family programme and padding-contract note).
 
 The only thing new against LoadWord is the width of the selection. A half-word load picks one of
 the RAM cell's **four** u16 limbs, so the row commits two offset bits (address bits 1 and 2) and
@@ -97,7 +97,8 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormed) (halign 
     iTypeReader_spec hi _ _ _ _ _ _ _ _⟩
   -- the address fits in 48 bits, is above the reserved page, and is 2-byte aligned
   · rw [haddr64]; exact h.addr_lt
-  · rw [haddr48]; exact h.addr_ge
+  · intro _
+    rw [haddr48]; exact h.addr_ge
   · rw [haddr48]; exact halign'
   -- the two offset bits are binary, and decompose the address's low three bits
   · show ((memLimbIndex e.addr % 2 : ℕ) : ZMod p) = 0 ∨ ((memLimbIndex e.addr % 2 : ℕ) : ZMod p) = 1
@@ -177,8 +178,7 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormed) (halign 
 A plain `def`, deliberately not an `abbrev` (see `AddChip.component` for the measurement). -/
 def component : Air.Flat.Component (ZMod p) := ⟨circuit⟩
 
-/-- The rows a trace builds: one input row per event. **No padding tail** — see
-`LoadWordChip/Complete.lean`. -/
+/-- The event rows, before ensemble-level zero padding (see `LoadWordChip/Complete.lean`). -/
 def traceInputs (events : List MemoryEvent) : List (Inputs (ZMod p)) :=
   events.map MemoryEvent.toLoadHalfInputs
 

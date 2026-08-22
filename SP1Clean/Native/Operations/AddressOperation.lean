@@ -20,7 +20,7 @@ limbs are non-zero (the `value[1]+value[2]` inverse gate); and the low 3 bits of
 range-checked (`(value[0] - 4·b₂ - 2·b₁ - b₀)/8 < 2^13`) to pin the offset decomposition.
 
 Address limbs are witnessed via `AddrAddOperation.populate`; `AddrAddOperation` (a `FormalAssertion`)
-is composed as a Clean `assertion` (`is_real := 1`). `RawSpec` composes `AddrAddOperation.RawSpec`
+is composed as a Clean `assertion` at `input.is_real`. `RawSpec` composes `AddrAddOperation.RawSpec`
 plus the offset constraints; `Faithful/AddressOperation.lean` anchors it to the generated
 `Extracted.AddressOperation.asserts`/`interactions` lists. Soundness and completeness are axiom-clean.
 
@@ -63,13 +63,14 @@ def SoundnessAssumptions (input : Inputs (ZMod p)) : Prop :=
   Word.isU64 input.b ∧ Word.isU64 input.cc ∧
     (input.is_real = 0 ∨ input.is_real = 1)
 
-/-- The honest prover supplies a **valid, non-reserved, offset-decomposed** 48-bit address. Beyond
-the address-fit condition, the three
-offset bits are boolean; the address is non-reserved (`≥ 2^16`, so the top two limbs `value[1] +
-value[2] ≠ 0` and the inverse gate is satisfiable); and the offset bits are the low 3 bits of the
-address (`offset0 + 2·offset1 + 4·offset2 = addr mod 8`, so the offset range check holds). These are
-completeness-side witness-generation obligations, kept separate from `SoundnessAssumptions` by the
-`GeneralFormalCircuit` boundary. -/
+/-- The honest prover supplies a valid, offset-decomposed 48-bit address. Beyond the address-fit
+condition, the three offset bits are boolean; on a real row the address is non-reserved
+(`≥ 2^16`, so the top two limbs `value[1] + value[2] ≠ 0` and the inverse gate is satisfiable);
+and the offset bits are the low 3 bits of the address
+(`offset0 + 2·offset1 + 4·offset2 = addr mod 8`, so the offset range check holds). The lower bound
+is gated exactly like the circuit's inverse equation: a zero padding row has `is_real = 0` and
+therefore owes no fictitious non-reserved address. These are completeness-side witness-generation
+obligations, kept separate from `SoundnessAssumptions` by the `GeneralFormalCircuit` boundary. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   Word.isU64 input.b ∧ Word.isU64 input.cc ∧
     (input.is_real = 0 ∨ input.is_real = 1) ∧
@@ -77,7 +78,8 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
     (input.offset_bit0 = 0 ∨ input.offset_bit0 = 1) ∧
     (input.offset_bit1 = 0 ∨ input.offset_bit1 = 1) ∧
     (input.offset_bit2 = 0 ∨ input.offset_bit2 = 1) ∧
-    2 ^ 16 ≤ (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48 ∧
+    (input.is_real = 1 →
+      2 ^ 16 ≤ (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48) ∧
     input.offset_bit0.val + 2 * input.offset_bit1.val + 4 * input.offset_bit2.val
       = (Word.toNat input.b + Word.toNat input.cc) % 2 ^ 48 % 8
 
@@ -180,7 +182,8 @@ theorem addressSemantics_of_raw {input : Inputs (ZMod p)}
 /-! ## The witnessed `GeneralFormalCircuit`
 
 Witnesses the address limbs via `AddrAddOperation.populate` and composes the gadget as a Clean
-`assertion` (`is_real := 1`). Byte-bus limb range checks come from the gadget's `assertion`;
+`assertion` at the row's `input.is_real` gate. Byte-bus limb range checks come from the gadget's
+`assertion`;
 the offset booleans, the top-two-limb inverse gate, and the low-3-bits offset range check stay here. -/
 
 def main (input : Var Inputs (ZMod p)) :
@@ -200,8 +203,8 @@ def main (input : Var Inputs (ZMod p)) :
   inv[0] * (value[1] + value[2]) - input.is_real === 0
   -- offset low-3-bits range check via the **byte bus** (SP1's `Range(13)` send,
   -- `Extracted/AddressOperation.lean`), not a `ToBits` bit-decomposition: the offset decomposition
-  -- `(value[0] - 4·b₂ - 2·b₁ - b₀)/8 < 2^13` as a `byteChannel` `Range` receive (mult `1` — the gadget
-  -- runs at `is_real = 1`, like the composed `AddrAddOperation` assertion's sends).
+  -- `(value[0] - 4·b₂ - 2·b₁ - b₀)/8 < 2^13` as a `byteChannel` `Range` receive at
+  -- `input.is_real`, matching the composed `AddrAddOperation` assertion's sends.
   byteChannel.pullIf input.is_real
     (⟨6, (value[0] - 4 * input.offset_bit2 - 2 * input.offset_bit1 - input.offset_bit0) * (8 : ZMod p)⁻¹,
        Expression.const ((13 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
@@ -265,6 +268,21 @@ theorem soundness :
   · intro h1 h0
     exact off_gate_vacuous hbin h1 h0
 
+omit [Fact (2 ^ 17 < p)] in
+/-- **Padding regression.** The literal all-zero operation input satisfies the honest-prover
+contract. In particular, the non-reserved-address premise is vacuous when `is_real = 0`, exactly
+as the inverse and byte-pull constraints are; active rows still owe the same lower bound. -/
+theorem assumptions_zero :
+    Assumptions
+      (⟨#v[0, 0, 0, 0], #v[0, 0, 0, 0], 0, 0, 0, 0⟩ : Inputs (ZMod p)) := by
+  have hzero : Word.isU64 (#v[0, 0, 0, 0] : Word (ZMod p)) :=
+    Word.isU64_of_cases (by simp) (by simp) (by simp) (by simp)
+  refine ⟨hzero, hzero, Or.inl rfl, ?_, Or.inl rfl, Or.inl rfl, Or.inl rfl, ?_, ?_⟩
+  · norm_num [Word.toNat]
+  · intro h
+    exact absurd h zero_ne_one
+  · norm_num [Word.toNat]
+
 theorem completeness :
   GeneralFormalCircuit.Completeness (ZMod p) main
       (fun input _ _ => Assumptions input) (fun _ _ _ => True) := by
@@ -311,10 +329,13 @@ theorem completeness :
   set v1 := env.get (i₀ + 1) with hv1d
   set v2 := env.get (i₀ + 2) with hv2d
   set A := (Word.toNat input_b + Word.toNat input_cc) % 2 ^ 48 with hAd
-  -- `v0` is the low 16 bits of the address; `A ≥ 2^16` ⟹ `v1 + v2 ≠ 0` (non-reserved).
+  -- `v0` is the low 16 bits of the address; on a real row, `A ≥ 2^16` ⟹
+  -- `v1 + v2 ≠ 0` (non-reserved). Padding never needs an inverse.
   have hv0_eq : v0.val = A % 2 ^ 16 := by omega
-  have hv12pos : 0 < v1.val + v2.val := by omega
-  have hsum_ne : v1 + v2 ≠ 0 := by
+  have hsum_ne (hreal : input_is_real = 1) : v1 + v2 ≠ 0 := by
+    have hv12pos : 0 < v1.val + v2.val := by
+      have := haddr_ge hreal
+      omega
     intro h
     have hval2 : (v1 + v2).val = v1.val + v2.val := ZMod.val_add_of_lt (by omega)
     rw [h, ZMod.val_zero] at hval2; omega
@@ -343,7 +364,7 @@ theorem completeness :
   · rcases hbin with h0 | h1
     · rw [h_inv_def, h0]
       simp
-    · rw [h_inv_def, h1, one_mul, inv_mul_cancel₀ hsum_ne]
+    · rw [h_inv_def, h1, one_mul, inv_mul_cancel₀ (hsum_ne h1)]
       simp
   · -- the byte-bus `Range(13)` guarantee: `ByteRowSpec ⟨6, arg, 13, 0⟩ ↔ arg.val < 2^13`.
     intro hneg

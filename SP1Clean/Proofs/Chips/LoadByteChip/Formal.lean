@@ -166,11 +166,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     Or.inr ⟨h_bin, h_load_isu64, h_clk.at_four⟩⟩
 
 /-- Prover-side row well-formedness: the address facts + selector binaries + `op_a_0 = 0` + the byte
-value bounds + the sign-bit fact + the limb-selection / byte-mux equations + the reader `Spec`s. -/
+value bounds + the branch-correct signed/unsigned byte facts + the limb-selection / byte-mux
+equations + the reader `Spec`s. The non-reserved-address lower bound is real-row-gated, matching
+`AddressOperation`'s inverse gate; `LB` alone ties `msb` to the selected byte's high bit, while
+`LBU` requires `msb = 0`. -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
-    2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
+    (isReal input = 1 →
+      2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48) ∧
     input.offset_bit[0].val + 2 * input.offset_bit[1].val + 4 * input.offset_bit[2].val
       = (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 ∧
     (input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1) ∧
@@ -181,8 +185,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p)) (_
     (isReal input = 0 ∨ isReal input = 1) ∧
     input.adapter.op_a_0 = 0 ∧
     input.selected_limb_low_byte.val < 256 ∧ (highByte input).val < 256 ∧ input.selected_byte.val < 256 ∧
-    (input.msb = 0 ∨ input.msb = 1) ∧ (input.msb = 1 ↔ 128 ≤ input.selected_byte.val) ∧
-    input.is_lbu * input.msb = 0 ∧
+    (input.msb = 0 ∨ input.msb = 1) ∧
+    (input.is_lb = 1 → (input.msb = 1 ↔ 128 ≤ input.selected_byte.val)) ∧
+    (input.is_lbu = 1 → input.msb = 0) ∧
     ((input.selected_limb - input.memory_access.prev_value[0])
         * (input.offset_bit[1] - 1) * (input.offset_bit[2] - 1) = 0 ∧
       (input.selected_limb - input.memory_access.prev_value[1])
@@ -245,7 +250,7 @@ theorem completeness :
   have hp17 := hp16.2
   have h_msb_iff := hp17.1
   have hp18 := hp17.2
-  have h_msbgate := hp18.1
+  have h_lbu_msb := hp18.1
   have hp19 := hp18.2
   have hsel0 := hp19.1.1
   have hsel1 := hp19.1.2.1
@@ -298,9 +303,10 @@ theorem completeness :
     simp only [byteChannel]
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hlo_pa, hhi_pa⟩
   · -- MSB receive obligation (real LB row); value is raw (`toRaw` (gated post-#398)).
-    intro _
+    intro hneg
+    have hlb : input_is_lb = 1 := neg_inj.mp hneg
     simp only [byteChannel]
-    exact (byteRowSpec_msb _ _).mpr ⟨⟨h_msb_lt, hbyte_pa⟩, h_msb_bin, h_msb_iff⟩
+    exact (byteRowSpec_msb _ _).mpr ⟨⟨h_msb_lt, hbyte_pa⟩, h_msb_bin, h_msb_iff hlb⟩
   · exact ⟨hbin, hbin, h_clk⟩
   · exact h_it
   · exact ⟨hbin, fun _ => h_load_isu64, h_clk.at_four⟩
@@ -311,7 +317,10 @@ theorem completeness :
   · simp only [eob, epv]; exact hsel3
   · simp only [eob]; exact sub_eq_zero_of_eq hmux_pa
   · exact h_op_a_0
-  · exact h_msbgate
+  · rcases h_lbu_bin with hzero | hone
+    · rw [hzero, zero_mul]
+    · rw [hone, one_mul]
+      exact h_lbu_msb hone
   · rcases h_lb_bin with h | h <;> rw [h] <;> simp
   · rcases h_lbu_bin with h | h <;> rw [h] <;> simp
   · rcases hbin with h | h <;> rw [h] <;> simp

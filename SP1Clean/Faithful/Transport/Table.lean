@@ -47,9 +47,11 @@ surjectivity claim, so it does not need one either.
 
 ## Scope
 
-This is the table-level half. The ensemble-level transport — assembling twenty-five transported
-tables plus the provider and boundary segments into an `EnsembleWitness`, and deriving the four
-channel balances from the extracted AIR's own ℕ-exact balance — builds on these theorems; see
+This is the table-level half. The ensemble-level transport assembles twenty-five transported
+tables plus the provider and boundary segments into an `EnsembleWitness`. Its literal native
+consumer recount derives Byte/Program balance; State/Memory balance remains an explicit global
+translation obligation. The exact AIR's own ℕ-balance is useful evidence for that later
+translation, but it does not directly balance a differently shaped reduced native slice; see
 `docs/roadmap.md`.
 -/
 
@@ -62,6 +64,258 @@ open Air.Flat (Component Table)
 open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime]
+
+/-- The literal Clean interaction ledger of one table.  Unlike `tableNativeAccesses`, this does
+not dualize the Memory or Program signs to match the extracted Rust oracle: it is exactly
+`Table.interactions`, evaluated by Clean, followed by the common integer projection.  Native
+provider recounting and native channel balance must use this definition. -/
+def tableCleanAccesses (table : Table (ZMod p)) : LookupAccessList :=
+  table.interactions.map Interaction.toAccess
+
+/-- Concatenate the literal Clean ledgers of a list of tables, preserving table and row order. -/
+def tablesCleanAccesses (tables : List (Table (ZMod p))) : LookupAccessList :=
+  tables.flatMap tableCleanAccesses
+
+@[simp] theorem tablesCleanAccesses_append (left right : List (Table (ZMod p))) :
+    tablesCleanAccesses (left ++ right) =
+      tablesCleanAccesses left ++ tablesCleanAccesses right := by
+  simp only [tablesCleanAccesses, List.flatMap_append]
+
+/-- Evaluating an abstract interaction and then applying the literal Clean projection is the same
+as applying the expression-level projection in its environment.  This is intentionally about
+Clean's orientation; it performs none of the Memory/Program dualization used by the Rust-facing
+faithfulness vocabulary. -/
+theorem interactionToAccess_eval (env : Environment (ZMod p))
+    (interaction : AbstractInteraction (ZMod p)) :
+    Interaction.toAccess (interaction.eval env) =
+      AbstractInteraction.toAccess env interaction := by
+  simp only [Interaction.toAccess, AbstractInteraction.toAccess, AbstractInteraction.eval,
+    Vector.toList]
+
+/-- Closed form for the literal Clean access ledger of an honestly built table. -/
+theorem tableCleanAccesses_build (component : Component (ZMod p))
+    (inputs : List (component.Input (ZMod p))) (data : ProverData (ZMod p))
+    (hint : ProverHint (ZMod p)) :
+    tableCleanAccesses (Table.build component inputs data hint) =
+      inputs.flatMap fun input =>
+        component.operations.interactions.map
+          (AbstractInteraction.toAccess
+            (Environment.fromArray (component.buildRow input data hint) data)) := by
+  simp only [tableCleanAccesses, Table.build_interactionValues,
+    Operations.interactionValues, List.map_flatMap, List.map_map, Function.comp_def,
+    interactionToAccess_eval]
+
+/-- Row-wise singleton specialization of `tableCleanAccesses_build`.  Provider components emit one
+literal Clean access per row. -/
+theorem tableCleanAccesses_build_map_singleton
+    {Row : Type} (component : Component (ZMod p)) (rows : List Row)
+    (decode : Row → component.Input (ZMod p)) (access : Row → LookupAccess)
+    (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p))
+    (rowAccess : ∀ row ∈ rows,
+      component.operations.interactions.map
+          (AbstractInteraction.toAccess
+            (Environment.fromArray (component.buildRow (decode row) data hint) data)) =
+        [access row]) :
+    tableCleanAccesses (Table.build component (rows.map decode) data hint) =
+      rows.map access := by
+  rw [tableCleanAccesses_build]
+  induction rows with
+  | nil => rfl
+  | cons row rest ih =>
+    simp only [List.map_cons, List.flatMap_cons]
+    rw [rowAccess row (by simp), ih (fun r hr => rowAccess r (by simp [hr]))]
+    rfl
+
+/-- Project all physical rows of a native table through the same complete access vocabulary used
+by the whole-chip faithfulness anchors.  This definition is shared by row-for-row chip transports
+and by the constructive provider redistributions. -/
+noncomputable def tableNativeAccesses (table : Table (ZMod p)) : LookupAccessList :=
+  table.table.flatMap fun row =>
+    nativeAccesses (table.environment row) table.component.operations
+
+/-- Active filtering distributes over a list of whole-table ledgers while leaving each table's
+component and operation tree opaque. -/
+theorem active_flatMap_tableNativeAccesses (tables : List (Table (ZMod p))) :
+    LookupAccessList.active (tables.flatMap tableNativeAccesses) =
+      tables.flatMap fun table => LookupAccessList.active (tableNativeAccesses table) := by
+  simp only [LookupAccessList.active, List.filter_flatMap]
+
+/-- Row-wise form of one active whole-table ledger. -/
+theorem active_tableNativeAccesses (table : Table (ZMod p)) :
+    LookupAccessList.active (tableNativeAccesses table) =
+      table.table.flatMap fun row =>
+        LookupAccessList.active
+          (nativeAccesses (table.environment row) table.component.operations) := by
+  simp only [LookupAccessList.active, tableNativeAccesses, List.filter_flatMap]
+
+/-- Erasing zero-multiplicity accesses commutes with the table and row concatenations without
+unfolding any component's operation tree.  This folded bridge is the scalable form used by the
+twenty-five-table instruction transport: unfolding `tableNativeAccesses` there asks `whnf` to
+normalize every chip circuit at once. -/
+theorem active_tablesNativeAccesses (tables : List (Table (ZMod p))) :
+    LookupAccessList.active (tables.flatMap tableNativeAccesses) =
+      tables.flatMap fun table =>
+        table.table.flatMap fun row =>
+          LookupAccessList.active
+            (nativeAccesses (table.environment row) table.component.operations) := by
+  simp only [LookupAccessList.active, tableNativeAccesses, List.filter_flatMap]
+
+/-- Closed form for the native access list of an honestly built table.  Keeping this equation
+beside `Table.build_table` avoids unfolding the complete witness generator in every provider
+transport: only the per-input row projection remains. -/
+theorem tableNativeAccesses_build (component : Component (ZMod p))
+    (inputs : List (component.Input (ZMod p))) (data : ProverData (ZMod p))
+    (hint : ProverHint (ZMod p)) :
+    tableNativeAccesses (Table.build component inputs data hint) =
+      inputs.flatMap fun input =>
+        nativeAccesses
+          (Environment.fromArray (component.buildRow input data hint) data)
+          component.operations := by
+  simp only [tableNativeAccesses, Table.build_table, List.flatMap_map,
+    Table.build_environment, Table.build_component]
+
+/-- Row-wise singleton specialization of `tableNativeAccesses_build`.  Provider components each
+emit one bus access, so their whole-table transports reduce to one local access equation per
+semantic source row. -/
+theorem tableNativeAccesses_build_map_singleton
+    {Row : Type} (component : Component (ZMod p)) (rows : List Row)
+    (decode : Row → component.Input (ZMod p)) (access : Row → LookupAccess)
+    (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p))
+    (rowAccess : ∀ row ∈ rows,
+      nativeAccesses
+          (Environment.fromArray (component.buildRow (decode row) data hint) data)
+          component.operations = [access row]) :
+    tableNativeAccesses (Table.build component (rows.map decode) data hint) =
+      rows.map access := by
+  rw [tableNativeAccesses_build]
+  induction rows with
+  | nil => rfl
+  | cons row rest ih =>
+    simp only [List.map_cons, List.flatMap_cons]
+    rw [rowAccess row (by simp), ih (fun r hr => rowAccess r (by simp [hr]))]
+    rfl
+
+/-- A built row keeps its typed input as a literal prefix.  This cell-level form is useful when
+normalizing interactions: after a component's `rowOperations` is unfolded, its input variables are
+plain offsets rather than an occurrence of `rowInput`, so `Component.rowInput_buildRow` cannot
+rewrite them directly. -/
+theorem buildRow_input_get (component : Component (ZMod p))
+    (input : component.Input (ZMod p)) (data : ProverData (ZMod p))
+    (hint : ProverHint (ZMod p)) (i : ℕ) (hi : i < size component.Input) :
+    (Environment.fromArray (component.buildRow input data hint) data).get i =
+      (toElements input)[i] := by
+  have decoded := component.rowInput_buildRow input data data hint
+  have atCell := congrArg
+    (fun value : component.Input (ZMod p) => (toElements value)[i]) decoded
+  simpa only [Component.rowInput, valueFromOffset, ProvableType.toElements_fromElements,
+    Vector.getElem_mapRange, Nat.zero_add] using atCell
+
+/-- Expression-level form of `buildRow_input_get`, matching the variables that remain after a
+component's interaction list has been normalized without unfolding `Expression.eval`. -/
+theorem eval_var_buildRow_input_get (component : Component (ZMod p))
+    (input : component.Input (ZMod p)) (data : ProverData (ZMod p))
+    (hint : ProverHint (ZMod p)) (i : ℕ) (hi : i < size component.Input) :
+    Expression.eval
+        (Environment.fromArray (component.buildRow input data hint) data)
+        (var ⟨i⟩) = (toElements input)[i] := by
+  simpa only [Expression.eval] using buildRow_input_get component input data hint i hi
+
+/-! ## Single-channel access normalization -/
+
+private theorem unexpectedInteractions_rowOperations_eq_nil_of_onlyChannel
+    {Input Output : TypeMap} [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit (ZMod p) Input Output)
+    (channel : RawChannel (ZMod p))
+    (known : channel = Channels.stateChannel.toRaw ∨
+      channel = Channels.byteChannel.toRaw ∨
+      channel = Channels.memoryChannel.toRaw ∨
+      channel = Channels.programChannel.toRaw)
+    (only : ∀ candidate ∈ circuit.channels, candidate = channel) :
+    Faithful.unexpectedInteractions
+        (⟨circuit⟩ : Component (ZMod p)).rowOperations = [] := by
+  unfold Faithful.unexpectedInteractions
+  apply List.filter_eq_nil_iff.mpr
+  intro interaction interactionMem
+  simp only [decide_eq_true_eq]
+  intro unexpected
+  have interactionMem' : interaction ∈
+      ((circuit.main (varFromOffset Input 0)).operations (size Input)).interactions := by
+    simpa only [Component.rowOperations_mk] using interactionMem
+  have channelMem : interaction.channel ∈
+      ((circuit.main (varFromOffset Input 0)).operations (size Input)).channels :=
+    List.mem_map.mpr ⟨interaction, interactionMem', rfl⟩
+  have channelEq := only interaction.channel
+    (circuit.channels_subset (varFromOffset Input 0) (size Input) channelMem)
+  rcases known with known | known | known | known
+  · exact unexpected.1 (channelEq.trans known)
+  · exact unexpected.2.1 (channelEq.trans known)
+  · exact unexpected.2.2.1 (channelEq.trans known)
+  · exact unexpected.2.2.2 (channelEq.trans known)
+
+private theorem interactionsWith_rowOperations_eq_nil_of_onlyChannel
+    {Input Output : TypeMap} [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit (ZMod p) Input Output)
+    (onlyChannel channel : RawChannel (ZMod p))
+    (only : ∀ candidate ∈ circuit.channels, candidate = onlyChannel)
+    (different : channel ≠ onlyChannel) :
+    Operations.interactionsWith channel
+        (⟨circuit⟩ : Component (ZMod p)).rowOperations = [] := by
+  unfold Operations.interactionsWith
+  apply List.filter_eq_nil_iff.mpr
+  intro interaction interactionMem
+  simp only [decide_eq_true_eq]
+  intro channelEq
+  have interactionMem' : interaction ∈
+      ((circuit.main (varFromOffset Input 0)).operations (size Input)).interactions := by
+    simpa only [Component.rowOperations_mk] using interactionMem
+  have channelMem : interaction.channel ∈
+      ((circuit.main (varFromOffset Input 0)).operations (size Input)).channels :=
+    List.mem_map.mpr ⟨interaction, interactionMem', rfl⟩
+  apply different
+  rw [← channelEq]
+  exact only interaction.channel
+    (circuit.channels_subset (varFromOffset Input 0) (size Input) channelMem)
+
+/-- If a circuit declares only the native Memory channel, its canonical Rust-facing access list is
+exactly its Memory interaction list followed by the project-wide Memory polarity dualization.  The
+proof uses the circuit's channel declaration rather than reopening interaction-free subcircuits. -/
+theorem nativeAccesses_memoryOnly
+    {Input Output : TypeMap} [ProvableType Input] [ProvableType Output]
+    (circuit : GeneralFormalCircuit (ZMod p) Input Output)
+    (only : ∀ candidate ∈ circuit.channels,
+      candidate = Channels.memoryChannel.toRaw)
+    (env : Environment (ZMod p)) :
+    Faithful.nativeAccesses env
+        (⟨circuit⟩ : Component (ZMod p)).rowOperations =
+      (((⟨circuit⟩ : Component (ZMod p)).rowOperations.interactionsWith
+        Channels.memoryChannel.toRaw).map (AbstractInteraction.toAccess env)).map
+          LookupAccessList.negMult := by
+  have stateNil := interactionsWith_rowOperations_eq_nil_of_onlyChannel circuit
+    Channels.memoryChannel.toRaw Channels.stateChannel.toRaw only
+    (of_eq_false Channels.stateChannel_eq_memoryChannel_false)
+  have byteNil := interactionsWith_rowOperations_eq_nil_of_onlyChannel circuit
+    Channels.memoryChannel.toRaw Channels.byteChannel.toRaw only
+    (of_eq_false Channels.byteChannel_eq_memoryChannel_false)
+  have programNil := interactionsWith_rowOperations_eq_nil_of_onlyChannel circuit
+    Channels.memoryChannel.toRaw Channels.programChannel.toRaw only
+    (of_eq_false Channels.programChannel_eq_memoryChannel_false)
+  have unexpected := unexpectedInteractions_rowOperations_eq_nil_of_onlyChannel circuit
+    Channels.memoryChannel.toRaw (Or.inr (Or.inr (Or.inl rfl))) only
+  unfold Faithful.nativeAccesses
+  rw [stateNil, byteNil, programNil, unexpected]
+  simp only [List.map_nil, List.nil_append, List.append_nil]
+
+/-- The centered integer representative vanishes exactly on the zero field element.  This is the
+small structural fact that lets access transports erase multiplicity-zero padding without making
+any bound assumption on nonzero multiplicities. -/
+theorem signedVal_eq_zero_iff (value : ZMod p) : signedVal value = 0 ↔ value = 0 := by
+  constructor
+  · intro h
+    have casted := congrArg (fun z : ℤ => (z : ZMod p)) h
+    simpa only [intCast_signedVal, Int.cast_zero] using casted
+  · rintro rfl
+    simp [signedVal, ZMod.val_zero]
+
 variable {Input NativeCols RustCols : TypeMap}
 variable [ProvableStruct Input] [ProvableStruct NativeCols]
 variable {circuit : GeneralFormalCircuit (ZMod p) Input NativeCols}
@@ -181,6 +435,20 @@ theorem transportTable_accesses_perm
     exact List.Perm.append
       (transportRow_accesses_perm faithful rustCols data (valid rustCols List.mem_cons_self))
       (ih fun c hc => valid c (List.mem_cons_of_mem _ hc))
+
+/-- Folded whole-table form of `transportTable_accesses_perm`.  This is the composition-facing
+statement: callers can concatenate many transported tables without normalizing their circuits. -/
+theorem transportTable_activeAccesses_perm
+    (faithful : ChipFaithful Input NativeCols RustCols circuit codec oracle)
+    (rustRows : List (RustCols (ZMod p))) (data : ProverData (ZMod p))
+    (valid : ∀ rustCols ∈ rustRows, List.Forall (· = 0) (oracle.assertZeros rustCols)) :
+    List.Perm
+      (LookupAccessList.active
+        (tableNativeAccesses (transportTable codec oracle rustRows data)))
+      (rustRows.flatMap fun rustCols => LookupAccessList.active (oracle.rustAccesses rustCols)) := by
+  rw [active_tableNativeAccesses]
+  simpa only [Table.environment, transportTable_component, transportTable_data] using
+    transportTable_accesses_perm faithful rustRows data valid
 
 /-! ## Composing with the native soundness side
 

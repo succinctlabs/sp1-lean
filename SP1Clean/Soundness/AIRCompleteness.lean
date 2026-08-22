@@ -1,25 +1,27 @@
 import SP1Clean.Proofs.Completeness.Assembly
 import SP1Clean.Proofs.Completeness.Ledger
+import SP1Clean.Model.BalanceBridge
 import SP1Clean.Soundness.AIR
 
 /-! # Machine-level completeness: a generated trace yields a valid AIR witness
 
-The converse direction of `Soundness/AIR.lean`. Soundness starts from an arbitrary witness the
-verifier accepts and extracts a Sail execution; this file starts from a *generated trace* and
-constructs a witness the verifier accepts. Together they say the supported-core AIR neither admits
-executions that did not happen nor rejects traces that did.
+The construction-facing companion to `Soundness/AIR.lean`. Soundness starts from an arbitrary
+witness the native relation accepts and extracts a Sail execution; this file starts from a
+*well-formed, balanced, boundary-bound generated trace* and constructs a witness the native
+relation accepts. The qualification matters: this theorem validates the AIR assembly performed by
+a trace generator, but it does not construct that trace from an arbitrary Sail execution.
 
 ## The claim, exactly
 
 `supported_core_native_complete` is `WitnessRelation.Complete` for the pair
 
 * AIR side — `SupportedCoreNativeRelation`, the *same* relation soundness consumes: the public
-  input matches, all forty-one tables satisfy their constraints, all four channels balance, and the
+  input matches, all 54 tables satisfy their constraints, all four channels balance, and the
   boundary binding holds;
 * execution side — `SupportedCoreTraceGeneratableExecutionRelation`, a well-formed generated trace.
 
 Nothing is weakened on the AIR side to make the construction go through. What the theorem provides
-is the witness itself: `Assembly.lean`'s forty built tables plus the verifier's boundary row, with
+is the witness itself: `Assembly.lean`'s 53 built tables plus the verifier's boundary row, with
 every witnessed cell computed by the circuits' own generators — never chosen to satisfy a
 constraint.
 
@@ -27,13 +29,14 @@ constraint.
 
 1. **`trace.WellFormed`** — every occurrence routed to a table belongs there. This is the
    generator's routing obligation, and everything downstream of it (the whole assertion system of
-   forty-one tables, on every row) is *derived*, in `witness_constraints`.
-2. **`trace.Balanced`** — the four buses' pushed and pulled message multisets agree, with signed
-   multiplicities and a length below the field characteristic. This is a combinatorial property of
-   the emitted trace: a real generator gets it by construction (it emits a provider row per lookup,
-   a State push per row consumed by the next row, a Memory push per read record), and the ledger
-   turns it into Clean's `BalancedChannels`.
-3. **`SemanticBoundaryBinding`** — the program and memory-boundary tables really describe the
+   54 tables, on every row) is *derived*, in `witness_constraints`.
+2. **`trace.ProviderMultiplicitiesFit`** — each aggregate Byte/Range/Program count satisfies
+   `2 * m ≤ p`, so its field encoding has the intended nonnegative centered representative.
+3. **`trace.Balanced`** — the four buses' centered-integer multiplicity sums vanish key by key and
+   each channel has fewer interactions than the field characteristic. This admits both unit rows
+   and canonically bounded aggregate provider counts. It is a combinatorial property of the emitted
+   trace, and the integer-to-field bridge turns it into Clean's `BalancedChannels`.
+4. **`SemanticBoundaryBinding`** — the program and memory-boundary tables really describe the
    caller's committed program and one concrete initial Sail state. This is the same companion
    predicate `SupportedCoreNativeRelation` carries, so it passes straight through.
 
@@ -43,7 +46,7 @@ It does **not** say every supported Sail execution produces a well-formed balanc
 the trace generator's own correctness — the step from `Model/Semantics/`'s `SailChain` to a
 `SupportedCoreTraceWitness` — and it is not proved here or anywhere in this repository. Stated
 plainly: this is completeness *relative to* a generator that routes and balances correctly, and the
-value it adds is that no chip's constraint system, and no combination of the forty, can reject a
+value it adds is that no chip's constraint system, and no combination of the 53, can reject a
 correctly routed trace. Composing it with a verified generator is future work; see
 `docs/roadmap.md`.
 -/
@@ -66,33 +69,80 @@ variable (trace : SupportedCoreTraceWitness p)
 
 /-! ## The bus ledger of a generated trace -/
 
-/--
-**One channel's ledger balances.** The three conditions Clean's `BalancedInteractions` reduces to
-under the ledger bridge: every interaction's multiplicity is `+1`, `0`, or `-1`; the whole
-machine's pushed messages are a permutation of its pulled messages; and the total interaction count
-stays below the field characteristic, so counting in `ZMod p` does not wrap.
+/-- **Provider-count capacity.**  Byte, Range, and Program providers accept aggregate natural
+counts, while the AIR stores those counts in `ZMod p` and the machine ledger reads their centered
+integer representatives.  These 24 source-level bounds make that encoding faithful: no
+`m + p` alias is admitted and every count remains on the nonnegative side of `signedVal`.
 
-This is a statement about the *emitted trace*, not about any row's witnessed cells. A generator
-satisfies it by construction: it emits one provider row per lookup a chip performs, one State push
-per row the next row consumes, and one Memory record per read.
--/
+Memory boundary multiplicities are already `Bool`, so they need no companion field here. -/
+structure ProviderMultiplicitiesFit : Prop where
+  u8Range : ∀ e ∈ trace.u8RangeEntries, e.MultiplicityFits p
+  msb : ∀ e ∈ trace.msbEntries, e.MultiplicityFits p
+  andByte : ∀ e ∈ trace.andByteEntries, e.MultiplicityFits p
+  orByte : ∀ e ∈ trace.orByteEntries, e.MultiplicityFits p
+  xorByte : ∀ e ∈ trace.xorByteEntries, e.MultiplicityFits p
+  ltu : ∀ e ∈ trace.ltuEntries, e.MultiplicityFits p
+  range : ∀ width e, e ∈ trace.rangeEntries width → e.MultiplicityFits p
+  rom : ∀ e ∈ trace.romEntries, e.MultiplicityFits p
+
+/-- **One channel's integer ledger balances.**  `Interaction.toAccess` converts every evaluated
+field multiplicity to its centered integer representative.  Requiring its exact per-key sum to
+vanish supports both the historical `0/±1` occurrence form and aggregate provider rows; the
+separate count bound is precisely Clean's field no-wrap premise. -/
 def BalancedOn (channel : RawChannel (ZMod p)) : Prop :=
   (trace.witness.interactionsWith channel).length < p ∧
-    SignedMults (trace.witness.interactionsWith channel) ∧
-    (pushedMessages (trace.witness.interactionsWith channel)).Perm
-      (pulledMessages (trace.witness.interactionsWith channel))
+    LookupAccessList.isConsistentBalanced
+      ((trace.witness.interactionsWith channel).map Interaction.toAccess)
+
+/-- The unit-occurrence ledger remains a convenient sufficient condition for `BalancedOn`.
+This compatibility constructor is useful to trace generators which have not aggregated equal
+provider keys: the old signed-message permutation first gives Clean balance, and the proved reverse
+bridge then recovers exact centered-integer balance. -/
+theorem balancedOn_of_signed_perm (channel : RawChannel (ZMod p))
+    (hlen : (trace.witness.interactionsWith channel).length < p)
+    (hbin : SignedMults (trace.witness.interactionsWith channel))
+    (hperm : (pushedMessages (trace.witness.interactionsWith channel)).Perm
+      (pulledMessages (trace.witness.interactionsWith channel))) :
+    trace.BalancedOn channel := by
+  refine ⟨hlen, LookupAccessList.isConsistentBalanced_of_balancedInteractions
+    _ _ channel ?_ (List.Perm.refl _)
+      (balancedInteractions_of_signed_perm _ hlen hbin hperm) ?_⟩
+  · exact fun _ interactionMem =>
+      Air.Flat.EnsembleWitness.channel_eq_of_mem_interactionsWith interactionMem
+  · intro access accessMem
+    obtain ⟨interaction, interactionMem, rfl⟩ := List.mem_map.mp accessMem
+    change signedVal interaction.mult = -1 ∨ signedVal interaction.mult = 0 ∨
+      signedVal interaction.mult = 1
+    have hp : 2 < p := by
+      have := Fact.out (p := 2 ^ 25 < p)
+      omega
+    rcases hbin interaction interactionMem with h | h | h
+    · right; left
+      rw [h, signedVal_is_real hp (Or.inl rfl), ZMod.val_zero, Nat.cast_zero]
+    · right; right
+      rw [h, signedVal_is_real hp (Or.inr rfl), ZMod.val_one_eq_one_mod,
+        Nat.mod_eq_of_lt (by omega), Nat.cast_one]
+    · left
+      rw [h, signedVal_neg_is_real hp (Or.inr rfl), ZMod.val_one_eq_one_mod,
+        Nat.mod_eq_of_lt (by omega), Nat.cast_one]
 
 /-- The generated trace balances on all four buses of `sp1Ensemble`. -/
 def Balanced : Prop :=
   ∀ channel ∈ (sp1Ensemble (p := p)).channels, trace.BalancedOn channel
 
-/-- **A balanced trace assembles into a witness whose channels balance.** One citation of the
-ledger's `balancedInteractions_of_signed_perm` per channel; the ensemble's own
-`allTablesWitness.interactionsWith` is definitionally the witness's, so no row is re-evaluated. -/
+/-- **A balanced trace assembles into a witness whose channels balance.** The exact integer ledger
+casts to Clean's field balance without a binary-multiplicity restriction; channel homogeneity is
+provided by the ensemble's own `interactionsWith` membership theorem. -/
 theorem witness_balancedChannels (hbal : trace.Balanced) : trace.witness.BalancedChannels := by
   intro channel hchannel
-  obtain ⟨hlen, hbin, hperm⟩ := hbal channel hchannel
-  exact balancedInteractions_of_signed_perm _ hlen hbin hperm
+  obtain ⟨hlen, integerBalanced⟩ := hbal channel hchannel
+  change BalancedInteractions (trace.witness.allTablesWitness.interactionsWith channel)
+  rw [Air.Flat.EnsembleWitness.interactionsWith_allTablesWitness]
+  exact LookupAccessList.balancedInteractions_of_isConsistentBalanced
+    _ _ channel
+    (fun _ interactionMem =>
+      Air.Flat.EnsembleWitness.channel_eq_of_mem_interactionsWith interactionMem)
+    (List.Perm.refl _) hlen integerBalanced
 
 end SupportedCoreTraceWitness
 
@@ -100,28 +150,30 @@ end SupportedCoreTraceWitness
 
 /--
 **The trace-generatable execution relation.** A generated trace counts as an execution of the
-public statement when it is well-formed, its bus ledger balances, and its boundary tables bind to
-the caller's committed program and one concrete initial Sail state.
+public statement when it is well-formed, its aggregate provider counts have faithful centered-field
+encodings, its bus ledger balances, and its boundary tables bind to the caller's committed program
+and one concrete initial Sail state.
 
-The third conjunct is literally the companion predicate `SupportedCoreNativeRelation` carries, so
+The final conjunct is literally the companion predicate `SupportedCoreNativeRelation` carries, so
 soundness and completeness speak about the same boundary object rather than two paraphrases of it.
 -/
 def SupportedCoreTraceGeneratableExecutionRelation :
     WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreTraceWitness p) :=
   fun statement trace =>
-    trace.WellFormed ∧ trace.Balanced ∧
+    trace.WellFormed ∧ trace.ProviderMultiplicitiesFit ∧ trace.Balanced ∧
       trace.publicValues = statement.publicValues ∧
       SemanticBoundaryBinding statement trace.witness
 
 /--
 **Machine-level completeness of the supported-core AIR.**
 
-Every well-formed, balanced, boundary-bound generated trace has an AIR witness the verifier
-accepts: the forty tables of `SupportedCoreTraceWitness.tables` plus the public boundary row, with
-every witnessed cell produced by the circuits' own witness generators.
+Every well-formed, capacity-bounded, balanced, boundary-bound generated trace has a native ensemble
+witness satisfying `SupportedCoreNativeRelation`: the 53 tables of
+`SupportedCoreTraceWitness.tables` plus the public
+boundary row, with every witnessed cell produced by the circuits' own witness generators.
 
 The two substantive conjuncts are proved, not assumed. `Constraints` is
-`SupportedCoreTraceWitness.witness_constraints` — forty-one tables' complete assertion systems,
+`SupportedCoreTraceWitness.witness_constraints` — 54 tables' complete assertion systems,
 each a citation of that table's `traceTable_constraints`, so the arithmetic content is the chips'
 own completeness proofs. `BalancedChannels` is the ledger bridge applied per channel. The public
 input matches by construction, and the boundary binding is carried through unchanged.
@@ -129,7 +181,7 @@ input matches by construction, and the boundary binding is carried through uncha
 theorem supported_core_native_complete :
     WitnessRelation.Complete (SupportedCoreNativeRelation (p := p))
       (SupportedCoreTraceGeneratableExecutionRelation (p := p)) := by
-  rintro statement trace ⟨wf, balanced, publicEq, boundary⟩
+  rintro statement trace ⟨wf, _, balanced, publicEq, boundary⟩
   exact ⟨trace.witness, ⟨publicEq, trace.witness_constraints wf,
     trace.witness_balancedChannels balanced⟩, boundary⟩
 
@@ -140,7 +192,7 @@ theorem sp1Ensemble_statement_of_traceGeneratable
     (statement : SupportedCoreStatement p) (trace : SupportedCoreTraceWitness p)
     (valid : SupportedCoreTraceGeneratableExecutionRelation statement trace) :
     (sp1Ensemble (p := p)).Statement statement.publicValues := by
-  obtain ⟨wf, balanced, publicEq, -⟩ := valid
+  obtain ⟨wf, _, balanced, publicEq, -⟩ := valid
   exact ⟨trace.witness, publicEq, trace.witness_constraints wf,
     trace.witness_balancedChannels balanced⟩
 

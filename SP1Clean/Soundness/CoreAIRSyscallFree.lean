@@ -4,18 +4,20 @@ set_option autoImplicit false
 
 /-! # The syscall-free restriction, and the obligations it discharges
 
-`CoreAIRRefinementObligations` (`Soundness/CoreAIR.lean`) is the fifteen-field proof bundle the
+`CoreAIRRefinementObligations` (`Soundness/CoreAIR.lean`) is the fourteen-field proof bundle the
 conditional `sp1_air_refinement_of_obligations` / `sp1_air_sound_of_obligations` combinators
-consume. Five of its fields are about SP1's syscall table, and four of those quantify over the
-shard's decoded syscall events. On a shard that performs no syscalls they are vacuous — which is
+consume. Five fields mention SP1's syscall table: four quantify over decoded syscall events, while
+`syscallTranscript` compares the supplied decoder's transcript with the extracted one. On a shard
+that performs no syscalls the four event fields are vacuous and the transcript field reduces under
+an explicit decoder-preservation premise — which is
 worth stating, because the drift-stable AIR scope this workstream verifies deliberately excludes
 the Global/Syscall cluster, so a syscall-free restriction is the regime the rest of the bundle will
 first be closed in.
 
 ## What this file is, and is not
 
-It shrinks the bundle from fifteen fields to eleven under one explicit hypothesis. It does **not**
-close `executionCase` — the field that carries the actual refinement, turning a valid extracted
+It closes four fields outright and conditionally reduces a fifth, leaving ten conceptually open
+obligations. It does **not** close `executionCase` — the field that carries the actual refinement, turning a valid extracted
 Core AIR witness into a Sail event-execution trace matching the shard's public endpoints. That one
 needs the whole-ensemble transport (`Faithful/Transport/` covers the twenty-five instruction
 tables' constraints; the provider, memory-boundary and system-table segments and the four channel

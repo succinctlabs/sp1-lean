@@ -106,9 +106,9 @@ that sits in the default loop and composes with #1879 either way; the `${config_
 additions split out as #1885. Both filed, comment posted. Reasoning and the local verification are
 in `sail-model-provenance.md`.
 
-## Draft 4 — SP1 upstream: `#[repr(C)]` on `RegisterAccessCols` — **PREPARED, owner-gated**
+## Draft 4 — SP1 upstream: `#[repr(C)]` on `RegisterAccessCols` — **DRAFT ONLY, NOT FILED**
 
-External PR110 report, Finding 6 (confirmed independently 2026-08-20: of 133 `AlignedBorrow`
+Alex Hicks's PR #110 review, Finding 6 (confirmed independently 2026-08-20: of 133 `AlignedBorrow`
 structs across `crates/core/machine` + `crates/hypercube`, exactly one lacks `#[repr(C)]`).
 `AlignedBorrow` generates an `unsafe` `align_to::<Self>()` reinterpretation of a raw row slice;
 without `#[repr(C)]` the field order is compiler-chosen, so the cast relies on unspecified layout.

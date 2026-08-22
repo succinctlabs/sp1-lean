@@ -20,10 +20,12 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
 
-/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, the honest
-`"bitwise_flags"` hint (each flag binary, one-hot, the sum = `is_real`), `op_a_0 = 0`,
-`imm_c = 0` (register-register ops), CPUState clock bounds, three timestamp `Spec`s
-(op_c gated by `is_real - imm_c`), and the three pulled prior records' 24-bit access clocks. -/
+/-- Prover-side row well-formedness for register and immediate bitwise operations: operand `isU64`s,
+`is_real` binary, the honest `"bitwise_flags"` hint (each flag binary, one-hot, the sum = `is_real`),
+`op_a_0 = 0`, and the exact ALU-row form invariant
+`imm_c = 0 ∨ (is_real = 1 ∧ imm_c = 1)`. The four copy gates witness that an immediate row's
+synthetic op_c access block contains the committed immediate. The remainder is the CPUState clock
+bounds, three timestamp `Spec`s (op_c gated by `is_real - imm_c`), and access-clock bounds. -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) : Prop :=
   let f := hintFlags hint
@@ -35,7 +37,16 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   (f[0] = 1 → f[1] = 0 ∧ f[2] = 0) ∧
   (f[1] = 1 → f[0] = 0 ∧ f[2] = 0) ∧
   (f[2] = 1 → f[0] = 0 ∧ f[1] = 0) ∧
-  input.adapter.op_a_0 = 0 ∧ input.adapter.imm_c = 0 ∧
+  input.adapter.op_a_0 = 0 ∧
+  (input.adapter.imm_c = 0 ∨ (input.is_real = 1 ∧ input.adapter.imm_c = 1)) ∧
+  (input.adapter.imm_c *
+      (input.adapter.op_c_memory.prev_value[0] - input.adapter.op_c[0]) = 0 ∧
+    input.adapter.imm_c *
+      (input.adapter.op_c_memory.prev_value[1] - input.adapter.op_c[1]) = 0 ∧
+    input.adapter.imm_c *
+      (input.adapter.op_c_memory.prev_value[2] - input.adapter.op_c[2]) = 0 ∧
+    input.adapter.imm_c *
+      (input.adapter.op_c_memory.prev_value[3] - input.adapter.op_c[3]) = 0) ∧
   Readers.CPUState.Spec
     { cols := input.state, next_pc := #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
       clk_inc := 8, is_real := input.is_real } ∧
@@ -50,9 +61,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
     input.state.pc[0].val < 2 ^ 16 ∧ input.state.pc[1].val < 2 ^ 16 ∧ input.state.pc[2].val < 2 ^ 16) ∧
   -- G1: the three pulled prior records' 24-bit access clocks (`Channels.MemoryMsg.ClkBound`, the clock
   -- half of the memory channel's `Guarantees`). A pull's completeness must exhibit the guarantee it
-  -- consumes; in a real trace each prior access sits at a genuine `< 2^24` timestamp. Gated on plain
-  -- `is_real` (with `imm_c = 0` above, op_c's `is_real - imm_c` gate reduces to it). Soundness does
-  -- *not* assume these — they are derived there from the pulls themselves.
+  -- consumes; in a real trace each prior access sits at a genuine `< 2^24` timestamp. The op_c
+  -- component is harmlessly stronger than its access gate on immediate rows (the honest builder puts
+  -- literal zero there). Soundness does *not* assume these — they are derived from the pulls.
   (input.is_real = 1 →
     input.adapter.op_a_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
     input.adapter.op_b_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
@@ -241,8 +252,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, ha_prev, hbin, hf0, hf1, hf2, hsum, hone0, hone1, hone2, hop_a_0, himm, h_cpu,
-    hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ := h_assumptions
+  obtain ⟨ha, hb, ha_prev, hbin, hf0, hf1, hf2, hsum, hone0, hone1, hone2, hop_a_0, himm,
+    himm_copy, h_cpu, hrac_a, hrac_b, hrac_c, hdec, hprevclk⟩ := h_assumptions
   -- G1: the *push* side clock bounds, from the prover-supplied CPUState clock byte bounds.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
   -- `h_env` now bundles the chip's flag/`bw_cols` witness-gen equations with the GFC `ALUTypeReader`
@@ -308,17 +319,31 @@ theorem completeness :
       exact Or.inr (Or.inr (by rw [hx, ho]; ring))
   have hop3 : (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0).val < 3 :=
     val_lt_three hop_cases
+  have himm_pad : (input_is_real - 1) * input_adapter_imm_c = 0 := by
+    rcases himm with h0 | ⟨hr, h1⟩
+    · rw [h0, mul_zero]
+    · rw [hr, h1]
+      simp
+  have hcbin : input_is_real - input_adapter_imm_c = 0 ∨
+      input_is_real - input_adapter_imm_c = 1 := by
+    rcases himm with h0 | ⟨hr, h1⟩
+    · rw [h0, sub_zero]
+      exact hbin
+    · rw [hr, h1]
+      simp
+  have hreal_of_c (hc : input_is_real - input_adapter_imm_c = 1) : input_is_real = 1 := by
+    rcases himm with h0 | ⟨hr, h1⟩
+    · rwa [h0, sub_zero] at hc
+    · exact hr
   refine ⟨⟨hbin, h_cpu⟩,
     ⟨⟨ha, hb, hop3, hbin⟩,
       ?_⟩,
     ⟨⟨hbin, hbin, h_clk⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
-      by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
-      ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
+      himm_pad, hcbin, himm_copy,
       hrac_a, hrac_b, hrac_c, hdec,
       (fun hr => ⟨ha_prev hr, ha, (hprevclk hr).1, (hprevclk hr).2.1⟩),
-      -- op_c's guarantee is gated by `is_real - imm_c`; `imm_c = 0` reduces that to `is_real = 1`.
-      fun hc => ⟨hb, (hprevclk (by rwa [himm, sub_zero] at hc)).2.2⟩⟩⟩,
+      fun hc => ⟨hb, (hprevclk (hreal_of_c hc)).2.2⟩⟩⟩,
     ⟨⟨hbin, ?_, h_clk.at_four⟩, trivial⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
     by rw [hsumc]; exact sub_self _,

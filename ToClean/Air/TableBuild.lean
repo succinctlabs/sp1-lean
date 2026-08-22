@@ -273,6 +273,28 @@ theorem buildRow_constraintsHold (c : Component F) (input : c.Input F) (data : P
     (by rw [h_input]; exact h_prover)
   exact ⟨(c.constraintsHold_iff _).mpr h.1, (c.guarantees_iff _).mpr h.2⟩
 
+/-- A valid row produced by `buildRow` also satisfies the component's semantic specification and
+all channel requirements.  This is the composition of honest witness generation with the
+component's already-bundled soundness theorem; downstream table transports can use the semantic
+boundary without reopening a circuit's witness implementation. -/
+theorem buildRow_spec_requirements (c : Component F) (input : c.Input F)
+    (data : ProverData F) (hint : ProverHint F)
+    (h_computable : c.circuit.base.ComputableWitnesses)
+    (h_prover : c.circuit.ProverAssumptions input data hint)
+    (h_assumptions : c.circuit.Assumptions input data) :
+    let env := Environment.fromArray (c.buildRow input data hint) data
+    c.Spec env ∧ c.operations.FullRequirements env := by
+  dsimp only
+  let env := Environment.fromArray (c.buildRow input data hint) data
+  have built := c.buildRow_constraintsHold input data hint h_computable h_prover
+  apply c.weakSoundness
+  · change c.circuit.Assumptions (c.rowInput env) data
+    rw [show env = Environment.fromArray (c.buildRow input data hint) data from rfl,
+      c.rowInput_buildRow input data data hint]
+    exact h_assumptions
+  · exact built.1
+  · exact built.2
+
 /-- Constraints of a built row survive a change of the environment's committed data, for a
 lookup-free component. Together with `buildRow_constraintsHold` this is what makes a table's shared
 `ProverData` a free choice: the rows do not have to be rebuilt for it. -/

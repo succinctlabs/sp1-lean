@@ -350,8 +350,8 @@ grounding family. Measured: squeezing `simp` → `simp only` already moved its f
 and the file 8.28s → 5.84s, so **the remaining cost is exactly the record unfolding**. Adding the 24 missing
 pairs in `Native/Chips/<Chip>/Defs.lean` should take it comfortably under the default.
 *Related:* the same missing-rfl-lemma cause blocks Clean's `SoundEnsemble.addTable` autoParam defaults —
-giving each provider circuit a `channelsWith{Guarantees,Requirements}_eq` would let **all 11** hand-written
-`addTable` obligation arguments across `ByteChip/Ensemble.lean`, `MemoryProviderEnsemble.lean` and
+giving the remaining provider/boundary circuits a `channelsWith{Guarantees,Requirements}_eq` would let
+the explicit obligation pairs at all three `addTable` sites across `MemoryProviderEnsemble.lean` and
 `ProgramProviderEnsemble.lean` be **omitted**. Needs an owner and a full build (attribute changes were
 suspended during parallel editing).
 

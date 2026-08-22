@@ -335,6 +335,40 @@ lemma aluTypeReaderCols_op_a_0_eq_one {e : ALUTypeEvent} (h : e.opA = 0) :
     (aluTypeReaderCols (p := p) e).op_a_0 = 1 := by
   rw [aluTypeReaderCols_op_a_0, if_pos h]
 
+omit [Fact (2 ^ 24 < p)] in
+/-- The immediate selector committed by the ALU-type builder is binary. Unlike the older
+register-only completeness lemmas, this statement preserves both honest row forms. -/
+lemma aluTypeReaderCols_imm_c_bool {e : ALUTypeEvent}
+    (h : e.immC = 0 ∨ e.immC = 1) :
+    (aluTypeReaderCols (p := p) e).imm_c = 0 ∨
+      (aluTypeReaderCols (p := p) e).imm_c = 1 := by
+  rcases h with h | h
+  · exact Or.inl (by rw [aluTypeReaderCols_imm_c, h, Nat.cast_zero])
+  · exact Or.inr (by rw [aluTypeReaderCols_imm_c, h, Nat.cast_one])
+
+omit [Fact (2 ^ 24 < p)] in
+/-- The four immediate-copy gates of a built ALU-type adapter. On a register row the selector
+vanishes; on an immediate row `aluTypeOpCCols` copies the committed `op_c` word into
+`op_c_memory.prev_value`, exactly as SP1's trace population does. -/
+lemma aluTypeReaderCols_imm_copy {e : ALUTypeEvent}
+    (h : e.immC = 0 ∨ e.immC = 1) :
+    let cols := aluTypeReaderCols (p := p) e
+    cols.imm_c * (cols.op_c_memory.prev_value[0] - cols.op_c[0]) = 0 ∧
+      cols.imm_c * (cols.op_c_memory.prev_value[1] - cols.op_c[1]) = 0 ∧
+      cols.imm_c * (cols.op_c_memory.prev_value[2] - cols.op_c[2]) = 0 ∧
+      cols.imm_c * (cols.op_c_memory.prev_value[3] - cols.op_c[3]) = 0 := by
+  let cols := aluTypeReaderCols (p := p) e
+  have hgate : ∀ i (hi : i < 4), cols.imm_c *
+      (cols.op_c_memory.prev_value[i] - cols.op_c[i]) = 0 := by
+    intro i hi
+    dsimp only [cols]
+    rcases h with h | h
+    · rw [aluTypeReaderCols_imm_c, h, Nat.cast_zero, zero_mul]
+    · rw [aluTypeReaderCols_imm_c, h, Nat.cast_one, one_mul,
+        aluTypeReaderCols_op_c_memory, aluTypeReaderCols_op_c,
+        aluTypeOpCCols, if_pos h, sub_self]
+  exact ⟨hgate 0 (by omega), hgate 1 (by omega), hgate 2 (by omega), hgate 3 (by omega)⟩
+
 /-- The value a built ALU-type `op_c` block commits is a u64 in **both** row forms — the `rs2`
 read value on a register row, the copied immediate word on an immediate row. Both are built by
 `wordOfNat`, so neither owes the event a limb bound. -/
@@ -356,6 +390,24 @@ lemma aluTypeOpCCols_prevLow_val_lt (e : ALUTypeEvent) :
   split
   · simp
   · exact registerAccessCols_prevLow_val_lt _ _ _
+
+/-- The op_c timestamp block built for either ALU row form satisfies its reader contract at the
+reader's exact `1 - imm_c` gate: an ordinary register access on `imm_c = 0`, and a vacuous zero
+block on `imm_c = 1`. -/
+theorem aluTypeOpCCols_spec {e : ALUTypeEvent} (hclk : e.clk % 8 = 1)
+    (himm : e.immC = 0 ∨ e.immC = 1)
+    (hprev : e.immC = 0 → e.prevTsC < e.clk + 2) :
+    Readers.RegisterAccessCols.Spec
+      ⟨aluTypeOpCCols (p := p) e,
+        1 - (aluTypeReaderCols (p := p) e).imm_c,
+        (cpuStateCols (p := p) e.clk e.pc).clk_0_16
+          + (cpuStateCols (p := p) e.clk e.pc).clk_16_24 * 65536 + 2⟩ := by
+  rcases himm with h | h
+  · rw [aluTypeOpCCols_of_reg h]
+    exact registerAccessCols_spec_opC hclk (hprev h)
+  · intro hgate
+    rw [aluTypeReaderCols_imm_c, h, Nat.cast_one, sub_self] at hgate
+    exact absurd hgate zero_ne_one
 
 omit [Fact (2 ^ 24 < p)] in
 /-- The built word of `0` is the zero word — RISC-V's `x0` read value, in committed form. -/
@@ -443,6 +495,21 @@ omit [Fact (2 ^ 24 < p)] in
 lemma jTypeReaderCols_op_a_0_eq_zero {e : JTypeEvent} (h : e.opA ≠ 0) :
     (jTypeReaderCols (p := p) e).op_a_0 = 0 := by
   rw [jTypeReaderCols_op_a_0, if_neg h]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- A built J-type block sets its destination-zero flag when `rd = x0`. -/
+lemma jTypeReaderCols_op_a_0_eq_one {e : JTypeEvent} (h : e.opA = 0) :
+    (jTypeReaderCols (p := p) e).op_a_0 = 1 := by
+  rw [jTypeReaderCols_op_a_0, if_pos h]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- The destination-zero flag of any built J-type row is binary. -/
+lemma jTypeReaderCols_op_a_0_bool (e : JTypeEvent) :
+    (jTypeReaderCols (p := p) e).op_a_0 = 0 ∨
+      (jTypeReaderCols (p := p) e).op_a_0 = 1 := by
+  by_cases h : e.opA = 0
+  · exact Or.inr (jTypeReaderCols_op_a_0_eq_one h)
+  · exact Or.inl (jTypeReaderCols_op_a_0_eq_zero h)
 
 /-! ## The `ITypeReader` block, whole
 

@@ -20,22 +20,19 @@ splits into three pieces.
    `LWU`, which zero-extends). The four selection gates then hold by `rfl` in the selected branch
    and by `mul_zero` in the other.
 
-## Why there is no padding row here
+## Padding contract status
 
 SP1 pads a chip's trace to a power-of-two height with literal zero bytes
 (`load_word.rs`: `core::ptr::write_bytes(buffer[padding_start..], 0, padding_size)`), and the
 chip's AIR is satisfied on such a row — the reserved-page inverse gate is
 `inv · (value[1] + value[2]) = is_real`, which a zero row satisfies with `inv = 0`.
 
-Its `ProverAssumptions`, however, states the address facts **ungated**, and one of them —
-`2 ^ 16 ≤ (op_b_val + op_c_imm) mod 2^48`, the "address is above the reserved low 64 KiB" fact — is
-*false* at the zero row. So no zero padding row satisfies this chip's honest-prover contract, and
-the theorems below are stated over the event rows alone. The same conjunct appears, ungated, in all
-five load chips and all four store chips, inherited from `AddressOperation.Assumptions`; gating it
-(and its three neighbours) on `is_real` is a contract change that would re-open
-`AddressOperation.completeness` and nine chip completeness proofs, so it is **reported, not
-patched**. The register-adapter families are unaffected: their padding rows are proved in
-`AddChip`/`AddiChip`/`UTypeChip`'s `proverAssumptions_padding`.
+The honest-prover contract now matches that gate: only a real row owes
+`2 ^ 16 ≤ (op_b_val + op_c_imm) mod 2^48`; the shared
+`AddressOperation.assumptions_zero` theorem exhibits the zero case for that address subcontract.
+The event-level table API below is intentionally still the unpadded core, and this file does not
+claim a full-chip zero-row inhabitance theorem. A future ensemble-height builder must construct and
+prove the complete chip padding row while choosing its table height.
 -/
 
 namespace SP1Clean.TraceGen
@@ -169,7 +166,8 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormed) (halign 
     iTypeReader_spec hi _ _ _ _ _ _ _ _⟩
   -- the address fits in 48 bits, is above the reserved page, and is 4-byte aligned
   · rw [haddr64]; exact h.addr_lt
-  · rw [haddr48]; exact h.addr_ge
+  · intro _
+    rw [haddr48]; exact h.addr_ge
   · rw [haddr48]; exact halign'
   -- `4 · offset_bit = addr mod 8`
   · rw [MemoryEvent.toLoadWordInputs_offset_bit, hoffval, haddr48]; exact hoff8
@@ -247,8 +245,8 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormed) (halign 
 A plain `def`, deliberately not an `abbrev` (see `AddChip.component` for the measurement). -/
 def component : Air.Flat.Component (ZMod p) := ⟨circuit⟩
 
-/-- The rows a trace builds: one input row per event. **No padding tail** — SP1 pads with zero
-rows, and this chip's `ProverAssumptions` is not satisfied there (see the module docstring). -/
+/-- The event rows of a trace. The current memory-family ensemble API builds exactly this height;
+threading explicit zero padding through that API remains separate work. -/
 def traceInputs (events : List MemoryEvent) : List (Inputs (ZMod p)) :=
   events.map MemoryEvent.toLoadWordInputs
 

@@ -82,6 +82,43 @@ private lemma intCast_list_sum (l : List ℤ) :
   | nil => simp
   | cons a t ih => simp [ih]
 
+/-- At the key of an observed interaction, the native integer multiplicity sum casts back to
+Clean's field-valued balance of that interaction's message.  This is the lossless algebraic core
+shared by both directions of the balance bridge; no binary-multiplicity or count bound is needed. -/
+theorem intCast_multiplicitySum_map_toAccess_eq_balanceOf
+    (interactions : List (Interaction (ZMod p))) (channel : RawChannel (ZMod p))
+    (h_channel : ∀ i ∈ interactions, i.channel = channel)
+    (i₀ : Interaction (ZMod p)) (hi₀ : i₀ ∈ interactions) :
+    ((multiplicitySum (interactions.map Interaction.toAccess)
+      (keyOf (Interaction.toAccess i₀)) : ℤ) : ZMod p) =
+      balanceOf interactions i₀.msg := by
+  have h_pred : ∀ i ∈ interactions,
+      decide (keyOf (Interaction.toAccess i) = keyOf (Interaction.toAccess i₀)) =
+        decide (i.msg = i₀.msg) := by
+    intro i hi
+    rw [decide_eq_decide]
+    refine ⟨fun h => ?_, fun h => ?_⟩
+    · exact Array.toList_inj.mp (List.map_injective_iff.mpr (ZMod.val_injective p)
+        (congrArg (fun t => t.2.2) h))
+    · simp only [Interaction.toAccess, keyOf, h_channel i hi, h_channel i₀ hi₀, h]
+  have h_filter :
+      (interactions.map Interaction.toAccess).filter
+          (fun a => keyOf a = keyOf (Interaction.toAccess i₀)) =
+        (interactions.filter (fun i => i.msg = i₀.msg)).map Interaction.toAccess := by
+    rw [List.filter_map]
+    exact congrArg (List.map Interaction.toAccess) (List.filter_congr h_pred)
+  calc
+    ((multiplicitySum (interactions.map Interaction.toAccess)
+        (keyOf (Interaction.toAccess i₀)) : ℤ) : ZMod p)
+        = ((((interactions.filter (fun i => i.msg = i₀.msg)).map
+            (fun i => signedVal i.mult)).sum : ℤ) : ZMod p) := by
+          rw [multiplicitySum, filterKey, h_filter, List.map_map]
+          rfl
+    _ = ((interactions.filter (fun i => i.msg = i₀.msg)).map (fun i => i.mult)).sum := by
+          rw [intCast_list_sum, List.map_map]
+          exact congrArg List.sum (List.map_congr_left fun i _ => intCast_signedVal i.mult)
+    _ = balanceOf interactions i₀.msg := rfl
+
 /-- **Per-key cast-sum zero.** For a single-channel interaction list whose Clean per-message balance
 vanishes, the `Interaction.toAccess`-image's ℤ-multiplicity-sum at *every* `LookupKey` is `≡ 0 (mod p)`
 — the `hmod` input of `isConsistentBalanced_of_intCast_zero`. Keys of same-channel interactions
@@ -95,27 +132,9 @@ theorem intCast_multiplicitySum_map_toAccess
     ((multiplicitySum (interactions.map Interaction.toAccess) k : ℤ) : ZMod p) = 0 := by
   by_cases h_ex : ∃ i ∈ interactions, keyOf (Interaction.toAccess i) = k
   · obtain ⟨i₀, hi₀, hk₀⟩ := h_ex
-    have h_pred : ∀ i ∈ interactions,
-        decide (keyOf (Interaction.toAccess i) = k) = decide (i.msg = i₀.msg) := by
-      intro i hi
-      rw [decide_eq_decide, ← hk₀]
-      refine ⟨fun h => ?_, fun h => ?_⟩
-      · exact Array.toList_inj.mp (List.map_injective_iff.mpr (ZMod.val_injective p)
-          (congrArg (fun t => t.2.2) h))
-      · simp only [Interaction.toAccess, keyOf, h_channel i hi, h_channel i₀ hi₀, h]
-    have h_filter : (interactions.map Interaction.toAccess).filter (fun a => keyOf a = k)
-        = (interactions.filter (fun i => i.msg = i₀.msg)).map Interaction.toAccess := by
-      rw [List.filter_map]
-      exact congrArg (List.map Interaction.toAccess) (List.filter_congr h_pred)
-    calc ((multiplicitySum (interactions.map Interaction.toAccess) k : ℤ) : ZMod p)
-        = ((((interactions.filter (fun i => i.msg = i₀.msg)).map
-            (fun i => signedVal i.mult)).sum : ℤ) : ZMod p) := by
-          rw [multiplicitySum, filterKey, h_filter, List.map_map]; rfl
-      _ = ((interactions.filter (fun i => i.msg = i₀.msg)).map (fun i => i.mult)).sum := by
-          rw [intCast_list_sum, List.map_map]
-          exact congrArg List.sum (List.map_congr_left fun i _ => intCast_signedVal i.mult)
-      _ = balanceOf interactions i₀.msg := rfl
-      _ = 0 := h_zero i₀.msg
+    rw [← hk₀]
+    exact (intCast_multiplicitySum_map_toAccess_eq_balanceOf interactions channel h_channel
+      i₀ hi₀).trans (h_zero i₀.msg)
   · have h0 : multiplicitySum (interactions.map Interaction.toAccess) k = 0 := by
       refine multiplicitySum_eq_zero_of_keyOf_ne fun a ha hak => ?_
       obtain ⟨i, hi, rfl⟩ := List.mem_map.mp ha
@@ -144,6 +163,33 @@ theorem isConsistentBalanced_of_balancedInteractions
   · intro k
     rw [multiplicitySum_perm _ _ h_perm k]
     exact intCast_multiplicitySum_map_toAccess interactions channel h_channel h_bal.2 k
+
+/-- **Native ℤ balance ⇒ Clean field balance, through `toAccess`.**  Unlike the forward direction,
+this implication needs no binary-multiplicity hypothesis: an integer sum which is literally zero
+casts to zero in the field.  The explicit count premise is exactly Clean's non-overflow side
+condition and is deliberately not inferred from balance. -/
+theorem balancedInteractions_of_isConsistentBalanced
+    (accesses : LookupAccessList)
+    (interactions : List (Interaction (ZMod p))) (channel : RawChannel (ZMod p))
+    (h_channel : ∀ i ∈ interactions, i.channel = channel)
+    (h_perm : accesses.Perm (interactions.map Interaction.toAccess))
+    (h_count : interactions.length < p)
+    (h_bal : isConsistentBalanced accesses) :
+    BalancedInteractions interactions := by
+  constructor
+  · left
+    simpa only [ZMod.ringChar_zmod_n] using h_count
+  · intro msg
+    by_cases h_ex : ∃ i ∈ interactions, i.msg = msg
+    · obtain ⟨i₀, hi₀, hmsg⟩ := h_ex
+      rw [← hmsg, ← intCast_multiplicitySum_map_toAccess_eq_balanceOf interactions channel
+        h_channel i₀ hi₀]
+      rw [← multiplicitySum_perm accesses _ h_perm _]
+      simpa only [Int.cast_zero] using congrArg (fun z : ℤ => (z : ZMod p))
+        (h_bal (keyOf (Interaction.toAccess i₀)))
+    · have h_filter : interactions.filter (fun i => i.msg = msg) = [] := by
+        exact List.filter_eq_nil_iff.mpr fun i hi himsg => h_ex ⟨i, hi, by simpa using himsg⟩
+      simp only [balanceOf, h_filter, List.map_nil, List.sum_nil]
 
 end CleanTranslation
 

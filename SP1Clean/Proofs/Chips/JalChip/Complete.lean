@@ -54,26 +54,29 @@ lemma linkTargetWord_toJalInputs {e : JTypeEvent} (h : e.pc < 2 ^ 48) :
 /-! ## The chip's honest-prover contract on a built row -/
 
 /--
-**A well-formed `JAL` event with a legal target builds a row the honest prover can complete.**
+**A well-formed `JAL` event with a legal target builds a row the honest prover can complete,
+including `jal x0, imm`.**
 Every conjunct of `JalChip.ProverAssumptions` at the built input row follows from
-`JTypeEvent.WellFormed` together with `htgt : e.JalTargets`, with no residual side condition.
+`JTypeEvent.WellFormedJal` together with `htgt : e.JalTargets`, with no residual side condition.
 
 `htgt` is the one thing the J-type record cannot supply — see the module docstring.
 
 The `data` and `hint` are arbitrary: `Jal`'s prover contract reads neither.
 -/
-theorem proverAssumptions_of_event {e : JTypeEvent} (h : e.WellFormed) (htgt : e.JalTargets)
+theorem proverAssumptions_of_event {e : JTypeEvent} (h : e.WellFormedJal) (htgt : e.JalTargets)
     (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p)) :
     ProverAssumptions (e.toJalInputs (p := p)) data hint := by
   obtain ⟨htgt48, htgt4, hlink⟩ := htgt
   have hpc : e.pc < 2 ^ 48 := h.pc_lt
   refine ⟨wordOfNat_isU64 _, cpuStateCols_pcWord_isU64 e.clk e.pc, fun _ => wordOfNat_isU64 _,
-    Or.inr rfl, jTypeReaderCols_op_a_0_eq_zero h.opA_ne_zero,
-    cpuState_spec e.clk e.pc h.clk_mod _ _ _,
+    Or.inr rfl, ?_, cpuState_spec e.clk e.pc h.clk_mod _ _ _,
     registerAccessCols_spec_opA h.clk_mod h.prevTsA_lt, ?_, ?_, ?_,
     fun _ => ⟨jTypeReaderCols_op_a_val_lt h.opA_lt, (cpuStateCols_pc_val_lt e.clk e.pc).1,
       (cpuStateCols_pc_val_lt e.clk e.pc).2.1, (cpuStateCols_pc_val_lt e.clk e.pc).2.2⟩,
     fun _ => registerAccessCols_prevLow_val_lt _ _ _⟩
+  · by_cases hzero : e.opA = 0
+    · exact Or.inr ⟨rfl, jTypeReaderCols_op_a_0_eq_one hzero⟩
+    · exact Or.inl (jTypeReaderCols_op_a_0_eq_zero hzero)
   -- the jump target is a program counter: 48 bits, so the committed high limb is zero
   · rw [jumpTargetWord_toJalInputs hpc]
     exact wordOfNat_three_eq_zero htgt48
@@ -87,7 +90,7 @@ theorem proverAssumptions_of_event {e : JTypeEvent} (h : e.WellFormed) (htgt : e
       (by omega)
 
 /-- **A padding row satisfies the same contract.** `is_real = 0` makes every gated conjunct vacuous;
-what survives is the two operand `isU64`s, the `op_a_0` zero flag, and — because they are stated
+what survives is the two operand `isU64`s, the exact `op_a_0` invariant, and — because they are stated
 **ungated** — the two `value[3] = 0` gates, which the zero row's two sums `0 + 0` and `0 + 4`
 satisfy. -/
 theorem proverAssumptions_padding (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p)) :
@@ -95,7 +98,8 @@ theorem proverAssumptions_padding (data : ProverData (ZMod p)) (hint : ProverHin
   have hzero : Word.isU64 (#v[0, 0, 0, 0] : Word (ZMod p)) :=
     Word.isU64_of_cases (by simp) (by simp) (by simp) (by simp)
   have hne : ¬((0 : ZMod p) = 1) := zero_ne_one
-  refine ⟨hzero, hzero, fun hr => absurd hr hne, Or.inl rfl, rfl, fun hr => absurd hr hne,
+  refine ⟨hzero, hzero, fun hr => absurd hr hne, Or.inl rfl, Or.inl rfl,
+    fun hr => absurd hr hne,
     fun hr => absurd hr hne, ?_, ?_, fun hr => absurd hr hne, fun hr => absurd hr hne,
     fun hr => absurd hr hne⟩ <;>
     simp [jumpTargetWord, linkTargetWord, jalPaddingInputs, zeroCPUStateCols,
@@ -115,7 +119,7 @@ def traceInputs (events : List JTypeEvent) (padding : ℕ) : List (Inputs (ZMod 
 /-- Every row of a built trace — event row or padding row — satisfies the chip's honest-prover
 contract. -/
 theorem proverAssumptions_of_mem_traceInputs {events : List JTypeEvent} {padding : ℕ}
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.JalTargets) (data : ProverData (ZMod p))
+    (h : ∀ e ∈ events, e.WellFormedJal ∧ e.JalTargets) (data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) :
     ∀ input ∈ traceInputs (p := p) events padding, ProverAssumptions input data hint := by
   intro input hin
@@ -129,7 +133,7 @@ theorem proverAssumptions_of_mem_traceInputs {events : List JTypeEvent} {padding
 circuit evaluates to zero on every built row, and no static lookup is left unchecked. -/
 theorem traceTable_constraints (events : List JTypeEvent) (padding : ℕ)
     (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p))
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.JalTargets) :
+    (h : ∀ e ∈ events, e.WellFormedJal ∧ e.JalTargets) :
     (Air.Flat.Table.build (component (p := p)) (traceInputs events padding) data
       hint).Constraints :=
   Air.Flat.Table.build_constraints _ _ _ _ computableWitnesses
@@ -139,7 +143,7 @@ theorem traceTable_constraints (events : List JTypeEvent) (padding : ℕ)
 Memory, Program and Byte channels carries the payload its channel promises. -/
 theorem traceTable_guarantees (events : List JTypeEvent) (padding : ℕ)
     (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p))
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.JalTargets) :
+    (h : ∀ e ∈ events, e.WellFormedJal ∧ e.JalTargets) :
     (Air.Flat.Table.build (component (p := p)) (traceInputs events padding) data
       hint).Guarantees :=
   Air.Flat.Table.build_guarantees _ _ _ _ computableWitnesses

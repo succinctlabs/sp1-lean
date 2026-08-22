@@ -192,7 +192,7 @@ SP1_SEMANTIC_COMMIT = "f66b4bff51d0ccff51d152e0f7f66b2ffedf3529"
 # left the dumper output byte-identical.
 SP1_PINNED_COMMIT = "b5616f908c393d6050970630871f69afe233a21c"
 
-# The only semantic-tree files the extractor overlay may touch. The checker below additionally
+# The only machine AIR files the extraction branch may touch. The checker below additionally
 # verifies that every changed line in these files is an import or derive-attribute change.
 EXTRACTOR_METADATA_FILES: Set[str] = {
     "crates/core/machine/src/alu/add_sub/add.rs",
@@ -222,11 +222,15 @@ EXTRACTOR_METADATA_FILES: Set[str] = {
     "crates/core/machine/src/memory/instructions/store/store_word.rs",
     "crates/core/machine/src/utype/mod.rs",
 }
-EXTRACTOR_ONLY_PREFIXES: Tuple[str, ...] = (
+# Trusted extraction implementation. These paths contain the constraint compiler, shape projection,
+# and symbolic IR/rendering code. They are authenticated by the exact extraction-branch commit and
+# reviewed as trusted tooling; matching this allowlist does NOT prove their changes semantically
+# inert. Keep this surface distinct from the line-checked machine AIR files above.
+TRUSTED_EXTRACTOR_PREFIXES: Tuple[str, ...] = (
     "crates/core/compiler/",
     "crates/hypercube/src/ir/",
 )
-EXTRACTOR_ONLY_FILES: Set[str] = {
+TRUSTED_EXTRACTOR_FILES: Set[str] = {
     # The workspace manifest gains the vendored witgen-interp member; the lockfile follows.
     "Cargo.toml",
     "Cargo.lock",
@@ -1018,9 +1022,14 @@ def _git_output(sp1_dir: str, args: Sequence[str]) -> str:
     return result.stdout.strip()
 
 
-def verify_extractor_overlay(sp1_dir: str, actual: str) -> None:
-    """Check that the pinned exporter is based on the exact semantic revision and that its only
-    machine-source edits are non-operational reflection metadata."""
+def verify_extraction_branch_delta(sp1_dir: str, actual: str) -> None:
+    """Check the two distinct surfaces of the pinned extraction branch.
+
+    Machine AIR sources may differ only by line-checked reflection metadata. Constraint-compiler,
+    shape, and symbolic-IR changes are instead confined to an explicit trusted-tooling allowlist and
+    authenticated by the exact branch commit; this gate deliberately does not call those changes
+    semantically inert.
+    """
     merge_base = _git_output(sp1_dir, ["merge-base", SP1_SEMANTIC_COMMIT, actual])
     if merge_base != SP1_SEMANTIC_COMMIT:
         raise SystemExit(
@@ -1032,14 +1041,14 @@ def verify_extractor_overlay(sp1_dir: str, actual: str) -> None:
         sp1_dir, ["diff", "--name-only", f"{SP1_SEMANTIC_COMMIT}..{actual}"]
     )
     changed = set(changed_text.splitlines()) if changed_text else set()
-    allowed = EXTRACTOR_ONLY_FILES | EXTRACTOR_METADATA_FILES
+    allowed = TRUSTED_EXTRACTOR_FILES | EXTRACTOR_METADATA_FILES
     unexpected = sorted(
         path for path in changed
-        if path not in allowed and not path.startswith(EXTRACTOR_ONLY_PREFIXES)
+        if path not in allowed and not path.startswith(TRUSTED_EXTRACTOR_PREFIXES)
     )
     if unexpected:
         raise SystemExit(
-            "extractor overlay changes files outside the audited exporter surface:\n  "
+            "extraction branch changes files outside the declared machine/tooling surfaces:\n  "
             + "\n  ".join(unexpected)
         )
 
@@ -1059,13 +1068,17 @@ def verify_extractor_overlay(sp1_dir: str, actual: str) -> None:
         ]
         if bad_lines:
             raise SystemExit(
-                f"extractor overlay changes runtime source in {path}:\n  "
+                f"extraction branch changes executable machine AIR source in {path}:\n  "
                 + "\n  ".join(bad_lines)
             )
 
+    machine_metadata = changed & EXTRACTOR_METADATA_FILES
+    trusted_tooling = changed - machine_metadata
     print(
-        f"Verified extractor overlay {actual}: semantic base {SP1_SEMANTIC_COMMIT}, "
-        f"{len(changed)} audited file(s), runtime AIR source unchanged"
+        f"Verified extraction branch {actual} over semantic base {SP1_SEMANTIC_COMMIT}: "
+        f"{len(machine_metadata)} machine AIR file(s) have derive/import-only deltas; "
+        f"{len(trusted_tooling)} extractor/shape/tooling file(s) are accepted at commit {actual} "
+        "(trusted, not proven semantically inert)"
     )
 
 
@@ -1130,7 +1143,7 @@ def main() -> None:
         else:
             raise SystemExit(f"{msg} Set SP1_ALLOW_UNPINNED=1 to extract anyway.")
 
-    verify_extractor_overlay(sp1_dir, actual)
+    verify_extraction_branch_delta(sp1_dir, actual)
     verify_extractor_clean(sp1_dir)
     verify_no_mprotect(sp1_dir)
 

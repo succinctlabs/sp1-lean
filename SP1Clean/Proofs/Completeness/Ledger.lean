@@ -29,8 +29,9 @@ That is a static fact about the component — it does not mention a row, a witne
 environment — and Clean already turns it into the strongest possible statement:
 `Table.interactionsWith_nil_of_channel_not_mem` reduces a whole table's contribution to `[]` on a
 channel its circuit never names. The `*_channels` lemmas below record that list for each of the
-sixteen provider/boundary components, so the assembly can discharge three of the four channels for
-most tables without touching a row.
+twenty-six single-bus components in the current twenty-eight-table provider/boundary tail. The two
+W3 system tables are multi-bus and are handled explicitly by the assembly; for the other tables the
+profile discharges three of the four channels without touching a row.
 
 This is deliberately the *static* profile rather than a per-row evaluated one. Evaluating a built
 row to read its interactions back is the documented performance catastrophe of this code base
@@ -226,8 +227,8 @@ facts about the circuits — no row, no witness, no environment — and Clean's
 `Table.interactionsWith_nil_of_channel_not_mem` turns each `∉` into a whole table's contribution
 being literally `[]`.
 
-The shape of the segment: **ten byte-only providers** (the six opcode tables and the four range
-widths) plus the Program-ROM provider touch exactly one bus each; the two memory boundary tables
+The shape of the segment: **twenty-three byte-only providers** (the six opcode tables and all
+seventeen range widths) plus the Program-ROM provider touch exactly one bus each; the two memory boundary tables
 touch the Memory bus only; the two W3 system tables are the only provider-segment rows on more than
 one bus (MemoryBump: Byte and Memory; StateBump: Byte and State); and the verifier row is on State
 and Byte. -/

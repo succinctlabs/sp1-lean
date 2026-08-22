@@ -25,7 +25,7 @@ This module is the in-circuit provider's push side. For each opcode we build a C
 - range-checks the byte operands in-circuit with Clean's `Gadgets.ToBits.rangeCheck 8` (an `assertion`
   subcircuit — a genuine bit-decomposition, *not* a byte lookup, so the provider owes nothing to the
   byte bus it provides), then
-- witnesses a multiplicity `m` (the LogUp lookup count) and `byteChannel.pushIf m`-pushes the row,
+- reads the explicit multiplicity column `m` from the row and `byteChannel.pushIf m`-pushes the row,
 
 and whose soundness discharges the push's `Requirements` (`ByteRowSpec` of the pushed row, since
 `byteChannel` is a typed/`Normal` channel whose push owes its `Guarantees`) via the matching
@@ -68,15 +68,18 @@ namespace U8Range
 structure Inputs (F : Type) where
   b : F
   c : F
+  /-- The LogUp count for this preprocessed byte-table key. Zero is padding; counts greater than
+  one aggregate repeated consumer occurrences. -/
+  multiplicity : F
 deriving ProvableStruct
 
-/-- Range-checks `b` and `c` as bytes (Clean `rangeCheck 8`, in-circuit bit decomposition), witnesses a
-multiplicity `m`, and pushes the `U8Range` row `⟨3, 0, b, c⟩` onto `byteChannel` with multiplicity `m`. -/
+/-- Range-checks `b` and `c` as bytes (Clean `rangeCheck 8`, in-circuit bit decomposition) and
+pushes the `U8Range` row `⟨3, 0, b, c⟩` at the explicit input multiplicity. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) input.b
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) input.c
-  let m ← witnessField 1
-  byteChannel.pushIf m (⟨3, 0, input.b, input.c⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pushIf input.multiplicity
+    (⟨3, 0, input.b, input.c⟩ : ByteRow (Expression (ZMod p)))
 
 /-- The `U8Range` provider: pushes `⟨3, 0, b, c⟩` for two in-circuit range-checked bytes. `Spec` is the
 two byte bounds; soundness derives them from the `rangeCheck` subcircuits and discharges the push's
@@ -105,6 +108,8 @@ namespace MSB
 /-- The checked byte — the `b` slot of SP1's `MSB` send `⟨5, msb, b, 0⟩` (the `msb` is derived). -/
 structure Inputs (F : Type) where
   b : F
+  /-- The LogUp count for this byte-table key. -/
+  multiplicity : F
 deriving ProvableStruct
 
 /-- The 8-bit MSB core (byte analog of `U16MSBOperation.msb_of_raw`): `msb` boolean and `2*b - msb*256`
@@ -153,35 +158,47 @@ lemma byte_msb_range {b : ZMod p} (hb : b.val < 2 ^ 8) :
 
 /-- Range-checks `b` as a byte, witnesses its high bit `msb`, asserts `msb` boolean and `2*b - msb*256`
 a byte (forcing `msb` to be the top bit), and pushes the `MSB` row `⟨5, msb, b, 0⟩`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Expression (ZMod p)) := do
   let b := input.b
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) b
   let msb ← witnessField (.ite (127 <? b.val) 1 0)
   assertion assertBool msb
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) (2 * b - msb * 256)
-  let m ← witnessField 1
-  byteChannel.pushIf m (⟨5, msb, b, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pushIf input.multiplicity
+    (⟨5, msb, b, 0⟩ : ByteRow (Expression (ZMod p)))
+  return msb
 
-/-- The `MSB` provider: pushes `⟨5, msb, b, 0⟩` where `msb` is the in-circuit-derived top bit of byte `b`.
-`Spec` is `b.val < 2^8` (the only verifier-visible input fact); soundness derives the `msb` boolean and
-the `msb = 1 ↔ 128 ≤ b.val` relation and discharges the push's `ByteRowSpec` via `byteRowSpec_msb`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
+/-- The `MSB` provider returns and pushes the in-circuit-derived top bit of byte `b`.  Its semantic
+`Spec` exposes that result even when the row multiplicity is zero; soundness also discharges the
+push's `ByteRowSpec` requirement via `byteRowSpec_msb`. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs field where
   main
-  Spec input _ _ := input.b.val < 2 ^ 8
+  Spec input output _ :=
+    input.b.val < 2 ^ 8 ∧ output = if 128 ≤ input.b.val then 1 else 0
   ProverAssumptions input _ _ := input.b.val < 2 ^ 8
   channelsWithRequirements := [byteChannel.toRaw]
   soundness := by
     circuit_proof_start [Gadgets.ToBits.rangeCheck]
     obtain ⟨hb, hbool, hr⟩ := h_holds
-    refine ⟨hb, fun _ _ => (byteRowSpec_msb _ _).mpr ⟨⟨?_, hb⟩, hbool, byte_msb_iff hb hbool ?_⟩⟩
+    have hiff := byte_msb_iff hb hbool hr
+    have hvalue : Expression.eval env
+        (var ⟨i₀ + (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt).localLength input_var_b⟩) =
+        if 128 ≤ input_b.val then 1 else 0 := by
+      split
+      · rename_i hge
+        exact hiff.mpr hge
+      · rename_i hlt
+        rcases hbool with hzero | hone
+        · exact hzero
+        · exact False.elim (hlt (hiff.mp hone))
+    refine ⟨⟨hb, hvalue⟩,
+      fun _ _ => (byteRowSpec_msb _ _).mpr ⟨⟨?_, hb⟩, hbool, hiff⟩⟩
     · rcases hbool with h | h <;> rw [h] <;> simp [ZMod.val_zero, ZMod.val_one]
-    · exact hr
   completeness := by
     circuit_proof_start [Gadgets.ToBits.rangeCheck]
-    obtain ⟨hmsb, -⟩ := h_env
     refine ⟨h_assumptions, ?_, ?_⟩
-    · rw [hmsb]; split <;> simp [IsBool]
-    · rw [hmsb]; exact byte_msb_range h_assumptions
+    · rw [h_env]; split <;> simp [IsBool]
+    · rw [h_env]; exact byte_msb_range h_assumptions
 
 end MSB
 
@@ -202,24 +219,29 @@ namespace AndByte
 structure Inputs (F : Type) where
   b : F
   c : F
+  /-- The LogUp count for this byte-table key. -/
+  multiplicity : F
 deriving ProvableStruct
 
 /-- Range-checks `b`, `c` as bytes, derives `r = b AND c` via Clean's `And8` gadget, and pushes the
 `AND` row `⟨0, r, b, c⟩`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Expression (ZMod p)) := do
   let b := input.b
   let c := input.c
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) b
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) c
   let r ← Gadgets.And.And8.circuit ⟨b, c⟩
-  let m ← witnessField 1
-  byteChannel.pushIf m (⟨0, r, b, c⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pushIf input.multiplicity
+    (⟨0, r, b, c⟩ : ByteRow (Expression (ZMod p)))
+  return r
 
-/-- The `AND` provider: pushes `⟨0, r, b, c⟩` with `r = b AND c` derived in-circuit; soundness discharges
-`ByteRowSpec` via `byteRowSpec_byteOp` (opcode `0`, `byteOp_zero`). -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
+/-- The `AND` provider returns and pushes `r = b AND c`; exposing `r` in `Spec` preserves the
+semantic result for zero-multiplicity rows as well. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs field where
   main
-  Spec input _ _ := input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8
+  Spec input output _ :=
+    (input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8) ∧
+      output.val = input.b.val &&& input.c.val
   ProverAssumptions input _ _ := input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8
   channelsWithRequirements := [byteChannel.toRaw]
   soundness := by
@@ -228,7 +250,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
     have hr : (Expression.eval env (Gadgets.And.And8.circuit.output
         { x := input_var_b, y := input_var_c } (i₀ + 8 + 8))).val = input_b.val &&& input_c.val :=
       hand ⟨hb, hc⟩
-    refine ⟨⟨hb, hc⟩, Or.inl rfl,
+    refine ⟨⟨⟨hb, hc⟩, hr⟩, Or.inl rfl,
       fun _ _ => (byteRowSpec_byteOp _ _ _ (by rw [ZMod.val_zero]; norm_num)).mpr ⟨⟨?_, hb, hc⟩, ?_⟩⟩
     · rw [hr]; exact Nat.and_lt_two_pow (n := 8) input_b.val hc
     · rw [ZMod.val_zero, byteOp_zero]; exact hr
@@ -244,24 +266,29 @@ namespace OrByte
 structure Inputs (F : Type) where
   b : F
   c : F
+  /-- The LogUp count for this byte-table key. -/
+  multiplicity : F
 deriving ProvableStruct
 
 /-- Range-checks `b`, `c` as bytes, derives `r = b OR c` via Clean's `Or8` gadget, and pushes the
 `OR` row `⟨1, r, b, c⟩`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Expression (ZMod p)) := do
   let b := input.b
   let c := input.c
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) b
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) c
   let r ← Gadgets.Or.Or8.circuit ⟨b, c⟩
-  let m ← witnessField 1
-  byteChannel.pushIf m (⟨1, r, b, c⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pushIf input.multiplicity
+    (⟨1, r, b, c⟩ : ByteRow (Expression (ZMod p)))
+  return r
 
-/-- The `OR` provider: pushes `⟨1, r, b, c⟩` with `r = b OR c` derived in-circuit; soundness discharges
-`ByteRowSpec` via `byteRowSpec_byteOp` (opcode `1`, `byteOp_one`). -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
+/-- The `OR` provider returns and pushes `r = b OR c`; the result remains specified independently
+of the interaction multiplicity. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs field where
   main
-  Spec input _ _ := input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8
+  Spec input output _ :=
+    (input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8) ∧
+      output.val = input.b.val ||| input.c.val
   ProverAssumptions input _ _ := input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8
   channelsWithRequirements := [byteChannel.toRaw]
   soundness := by
@@ -272,7 +299,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
         (Expression.eval env (Gadgets.Or.Or8.circuit.output
         { x := input_var_b, y := input_var_c } (i₀ + 8 + 8))).val < 256 :=
       hor ⟨hb, hc⟩
-    refine ⟨⟨hb, hc⟩, Or.inl rfl,
+    refine ⟨⟨⟨hb, hc⟩, hr.1⟩, Or.inl rfl,
       fun _ _ => (byteRowSpec_byteOp _ _ _ (by rw [ZMod.val_one]; norm_num)).mpr ⟨⟨hr.2, hb, hc⟩, ?_⟩⟩
     rw [ZMod.val_one, byteOp_one]; exact hr.1
   completeness := by
@@ -287,32 +314,37 @@ namespace XorByte
 structure Inputs (F : Type) where
   b : F
   c : F
+  /-- The LogUp count for this byte-table key. -/
+  multiplicity : F
 deriving ProvableStruct
 
 /-- Range-checks `b`, `c` as bytes, derives `r = b XOR c` via Clean's static `ByteXorTable` lookup, and
 pushes the `XOR` row `⟨2, r, b, c⟩`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Expression (ZMod p)) := do
   let b := input.b
   let c := input.c
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) b
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) c
   let r ← witnessField (b.val ^^^ c.val).toField
   lookup Gadgets.Xor.ByteXorTable (b, c, r)
-  let m ← witnessField 1
-  byteChannel.pushIf m (⟨2, r, b, c⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pushIf input.multiplicity
+    (⟨2, r, b, c⟩ : ByteRow (Expression (ZMod p)))
+  return r
 
-/-- The `XOR` provider: pushes `⟨2, r, b, c⟩` with `r = b XOR c` from the `ByteXorTable` lookup; soundness
-discharges `ByteRowSpec` via `byteRowSpec_byteOp` (opcode `2`, `byteOp_two`). -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
+/-- The `XOR` provider returns and pushes `r = b XOR c`; the result is part of the semantic `Spec`
+even when no lookup demand is assigned to the row. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs field where
   main
-  Spec input _ _ := input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8
+  Spec input output _ :=
+    (input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8) ∧
+      output.val = input.b.val ^^^ input.c.val
   ProverAssumptions input _ _ := input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8
   channelsWithRequirements := [byteChannel.toRaw]
   soundness := by
     circuit_proof_start [Gadgets.ToBits.rangeCheck, Gadgets.Xor.ByteXorTable]
     obtain ⟨hb, hc, -, -, hxor⟩ := h_holds
     have hval2 : (2 : ZMod p).val = 2 := val_2_zmod_p
-    refine ⟨⟨hb, hc⟩,
+    refine ⟨⟨⟨hb, hc⟩, hxor⟩,
       fun _ _ => (byteRowSpec_byteOp _ _ _ (by rw [hval2]; norm_num)).mpr ⟨⟨?_, hb, hc⟩, ?_⟩⟩
     · rw [hxor]; exact Nat.xor_lt_two_pow (n := 8) hb hc
     · rw [hval2, byteOp_two]; exact hxor
@@ -321,7 +353,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
     obtain ⟨hb, hc⟩ := h_assumptions
     have hxlt : input_b.val ^^^ input_c.val < 256 := Nat.xor_lt_two_pow (n := 8) hb hc
     refine ⟨hb, hc, hb, hc, ?_⟩
-    rw [h_env.1, ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]
+    rw [h_env, ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]
 
 end XorByte
 
@@ -337,6 +369,8 @@ namespace Ltu
 structure Inputs (F : Type) where
   b : F
   c : F
+  /-- The LogUp count for this byte-table key. -/
+  multiplicity : F
 deriving ProvableStruct
 
 /-- The 8-bit unsigned-comparison core (byte analog of `MSB.byte_msb_iff`): `ltu` boolean and
@@ -390,7 +424,7 @@ lemma byte_ltu_range {b c : ZMod p} (hb : b.val < 2 ^ 8) (hc : c.val < 2 ^ 8) :
 /-- Range-checks `b` and `c` as bytes, witnesses the comparison bit `ltu`, asserts `ltu` boolean and
 `b - c + ltu * 256` a byte (forcing `ltu` to be the unsigned comparison `b <u c`), and pushes the
 `LTU` row `⟨4, ltu, b, c⟩`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Expression (ZMod p)) := do
   let b := input.b
   let c := input.c
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) b
@@ -398,29 +432,40 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let ltu ← witnessField (.ite (.flt (.expr b) (.expr c)) 1 0)
   assertion assertBool ltu
   assertion (Gadgets.ToBits.rangeCheck 8 two_pow_eight_lt) (b - c + ltu * 256)
-  let m ← witnessField 1
-  byteChannel.pushIf m (⟨4, ltu, b, c⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pushIf input.multiplicity
+    (⟨4, ltu, b, c⟩ : ByteRow (Expression (ZMod p)))
+  return ltu
 
-/-- The `LTU` provider: pushes `⟨4, ltu, b, c⟩` where `ltu` is the in-circuit-derived comparison bit
-of the bytes `b`, `c`. `Spec` is the two byte bounds; soundness derives the `ltu` boolean and the
-`ltu = 1 ↔ b.val < c.val` relation and discharges the push's `ByteRowSpec` via `byteRowSpec_ltu`. -/
-def circuit : GeneralFormalCircuit (ZMod p) Inputs unit where
+/-- The `LTU` provider returns and pushes the in-circuit-derived comparison bit.  The output
+equation is part of `Spec`, so downstream faithful transports do not inspect witness internals. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs field where
   main
-  Spec input _ _ := input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8
+  Spec input output _ :=
+    (input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8) ∧
+      output = if input.b.val < input.c.val then 1 else 0
   ProverAssumptions input _ _ := input.b.val < 2 ^ 8 ∧ input.c.val < 2 ^ 8
   channelsWithRequirements := [byteChannel.toRaw]
   soundness := by
     circuit_proof_start [Gadgets.ToBits.rangeCheck]
     obtain ⟨hb, hc, hbool, hr⟩ := h_holds
-    refine ⟨⟨hb, hc⟩, fun _ _ =>
-      (byteRowSpec_ltu _ _ _).mpr ⟨⟨?_, hb, hc⟩, hbool, byte_ltu_iff hb hc hbool hr⟩⟩
+    have hiff := byte_ltu_iff hb hc hbool hr
+    have hvalue : Expression.eval env
+        (var ⟨i₀ + 8 + 8⟩) = if input_b.val < input_c.val then 1 else 0 := by
+      split
+      · rename_i hlt
+        exact hiff.mpr hlt
+      · rename_i hge
+        rcases hbool with hzero | hone
+        · exact hzero
+        · exact False.elim (hge (hiff.mp hone))
+    refine ⟨⟨⟨hb, hc⟩, hvalue⟩, fun _ _ =>
+      (byteRowSpec_ltu _ _ _).mpr ⟨⟨?_, hb, hc⟩, hbool, hiff⟩⟩
     rcases hbool with h | h <;> rw [h] <;> simp [ZMod.val_zero, ZMod.val_one]
   completeness := by
     circuit_proof_start [Gadgets.ToBits.rangeCheck]
-    obtain ⟨hltu, -⟩ := h_env
     refine ⟨h_assumptions.1, h_assumptions.2, ?_, ?_⟩
-    · rw [hltu]; split <;> simp [IsBool]
-    · rw [hltu]; exact byte_ltu_range h_assumptions.1 h_assumptions.2
+    · rw [h_env]; split <;> simp [IsBool]
+    · rw [h_env]; exact byte_ltu_range h_assumptions.1 h_assumptions.2
 
 end Ltu
 

@@ -5,7 +5,7 @@ import ToClean.Air.TableBuild
 /-! # `SP1Clean.StoreByteChip` — from trace events to a valid AIR table
 
 `SB` through the trace-generation chain (see `StoreWordChip/Complete.lean` for the store family's
-programme note, including the `op_a`-is-a-read discipline and **why there is no padding row**).
+programme, the `op_a`-is-a-read discipline, and the padding-contract note).
 
 The widest row of the family, and the only store with no alignment requirement — `SB` may target
 any of the eight bytes of the RAM cell, so the row commits all three low address bits. Two things
@@ -171,7 +171,8 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormedStore)
     fun _ => storeLimb_isU64 _ _ (storeByteLimb_lt _ _ _)⟩
   -- the address fits in 48 bits and is above the reserved page (a byte store has no alignment)
   · rw [haddr64]; exact h.addr_lt
-  · rw [haddr48]; exact h.addr_ge
+  · intro _
+    rw [haddr48]; exact h.addr_ge
   -- the three offset bits decompose the address's low three bits, and are binary
   · show (((e.addr % 2 : ℕ) : ZMod p)).val + 2 * (((memLimbIndex e.addr % 2 : ℕ) : ZMod p)).val
       + 4 * (((memLimbIndex e.addr / 2 : ℕ) : ZMod p)).val = _
@@ -300,8 +301,7 @@ theorem proverAssumptions_of_event {e : MemoryEvent} (h : e.WellFormedStore)
 A plain `def`, deliberately not an `abbrev` (see `AddChip.component` for the measurement). -/
 def component : Air.Flat.Component (ZMod p) := ⟨circuit⟩
 
-/-- The rows a trace builds: one input row per event. **No padding tail** — see
-`StoreWordChip/Complete.lean`. -/
+/-- The event rows, before ensemble-level zero padding (see `StoreWordChip/Complete.lean`). -/
 def traceInputs (events : List MemoryEvent) : List (Inputs (ZMod p)) :=
   events.map MemoryEvent.toStoreByteInputs
 

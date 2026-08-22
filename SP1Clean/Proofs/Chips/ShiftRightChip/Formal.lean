@@ -490,7 +490,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
     soundness := soundness, completeness := completeness,
     -- `byteChannel` dropped from `channelsWithRequirements` (W11): the nine `gate`-gated byte pulls'
     -- off-gate `Requirements` are discharged locally via the shallow `sum` boolean gate
-    -- (`off_gate_vacuous`), so `byteChannel` can later be *finished* in a Clean `SoundEnsemble`.
+    -- (`off_gate_vacuous`), so this circuit needs no Byte-channel requirement; the assembled
+    -- provider ledger handles the active multiplicities globally.
     channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ =>
       requirementsChannelsLawful_main input_var i₀,

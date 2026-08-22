@@ -11,14 +11,14 @@ The external PR110 report's Finding 3 asks whether the capstone's **full** hypot
 **jointly** satisfiable, or whether some conjunction of
 boundary fields is silently contradictory.  This file exhibits a fully proved witness at the
 concrete prime (KoalaBear, `SP1Prime`): the **boundary-only shard** — all 25 instruction tables and
-11 of the 13 boundary/provider tables have zero rows, and the boundary verifier row carries a
+26 of the 28 boundary/provider tables have zero rows, and the boundary verifier row carries a
 public State record with **equal initial and final endpoints** (clk `(0, 1)`, pc `0x10000` at both
 ends, committed in the W3 D5-A split-limb form), so its final-state pull and initial-state push are
 the same State message and cancel exactly.
 
 Since W3 D5-A the verifier row also pulls the twelve Byte-bus range checks of the split public
 limbs, so the shard is no longer channel-empty: two provider tables carry honest in-circuit rows
-whose pushes balance those pulls exactly.  `RangeChip.circuit16` (stable position 34) checks
+whose pushes balance those pulls exactly.  `RangeChip.circuitFor ⟨16, …⟩` (stable position 47) checks
 `a = 1` and `a = 0` in-circuit and pushes `⟨6, 1, 16, 0⟩` with multiplicity 4 and `⟨6, 0, 16, 0⟩`
 with multiplicity 6; `ByteChip.U8Range.circuit` (stable position 25) checks the byte pair `(0, 0)`
 and pushes `⟨3, 0, 0, 0⟩` with multiplicity 2.  Together they cancel the verifier's twelve `-1`
@@ -38,10 +38,12 @@ provider-content satisfiability is separately witnessed by the 18 `decodedInROM`
 (`Soundness/Decode.lean`), and single-row constraint satisfiability by the real-row battery
 (`SP1CleanTest/NonVacuityReal.lean` and `Audit/OneAddNativePremises.lean`).
 
-**What this deliberately does NOT claim**: a satisfying **non-empty** shard (an execution shard
-with active instruction rows and balanced provider content) — that is the machine-completeness
-workstream (`docs/roadmap.md`).  The capstone applied to this witness yields the honest 0-step
-local execution between the equal public endpoints. -/
+**What this deliberately does NOT claim**: this boundary-only witness itself contains an active
+instruction. `Audit/ActiveTraceNonVacuity.lean` separately supplies one hand-assembled JAL event
+with circuit-built physical rows and balanced provider content. General Sail-to-trace generation
+for arbitrary executions remains the machine-completeness workstream (`docs/roadmap.md`). The
+capstone applied to this witness yields the honest 0-step local execution between the equal public
+endpoints. -/
 
 open LeanRV64D.Defs
 
@@ -149,11 +151,11 @@ theorem anchorData_canonicalEncoding : Commit.CanonicalEncoding (p := SP1Prime) 
   · rw [anchorData_imageRows]
     simp
 
-/-! ## The joint witness: 36 zero-row tables plus the two Byte provider tables
+/-! ## The joint witness: 51 zero-row tables plus the two Byte provider tables
 
-Every table except the two byte providers has zero rows.  The provider rows are honest witnesses of
-their circuits: input cells first (`ProvableType` order), then the local witness cells in emission
-order — the `rangeCheck n` subcircuits' bit decompositions, then the pushed multiplicity. -/
+Every table except the two byte providers has zero rows. The provider rows are honest witnesses of
+their circuits: input cells first (`ProvableType` order, including the explicit multiplicity), then
+the `rangeCheck n` subcircuits' local bit-decomposition cells in emission order. -/
 
 /-- A zero-row table for one ensemble component. -/
 def emptyTableOf (c : Component (ZMod SP1Prime)) : Table (ZMod SP1Prime) where
@@ -163,7 +165,7 @@ def emptyTableOf (c : Component (ZMod SP1Prime)) : Table (ZMod SP1Prime) where
   data := anchorData
   uniform_width := by simp
 
-/-- The 38 zero-row tables in the stable ensemble layout — the all-empty template the joint
+/-- The 53 zero-row tables in the stable ensemble layout — the all-empty template the joint
 witness patches at the two byte-provider positions. -/
 noncomputable def emptyTables : List (Table (ZMod SP1Prime)) :=
   (sp1Ensemble (p := SP1Prime)).tables.map emptyTableOf
@@ -178,36 +180,38 @@ theorem emptyTables_data : ∀ t ∈ emptyTables, t.data = anchorData := by
   obtain ⟨c, -, rfl⟩ := List.mem_map.mp ht
   rfl
 
-theorem emptyTables_length : emptyTables.length = 40 := by
+theorem emptyTables_length : emptyTables.length = 53 := by
   simp only [emptyTables, List.length_map, sp1Ensemble_tables, List.length_append]
   rfl
 
 /-- The `U8Range` provider table (stable position 25): one row checking the byte pair `(0, 0)` and
-pushing `⟨3, 0, 0, 0⟩` with multiplicity 2.  Row layout: `[b, c]`, the two `rangeCheck 8` bit
-blocks (all zero), then the multiplicity cell. -/
+pushing `⟨3, 0, 0, 0⟩` with multiplicity 2. Row layout: `[b, c, multiplicity]`, then the two
+`rangeCheck 8` bit blocks (all zero). -/
 def u8RangeTable : Table (ZMod SP1Prime) where
   component := ⟨ByteChip.U8Range.circuit⟩
   width := 19
-  table := [#[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]]
+  table := [#[0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
   data := anchorData
   uniform_width := by intro row hrow; fin_cases hrow; rfl
 
-/-- The 16-bit `RangeChip` provider table (stable position 34): two rows checking `a = 1` and
+/-- The width-16 `RangeChip` provider table (stable position 47): two rows checking `a = 1` and
 `a = 0`, pushing `⟨6, 1, 16, 0⟩` with multiplicity 4 and `⟨6, 0, 16, 0⟩` with multiplicity 6.  Row
-layout: `[a]`, the `rangeCheck 16` bit block (little-endian, so `a = 1` sets exactly the first
-bit), then the multiplicity cell. -/
+layout: `[a, multiplicity]`, then the `rangeCheck 16` bit block (little-endian, so `a = 1` sets
+exactly the first bit). -/
+def rangeWidth16 : RangeChip.Width := ⟨16, by norm_num⟩
+
 def range16Table : Table (ZMod SP1Prime) where
-  component := ⟨RangeChip.circuit16⟩
+  component := ⟨RangeChip.circuitFor rangeWidth16⟩
   width := 18
-  table := [#[1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
-            #[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6]]
+  table := [#[1, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            #[0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
   data := anchorData
   uniform_width := by intro row hrow; fin_cases hrow <;> rfl
 
-/-- The 38 mapped tables of the joint shard: the all-empty template with the two byte-provider
-positions patched (25 = `U8Range`, 34 = `Range16`, matching `sp1ProviderTables` order). -/
+/-- The 53 mapped tables of the joint shard: the all-empty template with the two byte-provider
+positions patched (25 = `U8Range`, 47 = `Range16`, matching `sp1ProviderTables` order). -/
 noncomputable def jointTables : List (Table (ZMod SP1Prime)) :=
-  (emptyTables.set 25 u8RangeTable).set 34 range16Table
+  (emptyTables.set 25 u8RangeTable).set 47 range16Table
 
 theorem mem_jointTables {t : Table (ZMod SP1Prime)} (ht : t ∈ jointTables) :
     t ∈ emptyTables ∨ t = u8RangeTable ∨ t = range16Table := by
@@ -216,7 +220,7 @@ theorem mem_jointTables {t : Table (ZMod SP1Prime)} (ht : t ∈ jointTables) :
     exacts [Or.inl h, Or.inr (Or.inl rfl)]
   · exact Or.inr (Or.inr rfl)
 
-theorem jointTables_length : jointTables.length = 40 := by
+theorem jointTables_length : jointTables.length = 53 := by
   simp only [jointTables, List.length_set]
   exact emptyTables_length
 
@@ -260,7 +264,7 @@ theorem flatMap_set_set_of_nil {α β : Type*} {l : List α} {f : α → List β
         exact ih (by omega) (by simpa using hj)
           fun y hy => hnil y (List.mem_cons_of_mem _ hy)
 
-/-- **The joint shard**: 36 zero-row tables plus the two byte-provider tables, the shared canonical
+/-- **The joint shard**: 51 zero-row tables plus the two byte-provider tables, the shared canonical
 committed program data, and the equal-endpoints public boundary. -/
 noncomputable def jointWitness : SupportedCoreNativeWitness SP1Prime where
   tables := jointTables
@@ -270,13 +274,13 @@ noncomputable def jointWitness : SupportedCoreNativeWitness SP1Prime where
   same_circuits := by
     intro i hi
     rcases eq_or_ne i 25 with rfl | h25
-    · simp only [jointTables, List.getElem_set_ne (by omega : (34 : ℕ) ≠ 25),
+    · simp only [jointTables, List.getElem_set_ne (by omega : (47 : ℕ) ≠ 25),
         List.getElem_set_self]
       rfl
-    rcases eq_or_ne i 34 with rfl | h34
+    rcases eq_or_ne i 47 with rfl | h47
     · simp only [jointTables, List.getElem_set_self]
       rfl
-    · simp only [jointTables, List.getElem_set_ne (Ne.symm h34),
+    · simp only [jointTables, List.getElem_set_ne (Ne.symm h47),
         List.getElem_set_ne (Ne.symm h25)]
       simp [emptyTables, emptyTableOf]
   same_data := by
@@ -291,17 +295,17 @@ noncomputable def jointWitness : SupportedCoreNativeWitness SP1Prime where
 @[simp] theorem jointWitness_publicInput : jointWitness.publicInput = pv := rfl
 
 /-- Positions other than the two byte providers keep zero rows — in particular the stable
-provider/boundary positions 35/36/37 consumed by the `InitialBoundaryFacts` bindings. -/
+provider/boundary positions 48/49/50 consumed by the semantic boundary bindings. -/
 theorem jointTables_table_nil_of_ne (i : ℕ) (hi : i < jointTables.length)
-    (h25 : i ≠ 25) (h34 : i ≠ 34) : jointTables[i].table = [] := by
+    (h25 : i ≠ 25) (h47 : i ≠ 47) : jointTables[i].table = [] := by
   have hmem : jointTables[i] ∈ emptyTables := by
-    simp only [jointTables, List.getElem_set_ne (Ne.symm h34), List.getElem_set_ne (Ne.symm h25)]
+    simp only [jointTables, List.getElem_set_ne (Ne.symm h47), List.getElem_set_ne (Ne.symm h25)]
     exact List.getElem_mem _
   exact emptyTables_table_eq_nil _ hmem
 
 /-! ## Conjunct 1a: constraints
 
-The 36 zero-row tables are constraint-satisfied vacuously.  The verifier row and the three concrete
+The 51 zero-row tables are constraint-satisfied vacuously.  The verifier row and the three concrete
 provider rows are discharged by the executable whole-circuit constraint check (the
 `NonVacuityReal.lean` bridge, replicated here): no static lookups, and every flattened `assertZero`
 expression — the `rangeCheck` bit decompositions included — evaluates to zero on the concrete
@@ -428,8 +432,8 @@ theorem u8RangeTable_channels :
 
 theorem range16Table_channels :
     ∀ c ∈ range16Table.component.circuit.channels, c = byteChannel.toRaw := by
-  show ∀ c ∈ (RangeChip.circuit16 (p := SP1Prime)).channels, c = byteChannel.toRaw
-  simp [GeneralFormalCircuit.channels, RangeChip.circuit16, RangeChip.circuit, circuit_norm]
+  show ∀ c ∈ (RangeChip.circuitFor rangeWidth16 (p := SP1Prime)).channels, c = byteChannel.toRaw
+  simp [GeneralFormalCircuit.channels, RangeChip.circuitFor, RangeChip.circuit, circuit_norm]
 
 /-- The two provider tables are silent on every channel other than Byte. -/
 theorem u8RangeTable_interactionsWith_nil {ch : RawChannel (ZMod SP1Prime)}
@@ -453,7 +457,7 @@ theorem emptyTables_interactionsWith_nil (ch : RawChannel (ZMod SP1Prime)) :
   rfl
 
 /-- The whole-shard channel view splits into the verifier row plus the two provider tables (in
-stable position order), the 36 zero-row tables contributing nothing. -/
+stable position order), the 51 zero-row tables contributing nothing. -/
 theorem jointWitness_interactionsWith_split (ch : RawChannel (ZMod SP1Prime)) :
     jointWitness.interactionsWith ch =
       jointWitness.verifierTable.interactionsWith ch ++
@@ -503,7 +507,7 @@ def verifierBytePulls (pi : Var SP1PublicIO (ZMod SP1Prime)) :
       ByteRow (Expression (ZMod SP1Prime)))).toRaw,
    (byteChannel.pulled (⟨6, pi.init_clk_32_48, Expression.const ((16 : ℕ) : ZMod SP1Prime), 0⟩ :
       ByteRow (Expression (ZMod SP1Prime)))).toRaw,
-   (byteChannel.pulled (⟨3, 0, pi.init_clk_16_24, pi.init_clk_24_32⟩ :
+   (byteChannel.pulled (⟨3, 0, pi.init_clk_24_32, pi.init_clk_16_24⟩ :
       ByteRow (Expression (ZMod SP1Prime)))).toRaw,
    (byteChannel.pulled (⟨6, pi.init_pc0, Expression.const ((16 : ℕ) : ZMod SP1Prime), 0⟩ :
       ByteRow (Expression (ZMod SP1Prime)))).toRaw,
@@ -515,7 +519,7 @@ def verifierBytePulls (pi : Var SP1PublicIO (ZMod SP1Prime)) :
       ByteRow (Expression (ZMod SP1Prime)))).toRaw,
    (byteChannel.pulled (⟨6, pi.final_clk_32_48, Expression.const ((16 : ℕ) : ZMod SP1Prime), 0⟩ :
       ByteRow (Expression (ZMod SP1Prime)))).toRaw,
-   (byteChannel.pulled (⟨3, 0, pi.final_clk_16_24, pi.final_clk_24_32⟩ :
+   (byteChannel.pulled (⟨3, 0, pi.final_clk_24_32, pi.final_clk_16_24⟩ :
       ByteRow (Expression (ZMod SP1Prime)))).toRaw,
    (byteChannel.pulled (⟨6, pi.final_pc0, Expression.const ((16 : ℕ) : ZMod SP1Prime), 0⟩ :
       ByteRow (Expression (ZMod SP1Prime)))).toRaw,
@@ -531,6 +535,23 @@ theorem sp1StateVerifierMain_byteInteractions (pi : Var SP1PublicIO (ZMod SP1Pri
     ((sp1StateVerifierMain pi).operations offset).interactionsWith byteChannel.toRaw =
       verifierBytePulls pi := by
   simp [sp1StateVerifierMain, circuit_norm, verifierBytePulls]
+
+/-- A public boundary whose two middle timestamp bytes are pairwise distinct at both ends. -/
+def asymmetricClockBoundary : SP1PublicIO (ZMod SP1Prime) :=
+  ⟨0, 1, 2, 0, 0, 1, 0, 0, 3, 4, 0, 0, 1, 0⟩
+
+/-- Evaluated verifier Byte interactions for the asymmetric-clock regression. -/
+def asymmetricClockVerifierByteInteractions : List (Interaction (ZMod SP1Prime)) :=
+  (verifierBytePulls (varFromOffset SP1PublicIO 0)).map
+    (AbstractInteraction.eval (Environment.fromInput asymmetricClockBoundary anchorData))
+
+/-- The verifier emits the W3 U8 pairs in exact-public-value order `(24..32, 16..24)`.
+Distinct concrete bytes make this regression sensitive to an accidental operand swap. -/
+theorem verifierBytePulls_asymmetricClockOrder :
+    ((asymmetricClockVerifierByteInteractions.drop 2).head?.map (fun interaction => interaction.msg),
+      (asymmetricClockVerifierByteInteractions.drop 8).head?.map (fun interaction => interaction.msg)) =
+      (some #[(3 : ZMod SP1Prime), 0, 2, 1],
+        some #[(3 : ZMod SP1Prime), 0, 4, 3]) := by native_decide
 
 /-- The evaluated Byte-channel contribution of the joint shard, as one executable list: the
 verifier row's twelve pulls followed by the two provider tables' pushes.  Keeping this list
