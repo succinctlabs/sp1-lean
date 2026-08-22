@@ -336,6 +336,11 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Ledger.balanceOf_eq_pushed_sub_pulled
 #print axioms SP1Clean.Ledger.balancedInteractions_of_signed_perm
 #print axioms SP1Clean.Ledger.balancedInteractions_of_flatMap_perm
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.tables_map_component
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.witness_constraints
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.witness_balancedChannels
+#print axioms SP1Clean.Soundness.supported_core_native_complete
+#print axioms SP1Clean.Soundness.sp1Ensemble_statement_of_traceGeneratable
 #print axioms SP1Clean.AddChip.proverAssumptions_of_event
 #print axioms SP1Clean.AddChip.traceTable_constraints
 #print axioms SP1Clean.AddChip.traceTable_guarantees

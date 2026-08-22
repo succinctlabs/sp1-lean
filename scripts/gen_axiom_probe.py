@@ -73,6 +73,14 @@ TARGETS = [
     ("SP1Clean/Proofs/Completeness/Ledger.lean",
      r"theorem\s+(balancedInteractions_of_signed_perm|balancedInteractions_of_flatMap_perm|"
      r"balanceOf_eq_pushed_sub_pulled)\b"),
+    # W5: the machine-level assembly and its completeness capstone. The assembly's constraint
+    # theorem is the join of all forty-one tables' own theorems, so a regression anywhere in the
+    # completeness layer surfaces here first.
+    ("SP1Clean/Proofs/Completeness/Assembly.lean",
+     r"theorem\s+(witness_constraints|tables_map_component)\b"),
+    ("SP1Clean/Soundness/AIRCompleteness.lean",
+     r"theorem\s+(supported_core_native_complete|sp1Ensemble_statement_of_traceGeneratable|"
+     r"witness_balancedChannels)\b"),
     # The W4 completeness layer: each chip's trace-table constraint/guarantee theorems and its
     # event-to-prover-assumptions discharge. Probed from the pilot onward so the rollout cannot
     # silently introduce a compiler-trusted or deferred step.
