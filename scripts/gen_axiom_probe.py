@@ -63,6 +63,9 @@ TARGETS = [
      r"theorem\s+(transportTable_constraints|transportTable_accesses_perm|transportTable_spec)\b"),
     ("SP1Clean/Faithful/Transport/Ensemble.lean",
      r"theorem\s+(transported_map_component|transported_constraints)\b"),
+    ("SP1Clean/Soundness/CoreAIRSyscallFree.lean",
+     r"theorem\s+(publicCommitOperand|deferredCommitOperand|publicCommitSetsFlag|"
+     r"deferredCommitSetsFlag|syscallTranscript)\b"),
     # The real-row satisfiability battery: every named anchor (28 per-chip rows + the Spec-level
     # companions + the nonempty-assert-list guard) is census-visible so its native_decide trust is
     # disclosed per-declaration like the conformance anchors.

@@ -458,6 +458,7 @@ import SP1Clean.Soundness.RefreshWiring
 import SP1Clean.Soundness.AIR
 import SP1Clean.Soundness.AIRCompleteness
 import SP1Clean.Soundness.CoreAIR
+import SP1Clean.Soundness.CoreAIRSyscallFree
 import SP1Clean.Soundness.FinishedChannels
 import SP1Clean.Soundness.StateConsistency
 import SP1Clean.FormalModel.Contracts.Chips

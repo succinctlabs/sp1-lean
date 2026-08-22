@@ -326,6 +326,11 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.Transport.transportTable_spec
 #print axioms SP1Clean.Faithful.Transport.ExtractedInstructionRows.transported_map_component
 #print axioms SP1Clean.Faithful.Transport.ExtractedInstructionRows.transported_constraints
+#print axioms SP1Clean.Soundness.RelationSyscallFree.publicCommitOperand
+#print axioms SP1Clean.Soundness.RelationSyscallFree.deferredCommitOperand
+#print axioms SP1Clean.Soundness.RelationSyscallFree.publicCommitSetsFlag
+#print axioms SP1Clean.Soundness.RelationSyscallFree.deferredCommitSetsFlag
+#print axioms SP1Clean.Soundness.RelationSyscallFree.syscallTranscript
 #print axioms SP1Clean.ByteChip.U8Range.traceTable_constraints
 #print axioms SP1Clean.ByteChip.MSB.traceTable_constraints
 #print axioms SP1Clean.ByteChip.AndByte.traceTable_constraints
