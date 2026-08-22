@@ -321,6 +321,11 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_length
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_names
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_upstream
+#print axioms SP1Clean.Faithful.Transport.transportTable_constraints
+#print axioms SP1Clean.Faithful.Transport.transportTable_accesses_perm
+#print axioms SP1Clean.Faithful.Transport.transportTable_spec
+#print axioms SP1Clean.Faithful.Transport.ExtractedInstructionRows.transported_map_component
+#print axioms SP1Clean.Faithful.Transport.ExtractedInstructionRows.transported_constraints
 #print axioms SP1Clean.ByteChip.U8Range.traceTable_constraints
 #print axioms SP1Clean.ByteChip.MSB.traceTable_constraints
 #print axioms SP1Clean.ByteChip.AndByte.traceTable_constraints

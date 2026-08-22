@@ -270,6 +270,9 @@ import SP1Clean.Faithful.BranchChip
 import SP1Clean.Faithful.CoreAIR
 import SP1Clean.Faithful.CPUState
 import SP1Clean.Faithful.ChipOracle
+import SP1Clean.Faithful.Transport.Table
+import SP1Clean.Faithful.Transport.Chips
+import SP1Clean.Faithful.Transport.Ensemble
 import SP1Clean.Faithful.ChipTactics
 import SP1Clean.Faithful.DivRemChip
 import SP1Clean.Faithful.DivRemChip.Exact

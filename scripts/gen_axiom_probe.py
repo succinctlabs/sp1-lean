@@ -56,6 +56,13 @@ TARGETS = [
      r"(?:theorem|def)\s+(\w*faithful\w*)\b"),
     ("SP1Clean/Faithful/SupportedMachine.lean",
      r"(?:theorem|def)\s+(supportedChipFaithfulness\w*)\b"),
+    # W6: the transport layer — the generic per-table transport and its twenty-five
+    # instantiations, plus the identity that makes the transported tables the ensemble's own.
+    # These are the declarations that put `Faithful/` inside a live import closure.
+    ("SP1Clean/Faithful/Transport/Table.lean",
+     r"theorem\s+(transportTable_constraints|transportTable_accesses_perm|transportTable_spec)\b"),
+    ("SP1Clean/Faithful/Transport/Ensemble.lean",
+     r"theorem\s+(transported_map_component|transported_constraints)\b"),
     # The real-row satisfiability battery: every named anchor (28 per-chip rows + the Spec-level
     # companions + the nonempty-assert-list guard) is census-visible so its native_decide trust is
     # disclosed per-declaration like the conformance anchors.
