@@ -333,8 +333,9 @@ On an SP1 pin change:
 
 On a Sail model re-pin: never hand-edit generated Lean. Update the pins in
 `scripts/sail-config/generate_lean_rv64d.sh`, run `--stock` until byte-identical against the new
-opencompl base, then `--sp1` and audit that the base diff is still exactly the six config-value
-sites; publish + tag + pin, and refresh the pin rows in `release-audit.md`. Full procedure:
+opencompl base, then `--sp1` and audit that the base diff is still exactly the four
+platform-value sites the two-key config sets (PMP-off is a Lean-side hypothesis, not a
+generated-model edit); publish + tag + pin, and refresh the pin rows in `release-audit.md`. Full procedure:
 `docs/agents/sail-model-provenance.md` (expect `Model/SailMemory.lean` + `Proofs/Sail/` proof
 churn from the base move itself).
 

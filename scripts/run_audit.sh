@@ -113,6 +113,14 @@ else
 fi
 
 echo
+echo "== A1 audit-surface index (gate) =="
+if scripts/check_audit_surface.sh; then
+  :
+else
+  echo "FAIL: docs/audit-surface.md is out of sync with the tree (see above)"; fail=1
+fi
+
+echo
 echo "== A2 proof-deferral inventory (gate: none) =="
 # Both `sorry` and start-of-proof `stop` introduce `sorryAx`; neither is permitted in the main
 # library. Conditional theorem hypotheses and relation parameters are audited at the statement

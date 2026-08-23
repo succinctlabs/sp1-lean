@@ -51,6 +51,38 @@ W7 final docs/census.
 | 18g | LOW | Cold-build cost (one generated Sail module >45 min / >7 GB) and no cached-olean distribution | Acknowledged; a known property of the generated model. No campaign action (CI caches oleans per-SHA; external reproducers bear the cost once). | **acknowledged** |
 | Gap 1 | MED | The bus idealisation: LogUp/GKR → exact balance is not reduced (PCS, Fiat–Shamir, fingerprint injectivity, length side-condition, digest identification) | Out of scope by design — the ArkLib layer (`FormalModel/Verifier.lean` seam). The report itself notes this gap is structural, common to every zkVM formalisation it knows, and correctly named here. | **out of scope — disclosed** |
 
+## Gaps the report tags outside the numbered findings (§7, §8)
+
+The findings table above tracks §10. The report *also* grades gaps inside its bus-layer and
+trust-boundary sections, without giving them finding numbers — so an auditor cross-referencing §7.3
+against this document would previously have found nothing. They are tracked here.
+
+| Report site | Gap | Disposition | Status |
+|---|---|---|---|
+| §7.3 | Program provider: structural bounds proved, **content assumed**. `ProgramProviderChip` range-checks only `op_a`, the three pc limbs, and `op_a_0`; `opcode`, `op_b`, `op_c`, `imm_b`, `imm_c` are pushed unchecked with a free multiplicity, so which instruction sits at which pc is not an AIR fact in this model. *DISCLOSED GAP [MEDIUM]* | Correct, and correctly shaped. This is what the `programProvider` boundary premise (`ProgramProviderBound`) exists to carry; discharging it needs the preprocessed-commitment obligation C1, which is the ArkLib layer, not something a row-local constraint can reach. No change. | **open — by design, carried as a named premise** |
+| §7.3 | **PublicValues absent**: SP1's Core cluster has a public-values AIR emitting ten byte range checks over the shard's timestamp and pc fields; the native `sp1StateVerifier` has `Spec := True` and emits none. Named as the direct cause of the `MemoryPullTimestampHighBound` premise. *UNDISCLOSED GAP [MEDIUM]* | Closed in W3 phase 0. The boundary row now emits fourteen byte-channel range-check pulls over the split init/final clock and pc limbs in SP1's real layout (`Soundness/SP1Ensemble.lean:79-103`), and `sp1StateVerifierProverAssumptions` is the limb-bound obligation rather than `True`. | **closed** |
+| §8.2 | `MemoryPullTimestampHighBound` — the twelfth premise: every pulled prior memory record has `clk_high < 2 ^ 24`. The report spells out the attack it prevents (a non-canonical `prev_high` inverting the ordering to read a stale value — a time-travel read). *DISCLOSED GAP [MEDIUM]* | Closed in W3. The bound is now *derived* from the produced side of the capstone's own per-location Memory balance; the identifier no longer exists anywhere in the tree, and `SupportedCoreNativeRelation` lost its third conjunct. | **closed — premise became a theorem** |
+
+### Consequence: the premise count is eleven, not twelve
+
+The report's §8.2 tabulates **twelve named premises** — eleven `InitialBoundaryFacts` fields plus the
+timestamp bound. With the timestamp bound derived, `InitialBoundaryFacts`
+(`Soundness/ProviderBindings.lean:286`) is the whole semantic boundary and has exactly **eleven**
+fields: `programWellFormed`, `programCommitted`, `initialPc`, `initialClock`, `romLoaded`,
+`configured`, `codeMemoryCompatible`, `programProvider`, `memoryProvider`, `memoryProviderUnique`,
+`memoryFinalizeProviderUnique`.
+
+Seven of the eleven follow from a configured initial state, a committed program, and a canonical
+`ProverData` choice. Four require real construction — `programProvider`, `memoryProvider`, and the
+two uniqueness fields — and the report is right that the uniqueness pair is the sharpest residual:
+Clean balance cannot force it, upstream's mechanism is the MemoryGlobal strictly-increasing-address
+chain that this ensemble deliberately omits, and the premise is stated per `locOf` (8-byte cell)
+while that chain orders exact byte addresses. That granularity gap is recorded on the definitions
+themselves (`ProviderBindings.lean:213-226`, `:233-236`).
+
+The live inventory of these definitions is `docs/audit-surface.md`, gated by
+`scripts/check_audit_surface.sh`.
+
 ## Defects found during remediation (not in the report)
 
 Carrying all 25 chips through the W4 witness-assembly layer exercises each chip's

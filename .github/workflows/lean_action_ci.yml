@@ -30,6 +30,8 @@ jobs:
         run: scripts/check_root_index.sh
       - name: Doc citations resolve
         run: scripts/check_report_citations.sh
+      - name: Audit-surface index matches the tree
+        run: scripts/check_audit_surface.sh
 
   build:
     runs-on:
