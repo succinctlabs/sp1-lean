@@ -474,6 +474,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Ledger.balanceOf_eq_pushed_sub_pulled
 #print axioms SP1Clean.Ledger.balancedInteractions_of_signed_perm
 #print axioms SP1Clean.Ledger.balancedInteractions_of_flatMap_perm
+#print axioms SP1Clean.Soundness.interactions_eq_interactionsWith_of_onlyChannel
+#print axioms SP1Clean.Soundness.u8Range_interactionsWith_byte
+#print axioms SP1Clean.Soundness.u8Range_buildRow_cleanAccesses
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_closingAccesses
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_append_closingAccesses
 #print axioms SP1Clean.LookupAccessList.mem_closingKeys_of_multiplicitySum_ne_zero

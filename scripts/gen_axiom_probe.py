@@ -188,6 +188,10 @@ TARGETS = [
     # instantiation and the two conservativeness results that pin the closure out of State/Memory.
     # The ledger-level half of the provider closure moved to Model/InteractionBus.lean in 2026-08
     # (its namespace already said so); the trace-level half stayed in Closure.lean.
+    # Tier 1 of the provider closure: what one built provider row emits, in Clean orientation.
+    ("SP1Clean/Proofs/Completeness/ProviderInteractions.lean",
+     r"theorem\s+(interactions_eq_interactionsWith_of_onlyChannel|"
+     r"u8Range_interactionsWith_byte|u8Range_buildRow_cleanAccesses)\b"),
     ("SP1Clean/Model/InteractionBus.lean",
      r"theorem\s+(multiplicitySum_append_closingAccesses|multiplicitySum_append_closing|"
      r"multiplicitySum_closingAccesses|mem_closingKeys_of_multiplicitySum_ne_zero|"

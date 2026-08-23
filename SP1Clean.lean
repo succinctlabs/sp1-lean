@@ -517,4 +517,5 @@ import SP1Clean.Proofs.Completeness.ProviderWitgen
 import SP1Clean.Proofs.Completeness.Providers
 import SP1Clean.Proofs.Completeness.Assembly
 import SP1Clean.Proofs.Completeness.Ledger
+import SP1Clean.Proofs.Completeness.ProviderInteractions
 import SP1Clean.Proofs.Completeness.Closure
