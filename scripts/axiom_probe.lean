@@ -493,6 +493,12 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.providerLedger_multiplicitySum
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.fullLedger_multiplicitySum
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.byteProgram_balanced
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.fullLedger_multiplicitySum_channel
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.channelLedger_isConsistentBalanced
+#print axioms SP1Clean.Soundness.sp1Tables_channels_subset
+#print axioms SP1Clean.Soundness.sp1ProviderTables_channels_subset
+#print axioms SP1Clean.Soundness.sp1Ensemble_allTables_channels_subset
+#print axioms SP1Clean.Soundness.channel_eq_of_name_eq
 #print axioms SP1Clean.Soundness.u8Range_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.msb_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.and_traceTable_cleanAccesses
@@ -515,6 +521,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.tables_map_component
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.witness_constraints
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.balancedOn_of_signed_perm
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.balancedOn_of_closure
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.witness_balancedChannels
 #print axioms SP1Clean.Soundness.supported_core_native_complete
 #print axioms SP1Clean.Soundness.sp1Ensemble_statement_of_traceGeneratable
