@@ -192,11 +192,14 @@ def sourceRangeKey (row : CoreAIR.Current.Row p .rangeLookup) : LookupKey :=
 def sourceProgramKey (row : CoreAIR.Current.Row p .program) : LookupKey :=
   LookupAccessList.keyOf (exactProgramAccess row)
 
-/-- Native-consumer occurrence count for one inventory-selected provider key.  The `Int.toNat` is
-intentional: the recount contract separately states that the skeleton contribution is
-nonpositive, so this is exactly its additive inverse rather than truncation. -/
-def providerRecount (skeleton : LookupAccessList) (key : LookupKey) : ℕ :=
-  Int.toNat (-LookupAccessList.multiplicitySum skeleton key)
+/-! `providerRecount` — the native-consumer occurrence count for one inventory-selected provider
+key — is `LookupAccessList.providerRecount` (`Model/InteractionBus.lean`), *exported* into this
+namespace rather than redefined here: the completeness-side provider closure recounts against the
+same function, and the two layers must not drift into definitionally-equal-but-separate copies.
+
+An `export` and not an `abbrev`: an `abbrev` is reducible, so it unfolds before the `rw`/`simp`
+steps below can match on the name, and the recount rewrites in this file stop firing. -/
+export LookupAccessList (providerRecount)
 
 /-- The canonical field multiplicity installed in a native provider row. -/
 def providerRecountField (skeleton : LookupAccessList) (key : LookupKey) : ZMod p :=

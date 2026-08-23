@@ -116,6 +116,25 @@ theorem multiplicitySum_append (l1 l2 : LookupAccessList) (k : LookupKey) :
     multiplicitySum (l1 ++ l2) k = multiplicitySum l1 k + multiplicitySum l2 k := by
   simp only [multiplicitySum, filterKey, List.filter_append, List.map_append, List.sum_append]
 
+/-- How many times a *provider* must supply one key so that a consumer-only ledger balances at it.
+
+`skeleton` is a ledger of consumers with the providers for that key deliberately absent, so its
+contribution at the key is nonpositive and this is exactly its additive inverse. The `Int.toNat` is
+therefore not truncation — callers state the nonpositivity separately, and truncation would silently
+turn a provider *over*-supply into a demand of zero rather than a failure.
+
+Both the exact→native transport and the completeness-side provider closure recount against this one
+definition, which is why it lives here on the shared bus vocabulary rather than in either layer. -/
+def providerRecount (skeleton : LookupAccessList) (key : LookupKey) : ℕ :=
+  Int.toNat (-multiplicitySum skeleton key)
+
+@[simp] theorem providerRecount_nil (key : LookupKey) : providerRecount [] key = 0 := rfl
+
+/-- A ledger that is already balanced at a key demands nothing there. -/
+theorem providerRecount_eq_zero_of_balanced {skeleton : LookupAccessList} {key : LookupKey}
+    (h : multiplicitySum skeleton key = 0) : providerRecount skeleton key = 0 := by
+  simp [providerRecount, h]
+
 /-- Removing zero-multiplicity contributions preserves the signed balance at every key. -/
 theorem multiplicitySum_active (accesses : LookupAccessList) (k : LookupKey) :
     multiplicitySum (active accesses) k = multiplicitySum accesses k := by
