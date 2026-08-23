@@ -140,4 +140,130 @@ theorem u8Range_buildRow_cleanAccesses
   cases input
   rfl
 
+omit [Fact (2 ^ 24 < p)] in
+theorem assertBool_interactionsWith
+    (channel : RawChannel (ZMod p)) (offset : ℕ)
+    (input : Expression (ZMod p)) (ops : Operations (ZMod p)) :
+    Operations.interactionsWith channel
+        (.subcircuit (assertBool.toSubcircuit offset input) :: ops) =
+      Operations.interactionsWith channel ops := by
+  apply InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil
+  · change channel ∉ ([] : List (RawChannel (ZMod p)))
+    exact List.not_mem_nil
+  · change channel ∉ ([] : List (RawChannel (ZMod p)))
+    exact List.not_mem_nil
+
+/-! ## MSB
+
+The first family with a *derived* output cell: the pushed row's `a` field is the high bit, which the
+circuit witnesses rather than reading from the input. That cell is recovered from the circuit's own
+`Spec` through `buildRow_spec_requirements`, which is why this family (and And/Or/Xor/Ltu below)
+carries a byte-bound premise where `U8Range` and `Range` do not. -/
+
+/-- Row-level symbolic Byte list for `MSB`. -/
+theorem msb_interactionsWith_byte
+    (input : Var ByteChip.MSB.Inputs (ZMod p)) (offset : ℕ) :
+    ((ByteChip.MSB.main input).operations offset).interactionsWith byteChannel.toRaw =
+      [(pushedIf (channel := byteChannel) input.multiplicity
+        (⟨5,
+          var ⟨offset +
+            (Gadgets.ToBits.rangeCheck 8 ByteChip.two_pow_eight_lt).localLength input.b⟩,
+          input.b, 0⟩ : ByteRow (Expression (ZMod p)))).toRaw] := by
+  simp only [ByteChip.MSB.main, Circuit.operations, Circuit.bind_def, witnessField,
+    assertion, Operations.localLength]
+  simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+    rangeCheck8_interactionsWith, assertBool_interactionsWith,
+    Channel.pushIf, Operations.interactionsWith_interact, Operations.interactionsWith_nil,
+    ChannelInteraction.toRaw_channel, List.nil_append]
+  simp only [if_true, circuit_norm, Nat.add_zero]
+
+theorem msb_main_output_eq
+    (input : Var ByteChip.MSB.Inputs (ZMod p)) (offset : ℕ) :
+    (ByteChip.MSB.main input).output offset =
+      var ⟨offset +
+        (Gadgets.ToBits.rangeCheck 8 ByteChip.two_pow_eight_lt).localLength input.b⟩ := rfl
+
+/-- The witnessed high-bit cell of a built `MSB` row, recovered from the circuit's own `Spec`. -/
+theorem msb_buildRow_result
+    (input : ByteChip.MSB.Inputs (ZMod p))
+    (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p))
+    (bound : input.b.val < 2 ^ 8) :
+    Expression.eval
+      (Environment.fromArray
+        ((⟨ByteChip.MSB.circuit⟩ : Component (ZMod p)).buildRow input data hint) data)
+      (var ⟨size ByteChip.MSB.Inputs +
+        (Gadgets.ToBits.rangeCheck 8 ByteChip.two_pow_eight_lt).localLength
+          (varFromOffset ByteChip.MSB.Inputs 0 : Var ByteChip.MSB.Inputs (ZMod p)).b⟩) =
+      if 128 ≤ input.b.val then 1 else 0 := by
+  let component := (⟨ByteChip.MSB.circuit⟩ : Component (ZMod p))
+  let env := Environment.fromArray (component.buildRow input data hint) data
+  have hspec := (component.buildRow_spec_requirements input data hint
+    ByteChip.MSB.computableWitnesses bound (by trivial)).1
+  have hinput : component.rowInput env = input :=
+    component.rowInput_buildRow input data data hint
+  simp only [Air.Flat.Component.Spec] at hspec
+  rw [hinput] at hspec
+  have hresult : Expression.eval env
+      ((ByteChip.MSB.circuit (p := p)).output
+        (varFromOffset ByteChip.MSB.Inputs 0) (size ByteChip.MSB.Inputs)) =
+      if 128 ≤ input.b.val then 1 else 0 := by
+    simpa only [component, Air.Flat.Component.rowOutput, circuit_norm] using hspec.2
+  rw [← msb_main_output_eq]
+  rw [← show (ByteChip.MSB.circuit (p := p)).main = ByteChip.MSB.main from rfl]
+  rw [(ByteChip.MSB.circuit (p := p)).elaborated.output_eq]
+  exact hresult
+
+omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
+/-- The `MSB` input variable's fields, by cell. -/
+theorem msbVar_b :
+    (varFromOffset ByteChip.MSB.Inputs 0 : Var ByteChip.MSB.Inputs (ZMod p)).b = var ⟨0⟩ := rfl
+
+omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
+theorem msbVar_multiplicity :
+    (varFromOffset ByteChip.MSB.Inputs 0 : Var ByteChip.MSB.Inputs (ZMod p)).multiplicity
+      = var ⟨1⟩ := rfl
+
+/-- Component-level form of `msb_interactionsWith_byte`, at the offset `Component.rowOperations`
+introduces. -/
+theorem msb_component_interactionsWith_byte :
+    (ByteChip.MSB.component (p := p)).operations.interactionsWith byteChannel.toRaw =
+      [(pushedIf (channel := byteChannel)
+          (varFromOffset ByteChip.MSB.Inputs 0 : Var ByteChip.MSB.Inputs (ZMod p)).multiplicity
+        (⟨5,
+          var ⟨size ByteChip.MSB.Inputs +
+            (Gadgets.ToBits.rangeCheck 8 ByteChip.two_pow_eight_lt).localLength
+              (varFromOffset ByteChip.MSB.Inputs 0 : Var ByteChip.MSB.Inputs (ZMod p)).b⟩,
+          (varFromOffset ByteChip.MSB.Inputs 0 : Var ByteChip.MSB.Inputs (ZMod p)).b,
+          0⟩ : ByteRow (Expression (ZMod p)))).toRaw] := by
+  rw [Component.interactionsWith_eq]
+  show Operations.interactionsWith byteChannel.toRaw
+      (Air.Flat.Component.rowOperations (⟨ByteChip.MSB.circuit⟩ : Component (ZMod p))) = _
+  rw [Air.Flat.Component.rowOperations_mk,
+    show (ByteChip.MSB.circuit (p := p)).main = ByteChip.MSB.main from rfl]
+  exact msb_interactionsWith_byte _ _
+
+/-- **A built `MSB` row emits exactly one access.** -/
+theorem msb_buildRow_cleanAccesses
+    (input : ByteChip.MSB.Inputs (ZMod p)) (data : ProverData (ZMod p))
+    (hint : ProverHint (ZMod p)) (bound : input.b.val < 2 ^ 8) :
+    (ByteChip.MSB.component (p := p)).operations.interactions.map
+        (AbstractInteraction.toAccess
+          (Environment.fromArray
+            ((ByteChip.MSB.component (p := p)).buildRow input data hint) data)) =
+      [(InteractionKind.Byte, "SP1Byte",
+        [(5 : ZMod p).val, (if 128 ≤ input.b.val then (1 : ZMod p) else 0).val,
+         input.b.val, (0 : ZMod p).val],
+        signedVal input.multiplicity)] := by
+  rw [interactions_eq_interactionsWith_of_onlyChannel _ byteChannel.toRaw
+      Ledger.onlyChannel_MSB, msb_component_interactionsWith_byte]
+  show (List.map _ _ : LookupAccessList) = _
+  unfold ByteChip.MSB.component
+  simp only [List.map_cons, List.map_nil, toAccess_pushIf_byte]
+  rw [msb_buildRow_result input data hint bound, msbVar_b, msbVar_multiplicity,
+    eval_var_buildRow_input_get _ _ _ _ 0 (by change 0 < 2; omega),
+    eval_var_buildRow_input_get _ _ _ _ 1 (by change 1 < 2; omega)]
+  cases input
+  simp only [Expression.eval]
+  rfl
+
 end SP1Clean.Soundness
