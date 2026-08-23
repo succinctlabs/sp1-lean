@@ -188,6 +188,15 @@ abbrev ramEffectOffset : ℕ := 1
 `MemoryAccessPosition::A = 4`). -/
 abbrev regEffectOffset : ℕ := 4
 
+/-- The intra-window offset at which the `op_b` register read observes (Rust
+`MemoryAccessPosition::B = 3`). Named alongside `regEffectOffset` so the trace layer's operand
+timestamps can cite the Rust constant rather than repeat the literal. -/
+abbrev regBOffset : ℕ := 3
+
+/-- The intra-window offset at which the `op_c` register read observes (Rust
+`MemoryAccessPosition::C = 2`). -/
+abbrev regCOffset : ℕ := 2
+
 /-- **The intra-row effect convention, as a function.** `microValue s0 c0 loc τ`: the content of
 `loc` at micro-time `τ` on the trajectory from `s0` with genesis clock `c0`. Window
 `k = (τ − c0) / ordinaryClkInc`, offset `δ = (τ − c0) % ordinaryClkInc`; the window's step has

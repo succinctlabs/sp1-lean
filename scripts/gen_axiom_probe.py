@@ -209,6 +209,18 @@ TARGETS = [
     ("SP1Clean/Soundness/EnsembleChannels.lean",
      r"theorem\s+(sp1Tables_channels_subset|sp1ProviderTables_channels_subset|"
      r"sp1Ensemble_allTables_channels_subset|channel_eq_of_name_eq)\b"),
+    # Phase 3: the clock bridge, the generator's shadow bookkeeping, and the ALU fold.
+    ("SP1Clean/FormalModel/TraceGen/ClockBridge.lean",
+     r"theorem\s+(ordinarySchedule_duration_eq|accessOffsets_ordered|"
+     r"clockAt_ordinary_eq|clockAt_ordinary_mod)\b"),
+    ("SP1Clean/FormalModel/TraceGen/GenState.lean",
+     r"theorem\s+(initial_bounded|prevTs_lt|stepRType_bounded)\b"),
+    ("SP1Clean/FormalModel/TraceGen/AluGenerator.lean",
+     r"theorem\s+(aluEvents_wellFormed|witnessStep_wellFormed|"
+     r"witnessEvents_wellFormed)\b"),
+    ("SP1Clean/Proofs/Completeness/AluGeneration.lean",
+     r"theorem\s+(aluEvents_addTable_constraints|aluEvents_addTable_guarantees|"
+     r"aluEvents_subTable_constraints)\b"),
     # Phase 2: the two system tables' rows are built from crossings, not supplied.
     ("SP1Clean/FormalModel/TraceGen/Bump.lean",
      r"theorem\s+(stateBump_spec|memoryBump_spec|stateBumpTraceInputs_spec|"
