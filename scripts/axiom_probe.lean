@@ -499,6 +499,12 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.sp1ProviderTables_channels_subset
 #print axioms SP1Clean.Soundness.sp1Ensemble_allTables_channels_subset
 #print axioms SP1Clean.Soundness.channel_eq_of_name_eq
+#print axioms SP1Clean.TraceGen.stateBump_spec
+#print axioms SP1Clean.TraceGen.memoryBump_spec
+#print axioms SP1Clean.TraceGen.stateBumpTraceInputs_spec
+#print axioms SP1Clean.TraceGen.memoryBumpTraceInputs_spec
+#print axioms SP1Clean.TraceGen.stateBumpEvent_wellFormed_witness
+#print axioms SP1Clean.TraceGen.memoryBumpEvent_wellFormed_witness
 #print axioms SP1Clean.Soundness.u8Range_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.msb_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.and_traceTable_cleanAccesses
