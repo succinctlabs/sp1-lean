@@ -1,4 +1,4 @@
-import SP1Clean.Faithful.Transport.Table
+import SP1Clean.Model.CleanLedger
 import SP1Clean.Proofs.Completeness.Assembly
 
 /-! # The provider closure: recounting Byte/Range/Program demand from the consumers
@@ -206,7 +206,6 @@ end SP1Clean.LookupAccessList
 namespace SP1Clean.Soundness
 
 open Air.Flat (Table)
-open SP1Clean.Faithful.Transport (tableCleanAccesses tablesCleanAccesses)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 25 < p)]
 

@@ -113,6 +113,14 @@ else
 fi
 
 echo
+echo "== A1 layering contract (gate) =="
+if scripts/check_layering.sh; then
+  :
+else
+  echo "FAIL: the layering contract is violated (see above)"; fail=1
+fi
+
+echo
 echo "== A1 audit-surface index (gate) =="
 if scripts/check_audit_surface.sh; then
   :

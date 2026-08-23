@@ -286,7 +286,7 @@ import SP1Clean.Faithful.ChipTactics
 import SP1Clean.Faithful.DivRemChip
 import SP1Clean.Faithful.DivRemChip.Exact
 import SP1Clean.Faithful.SupportedMachine
-import SP1Clean.Faithful.ExtractedInteractionModel
+import SP1Clean.Extracted.InteractionModel
 import SP1Clean.Faithful.ITypeReaderImmutable
 import SP1Clean.Faithful.IsEqualWordOperation
 import SP1Clean.Faithful.IsZeroOperation
@@ -327,6 +327,7 @@ import SP1Clean.Model.ChipAir
 import SP1Clean.Math.HWord
 import SP1Clean.Model.InteractionBus
 import SP1Clean.Model.InteractionProjection
+import SP1Clean.Model.CleanLedger
 import SP1Clean.Math.MulCarryChain
 import SP1Clean.Math.ShiftBounds
 import SP1Clean.Model.Register

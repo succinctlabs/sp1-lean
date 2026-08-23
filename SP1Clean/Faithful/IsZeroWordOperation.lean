@@ -5,7 +5,7 @@ import SP1Clean.Native.Operations.IsZeroWordOperation.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
 import ToClean.Circuit.InteractionRecovery
-import SP1Clean.Faithful.ExtractedInteractionModel
+import SP1Clean.Extracted.InteractionModel
 import SP1Clean.Extracted.IsZeroWordOperation
 import SP1Clean.Faithful.IsZeroOperation
 import SP1Clean.Faithful.ChipTactics

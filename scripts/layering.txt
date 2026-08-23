@@ -1,0 +1,63 @@
+# The stratum map: which layer each module lives in.
+#
+# Read by scripts/check_layering.sh (import-direction + namespace-agreement gates) and by the
+# placement linter in scripts/sp1Lint.lean. One table, two readers — the strata must not drift
+# apart. The contract these numbers encode is docs/layering.md.
+#
+# Format:   <stratum> <pillar> <path-prefix>
+# A module takes the stratum of the LONGEST matching prefix, so a straddling directory is fixed by
+# adding a more specific line rather than by an allowlist entry. Every module must match some
+# prefix; check_layering.sh fails on an unmapped module, so a new top-level directory cannot
+# silently escape the map.
+#
+# `pillar` is the namespace root a file in this stratum is expected to declare (law 3). Use `-` when
+# the stratum spans namespaces and no single root is expected.
+
+# 0 — upstream-destined: no SP1 concepts at all.
+0   -             ToMathlib/
+0   -             ToClean/
+
+# 1..3 — the substrate. Model/ is currently the one pillar that obeys the contract exactly.
+1   Math          SP1Clean/Math/
+2   Model         SP1Clean/Model/
+3   Extracted     SP1Clean/Extracted/
+
+# 4 — semantic contracts and the row view they are read through.
+4   FormalModel   SP1Clean/FormalModel/
+4   Soundness     SP1Clean/Soundness/RowView.lean
+
+# 5 — operation gadgets, readers, and their soundness; plus the shared proof-start tactic.
+5   Native        SP1Clean/Native/Operations/
+5   Native        SP1Clean/Native/Readers/
+5   Native        SP1Clean/Native/Witgen/
+5   -             SP1Clean/Proofs/Operations/
+5   -             SP1Clean/Proofs/CircuitProofStart.lean
+
+# 6 — whole chips: circuits, their proofs, and the event -> row builders.
+6   Native        SP1Clean/Native/Chips/
+6   -             SP1Clean/Proofs/Chips/
+6   FormalModel   SP1Clean/FormalModel/TraceGen/
+
+# 7 — per-chip and list-level Rust faithfulness.
+7   Faithful      SP1Clean/Faithful/
+
+# 8 — the machine: registry, ensemble, grounding, soundness capstone.
+#
+# The three per-chip files under Proofs/Chips/<X>/ are NOT all at the chip stratum. `Bridge.lean`
+# needs Soundness.ChipRow and the Sail advance layer; `Contracts.lean` needs Soundness.TypedMemory
+# (whose own closure reaches all 25 chips). Both already declare `namespace SP1Clean.Soundness`.
+# They are machine files that live in the chip directory — measured, not assumed.
+8   Soundness     SP1Clean/Soundness/
+8   Soundness     SP1Clean/Proofs/Sail/
+8   Soundness     SP1Clean/Proofs/Chips/*/Bridge.lean
+8   Soundness     SP1Clean/Proofs/Chips/*/Contracts.lean
+
+# 9 — assembly: a trace record becomes built tables and an EnsembleWitness.
+9   Soundness     SP1Clean/Proofs/Completeness/
+
+# 10 — the converse capstone.
+10  Soundness     SP1Clean/Soundness/AIRCompleteness.lean
+
+# 11 — the composed exact -> native artifact.
+11  Faithful      SP1Clean/Faithful/Transport/
+11  Faithful      SP1Clean/Faithful/SupportedMachine.lean

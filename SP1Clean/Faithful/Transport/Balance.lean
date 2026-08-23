@@ -1,5 +1,5 @@
 import SP1Clean.Faithful.CoreAIR
-import SP1Clean.Faithful.ExtractedInteractionModel
+import SP1Clean.Extracted.InteractionModel
 import SP1Clean.Model.InteractionProjection
 
 set_option autoImplicit false

@@ -1,0 +1,45 @@
+# Named exceptions to the layering contract (docs/layering.md).
+#
+# This is a prohibition with a bar, not a ratchet: an entry needs a reason that survives review, and
+# "it was easier" is not one. Adding a line here should feel worse than fixing the code. If a whole
+# class of file keeps needing entries, the stratum map is too coarse — split a stratum in
+# scripts/layering.txt instead (that is how Proofs/Chips/*/{Bridge,Contracts}.lean was handled, and
+# it removed 63 would-be entries).
+#
+#   import    <importer-path> <imported-path>
+#   namespace <path>
+
+# ---------------------------------------------------------------------------
+# 1. DivRem's rich contract. FormalModel/Contracts/DivRem.lean states the four semantic families
+#    against the operation circuits and their soundness, so it reaches stratum 5 from stratum 4.
+#    Moving it out of Contracts/ would take DivRem's contract off the audit surface, which is a
+#    semantic regression, not a layering fix. Reviewed and kept.
+import SP1Clean/FormalModel/Contracts/DivRem.lean SP1Clean/Native/Operations/DivRemOperation/OwnAsserts.lean
+import SP1Clean/FormalModel/Contracts/DivRem.lean SP1Clean/Proofs/Operations/IsEqualWordOperation/Formal.lean
+import SP1Clean/FormalModel/Contracts/DivRem.lean SP1Clean/Proofs/Operations/LtOperationUnsigned/Formal.lean
+import SP1Clean/FormalModel/Contracts/DivRem.lean SP1Clean/Proofs/Operations/MulOperation/Formal.lean
+
+# ---------------------------------------------------------------------------
+# 2. The two documented proof-decomposition exceptions (docs/architecture.md § "Deliberate layering
+#    exceptions", item 1). DivRem and the shifts keep `main` in Proofs/ because their mains are
+#    entangled with proof-layer decomposition; the cost is these two edges.
+import SP1Clean/Proofs/Operations/DivRemOperation/Core.lean SP1Clean/Proofs/Chips/DivRemChip/Extract.lean
+import SP1Clean/Proofs/Chips/BranchChip/Core.lean SP1Clean/Proofs/Chips/BranchChip/Contracts.lean
+
+# ---------------------------------------------------------------------------
+# 3. Namespace exceptions where the PATH is right and the namespace is a deliberate naming choice,
+#    not a placement signal. AGENTS.md sanctions this explicitly for Model/Opcode.lean ("namespace
+#    `SP1Clean.Soundness` per the decoupling rule"): these declarations are *consumed* by the
+#    soundness layer and named for it, while structurally belonging to the substrate — and Model/ is
+#    measurably clean, with zero imports into any higher pillar.
+#
+#    Note this is the case where law 3's premise does NOT hold. It holds for
+#    Faithful/ExtractedInteractionModel.lean, where the namespace records a genuine misplacement;
+#    here it records intended vocabulary. The distinction is why these are entries with reasons
+#    rather than a blanket relaxation of the law.
+namespace SP1Clean/Model/Opcode.lean
+namespace SP1Clean/Model/Machine/Boot.lean
+namespace SP1Clean/Model/Semantics/Decode.lean
+namespace SP1Clean/Model/Semantics/GuestProgram.lean
+namespace SP1Clean/FormalModel/OpcodeTable.lean
+namespace SP1Clean/FormalModel/Trace/Witness.lean

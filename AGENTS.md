@@ -247,9 +247,18 @@ Mirror-rust layout under `SP1Clean/`:
   formerly the top-level `Trace.lean`). The design rationale for the whole-chip semantic boundary is in
   `docs/architecture.md`. The root index is `SP1Clean.lean` — **wire every new module's import there**.
 
-**Namespaces are decoupled from directory paths** — a file's `namespace` (e.g. `SP1Clean.AddChip`,
-`SP1Clean.Word`) does **not** track its directory, so files can be moved between pillars without changing
-any fully-qualified name (only `import` lines and tooling path-globs follow the move). Keep it that way.
+**Namespaces are decoupled from directory paths, below the pillar root** — a file's `namespace` (e.g.
+`SP1Clean.AddChip`, `SP1Clean.Word`) does **not** track its directory, so files can be moved between
+pillars without changing any fully-qualified name (only `import` lines and tooling path-globs follow the
+move). Keep that.
+⚠ **The pillar root is the exception, and it is gated.** If the first `namespace` names a pillar
+(`SP1Clean.Model`, `SP1Clean.Soundness`, …) it must be the pillar the file's stratum expects —
+`scripts/check_layering.sh` fails the build otherwise. The decoupling is what let
+`Faithful/ExtractedInteractionModel.lean` sit in the wrong pillar for months *while declaring
+`namespace SP1Clean.Extracted`*, which put `Interaction.toAccess` out of reach of the completeness
+layer. Where the namespace deliberately records intended vocabulary rather than placement (as
+`Model/Opcode.lean` does), that is an entry in `scripts/layering_allowlist.txt` with a reason, not a
+silent divergence. Full contract: `docs/layering.md`.
 
 **Lake libraries** (`lakefile.toml`): the umbrella `SP1Clean` (the default target — its root index imports
 the whole **main** library, so `lake build` builds all of it) plus per-pillar build-targets `SP1Math` /

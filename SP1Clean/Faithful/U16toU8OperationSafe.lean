@@ -4,7 +4,7 @@ import SP1Clean.Native.Operations.U16toU8OperationSafe
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
 import ToClean.Circuit.InteractionRecovery
-import SP1Clean.Faithful.ExtractedInteractionModel
+import SP1Clean.Extracted.InteractionModel
 import SP1Clean.Extracted.U16toU8OperationSafe
 
 /-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (U16toU8 safe)
